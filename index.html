@@ -395,6 +395,14 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
 
   <!-- ===================== 차트 ===================== -->
   <div class="grid">
+    <section class="card c12">
+      <div class="card-head">
+        <div class="t"><h2>월별 종합 장표</h2><p class="cap" id="capMx">사업라인 × 월 인식 금액 · 합계 · 전년 대비</p></div>
+        <div class="seg" id="segMxYear"></div>
+      </div>
+      <div class="tbl-wrap" style="max-height:none"><table id="tMx"></table></div>
+    </section>
+
     <section class="card c8">
       <div class="card-head">
         <div class="t">
@@ -1189,7 +1197,84 @@ function renderAll(){
   renderExpiring(list);
   renderLg();
   renderVs();
+  renderMatrix(list);
   renderAllTable(list);
+}
+
+/* ---- 월별 종합 장표 (시트 첫 장표 스타일) ---- */
+var MX_YEAR=null;
+function renderMatrix(list){
+  list=list||idxs();
+  var years={};
+  for(var i=0;i<M;i++) years[yOf(i)]=1;
+  var ys=Object.keys(years).map(Number).sort();
+  if(MX_YEAR==null) MX_YEAR=yOf(STATE.base);
+
+  // 연도 선택 버튼
+  var seg=$('#segMxYear');
+  if(seg && !seg._built){
+    seg._built=1;
+    ys.forEach(function(y){
+      var b=document.createElement('button');
+      b.textContent=String(y); b.dataset.y=y;
+      b.onclick=function(){ MX_YEAR=+this.dataset.y; renderMatrix(); };
+      seg.appendChild(b);
+    });
+  }
+  if(seg) seg.querySelectorAll('button').forEach(function(b){
+    b.setAttribute('aria-pressed', +b.dataset.y===MX_YEAR?'true':'false');
+  });
+
+  var Y=MX_YEAR;
+  $('#capMx').textContent = Y+'년 · 월별 인식 금액 · 미래 월은 계약상 예정';
+
+  // 라인×월 집계
+  var lines=DATA.lines.map(function(l){return l.label;}).filter(function(lb){return STATE.lines[lb];});
+  function cell(lb,y,m){
+    var idx=(y-2020)*12+(m-6);
+    if(idx<0||idx>=M) return 0;
+    var s=0;
+    list.forEach(function(k){ if(!lb || DATA.rows[k].line===lb) s+=MAT[k][idx]; });
+    return s;
+  }
+  function num(v){ return v? Math.round(v/10000).toLocaleString('ko-KR') : '·'; }
+
+  var t=$('#tMx'); t.innerHTML='';
+  var thead=document.createElement('thead');
+  var h='<tr><th>구분</th>';
+  for(var m=1;m<=12;m++) h+='<th class="n">'+m+'월</th>';
+  h+='<th class="n" style="border-left:1px solid var(--ring)">연 합계</th><th class="n">전년비</th></tr>';
+  thead.innerHTML=h;
+  t.appendChild(thead);
+
+  var tb=document.createElement('tbody');
+  var nowI=STATE.base;
+  function rowHtml(label, lb, strong){
+    var sum=0, prev=0, tds='';
+    for(var m=1;m<=12;m++){
+      var v=cell(lb,Y,m); sum+=v;
+      var idx=(Y-2020)*12+(m-6);
+      var fut=idx>nowI;
+      tds+='<td class="n"'+(fut?' style="color:var(--muted)"':'')+'>'+num(v)+'</td>';
+    }
+    for(var m2=1;m2<=12;m2++) prev+=cell(lb,Y-1,m2);
+    var yoy=prev? ((sum-prev)/prev*100) : null;
+    var yoyTxt=yoy==null? '—' : (yoy>=0?'+':'')+yoy.toFixed(1)+'%';
+    var yoyCls=yoy==null? '' : (yoy>=0?'up':'down');
+    var tr=document.createElement('tr');
+    if(strong) tr.style.cssText='font-weight:700;border-top:2px solid var(--axis);background:var(--surface-2)';
+    tr.innerHTML='<td>'+esc(label)+'</td>'+tds+
+      '<td class="n" style="border-left:1px solid var(--ring);font-weight:650">'+num(sum)+'</td>'+
+      '<td class="n '+yoyCls+'">'+yoyTxt+'</td>';
+    tb.appendChild(tr);
+  }
+  lines.forEach(function(lb){ rowHtml(lb, lb, false); });
+  rowHtml('합계', null, true);
+  t.appendChild(tb);
+
+  // 단위 안내
+  var cap=$('#capMx');
+  cap.textContent = Y+'년 · 단위: 만원 · 미래 월은 계약상 예정 금액 (회색)';
 }
 
 /* ---- LG U+ 경유 판매 ---- */
