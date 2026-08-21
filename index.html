@@ -882,13 +882,48 @@ function idxDate(i){  // 인덱스 → 'YYYY-MM-01'
 
 var SB_RAW={customers:[],contracts:[]};   // 편집 화면에서 재사용
 
+function sbYm(v){ return v? String(v).slice(0,7):''; }
+async function sbTry(q){ try{ return await sbAll(q); }catch(e){ return null; } }
+
+function shapeLive(rows){
+  if(!rows||!rows.length) return null;
+  var out=rows.map(function(r){ return {ind:r.industry||'미분류',cust:r.name,key:r.mss_key||'',
+    prod:r.product||'미분류',line:r.line||'',nodes:Number(r.nodes)||0,
+    start:sbYm(r.start_month),end:sbYm(r.end_month),churnMon:sbYm(r.churn_month),dup:!!r.dup}; });
+  var uq={},uqND={};
+  out.forEach(function(x){ uq[x.cust]=1; if(!x.dup)uqND[x.cust]=1; });
+  return {ok:true,count:out.length,uniq:Object.keys(uq).length,uniqNoDup:Object.keys(uqND).length,rows:out};
+}
+function shapeLg(rows){
+  if(!rows||!rows.length) return null;
+  var fee=0;
+  var out=rows.map(function(r){ fee+=Number(r.monthly_fee)||0;
+    return {cust:r.customer,partner:r.partner||'',prod:r.product||'',nodes:Number(r.nodes)||0,
+      start:sbYm(r.start_month),end:sbYm(r.end_month),months:Number(r.months)||0,fee:Number(r.monthly_fee)||0}; });
+  return {ok:true,count:out.length,feeSum:fee,rows:out};
+}
+function shapeVs(rows){
+  if(!rows||!rows.length) return null;
+  var items=[],details=[],ym='',asOf='';
+  rows.forEach(function(r){
+    ym=r.ym||ym; asOf=r.as_of? String(r.as_of).slice(0,10):asOf;
+    if(r.kind==='sum') items.push({k:r.item,v:Number(r.biz)||0});
+    else details.push({cust:r.item,biz:Number(r.biz)||0,sheet:Number(r.sheet)||0,diff:Number(r.diff)||0,note:r.note||''});
+  });
+  return {ok:true,asOf:asOf,month:ym,items:items,details:details};
+}
+
 async function loadFromDb(){
   var res=await Promise.all([
     sbAll('customers?select=id,name,industry&order=id'),
     sbAll('contracts?select=*&order=id'),
-    sbAll('monthly_revenue?select=contract_id,month,amount&order=contract_id,month')
+    sbAll('monthly_revenue?select=contract_id,month,amount&order=contract_id,month'),
+    sbTry('live_customers?select=*&order=id'),
+    sbTry('lg_sales?select=*&order=id'),
+    sbTry('biz_recon?select=*&order=id')
   ]);
   var custs=res[0], cts=res[1], mrs=res[2];
+  var LIVE=shapeLive(res[3]), LGD=shapeLg(res[4]), VSD=shapeVs(res[5]);
   SB_RAW.customers=custs; SB_RAW.contracts=cts;
   var cMap={}; custs.forEach(function(c){ cMap[c.id]=c; });
 
@@ -932,7 +967,7 @@ async function loadFromDb(){
     todayKey:'', nowIdx: dIdx(now.getFullYear()+'-'+('0'+(now.getMonth()+1)).slice(-2)),
     monthKeys:monthKeys,
     lines:[{label:'Cloud',color:1},{label:'S1',color:2},{label:'MDR',color:3},{label:'PNS',color:4},{label:'MDR_S1',color:5}],
-    rows:rows, warnings:[], live:null, lg:null, vs:null, sheetUrl:''
+    rows:rows, warnings:[], live:LIVE, lg:LGD, vs:VSD, sheetUrl:''
   };
 }
 
