@@ -277,6 +277,45 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
 }
 .demo-flag.on{display:block}
 
+/* ---------- 좌측 메뉴 ---------- */
+body{padding-left:192px}
+.side{
+  position:fixed;left:0;top:0;bottom:0;width:192px;z-index:40;
+  background:var(--surface);border-right:1px solid var(--ring);
+  padding:16px 10px;display:flex;flex-direction:column;gap:3px;overflow:auto;
+}
+.side .logo{font-weight:750;font-size:13.5px;letter-spacing:-.01em;padding:2px 10px 12px;color:var(--ink)}
+.side .logo small{display:block;font-weight:500;font-size:10.5px;color:var(--muted);margin-top:2px}
+.side button{
+  display:flex;gap:9px;align-items:center;width:100%;text-align:left;border:0;background:transparent;
+  color:var(--ink-2);padding:9px 11px;border-radius:9px;font-size:12.5px;cursor:pointer;font-family:inherit;
+}
+.side button:hover{background:var(--surface-2);color:var(--ink)}
+.side button[aria-current="true"]{background:var(--s1);color:#fff}
+.side .grp{font-size:10px;color:var(--muted);letter-spacing:.08em;padding:14px 11px 4px}
+@media (max-width:1000px){
+  body{padding-left:0}
+  .side{position:static;width:auto;flex-direction:row;flex-wrap:wrap;border-right:0;border-bottom:1px solid var(--ring);padding:8px}
+  .side .logo,.side .grp{display:none}
+}
+
+/* ---------- 데이터 관리 그리드 ---------- */
+.dbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.dbar input[type="search"]{height:32px;min-width:220px}
+.dgrid td input,.dgrid td select{
+  height:29px;padding:0 7px;border-radius:7px;border:1px solid var(--ring);
+  background:var(--surface-2);color:var(--ink);font-size:12px;font-family:inherit;width:100%;min-width:70px;outline:none;
+}
+.dgrid td input:focus,.dgrid td select:focus{border-color:var(--s1)}
+.dgrid td input[type="checkbox"]{width:16px;height:16px;min-width:0}
+.dgrid .act button{
+  border:1px solid var(--ring);background:var(--surface-2);color:var(--ink-2);border-radius:7px;
+  padding:4px 9px;font-size:11.5px;cursor:pointer;font-family:inherit;margin-right:4px;
+}
+.dgrid .act button:hover{color:var(--ink);border-color:var(--axis)}
+.dgrid .act .sv{border-color:var(--s1);color:var(--s1)}
+.dgrid .act .dl:hover{border-color:var(--critical);color:var(--critical)}
+
 /* ---------- 입력·수정 모달 ---------- */
 .ovl{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:60;display:none;align-items:flex-start;justify-content:center;padding:6vh 16px}
 .ovl.on{display:flex}
@@ -311,6 +350,18 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
   <div>매출 시트를 읽고 있습니다…</div>
 </div>
 
+<nav class="side hidden" id="side">
+  <div class="logo">서비스사업부<small>매출 관리 시스템</small></div>
+  <button data-v="dash" aria-current="true">📊 대시보드</button>
+  <div class="grp">데이터 관리</div>
+  <button data-v="contracts">📋 계약</button>
+  <button data-v="live">🟢 LIVE 고객사</button>
+  <button data-v="lg">📶 LG 판매</button>
+  <button data-v="biz">⚖️ 비즈포탈 차액</button>
+  <div class="grp">기록</div>
+  <button data-v="log">🕘 변경 이력</button>
+</nav>
+
 <div class="wrap hidden" id="app">
 
   <div class="topbar">
@@ -332,6 +383,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
   </div>
 
   <!-- ===================== 질문 바 ===================== -->
+  <div id="viewDash">
   <section class="ask">
     <div class="ask-row">
       <div class="ask-ico">AI</div>
@@ -492,6 +544,25 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
         <div class="t"><h2>계약 목록</h2><p class="cap" id="capAll">필터 조건에 맞는 전체 계약 · 열 제목을 눌러 정렬</p></div>
       </div>
       <div class="tbl-wrap"><table id="tAll"></table></div>
+    </section>
+  </div>
+
+  </div><!-- /viewDash -->
+
+  <div id="viewData" class="hidden">
+    <section class="card c12">
+      <div class="card-head">
+        <div class="t"><h2 id="dvTitle">데이터</h2><p class="cap" id="dvCap"></p></div>
+      </div>
+      <div class="dbar">
+        <input type="search" id="dvSearch" placeholder="검색…">
+        <button class="pill" id="dvAdd">＋ 행 추가</button>
+        <button class="pill ghost" id="dvReload">↻ 다시 읽기</button>
+        <span class="mini" id="dvMsg"></span>
+        <span class="spacer"></span>
+        <span class="mini" id="dvCount"></span>
+      </div>
+      <div class="tbl-wrap" style="max-height:70vh"><table id="dvTable" class="dgrid"></table></div>
     </section>
   </div>
 
@@ -924,6 +995,7 @@ async function loadFromDb(){
   ]);
   var custs=res[0], cts=res[1], mrs=res[2];
   var LIVE=shapeLive(res[3]), LGD=shapeLg(res[4]), VSD=shapeVs(res[5]);
+  window.RAWX={customers:custs, contracts:cts, live:res[3]||[], lg:res[4]||[], biz:res[5]||[], log:null};
   SB_RAW.customers=custs; SB_RAW.contracts=cts;
   var cMap={}; custs.forEach(function(c){ cMap[c.id]=c; });
 
@@ -972,7 +1044,8 @@ async function loadFromDb(){
 }
 
 function boot(){
-  if(!window.__editInit){ window.__editInit=1; setupEdit(); }
+  if(!window.__editInit){ window.__editInit=1; setupEdit(); setupSide(); }
+  $('#side').classList.remove('hidden');
   loadFromDb().then(function(d){
     if(!d.rows.length && !SB_TOKEN){
       // 읽기가 로그인 전용으로 잠긴 경우
@@ -1204,7 +1277,7 @@ function buildControls(){
 
   $('#periodLabel').textContent = DATA.monthKeys[0]+' ~ '+DATA.monthKeys[M-1]+' · 계약 '+DATA.rows.length.toLocaleString('ko-KR')+'건';
   $('#loadedAt').textContent = '읽은 시각 '+DATA.generatedAt;
-  $('#foot').innerHTML = '원본: 서비스사업부 매출시트 · 이 대시보드는 시트를 읽기만 하며 아무것도 수정하지 않습니다.'+
+  $('#foot').innerHTML = '원본: Supabase DB · 모든 수정은 변경 이력에 기록됩니다 · 수정은 로그인 후 가능'+
     (DATA.warnings&&DATA.warnings.length? '<br>⚠️ '+DATA.warnings.join(' / ') : '');
 }
 function uniq(f){
@@ -2670,6 +2743,265 @@ function showAnswer(q,res){
 /* ==================================================================
    6. 데모 데이터 (Apps Script 밖에서 열었을 때만)
    ================================================================== */
+/* ==================================================================
+   좌측 메뉴 · 데이터 관리 그리드
+   ================================================================== */
+var CUR_VIEW='dash', DIRTY=false;
+
+var LINE_OPTS=['Cloud','S1','MDR','PNS','MDR_S1'];
+var PTN_OPTS=['다원티에스','글로웰시스템','에티버스','직접(계산서)'];
+var IND_OPTS=['기업','공공','금융','의료','미분류'];
+
+var GRIDS={
+  contracts:{
+    title:'계약 관리', table:'contracts',
+    cap:'행의 ✎ 를 눌러 수정 · 월별 인식 금액은 여기서 바뀌지 않습니다 (금액은 ✏️ 입력·수정 사용) · 삭제 불가',
+    add:false, del:false,
+    rows:function(){ return (RAWX.contracts||[]).map(function(c){
+      var cu=(RAWX.customers||[]).filter(function(x){return x.id===c.customer_id;})[0]||{};
+      c._custName=cu.name||'?'; return c; }); },
+    cols:[
+      {k:'_custName',l:'고객사',ro:true},
+      {k:'line',l:'라인',t:'select',opts:LINE_OPTS},
+      {k:'partner',l:'파트너',t:'select',opts:PTN_OPTS},
+      {k:'biller',l:'발행처'},
+      {k:'contract_type',l:'구분'},
+      {k:'status',l:'상태'},
+      {k:'churn_reason',l:'해지사유'},
+      {k:'start_month',l:'시작월',t:'month'},
+      {k:'end_month',l:'종료월',t:'month'},
+      {k:'mrr',l:'MRR(참고)',t:'number'},
+      {k:'note',l:'비고'}
+    ]
+  },
+  live:{
+    title:'LIVE 고객사', table:'live_customers',
+    cap:'서비스 중 사이트 목록 · 고객사 수 질문의 기준 데이터', add:true, del:true,
+    rows:function(){ return RAWX.live||[]; },
+    cols:[
+      {k:'industry',l:'산업군',t:'select',opts:IND_OPTS},
+      {k:'name',l:'고객사',req:true},
+      {k:'product',l:'제품군'},
+      {k:'line',l:'라인',t:'select',opts:LINE_OPTS.concat(['DRM'])},
+      {k:'nodes',l:'노드',t:'number'},
+      {k:'start_month',l:'시작월',t:'month'},
+      {k:'end_month',l:'종료월',t:'month'},
+      {k:'churn_month',l:'해지연월',t:'month'},
+      {k:'dup',l:'중복',t:'bool'},
+      {k:'note',l:'비고'}
+    ]
+  },
+  lg:{
+    title:'LG U+ 판매', table:'lg_sales',
+    cap:'LG 경유 판매 계약 (매출은 각 라인에 포함)', add:true, del:true,
+    rows:function(){ return RAWX.lg||[]; },
+    cols:[
+      {k:'customer',l:'고객사',req:true},
+      {k:'partner',l:'구축파트너'},
+      {k:'product',l:'제품'},
+      {k:'nodes',l:'노드',t:'number'},
+      {k:'start_month',l:'시작월',t:'month'},
+      {k:'end_month',l:'종료월',t:'month'},
+      {k:'months',l:'개월',t:'number'},
+      {k:'monthly_fee',l:'월액(원)',t:'number'}
+    ]
+  },
+  biz:{
+    title:'비즈포탈 차액', table:'biz_recon',
+    cap:'매달 대조 결과 입력 · kind=sum(요약)/detail(고객사별)', add:true, del:true,
+    rows:function(){ return RAWX.biz||[]; },
+    cols:[
+      {k:'ym',l:'월(예:7월)',req:true},
+      {k:'as_of',l:'작성일',t:'date'},
+      {k:'kind',l:'종류',t:'select',opts:['sum','detail']},
+      {k:'item',l:'항목/고객사',req:true},
+      {k:'biz',l:'비즈포탈',t:'number'},
+      {k:'sheet',l:'매출시트',t:'number'},
+      {k:'diff',l:'차이',t:'number'},
+      {k:'note',l:'사유'}
+    ]
+  },
+  log:{
+    title:'변경 이력', table:'change_log',
+    cap:'웹에서 수정한 기록 (최근 300건)', add:false, del:false, ro:true,
+    rows:function(){ return RAWX.log||[]; },
+    cols:[
+      {k:'at',l:'시각',ro:true,fmt:function(v){return String(v||'').replace('T',' ').slice(0,16);}},
+      {k:'actor',l:'누가',ro:true},
+      {k:'action',l:'동작',ro:true},
+      {k:'target',l:'대상',ro:true},
+      {k:'target_id',l:'ID',ro:true},
+      {k:'detail',l:'내용',ro:true,fmt:function(v){return v? JSON.stringify(v).slice(0,80):'';}}
+    ]
+  }
+};
+
+function setupSide(){
+  $('#side').querySelectorAll('button').forEach(function(b){
+    b.onclick=function(){ switchView(this.dataset.v); };
+  });
+  $('#dvSearch').oninput=function(){ renderGrid(); };
+  $('#dvAdd').onclick=function(){ gridAddRow(); };
+  $('#dvReload').onclick=function(){
+    loadFromDb().then(function(nd){ onData(nd); if(CUR_VIEW!=='dash') renderGrid(); });
+  };
+}
+
+function switchView(v){
+  CUR_VIEW=v;
+  $('#side').querySelectorAll('button').forEach(function(b){
+    b.setAttribute('aria-current', b.dataset.v===v?'true':'false');
+  });
+  var dash=v==='dash';
+  $('#viewDash').classList.toggle('hidden',!dash);
+  $('#viewData').classList.toggle('hidden',dash);
+  if(dash){
+    if(DIRTY){ DIRTY=false; loadFromDb().then(onData); }
+    return;
+  }
+  if(v==='log' && !RAWX.log){
+    sbTry('change_log?select=*&order=id.desc&limit=300').then(function(rows){
+      RAWX.log=rows||[]; renderGrid();
+    });
+  }
+  var g=GRIDS[v];
+  $('#dvTitle').textContent=g.title;
+  $('#dvCap').textContent=g.cap;
+  $('#dvAdd').style.display=g.add?'':'none';
+  $('#dvSearch').value='';
+  renderGrid();
+}
+
+function fmtCell(c,v){
+  if(c.fmt) return c.fmt(v);
+  if(v===null||v===undefined||v==='') return '·';
+  if(c.t==='month') return String(v).slice(0,7);
+  if(c.t==='date') return String(v).slice(0,10);
+  if(c.t==='bool') return v? '중복':'·';
+  if(c.t==='number') return Number(v).toLocaleString('ko-KR');
+  return String(v);
+}
+function editCell(c,v){
+  if(c.t==='select'){
+    return '<select data-k="'+c.k+'">'+c.opts.map(function(o){
+      return '<option'+(String(v)===o?' selected':'')+'>'+o+'</option>';}).join('')+'</select>';
+  }
+  if(c.t==='bool') return '<input type="checkbox" data-k="'+c.k+'"'+(v?' checked':'')+'>';
+  var ty=c.t==='month'?'month':c.t==='date'?'date':c.t==='number'?'number':'text';
+  var val=v==null?'':(c.t==='month'?String(v).slice(0,7):c.t==='date'?String(v).slice(0,10):v);
+  return '<input type="'+ty+'" data-k="'+c.k+'" value="'+esc(String(val))+'">';
+}
+function readRowInputs(tr,g){
+  var body={};
+  tr.querySelectorAll('[data-k]').forEach(function(inp){
+    var c=g.cols.filter(function(x){return x.k===inp.dataset.k;})[0];
+    var v;
+    if(c.t==='bool') v=inp.checked;
+    else if(c.t==='number') v=inp.value===''? null: Number(inp.value);
+    else if(c.t==='month') v=inp.value? inp.value+'-01': null;
+    else if(c.t==='date') v=inp.value||null;
+    else v=inp.value.trim()||null;
+    if(c.req && (v===null||v==='')) throw new Error('「'+c.l+'」 은 필수입니다.');
+    body[c.k]=v;
+  });
+  return body;
+}
+
+function renderGrid(){
+  var g=GRIDS[CUR_VIEW]; if(!g) return;
+  var q=($('#dvSearch').value||'').toLowerCase();
+  var rows=g.rows().filter(function(r){
+    if(!q) return true;
+    return g.cols.some(function(c){ return String(r[c.k]==null?'':r[c.k]).toLowerCase().indexOf(q)>=0; });
+  });
+  $('#dvCount').textContent=rows.length.toLocaleString('ko-KR')+'행'+(rows.length>300?' · 상위 300만 표시':'');
+  var t=$('#dvTable'); t.innerHTML='';
+  var thead=document.createElement('thead');
+  thead.innerHTML='<tr>'+g.cols.map(function(c){return '<th>'+c.l+'</th>';}).join('')+(g.ro?'':'<th style="width:110px"></th>')+'</tr>';
+  t.appendChild(thead);
+  var tb=document.createElement('tbody');
+  rows.slice(0,300).forEach(function(r){ tb.appendChild(gridRow(r,g,false)); });
+  t.appendChild(tb);
+}
+
+function gridRow(r,g,editing){
+  var tr=document.createElement('tr');
+  function view(){
+    tr.innerHTML=g.cols.map(function(c){
+      var n=c.t==='number'?' class="n"':'';
+      return '<td'+n+'>'+esc(fmtCell(c,r[c.k]))+'</td>';
+    }).join('')+(g.ro?'':'<td class="act"></td>');
+    if(!g.ro){
+      var act=tr.lastChild;
+      var be=document.createElement('button'); be.textContent='✎';
+      be.onclick=function(){ edit(); };
+      act.appendChild(be);
+      if(g.del){
+        var bd=document.createElement('button'); bd.textContent='🗑'; bd.className='dl';
+        bd.onclick=function(){
+          if(!SB_TOKEN){ openOvl('ovlAuth'); return; }
+          if(!confirm('이 행을 삭제할까요?\n'+g.cols.slice(0,2).map(function(c){return r[c.k];}).join(' · '))) return;
+          sbWrite('DELETE',g.table+'?id=eq.'+r.id).then(function(){
+            logChange('delete',g.table,r.id,{});
+            var arr=g.rows(); var i=(RAWX[CUR_VIEW]||[]).indexOf(r); if(i>=0) RAWX[CUR_VIEW].splice(i,1);
+            DIRTY=true; renderGrid();
+          }).catch(function(e){ $('#dvMsg').textContent=String(e.message||e); });
+        };
+        act.appendChild(bd);
+      }
+    }
+  }
+  function edit(){
+    tr.innerHTML=g.cols.map(function(c){
+      return '<td>'+(c.ro? esc(fmtCell(c,r[c.k])) : editCell(c,r[c.k]))+'</td>';
+    }).join('')+'<td class="act"></td>';
+    var act=tr.lastChild;
+    var bs=document.createElement('button'); bs.textContent='저장'; bs.className='sv';
+    bs.onclick=function(){
+      if(!SB_TOKEN){ openOvl('ovlAuth'); return; }
+      try{
+        var body=readRowInputs(tr,g);
+        sbWrite('PATCH',g.table+'?id=eq.'+r.id,body).then(function(){
+          Object.keys(body).forEach(function(k){ r[k]=body[k]; });
+          logChange('update',g.table,r.id,body);
+          DIRTY=true; $('#dvMsg').textContent='저장됨 ✅';
+          view();
+        }).catch(function(e){ $('#dvMsg').textContent=String(e.message||e); });
+      }catch(e){ $('#dvMsg').textContent=String(e.message||e); }
+    };
+    var bc=document.createElement('button'); bc.textContent='취소';
+    bc.onclick=view;
+    act.appendChild(bs); act.appendChild(bc);
+  }
+  if(editing) edit(); else view();
+  return tr;
+}
+
+function gridAddRow(){
+  var g=GRIDS[CUR_VIEW]; if(!g||!g.add) return;
+  if(!SB_TOKEN){ openOvl('ovlAuth'); return; }
+  var t=$('#dvTable'); var tb=t.querySelector('tbody'); if(!tb) return;
+  var tr=document.createElement('tr');
+  tr.innerHTML=g.cols.map(function(c){ return '<td>'+editCell(c,null)+'</td>'; }).join('')+'<td class="act"></td>';
+  var act=tr.lastChild;
+  var bs=document.createElement('button'); bs.textContent='추가'; bs.className='sv';
+  bs.onclick=function(){
+    try{
+      var body=readRowInputs(tr,g);
+      sbWrite('POST',g.table+'?select=*',[body],'return=representation').then(function(rows){
+        RAWX[CUR_VIEW]=RAWX[CUR_VIEW]||[]; RAWX[CUR_VIEW].push(rows[0]);
+        logChange('insert',g.table,rows[0].id,body);
+        DIRTY=true; $('#dvMsg').textContent='추가됨 ✅';
+        renderGrid();
+      }).catch(function(e){ $('#dvMsg').textContent=String(e.message||e); });
+    }catch(e){ $('#dvMsg').textContent=String(e.message||e); }
+  };
+  var bc=document.createElement('button'); bc.textContent='취소'; bc.onclick=function(){ tr.remove(); };
+  act.appendChild(bs); act.appendChild(bc);
+  tb.insertBefore(tr, tb.firstChild);
+  tr.querySelector('input,select') && tr.querySelector('input,select').focus();
+}
+
 /* ==================================================================
    입력·수정 (Supabase 쓰기)
    ================================================================== */
