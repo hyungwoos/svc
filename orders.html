@@ -178,7 +178,7 @@ td select{height:30px;font-size:12px;width:auto;min-width:96px}
   <div id="paneAst" class="hidden">
   <div class="card">
     <h2>장비 자산 현황</h2>
-    <p class="cap">시리얼 단위 자산 마스터 — 요청 상태를 「설치완료」로 바꾸면 자동으로 임대중, 「회수완료」면 재고로 돌아옵니다</p>
+    <p class="cap">시리얼 단위 자산 마스터 — 요청 상태를 「설치완료」로 바꾸면 자동으로 임대중, 「회수완료」면 자동으로 회수완료 처리됩니다</p>
     <div class="chips" id="astChips"></div>
     <div style="display:flex;gap:10px;margin-bottom:12px;align-items:center;flex-wrap:wrap">
       <input id="aq" type="search" placeholder="시리얼·고객사·모델 검색…" style="max-width:260px;height:33px">
@@ -197,7 +197,7 @@ var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var TOKEN=null, USER=null, ORDERS=[], ASSETS=[], AFILTER='';
 var STATUSES=['접수','출하요청','배송중','설치완료','회수예정','회수완료','취소'];
-var ASTATUS=['재고','임대중','수리중','분실','폐기'];
+var ASTATUS=['재고','임대중','회수완료','수리중','분실','폐기'];
 function today(){ return new Date().toISOString().slice(0,10); }
 function parseSerials(s){ return String(s||'').split(/[,\s]+/).filter(function(x){return x;}); }
 
@@ -301,8 +301,8 @@ async function syncAssets(r, st){
   }
   if(st==='회수완료'){
     await api('PATCH','equipment_assets?serial=in.('+ser.map(encodeURIComponent).join(',')+')',
-      {status:'재고',customer:null,returned_date:today(),order_id:r.id,updated_at:new Date().toISOString()});
-    return ' · 자산 '+ser.length+'대 → 재고';
+      {status:'회수완료',customer:null,returned_date:today(),order_id:r.id,updated_at:new Date().toISOString()});
+    return ' · 자산 '+ser.length+'대 → 회수완료';
   }
   return '';
 }
@@ -341,9 +341,9 @@ function renderAssets(){
     sel.className='badge st-'+(a.status||'재고');
     sel.onchange=async function(){
       var body={status:this.value,updated_at:new Date().toISOString()};
-      if(this.value==='재고'){ body.customer=null; body.returned_date=today(); }
+      if(this.value==='회수완료'){ body.customer=null; body.returned_date=today(); }
       try{ await api('PATCH','equipment_assets?id=eq.'+a.id,body);
-        a.status=this.value; if(this.value==='재고'){a.customer=null;a.returned_date=today();} renderAssets();
+        a.status=this.value; if(this.value==='회수완료'){a.customer=null;a.returned_date=today();} renderAssets();
       }catch(e){ alert('저장 실패: '+e.message); }
     };
     tr.children[2].appendChild(sel);
