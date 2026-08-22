@@ -1490,23 +1490,25 @@ function renderGoal(list){
   var yr=yOf(STATE.base);
   var tg=(RAWX.targets||[]).filter(function(t){return +t.year===yr;})[0];
   if(!tg||!tg.amount){ box.style.display='none'; return; }
-  var done=0, plan=0;
-  for(var i=0;i<M;i++){
-    if(yOf(i)!==yr) continue;
-    var v=monthlyTotal(list,i);
-    plan+=v;
-    if(i<=STATE.base) done+=v;
-  }
-  var p1=Math.min(100,done/tg.amount*100), p2=Math.min(100,plan/tg.amount*100);
+
+  // 목표 = 그 해 연말 ARR (12월 MRR × 12)
+  var curArr = monthlyTotal(list, STATE.base) * 12;          // 현재 ARR
+  var decIdx = (yr - 2020) * 12 + (12 - 6);                  // 그 해 12월 인덱스
+  var decArr = (decIdx >= 0 && decIdx < M) ? monthlyTotal(list, decIdx) * 12 : 0;  // 연말 예정 ARR (계약 기준)
+  var p1=Math.min(100,curArr/tg.amount*100), p2=Math.min(100,decArr/tg.amount*100);
+  var needMrr = tg.amount / 12;                              // 달성에 필요한 12월 MRR
+
   box.style.display='';
   box.innerHTML=
     '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:9px">'+
-      '<div style="font-size:12.5px;font-weight:650">🎯 '+yr+'년 목표 '+won(tg.amount)+'원</div>'+
-      '<div style="font-size:12px;color:var(--ink-2)">실적 <b style="color:var(--ink)">'+won(done)+'원 ('+p1.toFixed(1)+'%)</b>'+
-      ' · 계약분 포함 전망 '+won(plan)+'원 ('+p2.toFixed(1)+'%)</div></div>'+
+      '<div style="font-size:12.5px;font-weight:650">🎯 '+yr+'년 목표 ARR '+won(tg.amount)+'원'+
+        '<span style="font-weight:500;color:var(--muted)"> · 필요 12월 MRR '+won(needMrr)+'원</span></div>'+
+      '<div style="font-size:12px;color:var(--ink-2)">현재 ARR <b style="color:var(--ink)">'+won(curArr)+'원 ('+p1.toFixed(1)+'%)</b>'+
+      (decArr? ' · 12월 계약분 기준 '+won(decArr)+'원 ('+p2.toFixed(1)+'%)':'')+'</div></div>'+
     '<div style="position:relative;height:14px;border-radius:7px;background:var(--surface-2);overflow:hidden">'+
-      '<div style="position:absolute;left:0;top:0;bottom:0;width:'+p2+'%;background:var(--glow)"></div>'+
-      '<div style="position:absolute;left:0;top:0;bottom:0;width:'+p1+'%;background:var(--s1);border-radius:0 7px 7px 0"></div>'+
+      '<div style="position:absolute;left:0;top:0;bottom:0;width:'+Math.max(p1,p2)+'%;background:var(--glow)"></div>'+
+      '<div style="position:absolute;left:0;top:0;bottom:0;width:'+p1+'%;background:'+(p1>=100?'var(--good)':'var(--s1)')+';border-radius:0 7px 7px 0"></div>'+
+      '<div style="position:absolute;left:calc(100% - 2px);top:0;bottom:0;width:2px;background:var(--axis)"></div>'+
     '</div>';
 }
 
@@ -2900,12 +2902,16 @@ var GRIDS={
     ]
   },
   targets:{
-    title:'연간 목표', table:'targets',
-    cap:'연도별 목표 금액 — 대시보드 상단 달성률 게이지의 기준', add:true, del:true,
+    title:'연간 목표 (ARR 기준)', table:'targets',
+    cap:'목표 = 그 해 연말 ARR (12월 MRR × 12). 예: 2026년 목표 13억 = 12월 MRR 1.083억 달성 시 100%', add:true, del:true,
     rows:function(){ return RAWX.targets||[]; },
     cols:[
-      {k:'year',l:'연도',t:'number',req:true},
-      {k:'amount',l:'목표 금액(원)',t:'number',req:true},
+      {k:'year',l:'연도',t:'select',num:true,req:true,opts:function(){
+        var ys=[], y0=new Date().getFullYear();
+        for(var y=2020;y<=y0+5;y++) ys.push(String(y));
+        return ys;
+      }},
+      {k:'amount',l:'목표 ARR(원)',t:'number',req:true},
       {k:'note',l:'메모'}
     ]
   },
@@ -2973,7 +2979,8 @@ function fmtCell(c,v){
 }
 function editCell(c,v){
   if(c.t==='select'){
-    return '<select data-k="'+c.k+'">'+c.opts.map(function(o){
+    var opts=typeof c.opts==='function'? c.opts():c.opts;
+    return '<select data-k="'+c.k+'">'+opts.map(function(o){
       return '<option'+(String(v)===o?' selected':'')+'>'+o+'</option>';}).join('')+'</select>';
   }
   if(c.t==='bool') return '<input type="checkbox" data-k="'+c.k+'"'+(v?' checked':'')+'>';
@@ -2987,6 +2994,7 @@ function readRowInputs(tr,g){
     var c=g.cols.filter(function(x){return x.k===inp.dataset.k;})[0];
     var v;
     if(c.t==='bool') v=inp.checked;
+    else if(c.t==='select' && c.num) v=Number(inp.value);
     else if(c.t==='number') v=inp.value===''? null: Number(inp.value);
     else if(c.t==='month') v=inp.value? inp.value+'-01': null;
     else if(c.t==='date') v=inp.value||null;
