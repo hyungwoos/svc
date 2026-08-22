@@ -613,7 +613,7 @@ body{padding-left:192px}
     <div class="mact">
       <span class="mmsg" id="auMsg"></span>
       <button class="pill ghost" id="auLogout" style="display:none;border-color:var(--critical);color:var(--critical)">로그아웃</button>
-      <button class="pill ghost" onclick="closeOvl('ovlAuth')">닫기</button>
+      <button class="pill ghost" id="auClose" onclick="closeOvl('ovlAuth')">닫기</button>
       <button class="btn" style="height:36px" id="auGo">로그인</button>
     </div>
   </div>
@@ -3257,10 +3257,26 @@ async function doLogin(){
     $('#btnAuth').textContent=AUTH_USER.split('@')[0]+' ▾';
     $('#btnAuth').title='비밀번호 변경 · 로그아웃';
     msg('auMsg','');
+
+    // 최초 로그인(비밀번호 미변경) 확인 — user_metadata.pw_changed 플래그
+    var changed = j.user && j.user.user_metadata && j.user.user_metadata.pw_changed;
+    if(!changed){
+      FORCE_PW = true;
+      setAuthTab('pw');
+      $('#auTabs').style.display='none';
+      $('#auClose').style.display='none';
+      $('#auLogout').style.display='';
+      msg('auMsg','최초 로그인입니다 — 본인 비밀번호로 변경해야 사용할 수 있습니다','bad');
+      setTimeout(function(){ $('#apPw').focus(); },50);
+      loadFromDb().then(onData).catch(onErr);   // 뒤에서 미리 로드 (모달이 막고 있음)
+      return;
+    }
     closeOvl('ovlAuth');
     loadFromDb().then(onData).catch(onErr);
   }catch(e){ msg('auMsg',String(e.message||e),'bad'); }
 }
+
+var FORCE_PW=false;
 
 async function doPwChange(){
   if(!SB_TOKEN) return msg('auMsg','먼저 「로그인」 탭에서 로그인하세요','bad');
@@ -3271,12 +3287,18 @@ async function doPwChange(){
   try{
     var r=await fetch(SB_URL+'/auth/v1/user',{
       method:'PUT', headers:{apikey:SB_KEY,'Content-Type':'application/json',Authorization:'Bearer '+SB_TOKEN},
-      body:JSON.stringify({password:p1})
+      body:JSON.stringify({password:p1, data:{pw_changed:true}})
     });
     var j=await r.json();
     if(!r.ok) throw new Error(j.error_description||j.msg||'변경 실패');
     $('#apPw').value=$('#apPw2').value='';
     msg('auMsg','비밀번호를 변경했습니다 ✅','ok');
+    if(FORCE_PW){
+      FORCE_PW=false;
+      $('#auTabs').style.display='';
+      $('#auClose').style.display='';
+      setTimeout(function(){ closeOvl('ovlAuth'); },700);
+    }
   }catch(e){ msg('auMsg',String(e.message||e),'bad'); }
 }
 
@@ -3296,6 +3318,8 @@ function setupAuth(){
     if(SB_TOKEN){
       // 로그인 상태: 계정 창을 비밀번호 변경 탭으로 열기
       setAuthTab('pw');
+      $('#auTabs').style.display='';
+      $('#auClose').style.display='';
       $('#auTabs').querySelector('[data-t="login"]').style.display='none';
       $('#auLogout').style.display='';
       openOvl('ovlAuth');
