@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ko" data-theme="dark">
+<html lang="ko" data-theme="light">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -359,6 +359,8 @@ body{padding-left:192px}
   <button data-v="lg">📶 LG 판매</button>
   <button data-v="biz">⚖️ 비즈포탈 차액</button>
   <button data-v="targets">🎯 연간 목표</button>
+  <div class="grp">도구</div>
+  <button data-v="quote">📄 견적 시스템</button>
   <div class="grp">기록</div>
   <button data-v="log">🕘 변경 이력</button>
 </nav>
@@ -567,6 +569,17 @@ body{padding-left:192px}
       </div>
       <div class="tbl-wrap" style="max-height:70vh"><table id="dvTable" class="dgrid"></table></div>
       <div id="dvPager" style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:12px"></div>
+    </section>
+  </div>
+
+  <div id="viewQuote" class="hidden">
+    <section class="card c12" style="padding:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px 10px">
+        <div style="font-size:13px;font-weight:650">📄 견적 시스템</div>
+        <a href="quote.html" target="_blank" class="pill ghost" style="text-decoration:none">↗ 새 창에서 열기</a>
+      </div>
+      <iframe id="quoteFrame" title="견적 시스템"
+        style="width:100%;height:calc(100vh - 150px);border:0;border-radius:10px;background:#525659"></iframe>
     </section>
   </div>
 
@@ -2947,9 +2960,15 @@ function switchView(v){
   $('#side').querySelectorAll('button').forEach(function(b){
     b.setAttribute('aria-current', b.dataset.v===v?'true':'false');
   });
-  var dash=v==='dash';
+  var dash=v==='dash', quote=v==='quote';
   $('#viewDash').classList.toggle('hidden',!dash);
-  $('#viewData').classList.toggle('hidden',dash);
+  $('#viewQuote').classList.toggle('hidden',!quote);
+  $('#viewData').classList.toggle('hidden',dash||quote);
+  if(quote){
+    var fr=$('#quoteFrame');
+    if(!fr.src) fr.src='quote.html';
+    return;
+  }
   if(dash){
     if(DIRTY){ DIRTY=false; loadFromDb().then(onData); }
     return;
