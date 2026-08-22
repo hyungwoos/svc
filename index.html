@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ko" data-theme="light">
+<html lang="ko" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -592,7 +592,6 @@ body{padding-left:192px}
     <h3>계정</h3>
     <div class="mtabs" id="auTabs">
       <button data-t="login" aria-pressed="true">로그인</button>
-      <button data-t="join">회원가입</button>
       <button data-t="pw">비밀번호 변경</button>
     </div>
 
@@ -603,17 +602,8 @@ body{padding-left:192px}
       </div>
     </div>
 
-    <div id="auTabJoin" style="display:none">
-      <p class="cap">회사 이메일로 가입합니다. 관리자가 Supabase에서 가입 허용을 꺼둔 경우 가입되지 않습니다.</p>
-      <div class="frm">
-        <div class="full"><label>이메일</label><input id="ajEmail" type="email" autocomplete="username"></div>
-        <div><label>비밀번호 (6자 이상)</label><input id="ajPw" type="password" autocomplete="new-password"></div>
-        <div><label>비밀번호 확인</label><input id="ajPw2" type="password" autocomplete="new-password"></div>
-      </div>
-    </div>
-
     <div id="auTabPw" style="display:none">
-      <p class="cap">로그인된 계정의 비밀번호를 바꿉니다. (먼저 로그인하세요)</p>
+      <p class="cap">관리자에게 받은 계정으로 먼저 로그인한 뒤, 여기서 본인 비밀번호로 바꾸세요.</p>
       <div class="frm">
         <div><label>새 비밀번호 (6자 이상)</label><input id="apPw" type="password" autocomplete="new-password"></div>
         <div><label>새 비밀번호 확인</label><input id="apPw2" type="password" autocomplete="new-password"></div>
@@ -3261,29 +3251,6 @@ async function doLogin(){
   }catch(e){ msg('auMsg',String(e.message||e),'bad'); }
 }
 
-async function doJoin(){
-  var em=$('#ajEmail').value.trim(), p1=$('#ajPw').value, p2=$('#ajPw2').value;
-  if(!em||p1.length<6) return msg('auMsg','이메일과 6자 이상 비밀번호를 입력하세요','bad');
-  if(p1!==p2) return msg('auMsg','비밀번호 확인이 일치하지 않습니다','bad');
-  msg('auMsg','가입 중…');
-  try{
-    var r=await fetch(SB_URL+'/auth/v1/signup',{
-      method:'POST', headers:{apikey:SB_KEY,'Content-Type':'application/json'},
-      body:JSON.stringify({email:em, password:p1})
-    });
-    var j=await r.json();
-    if(!r.ok) throw new Error(j.error_description||j.msg||'가입 실패 (관리자가 가입을 꺼두었을 수 있습니다)');
-    if(j.access_token){
-      SB_TOKEN=j.access_token; AUTH_USER=em;
-      $('#btnAuth').textContent=em.split('@')[0]+' · 로그아웃';
-      msg('auMsg','가입 완료 ✅','ok');
-      setTimeout(function(){ closeOvl('ovlAuth'); loadFromDb().then(onData).catch(onErr); },600);
-    } else {
-      msg('auMsg','가입 요청 완료 — 이메일 인증 메일을 확인하세요','ok');
-    }
-  }catch(e){ msg('auMsg',String(e.message||e),'bad'); }
-}
-
 async function doPwChange(){
   if(!SB_TOKEN) return msg('auMsg','먼저 「로그인」 탭에서 로그인하세요','bad');
   var p1=$('#apPw').value, p2=$('#apPw2').value;
@@ -3308,16 +3275,15 @@ function setAuthTab(t){
     b.setAttribute('aria-pressed', b.dataset.t===t?'true':'false');
   });
   $('#auTabLogin').style.display = t==='login'?'':'none';
-  $('#auTabJoin').style.display = t==='join'?'':'none';
   $('#auTabPw').style.display = t==='pw'?'':'none';
-  $('#auGo').textContent = t==='login'?'로그인': t==='join'?'가입':'변경';
+  $('#auGo').textContent = t==='login'?'로그인':'변경';
   msg('auMsg','');
 }
 
 function setupAuth(){
   $('#btnAuth').onclick=function(){
     if(SB_TOKEN){
-      if(confirm('로그아웃할까요?')){ SB_TOKEN=null; AUTH_USER=null; this.textContent='로그인'; }
+      if(confirm('로그아웃할까요?')){ SB_TOKEN=null; AUTH_USER=null; location.reload(); }
       return;
     }
     setAuthTab('login');
@@ -3329,11 +3295,10 @@ function setupAuth(){
   });
   $('#auGo').onclick=function(){
     if(AU_TAB==='login') doLogin();
-    else if(AU_TAB==='join') doJoin();
     else doPwChange();
   };
   // Enter 로 제출
-  ['auEmail','auPw','ajEmail','ajPw','ajPw2','apPw','apPw2'].forEach(function(id){
+  ['auEmail','auPw','apPw','apPw2'].forEach(function(id){
     var el0=$('#'+id); if(!el0) return;
     el0.addEventListener('keydown',function(e){
       if(e.key==='Enter'){ e.preventDefault(); $('#auGo').click(); }
