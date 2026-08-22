@@ -1331,9 +1331,9 @@ function buildControls(){
   $('#btnAsk').onclick=function(){ ask($('#q').value); };
   setupSuggest();
 
-  var samples=['올해 매출 어때?','요즘 클라우드 좀 어때?','제일 큰 고객 누구야?','작년보다 얼마나 늘었어?',
-    '곧 재약정 챙겨야 할 데 있어?','왜 이렇게 많이 해지했지?','다원티에스랑 글로웰시스템 중에 누가 더 커?',
-    '공공 비중이 얼마나 돼?','최근 6개월 추이 보여줘','제일 큰 계약 5개'];
+  var samples=['이번 달 매출','이번 분기 실적','올해 매출 어때?','분기별 비교','연도별 매출',
+    '작년이랑 비교','파트너별 실적','live 고객사 수','곧 재약정 챙겨야 할 데 있어?',
+    '왜 이렇게 많이 해지했지?','제일 큰 고객 누구야?','제일 큰 계약 5개'];
   var cb=$('#chips'); cb.innerHTML='';
   samples.forEach(function(s){ var c=el('button','chip',s); c.onclick=function(){ $('#q').value=s; ask(s); }; cb.appendChild(c); });
 
@@ -2171,12 +2171,16 @@ function parseRaw(q){
   var ry = raw.match(/(?:최근|지난)\s*(\d{1,2})\s*년(?!\s*\d)/);
   if (!p.relN && ry) { p.relN = Math.min(120, +ry[1] * 12); hit(); }
   if (!p.relN && p.from == null && RX.allTime.test(s)) { p.from = 0; p.to = STATE.base; hit(); }
-  if (!p.relN && !p.from && /요즘|최근에|근래|요새|최근/.test(raw) && !/20\d{2}/.test(raw)) { p.relN = 6; hit(); }
+  if (!p.relN && !p.from && /요즘|최근에|근래|요새|최근|현재|지금(?!까지)/.test(raw) && !/20\d{2}/.test(raw)) { p.relN = 6; p._recentAuto = true; hit(); }
   if (RX.avg.test(s)) { p.avg = true; hit(); }
 
   /* ---- 연도 ---- */
   if (p.from == null && !p.relN) {
     (raw.match(/20\d{2}/g) || []).forEach(function(y){ p.years.push(+y); hit(); });
+    (raw.match(/(?:^|[^0-9])([23][0-9])\s*년/g) || []).forEach(function(x){
+      var v = +x.replace(/\D/g, '');
+      if (v >= 20 && v <= 35) { p.years.push(2000 + v); hit(); }
+    });
     if (/올해|금년|이번\s*해|당해|올\s*한\s*해|올\s*들어|연초부터|연초\s*이후/.test(raw)) { p.years.push(nowY); hit(); }
     if (/재작년/.test(raw)) { p.years.push(nowY - 2); hit(); }
     else if (/작년|지난해|전년/.test(raw)) { p.years.push(nowY - 1); hit(); }
@@ -2195,6 +2199,8 @@ function parseRaw(q){
     if (mm && !rg) mm.forEach(function(x){ var v = +x.replace(/\D/g,''); if (v >= 1 && v <= 12) { p.months.push(v); hit(); } });
     if (/이번\s*달|당월|금월|이달/.test(raw)) { p.months.push(nowM); hit(); }
     if (/지난\s*달|전월|저번\s*달/.test(raw)) { p.months.push(nowM === 1 ? 12 : nowM - 1); hit(); }
+    var qms = raw.match(/[1-4]\s*분기/g) || [];
+    p.quarters = qms.map(function(x){ return +x.replace(/\D/g,''); }).filter(function(v,i,a){ return a.indexOf(v)===i; });
     var qm = raw.match(/([1-4])\s*분기|Q\s*([1-4])/i);
     if (qm) { p.quarter = +(qm[1] || qm[2]); hit(); }
     if (/이번\s*분기|금분기/.test(raw)) { p.quarter = Math.ceil(nowM / 3); if (!p.years.length) p.years.push(nowY); hit(); }
@@ -2242,6 +2248,7 @@ function parseRaw(q){
   else if (/산업군|업종|섹터|분야별/.test(raw)) p.groupBy = 'ind';
   else if (/사업라인|라인별|제품별|상품별|서비스별|솔루션별|제품|상품|솔루션/.test(raw)) p.groupBy = 'line';
   else if (/고객사별|고객별|업체별|회사별|거래처별/.test(raw)) p.groupBy = 'cust';
+  else if (/분기별|분기마다|쿼터별/.test(raw)) p.groupBy = 'quarter';
   else if (/월별|월간|매월|달별/.test(raw)) p.groupBy = 'month';
   else if (/연도별|연간|년도별|해마다|매년|년별/.test(raw)) p.groupBy = 'year';
   else if (/사유|이유|원인/.test(raw) || (/왜/.test(raw) && RX.churn.test(s))) p.groupBy = 'churn';
@@ -2286,10 +2293,15 @@ function parseRaw(q){
     else if (p.partners.length >= 2) { p.compareBy = 'partner'; p.compareItems = p.partners.slice(0, 5); p.partners = []; p.partner = null; }
     else if (p.custs.length >= 2) { p.compareBy = 'cust'; p.compareItems = p.custs.slice(0, 5); p.custs = []; p.cust = null; }
     else if (p.years.length >= 2) { p.compareBy = 'year'; p.compareItems = p.years.slice(0, 5).map(String); p.years = []; }
+    else if (p.quarters && p.quarters.length >= 2) { p.compareBy = 'quarter'; p.compareItems = p.quarters.slice(0, 4).map(String); p.quarter = null; }
+    else if (p.years.length === 1 && p.years[0] !== nowY) { p.compareBy = 'year'; p.compareItems = [String(p.years[0]), String(nowY)]; p.years = []; }
     if (p.compareItems) { p.metric = 'compare'; p.metricExplicit = true; hit(); }
   }
+  // "분기별 비교" 처럼 항목 없이 비교를 말하면 분기별 집계로
+  if (RX.compare.test(s) && !p.compareItems && p.groupBy === 'quarter') { p.metric = 'sum'; }
 
   /* ---- 기본 보정 ---- */
+  if (p.metric === 'count' && p._recentAuto) { p.relN = null; }   // "현재 고객 수" → LIVE 탭 기준
   if ((p.quarter || p.half) && !p.years.length && p.from == null && !p.relN) p.years = [nowY];
   if (p.metric === 'sum' && p.groupBy === 'month') { p.metric = 'trend'; }
   if (p.metric === 'share' && !p.groupBy) {
@@ -2541,6 +2553,18 @@ function computeFromP(p){
         series.push({label:y+'년', data:d, color:seriesColor(i+1)});
         totals.push({name:y+'년', v:d.reduce(function(a,b){return a+b;},0)});
       });
+    } else if(by==='quarter'){
+      var qy = p.years && p.years.length ? p.years[0] : yOf(STATE.base);
+      labels=['1개월차','2개월차','3개월차'];
+      items.forEach(function(q,i){
+        var q0=+q;
+        var d=[0,1,2].map(function(mi){
+          var j=ymIdx(qy+'-'+((q0-1)*3+mi+1));
+          return (j!=null&&j>=0&&j<M)? monthlyTotal(list,j):0;
+        });
+        series.push({label:qy+'년 '+q0+'분기', data:d, color:seriesColor(i+1)});
+        totals.push({name:qy+'년 '+q0+'분기', v:d.reduce(function(a,b){return a+b;},0)});
+      });
     } else {
       var js=mf || (function(){var a=[];for(var j=Math.max(0,STATE.base-23);j<=STATE.base;j++)a.push(j);return a;})();
       labels=js.map(mkLabel);
@@ -2708,7 +2732,7 @@ function computeFromP(p){
   }
 
   /* --- 순위 / 비중 / 그룹 집계 --- */
-  if(p.topN || p.metric==='share' || (p.groupBy && p.groupBy!=='month' && p.groupBy!=='year')){
+  if(p.topN || p.metric==='share' || (p.groupBy && p.groupBy!=='month' && p.groupBy!=='year' && p.groupBy!=='quarter')){
     var gb2 = p.groupBy || (p.cust? 'line' : 'cust');
     if(gb2==='churn'){
       var cl=list.filter(function(k){return DATA.rows[k].churn;});
@@ -2740,6 +2764,33 @@ function computeFromP(p){
       table:{cols:[gbLabel(gb2),'금액','비중'], rows:top2.map(function(x){return [x.name, won(x.v)+'원', (x.v/total*100).toFixed(1)+'%'];})},
       note: jsel? '지정한 기간의 월별 인식 금액을 합산했습니다.' : '기간을 지정하지 않아 기준월('+mk(STATE.base)+') MRR로 계산했습니다.'
     };
+  }
+
+  /* --- 분기별 --- */
+  if(p.groupBy==='quarter'){
+    var qys = p.years.length? p.years.slice().sort() : [yOf(STATE.base)];
+    var qlabels=[], qdata=[], qrows=[];
+    qys.forEach(function(y){
+      for(var q=1;q<=4;q++){
+        var s=0, sPrev=0;
+        for(var mi=1;mi<=3;mi++){
+          var j=ymIdx(y+'-'+((q-1)*3+mi));
+          if(j!=null&&j>=0&&j<M) s+=monthlyTotal(list,j);
+          var jp=ymIdx((y-1)+'-'+((q-1)*3+mi));
+          if(jp!=null&&jp>=0&&jp<M) sPrev+=monthlyTotal(list,jp);
+        }
+        qlabels.push((qys.length>1? String(y).slice(2)+"' ":'')+q+'분기');
+        qdata.push(s);
+        qrows.push([(qys.length>1? y+'년 ':'')+q+'분기', won(s)+'원',
+          sPrev? ((s-sPrev)/sPrev*100>=0?'+':'')+((s-sPrev)/sPrev*100).toFixed(1)+'%' : '—']);
+      }
+    });
+    var qsum=qdata.reduce(function(a,b){return a+b;},0);
+    return { title:scope+' · 분기별 매출', hero:won(qsum), unit:'원',
+      sub:(qys.length>1? qys[0]+'~'+qys[qys.length-1]+'년':qys[0]+'년')+' 분기 합계 · 전년 동분기 대비 포함',
+      chart:{type:'bar', labels:qlabels, series:[{label:'분기 매출', data:qdata, color:cssv('--s1')}], money:true},
+      table:{cols:['분기','매출','전년 동분기'], rows:qrows},
+      note:'미래 분기는 계약상 예정 금액 기준입니다.' };
   }
 
   /* --- 추이 --- */
