@@ -1,0 +1,1507 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Genians 공식 자동 견적 시스템 v5.4 PC전용</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
+        :root { --genians-green: #1fb53a; --border-color: #000; --gray-bg: #f8f9fa; }
+        * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        body { font-family: 'Noto Sans KR', sans-serif; background: #525659; margin: 0; padding: 20px; color: #333; }
+        .toolbar { width: 210mm; margin: 0 auto 15px; background: #fff; padding: 12px 15px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .toolbar-actions { display: flex; gap: 8px; align-items: center; }
+        .btn { padding: 9px 14px; font-weight: bold; border-radius: 5px; cursor: pointer; border: none; color: white; font-size: 13px; white-space: nowrap; }
+        .btn-print { background: var(--genians-green); }
+        .btn-add { background: #343a40; }
+        .btn-secondary { background: #6c757d; }
+        .btn-github { background: #24292e; }
+        .dropdown { position: relative; display: inline-block; }
+        .dropdown-menu { display: none; position: absolute; top: 115%; left: 0; background: #fff; border: 1px solid #ddd; border-radius: 6px; box-shadow: 0 6px 16px rgba(0,0,0,0.18); min-width: 170px; z-index: 50; overflow: hidden; }
+        .dropdown-menu.open { display: block; }
+        .dropdown-item { display: block; width: 100%; text-align: left; padding: 10px 14px; font-size: 13px; border: none; background: #fff; cursor: pointer; color: #333; }
+        .dropdown-item:hover { background: #f2f2f2; }
+        .dropdown-item input[type="file"] { display: none; }
+        .page { width: 210mm; min-height: 297mm; background: white; margin: 0 auto; padding: 15mm; position: relative; }
+        input, select, textarea { width: 100%; border: none; outline: none; font-family: inherit; font-size: inherit; background: transparent; padding: 2px; }
+        select { border: 1px solid #ccc; background: #fff; border-radius: 3px; padding: 4px; font-size: 11px; }
+        .logo-box { position: absolute; top: 15mm; left: 15mm; }
+        .logo-box img { height: 35px; object-fit: contain; }
+        .doc-title { font-size: 36px; font-weight: 900; text-align: center; letter-spacing: 15px; text-decoration: underline; text-underline-offset: 10px; margin-bottom: 30px; }
+        .info-section { display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 12px; }
+        .info-left { width: 45%; display: flex; flex-direction: column; justify-content: flex-end; gap: 10px; padding-bottom: 5px; }
+        .info-left .input-line { border-bottom: 1px solid #aaa; border-radius: 0; padding-left: 5px; }
+        .info-right { width: 50%; }
+        .info-right table { width: 100%; border-collapse: collapse; border: 2px solid var(--border-color); font-size: 11px; }
+        .info-right th, .info-right td { border: 1px solid var(--border-color); padding: 4px; text-align: center; }
+        .info-right th { background: #f0f0f0; font-weight: bold; }
+        .info-right .provider-title { writing-mode: vertical-rl; text-orientation: upright; width: 30px; letter-spacing: 5px; font-size: 13px; }
+        .table-responsive { width: 100%; }
+        .main-table { width: 100%; border-collapse: collapse; border: 1px solid var(--border-color); font-size: 11px; table-layout: fixed; }
+        .main-table th { background: var(--genians-green); color: white; height: 35px; border: 1px solid var(--genians-green); }
+        .main-table td { border: 1px solid #ccc; height: 40px; padding: 2px; text-align: center; vertical-align: middle; }
+        .text-right { text-align: right !important; }
+        .input-num { text-align: right; }
+        .custom-input { width: 100%; border: 1px solid #ccc; background: #fff; border-radius: 3px; padding: 4px; font-size: 11px; box-sizing: border-box; }
+        tr.row-incomplete td { background: #fff3cd !important; }
+        #incompleteWarning { color: #c0392b; font-size: 12px; font-weight: bold; margin-bottom: 6px; min-height: 16px; }
+        .subtotal-box { margin-top: 15px; border: 1px solid var(--border-color); padding: 10px 15px; font-size: 13px; font-weight: bold; display: flex; justify-content: space-between; background: #fdfdfd; color: #555; }
+        .amount-box { margin-top: 8px; border: 2px solid var(--border-color); padding: 15px; font-size: 16px; font-weight: bold; display: flex; justify-content: space-between; background: #fdfdfd; }
+        .remarks-section { margin-top: 25px; font-size: 12px; }
+        .remarks-section table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        .remarks-section td { padding: 5px; vertical-align: middle; }
+        .remarks-section input { font-size: 11px; width: 100%; text-align: left; }
+        .remarks-section textarea { width: 100%; min-height: 120px; resize: none; border: 1px solid #eee; padding: 5px; font-size: 11px; font-family: inherit; line-height: 1.5; overflow: hidden; }
+        .only-print { display: none; }
+        .print-text { display: none; }
+        .main-table td:first-child { line-height: 1.2; }
+        .main-table td:first-child .print-text {
+            white-space: normal; word-break: keep-all; overflow-wrap: anywhere;
+            line-height: 1.2; font-size: 10px; padding: 0 2px;
+        }
+        .row-actions { position: absolute; right: -50px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: row; gap: 4px; }
+        .row-actions button { border: none; border-radius: 50%; cursor: pointer; width: 20px; height: 20px; font-size: 11px; line-height: 1; color: white; flex-shrink: 0; }
+        .btn-dup { background: var(--genians-green); }
+        .btn-del { background: #e74c3c; }
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9998; justify-content: center; align-items: center; }
+        .modal-box { background: #fff; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        .modal-box label { display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; margin-top: 10px; }
+        .modal-box input[type="text"], .modal-box input[type="password"] { border: 1px solid #ccc; border-radius: 4px; padding: 8px; font-size: 13px; }
+        /* 문서 보기 모드: "불러오기"로 새 창을 열었을 때 완성본처럼 읽기 전용으로 보여줍니다 */
+        body.doc-view-mode .toolbar,
+        body.doc-view-mode .btn-del,
+        body.doc-view-mode .btn-dup,
+        body.doc-view-mode .no-print,
+        body.doc-view-mode .modal-overlay { display: none !important; }
+        body.doc-view-mode .only-print { display: block !important; }
+        body.doc-view-mode .print-text { display: block !important; }
+        body.doc-view-mode tr.row-incomplete td { background: transparent !important; }
+        body.doc-view-mode #incompleteWarning { display: none !important; }
+        body.doc-view-mode .info-left .input-line,
+        body.doc-view-mode input,
+        body.doc-view-mode textarea { border: none !important; background: transparent !important; }
+        body.doc-view-mode .remarks-section textarea { border: none !important; }
+        body.doc-view-mode .main-table td:first-child .print-text {
+            display: block !important; white-space: normal !important; word-break: keep-all !important;
+            overflow-wrap: anywhere !important; font-size: 9.5px !important; line-height: 1.2 !important; max-width: 100% !important;
+        }
+        #viewModeBar { display: none; position: fixed; top: 10px; right: 10px; z-index: 10000; gap: 6px; }
+        @media print { #viewModeBar { display: none !important; } }
+        /* PDF 캡처 모드: GitHub에 실제 PDF를 저장하기 위해 화면을 인쇄 화면처럼 잠깐 바꿉니다 */
+        body.pdf-capturing .toolbar,
+        body.pdf-capturing .btn-del,
+        body.pdf-capturing .btn-dup,
+        body.pdf-capturing .no-print,
+        body.pdf-capturing .modal-overlay { display: none !important; }
+        body.pdf-capturing .only-print { display: block !important; }
+        body.pdf-capturing .print-text { display: block !important; }
+        body.pdf-capturing tr.row-incomplete td { background: transparent !important; }
+        body.pdf-capturing #incompleteWarning { display: none !important; }
+        body.pdf-capturing .info-left .input-line,
+        body.pdf-capturing input,
+        body.pdf-capturing textarea { border: none !important; background: transparent !important; }
+        body.pdf-capturing .remarks-section textarea { border: none !important; }
+        body.pdf-capturing .main-table td:first-child .print-text {
+            display: block !important; white-space: normal !important; word-break: keep-all !important;
+            overflow-wrap: anywhere !important; font-size: 9.5px !important; line-height: 1.2 !important; max-width: 100% !important;
+        }
+        @media print {
+            @page { size: A4 portrait; margin: 0; }
+            html, body {
+                width: 210mm !important; height: 297mm !important; margin: 0 !important; padding: 0 !important;
+                background: #fff !important; overflow: hidden !important;
+            }
+            .page {
+                width: 210mm !important; height: 297mm !important; min-height: 297mm !important; margin: 0 auto !important;
+                padding: 15mm !important; box-shadow: none !important; position: relative !important; box-sizing: border-box !important;
+                page-break-after: avoid !important; page-break-inside: avoid !important; overflow: hidden !important;
+            }
+            .toolbar, .btn-del, .btn-dup, .no-print, .modal-overlay { display: none !important; }
+            .only-print { display: block !important; }
+            .print-text { display: block !important; }
+            tr.row-incomplete td { background: transparent !important; }
+            #incompleteWarning { display: none !important; }
+            .logo-box { position: absolute !important; top: 15mm !important; left: 15mm !important; text-align: left !important; display: block !important; margin: 0 !important; }
+            .doc-title { margin-top: 0 !important; margin-bottom: 30px !important; font-size: 36px !important; text-align: center !important; }
+            .info-section { display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; justify-content: space-between !important; gap: 0 !important; }
+            .info-left { width: 45% !important; flex: 0 0 45% !important; display: flex !important; flex-direction: column !important; justify-content: flex-end !important; }
+            .info-right { width: 50% !important; flex: 0 0 50% !important; }
+            .table-responsive { overflow: visible !important; width: 100% !important; display: block !important; }
+            .main-table { display: table !important; width: 100% !important; table-layout: fixed !important; }
+            .main-table th, .main-table td { padding: 2px !important; white-space: nowrap !important; }
+            .main-table th:first-child, .main-table td:first-child {
+                white-space: normal !important; word-break: keep-all !important; overflow-wrap: anywhere !important; line-height: 1.2 !important;
+            }
+            .main-table td:first-child .print-text {
+                display: block !important; white-space: normal !important; word-break: keep-all !important;
+                overflow-wrap: anywhere !important; font-size: 9.5px !important; line-height: 1.2 !important; max-width: 100% !important;
+            }
+            .subtotal-box { display: flex !important; flex-direction: row !important; text-align: left !important; justify-content: space-between !important; }
+            .amount-box { display: flex !important; flex-direction: row !important; text-align: left !important; justify-content: space-between !important; }
+            .remarks-section table { display: table !important; width: 100% !important; table-layout: fixed !important; }
+            .remarks-section tbody { display: table-row-group !important; width: 100% !important; }
+            .remarks-section tr { display: table-row !important; width: 100% !important; }
+            .remarks-section td { display: table-cell !important; padding: 5px !important; width: auto !important; }
+            input::placeholder, textarea::placeholder { color: transparent; }
+            .info-left .input-line, input, textarea { border: none !important; background: transparent !important; }
+            input[type="date"]::-webkit-calendar-picker-indicator { display: none; }
+            select { display: none !important; }
+            .remarks-section textarea { border: none !important; }
+            .provider-title { white-space: nowrap !important; }
+        }
+    </style>
+</head>
+<body>
+<!--
+    [보안 관련 참고]
+    아래 로그인 화면 및 GitHub 설정 비밀번호 게이트는 실질적인 보안 장치가 아니라
+    "아무나 우연히 열거나 실수로 설정을 건드리는 것"을 막는 가벼운 안내 화면입니다.
+    비밀번호는 base64로만 인코딩되어 소스에 그대로 포함되어 있어 개발자도구로
+    손쉽게 우회할 수 있습니다. 실제 접근 제어가 필요하다면 서버/게이트웨이 단의
+    인증 수단을 함께 사용하세요.
+-->
+<div id="loginOverlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #525659; z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+    <div style="background: #fff; padding: 40px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); text-align: center; width: 300px;">
+        <img src="Logo.jpg" alt="Genians" style="height: 40px; margin-bottom: 20px;">
+        <h3 style="margin: 0 0 20px 0; color: #333;">견적 시스템 접속</h3>
+        <input type="password" id="pwInput" placeholder="비밀번호를 입력하세요" onkeypress="if(event.key==='Enter') checkPassword()" style="width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 5px; font-size: 14px; box-sizing: border-box; text-align: center;">
+        <button onclick="checkPassword()" style="width: 100%; padding: 10px; background: var(--genians-green); color: white; border: none; border-radius: 5px; font-weight: bold; font-size: 15px; cursor: pointer;">접 속</button>
+        <div style="margin-top: 10px; font-size: 10px; color: #999;">※ 사내 참고용 화면으로, 강력한 접근 제어를 대체하지 않습니다.</div>
+    </div>
+</div>
+<!-- 견적서 종류 선택 화면 -->
+<div id="quoteTypeOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #525659; z-index: 9999; flex-direction: column; justify-content: center; align-items: center;">
+    <div style="background: #fff; padding: 40px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); text-align: center; width: 340px;">
+        <img src="Logo.jpg" alt="Genians" style="height: 40px; margin-bottom: 20px;">
+        <h3 style="margin: 0 0 20px 0; color: #333;">견적서 종류 선택</h3>
+        <div style="display:flex; flex-direction:column; gap:10px;">
+            <button onclick="selectQuoteType('enterprise')" style="padding: 14px; background: var(--genians-green); color: white; border: none; border-radius: 5px; font-weight: bold; font-size: 15px; cursor: pointer;">기업용 견적</button>
+            <button onclick="selectQuoteType('public')" style="padding: 14px; background: #24292e; color: white; border: none; border-radius: 5px; font-weight: bold; font-size: 15px; cursor: pointer;">공공용 견적</button>
+        </div>
+    </div>
+</div>
+<script>
+    function checkPassword() {
+        const secureKey = "MUdlbmlka3Mh";
+        const input = document.getElementById('pwInput').value;
+        if (btoa(input) === secureKey) {
+            document.getElementById('loginOverlay').style.display = 'none';
+            // 견적 데이터를 조회용으로 여는 경우(?view=)엔 종류 선택 없이 바로 진행
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('view')) {
+                selectQuoteType('enterprise');
+            } else {
+                document.getElementById('quoteTypeOverlay').style.display = 'flex';
+            }
+        } else {
+            alert('비밀번호가 일치하지 않습니다.');
+            document.getElementById('pwInput').value = '';
+            document.getElementById('pwInput').focus();
+        }
+    }
+</script>
+<!-- GitHub 설정 비밀번호 게이트 -->
+<div id="githubGateModal" class="modal-overlay no-print">
+    <div class="modal-box" style="padding: 25px; width: 300px; text-align:center;">
+        <h3 style="margin: 0 0 15px 0;">설정 화면 비밀번호</h3>
+        <input type="password" id="ghGatePw" placeholder="비밀번호를 입력하세요" onkeypress="if(event.key==='Enter') submitGithubGate()" style="border:1px solid #ccc; border-radius:5px; padding:10px; text-align:center; margin-bottom:15px;">
+        <div style="display:flex; gap:8px;">
+            <button onclick="closeGithubGate()" style="flex:1; padding:10px; background:#ccc; border:none; border-radius:5px; cursor:pointer;">취소</button>
+            <button onclick="submitGithubGate()" style="flex:1; padding:10px; background:var(--genians-green); color:white; border:none; border-radius:5px; cursor:pointer; font-weight:bold;">확인</button>
+        </div>
+    </div>
+</div>
+<!-- 저장 서버(Worker) 설정 모달 -->
+<div id="githubSettingsModal" class="modal-overlay no-print">
+    <div class="modal-box" style="padding: 25px; width: 340px;">
+        <h3 style="margin: 0 0 5px 0;">견적 저장 서버 연동 설정</h3>
+        <div style="font-size: 11px; color: #888; margin-bottom: 10px;">
+            GitHub Token은 이 파일에 없고, 별도의 저장 서버(Worker)에만 보관되어 있습니다.
+            아래 <b>접속 비밀번호</b>(팀 공용)만 입력하면 저장/조회가 가능합니다.
+            이 브라우저에 저장되어 새로고침해도 다시 입력할 필요가 없습니다.
+        </div>
+        <label>저장 서버 주소</label>
+        <input type="text" id="ghOwner" placeholder="https://xxxx.workers.dev">
+        <label>접속 비밀번호 (팀 공용)</label>
+        <input type="password" id="ghToken" placeholder="팀 관리자에게 문의">
+        <div style="text-align:right; margin-top:4px;">
+            <button onclick="clearStoredGithubToken()" style="background:none; border:none; color:#c0392b; font-size:11px; cursor:pointer; text-decoration:underline; padding:0;">저장된 비밀번호 삭제</button>
+        </div>
+        <div style="display:flex; gap:8px; margin-top:14px;">
+            <button onclick="closeGithubSettings()" style="flex:1; padding:10px; background:#ccc; border:none; border-radius:5px; cursor:pointer;">취소</button>
+            <button onclick="saveGithubSettings()" style="flex:1; padding:10px; background:var(--genians-green); color:white; border:none; border-radius:5px; cursor:pointer; font-weight:bold;">저장</button>
+        </div>
+    </div>
+</div>
+<!-- GitHub 저장 내역 목록 모달 -->
+<div id="githubListModal" class="modal-overlay no-print">
+    <div class="modal-box" style="padding: 20px; width: 440px; max-height: 70vh; display: flex; flex-direction: column;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <h3 style="margin:0;">GitHub 저장 내역</h3>
+            <button onclick="closeGithubListModal()" style="border:none; background:none; font-size:18px; cursor:pointer;">✕</button>
+        </div>
+        <div id="githubListBody" style="overflow-y:auto; border:1px solid #eee; border-radius:4px; flex:1; min-height: 100px;"></div>
+    </div>
+</div>
+<div id="viewModeBar" style="display:none; position:fixed; top:10px; right:10px; z-index:10000; gap:6px;">
+    <button onclick="window.print()" style="padding:8px 14px; background:var(--genians-green); color:#fff; border:none; border-radius:5px; cursor:pointer; font-weight:bold;">인쇄</button>
+    <button onclick="exitDocViewMode()" style="padding:8px 14px; background:#6c757d; color:#fff; border:none; border-radius:5px; cursor:pointer; font-weight:bold;">✎ 수정하기</button>
+    <button onclick="window.close()" style="padding:8px 14px; background:#333; color:#fff; border:none; border-radius:5px; cursor:pointer; font-weight:bold;">✕ 닫기</button>
+</div>
+<div class="toolbar">
+    <div style="font-weight: bold; color: var(--genians-green);">Genians Pricing System v5.4 <span id="quoteTypeBadge" style="color:#888; font-weight:normal; font-size:12px;"></span></div>
+    <div class="toolbar-actions">
+        <button class="btn btn-add" onclick="addRow()">+ 항목 추가</button>
+        <div class="dropdown no-print">
+            <button class="btn btn-secondary" onclick="toggleDropdown('fileDropdown')">파일 ▾</button>
+            <div id="fileDropdown" class="dropdown-menu">
+                <button class="dropdown-item" onclick="saveQuoteData(); closeAllDropdowns();">💾 임시저장 (JSON 다운로드)</button>
+                <label class="dropdown-item" style="cursor:pointer;">
+                    📂 불러오기 (JSON 파일)
+                    <input type="file" accept=".json" onchange="loadQuoteData(event); closeAllDropdowns();">
+                </label>
+            </div>
+        </div>
+        <div class="dropdown no-print">
+            <button class="btn btn-github" onclick="toggleDropdown('githubDropdown')">GitHub ▾</button>
+            <div id="githubDropdown" class="dropdown-menu">
+                <button class="dropdown-item" onclick="requestGithubSettings(); closeAllDropdowns();">⚙ 설정 (비밀번호 필요)</button>
+                <button class="dropdown-item" onclick="saveToGithub(); closeAllDropdowns();">☁ GitHub에 저장</button>
+                <button class="dropdown-item" onclick="listGithubQuotes(); closeAllDropdowns();">📋 저장 내역 조회</button>
+            </div>
+        </div>
+        <button class="btn btn-print" onclick="prepareAndPrint()">견적서 발행 (PDF)</button>
+    </div>
+</div>
+<div class="page">
+    <div class="logo-box">
+        <img src="Logo.jpg" alt="Genians Logo">
+    </div>
+    <div class="doc-title">견 적 서</div>
+    <div class="info-section">
+        <div class="info-left">
+            <div style="font-size: 18px; font-weight: bold; display: flex; align-items: flex-end; margin-bottom: 5px;">
+                <input type="text" id="customerName" style="width: 100%; font-size: 20px; font-weight: 900; border-bottom: 2px solid #000; text-align: left; padding: 0 5px;" placeholder="고객사명">
+            </div>
+            <div style="display: flex; align-items: center;">
+                <span style="width: 60px; font-weight: bold;">담당자</span>
+                <input type="text" id="contactPersonName" class="input-line" style="flex: 1; margin-right: 5px;" placeholder="담당자 성명 또는 직급을 입력하세요"> <span style="font-size: 16px; font-weight: bold;">귀하</span>
+            </div>
+            <div style="display: flex; align-items: center;">
+                <span style="width: 60px; font-weight: bold;">견적일</span>
+                <input type="date" class="input-line" style="flex: 1; font-family: inherit;" id="quoteDate">
+            </div>
+        </div>
+        <div class="info-right">
+            <table>
+                <tr>
+                    <th rowspan="4" class="provider-title">공급자</th>
+                    <th style="width: 18%;">상호</th>
+                    <td style="width: 37%; font-weight: bold;">지니언스 주식회사</td>
+                    <th style="width: 15%;">대표</th>
+                    <td style="width: 25%; position: relative;">
+                        <span style="position: relative; z-index: 2;">이동범</span>
+                        <img src="도장.jpg" alt="직인" style="position: absolute; top: 50%; right: -10px; transform: translateY(-50%); width: 40px; mix-blend-mode: multiply; z-index: 1;">
+                    </td>
+                </tr>
+                <tr>
+                    <th>주소</th>
+                    <td colspan="3" style="text-align: left; padding-left: 10px; line-height: 1.4;">경기도 안양시 동안구 벌말로 66, 평촌역하이필드<br>A동 12층</td>
+                </tr>
+                <tr>
+                    <th>홈페이지</th>
+                    <td colspan="3" style="text-align: left; padding-left: 10px;">[www.genians.co.kr](https://www.genians.co.kr)</td>
+                </tr>
+                <tr>
+                    <th>담당자</th>
+                    <td colspan="3" style="border: none; padding: 4px; vertical-align: middle;">
+                        <div style="display: flex; flex-direction: column; gap: 4px; width: 100%; padding-left: 5px;">
+                            <select id="managerSelect" class="no-print" onchange="updateManagerInfo()" style="width: 90%; border: 1px solid #ccc; text-align: left; padding: 2px;">
+                                <option value="">담당자 선택</option>
+                            </select>
+                            <input type="text" id="printManagerName" class="only-print" style="width: 100%; text-align: left; border: none; font-weight: bold;" readonly>
+                            <input type="text" id="managerContact" placeholder="이메일 또는 연락처" style="width: 100%; border: none; text-align: left; font-size: 11px;" readonly>
+                        </div>
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+    <div id="quoteMessage" style="text-align: left; font-size: 15px; font-weight: bold; margin-bottom: 5px; min-height: 22px;"></div>
+    <div id="incompleteWarning" class="no-print"></div>
+    <div id="internalHint" class="no-print" style="display:none; background:#fff8e1; border:1px solid #ffd54f; border-radius:5px; padding:8px 12px; font-size:11px; color:#7a5c00; margin-bottom:8px;"></div>
+    <div class="table-responsive">
+        <table class="main-table" id="itemTable">
+            <thead>
+                <tr>
+                    <th style="width: 19%;">서비스</th>
+                    <th style="width: 10%;">계약 기간</th>
+                    <th style="width: 9%;">납부 주기</th>
+                    <th style="width: 10%;">소비자 단가(₩)</th>
+                    <th style="width: 10%;">수량</th>
+                    <th style="width: 10%;">제안 단가(₩)</th>
+                    <th style="width: 12%;">공급 제안가(₩)</th>
+                    <th style="width: 10%;">세액(₩)</th>
+                    <th style="width: 7%;">비고</th>
+                </tr>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
+    </div>
+    <div class="subtotal-box">
+        <div>공급가액 합계 (부가세 제외)</div>
+        <div>₩ <span id="numSubTotal">0</span></div>
+    </div>
+    <div class="amount-box">
+        <div>총 합계금액 (공급 제안가 + 부가세)</div>
+        <div style="color: var(--genians-green);">일금 <span id="txtGrandTotal">영</span> 원정 (₩ <span id="numGrandTotal">0</span>)</div>
+    </div>
+    <div class="remarks-section">
+        <table>
+            <colgroup>
+                <col style="width: 13%;">
+                <col style="width: 37%;">
+                <col style="width: 13%;">
+                <col style="width: 37%;">
+            </colgroup>
+            <tr>
+                <td><input type="text" value="결 제 조 건:" style="font-weight: bold; letter-spacing: 2px;"></td>
+                <td><input type="text" value="검수 후 계산서 발행(발행 후 30일이내 현금결제)"></td>
+                <td><input type="text" value="설 치 비 용:" style="font-weight: bold; letter-spacing: 2px;"></td>
+                <td><input type="text" value="당사 파트너사 지원"></td>
+            </tr>
+            <tr>
+                <td><input type="text" value="견 적 유 효:" style="font-weight: bold; letter-spacing: 2px;"></td>
+                <td><input type="text" value="견적후 3개월"></td>
+                <td><input type="text" value="교 육 비 용:" style="font-weight: bold; letter-spacing: 2px;"></td>
+                <td><input type="text" value="당사 파트너사 지원"></td>
+            </tr>
+            <tr>
+                <td><input type="text" value="납 기 일 자:" style="font-weight: bold; letter-spacing: 2px;"></td>
+                <td><input type="text" value="별도 협의"></td>
+                <td><input type="text" value="유 지 보 수:" style="font-weight: bold; letter-spacing: 2px;"></td>
+                <td><input type="text" value="유지보수 포함"></td>
+            </tr>
+            <tr>
+                <td style="vertical-align: top; padding-top: 15px;">
+                    <input type="text" value="비       고:" style="font-weight: bold; letter-spacing: 2px;">
+                </td>
+                <td colspan="3" style="padding-top: 10px;">
+                    <textarea placeholder="추가적인 내용을 입력하세요. (출력 시 테두리는 보이지 않습니다.)" oninput="this.style.height = 'auto'; this.style.height = (this.scrollHeight) + 'px'; window.lastAutoRemarks = 'modified';"></textarea>
+                </td>
+            </tr>
+        </table>
+    </div>
+</div>
+<script>
+    window.lastAutoRemarks = "";
+    // ─────────────────────────────────────────────
+    // Worker 연동 설정: GitHub Token은 이제 이 파일 안에 전혀 없습니다.
+    // Cloudflare Worker(baseUrl)가 Token을 서버 쪽에서만 보관하고,
+    // 이 파일은 팀 공용 비밀번호(accessPassword)로만 Worker에 요청을 보냅니다.
+    // ─────────────────────────────────────────────
+    let workerConfig = {
+        baseUrl: 'https://aged-union-cdd3.choihw.workers.dev',
+        accessPassword: ''
+    };
+    // 설정 화면 비밀번호 (기본값: 1Genidks! - 접속 비밀번호와 통일)
+    // 바꾸고 싶다면 브라우저 콘솔에서 btoa('원하는비밀번호') 실행 후 그 결과를 아래에 넣으세요.
+    const githubGatePassKey = "MUdlbmlka3Mh";
+    // ─────────────────────────────────────────────
+    // 접속 비밀번호(팀 공용) 로컬 보관
+    // 이건 GitHub Token이 아니라 Worker에 접근하기 위한 팀 공용 비밀번호이므로
+    // 브라우저에 저장해도 GitHub 저장소 자체가 뚫릴 위험은 없습니다.
+    // ─────────────────────────────────────────────
+    const GH_STORAGE_KEY = 'genians_quote_worker_config_v1';
+    function loadGithubConfigFromStorage() {
+        try {
+            const saved = localStorage.getItem(GH_STORAGE_KEY);
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                workerConfig = Object.assign({}, workerConfig, parsed);
+            }
+        } catch (err) {
+            console.warn('로컬 저장소를 사용할 수 없어 이번 세션에서는 설정이 저장되지 않습니다.', err);
+        }
+    }
+    function persistGithubConfig() {
+        try {
+            localStorage.setItem(GH_STORAGE_KEY, JSON.stringify(workerConfig));
+        } catch (err) {
+            console.warn('로컬 저장소에 설정을 저장하지 못했습니다.', err);
+        }
+    }
+    function clearStoredGithubToken() {
+        workerConfig.accessPassword = '';
+        document.getElementById('ghToken').value = '';
+        try {
+            localStorage.removeItem(GH_STORAGE_KEY);
+        } catch (err) { /* noop */ }
+        alert('저장된 접속 비밀번호가 삭제되었습니다.');
+    }
+    function requestGithubSettings() {
+        document.getElementById('ghGatePw').value = '';
+        document.getElementById('githubGateModal').style.display = 'flex';
+        setTimeout(() => document.getElementById('ghGatePw').focus(), 50);
+    }
+    function closeGithubGate() {
+        document.getElementById('githubGateModal').style.display = 'none';
+    }
+    function submitGithubGate() {
+        const pw = document.getElementById('ghGatePw').value;
+        if (btoa(pw) === githubGatePassKey) {
+            closeGithubGate();
+            openGithubSettings();
+        } else {
+            alert('비밀번호가 일치하지 않습니다.');
+            document.getElementById('ghGatePw').value = '';
+            document.getElementById('ghGatePw').focus();
+        }
+    }
+    // ─────────────────────────────────────────────
+    // 상단 툴바 드롭다운 메뉴
+    // ─────────────────────────────────────────────
+    function toggleDropdown(id) {
+        const el = document.getElementById(id);
+        const isOpen = el.classList.contains('open');
+        closeAllDropdowns();
+        if (!isOpen) el.classList.add('open');
+    }
+    function closeAllDropdowns() {
+        document.querySelectorAll('.dropdown-menu').forEach(d => d.classList.remove('open'));
+    }
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.dropdown')) closeAllDropdowns();
+    });
+    // ─────────────────────────────────────────────
+    // 담당자 목록
+    // ─────────────────────────────────────────────
+    const managerList = [
+        { name: "송기영 부장", contact: "kholong@genians.com / 010-6305-6392" },
+        { name: "최형우 차장", contact: "choihw@genians.com / 010-7278-4782" }
+    ];
+    function populateManagerSelect() {
+        const sel = document.getElementById('managerSelect');
+        managerList.forEach(m => {
+            const opt = document.createElement('option');
+            opt.value = m.contact;
+            opt.textContent = m.name;
+            sel.appendChild(opt);
+        });
+    }
+    function sanitizeFileName(str) {
+        return String(str).replace(/[\\/:*?"<>|]/g, '_').trim();
+    }
+    async function prepareAndPrint() {
+        calcAll();
+        const customer = sanitizeFileName(document.getElementById('customerName').value || "고객사명");
+        const qDate = sanitizeFileName(document.getElementById('quoteDate').value || "날짜미입력");
+        const firstRow = document.querySelector('#itemTable tbody tr');
+        let prodLabel = "견적서";
+        let qty = "0";
+        let unit = "User";
+        if (firstRow) {
+            const prodValue = firstRow.querySelector('.product-sel').value;
+            const qtyValue = firstRow.querySelector('.qty').value;
+            qty = qtyValue || "0";
+            if (prodValue === "direct") {
+                const customProd = firstRow.querySelector('.product-custom').value;
+                prodLabel = customProd || "직접입력_견적";
+            } else if (prodValue.includes("MDR") || prodValue.includes("AV") || prodValue.includes("Ransomware") || prodValue.includes("Device")) {
+                prodLabel = "Genian MDR(서비스형)";
+                unit = "User";
+            } else if (prodValue.includes("NAC") || prodValue.includes("ZTNA")) {
+                prodLabel = prodValue.includes("NAC") ? "Genian Cloud NAC(서비스형)" : "Genian Cloud ZTNA(서비스형)";
+                unit = "Node";
+            } else if (prodValue.includes("DocuRay")) {
+                prodLabel = prodValue + "(서비스형)";
+                unit = "User";
+            } else {
+                prodLabel = prodValue || "견적서비스";
+            }
+        }
+        const fileName = sanitizeFileName(`${qDate}_${customer}_${prodLabel}_${qty}${unit}_견적서(지니언스)`);
+        const originalTitle = document.title;
+        document.title = fileName;
+        window.onafterprint = function() {
+            document.title = originalTitle;
+        };
+        // 발행 전 자동 저장 (설정되어 있을 때만, 실패해도 발행은 계속 진행)
+        const saveResult = await silentSaveToGithub();
+        if (saveResult.attempted && !saveResult.ok) {
+            alert(`⚠ 자동 저장에 실패했지만 발행은 계속 진행됩니다.\n오류: ${saveResult.error}`);
+        }
+        setTimeout(function() {
+            window.print();
+        }, 100);
+    }
+    function updateQuoteMessage() {
+        const firstRowSel = document.querySelector('#itemTable tbody tr:first-child .product-sel');
+        const msgDiv = document.getElementById('quoteMessage');
+        if (!firstRowSel || !firstRowSel.value) {
+            msgDiv.innerText = "";
+            return;
+        }
+        const prodMap = {
+            "GIES (MDR Service)": "Genian MDR(서비스형) 제안에 대하여 아래와 같이 견적 합니다.",
+            "GIEA (AV Service)": "Genian MDR(서비스형) 제안에 대하여 아래와 같이 견적 합니다.",
+            "GIER (Ransomware Service)": "Genian MDR(서비스형) 제안에 대하여 아래와 같이 견적 합니다.",
+            "GIED (Device Control)": "Genian MDR(서비스형) 제안에 대하여 아래와 같이 견적 합니다.",
+            "Cloud NAC V6.0": "Genian Cloud NAC(서비스형) 제안에 대하여 아래와 같이 견적 합니다.",
+            "Cloud NAC V5.0": "Genian Cloud NAC(서비스형) 제안에 대하여 아래와 같이 견적 합니다.",
+            "Cloud ZTNA (PA)": "Genian Cloud ZTNA(서비스형) 제안에 대하여 아래와 같이 견적 합니다.",
+            "DocuRay DRM": "DocuRay DRM 클라우드 서비스형 제안에 대하여 아래와 같이 견적 합니다.",
+            "DocuRay DLP": "DocuRay DLP 클라우드 서비스형 제안에 대하여 아래와 같이 견적 합니다.",
+            "Genian Cloud ZTNA (공공)": "Genian Cloud ZTNA(공공) 제안에 대하여 아래와 같이 견적 합니다.",
+            "Genian Cloud GPI (공공)": "Genian Cloud GPI(공공) 제안에 대하여 아래와 같이 견적 합니다."
+        };
+        if (firstRowSel.value === "direct") {
+            msgDiv.innerText = "제안에 대하여 아래와 같이 견적 합니다.";
+        } else {
+            msgDiv.innerText = prodMap[firstRowSel.value] || "";
+        }
+    }
+    function updateRemarksText() {
+        let hasMDR = false, mdrCycle = "";
+        let hasNAC = false, nacCycle = "";
+        let hasPA = false, paCycle = "";
+        let hasDocuRay = false;
+        let hasPublicZTNA = false, publicZtnaCycle = "";
+        let hasPublicGPI = false, publicGpiCycle = "";
+        let hasBlockModule = false, hasGatewayModule = false;
+        const rows = document.querySelectorAll('#itemTable tbody tr');
+        rows.forEach(tr => {
+            const prod = tr.querySelector('.product-sel').value;
+            if (!prod || prod === "direct") return;
+            const billing = tr.querySelector('.billing-sel').value;
+            if (!billing) return;
+            let cycleStr = "연";
+            if (billing === "1") cycleStr = "월";
+            else if (billing === "lump") cycleStr = "일시납";
+            // 공공용 서비스는 기업용과 문구가 다르므로 먼저 별도로 처리하고 넘어갑니다.
+            if (prod === "Genian Cloud ZTNA (공공)") {
+                hasPublicZTNA = true; publicZtnaCycle = cycleStr;
+                return;
+            }
+            if (prod === "Genian Cloud GPI (공공)") {
+                hasPublicGPI = true; publicGpiCycle = cycleStr;
+                return;
+            }
+            if (prod === "차단서버모듈") {
+                hasBlockModule = true;
+                return;
+            }
+            if (prod === "게이트웨이모듈 (ZTNA 전용)") {
+                hasGatewayModule = true;
+                return;
+            }
+            if (prod.includes("MDR") || prod.includes("AV") || prod.includes("Ransomware") || prod.includes("Device")) {
+                hasMDR = true; mdrCycle = cycleStr;
+            } else if (prod.includes("NAC")) {
+                hasNAC = true; nacCycle = cycleStr;
+            } else if (prod.includes("ZTNA") || prod.includes("PA")) {
+                hasPA = true; paCycle = cycleStr;
+            } else if (prod.includes("DocuRay")) {
+                hasDocuRay = true;
+            }
+        });
+        let parts = [];
+        const getMethodStr = (cycle) => cycle === "일시납" ? "- 약정 일시납 조건" : `- ${cycle} 구독 서비스 방식`;
+        if (hasPublicZTNA) {
+            parts.push(`[Genian Cloud ZTNA (공공)]\n${getMethodStr(publicZtnaCycle)}\n- Node 수량 기준 월 이용료이며, 실제 구성에 따라 변경될 수 있습니다.`);
+        }
+        if (hasPublicGPI) {
+            parts.push(`[Genian Cloud GPI (공공)]\n${getMethodStr(publicGpiCycle)}\n- Agent 수량 기준 월 이용료이며, 실제 구성에 따라 변경될 수 있습니다.\n- 별도 초기 구축비용 없음`);
+        }
+        if (hasBlockModule || hasGatewayModule) {
+            const setupTotal = (hasBlockModule ? 1000000 : 0) + (hasGatewayModule ? 3000000 : 0);
+            let moduleDesc = [];
+            if (hasBlockModule) moduleDesc.push('차단서버모듈(NAC 기능, 100만원)');
+            if (hasGatewayModule) moduleDesc.push('게이트웨이모듈(ZTNA 기능, 300만원)');
+            parts.push(`[초기 구축비용]\n- 포함 모듈: ${moduleDesc.join(' + ')}\n- 총 초기 구축비용(1회성, 월 이용료 별도): ${setupTotal.toLocaleString()}원`);
+        }
+        if (hasMDR) {
+            parts.push(`[Genian MDR]\n${getMethodStr(mdrCycle)}\n- 관제/대응/분석/조치 모두 포함\n- 별도 추가 과금 없음`);
+        }
+        if (hasNAC && hasPA) {
+            parts.push(`[Cloud ZTNA]\n${getMethodStr(nacCycle)}\n- 네트워크 구성에 따라 장비 및 수량이 변경 될 수 있습니다.\n- 구축/기술지원/유지보수 모두 포함\n- PA 라이선스는 SSL VPN 동시 접속자 기준`);
+        } else if (hasNAC) {
+            parts.push(`[Cloud NAC]\n${getMethodStr(nacCycle)}\n- 네트워크 구성에 따라 장비 및 수량이 변경 될 수 있습니다.\n- 구축/기술지원/유지보수 모두 포함\n- 별도 추가 과금 없음`);
+        } else if (hasPA) {
+            parts.push(`[Cloud ZTNA (PA)]\n${getMethodStr(paCycle)}\n- 네트워크 구성에 따라 장비 및 수량이 변경 될 수 있습니다.\n- 구축/기술지원/유지보수 모두 포함\n- 별도 추가 과금 없음`);
+        }
+        if (hasDocuRay) {
+            parts.push(`[DocuRay]\n- 클라우드 서비스형 월 사용 견적 기준\n- 폐쇄망 운영 고객사는 서비스 불가\n- User 추가는 10명 단위로 가능, 제안 단가는 동일하게 적용`);
+        }
+        const autoStr = parts.join('\n\n');
+        const textarea = document.querySelector('.remarks-section textarea');
+        if (textarea.value.trim() === "" || textarea.value === window.lastAutoRemarks) {
+            textarea.value = autoStr;
+            window.lastAutoRemarks = autoStr;
+            textarea.style.height = "auto";
+            if (autoStr !== "") {
+                textarea.style.height = (textarea.scrollHeight + 5) + "px";
+            } else {
+                textarea.style.height = "120px";
+            }
+        }
+    }
+    function updateManagerInfo() {
+        const sel = document.getElementById('managerSelect');
+        const contactInput = document.getElementById('managerContact');
+        const printName = document.getElementById('printManagerName');
+        if (sel.value) {
+            contactInput.value = sel.value;
+            printName.value = sel.options[sel.selectedIndex].text;
+        } else {
+            contactInput.value = "";
+            printName.value = "";
+        }
+    }
+    const pricingDB = {
+        "GIES (MDR Service)": {
+            type: "yearly",
+            tiers: [
+                { max: 49, prices: { "무약정": 86900, "1년약정": 86900 } },
+                { max: 99, prices: { "무약정": 81400, "1년약정": 81400 } },
+                { max: 299, prices: { "무약정": 75900, "1년약정": 75900 } },
+                { max: 499, prices: { "무약정": 70400, "1년약정": 70400 } },
+                { max: 999, prices: { "무약정": 64900, "1년약정": 64900 } },
+                { max: 2999, prices: { "무약정": 59400, "1년약정": 59400 } },
+                { max: 4999, prices: { "무약정": 53900, "1년약정": 53900 } },
+                { max: 9999, prices: { "무약정": 48400, "1년약정": 48400 } },
+                { max: 9999999, prices: { "무약정": 42900, "1년약정": 42900 } }
+            ]
+        },
+        "GIEA (AV Service)": {
+            type: "yearly",
+            tiers: [
+                { max: 49, prices: { "무약정": 74400, "1년약정": 74400 } },
+                { max: 99, prices: { "무약정": 67500, "1년약정": 67500 } },
+                { max: 299, prices: { "무약정": 61300, "1년약정": 61300 } },
+                { max: 499, prices: { "무약정": 57500, "1년약정": 57500 } },
+                { max: 999, prices: { "무약정": 54400, "1년약정": 54400 } },
+                { max: 2999, prices: { "무약정": 50600, "1년약정": 50600 } },
+                { max: 4999, prices: { "무약정": 48100, "1년약정": 48100 } },
+                { max: 9999, prices: { "무약정": 45000, "1년약정": 45000 } },
+                { max: 9999999, prices: { "무약정": 40600, "1년약정": 40600 } }
+            ]
+        },
+        "GIER (Ransomware Service)": {
+            type: "yearly",
+            tiers: [
+                { max: 49, prices: { "무약정": 43500, "1년약정": 43500 } },
+                { max: 99, prices: { "무약정": 40700, "1년약정": 40700 } },
+                { max: 299, prices: { "무약정": 38000, "1년약정": 38000 } },
+                { max: 499, prices: { "무약정": 35200, "1년약정": 35200 } },
+                { max: 999, prices: { "무약정": 32400, "1년약정": 32400 } },
+                { max: 2999, prices: { "무약정": 29700, "1년약정": 29700 } },
+                { max: 4999, prices: { "무약정": 26900, "1년약정": 26900 } },
+                { max: 9999, prices: { "무약정": 24200, "1년약정": 24200 } },
+                { max: 9999999, prices: { "무약정": 21400, "1년약정": 21400 } }
+            ]
+        },
+        "GIED (Device Control)": {
+            type: "yearly",
+            tiers: [
+                { max: 49, prices: { "무약정": 19800, "1년약정": 19800 } },
+                { max: 99, prices: { "무약정": 17800, "1년약정": 17800 } },
+                { max: 299, prices: { "무약정": 16100, "1년약정": 16100 } },
+                { max: 499, prices: { "무약정": 15100, "1년약정": 15100 } },
+                { max: 999, prices: { "무약정": 14100, "1년약정": 14100 } },
+                { max: 2999, prices: { "무약정": 13200, "1년약정": 13200 } },
+                { max: 4999, prices: { "무약정": 12500, "1년약정": 12500 } },
+                { max: 9999, prices: { "무약정": 11800, "1년약정": 11800 } },
+                { max: 9999999, prices: { "무약정": 10500, "1년약정": 10500 } }
+            ]
+        },
+        "Cloud NAC V6.0": {
+            type: "monthly",
+            tiers: [
+                { max: 100, prices: { "무약정": 16000, "1년약정": 16000, "2년약정": 16000, "3년약정": 16000 } },
+                { max: 200, prices: { "무약정": 10700, "1년약정": 10700, "2년약정": 10700, "3년약정": 10700 } },
+                { max: 300, prices: { "무약정": 8700, "1년약정": 8700, "2년약정": 8700, "3년약정": 8700 } },
+                { max: 400, prices: { "무약정": 7400, "1년약정": 7400, "2년약정": 7400, "3년약정": 7400 } },
+                { max: 500, prices: { "무약정": 6700, "1년약정": 6700, "2년약정": 6700, "3년약정": 6700 } },
+                { max: 600, prices: { "무약정": 6100, "1년약정": 6100, "2년약정": 6100, "3년약정": 6100 } },
+                { max: 700, prices: { "무약정": 5600, "1년약정": 5600, "2년약정": 5600, "3년약정": 5600 } },
+                { max: 800, prices: { "무약정": 5400, "1년약정": 5400, "2년약정": 5400, "3년약정": 5400 } },
+                { max: 900, prices: { "무약정": 5100, "1년약정": 5100, "2년약정": 5100, "3년약정": 5100 } },
+                { max: 1000, prices: { "무약정": 4900, "1년약정": 4900, "2년약정": 4900, "3년약정": 4900 } },
+                { max: 1500, prices: { "무약정": 3900, "1년약정": 3900, "2년약정": 3900, "3년약정": 3900 } },
+                { max: 2000, prices: { "무약정": 3300, "1년약정": 3300, "2년약정": 3300, "3년약정": 3300 } },
+                { max: 2500, prices: { "무약정": 2900, "1년약정": 2900, "2년약정": 2900, "3년약정": 2900 } },
+                { max: 9999999, prices: { "무약정": 2700, "1년약정": 2700, "2년약정": 2700, "3년약정": 2700 } }
+            ]
+        },
+        "Cloud NAC V5.0": {
+            type: "monthly",
+            tiers: [
+                { max: 100, prices: { "무약정": 16000, "1년약정": 16000, "2년약정": 16000, "3년약정": 16000 } },
+                { max: 200, prices: { "무약정": 10700, "1년약정": 10700, "2년약정": 10700, "3년약정": 10700 } },
+                { max: 300, prices: { "무약정": 8700, "1년약정": 8700, "2년약정": 8700, "3년약정": 8700 } },
+                { max: 400, prices: { "무약정": 7400, "1년약정": 7400, "2년약정": 7400, "3년약정": 7400 } },
+                { max: 500, prices: { "무약정": 6700, "1년약정": 6700, "2년약정": 6700, "3년약정": 6700 } },
+                { max: 600, prices: { "무약정": 6100, "1년약정": 6100, "2년약정": 6100, "3년약정": 6100 } },
+                { max: 700, prices: { "무약정": 5600, "1년약정": 5600, "2년약정": 5600, "3년약정": 5600 } },
+                { max: 800, prices: { "무약정": 5400, "1년약정": 5400, "2년약정": 5400, "3년약정": 5400 } },
+                { max: 900, prices: { "무약정": 5100, "1년약정": 5100, "2년약정": 5100, "3년약정": 5100 } },
+                { max: 1000, prices: { "무약정": 4900, "1년약정": 4900, "2년약정": 4900, "3년약정": 4900 } },
+                { max: 1500, prices: { "무약정": 3900, "1년약정": 3900, "2년약정": 3900, "3년약정": 3900 } },
+                { max: 2000, prices: { "무약정": 3300, "1년약정": 3300, "2년약정": 3300, "3년약정": 3300 } },
+                { max: 2500, prices: { "무약정": 2900, "1년약정": 2900, "2년약정": 2900, "3년약정": 2900 } },
+                { max: 9999999, prices: { "무약정": 2700, "1년약정": 2700, "2년약정": 2700, "3년약정": 2700 } }
+            ]
+        },
+        "Cloud Sensor": {
+            type: "monthly", // Cloud NAC와 동일한 계약기간 체계(무약정/1년/2년/3년약정)를 따릅니다.
+            tiers: [
+                { max: 9999999, prices: { "무약정": 150000, "1년약정": 150000, "2년약정": 150000, "3년약정": 150000 } }
+            ]
+        },
+        "Cloud ZTNA (PA)": {
+            type: "monthly",
+            tiers: [
+                { max: 100, prices: { "무약정": 26600, "1년약정": 26600, "2년약정": 26600, "3년약정": 26600 } },
+                { max: 200, prices: { "무약정": 17800, "1년약정": 17800, "2년약정": 17800, "3년약정": 17800 } },
+                { max: 300, prices: { "무약정": 14400, "1년약정": 14400, "2년약정": 14400, "3년약정": 14400 } },
+                { max: 400, prices: { "무약정": 12400, "1년약정": 12400, "2년약정": 12400, "3년약정": 12400 } },
+                { max: 500, prices: { "무약정": 11200, "1년약정": 11200, "2년약정": 11200, "3년약정": 11200 } },
+                { max: 600, prices: { "무약정": 10200, "1년약정": 10200, "2년약정": 10200, "3년약정": 10200 } },
+                { max: 700, prices: { "무약정": 9400, "1년약정": 9400, "2년약정": 9400, "3년약정": 9400 } },
+                { max: 800, prices: { "무약정": 9000, "1년약정": 9000, "2년약정": 9000, "3년약정": 9000 } },
+                { max: 900, prices: { "무약정": 8400, "1년약정": 8400, "2년약정": 8400, "3년약정": 8400 } },
+                { max: 1000, prices: { "무약정": 8200, "1년약정": 8200, "2년약정": 8200, "3년약정": 8200 } },
+                { max: 1500, prices: { "무약정": 6400, "1년약정": 6400, "2년약정": 6400, "3년약정": 6400 } },
+                { max: 2000, prices: { "무약정": 5400, "1년약정": 5400, "2년약정": 5400, "3년약정": 5400 } },
+                { max: 2500, prices: { "무약정": 4800, "1년약정": 4800, "2년약정": 4800, "3년약정": 4800 } },
+                { max: 9999999, prices: { "무약정": 4400, "1년약정": 4400, "2년약정": 4400, "3년약정": 4400 } }
+            ]
+        },
+        "DocuRay DRM": {
+            type: "monthly",
+            tiers: [
+                { max: 9999999, prices: { "무약정": 20000, "1년약정": 20000, "2년약정": 20000, "3년약정": 20000 } }
+            ]
+        },
+        "DocuRay DLP": {
+            type: "monthly",
+            tiers: [
+                { max: 9999999, prices: { "무약정": 20000, "1년약정": 20000, "2년약정": 20000, "3년약정": 20000 } }
+            ]
+        }
+    };
+    // ─────────────────────────────────────────────
+    // 공공용 가격 DB (Genian Cloud ZTNA / GPI, Node·Agent 수량 기준 월 이용료)
+    // setupCost: 참고용 1회성 초기 구축비용 (계산에는 자동 반영되지 않고 비고란 안내문에만 사용됩니다)
+    // ─────────────────────────────────────────────
+    const publicPricingDB = {
+        "Genian Cloud ZTNA (공공)": {
+            type: "monthly",
+            setupCost: 4000000, // 차단서버모듈 100만 + 게이트웨이모듈 300만
+            tiers: [
+                { max: 50, prices: { "무약정": 324000, "1년약정": 324000, "2년약정": 324000, "3년약정": 324000 } },
+                { max: 100, prices: { "무약정": 494000, "1년약정": 494000, "2년약정": 494000, "3년약정": 494000 } },
+                { max: 200, prices: { "무약정": 663000, "1년약정": 663000, "2년약정": 663000, "3년약정": 663000 } },
+                { max: 300, prices: { "무약정": 832000, "1년약정": 832000, "2년약정": 832000, "3년약정": 832000 } },
+                { max: 400, prices: { "무약정": 1001000, "1년약정": 1001000, "2년약정": 1001000, "3년약정": 1001000 } },
+                { max: 500, prices: { "무약정": 1170000, "1년약정": 1170000, "2년약정": 1170000, "3년약정": 1170000 } },
+                { max: 600, prices: { "무약정": 1281000, "1년약정": 1281000, "2년약정": 1281000, "3년약정": 1281000 } },
+                { max: 700, prices: { "무약정": 1395000, "1년약정": 1395000, "2년약정": 1395000, "3년약정": 1395000 } },
+                { max: 800, prices: { "무약정": 1508000, "1년약정": 1508000, "2년약정": 1508000, "3년약정": 1508000 } },
+                { max: 900, prices: { "무약정": 1606000, "1년약정": 1606000, "2년약정": 1606000, "3년약정": 1606000 } },
+                { max: 1000, prices: { "무약정": 1703000, "1년약정": 1703000, "2년약정": 1703000, "3년약정": 1703000 } },
+                { max: 1100, prices: { "무약정": 1775000, "1년약정": 1775000, "2년약정": 1775000, "3년약정": 1775000 } },
+                { max: 1200, prices: { "무약정": 1846000, "1년약정": 1846000, "2년약정": 1846000, "3년약정": 1846000 } },
+                { max: 1300, prices: { "무약정": 1915000, "1년약정": 1915000, "2년약정": 1915000, "3년약정": 1915000 } },
+                { max: 1400, prices: { "무약정": 1986000, "1년약정": 1986000, "2년약정": 1986000, "3년약정": 1986000 } },
+                { max: 1500, prices: { "무약정": 2057000, "1년약정": 2057000, "2년약정": 2057000, "3년약정": 2057000 } },
+                { max: 1600, prices: { "무약정": 2126000, "1년약정": 2126000, "2년약정": 2126000, "3년약정": 2126000 } },
+                { max: 1700, prices: { "무약정": 2197000, "1년약정": 2197000, "2년약정": 2197000, "3년약정": 2197000 } },
+                { max: 1800, prices: { "무약정": 2269000, "1년약정": 2269000, "2년약정": 2269000, "3년약정": 2269000 } },
+                { max: 1900, prices: { "무약정": 2337000, "1년약정": 2337000, "2년약정": 2337000, "3년약정": 2337000 } },
+                { max: 2000, prices: { "무약정": 2409000, "1년약정": 2409000, "2년약정": 2409000, "3년약정": 2409000 } },
+                { max: 2200, prices: { "무약정": 2548000, "1년약정": 2548000, "2년약정": 2548000, "3년약정": 2548000 } },
+                { max: 2400, prices: { "무약정": 2691000, "1년약정": 2691000, "2년약정": 2691000, "3년약정": 2691000 } },
+                { max: 2600, prices: { "무약정": 2831000, "1년약정": 2831000, "2년약정": 2831000, "3년약정": 2831000 } },
+                { max: 2800, prices: { "무약정": 2971000, "1년약정": 2971000, "2년약정": 2971000, "3년약정": 2971000 } },
+                { max: 3000, prices: { "무약정": 3114000, "1년약정": 3114000, "2년약정": 3114000, "3년약정": 3114000 } },
+                { max: 9999999, prices: { "무약정": 3114000, "1년약정": 3114000, "2년약정": 3114000, "3년약정": 3114000 } }
+            ]
+        },
+        "Genian Cloud GPI (공공)": {
+            type: "monthly",
+            setupCost: 0,
+            tiers: [
+                { max: 50, prices: { "무약정": 162000, "1년약정": 162000, "2년약정": 162000, "3년약정": 162000 } },
+                { max: 100, prices: { "무약정": 228000, "1년약정": 228000, "2년약정": 228000, "3년약정": 228000 } },
+                { max: 200, prices: { "무약정": 306000, "1년약정": 306000, "2년약정": 306000, "3년약정": 306000 } },
+                { max: 300, prices: { "무약정": 384000, "1년약정": 384000, "2년약정": 384000, "3년약정": 384000 } },
+                { max: 400, prices: { "무약정": 462000, "1년약정": 462000, "2년약정": 462000, "3년약정": 462000 } },
+                { max: 500, prices: { "무약정": 540000, "1년약정": 540000, "2년약정": 540000, "3년약정": 540000 } },
+                { max: 600, prices: { "무약정": 591000, "1년약정": 591000, "2년약정": 591000, "3년약정": 591000 } },
+                { max: 700, prices: { "무약정": 644000, "1년약정": 644000, "2년약정": 644000, "3년약정": 644000 } },
+                { max: 800, prices: { "무약정": 696000, "1년약정": 696000, "2년약정": 696000, "3년약정": 696000 } },
+                { max: 900, prices: { "무약정": 741000, "1년약정": 741000, "2년약정": 741000, "3년약정": 741000 } },
+                { max: 1000, prices: { "무약정": 786000, "1년약정": 786000, "2년약정": 786000, "3년약정": 786000 } },
+                { max: 1100, prices: { "무약정": 819000, "1년약정": 819000, "2년약정": 819000, "3년약정": 819000 } },
+                { max: 1200, prices: { "무약정": 852000, "1년약정": 852000, "2년약정": 852000, "3년약정": 852000 } },
+                { max: 1300, prices: { "무약정": 884000, "1년약정": 884000, "2년약정": 884000, "3년약정": 884000 } },
+                { max: 1400, prices: { "무약정": 917000, "1년약정": 917000, "2년약정": 917000, "3년약정": 917000 } },
+                { max: 1500, prices: { "무약정": 949000, "1년약정": 949000, "2년약정": 949000, "3년약정": 949000 } },
+                { max: 1600, prices: { "무약정": 981000, "1년약정": 981000, "2년약정": 981000, "3년약정": 981000 } },
+                { max: 1700, prices: { "무약정": 1014000, "1년약정": 1014000, "2년약정": 1014000, "3년약정": 1014000 } },
+                { max: 1800, prices: { "무약정": 1047000, "1년약정": 1047000, "2년약정": 1047000, "3년약정": 1047000 } },
+                { max: 1900, prices: { "무약정": 1079000, "1년약정": 1079000, "2년약정": 1079000, "3년약정": 1079000 } },
+                { max: 2000, prices: { "무약정": 1112000, "1년약정": 1112000, "2년약정": 1112000, "3년약정": 1112000 } },
+                { max: 2200, prices: { "무약정": 1176000, "1년약정": 1176000, "2년약정": 1176000, "3년약정": 1176000 } },
+                { max: 2400, prices: { "무약정": 1242000, "1년약정": 1242000, "2년약정": 1242000, "3년약정": 1242000 } },
+                { max: 2600, prices: { "무약정": 1307000, "1년약정": 1307000, "2년약정": 1307000, "3년약정": 1307000 } },
+                { max: 2800, prices: { "무약정": 1371000, "1년약정": 1371000, "2년약정": 1371000, "3년약정": 1371000 } },
+                { max: 3000, prices: { "무약정": 1437000, "1년약정": 1437000, "2년약정": 1437000, "3년약정": 1437000 } },
+                { max: 9999999, prices: { "무약정": 1437000, "1년약정": 1437000, "2년약정": 1437000, "3년약정": 1437000 } }
+            ]
+        },
+        "차단서버모듈": {
+            type: "monthly",
+            setupCost: 1000000, // NAC 기능(차단서버모듈) 사용 시 초기 구축비용
+            tiers: [
+                { max: 250, prices: { "무약정": 20000, "1년약정": 20000, "2년약정": 20000, "3년약정": 20000 } },
+                { max: 500, prices: { "무약정": 30000, "1년약정": 30000, "2년약정": 30000, "3년약정": 30000 } },
+                { max: 1500, prices: { "무약정": 70000, "1년약정": 70000, "2년약정": 70000, "3년약정": 70000 } },
+                { max: 2500, prices: { "무약정": 100000, "1년약정": 100000, "2년약정": 100000, "3년약정": 100000 } },
+                { max: 9999999, prices: { "무약정": 100000, "1년약정": 100000, "2년약정": 100000, "3년약정": 100000 } }
+            ]
+        },
+        "게이트웨이모듈 (ZTNA 전용)": {
+            type: "monthly",
+            setupCost: 3000000, // ZTNA 기능(게이트웨이모듈) 사용 시 초기 구축비용
+            tiers: [
+                { max: 250, prices: { "무약정": 60000, "1년약정": 60000, "2년약정": 60000, "3년약정": 60000 } },
+                { max: 500, prices: { "무약정": 90000, "1년약정": 90000, "2년약정": 90000, "3년약정": 90000 } },
+                { max: 1500, prices: { "무약정": 280000, "1년약정": 280000, "2년약정": 280000, "3년약정": 280000 } },
+                { max: 2500, prices: { "무약정": 500000, "1년약정": 500000, "2년약정": 500000, "3년약정": 500000 } },
+                { max: 9999999, prices: { "무약정": 500000, "1년약정": 500000, "2년약정": 500000, "3년약정": 500000 } }
+            ]
+        }
+    };
+    // 계산/조회 시에는 두 DB를 합쳐서 찾습니다 (기존에 저장된 견적을 나중에 열어도 정상 계산되도록).
+    const allPricingDB = Object.assign({}, pricingDB, publicPricingDB);
+    // 화면에 보여줄 "서비스 선택" 목록은 선택한 견적 종류에 따라 달라집니다.
+    let activePricingDB = pricingDB;
+    function selectQuoteType(type) {
+        window.currentQuoteType = type;
+        activePricingDB = (type === 'public') ? publicPricingDB : pricingDB;
+        document.getElementById('quoteTypeOverlay').style.display = 'none';
+        document.getElementById('quoteTypeBadge').innerText = (type === 'public') ? '[공공용]' : '[기업용]';
+        initAppAfterTypeSelected();
+    }
+    async function initAppAfterTypeSelected() {
+        populateManagerSelect();
+        addRow();
+        // URL에 ?view=경로 가 있으면, 그 견적을 자동으로 불러와서 읽기 전용으로 보여줍니다.
+        const params = new URLSearchParams(window.location.search);
+        const viewPath = params.get('view');
+        if (viewPath) {
+            if (!workerConfig.baseUrl || !workerConfig.accessPassword) {
+                alert('저장 서버 설정(접속 비밀번호)이 필요합니다. "GitHub ▾ → 설정"에서 먼저 설정해주세요.');
+                return;
+            }
+            try {
+                const res = await fetch(`${workerConfig.baseUrl}/load?path=${encodeURIComponent(viewPath)}`, {
+                    headers: { 'X-Access-Password': workerConfig.accessPassword }
+                });
+                if (!res.ok) {
+                    const errResult = await res.json().catch(() => ({}));
+                    throw new Error(errResult.error || `HTTP ${res.status}`);
+                }
+                const text = await res.text();
+                const data = JSON.parse(text);
+                // 불러온 견적에 공공용 서비스가 포함되어 있으면, 서비스 선택 목록도 공공용 기준으로 전환합니다.
+                const isPublicQuote = (data.rows || []).some(r => publicPricingDB[r.prod]);
+                if (isPublicQuote) {
+                    activePricingDB = publicPricingDB;
+                    document.getElementById('quoteTypeBadge').innerText = '[공공용]';
+                }
+                applyQuoteData(data);
+                enterDocViewMode();
+            } catch (err) {
+                alert('견적을 불러오는 중 오류가 발생했습니다.\n' + err.message);
+            }
+        }
+    };
+    window.onload = function() {
+        document.getElementById('quoteDate').valueAsDate = new Date();
+        loadGithubConfigFromStorage();
+    };
+    function enterDocViewMode() {
+        document.body.classList.add('doc-view-mode');
+        document.getElementById('viewModeBar').style.display = 'flex';
+    }
+    function exitDocViewMode() {
+        document.body.classList.remove('doc-view-mode');
+        document.getElementById('viewModeBar').style.display = 'none';
+    }
+    function addRow(data) {
+        const tbody = document.querySelector('#itemTable tbody');
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td style="vertical-align: middle;">
+                <select class="product-sel no-print" onchange="updateOptions(this);">
+                    <option value="">-- 서비스 선택 --</option>
+                    ${Object.keys(activePricingDB).map(name => `<option value="${name}">${name}</option>`).join('')}
+                    <option value="direct">직접 입력</option>
+                </select>
+                <input type="text" class="product-custom custom-input no-print" style="display:none;" placeholder="서비스명 직접입력" oninput="calcAll()">
+                <div class="print-text"></div>
+            </td>
+            <td style="vertical-align: middle;">
+                <select class="term-sel no-print" onchange="resetConsumerManual(this.closest('tr')); calcAll();">
+                    <option value="">-- 계약 기간 --</option>
+                </select>
+                <input type="text" class="term-custom custom-input no-print" style="display:none;" placeholder="기간 직접입력" oninput="calcAll()">
+                <div class="print-text"></div>
+            </td>
+            <td style="vertical-align: middle;">
+                <select class="billing-sel no-print" onchange="resetConsumerManual(this.closest('tr')); calcAll();">
+                    <option value="">-- 납부 주기 --</option>
+                    <option value="lump">일시납</option>
+                    <option value="12">연납(1년)</option>
+                    <option value="1">월납</option>
+                </select>
+                <div class="print-text"></div>
+            </td>
+            <td><input type="text" class="consumer-price input-num text-right" data-manual="false" placeholder="자동계산" oninput="onConsumerPriceInput(this)"></td>
+            <td><input type="text" inputmode="numeric" class="qty input-num" value="1" maxlength="9" oninput="sanitizeQtyInput(this); resetConsumerManual(this.closest('tr')); calcAll();" style="display: none; width: 100%; box-sizing: border-box; padding: 2px 4px;"></td>
+            <td><input type="text" class="proposed-price input-num text-right" oninput="formatCurrency(this)" placeholder="직접입력"></td>
+            <td><input type="text" class="row-total input-num text-right" readonly></td>
+            <td><input type="text" class="row-vat input-num text-right" readonly></td>
+            <td style="position:relative;">
+                <input type="text" style="width: 100%; border: none; text-align: center;">
+                <div class="row-actions no-print">
+                    <button class="btn-dup" onclick="duplicateRow(this)" title="이 행 복제">＋</button>
+                    <button class="btn-del" onclick="this.closest('tr').remove(); calcAll();" title="이 행 삭제">X</button>
+                </div>
+            </td>
+        `;
+        tbody.appendChild(tr);
+        if (data) {
+            const prodSel = tr.querySelector('.product-sel');
+            prodSel.value = data.prod || "";
+            if (data.prod === 'direct') {
+                prodSel.style.display = 'none';
+                const prodCustom = tr.querySelector('.product-custom');
+                prodCustom.style.display = 'block';
+                prodCustom.value = data.prodCustom || "";
+                const termSel = tr.querySelector('.term-sel');
+                termSel.style.display = 'none';
+                const termCustom = tr.querySelector('.term-custom');
+                termCustom.style.display = 'block';
+                termCustom.value = data.termCustom || "";
+                tr.querySelector('.qty').style.display = 'inline-block';
+                tr.querySelector('.qty').value = data.qty || 1;
+                const consumerPrice = tr.querySelector('.consumer-price');
+                consumerPrice.removeAttribute('readonly');
+                consumerPrice.placeholder = "단가 직접입력";
+                consumerPrice.value = data.consumerPrice || "";
+            } else if (data.prod && allPricingDB[data.prod]) {
+                updateOptions(prodSel);
+                tr.querySelector('.term-sel').value = data.term || "";
+                tr.querySelector('.qty').value = data.qty || 1;
+                // 저장 당시 소비자 단가를 사용자가 직접 수정했었다면(자동계산과 다르면) 그 값을 복원하고 수동 입력 상태를 유지합니다.
+                if (data.consumerPrice) {
+                    const cpInput = tr.querySelector('.consumer-price');
+                    cpInput.value = parseInt(data.consumerPrice).toLocaleString();
+                    cpInput.dataset.manual = "true";
+                }
+            }
+            tr.querySelector('.billing-sel').value = data.billing || "";
+            tr.querySelector('.proposed-price').value = data.proposed || "";
+            tr.querySelector('td:last-child input[type="text"]').value = data.note || "";
+        }
+        calcAll();
+        return tr;
+    }
+    function duplicateRow(btn) {
+        const tr = btn.closest('tr');
+        const data = {
+            prod: tr.querySelector('.product-sel').value,
+            prodCustom: tr.querySelector('.product-custom').value,
+            term: tr.querySelector('.term-sel').value,
+            termCustom: tr.querySelector('.term-custom').value,
+            billing: tr.querySelector('.billing-sel').value,
+            qty: tr.querySelector('.qty').value,
+            proposed: tr.querySelector('.proposed-price').value.replace(/,/g, ''),
+            consumerPrice: tr.querySelector('.consumer-price').value.replace(/,/g, ''),
+            note: tr.querySelector('td:last-child input[type="text"]').value
+        };
+        addRow(data);
+    }
+    // 공공용 서비스는 무조건 연간 계약이므로, 해당 행의 납부주기 선택을 "연납(1년)"만 남기고 잠급니다.
+    function applyBillingRestriction(tr, prodName) {
+        const billingSel = tr.querySelector('.billing-sel');
+        const isPublicProduct = !!publicPricingDB[prodName];
+        if (isPublicProduct) {
+            billingSel.innerHTML = '<option value="12">연납(1년)</option>';
+            billingSel.value = '12';
+            billingSel.disabled = true;
+        } else {
+            billingSel.disabled = false;
+            billingSel.innerHTML = `
+                <option value="">-- 납부 주기 --</option>
+                <option value="lump">일시납</option>
+                <option value="12">연납(1년)</option>
+                <option value="1">월납</option>
+            `;
+        }
+    }
+    function updateOptions(selectElem) {
+        const tr = selectElem.closest('tr');
+        const termSel = tr.querySelector('.term-sel');
+        const qtyInput = tr.querySelector('.qty');
+        const prodName = selectElem.value;
+        const prodCustom = tr.querySelector('.product-custom');
+        const termCustom = tr.querySelector('.term-custom');
+        const consumerPrice = tr.querySelector('.consumer-price');
+        consumerPrice.dataset.manual = "false";
+        termSel.innerHTML = '<option value="">-- 계약 기간 --</option>';
+        applyBillingRestriction(tr, prodName);
+        if (prodName === 'direct') {
+            selectElem.style.display = 'none';
+            prodCustom.style.display = 'block';
+            termSel.style.display = 'none';
+            termCustom.style.display = 'block';
+            qtyInput.style.display = 'inline-block';
+            consumerPrice.removeAttribute('readonly');
+            consumerPrice.placeholder = "단가 직접입력";
+            consumerPrice.value = "";
+            tr.querySelector('.proposed-price').value = "";
+            tr.querySelector('.row-total').value = "";
+            tr.querySelector('.row-vat').value = "";
+            calcAll();
+            return;
+        }
+        if (!prodName) {
+            qtyInput.style.display = 'none';
+            consumerPrice.value = "";
+            tr.querySelector('.proposed-price').value = "";
+            tr.querySelector('.row-total').value = "";
+            tr.querySelector('.row-vat').value = "";
+            calcAll();
+            return;
+        } else {
+            qtyInput.style.display = 'inline-block';
+        }
+        const isPublicProduct = !!publicPricingDB[prodName];
+        let conditions = Object.keys(allPricingDB[prodName].tiers[0].prices);
+        if (isPublicProduct) {
+            conditions = conditions.filter(c => c === '1년약정'); // 공공은 연간 계약만 허용
+        }
+        conditions.forEach(cond => {
+            termSel.innerHTML += `<option value="${cond}">${cond}</option>`;
+        });
+        if (conditions.length > 0) {
+            termSel.value = conditions[0];
+        }
+        calcAll();
+    }
+    function formatCurrency(input) {
+        let val = input.value.replace(/[^0-9]/g, '');
+        if (val) { input.value = parseInt(val).toLocaleString(); }
+        else { input.value = ''; }
+        calcAll();
+    }
+    // 수량 입력: 숫자만 남기고, 자릿수 제한(browser number input 렌더링 이슈) 없이 그대로 반영합니다.
+    function sanitizeQtyInput(input) {
+        let val = input.value.replace(/[^0-9]/g, '');
+        // 선행 0 제거 (단, "0" 한 글자는 유지)
+        val = val.replace(/^0+(?=\d)/, '');
+        input.value = val;
+    }
+    // 소비자 단가: DB 가격이 자동으로 채워지지만, 사용자가 직접 값을 고치면
+    // 그 다음부터는 calcAll()이 자동계산 값으로 덮어쓰지 않도록 표시해둡니다.
+    function onConsumerPriceInput(input) {
+        input.dataset.manual = "true";
+        formatCurrency(input);
+    }
+    // 서비스/계약기간/납부주기/수량이 바뀌면, 그 행은 새로 자동계산되도록 수동 입력 표시를 초기화합니다.
+    function resetConsumerManual(tr) {
+        const consumerPrice = tr.querySelector('.consumer-price');
+        if (consumerPrice) consumerPrice.dataset.manual = "false";
+    }
+    function calcAll() {
+        let grandVal = 0, grandVat = 0;
+        let incompleteCount = 0;
+        const rows = document.querySelectorAll('#itemTable tbody tr');
+        rows.forEach(tr => {
+            const prodSel = tr.querySelector('.product-sel');
+            const prodName = prodSel.value;
+            const term = tr.querySelector('.term-sel').value;
+            const billingVal = tr.querySelector('.billing-sel').value;
+            const isLumpSum = (billingVal === 'lump');
+            const billingMulti = parseInt(billingVal) || 1;
+            const qty = parseInt(tr.querySelector('.qty').value) || 0;
+            const proposedInput = tr.querySelector('.proposed-price').value.replace(/,/g, '');
+            const proposedPrice = parseInt(proposedInput) || 0;
+            let consumerPrice = 0;
+            if (prodName === 'direct') {
+                const cPriceInput = tr.querySelector('.consumer-price').value.replace(/,/g, '');
+                consumerPrice = parseInt(cPriceInput) || 0;
+            } else if (prodName && term && billingVal !== "" && qty > 0) {
+                const db = allPricingDB[prodName];
+                let tier = db.tiers.find(t => qty <= t.max);
+                if (!tier) tier = db.tiers[db.tiers.length - 1];
+                let basePrice = tier.prices[term] || 0;
+                if (isLumpSum) {
+                    let years = 1;
+                    if (term.includes('2년')) years = 2;
+                    else if (term.includes('3년')) years = 3;
+                    else if (term.includes('4년')) years = 4;
+                    else if (term.includes('5년')) years = 5;
+                    if (db.type === "monthly") {
+                        if (term === '무약정') { basePrice *= 1; }
+                        else { basePrice *= (years * 12); }
+                    } else if (db.type === "yearly") {
+                        basePrice *= years;
+                    }
+                } else {
+                    if (db.type === "monthly" && billingMulti === 12) basePrice *= 12;
+                    if (db.type === "yearly" && billingMulti === 1) basePrice = Math.floor(basePrice / 12);
+                }
+                consumerPrice = basePrice;
+            }
+            const isIncomplete = !!prodName && prodName !== 'direct' && (!term || billingVal === "");
+            tr.classList.toggle('row-incomplete', isIncomplete);
+            if (isIncomplete) incompleteCount++;
+            const subTotal = proposedPrice * qty;
+            const vat = Math.floor(subTotal * 0.1);
+            if (prodName === 'direct') {
+                if (consumerPrice > 0) {
+                    tr.querySelector('.consumer-price').value = consumerPrice.toLocaleString();
+                }
+                tr.querySelector('.row-total').value = subTotal ? subTotal.toLocaleString() : "";
+                tr.querySelector('.row-vat').value = vat ? vat.toLocaleString() : "";
+            } else if (prodName) {
+                const consumerPriceInput = tr.querySelector('.consumer-price');
+                if (consumerPriceInput.dataset.manual !== "true") {
+                    consumerPriceInput.value = consumerPrice ? consumerPrice.toLocaleString() : "";
+                }
+                tr.querySelector('.row-total').value = subTotal ? subTotal.toLocaleString() : "";
+                tr.querySelector('.row-vat').value = vat ? vat.toLocaleString() : "";
+            }
+            const prodPrint = prodSel.parentElement.querySelector('.print-text');
+            if (prodSel.value === 'direct') {
+                prodPrint.innerText = tr.querySelector('.product-custom').value;
+            } else if (prodSel.selectedIndex > 0) {
+                prodPrint.innerText = prodSel.options[prodSel.selectedIndex].text;
+            } else {
+                prodPrint.innerText = "";
+            }
+            const termSel = tr.querySelector('.term-sel');
+            const termPrint = termSel.parentElement.querySelector('.print-text');
+            if (prodSel.value === 'direct') {
+                termPrint.innerText = tr.querySelector('.term-custom').value;
+            } else if (termSel.selectedIndex > 0) {
+                termPrint.innerText = termSel.options[termSel.selectedIndex].text;
+            } else {
+                termPrint.innerText = "";
+            }
+            const billSel = tr.querySelector('.billing-sel');
+            const billPrint = billSel.parentElement.querySelector('.print-text');
+            if (billSel.value !== "" && billSel.selectedIndex >= 0) {
+                billPrint.innerText = billSel.options[billSel.selectedIndex].text;
+            } else {
+                billPrint.innerText = "";
+            }
+            grandVal += subTotal;
+            grandVat += vat;
+        });
+        const totalAmt = grandVal + grandVat;
+        document.getElementById('numSubTotal').innerText = grandVal.toLocaleString();
+        document.getElementById('numGrandTotal').innerText = totalAmt.toLocaleString();
+        document.getElementById('txtGrandTotal').innerText = amtToKor(totalAmt);
+        const warnDiv = document.getElementById('incompleteWarning');
+        warnDiv.innerText = incompleteCount > 0
+            ? `⚠ ${incompleteCount}개 항목의 계약기간/납부주기 선택이 누락되어 금액이 계산되지 않았습니다.`
+            : "";
+        // 견적 작성자에게만 보이는 안내 (인쇄/저장/고객용 화면에는 절대 나오지 않음)
+        const hasPublicZTNARow = Array.from(rows).some(tr => tr.querySelector('.product-sel').value === 'Genian Cloud ZTNA (공공)');
+        const hintDiv = document.getElementById('internalHint');
+        if (hasPublicZTNARow) {
+            hintDiv.style.display = 'block';
+            hintDiv.innerHTML = "📌 <b>작성 참고 (고객에게는 표시되지 않음)</b>: 'Genian Cloud ZTNA'는 NAC(차단서버모듈)/ZTNA(게이트웨이모듈) 기능을 선택적으로 제공합니다. 사용할 기능에 맞는 모듈을 서비스 항목에 함께 추가해주세요.";
+        } else {
+            hintDiv.style.display = 'none';
+            hintDiv.innerHTML = '';
+        }
+        updateQuoteMessage();
+        updateRemarksText();
+    }
+    function amtToKor(num) {
+        if (num === 0) return "영";
+        const kor = ["", "일", "이", "삼", "사", "오", "육", "칠", "팔", "구"];
+        const unit = ["", "십", "백", "천"];
+        const bigUnit = ["", "만", "억", "조"];
+        let res = "", i = 0, n = num;
+        while (n > 0) {
+            let m = n % 10000, s = "", j = 0;
+            while (m > 0) {
+                let d = m % 10;
+                if (d > 0) s = kor[d] + unit[j] + s;
+                m = Math.floor(m / 10); j++;
+            }
+            if (s !== "") res = s + bigUnit[i] + res;
+            n = Math.floor(n / 10000); i++;
+        }
+        return res;
+    }
+    // ─────────────────────────────────────────────
+    // 견적 데이터 수집 / 복원
+    // ─────────────────────────────────────────────
+    function collectQuoteData() {
+        const rows = [];
+        document.querySelectorAll('#itemTable tbody tr').forEach(tr => {
+            rows.push({
+                prod: tr.querySelector('.product-sel').value,
+                prodCustom: tr.querySelector('.product-custom').value,
+                term: tr.querySelector('.term-sel').value,
+                termCustom: tr.querySelector('.term-custom').value,
+                billing: tr.querySelector('.billing-sel').value,
+                qty: tr.querySelector('.qty').value,
+                proposed: tr.querySelector('.proposed-price').value.replace(/,/g, ''),
+                consumerPrice: tr.querySelector('.consumer-price').value.replace(/,/g, ''),
+                note: tr.querySelector('td:last-child input[type="text"]').value
+            });
+        });
+        const remarksVal = document.querySelector('.remarks-section textarea').value;
+        return {
+            version: "3.0",
+            savedAt: new Date().toISOString(),
+            customerName: document.getElementById('customerName').value,
+            contactPerson: document.getElementById('contactPersonName').value,
+            quoteDate: document.getElementById('quoteDate').value,
+            manager: document.getElementById('managerSelect').value,
+            remarks: remarksVal,
+            remarksIsAuto: (remarksVal === window.lastAutoRemarks),
+            grandTotal: document.getElementById('numGrandTotal').innerText,
+            rows: rows
+        };
+    }
+    function applyQuoteData(data) {
+        document.getElementById('customerName').value = data.customerName || '';
+        document.getElementById('contactPersonName').value = data.contactPerson || '';
+        document.getElementById('quoteDate').value = data.quoteDate || '';
+        document.getElementById('managerSelect').value = data.manager || '';
+        updateManagerInfo();
+        document.querySelector('#itemTable tbody').innerHTML = '';
+        (data.rows || []).forEach(rowData => addRow(rowData));
+        if (document.querySelectorAll('#itemTable tbody tr').length === 0) addRow();
+        const ta = document.querySelector('.remarks-section textarea');
+        if (!data.remarksIsAuto && data.remarks) {
+            ta.value = data.remarks;
+            window.lastAutoRemarks = "__loaded_manual__";
+            ta.style.height = 'auto';
+            ta.style.height = (ta.scrollHeight + 5) + 'px';
+        }
+        calcAll();
+    }
+    // ─────────────────────────────────────────────
+    // 로컬 파일 임시저장 / 불러오기
+    // ─────────────────────────────────────────────
+    function saveQuoteData() {
+        const data = collectQuoteData();
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const customer = sanitizeFileName(data.customerName || '견적서');
+        a.href = url;
+        a.download = `${customer}_견적데이터.json`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+    }
+    function loadQuoteData(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const data = JSON.parse(e.target.result);
+                applyQuoteData(data);
+                alert('불러오기가 완료되었습니다.');
+            } catch (err) {
+                alert('파일을 읽는 중 오류가 발생했습니다. 올바른 견적 데이터(.json) 파일인지 확인해주세요.');
+            }
+        };
+        reader.readAsText(file);
+        event.target.value = '';
+    }
+    // ─────────────────────────────────────────────
+    // 저장 서버(Worker) 연동: 설정 / 저장 / 목록 조회 / 불러오기
+    // GitHub Token은 이 파일에 없고, Worker 서버 안에만 있습니다.
+    // ─────────────────────────────────────────────
+    function openGithubSettings() {
+        document.getElementById('ghOwner').value = workerConfig.baseUrl;
+        document.getElementById('ghToken').value = workerConfig.accessPassword;
+        document.getElementById('githubSettingsModal').style.display = 'flex';
+    }
+    function closeGithubSettings() {
+        document.getElementById('githubSettingsModal').style.display = 'none';
+    }
+    function closeGithubListModal() {
+        document.getElementById('githubListModal').style.display = 'none';
+    }
+    function saveGithubSettings() {
+        workerConfig.baseUrl = document.getElementById('ghOwner').value.trim().replace(/\/+$/g, '');
+        workerConfig.accessPassword = document.getElementById('ghToken').value.trim();
+        persistGithubConfig();
+        closeGithubSettings();
+    }
+    function utf8ToBase64(str) {
+        return btoa(unescape(encodeURIComponent(str)));
+    }
+    // 실제 저장 로직 (Worker에 JSON 저장). 버튼 클릭과 PDF 발행 시 자동 저장에서 공용으로 사용.
+    async function silentSaveToGithub() {
+        if (!workerConfig.baseUrl || !workerConfig.accessPassword) {
+            return { attempted: false };
+        }
+        const data = collectQuoteData();
+        const customer = sanitizeFileName(data.customerName || '고객사미입력');
+        const dateStr = (data.quoteDate || new Date().toISOString().slice(0, 10)).replace(/-/g, '');
+        const timeStamp = Date.now();
+        const fileName = `${dateStr}_${customer}_${timeStamp}.json`;
+        try {
+            const res = await fetch(`${workerConfig.baseUrl}/save`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Access-Password': workerConfig.accessPassword
+                },
+                body: JSON.stringify({
+                    fileName: fileName,
+                    message: `견적 저장: ${data.customerName || '고객사미입력'} (${data.quoteDate || ''})`,
+                    content: utf8ToBase64(JSON.stringify(data, null, 2))
+                })
+            });
+            const result = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(result.error || `HTTP ${res.status}`);
+            return { attempted: true, ok: true, fileName };
+        } catch (err) {
+            return { attempted: true, ok: false, error: err.message };
+        }
+    }
+    async function saveToGithub() {
+        if (!workerConfig.baseUrl || !workerConfig.accessPassword) {
+            alert('먼저 "GitHub ▾ → 설정"에서 접속 비밀번호를 입력해주세요.');
+            requestGithubSettings();
+            return;
+        }
+        const result = await silentSaveToGithub();
+        if (result.ok) {
+            alert(`저장되었습니다.\n파일명: ${result.fileName}`);
+        } else {
+            alert(`저장 중 오류가 발생했습니다.\n${result.error}\n\n(저장 서버 주소와 접속 비밀번호를 확인해주세요.)`);
+        }
+    }
+    async function listGithubQuotes() {
+        if (!workerConfig.baseUrl) {
+            alert('먼저 "GitHub ▾ → 설정"에서 저장 서버 주소를 확인해주세요.');
+            requestGithubSettings();
+            return;
+        }
+        if (!workerConfig.accessPassword) {
+            alert('먼저 "GitHub ▾ → 설정"에서 접속 비밀번호를 입력해주세요.');
+            requestGithubSettings();
+            return;
+        }
+        const listDiv = document.getElementById('githubListBody');
+        listDiv.innerHTML = '<div style="padding:15px; text-align:center; color:#888;">불러오는 중...</div>';
+        document.getElementById('githubListModal').style.display = 'flex';
+        try {
+            const res = await fetch(`${workerConfig.baseUrl}/list`, {
+                headers: { 'X-Access-Password': workerConfig.accessPassword }
+            });
+            const result = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(result.error || `HTTP ${res.status}`);
+            const jsonFiles = result.files || [];
+            if (jsonFiles.length === 0) {
+                listDiv.innerHTML = '<div style="padding:15px; text-align:center; color:#888;">저장된 견적 내역이 없습니다.</div>';
+                return;
+            }
+            listDiv.innerHTML = '';
+            jsonFiles.forEach(f => {
+                const isPdf = f.name.endsWith('.pdf');
+                const row = document.createElement('div');
+                row.style.display = 'flex';
+                row.style.justifyContent = 'space-between';
+                row.style.alignItems = 'center';
+                row.style.padding = '10px 12px';
+                row.style.borderBottom = '1px solid #eee';
+                row.innerHTML = `
+                    <span style="font-size:13px; word-break:break-all;">${isPdf ? '📄 ' : '📝 '}${f.name}</span>
+                    <span style="flex-shrink:0; display:flex; gap:6px; margin-left:10px;">
+                        <button class="btn-load" style="padding:6px 12px; background:var(--genians-green); color:white; border:none; border-radius:4px; cursor:pointer; font-size:12px;">${isPdf ? '열기' : '불러오기'}</button>
+                        <button class="btn-remove" style="padding:6px 10px; background:#e74c3c; color:white; border:none; border-radius:4px; cursor:pointer; font-size:12px;" title="삭제">🗑</button>
+                    </span>
+                `;
+                row.querySelector('.btn-load').onclick = () => loadGithubFile(f.path, f.name);
+                row.querySelector('.btn-remove').onclick = () => deleteGithubFile(f.path, f.name);
+                listDiv.appendChild(row);
+            });
+        } catch (err) {
+            listDiv.innerHTML = `<div style="padding:15px; text-align:center; color:#c0392b;">목록 조회 중 오류: ${err.message}</div>`;
+        }
+    }
+    function loadGithubFile(filePath, fileName) {
+        if (fileName.endsWith('.pdf')) {
+            loadGithubPdfFile(filePath, fileName);
+            return;
+        }
+        // JSON 견적: 현재 화면을 건드리지 않고, 새 창에서 자동으로 불러와 읽기 전용으로 보여줍니다.
+        const url = `${window.location.pathname}?view=${encodeURIComponent(filePath)}`;
+        window.open(url, '_blank');
+        closeGithubListModal();
+    }
+    async function loadGithubPdfFile(filePath, fileName) {
+        try {
+            const res = await fetch(`${workerConfig.baseUrl}/load?path=${encodeURIComponent(filePath)}`, {
+                headers: { 'X-Access-Password': workerConfig.accessPassword }
+            });
+            if (!res.ok) {
+                const errResult = await res.json().catch(() => ({}));
+                throw new Error(errResult.error || `HTTP ${res.status}`);
+            }
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            window.open(url, '_blank');
+            closeGithubListModal();
+        } catch (err) {
+            alert(`불러오기 중 오류가 발생했습니다.\n${err.message}`);
+        }
+    }
+    async function deleteGithubFile(filePath, fileName) {
+        if (!confirm(`"${fileName}" 을(를) 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
+        try {
+            const res = await fetch(`${workerConfig.baseUrl}/delete`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Access-Password': workerConfig.accessPassword
+                },
+                body: JSON.stringify({
+                    path: filePath,
+                    message: `견적 삭제: ${fileName}`
+                })
+            });
+            const result = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(result.error || `HTTP ${res.status}`);
+            listGithubQuotes(); // 목록 새로고침
+        } catch (err) {
+            alert(`삭제 중 오류가 발생했습니다.\n${err.message}`);
+        }
+    }
+</script>
+</body>
+</html>
