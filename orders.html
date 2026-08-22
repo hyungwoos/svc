@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>임대장비 발주 · 서비스사업부</title>
+<style>
+:root{
+  color-scheme: light;
+  --plane:#f9f9f7; --surface:#fcfcfb; --surface-2:#f2f1ed;
+  --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781;
+  --ring:rgba(11,11,11,.10); --s1:#2a78d6; --good:#0ca30c; --critical:#d03b3b; --warning:#b97800;
+  --glow:rgba(42,120,214,.10);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--plane);color:var(--ink);
+  font-family:system-ui,-apple-system,"Segoe UI","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  font-size:13.5px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1080px;margin:0 auto;padding:22px 18px 60px}
+.top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+.top h1{font-size:18px;font-weight:750;margin:0;letter-spacing:-.02em}
+.top .sub{font-size:11.5px;color:var(--muted)}
+.spacer{flex:1}
+.pill{display:inline-flex;align-items:center;gap:6px;height:31px;padding:0 13px;border-radius:999px;
+  border:1px solid var(--ring);background:var(--surface);color:var(--ink-2);font-size:12.5px;cursor:pointer;font-family:inherit}
+.pill:hover{background:var(--surface-2);color:var(--ink)}
+.card{background:var(--surface);border:1px solid var(--ring);border-radius:14px;padding:18px 20px;margin-bottom:16px}
+.card h2{font-size:14.5px;font-weight:700;margin:0 0 4px;display:flex;align-items:center;gap:8px}
+.card h2::before{content:"";width:3px;height:13px;border-radius:2px;background:var(--s1)}
+.cap{font-size:12px;color:var(--ink-2);opacity:.8;margin:0 0 14px}
+.frm{display:grid;grid-template-columns:1fr 1fr;gap:11px 14px}
+@media (max-width:640px){.frm{grid-template-columns:1fr}}
+.frm .full{grid-column:1/-1}
+.frm label{display:block;font-size:11.5px;color:var(--ink-2);margin-bottom:4px;font-weight:600}
+input,select{width:100%;height:38px;padding:0 11px;border-radius:9px;border:1px solid var(--ring);
+  background:var(--surface-2);color:var(--ink);font-size:13.5px;font-family:inherit;outline:none}
+input:focus,select:focus{border-color:var(--s1);box-shadow:0 0 0 3px var(--glow)}
+.btn{height:42px;padding:0 22px;border-radius:10px;border:1px solid var(--s1);background:var(--s1);
+  color:#fff;font-size:14px;font-weight:650;cursor:pointer;font-family:inherit}
+.btn:hover{filter:brightness(1.06)} .btn[disabled]{opacity:.6}
+.grp{font-size:11px;color:var(--muted);letter-spacing:.05em;margin:16px 0 10px;font-weight:700}
+.msg{font-size:12.5px;min-height:18px;margin-top:10px}
+.msg.ok{color:var(--good)} .msg.bad{color:var(--critical)}
+.actrow{display:flex;gap:10px;align-items:center;margin-top:16px}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th,td{padding:8px 10px;text-align:left;white-space:nowrap}
+thead th{position:sticky;top:0;background:var(--surface-2);color:var(--ink-2);font-weight:650;font-size:11.5px;border-bottom:1px solid var(--ring)}
+tbody tr{border-bottom:1px solid var(--ring)}
+tbody tr:nth-child(even){background:rgba(127,127,127,.045)}
+.tblwrap{overflow:auto;max-height:60vh;border:1px solid var(--ring);border-radius:10px}
+.badge{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:650;border:1px solid transparent}
+.st-접수{color:var(--s1);border-color:var(--s1);background:var(--glow)}
+.st-출하요청,.st-배송중{color:var(--warning);border-color:var(--warning);background:rgba(185,120,0,.08)}
+.st-설치완료{color:var(--good);border-color:var(--good);background:rgba(12,163,12,.08)}
+.st-회수예정{color:var(--critical);border-color:var(--critical);background:rgba(208,59,59,.07)}
+.st-회수완료,.st-취소{color:var(--muted);border-color:var(--ring)}
+td select{height:30px;font-size:12px;width:auto;min-width:96px}
+.mini{font-size:11px;color:var(--muted)}
+.hidden{display:none!important}
+.center{max-width:400px;margin:10vh auto 0}
+</style>
+</head>
+<body>
+
+<!-- 로그인 -->
+<div id="viewLogin" class="center">
+  <div class="card">
+    <h2>임대장비 발주 시스템</h2>
+    <p class="cap">서비스사업부 · 계정은 관리자가 발급합니다</p>
+    <div class="frm">
+      <div class="full"><label>이메일</label><input id="lgEmail" type="email" autocomplete="username"></div>
+      <div class="full"><label>비밀번호</label><input id="lgPw" type="password" autocomplete="current-password"></div>
+    </div>
+    <div class="actrow">
+      <div class="msg" id="lgMsg" style="flex:1"></div>
+      <button class="btn" id="lgGo">로그인</button>
+    </div>
+  </div>
+</div>
+
+<!-- 최초 비밀번호 변경 (강제) -->
+<div id="viewPw" class="center hidden">
+  <div class="card">
+    <h2>비밀번호 변경</h2>
+    <p class="cap">최초 로그인입니다 — 본인 비밀번호로 변경해야 사용할 수 있습니다.</p>
+    <div class="frm">
+      <div class="full"><label>새 비밀번호 (6자 이상)</label><input id="npw1" type="password" autocomplete="new-password"></div>
+      <div class="full"><label>새 비밀번호 확인</label><input id="npw2" type="password" autocomplete="new-password"></div>
+    </div>
+    <div class="actrow">
+      <div class="msg" id="pwMsg" style="flex:1"></div>
+      <button class="btn" id="pwGo">변경</button>
+    </div>
+  </div>
+</div>
+
+<!-- 메인 -->
+<div id="viewMain" class="wrap hidden">
+  <div class="top">
+    <h1>📦 임대장비 발주</h1>
+    <span class="sub">S1 Cloud NAC · 신청하면 슬랙 에스원 채널로 자동 통보됩니다</span>
+    <span class="spacer"></span>
+    <button class="pill" id="btnMe">계정</button>
+    <button class="pill" id="btnOut">로그아웃</button>
+  </div>
+
+  <div class="card">
+    <h2>발주 신청</h2>
+    <p class="cap">* 표시는 필수 항목</p>
+    <div class="frm" style="margin-bottom:4px">
+      <div><label>판매 채널 *</label><select id="odChannel"><option>에스원</option><option>LGU+</option><option>공공</option><option>기타</option></select></div>
+      <div><label>요청 유형 *</label><select id="odType"><option>신규발주</option><option>추가</option><option>교체(장애)</option><option>교체(증설)</option><option>철거·회수</option></select></div>
+    </div>
+    <div class="grp">— 신청자 정보 —</div>
+    <div class="frm">
+      <div><label>고객사명 *</label><input id="odCustomer"></div>
+      <div><label>계약번호</label><input id="odContract" placeholder="모르면 비워두세요 (생성 중)"></div>
+      <div><label>고객 담당자 *</label><input id="odMgr"></div>
+      <div><label>담당자 연락처</label><input id="odPhone" placeholder="010-0000-0000"></div>
+      <div><label>관리자 계정 (이메일)</label><input id="odAdmin"></div>
+      <div><label>설치 희망일</label><input id="odInstall" type="date"></div>
+      <div class="full"><label>고객사 주소</label><input id="odAddr"></div>
+      <div><label>서비스 에디션</label><select id="odEdition"><option>Enterprise Edition</option><option>Basic Edition</option></select></div>
+      <div><label>요청 서비스 기능</label><input id="odFeat" value="IP관리, 단말 무결성 검증"></div>
+      <div><label>노드수</label><input id="odNodes" type="number" min="0"></div>
+      <div><label>모델명</label><select id="odModel"><option>S100</option><option>S200</option><option>S10_R2</option></select></div>
+      <div><label>수량</label><input id="odQty" type="number" min="1" value="1"></div>
+    </div>
+    <div class="grp">— 배송 관련 정보 —</div>
+    <div class="frm">
+      <div class="full"><label>수령 주소</label><input id="odRecvAddr"></div>
+      <div><label>수령인 성명</label><input id="odRecvName"></div>
+      <div><label>수령인 연락처</label><input id="odRecvPhone"></div>
+      <div><label>수령 희망일</label><input id="odShip" type="date"></div>
+      <div><label>요청사항</label><input id="odNote" placeholder="예: GNOS 사용 가능, 퀵 발송 필요"></div>
+      <div class="full"><label>장비 시리얼 (교체·회수 시, 콤마 구분)</label><input id="odSerials" placeholder="예: SBC224A02BB, SBC224A0A12"></div>
+    </div>
+    <div class="actrow">
+      <div class="msg" id="odMsg" style="flex:1"></div>
+      <button class="btn" id="odGo">발주 신청</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>발주 내역</h2>
+    <p class="cap">상태를 바꾸면 즉시 저장됩니다 (접수 → 출하요청 → 배송중 → 설치완료 → 회수예정 → 회수완료)</p>
+    <div style="display:flex;gap:10px;margin-bottom:12px;align-items:center">
+      <select id="fCh" style="width:auto;height:33px"><option value="">채널 전체</option><option>에스원</option><option>LGU+</option><option>공공</option><option>기타</option></select>
+      <input id="q" type="search" placeholder="고객사·담당자 검색…" style="max-width:260px;height:33px">
+      <span class="mini" id="cnt"></span>
+    </div>
+    <div class="tblwrap"><table id="tbl"></table></div>
+  </div>
+
+  <div class="mini" style="text-align:center;margin-top:16px">서비스사업부 매출 관리 시스템 · 임대장비 모듈</div>
+</div>
+
+<script>
+var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
+var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
+var TOKEN=null, USER=null, ORDERS=[];
+var STATUSES=['접수','출하요청','배송중','설치완료','회수예정','회수완료','취소'];
+
+function $(s){ return document.querySelector(s); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+function msg(id,t,c){ var e=$('#'+id); e.textContent=t||''; e.className='msg'+(c?' '+c:''); }
+function hdr(json){ var h={apikey:SB_KEY,Authorization:'Bearer '+(TOKEN||SB_KEY)}; if(json)h['Content-Type']='application/json'; return h; }
+
+async function api(method,path,body,prefer){
+  var o={method:method,headers:hdr(true)};
+  if(prefer) o.headers.Prefer=prefer;
+  if(body!==undefined) o.body=JSON.stringify(body);
+  var r=await fetch(SB_URL+'/rest/v1/'+path,o);
+  if(!r.ok) throw new Error((await r.text()).slice(0,200));
+  var t=await r.text();
+  return t? JSON.parse(t): null;
+}
+
+/* ---- 로그인 ---- */
+async function login(){
+  msg('lgMsg','확인 중…');
+  try{
+    var r=await fetch(SB_URL+'/auth/v1/token?grant_type=password',{
+      method:'POST',headers:{apikey:SB_KEY,'Content-Type':'application/json'},
+      body:JSON.stringify({email:$('#lgEmail').value.trim(),password:$('#lgPw').value})
+    });
+    var j=await r.json();
+    if(!r.ok||!j.access_token) throw new Error(j.error_description||j.msg||'이메일 또는 비밀번호가 올바르지 않습니다');
+    TOKEN=j.access_token; USER=$('#lgEmail').value.trim();
+    var changed=j.user&&j.user.user_metadata&&j.user.user_metadata.pw_changed;
+    $('#viewLogin').classList.add('hidden');
+    if(!changed){ $('#viewPw').classList.remove('hidden'); $('#npw1').focus(); return; }
+    enter();
+  }catch(e){ msg('lgMsg',String(e.message||e),'bad'); }
+}
+async function changePw(){
+  var p1=$('#npw1').value,p2=$('#npw2').value;
+  if(p1.length<6) return msg('pwMsg','6자 이상으로 입력하세요','bad');
+  if(p1!==p2) return msg('pwMsg','비밀번호 확인이 일치하지 않습니다','bad');
+  msg('pwMsg','변경 중…');
+  try{
+    var r=await fetch(SB_URL+'/auth/v1/user',{method:'PUT',
+      headers:{apikey:SB_KEY,'Content-Type':'application/json',Authorization:'Bearer '+TOKEN},
+      body:JSON.stringify({password:p1,data:{pw_changed:true}})});
+    if(!r.ok){ var j=await r.json(); throw new Error(j.msg||'변경 실패'); }
+    msg('pwMsg','변경 완료 ✅','ok');
+    setTimeout(function(){ $('#viewPw').classList.add('hidden'); enter(); },600);
+  }catch(e){ msg('pwMsg',String(e.message||e),'bad'); }
+}
+function enter(){
+  $('#viewMain').classList.remove('hidden');
+  $('#btnMe').textContent=USER.split('@')[0];
+  load();
+}
+
+/* ---- 목록 ---- */
+async function load(){
+  try{ ORDERS=await api('GET','equipment_orders?select=*&order=id.desc&limit=1000'); }
+  catch(e){ ORDERS=[]; }
+  render();
+}
+function render(){
+  var q=($('#q').value||'').toLowerCase();
+  var ch=$('#fCh').value;
+  var rows=ORDERS.filter(function(r){
+    if(ch && r.channel!==ch) return false;
+    if(!q) return true;
+    return [r.customer,r.mgr_name,r.requester,r.contract_no,r.model,r.status,r.serials].join(' ').toLowerCase().indexOf(q)>=0;
+  });
+  $('#cnt').textContent=rows.length+'건';
+  var t=$('#tbl');
+  t.innerHTML='<thead><tr><th>신청일</th><th>채널</th><th>유형</th><th>고객사</th><th>담당자</th><th>모델</th><th>수량</th><th>노드</th><th>설치희망</th><th>신청자</th><th>상태</th><th>시리얼</th><th>요청사항</th></tr></thead>';
+  var tb=document.createElement('tbody');
+  rows.forEach(function(r){
+    var tr=document.createElement('tr');
+    tr.innerHTML='<td>'+String(r.created_at||'').slice(0,10)+'</td>'+
+      '<td>'+esc(r.channel||'')+'</td><td class="mini">'+esc(r.order_type||'')+'</td><td><b>'+esc(r.customer)+'</b></td>'+
+      '<td>'+esc(r.mgr_name||'')+'</td><td>'+esc(r.model||'')+'</td><td>'+(r.qty||'')+'</td><td>'+(r.nodes||'')+'</td>'+
+      '<td>'+String(r.install_date||'').slice(0,10)+'</td>'+
+      '<td class="mini">'+esc((r.requester||'').split('@')[0])+'</td><td></td>'+
+      '<td class="mini">'+esc(r.serials||'')+'</td><td class="mini">'+esc(r.request_note||'')+'</td>';
+    var sel=document.createElement('select');
+    STATUSES.forEach(function(s){
+      var o=document.createElement('option'); o.textContent=s; o.selected=(r.status===s); sel.appendChild(o);
+    });
+    sel.className='badge st-'+(r.status||'접수');
+    sel.onchange=async function(){
+      try{
+        await api('PATCH','equipment_orders?id=eq.'+r.id,{status:this.value,updated_at:new Date().toISOString()});
+        r.status=this.value; this.className='badge st-'+this.value;
+      }catch(e){ alert('저장 실패: '+e.message); }
+    };
+    tr.children[10].appendChild(sel);
+    tb.appendChild(tr);
+  });
+  t.appendChild(tb);
+}
+
+/* ---- 신청 ---- */
+async function submitOrder(){
+  var cust=$('#odCustomer').value.trim(), mgr=$('#odMgr').value.trim();
+  if(!cust||!mgr) return msg('odMsg','고객사명과 담당자는 필수입니다','bad');
+  var btn=$('#odGo'); btn.disabled=true; msg('odMsg','접수 중…');
+  try{
+    var row={
+      channel:$('#odChannel').value, order_type:$('#odType').value,
+      serials:$('#odSerials').value.trim()||null,
+      requester:USER, customer:cust,
+      contract_no:$('#odContract').value.trim()||null,
+      mgr_name:mgr, mgr_phone:$('#odPhone').value.trim()||null,
+      admin_account:$('#odAdmin').value.trim()||null,
+      install_date:$('#odInstall').value||null,
+      customer_addr:$('#odAddr').value.trim()||null,
+      edition:$('#odEdition').value, features:$('#odFeat').value.trim()||null,
+      nodes:+$('#odNodes').value||null, model:$('#odModel').value, qty:+$('#odQty').value||1,
+      recv_addr:$('#odRecvAddr').value.trim()||null, recv_name:$('#odRecvName').value.trim()||null,
+      recv_phone:$('#odRecvPhone').value.trim()||null, ship_date:$('#odShip').value||null,
+      request_note:$('#odNote').value.trim()||null, status:'접수'
+    };
+    var out=await api('POST','equipment_orders?select=*',[row],'return=representation');
+    ORDERS.unshift(out[0]); render();
+    msg('odMsg','접수 완료 ✅ — 슬랙 채널로 통보되었습니다','ok');
+    ['odCustomer','odContract','odMgr','odPhone','odAdmin','odInstall','odAddr','odNodes','odRecvAddr','odRecvName','odRecvPhone','odShip','odNote','odSerials']
+      .forEach(function(i){ $('#'+i).value=''; });
+    $('#odQty').value='1';
+  }catch(e){ msg('odMsg',String(e.message||e),'bad'); }
+  btn.disabled=false;
+}
+
+/* ---- 바인딩 ---- */
+$('#lgGo').onclick=login;
+['lgEmail','lgPw'].forEach(function(id){
+  $('#'+id).addEventListener('keydown',function(e){ if(e.key==='Enter'){e.preventDefault();login();} });
+});
+$('#pwGo').onclick=changePw;
+['npw1','npw2'].forEach(function(id){
+  $('#'+id).addEventListener('keydown',function(e){ if(e.key==='Enter'){e.preventDefault();changePw();} });
+});
+$('#odGo').onclick=submitOrder;
+$('#q').oninput=render; $('#fCh').onchange=render;
+$('#btnOut').onclick=function(){ location.reload(); };
+$('#btnMe').onclick=function(){
+  var p=prompt('새 비밀번호 (6자 이상) — 취소하면 변경하지 않습니다');
+  if(!p||p.length<6) return;
+  fetch(SB_URL+'/auth/v1/user',{method:'PUT',
+    headers:{apikey:SB_KEY,'Content-Type':'application/json',Authorization:'Bearer '+TOKEN},
+    body:JSON.stringify({password:p,data:{pw_changed:true}})
+  }).then(function(r){ alert(r.ok?'비밀번호를 변경했습니다':'변경 실패'); });
+};
+</script>
+</body>
+</html>
