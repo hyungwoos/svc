@@ -360,6 +360,7 @@ body{padding-left:192px}
   <button data-v="biz">⚖️ 비즈포탈 차액</button>
   <button data-v="targets">🎯 연간 목표</button>
   <button data-v="orders">📦 임대장비</button>
+  <button data-v="assets">🔧 장비 자산</button>
   <div class="grp">도구</div>
   <button data-v="quote">📄 견적 시스템</button>
   <div class="grp">기록</div>
@@ -1084,12 +1085,13 @@ async function loadFromDb(){
     sbTry('biz_recon?select=*&order=id'),
     sbTry('targets?select=*&order=year'),
     sbTry('equipment_orders?select=*&order=id.desc'),
-    sbTry('user_roles?select=role')
+    sbTry('user_roles?select=role'),
+    sbTry('equipment_assets?select=*&order=serial')
   ]);
   var custs=res[0], cts=res[1], mrs=res[2];
   var LIVE=shapeLive(res[3]), LGD=shapeLg(res[4]), VSD=shapeVs(res[5]);
   window.RAWX={customers:custs, contracts:cts, live:res[3]||[], lg:res[4]||[], biz:res[5]||[],
-    targets:res[6]||[], orders:res[7]||[], log:null, mrs:mrs};
+    targets:res[6]||[], orders:res[7]||[], assets:res[9]||[], log:null, mrs:mrs};
   window.IS_VIEWER = !!(res[8] && res[8].length && res[8][0].role==='viewer');
   SB_RAW.customers=custs; SB_RAW.contracts=cts;
   var cMap={}; custs.forEach(function(c){ cMap[c.id]=c; });
@@ -3054,6 +3056,22 @@ var GRIDS={
       {k:'request_note',l:'요청사항'}
     ]
   },
+  assets:{
+    title:'장비 자산 (시리얼 단위)', table:'equipment_assets',
+    cap:'발주 상태를 「설치완료」로 바꾸면 자동 임대중, 「회수완료」면 자동 재고 처리됩니다', add:true, del:true,
+    rows:function(){ return RAWX.assets||[]; },
+    cols:[
+      {k:'serial',l:'시리얼',req:true},
+      {k:'model',l:'모델',t:'select',opts:['S10_R2','S20_R2','S100','S200']},
+      {k:'status',l:'상태',t:'select',opts:['재고','임대중','수리중','분실','폐기']},
+      {k:'customer',l:'고객사'},
+      {k:'channel',l:'채널',t:'select',opts:['에스원','LGU+','공공','기타']},
+      {k:'in_date',l:'입고일',t:'date'},
+      {k:'deployed_date',l:'출고일',t:'date'},
+      {k:'returned_date',l:'회수일',t:'date'},
+      {k:'note',l:'비고'}
+    ]
+  },
   log:{
     title:'변경 이력', table:'change_log',
     cap:'웹에서 수정한 기록 (최근 300건)', add:false, del:false, ro:true,
@@ -3068,6 +3086,25 @@ var GRIDS={
     ]
   }
 };
+
+async function syncOrderAssets(r, st){
+  var ser=String(r.serials||'').split(/[,\s]+/).filter(function(x){return x;});
+  if(!ser.length) return '';
+  var todayS=new Date().toISOString().slice(0,10);
+  try{
+    if(st==='설치완료'){
+      var rows=ser.map(function(s){ return {
+        serial:s, model:r.model||null, status:'임대중', customer:r.customer||null,
+        channel:r.channel||null, deployed_date:todayS, returned_date:null, order_id:r.id }; });
+      await sbWrite('POST','equipment_assets?on_conflict=serial',rows,'resolution=merge-duplicates');
+    }else if(st==='회수완료'){
+      await sbWrite('PATCH','equipment_assets?serial=in.('+ser.map(encodeURIComponent).join(',')+')',
+        {status:'재고',customer:null,returned_date:todayS,order_id:r.id,updated_at:new Date().toISOString()});
+    }else return '';
+    try{ RAWX.assets=await sbTry('equipment_assets?select=*&order=serial')||RAWX.assets; }catch(_){}
+    return ' · 자산 '+ser.length+'대 '+(st==='설치완료'?'임대중':'재고')+' 처리';
+  }catch(e){ return ' · ⚠ 자산 동기화 실패: '+String(e.message||e).slice(0,80); }
+}
 
 function openOrderForm(){
   if(!SB_TOKEN){ openOvl('ovlAuth'); return; }
@@ -3369,10 +3406,14 @@ function gridRow(r,g,editing){
       if(!SB_TOKEN){ openOvl('ovlAuth'); return; }
       try{
         var body=readRowInputs(tr,g);
+        var stChanged=(g.table==='equipment_orders' && body.status && body.status!==r.status)? body.status : null;
         sbWrite('PATCH',g.table+'?id=eq.'+r.id,body).then(function(){
           Object.keys(body).forEach(function(k){ r[k]=body[k]; });
           logChange('update',g.table,r.id,body);
           DIRTY=true; $('#dvMsg').textContent='저장됨 ✅';
+          if(stChanged) syncOrderAssets(r,stChanged).then(function(x){
+            if(x) $('#dvMsg').textContent='저장됨 ✅'+x;
+          });
           view();
         }).catch(function(e){ $('#dvMsg').textContent=String(e.message||e); });
       }catch(e){ $('#dvMsg').textContent=String(e.message||e); }
