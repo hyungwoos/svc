@@ -359,9 +359,10 @@ body{padding-left:192px}
   <button data-v="lg">📶 LG 판매</button>
   <button data-v="biz">⚖️ 비즈포탈 차액</button>
   <button data-v="targets">🎯 연간 목표</button>
-  <button data-v="orders">📦 임대장비</button>
+  <button data-v="orders">📦 장비 요청 내역</button>
   <button data-v="assets">🔧 장비 자산</button>
   <div class="grp">도구</div>
+  <button data-v="ordernew">📝 장비 신청</button>
   <button data-v="quote">📄 견적 시스템</button>
   <div class="grp">기록</div>
   <button data-v="log">🕘 변경 이력</button>
@@ -3162,8 +3163,8 @@ var GRIDS={
     ]
   },
   orders:{
-    title:'임대장비 발주', table:'equipment_orders',
-    cap:'신청하면 슬랙 에스원 채널로 자동 통보 · 상태(접수→출하→설치→회수)는 ✎ 로 갱신', add:true, del:true,
+    title:'장비 요청 내역', table:'equipment_orders',
+    cap:'발주·교체·회수 요청의 상태 관리 (설치완료/회수완료 시 자산 자동 반영) · 신규 신청은 도구 › 장비 신청', add:true, del:true,
     rows:function(){ return RAWX.orders||[]; },
     cols:[
       {k:'created_at',l:'신청일',ro:true,fmt:function(v){return String(v||'').slice(0,10);}},
@@ -3297,6 +3298,7 @@ function setupSide(){
 }
 
 function switchView(v){
+  if(v==='ordernew'){ openOrderForm(); return; }   // 도구: 신청 모달만 띄우고 화면 유지
   CUR_VIEW=v;
   $('#side').querySelectorAll('button').forEach(function(b){
     b.setAttribute('aria-current', b.dataset.v===v?'true':'false');
