@@ -58,6 +58,19 @@ td select{height:30px;font-size:12px;width:auto;min-width:96px}
 .mini{font-size:11px;color:var(--muted)}
 .hidden{display:none!important}
 .center{max-width:400px;margin:10vh auto 0}
+.tabs{display:flex;gap:8px;margin-bottom:16px}
+.tab{height:34px;padding:0 16px;border-radius:999px;border:1px solid var(--ring);background:var(--surface);
+  color:var(--ink-2);font-size:13px;font-weight:650;cursor:pointer;font-family:inherit}
+.tab.on{background:var(--s1);border-color:var(--s1);color:#fff}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:999px;
+  border:1px solid var(--ring);background:var(--surface-2);font-size:12px;cursor:pointer}
+.chip b{font-size:13px}
+.chip.on{border-color:var(--s1);background:var(--glow);color:var(--s1)}
+.st-재고{color:var(--s1);border-color:var(--s1);background:var(--glow)}
+.st-임대중{color:var(--good);border-color:var(--good);background:rgba(12,163,12,.08)}
+.st-수리중{color:var(--warning);border-color:var(--warning);background:rgba(185,120,0,.08)}
+.st-분실,.st-폐기{color:var(--critical);border-color:var(--critical);background:rgba(208,59,59,.07)}
 </style>
 </head>
 <body>
@@ -104,6 +117,12 @@ td select{height:30px;font-size:12px;width:auto;min-width:96px}
     <button class="pill" id="btnOut">로그아웃</button>
   </div>
 
+  <div class="tabs">
+    <button class="tab on" id="tabReq">📦 신청 · 처리</button>
+    <button class="tab" id="tabAst">🔧 장비 현황</button>
+  </div>
+
+  <div id="paneReq">
   <div class="card">
     <h2>발주 신청</h2>
     <p class="cap">* 표시는 필수 항목</p>
@@ -151,6 +170,21 @@ td select{height:30px;font-size:12px;width:auto;min-width:96px}
     </div>
     <div class="tblwrap"><table id="tbl"></table></div>
   </div>
+  </div><!-- /paneReq -->
+
+  <div id="paneAst" class="hidden">
+  <div class="card">
+    <h2>장비 자산 현황</h2>
+    <p class="cap">시리얼 단위 자산 마스터 — 요청 상태를 「설치완료」로 바꾸면 자동으로 임대중, 「회수완료」면 재고로 돌아옵니다</p>
+    <div class="chips" id="astChips"></div>
+    <div style="display:flex;gap:10px;margin-bottom:12px;align-items:center;flex-wrap:wrap">
+      <input id="aq" type="search" placeholder="시리얼·고객사·모델 검색…" style="max-width:260px;height:33px">
+      <button class="pill" id="astAdd">＋ 장비 등록</button>
+      <span class="mini" id="acnt"></span>
+    </div>
+    <div class="tblwrap"><table id="atbl"></table></div>
+  </div>
+  </div><!-- /paneAst -->
 
   <div class="mini" style="text-align:center;margin-top:16px">서비스사업부 매출 관리 시스템 · 임대장비 모듈</div>
 </div>
@@ -158,8 +192,11 @@ td select{height:30px;font-size:12px;width:auto;min-width:96px}
 <script>
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
-var TOKEN=null, USER=null, ORDERS=[];
+var TOKEN=null, USER=null, ORDERS=[], ASSETS=[], AFILTER='';
 var STATUSES=['접수','출하요청','배송중','설치완료','회수예정','회수완료','취소'];
+var ASTATUS=['재고','임대중','수리중','분실','폐기'];
+function today(){ return new Date().toISOString().slice(0,10); }
+function parseSerials(s){ return String(s||'').split(/[,\s]+/).filter(function(x){return x;}); }
 
 function $(s){ return document.querySelector(s); }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
@@ -217,7 +254,92 @@ function enter(){
 async function load(){
   try{ ORDERS=await api('GET','equipment_orders?select=*&order=id.desc&limit=1000'); }
   catch(e){ ORDERS=[]; }
-  render();
+  try{ ASSETS=await api('GET','equipment_assets?select=*&order=serial.asc&limit=2000'); }
+  catch(e){ ASSETS=[]; }
+  render(); renderAssets();
+}
+
+/* ---- 자산 자동 동기화 ---- */
+async function syncAssets(r, st){
+  var ser=parseSerials(r.serials);
+  if(!ser.length) return '';
+  if(st==='설치완료'){
+    var rows=ser.map(function(s){ return {
+      serial:s, model:r.model||null, status:'임대중', customer:r.customer||null,
+      channel:r.channel||null, deployed_date:today(), returned_date:null, order_id:r.id }; });
+    await api('POST','equipment_assets?on_conflict=serial',rows,'resolution=merge-duplicates');
+    return ' · 자산 '+ser.length+'대 → 임대중';
+  }
+  if(st==='회수완료'){
+    await api('PATCH','equipment_assets?serial=in.('+ser.map(encodeURIComponent).join(',')+')',
+      {status:'재고',customer:null,returned_date:today(),order_id:r.id,updated_at:new Date().toISOString()});
+    return ' · 자산 '+ser.length+'대 → 재고';
+  }
+  return '';
+}
+
+/* ---- 장비 현황 ---- */
+function renderAssets(){
+  var q=($('#aq').value||'').toLowerCase();
+  var counts={}; ASTATUS.forEach(function(s){counts[s]=0;});
+  ASSETS.forEach(function(a){ if(counts[a.status]!=null) counts[a.status]++; });
+  var ch=$('#astChips'); ch.innerHTML='';
+  var all=document.createElement('span');
+  all.className='chip'+(AFILTER?'':' on'); all.innerHTML='전체 <b>'+ASSETS.length+'</b>';
+  all.onclick=function(){ AFILTER=''; renderAssets(); }; ch.appendChild(all);
+  ASTATUS.forEach(function(s){
+    var c=document.createElement('span');
+    c.className='chip'+(AFILTER===s?' on':''); c.innerHTML=esc(s)+' <b>'+counts[s]+'</b>';
+    c.onclick=function(){ AFILTER=(AFILTER===s?'':s); renderAssets(); }; ch.appendChild(c);
+  });
+  var rows=ASSETS.filter(function(a){
+    if(AFILTER && a.status!==AFILTER) return false;
+    if(!q) return true;
+    return [a.serial,a.customer,a.model,a.channel,a.note].join(' ').toLowerCase().indexOf(q)>=0;
+  });
+  $('#acnt').textContent=rows.length+'대';
+  var t=$('#atbl');
+  t.innerHTML='<thead><tr><th>시리얼</th><th>모델</th><th>상태</th><th>고객사</th><th>채널</th><th>출고일</th><th>회수일</th><th>비고</th><th></th></tr></thead>';
+  var tb=document.createElement('tbody');
+  rows.forEach(function(a){
+    var tr=document.createElement('tr');
+    tr.innerHTML='<td><b>'+esc(a.serial)+'</b></td><td>'+esc(a.model||'')+'</td><td></td>'+
+      '<td>'+esc(a.customer||'')+'</td><td class="mini">'+esc(a.channel||'')+'</td>'+
+      '<td>'+String(a.deployed_date||'').slice(0,10)+'</td><td>'+String(a.returned_date||'').slice(0,10)+'</td>'+
+      '<td class="mini">'+esc(a.note||'')+'</td><td></td>';
+    var sel=document.createElement('select');
+    ASTATUS.forEach(function(s){ var o=document.createElement('option'); o.textContent=s; o.selected=(a.status===s); sel.appendChild(o); });
+    sel.className='badge st-'+(a.status||'재고');
+    sel.onchange=async function(){
+      var body={status:this.value,updated_at:new Date().toISOString()};
+      if(this.value==='재고'){ body.customer=null; body.returned_date=today(); }
+      try{ await api('PATCH','equipment_assets?id=eq.'+a.id,body);
+        a.status=this.value; if(this.value==='재고'){a.customer=null;a.returned_date=today();} renderAssets();
+      }catch(e){ alert('저장 실패: '+e.message); }
+    };
+    tr.children[2].appendChild(sel);
+    var ed=document.createElement('button'); ed.className='pill'; ed.style.height='26px'; ed.textContent='✎';
+    ed.onclick=async function(){
+      var cu=prompt('고객사 (임대중일 때)', a.customer||''); if(cu===null) return;
+      var nt=prompt('비고', a.note||''); if(nt===null) return;
+      try{ await api('PATCH','equipment_assets?id=eq.'+a.id,{customer:cu||null,note:nt||null,updated_at:new Date().toISOString()});
+        a.customer=cu||null; a.note=nt||null; renderAssets();
+      }catch(e){ alert('저장 실패: '+e.message); }
+    };
+    tr.children[8].appendChild(ed);
+    tb.appendChild(tr);
+  });
+  t.appendChild(tb);
+}
+async function addAsset(){
+  var s=prompt('장비 시리얼 (콤마로 여러 개 가능)'); if(!s) return;
+  var m=prompt('모델명 (예: S10_R2, S100)','S10_R2'); if(m===null) return;
+  var rows=parseSerials(s).map(function(x){ return {serial:x,model:m||null,status:'재고',channel:'에스원',in_date:today()}; });
+  if(!rows.length) return;
+  try{
+    await api('POST','equipment_assets?on_conflict=serial',rows,'resolution=merge-duplicates');
+    await load();
+  }catch(e){ alert('등록 실패: '+e.message); }
 }
 function render(){
   var q=($('#q').value||'').toLowerCase();
@@ -248,6 +370,8 @@ function render(){
       try{
         await api('PATCH','equipment_orders?id=eq.'+r.id,{status:this.value,updated_at:new Date().toISOString()});
         r.status=this.value; this.className='badge st-'+this.value;
+        var extra=await syncAssets(r,this.value);
+        if(extra){ try{ ASSETS=await api('GET','equipment_assets?select=*&order=serial.asc&limit=2000'); }catch(_){} renderAssets(); }
       }catch(e){ alert('저장 실패: '+e.message); }
     };
     tr.children[10].appendChild(sel);
@@ -298,6 +422,11 @@ $('#pwGo').onclick=changePw;
 });
 $('#odGo').onclick=submitOrder;
 $('#q').oninput=render; $('#fCh').onchange=render;
+$('#aq').oninput=renderAssets; $('#astAdd').onclick=addAsset;
+$('#tabReq').onclick=function(){ this.classList.add('on'); $('#tabAst').classList.remove('on');
+  $('#paneReq').classList.remove('hidden'); $('#paneAst').classList.add('hidden'); };
+$('#tabAst').onclick=function(){ this.classList.add('on'); $('#tabReq').classList.remove('on');
+  $('#paneAst').classList.remove('hidden'); $('#paneReq').classList.add('hidden'); renderAssets(); };
 $('#btnOut').onclick=function(){ location.reload(); };
 $('#btnMe').onclick=function(){
   var p=prompt('새 비밀번호 (6자 이상) — 취소하면 변경하지 않습니다');
