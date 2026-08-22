@@ -583,7 +583,46 @@ body{padding-left:192px}
         <a href="quote.html" target="_blank" class="pill ghost" style="text-decoration:none">↗ 새 창에서 열기</a>
       </div>
       <iframe id="quoteFrame" title="견적 시스템"
-        style="width:100%;height:calc(100vh - 150px);border:0;border-radius:10px;background:#525659"></iframe>
+        style="width:100%;height:calc(100vh - 150px);border:0;border-radius:10px;background:#f9f9f7"></iframe>
+    </section>
+  </div>
+
+  <div id="viewOrderNew" class="hidden">
+    <section class="card c12" style="max-width:860px;margin:0 auto">
+      <h3 style="margin:0 0 4px;font-size:16px">📝 임대장비 발주 신청</h3>
+      <p class="cap" style="margin:0 0 16px">저장하면 DB에 기록되고 슬랙 채널로 자동 통보됩니다. 처리 현황은 「장비 요청 내역」에서 확인하세요.</p>
+      <div class="frm" style="margin-bottom:10px">
+        <div><label>판매 채널 *</label><select id="odChannel"><option>에스원</option><option>LGU+</option><option>공공</option><option>기타</option></select></div>
+        <div><label>요청 유형 *</label><select id="odType"><option>신규발주</option><option>추가</option><option>교체(장애)</option><option>교체(증설)</option><option>철거·회수</option></select></div>
+      </div>
+      <div style="font-size:11px;color:var(--ink-2);opacity:.75;margin:6px 0 10px">— 신청자 정보 —</div>
+      <div class="frm">
+        <div><label>고객사명 *</label><input id="odCustomer"></div>
+        <div><label>계약번호</label><input id="odContract" placeholder="모르면 비워두세요 (생성 중)"></div>
+        <div><label>고객 담당자 *</label><input id="odMgr"></div>
+        <div><label>담당자 연락처</label><input id="odPhone" placeholder="010-0000-0000"></div>
+        <div><label>관리자 계정 (이메일)</label><input id="odAdmin"></div>
+        <div><label>설치 희망일</label><input id="odInstall" type="date"></div>
+        <div class="full"><label>고객사 주소</label><input id="odAddr"></div>
+        <div><label>서비스 에디션</label><select id="odEdition"><option>Enterprise Edition</option><option>Basic Edition</option></select></div>
+        <div><label>요청 서비스 기능</label><input id="odFeat" value="IP관리, 단말 무결성 검증"></div>
+        <div><label>노드수</label><input id="odNodes" type="number" min="0"></div>
+        <div><label>모델명</label><select id="odModel"><option>S100</option><option>S200</option><option>S10_R2</option></select></div>
+        <div><label>수량</label><input id="odQty" type="number" min="1" value="1"></div>
+      </div>
+      <div style="font-size:11px;color:var(--ink-2);opacity:.75;margin:14px 0 10px">— 배송 관련 정보 —</div>
+      <div class="frm">
+        <div class="full"><label>수령 주소</label><input id="odRecvAddr"></div>
+        <div><label>수령인 성명</label><input id="odRecvName"></div>
+        <div><label>수령인 연락처</label><input id="odRecvPhone"></div>
+        <div><label>수령 희망일</label><input id="odShip" type="date"></div>
+        <div><label>요청사항</label><input id="odNote" placeholder="예: GNOS 사용 가능, 퀵 발송 필요"></div>
+        <div class="full"><label>장비 시리얼 (교체·회수 시, 콤마 구분)</label><input id="odSerials"></div>
+      </div>
+      <div class="mact" style="margin-top:16px">
+        <span class="mmsg" id="odMsg"></span>
+        <button class="btn" style="height:38px;padding:0 28px" id="odGo">발주 신청</button>
+      </div>
     </section>
   </div>
 
@@ -624,45 +663,7 @@ body{padding-left:192px}
 </div>
 
 <!-- 임대장비 발주 신청 -->
-<div class="ovl" id="ovlOrder">
-  <div class="modal" style="width:min(720px,100%)">
-    <h3>📦 임대장비 발주 신청</h3>
-    <p class="cap">저장하면 DB에 기록되고 슬랙 에스원 채널로 자동 통보됩니다.</p>
-    <div class="frm" style="margin-bottom:10px">
-      <div><label>판매 채널 *</label><select id="odChannel"><option>에스원</option><option>LGU+</option><option>공공</option><option>기타</option></select></div>
-      <div><label>요청 유형 *</label><select id="odType"><option>신규발주</option><option>추가</option><option>교체(장애)</option><option>교체(증설)</option><option>철거·회수</option></select></div>
-    </div>
-    <div style="font-size:11px;color:var(--ink-2);opacity:.75;margin:-6px 0 10px">— 신청자 정보 —</div>
-    <div class="frm">
-      <div><label>고객사명 *</label><input id="odCustomer"></div>
-      <div><label>계약번호</label><input id="odContract" placeholder="모르면 비워두세요 (생성 중)"></div>
-      <div><label>고객 담당자 *</label><input id="odMgr"></div>
-      <div><label>담당자 연락처</label><input id="odPhone" placeholder="010-0000-0000"></div>
-      <div><label>관리자 계정 (이메일)</label><input id="odAdmin"></div>
-      <div><label>설치 희망일</label><input id="odInstall" type="date"></div>
-      <div class="full"><label>고객사 주소</label><input id="odAddr"></div>
-      <div><label>서비스 에디션</label><select id="odEdition"><option>Enterprise Edition</option><option>Basic Edition</option></select></div>
-      <div><label>요청 서비스 기능</label><input id="odFeat" value="IP관리, 단말 무결성 검증"></div>
-      <div><label>노드수</label><input id="odNodes" type="number" min="0"></div>
-      <div><label>모델명</label><select id="odModel"><option>S100</option><option>S200</option><option>S10_R2</option></select></div>
-      <div><label>수량</label><input id="odQty" type="number" min="1" value="1"></div>
-    </div>
-    <div style="font-size:11px;color:var(--ink-2);opacity:.75;margin:14px 0 10px">— 배송 관련 정보 —</div>
-    <div class="frm">
-      <div class="full"><label>수령 주소</label><input id="odRecvAddr"></div>
-      <div><label>수령인 성명</label><input id="odRecvName"></div>
-      <div><label>수령인 연락처</label><input id="odRecvPhone"></div>
-      <div><label>수령 희망일</label><input id="odShip" type="date"></div>
-      <div><label>요청사항</label><input id="odNote" placeholder="예: GNOS 사용 가능, 퀵 발송 필요"></div>
-      <div class="full"><label>장비 시리얼 (교체·회수 시, 콤마 구분)</label><input id="odSerials"></div>
-    </div>
-    <div class="mact">
-      <span class="mmsg" id="odMsg"></span>
-      <button class="pill ghost" onclick="closeOvl('ovlOrder')">닫기</button>
-      <button class="btn" style="height:36px" id="odGo">신청</button>
-    </div>
-  </div>
-</div>
+<!-- (장비 신청 모달 제거됨 — 도구 › 장비 신청 전용 화면으로 이동) -->
 
 <!-- 계약 상세 -->
 <div class="ovl" id="ovlDetail">
@@ -3235,12 +3236,7 @@ async function syncOrderAssets(r, st){
   }catch(e){ return ' · ⚠ 자산 동기화 실패: '+String(e.message||e).slice(0,80); }
 }
 
-function openOrderForm(){
-  if(!SB_TOKEN){ openOvl('ovlAuth'); return; }
-  msg('odMsg','');
-  openOvl('ovlOrder');
-  setTimeout(function(){ $('#odCustomer').focus(); },50);
-}
+function openOrderForm(){ switchView('ordernew'); }
 async function submitOrder(){
   var cust=$('#odCustomer').value.trim(), mgr=$('#odMgr').value.trim();
   if(!cust||!mgr){ msg('odMsg','고객사명과 담당자는 필수입니다','bad'); return; }
@@ -3275,8 +3271,7 @@ async function submitOrder(){
     msg('odMsg','접수 완료 ✅ — 슬랙 채널로 통보되었습니다','ok');
     ['odCustomer','odContract','odMgr','odPhone','odAdmin','odInstall','odAddr','odNodes','odRecvAddr','odRecvName','odRecvPhone','odShip','odNote','odSerials'].forEach(function(i){ $('#'+i).value=''; });
     $('#odQty').value='1';
-    renderGrid();
-    setTimeout(function(){ closeOvl('ovlOrder'); },900);
+    setTimeout(function(){ switchView('orders'); },900);   // 접수 후 요청 내역으로 이동
   }catch(e){ msg('odMsg',String(e.message||e),'bad'); }
   btn.disabled=false;
 }
@@ -3298,15 +3293,21 @@ function setupSide(){
 }
 
 function switchView(v){
-  if(v==='ordernew'){ openOrderForm(); return; }   // 도구: 신청 모달만 띄우고 화면 유지
+  if(v==='ordernew' && !SB_TOKEN){ openOvl('ovlAuth'); return; }
   CUR_VIEW=v;
   $('#side').querySelectorAll('button').forEach(function(b){
     b.setAttribute('aria-current', b.dataset.v===v?'true':'false');
   });
-  var dash=v==='dash', quote=v==='quote';
+  var dash=v==='dash', quote=v==='quote', onew=v==='ordernew';
   $('#viewDash').classList.toggle('hidden',!dash);
   $('#viewQuote').classList.toggle('hidden',!quote);
-  $('#viewData').classList.toggle('hidden',dash||quote);
+  $('#viewOrderNew').classList.toggle('hidden',!onew);
+  $('#viewData').classList.toggle('hidden',dash||quote||onew);
+  if(onew){
+    msg('odMsg','');
+    setTimeout(function(){ $('#odCustomer').focus(); },50);
+    return;
+  }
   if(quote){
     var fr=$('#quoteFrame');
     if(!fr.src) fr.src='quote.html';
