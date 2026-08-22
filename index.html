@@ -358,6 +358,7 @@ body{padding-left:192px}
   <button data-v="live">🟢 LIVE 고객사</button>
   <button data-v="lg">📶 LG 판매</button>
   <button data-v="biz">⚖️ 비즈포탈 차액</button>
+  <button data-v="targets">🎯 연간 목표</button>
   <div class="grp">기록</div>
   <button data-v="log">🕘 변경 이력</button>
 </nav>
@@ -443,6 +444,7 @@ body{padding-left:192px}
   </div>
 
   <!-- ===================== KPI ===================== -->
+  <div id="goalBar" style="display:none;background:var(--surface);border:1px solid var(--ring);border-radius:13px;padding:13px 16px;margin-bottom:16px"></div>
   <div class="kpis" id="kpis"></div>
 
   <!-- ===================== 차트 ===================== -->
@@ -558,6 +560,7 @@ body{padding-left:192px}
         <input type="search" id="dvSearch" placeholder="검색…">
         <button class="pill" id="dvAdd">＋ 행 추가</button>
         <button class="pill ghost" id="dvReload">↻ 다시 읽기</button>
+        <button class="pill ghost" id="dvCsv">⬇ CSV</button>
         <span class="mini" id="dvMsg"></span>
         <span class="spacer"></span>
         <span class="mini" id="dvCount"></span>
@@ -608,6 +611,21 @@ body{padding-left:192px}
       <span class="mmsg" id="auMsg"></span>
       <button class="pill ghost" onclick="closeOvl('ovlAuth')">닫기</button>
       <button class="btn" style="height:36px" id="auGo">로그인</button>
+    </div>
+  </div>
+</div>
+
+<!-- 계약 상세 -->
+<div class="ovl" id="ovlDetail">
+  <div class="modal" style="width:min(760px,100%)">
+    <h3 id="dtTitle">계약 상세</h3>
+    <p class="cap" id="dtMeta"></p>
+    <div class="chartbox h200" id="dtChart"></div>
+    <div style="font-size:11.5px;color:var(--ink-2);opacity:.8;margin:14px 0 6px">변경 이력</div>
+    <div class="tbl-wrap" style="max-height:220px"><table id="dtLog"></table></div>
+    <div class="mact">
+      <span class="mmsg"></span>
+      <button class="pill ghost" onclick="closeOvl('ovlDetail')">닫기</button>
     </div>
   </div>
 </div>
@@ -1017,11 +1035,15 @@ async function loadFromDb(){
     sbAll('monthly_revenue?select=contract_id,month,amount&order=contract_id,month'),
     sbTry('live_customers?select=*&order=id'),
     sbTry('lg_sales?select=*&order=id'),
-    sbTry('biz_recon?select=*&order=id')
+    sbTry('biz_recon?select=*&order=id'),
+    sbTry('targets?select=*&order=year'),
+    sbTry('user_roles?select=role')
   ]);
   var custs=res[0], cts=res[1], mrs=res[2];
   var LIVE=shapeLive(res[3]), LGD=shapeLg(res[4]), VSD=shapeVs(res[5]);
-  window.RAWX={customers:custs, contracts:cts, live:res[3]||[], lg:res[4]||[], biz:res[5]||[], log:null};
+  window.RAWX={customers:custs, contracts:cts, live:res[3]||[], lg:res[4]||[], biz:res[5]||[],
+    targets:res[6]||[], log:null, mrs:mrs};
+  window.IS_VIEWER = !!(res[7] && res[7].length && res[7][0].role==='viewer');
   SB_RAW.customers=custs; SB_RAW.contracts=cts;
   var cMap={}; custs.forEach(function(c){ cMap[c.id]=c; });
 
@@ -1094,6 +1116,7 @@ function onErr(e){
 function onData(d){
   $('#side').classList.remove('hidden');
   document.body.style.paddingLeft='';
+  $('#btnEdit').style.display = window.IS_VIEWER? 'none':'';
   (d.rows||[]).forEach(function(r){
     if(!r.ptn){
       var p0=String(r.partner||'');
@@ -1327,6 +1350,7 @@ function renderAll(){
   var list=idxs();
   $('#filterCount').textContent = list.length.toLocaleString('ko-KR')+'건 선택됨';
   renderKpis(list);
+  renderGoal(list);
   renderTrend(list);
   renderYear(list);
   renderBars(list);
@@ -1461,6 +1485,31 @@ function renderVs(){
 }
 
 /* ---- KPI ---- */
+function renderGoal(list){
+  var box=$('#goalBar'); if(!box) return;
+  var yr=yOf(STATE.base);
+  var tg=(RAWX.targets||[]).filter(function(t){return +t.year===yr;})[0];
+  if(!tg||!tg.amount){ box.style.display='none'; return; }
+  var done=0, plan=0;
+  for(var i=0;i<M;i++){
+    if(yOf(i)!==yr) continue;
+    var v=monthlyTotal(list,i);
+    plan+=v;
+    if(i<=STATE.base) done+=v;
+  }
+  var p1=Math.min(100,done/tg.amount*100), p2=Math.min(100,plan/tg.amount*100);
+  box.style.display='';
+  box.innerHTML=
+    '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:9px">'+
+      '<div style="font-size:12.5px;font-weight:650">🎯 '+yr+'년 목표 '+won(tg.amount)+'원</div>'+
+      '<div style="font-size:12px;color:var(--ink-2)">실적 <b style="color:var(--ink)">'+won(done)+'원 ('+p1.toFixed(1)+'%)</b>'+
+      ' · 계약분 포함 전망 '+won(plan)+'원 ('+p2.toFixed(1)+'%)</div></div>'+
+    '<div style="position:relative;height:14px;border-radius:7px;background:var(--surface-2);overflow:hidden">'+
+      '<div style="position:absolute;left:0;top:0;bottom:0;width:'+p2+'%;background:var(--glow)"></div>'+
+      '<div style="position:absolute;left:0;top:0;bottom:0;width:'+p1+'%;background:var(--s1);border-radius:0 7px 7px 0"></div>'+
+    '</div>';
+}
+
 function renderKpis(list){
   list=list||idxs();
   var b=STATE.base;
@@ -2850,6 +2899,16 @@ var GRIDS={
       {k:'note',l:'사유'}
     ]
   },
+  targets:{
+    title:'연간 목표', table:'targets',
+    cap:'연도별 목표 금액 — 대시보드 상단 달성률 게이지의 기준', add:true, del:true,
+    rows:function(){ return RAWX.targets||[]; },
+    cols:[
+      {k:'year',l:'연도',t:'number',req:true},
+      {k:'amount',l:'목표 금액(원)',t:'number',req:true},
+      {k:'note',l:'메모'}
+    ]
+  },
   log:{
     title:'변경 이력', table:'change_log',
     cap:'웹에서 수정한 기록 (최근 300건)', add:false, del:false, ro:true,
@@ -2871,6 +2930,7 @@ function setupSide(){
   });
   $('#dvSearch').oninput=function(){ DV.page=0; renderGrid(); };
   $('#dvAdd').onclick=function(){ gridAddRow(); };
+  $('#dvCsv').onclick=function(){ exportCsv(); };
   $('#dvReload').onclick=function(){
     loadFromDb().then(function(nd){ onData(nd); if(CUR_VIEW!=='dash') renderGrid(); });
   };
@@ -2896,8 +2956,8 @@ function switchView(v){
   DV.page=0; DV.sortK=null; DV.sortDir=1;
   var g=GRIDS[v];
   $('#dvTitle').textContent=g.title;
-  $('#dvCap').textContent=g.cap;
-  $('#dvAdd').style.display=g.add?'':'none';
+  $('#dvCap').textContent=g.cap + (window.IS_VIEWER? ' · 조회 전용 계정입니다':'');
+  $('#dvAdd').style.display=(g.add && !window.IS_VIEWER)?'':'none';
   $('#dvSearch').value='';
   renderGrid();
 }
@@ -2939,26 +2999,50 @@ function readRowInputs(tr,g){
 
 var DV={page:0, per:100, sortK:null, sortDir:1};
 
-function renderGrid(){
-  var g=GRIDS[CUR_VIEW]; if(!g) return;
+function gridFilteredSorted(g){
   var q=($('#dvSearch').value||'').toLowerCase();
   var rows=g.rows().filter(function(r){
     if(!q) return true;
     return g.cols.some(function(c){ return String(r[c.k]==null?'':r[c.k]).toLowerCase().indexOf(q)>=0; });
   });
-
-  /* 정렬 */
   if(DV.sortK){
     var col=g.cols.filter(function(c){return c.k===DV.sortK;})[0];
     var isNum = col && col.t==='number';
     rows=rows.slice().sort(function(a,b){
       var x=a[DV.sortK], y=b[DV.sortK];
       var ex=(x===null||x===undefined||x===''), ey=(y===null||y===undefined||y==='');
-      if(ex&&ey) return 0; if(ex) return 1; if(ey) return -1;   // 빈값은 항상 뒤로
+      if(ex&&ey) return 0; if(ex) return 1; if(ey) return -1;
       var r0 = isNum? (Number(x)-Number(y)) : String(x).localeCompare(String(y),'ko');
       return r0*DV.sortDir;
     });
   }
+  return rows;
+}
+
+function exportCsv(){
+  var g=GRIDS[CUR_VIEW]; if(!g) return;
+  var rows=gridFilteredSorted(g);
+  var head=g.cols.map(function(c){return c.l;});
+  function cell(v){ v=(v==null?'':String(v)); return /[",\n]/.test(v)? '"'+v.replace(/"/g,'""')+'"' : v; }
+  var csv='\ufeff'+head.join(',')+'\n'+rows.map(function(r){
+    return g.cols.map(function(c){
+      var v=r[c.k];
+      if(c.t==='month'&&v) v=String(v).slice(0,7);
+      if(c.t==='bool') v=v?'Y':'';
+      if(c.fmt) v=c.fmt(r[c.k]);
+      return cell(v);
+    }).join(',');
+  }).join('\n');
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  a.download=g.title.replace(/\s+/g,'_')+'_'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); },2000);
+}
+
+function renderGrid(){
+  var g=GRIDS[CUR_VIEW]; if(!g) return;
+  var rows=gridFilteredSorted(g);
 
   /* 페이지 */
   var totalPages=Math.max(1,Math.ceil(rows.length/DV.per));
@@ -3013,6 +3097,32 @@ function renderGrid(){
   }
 }
 
+function openDetail(c){
+  var cu=(RAWX.customers||[]).filter(function(x){return x.id===c.customer_id;})[0]||{};
+  $('#dtTitle').textContent=cu.name||'?';
+  $('#dtMeta').textContent=[c.line, c.partner, c.biller, (c.start_month||'').slice(0,7)+'~'+((c.end_month||'').slice(0,7)||'?'),
+    c.status||'활성', c.churn_reason||''].filter(Boolean).join(' · ');
+  openOvl('ovlDetail');
+  // 월별 금액 차트
+  var mine=(RAWX.mrs||[]).filter(function(x){return x.contract_id===c.id;});
+  var host=$('#dtChart'); host.innerHTML='';
+  if(mine.length>=2){
+    Viz.lines(host,{labels:mine.map(function(x){return String(x.month).slice(2,7).replace('-','.');}),
+      series:[{label:'월 금액',data:mine.map(function(x){return Number(x.amount);}),color:cssv('--s1')}],
+      fmt:won, tipFmt:wonFull, fill:true});
+  } else host.innerHTML='<p class="cap">월별 금액 데이터가 없습니다.</p>';
+  // 변경 이력
+  var t=$('#dtLog'); t.innerHTML='<tbody><tr><td class="mini">불러오는 중…</td></tr></tbody>';
+  sbTry('change_log?select=*&target_id=eq.'+c.id+'&order=id.desc&limit=50').then(function(rows){
+    rows=rows||[];
+    t.innerHTML='<thead><tr><th>시각</th><th>누가</th><th>동작</th><th>내용</th></tr></thead><tbody>'+
+      (rows.length? rows.map(function(x){
+        return '<tr><td>'+String(x.at||'').replace('T',' ').slice(0,16)+'</td><td>'+esc(x.actor||'')+
+          '</td><td>'+esc(x.action||'')+'</td><td class="mini">'+esc(x.detail?JSON.stringify(x.detail).slice(0,90):'')+'</td></tr>';
+      }).join('') : '<tr><td colspan="4" class="mini">웹에서 수정한 기록이 없습니다 (최초 이관 데이터)</td></tr>')+'</tbody>';
+  });
+}
+
 function gridRow(r,g,editing){
   var tr=document.createElement('tr');
   function view(){
@@ -3022,6 +3132,12 @@ function gridRow(r,g,editing){
     }).join('')+(g.ro?'':'<td class="act"></td>');
     if(!g.ro){
       var act=tr.lastChild;
+      if(CUR_VIEW==='contracts'){
+        var bv=document.createElement('button'); bv.textContent='👁'; bv.title='상세 보기';
+        bv.onclick=function(){ openDetail(r); };
+        act.appendChild(bv);
+      }
+      if(window.IS_VIEWER) return;
       var be=document.createElement('button'); be.textContent='✎';
       be.onclick=function(){ edit(); };
       act.appendChild(be);
