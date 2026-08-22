@@ -118,11 +118,12 @@ td select{height:30px;font-size:12px;width:auto;min-width:96px}
   </div>
 
   <div class="tabs">
-    <button class="tab on" id="tabReq">📦 신청 · 처리</button>
-    <button class="tab" id="tabAst">🔧 장비 현황</button>
+    <button class="tab on" data-pane="paneNew">📝 장비 신청</button>
+    <button class="tab" data-pane="paneReq">📦 처리 내역</button>
+    <button class="tab" data-pane="paneAst">🔧 장비 현황</button>
   </div>
 
-  <div id="paneReq">
+  <div id="paneNew">
   <div class="card">
     <h2>발주 신청</h2>
     <p class="cap">* 표시는 필수 항목</p>
@@ -159,7 +160,9 @@ td select{height:30px;font-size:12px;width:auto;min-width:96px}
       <button class="btn" id="odGo">발주 신청</button>
     </div>
   </div>
+  </div><!-- /paneNew -->
 
+  <div id="paneReq" class="hidden">
   <div class="card">
     <h2>발주 내역</h2>
     <p class="cap">상태를 바꾸면 즉시 저장됩니다 (접수 → 출하요청 → 배송중 → 설치완료 → 회수예정 → 회수완료)</p>
@@ -449,10 +452,16 @@ $('#pwGo').onclick=changePw;
 $('#odGo').onclick=submitOrder;
 $('#q').oninput=render; $('#fCh').onchange=render;
 $('#aq').oninput=renderAssets; $('#astAdd').onclick=addAsset;
-$('#tabReq').onclick=function(){ this.classList.add('on'); $('#tabAst').classList.remove('on');
-  $('#paneReq').classList.remove('hidden'); $('#paneAst').classList.add('hidden'); };
-$('#tabAst').onclick=function(){ this.classList.add('on'); $('#tabReq').classList.remove('on');
-  $('#paneAst').classList.remove('hidden'); $('#paneReq').classList.add('hidden'); renderAssets(); };
+document.querySelectorAll('.tab').forEach(function(t){
+  t.onclick=function(){
+    document.querySelectorAll('.tab').forEach(function(x){ x.classList.remove('on'); });
+    this.classList.add('on');
+    ['paneNew','paneReq','paneAst'].forEach(function(p){ $('#'+p).classList.add('hidden'); });
+    $('#'+this.dataset.pane).classList.remove('hidden');
+    if(this.dataset.pane==='paneAst') renderAssets();
+    if(this.dataset.pane==='paneReq') render();
+  };
+});
 $('#btnOut').onclick=function(){ clearSess(); location.reload(); };
 /* 저장된 세션이 있으면 로그인 화면 건너뜀 */
 restoreSess().then(function(ok){
