@@ -352,7 +352,7 @@ body{padding-left:192px}
 
 <nav class="side hidden" id="side">
   <div class="logo">서비스사업부<small>통합 관리 포탈</small></div>
-  <button data-v="dash" aria-current="true">📊 대시보드</button>
+  <button data-v="dash" aria-current="true">🏠 홈 (대시보드)</button>
   <div class="grp">데이터 관리</div>
   <button data-v="contracts">📋 계약</button>
   <button data-v="live">🟢 LIVE 고객사</button>
@@ -366,6 +366,8 @@ body{padding-left:192px}
   <button data-v="quote">📄 견적 시스템</button>
   <div class="grp">기록</div>
   <button data-v="log">🕘 변경 이력</button>
+  <div class="grp">계정</div>
+  <button data-v="account">👤 내 계정</button>
 </nav>
 
 <div class="wrap hidden" id="app">
@@ -623,6 +625,14 @@ body{padding-left:192px}
         <span class="mmsg" id="odMsg"></span>
         <button class="btn" style="height:38px;padding:0 28px" id="odGo">발주 신청</button>
       </div>
+    </section>
+  </div>
+
+  <div id="viewAccount" class="hidden">
+    <section class="card c12" style="max-width:560px;margin:0 auto">
+      <h3 style="margin:0 0 4px;font-size:16px">👤 내 계정</h3>
+      <p class="cap" style="margin:0 0 16px">현재 로그인 정보와 권한</p>
+      <div id="accBody"></div>
     </section>
   </div>
 
@@ -3413,6 +3423,57 @@ function renderBizEditor(host, months){
   };
 }
 
+/* ---- 내 계정 ---- */
+var ROLE_INFO={
+  admin:     ['관리자','모든 데이터 조회·수정과 계정 관리가 가능합니다.'],
+  editor:    ['편집자','매출·장비 데이터를 조회하고 수정할 수 있습니다.'],
+  viewer:    ['조회 전용','모든 화면을 볼 수 있지만 수정은 할 수 없습니다.'],
+  equipment: ['장비 전용','장비 신청·자산만 사용할 수 있고 매출 데이터에는 접근할 수 없습니다.']
+};
+async function renderAccount(){
+  var box=$('#accBody');
+  if(!SB_TOKEN){
+    box.innerHTML='<p class="cap">로그인이 필요합니다.</p>';
+    var lb=document.createElement('button'); lb.className='pill'; lb.textContent='로그인';
+    lb.onclick=function(){ openOvl('ovlAuth'); };
+    box.appendChild(lb); return;
+  }
+  box.innerHTML='<p class="cap">불러오는 중…</p>';
+  var role=null;
+  try{
+    var rr=await sbTry('user_roles?select=role&email=eq.'+encodeURIComponent(AUTH_USER||''));
+    if(rr && rr.length) role=rr[0].role;
+  }catch(e){}
+  var ri=ROLE_INFO[role]||['기본 (역할 미지정)','역할이 지정되지 않아 기본 권한으로 동작합니다. 관리자에게 문의하세요.'];
+  var sessTxt='로그인 유지 켜짐 · 만료 시 자동 갱신';
+  try{
+    var s0=JSON.parse(localStorage.getItem(SESS_KEY)||'null');
+    if(s0 && s0.e) sessTxt='로그인 유지 켜짐 · 현재 토큰 만료 '+new Date(s0.e*1000).toLocaleString('ko-KR')+' (자동 갱신)';
+  }catch(e){}
+  function row(k,v){ return '<div style="display:flex;gap:14px;padding:9px 2px;border-bottom:1px solid var(--ring)">'+
+    '<span style="width:110px;color:var(--muted);font-size:12.5px;flex-shrink:0">'+k+'</span>'+
+    '<span style="font-size:13.5px">'+v+'</span></div>'; }
+  box.innerHTML=
+    row('이메일', esc(AUTH_USER||''))+
+    row('권한', '<b>'+esc(ri[0])+'</b>'+(role? ' <span class="mini">('+esc(role)+')</span>':''))+
+    row('권한 설명', '<span style="color:var(--ink-2)">'+esc(ri[1])+'</span>')+
+    row('로그인 세션', '<span style="color:var(--ink-2)">'+esc(sessTxt)+'</span>');
+  var act=document.createElement('div');
+  act.style.cssText='display:flex;gap:10px;margin-top:18px';
+  var bp=document.createElement('button'); bp.className='pill'; bp.textContent='🔑 비밀번호 변경';
+  bp.onclick=function(){ openOvl('ovlAuth'); setAuthTab('pw'); };
+  var bo=document.createElement('button'); bo.className='pill ghost'; bo.textContent='로그아웃';
+  bo.style.cssText='border-color:var(--critical,#d03b3b);color:var(--critical,#d03b3b)';
+  bo.onclick=function(){
+    if(confirm('로그아웃할까요?')){ clearSess(); try{ localStorage.removeItem(CACHE_KEY); }catch(e){} location.reload(); }
+  };
+  act.appendChild(bp); act.appendChild(bo);
+  box.appendChild(act);
+  var tip=document.createElement('p'); tip.className='cap'; tip.style.marginTop='14px';
+  tip.textContent='계정 발급·권한 변경은 관리자가 Supabase 콘솔에서 처리합니다.';
+  box.appendChild(tip);
+}
+
 function openOrderForm(){ switchView('ordernew'); }
 async function submitOrder(){
   var cust=$('#odCustomer').value.trim(), mgr=$('#odMgr').value.trim();
@@ -3475,11 +3536,13 @@ function switchView(v){
   $('#side').querySelectorAll('button').forEach(function(b){
     b.setAttribute('aria-current', b.dataset.v===v?'true':'false');
   });
-  var dash=v==='dash', quote=v==='quote', onew=v==='ordernew';
+  var dash=v==='dash', quote=v==='quote', onew=v==='ordernew', acct=v==='account';
   $('#viewDash').classList.toggle('hidden',!dash);
   $('#viewQuote').classList.toggle('hidden',!quote);
   $('#viewOrderNew').classList.toggle('hidden',!onew);
-  $('#viewData').classList.toggle('hidden',dash||quote||onew);
+  $('#viewAccount').classList.toggle('hidden',!acct);
+  $('#viewData').classList.toggle('hidden',dash||quote||onew||acct);
+  if(acct){ renderAccount(); return; }
   if(onew){
     msg('odMsg','');
     setTimeout(function(){ $('#odCustomer').focus(); },50);
