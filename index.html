@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ko" data-theme="dark">
+<html lang="ko" data-theme="light">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -376,7 +376,7 @@ body{padding-left:192px}
     <span class="live"><span class="dot"></span><span id="loadedAt"></span></span>
     <button class="pill" id="btnEdit">✏️ 입력·수정</button>
     <button class="pill ghost" id="btnAuth">로그인</button>
-    <button class="pill ghost" id="btnTheme">◐ 라이트</button>
+    <button class="pill ghost" id="btnTheme">◐ 다크</button>
     <button class="pill ghost" id="btnReload">↻ 새로고침</button>
   </div>
 
@@ -612,6 +612,7 @@ body{padding-left:192px}
 
     <div class="mact">
       <span class="mmsg" id="auMsg"></span>
+      <button class="pill ghost" id="auLogout" style="display:none;border-color:var(--critical);color:var(--critical)">로그아웃</button>
       <button class="pill ghost" onclick="closeOvl('ovlAuth')">닫기</button>
       <button class="btn" style="height:36px" id="auGo">로그인</button>
     </div>
@@ -1310,8 +1311,17 @@ function buildControls(){
     var l = document.documentElement.getAttribute('data-theme')==='light';
     document.documentElement.setAttribute('data-theme', l?'dark':'light');
     this.textContent = l? '◐ 라이트' : '◐ 다크';
+    try{ localStorage.setItem('svc_theme', l?'dark':'light'); }catch(e){}
     renderAll();
   };
+  // 저장된 테마 복원 (기본: 라이트)
+  try{
+    var th=localStorage.getItem('svc_theme');
+    if(th==='dark'){
+      document.documentElement.setAttribute('data-theme','dark');
+      $('#btnTheme').textContent='◐ 라이트';
+    }
+  }catch(e){}
   $('#btnReload').onclick=function(){
     $('#app').classList.add('hidden'); $('#loading').classList.remove('hidden');
     $('#loading').innerHTML='<div class="spin"></div><div>다시 읽고 있습니다…</div>';
@@ -3244,7 +3254,8 @@ async function doLogin(){
     var j=await r.json();
     if(!r.ok||!j.access_token) throw new Error(j.error_description||j.msg||'이메일 또는 비밀번호가 올바르지 않습니다');
     SB_TOKEN=j.access_token; AUTH_USER=($('#auEmail').value.trim());
-    $('#btnAuth').textContent=AUTH_USER.split('@')[0]+' · 로그아웃';
+    $('#btnAuth').textContent=AUTH_USER.split('@')[0]+' ▾';
+    $('#btnAuth').title='비밀번호 변경 · 로그아웃';
     msg('auMsg','');
     closeOvl('ovlAuth');
     loadFromDb().then(onData).catch(onErr);
@@ -3283,12 +3294,22 @@ function setAuthTab(t){
 function setupAuth(){
   $('#btnAuth').onclick=function(){
     if(SB_TOKEN){
-      if(confirm('로그아웃할까요?')){ SB_TOKEN=null; AUTH_USER=null; location.reload(); }
+      // 로그인 상태: 계정 창을 비밀번호 변경 탭으로 열기
+      setAuthTab('pw');
+      $('#auTabs').querySelector('[data-t="login"]').style.display='none';
+      $('#auLogout').style.display='';
+      openOvl('ovlAuth');
+      setTimeout(function(){ $('#apPw').focus(); },50);
       return;
     }
+    $('#auTabs').querySelector('[data-t="login"]').style.display='';
+    $('#auLogout').style.display='none';
     setAuthTab('login');
     openOvl('ovlAuth');
     setTimeout(function(){ $('#auEmail').focus(); },50);
+  };
+  $('#auLogout').onclick=function(){
+    if(confirm('로그아웃할까요?')){ SB_TOKEN=null; AUTH_USER=null; location.reload(); }
   };
   $('#auTabs').querySelectorAll('button').forEach(function(b){
     b.onclick=function(){ setAuthTab(this.dataset.t); };
