@@ -359,6 +359,7 @@ body{padding-left:192px}
   <button data-v="lg">📶 LG 판매</button>
   <button data-v="biz">⚖️ 비즈포탈 차액</button>
   <button data-v="targets">🎯 연간 목표</button>
+  <button data-v="orders">📦 임대장비</button>
   <div class="grp">도구</div>
   <button data-v="quote">📄 견적 시스템</button>
   <div class="grp">기록</div>
@@ -615,6 +616,47 @@ body{padding-left:192px}
       <button class="pill ghost" id="auLogout" style="display:none;border-color:var(--critical);color:var(--critical)">로그아웃</button>
       <button class="pill ghost" id="auClose" onclick="closeOvl('ovlAuth')">닫기</button>
       <button class="btn" style="height:36px" id="auGo">로그인</button>
+    </div>
+  </div>
+</div>
+
+<!-- 임대장비 발주 신청 -->
+<div class="ovl" id="ovlOrder">
+  <div class="modal" style="width:min(720px,100%)">
+    <h3>📦 임대장비 발주 신청</h3>
+    <p class="cap">저장하면 DB에 기록되고 슬랙 에스원 채널로 자동 통보됩니다.</p>
+    <div class="frm" style="margin-bottom:10px">
+      <div><label>판매 채널 *</label><select id="odChannel"><option>에스원</option><option>LGU+</option><option>공공</option><option>기타</option></select></div>
+      <div><label>요청 유형 *</label><select id="odType"><option>신규발주</option><option>추가</option><option>교체(장애)</option><option>교체(증설)</option><option>철거·회수</option></select></div>
+    </div>
+    <div style="font-size:11px;color:var(--ink-2);opacity:.75;margin:-6px 0 10px">— 신청자 정보 —</div>
+    <div class="frm">
+      <div><label>고객사명 *</label><input id="odCustomer"></div>
+      <div><label>계약번호</label><input id="odContract" placeholder="모르면 비워두세요 (생성 중)"></div>
+      <div><label>고객 담당자 *</label><input id="odMgr"></div>
+      <div><label>담당자 연락처</label><input id="odPhone" placeholder="010-0000-0000"></div>
+      <div><label>관리자 계정 (이메일)</label><input id="odAdmin"></div>
+      <div><label>설치 희망일</label><input id="odInstall" type="date"></div>
+      <div class="full"><label>고객사 주소</label><input id="odAddr"></div>
+      <div><label>서비스 에디션</label><select id="odEdition"><option>Enterprise Edition</option><option>Basic Edition</option></select></div>
+      <div><label>요청 서비스 기능</label><input id="odFeat" value="IP관리, 단말 무결성 검증"></div>
+      <div><label>노드수</label><input id="odNodes" type="number" min="0"></div>
+      <div><label>모델명</label><select id="odModel"><option>S100</option><option>S200</option><option>S10_R2</option></select></div>
+      <div><label>수량</label><input id="odQty" type="number" min="1" value="1"></div>
+    </div>
+    <div style="font-size:11px;color:var(--ink-2);opacity:.75;margin:14px 0 10px">— 배송 관련 정보 —</div>
+    <div class="frm">
+      <div class="full"><label>수령 주소</label><input id="odRecvAddr"></div>
+      <div><label>수령인 성명</label><input id="odRecvName"></div>
+      <div><label>수령인 연락처</label><input id="odRecvPhone"></div>
+      <div><label>수령 희망일</label><input id="odShip" type="date"></div>
+      <div><label>요청사항</label><input id="odNote" placeholder="예: GNOS 사용 가능, 퀵 발송 필요"></div>
+      <div class="full"><label>장비 시리얼 (교체·회수 시, 콤마 구분)</label><input id="odSerials"></div>
+    </div>
+    <div class="mact">
+      <span class="mmsg" id="odMsg"></span>
+      <button class="pill ghost" onclick="closeOvl('ovlOrder')">닫기</button>
+      <button class="btn" style="height:36px" id="odGo">신청</button>
     </div>
   </div>
 </div>
@@ -1041,13 +1083,14 @@ async function loadFromDb(){
     sbTry('lg_sales?select=*&order=id'),
     sbTry('biz_recon?select=*&order=id'),
     sbTry('targets?select=*&order=year'),
+    sbTry('equipment_orders?select=*&order=id.desc'),
     sbTry('user_roles?select=role')
   ]);
   var custs=res[0], cts=res[1], mrs=res[2];
   var LIVE=shapeLive(res[3]), LGD=shapeLg(res[4]), VSD=shapeVs(res[5]);
   window.RAWX={customers:custs, contracts:cts, live:res[3]||[], lg:res[4]||[], biz:res[5]||[],
-    targets:res[6]||[], log:null, mrs:mrs};
-  window.IS_VIEWER = !!(res[7] && res[7].length && res[7][0].role==='viewer');
+    targets:res[6]||[], orders:res[7]||[], log:null, mrs:mrs};
+  window.IS_VIEWER = !!(res[8] && res[8].length && res[8][0].role==='viewer');
   SB_RAW.customers=custs; SB_RAW.contracts=cts;
   var cMap={}; custs.forEach(function(c){ cMap[c.id]=c; });
 
@@ -1095,9 +1138,18 @@ async function loadFromDb(){
   };
 }
 
+function afterLoad(dd){
+  if(!dd.rows.length && SB_TOKEN){ location.href='orders.html'; return; }
+  onData(dd);
+}
 function boot(){
   if(!window.__editInit){ window.__editInit=1; setupEdit(); setupSide(); }
   loadFromDb().then(function(d){
+    if(!d.rows.length && SB_TOKEN){
+      // 로그인했는데 매출 데이터가 안 보임 = 장비 전용(equipment) 계정
+      location.href='orders.html';
+      return;
+    }
     if(!d.rows.length && !SB_TOKEN){
       $('#side').classList.add('hidden');
       document.body.style.paddingLeft='0';
@@ -2979,6 +3031,29 @@ var GRIDS={
       {k:'note',l:'메모'}
     ]
   },
+  orders:{
+    title:'임대장비 발주', table:'equipment_orders',
+    cap:'신청하면 슬랙 에스원 채널로 자동 통보 · 상태(접수→출하→설치→회수)는 ✎ 로 갱신', add:true, del:true,
+    rows:function(){ return RAWX.orders||[]; },
+    cols:[
+      {k:'created_at',l:'신청일',ro:true,fmt:function(v){return String(v||'').slice(0,10);}},
+      {k:'channel',l:'채널',t:'select',opts:['에스원','LGU+','공공','기타']},
+      {k:'order_type',l:'유형',t:'select',opts:['신규발주','추가','교체(장애)','교체(증설)','철거·회수']},
+      {k:'customer',l:'고객사',req:true},
+      {k:'contract_no',l:'계약번호'},
+      {k:'mgr_name',l:'담당자'},
+      {k:'install_date',l:'설치희망',t:'date'},
+      {k:'edition',l:'에디션',t:'select',opts:['Enterprise Edition','Basic Edition']},
+      {k:'nodes',l:'노드',t:'number'},
+      {k:'model',l:'모델',t:'select',opts:['S100','S200','S10_R2']},
+      {k:'qty',l:'수량',t:'number'},
+      {k:'recv_name',l:'수령인'},
+      {k:'ship_date',l:'수령희망',t:'date'},
+      {k:'status',l:'상태',t:'select',opts:['접수','출하요청','배송중','설치완료','회수예정','회수완료','취소']},
+      {k:'serials',l:'시리얼'},
+      {k:'request_note',l:'요청사항'}
+    ]
+  },
   log:{
     title:'변경 이력', table:'change_log',
     cap:'웹에서 수정한 기록 (최근 300건)', add:false, del:false, ro:true,
@@ -2994,12 +3069,62 @@ var GRIDS={
   }
 };
 
+function openOrderForm(){
+  if(!SB_TOKEN){ openOvl('ovlAuth'); return; }
+  msg('odMsg','');
+  openOvl('ovlOrder');
+  setTimeout(function(){ $('#odCustomer').focus(); },50);
+}
+async function submitOrder(){
+  var cust=$('#odCustomer').value.trim(), mgr=$('#odMgr').value.trim();
+  if(!cust||!mgr){ msg('odMsg','고객사명과 담당자는 필수입니다','bad'); return; }
+  var btn=$('#odGo'); btn.disabled=true; msg('odMsg','접수 중…');
+  try{
+    var row={
+      channel: $('#odChannel').value, order_type: $('#odType').value,
+      serials: $('#odSerials').value.trim()||null,
+      requester: AUTH_USER||null,
+      customer: cust,
+      contract_no: $('#odContract').value.trim()||null,
+      mgr_name: mgr,
+      mgr_phone: $('#odPhone').value.trim()||null,
+      admin_account: $('#odAdmin').value.trim()||null,
+      install_date: $('#odInstall').value||null,
+      customer_addr: $('#odAddr').value.trim()||null,
+      edition: $('#odEdition').value,
+      features: $('#odFeat').value.trim()||null,
+      nodes: +$('#odNodes').value||null,
+      model: $('#odModel').value,
+      qty: +$('#odQty').value||1,
+      recv_addr: $('#odRecvAddr').value.trim()||null,
+      recv_name: $('#odRecvName').value.trim()||null,
+      recv_phone: $('#odRecvPhone').value.trim()||null,
+      ship_date: $('#odShip').value||null,
+      request_note: $('#odNote').value.trim()||null,
+      status:'접수'
+    };
+    var out=await sbWrite('POST','equipment_orders?select=*',[row],'return=representation');
+    RAWX.orders=RAWX.orders||[]; RAWX.orders.unshift(out[0]);
+    logChange('insert','equipment_orders',out[0].id,{customer:cust,model:row.model,qty:row.qty});
+    msg('odMsg','접수 완료 ✅ — 슬랙 채널로 통보되었습니다','ok');
+    ['odCustomer','odContract','odMgr','odPhone','odAdmin','odInstall','odAddr','odNodes','odRecvAddr','odRecvName','odRecvPhone','odShip','odNote','odSerials'].forEach(function(i){ $('#'+i).value=''; });
+    $('#odQty').value='1';
+    renderGrid();
+    setTimeout(function(){ closeOvl('ovlOrder'); },900);
+  }catch(e){ msg('odMsg',String(e.message||e),'bad'); }
+  btn.disabled=false;
+}
+
 function setupSide(){
   $('#side').querySelectorAll('button').forEach(function(b){
     b.onclick=function(){ switchView(this.dataset.v); };
   });
   $('#dvSearch').oninput=function(){ DV.page=0; renderGrid(); };
-  $('#dvAdd').onclick=function(){ gridAddRow(); };
+  $('#dvAdd').onclick=function(){
+    if(CUR_VIEW==='orders'){ openOrderForm(); return; }
+    gridAddRow();
+  };
+  $('#odGo').onclick=submitOrder;
   $('#dvCsv').onclick=function(){ exportCsv(); };
   $('#dvReload').onclick=function(){
     loadFromDb().then(function(nd){ onData(nd); if(CUR_VIEW!=='dash') renderGrid(); });
@@ -3319,11 +3444,11 @@ async function doLogin(){
       $('#auLogout').style.display='';
       msg('auMsg','최초 로그인입니다 — 본인 비밀번호로 변경해야 사용할 수 있습니다','bad');
       setTimeout(function(){ $('#apPw').focus(); },50);
-      loadFromDb().then(onData).catch(onErr);   // 뒤에서 미리 로드 (모달이 막고 있음)
+      loadFromDb().then(afterLoad).catch(onErr);   // 뒤에서 미리 로드 (모달이 막고 있음)
       return;
     }
     closeOvl('ovlAuth');
-    loadFromDb().then(onData).catch(onErr);
+    loadFromDb().then(afterLoad).catch(onErr);
   }catch(e){ msg('auMsg',String(e.message||e),'bad'); }
 }
 
