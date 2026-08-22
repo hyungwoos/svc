@@ -199,6 +199,30 @@ function today(){ return new Date().toISOString().slice(0,10); }
 function parseSerials(s){ return String(s||'').split(/[,\s]+/).filter(function(x){return x;}); }
 
 function $(s){ return document.querySelector(s); }
+/* ---- 로그인 세션 유지 (index.html 과 공유) ---- */
+var SESS_KEY='svc_sess';
+function saveSess(j,email,pOverride){
+  try{ localStorage.setItem(SESS_KEY, JSON.stringify({
+    a:j.access_token, r:j.refresh_token||null,
+    e:Math.floor(Date.now()/1000)+(j.expires_in||3600), u:email,
+    p:(pOverride!==undefined)? pOverride : !!(j.user&&j.user.user_metadata&&j.user.user_metadata.pw_changed)
+  })); }catch(e){}
+}
+function clearSess(){ try{ localStorage.removeItem(SESS_KEY); }catch(e){} }
+async function restoreSess(){
+  var s=null; try{ s=JSON.parse(localStorage.getItem(SESS_KEY)||'null'); }catch(e){}
+  if(!s || !s.a || s.p===false) return false;
+  if(Math.floor(Date.now()/1000) < (s.e||0)-120){ TOKEN=s.a; USER=s.u; return true; }
+  if(!s.r){ clearSess(); return false; }
+  try{
+    var r=await fetch(SB_URL+'/auth/v1/token?grant_type=refresh_token',{
+      method:'POST', headers:{apikey:SB_KEY,'Content-Type':'application/json'},
+      body:JSON.stringify({refresh_token:s.r})});
+    var j=await r.json();
+    if(!r.ok||!j.access_token){ clearSess(); return false; }
+    TOKEN=j.access_token; USER=s.u; saveSess(j,s.u,true); return true;
+  }catch(e){ clearSess(); return false; }
+}
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
 function msg(id,t,c){ var e=$('#'+id); e.textContent=t||''; e.className='msg'+(c?' '+c:''); }
 function hdr(json){ var h={apikey:SB_KEY,Authorization:'Bearer '+(TOKEN||SB_KEY)}; if(json)h['Content-Type']='application/json'; return h; }
@@ -224,6 +248,7 @@ async function login(){
     var j=await r.json();
     if(!r.ok||!j.access_token) throw new Error(j.error_description||j.msg||'이메일 또는 비밀번호가 올바르지 않습니다');
     TOKEN=j.access_token; USER=$('#lgEmail').value.trim();
+    saveSess(j, USER);
     var changed=j.user&&j.user.user_metadata&&j.user.user_metadata.pw_changed;
     $('#viewLogin').classList.add('hidden');
     if(!changed){ $('#viewPw').classList.remove('hidden'); $('#npw1').focus(); return; }
@@ -240,6 +265,7 @@ async function changePw(){
       headers:{apikey:SB_KEY,'Content-Type':'application/json',Authorization:'Bearer '+TOKEN},
       body:JSON.stringify({password:p1,data:{pw_changed:true}})});
     if(!r.ok){ var j=await r.json(); throw new Error(j.msg||'변경 실패'); }
+    try{ var s0=JSON.parse(localStorage.getItem(SESS_KEY)||'null'); if(s0){ s0.p=true; localStorage.setItem(SESS_KEY,JSON.stringify(s0)); } }catch(e){}
     msg('pwMsg','변경 완료 ✅','ok');
     setTimeout(function(){ $('#viewPw').classList.add('hidden'); enter(); },600);
   }catch(e){ msg('pwMsg',String(e.message||e),'bad'); }
@@ -427,7 +453,11 @@ $('#tabReq').onclick=function(){ this.classList.add('on'); $('#tabAst').classLis
   $('#paneReq').classList.remove('hidden'); $('#paneAst').classList.add('hidden'); };
 $('#tabAst').onclick=function(){ this.classList.add('on'); $('#tabReq').classList.remove('on');
   $('#paneAst').classList.remove('hidden'); $('#paneReq').classList.add('hidden'); renderAssets(); };
-$('#btnOut').onclick=function(){ location.reload(); };
+$('#btnOut').onclick=function(){ clearSess(); location.reload(); };
+/* 저장된 세션이 있으면 로그인 화면 건너뜀 */
+restoreSess().then(function(ok){
+  if(ok){ $('#viewLogin').classList.add('hidden'); enter(); }
+});
 $('#btnMe').onclick=function(){
   var p=prompt('새 비밀번호 (6자 이상) — 취소하면 변경하지 않습니다');
   if(!p||p.length<6) return;
