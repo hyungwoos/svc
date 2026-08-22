@@ -997,6 +997,36 @@ var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
 
+/* ---- 로그인 세션 유지 (localStorage) ---- */
+var SESS_KEY='svc_sess';
+function saveSess(j,email,pOverride){
+  try{ localStorage.setItem(SESS_KEY, JSON.stringify({
+    a:j.access_token, r:j.refresh_token||null,
+    e:Math.floor(Date.now()/1000)+(j.expires_in||3600), u:email,
+    p:(pOverride!==undefined)? pOverride : !!(j.user&&j.user.user_metadata&&j.user.user_metadata.pw_changed)
+  })); }catch(e){}
+}
+function clearSess(){ try{ localStorage.removeItem(SESS_KEY); }catch(e){} }
+async function restoreSess(){
+  var s=null; try{ s=JSON.parse(localStorage.getItem(SESS_KEY)||'null'); }catch(e){}
+  if(!s || !s.a || s.p===false) return false;      // 비밀번호 미변경 계정은 다시 로그인
+  if(Math.floor(Date.now()/1000) < (s.e||0)-120){ SB_TOKEN=s.a; AUTH_USER=s.u; return true; }
+  if(!s.r){ clearSess(); return false; }
+  try{
+    var r=await fetch(SB_URL+'/auth/v1/token?grant_type=refresh_token',{
+      method:'POST', headers:{apikey:SB_KEY,'Content-Type':'application/json'},
+      body:JSON.stringify({refresh_token:s.r})});
+    var j=await r.json();
+    if(!r.ok||!j.access_token){ clearSess(); return false; }
+    SB_TOKEN=j.access_token; AUTH_USER=s.u; saveSess(j,s.u,true); return true;
+  }catch(e){ clearSess(); return false; }
+}
+function showLoading(t){
+  $('#app').classList.add('hidden');
+  var l=$('#loading'); l.classList.remove('hidden');
+  l.innerHTML='<div class="spin"></div><div>'+t+'</div>';
+}
+
 function sbHeaders(json){
   var h={apikey:SB_KEY, Authorization:'Bearer '+(SB_TOKEN||SB_KEY)};
   if(json) h['Content-Type']='application/json';
@@ -1146,7 +1176,14 @@ function afterLoad(dd){
 }
 function boot(){
   if(!window.__editInit){ window.__editInit=1; setupEdit(); setupSide(); }
-  loadFromDb().then(function(d){
+  restoreSess().then(function(ok){
+    if(ok){
+      $('#btnAuth').textContent=AUTH_USER.split('@')[0]+' ▾';
+      $('#btnAuth').title='비밀번호 변경 · 로그아웃';
+      showLoading('데이터를 불러오는 중…');
+    }
+    return loadFromDb();
+  }).then(function(d){
     if(!d.rows.length && SB_TOKEN){
       // 로그인했는데 매출 데이터가 안 보임 = 장비 전용(equipment) 계정
       location.href='orders.html';
@@ -3471,6 +3508,7 @@ async function doLogin(){
     var j=await r.json();
     if(!r.ok||!j.access_token) throw new Error(j.error_description||j.msg||'이메일 또는 비밀번호가 올바르지 않습니다');
     SB_TOKEN=j.access_token; AUTH_USER=($('#auEmail').value.trim());
+    saveSess(j, AUTH_USER);
     $('#btnAuth').textContent=AUTH_USER.split('@')[0]+' ▾';
     $('#btnAuth').title='비밀번호 변경 · 로그아웃';
     msg('auMsg','');
@@ -3489,6 +3527,7 @@ async function doLogin(){
       return;
     }
     closeOvl('ovlAuth');
+    showLoading('로그인 완료 — 데이터를 불러오는 중…');
     loadFromDb().then(afterLoad).catch(onErr);
   }catch(e){ msg('auMsg',String(e.message||e),'bad'); }
 }
@@ -3509,6 +3548,7 @@ async function doPwChange(){
     var j=await r.json();
     if(!r.ok) throw new Error(j.error_description||j.msg||'변경 실패');
     $('#apPw').value=$('#apPw2').value='';
+    try{ var s0=JSON.parse(localStorage.getItem(SESS_KEY)||'null'); if(s0){ s0.p=true; localStorage.setItem(SESS_KEY,JSON.stringify(s0)); } }catch(e){}
     msg('auMsg','비밀번호를 변경했습니다 ✅','ok');
     if(FORCE_PW){
       FORCE_PW=false;
@@ -3550,7 +3590,7 @@ function setupAuth(){
     setTimeout(function(){ $('#auEmail').focus(); },50);
   };
   $('#auLogout').onclick=function(){
-    if(confirm('로그아웃할까요?')){ SB_TOKEN=null; AUTH_USER=null; location.reload(); }
+    if(confirm('로그아웃할까요?')){ clearSess(); SB_TOKEN=null; AUTH_USER=null; location.reload(); }
   };
   $('#auTabs').querySelectorAll('button').forEach(function(b){
     b.onclick=function(){ setAuthTab(this.dataset.t); };
