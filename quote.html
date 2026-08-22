@@ -8,16 +8,18 @@
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
         :root { --genians-green: #1fb53a; --border-color: #000; --gray-bg: #f8f9fa; }
         * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-        body { font-family: 'Noto Sans KR', sans-serif; background: #525659; margin: 0; padding: 20px; color: #333; }
-        .toolbar { width: 210mm; margin: 0 auto 15px; background: #fff; padding: 12px 15px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        body { font-family: 'Noto Sans KR', sans-serif; background: #f9f9f7; margin: 0; padding: 20px; color: #333; }
+        .toolbar { width: 210mm; margin: 0 auto 15px; background: #fcfcfb; padding: 12px 15px; border: 1px solid rgba(11,11,11,.10); border-radius: 14px; display: flex; justify-content: space-between; align-items: center; }
+        @media screen { .page { box-shadow: 0 1px 6px rgba(0,0,0,.07); border: 1px solid rgba(11,11,11,.06); } }
+        body.pdf-capturing .page { box-shadow: none !important; border: none !important; }
         .toolbar-actions { display: flex; gap: 8px; align-items: center; }
-        .btn { padding: 9px 14px; font-weight: bold; border-radius: 5px; cursor: pointer; border: none; color: white; font-size: 13px; white-space: nowrap; }
+        .btn { padding: 9px 14px; font-weight: bold; border-radius: 9px; cursor: pointer; border: none; color: white; font-size: 13px; white-space: nowrap; }
         .btn-print { background: var(--genians-green); }
         .btn-add { background: #343a40; }
         .btn-secondary { background: #6c757d; }
         .btn-github { background: #24292e; }
         .dropdown { position: relative; display: inline-block; }
-        .dropdown-menu { display: none; position: absolute; top: 115%; left: 0; background: #fff; border: 1px solid #ddd; border-radius: 6px; box-shadow: 0 6px 16px rgba(0,0,0,0.18); min-width: 170px; z-index: 50; overflow: hidden; }
+        .dropdown-menu { display: none; position: absolute; top: 115%; left: 0; background: #fff; border: 1px solid rgba(11,11,11,.12); border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,0.12); min-width: 170px; z-index: 50; overflow: hidden; }
         .dropdown-menu.open { display: block; }
         .dropdown-item { display: block; width: 100%; text-align: left; padding: 10px 14px; font-size: 13px; border: none; background: #fff; cursor: pointer; color: #333; }
         .dropdown-item:hover { background: #f2f2f2; }
@@ -154,24 +156,23 @@
 <body>
 <!--
     [보안 관련 참고]
-    아래 로그인 화면 및 GitHub 설정 비밀번호 게이트는 실질적인 보안 장치가 아니라
-    "아무나 우연히 열거나 실수로 설정을 건드리는 것"을 막는 가벼운 안내 화면입니다.
-    비밀번호는 base64로만 인코딩되어 소스에 그대로 포함되어 있어 개발자도구로
-    손쉽게 우회할 수 있습니다. 실제 접근 제어가 필요하다면 서버/게이트웨이 단의
-    인증 수단을 함께 사용하세요.
+    접속·설정 게이트는 포탈(index.html) 로그인 세션(svc_sess)을 공유합니다.
+    이 파일에는 더 이상 하드코딩된 비밀번호가 없습니다.
+    견적 데이터 접근(저장/조회)은 별도로 Worker 의 접속 비밀번호(X-Access-Password)로
+    서버 측에서 검증됩니다.
 -->
-<div id="loginOverlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #525659; z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center;">
-    <div style="background: #fff; padding: 40px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); text-align: center; width: 300px;">
+<div id="loginOverlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f9f9f7; z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+    <div style="background: #fcfcfb; border: 1px solid rgba(11,11,11,.10); padding: 40px; border-radius: 14px; text-align: center; width: 320px;">
         <img src="Logo.jpg" alt="Genians" style="height: 40px; margin-bottom: 20px;">
-        <h3 style="margin: 0 0 20px 0; color: #333;">견적 시스템 접속</h3>
-        <input type="password" id="pwInput" placeholder="비밀번호를 입력하세요" onkeypress="if(event.key==='Enter') checkPassword()" style="width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 5px; font-size: 14px; box-sizing: border-box; text-align: center;">
-        <button onclick="checkPassword()" style="width: 100%; padding: 10px; background: var(--genians-green); color: white; border: none; border-radius: 5px; font-weight: bold; font-size: 15px; cursor: pointer;">접 속</button>
-        <div style="margin-top: 10px; font-size: 10px; color: #999;">※ 사내 참고용 화면으로, 강력한 접근 제어를 대체하지 않습니다.</div>
+        <h3 style="margin: 0 0 10px 0; color: #0b0b0b;">포탈 로그인이 필요합니다</h3>
+        <p style="font-size: 12px; color: #52514e; margin: 0 0 20px;">견적 시스템은 서비스사업부 통합 관리 포탈<br>계정으로 로그인한 사용자만 사용할 수 있습니다.</p>
+        <button onclick="goPortalLogin()" style="width: 100%; padding: 11px; background: var(--genians-green); color: white; border: none; border-radius: 9px; font-weight: bold; font-size: 14px; cursor: pointer;">포탈 로그인 하러 가기</button>
+        <button onclick="location.reload()" style="width: 100%; margin-top: 8px; padding: 10px; background: #fff; color: #52514e; border: 1px solid rgba(11,11,11,.15); border-radius: 9px; font-size: 13px; cursor: pointer;">로그인 후 다시 확인</button>
     </div>
 </div>
 <!-- 견적서 종류 선택 화면 -->
-<div id="quoteTypeOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #525659; z-index: 9999; flex-direction: column; justify-content: center; align-items: center;">
-    <div style="background: #fff; padding: 40px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); text-align: center; width: 340px;">
+<div id="quoteTypeOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f9f9f7; z-index: 9999; flex-direction: column; justify-content: center; align-items: center;">
+    <div style="background: #fcfcfb; border: 1px solid rgba(11,11,11,.10); padding: 40px; border-radius: 14px; text-align: center; width: 340px;">
         <img src="Logo.jpg" alt="Genians" style="height: 40px; margin-bottom: 20px;">
         <h3 style="margin: 0 0 20px 0; color: #333;">견적서 종류 선택</h3>
         <div style="display:flex; flex-direction:column; gap:10px;">
@@ -181,36 +182,40 @@
     </div>
 </div>
 <script>
-    function checkPassword() {
-        const secureKey = "MUdlbmlka3Mh";
-        const input = document.getElementById('pwInput').value;
-        if (btoa(input) === secureKey) {
-            document.getElementById('loginOverlay').style.display = 'none';
-            // 견적 데이터를 조회용으로 여는 경우(?view=)엔 종류 선택 없이 바로 진행
-            const params = new URLSearchParams(window.location.search);
-            if (params.get('view')) {
-                selectQuoteType('enterprise');
-            } else {
-                document.getElementById('quoteTypeOverlay').style.display = 'flex';
-            }
+    // ─────────────────────────────────────────────
+    // 접속 게이트: 포탈(index.html) 로그인 세션(svc_sess) 공유
+    // 하드코딩 비밀번호는 제거되었습니다 — 포탈 계정으로 로그인하면 자동 통과.
+    // ─────────────────────────────────────────────
+    function portalSess() {
+        try {
+            var s = JSON.parse(localStorage.getItem('svc_sess') || 'null');
+            if (s && s.a && s.p !== false && Math.floor(Date.now()/1000) < (s.e || 0) - 60) return s;
+        } catch (e) {}
+        return null;
+    }
+    function goPortalLogin() {
+        if (window.top !== window.self) {
+            alert('좌측 메뉴의 다른 탭에서 로그인한 뒤 다시 열어주세요.');
+            return;
+        }
+        location.href = 'index.html';
+    }
+    function enterQuote() {
+        document.getElementById('loginOverlay').style.display = 'none';
+        // 견적 데이터를 조회용으로 여는 경우(?view=)엔 종류 선택 없이 바로 진행
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('view')) {
+            selectQuoteType('enterprise');
         } else {
-            alert('비밀번호가 일치하지 않습니다.');
-            document.getElementById('pwInput').value = '';
-            document.getElementById('pwInput').focus();
+            document.getElementById('quoteTypeOverlay').style.display = 'flex';
         }
     }
+    document.addEventListener('DOMContentLoaded', function () {
+        if (portalSess()) enterQuote();
+    });
 </script>
-<!-- GitHub 설정 비밀번호 게이트 -->
-<div id="githubGateModal" class="modal-overlay no-print">
-    <div class="modal-box" style="padding: 25px; width: 300px; text-align:center;">
-        <h3 style="margin: 0 0 15px 0;">설정 화면 비밀번호</h3>
-        <input type="password" id="ghGatePw" placeholder="비밀번호를 입력하세요" onkeypress="if(event.key==='Enter') submitGithubGate()" style="border:1px solid #ccc; border-radius:5px; padding:10px; text-align:center; margin-bottom:15px;">
-        <div style="display:flex; gap:8px;">
-            <button onclick="closeGithubGate()" style="flex:1; padding:10px; background:#ccc; border:none; border-radius:5px; cursor:pointer;">취소</button>
-            <button onclick="submitGithubGate()" style="flex:1; padding:10px; background:var(--genians-green); color:white; border:none; border-radius:5px; cursor:pointer; font-weight:bold;">확인</button>
-        </div>
-    </div>
-</div>
+<!-- (설정 비밀번호 게이트 제거됨 — 포탈 로그인으로 대체) -->
+<div id="githubGateModal" class="modal-overlay no-print" style="display:none"></div>
 <!-- 저장 서버(Worker) 설정 모달 -->
 <div id="githubSettingsModal" class="modal-overlay no-print">
     <div class="modal-box" style="padding: 25px; width: 340px;">
@@ -265,7 +270,7 @@
         <div class="dropdown no-print">
             <button class="btn btn-github" onclick="toggleDropdown('githubDropdown')">GitHub ▾</button>
             <div id="githubDropdown" class="dropdown-menu">
-                <button class="dropdown-item" onclick="requestGithubSettings(); closeAllDropdowns();">⚙ 설정 (비밀번호 필요)</button>
+                <button class="dropdown-item" onclick="requestGithubSettings(); closeAllDropdowns();">⚙ 설정</button>
                 <button class="dropdown-item" onclick="saveToGithub(); closeAllDropdowns();">☁ GitHub에 저장</button>
                 <button class="dropdown-item" onclick="listGithubQuotes(); closeAllDropdowns();">📋 저장 내역 조회</button>
             </div>
@@ -405,9 +410,7 @@
         baseUrl: 'https://aged-union-cdd3.choihw.workers.dev',
         accessPassword: ''
     };
-    // 설정 화면 비밀번호 (기본값: 1Genidks! - 접속 비밀번호와 통일)
-    // 바꾸고 싶다면 브라우저 콘솔에서 btoa('원하는비밀번호') 실행 후 그 결과를 아래에 넣으세요.
-    const githubGatePassKey = "MUdlbmlka3Mh";
+    // 설정 화면 게이트: 포탈 로그인 세션으로 대체 (하드코딩 비밀번호 제거됨)
     // ─────────────────────────────────────────────
     // 접속 비밀번호(팀 공용) 로컬 보관
     // 이건 GitHub Token이 아니라 Worker에 접근하기 위한 팀 공용 비밀번호이므로
@@ -441,23 +444,12 @@
         alert('저장된 접속 비밀번호가 삭제되었습니다.');
     }
     function requestGithubSettings() {
-        document.getElementById('ghGatePw').value = '';
-        document.getElementById('githubGateModal').style.display = 'flex';
-        setTimeout(() => document.getElementById('ghGatePw').focus(), 50);
+        // 포탈 로그인 사용자만 설정 화면 진입 가능
+        if (portalSess()) { openGithubSettings(); return; }
+        alert('포탈에 로그인한 사용자만 설정을 변경할 수 있습니다.');
     }
     function closeGithubGate() {
         document.getElementById('githubGateModal').style.display = 'none';
-    }
-    function submitGithubGate() {
-        const pw = document.getElementById('ghGatePw').value;
-        if (btoa(pw) === githubGatePassKey) {
-            closeGithubGate();
-            openGithubSettings();
-        } else {
-            alert('비밀번호가 일치하지 않습니다.');
-            document.getElementById('ghGatePw').value = '';
-            document.getElementById('ghGatePw').focus();
-        }
     }
     // ─────────────────────────────────────────────
     // 상단 툴바 드롭다운 메뉴
