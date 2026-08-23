@@ -428,6 +428,47 @@ body::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;ba
 /* 페이지 진입 애니메이션 */
 #viewDash,#viewData,#viewOrderNew,#viewAccount{animation:pageIn .3s ease both}
 @keyframes pageIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* ---------- 플로팅 사이드바 ---------- */
+@media (min-width:1001px){
+  .side{left:12px;top:12px;bottom:12px;width:196px;border-radius:20px;border:1px solid var(--ring);
+    background:color-mix(in oklab, var(--surface) 88%, transparent);
+    backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+    box-shadow:0 14px 44px -18px rgba(0,0,0,.28);padding:18px 12px}
+  body{padding-left:224px}
+  .topbar{margin-left:-20px}
+}
+
+/* ---------- 대시보드 히어로 ---------- */
+#dashHero{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;
+  padding:24px 28px;margin-bottom:16px;border-radius:22px;position:relative;overflow:hidden;
+  border:1px solid var(--ring);
+  background:
+    radial-gradient(560px 220px at 8% -30%, color-mix(in oklab, var(--s1) 20%, transparent), transparent 70%),
+    radial-gradient(520px 240px at 92% 130%, color-mix(in oklab, var(--s7) 16%, transparent), transparent 70%),
+    var(--surface)}
+.hero-hi{font-size:21px;font-weight:800;letter-spacing:-.03em}
+.hero-date{font-size:12.5px;color:var(--muted);margin-top:5px}
+.hero-stats{display:flex;gap:26px;flex-wrap:wrap}
+.hstat{min-width:104px}
+.hstat .hk{font-size:11px;color:var(--muted);font-weight:650}
+.hstat .hv{font-size:21px;font-weight:800;letter-spacing:-.03em;margin-top:3px;font-variant-numeric:tabular-nums}
+.hstat .hv small{font-size:12px;font-weight:600;color:var(--ink-2);margin-left:1px}
+.hstat .hv.warn{color:var(--s2)}
+
+/* ---------- 위젯 드래그 ---------- */
+.whandle{margin-left:auto;cursor:grab;color:var(--muted);font-size:13px;padding:0 4px;user-select:none;flex:none}
+.whandle:hover{color:var(--ink)}
+[data-w].dragging{opacity:.45;outline:2px dashed var(--s1);outline-offset:4px;border-radius:18px}
+
+/* ---------- 커스텀 질문 위젯 ---------- */
+.qw-head{display:flex;align-items:flex-start;gap:8px;margin-bottom:10px}
+.qw-head .t{flex:1;min-width:0}
+.qw-hero{font-size:24px;font-weight:800;letter-spacing:-.03em;margin:2px 0 8px;font-variant-numeric:tabular-nums}
+.qw-hero small{font-size:13px;font-weight:600;color:var(--ink-2)}
+.qw-btn{border:1px solid var(--ring);background:transparent;border-radius:8px;width:26px;height:26px;
+  cursor:pointer;color:var(--muted);font-size:12px;flex:none}
+.qw-btn:hover{color:var(--ink);border-color:var(--axis)}
 </style>
 </head>
 <body>
@@ -519,6 +560,13 @@ body::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;ba
 
   <!-- ===================== 질문 바 ===================== -->
   <div id="viewDash">
+  <section id="dashHero" data-w="hero">
+    <div class="hero-l">
+      <div class="hero-hi" id="heroHi"></div>
+      <div class="hero-date" id="heroDate"></div>
+    </div>
+    <div class="hero-stats" id="heroStats"></div>
+  </section>
   <section class="ask">
     <div class="ask-row">
       <div class="ask-ico">AI</div>
@@ -1790,11 +1838,149 @@ function renderAll(){
   renderVs();
   renderMatrix(list);
   renderAllTable(list);
+  renderHero(list);
+  renderQWidgets();
+  applyWidgetOrder();
+  initWidgetDnD();
   applyWidgets();
+}
+
+/* ---- 대시보드 히어로 ---- */
+function renderHero(list){
+  var el0=$('#dashHero'); if(!el0) return;
+  function hst(k,v,u,cls){ return '<div class="hstat"><div class="hk">'+k+'</div><div class="hv '+(cls||'')+'">'+v+'<small>'+u+'</small></div></div>'; }
+  var name=(AUTH_USER||'').split('@')[0]||'게스트';
+  var now=new Date(), h=now.getHours();
+  var greet= h<6?'좋은 새벽이에요':h<12?'좋은 아침이에요':h<18?'좋은 오후예요':'좋은 저녁이에요';
+  $('#heroHi').textContent=greet+', '+name+'님 👋';
+  $('#heroDate').textContent=now.getFullYear()+'년 '+(now.getMonth()+1)+'월 '+now.getDate()+'일 · '+baseLabel()+' 기준 현황';
+  var b=STATE.base;
+  var mrr=monthlyTotal(list,b);
+  var lv=(DATA.live&&DATA.live.ok)? DATA.live.rows.length : activeCustomers(list,b);
+  var pend=(RAWX.orders||[]).filter(function(o){ return ['접수','출하요청','배송중','회수예정'].indexOf(o.status)>=0; }).length;
+  var expCnt=0; list.forEach(function(k){ var e=DATA.rows[k].endIdx; if(e!=null&&e>=b&&e<=b+2) expCnt++; });
+  $('#heroStats').innerHTML=
+    hst('당월 MRR', won(mrr), '원')+
+    hst('LIVE 고객', Number(lv).toLocaleString('ko-KR'), '곳')+
+    hst('처리 대기 장비 요청', pend, '건', pend?'warn':'')+
+    hst('3개월 내 만료', expCnt, '건', expCnt?'warn':'');
+}
+
+/* ---- 커스텀 질문 위젯 (검색 결과 고정) ---- */
+function qwKey(){ return 'svc_qw_'+(AUTH_USER||'anon'); }
+function qwList(){ try{ return JSON.parse(localStorage.getItem(qwKey())||'[]')||[]; }catch(e){ return []; } }
+function qwSave(l){ try{ localStorage.setItem(qwKey(), JSON.stringify(l)); }catch(e){} }
+function pinQuery(q){
+  if(!q) return;
+  var l=qwList();
+  if(l.some(function(w){return w.q===q;})){ toast('이미 고정된 질문입니다', q, 'info'); return; }
+  l.push({id:'q'+Date.now().toString(36), q:q});
+  qwSave(l);
+  renderQWidgets(); applyWidgetOrder(); initWidgetDnD();
+  toast('대시보드 위젯으로 고정했습니다', q);
+}
+function removeQWidget(id){
+  qwSave(qwList().filter(function(w){ return w.id!==id; }));
+  var el0=document.querySelector('[data-w="'+id+'"]'); if(el0) el0.remove();
+  toast('위젯을 제거했습니다','','info');
+}
+function renderQWidgets(){
+  var grid=document.querySelector('#viewDash .grid'); if(!grid) return;
+  document.querySelectorAll('#viewDash [data-w^="q"]').forEach(function(e){ if(/^q[0-9a-z]+$/.test(e.dataset.w)) e.remove(); });
+  qwList().forEach(function(w){
+    var res=null; try{ res=runQuery(w.q); }catch(e){}
+    var sec=document.createElement('section');
+    sec.className='card c6'; sec.dataset.w=w.id;
+    sec.innerHTML='<div class="qw-head"><div class="t">'+
+      '<h2 style="font-size:13.5px">📌 '+esc((res&&res.title)||w.q)+'</h2>'+
+      '<p class="cap" style="margin:2px 0 0">'+esc(w.q)+'</p></div>'+
+      '<button class="qw-btn" data-a="rf" title="새로고침">↻</button>'+
+      '<button class="qw-btn" data-a="rm" title="위젯 제거">✕</button></div>'+
+      ((res&&res.hero)? '<div class="qw-hero">'+esc(res.hero)+'<small> '+esc(res.unit||'')+'</small></div>':'')+
+      ((res&&res.sub)? '<p class="cap" style="margin:-4px 0 8px">'+esc(res.sub)+'</p>':'')+
+      '<div id="qwc_'+w.id+'" style="min-height:60px"></div>';
+    grid.appendChild(sec);
+    var host=document.getElementById('qwc_'+w.id);
+    if(res && res.chart && res.chart.labels && res.chart.labels.length){
+      var c=res.chart, fmt=c.money? won : function(v){ return Math.round(v)+'건'; };
+      try{
+        if(c.horizontal){
+          host.innerHTML='<div id="qwb_'+w.id+'" style="overflow:auto;max-height:220px"></div>';
+          var tot=c.series[0].data.reduce(function(a,b2){ return a+b2; },0);
+          hbars('#qwb_'+w.id, c.labels.map(function(nm,i){ return {name:nm, v:c.series[0].data[i], c:c.series[0].color}; }), tot, !c.money);
+        }else{
+          host.style.height='190px';
+          if(c.type==='line') Viz.lines(host,{labels:c.labels,series:c.series,fmt:fmt,tipFmt:c.money?wonFull:fmt,fill:c.series.length===1});
+          else Viz.bars(host,{labels:c.labels,series:c.series,fmt:fmt,tipFmt:c.money?wonFull:fmt});
+        }
+      }catch(e){ host.innerHTML='<p class="cap">차트를 그리지 못했습니다</p>'; }
+    } else if(res && res.table && res.table.rows.length){
+      host.innerHTML='<div class="tbl-wrap" style="max-height:220px"><table><thead><tr>'+
+        res.table.cols.map(function(c2,i){ return '<th'+(i?' class="n"':'')+'>'+esc(c2)+'</th>'; }).join('')+'</tr></thead><tbody>'+
+        res.table.rows.slice(0,8).map(function(r){ return '<tr>'+r.map(function(v,i){ return '<td'+(i?' class="n"':'')+'>'+esc(v)+'</td>'; }).join('')+'</tr>'; }).join('')+
+        '</tbody></table></div>'+(res.table.rows.length>8? '<p class="mini" style="margin-top:6px">상위 8행 표시 · 전체는 질문창에서</p>':'');
+    } else if(!res || !res.hero){
+      host.innerHTML='<p class="cap" style="padding-top:14px">표시할 데이터가 없습니다</p>';
+    }
+    sec.querySelector('[data-a="rm"]').onclick=function(){ removeQWidget(w.id); };
+    sec.querySelector('[data-a="rf"]').onclick=function(){ renderQWidgets(); applyWidgetOrder(); initWidgetDnD(); toast('위젯을 갱신했습니다','','info'); };
+  });
+}
+
+/* ---- 위젯 드래그 배치 ---- */
+var DRAG_W=null;
+function initWidgetDnD(){
+  var grid=document.querySelector('#viewDash .grid'); if(!grid) return;
+  document.querySelectorAll('#viewDash .grid > [data-w]').forEach(function(sec){
+    if(sec.querySelector('.whandle')) return;
+    var head=sec.querySelector('.card-head')||sec.querySelector('.qw-head')||sec.querySelector('h2');
+    if(!head) return;
+    var hd=document.createElement('span');
+    hd.className='whandle'; hd.textContent='⠿'; hd.title='드래그하여 위치 이동'; hd.draggable=true;
+    hd.addEventListener('dragstart',function(e){
+      DRAG_W=sec; sec.classList.add('dragging');
+      e.dataTransfer.effectAllowed='move';
+      try{ e.dataTransfer.setData('text','w'); }catch(_){}
+    });
+    hd.addEventListener('dragend',function(){
+      sec.classList.remove('dragging'); DRAG_W=null; saveWidgetOrder();
+    });
+    head.appendChild(hd);
+  });
+  if(!grid.__dnd){
+    grid.__dnd=1;
+    grid.addEventListener('dragover',function(e){
+      if(!DRAG_W) return;
+      e.preventDefault();
+      var tgt=e.target.closest? e.target.closest('[data-w]'):null;
+      if(!tgt || tgt===DRAG_W || tgt.parentElement!==grid) return;
+      var r=tgt.getBoundingClientRect();
+      var before=(e.clientY < r.top + r.height/2);
+      grid.insertBefore(DRAG_W, before? tgt : tgt.nextSibling);
+    });
+    grid.addEventListener('drop',function(e){ e.preventDefault(); });
+  }
+}
+function saveWidgetOrder(){
+  var grid=document.querySelector('#viewDash .grid'); if(!grid) return;
+  var keys=[].map.call(grid.querySelectorAll(':scope > [data-w]'),function(s){ return s.dataset.w; });
+  var o=widgetPrefs(); o.__order=keys;
+  try{ localStorage.setItem(widgetKey(), JSON.stringify(o)); }catch(e){}
+  toast('위젯 배치를 저장했습니다','','info');
+}
+function applyWidgetOrder(){
+  var o=widgetPrefs(); if(!o.__order) return;
+  var grid=document.querySelector('#viewDash .grid'); if(!grid) return;
+  o.__order.forEach(function(k){
+    if(!/^[\w-]+$/.test(k)) return;
+    var el0=grid.querySelector('[data-w="'+k+'"]');
+    if(el0 && el0.parentElement===grid) grid.appendChild(el0);
+  });
 }
 
 /* ---- 대시보드 위젯 커스터마이징 (사용자별, 이 브라우저에 저장) ---- */
 var WIDGET_DEFS=[
+  ['hero','히어로 요약'],
   ['kpi','KPI 카드'], ['goal','연간 목표 진행'], ['mx','월별 종합 장표'],
   ['trend','MRR 추이'], ['year','연도별 매출'], ['line','서비스별 MRR'],
   ['ptn','파트너 실적'], ['ind','산업군'], ['nc','신규·해지 고객수'],
@@ -1808,6 +1994,7 @@ function widgetPrefs(){
 function widgetEl(k){
   if(k==='kpi') return $('#kpis');
   if(k==='goal') return $('#goalBar');
+  if(k==='hero') return $('#dashHero');
   return document.querySelector('[data-w="'+k+'"]');
 }
 function applyWidgets(){
@@ -1829,6 +2016,15 @@ function toggleWidgetPanel(){
     h+='<label style="display:flex;gap:8px;align-items:center;padding:4px 0;font-size:12.5px;cursor:pointer">'+
        '<input type="checkbox" data-wk="'+d[0]+'" '+(off[d[0]]===false?'':'checked')+' style="width:15px;height:15px"> '+esc(d[1])+'</label>';
   });
+  var qws=qwList();
+  if(qws.length){
+    h+='<div style="font-size:11px;color:var(--muted);letter-spacing:.08em;margin:10px 0 4px">고정한 질문</div>';
+    qws.forEach(function(w){
+      h+='<div style="display:flex;gap:6px;align-items:center;padding:3px 0;font-size:12px">'+
+         '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📌 '+esc(w.q)+'</span>'+
+         '<button class="qw-btn" data-qrm="'+w.id+'" style="width:22px;height:22px">✕</button></div>';
+    });
+  }
   h+='<div style="display:flex;gap:8px;margin-top:10px"><button class="pill ghost" id="wpAll" style="flex:1;justify-content:center">모두 표시</button>'+
      '<button class="pill" id="wpClose" style="flex:1;justify-content:center">닫기</button></div>'+
      '<div class="mini" style="margin-top:8px;color:var(--muted)">내 계정·이 브라우저에만 적용됩니다</div>';
@@ -1847,6 +2043,9 @@ function toggleWidgetPanel(){
     applyWidgets();
   };
   p.querySelector('#wpClose').onclick=function(){ p.remove(); };
+  p.querySelectorAll('[data-qrm]').forEach(function(b){
+    b.onclick=function(){ removeQWidget(this.dataset.qrm); this.parentElement.remove(); };
+  });
 }
 
 /* ---- 월별 종합 장표 (시트 첫 장표 스타일) ---- */
@@ -3325,6 +3524,13 @@ function gbLabel(k){ return {partner:'파트너',biller:'계산서 발행처',in
 
 function showAnswer(q,res){
   $('#answer').classList.add('on');
+  var ph=document.getElementById('ansPin');
+  if(!ph){
+    ph=document.createElement('button'); ph.id='ansPin'; ph.className='pill';
+    ph.textContent='📌 위젯으로 고정'; ph.style.cssText='margin-top:10px';
+    var hd0=document.querySelector('#answer .ans-head'); if(hd0) hd0.appendChild(ph);
+  }
+  ph.onclick=function(){ pinQuery(q); };
   var rs=$('#ansRestate');
   if(res.restate){ rs.className='restate on'; rs.innerHTML='이렇게 이해했어요 — <b>'+esc(res.restate)+'</b>'; }
   else rs.className='restate';
