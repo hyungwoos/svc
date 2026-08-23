@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>서비스사업부 통합 관리 포탈</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23149e40'/%3E%3Cg fill='%23fff'%3E%3Crect x='14' y='32' width='9' height='18' rx='2'/%3E%3Crect x='27.5' y='22' width='9' height='28' rx='2'/%3E%3Crect x='41' y='14' width='9' height='36' rx='2'/%3E%3C/g%3E%3C/svg%3E">
 <style>
 /* ==================================================================
    토큰 — dataviz 기준 팔레트 (다크는 별도 스텝, 라이트의 반전이 아님)
@@ -46,7 +47,7 @@ a{color:var(--s1)}
 ::-webkit-scrollbar-thumb:hover{background:var(--axis)}
 ::-webkit-scrollbar-track{background:transparent}
 
-.wrap{max-width:1720px;margin:0 auto;padding:18px 20px 64px}
+.wrap{max-width:none;margin:0 auto;padding:18px 26px 64px}
 
 /* ---------- 상단바 ---------- */
 .topbar{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:18px}
@@ -607,12 +608,6 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
   <!-- ===================== 질문 바 ===================== -->
   <div id="viewDash">
   <section id="dashHero" data-w="hero">
-    <div class="hi-row">
-      <span id="heroHi"></span>
-      <span id="heroDate"></span>
-      <span class="spacer"></span>
-      <span class="hero-stats" id="heroStats"></span>
-    </div>
     <div id="noticeStack"></div>
   </section>
   <section class="ask">
@@ -1896,14 +1891,7 @@ function renderAll(){
 /* ---- 대시보드 인사 + 알림 배너 ---- */
 function renderHero(list){
   var el0=$('#dashHero'); if(!el0) return;
-  var name=(AUTH_USER||'').split('@')[0]||'게스트';
-  var now=new Date(), h=now.getHours();
-  var greet= h<6?'좋은 새벽이에요':h<12?'좋은 아침이에요':h<18?'좋은 오후예요':'좋은 저녁이에요';
-  $('#heroHi').textContent=greet+', '+name+'님';
-  $('#heroDate').textContent=now.getFullYear()+'년 '+(now.getMonth()+1)+'월 '+now.getDate()+'일 · '+baseLabel()+' 기준';
   var b=STATE.base;
-  $('#heroStats').textContent='당월 MRR '+won(monthlyTotal(list,b))+'원';
-
   // 할 일 알림 배너 (클릭 → 해당 화면)
   var pend=(RAWX.orders||[]).filter(function(o){ return ['접수','출하요청','배송중','회수예정'].indexOf(o.status)>=0; }).length;
   var expCnt=0, expAmt=0;
