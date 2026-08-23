@@ -1227,6 +1227,8 @@ function won(v){
 function wonFull(v){ return Math.round(v).toLocaleString('ko-KR')+'원'; }
 function pct(v){ return (v>0?'+':'')+v.toFixed(1)+'%'; }
 function mk(i){ return DATA.monthKeys[i]||''; }
+var LINE_LABEL={Cloud:'Cloud NAC', S1:'S1 Cloud NAC', MDR:'MDR', MDR_S1:'S1 MDR', PNS:'PNS', DRM:'DRM', DLP:'DLP'};
+function lline(l){ return LINE_LABEL[l]||l; }
 function qOfIdx(i){ return Math.ceil(monOf(i)/3); }
 function baseRange(){ // 현재 단위 기준 [시작, 끝] 월 인덱스 (끝 = STATE.base)
   var b=STATE.base;
@@ -1510,7 +1512,13 @@ function buildFromRes(res){
                  ('0'+now.getHours()).slice(-2)+':'+('0'+now.getMinutes()).slice(-2),
     todayKey:'', nowIdx: dIdx(now.getFullYear()+'-'+('0'+(now.getMonth()+1)).slice(-2)),
     monthKeys:monthKeys,
-    lines:[{label:'Cloud',color:1},{label:'S1',color:2},{label:'MDR',color:3},{label:'PNS',color:4},{label:'MDR_S1',color:5}],
+    lines:(function(){
+      var ORDER=['Cloud','S1','MDR','PNS','MDR_S1','DRM','DLP'];
+      var seen={}; rows.forEach(function(r){ if(r.line) seen[r.line]=1; });
+      return ORDER.filter(function(l){ return seen[l]; })
+        .concat(Object.keys(seen).filter(function(l){ return ORDER.indexOf(l)<0; }))
+        .map(function(l,i){ return {label:l, color:i+1}; });
+    })(),
     rows:rows, warnings:[], live:LIVE, lg:LGD, vs:VSD, sheetUrl:''
   };
 }
@@ -1743,7 +1751,7 @@ function buildControls(){
   // 사업라인 칩
   var box=$('#lineChips'); box.innerHTML='';
   DATA.lines.forEach(function(l){
-    var b=el('button','pill',l.label);
+    var b=el('button','pill',lline(l.label));
     b.setAttribute('aria-pressed','true');
     b.style.borderColor=seriesColor(l.color);
     b.onclick=function(){
@@ -2169,7 +2177,7 @@ function renderMatrix(list){
       '<td class="n '+yoyCls+'">'+yoyTxt+'</td>';
     tb.appendChild(tr);
   }
-  lines.forEach(function(lb){ rowHtml(lb, lb, false); });
+  lines.forEach(function(lb){ rowHtml(lline(lb), lb, false); });
   rowHtml('합계', null, true);
   t.appendChild(tb);
 
@@ -2368,9 +2376,9 @@ function renderTrend(list){
     var col=seriesColor(l.color);
     var data=byLine[l.label].slice(from,to+1);
     if(!data.some(function(v){return v!==0;})) return;
-    series.push({label:l.label, data:data, color:col});
+    series.push({label:lline(l.label), data:data, color:col});
     var li=el('span','li');
-    var sw=el('span','sw'); sw.style.background=col; li.appendChild(sw); li.appendChild(el('span',null,l.label));
+    var sw=el('span','sw'); sw.style.background=col; li.appendChild(sw); li.appendChild(el('span',null,lline(l.label)));
     legend.appendChild(li);
   });
 
@@ -2420,7 +2428,7 @@ function renderBars(list){
   $('#capInd').textContent = mk(b)+' 기준 비중';
 
   hbars('#barLine', DATA.lines.filter(function(l){return STATE.lines[l.label];}).map(function(l){
-    return {name:l.label, v:monthlyTotal(list.filter(function(k){return DATA.rows[k].line===l.label;}),b), c:seriesColor(l.color)};
+    return {name:lline(l.label), v:monthlyTotal(list.filter(function(k){return DATA.rows[k].line===l.label;}),b), c:seriesColor(l.color)};
   }).filter(function(x){return x.v!==0;}).sort(function(a,b2){return b2.v-a.v;}), tot);
 
   $('#capPartner').textContent = mk(b)+' 기준 · 실제 파트너 3사 + 직접';
@@ -2571,6 +2579,8 @@ function sortVal(r,k){
    5. 자연어 질문 엔진 (규칙형 · 외부 API 불필요)
    ================================================================== */
 var LINE_ALIAS=[
+  [/\bdrm\b|디알엠|문서보안/i,'DRM'],
+  [/\bdlp\b|디엘피|정보유출/i,'DLP'],
   [/클라우드|cloud|클라우|클라드|나크|nac/i,'Cloud'],
   [/mdr[_\-]?s1|에스원mdr|mdr에스원|엠디알에스원/i,'MDR_S1'],
   [/\bmdr\b|엠디알|탐지대응/i,'MDR'],
@@ -3642,7 +3652,7 @@ function showAnswer(q,res){
    ================================================================== */
 var CUR_VIEW='dash', DIRTY=false;
 
-var LINE_OPTS=['Cloud','S1','MDR','PNS','MDR_S1'];
+var LINE_OPTS=['Cloud','S1','MDR','PNS','MDR_S1','DRM','DLP'];
 var PTN_OPTS=['다원티에스','글로웰시스템','에티버스','직접(계산서)'];
 var IND_OPTS=['기업','공공','금융','의료','미분류'];
 
@@ -3656,7 +3666,7 @@ var GRIDS={
       c._custName=cu.name||'?'; return c; }); },
     cols:[
       {k:'_custName',l:'고객사',ro:true},
-      {k:'line',l:'서비스',t:'select',opts:LINE_OPTS},
+      {k:'line',l:'서비스',t:'select',opts:LINE_OPTS,fmt:function(v){return lline(v);}},
       {k:'partner',l:'파트너',t:'select',opts:PTN_OPTS},
       {k:'biller',l:'발행처'},
       {k:'contract_type',l:'구분'},
@@ -3676,7 +3686,7 @@ var GRIDS={
       {k:'industry',l:'산업군',t:'select',opts:IND_OPTS},
       {k:'name',l:'고객사',req:true},
       {k:'product',l:'제품군'},
-      {k:'line',l:'서비스',t:'select',opts:LINE_OPTS.concat(['DRM'])},
+      {k:'line',l:'서비스',t:'select',opts:LINE_OPTS},
       {k:'nodes',l:'노드',t:'number'},
       {k:'start_month',l:'시작월',t:'month'},
       {k:'end_month',l:'종료월',t:'month'},
