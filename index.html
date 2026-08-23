@@ -352,6 +352,44 @@ body{padding-left:192px}
 </head>
 <body>
 
+<!-- 로그인 전용 화면 (비로그인 시 전체 화면) -->
+<div id="viewLogin" class="hidden" style="position:fixed;inset:0;z-index:900;background:var(--plane);display:flex;align-items:center;justify-content:center;padding:20px">
+  <div style="width:min(410px,94vw)">
+    <div style="text-align:center;margin-bottom:26px">
+      <div style="width:54px;height:54px;margin:0 auto 14px;border-radius:15px;display:flex;align-items:center;justify-content:center;font-size:26px;
+                  background:linear-gradient(135deg,var(--s1),#7aa8e8);box-shadow:0 8px 22px rgba(42,120,214,.32)">📊</div>
+      <div style="font-size:21px;font-weight:800;letter-spacing:-.02em">서비스사업부 통합 관리 포탈</div>
+      <div style="font-size:12.5px;color:var(--muted);margin-top:5px">매출 · 임대장비 · 견적 통합 관리</div>
+    </div>
+    <div class="card" style="padding:26px 26px 22px;border-radius:16px;box-shadow:0 12px 34px rgba(0,0,0,.08)">
+      <div id="lsLogin">
+        <label style="display:block;font-size:12px;font-weight:650;color:var(--ink-2);margin-bottom:6px">이메일</label>
+        <input id="lsEmail" type="email" autocomplete="username" placeholder="name@genians.com"
+               style="width:100%;height:42px;padding:0 13px;border-radius:10px;border:1px solid var(--ring);background:var(--surface-2);font-size:14px;margin-bottom:14px">
+        <label style="display:block;font-size:12px;font-weight:650;color:var(--ink-2);margin-bottom:6px">비밀번호</label>
+        <input id="lsPw" type="password" autocomplete="current-password" placeholder="••••••••"
+               style="width:100%;height:42px;padding:0 13px;border-radius:10px;border:1px solid var(--ring);background:var(--surface-2);font-size:14px;margin-bottom:18px">
+        <button id="lsGo" class="btn" style="width:100%;height:44px;font-size:14.5px;border-radius:11px">로그인</button>
+      </div>
+      <div id="lsForce" style="display:none">
+        <div style="font-size:14px;font-weight:700;margin-bottom:4px">비밀번호 변경</div>
+        <p class="cap" style="margin:0 0 14px">최초 로그인입니다 — 본인 비밀번호로 변경해야 사용할 수 있습니다.</p>
+        <label style="display:block;font-size:12px;font-weight:650;color:var(--ink-2);margin-bottom:6px">새 비밀번호 (6자 이상)</label>
+        <input id="lsNpw1" type="password" autocomplete="new-password"
+               style="width:100%;height:42px;padding:0 13px;border-radius:10px;border:1px solid var(--ring);background:var(--surface-2);font-size:14px;margin-bottom:14px">
+        <label style="display:block;font-size:12px;font-weight:650;color:var(--ink-2);margin-bottom:6px">새 비밀번호 확인</label>
+        <input id="lsNpw2" type="password" autocomplete="new-password"
+               style="width:100%;height:42px;padding:0 13px;border-radius:10px;border:1px solid var(--ring);background:var(--surface-2);font-size:14px;margin-bottom:18px">
+        <button id="lsPwGo" class="btn" style="width:100%;height:44px;font-size:14.5px;border-radius:11px">변경하고 시작하기</button>
+      </div>
+      <div id="lsMsg" style="font-size:12.5px;min-height:18px;margin-top:12px;text-align:center;color:var(--critical,#d03b3b)"></div>
+    </div>
+    <p style="text-align:center;font-size:11.5px;color:var(--muted);margin-top:16px">
+      계정은 관리자가 발급합니다 · 문의: 서비스사업팀
+    </p>
+  </div>
+</div>
+
 <div id="loading" class="loading">
   <div class="spin"></div>
   <div>데이터를 불러오는 중…</div>
@@ -1255,14 +1293,14 @@ function afterLoad(dd){
   if(!dd.rows.length && SB_TOKEN){ location.href='orders.html'; return; }
   onData(dd);
 }
-function boot(){
+function boot(skipCache){
   if(!window.__editInit){ window.__editInit=1; setupEdit(); setupSide(); }
   restoreSess().then(function(ok){
     if(ok){
       $('#btnAuth').textContent=AUTH_USER.split('@')[0]+' ▾';
       $('#btnAuth').title='비밀번호 변경 · 로그아웃';
       // 이전 방문 캐시가 있으면 즉시 그리고, 최신 데이터는 뒤에서 받아 교체
-      var cached=loadFromCache();
+      var cached=skipCache? null : loadFromCache();
       if(cached && cached.rows.length){
         onData(cached);
         var pl=$('#periodLabel'); pl.textContent += ' · 최신 데이터 확인 중…';
@@ -1283,18 +1321,79 @@ function boot(){
       return;
     }
     if(!d.rows.length && !SB_TOKEN){
-      $('#side').classList.add('hidden');
-      document.body.style.paddingLeft='0';
-      // 읽기가 로그인 전용으로 잠긴 경우
-      $('#loading').innerHTML='<div class="card" style="max-width:440px;margin:0 auto">'+
-        '<h2 style="font-size:15px">로그인이 필요합니다</h2>'+
-        '<p class="cap">매출 데이터는 로그인한 사용자에게만 보입니다.</p></div>';
-      openOvl('ovlAuth');
+      showLoginScreen();   // 비로그인: 전용 로그인 화면
       return;
     }
     onData(d);
   }).catch(onErr);
 }
+
+/* ---- 로그인 전용 화면 ---- */
+function showLoginScreen(){
+  $('#side').classList.add('hidden');
+  document.body.style.paddingLeft='0';
+  $('#app').classList.add('hidden');
+  $('#loading').classList.add('hidden');
+  $('#viewLogin').classList.remove('hidden');
+  setTimeout(function(){ var e=$('#lsEmail'); if(e) e.focus(); },60);
+}
+function enterAfterLogin(){
+  $('#viewLogin').classList.add('hidden');
+  $('#loading').classList.remove('hidden');
+  document.body.style.paddingLeft='';
+  showLoading('로그인 완료 — 데이터를 불러오는 중…');
+  loadFromDb().then(afterLoad).catch(onErr);
+}
+async function screenLogin(){
+  var em=$('#lsEmail').value.trim(), pw=$('#lsPw').value, m=$('#lsMsg');
+  if(!em||!pw){ m.textContent='이메일과 비밀번호를 입력하세요'; return; }
+  m.style.color='var(--muted)'; m.textContent='확인 중…';
+  try{
+    var r=await fetch(SB_URL+'/auth/v1/token?grant_type=password',{
+      method:'POST', headers:{apikey:SB_KEY,'Content-Type':'application/json'},
+      body:JSON.stringify({email:em, password:pw})});
+    var j=await r.json();
+    if(!r.ok||!j.access_token) throw new Error(j.error_description||j.msg||'이메일 또는 비밀번호가 올바르지 않습니다');
+    SB_TOKEN=j.access_token; AUTH_USER=em;
+    saveSess(j, em);
+    $('#btnAuth').textContent=em.split('@')[0]+' ▾';
+    $('#btnAuth').title='비밀번호 변경 · 로그아웃';
+    var changed=j.user && j.user.user_metadata && j.user.user_metadata.pw_changed;
+    if(!changed){
+      $('#lsLogin').style.display='none'; $('#lsForce').style.display='';
+      m.textContent='';
+      setTimeout(function(){ $('#lsNpw1').focus(); },60);
+      return;
+    }
+    enterAfterLogin();
+  }catch(e){ m.style.color='var(--critical,#d03b3b)'; m.textContent=String(e.message||e); }
+}
+async function screenPw(){
+  var p1=$('#lsNpw1').value, p2=$('#lsNpw2').value, m=$('#lsMsg');
+  if(p1.length<6){ m.style.color='var(--critical,#d03b3b)'; m.textContent='6자 이상으로 입력하세요'; return; }
+  if(p1!==p2){ m.style.color='var(--critical,#d03b3b)'; m.textContent='비밀번호 확인이 일치하지 않습니다'; return; }
+  m.style.color='var(--muted)'; m.textContent='변경 중…';
+  try{
+    var r=await fetch(SB_URL+'/auth/v1/user',{
+      method:'PUT', headers:{apikey:SB_KEY,'Content-Type':'application/json',Authorization:'Bearer '+SB_TOKEN},
+      body:JSON.stringify({password:p1, data:{pw_changed:true}})});
+    var j=await r.json();
+    if(!r.ok) throw new Error(j.error_description||j.msg||'변경 실패');
+    try{ var s0=JSON.parse(localStorage.getItem(SESS_KEY)||'null'); if(s0){ s0.p=true; localStorage.setItem(SESS_KEY,JSON.stringify(s0)); } }catch(e){}
+    enterAfterLogin();
+  }catch(e){ m.style.color='var(--critical,#d03b3b)'; m.textContent=String(e.message||e); }
+}
+(function(){
+  var g=document.getElementById('lsGo'); if(!g) return;
+  g.onclick=screenLogin;
+  document.getElementById('lsPwGo').onclick=screenPw;
+  ['lsEmail','lsPw'].forEach(function(id){
+    document.getElementById(id).addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); screenLogin(); } });
+  });
+  ['lsNpw1','lsNpw2'].forEach(function(id){
+    document.getElementById(id).addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); screenPw(); } });
+  });
+})();
 function onErr(e){
   $('#loading').innerHTML = '<div class="card err" style="max-width:620px">'+
     '<h2>데이터를 불러오지 못했습니다</h2><p class="cap">'+String(e&&e.message||e)+'</p>'+
@@ -1510,7 +1609,7 @@ function buildControls(){
   $('#btnReload').onclick=function(){
     $('#app').classList.add('hidden'); $('#loading').classList.remove('hidden');
     $('#loading').innerHTML='<div class="spin"></div><div>다시 읽고 있습니다…</div>';
-    boot();
+    boot(true);   // 캐시 무시하고 DB에서 새로 읽기
   };
 
   $('#btnAsk').onclick=function(){ ask($('#q').value); };
