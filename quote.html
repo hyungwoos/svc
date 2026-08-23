@@ -188,7 +188,7 @@
     // ─────────────────────────────────────────────
     function portalSess() {
         try {
-            var s = JSON.parse(localStorage.getItem('svc_sess') || 'null');
+            var s = JSON.parse(sessionStorage.getItem('svc_sess') || 'null');
             if (s && s.a && s.p !== false && Math.floor(Date.now()/1000) < (s.e || 0) - 60) return s;
         } catch (e) {}
         return null;
