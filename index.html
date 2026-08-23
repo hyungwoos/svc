@@ -461,6 +461,52 @@ body::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;ba
 .whandle:hover{color:var(--ink)}
 [data-w].dragging{opacity:.45;outline:2px dashed var(--s1);outline-offset:4px;border-radius:18px}
 
+/* ==================================================================
+   리디자인 v3 — 지니언스 브랜드 + 해외 SaaS 마감 (플랫 · 절제)
+   ================================================================== */
+:root{ --brand:#2ebd57; --brand-2:#27a54c; --brand-t:rgba(46,189,87,.13); }
+html[data-theme="light"]{ --brand:#149e40; --brand-2:#0f8836; --brand-t:rgba(20,158,64,.10); }
+
+/* 화려한 요소 제거 → 조용한 배경 */
+body::before{background:none}
+.brand h1{background:none;-webkit-text-fill-color:initial;color:var(--ink)}
+
+/* 브랜드 그린 적용 (차트 색상은 그대로) */
+.side .logo{background:var(--brand);color:#fff;border-radius:13px;padding:13px 14px;margin:0 0 12px}
+.side .logo small{color:rgba(255,255,255,.8)}
+.side .logo::before{background:#fff;box-shadow:none;width:8px;height:8px}
+.side button[aria-current="true"]{background:var(--brand-t);color:var(--brand);box-shadow:none;font-weight:700}
+.btn{background:var(--brand);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.btn:hover{background:var(--brand-2);filter:none}
+.pill[aria-pressed="true"]{background:var(--brand);border-color:var(--brand)}
+input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-shadow:0 0 0 3px var(--brand-t)}
+.card h2::before{background:var(--brand)}
+.kpi::after{background:var(--brand);opacity:.5;height:2px;right:auto;width:34px;left:16px}
+#ansPin,.pill:not(.ghost)[style]{}
+.toast.ok .ti{background:var(--brand)}
+.side button[aria-current="true"] .whandle{color:inherit}
+
+/* 인사 줄 + 알림 배너 */
+#dashHero{display:block;margin-bottom:16px;padding:0;border:none;background:none;box-shadow:none;border-radius:0;overflow:visible}
+.hero-stats{display:inline}
+.hi-row{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:12px;padding:0 2px}
+#heroHi{font-size:18px;font-weight:800;letter-spacing:-.02em}
+#heroDate{font-size:12px;color:var(--muted)}
+.hero-stats{font-size:12.5px;color:var(--ink-2);font-weight:650;font-variant-numeric:tabular-nums}
+.nb{display:flex;align-items:center;gap:12px;padding:13px 16px;border-radius:12px;margin-bottom:8px;
+  font-size:13px;border:1px solid;cursor:pointer;transition:transform .12s, box-shadow .15s}
+.nb:hover{transform:translateY(-1px);box-shadow:0 6px 16px -8px rgba(0,0,0,.18)}
+.nb .ni{flex:none;font-size:14px}
+.nb .na{flex:none;font-size:12px;font-weight:650;opacity:.75}
+.nb b{font-weight:750}
+.nb-info{background:color-mix(in oklab, var(--s1) 9%, var(--surface));border-color:color-mix(in oklab, var(--s1) 26%, transparent);color:var(--ink)}
+.nb-info .na{color:var(--s1)}
+.nb-warn{background:color-mix(in oklab, var(--s4) 11%, var(--surface));border-color:color-mix(in oklab, var(--s4) 30%, transparent);color:var(--ink)}
+.nb-warn .na{color:var(--s4)}
+.nb-ok{background:var(--brand-t);border-color:color-mix(in oklab, var(--brand) 30%, transparent);cursor:default}
+.nb-ok .ni{color:var(--brand);font-weight:800}
+.nb-ok:hover{transform:none;box-shadow:none}
+
 /* ---------- 커스텀 질문 위젯 ---------- */
 .qw-head{display:flex;align-items:flex-start;gap:8px;margin-bottom:10px}
 .qw-head .t{flex:1;min-width:0}
@@ -478,7 +524,7 @@ body::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;ba
   <div style="width:min(410px,94vw)">
     <div style="text-align:center;margin-bottom:26px">
       <div style="width:54px;height:54px;margin:0 auto 14px;border-radius:15px;display:flex;align-items:center;justify-content:center;font-size:26px;
-                  background:linear-gradient(135deg,var(--s1),#7aa8e8);box-shadow:0 8px 22px rgba(42,120,214,.32)">📊</div>
+                  background:var(--brand,#149e40);box-shadow:0 8px 22px rgba(20,158,64,.30)">📊</div>
       <div style="font-size:21px;font-weight:800;letter-spacing:-.02em">서비스사업부 통합 관리 포탈</div>
       <div style="font-size:12.5px;color:var(--muted);margin-top:5px">매출 · 임대장비 · 견적 통합 관리</div>
     </div>
@@ -561,11 +607,13 @@ body::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;ba
   <!-- ===================== 질문 바 ===================== -->
   <div id="viewDash">
   <section id="dashHero" data-w="hero">
-    <div class="hero-l">
-      <div class="hero-hi" id="heroHi"></div>
-      <div class="hero-date" id="heroDate"></div>
+    <div class="hi-row">
+      <span id="heroHi"></span>
+      <span id="heroDate"></span>
+      <span class="spacer"></span>
+      <span class="hero-stats" id="heroStats"></span>
     </div>
-    <div class="hero-stats" id="heroStats"></div>
+    <div id="noticeStack"></div>
   </section>
   <section class="ask">
     <div class="ask-row">
@@ -1845,25 +1893,43 @@ function renderAll(){
   applyWidgets();
 }
 
-/* ---- 대시보드 히어로 ---- */
+/* ---- 대시보드 인사 + 알림 배너 ---- */
 function renderHero(list){
   var el0=$('#dashHero'); if(!el0) return;
-  function hst(k,v,u,cls){ return '<div class="hstat"><div class="hk">'+k+'</div><div class="hv '+(cls||'')+'">'+v+'<small>'+u+'</small></div></div>'; }
   var name=(AUTH_USER||'').split('@')[0]||'게스트';
   var now=new Date(), h=now.getHours();
   var greet= h<6?'좋은 새벽이에요':h<12?'좋은 아침이에요':h<18?'좋은 오후예요':'좋은 저녁이에요';
-  $('#heroHi').textContent=greet+', '+name+'님 👋';
-  $('#heroDate').textContent=now.getFullYear()+'년 '+(now.getMonth()+1)+'월 '+now.getDate()+'일 · '+baseLabel()+' 기준 현황';
+  $('#heroHi').textContent=greet+', '+name+'님';
+  $('#heroDate').textContent=now.getFullYear()+'년 '+(now.getMonth()+1)+'월 '+now.getDate()+'일 · '+baseLabel()+' 기준';
   var b=STATE.base;
-  var mrr=monthlyTotal(list,b);
-  var lv=(DATA.live&&DATA.live.ok)? DATA.live.rows.length : activeCustomers(list,b);
+  $('#heroStats').textContent='당월 MRR '+won(monthlyTotal(list,b))+'원';
+
+  // 할 일 알림 배너 (클릭 → 해당 화면)
   var pend=(RAWX.orders||[]).filter(function(o){ return ['접수','출하요청','배송중','회수예정'].indexOf(o.status)>=0; }).length;
-  var expCnt=0; list.forEach(function(k){ var e=DATA.rows[k].endIdx; if(e!=null&&e>=b&&e<=b+2) expCnt++; });
-  $('#heroStats').innerHTML=
-    hst('당월 MRR', won(mrr), '원')+
-    hst('LIVE 고객', Number(lv).toLocaleString('ko-KR'), '곳')+
-    hst('처리 대기 장비 요청', pend, '건', pend?'warn':'')+
-    hst('3개월 내 만료', expCnt, '건', expCnt?'warn':'');
+  var expCnt=0, expAmt=0;
+  list.forEach(function(k){
+    var e=DATA.rows[k].endIdx;
+    if(e!=null && e>=b && e<=b+2){ expCnt++; expAmt+=MAT[k][Math.min(e,M-1)]||DATA.rows[k].mrr||0; }
+  });
+  var curYm=monOf(b)+'월';
+  var bizDone=(RAWX.biz||[]).some(function(r){ return r.ym===curYm; });
+  var items=[];
+  if(pend) items.push({t:'warn', ic:'📦', msg:'처리 대기 장비 요청이 <b>'+pend+'건</b> 있습니다.', go:function(){ switchView('orders'); }});
+  if(expCnt) items.push({t:'info', ic:'⏳', msg:'3개월 내 만료 계약이 <b>'+expCnt+'건</b> ('+won(expAmt)+'원) 있습니다 — 재약정 타깃.', go:function(){ var s=document.querySelector('[data-w="exp"]'); if(s) s.scrollIntoView({behavior:'smooth',block:'start'}); }});
+  if(!bizDone) items.push({t:'warn', ic:'⚖️', msg:'이번 달('+curYm+') 비즈포탈 차액이 아직 입력되지 않았습니다.', go:function(){ switchView('biz'); }});
+  var st=$('#noticeStack'); st.innerHTML='';
+  if(!items.length){
+    var ok=document.createElement('div'); ok.className='nb nb-ok';
+    ok.innerHTML='<span class="ni">✓</span><span>처리할 알림이 없습니다. 모든 항목이 정리되어 있어요.</span>';
+    st.appendChild(ok);
+  }else{
+    items.forEach(function(it){
+      var d=document.createElement('div'); d.className='nb nb-'+it.t;
+      d.innerHTML='<span class="ni">'+it.ic+'</span><span style="flex:1">'+it.msg+'</span><span class="na">확인 →</span>';
+      d.onclick=it.go;
+      st.appendChild(d);
+    });
+  }
 }
 
 /* ---- 커스텀 질문 위젯 (검색 결과 고정) ---- */
