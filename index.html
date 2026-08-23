@@ -1293,15 +1293,15 @@ var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
 /* ---- 로그인 세션 유지 (localStorage) ---- */
 var SESS_KEY='svc_sess';
 function saveSess(j,email,pOverride){
-  try{ localStorage.setItem(SESS_KEY, JSON.stringify({
+  try{ sessionStorage.setItem(SESS_KEY, JSON.stringify({
     a:j.access_token, r:j.refresh_token||null,
     e:Math.floor(Date.now()/1000)+(j.expires_in||3600), u:email,
     p:(pOverride!==undefined)? pOverride : !!(j.user&&j.user.user_metadata&&j.user.user_metadata.pw_changed)
   })); }catch(e){}
 }
-function clearSess(){ try{ localStorage.removeItem(SESS_KEY); }catch(e){} }
+function clearSess(){ try{ sessionStorage.removeItem(SESS_KEY); }catch(e){} }
 async function restoreSess(){
-  var s=null; try{ s=JSON.parse(localStorage.getItem(SESS_KEY)||'null'); }catch(e){}
+  var s=null; try{ s=JSON.parse(sessionStorage.getItem(SESS_KEY)||'null'); }catch(e){}
   if(!s || !s.a || s.p===false) return false;      // 비밀번호 미변경 계정은 다시 로그인
   if(Math.floor(Date.now()/1000) < (s.e||0)-120){ SB_TOKEN=s.a; AUTH_USER=s.u; return true; }
   if(!s.r){ clearSess(); return false; }
@@ -1316,7 +1316,7 @@ async function restoreSess(){
 }
 function doLogout(){
   if(!confirm('로그아웃할까요?')) return;
-  clearSess(); try{ localStorage.removeItem(CACHE_KEY); }catch(e){}
+  clearSess(); try{ sessionStorage.removeItem(CACHE_KEY); }catch(e){}
   SB_TOKEN=null; AUTH_USER=null; location.reload();
 }
 function showAuthUi(){
@@ -1437,7 +1437,7 @@ async function loadFromDb(){
         (j.mrs||[]).map(function(a){ return {contract_id:a[0], month:a[1], amount:a[2]}; }),
         j.live, j.lg, j.biz, j.targets, j.orders, j.roles, j.assets
       ];
-      try{ localStorage.setItem(CACHE_KEY, JSON.stringify({t:Date.now(), res:res0})); }catch(e){}
+      try{ sessionStorage.setItem(CACHE_KEY, JSON.stringify({t:Date.now(), res:res0})); }catch(e){}
       return buildFromRes(res0);
     }
   }catch(e){ /* 함수 미설치 등 → 아래 기존 방식으로 */ }
@@ -1453,13 +1453,13 @@ async function loadFromDb(){
     sbTry('user_roles?select=role'),
     sbTry('equipment_assets?select=*&order=serial')
   ]);
-  try{ localStorage.setItem(CACHE_KEY, JSON.stringify({t:Date.now(), res:res})); }catch(e){}
+  try{ sessionStorage.setItem(CACHE_KEY, JSON.stringify({t:Date.now(), res:res})); }catch(e){}
   return buildFromRes(res);
 }
 function loadFromCache(){
   // 이전 방문 때 저장한 데이터로 즉시 그린 뒤, 백그라운드에서 최신본으로 교체
   try{
-    var c=JSON.parse(localStorage.getItem(CACHE_KEY)||'null');
+    var c=JSON.parse(sessionStorage.getItem(CACHE_KEY)||'null');
     if(c && c.res && c.res[0] && c.res[0].length) return buildFromRes(c.res);
   }catch(e){}
   return null;
@@ -1611,7 +1611,7 @@ async function screenPw(){
       body:JSON.stringify({password:p1, data:{pw_changed:true}})});
     var j=await r.json();
     if(!r.ok) throw new Error(j.error_description||j.msg||'변경 실패');
-    try{ var s0=JSON.parse(localStorage.getItem(SESS_KEY)||'null'); if(s0){ s0.p=true; localStorage.setItem(SESS_KEY,JSON.stringify(s0)); } }catch(e){}
+    try{ var s0=JSON.parse(sessionStorage.getItem(SESS_KEY)||'null'); if(s0){ s0.p=true; sessionStorage.setItem(SESS_KEY,JSON.stringify(s0)); } }catch(e){}
     enterAfterLogin();
   }catch(e){ m.style.color='var(--critical,#d03b3b)'; m.textContent=String(e.message||e); }
 }
@@ -4014,7 +4014,7 @@ async function renderAccount(){
   var ri=ROLE_INFO[role]||['기본 (역할 미지정)','역할이 지정되지 않아 기본 권한으로 동작합니다. 관리자에게 문의하세요.'];
   var sessTxt='로그인 유지 켜짐 · 만료 시 자동 갱신';
   try{
-    var s0=JSON.parse(localStorage.getItem(SESS_KEY)||'null');
+    var s0=JSON.parse(sessionStorage.getItem(SESS_KEY)||'null');
     if(s0 && s0.e) sessTxt='로그인 유지 켜짐 · 현재 토큰 만료 '+new Date(s0.e*1000).toLocaleString('ko-KR')+' (자동 갱신)';
   }catch(e){}
   function row(k,v){ return '<div style="display:flex;gap:14px;padding:9px 2px;border-bottom:1px solid var(--ring)">'+
@@ -4465,7 +4465,7 @@ async function doPwChange(){
     var j=await r.json();
     if(!r.ok) throw new Error(j.error_description||j.msg||'변경 실패');
     $('#apPw').value=$('#apPw2').value='';
-    try{ var s0=JSON.parse(localStorage.getItem(SESS_KEY)||'null'); if(s0){ s0.p=true; localStorage.setItem(SESS_KEY,JSON.stringify(s0)); } }catch(e){}
+    try{ var s0=JSON.parse(sessionStorage.getItem(SESS_KEY)||'null'); if(s0){ s0.p=true; sessionStorage.setItem(SESS_KEY,JSON.stringify(s0)); } }catch(e){}
     msg('auMsg','비밀번호를 변경했습니다 ✅','ok');
     if(FORCE_PW){
       FORCE_PW=false;
