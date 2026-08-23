@@ -62,6 +62,40 @@ a{color:var(--s1)}
 .pill:hover{background:var(--surface-2);color:var(--ink)}
 .pill[aria-pressed="true"]{background:var(--s1);border-color:var(--s1);color:#fff}
 .pill.ghost{background:transparent}
+
+/* ---------- 폴리시(트렌디 마감) ---------- */
+.card{transition:box-shadow .18s ease}
+.kpi{transition:transform .16s ease, box-shadow .2s ease}
+.kpi:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(0,0,0,.08)}
+.pill{transition:background .12s,border-color .12s,color .12s,transform .1s}
+.pill:active{transform:scale(.97)}
+.btn{transition:filter .14s, transform .1s}
+.btn:active{transform:scale(.98)}
+.side button{transition:background .14s,color .14s}
+.side button[aria-current="true"]{
+  background:linear-gradient(135deg,var(--s1),#4d8fe0);
+  box-shadow:0 4px 14px rgba(42,120,214,.30); color:#fff;
+}
+input:focus,select:focus,textarea:focus{
+  outline:none; border-color:var(--s1)!important;
+  box-shadow:0 0 0 3px rgba(42,120,214,.14);
+}
+
+/* ---------- 토스트 알림 ---------- */
+#toasts{position:fixed;top:18px;right:18px;z-index:1400;display:flex;flex-direction:column;gap:10px;pointer-events:none}
+.toast{display:flex;align-items:flex-start;gap:11px;min-width:250px;max-width:370px;padding:13px 16px;border-radius:13px;
+  background:var(--surface);border:1px solid var(--ring);box-shadow:0 12px 34px rgba(0,0,0,.16);
+  font-size:13px;pointer-events:auto;animation:toastIn .3s cubic-bezier(.21,1.02,.73,1) both}
+.toast.out{animation:toastOut .25s ease both}
+.toast .ti{width:22px;height:22px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff;margin-top:1px}
+.toast.ok .ti{background:var(--good,#0ca30c)}
+.toast.bad .ti{background:var(--critical,#d03b3b)}
+.toast.info .ti{background:var(--s1)}
+.toast b{display:block;font-size:13px;letter-spacing:-.01em}
+.toast .tm{display:block;color:var(--ink-2);font-size:12px;margin-top:2px}
+@keyframes toastIn{from{opacity:0;transform:translateX(26px)}to{opacity:1;transform:none}}
+@keyframes toastOut{to{opacity:0;transform:translateX(26px)}}
+.w-off{display:none!important}
 .live{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;color:var(--muted)}
 .dot{width:7px;height:7px;border-radius:50%;background:var(--good);box-shadow:0 0 0 3px rgba(12,163,12,.18)}
 
@@ -426,6 +460,8 @@ body{padding-left:192px}
     <span class="live"><span class="dot"></span><span id="loadedAt"></span></span>
     <button class="pill" id="btnEdit">✏️ 입력·수정</button>
     <button class="pill ghost" id="btnAuth">로그인</button>
+    <button class="pill ghost" id="btnLogout" style="display:none;border-color:rgba(208,59,59,.35);color:var(--critical,#d03b3b)">로그아웃</button>
+    <button class="pill ghost" id="btnWidgets" title="대시보드 위젯 표시 설정">⊞ 위젯</button>
     <button class="pill ghost" id="btnTheme">◐ 다크</button>
     <button class="pill ghost" id="btnReload">↻ 새로고침</button>
   </div>
@@ -502,7 +538,7 @@ body{padding-left:192px}
 
   <!-- ===================== 차트 ===================== -->
   <div class="grid">
-    <section class="card c12">
+    <section class="card c12" data-w="mx">
       <div class="card-head">
         <div class="t"><h2>월별 종합 장표</h2><p class="cap" id="capMx">서비스 × 월 인식 금액 · 합계 · 전년 대비</p></div>
         <div class="seg" id="segMxYear"></div>
@@ -510,7 +546,7 @@ body{padding-left:192px}
       <div class="tbl-wrap" style="max-height:none"><table id="tMx"></table></div>
     </section>
 
-    <section class="card c8">
+    <section class="card c8" data-w="trend">
       <div class="card-head">
         <div class="t">
           <h2>MRR 추이</h2>
@@ -528,7 +564,7 @@ body{padding-left:192px}
       <div class="tbl-wrap hidden" id="tvTrend"><table></table></div>
     </section>
 
-    <section class="card c4">
+    <section class="card c4" data-w="year">
       <div class="card-head">
         <div class="t"><h2>연도별 매출</h2><p class="cap">연 합계 · 막대에 마우스를 올리면 전년 대비</p></div>
         <button class="pill ghost" data-tv="year">표</button>
@@ -537,12 +573,12 @@ body{padding-left:192px}
       <div class="tbl-wrap hidden" id="tvYear"><table></table></div>
     </section>
 
-    <section class="card c4">
+    <section class="card c4" data-w="line">
       <div class="card-head"><div class="t"><h2>서비스별 MRR</h2><p class="cap" id="capLine"></p></div></div>
       <div id="barLine"></div>
     </section>
 
-    <section class="card c4">
+    <section class="card c4" data-w="ptn">
       <div class="card-head"><div class="t"><h2>파트너 실적</h2><p class="cap" id="capPartner"></p></div></div>
       <div id="barPartner"></div>
       <div style="margin-top:14px;padding-top:10px;border-top:1px solid var(--ring)">
@@ -551,12 +587,12 @@ body{padding-left:192px}
       </div>
     </section>
 
-    <section class="card c4">
+    <section class="card c4" data-w="ind">
       <div class="card-head"><div class="t"><h2>산업군</h2><p class="cap" id="capInd"></p></div></div>
       <div id="barInd"></div>
     </section>
 
-    <section class="card c6">
+    <section class="card c6" data-w="nc">
       <div class="card-head">
         <div class="t"><h2>신규 · 해지 고객수</h2><p class="cap">월별 계약 시작 / 종료 건수 (최근 24개월)</p></div>
         <button class="pill ghost" data-tv="churn">표</button>
@@ -566,12 +602,12 @@ body{padding-left:192px}
       <div class="tbl-wrap hidden" id="tvChurn"><table></table></div>
     </section>
 
-    <section class="card c6">
+    <section class="card c6" data-w="churn">
       <div class="card-head"><div class="t"><h2>해지 · 중지 사유</h2><p class="cap">건수 기준 상위 사유</p></div></div>
       <div id="barChurn"></div>
     </section>
 
-    <section class="card c12">
+    <section class="card c12" data-w="exp">
       <div class="card-head">
         <div class="t"><h2>계약 만료 예정</h2><p class="cap" id="capExp">기준월 이후 만료되는 계약 · 재약정 타깃</p></div>
         <div class="seg" id="segExp">
@@ -583,18 +619,18 @@ body{padding-left:192px}
       <div class="tbl-wrap"><table id="tExp"></table></div>
     </section>
 
-    <section class="card c6" id="secLg" style="display:none">
+    <section class="card c6" id="secLg" data-w="lg" style="display:none">
       <div class="card-head"><div class="t"><h2>LG U+ 경유 판매</h2><p class="cap" id="capLg">LG 탭 · 매출은 각 서비스에 포함됨</p></div></div>
       <div class="tbl-wrap"><table id="tLg"></table></div>
     </section>
 
-    <section class="card c6" id="secVs" style="display:none">
+    <section class="card c6" id="secVs" data-w="vs" style="display:none">
       <div class="card-head"><div class="t"><h2>비즈포탈 차액</h2><p class="cap" id="capVs">회계매출(비즈포탈) vs 매출시트 차이</p></div></div>
       <div id="vsSummary" style="padding:2px 0 10px"></div>
       <div class="tbl-wrap"><table id="tVs"></table></div>
     </section>
 
-    <section class="card c12">
+    <section class="card c12" data-w="all">
       <div class="card-head">
         <div class="t"><h2>계약 목록</h2><p class="cap" id="capAll">필터 조건에 맞는 전체 계약 · 열 제목을 눌러 정렬</p></div>
       </div>
@@ -638,6 +674,17 @@ body{padding-left:192px}
     <section class="card c12" style="max-width:860px;margin:0 auto">
       <h3 style="margin:0 0 4px;font-size:16px">📝 임대장비 발주 신청</h3>
       <p class="cap" style="margin:0 0 16px">저장하면 DB에 기록되고 슬랙 채널로 자동 통보됩니다. 처리 현황은 「장비 요청 내역」에서 확인하세요.</p>
+      <div id="odDone" style="display:none;text-align:center;padding:34px 10px 22px">
+        <div style="width:66px;height:66px;margin:0 auto 16px;border-radius:50%;background:rgba(12,163,12,.12);display:flex;align-items:center;justify-content:center;font-size:30px;color:var(--good,#0ca30c)">✓</div>
+        <div style="font-size:17.5px;font-weight:750;letter-spacing:-.01em">발주 신청이 접수되었습니다</div>
+        <p class="cap" id="odDoneSum" style="margin:10px 0 4px;font-size:12.5px"></p>
+        <p class="cap" style="margin:0 0 22px">슬랙 <b>#service-managed</b> 채널로 자동 통보되었습니다</p>
+        <div style="display:flex;gap:10px;justify-content:center">
+          <button class="pill" id="odDoneList" style="background:var(--s1);border-color:var(--s1);color:#fff">📦 요청 내역 보기</button>
+          <button class="pill ghost" id="odDoneNew">＋ 새 신청 작성</button>
+        </div>
+      </div>
+      <div id="odFormWrap">
       <div class="frm" style="margin-bottom:10px">
         <div><label>판매 채널 *</label><select id="odChannel"><option>에스원</option><option>LGU+</option><option>공공</option><option>기타</option></select></div>
         <div><label>요청 유형 *</label><select id="odType"><option>신규발주</option><option>추가</option><option>교체(장애)</option><option>교체(증설)</option><option>철거·회수</option></select></div>
@@ -670,6 +717,7 @@ body{padding-left:192px}
         <span class="mmsg" id="odMsg"></span>
         <button class="btn" style="height:38px;padding:0 28px" id="odGo">발주 신청</button>
       </div>
+      </div><!-- /odFormWrap -->
     </section>
   </div>
 
@@ -1127,6 +1175,28 @@ async function restoreSess(){
     SB_TOKEN=j.access_token; AUTH_USER=s.u; saveSess(j,s.u,true); return true;
   }catch(e){ clearSess(); return false; }
 }
+function doLogout(){
+  if(!confirm('로그아웃할까요?')) return;
+  clearSess(); try{ localStorage.removeItem(CACHE_KEY); }catch(e){}
+  SB_TOKEN=null; AUTH_USER=null; location.reload();
+}
+function showAuthUi(){
+  $('#btnAuth').textContent=(AUTH_USER||'').split('@')[0]+' ▾';
+  $('#btnAuth').title='비밀번호 변경';
+  $('#btnLogout').style.display='';
+}
+
+/* ---- 토스트 알림 ---- */
+function toast(title, sub, type){
+  var box=document.getElementById('toasts');
+  if(!box){ box=document.createElement('div'); box.id='toasts'; document.body.appendChild(box); }
+  var t=document.createElement('div'); t.className='toast '+(type||'ok');
+  t.innerHTML='<span class="ti">'+(type==='bad'?'✕':(type==='info'?'i':'✓'))+'</span>'+
+    '<span><b>'+esc(title)+'</b>'+(sub?'<span class="tm">'+esc(sub)+'</span>':'')+'</span>';
+  box.appendChild(t);
+  setTimeout(function(){ t.classList.add('out'); setTimeout(function(){ t.remove(); },260); }, 4000);
+}
+
 function showLoading(t){
   $('#app').classList.add('hidden');
   var l=$('#loading'); l.classList.remove('hidden');
@@ -1316,8 +1386,7 @@ function boot(skipCache){
   if(!window.__editInit){ window.__editInit=1; setupEdit(); setupSide(); }
   restoreSess().then(function(ok){
     if(ok){
-      $('#btnAuth').textContent=AUTH_USER.split('@')[0]+' ▾';
-      $('#btnAuth').title='비밀번호 변경 · 로그아웃';
+      showAuthUi();
       // 이전 방문 캐시가 있으면 즉시 그리고, 최신 데이터는 뒤에서 받아 교체
       var cached=skipCache? null : loadFromCache();
       if(cached && cached.rows.length){
@@ -1375,8 +1444,7 @@ async function screenLogin(){
     if(!r.ok||!j.access_token) throw new Error(j.error_description||j.msg||'이메일 또는 비밀번호가 올바르지 않습니다');
     SB_TOKEN=j.access_token; AUTH_USER=em;
     saveSess(j, em);
-    $('#btnAuth').textContent=em.split('@')[0]+' ▾';
-    $('#btnAuth').title='비밀번호 변경 · 로그아웃';
+    showAuthUi();
     var changed=j.user && j.user.user_metadata && j.user.user_metadata.pw_changed;
     if(!changed){
       $('#lsLogin').style.display='none'; $('#lsForce').style.display='';
@@ -1676,6 +1744,63 @@ function renderAll(){
   renderVs();
   renderMatrix(list);
   renderAllTable(list);
+  applyWidgets();
+}
+
+/* ---- 대시보드 위젯 커스터마이징 (사용자별, 이 브라우저에 저장) ---- */
+var WIDGET_DEFS=[
+  ['kpi','KPI 카드'], ['goal','연간 목표 진행'], ['mx','월별 종합 장표'],
+  ['trend','MRR 추이'], ['year','연도별 매출'], ['line','서비스별 MRR'],
+  ['ptn','파트너 실적'], ['ind','산업군'], ['nc','신규·해지 고객수'],
+  ['churn','해지·중지 사유'], ['exp','계약 만료 예정'], ['lg','LG 판매'],
+  ['vs','비즈포탈 차액'], ['all','계약 목록']
+];
+function widgetKey(){ return 'svc_widgets_'+(AUTH_USER||'anon'); }
+function widgetPrefs(){
+  try{ return JSON.parse(localStorage.getItem(widgetKey())||'{}')||{}; }catch(e){ return {}; }
+}
+function widgetEl(k){
+  if(k==='kpi') return $('#kpis');
+  if(k==='goal') return $('#goalBar');
+  return document.querySelector('[data-w="'+k+'"]');
+}
+function applyWidgets(){
+  var off=widgetPrefs();
+  WIDGET_DEFS.forEach(function(d){
+    var el=widgetEl(d[0]); if(!el) return;
+    el.classList.toggle('w-off', off[d[0]]===false);
+  });
+}
+function toggleWidgetPanel(){
+  var p=document.getElementById('widgetPanel');
+  if(p){ p.remove(); return; }
+  var off=widgetPrefs();
+  p=document.createElement('div'); p.id='widgetPanel';
+  p.style.cssText='position:fixed;top:56px;right:18px;z-index:1300;width:238px;background:var(--surface);'+
+    'border:1px solid var(--ring);border-radius:14px;box-shadow:0 14px 40px rgba(0,0,0,.16);padding:14px 16px';
+  var h='<div style="font-size:12.5px;font-weight:700;margin-bottom:10px">⊞ 대시보드 위젯</div>';
+  WIDGET_DEFS.forEach(function(d){
+    h+='<label style="display:flex;gap:8px;align-items:center;padding:4px 0;font-size:12.5px;cursor:pointer">'+
+       '<input type="checkbox" data-wk="'+d[0]+'" '+(off[d[0]]===false?'':'checked')+' style="width:15px;height:15px"> '+esc(d[1])+'</label>';
+  });
+  h+='<div style="display:flex;gap:8px;margin-top:10px"><button class="pill ghost" id="wpAll" style="flex:1;justify-content:center">모두 표시</button>'+
+     '<button class="pill" id="wpClose" style="flex:1;justify-content:center">닫기</button></div>'+
+     '<div class="mini" style="margin-top:8px;color:var(--muted)">내 계정·이 브라우저에만 적용됩니다</div>';
+  p.innerHTML=h;
+  document.body.appendChild(p);
+  p.querySelectorAll('input[data-wk]').forEach(function(cb){
+    cb.onchange=function(){
+      var o=widgetPrefs(); o[this.dataset.wk]=this.checked? true:false;
+      try{ localStorage.setItem(widgetKey(), JSON.stringify(o)); }catch(e){}
+      applyWidgets();
+    };
+  });
+  p.querySelector('#wpAll').onclick=function(){
+    try{ localStorage.removeItem(widgetKey()); }catch(e){}
+    p.querySelectorAll('input[data-wk]').forEach(function(cb){ cb.checked=true; });
+    applyWidgets();
+  };
+  p.querySelector('#wpClose').onclick=function(){ p.remove(); };
 }
 
 /* ---- 월별 종합 장표 (시트 첫 장표 스타일) ---- */
@@ -3542,6 +3667,7 @@ function renderBizEditor(host, months){
       var ins=await sbWrite('POST','biz_recon?select=*',out,'return=representation');
       RAWX.biz=(RAWX.biz||[]).filter(function(r){return r.ym!==ym;}).concat(ins||[]);
       logChange('update','biz_recon',0,{ym:ym, rows:out.length});
+      toast('저장되었습니다', ym+' 비즈포탈 대조 결과');
       DIRTY=true; BIZV.edit=false; BIZV.ym=ym;
       renderBizMonthly();
     }catch(e){ $('#bzMsg').textContent=String(e.message||e); this.disabled=false; }
@@ -3589,9 +3715,7 @@ async function renderAccount(){
   bp.onclick=function(){ openOvl('ovlAuth'); setAuthTab('pw'); };
   var bo=document.createElement('button'); bo.className='pill ghost'; bo.textContent='로그아웃';
   bo.style.cssText='border-color:var(--critical,#d03b3b);color:var(--critical,#d03b3b)';
-  bo.onclick=function(){
-    if(confirm('로그아웃할까요?')){ clearSess(); try{ localStorage.removeItem(CACHE_KEY); }catch(e){} location.reload(); }
-  };
+  bo.onclick=doLogout;
   act.appendChild(bp); act.appendChild(bo);
   box.appendChild(act);
   var tip=document.createElement('p'); tip.className='cap'; tip.style.marginTop='14px';
@@ -3631,10 +3755,14 @@ async function submitOrder(){
     var out=await sbWrite('POST','equipment_orders?select=*',[row],'return=representation');
     RAWX.orders=RAWX.orders||[]; RAWX.orders.unshift(out[0]);
     logChange('insert','equipment_orders',out[0].id,{customer:cust,model:row.model,qty:row.qty});
-    msg('odMsg','접수 완료 ✅ — 슬랙 채널로 통보되었습니다','ok');
+    msg('odMsg','');
+    // 명시적 완료 화면
+    $('#odDoneSum').textContent=[row.channel, cust, row.model+' × '+row.qty, row.order_type].filter(Boolean).join(' · ');
+    $('#odFormWrap').style.display='none';
+    $('#odDone').style.display='';
+    toast('발주 신청 접수 완료', cust+' · '+row.model+' × '+row.qty);
     ['odCustomer','odContract','odMgr','odPhone','odAdmin','odInstall','odAddr','odNodes','odRecvAddr','odRecvName','odRecvPhone','odShip','odNote','odSerials'].forEach(function(i){ $('#'+i).value=''; });
     $('#odQty').value='1';
-    setTimeout(function(){ switchView('orders'); },900);   // 접수 후 요청 내역으로 이동
   }catch(e){ msg('odMsg',String(e.message||e),'bad'); }
   btn.disabled=false;
 }
@@ -3649,6 +3777,10 @@ function setupSide(){
     gridAddRow();
   };
   $('#odGo').onclick=submitOrder;
+  $('#odDoneList').onclick=function(){ switchView('orders'); };
+  $('#odDoneNew').onclick=function(){ $('#odDone').style.display='none'; $('#odFormWrap').style.display=''; $('#odCustomer').focus(); };
+  $('#btnLogout').onclick=doLogout;
+  $('#btnWidgets').onclick=toggleWidgetPanel;
   $('#dvCsv').onclick=function(){ exportCsv(); };
   $('#dvReload').onclick=function(){
     loadFromDb().then(function(nd){ onData(nd); if(CUR_VIEW!=='dash') renderGrid(); });
@@ -3670,6 +3802,8 @@ function switchView(v){
   if(acct){ renderAccount(); return; }
   if(onew){
     msg('odMsg','');
+    $('#odFormWrap').style.display='';
+    $('#odDone').style.display='none';
     setTimeout(function(){ $('#odCustomer').focus(); },50);
     return;
   }
@@ -3890,6 +4024,7 @@ function gridRow(r,g,editing){
           if(!confirm('이 행을 삭제할까요?\n'+g.cols.slice(0,2).map(function(c){return r[c.k];}).join(' · '))) return;
           sbWrite('DELETE',g.table+'?id=eq.'+r.id).then(function(){
             logChange('delete',g.table,r.id,{});
+            toast('삭제되었습니다', g.title, 'info');
             var arr=g.rows(); var i=(RAWX[CUR_VIEW]||[]).indexOf(r); if(i>=0) RAWX[CUR_VIEW].splice(i,1);
             DIRTY=true; renderGrid();
           }).catch(function(e){ $('#dvMsg').textContent=String(e.message||e); });
@@ -3913,8 +4048,9 @@ function gridRow(r,g,editing){
           Object.keys(body).forEach(function(k){ r[k]=body[k]; });
           logChange('update',g.table,r.id,body);
           DIRTY=true; $('#dvMsg').textContent='저장됨 ✅';
+          toast('저장되었습니다', g.title);
           if(stChanged) syncOrderAssets(r,stChanged).then(function(x){
-            if(x) $('#dvMsg').textContent='저장됨 ✅'+x;
+            if(x) toast('장비 자산 자동 반영', x.replace(/^ · /,''), 'info');
           });
           view();
         }).catch(function(e){ $('#dvMsg').textContent=String(e.message||e); });
@@ -3940,6 +4076,7 @@ function gridAddRow(){
     try{
       var body=readRowInputs(tr,g);
       sbWrite('POST',g.table+'?select=*',[body],'return=representation').then(function(rows){
+        toast('추가되었습니다', g.title);
         RAWX[CUR_VIEW]=RAWX[CUR_VIEW]||[]; RAWX[CUR_VIEW].push(rows[0]);
         logChange('insert',g.table,rows[0].id,body);
         DIRTY=true; $('#dvMsg').textContent='추가됨 ✅';
@@ -3974,8 +4111,7 @@ async function doLogin(){
     if(!r.ok||!j.access_token) throw new Error(j.error_description||j.msg||'이메일 또는 비밀번호가 올바르지 않습니다');
     SB_TOKEN=j.access_token; AUTH_USER=($('#auEmail').value.trim());
     saveSess(j, AUTH_USER);
-    $('#btnAuth').textContent=AUTH_USER.split('@')[0]+' ▾';
-    $('#btnAuth').title='비밀번호 변경 · 로그아웃';
+    showAuthUi();
     msg('auMsg','');
 
     // 최초 로그인(비밀번호 미변경) 확인 — user_metadata.pw_changed 플래그
@@ -4055,7 +4191,7 @@ function setupAuth(){
     setTimeout(function(){ $('#auEmail').focus(); },50);
   };
   $('#auLogout').onclick=function(){
-    if(confirm('로그아웃할까요?')){ clearSess(); try{ localStorage.removeItem(CACHE_KEY); }catch(e){} SB_TOKEN=null; AUTH_USER=null; location.reload(); }
+    doLogout();
   };
   $('#auTabs').querySelectorAll('button').forEach(function(b){
     b.onclick=function(){ setAuthTab(this.dataset.t); };
