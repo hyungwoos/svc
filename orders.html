@@ -206,15 +206,15 @@ function $(s){ return document.querySelector(s); }
 /* ---- 로그인 세션 유지 (index.html 과 공유) ---- */
 var SESS_KEY='svc_sess';
 function saveSess(j,email,pOverride){
-  try{ localStorage.setItem(SESS_KEY, JSON.stringify({
+  try{ sessionStorage.setItem(SESS_KEY, JSON.stringify({
     a:j.access_token, r:j.refresh_token||null,
     e:Math.floor(Date.now()/1000)+(j.expires_in||3600), u:email,
     p:(pOverride!==undefined)? pOverride : !!(j.user&&j.user.user_metadata&&j.user.user_metadata.pw_changed)
   })); }catch(e){}
 }
-function clearSess(){ try{ localStorage.removeItem(SESS_KEY); }catch(e){} }
+function clearSess(){ try{ sessionStorage.removeItem(SESS_KEY); }catch(e){} }
 async function restoreSess(){
-  var s=null; try{ s=JSON.parse(localStorage.getItem(SESS_KEY)||'null'); }catch(e){}
+  var s=null; try{ s=JSON.parse(sessionStorage.getItem(SESS_KEY)||'null'); }catch(e){}
   if(!s || !s.a || s.p===false) return false;
   if(Math.floor(Date.now()/1000) < (s.e||0)-120){ TOKEN=s.a; USER=s.u; return true; }
   if(!s.r){ clearSess(); return false; }
@@ -269,7 +269,7 @@ async function changePw(){
       headers:{apikey:SB_KEY,'Content-Type':'application/json',Authorization:'Bearer '+TOKEN},
       body:JSON.stringify({password:p1,data:{pw_changed:true}})});
     if(!r.ok){ var j=await r.json(); throw new Error(j.msg||'변경 실패'); }
-    try{ var s0=JSON.parse(localStorage.getItem(SESS_KEY)||'null'); if(s0){ s0.p=true; localStorage.setItem(SESS_KEY,JSON.stringify(s0)); } }catch(e){}
+    try{ var s0=JSON.parse(sessionStorage.getItem(SESS_KEY)||'null'); if(s0){ s0.p=true; sessionStorage.setItem(SESS_KEY,JSON.stringify(s0)); } }catch(e){}
     msg('pwMsg','변경 완료 ✅','ok');
     setTimeout(function(){ $('#viewPw').classList.add('hidden'); enter(); },600);
   }catch(e){ msg('pwMsg',String(e.message||e),'bad'); }
