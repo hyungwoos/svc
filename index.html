@@ -308,6 +308,13 @@ body{padding-left:192px}
 }
 .dgrid td input:focus,.dgrid td select:focus{border-color:var(--s1)}
 .dgrid td input[type="checkbox"]{width:16px;height:16px;min-width:0}
+/* 동작(✎/🗑) 열 오른쪽 고정 — 가로 스크롤 없이 항상 보이게 */
+.dgrid td.act, .dgrid th.act{
+  position:sticky; right:0; z-index:2;
+  background:var(--surface);
+  box-shadow:-8px 0 10px -8px rgba(0,0,0,.25);
+}
+.dgrid thead th.act{ background:var(--surface-2); z-index:3; }
 .dgrid .act button{
   border:1px solid var(--ring);background:var(--surface-2);color:var(--ink-2);border-radius:7px;
   padding:4px 9px;font-size:11.5px;cursor:pointer;font-family:inherit;margin-right:4px;
@@ -3685,7 +3692,7 @@ function renderGrid(){
     };
     tr0.appendChild(th);
   });
-  if(!g.ro){ var th2=document.createElement('th'); th2.style.width='110px'; tr0.appendChild(th2); }
+  if(!g.ro){ var th2=document.createElement('th'); th2.style.width='110px'; th2.className='act'; tr0.appendChild(th2); }
   thead.appendChild(tr0);
   t.appendChild(thead);
 
