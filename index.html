@@ -841,7 +841,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
         <div class="t"><h2 id="dvTitle">데이터</h2><p class="cap" id="dvCap"></p></div>
       </div>
       <div class="dbar">
-        <input type="search" id="dvSearch" placeholder="검색…">
+        <input type="search" id="dvSearch" placeholder="검색 — 여러 단어로 좁히기 (예: 에스원 mdr)">
         <button class="pill" id="dvAdd">＋ 행 추가</button>
         <button class="pill ghost" id="dvReload">↻ 다시 읽기</button>
         <button class="pill ghost" id="dvCsv">⬇ CSV</button>
@@ -1754,6 +1754,8 @@ function onData(d){
   DATA = d; M = d.monthKeys.length;
   MAT = d.rows.map(function(r){
     var a = new Float64Array(M);
+    // H/W 판매(일시 매출)는 MRR·차트 집계에서 제외 — 계약 목록에는 그대로 표시
+    if(/H\/W/i.test(r.saleType||'') || /H\/W/i.test(r.ctype||'')){ r._hw=true; return a; }
     r.segs.forEach(function(s){
       for(var i=Math.max(0,s[0]); i<=Math.min(M-1,s[1]); i++) a[i]+=s[2];
     });
@@ -4418,11 +4420,20 @@ function readRowInputs(tr,g){
 var DV={page:0, per:100, sortK:null, sortDir:1};
 
 function gridFilteredSorted(g){
-  var q=($('#dvSearch').value||'').toLowerCase();
+  // 검색 개선: 공백 무시 + 여러 단어 AND + 표시명(예: MDR_S1→S1 MDR)도 함께 검색
+  var q=($('#dvSearch').value||'').trim().toLowerCase();
+  var toks=q? q.split(/\s+/).filter(Boolean):[];
   var rows=g.rows().filter(function(r){
     if(g.chipsField && DV.chipVal && String(r[g.chipsField]||'')!==DV.chipVal) return false;
-    if(!q) return true;
-    return g.cols.some(function(c){ return String(r[c.k]==null?'':r[c.k]).toLowerCase().indexOf(q)>=0; });
+    if(!toks.length) return true;
+    var hay='';
+    g.cols.forEach(function(c){
+      var v=r[c.k];
+      hay+=String(v==null?'':v)+' ';
+      if(c.fmt){ try{ hay+=String(c.fmt(v)==null?'':c.fmt(v))+' '; }catch(e){} }
+    });
+    hay=hay.toLowerCase().replace(/\s+/g,'');
+    return toks.every(function(t){ return hay.indexOf(t.replace(/\s+/g,''))>=0; });
   });
   if(DV.sortK){
     var col=g.cols.filter(function(c){return c.k===DV.sortK;})[0];
