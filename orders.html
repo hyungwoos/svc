@@ -54,7 +54,7 @@ tbody tr:nth-child(even){background:rgba(127,127,127,.045)}
 .st-출하요청,.st-배송중{color:var(--warning);border-color:var(--warning);background:rgba(185,120,0,.08)}
 .st-설치완료{color:var(--good);border-color:var(--good);background:rgba(12,163,12,.08)}
 .st-회수예정{color:var(--critical);border-color:var(--critical);background:rgba(208,59,59,.07)}
-.st-회수완료,.st-취소{color:var(--muted);border-color:var(--ring)}
+.st-회수완료,.st-취소,.st-판매완료{color:var(--muted);border-color:var(--ring)}
 td select{height:30px;font-size:12px;width:auto;min-width:96px}
 .mini{font-size:11px;color:var(--muted)}
 .hidden{display:none!important}
@@ -129,7 +129,7 @@ td select{height:30px;font-size:12px;width:auto;min-width:96px}
     <h2>발주 신청</h2>
     <p class="cap">* 표시는 필수 항목</p>
     <div class="frm" style="margin-bottom:4px">
-      <div><label>판매 채널 *</label><select id="odChannel"><option>에스원</option><option>LGU+</option><option>공공</option><option>기타</option></select></div>
+      <div><label>판매 채널 *</label><select id="odChannel"><option>에스원</option><option>LGU+</option><option>공공</option><option>일반</option><option>기타</option></select></div>
       <div><label>요청 유형 *</label><select id="odType"><option>신규발주</option><option>추가</option><option>교체(장애)</option><option>교체(증설)</option><option>철거·회수</option></select></div>
     </div>
     <div class="grp">— 신청자 정보 —</div>
@@ -170,7 +170,7 @@ td select{height:30px;font-size:12px;width:auto;min-width:96px}
     <h2>발주 내역</h2>
     <p class="cap">상태를 바꾸면 즉시 저장됩니다 (접수 → 출하요청 → 배송중 → 설치완료 → 회수예정 → 회수완료)</p>
     <div style="display:flex;gap:10px;margin-bottom:12px;align-items:center">
-      <select id="fCh" style="width:auto;height:33px"><option value="">채널 전체</option><option>에스원</option><option>LGU+</option><option>공공</option><option>기타</option></select>
+      <select id="fCh" style="width:auto;height:33px"><option value="">채널 전체</option><option>에스원</option><option>LGU+</option><option>공공</option><option>일반</option><option>기타</option></select>
       <input id="q" type="search" placeholder="고객사·담당자 검색…" style="max-width:260px;height:33px">
       <span class="mini" id="cnt"></span>
     </div>
@@ -200,7 +200,7 @@ var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var TOKEN=null, USER=null, ORDERS=[], ASSETS=[], AFILTER='';
 var STATUSES=['접수','출하요청','배송중','설치완료','회수예정','회수완료','취소'];
-var ASTATUS=['재고','임대중','회수완료','수리중','분실','폐기'];
+var ASTATUS=['재고','임대중','회수완료','판매완료','수리중','분실','폐기'];
 function today(){ return new Date().toISOString().slice(0,10); }
 function parseSerials(s){ return String(s||'').split(/[,\s]+/).filter(function(x){return x;}); }
 
@@ -358,11 +358,11 @@ function renderAssets(){
   });
   $('#acnt').textContent=rows.length+'대';
   var t=$('#atbl');
-  t.innerHTML='<thead><tr><th>시리얼</th><th>모델</th><th>상태</th><th>고객사</th><th>채널</th><th>출고일</th><th>회수일</th><th>비고</th><th></th></tr></thead>';
+  t.innerHTML='<thead><tr><th>시리얼</th><th>모델</th><th>구분</th><th>상태</th><th>고객사</th><th>채널</th><th>출고일</th><th>회수일</th><th>비고</th><th></th></tr></thead>';
   var tb=document.createElement('tbody');
   rows.forEach(function(a){
     var tr=document.createElement('tr');
-    tr.innerHTML='<td><b>'+esc(a.serial)+'</b></td><td>'+esc(a.model||'')+'</td><td></td>'+
+    tr.innerHTML='<td><b>'+esc(a.serial)+'</b></td><td>'+esc(a.model||'')+'</td><td class="mini">'+esc(a.usage||'임대')+'</td><td></td>'+
       '<td>'+esc(a.customer||'')+'</td><td class="mini">'+esc(a.channel||'')+'</td>'+
       '<td>'+String(a.deployed_date||'').slice(0,10)+'</td><td>'+String(a.returned_date||'').slice(0,10)+'</td>'+
       '<td class="mini">'+esc(a.note||'')+'</td><td></td>';
@@ -376,7 +376,7 @@ function renderAssets(){
         a.status=this.value; if(this.value==='회수완료'){a.customer=null;a.returned_date=today();} renderAssets();
       }catch(e){ alert('저장 실패: '+e.message); }
     };
-    tr.children[2].appendChild(sel);
+    tr.children[3].appendChild(sel);
     var ed=document.createElement('button'); ed.className='pill'; ed.style.height='26px'; ed.textContent='✎';
     ed.onclick=async function(){
       var cu=prompt('고객사 (임대중일 때)', a.customer||''); if(cu===null) return;
@@ -385,7 +385,7 @@ function renderAssets(){
         a.customer=cu||null; a.note=nt||null; renderAssets();
       }catch(e){ alert('저장 실패: '+e.message); }
     };
-    tr.children[8].appendChild(ed);
+    tr.children[9].appendChild(ed);
     tb.appendChild(tr);
   });
   t.appendChild(tb);
