@@ -890,6 +890,7 @@
         initAppAfterTypeSelected();
     }
     async function initAppAfterTypeSelected() {
+        loadGithubConfigFromStorage();   // onload 이전에 진입해도 저장된 접속 비밀번호를 먼저 읽는다
         populateManagerSelect();
         addRow();
         // URL에 ?view=경로 가 있으면, 그 견적을 자동으로 불러와서 읽기 전용으로 보여줍니다.
