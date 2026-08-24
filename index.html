@@ -830,7 +830,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
       </div>
       <div id="odFormWrap">
       <div class="frm" style="margin-bottom:10px">
-        <div><label>판매 채널 *</label><select id="odChannel"><option>에스원</option><option>LGU+</option><option>공공</option><option>기타</option></select></div>
+        <div><label>판매 채널 *</label><select id="odChannel"><option>에스원</option><option>LGU+</option><option>공공</option><option>일반</option><option>기타</option></select></div>
         <div><label>요청 유형 *</label><select id="odType"><option>신규발주</option><option>추가</option><option>교체(장애)</option><option>교체(증설)</option><option>철거·회수</option></select></div>
       </div>
       <div style="font-size:11px;color:var(--ink-2);opacity:.75;margin:6px 0 10px">— 신청자 정보 —</div>
@@ -3771,7 +3771,7 @@ var GRIDS={
     rows:function(){ return RAWX.orders||[]; },
     cols:[
       {k:'created_at',l:'신청일',ro:true,fmt:function(v){return String(v||'').slice(0,10);}},
-      {k:'channel',l:'채널',t:'select',opts:['에스원','LGU+','공공','기타']},
+      {k:'channel',l:'채널',t:'select',opts:['에스원','LGU+','공공','일반','기타']},
       {k:'order_type',l:'유형',t:'select',opts:['신규발주','추가','교체(장애)','교체(증설)','철거·회수']},
       {k:'customer',l:'고객사',req:true},
       {k:'contract_no',l:'계약번호'},
@@ -3790,15 +3790,17 @@ var GRIDS={
   },
   assets:{
     title:'장비 자산 (시리얼 단위)', table:'equipment_assets',
-    chipsField:'channel', chipsOpts:['에스원','LGU+','공공','기타'],
+    chipsField:'channel', chipsOpts:['에스원','LGU+','공공','일반','기타'],
     cap:'발주 상태를 「설치완료」로 바꾸면 자동 임대중, 「회수완료」면 자동 회수완료 처리됩니다', add:true, del:true,
     rows:function(){ return RAWX.assets||[]; },
     cols:[
       {k:'serial',l:'시리얼',req:true},
-      {k:'model',l:'모델',t:'select',opts:['S10_R2','S20_R2','S100','S200']},
-      {k:'status',l:'상태',t:'select',opts:['재고','임대중','회수완료','수리중','분실','폐기']},
+      {k:'model',l:'모델',t:'select',opts:['S10_R2','S20_R2','S30H_R1','S100','S200','ES30']},
+      {k:'usage',l:'구분',t:'select',opts:['임대','데모','대여','판매','하자보수']},
+      {k:'status',l:'상태',t:'select',opts:['재고','임대중','회수완료','판매완료','수리중','분실','폐기']},
       {k:'customer',l:'고객사'},
-      {k:'channel',l:'채널',t:'select',opts:['에스원','LGU+','공공','기타']},
+      {k:'channel',l:'채널',t:'select',opts:['에스원','LGU+','공공','일반','기타']},
+      {k:'partner',l:'파트너'},
       {k:'in_date',l:'입고일',t:'date'},
       {k:'deployed_date',l:'출고일',t:'date'},
       {k:'returned_date',l:'회수일',t:'date'},
