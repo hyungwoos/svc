@@ -358,6 +358,12 @@ async function syncAssets(r, st){
   return '';
 }
 
+/* ---- 검색: 공백 무시 + 여러 단어 AND ---- */
+function qMatch(fields, q){
+  var hay=fields.join(' ').toLowerCase().replace(/\s+/g,'');
+  return q.split(/\s+/).filter(Boolean).every(function(t){ return hay.indexOf(t.replace(/\s+/g,''))>=0; });
+}
+
 /* ---- 장비 현황 ---- */
 function renderAssets(){
   var q=($('#aq').value||'').toLowerCase();
@@ -375,7 +381,7 @@ function renderAssets(){
   var rows=ASSETS.filter(function(a){
     if(AFILTER && a.status!==AFILTER) return false;
     if(!q) return true;
-    return [a.serial,a.customer,a.model,a.channel,a.note].join(' ').toLowerCase().indexOf(q)>=0;
+    return qMatch([a.serial,a.customer,a.model,a.channel,a.note], q);
   });
   $('#acnt').textContent=rows.length+'대';
   var t=$('#atbl');
@@ -427,7 +433,7 @@ function render(){
   var rows=ORDERS.filter(function(r){
     if(ch && r.channel!==ch) return false;
     if(!q) return true;
-    return [r.customer,r.mgr_name,r.requester,r.contract_no,r.model,r.status,r.serials].join(' ').toLowerCase().indexOf(q)>=0;
+    return qMatch([r.customer,r.mgr_name,r.requester,r.contract_no,r.model,r.status,r.serials], q);
   });
   $('#cnt').textContent=rows.length+'건';
   var t=$('#tbl');
