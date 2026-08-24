@@ -571,7 +571,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
   <button data-v="live">🟢 LIVE 고객사</button>
   <div class="grp">사업 영역</div>
   <button data-v="chgen">🤝 일반 판매</button>
-  <button data-v="chpub">🏛 공공</button>
+  <button data-v="chpub">🏛️ 공공</button>
   <button data-v="chlgu">📶 LGU+</button>
   <button data-v="chs1">🔒 에스원</button>
   <button data-v="chdist">📀 유통 (DLP·DRM)</button>
@@ -847,6 +847,11 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
         <div><label>노드수</label><input id="odNodes" type="number" min="0"></div>
         <div><label>모델명</label><select id="odModel"><option>S100</option><option>S200</option><option>S10_R2</option></select></div>
         <div><label>수량</label><input id="odQty" type="number" min="1" value="1"></div>
+        <div><label>단독 Pod 여부</label>
+          <label style="display:flex;align-items:center;gap:8px;height:36px;cursor:pointer;font-size:13px;font-weight:500">
+            <input id="odPod" type="checkbox" style="width:16px;height:16px;accent-color:var(--brand,#149e40)"> 단독 Pod 구성입니다
+          </label>
+        </div>
       </div>
       <div style="font-size:11px;color:var(--ink-2);opacity:.75;margin:14px 0 10px">— 배송 관련 정보 —</div>
       <div class="frm">
@@ -1493,6 +1498,7 @@ function buildFromRes(res){
   window.RAWX={customers:custs, contracts:cts, live:res[3]||[], lg:res[4]||[], biz:res[5]||[],
     targets:res[6]||[], orders:res[7]||[], assets:res[9]||[], log:null, mrs:mrs};
   window.IS_VIEWER = !!(res[8] && res[8].length && res[8][0].role==='viewer');
+  window.MY_ROLE = (res[8] && res[8].length && res[8][0].role) || '';
   SB_RAW.customers=custs; SB_RAW.contracts=cts;
   var cMap={}; custs.forEach(function(c){ cMap[c.id]=c; });
 
@@ -1547,8 +1553,38 @@ function buildFromRes(res){
 }
 
 function afterLoad(dd){
-  if(!dd.rows.length && SB_TOKEN){ location.href='orders.html'; return; }
+  if(isEquipAcct(dd)){ enterEquipMode(dd); return; }
   onData(dd);
+}
+/* ---- 장비 전용(equipment) 계정: 포탈 안에서 장비 메뉴만 사용 ---- */
+function isEquipAcct(d){
+  return !!SB_TOKEN && (window.MY_ROLE==='equipment' || !d.rows.length);
+}
+var EQUIP_VIEWS={orders:1, assets:1, ordernew:1, account:1};
+function enterEquipMode(d){
+  window.IS_EQUIP=true;
+  DATA=d; M=d.monthKeys.length; MAT=[];
+  var side=$('#side');
+  side.querySelectorAll('button').forEach(function(b){
+    if(!EQUIP_VIEWS[b.dataset.v]) b.style.display='none';
+  });
+  side.querySelectorAll('.grp').forEach(function(g){
+    var el=g.nextElementSibling, vis=false;
+    while(el && !el.classList.contains('grp')){
+      if(el.tagName==='BUTTON' && el.style.display!=='none') vis=true;
+      el=el.nextElementSibling;
+    }
+    g.style.display=vis? '':'none';
+  });
+  $('#btnEdit').style.display='none';
+  $('#btnWidgets').style.display='none';
+  showAuthUi();
+  $('#loading').classList.add('hidden');
+  $('#app').classList.remove('hidden');
+  side.classList.remove('hidden');
+  document.body.style.paddingLeft='';
+  $('#periodLabel').textContent='장비 관리 전용';
+  switchView(EQUIP_VIEWS[CUR_VIEW]? CUR_VIEW : 'orders');
 }
 function boot(skipCache){
   if(!window.__editInit){ window.__editInit=1; setupEdit(); setupSide(); }
@@ -1561,8 +1597,7 @@ function boot(skipCache){
         onData(cached);
         var pl=$('#periodLabel'); pl.textContent += ' · 최신 데이터 확인 중…';
         loadFromDb().then(function(d2){
-          if(!d2.rows.length && SB_TOKEN){ location.href='orders.html'; return; }
-          onData(d2);
+          afterLoad(d2);
         }).catch(function(){ pl.textContent=pl.textContent.replace(' · 최신 데이터 확인 중…',''); });
         return null;   // 아래 then 건너뜀
       }
@@ -1571,9 +1606,9 @@ function boot(skipCache){
     return loadFromDb();
   }).then(function(d){
     if(d===null) return;   // 캐시 경로에서 이미 처리됨
-    if(!d.rows.length && SB_TOKEN){
+    if(isEquipAcct(d)){
       // 로그인했는데 매출 데이터가 안 보임 = 장비 전용(equipment) 계정
-      location.href='orders.html';
+      enterEquipMode(d);
       return;
     }
     if(!d.rows.length && !SB_TOKEN){
@@ -3766,7 +3801,7 @@ var GRIDS={
   },
   orders:{
     title:'장비 요청 내역', table:'equipment_orders',
-    chipsField:'channel', chipsOpts:['에스원','LGU+','공공','기타'],
+    chipsField:'channel', chipsOpts:['에스원','LGU+','공공','일반','기타'],
     cap:'발주·교체·회수 요청의 상태 관리 (설치완료/회수완료 시 자산 자동 반영) · 신규 신청은 도구 › 장비 신청', add:true, del:true,
     rows:function(){ return RAWX.orders||[]; },
     cols:[
@@ -3781,6 +3816,7 @@ var GRIDS={
       {k:'nodes',l:'노드',t:'number'},
       {k:'model',l:'모델',t:'select',opts:['S100','S200','S10_R2']},
       {k:'qty',l:'수량',t:'number'},
+      {k:'standalone_pod',l:'단독Pod',t:'bool',fmt:function(v){return v?'✅ 단독':'·';}},
       {k:'recv_name',l:'수령인'},
       {k:'ship_date',l:'수령희망',t:'date'},
       {k:'status',l:'상태',t:'select',opts:['접수','출하요청','배송중','설치완료','회수예정','회수완료','취소']},
@@ -4021,7 +4057,7 @@ function renderBizEditor(host, months){
 /* ---- 사업 영역(판매 채널) 화면 ---- */
 var CH_DEFS={
   chgen:['🤝 일반 판매','일반','파트너(다원티에스·글로웰시스템·에티버스) 경유 + 예외적 직판'],
-  chpub:['🏛 공공','공공','공공 사업 영역'],
+  chpub:['🏛️ 공공','공공','공공 사업 영역'],
   chlgu:['📶 LGU+','LGU+','LGU+ 경유 판매'],
   chs1:['🔒 에스원','에스원','에스원(S1) 채널 — S1 Cloud NAC · S1 MDR'],
   chdist:['📀 유통','유통','블루문소프트 DLP·DRM 등 유통 사업']
@@ -4190,6 +4226,7 @@ async function submitOrder(){
       nodes: +$('#odNodes').value||null,
       model: $('#odModel').value,
       qty: +$('#odQty').value||1,
+      standalone_pod: $('#odPod').checked,
       recv_addr: $('#odRecvAddr').value.trim()||null,
       recv_name: $('#odRecvName').value.trim()||null,
       recv_phone: $('#odRecvPhone').value.trim()||null,
@@ -4202,12 +4239,12 @@ async function submitOrder(){
     logChange('insert','equipment_orders',out[0].id,{customer:cust,model:row.model,qty:row.qty});
     msg('odMsg','');
     // 명시적 완료 화면
-    $('#odDoneSum').textContent=[row.channel, cust, row.model+' × '+row.qty, row.order_type].filter(Boolean).join(' · ');
+    $('#odDoneSum').textContent=[row.channel, cust, row.model+' × '+row.qty, row.order_type, row.standalone_pod?'단독 Pod':''].filter(Boolean).join(' · ');
     $('#odFormWrap').style.display='none';
     $('#odDone').style.display='';
     toast('발주 신청 접수 완료', cust+' · '+row.model+' × '+row.qty);
     ['odCustomer','odContract','odMgr','odPhone','odAdmin','odInstall','odAddr','odNodes','odRecvAddr','odRecvName','odRecvPhone','odShip','odNote','odSerials'].forEach(function(i){ $('#'+i).value=''; });
-    $('#odQty').value='1';
+    $('#odQty').value='1'; $('#odPod').checked=false;
   }catch(e){ msg('odMsg',String(e.message||e),'bad'); }
   btn.disabled=false;
 }
@@ -4228,12 +4265,16 @@ function setupSide(){
   $('#btnWidgets').onclick=toggleWidgetPanel;
   $('#dvCsv').onclick=function(){ exportCsv(); };
   $('#dvReload').onclick=function(){
-    loadFromDb().then(function(nd){ onData(nd); if(CUR_VIEW!=='dash') renderGrid(); });
+    loadFromDb().then(function(nd){
+      if(window.IS_EQUIP){ renderGrid(); return; }   // 장비 전용: RAWX만 갱신
+      onData(nd); if(CUR_VIEW!=='dash') renderGrid();
+    });
   };
 }
 
 function switchView(v){
   if(v==='ordernew' && !SB_TOKEN){ openOvl('ovlAuth'); return; }
+  if(window.IS_EQUIP && !EQUIP_VIEWS[v]) v='orders';   // 장비 전용 계정은 장비 화면만
   CUR_VIEW=v;
   $('#side').querySelectorAll('button').forEach(function(b){
     b.setAttribute('aria-current', b.dataset.v===v?'true':'false');
@@ -4545,13 +4586,28 @@ function gridAddRow(){
   bs.onclick=function(){
     try{
       var body=readRowInputs(tr,g);
+      // 자산: 이미 있는 시리얼이면 새 행 대신 기존 행을 찾아 보여줌
+      if(g.table==='equipment_assets' && body.serial){
+        var serU=String(body.serial).trim().toUpperCase(); body.serial=serU;
+        var dup=(RAWX.assets||[]).some(function(a){ return String(a.serial||'').toUpperCase()===serU; });
+        if(dup){
+          DV.chipVal=''; $('#dvSearch').value=serU; DV.page=0; renderGrid();
+          $('#dvMsg').textContent='이미 등록된 시리얼입니다 — 아래 기존 행을 ✎ 버튼으로 수정해주세요.';
+          toast('중복 시리얼', serU+' 은(는) 이미 자산 목록에 있습니다');
+          return;
+        }
+      }
       sbWrite('POST',g.table+'?select=*',[body],'return=representation').then(function(rows){
         toast('추가되었습니다', g.title);
         RAWX[CUR_VIEW]=RAWX[CUR_VIEW]||[]; RAWX[CUR_VIEW].push(rows[0]);
         logChange('insert',g.table,rows[0].id,body);
         DIRTY=true; $('#dvMsg').textContent='추가됨 ✅';
         renderGrid();
-      }).catch(function(e){ $('#dvMsg').textContent=String(e.message||e); });
+      }).catch(function(e){
+        var s=String(e.message||e);
+        if(s.indexOf('23505')>=0) s='이미 존재하는 값입니다 (중복 키) — 검색으로 기존 행을 찾아 수정해주세요.';
+        $('#dvMsg').textContent=s;
+      });
     }catch(e){ $('#dvMsg').textContent=String(e.message||e); }
   };
   var bc=document.createElement('button'); bc.textContent='취소'; bc.onclick=function(){ tr.remove(); };
