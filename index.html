@@ -566,14 +566,21 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
 <nav class="side hidden" id="side">
   <div class="logo">서비스사업부<small>통합 관리 포탈</small></div>
   <button data-v="dash" aria-current="true">🏠 홈 (대시보드)</button>
-  <div class="grp">데이터 관리</div>
+  <div class="grp">전체 데이터</div>
   <button data-v="contracts">📋 계약</button>
   <button data-v="live">🟢 LIVE 고객사</button>
-  <button data-v="lg">📶 LG 판매</button>
-  <button data-v="biz">⚖️ 비즈포탈 차액</button>
-  <button data-v="targets">🎯 연간 목표</button>
+  <div class="grp">사업 영역</div>
+  <button data-v="chgen">🤝 일반 판매</button>
+  <button data-v="chpub">🏛 공공</button>
+  <button data-v="chlgu">📶 LGU+</button>
+  <button data-v="chs1">🔒 에스원</button>
+  <button data-v="chdist">📀 유통 (DLP·DRM)</button>
+  <div class="grp">임대장비</div>
   <button data-v="orders">📦 장비 요청 내역</button>
   <button data-v="assets">🔧 장비 자산</button>
+  <div class="grp">정산·목표</div>
+  <button data-v="biz">⚖️ 비즈포탈 차액</button>
+  <button data-v="targets">🎯 연간 목표</button>
   <div class="grp">도구</div>
   <button data-v="ordernew">📝 장비 신청</button>
   <button data-v="quote">📄 견적 시스템</button>
@@ -860,6 +867,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
     </section>
   </div>
 
+  <div id="viewChannel" class="hidden"><div id="chBody"></div></div>
+
   <div id="viewAccount" class="hidden">
     <section class="card c12" style="max-width:560px;margin:0 auto">
       <h3 style="margin:0 0 4px;font-size:16px">👤 내 계정</h3>
@@ -947,6 +956,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
           <option value="DRM">DRM</option>
           <option value="DLP">DLP</option>
         </select></div>
+        <div><label>판매 채널</label><select id="nChannel"><option>일반</option><option>공공</option><option>LGU+</option><option>에스원</option><option>유통</option></select></div>
         <div><label>파트너 *</label><select id="nPtn"><option>직접(계산서)</option><option>다원티에스</option><option>글로웰시스템</option><option>에티버스</option></select></div>
         <div><label>계산서 발행처</label><input id="nBiller" placeholder="예: 엘림넷"></div>
         <div><label>계약 구분</label><select id="nType"><option>신규</option><option>재약정</option></select></div>
@@ -1506,7 +1516,7 @@ function buildFromRes(res){
       _id:c.id, line:c.line, ind:cu.industry||'미분류', cust:cu.name||'?',
       partner:c.biller||'미지정', ptn:c.partner||'직접(계산서)',
       ctype:c.contract_type||'', status:c.status||'', note:c.note||'',
-      churn:c.churn_reason||'', saleType:c.sale_type||'', ver:c.version||'', csm:c.csm||'',
+      churn:c.churn_reason||'', saleType:c.sale_type||'', ver:c.version||'', csm:c.csm||'', channel:c.channel||'일반',
       startIdx:c.start_month? dIdx(c.start_month): first,
       endIdx:c.end_month? dIdx(c.end_month): last,
       dataFirst:first, dataLast:last,
@@ -3680,6 +3690,7 @@ var GRIDS={
     cols:[
       {k:'_custName',l:'고객사',ro:true},
       {k:'line',l:'서비스',t:'select',opts:LINE_OPTS,fmt:function(v){return lline(v);}},
+      {k:'channel',l:'판매 채널',t:'select',opts:['일반','공공','LGU+','에스원','유통']},
       {k:'partner',l:'파트너',t:'select',opts:PTN_OPTS},
       {k:'biller',l:'발행처'},
       {k:'contract_type',l:'구분'},
@@ -3755,6 +3766,7 @@ var GRIDS={
   },
   orders:{
     title:'장비 요청 내역', table:'equipment_orders',
+    chipsField:'channel', chipsOpts:['에스원','LGU+','공공','기타'],
     cap:'발주·교체·회수 요청의 상태 관리 (설치완료/회수완료 시 자산 자동 반영) · 신규 신청은 도구 › 장비 신청', add:true, del:true,
     rows:function(){ return RAWX.orders||[]; },
     cols:[
@@ -3778,6 +3790,7 @@ var GRIDS={
   },
   assets:{
     title:'장비 자산 (시리얼 단위)', table:'equipment_assets',
+    chipsField:'channel', chipsOpts:['에스원','LGU+','공공','기타'],
     cap:'발주 상태를 「설치완료」로 바꾸면 자동 임대중, 「회수완료」면 자동 회수완료 처리됩니다', add:true, del:true,
     rows:function(){ return RAWX.assets||[]; },
     cols:[
@@ -4003,6 +4016,80 @@ function renderBizEditor(host, months){
   };
 }
 
+/* ---- 사업 영역(판매 채널) 화면 ---- */
+var CH_DEFS={
+  chgen:['🤝 일반 판매','일반','파트너(다원티에스·글로웰시스템·에티버스) 경유 + 예외적 직판'],
+  chpub:['🏛 공공','공공','공공 사업 영역'],
+  chlgu:['📶 LGU+','LGU+','LGU+ 경유 판매'],
+  chs1:['🔒 에스원','에스원','에스원(S1) 채널 — S1 Cloud NAC · S1 MDR'],
+  chdist:['📀 유통','유통','블루문소프트 DLP·DRM 등 유통 사업']
+};
+function chOf(r){ return r.channel||'일반'; }
+function renderChannelView(key){
+  var def=CH_DEFS[key], ch=def[1];
+  var host=$('#chBody');
+  var list=[]; DATA.rows.forEach(function(r,k){ if(chOf(r)===ch) list.push(k); });
+  var b=STATE.base;
+  var mrr=monthlyTotal(list,b);
+  var act=0, custs={};
+  list.forEach(function(k){ if(MAT[k][b]>0){ act++; custs[DATA.rows[k].cust]=1; } });
+  var hasEq=['공공','LGU+','에스원'].indexOf(ch)>=0;
+  var pendEq=0, rentEq=0;
+  if(hasEq){
+    (RAWX.orders||[]).forEach(function(o){ if(o.channel===ch && ['접수','출하요청','배송중','회수예정'].indexOf(o.status)>=0) pendEq++; });
+    (RAWX.assets||[]).forEach(function(a){ if(a.channel===ch && a.status==='임대중') rentEq++; });
+  }
+  function tile(k2,v2,u2,d2){ return '<div class="kpi"><div class="k">'+k2+'</div><div class="v">'+v2+'<small>'+u2+'</small></div><div class="d">'+(d2||'')+'</div></div>'; }
+  var h='<div style="display:flex;align-items:baseline;gap:12px;margin:2px 2px 14px">'+
+    '<span style="font-size:18px;font-weight:800">'+def[0]+' 사업 영역</span>'+
+    '<span class="mini">'+esc(def[2])+' · '+baseLabel()+' 기준</span></div>';
+  h+='<div class="kpis" style="margin-bottom:16px">'+
+    tile('당월 MRR', won(mrr), '원', '연환산 '+won(mrr*12)+'원')+
+    tile('활성 계약', act.toLocaleString('ko-KR'), '건', '전체 이력 '+list.length+'건')+
+    tile('고객사', Object.keys(custs).length.toLocaleString('ko-KR'), '곳', '당월 매출 기준')+
+    (hasEq? tile('임대중 장비', rentEq, '대', pendEq? '처리 대기 요청 '+pendEq+'건':'대기 요청 없음')
+          : tile('비중', (monthlyTotal(idxs(),b)? (mrr/monthlyTotal(idxs(),b)*100).toFixed(1):'0')+'%','','전체 당월 매출 대비'))+
+    '</div>';
+  h+='<div class="grid">';
+  h+='<section class="card c12"><h2>월별 매출 추이</h2><p class="cap">최근 24개월 · '+esc(def[0].replace(/^\S+ /,''))+'</p><div class="chartbox h260" id="chvTrend"></div></section>';
+  h+='<section class="card c12"><h2>계약 목록</h2><p class="cap" id="chvCtCap"></p><div class="tbl-wrap" style="max-height:420px"><table id="chvCt"></table></div></section>';
+  if(ch==='LGU+' && DATA.lg && DATA.lg.ok){
+    h+='<section class="card c12"><h2>LG 판매 참고 목록</h2><p class="cap">'+DATA.lg.count+'건 · 월액 합계 '+won(DATA.lg.feeSum)+'원 · 매출은 각 서비스에 포함</p>'+
+       '<div class="tbl-wrap" style="max-height:320px"><table id="chvLg"></table></div></section>';
+  }
+  h+='</div>';
+  host.innerHTML=h;
+
+  // 추이 차트
+  var from=Math.max(0,b-23), labels=[], data=[];
+  for(var j=from;j<=b;j++){ labels.push(mk(j)); data.push(monthlyTotal(list,j)); }
+  try{
+    Viz.lines($('#chvTrend'),{labels:labels,series:[{label:def[1],data:data,color:cssv('--s1')}],fmt:won,tipFmt:wonFull,fill:true});
+  }catch(e){ $('#chvTrend').innerHTML='<p class="cap">데이터가 없습니다</p>'; }
+
+  // 계약 테이블
+  var rows=list.map(function(k){ return DATA.rows[k]; })
+    .sort(function(a,b2){ return (b2.mrr||0)-(a.mrr||0); });
+  $('#chvCtCap').textContent=rows.length+'건 · MRR 큰 순 (상위 200)';
+  var t=$('#chvCt');
+  t.innerHTML='<thead><tr><th>고객사</th><th>서비스</th><th>파트너</th><th>기간</th><th style="text-align:right">MRR</th><th>상태</th></tr></thead>'+
+    '<tbody>'+rows.slice(0,200).map(function(r){
+      return '<tr><td><b>'+esc(r.cust)+'</b></td><td>'+lline(r.line)+'</td><td>'+esc(r.ptn)+'</td>'+
+        '<td class="mini">'+(mk(r.startIdx)||'?')+' ~ '+(mk(r.endIdx)||'?')+'</td>'+
+        '<td style="text-align:right">'+won(r.mrr||0)+'원</td><td class="mini">'+esc(r.status||'활성')+'</td></tr>';
+    }).join('')+'</tbody>';
+
+  // LG 참고 목록
+  if(ch==='LGU+' && DATA.lg && DATA.lg.ok){
+    var lt=$('#chvLg');
+    lt.innerHTML='<thead><tr><th>고객사</th><th>제품</th><th style="text-align:right">노드</th><th>기간</th><th style="text-align:right">월액</th></tr></thead>'+
+      '<tbody>'+DATA.lg.rows.map(function(x){
+        return '<tr><td>'+esc(x.cust)+'</td><td>'+esc(x.prod)+'</td><td style="text-align:right">'+(x.nodes||'-')+'</td>'+
+          '<td class="mini">'+(x.start||'-')+' ~ '+(x.end||'무약정')+'</td><td style="text-align:right">'+won(x.fee)+'원</td></tr>';
+      }).join('')+'</tbody>';
+  }
+}
+
 /* ---- 내 계정 ---- */
 var ROLE_INFO={
   admin:     ['관리자','모든 데이터 조회·수정과 계정 관리가 가능합니다.'],
@@ -4150,11 +4237,14 @@ function switchView(v){
     b.setAttribute('aria-current', b.dataset.v===v?'true':'false');
   });
   var dash=v==='dash', quote=v==='quote', onew=v==='ordernew', acct=v==='account';
+  var chv=CH_DEFS[v]||null;
   $('#viewDash').classList.toggle('hidden',!dash);
   $('#viewQuote').classList.toggle('hidden',!quote);
   $('#viewOrderNew').classList.toggle('hidden',!onew);
   $('#viewAccount').classList.toggle('hidden',!acct);
-  $('#viewData').classList.toggle('hidden',dash||quote||onew||acct);
+  $('#viewChannel').classList.toggle('hidden',!chv);
+  $('#viewData').classList.toggle('hidden',dash||quote||onew||acct||!!chv);
+  if(chv){ renderChannelView(v); return; }
   if(acct){ renderAccount(); return; }
   if(onew){
     msg('odMsg','');
@@ -4178,7 +4268,7 @@ function switchView(v){
       RAWX.log=rows||[]; renderGrid();
     });
   }
-  DV.page=0; DV.sortK=null; DV.sortDir=1;
+  DV.page=0; DV.sortK=null; DV.sortDir=1; DV.chipVal='';
   var g=GRIDS[v];
   $('#dvTitle').textContent=g.title;
   $('#dvCap').textContent=g.cap + (window.IS_VIEWER? ' · 조회 전용 계정입니다':'');
@@ -4230,6 +4320,7 @@ var DV={page:0, per:100, sortK:null, sortDir:1};
 function gridFilteredSorted(g){
   var q=($('#dvSearch').value||'').toLowerCase();
   var rows=g.rows().filter(function(r){
+    if(g.chipsField && DV.chipVal && String(r[g.chipsField]||'')!==DV.chipVal) return false;
     if(!q) return true;
     return g.cols.some(function(c){ return String(r[c.k]==null?'':r[c.k]).toLowerCase().indexOf(q)>=0; });
   });
@@ -4271,6 +4362,25 @@ function exportCsv(){
 function renderGrid(){
   var g=GRIDS[CUR_VIEW]; if(!g) return;
   var isCustom=!!g.custom;
+  // 채널 칩 필터
+  var cb=document.getElementById('dvChipBar');
+  if(!cb){
+    cb=document.createElement('div'); cb.id='dvChipBar';
+    cb.style.cssText='display:none;gap:8px;flex-wrap:wrap;margin-bottom:10px';
+    var bar=$('#dvSearch').parentElement; bar.parentElement.insertBefore(cb,bar);
+  }
+  if(g.chipsField && !isCustom){
+    cb.style.display='flex'; cb.innerHTML='';
+    ['전체'].concat(g.chipsOpts).forEach(function(op){
+      var v=(op==='전체')? '':op;
+      var btn=document.createElement('button');
+      btn.className='pill'+(DV.chipVal===v||(!DV.chipVal&&!v)?'':' ghost');
+      if(DV.chipVal===v||(!DV.chipVal&&!v)){ btn.style.background='var(--brand,#149e40)'; btn.style.borderColor='var(--brand,#149e40)'; btn.style.color='#fff'; }
+      btn.textContent=op;
+      btn.onclick=function(){ DV.chipVal=v; DV.page=0; renderGrid(); };
+      cb.appendChild(btn);
+    });
+  } else cb.style.display='none';
   ['dvSearch','dvCsv'].forEach(function(id){ $('#'+id).style.display=isCustom?'none':''; });
   $('#dvPager').style.display=isCustom?'none':'';
   if(isCustom){ g.custom(); return; }
@@ -4629,6 +4739,7 @@ async function saveEdit(){
       var cid=await ensureCustomer(cust, $('#nInd').value);
       var ct=await sbWrite('POST','contracts?select=id',[{
         customer_id:cid, line:$('#nLine').value, partner:$('#nPtn').value,
+        channel:$('#nChannel').value,
         biller:$('#nBiller').value.trim()||null, contract_type:$('#nType').value,
         note:$('#nNote').value.trim()||null,
         start_month:idxDate(s0), end_month:idxDate(e0),
@@ -4679,6 +4790,13 @@ async function saveEdit(){
 }
 
 function setupEdit(){
+  var nl=document.getElementById('nLine');
+  if(nl) nl.addEventListener('change',function(){
+    var v=this.value, c=document.getElementById('nChannel');
+    if(!c) return;
+    if(v==='S1'||v==='MDR_S1') c.value='에스원';
+    else if(v==='DRM'||v==='DLP') c.value='유통';
+  });
   $('#btnEdit').onclick=function(){
     // 자동완성 목록 채우기
     var dl=$('#dlCust'); dl.innerHTML='';
