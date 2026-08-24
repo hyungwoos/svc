@@ -883,12 +883,31 @@
     // 화면에 보여줄 "서비스 선택" 목록은 선택한 견적 종류에 따라 달라집니다.
     let activePricingDB = pricingDB;
     function selectQuoteType(type) {
+        var prevType = window.currentQuoteType;
         window.currentQuoteType = type;
         activePricingDB = (type === 'public') ? publicPricingDB : pricingDB;
         document.getElementById('quoteTypeOverlay').style.display = 'none';
         document.getElementById('quoteTypeBadge').innerText = (type === 'public') ? '[공공용]' : '[기업용]';
+        if (window.__quoteInit) {
+            // 재진입(포탈 메뉴 재클릭) 후 종류 재선택:
+            // 같은 종류면 작성 중이던 내용 유지, 다른 종류면 품목 표를 새 종류 기준으로 초기화
+            if (prevType !== type) {
+                document.querySelector('#itemTable tbody').innerHTML = '';
+                addRow();
+                if (typeof calcAll === 'function') calcAll();
+            }
+            return;
+        }
+        window.__quoteInit = true;
         initAppAfterTypeSelected();
     }
+    // 포탈 좌측 메뉴에서 「견적 시스템」을 다시 누르면 종류 선택 화면을 다시 띄운다
+    window.addEventListener('message', function (ev) {
+        if (ev && ev.data && ev.data.type === 'quoteReset') {
+            var ovl = document.getElementById('quoteTypeOverlay');
+            if (ovl) ovl.style.display = 'flex';
+        }
+    });
     async function initAppAfterTypeSelected() {
         loadGithubConfigFromStorage();   // onload 이전에 진입해도 저장된 접속 비밀번호를 먼저 읽는다
         populateManagerSelect();
