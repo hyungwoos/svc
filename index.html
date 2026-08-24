@@ -516,6 +516,55 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
 .qw-btn{border:1px solid var(--ring);background:transparent;border-radius:8px;width:26px;height:26px;
   cursor:pointer;color:var(--muted);font-size:12px;flex:none}
 .qw-btn:hover{color:var(--ink);border-color:var(--axis)}
+
+/* ==================================================================
+   모바일 반응형 (≤760px) — 드로어 사이드바 · 1열 폼 · 표 스와이프
+   ================================================================== */
+#btnMenu{display:none}
+#sideDim{position:fixed;inset:0;background:rgba(0,0,0,.42);z-index:145;display:none;
+  -webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px)}
+#sideDim.on{display:block}
+@media (max-width:760px){
+  body{padding-left:0}
+  /* 사이드바 → 좌측 슬라이드 드로어 */
+  .side{position:fixed;left:0;top:0;bottom:0;width:250px;z-index:150;
+    flex-direction:column;flex-wrap:nowrap;border-right:1px solid var(--ring);border-bottom:0;
+    border-radius:0 18px 18px 0;padding:18px 12px;background:var(--surface);overflow:auto;
+    transform:translateX(-105%);transition:transform .22s ease;
+    box-shadow:none}
+  .side.open{transform:none;box-shadow:16px 0 60px rgba(0,0,0,.3)}
+  .side.hidden{display:none}
+  .side .logo,.side .grp{display:block}
+  .side button{padding:12px 12px;font-size:13.5px}   /* 터치 타깃 확대 */
+  #btnMenu{display:inline-flex}
+  /* 상단바 */
+  .wrap{padding:12px 12px 60px}
+  .topbar{margin:-12px -12px 14px;padding:10px 12px;gap:7px}
+  .brand h1{font-size:15px}
+  .brand .sub,.live{display:none}
+  #btnWidgets{display:none!important}
+  .pill{height:32px;padding:0 11px;font-size:11.5px}
+  /* 대시보드 */
+  #dashHero{padding:16px;border-radius:16px}
+  .ask{padding:14px 12px 12px}
+  .ask-ico{display:none}
+  .hero{font-size:31px}
+  .kpi{padding:12px 13px}
+  .kpi .v{font-size:21px}
+  .filters{position:static;box-shadow:none}
+  /* 폼: 두 열 → 한 열 */
+  .frm{grid-template-columns:1fr}
+  /* iOS 포커스 자동확대 방지: 입력 필드는 16px */
+  .frm input,.frm select,#q,.dbar input[type="search"],#viewLogin input{height:42px;font-size:16px}
+  /* 데이터 화면: 검색창은 한 줄 전체 사용 */
+  .dbar input[type="search"]{min-width:0;flex:1 1 100%;width:100%}
+  .card{padding:14px}
+  /* 모달·토스트 */
+  .ovl{padding:2vh 8px}
+  .modal{padding:16px 14px;max-height:94vh}
+  #toasts{left:12px;right:12px;top:10px}
+  .toast{max-width:none;width:100%;min-width:0}
+}
 </style>
 </head>
 <body>
@@ -589,10 +638,12 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
   <div class="grp">계정</div>
   <button data-v="account">👤 내 계정</button>
 </nav>
+<div id="sideDim"></div>
 
 <div class="wrap hidden" id="app">
 
   <div class="topbar">
+    <button class="pill ghost" id="btnMenu" aria-label="메뉴">☰</button>
     <div class="brand">
       <h1>서비스사업부 통합 관리 포탈</h1>
       <span class="sub" id="periodLabel"></span>
@@ -4249,10 +4300,16 @@ async function submitOrder(){
   btn.disabled=false;
 }
 
+function closeDrawer(){ $('#side').classList.remove('open'); $('#sideDim').classList.remove('on'); }
 function setupSide(){
   $('#side').querySelectorAll('button').forEach(function(b){
-    b.onclick=function(){ switchView(this.dataset.v); };
+    b.onclick=function(){ switchView(this.dataset.v); closeDrawer(); };
   });
+  $('#btnMenu').onclick=function(){
+    var open=$('#side').classList.toggle('open');
+    $('#sideDim').classList.toggle('on', open);
+  };
+  $('#sideDim').onclick=closeDrawer;
   $('#dvSearch').oninput=function(){ DV.page=0; renderGrid(); };
   $('#dvAdd').onclick=function(){
     if(CUR_VIEW==='orders'){ openOrderForm(); return; }
