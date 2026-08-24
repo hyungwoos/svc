@@ -4358,7 +4358,11 @@ function switchView(v){
   }
   if(quote){
     var fr=$('#quoteFrame');
-    if(!fr.src) fr.src='quote.html';
+    if(!fr.src){ fr.src='quote.html'; }
+    else{
+      // 메뉴를 다시 누르면 견적 종류(기업/공공)를 다시 고를 수 있게
+      try{ fr.contentWindow.postMessage({type:'quoteReset'},'*'); }catch(e){}
+    }
     return;
   }
   if(dash){
