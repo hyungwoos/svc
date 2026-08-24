@@ -938,7 +938,15 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
       <div class="frm">
         <div><label>고객사 *</label><input id="nCust" list="dlCust" placeholder="기존 고객이면 자동완성"><datalist id="dlCust"></datalist></div>
         <div><label>산업군</label><select id="nInd"><option>기업</option><option>공공</option><option>금융</option><option>의료</option><option>미분류</option></select></div>
-        <div><label>서비스 *</label><select id="nLine"><option>Cloud</option><option>S1</option><option>MDR</option><option>PNS</option><option>MDR_S1</option></select></div>
+        <div><label>서비스 *</label><select id="nLine">
+          <option value="Cloud">Cloud NAC</option>
+          <option value="S1">S1 Cloud NAC</option>
+          <option value="MDR">MDR</option>
+          <option value="MDR_S1">S1 MDR</option>
+          <option value="PNS">PNS</option>
+          <option value="DRM">DRM</option>
+          <option value="DLP">DLP</option>
+        </select></div>
         <div><label>파트너 *</label><select id="nPtn"><option>직접(계산서)</option><option>다원티에스</option><option>글로웰시스템</option><option>에티버스</option></select></div>
         <div><label>계산서 발행처</label><input id="nBiller" placeholder="예: 엘림넷"></div>
         <div><label>계약 구분</label><select id="nType"><option>신규</option><option>재약정</option></select></div>
@@ -4189,7 +4197,8 @@ function editCell(c,v){
   if(c.t==='select'){
     var opts=typeof c.opts==='function'? c.opts():c.opts;
     return '<select data-k="'+c.k+'">'+opts.map(function(o){
-      return '<option'+(String(v)===o?' selected':'')+'>'+o+'</option>';}).join('')+'</select>';
+      var lb=(c.k==='line')? lline(o) : o;
+      return '<option value="'+esc(o)+'"'+(String(v)===o?' selected':'')+'>'+esc(lb)+'</option>';}).join('')+'</select>';
   }
   if(c.t==='bool') return '<input type="checkbox" data-k="'+c.k+'"'+(v?' checked':'')+'>';
   var ty=c.t==='month'?'month':c.t==='date'?'date':c.t==='number'?'number':'text';
