@@ -149,6 +149,8 @@ td select{height:30px;font-size:12px;width:auto;min-width:96px}
     </div>
     <div class="grp">— 배송 관련 정보 —</div>
     <div class="frm">
+      <div class="full"><label>수령처 빠른 선택 (선택하면 아래가 자동 입력됩니다)</label>
+        <select id="odRecvPick"><option value="">— 직접 입력 —</option></select></div>
       <div class="full"><label>수령 주소</label><input id="odRecvAddr"></div>
       <div><label>수령인 성명</label><input id="odRecvName"></div>
       <div><label>수령인 연락처</label><input id="odRecvPhone"></div>
@@ -286,7 +288,34 @@ async function load(){
   catch(e){ ORDERS=[]; }
   try{ ASSETS=await api('GET','equipment_assets?select=*&order=serial.asc&limit=2000'); }
   catch(e){ ASSETS=[]; }
+  loadRecvPresets();
   render(); renderAssets();
+}
+
+/* ---- 수령처 프리셋 ---- */
+var RECV_PRESETS=null;
+async function loadRecvPresets(){
+  if(RECV_PRESETS) return;
+  var rows=null;
+  try{ rows=await api('GET','recv_presets?select=*&order=sort'); }catch(e){}
+  if(!rows || !rows.length) return;
+  RECV_PRESETS=rows;
+  var sel=$('#odRecvPick');
+  sel.innerHTML='<option value="">— 직접 입력 —</option>';
+  var groups={};
+  rows.forEach(function(r){
+    if(!groups[r.grp]){ groups[r.grp]=document.createElement('optgroup'); groups[r.grp].label=r.grp; sel.appendChild(groups[r.grp]); }
+    var o=document.createElement('option'); o.value=r.id; o.textContent=r.name;
+    groups[r.grp].appendChild(o);
+  });
+  sel.onchange=function(){
+    var v=this.value;
+    var r=(RECV_PRESETS||[]).filter(function(x){ return String(x.id)===v; })[0];
+    if(!r) return;
+    $('#odRecvAddr').value=r.addr||'';
+    $('#odRecvName').value=(r.name||'').replace(/\s*\(.*\)$/,'').replace(/\s(부장|차장|과장|대리|사원|팀장)$/,'');
+    $('#odRecvPhone').value=r.phone||'';
+  };
 }
 
 /* ---- 자산 자동 동기화 ---- */
