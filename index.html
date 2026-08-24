@@ -843,6 +843,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
       </div>
       <div style="font-size:11px;color:var(--ink-2);opacity:.75;margin:14px 0 10px">— 배송 관련 정보 —</div>
       <div class="frm">
+        <div class="full"><label>수령처 빠른 선택 (선택하면 아래 배송 정보가 자동 입력됩니다)</label>
+          <select id="odRecvPick"><option value="">— 직접 입력 —</option></select></div>
         <div class="full"><label>수령 주소</label><input id="odRecvAddr"></div>
         <div><label>수령인 성명</label><input id="odRecvName"></div>
         <div><label>수령인 연락처</label><input id="odRecvPhone"></div>
@@ -4039,6 +4041,33 @@ async function renderAccount(){
   box.appendChild(tip);
 }
 
+/* ---- 수령처 프리셋 (DB recv_presets · 로그인 필요) ---- */
+var RECV_PRESETS=null;
+function loadRecvPresets(){
+  if(RECV_PRESETS) return;
+  sbTry('recv_presets?select=*&order=sort').then(function(rows){
+    if(!rows || !rows.length) return;
+    RECV_PRESETS=rows;
+    var sel=$('#odRecvPick'); if(!sel) return;
+    sel.innerHTML='<option value="">— 직접 입력 —</option>';
+    var groups={};
+    rows.forEach(function(r){
+      if(!groups[r.grp]){ groups[r.grp]=document.createElement('optgroup'); groups[r.grp].label=r.grp; sel.appendChild(groups[r.grp]); }
+      var o=document.createElement('option');
+      o.value=r.id; o.textContent=r.name+(r.grp!=='지니언스'&&r.grp!=='본사(서울)'? '':'');
+      groups[r.grp].appendChild(o);
+    });
+    sel.onchange=function(){
+      var v=this.value;
+      var r=(RECV_PRESETS||[]).filter(function(x){ return String(x.id)===v; })[0];
+      if(!r) return;
+      $('#odRecvAddr').value=r.addr||'';
+      $('#odRecvName').value=(r.name||'').replace(/\s*\(.*\)$/,'').replace(/\s(부장|차장|과장|대리|사원|팀장)$/,'');
+      $('#odRecvPhone').value=r.phone||'';
+    };
+  });
+}
+
 function openOrderForm(){ switchView('ordernew'); }
 async function submitOrder(){
   var cust=$('#odCustomer').value.trim(), mgr=$('#odMgr').value.trim();
@@ -4120,6 +4149,7 @@ function switchView(v){
     msg('odMsg','');
     $('#odFormWrap').style.display='';
     $('#odDone').style.display='none';
+    loadRecvPresets();
     setTimeout(function(){ $('#odCustomer').focus(); },50);
     return;
   }
