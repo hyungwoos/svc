@@ -1237,8 +1237,11 @@ function won(v){
 function wonFull(v){ return Math.round(v).toLocaleString('ko-KR')+'원'; }
 function pct(v){ return (v>0?'+':'')+v.toFixed(1)+'%'; }
 function mk(i){ return DATA.monthKeys[i]||''; }
-var LINE_LABEL={Cloud:'Cloud NAC', S1:'S1 Cloud NAC', MDR:'MDR', MDR_S1:'S1 MDR', PNS:'PNS', DRM:'DRM', DLP:'DLP'};
+var LINE_LABEL={Cloud:'Cloud NAC', S1:'S1 Cloud NAC', MDR:'MDR', MDR_S1:'S1 MDR', PNS:'PNS', DRM:'DRM', DLP:'DLP',
+  'Cloud NAC':'Cloud NAC', 'SSL PNS':'PNS'};
 function lline(l){ return LINE_LABEL[l]||l; }
+// LIVE 시트 원문 표기 → 표준 코드
+var LIVE2CODE={'Cloud NAC':'Cloud','S1':'S1','MDR':'MDR','SSL PNS':'PNS','PNS':'PNS','DRM':'DRM','DLP':'DLP','MDR_S1':'MDR_S1','Cloud':'Cloud'};
 function qOfIdx(i){ return Math.ceil(monOf(i)/3); }
 function baseRange(){ // 현재 단위 기준 [시작, 끝] 월 인덱스 (끝 = STATE.base)
   var b=STATE.base;
@@ -1405,7 +1408,7 @@ async function sbTry(q){ try{ return await sbAll(q); }catch(e){ return null; } }
 function shapeLive(rows){
   if(!rows||!rows.length) return null;
   var out=rows.map(function(r){ return {ind:r.industry||'미분류',cust:r.name,key:r.mss_key||'',
-    prod:r.product||'미분류',line:r.line||'',nodes:Number(r.nodes)||0,
+    prod:r.product||'미분류',line:(LIVE2CODE[String(r.line||'').trim()]||r.line||''),nodes:Number(r.nodes)||0,
     start:sbYm(r.start_month),end:sbYm(r.end_month),churnMon:sbYm(r.churn_month),dup:!!r.dup}; });
   var uq={},uqND={};
   out.forEach(function(x){ uq[x.cust]=1; if(!x.dup)uqND[x.cust]=1; });
@@ -2529,7 +2532,7 @@ function renderExpiring(list){
       var mrr=MAT[k][Math.min(r.endIdx,M-1)]||r.mrr||0;
       var cls = left<=1? 'b-churn' : left<=3? 'b-warn' : 'b-end';
       return '<tr><td>'+mk(r.endIdx)+'</td><td><span class="badge '+cls+'">'+left+'개월</span></td>'+
-        '<td>'+r.line+'</td><td>'+r.ind+'</td><td><b>'+esc(r.cust)+'</b></td><td>'+esc(r.partner)+'</td>'+
+        '<td>'+lline(r.line)+'</td><td>'+r.ind+'</td><td><b>'+esc(r.cust)+'</b></td><td>'+esc(r.partner)+'</td>'+
         '<td>'+esc(r.ctype||'-')+'</td><td>'+statusBadge(r)+'</td>'+
         '<td class="n">'+won(mrr)+'</td><td class="n">'+won(r.total)+'</td></tr>';
     }).join('') : '<tr><td colspan="10" class="mini" style="padding:16px">해당 기간에 만료되는 계약이 없습니다.</td></tr>')+'</tbody>';
@@ -2563,7 +2566,7 @@ function renderAllTable(list){
   var body='<tbody>'+rows.map(function(k){
     var r=DATA.rows[k];
     return '<tr>'+
-      '<td>'+r.line+'</td><td>'+esc(r.ind)+'</td><td><b>'+esc(r.cust)+'</b>'+(r.csm?' <span class="mini">'+esc(r.csm)+'</span>':'')+'</td>'+
+      '<td>'+lline(r.line)+'</td><td>'+esc(r.ind)+'</td><td><b>'+esc(r.cust)+'</b>'+(r.csm?' <span class="mini">'+esc(r.csm)+'</span>':'')+'</td>'+
       '<td>'+esc(r.partner)+'</td><td>'+esc(r.ctype||'-')+'</td><td>'+statusBadge(r)+'</td>'+
       '<td class="n">'+(r.startIdx!=null?mk(r.startIdx):'-')+'</td><td class="n">'+(r.endIdx!=null?mk(r.endIdx):'-')+'</td>'+
       '<td class="n">'+(r.term||'-')+'</td><td class="n">'+won(r.mrr)+'</td><td class="n">'+won(r.total)+'</td><td class="n">'+won(r.sum)+'</td></tr>';
@@ -3468,10 +3471,10 @@ function computeFromP(p){
       title:(sc0.length? sc0.join(' · ')+' · ':'')+'LIVE 고객사 탭 기준',
       hero: sel.length.toLocaleString('ko-KR'), unit:'건',
       sub: '고객사 '+Object.keys(uq).length+'곳 (중복 제외 '+Object.keys(uqND).length+'곳)'+(nodes? ' · 노드 '+nodes.toLocaleString('ko-KR')+'개':''),
-      chart:{type:'bar', labels:arr0.map(function(x){return x[0];}),
+      chart:{type:'bar', labels:arr0.map(function(x){return lline(x[0]);}),
              series:[{label:useInd?'산업군':'제품군', data:arr0.map(function(x){return x[1];}), color:cssv('--s1')}], money:false},
       table:{cols:[useInd?'산업군':'제품군','건수','비중'],
-             rows:arr0.map(function(x){return [x[0], x[1]+'건', (x[1]/sel.length*100).toFixed(1)+'%'];})},
+             rows:arr0.map(function(x){return [lline(x[0]), x[1]+'건', (x[1]/sel.length*100).toFixed(1)+'%'];})},
       note:'LIVE 고객사 탭을 그대로 셉니다 (사이트 단위). 기간이나 파트너를 지정하면 월별 금액 기준으로 계산합니다.'
     };
   }
@@ -3696,7 +3699,7 @@ var GRIDS={
       {k:'industry',l:'산업군',t:'select',opts:IND_OPTS},
       {k:'name',l:'고객사',req:true},
       {k:'product',l:'제품군'},
-      {k:'line',l:'서비스',t:'select',opts:LINE_OPTS},
+      {k:'line',l:'서비스',t:'select',opts:LINE_OPTS,fmt:function(v){return lline(v);}},
       {k:'nodes',l:'노드',t:'number'},
       {k:'start_month',l:'시작월',t:'month'},
       {k:'end_month',l:'종료월',t:'month'},
@@ -4566,7 +4569,7 @@ function setupAuth(){
 
 /* ---- 계약 검색 위젯 ---- */
 function ctLabel(r){
-  return r.cust+' · '+r.line+' · '+(mk(r.startIdx)||'?')+'~'+(mk(r.endIdx)||'?')+' · '+won(r.mrr||0)+'원';
+  return r.cust+' · '+lline(r.line)+' · '+(mk(r.startIdx)||'?')+'~'+(mk(r.endIdx)||'?')+' · '+won(r.mrr||0)+'원';
 }
 function setupPick(inputId, pickId, store){
   var inp=$('#'+inputId), box=$('#'+pickId);
@@ -4577,7 +4580,7 @@ function setupPick(inputId, pickId, store){
       return r.cust.toLowerCase().indexOf(q)>=0;
     }).slice(0,30).forEach(function(r){
       var it=el('div','pi');
-      it.innerHTML='<span>'+esc(r.cust)+' <small>'+r.line+' · '+(r.status||'활성')+'</small></span>'+
+      it.innerHTML='<span>'+esc(r.cust)+' <small>'+lline(r.line)+' · '+(r.status||'활성')+'</small></span>'+
                    '<small>'+(mk(r.startIdx)||'?')+'~'+(mk(r.endIdx)||'?')+' · '+won(r.mrr||0)+'원</small>';
       it.onclick=function(){
         store.sel=r;
