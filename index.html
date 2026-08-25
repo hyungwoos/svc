@@ -372,6 +372,8 @@ body{padding-left:192px}
 .mtabs button[aria-pressed="true"]{background:var(--s1);border-color:var(--s1);color:#fff}
 .frm{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px}
 .frm .full{grid-column:1/-1}
+.mpchk{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:550;cursor:pointer;padding:7px 12px;border:1px solid var(--ring);border-radius:10px;background:var(--surface-2)}
+.mpchk input{width:16px;height:16px;accent-color:var(--brand,#149e40)}
 .frm label{display:block;font-size:11.5px;color:var(--ink-2);margin-bottom:4px}
 .frm input,.frm select,.frm textarea{width:100%;height:36px;padding:0 10px;border-radius:9px;border:1px solid var(--ring);
   background:var(--surface-2);color:var(--ink);font-size:13px;font-family:inherit;outline:none}
@@ -630,6 +632,9 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
   <div class="grp">정산·목표</div>
   <button data-v="biz">⚖️ 비즈포탈 차액</button>
   <button data-v="targets">🎯 연간 목표</button>
+  <div class="grp">MDR POC</div>
+  <button data-v="mdrnew">🛡️ POC 신청</button>
+  <button data-v="mdrpoc">📋 POC 신청 내역</button>
   <div class="grp">도구</div>
   <button data-v="ordernew">📝 장비 신청</button>
   <button data-v="quote">📄 견적 시스템</button>
@@ -920,6 +925,59 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
         <button class="btn" style="height:38px;padding:0 28px" id="odGo">발주 신청</button>
       </div>
       </div><!-- /odFormWrap -->
+    </section>
+  </div>
+
+  <div id="viewMdrNew" class="hidden">
+    <section class="card c12" style="max-width:860px;margin:0 auto">
+      <h3 style="margin:0 0 4px;font-size:16px">🛡️ EDR+MDR POC 신청</h3>
+      <p class="cap" style="margin:0 0 16px">저장하면 DB에 기록되고 슬랙으로 자동 통보됩니다. 진행 현황은 「POC 신청 내역」에서 확인하세요.</p>
+      <div id="mpDone" style="display:none;text-align:center;padding:34px 10px 22px">
+        <div style="width:66px;height:66px;margin:0 auto 16px;border-radius:50%;background:rgba(12,163,12,.12);display:flex;align-items:center;justify-content:center;font-size:30px;color:var(--good,#0ca30c)">✓</div>
+        <div style="font-size:17.5px;font-weight:750;letter-spacing:-.01em">POC 신청이 접수되었습니다</div>
+        <p class="cap" id="mpDoneSum" style="margin:10px 0 4px;font-size:12.5px"></p>
+        <p class="cap" style="margin:0 0 22px">슬랙 채널로 자동 통보되었습니다</p>
+        <div style="display:flex;gap:10px;justify-content:center">
+          <button class="pill" id="mpDoneList" style="background:var(--s1);border-color:var(--s1);color:#fff">📋 신청 내역 보기</button>
+          <button class="pill ghost" id="mpDoneNew">＋ 새 신청 작성</button>
+        </div>
+      </div>
+      <div id="mpFormWrap">
+      <div style="font-size:11px;color:var(--ink-2);opacity:.75;margin:2px 0 10px">— 고객 정보 —</div>
+      <div class="frm">
+        <div class="full"><label>회사명 *</label><input id="mpCompany"></div>
+        <div><label>고객 담당자 이름 *</label><input id="mpMgr"></div>
+        <div><label>고객 연락처</label><input id="mpPhone" placeholder="010-0000-0000"></div>
+        <div class="full"><label>고객 담당자 이메일</label><input id="mpEmail" type="email"></div>
+        <div class="full"><label>단말 및 서버 수량</label><input id="mpDev" placeholder="예: PC 100대 / 서버 5대"></div>
+      </div>
+      <div style="font-size:11px;color:var(--ink-2);opacity:.75;margin:16px 0 8px">— 적용 예정 모듈 —</div>
+      <div style="display:flex;gap:18px;flex-wrap:wrap;padding:2px 0 2px">
+        <label class="mpchk"><input id="mpEdr" type="checkbox" checked> EDR+MDR</label>
+        <label class="mpchk"><input id="mpAv" type="checkbox"> 안티바이러스</label>
+        <label class="mpchk"><input id="mpRansom" type="checkbox"> 안티랜섬웨어</label>
+        <label class="mpchk"><input id="mpMedia" type="checkbox"> 매체제어</label>
+      </div>
+      <div style="font-size:11px;color:var(--ink-2);opacity:.75;margin:16px 0 10px">— 운영체제별 설치 수량 —</div>
+      <div class="frm">
+        <div><label>Windows</label><input id="mpWin" type="number" min="0" placeholder="0"></div>
+        <div><label>Linux</label><input id="mpLinux" type="number" min="0" placeholder="0"></div>
+        <div><label>MacOS</label><input id="mpMac" type="number" min="0" placeholder="0"></div>
+        <div><label>NAC 사용여부</label><select id="mpNac"><option>사용X</option><option>사용</option></select></div>
+        <div class="full"><label>EDR Web UI 접속 계정용 이메일 주소</label><input id="mpWebui" type="email"></div>
+      </div>
+      <div style="font-size:11px;color:var(--ink-2);opacity:.75;margin:16px 0 10px">— 신청 정보 —</div>
+      <div class="frm">
+        <div><label>영업담당자</label><input id="mpSales"></div>
+        <div><label>영업담당자 연락처</label><input id="mpSalesPh" placeholder="010-0000-0000"></div>
+        <div><label>신청일자</label><input id="mpDate" type="date"></div>
+        <div class="full"><label>요청사항 / 비고</label><input id="mpNote" placeholder="예: 특정 기간 희망, 사전 협의 사항"></div>
+      </div>
+      <div class="mact" style="margin-top:16px">
+        <span class="mmsg" id="mpMsg"></span>
+        <button class="btn" style="height:38px;padding:0 28px" id="mpGo">POC 신청</button>
+      </div>
+      </div><!-- /mpFormWrap -->
     </section>
   </div>
 
@@ -1514,7 +1572,7 @@ async function loadFromDb(){
       var res0=[
         j.customers, j.contracts,
         (j.mrs||[]).map(function(a){ return {contract_id:a[0], month:a[1], amount:a[2]}; }),
-        j.live, j.lg, j.biz, j.targets, j.orders, j.roles, j.assets
+        j.live, j.lg, j.biz, j.targets, j.orders, j.roles, j.assets, j.mdrpoc
       ];
       try{ sessionStorage.setItem(CACHE_KEY, JSON.stringify({t:Date.now(), res:res0})); }catch(e){}
       return buildFromRes(res0);
@@ -1530,7 +1588,8 @@ async function loadFromDb(){
     sbTry('targets?select=*&order=year'),
     sbTry('equipment_orders?select=*&order=id.desc'),
     sbTry('user_roles?select=role'),
-    sbTry('equipment_assets?select=*&order=serial')
+    sbTry('equipment_assets?select=*&order=serial'),
+    sbTry('mdr_poc_requests?select=*&order=id.desc')
   ]);
   try{ sessionStorage.setItem(CACHE_KEY, JSON.stringify({t:Date.now(), res:res})); }catch(e){}
   return buildFromRes(res);
@@ -1547,7 +1606,7 @@ function buildFromRes(res){
   var custs=res[0], cts=res[1], mrs=res[2];
   var LIVE=shapeLive(res[3]), LGD=shapeLg(res[4]), VSD=shapeVs(res[5]);
   window.RAWX={customers:custs, contracts:cts, live:res[3]||[], lg:res[4]||[], biz:res[5]||[],
-    targets:res[6]||[], orders:res[7]||[], assets:res[9]||[], log:null, mrs:mrs};
+    targets:res[6]||[], orders:res[7]||[], assets:res[9]||[], mdrpoc:res[10]||[], log:null, mrs:mrs};
   window.IS_VIEWER = !!(res[8] && res[8].length && res[8][0].role==='viewer');
   window.MY_ROLE = (res[8] && res[8].length && res[8][0].role) || '';
   SB_RAW.customers=custs; SB_RAW.contracts=cts;
@@ -3852,6 +3911,34 @@ var GRIDS={
       {k:'note',l:'메모'}
     ]
   },
+  mdrpoc:{
+    title:'MDR POC 신청 내역', table:'mdr_poc_requests',
+    chipsField:'status', chipsOpts:['접수','진행중','완료','취소'],
+    cap:'EDR+MDR POC 신청 접수 현황 · 신규 신청은 MDR POC › POC 신청', add:true, del:true,
+    rows:function(){ return RAWX.mdrpoc||[]; },
+    cols:[
+      {k:'created_at',l:'신청일',ro:true,fmt:function(v){return String(v||'').slice(0,10);}},
+      {k:'company',l:'회사명',req:true},
+      {k:'mgr_name',l:'고객 담당자'},
+      {k:'mgr_phone',l:'연락처'},
+      {k:'mgr_email',l:'고객 이메일'},
+      {k:'device_count',l:'단말·서버 수량'},
+      {k:'mod_edr',l:'EDR+MDR',t:'bool',fmt:function(v){return v?'O':'X';}},
+      {k:'mod_av',l:'백신',t:'bool',fmt:function(v){return v?'O':'X';}},
+      {k:'mod_ransom',l:'랜섬웨어',t:'bool',fmt:function(v){return v?'O':'X';}},
+      {k:'mod_media',l:'매체제어',t:'bool',fmt:function(v){return v?'O':'X';}},
+      {k:'os_win',l:'Windows',t:'number'},
+      {k:'os_linux',l:'Linux',t:'number'},
+      {k:'os_mac',l:'MacOS',t:'number'},
+      {k:'webui_email',l:'WebUI 계정'},
+      {k:'nac_use',l:'NAC',t:'select',opts:['사용X','사용']},
+      {k:'sales_name',l:'영업담당'},
+      {k:'sales_phone',l:'영업 연락처'},
+      {k:'apply_date',l:'신청일자',t:'date'},
+      {k:'status',l:'상태',t:'select',opts:['접수','진행중','완료','취소']},
+      {k:'note',l:'비고'}
+    ]
+  },
   orders:{
     title:'장비 요청 내역', table:'equipment_orders',
     chipsField:'channel', chipsOpts:['에스원','LGU+','공공','일반','기타'],
@@ -4302,6 +4389,48 @@ async function submitOrder(){
   btn.disabled=false;
 }
 
+async function submitMdrPoc(){
+  var comp=$('#mpCompany').value.trim(), mgr=$('#mpMgr').value.trim();
+  if(!comp||!mgr){ msg('mpMsg','회사명과 고객 담당자 이름은 필수입니다','bad'); return; }
+  var btn=$('#mpGo'); btn.disabled=true; msg('mpMsg','접수 중…');
+  try{
+    var row={
+      requester: AUTH_USER||null,
+      company: comp,
+      mgr_name: mgr,
+      mgr_phone: $('#mpPhone').value.trim()||null,
+      mgr_email: $('#mpEmail').value.trim()||null,
+      device_count: $('#mpDev').value.trim()||null,
+      mod_edr: $('#mpEdr').checked,
+      mod_av: $('#mpAv').checked,
+      mod_ransom: $('#mpRansom').checked,
+      mod_media: $('#mpMedia').checked,
+      os_win: $('#mpWin').value===''? null : +$('#mpWin').value,
+      os_linux: $('#mpLinux').value===''? null : +$('#mpLinux').value,
+      os_mac: $('#mpMac').value===''? null : +$('#mpMac').value,
+      webui_email: $('#mpWebui').value.trim()||null,
+      nac_use: $('#mpNac').value,
+      sales_name: $('#mpSales').value.trim()||null,
+      sales_phone: $('#mpSalesPh').value.trim()||null,
+      apply_date: $('#mpDate').value||null,
+      note: $('#mpNote').value.trim()||null,
+      status:'접수'
+    };
+    var out=await sbWrite('POST','mdr_poc_requests?select=*',[row],'return=representation');
+    RAWX.mdrpoc=RAWX.mdrpoc||[]; RAWX.mdrpoc.unshift(out[0]);
+    logChange('insert','mdr_poc_requests',out[0].id,{company:comp,mgr:mgr});
+    msg('mpMsg','');
+    var mods=[row.mod_edr?'EDR+MDR':'',row.mod_av?'백신':'',row.mod_ransom?'랜섬웨어':'',row.mod_media?'매체제어':''].filter(Boolean).join('·');
+    $('#mpDoneSum').textContent=[comp, mgr, row.device_count||'', mods].filter(Boolean).join(' · ');
+    $('#mpFormWrap').style.display='none';
+    $('#mpDone').style.display='';
+    toast('POC 신청 접수 완료', comp+' · '+(mods||'모듈 미선택'));
+    ['mpCompany','mpMgr','mpPhone','mpEmail','mpDev','mpWin','mpLinux','mpMac','mpWebui','mpSales','mpSalesPh','mpNote'].forEach(function(i){ $('#'+i).value=''; });
+    $('#mpEdr').checked=true; ['mpAv','mpRansom','mpMedia'].forEach(function(i){ $('#'+i).checked=false; });
+  }catch(e){ msg('mpMsg',String(e.message||e),'bad'); }
+  btn.disabled=false;
+}
+
 function closeDrawer(){ $('#side').classList.remove('open'); $('#sideDim').classList.remove('on'); }
 function setupSide(){
   $('#side').querySelectorAll('button').forEach(function(b){
@@ -4318,6 +4447,9 @@ function setupSide(){
     gridAddRow();
   };
   $('#odGo').onclick=submitOrder;
+  $('#mpGo').onclick=submitMdrPoc;
+  $('#mpDoneList').onclick=function(){ switchView('mdrpoc'); };
+  $('#mpDoneNew').onclick=function(){ $('#mpDone').style.display='none'; $('#mpFormWrap').style.display=''; $('#mpCompany').focus(); };
   $('#odDoneList').onclick=function(){ switchView('orders'); };
   $('#odDoneNew').onclick=function(){ $('#odDone').style.display='none'; $('#odFormWrap').style.display=''; $('#odCustomer').focus(); };
   $('#btnLogout').onclick=doLogout;
@@ -4332,20 +4464,21 @@ function setupSide(){
 }
 
 function switchView(v){
-  if(v==='ordernew' && !SB_TOKEN){ openOvl('ovlAuth'); return; }
+  if((v==='ordernew'||v==='mdrnew') && !SB_TOKEN){ openOvl('ovlAuth'); return; }
   if(window.IS_EQUIP && !EQUIP_VIEWS[v]) v='orders';   // 장비 전용 계정은 장비 화면만
   CUR_VIEW=v;
   $('#side').querySelectorAll('button').forEach(function(b){
     b.setAttribute('aria-current', b.dataset.v===v?'true':'false');
   });
-  var dash=v==='dash', quote=v==='quote', onew=v==='ordernew', acct=v==='account';
+  var dash=v==='dash', quote=v==='quote', onew=v==='ordernew', acct=v==='account', mnew=v==='mdrnew';
   var chv=CH_DEFS[v]||null;
   $('#viewDash').classList.toggle('hidden',!dash);
   $('#viewQuote').classList.toggle('hidden',!quote);
   $('#viewOrderNew').classList.toggle('hidden',!onew);
+  $('#viewMdrNew').classList.toggle('hidden',!mnew);
   $('#viewAccount').classList.toggle('hidden',!acct);
   $('#viewChannel').classList.toggle('hidden',!chv);
-  $('#viewData').classList.toggle('hidden',dash||quote||onew||acct||!!chv);
+  $('#viewData').classList.toggle('hidden',dash||quote||onew||mnew||acct||!!chv);
   if(chv){ renderChannelView(v); return; }
   if(acct){ renderAccount(); return; }
   if(onew){
@@ -4354,6 +4487,15 @@ function switchView(v){
     $('#odDone').style.display='none';
     loadRecvPresets();
     setTimeout(function(){ $('#odCustomer').focus(); },50);
+    return;
+  }
+  if(mnew){
+    msg('mpMsg','');
+    $('#mpFormWrap').style.display='';
+    $('#mpDone').style.display='none';
+    if(!$('#mpDate').value) $('#mpDate').value=new Date().toISOString().slice(0,10);
+    if(!$('#mpSales').value && AUTH_USER) $('#mpSales').value='';
+    setTimeout(function(){ $('#mpCompany').focus(); },50);
     return;
   }
   if(quote){
