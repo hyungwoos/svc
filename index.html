@@ -1572,13 +1572,30 @@ function shapeLg(rows){
 }
 function shapeVs(rows){
   if(!rows||!rows.length) return null;
-  var items=[],details=[],ym='',asOf='';
+  // 여러 달이 들어있으면 «가장 최근 달» 만 대시보드에 보여줍니다 (과거는 정산·목표 › 비즈포탈 차액에서)
+  function mNum(r){
+    var m=String(r.ym||'').match(/(\d+)/);
+    var n=m? +m[1] : 0;
+    var y=String(r.as_of||'').slice(0,4);
+    return (y? +y*100 : 0) + n;                    // 연도+월 로 비교
+  }
+  var best=null, bestKey=-1, bestId=-1;
   rows.forEach(function(r){
-    ym=r.ym||ym; asOf=r.as_of? String(r.as_of).slice(0,10):asOf;
+    var k=mNum(r), id=Number(r.id)||0;
+    if(k>bestKey || (k===bestKey && id>bestId)){ bestKey=k; bestId=id; best=r.ym||''; }
+  });
+  var pick=rows.filter(function(r){ return (r.ym||'')===best; });
+  if(!pick.length) pick=rows;
+
+  var items=[],details=[],ym=best||'',asOf='';
+  pick.forEach(function(r){
+    if(r.as_of) asOf=String(r.as_of).slice(0,10);
     if(r.kind==='sum') items.push({k:r.item,v:Number(r.biz)||0});
     else details.push({cust:r.item,biz:Number(r.biz)||0,sheet:Number(r.sheet)||0,diff:Number(r.diff)||0,note:r.note||''});
   });
-  return {ok:true,asOf:asOf,month:ym,items:items,details:details};
+  return {ok:true,asOf:asOf,month:ym,items:items,details:details,monthCount:(function(){
+    var seen={},n=0; rows.forEach(function(r){ if(r.ym&&!seen[r.ym]){seen[r.ym]=1;n++;} }); return n;
+  })()};
 }
 
 var CACHE_KEY='svc_cache_v1';
@@ -2251,9 +2268,11 @@ var WIDGET_DEFS=[
   ['kpi','KPI 카드'], ['goal','연간 목표 진행'], ['mx','월별 종합 장표'],
   ['trend','MRR 추이'], ['year','연도별 매출'], ['line','서비스별 MRR'],
   ['ptn','파트너 실적'], ['ind','산업군'], ['nc','신규·해지 고객수'],
-  ['churn','해지·중지 사유'], ['exp','계약 만료 예정'], ['lg','LG 판매'],
+  ['churn','해지·중지 사유'], ['exp','계약 만료 예정'],
   ['vs','비즈포탈 차액'], ['all','계약 목록']
 ];
+// 기본으로 꺼둘 위젯 (설정에서 켜면 켜집니다)
+var WIDGET_OFF_DEFAULT={vs:1};
 function widgetKey(){ return 'svc_widgets_'+(AUTH_USER||'anon'); }
 function widgetPrefs(){
   try{ return JSON.parse(localStorage.getItem(widgetKey())||'{}')||{}; }catch(e){ return {}; }
@@ -2264,12 +2283,19 @@ function widgetEl(k){
   if(k==='hero') return $('#dashHero');
   return document.querySelector('[data-w="'+k+'"]');
 }
+function widgetOn(k, off){
+  // 저장된 설정이 있으면 그걸 따르고, 없으면 기본값(WIDGET_OFF_DEFAULT) 적용
+  if(off && Object.prototype.hasOwnProperty.call(off,k)) return off[k]!==false;
+  return !WIDGET_OFF_DEFAULT[k];
+}
 function applyWidgets(){
   var off=widgetPrefs();
   WIDGET_DEFS.forEach(function(d){
     var el=widgetEl(d[0]); if(!el) return;
-    el.classList.toggle('w-off', off[d[0]]===false);
+    el.classList.toggle('w-off', !widgetOn(d[0], off));
   });
+  var lg=document.querySelector('[data-w="lg"]');   // LG 판매 위젯은 대시보드에서 제외
+  if(lg) lg.style.display='none';
 }
 function toggleWidgetPanel(){
   var p=document.getElementById('widgetPanel');
@@ -2281,7 +2307,7 @@ function toggleWidgetPanel(){
   var h='<div style="font-size:12.5px;font-weight:700;margin-bottom:10px">⊞ 대시보드 위젯</div>';
   WIDGET_DEFS.forEach(function(d){
     h+='<label style="display:flex;gap:8px;align-items:center;padding:4px 0;font-size:12.5px;cursor:pointer">'+
-       '<input type="checkbox" data-wk="'+d[0]+'" '+(off[d[0]]===false?'':'checked')+' style="width:15px;height:15px"> '+esc(d[1])+'</label>';
+       '<input type="checkbox" data-wk="'+d[0]+'" '+(widgetOn(d[0],off)?'checked':'')+' style="width:15px;height:15px"> '+esc(d[1])+'</label>';
   });
   var qws=qwList();
   if(qws.length){
@@ -2414,7 +2440,8 @@ function renderVs(){
   var vs=DATA.vs, sec=$('#secVs');
   if(!vs || !vs.ok || (!vs.items.length && !vs.details.length)){ if(sec) sec.style.display='none'; return; }
   sec.style.display='';
-  $('#capVs').textContent = (vs.month? vs.month+' 기준':'')+(vs.asOf? ' · 작성일 '+vs.asOf:'');
+  $('#capVs').textContent = (vs.month? vs.month+' 기준':'')+(vs.asOf? ' · 작성일 '+vs.asOf:'')+
+    (vs.monthCount>1? ' · 최근 달만 표시 (전체는 정산·목표 › 비즈포탈 차액)':'');
   var sm=$('#vsSummary'); sm.innerHTML='';
   vs.items.forEach(function(x){
     var row=el('div'); row.style.cssText='display:flex;justify-content:space-between;gap:12px;padding:3px 2px;font-size:13px';
