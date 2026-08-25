@@ -2771,30 +2771,44 @@ var LINE_ALIAS=[
 var AICFG = {enabled:false, narrate:true, maskNames:true, model:''};
 var HIST = [];
 
+function aiEndpoint(){ return SB_URL + '/functions/v1/ask'; }
+async function aiFetch(payload){
+  var r=await fetch(aiEndpoint(),{
+    method:'POST',
+    headers:{'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+(SB_TOKEN||'')},
+    body:JSON.stringify(payload)
+  });
+  var j=null; try{ j=await r.json(); }catch(e){}
+  if(!r.ok) throw new Error((j&&j.error)||('HTTP '+r.status));
+  return j;
+}
 function loadAiConfig(){
   var badge=$('#aiBadge');
-  if(typeof google==='undefined' || !google.script || !google.script.run){
+  if(!SB_TOKEN){
     badge.className='ai-badge'; badge.textContent='규칙형';
-    badge.title='데모 모드에서는 내장 규칙형 해석기로 동작합니다.'; return;
+    badge.title='로그인하면 AI 질문을 사용할 수 있습니다.';
+    AICFG.enabled=false; return;
   }
-  google.script.run.withSuccessHandler(function(c){
-    AICFG=c||AICFG;
-    if(AICFG.enabled){
-      badge.className='ai-badge on';
-      var VIA = {vertex:'회사 Google Cloud', claude:'Claude API', openai:'OpenAI API', key:'Gemini API 키'};
-      var via = VIA[AICFG.mode] || 'API 키';
-      badge.innerHTML='<span class="d"></span>AI 연결됨';
-      badge.title=(AICFG.model||'')+' · '+via+
-        (AICFG.mode==='vertex'? ' ('+AICFG.project+' / '+AICFG.location+')' : '')+
-        '\n· 금액 계산은 전부 시트에서 직접 수행합니다'+
-        '\n· AI 해설: '+(AICFG.narrate?'켜짐':'꺼짐')+
-        '\n· 고객명 마스킹: '+(AICFG.maskNames?'켜짐':'꺼짐');
-      $('#q').placeholder='아무렇게나 물어보세요 — 예: 요즘 클라우드 좀 어때? 제일 큰 고객 누구야? 곧 재약정 챙겨야 할 데 있어?';
-    } else {
+  badge.className='ai-badge'; badge.textContent='AI 확인 중…';
+  // 가벼운 호출로 중계 함수(ask) 연결 여부만 확인합니다
+  aiFetch({mode:'ping'}).then(function(){ aiOn(badge); })
+    .catch(function(e){
+      var m=String(e.message||e);
+      if(/질문이 비어/.test(m)){ aiOn(badge); return; }   // 함수는 살아있음 = 연결 OK
+      AICFG.enabled=false;
       badge.className='ai-badge'; badge.textContent='규칙형 (AI 미연결)';
-      badge.title='시트 메뉴 [📊 매출 대시보드 › AI 질문 켜기]에서 회사 Google Cloud 또는 API 키를 연결하면 자유로운 문장으로 물어볼 수 있습니다.';
-    }
-  }).withFailureHandler(function(){ badge.className='ai-badge'; badge.textContent='규칙형'; }).getAiConfig();
+      badge.title='Claude 연결이 없어 내장 규칙형으로 동작합니다.\n'+m;
+    });
+}
+function aiOn(badge){
+  AICFG.enabled=true;
+  badge.className='ai-badge on';
+  badge.innerHTML='<span class="d"></span>AI 연결됨';
+  badge.title='Claude API · 중계: Supabase Edge Function (ask)'+
+    '\n· 금액 계산은 전부 포탈이 DB 원본으로 직접 수행합니다'+
+    '\n· AI 해설: '+(AICFG.narrate?'켜짐':'꺼짐')+
+    '\n· 고객명 마스킹: '+(AICFG.maskNames?'켜짐':'꺼짐');
+  $('#q').placeholder='아무렇게나 물어보세요 — 예: 요즘 클라우드 좀 어때? 제일 큰 고객 누구야? 곧 재약정 챙겨야 할 데 있어?';
 }
 
 function setAsking(on){
@@ -2815,10 +2829,10 @@ function ask(q){
     churnReasons: uniq(function(r){return r.churn;}).slice(0,20),
     history: HIST.slice(-3)
   };
-  google.script.run
-    .withSuccessHandler(function(r){ setAsking(false); onPlan(q,r); })
-    .withFailureHandler(function(e){ setAsking(false); localAnswer(q,'AI 호출에 실패해 내장 규칙으로 답했습니다. ('+String(e&&e.message||e).slice(0,120)+')'); })
-    .aiPlan(q, ctx);
+  ctx.channels = uniq(function(r){ return r.channel; }).slice(0,10);
+  aiFetch({mode:'plan', question:q, ctx:ctx})
+    .then(function(r){ setAsking(false); onPlan(q,r); })
+    .catch(function(e){ setAsking(false); localAnswer(q,'AI 호출에 실패해 내장 규칙으로 답했습니다. ('+String(e&&e.message||e).slice(0,120)+')'); });
 }
 
 function localAnswer(q, note){
@@ -2888,13 +2902,12 @@ function requestNarrate(q, plan, res){
     } : null,
     unit:'원(KRW)', note:'미래 월은 계약상 예정 금액'
   };
-  google.script.run
-    .withSuccessHandler(function(x){
+  aiFetch({mode:'narrate', payload:payload})
+    .then(function(x){
       if(x && x.ok && x.text){ box.className='ai-comment on'; box.innerHTML='<span class="lb">AI 코멘트</span>'+esc(x.text); }
       else box.className='ai-comment';
     })
-    .withFailureHandler(function(){ box.className='ai-comment'; })
-    .aiNarrate(payload);
+    .catch(function(){ box.className='ai-comment'; });
 }
 
 /* ---- 이름 매칭 (표기 흔들림·오타 허용) ---- */
@@ -2967,13 +2980,15 @@ function planToP(plan){
   (plan.lines||[]).forEach(function(s){ var v=valid[String(s).toLowerCase()]; if(v && p.lines.indexOf(v)<0) p.lines.push(v); });
 
   if(plan.industry==='기업'||plan.industry==='공공') p.ind=plan.industry;
+  var CHOK={'일반':1,'공공':1,'LGU+':1,'에스원':1,'유통':1};
+  p.channels=(plan.channels||[]).map(String).filter(function(c){ return CHOK[c]; });
   p.partners=resolveMany(plan.partners,'partner');
   p.custs=resolveMany(plan.customers,'cust');
   p.partner=p.partners[0]||null; p.cust=p.custs[0]||null;
   p.statuses=(plan.statuses||[]).filter(function(s){ return ['신규','재약정','서비스 종료','해지'].indexOf(s)>=0; });
 
   var g=String(plan.groupBy||'none');
-  if(['partner','ind','line','cust','month','year','churn','status'].indexOf(g)>=0) p.groupBy=g;
+  if(['partner','ind','line','cust','month','year','churn','status','channel'].indexOf(g)>=0) p.groupBy=g;
   if(plan.topN>0) p.topN=Math.min(50, plan.topN|0);
   if(plan.horizonMonths>0) p.horizon=Math.min(60, plan.horizonMonths|0);
 
@@ -3419,6 +3434,7 @@ function rowFilter(p){
     if(p.custs && p.custs.length){ if(p.custs.indexOf(r.cust)<0) return false; }
     else if(p.cust && r.cust!==p.cust) return false;
     if(p.statuses && p.statuses.length && p.statuses.indexOf(statusOf(r))<0) return false;
+    if(p.channels && p.channels.length && p.channels.indexOf(r.channel||'일반')<0) return false;
     return true;
   });
 }
@@ -3431,6 +3447,7 @@ function scopeText(p){
   if(p.months.length) t.push(p.months.join(',')+'월');
   if(p.lines.length) t.push(p.lines.join('+'));
   if(p.ind) t.push(p.ind);
+  if(p.channels && p.channels.length) t.push(p.channels.join('+'));
   if(p.relN) t.push('최근 '+p.relN+'개월');
   if(p.from!=null && p.to!=null) t.push(mk(Math.max(0,p.from))+'~'+mk(Math.min(M-1,p.to)));
   if(p.partners && p.partners.length) t.push('파트너 '+p.partners.join('+'));
@@ -3677,9 +3694,9 @@ function computeFromP(p){
         table:{cols:['사유','건수'],rows:g2.map(function(x){return [x.name,x.v+'건'];})}, note:'' };
     }
     var jsel = mf, agg={};
-    var fld2 = gb2==='partner'? 'ptn' : gb2==='biller'? 'partner' : gb2;
+    var fld2 = gb2==='partner'? 'ptn' : gb2==='biller'? 'partner' : gb2;   // channel 은 r.channel 사용
     list.forEach(function(k){
-      var r=DATA.rows[k], g=r[fld2]||'미지정', a=MAT[k], s=0;
+      var r=DATA.rows[k], g=r[fld2]||(fld2==='channel'?'일반':'미지정'), a=MAT[k], s=0;
       if(jsel){ jsel.forEach(function(j){ s+=a[j]; }); } else { s+=a[STATE.base]; }
       if(s) agg[g]=(agg[g]||0)+s;
     });
@@ -3765,7 +3782,7 @@ function computeFromP(p){
     note: js2? '' : '기간을 지정하지 않아 기준월 기준으로 답했습니다. "2025년" 처럼 연도를 넣으면 합계로 계산합니다.'
   };
 }
-function gbLabel(k){ return {partner:'파트너',biller:'계산서 발행처',ind:'산업군',line:'서비스',cust:'고객사',churn:'해지 사유',month:'월',year:'연도'}[k]||k; }
+function gbLabel(k){ return {partner:'파트너',biller:'계산서 발행처',ind:'산업군',line:'서비스',cust:'고객사',churn:'해지 사유',month:'월',year:'연도',channel:'사업 영역',status:'계약 상태'}[k]||k; }
 
 function showAnswer(q,res){
   $('#answer').classList.add('on');
