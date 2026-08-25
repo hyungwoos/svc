@@ -1613,7 +1613,7 @@ async function loadFromDb(){
       var res0=[
         j.customers, j.contracts,
         (j.mrs||[]).map(function(a){ return {contract_id:a[0], month:a[1], amount:a[2]}; }),
-        j.live, j.lg, j.biz, j.targets, j.orders, j.roles, j.assets, j.mdrpoc
+        j.live, j.lg, j.biz, j.targets, j.orders, j.roles, j.assets, j.mdrpoc, j.mtargets
       ];
       try{ sessionStorage.setItem(CACHE_KEY, JSON.stringify({t:Date.now(), res:res0})); }catch(e){}
       return buildFromRes(res0);
@@ -1630,7 +1630,8 @@ async function loadFromDb(){
     sbTry('equipment_orders?select=*&order=id.desc'),
     sbTry('user_roles?select=role'),
     sbTry('equipment_assets?select=*&order=serial'),
-    sbTry('mdr_poc_requests?select=*&order=id.desc')
+    sbTry('mdr_poc_requests?select=*&order=id.desc'),
+    sbTry('monthly_targets?select=*&order=year,month')
   ]);
   try{ sessionStorage.setItem(CACHE_KEY, JSON.stringify({t:Date.now(), res:res})); }catch(e){}
   return buildFromRes(res);
@@ -1647,7 +1648,7 @@ function buildFromRes(res){
   var custs=res[0], cts=res[1], mrs=res[2];
   var LIVE=shapeLive(res[3]), LGD=shapeLg(res[4]), VSD=shapeVs(res[5]);
   window.RAWX={customers:custs, contracts:cts, live:res[3]||[], lg:res[4]||[], biz:res[5]||[],
-    targets:res[6]||[], orders:res[7]||[], assets:res[9]||[], mdrpoc:res[10]||[], log:null, mrs:mrs};
+    targets:res[6]||[], orders:res[7]||[], assets:res[9]||[], mdrpoc:res[10]||[], mtargets:res[11]||[], log:null, mrs:mrs};
   window.IS_VIEWER = !!(res[8] && res[8].length && res[8][0].role==='viewer');
   window.MY_ROLE = (res[8] && res[8].length && res[8][0].role) || '';
   SB_RAW.customers=custs; SB_RAW.contracts=cts;
@@ -4355,6 +4356,9 @@ function renderBizMonthly(){
   }
   host.appendChild(bar);
 
+  // ── 월 목표 대비 달성률 ─────────────────────────────
+  renderTargetTable(host, rows);
+
   if(!BIZV.ym){
     var em=document.createElement('p'); em.className='cap';
     em.textContent='아직 입력된 달이 없습니다. 「＋ 새 달 입력」으로 시작하세요.';
@@ -4394,6 +4398,145 @@ function renderBizMonthly(){
     dt.innerHTML=db+'</tbody>';
     host.appendChild(dt);
   }
+}
+
+/* ---- 월 목표 대비 달성률 (비즈포탈 회계매출 · 매출시트 매출 두 기준) ---- */
+function bizYear(rows){
+  var y='';
+  (rows||[]).forEach(function(r){ if(r.as_of) y=String(r.as_of).slice(0,4); });
+  return +(y || new Date().getFullYear());
+}
+function bizMonthNum(ym){ var m=String(ym||'').match(/(\d+)/); return m? +m[1] : 0; }
+function bizPick(rows, ym, re){
+  var hit=(rows||[]).filter(function(r){ return r.ym===ym && r.kind==='sum' && re.test(r.item||''); })[0];
+  return hit? Number(hit.biz)||0 : null;
+}
+function renderTargetTable(host, rows){
+  var year=BIZV.year||bizYear(rows);
+  BIZV.year=year;
+  var tg={};
+  (RAWX.mtargets||[]).forEach(function(t){ if(+t.year===year) tg[+t.month]=Number(t.amount)||0; });
+
+  var box=document.createElement('section');
+  box.style.cssText='margin-bottom:22px;padding-bottom:18px;border-bottom:1px solid var(--ring)';
+
+  var hd=document.createElement('div');
+  hd.style.cssText='display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px';
+  hd.innerHTML='<b style="font-size:14px">🎯 '+year+'년 월 목표 대비 달성률</b>'+
+    '<span class="cap" style="margin:0">목표는 연초 기준 · 달성률 = 성과 ÷ 목표</span>';
+  if(!window.IS_VIEWER){
+    var sp=document.createElement('span'); sp.style.flex='1'; hd.appendChild(sp);
+    var be=document.createElement('button'); be.className='pill'; be.textContent='✎ 월 목표 입력';
+    be.onclick=function(){ if(!SB_TOKEN){openOvl('ovlAuth');return;} openTargetEditor(year); };
+    hd.appendChild(be);
+  }
+  box.appendChild(hd);
+
+  var t=document.createElement('table'); t.className='dgrid';
+  var h='<thead><tr><th>구분</th><th style="text-align:right">목표</th>'+
+        '<th style="text-align:right">비즈포탈 회계매출</th><th style="text-align:right">달성률</th>'+
+        '<th style="text-align:right">매출시트 매출</th><th style="text-align:right">달성률</th></tr></thead><tbody>';
+
+  function pct(v, base){
+    if(!base) return '<td style="text-align:right;color:var(--muted)">·</td>';
+    var r=v/base*100;
+    var c = r>=100? 'var(--good,#0ca30c)' : (r>=95? 'var(--warning,#fab219)' : 'var(--critical,#d03b3b)');
+    return '<td style="text-align:right;font-weight:650;color:'+c+'">'+r.toFixed(1)+'%</td>';
+  }
+  function money(v){ return v==null? '·' : Number(v).toLocaleString('ko-KR'); }
+
+  var accT=0, accB=0, accS=0, qT=0, qB=0, qS=0;
+  for(var m=1;m<=12;m++){
+    var ym=m+'월';
+    var bz=bizPick(rows, ym, /비즈포탈\s*회계매출/);
+    var sh=bizPick(rows, ym, /^매출시트\s*매출$/) ;
+    if(sh==null) sh=bizPick(rows, ym, /매출시트\s*매출/);
+    var tgt=tg[m]||0;
+    if(!tgt && bz==null && sh==null) continue;
+
+    h+='<tr><td>'+m+'월</td><td style="text-align:right">'+money(tgt||null)+'</td>'+
+       '<td style="text-align:right">'+money(bz)+'</td>'+(bz!=null? pct(bz,tgt):'<td style="text-align:right;color:var(--muted)">·</td>')+
+       '<td style="text-align:right">'+money(sh)+'</td>'+(sh!=null? pct(sh,tgt):'<td style="text-align:right;color:var(--muted)">·</td>')+'</tr>';
+
+    if(tgt>0){                                  // 목표가 있는 달만 누계에 포함
+      accT+=tgt; accB+=(bz||0); accS+=(sh||0);
+      qT+=tgt;   qB+=(bz||0);   qS+=(sh||0);
+    }
+    if(m%3===0 && qT>0){
+      h+='<tr style="background:var(--surface-2);font-weight:650"><td>'+(m/3)+'Q 누계</td>'+
+         '<td style="text-align:right">'+money(qT)+'</td><td style="text-align:right">'+money(qB)+'</td>'+pct(qB,qT)+
+         '<td style="text-align:right">'+money(qS)+'</td>'+pct(qS,qT)+'</tr>';
+      qT=0; qB=0; qS=0;
+    }
+    if(m===6 && accT){
+      h+='<tr style="background:var(--surface-2);font-weight:700"><td>상반기(1H)</td>'+
+         '<td style="text-align:right">'+money(accT)+'</td><td style="text-align:right">'+money(accB)+'</td>'+pct(accB,accT)+
+         '<td style="text-align:right">'+money(accS)+'</td>'+pct(accS,accT)+'</tr>';
+    }
+  }
+  if(accT){
+    h+='<tr style="border-top:2px solid var(--axis);font-weight:750"><td>누계</td>'+
+       '<td style="text-align:right">'+money(accT)+'</td><td style="text-align:right">'+money(accB)+'</td>'+pct(accB,accT)+
+       '<td style="text-align:right">'+money(accS)+'</td>'+pct(accS,accT)+'</tr>';
+  }
+  t.innerHTML=h+'</tbody>';
+  box.appendChild(t);
+
+  if(!accT){
+    var p0=document.createElement('p'); p0.className='cap'; p0.style.marginTop='8px';
+    p0.textContent='월 목표가 없습니다. 「✎ 월 목표 입력」으로 넣으면 달성률이 계산됩니다.';
+    box.appendChild(p0);
+  }
+  host.appendChild(box);
+}
+
+/* ---- 월 목표 입력 ---- */
+function openTargetEditor(year){
+  var tg={};
+  (RAWX.mtargets||[]).forEach(function(t){ if(+t.year===year) tg[+t.month]=Number(t.amount)||0; });
+  var ovl=document.createElement('div'); ovl.className='ovl on'; ovl.id='ovlTarget';
+  var rowsHtml='';
+  for(var m=1;m<=12;m++){
+    rowsHtml+='<div><label>'+m+'월</label><input type="number" data-m="'+m+'" min="0" step="1000000" value="'+(tg[m]||'')+'"></div>';
+  }
+  ovl.innerHTML='<div class="modal" style="width:min(560px,100%)">'+
+    '<h3>'+year+'년 월 목표</h3>'+
+    '<p class="cap">연초에 정한 월별 목표 금액(원)을 넣으세요. 비워두면 그 달은 달성률을 계산하지 않습니다.</p>'+
+    '<div class="frm">'+rowsHtml+'</div>'+
+    '<div class="mact"><span class="mmsg" id="tgMsg" style="flex:1"></span>'+
+    '<button class="pill ghost" id="tgCancel">취소</button>'+
+    '<button class="pill" id="tgSave" style="background:var(--s1);border-color:var(--s1);color:#fff">저장</button></div></div>';
+  document.body.appendChild(ovl);
+  ovl.querySelector('#tgCancel').onclick=function(){ ovl.remove(); };
+  ovl.querySelector('#tgSave').onclick=async function(){
+    var btn=this; btn.disabled=true;
+    var msg=ovl.querySelector('#tgMsg'); msg.textContent='저장 중…';
+    try{
+      var payload=[];
+      ovl.querySelectorAll('input[data-m]').forEach(function(inp){
+        var v=inp.value===''? null : Number(inp.value);
+        if(v!=null) payload.push({year:year, month:+inp.dataset.m, amount:v});
+      });
+      if(payload.length){
+        await sbWrite('POST','monthly_targets?on_conflict=year,month',payload,'resolution=merge-duplicates');
+      }
+      // 비운 달은 삭제
+      var keep={}; payload.forEach(function(x){ keep[x.month]=1; });
+      var del=(RAWX.mtargets||[]).filter(function(t){ return +t.year===year && !keep[+t.month]; });
+      for(var i=0;i<del.length;i++){
+        await sbWrite('DELETE','monthly_targets?year=eq.'+year+'&month=eq.'+del[i].month);
+      }
+      // 화면은 방금 입력한 값으로 즉시 갱신 (재조회가 실패해도 값이 사라지지 않게)
+      RAWX.mtargets=(RAWX.mtargets||[]).filter(function(t){ return +t.year!==year; }).concat(payload);
+      try{
+        var fresh=await sbTry('monthly_targets?select=*&order=year,month');
+        if(fresh && fresh.length) RAWX.mtargets=fresh;
+      }catch(_){}
+      logChange('update','monthly_targets',year,{months:payload.length});
+      toast('월 목표 저장 완료', year+'년 '+payload.length+'개월');
+      ovl.remove(); renderBizMonthly();
+    }catch(e){ msg.textContent=String(e.message||e); btn.disabled=false; }
+  };
 }
 
 function renderBizEditor(host, months){
