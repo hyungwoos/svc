@@ -4430,13 +4430,15 @@ function gridFilteredSorted(g){
   var rows=g.rows().filter(function(r){
     if(g.chipsField && DV.chipVal && String(r[g.chipsField]||'')!==DV.chipVal) return false;
     if(!toks.length) return true;
+    // 열 안의 공백만 무시하고, 열 사이에는 경계 문자를 둬서
+    // 옆 열과 이어붙은 가짜 매칭(DRM+DRM→"MDR")을 막는다
     var hay='';
     g.cols.forEach(function(c){
       var v=r[c.k];
-      hay+=String(v==null?'':v)+' ';
-      if(c.fmt){ try{ hay+=String(c.fmt(v)==null?'':c.fmt(v))+' '; }catch(e){} }
+      hay+=String(v==null?'':v).replace(/\s+/g,'')+'';
+      if(c.fmt){ try{ var f=c.fmt(v); hay+=String(f==null?'':f).replace(/\s+/g,'')+''; }catch(e){} }
     });
-    hay=hay.toLowerCase().replace(/\s+/g,'');
+    hay=hay.toLowerCase();
     return toks.every(function(t){ return hay.indexOf(t.replace(/\s+/g,''))>=0; });
   });
   if(DV.sortK){
