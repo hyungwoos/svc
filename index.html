@@ -639,7 +639,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
   <button data-v="live">🟢 LIVE 고객사</button>
   <div class="grp">사업 영역</div>
   <button data-v="chgen">🤝 일반 판매</button>
-  <button data-v="chpub">🏛️ 공공</button>
+  <button data-v="chpub">🏛️ 조달</button>
   <button data-v="chlgu">📶 LGU+</button>
   <button data-v="chs1">🔒 에스원</button>
   <button data-v="chdist">📀 유통 (DLP·DRM)</button>
@@ -904,7 +904,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
       </div>
       <div id="odFormWrap">
       <div class="frm" style="margin-bottom:10px">
-        <div><label>판매 채널 *</label><select id="odChannel"><option>에스원</option><option>LGU+</option><option>공공</option><option>일반</option><option>기타</option></select></div>
+        <div><label>판매 채널 *</label><select id="odChannel"><option>에스원</option><option>LGU+</option><option>조달</option><option>일반</option><option>기타</option></select></div>
         <div><label>요청 유형 *</label><select id="odType"><option>신규발주</option><option>추가</option><option>교체(장애)</option><option>교체(증설)</option><option>철거·회수</option></select></div>
       </div>
       <div style="font-size:11px;color:var(--ink-2);opacity:.75;margin:6px 0 10px">— 신청자 정보 —</div>
@@ -1088,7 +1088,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
           <option value="DRM">DRM</option>
           <option value="DLP">DLP</option>
         </select></div>
-        <div><label>판매 채널</label><select id="nChannel"><option>일반</option><option>공공</option><option>LGU+</option><option>에스원</option><option>유통</option></select></div>
+        <div><label>판매 채널</label><select id="nChannel"><option>일반</option><option>조달</option><option>LGU+</option><option>에스원</option><option>유통</option></select></div>
         <div><label>파트너 *</label><select id="nPtn"><option>직접(계산서)</option><option>다원티에스</option><option>글로웰시스템</option><option>에티버스</option></select></div>
         <div><label>계산서 발행처</label><input id="nBiller" placeholder="예: 엘림넷"></div>
         <div><label>계약 구분</label><select id="nType"><option>신규</option><option>재약정</option></select></div>
@@ -3175,7 +3175,7 @@ function planToP(plan){
   (plan.lines||[]).forEach(function(s){ var v=valid[String(s).toLowerCase()]; if(v && p.lines.indexOf(v)<0) p.lines.push(v); });
 
   if(plan.industry==='기업'||plan.industry==='공공') p.ind=plan.industry;
-  var CHOK={'일반':1,'공공':1,'LGU+':1,'에스원':1,'유통':1};
+  var CHOK={'일반':1,'조달':1,'공공':1,'LGU+':1,'에스원':1,'유통':1};   // 공공은 옛 표기 호환
   p.channels=(plan.channels||[]).map(String).filter(function(c){ return CHOK[c]; });
   p.partners=resolveMany(plan.partners,'partner');
   p.custs=resolveMany(plan.customers,'cust');
@@ -4102,6 +4102,12 @@ var CUR_VIEW='dash', DIRTY=false;
 var LINE_OPTS=['Cloud','S1','MDR','PNS','MDR_S1','DRM','DLP'];
 var PTN_OPTS=['다원티에스','글로웰시스템','에티버스','직접(계산서)'];
 var IND_OPTS=['기업','공공','금융','의료','미분류'];
+/* 계약 관리 선택 목록 */
+var CH_OPTS=['일반','조달','LGU+','에스원','유통'];
+var CTYPE_OPTS=['신규','재약정','추가'];
+var CSTATUS_OPTS=['신규','재약정','추가','서비스종료','해지'];
+var CNOTE_OPTS=['재약정 완료','재약정 예정','정부 지원','중도 해지','미연장','매월 연장 확인 필요'];
+var CHURN_OPTS=['경영악화','비용이슈','폐업','고객사정','구축형전환','기타'];
 
 var GRIDS={
   contracts:{
@@ -4114,16 +4120,16 @@ var GRIDS={
     cols:[
       {k:'_custName',l:'고객사',ro:true},
       {k:'line',l:'서비스',t:'select',opts:LINE_OPTS,fmt:function(v){return lline(v);}},
-      {k:'channel',l:'판매 채널',t:'select',opts:['일반','공공','LGU+','에스원','유통']},
+      {k:'channel',l:'판매 채널',t:'select',opts:CH_OPTS},
       {k:'partner',l:'파트너',t:'select',opts:PTN_OPTS},
       {k:'biller',l:'발행처'},
-      {k:'contract_type',l:'구분'},
-      {k:'status',l:'상태'},
-      {k:'churn_reason',l:'해지사유'},
+      {k:'contract_type',l:'구분',t:'select',opts:CTYPE_OPTS},
+      {k:'status',l:'상태',t:'select',opts:CSTATUS_OPTS},
+      {k:'churn_reason',l:'해지사유',t:'list',opts:CHURN_OPTS},
       {k:'start_month',l:'시작월',t:'month'},
       {k:'end_month',l:'종료월',t:'month'},
       {k:'mrr',l:'MRR(참고)',t:'number'},
-      {k:'note',l:'비고'}
+      {k:'note',l:'비고',t:'list',opts:CNOTE_OPTS}
     ]
   },
   live:{
@@ -4218,12 +4224,12 @@ var GRIDS={
   },
   orders:{
     title:'장비 요청 내역', table:'equipment_orders',
-    chipsField:'channel', chipsOpts:['에스원','LGU+','공공','일반','기타'],
+    chipsField:'channel', chipsOpts:['에스원','LGU+','조달','일반','기타'],
     cap:'발주·교체·회수 요청의 상태 관리 (설치완료/회수완료 시 자산 자동 반영) · 신규 신청은 도구 › 장비 신청', add:true, del:true,
     rows:function(){ return RAWX.orders||[]; },
     cols:[
       {k:'created_at',l:'신청일',ro:true,fmt:function(v){return String(v||'').slice(0,10);}},
-      {k:'channel',l:'채널',t:'select',opts:['에스원','LGU+','공공','일반','기타']},
+      {k:'channel',l:'채널',t:'select',opts:['에스원','LGU+','조달','일반','기타']},
       {k:'order_type',l:'유형',t:'select',opts:['신규발주','추가','교체(장애)','교체(증설)','철거·회수']},
       {k:'customer',l:'고객사',req:true},
       {k:'contract_no',l:'계약번호'},
@@ -4243,7 +4249,7 @@ var GRIDS={
   },
   assets:{
     title:'장비 자산 (시리얼 단위)', table:'equipment_assets',
-    chipsField:'channel', chipsOpts:['에스원','LGU+','공공','일반','기타'],
+    chipsField:'channel', chipsOpts:['에스원','LGU+','조달','일반','기타'],
     cap:'발주 상태를 「설치완료」로 바꾸면 자동 임대중, 「회수완료」면 자동 회수완료 처리됩니다', add:true, del:true,
     rows:function(){ return RAWX.assets||[]; },
     cols:[
@@ -4252,7 +4258,7 @@ var GRIDS={
       {k:'usage',l:'구분',t:'select',opts:['임대','데모','대여','판매','하자보수']},
       {k:'status',l:'상태',t:'select',opts:['재고','임대중','회수완료','판매완료','수리중','분실','폐기']},
       {k:'customer',l:'고객사'},
-      {k:'channel',l:'채널',t:'select',opts:['에스원','LGU+','공공','일반','기타']},
+      {k:'channel',l:'채널',t:'select',opts:['에스원','LGU+','조달','일반','기타']},
       {k:'partner',l:'파트너'},
       {k:'in_date',l:'입고일',t:'date'},
       {k:'deployed_date',l:'출고일',t:'date'},
@@ -4474,12 +4480,12 @@ function renderBizEditor(host, months){
 /* ---- 사업 영역(판매 채널) 화면 ---- */
 var CH_DEFS={
   chgen:['🤝 일반 판매','일반','파트너(다원티에스·글로웰시스템·에티버스) 경유 + 예외적 직판'],
-  chpub:['🏛️ 공공','공공','공공 사업 영역'],
+  chpub:['🏛️ 조달','조달','조달(공공) 사업 영역'],
   chlgu:['📶 LGU+','LGU+','LGU+ 경유 판매'],
   chs1:['🔒 에스원','에스원','에스원(S1) 채널 — S1 Cloud NAC · S1 MDR'],
   chdist:['📀 유통','유통','블루문소프트 DLP·DRM 등 유통 사업']
 };
-function chOf(r){ return r.channel||'일반'; }
+function chOf(r){ var c=r.channel||'일반'; return c==='공공'? '조달' : c; }   // 옛 표기 호환
 function renderChannelView(key){
   var def=CH_DEFS[key], ch=def[1];
   var host=$('#chBody');
@@ -4488,7 +4494,7 @@ function renderChannelView(key){
   var mrr=monthlyTotal(list,b);
   var act=0, custs={};
   list.forEach(function(k){ if(MAT[k][b]>0){ act++; custs[DATA.rows[k].cust]=1; } });
-  var hasEq=['공공','LGU+','에스원'].indexOf(ch)>=0;
+  var hasEq=['조달','공공','LGU+','에스원'].indexOf(ch)>=0;
   var pendEq=0, rentEq=0;
   if(hasEq){
     (RAWX.orders||[]).forEach(function(o){ if(o.channel===ch && ['접수','출하요청','배송중','회수예정'].indexOf(o.status)>=0) pendEq++; });
@@ -4815,10 +4821,19 @@ function fmtCell(c,v){
 }
 function editCell(c,v){
   if(c.t==='select'){
-    var opts=typeof c.opts==='function'? c.opts():c.opts;
+    var opts=(typeof c.opts==='function'? c.opts():c.opts).slice();
+    if(!c.req && opts.indexOf('')<0) opts.unshift('');              // 비울 수 있게
+    var cv=(v==null?'':String(v));
+    if(cv && opts.indexOf(cv)<0) opts.splice(1,0,cv);               // 기존 값 보존
     return '<select data-k="'+c.k+'">'+opts.map(function(o){
-      var lb=(c.k==='line')? lline(o) : o;
-      return '<option value="'+esc(o)+'"'+(String(v)===o?' selected':'')+'>'+esc(lb)+'</option>';}).join('')+'</select>';
+      var lb=(c.k==='line')? lline(o) : (o===''? '— 없음 —' : o);
+      return '<option value="'+esc(o)+'"'+(cv===o?' selected':'')+'>'+esc(lb)+'</option>';}).join('')+'</select>';
+  }
+  if(c.t==='list'){                                                  // 목록에서 고르거나 직접 입력
+    var lopts=typeof c.opts==='function'? c.opts():c.opts;
+    var lid='dl_'+c.k;
+    return '<input type="text" data-k="'+c.k+'" list="'+lid+'" value="'+esc(v==null?'':String(v))+'">'+
+      '<datalist id="'+lid+'">'+lopts.map(function(o){ return '<option value="'+esc(o)+'"></option>'; }).join('')+'</datalist>';
   }
   if(c.t==='bool') return '<input type="checkbox" data-k="'+c.k+'"'+(v?' checked':'')+'>';
   var ty=c.t==='month'?'month':c.t==='date'?'date':c.t==='number'?'number':'text';
