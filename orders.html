@@ -360,7 +360,8 @@ async function syncAssets(r, st){
 
 /* ---- 검색: 공백 무시 + 여러 단어 AND ---- */
 function qMatch(fields, q){
-  var hay=fields.join(' ').toLowerCase().replace(/\s+/g,'');
+  // 필드 안 공백만 무시, 필드 사이엔 경계 문자(옆 필드와 이어붙은 가짜 매칭 방지)
+  var hay=fields.map(function(f){ return String(f==null?'':f).replace(/\s+/g,''); }).join('').toLowerCase();
   return q.split(/\s+/).filter(Boolean).every(function(t){ return hay.indexOf(t.replace(/\s+/g,''))>=0; });
 }
 
