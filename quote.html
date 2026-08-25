@@ -516,8 +516,18 @@
         const fileName = sanitizeFileName(`${qDate}_${customer}_${prodLabel}_${qty}${unit}_견적서(지니언스)`);
         const originalTitle = document.title;
         document.title = fileName;
+        // 포탈(iframe) 안에서 발행하면 PDF 파일명이 바깥 포탈 제목으로 잡히므로,
+        // 발행하는 동안 포탈 탭 제목도 견적서 파일명으로 잠깐 바꿨다가 되돌립니다.
+        let topTitle = null;
+        try {
+            if (window.top !== window.self) {
+                topTitle = window.top.document.title;
+                window.top.document.title = fileName;
+            }
+        } catch (e) {}
         window.onafterprint = function() {
             document.title = originalTitle;
+            try { if (topTitle !== null) window.top.document.title = topTitle; } catch (e) {}
         };
         // 발행 전 자동 저장 (설정되어 있을 때만, 실패해도 발행은 계속 진행)
         const saveResult = await silentSaveToGithub();
