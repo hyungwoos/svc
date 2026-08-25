@@ -294,6 +294,23 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
   background:linear-gradient(180deg,var(--glow),transparent 60%),var(--surface-2);
 }
 .ai-comment.on{display:block}
+/* 대화형 답변 — 화면 맨 위, 크게 */
+.ai-say{
+  display:none;margin:0 0 16px;padding:16px 18px 16px 16px;border-radius:14px;
+  font-size:14.5px;line-height:1.78;color:var(--ink);white-space:pre-wrap;
+  border:1px solid var(--ring);border-left:3px solid var(--s1);
+  background:linear-gradient(180deg,var(--glow),transparent 55%),var(--surface);
+}
+.ai-say.on{display:block}
+.ai-say.loading{color:var(--muted);font-style:italic;font-size:13px}
+.ai-say .lb{
+  display:block;font-size:10.5px;font-weight:750;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--s1);margin-bottom:7px;
+}
+.ai-say .dots span{display:inline-block;animation:blink 1.2s infinite}
+.ai-say .dots span:nth-child(2){animation-delay:.2s}
+.ai-say .dots span:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,60%,100%{opacity:.25}30%{opacity:1}}
 .ai-comment.loading{color:var(--muted);font-style:italic}
 .ai-comment .lb{
   display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;letter-spacing:.04em;
@@ -687,6 +704,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
     <div class="chips" id="chips"></div>
 
     <div class="answer" id="answer">
+      <div class="ai-say" id="aiSay"></div>
       <div class="restate" id="ansRestate"></div>
       <div class="ans-head">
         <div class="ans-title" id="ansTitle"></div>
@@ -2829,19 +2847,42 @@ function ask(q){
   if(!AICFG.enabled){ localAnswer(q); return; }
 
   setAsking(true);
-  var ctx={
-    baseMonth: mk(STATE.base), firstMonth: DATA.monthKeys[0], lastMonth: DATA.monthKeys[M-1],
-    today: DATA.todayKey || '', partners: uniqCache('partner').slice(0,40),
-    churnReasons: uniq(function(r){return r.churn;}).slice(0,20),
-    history: HIST.slice(-3)
-  };
-  ctx.channels = uniq(function(r){ return r.channel; }).slice(0,10);
-  aiFetch({mode:'plan', question:q, ctx:ctx})
-    .then(function(r){ setAsking(false); onPlan(q,r); })
-    .catch(function(e){ setAsking(false); localAnswer(q,'AI 호출에 실패해 내장 규칙으로 답했습니다. ('+String(e&&e.message||e).slice(0,120)+')'); });
+  // 답변 자리를 먼저 열고 "생각 중" 표시
+  $('#answer').classList.add('on');
+  $('#ansRestate').className='restate';
+  $('#ansTitle').textContent=q;
+  $('#ansHero').textContent=''; $('#ansSub').textContent='';
+  $('#aiComment').className='ai-comment';
+  var say=$('#aiSay');
+  say.className='ai-say on loading';
+  say.innerHTML='<span class="lb">AI</span>데이터를 보고 있습니다<span class="dots"><span>·</span><span>·</span><span>·</span></span>';
+  var grid=document.getElementById('ansGrid'); if(grid) grid.style.display='none';
+
+  aiFetch({mode:'chat', question:q, digest:buildDigest(), history:HIST.slice(-4)})
+    .then(function(r){
+      setAsking(false);
+      if(!r || !r.ok || !r.text){ localAnswer(q,'AI가 답하지 못해 내장 규칙으로 답했습니다.'); return; }
+      say.className='ai-say on';
+      say.innerHTML='<span class="lb">AI</span>'+esc(r.text);
+      HIST.push({q:q, a:r.text}); if(HIST.length>8) HIST.shift();
+      // 표·그래프가 도움이 되는 질문이면 포탈이 직접 계산해서 아래에 붙입니다
+      if(r.view && r.view.intent){
+        try{
+          var pp=planToP(r.view), res=computeFromP(pp);
+          res.restate=''; res.suggestions=[];
+          renderAnswerBody(res);
+        }catch(e){ /* 계산 실패해도 대화 답변은 그대로 둡니다 */ }
+      }
+    })
+    .catch(function(e){
+      setAsking(false);
+      localAnswer(q,'AI 호출에 실패해 내장 규칙으로 답했습니다. ('+String(e&&e.message||e).slice(0,120)+')');
+    });
 }
 
+function clearSay(){ var e=$('#aiSay'); if(e){ e.className='ai-say'; e.innerHTML=''; } }
 function localAnswer(q, note){
+  clearSay();
   var res;
   try{ res=runQuery(q); }
   catch(e){ res={title:q, hero:'?', unit:'', sub:'질문을 이해하지 못했습니다', note:String(e.message||e)}; }
@@ -2943,7 +2984,32 @@ function buildDigest(){
     월별매출_최근24개월:months, 연도별매출:byYear,
     상위고객사15:topCust,
     만료예정_12개월내:exp.slice(0,20),
-    해지사유별건수:churn
+    해지사유별건수:churn,
+    임대장비: (function(){
+      var a=RAWX.assets||[]; if(!a.length) return null;
+      var st={}, ch={}, us={};
+      a.forEach(function(x){
+        st[x.status||'미지정']=(st[x.status||'미지정']||0)+1;
+        ch[x.channel||'미지정']=(ch[x.channel||'미지정']||0)+1;
+        us[x.usage||'임대']=(us[x.usage||'임대']||0)+1;
+      });
+      return {전체대수:a.length, 상태별:st, 채널별:ch, 구분별:us};
+    })(),
+    장비요청: (function(){
+      var o=RAWX.orders||[]; if(!o.length) return null;
+      var st={}; o.forEach(function(x){ st[x.status||'접수']=(st[x.status||'접수']||0)+1; });
+      return {전체건수:o.length, 상태별:st};
+    })(),
+    MDR_POC신청: (function(){
+      var m=RAWX.mdrpoc||[]; if(!m.length) return null;
+      var st={}; m.forEach(function(x){ st[x.status||'접수']=(st[x.status||'접수']||0)+1; });
+      return {전체건수:m.length, 상태별:st,
+        최근:(m.slice(0,5).map(function(x){ return [x.company, x.status, String(x.created_at||'').slice(0,10)]; }))};
+    })(),
+    비즈포탈차액: (function(){
+      var v=DATA.vs; if(!v||!v.ok) return null;
+      return {기준월:v.month, 항목:v.items.map(function(x){ return [x.k, x.v]; })};
+    })()
   };
 }
 
@@ -3920,7 +3986,12 @@ function showAnswer(q,res){
       var c=el('button','chip',s); c.onclick=function(){ ask(s); }; sg.appendChild(c);
     });
   } else $('#ansSuggestTitle').style.display='none';
-  $('#ansTitle').textContent=res.title||q;
+  renderAnswerBody(res, q);
+}
+
+/* 답변의 숫자·그래프·표 부분 (대화 답변 아래에 붙습니다) */
+function renderAnswerBody(res, q){
+  $('#ansTitle').textContent=res.title||'';
   $('#ansHero').innerHTML=esc(res.hero)+(res.unit?'<span class="u">'+res.unit+'</span>':'');
   $('#ansSub').textContent=res.sub||'';
   $('#ansNote').textContent=res.note||'';
