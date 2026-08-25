@@ -2863,7 +2863,7 @@ function ask(q){
       setAsking(false);
       if(!r || !r.ok || !r.text){ localAnswer(q,'AI가 답하지 못해 내장 규칙으로 답했습니다.'); return; }
       say.className='ai-say on';
-      say.innerHTML='<span class="lb">AI</span>'+esc(r.text);
+      say.innerHTML='<span class="lb">AI</span>'+esc(cleanSay(r.text));
       HIST.push({q:q, a:r.text}); if(HIST.length>8) HIST.shift();
       // 표·그래프가 도움이 되는 질문이면 포탈이 직접 계산해서 아래에 붙입니다
       if(r.view && r.view.intent){
@@ -2880,6 +2880,20 @@ function ask(q){
     });
 }
 
+/* 답변에 JSON/코드펜스가 섞여 오면 사람이 읽을 문장만 남깁니다 */
+function cleanSay(t){
+  t=String(t==null?'':t).trim();
+  // ```json { "answer": "..." } ``` 형태면 answer 만 뽑기
+  var m=t.match(/\{[\s\S]*"answer"\s*:\s*"([\s\S]*?)"\s*,\s*"view"/);
+  if(m){
+    var head=t.slice(0,t.indexOf('```')>=0? t.indexOf('```') : t.indexOf('{')).trim();
+    if(head) return head;                       // 앞에 이미 사람말이 있으면 그것만
+    try{ return JSON.parse(m[0].replace(/,\s*"view".*$/,'}')).answer; }catch(e){}
+    return m[1].replace(/\\n/g,'\n');
+  }
+  t=t.replace(/```[\s\S]*?```/g,'').trim();     // 남은 코드블록 제거
+  return t;
+}
 function clearSay(){ var e=$('#aiSay'); if(e){ e.className='ai-say'; e.innerHTML=''; } }
 function localAnswer(q, note){
   clearSay();
