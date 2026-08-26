@@ -391,6 +391,10 @@ body{padding-left:192px}
 .frm .full{grid-column:1/-1}
 .mpchk{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:550;cursor:pointer;padding:7px 12px;border:1px solid var(--ring);border-radius:10px;background:var(--surface-2)}
 .mpchk input{width:16px;height:16px;accent-color:var(--brand,#149e40)}
+.oi-prow{display:flex;gap:10px;align-items:center;margin-bottom:7px;flex-wrap:wrap}
+.oi-prow .oi-qty{width:120px;height:36px;padding:0 10px;border-radius:9px;border:1px solid var(--ring);background:var(--surface-2);color:var(--ink);font-family:inherit;font-size:13px}
+.oi-prow .oi-etc{height:36px;padding:0 10px;border-radius:9px;border:1px solid var(--ring);background:var(--surface-2);color:var(--ink);font-family:inherit;font-size:13px}
+.oi-prow input:disabled{opacity:.45}
 .frm label{display:block;font-size:11.5px;color:var(--ink-2);margin-bottom:4px}
 .frm input,.frm select,.frm textarea{width:100%;height:36px;padding:0 10px;border-radius:9px;border:1px solid var(--ring);
   background:var(--surface-2);color:var(--ink);font-size:13px;font-family:inherit;outline:none}
@@ -1018,19 +1022,19 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
       <div id="oiFormWrap">
       <div style="font-size:11px;color:var(--ink-2);opacity:.75;margin:2px 0 10px">— 고객사 정보 —</div>
       <div class="frm">
-        <div><label>산업군 *</label><select id="oiInd"><option>공공</option><option>의료</option><option>학교</option><option selected>기업</option><option>금융</option><option>국방</option><option>홈네트워크</option></select></div>
+        <div><label>산업군 *</label><select id="oiInd"></select></div>
         <div><label>고객사 *</label><input id="oiCust"></div>
         <div><label>고객 담당자 부서</label><input id="oiCDept"></div>
         <div><label>고객 담당자 이름</label><input id="oiCName"></div>
         <div><label>고객 담당자 이메일</label><input id="oiCEmail" type="email"></div>
         <div><label>고객 담당자 연락처</label><input id="oiCPhone" placeholder="010-0000-0000"></div>
-        <div><label>지니언스 담당자 *</label><input id="oiOwner"></div>
-        <div><label>구축 파트너</label><input id="oiPartner" list="dl_oiPartner"><datalist id="dl_oiPartner"><option value="다원티에스"></option><option value="글로웰시스템"></option><option value="에티버스"></option></datalist></div>
+        <div><label>지니언스 담당자 *</label><select id="oiOwner"></select></div>
+        <div><label>구축 파트너</label><select id="oiPartner"></select></div>
       </div>
       <div style="font-size:11px;color:var(--ink-2);opacity:.75;margin:16px 0 10px">— 사업 관련 정보 —</div>
       <div class="frm">
-        <div><label>사업형태 *</label><select id="oiType"><option>신규제안</option><option>확산(증설)</option><option>망분리</option><option>EoL(노후교체)</option><option>SI</option><option>회선</option></select></div>
-        <div><label>사업명 *</label><input id="oiName"></div>
+        <div><label>사업형태 *</label><select id="oiType"></select></div>
+        <div><label>사업명</label><input id="oiName" placeholder="비워두면 «고객사 + 사업형태» 로 자동 생성"></div>
         <div><label>매출경로</label><input id="oiRoute" placeholder="예: 파트너 경유, 직판"></div>
         <div><label>무상 유지관리 기간 (개월)</label><input id="oiFree" type="number" min="0"></div>
         <div><label>계약 예상 시기</label><input id="oiMonth" type="month"></div>
@@ -1039,11 +1043,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
         <div><label>수주 가능성</label><select id="oiProb"></select></div>
         <div class="full"><label>경쟁 현황 및 영업전략</label><input id="oiStrategy" placeholder="윈백 사업인 경우 기존 사용 제품의 제조사를 적어주세요"></div>
       </div>
-      <div style="font-size:11px;color:var(--ink-2);opacity:.75;margin:16px 0 8px">— 제품군 (복수 선택) —</div>
-      <div id="oiProducts" style="display:flex;gap:10px;flex-wrap:wrap"></div>
-      <div style="font-size:11px;color:var(--ink-2);opacity:.75;margin:16px 0 8px">— 제품 정보 (모델·수량) —</div>
-      <div id="oiItems"></div>
-      <button class="pill ghost" id="oiAddItem" style="margin:8px 0 4px">＋ 제품 추가</button>
+      <div style="font-size:11px;color:var(--ink-2);opacity:.75;margin:16px 0 8px">— 제품군·수량 (해당 제품을 체크하고 수량을 넣으세요) —</div>
+      <div id="oiProducts"></div>
       <div style="font-size:11px;color:var(--ink-2);opacity:.75;margin:16px 0 10px">— 진행 관리 —</div>
       <div class="frm">
         <div><label>다음 할 일</label><input id="oiNext" placeholder="예: BMT 일정 조율"></div>
@@ -1148,6 +1149,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
           <option value="DLP">DLP</option>
         </select></div>
         <div><label>판매 채널</label><select id="nChannel"><option>일반</option><option>조달</option><option>LGU+</option><option>에스원</option><option>유통</option></select></div>
+        <div><label>모듈 (MDR 결합)</label><select id="nCombine"><option value="">— 없음 —</option><option>Add-on</option><option>MDR+AV</option><option>MDR+AR</option><option>MDR+AV+AR</option></select></div>
         <div><label>파트너 *</label><select id="nPtn"><option>직접(계산서)</option><option>다원티에스</option><option>글로웰시스템</option><option>에티버스</option></select></div>
         <div><label>계산서 발행처</label><input id="nBiller" placeholder="예: 엘림넷"></div>
         <div><label>계약 구분</label><select id="nType"><option>신규</option><option>재약정</option></select></div>
@@ -1735,6 +1737,7 @@ function buildFromRes(res){
       partner:c.biller||'미지정', ptn:c.partner||'직접(계산서)',
       ctype:c.contract_type||'', status:c.status||'', note:c.note||'',
       churn:c.churn_reason||'', saleType:c.sale_type||'', ver:c.version||'', csm:c.csm||'', channel:c.channel||'일반',
+      combine:c.combine||'',
       startIdx:c.start_month? dIdx(c.start_month): first,
       endIdx:c.end_month? dIdx(c.end_month): last,
       dataFirst:first, dataLast:last,
@@ -4208,10 +4211,15 @@ var OI_PROB=[
   [90,'고객 발주 접수'],
   [100,'지니네트웍스에 발주 완료']
 ];
-var OI_TYPE=['신규제안','확산(증설)','망분리','EoL(노후교체)','SI','회선'];
+var OI_TYPE=['신규제안','윈백제안','확산(증설)'];
 var OI_IND=['공공','의료','학교','기업','금융','국방','홈네트워크'];
-var OI_PRODUCTS=['NAC','IPAM','ZTNA','SSL VPN','INSIGHTS (EDR)','GPI','Cloud NAC','Cloud ZTNA','Cloud GPI',
-  'Genian Home','AV','MDR','DRM','DLP'];
+/* MDR 결합 모듈 (매출시트 Combine 열) — AV=안티바이러스, AR=안티랜섬웨어 */
+var COMBINE_OPTS=['Add-on','MDR+AV','MDR+AR','MDR+AV+AR'];
+/* 제품군은 서비스사업부에서 다루는 것만 (+ 직접입력) */
+var OI_PRODUCTS=['Cloud NAC','S1 Cloud NAC','Cloud EDR','MDR','S1 MDR','MDR Add-on',
+  'AV (안티바이러스)','AR (안티랜섬웨어)','PNS','DRM','DLP'];
+var OI_OWNERS=['송기영 부장','최형우 차장'];
+var OI_PARTNERS=['다원티에스','글로웰시스템','에티버스','지니언스(주)'];
 
 var GRIDS={
   contracts:{
@@ -4227,6 +4235,7 @@ var GRIDS={
       {k:'channel',l:'판매 채널',t:'select',opts:CH_OPTS},
       {k:'partner',l:'파트너',t:'select',opts:PTN_OPTS},
       {k:'biller',l:'발행처'},
+      {k:'combine',l:'모듈',t:'select',opts:COMBINE_OPTS},
       {k:'contract_type',l:'구분',t:'select',opts:CTYPE_OPTS},
       {k:'status',l:'상태',t:'select',opts:CSTATUS_OPTS},
       {k:'churn_reason',l:'해지사유',t:'list',opts:CHURN_OPTS},
@@ -4314,6 +4323,10 @@ var GRIDS={
       {k:'industry',l:'산업군',t:'select',opts:OI_IND},
       {k:'owner',l:'담당자'},
       {k:'partner',l:'구축파트너'},
+      {k:'products',l:'제품군',ro:true,fmt:function(v){ return (v&&v.length)? v.join(', ') : '·'; }},
+      {k:'items',l:'수량',ro:true,fmt:function(v){
+        try{ return (v&&v.length)? v.map(function(x){ return x.product+(x.qty? ' '+x.qty:''); }).join(', ') : '·'; }
+        catch(e){ return '·'; } }},
       {k:'expect_month',l:'계약예상',t:'month'},
       {k:'expect_amount',l:'예상단가',t:'number'},
       {k:'rival_price',l:'경쟁사가',t:'number'},
@@ -5001,37 +5014,64 @@ function initOiForm(){
     sel.innerHTML=OI_PROB.map(function(x){
       return '<option value="'+x[0]+'">'+x[0]+'% ('+esc(x[1])+')</option>'; }).join('');
   }
-  // 제품군 체크박스
+  // 사업형태 · 산업군
+  var ty=$('#oiType');
+  if(!ty.options.length) ty.innerHTML=OI_TYPE.map(function(n){ return '<option>'+esc(n)+'</option>'; }).join('');
+  var ind=$('#oiInd');
+  if(!ind.options.length) ind.innerHTML=OI_IND.map(function(n){
+    return '<option'+(n==='기업'?' selected':'')+'>'+esc(n)+'</option>'; }).join('');
+  // 지니언스 담당자 · 구축 파트너
+  var ow=$('#oiOwner');
+  if(!ow.options.length){
+    ow.innerHTML='<option value="">— 선택 —</option>'+
+      OI_OWNERS.map(function(n){ return '<option>'+esc(n)+'</option>'; }).join('');
+  }
+  var pt=$('#oiPartner');
+  if(!pt.options.length){
+    pt.innerHTML='<option value="">— 선택 —</option>'+
+      OI_PARTNERS.map(function(n){ return '<option>'+esc(n)+'</option>'; }).join('');
+  }
+  // 제품군 + 수량
   var pb=$('#oiProducts');
   if(!pb.children.length){
-    pb.innerHTML=OI_PRODUCTS.map(function(name){
-      return '<label class="mpchk"><input type="checkbox" data-oip="'+esc(name)+'"> '+esc(name)+'</label>'; }).join('');
+    var h=OI_PRODUCTS.map(function(name){
+      return '<div class="oi-prow">'+
+        '<label class="mpchk" style="min-width:190px"><input type="checkbox" data-oip="'+esc(name)+'"> '+esc(name)+'</label>'+
+        '<input class="oi-qty" type="number" min="1" placeholder="수량" disabled></div>';
+    }).join('');
+    h+='<div class="oi-prow">'+
+       '<label class="mpchk" style="min-width:190px"><input type="checkbox" data-oip="__etc"> 직접 입력</label>'+
+       '<input class="oi-etc" placeholder="제품명" disabled style="flex:1;max-width:220px">'+
+       '<input class="oi-qty" type="number" min="1" placeholder="수량" disabled></div>';
+    pb.innerHTML=h;
+    pb.querySelectorAll('input[data-oip]').forEach(function(cb){
+      cb.onchange=function(){
+        var row=this.closest('.oi-prow');
+        row.querySelectorAll('.oi-qty,.oi-etc').forEach(function(i){
+          i.disabled=!cb.checked; if(!cb.checked) i.value='';
+        });
+        if(cb.checked){ var f=row.querySelector('.oi-etc')||row.querySelector('.oi-qty'); if(f) f.focus(); }
+      };
+    });
   }
-  // 제품 정보 행
-  if(!$('#oiItems').children.length) oiAddItemRow();
-  if(!$('#oiOwner').value && AUTH_USER) $('#oiOwner').value='';
 }
-function oiAddItemRow(model, qty){
-  var box=$('#oiItems');
-  var row=document.createElement('div');
-  row.style.cssText='display:flex;gap:8px;margin-bottom:6px;max-width:560px';
-  row.innerHTML='<input class="oi-model" placeholder="모델명" style="flex:2;height:36px;padding:0 10px;border-radius:9px;border:1px solid var(--ring);background:var(--surface-2);color:var(--ink);font-family:inherit" value="'+esc(model||'')+'">'+
-    '<input class="oi-qty" type="number" min="1" placeholder="수량" style="width:110px;height:36px;padding:0 10px;border-radius:9px;border:1px solid var(--ring);background:var(--surface-2);color:var(--ink);font-family:inherit" value="'+esc(qty||'')+'">';
-  var rm=document.createElement('button'); rm.className='pill ghost'; rm.textContent='✕'; rm.style.cssText='height:36px;padding:0 12px';
-  rm.onclick=function(){ row.remove(); if(!box.children.length) oiAddItemRow(); };
-  row.appendChild(rm);
-  box.appendChild(row);
-}
+
 async function submitOi(){
-  var cust=$('#oiCust').value.trim(), name=$('#oiName').value.trim(), owner=$('#oiOwner').value.trim();
-  if(!cust||!name){ msg('oiMsg','고객사와 사업명은 필수입니다','bad'); return; }
+  var cust=$('#oiCust').value.trim(), name=$('#oiName').value.trim(), owner=$('#oiOwner').value;
+  if(!cust){ msg('oiMsg','고객사는 필수입니다','bad'); return; }
+  if(!name) name=cust+' '+$('#oiType').value;            // 사업명이 없으면 자동 생성
   var btn=$('#oiGo'); btn.disabled=true; msg('oiMsg','등록 중…');
   try{
-    var prods=[]; $('#oiProducts').querySelectorAll('input[data-oip]:checked').forEach(function(c){ prods.push(c.dataset.oip); });
-    var items=[];
-    $('#oiItems').querySelectorAll('div').forEach(function(r){
-      var m=r.querySelector('.oi-model'), q=r.querySelector('.oi-qty');
-      if(m && m.value.trim()) items.push({model:m.value.trim(), qty:+(q&&q.value)||1});
+    var prods=[], items=[];
+    $('#oiProducts').querySelectorAll('.oi-prow').forEach(function(row){
+      var cb=row.querySelector('input[data-oip]');
+      if(!cb || !cb.checked) return;
+      var etc=row.querySelector('.oi-etc');
+      var name=(cb.dataset.oip==='__etc')? (etc&&etc.value.trim()) : cb.dataset.oip;
+      if(!name) return;
+      var q=row.querySelector('.oi-qty');
+      prods.push(name);
+      items.push({product:name, qty:+(q&&q.value)||null});
     });
     var row={
       requester: AUTH_USER||null,
@@ -5064,14 +5104,18 @@ async function submitOi(){
     logChange('insert','oi_deals',out[0].id,{customer:cust,deal:name});
     msg('oiMsg','');
     $('#oiDoneSum').textContent=[cust, name, row.deal_type,
-      row.expect_amount? won(row.expect_amount)+'원':'', prods.join('·')].filter(Boolean).join(' · ');
+      row.expect_amount? won(row.expect_amount)+'원':'',
+      items.map(function(x){ return x.product+(x.qty? ' '+x.qty:''); }).join(', ')].filter(Boolean).join(' · ');
     $('#oiFormWrap').style.display='none';
     $('#oiDone').style.display='';
     toast('OI 등록 완료', cust+' · '+name);
-    ['oiCust','oiCDept','oiCName','oiCEmail','oiCPhone','oiName','oiRoute','oiPartner','oiFree','oiMonth',
+    ['oiCust','oiCDept','oiCName','oiCEmail','oiCPhone','oiName','oiRoute','oiFree','oiMonth',
      'oiAmt','oiRival','oiStrategy','oiNext','oiNextDate','oiNote'].forEach(function(i){ $('#'+i).value=''; });
-    $('#oiProducts').querySelectorAll('input[data-oip]').forEach(function(c){ c.checked=false; });
-    $('#oiItems').innerHTML=''; oiAddItemRow();
+    $('#oiPartner').value='';
+    $('#oiProducts').querySelectorAll('input[data-oip]').forEach(function(c){
+      c.checked=false; var row=c.closest('.oi-prow');
+      row.querySelectorAll('.oi-qty,.oi-etc').forEach(function(i){ i.value=''; i.disabled=true; });
+    });
   }catch(e){ msg('oiMsg',String(e.message||e),'bad'); }
   btn.disabled=false;
 }
@@ -5131,7 +5175,6 @@ function setupSide(){
   $('#odGo').onclick=submitOrder;
   $('#mpGo').onclick=submitMdrPoc;
   $('#oiGo').onclick=submitOi;
-  $('#oiAddItem').onclick=function(){ oiAddItemRow(); };
   $('#oiDoneList').onclick=function(){ switchView('oi'); };
   $('#oiDoneNew').onclick=function(){ $('#oiDone').style.display='none'; $('#oiFormWrap').style.display=''; $('#oiCust').focus(); };
   $('#mpDoneList').onclick=function(){ switchView('mdrpoc'); };
@@ -5722,7 +5765,7 @@ async function saveEdit(){
       var cid=await ensureCustomer(cust, $('#nInd').value);
       var ct=await sbWrite('POST','contracts?select=id',[{
         customer_id:cid, line:$('#nLine').value, partner:$('#nPtn').value,
-        channel:$('#nChannel').value,
+        channel:$('#nChannel').value, combine: $('#nCombine').value||null,
         biller:$('#nBiller').value.trim()||null, contract_type:$('#nType').value,
         note:$('#nNote').value.trim()||null,
         start_month:idxDate(s0), end_month:idxDate(e0),
@@ -5774,12 +5817,22 @@ async function saveEdit(){
 
 function setupEdit(){
   var nl=document.getElementById('nLine');
+  function syncCombine(){
+    var v=(nl&&nl.value)||'', cb=document.getElementById('nCombine');
+    if(!cb) return;
+    var isMdr=(v==='MDR'||v==='MDR_S1');
+    cb.disabled=!isMdr;
+    cb.parentElement.style.opacity=isMdr? '':'0.45';
+    if(!isMdr) cb.value='';
+  }
   if(nl) nl.addEventListener('change',function(){
     var v=this.value, c=document.getElementById('nChannel');
+    syncCombine();
     if(!c) return;
     if(v==='S1'||v==='MDR_S1') c.value='에스원';
     else if(v==='DRM'||v==='DLP') c.value='유통';
   });
+  syncCombine();
   $('#btnEdit').onclick=function(){
     // 자동완성 목록 채우기
     var dl=$('#dlCust'); dl.innerHTML='';
