@@ -395,6 +395,9 @@ body{padding-left:192px}
 .oi-prow .oi-qty{width:120px;height:36px;padding:0 10px;border-radius:9px;border:1px solid var(--ring);background:var(--surface-2);color:var(--ink);font-family:inherit;font-size:13px}
 .oi-prow .oi-etc{height:36px;padding:0 10px;border-radius:9px;border:1px solid var(--ring);background:var(--surface-2);color:var(--ink);font-family:inherit;font-size:13px}
 .oi-prow input:disabled{opacity:.45}
+.qp-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 12px;border-bottom:1px solid var(--line);cursor:pointer}
+.qp-row:last-child{border-bottom:none}
+.qp-row:hover{background:var(--surface-2)}
 .frm label{display:block;font-size:11.5px;color:var(--ink-2);margin-bottom:4px}
 .frm input,.frm select,.frm textarea{width:100%;height:36px;padding:0 10px;border-radius:9px;border:1px solid var(--ring);
   background:var(--surface-2);color:var(--ink);font-size:13px;font-family:inherit;outline:none}
@@ -1020,6 +1023,10 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
         </div>
       </div>
       <div id="oiFormWrap">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:2px 0 14px;padding:10px 12px;border:1px dashed var(--line);border-radius:10px">
+        <button class="pill ghost" type="button" id="oiQuoteBtn" style="white-space:nowrap">📄 견적서에서 불러오기</button>
+        <span class="cap" id="oiQuoteTag" style="font-size:11.5px">저장된 견적서를 고르면 고객사·제품·수량·금액이 자동으로 채워집니다.</span>
+      </div>
       <div style="font-size:11px;color:var(--ink-2);opacity:.75;margin:2px 0 10px">— 고객사 정보 —</div>
       <div class="frm">
         <div><label>산업군 *</label><select id="oiInd"></select></div>
@@ -1070,6 +1077,24 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
   </div>
 
   <div class="foot" id="foot"></div>
+</div>
+
+<!-- 견적서 선택 (OI 자동 채움) -->
+<div class="ovl" id="ovlQuote">
+  <div class="modal" style="width:min(620px,100%)">
+    <h3>📄 견적서 불러오기</h3>
+    <p class="cap" style="margin:0 0 12px">견적 시스템에 저장된 견적서 목록입니다. 하나를 고르면 OI 등록 폼이 자동으로 채워집니다.</p>
+    <div id="qpGate" style="display:none">
+      <p class="cap" style="margin:0 0 8px">견적 저장소 접속 비밀번호가 필요합니다. (견적 시스템에서 쓰는 팀 공용 비밀번호와 같습니다 · 이 브라우저에 저장됩니다)</p>
+      <div class="frm"><div class="full"><label>접속 비밀번호</label><input id="qpPw" type="password" autocomplete="off"></div></div>
+    </div>
+    <div id="qpList" style="max-height:min(48vh,380px);overflow:auto;border:1px solid var(--line);border-radius:10px"></div>
+    <div class="mact">
+      <span class="mmsg" id="qpMsg"></span>
+      <button class="pill ghost" id="qpClose" onclick="closeOvl('ovlQuote')">닫기</button>
+      <button class="btn" style="height:36px;display:none" id="qpGo">확인</button>
+    </div>
+  </div>
 </div>
 
 <!-- 로그인 -->
@@ -4329,6 +4354,9 @@ var GRIDS={
         catch(e){ return '·'; } }},
       {k:'expect_month',l:'계약예상',t:'month'},
       {k:'expect_amount',l:'예상단가',t:'number'},
+      {k:'quote_file',l:'견적서',ro:true,
+        href:function(v){ return 'quote.html?view='+encodeURIComponent(v); },
+        fmt:function(v){ if(!v) return '·'; var L=qLabel(String(v).split('/').pop()); return '📄 '+(L.d||L.c); }},
       {k:'rival_price',l:'경쟁사가',t:'number'},
       {k:'next_action',l:'다음 할 일'},
       {k:'next_date',l:'예정일',t:'date'},
@@ -5043,7 +5071,12 @@ function initOiForm(){
        '<label class="mpchk" style="min-width:190px"><input type="checkbox" data-oip="__etc"> 직접 입력</label>'+
        '<input class="oi-etc" placeholder="제품명" disabled style="flex:1;max-width:220px">'+
        '<input class="oi-qty" type="number" min="1" placeholder="수량" disabled></div>';
+    h+='<div style="margin-top:8px"><button class="pill ghost" type="button" id="oiEtcAdd" '+
+       'style="height:28px;padding:0 12px;font-size:12px">＋ 직접 입력 항목 추가</button></div>';
     pb.innerHTML=h;
+    var addBtn=pb.querySelector('#oiEtcAdd');
+    if(addBtn) addBtn.onclick=function(){ var r=oiAddEtcRow(); if(r){
+      var c=r.querySelector('input[data-oip]'); c.checked=true; c.onchange(); r.querySelector('.oi-etc').focus(); } };
     pb.querySelectorAll('input[data-oip]').forEach(function(cb){
       cb.onchange=function(){
         var row=this.closest('.oi-prow');
@@ -5054,6 +5087,183 @@ function initOiForm(){
       };
     });
   }
+}
+
+/* ===== 견적서 → OI 자동 채움 ===================================
+   견적서는 견적 시스템(Worker→GitHub)에 JSON으로 저장됩니다.
+   포탈과 같은 사이트라 접속 비밀번호(localStorage)를 그대로 씁니다.       */
+var QCFG_KEY='genians_quote_worker_config_v1';
+var QCFG_DEF='https://aged-union-cdd3.choihw.workers.dev';
+/* 견적서 서비스명 → 포탈 OI 제품군 */
+var QPROD_MAP={
+  'GIES (MDR Service)':'MDR',
+  'GIEA (AV Service)':'AV (안티바이러스)',
+  'GIER (Ransomware Service)':'AR (안티랜섬웨어)',
+  'DocuRay DRM':'DRM',
+  'DocuRay DLP':'DLP',
+  'Cloud NAC V6.0':'Cloud NAC',
+  'Cloud NAC V5.0':'Cloud NAC'
+};
+var QMGR_MAP={'kholong':'송기영 부장','choihw':'최형우 차장'};
+var OI_QUOTE=null;   // {file, date, total}
+
+function qCfg(){
+  var o={};
+  try{ o=JSON.parse(localStorage.getItem(QCFG_KEY)||'{}')||{}; }catch(e){}
+  return { base:String(o.baseUrl||QCFG_DEF).replace(/\/+$/,''), pw:o.accessPassword||'' };
+}
+function qSavePw(pw){
+  try{
+    var o={}; try{ o=JSON.parse(localStorage.getItem(QCFG_KEY)||'{}')||{}; }catch(e){}
+    o.accessPassword=pw; if(!o.baseUrl) o.baseUrl=QCFG_DEF;
+    localStorage.setItem(QCFG_KEY,JSON.stringify(o));
+  }catch(e){}
+}
+function qNum(v){ return +String(v==null?'':v).replace(/[^0-9.-]/g,'')||0; }
+/* 파일명 20260826_고객사_1756000000000.json → 보기 좋게 */
+function qLabel(name){
+  var m=/^(\d{4})(\d{2})(\d{2})_(.+)_\d+\.json$/i.exec(name||'');
+  if(!m) return {d:'', c:(name||'').replace(/\.json$/i,'')};
+  return { d:m[1]+'-'+m[2]+'-'+m[3], c:m[4] };
+}
+
+function openQuotePick(){
+  var cfg=qCfg();
+  $('#qpGate').style.display = cfg.pw? 'none':'';
+  $('#qpGo').style.display   = cfg.pw? 'none':'';
+  $('#qpPw').value='';
+  msg('qpMsg','');
+  $('#qpList').innerHTML='';
+  openOvl('ovlQuote');
+  if(cfg.pw) qpLoadList();
+  else setTimeout(function(){ $('#qpPw').focus(); },60);
+}
+async function qpLoadList(){
+  var cfg=qCfg();
+  $('#qpList').innerHTML='<div class="cap" style="padding:16px;text-align:center">불러오는 중…</div>';
+  try{
+    var res=await fetch(cfg.base+'/list',{headers:{'X-Access-Password':cfg.pw}});
+    if(!res.ok){ var e=await res.json().catch(function(){return {};});
+      throw new Error(e.error||('HTTP '+res.status)); }
+    var out=await res.json();
+    var files=(out.files||[]).filter(function(f){ return /\.json$/i.test(f.name||''); });
+    files.sort(function(a,b){ return String(b.name).localeCompare(String(a.name)); });
+    if(!files.length){ $('#qpList').innerHTML='<div class="cap" style="padding:16px;text-align:center">저장된 견적서가 없습니다.</div>'; return; }
+    $('#qpList').innerHTML=files.slice(0,80).map(function(f){
+      var L=qLabel(f.name);
+      return '<div class="qp-row" data-path="'+esc(f.path||f.name)+'" data-name="'+esc(f.name)+'">'+
+        '<div style="min-width:0"><div style="font-weight:650;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(L.c)+'</div>'+
+        '<div class="cap" style="font-size:11px">'+esc(L.d||'')+'</div></div>'+
+        '<button class="pill ghost" type="button" style="height:28px;padding:0 12px;font-size:12px;flex:0 0 auto">불러오기</button></div>';
+    }).join('');
+    $('#qpList').querySelectorAll('.qp-row').forEach(function(r){
+      r.onclick=function(){ qpPick(r.dataset.path, r.dataset.name); };
+    });
+    if(files.length>80) msg('qpMsg','최근 80건만 표시했습니다');
+  }catch(err){
+    $('#qpList').innerHTML='<div class="cap" style="padding:16px;text-align:center;color:var(--critical)">목록 조회 실패: '+esc(String(err.message||err))+'</div>';
+    if(/40[13]/.test(String(err.message))){ $('#qpGate').style.display=''; $('#qpGo').style.display=''; }
+  }
+}
+async function qpPick(path, name){
+  var cfg=qCfg();
+  msg('qpMsg','견적서를 읽는 중…');
+  try{
+    var res=await fetch(cfg.base+'/load?path='+encodeURIComponent(path),{headers:{'X-Access-Password':cfg.pw}});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    var data=JSON.parse(await res.text());
+    oiApplyQuote(data, path, name);
+    closeOvl('ovlQuote');
+    toast('견적서 불러옴', (data.customerName||name));
+  }catch(err){ msg('qpMsg','불러오기 실패: '+String(err.message||err),'bad'); }
+}
+
+/* 직접 입력 제품 행 하나 추가 */
+function oiAddEtcRow(prodName, qty){
+  var pb=$('#oiProducts'); if(!pb) return null;
+  var row=document.createElement('div');
+  row.className='oi-prow'; row.dataset.extra='1';
+  row.innerHTML='<label class="mpchk" style="min-width:190px"><input type="checkbox" data-oip="__etc"> 직접 입력</label>'+
+    '<input class="oi-etc" placeholder="제품명" disabled style="flex:1;max-width:220px">'+
+    '<input class="oi-qty" type="number" min="1" placeholder="수량" disabled>'+
+    '<button class="pill ghost" type="button" style="height:26px;padding:0 9px;font-size:11px" title="행 삭제">✕</button>';
+  var cb=row.querySelector('input[data-oip]');
+  cb.onchange=function(){
+    row.querySelectorAll('.oi-qty,.oi-etc').forEach(function(i){ i.disabled=!cb.checked; if(!cb.checked) i.value=''; });
+  };
+  row.querySelector('button').onclick=function(){ row.remove(); };
+  var addWrap=pb.querySelector('#oiEtcAdd');
+  if(addWrap) pb.insertBefore(row, addWrap.parentNode); else pb.appendChild(row);
+  if(prodName){
+    cb.checked=true; cb.onchange();
+    row.querySelector('.oi-etc').value=prodName;
+    if(qty) row.querySelector('.oi-qty').value=qty;
+  }
+  return row;
+}
+
+/* 견적서 JSON → OI 폼 */
+function oiApplyQuote(data, path, name){
+  initOiForm();
+  // 고객사 · 견적일 · 담당자
+  if(data.customerName) $('#oiCust').value=data.customerName;
+  if(data.contactPerson) $('#oiCName').value=data.contactPerson;
+  var mgr='';
+  Object.keys(QMGR_MAP).forEach(function(k){ if(String(data.manager||'').indexOf(k)>=0) mgr=QMGR_MAP[k]; });
+  if(mgr) $('#oiOwner').value=mgr;
+
+  // 금액 — OI 예상단가는 VAT 별도
+  var supply=qNum(data.supplyTotal);
+  if(!supply) supply=Math.round(qNum(data.grandTotal)/1.1);
+  if(supply) $('#oiAmt').value=supply;
+
+  // 제품군 · 수량
+  var rows=data.rows||[], hasPublic=false, etcs=[];
+  $('#oiProducts').querySelectorAll('.oi-prow').forEach(function(r){
+    if(r.dataset.extra){ r.remove(); return; }
+    var cb=r.querySelector('input[data-oip]');
+    if(cb){ cb.checked=false; }
+    r.querySelectorAll('.oi-qty,.oi-etc').forEach(function(i){ i.value=''; i.disabled=true; });
+  });
+  rows.forEach(function(r){
+    var raw=(r.prod==='direct')? String(r.prodCustom||'').trim() : String(r.prod||'').trim();
+    if(!raw) return;
+    if(/\(공공\)/.test(raw)) hasPublic=true;
+    var mapped=QPROD_MAP[raw]||raw;
+    var qty=qNum(r.qty)||null;
+    var hit=$('#oiProducts').querySelector('input[data-oip="'+mapped.replace(/"/g,'\\"')+'"]');
+    if(hit){
+      var row=hit.closest('.oi-prow');
+      if(!hit.checked){ hit.checked=true; hit.onchange(); }
+      var q=row.querySelector('.oi-qty');
+      if(qty) q.value = q.value? (qNum(q.value)+qty) : qty;   // 같은 제품 여러 줄이면 수량 합산
+    }else{
+      etcs.push({name:raw, qty:qty});
+    }
+  });
+  etcs.forEach(function(e){ oiAddEtcRow(e.name, e.qty); });
+  if(hasPublic) $('#oiInd').value='공공';
+
+  // 수주가능성 — 견적 제출 = 10% (신규일 때만, 이미 올려둔 값은 건드리지 않음)
+  if(!+$('#oiProb').value) $('#oiProb').value='10';
+
+  // 비고
+  if(!$('#oiNote').value.trim()){
+    $('#oiNote').value='견적서 자동 입력'+(data.quoteDate? ' · 견적일 '+data.quoteDate:'')+
+      (qNum(data.grandTotal)? ' · 총액 '+won(qNum(data.grandTotal))+'원(VAT 포함)':'');
+  }
+
+  OI_QUOTE={ file:path, date:data.quoteDate||null, total:qNum(data.grandTotal)||null };
+  var L=qLabel(name||path);
+  $('#oiQuoteTag').innerHTML='📎 연결된 견적서: <b>'+esc(L.c)+'</b>'+(L.d? ' ('+esc(L.d)+')':'')+
+    ' · <a href="quote.html?view='+encodeURIComponent(path)+'" target="_blank" style="color:var(--s1)">원본 보기</a>'+
+    ' · <a href="#" id="oiQuoteClr" style="color:var(--critical)">연결 해제</a>';
+  var clr=$('#oiQuoteClr');
+  if(clr) clr.onclick=function(ev){ ev.preventDefault(); oiClearQuote(); };
+}
+function oiClearQuote(){
+  OI_QUOTE=null;
+  $('#oiQuoteTag').textContent='저장된 견적서를 고르면 고객사·제품·수량·금액이 자동으로 채워집니다.';
 }
 
 async function submitOi(){
@@ -5097,7 +5307,10 @@ async function submitOi(){
       win_prob: +$('#oiProb').value||0,
       next_action: $('#oiNext').value.trim()||null,
       next_date: $('#oiNextDate').value||null,
-      note: $('#oiNote').value.trim()||null
+      note: $('#oiNote').value.trim()||null,
+      quote_file:  OI_QUOTE? OI_QUOTE.file  : null,
+      quote_date:  OI_QUOTE? OI_QUOTE.date  : null,
+      quote_total: OI_QUOTE? OI_QUOTE.total : null
     };
     var out=await sbWrite('POST','oi_deals?select=*',[row],'return=representation');
     RAWX.oi=RAWX.oi||[]; RAWX.oi.unshift(out[0]);
@@ -5112,10 +5325,13 @@ async function submitOi(){
     ['oiCust','oiCDept','oiCName','oiCEmail','oiCPhone','oiName','oiRoute','oiFree','oiMonth',
      'oiAmt','oiRival','oiStrategy','oiNext','oiNextDate','oiNote'].forEach(function(i){ $('#'+i).value=''; });
     $('#oiPartner').value='';
-    $('#oiProducts').querySelectorAll('input[data-oip]').forEach(function(c){
-      c.checked=false; var row=c.closest('.oi-prow');
+    $('#oiProducts').querySelectorAll('.oi-prow').forEach(function(row){
+      if(row.dataset.extra){ row.remove(); return; }
+      var c=row.querySelector('input[data-oip]'); if(c) c.checked=false;
       row.querySelectorAll('.oi-qty,.oi-etc').forEach(function(i){ i.value=''; i.disabled=true; });
     });
+    $('#oiProb').value='0';
+    oiClearQuote();
   }catch(e){ msg('oiMsg',String(e.message||e),'bad'); }
   btn.disabled=false;
 }
@@ -5175,6 +5391,13 @@ function setupSide(){
   $('#odGo').onclick=submitOrder;
   $('#mpGo').onclick=submitMdrPoc;
   $('#oiGo').onclick=submitOi;
+  $('#oiQuoteBtn').onclick=openQuotePick;
+  $('#qpGo').onclick=function(){
+    var pw=$('#qpPw').value.trim();
+    if(!pw){ msg('qpMsg','접속 비밀번호를 입력하세요','bad'); return; }
+    qSavePw(pw); $('#qpGate').style.display='none'; $('#qpGo').style.display='none'; msg('qpMsg',''); qpLoadList();
+  };
+  $('#qpPw').onkeydown=function(e){ if(e.key==='Enter') $('#qpGo').click(); };
   $('#oiDoneList').onclick=function(){ switchView('oi'); };
   $('#oiDoneNew').onclick=function(){ $('#oiDone').style.display='none'; $('#oiFormWrap').style.display=''; $('#oiCust').focus(); };
   $('#mpDoneList').onclick=function(){ switchView('mdrpoc'); };
@@ -5483,7 +5706,12 @@ function gridRow(r,g,editing){
   function view(){
     tr.innerHTML=g.cols.map(function(c){
       var n=c.t==='number'?' class="n"':'';
-      return '<td'+n+'>'+esc(fmtCell(c,r[c.k]))+'</td>';
+      var txt=fmtCell(c,r[c.k]);
+      if(c.href && r[c.k]){
+        return '<td'+n+'><a href="'+esc(c.href(r[c.k],r))+'" target="_blank" '+
+               'style="color:var(--s1);text-decoration:none">'+esc(txt)+'</a></td>';
+      }
+      return '<td'+n+'>'+esc(txt)+'</td>';
     }).join('')+(g.ro?'':'<td class="act"></td>');
     if(!g.ro){
       var act=tr.lastChild;
