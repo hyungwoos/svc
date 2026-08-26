@@ -2538,8 +2538,11 @@ function renderKpis(list){
           return true;
         });
         var uq={}; sel.forEach(function(x){ uq[x.cust]=1; });
-        return { k:'LIVE 고객사', v:sel.length.toLocaleString('ko-KR'), u:'건',
-                 d:'고객사 '+Object.keys(uq).length+'곳 · LIVE 고객사 탭 기준' };
+        var nCust=Object.keys(uq).length, nRow=sel.length, dupN=nRow-nCust;
+        return { k:'LIVE 고객사', v:nCust.toLocaleString('ko-KR'), u:'곳',
+                 d:'서비스 기준 '+nRow.toLocaleString('ko-KR')+'건'+
+                   (dupN>0? ' · 한 고객사가 여러 서비스를 쓰면 서비스마다 1건으로 집계됩니다 ('+dupN+'건 중복)'
+                          : ' · LIVE 고객사 탭 기준') };
       }
       return { k:'활성 고객사', v:cust.toLocaleString('ko-KR'), u:'곳', d: custPrevY? deltaHtml(cust,custPrevY,'전년'):'' };
     })(),
@@ -3850,8 +3853,10 @@ function computeFromP(p){
     var sc0=[]; if(p.lines&&p.lines.length) sc0.push(p.lines.join('+')); if(p.ind) sc0.push(p.ind);
     return {
       title:(sc0.length? sc0.join(' · ')+' · ':'')+'LIVE 고객사 탭 기준',
-      hero: sel.length.toLocaleString('ko-KR'), unit:'건',
-      sub: '고객사 '+Object.keys(uq).length+'곳 (중복 제외 '+Object.keys(uqND).length+'곳)'+(nodes? ' · 노드 '+nodes.toLocaleString('ko-KR')+'개':''),
+      hero: Object.keys(uq).length.toLocaleString('ko-KR'), unit:'곳',
+      sub: '서비스 기준 '+sel.length.toLocaleString('ko-KR')+'건 (한 고객사가 여러 서비스를 쓰면 서비스마다 1건)'+
+           (Object.keys(uqND).length!==Object.keys(uq).length? ' · 중복표시 제외 '+Object.keys(uqND).length+'곳':'')+
+           (nodes? ' · 노드 '+nodes.toLocaleString('ko-KR')+'개':''),
       chart:{type:'bar', labels:arr0.map(function(x){return lline(x[0]);}),
              series:[{label:useInd?'산업군':'제품군', data:arr0.map(function(x){return x[1];}), color:cssv('--s1')}], money:false},
       table:{cols:[useInd?'산업군':'제품군','건수','비중'],
