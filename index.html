@@ -680,19 +680,19 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
   <button data-v="chlgu">📶 LGU+</button>
   <button data-v="chs1">🔒 에스원</button>
   <button data-v="chdist">📀 유통 (DLP·DRM)</button>
-  <div class="grp">신청</div>
-  <button data-v="ordernew">📝 임대 장비 신청</button>
-  <button data-v="mdrnew">🛡️ PoC 신청</button>
-  <div class="grp">현황</div>
-  <button data-v="orders">📦 임대 장비 신청 현황</button>
-  <button data-v="mdrpoc">📋 PoC 신청 현황</button>
   <div class="grp">장비</div>
+  <button data-v="ordernew">📝 임대 장비 신청</button>
+  <button data-v="orders">📦 임대 장비 신청 내역</button>
   <button data-v="assets">🔧 임대 장비 현황</button>
+  <div class="grp">PoC</div>
+  <button data-v="mdrnew">🛡️ PoC 신청</button>
+  <button data-v="mdrpoc">📋 PoC 신청 현황</button>
   <div class="grp">정산·목표</div>
   <button data-v="biz">⚖️ 비즈포탈 차액</button>
   <button data-v="targets">🎯 연간 목표</button>
   <div class="grp">도구</div>
   <button data-v="quote">📄 견적 시스템</button>
+  <div class="grp">기록·계정</div>
   <button data-v="log">🕘 변경 이력</button>
   <button data-v="account">👤 내 계정</button>
 </nav>
@@ -928,7 +928,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
   <div id="viewOrderNew" class="hidden">
     <section class="card c12" style="max-width:860px;margin:0 auto">
       <h3 style="margin:0 0 4px;font-size:16px">📝 임대장비 발주 신청</h3>
-      <p class="cap" style="margin:0 0 16px">저장하면 DB에 기록되고 슬랙 채널로 자동 통보됩니다. 처리 현황은 「임대 장비 신청 현황」에서 확인하세요.</p>
+      <p class="cap" style="margin:0 0 16px">저장하면 DB에 기록되고 슬랙 채널로 자동 통보됩니다. 처리 현황은 「임대 장비 신청 내역」에서 확인하세요.</p>
       <div id="odDone" style="display:none;text-align:center;padding:34px 10px 22px">
         <div style="width:66px;height:66px;margin:0 auto 16px;border-radius:50%;background:rgba(12,163,12,.12);display:flex;align-items:center;justify-content:center;font-size:30px;color:var(--good,#0ca30c)">✓</div>
         <div style="font-size:17.5px;font-weight:750;letter-spacing:-.01em">발주 신청이 접수되었습니다</div>
@@ -1104,6 +1104,19 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
   </div>
 
   <div class="foot" id="foot"></div>
+</div>
+
+<!-- 사업 영역 · 고객사 계약 이력 -->
+<div class="ovl" id="ovlChvHist">
+  <div class="modal" style="width:min(920px,100%)">
+    <h3 id="chvHTitle">고객사</h3>
+    <p class="cap" id="chvHCap" style="margin:0 0 12px"></p>
+    <div id="chvHBody"></div>
+    <div class="mact">
+      <span class="mmsg"></span>
+      <button class="pill ghost" onclick="closeOvl('ovlChvHist')">닫기</button>
+    </div>
+  </div>
 </div>
 
 <!-- 견적서 선택 (OI 자동 채움) -->
@@ -4396,7 +4409,7 @@ var GRIDS={
   mdrpoc:{
     title:'PoC 신청 현황', table:'mdr_poc_requests',
     chipsField:'status', chipsOpts:['접수','진행중','완료','취소'],
-    cap:'EDR+MDR POC 신청 접수 현황 · 신규 신청은 신청 › PoC 신청', add:true, del:true,
+    cap:'EDR+MDR POC 신청 접수 현황 · 신규 신청은 PoC › PoC 신청', add:true, del:true,
     rows:function(){ return RAWX.mdrpoc||[]; },
     cols:[
       {k:'created_at',l:'신청일',ro:true,fmt:function(v){return String(v||'').slice(0,10);}},
@@ -4422,9 +4435,9 @@ var GRIDS={
     ]
   },
   orders:{
-    title:'임대 장비 신청 현황', table:'equipment_orders',
+    title:'임대 장비 신청 내역', table:'equipment_orders',
     chipsField:'channel', chipsOpts:['에스원','LGU+','조달','일반','기타'],
-    cap:'발주·교체·회수 요청의 상태 관리 (설치완료/회수완료 시 자산 자동 반영) · 신규 신청은 신청 › 임대 장비 신청', add:true, del:true,
+    cap:'발주·교체·회수 요청의 상태 관리 (설치완료/회수완료 시 자산 자동 반영) · 신규 신청은 장비 › 임대 장비 신청', add:true, del:true,
     rows:function(){ return RAWX.orders||[]; },
     cols:[
       {k:'created_at',l:'신청일',ro:true,fmt:function(v){return String(v||'').slice(0,10);}},
@@ -4818,6 +4831,160 @@ function renderBizEditor(host, months){
   };
 }
 
+/* ===== 사업 영역 계약 목록 — 고객사별 최신 1건 + 이력 보기 + 열 필터 ===== */
+var CHV={key:null, all:[], q:'', filters:{}, sortK:'mrr', sortDir:-1};
+var CHV_COLS=[
+  {k:'cust',    l:'고객사', link:true, text:function(r){ return r.cust||''; }},
+  {k:'line',    l:'서비스', text:function(r){ return lline(r.line)||''; }},
+  {k:'ptn',     l:'파트너', text:function(r){ return r.ptn||''; }},
+  {k:'partner', l:'발행처', text:function(r){ return r.partner||''; }},
+  {k:'ctype',   l:'구분',   text:function(r){ return r.ctype||''; }},
+  {k:'status',  l:'상태',   text:function(r){ return r.status||''; }},
+  {k:'start',   l:'시작월', text:function(r){ return mk(r.startIdx)||''; }},
+  {k:'end',     l:'종료월', text:function(r){ return mk(r.endIdx)||''; }},
+  {k:'mrr',     l:'MRR',    num:true, right:true, text:function(r){ return won(r.mrr||0)+'원'; }},
+  {k:'hist',    l:'이력',   text:function(r){ return (r._hist? r._hist.length:1)+'건'; }}
+];
+function chvText(c,r){ var t=String(c.text(r)||'').trim(); return t===''? BLANK_LABEL : t; }
+
+/* 고객사별로 «가장 최근» 계약 1건만 남기고, 나머지는 _hist 에 담는다
+   최신 기준: 시작월 → 종료월 → MRR 순 (모두 큰 쪽이 최신) */
+function chvLatest(rows){
+  var by={}, order=[];
+  rows.forEach(function(r){
+    var k=r.cust||'?';
+    if(!by[k]){ by[k]=[]; order.push(k); }
+    by[k].push(r);
+  });
+  return order.map(function(k){
+    var arr=by[k].slice().sort(function(a,b){
+      return (b.startIdx-a.startIdx) || (b.endIdx-a.endIdx) || ((b.mrr||0)-(a.mrr||0));
+    });
+    var top=Object.create(arr[0]);      // 원본을 건드리지 않고 _hist 만 얹는다
+    top._hist=arr;
+    return top;
+  });
+}
+function chvPass(r,skipK){
+  for(var k in CHV.filters){
+    if(k===skipK) continue;
+    var sel=CHV.filters[k]; if(!sel||!sel.length) continue;
+    var col=null;
+    for(var i=0;i<CHV_COLS.length;i++){ if(CHV_COLS[i].k===k){ col=CHV_COLS[i]; break; } }
+    if(!col) continue;
+    if(sel.indexOf(chvText(col,r))<0) return false;
+  }
+  return true;
+}
+function chvBase(skipK){
+  var q=(($('#chvQ')&&$('#chvQ').value)||'').trim().toLowerCase();
+  var toks=q? q.split(/\s+/).filter(Boolean):[];
+  return chvLatest(CHV.all).filter(function(r){
+    if(!chvPass(r,skipK)) return false;
+    if(!toks.length) return true;
+    var hay='';
+    CHV_COLS.forEach(function(c){ hay+=String(c.text(r)||'').replace(/\s+/g,''); });
+    (r._hist||[]).forEach(function(h){ hay+=String(h.note||'').replace(/\s+/g,''); });
+    hay=hay.toLowerCase();
+    return toks.every(function(t){ return hay.indexOf(t.replace(/\s+/g,''))>=0; });
+  });
+}
+function renderChvTable(){
+  var rows=chvBase(null);
+  if(CHV.sortK){
+    var col=null;
+    for(var i=0;i<CHV_COLS.length;i++){ if(CHV_COLS[i].k===CHV.sortK){ col=CHV_COLS[i]; break; } }
+    if(col) rows=rows.slice().sort(function(a,b){
+      if(col.num) return ((a.mrr||0)-(b.mrr||0))*CHV.sortDir;
+      if(col.k==='hist') return (((a._hist?a._hist.length:1)-(b._hist?b._hist.length:1)))*CHV.sortDir;
+      return String(col.text(a)).localeCompare(String(col.text(b)),'ko')*CHV.sortDir;
+    });
+  }
+  var nAll=chvLatest(CHV.all).length, nDup=CHV.all.length-nAll;
+  $('#chvCtCap').textContent='고객사 '+nAll.toLocaleString('ko-KR')+'곳 · 고객사마다 가장 최근 계약 1건만 표시'+
+    (nDup>0? ' · 재약정·추가 등 이전 이력 '+nDup+'건은 고객사명을 눌러서 확인 (MRR은 그 계약 1건 기준, 고객사 합계는 이력 창에서)':'');
+  $('#chvCnt').textContent=rows.length.toLocaleString('ko-KR')+'곳'+(rows.length!==nAll? ' / '+nAll+'곳':'');
+  var nf=0; for(var k in CHV.filters){ if(CHV.filters[k]&&CHV.filters[k].length) nf++; }
+  var fb=$('#chvFclr'); fb.style.display=nf? '':'none'; fb.textContent='✕ 필터 해제 ('+nf+')';
+
+  var t=$('#chvCt');
+  t.innerHTML='<thead><tr>'+CHV_COLS.map(function(c){
+      return '<th'+(c.right?' class="n"':'')+'></th>'; }).join('')+'</tr></thead>'+
+    '<tbody>'+rows.slice(0,300).map(function(r,i){
+      return '<tr data-i="'+i+'">'+CHV_COLS.map(function(c){
+        var txt=chvText(c,r); if(txt===BLANK_LABEL) txt='·';
+        if(c.link){
+          var n=(r._hist? r._hist.length:1);
+          return '<td><a href="#" class="chv-cust" data-i="'+i+'" style="color:var(--s1);font-weight:700;text-decoration:none">'+
+                 esc(txt)+'</a>'+(n>1? ' <span class="mini" style="opacity:.65">('+n+')</span>':'')+'</td>';
+        }
+        return '<td'+(c.right?' class="n"':'')+'>'+esc(txt)+'</td>';
+      }).join('')+'</tr>';
+    }).join('')+'</tbody>';
+
+  // 헤더 (정렬 + 값 골라 보기)
+  var ths=t.querySelectorAll('thead th');
+  CHV_COLS.forEach(function(c,ci){
+    var th=ths[ci];
+    var on=!!(CHV.filters[c.k] && CHV.filters[c.k].length);
+    var wrap=document.createElement('div'); wrap.className='thw';
+    var lab=document.createElement('span');
+    lab.textContent=c.l+(CHV.sortK===c.k? (CHV.sortDir>0?' ▲':' ▼'):'');
+    lab.style.cursor='pointer'; lab.title='클릭: 정렬';
+    lab.onclick=function(){
+      if(CHV.sortK===c.k) CHV.sortDir*=-1; else { CHV.sortK=c.k; CHV.sortDir=1; }
+      renderChvTable();
+    };
+    var fb2=document.createElement('button');
+    fb2.type='button'; fb2.className='fbtn'+(on?' on':''); fb2.textContent='▼';
+    fb2.title=on? '필터 적용 중 — 클릭해서 바꾸기':'값 골라 보기';
+    fb2.onclick=function(ev){
+      ev.stopPropagation();
+      var base=chvBase(c.k), cnt={}, order=[];
+      base.forEach(function(r){
+        var v=chvText(c,r);
+        if(cnt[v]===undefined){ cnt[v]=0; order.push(v); }
+        cnt[v]++;
+      });
+      openFilterPanel(fb2,{ label:c.l, order:order, cnt:cnt, num:!!c.num,
+        selected:CHV.filters[c.k]||null,
+        onApply:function(sel){
+          if(sel) CHV.filters[c.k]=sel; else delete CHV.filters[c.k];
+          renderChvTable();
+        }});
+    };
+    wrap.appendChild(lab); wrap.appendChild(fb2);
+    th.appendChild(wrap);
+  });
+
+  t.querySelectorAll('a.chv-cust').forEach(function(a){
+    a.onclick=function(ev){ ev.preventDefault(); openChvHist(rows[+a.dataset.i]); };
+  });
+}
+
+/* 고객사 계약 이력 (중복 포함) */
+function openChvHist(r){
+  if(!r) return;
+  var hist=(r._hist||[r]).slice();
+  $('#chvHTitle').textContent=r.cust||'?';
+  var b0=STATE.base, live=hist.filter(function(h){ return h.startIdx<=b0 && h.endIdx>=b0; });
+  var sum=live.reduce(function(a,h){ return a+(h.mrr||0); },0);
+  $('#chvHCap').textContent=(CH_DEFS[CHV.key]? CH_DEFS[CHV.key][1]+' 채널 · ':'')+hist.length+'건 · 최근 계약이 위쪽입니다'+
+    (live.length? ' · '+baseLabel()+' 유효 '+live.length+'건, 합계 MRR '+won(sum)+'원' : ' · '+baseLabel()+' 유효 계약 없음');
+  $('#chvHBody').innerHTML='<div class="tbl-wrap" style="max-height:min(58vh,460px)"><table class="dgrid">'+
+    '<thead><tr><th>서비스</th><th>파트너</th><th>발행처</th><th>구분</th><th>상태</th>'+
+    '<th>시작월</th><th>종료월</th><th class="n">MRR</th><th>비고</th></tr></thead><tbody>'+
+    hist.map(function(h,i){
+      return '<tr'+(i===0?' style="background:rgba(20,158,64,.07)"':'')+'>'+
+        '<td>'+esc(lline(h.line)||'·')+'</td><td>'+esc(h.ptn||'·')+'</td><td>'+esc(h.partner||'·')+'</td>'+
+        '<td>'+esc(h.ctype||'·')+'</td><td>'+esc(h.status||'·')+'</td>'+
+        '<td>'+esc(mk(h.startIdx)||'·')+'</td><td>'+esc(mk(h.endIdx)||'·')+'</td>'+
+        '<td class="n">'+won(h.mrr||0)+'원</td>'+
+        '<td>'+esc([h.note,h.churn].filter(Boolean).join(' · ')||'·')+'</td></tr>';
+    }).join('')+'</tbody></table></div>';
+  openOvl('ovlChvHist');
+}
+
 /* ---- 사업 영역(판매 채널) 화면 ---- */
 var CH_DEFS={
   chgen:['🤝 일반 판매','일반','파트너(다원티에스·글로웰시스템·에티버스) 경유 + 예외적 직판'],
@@ -4854,7 +5021,13 @@ function renderChannelView(key){
     '</div>';
   h+='<div class="grid">';
   h+='<section class="card c12"><h2>월별 매출 추이</h2><p class="cap">최근 24개월 · '+esc(def[0].replace(/^\S+ /,''))+'</p><div class="chartbox h260" id="chvTrend"></div></section>';
-  h+='<section class="card c12"><h2>계약 목록</h2><p class="cap" id="chvCtCap"></p><div class="tbl-wrap" style="max-height:420px"><table id="chvCt"></table></div></section>';
+  h+='<section class="card c12"><h2>계약 목록</h2><p class="cap" id="chvCtCap"></p>'+
+     '<div class="dbar" style="margin-bottom:10px">'+
+       '<input type="search" id="chvQ" placeholder="검색 — 여러 단어로 좁히기 (예: 다원 MDR)">'+
+       '<button class="pill ghost" id="chvFclr" style="display:none;border-color:var(--critical);color:var(--critical)">✕ 필터 해제</button>'+
+       '<span class="spacer"></span><span class="mini" id="chvCnt"></span>'+
+     '</div>'+
+     '<div class="tbl-wrap" style="max-height:460px"><table id="chvCt" class="dgrid"></table></div></section>';
   if(ch==='LGU+' && DATA.lg && DATA.lg.ok){
     h+='<section class="card c12"><h2>LG 판매 참고 목록</h2><p class="cap">'+DATA.lg.count+'건 · 월액 합계 '+won(DATA.lg.feeSum)+'원 · 매출은 각 서비스에 포함</p>'+
        '<div class="tbl-wrap" style="max-height:320px"><table id="chvLg"></table></div></section>';
@@ -4869,17 +5042,12 @@ function renderChannelView(key){
     Viz.lines($('#chvTrend'),{labels:labels,series:[{label:def[1],data:data,color:cssv('--s1')}],fmt:won,tipFmt:wonFull,fill:true});
   }catch(e){ $('#chvTrend').innerHTML='<p class="cap">데이터가 없습니다</p>'; }
 
-  // 계약 테이블
-  var rows=list.map(function(k){ return DATA.rows[k]; })
-    .sort(function(a,b2){ return (b2.mrr||0)-(a.mrr||0); });
-  $('#chvCtCap').textContent=rows.length+'건 · MRR 큰 순 (상위 200)';
-  var t=$('#chvCt');
-  t.innerHTML='<thead><tr><th>고객사</th><th>서비스</th><th>파트너</th><th>기간</th><th style="text-align:right">MRR</th><th>상태</th></tr></thead>'+
-    '<tbody>'+rows.slice(0,200).map(function(r){
-      return '<tr><td><b>'+esc(r.cust)+'</b></td><td>'+lline(r.line)+'</td><td>'+esc(r.ptn)+'</td>'+
-        '<td class="mini">'+(mk(r.startIdx)||'?')+' ~ '+(mk(r.endIdx)||'?')+'</td>'+
-        '<td style="text-align:right">'+won(r.mrr||0)+'원</td><td class="mini">'+esc(r.status||'활성')+'</td></tr>';
-    }).join('')+'</tbody>';
+  // 계약 테이블 — 고객사별 «최신 1건» 만, 나머지는 고객사 클릭으로
+  CHV.key=key; CHV.q=''; CHV.filters={}; CHV.sortK='mrr'; CHV.sortDir=-1;
+  CHV.all=list.map(function(k){ return DATA.rows[k]; });
+  $('#chvQ').oninput=function(){ renderChvTable(); };
+  $('#chvFclr').onclick=function(){ CHV.filters={}; renderChvTable(); };
+  renderChvTable();
 
   // LG 참고 목록
   if(ch==='LGU+' && DATA.lg && DATA.lg.ok){
@@ -4897,7 +5065,7 @@ var ROLE_INFO={
   admin:     ['관리자','모든 데이터 조회·수정과 계정 관리가 가능합니다.'],
   editor:    ['편집자','매출·장비 데이터를 조회하고 수정할 수 있습니다.'],
   viewer:    ['조회 전용','모든 화면을 볼 수 있지만 수정은 할 수 없습니다.'],
-  equipment: ['장비 전용','임대 장비 신청·현황만 사용할 수 있고 매출 데이터에는 접근할 수 없습니다.'],
+  equipment: ['장비 전용','임대 장비 신청·내역·현황만 사용할 수 있고 매출 데이터에는 접근할 수 없습니다.'],
   poc:       ['MDR POC 전용','PoC 신청·현황만 사용할 수 있고 매출 데이터에는 접근할 수 없습니다.'],
   equipment_poc: ['장비·POC 전용','임대장비와 MDR POC를 사용할 수 있고 매출 데이터에는 접근할 수 없습니다.']
 };
@@ -5625,8 +5793,8 @@ function colfOutside(e){
 }
 function colfEsc(e){ if(e.key==='Escape') closeColFilter(); }
 
+/* 열의 값 목록을 세어서 범용 패널을 띄운다 */
 function openColFilter(anchor,g,c){
-  closeColFilter();
   var rows=baseRows(g,c.k);
   var cnt={}, order=[];
   rows.forEach(function(r){
@@ -5634,26 +5802,40 @@ function openColFilter(anchor,g,c){
     if(cnt[t]===undefined){ cnt[t]=0; order.push(t); }
     cnt[t]++;
   });
-  var isNum=(c.t==='number');
+  openFilterPanel(anchor,{
+    label:c.l, order:order, cnt:cnt, num:(c.t==='number'),
+    selected:DV.filters[c.k]||null,
+    onApply:function(sel){
+      if(sel) DV.filters[c.k]=sel; else delete DV.filters[c.k];
+      DV.page=0; renderGrid();
+    }
+  });
+}
+
+/* 범용 «값 골라 보기» 패널 — 계약 그리드와 사업 영역 표가 함께 씁니다
+   opt = {label, order:[값], cnt:{값:개수}, num, selected:[]|null, onApply(sel|null)} */
+function openFilterPanel(anchor,opt){
+  closeColFilter();
+  var order=opt.order.slice(), cnt=opt.cnt||{};
   order.sort(function(a,b){
     if(a===BLANK_LABEL) return 1; if(b===BLANK_LABEL) return -1;
-    if(isNum){ var x=+String(a).replace(/[^0-9.-]/g,''), y=+String(b).replace(/[^0-9.-]/g,'');
+    if(opt.num){ var x=+String(a).replace(/[^0-9.-]/g,''), y=+String(b).replace(/[^0-9.-]/g,'');
       if(!isNaN(x)&&!isNaN(y)&&x!==y) return x-y; }
     return String(a).localeCompare(String(b),'ko');
   });
-  var cur=DV.filters[c.k];
   var picked={};
-  if(cur&&cur.length) cur.forEach(function(v){ picked[v]=1; });
-  else order.forEach(function(v){ picked[v]=1; });   // 필터 없으면 전부 선택 상태
+  if(opt.selected && opt.selected.length) opt.selected.forEach(function(v){ picked[v]=1; });
+  else order.forEach(function(v){ picked[v]=1; });
 
   var el=document.createElement('div');
   el.className='colf'; el.id='colfPanel';
-  el.innerHTML='<div class="colf-h">'+esc(c.l)+' — 볼 값 고르기</div>'+
-    '<input type="search" id="colfQ" placeholder="값 검색">'+
+  el.innerHTML='<div class="colf-h">'+esc(opt.label)+' — 볼 값 고르기'+
+      '<span id="colfCnt" style="float:right;font-weight:600;opacity:.65"></span></div>'+
+    '<input type="search" id="colfQ" placeholder="값 검색 — 찾은 뒤 「모두」 를 누르면 그것만 선택">'+
     '<div class="colf-list" id="colfList"></div>'+
     '<div class="colf-a">'+
-      '<button type="button" id="colfAll">모두</button>'+
-      '<button type="button" id="colfNone">해제</button>'+
+      '<button type="button" id="colfAll" title="검색 중이면 검색 결과만 선택, 아니면 전체 선택">모두</button>'+
+      '<button type="button" id="colfNone" title="선택 전부 해제">해제</button>'+
       '<span style="flex:1"></span>'+
       '<button type="button" id="colfCancel">취소</button>'+
       '<button type="button" class="pri" id="colfOk">적용</button>'+
@@ -5664,33 +5846,40 @@ function openColFilter(anchor,g,c){
     var q=(document.getElementById('colfQ').value||'').trim().toLowerCase();
     var list=document.getElementById('colfList');
     var vis=order.filter(function(v){ return !q || String(v).toLowerCase().indexOf(q)>=0; });
+    var nsel=0; order.forEach(function(v){ if(picked[v]) nsel++; });
+    var hd=document.getElementById('colfCnt');
+    if(hd) hd.textContent=nsel+' / '+order.length+' 선택'+(q? ' · 검색 '+vis.length+'개':'');
     if(!vis.length){ list.innerHTML='<div class="cap" style="padding:10px;text-align:center">해당하는 값이 없습니다</div>'; return; }
     list.innerHTML=vis.map(function(v){
       return '<label class="colf-i"><input type="checkbox" data-v="'+esc(v)+'"'+(picked[v]?' checked':'')+'>'+
-        '<span class="t" title="'+esc(v)+'">'+esc(v)+'</span><span class="n">'+cnt[v]+'</span></label>';
+        '<span class="t" title="'+esc(v)+'">'+esc(v)+'</span><span class="n">'+(cnt[v]||0)+'</span></label>';
     }).join('');
     list.querySelectorAll('input[data-v]').forEach(function(i){
-      i.onchange=function(){ if(i.checked) picked[i.dataset.v]=1; else delete picked[i.dataset.v]; };
+      i.onchange=function(){ if(i.checked) picked[i.dataset.v]=1; else delete picked[i.dataset.v];
+        var n=0; order.forEach(function(v){ if(picked[v]) n++; });
+        var h2=document.getElementById('colfCnt');
+        var q2=(document.getElementById('colfQ').value||'').trim().toLowerCase();
+        if(h2) h2.textContent=n+' / '+order.length+' 선택'+(q2? ' · 검색 '+vis.length+'개':'');
+      };
     });
   }
   paint();
   document.getElementById('colfQ').oninput=paint;
   document.getElementById('colfAll').onclick=function(){
     var q=(document.getElementById('colfQ').value||'').trim().toLowerCase();
-    order.forEach(function(v){ if(!q||String(v).toLowerCase().indexOf(q)>=0) picked[v]=1; }); paint(); };
-  document.getElementById('colfNone').onclick=function(){
-    var q=(document.getElementById('colfQ').value||'').trim().toLowerCase();
-    order.forEach(function(v){ if(!q||String(v).toLowerCase().indexOf(q)>=0) delete picked[v]; }); paint(); };
+    if(q){ picked={}; order.forEach(function(v){ if(String(v).toLowerCase().indexOf(q)>=0) picked[v]=1; }); }
+    else  { order.forEach(function(v){ picked[v]=1; }); }
+    paint(); };
+  document.getElementById('colfNone').onclick=function(){ picked={}; paint(); };
   document.getElementById('colfCancel').onclick=closeColFilter;
   document.getElementById('colfOk').onclick=function(){
     var sel=order.filter(function(v){ return picked[v]; });
     if(!sel.length){ alert('최소 한 개는 골라야 합니다. 전체를 보려면 「모두」 를 누르세요.'); return; }
-    if(sel.length===order.length) delete DV.filters[c.k];   // 전부 = 필터 없음
-    else DV.filters[c.k]=sel;
-    DV.page=0; closeColFilter(); renderGrid();
+    var out=(sel.length===order.length)? null : sel;
+    closeColFilter();
+    opt.onApply(out);
   };
 
-  // 위치 — 헤더 아래, 화면 밖으로 나가지 않게
   var r=anchor.getBoundingClientRect(), w=el.offsetWidth, h=el.offsetHeight;
   var left=Math.min(Math.max(8,r.left-w+r.width+8), window.innerWidth-w-8);
   var top=r.bottom+6;
