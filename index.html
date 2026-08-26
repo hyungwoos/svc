@@ -637,6 +637,9 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
   <div class="grp">전체 데이터</div>
   <button data-v="contracts">📋 계약</button>
   <button data-v="live">🟢 LIVE 고객사</button>
+  <div class="grp">영업</div>
+  <button data-v="oinew">✏️ OI 등록</button>
+  <button data-v="oi">🎯 OI 현황</button>
   <div class="grp">사업 영역</div>
   <button data-v="chgen">🤝 일반 판매</button>
   <button data-v="chpub">🏛️ 조달</button>
@@ -996,6 +999,62 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
         <button class="btn" style="height:38px;padding:0 28px" id="mpGo">POC 신청</button>
       </div>
       </div><!-- /mpFormWrap -->
+    </section>
+  </div>
+
+  <div id="viewOiNew" class="hidden">
+    <section class="card c12" style="max-width:1000px;margin:0 auto">
+      <h3 style="margin:0 0 4px;font-size:16px">✏️ OI (영업기회) 등록</h3>
+      <p class="cap" style="margin:0 0 16px">등록하면 슬랙으로 공유되고, 「OI 현황」에서 진행 상태를 관리합니다.</p>
+      <div id="oiDone" style="display:none;text-align:center;padding:34px 10px 22px">
+        <div style="width:66px;height:66px;margin:0 auto 16px;border-radius:50%;background:rgba(12,163,12,.12);display:flex;align-items:center;justify-content:center;font-size:30px;color:var(--good,#0ca30c)">✓</div>
+        <div style="font-size:17.5px;font-weight:750;letter-spacing:-.01em">OI가 등록되었습니다</div>
+        <p class="cap" id="oiDoneSum" style="margin:10px 0 22px;font-size:12.5px"></p>
+        <div style="display:flex;gap:10px;justify-content:center">
+          <button class="pill" id="oiDoneList" style="background:var(--s1);border-color:var(--s1);color:#fff">🎯 OI 현황 보기</button>
+          <button class="pill ghost" id="oiDoneNew">＋ 새로 등록</button>
+        </div>
+      </div>
+      <div id="oiFormWrap">
+      <div style="font-size:11px;color:var(--ink-2);opacity:.75;margin:2px 0 10px">— 고객사 정보 —</div>
+      <div class="frm">
+        <div><label>산업군 *</label><select id="oiInd"><option>공공</option><option>의료</option><option>학교</option><option selected>기업</option><option>금융</option><option>국방</option><option>홈네트워크</option></select></div>
+        <div><label>고객사 *</label><input id="oiCust"></div>
+        <div><label>고객 담당자 부서</label><input id="oiCDept"></div>
+        <div><label>고객 담당자 이름</label><input id="oiCName"></div>
+        <div><label>고객 담당자 이메일</label><input id="oiCEmail" type="email"></div>
+        <div><label>고객 담당자 연락처</label><input id="oiCPhone" placeholder="010-0000-0000"></div>
+        <div><label>지니언스 담당자 *</label><input id="oiOwner"></div>
+        <div><label>구축 파트너</label><input id="oiPartner" list="dl_oiPartner"><datalist id="dl_oiPartner"><option value="다원티에스"></option><option value="글로웰시스템"></option><option value="에티버스"></option></datalist></div>
+      </div>
+      <div style="font-size:11px;color:var(--ink-2);opacity:.75;margin:16px 0 10px">— 사업 관련 정보 —</div>
+      <div class="frm">
+        <div><label>사업형태 *</label><select id="oiType"><option>신규제안</option><option>확산(증설)</option><option>망분리</option><option>EoL(노후교체)</option><option>SI</option><option>회선</option></select></div>
+        <div><label>사업명 *</label><input id="oiName"></div>
+        <div><label>매출경로</label><input id="oiRoute" placeholder="예: 파트너 경유, 직판"></div>
+        <div><label>무상 유지관리 기간 (개월)</label><input id="oiFree" type="number" min="0"></div>
+        <div><label>계약 예상 시기</label><input id="oiMonth" type="month"></div>
+        <div><label>계약 예상단가 (VAT 별도)</label><input id="oiAmt" type="number" min="0" step="100000"></div>
+        <div><label>경쟁사 제안가</label><input id="oiRival" type="number" min="0" step="100000"></div>
+        <div><label>수주 가능성</label><select id="oiProb"></select></div>
+        <div class="full"><label>경쟁 현황 및 영업전략</label><input id="oiStrategy" placeholder="윈백 사업인 경우 기존 사용 제품의 제조사를 적어주세요"></div>
+      </div>
+      <div style="font-size:11px;color:var(--ink-2);opacity:.75;margin:16px 0 8px">— 제품군 (복수 선택) —</div>
+      <div id="oiProducts" style="display:flex;gap:10px;flex-wrap:wrap"></div>
+      <div style="font-size:11px;color:var(--ink-2);opacity:.75;margin:16px 0 8px">— 제품 정보 (모델·수량) —</div>
+      <div id="oiItems"></div>
+      <button class="pill ghost" id="oiAddItem" style="margin:8px 0 4px">＋ 제품 추가</button>
+      <div style="font-size:11px;color:var(--ink-2);opacity:.75;margin:16px 0 10px">— 진행 관리 —</div>
+      <div class="frm">
+        <div><label>다음 할 일</label><input id="oiNext" placeholder="예: BMT 일정 조율"></div>
+        <div><label>다음 액션 예정일</label><input id="oiNextDate" type="date"></div>
+        <div class="full"><label>비고</label><input id="oiNote"></div>
+      </div>
+      <div class="mact" style="margin-top:16px">
+        <span class="mmsg" id="oiMsg"></span>
+        <button class="btn" style="height:38px;padding:0 28px" id="oiGo">OI 등록</button>
+      </div>
+      </div><!-- /oiFormWrap -->
     </section>
   </div>
 
@@ -1613,7 +1672,7 @@ async function loadFromDb(){
       var res0=[
         j.customers, j.contracts,
         (j.mrs||[]).map(function(a){ return {contract_id:a[0], month:a[1], amount:a[2]}; }),
-        j.live, j.lg, j.biz, j.targets, j.orders, j.roles, j.assets, j.mdrpoc, j.mtargets
+        j.live, j.lg, j.biz, j.targets, j.orders, j.roles, j.assets, j.mdrpoc, j.mtargets, j.oi
       ];
       try{ sessionStorage.setItem(CACHE_KEY, JSON.stringify({t:Date.now(), res:res0})); }catch(e){}
       return buildFromRes(res0);
@@ -1631,7 +1690,8 @@ async function loadFromDb(){
     sbTry('user_roles?select=role'),
     sbTry('equipment_assets?select=*&order=serial'),
     sbTry('mdr_poc_requests?select=*&order=id.desc'),
-    sbTry('monthly_targets?select=*&order=year,month')
+    sbTry('monthly_targets?select=*&order=year,month'),
+    sbTry('oi_deals?select=*&order=id.desc')
   ]);
   try{ sessionStorage.setItem(CACHE_KEY, JSON.stringify({t:Date.now(), res:res})); }catch(e){}
   return buildFromRes(res);
@@ -1648,7 +1708,7 @@ function buildFromRes(res){
   var custs=res[0], cts=res[1], mrs=res[2];
   var LIVE=shapeLive(res[3]), LGD=shapeLg(res[4]), VSD=shapeVs(res[5]);
   window.RAWX={customers:custs, contracts:cts, live:res[3]||[], lg:res[4]||[], biz:res[5]||[],
-    targets:res[6]||[], orders:res[7]||[], assets:res[9]||[], mdrpoc:res[10]||[], mtargets:res[11]||[], log:null, mrs:mrs};
+    targets:res[6]||[], orders:res[7]||[], assets:res[9]||[], mdrpoc:res[10]||[], mtargets:res[11]||[], oi:res[12]||[], log:null, mrs:mrs};
   window.IS_VIEWER = !!(res[8] && res[8].length && res[8][0].role==='viewer');
   window.MY_ROLE = (res[8] && res[8].length && res[8][0].role) || '';
   SB_RAW.customers=custs; SB_RAW.contracts=cts;
@@ -3200,7 +3260,8 @@ function planToP(plan){
   p.partners=resolveMany(plan.partners,'partner');
   p.custs=resolveMany(plan.customers,'cust');
   p.partner=p.partners[0]||null; p.cust=p.custs[0]||null;
-  p.statuses=(plan.statuses||[]).filter(function(s){ return ['신규','재약정','서비스 종료','해지'].indexOf(s)>=0; });
+  p.statuses=(plan.statuses||[]).filter(function(s){ return ['신규','재약정','추가','서비스 종료','서비스종료','해지'].indexOf(s)>=0; })
+    .map(function(s){ return s==='서비스종료'? '서비스 종료' : s; });
 
   var g=String(plan.groupBy||'none');
   if(['partner','ind','line','cust','month','year','churn','status','channel'].indexOf(g)>=0) p.groupBy=g;
@@ -4130,6 +4191,27 @@ var CTYPE_OPTS=['신규','재약정','추가'];
 var CSTATUS_OPTS=['신규','재약정','추가','서비스종료','해지'];
 var CNOTE_OPTS=['재약정 완료','재약정 예정','정부 지원','중도 해지','미연장','매월 연장 확인 필요'];
 var CHURN_OPTS=['경영악화','비용이슈','폐업','고객사정','구축형전환','기타'];
+/* OI (영업기회) — 비즈포탈 체계 그대로 */
+var OI_STAGE=['등록','진행','수주','계산서발행','종료','중지','실패'];
+var OI_STAGE_DESC={'등록':'초기문의단계','진행':'영업진행단계','수주':'발주서접수','계산서발행':'세금계산서 발행',
+  '종료':'수금완료','중지':'진행일시 중지','실패':'수주실패'};
+var OI_PROB=[
+  [0,'초기 영업단계'],
+  [10,'고객 Need/Pain 파악, 설명회 수준의 소개, 초기 견적 제출'],
+  [20,'고객 시스템 구성 확인, 제안서 제출'],
+  [30,'제안구성에 대한 고객의 Acceptance (H/W 등 관련 제품 사양 포함)'],
+  [40,'Demo, BMT, POC Test 완료, 예산확보'],
+  [50,'고객 핵심 인력의 확정'],
+  [60,'최종 견적, 고객 내부 기안 완료, RFP 공동 작업'],
+  [70,'최종결정자 결재, 구매/입찰 일정 확정'],
+  [80,'입찰 선정, 최종 협상'],
+  [90,'고객 발주 접수'],
+  [100,'지니네트웍스에 발주 완료']
+];
+var OI_TYPE=['신규제안','확산(증설)','망분리','EoL(노후교체)','SI','회선'];
+var OI_IND=['공공','의료','학교','기업','금융','국방','홈네트워크'];
+var OI_PRODUCTS=['NAC','IPAM','ZTNA','SSL VPN','INSIGHTS (EDR)','GPI','Cloud NAC','Cloud ZTNA','Cloud GPI',
+  'Genian Home','AV','MDR','DRM','DLP'];
 
 var GRIDS={
   contracts:{
@@ -4214,6 +4296,33 @@ var GRIDS={
       }},
       {k:'amount',l:'목표 ARR(원)',t:'number',req:true},
       {k:'note',l:'메모'}
+    ]
+  },
+  oi:{
+    title:'OI 현황 (영업기회)', table:'oi_deals',
+    chipsField:'stage', chipsOpts:OI_STAGE,
+    cap:'등록된 영업기회의 진행 상태 관리 · 신규 등록은 영업 › OI 등록', add:false, del:true,
+    rows:function(){ return RAWX.oi||[]; },
+    cols:[
+      {k:'created_at',l:'등록일',ro:true,fmt:function(v){return String(v||'').slice(0,10);}},
+      {k:'stage',l:'진행상태',t:'select',opts:OI_STAGE},
+      {k:'win_prob',l:'수주가능성',t:'select',num:true,opts:OI_PROB.map(function(x){return String(x[0]);}),
+        fmt:function(v){ return (v==null?0:v)+'%'; }},
+      {k:'customer',l:'고객사',req:true},
+      {k:'deal_name',l:'사업명'},
+      {k:'deal_type',l:'사업형태',t:'select',opts:OI_TYPE},
+      {k:'industry',l:'산업군',t:'select',opts:OI_IND},
+      {k:'owner',l:'담당자'},
+      {k:'partner',l:'구축파트너'},
+      {k:'expect_month',l:'계약예상',t:'month'},
+      {k:'expect_amount',l:'예상단가',t:'number'},
+      {k:'rival_price',l:'경쟁사가',t:'number'},
+      {k:'next_action',l:'다음 할 일'},
+      {k:'next_date',l:'예정일',t:'date'},
+      {k:'cust_name',l:'고객 담당자'},
+      {k:'cust_phone',l:'연락처'},
+      {k:'lost_reason',l:'실패사유'},
+      {k:'note',l:'비고'}
     ]
   },
   mdrpoc:{
@@ -4880,6 +4989,130 @@ async function submitMdrPoc(){
   btn.disabled=false;
 }
 
+/* ================= OI (영업기회) ================= */
+function oiProbLabel(p){
+  var hit=OI_PROB.filter(function(x){ return x[0]===Number(p); })[0];
+  return hit? hit[0]+'% — '+hit[1] : (p||0)+'%';
+}
+function initOiForm(){
+  // 수주 가능성
+  var sel=$('#oiProb');
+  if(!sel.options.length){
+    sel.innerHTML=OI_PROB.map(function(x){
+      return '<option value="'+x[0]+'">'+x[0]+'% ('+esc(x[1])+')</option>'; }).join('');
+  }
+  // 제품군 체크박스
+  var pb=$('#oiProducts');
+  if(!pb.children.length){
+    pb.innerHTML=OI_PRODUCTS.map(function(name){
+      return '<label class="mpchk"><input type="checkbox" data-oip="'+esc(name)+'"> '+esc(name)+'</label>'; }).join('');
+  }
+  // 제품 정보 행
+  if(!$('#oiItems').children.length) oiAddItemRow();
+  if(!$('#oiOwner').value && AUTH_USER) $('#oiOwner').value='';
+}
+function oiAddItemRow(model, qty){
+  var box=$('#oiItems');
+  var row=document.createElement('div');
+  row.style.cssText='display:flex;gap:8px;margin-bottom:6px;max-width:560px';
+  row.innerHTML='<input class="oi-model" placeholder="모델명" style="flex:2;height:36px;padding:0 10px;border-radius:9px;border:1px solid var(--ring);background:var(--surface-2);color:var(--ink);font-family:inherit" value="'+esc(model||'')+'">'+
+    '<input class="oi-qty" type="number" min="1" placeholder="수량" style="width:110px;height:36px;padding:0 10px;border-radius:9px;border:1px solid var(--ring);background:var(--surface-2);color:var(--ink);font-family:inherit" value="'+esc(qty||'')+'">';
+  var rm=document.createElement('button'); rm.className='pill ghost'; rm.textContent='✕'; rm.style.cssText='height:36px;padding:0 12px';
+  rm.onclick=function(){ row.remove(); if(!box.children.length) oiAddItemRow(); };
+  row.appendChild(rm);
+  box.appendChild(row);
+}
+async function submitOi(){
+  var cust=$('#oiCust').value.trim(), name=$('#oiName').value.trim(), owner=$('#oiOwner').value.trim();
+  if(!cust||!name){ msg('oiMsg','고객사와 사업명은 필수입니다','bad'); return; }
+  var btn=$('#oiGo'); btn.disabled=true; msg('oiMsg','등록 중…');
+  try{
+    var prods=[]; $('#oiProducts').querySelectorAll('input[data-oip]:checked').forEach(function(c){ prods.push(c.dataset.oip); });
+    var items=[];
+    $('#oiItems').querySelectorAll('div').forEach(function(r){
+      var m=r.querySelector('.oi-model'), q=r.querySelector('.oi-qty');
+      if(m && m.value.trim()) items.push({model:m.value.trim(), qty:+(q&&q.value)||1});
+    });
+    var row={
+      requester: AUTH_USER||null,
+      industry: $('#oiInd').value,
+      customer: cust,
+      cust_dept: $('#oiCDept').value.trim()||null,
+      cust_name: $('#oiCName').value.trim()||null,
+      cust_email: $('#oiCEmail').value.trim()||null,
+      cust_phone: $('#oiCPhone').value.trim()||null,
+      owner: owner||null,
+      deal_type: $('#oiType').value,
+      deal_name: name,
+      sales_route: $('#oiRoute').value.trim()||null,
+      partner: $('#oiPartner').value.trim()||null,
+      free_months: $('#oiFree').value===''? null : +$('#oiFree').value,
+      expect_month: $('#oiMonth').value? $('#oiMonth').value+'-01' : null,
+      expect_amount: $('#oiAmt').value===''? null : +$('#oiAmt').value,
+      rival_price: $('#oiRival').value===''? null : +$('#oiRival').value,
+      strategy: $('#oiStrategy').value.trim()||null,
+      products: prods,
+      items: items,
+      stage: '등록',
+      win_prob: +$('#oiProb').value||0,
+      next_action: $('#oiNext').value.trim()||null,
+      next_date: $('#oiNextDate').value||null,
+      note: $('#oiNote').value.trim()||null
+    };
+    var out=await sbWrite('POST','oi_deals?select=*',[row],'return=representation');
+    RAWX.oi=RAWX.oi||[]; RAWX.oi.unshift(out[0]);
+    logChange('insert','oi_deals',out[0].id,{customer:cust,deal:name});
+    msg('oiMsg','');
+    $('#oiDoneSum').textContent=[cust, name, row.deal_type,
+      row.expect_amount? won(row.expect_amount)+'원':'', prods.join('·')].filter(Boolean).join(' · ');
+    $('#oiFormWrap').style.display='none';
+    $('#oiDone').style.display='';
+    toast('OI 등록 완료', cust+' · '+name);
+    ['oiCust','oiCDept','oiCName','oiCEmail','oiCPhone','oiName','oiRoute','oiPartner','oiFree','oiMonth',
+     'oiAmt','oiRival','oiStrategy','oiNext','oiNextDate','oiNote'].forEach(function(i){ $('#'+i).value=''; });
+    $('#oiProducts').querySelectorAll('input[data-oip]').forEach(function(c){ c.checked=false; });
+    $('#oiItems').innerHTML=''; oiAddItemRow();
+  }catch(e){ msg('oiMsg',String(e.message||e),'bad'); }
+  btn.disabled=false;
+}
+/* OI 현황 위 요약 타일 */
+function renderOiTiles(on){
+  var host=document.getElementById('oiTiles');
+  if(!on){ if(host) host.style.display='none'; return; }
+  if(!host){
+    host=document.createElement('div'); host.id='oiTiles'; host.className='kpis';
+    var t=document.getElementById('dvTitle');
+    var card=t? t.closest('.card') : null;
+    var bar=document.querySelector('#viewData .dbar');
+    if(bar && bar.parentElement) bar.parentElement.insertBefore(host, bar);
+  }
+  host.style.display='';
+  var rows=(RAWX.oi||[]);
+  var open=rows.filter(function(r){ return ['등록','진행'].indexOf(r.stage)>=0; });
+  var sum=function(a){ return a.reduce(function(s,r){ return s+(Number(r.expect_amount)||0); },0); };
+  var wsum=open.reduce(function(s,r){ return s+(Number(r.expect_amount)||0)*(Number(r.win_prob)||0)/100; },0);
+  var now=new Date(), q=Math.floor(now.getMonth()/3), qs=new Date(now.getFullYear(), q*3, 1), qe=new Date(now.getFullYear(), q*3+3, 1);
+  var thisQ=rows.filter(function(r){
+    if(!r.expect_month) return false;
+    var d=new Date(String(r.expect_month).slice(0,10));
+    return d>=qs && d<qe && ['수주','계산서발행','종료','실패','중지'].indexOf(r.stage)<0;
+  });
+  var won2=rows.filter(function(r){ return ['수주','계산서발행','종료'].indexOf(r.stage)>=0; });
+  var late=open.filter(function(r){ return r.next_date && String(r.next_date).slice(0,10) < new Date().toISOString().slice(0,10); });
+  host.innerHTML=
+    '<div class="kpi"><div class="k">진행 중</div><div class="v">'+open.length+'<small>건</small></div>'+
+      '<div class="d">예상 '+won(sum(open))+'원</div></div>'+
+    '<div class="kpi"><div class="k">가중 파이프라인</div><div class="v">'+won(Math.round(wsum))+'<small>원</small></div>'+
+      '<div class="d">수주가능성 반영</div></div>'+
+    '<div class="kpi"><div class="k">이번 분기 계약예상</div><div class="v">'+thisQ.length+'<small>건</small></div>'+
+      '<div class="d">'+won(sum(thisQ))+'원</div></div>'+
+    '<div class="kpi"><div class="k">수주 확정</div><div class="v">'+won2.length+'<small>건</small></div>'+
+      '<div class="d">'+won(sum(won2))+'원</div></div>'+
+    (late.length? '<div class="kpi" style="border-color:var(--critical,#d03b3b)"><div class="k">⏰ 액션 지연</div>'+
+      '<div class="v" style="color:var(--critical,#d03b3b)">'+late.length+'<small>건</small></div>'+
+      '<div class="d">'+esc(late.slice(0,2).map(function(r){return r.customer;}).join(', '))+'</div></div>' : '');
+}
+
 function closeDrawer(){ $('#side').classList.remove('open'); $('#sideDim').classList.remove('on'); }
 function setupSide(){
   $('#side').querySelectorAll('button').forEach(function(b){
@@ -4897,6 +5130,10 @@ function setupSide(){
   };
   $('#odGo').onclick=submitOrder;
   $('#mpGo').onclick=submitMdrPoc;
+  $('#oiGo').onclick=submitOi;
+  $('#oiAddItem').onclick=function(){ oiAddItemRow(); };
+  $('#oiDoneList').onclick=function(){ switchView('oi'); };
+  $('#oiDoneNew').onclick=function(){ $('#oiDone').style.display='none'; $('#oiFormWrap').style.display=''; $('#oiCust').focus(); };
   $('#mpDoneList').onclick=function(){ switchView('mdrpoc'); };
   $('#mpDoneNew').onclick=function(){ $('#mpDone').style.display='none'; $('#mpFormWrap').style.display=''; $('#mpCompany').focus(); };
   $('#odDoneList').onclick=function(){ switchView('orders'); };
@@ -4913,21 +5150,22 @@ function setupSide(){
 }
 
 function switchView(v){
-  if((v==='ordernew'||v==='mdrnew') && !SB_TOKEN){ openOvl('ovlAuth'); return; }
+  if((v==='ordernew'||v==='mdrnew'||v==='oinew') && !SB_TOKEN){ openOvl('ovlAuth'); return; }
   if(window.IS_EQUIP && !EQUIP_VIEWS[v]) v=window.EQUIP_HOME||'orders';   // 제한 계정은 허용된 화면만
   CUR_VIEW=v;
   $('#side').querySelectorAll('button').forEach(function(b){
     b.setAttribute('aria-current', b.dataset.v===v?'true':'false');
   });
-  var dash=v==='dash', quote=v==='quote', onew=v==='ordernew', acct=v==='account', mnew=v==='mdrnew';
+  var dash=v==='dash', quote=v==='quote', onew=v==='ordernew', acct=v==='account', mnew=v==='mdrnew', oinew=v==='oinew';
   var chv=CH_DEFS[v]||null;
   $('#viewDash').classList.toggle('hidden',!dash);
   $('#viewQuote').classList.toggle('hidden',!quote);
   $('#viewOrderNew').classList.toggle('hidden',!onew);
   $('#viewMdrNew').classList.toggle('hidden',!mnew);
+  $('#viewOiNew').classList.toggle('hidden',!oinew);
   $('#viewAccount').classList.toggle('hidden',!acct);
   $('#viewChannel').classList.toggle('hidden',!chv);
-  $('#viewData').classList.toggle('hidden',dash||quote||onew||mnew||acct||!!chv);
+  $('#viewData').classList.toggle('hidden',dash||quote||onew||mnew||oinew||acct||!!chv);
   if(chv){ renderChannelView(v); return; }
   if(acct){ renderAccount(); return; }
   if(onew){
@@ -4936,6 +5174,14 @@ function switchView(v){
     $('#odDone').style.display='none';
     loadRecvPresets();
     setTimeout(function(){ $('#odCustomer').focus(); },50);
+    return;
+  }
+  if(oinew){
+    msg('oiMsg','');
+    $('#oiFormWrap').style.display='';
+    $('#oiDone').style.display='none';
+    initOiForm();
+    setTimeout(function(){ $('#oiCust').focus(); },50);
     return;
   }
   if(mnew){
@@ -4967,6 +5213,7 @@ function switchView(v){
   }
   DV.page=0; DV.sortK=null; DV.sortDir=1; DV.chipVal='';
   var g=GRIDS[v];
+  renderOiTiles(v==='oi');
   $('#dvTitle').textContent=g.title;
   $('#dvCap').textContent=g.cap + (window.IS_VIEWER? ' · 조회 전용 계정입니다':'');
   $('#dvAdd').style.display=(g.add && !window.IS_VIEWER)?'':'none';
@@ -4988,7 +5235,11 @@ function editCell(c,v){
     var opts=(typeof c.opts==='function'? c.opts():c.opts).slice();
     if(!c.req && opts.indexOf('')<0) opts.unshift('');              // 비울 수 있게
     var cv=(v==null?'':String(v));
-    if(cv && opts.indexOf(cv)<0) opts.splice(1,0,cv);               // 기존 값 보존
+    // 공백만 다른 표기(예: '서비스 종료' vs '서비스종료')는 같은 값으로 취급 → 중복 옵션 방지
+    var nz=function(x){ return String(x).replace(/\s+/g,''); };
+    var same=opts.filter(function(o){ return nz(o)===nz(cv); })[0];
+    if(cv && same!==undefined) cv=same;
+    else if(cv && opts.indexOf(cv)<0) opts.splice(1,0,cv);           // 정말 없는 값만 보존
     return '<select data-k="'+c.k+'">'+opts.map(function(o){
       var lb=(c.k==='line')? lline(o) : (o===''? '— 없음 —' : o);
       return '<option value="'+esc(o)+'"'+(cv===o?' selected':'')+'>'+esc(lb)+'</option>';}).join('')+'</select>';
@@ -5560,7 +5811,7 @@ function makeDemo(){
   var lines=[{label:'Cloud',color:1},{label:'S1',color:2},{label:'MDR',color:3},{label:'PNS',color:4},{label:'MDR_S1',color:5}];
   var inds=['기업','공공'];
   var partners=['다원티에스','글로웰시스템','엘림넷','카카오엔터프라이즈','에스원(S1)','LG U+','금호타이어','지니언스'];
-  var sts=['신규','재약정','서비스 종료','해지'];
+  var sts=['신규','재약정','추가','서비스 종료','해지'];
   var reasons=['지원사업종료','미연장','고객변심/고객사정','비용이슈','폐업','경영악화'];
   var M2=(2029-2020)*12+12-5, rows=[], seed=7;
   function rnd(){ seed=(seed*1103515245+12345)&0x7fffffff; return seed/0x7fffffff; }
