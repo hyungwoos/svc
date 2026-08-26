@@ -2156,7 +2156,9 @@ function qwKey(){ return 'svc_qw_'+(AUTH_USER||'anon'); }
 function qwList(){ try{ return JSON.parse(localStorage.getItem(qwKey())||'[]')||[]; }catch(e){ return []; } }
 function qwSave(l){ try{ localStorage.setItem(qwKey(), JSON.stringify(l)); }catch(e){} }
 function pinQuery(q){
+  q=String(q||'').trim();
   if(!q) return;
+  if(q.length>200) q=q.slice(0,200);      // 지나치게 긴 질문은 잘라서 고정
   var l=qwList();
   if(l.some(function(w){return w.q===q;})){ toast('이미 고정된 질문입니다', q, 'info'); return; }
   l.push({id:'q'+Date.now().toString(36), q:q});
@@ -2177,8 +2179,8 @@ function renderQWidgets(){
     var sec=document.createElement('section');
     sec.className='card c6'; sec.dataset.w=w.id;
     sec.innerHTML='<div class="qw-head"><div class="t">'+
-      '<h2 style="font-size:13.5px">📌 '+esc((res&&res.title)||w.q)+'</h2>'+
-      '<p class="cap" style="margin:2px 0 0">'+esc(w.q)+'</p></div>'+
+      '<h2 style="font-size:13.5px">📌 '+esc(shortQ((res&&res.title)||w.q))+'</h2>'+
+      '<p class="cap" style="margin:2px 0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(w.q)+'">'+esc(shortQ(w.q))+'</p></div>'+
       '<button class="qw-btn" data-a="rf" title="새로고침">↻</button>'+
       '<button class="qw-btn" data-a="rm" title="위젯 제거">✕</button></div>'+
       ((res&&res.hero)? '<div class="qw-hero">'+esc(res.hero)+'<small> '+esc(res.unit||'')+'</small></div>':'')+
@@ -2319,6 +2321,10 @@ function toggleWidgetPanel(){
          '<button class="qw-btn" data-qrm="'+w.id+'" style="width:22px;height:22px">✕</button></div>';
     });
   }
+  if(qws.length){
+    h+='<button class="pill ghost" id="wpQClear" style="width:100%;justify-content:center;margin-top:6px;'+
+       'border-color:var(--critical,#d03b3b);color:var(--critical,#d03b3b)">고정 질문 모두 지우기</button>';
+  }
   h+='<div style="display:flex;gap:8px;margin-top:10px"><button class="pill ghost" id="wpAll" style="flex:1;justify-content:center">모두 표시</button>'+
      '<button class="pill" id="wpClose" style="flex:1;justify-content:center">닫기</button></div>'+
      '<div class="mini" style="margin-top:8px;color:var(--muted)">내 계정·이 브라우저에만 적용됩니다</div>';
@@ -2337,6 +2343,13 @@ function toggleWidgetPanel(){
     applyWidgets();
   };
   p.querySelector('#wpClose').onclick=function(){ p.remove(); };
+  var qc=p.querySelector('#wpQClear');
+  if(qc) qc.onclick=function(){
+    if(!confirm('대시보드에 고정한 질문을 모두 지울까요?')) return;
+    qwSave([]);
+    document.querySelectorAll('#viewDash [data-w^="q"]').forEach(function(e){ if(/^q[0-9a-z]+$/.test(e.dataset.w)) e.remove(); });
+    p.remove(); toast('고정 질문을 모두 지웠습니다','','info');
+  };
   p.querySelectorAll('[data-qrm]').forEach(function(b){
     b.onclick=function(){ removeQWidget(this.dataset.qrm); this.parentElement.remove(); };
   });
@@ -2871,17 +2884,19 @@ function setAsking(on){
   b.disabled=on; b.textContent = on? '생각 중…' : '질문';
 }
 
+function shortQ(q){ q=String(q||''); return q.length>90? q.slice(0,90)+'…' : q; }
 function ask(q){
   q=(q||'').trim();
   if(!q){ $('#answer').classList.remove('on'); return; }
-  $('#q').value=q;
+  $('#q').value='';            // 물어본 뒤에는 입력칸을 비웁니다
+  $('#sug').classList.remove('on');
   if(!AICFG.enabled){ localAnswer(q); return; }
 
   setAsking(true);
   // 답변 자리를 먼저 열고 "생각 중" 표시
   $('#answer').classList.add('on');
   $('#ansRestate').className='restate';
-  $('#ansTitle').textContent=q;
+  $('#ansTitle').textContent=shortQ(q);
   $('#ansHero').textContent=''; $('#ansSub').textContent='';
   $('#aiComment').className='ai-comment';
   var say=$('#aiSay');
@@ -2928,6 +2943,7 @@ function cleanSay(t){
 function clearSay(){ var e=$('#aiSay'); if(e){ e.className='ai-say'; e.innerHTML=''; } }
 function localAnswer(q, note){
   clearSay();
+  $('#q').value='';
   var res;
   try{ res=runQuery(q); }
   catch(e){ res={title:q, hero:'?', unit:'', sub:'질문을 이해하지 못했습니다', note:String(e.message||e)}; }
@@ -4054,7 +4070,7 @@ function showAnswer(q,res){
 
 /* 답변의 숫자·그래프·표 부분 (대화 답변 아래에 붙습니다) */
 function renderAnswerBody(res, q){
-  $('#ansTitle').textContent=res.title||'';
+  $('#ansTitle').textContent=shortQ(res.title||'');
   $('#ansHero').innerHTML=esc(res.hero)+(res.unit?'<span class="u">'+res.unit+'</span>':'');
   $('#ansSub').textContent=res.sub||'';
   $('#ansNote').textContent=res.note||'';
