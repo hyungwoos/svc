@@ -4361,16 +4361,16 @@ var OI_PARTNERS=['다원티에스','글로웰시스템','에티버스','지니�
 var GRIDS={
   contracts:{
     title:'계약 관리', table:'contracts',
-    cap:'행의 ✎ 를 눌러 수정 · 월별 인식 금액은 여기서 바뀌지 않습니다 (금액은 ✏️ 입력·수정 사용) · 삭제 불가',
-    add:false, del:false,
+    cap:'행의 ✎ 를 눌러 수정 · 월별 인식 금액은 여기서 바뀌지 않습니다 (금액은 ✏️ 입력·수정 사용) · 삭제는 슈퍼 관리자만',
+    add:false, del:'super',
     rows:function(){ var out=(RAWX.contracts||[]).map(function(c){
       var cu=(RAWX.customers||[]).filter(function(x){return x.id===c.customer_id;})[0]||{};
       c._custName=cu.name||'?'; return c; });
-      // 고객사 가나다 → 같은 고객사는 시작월 내림차순 (최신 위)
+      // 최신 항목이 맨 위 — 시작월 내림차순, 같으면 나중에 입력한 것(id) 위
       out.sort(function(a,b){
-        var n=String(a._custName).localeCompare(String(b._custName),'ko');
+        var n=String(b.start_month||'').localeCompare(String(a.start_month||''));
         if(n) return n;
-        return String(b.start_month||'').localeCompare(String(a.start_month||''));
+        return (b.id||0)-(a.id||0);
       });
       return out; },
     cols:[
@@ -4392,7 +4392,9 @@ var GRIDS={
   live:{
     title:'LIVE 고객사', table:'live_customers',
     cap:'서비스 중 사이트 목록 · 고객사 수 질문의 기준 데이터', add:true, del:true,
-    rows:function(){ return RAWX.live||[]; },
+    rows:function(){ return (RAWX.live||[]).slice().sort(function(a,b){
+      var n=String(b.start_month||'').localeCompare(String(a.start_month||''));
+      return n || ((b.id||0)-(a.id||0)); }); },
     cols:[
       {k:'industry',l:'산업군',t:'select',opts:IND_OPTS},
       {k:'name',l:'고객사',req:true},
@@ -4542,7 +4544,10 @@ var GRIDS={
     title:'임대 장비 현황 (시리얼 단위)', table:'equipment_assets',
     chipsField:'channel', chipsOpts:['에스원','LGU+','조달','일반','기타'],
     cap:'발주 상태를 「설치완료」로 바꾸면 자동 임대중, 「회수완료」면 자동 회수완료 처리됩니다', add:true, del:true,
-    rows:function(){ return RAWX.assets||[]; },
+    rows:function(){ return (RAWX.assets||[]).slice().sort(function(a,b){
+      var x=a.in_date||a.deployed_date||'', y=b.in_date||b.deployed_date||'';
+      if(x!==y) return String(y).localeCompare(String(x));      // 최신 위, 빈 값 아래
+      return String(a.serial||'').localeCompare(String(b.serial||'')); }); },
     cols:[
       {k:'serial',l:'시리얼',req:true},
       {k:'model',l:'모델',t:'select',opts:['S10_R2','S20_R2','S30H_R1','S100','S200','ES30']},
@@ -6344,11 +6349,15 @@ function gridRow(r,g,editing){
       var be=document.createElement('button'); be.textContent='✎';
       be.onclick=function(){ edit(); };
       act.appendChild(be);
-      if(g.del){
+      var canDel = g.del===true || (g.del==='super' && window.IS_SUPER);
+      if(canDel){
         var bd=document.createElement('button'); bd.textContent='🗑'; bd.className='dl';
         bd.onclick=function(){
           if(!SB_TOKEN){ openOvl('ovlAuth'); return; }
-          if(!confirm('이 행을 삭제할까요?\n'+g.cols.slice(0,2).map(function(c){return r[c.k];}).join(' · '))) return;
+          var warn='이 행을 삭제할까요?\n'+g.cols.slice(0,2).map(function(c){return r[c.k];}).join(' · ');
+          if(g.table==='contracts') warn='계약을 삭제할까요?\n'+ (r._custName||'') +' · '+lline(r.line||'')+
+            '\n\n이 계약의 월별 인식 금액도 함께 삭제되고 되돌릴 수 없습니다.';
+          if(!confirm(warn)) return;
           sbWrite('DELETE',g.table+'?id=eq.'+r.id).then(function(){
             logChange('delete',g.table,r.id,{});
             toast('삭제되었습니다', g.title, 'info');
