@@ -2059,6 +2059,7 @@ function onData(d){
 
   buildControls();
   applyChannelMenu();
+  window.LAST_LOAD=Date.now();
   $('#loading').classList.add('hidden');
   $('#app').classList.remove('hidden');
   // 레이아웃이 확정된 다음에 그려야 차트 폭이 정확합니다
@@ -2235,6 +2236,35 @@ function buildControls(){
     $('#loading').innerHTML='<div class="spin"></div><div>다시 읽고 있습니다…</div>';
     boot(true);   // 캐시 무시하고 DB에서 새로 읽기
   };
+
+  /* ===== 자동 갱신 =====
+     · 다른 탭 갔다 돌아오면: 마지막 로딩이 60초 넘었을 때 조용히 다시 읽음
+     · 화면을 계속 켜두면: 5분마다 조용히 다시 읽음
+     보고 있는 화면·검색·필터는 그대로 두고 데이터만 바꿉니다.        */
+  window.LAST_LOAD=Date.now();
+  var REFRESHING=false;
+  function silentRefresh(reason){
+    if(REFRESHING || !SB_TOKEN || !window.DATA) return;
+    if(document.getElementById('ovlEdit').classList.contains('on')) return;   // 입력 중엔 건드리지 않음
+    if(document.getElementById('ovlAuth').classList.contains('on')) return;
+    REFRESHING=true;
+    var keep=CUR_VIEW;
+    loadFromDb().then(function(nd){
+      window.LAST_LOAD=Date.now();
+      if(window.IS_EQUIP){ if(GRIDS[keep]) renderGrid(); }
+      else{
+        onData(nd);
+        if(keep && keep!=='dash') switchView(keep);
+      }
+      REFRESHING=false;
+    }).catch(function(){ REFRESHING=false; });
+  }
+  document.addEventListener('visibilitychange',function(){
+    if(document.visibilityState==='visible' && Date.now()-window.LAST_LOAD>60*1000) silentRefresh('focus');
+  });
+  setInterval(function(){
+    if(document.visibilityState==='visible' && Date.now()-window.LAST_LOAD>5*60*1000) silentRefresh('timer');
+  }, 60*1000);
 
   $('#btnAsk').onclick=function(){ ask($('#q').value); };
   setupSuggest();
