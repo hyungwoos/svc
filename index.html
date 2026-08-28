@@ -345,11 +345,17 @@ body{padding-left:192px}
 }
 .side button:hover{background:var(--surface-2);color:var(--ink)}
 .side button[aria-current="true"]{background:var(--s1);color:#fff}
-.side .grp{font-size:10px;color:var(--muted);letter-spacing:.08em;padding:14px 11px 4px}
+.side .grp{font-size:10px;color:var(--muted);letter-spacing:.08em;padding:14px 11px 4px;
+  cursor:pointer;user-select:none;display:flex;align-items:center;gap:5px;border-radius:7px}
+.side .grp:hover{color:var(--ink-2)}
+.side .grp::before{content:'▸';font-size:8.5px;transition:transform .12s;flex:0 0 auto}
+.side .grp.open::before{transform:rotate(90deg)}
+.side button.clps{display:none!important}
 @media (max-width:1000px){
   body{padding-left:0}
   .side{position:static;width:auto;flex-direction:row;flex-wrap:wrap;border-right:0;border-bottom:1px solid var(--ring);padding:8px}
   .side .logo,.side .grp{display:none}
+  .side button.clps{display:inline-flex!important}
 }
 
 /* ---------- 데이터 관리 그리드 ---------- */
@@ -2060,6 +2066,8 @@ function onData(d){
 
   buildControls();
   applyChannelMenu();
+  applyMenuFold();
+  if(CUR_VIEW) try{ ensureGroupOpen(CUR_VIEW); }catch(e){}
   window.LAST_LOAD=Date.now();
   $('#loading').classList.add('hidden');
   $('#app').classList.remove('hidden');
@@ -5927,10 +5935,55 @@ function renderOiTiles(on){
 }
 
 function closeDrawer(){ $('#side').classList.remove('open'); $('#sideDim').classList.remove('on'); }
+/* ===== 사이드바 그룹 접기 =====
+   · 처음엔 모두 접힌 채로 시작, 그룹 제목을 누르면 펼침/접힘
+   · 펼침 상태는 계정별로 저장 → 다음 접속에도 그대로
+   · 현재 보고 있는 화면의 그룹은 자동으로 펼쳐집니다               */
+function menuKey(){ return 'svc_menu_'+(AUTH_USER||'anon'); }
+function menuOpenSet(){
+  try{ return JSON.parse(localStorage.getItem(menuKey())||'null')||{}; }catch(e){ return {}; }
+}
+function menuSave(o){ try{ localStorage.setItem(menuKey(), JSON.stringify(o)); }catch(e){} }
+function grpButtons(g){
+  var out=[], el=g.nextElementSibling;
+  while(el && !el.classList.contains('grp')){
+    if(el.tagName==='BUTTON') out.push(el);
+    el=el.nextElementSibling;
+  }
+  return out;
+}
+function applyMenuFold(){
+  var open=menuOpenSet();
+  $('#side').querySelectorAll('.grp').forEach(function(g){
+    var name=g.textContent.trim();
+    var isOpen=!!open[name];
+    g.classList.toggle('open', isOpen);
+    grpButtons(g).forEach(function(b){ b.classList.toggle('clps', !isOpen); });
+  });
+}
+function ensureGroupOpen(view){
+  var btn=$('#side').querySelector('button[data-v="'+view+'"]');
+  if(!btn || !btn.classList.contains('clps')) return;
+  // 이 버튼이 속한 그룹을 찾아 펼침
+  var el=btn.previousElementSibling;
+  while(el && !el.classList.contains('grp')) el=el.previousElementSibling;
+  if(!el) return;
+  var open=menuOpenSet(); open[el.textContent.trim()]=true; menuSave(open);
+  applyMenuFold();
+}
 function setupSide(){
   $('#side').querySelectorAll('button').forEach(function(b){
     b.onclick=function(){ switchView(this.dataset.v); closeDrawer(); };
   });
+  $('#side').querySelectorAll('.grp').forEach(function(g){
+    g.onclick=function(){
+      var name=g.textContent.trim();
+      var open=menuOpenSet();
+      open[name]=!open[name]; menuSave(open);
+      applyMenuFold();
+    };
+  });
+  applyMenuFold();
   $('#btnMenu').onclick=function(){
     var open=$('#side').classList.toggle('open');
     $('#sideDim').classList.toggle('on', open);
@@ -5979,6 +6032,7 @@ function switchView(v){
   $('#side').querySelectorAll('button').forEach(function(b){
     b.setAttribute('aria-current', b.dataset.v===v?'true':'false');
   });
+  try{ ensureGroupOpen(v); }catch(e){}
   var dash=v==='dash', quote=v==='quote', onew=v==='ordernew', acct=v==='account', mnew=v==='mdrnew', oinew=v==='oinew';
   var adminx=v==='adminx';
   if(adminx && !window.IS_SUPER){ v='dash'; dash=true; adminx=false; CUR_VIEW='dash'; }
