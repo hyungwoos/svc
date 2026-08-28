@@ -671,16 +671,18 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
   <div class="grp">전체 데이터</div>
   <button data-v="contracts">📋 계약</button>
   <button data-v="live">🟢 LIVE 고객사</button>
-  <div class="grp">사업 영역 · Cloud NAC</div>
+  <div class="grp" data-chgrp="1">사업 영역 · Cloud NAC</div>
   <button data-v="cngen">🤝 일반 판매</button>
   <button data-v="cnpub">🏛️ 조달 판매</button>
   <button data-v="cns1">🔒 에스원</button>
   <button data-v="cnlgu">📶 LG U+</button>
-  <button data-v="chdist">📀 DLP/DRM</button>
-  <button data-v="cnpns">🧷 PNS</button>
-  <div class="grp">사업 영역 · MDR</div>
+  <div class="grp" data-chgrp="1">사업 영역 · MDR</div>
   <button data-v="mdrgen">🤝 일반 판매</button>
   <button data-v="mdrs1">🔒 에스원</button>
+  <button data-v="mdrlgu">📶 LG U+</button>
+  <div class="grp" data-chgrp="1">사업 영역 · 기타 (유통)</div>
+  <button data-v="chdist">📀 DLP/DRM</button>
+  <button data-v="cnpns">🧷 PNS</button>
   <div class="grp">장비</div>
   <button data-v="ordernew">📝 임대 장비 신청</button>
   <button data-v="orders">📦 임대 장비 신청 내역</button>
@@ -2056,6 +2058,7 @@ function onData(d){
   d.lines.forEach(function(l){ STATE.lines[l.label]=true; });
 
   buildControls();
+  applyChannelMenu();
   $('#loading').classList.add('hidden');
   $('#app').classList.remove('hidden');
   // 레이아웃이 확정된 다음에 그려야 차트 폭이 정확합니다
@@ -5078,11 +5081,34 @@ var CH_DEFS={
          function(r){ return r.line==='DRM'||r.line==='DLP'; }],
   cnpns:['🧷 PNS','',                           'SSL PNS 사업',
          function(r){ return r.line==='PNS'; }],
-  mdrgen:['🤝 MDR · 일반 판매','',              'MDR (에스원 외 전 채널)',
-         function(r){ return r.line==='MDR'; }],
+  mdrgen:['🤝 MDR · 일반 판매','',              'MDR (에스원·LG U+ 외 전 채널)',
+         function(r){ return r.line==='MDR' && chOf(r)!=='LGU+'; }],
   mdrs1:['🔒 MDR · 에스원','에스원',            '에스원 채널 — S1 MDR',
-         function(r){ return r.line==='MDR_S1'; }]
+         function(r){ return r.line==='MDR_S1'; }],
+  mdrlgu:['📶 MDR · LG U+','LGU+',              'LG U+ 경유 판매 (MDR)',
+         function(r){ return r.line==='MDR' && chOf(r)==='LGU+'; }]
 };
+
+/* 계약이 하나도 없는 사업 영역 메뉴는 숨기고, 계약이 생기면 자동으로 나타납니다 */
+function applyChannelMenu(){
+  if(window.IS_EQUIP || !DATA || !DATA.rows) return;
+  Object.keys(CH_DEFS).forEach(function(k){
+    var btn=document.querySelector('.side button[data-v="'+k+'"]');
+    if(!btn) return;
+    var has=false;
+    for(var i=0;i<DATA.rows.length;i++){ if(CH_DEFS[k][3](DATA.rows[i])){ has=true; break; } }
+    btn.style.display=has? '':'none';
+  });
+  // 그룹 안 버튼이 전부 숨었으면 그룹 제목도 숨김
+  document.querySelectorAll('.side .grp[data-chgrp]').forEach(function(g){
+    var el=g.nextElementSibling, vis=false;
+    while(el && !el.classList.contains('grp')){
+      if(el.tagName==='BUTTON' && el.style.display!=='none') vis=true;
+      el=el.nextElementSibling;
+    }
+    g.style.display=vis? '':'none';
+  });
+}
 function renderChannelView(key){
   var def=CH_DEFS[key], ch=def[1], match=def[3];
   var host=$('#chBody');
@@ -5155,6 +5181,14 @@ var AX_ROLE_KO={super_admin:'슈퍼 관리자',admin:'관리자',editor:'편집�
   equipment:'장비 전용',poc:'PoC 전용',equipment_poc:'장비·PoC 전용'};
 var AX_USERS=[];
 function axMsg(t,bad){ var e=$('#axMsg'); e.textContent=t||''; e.style.color=bad?'var(--critical)':'var(--ink-2)'; }
+/* DB의 UTC 시각 → 보는 사람 시간대(한국이면 KST)로 */
+function axTime(v){
+  if(!v) return '·';
+  var d=new Date(/[zZ]|[+\-]\d\d:?\d\d$/.test(String(v))? v : v+'Z');   // 시간대 없으면 UTC 로 간주
+  if(isNaN(d)) return String(v).replace('T',' ').slice(0,16);
+  var p=function(n){ return (n<10?'0':'')+n; };
+  return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes());
+}
 async function adminFetch(payload){
   var r=await fetch(SB_URL+'/functions/v1/admin',{
     method:'POST',
@@ -5203,8 +5237,8 @@ function axPaint(){
       '</select>';
     tr.innerHTML='<td>'+esc(u.email||'')+(me?' <span class="mini" style="opacity:.6">(나)</span>':'')+'</td>'+
       '<td>'+sel+'</td>'+
-      '<td class="mini">'+esc(String(u.last_sign_in||'').replace('T',' ').slice(0,16)||'·')+'</td>'+
-      '<td class="mini">'+esc(String(u.created_at||'').slice(0,10))+'</td>'+
+      '<td class="mini">'+esc(axTime(u.last_sign_in))+'</td>'+
+      '<td class="mini">'+esc(axTime(u.created_at).slice(0,10))+'</td>'+
       '<td class="act"></td>';
     var act=tr.lastChild;
     var bp=document.createElement('button'); bp.textContent='비번 초기화';
@@ -5221,6 +5255,13 @@ function axPaint(){
   t.querySelectorAll('select[data-ax]').forEach(function(sel){
     sel.onchange=function(){
       var em=this.dataset.ax, v=this.value, that=this;
+      var u0=AX_USERS.filter(function(x){return x.email===em;})[0];
+      var before=(u0&&u0.role)||'권한 없음', after=v||'권한 없음';
+      if(!confirm('권한을 변경할까요?\n\n'+em+'\n'+before+' → '+after)){
+        that.value=(u0&&u0.role)||'';                 // 취소 → 원래 값으로 복귀
+        axMsg('변경 취소');
+        return;
+      }
       axMsg('변경 중…');
       var call=v? sbWrite('POST','rpc/admin_set_role',{target_email:em,new_role:v})
                 : sbWrite('POST','rpc/admin_clear_role',{target_email:em});
