@@ -2464,6 +2464,7 @@ function toggleWidgetPanel(){
     h+='<button class="pill ghost" id="wpQClear" style="width:100%;justify-content:center;margin-top:6px;'+
        'border-color:var(--critical,#d03b3b);color:var(--critical,#d03b3b)">고정 질문 모두 지우기</button>';
   }
+  h+='<button class="pill ghost" id="wpForget" style="width:100%;justify-content:center;margin-top:6px">🧠 AI 대화 기억 지우기</button>';
   h+='<div style="display:flex;gap:8px;margin-top:10px"><button class="pill ghost" id="wpAll" style="flex:1;justify-content:center">모두 표시</button>'+
      '<button class="pill" id="wpClose" style="flex:1;justify-content:center">닫기</button></div>'+
      '<div class="mini" style="margin-top:8px;color:var(--muted)">내 계정·이 브라우저에만 적용됩니다</div>';
@@ -2476,6 +2477,15 @@ function toggleWidgetPanel(){
       applyWidgets();
     };
   });
+  var wf=p.querySelector('#wpForget');
+  if(wf) wf.onclick=function(){
+    if(!SB_TOKEN){ openOvl('ovlAuth'); return; }
+    if(!confirm('AI가 기억하고 있는 내 대화 이력을 모두 지울까요?\n(내 계정 것만 지워집니다)')) return;
+    sbWrite('POST','rpc/ai_forget',{}).then(function(n){
+      HIST=[]; HIST_LOADED=true;
+      toast('AI 기억 삭제', (n||0)+'건의 대화를 지웠습니다','info');
+    }).catch(function(e){ toast('삭제 실패', String(e.message||e).slice(0,80),'info'); });
+  };
   p.querySelector('#wpAll').onclick=function(){
     try{ localStorage.removeItem(widgetKey()); }catch(e){}
     p.querySelectorAll('input[data-wk]').forEach(function(cb){ cb.checked=true; });
@@ -2977,6 +2987,24 @@ var LINE_ALIAS=[
 ];
 var AICFG = {enabled:false, narrate:true, maskNames:true, model:''};
 var HIST = [];
+var HIST_LOADED=false;
+/* 계정별 대화 기억 — DB(ai_chat_history)에서 최근 문답을 불러옵니다 (최초 1회) */
+function loadHist(){
+  if(HIST_LOADED || !SB_TOKEN) return Promise.resolve();
+  HIST_LOADED=true;
+  return sbGet('ai_chat_history?select=q,a&order=id.desc&limit=8').catch(function(){ return null; }).then(function(rows){
+    if(rows && rows.length){
+      var prev=rows.reverse().map(function(r){ return {q:r.q, a:r.a||''}; });
+      HIST=prev.concat(HIST).slice(-8);
+    }
+  });
+}
+/* 문답 한 턴을 계정 기억에 저장 (실패해도 조용히 넘어감) */
+function saveHistTurn(q,a){
+  if(!SB_TOKEN) return;
+  try{ sbWrite('POST','ai_chat_history',[{q:q, a:String(a||'').slice(0,2000), email:AUTH_USER||null}])
+        .catch(function(){}); }catch(e){}
+}
 
 function aiEndpoint(){ return SB_URL + '/functions/v1/ask'; }
 async function aiFetch(payload){
@@ -3043,13 +3071,16 @@ function ask(q){
   say.innerHTML='<span class="lb">AI</span>데이터를 보고 있습니다<span class="dots"><span>·</span><span>·</span><span>·</span></span>';
   var grid=document.getElementById('ansGrid'); if(grid) grid.style.display='none';
 
-  aiFetch({mode:'chat', question:q, digest:buildDigest(), history:HIST.slice(-4)})
+  loadHist().then(function(){
+    return aiFetch({mode:'chat', question:q, digest:buildDigest(), history:HIST.slice(-6)});
+  })
     .then(function(r){
       setAsking(false);
       if(!r || !r.ok || !r.text){ localAnswer(q,'AI가 답하지 못해 내장 규칙으로 답했습니다.'); return; }
       say.className='ai-say on';
       say.innerHTML='<span class="lb">AI</span>'+esc(cleanSay(r.text));
-      HIST.push({q:q, a:r.text}); if(HIST.length>8) HIST.shift();
+      HIST.push({q:q, a:r.text}); if(HIST.length>10) HIST.shift();
+      saveHistTurn(q, r.text);                  // 계정별 누적 기억 (세션 무관)
       // 표·그래프가 도움이 되는 질문이면 포탈이 직접 계산해서 아래에 붙입니다
       if(r.view && r.view.intent){
         try{
