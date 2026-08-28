@@ -480,8 +480,8 @@ body::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;ba
 .btn{background:linear-gradient(135deg,var(--s1),#5e79df);border:none;box-shadow:0 6px 16px -6px rgba(42,120,214,.55)}
 .btn:hover{filter:brightness(1.07)}
 /* 페이지 진입 애니메이션 */
-#viewDash,#viewData,#viewOrderNew,#viewAccount{animation:pageIn .3s ease both}
-@keyframes pageIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+#viewDash,#viewData,#viewOrderNew,#viewAccount{animation:pageIn .1s ease both}
+@keyframes pageIn{from{opacity:.5}to{opacity:1}}
 
 /* ---------- 플로팅 사이드바 ---------- */
 @media (min-width:1001px){
@@ -687,12 +687,12 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
   <button data-v="ordernew">📝 임대 장비 신청</button>
   <button data-v="orders">📦 임대 장비 신청 내역</button>
   <button data-v="assets">🔧 임대 장비 현황</button>
-  <div class="grp">영업</div>
-  <button data-v="oinew">✏️ OI 등록</button>
-  <button data-v="oi">🎯 OI 현황</button>
   <div class="grp">PoC</div>
   <button data-v="mdrnew">🛡️ PoC 신청</button>
   <button data-v="mdrpoc">📋 PoC 신청 현황</button>
+  <div class="grp">영업</div>
+  <button data-v="oinew">✏️ OI 등록</button>
+  <button data-v="oi">🎯 OI 현황</button>
   <div class="grp">정산·목표</div>
   <button data-v="biz">⚖️ 비즈포탈 차액</button>
   <button data-v="targets">🎯 연간 목표</button>
