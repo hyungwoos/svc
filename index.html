@@ -1161,6 +1161,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
     <div id="qpList" style="max-height:min(48vh,380px);overflow:auto;border:1px solid var(--line);border-radius:10px"></div>
     <div class="mact">
       <span class="mmsg" id="qpMsg"></span>
+      <button class="pill ghost" id="qpUnlink" style="display:none;border-color:var(--critical);color:var(--critical)">연결 해제</button>
       <button class="pill ghost" id="qpClose" onclick="closeOvl('ovlQuote')">닫기</button>
       <button class="btn" style="height:36px;display:none" id="qpGo">확인</button>
     </div>
@@ -1292,7 +1293,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
 
     <div class="mact">
       <span class="mmsg" id="eMsg"></span>
-      <button class="pill ghost" onclick="closeOvl('ovlEdit')">닫기</button>
+      <button class="pill ghost" onclick="OI_CONVERT=null;closeOvl('ovlEdit')">닫기</button>
       <button class="btn" style="height:36px" id="eGo">저장</button>
     </div>
   </div>
@@ -4505,6 +4506,7 @@ var GRIDS={
         catch(e){ return '·'; } }},
       {k:'expect_month',l:'계약예상',t:'month'},
       {k:'expect_amount',l:'예상단가',t:'number'},
+      {k:'contract_id',l:'계약전환',ro:true,fmt:function(v){ return v? '✅ #'+v : '·'; }},
       {k:'quote_file',l:'견적서',ro:true,
         href:function(v){ return 'quote.html?view='+encodeURIComponent(v); },
         fmt:function(v){ if(!v) return '·'; var L=qLabel(String(v).split('/').pop()); return '📄 '+(L.d||L.c); }},
@@ -5606,16 +5608,36 @@ function qLabel(name){
   return { d:m[1]+'-'+m[2]+'-'+m[3], c:m[4] };
 }
 
-function openQuotePick(){
+var QP_TARGET=null;   // null = OI 등록 폼 채우기 · {row:r} = 기존 OI 에 연결
+function openQuotePick(target){
+  QP_TARGET=(target&&target.row)? target : null;
   var cfg=qCfg();
   $('#qpGate').style.display = cfg.pw? 'none':'';
   $('#qpGo').style.display   = cfg.pw? 'none':'';
   $('#qpPw').value='';
-  msg('qpMsg','');
+  msg('qpMsg', QP_TARGET? ('「'+(QP_TARGET.row.customer||'')+'」 OI에 연결할 견적서를 고르세요') : '');
+  var ul=$('#qpUnlink');
+  ul.style.display=(QP_TARGET && QP_TARGET.row.quote_file)? '':'none';
+  ul.onclick=function(){
+    var r=QP_TARGET.row;
+    if(!confirm(r.customer+' OI의 견적서 연결을 해제할까요?\n(견적서 파일 자체는 지워지지 않습니다)')) return;
+    sbWrite('PATCH','oi_deals?id=eq.'+r.id,{quote_file:null,quote_date:null,quote_total:null,updated_at:new Date().toISOString()})
+      .then(function(){
+        r.quote_file=null; r.quote_date=null; r.quote_total=null;
+        logChange('update','oi_deals',r.id,{quote:'연결 해제'});
+        toast('견적서 연결 해제', r.customer,'info');
+        closeOvl('ovlQuote'); renderGrid();
+      }).catch(function(e){ msg('qpMsg',String(e.message||e),'bad'); });
+  };
   $('#qpList').innerHTML='';
   openOvl('ovlQuote');
   if(cfg.pw) qpLoadList();
   else setTimeout(function(){ $('#qpPw').focus(); },60);
+}
+/* OI 현황 행 → 견적서 연결/변경 */
+function oiLinkQuote(r){
+  if(!SB_TOKEN){ openOvl('ovlAuth'); return; }
+  openQuotePick({row:r});
 }
 async function qpLoadList(){
   var cfg=qCfg();
@@ -5651,6 +5673,19 @@ async function qpPick(path, name){
     var res=await fetch(cfg.base+'/load?path='+encodeURIComponent(path),{headers:{'X-Access-Password':cfg.pw}});
     if(!res.ok) throw new Error('HTTP '+res.status);
     var data=JSON.parse(await res.text());
+    if(QP_TARGET && QP_TARGET.row){
+      // 기존 OI 에 연결만 — 폼은 건드리지 않음
+      var r=QP_TARGET.row;
+      var body={ quote_file:path, quote_date:data.quoteDate||null,
+                 quote_total:qNum(data.grandTotal)||null, updated_at:new Date().toISOString() };
+      await sbWrite('PATCH','oi_deals?id=eq.'+r.id, body);
+      r.quote_file=path; r.quote_date=body.quote_date; r.quote_total=body.quote_total;
+      logChange('update','oi_deals',r.id,{quote:path});
+      closeOvl('ovlQuote');
+      toast('견적서 연결됨', r.customer+' ← '+(data.customerName||name));
+      renderGrid();
+      return;
+    }
     oiApplyQuote(data, path, name);
     closeOvl('ovlQuote');
     toast('견적서 불러옴', (data.customerName||name));
@@ -5814,6 +5849,45 @@ async function submitOi(){
   }catch(e){ msg('oiMsg',String(e.message||e),'bad'); }
   btn.disabled=false;
 }
+/* ===== OI 수주 건 → 신규 계약 전환 =====
+   입력·수정 모달(신규 탭)을 OI 값으로 채워서 열고,
+   저장이 끝나면 그 OI 에 contract_id 를 기록합니다. */
+var OI_CONVERT=null;   // 전환 중인 OI 행
+var OIP2LINE={'Cloud NAC':'Cloud','S1 Cloud NAC':'S1','MDR':'MDR','S1 MDR':'MDR_S1',
+  'MDR Add-on':'MDR','AV (안티바이러스)':'MDR','AR (안티랜섬웨어)':'MDR',
+  'PNS':'PNS','DRM':'DRM','DLP':'DLP'};
+function oiToContract(r){
+  if(!SB_TOKEN){ openOvl('ovlAuth'); return; }
+  if(!confirm(r.customer+' · '+(r.deal_name||'')+'\n이 수주 건을 신규 계약으로 전환할까요?\n\n'+
+    '계약 입력창이 OI 내용으로 채워져 열립니다. 금액(MRR)·기간을 확인하고 저장하세요.')) return;
+  $('#btnEdit').click();                              // 열면서 폼이 초기화됨
+  $('#eTabs').querySelector('button[data-t="new"]').click();
+  OI_CONVERT=r;                                       // 초기화 이후에 지정
+  $('#nCust').value=r.customer||'';
+  if(r.industry) $('#nInd').value=(['기업','공공','금융','의료'].indexOf(r.industry)>=0)? r.industry:'기업';
+  // 제품군 첫 항목 → 서비스
+  var line=null;
+  (r.products||[]).some(function(pn){ if(OIP2LINE[pn]){ line=OIP2LINE[pn]; return true; } return false; });
+  if(line){ var nl=$('#nLine'); nl.value=line; nl.dispatchEvent(new Event('change')); }
+  // 파트너 매핑 (목록에 없으면 직접 입력으로)
+  var ptn=String(r.partner||'').trim();
+  if(ptn){
+    if(/지니언스/.test(ptn)) $('#nPtn').value='지니언스(직접)';
+    else if(['다원티에스','글로웰시스템'].indexOf(ptn)>=0) $('#nPtn').value=ptn;
+    else{ $('#nPtn').value='__etc'; $('#nPtn').dispatchEvent(new Event('change')); $('#nPtnEtc').value=ptn; }
+  }
+  // 시작월 = 계약 예상 시기
+  if(r.expect_month) $('#nStart').value=String(r.expect_month).slice(0,7);
+  // 수량 = 제품 수량 합
+  try{
+    var q=(r.items||[]).reduce(function(a,x){ return a+(+x.qty||0); },0);
+    if(q) $('#nQty').value=q;
+  }catch(e){}
+  $('#nNote').value='OI 전환 · '+(r.deal_name||'')+
+    (r.expect_amount? ' · 예상단가 '+won(r.expect_amount)+'원(VAT별도)':'');
+  msg('eMsg','OI 「'+(r.deal_name||r.customer)+'」 전환 중 — MRR·종료월을 채우고 저장하세요','ok');
+}
+
 /* OI 현황 위 요약 타일 */
 function renderOiTiles(on){
   var host=document.getElementById('oiTiles');
@@ -6376,6 +6450,19 @@ function gridRow(r,g,editing){
         act.appendChild(bv);
       }
       if(window.IS_VIEWER) return;
+      if(CUR_VIEW==='oi'){
+        // 수주(이후) 단계 + 아직 계약 미연결 → 계약으로 전환
+        if(['수주','계산서발행','종료'].indexOf(r.stage)>=0 && !r.contract_id){
+          var bc=document.createElement('button'); bc.textContent='→계약'; bc.title='이 수주 건을 신규 계약으로 전환';
+          bc.style.color='var(--good,#0ca30c)';
+          bc.onclick=function(){ oiToContract(r); };
+          act.appendChild(bc);
+        }
+        var bq=document.createElement('button'); bq.textContent='📎';
+        bq.title=r.quote_file? '연결된 견적서 바꾸기/해제' : '견적서 연결';
+        bq.onclick=function(){ oiLinkQuote(r); };
+        act.appendChild(bq);
+      }
       var be=document.createElement('button'); be.textContent='✎';
       be.onclick=function(){ edit(); };
       act.appendChild(be);
@@ -6669,6 +6756,16 @@ async function saveEdit(){
       await sbWrite('POST','monthly_revenue', monthRows(id,s0,e0,mrr));
       await logChange('insert','contracts',id,{cust:cust,mrr:mrr,from:idxDate(s0),to:idxDate(e0)});
       msg('eMsg','저장 완료 ✅ — '+cust+' '+(e0-s0+1)+'개월','ok');
+      if(OI_CONVERT){
+        try{
+          await sbWrite('PATCH','oi_deals?id=eq.'+OI_CONVERT.id,
+            {contract_id:id, updated_at:new Date().toISOString()});
+          OI_CONVERT.contract_id=id;
+          logChange('update','oi_deals',OI_CONVERT.id,{계약전환:id});
+          toast('OI → 계약 전환 완료', OI_CONVERT.customer+' · 계약 #'+id);
+        }catch(e2){ toast('OI 연결 실패', String(e2.message||e2).slice(0,80),'info'); }
+        OI_CONVERT=null;
+      }
       if(window.resetNewForm) window.resetNewForm();   // 다음 입력을 위해 즉시 비움
     }
     else if(CUR_TAB==='churn'){
