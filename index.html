@@ -87,7 +87,7 @@ input:focus,select:focus,textarea:focus{
 #toasts{position:fixed;top:18px;right:18px;z-index:1400;display:flex;flex-direction:column;gap:10px;pointer-events:none}
 .toast{display:flex;align-items:flex-start;gap:11px;min-width:250px;max-width:370px;padding:13px 16px;border-radius:13px;
   background:var(--surface);border:1px solid var(--ring);box-shadow:0 12px 34px rgba(0,0,0,.16);
-  font-size:13px;pointer-events:auto;animation:toastIn .3s cubic-bezier(.21,1.02,.73,1) both}
+  font-size:13px;pointer-events:none;animation:toastIn .3s cubic-bezier(.21,1.02,.73,1) both}   /* 알림이 버튼을 가려도 클릭이 통과되게 */
 .toast.out{animation:toastOut .25s ease both}
 .toast .ti{width:22px;height:22px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff;margin-top:1px}
 .toast.ok .ti{background:var(--good,#0ca30c)}
@@ -1745,7 +1745,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-08-29 ⑧';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-08-29 ⑨';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -5495,7 +5495,10 @@ function renderTodo(){
 function applyFs(n){
   document.body.style.zoom = n===1? '1.12' : n===2? '1.24' : '';
   var b=document.getElementById('btnFont');
-  if(b) b.style.background = n>0? 'var(--brand-t,rgba(46,189,87,.13))':'';
+  if(b){
+    b.style.background = n>0? 'var(--brand-t,rgba(46,189,87,.13))':'';
+    b.innerHTML = '가<b style="font-size:14px">A</b>'+(n===1?' 크게':n===2?' 최대':'');
+  }
 }
 (function(){
   var n=0; try{ n=+(localStorage.getItem('svc_fs')||0); }catch(e){}
@@ -5509,8 +5512,7 @@ function applyFs(n){
     b.onclick=function(){
       n=(n+1)%3;
       try{ localStorage.setItem('svc_fs', String(n)); }catch(e){}
-      applyFs(n);
-      toast('글자 크기', ['보통','크게','아주 크게'][n], 'info');
+      applyFs(n);   // 알림창 없음 — 버튼 글씨로 단계 표시 (연속 클릭 가능)
     };
   }, 300);
 })();
@@ -5844,7 +5846,10 @@ async function renderWeekly(atWeek){
     var vw=document.getElementById('viewWeekly');
     if(z>0) vw.setAttribute('data-zoom', String(z)); else vw.removeAttribute('data-zoom');
     var lb=document.getElementById('wkZoom');
-    if(lb) lb.style.background = z>0? 'var(--brand-t,rgba(46,189,87,.13))':'';
+    if(lb){
+      lb.style.background = z>0? 'var(--brand-t,rgba(46,189,87,.13))':'';
+      lb.innerHTML='가<span style="font-size:15px;font-weight:800">A</span> '+(z===1?'크게':z===2?'최대':'글자 크기');
+    }
   }
   var wkZ=0; try{ wkZ=+(localStorage.getItem('svc_wk_zoom')||0); }catch(e){}
   wkApplyZoom(wkZ);
@@ -5853,7 +5858,6 @@ async function renderWeekly(atWeek){
     try{ localStorage.setItem('svc_wk_zoom', String(wkZ)); }catch(e){}
     wkApplyZoom(wkZ);
     requestAnimationFrame(wkMeasure);   // 글자 크기가 바뀌면 헤더 높이도 다시 잼
-    toast('글자 크기', ['보통','크게','아주 크게'][wkZ],'info');
   };
   $('#wkNext').onclick=function(){ this.blur(); wkNext(); };
   $('#wkFetch').onclick=wkRefetch;
