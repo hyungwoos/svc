@@ -460,6 +460,21 @@ body{padding-left:192px}
 .wk-phase .ln{flex:1;height:1px;background:var(--grid)}
 .wk-body{white-space:pre-line}
 @media (max-width:1000px){ .wk-wrap{grid-template-columns:1fr} .wk-rail{position:static;max-height:none} }
+/* 홈 — 오늘 할 일 카드 + 바로가기 */
+.todo-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:10px}
+.todo-card{background:var(--surface);border:1px solid var(--ring);border-radius:14px;padding:12px 15px;cursor:pointer;transition:transform .12s,box-shadow .12s}
+.todo-card:hover{transform:translateY(-1px);box-shadow:0 8px 20px -12px rgba(0,0,0,.25)}
+.todo-card .l{font-size:11.5px;color:var(--muted);font-weight:650;display:flex;gap:6px;align-items:center}
+.todo-card .v{font-size:20px;font-weight:800;margin-top:2px}
+.todo-card .s{font-size:11px;color:var(--muted);margin-top:1px}
+.todo-card.warn .v{color:#a06c00}
+.todo-card.crit .v{color:var(--critical,#d03b3b)}
+.todo-card.ok .v{color:var(--brand,#149e40)}
+.quick-links{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+.quick-links .ql-l{font-size:11px;color:var(--muted);font-weight:650;margin-right:2px}
+.quick-links button{border:1px solid var(--ring);background:var(--surface);border-radius:999px;height:29px;padding:0 13px;font:inherit;font-size:12px;cursor:pointer;color:var(--ink-2)}
+.quick-links button:hover{background:var(--surface-2);color:var(--ink)}
+@media(max-width:1000px){ .todo-cards{grid-template-columns:repeat(2,1fr)} }
 /* 인바운드 통계 */
 .inb-kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:12px}
 .inb-kpi{background:var(--surface);border:1px solid var(--ring);border-radius:14px;padding:12px 15px}
@@ -702,6 +717,16 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
   .modal{padding:16px 14px;max-height:94vh}
   #toasts{left:12px;right:12px;top:10px}
   .toast{max-width:none;width:100%;min-width:0}
+  /* 목록(그리드): 폰에서 읽기 좋게 */
+  .tbl-wrap{border-radius:11px;-webkit-overflow-scrolling:touch}
+  .dgrid{font-size:12.5px}
+  .dgrid th{padding:8px 8px;white-space:nowrap}
+  .dgrid td{padding:8px 8px;max-width:190px;overflow:hidden;text-overflow:ellipsis}
+  .dgrid td:first-child,.dgrid th:first-child{position:sticky;left:0;background:var(--surface);z-index:1;box-shadow:2px 0 0 var(--grid)}
+  .dgrid thead th:first-child{background:var(--surface-2);z-index:3}
+  .colf{width:min(320px,94vw)}
+  .todo-card .v{font-size:18px}
+  .quick-links button{height:34px;font-size:12.5px}
 }
 </style>
 </head>
@@ -808,6 +833,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
     <button class="pill ghost" id="btnAuth">로그인</button>
     <button class="pill ghost" id="btnLogout" style="display:none;border-color:rgba(208,59,59,.35);color:var(--critical,#d03b3b)">로그아웃</button>
     <button class="pill ghost" id="btnWidgets" title="대시보드 위젯 표시 설정">⊞ 위젯</button>
+    <button class="pill ghost" id="btnFont" title="포탈 전체 글자 크기 — 보통 → 크게 → 아주 크게">가<b style="font-size:14px">A</b></button>
     <button class="pill ghost" id="btnTheme">◐ 다크</button>
     <button class="pill ghost" id="btnReload">↻ 새로고침</button>
   </div>
@@ -821,6 +847,10 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
   <div id="viewDash">
   <section id="dashHero" data-w="hero">
     <div id="noticeStack"></div>
+  </section>
+  <section id="todoWrap" style="margin-bottom:14px;display:none">
+    <div class="todo-cards" id="todoCards"></div>
+    <div class="quick-links" id="quickLinks"></div>
   </section>
   <section class="ask">
     <div class="ask-row">
@@ -1715,7 +1745,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-08-29 ⑦';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-08-29 ⑧';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -2207,7 +2237,7 @@ function onData(d){
   $('#loading').classList.add('hidden');
   $('#app').classList.remove('hidden');
   // 레이아웃이 확정된 다음에 그려야 차트 폭이 정확합니다
-  requestAnimationFrame(function(){ renderAll(); watchWidth(); });
+  requestAnimationFrame(function(){ renderAll(); watchWidth(); try{ renderTodo(); }catch(e){} });
 }
 
 /* 카드 폭이 바뀌면 (창 크기, 사이드바, 인쇄) 다시 그립니다 */
@@ -5392,6 +5422,99 @@ function renderChannelView(key){
 
 }
 
+/* ===== 홈 — 오늘 할 일 카드 + 바로가기 ===== */
+function viewLabel(v){
+  var b=document.querySelector('.side button[data-v="'+v+'"]');
+  return b? b.textContent.trim():v;
+}
+function recentKey(){ return 'svc_recent_'+(AUTH_USER||'anon'); }
+function pushRecent(v){
+  if(v==='dash'||v==='account'||v==='adminx') return;
+  try{
+    var a=JSON.parse(localStorage.getItem(recentKey())||'[]').filter(function(x){return x!==v;});
+    a.unshift(v); localStorage.setItem(recentKey(), JSON.stringify(a.slice(0,6)));
+  }catch(e){}
+}
+function renderTodo(){
+  var wrap=document.getElementById('todoWrap'); if(!wrap) return;
+  if(!SB_TOKEN || !window.DATA || window.IS_EQUIP){ wrap.style.display='none'; return; }
+  wrap.style.display='';
+  var today=new Date(), t0=today.getTime(), todayS=today.toISOString().slice(0,10);
+  // ① 인바운드 장기 미대응 — 10분 캐시, 필요한 열만 가볍게 조회
+  if(!window.__inbTodo || t0-window.__inbTodo.t>10*60*1000){
+    window.__inbTodo={t:t0, n:window.__inbTodo? window.__inbTodo.n:null};
+    sbTry('inbound_leads?y=eq.'+today.getFullYear()+'&result=eq.'+encodeURIComponent('진행중')+'&select=on_date,s1d,s2d,s21d,s3d')
+      .then(function(rows){
+        var n=null;
+        if(rows){ n=0; rows.forEach(function(x){
+          var last=[x.on_date,x.s1d,x.s2d,x.s21d,x.s3d].filter(function(d){return d&&/^\d{4}-\d{2}-\d{2}/.test(d);}).sort().pop();
+          if(last && (t0-new Date(last).getTime())/864e5>=14) n++;
+        }); }
+        window.__inbTodo={t:t0, n:n};
+        if(CUR_VIEW==='dash') renderTodo();
+      });
+  }
+  var inbN=window.__inbTodo? window.__inbTodo.n:null;
+  // ② OI 밀린 액션 — 예정일이 지났는데 아직 진행 중
+  var oiLate=(RAWX.oi||[]).filter(function(o){
+    return o.next_date && String(o.next_date).slice(0,10)<todayS && !/수주|실패/.test(String(o.stage||''));
+  }).length;
+  // ③ 재약정 도래 — 60일(2개월) 안에 종료되는 계약
+  var nowI=dIdx(todayS), renewN=0;
+  (DATA.rows||[]).forEach(function(r){
+    if(r._hw || /해지/.test(String(r.status||''))) return;
+    if(r.endIdx!=null && r.endIdx>=nowI && r.endIdx<=nowI+2) renewN++;
+  });
+  // ④ 다음 주간회의 (월요일)
+  var dow=today.getDay(), toMon=(8-dow)%7;
+  var wkTxt= dow===1? '오늘':'D-'+(toMon===0?7:toMon);
+  function card(cls,icon,label,val,sub,go){
+    return '<div class="todo-card '+cls+'" data-go="'+go+'"><div class="l">'+icon+' '+label+'</div>'+
+      '<div class="v">'+val+'</div><div class="s">'+sub+'</div></div>';
+  }
+  document.getElementById('todoCards').innerHTML=
+    card(inbN>0?'crit':'ok','📥','인바운드 미대응', inbN==null?'…':inbN+'건', inbN>0?'진행중인데 14일+ 대응 없음':'밀린 건 없음','inbstat')+
+    card(oiLate>0?'warn':'ok','🎯','OI 밀린 액션', oiLate+'건', oiLate>0?'다음 할 일 예정일 지남':'예정일 지난 건 없음','oi')+
+    card(renewN>0?'warn':'ok','📋','재약정 도래', renewN+'건','60일 안에 계약 종료','contracts')+
+    card('','📊','주간회의', wkTxt,'매주 월요일 · 일요일 저녁 자동 취합','weekly');
+  // 바로가기 + 최근 방문
+  var fav=['contracts','oi','inbstat','weekly','quote'];
+  var rec=[]; try{ rec=JSON.parse(localStorage.getItem(recentKey())||'[]'); }catch(e){}
+  rec=rec.filter(function(v){return fav.indexOf(v)<0;}).slice(0,3);
+  document.getElementById('quickLinks').innerHTML=
+    '<span class="ql-l">바로가기</span>'+
+    fav.map(function(v){return '<button data-go="'+v+'">'+esc(viewLabel(v))+'</button>';}).join('')+
+    (rec.length? '<span class="ql-l" style="margin-left:8px">최근</span>'+
+      rec.map(function(v){return '<button data-go="'+v+'">'+esc(viewLabel(v))+'</button>';}).join(''):'');
+  wrap.querySelectorAll('[data-go]').forEach(function(el){
+    el.onclick=function(){ switchView(el.dataset.go); };
+  });
+}
+
+/* ===== 포탈 전체 글자 크기 (보통/크게/아주 크게 — 이 브라우저에 기억) ===== */
+function applyFs(n){
+  document.body.style.zoom = n===1? '1.12' : n===2? '1.24' : '';
+  var b=document.getElementById('btnFont');
+  if(b) b.style.background = n>0? 'var(--brand-t,rgba(46,189,87,.13))':'';
+}
+(function(){
+  var n=0; try{ n=+(localStorage.getItem('svc_fs')||0); }catch(e){}
+  applyFs(n);
+  document.addEventListener('DOMContentLoaded',function(){ applyFs(n); });
+  var t=setInterval(function(){
+    var b=document.getElementById('btnFont');
+    if(!b) return;
+    clearInterval(t);
+    applyFs(n);
+    b.onclick=function(){
+      n=(n+1)%3;
+      try{ localStorage.setItem('svc_fs', String(n)); }catch(e){}
+      applyFs(n);
+      toast('글자 크기', ['보통','크게','아주 크게'][n], 'info');
+    };
+  }, 300);
+})();
+
 /* ===== 인바운드 관리 — 통계 + 목록 (원본: 구글시트, 매일 아침 자동 동기화) ===== */
 var INB_Y=String(new Date().getFullYear());
 function loadInbound(cb){
@@ -6592,6 +6715,7 @@ function switchView(v){
   if((v==='ordernew'||v==='mdrnew'||v==='oinew') && !SB_TOKEN){ openOvl('ovlAuth'); return; }
   if(window.IS_EQUIP && !EQUIP_VIEWS[v]) v=window.EQUIP_HOME||'orders';   // 제한 계정은 허용된 화면만
   CUR_VIEW=v;
+  try{ pushRecent(v); }catch(e){}
   $('#side').querySelectorAll('button').forEach(function(b){
     b.setAttribute('aria-current', b.dataset.v===v?'true':'false');
   });
@@ -6651,6 +6775,7 @@ function switchView(v){
     return;
   }
   if(dash){
+    try{ renderTodo(); }catch(e){}
     if(DIRTY){ DIRTY=false; loadFromDb().then(onData); }
     return;
   }
