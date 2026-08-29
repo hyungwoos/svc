@@ -431,6 +431,31 @@ body{padding-left:192px}
 .qp-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 12px;border-bottom:1px solid var(--line);cursor:pointer}
 .qp-row:last-child{border-bottom:none}
 .qp-row:hover{background:var(--surface-2)}
+/* 주간회의 */
+.wk-wrap{display:grid;grid-template-columns:222px 1fr;gap:16px;align-items:start}
+.wk-rail{background:var(--surface);border:1px solid var(--ring);border-radius:14px;padding:11px;position:sticky;top:10px;font-size:12px;max-height:calc(100vh - 24px);overflow:auto}
+.wk-rail .ph{font-size:10.5px;letter-spacing:.1em;color:var(--muted);font-weight:750;margin:8px 6px 5px}
+.wk-rail a{display:flex;justify-content:space-between;gap:6px;padding:5px 8px;border-radius:8px;color:var(--ink-2);text-decoration:none;cursor:pointer}
+.wk-rail a small{color:var(--muted)}
+.wk-rail a.on{background:var(--brand-t,rgba(46,189,87,.13));color:var(--ink);font-weight:700}
+.wk-card{background:var(--surface);border:1px solid var(--ring);border-radius:13px;padding:13px 16px;margin-bottom:11px;scroll-margin-top:12px}
+.wk-card h2{font-size:13.5px;margin:0 0 8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;border:none;padding:0}
+.wk-card h2 .no{width:21px;height:21px;border-radius:50%;background:var(--brand,#149e40);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;font-weight:750;flex:0 0 auto}
+.wk-card.plan h2 .no{background:var(--s1)}
+.wk-card h2 .who{font-size:11px;color:var(--brand,#149e40);background:var(--brand-t,rgba(46,189,87,.13));border-radius:999px;padding:2px 9px;font-weight:650}
+.wk-card h2 small{color:var(--muted);font-weight:400;margin-left:auto}
+.wk-tbl{width:100%;border-collapse:collapse;font-size:12.4px}
+.wk-tbl td{padding:6px 8px;border-bottom:1px solid var(--grid);vertical-align:top;line-height:1.5}
+.wk-tbl tr:last-child td{border-bottom:0}
+.wk-chip{display:inline-block;border-radius:999px;padding:1.5px 8px;font-size:10.5px;font-weight:650;white-space:nowrap}
+.wkc-red{background:rgba(208,59,59,.12);color:var(--critical)} .wkc-grn{background:var(--brand-t,rgba(46,189,87,.13));color:var(--brand,#149e40)}
+.wkc-yel{background:rgba(237,161,0,.14);color:#a06c00} .wkc-blu{background:rgba(42,120,214,.12);color:var(--s1)}
+.wkc-gry{background:var(--surface-2);color:var(--ink-2)}
+.wk-phase{margin:22px 0 10px;display:flex;align-items:center;gap:12px}
+.wk-phase .pt{font-size:15px;font-weight:800}
+.wk-phase .ln{flex:1;height:1px;background:var(--grid)}
+.wk-body{white-space:pre-line}
+@media (max-width:1000px){ .wk-wrap{grid-template-columns:1fr} .wk-rail{position:static;max-height:none} }
 .frm label{display:block;font-size:11.5px;color:var(--ink-2);margin-bottom:4px}
 .frm input,.frm select,.frm textarea{width:100%;height:36px;padding:0 10px;border-radius:9px;border:1px solid var(--ring);
   background:var(--surface-2);color:var(--ink);font-size:13px;font-family:inherit;outline:none}
@@ -674,6 +699,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
 <nav class="side hidden" id="side">
   <div class="logo">서비스사업부<small>통합 관리 포탈</small></div>
   <button data-v="dash" aria-current="true">🏠 홈 (대시보드)</button>
+  <button data-v="weekly">📊 주간회의</button>
   <div class="grp">전체 데이터</div>
   <button data-v="contracts">📋 계약</button>
   <button data-v="live">🟢 LIVE 고객사</button>
@@ -1107,6 +1133,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
   </div>
 
   <div id="viewChannel" class="hidden"><div id="chBody"></div></div>
+
+  <div id="viewWeekly" class="hidden"><div id="wkBody"></div></div>
 
   <div id="viewAdmin" class="hidden">
     <section class="card c12" style="max-width:1000px;margin:0 auto">
@@ -5220,6 +5248,205 @@ function renderChannelView(key){
 
 }
 
+/* ===== 주간회의 — 주간업무보고 자동 취합 화면 ===== */
+var WEEKLY_GAS='https://script.google.com/macros/s/AKfycbz0PDzgvgtM0ZZHEfMwEzPpgoPYidD6ElPx3oTGsgnVuveCnVA9PmYPB4WAPfr9a6DY/exec';
+var WK={data:null, week:null, secs:[]};
+var WK_BIZ_ORDER=['계약현황','영업','기획','마케팅','기획·마케팅'];
+function wkTime(v){ return v? axTime(v):'·'; }
+function wkChipCls(st){
+  st=String(st||'');
+  if(/완료/.test(st)) return 'wkc-grn';
+  if(/진행|접수/.test(st)) return 'wkc-yel';
+  if(/보류|중지|대기/.test(st)) return 'wkc-gry';
+  return 'wkc-gry';
+}
+function wkCustMatch(name){
+  var n=String(name||'').replace(/\s+|\(.*?\)/g,'').toLowerCase();
+  if(!n) return null;
+  var hit=(RAWX.customers||[]).some(function(c){
+    var m=String(c.name||'').replace(/\s+|\(.*?\)/g,'').toLowerCase();
+    return m && (m.indexOf(n)>=0 || n.indexOf(m)>=0);
+  });
+  return hit;
+}
+async function renderWeekly(atWeek){
+  var host=$('#wkBody');
+  host.innerHTML='<div class="cap" style="padding:40px;text-align:center">주간보고를 불러오는 중…</div>';
+  var d=null;
+  try{
+    d=await sbWrite('POST', atWeek? 'rpc/load_weekly_at':'rpc/load_weekly', atWeek? {p_week:atWeek}:{});
+  }catch(e){
+    host.innerHTML='<section class="card c12"><h3 style="margin:0 0 6px">📊 주간회의</h3>'+
+      '<p class="cap">데이터를 불러오지 못했습니다 — 40_weekly.sql 실행 여부를 확인하세요.<br>'+esc(String(e.message||e))+'</p></section>';
+    return;
+  }
+  if(!d || !d.items || !d.items.length){
+    host.innerHTML='<section class="card c12" style="max-width:640px;margin:0 auto;text-align:center;padding:40px">'+
+      '<h3 style="margin:0 0 8px">📊 주간회의</h3>'+
+      '<p class="cap">아직 취합된 주간보고가 없습니다.<br>매주 일요일 19시에 자동으로 가져오며, 지금 바로 가져올 수도 있습니다.</p>'+
+      '<button class="pill" id="wkFetch0" style="margin-top:10px">↻ 시트에서 지금 가져오기</button></section>';
+    var b0=document.getElementById('wkFetch0');
+    if(b0) b0.onclick=wkRefetch;
+    return;
+  }
+  WK.data=d; WK.week=(d.meta&&d.meta.week)||null;
+
+  var items=d.items, meta=d.meta||{};
+  function rows(part,team,sec){
+    return items.filter(function(x){ return x.part===part && (!team||x.team===team) && (!sec||x.section===sec); });
+  }
+  // 실적 섹션 순서: 사업팀 고정 순서 → MSS 시트 등장 순서
+  var secs=[];
+  WK_BIZ_ORDER.forEach(function(sc){ if(rows('실적','사업팀',sc).length) secs.push({team:'사업팀',sec:sc}); });
+  var seen={};
+  items.filter(function(x){return x.part==='실적'&&x.team==='MSS팀';}).forEach(function(x){
+    if(!seen[x.section]){ seen[x.section]=1; secs.push({team:'MSS팀',sec:x.section}); } });
+
+  var no=0, railPerf=[], railPlan=[], bodyH='';
+  function card(id,title,whos,cnt,inner,plan){
+    return '<div class="wk-card'+(plan?' plan':'')+'" id="'+id+'" data-wksec="1">'+
+      '<h2><span class="no">'+(++no)+'</span>'+esc(title)+
+      (whos||[]).map(function(w){ return '<span class="who">'+esc(w)+'</span>'; }).join('')+
+      '<small>'+cnt+'건</small></h2>'+inner+'</div>';
+  }
+  function owners(list){
+    var o=[],s={};
+    list.forEach(function(x){ String(x.owner||'').split(/[\n,·]/).forEach(function(w){
+      w=w.trim(); if(w&&!s[w]&&o.length<3){ s[w]=1; o.push(w); } }); });
+    return o;
+  }
+  function tbl(list,opts){
+    opts=opts||{};
+    return '<table class="wk-tbl">'+list.map(function(x){
+      var chips='';
+      if(opts.tagChip && x.section) chips='<span class="wk-chip wkc-blu">'+esc(x.section)+'</span>';
+      else if(x.status) chips='<span class="wk-chip '+wkChipCls(x.status)+'">'+esc(x.status)+'</span>';
+      var extra='';
+      if(opts.contract){
+        var ok=wkCustMatch(x.customer);
+        extra='<td style="width:74px">'+(ok===null?'·':
+          ok? '<span class="wk-chip wkc-grn">일치✓</span>':'<span class="wk-chip wkc-red">미입력</span>')+'</td>';
+      }
+      var amt=(x.expect_amt!=null&&x.expect_amt!=='')? ' <b style="white-space:nowrap">· '+x.expect_amt+'백만</b>':'';
+      var due=x.due? ' <span class="wk-chip wkc-gry">'+esc(String(x.due).slice(0,10))+'</span>':'';
+      var iss=x.issue_ref? ' <span class="mini">'+esc(x.issue_ref)+'</span>':'';
+      return '<tr>'+
+        '<td style="width:78px">'+(chips||'·')+'</td>'+
+        '<td><div class="wk-body">'+esc(x.content||'')+'</div>'+ (amt||due||iss? '<div class="mini" style="margin-top:2px">'+amt+due+iss+'</div>':'')+'</td>'+
+        '<td style="width:120px">'+esc(x.customer||'·')+'</td>'+
+        '<td style="width:86px">'+esc(String(x.owner||'·').replace(/\n/g,'·'))+'</td>'+
+        extra+'</tr>';
+    }).join('')+'</table>';
+  }
+
+  // ── 전주 실적 ──
+  bodyH+='<div class="wk-phase"><span class="pt">전주 실적</span><span class="ln"></span>'+
+    '<span class="mini">사업팀 → MSS팀 순서로 보고</span></div>';
+  secs.forEach(function(g){
+    var list=rows('실적',g.team,g.sec);
+    var id='wks'+no;
+    var title=(g.team==='MSS팀'? 'MSS · ':'')+g.sec;
+    bodyH+=card(id,title,owners(list),list.length,tbl(list,{contract:g.sec==='계약현황'}));
+    railPerf.push({id:id,label:title,who:owners(list)[0]||''});
+  });
+
+  // ── 금주 계획 ──
+  var planBiz=rows('계획','사업팀'), planMss=rows('계획','MSS팀');
+  bodyH+='<div class="wk-phase"><span class="pt">금주 계획</span><span class="ln"></span>'+
+    '<span class="mini">같은 순서로 한 바퀴</span></div>';
+  if(planBiz.length){ var id1='wks'+no;
+    bodyH+=card(id1,'사업팀',[],planBiz.length,tbl(planBiz,{tagChip:true}),true);
+    railPlan.push({id:id1,label:'사업팀'}); }
+  if(planMss.length){ var id2='wks'+no;
+    bodyH+=card(id2,'MSS팀',[],planMss.length,tbl(planMss,{tagChip:true}),true);
+    railPlan.push({id:id2,label:'MSS팀'}); }
+
+  // ── 마무리: 특이 + 지난주 액션 + 회의 메모 ──
+  var etc=rows('특이');
+  var memoId='wks'+no;
+  var memoInner='';
+  if(etc.length) memoInner+='<div class="mini" style="margin-bottom:8px;font-weight:700">요청 / 특이사항</div>'+tbl(etc)+'<div style="height:10px"></div>';
+  if(d.prev_memo) memoInner+='<div class="ai-comment on" style="margin:0 0 8px"><b>지난주 액션</b><div class="wk-body" style="margin-top:4px">'+esc(d.prev_memo)+'</div></div>';
+  memoInner+='<textarea id="wkMemo" style="width:100%;min-height:76px;border:1px solid var(--ring);border-radius:10px;'+
+    'background:var(--surface-2);color:var(--ink);padding:10px;font-family:inherit;font-size:12.5px" '+
+    'placeholder="회의에서 정한 것을 적어두면 다음 주 이 화면에 「지난주 액션」으로 표시됩니다">'+esc((meta&&meta.memo)||'')+'</textarea>'+
+    '<div style="display:flex;gap:8px;margin-top:8px;align-items:center"><span class="mini" id="wkMemoMsg"></span>'+
+    '<span style="flex:1"></span><button class="pill" id="wkMemoSave">메모 저장</button></div>';
+  bodyH+=card(memoId,'회의 메모',[],etc.length,memoInner);
+
+  // ── 헤더 + 레일 조립 ──
+  var counts=meta.counts||{};
+  var weekNav=(d.weeks||[]).slice(0,8);
+  var head='<div style="display:flex;align-items:center;gap:9px;margin-bottom:14px;flex-wrap:wrap">'+
+    '<span style="font-size:17px;font-weight:800">📊 주간회의</span>'+
+    '<select id="wkWeekSel" class="pill" style="height:31px;font-family:inherit">'+
+      weekNav.map(function(w){ return '<option value="'+w+'"'+(w===WK.week?' selected':'')+'>'+w+' 주간</option>'; }).join('')+'</select>'+
+    '<span class="pill ghost" style="font-size:11.5px">'+esc(meta.file_name||'')+' · '+wkTime(meta.fetched_at)+' 취합</span>'+
+    (meta.missing&&meta.missing.length? '<span class="wk-chip wkc-red">⚠ 누락 탭: '+esc(meta.missing.join(', '))+'</span>'
+      : '<span class="wk-chip wkc-grn">누락 팀 없음 ✓</span>')+
+    '<span style="flex:1"></span>'+
+    '<span class="mini">'+Object.keys(counts).map(function(k){return k+' '+counts[k]+'건';}).join(' · ')+'</span>'+
+    '<button class="pill ghost" id="wkFetch">↻ 다시 가져오기</button>'+
+    '<button class="pill" id="wkNext">▶ 다음 (Space)</button></div>';
+
+  var rail='<div class="wk-rail"><div class="ph">전주 실적</div>'+
+    railPerf.map(function(r){ return '<a data-go="'+r.id+'">'+esc(r.label)+'<small>'+esc(r.who)+'</small></a>'; }).join('')+
+    '<div class="ph">금주 계획</div>'+
+    railPlan.map(function(r){ return '<a data-go="'+r.id+'">'+esc(r.label)+'</a>'; }).join('')+
+    '<div class="ph">마무리</div><a data-go="'+memoId+'">회의 메모</a></div>';
+
+  host.innerHTML=head+'<div class="wk-wrap">'+rail+'<div id="wkMain">'+bodyH+'</div></div>';
+
+  // ── 동작 ──
+  WK.secs=Array.prototype.slice.call(host.querySelectorAll('[data-wksec]')).map(function(e){return e.id;});
+  host.querySelectorAll('.wk-rail a').forEach(function(a){
+    a.onclick=function(){ wkGo(a.dataset.go); };
+  });
+  $('#wkWeekSel').onchange=function(){ renderWeekly(this.value); };
+  $('#wkNext').onclick=wkNext;
+  $('#wkFetch').onclick=wkRefetch;
+  $('#wkMemoSave').onclick=async function(){
+    var t=$('#wkMemo').value;
+    try{
+      await sbWrite('PATCH','weekly_meta?week=eq.'+WK.week,{memo:t||null});
+      msgTo('wkMemoMsg','저장됨 ✓');
+    }catch(e){ msgTo('wkMemoMsg',String(e.message||e).slice(0,80)); }
+  };
+  function msgTo(id,t){ var e=document.getElementById(id); if(e) e.textContent=t; }
+}
+function wkGo(id){
+  var el=document.getElementById(id); if(!el) return;
+  el.scrollIntoView({behavior:'smooth',block:'start'});
+  document.querySelectorAll('.wk-rail a').forEach(function(a){ a.classList.toggle('on',a.dataset.go===id); });
+}
+function wkNext(){
+  var cur=document.querySelector('.wk-rail a.on');
+  var links=Array.prototype.slice.call(document.querySelectorAll('.wk-rail a'));
+  var i=cur? links.indexOf(cur):-1;
+  var nx=links[Math.min(i+1,links.length-1)];
+  if(nx) wkGo(nx.dataset.go);
+}
+document.addEventListener('keydown',function(e){
+  if(CUR_VIEW!=='weekly') return;
+  if(e.code!=='Space') return;
+  var t=e.target && e.target.tagName;
+  if(t==='INPUT'||t==='TEXTAREA'||t==='SELECT') return;
+  e.preventDefault(); wkNext();
+});
+async function wkRefetch(){
+  toast('주간보고 취합','시트에서 가져오는 중… (수십 초 걸릴 수 있습니다)','info');
+  try{
+    var r=await fetch(WEEKLY_GAS+'?action=weekly_fetch');
+    var j=await r.json();
+    if(!j.ok) throw new Error(j.error||'실패');
+    toast('취합 완료', j.msg||('사업팀·MSS팀 갱신'));
+  }catch(e){
+    // CORS 차단 등 — 새 탭에서 실행 (결과 JSON 표시)
+    window.open(WEEKLY_GAS+'?action=weekly_fetch','_blank');
+  }
+  setTimeout(function(){ renderWeekly(); }, 1500);
+}
+
 /* ===== 관리자 (super_admin 전용) — 계정·권한 관리 ===== */
 var AX_ROLES=['super_admin','admin','editor','viewer','equipment','poc','equipment_poc'];
 var AX_ROLE_KO={super_admin:'슈퍼 관리자',admin:'관리자',editor:'편집자',viewer:'조회 전용',
@@ -6039,7 +6266,7 @@ function switchView(v){
   });
   try{ ensureGroupOpen(v); }catch(e){}
   var dash=v==='dash', quote=v==='quote', onew=v==='ordernew', acct=v==='account', mnew=v==='mdrnew', oinew=v==='oinew';
-  var adminx=v==='adminx';
+  var adminx=v==='adminx', weekly=v==='weekly';
   if(adminx && !window.IS_SUPER){ v='dash'; dash=true; adminx=false; CUR_VIEW='dash'; }
   var chv=CH_DEFS[v]||null;
   $('#viewDash').classList.toggle('hidden',!dash);
@@ -6049,8 +6276,10 @@ function switchView(v){
   $('#viewOiNew').classList.toggle('hidden',!oinew);
   $('#viewAccount').classList.toggle('hidden',!acct);
   $('#viewAdmin').classList.toggle('hidden',!adminx);
+  $('#viewWeekly').classList.toggle('hidden',!weekly);
   $('#viewChannel').classList.toggle('hidden',!chv);
-  $('#viewData').classList.toggle('hidden',dash||quote||onew||mnew||oinew||acct||adminx||!!chv);
+  $('#viewData').classList.toggle('hidden',dash||quote||onew||mnew||oinew||acct||adminx||weekly||!!chv);
+  if(weekly){ renderWeekly(); return; }
   if(adminx){ renderAdmin(); return; }
   if(chv){ renderChannelView(v); return; }
   if(acct){ renderAccount(); return; }
