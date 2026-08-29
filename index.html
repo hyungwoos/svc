@@ -5331,6 +5331,8 @@ async function renderWeekly(atWeek){
   }
   function tbl(list,opts){
     opts=opts||{};
+    // 칩(상태/구분)이 하나도 없는 목록이면 칩 열 자체를 뺀다
+    var hasChips=list.some(function(x){ return (opts.tagChip && x.section) || x.status; });
     return '<table class="wk-tbl">'+list.map(function(x){
       var chips='';
       if(opts.tagChip && x.section) chips='<span class="wk-chip wkc-blu">'+esc(x.section)+'</span>';
@@ -5345,10 +5347,10 @@ async function renderWeekly(atWeek){
       var due=x.due? ' <span class="wk-chip wkc-gry">'+esc(String(x.due).slice(0,10))+'</span>':'';
       var iss=x.issue_ref? ' <span class="mini">'+esc(x.issue_ref)+'</span>':'';
       return '<tr>'+
-        '<td style="width:78px">'+(chips||'·')+'</td>'+
+        (hasChips? '<td style="width:78px">'+(chips||'·')+'</td>':'')+
+        '<td style="width:118px"><b style="font-weight:650">'+esc(x.customer||'·')+'</b></td>'+
+        '<td style="width:84px;color:var(--ink-2)">'+esc(String(x.owner||'·').replace(/\n/g,'·'))+'</td>'+
         '<td><div class="wk-body">'+esc(x.content||'')+'</div>'+ (amt||due||iss? '<div class="mini" style="margin-top:2px">'+amt+due+iss+'</div>':'')+'</td>'+
-        '<td style="width:120px">'+esc(x.customer||'·')+'</td>'+
-        '<td style="width:86px">'+esc(String(x.owner||'·').replace(/\n/g,'·'))+'</td>'+
         extra+'</tr>';
     }).join('')+'</table>';
   }
