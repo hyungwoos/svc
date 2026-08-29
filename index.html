@@ -432,20 +432,24 @@ body{padding-left:192px}
 .qp-row:last-child{border-bottom:none}
 .qp-row:hover{background:var(--surface-2)}
 /* 주간회의 */
+.wk-head{display:flex;align-items:center;gap:9px;flex-wrap:wrap;
+  position:sticky;top:0;z-index:40;background:var(--plane);
+  padding:10px 2px;margin:-10px 0 10px;border-bottom:1px solid var(--grid)}
 .wk-wrap{display:grid;grid-template-columns:222px 1fr;gap:16px;align-items:start}
-.wk-rail{background:var(--surface);border:1px solid var(--ring);border-radius:14px;padding:11px;position:sticky;top:10px;font-size:12px;max-height:calc(100vh - 24px);overflow:auto}
+.wk-rail{background:var(--surface);border:1px solid var(--ring);border-radius:14px;padding:11px;position:sticky;top:72px;font-size:12px;max-height:calc(100vh - 86px);overflow:auto}
 .wk-rail .ph{font-size:10.5px;letter-spacing:.1em;color:var(--muted);font-weight:750;margin:8px 6px 5px}
 .wk-rail a{display:flex;justify-content:space-between;gap:6px;padding:5px 8px;border-radius:8px;color:var(--ink-2);text-decoration:none;cursor:pointer}
 .wk-rail a small{color:var(--muted)}
 .wk-rail a.on{background:var(--brand-t,rgba(46,189,87,.13));color:var(--ink);font-weight:700}
-.wk-card{background:var(--surface);border:1px solid var(--ring);border-radius:13px;padding:13px 16px;margin-bottom:11px;scroll-margin-top:12px}
+.wk-card{background:var(--surface);border:1px solid var(--ring);border-radius:13px;padding:13px 16px;margin-bottom:11px;scroll-margin-top:74px}
 .wk-card h2{font-size:13.5px;margin:0 0 8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;border:none;padding:0}
 .wk-card h2 .no{width:21px;height:21px;border-radius:50%;background:var(--brand,#149e40);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;font-weight:750;flex:0 0 auto}
 .wk-card.plan h2 .no{background:var(--s1)}
 .wk-card h2 .who{font-size:11px;color:var(--brand,#149e40);background:var(--brand-t,rgba(46,189,87,.13));border-radius:999px;padding:2px 9px;font-weight:650}
 .wk-card h2 small{color:var(--muted);font-weight:400;margin-left:auto}
 .wk-tbl{width:100%;border-collapse:collapse;font-size:12.4px}
-.wk-tbl td{padding:6px 8px;border-bottom:1px solid var(--grid);vertical-align:top;line-height:1.5}
+.wk-tbl td{padding:6px 12px 6px 8px;border-bottom:1px solid var(--grid);vertical-align:top;line-height:1.5}
+.wk-tbl td:nth-last-child(1){padding-right:8px}
 .wk-tbl tr:last-child td{border-bottom:0}
 .wk-chip{display:inline-block;border-radius:999px;padding:1.5px 8px;font-size:10.5px;font-weight:650;white-space:nowrap}
 .wkc-red{background:rgba(208,59,59,.12);color:var(--critical)} .wkc-grn{background:var(--brand-t,rgba(46,189,87,.13));color:var(--brand,#149e40)}
@@ -5348,8 +5352,8 @@ async function renderWeekly(atWeek){
       var iss=x.issue_ref? ' <span class="mini">'+esc(x.issue_ref)+'</span>':'';
       return '<tr>'+
         (hasChips? '<td style="width:78px">'+(chips||'·')+'</td>':'')+
-        '<td style="width:118px"><b style="font-weight:650">'+esc(x.customer||'·')+'</b></td>'+
-        '<td style="width:84px;color:var(--ink-2)">'+esc(String(x.owner||'·').replace(/\n/g,'·'))+'</td>'+
+        '<td style="width:132px"><b style="font-weight:650">'+esc(x.customer||'·')+'</b></td>'+
+        '<td style="width:100px;color:var(--ink-2)">'+esc(String(x.owner||'·').replace(/\n/g,'·'))+'</td>'+
         '<td><div class="wk-body">'+esc(x.content||'')+'</div>'+ (amt||due||iss? '<div class="mini" style="margin-top:2px">'+amt+due+iss+'</div>':'')+'</td>'+
         extra+'</tr>';
     }).join('')+'</table>';
@@ -5393,7 +5397,7 @@ async function renderWeekly(atWeek){
   // ── 헤더 + 레일 조립 ──
   var counts=meta.counts||{};
   var weekNav=(d.weeks||[]).slice(0,8);
-  var head='<div style="display:flex;align-items:center;gap:9px;margin-bottom:14px;flex-wrap:wrap">'+
+  var head='<div class="wk-head">'+
     '<span style="font-size:17px;font-weight:800">📊 주간회의</span>'+
     '<select id="wkWeekSel" class="pill" style="height:31px;font-family:inherit">'+
       weekNav.map(function(w){ return '<option value="'+w+'"'+(w===WK.week?' selected':'')+'>'+w+' 주간</option>'; }).join('')+'</select>'+
@@ -5435,7 +5439,7 @@ async function renderWeekly(atWeek){
     wkApplyZoom(wkZ);
     toast('글자 크기', ['보통','크게','아주 크게'][wkZ],'info');
   };
-  $('#wkNext').onclick=wkNext;
+  $('#wkNext').onclick=function(){ this.blur(); wkNext(); };
   $('#wkFetch').onclick=wkRefetch;
   $('#wkMemoSave').onclick=async function(){
     var t=$('#wkMemo').value;
