@@ -433,15 +433,15 @@ body{padding-left:192px}
 .qp-row:hover{background:var(--surface-2)}
 /* 주간회의 */
 .wk-head{display:flex;align-items:center;gap:9px;flex-wrap:wrap;
-  position:sticky;top:0;z-index:40;background:var(--plane);
+  position:sticky;top:var(--tbh,60px);z-index:40;background:var(--plane);
   padding:10px 2px;margin:-10px 0 10px;border-bottom:1px solid var(--grid)}
 .wk-wrap{display:grid;grid-template-columns:222px 1fr;gap:16px;align-items:start}
-.wk-rail{background:var(--surface);border:1px solid var(--ring);border-radius:14px;padding:11px;position:sticky;top:72px;font-size:12px;max-height:calc(100vh - 86px);overflow:auto}
+.wk-rail{background:var(--surface);border:1px solid var(--ring);border-radius:14px;padding:11px;position:sticky;top:calc(var(--tbh,60px) + var(--wkh,52px) + 10px);font-size:12px;max-height:calc(100vh - var(--tbh,60px) - var(--wkh,52px) - 26px);overflow:auto}
 .wk-rail .ph{font-size:10.5px;letter-spacing:.1em;color:var(--muted);font-weight:750;margin:8px 6px 5px}
 .wk-rail a{display:flex;justify-content:space-between;gap:6px;padding:5px 8px;border-radius:8px;color:var(--ink-2);text-decoration:none;cursor:pointer}
 .wk-rail a small{color:var(--muted)}
 .wk-rail a.on{background:var(--brand-t,rgba(46,189,87,.13));color:var(--ink);font-weight:700}
-.wk-card{background:var(--surface);border:1px solid var(--ring);border-radius:13px;padding:13px 16px;margin-bottom:11px;scroll-margin-top:74px}
+.wk-card{background:var(--surface);border:1px solid var(--ring);border-radius:13px;padding:13px 16px;margin-bottom:11px;scroll-margin-top:calc(var(--tbh,60px) + var(--wkh,52px) + 12px)}
 .wk-card h2{font-size:13.5px;margin:0 0 8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;border:none;padding:0}
 .wk-card h2 .no{width:21px;height:21px;border-radius:50%;background:var(--brand,#149e40);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;font-weight:750;flex:0 0 auto}
 .wk-card.plan h2 .no{background:var(--s1)}
@@ -1663,7 +1663,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-08-29 ①';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-08-29 ②';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -5426,6 +5426,18 @@ async function renderWeekly(atWeek){
 
   host.innerHTML=head+'<div class="wk-wrap">'+rail+'<div id="wkMain">'+bodyH+'</div></div>';
 
+  // 상단 제목 바·주간 헤더의 실제 높이를 재서 고정 위치를 맞춤 (제목 바 밑에 숨지 않게)
+  function wkMeasure(){
+    try{
+      var tb=document.querySelector('.topbar'), hd=host.querySelector('.wk-head');
+      if(tb) document.documentElement.style.setProperty('--tbh', tb.offsetHeight+'px');
+      if(hd) document.documentElement.style.setProperty('--wkh', hd.offsetHeight+'px');
+    }catch(e){}
+  }
+  requestAnimationFrame(wkMeasure);
+  if(!window.__wkRz){ window.__wkRz=1; window.addEventListener('resize', function(){ if(CUR_VIEW==='weekly') wkMeasure(); }); }
+  window.__wkMeasure=wkMeasure;
+
   // ── 동작 ──
   WK.secs=Array.prototype.slice.call(host.querySelectorAll('[data-wksec]')).map(function(e){return e.id;});
   host.querySelectorAll('.wk-rail a').forEach(function(a){
@@ -5445,6 +5457,7 @@ async function renderWeekly(atWeek){
     wkZ=(wkZ+1)%3;
     try{ localStorage.setItem('svc_wk_zoom', String(wkZ)); }catch(e){}
     wkApplyZoom(wkZ);
+    requestAnimationFrame(wkMeasure);   // 글자 크기가 바뀌면 헤더 높이도 다시 잼
     toast('글자 크기', ['보통','크게','아주 크게'][wkZ],'info');
   };
   $('#wkNext').onclick=function(){ this.blur(); wkNext(); };
