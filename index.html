@@ -1663,7 +1663,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-08-29 ②';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-08-29 ③';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -5404,7 +5404,7 @@ async function renderWeekly(atWeek){
 
   // ── 헤더 + 레일 조립 ──
   var counts=meta.counts||{};
-  var weekNav=(d.weeks||[]).slice(0,8);
+  var weekNav=(d.weeks||[]);   // 저장된 주차 전부 (소급분 포함)
   var head='<div class="wk-head">'+
     '<span style="font-size:17px;font-weight:800">📊 주간회의</span>'+
     '<select id="wkWeekSel" class="pill" style="height:31px;font-family:inherit">'+
