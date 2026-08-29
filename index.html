@@ -1663,6 +1663,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
+var APP_VER='2026-08-29 ①';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -1749,6 +1750,8 @@ async function sbWrite(method, path, body, prefer){
     body: body!==undefined? JSON.stringify(body): undefined
   });
   if(!r.ok) throw new Error('저장 실패 ('+r.status+'): '+(await r.text()).slice(0,220));
+  // 저장 성공 → 이전 캐시는 옛 데이터이므로 즉시 무효화 (새로고침 시 옛 화면 방지)
+  try{ sessionStorage.removeItem(CACHE_KEY); }catch(e){}
   var t=await r.text();
   return t? JSON.parse(t): null;
 }
@@ -1858,7 +1861,10 @@ function loadFromCache(){
   // 이전 방문 때 저장한 데이터로 즉시 그린 뒤, 백그라운드에서 최신본으로 교체
   try{
     var c=JSON.parse(sessionStorage.getItem(CACHE_KEY)||'null');
-    if(c && c.res && c.res[0] && c.res[0].length) return buildFromRes(c.res);
+    if(c && c.res && c.res[0] && c.res[0].length){
+      if(Date.now()-(c.t||0) > 10*60*1000) return null;   // 10분 넘은 캐시는 쓰지 않음
+      return buildFromRes(c.res);
+    }
   }catch(e){}
   return null;
 }
@@ -1982,7 +1988,9 @@ function boot(skipCache){
         onData(cached);
         var pl=$('#periodLabel'); pl.textContent += ' · 최신 데이터 확인 중…';
         loadFromDb().then(function(d2){
+          var keep=CUR_VIEW;                    // 보고 있던 화면 유지한 채 데이터만 최신으로
           afterLoad(d2);
+          if(keep && keep!=='dash' && !window.IS_EQUIP) try{ switchView(keep); }catch(e){}
         }).catch(function(){ pl.textContent=pl.textContent.replace(' · 최신 데이터 확인 중…',''); });
         return null;   // 아래 then 건너뜀
       }
@@ -2336,7 +2344,7 @@ function buildControls(){
 
   $('#periodLabel').textContent = DATA.monthKeys[0]+' ~ '+DATA.monthKeys[M-1]+' · 계약 '+DATA.rows.length.toLocaleString('ko-KR')+'건';
   $('#loadedAt').textContent = '읽은 시각 '+DATA.generatedAt;
-  $('#foot').innerHTML = '원본: Supabase DB · 모든 수정은 변경 이력에 기록됩니다 · 수정은 로그인 후 가능'+
+  $('#foot').innerHTML = '원본: Supabase DB · 모든 수정은 변경 이력에 기록됩니다 · 수정은 로그인 후 가능 · 포탈 버전 '+APP_VER+
     (DATA.warnings&&DATA.warnings.length? '<br>⚠️ '+DATA.warnings.join(' / ') : '');
 }
 function uniq(f){
@@ -5505,6 +5513,7 @@ async function adminFetch(payload){
   });
   var j=null; try{ j=await r.json(); }catch(e){}
   if(!r.ok || !j || !j.ok) throw new Error((j&&j.error)||('HTTP '+r.status));
+  try{ sessionStorage.removeItem(CACHE_KEY); }catch(e){}   // 권한 변경 등도 캐시 무효화
   return j;
 }
 function renderAdmin(){
