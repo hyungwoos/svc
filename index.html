@@ -1663,7 +1663,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-08-29 ③';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-08-29 ④';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -1751,7 +1751,8 @@ async function sbWrite(method, path, body, prefer){
   });
   if(!r.ok) throw new Error('저장 실패 ('+r.status+'): '+(await r.text()).slice(0,220));
   // 저장 성공 → 이전 캐시는 옛 데이터이므로 즉시 무효화 (새로고침 시 옛 화면 방지)
-  try{ sessionStorage.removeItem(CACHE_KEY); }catch(e){}
+  // 단, rpc/load_… 는 읽기 전용 호출이라 캐시를 지우지 않음
+  if(!/^rpc\/load_/.test(path)) try{ sessionStorage.removeItem(CACHE_KEY); }catch(e){}
   var t=await r.text();
   return t? JSON.parse(t): null;
 }
@@ -1990,7 +1991,8 @@ function boot(skipCache){
         loadFromDb().then(function(d2){
           var keep=CUR_VIEW;                    // 보고 있던 화면 유지한 채 데이터만 최신으로
           afterLoad(d2);
-          if(keep && keep!=='dash' && !window.IS_EQUIP) try{ switchView(keep); }catch(e){}
+          // 주간회의 화면은 다시 그리지 않음 (껌뻑임 방지)
+          if(keep && keep!=='dash' && keep!=='weekly' && !window.IS_EQUIP) try{ switchView(keep); }catch(e){}
         }).catch(function(){ pl.textContent=pl.textContent.replace(' · 최신 데이터 확인 중…',''); });
         return null;   // 아래 then 건너뜀
       }
@@ -2318,7 +2320,8 @@ function buildControls(){
       if(window.IS_EQUIP){ if(GRIDS[keep]) renderGrid(); }
       else{
         onData(nd);
-        if(keep && keep!=='dash') switchView(keep);
+        // 주간회의 화면은 다시 그리지 않음 — 화면 껌뻑임·메모 입력 유실 방지 (주 1회 데이터라 실시간 갱신 불필요)
+        if(keep && keep!=='dash' && keep!=='weekly') switchView(keep);
       }
       REFRESHING=false;
     }).catch(function(){ REFRESHING=false; });
