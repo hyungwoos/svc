@@ -456,6 +456,20 @@ body{padding-left:192px}
 .wk-phase .ln{flex:1;height:1px;background:var(--grid)}
 .wk-body{white-space:pre-line}
 @media (max-width:1000px){ .wk-wrap{grid-template-columns:1fr} .wk-rail{position:static;max-height:none} }
+/* 주간회의 글자 크게 — 회의실 화면·시니어 배려 */
+#viewWeekly[data-zoom="1"]{font-size:15px}
+#viewWeekly[data-zoom="1"] .wk-tbl{font-size:14.5px}
+#viewWeekly[data-zoom="1"] .wk-card h2{font-size:16px}
+#viewWeekly[data-zoom="1"] .wk-chip{font-size:12.5px}
+#viewWeekly[data-zoom="1"] .wk-phase .pt{font-size:18px}
+#viewWeekly[data-zoom="1"] .mini{font-size:12.5px}
+#viewWeekly[data-zoom="2"]{font-size:17px}
+#viewWeekly[data-zoom="2"] .wk-tbl{font-size:16.5px}
+#viewWeekly[data-zoom="2"] .wk-card h2{font-size:18px}
+#viewWeekly[data-zoom="2"] .wk-chip{font-size:14px}
+#viewWeekly[data-zoom="2"] .wk-phase .pt{font-size:21px}
+#viewWeekly[data-zoom="2"] .mini{font-size:14px}
+#viewWeekly[data-zoom="2"] .wk-tbl td{padding:9px 10px;line-height:1.6}
 .frm label{display:block;font-size:11.5px;color:var(--ink-2);margin-bottom:4px}
 .frm input,.frm select,.frm textarea{width:100%;height:36px;padding:0 10px;border-radius:9px;border:1px solid var(--ring);
   background:var(--surface-2);color:var(--ink);font-size:13px;font-family:inherit;outline:none}
@@ -5386,6 +5400,7 @@ async function renderWeekly(atWeek){
       : '<span class="wk-chip wkc-grn">누락 팀 없음 ✓</span>')+
     '<span style="flex:1"></span>'+
     '<span class="mini">'+Object.keys(counts).map(function(k){return k+' '+counts[k]+'건';}).join(' · ')+'</span>'+
+    '<button class="pill ghost" id="wkZoom" title="글자 크기 — 보통 → 크게 → 아주 크게">가<span style="font-size:15px;font-weight:800">A</span> 글자 크기</button>'+
     '<button class="pill ghost" id="wkFetch">↻ 다시 가져오기</button>'+
     '<button class="pill" id="wkNext">▶ 다음 (Space)</button></div>';
 
@@ -5403,6 +5418,21 @@ async function renderWeekly(atWeek){
     a.onclick=function(){ wkGo(a.dataset.go); };
   });
   $('#wkWeekSel').onchange=function(){ renderWeekly(this.value); };
+  // 글자 크기 3단계 (보통/크게/아주 크게) — 이 브라우저에 기억
+  function wkApplyZoom(z){
+    var vw=document.getElementById('viewWeekly');
+    if(z>0) vw.setAttribute('data-zoom', String(z)); else vw.removeAttribute('data-zoom');
+    var lb=document.getElementById('wkZoom');
+    if(lb) lb.style.background = z>0? 'var(--brand-t,rgba(46,189,87,.13))':'';
+  }
+  var wkZ=0; try{ wkZ=+(localStorage.getItem('svc_wk_zoom')||0); }catch(e){}
+  wkApplyZoom(wkZ);
+  $('#wkZoom').onclick=function(){
+    wkZ=(wkZ+1)%3;
+    try{ localStorage.setItem('svc_wk_zoom', String(wkZ)); }catch(e){}
+    wkApplyZoom(wkZ);
+    toast('글자 크기', ['보통','크게','아주 크게'][wkZ],'info');
+  };
   $('#wkNext').onclick=wkNext;
   $('#wkFetch').onclick=wkRefetch;
   $('#wkMemoSave').onclick=async function(){
