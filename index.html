@@ -686,8 +686,6 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
   <button data-v="mdrgen">🤝 일반 판매</button>
   <button data-v="mdrs1">🔒 에스원</button>
   <button data-v="mdrlgu">📶 LG U+</button>
-  <button data-v="mdrnew">🛡️ PoC 신청</button>
-  <button data-v="mdrops">🛰️ 운영·신청 현황</button>
   <div class="grp" data-chgrp="1">사업 영역 · 기타 (유통)</div>
   <button data-v="chdist">📀 DLP/DRM</button>
   <button data-v="cnpns">🧷 PNS</button>
@@ -695,6 +693,9 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
   <button data-v="ordernew">📝 임대 장비 신청</button>
   <button data-v="orders">📦 임대 장비 신청 내역</button>
   <button data-v="assets">🔧 임대 장비 현황</button>
+  <div class="grp">PoC·데모</div>
+  <button data-v="mdrnew">🛡️ PoC 신청</button>
+  <button data-v="mdrops">🛰️ 운영·신청 현황</button>
   <div class="grp">영업</div>
   <button data-v="oinew">✏️ OI 등록</button>
   <button data-v="oi">🎯 OI 현황</button>
@@ -5200,10 +5201,6 @@ function renderChannelView(key){
        '<span class="spacer"></span><span class="mini" id="chvCnt"></span>'+
      '</div>'+
      '<div class="tbl-wrap" style="max-height:460px"><table id="chvCt" class="dgrid"></table></div></section>';
-  if(key==='cnlgu' && DATA.lg && DATA.lg.ok){
-    h+='<section class="card c12"><h2>LG 판매 참고 목록</h2><p class="cap">'+DATA.lg.count+'건 · 월액 합계 '+won(DATA.lg.feeSum)+'원 · 매출은 각 서비스에 포함</p>'+
-       '<div class="tbl-wrap" style="max-height:320px"><table id="chvLg"></table></div></section>';
-  }
   h+='</div>';
   host.innerHTML=h;
 
@@ -5221,15 +5218,6 @@ function renderChannelView(key){
   $('#chvFclr').onclick=function(){ CHV.filters={}; renderChvTable(); };
   renderChvTable();
 
-  // LG 참고 목록
-  if(key==='cnlgu' && DATA.lg && DATA.lg.ok){
-    var lt=$('#chvLg');
-    lt.innerHTML='<thead><tr><th>고객사</th><th>제품</th><th style="text-align:right">노드</th><th>기간</th><th style="text-align:right">월액</th></tr></thead>'+
-      '<tbody>'+DATA.lg.rows.map(function(x){
-        return '<tr><td>'+esc(x.cust)+'</td><td>'+esc(x.prod)+'</td><td style="text-align:right">'+(x.nodes||'-')+'</td>'+
-          '<td class="mini">'+(x.start||'-')+' ~ '+(x.end||'무약정')+'</td><td style="text-align:right">'+won(x.fee)+'원</td></tr>';
-      }).join('')+'</tbody>';
-  }
 }
 
 /* ===== 관리자 (super_admin 전용) — 계정·권한 관리 ===== */
