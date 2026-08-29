@@ -345,10 +345,10 @@ body{padding-left:192px}
 }
 .side button:hover{background:var(--surface-2);color:var(--ink)}
 .side button[aria-current="true"]{background:var(--s1);color:#fff}
-.side .grp{font-size:10px;color:var(--muted);letter-spacing:.08em;padding:14px 11px 4px;
-  cursor:pointer;user-select:none;display:flex;align-items:center;gap:5px;border-radius:7px}
-.side .grp:hover{color:var(--ink-2)}
-.side .grp::before{content:'▸';font-size:8.5px;transition:transform .12s;flex:0 0 auto}
+.side .grp{font-size:12px;color:var(--ink-2);letter-spacing:.05em;padding:14px 11px 4px;
+  cursor:pointer;user-select:none;display:flex;align-items:center;gap:6px;border-radius:7px}
+.side .grp:hover{color:var(--ink)}
+.side .grp::before{content:'▸';font-size:10px;transition:transform .12s;flex:0 0 auto}
 .side .grp.open::before{transform:rotate(90deg)}
 .side button.clps{display:none!important}
 @media (max-width:1000px){
@@ -551,7 +551,7 @@ body::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;ba
 .side .logo::before{content:'';display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:7px;
   background:linear-gradient(135deg,var(--s1),var(--s7));box-shadow:0 2px 8px rgba(42,120,214,.45)}
 .side button{padding:10px 12px;border-radius:11px;font-size:13px;margin:1px 0;font-weight:550}
-.side .grp{letter-spacing:.14em;text-transform:uppercase;font-weight:700}
+.side .grp{letter-spacing:.08em;text-transform:uppercase;font-weight:750}
 /* 필터바: 글래스 */
 .filters{border-radius:15px;
   background:color-mix(in oklab, var(--surface) 82%, transparent);
@@ -1715,7 +1715,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-08-29 ⑥';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-08-29 ⑦';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
