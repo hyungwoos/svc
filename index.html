@@ -1888,7 +1888,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-08-30 ㉒';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-08-30 ㉓';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -6238,7 +6238,7 @@ function prBindSaas(){
       if(saasMon!=null&&sMon>0){ saasMon+=sMon; sTxt+=' + 센서 '+sParts.join('·')+' (월 '+prWon(sMon)+'원)'; }
     } else sTxt='3,000노드 초과 — 별도 협의';
     var saas=saasMon!=null? saasMon*12*y : null;
-    LASTT={saas:saas, y:y};
+    LASTT={saas:saas, saasMon:saasMon, sTxt:sTxt, y:y};
     $('#ptS').textContent=saas!=null?'₩'+prWon(saas):'별도 협의';
     $('#ptSs').textContent=sTxt+(p==='ztna'?' · SaaS ZTNA는 Cloud NAC 기본 포함':'');
     // ── 구축형: 라이선스 + 정책서버(자동) + 차단센서(수동 선택) → 소비자가 합 × 할인 + 유지보수 10~15%/년
@@ -6295,21 +6295,51 @@ function prBindSaas(){
     if(!TCOQ){ m.innerHTML=''; return; }
     var q=TCOQ, y=(LASTT&&LASTT.y)||(+$('#ptY').value||1);
     var mr=(typeof q.maint_rate==='number'&&q.maint_rate>0&&q.maint_rate<1)? q.maint_rate:null;
+    var mrL=(mr!==null?mr:0.10), mrH=(mr!==null?mr:0.15);
     var intro=+q.total_offer||0;
-    var low=intro*(1+(mr!==null?mr:0.10)*Math.max(y-1,0));
-    var high=intro*(1+(mr!==null?mr:0.15)*Math.max(y-1,0));
     var items=(q.items||[]).map(function(i){ return esc(String((i&&(i.model||i.desc))||''))+((i&&+i.qty>1)?'×'+i.qty:''); }).filter(Boolean).join(' · ');
-    var saas=LASTT?LASTT.saas:null, vs='';
-    if(saas!=null&&intro){ var mid=(low+high)/2, diff=Math.round((1-saas/mid)*100);
-      vs=diff>3? 'SaaS가 약 '+diff+'% 저렴' : (diff<-3? '실제 견적(구축형)이 약 '+(-diff)+'% 저렴' : '비슷한 수준'); }
+    var saasMon=LASTT?LASTT.saasMon:null;
+    // 3·5·6년(+현재 선택 기간) 각각 비교 + 기간별 «승부 월액» (구축형 최저 누적과 동률이 되는 SaaS 월액)
+    var yrs=[3,5,6]; if(yrs.indexOf(y)<0) yrs.push(y); yrs.sort(function(a,b){return a-b;});
+    var recs=[];
+    var rowsH=yrs.map(function(k){
+      var oL=intro*(1+mrL*Math.max(k-1,0)), oH=intro*(1+mrH*Math.max(k-1,0));
+      var sK=saasMon!=null? saasMon*12*k : null, vv='—';
+      if(sK!=null&&intro){ var mid2=(oL+oH)/2, df=Math.round((1-sK/mid2)*100);
+        vv=df>3? 'SaaS가 약 '+df+'% 저렴' : (df<-3? '구축형이 약 '+(-df)+'% 저렴' : '비슷한 수준'); }
+      var target=intro? Math.floor(oL/(12*k)/1000)*1000 : null;      // 유지보수 최저(10%) 가정 — 이 이하면 무조건 이김
+      var needDisc=(target!=null&&saasMon!=null&&saasMon>target)? Math.ceil((1-target/saasMon)*100) : 0;
+      recs.push({k:k, target:target, needDisc:needDisc});
+      return '<tr'+(k===y?' style="font-weight:700"':'')+'><td>'+k+'년'+(k===y?' ◀':'')+'</td>'+
+        '<td class="n">₩'+prWon(Math.round(oL))+(Math.round(oL)!==Math.round(oH)?' ~ '+prWon(Math.round(oH)):'')+'</td>'+
+        '<td class="n">'+(sK!=null?'₩'+prWon(sK):'—')+'</td><td>'+vv+'</td>'+
+        '<td class="n">'+(target!=null?'₩'+prWon(target)+(needDisc>0?' <span style="color:var(--critical)">(−'+needDisc+'%)</span>':''):'—')+'</td></tr>';
+    }).join('');
+    var recHtml='';
+    if(saasMon!=null&&intro){
+      var need=recs.filter(function(r){ return r.needDisc>0; });
+      var recTxt;
+      if(!need.length){
+        recTxt='표준 3년 약정 단가(월 '+prWon(saasMon)+'원) 그대로 제안해도 <b>모든 기간에서 SaaS가 저렴</b>합니다 — 할인 없이 승부 가능.';
+      }else{
+        var w=need[need.length-1];
+        recTxt='고객 검토 기간이 '+w.k+'년이면 <b>월 '+prWon(w.target)+'원 이하</b>로 제안해야 구축형을 이깁니다 (표준 월 '+prWon(saasMon)+'원 대비 약 '+w.needDisc+'% 할인 필요).';
+        var okRows=recs.filter(function(r){ return r.needDisc===0; });
+        if(okRows.length) recTxt+=' '+okRows.map(function(r){ return r.k; }).join('·')+'년 기준은 표준가로도 SaaS가 저렴합니다.';
+      }
+      recHtml='<div style="font-size:12.5px;margin-top:8px;padding:8px 10px;border-radius:8px;background:var(--surface)">💡 <b>최적 SaaS 제안</b> — '+recTxt+
+        ' <span class="pr-note">승부 월액 = 그 기간의 구축형 총비용(유지보수 최저 10% 가정)과 같아지는 SaaS 월액. 그 이하로 제안하면 유지보수율과 무관하게 SaaS가 이기며, 구축형의 운영 인력·상면·장비 교체 비용까지 더하면 실제 우위는 더 큽니다.</span></div>';
+    }
     m.innerHTML='<div style="border:1px solid var(--ring);border-radius:10px;padding:10px 12px;background:var(--surface-2)">'+
       '<div style="font-size:12px;margin-bottom:4px"><b>'+esc(String(q.customer||'고객사 미상'))+'</b>'+(q.quote_date?' · '+esc(String(q.quote_date)):'')+' · '+esc(String(q._file||''))+
       (q._model?' <span class="pr-note">(분석: '+esc(String(q._model).replace(/^claude-/,''))+')</span>':'')+
       ' <button class="pill" id="ptQX" style="height:22px;padding:0 8px;float:right">지우기</button></div>'+
       (items?'<div class="pr-note">'+items+'</div>':'')+
       '<div style="font-size:12.5px;margin-top:6px">실제 견적 도입가 <b>₩'+prWon(intro)+'</b> (VAT별도'+(+q.total_vat?' · VAT포함 '+prWon(+q.total_vat)+'원':'')+')'+
-      ' + 유지보수 '+(mr!==null? (mr*100)+'%':'10~15%')+'/년 → <b>'+y+'년 누적 ₩'+prWon(Math.round(low))+(Math.round(low)!==Math.round(high)?' ~ '+prWon(Math.round(high)):'')+'</b>'+
-      (saas!=null?' &nbsp;vs&nbsp; SaaS 추천안 '+y+'년 <b>₩'+prWon(saas)+'</b>'+(vs?' → <b>'+vs+'</b>':''):'')+'</div>'+
+      ' + 유지보수 '+(mr!==null? (mr*100)+'%':'10~15%')+'/년(2년차~)</div>'+
+      (saasMon!=null&&LASTT&&LASTT.sTxt?'<div class="pr-note" style="margin-top:3px">SaaS 산정 근거 — 3년 약정 단가: '+LASTT.sTxt+' = <b>월 '+prWon(saasMon)+'원</b></div>':'')+
+      '<div style="overflow-x:auto"><table class="pr" style="margin-top:6px"><thead><tr><th>기간</th><th class="n">실제 견적 누적 (도입가+유지보수)</th><th class="n">SaaS 누적 (3년 약정 단가)</th><th>판정</th><th class="n">승부 월액</th></tr></thead><tbody>'+rowsH+'</tbody></table></div>'+
+      recHtml+
       (function(){                                                   // 채널 판정 — 엔드가/소비자가 비율로 어느 딜인지 추정
         var tl=+q.total_list, to=+q.total_offer; if(!tl||!to) return '';
         var rr=to/tl, dd=Math.round((1-rr)*100), ch;
