@@ -1888,7 +1888,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-08-30 ⑳';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-08-30 ㉒';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -5959,6 +5959,7 @@ function applyFs(n){
 
 /* ===== 제품 가격표 — 판(개정판) 단위 관리 ===== */
 var PR={seg:'saas', ver:{saas:0,onprem:0}, op:'ztna', q:'', tcoP:'nac', tcoD:0.30};
+var TCOQ=null;   // 업로드한 구축형 견적서 분석 결과 (메모리에만 — 새로고침 시 소멸)
 function loadPrice(cb){
   if(loadPrice._q){ loadPrice._q.push(cb); return; }   // 중복 호출 방지 — 한 번만 불러옴
   loadPrice._q=[cb];
@@ -6055,8 +6056,9 @@ function prSaasHtml(){
     ' 기간 <select id="ptY" style="'+inSt+'">'+yOpt+'</select>'+
     '<span id="ptZW" style="display:none"> 동시접속 Agent <input type="number" id="ptZQ" value="100" min="1" style="'+inSt+';width:80px"></span>'+
     '<span>구축형 할인 <span style="display:inline-flex;gap:4px">'+
-      '<button class="pill" data-tcod="70" id="td70" style="height:30px">70% 할인</button>'+
-      '<button class="pill" data-tcod="80" id="td80" style="height:30px">80% 할인</button></span></span>'+
+      '<button class="pill" data-tcod="60" id="td60" style="height:30px" title="SR파트너가 영업하는 일반 채널 딜의 통상 엔드가 — SR 마진 10%p 포함">60% (SR채널)</button>'+
+      '<button class="pill" data-tcod="70" id="td70" style="height:30px" title="SR 배제선 — 직판·PR 직대응 딜의 하한가 (인바운드 견적 수준)">70% (직판·PR)</button>'+
+      '<button class="pill" data-tcod="80" id="td80" style="height:30px" title="PR 배제선 — 사실상 방어 최저가">80% (최저)</button></span></span>'+
     '</div>'+
     '<div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;margin:0 0 10px" class="pr-note">'+
     '<span style="display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap">SaaS 센서(월/대) <span id="ptSsL" style="display:inline-flex;gap:6px;flex-wrap:wrap"></span><button class="pill" id="ptSsAdd" title="센서 종류 추가" style="height:26px;padding:0 9px">＋</button></span>'+
@@ -6066,7 +6068,14 @@ function prSaasHtml(){
     '<div class="pr-ob"><div class="l" id="ptOL">구축형 누적</div><div class="v" id="ptO">—</div><div class="pr-note" id="ptOs"></div></div>'+
     '<div class="pr-ob fin"><div class="l">판정</div><div class="v" style="font-size:13.5px;line-height:1.4" id="ptV">—</div></div></div>'+
     '<div class="pr-note" id="ptCfg" style="margin-top:8px"></div>'+
-    '<div id="ptB" style="margin-top:10px"></div></div>';
+    '<div id="ptB" style="margin-top:10px"></div>'+
+    '<div style="margin-top:12px;border-top:1px dashed var(--ring);padding-top:10px">'+
+      '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+
+      '<b style="font-size:12px">📄 실제 구축형 견적서(PDF)로 비교</b>'+
+      '<input type="file" id="ptQF" accept="application/pdf" style="font-size:11.5px;max-width:260px">'+
+      '<button class="pill" id="ptQGo" style="height:28px">AI 분석</button>'+
+      '<span class="pr-note">파일은 분석에만 쓰고 어디에도 저장하지 않습니다 — 새로고침하면 사라집니다</span></div>'+
+      '<div id="ptQR" style="margin-top:8px"></div></div></div>';
   // 표
   var t='';
   var bLab=SUP?'공급가':'소비자가';
@@ -6205,13 +6214,14 @@ function prBindSaas(){
     document.querySelectorAll('[data-osq]').forEach(function(e){ e.oninput=e.onchange=function(){ PR.tcoOS[+e.dataset.osq].q=Math.max(0,+e.value||0); tco(); }; });
     document.querySelectorAll('[data-osx]').forEach(function(e){ e.onclick=function(){ PR.tcoOS.splice(+e.dataset.osx,1); renderSen(); tco(); }; });
   }
+  var LASTT=null;                                                    // 마지막 SaaS 계산값 (견적서 비교용)
   function tco(){
     var p=PR.tcoP||'nac', dRate=PR.tcoD||0.30;                       // dRate = 지불 비율 (70%할인=0.30)
     var n=+$('#ptQty').value||0, y=+$('#ptY').value||1;
     var zq=p==='ztna'? Math.max(0,+$('#ptZQ').value||0) : 0;
     $('#ptZW').style.display=p==='ztna'?'':'none';
     function clear(){ $('#ptO').textContent=$('#ptV').textContent='—'; $('#ptOs').textContent=''; $('#ptCfg').innerHTML=''; $('#ptB').innerHTML=''; }
-    if(!n){ $('#ptS').textContent='—'; $('#ptSs').textContent=''; clear(); return; }
+    if(!n){ $('#ptS').textContent='—'; $('#ptSs').textContent=''; clear(); LASTT={saas:null,y:y}; renderQuoteCmp(); return; }
     // ── SaaS: 3년 약정 엔드가(소비자가) + 센서(월 5·10·15만원/대) (+ ZTNA 선택 시 PA Agent)
     var ti=prNacTier(n), saasMon=null, sTxt='';
     if(ti>=0){
@@ -6228,6 +6238,7 @@ function prBindSaas(){
       if(saasMon!=null&&sMon>0){ saasMon+=sMon; sTxt+=' + 센서 '+sParts.join('·')+' (월 '+prWon(sMon)+'원)'; }
     } else sTxt='3,000노드 초과 — 별도 협의';
     var saas=saasMon!=null? saasMon*12*y : null;
+    LASTT={saas:saas, y:y};
     $('#ptS').textContent=saas!=null?'₩'+prWon(saas):'별도 협의';
     $('#ptSs').textContent=sTxt+(p==='ztna'?' · SaaS ZTNA는 Cloud NAC 기본 포함':'');
     // ── 구축형: 라이선스 + 정책서버(자동) + 차단센서(수동 선택) → 소비자가 합 × 할인 + 유지보수 10~15%/년
@@ -6235,7 +6246,7 @@ function prBindSaas(){
     $('#ptOL').textContent='구축형 누적 ('+Math.round((1-dRate)*100)+'% 할인가)';
     if(!bld){ clear();
       $('#ptO').textContent='구간 초과 — 별도 협의';
-      $('#ptCfg').innerHTML='구축형 '+(p==='nac'?'NAC':'ZTNA')+' 가격표 데이터를 찾을 수 없습니다'; return; }
+      $('#ptCfg').innerHTML='구축형 '+(p==='nac'?'NAC':'ZTNA')+' 가격표 데이터를 찾을 수 없습니다'; renderQuoteCmp(); return; }
     var senRows=tcoSenRowsO(), senCost=0, senDesc=[];
     PR.tcoOS.forEach(function(r){
       if(!r.q) return;
@@ -6248,6 +6259,10 @@ function prBindSaas(){
     if(bld.pc) cfg+=' · 정책서버 '+esc(bld.pc.model)+' '+prWon(bld.pc.price)+'원';
     cfg+=senDesc.length? ' · 센서 '+senDesc.join(' + ') : ' · 센서 없음';
     cfg+=' → 소비자가 합 <b>'+prWon(consAll)+'원</b> → '+Math.round((1-dRate)*100)+'% 할인 도입가 <b>'+prWon(intro)+'원</b>';
+    var dMean=dRate===0.40? 'SR 채널 통상가 — 제조사 17.5%p·총판 2.5%p·PR 10%p·SR 10%p'
+            : dRate===0.30? '직판·PR 딜 하한(SR 배제선) — 제조사 17.5%p·총판 2.5%p·PR 10%p'
+            : '방어 최저가(PR 배제선) — 제조사 17.5%p·총판 2.5%p';
+    cfg+=' <span style="color:var(--muted)">('+dMean+')</span>';
     if(bld.over) cfg+=' · <span style="color:var(--critical)">⚠ 일부 구성이 최대 모델 기준 초과 — 별도 협의 필요</span>';
     $('#ptCfg').innerHTML=cfg;
     var onLow=intro+intro*0.10*Math.max(y-1,0), onHigh=intro+intro*0.15*Math.max(y-1,0);
@@ -6272,6 +6287,92 @@ function prBindSaas(){
         '<span style="width:225px;text-align:right;color:var(--ink-2)">'+(r[1]?'₩'+prWon(r[1]):'—')+' vs ₩'+prWon(Math.round(r[2]))+'</span></div>';
     });
     $('#ptB').innerHTML='<div style="font-size:10.5px;color:var(--muted);margin-bottom:4px"><span style="color:var(--brand)">■</span> SaaS 누적 · <span style="color:#b9beb2">■</span> 구축형 도입가+유지보수(12.5% 중간값) — 구축비·설치비 제외 · VAT별도</div>'+bars;
+    renderQuoteCmp();
+  }
+  /* ── 실제 구축형 견적서(PDF) 비교 — 휘발성: TCOQ 메모리 변수에만 존재 ── */
+  function renderQuoteCmp(){
+    var m=document.getElementById('ptQR'); if(!m) return;
+    if(!TCOQ){ m.innerHTML=''; return; }
+    var q=TCOQ, y=(LASTT&&LASTT.y)||(+$('#ptY').value||1);
+    var mr=(typeof q.maint_rate==='number'&&q.maint_rate>0&&q.maint_rate<1)? q.maint_rate:null;
+    var intro=+q.total_offer||0;
+    var low=intro*(1+(mr!==null?mr:0.10)*Math.max(y-1,0));
+    var high=intro*(1+(mr!==null?mr:0.15)*Math.max(y-1,0));
+    var items=(q.items||[]).map(function(i){ return esc(String((i&&(i.model||i.desc))||''))+((i&&+i.qty>1)?'×'+i.qty:''); }).filter(Boolean).join(' · ');
+    var saas=LASTT?LASTT.saas:null, vs='';
+    if(saas!=null&&intro){ var mid=(low+high)/2, diff=Math.round((1-saas/mid)*100);
+      vs=diff>3? 'SaaS가 약 '+diff+'% 저렴' : (diff<-3? '실제 견적(구축형)이 약 '+(-diff)+'% 저렴' : '비슷한 수준'); }
+    m.innerHTML='<div style="border:1px solid var(--ring);border-radius:10px;padding:10px 12px;background:var(--surface-2)">'+
+      '<div style="font-size:12px;margin-bottom:4px"><b>'+esc(String(q.customer||'고객사 미상'))+'</b>'+(q.quote_date?' · '+esc(String(q.quote_date)):'')+' · '+esc(String(q._file||''))+
+      (q._model?' <span class="pr-note">(분석: '+esc(String(q._model).replace(/^claude-/,''))+')</span>':'')+
+      ' <button class="pill" id="ptQX" style="height:22px;padding:0 8px;float:right">지우기</button></div>'+
+      (items?'<div class="pr-note">'+items+'</div>':'')+
+      '<div style="font-size:12.5px;margin-top:6px">실제 견적 도입가 <b>₩'+prWon(intro)+'</b> (VAT별도'+(+q.total_vat?' · VAT포함 '+prWon(+q.total_vat)+'원':'')+')'+
+      ' + 유지보수 '+(mr!==null? (mr*100)+'%':'10~15%')+'/년 → <b>'+y+'년 누적 ₩'+prWon(Math.round(low))+(Math.round(low)!==Math.round(high)?' ~ '+prWon(Math.round(high)):'')+'</b>'+
+      (saas!=null?' &nbsp;vs&nbsp; SaaS 추천안 '+y+'년 <b>₩'+prWon(saas)+'</b>'+(vs?' → <b>'+vs+'</b>':''):'')+'</div>'+
+      (function(){                                                   // 채널 판정 — 엔드가/소비자가 비율로 어느 딜인지 추정
+        var tl=+q.total_list, to=+q.total_offer; if(!tl||!to) return '';
+        var rr=to/tl, dd=Math.round((1-rr)*100), ch;
+        if(rr<=0.22) ch='PR 배제선 이하 — 방어 최저가·총판 직대응 수준';
+        else if(rr<=0.33) ch='SR 배제선 수준 — 직판 또는 PR 직대응 딜 (SR 마진 자리 없음)';
+        else if(rr<=0.50) ch='SR 채널 딜 범위 — SR 마진 약 '+Math.round((rr-0.30)*100)+'%p 추정';
+        else ch='채널 마진 여유 충분';
+        return '<div class="pr-note" style="margin-top:4px">채널 판정: 엔드가 = 소비자가의 '+Math.round(rr*100)+'% (할인 '+dd+'%) → '+ch+'</div>';
+      })()+
+      '<div class="pr-note" style="margin-top:4px">견적 구성이 위 계산기에 자동 입력되었습니다'+
+      (PR.tcoP==='ztna'?' — ZTNA 동시접속 Agent 수는 노드수로 가정했으니 실제 값으로 조정하세요.':'.')+
+      ' 이 파일과 분석 결과는 저장되지 않습니다.</div></div>';
+    var x=document.getElementById('ptQX');
+    if(x) x.onclick=function(){ TCOQ=null; var f=document.getElementById('ptQF'); if(f) f.value=''; renderQuoteCmp(); };
+  }
+  function applyQuote(){
+    var q=TCOQ; if(!q) return;
+    if(q.product==='nac'||q.product==='ztna'){
+      PR.tcoP=q.product;
+      document.querySelectorAll('[data-tcop]').forEach(function(x){ x.setAttribute('aria-pressed', x.dataset.tcop===q.product?'true':'false'); });
+    }
+    var lic=(q.items||[]).filter(function(i){ return i&&i.kind==='license'; })[0];
+    var n=(lic&&+lic.nodes)? +lic.nodes : 0;
+    if(!n&&lic){ var mm=String(lic.model||'').match(/(\d{2,5})/); if(mm) n=+mm[1]; }
+    if(n){ $('#ptQty').value=n; if(PR.tcoP==='ztna') $('#ptZQ').value=n; }
+    if(+q.total_list&&+q.total_offer){                               // 할인 토글: 제안가/소비자가 비율 근사 (60/70/80 중 최근접)
+      var ratio=q.total_offer/q.total_list, best=0.30;
+      [0.40,0.30,0.20].forEach(function(c){ if(Math.abs(ratio-c)<Math.abs(ratio-best)) best=c; });
+      PR.tcoD=best;
+      var bid=best===0.20?'td80':(best===0.40?'td60':'td70');
+      document.querySelectorAll('[data-tcod]').forEach(function(x){ x.setAttribute('aria-pressed', x.id===bid?'true':'false'); });
+    }
+    var names=tcoSenRowsO().map(function(x){ return String(x[1]); });  // 센서 품목 → 가격표 모델 매칭
+    var os=[];
+    (q.items||[]).forEach(function(i){
+      if(!i||i.kind!=='sensor') return;
+      var mdl=String(i.model||'').trim();
+      var hit=names.filter(function(nm){ return nm===mdl || nm.replace(/[\s_-]/g,'').toLowerCase()===mdl.replace(/[\s_-]/g,'').toLowerCase(); })[0];
+      if(hit) os.push({m:hit, q:+i.qty||1});
+    });
+    if(os.length) PR.tcoOS=os;
+    renderSen(); tco();
+  }
+  async function quoteGo(){
+    var fi=document.getElementById('ptQF'), m=document.getElementById('ptQR');
+    var f=fi&&fi.files&&fi.files[0];
+    if(!f){ m.innerHTML='<span class="pr-note">PDF 파일을 먼저 선택하세요</span>'; return; }
+    if(!/pdf$/i.test(f.type||'')&&!/\.pdf$/i.test(f.name||'')){ m.innerHTML='<span style="color:var(--critical)">PDF 파일만 분석할 수 있습니다</span>'; return; }
+    if(f.size>4*1024*1024){ m.innerHTML='<span style="color:var(--critical)">4MB 이하 PDF만 가능합니다</span>'; return; }
+    m.innerHTML='<span class="pr-note">⏳ AI가 견적서를 읽는 중… (10~20초)</span>';
+    try{
+      var b64=await new Promise(function(res,rej){
+        var rd=new FileReader();
+        rd.onload=function(){ res(String(rd.result).split(',')[1]||''); };
+        rd.onerror=function(){ rej(new Error('파일을 읽지 못했습니다')); };
+        rd.readAsDataURL(f);
+      });
+      var j=await aiFetch({mode:'quote', pdf:b64});
+      if(!j||!j.ok||!j.quote) throw new Error((j&&j.error)||'분석 실패');
+      TCOQ=j.quote; TCOQ._file=f.name; TCOQ._model=j.model||'';
+      applyQuote();
+      toast('견적서 분석 완료', (TCOQ.customer||'')+' → TCO 계산기에 적용');
+    }catch(e){ m.innerHTML='<span style="color:var(--critical)">분석 실패: '+esc(String(e.message||e))+'</span>'; }
   }
   document.querySelectorAll('[data-prbasis]').forEach(function(b){
     b.onclick=function(){ PR.basis=b.dataset.prbasis; prPaintMain(); };
@@ -6282,18 +6383,19 @@ function prBindSaas(){
   ['ptQty','ptY','ptZQ'].forEach(function(i){ var e=document.getElementById(i); if(e){ e.onchange=tco; e.oninput=tco; } });
   var eA=document.getElementById('ptSsAdd'); if(eA) eA.onclick=function(){ PR.tcoSS.push({p:50000,q:1}); renderSen(); tco(); };
   var eB=document.getElementById('ptOsAdd'); if(eB) eB.onclick=function(){ PR.tcoOS.push(tcoOsDefault()); renderSen(); tco(); };
+  var eQ=document.getElementById('ptQGo'); if(eQ) eQ.onclick=quoteGo;
   document.querySelectorAll('[data-tcop]').forEach(function(b){
     b.onclick=function(){ PR.tcoP=b.dataset.tcop;
       document.querySelectorAll('[data-tcop]').forEach(function(x){ x.setAttribute('aria-pressed', x===b?'true':'false'); });
       PR.tcoOS=null; renderSen(); tco(); };            // 제품 전환 시 센서 모델 목록도 교체
   });
   document.querySelectorAll('[data-tcod]').forEach(function(b){
-    b.onclick=function(){ PR.tcoD=b.dataset.tcod==='80'?0.20:0.30;
+    b.onclick=function(){ PR.tcoD=b.dataset.tcod==='80'?0.20:(b.dataset.tcod==='60'?0.40:0.30);
       document.querySelectorAll('[data-tcod]').forEach(function(x){ x.setAttribute('aria-pressed', x===b?'true':'false'); });
       tco(); };
   });
   var _tp=document.getElementById(PR.tcoP==='ztna'?'tpZtna':'tpNac'); if(_tp)_tp.setAttribute('aria-pressed','true');
-  var _td=document.getElementById(PR.tcoD===0.20?'td80':'td70'); if(_td)_td.setAttribute('aria-pressed','true');
+  var _td=document.getElementById(PR.tcoD===0.20?'td80':(PR.tcoD===0.40?'td60':'td70')); if(_td)_td.setAttribute('aria-pressed','true');
   nac(); mdr(); renderSen(); tco();
 }
 /* 새 판 등록 (슈퍼 관리자) */
