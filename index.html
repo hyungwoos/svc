@@ -1275,6 +1275,18 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
       <div class="tbl-wrap" style="max-height:56vh"><table id="axTable" class="dgrid"></table></div>
       <p class="cap" style="margin:10px 0 0">권한 설명 — super_admin: 전체+계정 관리 · admin/editor: 조회+수정 · viewer: 조회만
         · equipment/poc/equipment_poc: 해당 메뉴만 · «권한 없음»: 로그인은 되지만 제한 화면만 보입니다</p>
+
+      <div style="font-size:11px;color:var(--ink-2);opacity:.75;margin:22px 0 8px">— AI 사용 비용 (Anthropic) —</div>
+      <div id="axBillKpi" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px"></div>
+      <div id="axBillBars" style="margin-bottom:10px"></div>
+      <div class="frm" style="grid-template-columns:1fr 1fr 1fr 1fr">
+        <div><label>충전 금액 (USD)</label><input id="abCredit" type="number" step="0.01" placeholder="예: 50"></div>
+        <div><label>충전일</label><input id="abDate" type="date"></div>
+        <div style="display:flex;align-items:flex-end"><button class="pill" id="abSave" style="height:36px">저장 후 다시 계산</button></div>
+        <div style="display:flex;align-items:flex-end"><span class="mini" id="abMsg"></span></div>
+      </div>
+      <p class="cap" style="margin:6px 0 0">Anthropic은 잔액 조회 API가 없어 «충전액 − 충전일 이후 사용액»으로 잔여를 추정합니다 (사용액은 Cost API 실측).
+        Edge Function admin 의 Secrets에 <b>ANTHROPIC_ADMIN_KEY</b>(sk-ant-admin…, 콘솔 Settings→Admin keys) 추가 필요.</p>
     </section>
   </div>
 
@@ -1796,7 +1808,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-08-30 ⑩';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-08-30 ⑫';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -2031,8 +2043,10 @@ function loadFromCache(){
 function buildFromRes(res){
   var custs=res[0], cts=res[1], mrs=res[2];
   var LIVE=shapeLive(res[3]), LGD=shapeLg(res[4]), VSD=shapeVs(res[5]);
+  var prevRawx=window.RAWX||{};   // 별도 화면 캐시(가격표·인바운드·변경이력)는 자동 갱신에 휩쓸려 지우지 않음
   window.RAWX={customers:custs, contracts:cts, live:res[3]||[], lg:res[4]||[], biz:res[5]||[],
-    targets:res[6]||[], orders:res[7]||[], assets:res[9]||[], mdrpoc:res[10]||[], mtargets:res[11]||[], oi:res[12]||[], mdrops:res[13]||[], log:null, mrs:mrs};
+    targets:res[6]||[], orders:res[7]||[], assets:res[9]||[], mdrpoc:res[10]||[], mtargets:res[11]||[], oi:res[12]||[], mdrops:res[13]||[], log:prevRawx.log||null, mrs:mrs};
+  window.RAWX.price=prevRawx.price; window.RAWX.inbound=prevRawx.inbound; window.RAWX._inbAt=prevRawx._inbAt;
   window.IS_VIEWER = !!(res[8] && res[8].length && res[8][0].role==='viewer');
   window.MY_ROLE = (res[8] && res[8].length && res[8][0].role) || '';
   window.IS_SUPER = window.MY_ROLE==='super_admin';
@@ -2150,8 +2164,8 @@ function boot(skipCache){
         loadFromDb().then(function(d2){
           var keep=CUR_VIEW;                    // 보고 있던 화면 유지한 채 데이터만 최신으로
           afterLoad(d2);
-          // 주간회의 화면은 다시 그리지 않음 (껌뻑임 방지)
-          if(keep && keep!=='dash' && keep!=='weekly' && !window.IS_EQUIP) try{ switchView(keep); }catch(e){}
+          // 로딩 사이에 다른 화면으로 이동했으면 되돌리지 않음 · 주간회의는 다시 그리지 않음
+          if(keep && keep===CUR_VIEW && keep!=='dash' && keep!=='weekly' && !window.IS_EQUIP) try{ switchView(keep); }catch(e){}
         }).catch(function(){ pl.textContent=pl.textContent.replace(' · 최신 데이터 확인 중…',''); });
         return null;   // 아래 then 건너뜀
       }
@@ -2463,9 +2477,10 @@ function buildControls(){
   };
 
   /* ===== 자동 갱신 =====
-     · 다른 탭 갔다 돌아오면: 마지막 로딩이 60초 넘었을 때 조용히 다시 읽음
-     · 화면을 계속 켜두면: 5분마다 조용히 다시 읽음
-     보고 있는 화면·검색·필터는 그대로 두고 데이터만 바꿉니다.        */
+     · 다른 탭 갔다 돌아오면: 마지막 로딩이 5분 넘었을 때만 조용히 다시 읽음
+     · 화면을 계속 켜두면: 15분마다 조용히 다시 읽음
+     · 데이터가 실제로 바뀐 경우에만 다시 그리고, 그때도 필터·정렬·페이지는 유지
+     · 갱신 도중 다른 화면으로 이동했으면 절대 되돌리지 않음                    */
   window.LAST_LOAD=Date.now();
   var REFRESHING=false;
   function silentRefresh(reason){
@@ -2474,22 +2489,35 @@ function buildControls(){
     if(document.getElementById('ovlAuth').classList.contains('on')) return;
     REFRESHING=true;
     var keep=CUR_VIEW;
+    var prevSnap=''; try{ prevSnap=sessionStorage.getItem(CACHE_KEY)||''; }catch(e){}
     loadFromDb().then(function(nd){
       window.LAST_LOAD=Date.now();
+      // 데이터가 그대로면 화면을 건드리지 않음 (의미 없는 다시 그리기 방지)
+      var same=false;
+      try{
+        var a=JSON.parse(prevSnap||'{}').res, b=JSON.parse(sessionStorage.getItem(CACHE_KEY)||'{}').res;
+        same = !!a && !!b && JSON.stringify(a)===JSON.stringify(b);
+      }catch(e){}
+      if(same){ REFRESHING=false; return; }
       if(window.IS_EQUIP){ if(GRIDS[keep]) renderGrid(); }
       else{
         onData(nd);
-        // 주간회의 화면은 다시 그리지 않음 — 화면 껌뻑임·메모 입력 유실 방지 (주 1회 데이터라 실시간 갱신 불필요)
-        if(keep && keep!=='dash' && keep!=='weekly') switchView(keep);
+        if(keep && keep===CUR_VIEW && keep!=='dash' && keep!=='weekly'){
+          // switchView 는 필터를 초기화하므로 쓰지 않고, 화면 종류별로 데이터만 다시 그림
+          if(GRIDS[keep]) renderGrid();                       // 필터·정렬·페이지 유지
+          else if(CH_DEFS[keep]) try{ renderChannelView(keep); }catch(e){}
+          else if(keep==='inbstat') try{ renderInbStat(); }catch(e){}
+          // price 등 자체 데이터 화면은 건드리지 않음
+        }
       }
       REFRESHING=false;
     }).catch(function(){ REFRESHING=false; });
   }
   document.addEventListener('visibilitychange',function(){
-    if(document.visibilityState==='visible' && Date.now()-window.LAST_LOAD>60*1000) silentRefresh('focus');
+    if(document.visibilityState==='visible' && Date.now()-window.LAST_LOAD>5*60*1000) silentRefresh('focus');
   });
   setInterval(function(){
-    if(document.visibilityState==='visible' && Date.now()-window.LAST_LOAD>5*60*1000) silentRefresh('timer');
+    if(document.visibilityState==='visible' && Date.now()-window.LAST_LOAD>15*60*1000) silentRefresh('timer');
   }, 60*1000);
 
   $('#btnAsk').onclick=function(){ ask($('#q').value); };
@@ -3362,9 +3390,12 @@ function ask(q){
   })
     .then(function(r){
       setAsking(false);
-      if(!r || !r.ok || !r.text){ localAnswer(q,'AI가 답하지 못해 내장 규칙으로 답했습니다.'); return; }
+      if(!r || !r.ok || !r.text){ localAnswer(q,'⚠ AI가 답하지 못해 내장 규칙(간단 패턴)으로 답했습니다 — AI 답변이 아닙니다. '+String((r&&r.error)||'').slice(0,100)); return; }
       say.className='ai-say on';
-      say.innerHTML='<span class="lb">AI</span>'+esc(cleanSay(r.text));
+      say.innerHTML='<span class="lb">AI</span>'+esc(cleanSay(r.text))+
+        '<div style="font-size:10px;color:var(--muted);margin-top:6px;opacity:.8">'+
+        esc(String(r.model||'').replace(/^claude-/,''))+
+        (r.queries&&r.queries.length? ' · DB 조회 '+r.queries.length+'회':'')+'</div>';
       HIST.push({q:q, a:r.text}); if(HIST.length>10) HIST.shift();
       saveHistTurn(q, r.text);                  // 계정별 누적 기억 (세션 무관)
       // 표·그래프가 도움이 되는 질문이면 포탈이 직접 계산해서 아래에 붙입니다
@@ -3378,7 +3409,7 @@ function ask(q){
     })
     .catch(function(e){
       setAsking(false);
-      localAnswer(q,'AI 호출에 실패해 내장 규칙으로 답했습니다. ('+String(e&&e.message||e).slice(0,120)+')');
+      localAnswer(q,'⚠ AI 호출 실패 — 이 답은 AI가 아니라 내장 규칙(간단 패턴)입니다. ('+String(e&&e.message||e).slice(0,120)+')');
     });
 }
 
@@ -5571,8 +5602,12 @@ function applyFs(n){
 /* ===== 제품 가격표 — 판(개정판) 단위 관리 ===== */
 var PR={seg:'saas', ver:{saas:0,onprem:0}, op:'ztna', q:''};
 function loadPrice(cb){
+  if(loadPrice._q){ loadPrice._q.push(cb); return; }   // 중복 호출 방지 — 한 번만 불러옴
+  loadPrice._q=[cb];
   sbTry('price_books?select=id,seg,label,applied,data,note&order=applied.desc,id.desc').then(function(rows){
-    RAWX.price=rows||[]; if(cb) cb();
+    RAWX.price=rows||[];
+    var q=loadPrice._q; loadPrice._q=null;
+    q.forEach(function(f){ if(f) try{ f(); }catch(e){} });
   });
 }
 function prBooks(seg){ return (RAWX.price||[]).filter(function(b){return b.seg===seg;}); }
@@ -5623,6 +5658,12 @@ function prPaintMain(){
 }
 function prSaasHtml(){
   var D=prCur('saas').data, h='';
+  var SUP=PR.basis==='supply';                       // Cloud NAC·ZTNA PA 표시 기준
+  var RT=(D.supply_rate&&D.supply_rate.cnac)||0.5;   // 총판 공급가 = 표시가 × 50%
+  function pv(v){ return typeof v==='number'? prWon(SUP? Math.round(v*RT):v) : prWon(v); }
+  var basisBtn='<span style="display:inline-flex;gap:4px;margin-left:8px">'+
+    '<button class="pill" data-prbasis="cons" style="height:26px;font-size:11px;'+(!SUP?'background:var(--brand-t);border-color:var(--brand);color:var(--brand);font-weight:700':'')+'">소비자가</button>'+
+    '<button class="pill" data-prbasis="supply" style="height:26px;font-size:11px;'+(SUP?'background:var(--brand-t);border-color:var(--brand);color:var(--brand);font-weight:700':'')+'">총판 공급가 '+(RT*100)+'% 🔒</button></span>';
   // 계산기 + TCO
   h+='<div class="pr-calc">'+
     '<h3 style="margin:0 0 6px;font-size:13.5px">🧮 빠른 견적 — Cloud NAC <small style="color:var(--muted);font-weight:400">기본 구독 + ZTNA 사용 시 PA Agent 추가</small></h3>'+
@@ -5653,16 +5694,17 @@ function prSaasHtml(){
     '<div id="ptB" style="margin-top:12px"></div></div>';
   // 표
   var t='';
+  var bLab=SUP?'공급가':'소비자가';
   var cn=(D.cnac?D.cnac.rows:[]).filter(function(r){return prMatch('cloud nac v6 '+r[0]);}).map(function(r){
-    return '<tr><td>'+r[0]+'</td><td class="n">'+prWon(r[1])+'</td><td class="n">'+prWon(r[2])+'</td><td class="n">'+prWon(r[3])+'</td><td class="n">'+prWon(r[4])+'</td></tr>'; }).join('');
-  if(cn) t+='<div class="pr-card"><h3>☁️ Cloud NAC V6.0 <small>SaaS 기본 · 원/노드·월 · VAT별도</small></h3>'+
-    '<p class="cap" style="margin:0 0 8px">3,000노드 초과 별도 협의 · ZTNA 사용 시 PA Agent 추가 구매</p>'+
-    '<table class="pr"><thead><tr><th>구분(NODE)</th><th class="n">소비자가(무약정)</th><th class="n">1년</th><th class="n">2년</th><th class="n">3년</th></tr></thead><tbody>'+cn+'</tbody></table></div>';
+    return '<tr><td>'+r[0]+'</td><td class="n">'+pv(r[1])+'</td><td class="n">'+pv(r[2])+'</td><td class="n">'+pv(r[3])+'</td><td class="n">'+pv(r[4])+'</td></tr>'; }).join('');
+  if(cn) t+='<div class="pr-card"><h3>☁️ Cloud NAC V6.0 '+basisBtn+' <small>SaaS 기본 · 원/노드·월 · VAT별도</small></h3>'+
+    '<p class="cap" style="margin:0 0 8px">3,000노드 초과 별도 협의 · ZTNA 사용 시 PA Agent 추가 구매 · 총판 공급가 = 표시가의 '+(RT*100)+'%</p>'+
+    '<table class="pr"><thead><tr><th>구분(NODE)</th><th class="n">'+bLab+'(무약정)</th><th class="n">1년</th><th class="n">2년</th><th class="n">3년</th></tr></thead><tbody>'+cn+'</tbody></table></div>';
   var zr=(D.ztna?D.ztna.rows:[]).filter(function(r){return prMatch('ztna pa '+r[0]);}).map(function(r){
-    return '<tr><td>'+r[0]+'</td><td class="n">'+prWon(r[1])+'</td><td class="n">'+prWon(r[2])+'</td><td class="n">'+prWon(r[3])+'</td><td class="n">'+prWon(r[4])+'</td></tr>'; }).join('');
-  if(zr) t+='<div class="pr-card"><h3>🌐 Cloud ZTNA PA Agent <small>Cloud NAC 추가 옵션 · 원/Agent·월 · VAT별도</small></h3>'+
-    '<p class="cap" style="margin:0 0 8px">동시접속자 기준 수량 구매 · Cloud Gateway는 고객사 인프라에 구성</p>'+
-    '<table class="pr"><thead><tr><th>구분(Agent)</th><th class="n">소비자가(무약정)</th><th class="n">1년</th><th class="n">2년</th><th class="n">3년</th></tr></thead><tbody>'+zr+'</tbody></table></div>';
+    return '<tr><td>'+r[0]+'</td><td class="n">'+pv(r[1])+'</td><td class="n">'+pv(r[2])+'</td><td class="n">'+pv(r[3])+'</td><td class="n">'+pv(r[4])+'</td></tr>'; }).join('');
+  if(zr) t+='<div class="pr-card"><h3>🌐 Cloud ZTNA PA Agent '+basisBtn+' <small>Cloud NAC 추가 옵션 · 원/Agent·월 · VAT별도</small></h3>'+
+    '<p class="cap" style="margin:0 0 8px">동시접속자 기준 수량 구매 · Cloud Gateway는 고객사 인프라에 구성 · 총판 공급가 = 표시가의 '+(RT*100)+'%</p>'+
+    '<table class="pr"><thead><tr><th>구분(Agent)</th><th class="n">'+bLab+'(무약정)</th><th class="n">1년</th><th class="n">2년</th><th class="n">3년</th></tr></thead><tbody>'+zr+'</tbody></table></div>';
   (D.services||[]).forEach(function(s){
     var rows=s.tiers.map(function(tt,i){
       if(!prMatch(s.name+' '+tt)) return '';
@@ -5723,12 +5765,14 @@ function prBindSaas(){
     var ti=prNacTier(n), col=tm===0?1:tm+1;
     if(!n||ti<0){ $('#pvMon').textContent=$('#pvZ').textContent=$('#pvTot').textContent='—';
       $('#pvNote').textContent=(ti<0&&n)?'3,000노드 초과는 별도 협의입니다.':''; return; }
-    var rate=D.cnac.rows[ti][col], mon=rate*n, zmon=0, zq=0;
-    if(z){ zq=+$('#pnZQ').value||0; var zi=prNacTier(zq); if(zq&&zi>=0) zmon=D.ztna.rows[zi][col]*zq; }
+    var f=PR.basis==='supply'? ((D.supply_rate&&D.supply_rate.cnac)||0.5) : 1;   // 총판 공급가 = 표시가 × 50%
+    var rate=Math.round(D.cnac.rows[ti][col]*f), mon=rate*n, zmon=0, zq=0;
+    if(z){ zq=+$('#pnZQ').value||0; var zi=prNacTier(zq); if(zq&&zi>=0) zmon=Math.round(D.ztna.rows[zi][col]*f)*zq; }
     $('#pvMon').textContent='₩'+prWon(mon);
     $('#pvZ').textContent=z?(zmon?'₩'+prWon(zmon):'—'):'미사용';
     $('#pvTot').textContent='₩'+prWon(mon+zmon)+' · 연 ₩'+prWon((mon+zmon)*12);
-    $('#pvNote').textContent='Cloud NAC '+D.cnac.rows[ti][0]+' 구간 노드당 '+prWon(rate)+'원/월'+(z&&zmon?' · ZTNA PA '+prWon(zq)+'개':'')+' · 소비자가 기준 · VAT별도';
+    $('#pvNote').textContent='Cloud NAC '+D.cnac.rows[ti][0]+' 구간 노드당 '+prWon(rate)+'원/월'+(z&&zmon?' · ZTNA PA '+prWon(zq)+'개':'')+
+      ' · '+(f===1?'소비자가':'총판 공급가('+(f*100)+'%)')+' 기준 · VAT별도';
   }
   function mdr(){
     var sel=[].slice.call(document.querySelectorAll('[data-prs]:checked')).map(function(x){return x.dataset.prs;});
@@ -5772,6 +5816,9 @@ function prBindSaas(){
     });
     $('#ptB').innerHTML='<div style="font-size:10.5px;color:var(--muted);margin-bottom:4px"><span style="color:var(--brand)">■</span> SaaS 누적 · <span style="color:#b9beb2">■</span> 구축형(유지보수 12.5% 중간값) — H/W·구축비 제외</div>'+bars;
   }
+  document.querySelectorAll('[data-prbasis]').forEach(function(b){
+    b.onclick=function(){ PR.basis=b.dataset.prbasis; prPaintMain(); };
+  });
   ['pnQty','pnTerm','pnZ','pnZQ'].forEach(function(i){ var e=document.getElementById(i); if(e){ e.onchange=nac; e.oninput=nac; } });
   document.querySelectorAll('[data-prs]').forEach(function(e){ e.onchange=mdr; });
   ['pmQty','pmWho'].forEach(function(i){ var e=document.getElementById(i); if(e){ e.onchange=mdr; e.oninput=mdr; } });
@@ -5971,16 +6018,23 @@ function wkCustMatch(name){
   });
   return hit;
 }
+var WK_CACHE={};   // 주차별 캐시 — 주 1회 바뀌는 데이터라 10분 캐시로 즉시 표시
 async function renderWeekly(atWeek){
   var host=$('#wkBody');
-  host.innerHTML='<div class="cap" style="padding:40px;text-align:center">주간보고를 불러오는 중…</div>';
+  var ck=atWeek||'', cc=WK_CACHE[ck];
   var d=null;
-  try{
-    d=await sbWrite('POST', atWeek? 'rpc/load_weekly_at':'rpc/load_weekly', atWeek? {p_week:atWeek}:{});
-  }catch(e){
-    host.innerHTML='<section class="card c12"><h3 style="margin:0 0 6px">📊 주간회의</h3>'+
-      '<p class="cap">데이터를 불러오지 못했습니다 — 40_weekly.sql 실행 여부를 확인하세요.<br>'+esc(String(e.message||e))+'</p></section>';
-    return;
+  if(cc && Date.now()-cc.t<10*60*1000){
+    d=cc.d;                                   // 캐시로 즉시 렌더 (로딩 화면 없음)
+  }else{
+    host.innerHTML='<div class="cap" style="padding:40px;text-align:center">주간보고를 불러오는 중…</div>';
+    try{
+      d=await sbWrite('POST', atWeek? 'rpc/load_weekly_at':'rpc/load_weekly', atWeek? {p_week:atWeek}:{});
+      WK_CACHE[ck]={t:Date.now(), d:d};
+    }catch(e){
+      host.innerHTML='<section class="card c12"><h3 style="margin:0 0 6px">📊 주간회의</h3>'+
+        '<p class="cap">데이터를 불러오지 못했습니다 — 40_weekly.sql 실행 여부를 확인하세요.<br>'+esc(String(e.message||e))+'</p></section>';
+      return;
+    }
   }
   if(!d || !d.items || !d.items.length){
     host.innerHTML='<section class="card c12" style="max-width:640px;margin:0 auto;text-align:center;padding:40px">'+
@@ -6144,6 +6198,9 @@ async function renderWeekly(atWeek){
     var t=$('#wkMemo').value;
     try{
       await sbWrite('PATCH','weekly_meta?week=eq.'+WK.week,{memo:t||null});
+      Object.keys(WK_CACHE).forEach(function(k){       // 캐시에도 반영 (다시 열어도 방금 메모 유지)
+        try{ if(WK_CACHE[k].d&&WK_CACHE[k].d.meta&&WK_CACHE[k].d.meta.week===WK.week) WK_CACHE[k].d.meta.memo=t||null; }catch(e){}
+      });
       msgTo('wkMemoMsg','저장됨 ✓');
     }catch(e){ msgTo('wkMemoMsg',String(e.message||e).slice(0,80)); }
   };
@@ -6179,6 +6236,7 @@ async function wkRefetch(){
     // CORS 차단 등 — 새 탭에서 실행 (결과 JSON 표시)
     window.open(WEEKLY_GAS+'?action=weekly_fetch','_blank');
   }
+  WK_CACHE={};   // 새로 취합했으니 캐시 비움
   setTimeout(function(){ renderWeekly(); }, 1500);
 }
 
@@ -6217,8 +6275,56 @@ function renderAdmin(){
     $('#axReload').onclick=axLoad;
     $('#axQ').oninput=axPaint;
     $('#axCreate').onclick=axCreate;
+    $('#abSave').onclick=abSave;
   }
   axLoad();
+  abLoad();
+}
+/* ── AI 사용 비용 (Anthropic Cost API + 충전액 기준 잔여 추정) ── */
+async function abLoad(){
+  var kpi=$('#axBillKpi'), bars=$('#axBillBars');
+  kpi.innerHTML='<div class="cap">AI 사용 비용을 불러오는 중…</div>'; bars.innerHTML='';
+  var bill=null;
+  try{ var rows=await sbTry('ai_billing?select=*'); bill=(rows&&rows[0])||null; }catch(e){}
+  if(bill){
+    if(!$('#abCredit').value && bill.credit_usd) $('#abCredit').value=bill.credit_usd;
+    if(!$('#abDate').value && bill.baseline) $('#abDate').value=String(bill.baseline).slice(0,10);
+  }
+  var from=(bill&&bill.baseline)? String(bill.baseline).slice(0,10) : new Date(Date.now()-29*864e5).toISOString().slice(0,10);
+  var r;
+  try{ r=await adminFetch({action:'ai_cost', from:from}); }
+  catch(e){ kpi.innerHTML='<div class="cap">⚠ '+esc(String(e.message||e))+'</div>'; return; }
+  var credit=bill? Number(bill.credit_usd)||0 : 0;
+  var remain=credit? Math.round((credit-r.total_usd)*100)/100 : null;
+  function box(l,v,s,warn){
+    return '<div class="kpi'+(warn?'':'')+'" style="padding:11px 14px"><div style="font-size:11px;color:var(--muted);font-weight:650">'+l+'</div>'+
+      '<div style="font-size:19px;font-weight:800;margin-top:2px'+(warn?';color:var(--critical)':'')+'">'+v+'</div>'+
+      '<div style="font-size:10.5px;color:var(--muted)">'+s+'</div></div>';
+  }
+  kpi.innerHTML=
+    box('잔여 크레딧 (추정)', remain==null?'충전액 미입력':'$'+remain.toLocaleString('en-US'),
+        remain==null?'아래에 충전액·충전일을 입력하세요':'충전액 $'+credit+' − 사용 $'+r.total_usd, remain!=null&&remain<5)+
+    box('이번 달 사용액','$'+Number(r.month_usd).toLocaleString('en-US'), new Date().toISOString().slice(0,7)+' 실측 (Cost API)')+
+    box('기준일 이후 사용액','$'+Number(r.total_usd).toLocaleString('en-US'), r.from+' 부터 누적');
+  var mx=0.01; (r.daily||[]).forEach(function(d){ mx=Math.max(mx,d.usd); });
+  bars.innerHTML=(r.daily&&r.daily.length)?
+    '<div class="mini" style="margin-bottom:4px">최근 14일 일별 사용액</div>'+
+    '<div style="display:flex;align-items:flex-end;gap:3px;height:52px">'+
+    r.daily.map(function(d){
+      return '<div title="'+d.d+' · $'+d.usd+'" style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:2px">'+
+        '<div style="width:100%;border-radius:3px 3px 0 0;background:var(--brand);height:'+Math.max(2,Math.round(d.usd/mx*40))+'px"></div>'+
+        '<span style="font-size:8.5px;color:var(--muted)">'+d.d.slice(8)+'</span></div>';
+    }).join('')+'</div>' : '';
+}
+async function abSave(){
+  var c=+$('#abCredit').value||0, d=$('#abDate').value, m=$('#abMsg');
+  if(!d){ m.textContent='충전일을 입력하세요'; return; }
+  m.textContent='저장 중…';
+  try{
+    await sbWrite('PATCH','ai_billing?id=eq.1',{credit_usd:c, baseline:d, updated_at:new Date().toISOString()});
+    m.textContent='저장됨';
+    abLoad();
+  }catch(e){ m.textContent=String(e.message||e).slice(0,80); }
 }
 async function axLoad(){
   axMsg('불러오는 중…');
