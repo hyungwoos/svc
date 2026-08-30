@@ -1888,7 +1888,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-08-30 ㉓';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-08-30 ㉔';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -6310,20 +6310,29 @@ function prBindSaas(){
       var target=intro? Math.floor(oL/(12*k)/1000)*1000 : null;      // 유지보수 최저(10%) 가정 — 이 이하면 무조건 이김
       var needDisc=(target!=null&&saasMon!=null&&saasMon>target)? Math.ceil((1-target/saasMon)*100) : 0;
       recs.push({k:k, target:target, needDisc:needDisc});
+      var nQ=+$('#ptQty').value||0;
       return '<tr'+(k===y?' style="font-weight:700"':'')+'><td>'+k+'년'+(k===y?' ◀':'')+'</td>'+
         '<td class="n">₩'+prWon(Math.round(oL))+(Math.round(oL)!==Math.round(oH)?' ~ '+prWon(Math.round(oH)):'')+'</td>'+
         '<td class="n">'+(sK!=null?'₩'+prWon(sK):'—')+'</td><td>'+vv+'</td>'+
-        '<td class="n">'+(target!=null?'₩'+prWon(target)+(needDisc>0?' <span style="color:var(--critical)">(−'+needDisc+'%)</span>':''):'—')+'</td></tr>';
+        '<td class="n">'+(target!=null?'₩'+prWon(target)+(needDisc>0?' <span style="color:var(--critical)">(−'+needDisc+'%)</span>':'')+
+          (nQ>0?'<div class="pr-note">'+prWon(Math.round(target/nQ))+'원/노드·월</div>':''):'—')+'</td></tr>';
     }).join('');
     var recHtml='';
     if(saasMon!=null&&intro){
+      var nQ2=+$('#ptQty').value||0;
+      var pn=function(v){ return nQ2>0? ' (노드당 '+prWon(Math.round(v/nQ2))+'원)' : ''; };
       var need=recs.filter(function(r){ return r.needDisc>0; });
       var recTxt;
       if(!need.length){
-        recTxt='표준 3년 약정 단가(월 '+prWon(saasMon)+'원) 그대로 제안해도 <b>모든 기간에서 SaaS가 저렴</b>합니다 — 할인 없이 승부 가능.';
+        recTxt='표준 3년 약정 단가(월 '+prWon(saasMon)+'원'+pn(saasMon)+') 그대로도 <b>모든 기간에서 SaaS가 이깁니다</b>.';
+        var minT=null; recs.forEach(function(r){ if(r.target!=null&&(minT==null||r.target<minT)) minT=r.target; });
+        if(minT!=null&&minT>saasMon){
+          var up=Math.round((minT/saasMon-1)*100);
+          recTxt+=' 경쟁 구도라면 <b>월 '+prWon(minT)+'원'+pn(minT)+'</b>까지 올려 제안해도 전 기간 승 — 표준가 대비 최대 <b>+'+up+'%</b> 인상 여지. 특정 기간만 방어하면 되면 그 기간의 승부 월액 바로 아래까지 가능합니다 (가격표보다 높은 제안은 무방, 낮은 제안만 내부 협의 필요).';
+        }
       }else{
         var w=need[need.length-1];
-        recTxt='고객 검토 기간이 '+w.k+'년이면 <b>월 '+prWon(w.target)+'원 이하</b>로 제안해야 구축형을 이깁니다 (표준 월 '+prWon(saasMon)+'원 대비 약 '+w.needDisc+'% 할인 필요).';
+        recTxt='고객 검토 기간이 '+w.k+'년이면 <b>월 '+prWon(w.target)+'원'+pn(w.target)+' 이하</b>로 제안해야 구축형을 이깁니다 (표준 월 '+prWon(saasMon)+'원'+pn(saasMon)+' 대비 약 '+w.needDisc+'% 할인 필요 — 가격표 미만 제안은 내부 협의 필요).';
         var okRows=recs.filter(function(r){ return r.needDisc===0; });
         if(okRows.length) recTxt+=' '+okRows.map(function(r){ return r.k; }).join('·')+'년 기준은 표준가로도 SaaS가 저렴합니다.';
       }
@@ -6337,7 +6346,7 @@ function prBindSaas(){
       (items?'<div class="pr-note">'+items+'</div>':'')+
       '<div style="font-size:12.5px;margin-top:6px">실제 견적 도입가 <b>₩'+prWon(intro)+'</b> (VAT별도'+(+q.total_vat?' · VAT포함 '+prWon(+q.total_vat)+'원':'')+')'+
       ' + 유지보수 '+(mr!==null? (mr*100)+'%':'10~15%')+'/년(2년차~)</div>'+
-      (saasMon!=null&&LASTT&&LASTT.sTxt?'<div class="pr-note" style="margin-top:3px">SaaS 산정 근거 — 3년 약정 단가: '+LASTT.sTxt+' = <b>월 '+prWon(saasMon)+'원</b></div>':'')+
+      (saasMon!=null&&LASTT&&LASTT.sTxt?'<div class="pr-note" style="margin-top:3px">SaaS 산정 근거 — 3년 약정 단가: '+LASTT.sTxt+' = <b>월 '+prWon(saasMon)+'원</b>'+((+$('#ptQty').value||0)>0?' (노드당 '+prWon(Math.round(saasMon/(+$('#ptQty').value)))+'원/월)':'')+'</div>':'')+
       '<div style="overflow-x:auto"><table class="pr" style="margin-top:6px"><thead><tr><th>기간</th><th class="n">실제 견적 누적 (도입가+유지보수)</th><th class="n">SaaS 누적 (3년 약정 단가)</th><th>판정</th><th class="n">승부 월액</th></tr></thead><tbody>'+rowsH+'</tbody></table></div>'+
       recHtml+
       (function(){                                                   // 채널 판정 — 엔드가/소비자가 비율로 어느 딜인지 추정
