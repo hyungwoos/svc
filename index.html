@@ -1273,8 +1273,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
         <span class="mini" id="axMsg"></span>
       </div>
       <div class="tbl-wrap" style="max-height:56vh"><table id="axTable" class="dgrid"></table></div>
-      <p class="cap" style="margin:10px 0 0">권한 설명 — super_admin: 전체+계정 관리 · admin/editor: 조회+수정 · viewer: 조회만
-        · equipment/poc/equipment_poc: 해당 메뉴만 · «권한 없음»: 로그인은 되지만 제한 화면만 보입니다</p>
+      <p class="cap" style="margin:10px 0 0">권한 설명 — super_admin: 전체+계정 관리+변경 이력 · admin: 조회+수정 · admin_viewer: 조회만(수정 불가)
+        · poc: PoC·주간회의 메뉴만 · equipment_poc: 장비+PoC+주간회의 메뉴만 · «권한 없음»: 로그인은 되지만 제한 화면만 보입니다</p>
 
       <div style="font-size:11px;color:var(--ink-2);opacity:.75;margin:22px 0 8px">— AI 사용 비용 (Anthropic) —</div>
       <div id="axBillKpi" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px"></div>
@@ -1808,7 +1808,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-08-30 ⑫';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-08-30 ⑬';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -2047,11 +2047,13 @@ function buildFromRes(res){
   window.RAWX={customers:custs, contracts:cts, live:res[3]||[], lg:res[4]||[], biz:res[5]||[],
     targets:res[6]||[], orders:res[7]||[], assets:res[9]||[], mdrpoc:res[10]||[], mtargets:res[11]||[], oi:res[12]||[], mdrops:res[13]||[], log:prevRawx.log||null, mrs:mrs};
   window.RAWX.price=prevRawx.price; window.RAWX.inbound=prevRawx.inbound; window.RAWX._inbAt=prevRawx._inbAt;
-  window.IS_VIEWER = !!(res[8] && res[8].length && res[8][0].role==='viewer');
   window.MY_ROLE = (res[8] && res[8].length && res[8][0].role) || '';
+  window.IS_VIEWER = (window.MY_ROLE==='viewer' || window.MY_ROLE==='admin_viewer');   // 조회 전용
   window.IS_SUPER = window.MY_ROLE==='super_admin';
   var abtn=document.querySelector('.side button[data-v="adminx"]');
   if(abtn) abtn.style.display = window.IS_SUPER? '':'none';
+  var lbtn=document.querySelector('.side button[data-v="log"]');
+  if(lbtn) lbtn.style.display = window.IS_SUPER? '':'none';   // 변경 이력은 슈퍼 관리자만
   SB_RAW.customers=custs; SB_RAW.contracts=cts;
   var cMap={}; custs.forEach(function(c){ cMap[c.id]=c; });
 
@@ -2112,11 +2114,11 @@ function afterLoad(dd){
 }
 /* ---- 제한 역할(장비/POC 전용) : 포탈 안에서 해당 메뉴만 사용 ---- */
 var ROLE_VIEWS={
-  equipment:     {orders:1, assets:1, ordernew:1, account:1},
-  poc:           {mdrnew:1, mdrops:1, account:1},
-  equipment_poc: {orders:1, assets:1, ordernew:1, mdrnew:1, mdrops:1, account:1}
+  equipment:     {orders:1, assets:1, ordernew:1, weekly:1, account:1},   // (구) — equipment_poc 로 통합됨
+  poc:           {mdrnew:1, mdrops:1, weekly:1, account:1},
+  equipment_poc: {orders:1, assets:1, ordernew:1, mdrnew:1, mdrops:1, weekly:1, account:1}
 };
-var ROLE_LABEL={equipment:'장비 관리 전용', poc:'MDR POC 전용', equipment_poc:'장비·POC 전용'};
+var ROLE_LABEL={equipment:'장비 관리 전용', poc:'PoC 전용', equipment_poc:'장비·PoC 전용'};
 var EQUIP_VIEWS=ROLE_VIEWS.equipment;   // 현재 계정에 허용된 화면 (아래에서 교체)
 function isEquipAcct(d){
   if(!SB_TOKEN) return false;
@@ -6125,11 +6127,12 @@ async function renderWeekly(atWeek){
   var memoInner='';
   if(etc.length) memoInner+='<div class="mini" style="margin-bottom:8px;font-weight:700">요청 / 특이사항</div>'+tbl(etc)+'<div style="height:10px"></div>';
   if(d.prev_memo) memoInner+='<div class="ai-comment on" style="margin:0 0 8px"><b>지난주 액션</b><div class="wk-body" style="margin-top:4px">'+esc(d.prev_memo)+'</div></div>';
-  memoInner+='<textarea id="wkMemo" style="width:100%;min-height:76px;border:1px solid var(--ring);border-radius:10px;'+
+  var wkCanMemo=!window.IS_EQUIP && !window.IS_VIEWER;   // 메모 저장은 admin 이상만
+  memoInner+='<textarea id="wkMemo"'+(wkCanMemo?'':' disabled')+' style="width:100%;min-height:76px;border:1px solid var(--ring);border-radius:10px;'+
     'background:var(--surface-2);color:var(--ink);padding:10px;font-family:inherit;font-size:12.5px" '+
     'placeholder="회의에서 정한 것을 적어두면 다음 주 이 화면에 「지난주 액션」으로 표시됩니다">'+esc((meta&&meta.memo)||'')+'</textarea>'+
     '<div style="display:flex;gap:8px;margin-top:8px;align-items:center"><span class="mini" id="wkMemoMsg"></span>'+
-    '<span style="flex:1"></span><button class="pill" id="wkMemoSave">메모 저장</button></div>';
+    '<span style="flex:1"></span>'+(wkCanMemo?'<button class="pill" id="wkMemoSave">메모 저장</button>':'<span class="mini">메모 저장은 관리자만</span>')+'</div>';
   bodyH+=card(memoId,'회의 메모',[],etc.length,memoInner);
 
   // ── 헤더 + 레일 조립 ──
@@ -6194,7 +6197,7 @@ async function renderWeekly(atWeek){
   };
   $('#wkNext').onclick=function(){ this.blur(); wkNext(); };
   $('#wkFetch').onclick=wkRefetch;
-  $('#wkMemoSave').onclick=async function(){
+  if($('#wkMemoSave')) $('#wkMemoSave').onclick=async function(){
     var t=$('#wkMemo').value;
     try{
       await sbWrite('PATCH','weekly_meta?week=eq.'+WK.week,{memo:t||null});
@@ -6241,9 +6244,10 @@ async function wkRefetch(){
 }
 
 /* ===== 관리자 (super_admin 전용) — 계정·권한 관리 ===== */
-var AX_ROLES=['super_admin','admin','editor','viewer','equipment','poc','equipment_poc'];
-var AX_ROLE_KO={super_admin:'슈퍼 관리자',admin:'관리자',editor:'편집자',viewer:'조회 전용',
-  equipment:'장비 전용',poc:'PoC 전용',equipment_poc:'장비·PoC 전용'};
+var AX_ROLES=['super_admin','admin','admin_viewer','poc','equipment_poc'];
+var AX_ROLE_KO={super_admin:'슈퍼 관리자',admin:'관리자 (조회+수정)',admin_viewer:'관리자-조회 전용',
+  poc:'PoC 전용',equipment_poc:'장비·PoC 전용',
+  editor:'(구) 편집자→관리자',viewer:'(구) 조회→관리자-조회',equipment:'(구) 장비→장비·PoC'};
 var AX_USERS=[];
 function axMsg(t,bad){ var e=$('#axMsg'); e.textContent=t||''; e.style.color=bad?'var(--critical)':'var(--ink-2)'; }
 /* DB의 UTC 시각 → 보는 사람 시간대(한국이면 KST)로 */
@@ -7103,6 +7107,7 @@ function switchView(v){
   if(v==='mdrpoc') v='mdrops';                       // 통합 전 이름 호환
   if((v==='ordernew'||v==='mdrnew'||v==='oinew') && !SB_TOKEN){ openOvl('ovlAuth'); return; }
   if(window.IS_EQUIP && !EQUIP_VIEWS[v]) v=window.EQUIP_HOME||'orders';   // 제한 계정은 허용된 화면만
+  if(v==='log' && !window.IS_SUPER) v='dash';                             // 변경 이력은 슈퍼 관리자만
   CUR_VIEW=v;
   try{ pushRecent(v); }catch(e){}
   $('#side').querySelectorAll('button').forEach(function(b){
