@@ -1888,7 +1888,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-08-30 ㉔';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-08-30 ㉕';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -6183,8 +6183,15 @@ function prBindSaas(){
   var SEN_P=[50000,100000,150000];                                   // SaaS 센서 월 요금(엔드가) 선택지
   if(!PR.tcoSS||!PR.tcoSS.length) PR.tcoSS=[{p:50000,q:1}];
   function tcoSenRowsO(){                                            // 현재 제품(NAC/ZTNA)의 구축형 센서 모델 목록
-    var ob=prCur('onprem'); var tb=ob&&ob.data[PR.tcoP]&&ob.data[PR.tcoP].tables&&ob.data[PR.tcoP].tables[2];
-    return ((tb&&tb.rows)||[]).filter(function(r){ return typeof r[2]==='number'; });
+    var ob=prCur('onprem'); if(!ob) return [];
+    function tb(k){ var t=ob.data[k]&&ob.data[k].tables&&ob.data[k].tables[2];
+      return ((t&&t.rows)||[]).filter(function(r){ return typeof r[2]==='number'; }); }
+    var rows=tb(PR.tcoP).slice();
+    if(PR.tcoP==='nac'){                                             // V6.0부터 NAC 딜도 V6(ZTNA 명칭) 센서로 견적됨 — V6 센서도 함께 제공
+      var have={}; rows.forEach(function(r){ have[String(r[1])]=1; });
+      tb('ztna').forEach(function(r){ if(!have[String(r[1])]) rows.push(r); });
+    }
+    return rows;
   }
   function tcoOsDefault(){                                           // 새 행 기본값 = 현재 노드 규모에 맞는 추천 모델
     var rec=prPickTier(tcoSenRowsO(), +$('#ptQty').value||0);
