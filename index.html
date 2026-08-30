@@ -788,8 +788,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
 <div id="viewLogin" class="hidden" style="position:fixed;inset:0;z-index:900;background:var(--plane);display:flex;align-items:center;justify-content:center;padding:20px">
   <div style="width:min(410px,94vw)">
     <div style="text-align:center;margin-bottom:26px">
-      <img src="Logo.jpg" alt="Genians" style="height:42px;margin:0 auto 16px;display:block"
-           onerror="this.outerHTML='&lt;div style=&quot;width:54px;height:54px;margin:0 auto 14px;border-radius:15px;display:flex;align-items:center;justify-content:center;font-size:26px;background:var(--brand,#149e40);box-shadow:0 8px 22px rgba(20,158,64,.30)&quot;&gt;📊&lt;/div&gt;'">
+      <div style="width:54px;height:54px;margin:0 auto 14px;border-radius:15px;display:flex;align-items:center;justify-content:center;font-size:26px;
+                  background:var(--brand,#149e40);box-shadow:0 8px 22px rgba(20,158,64,.30)">📊</div>
       <div style="font-size:21px;font-weight:800;letter-spacing:-.02em">서비스사업부 통합 관리 포탈</div>
       <div style="font-size:12.5px;color:var(--muted);margin-top:5px">매출 · 임대장비 · 견적 통합 관리</div>
     </div>
@@ -1888,7 +1888,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-08-30 ⑮';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-08-30 ⑰';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -2623,6 +2623,9 @@ function buildControls(){
   }, 60*1000);
 
   $('#btnAsk').onclick=function(){ ask($('#q').value); };
+  $('#q').addEventListener('keydown',function(e){   // Enter 로 질문 (자동완성 끄면서 빠졌던 기능 복원)
+    if(e.key==='Enter' && !e.isComposing){ e.preventDefault(); ask(this.value); }
+  });
   // setupSuggest();   // 질문창 자동완성 드롭다운 — 사용자 요청으로 끔 (아래 칩 예시는 유지)
 
   var samples=['이번 달 매출','이번 분기 실적','올해 매출 어때?','분기별 비교','연도별 매출',
