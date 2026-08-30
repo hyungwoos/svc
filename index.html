@@ -1888,7 +1888,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-08-30 ⑲';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-08-30 ⑳';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -6044,22 +6044,23 @@ function prSaasHtml(){
     '<div class="pr-ob"><div class="l">Agent당 공급 단가 합</div><div class="v" id="pmUnit">—</div></div></div>'+
     '<div class="pr-note" id="pmNote" style="margin-top:8px"></div></div>';
   var inSt='height:34px;border:1px solid var(--ring);border-radius:9px;padding:0 10px;font:inherit;background:var(--surface)';
+  var yOpt=''; for(var yk=1;yk<=10;yk++) yOpt+='<option value="'+yk+'"'+(yk===5?' selected':'')+'>'+yk+'년</option>';
   h+='<div class="pr-card" style="margin-bottom:14px"><h3>⚖️ TCO 비교 — SaaS vs 구축형'+
-    '<small>SaaS = 3년 약정 엔드가 + 센서 월 5만원/대 · 구축형 = 라이선스+정책서버+차단센서(할인가) + 유지보수 10~15%/년(2년차~)</small></h3>'+
+    '<small>SaaS = 3년 약정 엔드가 + 센서(월 5·10·15만원/대 선택) · 구축형 = 라이선스+정책서버+차단센서(모델 선택, 할인가) + 유지보수 10~15%/년(2년차~)</small></h3>'+
     '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0">'+
     '<span style="display:inline-flex;gap:4px">'+
       '<button class="pill" data-tcop="nac" id="tpNac">NAC</button>'+
       '<button class="pill" data-tcop="ztna" id="tpZtna">ZTNA</button></span>'+
     ' 노드 <input type="number" id="ptQty" value="500" min="1" style="'+inSt+';width:88px">'+
-    ' 기간 <select id="ptY" style="'+inSt+'"><option value="1">1년</option><option value="3">3년</option><option value="5" selected>5년</option></select>'+
+    ' 기간 <select id="ptY" style="'+inSt+'">'+yOpt+'</select>'+
     '<span id="ptZW" style="display:none"> 동시접속 Agent <input type="number" id="ptZQ" value="100" min="1" style="'+inSt+';width:80px"></span>'+
-    '</div>'+
-    '<div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin:0 0 10px" class="pr-note">'+
-    '<span>SaaS 센서 <input type="number" id="ptSsen" value="1" min="0" style="'+inSt+';width:64px;height:30px"> 대 (월 5만원/대)</span>'+
-    '<span>구축형 센서 <input type="number" id="ptOsen" value="1" min="0" style="'+inSt+';width:64px;height:30px"> 대 (규모에 맞는 모델 자동)</span>'+
     '<span>구축형 할인 <span style="display:inline-flex;gap:4px">'+
       '<button class="pill" data-tcod="70" id="td70" style="height:30px">70% 할인</button>'+
       '<button class="pill" data-tcod="80" id="td80" style="height:30px">80% 할인</button></span></span>'+
+    '</div>'+
+    '<div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;margin:0 0 10px" class="pr-note">'+
+    '<span style="display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap">SaaS 센서(월/대) <span id="ptSsL" style="display:inline-flex;gap:6px;flex-wrap:wrap"></span><button class="pill" id="ptSsAdd" title="센서 종류 추가" style="height:26px;padding:0 9px">＋</button></span>'+
+    '<span style="display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap">구축형 센서(모델 선택) <span id="ptOsL" style="display:inline-flex;gap:6px;flex-wrap:wrap"></span><button class="pill" id="ptOsAdd" title="센서 모델 추가" style="height:26px;padding:0 9px">＋</button></span>'+
     '</div>'+
     '<div class="pr-out"><div class="pr-ob"><div class="l">SaaS 누적 (3년 약정 엔드가)</div><div class="v" id="ptS">—</div><div class="pr-note" id="ptSs"></div></div>'+
     '<div class="pr-ob"><div class="l" id="ptOL">구축형 누적</div><div class="v" id="ptO">—</div><div class="pr-note" id="ptOs"></div></div>'+
@@ -6133,18 +6134,14 @@ function prPickTier(rows, n){
   if(!best && max){ max.over=true; return max; }
   return best;
 }
-/* 구축형 구성 자동 산출 — key: 'nac'|'ztna' */
-function prOnpremBuild(key, n, senQty){
+/* 구축형 라이선스+정책서버 자동 산출 — key: 'nac'|'ztna' (센서는 수동 선택) */
+function prOnpremBuild(key, n){
   var ob=prCur('onprem'); if(!ob||!ob.data[key]) return null;
   var tbs=ob.data[key].tables;
   var lic=prPickTier(tbs[0]&&tbs[0].rows, n);
   var pc =prPickTier(tbs[1]&&tbs[1].rows, n);
-  var senRows=(tbs[2]&&tbs[2].rows)||[];
-  var per=senQty>0? Math.ceil(n/senQty) : n;
-  var sen=senQty>0? prPickTier(senRows, per) : null;
   if(!lic) return null;
-  var cons=lic.price + (pc?pc.price:0) + (sen? sen.price*senQty:0);
-  return {lic:lic, pc:pc, sen:sen, senQty:senQty, cons:cons, over:(lic.over||(pc&&pc.over)||(sen&&sen.over))};
+  return {lic:lic, pc:pc, cons:lic.price+(pc?pc.price:0), over:(lic.over||(pc&&pc.over))};
 }
 function prBindSaas(){
   var D=prCur('saas').data;
@@ -6174,15 +6171,48 @@ function prBindSaas(){
     $('#pmCons').textContent='₩'+prWon(cons); $('#pmSup').textContent='₩'+prWon(sup); $('#pmUnit').textContent='₩'+prWon(unit);
     $('#pmNote').textContent=note+'구간 '+D.services[0].tiers[ti]+' · '+(who==='dist'?'총판':'파트너')+' 공급가 기준 · 할인은 별도 협의 · 실제 견적은 견적 시스템에서';
   }
+  var SEN_P=[50000,100000,150000];                                   // SaaS 센서 월 요금(엔드가) 선택지
+  if(!PR.tcoSS||!PR.tcoSS.length) PR.tcoSS=[{p:50000,q:1}];
+  function tcoSenRowsO(){                                            // 현재 제품(NAC/ZTNA)의 구축형 센서 모델 목록
+    var ob=prCur('onprem'); var tb=ob&&ob.data[PR.tcoP]&&ob.data[PR.tcoP].tables&&ob.data[PR.tcoP].tables[2];
+    return ((tb&&tb.rows)||[]).filter(function(r){ return typeof r[2]==='number'; });
+  }
+  function tcoOsDefault(){                                           // 새 행 기본값 = 현재 노드 규모에 맞는 추천 모델
+    var rec=prPickTier(tcoSenRowsO(), +$('#ptQty').value||0);
+    return {m:rec?String(rec.model):'', q:1};
+  }
+  function renderSen(){
+    var sSt='height:28px;border:1px solid var(--ring);border-radius:8px;padding:0 6px;font:inherit;font-size:11.5px;background:var(--surface)';
+    $('#ptSsL').innerHTML=PR.tcoSS.map(function(r,i){
+      return '<span style="display:inline-flex;gap:4px;align-items:center">'+
+        '<select data-ssp="'+i+'" style="'+sSt+'">'+SEN_P.map(function(pv2){ return '<option value="'+pv2+'"'+(r.p===pv2?' selected':'')+'>'+(pv2/10000)+'만원</option>'; }).join('')+'</select>'+
+        '<input type="number" data-ssq="'+i+'" value="'+r.q+'" min="0" style="'+sSt+';width:52px">대'+
+        (PR.tcoSS.length>1?'<button data-ssx="'+i+'" class="pill" style="height:24px;padding:0 7px">×</button>':'')+'</span>';
+    }).join('');
+    var rows=tcoSenRowsO();
+    var names=rows.map(function(x){ return String(x[1]); });
+    if(!PR.tcoOS||!PR.tcoOS.length||PR.tcoOS.some(function(r){ return names.indexOf(r.m)<0; })) PR.tcoOS=[tcoOsDefault()];
+    $('#ptOsL').innerHTML=PR.tcoOS.map(function(r,i){
+      return '<span style="display:inline-flex;gap:4px;align-items:center">'+
+        '<select data-osm="'+i+'" style="'+sSt+'">'+rows.map(function(x){ return '<option value="'+esc(String(x[1]))+'"'+(String(x[1])===r.m?' selected':'')+'>'+esc(String(x[1]))+' · '+esc(String(x[0]))+' · '+prWon(x[2])+'원</option>'; }).join('')+'</select>'+
+        '<input type="number" data-osq="'+i+'" value="'+r.q+'" min="0" style="'+sSt+';width:52px">대'+
+        (PR.tcoOS.length>1?'<button data-osx="'+i+'" class="pill" style="height:24px;padding:0 7px">×</button>':'')+'</span>';
+    }).join('');
+    document.querySelectorAll('[data-ssp]').forEach(function(e){ e.onchange=function(){ PR.tcoSS[+e.dataset.ssp].p=+e.value; tco(); }; });
+    document.querySelectorAll('[data-ssq]').forEach(function(e){ e.oninput=e.onchange=function(){ PR.tcoSS[+e.dataset.ssq].q=Math.max(0,+e.value||0); tco(); }; });
+    document.querySelectorAll('[data-ssx]').forEach(function(e){ e.onclick=function(){ PR.tcoSS.splice(+e.dataset.ssx,1); renderSen(); tco(); }; });
+    document.querySelectorAll('[data-osm]').forEach(function(e){ e.onchange=function(){ PR.tcoOS[+e.dataset.osm].m=e.value; tco(); }; });
+    document.querySelectorAll('[data-osq]').forEach(function(e){ e.oninput=e.onchange=function(){ PR.tcoOS[+e.dataset.osq].q=Math.max(0,+e.value||0); tco(); }; });
+    document.querySelectorAll('[data-osx]').forEach(function(e){ e.onclick=function(){ PR.tcoOS.splice(+e.dataset.osx,1); renderSen(); tco(); }; });
+  }
   function tco(){
     var p=PR.tcoP||'nac', dRate=PR.tcoD||0.30;                       // dRate = 지불 비율 (70%할인=0.30)
     var n=+$('#ptQty').value||0, y=+$('#ptY').value||1;
-    var ssen=Math.max(0,+$('#ptSsen').value||0), osen=Math.max(0,+$('#ptOsen').value||0);
     var zq=p==='ztna'? Math.max(0,+$('#ptZQ').value||0) : 0;
     $('#ptZW').style.display=p==='ztna'?'':'none';
     function clear(){ $('#ptO').textContent=$('#ptV').textContent='—'; $('#ptOs').textContent=''; $('#ptCfg').innerHTML=''; $('#ptB').innerHTML=''; }
     if(!n){ $('#ptS').textContent='—'; $('#ptSs').textContent=''; clear(); return; }
-    // ── SaaS: 3년 약정 엔드가(소비자가) + 센서 월 5만원/대 (+ ZTNA 선택 시 PA Agent)
+    // ── SaaS: 3년 약정 엔드가(소비자가) + 센서(월 5·10·15만원/대) (+ ZTNA 선택 시 PA Agent)
     var ti=prNacTier(n), saasMon=null, sTxt='';
     if(ti>=0){
       var rate=D.cnac.rows[ti][4];                                   // 3년 약정 단가
@@ -6193,23 +6223,31 @@ function prBindSaas(){
         if(zq&&zi>=0){ var zr=D.ztna.rows[zi][4]; saasMon+=zr*zq; sTxt+=' + ZTNA PA '+prWon(zq)+'개 × '+prWon(zr)+'원/월'; }
         else { saasMon=null; sTxt=zq?'ZTNA 동시접속 3,000 초과 — 별도 협의':'ZTNA 동시접속 수를 입력하세요'; }
       }
-      if(saasMon!=null&&ssen>0){ saasMon+=50000*ssen; sTxt+=' + 센서 '+ssen+'대 × 50,000원/월'; }
+      var sMon=0, sParts=[];
+      PR.tcoSS.forEach(function(r){ if(!r.q) return; sMon+=r.p*r.q; sParts.push((r.p/10000)+'만원×'+r.q+'대'); });
+      if(saasMon!=null&&sMon>0){ saasMon+=sMon; sTxt+=' + 센서 '+sParts.join('·')+' (월 '+prWon(sMon)+'원)'; }
     } else sTxt='3,000노드 초과 — 별도 협의';
     var saas=saasMon!=null? saasMon*12*y : null;
     $('#ptS').textContent=saas!=null?'₩'+prWon(saas):'별도 협의';
     $('#ptSs').textContent=sTxt+(p==='ztna'?' · SaaS ZTNA는 Cloud NAC 기본 포함':'');
-    // ── 구축형: 라이선스 + 정책서버 + 차단센서 (소비자가 합 × 할인) + 유지보수 10~15%/년
-    var bld=prOnpremBuild(p,n,osen);
+    // ── 구축형: 라이선스 + 정책서버(자동) + 차단센서(수동 선택) → 소비자가 합 × 할인 + 유지보수 10~15%/년
+    var bld=prOnpremBuild(p,n);
     $('#ptOL').textContent='구축형 누적 ('+Math.round((1-dRate)*100)+'% 할인가)';
     if(!bld){ clear();
       $('#ptO').textContent='구간 초과 — 별도 협의';
       $('#ptCfg').innerHTML='구축형 '+(p==='nac'?'NAC':'ZTNA')+' 가격표 데이터를 찾을 수 없습니다'; return; }
-    var intro=Math.round(bld.cons*dRate);
+    var senRows=tcoSenRowsO(), senCost=0, senDesc=[];
+    PR.tcoOS.forEach(function(r){
+      if(!r.q) return;
+      var x=senRows.filter(function(v){ return String(v[1])===r.m; })[0]; if(!x) return;
+      senCost+=x[2]*r.q; senDesc.push(esc(String(x[1]))+'('+esc(String(x[0]))+') × '+r.q+'대 '+prWon(x[2]*r.q)+'원');
+    });
+    var consAll=bld.cons+senCost;
+    var intro=Math.round(consAll*dRate);
     var cfg='<b>구축형 구성</b> · 라이선스 '+esc(bld.lic.model)+'('+esc(String(bld.lic.name))+') '+prWon(bld.lic.price)+'원';
     if(bld.pc) cfg+=' · 정책서버 '+esc(bld.pc.model)+' '+prWon(bld.pc.price)+'원';
-    if(bld.sen) cfg+=' · 센서 '+esc(bld.sen.model)+'(대당 '+esc(String(bld.sen.name))+') × '+bld.senQty+'대 '+prWon(bld.sen.price*bld.senQty)+'원';
-    else cfg+=' · 센서 0대';
-    cfg+=' → 소비자가 합 <b>'+prWon(bld.cons)+'원</b> → '+Math.round((1-dRate)*100)+'% 할인 도입가 <b>'+prWon(intro)+'원</b>';
+    cfg+=senDesc.length? ' · 센서 '+senDesc.join(' + ') : ' · 센서 없음';
+    cfg+=' → 소비자가 합 <b>'+prWon(consAll)+'원</b> → '+Math.round((1-dRate)*100)+'% 할인 도입가 <b>'+prWon(intro)+'원</b>';
     if(bld.over) cfg+=' · <span style="color:var(--critical)">⚠ 일부 구성이 최대 모델 기준 초과 — 별도 협의 필요</span>';
     $('#ptCfg').innerHTML=cfg;
     var onLow=intro+intro*0.10*Math.max(y-1,0), onHigh=intro+intro*0.15*Math.max(y-1,0);
@@ -6241,11 +6279,13 @@ function prBindSaas(){
   ['pnQty','pnTerm','pnZ','pnZQ'].forEach(function(i){ var e=document.getElementById(i); if(e){ e.onchange=nac; e.oninput=nac; } });
   document.querySelectorAll('[data-prs]').forEach(function(e){ e.onchange=mdr; });
   ['pmQty','pmWho'].forEach(function(i){ var e=document.getElementById(i); if(e){ e.onchange=mdr; e.oninput=mdr; } });
-  ['ptQty','ptY','ptZQ','ptSsen','ptOsen'].forEach(function(i){ var e=document.getElementById(i); if(e){ e.onchange=tco; e.oninput=tco; } });
+  ['ptQty','ptY','ptZQ'].forEach(function(i){ var e=document.getElementById(i); if(e){ e.onchange=tco; e.oninput=tco; } });
+  var eA=document.getElementById('ptSsAdd'); if(eA) eA.onclick=function(){ PR.tcoSS.push({p:50000,q:1}); renderSen(); tco(); };
+  var eB=document.getElementById('ptOsAdd'); if(eB) eB.onclick=function(){ PR.tcoOS.push(tcoOsDefault()); renderSen(); tco(); };
   document.querySelectorAll('[data-tcop]').forEach(function(b){
     b.onclick=function(){ PR.tcoP=b.dataset.tcop;
       document.querySelectorAll('[data-tcop]').forEach(function(x){ x.setAttribute('aria-pressed', x===b?'true':'false'); });
-      tco(); };
+      PR.tcoOS=null; renderSen(); tco(); };            // 제품 전환 시 센서 모델 목록도 교체
   });
   document.querySelectorAll('[data-tcod]').forEach(function(b){
     b.onclick=function(){ PR.tcoD=b.dataset.tcod==='80'?0.20:0.30;
@@ -6254,7 +6294,7 @@ function prBindSaas(){
   });
   var _tp=document.getElementById(PR.tcoP==='ztna'?'tpZtna':'tpNac'); if(_tp)_tp.setAttribute('aria-pressed','true');
   var _td=document.getElementById(PR.tcoD===0.20?'td80':'td70'); if(_td)_td.setAttribute('aria-pressed','true');
-  nac(); mdr(); tco();
+  nac(); mdr(); renderSen(); tco();
 }
 /* 새 판 등록 (슈퍼 관리자) */
 document.addEventListener('DOMContentLoaded',function(){
