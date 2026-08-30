@@ -1891,7 +1891,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-08-30 ㉙';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-08-30 ㉚';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -7769,12 +7769,85 @@ function rpMonthData(j){
   return {j:j, ym:ym, tot:tot, prev:prev, actCnt:Object.keys(act).length, newCt:newCt, endCt:endCt,
     ytd:ytd, mtg:mtg, ytg:ytg, poc:poc, inb:inb, inbWon:inbWon, oiOpen:oiOpen, oiSum:oiSum, oiW:oiW, trend:trend};
 }
+function rpTotAt(idx){ if(idx==null||idx<0||idx>=M) return 0; var s=0; for(var i=0;i<MAT.length;i++) s+=MAT[i][idx]; return s; }
+/* QBR «매출 Review» — 헤드라인 불릿 + 제품별×월별 매출 표 (해당 연도) */
+function rpRevData(j){
+  var ym=mk(j), year=+ym.slice(0,4), mon=+ym.slice(5,7), jan=j-mon+1;
+  var mrr=rpTotAt(j), arrN=mrr*12, yoyA=rpTotAt(j-12)*12;
+  var decI=dIdx((year-1)+'-12'), decA=rpTotAt(decI)*12;
+  function nacCnt(idx){
+    var g={},s1={},all={};
+    if(idx!=null&&idx>=0) DATA.rows.forEach(function(r,i){
+      if(MAT[i][idx]>0){ if(r.line==='Cloud'){g[r.cust]=1;all[r.cust]=1;} if(r.line==='S1'){s1[r.cust]=1;all[r.cust]=1;} } });
+    return {g:Object.keys(g).length, s1:Object.keys(s1).length, all:Object.keys(all).length};
+  }
+  var nc=nacCnt(j), ncY=nacCnt(j-12);
+  var bullets=[''+ym+' 기준 ARR '+won(arrN)+'원 (월 매출 '+won(mrr)+'원)'];
+  if(yoyA>0) bullets.push('전년 동기 대비 ARR '+pct((arrN/yoyA-1)*100)+' ('+(year-1)+'년 '+mon+'월 ARR '+won(yoyA)+'원)');
+  if(decA>0) bullets.push('전년 12월말 대비 ARR '+pct((arrN/decA-1)*100)+' ('+(year-1)+'년 12월 ARR '+won(decA)+'원)');
+  if(nc.all) bullets.push('Cloud NAC 고객사 '+nc.all+'개사 (일반 '+nc.g+'개사 · 에스원 '+nc.s1+'개사)'+(ncY.all? ' · 전년 동기 대비 '+pct((nc.all/ncY.all-1)*100)+' ('+ncY.all+'개사 → '+nc.all+'개사)':''));
+  var groups=[
+    {label:'Cloud NAC 일반', f:function(r){return r.line==='Cloud';}},
+    {label:'Cloud NAC 에스원', f:function(r){return r.line==='S1';}},
+    {label:'MDR', f:function(r){return r.line==='MDR'||r.line==='MDR_S1';}},
+    {label:'DRM', f:function(r){return r.line==='DRM';}},
+    {label:'DLP', f:function(r){return r.line==='DLP';}},
+    {label:'PNS', f:function(r){return r.line==='PNS';}}];
+  var cols=[];                                   // {t:'1', idxs:[...]} — 월·분기소계·누계
+  var qb=[];
+  for(var t=jan;t<=j;t++){
+    var mn=t-jan+1;
+    cols.push({t:String(mn), idxs:[t]}); qb.push(t);
+    if(mn%3===0){ cols.push({t:Math.ceil(mn/3)+'Q', idxs:qb.slice()}); qb=[]; }
+  }
+  var allM=[]; for(var t2=jan;t2<=j;t2++) allM.push(t2);
+  cols.push({t:'누계', idxs:allM});
+  function sumG(f,idxs){ var s=0; DATA.rows.forEach(function(r,i){ if(f(r)) idxs.forEach(function(x){ s+=MAT[i][x]; }); }); return s; }
+  var rows=[], nacSub=null;
+  groups.forEach(function(g,gi){
+    var vals=cols.map(function(c){ return sumG(g.f,c.idxs); });
+    if(gi>=2 && vals[vals.length-1]===0) return;          // 매출 없는 제품군 생략 (NAC 2행은 유지)
+    rows.push([g.label].concat(vals.map(function(v){ return {t:Math.round(v).toLocaleString('ko-KR'), n:1}; })));
+    if(gi===1){
+      nacSub=cols.map(function(c){ return sumG(function(r){return r.line==='Cloud'||r.line==='S1';},c.idxs); });
+      rows.push(['Cloud NAC 소계'].concat(nacSub.map(function(v){ return {t:Math.round(v).toLocaleString('ko-KR'), n:1}; })));
+    }
+  });
+  rows.push(['합계'].concat(cols.map(function(c){ var s=0; c.idxs.forEach(function(x){ s+=rpTotAt(x); }); return {t:Math.round(s).toLocaleString('ko-KR'), n:1}; })));
+  var head=[['구분']].concat(cols.map(function(c){ return [c.t,1]; }));
+  return {bullets:bullets, head:head, rows:rows, year:year};
+}
+/* QBR «MDR 고객 현황» — 총 고객사·연도별 신규 수주 나열·PoC 진행 나열 */
+function rpMdrData(j){
+  var ym=mk(j), year=+ym.slice(0,4);
+  function isM(r){ return r.line==='MDR'||r.line==='MDR_S1'; }
+  var act={}, actAdd={}, ep=0;
+  DATA.rows.forEach(function(r,i){ if(isM(r)&&MAT[i][j]>0){ act[r.cust]=1; if(/Add-?on/i.test(r.combine||'')) actAdd[r.cust]=1; ep+=r.qty||0; } });
+  function yearNew(y){
+    var out=[];
+    DATA.rows.forEach(function(r){
+      if(!isM(r)||r.startIdx==null) return;
+      if(mk(r.startIdx).slice(0,4)!==String(y)) return;
+      out.push(r.cust+(/Add-?on/i.test(r.combine||'')?' (Add-on'+(r.qty?', '+r.qty:'')+')':(r.qty?' ('+r.qty+')':'')));
+    });
+    return out;
+  }
+  var cur=yearNew(year), prv=yearNew(year-1);
+  var poc=(RAWX.mdrops||[]).filter(function(x){ return ['신청','대기','진행중','데모'].indexOf(x.status||'')>=0; });
+  var pocEp=0; poc.forEach(function(x){ pocEp+=Number(x.plan_qty)||0; });
+  var actN=Object.keys(act).length, addN=Object.keys(actAdd).length;
+  var lines=['총 '+actN+'개 고객사 확보 (MDR '+(actN-addN)+'개사, Add-on '+addN+'개사)'+(ep?' · '+ep.toLocaleString('ko-KR')+'개 엔드포인트 관리 중':'')];
+  if(prv.length) lines.push('- '+(year-1)+'년 '+prv.length+'개사 신규 수주: '+prv.join(', '));
+  if(cur.length) lines.push('- '+year+'년 '+cur.length+'개사 신규 수주: '+cur.join(', '));
+  if(poc.length) lines.push('- '+poc.length+'개사 PoC 진행 중'+(pocEp?' ('+pocEp.toLocaleString('ko-KR')+' 엔드포인트)':'')+': '+poc.map(function(x){ return (x.customer||'-')+(x.plan_qty?' ('+x.plan_qty+')':''); }).join(', '));
+  return {lines:lines};
+}
 function renderReport(){
   var host=$('#rpBody');
   if(!DATA||!DATA.rows||!DATA.rows.length){ host.innerHTML='<div class="cap" style="padding:40px;text-align:center">데이터를 불러오는 중…</div>'; return; }
   if(!RAWX.inbound){ loadInbound(function(){ if(CUR_VIEW==='report'&&!RP._touched) renderReport(); }); }
   var maxJ=Math.min(DATA.nowIdx>=0? DATA.nowIdx : M-1, M-1);       // 미래(계약상 예정) 월은 리포트 대상에서 제외
-  if(RP.j==null||RP.j>maxJ) RP.j=Math.max(0, maxJ-1);              // 기본 = 전월
+  if(RP.j==null||RP.j>maxJ) RP.j=maxJ;                             // 기본 = 최신달(현재월)
   RP._touched=false;
   var d=rpMonthData(RP.j);
   var opts=''; for(var i=maxJ;i>=Math.max(0,maxJ-35);i--) opts+='<option value="'+i+'"'+(i===RP.j?' selected':'')+'>'+mk(i)+'</option>';
@@ -7801,6 +7874,13 @@ function renderReport(){
     '<button class="pill" id="rpPpt" style="height:34px">⬇ PPT 다운로드</button>'+
     '<button class="pill" id="rpNoteAdd" style="height:34px">＋ 메모 슬라이드</button>'+
     '<span class="pr-note" id="rpMsg"></span></div></div>';
+  var rv=rpRevData(RP.j), md=rpMdrData(RP.j);
+  h+='<div class="pr-card" style="margin-bottom:14px"><h3>💰 <span contenteditable spellcheck="false" id="rpRevT">'+rv.year+'년 매출 Review</span>'+rpCopyBtn('rpTblRev')+inc('rev')+'</h3>'+
+    '<div id="rpRevB" contenteditable spellcheck="false" style="font-size:13px;line-height:1.9;margin:4px 0 10px">'+rv.bullets.map(function(x){return esc(x);}).join('<br>')+'</div>'+
+    tbl('rpTblRev', rv.head, rv.rows,'매출 데이터가 없습니다')+
+    '<p class="pr-note" style="margin-top:4px">단위: 원 · 월 숫자는 해당 연도 1월부터 기준월까지 · Q=분기 소계</p></div>';
+  h+='<div class="pr-card" style="margin-bottom:14px"><h3>🛡️ <span contenteditable spellcheck="false" id="rpMdrT">MDR 고객 현황</span>'+inc('mdrc')+'</h3>'+
+    '<div id="rpMdrB" contenteditable spellcheck="false" style="font-size:13px;line-height:2.0">'+md.lines.map(function(x){return esc(x);}).join('<br>')+'</div></div>';
   h+='<div class="pr-card" style="margin-bottom:14px"><h3><span contenteditable spellcheck="false" id="rpKT">'+d.ym+' 요약</span>'+rpCopyBtn('rpK')+inc('sum')+'</h3><div class="pr-out" id="rpK" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">'+
     kpi('월 매출(MRR)','₩'+won(d.tot), d.prev?('전월 대비 '+pct(dif)):'')+
     kpi('ARR 환산','₩'+won(d.tot*12),'')+
@@ -7950,6 +8030,39 @@ async function rpMakePpt(){
     s1.addText(sub,{x:0.62,y:3.62,w:6,h:0.55,fontSize:20,bold:true,color:'7EBA25',fontFace:F});
     s1.addText(new Date().toISOString().slice(0,10).replace(/-/g,'.')+'\n서비스사업부',{x:0.62,y:4.25,w:6,h:0.85,fontSize:14,color:'D9E2F2',fontFace:F,lineSpacing:24});
     s1.addImage({data:RP_IMG.logoW,x:0.55,y:6.78,w:1.35,h:0.30});
+    // ── 매출 Review (QBR 본문 1) ──
+    if(on('rev')){
+      var sR=p.addSlide({masterName:'M'});
+      slTitle(sR, (($('#rpRevT')&&$('#rpRevT').textContent)||'매출 Review').trim());
+      var rB=($('#rpRevB')?$('#rpRevB').innerText:'').split('\n').map(function(x){return x.trim();}).filter(Boolean);
+      if(rB.length) sR.addText(rB.map(function(x){ return {text:x, options:{bullet:{code:'25B8',color:GRN}, breakLine:true}}; }),
+        {x:0.55,y:1.15,w:12.3,h:0.42*rB.length,fontSize:13,bold:true,color:NAVY,fontFace:F,valign:'top',lineSpacing:22});
+      var rT=rpTableData('rpTblRev');
+      if(rT.rows.length){
+        var ry=1.25+0.34*rB.length+0.25;
+        var rtx=[rT.head.map(function(x){ return {text:x, options:{bold:true,color:NAVY,fill:{color:THD},fontSize:9,fontFace:F,align:'center'}}; })]
+          .concat(rT.rows.map(function(r){
+            var last=/합계|소계/.test(r[0]);
+            return r.map(function(c,ci){ return {text:String(c), options:{fontSize:8.5,color:INK,fontFace:F,bold:last,align:ci?'right':'left',fill:{color:last?(r[0]==='합계'?'BFBFBF':'E2EFD9'):'FFFFFF'}}}; });
+          }));
+        sR.addTable(rtx,{x:0.5,y:ry,w:12.3,border:{pt:0.5,color:BORD},autoPage:false,rowH:0.3,colW:[1.55].concat(rT.head.slice(1).map(function(){ return 10.75/(rT.head.length-1); }))});
+      }
+    }
+    // ── MDR 고객 현황 (QBR 본문 2) ──
+    if(on('mdrc')){
+      var sM=p.addSlide({masterName:'M'});
+      slTitle(sM, (($('#rpMdrT')&&$('#rpMdrT').textContent)||'MDR 고객 현황').trim());
+      var mB=($('#rpMdrB')?$('#rpMdrB').innerText:'').split('\n').map(function(x){return x.trim();}).filter(Boolean);
+      var yy=1.25;
+      mB.forEach(function(ln,li){
+        var head=li===0, sub=/^-/.test(ln);
+        var txt=ln.replace(/^-\s*/,'');
+        var lines=Math.ceil(txt.length/95)||1;
+        sM.addText(head? [{text:txt, options:{bullet:{code:'27A4',color:GRN}}}] : txt,
+          {x:head?0.55:0.8,y:yy,w:12.2,h:0.34*lines+0.12,fontSize:head?15:12,bold:head||sub,color:head?NAVY:INK,fontFace:F,valign:'top',lineSpacing:19});
+        yy+=0.34*lines+(head?0.28:0.16);
+      });
+    }
     // ── 요약 KPI ──
     if(on('sum')){
       var s2=p.addSlide({masterName:'M'});
