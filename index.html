@@ -467,6 +467,24 @@ body{padding-left:192px}
 .wk-phase .ln{flex:1;height:1px;background:var(--grid)}
 .wk-body{white-space:pre-line}
 @media (max-width:1000px){ .wk-wrap{grid-template-columns:1fr} .wk-rail{position:static;max-height:none} }
+/* 전역 검색 (Ctrl+K) */
+#fkInput{width:100%;height:44px;border:1px solid var(--ring);border-radius:12px;padding:0 14px;font:inherit;font-size:15px;background:var(--surface-2);color:var(--ink)}
+.fk-row{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;cursor:pointer}
+.fk-row:hover,.fk-row.sel{background:var(--surface-2)}
+.fk-row .tp{font-size:10px;font-weight:700;border-radius:6px;padding:2px 7px;background:var(--brand-t,rgba(46,189,87,.13));color:var(--brand,#149e40);white-space:nowrap;min-width:52px;text-align:center}
+.fk-row .nm{font-size:13px;font-weight:650}
+.fk-row .sb{font-size:11.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* 고객 360 */
+.c360-sec{margin-bottom:14px}
+.c360-sec h4{font-size:12.5px;margin:0 0 6px;display:flex;gap:7px;align-items:center}
+.c360-sec h4 .ct{font-size:10.5px;color:var(--muted);font-weight:400}
+.c360-sec table{width:100%;border-collapse:collapse;font-size:12px}
+.c360-sec th{background:var(--surface-2);text-align:left;padding:5px 8px;font-size:10.8px;color:var(--ink-2);white-space:nowrap}
+.c360-sec td{padding:5px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+.c360-sec tr:last-child td{border-bottom:0}
+/* 표 밀도 — 컴팩트 */
+.dgrid.dense td{padding:3px 7px!important;font-size:11.8px}
+.dgrid.dense th{padding:5px 7px!important}
 /* 홈 — 오늘 할 일 카드 + 바로가기 */
 .todo-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:10px}
 .todo-card{background:var(--surface);border:1px solid var(--ring);border-radius:14px;padding:12px 15px;cursor:pointer;transition:transform .12s,box-shadow .12s}
@@ -770,8 +788,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
 <div id="viewLogin" class="hidden" style="position:fixed;inset:0;z-index:900;background:var(--plane);display:flex;align-items:center;justify-content:center;padding:20px">
   <div style="width:min(410px,94vw)">
     <div style="text-align:center;margin-bottom:26px">
-      <div style="width:54px;height:54px;margin:0 auto 14px;border-radius:15px;display:flex;align-items:center;justify-content:center;font-size:26px;
-                  background:var(--brand,#149e40);box-shadow:0 8px 22px rgba(20,158,64,.30)">📊</div>
+      <img src="Logo.jpg" alt="Genians" style="height:42px;margin:0 auto 16px;display:block"
+           onerror="this.outerHTML='&lt;div style=&quot;width:54px;height:54px;margin:0 auto 14px;border-radius:15px;display:flex;align-items:center;justify-content:center;font-size:26px;background:var(--brand,#149e40);box-shadow:0 8px 22px rgba(20,158,64,.30)&quot;&gt;📊&lt;/div&gt;'">
       <div style="font-size:21px;font-weight:800;letter-spacing:-.02em">서비스사업부 통합 관리 포탈</div>
       <div style="font-size:12.5px;color:var(--muted);margin-top:5px">매출 · 임대장비 · 견적 통합 관리</div>
     </div>
@@ -869,6 +887,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
     <button class="pill ghost" id="btnAuth">로그인</button>
     <button class="pill ghost" id="btnLogout" style="display:none;border-color:rgba(208,59,59,.35);color:var(--critical,#d03b3b)">로그아웃</button>
     <button class="pill ghost" id="btnWidgets" title="대시보드 위젯 표시 설정">⊞ 위젯</button>
+    <button class="pill ghost" id="btnFind" title="전역 검색 (Ctrl+K)">⌕ 검색</button>
     <button class="pill ghost" id="btnFont" title="포탈 전체 글자 크기 — 보통 → 크게 → 아주 크게">가<b style="font-size:14px">A</b></button>
     <button class="pill ghost" id="btnTheme">◐ 다크</button>
     <button class="pill ghost" id="btnReload">↻ 새로고침</button>
@@ -1064,8 +1083,10 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
       <div class="dbar">
         <input type="search" id="dvSearch" placeholder="검색 — 여러 단어로 좁히기 (예: 에스원 mdr)">
         <button class="pill" id="dvAdd">＋ 행 추가</button>
+        <button class="pill ghost" id="dvPaste" style="display:none">📋 붙여넣기 입력</button>
         <button class="pill ghost" id="dvReload">↻ 다시 읽기</button>
         <button class="pill ghost" id="dvCsv">⬇ CSV</button>
+        <button class="pill ghost" id="dvDense" title="표 밀도 — 보통/컴팩트">☰ 밀도</button>
         <button class="pill ghost" id="dvFclr" style="display:none;border-color:var(--critical);color:var(--critical)">✕ 필터 해제</button>
         <span class="mini" id="dvMsg"></span>
         <span class="spacer"></span>
@@ -1318,6 +1339,41 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
     <div class="mact">
       <span class="mmsg"></span>
       <button class="pill ghost" onclick="closeOvl('ovlChvHist')">닫기</button>
+    </div>
+  </div>
+</div>
+
+<!-- 전역 검색 (Ctrl+K) -->
+<div class="ovl" id="ovlFind">
+  <div class="modal" style="width:min(620px,100%)">
+    <input id="fkInput" placeholder="고객사·시리얼·사업명 검색…  (Enter: 첫 결과 열기 · Esc: 닫기)" autocomplete="off">
+    <div id="fkOut" style="max-height:52vh;overflow:auto;margin-top:10px"></div>
+    <p class="cap" style="margin:8px 0 0">계약 · LIVE · OI · 인바운드 · MDR 운영 · 장비를 한 번에 찾습니다 — 단축키 <b>Ctrl+K</b></p>
+  </div>
+</div>
+
+<!-- 고객 360 -->
+<div class="ovl" id="ovlC360">
+  <div class="modal" style="width:min(980px,100%)">
+    <h3 id="c360Title">고객 360</h3>
+    <p class="cap" id="c360Cap" style="margin:0 0 12px"></p>
+    <div id="c360Body" style="max-height:64vh;overflow:auto"></div>
+    <div class="mact"><span class="mmsg"></span><button class="pill ghost" onclick="closeOvl('ovlC360')">닫기</button></div>
+  </div>
+</div>
+
+<!-- 엑셀 붙여넣기 대량 입력 -->
+<div class="ovl" id="ovlPaste">
+  <div class="modal" style="width:min(760px,100%)">
+    <h3>📋 엑셀 붙여넣기로 여러 행 입력</h3>
+    <p class="cap" id="pasteCols" style="margin:0 0 10px"></p>
+    <textarea id="pasteTa" style="width:100%;min-height:170px;border:1px solid var(--ring);border-radius:10px;background:var(--surface-2);color:var(--ink);padding:10px;font-family:monospace;font-size:12px"
+      placeholder="엑셀에서 위 열 순서대로 범위를 복사(Ctrl+C)해서 여기에 붙여넣으세요(Ctrl+V). 한 줄 = 한 행."></textarea>
+    <div id="pastePrev" class="cap" style="margin-top:8px"></div>
+    <div class="mact">
+      <span class="mmsg" id="pasteMsg"></span>
+      <button class="pill ghost" onclick="closeOvl('ovlPaste')">취소</button>
+      <button class="pill" id="pasteGo">저장</button>
     </div>
   </div>
 </div>
@@ -1832,7 +1888,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-08-30 ⑭';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-08-30 ⑮';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -2025,9 +2081,22 @@ async function loadFromDb(){
   try{
     var j=await sbRpc('load_all');
     if(j && j.customers){
+      var mrsRows;
+      if(j.mrsegs){
+        // 서버 구간 압축본([계약, 시작월, 끝월, 금액])을 월별 행으로 펼침 (47단계 — 전송량 절감)
+        mrsRows=[];
+        j.mrsegs.forEach(function(a){
+          var i0=dIdx(a[1]), i1=dIdx(a[2]);
+          if(i0==null||i1==null) return;
+          for(var i=i0;i<=i1;i++) mrsRows.push({contract_id:a[0], month:idxDate(i), amount:a[3]});
+        });
+        mrsRows.sort(function(x,y){ return x.contract_id-y.contract_id || (x.month<y.month?-1:1); });
+      }else{
+        mrsRows=(j.mrs||[]).map(function(a){ return {contract_id:a[0], month:a[1], amount:a[2]}; });
+      }
       var res0=[
         j.customers, j.contracts,
-        (j.mrs||[]).map(function(a){ return {contract_id:a[0], month:a[1], amount:a[2]}; }),
+        mrsRows,
         j.live, j.lg, j.biz, j.targets, j.orders, j.roles, j.assets, j.mdrpoc, j.mtargets, j.oi, j.mdrops
       ];
       try{ sessionStorage.setItem(CACHE_KEY, JSON.stringify({t:Date.now(), res:res0})); }catch(e){}
@@ -4683,8 +4752,9 @@ var OI_PARTNERS=['다원티에스','글로웰시스템','에티버스','지니�
 var GRIDS={
   contracts:{
     title:'계약 관리', table:'contracts',
-    cap:'행의 ✎ 를 눌러 수정 · 월별 인식 금액은 여기서 바뀌지 않습니다 (금액은 ✏️ 입력·수정 사용) · 삭제는 슈퍼 관리자만',
+    cap:'행 클릭 = 고객 360 · ✎ 수정 · 금액은 ✏️ 입력·수정 사용 · 삭제는 슈퍼 관리자만',
     add:false, del:'super',
+    rowClick:function(r){ openCust360(r._custName); },
     rows:function(){ var out=(RAWX.contracts||[]).map(function(c){
       var cu=(RAWX.customers||[]).filter(function(x){return x.id===c.customer_id;})[0]||{};
       c._custName=cu.name||'?'; return c; });
@@ -4713,7 +4783,8 @@ var GRIDS={
   },
   live:{
     title:'LIVE 고객사', table:'live_customers',
-    cap:'서비스 중 사이트 목록 · 고객사 수 질문의 기준 데이터', add:true, del:true,
+    cap:'행 클릭 = 고객 360 · 서비스 중 사이트 목록 · 고객사 수 질문의 기준 데이터', add:true, del:true,
+    rowClick:function(r){ openCust360(r.name); },
     rows:function(){ return (RAWX.live||[]).slice().sort(function(a,b){
       var n=String(b.start_month||'').localeCompare(String(a.start_month||''));
       return n || ((b.id||0)-(a.id||0)); }); },
@@ -4778,7 +4849,8 @@ var GRIDS={
   oi:{
     title:'OI 현황 (영업기회)', table:'oi_deals',
     chipsField:'stage', chipsOpts:OI_STAGE,
-    cap:'등록된 영업기회의 진행 상태 관리 · 신규 등록은 영업 › OI 등록', add:false, del:true,
+    cap:'행 클릭 = 고객 360 · 진행 상태 관리 · 신규 등록은 영업 › OI 등록', add:false, del:true,
+    rowClick:function(r){ openCust360(r.customer); },
     rows:function(){ return RAWX.oi||[]; },
     cols:[
       {k:'created_at',l:'등록일',ro:true,fmt:function(v){return String(v||'').slice(0,10);}},
@@ -4813,7 +4885,8 @@ var GRIDS={
   mdrops:{
     title:'MDR 운영·신청 현황', table:'mdr_ops',
     chipsField:'status', chipsOpts:['신청','대기','진행중','데모','구독','종료'],
-    cap:'PoC 신청부터 운영까지 한 곳에서 — 신청 → 진행중 → 데모 → 구독 · 설치율 = 설치 단말 ÷ 계약(예정) 수량 · 매출 집계와는 별개', add:true, del:true,
+    cap:'행 클릭 = 고객 360 · PoC 신청부터 운영까지 — 신청 → 진행중 → 데모 → 구독 · 설치율 = 설치 ÷ 계약 수량', add:true, del:true,
+    rowClick:function(r){ if(!window.IS_EQUIP) openCust360(r.customer); },
     rows:function(){ return (RAWX.mdrops||[]).slice().sort(function(a,b){
       var n=String(b.start_date||'').localeCompare(String(a.start_date||''));
       return n || ((b.id||0)-(a.id||0)); }); },
@@ -5535,6 +5608,163 @@ function renderChannelView(key){
   $('#chvFclr').onclick=function(){ CHV.filters={}; renderChvTable(); };
   renderChvTable();
 
+}
+
+/* ===== 전역 검색 (Ctrl+K) ===== */
+function fkNorm(s){ return String(s==null?'':s).toLowerCase().replace(/\s+/g,''); }
+function fkSources(){
+  var out=[];
+  (window.DATA&&DATA.rows||[]).forEach(function(r){
+    out.push({t:'계약', nm:r.cust, sb:lline(r.line)+' · '+(r.channel||'')+' · '+(r.partner||''), go:function(){ switchView('contracts'); $('#dvSearch').value=r.cust; renderGrid(); }, cust:r.cust});
+  });
+  (RAWX.live||[]).forEach(function(r){
+    out.push({t:'LIVE', nm:r.name, sb:(r.product||'')+' · '+(r.nodes||'')+'노드', go:function(){ switchView('live'); $('#dvSearch').value=r.name; renderGrid(); }, cust:r.name});
+  });
+  (RAWX.oi||[]).forEach(function(r){
+    out.push({t:'OI', nm:r.customer, sb:(r.deal_name||'')+' · '+(r.stage||''), go:function(){ switchView('oi'); $('#dvSearch').value=r.customer; renderGrid(); }, cust:r.customer});
+  });
+  (RAWX.inbound||[]).forEach(function(r){
+    out.push({t:'인바운드', nm:r.org, sb:(r.on_date||'')+' · '+(r.product||'')+' · '+(r.result||''), go:function(){ goInbList(); $('#dvSearch').value=r.org; renderGrid(); }, cust:r.org});
+  });
+  (RAWX.mdrops||[]).forEach(function(r){
+    out.push({t:'MDR', nm:r.customer, sb:(r.svc_type||'')+' · '+(r.status||''), go:function(){ switchView('mdrops'); $('#dvSearch').value=r.customer; renderGrid(); }, cust:r.customer});
+  });
+  (RAWX.assets||[]).forEach(function(r){
+    out.push({t:'장비', nm:r.serial, sb:(r.model||'')+' · '+(r.status||'')+' · '+(r.customer||''), go:function(){ switchView('assets'); $('#dvSearch').value=r.serial; renderGrid(); }});
+  });
+  return out;
+}
+function openFind(){
+  if(!SB_TOKEN || !window.DATA) return;
+  if(RAWX.inbound===undefined && !window.IS_EQUIP) try{ loadInbound(function(){}); }catch(e){}
+  openOvl('ovlFind');
+  var inp=$('#fkInput'); inp.value=''; $('#fkOut').innerHTML='';
+  setTimeout(function(){ inp.focus(); },60);
+  inp.oninput=function(){
+    var q=fkNorm(inp.value), out=$('#fkOut');
+    if(q.length<2){ out.innerHTML=''; return; }
+    var src=fkSources(), hits=[], seen={};
+    // ① 고객 360 후보 (고객사명 매치, 중복 제거)
+    var custs={};
+    src.forEach(function(s){ if(s.cust && fkNorm(s.cust).indexOf(q)>=0) custs[s.cust]=1; });
+    Object.keys(custs).slice(0,4).forEach(function(c){
+      hits.push({t:'고객 360', nm:c, sb:'이 고객사의 계약·OI·인바운드·PoC·장비 한눈에', go:function(){ openCust360(c); }, k360:1});
+    });
+    // ② 개별 결과
+    src.forEach(function(s){
+      if(hits.length>=32) return;
+      if(fkNorm(s.nm).indexOf(q)<0 && fkNorm(s.sb).indexOf(q)<0) return;
+      var key=s.t+'|'+s.nm+'|'+s.sb; if(seen[key]) return; seen[key]=1;
+      hits.push(s);
+    });
+    out.innerHTML=hits.map(function(h,i){
+      return '<div class="fk-row" data-i="'+i+'"><span class="tp"'+(h.k360?' style="background:rgba(42,120,214,.12);color:var(--s1)"':'')+'>'+h.t+'</span>'+
+        '<span class="nm">'+esc(h.nm||'')+'</span><span class="sb">'+esc(h.sb||'')+'</span></div>';
+    }).join('')||'<p class="cap" style="padding:8px">결과 없음</p>';
+    out.querySelectorAll('.fk-row').forEach(function(row){
+      row.onclick=function(){ closeOvl('ovlFind'); hits[+row.dataset.i].go(); };
+    });
+    inp.onkeydown=function(e){
+      if(e.key==='Enter' && hits.length){ closeOvl('ovlFind'); hits[0].go(); }
+      if(e.key==='Escape') closeOvl('ovlFind');
+    };
+  };
+}
+document.addEventListener('keydown',function(e){
+  if((e.ctrlKey||e.metaKey) && (e.key==='k'||e.key==='K')){ e.preventDefault(); openFind(); }
+});
+
+/* ===== 고객 360 — 한 고객사의 모든 정보 ===== */
+function c360Match(a,b){
+  var x=fkNorm(a), y=fkNorm(b);
+  if(!x||!y) return false;
+  return x.indexOf(y)>=0 || y.indexOf(x)>=0;
+}
+function openCust360(name){
+  var nm=name;
+  function tb(cols, rows){
+    if(!rows.length) return '<p class="cap" style="margin:2px 0 0">없음</p>';
+    return '<table><thead><tr>'+cols.map(function(c){return '<th>'+c+'</th>';}).join('')+'</tr></thead><tbody>'+
+      rows.map(function(r){ return '<tr>'+r.map(function(v){return '<td>'+esc(String(v==null||v===''?'·':v))+'</td>';}).join('')+'</tr>'; }).join('')+'</tbody></table>';
+  }
+  var cts=(window.DATA&&DATA.rows||[]).filter(function(r){return c360Match(r.cust,nm);});
+  var lives=(RAWX.live||[]).filter(function(r){return c360Match(r.name,nm);});
+  var ois=(RAWX.oi||[]).filter(function(r){return c360Match(r.customer,nm);});
+  var inbs=(RAWX.inbound||[]).filter(function(r){return c360Match(r.org,nm);});
+  var mdrs=(RAWX.mdrops||[]).filter(function(r){return c360Match(r.customer,nm);});
+  var asts=(RAWX.assets||[]).filter(function(r){return c360Match(r.customer,nm);});
+  var ords=(RAWX.orders||[]).filter(function(r){return c360Match(r.customer,nm);});
+  $('#c360Title').textContent='🏢 '+nm;
+  $('#c360Cap').textContent='계약 '+cts.length+' · LIVE '+lives.length+' · OI '+ois.length+' · 인바운드 '+inbs.length+' · MDR 운영 '+mdrs.length+' · 장비 '+(asts.length+ords.length)+
+    (RAWX.inbound===undefined? ' · (인바운드는 메뉴를 한 번 연 뒤 집계됩니다)':'');
+  function sec(icon,label,n,html){ return '<div class="c360-sec"><h4>'+icon+' '+label+' <span class="ct">'+n+'건</span></h4>'+html+'</div>'; }
+  $('#c360Body').innerHTML=
+    sec('📋','계약',cts.length, tb(['서비스','채널','파트너','구분','상태','기간','MRR'],
+      cts.map(function(r){ return [lline(r.line), r.channel, r.partner, r.ctype||r.contract_type, r.status,
+        (r.start||'')+' ~ '+(r.end||''), r.mrr? Number(r.mrr).toLocaleString('ko-KR'):'' ]; })))+
+    sec('🟢','LIVE',lives.length, tb(['제품','서비스','노드','시작','종료'],
+      lives.map(function(r){ return [r.product, r.line, r.nodes, String(r.start_month||'').slice(0,7), String(r.end_month||'').slice(0,7)]; })))+
+    sec('🎯','OI (영업기회)',ois.length, tb(['사업명','상태','예상시기','예상단가','담당'],
+      ois.map(function(r){ return [r.deal_name, r.stage, String(r.expect_month||'').slice(0,7), r.expect_amount? Number(r.expect_amount).toLocaleString('ko-KR'):'', r.owner]; })))+
+    sec('📥','인바운드',inbs.length, tb(['접수일','문의 제품','유형','상태','담당'],
+      inbs.map(function(r){ return [r.on_date, r.product, r.qtype, r.result, r.owner]; })))+
+    sec('🛰️','MDR 운영·PoC',mdrs.length, tb(['유형','상태','라이선스','시작일','설치/계약'],
+      mdrs.map(function(r){ return [r.svc_type, r.status, r.license, r.start_date, (r.agents_total||0)+'/'+(r.plan_qty||0)]; })))+
+    sec('🔧','장비',asts.length+ords.length, tb(['구분','시리얼/발주','모델','상태','일자'],
+      asts.map(function(r){ return ['자산', r.serial, r.model, r.status, r.deployed_date||r.in_date]; })
+      .concat(ords.map(function(r){ return ['발주', '#'+r.id, r.model, r.status, String(r.created_at||'').slice(0,10)]; }))));
+  openOvl('ovlC360');
+}
+
+/* ===== 표 밀도 (보통/컴팩트) ===== */
+function denseKey(){ return 'svc_dense_'+(AUTH_USER||'anon'); }
+function applyDense(){
+  var on=false; try{ on=localStorage.getItem(denseKey())==='1'; }catch(e){}
+  var t=document.getElementById('dvTable'); if(t) t.classList.toggle('dense', on);
+  var b=document.getElementById('dvDense');
+  if(b) b.style.background = on? 'var(--brand-t,rgba(46,189,87,.13))':'';
+}
+
+/* ===== 엑셀 붙여넣기 대량 입력 ===== */
+function pasteCols(g){ return g.cols.filter(function(c){ return !c.ro && c.k[0]!=='_'; }); }
+function openPaste(){
+  var g=GRIDS[CUR_VIEW]; if(!g||!g.add) return;
+  var cols=pasteCols(g);
+  $('#pasteCols').innerHTML='열 순서: '+cols.map(function(c){return '<b>'+esc(c.l)+'</b>';}).join(' → ')+
+    ' <span class="mini">(엑셀에서 이 순서로 열을 맞춰 복사하세요 · 빈 칸은 비워둬도 됩니다)</span>';
+  $('#pasteTa').value=''; $('#pastePrev').textContent=''; $('#pasteMsg').textContent='';
+  function parse(){
+    var lines=$('#pasteTa').value.split(/\r?\n/).filter(function(l){return l.trim();});
+    return lines.map(function(l){
+      var cells=l.split('\t'), row={};
+      cols.forEach(function(c,i){
+        var v=(cells[i]||'').trim();
+        if(v===''){ row[c.k]=null; return; }
+        if(c.t==='number'){ var n=parseFloat(v.replace(/[^\d.\-]/g,'')); row[c.k]=isNaN(n)?null:n; }
+        else if(c.t==='month'){ var m=v.match(/(\d{4})[.\-\/년\s]*(\d{1,2})/); row[c.k]=m? m[1]+'-'+('0'+m[2]).slice(-2)+'-01':null; }
+        else if(c.t==='bool'){ row[c.k]=/^(o|y|true|1|예|중복)$/i.test(v); }
+        else row[c.k]=v;
+      });
+      return row;
+    });
+  }
+  $('#pasteTa').oninput=function(){
+    var rows=parse();
+    $('#pastePrev').textContent=rows.length? rows.length+'행 인식됨 — 첫 행: '+JSON.stringify(rows[0]).slice(0,140):'';
+  };
+  $('#pasteGo').onclick=async function(){
+    var rows=parse();
+    if(!rows.length){ $('#pasteMsg').textContent='붙여넣은 내용이 없습니다'; return; }
+    if(!confirm(rows.length+'행을 「'+g.title+'」에 추가할까요?')) return;
+    $('#pasteMsg').textContent='저장 중…';
+    try{
+      for(var i=0;i<rows.length;i+=100) await sbWrite('POST', g.table, rows.slice(i,i+100));
+      closeOvl('ovlPaste');
+      toast('붙여넣기 입력', rows.length+'행 추가됨 — '+g.title);
+      loadFromDb().then(function(nd){ onData(nd); if(GRIDS[CUR_VIEW]) renderGrid(); });
+    }catch(e){ $('#pasteMsg').textContent=String(e.message||e).slice(0,140); }
+  };
+  openOvl('ovlPaste');
 }
 
 /* ===== 홈 — 오늘 할 일 카드 + 바로가기 ===== */
@@ -7219,6 +7449,12 @@ function setupSide(){
   $('#btnLogout').onclick=doLogout;
   $('#btnWidgets').onclick=toggleWidgetPanel;
   $('#dvCsv').onclick=function(){ exportCsv(); };
+  $('#dvDense').onclick=function(){
+    try{ localStorage.setItem(denseKey(), localStorage.getItem(denseKey())==='1'?'0':'1'); }catch(e){}
+    applyDense();
+  };
+  $('#dvPaste').onclick=openPaste;
+  var bf2=document.getElementById('btnFind'); if(bf2) bf2.onclick=openFind;
   $('#dvReload').onclick=function(){
     if(CUR_VIEW==='inbound'){ loadInbound(function(){ renderGrid(); }); return; }
     loadFromDb().then(function(nd){
@@ -7314,8 +7550,10 @@ function switchView(v){
   $('#dvTitle').textContent=g.title;
   $('#dvCap').textContent=g.cap + (window.IS_VIEWER? ' · 조회 전용 계정입니다':'');
   $('#dvAdd').style.display=(g.add && !window.IS_VIEWER)?'':'none';
+  $('#dvPaste').style.display=(g.add && !window.IS_VIEWER)?'':'none';
   $('#dvSearch').value='';
   renderGrid();
+  applyDense();
 }
 
 function fmtCell(c,v,r){
@@ -7712,7 +7950,10 @@ function gridRow(r,g,editing){
       }
       return '<td'+n+'>'+esc(txt)+'</td>';
     }).join('')+(g.ro?'':'<td class="act"></td>');
-    if(g.rowClick){ tr.style.cursor='pointer'; tr.onclick=function(){ g.rowClick(r); }; }
+    if(g.rowClick){ tr.style.cursor='pointer'; tr.onclick=function(e){
+      if(e.target.closest('button')||e.target.closest('input')||e.target.closest('select')||e.target.closest('a')) return;
+      g.rowClick(r);
+    }; }
     if(!g.ro){
       var act=tr.lastChild;
       if(CUR_VIEW==='contracts'){
