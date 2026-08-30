@@ -351,6 +351,13 @@ body{padding-left:192px}
 .side .grp::before{content:'▸';font-size:10px;transition:transform .12s;flex:0 0 auto}
 .side .grp.open::before{transform:rotate(90deg)}
 .side button.clps{display:none!important}
+.side .mhide{display:none!important}   /* 메뉴 편집에서 숨긴 항목 */
+.mc-row{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;border:1px solid var(--line);margin-bottom:4px;background:var(--surface)}
+.mc-row.child{margin-left:26px;border-style:dashed}
+.mc-row .nm{flex:1;font-size:12.5px}
+.mc-row button.mv{border:1px solid var(--ring);background:var(--surface-2);border-radius:7px;width:26px;height:26px;cursor:pointer;font-size:12px;line-height:1}
+.mc-row label{display:inline-flex;gap:5px;align-items:center;font-size:11.5px;color:var(--ink-2);cursor:pointer}
+.mc-row input[type=checkbox]{accent-color:var(--critical,#d03b3b)}
 @media (max-width:1000px){
   body{padding-left:0}
   .side{position:static;width:auto;flex-direction:row;flex-wrap:wrap;border-right:0;border-bottom:1px solid var(--ring);padding:8px}
@@ -840,10 +847,11 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
   <div class="grp">도구</div>
   <button data-v="quote">📄 견적 시스템</button>
   <button data-v="price">💰 가격표</button>
-  <div class="grp">기록·계정</div>
+  <div class="grp" id="grpAdmin">관리자</div>
   <button data-v="log">🕘 변경 이력</button>
-  <button data-v="account">👤 내 계정</button>
   <button data-v="adminx" style="display:none">🛡️ 관리자</button>
+  <button data-v="account">👤 내 계정</button>
+  <button id="btnMenuEdit" style="display:none;opacity:.75">⚙ 메뉴 편집</button>
 </nav>
 <div id="sideDim"></div>
 
@@ -1310,6 +1318,22 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
     <div class="mact">
       <span class="mmsg"></span>
       <button class="pill ghost" onclick="closeOvl('ovlChvHist')">닫기</button>
+    </div>
+  </div>
+</div>
+
+<!-- 메뉴 편집 (admin 이상 · 내 화면에만 적용) -->
+<div class="ovl" id="ovlMenu">
+  <div class="modal" style="width:min(560px,100%)">
+    <h3>⚙ 메뉴 편집</h3>
+    <p class="cap" style="margin:0 0 12px">순서 이동(↑↓)과 숨김은 <b>이 계정·이 브라우저에만</b> 적용됩니다 (다른 사람 화면은 그대로).<br>
+      숨김은 화면에서만 감추는 것이고 권한과는 무관합니다.</p>
+    <div id="mcBody" style="max-height:56vh;overflow:auto"></div>
+    <div class="mact">
+      <span class="mmsg"></span>
+      <button class="pill ghost" id="mcReset">기본값 복원</button>
+      <button class="pill ghost" onclick="closeOvl('ovlMenu')">취소</button>
+      <button class="pill" id="mcSave">저장</button>
     </div>
   </div>
 </div>
@@ -1808,7 +1832,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-08-30 ⑬';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-08-30 ⑭';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -1864,8 +1888,8 @@ function doLogout(){
 }
 function showAuthUi(){
   $('#btnAuth').textContent=(AUTH_USER||'').split('@')[0]+' ▾';
-  $('#btnAuth').title='비밀번호 변경';
-  $('#btnLogout').style.display='';
+  $('#btnAuth').title='내 계정 · 로그아웃';
+  $('#btnLogout').style.display='none';   // 로그아웃은 계정 메뉴 안으로 이동
 }
 
 /* ---- 토스트 알림 ---- */
@@ -2054,6 +2078,10 @@ function buildFromRes(res){
   if(abtn) abtn.style.display = window.IS_SUPER? '':'none';
   var lbtn=document.querySelector('.side button[data-v="log"]');
   if(lbtn) lbtn.style.display = window.IS_SUPER? '':'none';   // 변경 이력은 슈퍼 관리자만
+  var ggrp=document.getElementById('grpAdmin');
+  if(ggrp) ggrp.style.display = window.IS_SUPER? '':'none';   // 「관리자」 그룹 헤더도 슈퍼만
+  var mbtn=document.getElementById('btnMenuEdit');
+  if(mbtn) mbtn.style.display = (window.IS_SUPER||window.MY_ROLE==='admin')? '':'none';   // 메뉴 편집은 admin 이상
   SB_RAW.customers=custs; SB_RAW.contracts=cts;
   var cMap={}; custs.forEach(function(c){ cMap[c.id]=c; });
 
@@ -2298,7 +2326,10 @@ function onData(d){
 
   buildControls();
   applyChannelMenu();
+  try{ applyMenuConf(); }catch(e){}
   applyMenuFold();
+  var meBtn=document.getElementById('btnMenuEdit');
+  if(meBtn && !meBtn.__b){ meBtn.__b=1; meBtn.onclick=openMenuEdit; }
   if(CUR_VIEW) try{ ensureGroupOpen(CUR_VIEW); }catch(e){}
   window.LAST_LOAD=Date.now();
   $('#loading').classList.add('hidden');
@@ -2523,7 +2554,7 @@ function buildControls(){
   }, 60*1000);
 
   $('#btnAsk').onclick=function(){ ask($('#q').value); };
-  setupSuggest();
+  // setupSuggest();   // 질문창 자동완성 드롭다운 — 사용자 요청으로 끔 (아래 칩 예시는 유지)
 
   var samples=['이번 달 매출','이번 분기 실적','올해 매출 어때?','분기별 비교','연도별 매출',
     '작년이랑 비교','파트너별 실적','live 고객사 수','곧 재약정 챙겨야 할 데 있어?',
@@ -5512,6 +5543,97 @@ function viewLabel(v){
   return b? b.textContent.trim():v;
 }
 function recentKey(){ return 'svc_recent_'+(AUTH_USER||'anon'); }
+
+/* ===== 메뉴 편집 — 순서·숨김 (admin 이상 · 내 계정/브라우저에만 적용) ===== */
+function menuConfKey(){ return 'svc_menuconf_'+(AUTH_USER||'anon'); }
+function menuSegments(){
+  var out=[], kids=Array.prototype.slice.call($('#side').children);
+  kids.forEach(function(el){
+    if(el.classList && el.classList.contains('grp')){
+      out.push({key:'g:'+el.textContent.trim(), label:el.textContent.trim(), grp:el, buttons:[]});
+    }else if(el.tagName==='BUTTON'){
+      var v=el.dataset.v;
+      if(!v || v==='dash' || v==='account' || el.id==='btnMenuEdit') return;   // 고정 항목
+      var last=out[out.length-1];
+      if(last && last.grp) last.buttons.push(el);
+      else out.push({key:'b:'+v, label:el.textContent.trim(), btn:el});
+    }
+  });
+  return out;
+}
+function applyMenuConf(){
+  if(window.IS_EQUIP) return;   // 제한 계정은 기본 메뉴 그대로
+  var conf=null; try{ conf=JSON.parse(localStorage.getItem(menuConfKey())||'null'); }catch(e){}
+  var segs=menuSegments(), side=$('#side');
+  if(conf && conf.order && conf.order.length){
+    var map={}; segs.forEach(function(s){ map[s.key]=s; });
+    var ordered=conf.order.filter(function(k){return map[k];}).map(function(k){return map[k];});
+    segs.forEach(function(s){ if(conf.order.indexOf(s.key)<0) ordered.push(s); });   // 새로 생긴 메뉴는 뒤에
+    ordered.forEach(function(s){
+      if(s.grp){ side.appendChild(s.grp); s.buttons.forEach(function(b){ side.appendChild(b); }); }
+      else side.appendChild(s.btn);
+    });
+    // 고정 항목은 항상 맨 아래
+    var acc=side.querySelector('button[data-v="account"]'), me=document.getElementById('btnMenuEdit');
+    if(acc) side.appendChild(acc); if(me) side.appendChild(me);
+  }
+  var hid=(conf && conf.hidden)||{};
+  segs.forEach(function(s){
+    var h=!!hid[s.key];
+    if(s.grp){
+      s.grp.classList.toggle('mhide', h);
+      s.buttons.forEach(function(b){ b.classList.toggle('mhide', h || !!hid['b:'+b.dataset.v]); });
+    }else s.btn.classList.toggle('mhide', h);
+  });
+}
+function openMenuEdit(){
+  var conf=null; try{ conf=JSON.parse(localStorage.getItem(menuConfKey())||'null'); }catch(e){}
+  var segs=menuSegments();
+  var hid=(conf&&conf.hidden)||{};
+  // 현재 화면 순서 그대로 시작 (applyMenuConf 후의 DOM 순서)
+  var st=segs.map(function(s){ return s; });
+  function paint(){
+    var h='';
+    st.forEach(function(s,i){
+      h+='<div class="mc-row"><button class="mv" data-mv="up" data-i="'+i+'">↑</button>'+
+        '<button class="mv" data-mv="dn" data-i="'+i+'">↓</button>'+
+        '<span class="nm"><b>'+esc(s.label)+'</b></span>'+
+        '<label><input type="checkbox" data-hk="'+esc(s.key)+'"'+(hid[s.key]?' checked':'')+'>숨김</label></div>';
+      if(s.grp) s.buttons.forEach(function(b){
+        var v=b.dataset.v;
+        if(v==='adminx') return;   // 관리자 메뉴는 권한으로만 제어
+        h+='<div class="mc-row child"><span class="nm">'+esc(b.textContent.trim())+'</span>'+
+          '<label><input type="checkbox" data-hk="b:'+esc(v)+'"'+(hid['b:'+v]?' checked':'')+'>숨김</label></div>';
+      });
+    });
+    $('#mcBody').innerHTML=h;
+    $('#mcBody').querySelectorAll('[data-mv]').forEach(function(bt){
+      bt.onclick=function(){
+        var i=+bt.dataset.i, j=bt.dataset.mv==='up'? i-1 : i+1;
+        if(j<0||j>=st.length) return;
+        var t=st[i]; st[i]=st[j]; st[j]=t;
+        // 체크 상태 먼저 반영
+        $('#mcBody').querySelectorAll('[data-hk]').forEach(function(c){ if(c.checked) hid[c.dataset.hk]=1; else delete hid[c.dataset.hk]; });
+        paint();
+      };
+    });
+  }
+  paint();
+  $('#mcSave').onclick=function(){
+    $('#mcBody').querySelectorAll('[data-hk]').forEach(function(c){ if(c.checked) hid[c.dataset.hk]=1; else delete hid[c.dataset.hk]; });
+    try{ localStorage.setItem(menuConfKey(), JSON.stringify({order:st.map(function(s){return s.key;}), hidden:hid})); }catch(e){}
+    closeOvl('ovlMenu');
+    applyMenuConf(); applyChannelMenu(); applyMenuFold();
+    toast('메뉴 편집','저장됨 — 내 화면에만 적용됩니다');
+  };
+  $('#mcReset').onclick=function(){
+    if(!confirm('메뉴 순서·숨김을 기본값으로 되돌릴까요?')) return;
+    try{ localStorage.removeItem(menuConfKey()); }catch(e){}
+    closeOvl('ovlMenu');
+    location.reload();   // DOM 순서 원복은 새로고침이 가장 확실
+  };
+  openOvl('ovlMenu');
+}
 function pushRecent(v){
   if(v==='dash'||v==='account'||v==='adminx') return;
   try{
@@ -6429,12 +6551,15 @@ async function axDelete(em){
 
 /* ---- 내 계정 ---- */
 var ROLE_INFO={
-  admin:     ['관리자','모든 데이터 조회·수정과 계정 관리가 가능합니다.'],
-  editor:    ['편집자','매출·장비 데이터를 조회하고 수정할 수 있습니다.'],
-  viewer:    ['조회 전용','모든 화면을 볼 수 있지만 수정은 할 수 없습니다.'],
-  equipment: ['장비 전용','임대 장비 신청·내역·현황만 사용할 수 있고 매출 데이터에는 접근할 수 없습니다.'],
-  poc:       ['MDR POC 전용','PoC 신청·현황만 사용할 수 있고 매출 데이터에는 접근할 수 없습니다.'],
-  equipment_poc: ['장비·POC 전용','임대장비와 MDR POC를 사용할 수 있고 매출 데이터에는 접근할 수 없습니다.']
+  super_admin:  ['슈퍼 관리자','포탈의 모든 기능을 사용합니다 — 전체 데이터 조회·수정, 계정·권한 관리, 가격표 새 판 등록, 변경 이력, AI 사용 비용 확인까지.'],
+  admin:        ['관리자','모든 화면을 조회하고 수정할 수 있습니다 (계약·장비·OI·주간회의 메모 등). 계정 관리와 변경 이력은 슈퍼 관리자 전용입니다.'],
+  admin_viewer: ['관리자 — 조회 전용','모든 화면을 볼 수 있지만 어떤 데이터도 수정할 수 없습니다.'],
+  poc:          ['PoC 전용','PoC 신청·운영 현황과 주간회의만 사용할 수 있고, 매출 데이터에는 접근할 수 없습니다.'],
+  equipment_poc:['장비·PoC 전용','임대 장비(신청·내역·현황), PoC, 주간회의만 사용할 수 있고 매출 데이터에는 접근할 수 없습니다.'],
+  /* (구) 역할 — 46단계 실행 전 임시 표시용 */
+  editor:    ['(구) 편집자','admin 으로 통합 예정입니다.'],
+  viewer:    ['(구) 조회 전용','admin_viewer 로 통합 예정입니다.'],
+  equipment: ['(구) 장비 전용','equipment_poc 로 통합 예정입니다.']
 };
 async function renderAccount(){
   var box=$('#accBody');
@@ -7785,19 +7910,34 @@ function setAuthTab(t){
   msg('auMsg','');
 }
 
+function toggleAuthMenu(){
+  var old=document.getElementById('authMenu');
+  if(old){ old.remove(); return; }
+  var r=$('#btnAuth').getBoundingClientRect();
+  var m=document.createElement('div'); m.id='authMenu';
+  m.style.cssText='position:fixed;top:'+(r.bottom+6)+'px;right:'+Math.max(10,window.innerWidth-r.right)+'px;z-index:1200;'+
+    'background:var(--surface);border:1px solid var(--ring);border-radius:12px;'+
+    'box-shadow:0 14px 34px -14px rgba(0,0,0,.32);padding:6px;min-width:180px';
+  var bs='display:block;width:100%;text-align:left;border:0;background:transparent;padding:9px 11px;border-radius:8px;font:inherit;font-size:13px;cursor:pointer;color:var(--ink)';
+  m.innerHTML='<div style="padding:7px 11px 5px;font-size:11px;color:var(--muted);border-bottom:1px solid var(--line);margin-bottom:4px">'+esc(AUTH_USER||'')+'</div>'+
+    '<button data-a="acct" style="'+bs+'">👤 내 계정</button>'+
+    '<button data-a="out" style="'+bs+';color:var(--critical,#d03b3b)">로그아웃</button>';
+  document.body.appendChild(m);
+  m.querySelectorAll('button').forEach(function(b){
+    b.onmouseenter=function(){ b.style.background='var(--surface-2)'; };
+    b.onmouseleave=function(){ b.style.background='transparent'; };
+  });
+  m.querySelector('[data-a="acct"]').onclick=function(){ m.remove(); switchView('account'); };
+  m.querySelector('[data-a="out"]').onclick=function(){ m.remove(); doLogout(); };
+  setTimeout(function(){
+    document.addEventListener('click', function h(e){
+      if(!m.contains(e.target) && e.target.id!=='btnAuth'){ m.remove(); document.removeEventListener('click',h); }
+    });
+  },0);
+}
 function setupAuth(){
   $('#btnAuth').onclick=function(){
-    if(SB_TOKEN){
-      // 로그인 상태: 계정 창을 비밀번호 변경 탭으로 열기
-      setAuthTab('pw');
-      $('#auTabs').style.display='';
-      $('#auClose').style.display='';
-      $('#auTabs').querySelector('[data-t="login"]').style.display='none';
-      $('#auLogout').style.display='';
-      openOvl('ovlAuth');
-      setTimeout(function(){ $('#apPw').focus(); },50);
-      return;
-    }
+    if(SB_TOKEN){ toggleAuthMenu(); return; }   // 로그인 상태: 내 계정/로그아웃 메뉴
     $('#auTabs').querySelector('[data-t="login"]').style.display='';
     $('#auLogout').style.display='none';
     setAuthTab('login');
