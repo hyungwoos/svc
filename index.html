@@ -1891,7 +1891,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-08-30 ㉖';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-08-30 ㉗';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -2612,7 +2612,7 @@ function buildControls(){
           if(GRIDS[keep]) renderGrid();                       // 필터·정렬·페이지 유지
           else if(CH_DEFS[keep]) try{ renderChannelView(keep); }catch(e){}
           else if(keep==='inbstat') try{ renderInbStat(); }catch(e){}
-          else if(keep==='report') try{ renderReport(); }catch(e){}
+          else if(keep==='report'){ if(!RP._touched) try{ renderReport(); }catch(e){} }   // 수정 중이면 덮어쓰지 않음
           // price 등 자체 데이터 화면은 건드리지 않음
         }
       }
@@ -7733,7 +7733,7 @@ function setupSide(){
   };
 }
 
-/* ===== 월간 리포트 — 보고용 양식 + 표 복사 + PPT 다운로드 ===== */
+/* ===== 월간 리포트 — 커스텀 리포트 빌더 (모든 값 클릭 수정 · 행 추가 · 자유 슬라이드 → PPT) ===== */
 var RP={j:null};
 function rpMonthData(j){
   var tot=0, prev=0, act={}, newCt=[], endCt=[];
@@ -7762,19 +7762,36 @@ function rpMonthData(j){
 function renderReport(){
   var host=$('#rpBody');
   if(!DATA||!DATA.rows||!DATA.rows.length){ host.innerHTML='<div class="cap" style="padding:40px;text-align:center">데이터를 불러오는 중…</div>'; return; }
-  if(!RAWX.inbound){ loadInbound(function(){ if(CUR_VIEW==='report') renderReport(); }); }
-  if(RP.j==null){ RP.j=Math.max(0, Math.min((DATA.nowIdx||0)-1, M-1)); }   // 기본 = 전월
+  if(!RAWX.inbound){ loadInbound(function(){ if(CUR_VIEW==='report'&&!RP._touched) renderReport(); }); }
+  var maxJ=Math.min(DATA.nowIdx>=0? DATA.nowIdx : M-1, M-1);       // 미래(계약상 예정) 월은 리포트 대상에서 제외
+  if(RP.j==null||RP.j>maxJ) RP.j=Math.max(0, maxJ-1);              // 기본 = 전월
+  RP._touched=false;
   var d=rpMonthData(RP.j);
-  var opts=''; for(var i=M-1;i>=Math.max(0,M-36);i--) opts+='<option value="'+i+'"'+(i===RP.j?' selected':'')+'>'+mk(i)+'</option>';
+  var opts=''; for(var i=maxJ;i>=Math.max(0,maxJ-35);i--) opts+='<option value="'+i+'"'+(i===RP.j?' selected':'')+'>'+mk(i)+'</option>';
   var dif=d.prev? (d.tot/d.prev-1)*100 : 0;
-  function kpi(l,v,s){ return '<div class="pr-ob"><div class="l">'+l+'</div><div class="v">'+v+'</div>'+(s?'<div class="pr-note">'+s+'</div>':'')+'</div>'; }
-  var h='<div class="pr-card" style="margin-bottom:14px"><h3>📑 월간 사업 리포트'+
-    '<small>표 옆 «복사» 버튼 → PPT·워드에 붙여넣기 가능 · 숫자는 전부 포탈 DB 계산값</small></h3>'+
-    '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:8px 0 0">대상월 '+
-    '<select id="rpM" style="height:34px;border:1px solid var(--ring);border-radius:9px;padding:0 10px;font:inherit;background:var(--surface)">'+opts+'</select>'+
+  var inSt='height:34px;border:1px solid var(--ring);border-radius:9px;padding:0 10px;font:inherit;background:var(--surface)';
+  function kpi(l,v,s){ return '<div class="pr-ob"><div class="l" contenteditable spellcheck="false">'+l+'</div><div class="v" contenteditable spellcheck="false">'+v+'</div><div class="pr-note" contenteditable spellcheck="false">'+(s||'&nbsp;')+'</div></div>'; }
+  function inc(k){ return '<label style="font-size:11px;color:var(--muted);font-weight:400;display:inline-flex;gap:4px;align-items:center;margin-left:auto"><input type="checkbox" data-rpinc="'+k+'" checked> PPT 포함</label>'; }
+  function tbl(id,head,rows2,empty){
+    var h2='<div style="overflow-x:auto"><table class="pr" id="'+id+'"><thead><tr>'+
+      head.map(function(x){ return '<th'+(x[1]?' class="n"':'')+' contenteditable spellcheck="false">'+x[0]+'</th>'; }).join('')+
+      '<th class="rpCtl" style="width:30px"></th></tr></thead><tbody>'+
+      rows2.map(function(cells){ return '<tr>'+cells.map(function(c){ return '<td'+(c&&c.n?' class="n"':'')+' contenteditable spellcheck="false">'+esc(String((c&&c.t!==undefined)?c.t:c))+'</td>'; }).join('')+
+        '<td class="rpCtl"><button data-rpdel title="행 삭제" style="border:none;background:none;cursor:pointer;color:var(--muted)">×</button></td></tr>'; }).join('')+'</tbody></table></div>'+
+      '<div style="margin-top:6px;display:flex;gap:8px;align-items:center"><button class="pill" data-rpadd="'+id+'" style="height:24px;padding:0 9px;font-size:11px">＋ 행 추가</button>'+
+      (rows2.length?'':'<span class="pr-note">'+empty+' — 필요하면 직접 행을 추가하세요</span>')+'</div>';
+    return h2;
+  }
+  var h='<div class="pr-card" style="margin-bottom:14px"><h3>📑 커스텀 리포트'+
+    '<small>숫자·표·제목 전부 클릭해서 직접 수정 가능 · 자동 계산값은 시작점일 뿐입니다 · 대상월을 바꾸면 초기화됩니다</small></h3>'+
+    '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:8px 0 0">'+
+    '대상월 <select id="rpM" style="'+inSt+'">'+opts+'</select>'+
+    '제목 <input id="rpTitle" value="서비스사업부 월간 사업 리포트" style="'+inSt+';width:280px">'+
+    '표지 라벨 <input id="rpSub" value="'+d.ym+'" style="'+inSt+';width:120px">'+
     '<button class="pill" id="rpPpt" style="height:34px">⬇ PPT 다운로드</button>'+
+    '<button class="pill" id="rpNoteAdd" style="height:34px">＋ 메모 슬라이드</button>'+
     '<span class="pr-note" id="rpMsg"></span></div></div>';
-  h+='<div class="pr-card" style="margin-bottom:14px"><h3>'+d.ym+' 요약'+rpCopyBtn('rpK')+'</h3><div class="pr-out" id="rpK" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">'+
+  h+='<div class="pr-card" style="margin-bottom:14px"><h3><span contenteditable spellcheck="false" id="rpKT">'+d.ym+' 요약</span>'+rpCopyBtn('rpK')+inc('sum')+'</h3><div class="pr-out" id="rpK" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">'+
     kpi('월 매출(MRR)','₩'+won(d.tot), d.prev?('전월 대비 '+pct(dif)):'')+
     kpi('ARR 환산','₩'+won(d.tot*12),'')+
     kpi('월 목표 달성률', d.mtg? Math.round(d.tot/d.mtg*100)+'%':'목표 없음', d.mtg?('목표 ₩'+won(d.mtg)):'')+
@@ -7788,52 +7805,101 @@ function renderReport(){
       '<div style="flex:1"><div style="height:9px;border-radius:4px;background:'+(x[0]===d.ym?'var(--brand)':'var(--brand-t)')+';width:'+Math.round(x[1]/mx*100)+'%"></div></div>'+
       '<span style="width:90px;text-align:right;color:var(--ink-2)">₩'+won(x[1])+'</span></div>';
   });
-  h+='<div class="pr-card" style="margin-bottom:14px"><h3>최근 12개월 매출 추이</h3>'+tr+'</div>';
-  function tbl(id,head,rows2,empty){
-    if(!rows2.length) return '<p class="cap" style="margin:6px 0 0">'+empty+'</p>';
-    return '<div style="overflow-x:auto"><table class="pr" id="'+id+'"><thead><tr>'+head.map(function(x){return '<th'+(x[1]?' class="n"':'')+'>'+x[0]+'</th>';}).join('')+'</tr></thead><tbody>'+
-      rows2.map(function(cells){ return '<tr>'+cells.map(function(c){ return '<td'+(c&&c.n?' class="n"':'')+'>'+esc(String((c&&c.t!==undefined)?c.t:c))+'</td>'; }).join('')+'</tr>'; }).join('')+'</tbody></table></div>';
-  }
-  h+='<div class="pr-card" style="margin-bottom:14px"><h3>🆕 신규 계약 <small>'+d.newCt.length+'건</small>'+rpCopyBtn('rpTblNew')+'</h3>'+
+  h+='<div class="pr-card" style="margin-bottom:14px"><h3>최근 12개월 매출 추이 <small>이 카드만 자동값 고정 (PPT에서는 수정 가능한 차트)</small>'+inc('trend')+'</h3>'+tr+'</div>';
+  h+='<div class="pr-card" style="margin-bottom:14px"><h3>🆕 <span contenteditable spellcheck="false">신규 계약</span> <small>'+d.newCt.length+'건</small>'+rpCopyBtn('rpTblNew')+inc('new')+'</h3>'+
     tbl('rpTblNew',[['고객사'],['서비스'],['채널'],['구분'],['수량',1],['월액(원)',1]],
       d.newCt.map(function(x){ return [x.r.cust, LINE_LABEL[x.r.line]||x.r.line, x.r.channel, x.r.ctype||'-', {t:x.r.qty||'-',n:1}, {t:Math.round(x.v).toLocaleString('ko-KR'),n:1}]; }),'신규 계약이 없습니다')+'</div>';
-  h+='<div class="pr-card" style="margin-bottom:14px"><h3>📉 해지·종료 <small>'+d.endCt.length+'건</small>'+rpCopyBtn('rpTblEnd')+'</h3>'+
+  h+='<div class="pr-card" style="margin-bottom:14px"><h3>📉 <span contenteditable spellcheck="false">해지·종료</span> <small>'+d.endCt.length+'건</small>'+rpCopyBtn('rpTblEnd')+inc('end')+'</h3>'+
     tbl('rpTblEnd',[['고객사'],['서비스'],['채널'],['사유'],['직전 월액(원)',1]],
       d.endCt.map(function(x){ return [x.r.cust, LINE_LABEL[x.r.line]||x.r.line, x.r.channel, x.r.churn||x.r.status||'-', {t:Math.round(x.v).toLocaleString('ko-KR'),n:1}]; }),'해지·종료가 없습니다')+'</div>';
-  h+='<div class="pr-card" style="margin-bottom:14px"><h3>🛡️ 신규 PoC 신청 <small>'+d.poc.length+'건</small>'+rpCopyBtn('rpTblPoc')+'</h3>'+
+  h+='<div class="pr-card" style="margin-bottom:14px"><h3>🛡️ <span contenteditable spellcheck="false">신규 PoC 신청</span> <small>'+d.poc.length+'건</small>'+rpCopyBtn('rpTblPoc')+inc('poc')+'</h3>'+
     tbl('rpTblPoc',[['고객사'],['서비스 유형'],['상태'],['계약예정수량',1],['영업담당']],
       d.poc.map(function(x){ return [x.customer||'-', x.svc_type||'-', x.status||'-', {t:x.plan_qty||'-',n:1}, x.sales_name||'-']; }),'해당 월 PoC 신청이 없습니다')+'</div>';
   var inbBy={}; d.inb.forEach(function(x){ var k=x.result||'미기재'; inbBy[k]=(inbBy[k]||0)+1; });
-  h+='<div class="pr-card" style="margin-bottom:14px"><h3>📨 인바운드 <small>'+d.inb.length+'건'+(RAWX.inbound?'':' · 불러오는 중…')+'</small>'+rpCopyBtn('rpTblInb')+'</h3>'+
+  var inbNote='접수 '+d.inb.length+'건'+(d.inbWon.length?' · 수주 전환 '+d.inbWon.length+'건'+(function(){var s2=0;d.inbWon.forEach(function(x){s2+=Number(x.amount)||0;});return s2?' · 수주액 합 ₩'+won(s2):'';})():'');
+  h+='<div class="pr-card" style="margin-bottom:14px"><h3>📨 <span contenteditable spellcheck="false">인바운드</span> <small>'+d.inb.length+'건'+(RAWX.inbound?'':' · 불러오는 중…')+'</small>'+rpCopyBtn('rpTblInb')+inc('inb')+'</h3>'+
     tbl('rpTblInb',[['상태'],['건수',1]], Object.keys(inbBy).sort(function(a,b){return inbBy[b]-inbBy[a];}).map(function(k){ return [k,{t:inbBy[k],n:1}]; }),'해당 월 인바운드가 없습니다')+
-    (d.inbWon.length?'<p class="pr-note" style="margin-top:6px">수주 전환 '+d.inbWon.length+'건'+(function(){var s2=0;d.inbWon.forEach(function(x){s2+=Number(x.amount)||0;});return s2?' · 수주액 합 ₩'+won(s2):'';})()+'</p>':'')+'</div>';
-  h+='<div class="pr-card"><h3>🎯 OI 파이프라인 <small>현재 시점 스냅샷</small>'+rpCopyBtn('rpK2')+'</h3><div class="pr-out" id="rpK2" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">'+
+    '<p class="pr-note" id="rpInbX" contenteditable spellcheck="false" style="margin-top:6px">'+inbNote+'</p></div>';
+  h+='<div class="pr-card" style="margin-bottom:14px"><h3>🎯 <span contenteditable spellcheck="false">OI 파이프라인</span> <small>현재 시점 스냅샷</small>'+rpCopyBtn('rpK2')+inc('oi')+'</h3><div class="pr-out" id="rpK2" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">'+
     kpi('진행 중 OI', d.oiOpen.length+'건','등록+진행 단계')+
     kpi('예상 금액 합','₩'+won(d.oiSum),'전부 수주 가정 · VAT별도')+
     kpi('기대 수주액','₩'+won(d.oiW),'수주가능성 가중')+
     '</div></div>';
+  h+='<div id="rpNotes"></div>';
   host.innerHTML=h;
   var s=$('#rpM'); if(s) s.onchange=function(){ RP.j=+s.value; renderReport(); };
   var pb=$('#rpPpt'); if(pb) pb.onclick=rpMakePpt;
+  var nb=$('#rpNoteAdd'); if(nb) nb.onclick=rpAddNote;
   document.querySelectorAll('[data-rpcopy]').forEach(function(b){ b.onclick=function(){ rpCopy(b.dataset.rpcopy, b); }; });
+  host.onclick=function(e){
+    var del=e.target.closest? e.target.closest('[data-rpdel]') : null;
+    if(del){ var tr2=del.closest('tr'); if(tr2) tr2.remove(); RP._touched=true; return; }
+    var add=e.target.closest? e.target.closest('[data-rpadd]') : null;
+    if(add){
+      var tb2=document.getElementById(add.dataset.rpadd); if(!tb2) return;
+      var n=tb2.tHead.rows[0].cells.length-1, tr3=tb2.tBodies[0].insertRow(-1);
+      for(var c=0;c<n;c++){ var td=tr3.insertCell(-1); td.contentEditable='true'; td.spellcheck=false; if(tb2.tHead.rows[0].cells[c].className.indexOf('n')>=0) td.className='n'; }
+      var tc=tr3.insertCell(-1); tc.className='rpCtl'; tc.innerHTML='<button data-rpdel title="행 삭제" style="border:none;background:none;cursor:pointer;color:var(--muted)">×</button>';
+      tr3.cells[0].focus(); RP._touched=true;
+    }
+  };
+  host.oninput=function(){ RP._touched=true; };
 }
-function rpCopyBtn(id){ return ' <button class="pill" data-rpcopy="'+id+'" style="height:24px;padding:0 9px;font-size:11px;float:right">📋 복사</button>'; }
+function rpAddNote(){
+  var wrap=$('#rpNotes'); if(!wrap) return;
+  var blk=document.createElement('div');
+  blk.className='pr-card rpNoteBlk'; blk.style.marginBottom='14px';
+  blk.innerHTML='<h3>📝 <span class="rpNT" contenteditable spellcheck="false">특이사항·하이라이트</span>'+
+    '<button class="pill" data-rpnx style="height:24px;padding:0 9px;font-size:11px;margin-left:auto">× 슬라이드 삭제</button></h3>'+
+    '<div class="rpNB" contenteditable spellcheck="false" style="min-height:70px;border:1px dashed var(--ring);border-radius:9px;padding:10px 12px;font-size:13px;line-height:1.8">· 여기에 내용을 입력하세요 (줄마다 불릿 하나)</div>';
+  blk.querySelector('[data-rpnx]').onclick=function(){ blk.remove(); };
+  wrap.appendChild(blk); RP._touched=true;
+  var b=blk.querySelector('.rpNB'); var r=document.createRange(); r.selectNodeContents(b); var sel=window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+}
+function rpCopyBtn(id){ return ' <button class="pill" data-rpcopy="'+id+'" style="height:24px;padding:0 9px;font-size:11px">📋 복사</button>'; }
 function rpCopy(id, btn){
   var el=document.getElementById(id); if(!el) return;
+  var target=el, tmp=null;
+  if(el.tagName==='TABLE'){                       // 컨트롤 열(×) 빼고 복사
+    tmp=el.cloneNode(true);
+    tmp.querySelectorAll('.rpCtl').forEach(function(x){ x.remove(); });
+    tmp.querySelectorAll('[contenteditable]').forEach(function(x){ x.removeAttribute('contenteditable'); });
+    tmp.style.position='fixed'; tmp.style.left='-9999px'; document.body.appendChild(tmp); target=tmp;
+  }
   try{
-    var rng=document.createRange(); rng.selectNode(el);
+    var rng=document.createRange(); rng.selectNode(target);
     var sel=window.getSelection(); sel.removeAllRanges(); sel.addRange(rng);
     document.execCommand('copy'); sel.removeAllRanges();
     if(btn){ var o=btn.textContent; btn.textContent='✓ 복사됨'; setTimeout(function(){ btn.textContent=o; },1500); }
   }catch(e){ toast('복사 실패', String(e.message||e)); }
+  if(tmp) tmp.remove();
+}
+function rpTableData(id){
+  var t=document.getElementById(id); if(!t) return {head:[],rows:[]};
+  var head=[].slice.call(t.tHead.rows[0].cells).filter(function(c){return c.className.indexOf('rpCtl')<0;}).map(function(c){return c.textContent.trim();});
+  var rows=[].slice.call(t.tBodies[0].rows).map(function(r){
+    return [].slice.call(r.cells).filter(function(c){return c.className.indexOf('rpCtl')<0;}).map(function(c){return c.textContent.trim();});
+  }).filter(function(r){ return r.some(function(c){ return c!==''; }); });
+  return {head:head, rows:rows};
+}
+function rpKpiData(id){
+  var el=document.getElementById(id); if(!el) return [];
+  return [].slice.call(el.querySelectorAll('.pr-ob')).map(function(b){
+    var l=b.querySelector('.l'), v=b.querySelector('.v'), n=b.querySelector('.pr-note');
+    return [l?l.textContent.trim():'', v?v.textContent.trim():'', n?n.textContent.replace(/ /g,'').trim():''];
+  });
 }
 function rpLoadPptx(){
   return new Promise(function(res,rej){
     if(window.PptxGenJS) return res();
-    var s=document.createElement('script');
-    s.src='https://cdnjs.cloudflare.com/ajax/libs/pptxgen/3.12.0/pptxgen.bundle.js';
-    s.onload=function(){ res(); }; s.onerror=function(){ rej(new Error('PPT 라이브러리를 불러오지 못했습니다 (네트워크 확인)')); };
-    document.head.appendChild(s);
+    var urls=['https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js',
+              'https://unpkg.com/pptxgenjs@3.12.0/dist/pptxgen.bundle.js'];
+    (function tryNext(i){
+      if(i>=urls.length) return rej(new Error('PPT 라이브러리를 불러오지 못했습니다 (네트워크·사내 차단 확인)'));
+      var s=document.createElement('script'); s.src=urls[i];
+      s.onload=function(){ res(); }; s.onerror=function(){ s.remove(); tryNext(i+1); };
+      document.head.appendChild(s);
+    })(0);
   });
 }
 async function rpMakePpt(){
@@ -7842,66 +7908,76 @@ async function rpMakePpt(){
     await rpLoadPptx();
     var d=rpMonthData(RP.j);
     var GRN='149E40', INK='30343B', MUT='7A828E', BGH='EAF6EE';
+    var title=($('#rpTitle')&&$('#rpTitle').value)||'서비스사업부 월간 사업 리포트';
+    var sub=($('#rpSub')&&$('#rpSub').value)||d.ym;
+    function on(k){ var c=document.querySelector('[data-rpinc="'+k+'"]'); return !c||c.checked; }
     var p=new PptxGenJS(); p.layout='LAYOUT_WIDE';
     p.defineSlideMaster({ title:'M', background:{color:'FFFFFF'},
       objects:[ {rect:{x:0,y:7.1,w:'100%',h:0.4,fill:{color:GRN}}},
                 {text:{text:'Genians 서비스사업부 · 대외비', options:{x:0.3,y:7.12,w:6,h:0.35,fontSize:9,color:'FFFFFF',valign:'middle'}}} ] });
-    // 표지
     var s1=p.addSlide({masterName:'M'});
-    s1.addText('서비스사업부 월간 사업 리포트',{x:0.7,y:2.4,w:12,h:1,fontSize:36,bold:true,color:INK});
-    s1.addText(d.ym,{x:0.7,y:3.5,w:12,h:0.7,fontSize:24,color:GRN,bold:true});
-    s1.addText('생성일 '+new Date().toISOString().slice(0,10)+' · 서비스사업부 통합 관리 포탈 자동 생성',{x:0.7,y:4.3,w:12,h:0.5,fontSize:12,color:MUT});
-    // 요약
-    var s2=p.addSlide({masterName:'M'});
-    s2.addText(d.ym+' 요약',{x:0.5,y:0.35,w:12,h:0.6,fontSize:22,bold:true,color:INK});
-    var dif=d.prev?(d.tot/d.prev-1)*100:0;
-    var K=[['월 매출(MRR)','₩'+won(d.tot),(d.prev?'전월 대비 '+pct(dif):'')],['ARR 환산','₩'+won(d.tot*12),''],
-      ['월 목표 달성률', d.mtg?Math.round(d.tot/d.mtg*100)+'%':'목표 없음', d.mtg?'목표 ₩'+won(d.mtg):''],
-      ['연 누계','₩'+won(d.ytd), d.ytg?('연 목표의 '+Math.round(d.ytd/d.ytg*100)+'%'):''],
-      ['활성 고객사', d.actCnt+'곳','매출 발생 기준'],['신규 / 해지', d.newCt.length+'건 / '+d.endCt.length+'건','']];
-    K.forEach(function(k,i){
-      var x=0.5+(i%3)*4.25, y=1.2+Math.floor(i/3)*2.6;
-      s2.addShape('roundRect',{x:x,y:y,w:4,h:2.3,fill:{color:BGH},line:{color:'DDE5DD'},rectRadius:0.08});
-      s2.addText(k[0],{x:x+0.25,y:y+0.25,w:3.5,h:0.4,fontSize:12,color:MUT});
-      s2.addText(k[1],{x:x+0.25,y:y+0.75,w:3.5,h:0.8,fontSize:28,bold:true,color:INK});
-      if(k[2]) s2.addText(k[2],{x:x+0.25,y:y+1.6,w:3.5,h:0.4,fontSize:11,color:GRN});
-    });
-    // 추이 차트
-    var s3=p.addSlide({masterName:'M'});
-    s3.addText('최근 12개월 매출 추이',{x:0.5,y:0.35,w:12,h:0.6,fontSize:22,bold:true,color:INK});
-    s3.addChart(p.ChartType.bar,[{name:'월 매출', labels:d.trend.map(function(x){return x[0];}), values:d.trend.map(function(x){return Math.round(x[1]);})}],
-      {x:0.5,y:1.1,w:12.3,h:5.6, barDir:'col', chartColors:[GRN], catAxisLabelFontSize:10, valAxisLabelFontSize:10, showValue:false, valAxisLabelFormatCode:'#,##0'});
-    // 표 슬라이드 헬퍼
-    function tSlide(title, head, rows2, empty){
-      var s=p.addSlide({masterName:'M'});
-      s.addText(title,{x:0.5,y:0.35,w:12,h:0.6,fontSize:22,bold:true,color:INK});
-      if(!rows2.length){ s.addText(empty,{x:0.5,y:1.3,w:12,h:0.5,fontSize:14,color:MUT}); return; }
-      var lim=rows2.slice(0,14);
-      var tr=[head.map(function(x){ return {text:x, options:{bold:true,color:'FFFFFF',fill:{color:GRN},fontSize:11}}; })]
-        .concat(lim.map(function(r){ return r.map(function(c){ return {text:String(c), options:{fontSize:10.5,color:INK}}; }); }));
-      s.addTable(tr,{x:0.5,y:1.1,w:12.3, border:{pt:0.5,color:'D8DEE4'}, autoPage:false, rowH:0.32});
-      if(rows2.length>14) s.addText('외 '+(rows2.length-14)+'건 — 포탈에서 전체 확인',{x:0.5,y:6.6,w:12,h:0.4,fontSize:11,color:MUT});
+    s1.addText(title,{x:0.7,y:2.4,w:12,h:1,fontSize:36,bold:true,color:INK});
+    s1.addText(sub,{x:0.7,y:3.5,w:12,h:0.7,fontSize:24,color:GRN,bold:true});
+    s1.addText('생성일 '+new Date().toISOString().slice(0,10)+' · 서비스사업부 통합 관리 포탈',{x:0.7,y:4.3,w:12,h:0.5,fontSize:12,color:MUT});
+    if(on('sum')){
+      var s2=p.addSlide({masterName:'M'});
+      s2.addText(($('#rpKT')&&$('#rpKT').textContent)||sub+' 요약',{x:0.5,y:0.35,w:12,h:0.6,fontSize:22,bold:true,color:INK});
+      rpKpiData('rpK').forEach(function(k,i){
+        var x=0.5+(i%3)*4.25, y=1.2+Math.floor(i/3)*2.6;
+        s2.addShape('roundRect',{x:x,y:y,w:4,h:2.3,fill:{color:BGH},line:{color:'DDE5DD'},rectRadius:0.08});
+        s2.addText(k[0],{x:x+0.25,y:y+0.25,w:3.5,h:0.4,fontSize:12,color:MUT});
+        s2.addText(k[1],{x:x+0.25,y:y+0.75,w:3.5,h:0.8,fontSize:26,bold:true,color:INK});
+        if(k[2]) s2.addText(k[2],{x:x+0.25,y:y+1.6,w:3.5,h:0.4,fontSize:11,color:GRN});
+      });
     }
-    tSlide(d.ym+' 신규 계약 ('+d.newCt.length+'건)',['고객사','서비스','채널','구분','수량','월액(원)'],
-      d.newCt.map(function(x){ return [x.r.cust, LINE_LABEL[x.r.line]||x.r.line, x.r.channel, x.r.ctype||'-', x.r.qty||'-', Math.round(x.v).toLocaleString('ko-KR')]; }),'신규 계약이 없습니다');
-    tSlide(d.ym+' 해지·종료 ('+d.endCt.length+'건)',['고객사','서비스','채널','사유','직전 월액(원)'],
-      d.endCt.map(function(x){ return [x.r.cust, LINE_LABEL[x.r.line]||x.r.line, x.r.channel, x.r.churn||x.r.status||'-', Math.round(x.v).toLocaleString('ko-KR')]; }),'해지·종료가 없습니다');
-    // PoC·인바운드·OI
-    var s6=p.addSlide({masterName:'M'});
-    s6.addText('PoC · 인바운드 · 영업 파이프라인',{x:0.5,y:0.35,w:12,h:0.6,fontSize:22,bold:true,color:INK});
-    var inbBy={}; d.inb.forEach(function(x){ var k=x.result||'미기재'; inbBy[k]=(inbBy[k]||0)+1; });
-    var col=[
-      ['신규 PoC '+d.poc.length+'건', d.poc.slice(0,10).map(function(x){ return '· '+(x.customer||'-')+' ('+(x.svc_type||'-')+', '+(x.status||'-')+')'; }).join('\n')||'없음'],
-      ['인바운드 '+d.inb.length+'건', Object.keys(inbBy).sort(function(a,b){return inbBy[b]-inbBy[a];}).slice(0,10).map(function(k){ return '· '+k+' '+inbBy[k]+'건'; }).join('\n')||'없음'],
-      ['OI 파이프라인 (현재)', '· 진행 중 '+d.oiOpen.length+'건\n· 예상 금액 합 ₩'+won(d.oiSum)+'\n· 기대 수주액 ₩'+won(d.oiW)+'\n  (수주가능성 가중)']
-    ];
-    col.forEach(function(c,i){
-      var x=0.5+i*4.35;
-      s6.addText(c[0],{x:x,y:1.1,w:4.1,h:0.5,fontSize:15,bold:true,color:GRN});
-      s6.addText(c[1],{x:x,y:1.7,w:4.1,h:4.8,fontSize:11.5,color:INK,valign:'top'});
+    if(on('trend')){
+      var s3=p.addSlide({masterName:'M'});
+      s3.addText('최근 12개월 매출 추이',{x:0.5,y:0.35,w:12,h:0.6,fontSize:22,bold:true,color:INK});
+      s3.addChart(p.ChartType.bar,[{name:'월 매출', labels:d.trend.map(function(x){return x[0];}), values:d.trend.map(function(x){return Math.round(x[1]);})}],
+        {x:0.5,y:1.1,w:12.3,h:5.6, barDir:'col', chartColors:[GRN], catAxisLabelFontSize:10, valAxisLabelFontSize:10, showValue:false, valAxisLabelFormatCode:'#,##0'});
+    }
+    function tSlide(key, tblId, ttl){
+      if(!on(key)) return;
+      var td=rpTableData(tblId);
+      if(!td.rows.length) return;
+      var s=p.addSlide({masterName:'M'});
+      s.addText(ttl+' ('+td.rows.length+'건)',{x:0.5,y:0.35,w:12,h:0.6,fontSize:22,bold:true,color:INK});
+      var lim=td.rows.slice(0,14);
+      var trx=[td.head.map(function(x){ return {text:x, options:{bold:true,color:'FFFFFF',fill:{color:GRN},fontSize:11}}; })]
+        .concat(lim.map(function(r){ return r.map(function(c){ return {text:String(c), options:{fontSize:10.5,color:INK}}; }); }));
+      s.addTable(trx,{x:0.5,y:1.1,w:12.3, border:{pt:0.5,color:'D8DEE4'}, autoPage:false, rowH:0.32});
+      if(tblId==='rpTblInb'){ var xn=$('#rpInbX'); if(xn&&xn.textContent.trim()) s.addText(xn.textContent.trim(),{x:0.5,y:6.2,w:12,h:0.4,fontSize:12,color:MUT}); }
+      if(td.rows.length>14) s.addText('외 '+(td.rows.length-14)+'건 — 포탈에서 전체 확인',{x:0.5,y:6.6,w:12,h:0.4,fontSize:11,color:MUT});
+    }
+    function secTitle(tblId, fb){ var t=document.querySelector('#'+tblId) ? null : null; return fb; }
+    tSlide('new','rpTblNew', sub+' 신규 계약');
+    tSlide('end','rpTblEnd', sub+' 해지·종료');
+    tSlide('poc','rpTblPoc', sub+' 신규 PoC 신청');
+    tSlide('inb','rpTblInb', sub+' 인바운드');
+    if(on('oi')){
+      var kk=rpKpiData('rpK2');
+      if(kk.length){
+        var s7=p.addSlide({masterName:'M'});
+        s7.addText('OI 파이프라인 (현재 시점)',{x:0.5,y:0.35,w:12,h:0.6,fontSize:22,bold:true,color:INK});
+        kk.forEach(function(k,i){
+          var x=0.5+(i%3)*4.25, y=1.4;
+          s7.addShape('roundRect',{x:x,y:y,w:4,h:2.3,fill:{color:BGH},line:{color:'DDE5DD'},rectRadius:0.08});
+          s7.addText(k[0],{x:x+0.25,y:y+0.25,w:3.5,h:0.4,fontSize:12,color:MUT});
+          s7.addText(k[1],{x:x+0.25,y:y+0.75,w:3.5,h:0.8,fontSize:26,bold:true,color:INK});
+          if(k[2]) s7.addText(k[2],{x:x+0.25,y:y+1.6,w:3.5,h:0.4,fontSize:11,color:GRN});
+        });
+      }
+    }
+    document.querySelectorAll('.rpNoteBlk').forEach(function(blk){
+      var t=blk.querySelector('.rpNT'), b=blk.querySelector('.rpNB');
+      var lines=(b?b.innerText:'').split('\n').map(function(x){ return x.replace(/^[·•\-\s]+/,'').trim(); }).filter(Boolean);
+      var sN=p.addSlide({masterName:'M'});
+      sN.addText((t?t.textContent.trim():'특이사항'),{x:0.5,y:0.35,w:12,h:0.6,fontSize:22,bold:true,color:INK});
+      if(lines.length) sN.addText(lines.map(function(x){ return {text:x, options:{bullet:true, breakLine:true}}; }),
+        {x:0.7,y:1.3,w:11.9,h:5.4,fontSize:15,color:INK,valign:'top',lineSpacing:28});
     });
-    await p.writeFile({fileName:'서비스사업부_월간리포트_'+d.ym+'.pptx'});
-    m.textContent='✓ PPT 다운로드 완료 ('+d.ym+')';
+    await p.writeFile({fileName:'서비스사업부_리포트_'+sub.replace(/[\\/:*?"<>|\s]+/g,'_')+'.pptx'});
+    m.textContent='✓ PPT 다운로드 완료';
   }catch(e){ m.textContent='PPT 생성 실패: '+String(e.message||e); }
 }
 
