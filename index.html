@@ -1894,7 +1894,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-08-31 ㉛';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-08-31 ㉜';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -7849,10 +7849,12 @@ function renderChurn(){
   });
   var rc=$('#chRsClr'); if(rc) rc.onclick=function(){ CHURN.rs=''; renderChurn(); };
   var bx=$('#chXls'); if(bx) bx.onclick=function(){
-    xlsxAoa('해지기업리스트_'+mk(CHURN.f)+'~'+mk(CHURN.t),
-      ['고객사','서비스','채널','구분','해지월','사유','직전 월액(원)','비고'],
-      list.map(function(x){ return [x.cust,x.line,x.channel,x.ctype,x.ym,x.reason,Math.round(x.amt),x.note]; }))
-      .catch(function(e){ toast('엑셀 생성 실패', String(e.message||e)); });
+    xlsxBook('해지분석_'+mk(CHURN.f)+'~'+mk(CHURN.t), [
+      {name:'사유별 집계', head:['해지 사유','건수','비중(%)','월액 합(원)','연환산(원)'],
+       rows:keys.map(function(k2){ var o3=by[k2]; return [k2,o3.n,(totN?Math.round(o3.n/totN*100):0),Math.round(o3.amt),Math.round(o3.amt*12)]; })},
+      {name:'해지 기업 리스트', head:['고객사','서비스','채널','구분','해지월','사유','직전 월액(원)','비고'],
+       rows:list.map(function(x){ return [x.cust,x.line,x.channel,x.ctype,x.ym,x.reason,Math.round(x.amt),x.note]; })}
+    ]).catch(function(e){ toast('엑셀 생성 실패', String(e.message||e)); });
   };
 }
 
@@ -8592,18 +8594,21 @@ function loadXlsxLib(){
       document.head.appendChild(s); })(0);
   });
 }
-async function xlsxAoa(name, head, rows){
+async function xlsxBook(name, sheets){                       // sheets: [{name, head, rows}]
   await loadXlsxLib();
-  var ws=XLSX.utils.aoa_to_sheet([head].concat(rows));
-  ws['!cols']=head.map(function(h2,i){
-    var w=String(h2).length+2;
-    rows.slice(0,80).forEach(function(r){ var L=String(r[i]==null?'':r[i]).length+2; if(L>w) w=L; });
-    return {wch:Math.min(42,w)};
-  });
   var wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+  sheets.forEach(function(sh,si){
+    var ws=XLSX.utils.aoa_to_sheet([sh.head].concat(sh.rows));
+    ws['!cols']=sh.head.map(function(h2,i){
+      var w=String(h2).length+2;
+      sh.rows.slice(0,80).forEach(function(r){ var L=String(r[i]==null?'':r[i]).length+2; if(L>w) w=L; });
+      return {wch:Math.min(42,w)};
+    });
+    XLSX.utils.book_append_sheet(wb, ws, String(sh.name||('Sheet'+(si+1))).replace(/[\\/:*?\[\]]/g,' ').slice(0,31));
+  });
   XLSX.writeFile(wb, name.replace(/[\\/:*?"<>|]/g,'_')+'_'+new Date().toISOString().slice(0,10)+'.xlsx');
 }
+function xlsxAoa(name, head, rows){ return xlsxBook(name, [{name:'Sheet1', head:head, rows:rows}]); }
 async function exportXlsx(){
   var g=GRIDS[CUR_VIEW]; if(!g) return;
   var rows=gridFilteredSorted(g);
