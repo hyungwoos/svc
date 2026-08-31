@@ -1894,7 +1894,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-08-31 ㊳';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-08-31 ㊴';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -7774,22 +7774,39 @@ function setupSide(){
 }
 
 /* ===== 해지 분석 — 기간별 해지 사유·기업 리스트 ===== */
-var CHURN={f:null,t:null,q:'',fil:{},sk:'',sd:1};   // fil: 열별 «볼 값 고르기» 선택
+var CHURN={f:null,t:null,q:'',fil:{},sk:'',sd:1,inclRenew:false};   // fil: 열별 «볼 값 고르기» · inclRenew: 재약정 포함 여부
 var CH_COLS=[['cust','고객사',0],['line','서비스',0],['channel','채널',0],['ctype','구분',0],
-              ['ym','해지월',0],['reason','사유',0],['amt','직전 월액(원)',1],['note','비고',0]];
+              ['ym','해지월',0],['reason','사유',0],['amt','직전 월액(원)',1],['note','비고',0],['rw','재약정',0]];
 function chVal(x,k){                                            // 필터·표시용 셀 값
   if(k==='amt') return Math.round(x.amt).toLocaleString('ko-KR');
+  if(k==='rw') return x.renew? '재약정':'이탈';
   var v=x[k];
   return (v==null||v==='')? BLANK_LABEL : String(v);
 }
 function churnRows(){
+  // 같은 고객사+서비스의 계약 시작월 목록 — 재약정(계약 승계) 판별용
+  var startIdxBy={};
+  DATA.rows.forEach(function(r){
+    var k=(r.cust||'')+'|'+(r.line||'');
+    var s=(r.startIdx!=null? r.startIdx : r._f);
+    if(s==null||s<0) return;
+    (startIdxBy[k]=startIdxBy[k]||[]).push(s);
+  });
   var out=[];
   DATA.rows.forEach(function(r,i){
     if(!/해지|종료/.test(String(r.status||''))) return;
     var e=r.endIdx!=null? r.endIdx : r._l; if(e==null||e<0) return;
     var amt=MAT[i][e]||MAT[i][Math.max(e-1,0)]||r.mrr||0;
+    var note=r.note||'';
+    // ① 비고에 «재약정 완료/재계약/갱신» 표기 (단, «미연장·미재약정»은 실제 이탈)
+    var byNote=/재약정\s*완료|재계약|갱신\s*완료|연장\s*완료/.test(note) && !/미연장|미재약정|해지/.test(note);
+    // ② 같은 고객사·서비스로 이 계약 종료 무렵(-1 ~ +3개월)에 시작한 다른 계약이 있으면 승계로 간주
+    var k=(r.cust||'')+'|'+(r.line||'');
+    var mine=(r.startIdx!=null? r.startIdx : r._f);
+    var byNext=(startIdxBy[k]||[]).some(function(s){ return s!==mine && s>=e-1 && s<=e+3; });
     out.push({cust:r.cust, line:lline(r.line), channel:chOf(r), ctype:r.ctype||'', ym:mk(e), e:e,
-      reason:r.churn||'미기재', amt:amt, note:r.note||''});
+      reason:r.churn||'미기재', amt:amt, note:note, renew:!!(byNote||byNext),
+      rwhy: byNote? '비고 재약정 표기' : (byNext? '동일 고객·서비스 계약 이어짐':'')});
   });
   return out;
 }
@@ -7801,7 +7818,10 @@ function renderChurn(){
   if(CHURN.f==null){ var jan=dIdx(mk(maxJ).slice(0,4)+'-01'); CHURN.f=(jan!=null&&jan>=0)? jan:0; }
   if(CHURN.f>CHURN.t) CHURN.f=CHURN.t;
   var all=churnRows();
-  var inR0=all.filter(function(x){ return x.e>=CHURN.f && x.e<=CHURN.t; });
+  var inRAll=all.filter(function(x){ return x.e>=CHURN.f && x.e<=CHURN.t; });
+  var renewN=inRAll.filter(function(x){ return x.renew; }).length;
+  // 재약정(계약 승계)은 실제 이탈이 아니므로 기본 제외
+  var inR0=CHURN.inclRenew? inRAll : inRAll.filter(function(x){ return !x.renew; });
   var qw=String(CHURN.q||'').toLowerCase().split(/\s+/).filter(Boolean);
   function passQ(x){
     if(!qw.length) return true;
@@ -7842,10 +7862,17 @@ function renderChurn(){
     '<select id="chT" style="'+inSt+'">'+mopt(CHURN.t)+'</select>'+
     '<button class="pill" id="chY" style="height:34px">올해</button>'+
     '<button class="pill ghost" id="chY1" style="height:34px">작년</button>'+
-    '<button class="pill ghost" id="chAll" style="height:34px">전체 기간</button></div></div>';
-  h+='<div class="pr-card" style="margin-bottom:14px"><h3>'+mk(CHURN.f)+' ~ '+mk(CHURN.t)+' 요약</h3>'+
+    '<button class="pill ghost" id="chAll" style="height:34px">전체 기간</button>'+
+    '<label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;margin-left:6px;cursor:pointer" title="재약정으로 이어진 계약 종료 건도 목록에 포함">'+
+      '<input type="checkbox" id="chRenew"'+(CHURN.inclRenew?' checked':'')+'> 재약정 건 포함</label>'+
+    '</div>'+
+    '<p class="pr-note" style="margin:8px 0 0">'+(CHURN.inclRenew
+      ? '⚠ 재약정으로 이어진 '+renewN+'건도 포함해서 보고 있습니다 — 실제 이탈 수치가 아닙니다'
+      : (renewN? '재약정으로 이어진 '+renewN+'건은 제외했습니다 (계약 종료 후 같은 고객·서비스로 재계약된 건 · 비고 «재약정 완료» 포함)':'재약정 승계 건 없음'))+
+    '</p></div>';
+  h+='<div class="pr-card" style="margin-bottom:14px"><h3>'+mk(CHURN.f)+' ~ '+mk(CHURN.t)+' 요약 <small>'+(CHURN.inclRenew?'재약정 포함':'실제 이탈만 (재약정 제외)')+'</small></h3>'+
     '<div class="pr-out" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">'+
-    kpi('해지·종료', totN+'건','')+
+    kpi(CHURN.inclRenew?'해지·종료':'실제 이탈', totN+'건', renewN? (CHURN.inclRenew? '이 중 재약정 '+renewN+'건':'재약정 '+renewN+'건 제외'):'')+
     kpi('고객사', Object.keys(custN).length+'곳','')+
     kpi('이탈 월액 합','₩'+won(totA),'해지 직전 월 매출 기준')+
     kpi('연환산 손실','₩'+won(totA*12),'ARR 감소분')+
@@ -7881,9 +7908,10 @@ function renderChurn(){
     }).join('')+
     '</tr></thead><tbody>'+
     (list.map(function(x){
-      return '<tr><td>'+esc(x.cust)+'</td><td>'+esc(x.line)+'</td><td>'+esc(x.channel)+'</td><td>'+esc(x.ctype)+'</td>'+
-        '<td>'+x.ym+'</td><td>'+esc(x.reason)+'</td><td class="n">'+Math.round(x.amt).toLocaleString('ko-KR')+'</td><td>'+esc(x.note)+'</td></tr>';
-    }).join('') || '<tr><td colspan="8" class="cap">해당 조건의 해지 기업이 없습니다</td></tr>')+
+      return '<tr'+(x.renew?' style="opacity:.72"':'')+'><td>'+esc(x.cust)+'</td><td>'+esc(x.line)+'</td><td>'+esc(x.channel)+'</td><td>'+esc(x.ctype)+'</td>'+
+        '<td>'+x.ym+'</td><td>'+esc(x.reason)+'</td><td class="n">'+Math.round(x.amt).toLocaleString('ko-KR')+'</td><td>'+esc(x.note)+'</td>'+
+        '<td'+(x.renew?' title="'+esc(x.rwhy)+'"':'')+'>'+(x.renew?'<span style="color:var(--muted)">재약정</span>':'이탈')+'</td></tr>';
+    }).join('') || '<tr><td colspan="9" class="cap">해당 조건의 해지 기업이 없습니다</td></tr>')+
     '</tbody></table></div></div>';
   host.innerHTML=h;
   var f=$('#chF'), t2=$('#chT');
@@ -7894,6 +7922,7 @@ function renderChurn(){
   var bY=$('#chY'); if(bY) bY.onclick=function(){ setRange(dIdx(y0+'-01'), maxJ); };
   var bY1=$('#chY1'); if(bY1) bY1.onclick=function(){ setRange(dIdx((y0-1)+'-01'), dIdx((y0-1)+'-12')); };
   var bA=$('#chAll'); if(bA) bA.onclick=function(){ setRange(0, maxJ); };
+  var rw=$('#chRenew'); if(rw) rw.onchange=function(){ CHURN.inclRenew=rw.checked; renderChurn(); };
   document.querySelectorAll('#chAgg tbody tr[data-rs]').forEach(function(row){
     row.onclick=function(){
       var v=row.dataset.rs, cur=CHURN.fil.reason;
@@ -7909,8 +7938,8 @@ function renderChurn(){
     xlsxBook(fn, [
       {name:'사유별 집계', head:['해지 사유','건수','비중(%)','월액 합(원)','연환산(원)'],
        rows:keys.map(function(k2){ var o3=by[k2]; return [k2,o3.n,(totN?Math.round(o3.n/totN*100):0),Math.round(o3.amt),Math.round(o3.amt*12)]; })},
-      {name:'해지 기업 리스트', head:['고객사','서비스','채널','구분','해지월','사유','직전 월액(원)','비고'],
-       rows:list.map(function(x){ return [x.cust,x.line,x.channel,x.ctype,x.ym,x.reason,Math.round(x.amt),x.note]; })}
+      {name:'해지 기업 리스트', head:['고객사','서비스','채널','구분','해지월','사유','직전 월액(원)','비고','재약정'],
+       rows:list.map(function(x){ return [x.cust,x.line,x.channel,x.ctype,x.ym,x.reason,Math.round(x.amt),x.note,(x.renew?'재약정':'이탈')]; })}
     ]).then(function(){ if(msg) msg.textContent='✓ 다운로드 완료 (시트 2장: 사유별 집계 + 기업 리스트)'; })
       .catch(function(e){ if(msg) msg.textContent='실패: '+String(e.message||e); toast('엑셀 생성 실패', String(e.message||e)); });
   }
