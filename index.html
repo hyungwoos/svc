@@ -1894,7 +1894,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-08-31 ㉟';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-08-31 ㊱';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -7811,7 +7811,9 @@ function renderChurn(){
     '<select id="chT" style="'+inSt+'">'+mopt(CHURN.t)+'</select>'+
     '<button class="pill" id="chY" style="height:34px">올해</button>'+
     '<button class="pill ghost" id="chY1" style="height:34px">작년</button>'+
-    '<button class="pill ghost" id="chAll" style="height:34px">전체 기간</button></div></div>';
+    '<button class="pill ghost" id="chAll" style="height:34px">전체 기간</button>'+
+    '<button class="pill" id="chXlsTop" style="height:34px;background:var(--brand);border-color:var(--brand);color:#fff;font-weight:700">⬇ 엑셀 다운로드</button>'+
+    '<span class="pr-note" id="chXmsg"></span></div></div>';
   h+='<div class="pr-card" style="margin-bottom:14px"><h3>'+mk(CHURN.f)+' ~ '+mk(CHURN.t)+' 요약</h3>'+
     '<div class="pr-out" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">'+
     kpi('해지·종료', totN+'건','')+
@@ -7830,7 +7832,7 @@ function renderChurn(){
     '</tbody></table></div>'+
     (CHURN.rs?'<p class="pr-note" style="margin-top:6px"><button class="pill" id="chRsClr" style="height:24px;padding:0 9px;font-size:11px">✕ 사유 필터 해제 ('+esc(CHURN.rs)+')</button></p>':'')+'</div>';
   h+='<div class="pr-card"><h3>해지 기업 리스트 <small>'+list.length+'건 · 해지월 최신순</small>'+
-    ' <button class="pill" id="chXls" style="height:24px;padding:0 9px;font-size:11px">⬇ 엑셀</button></h3>'+
+    ' <button class="pill" id="chXls" style="height:28px;padding:0 12px">⬇ 엑셀 다운로드</button></h3>'+
     '<div style="overflow-x:auto"><table class="pr" id="chList"><thead><tr><th>고객사</th><th>서비스</th><th>채널</th><th>구분</th><th>해지월</th><th>사유</th><th class="n">직전 월액(원)</th><th>비고</th></tr></thead><tbody>'+
     (list.map(function(x){
       return '<tr><td>'+esc(x.cust)+'</td><td>'+esc(x.line)+'</td><td>'+esc(x.channel)+'</td><td>'+esc(x.ctype)+'</td>'+
@@ -7850,14 +7852,18 @@ function renderChurn(){
     row.onclick=function(){ CHURN.rs=(CHURN.rs===row.dataset.rs)? '':row.dataset.rs; renderChurn(); };
   });
   var rc=$('#chRsClr'); if(rc) rc.onclick=function(){ CHURN.rs=''; renderChurn(); };
-  var bx=$('#chXls'); if(bx) bx.onclick=function(){
+  function chExport(){
+    var msg=$('#chXmsg'); if(msg) msg.textContent='엑셀 생성 중…';
     xlsxBook('해지분석_'+mk(CHURN.f)+'~'+mk(CHURN.t), [
       {name:'사유별 집계', head:['해지 사유','건수','비중(%)','월액 합(원)','연환산(원)'],
        rows:keys.map(function(k2){ var o3=by[k2]; return [k2,o3.n,(totN?Math.round(o3.n/totN*100):0),Math.round(o3.amt),Math.round(o3.amt*12)]; })},
       {name:'해지 기업 리스트', head:['고객사','서비스','채널','구분','해지월','사유','직전 월액(원)','비고'],
        rows:list.map(function(x){ return [x.cust,x.line,x.channel,x.ctype,x.ym,x.reason,Math.round(x.amt),x.note]; })}
-    ]).catch(function(e){ toast('엑셀 생성 실패', String(e.message||e)); });
-  };
+    ]).then(function(){ if(msg) msg.textContent='✓ 다운로드 완료 (시트 2장: 사유별 집계 + 기업 리스트)'; })
+      .catch(function(e){ if(msg) msg.textContent='실패: '+String(e.message||e); toast('엑셀 생성 실패', String(e.message||e)); });
+  }
+  var bx=$('#chXls'); if(bx) bx.onclick=chExport;
+  var bx2=$('#chXlsTop'); if(bx2) bx2.onclick=chExport;
 }
 
 /* ===== 월간 리포트 — 커스텀 리포트 빌더 (모든 값 클릭 수정 · 행 추가 · 자유 슬라이드 → PPT) ===== */
