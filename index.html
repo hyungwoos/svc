@@ -1894,7 +1894,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-08-31 ㉜';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-08-31 ㉞';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -5526,7 +5526,7 @@ function openChvHist(r){
 }
 
 /* ---- 사업 영역(판매 채널) 화면 ---- */
-function chOf(r){ var c=r.channel||'일반'; return c==='공공'? '조달' : c; }   // 옛 표기 호환
+function chOf(r){ return r.channel||'일반'; }   // «공공»은 산업군 오인 표기 — 조달로 집계하지 않음 (48단계 SQL로 정리)
 /* [라벨, 장비 채널(''=장비 타일 없음), 설명, 매처(r)] — 제품 × 채널로 세분화 */
 var CH_DEFS={
   cngen:['🤝 Cloud NAC · 일반 판매','',        '파트너 경유 + 직판 (Cloud NAC)',
@@ -5595,27 +5595,29 @@ function renderChannelView(key){
           : tile('비중', (monthlyTotal(idxs(),b)? (mrr/monthlyTotal(idxs(),b)*100).toFixed(1):'0')+'%','','전체 당월 매출 대비'))+
     '</div>';
   if(key==='cnpub'){
-    var histC={}, valid={}, pub2=0, othGov={}, indGov={};
+    var histC={}, valid={}, pubBad={}, othGov={}, indGov={};
     DATA.rows.forEach(function(r){
       if(r.line==='Cloud'&&chOf(r)==='조달'){
         histC[r.cust]=1;
         if(!/해지|종료/.test(String(r.status||'')) && (r.endIdx==null||r.endIdx>=b)) valid[r.cust]=1;
-        if(r.channel==='공공') pub2++;
       }
+      if(r.channel==='공공') pubBad[r.cust]=1;                       // 산업군 오인 표기 — 조달 아님, 어떤 채널 집계에도 미포함
       if(chOf(r)==='조달'&&r.line!=='Cloud') othGov[r.line]=(othGov[r.line]||0)+1;
       if(r.ind==='공공'&&chOf(r)!=='조달') indGov[r.cust]=1;
     });
     var oth=Object.keys(othGov).map(function(k3){ return lline(k3)+' '+othGov[k3]+'건'; }).join(' · ');
+    var pubN=Object.keys(pubBad).length;
     h+='<section class="card c12" style="margin-bottom:16px"><h2>🧮 조달 고객사 수 검증</h2>'+
-      '<p class="cap">같은 «조달 고객사 수»도 기준에 따라 달라집니다 — 보고 전에 어느 기준인지 명확히 하세요</p>'+
+      '<p class="cap">조달 = 매출시트 «판매유형»이 조달인 계약만 집계합니다. 산업군이 공공인 것과는 다른 개념입니다.</p>'+
       '<div class="kpis">'+
-      tile('당월 매출 발생', Object.keys(custs).length.toLocaleString('ko-KR'),'곳', baseLabel()+' 매출이 있는 고객사')+
+      tile('당월 매출 발생', Object.keys(custs).length.toLocaleString('ko-KR'),'곳', baseLabel()+' 매출이 있는 조달 고객사')+
       tile('유효 계약 보유', Object.keys(valid).length.toLocaleString('ko-KR'),'곳','해지·종료 제외, 계약기간 유효')+
       tile('이력 전체', Object.keys(histC).length.toLocaleString('ko-KR'),'곳','과거 포함 조달 거래 이력')+
-      tile('표기 점검', pub2,'건', pub2? '옛 표기 «공공» 잔존 — 조달로 자동 집계됨':'채널 표기 정상')+
+      tile('표기 오류', pubN,'곳', pubN? '채널이 «공공»으로 잘못 입력됨 — 조달 아님, 정리 필요(48단계 SQL)':'채널 표기 정상')+
       '</div>'+
+      (pubN? '<p class="cap" style="margin-top:8px">⚠ 채널 «공공» 표기 고객사: '+esc(Object.keys(pubBad).slice(0,12).join(', '))+(pubN>12?' 외 '+(pubN-12)+'곳':'')+' — 산업군이 공공일 뿐 조달 판매가 아니면 채널을 «일반»으로, 실제 조달이면 «조달»로 수정하세요</p>':'')+
       (oth? '<p class="cap" style="margin-top:8px">참고: Cloud NAC 외 제품의 조달 계약 '+oth+' — 이 화면 집계에는 포함되지 않습니다 (계약 화면 채널 필터로 확인)</p>':'')+
-      (Object.keys(indGov).length? '<p class="cap">참고: 산업군이 «공공»인데 판매 채널은 조달이 아닌 고객사 '+Object.keys(indGov).length+'곳 — 산업군(고객 속성)과 조달 채널(판매 경로)은 다른 개념이라 집계가 갈립니다</p>':'')+
+      (Object.keys(indGov).length? '<p class="cap">참고: 산업군이 «공공»인데 판매 채널은 조달이 아닌 고객사 '+Object.keys(indGov).length+'곳 — 정상입니다 (산업군≠판매 경로)</p>':'')+
       '</section>';
   }
   h+='<div class="grid">';
@@ -5930,7 +5932,7 @@ function renderTodo(){
         var n=null;
         if(rows){ n=0; rows.forEach(function(x){
           var last=[x.on_date,x.s1d,x.s2d,x.s21d,x.s3d].filter(function(d){return d&&/^\d{4}-\d{2}-\d{2}/.test(d);}).sort().pop();
-          if(last && (t0-new Date(last).getTime())/864e5>=30) n++;   // 대시보드 기준: 1개월
+          if(last && (t0-new Date(last).getTime())/864e5>=90) n++;   // 대시보드 기준: 3개월
         }); }
         window.__inbTodo={t:t0, n:n};
         if(CUR_VIEW==='dash') renderTodo();
@@ -5955,7 +5957,7 @@ function renderTodo(){
       '<div class="v">'+val+'</div><div class="s">'+sub+'</div></div>';
   }
   document.getElementById('todoCards').innerHTML=
-    card(inbN>0?'crit':'ok','📥','인바운드 미대응', inbN==null?'…':inbN+'건', inbN>0?'진행중인데 1개월+ 대응 없음':'밀린 건 없음','inbstat')+
+    card(inbN>0?'crit':'ok','📥','인바운드 미대응', inbN==null?'…':inbN+'건', inbN>0?'진행중인데 3개월+ 대응 없음':'밀린 건 없음','inbstat')+
     card(oiLate>0?'warn':'ok','🎯','OI 밀린 액션', oiLate+'건', oiLate>0?'다음 할 일 예정일 지남':'예정일 지난 건 없음','oi')+
     card(renewN>0?'warn':'ok','📋','재약정 도래', renewN+'건','60일 안에 계약 종료','contracts')+
     card('','📊','주간회의', wkTxt,'매주 월요일 · 일요일 저녁 자동 취합','weekly');
