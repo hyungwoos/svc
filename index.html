@@ -382,13 +382,13 @@ body{padding-left:192px}
 }
 .dgrid thead th.act{ background:var(--surface-2); z-index:3; }
 /* 열 필터 (구글시트식) */
-.dgrid thead th .thw{display:flex;align-items:center;gap:5px;justify-content:space-between}
-.dgrid thead th .fbtn{
+.dgrid thead th .thw,#chList thead th .thw{display:flex;align-items:center;gap:5px;justify-content:space-between}
+.dgrid thead th .fbtn,#chList thead th .fbtn{
   border:none;background:transparent;color:var(--ink-2);opacity:.42;cursor:pointer;
   font-size:11px;line-height:1;padding:2px 3px;border-radius:5px;font-family:inherit;flex:0 0 auto;
 }
-.dgrid thead th .fbtn:hover{opacity:1;background:var(--surface)}
-.dgrid thead th .fbtn.on{opacity:1;color:#fff;background:var(--s1)}
+.dgrid thead th .fbtn:hover,#chList thead th .fbtn:hover{opacity:1;background:var(--surface)}
+.dgrid thead th .fbtn.on,#chList thead th .fbtn.on{opacity:1;color:#fff;background:var(--s1)}
 .colf{
   position:fixed;z-index:120;width:min(286px,92vw);background:var(--surface);
   border:1px solid var(--ring);border-radius:12px;box-shadow:0 18px 40px rgba(0,0,0,.28);
@@ -1894,7 +1894,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-08-31 ㊲';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-08-31 ㊳';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -7774,7 +7774,14 @@ function setupSide(){
 }
 
 /* ===== 해지 분석 — 기간별 해지 사유·기업 리스트 ===== */
-var CHURN={f:null,t:null,rs:'',q:'',line:'',ch:'',sk:'',sd:1};
+var CHURN={f:null,t:null,q:'',fil:{},sk:'',sd:1};   // fil: 열별 «볼 값 고르기» 선택
+var CH_COLS=[['cust','고객사',0],['line','서비스',0],['channel','채널',0],['ctype','구분',0],
+              ['ym','해지월',0],['reason','사유',0],['amt','직전 월액(원)',1],['note','비고',0]];
+function chVal(x,k){                                            // 필터·표시용 셀 값
+  if(k==='amt') return Math.round(x.amt).toLocaleString('ko-KR');
+  var v=x[k];
+  return (v==null||v==='')? BLANK_LABEL : String(v);
+}
 function churnRows(){
   var out=[];
   DATA.rows.forEach(function(r,i){
@@ -7795,19 +7802,23 @@ function renderChurn(){
   if(CHURN.f>CHURN.t) CHURN.f=CHURN.t;
   var all=churnRows();
   var inR0=all.filter(function(x){ return x.e>=CHURN.f && x.e<=CHURN.t; });
-  var lineOpts={}, chOpts={};
-  inR0.forEach(function(x){ if(x.line) lineOpts[x.line]=1; if(x.channel) chOpts[x.channel]=1; });
   var qw=String(CHURN.q||'').toLowerCase().split(/\s+/).filter(Boolean);
   function passQ(x){
     if(!qw.length) return true;
     var hay=(x.cust+' '+x.line+' '+x.channel+' '+x.ctype+' '+x.ym+' '+x.reason+' '+x.note).toLowerCase();
     return qw.every(function(w){ return hay.indexOf(w)>=0; });
   }
-  // 사유별 집계는 검색·서비스·채널 필터까지 반영 (사유 선택은 제외 — 다른 사유도 보여야 하므로)
-  var inR=inR0.filter(function(x){
-    return passQ(x) && (!CHURN.line || x.line===CHURN.line) && (!CHURN.ch || x.channel===CHURN.ch);
-  });
-  var list=inR.filter(function(x){ return !CHURN.rs || x.reason===CHURN.rs; });
+  function chPass(x, skipK){                                    // 열별 필터 통과 여부
+    for(var k in CHURN.fil){
+      if(k===skipK) continue;
+      var sel=CHURN.fil[k]; if(!sel||!sel.length) continue;
+      if(sel.indexOf(chVal(x,k))<0) return false;
+    }
+    return true;
+  }
+  // 사유별 집계 = 검색 + (사유 외) 열 필터 반영 — 사유 선택 자체는 빼야 다른 사유도 보임
+  var inR=inR0.filter(function(x){ return passQ(x) && chPass(x,'reason'); });
+  var list=inR0.filter(function(x){ return passQ(x) && chPass(x); });
   var SK={cust:'cust',line:'line',channel:'channel',ctype:'ctype',ym:'e',reason:'reason',amt:'amt',note:'note'};
   if(CHURN.sk && SK[CHURN.sk]){
     var kk=SK[CHURN.sk];
@@ -7842,31 +7853,32 @@ function renderChurn(){
   h+='<div class="pr-card" style="margin-bottom:14px"><h3>사유별 집계 <small>행을 클릭하면 아래 리스트가 그 사유로 좁혀집니다</small></h3>'+
     '<div style="overflow-x:auto"><table class="pr" id="chAgg"><thead><tr><th>해지 사유</th><th class="n">건수</th><th class="n">비중</th><th class="n">월액 합(원)</th><th class="n">연환산(원)</th></tr></thead><tbody>'+
     (keys.map(function(k2){
-      var o=by[k2], on=CHURN.rs===k2;
+      var o=by[k2], on=!!(CHURN.fil.reason && CHURN.fil.reason.length===1 && CHURN.fil.reason[0]===k2);
       return '<tr data-rs="'+esc(k2)+'" style="cursor:pointer'+(on?';background:var(--brand-t);font-weight:700':'')+'">'+
         '<td>'+esc(k2)+(on?' ✓':'')+'</td><td class="n">'+o.n+'</td><td class="n">'+(totN?Math.round(o.n/totN*100):0)+'%</td>'+
         '<td class="n">'+Math.round(o.amt).toLocaleString('ko-KR')+'</td><td class="n">'+Math.round(o.amt*12).toLocaleString('ko-KR')+'</td></tr>';
     }).join('') || '<tr><td colspan="5" class="cap">해당 기간 해지가 없습니다</td></tr>')+
     '</tbody></table></div>'+
-    (CHURN.rs?'<p class="pr-note" style="margin-top:6px"><button class="pill" id="chRsClr" style="height:24px;padding:0 9px;font-size:11px">✕ 사유 필터 해제 ('+esc(CHURN.rs)+')</button></p>':'')+'</div>';
-  var nFil=(CHURN.q?1:0)+(CHURN.line?1:0)+(CHURN.ch?1:0)+(CHURN.rs?1:0);
-  function selOpts(obj,cur){ return '<option value="">전체</option>'+Object.keys(obj).sort().map(function(v){
-    return '<option value="'+esc(v)+'"'+(cur===v?' selected':'')+'>'+esc(v)+'</option>'; }).join(''); }
+    ((CHURN.fil.reason&&CHURN.fil.reason.length)?'<p class="pr-note" style="margin-top:6px"><button class="pill" id="chRsClr" style="height:24px;padding:0 9px;font-size:11px">✕ 사유 필터 해제 ('+esc(CHURN.fil.reason.join(', '))+')</button></p>':'')+'</div>';
+  var nFil=(CHURN.q?1:0); for(var fk in CHURN.fil){ if(CHURN.fil[fk]&&CHURN.fil[fk].length) nFil++; }
   var sArrow=function(k2){ return CHURN.sk===k2? (CHURN.sd>0?' ▲':' ▼') : ''; };
-  var cols=[['cust','고객사',0],['line','서비스',0],['channel','채널',0],['ctype','구분',0],
-            ['ym','해지월',0],['reason','사유',0],['amt','직전 월액(원)',1],['note','비고',0]];
+  var cols=CH_COLS;
   h+='<div class="pr-card"><h3>해지 기업 리스트 <small>'+list.length+'건'+(CHURN.sk?'':' · 해지월 최신순')+'</small></h3>'+
     '<div class="dbar" style="margin:6px 0 10px">'+
       '<input type="search" id="chQ" placeholder="검색 — 고객사·사유·비고 등 (여러 단어)" value="'+esc(CHURN.q||'')+'">'+
-      '서비스 <select id="chLine" style="'+inSt+';height:32px">'+selOpts(lineOpts,CHURN.line)+'</select>'+
-      '채널 <select id="chCh" style="'+inSt+';height:32px">'+selOpts(chOpts,CHURN.ch)+'</select>'+
       '<button class="pill ghost" id="chXls" title="현재 기간·필터가 적용된 목록을 엑셀 파일로 저장">⬇ 엑셀</button>'+
       (nFil? '<button class="pill ghost" id="chFclr" style="border-color:var(--critical);color:var(--critical)">✕ 필터 해제 ('+nFil+')</button>':'')+
       '<span class="mini" id="chXmsg"></span>'+
-      '<span class="spacer"></span><span class="mini">'+list.length+'건 / 기간 내 '+inR0.length+'건</span>'+
+      '<span class="spacer"></span><span class="mini">열 제목의 ▼ 로 값 골라 보기 · '+list.length+'건 / 기간 내 '+inR0.length+'건</span>'+
     '</div>'+
     '<div style="overflow-x:auto"><table class="pr" id="chList"><thead><tr>'+
-    cols.map(function(c){ return '<th'+(c[2]?' class="n"':'')+' data-sk="'+c[0]+'" style="cursor:pointer" title="클릭: 정렬">'+c[1]+sArrow(c[0])+'</th>'; }).join('')+
+    cols.map(function(c){
+      var on=!!(CHURN.fil[c[0]] && CHURN.fil[c[0]].length);
+      return '<th'+(c[2]?' class="n"':'')+'><div class="thw">'+
+        '<span data-sk="'+c[0]+'" style="cursor:pointer" title="클릭: 정렬">'+c[1]+sArrow(c[0])+'</span>'+
+        '<button type="button" class="fbtn'+(on?' on':'')+'" data-fk="'+c[0]+'" title="'+(on?'필터 적용 중 ('+CHURN.fil[c[0]].length+'개 값) — 클릭해서 바꾸기':'값 골라 보기')+'">▼</button>'+
+        '</div></th>';
+    }).join('')+
     '</tr></thead><tbody>'+
     (list.map(function(x){
       return '<tr><td>'+esc(x.cust)+'</td><td>'+esc(x.line)+'</td><td>'+esc(x.channel)+'</td><td>'+esc(x.ctype)+'</td>'+
@@ -7877,18 +7889,23 @@ function renderChurn(){
   var f=$('#chF'), t2=$('#chT');
   if(f) f.onchange=function(){ CHURN.f=+f.value; if(CHURN.f>CHURN.t){CHURN.t=CHURN.f;} renderChurn(); };
   if(t2) t2.onchange=function(){ CHURN.t=+t2.value; if(CHURN.t<CHURN.f){CHURN.f=CHURN.t;} renderChurn(); };
-  function setRange(f2,t3){ CHURN.f=Math.max(0,f2); CHURN.t=Math.min(maxJ,t3); CHURN.rs=''; renderChurn(); }
+  function setRange(f2,t3){ CHURN.f=Math.max(0,f2); CHURN.t=Math.min(maxJ,t3); CHURN.fil={}; renderChurn(); }
   var y0=+mk(maxJ).slice(0,4);
   var bY=$('#chY'); if(bY) bY.onclick=function(){ setRange(dIdx(y0+'-01'), maxJ); };
   var bY1=$('#chY1'); if(bY1) bY1.onclick=function(){ setRange(dIdx((y0-1)+'-01'), dIdx((y0-1)+'-12')); };
   var bA=$('#chAll'); if(bA) bA.onclick=function(){ setRange(0, maxJ); };
   document.querySelectorAll('#chAgg tbody tr[data-rs]').forEach(function(row){
-    row.onclick=function(){ CHURN.rs=(CHURN.rs===row.dataset.rs)? '':row.dataset.rs; renderChurn(); };
+    row.onclick=function(){
+      var v=row.dataset.rs, cur=CHURN.fil.reason;
+      if(cur && cur.length===1 && cur[0]===v) delete CHURN.fil.reason; else CHURN.fil.reason=[v];
+      renderChurn();
+    };
   });
-  var rc=$('#chRsClr'); if(rc) rc.onclick=function(){ CHURN.rs=''; renderChurn(); };
+  var rc=$('#chRsClr'); if(rc) rc.onclick=function(){ delete CHURN.fil.reason; renderChurn(); };
   function chExport(){
     var msg=$('#chXmsg'); if(msg) msg.textContent='엑셀 생성 중…';
-    var fn='해지분석_'+mk(CHURN.f)+'~'+mk(CHURN.t)+(CHURN.line?'_'+CHURN.line:'')+(CHURN.ch?'_'+CHURN.ch:'')+(CHURN.rs?'_'+CHURN.rs:'');
+    var fnx=[]; for(var fk2 in CHURN.fil){ var sv=CHURN.fil[fk2]; if(sv&&sv.length&&sv.length<=2) fnx.push(sv.join('·')); }
+    var fn='해지분석_'+mk(CHURN.f)+'~'+mk(CHURN.t)+(fnx.length?'_'+fnx.join('_'):'');
     xlsxBook(fn, [
       {name:'사유별 집계', head:['해지 사유','건수','비중(%)','월액 합(원)','연환산(원)'],
        rows:keys.map(function(k2){ var o3=by[k2]; return [k2,o3.n,(totN?Math.round(o3.n/totN*100):0),Math.round(o3.amt),Math.round(o3.amt*12)]; })},
@@ -7903,14 +7920,31 @@ function renderChurn(){
     q.oninput=function(){ CHURN.q=q.value; CHURN._focus=true; renderChurn(); };
     if(CHURN._focus){ CHURN._focus=false; q.focus(); try{ q.setSelectionRange(q.value.length,q.value.length); }catch(e){} }
   }
-  var sl=$('#chLine'); if(sl) sl.onchange=function(){ CHURN.line=sl.value; renderChurn(); };
-  var sc=$('#chCh'); if(sc) sc.onchange=function(){ CHURN.ch=sc.value; renderChurn(); };
-  var fc=$('#chFclr'); if(fc) fc.onclick=function(){ CHURN.q=''; CHURN.line=''; CHURN.ch=''; CHURN.rs=''; renderChurn(); };
-  document.querySelectorAll('#chList thead th[data-sk]').forEach(function(th){
-    th.onclick=function(){
-      var k2=th.dataset.sk;
+  var fc=$('#chFclr'); if(fc) fc.onclick=function(){ CHURN.q=''; CHURN.fil={}; renderChurn(); };
+  document.querySelectorAll('#chList thead [data-sk]').forEach(function(el2){
+    el2.onclick=function(){
+      var k2=el2.dataset.sk;
       if(CHURN.sk===k2) CHURN.sd*=-1; else { CHURN.sk=k2; CHURN.sd=1; }
       renderChurn();
+    };
+  });
+  // 열 제목 ▼ — 계약 그리드와 동일한 «볼 값 고르기» 패널
+  document.querySelectorAll('#chList thead .fbtn[data-fk]').forEach(function(btn){
+    btn.onclick=function(ev){
+      ev.stopPropagation();
+      var k2=btn.dataset.fk;
+      var base=inR0.filter(function(x){ return passQ(x) && chPass(x,k2); });
+      var cnt={}, order=[];
+      base.forEach(function(x){ var t=chVal(x,k2); if(cnt[t]===undefined){ cnt[t]=0; order.push(t); } cnt[t]++; });
+      var col=null; CH_COLS.forEach(function(c){ if(c[0]===k2) col=c; });
+      openFilterPanel(btn,{
+        label:(col?col[1]:k2), order:order, cnt:cnt, num:(k2==='amt'),
+        selected:CHURN.fil[k2]||null,
+        onApply:function(sel){
+          if(sel) CHURN.fil[k2]=sel; else delete CHURN.fil[k2];
+          renderChurn();
+        }
+      });
     };
   });
 }
