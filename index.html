@@ -1894,7 +1894,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-08-31 ㊱';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-08-31 ㊲';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -7774,7 +7774,7 @@ function setupSide(){
 }
 
 /* ===== 해지 분석 — 기간별 해지 사유·기업 리스트 ===== */
-var CHURN={f:null,t:null,rs:''};
+var CHURN={f:null,t:null,rs:'',q:'',line:'',ch:'',sk:'',sd:1};
 function churnRows(){
   var out=[];
   DATA.rows.forEach(function(r,i){
@@ -7794,9 +7794,29 @@ function renderChurn(){
   if(CHURN.f==null){ var jan=dIdx(mk(maxJ).slice(0,4)+'-01'); CHURN.f=(jan!=null&&jan>=0)? jan:0; }
   if(CHURN.f>CHURN.t) CHURN.f=CHURN.t;
   var all=churnRows();
-  var inR=all.filter(function(x){ return x.e>=CHURN.f && x.e<=CHURN.t; });
+  var inR0=all.filter(function(x){ return x.e>=CHURN.f && x.e<=CHURN.t; });
+  var lineOpts={}, chOpts={};
+  inR0.forEach(function(x){ if(x.line) lineOpts[x.line]=1; if(x.channel) chOpts[x.channel]=1; });
+  var qw=String(CHURN.q||'').toLowerCase().split(/\s+/).filter(Boolean);
+  function passQ(x){
+    if(!qw.length) return true;
+    var hay=(x.cust+' '+x.line+' '+x.channel+' '+x.ctype+' '+x.ym+' '+x.reason+' '+x.note).toLowerCase();
+    return qw.every(function(w){ return hay.indexOf(w)>=0; });
+  }
+  // 사유별 집계는 검색·서비스·채널 필터까지 반영 (사유 선택은 제외 — 다른 사유도 보여야 하므로)
+  var inR=inR0.filter(function(x){
+    return passQ(x) && (!CHURN.line || x.line===CHURN.line) && (!CHURN.ch || x.channel===CHURN.ch);
+  });
   var list=inR.filter(function(x){ return !CHURN.rs || x.reason===CHURN.rs; });
-  list.sort(function(a,b){ return b.e-a.e || b.amt-a.amt; });
+  var SK={cust:'cust',line:'line',channel:'channel',ctype:'ctype',ym:'e',reason:'reason',amt:'amt',note:'note'};
+  if(CHURN.sk && SK[CHURN.sk]){
+    var kk=SK[CHURN.sk];
+    list.sort(function(a,b){
+      var va=a[kk], vb=b[kk];
+      if(typeof va==='number'&&typeof vb==='number') return (va-vb)*CHURN.sd;
+      return String(va).localeCompare(String(vb),'ko')*CHURN.sd;
+    });
+  } else list.sort(function(a,b){ return b.e-a.e || b.amt-a.amt; });
   var by={}; inR.forEach(function(x){ var o=(by[x.reason]=by[x.reason]||{n:0,amt:0}); o.n++; o.amt+=x.amt; });
   var keys=Object.keys(by).sort(function(a,b){ return by[b].n-by[a].n; });
   var totN=inR.length, totA=0, custN={};
@@ -7811,9 +7831,7 @@ function renderChurn(){
     '<select id="chT" style="'+inSt+'">'+mopt(CHURN.t)+'</select>'+
     '<button class="pill" id="chY" style="height:34px">올해</button>'+
     '<button class="pill ghost" id="chY1" style="height:34px">작년</button>'+
-    '<button class="pill ghost" id="chAll" style="height:34px">전체 기간</button>'+
-    '<button class="pill" id="chXlsTop" style="height:34px;background:var(--brand);border-color:var(--brand);color:#fff;font-weight:700">⬇ 엑셀 다운로드</button>'+
-    '<span class="pr-note" id="chXmsg"></span></div></div>';
+    '<button class="pill ghost" id="chAll" style="height:34px">전체 기간</button></div></div>';
   h+='<div class="pr-card" style="margin-bottom:14px"><h3>'+mk(CHURN.f)+' ~ '+mk(CHURN.t)+' 요약</h3>'+
     '<div class="pr-out" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">'+
     kpi('해지·종료', totN+'건','')+
@@ -7831,9 +7849,25 @@ function renderChurn(){
     }).join('') || '<tr><td colspan="5" class="cap">해당 기간 해지가 없습니다</td></tr>')+
     '</tbody></table></div>'+
     (CHURN.rs?'<p class="pr-note" style="margin-top:6px"><button class="pill" id="chRsClr" style="height:24px;padding:0 9px;font-size:11px">✕ 사유 필터 해제 ('+esc(CHURN.rs)+')</button></p>':'')+'</div>';
-  h+='<div class="pr-card"><h3>해지 기업 리스트 <small>'+list.length+'건 · 해지월 최신순</small>'+
-    ' <button class="pill" id="chXls" style="height:28px;padding:0 12px">⬇ 엑셀 다운로드</button></h3>'+
-    '<div style="overflow-x:auto"><table class="pr" id="chList"><thead><tr><th>고객사</th><th>서비스</th><th>채널</th><th>구분</th><th>해지월</th><th>사유</th><th class="n">직전 월액(원)</th><th>비고</th></tr></thead><tbody>'+
+  var nFil=(CHURN.q?1:0)+(CHURN.line?1:0)+(CHURN.ch?1:0)+(CHURN.rs?1:0);
+  function selOpts(obj,cur){ return '<option value="">전체</option>'+Object.keys(obj).sort().map(function(v){
+    return '<option value="'+esc(v)+'"'+(cur===v?' selected':'')+'>'+esc(v)+'</option>'; }).join(''); }
+  var sArrow=function(k2){ return CHURN.sk===k2? (CHURN.sd>0?' ▲':' ▼') : ''; };
+  var cols=[['cust','고객사',0],['line','서비스',0],['channel','채널',0],['ctype','구분',0],
+            ['ym','해지월',0],['reason','사유',0],['amt','직전 월액(원)',1],['note','비고',0]];
+  h+='<div class="pr-card"><h3>해지 기업 리스트 <small>'+list.length+'건'+(CHURN.sk?'':' · 해지월 최신순')+'</small></h3>'+
+    '<div class="dbar" style="margin:6px 0 10px">'+
+      '<input type="search" id="chQ" placeholder="검색 — 고객사·사유·비고 등 (여러 단어)" value="'+esc(CHURN.q||'')+'">'+
+      '서비스 <select id="chLine" style="'+inSt+';height:32px">'+selOpts(lineOpts,CHURN.line)+'</select>'+
+      '채널 <select id="chCh" style="'+inSt+';height:32px">'+selOpts(chOpts,CHURN.ch)+'</select>'+
+      '<button class="pill ghost" id="chXls" title="현재 기간·필터가 적용된 목록을 엑셀 파일로 저장">⬇ 엑셀</button>'+
+      (nFil? '<button class="pill ghost" id="chFclr" style="border-color:var(--critical);color:var(--critical)">✕ 필터 해제 ('+nFil+')</button>':'')+
+      '<span class="mini" id="chXmsg"></span>'+
+      '<span class="spacer"></span><span class="mini">'+list.length+'건 / 기간 내 '+inR0.length+'건</span>'+
+    '</div>'+
+    '<div style="overflow-x:auto"><table class="pr" id="chList"><thead><tr>'+
+    cols.map(function(c){ return '<th'+(c[2]?' class="n"':'')+' data-sk="'+c[0]+'" style="cursor:pointer" title="클릭: 정렬">'+c[1]+sArrow(c[0])+'</th>'; }).join('')+
+    '</tr></thead><tbody>'+
     (list.map(function(x){
       return '<tr><td>'+esc(x.cust)+'</td><td>'+esc(x.line)+'</td><td>'+esc(x.channel)+'</td><td>'+esc(x.ctype)+'</td>'+
         '<td>'+x.ym+'</td><td>'+esc(x.reason)+'</td><td class="n">'+Math.round(x.amt).toLocaleString('ko-KR')+'</td><td>'+esc(x.note)+'</td></tr>';
@@ -7854,7 +7888,8 @@ function renderChurn(){
   var rc=$('#chRsClr'); if(rc) rc.onclick=function(){ CHURN.rs=''; renderChurn(); };
   function chExport(){
     var msg=$('#chXmsg'); if(msg) msg.textContent='엑셀 생성 중…';
-    xlsxBook('해지분석_'+mk(CHURN.f)+'~'+mk(CHURN.t), [
+    var fn='해지분석_'+mk(CHURN.f)+'~'+mk(CHURN.t)+(CHURN.line?'_'+CHURN.line:'')+(CHURN.ch?'_'+CHURN.ch:'')+(CHURN.rs?'_'+CHURN.rs:'');
+    xlsxBook(fn, [
       {name:'사유별 집계', head:['해지 사유','건수','비중(%)','월액 합(원)','연환산(원)'],
        rows:keys.map(function(k2){ var o3=by[k2]; return [k2,o3.n,(totN?Math.round(o3.n/totN*100):0),Math.round(o3.amt),Math.round(o3.amt*12)]; })},
       {name:'해지 기업 리스트', head:['고객사','서비스','채널','구분','해지월','사유','직전 월액(원)','비고'],
@@ -7863,7 +7898,21 @@ function renderChurn(){
       .catch(function(e){ if(msg) msg.textContent='실패: '+String(e.message||e); toast('엑셀 생성 실패', String(e.message||e)); });
   }
   var bx=$('#chXls'); if(bx) bx.onclick=chExport;
-  var bx2=$('#chXlsTop'); if(bx2) bx2.onclick=chExport;
+  var q=$('#chQ');
+  if(q){
+    q.oninput=function(){ CHURN.q=q.value; CHURN._focus=true; renderChurn(); };
+    if(CHURN._focus){ CHURN._focus=false; q.focus(); try{ q.setSelectionRange(q.value.length,q.value.length); }catch(e){} }
+  }
+  var sl=$('#chLine'); if(sl) sl.onchange=function(){ CHURN.line=sl.value; renderChurn(); };
+  var sc=$('#chCh'); if(sc) sc.onchange=function(){ CHURN.ch=sc.value; renderChurn(); };
+  var fc=$('#chFclr'); if(fc) fc.onclick=function(){ CHURN.q=''; CHURN.line=''; CHURN.ch=''; CHURN.rs=''; renderChurn(); };
+  document.querySelectorAll('#chList thead th[data-sk]').forEach(function(th){
+    th.onclick=function(){
+      var k2=th.dataset.sk;
+      if(CHURN.sk===k2) CHURN.sd*=-1; else { CHURN.sk=k2; CHURN.sd=1; }
+      renderChurn();
+    };
+  });
 }
 
 /* ===== 월간 리포트 — 커스텀 리포트 빌더 (모든 값 클릭 수정 · 행 추가 · 자유 슬라이드 → PPT) ===== */
