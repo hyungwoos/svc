@@ -1894,7 +1894,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-08-31 ㉞';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-08-31 ㉟';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -6547,7 +6547,7 @@ function renderInbStat(){
     if(String(x.y)!==String(new Date().getFullYear()) || x.result!=='진행중') return;
     var last=inbLast(x); if(!last) return;
     var dd=Math.floor((today-new Date(last).getTime())/864e5);
-    if(dd>=14) stale.push([dd,x]);
+    if(dd>=90) stale.push([dd,x]);   // 3개월
   });
   stale.sort(function(a,b){return b[0]-a[0];});
   // 월별 추이 (선택 연도 vs 전년)
@@ -6593,10 +6593,10 @@ function renderInbStat(){
     '<div class="inb-kpi"><div class="l">진행중</div><div class="v">'+prog+'건</div><div class="s">방문미팅·데모·이관 포함</div></div>'+
     '<div class="inb-kpi"><div class="l">수주</div><div class="v">'+wonL.length+'건</div><div class="s">전환율 '+conv+'%</div></div>'+
     '<div class="inb-kpi"><div class="l">수주액</div><div class="v">'+(amt>=1e8?(amt/1e8).toFixed(1)+'억':Math.round(amt/1e4).toLocaleString()+'만')+'</div><div class="s">₩'+Math.round(amt).toLocaleString()+'</div></div>'+
-    '<div class="inb-kpi warn"><div class="l">14일+ 무응답</div><div class="v">'+stale.length+'건</div><div class="s">진행중인데 대응 기록이 오래됨</div></div></div>'+
+    '<div class="inb-kpi warn"><div class="l">3개월+ 무응답</div><div class="v">'+stale.length+'건</div><div class="s">진행중인데 대응 기록이 오래됨</div></div></div>'+
     '<div class="inb-2">'+
     '<div class="inb-card"><h3>월별 유입 추이 <small><span style="color:var(--brand)">■</span> '+curY+'년 · <span style="color:var(--muted)">■</span> '+prvY+'년</small></h3><div class="inb-bars">'+bars+'</div></div>'+
-    '<div class="inb-card"><h3>⚠ 오래 머문 진행중 <small>마지막 대응 후 14일 경과 · 월요일 아침 슬랙 리마인드</small></h3>'+
+    '<div class="inb-card"><h3>⚠ 오래 머문 진행중 <small>마지막 대응 후 3개월 경과 · 월요일 아침 슬랙 리마인드</small></h3>'+
     '<div class="inb-stale" style="max-height:150px;overflow:auto">'+
     (stale.slice(0,30).map(function(a){
       return '<a data-inbid="'+a[1].id+'"><span><b>'+esc(a[1].org)+'</b> · '+esc(a[1].product||'')+' <span class="mini">'+esc(a[1].owner||'')+'</span></span><span class="dd">'+a[0]+'일</span></a>';
