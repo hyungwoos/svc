@@ -98,6 +98,15 @@ input:focus,select:focus,textarea:focus{
 @keyframes toastIn{from{opacity:0;transform:translateX(26px)}to{opacity:1;transform:none}}
 @keyframes toastOut{to{opacity:0;transform:translateX(26px)}}
 .w-off{display:none!important}
+/* 알림·검색에서 카드로 이동할 때 sticky 상단바에 제목이 가리지 않도록 */
+.card,#kpis,#goalBar,#dashHero{scroll-margin-top:calc(var(--tbh,64px) + 16px)}
+/* 이동해서 «도착한» 카드를 잠깐 강조 — 어디로 갔는지 눈에 보이게 */
+@keyframes cardFlash{
+  0%{box-shadow:0 0 0 0 rgba(42,120,214,.55)}
+  15%{box-shadow:0 0 0 5px rgba(42,120,214,.35)}
+  100%{box-shadow:0 0 0 0 rgba(42,120,214,0)}
+}
+.card-flash{animation:cardFlash 1.5s ease-out 1}
 .live{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;color:var(--muted)}
 .dot{width:7px;height:7px;border-radius:50%;background:var(--good);box-shadow:0 0 0 3px rgba(12,163,12,.18)}
 
@@ -1940,7 +1949,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-01 ㊸';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-01 ㊹';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -2746,7 +2755,7 @@ function renderHero(list){
   var bizDone=(RAWX.biz||[]).some(function(r){ return r.ym===curYm; });
   var items=[];
   if(pend) items.push({t:'warn', ic:'📦', msg:'처리 대기 장비 요청이 <b>'+pend+'건</b> 있습니다.', go:function(){ switchView('orders'); }});
-  if(expCnt) items.push({t:'info', ic:'⏳', msg:'3개월 내 만료 계약이 <b>'+expCnt+'건</b> ('+won(expAmt)+'천원) 있습니다 — 재약정 타깃.', go:function(){ var s=document.querySelector('[data-w="exp"]'); if(s) s.scrollIntoView({behavior:'smooth',block:'start'}); }});
+  if(expCnt) items.push({t:'info', ic:'⏳', msg:'3개월 내 만료 계약이 <b>'+expCnt+'건</b> ('+won(expAmt)+'천원) 있습니다 — 재약정 타깃.', go:function(){ goWidget('exp','계약 만료 예정'); }});
   if(!bizDone) items.push({t:'warn', ic:'⚖️', msg:'이번 달('+curYm+') 비즈포탈 차액이 아직 입력되지 않았습니다.', go:function(){ switchView('biz'); }});
   var st=$('#noticeStack'); st.innerHTML='';
   if(!items.length){
@@ -2867,6 +2876,34 @@ function saveWidgetOrder(){
   try{ localStorage.setItem(widgetKey(), JSON.stringify(o)); }catch(e){}
   toast('위젯 배치를 저장했습니다','','info');
 }
+/* sticky 상단바의 실제 높이를 --tbh 에 기록 — 카드 스크롤 여백 계산에 씁니다.
+   상단바는 좁은 화면에서 두 줄로 접히므로 값이 고정이 아닙니다. */
+function measureTopbar(){
+  try{
+    var tb=document.querySelector('.topbar');
+    if(tb && tb.offsetHeight) document.documentElement.style.setProperty('--tbh', tb.offsetHeight+'px');
+  }catch(e){}
+}
+/* 위젯 하나로 이동 — 꺼져 있으면 켜고, 상단바에 가리지 않게 스크롤한 뒤 잠깐 강조 */
+function goWidget(k, label){
+  if(CUR_VIEW!=='dash'){ switchView('dash'); }
+  var el0=widgetEl(k);
+  if(!el0){ toast('이동할 위젯을 찾지 못했습니다', label||k, 'info'); return; }
+  if(el0.classList.contains('w-off')){
+    var o=widgetPrefs(); o[k]=true;
+    try{ localStorage.setItem(widgetKey(), JSON.stringify(o)); }catch(e){}
+    applyWidgets();
+    toast('«'+(label||k)+'» 위젯을 다시 켰습니다','숨겨져 있어서 켜고 이동합니다','info');
+  }
+  measureTopbar();
+  requestAnimationFrame(function(){
+    el0.scrollIntoView({behavior:'smooth',block:'start'});
+    el0.classList.remove('card-flash');
+    void el0.offsetWidth;                 // 애니메이션 재시작
+    el0.classList.add('card-flash');
+    setTimeout(function(){ el0.classList.remove('card-flash'); }, 1700);
+  });
+}
 function applyWidgetOrder(){
   var o=widgetPrefs(); if(!o.__order) return;
   var grid=document.querySelector('#viewDash .grid'); if(!grid) return;
@@ -2911,6 +2948,7 @@ function applyWidgets(){
   });
   var lg=document.querySelector('[data-w="lg"]');   // LG 판매 위젯은 대시보드에서 제외
   if(lg) lg.style.display='none';
+  measureTopbar();
 }
 function toggleWidgetPanel(){
   var p=document.getElementById('widgetPanel');
@@ -3232,7 +3270,10 @@ function kill(id){ /* Viz는 인스턴스를 남기지 않음 */ }
 var RESIZE_HOOKS=[];
 function onResize(fn){ RESIZE_HOOKS.push(fn); }
 (function(){ var t; window.addEventListener('resize',function(){ clearTimeout(t);
-  t=setTimeout(function(){ RESIZE_HOOKS.forEach(function(f){ try{f();}catch(e){} }); },160); }); })();
+  t=setTimeout(function(){
+    try{ measureTopbar(); }catch(e){}          // 상단바가 두 줄로 접히면 높이가 바뀝니다
+    RESIZE_HOOKS.forEach(function(f){ try{f();}catch(e){} });
+  },160); }); })();
 
 /* ---- MRR 추이 ---- */
 function renderTrend(list){
