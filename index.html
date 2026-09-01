@@ -1817,13 +1817,12 @@ function $$(s){ return Array.prototype.slice.call(document.querySelectorAll(s));
 function cssv(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
 function el(t,c,x){ var e=document.createElement(t); if(c)e.className=c; if(x!=null)e.textContent=x; return e; }
 
-function won(v){
-  var a=Math.abs(v);
-  if(a>=1e8) return (v/1e8).toFixed(a>=1e9?0:1).replace(/\.0$/,'')+'억';
-  if(a>=1e4) return Math.round(v/1e4).toLocaleString('ko-KR')+'만';
-  return Math.round(v).toLocaleString('ko-KR');
-}
-function wonFull(v){ return Math.round(v).toLocaleString('ko-KR')+'원'; }
+/* 포탈 전체 금액 표시 단위 = 천원 (원 단위 이하는 표시하지 않음)
+   · won(v)     → 천원 숫자만 (예: 150,000)  — 호출부에서 '천원' 을 붙입니다
+   · wonFull(v) → 천원 + 단위 (예: 150,000천원)
+   · 가격표·견적서의 단가는 원 단위 유지 (prWon 사용) */
+function won(v){ return Math.round(Number(v||0)/1000).toLocaleString('ko-KR'); }
+function wonFull(v){ return Math.round(Number(v||0)/1000).toLocaleString('ko-KR')+'천원'; }
 function pct(v){ return (v>0?'+':'')+v.toFixed(1)+'%'; }
 function mk(i){ return DATA.monthKeys[i]||mkFuture(i); }
 // 데이터 범위를 넘어선 미래 월 라벨 (전망에서 사용)
@@ -1894,7 +1893,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-08-31 ㊴';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-01 ㊶';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -2647,7 +2646,7 @@ function buildControls(){
 
   $('#periodLabel').textContent = DATA.monthKeys[0]+' ~ '+DATA.monthKeys[M-1]+' · 계약 '+DATA.rows.length.toLocaleString('ko-KR')+'건';
   $('#loadedAt').textContent = '읽은 시각 '+DATA.generatedAt;
-  $('#foot').innerHTML = '원본: Supabase DB · 모든 수정은 변경 이력에 기록됩니다 · 수정은 로그인 후 가능 · 포탈 버전 '+APP_VER+
+  $('#foot').innerHTML = '원본: Supabase DB · <b>금액 단위: 천원</b> (입력·수정과 가격표 단가는 원 단위) · 모든 수정은 변경 이력에 기록됩니다 · 포탈 버전 '+APP_VER+
     (DATA.warnings&&DATA.warnings.length? '<br>⚠️ '+DATA.warnings.join(' / ') : '');
 }
 function uniq(f){
@@ -2700,7 +2699,7 @@ function renderHero(list){
   var bizDone=(RAWX.biz||[]).some(function(r){ return r.ym===curYm; });
   var items=[];
   if(pend) items.push({t:'warn', ic:'📦', msg:'처리 대기 장비 요청이 <b>'+pend+'건</b> 있습니다.', go:function(){ switchView('orders'); }});
-  if(expCnt) items.push({t:'info', ic:'⏳', msg:'3개월 내 만료 계약이 <b>'+expCnt+'건</b> ('+won(expAmt)+'원) 있습니다 — 재약정 타깃.', go:function(){ var s=document.querySelector('[data-w="exp"]'); if(s) s.scrollIntoView({behavior:'smooth',block:'start'}); }});
+  if(expCnt) items.push({t:'info', ic:'⏳', msg:'3개월 내 만료 계약이 <b>'+expCnt+'건</b> ('+won(expAmt)+'천원) 있습니다 — 재약정 타깃.', go:function(){ var s=document.querySelector('[data-w="exp"]'); if(s) s.scrollIntoView({behavior:'smooth',block:'start'}); }});
   if(!bizDone) items.push({t:'warn', ic:'⚖️', msg:'이번 달('+curYm+') 비즈포탈 차액이 아직 입력되지 않았습니다.', go:function(){ switchView('biz'); }});
   var st=$('#noticeStack'); st.innerHTML='';
   if(!items.length){
@@ -3012,14 +3011,14 @@ function renderLg(){
   var lg=DATA.lg, sec=$('#secLg');
   if(!lg || !lg.ok || !lg.rows.length){ if(sec) sec.style.display='none'; return; }
   sec.style.display='';
-  $('#capLg').textContent = lg.count+'건 · 월액 합계 '+won(lg.feeSum)+'원 · 매출은 각 서비스에 포함됨';
+  $('#capLg').textContent = lg.count+'건 · 월액 합계 '+won(lg.feeSum)+'천원 · 매출은 각 서비스에 포함됨';
   var t=$('#tLg'); t.innerHTML='';
   var thead=document.createElement('thead'), tb=document.createElement('tbody');
   thead.innerHTML='<tr><th>고객사</th><th>제품</th><th style="text-align:right">노드</th><th>기간</th><th style="text-align:right">월액</th></tr>';
   lg.rows.forEach(function(x){
     var tr=document.createElement('tr');
     tr.innerHTML='<td>'+esc(x.cust)+'</td><td>'+esc(x.prod)+'</td><td style="text-align:right">'+(x.nodes||'-')+
-      '</td><td>'+(x.start||'-')+'~'+(x.end||'무약정')+'</td><td style="text-align:right">'+won(x.fee)+'원</td>';
+      '</td><td>'+(x.start||'-')+'~'+(x.end||'무약정')+'</td><td style="text-align:right">'+won(x.fee)+'천원</td>';
     tb.appendChild(tr);
   });
   t.appendChild(thead); t.appendChild(tb);
@@ -3036,7 +3035,7 @@ function renderVs(){
   vs.items.forEach(function(x){
     var row=el('div'); row.style.cssText='display:flex;justify-content:space-between;gap:12px;padding:3px 2px;font-size:13px';
     var k=el('span','',x.k); k.style.color='var(--mut)';
-    var v=el('b','',won(x.v)+'원');
+    var v=el('b','',won(x.v)+'천원');
     if(/차액/.test(x.k)) v.style.color = x.v>=0? 'var(--up,#199e70)':'var(--dn,#d95926)';
     row.appendChild(k); row.appendChild(v); sm.appendChild(row);
   });
@@ -3046,8 +3045,8 @@ function renderVs(){
     thead.innerHTML='<tr><th>고객사</th><th style="text-align:right">비즈포탈</th><th style="text-align:right">매출시트</th><th style="text-align:right">차이</th><th>사유</th></tr>';
     vs.details.forEach(function(x){
       var tr=document.createElement('tr');
-      tr.innerHTML='<td>'+esc(x.cust)+'</td><td style="text-align:right">'+won(x.biz)+'원</td><td style="text-align:right">'+won(x.sheet)+
-        '원</td><td style="text-align:right">'+won(x.diff)+'원</td><td style="font-size:12px;color:var(--mut)">'+esc(x.note)+'</td>';
+      tr.innerHTML='<td>'+esc(x.cust)+'</td><td style="text-align:right">'+won(x.biz)+'천원</td><td style="text-align:right">'+won(x.sheet)+
+        '천원</td><td style="text-align:right">'+won(x.diff)+'천원</td><td style="font-size:12px;color:var(--mut)">'+esc(x.note)+'</td>';
       tb.appendChild(tr);
     });
     t.appendChild(thead); t.appendChild(tb);
@@ -3071,10 +3070,10 @@ function renderGoal(list){
   box.style.display='';
   box.innerHTML=
     '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:9px">'+
-      '<div style="font-size:12.5px;font-weight:650">🎯 '+yr+'년 목표 ARR '+won(tg.amount)+'원'+
-        '<span style="font-weight:500;color:var(--muted)"> · 필요 12월 MRR '+won(needMrr)+'원</span></div>'+
-      '<div style="font-size:12px;color:var(--ink-2)">현재 ARR <b style="color:var(--ink)">'+won(curArr)+'원 ('+p1.toFixed(1)+'%)</b>'+
-      (decArr? ' · 12월 계약분 기준 '+won(decArr)+'원 ('+p2.toFixed(1)+'%)':'')+'</div></div>'+
+      '<div style="font-size:12.5px;font-weight:650">🎯 '+yr+'년 목표 ARR '+won(tg.amount)+'천원'+
+        '<span style="font-weight:500;color:var(--muted)"> · 필요 12월 MRR '+won(needMrr)+'천원</span></div>'+
+      '<div style="font-size:12px;color:var(--ink-2)">현재 ARR <b style="color:var(--ink)">'+won(curArr)+'천원 ('+p1.toFixed(1)+'%)</b>'+
+      (decArr? ' · 12월 계약분 기준 '+won(decArr)+'천원 ('+p2.toFixed(1)+'%)':'')+'</div></div>'+
     '<div style="position:relative;height:14px;border-radius:7px;background:var(--surface-2);overflow:hidden">'+
       '<div style="position:absolute;left:0;top:0;bottom:0;width:'+Math.max(p1,p2)+'%;background:var(--glow)"></div>'+
       '<div style="position:absolute;left:0;top:0;bottom:0;width:'+p1+'%;background:'+(p1>=100?'var(--good)':'var(--s1)')+';border-radius:0 7px 7px 0"></div>'+
@@ -3113,9 +3112,9 @@ function renderKpis(list){
   var series24=ser.slice(Math.max(0,b-23), b+1);
 
   var tiles=[
-    { k:'당월 MRR ('+mk(b)+')', v:won(mrr), u:'원', d: prevM? deltaHtml(mrr,prevM,'전월'):'', spark:series24 },
-    { k:'연환산 ARR', v:won(mrr*12), u:'원', d:'MRR × 12 기준' },
-    { k:'전년 동월 대비', v:(prevY? pct((mrr-prevY)/prevY*100):'—'), u:'', d: prevY? mk(b-12)+' '+won(prevY)+'원':'비교 데이터 없음',
+    { k:'당월 MRR ('+mk(b)+')', v:won(mrr), u:'천원', d: prevM? deltaHtml(mrr,prevM,'전월'):'', spark:series24 },
+    { k:'연환산 ARR', v:won(mrr*12), u:'천원', d:'MRR × 12 기준' },
+    { k:'전년 동월 대비', v:(prevY? pct((mrr-prevY)/prevY*100):'—'), u:'', d: prevY? mk(b-12)+' '+won(prevY)+'천원':'비교 데이터 없음',
       cls:(prevY&&mrr>=prevY)?'up':'down' },
     (function(){
       var lv = DATA.live;
@@ -3135,16 +3134,16 @@ function renderKpis(list){
       }
       return { k:'활성 고객사', v:cust.toLocaleString('ko-KR'), u:'곳', d: custPrevY? deltaHtml(cust,custPrevY,'전년'):'' };
     })(),
-    { k:(STATE.unit==='month'?'당월':'기간 내')+' 신규 / 해지', v:newCnt+' / '+churnCnt, u:'건', d: churnAmt? '이탈 MRR '+won(churnAmt)+'원':'이탈 MRR 0원',
+    { k:(STATE.unit==='month'?'당월':'기간 내')+' 신규 / 해지', v:newCnt+' / '+churnCnt, u:'건', d: churnAmt? '이탈 MRR '+won(churnAmt)+'천원':'이탈 MRR 0천원',
       cls: churnCnt>newCnt? 'down':'up' },
-    { k:'3개월 내 만료', v:won(expAmt), u:'원', d: expCnt+'건 · 재약정 타깃', cls: expCnt? 'down':'' }
+    { k:'3개월 내 만료', v:won(expAmt), u:'천원', d: expCnt+'건 · 재약정 타깃', cls: expCnt? 'down':'' }
   ];
   if(STATE.unit!=='month'){
-    tiles[0]={ k:baseLabel()+' 매출 합계', v:won(perSum), u:'원',
+    tiles[0]={ k:baseLabel()+' 매출 합계', v:won(perSum), u:'천원',
       d: perPrev? deltaHtml(perSum,perPrev, STATE.unit==='quarter'?'전분기':'전년'):'', spark:series24 };
-    tiles[1]={ k:'기말 MRR ('+mk(b)+')', v:won(mrr), u:'원', d:'연환산 ARR '+won(mrr*12)+'원' };
+    tiles[1]={ k:'기말 MRR ('+mk(b)+')', v:won(mrr), u:'천원', d:'연환산 ARR '+won(mrr*12)+'천원' };
     tiles[2]={ k:'전년 동기 대비', v:(perPy? pct((perSum-perPy)/perPy*100):'—'), u:'',
-      d: perPy? '전년 동기 '+won(perPy)+'원':'비교 데이터 없음', cls:(perPy&&perSum>=perPy)?'up':'down' };
+      d: perPy? '전년 동기 '+won(perPy)+'천원':'비교 데이터 없음', cls:(perPy&&perSum>=perPy)?'up':'down' };
   }
   var box=$('#kpis'); box.innerHTML='';
   tiles.forEach(function(t){
@@ -3249,7 +3248,7 @@ function renderYear(list){
 function renderBars(list){
   list=list||idxs();
   var b=STATE.base, tot=monthlyTotal(list,b);
-  $('#capLine').textContent = mk(b)+' 기준 · 합계 '+won(tot)+'원';
+  $('#capLine').textContent = mk(b)+' 기준 · 합계 '+won(tot)+'천원 (단위: 천원)';
   $('#capInd').textContent = mk(b)+' 기준 비중';
 
   hbars('#barLine', DATA.lines.filter(function(l){return STATE.lines[l.label];}).map(function(l){
@@ -3334,11 +3333,11 @@ function renderExpiring(list){
   }).sort(function(a,b2){ return DATA.rows[a].endIdx-DATA.rows[b2].endIdx || (MAT[b2][Math.min(DATA.rows[b2].endIdx,M-1)]-MAT[a][Math.min(DATA.rows[a].endIdx,M-1)]); });
 
   var amt=rows.reduce(function(s,k){ var r=DATA.rows[k]; return s+(MAT[k][Math.min(r.endIdx,M-1)]||r.mrr||0); },0);
-  $('#capExp').textContent = mk(b)+' 이후 '+mm+'개월 내 만료 '+rows.length+'건 · 해당 MRR 합계 '+won(amt)+'원';
+  $('#capExp').textContent = mk(b)+' 이후 '+mm+'개월 내 만료 '+rows.length+'건 · 해당 MRR 합계 '+won(amt)+'천원';
 
   var t=$('#tExp');
   t.innerHTML='<thead><tr><th>만료월</th><th>남은 개월</th><th>서비스</th><th>산업군</th><th>고객사</th><th>파트너</th>'+
-    '<th>계약구분</th><th>상태</th><th class="n">월 MRR</th><th class="n">총 계약액</th></tr></thead><tbody>'+
+    '<th>계약구분</th><th>상태</th><th class="n">월 MRR(천원)</th><th class="n">총 계약액(천원)</th></tr></thead><tbody>'+
     (rows.length? rows.map(function(k){
       var r=DATA.rows[k]; var left=r.endIdx-b;
       var mrr=MAT[k][Math.min(r.endIdx,M-1)]||r.mrr||0;
@@ -3360,7 +3359,7 @@ function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){retur
 var ALL_COLS=[
   {k:'line',t:'라인'},{k:'ind',t:'산업군'},{k:'cust',t:'고객사'},{k:'partner',t:'파트너'},
   {k:'ctype',t:'계약구분'},{k:'_status',t:'상태'},{k:'_start',t:'시작',n:1},{k:'_end',t:'종료',n:1},
-  {k:'term',t:'개월',n:1},{k:'mrr',t:'월 MRR',n:1},{k:'total',t:'총 계약액',n:1},{k:'sum',t:'누적 인식',n:1}
+  {k:'term',t:'개월',n:1},{k:'mrr',t:'월 MRR(천원)',n:1},{k:'total',t:'총 계약액(천원)',n:1},{k:'sum',t:'누적 인식(천원)',n:1}
 ];
 function renderAllTable(list){
   list=list||idxs();
@@ -3717,7 +3716,7 @@ function requestNarrate(q, plan, res){
       cols: res.table.cols,
       rows: res.table.rows.slice(0,12).map(function(row){ return row.map(mn); })
     } : null,
-    unit:'원(KRW)', note:'미래 월은 계약상 예정 금액'
+    unit:'천원(KRW)', note:'미래 월은 계약상 예정 금액'
   };
   aiFetch({mode:'narrate', payload:payload})
     .then(function(x){
@@ -4291,19 +4290,19 @@ function computeFromP(p){
   if(RX.lgu.test(q0) && DATA.lg && DATA.lg.ok){
     var lg=DATA.lg;
     return { title:'LG U+ 경유 판매 (LG 탭)', hero:lg.count.toLocaleString('ko-KR'), unit:'건',
-      sub:'월액 합계 '+won(lg.feeSum)+'원 · 매출은 각 서비스에 포함되어 있습니다',
+      sub:'월액 합계 '+won(lg.feeSum)+'천원 · 매출은 각 서비스에 포함되어 있습니다',
       table:{cols:['고객사','제품','기간','월액'],
-        rows:lg.rows.map(function(x){return [x.cust,x.prod,(x.start||'-')+'~'+(x.end||'무약정'),won(x.fee)+'원'];})},
+        rows:lg.rows.map(function(x){return [x.cust,x.prod,(x.start||'-')+'~'+(x.end||'무약정'),won(x.fee)+'천원'];})},
       note:'LG 탭 기준' };
   }
   if(RX.bizvs.test(q0) && DATA.vs && DATA.vs.ok){
     var vs=DATA.vs;
     var diff=(vs.items.filter(function(x){return /차액/.test(x.k);})[0]||{}).v;
     return { title:'비즈포탈 차액 ('+(vs.month||'최근')+(vs.asOf? ' · 작성 '+vs.asOf:'')+')',
-      hero: diff!=null? won(diff):'—', unit: diff!=null? '원 차이':'',
-      sub: vs.items.map(function(x){return x.k+' '+won(x.v)+'원';}).join(' · '),
+      hero: diff!=null? won(diff):'—', unit: diff!=null? '천원 차이':'',
+      sub: vs.items.map(function(x){return x.k+' '+won(x.v)+'천원';}).join(' · '),
       table:{cols:['고객사','비즈포탈','매출시트','차이','사유'],
-        rows:vs.details.map(function(x){return [x.cust,won(x.biz)+'원',won(x.sheet)+'원',won(x.diff)+'원',x.note];})},
+        rows:vs.details.map(function(x){return [x.cust,won(x.biz)+'천원',won(x.sheet)+'천원',won(x.diff)+'천원',x.note];})},
       note:'VS. 비즈포탈 탭 기준' };
   }
 
@@ -4354,11 +4353,11 @@ function computeFromP(p){
     return {
       title: scope+' · '+(sorted.map(function(x){return x.name;}).join(' vs '))+' 비교',
       hero: sorted[0].name, unit:'',
-      sub: sorted[0].name+' '+won(sorted[0].v)+'원'+(sorted.length>1? ' · 2위 '+sorted[1].name+'보다 '+
+      sub: sorted[0].name+' '+won(sorted[0].v)+'천원'+(sorted.length>1? ' · 2위 '+sorted[1].name+'보다 '+
            (gap>=0? gap.toFixed(1)+'% 많음':'') : ''),
       chart:{type:'line', labels:labels, series:series, money:true},
       table:{cols:['구분','합계','1위 대비'], rows:sorted.map(function(x){
-        return [x.name, won(x.v)+'원', sorted[0].v? (x.v/sorted[0].v*100).toFixed(1)+'%':'—']; })},
+        return [x.name, won(x.v)+'천원', sorted[0].v? (x.v/sorted[0].v*100).toFixed(1)+'%':'—']; })},
       note:'같은 기간·같은 기준으로 나란히 계산했습니다.'
     };
   }
@@ -4370,15 +4369,15 @@ function computeFromP(p){
     var sumT=cs.reduce(function(s,k){return s+(DATA.rows[k].total||0);},0);
     return {
       title: scope+' · 계약 규모 상위 '+cs.length+'건',
-      hero: won(sumT), unit:'원',
+      hero: won(sumT), unit:'천원',
       sub: '상위 '+cs.length+'건 총 계약액 합계',
       chart:{type:'bar', labels:cs.map(function(k){return DATA.rows[k].cust;}),
              series:[{label:'총 계약액', data:cs.map(function(k){return DATA.rows[k].total||0;}), color:cssv('--s1')}],
              money:true, horizontal:true},
-      table:{cols:['고객사','라인','계약기간','개월','월 MRR','총 계약액'], rows:cs.map(function(k){
+      table:{cols:['고객사','라인','계약기간','개월','월 MRR(천원)','총 계약액(천원)'], rows:cs.map(function(k){
         var r=DATA.rows[k];
         return [r.cust, r.line, (r.startIdx!=null?mk(r.startIdx):'-')+'~'+(r.endIdx!=null?mk(r.endIdx):'-'),
-                (r.term||'-')+'', won(r.mrr)+'원', won(r.total)+'원'];})},
+                (r.term||'-')+'', won(r.mrr)+'천원', won(r.total)+'천원'];})},
       note:'총 계약액(계약 전체 금액) 기준입니다.'
     };
   }
@@ -4395,9 +4394,9 @@ function computeFromP(p){
     return {
       title: scope+' · 향후 '+h+'개월 내 만료 계약',
       hero: rows.length.toLocaleString('ko-KR'), unit:'건',
-      sub: '해당 계약 MRR 합계 '+won(amt)+'원',
+      sub: '해당 계약 MRR 합계 '+won(amt)+'천원',
       chart:{type:'bar', labels:lb, series:[{label:'만료 MRR', data:lb.map(function(x){return byM[x];}), color:cssv('--warning')}], money:true},
-      table:{cols:['만료월','고객사','라인','파트너','월 MRR'],
+      table:{cols:['만료월','고객사','라인','파트너','월 MRR(천원)'],
         rows:rows.slice(0,120).map(function(k){var r=DATA.rows[k];
           return [mk(r.endIdx), r.cust, r.line, r.partner, won(MAT[k][Math.min(r.endIdx,M-1)]||r.mrr||0)];})},
       note:'기준월 '+mk(b)+' · 상태가 「해지」인 계약은 제외했습니다.'
@@ -4429,7 +4428,7 @@ function computeFromP(p){
     return {
       title: scope+' · '+want+' 계약',
       hero: sel.length.toLocaleString('ko-KR'), unit:'건',
-      sub: (want==='해지'?'이탈 MRR ':'해당 MRR ')+won(lostMrr)+'원 · 고객 '+
+      sub: (want==='해지'?'이탈 MRR ':'해당 MRR ')+won(lostMrr)+'천원 · 고객 '+
            Object.keys(sel.reduce(function(a,k){a[DATA.rows[k].cust]=1;return a;},{})).length+'곳',
       chart:{type:'bar', labels:mlab, series:[{label:want+' 건수', data:mlab.map(function(x){return byMonth[x];}),
              color: want==='해지'? cssv('--critical'):cssv('--s1')}], money:false},
@@ -4448,10 +4447,10 @@ function computeFromP(p){
     return {
       title: scope+' · 전년 대비 성장률',
       hero: prv? pct((cur-prv)/prv*100) : '—', unit:'',
-      sub: tgt+'년 '+won(cur)+'원  vs  '+(tgt-1)+'년 '+won(prv)+'원',
+      sub: tgt+'년 '+won(cur)+'천원  vs  '+(tgt-1)+'년 '+won(prv)+'천원',
       chart:{type:'bar', labels:ys, series:[{label:'연 매출', data:ys.map(function(y){return byY[y];}), color:cssv('--s1')}], money:true},
       table:{cols:['연도','매출','전년비'], rows:ys.map(function(y,i){
-        var pp=i>0?byY[ys[i-1]]:0; return [y+'년', won(byY[y])+'원', pp? pct((byY[y]-pp)/pp*100):'—']; })},
+        var pp=i>0?byY[ys[i-1]]:0; return [y+'년', won(byY[y])+'천원', pp? pct((byY[y]-pp)/pp*100):'—']; })},
       note:'월별 인식 금액의 연 합계 기준입니다. 미래 연도는 계약에 따른 예정 금액입니다.'
     };
   }
@@ -4496,9 +4495,9 @@ function computeFromP(p){
     return {
       title: scope+' · '+mk(jj)+' 기준 활성 고객사',
       hero: cnt.toLocaleString('ko-KR'), unit:'곳',
-      sub: '해당 월 MRR '+won(monthlyTotal(list,jj))+'원',
+      sub: '해당 월 MRR '+won(monthlyTotal(list,jj))+'천원',
       chart:{type:'line', labels:tl, series:[{label:'활성 고객사', data:trend, color:cssv('--s1')}], money:false},
-      table:{cols:['고객사','월 MRR'], rows:top.map(function(t){return [t.name, won(t.v)+'원'];})},
+      table:{cols:['고객사','월 MRR'], rows:top.map(function(t){return [t.name, won(t.v)+'천원'];})},
       note:'해당 월에 금액이 인식된 고객사를 셉니다.'
     };
   }
@@ -4528,12 +4527,12 @@ function computeFromP(p){
     return {
       title: scope+' · '+gbLabel(gb2)+(jsel?' 기간 합계':' '+mk(STATE.base)+' MRR')+(p.metric==='share'?' 비중':(p.bottom?' 하위':' 순위')),
       hero: fo && total ? (fo.v/total*100).toFixed(1)+'%' : won(total),
-      unit: fo && total ? '' : '원',
-      sub: fo ? (p.focus+' '+won(fo.v)+'원 / 전체 '+won(total)+'원')
+      unit: fo && total ? '' : '천원',
+      sub: fo ? (p.focus+' '+won(fo.v)+'천원 / 전체 '+won(total)+'천원')
               : (gbLabel(gb2)+' '+arr.length+'개 · 상위 '+top2.length+'개 비중 '+(total? (top2.reduce(function(s,x){return s+x.v;},0)/total*100).toFixed(1):0)+'%'),
       chart:{type:'bar', labels:top2.map(function(x){return x.name;}),
              series:[{label:gbLabel(gb2), data:top2.map(function(x){return x.v;}), color:cssv('--s1')}], money:true, horizontal:true},
-      table:{cols:[gbLabel(gb2),'금액','비중'], rows:top2.map(function(x){return [x.name, won(x.v)+'원', (x.v/total*100).toFixed(1)+'%'];})},
+      table:{cols:[gbLabel(gb2),'금액','비중'], rows:top2.map(function(x){return [x.name, won(x.v)+'천원', (x.v/total*100).toFixed(1)+'%'];})},
       note: jsel? '지정한 기간의 월별 인식 금액을 합산했습니다.' : '기간을 지정하지 않아 기준월('+mk(STATE.base)+') MRR로 계산했습니다.'
     };
   }
@@ -4553,12 +4552,12 @@ function computeFromP(p){
         }
         qlabels.push((qys.length>1? String(y).slice(2)+"' ":'')+q+'분기');
         qdata.push(s);
-        qrows.push([(qys.length>1? y+'년 ':'')+q+'분기', won(s)+'원',
+        qrows.push([(qys.length>1? y+'년 ':'')+q+'분기', won(s)+'천원',
           sPrev? ((s-sPrev)/sPrev*100>=0?'+':'')+((s-sPrev)/sPrev*100).toFixed(1)+'%' : '—']);
       }
     });
     var qsum=qdata.reduce(function(a,b){return a+b;},0);
-    return { title:scope+' · 분기별 매출', hero:won(qsum), unit:'원',
+    return { title:scope+' · 분기별 매출', hero:won(qsum), unit:'천원',
       sub:(qys.length>1? qys[0]+'~'+qys[qys.length-1]+'년':qys[0]+'년')+' 분기 합계 · 전년 동분기 대비 포함',
       chart:{type:'bar', labels:qlabels, series:[{label:'분기 매출', data:qdata, color:cssv('--s1')}], money:true},
       table:{cols:['분기','매출','전년 동분기'], rows:qrows},
@@ -4591,14 +4590,14 @@ function computeFromP(p){
     for(var m2=step; m2<=hz; m2+=step){
       var v = cur*Math.pow(1+g, m2);
       labs.push(mk(b+m2).slice(2)); data.push(null); proj.push(v);
-      rows.push([mk(b+m2), won(Math.round(v))+'원', won(Math.round(v*12))+'원']);
+      rows.push([mk(b+m2), won(Math.round(v))+'천원', won(Math.round(v*12))+'천원']);
     }
     var endMrr = cur*Math.pow(1+g, hz);
     var yrs = (hz/12);
     return {
       title: scope+' · '+(yrs>=1? (Math.round(yrs*10)/10)+'년 뒤':hz+'개월 뒤')+' 전망 (최근 '+win+'개월 추세 기준)',
-      hero: won(Math.round(endMrr*12)), unit:'원 (ARR)',
-      sub: '기준월 MRR '+won(cur)+'원 · 현재 ARR '+won(cur*12)+'원 → '+mk(b+hz)+' 예상 MRR '+won(Math.round(endMrr))+'원'+
+      hero: won(Math.round(endMrr*12)), unit:'천원 (ARR)',
+      sub: '기준월 MRR '+won(cur)+'천원 · 현재 ARR '+won(cur*12)+'천원 → '+mk(b+hz)+' 예상 MRR '+won(Math.round(endMrr))+'천원'+
            ' · 최근 월 성장률 '+(g*100).toFixed(2)+'% (연 '+(gYr*100).toFixed(1)+'%)',
       chart:{type:'line', labels:labs, money:true, series:[
         {label:'실적', data:data, color:cssv('--s1')},
@@ -4606,7 +4605,7 @@ function computeFromP(p){
       ]},
       table:{cols:['시점','예상 MRR','예상 ARR'], rows:rows},
       note:'※ 최근 '+win+'개월 성장률이 그대로 이어진다고 가정한 단순 추정입니다. 신규 수주·해지·가격 변동은 반영되지 않습니다.'+
-           (contracted? ' 참고로 '+mk(contractedIdx)+' 시점에 계약상 확정된 금액은 '+won(contracted)+'원입니다.' : '')
+           (contracted? ' 참고로 '+mk(contractedIdx)+' 시점에 계약상 확정된 금액은 '+won(contracted)+'천원입니다.' : '')
     };
   }
 
@@ -4615,18 +4614,18 @@ function computeFromP(p){
       var ser2=monthlySeries(list), byY2={};
       for(var j4=0;j4<M;j4++){ byY2[yOf(j4)]=(byY2[yOf(j4)]||0)+ser2[j4]; }
       var ys2=Object.keys(byY2).sort();
-      return { title:scope+' · 연도별 매출', hero:won(ys2.reduce(function(s,y){return s+byY2[y];},0)), unit:'원',
+      return { title:scope+' · 연도별 매출', hero:won(ys2.reduce(function(s,y){return s+byY2[y];},0)), unit:'천원',
         sub:ys2[0]+' ~ '+ys2[ys2.length-1],
         chart:{type:'bar',labels:ys2,series:[{label:'연 매출',data:ys2.map(function(y){return byY2[y];}),color:cssv('--s1')}],money:true},
-        table:{cols:['연도','매출'],rows:ys2.map(function(y){return [y+'년',won(byY2[y])+'원'];})}, note:'' };
+        table:{cols:['연도','매출'],rows:ys2.map(function(y){return [y+'년',won(byY2[y])+'천원'];})}, note:'' };
     }
     var js = mf || (function(){ var a=[]; for(var j=Math.max(0,STATE.base-23);j<=STATE.base;j++) a.push(j); return a; })();
     var lab=js.map(mkLabel), dat=js.map(function(j){return monthlyTotal(list,j);});
     var sum=dat.reduce(function(a,b){return a+b;},0);
-    return { title:scope+(p.avg?' · 월평균 매출':' · 월별 추이'), hero:won(p.avg? sum/js.length : sum), unit:'원',
-      sub:mk(js[0])+' ~ '+mk(js[js.length-1])+(p.avg? ' · 합계 '+won(sum)+'원' : ' 합계 · 월평균 '+won(sum/js.length)+'원'),
+    return { title:scope+(p.avg?' · 월평균 매출':' · 월별 추이'), hero:won(p.avg? sum/js.length : sum), unit:'천원',
+      sub:mk(js[0])+' ~ '+mk(js[js.length-1])+(p.avg? ' · 합계 '+won(sum)+'천원' : ' 합계 · 월평균 '+won(sum/js.length)+'천원'),
       chart:{type:'line',labels:lab,series:[{label:'월 매출',data:dat,color:cssv('--s1')}],money:true},
-      table:{cols:['월','금액'],rows:js.map(function(j,i){return [mk(j),won(dat[i])+'원'];}).reverse()}, note:'' };
+      table:{cols:['월','금액'],rows:js.map(function(j,i){return [mk(j),won(dat[i])+'천원'];}).reverse()}, note:'' };
   }
 
   /* --- 기본: 합계 --- */
@@ -4636,12 +4635,12 @@ function computeFromP(p){
   var byLine2={}; list.forEach(function(k){ var r=DATA.rows[k],a=MAT[k],s=0;
     if(js2) js2.forEach(function(j){s+=a[j];}); else s=a[STATE.base];
     if(s) byLine2[r.line]=(byLine2[r.line]||0)+s; });
-  var lrows=Object.keys(byLine2).map(function(k2){return [k2, won(byLine2[k2])+'원', (byLine2[k2]/sum2*100).toFixed(1)+'%'];});
+  var lrows=Object.keys(byLine2).map(function(k2){return [k2, won(byLine2[k2])+'천원', (byLine2[k2]/sum2*100).toFixed(1)+'%'];});
   return {
     title: scope + (p.avg && js2? ' · 월평균 매출' : (js2? ' · 기간 합계 매출' : ' · '+mk(STATE.base)+' MRR')),
-    hero: won(p.avg && js2? sum2/js2.length : sum2), unit:'원',
-    sub: js2? (mk(js2[0])+' ~ '+mk(js2[js2.length-1])+' · '+js2.length+'개월 · 월평균 '+won(sum2/js2.length)+'원')
-            : ('기준월 MRR · 연환산 '+won(sum2*12)+'원'),
+    hero: won(p.avg && js2? sum2/js2.length : sum2), unit:'천원',
+    sub: js2? (mk(js2[0])+' ~ '+mk(js2[js2.length-1])+' · '+js2.length+'개월 · 월평균 '+won(sum2/js2.length)+'천원')
+            : ('기준월 MRR · 연환산 '+won(sum2*12)+'천원'),
     chart:{type:'line', labels:lab2, series:[{label:'월 매출', data:dat2, color:cssv('--s1')}], money:true},
     table:{cols:['서비스','금액','비중'], rows:lrows},
     note: js2? '' : '기간을 지정하지 않아 기준월 기준으로 답했습니다. "2025년" 처럼 연도를 넣으면 합계로 계산합니다.'
@@ -4789,7 +4788,7 @@ var GRIDS={
       {k:'churn_reason',l:'해지사유',t:'list',opts:CHURN_OPTS},
       {k:'start_month',l:'시작월',t:'month'},
       {k:'end_month',l:'종료월',t:'month'},
-      {k:'mrr',l:'MRR(참고)',t:'number'},
+      {k:'mrr',l:'MRR(천원)',t:'number',won:1},
       {k:'note',l:'비고',t:'list',opts:CNOTE_OPTS}
     ]
   },
@@ -4825,7 +4824,7 @@ var GRIDS={
       {k:'start_month',l:'시작월',t:'month'},
       {k:'end_month',l:'종료월',t:'month'},
       {k:'months',l:'개월',t:'number'},
-      {k:'monthly_fee',l:'월액(원)',t:'number'}
+      {k:'monthly_fee',l:'월액(천원)',t:'number',won:1}
     ]
   },
   biz:{
@@ -4838,9 +4837,9 @@ var GRIDS={
       {k:'as_of',l:'작성일',t:'date'},
       {k:'kind',l:'종류',t:'select',opts:['sum','detail']},
       {k:'item',l:'항목/고객사',req:true},
-      {k:'biz',l:'비즈포탈',t:'number'},
-      {k:'sheet',l:'매출시트',t:'number'},
-      {k:'diff',l:'차이',t:'number'},
+      {k:'biz',l:'비즈포탈(천원)',t:'number',won:1},
+      {k:'sheet',l:'매출시트(천원)',t:'number',won:1},
+      {k:'diff',l:'차이(천원)',t:'number',won:1},
       {k:'note',l:'사유'}
     ]
   },
@@ -4854,7 +4853,7 @@ var GRIDS={
         for(var y=2020;y<=y0+5;y++) ys.push(String(y));
         return ys;
       }},
-      {k:'amount',l:'목표 ARR(원)',t:'number',req:true},
+      {k:'amount',l:'목표 ARR(천원)',t:'number',won:1,req:true},
       {k:'note',l:'메모'}
     ]
   },
@@ -4880,12 +4879,12 @@ var GRIDS={
         try{ return (v&&v.length)? v.map(function(x){ return x.product+(x.qty? ' '+x.qty:''); }).join(', ') : '·'; }
         catch(e){ return '·'; } }},
       {k:'expect_month',l:'계약예상',t:'month'},
-      {k:'expect_amount',l:'예상단가',t:'number'},
+      {k:'expect_amount',l:'예상단가(천원)',t:'number',won:1},
       {k:'contract_id',l:'계약전환',ro:true,fmt:function(v){ return v? '✅ #'+v : '·'; }},
       {k:'quote_file',l:'견적서',ro:true,
         href:function(v){ return 'quote.html?view='+encodeURIComponent(v); },
         fmt:function(v){ if(!v) return '·'; var L=qLabel(String(v).split('/').pop()); return '📄 '+(L.d||L.c); }},
-      {k:'rival_price',l:'경쟁사가',t:'number'},
+      {k:'rival_price',l:'경쟁사가(천원)',t:'number',won:1},
       {k:'next_action',l:'다음 할 일'},
       {k:'next_date',l:'예정일',t:'date'},
       {k:'cust_name',l:'고객 담당자'},
@@ -5013,7 +5012,7 @@ var GRIDS={
         if(v==null) return '·';
         return (r&&r.result==='진행중'&&v>=14)? v+'일 ⚠':v+'일'; }},
       {k:'result',l:'상태',ro:true},
-      {k:'amount',l:'수주액',t:'number',ro:true},
+      {k:'amount',l:'수주액(천원)',t:'number',won:1,ro:true},
       {k:'note',l:'비고',ro:true,fmt:function(v){return String(v||'').slice(0,40);}}
     ]
   },
@@ -5305,7 +5304,7 @@ function renderBizEditor(host, months){
       '<div><label>월 *</label><input id="bzYm" placeholder="예: 8월" value="'+esc(editYm)+'"></div>'+
       '<div><label>작성일</label><input id="bzAsOf" type="date" value="'+esc(asOf)+'"></div>'+
     '</div>'+
-    '<div class="cap" style="margin-bottom:6px">요약 항목 (금액은 원 단위)</div><div id="bzSums"></div>'+
+    '<div class="cap" style="margin-bottom:6px">요약 항목 (금액은 천원 단위)</div><div id="bzSums"></div>'+
     '<button class="pill ghost" id="bzAddSum" style="margin:6px 0 16px">＋ 항목 추가</button>'+
     '<div class="cap" style="margin-bottom:6px">고객사별 차이 (없으면 비워두세요 · 차이는 자동 계산)</div><div id="bzDets"></div>'+
     '<button class="pill ghost" id="bzAddDet" style="margin:6px 0 18px">＋ 고객사 추가</button>'+
@@ -5382,7 +5381,7 @@ var CHV_COLS=[
   {k:'status',  l:'상태',   text:function(r){ return r.status||''; }},
   {k:'start',   l:'시작월', text:function(r){ return mk(r.startIdx)||''; }},
   {k:'end',     l:'종료월', text:function(r){ return mk(r.endIdx)||''; }},
-  {k:'mrr',     l:'MRR',    num:true, right:true, text:function(r){ return won(r.mrr||0)+'원'; }},
+  {k:'mrr',     l:'MRR(천원)', num:true, right:true, text:function(r){ return Math.round((r.mrr||0)/1000).toLocaleString('ko-KR'); }},
   {k:'hist',    l:'이력',   text:function(r){ return (r._hist? r._hist.length:1)+'건'; }}
 ];
 function chvText(c,r){ var t=String(c.text(r)||'').trim(); return t===''? BLANK_LABEL : t; }
@@ -5510,7 +5509,7 @@ function openChvHist(r){
   var b0=STATE.base, live=hist.filter(function(h){ return h.startIdx<=b0 && h.endIdx>=b0; });
   var sum=live.reduce(function(a,h){ return a+(h.mrr||0); },0);
   $('#chvHCap').textContent=(CH_DEFS[CHV.key]? CH_DEFS[CHV.key][0].replace(/^\S+ /,'')+' · ':'')+hist.length+'건 · 최근 계약이 위쪽입니다'+
-    (live.length? ' · '+baseLabel()+' 유효 '+live.length+'건, 합계 MRR '+won(sum)+'원' : ' · '+baseLabel()+' 유효 계약 없음');
+    (live.length? ' · '+baseLabel()+' 유효 '+live.length+'건, 합계 MRR '+won(sum)+'천원' : ' · '+baseLabel()+' 유효 계약 없음');
   $('#chvHBody').innerHTML='<div class="tbl-wrap" style="max-height:min(58vh,460px)"><table class="dgrid">'+
     '<thead><tr><th>서비스</th><th>파트너</th><th>계산서발행처</th><th>구분</th><th>상태</th>'+
     '<th>시작월</th><th>종료월</th><th class="n">MRR</th><th>비고</th></tr></thead><tbody>'+
@@ -5519,7 +5518,7 @@ function openChvHist(r){
         '<td>'+esc(lline(h.line)||'·')+'</td><td>'+esc(h.ptn||'·')+'</td><td>'+esc(h.partner||'·')+'</td>'+
         '<td>'+esc(h.ctype||'·')+'</td><td>'+esc(h.status||'·')+'</td>'+
         '<td>'+esc(mk(h.startIdx)||'·')+'</td><td>'+esc(mk(h.endIdx)||'·')+'</td>'+
-        '<td class="n">'+won(h.mrr||0)+'원</td>'+
+        '<td class="n">'+won(h.mrr||0)+'천원</td>'+
         '<td>'+esc([h.note,h.churn].filter(Boolean).join(' · ')||'·')+'</td></tr>';
     }).join('')+'</tbody></table></div>';
   openOvl('ovlChvHist');
@@ -5588,7 +5587,7 @@ function renderChannelView(key){
     '<span style="font-size:18px;font-weight:800">'+def[0]+' 사업 영역</span>'+
     '<span class="mini">'+esc(def[2])+' · '+baseLabel()+' 기준</span></div>';
   h+='<div class="kpis" style="margin-bottom:16px">'+
-    tile('당월 MRR', won(mrr), '원', '연환산 '+won(mrr*12)+'원')+
+    tile('당월 MRR', won(mrr), '원', '연환산 '+won(mrr*12)+'천원')+
     tile('활성 계약', act.toLocaleString('ko-KR'), '건', '전체 이력 '+list.length+'건')+
     tile('고객사', Object.keys(custs).length.toLocaleString('ko-KR'), '곳', '당월 매출 기준')+
     (hasEq? tile('임대중 장비', rentEq, '대', pendEq? '처리 대기 요청 '+pendEq+'건':'대기 요청 없음')
@@ -5747,13 +5746,13 @@ function openCust360(name){
     (RAWX.inbound===undefined? ' · (인바운드는 메뉴를 한 번 연 뒤 집계됩니다)':'');
   function sec(icon,label,n,html){ return '<div class="c360-sec"><h4>'+icon+' '+label+' <span class="ct">'+n+'건</span></h4>'+html+'</div>'; }
   $('#c360Body').innerHTML=
-    sec('📋','계약',cts.length, tb(['서비스','채널','파트너','구분','상태','기간','MRR'],
+    sec('📋','계약',cts.length, tb(['서비스','채널','파트너','구분','상태','기간','MRR(천원)'],
       cts.map(function(r){ return [lline(r.line), r.channel, r.partner, r.ctype||r.contract_type, r.status,
-        (r.start||'')+' ~ '+(r.end||''), r.mrr? Number(r.mrr).toLocaleString('ko-KR'):'' ]; })))+
+        (r.start||'')+' ~ '+(r.end||''), r.mrr? Math.round(Number(r.mrr)/1000).toLocaleString('ko-KR'):'' ]; })))+
     sec('🟢','LIVE',lives.length, tb(['제품','서비스','노드','시작','종료'],
       lives.map(function(r){ return [r.product, r.line, r.nodes, String(r.start_month||'').slice(0,7), String(r.end_month||'').slice(0,7)]; })))+
-    sec('🎯','OI (영업기회)',ois.length, tb(['사업명','상태','예상시기','예상단가','담당'],
-      ois.map(function(r){ return [r.deal_name, r.stage, String(r.expect_month||'').slice(0,7), r.expect_amount? Number(r.expect_amount).toLocaleString('ko-KR'):'', r.owner]; })))+
+    sec('🎯','OI (영업기회)',ois.length, tb(['사업명','상태','예상시기','예상단가(천원)','담당'],
+      ois.map(function(r){ return [r.deal_name, r.stage, String(r.expect_month||'').slice(0,7), r.expect_amount? Math.round(Number(r.expect_amount)/1000).toLocaleString('ko-KR'):'', r.owner]; })))+
     sec('📥','인바운드',inbs.length, tb(['접수일','문의 제품','유형','상태','담당'],
       inbs.map(function(r){ return [r.on_date, r.product, r.qtype, r.result, r.owner]; })))+
     sec('🛰️','MDR 운영·PoC',mdrs.length, tb(['유형','상태','라이선스','시작일','설치/계약'],
@@ -7513,7 +7512,7 @@ function oiApplyQuote(data, path, name){
   // 비고
   if(!$('#oiNote').value.trim()){
     $('#oiNote').value='견적서 자동 입력'+(data.quoteDate? ' · 견적일 '+data.quoteDate:'')+
-      (qNum(data.grandTotal)? ' · 총액 '+won(qNum(data.grandTotal))+'원(VAT 포함)':'');
+      (qNum(data.grandTotal)? ' · 총액 '+won(qNum(data.grandTotal))+'천원(VAT 포함)':'');
   }
 
   OI_QUOTE={ file:path, date:data.quoteDate||null, total:qNum(data.grandTotal)||null };
@@ -7580,7 +7579,7 @@ async function submitOi(){
     logChange('insert','oi_deals',out[0].id,{customer:cust,deal:name});
     msg('oiMsg','');
     $('#oiDoneSum').textContent=[cust, name, row.deal_type,
-      row.expect_amount? won(row.expect_amount)+'원':'',
+      row.expect_amount? won(row.expect_amount)+'천원':'',
       items.map(function(x){ return x.product+(x.qty? ' '+x.qty:''); }).join(', ')].filter(Boolean).join(' · ');
     $('#oiFormWrap').style.display='none';
     $('#oiDone').style.display='';
@@ -7633,7 +7632,7 @@ function oiToContract(r){
     if(q) $('#nQty').value=q;
   }catch(e){}
   $('#nNote').value='OI 전환 · '+(r.deal_name||'')+
-    (r.expect_amount? ' · 예상단가 '+won(r.expect_amount)+'원(VAT별도)':'');
+    (r.expect_amount? ' · 예상단가 '+won(r.expect_amount)+'천원(VAT별도)':'');
   msg('eMsg','OI 「'+(r.deal_name||r.customer)+'」 전환 중 — MRR·종료월을 채우고 저장하세요','ok');
 }
 
@@ -7663,13 +7662,13 @@ function renderOiTiles(on){
   var late=open.filter(function(r){ return r.next_date && String(r.next_date).slice(0,10) < new Date().toISOString().slice(0,10); });
   host.innerHTML=
     '<div class="kpi"><div class="k">진행 중</div><div class="v">'+open.length+'<small>건</small></div>'+
-      '<div class="d">예상 '+won(sum(open))+'원</div></div>'+
+      '<div class="d">예상 '+won(sum(open))+'천원</div></div>'+
     '<div class="kpi"><div class="k">기대 수주액</div><div class="v">'+won(Math.round(wsum))+'<small>원</small></div>'+
       '<div class="d">예상금액 × 수주가능성% 합계</div></div>'+
     '<div class="kpi"><div class="k">이번 분기 계약예상</div><div class="v">'+thisQ.length+'<small>건</small></div>'+
-      '<div class="d">'+won(sum(thisQ))+'원</div></div>'+
+      '<div class="d">'+won(sum(thisQ))+'천원</div></div>'+
     '<div class="kpi"><div class="k">수주 확정</div><div class="v">'+won2.length+'<small>건</small></div>'+
-      '<div class="d">'+won(sum(won2))+'원</div></div>'+
+      '<div class="d">'+won(sum(won2))+'천원</div></div>'+
     (late.length? '<div class="kpi" style="border-color:var(--critical,#d03b3b)"><div class="k">⏰ 액션 지연</div>'+
       '<div class="v" style="color:var(--critical,#d03b3b)">'+late.length+'<small>건</small></div>'+
       '<div class="d">'+esc(late.slice(0,2).map(function(r){return r.customer;}).join(', '))+'</div></div>' : '');
@@ -7776,9 +7775,9 @@ function setupSide(){
 /* ===== 해지 분석 — 기간별 해지 사유·기업 리스트 ===== */
 var CHURN={f:null,t:null,q:'',fil:{},sk:'',sd:1,inclRenew:false};   // fil: 열별 «볼 값 고르기» · inclRenew: 재약정 포함 여부
 var CH_COLS=[['cust','고객사',0],['line','서비스',0],['channel','채널',0],['ctype','구분',0],
-              ['ym','해지월',0],['reason','사유',0],['amt','직전 월액(원)',1],['note','비고',0],['rw','재약정',0]];
+              ['ym','해지월',0],['reason','사유',0],['amt','직전 월액(천원)',1],['note','비고',0],['rw','재약정',0]];
 function chVal(x,k){                                            // 필터·표시용 셀 값
-  if(k==='amt') return Math.round(x.amt).toLocaleString('ko-KR');
+  if(k==='amt') return Math.round(x.amt/1000).toLocaleString('ko-KR');   // 천원
   if(k==='rw') return x.renew? '재약정':'이탈';
   var v=x[k];
   return (v==null||v==='')? BLANK_LABEL : String(v);
@@ -7874,16 +7873,16 @@ function renderChurn(){
     '<div class="pr-out" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">'+
     kpi(CHURN.inclRenew?'해지·종료':'실제 이탈', totN+'건', renewN? (CHURN.inclRenew? '이 중 재약정 '+renewN+'건':'재약정 '+renewN+'건 제외'):'')+
     kpi('고객사', Object.keys(custN).length+'곳','')+
-    kpi('이탈 월액 합','₩'+won(totA),'해지 직전 월 매출 기준')+
-    kpi('연환산 손실','₩'+won(totA*12),'ARR 감소분')+
+    kpi('이탈 월액 합',won(totA)+'천원','해지 직전 월 매출 기준')+
+    kpi('연환산 손실',won(totA*12)+'천원','ARR 감소분')+
     '</div></div>';
   h+='<div class="pr-card" style="margin-bottom:14px"><h3>사유별 집계 <small>행을 클릭하면 아래 리스트가 그 사유로 좁혀집니다</small></h3>'+
-    '<div style="overflow-x:auto"><table class="pr" id="chAgg"><thead><tr><th>해지 사유</th><th class="n">건수</th><th class="n">비중</th><th class="n">월액 합(원)</th><th class="n">연환산(원)</th></tr></thead><tbody>'+
+    '<div style="overflow-x:auto"><table class="pr" id="chAgg"><thead><tr><th>해지 사유</th><th class="n">건수</th><th class="n">비중</th><th class="n">월액 합(천원)</th><th class="n">연환산(천원)</th></tr></thead><tbody>'+
     (keys.map(function(k2){
       var o=by[k2], on=!!(CHURN.fil.reason && CHURN.fil.reason.length===1 && CHURN.fil.reason[0]===k2);
       return '<tr data-rs="'+esc(k2)+'" style="cursor:pointer'+(on?';background:var(--brand-t);font-weight:700':'')+'">'+
         '<td>'+esc(k2)+(on?' ✓':'')+'</td><td class="n">'+o.n+'</td><td class="n">'+(totN?Math.round(o.n/totN*100):0)+'%</td>'+
-        '<td class="n">'+Math.round(o.amt).toLocaleString('ko-KR')+'</td><td class="n">'+Math.round(o.amt*12).toLocaleString('ko-KR')+'</td></tr>';
+        '<td class="n">'+Math.round(o.amt/1000).toLocaleString('ko-KR')+'</td><td class="n">'+Math.round(o.amt*12/1000).toLocaleString('ko-KR')+'</td></tr>';
     }).join('') || '<tr><td colspan="5" class="cap">해당 기간 해지가 없습니다</td></tr>')+
     '</tbody></table></div>'+
     ((CHURN.fil.reason&&CHURN.fil.reason.length)?'<p class="pr-note" style="margin-top:6px"><button class="pill" id="chRsClr" style="height:24px;padding:0 9px;font-size:11px">✕ 사유 필터 해제 ('+esc(CHURN.fil.reason.join(', '))+')</button></p>':'')+'</div>';
@@ -7909,7 +7908,7 @@ function renderChurn(){
     '</tr></thead><tbody>'+
     (list.map(function(x){
       return '<tr'+(x.renew?' style="opacity:.72"':'')+'><td>'+esc(x.cust)+'</td><td>'+esc(x.line)+'</td><td>'+esc(x.channel)+'</td><td>'+esc(x.ctype)+'</td>'+
-        '<td>'+x.ym+'</td><td>'+esc(x.reason)+'</td><td class="n">'+Math.round(x.amt).toLocaleString('ko-KR')+'</td><td>'+esc(x.note)+'</td>'+
+        '<td>'+x.ym+'</td><td>'+esc(x.reason)+'</td><td class="n">'+Math.round(x.amt/1000).toLocaleString('ko-KR')+'</td><td>'+esc(x.note)+'</td>'+
         '<td'+(x.renew?' title="'+esc(x.rwhy)+'"':'')+'>'+(x.renew?'<span style="color:var(--muted)">재약정</span>':'이탈')+'</td></tr>';
     }).join('') || '<tr><td colspan="9" class="cap">해당 조건의 해지 기업이 없습니다</td></tr>')+
     '</tbody></table></div></div>';
@@ -7936,10 +7935,10 @@ function renderChurn(){
     var fnx=[]; for(var fk2 in CHURN.fil){ var sv=CHURN.fil[fk2]; if(sv&&sv.length&&sv.length<=2) fnx.push(sv.join('·')); }
     var fn='해지분석_'+mk(CHURN.f)+'~'+mk(CHURN.t)+(fnx.length?'_'+fnx.join('_'):'');
     xlsxBook(fn, [
-      {name:'사유별 집계', head:['해지 사유','건수','비중(%)','월액 합(원)','연환산(원)'],
-       rows:keys.map(function(k2){ var o3=by[k2]; return [k2,o3.n,(totN?Math.round(o3.n/totN*100):0),Math.round(o3.amt),Math.round(o3.amt*12)]; })},
-      {name:'해지 기업 리스트', head:['고객사','서비스','채널','구분','해지월','사유','직전 월액(원)','비고','재약정'],
-       rows:list.map(function(x){ return [x.cust,x.line,x.channel,x.ctype,x.ym,x.reason,Math.round(x.amt),x.note,(x.renew?'재약정':'이탈')]; })}
+      {name:'사유별 집계', head:['해지 사유','건수','비중(%)','월액 합(천원)','연환산(천원)'],
+       rows:keys.map(function(k2){ var o3=by[k2]; return [k2,o3.n,(totN?Math.round(o3.n/totN*100):0),Math.round(o3.amt/1000),Math.round(o3.amt*12/1000)]; })},
+      {name:'해지 기업 리스트', head:['고객사','서비스','채널','구분','해지월','사유','직전 월액(천원)','비고','재약정'],
+       rows:list.map(function(x){ return [x.cust,x.line,x.channel,x.ctype,x.ym,x.reason,Math.round(x.amt/1000),x.note,(x.renew?'재약정':'이탈')]; })}
     ]).then(function(){ if(msg) msg.textContent='✓ 다운로드 완료 (시트 2장: 사유별 집계 + 기업 리스트)'; })
       .catch(function(e){ if(msg) msg.textContent='실패: '+String(e.message||e); toast('엑셀 생성 실패', String(e.message||e)); });
   }
@@ -8017,9 +8016,9 @@ function rpRevData(j){
     return {g:Object.keys(g).length, s1:Object.keys(s1).length, all:Object.keys(all).length};
   }
   var nc=nacCnt(j), ncY=nacCnt(j-12);
-  var bullets=[''+ym+' 기준 ARR '+won(arrN)+'원 (월 매출 '+won(mrr)+'원)'];
-  if(yoyA>0) bullets.push('전년 동기 대비 ARR '+pct((arrN/yoyA-1)*100)+' ('+(year-1)+'년 '+mon+'월 ARR '+won(yoyA)+'원)');
-  if(decA>0) bullets.push('전년 12월말 대비 ARR '+pct((arrN/decA-1)*100)+' ('+(year-1)+'년 12월 ARR '+won(decA)+'원)');
+  var bullets=[''+ym+' 기준 ARR '+won(arrN)+'천원 (월 매출 '+won(mrr)+'천원)'];
+  if(yoyA>0) bullets.push('전년 동기 대비 ARR '+pct((arrN/yoyA-1)*100)+' ('+(year-1)+'년 '+mon+'월 ARR '+won(yoyA)+'천원)');
+  if(decA>0) bullets.push('전년 12월말 대비 ARR '+pct((arrN/decA-1)*100)+' ('+(year-1)+'년 12월 ARR '+won(decA)+'천원)');
   if(nc.all) bullets.push('Cloud NAC 고객사 '+nc.all+'개사 (일반 '+nc.g+'개사 · 에스원 '+nc.s1+'개사)'+(ncY.all? ' · 전년 동기 대비 '+pct((nc.all/ncY.all-1)*100)+' ('+ncY.all+'개사 → '+nc.all+'개사)':''));
   var groups=[
     {label:'Cloud NAC 일반', f:function(r){return r.line==='Cloud';}},
@@ -8042,13 +8041,13 @@ function rpRevData(j){
   groups.forEach(function(g,gi){
     var vals=cols.map(function(c){ return sumG(g.f,c.idxs); });
     if(gi>=2 && vals[vals.length-1]===0) return;          // 매출 없는 제품군 생략 (NAC 2행은 유지)
-    rows.push([g.label].concat(vals.map(function(v){ return {t:Math.round(v).toLocaleString('ko-KR'), n:1}; })));
+    rows.push([g.label].concat(vals.map(function(v){ return {t:Math.round(v/1000).toLocaleString('ko-KR'), n:1}; })));
     if(gi===1){
       nacSub=cols.map(function(c){ return sumG(function(r){return r.line==='Cloud'||r.line==='S1';},c.idxs); });
-      rows.push(['Cloud NAC 소계'].concat(nacSub.map(function(v){ return {t:Math.round(v).toLocaleString('ko-KR'), n:1}; })));
+      rows.push(['Cloud NAC 소계'].concat(nacSub.map(function(v){ return {t:Math.round(v/1000).toLocaleString('ko-KR'), n:1}; })));
     }
   });
-  rows.push(['합계'].concat(cols.map(function(c){ var s=0; c.idxs.forEach(function(x){ s+=rpTotAt(x); }); return {t:Math.round(s).toLocaleString('ko-KR'), n:1}; })));
+  rows.push(['합계'].concat(cols.map(function(c){ var s=0; c.idxs.forEach(function(x){ s+=rpTotAt(x); }); return {t:Math.round(s/1000).toLocaleString('ko-KR'), n:1}; })));
   var head=[['구분']].concat(cols.map(function(c){ return [c.t,1]; }));
   return {bullets:bullets, head:head, rows:rows, year:year};
 }
@@ -8113,14 +8112,14 @@ function renderReport(){
   h+='<div class="pr-card" style="margin-bottom:14px"><h3>💰 <span contenteditable spellcheck="false" id="rpRevT">'+rv.year+'년 매출 Review</span>'+rpCopyBtn('rpTblRev')+inc('rev')+'</h3>'+
     '<div id="rpRevB" contenteditable spellcheck="false" style="font-size:13px;line-height:1.9;margin:4px 0 10px">'+rv.bullets.map(function(x){return esc(x);}).join('<br>')+'</div>'+
     tbl('rpTblRev', rv.head, rv.rows,'매출 데이터가 없습니다')+
-    '<p class="pr-note" style="margin-top:4px">단위: 원 · 월 숫자는 해당 연도 1월부터 기준월까지 · Q=분기 소계</p></div>';
+    '<p class="pr-note" style="margin-top:4px">단위: 천원 · 월 숫자는 해당 연도 1월부터 기준월까지 · Q=분기 소계</p></div>';
   h+='<div class="pr-card" style="margin-bottom:14px"><h3>🛡️ <span contenteditable spellcheck="false" id="rpMdrT">MDR 고객 현황</span>'+inc('mdrc')+'</h3>'+
     '<div id="rpMdrB" contenteditable spellcheck="false" style="font-size:13px;line-height:2.0">'+md.lines.map(function(x){return esc(x);}).join('<br>')+'</div></div>';
   h+='<div class="pr-card" style="margin-bottom:14px"><h3><span contenteditable spellcheck="false" id="rpKT">'+d.ym+' 요약</span>'+rpCopyBtn('rpK')+inc('sum')+'</h3><div class="pr-out" id="rpK" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">'+
-    kpi('월 매출(MRR)','₩'+won(d.tot), d.prev?('전월 대비 '+pct(dif)):'')+
-    kpi('ARR 환산','₩'+won(d.tot*12),'')+
+    kpi('월 매출(MRR)',won(d.tot)+'천원', d.prev?('전월 대비 '+pct(dif)):'')+
+    kpi('ARR 환산',won(d.tot*12)+'천원','')+
     kpi('월 목표 달성률', d.mtg? Math.round(d.tot/d.mtg*100)+'%':'목표 없음', d.mtg?('목표 ₩'+won(d.mtg)):'')+
-    kpi('연 누계', '₩'+won(d.ytd), d.ytg?('연 목표 '+won(d.ytg)+' 의 '+Math.round(d.ytd/d.ytg*100)+'%'):'')+
+    kpi('연 누계', won(d.ytd)+'천원', d.ytg?('연 목표 '+won(d.ytg)+' 의 '+Math.round(d.ytd/d.ytg*100)+'%'):'')+
     kpi('활성 고객사', d.actCnt+'곳','매출 발생 기준')+
     kpi('신규 / 해지', d.newCt.length+'건 / '+d.endCt.length+'건','')+
     '</div></div>';
@@ -8132,11 +8131,11 @@ function renderReport(){
   });
   h+='<div class="pr-card" style="margin-bottom:14px"><h3>최근 12개월 매출 추이 <small>이 카드만 자동값 고정 (PPT에서는 수정 가능한 차트)</small>'+inc('trend')+'</h3>'+tr+'</div>';
   h+='<div class="pr-card" style="margin-bottom:14px"><h3>🆕 <span contenteditable spellcheck="false">신규 계약</span> <small>'+d.newCt.length+'건</small>'+rpCopyBtn('rpTblNew')+inc('new')+'</h3>'+
-    tbl('rpTblNew',[['고객사'],['서비스'],['채널'],['구분'],['수량',1],['월액(원)',1]],
-      d.newCt.map(function(x){ return [x.r.cust, LINE_LABEL[x.r.line]||x.r.line, x.r.channel, x.r.ctype||'-', {t:x.r.qty||'-',n:1}, {t:Math.round(x.v).toLocaleString('ko-KR'),n:1}]; }),'신규 계약이 없습니다')+'</div>';
+    tbl('rpTblNew',[['고객사'],['서비스'],['채널'],['구분'],['수량',1],['월액(천원)',1]],
+      d.newCt.map(function(x){ return [x.r.cust, LINE_LABEL[x.r.line]||x.r.line, x.r.channel, x.r.ctype||'-', {t:x.r.qty||'-',n:1}, {t:Math.round(x.v/1000).toLocaleString('ko-KR'),n:1}]; }),'신규 계약이 없습니다')+'</div>';
   h+='<div class="pr-card" style="margin-bottom:14px"><h3>📉 <span contenteditable spellcheck="false">해지·종료</span> <small>'+d.endCt.length+'건</small>'+rpCopyBtn('rpTblEnd')+inc('end')+'</h3>'+
-    tbl('rpTblEnd',[['고객사'],['서비스'],['채널'],['사유'],['직전 월액(원)',1]],
-      d.endCt.map(function(x){ return [x.r.cust, LINE_LABEL[x.r.line]||x.r.line, x.r.channel, x.r.churn||x.r.status||'-', {t:Math.round(x.v).toLocaleString('ko-KR'),n:1}]; }),'해지·종료가 없습니다')+'</div>';
+    tbl('rpTblEnd',[['고객사'],['서비스'],['채널'],['사유'],['직전 월액(천원)',1]],
+      d.endCt.map(function(x){ return [x.r.cust, LINE_LABEL[x.r.line]||x.r.line, x.r.channel, x.r.churn||x.r.status||'-', {t:Math.round(x.v/1000).toLocaleString('ko-KR'),n:1}]; }),'해지·종료가 없습니다')+'</div>';
   h+='<div class="pr-card" style="margin-bottom:14px"><h3>🛡️ <span contenteditable spellcheck="false">신규 PoC 신청</span> <small>'+d.poc.length+'건</small>'+rpCopyBtn('rpTblPoc')+inc('poc')+'</h3>'+
     tbl('rpTblPoc',[['고객사'],['서비스 유형'],['상태'],['계약예정수량',1],['영업담당']],
       d.poc.map(function(x){ return [x.customer||'-', x.svc_type||'-', x.status||'-', {t:x.plan_qty||'-',n:1}, x.sales_name||'-']; }),'해당 월 PoC 신청이 없습니다')+'</div>';
@@ -8147,8 +8146,8 @@ function renderReport(){
     '<p class="pr-note" id="rpInbX" contenteditable spellcheck="false" style="margin-top:6px">'+inbNote+'</p></div>';
   h+='<div class="pr-card" style="margin-bottom:14px"><h3>🎯 <span contenteditable spellcheck="false">OI 파이프라인</span> <small>현재 시점 스냅샷</small>'+rpCopyBtn('rpK2')+inc('oi')+'</h3><div class="pr-out" id="rpK2" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">'+
     kpi('진행 중 OI', d.oiOpen.length+'건','등록+진행 단계')+
-    kpi('예상 금액 합','₩'+won(d.oiSum),'전부 수주 가정 · VAT별도')+
-    kpi('기대 수주액','₩'+won(d.oiW),'수주가능성 가중')+
+    kpi('예상 금액 합',won(d.oiSum)+'천원','전부 수주 가정 · VAT별도')+
+    kpi('기대 수주액',won(d.oiW)+'천원','수주가능성 가중')+
     '</div></div>';
   h+='<div id="rpNotes"></div>';
   host.innerHTML=h;
@@ -8470,10 +8469,11 @@ function fmtCell(c,v,r){
   if(c.t==='month') return String(v).slice(0,7);
   if(c.t==='date') return String(v).slice(0,10);
   if(c.t==='bool') return v? '중복':'·';
-  if(c.t==='number') return Number(v).toLocaleString('ko-KR');
+  if(c.t==='number') return (c.won? Math.round(Number(v)/1000):Number(v)).toLocaleString('ko-KR');
   return String(v);
 }
 function editCell(c,v){
+  /* 참고: 금액 열(c.won)은 화면 표시만 천원 단위이며, 입력·저장 값은 원 단위 그대로입니다 */
   if(c.t==='select'){
     var opts=(typeof c.opts==='function'? c.opts():c.opts).slice();
     if(!c.req && opts.indexOf('')<0) opts.unshift('');              // 비울 수 있게
@@ -8737,6 +8737,7 @@ async function exportXlsx(){
     var v=r[c.k];
     if(c.t==='month'&&v) return String(v).slice(0,7);
     if(c.t==='bool') return v?'Y':'';
+    if(c.won) return Math.round(Number(v||0)/1000);            // 천원 단위
     if(typeof v==='number') return v;
     if(c.fmt){ try{ var fv=c.fmt(v); if(fv!=null) return String(fv).replace(/<[^>]*>/g,''); }catch(e){} }
     return v==null?'':String(v);
@@ -9155,7 +9156,7 @@ function setupAuth(){
 
 /* ---- 계약 검색 위젯 ---- */
 function ctLabel(r){
-  return r.cust+' · '+lline(r.line)+' · '+(mk(r.startIdx)||'?')+'~'+(mk(r.endIdx)||'?')+' · '+won(r.mrr||0)+'원';
+  return r.cust+' · '+lline(r.line)+' · '+(mk(r.startIdx)||'?')+'~'+(mk(r.endIdx)||'?')+' · '+won(r.mrr||0)+'천원';
 }
 function setupPick(inputId, pickId, store){
   var inp=$('#'+inputId), box=$('#'+pickId);
@@ -9167,7 +9168,7 @@ function setupPick(inputId, pickId, store){
     }).slice(0,30).forEach(function(r){
       var it=el('div','pi');
       it.innerHTML='<span>'+esc(r.cust)+' <small>'+lline(r.line)+' · '+(r.status||'활성')+'</small></span>'+
-                   '<small>'+(mk(r.startIdx)||'?')+'~'+(mk(r.endIdx)||'?')+' · '+won(r.mrr||0)+'원</small>';
+                   '<small>'+(mk(r.startIdx)||'?')+'~'+(mk(r.endIdx)||'?')+' · '+won(r.mrr||0)+'천원</small>';
       it.onclick=function(){
         store.sel=r;
         box.querySelectorAll('.pi').forEach(function(x){x.classList.remove('sel');});
@@ -9265,7 +9266,7 @@ async function saveEdit(){
       await sbWrite('DELETE','monthly_revenue?contract_id=eq.'+r2._id+'&month=gte.'+idxDate(from));
       await sbWrite('POST','monthly_revenue', monthRows(r2._id,from,ne,amt));
       await logChange('update','contracts',r2._id,{action:'재약정',newEnd:idxDate(ne),amount:amt});
-      msg('eMsg','재약정 완료 ✅ — '+r2.cust+' → '+$('#rEnd').value+' · 월 '+won(amt)+'원','ok');
+      msg('eMsg','재약정 완료 ✅ — '+r2.cust+' → '+$('#rEnd').value+' · 월 '+won(amt)+'천원','ok');
     }
     else if(CUR_TAB==='fix'){
       var r3=PK_F.sel; if(!r3) throw new Error('계약을 선택하세요.');
@@ -9274,7 +9275,7 @@ async function saveEdit(){
       await sbWrite('PATCH','monthly_revenue?contract_id=eq.'+r3._id+'&month=gte.'+idxDate(f0),{amount:na});
       await sbWrite('PATCH','contracts?id=eq.'+r3._id,{mrr:na,updated_at:new Date().toISOString()});
       await logChange('update','monthly_revenue',r3._id,{from:idxDate(f0),amount:na});
-      msg('eMsg','금액 수정 완료 ✅ — '+r3.cust+' '+$('#fFrom').value+'부터 월 '+won(na)+'원','ok');
+      msg('eMsg','금액 수정 완료 ✅ — '+r3.cust+' '+$('#fFrom').value+'부터 월 '+won(na)+'천원','ok');
     }
     // 데이터 새로고침
     var nd=await loadFromDb(); onData(nd);
