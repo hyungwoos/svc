@@ -577,6 +577,31 @@ body{padding-left:192px}
 #viewWeekly[data-zoom="2"] .wk-phase .pt{font-size:21px}
 #viewWeekly[data-zoom="2"] .mini{font-size:14px}
 #viewWeekly[data-zoom="2"] .wk-tbl td{padding:9px 10px;line-height:1.6}
+/* ── 주간회의 발표(전체화면) 모드 — 사이드바·상단바 없이 보고 화면만 ── */
+#viewWeekly:fullscreen,#viewWeekly:-webkit-full-screen{
+  background:var(--plane);padding:0 26px 26px;overflow:auto;
+  --tbh:0px;                               /* 상단바가 없으니 sticky 기준을 0으로 */
+}
+#viewWeekly:fullscreen .wk-head,#viewWeekly:-webkit-full-screen .wk-head{
+  top:0;padding:12px 2px;margin:0 0 12px;background:var(--plane);z-index:60}
+#viewWeekly:fullscreen .wk-wrap,#viewWeekly:-webkit-full-screen .wk-wrap{
+  grid-template-columns:250px 1fr;gap:22px;max-width:1900px;margin:0 auto}
+#viewWeekly:fullscreen{font-size:16px}
+#viewWeekly:fullscreen .wk-tbl{font-size:15.5px}
+#viewWeekly:fullscreen .wk-card{padding:16px 20px;margin-bottom:14px}
+#viewWeekly:fullscreen .wk-card h2{font-size:17px}
+#viewWeekly:fullscreen .wk-chip{font-size:13px}
+#viewWeekly:fullscreen .wk-phase .pt{font-size:20px}
+#viewWeekly:fullscreen .wk-rail{font-size:13.5px}
+/* 발표 모드에서 글자 크기 버튼을 겹쳐 적용 */
+#viewWeekly:fullscreen[data-zoom="1"]{font-size:18.5px}
+#viewWeekly:fullscreen[data-zoom="1"] .wk-tbl{font-size:18px}
+#viewWeekly:fullscreen[data-zoom="1"] .wk-card h2{font-size:19.5px}
+#viewWeekly:fullscreen[data-zoom="2"]{font-size:21px}
+#viewWeekly:fullscreen[data-zoom="2"] .wk-tbl{font-size:20.5px}
+#viewWeekly:fullscreen[data-zoom="2"] .wk-card h2{font-size:22px}
+#viewWeekly:fullscreen .wk-fsonly{display:inline-flex !important}
+.wk-fsonly{display:none !important}
 .frm label{display:block;font-size:11.5px;color:var(--ink-2);margin-bottom:4px}
 .frm input,.frm select,.frm textarea{width:100%;height:36px;padding:0 10px;border-radius:9px;border:1px solid var(--ring);
   background:var(--surface-2);color:var(--ink);font-size:13px;font-family:inherit;outline:none}
@@ -604,6 +629,26 @@ body::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;ba
   backdrop-filter:blur(16px) saturate(1.3); -webkit-backdrop-filter:blur(16px) saturate(1.3);
   border-bottom:1px solid var(--ring)}
 .brand h1{font-size:20px;font-weight:800;letter-spacing:-.035em}
+/* ── 금액 표시 단위 대표 표시 (포탈 전체 = 천원) ───────────────── */
+.ubadge{display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 10px;border-radius:999px;
+  font-size:11.5px;font-weight:750;letter-spacing:-.01em;white-space:nowrap;cursor:help;
+  color:var(--brand,#2a78d6);background:var(--brand-t,rgba(42,120,214,.10));
+  border:1px solid color-mix(in oklab, var(--brand,#2a78d6) 30%, transparent)}
+.ubadge b{font-weight:800}
+.ubadge.sm{height:21px;padding:0 8px;font-size:10.5px;font-weight:700}
+/* 원 단위 영역(가격표·견적서·입력폼) 구분용 — 앰버 */
+.ubadge.won{color:#8a5a00;background:rgba(250,178,25,.14);border-color:rgba(250,178,25,.45)}
+:root[data-theme="dark"] .ubadge.won,html.dark .ubadge.won{color:#f0c460}
+/* 카드 제목 옆 작은 단위 꼬리표 */
+.ukw{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:6px;vertical-align:middle;
+  font-size:10px;font-weight:750;line-height:15px;letter-spacing:0;
+  color:var(--brand,#2a78d6);background:var(--brand-t,rgba(42,120,214,.10));
+  border:1px solid color-mix(in oklab, var(--brand,#2a78d6) 26%, transparent)}
+.ukw::before{content:'단위 '}
+/* 표 안 금액 열 머리글 표시 */
+th.wonh::after{content:'천원';display:inline-block;margin-left:4px;padding:0 4px;border-radius:5px;
+  font-size:9.5px;font-weight:750;color:var(--brand,#2a78d6);background:var(--brand-t,rgba(42,120,214,.10))}
+@media (max-width:900px){ #unitBadge .ub-long{display:none} }
 /* 카드: 더 큰 라운드 + 레이어드 섀도 */
 .card{border-radius:18px;box-shadow:0 1px 2px rgba(0,0,0,.05), 0 10px 30px -14px rgba(0,0,0,.12)}
 .card h2{font-size:14.5px;font-weight:750}
@@ -883,6 +928,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
       <h1>서비스사업부 통합 관리 포탈</h1>
       <span class="sub" id="periodLabel"></span>
     </div>
+    <span class="ubadge" id="unitBadge"
+      title="포탈에 표시되는 모든 금액은 천원 단위입니다.&#10;예) 51,104천원 = 5,110만원 (= 51,104,000원)&#10;· 입력·수정 화면과 가격표·견적서 단가는 원 단위 그대로입니다.">₩ <b>천원</b> 단위<span class="ub-long"> 표시</span></span>
     <div class="spacer"></div>
     <span class="live"><span class="dot"></span><span id="loadedAt"></span></span>
     <button class="pill" id="btnEdit">✏️ 입력·수정</button>
@@ -977,7 +1024,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
   <div class="grid">
     <section class="card c12" data-w="mx">
       <div class="card-head">
-        <div class="t"><h2>월별 종합 장표</h2><p class="cap" id="capMx">서비스 × 월 인식 금액 · 합계 · 전년 대비</p></div>
+        <div class="t"><h2>월별 종합 장표<span class="ukw">천원</span></h2><p class="cap" id="capMx">서비스 × 월 인식 금액 · 합계 · 전년 대비</p></div>
         <div class="seg" id="segMxYear"></div>
       </div>
       <div class="tbl-wrap" style="max-height:none"><table id="tMx"></table></div>
@@ -986,7 +1033,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
     <section class="card c8" data-w="trend">
       <div class="card-head">
         <div class="t">
-          <h2>MRR 추이</h2>
+          <h2>MRR 추이<span class="ukw">천원</span></h2>
           <p class="cap" id="capTrend">서비스별 월 반복매출 누적</p>
         </div>
         <div class="seg" id="segTrend">
@@ -1003,7 +1050,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
 
     <section class="card c4" data-w="year">
       <div class="card-head">
-        <div class="t"><h2>연도별 매출</h2><p class="cap">연 합계 · 막대에 마우스를 올리면 전년 대비</p></div>
+        <div class="t"><h2>연도별 매출<span class="ukw">천원</span></h2><p class="cap">연 합계 · 막대에 마우스를 올리면 전년 대비</p></div>
         <button class="pill ghost" data-tv="year">표</button>
       </div>
       <div class="chartbox h300" id="chYear"></div>
@@ -1011,12 +1058,12 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
     </section>
 
     <section class="card c4" data-w="line">
-      <div class="card-head"><div class="t"><h2>서비스별 MRR</h2><p class="cap" id="capLine"></p></div></div>
+      <div class="card-head"><div class="t"><h2>서비스별 MRR<span class="ukw">천원</span></h2><p class="cap" id="capLine"></p></div></div>
       <div id="barLine"></div>
     </section>
 
     <section class="card c4" data-w="ptn">
-      <div class="card-head"><div class="t"><h2>파트너 실적</h2><p class="cap" id="capPartner"></p></div></div>
+      <div class="card-head"><div class="t"><h2>파트너 실적<span class="ukw">천원</span></h2><p class="cap" id="capPartner"></p></div></div>
       <div id="barPartner"></div>
       <div style="margin-top:14px;padding-top:10px;border-top:1px solid var(--ring)">
         <div style="font-size:11.5px;color:var(--ink-2);opacity:.8;margin-bottom:4px">계산서 발행처 Top 8</div>
@@ -1025,7 +1072,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
     </section>
 
     <section class="card c4" data-w="ind">
-      <div class="card-head"><div class="t"><h2>산업군</h2><p class="cap" id="capInd"></p></div></div>
+      <div class="card-head"><div class="t"><h2>산업군<span class="ukw">천원</span></h2><p class="cap" id="capInd"></p></div></div>
       <div id="barInd"></div>
     </section>
 
@@ -1046,7 +1093,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
 
     <section class="card c12" data-w="exp">
       <div class="card-head">
-        <div class="t"><h2>계약 만료 예정</h2><p class="cap" id="capExp">기준월 이후 만료되는 계약 · 재약정 타깃</p></div>
+        <div class="t"><h2>계약 만료 예정<span class="ukw">천원</span></h2><p class="cap" id="capExp">기준월 이후 만료되는 계약 · 재약정 타깃</p></div>
         <div class="seg" id="segExp">
           <button data-m="3" aria-pressed="true">3개월</button>
           <button data-m="6">6개월</button>
@@ -1057,19 +1104,19 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
     </section>
 
     <section class="card c6" id="secLg" data-w="lg" style="display:none">
-      <div class="card-head"><div class="t"><h2>LG U+ 경유 판매</h2><p class="cap" id="capLg">LG 탭 · 매출은 각 서비스에 포함됨</p></div></div>
+      <div class="card-head"><div class="t"><h2>LG U+ 경유 판매<span class="ukw">천원</span></h2><p class="cap" id="capLg">LG 탭 · 매출은 각 서비스에 포함됨</p></div></div>
       <div class="tbl-wrap"><table id="tLg"></table></div>
     </section>
 
     <section class="card c6" id="secVs" data-w="vs" style="display:none">
-      <div class="card-head"><div class="t"><h2>비즈포탈 차액</h2><p class="cap" id="capVs">회계매출(비즈포탈) vs 매출시트 차이</p></div></div>
+      <div class="card-head"><div class="t"><h2>비즈포탈 차액<span class="ukw">천원</span></h2><p class="cap" id="capVs">회계매출(비즈포탈) vs 매출시트 차이</p></div></div>
       <div id="vsSummary" style="padding:2px 0 10px"></div>
       <div class="tbl-wrap"><table id="tVs"></table></div>
     </section>
 
     <section class="card c12" data-w="all">
       <div class="card-head">
-        <div class="t"><h2>계약 목록</h2><p class="cap" id="capAll">필터 조건에 맞는 전체 계약 · 열 제목을 눌러 정렬</p></div>
+        <div class="t"><h2>계약 목록<span class="ukw">천원</span></h2><p class="cap" id="capAll">필터 조건에 맞는 전체 계약 · 열 제목을 눌러 정렬</p></div>
       </div>
       <div class="tbl-wrap"><table id="tAll"></table></div>
     </section>
@@ -1102,7 +1149,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
   <div id="viewQuote" class="hidden">
     <section class="card c12" style="padding:10px">
       <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px 10px">
-        <div style="font-size:13px;font-weight:650">📄 견적 시스템</div>
+        <div style="font-size:13px;font-weight:650">📄 견적 시스템 <span class="ubadge sm won">₩ 견적 금액은 원 단위</span></div>
         <a href="quote.html" target="_blank" class="pill ghost" style="text-decoration:none">↗ 새 창에서 열기</a>
       </div>
       <iframe id="quoteFrame" title="견적 시스템"
@@ -1893,7 +1940,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-01 ㊶';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-01 ㊸';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -2966,7 +3013,7 @@ function renderMatrix(list){
     list.forEach(function(k){ if(!lb || DATA.rows[k].line===lb) s+=MAT[k][idx]; });
     return s;
   }
-  function num(v){ return v? Math.round(v/10000).toLocaleString('ko-KR') : '·'; }
+  function num(v){ return v? Math.round(v/1000).toLocaleString('ko-KR') : '·'; }   // 천원 단위
 
   var t=$('#tMx'); t.innerHTML='';
   var thead=document.createElement('thead');
@@ -3003,7 +3050,7 @@ function renderMatrix(list){
 
   // 단위 안내
   var cap=$('#capMx');
-  cap.textContent = Y+'년 · 단위: 만원 · 미래 월은 계약상 예정 금액 (회색)';
+  cap.textContent = Y+'년 · 단위: 천원 · 미래 월은 계약상 예정 금액 (회색)';
 }
 
 /* ---- LG U+ 경유 판매 ---- */
@@ -5123,25 +5170,25 @@ function renderBizMonthly(){
   host.appendChild(head);
 
   var st=document.createElement('table'); st.className='dgrid'; st.style.maxWidth='560px';
-  var sb='<thead><tr><th>항목</th><th style="text-align:right">금액(원)</th></tr></thead><tbody>';
+  var sb='<thead><tr><th>항목</th><th style="text-align:right">금액(천원)</th></tr></thead><tbody>';
   sums.forEach(function(r){
     var hl=/차액/.test(r.item||'');
     sb+='<tr'+(hl?' style="font-weight:700;border-top:2px solid var(--axis)"':'')+'><td>'+esc(r.item)+'</td>'+
         '<td style="text-align:right'+(hl?';color:'+((r.biz||0)>=0?'var(--good,#0ca30c)':'var(--critical,#d03b3b)'):'')+'">'+
-        Number(r.biz||0).toLocaleString('ko-KR')+'</td></tr>';
+        Math.round(Number(r.biz||0)/1000).toLocaleString('ko-KR')+'</td></tr>';
   });
   st.innerHTML=sb+'</tbody>';
   host.appendChild(st);
 
   if(dets.length){
-    var h2=document.createElement('p'); h2.className='cap'; h2.style.marginTop='18px'; h2.textContent='고객사별 차이';
+    var h2=document.createElement('p'); h2.className='cap'; h2.style.marginTop='18px'; h2.innerHTML='고객사별 차이 <b style="color:var(--brand,#2a78d6)">· 단위: 천원</b>';
     host.appendChild(h2);
     var dt=document.createElement('table'); dt.className='dgrid';
-    var db='<thead><tr><th>고객사</th><th style="text-align:right">비즈포탈</th><th style="text-align:right">매출시트</th><th style="text-align:right">차이</th><th>사유</th></tr></thead><tbody>';
+    var db='<thead><tr><th>고객사</th><th style="text-align:right">비즈포탈(천원)</th><th style="text-align:right">매출시트(천원)</th><th style="text-align:right">차이(천원)</th><th>사유</th></tr></thead><tbody>';
     dets.forEach(function(r){
-      db+='<tr><td>'+esc(r.item)+'</td><td style="text-align:right">'+Number(r.biz||0).toLocaleString('ko-KR')+'</td>'+
-          '<td style="text-align:right">'+Number(r.sheet||0).toLocaleString('ko-KR')+'</td>'+
-          '<td style="text-align:right;color:'+((r.diff||0)>=0?'var(--good,#0ca30c)':'var(--critical,#d03b3b)')+'">'+Number(r.diff||0).toLocaleString('ko-KR')+'</td>'+
+      db+='<tr><td>'+esc(r.item)+'</td><td style="text-align:right">'+won(r.biz)+'</td>'+
+          '<td style="text-align:right">'+won(r.sheet)+'</td>'+
+          '<td style="text-align:right;color:'+((r.diff||0)>=0?'var(--good,#0ca30c)':'var(--critical,#d03b3b)')+'">'+won(r.diff)+'</td>'+
           '<td style="font-size:12px;color:var(--muted)">'+esc(r.note||'')+'</td></tr>';
     });
     dt.innerHTML=db+'</tbody>';
@@ -5172,7 +5219,8 @@ function renderTargetTable(host, rows){
   var hd=document.createElement('div');
   hd.style.cssText='display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px';
   hd.innerHTML='<b style="font-size:14px">🎯 '+year+'년 월 목표 대비 달성률</b>'+
-    '<span class="cap" style="margin:0">목표는 연초 기준 · 달성률 = 성과 ÷ 목표</span>';
+    '<span class="ubadge sm">₩ 천원</span>'+
+    '<span class="cap" style="margin:0">목표는 연초 기준 · 달성률 = 성과 ÷ 목표 · 금액은 모두 천원</span>';
   if(!window.IS_VIEWER){
     var sp=document.createElement('span'); sp.style.flex='1'; hd.appendChild(sp);
     var be=document.createElement('button'); be.className='pill'; be.textContent='✎ 월 목표 입력';
@@ -5182,9 +5230,9 @@ function renderTargetTable(host, rows){
   box.appendChild(hd);
 
   var t=document.createElement('table'); t.className='dgrid';
-  var h='<thead><tr><th>구분</th><th style="text-align:right">목표</th>'+
-        '<th style="text-align:right">비즈포탈 회계매출</th><th style="text-align:right">달성률</th>'+
-        '<th style="text-align:right">매출시트 매출</th><th style="text-align:right">달성률</th></tr></thead><tbody>';
+  var h='<thead><tr><th>구분</th><th style="text-align:right">목표(천원)</th>'+
+        '<th style="text-align:right">비즈포탈 회계매출(천원)</th><th style="text-align:right">달성률</th>'+
+        '<th style="text-align:right">매출시트 매출(천원)</th><th style="text-align:right">달성률</th></tr></thead><tbody>';
 
   function pct(v, base){
     if(!base) return '<td style="text-align:right;color:var(--muted)">·</td>';
@@ -5192,7 +5240,7 @@ function renderTargetTable(host, rows){
     var c = r>=100? 'var(--good,#0ca30c)' : (r>=95? 'var(--warning,#fab219)' : 'var(--critical,#d03b3b)');
     return '<td style="text-align:right;font-weight:650;color:'+c+'">'+r.toFixed(1)+'%</td>';
   }
-  function money(v){ return v==null? '·' : Number(v).toLocaleString('ko-KR'); }
+  function money(v){ return v==null? '·' : won(v); }        /* 천원 단위 */
 
   var accT=0, accB=0, accS=0, qT=0, qB=0, qS=0;
   for(var m=1;m<=12;m++){
@@ -5250,7 +5298,7 @@ function openTargetEditor(year){
   }
   ovl.innerHTML='<div class="modal" style="width:min(560px,100%)">'+
     '<h3>'+year+'년 월 목표</h3>'+
-    '<p class="cap">연초에 정한 월별 목표 금액(원)을 넣으세요. 비워두면 그 달은 달성률을 계산하지 않습니다.</p>'+
+    '<p class="cap">연초에 정한 월별 목표 금액을 <b>원 단위로</b> 넣으세요 (표에는 천원으로 표시). 비워두면 그 달은 달성률을 계산하지 않습니다.</p>'+
     '<div class="frm">'+rowsHtml+'</div>'+
     '<div class="mact"><span class="mmsg" id="tgMsg" style="flex:1"></span>'+
     '<button class="pill ghost" id="tgCancel">취소</button>'+
@@ -5304,9 +5352,9 @@ function renderBizEditor(host, months){
       '<div><label>월 *</label><input id="bzYm" placeholder="예: 8월" value="'+esc(editYm)+'"></div>'+
       '<div><label>작성일</label><input id="bzAsOf" type="date" value="'+esc(asOf)+'"></div>'+
     '</div>'+
-    '<div class="cap" style="margin-bottom:6px">요약 항목 (금액은 천원 단위)</div><div id="bzSums"></div>'+
+    '<div class="cap" style="margin-bottom:6px">요약 항목 — 금액은 <b>원 단위로 입력</b> (표·대시보드에는 천원으로 표시됩니다)</div><div id="bzSums"></div>'+
     '<button class="pill ghost" id="bzAddSum" style="margin:6px 0 16px">＋ 항목 추가</button>'+
-    '<div class="cap" style="margin-bottom:6px">고객사별 차이 (없으면 비워두세요 · 차이는 자동 계산)</div><div id="bzDets"></div>'+
+    '<div class="cap" style="margin-bottom:6px">고객사별 차이 (없으면 비워두세요 · 차이는 자동 계산) — <b>원 단위로 입력</b></div><div id="bzDets"></div>'+
     '<button class="pill ghost" id="bzAddDet" style="margin:6px 0 18px">＋ 고객사 추가</button>'+
     '<div style="display:flex;gap:10px;align-items:center">'+
       '<span class="mini" id="bzMsg" style="flex:1"></span>'+
@@ -5585,9 +5633,10 @@ function renderChannelView(key){
   function tile(k2,v2,u2,d2){ return '<div class="kpi"><div class="k">'+k2+'</div><div class="v">'+v2+'<small>'+u2+'</small></div><div class="d">'+(d2||'')+'</div></div>'; }
   var h='<div style="display:flex;align-items:baseline;gap:12px;margin:2px 2px 14px">'+
     '<span style="font-size:18px;font-weight:800">'+def[0]+' 사업 영역</span>'+
+    '<span class="ubadge sm">₩ 금액 단위 = 천원</span>'+
     '<span class="mini">'+esc(def[2])+' · '+baseLabel()+' 기준</span></div>';
   h+='<div class="kpis" style="margin-bottom:16px">'+
-    tile('당월 MRR', won(mrr), '원', '연환산 '+won(mrr*12)+'천원')+
+    tile('당월 MRR', won(mrr), '천원', '연환산 '+won(mrr*12)+'천원')+
     tile('활성 계약', act.toLocaleString('ko-KR'), '건', '전체 이력 '+list.length+'건')+
     tile('고객사', Object.keys(custs).length.toLocaleString('ko-KR'), '곳', '당월 매출 기준')+
     (hasEq? tile('임대중 장비', rentEq, '대', pendEq? '처리 대기 요청 '+pendEq+'건':'대기 요청 없음')
@@ -5620,8 +5669,8 @@ function renderChannelView(key){
       '</section>';
   }
   h+='<div class="grid">';
-  h+='<section class="card c12"><h2>월별 매출 추이</h2><p class="cap">최근 24개월 · '+esc(def[0].replace(/^\S+ /,''))+'</p><div class="chartbox h260" id="chvTrend"></div></section>';
-  h+='<section class="card c12"><h2>계약 목록</h2><p class="cap" id="chvCtCap"></p>'+
+  h+='<section class="card c12"><h2>월별 매출 추이<span class="ukw">천원</span></h2><p class="cap">최근 24개월 · '+esc(def[0].replace(/^\S+ /,''))+'</p><div class="chartbox h260" id="chvTrend"></div></section>';
+  h+='<section class="card c12"><h2>계약 목록<span class="ukw">천원</span></h2><p class="cap" id="chvCtCap"></p>'+
      '<div class="dbar" style="margin-bottom:10px">'+
        '<input type="search" id="chvQ" placeholder="검색 — 여러 단어로 좁히기 (예: 다원 MDR)">'+
        '<button class="pill ghost" id="chvFclr" style="display:none;border-color:var(--critical);color:var(--critical)">✕ 필터 해제</button>'+
@@ -6037,7 +6086,8 @@ function renderPrice(){
   var verSel='<select id="prVer" class="pill" style="height:31px;font-family:inherit">'+
     vers.map(function(b,i){ return '<option value="'+i+'"'+(i===(PR.ver[PR.seg]||0)?' selected':'')+'>'+esc(b.label)+(i===0?' (현행)':' (이력)')+'</option>'; }).join('')+'</select>';
   var head='<div class="pr-top">'+
-    '<span style="font-size:17px;font-weight:800">💰 제품 가격표</span>'+verSel+
+    '<span style="font-size:17px;font-weight:800">💰 제품 가격표</span>'+
+    '<span class="ubadge sm won">₩ 단가는 원 단위</span>'+verSel+
     '<span class="pr-ver">적용일 '+esc(String(book.applied||''))+' · 새 판 등록 시 자동 교체 · 이전 판은 이력</span>'+
     '<span style="flex:1"></span>'+
     '<input id="prQ" class="pill" style="height:33px;min-width:200px" placeholder="제품·모델명 검색" value="'+esc(PR.q)+'">'+
@@ -6089,7 +6139,7 @@ function prSaasHtml(){
     '<div class="pr-note" id="pmNote" style="margin-top:8px"></div></div>';
   var inSt='height:34px;border:1px solid var(--ring);border-radius:9px;padding:0 10px;font:inherit;background:var(--surface)';
   var yOpt=''; for(var yk=1;yk<=10;yk++) yOpt+='<option value="'+yk+'"'+(yk===5?' selected':'')+'>'+yk+'년</option>';
-  h+='<div class="pr-card" style="margin-bottom:14px"><h3>⚖️ TCO 비교 — SaaS vs 구축형'+
+  h+='<div class="pr-card" style="margin-bottom:14px"><h3>⚖️ TCO 비교 — SaaS vs 구축형 <span class="ubadge sm won">₩ 이 카드는 원 단위</span>'+
     '<small>SaaS = 3년 약정 엔드가 + 센서(월 5·10·15만원/대 선택) · 구축형 = 라이선스+정책서버+차단센서(모델 선택, 할인가) + 유지보수 10~15%/년(2년차~)</small></h3>'+
     '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0">'+
     '<span style="display:inline-flex;gap:4px">'+
@@ -6583,6 +6633,7 @@ function renderInbStat(){
   host.innerHTML=
     '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">'+
     '<span style="font-size:17px;font-weight:800">📥 인바운드 통계</span>'+
+    '<span class="ubadge sm">₩ 금액 단위 = 천원</span>'+
     '<span class="mini">원본: 구글시트 · 매일 아침 7시 자동 동기화</span>'+
     '<span style="flex:1"></span>'+yb+
     '<button class="pill ghost" id="inbFetch">↻ 시트에서 다시 가져오기</button>'+
@@ -6591,7 +6642,7 @@ function renderInbStat(){
     '<div class="inb-kpi"><div class="l">유입 건수</div><div class="v">'+R.length.toLocaleString()+'건</div><div class="s">'+(INB_Y==='all'?'25년~현재 누적':INB_Y+'년')+'</div></div>'+
     '<div class="inb-kpi"><div class="l">진행중</div><div class="v">'+prog+'건</div><div class="s">방문미팅·데모·이관 포함</div></div>'+
     '<div class="inb-kpi"><div class="l">수주</div><div class="v">'+wonL.length+'건</div><div class="s">전환율 '+conv+'%</div></div>'+
-    '<div class="inb-kpi"><div class="l">수주액</div><div class="v">'+(amt>=1e8?(amt/1e8).toFixed(1)+'억':Math.round(amt/1e4).toLocaleString()+'만')+'</div><div class="s">₩'+Math.round(amt).toLocaleString()+'</div></div>'+
+    '<div class="inb-kpi"><div class="l">수주액</div><div class="v">'+won(amt)+'<small style="font-size:11px;font-weight:600"> 천원</small></div><div class="s">단위: 천원</div></div>'+
     '<div class="inb-kpi warn"><div class="l">3개월+ 무응답</div><div class="v">'+stale.length+'건</div><div class="s">진행중인데 대응 기록이 오래됨</div></div></div>'+
     '<div class="inb-2">'+
     '<div class="inb-card"><h3>월별 유입 추이 <small><span style="color:var(--brand)">■</span> '+curY+'년 · <span style="color:var(--muted)">■</span> '+prvY+'년</small></h3><div class="inb-bars">'+bars+'</div></div>'+
@@ -6649,7 +6700,7 @@ function openInbDetail(r){
     '<div><b>이메일</b>'+esc(r.email||'-')+'</div>'+
     '<div><b>연락처</b>'+esc(r.phone||'-')+'</div>'+
     (r.biz_no?'<div><b>영업현황 번호</b>'+esc(r.biz_no)+'</div>':'')+
-    (r.amount?'<div><b>수주액</b>₩'+Math.round(Number(r.amount)).toLocaleString()+'</div>':'')+
+    (r.amount?'<div><b>수주액</b>'+won(r.amount)+'천원</div>':'')+
     '</div>'+
     '<div class="inb-body">'+esc(r.content||'(요청내용 없음)')+'</div>'+
     (steps.length?'<div class="inb-tl">'+steps.map(function(s){
@@ -6800,6 +6851,7 @@ async function renderWeekly(atWeek){
   var weekNav=(d.weeks||[]);   // 저장된 주차 전부 (소급분 포함)
   var head='<div class="wk-head">'+
     '<span style="font-size:17px;font-weight:800">📊 주간회의</span>'+
+    '<span class="wk-chip wkc-blu wk-fsonly">발표 모드 · Space/↓ 다음 · ↑ 이전 · ESC 종료</span>'+
     '<select id="wkWeekSel" class="pill" style="height:31px;font-family:inherit">'+
       weekNav.map(function(w){ return '<option value="'+w+'"'+(w===WK.week?' selected':'')+'>'+w+' 주간</option>'; }).join('')+'</select>'+
     '<span class="pill ghost" style="font-size:11.5px">'+esc(meta.file_name||'')+' · '+wkTime(meta.fetched_at)+' 취합</span>'+
@@ -6808,6 +6860,7 @@ async function renderWeekly(atWeek){
     '<span style="flex:1"></span>'+
     '<span class="mini">'+Object.keys(counts).map(function(k){return k+' '+counts[k]+'건';}).join(' · ')+'</span>'+
     '<button class="pill ghost" id="wkZoom" title="글자 크기 — 보통 → 크게 → 아주 크게">가<span style="font-size:15px;font-weight:800">A</span> 글자 크기</button>'+
+    '<button class="pill ghost" id="wkFs" title="보고 화면만 전체화면으로 — 사이드바·상단바 없이 발표 (ESC 또는 F로 종료)">⛶ 발표 모드</button>'+
     '<button class="pill ghost" id="wkFetch">↻ 다시 가져오기</button>'+
     '<button class="pill" id="wkNext">▶ 다음 (Space)</button></div>';
 
@@ -6856,6 +6909,7 @@ async function renderWeekly(atWeek){
     requestAnimationFrame(wkMeasure);   // 글자 크기가 바뀌면 헤더 높이도 다시 잼
   };
   $('#wkNext').onclick=function(){ this.blur(); wkNext(); };
+  var bfs=$('#wkFs'); if(bfs) bfs.onclick=function(){ this.blur(); wkToggleFs(); };
   $('#wkFetch').onclick=wkRefetch;
   if($('#wkMemoSave')) $('#wkMemoSave').onclick=async function(){
     var t=$('#wkMemo').value;
@@ -6869,6 +6923,28 @@ async function renderWeekly(atWeek){
   };
   function msgTo(id,t){ var e=document.getElementById(id); if(e) e.textContent=t; }
 }
+/* 주간회의 발표(전체화면) 모드 — 보고 화면만 화면 전체에 띄웁니다 */
+function wkFsOn(){ return !!(document.fullscreenElement||document.webkitFullscreenElement); }
+function wkToggleFs(){
+  var vw=document.getElementById('viewWeekly'); if(!vw) return;
+  try{
+    if(wkFsOn()){ (document.exitFullscreen||document.webkitExitFullscreen).call(document); return; }
+    var rq=vw.requestFullscreen||vw.webkitRequestFullscreen;
+    if(!rq){ toast('전체화면 불가','이 브라우저는 전체화면을 지원하지 않습니다','info'); return; }
+    var r=rq.call(vw);
+    if(r&&r.catch) r.catch(function(e){ toast('전체화면 실패', String(e.message||e), 'info'); });
+  }catch(e){ toast('전체화면 실패', String(e.message||e), 'info'); }
+}
+document.addEventListener('fullscreenchange', wkFsSync);
+document.addEventListener('webkitfullscreenchange', wkFsSync);
+function wkFsSync(){
+  var on=wkFsOn();
+  var b=document.getElementById('wkFs');
+  if(b){ b.textContent = on? '⛶ 발표 종료 (ESC)' : '⛶ 발표 모드';
+         b.style.background = on? 'var(--brand-t,rgba(46,189,87,.13))':''; }
+  if(!on){ document.documentElement.style.removeProperty('--tbh'); }
+  try{ if(window.__wkMeasure && !on) window.__wkMeasure(); }catch(e){}
+}
 function wkGo(id){
   var el=document.getElementById(id); if(!el) return;
   el.scrollIntoView({behavior:'smooth',block:'start'});
@@ -6881,12 +6957,21 @@ function wkNext(){
   var nx=links[Math.min(i+1,links.length-1)];
   if(nx) wkGo(nx.dataset.go);
 }
+function wkPrev(){
+  var cur=document.querySelector('.wk-rail a.on');
+  var links=Array.prototype.slice.call(document.querySelectorAll('.wk-rail a'));
+  var i=cur? links.indexOf(cur):links.length;
+  var pv=links[Math.max(i-1,0)];
+  if(pv) wkGo(pv.dataset.go);
+}
 document.addEventListener('keydown',function(e){
   if(CUR_VIEW!=='weekly') return;
-  if(e.code!=='Space') return;
   var t=e.target && e.target.tagName;
   if(t==='INPUT'||t==='TEXTAREA'||t==='SELECT') return;
-  e.preventDefault(); wkNext();
+  if(e.code==='Space'){ e.preventDefault(); wkNext(); return; }
+  if(e.code==='ArrowDown'||e.code==='PageDown'){ e.preventDefault(); wkNext(); return; }
+  if(e.code==='ArrowUp'||e.code==='PageUp'){ e.preventDefault(); wkPrev(); return; }
+  if(e.key==='f'||e.key==='F'){ e.preventDefault(); wkToggleFs(); }
 });
 async function wkRefetch(){
   toast('주간보고 취합','시트에서 가져오는 중… (수십 초 걸릴 수 있습니다)','info');
@@ -7854,7 +7939,7 @@ function renderChurn(){
   var inSt='height:34px;border:1px solid var(--ring);border-radius:9px;padding:0 10px;font:inherit;background:var(--surface)';
   function mopt(sel){ var s2=''; for(var i2=maxJ;i2>=0;i2--) s2+='<option value="'+i2+'"'+(i2===sel?' selected':'')+'>'+mk(i2)+'</option>'; return s2; }
   function kpi(l,v,s){ return '<div class="pr-ob"><div class="l">'+l+'</div><div class="v">'+v+'</div>'+(s?'<div class="pr-note">'+s+'</div>':'')+'</div>'; }
-  var h='<div class="pr-card" style="margin-bottom:14px"><h3>📉 해지 분석'+
+  var h='<div class="pr-card" style="margin-bottom:14px"><h3>📉 해지 분석 <span class="ubadge sm">₩ 금액 단위 = 천원</span>'+
     '<small>해지·서비스 종료 계약 기준 · 해지월 = 마지막 매출월(또는 계약 종료월)</small></h3>'+
     '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:8px 0 0">기간 '+
     '<select id="chF" style="'+inSt+'">'+mopt(CHURN.f)+'</select> ~ '+
@@ -7869,7 +7954,7 @@ function renderChurn(){
       ? '⚠ 재약정으로 이어진 '+renewN+'건도 포함해서 보고 있습니다 — 실제 이탈 수치가 아닙니다'
       : (renewN? '재약정으로 이어진 '+renewN+'건은 제외했습니다 (계약 종료 후 같은 고객·서비스로 재계약된 건 · 비고 «재약정 완료» 포함)':'재약정 승계 건 없음'))+
     '</p></div>';
-  h+='<div class="pr-card" style="margin-bottom:14px"><h3>'+mk(CHURN.f)+' ~ '+mk(CHURN.t)+' 요약 <small>'+(CHURN.inclRenew?'재약정 포함':'실제 이탈만 (재약정 제외)')+'</small></h3>'+
+  h+='<div class="pr-card" style="margin-bottom:14px"><h3>'+mk(CHURN.f)+' ~ '+mk(CHURN.t)+' 요약 <span class="ubadge sm">₩ 천원</span><small>'+(CHURN.inclRenew?'재약정 포함':'실제 이탈만 (재약정 제외)')+'</small></h3>'+
     '<div class="pr-out" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">'+
     kpi(CHURN.inclRenew?'해지·종료':'실제 이탈', totN+'건', renewN? (CHURN.inclRenew? '이 중 재약정 '+renewN+'건':'재약정 '+renewN+'건 제외'):'')+
     kpi('고객사', Object.keys(custN).length+'곳','')+
@@ -8099,7 +8184,7 @@ function renderReport(){
       (rows2.length?'':'<span class="pr-note">'+empty+' — 필요하면 직접 행을 추가하세요</span>')+'</div>';
     return h2;
   }
-  var h='<div class="pr-card" style="margin-bottom:14px"><h3>📑 커스텀 리포트'+
+  var h='<div class="pr-card" style="margin-bottom:14px"><h3>📑 커스텀 리포트 <span class="ubadge sm">₩ 금액 단위 = 천원</span>'+
     '<small>숫자·표·제목 전부 클릭해서 직접 수정 가능 · 자동 계산값은 시작점일 뿐입니다 · 대상월을 바꾸면 초기화됩니다</small></h3>'+
     '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:8px 0 0">'+
     '대상월 <select id="rpM" style="'+inSt+'">'+opts+'</select>'+
@@ -8115,11 +8200,11 @@ function renderReport(){
     '<p class="pr-note" style="margin-top:4px">단위: 천원 · 월 숫자는 해당 연도 1월부터 기준월까지 · Q=분기 소계</p></div>';
   h+='<div class="pr-card" style="margin-bottom:14px"><h3>🛡️ <span contenteditable spellcheck="false" id="rpMdrT">MDR 고객 현황</span>'+inc('mdrc')+'</h3>'+
     '<div id="rpMdrB" contenteditable spellcheck="false" style="font-size:13px;line-height:2.0">'+md.lines.map(function(x){return esc(x);}).join('<br>')+'</div></div>';
-  h+='<div class="pr-card" style="margin-bottom:14px"><h3><span contenteditable spellcheck="false" id="rpKT">'+d.ym+' 요약</span>'+rpCopyBtn('rpK')+inc('sum')+'</h3><div class="pr-out" id="rpK" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">'+
+  h+='<div class="pr-card" style="margin-bottom:14px"><h3><span contenteditable spellcheck="false" id="rpKT">'+d.ym+' 요약</span> <span class="ubadge sm">₩ 천원</span>'+rpCopyBtn('rpK')+inc('sum')+'</h3><div class="pr-out" id="rpK" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">'+
     kpi('월 매출(MRR)',won(d.tot)+'천원', d.prev?('전월 대비 '+pct(dif)):'')+
     kpi('ARR 환산',won(d.tot*12)+'천원','')+
-    kpi('월 목표 달성률', d.mtg? Math.round(d.tot/d.mtg*100)+'%':'목표 없음', d.mtg?('목표 ₩'+won(d.mtg)):'')+
-    kpi('연 누계', won(d.ytd)+'천원', d.ytg?('연 목표 '+won(d.ytg)+' 의 '+Math.round(d.ytd/d.ytg*100)+'%'):'')+
+    kpi('월 목표 달성률', d.mtg? Math.round(d.tot/d.mtg*100)+'%':'목표 없음', d.mtg?('목표 '+won(d.mtg)+'천원'):'')+
+    kpi('연 누계', won(d.ytd)+'천원', d.ytg?('연 목표 '+won(d.ytg)+'천원 의 '+Math.round(d.ytd/d.ytg*100)+'%'):'')+
     kpi('활성 고객사', d.actCnt+'곳','매출 발생 기준')+
     kpi('신규 / 해지', d.newCt.length+'건 / '+d.endCt.length+'건','')+
     '</div></div>';
@@ -8127,9 +8212,9 @@ function renderReport(){
   d.trend.forEach(function(x){
     tr+='<div style="display:flex;align-items:center;gap:8px;margin:2px 0;font-size:11px"><span style="width:52px;color:var(--muted)">'+x[0]+'</span>'+
       '<div style="flex:1"><div style="height:9px;border-radius:4px;background:'+(x[0]===d.ym?'var(--brand)':'var(--brand-t)')+';width:'+Math.round(x[1]/mx*100)+'%"></div></div>'+
-      '<span style="width:90px;text-align:right;color:var(--ink-2)">₩'+won(x[1])+'</span></div>';
+      '<span style="width:98px;text-align:right;color:var(--ink-2)">'+won(x[1])+'</span></div>';
   });
-  h+='<div class="pr-card" style="margin-bottom:14px"><h3>최근 12개월 매출 추이 <small>이 카드만 자동값 고정 (PPT에서는 수정 가능한 차트)</small>'+inc('trend')+'</h3>'+tr+'</div>';
+  h+='<div class="pr-card" style="margin-bottom:14px"><h3>최근 12개월 매출 추이 <span class="ubadge sm">₩ 천원</span><small>이 카드만 자동값 고정 (PPT에서는 수정 가능한 차트)</small>'+inc('trend')+'</h3>'+tr+'</div>';
   h+='<div class="pr-card" style="margin-bottom:14px"><h3>🆕 <span contenteditable spellcheck="false">신규 계약</span> <small>'+d.newCt.length+'건</small>'+rpCopyBtn('rpTblNew')+inc('new')+'</h3>'+
     tbl('rpTblNew',[['고객사'],['서비스'],['채널'],['구분'],['수량',1],['월액(천원)',1]],
       d.newCt.map(function(x){ return [x.r.cust, LINE_LABEL[x.r.line]||x.r.line, x.r.channel, x.r.ctype||'-', {t:x.r.qty||'-',n:1}, {t:Math.round(x.v/1000).toLocaleString('ko-KR'),n:1}]; }),'신규 계약이 없습니다')+'</div>';
@@ -8140,11 +8225,11 @@ function renderReport(){
     tbl('rpTblPoc',[['고객사'],['서비스 유형'],['상태'],['계약예정수량',1],['영업담당']],
       d.poc.map(function(x){ return [x.customer||'-', x.svc_type||'-', x.status||'-', {t:x.plan_qty||'-',n:1}, x.sales_name||'-']; }),'해당 월 PoC 신청이 없습니다')+'</div>';
   var inbBy={}; d.inb.forEach(function(x){ var k=x.result||'미기재'; inbBy[k]=(inbBy[k]||0)+1; });
-  var inbNote='접수 '+d.inb.length+'건'+(d.inbWon.length?' · 수주 전환 '+d.inbWon.length+'건'+(function(){var s2=0;d.inbWon.forEach(function(x){s2+=Number(x.amount)||0;});return s2?' · 수주액 합 ₩'+won(s2):'';})():'');
+  var inbNote='접수 '+d.inb.length+'건'+(d.inbWon.length?' · 수주 전환 '+d.inbWon.length+'건'+(function(){var s2=0;d.inbWon.forEach(function(x){s2+=Number(x.amount)||0;});return s2?' · 수주액 합 '+won(s2)+'천원':'';})():'');
   h+='<div class="pr-card" style="margin-bottom:14px"><h3>📨 <span contenteditable spellcheck="false">인바운드</span> <small>'+d.inb.length+'건'+(RAWX.inbound?'':' · 불러오는 중…')+'</small>'+rpCopyBtn('rpTblInb')+inc('inb')+'</h3>'+
     tbl('rpTblInb',[['상태'],['건수',1]], Object.keys(inbBy).sort(function(a,b){return inbBy[b]-inbBy[a];}).map(function(k){ return [k,{t:inbBy[k],n:1}]; }),'해당 월 인바운드가 없습니다')+
     '<p class="pr-note" id="rpInbX" contenteditable spellcheck="false" style="margin-top:6px">'+inbNote+'</p></div>';
-  h+='<div class="pr-card" style="margin-bottom:14px"><h3>🎯 <span contenteditable spellcheck="false">OI 파이프라인</span> <small>현재 시점 스냅샷</small>'+rpCopyBtn('rpK2')+inc('oi')+'</h3><div class="pr-out" id="rpK2" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">'+
+  h+='<div class="pr-card" style="margin-bottom:14px"><h3>🎯 <span contenteditable spellcheck="false">OI 파이프라인</span> <span class="ubadge sm">₩ 천원</span><small>현재 시점 스냅샷</small>'+rpCopyBtn('rpK2')+inc('oi')+'</h3><div class="pr-out" id="rpK2" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">'+
     kpi('진행 중 OI', d.oiOpen.length+'건','등록+진행 단계')+
     kpi('예상 금액 합',won(d.oiSum)+'천원','전부 수주 가정 · VAT별도')+
     kpi('기대 수주액',won(d.oiW)+'천원','수주가능성 가중')+
@@ -8253,6 +8338,8 @@ async function rpMakePpt(){
       slideNumber:{x:12.85,y:7.05,w:0.4,h:0.3,fontSize:10,color:'9AA0A6',fontFace:F} });
     var secN=0;
     function slTitle(s,t){ secN++; s.addText(secN+'. '+t,{x:0.5,y:0.13,w:11.6,h:0.62,fontSize:20,bold:true,color:NAVY,fontFace:F,valign:'middle'}); }
+    /* 금액이 들어간 슬라이드에는 «단위: 천원» 각주를 항상 표시 */
+    function uNote(s,y){ s.addText('※ 금액 단위: 천원 (1,000원)',{x:0.5,y:(y==null?7.02:y),w:5.6,h:0.3,fontSize:10,italic:true,color:MUT,fontFace:F}); }
     // ── 표지 (네이비 + 패턴 + CONFIDENTIAL) ──
     var s1=p.addSlide();
     s1.background={color:NAVY};
@@ -8263,6 +8350,7 @@ async function rpMakePpt(){
     s1.addText(title,{x:0.6,y:2.55,w:7.6,h:1.0,fontSize:33,bold:true,color:'FFFFFF',fontFace:F});
     s1.addText(sub,{x:0.62,y:3.62,w:6,h:0.55,fontSize:20,bold:true,color:'7EBA25',fontFace:F});
     s1.addText(new Date().toISOString().slice(0,10).replace(/-/g,'.')+'\n서비스사업부',{x:0.62,y:4.25,w:6,h:0.85,fontSize:14,color:'D9E2F2',fontFace:F,lineSpacing:24});
+    s1.addText('※ 본 자료의 모든 금액 단위는 천원(1,000원) 입니다.',{x:0.62,y:5.35,w:7,h:0.32,fontSize:11,color:'A9BCD9',fontFace:F});
     s1.addImage({data:RP_IMG.logoW,x:0.55,y:6.78,w:1.35,h:0.30});
     // ── 매출 Review (QBR 본문 1) ──
     if(on('rev')){
@@ -8281,6 +8369,7 @@ async function rpMakePpt(){
           }));
         sR.addTable(rtx,{x:0.5,y:ry,w:12.3,border:{pt:0.5,color:BORD},autoPage:false,rowH:0.3,colW:[1.55].concat(rT.head.slice(1).map(function(){ return 10.75/(rT.head.length-1); }))});
       }
+      uNote(sR);
     }
     // ── MDR 고객 현황 (QBR 본문 2) ──
     if(on('mdrc')){
@@ -8309,15 +8398,17 @@ async function rpMakePpt(){
         s2.addText(k[1],{x:x+0.28,y:y+0.78,w:3.5,h:0.85,fontSize:27,bold:true,color:NAVY,fontFace:F});
         if(k[2]) s2.addText(k[2],{x:x+0.28,y:y+1.72,w:3.5,h:0.4,fontSize:11,color:'4E8A1E',fontFace:F});
       });
+      uNote(s2);
     }
     // ── 매출 추이 차트 ──
     if(on('trend')){
       var s3=p.addSlide({masterName:'M'});
       slTitle(s3,'최근 12개월 매출 추이');
-      s3.addChart(p.ChartType.bar,[{name:'월 매출', labels:d.trend.map(function(x){return x[0];}), values:d.trend.map(function(x){return Math.round(x[1]);})}],
+      s3.addChart(p.ChartType.bar,[{name:'월 매출(천원)', labels:d.trend.map(function(x){return x[0];}), values:d.trend.map(function(x){return Math.round(x[1]/1000);})}],
         {x:0.5,y:1.35,w:12.3,h:5.3, barDir:'col', chartColors:[GRN], catAxisLabelFontSize:10, valAxisLabelFontSize:10,
          showValue:false, valAxisLabelFormatCode:'#,##0', valGridLine:{color:'E5EAE0',style:'solid',size:0.5},
          catAxisLabelColor:MUT, valAxisLabelColor:MUT, fontFace:F});
+      uNote(s3);
     }
     // ── 표 슬라이드 (QBR 표 스타일: 연두 헤더 밴딩) ──
     function tSlide(key, tblId, ttl){
@@ -8332,6 +8423,7 @@ async function rpMakePpt(){
       s.addTable(trx,{x:0.5,y:1.3,w:12.3, border:{pt:0.5,color:BORD}, autoPage:false, rowH:0.34});
       if(tblId==='rpTblInb'){ var xn=$('#rpInbX'); if(xn&&xn.textContent.trim()) s.addText('➤ '+xn.textContent.trim(),{x:0.5,y:6.25,w:12,h:0.4,fontSize:12,color:NAVY,bold:true,fontFace:F}); }
       if(td.rows.length>14) s.addText('외 '+(td.rows.length-14)+'건 — 포탈에서 전체 확인',{x:0.5,y:6.65,w:12,h:0.35,fontSize:11,color:MUT,fontFace:F});
+      if(td.head.some(function(x){ return /천원|금액|월액/.test(String(x)); })) uNote(s);
     }
     tSlide('new','rpTblNew', sub+' 신규 계약');
     tSlide('end','rpTblEnd', sub+' 해지·종료');
@@ -8351,6 +8443,7 @@ async function rpMakePpt(){
           s7.addText(k[1],{x:x+0.28,y:y+0.78,w:3.5,h:0.85,fontSize:27,bold:true,color:NAVY,fontFace:F});
           if(k[2]) s7.addText(k[2],{x:x+0.28,y:y+1.72,w:3.5,h:0.4,fontSize:11,color:'4E8A1E',fontFace:F});
         });
+        uNote(s7);
       }
     }
     // ── 메모(자유) 슬라이드 ──
@@ -8454,8 +8547,10 @@ function switchView(v){
   DV.page=0; DV.sortK=null; DV.sortDir=1; DV.chipVal=''; DV.filters={}; closeColFilter();
   var g=GRIDS[v];
   renderOiTiles(v==='oi');
-  $('#dvTitle').textContent=g.title;
-  $('#dvCap').textContent=g.cap + (window.IS_VIEWER? ' · 조회 전용 계정입니다':'');
+  /* 금액 열(won:1)이 있는 표는 제목 옆에 «천원 단위» 배지를 붙입니다 */
+  var hasWon=(g.cols||[]).some(function(c){ return c.won; });
+  $('#dvTitle').innerHTML=esc(g.title)+(hasWon? ' <span class="ubadge sm">₩ 금액 단위 = 천원</span>':'');
+  $('#dvCap').textContent=g.cap + (hasWon? ' · 표의 금액은 천원 단위 (입력·수정 창은 원 단위)':'') + (window.IS_VIEWER? ' · 조회 전용 계정입니다':'');
   $('#dvAdd').style.display=(g.add && !window.IS_VIEWER)?'':'none';
   $('#dvPaste').style.display=(g.add && !window.IS_VIEWER)?'':'none';
   $('#dvSearch').value='';
@@ -8496,7 +8591,9 @@ function editCell(c,v){
   if(c.t==='bool') return '<input type="checkbox" data-k="'+c.k+'"'+(v?' checked':'')+'>';
   var ty=c.t==='month'?'month':c.t==='date'?'date':c.t==='number'?'number':'text';
   var val=v==null?'':(c.t==='month'?String(v).slice(0,7):c.t==='date'?String(v).slice(0,10):v);
-  return '<input type="'+ty+'" data-k="'+c.k+'" value="'+esc(String(val))+'">';
+  /* 금액 열은 «원 단위로 입력»임을 입력칸에서도 알 수 있게 안내 */
+  var hint=(c.won&&c.t==='number')? ' placeholder="원 단위" title="원 단위로 입력하세요 — 목록·대시보드에는 천원으로 표시됩니다"':'';
+  return '<input type="'+ty+'" data-k="'+c.k+'" value="'+esc(String(val))+'"'+hint+'>';
 }
 function readRowInputs(tr,g){
   var body={};
@@ -8755,7 +8852,8 @@ function exportCsv(){
       var v=r[c.k];
       if(c.t==='month'&&v) v=String(v).slice(0,7);
       if(c.t==='bool') v=v?'Y':'';
-      if(c.fmt) v=c.fmt(r[c.k]);
+      else if(c.won) v=Math.round(Number(v||0)/1000);          // 천원 단위 (열 이름에 (천원) 표기)
+      else if(c.fmt) v=c.fmt(r[c.k]);
       return cell(v);
     }).join(',');
   }).join('\n');
