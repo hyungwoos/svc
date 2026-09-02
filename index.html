@@ -344,6 +344,10 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
   color:var(--s1);margin-right:8px;vertical-align:1px;
 }
 .btn[disabled]{opacity:.6;cursor:progress}
+.btn.asking{opacity:.85;cursor:pointer;min-width:120px;white-space:nowrap}
+.dclr{margin-left:2px;width:20px;height:20px;padding:0;border:1px solid var(--ring);border-radius:5px;background:var(--surface-2);color:var(--mut);font-size:10px;line-height:18px;cursor:pointer;vertical-align:middle}
+.dclr:hover{color:var(--critical);border-color:var(--critical)}
+.btn.asking:hover{opacity:1;filter:brightness(1.05)}
 .suggest-title{font-size:11.5px;color:var(--muted);margin:12px 0 0}
 
 .loading{display:grid;place-items:center;height:70vh;gap:14px;color:var(--muted)}
@@ -1406,7 +1410,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
         <div style="display:flex;align-items:flex-end"><button class="pill" id="abSave" style="height:36px">저장 후 다시 계산</button></div>
         <div style="display:flex;align-items:flex-end"><span class="mini" id="abMsg"></span></div>
       </div>
-      <p class="cap" style="margin:6px 0 0">Anthropic은 잔액 조회 API가 없어 «충전액 − 충전일 이후 사용액»으로 잔여를 추정합니다 (사용액은 Cost API 실측).
+      <p class="cap" style="margin:6px 0 0">Anthropic은 잔액 조회 API가 없어 «충전액 − 충전일 이후 사용액»으로 잔여를 추정합니다 (사용액은 Cost API 실측 · 최대 5분~수 시간 지연).
+        콘솔에서 <b>자동 충전(auto-reload)</b>이 켜져 있으면 충전분이 반영되지 않아 실제 잔액보다 적게 나옵니다 — 그때는 충전액 칸을 «누적 충전 합계»로 고쳐 주세요.
         Edge Function admin 의 Secrets에 <b>ANTHROPIC_ADMIN_KEY</b>(sk-ant-admin…, 콘솔 Settings→Admin keys) 추가 필요.</p>
     </section>
   </div>
@@ -1979,7 +1984,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-02 ㊿+1';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-02 ㊿+2';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -2099,6 +2104,9 @@ async function sbWrite(method, path, body, prefer){
   return t? JSON.parse(t): null;
 }
 
+/* 오늘 날짜(현지 시각 기준) — toISOString() 은 UTC 라서 한국에서 아침 9시 전에는 «어제»가 나옵니다 */
+function todayStr(d){ d=d||new Date(); return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); }
+function thisMonthStr(){ return todayStr().slice(0,7); }
 function dIdx(dateStr){  // 'YYYY-MM-…' → 월 인덱스 (2020-06 = 0)
   if(!dateStr) return null;
   var y=+String(dateStr).slice(0,4), m=+String(dateStr).slice(5,7);
@@ -2291,7 +2299,7 @@ function buildFromRes(res){
     todayKey:'', nowIdx: dIdx(now.getFullYear()+'-'+('0'+(now.getMonth()+1)).slice(-2)),
     monthKeys:monthKeys,
     lines:(function(){
-      var ORDER=['Cloud','S1','MDR','PNS','MDR_S1','DRM','DLP'];
+      var ORDER=['Cloud','S1','MDR','MDR_S1','DRM','PNS','DLP'];   // 표시 순서: Cloud NAC > S1 Cloud NAC > MDR > S1 MDR > DRM > PNS
       var seen={}; rows.forEach(function(r){ if(r.line) seen[r.line]=1; });
       return ORDER.filter(function(l){ return seen[l]; })
         .concat(Object.keys(seen).filter(function(l){ return ORDER.indexOf(l)<0; }))
@@ -2724,7 +2732,7 @@ function buildControls(){
     if(document.visibilityState==='visible' && Date.now()-window.LAST_LOAD>15*60*1000) silentRefresh('timer');
   }, 60*1000);
 
-  $('#btnAsk').onclick=function(){ ask($('#q').value); };
+  $('#btnAsk').onclick=function(){ if(isAsking()){ abortAsk(); return; } ask($('#q').value); };
   $('#q').addEventListener('keydown',function(e){   // Enter 로 질문 (자동완성 끄면서 빠졌던 기능 복원)
     if(e.key==='Enter' && !e.isComposing){ e.preventDefault(); ask(this.value); }
   });
@@ -2766,7 +2774,7 @@ function renderAll(){
   renderTrend(list);
   renderYear(list);
   renderBars(list);
-  renderChurn(list);
+  renderNcWidget(list);
   renderExpiring(list);
   renderLg();
   renderVs();
@@ -3547,8 +3555,9 @@ function hbars(sel, arr, total, isCount){
   });
 }
 
-/* ---- 신규 / 해지 건수 ---- */
-function renderChurn(list){
+/* ---- 신규 / 해지 건수 (대시보드 위젯) ----
+   ※ «해지 분석» 화면의 renderChurn() 과 이름이 같아 위젯이 비어 보이던 버그 → renderNcWidget 로 분리 */
+function renderNcWidget(list){
   list=list||idxs();
   var to=STATE.base, from=Math.max(0,to-23);
   var nw=[],ch=[],labels=[];
@@ -3691,7 +3700,7 @@ function saveHistTurn(q,a){
 function aiEndpoint(){ return SB_URL + '/functions/v1/ask'; }
 /* 중계 함수가 응답을 주지 않으면 fetch 는 영원히 안 끝납니다.
    타임아웃을 걸어 반드시 끝나게 하고, 끝나지 않으면 내장 규칙으로 답합니다. */
-var AI_TIMEOUT_MS = 75000;      // 질문 1건 최대 대기 (AI가 DB를 여러 번 조회할 수 있어 넉넉히)
+var AI_TIMEOUT_MS = 60000;   // 중계 함수(ask)의 총 예산 45초 + 여유      // 질문 1건 최대 대기 (AI가 DB를 여러 번 조회할 수 있어 넉넉히)
 var AI_PING_MS    = 12000;      // 연결 확인은 짧게
 async function aiFetch(payload, ms){
   ms = ms || (payload && payload.mode==='ping' ? AI_PING_MS : AI_TIMEOUT_MS);
@@ -3699,6 +3708,7 @@ async function aiFetch(payload, ms){
   var timedOut=false;
   var t = setTimeout(function(){ timedOut=true; if(ctl) ctl.abort(); }, ms);
   var t0 = Date.now();
+  if(payload && payload.mode==='chat') AI_CUR=ctl;          // «중단» 버튼용
   try{
     var opt={ method:'POST',
       headers:{'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+(SB_TOKEN||'')},
@@ -3711,10 +3721,12 @@ async function aiFetch(payload, ms){
     return j;
   }catch(e){
     if(timedOut) throw new Error(Math.round(ms/1000)+'초 안에 응답이 없어 중단했습니다 (중계 함수 ask 응답 없음)');
-    if(e && e.name==='AbortError') throw new Error('요청이 중단되었습니다');
+    if(e && e.name==='AbortError') throw new Error('요청을 중단했습니다');
     throw e;
-  }finally{ clearTimeout(t); }
+  }finally{ clearTimeout(t); if(AI_CUR===ctl) AI_CUR=null; }
 }
+var AI_CUR=null;             // 진행 중인 chat 요청의 AbortController
+var ASK_T0=0, ASK_TICK=null; // «생각 중… n초» 표시용
 function loadAiConfig(){
   var badge=$('#aiBadge');
   if(!SB_TOKEN){
@@ -3746,7 +3758,24 @@ function aiOn(badge){
 
 function setAsking(on){
   var b=$('#btnAsk');
-  b.disabled=on; b.textContent = on? '생각 중…' : '질문';
+  if(ASK_TICK){ clearInterval(ASK_TICK); ASK_TICK=null; }
+  b.disabled=false;                         // 기다리는 동안에도 눌러서 «중단» 할 수 있게
+  b.classList.toggle('asking', !!on);
+  if(!on){ b.textContent='질문'; b.title=''; return; }
+  ASK_T0=Date.now();
+  b.textContent='생각 중… 0초'; b.title='누르면 중단합니다';
+  ASK_TICK=setInterval(function(){
+    var s=Math.round((Date.now()-ASK_T0)/1000);
+    b.textContent='생각 중… '+s+'초'+(s>=8? ' · 중단':'');
+    if(s>=20 && !b._slowTold){ b._slowTold=1; toast('AI 가 오래 걸리고 있습니다','DB 를 여러 번 조회하는 질문이면 40~50초까지 걸릴 수 있어요. 버튼을 누르면 중단합니다','info'); }
+  },1000);
+  b._slowTold=0;
+}
+function isAsking(){ return $('#btnAsk').classList.contains('asking'); }
+function abortAsk(){
+  if(AI_CUR){ try{ AI_CUR.abort(); }catch(e){} }
+  setAsking(false);
+  var say=$('#aiSay'); if(say){ say.className='ai-say on'; say.innerHTML='<span class="lb">AI</span>중단했습니다.'; }
 }
 
 function shortQ(q){ q=String(q||''); return q.length>90? q.slice(0,90)+'…' : q; }
@@ -3783,7 +3812,7 @@ function ask(q){
 
   // 최후 안전장치 — 어떤 이유로든 체인이 끝나지 않아도 버튼은 반드시 풀립니다
   var guard=setTimeout(function(){
-    if($('#btnAsk').disabled){
+    if(isAsking()){
       setAsking(false);
       localAnswer(q,'⚠ AI가 응답하지 않아 내장 규칙으로 답했습니다 — 잠시 후 다시 물어봐 주세요.');
     }
@@ -3815,6 +3844,7 @@ function ask(q){
     })
     .catch(function(e){
       clearTimeout(guard); setAsking(false);
+      if(/^요청을 중단했습니다/.test(String(e&&e.message||''))){ $('#q').value=q; return; }   // 사용자가 끊음 → 질문 복원 (타임아웃은 아래로)
       localAnswer(q,'⚠ AI 호출 실패 — 이 답은 AI가 아니라 내장 규칙(간단 패턴)입니다. ('+String(e&&e.message||e).slice(0,120)+')');
       aiRetryBtn(q);
     });
@@ -5028,7 +5058,7 @@ function renderAnswerBody(res, q){
    ================================================================== */
 var CUR_VIEW='dash', DIRTY=false;
 
-var LINE_OPTS=['Cloud','S1','MDR','PNS','MDR_S1','DRM','DLP'];
+var LINE_OPTS=['Cloud','S1','MDR','MDR_S1','DRM','PNS','DLP'];
 var PTN_OPTS=['다원티에스','글로웰시스템','에티버스','직접(계산서)'];
 var IND_OPTS=['기업','공공','금융','의료','미분류'];
 /* 계약 관리 선택 목록 */
@@ -5293,7 +5323,11 @@ var GRIDS={
       {k:'partner',l:'파트너'},
       {k:'in_date',l:'입고일',t:'date'},
       {k:'deployed_date',l:'출고일',t:'date'},
-      {k:'returned_date',l:'회수일',t:'date'},
+      {k:'returned_date',l:'회수일',t:'date',fmt:function(v,r){
+        if(!v) return '·';
+        /* 임대중인데 회수일이 남아 있으면 이전 임대의 값이 남은 것 — 사람 확인 필요 */
+        return String(v).slice(0,10)+((r&&r.status==='임대중')? ' ⚠':'');
+      }},
       {k:'note',l:'비고'}
     ]
   },
@@ -5352,7 +5386,7 @@ var GRIDS={
 async function syncOrderAssets(r, st){
   var ser=String(r.serials||'').split(/[,\s]+/).filter(function(x){return x;});
   if(!ser.length) return '';
-  var todayS=new Date().toISOString().slice(0,10);
+  var todayS=todayStr();
   try{
     if(st==='설치완료'){
       var rows=ser.map(function(s){ return {
@@ -5615,7 +5649,7 @@ function renderBizEditor(host, months){
     : rows.filter(function(r){ return r.ym===editYm && r.kind==='sum'; });
   if(!src.length) src=[{item:'비즈포탈 회계매출',biz:null},{item:'매출시트 매출',biz:null},{item:'차액 총계',biz:null}];
   var dsrc = BIZV.newMonth? [] : rows.filter(function(r){ return r.ym===editYm && r.kind==='detail'; });
-  var asOf = BIZV.newMonth? new Date().toISOString().slice(0,10) : ((rows.find(function(r){return r.ym===editYm;})||{}).as_of||'').slice(0,10);
+  var asOf = BIZV.newMonth? todayStr() : ((rows.find(function(r){return r.ym===editYm;})||{}).as_of||'').slice(0,10);
 
   var f=document.createElement('div'); f.style.maxWidth='760px';
   f.innerHTML=
@@ -5692,7 +5726,7 @@ function renderBizEditor(host, months){
 var CHV={key:null, all:[], q:'', filters:{}, sortK:'mrr', sortDir:-1};
 var CHV_COLS=[
   {k:'cust',    l:'고객사', link:true, text:function(r){ return r.cust||''; }},
-  {k:'csm',     l:'CSM 고객사명', text:function(r){ return r.csm||''; }},
+  {k:'csm',     l:'CSM(사이트명)', text:function(r){ return r.csm||''; }},
   {k:'line',    l:'서비스', text:function(r){ return lline(r.line)||''; }},
   {k:'ptn',     l:'파트너', text:function(r){ return r.ptn||''; }},
   {k:'partner', l:'계산서발행처', text:function(r){ return r.partner||''; }},
@@ -6242,7 +6276,7 @@ function renderTodo(){
   var wrap=document.getElementById('todoWrap'); if(!wrap) return;
   if(!SB_TOKEN || !window.DATA || window.IS_EQUIP){ wrap.style.display='none'; return; }
   wrap.style.display='';
-  var today=new Date(), t0=today.getTime(), todayS=today.toISOString().slice(0,10);
+  var today=new Date(), t0=today.getTime(), todayS=todayStr(today);
   // ① 인바운드 장기 미대응 — 10분 캐시, 필요한 열만 가볍게 조회
   if(!window.__inbTodo || t0-window.__inbTodo.t>10*60*1000){
     window.__inbTodo={t:t0, n:window.__inbTodo? window.__inbTodo.n:null};
@@ -6371,7 +6405,7 @@ function renderPrice(){
   host.querySelectorAll('[data-prseg]').forEach(function(b){ b.onclick=function(){ PR.seg=b.dataset.prseg; renderPrice(); }; });
   var q=$('#prQ'); q.oninput=function(){ PR.q=this.value.trim().toLowerCase(); prPaintMain(); var e2=$('#prQ'); };
   var bn=document.getElementById('prNew');
-  if(bn) bn.onclick=function(){ $('#pnMsg').textContent=''; if(!$('#pnDate').value) $('#pnDate').value=new Date().toISOString().slice(0,10); openOvl('ovlPrNew'); };
+  if(bn) bn.onclick=function(){ $('#pnMsg').textContent=''; if(!$('#pnDate').value) $('#pnDate').value=todayStr(); openOvl('ovlPrNew'); };
   prPaintMain();
 }
 function prPaintMain(){
@@ -6834,7 +6868,7 @@ function mxKey(line,Y,M){ return (line||'')+'|'+Y+'|'+M; }
 function loadMxMemos(cb){
   sbTry('mx_memos?select=*&order=year.desc,month.desc').then(function(rows){
     MXM={};
-    (rows||[]).forEach(function(r){ MXM[mxKey(r.line, r.year, r.month)]=r; });
+    (rows||[]).forEach(function(r){ MXM[mxKey(r.line||'', r.year, r.month)]=r; });
     RAWX._mxAt=Date.now();
     if(cb) cb();
   }).catch(function(){ /* 51단계 SQL 미설치 — 메모 기능만 비활성 */ });
@@ -6881,14 +6915,21 @@ function openMxMemo(td, line, Y, M, label){
       if(!body){ await mxRemove(k, cur); }
       else{
         await sbWrite('POST','mx_memos?on_conflict=line,year,month',
-          [{line:line||null, year:Y, month:M, body:body, updated_by:AUTH_USER||'', updated_at:new Date().toISOString()}],
+          /* 합계 행은 line='' — null 이면 unique 제약에 걸리지 않아 on_conflict 가 동작하지 않습니다 (42P10) */
+          [{line:line||'', year:Y, month:M, body:body, updated_by:AUTH_USER||'', updated_at:new Date().toISOString()}],
           'resolution=merge-duplicates');
-        MXM[k]={line:line||null,year:Y,month:M,body:body,updated_by:AUTH_USER||'',updated_at:new Date().toISOString()};
+        MXM[k]={line:line||'',year:Y,month:M,body:body,updated_by:AUTH_USER||'',updated_at:new Date().toISOString()};
         logChange('update','mx_memos',0,{cell:k});
       }
       closeMxPop(); renderMatrix();
       toast('특이사항을 저장했습니다', label+' '+Y+'년 '+M+'월');
-    }catch(e){ msg.textContent=String(e.message||e).slice(0,90); this.disabled=false; }
+    }catch(e){
+      var em=String(e.message||e);
+      if(/42P10|no unique or exclusion/.test(em)) em='DB 에 51단계 SQL(mx_memos) 최신본이 필요합니다 — 51_mx_memo.sql 을 다시 실행해 주세요';
+      else if(/42P01|does not exist/.test(em)) em='메모 표(mx_memos)가 없습니다 — 51_mx_memo.sql 을 먼저 실행해 주세요';
+      else if(/42501|row-level security/.test(em)) em='저장 권한이 없습니다 (관리자 이상만 메모를 쓸 수 있습니다)';
+      msg.textContent=em.slice(0,140); this.disabled=false;
+    }
   };
   var dl=document.getElementById('mxDel');
   if(dl) dl.onclick=async function(){
@@ -6901,7 +6942,7 @@ function openMxMemo(td, line, Y, M, label){
 async function mxRemove(k, cur){
   if(!cur) return;
   await sbWrite('DELETE','mx_memos?year=eq.'+cur.year+'&month=eq.'+cur.month+
-    (cur.line? '&line=eq.'+encodeURIComponent(cur.line) : '&line=is.null'));
+    '&line=eq.'+encodeURIComponent(cur.line||''));
   delete MXM[k];
   logChange('delete','mx_memos',0,{cell:k});
 }
@@ -7388,7 +7429,7 @@ async function abLoad(){
     if(!$('#abCredit').value && bill.credit_usd) $('#abCredit').value=bill.credit_usd;
     if(!$('#abDate').value && bill.baseline) $('#abDate').value=String(bill.baseline).slice(0,10);
   }
-  var from=(bill&&bill.baseline)? String(bill.baseline).slice(0,10) : new Date(Date.now()-29*864e5).toISOString().slice(0,10);
+  var from=(bill&&bill.baseline)? String(bill.baseline).slice(0,10) : todayStr(new Date(Date.now()-29*864e5));
   var r;
   try{ r=await adminFetch({action:'ai_cost', from:from}); }
   catch(e){ kpi.innerHTML='<div class="cap">⚠ '+esc(String(e.message||e))+'</div>'; return; }
@@ -7402,7 +7443,7 @@ async function abLoad(){
   kpi.innerHTML=
     box('잔여 크레딧 (추정)', remain==null?'충전액 미입력':'$'+remain.toLocaleString('en-US'),
         remain==null?'아래에 충전액·충전일을 입력하세요':'충전액 $'+credit+' − 사용 $'+r.total_usd, remain!=null&&remain<5)+
-    box('이번 달 사용액','$'+Number(r.month_usd).toLocaleString('en-US'), new Date().toISOString().slice(0,7)+' 실측 (Cost API)')+
+    box('이번 달 사용액','$'+Number(r.month_usd).toLocaleString('en-US'), thisMonthStr()+' 실측 (Cost API)')+
     box('기준일 이후 사용액','$'+Number(r.total_usd).toLocaleString('en-US'), r.from+' 부터 누적')+
     (r.partial? '<div class="cap" style="grid-column:1/-1;color:var(--warning,#a06c00)">⚠ 일부 기간만 집계됐습니다 — '+esc(String(r.partial))+'</div>':'');
   var mx=0.01; (r.daily||[]).forEach(function(d){ mx=Math.max(mx,d.usd); });
@@ -8094,7 +8135,7 @@ function renderOiTiles(on){
     return d>=qs && d<qe && ['수주','계산서발행','종료','실패','중지'].indexOf(r.stage)<0;
   });
   var won2=rows.filter(function(r){ return ['수주','계산서발행','종료'].indexOf(r.stage)>=0; });
-  var late=open.filter(function(r){ return r.next_date && String(r.next_date).slice(0,10) < new Date().toISOString().slice(0,10); });
+  var late=open.filter(function(r){ return r.next_date && String(r.next_date).slice(0,10) < todayStr(); });
   host.innerHTML=
     '<div class="kpi"><div class="k">진행 중</div><div class="v">'+open.length+'<small>건</small></div>'+
       '<div class="d">예상 '+won(sum(open))+'천원</div></div>'+
@@ -8969,7 +9010,7 @@ async function rpMakePpt(){
     s1.addText('CONFIDENTIAL',{x:11.5,y:0.38,w:1.62,h:0.44,fontSize:11,bold:true,color:'E60012',align:'center',valign:'middle',fontFace:F});
     s1.addText(title,{x:0.6,y:2.55,w:7.6,h:1.0,fontSize:33,bold:true,color:'FFFFFF',fontFace:F});
     s1.addText(sub,{x:0.62,y:3.62,w:6,h:0.55,fontSize:20,bold:true,color:'7EBA25',fontFace:F});
-    s1.addText(new Date().toISOString().slice(0,10).replace(/-/g,'.')+'\n서비스사업부',{x:0.62,y:4.25,w:6,h:0.85,fontSize:14,color:'D9E2F2',fontFace:F,lineSpacing:24});
+    s1.addText(todayStr().replace(/-/g,'.')+'\n서비스사업부',{x:0.62,y:4.25,w:6,h:0.85,fontSize:14,color:'D9E2F2',fontFace:F,lineSpacing:24});
     s1.addText('※ 본 자료의 모든 금액 단위는 천원(1,000원) 입니다.',{x:0.62,y:5.35,w:7,h:0.32,fontSize:11,color:'A9BCD9',fontFace:F});
     s1.addImage({data:RP_IMG.logoW,x:0.55,y:6.78,w:1.35,h:0.30});
     // ── 매출 Review (QBR 본문 1) ──
@@ -9182,7 +9223,7 @@ function switchView(v){
     msg('mpMsg','');
     $('#mpFormWrap').style.display='';
     $('#mpDone').style.display='none';
-    if(!$('#mpDate').value) $('#mpDate').value=new Date().toISOString().slice(0,10);
+    if(!$('#mpDate').value) $('#mpDate').value=todayStr();
     if(!$('#mpSales').value && AUTH_USER) $('#mpSales').value='';
     setTimeout(function(){ $('#mpCompany').focus(); },50);
     return;
@@ -9260,6 +9301,29 @@ function editCell(c,v){
   var hint=(c.won&&c.t==='number')? ' placeholder="원 단위" title="원 단위로 입력하세요 — 목록·대시보드에는 천원으로 표시됩니다"':'';
   return '<input type="'+ty+'" data-k="'+c.k+'" value="'+esc(String(val))+'"'+hint+'>';
 }
+/* 편집 행의 입력칸 보조 동작
+   · 날짜 칸: 값이 있으면 옆에 ✕(비우기) — 브라우저 날짜 입력은 지우는 법이 잘 안 보입니다
+   · 임대 장비: 상태를 «임대중»으로 바꾸면 회수일을 비우고, «회수완료»로 바꾸면 회수일이 비어 있을 때 오늘을 넣습니다 */
+function wireRowInputs(tr,g){
+  tr.querySelectorAll('input[type=date],input[type=month]').forEach(function(inp){
+    var x=document.createElement('button'); x.type='button'; x.className='dclr'; x.textContent='✕'; x.title='비우기';
+    x.onclick=function(){ inp.value=''; inp.dispatchEvent(new Event('change')); };
+    inp.insertAdjacentElement('afterend', x);
+    var sync=function(){ x.style.display = inp.value? '' : 'none'; };
+    inp.addEventListener('input', sync); inp.addEventListener('change', sync); sync();
+  });
+  if(g && g.table==='equipment_assets'){
+    var st=tr.querySelector('select[data-k="status"]'), rd=tr.querySelector('input[data-k="returned_date"]');
+    if(st && rd) st.addEventListener('change', function(){
+      if(st.value==='임대중' && rd.value){
+        rd.value=''; rd.dispatchEvent(new Event('change'));
+        toast('회수일을 비웠습니다','임대중인 장비는 회수일이 없어야 합니다 — 필요하면 다시 입력하세요','info');
+      }else if(st.value==='회수완료' && !rd.value){
+        rd.value=todayStr(); rd.dispatchEvent(new Event('change'));
+      }
+    });
+  }
+}
 function readRowInputs(tr,g){
   var body={};
   tr.querySelectorAll('[data-k]').forEach(function(inp){
@@ -9316,7 +9380,7 @@ function baseRows(g,skipK){
     g.cols.forEach(function(c){
       var v=r[c.k];
       hay+=String(v==null?'':v).replace(/\s+/g,'')+'';
-      if(c.fmt){ try{ var f=c.fmt(v); hay+=String(f==null?'':f).replace(/\s+/g,'')+''; }catch(e){} }
+      if(c.fmt){ try{ var f=c.fmt(v,r); hay+=String(f==null?'':f).replace(/\s+/g,'')+''; }catch(e){} }
     });
     hay=hay.toLowerCase();
     return toks.every(function(t){ return hay.indexOf(t.replace(/\s+/g,''))>=0; });
@@ -9448,7 +9512,7 @@ function gridFilteredSorted(g){
     g.cols.forEach(function(c){
       var v=r[c.k];
       hay+=String(v==null?'':v).replace(/\s+/g,'')+'';
-      if(c.fmt){ try{ var f=c.fmt(v); hay+=String(f==null?'':f).replace(/\s+/g,'')+''; }catch(e){} }
+      if(c.fmt){ try{ var f=c.fmt(v,r); hay+=String(f==null?'':f).replace(/\s+/g,'')+''; }catch(e){} }
     });
     hay=hay.toLowerCase();
     return toks.every(function(t){ return hay.indexOf(t.replace(/\s+/g,''))>=0; });
@@ -9490,7 +9554,7 @@ async function xlsxBook(name, sheets){                       // sheets: [{name, 
     });
     XLSX.utils.book_append_sheet(wb, ws, String(sh.name||('Sheet'+(si+1))).replace(/[\\/:*?\[\]]/g,' ').slice(0,31));
   });
-  XLSX.writeFile(wb, name.replace(/[\\/:*?"<>|]/g,'_')+'_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  XLSX.writeFile(wb, name.replace(/[\\/:*?"<>|]/g,'_')+'_'+todayStr()+'.xlsx');
 }
 function xlsxAoa(name, head, rows){ return xlsxBook(name, [{name:'Sheet1', head:head, rows:rows}]); }
 async function exportXlsx(){
@@ -9503,7 +9567,7 @@ async function exportXlsx(){
     if(c.t==='bool') return v?'Y':'';
     if(c.won) return Math.round(Number(v||0)/1000);            // 천원 단위
     if(typeof v==='number') return v;
-    if(c.fmt){ try{ var fv=c.fmt(v); if(fv!=null) return String(fv).replace(/<[^>]*>/g,''); }catch(e){} }
+    if(c.fmt){ try{ var fv=c.fmt(v,r); if(fv!=null) return String(fv).replace(/<[^>]*>/g,''); }catch(e){} }
     return v==null?'':String(v);
   }); });
   try{ await xlsxAoa(g.title.replace(/\s+/g,'_'), head, aoa); }
@@ -9520,13 +9584,13 @@ function exportCsv(){
       if(c.t==='month'&&v) v=String(v).slice(0,7);
       if(c.t==='bool') v=v?'Y':'';
       else if(c.won) v=Math.round(Number(v||0)/1000);          // 천원 단위 (열 이름에 (천원) 표기)
-      else if(c.fmt) v=c.fmt(r[c.k]);
+      else if(c.fmt) v=c.fmt(r[c.k],r);
       return cell(v);
     }).join(',');
   }).join('\n');
   var a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
-  a.download=g.title.replace(/\s+/g,'_')+'_'+new Date().toISOString().slice(0,10)+'.csv';
+  a.download=g.title.replace(/\s+/g,'_')+'_'+todayStr()+'.csv';
   a.click();
   setTimeout(function(){ URL.revokeObjectURL(a.href); },2000);
 }
@@ -9715,14 +9779,17 @@ function gridRow(r,g,editing){
   }
   function edit(){
     tr.innerHTML=g.cols.map(function(c){
-      return '<td>'+(c.ro? esc(fmtCell(c,r[c.k])) : editCell(c,r[c.k]))+'</td>';
+      return '<td>'+(c.ro? esc(fmtCell(c,r[c.k],r)) : editCell(c,r[c.k]))+'</td>';
     }).join('')+'<td class="act"></td>';
+    wireRowInputs(tr,g);
     var act=tr.lastChild;
     var bs=document.createElement('button'); bs.textContent='저장'; bs.className='sv';
     bs.onclick=function(){
       if(!SB_TOKEN){ openOvl('ovlAuth'); return; }
       try{
         var body=readRowInputs(tr,g);
+        if(g.table==='equipment_assets' && body.status==='임대중' && body.returned_date &&
+           confirm('상태는 «임대중»인데 회수일('+body.returned_date+')이 있습니다.\n회수일을 비우고 저장할까요?\n\n(취소 = 그대로 저장)')) body.returned_date=null;
         var stChanged=(g.table==='equipment_orders' && body.status && body.status!==r.status)? body.status : null;
         sbWrite('PATCH',g.table+'?id=eq.'+r.id,body).then(function(){
           Object.keys(body).forEach(function(k){ r[k]=body[k]; });
@@ -9750,6 +9817,7 @@ function gridAddRow(){
   var t=$('#dvTable'); var tb=t.querySelector('tbody'); if(!tb) return;
   var tr=document.createElement('tr');
   tr.innerHTML=g.cols.map(function(c){ return '<td>'+editCell(c,null)+'</td>'; }).join('')+'<td class="act"></td>';
+  wireRowInputs(tr,g);
   var act=tr.lastChild;
   var bs=document.createElement('button'); bs.textContent='추가'; bs.className='sv';
   bs.onclick=function(){
