@@ -1654,6 +1654,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
           <option value="">— 선택 —</option><option>월납입</option><option>일시납</option><option>분기납</option><option>반년납</option><option>연납</option>
           <option value="__etc">직접 입력…</option>
         </select><input id="nBillingEtc" placeholder="과금방식 직접 입력" style="display:none;margin-top:6px"></div>
+        <div id="nFeeWrap"><label>설치비 (원) <small style="color:var(--muted)">— 1회성 · 주로 에스원 계약</small></label><input id="nFee" type="number" min="0" step="10000" placeholder="예: 100000"></div>
+        <div id="nSettleWrap"><label>대금정산일 <small style="color:var(--muted)">(설치비를 인식하는 달 · 비우면 시작월+1)</small></label><input id="nSettle" type="month"></div>
         <div class="full"><label>비고</label><input id="nNote"></div>
       </div>
     </div>
@@ -2007,7 +2009,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-02 ㊿+3';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-02 ㊿+4';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -10227,6 +10229,8 @@ async function saveEdit(){
         term_months:e0-s0+1, qty:+$('#nQty').value||null,
         csm:($('#nCsm').value||'').trim()||null,
         billing:nBillingVal()||null,
+        install_fee: $('#nFee').value===''? null : +$('#nFee').value,
+        settle_month: $('#nSettle').value? $('#nSettle').value+'-01' : ($('#nFee').value? idxDate(s0+1) : null),
         total_amount:mrr*(e0-s0+1), mrr:mrr
       }],'return=representation');
       var id=ct[0].id;
@@ -10300,6 +10304,12 @@ function setupEdit(){
     cb.parentElement.style.opacity=isMdr? '':'0.45';
     if(!isMdr) cb.value='';
   }
+  function syncFee(){
+    var v=(nl&&nl.value)||'', fw=document.getElementById('nFeeWrap'), sw=document.getElementById('nSettleWrap');
+    if(!fw||!sw) return;
+    var isS1=(v==='S1'||v==='MDR_S1');
+    fw.style.opacity=isS1? '':'0.6'; sw.style.opacity=isS1? '':'0.6';   // 다른 서비스도 입력은 가능
+  }
   function syncVer(){
     var v=(nl&&nl.value)||'', vr=document.getElementById('nVer'), w=document.getElementById('nVerWrap');
     if(!vr||!w) return;
@@ -10310,12 +10320,12 @@ function setupEdit(){
   }
   if(nl) nl.addEventListener('change',function(){
     var v=this.value, c=document.getElementById('nChannel');
-    syncCombine(); syncVer();
+    syncCombine(); syncVer(); syncFee();
     if(!c) return;
     if(v==='S1'||v==='MDR_S1') c.value='에스원';
     else if(v==='DRM'||v==='DLP') c.value='유통';
   });
-  syncCombine(); syncVer();
+  syncCombine(); syncVer(); syncFee();
   // 파트너 «직접 입력…» 선택 시 입력칸 표시
   var np=document.getElementById('nPtn'), npe=document.getElementById('nPtnEtc');
   if(np) np.addEventListener('change',function(){
@@ -10324,14 +10334,14 @@ function setupEdit(){
     if(etc) npe.focus(); else npe.value='';
   });
   function resetNewForm(){
-    ['nCust','nBiller','nStart','nEnd','nMrr','nQty','nNote','nPtnEtc','nCsm','nBillingEtc'].forEach(function(i){
+    ['nCust','nBiller','nStart','nEnd','nMrr','nQty','nNote','nPtnEtc','nCsm','nBillingEtc','nFee','nSettle'].forEach(function(i){
       var el=document.getElementById(i); if(el) el.value='';
     });
     var nbe=document.getElementById('nBillingEtc'); if(nbe) nbe.style.display='none';
     var d={nInd:'기업', nLine:'Cloud', nChannel:'일반', nCombine:'', nVer:'', nPtn:'지니언스(직접)', nType:'신규', nBilling:''};
     Object.keys(d).forEach(function(i){ var el=document.getElementById(i); if(el) el.value=d[i]; });
     if(npe) npe.style.display='none';
-    syncCombine(); syncVer();
+    syncCombine(); syncVer(); syncFee();
     // 계약 찾기 상태도 초기화
     [['cFind','cPick',PK_C],['rFind','rPick',PK_R],['fFind','fPick',PK_F]].forEach(function(x){
       var f=document.getElementById(x[0]); if(f) f.value='';
