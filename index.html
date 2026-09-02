@@ -99,11 +99,13 @@ input:focus,select:focus,textarea:focus{
 @keyframes toastOut{to{opacity:0;transform:translateX(26px)}}
 .w-off{display:none!important}
 /* ── 월별 종합 장표 셀 메모 (매출시트의 셀 코멘트) ───────────── */
-#tMx td.n{position:relative}
-#tMx td.mxm::after{content:'';position:absolute;top:0;right:0;
+#tMx td.n,#tIfee td.n{position:relative}
+#tMx td.mxm::after,#tIfee td.mxm::after{content:'';position:absolute;top:0;right:0;
   border-top:7px solid var(--brand,#2a78d6);border-left:7px solid transparent}
 #tMx td.n.mxc{cursor:pointer}
 #tMx td.n.mxc:hover{background:var(--brand-t,rgba(42,120,214,.10))}
+#tIfee td.ifc{cursor:pointer}
+#tIfee td.ifc:hover{background:var(--brand-t,rgba(42,120,214,.10))}
 .mxpop{position:fixed;z-index:1400;width:min(430px,92vw);background:var(--surface);
   border:1px solid var(--ring);border-radius:13px;box-shadow:0 16px 44px rgba(0,0,0,.20);padding:13px 14px}
 .mxpop h4{margin:0 0 3px;font-size:13px;font-weight:750;color:var(--ink)}
@@ -116,6 +118,19 @@ input:focus,select:focus,textarea:focus{
 .mxpop .act{display:flex;gap:7px;align-items:center;margin-top:9px}
 .mxpop .act .sp{flex:1}
 .mxpop .msg{font-size:11px;color:var(--muted)}
+.mxpop.wide{width:min(680px,94vw)}
+.mxtabs{display:flex;gap:6px;margin:6px 0 9px}
+.mxtabs button{height:27px;padding:0 11px;border-radius:999px;border:1px solid var(--ring);background:var(--surface-2);color:var(--mut);font-size:11.5px;font-weight:650;cursor:pointer}
+.mxtabs button[aria-pressed="true"]{background:var(--brand);border-color:var(--brand);color:#fff}
+.mxtabs .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--warn,#f0a020);margin-left:4px;vertical-align:middle}
+.mxdet{max-height:min(46vh,420px);overflow:auto;border:1px solid var(--ring);border-radius:9px}
+.mxdet table{width:100%;border-collapse:collapse;font-size:12px}
+.mxdet th{position:sticky;top:0;background:var(--surface-2);text-align:left;padding:6px 8px;font-size:11px;color:var(--mut);border-bottom:1px solid var(--ring)}
+.mxdet td{padding:5px 8px;border-bottom:1px solid var(--ring)}
+.mxdet .n{text-align:right;font-variant-numeric:tabular-nums}
+.mxdet tbody tr{cursor:pointer}
+.mxdet tbody tr:hover{background:var(--brand-t,rgba(42,120,214,.10))}
+.mxdet tfoot td{font-weight:750;background:var(--surface-2);border-bottom:none}
 /* 알림·검색에서 카드로 이동할 때 sticky 상단바에 제목이 가리지 않도록 */
 .card,#kpis,#goalBar,#dashHero{scroll-margin-top:calc(var(--tbh,64px) + 16px)}
 /* 이동해서 «도착한» 카드를 잠깐 강조 — 어디로 갔는지 눈에 보이게 */
@@ -1634,6 +1649,11 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
         <div><label>종료월 *</label><input id="nEnd" type="month"></div>
         <div><label>월 금액(MRR, 원) *</label><input id="nMrr" type="number" min="0" step="1000"></div>
         <div><label>수량(노드 등)</label><input id="nQty" type="number" min="0"></div>
+        <div><label>CSM (영문 사이트명)</label><input id="nCsm" placeholder="예: kumhotire" autocapitalize="off" spellcheck="false"></div>
+        <div><label>과금방식</label><select id="nBilling">
+          <option value="">— 선택 —</option><option>월납입</option><option>일시납</option><option>분기납</option><option>반년납</option><option>연납</option>
+          <option value="__etc">직접 입력…</option>
+        </select><input id="nBillingEtc" placeholder="과금방식 직접 입력" style="display:none;margin-top:6px"></div>
         <div class="full"><label>비고</label><input id="nNote"></div>
       </div>
     </div>
@@ -1660,8 +1680,11 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
       <div class="frm">
         <div class="full"><label>계약 찾기 (고객사명 입력)</label><input id="fFind" placeholder="고객사명 두 글자 이상">
           <div class="pick" id="fPick"></div></div>
+        <div class="full" id="fCur" style="display:none"></div>
         <div><label>적용 시작월 *</label><input id="fFrom" type="month"></div>
+        <div><label>적용 종료월 <small style="color:var(--muted)">(비우면 계약 끝까지)</small></label><input id="fTo" type="month"></div>
         <div><label>새 월 금액(원) *</label><input id="fMrr" type="number" min="0" step="1000"></div>
+        <div><label>&nbsp;</label><p class="cap" style="margin:6px 0 0">한 달만 고치려면 시작월·종료월을 같은 달로. 그 구간만 바뀌고 앞뒤 달은 그대로입니다.</p></div>
       </div>
     </div>
 
@@ -1984,7 +2007,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-02 ㊿+2';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-02 ㊿+3';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -3066,8 +3089,10 @@ function toggleWidgetPanel(){
 
 /* ---- 월별 종합 장표 (시트 첫 장표 스타일) ---- */
 var MX_YEAR=null;
+var MX_LIST=null;   // 장표를 그릴 때 쓴 계약 목록(필터 반영) — 셀 «내역 보기»가 같은 기준으로 계산합니다
 function renderMatrix(list){
   list=list||idxs();
+  MX_LIST=list;
   var years={};
   for(var i=0;i<M;i++) years[yOf(i)]=1;
   var ys=Object.keys(years).map(Number).sort();
@@ -3120,7 +3145,7 @@ function renderMatrix(list){
       var fut=idx>nowI;
       /* 셀 메모(특이사항) — 있으면 우상단에 삼각 표시, 마우스 올리면 내용 미리보기 */
       var mk=MXM[mxKey(lb,Y,m)];
-      var tip=mk? ' title="'+esc(String(mk.body).slice(0,400))+'"' : ' title="클릭해서 특이사항 메모"';
+      var tip=mk? ' title="'+esc(String(mk.body).slice(0,400))+'\n\n(클릭: 내역 보기 · 메모 수정)"' : ' title="클릭: 이 달 계약 내역 보기 · 특이사항 메모"';
       tds+='<td class="n mxc'+(mk?' mxm':'')+'"'+(fut?' style="color:var(--muted)"':'')+
         ' data-mxl="'+esc(lb||'')+'" data-mxm="'+m+'"'+tip+'>'+num(v)+'</td>';
     }
@@ -3150,7 +3175,7 @@ function renderMatrix(list){
   // 단위 안내
   var cap=$('#capMx');
   var nMemo=Object.keys(MXM).filter(function(k){ return k.split('|')[1]===String(Y); }).length;
-  cap.textContent = Y+'년 · 단위: 천원 · 미래 월은 계약상 예정 금액 (회색) · 셀을 클릭하면 특이사항 메모'+
+  cap.textContent = Y+'년 · 단위: 천원 · 미래 월은 계약상 예정 금액 (회색) · 셀을 클릭하면 계약 내역 조회 · 특이사항 메모'+
     (nMemo? ' (올해 '+nMemo+'건 작성됨 — 표시된 셀에 마우스를 올려보세요)':'');
 }
 
@@ -3175,6 +3200,23 @@ function ifeeYm(r){
   if(r.startIdx==null) return null;
   var t=(2020*12+5)+r.startIdx+1;
   return [Math.floor(t/12), (t%12)+1, true];
+}
+var IFEE_LINE='설치비';   // mx_memos 의 line 값 — 서비스 코드와 겹치지 않는 이름
+function openIfeeDetail(td, Y, M, det, adj){
+  var rows=det.filter(function(d){ return d.y===Y && d.m===M; }).sort(function(a,b){ return b.fee-a.fee; });
+  var a=adj[Y+'|'+M]||0;
+  var sum=rows.reduce(function(x,d){ return x+d.fee; },0)+a;
+  var h='<div class="mxdet"><table><thead><tr><th>고객사</th><th>서비스</th><th>근거</th><th class="n">설치비(천원)</th></tr></thead><tbody>';
+  rows.forEach(function(d,i){
+    h+='<tr data-i="'+i+'" title="계약 화면에서 보기"><td><b>'+esc(d.cust)+'</b></td><td>'+esc(lline(d.line))+'</td>'+
+       '<td style="color:var(--mut)">'+(d.guess? '시작월+1 (대금정산일 없음)':'대금정산일')+'</td><td class="n">'+won(d.fee)+'</td></tr>';
+  });
+  if(a) h+='<tr style="background:var(--surface-2)"><td colspan="2" style="color:var(--mut)">수동 조정 (설거비 등)</td><td style="color:var(--mut)">install_adj 표</td><td class="n">'+won(a)+'</td></tr>';
+  if(!rows.length && !a) h+='<tr><td colspan="4" style="text-align:center;color:var(--muted)">이 달 설치비 내역이 없습니다</td></tr>';
+  h+='</tbody><tfoot><tr><td colspan="3">계약 '+rows.length+'건'+(a? ' + 조정':'')+'</td><td class="n">'+won(sum)+'</td></tr></tfoot></table></div>'+
+     '<div class="who" style="margin-top:6px">줄을 누르면 그 고객사의 계약 화면으로 이동</div>';
+  openMxMemo(td, IFEE_LINE, Y, M, '설치비', null, {detail:{html:h, count:rows.length+(a?1:0), sum:sum,
+    go:function(i){ var d=rows[i]; if(!d) return; switchView('contracts'); var sInp=$('#dvSearch'); if(sInp){ sInp.value=d.cust; DV.page=0; renderGrid(); } }}});
 }
 function renderInstall(){
   var sec=document.querySelector('[data-w="ifee"]'); if(!sec) return;
@@ -3226,7 +3268,9 @@ function renderInstall(){
       var sum=0, a=0, tds='';
       for(var m=1;m<=12;m++){
         var v=cell[Y+'|'+m]||0; sum+=v; gm[m]+=v;
-        tds+='<td class="n">'+n(v)+'</td>';
+        var mk=MXM[mxKey(IFEE_LINE,Y,m)];
+        var tip=mk? ' title="'+esc(String(mk.body).slice(0,400))+'\n\n(클릭: 내역 보기 · 메모 수정)"' : ' title="클릭: 이 달 설치비 내역 · 특이사항 메모"';
+        tds+='<td class="n ifc'+(mk?' mxm':'')+'" data-y="'+Y+'" data-m="'+m+'"'+tip+'>'+n(v)+'</td>';
         a+=adj[Y+'|'+m]||0;
       }
       gTot+=sum; gAdj+=a;
@@ -3260,6 +3304,10 @@ function renderInstall(){
     html+='</tbody>';
   }
   t.innerHTML=html;
+  // 셀 클릭 → 그 달 설치비 내역 팝업
+  t.querySelectorAll('td.ifc').forEach(function(td){
+    td.onclick=function(){ openIfeeDetail(td, +td.dataset.y, +td.dataset.m, det, adj); };
+  });
 
   var nAdj=Object.keys(adj).filter(function(k){ return adj[k]; }).length;
   $('#capIfee').textContent='단위: 천원 · 설치비가 있는 계약 '+nFee+'건'+
@@ -3992,6 +4040,19 @@ function buildDigest(){
     LIVE고객사수: (DATA.live&&DATA.live.ok)? DATA.live.uniqNoDup : null,
     서비스별MRR:byKey('line'), 사업영역별MRR:byKey('channel'),
     산업군별MRR:byKey('ind'), 파트너별MRR:byKey('ptn'),
+    업종별: (function(){   // 2026-09 추가한 세분 업종(customers.sector) — 고객사 수 · 기준월 MRR
+      var cnt={}, mrr={}, seen={}, unc=0, dup=0, chk=0;
+      all.forEach(function(k){
+        var r=DATA.rows[k], sec=r.sector||'미분류';
+        if(!MAT[k][b]) return;                         // 기준월에 매출 있는(=활성) 계약만
+        mrr[sec]=Math.round((mrr[sec]||0)+MAT[k][b]);
+        if(!seen[r.cust]){ seen[r.cust]=1; cnt[sec]=(cnt[sec]||0)+1; if(!r.sector) unc++; if(r.sectorDup) dup++; if(r.sectorChk) chk++; }
+      });
+      var top=Object.keys(cnt).sort(function(a,c){ return cnt[c]-cnt[a]; });
+      return {설명:'업종(sector)은 산업군(industry: 기업/공공/금융/의료)보다 세분화된 분류입니다. «어느 업종이 많아?» 류 질문은 이 값을 쓰세요. 기준월에 매출 있는 고객 기준.',
+        업종별_고객사수:top.reduce(function(o,k){ o[k]=cnt[k]; return o; },{}),
+        업종별_기준월MRR:mrr, 미분류_고객사수:unc, 동명회사_확인필요:dup, 추정분류_확인필요:chk};
+    })(),
     월별매출_최근24개월:months, 연도별매출:byYear,
     상위고객사15:topCust,
     만료예정_12개월내:exp.slice(0,20),
@@ -6879,13 +6940,69 @@ function closeMxPop(){
   document.removeEventListener('keydown', mxPopEsc);
 }
 function mxPopEsc(e){ if(e.key==='Escape') closeMxPop(); }
-function openMxMemo(td, line, Y, M, label){
+function mxPlace(box, td){
+  var r=td.getBoundingClientRect(), w=box.offsetWidth, h=box.offsetHeight;
+  box.style.left=Math.min(Math.max(8, r.left-w/2+r.width/2), innerWidth-w-8)+'px';
+  var top=(r.bottom+h+12>innerHeight? Math.max(8, r.top-h-8) : r.bottom+8);
+  if(top+h>innerHeight-8) top=Math.max(8, innerHeight-h-8);
+  box.style.top=top+'px';
+}
+/* 장표 셀 하나에 들어간 계약들 — 장표와 같은 필터(MX_LIST)로 계산 */
+function mxDetailRows(line, Y, M){
+  var idx=(Y-2020)*12+(M-6);
+  var out=[];
+  if(idx<0||idx>=M_TOTAL()) return out;
+  (MX_LIST||idxs()).forEach(function(k){
+    var r=DATA.rows[k];
+    if(line && r.line!==line) return;
+    var v=MAT[k][idx]; if(!v) return;
+    out.push({k:k, cust:r.cust, line:r.line, ptn:r.ptn||'', ch:r.channel||'', st:statusOf(r)||'', ctype:r.ctype||'', amt:v});
+  });
+  out.sort(function(a,b){ return b.amt-a.amt; });
+  return out;
+}
+function M_TOTAL(){ return (typeof M==='number')? M : 0; }
+function mxDetailHtml(rows, cellSum){
+  if(!rows.length) return '<div class="ro" style="text-align:center;color:var(--muted)">이 달에 인식 금액이 있는 계약이 없습니다</div>';
+  var sum=rows.reduce(function(a,x){ return a+x.amt; },0);
+  var h='<div class="mxdet"><table><thead><tr><th>고객사</th><th>서비스</th><th>파트너</th><th>채널</th><th>상태</th><th class="n">월 금액(천원)</th></tr></thead><tbody>';
+  rows.slice(0,300).forEach(function(x,i){
+    var stc=/해지|중지/.test(x.st)? ' style="color:var(--critical)"' : '';
+    h+='<tr data-i="'+i+'" title="계약 화면에서 «'+esc(x.cust)+'» 보기"><td><b>'+esc(x.cust)+'</b></td><td>'+esc(lline(x.line))+'</td>'+
+       '<td>'+esc(x.ptn)+'</td><td>'+esc(x.ch)+'</td><td'+stc+'>'+esc(x.st)+'</td><td class="n">'+won(x.amt)+'</td></tr>';
+  });
+  h+='</tbody><tfoot><tr><td colspan="5">합계 '+rows.length+'건'+(rows.length>300? ' (상위 300건 표시)':'')+'</td><td class="n">'+won(sum)+'</td></tr></tfoot></table></div>';
+  if(cellSum!=null && Math.round(cellSum)!==Math.round(sum))
+    h+='<div class="who" style="color:var(--critical);margin-top:6px">⚠ 셀 금액('+won(cellSum)+')과 내역 합계('+won(sum)+')가 다릅니다 — 화면을 새로고침해 주세요</div>';
+  else h+='<div class="who" style="margin-top:6px">셀 금액과 내역 합계가 일치합니다 · 줄을 누르면 그 고객사의 계약 화면으로 이동</div>';
+  return h;
+}
+/* opts.detail = {html, count, sum, go(i)}  — 설치비처럼 다른 내역을 같은 팝업에 얹을 때 */
+function openMxMemo(td, line, Y, M, label, startTab, opts){
   closeMxPop();
+  opts=opts||{};
   var k=mxKey(line,Y,M), cur=MXM[k], ed=mxCanEdit();
-  var box=document.createElement('div'); box.className='mxpop'; box.id='mxPop';
+  var det, cellSum, detHtml, detGo;
+  if(opts.detail){
+    det=new Array(opts.detail.count||0); cellSum=opts.detail.sum||0; detHtml=opts.detail.html; detGo=opts.detail.go;
+  }else{
+    det=mxDetailRows(line,Y,M);
+    cellSum=det.reduce(function(a,x){ return a+x.amt; },0);
+    detHtml=mxDetailHtml(det, cellSum);
+    detGo=function(i){ var x=det[i]; if(!x) return; switchView('contracts'); var sInp=$('#dvSearch'); if(sInp){ sInp.value=x.cust; DV.page=0; renderGrid(); } };
+  }
+  var tab=startTab || 'det';                      // 기본은 «내역» — 메모는 셀에 마우스만 올려도 미리 보이므로
+  var box=document.createElement('div'); box.className='mxpop'+(tab==='det'?' wide':''); box.id='mxPop';
   var when=cur&&cur.updated_at? String(cur.updated_at).replace('T',' ').slice(0,16):'';
   box.innerHTML=
-    '<h4>'+esc(label)+' · '+Y+'년 '+M+'월 특이사항</h4>'+
+    '<h4>'+esc(label)+' · '+Y+'년 '+M+'월</h4>'+
+    '<div class="mxtabs">'+
+      '<button data-t="det" aria-pressed="'+(tab==='det')+'">📋 내역 '+det.length+'건 · '+won(cellSum)+'천원</button>'+
+      '<button data-t="memo" aria-pressed="'+(tab==='memo')+'">📝 특이사항 메모'+(cur? ' <span class="dot"></span>':'')+'</button>'+
+    '</div>'+
+    '<div id="mxPaneDet"'+(tab==='det'?'':' hidden')+'>'+detHtml+
+      '<div class="act"><span class="sp"></span><button class="pill ghost" id="mxClose2">닫기</button></div></div>'+
+    '<div id="mxPaneMemo"'+(tab==='memo'?'':' hidden')+'>'+
     '<div class="who">'+(cur? esc(cur.updated_by||'')+(when? ' · '+when+' 수정':'') : '아직 메모가 없습니다')+'</div>'+
     (ed? '<textarea id="mxTa" placeholder="예)\nVS. 25년12월 -28,733원\n#. 해지 -443,533원\n1. 대신엔에스(와이드넷) : 191,000 > 19,100 (-171,900)\n#. 신규 +414,800원\n1. 서울대학교관악학생생활관 : 242,000원">'+esc(cur?cur.body:'')+'</textarea>'
        : '<div class="ro">'+(cur? esc(cur.body) : '내용이 없습니다')+'</div>')+
@@ -6893,11 +7010,26 @@ function openMxMemo(td, line, Y, M, label){
     (ed&&cur? '<button class="pill ghost" id="mxDel" style="color:var(--critical,#d03b3b);border-color:rgba(208,59,59,.35)">삭제</button>':'')+
     '<button class="pill ghost" id="mxCancel">'+(ed?'취소':'닫기')+'</button>'+
     (ed? '<button class="pill" id="mxSave" style="background:var(--brand);border-color:var(--brand);color:#fff">저장</button>':'')+
-    '</div>';
+    '</div></div>';
   document.body.appendChild(box);
-  var r=td.getBoundingClientRect(), w=box.offsetWidth, h=box.offsetHeight;
-  box.style.left=Math.min(Math.max(8, r.left-w/2+r.width/2), innerWidth-w-8)+'px';
-  box.style.top =(r.bottom+h+12>innerHeight? Math.max(8, r.top-h-8) : r.bottom+8)+'px';
+  // 탭 전환
+  box.querySelectorAll('.mxtabs button').forEach(function(b){
+    b.onclick=function(){
+      var t=b.dataset.t;
+      box.querySelectorAll('.mxtabs button').forEach(function(x){ x.setAttribute('aria-pressed', x.dataset.t===t?'true':'false'); });
+      document.getElementById('mxPaneDet').hidden = t!=='det';
+      document.getElementById('mxPaneMemo').hidden = t!=='memo';
+      box.classList.toggle('wide', t==='det');
+      if(t==='memo'){ var ta0=document.getElementById('mxTa'); if(ta0) ta0.focus(); }
+      mxPlace(box, td);
+    };
+  });
+  var c2=document.getElementById('mxClose2'); if(c2) c2.onclick=closeMxPop;
+  // 내역 줄 클릭 → 계약 화면
+  box.querySelectorAll('.mxdet tbody tr[data-i]').forEach(function(tr){
+    tr.onclick=function(){ var i=+tr.dataset.i; closeMxPop(); if(detGo) detGo(i); };
+  });
+  mxPlace(box, td);
   document.addEventListener('keydown', mxPopEsc);
   setTimeout(function(){
     document.addEventListener('mousedown', function out(e){
@@ -6921,7 +7053,7 @@ function openMxMemo(td, line, Y, M, label){
         MXM[k]={line:line||'',year:Y,month:M,body:body,updated_by:AUTH_USER||'',updated_at:new Date().toISOString()};
         logChange('update','mx_memos',0,{cell:k});
       }
-      closeMxPop(); renderMatrix();
+      closeMxPop(); renderMatrix(); try{ renderInstall(); }catch(e){}
       toast('특이사항을 저장했습니다', label+' '+Y+'년 '+M+'월');
     }catch(e){
       var em=String(e.message||e);
@@ -6935,7 +7067,7 @@ function openMxMemo(td, line, Y, M, label){
   if(dl) dl.onclick=async function(){
     if(!confirm('이 셀의 특이사항을 삭제할까요?')) return;
     var msg=document.getElementById('mxMsg'); msg.textContent='삭제 중…';
-    try{ await mxRemove(k, cur); closeMxPop(); renderMatrix(); toast('삭제했습니다',''); }
+    try{ await mxRemove(k, cur); closeMxPop(); renderMatrix(); try{ renderInstall(); }catch(e2){} toast('삭제했습니다',''); }
     catch(e){ msg.textContent=String(e.message||e).slice(0,90); }
   };
 }
@@ -10006,11 +10138,44 @@ function setupPick(inputId, pickId, store){
         store.sel=r;
         box.querySelectorAll('.pi').forEach(function(x){x.classList.remove('sel');});
         it.classList.add('sel');
+        if(store===PK_F) showFixCurrent(r);
       };
       box.appendChild(it);
     });
   };
 }
+
+/* 금액 수정 탭: 선택한 계약의 현재 월 금액 구간을 보여주고, 구간을 누르면 시작·종료월이 채워집니다 */
+function showFixCurrent(r){
+  var box=$('#fCur'); if(!box) return;
+  var segs=(r.segs||[]).slice();
+  if(!segs.length){ box.style.display=''; box.innerHTML='<label>현재 금액</label><div class="cap">인식 금액 행이 없습니다</div>'; return; }
+  box.style.display='';
+  box.innerHTML='<label>현재 금액 구간 <small style="color:var(--muted)">(누르면 그 구간이 입력칸에 채워집니다)</small></label>'+
+    '<div class="pick" style="max-height:120px">'+segs.map(function(sg,i){
+      return '<div class="pi" data-i="'+i+'"><span>'+mk(sg[0])+' ~ '+mk(sg[1])+' <small>'+(sg[1]-sg[0]+1)+'개월</small></span><small>월 '+won(sg[2])+'천원</small></div>';
+    }).join('')+'</div>';
+  box.querySelectorAll('.pi').forEach(function(el0){
+    el0.onclick=function(){
+      var sg=segs[+el0.dataset.i]; if(!sg) return;
+      $('#fFrom').value=mk(sg[0]); $('#fTo').value=mk(sg[1]); $('#fMrr').value=sg[2]; $('#fMrr').focus();
+      box.querySelectorAll('.pi').forEach(function(x){x.classList.remove('sel');}); el0.classList.add('sel');
+    };
+  });
+}
+/* 과금방식 select: «직접 입력…» 이면 옆 입력칸 값을 씁니다 */
+function nBillingVal(){
+  var sel=$('#nBilling'); if(!sel) return '';
+  if(sel.value==='__etc') return ($('#nBillingEtc').value||'').trim();
+  return sel.value||'';
+}
+(function(){
+  var sel=document.getElementById('nBilling'), etc=document.getElementById('nBillingEtc');
+  if(sel && etc) sel.addEventListener('change', function(){
+    etc.style.display = sel.value==='__etc'? '' : 'none';
+    if(sel.value==='__etc') etc.focus();
+  });
+})();
 
 /* ---- 공통 쓰기 도우미 ---- */
 function ymFromInput(v){ // 'YYYY-MM' → idx
@@ -10060,6 +10225,8 @@ async function saveEdit(){
         note:$('#nNote').value.trim()||null,
         start_month:idxDate(s0), end_month:idxDate(e0),
         term_months:e0-s0+1, qty:+$('#nQty').value||null,
+        csm:($('#nCsm').value||'').trim()||null,
+        billing:nBillingVal()||null,
         total_amount:mrr*(e0-s0+1), mrr:mrr
       }],'return=representation');
       var id=ct[0].id;
@@ -10103,12 +10270,19 @@ async function saveEdit(){
     }
     else if(CUR_TAB==='fix'){
       var r3=PK_F.sel; if(!r3) throw new Error('계약을 선택하세요.');
-      var f0=ymFromInput($('#fFrom').value), na=+$('#fMrr').value;
-      if(f0==null||!na) throw new Error('적용 시작월·새 금액은 필수입니다.');
-      await sbWrite('PATCH','monthly_revenue?contract_id=eq.'+r3._id+'&month=gte.'+idxDate(f0),{amount:na});
-      await sbWrite('PATCH','contracts?id=eq.'+r3._id,{mrr:na,updated_at:new Date().toISOString()});
-      await logChange('update','monthly_revenue',r3._id,{from:idxDate(f0),amount:na});
-      msg('eMsg','금액 수정 완료 ✅ — '+r3.cust+' '+$('#fFrom').value+'부터 월 '+won(na)+'천원','ok');
+      var f0=ymFromInput($('#fFrom').value), f1=ymFromInput($('#fTo').value), na=+$('#fMrr').value;
+      if(f0==null||isNaN(na)||$('#fMrr').value==='') throw new Error('적용 시작월·새 금액은 필수입니다. (0원도 됩니다)');
+      var endI=(r3.endIdx!=null? r3.endIdx : r3.dataLast);
+      if(f1==null) f1=endI;                                   // 비우면 계약 끝까지
+      if(f1<f0) throw new Error('적용 종료월이 시작월보다 빠릅니다.');
+      if(endI!=null && f1>endI) throw new Error('적용 종료월('+$('#fTo').value+')이 계약 종료월('+mk(endI)+')보다 늦습니다. 기간을 늘리려면 «갱신» 탭을 쓰세요.');
+      /* 구간을 지우고 다시 넣습니다 — 그 달 행이 아직 없던 경우(중간 공백)도 채워집니다 */
+      await sbWrite('DELETE','monthly_revenue?contract_id=eq.'+r3._id+'&month=gte.'+idxDate(f0)+'&month=lte.'+idxDate(f1));
+      if(na>0) await sbWrite('POST','monthly_revenue', monthRows(r3._id,f0,f1,na));
+      var toEnd=(endI==null || f1>=endI);
+      if(toEnd) await sbWrite('PATCH','contracts?id=eq.'+r3._id,{mrr:na,updated_at:new Date().toISOString()});   // 끝까지 바꾼 경우만 대표 MRR 갱신
+      await logChange('update','monthly_revenue',r3._id,{from:idxDate(f0),to:idxDate(f1),amount:na});
+      msg('eMsg','금액 수정 완료 ✅ — '+r3.cust+' '+mk(f0)+'~'+mk(f1)+' 월 '+won(na)+'천원'+(toEnd?' (대표 MRR 도 갱신)':' (구간만 · 대표 MRR 유지)'),'ok');
     }
     // 데이터 새로고침
     var nd=await loadFromDb(); onData(nd);
@@ -10150,10 +10324,11 @@ function setupEdit(){
     if(etc) npe.focus(); else npe.value='';
   });
   function resetNewForm(){
-    ['nCust','nBiller','nStart','nEnd','nMrr','nQty','nNote','nPtnEtc'].forEach(function(i){
+    ['nCust','nBiller','nStart','nEnd','nMrr','nQty','nNote','nPtnEtc','nCsm','nBillingEtc'].forEach(function(i){
       var el=document.getElementById(i); if(el) el.value='';
     });
-    var d={nInd:'기업', nLine:'Cloud', nChannel:'일반', nCombine:'', nVer:'', nPtn:'지니언스(직접)', nType:'신규'};
+    var nbe=document.getElementById('nBillingEtc'); if(nbe) nbe.style.display='none';
+    var d={nInd:'기업', nLine:'Cloud', nChannel:'일반', nCombine:'', nVer:'', nPtn:'지니언스(직접)', nType:'신규', nBilling:''};
     Object.keys(d).forEach(function(i){ var el=document.getElementById(i); if(el) el.value=d[i]; });
     if(npe) npe.style.display='none';
     syncCombine(); syncVer();
