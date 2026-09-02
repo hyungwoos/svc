@@ -1949,7 +1949,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-02 ㊻';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-02 ㊼';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -3522,15 +3522,31 @@ function saveHistTurn(q,a){
 }
 
 function aiEndpoint(){ return SB_URL + '/functions/v1/ask'; }
-async function aiFetch(payload){
-  var r=await fetch(aiEndpoint(),{
-    method:'POST',
-    headers:{'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+(SB_TOKEN||'')},
-    body:JSON.stringify(payload)
-  });
-  var j=null; try{ j=await r.json(); }catch(e){}
-  if(!r.ok) throw new Error((j&&j.error)||('HTTP '+r.status));
-  return j;
+/* 중계 함수가 응답을 주지 않으면 fetch 는 영원히 안 끝납니다.
+   타임아웃을 걸어 반드시 끝나게 하고, 끝나지 않으면 내장 규칙으로 답합니다. */
+var AI_TIMEOUT_MS = 75000;      // 질문 1건 최대 대기 (AI가 DB를 여러 번 조회할 수 있어 넉넉히)
+var AI_PING_MS    = 12000;      // 연결 확인은 짧게
+async function aiFetch(payload, ms){
+  ms = ms || (payload && payload.mode==='ping' ? AI_PING_MS : AI_TIMEOUT_MS);
+  var ctl = (typeof AbortController!=='undefined') ? new AbortController() : null;
+  var timedOut=false;
+  var t = setTimeout(function(){ timedOut=true; if(ctl) ctl.abort(); }, ms);
+  var t0 = Date.now();
+  try{
+    var opt={ method:'POST',
+      headers:{'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+(SB_TOKEN||'')},
+      body:JSON.stringify(payload) };
+    if(ctl) opt.signal=ctl.signal;
+    var r=await fetch(aiEndpoint(), opt);
+    var j=null; try{ j=await r.json(); }catch(e){}
+    if(!r.ok) throw new Error((j&&j.error)||('HTTP '+r.status));
+    if(j) j._ms = Date.now()-t0;
+    return j;
+  }catch(e){
+    if(timedOut) throw new Error(Math.round(ms/1000)+'초 안에 응답이 없어 중단했습니다 (중계 함수 ask 응답 없음)');
+    if(e && e.name==='AbortError') throw new Error('요청이 중단되었습니다');
+    throw e;
+  }finally{ clearTimeout(t); }
 }
 function loadAiConfig(){
   var badge=$('#aiBadge');
@@ -3586,18 +3602,26 @@ function ask(q){
   say.innerHTML='<span class="lb">AI</span>데이터를 보고 있습니다<span class="dots"><span>·</span><span>·</span><span>·</span></span>';
   var grid=document.getElementById('ansGrid'); if(grid) grid.style.display='none';
 
+  // 최후 안전장치 — 어떤 이유로든 체인이 끝나지 않아도 버튼은 반드시 풀립니다
+  var guard=setTimeout(function(){
+    if($('#btnAsk').disabled){
+      setAsking(false);
+      localAnswer(q,'⚠ AI가 응답하지 않아 내장 규칙으로 답했습니다 — 잠시 후 다시 물어봐 주세요.');
+    }
+  }, AI_TIMEOUT_MS+5000);
   loadHist().then(function(){
     return aiFetch({mode:'chat', question:q, digest:buildDigest(), history:HIST.slice(-6)});
   })
     .then(function(r){
-      setAsking(false);
+      clearTimeout(guard); setAsking(false);
       if(!r || !r.ok || !r.text){ localAnswer(q,'⚠ AI가 답하지 못해 내장 규칙(간단 패턴)으로 답했습니다 — AI 답변이 아닙니다. '+String((r&&r.error)||'').slice(0,100)); return; }
       say.className='ai-say on';
       say.innerHTML='<span class="lb">AI</span>'+esc(cleanSay(r.text))+
         '<div style="font-size:10px;color:var(--muted);margin-top:6px;opacity:.8">'+
         esc(String(r.model||'').replace(/^claude-/,''))+
         (r.queries&&r.queries.length? ' · DB 조회 '+r.queries.length+'회':'')+
-        (r.tried&&r.tried.length? ' · <span style="color:#a06c00">폴백: '+esc(r.tried.join(' / '))+'</span>':'')+'</div>';
+        (r.tried&&r.tried.length? ' · <span style="color:#a06c00">폴백: '+esc(r.tried.join(' / '))+'</span>':'')+
+        (r._ms? ' · '+(r._ms/1000).toFixed(1)+'초':'')+'</div>';
       HIST.push({q:q, a:r.text}); if(HIST.length>10) HIST.shift();
       saveHistTurn(q, r.text);                  // 계정별 누적 기억 (세션 무관)
       // 표·그래프가 도움이 되는 질문이면 포탈이 직접 계산해서 아래에 붙입니다
@@ -3610,9 +3634,20 @@ function ask(q){
       }
     })
     .catch(function(e){
-      setAsking(false);
+      clearTimeout(guard); setAsking(false);
       localAnswer(q,'⚠ AI 호출 실패 — 이 답은 AI가 아니라 내장 규칙(간단 패턴)입니다. ('+String(e&&e.message||e).slice(0,120)+')');
+      aiRetryBtn(q);
     });
+}
+
+/* AI 호출이 실패했을 때 «다시 시도» 버튼을 답변 영역에 붙입니다 */
+function aiRetryBtn(q){
+  var say=$('#aiSay'); if(!say) return;
+  say.className='ai-say on';
+  say.innerHTML='<span class="lb">AI</span>AI가 답하지 못했습니다. '+
+    '<button class="pill" id="aiRetry" style="height:26px;padding:0 10px;font-size:11.5px;margin-left:6px">↻ 다시 시도</button>';
+  var b=document.getElementById('aiRetry');
+  if(b) b.onclick=function(){ ask(q); };
 }
 
 /* 답변에 JSON/코드펜스가 섞여 오면 사람이 읽을 문장만 남깁니다 */
