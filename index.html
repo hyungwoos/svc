@@ -2009,7 +2009,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-02 ㊿+4';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-02 ㊿+5';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -10308,7 +10308,9 @@ function setupEdit(){
     var v=(nl&&nl.value)||'', fw=document.getElementById('nFeeWrap'), sw=document.getElementById('nSettleWrap');
     if(!fw||!sw) return;
     var isS1=(v==='S1'||v==='MDR_S1');
-    fw.style.opacity=isS1? '':'0.6'; sw.style.opacity=isS1? '':'0.6';   // 다른 서비스도 입력은 가능
+    /* 설치비는 에스원(S1) 계약에만 있는 항목 — 다른 서비스에서는 칸을 숨기고 값도 비웁니다 */
+    fw.style.display=isS1? '':'none'; sw.style.display=isS1? '':'none';
+    if(!isS1){ var f=document.getElementById('nFee'), st=document.getElementById('nSettle'); if(f) f.value=''; if(st) st.value=''; }
   }
   function syncVer(){
     var v=(nl&&nl.value)||'', vr=document.getElementById('nVer'), w=document.getElementById('nVerWrap');
