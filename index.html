@@ -1949,7 +1949,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-02 ㊼';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-02 ㊾';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -2234,6 +2234,7 @@ function buildFromRes(res){
     return {
       _id:c.id, line:c.line, ind:cu.industry||'미분류', cust:cu.name||'?',
       sector:cu.sector||'', sectorDetail:cu.sector_detail||'', sectorDup:!!cu.sector_dup,
+      sectorChk:!!cu.sector_check,
       partner:c.biller||'미지정', ptn:c.partner||'직접(계산서)',
       ctype:c.contract_type||'', status:c.status||'', note:c.note||'',
       churn:c.churn_reason||'', saleType:c.sale_type||'', ver:c.version||'', csm:c.csm||'', channel:c.channel||'일반',
@@ -4895,7 +4896,7 @@ var GRIDS={
       var out=(RAWX.contracts||[]).map(function(c){
       var cu=cmap[c.customer_id]||{};
       c._custName=cu.name||'?';
-      c._sector=cu.sector||''; c._sectorDup=!!cu.sector_dup; return c; });
+      c._sector=cu.sector||''; c._sectorDup=!!cu.sector_dup; c._sectorChk=!!cu.sector_check; return c; });
       // 최신 항목이 맨 위 — 시작월 내림차순, 같으면 나중에 입력한 것(id) 위
       out.sort(function(a,b){
         var n=String(b.start_month||'').localeCompare(String(a.start_month||''));
@@ -4907,7 +4908,8 @@ var GRIDS={
       {k:'_custName',l:'고객사',ro:true},
       {k:'_sector',l:'업종',ro:true,fmt:function(v,r0){
         if(!r0||!r0._sector) return '·';
-        return r0._sector + (r0._sectorDup? ' ⚠':'');   /* ⚠ = 동명 회사 여러 곳, 확인 필요 */
+        return r0._sector + (r0._sectorDup? ' ⚠':'') + (r0._sectorChk? ' ◇':'');
+        /* ⚠ = 동명 회사 여러 곳 · ◇ = 웹 검색 없이 사명 추정 — 둘 다 사람 확인 필요 */
       }},
       {k:'line',l:'서비스',t:'select',opts:LINE_OPTS,fmt:function(v){return lline(v);}},
       {k:'channel',l:'판매 채널',t:'select',opts:CH_OPTS},
@@ -9016,10 +9018,12 @@ var DV={page:0, per:100, sortK:null, sortDir:1, filters:{}};
 
 /* ===== 열 필터 (구글시트식 «값 골라 보기») ===== */
 var BLANK_LABEL='(빈 값)';
-function cellText(c,v){
+function cellText(c,v,r){
   var t;
-  try{ t=fmtCell(c,v); }catch(e){ t=v; }
-  t=String(t==null?'':t).trim();
+  /* 계산 열(업종·설치율·경과일 등)은 fmt 가 행 전체를 봐야 값이 나옵니다 —
+     행을 넘기지 않으면 모든 행이 «(빈 값)» 으로 잡힙니다 */
+  try{ t=fmtCell(c,v,r); }catch(e){ t=v; }
+  t=String(t==null?'':t).replace(/<[^>]*>/g,'').trim();
   if(t==='' || t==='·') t=BLANK_LABEL;
   return t;
 }
@@ -9033,7 +9037,7 @@ function passFilters(r,g,skipK){
     var col=null;
     for(var i=0;i<g.cols.length;i++){ if(g.cols[i].k===k){ col=g.cols[i]; break; } }
     if(!col) continue;
-    if(sel.indexOf(cellText(col,r[k]))<0) return false;
+    if(sel.indexOf(cellText(col,r[k],r))<0) return false;
   }
   return true;
 }
@@ -9073,7 +9077,7 @@ function openColFilter(anchor,g,c){
   var rows=baseRows(g,c.k);
   var cnt={}, order=[];
   rows.forEach(function(r){
-    var t=cellText(c,r[c.k]);
+    var t=cellText(c,r[c.k],r);
     if(cnt[t]===undefined){ cnt[t]=0; order.push(t); }
     cnt[t]++;
   });
