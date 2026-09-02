@@ -2009,7 +2009,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-02 ㊿+5';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-02 ㊿+6';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -3765,7 +3765,12 @@ async function aiFetch(payload, ms){
       body:JSON.stringify(payload) };
     if(ctl) opt.signal=ctl.signal;
     var r=await fetch(aiEndpoint(), opt);
+    if(r.status===401 && SB_TOKEN && await refreshToken()){      // 로그인 토큰 만료 → 연장 후 1회 재시도
+      opt.headers.Authorization='Bearer '+SB_TOKEN;
+      r=await fetch(aiEndpoint(), opt);
+    }
     var j=null; try{ j=await r.json(); }catch(e){}
+    if(r.status===401) throw new Error('로그인이 만료되었습니다 — 다시 로그인해 주세요');
     if(!r.ok) throw new Error((j&&j.error)||('HTTP '+r.status));
     if(j) j._ms = Date.now()-t0;
     return j;
@@ -3833,6 +3838,8 @@ function shortQ(q){ q=String(q||''); return q.length>90? q.slice(0,90)+'…' : q
    메뉴 이동만으로는 닫지 않습니다 — 답을 보고 다른 화면 확인하다 돌아오는 흐름은 살립니다. */
 function closeAnswer(why){
   var a=$('#answer'); if(!a || !a.classList.contains('on')) return;
+  /* 질문이 진행 중(생각 중…)이면 닫지 않습니다 — 자동 새로고침이 겹치면 답이 와도 보이지 않던 문제 */
+  if(typeof isAsking==='function' && isAsking()) return;
   a.classList.remove('on');
   try{ clearSay(); }catch(e){}
   var t=$('#ansTitle'); if(t) t.textContent='';
@@ -3873,6 +3880,7 @@ function ask(q){
     .then(function(r){
       clearTimeout(guard); setAsking(false);
       if(!r || !r.ok || !r.text){ localAnswer(q,'⚠ AI가 답하지 못해 내장 규칙(간단 패턴)으로 답했습니다 — AI 답변이 아닙니다. '+String((r&&r.error)||'').slice(0,100)); return; }
+      revealAnswer();
       say.className='ai-say on';
       say.innerHTML='<span class="lb">AI</span>'+esc(cleanSay(r.text))+
         '<div style="font-size:10px;color:var(--muted);margin-top:6px;opacity:.8">'+
@@ -3895,11 +3903,21 @@ function ask(q){
     .catch(function(e){
       clearTimeout(guard); setAsking(false);
       if(/^요청을 중단했습니다/.test(String(e&&e.message||''))){ $('#q').value=q; return; }   // 사용자가 끊음 → 질문 복원 (타임아웃은 아래로)
+      if(/로그인이 만료/.test(String(e&&e.message||''))){ $('#q').value=q; toast('로그인이 만료되었습니다','다시 로그인하면 질문이 그대로 남아 있습니다','warn'); openOvl('ovlAuth'); return; }
       localAnswer(q,'⚠ AI 호출 실패 — 이 답은 AI가 아니라 내장 규칙(간단 패턴)입니다. ('+String(e&&e.message||e).slice(0,120)+')');
       aiRetryBtn(q);
     });
 }
 
+/* 답변 패널을 열고, 화면 밖에 있으면 보이는 위치로 살짝 스크롤 */
+function revealAnswer(){
+  var a=$('#answer'); if(!a) return;
+  a.classList.add('on');
+  try{
+    var r=a.getBoundingClientRect(), tb=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tbh'))||64;
+    if(r.top<tb || r.top>innerHeight-120) a.scrollIntoView({behavior:'smooth',block:'start'});
+  }catch(e){}
+}
 /* AI 호출이 실패했을 때 «다시 시도» 버튼을 답변 영역에 붙입니다 */
 function aiRetryBtn(q){
   var say=$('#aiSay'); if(!say) return;
@@ -5046,7 +5064,7 @@ function computeFromP(p){
 function gbLabel(k){ return {partner:'파트너',biller:'계산서 발행처',ind:'산업군',line:'서비스',cust:'고객사',churn:'해지 사유',month:'월',year:'연도',channel:'사업 영역',status:'계약 상태'}[k]||k; }
 
 function showAnswer(q,res){
-  $('#answer').classList.add('on');
+  revealAnswer();
   var ph=document.getElementById('ansPin');
   if(!ph){
     ph=document.createElement('button'); ph.id='ansPin'; ph.className='pill';
