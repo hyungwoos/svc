@@ -2033,7 +2033,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-02 ㊿+10';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-02 ㊿+12';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -3909,7 +3909,7 @@ function ask(q){
       localAnswer(q,'⚠ AI가 응답하지 않아 내장 규칙으로 답했습니다 — 잠시 후 다시 물어봐 주세요.');
     }
   }, AI_TIMEOUT_MS+5000);
-  loadHist().then(function(){
+  Promise.all([loadHist(), clEnsure()]).then(function(){
     return aiFetch({mode:'chat', question:q, digest:buildDigest(), history:HIST.slice(-6)});
   })
     .then(function(r){
@@ -4112,6 +4112,22 @@ function buildDigest(){
     상위고객사15:topCust,
     만료예정_12개월내:exp.slice(0,20),
     해지사유별건수:churn,
+    클라우드비용: (function(){   // 도구 › 클라우드 비용 (AWS 세전 USD · NCP 공급가액 ₩)
+      if(!RAWX.cloud || !RAWX.cloud.costs || !RAWX.cloud.costs.length) return null;
+      var B=clBuild(); if(!B.months.length) return null;
+      var M=B.months, li=M.length-1, pi=Math.max(0,li-1);
+      var acc={}; B.awsKeys.concat(B.ncp? [B.ncp]:[]).forEach(function(k){ var a=B.acc[k];
+        acc[a.label]={용도:a.purpose, 통화:a.currency, 최근월:M[li], 최근월금액:Math.round(a.totals[li]||0), 전월금액:Math.round(a.totals[pi]||0),
+          최근12개월합:Math.round(clSum(a.totals.slice(-12)))}; });
+      var awsM=M.map(function(_,i){ return Math.round(B.awsKeys.reduce(function(s,k){ return s+(B.acc[k].totals[i]||0); },0)); });
+      var cnt=B.awsKeys.filter(function(k){ return B.acc[k].totals[li]!=null; }).length;
+      var fxL=B.fx[M[li]]||{};
+      return {설명:'AWS 는 세전 USD, NCP 는 공급가액 원. 원화환산 은 월별 적용 환율(인보이스)로 USD 를 바꾼 값(원). 최신 달은 인보이스가 덜 들어온 부분 집계일 수 있음 (집계 계정 수 참고).',
+        최근월_환율:fxL.rate||null, 환율근거:fxL.src||null,
+        AWS_최근월_원화환산:Math.round(awsM[li]*(fxL.rate||CL_FX_DEFAULT)),
+        기간:[M[0],M[li]], AWS_월별합계_USD:M.map(function(m,i){ return [m, awsM[i]]; }), 최신달_집계된AWS계정수:cnt+'/'+B.awsKeys.length,
+        계정별:acc, MDR인프라_USD:(B.acc.edr&&B.acc.tac)? {최근월:M[li], EDR:Math.round(B.acc.edr.totals[li]||0), awstac:Math.round(B.acc.tac.totals[li]||0)} : null};
+    })(),
     임대장비: (function(){
       var a=RAWX.assets||[]; if(!a.length) return null;
       var st={}, ch={}, us={};
@@ -6489,9 +6505,10 @@ function loadCloud(cb){
   Promise.all([
     sbTry('cloud_accounts?select=*&order=sort,id'),
     sbTry('cloud_costs?select=ym,account_id,service,usd,credit_usd,krw,kind,source,invoice_id&order=ym'),
-    sbTry('cloud_invoices?select=*&order=ym.desc,account_id')
+    sbTry('cloud_invoices?select=*&order=ym.desc,account_id'),
+    sbTry('cloud_fx?select=*&order=ym')
   ]).then(function(r){
-    RAWX.cloud={acc:r[0]||[], costs:r[1]||[], inv:r[2]||[], _at:Date.now()};
+    RAWX.cloud={acc:r[0]||[], costs:r[1]||[], inv:r[2]||[], fx:r[3]||[], _at:Date.now()};
     var q=loadCloud._q; loadCloud._q=null;
     q.forEach(function(f){ if(f) try{ f(); }catch(e){} });
   });
@@ -6538,18 +6555,60 @@ function clBuild(){
   var awsKeys=Object.keys(acc).filter(function(k){ return acc[k].vendor!=='NCP' && acc[k].active && acc[k].rows.length; })
     .sort(function(x,y){ return acc[x].sort-acc[y].sort; });
   var ncp=Object.keys(acc).filter(function(k){ return acc[k].vendor==='NCP' && acc[k].rows.length; })[0]||null;
-  return {months:months, acc:acc, awsKeys:awsKeys, ncp:ncp, inv:C.inv};
+  var B={months:months, acc:acc, awsKeys:awsKeys, ncp:ncp, inv:C.inv};
+  B.fx=clFxMap(B);
+  // 표시 통화로 변환한 값 (rows[].d, totals → dtotals, linked[].d)
+  Object.keys(acc).forEach(function(k){ var a=acc[k];
+    a.rows.forEach(function(r){ r.d=r.v.map(function(x,i){ return clConv(x,a.currency,months[i],B); }); });
+    a.linked.forEach(function(r){ r.d=r.v.map(function(x,i){ return clConv(x,a.currency,months[i],B); }); });
+    a.dtotals=a.totals.map(function(x,i){ return clConv(x,a.currency,months[i],B); });
+  });
+  return B;
+}
+/* ── 통화 표시 모드: 'usd'(세전 USD) | 'krw'(원화 환산 · 천원) ── */
+CL.cur = (function(){ try{ return localStorage.getItem('svc_cloud_cur')||'usd'; }catch(e){ return 'usd'; } })();
+var CL_FX_DEFAULT=1400;
+/* 월별 환율: cloud_fx → 그 달 인보이스 fx → 가장 가까운 이전 달 → 가장 가까운 다음 달 → 기본값 */
+function clFxMap(B){
+  var C=RAWX.cloud||{}, m={};
+  (C.inv||[]).forEach(function(i){ if(i.fx_rate) m[String(i.ym).slice(0,7)]={rate:Number(i.fx_rate), src:'invoice'}; });
+  (C.fx||[]).forEach(function(f){ m[String(f.ym).slice(0,7)]={rate:Number(f.rate), src:f.source||'manual'}; });
+  var out={}, known=Object.keys(m).sort();
+  B.months.forEach(function(ym){
+    if(m[ym]){ out[ym]=m[ym]; return; }
+    var prev=known.filter(function(k){ return k<ym; }).pop(), next=known.filter(function(k){ return k>ym; })[0];
+    var pick=prev||next;
+    out[ym]= pick? {rate:m[pick].rate, src:'near', from:pick} : {rate:CL_FX_DEFAULT, src:'default'};
+  });
+  return out;
+}
+/* 값 변환: 원 통화(a.currency) → 표시 통화. krw 모드는 «천원» 숫자 */
+function clConv(v, currency, ym, B){
+  if(v==null) return null;
+  var fx=(B.fx&&B.fx[ym]&&B.fx[ym].rate)||CL_FX_DEFAULT;
+  if(CL.cur==='krw') return (currency==='KRW'? v : v*fx)/1000;
+  return currency==='KRW'? v/fx : v;
+}
+function clIsK(){ return CL.cur==='krw'; }
+/* 표시 통화 포맷 — krw 모드: 천원 숫자(단위 배지가 따로 있음), usd 모드: $ */
+function clF(v){ return clIsK()? Math.round(v).toLocaleString('ko-KR') : '$'+Number(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function clFk(v){ return clIsK()? Math.round(v).toLocaleString('ko-KR') : '$'+Math.round(v).toLocaleString('en-US'); }
+function clUnit(){ return clIsK()? '천원' : 'USD'; }
+/* AI 질문 전에 클라우드 비용 데이터를 한 번 확보 (없으면 조용히 통과) */
+function clEnsure(){
+  if(RAWX.cloud) return Promise.resolve();
+  return new Promise(function(res){ var t=setTimeout(res, 4000); try{ loadCloud(function(){ clearTimeout(t); res(); }); }catch(e){ res(); } });
 }
 var clU=function(v){ return '$'+Number(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); };
 var clUk=function(v){ return '$'+Math.round(v).toLocaleString('en-US'); };
 var clW=function(v){ return '₩'+Math.round(v).toLocaleString('ko-KR'); };
 function clSum(a){ return a.reduce(function(s,x){ return s+(x||0); },0); }
-function clCell(v,isK){ if(v==null) return '<td class="n z">–</td>'; if(v===0) return '<td class="n z">0</td>'; return '<td class="n">'+(isK?clW(v):clU(v))+'</td>'; }
-function clDelta(prev,cur,isK){
+function clCell(v){ if(v==null) return '<td class="n z">–</td>'; if(Math.abs(v)<(clIsK()?0.5:0.005)) return '<td class="n z">0</td>'; return '<td class="n">'+clF(v)+'</td>'; }
+function clDelta(prev,cur){
   if(prev==null||cur==null) return '<span class="dl flat">–</span>';
-  var d=cur-prev; if(Math.abs(d)<(isK?1:0.005)) return '<span class="dl flat">±0</span>';
+  var d=cur-prev; if(Math.abs(d)<(clIsK()?0.5:0.005)) return '<span class="dl flat">±0</span>';
   var p=prev? Math.abs(d/prev*100).toFixed(1)+'%':'';
-  return '<span class="dl '+(d>0?'up':'down')+'">'+(d>0?'▲':'▼')+' '+(isK?clW(Math.abs(d)):clU(Math.abs(d)))+(p?' ('+p+')':'')+'</span>';
+  return '<span class="dl '+(d>0?'up':'down')+'">'+(d>0?'▲':'▼')+' '+clF(Math.abs(d))+(p?' ('+p+')':'')+'</span>';
 }
 function clMonLabel(m){ return m.slice(2,4)+'.'+m.slice(5,7); }
 
@@ -6571,9 +6630,12 @@ function renderCloud(){
   var first=B.months[0], last=B.months[B.months.length-1];
   var head='<div class="pr-top">'+
     '<span style="font-size:17px;font-weight:800">☁️ 클라우드 비용</span>'+
-    '<span class="ubadge sm won">$ USD 세전 · ₩ 공급가액</span>'+
+    (clIsK()? '<span class="ubadge sm" title="USD 는 월별 적용 환율로 원화 환산 · NCP 는 공급가액 · 천원 단위">₩ 천원 (환율 환산)</span>'
+            : '<span class="ubadge sm won" title="AWS 세전 USD · NCP(₩ 공급가액)는 환율로 USD 환산">$ USD 세전</span>')+
     '<span class="pr-ver">'+esc(first.replace('-','년 ')+'월')+' ~ '+esc(last.replace('-','년 ')+'월')+' · 인보이스 '+B.inv.length+'건 등록</span>'+
     '<span style="flex:1"></span>'+
+    '<div class="seg" id="clCur"><button data-c="usd" aria-pressed="'+(!clIsK())+'">$ USD</button><button data-c="krw" aria-pressed="'+clIsK()+'">₩ 천원</button></div>'+
+    '<button class="pill ghost" id="clFxBtn" title="월별 적용 환율 보기·수정">환율 '+Number(B.fx[last].rate).toLocaleString('ko-KR')+(B.fx[last].src==='invoice'||B.fx[last].src==='manual'?'':' (추정)')+'</button>'+
     (canEdit? '<button class="pill" id="clAdd" style="background:var(--brand);border-color:var(--brand);color:#fff">＋ 인보이스 PDF 추가</button>':'')+
     '</div>';
   host.innerHTML=head+
@@ -6588,17 +6650,46 @@ function renderCloud(){
     '<div class="pr-card" id="clInv"></div>';
   clSummary(B); clMdr(B); clChips(B); clChart(B); clAcctOverview(B); clLinked(B); clTable(B); clInvList(B, canEdit);
   var add=document.getElementById('clAdd'); if(add) add.onclick=function(){ clOpenAdd(); };
+  host.querySelectorAll('#clCur button').forEach(function(b){ b.onclick=function(){ CL.cur=b.dataset.c; try{ localStorage.setItem('svc_cloud_cur',CL.cur); }catch(e){} renderCloud(); }; });
+  var fxb=document.getElementById('clFxBtn'); if(fxb) fxb.onclick=function(){ clOpenFx(B, canEdit); };
+}
+/* 월별 환율 보기·수정 */
+function clOpenFx(B, canEdit){
+  var old=document.getElementById('clFxOvl'); if(old) old.remove();
+  var ov=document.createElement('div'); ov.className='ovl on'; ov.id='clFxOvl';
+  var rows=B.months.map(function(m){ var f=B.fx[m];
+    var src= f.src==='invoice'? '인보이스' : f.src==='manual'? '직접 입력' : f.src==='near'? '가까운 달('+clMonLabel(f.from)+') 적용' : '기본값 '+CL_FX_DEFAULT;
+    return '<tr><td>'+m+'</td><td class="n">'+(canEdit? '<input type="number" step="0.1" data-fx="'+m+'" value="'+f.rate+'" style="width:110px;text-align:right">' : Number(f.rate).toLocaleString('ko-KR'))+'</td><td class="cap">'+src+'</td></tr>'; }).join('');
+  ov.innerHTML='<div class="modal" style="width:min(560px,100%)"><h3>월별 적용 환율 (원/USD)</h3>'+
+    '<p class="cap">인보이스 PDF 를 올리면 «적용 환율»이 자동으로 들어옵니다. 인보이스가 없는 달은 가까운 달의 환율을 쓰며, 관리자는 값을 직접 넣을 수 있습니다. 원화 표시는 이 환율로 USD 를 환산해 천원 단위로 보입니다.</p>'+
+    '<div class="tbl-wrap" style="max-height:50vh"><table class="pr"><thead><tr><th>월</th><th class="n">환율</th><th>근거</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+    '<div class="mact"><span class="mmsg" id="clFxMsg"></span><button class="pill ghost" id="clFxClose">닫기</button>'+(canEdit? '<button class="btn" style="height:36px" id="clFxSave">저장</button>':'')+'</div></div>';
+  document.body.appendChild(ov);
+  document.getElementById('clFxClose').onclick=function(){ ov.remove(); };
+  var sv=document.getElementById('clFxSave');
+  if(sv) sv.onclick=async function(){
+    var inputs=Array.prototype.slice.call(ov.querySelectorAll('input[data-fx]'));
+    var changed=inputs.filter(function(i){ var m=i.dataset.fx, f=B.fx[m]; var v=Number(i.value); return v>0 && (f.src==='near'||f.src==='default'||Math.abs(v-f.rate)>0.0001); })
+      .map(function(i){ return {ym:i.dataset.fx+'-01', rate:Number(i.value), source:'manual', updated_by:AUTH_USER||null, updated_at:new Date().toISOString()}; });
+    if(!changed.length){ ov.remove(); return; }
+    sv.disabled=true;
+    try{ await sbWrite('POST','cloud_fx?on_conflict=ym',changed,'resolution=merge-duplicates'); logChange('update','cloud_fx',0,{n:changed.length});
+      toast('환율을 저장했습니다', changed.length+'개월'); ov.remove(); RAWX.cloud=null; renderCloud(); }
+    catch(e){ document.getElementById('clFxMsg').textContent=String(e.message||e); sv.disabled=false; }
+  };
 }
 function clSummary(B){
   var M=B.months, ks=B.awsKeys;
-  var awsMonth=M.map(function(_,i){ return ks.reduce(function(s,k){ return s+(B.acc[k].totals[i]||0); },0); });
-  var lastFull=M.length-1; while(lastFull>0 && ks.filter(function(k){ return B.acc[k].totals[lastFull]!=null; }).length<ks.length*0.6) lastFull--;
-  var shares=ks.map(function(k){ return {k:k,s:clSum(B.acc[k].totals)}; }).sort(function(a,b){ return b.s-a.s; });
+  var awsMonth=M.map(function(_,i){ return ks.reduce(function(s,k){ return s+(B.acc[k].dtotals[i]||0); },0); });
+  var lastFull=M.length-1; while(lastFull>0 && ks.filter(function(k){ return B.acc[k].dtotals[lastFull]!=null; }).length<ks.length*0.6) lastFull--;
+  var shares=ks.map(function(k){ return {k:k,s:clSum(B.acc[k].dtotals)}; }).sort(function(a,b){ return b.s-a.s; });
   var awsSum=clSum(awsMonth);
+  var U=clUnit();
+  var ncpSum=B.ncp? clSum(B.acc[B.ncp].dtotals) : 0, ncpN=B.ncp? B.acc[B.ncp].dtotals.filter(function(x){return x!=null;}).length : 0;
   var cards=[
-    {l:'AWS '+ks.length+'개 계정 합계 (세전, '+clMonLabel(M[0])+'~'+clMonLabel(M[M.length-1])+')', v:clU(awsSum),
-     s:'최근 완전 집계월 '+clMonLabel(M[lastFull])+' '+clUk(awsMonth[lastFull])+(lastFull>0? ' · 전월비 '+clDelta(awsMonth[lastFull-1],awsMonth[lastFull],false):'')},
-    B.ncp? {l:'공공기관 NCP 합계 (공급가액)', v:clW(clSum(B.acc[B.ncp].totals)), s:'월평균 '+clW(clSum(B.acc[B.ncp].totals)/B.acc[B.ncp].totals.filter(function(x){return x!=null;}).length)}
+    {l:'AWS '+ks.length+'개 계정 합계 ('+U+(clIsK()?' · 환율 환산':' 세전')+', '+clMonLabel(M[0])+'~'+clMonLabel(M[M.length-1])+')', v:clF(awsSum),
+     s:'최근 완전 집계월 '+clMonLabel(M[lastFull])+' '+clFk(awsMonth[lastFull])+(lastFull>0? ' · 전월비 '+clDelta(awsMonth[lastFull-1],awsMonth[lastFull]):'')},
+    B.ncp? {l:'공공기관 NCP 합계 ('+U+(clIsK()?' · 공급가액':' 환산')+')', v:clF(ncpSum), s:'월평균 '+clF(ncpSum/(ncpN||1))+(clIsK()? ' · AWS+NCP 전체 '+clFk(awsSum+ncpSum)+'천원':'')}
          : {l:'공공기관 NCP', v:'—', s:'데이터 없음'},
     {l:'AWS 계정별 비중', v:shares.slice(0,2).map(function(x){ return B.acc[x.k].label+' '+(x.s/awsSum*100).toFixed(0)+'%'; }).join(' · '),
      s:shares.slice(2).map(function(x){ return B.acc[x.k].label+' '+(x.s/awsSum*100).toFixed(0)+'%'; }).join(' · ')}
@@ -6619,16 +6710,16 @@ function clMdr(B){
   var box=$('#clMdr'); var A=B.acc.edr, T=B.acc.tac;
   if(!A||!T||!A.rows.length||!T.rows.length){ box.style.display='none'; return; }
   var M=B.months;
-  box.innerHTML='<h3>MDR 서비스 인프라 월별 비용 <small>EDR(KR) + awstac · 세전 USD</small></h3><div class="cl-legend">'+
+  box.innerHTML='<h3>MDR 서비스 인프라 월별 비용 <small>EDR(KR) + awstac · '+(clIsK()? '원화 환산 천원':'세전 USD')+'</small></h3><div class="cl-legend">'+
     [A,T].map(function(a){ return '<span><i style="background:'+a.color+'"></i>'+esc(a.label+' · '+a.purpose)+'</span>'; }).join('')+'</div><div id="clMdrChart" class="chartbox h220" data-h="h220"></div>'+
     '<div class="tbl-wrap" style="max-height:none;margin-top:10px"><table class="pr" id="clMdrT"></table></div>';
-  clBars(document.getElementById('clMdrChart'), M, [{label:A.label,vals:A.totals,color:A.color},{label:T.label,vals:T.totals,color:T.color}], clUk, true);
+  clBars(document.getElementById('clMdrChart'), M, [{label:A.label,vals:A.dtotals,color:A.color},{label:T.label,vals:T.dtotals,color:T.color}], clFk, true);
   var li=M.length-1;
   var h='<thead><tr><th>계정</th>'+M.map(function(m){ return '<th class="n">'+clMonLabel(m)+'</th>'; }).join('')+'<th class="n">합계</th><th class="n">'+clMonLabel(M[li])+' 전월비</th></tr></thead><tbody>';
   function row(a){ return '<tr><td><span style="display:inline-block;width:8px;height:8px;background:'+a.color+';margin-right:6px;border-radius:2px"></span>'+esc(a.label+' · '+a.purpose)+'</td>'+
-    a.totals.map(function(v){ return clCell(v,false); }).join('')+'<td class="n"><b>'+clU(clSum(a.totals))+'</b></td><td class="n">'+clDelta(a.totals[li-1],a.totals[li],false)+'</td></tr>'; }
-  var comb=M.map(function(_,i){ return (A.totals[i]==null&&T.totals[i]==null)? null : (A.totals[i]||0)+(T.totals[i]||0); });
-  h+=row(A)+row(T)+'<tr class="tot"><td>합계</td>'+comb.map(function(v){ return clCell(v,false); }).join('')+'<td class="n">'+clU(clSum(comb))+'</td><td class="n">'+clDelta(comb[li-1],comb[li],false)+'</td></tr></tbody>';
+    a.dtotals.map(function(v){ return clCell(v); }).join('')+'<td class="n"><b>'+clF(clSum(a.dtotals))+'</b></td><td class="n">'+clDelta(a.dtotals[li-1],a.dtotals[li])+'</td></tr>'; }
+  var comb=M.map(function(_,i){ return (A.dtotals[i]==null&&T.dtotals[i]==null)? null : (A.dtotals[i]||0)+(T.dtotals[i]||0); });
+  h+=row(A)+row(T)+'<tr class="tot"><td>합계</td>'+comb.map(function(v){ return clCell(v); }).join('')+'<td class="n">'+clF(clSum(comb))+'</td><td class="n">'+clDelta(comb[li-1],comb[li])+'</td></tr></tbody>';
   document.getElementById('clMdrT').innerHTML=h;
 }
 function clSelKeys(B){ return B.awsKeys.filter(function(k){ return CL.sel[k]; }); }
@@ -6657,23 +6748,24 @@ function clChips(B){
 }
 function clChart(B){
   var isN=CL.mode==='ncp', M=B.months;
-  var series=isN? [{label:B.acc[B.ncp].label,color:B.acc[B.ncp].color,vals:B.acc[B.ncp].totals}]
-                : clSelKeys(B).map(function(k){ var a=B.acc[k]; return {label:a.label+' · '+a.purpose,color:a.color,vals:a.totals}; });
+  var series=isN? [{label:B.acc[B.ncp].label,color:B.acc[B.ncp].color,vals:B.acc[B.ncp].dtotals}]
+                : clSelKeys(B).map(function(k){ var a=B.acc[k]; return {label:a.label+' · '+a.purpose,color:a.color,vals:a.dtotals}; });
   $('#clLegend').innerHTML=series.map(function(s){ return '<span><i style="background:'+s.color+'"></i>'+esc(s.label)+'</span>'; }).join('');
-  clBars(document.getElementById('clChart'), M, series, isN?clW:clUk);
+  clBars(document.getElementById('clChart'), M, series, clFk);
   var ks=clSelKeys(B);
-  $('#clChartT').textContent= isN? '월별 비용 추이 · 공공기관 NCP (₩)' : ks.length===B.awsKeys.length? '월별 비용 추이 · AWS '+ks.length+'개 계정 누적 (USD)' : ks.length===1? '월별 비용 추이 · '+B.acc[ks[0]].label+' (USD)' : '월별 비용 추이 · 선택 '+ks.length+'개 계정 누적 (USD)';
+  var U=clUnit();
+  $('#clChartT').textContent= isN? '월별 비용 추이 · 공공기관 NCP ('+U+')' : ks.length===B.awsKeys.length? '월별 비용 추이 · AWS '+ks.length+'개 계정 누적 ('+U+')' : ks.length===1? '월별 비용 추이 · '+B.acc[ks[0]].label+' ('+U+')' : '월별 비용 추이 · 선택 '+ks.length+'개 계정 누적 ('+U+')';
 }
 function clAcctOverview(B){
   var p=$('#clAcct'), ks=clSelKeys(B), M=B.months, li=M.length-1;
   if(CL.mode==='ncp'||ks.length<2){ p.style.display='none'; return; }
   p.style.display='';
-  var grand=ks.reduce(function(s,k){ return s+clSum(B.acc[k].totals); },0);
-  var rows=ks.map(function(k){ var a=B.acc[k], sum=clSum(a.totals), nm=a.totals.filter(function(x){ return x!=null; }).length;
+  var grand=ks.reduce(function(s,k){ return s+clSum(B.acc[k].dtotals); },0);
+  var rows=ks.map(function(k){ var a=B.acc[k], sum=clSum(a.dtotals), nm=a.dtotals.filter(function(x){ return x!=null; }).length;
     return {sum:sum, html:'<tr><td><span style="display:inline-block;width:8px;height:8px;background:'+a.color+';margin-right:6px;border-radius:2px"></span>'+esc(a.purpose)+'</td>'+
-      '<td>'+esc(a.email)+'<br><span class="cap">'+esc(a.acct)+' · '+esc(a.label)+'</span></td><td class="n"><b>'+clU(sum)+'</b></td><td class="n">'+clUk(sum/(nm||1))+'</td>'+
-      '<td class="n">'+(sum/grand*100).toFixed(1)+'%</td><td class="n">'+clDelta(a.totals[li-1],a.totals[li],false)+'</td></tr>'}; }).sort(function(a,b){ return b.sum-a.sum; });
-  p.innerHTML='<h3>선택 계정 개요 <small>용도별 비용 · 세전 USD</small></h3><div class="tbl-wrap" style="max-height:none"><table class="pr"><thead><tr><th>용도</th><th>계정</th><th class="n">합계</th><th class="n">월평균</th><th class="n">선택 내 비중</th><th class="n">'+clMonLabel(M[li])+' 전월비</th></tr></thead><tbody>'+
+      '<td>'+esc(a.email)+'<br><span class="cap">'+esc(a.acct)+' · '+esc(a.label)+'</span></td><td class="n"><b>'+clF(sum)+'</b></td><td class="n">'+clFk(sum/(nm||1))+'</td>'+
+      '<td class="n">'+(sum/grand*100).toFixed(1)+'%</td><td class="n">'+clDelta(a.dtotals[li-1],a.dtotals[li])+'</td></tr>'}; }).sort(function(a,b){ return b.sum-a.sum; });
+  p.innerHTML='<h3>선택 계정 개요 <small>용도별 비용 · '+clUnit()+'</small></h3><div class="tbl-wrap" style="max-height:none"><table class="pr"><thead><tr><th>용도</th><th>계정</th><th class="n">합계</th><th class="n">월평균</th><th class="n">선택 내 비중</th><th class="n">'+clMonLabel(M[li])+' 전월비</th></tr></thead><tbody>'+
     rows.map(function(r){ return r.html; }).join('')+'</tbody></table></div><p class="cap" style="margin-top:8px">비중은 현재 선택된 계정 합계 대비 · 월평균은 각 계정의 집계 월수 기준</p>';
 }
 function clLinked(B){
@@ -6681,37 +6773,38 @@ function clLinked(B){
   var only=(CL.mode==='aws'&&ks.length===1)? B.acc[ks[0]] : null;
   if(!only || !only.linked.length){ p.style.display='none'; return; }
   p.style.display='';
-  var rows=only.linked.slice().sort(function(a,b){ return clSum(b.v)-clSum(a.v); });
+  var rows=only.linked.slice().sort(function(a,b){ return clSum(b.d)-clSum(a.d); });
   var tot=M.map(function(_,i){ return rows.reduce(function(s,r){ return s+(r.v[i]||0); },0)||null; });
-  p.innerHTML='<h3>'+esc(only.label)+' 통합청구 · 연결 계정별 비용 <small>USD</small></h3><div class="tbl-wrap" style="max-height:none"><table class="pr"><thead><tr><th>연결 계정</th>'+
+  p.innerHTML='<h3>'+esc(only.label)+' 통합청구 · 연결 계정별 비용 <small>'+clUnit()+'</small></h3><div class="tbl-wrap" style="max-height:none"><table class="pr"><thead><tr><th>연결 계정</th>'+
     M.map(function(m){ return '<th class="n">'+clMonLabel(m)+'</th>'; }).join('')+'<th class="n">합계</th><th class="n">'+clMonLabel(M[li])+' 전월비</th></tr></thead><tbody>'+
-    rows.map(function(r){ return '<tr><td>'+esc(r.n)+'</td>'+r.v.map(function(x){ return clCell(x,false); }).join('')+'<td class="n"><b>'+clU(clSum(r.v))+'</b></td><td class="n">'+clDelta(r.v[li-1],r.v[li],false)+'</td></tr>'; }).join('')+
-    '<tr class="tot"><td>합계</td>'+tot.map(function(t){ return clCell(t,false); }).join('')+'<td class="n">'+clU(clSum(tot))+'</td><td class="n">'+clDelta(tot[li-1],tot[li],false)+'</td></tr></tbody></table></div>'+
+    rows.map(function(r){ return '<tr><td>'+esc(r.n)+'</td>'+r.d.map(function(x){ return clCell(x); }).join('')+'<td class="n"><b>'+clF(clSum(r.d))+'</b></td><td class="n">'+clDelta(r.d[li-1],r.d[li])+'</td></tr>'; }).join('')+
+    '<tr class="tot"><td>합계</td>'+tot.map(function(t){ return clCell(t); }).join('')+'<td class="n">'+clF(clSum(tot))+'</td><td class="n">'+clDelta(tot[li-1],tot[li])+'</td></tr></tbody></table></div>'+
     '<p class="cap" style="margin-top:8px">통합청구서의 계정별 요금 기준 · «–»는 해당 월 청구 내역 없음</p>';
 }
 function clTable(B){
   var isN=CL.mode==='ncp', ks=clSelKeys(B), M=B.months, li=M.length-1;
   var rows, totals;
-  if(isN){ rows=B.acc[B.ncp].rows.map(function(r){ return {n:r.n,v:r.v,src:null}; }); totals=B.acc[B.ncp].totals; }
-  else if(ks.length===1){ rows=B.acc[ks[0]].rows.map(function(r){ return {n:r.n,v:r.v,src:null}; }); totals=B.acc[ks[0]].totals; }
+  if(isN){ rows=B.acc[B.ncp].rows.map(function(r){ return {n:r.n,d:r.d,src:null}; }); totals=B.acc[B.ncp].dtotals; }
+  else if(ks.length===1){ rows=B.acc[ks[0]].rows.map(function(r){ return {n:r.n,d:r.d,src:null}; }); totals=B.acc[ks[0]].dtotals; }
   else{
     var map={};
     ks.forEach(function(k){ B.acc[k].rows.forEach(function(r){
-      var t=(map[r.n]=map[r.n]||{n:r.n,v:M.map(function(){return null;}),src:[]});
-      r.v.forEach(function(x,i){ if(x!=null) t.v[i]=(t.v[i]||0)+x; }); t.src.push(k); }); });
+      var t=(map[r.n]=map[r.n]||{n:r.n,d:M.map(function(){return null;}),src:[]});
+      r.d.forEach(function(x,i){ if(x!=null) t.d[i]=(t.d[i]||0)+x; }); t.src.push(k); }); });
     rows=Object.keys(map).map(function(n){ return map[n]; });
-    totals=M.map(function(_,i){ return ks.reduce(function(a,k){ return a+(B.acc[k].totals[i]||0); },0)||null; });
+    totals=M.map(function(_,i){ return ks.reduce(function(a,k){ return a+(B.acc[k].dtotals[i]||0); },0)||null; });
   }
-  rows.forEach(function(r){ r.sum=clSum(r.v); }); rows.sort(function(a,b){ return b.sum-a.sum; });
+  rows.forEach(function(r){ r.sum=clSum(r.d); }); rows.sort(function(a,b){ return b.sum-a.sum; });
   var multi=!isN&&ks.length>1;
   var tag=function(src){ return (multi&&src)? src.map(function(k){ return '<span title="'+esc(B.acc[k].label)+'" style="display:inline-block;width:8px;height:8px;background:'+B.acc[k].color+';margin-right:4px;border-radius:2px"></span>'; }).join('') : ''; };
   var h='<thead><tr><th>서비스</th>'+M.map(function(m){ return '<th class="n">'+clMonLabel(m)+'</th>'; }).join('')+'<th class="n">합계</th><th class="n">'+clMonLabel(M[li])+' 전월비</th></tr></thead><tbody>';
-  h+=rows.map(function(r){ return '<tr><td>'+tag(r.src)+esc(r.n)+'</td>'+r.v.map(function(x){ return clCell(x,isN); }).join('')+'<td class="n"><b>'+(isN?clW(r.sum):clU(r.sum))+'</b></td><td class="n">'+clDelta(r.v[li-1],r.v[li],isN)+'</td></tr>'; }).join('');
-  h+='<tr class="tot"><td>합계</td>'+totals.map(function(t){ return clCell(t,isN); }).join('')+'<td class="n">'+(isN?clW(clSum(totals)):clU(clSum(totals)))+'</td><td class="n">'+clDelta(totals[li-1],totals[li],isN)+'</td></tr></tbody>';
+  h+=rows.map(function(r){ return '<tr><td>'+tag(r.src)+esc(r.n)+'</td>'+r.d.map(function(x){ return clCell(x); }).join('')+'<td class="n"><b>'+clF(r.sum)+'</b></td><td class="n">'+clDelta(r.d[li-1],r.d[li])+'</td></tr>'; }).join('');
+  h+='<tr class="tot"><td>합계</td>'+totals.map(function(t){ return clCell(t); }).join('')+'<td class="n">'+clF(clSum(totals))+'</td><td class="n">'+clDelta(totals[li-1],totals[li])+'</td></tr></tbody>';
   document.getElementById('clTable').innerHTML=h;
   var a1=ks.length===1? B.acc[ks[0]] : null;
-  $('#clTableT').textContent= isN? '공공기관 NCP · 서비스 × 월 (₩, 공급가액)' : ks.length===B.awsKeys.length? '전체 AWS '+ks.length+'개 계정 · 서비스 × 월 (USD, 세전)' : a1? a1.purpose+' · '+a1.email+' ('+a1.acct+')' : '선택 합산('+ks.map(function(k){ return B.acc[k].label; }).join(' + ')+') · 서비스 × 월 (USD, 세전)';
-  $('#clNote').textContent=(isN? 'NCP 금액은 공급가액(VAT 별도) 기준 · «Other Services»는 명세서에 분리되지 않은 고정 비용. ' : 'AWS 금액은 세전 USD 기준 · 서비스명 앞 색 점은 비용이 발생한 계정. ')+'전 기간 0인 서비스는 제외했고 «–»는 해당 월 미발생/미집계입니다. 서비스명의 «Amazon/AWS» 접두는 통일해 표시합니다.';
+  var U2=clUnit();
+  $('#clTableT').textContent= isN? '공공기관 NCP · 서비스 × 월 ('+U2+(clIsK()?', 공급가액':', 환율 환산')+')' : ks.length===B.awsKeys.length? '전체 AWS '+ks.length+'개 계정 · 서비스 × 월 ('+U2+(clIsK()?', 환율 환산':', 세전')+')' : a1? a1.purpose+' · '+a1.email+' ('+a1.acct+') · '+U2 : '선택 합산('+ks.map(function(k){ return B.acc[k].label; }).join(' + ')+') · 서비스 × 월 ('+U2+')';
+  $('#clNote').textContent=(isN? 'NCP 금액은 공급가액(VAT 별도) 기준 · «Other Services»는 명세서에 분리되지 않은 고정 비용. ' : 'AWS 금액은 세전 USD 기준'+(clIsK()? '을 월별 적용 환율로 원화 환산(천원)한 값':'')+' · 서비스명 앞 색 점은 비용이 발생한 계정. ')+'전 기간 0인 서비스는 제외했고 «–»는 해당 월 미발생/미집계입니다. 서비스명의 «Amazon/AWS» 접두는 통일해 표시합니다.';
 }
 /* 인보이스 보관 목록 */
 function clInvList(B, canEdit){
@@ -6933,6 +7026,7 @@ async function clSaveParsed(){
         var merged={}; costRows.forEach(function(r){ var k=r.service; if(merged[k]){ merged[k].usd+=r.usd||0; merged[k].krw=(merged[k].krw||0)+(r.krw||0); } else merged[k]=r; });
         var arr=Object.keys(merged).map(function(k){ return merged[k]; });
         if(arr.length) await sbWrite('POST','cloud_costs',arr);
+        if(p.fx) try{ await sbWrite('POST','cloud_fx?on_conflict=ym',[{ym:p.ym+'-01',rate:p.fx,source:'invoice',updated_by:AUTH_USER||null,updated_at:new Date().toISOString()}],'resolution=merge-duplicates'); }catch(e){ /* 56단계 미설치면 무시 */ }
         logChange('insert','cloud_invoices',invId||0,{ym:p.ym,account:a.accId,rows:arr.length,file:it.name});
         done++;
       }catch(e){ fail++; msg.textContent='⚠ '+it.name+': '+String(e.message||e); console.error(e); }
