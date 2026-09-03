@@ -2009,7 +2009,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-02 ㊿+6';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-02 ㊿+7';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -3199,7 +3199,10 @@ function ifeeYm(r){
     var y=+String(r.settle).slice(0,4), m=+String(r.settle).slice(5,7);
     if(y&&m) return [y,m,false];
   }
-  if(r.startIdx==null) return null;
+  /* 대금정산일이 없을 때만 시작월+1 로 추정 — 단, 아직 시작하지 않은 계약(인식 금액이 한 달도 없음)이나
+     시작월이 데이터 범위 밖(예: 이관 때 임시로 들어간 2020-05)이면 «정산일 미정»으로 두고 달에 배치하지 않습니다 */
+  if(r.startIdx==null || r.startIdx<0) return null;
+  if(r.dataFirst==null && DATA && r.startIdx<=DATA.nowIdx) return null;   // 시작했어야 하는데 인식 금액이 한 달도 없음 = 아직 시작 전
   var t=(2020*12+5)+r.startIdx+1;
   return [Math.floor(t/12), (t%12)+1, true];
 }
@@ -3236,10 +3239,11 @@ function renderInstall(){
   });
 
   var adj=ifeeAdj();
-  var cell={}, det=[], nGuess=0, nFee=0;
+  var cell={}, det=[], pend=[], nGuess=0, nFee=0;
   (DATA.rows||[]).forEach(function(r){
     var f=Number(r.fee||0); if(!f) return;
-    var ym=ifeeYm(r); if(!ym) return;
+    var ym=ifeeYm(r);
+    if(!ym){ pend.push({cust:r.cust, line:r.line, fee:f}); return; }   // 정산일 미정 — 달에 넣지 않음
     nFee++; if(ym[2]) nGuess++;
     cell[ym[0]+'|'+ym[1]]=(cell[ym[0]+'|'+ym[1]]||0)+f;
     det.push({y:ym[0], m:ym[1], cust:r.cust, line:r.line, fee:f, guess:ym[2]});
@@ -3295,6 +3299,10 @@ function renderInstall(){
         '<td>'+lline(d.line)+'</td><td class="n">'+n(d.fee)+'</td>'+
         '<td style="color:var(--mut)">'+(d.guess? '시작월+1 (대금정산일 없음)':'대금정산일')+'</td></tr>';
     });
+    pend.forEach(function(d){
+      html+='<tr style="color:var(--mut)"><td>미정</td><td>'+esc(d.cust)+'</td><td>'+lline(d.line)+'</td><td class="n">'+n(d.fee)+'</td>'+
+        '<td>대금정산일 없음 · 아직 시작 전 — 계약에 대금정산일을 넣으면 그 달에 반영</td></tr>';
+    });
     var ak=Object.keys(adj).filter(function(k){ return adj[k]; })
       .sort(function(a,b){ var x=a.split('|'),y=b.split('|'); return (+y[0]-+x[0])||(+y[1]-+x[1]); });
     ak.forEach(function(k){
@@ -3312,8 +3320,10 @@ function renderInstall(){
   });
 
   var nAdj=Object.keys(adj).filter(function(k){ return adj[k]; }).length;
+  var pendSum=pend.reduce(function(a,d){ return a+d.fee; },0);
   $('#capIfee').textContent='단위: 천원 · 설치비가 있는 계약 '+nFee+'건'+
     (nGuess? ' (그중 '+nGuess+'건은 대금정산일이 없어 시작월 다음 달로 잡았습니다)':'')+
+    (pend.length? ' · 정산일 미정 '+pend.length+'건 '+n(pendSum)+'천원은 표에 넣지 않음 (월별 상세에서 확인)':'')+
     ' · 수동 조정 '+nAdj+'개월 · 이 금액은 MRR 합계에 들어가지 않습니다 (시트와 동일)';
 }
 
