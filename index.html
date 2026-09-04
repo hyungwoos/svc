@@ -2051,7 +2051,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-04 ㊿+23';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-04 ㊿+24';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -6099,12 +6099,7 @@ function liveAreaKey(x){
   if(line==='MDR_S1') return 'mdrs1';
   if(line==='PNS') return 'cnpns';
   if(line==='DRM'||line==='DLP') return 'chdist';
-  var ch='일반', best=null, nm=fkNorm(x.cust);
-  (DATA.rows||[]).forEach(function(r){
-    if(r.line!==line || fkNorm(r.cust)!==nm) return;
-    if(!best || (r.startIdx||0)>(best.startIdx||0)) best=r;
-  });
-  if(best) ch=chOf(best);
+  var ch=liveChannel(x);
   if(line==='Cloud') return ch==='조달'? 'cnpub' : ch==='LGU+'? 'cnlgu' : 'cngen';   /* 일반 + 조달 + LG U+ = Cloud NAC 전체 */
   if(line==='MDR')   return ch==='LGU+'? 'mdrlgu' : 'mdrgen';
   return null;
@@ -6122,10 +6117,16 @@ function liveForArea(key){
   if(!DATA || !DATA.live || !DATA.live.ok) return null;
   return DATA.live.rows.filter(function(x){ return liveAreaKey(x)===key; });
 }
+/* LIVE 행의 채널 = 같은 고객·서비스의 «원계약» 중 가장 최근 것의 채널 (부속 계약은 채널 판단에 쓰지 않음 · 원계약이 없을 때만 부속 참고) */
 function liveChannel(x){
-  var best=null, nm=fkNorm(x.cust);
-  (DATA.rows||[]).forEach(function(r){ if(r.line!==x.line || fkNorm(r.cust)!==nm) return; if(!best || (r.startIdx||0)>(best.startIdx||0)) best=r; });
-  return best? chOf(best) : '일반';
+  var best=null, bestChild=null, nm=fkNorm(x.cust);
+  (DATA.rows||[]).forEach(function(r){
+    if(r.line!==x.line || fkNorm(r.cust)!==nm) return;
+    if(r.parent){ if(!bestChild || (r.startIdx||0)>(bestChild.startIdx||0)) bestChild=r; return; }
+    if(!best || (r.startIdx||0)>(best.startIdx||0)) best=r;
+  });
+  var pick=best||bestChild;
+  return pick? chOf(pick) : '일반';
 }
 function renderChannelView(key){
   var def=CH_DEFS[key], ch=def[1], match=def[3];
