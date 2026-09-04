@@ -2035,7 +2035,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-04 ㊿+16';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-04 ㊿+18';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -6023,8 +6023,8 @@ function openChvHist(r){
 function chOf(r){ return r.channel||'일반'; }   // «공공»은 산업군 오인 표기 — 조달로 집계하지 않음 (48단계 SQL로 정리)
 /* [라벨, 장비 채널(''=장비 타일 없음), 설명, 매처(r)] — 제품 × 채널로 세분화 */
 var CH_DEFS={
-  cngen:['🤝 Cloud NAC · 일반 판매','',        '파트너 경유 + 직판 (Cloud NAC)',
-         function(r){ return r.line==='Cloud' && chOf(r)==='일반'; }],
+  cngen:['🤝 Cloud NAC · 일반 판매','',        '파트너 경유 + 직판 (Cloud NAC · 조달·LG U+ 제외)',
+         function(r){ return r.line==='Cloud' && chOf(r)!=='조달' && chOf(r)!=='LGU+'; }],   /* 조달·LG U+ 는 각각 따로 — 셋을 더하면 Cloud NAC 전체 */
   cnpub:['🏛️ Cloud NAC · 조달 판매','조달',    '조달(공공) 사업 (Cloud NAC)',
          function(r){ return r.line==='Cloud' && chOf(r)==='조달'; }],
   cns1: ['🔒 Cloud NAC · 에스원','에스원',      '에스원 채널 — S1 Cloud NAC',
@@ -6078,7 +6078,7 @@ function liveAreaKey(x){
     if(!best || (r.startIdx||0)>(best.startIdx||0)) best=r;
   });
   if(best) ch=chOf(best);
-  if(line==='Cloud') return ch==='조달'? 'cnpub' : ch==='LGU+'? 'cnlgu' : 'cngen';
+  if(line==='Cloud') return ch==='조달'? 'cnpub' : ch==='LGU+'? 'cnlgu' : 'cngen';   /* 일반 + 조달 + LG U+ = Cloud NAC 전체 */
   if(line==='MDR')   return ch==='LGU+'? 'mdrlgu' : 'mdrgen';
   return null;
 }
@@ -6089,11 +6089,33 @@ function liveGroupNote(key){
   if(!g) return 'LIVE 고객사 탭 기준';
   var parts=LIVE_GROUPS[g].map(function(k){ return (CH_DEFS[k][0].replace(/^\S+ /,'').split(' · ')[1]||k)+' '+(liveForArea(k)||[]).length; });
   var tot=LIVE_GROUPS[g].reduce(function(a,k){ return a+(liveForArea(k)||[]).length; },0);
-  return 'LIVE 탭 '+g+' 전체 '+tot+'개 = '+parts.join(' · ');
+  return 'LIVE 탭 '+g+' 전체 '+tot+'개 = '+parts.join(' + ');
+}
+/* 사업 영역 전체 합계 줄 — 대시보드 «LIVE 고객사» 위젯과 같은 수(고객사 n곳 · 서비스 기준 n건 · 중복 n건) */
+function liveTotalLine(){
+  var lv=DATA&&DATA.live; if(!lv||!lv.ok) return '';
+  var by={}; lv.rows.forEach(function(x){ (by[x.cust]=by[x.cust]||[]).push(x.line); });
+  var custs=Object.keys(by), multi=custs.filter(function(c){ return by[c].length>1; });
+  var cross=multi.filter(function(c){ var u={}; by[c].forEach(function(l){u[l]=1;}); return Object.keys(u).length>1; });
+  var same=multi.filter(function(c){ return cross.indexOf(c)<0; });
+  var s2='사업 영역 전체 = 대시보드와 같은 <b>LIVE 고객사 '+custs.length.toLocaleString('ko-KR')+'곳</b> · 서비스 기준 '+lv.rows.length+'건';
+  if(multi.length){
+    s2+=' · 영역별 숫자를 더하면 '+lv.rows.length+'이 되는 이유: ';
+    var bits=[];
+    if(cross.length) bits.push('여러 서비스를 함께 쓰는 고객 '+cross.length+'곳('+esc(cross.map(function(c){ return c+' '+by[c].map(lline).join('+'); }).join(', '))+')');
+    if(same.length) bits.push('같은 서비스를 사이트 2곳에서 쓰는 고객 '+same.length+'곳('+esc(same.join(', '))+')');
+    s2+=bits.join(' · ')+' — 대시보드는 이들을 1곳으로 셉니다';
+  }
+  return '<p class="cap" style="margin:-6px 2px 14px">'+s2+'</p>';
 }
 function liveForArea(key){
   if(!DATA || !DATA.live || !DATA.live.ok) return null;
   return DATA.live.rows.filter(function(x){ return liveAreaKey(x)===key; });
+}
+function liveChannel(x){
+  var best=null, nm=fkNorm(x.cust);
+  (DATA.rows||[]).forEach(function(r){ if(r.line!==x.line || fkNorm(r.cust)!==nm) return; if(!best || (r.startIdx||0)>(best.startIdx||0)) best=r; });
+  return best? chOf(best) : '일반';
 }
 function renderChannelView(key){
   var def=CH_DEFS[key], ch=def[1], match=def[3];
@@ -6125,7 +6147,7 @@ function renderChannelView(key){
       : tile('고객사', Object.keys(custs).length.toLocaleString('ko-KR'), '곳', '당월 매출 기준'))+
     (hasEq? tile('임대중 장비', rentEq, '대', pendEq? '처리 대기 요청 '+pendEq+'건':'대기 요청 없음')
           : tile('비중', (monthlyTotal(idxs(),b)? (mrr/monthlyTotal(idxs(),b)*100).toFixed(1):'0')+'%','','전체 당월 매출 대비'))+
-    '</div>';
+    '</div>'+liveTotalLine();
   if(key==='cnpub'){
     var histC={}, valid={}, pubBad={}, othGov={}, indGov={};
     DATA.rows.forEach(function(r){
