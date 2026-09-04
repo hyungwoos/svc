@@ -2051,7 +2051,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-04 ㊿+22';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-04 ㊿+23';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -6118,36 +6118,9 @@ function liveGroupNote(key){
   var tot=LIVE_GROUPS[g].reduce(function(a,k){ return a+(liveForArea(k)||[]).length; },0);
   return 'LIVE 탭 '+g+' 전체 '+tot+'개 = '+parts.join(' + ');
 }
-/* 사업 영역 전체 합계 줄 — 대시보드 «LIVE 고객사» 위젯과 같은 수(고객사 n곳 · 서비스 기준 n건 · 중복 n건) */
-function liveTotalLine(){
-  var lv=DATA&&DATA.live; if(!lv||!lv.ok) return '';
-  var by={}; lv.rows.forEach(function(x){ (by[x.cust]=by[x.cust]||[]).push(x.line); });
-  var custs=Object.keys(by), multi=custs.filter(function(c){ return by[c].length>1; });
-  var cross=multi.filter(function(c){ var u={}; by[c].forEach(function(l){u[l]=1;}); return Object.keys(u).length>1; });
-  var same=multi.filter(function(c){ return cross.indexOf(c)<0; });
-  var ma=liveMainAreas(), parts=Object.keys(CH_DEFS).filter(function(k){ return (ma[k]||[]).length; })
-    .map(function(k){ return CH_DEFS[k][0].replace(/^\S+ /,'')+' '+ma[k].length; });
-  var s2='주 소속 기준 영역별 고객사: '+esc(parts.join(' · '))+' = <b>'+Object.keys(ma).reduce(function(a,k){ return a+ma[k].length; },0)+'곳</b> (여러 서비스 고객은 먼저 시작한 서비스 영역에 속함)';
-  return '<p class="cap" style="margin:-6px 2px 14px">'+s2+'</p>';
-}
 function liveForArea(key){
   if(!DATA || !DATA.live || !DATA.live.ok) return null;
   return DATA.live.rows.filter(function(x){ return liveAreaKey(x)===key; });
-}
-/* 여러 서비스를 쓰는 고객사의 «주 소속» 영역 = 가장 먼저 시작한 서비스의 영역 (같으면 Cloud NAC > S1 > MDR > … 순).
-   주 소속으로 세면 영역별 고객사 수의 합 = 대시보드 LIVE 고객사 수(345) */
-function liveMainAreas(){
-  if(!DATA || !DATA.live || !DATA.live.ok) return {};
-  var ORD=['Cloud','S1','MDR','MDR_S1','DRM','DLP','PNS'];
-  var best={};
-  DATA.live.rows.forEach(function(x){
-    var k=liveAreaKey(x); if(!k) return;
-    var cur=best[x.cust];
-    var sc=(x.start||'9999-99')+'|'+String(ORD.indexOf(x.line)<0? 9:ORD.indexOf(x.line));
-    if(!cur || sc<cur.sc) best[x.cust]={key:k, sc:sc};
-  });
-  var out={}; Object.keys(best).forEach(function(c){ var k=best[c].key; (out[k]=out[k]||[]).push(c); });
-  return out;
 }
 function liveChannel(x){
   var best=null, nm=fkNorm(x.cust);
@@ -6179,13 +6152,11 @@ function renderChannelView(key){
   h+='<div class="kpis" style="margin-bottom:16px">'+
     tile('당월 MRR', won(mrr), '천원', '연환산 '+won(mrr*12)+'천원')+
     (lvN!=null
-      ? tile('LIVE 고객사', lv.length.toLocaleString('ko-KR'), '개', liveGroupNote(key)+(function(){
-            var m=(liveMainAreas()[key]||[]).length, moved=lvN-m;
-            return ' · 주 소속 고객사 '+m+'곳'+(moved>0? ' (다른 서비스가 먼저인 고객 '+moved+'곳은 그쪽에 속함)':''); })())
+      ? tile('LIVE 고객사', lv.length.toLocaleString('ko-KR'), '개', liveGroupNote(key))
       : tile('고객사', Object.keys(custs).length.toLocaleString('ko-KR'), '곳', '당월 매출 기준'))+
     (hasEq? tile('임대중 장비', rentEq, '대', pendEq? '처리 대기 요청 '+pendEq+'건':'대기 요청 없음')
           : tile('비중', (monthlyTotal(idxs(),b)? (mrr/monthlyTotal(idxs(),b)*100).toFixed(1):'0')+'%','','전체 당월 매출 대비'))+
-    '</div>'+liveTotalLine();
+    '</div>';
   if(key==='cnpub'){
     var histC={}, valid={}, pubBad={}, othGov={}, indGov={};
     DATA.rows.forEach(function(r){
