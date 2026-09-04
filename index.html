@@ -2085,7 +2085,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-04 ㊿+28';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-04 ㊿+29';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -9258,20 +9258,22 @@ function renderChurnRate(){
   var m=crMatch, baseLab={valid:'계약 유효 고객사',rev:'과금 고객사',cum:'누적고객(신규 − 해지)'}[CR.base];
   h+='<div class="pr-card" style="margin-bottom:12px"><h3>'+esc(crSummary())+' — '+(CR.unit==='year'?'연도별':CR.unit==='half'?'반기별':'분기별')+' 해지율'+
      ' <span class="ubadge sm">분모 = 기간 시작 전 달 '+baseLab+'</span><small>'+(CR.rows?'계약 행 단위':'고객사 단위')+' · 지원사업 '+({all:'포함',ex:'제외',only:'만'}[CR.sup])+' · CND '+(CR.cnd?'포함':'제외')+' · 지원 제외율 = 그 외 해지 ÷ '+(CR.exDen==='all'?'전체 활성':'지원 제외 활성')+'</small></h3>'+
-     '<div style="overflow-x:auto"><table class="pr"><thead><tr><th>기간</th><th class="n">기간 시작 활성</th><th class="n">└ 지원사업</th><th class="n">해지</th><th class="n">└ 지원사업</th><th class="n">└ 그 외</th><th class="n">해지율 (지원 포함)</th><th class="n">해지율 (지원 제외)</th><th class="n">해지 MRR(천원)</th></tr></thead><tbody>';
+     '<div style="overflow-x:auto"><table class="pr"><thead><tr><th>기간</th><th class="n" title="기간 시작 직전 달 기준 — 연도면 전년 12월">시작 활성<br><span class="mini">(직전 달)</span></th><th class="n">└ 지원사업</th><th class="n" title="기간 마지막 달 기준">기간 말 활성</th><th class="n">해지</th><th class="n">└ 지원사업</th><th class="n">└ 그 외</th><th class="n">해지율 (지원 포함)</th><th class="n">해지율 (지원 제외)</th><th class="n">해지 MRR(천원)</th></tr></thead><tbody>';
   var tot={lost:[],sup:[],org:[],amt:0};
   P.forEach(function(p){
     var base=crActive(p.s-1,m), baseSup=base.filter(crIsSup), lost=crLost(p.s,p.e,m), sup=lost.filter(crIsSup), org=lost.filter(function(r){return !crIsSup(r);});
+    var endA=crActive(p.e,m);
     var nb=crN(base), nbs=crN(baseSup), nl=crN(lost), no=crN(org);
     var amt=lost.reduce(function(a,r){ var i=r._k, e=r.endIdx!=null?r.endIdx:r._l; return a+((MAT[i]&&(MAT[i][e]||MAT[i][Math.max(e-1,0)]))||r.mrr||0); },0);
     tot.lost=tot.lost.concat(lost); tot.sup=tot.sup.concat(sup); tot.org=tot.org.concat(org); tot.amt+=amt;
-    h+='<tr><td><b>'+esc(p.l)+'</b></td><td class="n">'+crLink(base,p.s-1,p.s-1,'','base',p.l+' 시작 활성','color:var(--ink-2);font-weight:600')+'</td><td class="n">'+crLink(baseSup,p.s-1,p.s-1,'','basesup',p.l+' 시작 활성 · 지원사업','color:var(--muted)')+'</td>'+
+    h+='<tr><td><b>'+esc(p.l)+'</b></td><td class="n">'+crLink(base,p.s-1,p.s-1,'','base',p.l+' 시작 활성 ('+mk(p.s-1)+')','color:var(--ink-2);font-weight:600')+'</td><td class="n">'+crLink(baseSup,p.s-1,p.s-1,'','basesup',p.l+' 시작 활성 · 지원사업','color:var(--muted)')+'</td>'+
+       '<td class="n">'+crLink(endA,p.e,p.e,'','base',p.l+' 기간 말 활성 ('+mk(p.e)+')','color:var(--ink-2)')+'</td>'+
        '<td class="n">'+crLink(lost,p.s,p.e,'','lost',p.l+' 해지')+'</td><td class="n">'+crLink(sup,p.s,p.e,'','sup',p.l+' 해지 · 지원사업','color:var(--muted);font-weight:600')+'</td><td class="n">'+crLink(org,p.s,p.e,'','org',p.l+' 해지 · 그 외','color:var(--muted);font-weight:600')+'</td>'+
        '<td class="n"><b>'+crRate(nl,nb)+'</b></td><td class="n"><b>'+crRate(no, CR.exDen==='all'? nb : nb-nbs)+'</b></td><td class="n">'+won(amt)+'</td></tr>';
   });
-  h+='<tr style="background:var(--surface-2)"><td><b>누계</b></td><td></td><td></td><td class="n"><b>'+crN(tot.lost)+'</b></td><td class="n">'+crN(tot.sup)+'</td><td class="n">'+crN(tot.org)+'</td><td></td><td></td><td class="n">'+won(tot.amt)+'</td></tr>';
+  h+='<tr style="background:var(--surface-2)"><td><b>누계</b></td><td></td><td></td><td></td><td class="n"><b>'+crN(tot.lost)+'</b></td><td class="n">'+crN(tot.sup)+'</td><td class="n">'+crN(tot.org)+'</td><td></td><td></td><td class="n">'+won(tot.amt)+'</td></tr>';
   h+='</tbody></table></div>'+
-     '<p class="pr-note" style="margin:8px 0 0">해지 = 상태 «해지» 원계약(부속 계약 제외) · 해지월 = 종료월(시트 해지년월) · 지원사업 = 판매형태 «정부 지원» · 계약 유효 = 시작월 ≤ 그 달 ≤ 종료월 (해지·CN전환 아님) · 누적고객 = 통계 탭 방식(신규 누계 − 해지 누계, 서비스 종료·만기는 안 뺌)</p></div>';
+     '<p class="pr-note" style="margin:8px 0 0">해지율 분모는 <b>기간 시작 직전 달</b>의 활성(연도면 전년 12월)이라, 그 기간에 새로 들어온 고객은 분모에 없고 «기간 말 활성»에서만 보입니다 — 예: MDR은 2025년 7월 시작이라 2025년 시작 활성은 0, 기간 말 활성부터 잡힙니다. 해지 = 상태 «해지» 원계약(부속 계약 제외) · 해지월 = 종료월(시트 해지년월) · 지원사업 = 판매형태 «정부 지원» · 계약 유효 = 시작월 ≤ 그 달 ≤ 종료월 (해지·CN전환 아님) · 누적고객 = 통계 탭 방식(신규 누계 − 해지 누계, 서비스 종료·만기는 안 뺌) · 에스원 CND 제외 시 LIVE 메뉴보다 그만큼 적게 보임</p></div>';
   /* ② ③ 매트릭스 */
   [['제품별','line'],['사업영역별','area']].forEach(function(gg){
     var g=G.filter(function(x){return x.k===gg[1];})[0]; if(!g) return;
