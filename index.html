@@ -2085,7 +2085,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-04 ㊿+27';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-04 ㊿+28';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -2589,7 +2589,7 @@ function onData(d){
   d.rows.forEach(function(r,i){
     var a=MAT[i], f=-1, l=-1;
     for(var j=0;j<M;j++){ if(a[j]!==0){ if(f<0)f=j; l=j; } }
-    r._f=f; r._l=l;
+    r._f=f; r._l=l; r._k=i;                    // _k = MAT 행 인덱스 (indexOf 없이 바로 찾기)
     if(r.startIdx==null||r.startIdx<0) r.startIdx=f;
     if(r.endIdx==null||r.endIdx<0) r.endIdx=l;
   });
@@ -9161,8 +9161,9 @@ function crFilterGroups(){
   ];
   return groups;
 }
+var CR_G=null;                                   // 필터 그룹 캐시 — 행마다 다시 계산하면 화면이 멈춥니다
 function crMatch(r){
-  var G=crFilterGroups();
+  var G=CR_G||(CR_G=crFilterGroups());
   for(var i=0;i<G.length;i++){ var g=G[i], sel=CR.f[g.k]||[]; if(!sel.length) continue;
     if(g.test){ if(!g.test(r,sel)) return false; } else if(sel.indexOf(g.get(r)||'')<0) return false; }
   return true;
@@ -9227,14 +9228,15 @@ function crChips(g){
     (sel.length? '<button class="chip clr" data-fclr="'+g.k+'" title="이 조건 지우기">✕</button>':'')+'</div>';
 }
 function crSummary(){
-  var G=crFilterGroups(), parts=[];
+  var G=CR_G||(CR_G=crFilterGroups()), parts=[];
   G.forEach(function(g){ var sel=CR.f[g.k]||[]; if(!sel.length) return; var lab={}; g.opts.forEach(function(o){lab[o[0]]=o[1];}); parts.push(g.l+': '+sel.map(function(v){return lab[v]||v;}).join('·')); });
   return parts.length? parts.join(' / ') : '전체 계약';
 }
 function renderChurnRate(){
   var host=$('#crBody');
   if(!DATA||!DATA.rows||!DATA.rows.length){ host.innerHTML='<div class="cap" style="padding:40px;text-align:center">데이터를 불러오는 중…</div>'; return; }
-  var P=crPeriods(), G=crFilterGroups(), maxAll=Math.min(DATA.nowIdx>=0? DATA.nowIdx : M-1, M-1);
+  CR_G=crFilterGroups();
+  var P=crPeriods(), G=CR_G, maxAll=Math.min(DATA.nowIdx>=0? DATA.nowIdx : M-1, M-1);
   var isSheet=(CR.base==='cum'&&CR.cnd&&CR.rows&&CR.exDen==='all'), isPortal=(CR.base==='valid'&&!CR.cnd&&!CR.rows&&CR.exDen==='org');
   var h='<div class="pr-top"><div><h2 style="margin:0;font-size:18px">📐 해지율</h2><p class="cap" style="margin:2px 0 0">기간 · 제품 · 사업영역 · 판매형태 · 업종 등으로 잘라 보는 해지율 — 숫자를 누르면 그 칸의 계약 내역</p></div>'+
     '<span class="spacer"></span><div class="seg"><button data-preset="portal" aria-pressed="'+isPortal+'" title="고객사 단위 · 계약 유효 분모 · CND 제외 · 지원 제외율은 지원 제외 활성 대비">포탈 기준</button><button data-preset="sheet" aria-pressed="'+isSheet+'" title="계약 행 단위 · 누적고객 분모 · CND 포함 · Cloud NAC + 에스원 · 지원 제외율은 전체 활성 대비 (통계 탭 고객 관리 블록과 같은 방식)">통계 탭 기준</button></div></div>';
@@ -9261,7 +9263,7 @@ function renderChurnRate(){
   P.forEach(function(p){
     var base=crActive(p.s-1,m), baseSup=base.filter(crIsSup), lost=crLost(p.s,p.e,m), sup=lost.filter(crIsSup), org=lost.filter(function(r){return !crIsSup(r);});
     var nb=crN(base), nbs=crN(baseSup), nl=crN(lost), no=crN(org);
-    var amt=lost.reduce(function(a,r){ var i=DATA.rows.indexOf(r), e=r.endIdx!=null?r.endIdx:r._l; return a+(MAT[i][e]||MAT[i][Math.max(e-1,0)]||r.mrr||0); },0);
+    var amt=lost.reduce(function(a,r){ var i=r._k, e=r.endIdx!=null?r.endIdx:r._l; return a+((MAT[i]&&(MAT[i][e]||MAT[i][Math.max(e-1,0)]))||r.mrr||0); },0);
     tot.lost=tot.lost.concat(lost); tot.sup=tot.sup.concat(sup); tot.org=tot.org.concat(org); tot.amt+=amt;
     h+='<tr><td><b>'+esc(p.l)+'</b></td><td class="n">'+crLink(base,p.s-1,p.s-1,'','base',p.l+' 시작 활성','color:var(--ink-2);font-weight:600')+'</td><td class="n">'+crLink(baseSup,p.s-1,p.s-1,'','basesup',p.l+' 시작 활성 · 지원사업','color:var(--muted)')+'</td>'+
        '<td class="n">'+crLink(lost,p.s,p.e,'','lost',p.l+' 해지')+'</td><td class="n">'+crLink(sup,p.s,p.e,'','sup',p.l+' 해지 · 지원사업','color:var(--muted);font-weight:600')+'</td><td class="n">'+crLink(org,p.s,p.e,'','org',p.l+' 해지 · 그 외','color:var(--muted);font-weight:600')+'</td>'+
@@ -9305,7 +9307,7 @@ function renderChurnRate(){
 var CR_LAST=[];
 function crOpen(d){
   var s=+d.s, e=+d.e, m=crMatch;
-  if(d.x){ var kv=d.x.split('='), gk=kv[0], gv=kv.slice(1).join('='); var G=crFilterGroups(), g=G.filter(function(x){return x.k===gk;})[0];
+  if(d.x){ var kv=d.x.split('='), gk=kv[0], gv=kv.slice(1).join('='); var G=CR_G||(CR_G=crFilterGroups()), g=G.filter(function(x){return x.k===gk;})[0];
     if(g) m=function(r){ return crMatch(r) && (g.test? g.test(r,[gv]) : g.get(r)===gv); }; }
   var list;
   if(d.k==='base') list=crActive(s,m);
@@ -9313,7 +9315,7 @@ function crOpen(d){
   else { list=crLost(s,e,m); if(d.k==='sup') list=list.filter(crIsSup); if(d.k==='org') list=list.filter(function(r){return !crIsSup(r);}); }
   var isLost=(d.k==='lost'||d.k==='sup'||d.k==='org');
   list=list.slice().sort(function(a,b){ var ea=a.endIdx!=null?a.endIdx:a._l, eb=b.endIdx!=null?b.endIdx:b._l; return isLost? (ea-eb || a.cust.localeCompare(b.cust)) : a.cust.localeCompare(b.cust); });
-  CR_LAST=list.map(function(r){ var i=DATA.rows.indexOf(r), en=r.endIdx!=null?r.endIdx:r._l; var amt=isLost? (MAT[i][en]||MAT[i][Math.max(en-1,0)]||r.mrr||0) : (MAT[i][s]||r.mrr||0);
+  CR_LAST=list.map(function(r){ var i=r._k, en=r.endIdx!=null?r.endIdx:r._l; var amt=isLost? ((MAT[i]&&(MAT[i][en]||MAT[i][Math.max(en-1,0)]))||r.mrr||0) : ((MAT[i]&&MAT[i][s])||r.mrr||0);
     return {cust:r.cust, line:lline(r.line), ch:chOf(r), sale:r.saleType||'', ind:r.ind||'', sector:r.sector||'', st:r.status||'', start:mk(r.startIdx)||'', end:en!=null?mk(en):'', reason:r.churn||'', note:r.note||'', amt:amt, renew:r.renew||0}; });
   $('#crTitle').textContent=d.l;
   var u={}; CR_LAST.forEach(function(x){u[x.cust]=1;});
