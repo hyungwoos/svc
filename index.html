@@ -2035,7 +2035,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-04 ㊿+14';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-04 ㊿+16';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -6063,6 +6063,38 @@ function applyChannelMenu(){
     g.style.display=vis? '':'none';
   });
 }
+/* LIVE 고객사 탭의 각 행(사이트)을 사업 영역 하나에 배정합니다 — 대시보드 «LIVE 고객사» 수와 영역별 합이 맞도록.
+   제품은 LIVE 행의 서비스, 채널은 같은 고객·서비스의 가장 최근 계약 채널(없으면 일반).
+   Cloud 는 조달/LGU+ 외 전부 일반, MDR 은 LGU+ 외 전부 일반으로 묶습니다. */
+function liveAreaKey(x){
+  var line=x.line||'';
+  if(line==='S1') return 'cns1';
+  if(line==='MDR_S1') return 'mdrs1';
+  if(line==='PNS') return 'cnpns';
+  if(line==='DRM'||line==='DLP') return 'chdist';
+  var ch='일반', best=null, nm=fkNorm(x.cust);
+  (DATA.rows||[]).forEach(function(r){
+    if(r.line!==line || fkNorm(r.cust)!==nm) return;
+    if(!best || (r.startIdx||0)>(best.startIdx||0)) best=r;
+  });
+  if(best) ch=chOf(best);
+  if(line==='Cloud') return ch==='조달'? 'cnpub' : ch==='LGU+'? 'cnlgu' : 'cngen';
+  if(line==='MDR')   return ch==='LGU+'? 'mdrlgu' : 'mdrgen';
+  return null;
+}
+/* 같은 서비스(LIVE 탭 «서비스» 열)의 영역 합계 — LIVE 탭에서 서비스로 걸렀을 때 나오는 수와 같아야 합니다 */
+var LIVE_GROUPS={ 'Cloud NAC':['cngen','cnpub','cnlgu'], 'MDR':['mdrgen','mdrlgu'] };
+function liveGroupNote(key){
+  var g=Object.keys(LIVE_GROUPS).filter(function(n){ return LIVE_GROUPS[n].indexOf(key)>=0; })[0];
+  if(!g) return 'LIVE 고객사 탭 기준';
+  var parts=LIVE_GROUPS[g].map(function(k){ return (CH_DEFS[k][0].replace(/^\S+ /,'').split(' · ')[1]||k)+' '+(liveForArea(k)||[]).length; });
+  var tot=LIVE_GROUPS[g].reduce(function(a,k){ return a+(liveForArea(k)||[]).length; },0);
+  return 'LIVE 탭 '+g+' 전체 '+tot+'개 = '+parts.join(' · ');
+}
+function liveForArea(key){
+  if(!DATA || !DATA.live || !DATA.live.ok) return null;
+  return DATA.live.rows.filter(function(x){ return liveAreaKey(x)===key; });
+}
 function renderChannelView(key){
   var def=CH_DEFS[key], ch=def[1], match=def[3];
   var host=$('#chBody');
@@ -6071,6 +6103,9 @@ function renderChannelView(key){
   var mrr=monthlyTotal(list,b);
   var act=0, custs={};
   list.forEach(function(k){ if(MAT[k][b]>0){ act++; custs[DATA.rows[k].cust]=1; } });
+  /* 고객사 수는 LIVE 고객사 탭 기준 (대시보드와 같은 기준) — 당월 매출 기준 수는 보조 표기 */
+  var lv=liveForArea(key), lvCust={}; (lv||[]).forEach(function(x){ lvCust[x.cust]=1; });
+  var lvN=lv? Object.keys(lvCust).length : null;
   var hasEq=!!ch;
   var pendEq=0, rentEq=0;
   if(hasEq){
@@ -6085,7 +6120,9 @@ function renderChannelView(key){
   h+='<div class="kpis" style="margin-bottom:16px">'+
     tile('당월 MRR', won(mrr), '천원', '연환산 '+won(mrr*12)+'천원')+
     tile('활성 계약', act.toLocaleString('ko-KR'), '건', '전체 이력 '+list.length+'건')+
-    tile('고객사', Object.keys(custs).length.toLocaleString('ko-KR'), '곳', '당월 매출 기준')+
+    (lvN!=null
+      ? tile('LIVE 고객사', lv.length.toLocaleString('ko-KR'), '개', liveGroupNote(key)+' · 고객사 '+lvN+'곳 · 당월 매출 발생 '+Object.keys(custs).length+'곳')
+      : tile('고객사', Object.keys(custs).length.toLocaleString('ko-KR'), '곳', '당월 매출 기준'))+
     (hasEq? tile('임대중 장비', rentEq, '대', pendEq? '처리 대기 요청 '+pendEq+'건':'대기 요청 없음')
           : tile('비중', (monthlyTotal(idxs(),b)? (mrr/monthlyTotal(idxs(),b)*100).toFixed(1):'0')+'%','','전체 당월 매출 대비'))+
     '</div>';
