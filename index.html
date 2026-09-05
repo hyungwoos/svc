@@ -2085,7 +2085,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-04 ㊿+29';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-05 ㊿+30';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -7977,6 +7977,89 @@ function wkCustMatch(name){
   });
   return hit;
 }
+
+/* ── 주간보고 통합 양식 (전사 «주간 업무보고» 서비스사업부 탭 레이아웃) ──
+   열: A 전주 · B 구분(팀) · C 구분 · D 업무세부내용 · E 고객명 · F 담당자 · G 예상매출(백만) · H 관련부서/파트너 · I 비고
+   · 계약현황은 포탈 DB에서 자동 생성 (전주에 등록된 신규·추가 계약 + 연장 회차)
+   · 영업·기획·마케팅·MSS팀 항목은 취합된 주간보고(weekly_reports)의 «전주 실적» 을 그대로 옮김 */
+function wkUnifiedWindow(){
+  var wk=WK.week? new Date(WK.week+'T00:00:00') : new Date();
+  var end=new Date(wk); end.setDate(end.getDate()-1);          // 보고일 전날까지
+  var start=new Date(end); start.setDate(start.getDate()-6);   // 7일 창
+  var f=function(d){ return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); };
+  return {s:f(start), e:f(end)};
+}
+function wkTermTxt(m){ m=Number(m)||0; if(!m) return ''; return (m%12===0)? (m/12)+'년' : m+'개월'; }
+function wkContractRows(win){
+  var out=[], cmap={}; (SB_RAW.customers||[]).forEach(function(c){ cmap[c.id]=c; });
+  (SB_RAW.contracts||[]).forEach(function(c){
+    var cu=cmap[c.customer_id]||{}, nm=cu.name||'?';
+    var line=lline(c.line), ver=c.version? ' '+c.version:'', qty=c.qty? ' '+Math.round(Number(c.qty))+'노드':'';
+    var ptn=c.partner||c.biller||'';
+    var created=String(c.created_at||'').slice(0,10);
+    if(created>=win.s && created<=win.e){
+      var kind=c.parent_contract_id? '추가' : '신규';
+      out.push(['','', '계약현황', '('+kind+') '+line+ver+qty+' '+wkTermTxt(c.term_months), nm, '서비스사업팀', c.total_amount? (Math.round(Number(c.total_amount)/10000)/100):'' , ptn, '']);
+    }
+    (Array.isArray(c.renew_history)? c.renew_history:[]).forEach(function(h){
+      if(/migration|sheet-sync/i.test(String(h.by||''))) return;                  // 이관으로 만들어진 이력은 «전주 연장» 아님
+      var at=String(h.at||'').slice(0,10); if(!(at>=win.s && at<=win.e)) return;
+      var mo=(h.from&&h.to)? ((+String(h.to).slice(0,4)-+String(h.from).slice(0,4))*12 + (+String(h.to).slice(5,7)-+String(h.from).slice(5,7))+1) : 0;
+      var amt=(Number(h.mrr)||0)*mo;
+      out.push(['','', '계약현황', '(연장) '+line+ver+qty+' '+wkTermTxt(mo), nm, '서비스사업팀', amt? Math.round(amt/10000)/100:'', ptn, h.note||'']);
+    });
+  });
+  return out;
+}
+function wkUnifiedRows(){
+  var win=wkUnifiedWindow(), items=(WK.data&&WK.data.items)||[];
+  var rows=[['전주','구분','','업무세부내용','고객명','담당자','예상매출','관련부서/파트너','비고']];
+  function split(content){ var m=String(content||'').match(/^([\s\S]*?)\n\(비고\)\s*([\s\S]*)$/); return m? [m[1],m[2]] : [String(content||''),'']; }
+  // ① 계약현황: DB 자동 + 시트에 적힌 계약현황 중 DB에 없는 고객
+  var ct=wkContractRows(win), seen={}; ct.forEach(function(r){ seen[String(r[4]).replace(/\s/g,'')]=1; });
+  items.filter(function(x){ return x.part==='실적' && x.team==='사업팀' && x.section==='계약현황'; }).forEach(function(x){
+    var k=String(x.customer||'').replace(/\s/g,''); if(seen[k]) return;
+    var cd=split(x.content); ct.push(['','', '계약현황', cd[0], x.customer||'', x.owner||'서비스사업팀', x.expect_amt!=null? x.expect_amt:'', x.partner||'', cd[1]]);
+  });
+  var body=[];
+  ct.forEach(function(r,i){ if(i>0) r[2]=''; body.push(r); });
+  // ② 영업 · 기획 · 마케팅
+  ['영업','기획','마케팅','기획·마케팅'].forEach(function(sec){
+    var list=items.filter(function(x){ return x.part==='실적' && x.team==='사업팀' && x.section===sec; });
+    list.forEach(function(x,i){ var cd=split(x.content); body.push(['','', i===0? sec:'', cd[0], x.customer||'', x.owner||'', x.expect_amt!=null? x.expect_amt:'', x.partner||'', cd[1]]); });
+  });
+  if(body.length){ body[0][0]='전주'; body[0][1]='서비스사업팀'; }
+  // ③ MSS팀
+  var mss=items.filter(function(x){ return x.part==='실적' && x.team==='MSS팀'; }), first=true, lastSec=null;
+  mss.forEach(function(x){
+    body.push([ '', first? 'MSS팀':'', (x.section!==lastSec)? (x.section||'기타'):'', x.content||'', x.customer||'', x.owner||'', '', x.partner||'-', x.issue_ref||'-' ]);
+    first=false; lastSec=x.section;
+  });
+  return rows.concat(body);
+}
+function wkUnifiedTsv(rows){
+  return rows.map(function(r){ return r.map(function(c){ var s=String(c==null?'':c); return /[\t\n"]/.test(s)? '"'+s.replace(/"/g,'""')+'"' : s; }).join('\t'); }).join('\n');
+}
+async function wkUnifiedCopy(){
+  var rows=wkUnifiedRows(); if(rows.length<2){ toast('통합 양식','옮길 항목이 없습니다','warn'); return; }
+  try{ await navigator.clipboard.writeText(wkUnifiedTsv(rows)); toast('통합 양식 복사 완료', (rows.length-1)+'줄 — 전사 주간보고 «서비스사업부» 탭 A1 에 붙여넣기'); }
+  catch(e){ var ta=document.createElement('textarea'); ta.value=wkUnifiedTsv(rows); document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast('통합 양식 복사 완료', (rows.length-1)+'줄'); }
+}
+async function wkUnifiedToSheet(){
+  toast('통합 양식','구글 시트에 쓰는 중… (10~20초)','info');
+  try{
+    var r=await fetch(WEEKLY_GAS+'?action=weekly_unified'); var j=await r.json();
+    if(!j.ok) throw new Error(j.error||'실패');
+    toast('시트 생성 완료', j.rows+'줄 · 계약현황 '+j.contracts+'건 — 새 탭에서 열립니다');
+    if(j.url) window.open(j.url,'_blank');
+  }catch(e){ window.open(WEEKLY_GAS+'?action=weekly_unified','_blank'); }   // CORS 차단 시 결과 JSON 을 새 탭으로
+}
+function wkUnifiedXlsx(){
+  var rows=wkUnifiedRows(); if(rows.length<2){ toast('통합 양식','옮길 항목이 없습니다','warn'); return; }
+  var nm='주간업무보고_서비스사업부_'+(WK.week||todayStr());
+  xlsxBook(nm, [{name:'서비스사업부', head:rows[0], rows:rows.slice(1), widths:[12,17,16,92,24,15,19,19,23]}]);
+}
+
 var WK_CACHE={};   // 주차별 캐시 — 주 1회 바뀌는 데이터라 10분 캐시로 즉시 표시
 async function renderWeekly(atWeek){
   var host=$('#wkBody');
@@ -8108,6 +8191,9 @@ async function renderWeekly(atWeek){
     '<button class="pill ghost" id="wkZoom" title="글자 크기 — 보통 → 크게 → 아주 크게">가<span style="font-size:15px;font-weight:800">A</span> 글자 크기</button>'+
     '<button class="pill ghost" id="wkFs" title="보고 화면만 전체화면으로 — 사이드바·상단바 없이 발표 (ESC 또는 F로 종료)">⛶ 발표 모드</button>'+
     '<button class="pill ghost" id="wkFetch">↻ 다시 가져오기</button>'+
+    '<button class="pill ghost" id="wkUniCopy" title="전사 «주간 업무보고» 서비스사업부 탭 양식(9열)으로 복사 — 계약현황은 포탈 DB에서 자동 생성">📋 통합 양식 복사</button>'+
+    '<button class="pill ghost" id="wkUniXls" title="같은 양식을 엑셀 파일로">⬇ 통합 양식</button>'+
+    '<button class="pill ghost" id="wkUniSheet" title="통합 양식을 구글 시트(주간업무보고_서비스사업부(자동))에 바로 씁니다 — Apps Script 실행">☁ 시트에 쓰기</button>'+
     '<button class="pill" id="wkNext">▶ 다음 (Space)</button></div>';
 
   var rail='<div class="wk-rail"><div class="ph">전주 실적</div>'+
@@ -8157,6 +8243,9 @@ async function renderWeekly(atWeek){
   $('#wkNext').onclick=function(){ this.blur(); wkNext(); };
   var bfs=$('#wkFs'); if(bfs) bfs.onclick=function(){ this.blur(); wkToggleFs(); };
   $('#wkFetch').onclick=wkRefetch;
+  var uc=$('#wkUniCopy'); if(uc) uc.onclick=wkUnifiedCopy;
+  var ux=$('#wkUniXls'); if(ux) ux.onclick=wkUnifiedXlsx;
+  var us=$('#wkUniSheet'); if(us) us.onclick=wkUnifiedToSheet;
   if($('#wkMemoSave')) $('#wkMemoSave').onclick=async function(){
     var t=$('#wkMemo').value;
     try{
@@ -10595,7 +10684,7 @@ async function xlsxBook(name, sheets){                       // sheets: [{name, 
   var wb=XLSX.utils.book_new();
   sheets.forEach(function(sh,si){
     var ws=XLSX.utils.aoa_to_sheet([sh.head].concat(sh.rows));
-    ws['!cols']=sh.head.map(function(h2,i){
+    ws['!cols']=sh.widths? sh.widths.map(function(w){ return {wch:w}; }) : sh.head.map(function(h2,i){
       var w=String(h2).length+2;
       sh.rows.slice(0,80).forEach(function(r){ var L=String(r[i]==null?'':r[i]).length+2; if(L>w) w=L; });
       return {wch:Math.min(42,w)};
