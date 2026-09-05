@@ -2085,7 +2085,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-05 ㊿+30';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-05 ㊿+31';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -8045,15 +8045,6 @@ async function wkUnifiedCopy(){
   try{ await navigator.clipboard.writeText(wkUnifiedTsv(rows)); toast('통합 양식 복사 완료', (rows.length-1)+'줄 — 전사 주간보고 «서비스사업부» 탭 A1 에 붙여넣기'); }
   catch(e){ var ta=document.createElement('textarea'); ta.value=wkUnifiedTsv(rows); document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast('통합 양식 복사 완료', (rows.length-1)+'줄'); }
 }
-async function wkUnifiedToSheet(){
-  toast('통합 양식','구글 시트에 쓰는 중… (10~20초)','info');
-  try{
-    var r=await fetch(WEEKLY_GAS+'?action=weekly_unified'); var j=await r.json();
-    if(!j.ok) throw new Error(j.error||'실패');
-    toast('시트 생성 완료', j.rows+'줄 · 계약현황 '+j.contracts+'건 — 새 탭에서 열립니다');
-    if(j.url) window.open(j.url,'_blank');
-  }catch(e){ window.open(WEEKLY_GAS+'?action=weekly_unified','_blank'); }   // CORS 차단 시 결과 JSON 을 새 탭으로
-}
 function wkUnifiedXlsx(){
   var rows=wkUnifiedRows(); if(rows.length<2){ toast('통합 양식','옮길 항목이 없습니다','warn'); return; }
   var nm='주간업무보고_서비스사업부_'+(WK.week||todayStr());
@@ -8191,9 +8182,8 @@ async function renderWeekly(atWeek){
     '<button class="pill ghost" id="wkZoom" title="글자 크기 — 보통 → 크게 → 아주 크게">가<span style="font-size:15px;font-weight:800">A</span> 글자 크기</button>'+
     '<button class="pill ghost" id="wkFs" title="보고 화면만 전체화면으로 — 사이드바·상단바 없이 발표 (ESC 또는 F로 종료)">⛶ 발표 모드</button>'+
     '<button class="pill ghost" id="wkFetch">↻ 다시 가져오기</button>'+
-    '<button class="pill ghost" id="wkUniCopy" title="전사 «주간 업무보고» 서비스사업부 탭 양식(9열)으로 복사 — 계약현황은 포탈 DB에서 자동 생성">📋 통합 양식 복사</button>'+
+    '<button class="pill ghost" id="wkUniCopy" title="전사 «주간 업무보고» 서비스사업부 탭 양식(9열)으로 복사 — 시트의 「통합(자동)」 탭과 같은 내용 · 계약현황은 포탈 DB에서 자동 생성">📋 통합 양식 복사</button>'+
     '<button class="pill ghost" id="wkUniXls" title="같은 양식을 엑셀 파일로">⬇ 통합 양식</button>'+
-    '<button class="pill ghost" id="wkUniSheet" title="통합 양식을 구글 시트(주간업무보고_서비스사업부(자동))에 바로 씁니다 — Apps Script 실행">☁ 시트에 쓰기</button>'+
     '<button class="pill" id="wkNext">▶ 다음 (Space)</button></div>';
 
   var rail='<div class="wk-rail"><div class="ph">전주 실적</div>'+
@@ -8245,7 +8235,6 @@ async function renderWeekly(atWeek){
   $('#wkFetch').onclick=wkRefetch;
   var uc=$('#wkUniCopy'); if(uc) uc.onclick=wkUnifiedCopy;
   var ux=$('#wkUniXls'); if(ux) ux.onclick=wkUnifiedXlsx;
-  var us=$('#wkUniSheet'); if(us) us.onclick=wkUnifiedToSheet;
   if($('#wkMemoSave')) $('#wkMemoSave').onclick=async function(){
     var t=$('#wkMemo').value;
     try{
