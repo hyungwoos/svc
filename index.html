@@ -2122,7 +2122,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-07 ㊿+43';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-07 ㊿+45';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -2425,6 +2425,7 @@ function buildFromRes(res){
       fee:Number(c.install_fee)||0, settle:c.settle_month||'',   /* 설치비 · 대금정산일 */
       renew:Number(c.renew_count)||0, renewHist:Array.isArray(c.renew_history)? c.renew_history : [],   /* 연장 회차 */
       cid:c.customer_id, parent:c.parent_contract_id||null,                                              /* 부속 계약(추가 구매)이면 원계약 id */
+      noCount:!!c.no_count,                                                                               /* 매출은 세되 고객사 수·신규·해지에서는 빼는 행(시트 LIVE 집계의 «중복» 등) */
       sum:sum, segs:segs
     };
   });
@@ -3537,9 +3538,9 @@ function renderKpis(list){
      · 만료 = 종료월이 기준월~+2개월인 계약(해지·종료 상태 제외) */
   var newRows=[], churnRows=[], expRows=[], churnAmt=0, expAmt=0;
   list.forEach(function(k){
-    var r=DATA.rows[k]; if(r.parent) return;
+    var r=DATA.rows[k]; if(r.parent || r.noCount || String(r.saleType||'')==='H/W') return;
     var st=String(r.status||'');
-    if(st!=='CN전환' && st!=='통합과금' && r.startIdx!=null && r.startIdx>=f0 && r.startIdx<=b) newRows.push(k);
+    if(st!=='통합과금' && r.startIdx!=null && r.startIdx>=0 && r.startIdx>=f0 && r.startIdx<=b) newRows.push(k);
     if(st==='해지' && !(r.line==='S1' && String(r.saleType||'')==='CND')){ var x=r.endIdx!=null? r.endIdx : r._l; if(x!=null && x>=f0 && x<=b){ churnRows.push(k); churnAmt+=(MAT[k][x]||MAT[k][Math.max(x-1,0)]||r.mrr||0); } }
     var e=r.endIdx;
     if(e!=null && e>=b && e<=b+2 && !/해지|종료|CN전환/.test(st)){ expRows.push(k); expAmt+=MAT[k][Math.min(e,M-1)]||r.mrr||0; }
@@ -3574,12 +3575,11 @@ function renderKpis(list){
           if(STATE.ind && x.ind!==STATE.ind) return false;
           return true;
         });
-        var uq={}; sel.forEach(function(x){ uq[x.cust]=1; });
-        var nCust=Object.keys(uq).length, nRow=sel.length, dupN=nRow-nCust;
+        var uq={}, perLine={}; sel.forEach(function(x){ uq[x.cust]=1; (perLine[x.line]=perLine[x.line]||{})[x.cust]=1; });
+        var nCust=Object.keys(uq).length, nRow=sel.length, prodSum=Object.keys(perLine).reduce(function(a,l){ return a+Object.keys(perLine[l]).length; },0);
         return { k:'LIVE 고객사', v:nCust.toLocaleString('ko-KR'), u:'곳',
-                 d:'서비스 기준 '+nRow.toLocaleString('ko-KR')+'건'+
-                   (dupN>0? ' · 한 고객사가 여러 서비스를 쓰면 서비스마다 1건으로 집계됩니다 ('+dupN+'건 중복)'
-                          : ' · LIVE 고객사 탭 기준'), open:'live', tip:'LIVE 명단 시트 기준 — 누르면 LIVE 고객사 화면' };
+                 d:'제품별 고객사 합 '+prodSum.toLocaleString('ko-KR')+(prodSum>nCust? ' (두 제품 이상 쓰는 '+(prodSum-nCust)+'곳은 회사로는 1곳)':'')+
+                   (nRow>prodSum? ' · 사이트 기준 '+nRow+'건':''), open:'live', tip:'LIVE 명단 시트 기준 — 곳 = 회사 단위 · 제품별 합 = 매출시트 LIVE 고객사 산정 방식(제품마다 1곳) — 누르면 LIVE 고객사 화면' };
       }
       return { k:'활성 고객사', v:cust.toLocaleString('ko-KR'), u:'곳', d: custPrevY? deltaHtml(cust,custPrevY,'전년'):'', open:'live' };
     })(),
@@ -3802,9 +3802,9 @@ var NC_YEAR=null;
 function ncRows(list, kind, lb, s, e){                         // kind 'new'|'lost' · lb 서비스 코드('' = 전체) · [s,e] 월 인덱스
   var out=[];
   list.forEach(function(k){
-    var r=DATA.rows[k]; if(r.parent) return; if(lb && r.line!==lb) return;
+    var r=DATA.rows[k]; if(r.parent || r.noCount || String(r.saleType||'')==='H/W') return; if(lb && r.line!==lb) return;
     var st=String(r.status||'');
-    if(kind==='new'){ if(st==='CN전환'||st==='통합과금') return; if(r.startIdx!=null && r.startIdx>=s && r.startIdx<=e) out.push(k); }
+    if(kind==='new'){ if(st==='통합과금') return; if(r.startIdx!=null && r.startIdx>=0 && r.startIdx>=s && r.startIdx<=e) out.push(k); }
     else { if(st!=='해지') return; if(r.line==='S1' && String(r.saleType||'')==='CND') return; var x=r.endIdx!=null? r.endIdx : r._l; if(x!=null && x>=s && x<=e) out.push(k); }
   });
   return out;
@@ -6282,14 +6282,16 @@ var LIVE_GROUPS={ 'Cloud NAC':['cngen','cnpub','cnlgu'], 'MDR':['mdrgen','mdrlgu
 function liveGroupNote(key){
   var g=Object.keys(LIVE_GROUPS).filter(function(n){ return LIVE_GROUPS[n].indexOf(key)>=0; })[0];
   if(!g) return 'LIVE 고객사 탭 기준';
-  var parts=LIVE_GROUPS[g].map(function(k){ return (CH_DEFS[k][0].replace(/^\S+ /,'').split(' · ')[1]||k)+' '+(liveForArea(k)||[]).length; });
-  var tot=LIVE_GROUPS[g].reduce(function(a,k){ return a+(liveForArea(k)||[]).length; },0);
-  return 'LIVE 탭 '+g+' 전체 '+tot+'개 = '+parts.join(' + ');
+  var parts=LIVE_GROUPS[g].map(function(k){ return (CH_DEFS[k][0].replace(/^\S+ /,'').split(' · ')[1]||k)+' '+liveN(liveForArea(k)); });
+  var tot=LIVE_GROUPS[g].reduce(function(a,k){ return a+liveN(liveForArea(k)); },0);
+  return 'LIVE 명단 '+g+' 전체 '+tot+'곳 = '+parts.join(' + ');
 }
 function liveForArea(key){
   if(!DATA || !DATA.live || !DATA.live.ok) return null;
   return DATA.live.rows.filter(function(x){ return liveAreaKey(x)===key; });
 }
+/* LIVE 명단의 «곳» = 회사 이름 기준 (한 회사가 사이트를 여러 줄로 갖고 있으면 1곳) */
+function liveN(rows){ var u={}; (rows||[]).forEach(function(x){ u[x.cust]=1; }); return Object.keys(u).length; }
 /* LIVE 행의 채널 = 같은 고객·서비스의 «원계약» 중 가장 최근 것의 채널 (부속 계약은 채널 판단에 쓰지 않음 · 원계약이 없을 때만 부속 참고) */
 function liveChannel(x){
   var best=null, bestChild=null, nm=fkNorm(x.cust);
@@ -6326,7 +6328,7 @@ function renderChannelView(key){
   h+='<div class="kpis" style="margin-bottom:16px">'+
     tile('당월 MRR', won(mrr), '천원', '연환산 '+won(mrr*12)+'천원','cv_mrr')+
     (lvN!=null
-      ? tile('LIVE 고객사', lv.length.toLocaleString('ko-KR'), '개', liveGroupNote(key),'cv_live')
+      ? tile('LIVE 고객사', liveN(lv).toLocaleString('ko-KR'), '곳', (lv.length!==liveN(lv)? '사이트 기준 '+lv.length+'건 · ':'')+liveGroupNote(key),'cv_live')
       : tile('고객사', Object.keys(custs).length.toLocaleString('ko-KR'), '곳', '당월 매출 기준','cv_cust'))+
     (hasEq? tile('임대중 장비', rentEq, '대', pendEq? '처리 대기 요청 '+pendEq+'건':'대기 요청 없음','cv_eq')
           : tile('비중', (monthlyTotal(idxs(),b)? (mrr/monthlyTotal(idxs(),b)*100).toFixed(1):'0')+'%','','전체 당월 매출 대비','cv_mrr'))+
@@ -9351,7 +9353,7 @@ function churnRows(){
      · 재약정 승계는 더 이상 추정하지 않음 — 연장은 원계약 한 줄에 «연장 n회» 로 기록되므로 종료 행이 생기지 않음 */
   var out=[];
   DATA.rows.forEach(function(r,i){
-    if(r.parent) return;
+    if(r.parent || r.noCount) return;
     if(String(r.status||'')!=='해지') return;
     if(r.line==='S1' && String(r.saleType||'')==='CND') return;
     var e=r.endIdx!=null? r.endIdx : r._l; if(e==null||e<0) return;
@@ -9367,10 +9369,10 @@ function churnRows(){
    · 해지 = 상태 «해지» 인 원계약(부속 제외) · 해지월 = 종료월(시트 해지년월) · 지원사업 = 판매형태에 «지원»
    · 분모 = 기간 시작 직전 달의 활성 고객사 — «계약 유효»(기본) / «과금»(그 달 인식 금액) / «누적고객»(통계 탭: 신규 누계 − 해지 누계)
    숫자를 누르면 그 칸의 계약 내역이 뜹니다. */
-var CR={unit:'year', base:'valid', cnd:false, rows:false, exDen:'org', sup:'all', from:2021, upto:null, open:false,
+var CR={unit:'year', base:'valid', cnd:true, rows:false, exDen:'org', sup:'all', from:2021, upto:null, open:false,
         f:{line:[], area:[], sale:[], ind:[], sector:[], ch:[], ptn:[], billing:[], svc:[]}};
 var CR_PRESET={
-  portal:{base:'valid', cnd:false, rows:false, exDen:'org', sup:'all', f:{line:[],area:[],sale:[],ind:[],sector:[],ch:[],ptn:[],billing:[],svc:[]}},
+  portal:{base:'valid', cnd:true, rows:false, exDen:'org', sup:'all', f:{line:[],area:[],sale:[],ind:[],sector:[],ch:[],ptn:[],billing:[],svc:[]}},
   sheet: {base:'cum',   cnd:true,  rows:true,  exDen:'all', sup:'all', f:{line:['Cloud','S1'],area:[],sale:[],ind:[],sector:[],ch:[],ptn:[],billing:[],svc:[]}}
 };
 function crFilterGroups(){
@@ -9414,8 +9416,9 @@ function crEligible(r){
   if(CR.sup==='ex' && crIsSup(r)) return false;                // 지원사업 제외
   if(CR.sup==='only' && !crIsSup(r)) return false;             // 지원사업만
   if(String(r.status||'')==='통합과금') return false;                                                              // 에스원 통합 과금 행(CND→Basic 전환 고객 묶음 청구) — 매출만, 고객사 아님
-  if(!CR.cnd && (String(r.status||'')==='CN전환' || (r.line==='S1' && String(r.saleType||'')==='CND'))) return false;   // CND(Cloud NAC DeviceKeeper, 단종) → S1 Basic 전환 고객 — 시트 해지 집계는 제외, LIVE 명단은 포함
-  if(r.startIdx==null || r.startIdx<0) return false;                                                               // 시작월이 없고 매출도 없는 행 — 언제부터 고객인지 몰라 집계 불가(대조표에 표시)
+  if(r.noCount || String(r.saleType||'')==='H/W') return false;                                                   // 고객 수 집계 제외 행(시트 «중복») · H/W 일시 판매(구독 고객 아님)
+  if(!CR.cnd && (String(r.status||'')==='CN전환' || (r.line==='S1' && String(r.saleType||'')==='CND'))) return false;   // CND(DeviceKeeper→S1 Basic 전환) 고객은 LIVE 고객 — 기본 포함. «제외»는 매출시트 통계 탭과 맞출 때만
+  if(CR.base!=='sheet' && (r.startIdx==null || r.startIdx<0)) return false;                                        // 시작월이 없고 매출도 없는 행(계약 예정) — 시트 LIVE 규칙일 때만 포함
   if(r.endIdx!=null && r.endIdx>=0 && r.endIdx<r.startIdx) return false;                                          // 종료월이 시작월보다 앞선 행(데이터 오류) 제외
   return true;
 }
@@ -9425,6 +9428,11 @@ function crActive(t, match){
   DATA.rows.forEach(function(r,i){
     if(!crEligible(r) || !match(r)) return;
     if(CR.base==='rev'){ if(MAT[i][t]>0) out.push(r); return; }
+    if(CR.base==='sheet'){                                                                                          // 매출시트 LIVE 규칙: 상태 글자 기준 (신규·재약정·CN전환 = LIVE, 서비스종료·추가 = 아님, 해지는 해지월 전까지) · 날짜 없는 행도 포함
+      var st0=String(r.status||''); if(st0==='추가' || /종료/.test(st0)) return;
+      if(r.startIdx!=null && r.startIdx>=0 && r.startIdx>t) return;
+      if(st0==='해지'){ var xe=(r.endIdx!=null&&r.endIdx>=0)? r.endIdx : null; if(xe==null || xe<=t) return; }
+      out.push(r); return; }
     if(r.startIdx==null || r.startIdx>t) return;
     var e=(r.endIdx!=null && r.endIdx>=0)? r.endIdx : (r._l>=0? r._l : null);   // 종료월 없고 매출도 없으면(통합 과금 전환 고객) 열린 계약으로 봄
     if(CR.base==='cum'){ if(String(r.status||'')==='해지' && e!=null && e<=t) return; out.push(r); return; }   // 누적고객: 신규 누계 − 해지 누계 (만기·서비스종료는 안 뺌)
@@ -9439,6 +9447,7 @@ function crLost(s,e,match){
   DATA.rows.forEach(function(r){
     if(!crEligible(r) || !match(r)) return;
     if(String(r.status||'')!=='해지') return;
+    if(r.line==='S1' && String(r.saleType||'')==='CND') return;          // CND(DeviceKeeper) 해지는 매출시트 규칙대로 해지 집계에서 항상 제외
     var x=r.endIdx!=null? r.endIdx : r._l; if(x==null) return;
     if(x>=s && x<=e) out.push(r);
   });
@@ -9470,7 +9479,7 @@ function renderChurnRate(){
   if(!DATA||!DATA.rows||!DATA.rows.length){ host.innerHTML='<div class="cap" style="padding:40px;text-align:center">데이터를 불러오는 중…</div>'; return; }
   CR_G=crFilterGroups();
   var P=crPeriods(), G=CR_G, maxAll=Math.min(DATA.nowIdx>=0? DATA.nowIdx : M-1, M-1);
-  var isSheet=(CR.base==='cum'&&CR.cnd&&CR.rows&&CR.exDen==='all'), isPortal=(CR.base==='valid'&&!CR.cnd&&!CR.rows&&CR.exDen==='org');
+  var isSheet=(CR.base==='cum'&&CR.cnd&&CR.rows&&CR.exDen==='all'), isPortal=(CR.base==='valid'&&CR.cnd&&!CR.rows&&CR.exDen==='org');
   var h='<div class="pr-top"><div><h2 style="margin:0;font-size:18px">📐 해지율</h2><p class="cap" style="margin:2px 0 0">기간 · 제품 · 사업영역 · 판매형태 · 업종 등으로 잘라 보는 해지율 — 숫자를 누르면 그 칸의 계약 내역</p></div>'+
     '<span class="spacer"></span><div class="seg"><button data-preset="portal" aria-pressed="'+isPortal+'" title="고객사 단위 · 계약 유효 분모 · CND 제외 · 지원 제외율은 지원 제외 활성 대비">포탈 기준</button><button data-preset="sheet" aria-pressed="'+isSheet+'" title="계약 행 단위 · 누적고객 분모 · CND 포함 · Cloud NAC + 에스원 · 지원 제외율은 전체 활성 대비 (통계 탭 고객 관리 블록과 같은 방식)">통계 탭 기준</button></div></div>';
   h+=helpBox('churnrate','이 화면 읽는 법 (처음 보시는 분께)',[
@@ -9479,7 +9488,7 @@ function renderChurnRate(){
      ['분모 3가지','<b>계약 유효</b> = 그 달에 유효 계약이 있는 고객사(포탈 기본) · <b>과금</b> = 그 달 매출이 있는 고객사 · <b>누적고객</b> = 신규 누계 − 해지 누계(매출시트 통계 탭 방식, 만기 종료를 빼지 않아 분모가 커서 해지율이 낮게 나옴)'],
      ['포탈 기준 / 매출시트 기준','오른쪽 위 버튼. 매출시트 통계 탭과 같은 숫자를 보려면 «매출시트 기준»(누적고객 · CND 포함 · 계약 행 단위 · Cloud NAC+에스원)을 누르세요.'],
      ['지원사업 제외율','판매형태 «정부 지원» 고객을 빼고 계산한 해지율. 바우처 만기 해지를 걷어낸 «순수 이탈률»입니다.'],
-     ['CND 전환 고객','CND = Cloud NAC DeviceKeeper. 예전에 에스원으로 납품하던 제품인데 단종되어 전부 S1 Cloud NAC Basic으로 교체됐고, 과금은 에스원에 한 건으로 묶어 받습니다(«에스원 통합과금» 행). 그래서 고객별 매출 행이 없고, 매출시트 해지 통계는 이 고객들을 빼고 셉니다 — 기본은 제외, LIVE 고객사 수와 맞추려면 포함으로 바꾸세요.'],
+     ['CND 전환 고객','CND = Cloud NAC DeviceKeeper. 예전에 에스원으로 납품하던 제품인데 단종되어 전부 S1 Cloud NAC Basic으로 교체됐고, 과금은 에스원에 한 건으로 묶어 받습니다(«에스원 통합과금» 행). 이 고객들은 <b>LIVE 고객으로 항상 포함</b>합니다(기본). 다만 옛 DeviceKeeper 계약의 해지는 매출시트 규칙대로 해지 건수에 넣지 않습니다. «제외»는 매출시트 통계 탭이 CND를 통째로 빼고 계산한 값과 맞출 때만 쓰세요.'],
      ['분모가 작을 때','시작 활성이 20곳 미만(PNS·DRM·초기 MDR)이면 한 곳 차이가 10%p 이상 움직입니다. 그런 칸은 비율보다 «7곳 중 2곳»처럼 건수로 읽어 주세요.']
    ],'모든 숫자는 «계약» 메뉴의 데이터로 계산하며, 파란 숫자를 누르면 그 칸을 만든 계약 명단이 열립니다. 제품별·사업영역별 표의 오른쪽 «합계 → 전체» 열은 두 제품을 함께 쓰는 고객사 때문에 생기는 차이를 보여줍니다.');
   /* 계산 규칙 */
@@ -9487,9 +9496,9 @@ function renderChurnRate(){
      '<div class="crrow">'+
        crSeg('기간','unit',[['year','연도'],['half','반기'],['quarter','분기']],CR.unit)+
        crSeg('지원사업','sup',[['all','포함','지원사업 고객을 포함해 계산하고 표 안에서 지원사업/그 외로 나눠 보여줍니다'],['ex','제외','지원사업(판매형태 정부 지원) 계약을 분모·분자에서 모두 뺍니다'],['only','지원사업만','지원사업 계약만 봅니다']],CR.sup)+
-       crSeg('분모','base',[['valid','계약 유효','시작월 ≤ 그 달 ≤ 종료월인 고객사 · 해지 고객사는 해지월 말에 빠짐 (CN전환 제외)'],['rev','과금','그 달에 인식 금액이 있는 고객사'],['cum','누적고객','통계 탭 방식: 신규 누계 − 해지 누계 (만기 종료는 안 뺌)']],CR.base)+
+       crSeg('분모','base',[['valid','계약 유효','시작월 ≤ 그 달 ≤ 종료월인 고객사 · 해지 고객사는 해지월 말에 빠짐 (CN전환 제외)'],['rev','과금','그 달에 인식 금액이 있는 고객사'],['cum','누적고객','통계 탭 방식: 신규 누계 − 해지 누계 (만기 종료는 안 뺌)'],['sheet','시트 LIVE 규칙','매출시트 LIVE 고객사 산정 방식: 계약구분·계약상세 글자로 판단(신규·재약정·CN전환), 날짜 없는 행 포함, 해지는 해지월 전까지']],CR.base)+
        crSeg('단위','rows',[['cust','고객사'],['rows','계약 행','통계 탭은 계약 행 수']],CR.rows?'rows':'cust')+
-       crSeg('CND 전환 고객','cnd',[['ex','제외 — 매출시트 기준','CND(단종된 Cloud NAC DeviceKeeper)에서 S1 Basic으로 전환된 고객 — 매출시트 해지 통계처럼 제외'],['in','포함 — LIVE 기준','LIVE 고객사 수와 같은 범위']],CR.cnd?'in':'ex')+
+       crSeg('CND 전환 고객','cnd',[['in','포함 (기본)','DeviceKeeper→S1 Basic 전환 고객을 LIVE 고객으로 셉니다 · 해지 집계는 어차피 CND를 빼므로 분모에만 영향'],['ex','제외','매출시트 통계 탭이 CND를 통째로 빼고 계산한 것과 맞출 때만']],CR.cnd?'in':'ex')+
        crSeg('지원 제외율 분모','exDen',[['org','지원 제외 활성'],['all','전체 활성','통계 탭 장표 방식']],CR.exDen)+
        '<div class="crseg"><span>기준월</span><select id="crUpto">'+(function(){ var o=''; for(var j=maxAll;j>=Math.max(0,maxAll-35);j--) o+='<option value="'+j+'"'+(j===crMaxJ()?' selected':'')+'>'+mk(j)+'</option>'; return o; })()+'</select></div>'+
      '</div>'+
@@ -9635,14 +9644,14 @@ function renderCustFlow(){
      ['복귀','예전에 끊겼다가 다시 계약한 고객사. 첫 계약이 아니라서 신규에 안 잡히고 따로 보여줍니다.'],
      ['해지 (잔존)','상태가 «해지»이고 해지월이 그 기간인 고객사 — 해지율·해지 분석 화면과 같은 수. 괄호는 해지했지만 다른 서비스 계약이 남아 고객사로는 유지된 곳.'],
      ['종료(해지 외)','해지로 기록되지 않았는데 기간 말에 유효 계약이 없는 곳: 약정 만기 후 미연장, 서비스종료 등. 최근 기간에 잡히면 «만기 지났는데 처리 안 된 계약»일 수 있으니 명단을 확인해 주세요.'],
-     ['CND 전환 고객','CND = Cloud NAC DeviceKeeper. 예전에 에스원으로 납품하던 제품이 단종되어 전부 <b>S1 Cloud NAC Basic</b>으로 교체된 고객사입니다. 과금은 에스원에 한 건으로 묶어 받아서(«에스원 통합과금» 행) 고객별 매출 행이 없고, 그래서 매출시트 해지 통계에서는 빠집니다. 고객사로는 살아 있으니 <b>LIVE 기준</b>(포함)은 LIVE 고객사 메뉴와 맞고, <b>매출시트 기준</b>(제외)은 시트 통계와 맞습니다. 두 기준의 차이는 이 전환 고객 수만큼입니다.'],
+     ['CND 전환 고객','CND = Cloud NAC DeviceKeeper. 예전에 에스원으로 납품하던 제품이 단종되어 전부 <b>S1 Cloud NAC Basic</b>으로 교체된 고객사입니다. 과금은 에스원에 한 건으로 묶어 받아서(«에스원 통합과금» 행) 고객별 매출 행이 없지만, <b>LIVE 고객으로 항상 포함</b>합니다(기본). 옛 DeviceKeeper 계약의 해지만 매출시트 규칙대로 해지 건수에서 빠집니다. «매출시트 기준»(제외)은 통계 탭이 CND를 통째로 빼고 낸 숫자와 맞출 때만 쓰세요.'],
      ['지원사업','판매형태가 «정부 지원»(바우처)인 계약. 제외하면 분모·분자에서 모두 빠집니다.'],
      ['유입 경로','신규 고객사를 첫 계약의 판매형태·채널·사업영역·파트너·제품·산업군으로 나눈 표. 어디서 고객이 들어오는지 보는 용도입니다.']
    ],'화면의 모든 숫자는 «계약» 메뉴의 계약 데이터에서 계산합니다. LIVE 고객사 메뉴는 별도의 LIVE 명단 시트라 조금 다를 수 있고, 증감표 아래 «vs LIVE 메뉴» 대조표가 그 차이를 항목별로 보여줍니다.');
   h+='<div class="pr-card crpanel" style="margin-bottom:12px"><div class="crrow">'+
      crSeg('기간','unit',[['year','연도'],['half','반기'],['quarter','분기']],CR.unit)+
      crSeg('지원사업','sup',[['all','포함','지원사업(정부 지원) 고객을 포함해 셉니다'],['ex','제외','지원사업 고객을 빼고 셉니다'],['only','지원사업만','지원사업 고객만 봅니다']],CR.sup)+
-     crSeg('CND 전환 고객','cnd',[['in','포함 — LIVE 기준','DeviceKeeper→S1 Basic 전환 고객(통합 과금)을 고객사로 셉니다 · LIVE 고객사 메뉴·대시보드와 같은 범위'],['ex','제외 — 매출시트 기준','매출시트 해지 통계와 같은 범위']],CR.cnd?'in':'ex')+
+     crSeg('CND 전환 고객','cnd',[['in','포함 (기본)','DeviceKeeper→S1 Basic 전환 고객(통합 과금)은 LIVE 고객이므로 항상 포함이 기본'],['ex','제외','매출시트 통계 탭과 맞출 때만']],CR.cnd?'in':'ex')+
      '<div class="crseg"><span>기준월</span><select id="cfUpto" title="이 달까지의 데이터로 계산합니다 (기본 = 최신 달)">'+(function(){ var o=''; for(var j=maxAll;j>=Math.max(0,maxAll-35);j--) o+='<option value="'+j+'"'+(j===crMaxJ()?' selected':'')+'>'+mk(j)+'</option>'; return o; })()+'</select></div>'+
      '</div><div class="crrow crfilters">'+G.filter(function(g){return !g.more;}).map(crChips).join('')+'</div></div>';
   /* 지금 보고 있는 기준을 말로 풀어 보여줌 */
@@ -9703,7 +9712,7 @@ function renderCustFlow(){
        '<table class="pr" style="margin-top:6px"><thead><tr><th></th><th>왜 다른가</th><th class="n">곳</th><th>확인</th></tr></thead><tbody>'+
        det('LIVE 명단에 있는데 계약이 없음', cats.none, '+', '계약 미등록 또는 사명이 달라 못 찾음')+
        det('CND(DeviceKeeper→S1 Basic) 전환 고객', cats.cnd, '+', 'CND 제외 옵션이라 빠짐 — «LIVE 기준»으로 바꾸면 사라짐')+
-       det('계약에 시작월이 없음(매출 이력도 없음)', cats.nostart, '+', '언제부터 고객인지 알 수 없어 증감표에 못 넣음 — 계약 화면에서 시작월 입력')+
+       det('계약 예정 — 시작·종료월이 비어 있음', cats.nostart, '+', '시트에는 신규로 적혀 있지만 날짜가 없어 아직 시작 전으로 봄 · 시작하면 계약 화면에서 시작월 입력')+
        det('종료월이 시작월보다 앞선 계약', cats.bad, '+', '날짜 오류 — 계약 화면에서 수정')+
        det('계약 종료월이 지났는데 연장·해지 처리 안 됨', cats.expired, '+', '재약정이면 연장 등록, 끝났으면 해지로')+
        det('계약은 해지·서비스종료인데 LIVE 명단에 남아 있음', cats.ended, '+', 'LIVE 명단에서 빼야 함')+
@@ -9886,7 +9895,7 @@ function renderChurn(){
     '<p class="pr-note" style="margin:8px 0 0">해지 = 상태 «해지» 인 원계약 (매출시트의 해지년월 기입 건과 동일 · 부속 계약 · S1 CND 제외) · 해지월 = 종료월 · 지원사업 = 판매형태 «정부 지원»</p></div>';
   var supN=inR.filter(function(x){ return x.sup; }).length;
   h+=helpBox('churn','이 화면 읽는 법 (처음 보시는 분께)',[
-     ['해지','상태가 «해지»인 원계약 — 매출시트에 해지년월이 적힌 건과 같습니다. 부속 계약(라이선스·센서 추가)과 CND(단종된 DeviceKeeper → S1 Basic 전환) 고객은 매출시트 규칙대로 세지 않습니다.'],
+     ['해지','상태가 «해지»인 원계약 — 매출시트에 해지년월이 적힌 건과 같습니다. 부속 계약(라이선스·센서 추가)은 세지 않고, 옛 CND(DeviceKeeper) 계약의 해지도 매출시트 규칙대로 세지 않습니다. 전환 고객 자체는 LIVE 고객으로 분모에 들어갑니다.'],
      ['해지월','종료월 = 마지막으로 매출이 잡힌 달. «이탈 월액»은 그 달의 월 매출입니다.'],
      ['지원사업','판매형태가 «정부 지원»인 계약. 바우처 만기로 끝난 해지라 일반 해지와 성격이 다릅니다.'],
      ['제품별 해지율','그 제품의 해지 고객사 ÷ 기간 시작 직전 달 활성 고객사(계약 유효). 해지율 화면의 «포탈 기준»과 같은 숫자입니다.'],
@@ -9899,11 +9908,11 @@ function renderChurn(){
     kpi('이탈 월액 합',won(totA)+'천원','해지 직전 월 매출 기준','ch_amt')+
     kpi('연환산 손실',won(totA*12)+'천원','ARR 감소분','ch_amt')+
     '</div></div>';
-  /* ── 제품별 ── 기간 시작 직전 달 활성 고객사(계약 유효 · 부속·CND·CN전환 제외)를 분모로 제품별 해지율까지 */
+  /* ── 제품별 ── 기간 시작 직전 달 활성 고객사(계약 유효 · 부속·통합과금 제외 · CN전환 고객 포함)를 분모로 제품별 해지율까지 */
   var inRL=inR0.filter(function(x){ return passQ(x) && chPass(x,'line'); });     // 제품 선택 자체는 빼야 다른 제품도 보임
   var lineOrder=DATA.lines.map(function(l){ return lline(l.label); });
   var byL={}; inRL.forEach(function(x){ var o=(byL[x.line]=byL[x.line]||{n:0,amt:0,sup:0,cu:{},rs:{}}); o.n++; o.amt+=x.amt; if(x.sup) o.sup++; o.cu[x.cust]=1; o.rs[x.reason]=(o.rs[x.reason]||0)+1; });
-  function lineBase(lbl, t){ var u={}; DATA.rows.forEach(function(r){ if(r.parent||lline(r.line)!==lbl||/^(CN전환|통합과금)$/.test(String(r.status||''))||(r.line==='S1'&&String(r.saleType||'')==='CND')) return;
+  function lineBase(lbl, t){ var u={}; DATA.rows.forEach(function(r){ if(r.parent||r.noCount||String(r.saleType||'')==='H/W'||lline(r.line)!==lbl||String(r.status||'')==='통합과금') return;
       if(r.startIdx==null||r.startIdx<0||r.startIdx>t) return; var e=r.endIdx!=null? r.endIdx : r._l; if(e!=null&&e>=0&&(e<t||(e===t&&String(r.status||'')==='해지'))) return; u[r.cust]=1; }); return Object.keys(u).length; }
   var lKeys=Object.keys(byL).sort(function(a,b2){ var ia=lineOrder.indexOf(a), ib=lineOrder.indexOf(b2); return (ia<0?99:ia)-(ib<0?99:ib); });
   var lTot=inRL.length, lSel=(CHURN.fil.line||[]);
