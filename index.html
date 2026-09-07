@@ -2098,7 +2098,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-07 ㊿+37';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-07 ㊿+38';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -9430,16 +9430,19 @@ function renderChurnRate(){
   [['제품별','line'],['사업영역별','area']].forEach(function(gg){
     var g=G.filter(function(x){return x.k===gg[1];})[0]; if(!g) return;
     var cols=g.opts.filter(function(o){ var sel=CR.f[g.k]||[]; return !sel.length || sel.indexOf(o[0])>=0; });
-    h+='<div class="pr-card" style="margin-bottom:12px"><h3>'+gg[0]+' 해지율 <small>칸 = 해지 / 기간 시작 활성 · 해지율(지원 포함) · 다른 필터는 그대로 적용</small></h3><div style="overflow-x:auto"><table class="pr"><thead><tr><th>기간</th>'+
-       cols.map(function(o){ return '<th class="n">'+esc(o[1])+'</th>'; }).join('')+'</tr></thead><tbody>';
+    h+='<div class="pr-card" style="margin-bottom:12px"><h3>'+gg[0]+' 해지율 <small>칸 = 해지 / 기간 시작 활성 · 해지율(지원 포함) · 다른 필터는 그대로 적용 · 맨 오른쪽 = 칸 합계와 전체 표(회사 단위) 대조</small></h3><div style="overflow-x:auto"><table class="pr"><thead><tr><th>기간</th>'+
+       cols.map(function(o){ return '<th class="n">'+esc(o[1])+'</th>'; }).join('')+'<th class="n" title="칸을 그대로 더한 값 / 전체 표 값 — 두 제품(영역)을 함께 쓰는 고객사는 칸마다 1곳씩 잡히지만 전체 표에서는 회사 단위로 1곳이라 그만큼 차이가 납니다">합계 → 전체(회사 단위)</th></tr></thead><tbody>';
     P.forEach(function(p){
+      var sB=0, sL=0;
       h+='<tr><td><b>'+esc(p.l)+'</b></td>'+cols.map(function(o){
         var mm=function(r){ return crMatch(r) && (g.test? g.test(r,[o[0]]) : g.get(r)===o[0]); };
-        var base=crActive(p.s-1,mm), lost=crLost(p.s,p.e,mm), nb=crN(base), nl=crN(lost);
+        var base=crActive(p.s-1,mm), lost=crLost(p.s,p.e,mm), nb=crN(base), nl=crN(lost); sB+=nb; sL+=nl;
         if(!nb && !nl) return '<td class="n" style="color:var(--muted)">–</td>';
         var x=g.k+'='+o[0];
         return '<td class="n">'+crLink(lost,p.s,p.e,x,'lost',o[1]+' · '+p.l+' 해지')+' / '+crLink(base,p.s-1,p.s-1,x,'base',o[1]+' · '+p.l+' 시작 활성','color:var(--ink-2)')+'<div class="mini" style="font-weight:700">'+crRate(nl,nb)+'</div></td>';
-      }).join('')+'</tr>';
+      }).join('');
+      var tB=crN(crActive(p.s-1,crMatch)), tL=crN(crLost(p.s,p.e,crMatch)), dB=sB-tB, dL=sL-tL;
+      h+='<td class="n" style="color:var(--muted)">'+sL+' / '+sB+(dB||dL? ' <span title="'+gg[0]+' 칸 합계와 전체 표 차이 = 두 개 이상 '+gg[0]+'을 함께 쓰는 고객사 (전체 표에서는 1곳)">→ <b style="color:var(--ink-2)">'+tL+' / '+tB+'</b> <span class="mini">(중복 '+(dB? dB+'곳':'')+(dL? (dB?' · ':'')+'해지 '+dL:'')+')</span></span>':' <span class="mini">= 전체</span>')+'</td></tr>';
     });
     h+='</tbody></table></div></div>';
   });
