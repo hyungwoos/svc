@@ -567,32 +567,32 @@ body{padding-left:192px}
 .cl-prev .st.ok{color:#2e6b4f;border-color:#9fd3b6;background:#eaf6ee} .cl-prev .st.bad{color:var(--critical);border-color:rgba(208,59,59,.4);background:rgba(208,59,59,.08)} .cl-prev .st.dup{color:#8a5a00;border-color:rgba(250,178,25,.5);background:rgba(250,178,25,.12)}
 @media(max-width:1000px){ #viewCloud .cl-sum{grid-template-columns:1fr} }
 /* 가격표 */
-:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate) .pr-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
-:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate) .pr-ver{font-size:11px;background:var(--surface-2);border:1px solid var(--ring);border-radius:999px;padding:3px 11px;color:var(--ink-2)}
-:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate) .pr-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
-:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate) .pr-card{background:var(--surface);border:1px solid var(--ring);border-radius:14px;padding:15px 17px;margin-bottom:0}
-:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate) .pr-card h3{font-size:13.5px;margin:0 0 4px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;border:none;padding:0}
-:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate) .pr-card h3 small{color:var(--muted);font-weight:400;margin-left:auto;font-size:11px}
-:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate) table.pr{width:100%;border-collapse:collapse;font-size:12.3px}
-:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate) table.pr th{background:var(--surface-2);color:var(--ink-2);font-weight:650;text-align:left;padding:7px 9px;font-size:11.3px;white-space:nowrap;border-bottom:1px solid var(--ring);position:static}
-:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate) table.pr th.n,:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate) table.pr td.n{text-align:right}
-:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate) table.pr td{padding:6px 9px;border-bottom:1px solid var(--line);white-space:nowrap}
-:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate) table.pr tr:last-child td{border-bottom:0}
-:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate) .pr-lock{font-size:10px;color:#a06c00;border:1px solid rgba(160,108,0,.3);border-radius:6px;padding:0 5px;margin-left:4px;vertical-align:1px}
-:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate) .pr-chips{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 14px}
-:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate) .pr-chips button{border:1px solid var(--ring);background:var(--surface);border-radius:10px;padding:7px 14px;font:inherit;font-size:12.5px;cursor:pointer;color:var(--ink-2)}
-:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate) .pr-chips button.on{background:var(--ink);border-color:var(--ink);color:#fff;font-weight:700}
-:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate) .pr-calc{background:linear-gradient(135deg,rgba(20,158,64,.05),rgba(42,120,214,.05));border:1px solid var(--ring);border-radius:14px;padding:16px 18px;margin-bottom:14px}
-:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate) .pr-calc .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
-:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate) .pr-calc label.svc{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--ring);background:var(--surface);border-radius:10px;padding:7px 12px;font-size:12.5px;cursor:pointer}
-:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate) .pr-calc input[type=number],:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate) .pr-calc select{height:34px;border:1px solid var(--ring);border-radius:9px;padding:0 10px;font:inherit;font-size:13px;background:var(--surface);width:auto}
-:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate) .pr-out{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate) .pr-ob{background:var(--surface);border:1px solid var(--ring);border-radius:11px;padding:10px 13px}
-:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate) .pr-ob .l{font-size:10.5px;color:var(--muted);font-weight:650}
-:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate) .pr-ob .v{font-size:16px;font-weight:800;margin-top:2px}
-:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate) .pr-ob.fin{background:var(--brand-t);border-color:var(--brand)}
-:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate) .pr-note{font-size:11.5px;color:var(--muted);line-height:1.7}
-@media(max-width:1000px){ :is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate) .pr-grid{grid-template-columns:1fr} :is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate) .pr-out{grid-template-columns:1fr} }
+:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate,#viewCustFlow) .pr-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate,#viewCustFlow) .pr-ver{font-size:11px;background:var(--surface-2);border:1px solid var(--ring);border-radius:999px;padding:3px 11px;color:var(--ink-2)}
+:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate,#viewCustFlow) .pr-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
+:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate,#viewCustFlow) .pr-card{background:var(--surface);border:1px solid var(--ring);border-radius:14px;padding:15px 17px;margin-bottom:0}
+:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate,#viewCustFlow) .pr-card h3{font-size:13.5px;margin:0 0 4px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;border:none;padding:0}
+:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate,#viewCustFlow) .pr-card h3 small{color:var(--muted);font-weight:400;margin-left:auto;font-size:11px}
+:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate,#viewCustFlow) table.pr{width:100%;border-collapse:collapse;font-size:12.3px}
+:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate,#viewCustFlow) table.pr th{background:var(--surface-2);color:var(--ink-2);font-weight:650;text-align:left;padding:7px 9px;font-size:11.3px;white-space:nowrap;border-bottom:1px solid var(--ring);position:static}
+:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate,#viewCustFlow) table.pr th.n,:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate,#viewCustFlow) table.pr td.n{text-align:right}
+:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate,#viewCustFlow) table.pr td{padding:6px 9px;border-bottom:1px solid var(--line);white-space:nowrap}
+:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate,#viewCustFlow) table.pr tr:last-child td{border-bottom:0}
+:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate,#viewCustFlow) .pr-lock{font-size:10px;color:#a06c00;border:1px solid rgba(160,108,0,.3);border-radius:6px;padding:0 5px;margin-left:4px;vertical-align:1px}
+:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate,#viewCustFlow) .pr-chips{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 14px}
+:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate,#viewCustFlow) .pr-chips button{border:1px solid var(--ring);background:var(--surface);border-radius:10px;padding:7px 14px;font:inherit;font-size:12.5px;cursor:pointer;color:var(--ink-2)}
+:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate,#viewCustFlow) .pr-chips button.on{background:var(--ink);border-color:var(--ink);color:#fff;font-weight:700}
+:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate,#viewCustFlow) .pr-calc{background:linear-gradient(135deg,rgba(20,158,64,.05),rgba(42,120,214,.05));border:1px solid var(--ring);border-radius:14px;padding:16px 18px;margin-bottom:14px}
+:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate,#viewCustFlow) .pr-calc .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate,#viewCustFlow) .pr-calc label.svc{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--ring);background:var(--surface);border-radius:10px;padding:7px 12px;font-size:12.5px;cursor:pointer}
+:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate,#viewCustFlow) .pr-calc input[type=number],:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate,#viewCustFlow) .pr-calc select{height:34px;border:1px solid var(--ring);border-radius:9px;padding:0 10px;font:inherit;font-size:13px;background:var(--surface);width:auto}
+:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate,#viewCustFlow) .pr-out{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate,#viewCustFlow) .pr-ob{background:var(--surface);border:1px solid var(--ring);border-radius:11px;padding:10px 13px}
+:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate,#viewCustFlow) .pr-ob .l{font-size:10.5px;color:var(--muted);font-weight:650}
+:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate,#viewCustFlow) .pr-ob .v{font-size:16px;font-weight:800;margin-top:2px}
+:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate,#viewCustFlow) .pr-ob.fin{background:var(--brand-t);border-color:var(--brand)}
+:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate,#viewCustFlow) .pr-note{font-size:11.5px;color:var(--muted);line-height:1.7}
+@media(max-width:1000px){ :is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate,#viewCustFlow) .pr-grid{grid-template-columns:1fr} :is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate,#viewCustFlow) .pr-out{grid-template-columns:1fr} }
 /* 인바운드 통계 */
 .inb-kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:12px}
 .inb-kpi{background:var(--surface);border:1px solid var(--ring);border-radius:14px;padding:12px 15px}
@@ -893,22 +893,22 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
 }
 
 /* 해지율 화면 컨트롤 */
-#viewChurnRate .crpanel{padding:12px 16px}
-#viewChurnRate .crrow{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center}
-#viewChurnRate .crrow+.crrow{margin-top:10px;padding-top:10px;border-top:1px dashed var(--line)}
-#viewChurnRate .crseg{display:inline-flex;align-items:center;gap:6px}
-#viewChurnRate .crseg>span{font-size:11px;color:var(--muted);white-space:nowrap}
-#viewChurnRate .crseg select{height:28px;font-size:12px;border:1px solid var(--ring);border-radius:8px;padding:0 8px;background:var(--surface)}
-#viewChurnRate .seg{display:inline-flex;border:1px solid var(--ring);border-radius:9px;overflow:hidden;background:var(--surface)}
-#viewChurnRate .seg button{height:28px;padding:0 11px;font-size:12px;border:0;background:transparent;color:var(--ink-2);cursor:pointer;border-right:1px solid var(--ring)}
-#viewChurnRate .seg button:last-child{border-right:0}
-#viewChurnRate .seg button[aria-pressed="true"]{background:var(--s1);color:#fff;font-weight:700}
-#viewChurnRate .crchips{display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin:2px 0}
-#viewChurnRate .crlab{font-size:11px;color:var(--muted);min-width:56px}
-#viewChurnRate .crlab b{color:var(--s1)}
-#viewChurnRate .chip{height:26px;padding:0 10px;font-size:11.5px;border:1px solid var(--ring);border-radius:999px;background:var(--surface);color:var(--ink-2);cursor:pointer}
-#viewChurnRate .chip[aria-pressed="true"]{background:var(--s1);border-color:var(--s1);color:#fff;font-weight:700}
-#viewChurnRate .chip.clr{color:var(--critical);border-color:var(--critical);padding:0 8px}
+#viewCustFlow .crpanel,#viewChurnRate .crpanel{padding:12px 16px}
+#viewCustFlow .crrow,#viewChurnRate .crrow{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center}
+#viewCustFlow .crrow+.crrow,#viewChurnRate .crrow+.crrow{margin-top:10px;padding-top:10px;border-top:1px dashed var(--line)}
+#viewCustFlow .crseg,#viewChurnRate .crseg{display:inline-flex;align-items:center;gap:6px}
+#viewCustFlow .crseg>span,#viewChurnRate .crseg>span{font-size:11px;color:var(--muted);white-space:nowrap}
+#viewCustFlow .crseg select,#viewChurnRate .crseg select{height:28px;font-size:12px;border:1px solid var(--ring);border-radius:8px;padding:0 8px;background:var(--surface)}
+#viewCustFlow .seg,#viewChurnRate .seg{display:inline-flex;border:1px solid var(--ring);border-radius:9px;overflow:hidden;background:var(--surface)}
+#viewCustFlow .seg button,#viewChurnRate .seg button{height:28px;padding:0 11px;font-size:12px;border:0;background:transparent;color:var(--ink-2);cursor:pointer;border-right:1px solid var(--ring)}
+#viewCustFlow .seg button:last-child,#viewChurnRate .seg button:last-child{border-right:0}
+#viewCustFlow .seg button[aria-pressed="true"],#viewChurnRate .seg button[aria-pressed="true"]{background:var(--s1);color:#fff;font-weight:700}
+#viewCustFlow .crchips,#viewChurnRate .crchips{display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin:2px 0}
+#viewCustFlow .crlab,#viewChurnRate .crlab{font-size:11px;color:var(--muted);min-width:56px}
+#viewCustFlow .crlab b,#viewChurnRate .crlab b{color:var(--s1)}
+#viewCustFlow .chip,#viewChurnRate .chip{height:26px;padding:0 10px;font-size:11.5px;border:1px solid var(--ring);border-radius:999px;background:var(--surface);color:var(--ink-2);cursor:pointer}
+#viewCustFlow .chip[aria-pressed="true"],#viewChurnRate .chip[aria-pressed="true"]{background:var(--s1);border-color:var(--s1);color:#fff;font-weight:700}
+#viewCustFlow .chip.clr,#viewChurnRate .chip.clr{color:var(--critical);border-color:var(--critical);padding:0 8px}
 #viewChurnRate details{width:100%}
 #viewChurnRate details summary{cursor:pointer;font-size:11.5px;color:var(--ink-2);margin:2px 0 6px;user-select:none}
 #viewChurnRate details summary b{color:var(--s1)}
@@ -969,6 +969,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
   <button data-v="live">🟢 LIVE 고객사</button>
   <button data-v="churn">📉 해지 분석</button>
   <button data-v="churnrate">📐 해지율</button>
+  <button data-v="custflow">👥 고객사 증감</button>
   <div class="grp" data-chgrp="1">사업 영역 · Cloud NAC</div>
   <button data-v="cngen">🤝 일반 판매</button>
   <button data-v="cnpub">🏛️ 조달 판매</button>
@@ -1440,6 +1441,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
 
   <div id="viewChurn" class="hidden"><div id="churnBody"></div></div>
   <div id="viewChurnRate" class="hidden"><div id="crBody"></div></div>
+  <div id="viewCustFlow" class="hidden"><div id="cfBody"></div></div>
 
   <div id="viewAdmin" class="hidden">
     <section class="card c12" style="max-width:1000px;margin:0 auto">
@@ -2085,7 +2087,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-05 ㊿+31';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-07 ㊿+32';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -2823,6 +2825,7 @@ function buildControls(){
           else if(keep==='report'){ if(!RP._touched) try{ renderReport(); }catch(e){} }   // 수정 중이면 덮어쓰지 않음
           else if(keep==='churn') try{ renderChurn(); }catch(e){}
           else if(keep==='churnrate') try{ renderChurnRate(); }catch(e){}
+          else if(keep==='custflow') try{ renderCustFlow(); }catch(e){}
           else if(keep==='cloud') try{ renderCloud(); }catch(e){}
           // price 등 자체 데이터 화면은 건드리지 않음
         }
@@ -9276,6 +9279,7 @@ function crActive(t, match){
     var e=r.endIdx!=null? r.endIdx : r._l;
     if(CR.base==='cum'){ if(String(r.status||'')==='해지' && e!=null && e<=t) return; out.push(r); return; }   // 누적고객: 신규 누계 − 해지 누계 (만기·서비스종료는 안 뺌)
     if(e!=null && e<t) return;                                                                                  // 계약 유효: 종료월(해지월) 이 그 달 이후
+    if(e===t && String(r.status||'')==='해지') return;                                                          // 해지월 = 마지막 매출월 → 그 달 말(다음 기간 기초)엔 이미 빠진 것으로 (누적고객 기준과 동일)
     out.push(r);
   });
   return out;
@@ -9323,7 +9327,7 @@ function renderChurnRate(){
      '<div class="crrow">'+
        crSeg('기간','unit',[['year','연도'],['half','반기'],['quarter','분기']],CR.unit)+
        crSeg('지원사업','sup',[['all','포함','지원사업 고객을 포함해 계산하고 표 안에서 지원사업/그 외로 나눠 보여줍니다'],['ex','제외','지원사업(판매형태 정부 지원) 계약을 분모·분자에서 모두 뺍니다'],['only','지원사업만','지원사업 계약만 봅니다']],CR.sup)+
-       crSeg('분모','base',[['valid','계약 유효','시작월 ≤ 그 달 ≤ 종료월인 고객사 (해지·CN전환 제외)'],['rev','과금','그 달에 인식 금액이 있는 고객사'],['cum','누적고객','통계 탭 방식: 신규 누계 − 해지 누계 (만기 종료는 안 뺌)']],CR.base)+
+       crSeg('분모','base',[['valid','계약 유효','시작월 ≤ 그 달 ≤ 종료월인 고객사 · 해지 고객사는 해지월 말에 빠짐 (CN전환 제외)'],['rev','과금','그 달에 인식 금액이 있는 고객사'],['cum','누적고객','통계 탭 방식: 신규 누계 − 해지 누계 (만기 종료는 안 뺌)']],CR.base)+
        crSeg('단위','rows',[['cust','고객사'],['rows','계약 행','통계 탭은 계약 행 수']],CR.rows?'rows':'cust')+
        crSeg('에스원 CND','cnd',[['ex','제외'],['in','포함']],CR.cnd?'in':'ex')+
        crSeg('지원 제외율 분모','exDen',[['org','지원 제외 활성'],['all','전체 활성','통계 탭 장표 방식']],CR.exDen)+
@@ -9351,7 +9355,7 @@ function renderChurnRate(){
   });
   h+='<tr style="background:var(--surface-2)"><td><b>누계</b></td><td></td><td></td><td></td><td class="n"><b>'+crN(tot.lost)+'</b></td><td class="n">'+crN(tot.sup)+'</td><td class="n">'+crN(tot.org)+'</td><td></td><td></td><td class="n">'+won(tot.amt)+'</td></tr>';
   h+='</tbody></table></div>'+
-     '<p class="pr-note" style="margin:8px 0 0">해지율 분모는 <b>기간 시작 직전 달</b>의 활성(연도면 전년 12월)이라, 그 기간에 새로 들어온 고객은 분모에 없고 «기간 말 활성»에서만 보입니다 — 예: MDR은 2025년 7월 시작이라 2025년 시작 활성은 0, 기간 말 활성부터 잡힙니다. 해지 = 상태 «해지» 원계약(부속 계약 제외) · 해지월 = 종료월(시트 해지년월) · 지원사업 = 판매형태 «정부 지원» · 계약 유효 = 시작월 ≤ 그 달 ≤ 종료월 (해지·CN전환 아님) · 누적고객 = 통계 탭 방식(신규 누계 − 해지 누계, 서비스 종료·만기는 안 뺌) · 에스원 CND 제외 시 LIVE 메뉴보다 그만큼 적게 보임</p></div>';
+     '<p class="pr-note" style="margin:8px 0 0">해지율 분모는 <b>기간 시작 직전 달</b>의 활성(연도면 전년 12월)이라, 그 기간에 새로 들어온 고객은 분모에 없고 «기간 말 활성»에서만 보입니다 — 예: MDR은 2025년 7월 시작이라 2025년 시작 활성은 0, 기간 말 활성부터 잡힙니다. 해지 = 상태 «해지» 원계약(부속 계약 제외) · 해지월 = 종료월(시트 해지년월) · 지원사업 = 판매형태 «정부 지원» · 계약 유효 = 시작월 ≤ 그 달 ≤ 종료월, 해지 고객사는 해지월(마지막 매출월) 말에 빠짐 (CN전환 아님) · 누적고객 = 통계 탭 방식(신규 누계 − 해지 누계, 서비스 종료·만기는 안 뺌) · 에스원 CND 제외 시 LIVE 메뉴보다 그만큼 적게 보임</p></div>';
   /* ② ③ 매트릭스 */
   [['제품별','line'],['사업영역별','area']].forEach(function(gg){
     var g=G.filter(function(x){return x.k===gg[1];})[0]; if(!g) return;
@@ -9391,9 +9395,13 @@ function crOpen(d){
     if(g) m=function(r){ return crMatch(r) && (g.test? g.test(r,[gv]) : g.get(r)===gv); }; }
   var list;
   if(d.k==='base') list=crActive(s,m);
+  else if(d.k==='new') list=crNew(s,e,m);
+  else if(d.k==='ret') list=crRet(s,e,m);
+  else if(d.k==='keep') list=crLostKeep(s,e,m);
+  else if(d.k==='ended') list=crEnded(s,e,m);
   else if(d.k==='basesup') list=crActive(s,m).filter(crIsSup);
   else { list=crLost(s,e,m); if(d.k==='sup') list=list.filter(crIsSup); if(d.k==='org') list=list.filter(function(r){return !crIsSup(r);}); }
-  var isLost=(d.k==='lost'||d.k==='sup'||d.k==='org');
+  var isLost=(d.k==='lost'||d.k==='sup'||d.k==='org'||d.k==='ended'||d.k==='keep');
   list=list.slice().sort(function(a,b){ var ea=a.endIdx!=null?a.endIdx:a._l, eb=b.endIdx!=null?b.endIdx:b._l; return isLost? (ea-eb || a.cust.localeCompare(b.cust)) : a.cust.localeCompare(b.cust); });
   CR_LAST=list.map(function(r){ var i=r._k, en=r.endIdx!=null?r.endIdx:r._l; var amt=isLost? ((MAT[i]&&(MAT[i][en]||MAT[i][Math.max(en-1,0)]))||r.mrr||0) : ((MAT[i]&&MAT[i][s])||r.mrr||0);
     return {cust:r.cust, line:lline(r.line), ch:chOf(r), sale:r.saleType||'', ind:r.ind||'', sector:r.sector||'', st:r.status||'', start:mk(r.startIdx)||'', end:en!=null?mk(en):'', reason:r.churn||'', note:r.note||'', amt:amt, renew:r.renew||0}; });
@@ -9409,6 +9417,103 @@ function crOpen(d){
     xlsxAoa($('#crTitle').textContent.replace(/[\\/:*?"<>|]/g,' '), hd, rows);
   };
   openOvl('ovlCr');
+}
+
+
+/* ═══════════════════════ 고객사 증감 (기초 → +신규 −해지 → 기말) ═══════════════════════
+   해지율 화면과 같은 규칙·필터(CR)를 씁니다. 활성 = 계약 기간 유효 고객사(해지·CN전환·부속·CND 제외).
+   신규 = 그 기간에 첫 계약을 시작한 고객사 · 해지 = 상태 «해지» 종료월이 그 기간인 고객사
+   기타 조정 = 기말 − (기초 + 신규 − 해지): 약정 만기 뒤 재약정 없이 끝난 고객, 데이터 보정 등 */
+function crNew(s,e,match){
+  var first={};
+  DATA.rows.forEach(function(r){
+    if(!crEligible(r) || !match(r) || r.startIdx==null) return;
+    var k=r.cust; if(!first[k] || r.startIdx<first[k].startIdx) first[k]=r;
+  });
+  return Object.keys(first).map(function(k){ return first[k]; }).filter(function(r){ return r.startIdx>=s && r.startIdx<=e; });
+}
+/* 해지 후 잔존 = 그 기간에 해지 계약이 있지만 기말에도 다른 유효 계약(다른 서비스·재계약)이 남아 고객사 수에서는 빠지지 않는 곳 */
+function crLostKeep(s,e,match){
+  var a1=crCustSet(crActive(e,match)), seen={};
+  return crLost(s,e,match).filter(function(r){ if(!a1[r.cust]||seen[r.cust]) return false; seen[r.cust]=1; return true; });
+}
+function crCustSet(list){ var u={}; list.forEach(function(r){ u[r.cust]=1; }); return u; }
+/* 복귀 = 기말에 유효한데 기초엔 없었고 «신규(첫 계약)»도 아닌 고객사 → 예전에 끊겼다가 다시 계약한 곳 */
+function crRet(s,e,match){
+  var a0=crCustSet(crActive(s-1,match)), nw=crCustSet(crNew(s,e,match)), seen={};
+  return crActive(e,match).filter(function(r){ if(a0[r.cust]||nw[r.cust]||seen[r.cust]) return false; seen[r.cust]=1; return true; });
+}
+/* 종료(해지 외) = 기초에 있었거나 기간 중 신규였는데 기말엔 없고, «해지» 로도 안 잡힌 고객사 → 만기 후 미연장·서비스종료·CN전환 등 */
+function crEnded(s,e,match){
+  var a1=crCustSet(crActive(e,match)), lost=crCustSet(crLost(s,e,match)), pool=crActive(s-1,match).concat(crNew(s,e,match)), last={};
+  pool.forEach(function(r){ if(a1[r.cust]||lost[r.cust]) return; var x=r.endIdx!=null? r.endIdx : r._l; if(!last[r.cust] || (x||0)>(last[r.cust]._x||0)){ r._x=x; last[r.cust]=r; } });
+  return Object.keys(last).map(function(k){ return last[k]; });
+}
+function renderCustFlow(){
+  var host=$('#cfBody');
+  if(!DATA||!DATA.rows||!DATA.rows.length){ host.innerHTML='<div class="cap" style="padding:40px;text-align:center">데이터를 불러오는 중…</div>'; return; }
+  CR_G=crFilterGroups(); CR.base='valid';
+  var P=crPeriods(), G=CR_G, m=crMatch, maxAll=Math.min(DATA.nowIdx>=0? DATA.nowIdx : M-1, M-1);
+  var lineG=G.filter(function(g){return g.k==='line';})[0];
+  var h='<div class="pr-top"><div><h2 style="margin:0;font-size:18px">👥 고객사 증감</h2><p class="cap" style="margin:2px 0 0">기초 고객사 → +신규 −해지 → 기말 · 제품별 기말 고객사 · 숫자를 누르면 명단</p></div></div>';
+  h+='<div class="pr-card crpanel" style="margin-bottom:12px"><div class="crrow">'+
+     crSeg('기간','unit',[['year','연도'],['half','반기'],['quarter','분기']],CR.unit)+
+     crSeg('지원사업','sup',[['all','포함'],['ex','제외'],['only','지원사업만']],CR.sup)+
+     crSeg('에스원 CND','cnd',[['ex','제외'],['in','포함']],CR.cnd?'in':'ex')+
+     '<div class="crseg"><span>기준월</span><select id="cfUpto">'+(function(){ var o=''; for(var j=maxAll;j>=Math.max(0,maxAll-35);j--) o+='<option value="'+j+'"'+(j===crMaxJ()?' selected':'')+'>'+mk(j)+'</option>'; return o; })()+'</select></div>'+
+     '</div><div class="crrow crfilters">'+G.filter(function(g){return !g.more;}).map(crChips).join('')+'</div></div>';
+  /* ① 롤포워드 (2020년부터) */
+  var from0=CR.from; CR.from=2020; P=crPeriods(); CR.from=from0;
+  h+='<div class="pr-card" style="margin-bottom:12px"><h3>'+esc(crSummary())+' — 고객사 증감<small>고객사 단위 · 계약 유효 기준(해지 고객사는 해지월 말에 빠짐) · 지원사업 '+({all:'포함',ex:'제외',only:'만'}[CR.sup])+' · CND '+(CR.cnd?'포함':'제외')+'</small></h3>'+
+     '<div style="overflow-x:auto"><table class="pr"><thead><tr><th>기간</th><th class="n">기초</th><th class="n" title="그 기간에 첫 계약을 시작한 고객사">+ 신규</th><th class="n" title="예전에 끊겼다가 다시 계약한 고객사 (첫 계약이 아님)">+ 복귀</th><th class="n" title="상태 «해지» · 해지월이 그 기간 (해지율 화면과 같은 수) · 괄호 = 그중 다른 서비스 계약·재계약이 남아 고객사로는 유지된 곳">− 해지 <span class="mini">(잔존)</span></th><th class="n" title="해지가 아닌데 기간 말에 유효 계약이 없는 고객사: 약정 만기 후 미연장 · 서비스종료 · CN전환 등">− 종료(해지 외)</th><th class="n">기말</th><th class="n">순증</th><th class="n">증가율</th></tr></thead><tbody>';
+  var sumN=0,sumR=0,sumL=0,sumK=0,sumX=0;
+  P.forEach(function(p){
+    var b0=crActive(p.s-1,m), nw=crNew(p.s,p.e,m), rt=crRet(p.s,p.e,m), lo=crLost(p.s,p.e,m), kp=crLostKeep(p.s,p.e,m), xd=crEnded(p.s,p.e,m), e1=crActive(p.e,m);
+    var nb=crN(b0), nn=crN(nw), nr=crN(rt), nl=crN(lo), nk=crN(kp), nx=crN(xd), ne=crN(e1), net=ne-nb, adj=ne-(nb+nn+nr-(nl-nk)-nx);
+    sumN+=nn; sumR+=nr; sumL+=nl; sumK+=nk; sumX+=nx;
+    h+='<tr><td><b>'+esc(p.l)+'</b></td><td class="n">'+crLink(b0,p.s-1,p.s-1,'','base',p.l+' 기초 ('+mk(p.s-1)+')','color:var(--ink-2);font-weight:600')+'</td>'+
+       '<td class="n">'+crLink(nw,p.s,p.e,'','new',p.l+' 신규 고객사','color:var(--ok,#2e7d32);font-weight:700')+'</td>'+
+       '<td class="n">'+crLink(rt,p.s,p.e,'','ret',p.l+' 복귀 고객사','color:var(--ok,#2e7d32)')+'</td>'+
+       '<td class="n">'+crLink(lo,p.s,p.e,'','lost',p.l+' 해지')+(nk? ' <span class="mini">('+crLink(kp,p.s,p.e,'','keep',p.l+' 해지 후 잔존 (다른 계약 유지)','color:var(--muted)')+')</span>':'')+'</td>'+
+       '<td class="n">'+crLink(xd,p.s,p.e,'','ended',p.l+' 종료(해지 외)','color:var(--muted)')+(adj? ' <span class="mini" title="집계 보정: 같은 기간에 신규·해지가 겹친 고객사 등">('+(adj>0?'+':'')+adj+')</span>':'')+'</td>'+
+       '<td class="n">'+crLink(e1,p.e,p.e,'','base',p.l+' 기말 ('+mk(p.e)+')','color:var(--ink-2);font-weight:700')+'</td>'+
+       '<td class="n"><b style="color:'+(net>=0?'var(--ok,#2e7d32)':'var(--critical)')+'">'+(net>0?'+':'')+net+'</b></td><td class="n">'+(nb? (net/nb*100).toFixed(1)+'%':'–')+'</td></tr>';
+  });
+  if(P.length){ var pf=P[0], pl=P[P.length-1], bF=crN(crActive(pf.s-1,m)), eL=crN(crActive(pl.e,m));
+    h+='<tr style="background:var(--surface-2,rgba(0,0,0,.03))"><td><b>합계</b></td><td class="n">'+bF+'</td><td class="n" style="color:var(--ok,#2e7d32);font-weight:700">+'+sumN+'</td><td class="n" style="color:var(--ok,#2e7d32)">+'+sumR+'</td><td class="n" style="color:var(--critical);font-weight:700">−'+sumL+(sumK?' <span class="mini" style="color:var(--muted)">('+sumK+')</span>':'')+'</td><td class="n" style="color:var(--muted)">−'+sumX+'</td><td class="n"><b>'+eL+'</b></td><td class="n"><b>'+(eL-bF>0?'+':'')+(eL-bF)+'</b></td><td class="n">–</td></tr>'; }
+  h+='</tbody></table></div>';
+  h+='<p class="pr-note" style="margin:8px 0 0">기말 = 기초 + 신규 + 복귀 − (해지 − 잔존) − 종료(해지 외) · 신규 = 그 기간에 첫 계약을 시작한 고객사 · 해지 = 해지율 화면과 같은 기준(상태 «해지», 부속 계약·CND 제외) · 잔존 = 해지 계약이 있어도 다른 서비스 계약·재계약이 남아 고객사로는 유지된 곳 · 종료(해지 외) = 만기 후 미연장·서비스종료·CN전환처럼 해지로 기록되지 않고 끝난 곳 — 최근 기간에 잡히면 만기가 지났는데 연장·해지 처리가 안 된 계약일 수 있으니 명단을 확인하세요 · 숫자를 누르면 명단</p>';
+  /* 현재 LIVE 와 대조 */
+  if(DATA.live&&DATA.live.ok){
+    var nowA=crActive(maxAll,m), nowN=crN(nowA), lv=DATA.live.rows.filter(function(x){ var sel=CR.f.line||[]; return !sel.length || sel.indexOf(x.line)>=0; }), lu={}; lv.forEach(function(x){lu[x.cust]=1;});
+    var ln=Object.keys(lu).length, ak={}; nowA.forEach(function(r){ ak[fkNorm(r.cust)]=1; });
+    var onlyLive=Object.keys(lu).filter(function(c){ return !ak[fkNorm(c)]; }), onlyAct=[]; var lk={}; Object.keys(lu).forEach(function(c){lk[fkNorm(c)]=1;}); nowA.forEach(function(r){ if(!lk[fkNorm(r.cust)] && onlyAct.indexOf(r.cust)<0) onlyAct.push(r.cust); });
+    h+='<p class="pr-note" style="margin:8px 0 0">'+mk(maxAll)+' 기말(계약 유효) <b>'+nowN+'곳</b> vs LIVE 메뉴 <b>'+ln+'곳</b>'+
+       (onlyLive.length? ' · LIVE에만 있는 곳 '+onlyLive.length+' (에스원 CND·사명 표기 차이 등: '+esc(onlyLive.slice(0,8).join(', '))+(onlyLive.length>8?' 외 '+(onlyLive.length-8):'')+')':'')+
+       (onlyAct.length? ' · 계약에만 있는 곳 '+onlyAct.length+' (LIVE 목록 미등재 신규 등: '+esc(onlyAct.slice(0,8).join(', '))+(onlyAct.length>8?' 외 '+(onlyAct.length-8):'')+')':'')+'</p>';
+  }
+  h+='</div>';
+  /* ② 제품별 기말 고객사 */
+  if(lineG){
+    var cols=lineG.opts.filter(function(o){ var sel=CR.f.line||[]; return !sel.length || sel.indexOf(o[0])>=0; });
+    h+='<div class="pr-card" style="margin-bottom:12px"><h3>제품별 기말 고객사 <small>칸 = 기말 고객사 (순증) · 한 고객이 두 제품을 쓰면 제품마다 1곳 — 전체는 회사 단위라 제품 합보다 작을 수 있음</small></h3><div style="overflow-x:auto"><table class="pr"><thead><tr><th>기간</th>'+cols.map(function(o){return '<th class="n">'+esc(o[1])+'</th>';}).join('')+'<th class="n">전체(중복 제거)</th></tr></thead><tbody>';
+    P.forEach(function(p){
+      h+='<tr><td><b>'+esc(p.l)+'</b></td>'+cols.map(function(o){
+        var mm=function(r){ return crMatch(r) && r.line===o[0]; };
+        var e1=crActive(p.e,mm), b0=crActive(p.s-1,mm), ne=crN(e1), nb=crN(b0);
+        if(!ne&&!nb) return '<td class="n" style="color:var(--muted)">–</td>';
+        return '<td class="n">'+crLink(e1,p.e,p.e,'line='+o[0],'base',o[1]+' · '+p.l+' 기말','color:var(--ink-2);font-weight:700')+' <span class="mini" style="color:'+(ne-nb>=0?'var(--ok,#2e7d32)':'var(--critical)')+'">('+(ne-nb>0?'+':'')+(ne-nb)+')</span></td>';
+      }).join('')+'<td class="n"><b>'+crN(crActive(p.e,m))+'</b></td></tr>';
+    });
+    h+='</tbody></table></div></div>';
+  }
+  host.innerHTML=h;
+  host.querySelectorAll('.crseg button[data-g]').forEach(function(b){ b.onclick=function(){ var g=b.dataset.g, v=b.dataset.v;
+    if(g==='unit') CR.unit=v; else if(g==='cnd') CR.cnd=(v==='in'); else if(g==='sup') CR.sup=v; renderCustFlow(); }; });
+  host.querySelectorAll('button.chip[data-fg]').forEach(function(b){ b.onclick=function(){ var k=b.dataset.fg, v=b.dataset.fv, sel=CR.f[k]=CR.f[k]||[]; var i=sel.indexOf(v); if(i>=0) sel.splice(i,1); else sel.push(v); renderCustFlow(); }; });
+  host.querySelectorAll('button.chip[data-fclr]').forEach(function(b){ b.onclick=function(){ CR.f[b.dataset.fclr]=[]; renderCustFlow(); }; });
+  var up=$('#cfUpto'); if(up) up.onchange=function(){ CR.upto=+up.value; renderCustFlow(); };
+  host.querySelectorAll('a.crk').forEach(function(a){ a.onclick=function(ev){ ev.preventDefault(); crOpen(a.dataset); }; });
 }
 
 function renderChurn(){
@@ -10300,9 +10405,10 @@ function switchView(v){
   });
   try{ ensureGroupOpen(v); }catch(e){}
   var dash=v==='dash', quote=v==='quote', onew=v==='ordernew', acct=v==='account', mnew=v==='mdrnew', oinew=v==='oinew';
-  var adminx=v==='adminx', weekly=v==='weekly', inbstat=v==='inbstat', price=v==='price', report=v==='report', churn=v==='churn', cloud=v==='cloud', crate=v==='churnrate';
+  var adminx=v==='adminx', weekly=v==='weekly', inbstat=v==='inbstat', price=v==='price', report=v==='report', churn=v==='churn', cloud=v==='cloud', crate=v==='churnrate', cflow=v==='custflow';
   if(adminx && !window.IS_SUPER){ v='dash'; dash=true; adminx=false; CUR_VIEW='dash'; }
   $('#viewChurnRate').classList.toggle('hidden',!crate);
+  $('#viewCustFlow').classList.toggle('hidden',!cflow);
   var chv=CH_DEFS[v]||null;
   $('#viewReport').classList.toggle('hidden',!report);
   $('#viewChurn').classList.toggle('hidden',!churn);
@@ -10318,10 +10424,11 @@ function switchView(v){
   $('#viewAdmin').classList.toggle('hidden',!adminx);
   $('#viewWeekly').classList.toggle('hidden',!weekly);
   $('#viewChannel').classList.toggle('hidden',!chv);
-  $('#viewData').classList.toggle('hidden',dash||quote||onew||mnew||oinew||acct||adminx||weekly||inbstat||price||report||churn||cloud||crate||!!chv);
+  $('#viewData').classList.toggle('hidden',dash||quote||onew||mnew||oinew||acct||adminx||weekly||inbstat||price||report||churn||cloud||crate||cflow||!!chv);
   if(report){ renderReport(); return; }
   if(churn){ renderChurn(); return; }
   if(crate){ renderChurnRate(); return; }
+  if(cflow){ renderCustFlow(); return; }
   if(price){ renderPrice(); return; }
   if(cloud){ renderCloud(); return; }
   if(inbstat){ renderInbStat(); return; }
