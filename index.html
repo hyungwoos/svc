@@ -2122,7 +2122,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-07 ㊿+42';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-07 ㊿+43';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -3539,7 +3539,7 @@ function renderKpis(list){
   list.forEach(function(k){
     var r=DATA.rows[k]; if(r.parent) return;
     var st=String(r.status||'');
-    if(st!=='CN전환' && r.startIdx!=null && r.startIdx>=f0 && r.startIdx<=b) newRows.push(k);
+    if(st!=='CN전환' && st!=='통합과금' && r.startIdx!=null && r.startIdx>=f0 && r.startIdx<=b) newRows.push(k);
     if(st==='해지' && !(r.line==='S1' && String(r.saleType||'')==='CND')){ var x=r.endIdx!=null? r.endIdx : r._l; if(x!=null && x>=f0 && x<=b){ churnRows.push(k); churnAmt+=(MAT[k][x]||MAT[k][Math.max(x-1,0)]||r.mrr||0); } }
     var e=r.endIdx;
     if(e!=null && e>=b && e<=b+2 && !/해지|종료|CN전환/.test(st)){ expRows.push(k); expAmt+=MAT[k][Math.min(e,M-1)]||r.mrr||0; }
@@ -3804,7 +3804,7 @@ function ncRows(list, kind, lb, s, e){                         // kind 'new'|'lo
   list.forEach(function(k){
     var r=DATA.rows[k]; if(r.parent) return; if(lb && r.line!==lb) return;
     var st=String(r.status||'');
-    if(kind==='new'){ if(st==='CN전환') return; if(r.startIdx!=null && r.startIdx>=s && r.startIdx<=e) out.push(k); }
+    if(kind==='new'){ if(st==='CN전환'||st==='통합과금') return; if(r.startIdx!=null && r.startIdx>=s && r.startIdx<=e) out.push(k); }
     else { if(st!=='해지') return; if(r.line==='S1' && String(r.saleType||'')==='CND') return; var x=r.endIdx!=null? r.endIdx : r._l; if(x!=null && x>=s && x<=e) out.push(k); }
   });
   return out;
@@ -3849,7 +3849,7 @@ function renderNcWidget(list){
   h+='<tr style="font-weight:700;border-top:2px solid var(--axis)"><td>순증 (신규 − 해지)</td>'+nets+'<td class="n ncc" data-k="net" data-l="" data-m="0" style="border-left:1px solid var(--ring)" title="클릭: '+Y+'년 신규·해지 명단"><b>'+(nsum>0?'+':'')+nsum+'</b></td><td class="n" style="color:var(--muted)">'+(psum>0?'+':'')+psum+'</td><td class="n"></td></tr>';
   h+='</tbody>';
   t.innerHTML=h;
-  var cap=$('#capNc'); if(cap) cap.textContent=Y+'년 · 셀 = 그 달 고객사 수(회사 단위) · 신규 = 그 달 시작한 원계약의 고객사(기존 고객의 다른 서비스·재계약 포함 — 첫 계약만 세는 «고객사 증감»의 신규보다 많을 수 있음) · 해지 = 상태 «해지» 해지월(에스원 CND 제외) · 미래 월은 계약상 예정(회색) · 셀을 누르면 명단';
+  var cap=$('#capNc'); if(cap) cap.textContent=Y+'년 · 셀 = 그 달 고객사 수(회사 단위) · 신규 = 그 달 시작한 원계약의 고객사(기존 고객의 다른 서비스·재계약 포함 — 첫 계약만 세는 «고객사 증감»의 신규보다 많을 수 있음) · 해지 = 상태 «해지» 해지월(CND 전환 고객 제외) · 미래 월은 계약상 예정(회색) · 셀을 누르면 명단';
   t.querySelectorAll('td.ncc').forEach(function(td){
     td.onclick=function(){
       var kind=td.dataset.k, lb=td.dataset.l, m=+td.dataset.m, s0, e0, lab;
@@ -5390,7 +5390,7 @@ var IND_OPTS=['기업','공공','금융','의료','미분류'];
 /* 계약 관리 선택 목록 */
 var CH_OPTS=['일반','조달','LGU+','에스원','유통'];
 var CTYPE_OPTS=['신규','재약정','추가'];
-var CSTATUS_OPTS=['신규','재약정','추가','서비스종료','해지','CN전환'];
+var CSTATUS_OPTS=['신규','재약정','추가','서비스종료','해지','CN전환','통합과금'];
 var CNOTE_OPTS=['재약정 완료','재약정 예정','정부 지원','중도 해지','미연장','매월 연장 확인 필요'];
 /* 연장 회차 표기: 0 → '·', n → '연장 n회' (툴팁에 회차별 기간·금액) */
 function renewLabel(v,r0){                       /* 그리드 셀은 텍스트로 그려지므로 문자열만 */
@@ -9386,7 +9386,7 @@ function crFilterGroups(){
     {k:'sector', l:'업종', opts:vals(function(r){return r.sector;}).sort().map(function(v){return [v,v];}), get:function(r){return r.sector;}, more:true},
     {k:'ptn', l:'파트너', opts:vals(function(r){return r.ptn;}).sort().map(function(v){return [v,v];}), get:function(r){return r.ptn;}, more:true},
     {k:'billing', l:'과금방식', opts:vals(function(r){return r.billing;}).sort().map(function(v){return [v,v];}), get:function(r){return r.billing;}, more:true},
-    {k:'svc', l:'S1 서비스 종류', opts:vals(function(r){return /^CN[BDE]$/.test(r.saleType||'')? r.saleType : '';}).sort().map(function(v){return [v,v==='CND'?'CND (에스원 직접)':v];}), get:function(r){return r.saleType;}, more:true}
+    {k:'svc', l:'S1 서비스 종류', opts:vals(function(r){return /^CN[BDE]$/.test(r.saleType||'')? r.saleType : '';}).sort().map(function(v){return [v,v==='CND'?'CND (DeviceKeeper · 단종 → Basic 전환)':v==='CNB'?'CNB (Basic)':v==='CNE'?'CNE (Enterprise)':v];}), get:function(r){return r.saleType;}, more:true}
   ];
   return groups;
 }
@@ -9413,7 +9413,8 @@ function crEligible(r){
   if(r.parent) return false;                                   // 부속 계약(추가 구매) 제외
   if(CR.sup==='ex' && crIsSup(r)) return false;                // 지원사업 제외
   if(CR.sup==='only' && !crIsSup(r)) return false;             // 지원사업만
-  if(!CR.cnd && (String(r.status||'')==='CN전환' || (r.line==='S1' && String(r.saleType||'')==='CND'))) return false;   // 에스원 CND(CN전환 표기) — 시트 해지 집계는 제외, LIVE 명단은 포함
+  if(String(r.status||'')==='통합과금') return false;                                                              // 에스원 통합 과금 행(CND→Basic 전환 고객 묶음 청구) — 매출만, 고객사 아님
+  if(!CR.cnd && (String(r.status||'')==='CN전환' || (r.line==='S1' && String(r.saleType||'')==='CND'))) return false;   // CND(Cloud NAC DeviceKeeper, 단종) → S1 Basic 전환 고객 — 시트 해지 집계는 제외, LIVE 명단은 포함
   if(r.startIdx==null || r.startIdx<0) return false;                                                               // 시작월이 없고 매출도 없는 행 — 언제부터 고객인지 몰라 집계 불가(대조표에 표시)
   if(r.endIdx!=null && r.endIdx>=0 && r.endIdx<r.startIdx) return false;                                          // 종료월이 시작월보다 앞선 행(데이터 오류) 제외
   return true;
@@ -9425,7 +9426,7 @@ function crActive(t, match){
     if(!crEligible(r) || !match(r)) return;
     if(CR.base==='rev'){ if(MAT[i][t]>0) out.push(r); return; }
     if(r.startIdx==null || r.startIdx>t) return;
-    var e=r.endIdx!=null? r.endIdx : r._l;
+    var e=(r.endIdx!=null && r.endIdx>=0)? r.endIdx : (r._l>=0? r._l : null);   // 종료월 없고 매출도 없으면(통합 과금 전환 고객) 열린 계약으로 봄
     if(CR.base==='cum'){ if(String(r.status||'')==='해지' && e!=null && e<=t) return; out.push(r); return; }   // 누적고객: 신규 누계 − 해지 누계 (만기·서비스종료는 안 뺌)
     if(e!=null && e<t) return;                                                                                  // 계약 유효: 종료월(해지월) 이 그 달 이후
     if(e===t && String(r.status||'')==='해지') return;                                                          // 해지월 = 마지막 매출월 → 그 달 말(다음 기간 기초)엔 이미 빠진 것으로 (누적고객 기준과 동일)
@@ -9478,7 +9479,7 @@ function renderChurnRate(){
      ['분모 3가지','<b>계약 유효</b> = 그 달에 유효 계약이 있는 고객사(포탈 기본) · <b>과금</b> = 그 달 매출이 있는 고객사 · <b>누적고객</b> = 신규 누계 − 해지 누계(매출시트 통계 탭 방식, 만기 종료를 빼지 않아 분모가 커서 해지율이 낮게 나옴)'],
      ['포탈 기준 / 매출시트 기준','오른쪽 위 버튼. 매출시트 통계 탭과 같은 숫자를 보려면 «매출시트 기준»(누적고객 · CND 포함 · 계약 행 단위 · Cloud NAC+에스원)을 누르세요.'],
      ['지원사업 제외율','판매형태 «정부 지원» 고객을 빼고 계산한 해지율. 바우처 만기 해지를 걷어낸 «순수 이탈률»입니다.'],
-     ['에스원 CND','에스원이 묶어 과금하는 사이트. 매출시트 해지 통계는 CND를 빼기 때문에 기본은 제외이고, LIVE 고객사 수와 맞추려면 포함으로 바꾸세요.'],
+     ['CND 전환 고객','CND = Cloud NAC DeviceKeeper. 예전에 에스원으로 납품하던 제품인데 단종되어 전부 S1 Cloud NAC Basic으로 교체됐고, 과금은 에스원에 한 건으로 묶어 받습니다(«에스원 통합과금» 행). 그래서 고객별 매출 행이 없고, 매출시트 해지 통계는 이 고객들을 빼고 셉니다 — 기본은 제외, LIVE 고객사 수와 맞추려면 포함으로 바꾸세요.'],
      ['분모가 작을 때','시작 활성이 20곳 미만(PNS·DRM·초기 MDR)이면 한 곳 차이가 10%p 이상 움직입니다. 그런 칸은 비율보다 «7곳 중 2곳»처럼 건수로 읽어 주세요.']
    ],'모든 숫자는 «계약» 메뉴의 데이터로 계산하며, 파란 숫자를 누르면 그 칸을 만든 계약 명단이 열립니다. 제품별·사업영역별 표의 오른쪽 «합계 → 전체» 열은 두 제품을 함께 쓰는 고객사 때문에 생기는 차이를 보여줍니다.');
   /* 계산 규칙 */
@@ -9488,7 +9489,7 @@ function renderChurnRate(){
        crSeg('지원사업','sup',[['all','포함','지원사업 고객을 포함해 계산하고 표 안에서 지원사업/그 외로 나눠 보여줍니다'],['ex','제외','지원사업(판매형태 정부 지원) 계약을 분모·분자에서 모두 뺍니다'],['only','지원사업만','지원사업 계약만 봅니다']],CR.sup)+
        crSeg('분모','base',[['valid','계약 유효','시작월 ≤ 그 달 ≤ 종료월인 고객사 · 해지 고객사는 해지월 말에 빠짐 (CN전환 제외)'],['rev','과금','그 달에 인식 금액이 있는 고객사'],['cum','누적고객','통계 탭 방식: 신규 누계 − 해지 누계 (만기 종료는 안 뺌)']],CR.base)+
        crSeg('단위','rows',[['cust','고객사'],['rows','계약 행','통계 탭은 계약 행 수']],CR.rows?'rows':'cust')+
-       crSeg('에스원 CND','cnd',[['ex','제외'],['in','포함']],CR.cnd?'in':'ex')+
+       crSeg('CND 전환 고객','cnd',[['ex','제외 — 매출시트 기준','CND(단종된 Cloud NAC DeviceKeeper)에서 S1 Basic으로 전환된 고객 — 매출시트 해지 통계처럼 제외'],['in','포함 — LIVE 기준','LIVE 고객사 수와 같은 범위']],CR.cnd?'in':'ex')+
        crSeg('지원 제외율 분모','exDen',[['org','지원 제외 활성'],['all','전체 활성','통계 탭 장표 방식']],CR.exDen)+
        '<div class="crseg"><span>기준월</span><select id="crUpto">'+(function(){ var o=''; for(var j=maxAll;j>=Math.max(0,maxAll-35);j--) o+='<option value="'+j+'"'+(j===crMaxJ()?' selected':'')+'>'+mk(j)+'</option>'; return o; })()+'</select></div>'+
      '</div>'+
@@ -9634,20 +9635,20 @@ function renderCustFlow(){
      ['복귀','예전에 끊겼다가 다시 계약한 고객사. 첫 계약이 아니라서 신규에 안 잡히고 따로 보여줍니다.'],
      ['해지 (잔존)','상태가 «해지»이고 해지월이 그 기간인 고객사 — 해지율·해지 분석 화면과 같은 수. 괄호는 해지했지만 다른 서비스 계약이 남아 고객사로는 유지된 곳.'],
      ['종료(해지 외)','해지로 기록되지 않았는데 기간 말에 유효 계약이 없는 곳: 약정 만기 후 미연장, 서비스종료 등. 최근 기간에 잡히면 «만기 지났는데 처리 안 된 계약»일 수 있으니 명단을 확인해 주세요.'],
-     ['에스원 CND','에스원이 묶어서 과금하는 사이트라 고객별 매출은 없지만 LIVE 명단에는 들어 있는 고객사입니다. <b>LIVE 기준</b>(포함)은 LIVE 고객사 메뉴와 숫자가 맞고, <b>매출시트 기준</b>(제외)은 매출시트 해지 통계와 맞습니다. 두 기준의 차이는 이 CND 사이트 수만큼입니다.'],
+     ['CND 전환 고객','CND = Cloud NAC DeviceKeeper. 예전에 에스원으로 납품하던 제품이 단종되어 전부 <b>S1 Cloud NAC Basic</b>으로 교체된 고객사입니다. 과금은 에스원에 한 건으로 묶어 받아서(«에스원 통합과금» 행) 고객별 매출 행이 없고, 그래서 매출시트 해지 통계에서는 빠집니다. 고객사로는 살아 있으니 <b>LIVE 기준</b>(포함)은 LIVE 고객사 메뉴와 맞고, <b>매출시트 기준</b>(제외)은 시트 통계와 맞습니다. 두 기준의 차이는 이 전환 고객 수만큼입니다.'],
      ['지원사업','판매형태가 «정부 지원»(바우처)인 계약. 제외하면 분모·분자에서 모두 빠집니다.'],
      ['유입 경로','신규 고객사를 첫 계약의 판매형태·채널·사업영역·파트너·제품·산업군으로 나눈 표. 어디서 고객이 들어오는지 보는 용도입니다.']
    ],'화면의 모든 숫자는 «계약» 메뉴의 계약 데이터에서 계산합니다. LIVE 고객사 메뉴는 별도의 LIVE 명단 시트라 조금 다를 수 있고, 증감표 아래 «vs LIVE 메뉴» 대조표가 그 차이를 항목별로 보여줍니다.');
   h+='<div class="pr-card crpanel" style="margin-bottom:12px"><div class="crrow">'+
      crSeg('기간','unit',[['year','연도'],['half','반기'],['quarter','분기']],CR.unit)+
      crSeg('지원사업','sup',[['all','포함','지원사업(정부 지원) 고객을 포함해 셉니다'],['ex','제외','지원사업 고객을 빼고 셉니다'],['only','지원사업만','지원사업 고객만 봅니다']],CR.sup)+
-     crSeg('에스원 CND 사이트','cnd',[['in','포함 — LIVE 기준','LIVE 고객사 메뉴·대시보드와 같은 범위'],['ex','제외 — 매출시트 기준','매출시트 해지 통계와 같은 범위']],CR.cnd?'in':'ex')+
+     crSeg('CND 전환 고객','cnd',[['in','포함 — LIVE 기준','DeviceKeeper→S1 Basic 전환 고객(통합 과금)을 고객사로 셉니다 · LIVE 고객사 메뉴·대시보드와 같은 범위'],['ex','제외 — 매출시트 기준','매출시트 해지 통계와 같은 범위']],CR.cnd?'in':'ex')+
      '<div class="crseg"><span>기준월</span><select id="cfUpto" title="이 달까지의 데이터로 계산합니다 (기본 = 최신 달)">'+(function(){ var o=''; for(var j=maxAll;j>=Math.max(0,maxAll-35);j--) o+='<option value="'+j+'"'+(j===crMaxJ()?' selected':'')+'>'+mk(j)+'</option>'; return o; })()+'</select></div>'+
      '</div><div class="crrow crfilters">'+G.filter(function(g){return !g.more;}).map(crChips).join('')+'</div></div>';
   /* 지금 보고 있는 기준을 말로 풀어 보여줌 */
   (function(){ var cndN=0; if(CR.cnd){ var u={}; DATA.rows.forEach(function(r){ if(!r.parent && r.line==='S1' && String(r.saleType||'')==='CND' && r.startIdx!=null && r.startIdx>=0) u[r.cust]=1; }); cndN=Object.keys(u).length; }
      var fsel=[]; G.forEach(function(g){ var sel=CR.f[g.k]||[]; if(sel.length) fsel.push(g.l+' '+sel.map(function(v){ var o=g.opts.filter(function(x){return x[0]===v;})[0]; return o? o[1]:v; }).join('·')); });
-     h+='<div class="crnow">지금 보는 기준 — <b>'+({year:'연도별',half:'반기별',quarter:'분기별'}[CR.unit])+'</b> · <b>'+mk(crMaxJ())+'</b>까지 · 회사 단위 · 에스원 CND 사이트 <b>'+(CR.cnd? '포함 (LIVE 기준'+(cndN? ' · '+cndN+'곳':'')+')':'제외 (매출시트 기준)')+'</b> · 지원사업 <b>'+({all:'포함',ex:'제외',only:'만'}[CR.sup])+'</b>'+(fsel.length? ' · 필터: <b>'+esc(fsel.join(' / '))+'</b>':'')+
+     h+='<div class="crnow">지금 보는 기준 — <b>'+({year:'연도별',half:'반기별',quarter:'분기별'}[CR.unit])+'</b> · <b>'+mk(crMaxJ())+'</b>까지 · 회사 단위 · CND 전환 고객 <b>'+(CR.cnd? '포함 (LIVE 기준'+(cndN? ' · '+cndN+'곳':'')+')':'제외 (매출시트 기준)')+'</b> · 지원사업 <b>'+({all:'포함',ex:'제외',only:'만'}[CR.sup])+'</b>'+(fsel.length? ' · 필터: <b>'+esc(fsel.join(' / '))+'</b>':'')+
        '<span class="mini" style="color:var(--muted)"> — '+(CR.cnd? '매출시트 통계나 해지율 화면(CND 제외)과 비교하려면 «매출시트 기준»을 누르세요':'LIVE 고객사 메뉴·대시보드와 비교하려면 «LIVE 기준»을 누르세요')+'</span></div>'; })();
   /* ① 롤포워드 (2020년부터) */
   var from0=CR.from; CR.from=2020; P=crPeriods(); CR.from=from0;
@@ -9701,7 +9702,7 @@ function renderCustFlow(){
     h+='<div style="margin-top:14px;padding-top:10px;border-top:1px dashed var(--ring)"><b>'+mk(maxAll)+' 기말 '+nowN+'곳 vs LIVE 메뉴 '+ln+'곳</b> <span class="mini" style="color:var(--muted)">('+nowN+' + '+plus+' − '+minus+' = '+(nowN+plus-minus)+(nowN+plus-minus===ln?' ✓':' · 나머지 '+Math.abs(ln-(nowN+plus-minus))+'곳은 사명 표기가 달라 양쪽 매칭이 어긋난 것')+') — 기말은 계약 데이터에서, LIVE 메뉴는 LIVE 명단 시트에서 나오므로 아래 항목만큼 차이가 납니다. 항목이 0이 되면 두 숫자가 같아집니다.</span>'+
        '<table class="pr" style="margin-top:6px"><thead><tr><th></th><th>왜 다른가</th><th class="n">곳</th><th>확인</th></tr></thead><tbody>'+
        det('LIVE 명단에 있는데 계약이 없음', cats.none, '+', '계약 미등록 또는 사명이 달라 못 찾음')+
-       det('에스원 CND 고객사', cats.cnd, '+', 'CND 제외 옵션이라 빠짐 — «포함(LIVE 기준)»으로 바꾸면 사라짐')+
+       det('CND(DeviceKeeper→S1 Basic) 전환 고객', cats.cnd, '+', 'CND 제외 옵션이라 빠짐 — «LIVE 기준»으로 바꾸면 사라짐')+
        det('계약에 시작월이 없음(매출 이력도 없음)', cats.nostart, '+', '언제부터 고객인지 알 수 없어 증감표에 못 넣음 — 계약 화면에서 시작월 입력')+
        det('종료월이 시작월보다 앞선 계약', cats.bad, '+', '날짜 오류 — 계약 화면에서 수정')+
        det('계약 종료월이 지났는데 연장·해지 처리 안 됨', cats.expired, '+', '재약정이면 연장 등록, 끝났으면 해지로')+
@@ -9736,7 +9737,7 @@ function renderCustFlow(){
     h+='<tr style="background:var(--surface-2,rgba(0,0,0,.03));font-weight:700"><td>합계</td>'+cols.map(function(o){ var n=crN(byAll[o[0]]||[]); return '<td class="n">'+(n||'–')+' <span class="mini" style="color:var(--muted)">'+(allNw.length? Math.round(n/allNw.length*100):0)+'%</span></td>'; }).join('')+'<td class="n" style="border-left:1px solid var(--ring)">'+crN(allNw)+'</td></tr>';
     var cndIn=0; allNw.forEach(function(r){ if(r.line==='S1' && String(r.saleType||'')==='CND') cndIn++; });
     h+='</tbody></table></div><p class="pr-note" style="margin:8px 0 0">신규 = 회사의 첫 원계약(부속 계약 제외) · 두 제품을 같은 달에 시작하면 먼저 등록된 계약 기준 · 판매 채널·파트너가 비어 있으면 (미지정) · 위의 지원사업·CND 옵션과 필터가 그대로 적용됩니다'+
-       (CR.cnd? (cndIn? ' · <b>이 표에는 에스원 CND 사이트 '+cndIn+'곳이 들어 있습니다</b> — 매출시트 통계와 맞추려면 위에서 «매출시트 기준»을 누르세요':'') : ' · <b>에스원 CND 사이트는 제외된 상태</b>입니다 — LIVE 고객사 수와 맞추려면 «LIVE 기준»을 누르세요')+'</p></div>';
+       (CR.cnd? (cndIn? ' · <b>이 표에는 CND(DeviceKeeper→S1 Basic) 전환 고객 '+cndIn+'곳이 들어 있습니다</b> — 매출시트 통계와 맞추려면 위에서 «매출시트 기준»을 누르세요':'') : ' · <b>CND 전환 고객은 제외된 상태</b>입니다 — LIVE 고객사 수와 맞추려면 «LIVE 기준»을 누르세요')+'</p></div>';
   })();
   /* ② 제품별 기말 고객사 */
   if(lineG){
@@ -9885,7 +9886,7 @@ function renderChurn(){
     '<p class="pr-note" style="margin:8px 0 0">해지 = 상태 «해지» 인 원계약 (매출시트의 해지년월 기입 건과 동일 · 부속 계약 · S1 CND 제외) · 해지월 = 종료월 · 지원사업 = 판매형태 «정부 지원»</p></div>';
   var supN=inR.filter(function(x){ return x.sup; }).length;
   h+=helpBox('churn','이 화면 읽는 법 (처음 보시는 분께)',[
-     ['해지','상태가 «해지»인 원계약 — 매출시트에 해지년월이 적힌 건과 같습니다. 부속 계약(라이선스·센서 추가)과 에스원 CND 사이트는 세지 않습니다.'],
+     ['해지','상태가 «해지»인 원계약 — 매출시트에 해지년월이 적힌 건과 같습니다. 부속 계약(라이선스·센서 추가)과 CND(단종된 DeviceKeeper → S1 Basic 전환) 고객은 매출시트 규칙대로 세지 않습니다.'],
      ['해지월','종료월 = 마지막으로 매출이 잡힌 달. «이탈 월액»은 그 달의 월 매출입니다.'],
      ['지원사업','판매형태가 «정부 지원»인 계약. 바우처 만기로 끝난 해지라 일반 해지와 성격이 다릅니다.'],
      ['제품별 해지율','그 제품의 해지 고객사 ÷ 기간 시작 직전 달 활성 고객사(계약 유효). 해지율 화면의 «포탈 기준»과 같은 숫자입니다.'],
@@ -9902,7 +9903,7 @@ function renderChurn(){
   var inRL=inR0.filter(function(x){ return passQ(x) && chPass(x,'line'); });     // 제품 선택 자체는 빼야 다른 제품도 보임
   var lineOrder=DATA.lines.map(function(l){ return lline(l.label); });
   var byL={}; inRL.forEach(function(x){ var o=(byL[x.line]=byL[x.line]||{n:0,amt:0,sup:0,cu:{},rs:{}}); o.n++; o.amt+=x.amt; if(x.sup) o.sup++; o.cu[x.cust]=1; o.rs[x.reason]=(o.rs[x.reason]||0)+1; });
-  function lineBase(lbl, t){ var u={}; DATA.rows.forEach(function(r){ if(r.parent||lline(r.line)!==lbl||String(r.status||'')==='CN전환'||(r.line==='S1'&&String(r.saleType||'')==='CND')) return;
+  function lineBase(lbl, t){ var u={}; DATA.rows.forEach(function(r){ if(r.parent||lline(r.line)!==lbl||/^(CN전환|통합과금)$/.test(String(r.status||''))||(r.line==='S1'&&String(r.saleType||'')==='CND')) return;
       if(r.startIdx==null||r.startIdx<0||r.startIdx>t) return; var e=r.endIdx!=null? r.endIdx : r._l; if(e!=null&&e>=0&&(e<t||(e===t&&String(r.status||'')==='해지'))) return; u[r.cust]=1; }); return Object.keys(u).length; }
   var lKeys=Object.keys(byL).sort(function(a,b2){ var ia=lineOrder.indexOf(a), ib=lineOrder.indexOf(b2); return (ia<0?99:ia)-(ib<0?99:ib); });
   var lTot=inRL.length, lSel=(CHURN.fil.line||[]);
