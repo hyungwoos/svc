@@ -2122,7 +2122,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-07 ㊿+45';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-07 ㊿+46';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -10984,7 +10984,7 @@ function cellText(c,v,r){
   return t;
 }
 function filterCount(){ var n=0; for(var k in DV.filters){ if(DV.filters[k]&&DV.filters[k].length) n++; } return n; }
-function clearFilters(){ DV.filters={}; DV.page=0; renderGrid(); }
+function clearFilters(){ DV.filters={}; DV.lens=''; DV.page=0; renderGrid(); }
 /* skipK 열의 필터만 빼고 나머지 조건을 통과하는지 */
 function passFilters(r,g,skipK){
   for(var k in DV.filters){
@@ -11132,6 +11132,7 @@ function gridFilteredSorted(g){
   var q=($('#dvSearch').value||'').trim().toLowerCase();
   var toks=q? q.split(/\s+/).filter(Boolean):[];
   var rows=g.rows().filter(function(r){
+    if(g._lens && !g._lens[r.id]) return false;                                   // 관점 필터(계약 메뉴)
     if(g.chipsField && DV.chipVal && String(r[g.chipsField]||'')!==DV.chipVal) return false;
     if(!passFilters(r,g,null)) return false;
     if(!toks.length) return true;
@@ -11224,6 +11225,54 @@ function exportCsv(){
   setTimeout(function(){ URL.revokeObjectURL(a.href); },2000);
 }
 
+/* ── 계약 메뉴 «관점» 필터 ─────────────────────────────────────────────
+   각 관점은 해당하는 계약 id 집합을 만들어 표를 그 계약들로만 좁힙니다. 부속 계약은 원계약과 함께 보입니다. */
+var LENS_DEFS=[
+  ['multi','여러 제품 쓰는 고객사','유효한 원계약이 두 제품 이상인 고객사의 모든 계약'],
+  ['kids','부속 계약 있는 고객사','라이선스·센서 추가(부속 계약)가 붙어 있는 원계약과 그 부속들'],
+  ['dup','중복 등록 의심','같은 고객사·같은 서비스의 원계약이 같은 기간에 겹치는 것 (연장은 한 줄로 합쳐지고, [사이트명] 표기가 있는 별도 사이트는 제외)'],
+  ['pending','계약 예정','시작월·종료월이 모두 비어 있는 계약 — 고객 수에 들어가지 않음'],
+  ['overdue','만기 지났는데 미처리','종료월이 지났는데 상태가 아직 신규·재약정인 계약 — 연장 등록 또는 해지 처리 필요'],
+  ['renew','연장 이력 있음','재약정으로 연장 회차가 쌓인 계약'],
+  ['alias','사명 변경·사이트 통합','옛 사명이나 사이트명이 별칭으로 남아 있는 고객사'],
+  ['cnd','CND 전환 고객','DeviceKeeper → S1 Basic 전환 고객 (에스원 통합 과금) 과 통합과금 행'],
+  ['nocount','고객 수 집계 제외','통합과금 · 중복(no_count) · H/W 일시 판매 — 매출만 세고 고객 수에는 넣지 않는 계약']
+];
+var LENS_DESC={}; LENS_DEFS.forEach(function(d){ LENS_DESC[d[0]]=d[2]; });
+function lensSets(){
+  var cts=RAWX.contracts||[], cus={}; (RAWX.customers||[]).forEach(function(c){ cus[c.id]=c; });
+  var nowYm=(DATA&&DATA.nowIdx>=0? mk(DATA.nowIdx) : new Date().toISOString().slice(0,7))+'-01';
+  var byId={}; cts.forEach(function(c){ byId[c.id]=c; });
+  var kids={}; cts.forEach(function(c){ if(c.parent_contract_id) (kids[c.parent_contract_id]=kids[c.parent_contract_id]||[]).push(c.id); });
+  var root=function(c){ return c.parent_contract_id? (byId[c.parent_contract_id]||c) : c; };
+  var ended=function(c){ return /해지|종료|CN전환|통합과금/.test(String(c.status||'')); };
+  var valid=function(c){ return !c.parent_contract_id && !ended(c) && !c.no_count && (c.end_month==null || c.end_month>=nowYm) && String(c.sale_type||'')!=='H/W'; };
+  var out={}; LENS_DEFS.forEach(function(d){ out[d[0]]={ids:{},n:0}; });
+  var add=function(k,c){ out[k].ids[c.id]=1; (kids[c.id]||[]).forEach(function(i){ out[k].ids[i]=1; }); if(c.parent_contract_id) out[k].ids[c.parent_contract_id]=1; };
+  // 여러 제품
+  var lines={}; cts.forEach(function(c){ if(valid(c)) (lines[c.customer_id]=lines[c.customer_id]||{})[c.line]=1; });
+  cts.forEach(function(c){ var l=lines[c.customer_id]; if(l && Object.keys(l).length>1) add('multi',c); });
+  // 부속
+  cts.forEach(function(c){ if(kids[c.id]) add('kids',c); });
+  // 중복 의심: 같은 고객·서비스 원계약 기간 겹침
+  var grp={}; cts.forEach(function(c){ if(c.parent_contract_id) return; (grp[c.customer_id+'|'+c.line]=grp[c.customer_id+'|'+c.line]||[]).push(c); });
+  Object.keys(grp).forEach(function(k){ var a=grp[k]; if(a.length<2) return;
+    for(var i=0;i<a.length;i++) for(var j=i+1;j<a.length;j++){ var x=a[i], y=a[j];
+      var xs=x.start_month||'0000', xe=x.end_month||'9999', ys=y.start_month||'0000', ye=y.end_month||'9999';
+      var over = xs<=ye && ys<=xe;                                     // 기간 겹침(둘 다 날짜 없으면 겹침으로 봄)
+      var site=/^\[/.test(String(x.note||''))||/^\[/.test(String(y.note||''));           // «[사이트명]» 표기가 있으면 한 회사의 별도 사이트 — 중복이 아님
+      if(over && !site && !(ended(x)&&ended(y)&&x.start_month!==y.start_month)){ add('dup',x); add('dup',y); } } });
+  cts.forEach(function(c){
+    if(!c.parent_contract_id && !c.start_month && !c.end_month && !ended(c)) add('pending',c);
+    if(!c.parent_contract_id && c.end_month && c.end_month<nowYm && !ended(c) && String(c.status||'')!=='추가') add('overdue',c);
+    if(Number(c.renew_count)>0) add('renew',c);
+    var cu=cus[c.customer_id]; if(cu && cu.aliases && cu.aliases.length) add('alias',c);
+    if(c.line==='S1' && (String(c.sale_type||'')==='CND' || /CN전환|통합과금/.test(String(c.status||'')))) add('cnd',c);
+    if(c.no_count || String(c.status||'')==='통합과금' || String(c.sale_type||'')==='H/W') add('nocount',c);
+  });
+  LENS_DEFS.forEach(function(d){ var u={}; Object.keys(out[d[0]].ids).forEach(function(id){ var c=byId[id]; if(c) u[c.customer_id]=1; }); out[d[0]].n=Object.keys(u).length; out[d[0]].nRows=Object.keys(out[d[0]].ids).length; });
+  return out;
+}
 function renderGrid(){
   var g=GRIDS[CUR_VIEW]; if(!g) return;
   var isCustom=!!g.custom;
@@ -11246,6 +11295,23 @@ function renderGrid(){
       cb.appendChild(btn);
     });
   } else cb.style.display='none';
+  /* 관점 필터(계약 메뉴 전용): 여러 제품 고객사 · 부속 계약 · 중복 등록 의심 · 계약 예정 … 한 번에 보기 */
+  var lb=document.getElementById('dvLensBar');
+  if(!lb){ lb=document.createElement('div'); lb.id='dvLensBar'; lb.style.cssText='display:none;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px';
+    var bar2=$('#dvSearch').parentElement; bar2.parentElement.insertBefore(lb,bar2); }
+  if(CUR_VIEW==='contracts' && !isCustom){
+    lb.style.display='flex'; lb.innerHTML='<span class="mini" style="color:var(--muted);margin-right:2px">관점</span>';
+    var LS=lensSets();
+    [['','전체','모든 계약']].concat(LENS_DEFS.map(function(d){ return [d[0], d[1]+' '+LS[d[0]].n+'곳', d[2]+' · 계약 '+LS[d[0]].nRows+'건']; })).forEach(function(op){
+      var v=op[0], on=(DV.lens||'')===v;
+      var btn=document.createElement('button'); btn.className='chip'; btn.setAttribute('aria-pressed', on?'true':'false'); btn.textContent=op[1]; btn.title=op[2];
+      if(v && !LS[v].n){ btn.disabled=true; btn.style.opacity=.45; }
+      btn.onclick=function(){ DV.lens=(on? '':v); DV.page=0; renderGrid(); };
+      lb.appendChild(btn);
+    });
+    if(DV.lens && LENS_DESC[DV.lens]){ var dsc=document.createElement('span'); dsc.className='mini'; dsc.style.cssText='color:var(--ink-2);flex-basis:100%;margin-top:2px'; dsc.textContent='ⓘ '+LENS_DESC[DV.lens]; lb.appendChild(dsc); }
+    g._lens=(DV.lens && LS[DV.lens])? LS[DV.lens].ids : null;
+  } else { lb.style.display='none'; g._lens=null; }
   ['dvSearch','dvCsv'].forEach(function(id){ $('#'+id).style.display=isCustom?'none':''; });
   var nf=filterCount();
   var fc=$('#dvFclr');
