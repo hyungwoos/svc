@@ -2098,7 +2098,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-07 ㊿+36';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-07 ㊿+37';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -9691,14 +9691,18 @@ function renderChurn(){
   h+='<div class="pr-card" style="margin-bottom:14px"><h3>제품별 해지 <small>행을 클릭하면 아래 사유·리스트가 그 제품으로 좁혀집니다 · 해지율 분모 = '+mk(Math.max(CHURN.f-1,0))+' 활성 고객사(계약 유효)</small></h3>'+
     '<div style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 10px">'+
       '<button class="chip" data-ln="" aria-pressed="'+(!lSel.length)+'">전체 '+lTot+'</button>'+
-      lKeys.map(function(k2){ return '<button class="chip" data-ln="'+esc(k2)+'" aria-pressed="'+(lSel.length===1&&lSel[0]===k2)+'">'+esc(k2)+' '+byL[k2].n+'</button>'; }).join('')+'</div>'+
+      lKeys.map(function(k2){ return '<button class="chip" data-ln="'+esc(k2)+'" aria-pressed="'+(lSel.indexOf(k2)>=0)+'">'+esc(k2)+' '+byL[k2].n+'</button>'; }).join('')+
+      '<span class="mini" style="align-self:center;color:var(--muted)">여러 개 선택 가능 · 다시 누르면 해제'+(lSel.length>1? ' · 선택 '+lSel.length+'개 합산은 아래 리스트·사유 표에 반영':'')+'</span></div>'+
     '<div style="overflow-x:auto"><table class="pr" id="chLine"><thead><tr><th>제품</th><th class="n">해지 건수</th><th class="n">비중</th><th class="n">고객사</th><th class="n">지원사업</th><th class="n">시작 활성</th><th class="n">해지율</th><th class="n">월액 합(천원)</th><th class="n">연환산(천원)</th><th>주요 사유</th></tr></thead><tbody>'+
     (lKeys.map(function(k2){
-      var o=byL[k2], on=(lSel.length===1&&lSel[0]===k2), cu=Object.keys(o.cu).length, base=lineBase(k2, CHURN.f-1);
+      var o=byL[k2], on=(lSel.indexOf(k2)>=0), cu=Object.keys(o.cu).length, base=lineBase(k2, CHURN.f-1);
       var top=Object.keys(o.rs).sort(function(a,b2){ return o.rs[b2]-o.rs[a]; }).slice(0,3).map(function(r2){ return r2+' '+o.rs[r2]; }).join(' · ');
       return '<tr data-ln="'+esc(k2)+'" style="cursor:pointer'+(on?';background:var(--brand-t);font-weight:700':'')+'"><td>'+esc(k2)+(on?' ✓':'')+'</td><td class="n">'+o.n+'</td><td class="n">'+(lTot?Math.round(o.n/lTot*100):0)+'%</td><td class="n">'+cu+'</td><td class="n">'+(o.sup||'–')+'</td>'+
         '<td class="n">'+(base||'–')+'</td><td class="n">'+(base? (cu/base*100).toFixed(1)+'%':'–')+'</td><td class="n">'+Math.round(o.amt/1000).toLocaleString('ko-KR')+'</td><td class="n">'+Math.round(o.amt*12/1000).toLocaleString('ko-KR')+'</td><td class="mini">'+esc(top)+'</td></tr>';
     }).join('') || '<tr><td colspan="10" class="cap">해당 기간 해지가 없습니다</td></tr>')+
+    (lSel.length>1? (function(){ var sk=lKeys.filter(function(k2){ return lSel.indexOf(k2)>=0; }), sr=inRL.filter(function(x){ return lSel.indexOf(x.line)>=0; }), cuS={}; sr.forEach(function(x){ cuS[x.cust]=1; });
+        var cuN=Object.keys(cuS).length, bS=sk.reduce(function(a,k2){ return a+lineBase(k2,CHURN.f-1); },0), supS=sr.filter(function(x){return x.sup;}).length, amtS=sr.reduce(function(a,x){return a+x.amt;},0);
+        return '<tr style="background:var(--brand-t);font-weight:700"><td>선택 '+sk.length+'개 소계</td><td class="n">'+sr.length+'</td><td class="n">'+(lTot?Math.round(sr.length/lTot*100):0)+'%</td><td class="n">'+cuN+'</td><td class="n">'+(supS||'–')+'</td><td class="n">'+(bS||'–')+'</td><td class="n">'+(bS?(cuN/bS*100).toFixed(1)+'%':'–')+'</td><td class="n">'+Math.round(amtS/1000).toLocaleString('ko-KR')+'</td><td class="n">'+Math.round(amtS*12/1000).toLocaleString('ko-KR')+'</td><td class="mini">'+esc(sk.join(' + '))+'</td></tr>'; })() : '')+
     (lKeys.length>1? (function(){ var cuAll={}; inRL.forEach(function(x){ cuAll[x.cust]=1; }); var cuN=Object.keys(cuAll).length, bAll=lKeys.reduce(function(a,k2){ return a+lineBase(k2,CHURN.f-1); },0), supAll=inRL.filter(function(x){return x.sup;}).length, amtAll=inRL.reduce(function(a,x){return a+x.amt;},0);
         return '<tr style="background:var(--surface-2,rgba(0,0,0,.03))"><td><b>합계</b></td><td class="n"><b>'+lTot+'</b></td><td class="n">100%</td><td class="n">'+cuN+'</td><td class="n">'+(supAll||'–')+'</td><td class="n">'+(bAll||'–')+'</td><td class="n">'+(bAll?(cuN/bAll*100).toFixed(1)+'%':'–')+'</td><td class="n">'+Math.round(amtAll/1000).toLocaleString('ko-KR')+'</td><td class="n">'+Math.round(amtAll*12/1000).toLocaleString('ko-KR')+'</td><td class="mini">시작 활성 합은 제품별 합(두 제품 고객은 2번)</td></tr>'; })() : '')+
     '</tbody></table></div>';
@@ -9767,8 +9771,9 @@ function renderChurn(){
   var rc=$('#chRsClr'); if(rc) rc.onclick=function(){ delete CHURN.fil.reason; renderChurn(); };
   document.querySelectorAll('#chLine tbody tr[data-ln], #churnBody button.chip[data-ln]').forEach(function(el3){
     el3.onclick=function(){
-      var v=el3.dataset.ln, cur=CHURN.fil.line;
-      if(!v || (cur && cur.length===1 && cur[0]===v)) delete CHURN.fil.line; else CHURN.fil.line=[v];
+      var v=el3.dataset.ln, cur=(CHURN.fil.line||[]).slice();
+      if(!v) delete CHURN.fil.line;                                   // «전체» → 해제
+      else { var ix=cur.indexOf(v); if(ix>=0) cur.splice(ix,1); else cur.push(v); if(cur.length) CHURN.fil.line=cur; else delete CHURN.fil.line; }
       renderChurn();
     };
   });
