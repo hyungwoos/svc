@@ -2098,7 +2098,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-07 ㊿+35';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-07 ㊿+36';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -9680,6 +9680,37 @@ function renderChurn(){
     kpi('이탈 월액 합',won(totA)+'천원','해지 직전 월 매출 기준')+
     kpi('연환산 손실',won(totA*12)+'천원','ARR 감소분')+
     '</div></div>';
+  /* ── 제품별 ── 기간 시작 직전 달 활성 고객사(계약 유효 · 부속·CND·CN전환 제외)를 분모로 제품별 해지율까지 */
+  var inRL=inR0.filter(function(x){ return passQ(x) && chPass(x,'line'); });     // 제품 선택 자체는 빼야 다른 제품도 보임
+  var lineOrder=DATA.lines.map(function(l){ return lline(l.label); });
+  var byL={}; inRL.forEach(function(x){ var o=(byL[x.line]=byL[x.line]||{n:0,amt:0,sup:0,cu:{},rs:{}}); o.n++; o.amt+=x.amt; if(x.sup) o.sup++; o.cu[x.cust]=1; o.rs[x.reason]=(o.rs[x.reason]||0)+1; });
+  function lineBase(lbl, t){ var u={}; DATA.rows.forEach(function(r){ if(r.parent||lline(r.line)!==lbl||String(r.status||'')==='CN전환'||(r.line==='S1'&&String(r.saleType||'')==='CND')) return;
+      if(r.startIdx==null||r.startIdx<0||r.startIdx>t) return; var e=r.endIdx!=null? r.endIdx : r._l; if(e!=null&&e>=0&&(e<t||(e===t&&String(r.status||'')==='해지'))) return; u[r.cust]=1; }); return Object.keys(u).length; }
+  var lKeys=Object.keys(byL).sort(function(a,b2){ var ia=lineOrder.indexOf(a), ib=lineOrder.indexOf(b2); return (ia<0?99:ia)-(ib<0?99:ib); });
+  var lTot=inRL.length, lSel=(CHURN.fil.line||[]);
+  h+='<div class="pr-card" style="margin-bottom:14px"><h3>제품별 해지 <small>행을 클릭하면 아래 사유·리스트가 그 제품으로 좁혀집니다 · 해지율 분모 = '+mk(Math.max(CHURN.f-1,0))+' 활성 고객사(계약 유효)</small></h3>'+
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 10px">'+
+      '<button class="chip" data-ln="" aria-pressed="'+(!lSel.length)+'">전체 '+lTot+'</button>'+
+      lKeys.map(function(k2){ return '<button class="chip" data-ln="'+esc(k2)+'" aria-pressed="'+(lSel.length===1&&lSel[0]===k2)+'">'+esc(k2)+' '+byL[k2].n+'</button>'; }).join('')+'</div>'+
+    '<div style="overflow-x:auto"><table class="pr" id="chLine"><thead><tr><th>제품</th><th class="n">해지 건수</th><th class="n">비중</th><th class="n">고객사</th><th class="n">지원사업</th><th class="n">시작 활성</th><th class="n">해지율</th><th class="n">월액 합(천원)</th><th class="n">연환산(천원)</th><th>주요 사유</th></tr></thead><tbody>'+
+    (lKeys.map(function(k2){
+      var o=byL[k2], on=(lSel.length===1&&lSel[0]===k2), cu=Object.keys(o.cu).length, base=lineBase(k2, CHURN.f-1);
+      var top=Object.keys(o.rs).sort(function(a,b2){ return o.rs[b2]-o.rs[a]; }).slice(0,3).map(function(r2){ return r2+' '+o.rs[r2]; }).join(' · ');
+      return '<tr data-ln="'+esc(k2)+'" style="cursor:pointer'+(on?';background:var(--brand-t);font-weight:700':'')+'"><td>'+esc(k2)+(on?' ✓':'')+'</td><td class="n">'+o.n+'</td><td class="n">'+(lTot?Math.round(o.n/lTot*100):0)+'%</td><td class="n">'+cu+'</td><td class="n">'+(o.sup||'–')+'</td>'+
+        '<td class="n">'+(base||'–')+'</td><td class="n">'+(base? (cu/base*100).toFixed(1)+'%':'–')+'</td><td class="n">'+Math.round(o.amt/1000).toLocaleString('ko-KR')+'</td><td class="n">'+Math.round(o.amt*12/1000).toLocaleString('ko-KR')+'</td><td class="mini">'+esc(top)+'</td></tr>';
+    }).join('') || '<tr><td colspan="10" class="cap">해당 기간 해지가 없습니다</td></tr>')+
+    (lKeys.length>1? (function(){ var cuAll={}; inRL.forEach(function(x){ cuAll[x.cust]=1; }); var cuN=Object.keys(cuAll).length, bAll=lKeys.reduce(function(a,k2){ return a+lineBase(k2,CHURN.f-1); },0), supAll=inRL.filter(function(x){return x.sup;}).length, amtAll=inRL.reduce(function(a,x){return a+x.amt;},0);
+        return '<tr style="background:var(--surface-2,rgba(0,0,0,.03))"><td><b>합계</b></td><td class="n"><b>'+lTot+'</b></td><td class="n">100%</td><td class="n">'+cuN+'</td><td class="n">'+(supAll||'–')+'</td><td class="n">'+(bAll||'–')+'</td><td class="n">'+(bAll?(cuN/bAll*100).toFixed(1)+'%':'–')+'</td><td class="n">'+Math.round(amtAll/1000).toLocaleString('ko-KR')+'</td><td class="n">'+Math.round(amtAll*12/1000).toLocaleString('ko-KR')+'</td><td class="mini">시작 활성 합은 제품별 합(두 제품 고객은 2번)</td></tr>'; })() : '')+
+    '</tbody></table></div>';
+  /* 사유 × 제품 매트릭스 */
+  if(lKeys.length>1){
+    var rsAll={}; inRL.forEach(function(x){ rsAll[x.reason]=(rsAll[x.reason]||0)+1; });
+    var rsKeys=Object.keys(rsAll).sort(function(a,b2){ return rsAll[b2]-rsAll[a]; });
+    h+='<details style="margin-top:10px"><summary style="cursor:pointer;color:var(--s1);font-size:12.5px">사유 × 제품 표 펼치기</summary><div style="overflow-x:auto;margin-top:6px"><table class="pr"><thead><tr><th>해지 사유</th>'+lKeys.map(function(k2){ return '<th class="n">'+esc(k2)+'</th>'; }).join('')+'<th class="n">합계</th></tr></thead><tbody>'+
+      rsKeys.map(function(r2){ return '<tr><td>'+esc(r2)+'</td>'+lKeys.map(function(k2){ var v=byL[k2].rs[r2]||0; return '<td class="n"'+(v?'':' style="color:var(--muted)"')+'>'+(v||'–')+'</td>'; }).join('')+'<td class="n"><b>'+rsAll[r2]+'</b></td></tr>'; }).join('')+
+      '</tbody></table></div></details>';
+  }
+  h+='</div>';
   h+='<div class="pr-card" style="margin-bottom:14px"><h3>사유별 집계 <small>행을 클릭하면 아래 리스트가 그 사유로 좁혀집니다</small></h3>'+
     '<div style="overflow-x:auto"><table class="pr" id="chAgg"><thead><tr><th>해지 사유</th><th class="n">건수</th><th class="n">비중</th><th class="n">월액 합(천원)</th><th class="n">연환산(천원)</th></tr></thead><tbody>'+
     (keys.map(function(k2){
@@ -9734,11 +9765,20 @@ function renderChurn(){
     };
   });
   var rc=$('#chRsClr'); if(rc) rc.onclick=function(){ delete CHURN.fil.reason; renderChurn(); };
+  document.querySelectorAll('#chLine tbody tr[data-ln], #churnBody button.chip[data-ln]').forEach(function(el3){
+    el3.onclick=function(){
+      var v=el3.dataset.ln, cur=CHURN.fil.line;
+      if(!v || (cur && cur.length===1 && cur[0]===v)) delete CHURN.fil.line; else CHURN.fil.line=[v];
+      renderChurn();
+    };
+  });
   function chExport(){
     var msg=$('#chXmsg'); if(msg) msg.textContent='엑셀 생성 중…';
     var fnx=[]; for(var fk2 in CHURN.fil){ var sv=CHURN.fil[fk2]; if(sv&&sv.length&&sv.length<=2) fnx.push(sv.join('·')); }
     var fn='해지분석_'+mk(CHURN.f)+'~'+mk(CHURN.t)+(fnx.length?'_'+fnx.join('_'):'');
     xlsxBook(fn, [
+      {name:'제품별', head:['제품','해지 건수','고객사','지원사업','시작 활성','해지율(%)','월액 합(천원)','연환산(천원)'],
+       rows:lKeys.map(function(k2){ var o4=byL[k2], cu4=Object.keys(o4.cu).length, b4=lineBase(k2,CHURN.f-1); return [k2,o4.n,cu4,o4.sup,b4,(b4? +(cu4/b4*100).toFixed(1):''),Math.round(o4.amt/1000),Math.round(o4.amt*12/1000)]; })},
       {name:'사유별 집계', head:['해지 사유','건수','비중(%)','월액 합(천원)','연환산(천원)'],
        rows:keys.map(function(k2){ var o3=by[k2]; return [k2,o3.n,(totN?Math.round(o3.n/totN*100):0),Math.round(o3.amt/1000),Math.round(o3.amt*12/1000)]; })},
       {name:'해지 기업 리스트', head:['고객사','서비스','채널','구분','해지월','사유','직전 월액(천원)','비고','재약정'],
