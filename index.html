@@ -2124,7 +2124,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-12 ㊿+49';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-12 ㊿+50';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -6246,7 +6246,7 @@ function bzxRender(host){
     '<div class="kpi"><div class="k">비즈포탈 회계매출 (종료)</div><div class="v">'+w(S.biz/1000)+'<small>천원</small></div><div class="d">실패·중지 '+w(S.skip/1000)+'천원 제외</div></div>'+
     '<div class="kpi"><div class="k">포탈 매출 (월 매출 + 설치비)</div><div class="v">'+w(S.db/1000)+'<small>천원</small></div><div class="d">'+mk(T)+' 인식 금액 · 정산일 '+mk(T)+' 설치비 포함</div></div>'+
     '<div class="kpi '+(S.diff>=0?'up':'down')+'"><div class="k">차액 (비즈포탈 − 포탈)</div><div class="v">'+(S.diff>0?'+':'')+w(S.diff/1000)+'<small>천원</small></div><div class="d">일치 '+(S.n.eq||0)+'곳 · 확인할 차이 '+diffs.length+'곳'+(S.n.alias? ' (표기 차이 추정 '+S.n.alias+'쌍 포함)':'')+(ruled.length? ' · 반복 규칙 처리 '+ruled.length+'곳':'')+'</div></div></div>';
-  h+='<div style="overflow-x:auto"><table class="pr" style="width:100%;table-layout:fixed"><colgroup><col style="width:150px"><col><col style="width:110px"><col style="width:110px"><col style="width:110px"><col style="width:130px"><col style="width:30%"></colgroup><thead><tr><th>구분</th><th>고객사</th><th class="n">비즈포탈(원)</th><th class="n">포탈(원)</th><th class="n">차이(원)</th><th></th><th>사유 <span class="mini" style="color:var(--muted)">(담당자 입력 · 지난달 같은 사유는 미리 채움 · 회색 글은 자동 판단)</span></th></tr></thead><tbody>';
+  h+='<div style="overflow-x:auto"><table class="pr" style="width:100%;table-layout:fixed"><colgroup><col style="width:130px"><col style="width:24%"><col style="width:100px"><col style="width:100px"><col style="width:100px"><col style="width:200px"><col></colgroup><thead><tr><th>구분</th><th>고객사</th><th class="n">비즈포탈(원)</th><th class="n">포탈(원)</th><th class="n">차이(원)</th><th></th><th>사유 <span class="mini" style="color:var(--muted)">(담당자 입력 · 지난달 같은 사유는 미리 채움 · 회색 글은 자동 판단)</span></th></tr></thead><tbody>';
   if(!diffs.length) h+='<tr><td colspan="7" class="mini" style="color:var(--muted)">'+(ruled.length? '확인할 차이 없음 — 남은 차이는 모두 반복 규칙으로 처리됐습니다 ✓' : '차이 없음 — 전부 일치합니다 🎉')+'</td></tr>';
   diffs.forEach(function(q,i){
     var c=BZX_CAT[q.cat==='alias' && q.pairConf==='low'? 'aliasq' : q.cat], key=bzxNoteKey(q), note=(BZX.notes[key]!=null)? BZX.notes[key] : bzxPrevNote(q.name);
@@ -6260,8 +6260,8 @@ function bzxRender(host){
        '<td style="overflow-wrap:anywhere;white-space:normal"><b>'+esc(q.name)+'</b>'+pairTxt+(Object.keys(q.names).length>1 && !q.pair? '<div class="mini" style="color:var(--muted)">'+esc(Object.keys(q.names).filter(function(n){return n!==q.name;}).join(' · '))+'</div>':'')+'</td>'+
        '<td class="n">'+(q.biz.some(function(b){return b.st==='종료';})? w(bizAmt):'·')+'</td><td class="n">'+((q.db.length||q.pair)? w(dbAmt):'·')+'</td>'+
        '<td class="n" style="font-weight:700;color:'+(diff===0?'var(--muted)':diff>0?'var(--ok,#2e7d32)':'var(--critical)')+'">'+(diff>0?'+':'')+w(diff)+'</td>'+
-       '<td style="white-space:nowrap"><button class="chip bzx-det" data-i="'+i+'" title="양쪽 원본 행 보기">내역</button>'+(q.cat==='alias' && !window.IS_VIEWER? ' <button class="chip bzx-alias" data-i="'+i+'" title="비즈포탈 표기를 포탈 고객사의 별칭으로 저장 — 다음 달부터 자동으로 맞춰짐">별칭 저장</button>':'')+
-         ((q.cat!=='alias' || q.pairConf==='low') && !window.IS_VIEWER? ' <button class="chip bzx-rule" data-i="'+i+'" title="이 회사가 매달 같은 종류의 차이로 잡히면 다시 묻지 않고 지금 적은 사유를 그대로 씁니다">🔁 매달 이 사유로</button>':'')+'</td>'+
+       '<td style="white-space:normal"><div style="display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center"><button class="chip bzx-det" data-i="'+i+'" title="양쪽 원본 행 보기">내역</button>'+(q.cat==='alias' && !window.IS_VIEWER? '<button class="chip bzx-alias" data-i="'+i+'" title="비즈포탈 표기를 포탈 고객사의 별칭으로 저장 — 다음 달부터 자동으로 맞춰짐">별칭 저장</button>':'')+
+         ((q.cat!=='alias' || q.pairConf==='low') && !window.IS_VIEWER? '<button class="chip bzx-rule" data-i="'+i+'" title="이 회사가 매달 같은 종류의 차이로 잡히면 다시 묻지 않고 지금 적은 사유를 그대로 씁니다">🔁 매달 반복</button>':'')+'</div></td>'+
        '<td><input class="bzx-note" data-key="'+esc(key)+'" value="'+esc(note)+'" placeholder="'+esc(auto||'왜 다른지 한 줄로')+'" title="'+esc(auto||'')+'" style="width:100%;box-sizing:border-box;font:inherit;padding:5px 8px;border:1px solid var(--ring);border-radius:8px;background:var(--surface-2);color:inherit"></td></tr>';
     h+='<tr class="bzx-detrow" data-i="'+i+'" style="display:none"><td colspan="7" style="background:var(--surface-2,rgba(0,0,0,.02))"><div class="mini" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'+
        '<div><b>비즈포탈 행</b>'+(q.biz.length? '<table class="pr" style="margin-top:4px"><tbody>'+q.biz.map(function(b){ return '<tr><td>'+esc(b.proj)+'</td><td>'+esc(b.st)+'</td><td class="n">'+w(b.acc)+'</td><td class="mini">'+esc(b.why||'')+'</td></tr>'; }).join('')+'</tbody></table>' : '<div style="color:var(--muted)">없음</div>')+'</div>'+
