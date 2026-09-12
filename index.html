@@ -2124,7 +2124,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-09 ㊿+47';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-12 ㊿+48';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -5840,7 +5840,13 @@ function renderBizMonthly(){
       bar.appendChild(bd);
     }
   }
+  /* 비즈포탈 엑셀 자동 대조 — 파일을 읽어 바로 비교 (저장하지 않음) */
+  var bu=document.createElement('label'); bu.className='pill'; bu.style.cssText='cursor:pointer;display:inline-flex;align-items:center;gap:6px'; bu.title='비즈포탈에서 내려받은 매출 목록(.xlsx)을 올리면 그 달 포탈 매출과 회사 단위로 자동 대조합니다 — 파일은 저장하지 않습니다';
+  bu.innerHTML='📥 비즈포탈 엑셀 올려서 자동 대조 <input type="file" id="bzxFile" accept=".xlsx,.xls,.csv" style="display:none">';
+  bu.querySelector('input').onchange=function(){ bzxOpenFile(this.files[0]); this.value=''; };
+  bar.insertBefore(bu, bar.children[months.length]||null);
   host.appendChild(bar);
+  if(BZX.res){ bzxRender(host); }
 
   // ── 월 목표 대비 달성률 ─────────────────────────────
   renderTargetTable(host, rows);
@@ -6105,6 +6111,238 @@ function renderBizEditor(host, months){
       renderBizMonthly();
     }catch(e){ $('#bzMsg').textContent=String(e.message||e); this.disabled=false; }
   };
+}
+
+/* ==================================================================
+   비즈포탈 매출 엑셀 자동 대조 (목업 · 65단계)
+   · 비즈포탈(회사 메인 포탈)에서 내려받은 매출 목록(.xlsx)을 브라우저에서 읽어 — 저장하지 않고 — 포탈 DB 의 같은 달 매출과 회사 단위로 맞춰 봅니다.
+   · 비즈포탈 쪽: 진행상태 «종료» 행의 «회계매출»만 (실패·중지는 참고로만 표시)
+   · 포탈 쪽: 그 달 monthly_revenue 합 + 대금정산일이 그 달인 설치비(install_fee)
+   · 회사 이름은 띄어쓰기·㈜·(에스원)·괄호·별칭을 무시하고 묶음. 양쪽에 같은 금액이 한쪽씩만 있으면 «표기 차이(추정)»로 짝을 제안.
+   · 사유는 담당자가 적고, 「비즈포탈 차액 표에 저장」을 누르면 기존 biz_recon 표(월 요약 + 고객사별 차이)에 들어갑니다.
+   ================================================================== */
+var BZX={rows:null, month:null, file:'', notes:{}, res:null, showEq:false, showSkip:false};
+function bzxLoadLib(){
+  if(window.XLSX) return Promise.resolve();
+  return new Promise(function(ok,ng){
+    var sc=document.createElement('script'); sc.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    sc.onload=function(){ ok(); }; sc.onerror=function(){ ng(new Error('엑셀 읽기 라이브러리를 불러오지 못했습니다 (cdnjs 접속 확인)')); };
+    document.head.appendChild(sc);
+  });
+}
+function bzxDate(v){
+  if(v==null||v==='') return null;
+  if(v instanceof Date) return isNaN(v)? null : v;
+  if(typeof v==='number' && v>20000 && v<80000 && window.XLSX){ var d=XLSX.SSF.parse_date_code(v); return d? new Date(d.y,d.m-1,d.d) : null; }
+  var m=String(v).match(/(\d{4})[-./](\d{1,2})/); return m? new Date(+m[1],+m[2]-1,1) : null;
+}
+/* 엑셀 → 행 배열. 머릿글 행을 «고객사»·«회계매출» 이 있는 줄로 찾습니다(위에 제목 줄이 있어도 됨) */
+function bzxParse(buf){
+  var wb=XLSX.read(buf,{type:'array',cellDates:true});
+  var ws=wb.Sheets[wb.SheetNames[0]];
+  var aoa=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
+  var hi=-1; for(var i=0;i<Math.min(aoa.length,20);i++){ var r=aoa[i]||[]; if(r.indexOf('고객사')>=0 && r.some(function(c){ return /회계\s*매출/.test(String(c||'')); })){ hi=i; break; } }
+  if(hi<0) throw new Error('머릿글에 «고객사»·«회계매출» 열이 있는 시트가 아닙니다. 비즈포탈 매출 목록을 그대로 내려받은 파일을 올려주세요.');
+  var H=aoa[hi].map(function(c){ return String(c||'').replace(/\s+/g,''); });
+  function col(re){ for(var j=0;j<H.length;j++) if(re.test(H[j])) return j; return -1; }
+  var C={no:col(/^등록번호/), kind:col(/^매출종류/), proj:col(/^프로젝트명/), cust:col(/^고객사/), ch:col(/^영업채널/), biller:col(/^계산서발행대상/), st:col(/^진행상태/),
+         sales:col(/^매출액$/), acc:col(/^회계매출/), when:col(/^예상시기/), insp:col(/^검수일/), owner:col(/^담당자/), why:col(/^변경사유/)};
+  if(C.acc<0||C.cust<0) throw new Error('«고객사» 또는 «회계매출» 열을 찾지 못했습니다.');
+  var out=[];
+  for(var i=hi+1;i<aoa.length;i++){ var r=aoa[i]||[]; if(!r[C.cust]) continue;
+    var g=function(k){ return C[k]>=0? r[C[k]] : null; };
+    out.push({no:g('no'), kind:g('kind'), proj:String(g('proj')||''), cust:String(g('cust')||'').trim(), ch:g('ch')||'', biller:g('biller')||'', st:String(g('st')||'').trim(),
+              sales:Number(g('sales'))||0, acc:Number(g('acc'))||0, when:bzxDate(g('when')), insp:bzxDate(g('insp')), owner:g('owner')||'', why:g('why')||''}); }
+  return out;
+}
+/* 회사 매칭 키: (에스원)·(S1) 표기 제거 → nmKeys(별칭·괄호·(주)·공백 무시) → ㈜·재단법인·유한회사·기호도 제거. 짧은 괄호 키(지역·사이트명)는 버림 */
+var BZX_SITE=/^(중국|미국|청주|페루|괌|사우디|이집트|말레이시아|스웨덴|스웬덴|창원|대전센터|이레빌딩|판교|수원|천안|본사|물류센터)/;
+function bzxKeys(name){
+  var t=String(name||'').replace(/\((에스원|S1)\)/g,'').replace(/\s+-\s+.*$/,'');   // «○○ - 대전센터» 같은 사이트 꼬리 제거
+  var base=nmKeys(t.replace(/\([^)]*\)/g,''));
+  var par=[]; var re=/\(([^)]*)\)/g, m; while((m=re.exec(t))){ var x=m[1].trim(); if(/^구\.?\s*/.test(x) || (x.length>=5 && !BZX_SITE.test(x))) par=par.concat(nmKeys(x.replace(/^구\.?\s*/,''))); }
+  return base.concat(par).map(function(k){ return k.replace(/^(㈜|재단법인|사단법인|유한회사|학교법인)|(㈜|유한회사)$/g,'').replace(/[㈜·,.\-]/g,''); }).filter(function(k){ return k.length>=2; });
+}
+function bzxMonthIdx(rows){
+  var cnt={}; rows.forEach(function(r){ if(r.when){ var k=r.when.getFullYear()+'-'+('0'+(r.when.getMonth()+1)).slice(-2); cnt[k]=(cnt[k]||0)+1; } });
+  var best=Object.keys(cnt).sort(function(a,b){ return cnt[b]-cnt[a]; })[0];
+  return {ym:best||null, idx:best? dIdx(best) : null, months:Object.keys(cnt).sort(), cnt:cnt};
+}
+/* 대조 본체 */
+function bzxCompare(rows, T){
+  var ymKey=mk(T)+'-01';
+  // 포탈 쪽: 그 달 월 매출(계약별) + 정산일이 그 달인 설치비
+  var byCt={}; (RAWX.mrs||[]).forEach(function(x){ if(String(x.month).slice(0,10)===ymKey) byCt[x.contract_id]=(byCt[x.contract_id]||0)+Number(x.amount||0); });
+  var dbRows=[]; (DATA.rows||[]).forEach(function(r){
+    var a=byCt[r._id]||0, fee=(r.fee && String(r.settle||'').slice(0,7)===mk(T))? r.fee : 0;
+    if(!a && !fee) return;
+    dbRows.push({r:r, cust:r.cust, line:r.line, amt:a, fee:fee, status:r.status, note:r.note});
+  });
+  // 키 → 그룹 (union)
+  var G={}, nid=0; function gid(ks){ var ids=[]; ks.forEach(function(k){ if(G[k]!=null && ids.indexOf(G[k])<0) ids.push(G[k]); }); var g=ids.length? Math.min.apply(null,ids) : (++nid);
+    if(ids.length>1) Object.keys(G).forEach(function(k){ if(ids.indexOf(G[k])>=0) G[k]=g; }); ks.forEach(function(k){ G[k]=g; }); return g; }
+  var custAl={}; (SB_RAW.customers||[]).forEach(function(c){ custAl[c.name]=c.aliases||[]; });
+  dbRows.forEach(function(d){ d.g=gid(bzxKeys(d.cust).concat((custAl[d.cust]||[]).reduce(function(a,al){ return a.concat(bzxKeys(al)); },[]))); });
+  rows.forEach(function(b){ b.g=gid(bzxKeys(b.cust)); });
+  var groups={};
+  function grp(g){ return groups[g]=groups[g]||{g:g, biz:[], db:[], names:{}}; }
+  dbRows.forEach(function(d){ var q=grp(d.g); q.db.push(d); q.names[d.cust]=1; });
+  rows.forEach(function(b){ var q=grp(b.g); q.biz.push(b); q.names[b.cust]=1; });
+  var out=[];
+  Object.keys(groups).forEach(function(k){
+    var q=groups[k];
+    var done=q.biz.filter(function(b){ return b.st==='종료'; }), skip=q.biz.filter(function(b){ return b.st!=='종료'; });
+    q.bizAmt=done.reduce(function(a,b){ return a+b.acc; },0); q.skipAmt=skip.reduce(function(a,b){ return a+b.acc; },0);
+    q.bizFee=done.filter(function(b){ return /설치비/.test(b.proj); }).reduce(function(a,b){ return a+b.acc; },0);
+    q.dbAmt=q.db.reduce(function(a,d){ return a+d.amt; },0); q.dbFee=q.db.reduce(function(a,d){ return a+d.fee; },0);
+    q.dbTot=q.dbAmt+q.dbFee; q.diff=Math.round(q.bizAmt-q.dbTot);
+    q.name=Object.keys(q.names).sort(function(a,b){ return b.length-a.length; })[0];
+    var hasBiz=done.length>0, hasDb=q.db.length>0;
+    if(!hasBiz && !hasDb){ q.cat='skip'; }                      // 실패·중지만
+    else if(hasBiz && hasDb && q.diff===0) q.cat='eq';
+    else if(hasBiz && hasDb){ q.cat=(q.bizFee||q.dbFee) && Math.round((q.bizAmt-q.bizFee)-(q.dbTot-q.dbFee))===0? 'fee' : 'amt'; }
+    else if(hasBiz) q.cat='bizonly'; else q.cat='dbonly';
+    out.push(q);
+  });
+  // 표기 차이 추정: 비즈포탈만 ↔ 포탈만 중 금액이 같은 짝(유일할 때만). 이름이 닮았거나 금액이 흔하지 않으면 «표기 차이(추정)», 아니면 «금액만 같음(확인 필요)»
+  var bo=out.filter(function(q){ return q.cat==='bizonly'; }), dbo=out.filter(function(q){ return q.cat==='dbonly'; });
+  var amtCnt={}; out.forEach(function(q){ if(q.bizAmt) amtCnt[Math.round(q.bizAmt)]=(amtCnt[Math.round(q.bizAmt)]||0)+1; if(q.dbTot) amtCnt[Math.round(q.dbTot)]=(amtCnt[Math.round(q.dbTot)]||0)+1; });
+  function similar(a,b){ var ka=bzxKeys(a), kb=bzxKeys(b); return ka.some(function(x){ return kb.some(function(y){ if(x.indexOf(y)>=0||y.indexOf(x)>=0) return true; for(var i=0;i+3<=x.length;i++){ if(y.indexOf(x.slice(i,i+3))>=0) return true; } return false; }); }); }
+  bo.forEach(function(b){ var c=dbo.filter(function(d){ return !d.pair && Math.round(d.dbTot)===Math.round(b.bizAmt); });
+    if(c.length===1){ var d=c[0], conf=(similar(b.name,d.name) || (amtCnt[Math.round(b.bizAmt)]||0)<=2)? 'high':'low';
+      b.pair=d; d.pair=b; b.pairConf=d.pairConf=conf; b.cat='alias'; d.cat='alias2'; } });
+  // 비즈포탈에만 있는 회사: 포탈에 고객사·계약은 있는지(이 달 매출만 없는지) 확인해 둠
+  out.forEach(function(q){ if(q.cat!=='bizonly') return; var ks=bzxKeys(q.name);
+    q.dbCts=(DATA.rows||[]).filter(function(r){ return !r.parent && bzxKeys(r.cust).some(function(k){ return ks.indexOf(k)>=0; }); }); });
+  var sum={biz:0, db:0, skip:0, n:{}};
+  out.forEach(function(q){ sum.biz+=q.bizAmt; sum.db+=q.dbTot; sum.skip+=q.skipAmt; sum.n[q.cat]=(sum.n[q.cat]||0)+1; });
+  sum.diff=Math.round(sum.biz-sum.db);
+  return {groups:out, sum:sum, T:T};
+}
+var BZX_CAT={eq:['일치','var(--ok,#2e7d32)'], fee:['설치비 인식 시점','var(--warn,#b26a00)'], amt:['금액 다름','var(--critical)'], bizonly:['비즈포탈에만 있음','var(--critical)'], dbonly:['포탈에만 있음','var(--critical)'], alias:['표기 차이(추정)','var(--s1)'], alias2:['표기 차이(추정)','var(--s1)'], aliasq:['금액만 같음(확인 필요)','var(--warn,#b26a00)'], skip:['실패·중지(참고)','var(--muted)']};
+function bzxPrevNote(name){
+  // 예전 달 biz_recon 에 같은 고객사 사유가 있으면 기본값으로 (같은 차이가 매달 반복될 때 다시 안 적게)
+  var hit=null; (RAWX.biz||[]).forEach(function(r){ if(r.kind==='detail' && r.note && r.item && bzxKeys(r.item).some(function(k){ return bzxKeys(name).indexOf(k)>=0; })){ if(!hit || (r.id||0)>(hit.id||0)) hit=r; } });
+  return hit? hit.note : '';
+}
+function bzxNoteKey(q){ return mk(BZX.res.T)+'|'+q.name; }
+function bzxRender(host){
+  var res=BZX.res, S=res.sum, T=res.T;
+  var box=document.createElement('section'); box.id='bzxBox'; box.style.cssText='margin:6px 0 22px;padding:14px 16px;border:1px solid var(--ring);border-radius:12px;background:var(--surface)';
+  function w(v){ return Math.round(v).toLocaleString('ko-KR'); }
+  var diffs=res.groups.filter(function(q){ return ['fee','amt','bizonly','dbonly','alias'].indexOf(q.cat)>=0; }).sort(function(a,b){ return Math.abs(b.diff)-Math.abs(a.diff); });
+  var eqs=res.groups.filter(function(q){ return q.cat==='eq'; }), skips=res.groups.filter(function(q){ return q.cat==='skip' || q.skipAmt; });
+  var h='<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:8px"><b style="font-size:15px">📥 비즈포탈 엑셀 자동 대조 — '+mk(T)+'</b><span class="mini" style="color:var(--muted)">'+esc(BZX.file)+' · '+BZX.rows.length+'행 · 파일은 저장하지 않고 이 화면에서만 씁니다</span></div>';
+  h+='<div class="kpis" style="margin-bottom:12px">'+
+    '<div class="kpi"><div class="k">비즈포탈 회계매출 (종료)</div><div class="v">'+w(S.biz/1000)+'<small>천원</small></div><div class="d">실패·중지 '+w(S.skip/1000)+'천원 제외</div></div>'+
+    '<div class="kpi"><div class="k">포탈 매출 (월 매출 + 설치비)</div><div class="v">'+w(S.db/1000)+'<small>천원</small></div><div class="d">'+mk(T)+' 인식 금액 · 정산일 '+mk(T)+' 설치비 포함</div></div>'+
+    '<div class="kpi '+(S.diff>=0?'up':'down')+'"><div class="k">차액 (비즈포탈 − 포탈)</div><div class="v">'+(S.diff>0?'+':'')+w(S.diff/1000)+'<small>천원</small></div><div class="d">일치 '+(S.n.eq||0)+'곳 · 차이 '+diffs.length+'곳'+(S.n.alias? ' (표기 차이 추정 '+S.n.alias+'쌍 포함)':'')+'</div></div></div>';
+  h+='<div style="overflow-x:auto"><table class="pr" style="width:100%;table-layout:fixed"><colgroup><col style="width:150px"><col><col style="width:110px"><col style="width:110px"><col style="width:110px"><col style="width:130px"><col style="width:30%"></colgroup><thead><tr><th>구분</th><th>고객사</th><th class="n">비즈포탈(원)</th><th class="n">포탈(원)</th><th class="n">차이(원)</th><th></th><th>사유 <span class="mini" style="color:var(--muted)">(담당자 입력 · 지난달 같은 사유는 미리 채움 · 회색 글은 자동 판단)</span></th></tr></thead><tbody>';
+  if(!diffs.length) h+='<tr><td colspan="7" class="mini" style="color:var(--muted)">차이 없음 — 전부 일치합니다 🎉</td></tr>';
+  diffs.forEach(function(q,i){
+    var c=BZX_CAT[q.cat==='alias' && q.pairConf==='low'? 'aliasq' : q.cat], key=bzxNoteKey(q), note=(BZX.notes[key]!=null)? BZX.notes[key] : bzxPrevNote(q.name);
+    var pairTxt=q.pair? ' ⇄ '+esc(q.pair.name) : '';
+    var auto=q.cat==='fee'? '설치비 '+w(q.bizFee||q.dbFee)+'원 — 비즈포탈은 이 달, 포탈 정산일은 '+(q.db.filter(function(d){return d.r.fee;}).map(function(d){ return String(d.r.settle||'').slice(0,7)||'없음'; })[0]||'다른 달')
+           : q.cat==='alias'? (q.pairConf==='low'? '금액만 같고 이름은 전혀 달라 같은 회사인지 확인 필요 — 맞으면 별칭 저장, 아니면 각각 사유 기입' : '양쪽에 같은 금액 — 이름 표기만 다름(별칭 저장 권장)')
+           : (q.cat==='bizonly' && q.dbCts && q.dbCts.length)? '포탈에 고객사는 있으나 이 달 매출 없음 — 계약 '+q.dbCts.map(function(r){ return lline(r.line)+' '+(r.startRaw!=null?mk(r.startRaw):'?')+'~'+(r.endRaw!=null?mk(r.endRaw):'')+' '+(r.status||''); }).join(', ')
+           : q.cat==='bizonly'? '포탈에 이 고객사가 없음 — 계약 미등록 또는 사명이 전혀 다름' : '';
+    var bizAmt=q.cat==='alias'? q.bizAmt : q.bizAmt, dbAmt=q.cat==='alias'? q.pair.dbTot : q.dbTot, diff=q.cat==='alias'? 0 : q.diff;
+    h+='<tr data-i="'+i+'"><td><span class="chip" style="pointer-events:none;color:'+c[1]+';border-color:'+c[1]+'">'+c[0]+'</span></td>'+
+       '<td style="overflow-wrap:anywhere;white-space:normal"><b>'+esc(q.name)+'</b>'+pairTxt+(Object.keys(q.names).length>1 && !q.pair? '<div class="mini" style="color:var(--muted)">'+esc(Object.keys(q.names).filter(function(n){return n!==q.name;}).join(' · '))+'</div>':'')+'</td>'+
+       '<td class="n">'+(q.biz.some(function(b){return b.st==='종료';})? w(bizAmt):'·')+'</td><td class="n">'+((q.db.length||q.pair)? w(dbAmt):'·')+'</td>'+
+       '<td class="n" style="font-weight:700;color:'+(diff===0?'var(--muted)':diff>0?'var(--ok,#2e7d32)':'var(--critical)')+'">'+(diff>0?'+':'')+w(diff)+'</td>'+
+       '<td style="white-space:nowrap"><button class="chip bzx-det" data-i="'+i+'" title="양쪽 원본 행 보기">내역</button>'+(q.cat==='alias' && !window.IS_VIEWER? ' <button class="chip bzx-alias" data-i="'+i+'" title="비즈포탈 표기를 포탈 고객사의 별칭으로 저장 — 다음 달부터 자동으로 맞춰짐">별칭 저장</button>':'')+'</td>'+
+       '<td><input class="bzx-note" data-key="'+esc(key)+'" value="'+esc(note)+'" placeholder="'+esc(auto||'왜 다른지 한 줄로')+'" title="'+esc(auto||'')+'" style="width:100%;box-sizing:border-box;font:inherit;padding:5px 8px;border:1px solid var(--ring);border-radius:8px;background:var(--surface-2);color:inherit"></td></tr>';
+    h+='<tr class="bzx-detrow" data-i="'+i+'" style="display:none"><td colspan="7" style="background:var(--surface-2,rgba(0,0,0,.02))"><div class="mini" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'+
+       '<div><b>비즈포탈 행</b>'+(q.biz.length? '<table class="pr" style="margin-top:4px"><tbody>'+q.biz.map(function(b){ return '<tr><td>'+esc(b.proj)+'</td><td>'+esc(b.st)+'</td><td class="n">'+w(b.acc)+'</td><td class="mini">'+esc(b.why||'')+'</td></tr>'; }).join('')+'</tbody></table>' : '<div style="color:var(--muted)">없음</div>')+'</div>'+
+       '<div><b>포탈 계약</b>'+((q.pair? q.pair.db : q.db).length? '<table class="pr" style="margin-top:4px"><tbody>'+(q.pair? q.pair.db : q.db).map(function(d){ return '<tr><td>'+esc(d.cust)+'</td><td>'+esc(lline(d.line))+' · '+esc(d.status||'')+'</td><td class="n">'+w(d.amt)+(d.fee? ' + 설치비 '+w(d.fee):'')+'</td><td class="mini">'+esc((d.note||'').slice(0,40))+'</td></tr>'; }).join('')+'</tbody></table>' : '<div style="color:var(--muted)">이 달 매출 없음'+(q.cat==='bizonly'? ' — 계약 미등록·사명 불일치·인식 월 차이 중 하나':'')+'</div>')+'</div></div></td></tr>';
+  });
+  h+='</tbody></table></div>';
+  h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px">'+
+     '<button class="chip" id="bzxEq" aria-pressed="'+BZX.showEq+'">일치 '+eqs.length+'곳 '+(BZX.showEq?'접기':'보기')+'</button>'+
+     '<button class="chip" id="bzxSkip" aria-pressed="'+BZX.showSkip+'">실패·중지 참고 '+skips.length+'곳 · '+w(S.skip/1000)+'천원 '+(BZX.showSkip?'접기':'보기')+'</button>'+
+     '<span class="spacer" style="flex:1"></span>'+
+     (window.IS_VIEWER? '' : '<button class="pill" id="bzxSave" style="background:var(--s1);border-color:var(--s1);color:#fff">💾 비즈포탈 차액 표에 저장 ('+(T!=null? (+mk(T).slice(5,7))+'월':'')+')</button>')+
+     '<button class="pill ghost" id="bzxClose">닫기</button></div>';
+  if(BZX.showEq) h+='<div class="mini" style="margin-top:8px;line-height:1.7"><b>일치</b> — '+eqs.map(function(q){ return esc(q.name)+' '+w(q.bizAmt); }).join(' · ')+'</div>';
+  if(BZX.showSkip) h+='<div class="mini" style="margin-top:8px"><b>실패·중지 행</b> (회계매출이 적혀 있어도 비교에서 뺐습니다 — 중복 등록·해지 건)<table class="pr" style="margin-top:4px"><tbody>'+skips.map(function(q){ return q.biz.filter(function(b){return b.st!=='종료';}).map(function(b){ return '<tr><td>'+esc(b.cust)+'</td><td>'+esc(b.proj)+'</td><td>'+esc(b.st)+'</td><td class="n">'+w(b.acc)+'</td><td class="mini">'+esc(b.why||'')+'</td></tr>'; }).join(''); }).join('')+'</tbody></table></div>';
+  h+='<div style="margin-top:10px">'+helpBox('bzx','이 대조는 어떻게 계산하나요?',[
+    ['비즈포탈 쪽','진행상태 «종료» 행의 «회계매출» 합. 실패·중지 행은 중복 등록·해지 건이라 비교에서 빼고 참고로만 보여줍니다. 대상 월은 «예상시기» 열에서 읽습니다.'],
+    ['포탈 쪽','그 달 계약별 월 매출(monthly_revenue) 합 + 대금정산일이 그 달인 설치비. 비즈포탈은 설치비를 별도 행으로 잡기 때문에 같이 봐야 맞습니다.'],
+    ['회사 묶기','띄어쓰기·㈜·(에스원)·괄호 안 사이트명·사명 변경 별칭을 무시하고 회사 단위로 묶습니다(두산에너빌리티 사우디/괌/이집트 → 1곳). 그래도 안 맞는데 양쪽 금액이 같으면 «표기 차이(추정)»로 짝을 제안하고, «별칭 저장»을 누르면 다음 달부터 자동으로 맞춰집니다.'],
+    ['사유','차이 행마다 담당자가 한 줄로 적습니다. 지난달에 같은 고객사로 적은 사유가 있으면 미리 채워 두니 확인만 하면 됩니다. 「저장」을 누르면 요약 3줄 + 고객사별 차이가 아래 «비즈포탈 차액» 표에 들어갑니다.'],
+    ['엑셀 파일','저장하지 않습니다. 화면을 닫으면 사라지고, 다음 달에는 새 파일을 다시 올리면 됩니다.']
+  ])+'</div>';
+  box.innerHTML=h; host.insertBefore(box, host.firstChild.nextSibling);
+  helpWire(box);
+  box.querySelectorAll('.bzx-note').forEach(function(inp){ inp.oninput=function(){ BZX.notes[inp.dataset.key]=inp.value; }; });
+  box.querySelectorAll('.bzx-det').forEach(function(b){ b.onclick=function(){ var r=box.querySelector('.bzx-detrow[data-i="'+b.dataset.i+'"]'); r.style.display=r.style.display==='none'? '':'none'; }; });
+  box.querySelectorAll('.bzx-alias').forEach(function(b){ b.onclick=function(){ bzxSaveAlias(diffs[+b.dataset.i]); }; });
+  box.querySelector('#bzxEq').onclick=function(){ BZX.showEq=!BZX.showEq; renderBizMonthly(); };
+  box.querySelector('#bzxSkip').onclick=function(){ BZX.showSkip=!BZX.showSkip; renderBizMonthly(); };
+  box.querySelector('#bzxClose').onclick=function(){ BZX.res=null; BZX.rows=null; renderBizMonthly(); };
+  var sv=box.querySelector('#bzxSave'); if(sv) sv.onclick=function(){ bzxSave(diffs); };
+}
+async function bzxSaveAlias(q){
+  if(!SB_TOKEN){ openOvl('ovlAuth'); return; }
+  var dbName=q.pair && q.pair.db[0] && q.pair.db[0].cust, bizName=q.biz[0] && q.biz[0].cust;
+  if(!dbName||!bizName) return;
+  var al=String(bizName).replace(/\s*\((에스원|S1)\)\s*$/,'').trim();
+  if(!confirm('«'+al+'» 를 포탈 고객사 «'+dbName+'» 의 별칭으로 저장할까요?\n다음 달부터 이 표기는 자동으로 같은 회사로 맞춰집니다.')) return;
+  try{
+    var cu=(SB_RAW.customers||[]).filter(function(c){ return c.name===dbName; })[0]; if(!cu) throw new Error('고객사 마스터에서 찾지 못했습니다');
+    var next=(cu.aliases||[]).slice(); if(next.indexOf(al)<0) next.push(al);
+    await sbWrite('PATCH','customers?id=eq.'+cu.id,{aliases:next});
+    cu.aliases=next; logChange('update','customers',cu.id,{alias_add:al, from:'비즈포탈 대조'});
+    toast('별칭 저장', al+' → '+dbName);
+    BZX.res=bzxCompare(BZX.rows, BZX.res.T); renderBizMonthly();
+  }catch(e){ toast('별칭 저장 실패', String(e.message||e), 'info'); }
+}
+async function bzxSave(diffs){
+  if(!SB_TOKEN){ openOvl('ovlAuth'); return; }
+  var res=BZX.res, T=res.T, ym=(+mk(T).slice(5,7))+'월', y=+mk(T).slice(0,4);
+  var today=todayStr(), asof=(+today.slice(0,4)===y)? today : (y+'-'+mk(T).slice(5,7)+'-'+('0'+new Date(y,+mk(T).slice(5,7),0).getDate()).slice(-2));
+  var exists=(RAWX.biz||[]).some(function(r){ return r.ym===ym; });
+  if(exists && !confirm(ym+' 대조 결과가 이미 있습니다. 이번 자동 대조 결과로 바꿀까요?')) return;
+  var out=[
+    {ym:ym, as_of:asof, kind:'sum', item:'비즈포탈 회계매출', biz:Math.round(res.sum.biz)},
+    {ym:ym, as_of:asof, kind:'sum', item:'매출시트(포탈) 매출', biz:Math.round(res.sum.db)},
+    {ym:ym, as_of:asof, kind:'sum', item:'차액 총계', biz:res.sum.diff}
+  ];
+  diffs.forEach(function(q){
+    if(q.cat==='alias' && q.pairConf!=='low') return;   // 표기 차이는 금액 차이가 아니므로 표에 넣지 않음 (별칭 저장으로 해결)
+    if(q.cat==='alias'){ var note2=BZX.notes[bzxNoteKey(q)]||bzxPrevNote(q.name)||('금액만 같은 짝(확인 필요): '+q.pair.name);
+      out.push({ym:ym, as_of:asof, kind:'detail', item:q.name, biz:Math.round(q.bizAmt), sheet:0, diff:Math.round(q.bizAmt), note:note2});
+      out.push({ym:ym, as_of:asof, kind:'detail', item:q.pair.name, biz:0, sheet:Math.round(q.pair.dbTot), diff:-Math.round(q.pair.dbTot), note:note2}); return; }
+    var note=BZX.notes[bzxNoteKey(q)]; if(note==null) note=bzxPrevNote(q.name);
+    if(!note && q.cat==='fee') note='설치비 인식 시점 차이 (비즈포탈 '+mk(T)+' · 포탈 정산일 기준)';
+    out.push({ym:ym, as_of:asof, kind:'detail', item:q.name, biz:Math.round(q.bizAmt), sheet:Math.round(q.dbTot), diff:q.diff, note:note||null});
+  });
+  try{
+    await sbWrite('DELETE','biz_recon?ym=eq.'+encodeURIComponent(ym));
+    var ins=await sbWrite('POST','biz_recon?select=*',out,'return=representation');
+    RAWX.biz=(RAWX.biz||[]).filter(function(r){return r.ym!==ym;}).concat(ins||[]);
+    logChange('update','biz_recon',0,{ym:ym, rows:out.length, from:'엑셀 자동 대조', file:BZX.file});
+    toast('저장되었습니다', ym+' 비즈포탈 대조 결과 · 차이 '+(out.length-3)+'곳');
+    DIRTY=true; BIZV.ym=ym; BZX.res=null; BZX.rows=null; renderBizMonthly();
+  }catch(e){ toast('저장 실패', String(e.message||e), 'info'); }
+}
+async function bzxOpenFile(file){
+  if(!file) return;
+  var msgEl=$('#dvMsg'); msgEl.textContent='엑셀 읽는 중…';
+  try{
+    await bzxLoadLib();
+    var buf=await file.arrayBuffer();
+    var rows=bzxParse(buf);
+    var mi=bzxMonthIdx(rows);
+    if(mi.idx==null) throw new Error('«예상시기» 열에서 대상 월을 읽지 못했습니다.');
+    if(mi.months.length>1) toast('여러 달이 섞여 있음', mi.months.join(', ')+' — 가장 많은 '+mi.ym+' 기준으로 대조합니다', 'info');
+    BZX.rows=rows.filter(function(r){ return r.when && (r.when.getFullYear()+'-'+('0'+(r.when.getMonth()+1)).slice(-2))===mi.ym; });
+    BZX.file=file.name; BZX.month=mi.ym; BZX.notes={}; BZX.showEq=false; BZX.showSkip=false;
+    BZX.res=bzxCompare(BZX.rows, mi.idx);
+    msgEl.textContent='';
+    renderBizMonthly();
+  }catch(e){ msgEl.textContent=String(e.message||e); toast('엑셀 대조 실패', String(e.message||e).slice(0,120), 'info'); }
 }
 
 /* ===== 사업 영역 계약 목록 — 고객사별 최신 1건 + 이력 보기 + 열 필터 ===== */
