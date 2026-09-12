@@ -2124,7 +2124,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-12 ㊿+51';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-12 ㊿+52';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -6263,7 +6263,7 @@ function bzxRender(host){
        '<td class="n">'+(q.biz.some(function(b){return b.st==='종료';})? w(bizAmt):'·')+'</td><td class="n">'+((q.db.length||q.pair)? w(dbAmt):'·')+'</td>'+
        '<td class="n" style="font-weight:700;color:'+(diff===0?'var(--muted)':diff>0?'var(--ok,#2e7d32)':'var(--critical)')+'">'+(diff>0?'+':'')+w(diff)+'</td>'+
        '<td style="white-space:normal"><div style="display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center"><button class="chip bzx-det" data-i="'+i+'" title="양쪽 원본 행 보기">내역</button>'+(q.cat==='alias' && !window.IS_VIEWER? '<button class="chip bzx-alias" data-i="'+i+'" title="비즈포탈 표기를 포탈 고객사의 별칭으로 저장 — 다음 달부터 자동으로 맞춰짐">별칭 저장</button>':'')+
-         ((q.cat!=='alias' || q.pairConf==='low') && !window.IS_VIEWER? '<select class="chip bzx-rule" data-i="'+i+'" title="이 회사가 매달 같은 종류의 차이로 잡힐 때 어떻게 할지 — 다시 묻지 않습니다" style="font:inherit;font-size:12px;cursor:pointer"><option value="">🔁 매달 반복…</option><option value="note">사유 기록 반복 — 차액 표에 이 사유로 자동 기록</option><option value="ignore">무시 반복 — 우리 차액 아님 · 총계·표에서 제외</option></select>':'')+'</div></td>'+
+         ((q.cat!=='alias' || q.pairConf==='low') && !window.IS_VIEWER? '<select class="chip bzx-rule" data-i="'+i+'" title="이 회사가 매달 같은 종류의 차이로 잡힐 때 어떻게 할지 — 다시 묻지 않습니다. 사유 기록 = 차액 인정·사유 자동 기록 / 무시 = 우리 차액 아님·총계와 표에서 제외" style="font:inherit;font-size:12px;cursor:pointer;width:124px;max-width:124px;box-sizing:border-box;padding-right:14px;text-overflow:ellipsis"><option value="">🔁 반복 규칙</option><option value="note">사유 기록 반복</option><option value="ignore">무시 반복</option></select>':'')+'</div></td>'+
        '<td><input class="bzx-note" data-key="'+esc(key)+'" value="'+esc(note)+'" placeholder="'+esc(auto||'왜 다른지 한 줄로')+'" title="'+esc(auto||'')+'" style="width:100%;box-sizing:border-box;font:inherit;padding:5px 8px;border:1px solid var(--ring);border-radius:8px;background:var(--surface-2);color:inherit"></td></tr>';
     h+='<tr class="bzx-detrow" data-i="'+i+'" style="display:none"><td colspan="7" style="background:var(--surface-2,rgba(0,0,0,.02))"><div class="mini" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'+
        '<div><b>비즈포탈 행</b>'+(q.biz.length? '<table class="pr" style="margin-top:4px"><tbody>'+q.biz.map(function(b){ return '<tr><td>'+esc(b.proj)+'</td><td>'+esc(b.st)+'</td><td class="n">'+w(b.acc)+'</td><td class="mini">'+esc(b.why||'')+'</td></tr>'; }).join('')+'</tbody></table>' : '<div style="color:var(--muted)">없음</div>')+'</div>'+
