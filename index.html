@@ -501,6 +501,24 @@ body{padding-left:192px}
 .mtabs button[aria-pressed="true"]{background:var(--s1);border-color:var(--s1);color:#fff}
 .frm{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px}
 .frm .full{grid-column:1/-1}
+/* Cloud 사이트 관리 — 큰 작업 카드 · 단계 구역 · 요약 */
+.cs-acts{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+.cs-act{text-align:left;border:1.5px solid var(--ring);background:var(--surface-2);border-radius:14px;padding:14px 16px;cursor:pointer;font-family:inherit;color:inherit;transition:border-color .15s,background .15s}
+.cs-act .ic{font-size:22px;line-height:1;margin-bottom:8px}
+.cs-act .t{font-weight:750;font-size:14px}
+.cs-act .d{font-size:12px;color:var(--ink-2);margin-top:4px;line-height:1.45}
+.cs-act[aria-pressed="true"]{border-color:var(--s1);background:color-mix(in srgb,var(--s1) 8%,var(--surface))}
+.cs-sec{border:1px solid var(--ring);border-radius:12px;padding:14px 16px 16px;margin-top:12px;background:var(--surface)}
+.cs-sec>h4{margin:0 0 12px;font-size:13px;display:flex;align-items:center;gap:8px}
+.cs-sec>h4 .no{width:22px;height:22px;border-radius:50%;background:var(--s1);color:#fff;font-size:12px;display:inline-flex;align-items:center;justify-content:center}
+.cs-sec>h4 small{color:var(--muted);font-weight:400}
+.cs-sum{margin-top:14px;padding:12px 14px;border-radius:12px;background:color-mix(in srgb,var(--s1) 7%,var(--surface));border:1px solid color-mix(in srgb,var(--s1) 30%,var(--ring));font-size:13.5px;line-height:1.6}
+.cs-sum b{color:var(--s1)}
+.cs-sum.bad{background:rgba(208,59,59,.06);border-color:rgba(208,59,59,.35)}
+.cs-sum.bad b{color:var(--critical)}
+.cs-sum details{margin-top:6px}.cs-sum summary{cursor:pointer;font-size:12px;color:var(--muted)}
+.cs-sum pre{margin:6px 0 0;font-size:11.5px;white-space:pre-wrap;word-break:break-all;color:var(--ink-2)}
+@media (max-width:900px){.cs-acts{grid-template-columns:1fr}}
 .mpchk{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:550;cursor:pointer;padding:7px 12px;border:1px solid var(--ring);border-radius:10px;background:var(--surface-2)}
 .mpchk input{width:16px;height:16px;accent-color:var(--brand,#149e40)}
 .oi-prow{display:flex;gap:10px;align-items:center;margin-bottom:7px;flex-wrap:wrap}
@@ -1015,7 +1033,6 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
   <div class="grp">PoC·데모</div>
   <button data-v="mdrnew">🛡️ PoC 신청</button>
   <button data-v="mdrops">🛰️ 운영·신청 현황</button>
-  <button data-v="csite" style="display:none">☁️ Cloud 사이트 생성</button>
   <div class="grp">영업</div>
   <button data-v="oinew">✏️ OI 등록</button>
   <button data-v="oi">🎯 OI 현황</button>
@@ -1029,6 +1046,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
   <button data-v="quote">📄 견적 시스템</button>
   <button data-v="price">💰 가격표</button>
   <button data-v="cloud">☁️ 클라우드 비용</button>
+  <button data-v="csite" style="display:none">🛰️ Cloud 사이트 관리</button>
   <button data-v="report">📑 리포트</button>
   <div class="grp" id="grpAdmin">관리자</div>
   <button data-v="log">🕘 변경 이력</button>
@@ -1346,64 +1364,79 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
   </div>
 
   <div id="viewCsite" class="hidden">
-    <section class="card c12" style="max-width:900px;margin:0 auto">
-      <h3 style="margin:0 0 4px;font-size:16px">☁️ Cloud 사이트 생성·수정</h3>
-      <p class="cap" style="margin:0 0 12px">my.genians.co.kr 의 사이트 API를 포탈에서 바로 부릅니다. 요청과 결과는 아래 이력에 남고, API 키는 서버(Edge Function)에만 있어 화면·저장소에 노출되지 않습니다. <b>슈퍼 관리자 전용</b> 메뉴입니다.</p>
-      <div class="mtabs" id="csTabs" style="margin-bottom:12px">
-        <button data-t="create" aria-pressed="true">＋ 사이트 생성</button>
-        <button data-t="update">✎ 사이트 정보 수정 (노드 수·만료일)</button>
-        <button data-t="creds" id="csTabCreds" style="display:none">🔑 계정·API Key 관리</button>
+    <section class="card c12" style="max-width:960px;margin:0 auto">
+      <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><h3 style="margin:0;font-size:16px">🛰️ Cloud 사이트 관리</h3><span class="ubadge sm">슈퍼 관리자 전용</span></div>
+      <p class="cap" style="margin:0 0 14px">my.genians.co.kr 에 사이트를 만들거나(체험판) 기존 사이트의 노드 수·만료일을 바꿉니다. 아래 카드에서 할 일을 고르고 → 칸을 채우면 → 맨 아래 요약을 확인하고 실행합니다. API 키는 서버에만 있어 화면·저장소에 나오지 않습니다.</p>
+      <div class="cs-acts" id="csTabs">
+        <button class="cs-act" data-t="create" aria-pressed="true"><div class="ic">➕</div><div class="t">새 사이트 만들기</div><div class="d">고객 데모·PoC용 Cloud 사이트를 새로 만듭니다 (cloudsite)</div></button>
+        <button class="cs-act" data-t="update"><div class="ic">✏️</div><div class="t">기존 사이트 수정</div><div class="d">라이선스 노드 수·만료일을 바꿉니다 (cloudsite-update)</div></button>
+        <button class="cs-act" data-t="creds" id="csTabCreds" style="display:none"><div class="ic">🔑</div><div class="t">API 계정 관리</div><div class="d">my.genians API 키를 계정별로 등록·삭제</div></button>
       </div>
       <div id="csDone" style="display:none;text-align:center;padding:30px 10px 20px">
         <div id="csDoneIcon" style="width:66px;height:66px;margin:0 auto 14px;border-radius:50%;background:rgba(12,163,12,.12);display:flex;align-items:center;justify-content:center;font-size:30px;color:var(--good,#0ca30c)">✓</div>
         <div id="csDoneTitle" style="font-size:17.5px;font-weight:750;letter-spacing:-.01em">사이트가 만들어졌습니다</div>
         <p class="cap" id="csDoneSum" style="margin:10px 0 22px;font-size:12.5px"></p>
-        <div style="display:flex;gap:10px;justify-content:center"><button class="pill ghost" id="csDoneNew">＋ 계속 작업</button></div>
+        <div style="display:flex;gap:10px;justify-content:center"><button class="pill" id="csDoneNew" style="background:var(--s1);border-color:var(--s1);color:#fff">＋ 계속 작업</button></div>
       </div>
       <div id="csFormWrap">
-        <div class="frm" style="margin-bottom:6px">
-          <div class="full"><label>API 계정 <small style="color:var(--muted)">(어느 my.genians 계정으로 부를지)</small></label><select id="csCred"><option value="">불러오는 중…</option></select></div>
-        </div>
         <div id="csPaneCreate">
-          <div class="frm">
-            <div class="full"><label>고객사 <small style="color:var(--muted)">(포탈 고객사 이름 · 이력 표시용 · 선택)</small></label><input id="csCust" list="dlCust" placeholder="기존 고객이면 자동완성 · 신규면 그대로 입력"></div>
-            <div><label>사이트명 (sitename) *</label><input id="csName" placeholder="예: choihw · 영문 소문자·숫자·하이픈" autocapitalize="off" spellcheck="false"><div class="mini" id="csNameHint" style="color:var(--muted);margin-top:4px">영문 소문자·숫자·하이픈(-) 2~63자 · 보통 고객사 영문명(CSM)과 같게</div></div>
-            <div><label>노드 수 (numberofdevices) *</label><input id="csDev" type="number" min="1" max="100000" step="1" placeholder="예: 100"></div>
-            <div><label>제품 (product)</label><select id="csProd"><option value="ztna">ztna — Cloud ZTNA</option><option value="__etc">직접 입력…</option></select><input id="csProdEtc" placeholder="제품 코드" style="display:none;margin-top:6px" autocapitalize="off"></div>
-            <div><label>에디션 (edition)</label><select id="csEd"><option value="ent">ent — Enterprise</option><option value="__etc">직접 입력…</option></select><input id="csEdEtc" placeholder="에디션 코드 (예: bas)" style="display:none;margin-top:6px" autocapitalize="off"></div>
-            <div><label>언어 (language)</label><select id="csLang"><option value="ko">ko — 한국어</option><option value="en">en — English</option><option value="ja">ja — 日本語</option><option value="zh">zh — 中文</option></select></div>
-            <div><label>메모 <small style="color:var(--muted)">(선택 · 용도·담당 등)</small></label><input id="csMemo" placeholder="예: OO사 PoC 2주 · 담당 홍길동"></div>
+          <div class="cs-sec"><h4><span class="no">1</span>누구 사이트인가요 <small>— 고객사를 고르면 영문 사이트명이 자동으로 채워집니다</small></h4>
+            <div class="frm">
+              <div><label>고객사 <small style="color:var(--muted)">(이력 표시용 · 선택)</small></label><input id="csCust" list="dlCust" placeholder="기존 고객이면 자동완성 · 신규면 그대로 입력"></div>
+              <div><label>사이트명 <small style="color:var(--muted)">sitename · 접속 주소가 됩니다</small></label><input id="csName" placeholder="예: choihw" autocapitalize="off" spellcheck="false"><div class="mini" id="csNameHint" style="color:var(--muted);margin-top:4px">영문 소문자·숫자·하이픈(-) 2~63자</div></div>
+            </div>
+          </div>
+          <div class="cs-sec"><h4><span class="no">2</span>어떤 사이트로 만들까요</h4>
+            <div class="frm">
+              <div><label>제품 <small style="color:var(--muted)">product</small></label><select id="csProd"><option value="ztna">Cloud ZTNA (ztna)</option><option value="__etc">직접 입력…</option></select><input id="csProdEtc" placeholder="제품 코드" style="display:none;margin-top:6px" autocapitalize="off"></div>
+              <div><label>에디션 <small style="color:var(--muted)">edition</small></label><select id="csEd"><option value="ent">Enterprise (ent)</option><option value="__etc">직접 입력…</option></select><input id="csEdEtc" placeholder="에디션 코드 (예: bas)" style="display:none;margin-top:6px" autocapitalize="off"></div>
+              <div><label>노드 수 <small style="color:var(--muted)">numberofdevices · 라이선스 단말 수</small></label><input id="csDev" type="number" min="1" max="100000" step="1" placeholder="예: 100"></div>
+              <div><label>화면 언어 <small style="color:var(--muted)">language</small></label><select id="csLang"><option value="ko">한국어 (ko)</option><option value="en">English (en)</option><option value="ja">日本語 (ja)</option><option value="zh">中文 (zh)</option></select></div>
+              <div class="full"><label>메모 <small style="color:var(--muted)">(선택 · 용도·담당 — 이력에 남음)</small></label><input id="csMemo" placeholder="예: OO사 PoC 2주 · 담당 홍길동"></div>
+            </div>
           </div>
         </div>
         <div id="csPaneUpdate" style="display:none">
-          <div class="frm">
-            <div class="full"><label>사이트명 (sitename) *</label><input id="cuName" list="dlCsSites" placeholder="수정할 사이트 · 이력에서 자동완성" autocapitalize="off" spellcheck="false"><datalist id="dlCsSites"></datalist></div>
-            <div><label>라이선스 노드 수 (nodes) *</label><input id="cuNodes" type="number" min="1" max="100000" step="1" placeholder="예: 500"></div>
-            <div><label>SRA (sra) <small style="color:var(--muted)">— API 항목 그대로 · 모르면 비움</small></label><input id="cuSra" type="number" min="0" step="1" placeholder="예: 10"></div>
-            <div><label>만료일 (expiredate) *</label><input id="cuExp" type="date"></div>
-            <div><label>고객사 <small style="color:var(--muted)">(이력 표시용 · 선택)</small></label><input id="cuCust" list="dlCust"></div>
-            <div class="full"><label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="checkbox" id="cuMail" style="width:auto;height:auto;margin:0"> 고객에게 안내 메일 발송 (send_mail=1)</label></div>
-            <div class="full"><label>메모 <small style="color:var(--muted)">(선택)</small></label><input id="cuMemo" placeholder="예: 재약정 3년 · 노드 300→500"></div>
+          <div class="cs-sec"><h4><span class="no">1</span>어느 사이트를 고칠까요 <small>— 이 포탈에서 만든 사이트는 자동완성에 나옵니다</small></h4>
+            <div class="frm">
+              <div><label>사이트명 <small style="color:var(--muted)">sitename</small></label><input id="cuName" list="dlCsSites" placeholder="예: choihw" autocapitalize="off" spellcheck="false"><datalist id="dlCsSites"></datalist></div>
+              <div><label>고객사 <small style="color:var(--muted)">(이력 표시용 · 선택)</small></label><input id="cuCust" list="dlCust"></div>
+            </div>
+          </div>
+          <div class="cs-sec"><h4><span class="no">2</span>무엇을 바꿀까요</h4>
+            <div class="frm">
+              <div><label>라이선스 노드 수 <small style="color:var(--muted)">nodes</small></label><input id="cuNodes" type="number" min="1" max="100000" step="1" placeholder="예: 500"></div>
+              <div><label>만료일 <small style="color:var(--muted)">expiredate</small></label><input id="cuExp" type="date"></div>
+              <div><label>SRA <small style="color:var(--muted)">sra · API 항목 그대로 · 모르면 비움</small></label><input id="cuSra" type="number" min="0" step="1" placeholder="예: 10"></div>
+              <div style="display:flex;align-items:end"><label class="mpchk" style="width:100%;height:36px;justify-content:center;margin:0"><input type="checkbox" id="cuMail"> 고객에게 안내 메일 발송 (send_mail)</label></div>
+              <div class="full"><label>메모 <small style="color:var(--muted)">(선택 · 이력에 남음)</small></label><input id="cuMemo" placeholder="예: 재약정 3년 · 노드 300→500"></div>
+            </div>
           </div>
         </div>
         <div id="csPaneCreds" style="display:none">
-          <p class="cap" style="margin:0 0 10px">my.genians.co.kr 에서 발급한 API 키를 계정별로 등록합니다. 키는 서버 표(api_credentials)에만 저장되고 화면에는 다시 표시되지 않으며, 등록·삭제는 슈퍼 관리자만 할 수 있습니다.</p>
-          <div class="frm">
-            <div><label>라벨 *</label><input id="ccLabel" placeholder="예: 서비스사업부 공용 / 홍길동"></div>
-            <div><label>API 이메일 (apiemail) *</label><input id="ccEmail" type="email" placeholder="발급 계정 이메일" autocapitalize="off"></div>
-            <div class="full"><label>API 키 (apikey) *</label><input id="ccKey" type="password" placeholder="my.genians.co.kr 에서 복사한 키 — 저장 후 다시 볼 수 없음" autocomplete="off"></div>
+          <div class="cs-sec"><h4><span class="no">+</span>API 계정 추가 <small>— my.genians.co.kr 에서 발급한 키 · 저장 후에는 다시 볼 수 없습니다</small></h4>
+            <div class="frm">
+              <div><label>라벨 <small style="color:var(--muted)">화면 표시 이름</small></label><input id="ccLabel" placeholder="예: 서비스사업부 공용 / 홍길동"></div>
+              <div><label>API 이메일 <small style="color:var(--muted)">apiemail</small></label><input id="ccEmail" type="email" placeholder="발급 계정 이메일" autocapitalize="off"></div>
+              <div class="full"><label>API 키 <small style="color:var(--muted)">apikey</small></label><input id="ccKey" type="password" placeholder="my.genians.co.kr 에서 복사한 키" autocomplete="off"></div>
+            </div>
+            <div style="display:flex;gap:10px;align-items:center;margin-top:10px"><span class="mmsg" id="ccMsg" style="flex:1"></span><button class="btn" style="height:36px" id="ccAdd">🔑 계정 추가</button></div>
           </div>
-          <div style="display:flex;gap:10px;align-items:center;margin-top:10px"><span class="mmsg" id="ccMsg" style="flex:1"></span><button class="btn" style="height:36px" id="ccAdd">🔑 계정 추가</button></div>
-          <div style="overflow-x:auto;margin-top:12px"><table class="pr" id="ccList"><thead><tr><th>라벨</th><th>API 이메일</th><th>등록</th><th></th></tr></thead><tbody></tbody></table></div>
+          <div class="cs-sec"><h4>등록된 계정</h4>
+            <div style="overflow-x:auto"><table class="pr" id="ccList"><thead><tr><th>라벨</th><th>API 이메일</th><th>등록</th><th></th></tr></thead><tbody></tbody></table></div>
+          </div>
         </div>
-        <div class="cap" id="csPrev" style="margin:12px 0 0;padding:10px 12px;border:1px dashed var(--ring);border-radius:10px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:var(--ink-2)"></div>
-        <div style="display:flex;gap:10px;align-items:center;margin-top:14px" id="csActs">
-          <span class="mmsg" id="csMsg" style="flex:1"></span>
-          <button class="btn" style="height:36px" id="csGo">☁️ 사이트 생성</button>
+        <div class="cs-sec" id="csSecRun"><h4><span class="no">3</span>확인하고 실행 <small>— 실제 사이트가 바뀌는 작업이라 한 번 더 묻습니다</small></h4>
+          <div class="frm"><div class="full"><label>어느 API 계정으로 부를까요 <small style="color:var(--muted)">(등록된 my.genians 계정)</small></label><select id="csCred"><option value="">불러오는 중…</option></select></div></div>
+          <div class="cs-sum" id="csSum"></div>
+          <div style="display:flex;gap:10px;align-items:center;margin-top:12px" id="csActs">
+            <span class="mmsg" id="csMsg" style="flex:1"></span>
+            <button class="btn" style="height:38px;padding:0 18px" id="csGo">➕ 사이트 만들기</button>
+          </div>
         </div>
       </div>
       <div style="margin-top:22px;padding-top:14px;border-top:1px solid var(--ring)">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><b style="font-size:14px">🕘 요청 이력</b><span class="mini" id="csHistCap" style="color:var(--muted)"></span><span style="flex:1"></span><button class="chip" id="csHistRefresh">↻ 새로 읽기</button></div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap"><b style="font-size:14px">🕘 요청 이력</b><span class="mini" id="csHistCap" style="color:var(--muted)"></span><span style="flex:1"></span><input id="csHistQ" placeholder="사이트명·고객사 검색" style="height:30px;padding:0 10px;border:1px solid var(--ring);border-radius:8px;background:var(--surface-2);color:inherit;font:inherit;font-size:12px;width:200px"><button class="chip" id="csHistRefresh">↻ 새로 읽기</button></div>
         <div style="overflow-x:auto"><table class="pr" id="csHist"><thead><tr><th>일시</th><th>작업</th><th>사이트명</th><th>고객사</th><th>내용</th><th>결과</th><th>메시지</th><th>요청자</th><th>API 계정</th><th>메모</th></tr></thead><tbody></tbody></table></div>
       </div>
     </section>
@@ -2190,7 +2223,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-15 ㊿+56';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-15 ㊿+57';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -9346,21 +9379,39 @@ function csBody(){
   }
   return {action:'create', cred_id:$('#csCred').value, sitename:($('#csName').value||'').trim().toLowerCase(), product:csVal('csProd','csProdEtc')||'ztna', edition:csVal('csEd','csEdEtc')||'ent', language:$('#csLang').value, numberofdevices:String(+$('#csDev').value||'')};
 }
+var CS_PROD={ztna:'Cloud ZTNA'}, CS_ED={ent:'Enterprise', bas:'Basic', basic:'Basic', std:'Standard'}, CS_LANG={ko:'한국어',en:'English',ja:'日本語',zh:'中文'};
 function csPreview(){
   var b=csBody(), ok=/^[a-z0-9][a-z0-9-]{1,62}$/.test(b.sitename||'');
   if(CS.tab==='create') $('#csNameHint').style.color=(!b.sitename||ok)? 'var(--muted)' : 'var(--critical)';
+  if(CS.tab==='creds') return b;
   var show=Object.assign({}, b); delete show.action; delete show.cred_id;
   var cred=(CS.creds||[]).filter(function(c){ return String(c.id)===String($('#csCred').value); })[0];
-  $('#csPrev').textContent=CS.tab==='creds'? '' : 'POST my.genians.co.kr/genians/api/v1/'+(CS.tab==='update'?'cloudsite-update':'cloudsite')+'  '+JSON.stringify(Object.assign({apikey:'(서버 보관)', apiemail:cred? cred.apiemail : '(계정 선택)'}, show));
+  var box=$('#csSum'), miss=[], html;
+  if(!b.sitename) miss.push('사이트명'); else if(!ok) miss.push('사이트명 형식(영문 소문자·숫자·하이픈)');
+  if(CS.tab==='update'){
+    if(!(+b.nodes)) miss.push('노드 수'); if(!b.expiredate) miss.push('만료일');
+    var prevH=(CS.hist||[]).filter(function(x){ return x.result && x.sitename===b.sitename; })[0];
+    html='<b>'+esc(b.sitename||'(사이트명)')+'</b> 사이트의 라이선스를 <b>'+(b.nodes? Number(b.nodes).toLocaleString('ko-KR')+'노드':'(노드 수)')+'</b>'+(b.sra!=null? ' · SRA <b>'+b.sra+'</b>':'')+', 만료일 <b>'+(b.expiredate||'(만료일)')+'</b>로 바꿉니다'+(b.send_mail? ' — 고객에게 안내 메일을 <b>보냅니다</b>':' — 안내 메일은 보내지 않습니다')+'.'+
+         (prevH? '<div class="mini" style="color:var(--muted);margin-top:4px">이 포탈에서 '+esc(String(prevH.created_at).slice(0,10))+'에 '+esc(prevH.action==='update'?'수정':'생성')+'한 이력 있음'+(prevH.devices? ' · 당시 '+prevH.devices+'노드':'')+(prevH.customer? ' · '+esc(prevH.customer):'')+'</div>' : (b.sitename&&ok? '<div class="mini" style="color:var(--muted);margin-top:4px">이 포탈 이력에는 없는 사이트명 — 철자를 한 번 더 확인하세요</div>':''));
+  } else {
+    if(!(+b.numberofdevices)) miss.push('노드 수');
+    var dup=(CS.hist||[]).filter(function(x){ return x.result && x.action!=='update' && x.sitename===b.sitename; })[0];
+    html=(($('#csCust').value||'').trim()? '<b>'+esc($('#csCust').value.trim())+'</b> 고객사의 ':'')+'<b>'+esc(b.sitename||'(사이트명)')+'</b> 사이트를 <b>'+esc(CS_PROD[b.product]||b.product)+' '+esc(CS_ED[b.edition]||b.edition)+'</b> 에디션, '+esc(CS_LANG[b.language]||b.language)+' 화면, <b>'+(b.numberofdevices? Number(b.numberofdevices).toLocaleString('ko-KR')+'노드':'(노드 수)')+'</b>로 새로 만듭니다.'+
+         (dup? '<div class="mini" style="color:var(--critical);margin-top:4px">⚠ 같은 사이트명을 '+esc(String(dup.created_at).slice(0,10))+'에 이미 만들었습니다 — 중복이면 «기존 사이트 수정»을 쓰세요</div>':'');
+  }
+  html+='<div class="mini" style="margin-top:4px;color:var(--muted)">API 계정: '+(cred? esc(cred.label+' — '+cred.apiemail) : '<span style="color:var(--critical)">선택 필요</span>')+'</div>';
+  if(miss.length) html='<div style="color:var(--critical);font-weight:650;margin-bottom:4px">아직 비어 있음: '+miss.join(' · ')+'</div>'+html;
+  html+='<details><summary>실제로 보내는 요청 보기 (API 형식)</summary><pre>POST my.genians.co.kr/genians/api/v1/'+(CS.tab==='update'?'cloudsite-update':'cloudsite')+'\n'+esc(JSON.stringify(Object.assign({apikey:'(서버 보관)', apiemail:cred? cred.apiemail : '(계정 선택)'}, show), null, 1))+'</pre></details>';
+  box.className='cs-sum'+(miss.length?' bad':''); box.innerHTML=html;
+  $('#csGo').disabled=!!miss.length || !cred;
   return b;
 }
 function csSetTab(t){
   CS.tab=t;
   $('#csTabs').querySelectorAll('button').forEach(function(b){ b.setAttribute('aria-pressed', b.dataset.t===t? 'true':'false'); });
   $('#csPaneCreate').style.display=t==='create'?'':'none'; $('#csPaneUpdate').style.display=t==='update'?'':'none'; $('#csPaneCreds').style.display=t==='creds'?'':'none';
-  $('#csActs').style.display=t==='creds'?'none':''; $('#csPrev').style.display=t==='creds'?'none':'';
-  $('#csCred').parentElement.parentElement.style.display=t==='creds'?'none':'';
-  $('#csGo').textContent=t==='update'? '✎ 사이트 정보 수정' : '☁️ 사이트 생성';
+  $('#csSecRun').style.display=t==='creds'?'none':'';
+  $('#csGo').textContent=t==='update'? '✏️ 사이트 수정 실행' : '➕ 사이트 만들기';
   msg('csMsg',''); csPreview();
   if(t==='creds') csRenderCreds();
 }
@@ -9401,6 +9452,8 @@ function renderCsite(){
     $('#ccAdd').onclick=csAddCred;
     $('#csDoneNew').onclick=function(){ ['csName','csDev','csMemo','csCust','csProdEtc','csEdEtc','cuName','cuNodes','cuSra','cuExp','cuCust','cuMemo'].forEach(function(i){ $('#'+i).value=''; }); $('#cuMail').checked=false; $('#csProd').value='ztna'; $('#csEd').value='ent'; $('#csLang').value='ko'; renderCsite(); };
     $('#csHistRefresh').onclick=function(){ CS.hist=undefined; csHist(); };
+    $('#csHistQ').addEventListener('input',function(){ csHist(); });
+    $('#csCust').addEventListener('input',csPreview);
   }
   csSetTab(CS.tab||'create'); csLoadCreds(); csHist();
   setTimeout(function(){ var f=CS.tab==='update'? '#cuName' : '#csCust'; if(!$(f).value) $(f).focus(); },50);
@@ -9409,13 +9462,15 @@ async function csHist(){
   var tb=$('#csHist tbody');
   if(CS.hist===undefined){ tb.innerHTML='<tr><td colspan="10" class="mini" style="color:var(--muted)">불러오는 중…</td></tr>';
     try{ CS.hist=await sbTry('cloud_sites?select=*&order=id.desc&limit=300')||[]; }catch(e){ CS.hist=[]; } }
-  var h=CS.hist;
+  var q=($('#csHistQ').value||'').trim().toLowerCase();
+  var h=CS.hist.filter(function(x){ return !q || String(x.sitename||'').toLowerCase().indexOf(q)>=0 || String(x.customer||'').toLowerCase().indexOf(q)>=0; });
   var dl=$('#dlCsSites'); if(dl){ dl.innerHTML=''; var seen={}; h.forEach(function(x){ if(x.result && !seen[x.sitename]){ seen[x.sitename]=1; var o=document.createElement('option'); o.value=x.sitename; o.label=(x.customer||'')+(x.devices? ' · '+x.devices+'노드':''); dl.appendChild(o); } }); }
-  $('#csHistCap').textContent=h.length? h.length+'건 · 성공 '+h.filter(function(x){return x.result;}).length : '';
+  $('#csHistCap').textContent=CS.hist.length? (q? h.length+'건 (전체 '+CS.hist.length+')' : h.length+'건')+' · 성공 '+h.filter(function(x){return x.result;}).length : '';
   tb.innerHTML=h.length? h.map(function(x){ var up=x.action==='update', ex=x.extra||{};
       var what=up? ('노드 '+(x.devices||'')+(ex.sra!=null? ' · SRA '+ex.sra:'')+(ex.expiredate? ' · 만료 '+ex.expiredate:'')+(ex.send_mail? ' · 메일':'')) : ((x.product||'')+'/'+(x.edition||'')+(x.language&&x.language!=='ko'? ' · '+x.language:'')+' · '+(x.devices||'')+'노드');
       return '<tr'+(x.result?'':' style="color:var(--muted)"')+'><td style="white-space:nowrap">'+esc(String(x.created_at||'').replace('T',' ').slice(0,16))+'</td><td>'+(up? '<span class="badge b-re">수정</span>':'<span class="badge b-new">생성</span>')+'</td><td><b>'+esc(x.sitename)+'</b></td><td>'+esc(x.customer||'')+'</td><td class="mini">'+esc(what)+'</td><td>'+(x.result? '<span class="badge b-new">성공</span>':'<span class="badge b-churn">실패</span>')+'</td><td class="mini">'+esc(x.message||'')+'</td><td class="mini">'+esc(x.requested_by||'')+'</td><td class="mini">'+esc(x.cred_label||'')+'</td><td class="mini">'+esc(x.memo||'')+'</td></tr>'; }).join('')
-    : '<tr><td colspan="10" class="mini" style="color:var(--muted)">아직 이력이 없습니다 — 66_cloud_sites.sql 이 아직 실행되지 않았다면 표가 없어 비어 보입니다.</td></tr>';
+    : '<tr><td colspan="10" class="mini" style="color:var(--muted)">'+(q? '검색 결과 없음' : '아직 이력이 없습니다 — 66_cloud_sites.sql 이 아직 실행되지 않았다면 표가 없어 비어 보입니다.')+'</td></tr>';
+  try{ if(CS.tab!=='creds') csPreview(); }catch(e){}
 }
 async function csAddCred(){
   if(!SB_TOKEN){ openOvl('ovlAuth'); return; }
