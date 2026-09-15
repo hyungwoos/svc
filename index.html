@@ -971,15 +971,16 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
       <div style="font-size:12.5px;color:var(--muted);margin-top:5px">매출 · 임대장비 · 견적 통합 관리</div>
     </div>
     <div class="card" style="padding:26px 26px 22px;border-radius:16px;box-shadow:0 12px 34px rgba(0,0,0,.08)">
-      <div id="lsLogin">
-        <label style="display:block;font-size:12px;font-weight:650;color:var(--ink-2);margin-bottom:6px">이메일</label>
-        <input id="lsEmail" type="email" autocomplete="username" placeholder="name@genians.com"
+      <!-- form 으로 감싸고 name 을 붙여야 브라우저 비밀번호 관리자가 «아이디+비밀번호»를 한 쌍으로 저장·자동 완성합니다 (전에는 비밀번호만 채워지고 아이디가 비는 일이 있었음) -->
+      <form id="lsLogin" autocomplete="on" onsubmit="return false" style="margin:0">
+        <label for="lsEmail" style="display:block;font-size:12px;font-weight:650;color:var(--ink-2);margin-bottom:6px">이메일</label>
+        <input id="lsEmail" name="username" type="email" autocomplete="username" placeholder="name@genians.com" spellcheck="false" autocapitalize="off"
                style="width:100%;height:42px;padding:0 13px;border-radius:10px;border:1px solid var(--ring);background:var(--surface-2);font-size:14px;margin-bottom:14px">
-        <label style="display:block;font-size:12px;font-weight:650;color:var(--ink-2);margin-bottom:6px">비밀번호</label>
-        <input id="lsPw" type="password" autocomplete="current-password" placeholder="••••••••"
+        <label for="lsPw" style="display:block;font-size:12px;font-weight:650;color:var(--ink-2);margin-bottom:6px">비밀번호</label>
+        <input id="lsPw" name="password" type="password" autocomplete="current-password" placeholder="••••••••"
                style="width:100%;height:42px;padding:0 13px;border-radius:10px;border:1px solid var(--ring);background:var(--surface-2);font-size:14px;margin-bottom:18px">
-        <button id="lsGo" class="btn" style="width:100%;height:44px;font-size:14.5px;border-radius:11px">로그인</button>
-      </div>
+        <button id="lsGo" type="submit" class="btn" style="width:100%;height:44px;font-size:14.5px;border-radius:11px">로그인</button>
+      </form>
       <div id="lsForce" style="display:none">
         <div style="font-size:14px;font-weight:700;margin-bottom:4px">비밀번호 변경</div>
         <p class="cap" style="margin:0 0 14px">최초 로그인입니다 — 본인 비밀번호로 변경해야 사용할 수 있습니다.</p>
@@ -2223,7 +2224,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-15 ㊿+57';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-15 ㊿+58';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -2643,7 +2644,9 @@ function showLoginScreen(){
   $('#app').classList.add('hidden');
   $('#loading').classList.add('hidden');
   $('#viewLogin').classList.remove('hidden');
-  setTimeout(function(){ var e=$('#lsEmail'); if(e) e.focus(); },60);
+  /* 마지막으로 로그인한 이메일을 미리 채움 (이 브라우저에 기억 · 비밀번호는 저장하지 않음) → 브라우저 자동완성과 무관하게 아이디가 비지 않음 */
+  var e=$('#lsEmail'); try{ var last=localStorage.getItem('svc_last_email')||''; if(e && !e.value && last) e.value=last; }catch(x){}
+  setTimeout(function(){ var em=$('#lsEmail'), pw=$('#lsPw'); if(em && em.value && pw && !pw.value) pw.focus(); else if(em) em.focus(); },60);
 }
 function enterAfterLogin(){
   $('#viewLogin').classList.add('hidden');
@@ -2664,6 +2667,7 @@ async function screenLogin(){
     if(!r.ok||!j.access_token) throw new Error(j.error_description||j.msg||'이메일 또는 비밀번호가 올바르지 않습니다');
     SB_TOKEN=j.access_token; AUTH_USER=em;
     saveSess(j, em);
+    try{ localStorage.setItem('svc_last_email', em); }catch(x){}
     showAuthUi();
     var changed=j.user && j.user.user_metadata && j.user.user_metadata.pw_changed;
     if(!changed){
@@ -2692,7 +2696,8 @@ async function screenPw(){
 }
 (function(){
   var g=document.getElementById('lsGo'); if(!g) return;
-  g.onclick=screenLogin;
+  var f=document.getElementById('lsLogin'); if(f) f.addEventListener('submit',function(e){ e.preventDefault(); screenLogin(); });   // Enter·버튼 모두 submit 으로 → 비밀번호 관리자 저장 프롬프트도 정상 동작
+  g.onclick=function(e){ e.preventDefault(); screenLogin(); };
   document.getElementById('lsPwGo').onclick=screenPw;
   ['lsEmail','lsPw'].forEach(function(id){
     document.getElementById(id).addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); screenLogin(); } });
