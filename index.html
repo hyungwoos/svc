@@ -1221,7 +1221,9 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
     <section class="card c12" data-w="exp">
       <div class="card-head">
         <div class="t"><h2>계약 만료 예정<span class="ukw">천원</span></h2><p class="cap" id="capExp">기준월 이후 만료되는 계약 · 재약정 타깃</p></div>
-        <div class="seg" id="segExp">
+        <div class="seg" id="segExp" title="만료 기간 — 위 «N개월 내 만료» 타일과 같이 움직입니다">
+          <button data-m="1">1개월</button>
+          <button data-m="2">2개월</button>
           <button data-m="3" aria-pressed="true">3개월</button>
           <button data-m="6">6개월</button>
           <button data-m="12">12개월</button>
@@ -2124,7 +2126,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-12 ㊿+52';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-15 ㊿+53';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -2788,9 +2790,8 @@ function buildControls(){
   $('#segTrend').onclick=function(e){ if(e.target.tagName!=='BUTTON')return;
     $$('#segTrend button').forEach(function(b){b.setAttribute('aria-pressed','false');});
     e.target.setAttribute('aria-pressed','true'); STATE.trendR=+e.target.dataset.r; renderTrend(); };
-  $('#segExp').onclick=function(e){ if(e.target.tagName!=='BUTTON')return;
-    $$('#segExp button').forEach(function(b){b.setAttribute('aria-pressed','false');});
-    e.target.setAttribute('aria-pressed','true'); STATE.expM=+e.target.dataset.m; renderExpiring(); };
+  $('#segExp').onclick=function(e){ if(e.target.tagName!=='BUTTON')return; setExpN(+e.target.dataset.m); };
+  STATE.expM=expN(); $$('#segExp button').forEach(function(b){ b.setAttribute('aria-pressed', +b.dataset.m===STATE.expM? 'true':'false'); });
 
   $$('[data-tv]').forEach(function(b){
     b.setAttribute('aria-pressed','false');
@@ -2946,13 +2947,13 @@ function renderHero(list){
   var expCnt=0, expAmt=0;
   list.forEach(function(k){
     var e=DATA.rows[k].endIdx;
-    if(e!=null && e>=b && e<=b+2 && !/해지|종료|CN전환/.test(String(DATA.rows[k].status||''))){ expCnt++; expAmt+=MAT[k][Math.min(e,M-1)]||DATA.rows[k].mrr||0; }
+    if(e!=null && e>=b && e<=b+expN()-1 && !/해지|종료|CN전환/.test(String(DATA.rows[k].status||''))){ expCnt++; expAmt+=MAT[k][Math.min(e,M-1)]||DATA.rows[k].mrr||0; }
   });
   var curYm=monOf(b)+'월';
   var bizDone=(RAWX.biz||[]).some(function(r){ return r.ym===curYm; });
   var items=[];
   if(pend) items.push({t:'warn', ic:'📦', msg:'처리 대기 장비 요청이 <b>'+pend+'건</b> 있습니다.', go:function(){ switchView('orders'); }});
-  if(expCnt) items.push({t:'info', ic:'⏳', msg:'3개월 내 만료 계약이 <b>'+expCnt+'건</b> ('+won(expAmt)+'천원) 있습니다 — 재약정 타깃.', go:function(){ goWidget('exp','계약 만료 예정'); }});
+  if(expCnt) items.push({t:'info', ic:'⏳', msg:expN()+'개월 내 만료 계약이 <b>'+expCnt+'건</b> ('+won(expAmt)+'천원) 있습니다 — 재약정 타깃.', go:function(){ goWidget('exp','계약 만료 예정'); }});
   if(!bizDone) items.push({t:'warn', ic:'⚖️', msg:'이번 달('+curYm+') 비즈포탈 차액이 아직 입력되지 않았습니다.', go:function(){ switchView('biz'); }});
   var st=$('#noticeStack'); st.innerHTML='';
   if(!items.length){
@@ -3546,8 +3547,8 @@ function renderKpis(list){
     var st=String(r.status||'');
     if(st!=='통합과금' && r.startIdx!=null && r.startIdx>=0 && r.startIdx>=f0 && r.startIdx<=b) newRows.push(k);
     if(st==='해지' && !(r.line==='S1' && String(r.saleType||'')==='CND')){ var x=r.endIdx!=null? r.endIdx : r._l; if(x!=null && x>=f0 && x<=b){ churnRows.push(k); churnAmt+=(MAT[k][x]||MAT[k][Math.max(x-1,0)]||r.mrr||0); } }
-    var e=r.endIdx;
-    if(e!=null && e>=b && e<=b+2 && !/해지|종료|CN전환/.test(st)){ expRows.push(k); expAmt+=MAT[k][Math.min(e,M-1)]||r.mrr||0; }
+    var e=r.endIdx, EN=expN();
+    if(e!=null && e>=b && e<=b+EN-1 && !/해지|종료|CN전환/.test(st)){ expRows.push(k); expAmt+=MAT[k][Math.min(e,M-1)]||r.mrr||0; }
   });
   var newCnt=newRows.length, churnCnt=churnRows.length, expCnt=expRows.length;
   var uq2=function(ks){ var u={}; ks.forEach(function(k){ u[DATA.rows[k].cust]=1; }); return Object.keys(u).length; };
@@ -3595,7 +3596,10 @@ function renderKpis(list){
     { k:(STATE.unit==='month'?'당월':'기간 내')+' 신규 / 해지', v:newCnt+' / '+churnCnt, u:'건',
       d:'고객사 '+newCu+' / '+churnCu+'곳 · 이탈 MRR '+won(churnAmt)+'천원',
       cls: churnCnt>newCnt? 'down':'up', open:'nc', tip:'신규 = 원계약 시작월이 '+(STATE.unit==='month'? mk(b) : mk(f0)+'~'+mk(b))+' · 해지 = 상태 «해지» 해지월이 그 기간 (부속 계약·CND 제외 · 해지 분석·해지율 화면과 같은 기준) — 누르면 명단' },
-    { k:'3개월 내 만료', v:won(expAmt), u:'천원', d: expCnt+'건 · 재약정 타깃', cls: expCnt? 'down':'', open:'exp', tip:'종료월이 '+mk(b)+'~'+mk(Math.min(b+2,M-1))+'인 계약(해지·종료 상태 제외) — 누르면 명단' }
+    (function(){ var EN=expN(), eEnd=Math.min(b+EN-1,M-1);
+      var seg='<div class="expseg" style="display:flex;gap:3px;align-items:center;margin-top:8px;flex-wrap:wrap" title="만료 기간을 바꿉니다 (이 브라우저에 기억 · 아래 «만료 예정» 위젯도 같이 바뀜)"><span class="mini" style="color:var(--muted);margin-right:2px">기간</span>'+[1,2,3,6,12].map(function(n){ return '<button type="button" data-expn="'+n+'" aria-pressed="'+(n===EN)+'" style="font:inherit;font-size:11px;line-height:1;padding:4px 7px;border-radius:6px;border:1px solid var(--ring);cursor:pointer;background:'+(n===EN?'var(--s1)':'var(--surface-2)')+';color:'+(n===EN?'#fff':'var(--ink-2)')+'">'+n+'개월</button>'; }).join('')+'</div>';
+      return { k:EN+'개월 내 만료', v:won(expAmt), u:'천원', d: expCnt+'건 · 재약정 타깃 · '+mk(b)+'~'+mk(eEnd), cls: expCnt? 'down':'', open:'exp', extra:seg,
+               tip:'종료월이 '+mk(b)+'~'+mk(eEnd)+'인 원계약(해지·종료 상태 제외) — 숫자를 누르면 명단 · 아래 버튼으로 기간 변경' }; })()
   ];
   if(STATE.unit!=='month'){
     tiles[0]={ k:baseLabel()+' 매출 합계', v:won(perSum), u:'천원',
@@ -3610,14 +3614,25 @@ function renderKpis(list){
     c.appendChild(el('div','k',t.k));
     var v=el('div','v'); v.innerHTML=t.v+(t.u?'<small>'+t.u+'</small>':''); c.appendChild(v);
     var d=el('div','d'+(t.cls?' '+t.cls:'')); d.innerHTML=t.d||''; c.appendChild(d);
+    if(t.extra){ var ex=document.createElement('div'); ex.innerHTML=t.extra; c.appendChild(ex.firstChild); }
     if(t.spark) c.appendChild(sparkline(t.spark));
     if(t.open){ c.style.cursor='pointer'; c.title=(t.tip||'')+(t.tip?' ':'')+'(클릭)'; c.setAttribute('role','button'); c.tabIndex=0;
-      c.onclick=function(){ kpiOpen(t.open); }; c.onkeydown=function(ev){ if(ev.key==='Enter'||ev.key===' '){ ev.preventDefault(); kpiOpen(t.open); } }; }
+      c.onclick=function(ev){ if(ev && ev.target && ev.target.closest('button')) return; kpiOpen(t.open); }; c.onkeydown=function(ev){ if(ev.target!==c) return; if(ev.key==='Enter'||ev.key===' '){ ev.preventDefault(); kpiOpen(t.open); } }; }
+    /* 타일 안의 기간 버튼(만료 예정) — 타일 클릭(명단 열기)과 분리 */
+    c.querySelectorAll('button[data-expn]').forEach(function(bt){ bt.onclick=function(ev){ ev.stopPropagation(); setExpN(+bt.dataset.expn); }; });
     box.appendChild(c);
   });
 }
 /* ── 대시보드 타일 상세 ── 타일을 누르면 그 숫자를 만든 행을 그대로 보여줍니다 */
 var KPI_D=null;
+/* 만료 예정 타일의 기간(개월) — 타일 안의 1·2·3·6 버튼으로 바꾸며 이 브라우저에 기억 */
+function expN(){ var n=3; try{ n=+localStorage.getItem('svc_exp_n')||3; }catch(e){} return [1,2,3,6,12].indexOf(n)>=0? n : 3; }
+function setExpN(n){
+  try{ localStorage.setItem('svc_exp_n',String(n)); }catch(e){}
+  STATE.expM=n;   // «만료 예정» 위젯도 같은 기간으로
+  $$('#segExp button').forEach(function(b){ b.setAttribute('aria-pressed', +b.dataset.m===n? 'true':'false'); });
+  try{ renderKpis(); }catch(e){} try{ renderExpiring(); }catch(e){} try{ renderTodo(); }catch(e){}
+}
 function kpiTable(title, cap, head, rows, xname, view){
   view=view||'contracts';
   $('#crTitle').textContent=title; $('#crCap').textContent=cap;
@@ -3659,7 +3674,8 @@ function kpiOpen(kind){
     D.expRows.forEach(function(k){ var r=DATA.rows[k], a=MAT[k][Math.min(r.endIdx,M-1)]||r.mrr||0; tot+=a; rows.push({_cust:r.cust, c:base(r).concat([esc(r.saleType||''), r.parent?'부속':'', won(a)]), s:r.endIdx}); });
     rows.sort(function(x,y){ return x.s-y.s; });
     head=H6.concat([{l:'판매형태'},{l:'구분'},{l:'월액(천원)',n:true}]);
-    kpiTable('3개월 내 만료 — '+rows.length+'건 · '+won(tot)+'천원', '종료월이 '+mk(b)+' ~ '+mk(Math.min(b+2,M-1))+' 인 계약 (해지·서비스종료 상태 제외 · 부속 포함) · 연장을 등록하면 여기서 빠집니다 · 행을 누르면 계약 화면', head, rows, '만료예정_'+mk(b));
+    var EN2=expN();
+    kpiTable(EN2+'개월 내 만료 — '+rows.length+'건 · '+won(tot)+'천원', '종료월이 '+mk(b)+' ~ '+mk(Math.min(b+EN2-1,M-1))+' 인 계약 (해지·서비스종료 상태 제외 · 원계약 기준) · 연장을 등록하면 여기서 빠집니다 · 기간은 타일의 1·2·3·6·12 버튼으로 · 행을 누르면 계약 화면', head, rows, '만료예정_'+EN2+'개월_'+mk(b));
   }
 }
 function deltaHtml(a,b,label){
@@ -3882,12 +3898,13 @@ function renderExpiring(list){
   var b=STATE.base, mm=STATE.expM;
   var rows=list.filter(function(k){
     var r=DATA.rows[k];
-    if(/해지|종료|CN전환/.test(statusOf(r)+' '+String(r.status||''))) return false;   // 대시보드 «3개월 내 만료» 타일과 같은 기준
+    if(r.parent || r.noCount || String(r.saleType||'')==='H/W') return false;               // 대시보드 «N개월 내 만료» 타일과 같은 기준 (부속·고객수 제외 행·H/W 제외)
+    if(/해지|종료|CN전환/.test(statusOf(r)+' '+String(r.status||''))) return false;
     return r.endIdx!=null && r.endIdx>=b && r.endIdx<=b+mm-1;
   }).sort(function(a,b2){ return DATA.rows[a].endIdx-DATA.rows[b2].endIdx || (MAT[b2][Math.min(DATA.rows[b2].endIdx,M-1)]-MAT[a][Math.min(DATA.rows[a].endIdx,M-1)]); });
 
   var amt=rows.reduce(function(s,k){ var r=DATA.rows[k]; return s+(MAT[k][Math.min(r.endIdx,M-1)]||r.mrr||0); },0);
-  $('#capExp').textContent = mk(b)+' 이후 '+mm+'개월 내 만료 '+rows.length+'건 · 해당 MRR 합계 '+won(amt)+'천원';
+  $('#capExp').textContent = mk(b)+' 이후 '+mm+'개월 내 만료 '+rows.length+'건 · 해당 MRR 합계 '+won(amt)+'천원 · 원계약 기준(부속 계약은 원계약과 함께 만료) · 위 타일과 같은 수';
 
   var t=$('#tExp');
   t.innerHTML='<thead><tr><th>만료월</th><th>남은 개월</th><th>서비스</th><th>산업군</th><th>고객사</th><th>파트너</th>'+
