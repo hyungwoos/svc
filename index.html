@@ -1381,10 +1381,10 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
       </div>
       <div id="csFormWrap">
         <div id="csPaneCreate">
-          <div class="cs-sec"><h4><span class="no">1</span>누구 사이트인가요 <small>— 고객사를 고르면 영문 사이트명이 자동으로 채워집니다</small></h4>
+          <div class="cs-sec"><h4><span class="no">1</span>누구 사이트인가요 <small>— 새 고객의 사이트를 만듭니다 (기존 고객 사이트는 «기존 사이트 수정»)</small></h4>
             <div class="frm">
-              <div><label>고객사 <small style="color:var(--muted)">(이력 표시용 · 선택)</small></label><input id="csCust" list="dlCust" placeholder="기존 고객이면 자동완성 · 신규면 그대로 입력"></div>
-              <div><label>사이트명 <small style="color:var(--muted)">sitename · 접속 주소가 됩니다</small></label><input id="csName" placeholder="예: choihw" autocapitalize="off" spellcheck="false"><div class="mini" id="csNameHint" style="color:var(--muted);margin-top:4px">영문 소문자·숫자·하이픈(-) 2~63자</div></div>
+              <div><label>고객사 <small style="color:var(--muted)">(새 고객 이름 · 이력 표시용)</small></label><input id="csCust" placeholder="예: 한국테스트" autocomplete="off"></div>
+              <div><label>사이트명 <small style="color:var(--muted)">sitename · 접속 주소가 됩니다</small></label><input id="csName" placeholder="예: koreatest" autocapitalize="off" spellcheck="false" autocomplete="off"><div class="mini" id="csNameHint" style="color:var(--muted);margin-top:4px">영문 소문자·숫자·하이픈(-) 2~63자 · 계약의 CSM 및 이전 생성 이력과 중복을 확인합니다</div></div>
             </div>
           </div>
           <div class="cs-sec"><h4><span class="no">2</span>어떤 사이트로 만들까요</h4>
@@ -1398,10 +1398,10 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
           </div>
         </div>
         <div id="csPaneUpdate" style="display:none">
-          <div class="cs-sec"><h4><span class="no">1</span>어느 사이트를 고칠까요 <small>— 이 포탈에서 만든 사이트는 자동완성에 나옵니다</small></h4>
+          <div class="cs-sec"><h4><span class="no">1</span>어느 사이트를 고칠까요 <small>— 계약의 CSM(영문 사이트명)과 이 포탈에서 만든 사이트가 자동완성에 나옵니다</small></h4>
             <div class="frm">
-              <div><label>사이트명 <small style="color:var(--muted)">sitename</small></label><input id="cuName" list="dlCsSites" placeholder="예: choihw" autocapitalize="off" spellcheck="false"><datalist id="dlCsSites"></datalist></div>
-              <div><label>고객사 <small style="color:var(--muted)">(이력 표시용 · 선택)</small></label><input id="cuCust" list="dlCust"></div>
+              <div><label>사이트명 <small style="color:var(--muted)">sitename · 계약 CSM 에서 고르기</small></label><input id="cuName" list="dlCsSites" placeholder="고객사 이름이나 영문명 일부를 입력하세요" autocapitalize="off" spellcheck="false" autocomplete="off"><datalist id="dlCsSites"></datalist><div class="mini" id="cuNameHint" style="color:var(--muted);margin-top:4px"></div></div>
+              <div><label>고객사 <small style="color:var(--muted)">자동 표시</small></label><input id="cuCust" readonly tabindex="-1" placeholder="사이트명을 고르면 채워집니다" style="background:var(--surface);color:var(--ink-2)"></div>
             </div>
           </div>
           <div class="cs-sec"><h4><span class="no">2</span>무엇을 바꿀까요</h4>
@@ -1409,7 +1409,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
               <div><label>라이선스 노드 수 <small style="color:var(--muted)">nodes</small></label><input id="cuNodes" type="number" min="1" max="100000" step="1" placeholder="예: 500"></div>
               <div><label>만료일 <small style="color:var(--muted)">expiredate</small></label><input id="cuExp" type="date"></div>
               <div><label>SRA <small style="color:var(--muted)">sra · API 항목 그대로 · 모르면 비움</small></label><input id="cuSra" type="number" min="0" step="1" placeholder="예: 10"></div>
-              <div style="display:flex;align-items:end"><label class="mpchk" style="width:100%;height:36px;justify-content:center;margin:0"><input type="checkbox" id="cuMail"> 고객에게 안내 메일 발송 (send_mail)</label></div>
+              <div><label>&nbsp;</label><label class="mpchk" style="width:100%;height:36px;justify-content:center;margin:0;box-sizing:border-box"><input type="checkbox" id="cuMail" style="width:16px;height:16px;margin:0;padding:0"> 고객에게 안내 메일 발송 (send_mail)</label></div>
               <div class="full"><label>메모 <small style="color:var(--muted)">(선택 · 이력에 남음)</small></label><input id="cuMemo" placeholder="예: 재약정 3년 · 노드 300→500"></div>
             </div>
           </div>
@@ -2224,7 +2224,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-15 ㊿+58';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-15 ㊿+59';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -9384,6 +9384,37 @@ function csBody(){
   }
   return {action:'create', cred_id:$('#csCred').value, sitename:($('#csName').value||'').trim().toLowerCase(), product:csVal('csProd','csProdEtc')||'ztna', edition:csVal('csEd','csEdEtc')||'ent', language:$('#csLang').value, numberofdevices:String(+$('#csDev').value||'')};
 }
+/* 계약의 CSM(영문 사이트명) → 고객사. 같은 CSM 이 여러 계약에 있으면 가장 최근 시작 계약 기준 */
+function csCsmMap(){
+  var m={};
+  (window.DATA&&DATA.rows||[]).forEach(function(r){ var k=String(r.csm||'').trim().toLowerCase(); if(!k) return;
+    var cur=m[k]; if(!cur || (r.startIdx||0)>(cur.startIdx||0)) m[k]={cust:r.cust, line:r.line, status:r.status||'', startIdx:r.startIdx, qty:r.qty||0, csm:String(r.csm).trim()}; });
+  return m;
+}
+function csFillSiteList(){
+  var dl=$('#dlCsSites'); if(!dl) return; dl.innerHTML='';
+  var seen={}, m=csCsmMap();
+  Object.keys(m).sort(function(a,b){ return m[a].cust.localeCompare(m[b].cust,'ko'); }).forEach(function(k){ var x=m[k]; seen[k]=1; var o=document.createElement('option'); o.value=x.csm; o.label=x.cust+' · '+lline(x.line)+(x.qty? ' · '+x.qty+'노드':''); dl.appendChild(o); });
+  (CS.hist||[]).forEach(function(x){ var k=String(x.sitename||'').toLowerCase(); if(!x.result || seen[k]) return; seen[k]=1; var o=document.createElement('option'); o.value=x.sitename; o.label=(x.customer||'포탈 생성')+(x.devices? ' · '+x.devices+'노드':''); dl.appendChild(o); });
+}
+/* 수정 탭: 사이트명 → 고객사 자동 표시 (+ 힌트) */
+function cuSyncCust(){
+  var k=($('#cuName').value||'').trim().toLowerCase(), m=csCsmMap(), hit=m[k], hint=$('#cuNameHint');
+  var h=(CS.hist||[]).filter(function(x){ return x.result && String(x.sitename).toLowerCase()===k; })[0];
+  var nodesEl=$('#cuNodes'), canFill=(!nodesEl.value || String(nodesEl.value)===String(CS.autoNodes||''));   // 사용자가 직접 친 값은 건드리지 않음
+  function fillNodes(v){ if(canFill && v){ nodesEl.value=v; CS.autoNodes=String(v); } }
+  if(hit){ $('#cuCust').value=hit.cust; hint.style.color='var(--muted)'; hint.textContent='계약: '+lline(hit.line)+' · '+(hit.status||'')+(hit.qty? ' · 현재 '+hit.qty+'노드':'')+(hit.startIdx!=null? ' · '+mk(hit.startIdx)+'~':''); fillNodes(hit.qty); }
+  else if(h){ $('#cuCust').value=h.customer||''; hint.style.color='var(--muted)'; hint.textContent='이 포탈에서 '+String(h.created_at).slice(0,10)+'에 만든 사이트'+(h.devices? ' · '+h.devices+'노드':''); fillNodes(h.devices); }
+  else { $('#cuCust').value=''; if(k){ hint.style.color='var(--warn,#b26a00)'; hint.textContent='계약 CSM·생성 이력에 없는 사이트명 — 철자를 확인하세요 (그래도 실행은 가능)'; } else { hint.style.color='var(--muted)'; hint.textContent=''; } }
+}
+/* 생성 탭: 사이트명 중복 = 계약 CSM 에 이미 있거나, 이 포탈에서 성공적으로 만든 이력이 있음 */
+function csDupOf(name){
+  var k=String(name||'').trim().toLowerCase(); if(!k) return null;
+  var hit=csCsmMap()[k]; if(hit) return {kind:'csm', txt:'계약의 CSM 으로 이미 사용 중 — '+hit.cust+' ('+lline(hit.line)+(hit.status? ' · '+hit.status:'')+')'};
+  var h=(CS.hist||[]).filter(function(x){ return x.result && x.action!=='update' && String(x.sitename).toLowerCase()===k; })[0];
+  if(h) return {kind:'hist', txt:'이 포탈에서 '+String(h.created_at).slice(0,10)+'에 이미 만든 사이트'+(h.customer? ' — '+h.customer:'')};
+  return null;
+}
 var CS_PROD={ztna:'Cloud ZTNA'}, CS_ED={ent:'Enterprise', bas:'Basic', basic:'Basic', std:'Standard'}, CS_LANG={ko:'한국어',en:'English',ja:'日本語',zh:'中文'};
 function csPreview(){
   var b=csBody(), ok=/^[a-z0-9][a-z0-9-]{1,62}$/.test(b.sitename||'');
@@ -9395,14 +9426,18 @@ function csPreview(){
   if(!b.sitename) miss.push('사이트명'); else if(!ok) miss.push('사이트명 형식(영문 소문자·숫자·하이픈)');
   if(CS.tab==='update'){
     if(!(+b.nodes)) miss.push('노드 수'); if(!b.expiredate) miss.push('만료일');
-    var prevH=(CS.hist||[]).filter(function(x){ return x.result && x.sitename===b.sitename; })[0];
-    html='<b>'+esc(b.sitename||'(사이트명)')+'</b> 사이트의 라이선스를 <b>'+(b.nodes? Number(b.nodes).toLocaleString('ko-KR')+'노드':'(노드 수)')+'</b>'+(b.sra!=null? ' · SRA <b>'+b.sra+'</b>':'')+', 만료일 <b>'+(b.expiredate||'(만료일)')+'</b>로 바꿉니다'+(b.send_mail? ' — 고객에게 안내 메일을 <b>보냅니다</b>':' — 안내 메일은 보내지 않습니다')+'.'+
-         (prevH? '<div class="mini" style="color:var(--muted);margin-top:4px">이 포탈에서 '+esc(String(prevH.created_at).slice(0,10))+'에 '+esc(prevH.action==='update'?'수정':'생성')+'한 이력 있음'+(prevH.devices? ' · 당시 '+prevH.devices+'노드':'')+(prevH.customer? ' · '+esc(prevH.customer):'')+'</div>' : (b.sitename&&ok? '<div class="mini" style="color:var(--muted);margin-top:4px">이 포탈 이력에는 없는 사이트명 — 철자를 한 번 더 확인하세요</div>':''));
+    var prevH=(CS.hist||[]).filter(function(x){ return x.result && x.sitename===b.sitename; })[0], csmHit=csCsmMap()[b.sitename];
+    html=(($('#cuCust').value||'').trim()? '<b>'+esc($('#cuCust').value.trim())+'</b> 고객사의 ':'')+'<b>'+esc(b.sitename||'(사이트명)')+'</b> 사이트의 라이선스를 <b>'+(b.nodes? Number(b.nodes).toLocaleString('ko-KR')+'노드':'(노드 수)')+'</b>'+(b.sra!=null? ' · SRA <b>'+b.sra+'</b>':'')+', 만료일 <b>'+(b.expiredate||'(만료일)')+'</b>로 바꿉니다'+(b.send_mail? ' — 고객에게 안내 메일을 <b>보냅니다</b>':' — 안내 메일은 보내지 않습니다')+'.'+
+         (csmHit? '<div class="mini" style="color:var(--muted);margin-top:4px">계약 CSM 확인됨 — '+esc(csmHit.cust)+' · '+esc(lline(csmHit.line))+(csmHit.qty? ' · 현재 계약 '+csmHit.qty+'노드':'')+'</div>' : '')+
+         (prevH? '<div class="mini" style="color:var(--muted);margin-top:4px">이 포탈에서 '+esc(String(prevH.created_at).slice(0,10))+'에 '+esc(prevH.action==='update'?'수정':'생성')+'한 이력 있음'+(prevH.devices? ' · 당시 '+prevH.devices+'노드':'')+(prevH.customer? ' · '+esc(prevH.customer):'')+'</div>' : (b.sitename&&ok&&!csmHit? '<div class="mini" style="color:var(--warn,#b26a00);margin-top:4px">계약 CSM·포탈 이력에 없는 사이트명 — 철자를 한 번 더 확인하세요</div>':''));
   } else {
     if(!(+b.numberofdevices)) miss.push('노드 수');
-    var dup=(CS.hist||[]).filter(function(x){ return x.result && x.action!=='update' && x.sitename===b.sitename; })[0];
+    var dup=csDupOf(b.sitename);
+    if(dup) miss.push('사이트명 중복');
+    $('#csNameHint').style.color=dup? 'var(--critical)' : ((!b.sitename||ok)? 'var(--muted)':'var(--critical)');
+    $('#csNameHint').textContent=dup? '⚠ 중복: '+dup.txt : '영문 소문자·숫자·하이픈(-) 2~63자 · 계약의 CSM 및 이전 생성 이력과 중복을 확인합니다';
     html=(($('#csCust').value||'').trim()? '<b>'+esc($('#csCust').value.trim())+'</b> 고객사의 ':'')+'<b>'+esc(b.sitename||'(사이트명)')+'</b> 사이트를 <b>'+esc(CS_PROD[b.product]||b.product)+' '+esc(CS_ED[b.edition]||b.edition)+'</b> 에디션, '+esc(CS_LANG[b.language]||b.language)+' 화면, <b>'+(b.numberofdevices? Number(b.numberofdevices).toLocaleString('ko-KR')+'노드':'(노드 수)')+'</b>로 새로 만듭니다.'+
-         (dup? '<div class="mini" style="color:var(--critical);margin-top:4px">⚠ 같은 사이트명을 '+esc(String(dup.created_at).slice(0,10))+'에 이미 만들었습니다 — 중복이면 «기존 사이트 수정»을 쓰세요</div>':'');
+         (dup? '<div class="mini" style="color:var(--critical);margin-top:4px">⚠ '+esc(dup.txt)+' — 기존 사이트라면 «기존 사이트 수정»을, 새 사이트라면 다른 이름을 쓰세요</div>':'');
   }
   html+='<div class="mini" style="margin-top:4px;color:var(--muted)">API 계정: '+(cred? esc(cred.label+' — '+cred.apiemail) : '<span style="color:var(--critical)">선택 필요</span>')+'</div>';
   if(miss.length) html='<div style="color:var(--critical);font-weight:650;margin-bottom:4px">아직 비어 있음: '+miss.join(' · ')+'</div>'+html;
@@ -9441,18 +9476,16 @@ function renderCsite(){
   msg('csMsg',''); msg('ccMsg','');
   $('#csFormWrap').style.display=''; $('#csDone').style.display='none';
   $('#csTabCreds').style.display=window.IS_SUPER? '':'none';
-  var dl=$('#dlCust'); if(dl && !dl.children.length) (SB_RAW.customers||[]).forEach(function(c){ var o=document.createElement('option'); o.value=c.name; dl.appendChild(o); });
+  csFillSiteList();
   if(!CS.wired){
     CS.wired=true;
     ['csName','csDev','csProd','csProdEtc','csEd','csEdEtc','csLang','csCred','cuName','cuNodes','cuSra','cuExp','cuMail'].forEach(function(i){ var e=$('#'+i); e.addEventListener('input',csPreview); e.addEventListener('change',csPreview); });
     $('#csProd').addEventListener('change',function(){ $('#csProdEtc').style.display=this.value==='__etc'?'':'none'; });
     $('#csEd').addEventListener('change',function(){ $('#csEdEtc').style.display=this.value==='__etc'?'':'none'; });
     $('#csTabs').querySelectorAll('button').forEach(function(b){ b.onclick=function(){ csSetTab(b.dataset.t); }; });
-    /* 고객사를 고르면 그 고객의 CSM(영문 사이트명)을 사이트명 기본값으로 */
-    $('#csCust').addEventListener('change',function(){ var nm=this.value.trim(); if(!nm || $('#csName').value) return;
-      var r=(DATA&&DATA.rows||[]).filter(function(x){ return x.cust===nm && x.csm; })[0]; if(r) $('#csName').value=String(r.csm).toLowerCase().replace(/[^a-z0-9-]/g,''); csPreview(); });
-    /* 수정 탭: 사이트명을 고르면 이력의 고객사·노드를 채움 */
-    $('#cuName').addEventListener('change',function(){ var nm=this.value.trim().toLowerCase(); var h=(CS.hist||[]).filter(function(x){ return x.result && x.sitename===nm; })[0]; if(h){ if(!$('#cuCust').value) $('#cuCust').value=h.customer||''; if(!$('#cuNodes').value && h.devices) $('#cuNodes').value=h.devices; } csPreview(); });
+    /* 수정 탭: 사이트명(계약 CSM)을 고르면 고객사·계약 정보를 자동 표시 */
+    $('#cuName').addEventListener('input',function(){ cuSyncCust(); csPreview(); });
+    $('#cuName').addEventListener('change',function(){ cuSyncCust(); csPreview(); });
     $('#csGo').onclick=csSubmit;
     $('#ccAdd').onclick=csAddCred;
     $('#csDoneNew').onclick=function(){ ['csName','csDev','csMemo','csCust','csProdEtc','csEdEtc','cuName','cuNodes','cuSra','cuExp','cuCust','cuMemo'].forEach(function(i){ $('#'+i).value=''; }); $('#cuMail').checked=false; $('#csProd').value='ztna'; $('#csEd').value='ent'; $('#csLang').value='ko'; renderCsite(); };
@@ -9469,7 +9502,7 @@ async function csHist(){
     try{ CS.hist=await sbTry('cloud_sites?select=*&order=id.desc&limit=300')||[]; }catch(e){ CS.hist=[]; } }
   var q=($('#csHistQ').value||'').trim().toLowerCase();
   var h=CS.hist.filter(function(x){ return !q || String(x.sitename||'').toLowerCase().indexOf(q)>=0 || String(x.customer||'').toLowerCase().indexOf(q)>=0; });
-  var dl=$('#dlCsSites'); if(dl){ dl.innerHTML=''; var seen={}; h.forEach(function(x){ if(x.result && !seen[x.sitename]){ seen[x.sitename]=1; var o=document.createElement('option'); o.value=x.sitename; o.label=(x.customer||'')+(x.devices? ' · '+x.devices+'노드':''); dl.appendChild(o); } }); }
+  csFillSiteList();
   $('#csHistCap').textContent=CS.hist.length? (q? h.length+'건 (전체 '+CS.hist.length+')' : h.length+'건')+' · 성공 '+h.filter(function(x){return x.result;}).length : '';
   tb.innerHTML=h.length? h.map(function(x){ var up=x.action==='update', ex=x.extra||{};
       var what=up? ('노드 '+(x.devices||'')+(ex.sra!=null? ' · SRA '+ex.sra:'')+(ex.expiredate? ' · 만료 '+ex.expiredate:'')+(ex.send_mail? ' · 메일':'')) : ((x.product||'')+'/'+(x.edition||'')+(x.language&&x.language!=='ko'? ' · '+x.language:'')+' · '+(x.devices||'')+'노드');
@@ -9503,8 +9536,7 @@ async function csSubmit(){
     q='사이트 정보를 수정합니다.\n\n사이트명: '+b.sitename+'\n노드 수: '+b.nodes+(b.sra!=null? '\nSRA: '+b.sra:'')+'\n만료일: '+b.expiredate+'\n안내 메일: '+(b.send_mail?'발송':'안 함')+'\n\n실제 사이트 라이선스가 바뀝니다. 진행할까요?';
   } else {
     var dv=+b.numberofdevices; if(!dv||dv<1){ msg('csMsg','노드 수를 입력하세요.','bad'); $('#csDev').focus(); return; }
-    var dupHist=(CS.hist||[]).filter(function(x){ return x.result && x.action!=='update' && x.sitename===b.sitename; })[0];
-    if(dupHist && !confirm('«'+b.sitename+'» 는 '+String(dupHist.created_at).slice(0,10)+'에 이미 만든 이력이 있습니다. 그래도 요청할까요?')) return;
+    var dup=csDupOf(b.sitename); if(dup){ msg('csMsg','사이트명이 중복됩니다 — '+dup.txt,'bad'); $('#csName').focus(); return; }
     q='Cloud 사이트를 만듭니다.\n\n사이트명: '+b.sitename+'\n제품/에디션: '+b.product+' / '+b.edition+'\n언어: '+b.language+'\n노드: '+dv+(cust? '\n고객사: '+cust:'')+'\n\n실제 사이트가 생성되며 되돌릴 수 없습니다. 진행할까요?';
   }
   if(!confirm(q)) return;
