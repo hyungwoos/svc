@@ -1015,7 +1015,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
   <div class="grp">PoC·데모</div>
   <button data-v="mdrnew">🛡️ PoC 신청</button>
   <button data-v="mdrops">🛰️ 운영·신청 현황</button>
-  <button data-v="csite">☁️ Cloud 사이트 생성</button>
+  <button data-v="csite" style="display:none">☁️ Cloud 사이트 생성</button>
   <div class="grp">영업</div>
   <button data-v="oinew">✏️ OI 등록</button>
   <button data-v="oi">🎯 OI 현황</button>
@@ -1347,8 +1347,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
 
   <div id="viewCsite" class="hidden">
     <section class="card c12" style="max-width:900px;margin:0 auto">
-      <h3 style="margin:0 0 4px;font-size:16px">☁️ Cloud NAC 사이트 생성·수정</h3>
-      <p class="cap" style="margin:0 0 12px">my.genians.co.kr 의 사이트 API를 포탈에서 바로 부릅니다. 요청과 결과는 아래 이력에 남고, API 키는 서버(Edge Function)에만 있어 화면·저장소에 노출되지 않습니다.</p>
+      <h3 style="margin:0 0 4px;font-size:16px">☁️ Cloud 사이트 생성·수정</h3>
+      <p class="cap" style="margin:0 0 12px">my.genians.co.kr 의 사이트 API를 포탈에서 바로 부릅니다. 요청과 결과는 아래 이력에 남고, API 키는 서버(Edge Function)에만 있어 화면·저장소에 노출되지 않습니다. <b>슈퍼 관리자 전용</b> 메뉴입니다.</p>
       <div class="mtabs" id="csTabs" style="margin-bottom:12px">
         <button data-t="create" aria-pressed="true">＋ 사이트 생성</button>
         <button data-t="update">✎ 사이트 정보 수정 (노드 수·만료일)</button>
@@ -1369,7 +1369,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
             <div class="full"><label>고객사 <small style="color:var(--muted)">(포탈 고객사 이름 · 이력 표시용 · 선택)</small></label><input id="csCust" list="dlCust" placeholder="기존 고객이면 자동완성 · 신규면 그대로 입력"></div>
             <div><label>사이트명 (sitename) *</label><input id="csName" placeholder="예: choihw · 영문 소문자·숫자·하이픈" autocapitalize="off" spellcheck="false"><div class="mini" id="csNameHint" style="color:var(--muted);margin-top:4px">영문 소문자·숫자·하이픈(-) 2~63자 · 보통 고객사 영문명(CSM)과 같게</div></div>
             <div><label>노드 수 (numberofdevices) *</label><input id="csDev" type="number" min="1" max="100000" step="1" placeholder="예: 100"></div>
-            <div><label>제품 (product)</label><select id="csProd"><option value="nac">nac — Cloud NAC</option><option value="__etc">직접 입력…</option></select><input id="csProdEtc" placeholder="제품 코드" style="display:none;margin-top:6px" autocapitalize="off"></div>
+            <div><label>제품 (product)</label><select id="csProd"><option value="ztna">ztna — Cloud ZTNA</option><option value="__etc">직접 입력…</option></select><input id="csProdEtc" placeholder="제품 코드" style="display:none;margin-top:6px" autocapitalize="off"></div>
             <div><label>에디션 (edition)</label><select id="csEd"><option value="ent">ent — Enterprise</option><option value="__etc">직접 입력…</option></select><input id="csEdEtc" placeholder="에디션 코드 (예: bas)" style="display:none;margin-top:6px" autocapitalize="off"></div>
             <div><label>언어 (language)</label><select id="csLang"><option value="ko">ko — 한국어</option><option value="en">en — English</option><option value="ja">ja — 日本語</option><option value="zh">zh — 中文</option></select></div>
             <div><label>메모 <small style="color:var(--muted)">(선택 · 용도·담당 등)</small></label><input id="csMemo" placeholder="예: OO사 PoC 2주 · 담당 홍길동"></div>
@@ -2190,7 +2190,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-15 ㊿+54';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-15 ㊿+56';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -2454,6 +2454,8 @@ function buildFromRes(res){
   if(abtn) abtn.style.display = window.IS_SUPER? '':'none';
   var lbtn=document.querySelector('.side button[data-v="log"]');
   if(lbtn) lbtn.style.display = window.IS_SUPER? '':'none';   // 변경 이력은 슈퍼 관리자만
+  var cbtn=document.querySelector('.side button[data-v="csite"]');
+  if(cbtn) cbtn.style.display = window.IS_SUPER? '':'none';   // Cloud 사이트 생성·수정은 슈퍼 관리자만 (Edge Function 도 같은 규칙)
   var ggrp=document.getElementById('grpAdmin');
   if(ggrp) ggrp.style.display = window.IS_SUPER? '':'none';   // 「관리자」 그룹 헤더도 슈퍼만
   var mbtn=document.getElementById('btnMenuEdit');
@@ -9342,7 +9344,7 @@ function csBody(){
   if(CS.tab==='update'){
     return {action:'update', cred_id:$('#csCred').value, sitename:($('#cuName').value||'').trim().toLowerCase(), nodes:String(+$('#cuNodes').value||''), sra:$('#cuSra').value===''? null : +$('#cuSra').value, expiredate:$('#cuExp').value||'', send_mail:$('#cuMail').checked?1:0};
   }
-  return {action:'create', cred_id:$('#csCred').value, sitename:($('#csName').value||'').trim().toLowerCase(), product:csVal('csProd','csProdEtc')||'nac', edition:csVal('csEd','csEdEtc')||'ent', language:$('#csLang').value, numberofdevices:String(+$('#csDev').value||'')};
+  return {action:'create', cred_id:$('#csCred').value, sitename:($('#csName').value||'').trim().toLowerCase(), product:csVal('csProd','csProdEtc')||'ztna', edition:csVal('csEd','csEdEtc')||'ent', language:$('#csLang').value, numberofdevices:String(+$('#csDev').value||'')};
 }
 function csPreview(){
   var b=csBody(), ok=/^[a-z0-9][a-z0-9-]{1,62}$/.test(b.sitename||'');
@@ -9397,7 +9399,7 @@ function renderCsite(){
     $('#cuName').addEventListener('change',function(){ var nm=this.value.trim().toLowerCase(); var h=(CS.hist||[]).filter(function(x){ return x.result && x.sitename===nm; })[0]; if(h){ if(!$('#cuCust').value) $('#cuCust').value=h.customer||''; if(!$('#cuNodes').value && h.devices) $('#cuNodes').value=h.devices; } csPreview(); });
     $('#csGo').onclick=csSubmit;
     $('#ccAdd').onclick=csAddCred;
-    $('#csDoneNew').onclick=function(){ ['csName','csDev','csMemo','csCust','csProdEtc','csEdEtc','cuName','cuNodes','cuSra','cuExp','cuCust','cuMemo'].forEach(function(i){ $('#'+i).value=''; }); $('#cuMail').checked=false; $('#csProd').value='nac'; $('#csEd').value='ent'; $('#csLang').value='ko'; renderCsite(); };
+    $('#csDoneNew').onclick=function(){ ['csName','csDev','csMemo','csCust','csProdEtc','csEdEtc','cuName','cuNodes','cuSra','cuExp','cuCust','cuMemo'].forEach(function(i){ $('#'+i).value=''; }); $('#cuMail').checked=false; $('#csProd').value='ztna'; $('#csEd').value='ent'; $('#csLang').value='ko'; renderCsite(); };
     $('#csHistRefresh').onclick=function(){ CS.hist=undefined; csHist(); };
   }
   csSetTab(CS.tab||'create'); csLoadCreds(); csHist();
@@ -9443,7 +9445,7 @@ async function csSubmit(){
     var dv=+b.numberofdevices; if(!dv||dv<1){ msg('csMsg','노드 수를 입력하세요.','bad'); $('#csDev').focus(); return; }
     var dupHist=(CS.hist||[]).filter(function(x){ return x.result && x.action!=='update' && x.sitename===b.sitename; })[0];
     if(dupHist && !confirm('«'+b.sitename+'» 는 '+String(dupHist.created_at).slice(0,10)+'에 이미 만든 이력이 있습니다. 그래도 요청할까요?')) return;
-    q='Cloud NAC 사이트를 만듭니다.\n\n사이트명: '+b.sitename+'\n제품/에디션: '+b.product+' / '+b.edition+'\n언어: '+b.language+'\n노드: '+dv+(cust? '\n고객사: '+cust:'')+'\n\n실제 사이트가 생성되며 되돌릴 수 없습니다. 진행할까요?';
+    q='Cloud 사이트를 만듭니다.\n\n사이트명: '+b.sitename+'\n제품/에디션: '+b.product+' / '+b.edition+'\n언어: '+b.language+'\n노드: '+dv+(cust? '\n고객사: '+cust:'')+'\n\n실제 사이트가 생성되며 되돌릴 수 없습니다. 진행할까요?';
   }
   if(!confirm(q)) return;
   var btn=$('#csGo'); btn.disabled=true; msg('csMsg','my.genians.co.kr 에 요청 중…');
@@ -11446,6 +11448,7 @@ function switchView(v){
   if((v==='ordernew'||v==='mdrnew'||v==='oinew'||v==='csite') && !SB_TOKEN){ openOvl('ovlAuth'); return; }
   if(window.IS_EQUIP && !EQUIP_VIEWS[v]) v=window.EQUIP_HOME||'orders';   // 제한 계정은 허용된 화면만
   if(v==='log' && !window.IS_SUPER) v='dash';                             // 변경 이력은 슈퍼 관리자만
+  if(v==='csite' && !window.IS_SUPER){ toast('권한 없음','Cloud 사이트 생성·수정은 슈퍼 관리자만 할 수 있습니다','info'); v='dash'; }
   CUR_VIEW=v;
   try{ pushRecent(v); }catch(e){}
   $('#side').querySelectorAll('button').forEach(function(b){
