@@ -301,6 +301,13 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
 .b-warn{color:var(--warning);border-color:var(--warning);background:rgba(250,178,25,.10)}
 .mini{font-size:11px;color:var(--muted)}
 .hidden{display:none!important}
+/* 큰 표(계약 목록 등)는 화면에 들어올 때만 배치를 계산합니다 — 대시보드 첫 그림이 크게 빨라집니다.
+   화면 밖에서는 아래 크기만큼 자리만 잡아 두므로 스크롤 길이는 그대로입니다. */
+#viewDash [data-w="all"] .tbl-wrap,
+#viewDash [data-w="exp"] .tbl-wrap,
+#viewDash [data-w="mx"] .tbl-wrap,
+#viewDash [data-w="ifee"] .tbl-wrap{content-visibility:auto;contain-intrinsic-size:1px 900px}
+@media print{#viewDash .tbl-wrap{content-visibility:visible!important}}
 
 .bar-row{display:grid;grid-template-columns:130px 1fr 92px;gap:10px;align-items:center;padding:5px 0}
 .bar-row .nm{font-size:12px;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -2278,7 +2285,7 @@ window.addEventListener('message', function(ev){
 });
 
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-16 ㊿+73';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-16 ㊿+74';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -2417,6 +2424,18 @@ var SB_RAW={customers:[],contracts:[]};   // 편집 화면에서 재사용
 
 function sbYm(v){ return v? String(v).slice(0,7):''; }
 async function sbTry(q){ try{ return await sbAll(q); }catch(e){ return null; } }
+/* 첫 화면을 늦추지 않으려고 부가 표는 나중에 병렬로 읽어 채웁니다
+   · s1_map    : 계약의 «에스원 계약번호» 자동완성 목록 (없어도 화면은 정상)
+   · install_extra : 설치비 현황의 추가 항목 (오면 그 카드만 다시 그림) */
+function loadExtrasLater(needMap, needExtra){
+  var jobs=[];
+  if(needMap) jobs.push(sbTry('s1_map?select=contract_no,s1_name,biz_no,customer&active=is.true&order=contract_no')
+    .then(function(r){ if(r&&r.length) window.RAWX.s1map=r; }));
+  if(needExtra) jobs.push(sbTry('install_extra?select=*&order=year,month,id')
+    .then(function(r){ if(r&&r.length){ window.RAWX.iextra=r; try{ renderInstall(); }catch(e){} } }));
+  /* 캐시는 다시 쓰지 않습니다 — 큰 JSON 을 한 번 더 만드느라 화면이 멈추는 것보다,
+     다음에 들어올 때 이 두 표만 다시 읽는 편이 빠릅니다 */
+}
 
 function shapeLive(rows){
   if(!rows||!rows.length) return null;
@@ -2493,12 +2512,13 @@ async function loadFromDb(){
         mrsRows,
         j.live, j.lg, j.biz, j.targets, j.orders, j.roles, j.assets, j.mdrpoc, j.mtargets, j.oi, j.mdrops,
         j.iadj || [],
-        /* 에스원 계약번호 자동완성용 — load_all 에 없으면 한 번만 따로 읽습니다 */
-        (j.s1map || await sbTry('s1_map?select=contract_no,s1_name,biz_no,customer&active=is.true&order=contract_no')),
-        (j.iextra || await sbTry('install_extra?select=*&order=year,month,id'))
+        j.s1map || [],           /* 에스원 계약번호 자동완성 — load_all 에 없으면 아래에서 뒤늦게 채웁니다 */
+        j.iextra || []           /* 설치비 추가 항목 — 화면을 먼저 그리고 뒤에서 채웁니다 */
       ];
       try{ sessionStorage.setItem(CACHE_KEY, JSON.stringify({t:Date.now(), res:res0})); }catch(e){}
-      return buildFromRes(res0);
+      var built=buildFromRes(res0);
+      if(!j.s1map || !j.iextra) loadExtrasLater(!j.s1map, !j.iextra);   // 첫 화면을 붙잡지 않도록 뒤에서 병렬로
+      return built;
     }
   }catch(e){ /* 함수 미설치 등 → 아래 기존 방식으로 */ }
   var res=await Promise.all([
@@ -3240,11 +3260,20 @@ function saveWidgetOrder(){
 }
 /* sticky 상단바의 실제 높이를 --tbh 에 기록 — 카드 스크롤 여백 계산에 씁니다.
    상단바는 좁은 화면에서 두 줄로 접히므로 값이 고정이 아닙니다. */
-function measureTopbar(){
-  try{
-    var tb=document.querySelector('.topbar');
-    if(tb && tb.offsetHeight) document.documentElement.style.setProperty('--tbh', tb.offsetHeight+'px');
-  }catch(e){}
+var _tbRaf=0;
+function measureTopbar(now){
+  /* offsetHeight 읽기는 문서 전체 배치를 강제로 계산시킵니다(큰 화면에서 수백 ms).
+     그래서 그리는 도중에는 바로 재지 않고 다음 프레임으로 미룹니다. */
+  function run(){
+    try{
+      var tb=document.querySelector('.topbar');
+      if(tb && tb.offsetHeight) document.documentElement.style.setProperty('--tbh', tb.offsetHeight+'px');
+    }catch(e){}
+    _tbRaf=0;
+  }
+  if(now===true) return run();
+  if(_tbRaf) return;
+  _tbRaf=requestAnimationFrame(run);
 }
 /* 위젯 하나로 이동 — 꺼져 있으면 켜고, 상단바에 가리지 않게 스크롤한 뒤 잠깐 강조 */
 function goWidget(k, label){
