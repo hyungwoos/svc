@@ -388,6 +388,18 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
 .btn.asking{opacity:.85;cursor:pointer;min-width:120px;white-space:nowrap}
 .dclr{margin-left:2px;width:20px;height:20px;padding:0;border:1px solid var(--ring);border-radius:5px;background:var(--surface-2);color:var(--mut);font-size:10px;line-height:18px;cursor:pointer;vertical-align:middle}
 .dclr:hover{color:var(--critical);border-color:var(--critical)}
+/* 목록형 입력칸(콤보) — 눌러서 고르거나 직접 입력 */
+.cbo{position:relative;display:inline-flex;align-items:center;width:100%;gap:2px}
+.cbo input.cbi{flex:1;min-width:0}
+.cbb{width:20px;height:22px;padding:0;border:1px solid var(--ring);border-radius:5px;background:var(--surface-2);color:var(--mut);font-size:10px;line-height:20px;cursor:pointer;flex:0 0 auto}
+.cbb:hover{color:var(--ink);border-color:var(--s1)}
+.cbmenu{position:fixed;z-index:120;background:var(--surface);border:1px solid var(--ring);border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,.18);padding:4px;max-height:260px;overflow:auto;min-width:160px;font-size:12.5px}
+.cbmenu .it{padding:6px 9px;border-radius:7px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cbmenu .it:hover,.cbmenu .it.on{background:var(--surface-2)}
+.cbmenu .it.cur{color:var(--s1);font-weight:650}
+.cbmenu .it.cur::after{content:' ✓'}
+.cbmenu .hint{padding:6px 9px;color:var(--mut);font-size:11.5px}
+.cbmenu .sep{height:1px;background:var(--ring);margin:3px 0}
 .btn.asking:hover{opacity:1;filter:brightness(1.05)}
 .suggest-title{font-size:11.5px;color:var(--muted);margin:12px 0 0}
 
@@ -2266,7 +2278,7 @@ window.addEventListener('message', function(ev){
 });
 
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-16 ㊿+70';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-16 ㊿+71';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -11926,11 +11938,10 @@ function editCell(c,v){
       var lb=(c.k==='line')? lline(o) : (o===''? '— 없음 —' : o);
       return '<option value="'+esc(o)+'"'+(cv===o?' selected':'')+'>'+esc(lb)+'</option>';}).join('')+'</select>';
   }
-  if(c.t==='list'){                                                  // 목록에서 고르거나 직접 입력
-    var lopts=typeof c.opts==='function'? c.opts():c.opts;
-    var lid='dl_'+c.k;
-    return '<input type="text" data-k="'+c.k+'" list="'+lid+'" value="'+esc(v==null?'':String(v))+'">'+
-      '<datalist id="'+lid+'">'+lopts.map(function(o){ return '<option value="'+esc(o)+'"></option>'; }).join('')+'</datalist>';
+  if(c.t==='list'){
+    /* 목록에서 고르거나 직접 입력 — 칸을 누르면(또는 ▾) 값이 이미 있어도 전체 목록이 열립니다 */
+    return '<span class="cbo"><input type="text" class="cbi" data-k="'+c.k+'" autocomplete="off" value="'+esc(v==null?'':String(v))+'">'+
+           '<button type="button" class="cbb" tabindex="-1" title="목록 열기">▾</button></span>';
   }
   if(c.t==='bool') return '<input type="checkbox" data-k="'+c.k+'"'+(v?' checked':'')+'>';
   var ty=c.t==='month'?'month':c.t==='date'?'date':c.t==='number'?'number':'text';
@@ -11942,7 +11953,91 @@ function editCell(c,v){
 /* 편집 행의 입력칸 보조 동작
    · 날짜 칸: 값이 있으면 옆에 ✕(비우기) — 브라우저 날짜 입력은 지우는 법이 잘 안 보입니다
    · 임대 장비: 상태를 «임대중»으로 바꾸면 회수일을 비우고, «회수완료»로 바꾸면 회수일이 비어 있을 때 오늘을 넣습니다 */
+/* ===== 목록형 입력칸(콤보) =====
+   칸을 누르면 전체 목록이 뜨고, 글자를 치면 그에 맞게 좁혀집니다. 목록에 없는 값도 그대로 입력해 저장할 수 있습니다. */
+function comboClose(){ var m=document.getElementById('cbMenu'); if(m) m.remove(); }
+function comboWire(inp, opts, onPick){
+  opts=(opts||[]).map(function(o){ return String(o); });
+  var box=inp.closest('.cbo') || inp.parentElement;
+  var btn=box? box.querySelector('.cbb') : null;
+  function open(filter){
+    comboClose();
+    var q=String(filter==null? '' : filter).trim().toLowerCase();
+    var cur=String(inp.value||'').trim();
+    var list=opts.filter(function(o){ return !q || o.toLowerCase().indexOf(q)>=0; });
+    var m=document.createElement('div'); m.className='cbmenu'; m.id='cbMenu';
+    if(!list.length) m.innerHTML='<div class="hint">목록에 없는 값입니다 — 그대로 입력하면 저장됩니다</div>';
+    else m.innerHTML=list.map(function(o){
+      return '<div class="it'+(o===cur?' cur':'')+'" data-v="'+esc(o)+'">'+esc(o)+'</div>'; }).join('')+
+      (cur && opts.indexOf(cur)<0? '<div class="sep"></div><div class="hint">지금 값 「'+esc(cur)+'」 은 목록에 없지만 그대로 저장됩니다</div>':'')+
+      (cur? '<div class="sep"></div><div class="it" data-v="">— 비우기 —</div>':'');
+    document.body.appendChild(m);
+    var r=inp.getBoundingClientRect();
+    var w=Math.max(r.width+24, 150);
+    m.style.width=w+'px';
+    m.style.left=Math.max(6, Math.min(r.left, window.innerWidth-w-8))+'px';
+    var below=window.innerHeight-r.bottom;
+    if(below<180 && r.top>below){ m.style.top=''; m.style.bottom=(window.innerHeight-r.top+4)+'px'; }
+    else m.style.top=(r.bottom+4)+'px';
+    m.querySelectorAll('.it').forEach(function(it){
+      it.onmousedown=function(ev){ ev.preventDefault(); };      /* blur 로 닫히기 전에 값 넣기 */
+      it.onclick=function(){
+        inp.value=it.dataset.v||'';
+        inp.dispatchEvent(new Event('input',{bubbles:true}));
+        inp.dispatchEvent(new Event('change',{bubbles:true}));
+        comboClose(); inp.focus();
+        if(typeof onPick==='function') onPick(inp.value);
+      };
+    });
+    var on=m.querySelector('.it.cur'); if(on) on.scrollIntoView({block:'nearest'});
+  }
+  inp.addEventListener('focus', function(){ open(''); });
+  inp.addEventListener('click', function(){ open(''); });
+  inp.addEventListener('input', function(){ open(inp.value); });
+  inp.addEventListener('blur', function(){ setTimeout(function(){
+    /* 다시 그 칸으로 돌아왔거나(값을 고르는 중) 메뉴 안을 누른 경우에는 닫지 않습니다 */
+    if(document.activeElement===inp) return;
+    var m=document.getElementById('cbMenu');
+    if(m && m.contains(document.activeElement)) return;
+    comboClose();
+  }, 140); });
+  inp.addEventListener('keydown', function(e){
+    var m=document.getElementById('cbMenu');
+    if(e.key==='Escape'){ comboClose(); return; }
+    if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+      if(!m){ open(inp.value); return; }
+      e.preventDefault();
+      var its=[].slice.call(m.querySelectorAll('.it'));
+      if(!its.length) return;
+      var i=its.findIndex(function(x){ return x.classList.contains('on'); });
+      if(i<0) i=its.findIndex(function(x){ return x.classList.contains('cur'); });
+      i=(e.key==='ArrowDown')? Math.min(its.length-1, i+1) : Math.max(0, i-1);
+      its.forEach(function(x){ x.classList.remove('on'); });
+      its[i].classList.add('on'); its[i].scrollIntoView({block:'nearest'});
+      return;
+    }
+    if(e.key==='Enter' && m){
+      var sel=m.querySelector('.it.on');
+      if(sel){ e.preventDefault(); sel.click(); }
+      else comboClose();
+    }
+  });
+  if(btn) btn.onclick=function(ev){
+    ev.preventDefault(); ev.stopPropagation();
+    if(document.getElementById('cbMenu')) comboClose();
+    else { inp.focus(); open(''); }
+  };
+}
+window.addEventListener('scroll', comboClose, true);
+window.addEventListener('resize', comboClose);
+
 function wireRowInputs(tr,g){
+  /* 목록형(콤보) 칸 연결 — 열 정의의 opts 를 그때그때 읽습니다(계약번호처럼 값이 늘어나는 목록 때문) */
+  tr.querySelectorAll('input.cbi[data-k]').forEach(function(inp){
+    var c=((g&&g.cols)||[]).filter(function(x){ return x.k===inp.dataset.k; })[0];
+    var o=c? (typeof c.opts==='function'? c.opts() : c.opts) : [];
+    comboWire(inp, o||[]);
+  });
   tr.querySelectorAll('input[type=date],input[type=month]').forEach(function(inp){
     var x=document.createElement('button'); x.type='button'; x.className='dclr'; x.textContent='✕'; x.title='비우기';
     x.onclick=function(){ inp.value=''; inp.dispatchEvent(new Event('change')); };
