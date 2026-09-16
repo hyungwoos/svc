@@ -1287,6 +1287,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
         <button class="pill ghost" id="dvReload">↻ 다시 읽기</button>
         <button class="pill ghost" id="dvCsv" title="현재 필터·정렬이 적용된 목록을 엑셀 파일로 저장">⬇ 엑셀</button>
         <button class="pill ghost" id="dvDense" title="표 밀도 — 보통/컴팩트">☰ 밀도</button>
+        <button class="pill ghost" id="dvCols" title="보일 열 고르기 — 화면마다 따로 기억합니다">🧱 열</button>
         <button class="pill ghost" id="dvFclr" style="display:none;border-color:var(--critical);color:var(--critical)">✕ 필터 해제</button>
         <span class="mini" id="dvMsg"></span>
         <span class="spacer"></span>
@@ -1861,6 +1862,13 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
         <div><label>월 금액(MRR, 원) *</label><input id="nMrr" type="number" min="0" step="1000"></div>
         <div><label>수량(노드 등)</label><input id="nQty" type="number" min="0"></div>
         <div><label>CSM (영문 사이트명)</label><input id="nCsm" placeholder="예: kumhotire" autocapitalize="off" spellcheck="false"></div>
+        <div><label>에스원 계약번호 <small style="color:var(--muted)">(N… · 에스원 정산·장비 신청에서 자동완성)</small></label>
+          <input id="nS1No" list="dlS1No" placeholder="예: N6213654" autocapitalize="off" spellcheck="false"><datalist id="dlS1No"></datalist></div>
+        <div class="full" id="nSubWrap" style="display:none">
+          <label>같은 고객사의 상위 계약 <small style="color:var(--muted)">(에스원처럼 사업장마다 계약번호가 새로 나올 때 — 고르면 그 계약의 하위로 등록)</small></label>
+          <select id="nParent"><option value="">— 독립 계약으로 등록 —</option></select>
+          <div class="cap" id="nSubCap" style="margin-top:6px"></div>
+        </div>
         <div><label>과금방식</label><select id="nBilling">
           <option value="">— 선택 —</option><option>월납입</option><option>일시납</option><option>분기납</option><option>반년납</option><option>연납</option>
           <option value="__etc">직접 입력…</option>
@@ -2258,7 +2266,7 @@ window.addEventListener('message', function(ev){
 });
 
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-16 ㊿+67';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-16 ㊿+68';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -2313,6 +2321,7 @@ function doLogout(){
   SB_TOKEN=null; AUTH_USER=null; location.reload();
 }
 function showAuthUi(){
+  try{ loadHide(); }catch(e){}
   $('#btnAuth').textContent=(AUTH_USER||'').split('@')[0]+' ▾';
   $('#btnAuth').title='내 계정 · 로그아웃';
   $('#btnLogout').style.display='none';   // 로그아웃은 계정 메뉴 안으로 이동
@@ -2471,7 +2480,9 @@ async function loadFromDb(){
         j.customers, j.contracts,
         mrsRows,
         j.live, j.lg, j.biz, j.targets, j.orders, j.roles, j.assets, j.mdrpoc, j.mtargets, j.oi, j.mdrops,
-        j.iadj || []
+        j.iadj || [],
+        /* 에스원 계약번호 자동완성용 — load_all 에 없으면 한 번만 따로 읽습니다 */
+        (j.s1map || await sbTry('s1_map?select=contract_no,s1_name,biz_no,customer&active=is.true&order=contract_no'))
       ];
       try{ sessionStorage.setItem(CACHE_KEY, JSON.stringify({t:Date.now(), res:res0})); }catch(e){}
       return buildFromRes(res0);
@@ -2492,7 +2503,8 @@ async function loadFromDb(){
     sbTry('monthly_targets?select=*&order=year,month'),
     sbTry('oi_deals?select=*&order=id.desc'),
     sbTry('mdr_ops?select=*&order=id'),
-    sbTry('install_adj?select=*&order=year,month')   /* 52단계 미설치면 빈 배열 */
+    sbTry('install_adj?select=*&order=year,month'),   /* 52단계 미설치면 빈 배열 */
+    sbTry('s1_map?select=contract_no,s1_name,biz_no,customer&active=is.true&order=contract_no')   /* 68단계 — 에스원 계약번호 자동완성 */
   ]);
   try{ sessionStorage.setItem(CACHE_KEY, JSON.stringify({t:Date.now(), res:res})); }catch(e){}
   return buildFromRes(res);
@@ -2513,7 +2525,7 @@ function buildFromRes(res){
   var LIVE=shapeLive(res[3]), LGD=shapeLg(res[4]), VSD=shapeVs(res[5]);
   var prevRawx=window.RAWX||{};   // 별도 화면 캐시(가격표·인바운드·변경이력)는 자동 갱신에 휩쓸려 지우지 않음
   window.RAWX={customers:custs, contracts:cts, live:res[3]||[], lg:res[4]||[], biz:res[5]||[],
-    targets:res[6]||[], orders:res[7]||[], assets:res[9]||[], mdrpoc:res[10]||[], mtargets:res[11]||[], oi:res[12]||[], mdrops:res[13]||[], iadj:res[14]||[], log:prevRawx.log||null, mrs:mrs};
+    targets:res[6]||[], orders:res[7]||[], assets:res[9]||[], mdrpoc:res[10]||[], mtargets:res[11]||[], oi:res[12]||[], mdrops:res[13]||[], iadj:res[14]||[], s1map:res[15]||[], log:prevRawx.log||null, mrs:mrs};
   window.RAWX.price=prevRawx.price; window.RAWX.inbound=prevRawx.inbound; window.RAWX._inbAt=prevRawx._inbAt; window.RAWX.cloud=prevRawx.cloud;
   window.MY_ROLE = (res[8] && res[8].length && res[8][0].role) || '';
   window.IS_VIEWER = (window.MY_ROLE==='viewer' || window.MY_ROLE==='admin_viewer');   // 조회 전용
@@ -5551,7 +5563,28 @@ function renderAnswerBody(res, q){
 var CUR_VIEW='dash', DIRTY=false;
 
 var LINE_OPTS=['Cloud','S1','MDR','MDR_S1','DRM','PNS','DLP'];
-var PTN_OPTS=['다원티에스','글로웰시스템','에티버스','직접(계산서)'];
+var PTN_OPTS=['지니언스(직접)','다원티에스','글로웰시스템','에티버스','직접(계산서)'];
+/* 에스원 계약번호 후보 — 계약(s1_no) · 에스원 정산 매핑(s1_map) · 임대 장비 신청(equipment_orders.contract_no) 을 모아 보여줍니다 */
+function s1NoOpts(){
+  var set={}, R=window.RAWX||{};
+  (R.contracts||[]).forEach(function(c){ if(c.s1_no) set[String(c.s1_no).trim()]=1; });
+  (R.s1map||[]).forEach(function(m){ if(m.contract_no) set[String(m.contract_no).trim()]=1; });
+  (R.orders||[]).forEach(function(o){ if(o.contract_no) set[String(o.contract_no).trim()]=1; });
+  (R.assets||[]).forEach(function(a){ if(a.contract_no) set[String(a.contract_no).trim()]=1; });
+  return Object.keys(set).sort();
+}
+/* 계약번호로 알아낸 고객사 — 신규 등록 때 «이 번호는 ○○» 안내에 씁니다 */
+function s1NoInfo(no){
+  no=String(no||'').trim(); if(!no) return null;
+  var R=window.RAWX||{};
+  var m=(R.s1map||[]).filter(function(x){ return String(x.contract_no).trim()===no; })[0];
+  if(m) return {src:'에스원 정산', cust:m.customer||m.s1_name||'', biz:m.biz_no||null};
+  var o=(R.orders||[]).filter(function(x){ return String(x.contract_no||'').trim()===no; })[0];
+  if(o) return {src:'장비 신청', cust:o.customer||'', biz:null};
+  var c=(R.contracts||[]).filter(function(x){ return String(x.s1_no||'').trim()===no; })[0];
+  if(c){ var cu=(R.customers||[]).filter(function(x){ return x.id===c.customer_id; })[0]; return {src:'기존 계약', cust:(cu&&cu.name)||'', biz:null}; }
+  return null;
+}
 var IND_OPTS=['기업','공공','금융','의료','미분류'];
 /* 계약 관리 선택 목록 */
 var CH_OPTS=['일반','조달','LGU+','에스원','유통'];
@@ -5625,13 +5658,12 @@ var GRIDS={
       return res; },
     cols:[
       {k:'_custName',l:'고객사',ro:true},
-      {k:'_sector',l:'업종',ro:true,fmt:function(v,r0){
-        if(!r0||!r0._sector) return '·';
-        return r0._sector;      /* 확인 필요 표식(⚠ 동명 회사 · ◇ 추정 분류)은 화면에서 뺐습니다 — 값은 customers.sector_dup / sector_check 에 그대로 있음 */
-      }},
+      /* 업종은 고객사(customers.sector)에 붙는 값 — 여기서 고치면 그 고객사의 모든 계약에 함께 반영됩니다 */
+      {k:'_sector',l:'업종',t:'list',opts:function(){ return SECTOR_OPTS; },tbl:'customers',ref:'customer_id',src:'sector',
+       fmt:function(v,r0){ return (r0&&r0._sector)||'·'; }},
       {k:'line',l:'서비스',t:'select',opts:LINE_OPTS,fmt:function(v){return lline(v);}},
       {k:'channel',l:'판매 채널',t:'select',opts:CH_OPTS},
-      {k:'partner',l:'파트너',t:'select',opts:PTN_OPTS},
+      {k:'partner',l:'파트너',t:'list',opts:PTN_OPTS},           /* 목록에서 고르거나 직접 입력 */
       {k:'biller',l:'계산서발행처'},
       {k:'combine',l:'모듈',t:'select',opts:COMBINE_OPTS},
       {k:'contract_type',l:'구분',t:'select',opts:CTYPE_OPTS},
@@ -5642,6 +5674,8 @@ var GRIDS={
       {k:'churn_reason',l:'해지사유',t:'list',opts:CHURN_OPTS},
       {k:'start_month',l:'시작월',t:'month'},
       {k:'end_month',l:'종료월',t:'month'},
+      {k:'churn_month',l:'해지월',t:'month',fmt:function(v,r0){ return v? String(v).slice(0,7) : (/해지|종료/.test(String(r0&&r0.status||''))&&r0.end_month? String(r0.end_month).slice(0,7)+' (종료월)' : '·'); }},
+      {k:'s1_no',l:'에스원 계약번호',t:'list',opts:function(){ return s1NoOpts(); }},
       {k:'mrr',l:'MRR(천원)',t:'number',won:1},
       {k:'csm',l:'CSM(사이트명)'},                              /* 영문 사이트명 (site name) */
       {k:'billing',l:'과금방식',t:'list',opts:BILLING_OPTS},     /* 목록에서 고르거나 직접 입력 */
@@ -10132,6 +10166,7 @@ function setupSide(){
   $('#btnLogout').onclick=doLogout;
   $('#btnWidgets').onclick=toggleWidgetPanel;
   $('#dvCsv').onclick=function(){ exportXlsx(); };
+  $('#dvCols').onclick=function(ev){ ev.stopPropagation(); openColPick(this); };
   $('#dvDense').onclick=function(){
     try{ localStorage.setItem(denseKey(), localStorage.getItem(denseKey())==='1'?'0':'1'); }catch(e){}
     applyDense();
@@ -11799,6 +11834,60 @@ function readRowInputs(tr,g){
 
 var DV={page:0, per:100, sortK:null, sortDir:1, filters:{}};
 
+/* ===== 열 보이기/숨기기 (화면마다 따로 기억) =====
+   계약처럼 열이 많은 표에서 지금 보고 싶은 열만 남깁니다. 숨겨도 값은 그대로 있고 검색·엑셀 내려받기에만 빠집니다. */
+var HIDE={};
+function hideKey(){ return 'svc_hidecols_'+(AUTH_USER||'anon'); }
+function loadHide(){ try{ HIDE=JSON.parse(localStorage.getItem(hideKey())||'{}')||{}; }catch(e){ HIDE={}; } }
+function saveHide(){ try{ localStorage.setItem(hideKey(), JSON.stringify(HIDE)); }catch(e){} }
+function hiddenSet(view){ return (HIDE[view]||[]); }
+function visCols(g){
+  var h=hiddenSet(CUR_VIEW);
+  if(!h.length) return g.cols;
+  var out=g.cols.filter(function(c){ return h.indexOf(c.k)<0; });
+  return out.length? out : g.cols;      /* 전부 숨기면 아무것도 안 보이니 원래대로 */
+}
+function openColPick(btn){
+  var g=GRIDS[CUR_VIEW]; if(!g||g.custom) return;
+  closeColFilter();
+  var old=document.getElementById('colPick'); if(old) old.remove();
+  var h=hiddenSet(CUR_VIEW).slice();
+  var box=document.createElement('div'); box.id='colPick'; box.className='colmenu';
+  box.style.cssText='position:absolute;z-index:80;background:var(--surface);border:1px solid var(--ring);border-radius:12px;'+
+    'box-shadow:0 10px 30px rgba(0,0,0,.18);padding:10px;min-width:250px;max-height:60vh;overflow:auto;font-size:12px';
+  var r=btn.getBoundingClientRect();
+  box.style.left=Math.max(8, Math.min(r.left+window.scrollX, window.innerWidth-280))+'px';
+  box.style.top=(r.bottom+window.scrollY+6)+'px';
+  var head=document.createElement('div');
+  head.style.cssText='display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap';
+  head.innerHTML='<b style="font-size:12px">보일 열 고르기</b><span class="mini" style="color:var(--muted)">'+(g.cols.length-h.length)+'/'+g.cols.length+'</span>';
+  var all=document.createElement('button'); all.className='chip'; all.textContent='전체 보기';
+  all.onclick=function(){ HIDE[CUR_VIEW]=[]; saveHide(); box.remove(); renderGrid(); };
+  head.appendChild(all);
+  box.appendChild(head);
+  g.cols.forEach(function(c){
+    var lb=document.createElement('label');
+    lb.style.cssText='display:flex;gap:7px;align-items:center;padding:4px 2px;cursor:pointer';
+    var cb=document.createElement('input'); cb.type='checkbox'; cb.checked=h.indexOf(c.k)<0; cb.style.width='auto';
+    cb.onchange=function(){
+      var cur=hiddenSet(CUR_VIEW).slice();
+      var i=cur.indexOf(c.k);
+      if(cb.checked){ if(i>=0) cur.splice(i,1); } else if(i<0) cur.push(c.k);
+      HIDE[CUR_VIEW]=cur; saveHide(); renderGrid();
+      head.querySelector('.mini').textContent=(g.cols.length-cur.length)+'/'+g.cols.length;
+    };
+    lb.appendChild(cb); lb.appendChild(document.createTextNode(c.l));
+    box.appendChild(lb);
+  });
+  document.body.appendChild(box);
+  setTimeout(function(){
+    document.addEventListener('click', function off(ev){
+      if(box.contains(ev.target)||ev.target===btn) return;
+      box.remove(); document.removeEventListener('click', off);
+    });
+  },0);
+}
+
 /* ===== 열 필터 (구글시트식 «값 골라 보기») ===== */
 var BLANK_LABEL='(빈 값)';
 function cellText(c,v,r){
@@ -12017,8 +12106,9 @@ function xlsxAoa(name, head, rows){ return xlsxBook(name, [{name:'Sheet1', head:
 async function exportXlsx(){
   var g=GRIDS[CUR_VIEW]; if(!g) return;
   var rows=gridFilteredSorted(g);
-  var head=g.cols.map(function(c){return c.l;});
-  var aoa=rows.map(function(r){ return g.cols.map(function(c){
+  var VC=visCols(g);                                            /* 숨긴 열은 엑셀에도 빼고 내려받습니다 */
+  var head=VC.map(function(c){return c.l;});
+  var aoa=rows.map(function(r){ return VC.map(function(c){
     var v=r[c.k];
     if(c.t==='month'&&v) return String(v).slice(0,7);
     if(c.t==='bool') return v?'Y':'';
@@ -12033,10 +12123,11 @@ async function exportXlsx(){
 function exportCsv(){
   var g=GRIDS[CUR_VIEW]; if(!g) return;
   var rows=gridFilteredSorted(g);
-  var head=g.cols.map(function(c){return c.l;});
+  var VC=visCols(g);
+  var head=VC.map(function(c){return c.l;});
   function cell(v){ v=(v==null?'':String(v)); return /[",\n]/.test(v)? '"'+v.replace(/"/g,'""')+'"' : v; }
   var csv='\ufeff'+head.join(',')+'\n'+rows.map(function(r){
-    return g.cols.map(function(c){
+    return VC.map(function(c){
       var v=r[c.k];
       if(c.t==='month'&&v) v=String(v).slice(0,7);
       if(c.t==='bool') v=v?'Y':'';
@@ -12187,7 +12278,10 @@ function renderGrid(){
     g._lens=(DV.lens && LS[DV.lens])? LS[DV.lens].ids : null;
   } else if(CUR_VIEW==='live'){ lb.style.display='flex'; renderLiveBar(lb); g._lens=null; }
   else { lb.style.display='none'; g._lens=null; }
-  ['dvSearch','dvCsv'].forEach(function(id){ $('#'+id).style.display=isCustom?'none':''; });
+  ['dvSearch','dvCsv','dvCols'].forEach(function(id){ $('#'+id).style.display=isCustom?'none':''; });
+  var nHid=hiddenSet(CUR_VIEW).filter(function(k){ return g.cols.some(function(c){ return c.k===k; }); }).length;
+  var cbtn2=$('#dvCols'); if(cbtn2 && !isCustom){ cbtn2.textContent=nHid? ('🧱 열 '+(g.cols.length-nHid)+'/'+g.cols.length) : '🧱 열';
+    cbtn2.style.borderColor=nHid?'var(--s1)':''; cbtn2.style.color=nHid?'var(--s1)':''; }
   var nf=filterCount();
   var fc=$('#dvFclr');
   fc.style.display=(isCustom||!nf)?'none':'';
@@ -12210,7 +12304,7 @@ function renderGrid(){
   var t=$('#dvTable'); t.innerHTML='';
   var thead=document.createElement('thead');
   var tr0=document.createElement('tr');
-  g.cols.forEach(function(c){
+  visCols(g).forEach(function(c){
     var th=document.createElement('th');
     var arrow = DV.sortK===c.k ? (DV.sortDir>0?' ▲':' ▼') : '';
     var on=!!(DV.filters[c.k] && DV.filters[c.k].length);
@@ -12290,7 +12384,7 @@ function openDetail(c){
 function gridRow(r,g,editing){
   var tr=document.createElement('tr');
   function view(){
-    tr.innerHTML=g.cols.map(function(c){
+    tr.innerHTML=visCols(g).map(function(c){
       var n=c.t==='number'?' class="n"':'';
       var txt=fmtCell(c,r[c.k],r);
       if(c.href && r[c.k]){
@@ -12348,7 +12442,7 @@ function gridRow(r,g,editing){
     }
   }
   function edit(){
-    tr.innerHTML=g.cols.map(function(c){
+    tr.innerHTML=visCols(g).map(function(c){
       return '<td>'+(c.ro? esc(fmtCell(c,r[c.k],r)) : editCell(c,r[c.k]))+'</td>';
     }).join('')+'<td class="act"></td>';
     wireRowInputs(tr,g);
@@ -12358,12 +12452,34 @@ function gridRow(r,g,editing){
       if(!SB_TOKEN){ openOvl('ovlAuth'); return; }
       try{
         var body=readRowInputs(tr,g);
+        /* 다른 표에 붙는 열(예: 업종 = customers.sector)은 따로 떼어 그 표에 저장합니다 */
+        var side=[];
+        visCols(g).forEach(function(c){
+          if(!c.tbl || !(c.k in body)) return;
+          var val=body[c.k]; delete body[c.k];
+          var refId=r[c.ref];
+          if(!refId) return;
+          if(String(val||'')===String(r[c.k]||'')) return;
+          side.push({tbl:c.tbl, id:refId, col:c.src||c.k, val:val, key:c.k, label:c.l});
+        });
         if(g.table==='equipment_assets' && body.status==='임대중' && body.returned_date &&
            confirm('상태는 «임대중»인데 회수일('+body.returned_date+')이 있습니다.\n회수일을 비우고 저장할까요?\n\n(취소 = 그대로 저장)')) body.returned_date=null;
         var stChanged=(g.table==='equipment_orders' && body.status && body.status!==r.status)? body.status : null;
-        sbWrite('PATCH',g.table+'?id=eq.'+r.id,body).then(function(){
+        var sideJobs=side.map(function(x){
+          var o={}; o[x.col]=x.val;
+          return sbWrite('PATCH',x.tbl+'?id=eq.'+x.id,o).then(function(){
+            logChange('update',x.tbl,x.id,o);
+            r[x.key]=x.val;
+            /* 같은 고객사의 다른 계약 행에도 즉시 반영 (다시 읽지 않아도 보이게) */
+            (RAWX.customers||[]).forEach(function(cu){ if(cu.id===x.id) cu[x.col]=x.val; });
+            (RAWX.contracts||[]).forEach(function(c2){ if(c2[ (x.tbl==='customers'?'customer_id':'id') ]===x.id) c2[x.key]=x.val; });
+            toast(x.label+' 저장', '이 고객사의 모든 계약에 함께 반영됩니다', 'info');
+          });
+        });
+        Promise.all(sideJobs).then(function(){
+        return (Object.keys(body).length? sbWrite('PATCH',g.table+'?id=eq.'+r.id,body) : Promise.resolve()); }).then(function(){
           Object.keys(body).forEach(function(k){ r[k]=body[k]; });
-          logChange('update',g.table,r.id,body);
+          if(Object.keys(body).length) logChange('update',g.table,r.id,body);
           DIRTY=true; $('#dvMsg').textContent='저장됨 ✅';
           toast('저장되었습니다', g.title);
           if(stChanged) syncOrderAssets(r,stChanged).then(function(x){
@@ -12734,6 +12850,8 @@ async function saveEdit(){
         start_month:idxDate(s0), end_month:idxDate(e0),
         term_months:e0-s0+1, qty:+$('#nQty').value||null,
         csm:($('#nCsm').value||'').trim()||null,
+        s1_no:($('#nS1No').value||'').trim()||null,
+        parent_contract_id: (+($('#nParent')&&$('#nParent').value)||null),   /* 같은 고객사 아래 계약번호별 하위 등록 */
         billing:nBillingVal()||null,
         install_fee: $('#nFee').value===''? null : +$('#nFee').value,
         settle_month: $('#nSettle').value? $('#nSettle').value+'-01' : ($('#nFee').value? idxDate(s0+1) : null),
@@ -12742,7 +12860,8 @@ async function saveEdit(){
       var id=ct[0].id;
       await sbWrite('POST','monthly_revenue', monthRows(id,s0,e0,mrr));
       await logChange('insert','contracts',id,{cust:cust,mrr:mrr,from:idxDate(s0),to:idxDate(e0)});
-      msg('eMsg','저장 완료 ✅ — '+cust+' '+(e0-s0+1)+'개월'+($('#nType').value==='추가'? '' : (s0<=DATA.nowIdx? ' · LIVE 고객사에 반영됨' : ' · '+mk(s0)+'부터 LIVE 에 들어옴'))+' (대시보드·LIVE·해지율이 함께 갱신됩니다)','ok');
+      var subPid=+($('#nParent')&&$('#nParent').value)||null;
+      msg('eMsg','저장 완료 ✅ — '+cust+(subPid? ' (상위 계약 #'+subPid+'의 하위)':'')+' '+(e0-s0+1)+'개월'+($('#nType').value==='추가'? '' : (s0<=DATA.nowIdx? ' · LIVE 고객사에 반영됨' : ' · '+mk(s0)+'부터 LIVE 에 들어옴'))+' (대시보드·LIVE·해지율이 함께 갱신됩니다)','ok');
       if(OI_CONVERT){
         try{
           await sbWrite('PATCH','oi_deals?id=eq.'+OI_CONVERT.id,
@@ -12759,7 +12878,7 @@ async function saveEdit(){
       var r=PK_C.sel; if(!r) throw new Error('계약을 선택하세요.');
       var m0=ymFromInput($('#cMonth').value), rs=$('#cReason').value.trim();
       if(m0==null||!rs) throw new Error('해지월·사유는 필수입니다.');
-      await sbWrite('PATCH','contracts?id=eq.'+r._id,{status:'해지',churn_reason:rs,end_month:idxDate(m0),updated_at:new Date().toISOString()});
+      await sbWrite('PATCH','contracts?id=eq.'+r._id,{status:'해지',churn_reason:rs,end_month:idxDate(m0),churn_month:idxDate(m0),updated_at:new Date().toISOString()});
       await sbWrite('DELETE','monthly_revenue?contract_id=eq.'+r._id+'&month=gt.'+idxDate(m0));
       await logChange('update','contracts',r._id,{action:'해지',month:idxDate(m0),reason:rs});
       msg('eMsg','해지 처리 완료 ✅ — '+r.cust+' ('+$('#cMonth').value+'까지 인식'+(r.parent? '' : ' · '+mk(m0+1)+'부터 LIVE 제외')+')','ok');
@@ -12777,7 +12896,7 @@ async function saveEdit(){
       var hist=(r2.renewHist||[]).concat([{no:rno, from:idxDate(from), to:idxDate(ne), mrr:amt, prev_end:(r2.endIdx!=null? idxDate(r2.endIdx):null),
                  prev_mrr:r2.mrr, prev_status:r2.status, note:($('#rNote')&&$('#rNote').value.trim())||null, at:new Date().toISOString(), by:AUTH_USER}]);
       var nst=/해지|종료/.test(r2.status||'')? (r2.ctype==='추가'? '추가':'신규') : r2.status;
-      await sbWrite('PATCH','contracts?id=eq.'+r2._id,{end_month:idxDate(ne), mrr:amt, status:nst, churn_reason:null,
+      await sbWrite('PATCH','contracts?id=eq.'+r2._id,{end_month:idxDate(ne), mrr:amt, status:nst, churn_reason:null, churn_month:null,
         renew_count:rno, renew_history:hist, updated_at:new Date().toISOString()});
       await sbWrite('DELETE','monthly_revenue?contract_id=eq.'+r2._id+'&month=gte.'+idxDate(from));
       await sbWrite('POST','monthly_revenue', monthRows(r2._id,from,ne,amt));
@@ -12903,8 +13022,49 @@ function setupEdit(){
     npe.style.display=etc? '':'none';
     if(etc) npe.focus(); else npe.value='';
   });
+  /* ── 같은 고객사 아래 «계약번호별 하위 등록» ──
+     에스원은 같은 고객사라도 사업장마다 계약번호가 새로 나옵니다. 고객사를 고르면 그 고객사의 기존 계약을 보여주고,
+     하나를 고르면 그 계약의 하위(부속)로 저장합니다 — 고객사 수·LIVE 에 두 번 세지 않고 금액만 합쳐집니다. */
+  function nFillParents(){
+    var sel=document.getElementById('nParent'), wrap=document.getElementById('nSubWrap'), cap=document.getElementById('nSubCap');
+    if(!sel||!wrap) return;
+    var name=(document.getElementById('nCust').value||'').trim();
+    var cu=(RAWX.customers||[]).filter(function(c){ return String(c.name||'').trim()===name; })[0];
+    var list=cu? (RAWX.contracts||[]).filter(function(c){ return c.customer_id===cu.id && !c.parent_contract_id; }) : [];
+    list.sort(function(a,b){ return String(b.start_month||'').localeCompare(String(a.start_month||'')); });
+    var keep=sel.value;
+    sel.innerHTML='<option value="">— 독립 계약으로 등록 —</option>'+list.map(function(c){
+      return '<option value="'+c.id+'">#'+c.id+' · '+lline(c.line||'')+' · '+String(c.start_month||'').slice(0,7)+'~'+(String(c.end_month||'').slice(0,7)||'무약정')+
+             (c.s1_no? ' · '+esc(c.s1_no):'')+(c.qty? ' · '+c.qty+'노드':'')+'</option>';
+    }).join('');
+    if(keep && sel.querySelector('option[value="'+keep+'"]')) sel.value=keep;
+    wrap.style.display=list.length? '':'none';
+    if(cap) cap.innerHTML=list.length
+      ? '이 고객사에 계약이 <b>'+list.length+'건</b> 있습니다. 같은 고객사인데 계약번호가 새로 나온 건이면 위에서 상위 계약을 고르세요 — 목록에서 ↳ 로 붙어 보이고, 고객사 수·LIVE 에는 한 번만 셉니다.'
+      : '';
+  }
+  /* 에스원 계약번호를 넣으면 그 번호가 어디서 온 것인지 알려주고, 고객사가 비어 있으면 채워 줍니다 */
+  function nS1Sync(){
+    var el=document.getElementById('nS1No'); if(!el) return;
+    var info=s1NoInfo(el.value), cap=document.getElementById('nSubCap');
+    var cu=document.getElementById('nCust');
+    var nm='';
+    if(info && info.cust){
+      nm=String(info.cust).replace(/\s*\(에스원\)\s*$/,'').trim();
+      if(cu && !cu.value.trim()){ cu.value=nm; cu.dispatchEvent(new Event('input')); }
+    }
+    nFillParents();                                   /* 먼저 목록·안내를 새로 그린 뒤 */
+    if(info && cap) cap.innerHTML='<b>'+esc(el.value.trim())+'</b> — '+esc(info.src)+'에 있는 번호'+
+      (nm? ' (고객사 '+esc(nm)+(info.biz? ' · 비즈포탈 '+info.biz:'')+')':'') +
+      (cap.innerHTML? '<br>'+cap.innerHTML : '');     /* 안내 문구 위에 덧붙입니다 */
+  }
+  var nCustEl=document.getElementById('nCust'), nS1El=document.getElementById('nS1No');
+  if(nCustEl){ nCustEl.addEventListener('change', nFillParents); nCustEl.addEventListener('blur', nFillParents); }
+  if(nS1El){ nS1El.addEventListener('change', nS1Sync); nS1El.addEventListener('blur', nS1Sync); }
+  window.nFillParents=nFillParents;
+
   function resetNewForm(){
-    ['nCust','nBiller','nStart','nEnd','nMrr','nQty','nNote','nPtnEtc','nCsm','nBillingEtc','nFee','nSettle','nSectorEtc'].forEach(function(i){
+    ['nCust','nBiller','nStart','nEnd','nMrr','nQty','nNote','nPtnEtc','nCsm','nBillingEtc','nFee','nSettle','nSectorEtc','nS1No'].forEach(function(i){
       var el=document.getElementById(i); if(el) el.value='';
     });
     var nbe=document.getElementById('nBillingEtc'); if(nbe) nbe.style.display='none';
@@ -12912,6 +13072,9 @@ function setupEdit(){
     var nse=document.getElementById('nSectorEtc'); if(nse) nse.style.display='none';
     Object.keys(d).forEach(function(i){ var el=document.getElementById(i); if(el) el.value=d[i]; });
     if(npe) npe.style.display='none';
+    var npar=document.getElementById('nParent'); if(npar) npar.value='';
+    var nsw=document.getElementById('nSubWrap'); if(nsw) nsw.style.display='none';
+    var nsc=document.getElementById('nSubCap'); if(nsc) nsc.innerHTML='';
     syncCombine(); syncVer(); syncFee();
     // 계약 찾기 상태도 초기화
     [['cFind','cPick',PK_C],['rFind','rPick',PK_R],['fFind','fPick',PK_F],['aFind','aPick',PK_A]].forEach(function(x){
@@ -12970,6 +13133,8 @@ function setupEdit(){
     var dl=$('#dlCust'); dl.innerHTML='';
     SB_RAW.customers.forEach(function(c){ var o=document.createElement('option'); o.value=c.name; dl.appendChild(o); });
     fillSectorSel();
+    var ds=$('#dlS1No'); if(ds){ ds.innerHTML=''; s1NoOpts().forEach(function(v){ var o=document.createElement('option'); o.value=v;
+      var inf=s1NoInfo(v); if(inf&&inf.cust) o.label=String(inf.cust).replace(/\s*\(에스원\)\s*$/,''); ds.appendChild(o); }); }
     var dr=$('#dlReason'); dr.innerHTML='';
     var seen={};
     DATA.rows.forEach(function(r){ if(r.churn&&!seen[r.churn]){seen[r.churn]=1; var o=document.createElement('option'); o.value=r.churn; dr.appendChild(o);} });
