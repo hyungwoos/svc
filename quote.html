@@ -178,6 +178,7 @@
         <div style="display:flex; flex-direction:column; gap:10px;">
             <button onclick="selectQuoteType('enterprise')" style="padding: 14px; background: var(--genians-green); color: white; border: none; border-radius: 5px; font-weight: bold; font-size: 15px; cursor: pointer;">기업용 견적</button>
             <button onclick="selectQuoteType('public')" style="padding: 14px; background: #24292e; color: white; border: none; border-radius: 5px; font-weight: bold; font-size: 15px; cursor: pointer;">공공용 견적</button>
+            <button onclick="location.href='po.html'" style="padding: 12px; background: #fff; color: #333; border: 1px solid rgba(11,11,11,.18); border-radius: 5px; font-weight: bold; font-size: 14px; cursor: pointer;">📝 발주서 작성 <span style="font-weight:normal;font-size:12px;color:#777">— 파트너 구축·유지보수 발주</span></button>
         </div>
     </div>
 </div>
@@ -275,6 +276,7 @@
                 <button class="dropdown-item" onclick="listGithubQuotes(); closeAllDropdowns();">📋 저장 내역 조회</button>
             </div>
         </div>
+        <button class="btn btn-secondary no-print" onclick="location.href='po.html'" title="파트너 발주서 작성 화면으로">📝 발주서</button>
         <button class="btn btn-print" onclick="prepareAndPrint()">견적서 발행 (PDF)</button>
     </div>
 </div>
