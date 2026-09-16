@@ -148,6 +148,7 @@
         <button class="btn" onclick="makeReport('use')">프로젝트 리포트</button>
         <span class="more"><button class="btn line" onclick="toggleMore(this)">⋯ 더보기</button>
           <div class="moremenu">
+            <button onclick="printUse()">대조표 인쇄·PDF</button>
             <button onclick="copyBizCol()">등록번호 열 복사</button>
             <button onclick="dlUseXlsx()">내부용 엑셀 내려받기</button>
             <button class="red" onclick="delSettle('use')">이 달 저장분 삭제</button>
@@ -183,6 +184,7 @@
         <button class="btn" onclick="makeReport('install')">프로젝트 리포트</button>
         <span class="more"><button class="btn line" onclick="toggleMore(this)">⋯ 더보기</button>
           <div class="moremenu">
+            <button onclick="printInst()">내역서 인쇄·PDF</button>
             <button onclick="dlInstXlsx()">내부용 엑셀 내려받기</button>
             <button class="red" onclick="delSettle('install')">이 달 저장분 삭제</button>
           </div></span>
@@ -706,6 +708,125 @@ async function saveSettle(kind){
     msg(mid,'정산 저장 완료 ('+ym+' · '+(kind==='use'?'사용료':'설치비')+' · '+fmt(back.total)+'원) — 「저장 내역」에서 불러오거나 지울 수 있습니다','ok');
   }catch(e){ msg(mid,e.message,'bad'); }
 }
+/* ─────────────────────────────────────────────
+   내부용 출력 — 엑셀 말고 «보기 좋은 한 장»으로 인쇄·PDF 저장
+   새 창에 A4 한 장을 그려서 바로 인쇄창을 띄웁니다. (여백은 문서 안쪽에 고정)
+   ───────────────────────────────────────────── */
+function printDoc(o){
+  var base=location.href.replace(/[^\/]*$/,'');
+  var w=window.open('', '_blank');
+  if(!w){ alert('팝업이 막혀 있습니다 — 이 사이트의 팝업을 허용해 주세요'); return; }
+  function cell(v,i){ var c=o.cols[i]||{}; var t=(v==null?'':String(v));
+    return '<td class="'+(c.n?'n':'')+(c.mini?' mini':'')+(c.wrap?' wrap':'')+'">'+t.replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</td>'; }
+  var rows=(o.rows||[]).map(function(r,ri){
+    return '<tr'+(r.__hl?' class="hl"':'')+'>'+o.cols.map(function(c,i){ return cell(r[c.k],i); }).join('')+'</tr>';
+  }).join('');
+  var sums=(o.summary||[]).map(function(s){
+    return '<div class="sum'+(s.bad?' bad':'')+(s.ok?' ok':'')+'"><span>'+s.k+'</span><b>'+s.v+'</b></div>'; }).join('');
+  var foot=(o.foot||[]).map(function(f){
+    return '<tr class="ft">'+o.cols.map(function(c,i){ return '<td class="'+(c.n?'n':'')+'">'+(f[c.k]==null?'':String(f[c.k]))+'</td>'; }).join('')+'</tr>'; }).join('');
+  var html='<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>'+o.title+'</title><style>'+
+
+    '*{box-sizing:border-box}'+
+    'body{font-family:"Noto Sans KR","Malgun Gothic","맑은 고딕",sans-serif;margin:0;background:#eceef0;color:#1c1f22;-webkit-print-color-adjust:exact;print-color-adjust:exact}'+
+    '.page{width:210mm;min-height:297mm;margin:12px auto;background:#fff;padding:14mm 14mm 10mm;box-shadow:0 6px 24px rgba(0,0,0,.12)}'+
+    '.hd{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2.5px solid #1fb53a;padding-bottom:9px;margin-bottom:14px}'+
+    '.hd h1{font-size:19px;margin:0 0 3px;letter-spacing:-.3px}'+
+    '.hd .sub{font-size:11.5px;color:#6b7176}'+
+    '.hd img{height:26px}'+
+    '.sums{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}'+
+    '.sum{flex:1;min-width:104px;border:1px solid #e3e6e8;border-radius:9px;padding:8px 10px;background:#fafbfc}'+
+    '.sum span{display:block;font-size:10.5px;color:#6b7176;margin-bottom:2px}'+
+    '.sum b{font-size:14px;font-variant-numeric:tabular-nums}'+
+    '.sum.ok b{color:#1e8e3e} .sum.bad b{color:#c0392b}'+
+    'table{width:100%;border-collapse:collapse;font-size:10.5px}'+
+    'th{background:#1fb53a;color:#fff;font-weight:600;padding:6px 6px;text-align:left;border:1px solid #1fb53a;white-space:nowrap}'+
+    'td{padding:5px 6px;border:1px solid #e3e6e8;vertical-align:middle}'+
+    'td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}'+
+    'td.mini{font-size:9.5px;color:#6b7176}'+
+    'tbody tr:nth-child(even) td{background:#fafbfc}'+
+    'tr.hl td{background:#fff8e1}'+
+    'tr.ft td{background:#eef3f8;font-weight:700;border-top:2px solid #b8cce4}'+
+    '.note{margin-top:10px;font-size:10.5px;color:#4a5055;line-height:1.6;white-space:pre-line}'+
+    'td.wrap{white-space:normal;word-break:keep-all}'+
+    'td:not(.wrap){white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'+
+    '.ft2{margin-top:auto;padding-top:12px;display:flex;justify-content:space-between;font-size:9.5px;color:#8b9298}'+
+    '.bar{position:fixed;top:0;left:0;right:0;background:#22262a;color:#fff;padding:9px 14px;display:flex;gap:10px;align-items:center;font-size:12px;z-index:9}'+
+    '.bar button{background:#1fb53a;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-weight:700;cursor:pointer;font-family:inherit;font-size:12px}'+
+    '.bar button.g{background:#55595d}'+
+    '.bar+.page{margin-top:52px}'+
+    '@media print{@page{size:A4 portrait;margin:0}body{background:#fff}.bar{display:none}.page{margin:0;box-shadow:none;width:210mm;min-height:0}}'+
+    '</style></head><body>'+
+    '<div class="bar"><b>'+o.title+'</b><span style="flex:1"></span>'+
+      '<button onclick="window.print()">인쇄 · PDF로 저장</button>'+
+      '<button class="g" onclick="window.close()">닫기</button></div>'+
+    '<div class="page">'+
+      '<div class="hd"><div><h1>'+o.title+'</h1><div class="sub">'+(o.sub||'')+'</div></div>'+
+        '<img src="'+base+'Logo.jpg" alt="Genians" onerror="this.style.display=\'none\'"></div>'+
+      (sums? '<div class="sums">'+sums+'</div>':'')+
+      '<table><thead><tr>'+o.cols.map(function(c){ return '<th class="'+(c.n?'n':'')+'"'+(c.w? ' style="width:'+c.w+'"':'')+'>'+c.l+'</th>'; }).join('')+'</tr></thead>'+
+      '<tbody>'+rows+'</tbody>'+(foot? '<tfoot>'+foot+'</tfoot>':'')+'</table>'+
+      (o.note? '<div class="note">'+o.note+'</div>':'')+
+      '<div class="ft2"><span>지니언스㈜ 서비스사업부 · 내부 참고용</span><span>출력 '+new Date().toLocaleString('ko-KR')+'</span></div>'+
+    '</div></body></html>';
+  w.document.open(); w.document.write(html); w.document.close();
+  setTimeout(function(){ try{ w.focus(); }catch(e){} }, 300);
+}
+
+/* 에스원 — 사용료 정산 대조표 한 장 출력 */
+function printUse(){
+  if(!S.use||!S.use.nac){ msg('mU2','먼저 파일을 올려주세요','bad'); return; }
+  var ym=$('#ym').value||'';
+  var nacSum=S.use.nac.reduce(function(a,g){ return a+g.amt; },0);
+  var dkSum=(S.use.dk||[]).reduce(function(a,g){ return a+g.amt; },0);
+  var bizSum=(S.use.bizUse||[]).reduce(function(a,b){ return a+b.acc; },0)+(S.use.bizSettle||[]).reduce(function(a,b){ return a+b.acc; },0);
+  var rate=n(S.cfg.fee&&S.cfg.fee.rate||5);
+  printDoc({
+    title:'에스원 사용료 정산 대조표 — '+ym,
+    sub:'클라우드NAC 건별 + 디바이스키퍼 · 비즈포탈 영업현황 대조 · 단위: 원(VAT 별도)',
+    summary:[{k:'클라우드NAC',v:fmt(nacSum)+'원 ('+S.use.nac.length+'건)'},
+             {k:'디바이스키퍼',v:fmt(dkSum)+'원'},
+             {k:'청구 총액',v:fmt(nacSum+dkSum)+'원'},
+             {k:'비즈포탈 회계매출',v:fmt(bizSum)+'원'},
+             {k:'차액',v:fmt((nacSum+dkSum)-bizSum)+'원', ok:Math.abs((nacSum+dkSum)-bizSum)<1, bad:Math.abs((nacSum+dkSum)-bizSum)>=1},
+             {k:'파트너 수수료 '+rate+'%',v:fmt((nacSum+dkSum)*rate/100)+'원'}],
+    cols:[{k:'no',l:'등록번호',w:'10%'},{k:'nm',l:'에스원 고객(서비스제공처)',w:'25%'},{k:'cno',l:'계약번호',mini:true,w:'11%'},
+          {k:'svc',l:'서비스',mini:true},{k:'amt',l:'에스원 금액',n:true,w:'12%'},{k:'acc',l:'회계매출',n:true,w:'12%'},
+          {k:'diff',l:'차액',n:true,w:'9%'},{k:'kind',l:'구분',w:'8%'}],
+    rows:S.use.nac.map(function(g){ return { no:g.biz? g.biz.no:'', nm:g.nm, cno:g.cno||'',
+      svc:g.lines.map(function(l){ return l.svc; }).join(' + '), amt:fmt(g.amt), acc:g.biz? fmt(g.biz.acc):'',
+      diff:g.biz&&Math.abs(g.diff)>=1? fmt(g.diff):'', kind:g.isNew?'신규':(g.isEnd?'해약':(g.isExt?'연장':'기존')),
+      __hl:!g.biz||Math.abs(g.diff||0)>=1 }; }),
+    foot:[{ nm:'클라우드NAC 합계', amt:fmt(nacSum) },
+          { nm:'디바이스키퍼(임대 포함) 합계 — 비즈포탈 «대금 정산» 1건', amt:fmt(dkSum) },
+          { nm:'총계', amt:fmt(nacSum+dkSum) }],
+    note:'· 연한 노란 줄은 등록번호가 없거나 금액이 다른 건입니다.\n· 건수 — 신규 '+$('#cNew').value+' · 해약 '+$('#cEnd').value+' · 연장 '+$('#cExt').value+' · 기존 '+$('#cKeep').value
+  });
+}
+/* 에스원 — 설치비 내역서 한 장 출력 */
+function printInst(){
+  if(!S.inst||!S.inst.length){ msg('mI2','먼저 설치 리스트를 올려주세요','bad'); return; }
+  var ym=$('#ym').value||'';
+  var base=n(S.cfg.install&&S.cfg.install.base||100000), extra=n(S.cfg.install&&S.cfg.install.extra||80000);
+  var sum=S.inst.reduce(function(a,r){ return a+r.amt; },0), buy=n($('#buyTotal').value);
+  printDoc({
+    title:'클라우드 NAC 센서 설치/철거 — '+ym,
+    sub:'에스원 청구 기준 · 신규 '+fmt(base)+'원 · 추가(센서) '+fmt(extra)+'원 · 단위: 원(VAT 별도)',
+    summary:[{k:'설치 건수',v:S.inst.length+'건'},
+             {k:'기본 / 추가',v:S.inst.reduce(function(a,r){ return a+r.base; },0)+' / '+S.inst.reduce(function(a,r){ return a+r.extra; },0)},
+             {k:'청구액',v:fmt(sum)+'원'},
+             {k:'매입('+($('#vendor').value||'설치업체')+')',v:fmt(buy)+'원'},
+             {k:'마진',v:fmt(sum-buy)+'원', ok:(sum-buy)>=0, bad:(sum-buy)<0}],
+    cols:[{k:'no',l:'Bizportal 등록번호',w:'14%'},{k:'cno',l:'계약번호',w:'12%'},{k:'cust',l:'고객사',w:'22%'},
+          {k:'svc',l:'제공서비스',w:'10%'},{k:'b',l:'기본 수량',n:true,w:'9%'},{k:'e',l:'추가 수량',n:true,w:'9%'},
+          {k:'amt',l:'총 설치/철거비',n:true,w:'13%'},{k:'stat',l:'현재상태',w:'11%'}],
+    rows:S.inst.map(function(r){ return { no:r.biz? r.biz.no:'', cno:r.cno, cust:r.nm, svc:'설치비',
+      b:r.base, e:r.extra, amt:fmt(r.amt), stat:r.stat||'설치 완료', __hl:!r.biz }; }),
+    foot:[{ cust:'합계', amt:fmt(sum) }],
+    note:'· 연한 노란 줄은 비즈포탈 등록번호가 연결되지 않은 건입니다.\n· 설치업체 지급액은 업체 견적서 기준으로 입력합니다.'
+  });
+}
+
 /* ── 저장된 정산 불러오기·삭제 ── */
 async function loadSettles(){
   S.settleErr='';
