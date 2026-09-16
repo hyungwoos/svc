@@ -111,10 +111,24 @@
         .tag.issued { background: #e3f6e6; color: #1e8e3e; }
         #loginOverlay { position: fixed; inset: 0; background: #f9f9f7; z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; }
         @media print {
-            @page { size: A4 portrait; margin: 8mm 9mm; }
-            html, body { background: #fff; padding: 0; margin: 0; }
+            /* 여백은 인쇄 대화상자 설정과 무관하게 문서 안쪽 padding 으로 확보 (여백 «없음»으로 저장해도 같은 결과) */
+            @page { size: A4 portrait; margin: 0; }
+            html, body { background: #fff; padding: 0; margin: 0; width: 210mm; }
             .bar, .chips, .hint, .warn, .rowact, .no-print, .ovl { display: none !important; }
-            .page { box-shadow: none; width: 100%; min-height: 0; padding: 0; zoom: .8; }
+            .page { box-shadow: none; width: 210mm; min-height: 0; margin: 0; padding: 9mm 14mm 5mm; box-sizing: border-box; zoom: 1; font-size: 10px; height: 297mm; overflow: hidden; }
+            .page .hd { margin-bottom: 16px; }
+            .page .title-box { height: 96px; font-size: 21px; margin-top: 16px; }
+            .page table.ap td.sig { height: 46px; }
+            .page table.ap th, .page table.ap td { height: 18px; font-size: 10px; }
+            .page table.f th, .page table.f td { height: 21px; font-size: 10px; }
+            .page table.ci th, .page table.ci td { height: 35px; }
+            .page table.dv tbody td { height: 28px; } .page table.dv tfoot td { height: 18px; } .page table.dv thead th { height: 21px; }
+            .page table.by tbody td { height: 19px; } .page table.by tbody tr:first-child td { height: 35px; } .page table.by thead th, .page table.by tfoot td { height: 19px; }
+            .page .sec { margin: 8px 0 2px; height: 14px; font-size: 10px; }
+            .page .notes { font-size: 9.5px; }
+            .page .won, .page .won input { font-size: 11px; }
+            .page .foot { margin-top: 10px; font-size: 9px; }
+            .page .foot img { height: 26px; }
             input, textarea, select { background: transparent !important; }
             input::placeholder, textarea::placeholder { color: transparent; }
             table.ap td.sig:hover::after { display: none; }
