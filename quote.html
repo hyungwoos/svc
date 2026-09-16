@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Genians 공식 자동 견적·발주 시스템 v5.5 PC전용</title>
+    <title>Genians 공식 자동 견적·발주 시스템 v5.6 PC전용</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
         :root { --genians-green: #1fb53a; --border-color: #000; --gray-bg: #f8f9fa; }
@@ -178,7 +178,7 @@
         <div style="display:flex; flex-direction:column; gap:10px;">
             <button onclick="selectQuoteType('enterprise')" style="padding: 14px; background: var(--genians-green); color: white; border: none; border-radius: 5px; font-weight: bold; font-size: 15px; cursor: pointer;">기업용 견적</button>
             <button onclick="selectQuoteType('public')" style="padding: 14px; background: #24292e; color: white; border: none; border-radius: 5px; font-weight: bold; font-size: 15px; cursor: pointer;">공공용 견적</button>
-            <button onclick="selectQuoteType('po')" style="padding: 14px; background: #6c757d; color: white; border: none; border-radius: 5px; font-weight: bold; font-size: 15px; cursor: pointer;">발주서 (파트너 발주)</button>
+            <button onclick="selectQuoteType('po')" style="padding: 14px; background: #6c757d; color: white; border: none; border-radius: 5px; font-weight: bold; font-size: 15px; cursor: pointer;">발주서</button>
         </div>
     </div>
 </div>
@@ -255,7 +255,7 @@
     <button onclick="window.close()" style="padding:8px 14px; background:#333; color:#fff; border:none; border-radius:5px; cursor:pointer; font-weight:bold;">✕ 닫기</button>
 </div>
 <div class="toolbar">
-    <div style="font-weight: bold; color: var(--genians-green);">Genians Pricing System v5.5 <span id="quoteTypeBadge" style="color:#888; font-weight:normal; font-size:12px;"></span></div>
+    <div style="font-weight: bold; color: var(--genians-green);">Genians Pricing System v5.6 <span id="quoteTypeBadge" style="color:#888; font-weight:normal; font-size:12px;"></span></div>
     <div class="toolbar-actions">
         <button class="btn btn-add" onclick="addRow()">+ 항목 추가</button>
         <div class="dropdown no-print">
@@ -670,7 +670,7 @@
         // 발주서: 비고 표의 «발주자» 칸도 함께 채움 (비어 있거나 이전 자동값일 때만)
         if (typeof isPo === 'function' && isPo() && typeof remarkInputs === 'function') {
             const cell = remarkInputs()[0][3]; const nm = sel.value ? sel.options[sel.selectedIndex].text : '';
-            if (cell && (!cell.value || cell.value === window.__poByAuto)) { cell.value = nm ? nm + ' (' + sel.value.split(' / ')[0] + ')' : ''; window.__poByAuto = cell.value; }
+            if (cell && (!cell.value || cell.value === window.__poByAuto)) { const parts = sel.value.split(' / '); const tel = parts.find(x => /^\d{2,3}-\d{3,4}-\d{4}$/.test(x.trim())) || parts[0] || ''; cell.value = nm ? nm + (tel ? ' (' + tel.trim() + ')' : '') : ''; window.__poByAuto = cell.value; }
         }
         if (sel.value) {
             contactInput.value = sel.value;
@@ -912,7 +912,7 @@
     // 화면에 보여줄 "서비스 선택" 목록은 선택한 견적 종류에 따라 달라집니다.
     let activePricingDB = pricingDB;
     // ─────────────────────────────────────────────
-    // 발주서 모드 — 견적서와 같은 종이·표·상자를 그대로 쓰고, 제목·라벨·열·비고 항목만 바꿉니다.
+    // 발주서 모드 — 견적서 양식을 그대로 쓰고(발주서로 명칭만 변경), 필요한 항목만 추가·제거합니다.
     //   견적서: 고객사 / 담당자 귀하 / 견적일 · 서비스·계약기간·납부주기·소비자단가·수량·제안단가·공급제안가·세액·비고
     //   발주서: 수신처 貴中 / 수신자 貴下 / 발주일 · 품명·규격·수량·단가·합계·세액·비고 · 비고 표 = 발주번호·발주자·결제조건·납기일자·하자담보·유지보수
     // ─────────────────────────────────────────────
@@ -921,17 +921,17 @@
     const PO_HEAD = `<tr><th style="width: 20%;">품명</th><th style="width: 30%;">규격</th><th style="width: 8%;">수량</th><th style="width: 12%;">단가(₩)</th><th style="width: 13%;">합계(₩)</th><th style="width: 10%;">세액(₩)</th><th style="width: 7%;">비고</th></tr>`;
     const QUOTE_REMARKS = [["결 제 조 건:","검수 후 계산서 발행(발행 후 30일이내 현금결제)"],["설 치 비 용:","당사 파트너사 지원"],["견 적 유 효:","견적후 3개월"],["교 육 비 용:","당사 파트너사 지원"],["납 기 일 자:","별도 협의"],["유 지 보 수:","유지보수 포함"]];
     const PO_REMARKS    = [["발 주 번 호:",""],["발  주  자:",""],["결 제 조 건:","협의"],["납 기 일 자:","협의"],["하 자 담 보:","필요 시 하자이행증권 요청"],["유 지 보 수:","포함"]];
-    const PO_MANAGERS = [{ name: "김민정 대리", contact: "010-2985-8915" }];   // 발주서에서만 추가로 보이는 발주자
+    const PO_MANAGERS = [{ name: "김민정 대리", contact: "kmj915@genians.com / 010-2985-8915" }];   // 발주서에서만 목록에 추가되는 담당자 (견적서 목록에는 없음)
     function remarkInputs() { return Array.from(document.querySelectorAll('.remarks-section tr')).slice(0, 3).map(tr => Array.from(tr.querySelectorAll('input'))); }
     function setRemarks(pairs) { const rows = remarkInputs(); pairs.forEach((p, i) => { const r = rows[Math.floor(i / 2)]; if (!r) return; const off = (i % 2) * 2; r[off].value = p[0]; r[off + 1].value = p[1]; }); }
     function poNoFor(dateStr) { const d = (dateStr || new Date().toISOString().slice(0, 10)); return 'PO-' + d.slice(2, 4) + d.slice(5, 7) + d.slice(8, 10) + '-001'; }
     function applyDocMode(type) {
         const po = (type === 'po');
         document.getElementById('docTitle').innerText = po ? '발 주 서' : '견 적 서';
-        document.getElementById('customerName').placeholder = po ? '수신처 (예: ㈜다원티에스)' : '고객사명';
+        document.getElementById('customerName').placeholder = po ? '수신처 (회사명)' : '고객사명';
         document.getElementById('customerSuffix').style.display = po ? 'inline' : 'none';
         document.getElementById('contactLabel').innerText = po ? '수신자' : '담당자';
-        document.getElementById('contactPersonName').placeholder = po ? '수신자 성명·직급 (예: 김은실 이사님)' : '담당자 성명 또는 직급을 입력하세요';
+        document.getElementById('contactPersonName').placeholder = po ? '수신자 성명·직급' : '담당자 성명 또는 직급을 입력하세요';
         document.getElementById('contactSuffix').innerText = po ? '貴下' : '귀하';
         document.getElementById('dateLabel').innerText = po ? '발주일' : '견적일';
         document.getElementById('siteLabel').innerText = po ? '사업자' : '홈페이지';
@@ -947,7 +947,9 @@
         const sel = document.getElementById('managerSelect'); const cur = sel.value;
         sel.innerHTML = '<option value="">' + (po ? '발주자 선택' : '담당자 선택') + '</option>';
         (po ? PO_MANAGERS.concat(managerList) : managerList).forEach(m => { const o = document.createElement('option'); o.value = m.contact; o.textContent = m.name; sel.appendChild(o); });
-        sel.value = cur; if (sel.value !== cur) sel.value = ''; updateManagerInfo();
+        sel.value = cur; if (sel.value !== cur) sel.value = '';
+        if (po && !sel.value) sel.value = PO_MANAGERS[0].contact;   // 발주서는 기본 담당자 김민정 대리 (변경 가능)
+        updateManagerInfo();
     }
     // 발주서 행: 품명 · 규격 · 수량 · 단가 · 합계 · 세액 · 비고 (견적서 행과 같은 셀 스타일)
     function addPoRow(data) {
@@ -1009,7 +1011,7 @@
         if (prevType !== type && window.__quoteInit) {
             // 종류가 바뀌면 비고 표 항목도 그 문서 기준으로 (견적 ↔ 발주 왕복 시 서로의 문구가 남지 않게)
             setRemarks(type === 'po' ? PO_REMARKS : QUOTE_REMARKS);
-            if (type === 'po') { const r = remarkInputs(); r[0][1].value = poNoFor(document.getElementById('quoteDate').value); }
+            if (type === 'po') { const r = remarkInputs(); r[0][1].value = poNoFor(document.getElementById('quoteDate').value); window.__poByAuto = ''; updateManagerInfo(); }
             document.querySelector('.remarks-section textarea').value = ''; window.lastAutoRemarks = '';
         }
         if (window.__quoteInit) {
@@ -1025,7 +1027,7 @@
         window.__quoteInit = true;
         if (type === 'po') { setRemarks(PO_REMARKS); }
         initAppAfterTypeSelected();
-        if (type === 'po') { const r = remarkInputs(); r[0][1].value = poNoFor(document.getElementById('quoteDate').value); }
+        if (type === 'po') { const r = remarkInputs(); r[0][1].value = poNoFor(document.getElementById('quoteDate').value); window.__poByAuto = ''; updateManagerInfo(); }
     }
     // 포탈 좌측 메뉴에서 「견적 시스템」을 다시 누르면 종류 선택 화면을 다시 띄운다
     window.addEventListener('message', function (ev) {
