@@ -45,6 +45,26 @@
   .tag.map{background:#e3f6e6;color:#1e8e3e} .tag.amt{background:#e8f0fe;color:#1a56b8} .tag.need{background:#fff3cd;color:#7a5c00}
   .tag.diff{background:#fdecea;color:#c0392b} .tag.new{background:#fff9c4;color:#7a5c00} .tag.end{background:#fdecea;color:#c0392b}
   .tag.ext{background:#ede7f6;color:#5e35b1}
+  .more{position:relative;display:inline-block}
+  .moremenu{display:none;position:absolute;right:0;bottom:calc(100% + 6px);background:#fff;border:1px solid var(--bd);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.14);padding:4px;min-width:186px;z-index:60}
+  .moremenu.on{display:block}
+  .moremenu button{display:block;width:100%;text-align:left;border:none;background:none;padding:8px 10px;border-radius:7px;font-size:12px;cursor:pointer;font-family:inherit;color:#333;white-space:nowrap}
+  .moremenu button:hover{background:#f3f5f7}
+  .moremenu button.red{color:#c0392b}
+  .setmon{display:flex;align-items:baseline;gap:8px;margin:12px 0 5px;padding-bottom:4px;border-bottom:1px solid #eef0f2}
+  .setmon .ym{font-weight:700;font-size:13px}
+  .setmon .sum{font-size:11.5px;color:var(--muted)}
+  .setrow{display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:9px;font-size:12px}
+  .setrow:hover{background:#f7f9fa}
+  .setrow .kind{flex:0 0 52px;text-align:center;border-radius:999px;padding:2px 0;font-size:11px;font-weight:600}
+  .setrow .kind.u{background:#e8f0fe;color:#1a56b8} .setrow .kind.i{background:#e3f6e6;color:#1e8e3e}
+  .setrow .amt{flex:0 0 110px;text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+  .setrow .diff{flex:0 0 92px;font-size:11px}
+  .setrow .diff.ok{color:var(--ok)} .setrow .diff.bad{color:var(--warn)}
+  .setrow .cnt{flex:1;color:var(--muted);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .setrow .who{flex:0 0 auto;color:#98a2ab;font-size:11px}
+  .setrow .acts{flex:0 0 auto;display:flex;gap:4px;opacity:.4}
+  .setrow:hover .acts{opacity:1}
   select.pick{max-width:270px;font-size:11.5px}
   .msg{font-size:12px;margin:6px 0;min-height:16px}
   .msg.bad{color:var(--warn)} .msg.ok{color:var(--ok)}
@@ -73,6 +93,7 @@
     <button class="tab" data-t="cfg">③ 매핑·설정</button>
     <span style="flex:1"></span>
     <label class="f">정산월 <input type="month" id="ym"></label>
+    <button class="btn line" onclick="openSettles()" title="저장한 정산을 보고 화면으로 불러오거나 지웁니다">🗂 저장 내역 <span id="setN" class="mini"></span></button>
   </div>
 
   <!-- ───────────── ① 사용료 ───────────── -->
@@ -107,13 +128,15 @@
         <th>비즈포탈 등록번호</th><th>비즈포탈 고객사</th><th class="n">회계매출</th><th class="n">차액</th>
       </tr></thead><tbody></tbody></table></div>
       <div class="foot">
-        <button class="btn green" onclick="saveMaps()">매칭 저장 (다음 달 자동 적용)</button>
-        <button class="btn line" onclick="copyBizCol()">등록번호 열 복사</button>
-        <button class="btn line" onclick="dlUseXlsx()">내부용 엑셀 내려받기</button>
+        <button class="btn green" onclick="saveMaps()">매칭 저장</button>
         <button class="btn gray" onclick="saveSettle('use')">정산 저장</button>
-        <button class="btn line" onclick="openSettles()">저장 내역</button>
-        <button class="btn line" style="color:#c0392b;border-color:#e6b0aa" onclick="delSettle('use')">이 달 저장분 삭제</button>
-        <button class="btn" onclick="makeReport('use')">프로젝트 리포트 만들기</button>
+        <button class="btn" onclick="makeReport('use')">프로젝트 리포트</button>
+        <span class="more"><button class="btn line" onclick="toggleMore(this)">⋯ 더보기</button>
+          <div class="moremenu">
+            <button onclick="copyBizCol()">등록번호 열 복사</button>
+            <button onclick="dlUseXlsx()">내부용 엑셀 내려받기</button>
+            <button class="red" onclick="delSettle('use')">이 달 저장분 삭제</button>
+          </div></span>
       </div>
       <div class="msg" id="mU2"></div>
     </div>
@@ -141,12 +164,13 @@
         <span class="mini">업체 견적서 금액을 넣으면 행별 지급액과 대조합니다.</span>
       </div>
       <div class="foot">
-        <button class="btn green" onclick="saveMaps('inst')">매칭 저장</button>
-        <button class="btn line" onclick="dlInstXlsx()">내부용 엑셀 내려받기</button>
         <button class="btn gray" onclick="saveSettle('install')">정산 저장</button>
-        <button class="btn line" onclick="openSettles()">저장 내역</button>
-        <button class="btn line" style="color:#c0392b;border-color:#e6b0aa" onclick="delSettle('install')">이 달 저장분 삭제</button>
-        <button class="btn" onclick="makeReport('install')">프로젝트 리포트 만들기</button>
+        <button class="btn" onclick="makeReport('install')">프로젝트 리포트</button>
+        <span class="more"><button class="btn line" onclick="toggleMore(this)">⋯ 더보기</button>
+          <div class="moremenu">
+            <button onclick="dlInstXlsx()">내부용 엑셀 내려받기</button>
+            <button class="red" onclick="delSettle('install')">이 달 저장분 삭제</button>
+          </div></span>
       </div>
       <div class="msg" id="mI2"></div>
     </div>
@@ -172,6 +196,8 @@
       <div class="row" style="margin-bottom:8px">
         <input type="text" id="mq" placeholder="계약번호·고객사 검색" style="width:230px" oninput="renderMaps()">
         <span class="mini" id="mCnt"></span>
+        <span style="flex:1"></span>
+        <button class="btn line" onclick="fillContractS1()" title="여기 매핑과 임대 장비 신청의 계약번호를 포탈 계약 표(에스원 계약번호 열)에 채웁니다 — 이미 값이 있는 계약은 그대로 둡니다">계약 표에 계약번호 채우기</button>
       </div>
       <div class="scroll" style="max-height:52vh"><table id="tMap"><thead><tr>
         <th>계약번호</th><th>에스원 표기</th><th>비즈포탈 등록번호</th><th>비즈포탈 고객사</th><th>제품</th><th>수정일</th><th></th>
@@ -182,11 +208,9 @@
 
 <!-- ── 저장된 정산 내역 ── -->
 <div class="ovl" id="ovlSet"><div class="pan">
-  <h3>저장된 정산 내역 <button class="rowbtn" onclick="closeOvl('ovlSet')">닫기</button></h3>
-  <p class="st">월·구분마다 한 건씩 저장됩니다. 다시 올려 저장하면 그 달 기록을 덮어쓰고, 잘못 저장했으면 여기서 지우면 됩니다. (프로젝트 리포트는 따로 남습니다)</p>
-  <div style="max-height:60vh;overflow:auto"><table id="setT"><thead><tr>
-    <th>정산월</th><th>구분</th><th style="text-align:right">에스원 청구</th><th style="text-align:right">비즈포탈</th><th>건수</th><th>리포트</th><th>저장</th><th></th>
-  </tr></thead><tbody></tbody></table></div>
+  <h3>저장된 정산 내역 <span><button class="rowbtn" onclick="loadSettles().then(renderSettles)">새로고침</button> <button class="rowbtn" onclick="closeOvl('ovlSet')">닫기</button></span></h3>
+  <p class="st">월·구분마다 한 건씩 저장됩니다. «불러오기»를 누르면 엑셀을 다시 올리지 않아도 그때 결과를 화면에서 볼 수 있습니다.</p>
+  <div style="max-height:62vh;overflow:auto" id="setList"></div>
   <div class="msg" id="mS"></div>
 </div></div>
 
@@ -200,6 +224,11 @@ function sess(){ try{ var s=JSON.parse(sessionStorage.getItem('svc_sess')||'null
 function goPortalLogin(){ if(window.top!==window.self){ alert('좌측 메뉴의 다른 탭에서 로그인한 뒤 다시 열어주세요.'); return; } location.href='index.html'; }
 function hdr(json){ var s=sess(); var h={apikey:SB_KEY, Authorization:'Bearer '+(s?s.a:SB_KEY)}; if(json) h['Content-Type']='application/json'; return h; }
 async function sbGet(q){ var r=await fetch(SB_URL+'/rest/v1/'+q,{headers:hdr()}); if(!r.ok) throw new Error('DB 읽기 실패 ('+r.status+')'); return r.json(); }
+async function sbRpc(fn, args){
+  var r=await fetch(SB_URL+'/rest/v1/rpc/'+fn,{method:'POST',headers:hdr(true),body:JSON.stringify(args||{})});
+  if(!r.ok){ var x=await r.text(); throw new Error('실행 실패 ('+r.status+'): '+x.slice(0,140)); }
+  var tx=await r.text(); try{ return tx?JSON.parse(tx):null; }catch(e){ return null; }
+}
 async function sbWrite(m,p,b,pref){
   var r=await fetch(SB_URL+'/rest/v1/'+p,{method:m,headers:Object.assign(hdr(true),pref?{Prefer:pref}:{}),body:b!==undefined?JSON.stringify(b):undefined});
   if(!r.ok){ var t=await r.text();
@@ -569,7 +598,10 @@ async function saveMaps(kind){
     if(ins.length) await sbWrite('POST','s1_map',ins);
     for(var i=0;i<upd.length;i++){ var u=upd[i]; var id=u.id; delete u.id; delete u.created_by; await sbWrite('PATCH','s1_map?id=eq.'+id,u); }
     S.maps=await sbGet('s1_map?select=*&active=is.true&order=contract_no');
-    msg('mU2','매칭 저장 완료 — 새로 '+ins.length+'건, 갱신 '+upd.length+'건 (다음 달부터 자동으로 채워집니다)','ok');
+    var filled=0;
+    try{ filled=await sbRpc('fill_contract_s1_no'); }catch(e){ /* 71단계 SQL 미적용 등 — 매핑 저장은 그대로 */ }
+    msg('mU2','매칭 저장 완료 — 새로 '+ins.length+'건, 갱신 '+upd.length+'건 (다음 달부터 자동으로 채워집니다)'+
+        (filled? ' · 계약 표에 계약번호 '+filled+'건 채움':''),'ok');
     renderMaps();
   }catch(e){ msg('mU2',e.message,'bad'); }
 }
@@ -652,29 +684,110 @@ async function saveSettle(kind){
     if(have&&have[0]){ delete row.created_by; await sbWrite('PATCH','s1_settle?id=eq.'+have[0].id,row); S.settle[kind]=have[0].id; }
     else{ var r2=await sbWrite('POST','s1_settle?select=id',[row],'return=representation'); S.settle[kind]=r2&&r2[0]?r2[0].id:null; }
     await loadSettles();
-    msg(mid,'정산 저장 완료 ('+ym+' · '+(kind==='use'?'사용료':'설치비')+') — 「저장 내역」에서 확인·삭제할 수 있습니다','ok');
+    var back=(S.settles||[]).filter(function(v){ return v.kind===row.kind && String(v.month||'').slice(0,7)===ym; })[0];
+    if(!back) throw new Error('저장은 됐지만 다시 읽히지 않습니다 — 읽기 권한(RLS)이나 68_s1_settle.sql 적용을 확인해 주세요');
+    msg(mid,'정산 저장 완료 ('+ym+' · '+(kind==='use'?'사용료':'설치비')+' · '+fmt(back.total)+'원) — 「저장 내역」에서 불러오거나 지울 수 있습니다','ok');
   }catch(e){ msg(mid,e.message,'bad'); }
 }
 /* ── 저장된 정산 불러오기·삭제 ── */
 async function loadSettles(){
-  try{ S.settles=await sbGet('s1_settle?select=id,month,kind,total,biz_total,cnt_new,cnt_end,cnt_ext,cnt_keep,report_id,created_by,updated_at&order=month.desc,kind'); }
-  catch(e){ S.settles=[]; }
+  S.settleErr='';
+  try{ S.settles=await sbGet('s1_settle?select=*&order=month.desc,kind'); }
+  catch(e){
+    S.settles=[]; S.settleErr=String(e.message||e);
+    /* 조용히 비우지 않고 알려 줍니다 — 표가 없거나(68단계 SQL 미적용) 로그인이 끊긴 경우가 대부분입니다 */
+    msg('mS','저장 내역을 읽지 못했습니다: '+S.settleErr+(/(404|does not exist|relation)/i.test(S.settleErr)? ' — 68_s1_settle.sql 이 적용되었는지 확인하세요':''),'bad');
+  }
+  saveBadge();
   return S.settles;
+}
+/* 이번 정산월에 저장된 기록이 있으면 화면 위에 표시 (재접속해도 바로 보이게) */
+function saveBadge(){
+  var ym=$('#ym').value, list=S.settles||[];
+  [['use','mU2'],['install','mI2']].forEach(function(x){
+    var el=$('#'+x[1]); if(!el||el.dataset.keep==='1') return;
+    var r=list.filter(function(v){ return v.kind===x[0] && String(v.month||'').slice(0,7)===ym; })[0];
+    if(r) { el.textContent='이 달('+ym+') '+(x[0]==='use'?'사용료':'설치비')+' 정산이 저장되어 있습니다 — '+fmt(r.total)+'원 · '+
+            String(r.created_by||'').split('@')[0]+' '+String(r.updated_at||'').slice(0,10)+' (저장 내역에서 «불러오기»)';
+            el.className='msg ok'; }
+    else if(/저장되어 있습니다/.test(el.textContent)) { el.textContent=''; el.className='msg'; }
+  });
+}
+function toggleMore(btn){
+  var m=btn.nextElementSibling, on=m.classList.contains('on');
+  document.querySelectorAll('.moremenu').forEach(function(x){ x.classList.remove('on'); });
+  if(!on){ m.classList.add('on');
+    setTimeout(function(){ document.addEventListener('click', function off(ev){
+      if(m.contains(ev.target)||ev.target===btn) return; m.classList.remove('on'); document.removeEventListener('click',off); }); },0); }
 }
 function closeOvl(id){ var e=$('#'+id); if(e) e.classList.remove('show'); }
 function openSettles(){ $('#ovlSet').classList.add('show'); msg('mS',''); loadSettles().then(renderSettles); renderSettles(); }
 function renderSettles(){
-  var rows=S.settles||[];
-  $('#setT tbody').innerHTML=rows.map(function(r){
-    var cnt=(r.kind==='use')
-      ? '신규 '+(r.cnt_new||0)+' · 해약 '+(r.cnt_end||0)+' · 연장 '+(r.cnt_ext||0)+' · 기존 '+(r.cnt_keep||0)
-      : '기본 '+(r.cnt_new||0)+' · 추가 '+(r.cnt_ext||0);
-    return '<tr><td>'+esc(String(r.month||'').slice(0,7))+'</td><td>'+(r.kind==='use'?'사용료':'설치비')+'</td>'+
-      '<td style="text-align:right">'+fmt(r.total)+'</td><td style="text-align:right">'+fmt(r.biz_total)+'</td>'+
-      '<td class="mini">'+cnt+'</td><td class="mini">'+(r.report_id? '#'+r.report_id : '—')+'</td>'+
-      '<td class="mini">'+esc(String(r.created_by||'').split('@')[0])+' · '+esc(String(r.updated_at||'').slice(0,10))+'</td>'+
-      '<td><button class="rowbtn red" onclick="delSettleId('+r.id+')">삭제</button></td></tr>';
-  }).join('')||'<tr><td colspan="8" class="mini">저장된 정산이 없습니다</td></tr>';
+  var rows=(S.settles||[]).slice().sort(function(a,b){ return String(b.month).localeCompare(String(a.month)) || String(a.kind).localeCompare(String(b.kind)); });
+  var n=$('#setN'); if(n) n.textContent=rows.length? '('+rows.length+')' : '';
+  var byM={}, order=[];
+  rows.forEach(function(r){ var m=String(r.month||'').slice(0,7); if(!byM[m]){ byM[m]=[]; order.push(m); } byM[m].push(r); });
+  var html=order.map(function(m){
+    var tot=byM[m].reduce(function(a,r){ return a+Number(r.total||0); },0);
+    return '<div class="setmon"><span class="ym">'+esc(m)+'</span><span class="sum">합계 '+fmt(tot)+'원</span></div>'+
+      byM[m].map(function(r){
+        var cnt=(r.kind==='use')
+          ? '신규 '+(r.cnt_new||0)+' · 해약 '+(r.cnt_end||0)+' · 연장 '+(r.cnt_ext||0)+' · 기존 '+(r.cnt_keep||0)
+          : '기본 '+(r.cnt_new||0)+'건 · 추가 '+(r.cnt_ext||0)+'건'+(r.buy_amount? ' · 매입 '+fmt(r.buy_amount)+'원':'');
+        var diff=Number(r.total||0)-Number(r.biz_total||0);
+        return '<div class="setrow">'+
+          '<span class="kind '+(r.kind==='use'?'u':'i')+'">'+(r.kind==='use'?'사용료':'설치비')+'</span>'+
+          '<span class="amt">'+fmt(r.total)+'원</span>'+
+          '<span class="diff '+(Math.abs(diff)<1?'ok':'bad')+'" title="비즈포탈 회계매출 '+fmt(r.biz_total)+'원">'+(Math.abs(diff)<1? '대조 일치':'차액 '+fmt(diff))+'</span>'+
+          '<span class="cnt">'+esc(cnt)+'</span>'+
+          '<span class="who">'+esc(String(r.created_by||'').split('@')[0])+' '+esc(String(r.updated_at||'').slice(5,10))+(r.report_id? ' · 리포트 #'+r.report_id:'')+'</span>'+
+          '<span class="acts"><button class="rowbtn" onclick="restoreSettle('+r.id+')">불러오기</button>'+
+          '<button class="rowbtn red" onclick="delSettleId('+r.id+')">삭제</button></span></div>';
+      }).join('');
+  }).join('');
+  $('#setList').innerHTML=html||'<div class="mini" style="padding:14px 4px;color:#888">'+(S.settleErr? '읽기 실패 — 아래 메시지를 확인하세요' : '저장된 정산이 없습니다')+'</div>';
+}
+/* 저장된 정산을 화면으로 되살립니다 — 엑셀을 다시 올리지 않아도 그때 결과를 그대로 봅니다(읽기용) */
+async function restoreSettle(id){
+  try{
+    var rows=await sbGet('s1_settle?select=*&id=eq.'+id);
+    var r=rows&&rows[0]; if(!r) throw new Error('없는 기록입니다');
+    var p=r.payload||{}, ym=String(r.month||'').slice(0,7);
+    $('#ym').value=ym;
+    if(r.kind==='use'){
+      var nac=(p.nac||[]).map(function(x){
+        return { row:0, cno:x.cno, nm:x.nm, prod:'nac', amt:Number(x.amt||0), lines:[{svc:''}], cand:[],
+                 biz: x.biz? { no:x.biz, cust:x.biz_cust||'', acc:Number(x.acc||0), proj:'' } : null,
+                 by:x.by||null, diff:Number(x.diff||0), groupSum:Number(x.acc||0),
+                 isNew:x.kind==='new', isEnd:x.kind==='end', isExt:x.kind==='ext' };
+      });
+      S.use={ groups:nac, lines:[], nac:nac, dk:[{amt:Number(p.dk_total||0), lines:[]}],
+              bizUse:nac.filter(function(g){ return g.biz; }).map(function(g){ return g.biz; }),
+              bizSettle:(p.biz_settle||[]).map(function(b){ return {no:b.no, proj:b.proj, acc:Number(b.acc||0), cust:'', kind:'settle'}; }),
+              restored:true };
+      S.settle.use=r.id;
+      renderUse();
+      $('#cNew').value=r.cnt_new||0; $('#cEnd').value=r.cnt_end||0; $('#cExt').value=r.cnt_ext||0; $('#cKeep').value=r.cnt_keep||0;
+      document.querySelector('.tab[data-t="use"]').click();
+      $('#mU2').dataset.keep='1';
+      msg('mU2','저장된 정산을 불러왔습니다 ('+ym+' · '+fmt(r.total)+'원) — 다시 대조하려면 엑셀 두 개를 올리세요','ok');
+    }else{
+      S.inst=(p.rows||[]).map(function(x){
+        return { row:0, cno:x.cno, nm:x.nm, work:'', idate:x.idate||'', price:0, spec:'', qty:x.base||0, sensor:x.extra||0,
+                 note:x.note||'', stat:'', base:Number(x.base||0), extra:Number(x.extra||0), amt:Number(x.amt||0),
+                 biz: x.biz? { no:x.biz, cust:'', acc:Number(x.amt||0) } : null, by:'map', cand:[], diff:0 };
+      });
+      S.instBiz=S.inst.filter(function(x){ return x.biz; }).map(function(x){ return x.biz; });
+      S.settle.install=r.id;
+      if(p.vendor) $('#vendor').value=p.vendor;
+      $('#buyTotal').value=r.buy_amount||'';
+      renderInst();
+      document.querySelector('.tab[data-t="inst"]').click();
+      $('#mI2').dataset.keep='1';
+      msg('mI2','저장된 설치비 정산을 불러왔습니다 ('+ym+' · '+fmt(r.total)+'원)','ok');
+    }
+    closeOvl('ovlSet');
+  }catch(e){ msg('mS',e.message,'bad'); }
 }
 async function delSettleId(id){
   var r=(S.settles||[]).filter(function(x){ return x.id===id; })[0];
@@ -791,6 +904,15 @@ function renderMaps(){
       '<td><button class="btn line" style="padding:3px 8px" onclick="delMap('+m.id+')">삭제</button></td></tr>';
   }).join('')||'<tr><td colspan="7" class="mini">저장된 매핑이 없습니다 — 사용료 정산에서 «매칭 저장»을 누르면 쌓입니다.</td></tr>';
 }
+/* 매핑·장비 신청의 계약번호를 포탈 계약 표(contracts.s1_no)에 채웁니다 (71단계 함수) */
+async function fillContractS1(){
+  try{
+    msg('mC','채우는 중…');
+    var n=await sbRpc('fill_contract_s1_no');
+    msg('mC', n? ('계약 '+n+'건에 에스원 계약번호를 채웠습니다 — 포탈 계약 메뉴에서 확인하세요')
+              : '새로 채울 계약이 없습니다 (이미 채워져 있거나 고객사 이름이 달라 못 찾은 경우)', n?'ok':'bad');
+  }catch(e){ msg('mC', e.message+' — 71단계 SQL(fill_contract_s1_no)이 적용되었는지 확인하세요','bad'); }
+}
 async function editMap(id,k,v){
   try{ var o={}; o[k]=k==='biz_no'?(n(v)||null):v; await sbWrite('PATCH','s1_map?id=eq.'+id,o);
     var m=S.maps.find(function(x){ return x.id===id; }); if(m) m[k]=o[k]; msg('mC','수정했습니다','ok');
@@ -861,7 +983,7 @@ document.querySelectorAll('.tab').forEach(function(b){
     if(b.dataset.t==='cfg') renderMaps();
   });
 });
-$('#ym').addEventListener('change',function(){ if(S.use&&S.use.nac){ countUse(); renderUse(); } });
+$('#ym').addEventListener('change',function(){ if(S.use&&S.use.nac&&!S.use.restored){ countUse(); renderUse(); } saveBadge(); });
 $('#onlyTodo').addEventListener('change',renderUse);
 document.addEventListener('DOMContentLoaded', async function(){
   if(!sess()) return;
