@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Genians 공식 자동 견적·발주 시스템 v5.6 PC전용</title>
+    <title>Genians 공식 자동 견적·발주 시스템 v5.7 PC전용</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
         :root { --genians-green: #1fb53a; --border-color: #000; --gray-bg: #f8f9fa; }
@@ -255,7 +255,7 @@
     <button onclick="window.close()" style="padding:8px 14px; background:#333; color:#fff; border:none; border-radius:5px; cursor:pointer; font-weight:bold;">✕ 닫기</button>
 </div>
 <div class="toolbar">
-    <div style="font-weight: bold; color: var(--genians-green);">Genians Pricing System v5.6 <span id="quoteTypeBadge" style="color:#888; font-weight:normal; font-size:12px;"></span></div>
+    <div style="font-weight: bold; color: var(--genians-green);">Genians Pricing System v5.7 <span id="quoteTypeBadge" style="color:#888; font-weight:normal; font-size:12px;"></span></div>
     <div class="toolbar-actions">
         <button class="btn btn-add" onclick="addRow()">+ 항목 추가</button>
         <div class="dropdown no-print">
@@ -914,7 +914,7 @@
     // ─────────────────────────────────────────────
     // 발주서 모드 — 견적서 양식을 그대로 쓰고(발주서로 명칭만 변경), 필요한 항목만 추가·제거합니다.
     //   견적서: 고객사 / 담당자 귀하 / 견적일 · 서비스·계약기간·납부주기·소비자단가·수량·제안단가·공급제안가·세액·비고
-    //   발주서: 수신처 貴中 / 수신자 貴下 / 발주일 · 품명·규격·수량·단가·합계·세액·비고 · 비고 표 = 발주번호·발주자·결제조건·납기일자·하자담보·유지보수
+    //   발주서: 수신처 / 수신자 귀하 / 발주일 · 품명·규격·수량·단가·합계·세액·비고 · 비고 표 = 발주번호·발주자·결제조건·납기일자·하자담보·유지보수
     // ─────────────────────────────────────────────
     const isPo = () => window.currentQuoteType === 'po';
     const QUOTE_HEAD = `<tr><th style="width: 19%;">서비스</th><th style="width: 10%;">계약 기간</th><th style="width: 9%;">납부 주기</th><th style="width: 10%;">소비자 단가(₩)</th><th style="width: 10%;">수량</th><th style="width: 10%;">제안 단가(₩)</th><th style="width: 12%;">공급 제안가(₩)</th><th style="width: 10%;">세액(₩)</th><th style="width: 7%;">비고</th></tr>`;
@@ -929,10 +929,10 @@
         const po = (type === 'po');
         document.getElementById('docTitle').innerText = po ? '발 주 서' : '견 적 서';
         document.getElementById('customerName').placeholder = po ? '수신처 (회사명)' : '고객사명';
-        document.getElementById('customerSuffix').style.display = po ? 'inline' : 'none';
+        document.getElementById('customerSuffix').style.display = 'none';   // 발주서도 수신처 뒤 貴中 없이
         document.getElementById('contactLabel').innerText = po ? '수신자' : '담당자';
         document.getElementById('contactPersonName').placeholder = po ? '수신자 성명·직급' : '담당자 성명 또는 직급을 입력하세요';
-        document.getElementById('contactSuffix').innerText = po ? '貴下' : '귀하';
+        document.getElementById('contactSuffix').innerText = '귀하';
         document.getElementById('dateLabel').innerText = po ? '발주일' : '견적일';
         document.getElementById('siteLabel').innerText = po ? '사업자' : '홈페이지';
         document.getElementById('siteCell').innerHTML = po ? '등록번호 129-81-80148 · TEL (031) 8084-9770 · FAX (070) 4332-1683' : '[www.genians.co.kr](https://www.genians.co.kr)';
