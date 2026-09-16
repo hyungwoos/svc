@@ -2266,7 +2266,7 @@ window.addEventListener('message', function(ev){
 });
 
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-16 ㊿+68';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-16 ㊿+69';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -3485,18 +3485,101 @@ var IFEE_LINE='설치비';   // mx_memos 의 line 값 — 서비스 코드와 �
 function openIfeeDetail(td, Y, M, det, adj){
   var rows=det.filter(function(d){ return d.y===Y && d.m===M; }).sort(function(a,b){ return b.fee-a.fee; });
   var a=adj[Y+'|'+M]||0;
+  var aNote=ifeeAdjNote(Y,M);
   var sum=rows.reduce(function(x,d){ return x+d.fee; },0)+a;
-  var h='<div class="mxdet"><table><thead><tr><th>고객사</th><th>서비스</th><th>근거</th><th class="n">설치비(천원)</th></tr></thead><tbody>';
+  var ed=ifeeCanEdit();
+  /* 금액 칸은 «원 단위»로 직접 고칩니다 — 표에는 천원으로 보이지만 입력·저장은 원 단위(입력·수정 창과 같은 규칙) */
+  function amtCell(v, key, ph){
+    if(!ed) return '<td class="n">'+won(v)+'</td>';
+    return '<td class="n"><input class="ifin" data-f="'+key+'" type="number" step="10000" value="'+(v||'')+'" placeholder="'+(ph||'0')+'" '+
+           'style="width:104px;text-align:right;font-size:12px;padding:3px 5px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)"></td>';
+  }
+  var h='<div class="mxdet"><table><thead><tr><th>고객사</th><th>서비스</th><th>근거</th><th class="n">설치비(원)</th></tr></thead><tbody>';
   rows.forEach(function(d,i){
-    h+='<tr data-i="'+i+'" title="계약 화면에서 보기"><td><b>'+esc(d.cust)+'</b></td><td>'+esc(lline(d.line))+'</td>'+
-       '<td style="color:var(--mut)">'+(d.guess? '시작월+1 (대금정산일 없음)':'대금정산일')+'</td><td class="n">'+won(d.fee)+'</td></tr>';
+    h+='<tr data-i="'+i+'" data-cid="'+(d.id||'')+'"><td><b>'+esc(d.cust)+'</b>'+
+       (ed? ' <button class="ifgo" data-i="'+i+'" title="계약 화면에서 보기" style="border:none;background:none;cursor:pointer;color:var(--mut)">↗</button>':'')+'</td>'+
+       '<td>'+esc(lline(d.line))+'</td>'+
+       '<td style="color:var(--mut)">'+(d.guess? '시작월+1 (대금정산일 없음)':'대금정산일')+'</td>'+
+       amtCell(d.fee,'c'+(d.id||''))+'</tr>';
   });
-  if(a) h+='<tr style="background:var(--surface-2)"><td colspan="2" style="color:var(--mut)">수동 조정 (설거비 등)</td><td style="color:var(--mut)">install_adj 표</td><td class="n">'+won(a)+'</td></tr>';
-  if(!rows.length && !a) h+='<tr><td colspan="4" style="text-align:center;color:var(--muted)">이 달 설치비 내역이 없습니다</td></tr>';
-  h+='</tbody><tfoot><tr><td colspan="3">계약 '+rows.length+'건'+(a? ' + 조정':'')+'</td><td class="n">'+won(sum)+'</td></tr></tfoot></table></div>'+
-     '<div class="who" style="margin-top:6px">줄을 누르면 그 고객사의 계약 화면으로 이동</div>';
+  h+='<tr style="background:var(--surface-2)"><td colspan="2" style="color:var(--mut)">수동 조정 (설거비 등)</td>'+
+     '<td>'+(ed? '<input class="ifin" data-f="note" type="text" value="'+esc(aNote||'')+'" placeholder="예: 설거비"'+
+                 ' style="width:120px;font-size:12px;padding:3px 5px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)">'
+               : '<span style="color:var(--mut)">'+esc(aNote||'install_adj 표')+'</span>')+'</td>'+
+     amtCell(a,'adj','0 (음수도 가능)')+'</tr>';
+  if(!rows.length && !a && !ed) h+='<tr><td colspan="4" style="text-align:center;color:var(--muted)">이 달 설치비 내역이 없습니다</td></tr>';
+  h+='</tbody><tfoot><tr><td colspan="3">계약 '+rows.length+'건'+(a? ' + 조정':'')+'</td><td class="n" id="ifSum">'+won(sum)+'천원</td></tr></tfoot></table></div>'+
+     (ed? '<div class="act" style="margin-top:6px"><span class="msg" id="ifMsg" style="font-size:12px"></span><span class="sp"></span>'+
+          '<button class="pill" id="ifSave" style="background:var(--brand);border-color:var(--brand);color:#fff">금액 저장</button></div>'+
+          '<div class="who" style="margin-top:4px">금액은 <b>원 단위</b>로 입력합니다 (표에는 천원으로 표시) · 고객사 옆 ↗ 를 누르면 그 계약으로 이동 · 수동 조정은 계약에 없는 설거비 등을 더하거나 빼는 칸입니다</div>'
+        : '<div class="who" style="margin-top:6px">줄을 누르면 그 고객사의 계약 화면으로 이동 · 금액 수정은 편집 권한이 있는 계정만</div>');
   openMxMemo(td, IFEE_LINE, Y, M, '설치비', null, {detail:{html:h, count:rows.length+(a?1:0), sum:sum,
-    go:function(i){ var d=rows[i]; if(!d) return; switchView('contracts'); var sInp=$('#dvSearch'); if(sInp){ sInp.value=d.cust; DV.page=0; renderGrid(); } }}});
+    go:function(i){ var d=rows[i]; if(!d) return; switchView('contracts'); var sInp=$('#dvSearch'); if(sInp){ sInp.value=d.cust; DV.page=0; renderGrid(); } },
+    ready:function(box){ ifeeWire(box, Y, M, rows, a); }}});
+}
+/* 설치비 금액을 고칠 수 있는 계정인지 — install_adj 쓰기 정책과 같은 기준(관리자 이상) */
+function ifeeCanEdit(){ return !!SB_TOKEN && !window.IS_VIEWER && (window.IS_SUPER || MY_ROLE==='admin' || MY_ROLE==='editor'); }
+function ifeeAdjNote(Y,M){
+  var x=((window.RAWX&&RAWX.iadj)||[]).filter(function(r){ return +r.year===+Y && +r.month===+M; })[0];
+  return x? (x.note||'') : '';
+}
+function ifeeWire(box, Y, M, rows, adj0){
+  var go=box.querySelectorAll('.ifgo');
+  go.forEach(function(b){ b.onclick=function(ev){ ev.stopPropagation();
+    var d=rows[+b.dataset.i]; if(!d) return; closeMxPop(); switchView('contracts');
+    var sInp=$('#dvSearch'); if(sInp){ sInp.value=d.cust; DV.page=0; renderGrid(); } }; });
+  var save=box.querySelector('#ifSave'); if(!save) return;
+  function sumNow(){
+    var t=0;
+    box.querySelectorAll('.ifin[data-f]').forEach(function(i){ if(i.dataset.f!=='note') t+=Number(i.value||0); });
+    var el=box.querySelector('#ifSum'); if(el) el.textContent=won(t)+'천원';
+  }
+  box.querySelectorAll('.ifin').forEach(function(i){ i.addEventListener('input',sumNow); });
+  save.onclick=async function(){
+    var msg=box.querySelector('#ifMsg'); msg.textContent='저장 중…'; save.disabled=true;
+    try{
+      var jobs=[], changed=0;
+      rows.forEach(function(d){
+        var inp=box.querySelector('.ifin[data-f="c'+d.id+'"]'); if(!inp||!d.id) return;
+        var v=inp.value===''? null : Number(inp.value);
+        if(Number(v||0)===Number(d.fee||0)) return;
+        changed++;
+        jobs.push(sbWrite('PATCH','contracts?id=eq.'+d.id,{install_fee:v, updated_at:new Date().toISOString()}).then(function(){
+          logChange('update','contracts',d.id,{install_fee:v});
+          (RAWX.contracts||[]).forEach(function(c){ if(c.id===d.id) c.install_fee=v; });
+          (DATA.rows||[]).forEach(function(r){ if(r._id===d.id) r.fee=Number(v||0); });
+        }));
+      });
+      var ai=box.querySelector('.ifin[data-f="adj"]');
+      var note=(box.querySelector('.ifin[data-f="note"]')||{}).value||'';
+      if(ai){
+        var av=ai.value===''? 0 : Number(ai.value);
+        if(av!==Number(adj0||0) || note!==ifeeAdjNote(Y,M)){
+          changed++;
+          if(!av){
+            jobs.push(sbWrite('DELETE','install_adj?year=eq.'+Y+'&month=eq.'+M).then(function(){
+              logChange('delete','install_adj',0,{year:Y,month:M});
+              RAWX.iadj=(RAWX.iadj||[]).filter(function(r){ return !(+r.year===+Y && +r.month===+M); });
+            }));
+          }else{
+            jobs.push(sbWrite('POST','install_adj?on_conflict=year,month',
+              [{year:Y, month:M, amount:av, note:note||null, updated_by:AUTH_USER||'', updated_at:new Date().toISOString()}],
+              'resolution=merge-duplicates').then(function(){
+              logChange('update','install_adj',0,{year:Y,month:M,amount:av,note:note||null});
+              var hit=(RAWX.iadj||[]).filter(function(r){ return +r.year===+Y && +r.month===+M; })[0];
+              if(hit){ hit.amount=av; hit.note=note||null; }
+              else (RAWX.iadj=RAWX.iadj||[]).push({year:Y, month:M, amount:av, note:note||null});
+            }));
+          }
+        }
+      }
+      if(!changed){ msg.textContent='바뀐 금액이 없습니다'; save.disabled=false; return; }
+      await Promise.all(jobs);
+      closeMxPop();
+      toast('설치비 저장', Y+'년 '+M+'월 · '+changed+'건 반영');
+      DIRTY=true; renderInstall();
+    }catch(e){ msg.textContent=String(e.message||e).slice(0,120); save.disabled=false; }
+  };
 }
 function renderInstall(){
   var sec=document.querySelector('[data-w="ifee"]'); if(!sec) return;
@@ -3521,7 +3604,7 @@ function renderInstall(){
     if(!ym){ pend.push({cust:r.cust, line:r.line, fee:f}); return; }   // 정산일 미정 — 달에 넣지 않음
     nFee++; if(ym[2]) nGuess++;
     cell[ym[0]+'|'+ym[1]]=(cell[ym[0]+'|'+ym[1]]||0)+f;
-    det.push({y:ym[0], m:ym[1], cust:r.cust, line:r.line, fee:f, guess:ym[2]});
+    det.push({y:ym[0], m:ym[1], cust:r.cust, line:r.line, fee:f, guess:ym[2], id:r._id});
   });
   Object.keys(adj).forEach(function(k){ cell[k]=(cell[k]||0)+adj[k]; });
 
@@ -8517,6 +8600,7 @@ function openMxMemo(td, line, Y, M, label, startTab, opts){
     };
   });
   var c2=document.getElementById('mxClose2'); if(c2) c2.onclick=closeMxPop;
+  if(opts.detail && typeof opts.detail.ready==='function'){ try{ opts.detail.ready(box); }catch(e){} }
   // 내역 줄 클릭 → 계약 화면
   box.querySelectorAll('.mxdet tbody tr[data-i]').forEach(function(tr){
     tr.onclick=function(){ var i=+tr.dataset.i; closeMxPop(); if(detGo) detGo(i); };
