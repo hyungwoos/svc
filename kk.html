@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>카카오 마켓플레이스 정산 자동화 v1.0</title>
+<style>
+
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap');
+  :root{ --gg:#1fb53a; --bd:rgba(11,11,11,.12); --muted:#52514e; --bg:#f9f9f7; --warn:#c0392b; --ok:#1e8e3e; }
+  *{box-sizing:border-box}
+  body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);margin:0;padding:16px;color:#222;font-size:13px}
+  .wrap{max-width:1280px;margin:0 auto}
+  .card{background:#fff;border:1px solid var(--bd);border-radius:12px;padding:14px 16px;margin-bottom:12px}
+  h2{font-size:15px;margin:0 0 4px;display:flex;align-items:center;gap:8px}
+  h3{font-size:13px;margin:0 0 8px}
+  .cap{font-size:12px;color:var(--muted);margin:0 0 10px;line-height:1.55}
+  .btn{padding:8px 13px;font-weight:700;border-radius:9px;cursor:pointer;border:none;color:#fff;font-size:12px;background:#333;white-space:nowrap}
+  .btn.green{background:var(--gg)} .btn.line{background:#fff;color:#333;border:1px solid var(--bd)} .btn.gray{background:#6c757d}
+  .btn:disabled{opacity:.45;cursor:default}
+  .tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+  .tab{padding:9px 16px;border:1px solid var(--bd);background:#fff;border-radius:999px;cursor:pointer;font-weight:600;font-size:12.5px}
+  .tab.on{background:var(--gg);color:#fff;border-color:var(--gg)}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .drop{flex:1;min-width:240px;border:1.5px dashed #c9cfd5;border-radius:10px;padding:12px;background:#fcfcfb;text-align:center;cursor:pointer}
+  .drop.has{border-color:var(--gg);background:#f4fbf5}
+  .drop b{display:block;font-size:12.5px;margin-bottom:3px}
+  .drop span{font-size:11.5px;color:var(--muted)}
+  input[type=file]{display:none}
+  label.f{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+  input[type=month],input[type=text],input[type=number],select{border:1px solid #ccd2d8;border-radius:7px;padding:6px 8px;font-size:12px;font-family:inherit;background:#fff}
+  .tiles{display:flex;gap:10px;flex-wrap:wrap;margin:4px 0 10px}
+  .tile{flex:1;min-width:132px;border:1px solid var(--bd);border-radius:10px;padding:10px 12px;background:#fcfcfb}
+  .tile .t{font-size:11px;color:var(--muted)} .tile .v{font-size:17px;font-weight:700;margin-top:2px}
+  .tile.ok .v{color:var(--ok)} .tile.bad .v{color:var(--warn)}
+  .cnts{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:6px 0}
+  .cnts label{display:flex;align-items:center;gap:4px;font-size:12px;font-weight:600}
+  .cnts input{width:64px;text-align:right}
+  table{width:100%;border-collapse:collapse}
+  th,td{border-bottom:1px solid #eef0f2;padding:6px 7px;text-align:left;font-size:12px;vertical-align:middle}
+  th{background:#f5f6f7;position:sticky;top:0;z-index:2;font-weight:600;white-space:nowrap}
+  td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+  .scroll{max-height:62vh;overflow:auto;border:1px solid var(--bd);border-radius:10px}
+  tr.st-auto td{background:#fff} tr.st-map td{background:#f4fbf5} tr.st-need td{background:#fff8e1} tr.st-diff td{background:#fdecea}
+  .tag{display:inline-block;font-size:10.5px;padding:1px 7px;border-radius:999px;background:#eef3f8;color:#345;white-space:nowrap}
+  .tag.map{background:#e3f6e6;color:#1e8e3e} .tag.amt{background:#e8f0fe;color:#1a56b8} .tag.need{background:#fff3cd;color:#7a5c00}
+  .tag.diff{background:#fdecea;color:#c0392b} .tag.new{background:#fff9c4;color:#7a5c00} .tag.end{background:#fdecea;color:#c0392b}
+  .tag.ext{background:#ede7f6;color:#5e35b1}
+  .more{position:relative;display:inline-block}
+  .moremenu{display:none;position:absolute;right:0;bottom:calc(100% + 6px);background:#fff;border:1px solid var(--bd);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.14);padding:4px;min-width:186px;z-index:60}
+  .moremenu.on{display:block}
+  .moremenu button{display:block;width:100%;text-align:left;border:none;background:none;padding:8px 10px;border-radius:7px;font-size:12px;cursor:pointer;font-family:inherit;color:#333;white-space:nowrap}
+  .moremenu button:hover{background:#f3f5f7}
+  .moremenu button.red{color:#c0392b}
+  .setmon{display:flex;align-items:baseline;gap:8px;margin:12px 0 5px;padding-bottom:4px;border-bottom:1px solid #eef0f2}
+  .setmon .ym{font-weight:700;font-size:13px}
+  .setmon .sum{font-size:11.5px;color:var(--muted)}
+  .setrow{display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:9px;font-size:12px}
+  .setrow:hover{background:#f7f9fa}
+  .setrow .kind{flex:0 0 52px;text-align:center;border-radius:999px;padding:2px 0;font-size:11px;font-weight:600}
+  .setrow .kind.u{background:#e8f0fe;color:#1a56b8} .setrow .kind.i{background:#e3f6e6;color:#1e8e3e}
+  .setrow .amt{flex:0 0 110px;text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+  .setrow .diff{flex:0 0 92px;font-size:11px}
+  .setrow .diff.ok{color:var(--ok)} .setrow .diff.bad{color:var(--warn)}
+  .setrow .cnt{flex:1;color:var(--muted);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .setrow .who{flex:0 0 auto;color:#98a2ab;font-size:11px}
+  .setrow .acts{flex:0 0 auto;display:flex;gap:4px;opacity:.4}
+  .setrow:hover .acts{opacity:1}
+  .rest{max-width:1280px;margin:0 auto 10px;background:#eef6ff;border:1px solid #cfe3fb;color:#1a56b8;border-radius:10px;padding:8px 12px;display:flex;align-items:center;gap:10px;font-size:12px}
+  .rest span{flex:1}
+  .ovl{position:fixed;inset:0;background:rgba(15,20,25,.38);z-index:500;display:none;align-items:flex-start;justify-content:center;padding:52px 16px 24px;overflow:auto}
+  .ovl.show{display:flex}
+  .pan{background:#fff;border:1px solid var(--bd);border-radius:14px;width:820px;max-width:100%;padding:16px 18px 14px;box-shadow:0 18px 50px rgba(0,0,0,.22)}
+  .pan h3{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:14px;margin:0 0 6px}
+  .rowbtn{border:1px solid var(--bd);background:#fff;border-radius:7px;padding:3px 9px;cursor:pointer;font-size:11.5px;font-family:inherit;color:#333}
+  .rowbtn:hover{border-color:var(--gg);color:var(--gg)}
+  .rowbtn.red{color:#c0392b;border-color:#e6b0aa}
+  .st{font-size:11.5px;color:var(--muted);line-height:1.55;margin:0 0 8px}
+  .st.bad{color:var(--warn)} .st.ok{color:var(--ok)}
+  select.pick{max-width:270px;font-size:11.5px}
+  .msg{font-size:12px;margin:6px 0;min-height:16px}
+  .msg.bad{color:var(--warn)} .msg.ok{color:var(--ok)}
+  .foot{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .hidden{display:none!important}
+  .mini{font-size:11px;color:var(--muted)}
+  .lnk{color:#1a56b8;cursor:pointer;text-decoration:underline}
+  #loginOverlay{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;align-items:center;justify-content:center}
+
+  .kkrow td{font-size:12px}
+  .kkhint{font-size:11.5px;color:var(--muted)}
+  textarea.paste{width:100%;min-height:110px;border:1px solid #ccd2d8;border-radius:9px;padding:9px 11px;font-family:inherit;font-size:12px;line-height:1.5;resize:vertical}
+</style>
+</head>
+<body>
+<div id="loginOverlay">
+  <div style="background:#fcfcfb;border:1px solid var(--bd);padding:40px;border-radius:14px;text-align:center;width:330px">
+    <img src="Logo.jpg" alt="Genians" style="height:40px;margin-bottom:18px">
+    <h3 style="margin:0 0 8px">포탈 로그인이 필요합니다</h3>
+    <p class="cap">카카오 정산은 서비스사업부 통합 관리 포탈 계정으로<br>로그인한 사용자만 사용할 수 있습니다.</p>
+    <button class="btn green" style="width:100%;padding:11px" onclick="goPortalLogin()">포탈 로그인 하러 가기</button>
+    <button class="btn line" style="width:100%;margin-top:8px" onclick="location.reload()">로그인 후 다시 확인</button>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="rest hidden" id="restBar"><span id="restTxt"></span><button class="btn line" onclick="clearRestored()">✕ 치우기</button></div>
+
+  <div class="tabs">
+    <button class="tab on" data-t="run">① 정산 만들기</button>
+    <button class="tab" data-t="cfg">② 매핑·설정</button>
+    <span style="flex:1"></span>
+    <label class="f">청구월 <input type="month" id="ym"></label>
+    <label class="f" title="정산 대상 이용월 — 보통 청구월의 전달">이용월 <input type="month" id="um"></label>
+    <button class="btn line" onclick="openSettles()">🗂 저장 내역 <span id="setN" class="mini"></span></button>
+  </div>
+
+  <!-- ① 정산 만들기 -->
+  <div id="vRun">
+    <div class="card">
+      <h2>카카오 정산 안내 → SSL VPN 리스트 · 비즈포탈 대조</h2>
+      <p class="cap">카카오엔터프라이즈가 보낸 <b>정산 지급 안내</b>(메일을 PDF로 저장한 파일)를 올리거나 메일 표를 그대로 붙여넣으면, 프로젝트 코드로 고객사를 찾아 이번 달 <b>SSL VPN 리스트</b>를 만들고 비즈포탈 등록번호까지 맞춰 줍니다. 한 번 맞춘 코드는 저장되어 다음 달부터 자동입니다. 파일은 읽기만 하고 저장하지 않습니다.</p>
+      <div class="row">
+        <label class="drop" id="dK1"><b>① 정산 안내 PDF</b><span>[카카오클라우드] '26년 8월 마켓플레이스 이용료 정산…pdf</span><input type="file" id="fK1" accept="application/pdf"></label>
+        <label class="drop" id="dK2"><b>② 비즈포탈 영업현황 엑셀</b><span>BIZPORTAL-SALES_…xlsx (선택 — 등록번호 대조용)</span><input type="file" id="fK2" accept=".xlsx,.xls"></label>
+      </div>
+      <details style="margin-top:10px">
+        <summary class="kkhint" style="cursor:pointer">PDF 없이 메일 표를 붙여넣기</summary>
+        <p class="kkhint" style="margin:8px 0 6px">메일 본문의 표를 드래그해 복사한 뒤 아래에 붙여넣고 «붙여넣은 내용 읽기»를 누르세요. 프로젝트 코드(SCP…)와 금액이 있는 줄만 읽습니다.</p>
+        <textarea class="paste" id="kkPaste" placeholder="지니언스  SCP26104116S  MSP_공공_[경남교육청]26년 클라우드공급  SSL PNS  SSL PNS_SSL VPN License  VM  1  1.00  24,000  24,000"></textarea>
+        <div class="row" style="margin-top:6px"><button class="btn line" onclick="readPaste()">붙여넣은 내용 읽기</button></div>
+      </details>
+      <div class="msg" id="mK"></div>
+    </div>
+
+    <div class="card hidden" id="kRes">
+      <div class="tiles" id="kTiles"></div>
+      <div class="row" style="margin-bottom:8px">
+        <span class="mini" id="kCnt"></span>
+        <span style="flex:1"></span>
+        <label class="f">신규 <input type="number" id="cNew" style="width:58px"></label>
+        <label class="f">해약 <input type="number" id="cEnd" style="width:58px"></label>
+      </div>
+      <div class="scroll"><table id="tK"><thead><tr>
+        <th>상태</th><th>고객사(서비스제공처)</th><th>프로젝트 코드</th><th class="n">수량</th><th class="n">단가</th><th class="n">금액</th>
+        <th>회차</th><th>계약기간</th><th>비즈포탈 등록번호</th><th class="n">회계매출</th><th>비고</th>
+      </tr></thead><tbody></tbody></table></div>
+      <div class="foot">
+        <button class="btn green" onclick="saveMaps()">매핑 저장</button>
+        <button class="btn gray" onclick="saveSettle()">정산 저장</button>
+        <button class="btn" onclick="makeReport()">프로젝트 리포트</button>
+        <span class="more"><button class="btn line" onclick="toggleMore(this)">⋯ 더보기</button>
+          <div class="moremenu">
+            <button onclick="printList()">리스트 인쇄·PDF</button>
+            <button onclick="dlListXlsx()">SSL VPN 리스트 엑셀</button>
+            <button onclick="copyBizCol()">등록번호 열 복사</button>
+            <button class="red" onclick="delSettle()">이 달 저장분 삭제</button>
+          </div></span>
+      </div>
+      <div class="msg" id="mK2"></div>
+    </div>
+  </div>
+
+  <!-- ② 매핑·설정 -->
+  <div id="vCfg" class="hidden">
+    <div class="card">
+      <h2>기본 설정</h2>
+      <div class="row">
+        <label class="f">기본 단가 <input type="number" id="cfgUnit" style="width:110px"></label>
+        <label class="f">상품명 <input type="text" id="cfgProd" style="width:120px"></label>
+        <label class="f">계산서 발행일 매월 <input type="number" id="cfgDay" style="width:60px">일</label>
+        <label class="f">고객사 <input type="text" id="cfgCust" style="width:150px"></label>
+        <label class="f">담당자 <input type="text" id="cfgContact" style="width:130px"></label>
+        <button class="btn green" onclick="saveCfg()">설정 저장</button>
+      </div>
+      <div class="msg" id="mC"></div>
+    </div>
+    <div class="card">
+      <h2>프로젝트 코드 ↔ 고객사 매핑</h2>
+      <p class="cap">메일의 프로젝트명은 길고 매달 조금씩 달라지지만 프로젝트 코드(SCP…)는 그대로입니다. 그래서 코드로 고객사를 찾습니다. 회차 분모(1/6 의 6)와 계약기간도 여기서 관리합니다.</p>
+      <div class="row" style="margin-bottom:8px">
+        <input type="text" id="mq" placeholder="코드·고객사 검색" style="width:230px" oninput="renderMaps()">
+        <span class="mini" id="mCnt"></span>
+      </div>
+      <div class="scroll" style="max-height:56vh"><table id="tMap"><thead><tr>
+        <th style="width:130px">프로젝트 코드</th><th style="width:180px">고객사</th><th>카카오 프로젝트명</th>
+        <th style="width:110px">계약시작</th><th style="width:110px">계약종료</th><th style="width:70px">회차 분모</th><th style="width:60px"></th>
+      </tr></thead><tbody></tbody></table></div>
+    </div>
+  </div>
+</div>
+
+<!-- 저장 내역 -->
+<div class="ovl" id="ovlSet"><div class="pan">
+  <h3><span>🗂 저장된 정산 내역</span>
+    <span><button class="rowbtn" onclick="reloadSettles(this)">목록 다시 읽기</button>
+    <button class="rowbtn" onclick="closeOvl('ovlSet')">✕ 닫기</button></span></h3>
+  <p class="st">청구월마다 한 건씩 저장됩니다. «불러오기»를 누르면 그때 만든 리스트를 다시 볼 수 있습니다.</p>
+  <div style="max-height:62vh;overflow:auto" id="setList"></div>
+  <div class="msg" id="mS"></div>
+</div></div>
+
+<script>
+/* ─────────────────────────────────────────────
+   접속·DB — 포탈 로그인 세션(svc_sess) 공유. 서비스 키 없음(anon + 사용자 토큰 + RLS).
+   ───────────────────────────────────────────── */
+var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
+var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
+function sess(){ try{ var s=JSON.parse(sessionStorage.getItem('svc_sess')||'null'); if(s&&s.a&&s.p!==false&&Math.floor(Date.now()/1000)<(s.e||0)-60) return s; }catch(e){} return null; }
+function goPortalLogin(){ if(window.top!==window.self){ alert('좌측 메뉴의 다른 탭에서 로그인한 뒤 다시 열어주세요.'); return; } location.href='index.html'; }
+function hdr(json){ var s=sess(); var h={apikey:SB_KEY, Authorization:'Bearer '+(s?s.a:SB_KEY)}; if(json) h['Content-Type']='application/json'; return h; }
+async function sbGet(q){ var r=await fetch(SB_URL+'/rest/v1/'+q,{headers:hdr()}); if(!r.ok) throw new Error('DB 읽기 실패 ('+r.status+')'); return r.json(); }
+async function sbWrite(m,p,b,pref){
+  var r=await fetch(SB_URL+'/rest/v1/'+p,{method:m,headers:Object.assign(hdr(true),pref?{Prefer:pref}:{}),body:b!==undefined?JSON.stringify(b):undefined});
+  if(!r.ok){ var t=await r.text();
+    if(r.status===401) throw new Error('로그인이 만료되었습니다 — 포탈에서 다시 로그인해 주세요');
+    if(r.status===403||/policy/i.test(t)) throw new Error('쓰기 권한이 없습니다 (편집 권한 필요)');
+    throw new Error('저장 실패 ('+r.status+'): '+t.slice(0,150)); }
+  var tx=await r.text(); try{ return tx?JSON.parse(tx):null; }catch(e){ return null; }
+}
+async function aiFetch(payload){
+  var r=await fetch(SB_URL+'/functions/v1/ask',{method:'POST',headers:hdr(true),body:JSON.stringify(payload)});
+  var j=null; try{ j=await r.json(); }catch(e){}
+  if(!r.ok) throw new Error((j&&j.error)||('HTTP '+r.status));
+  return j;
+}
+var $=function(s){ return document.querySelector(s); };
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+function n(v){ var x=parseFloat(String(v==null?'':v).replace(/[^\d.\-]/g,'')); return isNaN(x)?0:x; }
+function fmt(v){ v=Math.round(v||0); return v?v.toLocaleString('ko-KR'):'0'; }
+function todayISO(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function msg(id,t,cls){ var e=$('#'+id); if(!e) return; e.textContent=t||''; e.className='msg'+(cls||''?' '+cls:''); }
+var K={ rows:null, biz:null, maps:[], cfg:{}, settles:[], settleId:null, settleErr:'' };
+
+/* SheetJS — 비즈포탈 엑셀 읽기·리스트 내려받기에만 씀 */
+function loadXlsx(){ return new Promise(function(ok,ng){
+  if(window.XLSX) return ok();
+  var sc=document.createElement('script'); sc.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+  sc.onload=function(){ ok(); }; sc.onerror=function(){ ng(new Error('엑셀 라이브러리를 불러오지 못했습니다 (cdnjs 접속 확인)')); };
+  document.head.appendChild(sc); }); }
+function readFile(f){ return new Promise(function(ok,ng){ var r=new FileReader(); r.onload=function(){ ok(new Uint8Array(r.result)); }; r.onerror=function(){ ng(new Error('파일을 읽지 못했습니다')); }; r.readAsArrayBuffer(f); }); }
+function readB64(f){ return new Promise(function(ok,ng){ var r=new FileReader(); r.onload=function(){ ok(String(r.result).split(',')[1]||''); }; r.onerror=function(){ ng(new Error('파일을 읽지 못했습니다')); }; r.readAsDataURL(f); }); }
+
+/* 이름 비교 — 에스원 정산과 같은 방식 */
+function norm(s){ s=String(s||'').toLowerCase(); s=s.replace(/\([^)]*\)/g,' ').replace(/주식회사|㈜/g,' ').replace(/[\s_\-\.,·]/g,''); return s; }
+function grams(s){ var g={}; for(var i=0;i<s.length-1;i++) g[s.substr(i,2)]=1; if(s.length===1) g[s]=1; return g; }
+function sim(a,b){ a=norm(a); b=norm(b); if(!a||!b) return 0; if(a===b) return 1;
+  if(a.indexOf(b)>=0||b.indexOf(a)>=0) return .88;
+  var ga=grams(a), gb=grams(b), hit=0, ka=Object.keys(ga), kb=Object.keys(gb);
+  ka.forEach(function(k){ if(gb[k]) hit++; }); return ka.length+kb.length? 2*hit/(ka.length+kb.length):0; }
+
+/* 고객사 이름 변형 — «경기도 양평군» ↔ «양평군청», «코드아이티(산림과학원)» ↔ «산림과학원» 처럼
+   앞의 시·도 이름이나 괄호 안 이름만 맞아도 같은 곳으로 봅니다 */
+var ADMIN=/^(서울특별시|서울시|경기도|강원특별자치도|강원도|충청북도|충청남도|전라북도|전북특별자치도|전라남도|경상북도|경상남도|제주특별자치도|제주도|서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주)\s*/;   // 긴 이름부터 (경기도 → 경기 로 잘리지 않게)
+function custKeys(c){
+  c=String(c||'').trim(); if(!c) return [];
+  var out=[c];
+  if(ADMIN.test(c)) out.push(c.replace(ADMIN,''));
+  var m=c.match(/\(([^)]+)\)/); if(m) out.push(m[1]);
+  out.push(c.replace(/\([^)]*\)/g,''));
+  return out.map(norm).filter(function(v,i,a){ return v && v.length>=2 && a.indexOf(v)===i; });
+}
+function custHit(cust, text){
+  var t=norm(text); if(!t) return 0;
+  var keys=custKeys(cust), best=0;
+  keys.forEach(function(k){
+    if(k.length>=3 && t.indexOf(k)>=0) best=Math.max(best, .95);
+    best=Math.max(best, sim(k,t));
+  });
+  return best;
+}
+
+/* ─────────────────────────────────────────────
+   ① 정산 안내 읽기 (PDF → AI · 또는 붙여넣기)
+   ───────────────────────────────────────────── */
+async function onPdf(f,d){
+  try{
+    if(f.size>4*1024*1024) throw new Error('4MB 이하 PDF만 가능합니다');
+    msg('mK','⏳ AI가 정산 안내를 읽는 중… (10~20초)');
+    var j=await aiFetch({mode:'kakao', pdf:await readB64(f)});
+    if(!j||!j.ok||!j.kakao) throw new Error((j&&j.error)||'분석 실패');
+    applyRows(j.kakao.rows||[], j.kakao.use_month, j.kakao.total);
+    markDrop(d,f);
+    msg('mK', (K.rows||[]).length+'건을 읽었습니다'+(j.kakao.total? ' · 안내 합계 '+fmt(j.kakao.total)+'원':'')+
+        (K.biz? '':' — 비즈포탈 엑셀을 올리면 등록번호까지 맞춰 줍니다'),'ok');
+  }catch(e){ msg('mK',e.message,'bad'); }
+}
+function readPaste(){
+  var t=$('#kkPaste').value||'';
+  if(!t.trim()){ msg('mK','붙여넣은 내용이 없습니다','bad'); return; }
+  var rows=[];
+  t.split(/\r?\n/).forEach(function(line){
+    var m=line.match(/(SCP[0-9A-Za-z]+)/); if(!m) return;
+    var nums=(line.match(/[\d,]{3,}/g)||[]).map(function(x){ return n(x); }).filter(function(x){ return x>=1000; });
+    var amt=nums.length? nums[nums.length-1] : 0;
+    var unit=nums.length>1? nums[nums.length-2] : amt;
+    var proj=line.split(m[1])[1]||'';
+    proj=proj.replace(/SSL[^\S\n]*PNS.*$/,'').replace(/\s{2,}/g,' ').trim();
+    rows.push({ code:m[1], project:proj, qty:1, unit_price:unit||amt, amount:amt });
+  });
+  if(!rows.length){ msg('mK','프로젝트 코드(SCP…)가 있는 줄을 찾지 못했습니다','bad'); return; }
+  applyRows(rows, null, rows.reduce(function(a,r){ return a+r.amount; },0));
+  msg('mK', rows.length+'건을 읽었습니다 (붙여넣기)','ok');
+}
+/* 읽은 행 → 화면 데이터 (매핑으로 고객사·회차·계약기간 채움) */
+function applyRows(rows, useMonth, total){
+  var byCode={}; K.maps.forEach(function(m){ byCode[String(m.project_code).trim().toUpperCase()]=m; });
+  var unit0=n((K.cfg.basic&&K.cfg.basic.unit_price)||24000);
+  K.rows=(rows||[]).map(function(r){
+    var code=String(r.code||'').trim().toUpperCase();
+    var m=byCode[code]||null;
+    return { code:code, project:r.project||'', product:r.product||((K.cfg.basic&&K.cfg.basic.product)||'SSL PNS'),
+             qty:n(r.qty)||1, unit:n(r.unit_price)||unit0, amt:n(r.amount)|| (n(r.unit_price)||unit0)*(n(r.qty)||1),
+             cust:m? m.customer : '', map:m||null, mapped:!!m,
+             start:m&&m.start_date? String(m.start_date).slice(0,10):'', end:m&&m.end_date? String(m.end_date).slice(0,10):'',
+             termTotal:(m&&m.term_total)||1, note:(m&&m.note)||'', biz:null, by:null };
+  });
+  if(useMonth && /^\d{4}-\d{2}$/.test(useMonth)){
+    $('#um').value=useMonth;
+    var d=new Date(useMonth+'-01T00:00:00'); d.setMonth(d.getMonth()+1);
+    $('#ym').value=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+  }
+  K.total=n(total)|| K.rows.reduce(function(a,r){ return a+r.amt; },0);
+  calcTerms(); matchBiz(); renderRun();
+}
+/* 회차 — 이전 달 저장분의 회차 +1 (없으면 1) */
+function calcTerms(){
+  var ym=$('#ym').value;
+  var prev=(K.settles||[]).filter(function(s){ return String(s.month||'').slice(0,7)<ym; })
+    .sort(function(a,b){ return String(b.month).localeCompare(String(a.month)); })[0];
+  var pm={}; if(prev&&prev.payload&&prev.payload.rows) prev.payload.rows.forEach(function(r){ pm[r.code]=r; });
+  (K.rows||[]).forEach(function(r){
+    var p=pm[r.code];
+    r.termNo = p&&p.termNo? Math.min(p.termNo+1, r.termTotal||1) : 1;
+    if((r.termTotal||1)===1) r.termNo=1;
+    r.isNew = !p;
+  });
+}
+/* 비즈포탈 등록번호 맞추기 (이번 청구월 카카오 건) */
+function matchBiz(){
+  var biz=(K.biz||[]).filter(function(b){ return /카카오|kakao/i.test(b.cust+' '+b.proj) || /SSL|VPN|구독/i.test(b.proj); });
+  var used={};
+  (K.rows||[]).forEach(function(r){
+    r.biz=null; r.by=null;
+    if(!biz.length) return;
+    var scored=biz.filter(function(b){ return !used[b.no]; })
+      .map(function(b){ return { b:b, s:Math.max(custHit(r.cust,b.proj), custHit(r.cust,b.cust)) }; })
+      .filter(function(x){ return x.s>=.55; }).sort(function(x,y){ return y.s-x.s; });
+    if(scored.length){ r.biz=scored[0].b; r.by='name'; used[scored[0].b.no]=1; return; }
+    var c2=biz.filter(function(b){ return !used[b.no] && Math.abs(b.acc-r.amt)<1; });
+    if(c2.length===1){ r.biz=c2[0]; r.by='amt'; used[c2[0].no]=1; }
+  });
+  K.bizPool=biz;
+}
+/* 비즈포탈 엑셀 */
+async function onBiz(f,d){
+  try{
+    msg('mK','⏳ 비즈포탈 엑셀을 읽는 중…'); await loadXlsx();
+    var wb=XLSX.read(await readFile(f),{type:'array'});
+    var ws=wb.Sheets[wb.SheetNames[0]];
+    var aoa=XLSX.utils.sheet_to_json(ws,{header:1,defval:null});
+    var hi=-1, H=null;
+    for(var i=0;i<Math.min(aoa.length,15);i++){
+      var line=(aoa[i]||[]).map(function(x){ return String(x==null?'':x).replace(/\s/g,''); });
+      if(line.some(function(v){ return v.indexOf('등록번호')>=0; }) && line.some(function(v){ return v.indexOf('고객사')>=0; })){ hi=i; H=line; break; }
+    }
+    if(hi<0) throw new Error('비즈포탈 엑셀 머리글(등록번호·고객사)을 찾지 못했습니다');
+    function col(names){ for(var i=0;i<H.length;i++){ for(var j=0;j<names.length;j++){ if(H[i]&&H[i].indexOf(names[j])>=0) return i; } } return -1; }
+    var C={no:col(['등록번호']), proj:col(['프로젝트명']), cust:col(['고객사']), acc:col(['회계매출']), stage:col(['진행상태'])};
+    K.biz=[];
+    for(var r=hi+1;r<aoa.length;r++){
+      var row=aoa[r]||[]; var no=row[C.no]; if(!no) continue;
+      K.biz.push({ no:Math.round(n(no)), proj:String(row[C.proj]||''), cust:String(row[C.cust]||''), acc:n(row[C.acc]), stage:String(row[C.stage]||'') });
+    }
+    markDrop(d,f);
+    msg('mK','비즈포탈 '+K.biz.length+'건을 읽었습니다','ok');
+    if(K.rows){ matchBiz(); renderRun(); }
+  }catch(e){ msg('mK',e.message,'bad'); }
+}
+
+/* ─────────────────────────────────────────────
+   화면
+   ───────────────────────────────────────────── */
+function tile(t,v,cls){ return '<div class="tile '+(cls||'')+'"><div class="t">'+esc(t)+'</div><div class="v">'+v+'</div></div>'; }
+function renderRun(){
+  if(!K.rows) return;
+  var sum=K.rows.reduce(function(a,r){ return a+r.amt; },0);
+  var bizSum=K.rows.reduce(function(a,r){ return a+(r.biz? r.biz.acc:0); },0);
+  var need=K.rows.filter(function(r){ return !r.mapped; }).length;
+  var needBiz=K.rows.filter(function(r){ return !r.biz; }).length;
+  $('#kTiles').innerHTML=
+    tile('고객사', K.rows.length+'곳')+
+    tile('청구 합계', fmt(sum)+'원')+
+    tile('안내 합계', fmt(K.total||sum)+'원', Math.abs((K.total||sum)-sum)<1?'ok':'bad')+
+    tile('비즈포탈 회계매출', fmt(bizSum)+'원')+
+    tile('차액', fmt(sum-bizSum), Math.abs(sum-bizSum)<1?'ok':'bad')+
+    tile('고객사 미확인 / 등록번호 미매칭', need+' / '+needBiz, (need+needBiz)?'bad':'ok');
+  var nNew=K.rows.filter(function(r){ return r.isNew; }).length;
+  if($('#cNew').value==='') $('#cNew').value=nNew;
+  if($('#cEnd').value==='') $('#cEnd').value=0;
+  $('#kCnt').textContent=K.rows.length+'건 · 이용월 '+($('#um').value||'-')+' · 청구월 '+($('#ym').value||'-');
+  var tb=$('#tK tbody'); tb.innerHTML='';
+  K.rows.forEach(function(r,i){
+    var st=!r.mapped? 'need' : (!r.biz? 'need':'auto');
+    var tag=r.mapped? '<span class="tag map">매핑</span>' : '<span class="tag need">고객사 확인</span>';
+    if(r.isNew) tag+=' <span class="tag new">신규</span>';
+    var cust=r.mapped? esc(r.cust)
+      : '<input type="text" value="'+esc(r.cust)+'" placeholder="고객사 입력" style="width:150px" onchange="setCust('+i+',this.value)">';
+    var pick='<select class="pick" onchange="pickBiz('+i+',this.value)"><option value="">— 선택 —</option>'+
+      (K.bizPool||[]).map(function(b){ return '<option value="'+b.no+'"'+(r.biz&&r.biz.no===b.no?' selected':'')+'>'+esc(b.no+' · '+(b.cust||b.proj).slice(0,22)+' · '+fmt(b.acc))+'</option>'; }).join('')+'</select>';
+    var tr=document.createElement('tr'); tr.className='st-'+st+' kkrow';
+    tr.innerHTML='<td>'+tag+'</td><td>'+cust+'</td><td class="mini">'+esc(r.code)+'<div class="mini" style="color:#98a2ab">'+esc(String(r.project).slice(0,34))+'</div></td>'+
+      '<td class="n">'+r.qty+'</td><td class="n">'+fmt(r.unit)+'</td><td class="n">'+fmt(r.amt)+'</td>'+
+      '<td class="mini">'+(r.termNo||1)+'/'+(r.termTotal||1)+'</td>'+
+      '<td class="mini">'+esc(r.start||'')+(r.end? ' ~ '+esc(r.end):'')+'</td>'+
+      '<td>'+pick+'</td><td class="n">'+(r.biz? fmt(r.biz.acc):'')+'</td>'+
+      '<td><input type="text" value="'+esc(r.note||'')+'" placeholder="비고" style="width:140px" onchange="setNote('+i+',this.value)"></td>';
+    tb.appendChild(tr);
+  });
+  $('#kRes').classList.remove('hidden');
+}
+function setCust(i,v){ K.rows[i].cust=String(v||'').trim(); K.rows[i].mapped=!!K.rows[i].cust; matchBiz(); renderRun(); }
+function setNote(i,v){ K.rows[i].note=String(v||'').trim(); }
+function pickBiz(i,v){ var no=+v; K.rows[i].biz=no? (K.bizPool||[]).filter(function(b){ return b.no===no; })[0]||null : null; K.rows[i].by=no?'pick':null; renderRun(); }
+
+/* ─────────────────────────────────────────────
+   저장·내보내기
+   ───────────────────────────────────────────── */
+async function saveMaps(){
+  var s=sess(); if(!s){ alert('로그인이 필요합니다'); return; }
+  var rows=(K.rows||[]).filter(function(r){ return r.code && r.cust; });
+  if(!rows.length){ msg('mK2','저장할 매핑이 없습니다','bad'); return; }
+  try{
+    var have={}; K.maps.forEach(function(m){ have[String(m.project_code).trim().toUpperCase()]=m; });
+    var ins=[], upd=0;
+    for(var i=0;i<rows.length;i++){
+      var r=rows[i], m=have[r.code];
+      var body={ project_code:r.code, customer:r.cust, kakao_project:r.project||null,
+                 start_date:r.start||null, end_date:r.end||null, term_total:r.termTotal||1, note:r.note||null };
+      if(!m) ins.push(Object.assign({created_by:s.u||null, active:true}, body));
+      else if(m.customer!==r.cust || (m.kakao_project||'')!==(r.project||'') || (m.term_total||1)!==(r.termTotal||1)){
+        await sbWrite('PATCH','kk_map?id=eq.'+m.id, body); upd++;
+      }
+    }
+    if(ins.length) await sbWrite('POST','kk_map',ins);
+    K.maps=await sbGet('kk_map?select=*&active=is.true&order=project_code');
+    msg('mK2','매핑 저장 완료 — 새로 '+ins.length+'건, 갱신 '+upd+'건 (다음 달부터 자동으로 채워집니다)','ok');
+    renderMaps();
+  }catch(e){ msg('mK2',e.message,'bad'); }
+}
+async function saveSettle(){
+  var s=sess(); if(!s){ alert('로그인이 필요합니다'); return; }
+  var ym=$('#ym').value; if(!ym){ alert('청구월을 고르세요'); return; }
+  try{
+    var sum=K.rows.reduce(function(a,r){ return a+r.amt; },0);
+    var row={ month:ym+'-01', use_month:($('#um').value? $('#um').value+'-01':null),
+      total:sum, biz_total:K.rows.reduce(function(a,r){ return a+(r.biz?r.biz.acc:0); },0),
+      cnt:K.rows.length, cnt_new:n($('#cNew').value), cnt_end:n($('#cEnd').value),
+      payload:{ rows:K.rows.map(function(r){ return { code:r.code, cust:r.cust, project:r.project, qty:r.qty, unit:r.unit, amt:r.amt,
+                termNo:r.termNo, termTotal:r.termTotal, start:r.start, end:r.end, note:r.note, biz:r.biz? r.biz.no:null, acc:r.biz? r.biz.acc:null }; }) },
+      created_by:s.u||null };
+    var have=await sbGet('kk_settle?select=id&month=eq.'+row.month);
+    if(have&&have[0]){ delete row.created_by; await sbWrite('PATCH','kk_settle?id=eq.'+have[0].id,row); K.settleId=have[0].id; }
+    else{ var r2=await sbWrite('POST','kk_settle?select=id',[row],'return=representation'); K.settleId=r2&&r2[0]?r2[0].id:null; }
+    await loadSettles();
+    var back=(K.settles||[]).filter(function(v){ return String(v.month||'').slice(0,7)===ym; })[0];
+    if(!back) throw new Error('저장은 됐지만 다시 읽히지 않습니다 — 읽기 권한(RLS)이나 72_kakao.sql 적용을 확인해 주세요');
+    msg('mK2','정산 저장 완료 ('+ym+' · '+fmt(back.total)+'원) — 「저장 내역」에서 불러오거나 지울 수 있습니다','ok');
+  }catch(e){ msg('mK2',e.message,'bad'); }
+}
+async function delSettle(){
+  var ym=$('#ym').value; if(!ym) return;
+  try{
+    var have=await sbGet('kk_settle?select=id,total&month=eq.'+ym+'-01');
+    if(!have||!have[0]){ msg('mK2', ym+' 로 저장된 정산이 없습니다','bad'); return; }
+    if(!confirm(ym+' 저장분('+fmt(have[0].total)+'원)을 지울까요?')) return;
+    await sbWrite('DELETE','kk_settle?id=eq.'+have[0].id);
+    K.settleId=null; await loadSettles(); renderSettles();
+    msg('mK2','저장분을 지웠습니다 ('+ym+')','ok');
+  }catch(e){ msg('mK2',e.message,'bad'); }
+}
+async function dlListXlsx(){
+  await loadXlsx();
+  var ym=$('#ym').value||'', um=$('#um').value||'';
+  var M=+ym.slice(5,7), UM=+um.slice(5,7);
+  var aoa=[[],['','','','','','신규 :',$('#cNew').value],['','','','','','해약 :',$('#cEnd').value],
+    ["'"+ym.slice(2,4)+'.'+M+"월 카카오엔터프라이즈 구독료 리스트('"+um.slice(2,4)+'.'+UM+"월이용분 청구건)"],
+    ['Bizpotal \n등록번호','\u00a0서비스제공처(고객사명)','제공서비스(품명)','수량','단가','계약시작일','계약종료일','','']];
+  K.rows.forEach(function(r){
+    aoa.push([ r.biz? r.biz.no:'', r.cust, r.product, r.qty, r.unit, r.start||'', r.end||'', (r.termNo||1)+'/'+(r.termTotal||1), r.note||'' ]);
+  });
+  aoa.push([' - 이 하 여 백 -']);
+  aoa.push([]); aoa.push([]); aoa.push([]); aoa.push([]);
+  aoa.push(['','','','TOTAL', K.rows.reduce(function(a,r){ return a+r.amt; },0)]);
+  var wb=XLSX.utils.book_new(), ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols']=[{wch:12},{wch:24},{wch:16},{wch:7},{wch:10},{wch:13},{wch:13},{wch:7},{wch:34}];
+  XLSX.utils.book_append_sheet(wb,ws,(M||'')+'월_계산서');
+  XLSX.writeFile(wb,'카카오_'+ym.slice(2,4)+'년'+M+'월정산'+(UM? UM+'월사용분청구':'')+'_SSL VPN 리스트.xlsx');
+}
+function copyBizCol(){
+  var txt=K.rows.map(function(r){ return r.biz? String(r.biz.no):''; }).join('\n');
+  (navigator.clipboard&&navigator.clipboard.writeText? navigator.clipboard.writeText(txt):Promise.reject())
+    .then(function(){ msg('mK2','등록번호 '+K.rows.length+'줄을 복사했습니다 — 리스트 엑셀의 첫 데이터 행에 붙여넣으세요','ok'); })
+    .catch(function(){ var ta=document.createElement('textarea'); ta.value=txt; document.body.appendChild(ta); ta.select();
+      try{ document.execCommand('copy'); msg('mK2','복사했습니다','ok'); }catch(e){ msg('mK2','복사 실패','bad'); } ta.remove(); });
+}
+/* 프로젝트 리포트 초안 */
+async function makeReport(){
+  var s=sess(); if(!s){ alert('로그인이 필요합니다'); return; }
+  var ym=$('#ym').value, um=$('#um').value; if(!ym){ alert('청구월을 고르세요'); return; }
+  var b=K.cfg.basic||{};
+  var M=+ym.slice(5,7), UM=um? +um.slice(5,7) : (M===1?12:M-1);
+  var today=todayISO(), day=String(n(b.invoice_day)||15).padStart(2,'0');
+  var d=new Date(ym+'-01T00:00:00'); d.setMonth(d.getMonth()+2); d.setDate(0);
+  var pay=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  var sum=K.rows.reduce(function(a,r){ return a+r.amt; },0);
+  var nos=K.rows.map(function(r){ return r.biz? r.biz.no:null; }).filter(Boolean);
+  nos.sort(function(x,y){ return x-y; });
+  var noTxt=nos.length? (nos.length>2? nos[0]+', '+nos[1]+'~'+nos[nos.length-1] : nos.join(', ')) : '';
+  try{
+    var p={ no:noTxt, team1:'서비스사업부', team2:'영업지원팀', team3:'경영지원본부', dept:b.dept||'서비스사업부',
+      customer:b.customer||'카카오엔터프라이즈', writer:b.writer||'김민정',
+      title:b.title||'카카오클라우드 마켓플레이스 SSL VPN 구독료', date:today, contact:b.contact||'권중혁 매니저',
+      cdate:today, amount:String(sum), paydate:pay, payterm:b.pay_term||'익월 말 결제', taxdate:ym+'-'+day,
+      warranty:'1개월', saletype:'간접판매', hwcost:'', flow:'고객사 - 카카오엔터프라이즈 - 지니언스',
+      remarks:'- 고객사별 구독료/월 형태로 과금 ('+fmt(K.rows[0]? K.rows[0].unit:24000)+'원 * '+K.rows.length+'개사 = '+fmt(sum)+'원 / vat별도)',
+      deliv:[{ model:'SSL VPN 구독료', cost:0, qty:1, note:' '+K.rows.length+'개 고객사\n('+UM+'월 이용분)' }],
+      buy:[], skip:['a4','a5','b1','b2'], kind:'subs', appr:'bu', coop1:false, coop2:true, month:ym, contract_id:null };
+    var row={ contract_id:null, customer:b.customer||'카카오엔터프라이즈', kind:'subs', report_month:ym+'-01',
+      report_no:noTxt||null, title:p.title, amount:sum, payload:p, created_by:s.u||null };
+    var r=await sbWrite('POST','project_reports?select=id',[row],'return=representation');
+    var id=r&&r[0]?r[0].id:null;
+    if(!id) throw new Error('리포트를 만들지 못했습니다');
+    if(K.settleId){ try{ await sbWrite('PATCH','kk_settle?id=eq.'+K.settleId,{report_id:id}); }catch(e){} }
+    msg('mK2','프로젝트 리포트 초안을 만들었습니다 — 리포트 화면에서 NO.·비고를 확인하고 발행하세요','ok');
+    if(window.parent!==window) window.parent.postMessage({type:'openReport', id:id},'*');
+    else window.open('report.html?id='+id,'_blank');
+  }catch(e){ msg('mK2',e.message,'bad'); }
+}
+
+/* ─────────────────────────────────────────────
+   내부용 출력 — 엑셀 말고 «보기 좋은 한 장»으로 인쇄·PDF 저장
+   새 창에 A4 한 장을 그려서 바로 인쇄창을 띄웁니다. (여백은 문서 안쪽에 고정)
+   ───────────────────────────────────────────── */
+function printDoc(o){
+  var base=location.href.replace(/[^\/]*$/,'');
+  var w=window.open('', '_blank');
+  if(!w){ alert('팝업이 막혀 있습니다 — 이 사이트의 팝업을 허용해 주세요'); return; }
+  function cell(v,i){ var c=o.cols[i]||{}; var t=(v==null?'':String(v));
+    return '<td class="'+(c.n?'n':'')+(c.mini?' mini':'')+(c.wrap?' wrap':'')+'">'+t.replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</td>'; }
+  var rows=(o.rows||[]).map(function(r,ri){
+    return '<tr'+(r.__hl?' class="hl"':'')+'>'+o.cols.map(function(c,i){ return cell(r[c.k],i); }).join('')+'</tr>';
+  }).join('');
+  var sums=(o.summary||[]).map(function(s){
+    return '<div class="sum'+(s.bad?' bad':'')+(s.ok?' ok':'')+'"><span>'+s.k+'</span><b>'+s.v+'</b></div>'; }).join('');
+  var foot=(o.foot||[]).map(function(f){
+    return '<tr class="ft">'+o.cols.map(function(c,i){ return '<td class="'+(c.n?'n':'')+'">'+(f[c.k]==null?'':String(f[c.k]))+'</td>'; }).join('')+'</tr>'; }).join('');
+  var html='<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>'+o.title+'</title><style>'+
+
+    '*{box-sizing:border-box}'+
+    'body{font-family:"Noto Sans KR","Malgun Gothic","맑은 고딕",sans-serif;margin:0;background:#eceef0;color:#1c1f22;-webkit-print-color-adjust:exact;print-color-adjust:exact}'+
+    '.page{width:210mm;min-height:297mm;margin:12px auto;background:#fff;padding:14mm 14mm 10mm;box-shadow:0 6px 24px rgba(0,0,0,.12)}'+
+    '.hd{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2.5px solid #1fb53a;padding-bottom:9px;margin-bottom:14px}'+
+    '.hd h1{font-size:19px;margin:0 0 3px;letter-spacing:-.3px}'+
+    '.hd .sub{font-size:11.5px;color:#6b7176}'+
+    '.hd img{height:26px}'+
+    '.sums{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}'+
+    '.sum{flex:1;min-width:104px;border:1px solid #e3e6e8;border-radius:9px;padding:8px 10px;background:#fafbfc}'+
+    '.sum span{display:block;font-size:10.5px;color:#6b7176;margin-bottom:2px}'+
+    '.sum b{font-size:14px;font-variant-numeric:tabular-nums}'+
+    '.sum.ok b{color:#1e8e3e} .sum.bad b{color:#c0392b}'+
+    'table{width:100%;border-collapse:collapse;font-size:10.5px}'+
+    'th{background:#1fb53a;color:#fff;font-weight:600;padding:6px 6px;text-align:left;border:1px solid #1fb53a;white-space:nowrap}'+
+    'td{padding:5px 6px;border:1px solid #e3e6e8;vertical-align:middle}'+
+    'td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}'+
+    'td.mini{font-size:9.5px;color:#6b7176}'+
+    'tbody tr:nth-child(even) td{background:#fafbfc}'+
+    'tr.hl td{background:#fff8e1}'+
+    'tr.ft td{background:#eef3f8;font-weight:700;border-top:2px solid #b8cce4}'+
+    '.note{margin-top:10px;font-size:10.5px;color:#4a5055;line-height:1.6;white-space:pre-line}'+
+    'td.wrap{white-space:normal;word-break:keep-all}'+
+    'td:not(.wrap){white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'+
+    '.ft2{margin-top:auto;padding-top:12px;display:flex;justify-content:space-between;font-size:9.5px;color:#8b9298}'+
+    '.bar{position:fixed;top:0;left:0;right:0;background:#22262a;color:#fff;padding:9px 14px;display:flex;gap:10px;align-items:center;font-size:12px;z-index:9}'+
+    '.bar button{background:#1fb53a;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-weight:700;cursor:pointer;font-family:inherit;font-size:12px}'+
+    '.bar button.g{background:#55595d}'+
+    '.bar+.page{margin-top:52px}'+
+    '@media print{@page{size:A4 portrait;margin:0}body{background:#fff}.bar{display:none}.page{margin:0;box-shadow:none;width:210mm;min-height:0}}'+
+    '</style></head><body>'+
+    '<div class="bar"><b>'+o.title+'</b><span style="flex:1"></span>'+
+      '<button onclick="window.print()">인쇄 · PDF로 저장</button>'+
+      '<button class="g" onclick="window.close()">닫기</button></div>'+
+    '<div class="page">'+
+      '<div class="hd"><div><h1>'+o.title+'</h1><div class="sub">'+(o.sub||'')+'</div></div>'+
+        '<img src="'+base+'Logo.jpg" alt="Genians" onerror="this.style.display=\'none\'"></div>'+
+      (sums? '<div class="sums">'+sums+'</div>':'')+
+      '<table><thead><tr>'+o.cols.map(function(c){ return '<th class="'+(c.n?'n':'')+'"'+(c.w? ' style="width:'+c.w+'"':'')+'>'+c.l+'</th>'; }).join('')+'</tr></thead>'+
+      '<tbody>'+rows+'</tbody>'+(foot? '<tfoot>'+foot+'</tfoot>':'')+'</table>'+
+      (o.note? '<div class="note">'+o.note+'</div>':'')+
+      '<div class="ft2"><span>지니언스㈜ 서비스사업부 · 내부 참고용</span><span>출력 '+new Date().toLocaleString('ko-KR')+'</span></div>'+
+    '</div></body></html>';
+  w.document.open(); w.document.write(html); w.document.close();
+  setTimeout(function(){ try{ w.focus(); }catch(e){} }, 300);
+}
+
+/* 카카오 — SSL VPN 리스트 한 장 출력 */
+function printList(){
+  if(!K.rows||!K.rows.length){ msg('mK2','먼저 정산 안내를 읽어주세요','bad'); return; }
+  var ym=$('#ym').value||'', um=$('#um').value||'';
+  var M=+ym.slice(5,7), UM=um? +um.slice(5,7):'';
+  var sum=K.rows.reduce(function(a,r){ return a+r.amt; },0);
+  var bizSum=K.rows.reduce(function(a,r){ return a+(r.biz? r.biz.acc:0); },0);
+  printDoc({
+    title:'카카오엔터프라이즈 구독료 리스트 — '+ym.slice(0,4)+'년 '+M+'월 청구',
+    sub:(um? um.slice(0,4)+'년 '+UM+'월 이용분 · ':'')+'카카오클라우드 마켓플레이스 SSL VPN · 단위: 원(VAT 별도)',
+    summary:[{k:'고객사',v:K.rows.length+'곳'},{k:'청구 합계',v:fmt(sum)+'원'},
+             {k:'비즈포탈 회계매출',v:fmt(bizSum)+'원'},
+             {k:'차액',v:fmt(sum-bizSum)+'원', ok:Math.abs(sum-bizSum)<1, bad:Math.abs(sum-bizSum)>=1},
+             {k:'신규 / 해약',v:($('#cNew').value||0)+' / '+($('#cEnd').value||0)}],
+    cols:[{k:'no',l:'Bizportal 등록번호',w:'15%'},{k:'cust',l:'서비스제공처(고객사명)',w:'20%'},{k:'prod',l:'제공서비스'},
+          {k:'qty',l:'수량',n:true,w:'7%'},{k:'unit',l:'단가',n:true,w:'10%'},{k:'amt',l:'금액',n:true,w:'11%'},
+          {k:'term',l:'회차',w:'7%'},{k:'period',l:'계약기간',mini:true,w:'16%'},{k:'note',l:'비고',mini:true,wrap:true}],
+    rows:K.rows.map(function(r){ return { no:r.biz? r.biz.no:'', cust:r.cust, prod:r.product, qty:r.qty,
+      unit:fmt(r.unit), amt:fmt(r.amt), term:(r.termNo||1)+'/'+(r.termTotal||1),
+      period:(r.start||'')+(r.end? ' ~ '+r.end:''), note:String(r.note||'').replace(/\s*\n\s*/g,' '), __hl:!r.biz }; }),
+    foot:[{ cust:'합계', amt:fmt(sum), qty:K.rows.length+'건' }],
+    note:'· 연한 노란 줄은 비즈포탈 등록번호가 아직 연결되지 않은 건입니다.\n· 계산서 발행일: 매월 '+((K.cfg.basic&&K.cfg.basic.invoice_day)||15)+'일 · 수금: '+((K.cfg.basic&&K.cfg.basic.pay_term)||'익월 말 결제')
+  });
+}
+
+/* ── 저장 내역 ── */
+async function loadSettles(){
+  K.settleErr='';
+  try{ K.settles=await sbGet('kk_settle?select=*&order=month.desc'); }
+  catch(e){ K.settles=[]; K.settleErr=String(e.message||e);
+    msg('mS','저장 내역을 읽지 못했습니다: '+K.settleErr+(/(404|does not exist|relation)/i.test(K.settleErr)? ' — 72_kakao.sql 이 적용되었는지 확인하세요':''),'bad'); }
+  saveBadge(); return K.settles;
+}
+function saveBadge(){
+  var n2=$('#setN'); if(n2) n2.textContent=(K.settles||[]).length? '('+K.settles.length+')' : '';
+}
+function closeOvl(id){ var e=$('#'+id); if(e) e.classList.remove('show'); }
+document.addEventListener('click', function(ev){ if(ev.target&&ev.target.classList&&ev.target.classList.contains('ovl')) ev.target.classList.remove('show'); });
+document.addEventListener('keydown', function(ev){ if(ev.key==='Escape') document.querySelectorAll('.ovl.show').forEach(function(o){ o.classList.remove('show'); }); });
+function openSettles(){ $('#ovlSet').classList.add('show'); msg('mS',''); loadSettles().then(renderSettles); renderSettles(); }
+async function reloadSettles(btn){
+  if(btn){ btn.disabled=true; btn.textContent='읽는 중…'; }
+  await loadSettles(); renderSettles();
+  if(btn){ btn.disabled=false; btn.textContent='목록 다시 읽기'; }
+  if(!K.settleErr) msg('mS','목록을 다시 읽었습니다 ('+(K.settles||[]).length+'건)','ok');
+}
+function renderSettles(){
+  var rows=(K.settles||[]).slice();
+  $('#setList').innerHTML=rows.map(function(r){
+    var ym=String(r.month||'').slice(0,7), um=String(r.use_month||'').slice(0,7);
+    return '<div class="setmon"><span class="ym">'+esc(ym)+' 청구</span><span class="sum">'+(um? um+' 이용분':'')+'</span></div>'+
+      '<div class="setrow"><span class="kind u">구독료</span><span class="amt">'+fmt(r.total)+'원</span>'+
+      '<span class="diff '+(Math.abs(Number(r.total||0)-Number(r.biz_total||0))<1?'ok':'bad')+'">'+
+        (Math.abs(Number(r.total||0)-Number(r.biz_total||0))<1? '대조 일치':'차액 '+fmt(Number(r.total||0)-Number(r.biz_total||0)))+'</span>'+
+      '<span class="cnt">고객사 '+(r.cnt||0)+'곳 · 신규 '+(r.cnt_new||0)+' · 해약 '+(r.cnt_end||0)+'</span>'+
+      '<span class="who">'+esc(String(r.created_by||'').split('@')[0])+' '+esc(String(r.updated_at||'').slice(5,10))+(r.report_id? ' · 리포트 #'+r.report_id:'')+'</span>'+
+      '<span class="acts"><button class="rowbtn" onclick="restoreSettle('+r.id+')">불러오기</button>'+
+      '<button class="rowbtn red" onclick="delSettleId('+r.id+')">삭제</button></span></div>';
+  }).join('')||'<div class="mini" style="padding:14px 4px;color:#888">'+(K.settleErr? '읽기 실패 — 아래 메시지를 확인하세요':'저장된 정산이 없습니다')+'</div>';
+}
+function restBar(t){ var b=$('#restBar'); if(!t){ b.classList.add('hidden'); return; } $('#restTxt').innerHTML=t; b.classList.remove('hidden'); }
+function clearRestored(){
+  K.rows=null; K.biz=null; K.settleId=null;
+  $('#kRes').classList.add('hidden'); restBar('');
+  msg('mK',''); msg('mK2','');
+  $('#cNew').value=''; $('#cEnd').value='';
+  ['dK1','dK2'].forEach(function(id){ var d=$('#'+id); if(d){ d.classList.remove('has'); delete d.dataset.done; } });
+  $('#fK1').value=''; $('#fK2').value=''; $('#kkPaste').value='';
+  var s1=$('#dK1 span'), s2=$('#dK2 span');
+  if(s1) s1.textContent="[카카오클라우드] '26년 8월 마켓플레이스 이용료 정산…pdf";
+  if(s2) s2.textContent='BIZPORTAL-SALES_…xlsx (선택 — 등록번호 대조용)';
+}
+async function restoreSettle(id){
+  try{
+    var rows=await sbGet('kk_settle?select=*&id=eq.'+id);
+    var r=rows&&rows[0]; if(!r) throw new Error('없는 기록입니다');
+    var p=r.payload||{};
+    $('#ym').value=String(r.month||'').slice(0,7);
+    $('#um').value=String(r.use_month||'').slice(0,7);
+    K.rows=(p.rows||[]).map(function(x){
+      return { code:x.code, project:x.project||'', product:(K.cfg.basic&&K.cfg.basic.product)||'SSL PNS', qty:x.qty||1,
+               unit:x.unit||0, amt:x.amt||0, cust:x.cust||'', mapped:!!x.cust, start:x.start||'', end:x.end||'',
+               termNo:x.termNo||1, termTotal:x.termTotal||1, note:x.note||'',
+               biz: x.biz? {no:x.biz, cust:x.cust, acc:Number(x.acc||0), proj:''} : null, by:'map', isNew:false };
+    });
+    K.bizPool=K.rows.filter(function(x){ return x.biz; }).map(function(x){ return x.biz; });
+    K.total=r.total; K.settleId=r.id;
+    $('#cNew').value=r.cnt_new||0; $('#cEnd').value=r.cnt_end||0;
+    renderRun(); closeOvl('ovlSet');
+    restBar('<b>저장된 정산을 보는 중</b> — '+esc(String(r.month||'').slice(0,7))+' 청구 · '+fmt(r.total)+'원 · 새로 만들려면 PDF를 올리거나 오른쪽에서 치우세요');
+    msg('mK2','저장된 정산을 불러왔습니다','ok');
+  }catch(e){ msg('mS',e.message,'bad'); }
+}
+async function delSettleId(id){
+  if(!confirm('저장된 정산을 지울까요?')) return;
+  try{ await sbWrite('DELETE','kk_settle?id=eq.'+id); K.settles=(K.settles||[]).filter(function(x){ return x.id!==id; }); renderSettles(); msg('mS','삭제했습니다','ok'); }
+  catch(e){ msg('mS',e.message,'bad'); }
+}
+
+/* ── 설정·매핑 ── */
+function applyCfg(){
+  var b=K.cfg.basic||{};
+  $('#cfgUnit').value=b.unit_price||24000; $('#cfgProd').value=b.product||'SSL PNS';
+  $('#cfgDay').value=b.invoice_day||15; $('#cfgCust').value=b.customer||'카카오엔터프라이즈';
+  $('#cfgContact').value=b.contact||'권중혁 매니저';
+}
+async function saveCfg(){
+  var s=sess(); if(!s){ alert('로그인이 필요합니다'); return; }
+  try{
+    var b=Object.assign({}, K.cfg.basic||{}, { unit_price:n($('#cfgUnit').value)||24000, product:$('#cfgProd').value||'SSL PNS',
+      invoice_day:n($('#cfgDay').value)||15, customer:$('#cfgCust').value||'카카오엔터프라이즈', contact:$('#cfgContact').value||'권중혁 매니저' });
+    await sbWrite('POST','kk_config',[{key:'basic', val:b, updated_by:s.u}],'resolution=merge-duplicates');
+    K.cfg.basic=b; applyCfg(); msg('mC','설정을 저장했습니다','ok');
+  }catch(e){ msg('mC',e.message,'bad'); }
+}
+function renderMaps(){
+  var q=($('#mq').value||'').trim().toLowerCase();
+  var list=(K.maps||[]).filter(function(m){ return !q || ((m.project_code||'')+' '+(m.customer||'')+' '+(m.kakao_project||'')).toLowerCase().indexOf(q)>=0; });
+  $('#mCnt').textContent=list.length+' / '+(K.maps||[]).length+'건';
+  $('#tMap tbody').innerHTML=list.map(function(m){
+    return '<tr><td class="mini">'+esc(m.project_code)+'</td>'+
+      '<td><input type="text" value="'+esc(m.customer||'')+'" style="width:100%" onchange="editMap('+m.id+',\'customer\',this.value)"></td>'+
+      '<td class="mini" title="'+esc(m.kakao_project||'')+'">'+esc(String(m.kakao_project||'').slice(0,40))+'</td>'+
+      '<td><input type="date" value="'+esc(String(m.start_date||'').slice(0,10))+'" onchange="editMap('+m.id+',\'start_date\',this.value)"></td>'+
+      '<td><input type="date" value="'+esc(String(m.end_date||'').slice(0,10))+'" onchange="editMap('+m.id+',\'end_date\',this.value)"></td>'+
+      '<td><input type="number" value="'+(m.term_total||1)+'" style="width:56px" onchange="editMap('+m.id+',\'term_total\',this.value)"></td>'+
+      '<td><button class="rowbtn red" onclick="delMap('+m.id+')">삭제</button></td></tr>';
+  }).join('')||'<tr><td colspan="7" class="mini">저장된 매핑이 없습니다</td></tr>';
+}
+async function editMap(id,k,v){
+  try{ var o={}; o[k]= k==='term_total'? (n(v)||1) : (v||null);
+    await sbWrite('PATCH','kk_map?id=eq.'+id,o);
+    var m=(K.maps||[]).filter(function(x){ return x.id===id; })[0]; if(m) m[k]=o[k];
+    msg('mC','수정했습니다','ok');
+  }catch(e){ msg('mC',e.message,'bad'); }
+}
+async function delMap(id){
+  if(!confirm('이 매핑을 지울까요?')) return;
+  try{ await sbWrite('PATCH','kk_map?id=eq.'+id,{active:false}); K.maps=(K.maps||[]).filter(function(m){ return m.id!==id; }); renderMaps(); }
+  catch(e){ msg('mC',e.message,'bad'); }
+}
+function toggleMore(btn){
+  var m=btn.nextElementSibling, on=m.classList.contains('on');
+  document.querySelectorAll('.moremenu').forEach(function(x){ x.classList.remove('on'); });
+  if(!on){ m.classList.add('on');
+    setTimeout(function(){ document.addEventListener('click', function off(ev){
+      if(m.contains(ev.target)||ev.target===btn) return; m.classList.remove('on'); document.removeEventListener('click',off); }); },0); }
+}
+
+/* ── 업로드 연결 ── */
+function markDrop(d,f){ d.classList.add('has'); d.dataset.done='1'; var s=d.querySelector('span'); if(s) s.textContent=f.name+' ('+Math.round(f.size/1024)+'KB)'; }
+function bindDrop(dropId,inputId,handler){
+  var d=$('#'+dropId), inp=$('#'+inputId);
+  inp.addEventListener('change',function(){ if(inp.files&&inp.files[0]) handler(inp.files[0],d); });
+  ['dragover','dragenter'].forEach(function(ev){ d.addEventListener(ev,function(e){ e.preventDefault(); d.classList.add('has'); }); });
+  d.addEventListener('dragleave',function(){ if(!d.dataset.done) d.classList.remove('has'); });
+  d.addEventListener('drop',function(e){ e.preventDefault(); var f=e.dataTransfer.files&&e.dataTransfer.files[0]; if(f) handler(f,d); });
+}
+document.querySelectorAll('.tab').forEach(function(b){
+  b.addEventListener('click',function(){
+    document.querySelectorAll('.tab').forEach(function(x){ x.classList.remove('on'); }); b.classList.add('on');
+    $('#vRun').classList.toggle('hidden', b.dataset.t!=='run');
+    $('#vCfg').classList.toggle('hidden', b.dataset.t!=='cfg');
+    if(b.dataset.t==='cfg') renderMaps();
+  });
+});
+$('#ym').addEventListener('change',function(){
+  var ym=this.value;
+  if(ym && !$('#um').value){ var d=new Date(ym+'-01T00:00:00'); d.setMonth(d.getMonth()-1);
+    $('#um').value=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+  if(K.rows){ calcTerms(); renderRun(); }
+  var has=(K.settles||[]).filter(function(v){ return String(v.month||'').slice(0,7)===ym; });
+  restBar(has.length? '<b>'+esc(ym)+'</b> 청구분이 이미 저장되어 있습니다 — '+fmt(has[0].total)+'원 &nbsp;<span class="lnk" onclick="openSettles()">저장 내역 열기</span>' : '');
+});
+document.addEventListener('DOMContentLoaded', async function(){
+  if(!sess()) return;
+  $('#loginOverlay').style.display='none';
+  var d=new Date();
+  $('#ym').value=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+  d.setMonth(d.getMonth()-1);
+  $('#um').value=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+  bindDrop('dK1','fK1',onPdf); bindDrop('dK2','fK2',onBiz);
+  try{
+    var r=await Promise.all([ sbGet('kk_map?select=*&active=is.true&order=project_code'), sbGet('kk_config?select=*') ]);
+    K.maps=r[0]; (r[1]||[]).forEach(function(c){ K.cfg[c.key]=c.val; });
+  }catch(e){ msg('mK','설정을 읽지 못했습니다: '+e.message,'bad'); }
+  applyCfg(); renderMaps(); loadSettles();
+});
+</script>
+</body>
+</html>
