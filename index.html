@@ -1045,6 +1045,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
   <button data-v="targets">🎯 연간 목표</button>
   <div class="grp">도구</div>
   <button data-v="quote">📄 견적 시스템</button>
+  <button data-v="po">📝 발주서</button>
   <button data-v="price">💰 가격표</button>
   <button data-v="cloud">☁️ 클라우드 비용</button>
   <button data-v="csite" style="display:none">🛰️ Cloud 사이트 관리</button>
@@ -1302,6 +1303,17 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
         <a href="quote.html" target="_blank" class="pill ghost" style="text-decoration:none">↗ 새 창에서 열기</a>
       </div>
       <iframe id="quoteFrame" title="견적 시스템"
+        style="width:100%;height:calc(100vh - 150px);border:0;border-radius:10px;background:#f9f9f7"></iframe>
+    </section>
+  </div>
+
+  <div id="viewPo" class="hidden">
+    <section class="card c12" style="padding:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px 10px">
+        <div style="font-size:13px;font-weight:650">📝 발주서 <span class="ubadge sm won">₩ 원 단위</span> <span class="mini" style="color:var(--muted);font-weight:400;margin-left:6px">파트너(다원티에스·글로웰 등)에 보내는 구축·유지보수 발주서 — 견적서와 같은 양식</span></div>
+        <a href="po.html" target="_blank" class="pill ghost" style="text-decoration:none">↗ 새 창에서 열기</a>
+      </div>
+      <iframe id="poFrame" title="발주서"
         style="width:100%;height:calc(100vh - 150px);border:0;border-radius:10px;background:#f9f9f7"></iframe>
     </section>
   </div>
@@ -2226,7 +2238,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-16 ㊿+61';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-16 ㊿+62';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -11581,7 +11593,7 @@ function switchView(v){
     b.setAttribute('aria-current', b.dataset.v===v?'true':'false');
   });
   try{ ensureGroupOpen(v); }catch(e){}
-  var dash=v==='dash', quote=v==='quote', onew=v==='ordernew', acct=v==='account', mnew=v==='mdrnew', oinew=v==='oinew', csite=v==='csite';
+  var dash=v==='dash', quote=v==='quote', po=v==='po', onew=v==='ordernew', acct=v==='account', mnew=v==='mdrnew', oinew=v==='oinew', csite=v==='csite';
   var adminx=v==='adminx', weekly=v==='weekly', inbstat=v==='inbstat', price=v==='price', report=v==='report', churn=v==='churn', cloud=v==='cloud', crate=v==='churnrate', cflow=v==='custflow';
   if(adminx && !window.IS_SUPER){ v='dash'; dash=true; adminx=false; CUR_VIEW='dash'; }
   $('#viewChurnRate').classList.toggle('hidden',!crate);
@@ -11594,6 +11606,7 @@ function switchView(v){
   $('#viewInb').classList.toggle('hidden',!inbstat);
   $('#viewDash').classList.toggle('hidden',!dash);
   $('#viewQuote').classList.toggle('hidden',!quote);
+  $('#viewPo').classList.toggle('hidden',!po);
   $('#viewOrderNew').classList.toggle('hidden',!onew);
   $('#viewMdrNew').classList.toggle('hidden',!mnew);
   $('#viewCsite').classList.toggle('hidden',!csite);
@@ -11602,7 +11615,8 @@ function switchView(v){
   $('#viewAdmin').classList.toggle('hidden',!adminx);
   $('#viewWeekly').classList.toggle('hidden',!weekly);
   $('#viewChannel').classList.toggle('hidden',!chv);
-  $('#viewData').classList.toggle('hidden',dash||quote||onew||mnew||oinew||csite||acct||adminx||weekly||inbstat||price||report||churn||cloud||crate||cflow||!!chv);
+  $('#viewData').classList.toggle('hidden',dash||quote||po||onew||mnew||oinew||csite||acct||adminx||weekly||inbstat||price||report||churn||cloud||crate||cflow||!!chv);
+  if(po){ var pf=$('#poFrame'); if(!pf.src) pf.src='po.html'; return; }
   if(csite){ renderCsite(); return; }
   if(report){ renderReport(); return; }
   if(churn){ renderChurn(); return; }
