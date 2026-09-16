@@ -2278,7 +2278,7 @@ window.addEventListener('message', function(ev){
 });
 
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-16 ㊿+71';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-16 ㊿+73';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -11955,7 +11955,25 @@ function editCell(c,v){
    · 임대 장비: 상태를 «임대중»으로 바꾸면 회수일을 비우고, «회수완료»로 바꾸면 회수일이 비어 있을 때 오늘을 넣습니다 */
 /* ===== 목록형 입력칸(콤보) =====
    칸을 누르면 전체 목록이 뜨고, 글자를 치면 그에 맞게 좁혀집니다. 목록에 없는 값도 그대로 입력해 저장할 수 있습니다. */
-function comboClose(){ var m=document.getElementById('cbMenu'); if(m) m.remove(); }
+var CB={inp:null, off:null};
+function comboClose(){
+  var m=document.getElementById('cbMenu'); if(m) m.remove();
+  if(CB.off){ document.removeEventListener('mousedown', CB.off, true); CB.off=null; }
+  CB.inp=null;
+}
+/* 열려 있는 목록을 입력칸 아래(또는 위)에 다시 붙입니다 — 표를 스크롤해도 따라다니게 */
+function comboPlace(){
+  var m=document.getElementById('cbMenu'), inp=CB.inp;
+  if(!m || !inp || !document.body.contains(inp)) return;
+  var r=inp.getBoundingClientRect();
+  if(r.bottom<0 || r.top>window.innerHeight){ comboClose(); return; }   /* 칸이 화면 밖으로 나가면 닫기 */
+  var w=Math.max(r.width+24, 150);
+  m.style.width=w+'px';
+  m.style.left=Math.max(6, Math.min(r.left, window.innerWidth-w-8))+'px';
+  var below=window.innerHeight-r.bottom;
+  if(below<180 && r.top>below){ m.style.top=''; m.style.bottom=(window.innerHeight-r.top+4)+'px'; }
+  else { m.style.bottom=''; m.style.top=(r.bottom+4)+'px'; }
+}
 function comboWire(inp, opts, onPick){
   opts=(opts||[]).map(function(o){ return String(o); });
   var box=inp.closest('.cbo') || inp.parentElement;
@@ -11972,15 +11990,22 @@ function comboWire(inp, opts, onPick){
       (cur && opts.indexOf(cur)<0? '<div class="sep"></div><div class="hint">지금 값 「'+esc(cur)+'」 은 목록에 없지만 그대로 저장됩니다</div>':'')+
       (cur? '<div class="sep"></div><div class="it" data-v="">— 비우기 —</div>':'');
     document.body.appendChild(m);
-    var r=inp.getBoundingClientRect();
-    var w=Math.max(r.width+24, 150);
-    m.style.width=w+'px';
-    m.style.left=Math.max(6, Math.min(r.left, window.innerWidth-w-8))+'px';
-    var below=window.innerHeight-r.bottom;
-    if(below<180 && r.top>below){ m.style.top=''; m.style.bottom=(window.innerHeight-r.top+4)+'px'; }
-    else m.style.top=(r.bottom+4)+'px';
+    CB.inp=inp; comboPlace();
+    /* 닫기는 «바깥을 눌렀을 때»만 — 목록의 스크롤바를 눌러도 닫히지 않습니다 */
+    if(CB.off) document.removeEventListener('mousedown', CB.off, true);
+    CB.off=function(ev){
+      var mm=document.getElementById('cbMenu');
+      if(!mm){ comboClose(); return; }
+      if(mm.contains(ev.target) || ev.target===inp || (btn && (ev.target===btn || btn.contains(ev.target)))) return;
+      comboClose();
+    };
+    document.addEventListener('mousedown', CB.off, true);
+    m.addEventListener('mousedown', function(ev){
+      /* 스크롤바·빈 곳을 눌러도 입력칸의 포커스를 유지 (항목은 아래에서 따로 처리) */
+      if(ev.target===m) ev.preventDefault();
+    });
     m.querySelectorAll('.it').forEach(function(it){
-      it.onmousedown=function(ev){ ev.preventDefault(); };      /* blur 로 닫히기 전에 값 넣기 */
+      it.onmousedown=function(ev){ ev.preventDefault(); };      /* 값을 넣기 전에 포커스가 빠지지 않게 */
       it.onclick=function(){
         inp.value=it.dataset.v||'';
         inp.dispatchEvent(new Event('input',{bubbles:true}));
@@ -11994,13 +12019,8 @@ function comboWire(inp, opts, onPick){
   inp.addEventListener('focus', function(){ open(''); });
   inp.addEventListener('click', function(){ open(''); });
   inp.addEventListener('input', function(){ open(inp.value); });
-  inp.addEventListener('blur', function(){ setTimeout(function(){
-    /* 다시 그 칸으로 돌아왔거나(값을 고르는 중) 메뉴 안을 누른 경우에는 닫지 않습니다 */
-    if(document.activeElement===inp) return;
-    var m=document.getElementById('cbMenu');
-    if(m && m.contains(document.activeElement)) return;
-    comboClose();
-  }, 140); });
+  /* 탭 등으로 다른 칸으로 옮겨갈 때만 닫습니다 (마우스로 목록을 다루는 중에는 닫지 않음) */
+  inp.addEventListener('keydown', function(e){ if(e.key==='Tab') comboClose(); });
   inp.addEventListener('keydown', function(e){
     var m=document.getElementById('cbMenu');
     if(e.key==='Escape'){ comboClose(); return; }
@@ -12028,8 +12048,13 @@ function comboWire(inp, opts, onPick){
     else { inp.focus(); open(''); }
   };
 }
-window.addEventListener('scroll', comboClose, true);
-window.addEventListener('resize', comboClose);
+/* 목록 안에서 굴린 스크롤은 그대로 두고, 화면·표를 스크롤하면 위치만 따라갑니다 (예전에는 닫혔습니다) */
+window.addEventListener('scroll', function(e){
+  var m=document.getElementById('cbMenu'); if(!m) return;
+  if(e.target && e.target.nodeType===1 && m.contains(e.target)) return;   /* 목록 자체를 스크롤하는 중 */
+  comboPlace();
+}, true);
+window.addEventListener('resize', comboPlace);
 
 function wireRowInputs(tr,g){
   /* 목록형(콤보) 칸 연결 — 열 정의의 opts 를 그때그때 읽습니다(계약번호처럼 값이 늘어나는 목록 때문) */
