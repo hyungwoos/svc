@@ -1298,8 +1298,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
   <div id="viewQuote" class="hidden">
     <section class="card c12" style="padding:10px">
       <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px 10px">
-        <div style="font-size:13px;font-weight:650">📄 견적·발주 시스템 <span class="ubadge sm won">₩ 금액은 원 단위</span> <span class="mini" style="color:var(--muted);font-weight:400;margin-left:6px">기업용 견적 · 공공용 견적 · 파트너 발주서</span></div>
-        <a href="quote.html" target="_blank" class="pill ghost" style="text-decoration:none">↗ 새 창에서 열기</a>
+        <div style="font-size:13px;font-weight:650">📄 견적·발주 시스템 <span class="ubadge sm won">₩ 금액은 원 단위</span> <span class="mini" style="color:var(--muted);font-weight:400;margin-left:6px">기업용 견적 · 공공용 견적 · 발주서</span></div>
+        <a href="quote.html" target="_blank" class="pill ghost" style="text-decoration:none" onclick="this.href='quote.html?v='+encodeURIComponent(APP_VER)">↗ 새 창에서 열기</a>
       </div>
       <iframe id="quoteFrame" title="견적 시스템"
         style="width:100%;height:calc(100vh - 150px);border:0;border-radius:10px;background:#f9f9f7"></iframe>
@@ -2226,7 +2226,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-16 ㊿+63';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-16 ㊿+65';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -11642,7 +11642,7 @@ function switchView(v){
   }
   if(quote){
     var fr=$('#quoteFrame');
-    if(!fr.src){ fr.src='quote.html'; }
+    if(!fr.src){ fr.src='quote.html?v='+encodeURIComponent(APP_VER); }   // 포탈 버전을 붙여 옛 견적 화면이 캐시에서 나오는 일을 막음
     else{
       // 메뉴를 다시 누르면 견적 종류(기업/공공)를 다시 고를 수 있게
       try{ fr.contentWindow.postMessage({type:'quoteReset'},'*'); }catch(e){}
