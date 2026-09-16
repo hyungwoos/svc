@@ -14,6 +14,8 @@
         input.num { text-align: right; }
         input.ctr { text-align: center; }
         input.ro { color: #444; }
+        select.sel-plain { appearance: none; -webkit-appearance: none; text-align: center; text-align-last: center; padding: 1px 3px; cursor: pointer; }
+        select.sel-plain:hover { background: #fffbe6; }
         .btn { padding: 8px 13px; font-weight: bold; border-radius: 9px; cursor: pointer; border: none; color: #fff; font-size: 13px; white-space: nowrap; background: #333; }
         .btn.green { background: var(--genians-green); }
         .btn.gray { background: #6c757d; }
@@ -33,39 +35,55 @@
         .chip.on small { color: #e8ffe8; }
         .hint { max-width: 900px; margin: 0 auto 10px; font-size: 12px; color: var(--muted); }
         .hint b { color: #c0392b; }
-        /* ── 문서 ── */
-        .page { width: 794px; min-height: 1080px; margin: 0 auto; background: #fff; padding: 34px 40px 28px; box-shadow: 0 2px 14px rgba(0,0,0,.08); font-size: 10.5px; position: relative; }
-        .hd { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 26px; }
-        .title-box { background: #2b2b2b; color: #fff; font-weight: 900; font-size: 26px; letter-spacing: 1px; padding: 22px 30px; width: 300px; text-align: center; margin-top: 12px; }
-        .no { text-align: right; font-size: 11px; margin-bottom: 3px; }
-        .no input { width: 190px; font-weight: bold; text-align: left; border-bottom: 1px dashed #bbb; }
-        table.ap { border-collapse: collapse; width: 340px; }
-        table.ap th, table.ap td { border: 1px solid var(--bd); text-align: center; font-size: 10.5px; padding: 0; height: 18px; }
-        table.ap th { font-weight: bold; }
-        table.ap th input { text-align: center; font-weight: bold; }
-        table.ap td.sig { height: 44px; cursor: pointer; position: relative; }
-        table.ap td.sig.skip { background: linear-gradient(to top right, transparent calc(50% - .6px), #000 calc(50% - .6px), #000 calc(50% + .6px), transparent calc(50% + .6px)); }
+        /* ── 문서: 원본 엑셀(맑은 고딕 · 테마 파랑 채움 · 열 비율 A~M) 재현 ── */
+        :root { --b1: #DCE6F1; --b2: #B8CCE4; --c1: #DAEEF3; --g1: #F2F2F2; --tb: #333333; }
+        .page, .page input, .page select, .page textarea { font-family: 'Malgun Gothic', '맑은 고딕', 'Noto Sans KR', sans-serif; }
+        .page { width: 794px; margin: 0 auto; background: #fff; padding: 30px 34px 22px; box-shadow: 0 2px 14px rgba(0,0,0,.08); font-size: 11px; color: #000; position: relative; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .page * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .hd { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 22px; }
+        .title-box { background: var(--tb); color: #fff; font-weight: 700; font-size: 24px; white-space: nowrap; width: 36.6%; height: 116px; display: flex; align-items: center; justify-content: center; margin-top: 20px; }
+        .title-box span { border-bottom: 2px solid #fff; padding-bottom: 2px; letter-spacing: .3px; }
+        .apwrap { width: 45.8%; }
+        .no { text-align: right; font-size: 11px; height: 20px; line-height: 20px; margin-bottom: 4px; }
+        .no input { width: 78%; font-weight: bold; text-align: left; border-bottom: 1px dashed #bbb; display: inline-block; }
+        table.ap { border-collapse: collapse; width: 100%; table-layout: fixed; }
+        table.ap col.w1 { width: 17.6%; } table.ap col.w2 { width: 18%; } table.ap col.w3 { width: 23.7%; } table.ap col.w4 { width: 16.7%; } table.ap col.w5 { width: 24%; }
+        table.ap th, table.ap td { border: 1px solid var(--bd); text-align: center; font-size: 11px; padding: 0; height: 21px; font-weight: normal; }
+        table.ap tr.team th { font-weight: bold; font-size: 12px; height: 22px; }
+        table.ap tr.team th input { text-align: center; font-weight: bold; font-size: 12px; }
+        table.ap tr.team2 th { height: 20px; }
+        table.ap tr.h2 th { height: 19px; }
+        table.ap td.sig { height: 58px; cursor: pointer; position: relative; }
+        table.ap td.sig.skip { background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' preserveAspectRatio='none' viewBox='0 0 100 100'><line x1='0' y1='100' x2='100' y2='0' stroke='black' stroke-width='1' vector-effect='non-scaling-stroke'/></svg>"); background-size: 100% 100%; background-repeat: no-repeat; }
         table.ap td.sig:hover::after { content: '사선'; position: absolute; right: 2px; bottom: 1px; font-size: 8px; color: #aaa; }
-        .sec { font-weight: bold; font-size: 11px; margin: 12px 0 4px; display: flex; justify-content: space-between; align-items: flex-end; }
-        .sec .unit { font-weight: bold; font-size: 10px; }
+        .sec { font-weight: bold; font-size: 11px; margin: 10px 0 3px; display: flex; justify-content: space-between; align-items: flex-end; height: 16px; }
+        .sec .unit { font-weight: bold; font-size: 10.5px; }
         table.f { width: 100%; border-collapse: collapse; table-layout: fixed; }
-        table.f th, table.f td { border: 1px solid var(--bd); padding: 2px 4px; height: 24px; text-align: center; }
-        table.f th { background: var(--head); font-weight: bold; }
+        table.f th, table.f td { border: 1px solid var(--bd); padding: 1px 4px; height: 25px; text-align: center; font-size: 11px; }
+        table.f th { font-weight: bold; }
         table.f td.l { text-align: left; }
         table.f td.l input, table.f td.l textarea { text-align: left; }
         table.f td.r input { text-align: right; }
-        table.f .lbl { background: var(--head); font-weight: bold; }
-        table.f .lbl2 { background: var(--head2); font-weight: bold; }
-        .two { display: flex; gap: 0; align-items: stretch; }
-        .two > table:first-child { width: 58%; }
-        .two > table:last-child { width: 42%; margin-left: -1px; }
-        td.vert { writing-mode: vertical-rl; text-orientation: upright; letter-spacing: 6px; font-weight: bold; background: var(--head2); width: 22px; padding: 0; }
-        .notes { font-size: 9.5px; font-weight: bold; margin: 4px 0 0; line-height: 1.5; }
+        .b1 { background: var(--b1); } .b2 { background: var(--b2); } .c1 { background: var(--c1); } .g1 { background: var(--g1); }
+        table.f .lbl { background: var(--b1); font-weight: bold; }
+        table.f .bold { font-weight: bold; }
+        table.f .bold input { font-weight: bold; }
+        table.ci th, table.ci td { height: 43px; }
+        table.dv thead th { height: 25px; } table.dv tbody td { height: 40px; } table.dv tfoot td { height: 20px; }
+        table.by thead th { height: 23px; } table.by tbody td { height: 23px; } table.by tbody tr:first-child td { height: 43px; } table.by tfoot td { height: 23px; }
+        .two { display: flex; align-items: stretch; }
+        .two > table:first-child { width: 45.6%; }
+        .two > table:last-child { width: 54.4%; margin-left: -1px; }
+        td.vert { writing-mode: vertical-rl; text-orientation: upright; letter-spacing: 8px; font-weight: bold; background: var(--g1); padding: 0; font-size: 12px; }
+        .won { font-size: 12px; font-weight: bold; font-family: Gulim, '굴림', 'Malgun Gothic', sans-serif; }
+        .won input { font-size: 12px; font-family: inherit; }
+        .won.nb input { font-weight: normal; }
+        .notes { font-size: 10.5px; font-weight: bold; margin: 2px 0 0; line-height: 1.45; }
         textarea { resize: none; line-height: 1.35; overflow: hidden; }
-        .flow { font-weight: bold; font-size: 10.5px; margin: 2px 0; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+        .flow { font-weight: bold; font-size: 11px; margin: 2px 0; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
         .flow input { border-bottom: 1px dashed #ccc; font-weight: bold; }
-        .foot { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 18px; font-size: 9px; color: #777; }
-        .foot img { height: 34px; }
+        .foot { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 14px; font-size: 9.5px; color: #555; font-weight: bold; }
+        .foot img { height: 30px; width: auto; }
         .rowact { position: absolute; right: -30px; top: 50%; transform: translateY(-50%); display: none; gap: 2px; }
         tr:hover .rowact { display: flex; }
         .rowact button { width: 20px; height: 20px; border-radius: 50%; border: none; color: #fff; font-size: 11px; cursor: pointer; padding: 0; }
@@ -93,22 +111,16 @@
         .tag.issued { background: #e3f6e6; color: #1e8e3e; }
         #loginOverlay { position: fixed; inset: 0; background: #f9f9f7; z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; }
         @media print {
-            @page { size: A4 portrait; margin: 9mm 9mm; }
-            body { background: #fff; padding: 0; }
+            @page { size: A4 portrait; margin: 8mm 9mm; }
+            html, body { background: #fff; padding: 0; margin: 0; }
             .bar, .chips, .hint, .warn, .rowact, .no-print, .ovl { display: none !important; }
-            .page { box-shadow: none; width: 100%; min-height: 0; padding: 4mm 3mm; }
-            input, textarea { background: transparent !important; }
+            .page { box-shadow: none; width: 100%; min-height: 0; padding: 0; zoom: .8; }
+            input, textarea, select { background: transparent !important; }
             input::placeholder, textarea::placeholder { color: transparent; }
             table.ap td.sig:hover::after { display: none; }
             .ratebox { display: none; }
-            .foot { position: static; margin-top: 8px; }
-            .hd { margin-bottom: 12px; }
-            .title-box { padding: 14px 20px; font-size: 22px; width: 260px; margin-top: 8px; }
-            table.ap td.sig { height: 34px; }
-            table.f th, table.f td { height: 19px; padding: 1px 3px; }
-            .sec { margin: 7px 0 2px; }
-            .notes { margin-top: 2px; }
             input[type=date]::-webkit-calendar-picker-indicator { display: none; }
+            select.sel-plain { background: transparent !important; }
             textarea[data-k=remarks] { min-height: 40px; }
         }
     </style>
@@ -133,7 +145,7 @@
         <option value="monthly">무약정 매월</option><option value="settle">월 정산(집계)</option><option value="subs">구독료</option>
     </select></label>
     <label>기준월 <input type="month" id="qMonth" style="width:140px"></label>
-    <label>결재선 <select id="qAppr"><option value="bu">본부장전결</option><option value="coo">COO전결</option><option value="ceo">대표이사</option></select></label>
+    <label>전결 <select id="qAppr" title="서비스사업팀 결재 라인 — 그 위 칸은 사선"><option value="tl">팀장전결</option><option value="bu" selected>본부장전결</option><option value="coo">COO전결</option><option value="ceo">대표이사 결재</option><option value="custom">직접 지정</option></select></label><label title="협조 부서 라인 — 끄면 그 칸에 사선"><input type="checkbox" id="qCoop1" style="width:auto"> 영업관리팀</label><label title="협조 부서 라인 — 끄면 그 칸에 사선"><input type="checkbox" id="qCoop2" checked style="width:auto"> 경영지원본부</label>
     <span class="sp"></span>
     <button class="btn line" onclick="newReport()">새로 작성</button>
     <button class="btn line" onclick="openList()">불러오기</button>
@@ -142,82 +154,84 @@
     <button class="btn green" onclick="printReport()">PDF 발행</button>
 </div>
 <div class="chips" id="chips"></div>
-<div class="hint" id="hint">고객명을 고르고 계약을 누르면 리포트가 자동으로 채워집니다. 채워진 값은 모두 직접 수정할 수 있고, 결재란 칸을 누르면 사선(생략) 표시가 바뀝니다.</div>
+<div class="hint" id="hint">고객명을 고르고 계약을 누르면 리포트가 자동으로 채워집니다. 채워진 값은 모두 직접 수정할 수 있고, 결재란은 전결 단계와 협조 부서(영업관리팀·경영지원본부)를 고르거나, 칸을 직접 눌러 사선을 바꿀 수 있습니다.</div>
 <div class="warn" id="warn"></div>
+<datalist id="dlModel"></datalist>
 
 <!-- ── 문서 ── -->
 <div class="page" id="page">
     <div class="hd">
-        <div class="title-box">PROJECT REPORT</div>
-        <div>
+        <div class="title-box"><span>PROJECT&nbsp; REPORT</span></div>
+        <div class="apwrap">
             <div class="no">NO. <input data-k="no" placeholder="비즈포탈 영업현황 등록번호 (수기)"></div>
             <table class="ap">
-                <tr><th colspan="5"><input data-k="team1" value="서비스사업팀"></th></tr>
-                <tr><th>담당</th><th>팀장</th><th>본부장</th><th>COO</th><th>대표이사</th></tr>
+                <colgroup><col class="w1"><col class="w2"><col class="w3"><col class="w4"><col class="w5"></colgroup>
+                <tr class="team"><th colspan="5"><input data-k="team1" value="서비스사업팀"></th></tr>
+                <tr class="h2"><th>담당</th><th>팀장</th><th>본부장</th><th>COO</th><th>대표이사</th></tr>
                 <tr><td class="sig" data-s="a1"></td><td class="sig" data-s="a2"></td><td class="sig" data-s="a3"></td><td class="sig" data-s="a4"></td><td class="sig" data-s="a5"></td></tr>
-                <tr><th colspan="2"><input data-k="team2" value="영업관리팀"></th><th colspan="3"><input data-k="team3" value="경영지원본부"></th></tr>
-                <tr><th>담당</th><th>팀장</th><th>담당</th><th>팀장</th><th>본부장</th></tr>
+                <tr class="team team2"><th colspan="2"><input data-k="team2" value="영업관리팀"></th><th colspan="3"><input data-k="team3" value="경영지원본부"></th></tr>
+                <tr class="h2"><th>담당</th><th>팀장</th><th>담당</th><th>팀장</th><th>본부장</th></tr>
                 <tr><td class="sig" data-s="b1"></td><td class="sig" data-s="b2"></td><td class="sig" data-s="b3"></td><td class="sig" data-s="b4"></td><td class="sig" data-s="b5"></td></tr>
             </table>
         </div>
     </div>
 
     <div class="sec"><span>1. 계약정보</span></div>
-    <table class="f">
-        <colgroup><col style="width:13%"><col style="width:30%"><col style="width:9%"><col style="width:14%"><col style="width:34%"></colgroup>
-        <tr><td class="lbl">부&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;서</td><td><input class="ctr" data-k="dept" value="서비스사업팀"></td><td class="lbl" rowspan="3">고객사</td><td class="lbl2">고객명</td><td><input class="ctr" data-k="customer" placeholder="고객명"></td></tr>
-        <tr><td class="lbl">품 의 자</td><td><input class="ctr" data-k="writer"></td><td class="lbl2">프로젝트명</td><td><input class="ctr" data-k="title" placeholder="프로젝트명"></td></tr>
-        <tr><td class="lbl">품의일자</td><td><input class="ctr" type="date" data-k="date"></td><td class="lbl2">담당자</td><td><input class="ctr" data-k="contact" placeholder="고객사 담당자 (수기)"></td></tr>
+    <table class="f ci">
+        <colgroup><col style="width:12.2%"><col style="width:24.4%"><col style="width:9.1%"><col style="width:16.6%"><col style="width:37.7%"></colgroup>
+        <tr><td class="lbl">부&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;서</td><td><input class="ctr" data-k="dept" value="서비스사업팀"></td><td class="bold" rowspan="3">고객사</td><td class="lbl">고객명</td><td><input class="ctr" data-k="customer" placeholder="고객명"></td></tr>
+        <tr><td class="lbl">품 의 자</td><td><select class="ctr sel-plain" data-k="writer"><option value="김민정">김민정</option><option value="최형우">최형우</option><option value="송기영">송기영</option></select></td><td class="lbl">프로젝트명</td><td><input class="ctr" data-k="title" placeholder="프로젝트명"></td></tr>
+        <tr><td class="lbl">품의일자</td><td><input class="ctr" type="date" data-k="date"></td><td class="lbl">담당자</td><td><input class="ctr" data-k="contact" placeholder="고객사 담당자 (수기)"></td></tr>
     </table>
 
     <div class="sec"><span>2. 프로젝트 수행내역</span><span class="unit">[단위 : 원, VAT별도]</span></div>
     <div class="two">
         <table class="f">
-            <colgroup><col style="width:25%"><col style="width:25%"><col style="width:30%"><col style="width:20%"></colgroup>
-            <tr><th>구분</th><th>일자</th><th>금액</th><th>DC율</th></tr>
-            <tr><td class="lbl2">계약일자</td><td><input class="ctr" type="date" data-k="cdate"></td><td class="r"><input class="num money" data-k="amount" placeholder="0"></td><td><input class="ctr" data-k="dc"></td></tr>
-            <tr><td class="lbl2">수금일자</td><td><input class="ctr" type="date" data-k="paydate"></td><td></td><td></td></tr>
-            <tr><td class="lbl2">Total</td><td></td><td></td><td></td></tr>
-            <tr><td class="lbl2">수금조건</td><td colspan="3"><input class="ctr" data-k="payterm" value="익월 말 결제"></td></tr>
-            <tr><td class="lbl2">계산서발행일</td><td colspan="3"><input class="ctr" type="date" data-k="taxdate"></td></tr>
-            <tr><td class="lbl2">무상유지보수 기간</td><td><input class="ctr" data-k="warranty"></td><td class="lbl2" rowspan="2">비고</td><td rowspan="2"><input class="ctr" data-k="note2"></td></tr>
-            <tr><td class="lbl2">판매형태</td><td><input class="ctr" data-k="saletype"></td></tr>
+            <colgroup><col style="width:29.4%"><col style="width:26.4%"><col style="width:32.2%"><col style="width:12%"></colgroup>
+            <tr><th style="height:29px">구분</th><th>일자</th><th>금액</th><th>DC율</th></tr>
+            <tr><td class="bold">계약일자</td><td class="bold"><input class="ctr" type="date" data-k="cdate"></td><td class="r"><input class="num money" data-k="amount" placeholder="0"></td><td><input class="ctr" data-k="dc"></td></tr>
+            <tr><td class="bold">수금일자</td><td class="bold"><input class="ctr" type="date" data-k="paydate"></td><td></td><td></td></tr>
+            <tr><td class="lbl">Total</td><td class="b1"></td><td class="b1"></td><td class="b1"></td></tr>
+            <tr><td class="bold">수금조건</td><td colspan="3"><input class="ctr" data-k="payterm" value="익월 말 결제"></td></tr>
+            <tr><td class="bold">계산서발행일</td><td colspan="3"><input class="ctr" type="date" data-k="taxdate"></td></tr>
+            <tr><td class="bold">무상유지보수 기간</td><td><input class="ctr" data-k="warranty"></td><td class="bold" rowspan="2" style="width:30%">비고</td><td rowspan="2"><input class="ctr" data-k="note2"></td></tr>
+            <tr><td class="bold">판매형태</td><td><input class="ctr" data-k="saletype"></td></tr>
         </table>
         <table class="f">
-            <colgroup><col style="width:7%"><col style="width:40%"><col style="width:53%"></colgroup>
-            <tr><td class="vert" rowspan="8">수익분석</td><td class="lbl">매출액</td><td class="r"><input class="num ro" id="cSales" readonly></td></tr>
-            <tr><td class="lbl">총 원가</td><td class="r"><input class="num ro" id="cCost" readonly></td></tr>
-            <tr><td class="lbl2">관리원가</td><td class="r"><input class="num ro" id="cMgmt" readonly></td></tr>
-            <tr><td class="lbl2">하자보수 장비 원가</td><td class="r"><input class="num money" data-k="hwcost" placeholder="0"></td></tr>
-            <tr><td class="lbl2">매입원가</td><td class="r"><input class="num ro" id="cBuy" readonly></td></tr>
-            <tr><td colspan="2" style="height:10px;border-left:none;border-right:none"></td></tr>
-            <tr><td class="lbl">Gross Margin</td><td class="r"><input class="num ro" id="cGm" readonly></td></tr>
-            <tr><td class="lbl">Margin Rate</td><td class="r"><input class="num ro" id="cRate" readonly></td></tr>
+            <colgroup><col style="width:7.1%"><col style="width:23.5%"><col style="width:69.4%"></colgroup>
+            <tr><td class="vert" rowspan="8">수익분석</td><td class="b2 bold">매출액</td><td class="b2 r won"><input class="num ro" id="cSales" readonly></td></tr>
+            <tr><td class="b1 bold">총 원가</td><td class="b1 r won"><input class="num ro" id="cCost" readonly></td></tr>
+            <tr><td class="b2 bold">관리원가</td><td class="b2 r won nb"><input class="num ro" id="cMgmt" readonly></td></tr>
+            <tr><td class="bold" style="white-space:nowrap;font-size:10px;padding:1px 2px">하자보수 장비 원가</td><td class="r won nb"><input class="num money" data-k="hwcost" placeholder="₩ -"></td></tr>
+            <tr><td class="bold">매입원가</td><td class="r won nb"><input class="num ro" id="cBuy" readonly></td></tr>
+            <tr><td colspan="2" style="height:12px;border-left:none;border-right:none"></td></tr>
+            <tr><td class="b2 bold">Gross Margin</td><td class="b2 r won"><input class="num ro" id="cGm" readonly></td></tr>
+            <tr><td class="bold">Margin Rate</td><td class="won"><input class="ctr ro" id="cRate" readonly></td></tr>
         </table>
     </div>
     <div class="notes">* 무상유지보수기간 반드시 표기<br>* 판매형태 기재방법 : 직접판매(고객사 그외)/간접판매(총판,PR,SR)/조달</div>
 
-    <div class="sec"><span>3. 납품내역</span><span class="no-print" style="font-weight:normal;font-size:10px;color:#777">원가 = 관리원가 기준 단가 × 적용개월 ÷ 12 (행에 마우스를 올리면 복제·삭제)</span></div>
-    <table class="f" id="tDeliv">
-        <colgroup><col style="width:7%"><col style="width:22%"><col style="width:18%"><col style="width:10%"><col style="width:20%"><col style="width:23%"></colgroup>
-        <thead><tr><th></th><th>MODEL</th><th>원가</th><th>수량</th><th>총액</th><th>비고</th></tr></thead>
+    <div class="sec"><span>3. 납품내역</span><span class="no-print" style="font-weight:normal;font-size:10px;color:#777">원가 = 관리원가 기준 단가 × 적용개월 ÷ 12 · HW 임대 = 매입단가 ÷ 5년 × 개월 (행에 마우스를 올리면 복제·삭제)</span></div>
+    <table class="f dv" id="tDeliv">
+        <colgroup><col style="width:12.2%"><col style="width:15.7%"><col style="width:17.8%"><col style="width:8.6%"><col style="width:27.2%"><col style="width:18.5%"></colgroup>
+        <thead><tr><th class="b1"></th><th class="b1">MODEL</th><th class="b1">원가</th><th class="b1">수량</th><th class="b1">총액</th><th class="b1">비고</th></tr></thead>
         <tbody></tbody>
         <tfoot><tr><td class="lbl">합계</td><td></td><td></td><td class="r"><input class="num ro" id="dQty" readonly></td><td class="r"><input class="num ro" id="dSum" readonly></td><td></td></tr></tfoot>
     </table>
 
     <div class="sec"><span>4. 매입내역</span><span class="no-print" style="font-weight:normal;font-size:10px;color:#777">수수료율을 고르면 총액 = 매출액 × 요율 (5% 단위, 직접입력 가능)</span></div>
-    <table class="f" id="tBuy">
-        <colgroup><col style="width:7%"><col style="width:22%"><col style="width:18%"><col style="width:10%"><col style="width:20%"><col style="width:23%"></colgroup>
-        <thead><tr><th></th><th>회사명</th><th>구매내역</th><th>수량</th><th>총액</th><th>지급조건</th></tr></thead>
+    <table class="f by" id="tBuy">
+        <colgroup><col style="width:12.2%"><col style="width:15.7%"><col style="width:17.8%"><col style="width:8.6%"><col style="width:27.2%"><col style="width:18.5%"></colgroup>
+        <thead><tr><th class="c1"></th><th class="c1">회사명</th><th class="c1">구매내역</th><th class="c1">수량</th><th class="c1">총액</th><th class="c1">지급조건</th></tr></thead>
         <tbody></tbody>
-        <tfoot><tr><td class="lbl">합계</td><td></td><td></td><td></td><td class="r"><input class="num ro" id="bSum" readonly></td><td></td></tr></tfoot>
+        <tfoot><tr><td class="c1 bold">합계</td><td></td><td></td><td></td><td class="r"><input class="num ro" id="bSum" readonly></td><td></td></tr></tfoot>
     </table>
 
     <div class="sec"><span>5. 매출경로</span></div>
     <div class="flow">- 매출흐름 : <input data-k="flow" placeholder="고객사 - 총판 - 지니언스 - 파트너"></div>
 
     <div class="sec"><span>6. 비고</span></div>
-    <textarea data-k="remarks" rows="3" style="width:100%;font-size:10.5px;font-weight:bold" placeholder="- 결제 방식, 계약 기간 등"></textarea>
+    <textarea data-k="remarks" rows="3" style="width:100%;font-size:11px;font-weight:bold" placeholder="- 결제 방식, 계약 기간 등"></textarea>
 
     <div class="foot">
         <div>지니언스㈜ 경기도 안양시 동안구 벌말로 66 평촌 하이필드 지식산업센터 A동 12층<br>TEL (031) 8084-9770 &nbsp; FAX (070) 4332-1683</div>
@@ -235,14 +249,14 @@
 <!-- ── 관리원가 기준 ── -->
 <div class="ovl" id="ovlCost"><div class="pan">
     <h3>관리원가 기준 (연도별) <button class="rowbtn" onclick="closeOvl('ovlCost')">닫기</button></h3>
-    <p class="st">매년 공지되는 관리원가를 여기에 두면 납품내역의 원가가 자동 계산됩니다. 공지 PDF를 올리면 AI가 표로 읽어 오고, 확인 후 저장합니다 — PDF 원본은 저장하지 않습니다.</p>
+    <p class="st">「전사통합 관리원가」 공지(구분·품목명·매입단가·연도별 관리원가)를 그대로 둡니다. 공지 PDF를 올리면 AI가 표로 읽어 오고(연도별 열 → 연도별 행), 확인 후 저장합니다 — PDF 원본은 저장하지 않습니다. SW 는 노드당 연 원가(1년차 적용), HW 임대는 매입단가 ÷ 5년 × 계약기간(감가상각)만 반영합니다.</p>
     <div style="display:flex;gap:8px;align-items:center;margin:6px 0 10px;flex-wrap:wrap">
         <input type="file" id="costPdf" accept="application/pdf" style="font-size:12px;width:auto">
         <button class="btn line" onclick="costFromPdf()" style="padding:6px 10px">PDF에서 읽기</button>
         <button class="btn line" onclick="costAddRow()" style="padding:6px 10px">+ 직접 추가</button>
         <span class="st" id="costSt"></span>
     </div>
-    <div style="max-height:55vh;overflow:auto"><table id="costT"><thead><tr><th style="width:70px">연도</th><th>항목/모델</th><th style="width:110px">단가(원)</th><th style="width:90px">기준</th><th>비고(적용 규칙)</th><th style="width:120px">근거</th><th style="width:70px"></th></tr></thead><tbody></tbody></table></div>
+    <div style="max-height:55vh;overflow:auto"><table id="costT"><thead><tr><th style="width:60px">연도</th><th style="width:50px">구분</th><th>품목명</th><th style="width:100px">매입단가</th><th style="width:110px">관리원가</th><th style="width:70px">기준</th><th>비고(적용 규칙)</th><th style="width:110px">근거</th><th style="width:60px"></th></tr></thead><tbody></tbody></table></div>
     <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px"><button class="btn green" onclick="costSaveNew()">새 항목 저장</button></div>
 </div></div>
 
@@ -280,6 +294,7 @@ var R = { customers: [], contracts: [], costs: [], reports: [], byCust: {}, id: 
 var KIND_LABEL = { new: '신규', add: '추가', renew: '재약정', qty: '수량변경', monthly: '무약정 매월', settle: '월 정산', subs: '구독료' };
 var WRITERS = { choihw: '최형우', kmj915: '김민정', kholong: '송기영' };
 var LINE_MODEL = { Cloud: 'Cloud NAC', S1: 'Cloud S1', MDR: 'MDR', PNS: 'PNS', DRM: 'DRM', MDR_S1: 'MDR+S1' };
+var COST_ALIAS = { 'cloud nac': 'NAC / ZTNA', 'cloud ztna': 'NAC / ZTNA', 'nac': 'NAC / ZTNA', 'ztna': 'NAC / ZTNA', 'mdr': 'EDR / AV / MDR', 'edr': 'EDR / AV / MDR', 'cloud s1': 'EDR / AV / MDR', 's1': 'EDR / AV / MDR', 'mdr+s1': 'EDR / AV / MDR', 'ssl vpn 구독료': 'SSL VPN' };   // 포탈 제품명 → 공지 품목명
 var $ = function (s) { return document.querySelector(s); };
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
 function n(v) { var x = parseFloat(String(v == null ? '' : v).replace(/[^\d.\-]/g, '')); return isNaN(x) ? 0 : x; }
@@ -299,7 +314,7 @@ function warn(t) { $('#warn').textContent = t || ''; }
 function addDeliv(d) {
     d = d || {};
     var tb = $('#tDeliv tbody'), tr = document.createElement('tr');
-    tr.innerHTML = '<td class="lbl2 idx"></td><td><input class="ctr d-model" placeholder="MODEL"></td><td class="r"><input class="num money d-cost" placeholder="0"></td><td class="r"><input class="num d-qty" placeholder="0"></td><td class="r"><input class="num ro d-tot" readonly></td><td style="position:relative"><textarea class="d-note" rows="1" style="text-align:center;font-size:10px"></textarea><div class="rowact no-print"><button class="dup" title="복제" onclick="dupRow(this,addDeliv,delivData)">＋</button><button class="del" title="삭제" onclick="delRow(this)">×</button></div></td>';
+    tr.innerHTML = '<td class="lbl idx"></td><td><input class="ctr d-model" list="dlModel" placeholder="MODEL"></td><td class="r"><input class="num money d-cost" placeholder="0"></td><td class="r"><input class="num d-qty" placeholder="0"></td><td class="r"><input class="num ro d-tot" readonly></td><td style="position:relative"><textarea class="d-note" rows="1" style="text-align:center;font-size:10px"></textarea><div class="rowact no-print"><button class="dup" title="복제" onclick="dupRow(this,addDeliv,delivData)">＋</button><button class="del" title="삭제" onclick="delRow(this)">×</button></div></td>';
     tb.appendChild(tr);
     tr.querySelector('.d-model').value = d.model || ''; tr.querySelector('.d-cost').value = d.cost ? fmt(d.cost) : ''; tr.querySelector('.d-qty').value = d.qty || ''; tr.querySelector('.d-note').value = d.note || '';
     if (d.cost && !Number.isInteger(+d.cost)) tr.querySelector('.d-cost').value = (+d.cost).toLocaleString('ko-KR', { maximumFractionDigits: 2 });
@@ -310,7 +325,7 @@ function addBuy(d) {
     d = d || {};
     var tb = $('#tBuy tbody'), tr = document.createElement('tr');
     var opts = '<option value="">직접입력</option>'; for (var p = 5; p <= 60; p += 5) opts += '<option value="' + p + '">' + p + '%</option>';
-    tr.innerHTML = '<td class="lbl2 idx"></td><td><input class="ctr b-name" placeholder="회사명"></td><td><input class="ctr b-desc"></td><td class="r"><input class="num b-qty"></td><td class="r" style="position:relative"><input class="num money b-tot" placeholder="0"><div class="ratebox no-print"><span style="font-size:9px;color:#777">수수료</span><select class="b-rate">' + opts + '</select><input class="b-ratem" placeholder="%" title="5% 단위가 아니면 직접 입력" style="display:none"></div></td><td style="position:relative"><textarea class="b-term" rows="1" style="text-align:center;font-size:10px"></textarea><div class="rowact no-print"><button class="dup" title="복제" onclick="dupRow(this,addBuy,buyData)">＋</button><button class="del" title="삭제" onclick="delRow(this)">×</button></div></td>';
+    tr.innerHTML = '<td class="c1 bold idx"></td><td><input class="ctr b-name" placeholder="회사명"></td><td><input class="ctr b-desc"></td><td class="r"><input class="num b-qty"></td><td class="r" style="position:relative"><input class="num money b-tot" placeholder="0"><div class="ratebox no-print"><span style="font-size:9px;color:#777">수수료</span><select class="b-rate">' + opts + '</select><input class="b-ratem" placeholder="%" title="5% 단위가 아니면 직접 입력" style="display:none"></div></td><td style="position:relative"><textarea class="b-term" rows="1" style="text-align:center;font-size:10px"></textarea><div class="rowact no-print"><button class="dup" title="복제" onclick="dupRow(this,addBuy,buyData)">＋</button><button class="del" title="삭제" onclick="delRow(this)">×</button></div></td>';
     tb.appendChild(tr);
     tr.querySelector('.b-name').value = d.name || ''; tr.querySelector('.b-desc').value = d.desc || ''; tr.querySelector('.b-qty').value = d.qty || ''; tr.querySelector('.b-tot').value = d.tot ? fmt(d.tot) : ''; tr.querySelector('.b-term').value = d.term || '';
     var rate = d.rate == null ? '' : String(d.rate);
@@ -354,13 +369,20 @@ document.addEventListener('input', function (e) {
     if (el.matches('.page input, .page textarea')) calc();
 });
 document.addEventListener('blur', function (e) { var el = e.target; if (el && el.classList && el.classList.contains('money')) { el.value = n(el.value) ? (Number.isInteger(n(el.value)) ? fmt(n(el.value)) : n(el.value).toLocaleString('ko-KR', { maximumFractionDigits: 2 })) : ''; calc(); } }, true);
-document.addEventListener('click', function (e) { var td = e.target.closest && e.target.closest('td.sig'); if (td) td.classList.toggle('skip'); });
+// 결재선: 전결 단계(팀장·본부장·COO·대표이사) + 협조 라인(영업관리팀·경영지원본부) 조합, 칸을 직접 눌러 사선을 바꾸면 «직접 지정»
+document.addEventListener('click', function (e) { var td = e.target.closest && e.target.closest('td.sig'); if (td) { td.classList.toggle('skip'); $('#qAppr').value = 'custom'; } });
+var APPR_SKIP = { tl: ['a3', 'a4', 'a5'], bu: ['a4', 'a5'], coo: ['a5'], ceo: [] };
 function setAppr(mode) {
+    if (mode === 'custom') return;
     document.querySelectorAll('td.sig').forEach(function (td) { td.classList.remove('skip'); });
-    var skip = mode === 'bu' ? ['a4', 'a5', 'b1', 'b2'] : mode === 'coo' ? ['a5', 'b1', 'b2'] : [];
+    var skip = (APPR_SKIP[mode] || []).slice();
+    if (!$('#qCoop1').checked) skip = skip.concat(['b1', 'b2']);
+    if (!$('#qCoop2').checked) skip = skip.concat(['b3', 'b4', 'b5']);
     skip.forEach(function (s) { var td = document.querySelector('td.sig[data-s="' + s + '"]'); if (td) td.classList.add('skip'); });
 }
 $('#qAppr').addEventListener('change', function () { setAppr(this.value); });
+$('#qCoop1').addEventListener('change', function () { if ($('#qAppr').value === 'custom') $('#qAppr').value = 'bu'; setAppr($('#qAppr').value); });
+$('#qCoop2').addEventListener('change', function () { if ($('#qAppr').value === 'custom') $('#qAppr').value = 'bu'; setAppr($('#qAppr').value); });
 $('#qKind').addEventListener('change', function () { if (R.contractId) prefill(R.contracts.find(function (c) { return c.id === R.contractId; }), true); else if (R.cust) prefillSettle(); });
 $('#qMonth').addEventListener('change', function () { if (R.contractId) prefill(R.contracts.find(function (c) { return c.id === R.contractId; }), true); else if (R.cust) prefillSettle(); });
 
@@ -378,9 +400,10 @@ async function loadAll() {
         R.customers = res[0]; R.contracts = res[1]; R.costs = res[2]; R.reports = res[3];
     } catch (e) { warn('포탈 데이터를 읽지 못했습니다: ' + e.message); return; }
     R.byCust = {}; R.customers.forEach(function (c) { R.byCust[c.id] = c.name; });
+    fillModelList();
     var names = {}; R.contracts.forEach(function (c) { var nm = R.byCust[c.customer_id]; if (nm) names[nm] = 1; });
     $('#dlCust').innerHTML = Object.keys(names).sort().map(function (nm) { return '<option value="' + esc(nm) + '">'; }).join('');
-    var who = (s.u || '').split('@')[0]; if (!getV('writer')) setV('writer', WRITERS[who] || who);
+    var who = (s.u || '').split('@')[0]; if (WRITERS[who]) setV('writer', WRITERS[who]);   // 로그인 계정으로 기본 선택 (김민정·최형우·송기영)
 }
 $('#qCust').addEventListener('change', function () { pickCustomer(this.value); });
 $('#qCust').addEventListener('input', function () { var v = this.value; if (Object.keys(R.byCust).some(function (id) { return R.byCust[id] === v; })) pickCustomer(v); });
@@ -412,11 +435,25 @@ $('#chips').addEventListener('click', function (e) {
 // ─────────────────────────────────────────────
 //  자동 채움
 // ─────────────────────────────────────────────
+function costKey(item) { var k = String(item || '').trim().toLowerCase().replace(/\s+/g, ' '); return COST_ALIAS[k] || item; }
 function costFor(item, dateIso) {
-    var y = +String(dateIso || todayISO()).slice(0, 4);
-    var cands = R.costs.filter(function (c) { return (c.item || '').toLowerCase() === (item || '').toLowerCase() && c.year <= y; }).sort(function (a, b) { return b.year - a.year; });
-    return cands[0] || null;
+    var y = +String(dateIso || todayISO()).slice(0, 4), want = String(costKey(item) || '').toLowerCase().replace(/\s+/g, '');
+    if (!want) return null;
+    var pool = R.costs.filter(function (c) { return c.year <= y; }).sort(function (a, b) { return b.year - a.year; });
+    var hit = pool.find(function (c) { return String(c.item || '').toLowerCase().replace(/\s+/g, '') === want; });                         // 정확히 같은 품목
+    if (!hit) hit = pool.find(function (c) { return String(c.item || '').toLowerCase().split('/').map(function (t) { return t.trim().replace(/\s+/g, ''); }).indexOf(want) >= 0; });   // «NAC / ZTNA» 의 한 토큰
+    return hit || null;
 }
+// 납품행 MODEL 을 바꾸면 원가 제안: SW = 연 단가(1년차) · HW(임대) = 매입단가 ÷ 5년 ÷ 12 × 계약개월 (감가상각)
+function suggestCost(tr) {
+    var model = tr.querySelector('.d-model').value, ci = tr.querySelector('.d-cost');
+    if (!model || (ci.value && ci.value !== ci.dataset.auto)) return;
+    var c = costFor(model, getV('cdate') || todayISO()); if (!c) return;
+    var months = n(getV('warranty')) || 12, v;
+    if (c.category === 'HW' && c.purchase_cost) v = +c.purchase_cost / 5 / 12 * months; else v = +c.unit_cost;
+    ci.value = Number.isInteger(v) ? fmt(v) : v.toLocaleString('ko-KR', { maximumFractionDigits: 2 }); ci.dataset.auto = ci.value; calc();
+}
+document.addEventListener('change', function (e) { if (e.target && e.target.classList && e.target.classList.contains('d-model')) suggestCost(e.target.closest('tr')); });
 function prevReport(name) {
     var p = R.reports.find(function (r) { return r.customer === name; }); return p || null;
 }
@@ -424,7 +461,7 @@ async function loadPayload(id) { var rows = await sbGet('project_reports?select=
 function clearDoc(keepHeader) {
     document.querySelectorAll('.page [data-k]').forEach(function (el) { if (['team1', 'team2', 'team3', 'dept', 'writer', 'payterm'].indexOf(el.dataset.k) >= 0 && keepHeader) return; el.value = ''; });
     $('#tDeliv tbody').innerHTML = ''; $('#tBuy tbody').innerHTML = ''; padRows();
-    setV('payterm', '익월 말 결제'); setAppr($('#qAppr').value);
+    setV('payterm', '익월 말 결제'); if ($('#qAppr').value !== 'custom') setAppr($('#qAppr').value);
 }
 async function prefill(c, keepUser) {
     if (!c) return;
@@ -514,16 +551,16 @@ function collect() {
     p.deliv = Array.from(document.querySelectorAll('#tDeliv tbody tr')).map(delivData).filter(function (r) { return r.model || r.cost || r.qty || r.note; });
     p.buy = Array.from(document.querySelectorAll('#tBuy tbody tr')).map(buyData).filter(function (r) { return r.name || r.tot || r.desc; });
     p.skip = Array.from(document.querySelectorAll('td.sig.skip')).map(function (td) { return td.dataset.s; });
-    p.kind = $('#qKind').value; p.appr = $('#qAppr').value; p.month = $('#qMonth').value; p.contract_id = R.contractId;
+    p.kind = $('#qKind').value; p.appr = $('#qAppr').value; p.coop1 = $('#qCoop1').checked; p.coop2 = $('#qCoop2').checked; p.month = $('#qMonth').value; p.contract_id = R.contractId;
     p.calc = { sales: $('#cSales').value, cost: $('#cCost').value, gm: $('#cGm').value, rate: $('#cRate').value };
     return p;
 }
 function apply(p) {
     clearDoc(false);
-    Object.keys(p).forEach(function (k) { if (['deliv', 'buy', 'skip', 'kind', 'appr', 'month', 'contract_id', 'calc'].indexOf(k) < 0) setV(k, p[k]); });
+    Object.keys(p).forEach(function (k) { if (['deliv', 'buy', 'skip', 'kind', 'appr', 'coop1', 'coop2', 'month', 'contract_id', 'calc'].indexOf(k) < 0) setV(k, p[k]); });
     $('#tDeliv tbody').innerHTML = ''; (p.deliv || []).forEach(addDeliv); $('#tBuy tbody').innerHTML = ''; (p.buy || []).forEach(function (b) { addBuy(Object.assign({}, b, { rate: b.rate })); }); padRows();
     document.querySelectorAll('td.sig').forEach(function (td) { td.classList.toggle('skip', (p.skip || []).indexOf(td.dataset.s) >= 0); });
-    if (p.kind) $('#qKind').value = p.kind; if (p.appr) $('#qAppr').value = p.appr; $('#qMonth').value = p.month || ''; R.contractId = p.contract_id || null;
+    if (p.kind) $('#qKind').value = p.kind; if (p.appr) $('#qAppr').value = p.appr; if (p.coop1 != null) $('#qCoop1').checked = !!p.coop1; if (p.coop2 != null) $('#qCoop2').checked = !!p.coop2; $('#qMonth').value = p.month || ''; R.contractId = p.contract_id || null;
     calc();
 }
 async function saveReport() {
@@ -582,16 +619,27 @@ var COST_NEW = [];
 function openCost() { $('#ovlCost').classList.add('show'); COST_NEW = []; renderCost(); }
 function renderCost() {
     var st = $('#costSt');
-    var html = COST_NEW.map(function (c, i) {
-        return '<tr style="background:#fffbe6"><td><input value="' + esc(c.year) + '" oninput="COST_NEW[' + i + '].year=this.value"></td><td><input value="' + esc(c.item) + '" oninput="COST_NEW[' + i + '].item=this.value"></td><td><input value="' + esc(c.unit_cost) + '" oninput="COST_NEW[' + i + '].unit_cost=this.value" style="text-align:right"></td><td><input value="' + esc(c.unit || '노드/년') + '" oninput="COST_NEW[' + i + '].unit=this.value"></td><td><input value="' + esc(c.note || '') + '" oninput="COST_NEW[' + i + '].note=this.value"></td><td><input value="' + esc(c.source || '') + '" oninput="COST_NEW[' + i + '].source=this.value"></td><td><button class="rowbtn red" onclick="COST_NEW.splice(' + i + ',1);renderCost()">빼기</button></td></tr>';
+    var html = (COST_NEW.length ? '<tr><td colspan="9" style="background:#fff3cd;font-size:11px;color:#7a5c00">새 항목 (연도 · 구분 · 품목명 · 매입단가 · 관리원가 · 기준 · 비고 · 근거) — 확인 후 「새 항목 저장」</td></tr>' : '') + COST_NEW.map(function (c, i) {
+        return '<tr style="background:#fffbe6"><td><input value="' + esc(c.year) + '" oninput="COST_NEW[' + i + '].year=this.value"></td><td><select onchange="COST_NEW[' + i + '].category=this.value" style="border:1px solid #ddd;border-radius:5px;background:#fff"><option' + (c.category === 'HW' ? ' selected' : '') + '>HW</option><option' + (c.category !== 'HW' ? ' selected' : '') + '>SW</option></select></td><td><input value="' + esc(c.item) + '" oninput="COST_NEW[' + i + '].item=this.value"></td><td><input value="' + esc(c.purchase_cost || '') + '" oninput="COST_NEW[' + i + '].purchase_cost=this.value" style="text-align:right" placeholder="HW만"></td><td><input value="' + esc(c.unit_cost) + '" oninput="COST_NEW[' + i + '].unit_cost=this.value" style="text-align:right"></td><td><input value="' + esc(c.unit || '노드/년') + '" oninput="COST_NEW[' + i + '].unit=this.value"></td><td><input value="' + esc(c.note || '') + '" oninput="COST_NEW[' + i + '].note=this.value"></td><td><input value="' + esc(c.source || '') + '" oninput="COST_NEW[' + i + '].source=this.value"></td><td><button class="rowbtn red" onclick="COST_NEW.splice(' + i + ',1);renderCost()">빼기</button></td></tr>';
     }).join('');
-    html += R.costs.map(function (c) {
-        return '<tr><td>' + esc(c.year) + '</td><td>' + esc(c.item) + '</td><td style="text-align:right">' + fmt(c.unit_cost) + '</td><td>' + esc(c.unit) + '</td><td>' + esc(c.note || '') + '</td><td style="color:#777">' + esc(c.source || '') + '</td><td><button class="rowbtn red" onclick="costDel(' + c.id + ')">삭제</button></td></tr>';
+    // 공지 표와 같은 모양(구분 · 품목명 · 매입단가 · 연도별 관리원가)으로 피벗
+    var years = []; R.costs.forEach(function (c) { if (years.indexOf(c.year) < 0) years.push(c.year); }); years.sort();
+    var groups = {}, order = [];
+    R.costs.forEach(function (c) { var key = (c.category || 'SW') + '|' + c.item; if (!groups[key]) { groups[key] = { category: c.category || 'SW', item: c.item, purchase_cost: c.purchase_cost, note: c.note, unit: c.unit, by: {}, ids: [] }; order.push(key); } groups[key].by[c.year] = c; groups[key].ids.push(c.id); if (c.purchase_cost) groups[key].purchase_cost = c.purchase_cost; if (c.note) groups[key].note = c.note; });
+    order.sort(function (a, b) { var ga = groups[a], gb = groups[b]; if (ga.category !== gb.category) return ga.category === 'HW' ? -1 : 1; return String(ga.item).localeCompare(String(gb.item), 'ko', { numeric: true }); });
+    $('#costT thead').innerHTML = '<tr><th style="width:50px">구분</th><th>품목명</th><th style="width:100px">매입단가</th>' + years.map(function (y) { return '<th style="width:110px;text-align:right">' + String(y).slice(2) + '년 관리원가</th>'; }).join('') + '<th style="width:70px">기준</th><th>비고(적용 규칙)</th><th style="width:60px"></th></tr>';
+    var last = null;
+    html += order.map(function (k) {
+        var g = groups[k]; var sep = last && last !== g.category ? ' style="border-top:2px solid #333"' : ''; last = g.category;
+        return '<tr' + sep + '><td><b>' + esc(g.category) + '</b></td><td>' + esc(g.item) + '</td><td style="text-align:right;color:#777">' + (g.purchase_cost ? fmt(g.purchase_cost) : '') + '</td>' +
+            years.map(function (y) { var c = g.by[y]; return '<td style="text-align:right' + (c ? '' : ';color:#bbb') + '">' + (c ? fmt(c.unit_cost) : '-') + '</td>'; }).join('') +
+            '<td>' + esc(g.unit || '') + '</td><td style="font-size:11px;color:#555">' + esc(g.note || '') + '</td><td><button class="rowbtn red" onclick="costDelMany([' + g.ids.join(',') + '])">삭제</button></td></tr>';
     }).join('');
-    $('#costT tbody').innerHTML = html || '<tr><td colspan="7" style="color:#888">등록된 기준이 없습니다</td></tr>';
+    $('#costT tbody').innerHTML = html || '<tr><td colspan="9" style="color:#888">등록된 기준이 없습니다</td></tr>';
     if (!st.textContent) st.textContent = R.costs.length + '건 등록';
 }
-function costAddRow() { COST_NEW.unshift({ year: new Date().getFullYear(), item: '', unit_cost: '', unit: '노드/년', note: '', source: '' }); renderCost(); }
+function fillModelList() { var seen = {}; var opts = ['Cloud NAC', 'Cloud ZTNA']; R.costs.forEach(function (c) { if (!seen[c.item]) { seen[c.item] = 1; opts.push(c.item); } }); $('#dlModel').innerHTML = opts.map(function (o) { return '<option value="' + esc(o) + '">'; }).join(''); }
+function costAddRow() { COST_NEW.unshift({ year: new Date().getFullYear(), category: 'SW', item: '', purchase_cost: '', unit_cost: '', unit: '노드/년', note: '', source: '' }); renderCost(); }
 async function costFromPdf() {
     var f = $('#costPdf').files && $('#costPdf').files[0], st = $('#costSt');
     if (!f) { st.textContent = 'PDF 파일을 먼저 선택하세요'; st.className = 'st bad'; return; }
@@ -601,7 +649,7 @@ async function costFromPdf() {
         var b64 = await new Promise(function (res, rej) { var rd = new FileReader(); rd.onload = function () { res(String(rd.result).split(',')[1] || ''); }; rd.onerror = function () { rej(new Error('파일을 읽지 못했습니다')); }; rd.readAsDataURL(f); });
         var j = await aiFetch({ mode: 'mgmtcost', pdf: b64 });
         if (!j || !j.ok || !j.costs) throw new Error((j && j.error) || '분석 실패');
-        var rows = (j.costs.items || []).map(function (r) { return { year: r.year || j.costs.year || new Date().getFullYear(), item: r.item || '', unit_cost: r.unit_cost || '', unit: r.unit || '노드/년', note: r.note || '', source: f.name }; });
+        var rows = (j.costs.items || []).map(function (r) { var hw = String(r.category || '').toUpperCase() === 'HW'; return { year: r.year || j.costs.year || new Date().getFullYear(), category: hw ? 'HW' : 'SW', item: r.item || '', purchase_cost: r.purchase_cost || '', unit_cost: r.unit_cost || '', unit: r.unit || (hw ? '대/년' : '노드/년'), note: r.note || '', source: f.name }; });
         if (!rows.length) throw new Error('표에서 항목을 찾지 못했습니다');
         COST_NEW = rows.concat(COST_NEW); renderCost();
         st.textContent = rows.length + '개 항목을 읽었습니다 — 노란 줄을 확인·수정한 뒤 「새 항목 저장」'; st.className = 'st ok';
@@ -609,7 +657,7 @@ async function costFromPdf() {
 }
 async function costSaveNew() {
     var s = sess(); var st = $('#costSt');
-    var rows = COST_NEW.filter(function (c) { return c.item && n(c.unit_cost); }).map(function (c) { return { year: +c.year || new Date().getFullYear(), item: String(c.item).trim(), unit_cost: n(c.unit_cost), unit: c.unit || '노드/년', note: c.note || null, source: c.source || null, created_by: s ? s.u : null }; });
+    var rows = COST_NEW.filter(function (c) { return c.item && n(c.unit_cost); }).map(function (c) { return { year: +c.year || new Date().getFullYear(), category: c.category || 'SW', item: String(c.item).trim(), purchase_cost: n(c.purchase_cost) || null, unit_cost: n(c.unit_cost), unit: c.unit || (c.category === 'HW' ? '대/년' : '노드/년'), note: c.note || null, source: c.source || null, created_by: s ? s.u : null }; });
     if (!rows.length) { st.textContent = '저장할 새 항목이 없습니다 (항목·단가 필수)'; st.className = 'st bad'; return; }
     try {
         for (var i = 0; i < rows.length; i++) {   // 같은 연도·항목이 있으면 비활성으로 돌리고 새 값 저장
@@ -617,11 +665,11 @@ async function costSaveNew() {
             for (var k = 0; k < dup.length; k++) await sbWrite('PATCH', 'mgmt_costs?id=eq.' + dup[k].id, { active: false });
         }
         await sbWrite('POST', 'mgmt_costs', rows);
-        R.costs = await sbGet('mgmt_costs?select=*&active=is.true&order=year.desc,item'); COST_NEW = [];
+        R.costs = await sbGet('mgmt_costs?select=*&active=is.true&order=year.desc,item'); COST_NEW = []; fillModelList();
         st.textContent = rows.length + '건 저장'; st.className = 'st ok'; renderCost();
     } catch (e) { st.textContent = e.message; st.className = 'st bad'; }
 }
-async function costDel(id) { if (!confirm('이 기준을 삭제(비활성)할까요?')) return; try { await sbWrite('PATCH', 'mgmt_costs?id=eq.' + id, { active: false }); R.costs = R.costs.filter(function (c) { return c.id !== id; }); renderCost(); } catch (e) { alert(e.message); } }
+async function costDelMany(ids) { if (!confirm('이 품목의 기준(' + ids.length + '건)을 삭제(비활성)할까요?')) return; try { await sbWrite('PATCH', 'mgmt_costs?id=in.(' + ids.join(',') + ')', { active: false }); R.costs = R.costs.filter(function (c) { return ids.indexOf(c.id) < 0; }); renderCost(); fillModelList(); } catch (e) { alert(e.message); } }
 
 // ─────────────────────────────────────────────
 //  시작
