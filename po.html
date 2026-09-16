@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Genians 발주서 작성 시스템</title>
+    <style>
+        /* 견적서(quote.html)와 같은 서체·색·종이 규격을 그대로 씁니다 — 두 문서가 한 세트로 보이게 */
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
+        :root { --genians-green: #1fb53a; --border-color: #000; --gray-bg: #f8f9fa; --hl: #fff9c4; }
+        * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        body { font-family: 'Noto Sans KR', sans-serif; background: #f9f9f7; margin: 0; padding: 20px; color: #333; }
+        .toolbar { width: 210mm; margin: 0 auto 15px; background: #fcfcfb; padding: 12px 15px; border: 1px solid rgba(11,11,11,.10); border-radius: 14px; display: flex; justify-content: space-between; align-items: center; }
+        @media screen { .page { box-shadow: 0 1px 6px rgba(0,0,0,.07); border: 1px solid rgba(11,11,11,.06); } }
+        .toolbar-actions { display: flex; gap: 8px; align-items: center; }
+        .btn { padding: 9px 14px; font-weight: bold; border-radius: 9px; cursor: pointer; border: none; color: white; font-size: 13px; white-space: nowrap; }
+        .btn-print { background: var(--genians-green); }
+        .btn-add { background: #343a40; }
+        .btn-secondary { background: #6c757d; }
+        .btn-quote { background: #24292e; }
+        .dropdown { position: relative; display: inline-block; }
+        .dropdown-menu { display: none; position: absolute; top: 115%; left: 0; background: #fff; border: 1px solid rgba(11,11,11,.12); border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,0.12); min-width: 190px; z-index: 50; overflow: hidden; }
+        .dropdown-menu.open { display: block; }
+        .dropdown-item { display: block; width: 100%; text-align: left; padding: 10px 14px; font-size: 13px; border: none; background: #fff; cursor: pointer; color: #333; }
+        .dropdown-item:hover { background: #f2f2f2; }
+        .dropdown-item input[type="file"] { display: none; }
+        .page { width: 210mm; min-height: 297mm; background: white; margin: 0 auto; padding: 15mm; position: relative; }
+        input, select, textarea { width: 100%; border: none; outline: none; font-family: inherit; font-size: inherit; background: transparent; padding: 2px; color: inherit; }
+        input:focus, textarea:focus { background: #f4fbf5; }
+        .logo-box { position: absolute; top: 15mm; left: 15mm; }
+        .logo-box img { height: 35px; object-fit: contain; }
+        .doc-title { font-size: 36px; font-weight: 900; text-align: center; letter-spacing: 15px; text-decoration: underline; text-underline-offset: 10px; margin-bottom: 26px; }
+        /* 상단: 왼쪽 수신처 · 오른콽 공급자 표 */
+        .info-section { display: flex; justify-content: space-between; margin-bottom: 14px; font-size: 12px; }
+        .info-left { width: 46%; display: flex; flex-direction: column; justify-content: flex-end; gap: 8px; padding-bottom: 5px; }
+        .info-left .row { display: flex; align-items: center; gap: 6px; }
+        .info-left .lab { width: 78px; font-weight: bold; letter-spacing: 3px; flex: 0 0 78px; }
+        .info-left .input-line { border-bottom: 1px solid #aaa; border-radius: 0; padding-left: 5px; flex: 1; }
+        .info-left .suffix { font-weight: bold; font-size: 14px; flex: 0 0 auto; }
+        .info-left .notes { font-size: 10.5px; color: #444; line-height: 1.6; margin-top: 6px; }
+        .info-right { width: 51%; }
+        .info-right table { width: 100%; border-collapse: collapse; border: 2px solid var(--border-color); font-size: 10.5px; }
+        .info-right th, .info-right td { border: 1px solid var(--border-color); padding: 3px 4px; text-align: center; }
+        .info-right th { background: #f0f0f0; font-weight: bold; white-space: nowrap; }
+        .info-right .provider-title { writing-mode: vertical-rl; text-orientation: upright; width: 26px; letter-spacing: 6px; font-size: 13px; }
+        .info-right td.l { text-align: left; }
+        /* 발주 정보 표 */
+        .meta-table { width: 100%; border-collapse: collapse; border: 2px solid var(--border-color); font-size: 11.5px; margin-bottom: 12px; table-layout: fixed; }
+        .meta-table th, .meta-table td { border: 1px solid var(--border-color); padding: 5px 8px; height: 30px; }
+        .meta-table th { background: #f0f0f0; font-weight: bold; letter-spacing: 3px; text-align: center; width: 17%; }
+        .meta-table td { background: var(--hl); }
+        .meta-table td.metatotal { font-size: 15px; font-weight: 900; text-align: center; background: #fff; }
+        .meta-table td.metatotal small { font-size: 11px; font-weight: bold; margin-left: 14px; }
+        .meta-table input { font-weight: bold; }
+        /* 품목 표 */
+        .main-table { width: 100%; border-collapse: collapse; border: 1px solid var(--border-color); font-size: 11px; table-layout: fixed; }
+        .main-table th { background: var(--genians-green); color: white; height: 34px; border: 1px solid var(--genians-green); }
+        .main-table td { border: 1px solid #ccc; height: 44px; padding: 2px 4px; text-align: center; vertical-align: middle; position: relative; }
+        .main-table td.l { text-align: left; }
+        .main-table textarea.cell { width: 100%; min-height: 40px; resize: none; text-align: center; line-height: 1.3; overflow: hidden; font-size: 10.5px; }
+        .main-table textarea.cell.l { text-align: left; }
+        .input-num { text-align: right; }
+        .main-table td.calc { background: #fafafa; color: #222; text-align: right; padding-right: 6px; font-weight: 600; }
+        .main-table tfoot td { height: 26px; font-weight: bold; border: 1px solid var(--border-color); background: #fff; }
+        .main-table tfoot td.lab { letter-spacing: 3px; text-align: center; }
+        .main-table tfoot td.num { text-align: right; padding-right: 6px; }
+        .main-table tfoot tr.grand td { font-size: 12.5px; }
+        .row-actions { position: absolute; right: -52px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: row; gap: 4px; }
+        .row-actions button { border: none; border-radius: 50%; cursor: pointer; width: 20px; height: 20px; font-size: 11px; line-height: 1; color: white; flex-shrink: 0; }
+        .btn-dup { background: var(--genians-green); }
+        .btn-del { background: #e74c3c; }
+        .remarks-section { margin-top: 10px; font-size: 11px; border: 1px solid var(--border-color); padding: 6px 8px; min-height: 90px; }
+        .remarks-section textarea { width: 100%; min-height: 80px; resize: none; padding: 2px; font-size: 11px; font-family: inherit; line-height: 1.6; overflow: hidden; }
+        .footer-note { margin-top: 16px; font-size: 10.5px; color: #555; display: flex; justify-content: space-between; }
+        #warn { color: #c0392b; font-size: 12px; font-weight: bold; margin-bottom: 6px; min-height: 16px; }
+        tr.row-incomplete td { background: #fff3cd !important; }
+        .hint { font-size: 11px; color: #888; margin-left: 8px; font-weight: normal; }
+        .only-print { display: none; }
+        @media print {
+            @page { size: A4 portrait; margin: 0; }
+            html, body { width: 210mm !important; height: 297mm !important; margin: 0 !important; padding: 0 !important; background: #fff !important; overflow: hidden !important; }
+            .page { width: 210mm !important; height: 297mm !important; min-height: 297mm !important; margin: 0 auto !important; padding: 15mm !important; box-shadow: none !important; border: none !important; overflow: hidden !important; }
+            .toolbar, .btn-del, .btn-dup, .row-actions, .no-print, #warn, .modal-overlay { display: none !important; }
+            .only-print { display: inline !important; }
+            tr.row-incomplete td { background: transparent !important; }
+            input::placeholder, textarea::placeholder { color: transparent; }
+            input, textarea { border: none !important; background: transparent !important; }
+            .info-left .input-line { border-bottom: 1px solid #aaa !important; }
+            input[type="date"]::-webkit-calendar-picker-indicator { display: none; }
+            select { display: none !important; }
+            .meta-table td { background: var(--hl) !important; }
+            .meta-table td.metatotal { background: #fff !important; }
+        }
+    </style>
+</head>
+<body>
+<div id="loginOverlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f9f9f7; z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+    <div style="background: #fcfcfb; border: 1px solid rgba(11,11,11,.10); padding: 40px; border-radius: 14px; text-align: center; width: 320px;">
+        <img src="Logo.jpg" alt="Genians" style="height: 40px; margin-bottom: 20px;">
+        <h3 style="margin: 0 0 10px 0; color: #0b0b0b;">포탈 로그인이 필요합니다</h3>
+        <p style="font-size: 12px; color: #52514e; margin: 0 0 20px;">발주서 작성은 서비스사업부 통합 관리 포탈<br>계정으로 로그인한 사용자만 사용할 수 있습니다.</p>
+        <button onclick="goPortalLogin()" style="width: 100%; padding: 11px; background: var(--genians-green); color: white; border: none; border-radius: 9px; font-weight: bold; font-size: 14px; cursor: pointer;">포탈 로그인 하러 가기</button>
+        <button onclick="location.reload()" style="width: 100%; margin-top: 8px; padding: 10px; background: #fff; color: #52514e; border: 1px solid rgba(11,11,11,.15); border-radius: 9px; font-size: 13px; cursor: pointer;">로그인 후 다시 확인</button>
+    </div>
+</div>
+<script>
+    /* 접속 게이트: 포탈(index.html) 로그인 세션(svc_sess) 공유 — 견적서와 동일 */
+    function portalSess() {
+        try { var s = JSON.parse(sessionStorage.getItem('svc_sess') || 'null'); if (s && s.a && s.p !== false && Math.floor(Date.now()/1000) < (s.e || 0) - 60) return s; } catch (e) {}
+        return null;
+    }
+    function goPortalLogin() { if (window.top !== window.self) { alert('좌측 메뉴의 다른 탭에서 로그인한 뒤 다시 열어주세요.'); return; } location.href = 'index.html'; }
+    document.addEventListener('DOMContentLoaded', function () { if (portalSess()) document.getElementById('loginOverlay').style.display = 'none'; });
+</script>
+
+<div class="toolbar">
+    <div style="font-weight: bold; color: var(--genians-green);">Genians 발주서 <span class="hint">파트너 구축·유지보수 발주 · 견적서와 같은 양식</span></div>
+    <div class="toolbar-actions">
+        <button class="btn btn-add" onclick="addRow()">+ 항목 추가</button>
+        <div class="dropdown no-print">
+            <button class="btn btn-secondary" onclick="toggleDropdown('fileDropdown')">파일 ▾</button>
+            <div id="fileDropdown" class="dropdown-menu">
+                <button class="dropdown-item" onclick="savePoData(); closeAllDropdowns();">💾 임시저장 (JSON 다운로드)</button>
+                <label class="dropdown-item" style="cursor:pointer;">📂 불러오기 (JSON 파일)<input type="file" accept=".json" onchange="loadPoData(event); closeAllDropdowns();"></label>
+                <button class="dropdown-item" onclick="resetPo(); closeAllDropdowns();">🧹 새 발주서 (초기화)</button>
+            </div>
+        </div>
+        <button class="btn btn-quote" onclick="location.href='quote.html'">← 견적서</button>
+        <button class="btn btn-print" onclick="prepareAndPrint()">발주서 발행 (PDF)</button>
+    </div>
+</div>
+
+<div class="page">
+    <div class="logo-box"><img src="Logo.jpg" alt="Genians Logo"></div>
+    <div class="doc-title">발 주 서</div>
+    <div class="info-section">
+        <div class="info-left">
+            <div class="row"><span class="lab">수 신 처</span><input type="text" id="recvCompany" class="input-line" list="dlPartners" placeholder="예: ㈜다원티에스" style="font-weight: bold; font-size: 14px;"><span class="suffix">貴中</span></div>
+            <datalist id="dlPartners"><option value="㈜다원티에스"><option value="주식회사 글로웰시스템"><option value="㈜엘림넷"><option value="㈜엘지유플러스"><option value="(주)에스원"><option value="에스케이쉴더스 주식회사"></datalist>
+            <div class="row"><span class="lab">수 신 자</span><input type="text" id="recvPerson" class="input-line" placeholder="예: 김은실 이사님"><span class="suffix">貴下</span></div>
+            <div class="notes">* 아래품목의 발주를 의뢰합니다.<br>* 필요에 따라 하자담보(하자이행증권)를 요청할 수 있습니다.</div>
+        </div>
+        <div class="info-right">
+            <table>
+                <tr><th rowspan="5" class="provider-title">공급자</th><th>등록번호</th><td colspan="3" style="font-weight: bold; letter-spacing: 1px;">129-81-80148</td></tr>
+                <tr><th>상 호</th><td style="font-weight: bold; width: 34%;">지니언스(주)</td><th style="width: 15%;">대표자</th>
+                    <td style="width: 22%; position: relative;"><span style="position: relative; z-index: 2;">이동범</span><img src="도장.jpg" alt="직인" style="position: absolute; top: 50%; right: -10px; transform: translateY(-50%); width: 40px; mix-blend-mode: multiply; z-index: 1;"></td></tr>
+                <tr><th>주 소</th><td colspan="3" class="l" style="line-height: 1.4;">경기도 안양시 동안구 벌말로 66 (관양동 922)<br>하이필드 지식산업센터 A동 12층</td></tr>
+                <tr><th>전 화</th><td>(031) 8084-9770</td><th>팩 스</th><td>(070) 4332-1683</td></tr>
+                <tr><th>종 목</th><td style="line-height: 1.3;">S/W,H/W 개발및공급<br>컴퓨터유지보수</td><th>업 태</th><td>서비스</td></tr>
+            </table>
+        </div>
+    </div>
+
+    <table class="meta-table">
+        <tr><th>발주일자</th><td><input type="date" id="poDate" class="no-print" onchange="syncPoNo(); calcAll();"><span id="poDateText" class="only-print" style="font-weight:bold"></span></td><th>발주번호</th><td><input type="text" id="poNo" placeholder="PO-YYMMDD-001"></td></tr>
+        <tr><th>발 주 자</th><td><input type="text" id="poBy" list="dlManagers" placeholder="예: 김민정 대리" onchange="fillContact()"></td><th>연 락 처</th><td><input type="text" id="poContact" placeholder="010-0000-0000"></td></tr>
+        <datalist id="dlManagers"></datalist>
+        <tr><th>결재조건</th><td><input type="text" id="payTerms" value="협의"></td><th>납기일자</th><td><input type="text" id="dueDate" value="협의"></td></tr>
+        <tr><th>발주총액</th><td colspan="3" class="metatotal">₩<span id="metaTotal">0</span><small>(VAT 별도)</small></td></tr>
+    </table>
+
+    <div id="warn" class="no-print"></div>
+    <table class="main-table" id="itemTable">
+        <thead><tr>
+            <th style="width: 6%;">항목</th><th style="width: 16%;">품명</th><th style="width: 32%;">규격</th><th style="width: 7%;">수량</th>
+            <th style="width: 12%;">단가(₩)</th><th style="width: 14%;">합계(₩)</th><th style="width: 13%;">세액(₩)</th>
+        </tr></thead>
+        <tbody></tbody>
+        <tfoot>
+            <tr><td colspan="5" class="lab">합 계 (부가세 별도)</td><td class="num">₩<span id="sumNet">0</span></td><td></td></tr>
+            <tr><td colspan="5" class="lab">부 가 가 치 세</td><td class="num">₩<span id="sumVat">0</span></td><td></td></tr>
+            <tr class="grand"><td colspan="5" class="lab">합 계 (부가세 포함)</td><td class="num">₩<span id="sumGross">0</span></td><td></td></tr>
+        </tfoot>
+    </table>
+    <div class="remarks-section">
+        <textarea id="remarks" placeholder="예)&#10;- 월 과금 지급 (42,120원/vat별도)&#10;- 수량 변경&#10;- 26년8월[22/36]~27년10월[36/36](15개월) 서비스 이용 요금 : 26년10월~27년12월(15개월) 계산서 발행 예정" oninput="autoGrow(this)"></textarea>
+    </div>
+    <div class="footer-note"><span>지니언스 주식회사 · www.genians.co.kr</span><span id="footerRef"></span></div>
+</div>
+
+
+<script>
+    /* ── 담당자(발주자) 목록 — 견적서의 담당자 목록과 같은 곳에서 관리하는 것이 좋습니다 ── */
+    const managerList = [
+        { name: "김민정 대리", contact: "010-2985-8915" },
+        { name: "송기영 부장", contact: "010-6305-6392" },
+        { name: "최형우 차장", contact: "010-7278-4782" }
+    ];
+    function fillContact() {
+        const nm = document.getElementById('poBy').value.trim(), hit = managerList.find(m => m.name === nm);
+        if (hit && !document.getElementById('poContact').value) document.getElementById('poContact').value = hit.contact;
+    }
+    function toggleDropdown(id) { const el = document.getElementById(id); const open = el.classList.contains('open'); closeAllDropdowns(); if (!open) el.classList.add('open'); }
+    function closeAllDropdowns() { document.querySelectorAll('.dropdown-menu').forEach(d => d.classList.remove('open')); }
+    document.addEventListener('click', e => { if (!e.target.closest('.dropdown')) closeAllDropdowns(); });
+    function autoGrow(el) { el.style.height = 'auto'; el.style.height = (el.scrollHeight) + 'px'; }
+    const fmt = n => (Math.round(n) || 0).toLocaleString('ko-KR');
+    const num = v => parseInt(String(v || '').replace(/[^\d-]/g, ''), 10) || 0;
+    function today() { const d = new Date(), p = n => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); }
+    /* 발주번호 PO-YYMMDD-001 — 날짜를 바꾸면 앞부분이 따라 바뀜(뒤 일련번호는 유지, 직접 고칠 수 있음) */
+    function syncPoNo() {
+        const d = document.getElementById('poDate').value; if (!d) return;
+        const yymmdd = d.slice(2, 4) + d.slice(5, 7) + d.slice(8, 10);
+        const el = document.getElementById('poNo'), m = (el.value || '').match(/-(\d{3})$/);
+        el.value = 'PO-' + yymmdd + '-' + (m ? m[1] : '001');
+    }
+    /* ── 품목 행 ── */
+    function addRow(data) {
+        data = data || {};
+        const tb = document.querySelector('#itemTable tbody'), tr = document.createElement('tr');
+        tr.innerHTML =
+            '<td class="idx"></td>' +
+            '<td><textarea class="cell name" placeholder="품명 (예: Genian Cloud NAC)" oninput="autoGrow(this)">' + esc(data.name || '') + '</textarea></td>' +
+            '<td><textarea class="cell l spec" placeholder="규격 · 예: 스냅컴퍼니(수량변경) 구축 및 유지보수 비용" oninput="autoGrow(this)">' + esc(data.spec || '') + '</textarea></td>' +
+            '<td><input type="text" class="input-num qty" inputmode="numeric" placeholder="0" value="' + esc(data.qty || '') + '"></td>' +
+            '<td><input type="text" class="input-num price" inputmode="numeric" placeholder="0" value="' + (data.price ? fmt(num(data.price)) : '') + '"></td>' +
+            '<td class="calc total">0</td>' +
+            '<td class="calc vat">0<div class="row-actions no-print"><button class="btn-dup" title="복제" onclick="dupRow(this)">⧉</button><button class="btn-del" title="삭제" onclick="delRow(this)">✕</button></div></td>';
+        tb.appendChild(tr);
+        tr.querySelectorAll('input').forEach(i => { i.addEventListener('input', calcAll); i.addEventListener('blur', () => { if (i.classList.contains('price')) i.value = num(i.value) ? fmt(num(i.value)) : ''; }); });
+        tr.querySelectorAll('textarea').forEach(t => { t.addEventListener('input', calcAll); autoGrow(t); });
+        calcAll(); return tr;
+    }
+    function dupRow(btn) { const tr = btn.closest('tr'); const d = rowData(tr); const n = addRow(d); tr.after(n); calcAll(); }
+    function delRow(btn) { const tb = document.querySelector('#itemTable tbody'); if (tb.children.length <= 1) { alert('항목은 최소 1줄이 필요합니다.'); return; } btn.closest('tr').remove(); calcAll(); }
+    function rowData(tr) { return { name: tr.querySelector('.name').value, spec: tr.querySelector('.spec').value, qty: tr.querySelector('.qty').value, price: num(tr.querySelector('.price').value) }; }
+    function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+    function calcAll() {
+        let net = 0, vat = 0, incomplete = 0;
+        document.querySelectorAll('#itemTable tbody tr').forEach((tr, i) => {
+            tr.querySelector('.idx').textContent = i + 1;
+            const q = num(tr.querySelector('.qty').value), p = num(tr.querySelector('.price').value);
+            const t = q * p, v = Math.round(t * 0.1);
+            tr.querySelector('.total').textContent = t ? fmt(t) : '';
+            const vc = tr.querySelector('.vat'); vc.firstChild.nodeValue = v ? fmt(v) : '';
+            const filled = tr.querySelector('.name').value.trim() || tr.querySelector('.spec').value.trim() || q || p;
+            const ok = !filled || (tr.querySelector('.spec').value.trim() && q && p);
+            tr.classList.toggle('row-incomplete', !ok); if (!ok) incomplete++;
+            net += t; vat += v;
+        });
+        document.getElementById('sumNet').textContent = fmt(net);
+        document.getElementById('sumVat').textContent = fmt(vat);
+        document.getElementById('sumGross').textContent = fmt(net + vat);
+        document.getElementById('metaTotal').textContent = fmt(net);
+        document.getElementById('warn').textContent = incomplete ? '⚠ 규격·수량·단가가 빠진 항목이 ' + incomplete + '줄 있습니다 (노란색). 발행 전에 채워주세요.' : '';
+        (function(){ const d=document.getElementById('poDate').value; const el=document.getElementById('poDateText'); if(!d){ el.textContent=''; return; }
+          const dt=new Date(d+'T00:00:00'); const W=['일','월','화','수','목','금','토']; el.textContent=dt.getFullYear()+'년 '+(dt.getMonth()+1)+'월 '+dt.getDate()+'일 '+W[dt.getDay()]+'요일'; })();
+        document.getElementById('footerRef').textContent = (document.getElementById('poNo').value || '') + (document.getElementById('recvCompany').value ? ' · ' + document.getElementById('recvCompany').value : '');
+    }
+    ['poNo', 'recvCompany'].forEach(id => document.getElementById(id).addEventListener('input', calcAll));
+    /* ── 저장/불러오기(JSON) ── */
+    function collect() {
+        const g = id => document.getElementById(id).value;
+        return { type: 'genians-po', v: 1, recvCompany: g('recvCompany'), recvPerson: g('recvPerson'), poDate: g('poDate'), poNo: g('poNo'), poBy: g('poBy'), poContact: g('poContact'),
+                 payTerms: g('payTerms'), dueDate: g('dueDate'), remarks: g('remarks'), items: [...document.querySelectorAll('#itemTable tbody tr')].map(rowData) };
+    }
+    function apply(d) {
+        const s = (id, v) => { document.getElementById(id).value = v == null ? '' : v; };
+        ['recvCompany', 'recvPerson', 'poDate', 'poNo', 'poBy', 'poContact', 'payTerms', 'dueDate', 'remarks'].forEach(k => s(k, d[k]));
+        document.querySelector('#itemTable tbody').innerHTML = '';
+        (d.items && d.items.length ? d.items : [{}]).forEach(it => addRow(it));
+        autoGrow(document.getElementById('remarks')); calcAll();
+    }
+    function sanitizeFileName(str) { return String(str).replace(/[\\/:*?"<>|]/g, '_').trim(); }
+    function savePoData() {
+        const d = collect(); const name = sanitizeFileName((d.poDate || today()) + '_' + (d.recvCompany || '수신처') + '_발주서.json');
+        const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(d, null, 2)], { type: 'application/json' })); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    }
+    function loadPoData(ev) {
+        const f = ev.target.files[0]; if (!f) return;
+        const r = new FileReader(); r.onload = () => { try { const d = JSON.parse(r.result); if (d.type !== 'genians-po') throw new Error('발주서 파일이 아닙니다'); apply(d); } catch (e) { alert('불러오기 실패: ' + e.message); } };
+        r.readAsText(f); ev.target.value = '';
+    }
+    function resetPo() { if (!confirm('입력한 내용을 지우고 새 발주서를 시작할까요?')) return; apply({ poDate: today(), payTerms: '협의', dueDate: '협의', items: [{}] }); syncPoNo(); }
+    /* ── 발행(PDF) — 파일명: 날짜_수신처_발주서(지니언스) ── */
+    function prepareAndPrint() {
+        calcAll();
+        if (!document.getElementById('recvCompany').value.trim()) { alert('수신처를 입력하세요.'); document.getElementById('recvCompany').focus(); return; }
+        if (document.querySelector('#itemTable tbody tr.row-incomplete')) { if (!confirm('규격·수량·단가가 빠진 항목이 있습니다. 그대로 발행할까요?')) return; }
+        const d = collect();
+        const fileName = sanitizeFileName((d.poDate || today()).replace(/-/g, '').slice(2) + '_' + (d.recvCompany || '수신처') + '_' + (d.items[0] && (d.items[0].spec || d.items[0].name) || '발주') + '_발주서(지니언스)');
+        const originalTitle = document.title; document.title = fileName;
+        let topTitle = null; try { if (window.top !== window.self) { topTitle = window.top.document.title; window.top.document.title = fileName; } } catch (e) {}
+        window.onafterprint = function () { document.title = originalTitle; try { if (topTitle !== null) window.top.document.title = topTitle; } catch (e) {} };
+        try { localStorage.setItem('genians_po_last', JSON.stringify(d)); } catch (e) {}
+        setTimeout(() => window.print(), 100);
+    }
+    /* ── 초기화: 오늘 날짜 · 발주번호 · 마지막 작성 내용 복원 ── */
+    document.addEventListener('DOMContentLoaded', () => {
+        const dl = document.getElementById('dlManagers'); managerList.forEach(m => { const o = document.createElement('option'); o.value = m.name; dl.appendChild(o); });
+        let last = null; try { last = JSON.parse(localStorage.getItem('genians_po_last') || 'null'); } catch (e) {}
+        if (last && last.type === 'genians-po' && confirm('마지막으로 발행한 발주서 내용을 불러올까요?\n(취소 = 빈 발주서로 시작)')) { apply(last); }
+        else { apply({ poDate: today(), payTerms: '협의', dueDate: '협의', items: [{}] }); syncPoNo(); }
+    });
+</script>
+</body>
+</html>
