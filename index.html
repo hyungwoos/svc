@@ -1403,6 +1403,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
               <div><label>사이트명 <small style="color:var(--muted)">sitename · 계약 CSM 에서 고르기</small></label><input id="cuName" list="dlCsSites" placeholder="고객사 이름이나 영문명 일부를 입력하세요" autocapitalize="off" spellcheck="false" autocomplete="off"><datalist id="dlCsSites"></datalist><div class="mini" id="cuNameHint" style="color:var(--muted);margin-top:4px"></div></div>
               <div><label>고객사 <small style="color:var(--muted)">자동 표시</small></label><input id="cuCust" readonly tabindex="-1" placeholder="사이트명을 고르면 채워집니다" style="background:var(--surface);color:var(--ink-2)"></div>
             </div>
+            <div id="cuChips" class="mini" style="margin-top:10px;display:none"></div>
           </div>
           <div class="cs-sec"><h4><span class="no">2</span>무엇을 바꿀까요</h4>
             <div class="frm">
@@ -2224,7 +2225,7 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
    1. 데이터 로드
    ================================================================== */
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-15 ㊿+59';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-16 ㊿+60';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -9395,7 +9396,39 @@ function csFillSiteList(){
   var dl=$('#dlCsSites'); if(!dl) return; dl.innerHTML='';
   var seen={}, m=csCsmMap();
   Object.keys(m).sort(function(a,b){ return m[a].cust.localeCompare(m[b].cust,'ko'); }).forEach(function(k){ var x=m[k]; seen[k]=1; var o=document.createElement('option'); o.value=x.csm; o.label=x.cust+' · '+lline(x.line)+(x.qty? ' · '+x.qty+'노드':''); dl.appendChild(o); });
-  (CS.hist||[]).forEach(function(x){ var k=String(x.sitename||'').toLowerCase(); if(!x.result || seen[k]) return; seen[k]=1; var o=document.createElement('option'); o.value=x.sitename; o.label=(x.customer||'포탈 생성')+(x.devices? ' · '+x.devices+'노드':''); dl.appendChild(o); });
+  var extra=csPortalSites();
+  extra.list.forEach(function(x){ var k=x.sitename.toLowerCase(); if(seen[k]) return; seen[k]=1; var o=document.createElement('option'); o.value=x.sitename; o.label=(x.customer||'포탈 생성')+(x.devices? ' · '+x.devices+'노드':'')+' · 포탈에서 생성'; dl.appendChild(o); });
+  csRenderChips(extra);
+}
+/* 계약에는 없고 이 포탈에서만 만든 사이트 — 목록에서 숨김/복구 가능 */
+function csPortalSites(){
+  var m=csCsmMap(), byName={}, hiddenBy={};
+  (CS.hist||[]).forEach(function(x){ var k=String(x.sitename||'').toLowerCase(); if(!k || !x.result) return; if(x.hidden) hiddenBy[k]=1;
+    if(x.action==='update' && !byName[k]) return; if(!byName[k]) byName[k]={sitename:k, customer:x.customer||'', devices:x.devices, created_at:x.created_at}; });
+  var list=[], hidden=[];
+  Object.keys(byName).forEach(function(k){ if(m[k]) return; (hiddenBy[k]? hidden : list).push(byName[k]); });
+  return {list:list, hidden:hidden};
+}
+function csRenderChips(x){
+  var box=$('#cuChips'); if(!box) return;
+  if(!x.list.length && !x.hidden.length){ box.style.display='none'; box.innerHTML=''; return; }
+  box.style.display='';
+  var h='<span style="color:var(--muted)">포탈에서 만든 사이트 (계약 없음) — 누르면 사이트명에 입력 · ✕ 는 목록에서 숨김:</span> ';
+  h+=x.list.map(function(p){ return '<span class="chip" style="display:inline-flex;align-items:center;gap:6px;margin:3px 4px 0 0;padding-right:4px"><span class="cu-pick" data-s="'+esc(p.sitename)+'" style="cursor:pointer" title="'+esc((p.customer||'')+' · '+String(p.created_at||'').slice(0,10))+'">'+esc(p.sitename)+(p.customer? ' <span style="color:var(--muted)">'+esc(p.customer)+'</span>':'')+'</span>'+(window.IS_SUPER? '<button class="cu-hide" data-s="'+esc(p.sitename)+'" title="목록에서 숨기기 (이력은 남음)" style="border:0;background:transparent;cursor:pointer;color:var(--muted);font-size:12px;line-height:1;padding:2px 4px">✕</button>':'')+'</span>'; }).join('');
+  if(x.hidden.length) h+='<details style="display:inline-block;margin-left:6px"><summary style="cursor:pointer;color:var(--muted)">숨긴 사이트 '+x.hidden.length+'</summary>'+x.hidden.map(function(p){ return '<span class="chip" style="display:inline-flex;align-items:center;gap:6px;margin:3px 4px 0 0;opacity:.7">'+esc(p.sitename)+(window.IS_SUPER? '<button class="cu-unhide" data-s="'+esc(p.sitename)+'" title="목록에 다시 표시" style="border:0;background:transparent;cursor:pointer;color:var(--s1);font-size:12px;padding:2px 4px">↩ 복구</button>':'')+'</span>'; }).join('')+'</details>';
+  box.innerHTML=h;
+  box.querySelectorAll('.cu-pick').forEach(function(el){ el.onclick=function(){ $('#cuName').value=el.dataset.s; cuSyncCust(); csPreview(); $('#cuNodes').focus(); }; });
+  box.querySelectorAll('.cu-hide').forEach(function(b){ b.onclick=function(){ csHideSite(b.dataset.s, true); }; });
+  box.querySelectorAll('.cu-unhide').forEach(function(b){ b.onclick=function(){ csHideSite(b.dataset.s, false); }; });
+}
+async function csHideSite(sn, hide){
+  if(!SB_TOKEN){ openOvl('ovlAuth'); return; }
+  if(hide && !confirm('«'+sn+'» 를 사이트 목록에서 숨길까요?\n요청 이력은 그대로 남고, 자동완성과 이 칩 목록에서만 빠집니다. «숨긴 사이트»에서 복구할 수 있습니다.')) return;
+  try{ var j=await csFn({action:'site_hide', sitename:sn, hidden:hide}); if(!j.ok) throw new Error(j.error);
+    (CS.hist||[]).forEach(function(x){ if(String(x.sitename).toLowerCase()===sn) x.hidden=hide; });
+    logChange('update','cloud_sites',0,{sitename:sn, hidden:hide});
+    toast(hide? '목록에서 숨김':'목록에 복구', sn); csHist(); cuSyncCust(); csPreview();
+  }catch(e){ toast('실패', String(e.message||e).slice(0,120), 'info'); }
 }
 /* 수정 탭: 사이트명 → 고객사 자동 표시 (+ 힌트) */
 function cuSyncCust(){
@@ -9506,7 +9539,7 @@ async function csHist(){
   $('#csHistCap').textContent=CS.hist.length? (q? h.length+'건 (전체 '+CS.hist.length+')' : h.length+'건')+' · 성공 '+h.filter(function(x){return x.result;}).length : '';
   tb.innerHTML=h.length? h.map(function(x){ var up=x.action==='update', ex=x.extra||{};
       var what=up? ('노드 '+(x.devices||'')+(ex.sra!=null? ' · SRA '+ex.sra:'')+(ex.expiredate? ' · 만료 '+ex.expiredate:'')+(ex.send_mail? ' · 메일':'')) : ((x.product||'')+'/'+(x.edition||'')+(x.language&&x.language!=='ko'? ' · '+x.language:'')+' · '+(x.devices||'')+'노드');
-      return '<tr'+(x.result?'':' style="color:var(--muted)"')+'><td style="white-space:nowrap">'+esc(String(x.created_at||'').replace('T',' ').slice(0,16))+'</td><td>'+(up? '<span class="badge b-re">수정</span>':'<span class="badge b-new">생성</span>')+'</td><td><b>'+esc(x.sitename)+'</b></td><td>'+esc(x.customer||'')+'</td><td class="mini">'+esc(what)+'</td><td>'+(x.result? '<span class="badge b-new">성공</span>':'<span class="badge b-churn">실패</span>')+'</td><td class="mini">'+esc(x.message||'')+'</td><td class="mini">'+esc(x.requested_by||'')+'</td><td class="mini">'+esc(x.cred_label||'')+'</td><td class="mini">'+esc(x.memo||'')+'</td></tr>'; }).join('')
+      return '<tr'+(x.result?'':' style="color:var(--muted)"')+'><td style="white-space:nowrap">'+esc(String(x.created_at||'').replace('T',' ').slice(0,16))+'</td><td>'+(up? '<span class="badge b-re">수정</span>':'<span class="badge b-new">생성</span>')+'</td><td><b>'+esc(x.sitename)+'</b>'+(x.hidden? ' <span class="mini" style="color:var(--muted)" title="사이트 목록에서 숨김">(숨김)</span>':'')+'</td><td>'+esc(x.customer||'')+'</td><td class="mini">'+esc(what)+'</td><td>'+(x.result? '<span class="badge b-new">성공</span>':'<span class="badge b-churn">실패</span>')+'</td><td class="mini">'+esc(x.message||'')+'</td><td class="mini">'+esc(x.requested_by||'')+'</td><td class="mini">'+esc(x.cred_label||'')+'</td><td class="mini">'+esc(x.memo||'')+'</td></tr>'; }).join('')
     : '<tr><td colspan="10" class="mini" style="color:var(--muted)">'+(q? '검색 결과 없음' : '아직 이력이 없습니다 — 66_cloud_sites.sql 이 아직 실행되지 않았다면 표가 없어 비어 보입니다.')+'</td></tr>';
   try{ if(CS.tab!=='creds') csPreview(); }catch(e){}
 }
