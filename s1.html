@@ -111,6 +111,8 @@
         <button class="btn line" onclick="copyBizCol()">등록번호 열 복사</button>
         <button class="btn line" onclick="dlUseXlsx()">내부용 엑셀 내려받기</button>
         <button class="btn gray" onclick="saveSettle('use')">정산 저장</button>
+        <button class="btn line" onclick="openSettles()">저장 내역</button>
+        <button class="btn line" style="color:#c0392b;border-color:#e6b0aa" onclick="delSettle('use')">이 달 저장분 삭제</button>
         <button class="btn" onclick="makeReport('use')">프로젝트 리포트 만들기</button>
       </div>
       <div class="msg" id="mU2"></div>
@@ -142,6 +144,8 @@
         <button class="btn green" onclick="saveMaps('inst')">매칭 저장</button>
         <button class="btn line" onclick="dlInstXlsx()">내부용 엑셀 내려받기</button>
         <button class="btn gray" onclick="saveSettle('install')">정산 저장</button>
+        <button class="btn line" onclick="openSettles()">저장 내역</button>
+        <button class="btn line" style="color:#c0392b;border-color:#e6b0aa" onclick="delSettle('install')">이 달 저장분 삭제</button>
         <button class="btn" onclick="makeReport('install')">프로젝트 리포트 만들기</button>
       </div>
       <div class="msg" id="mI2"></div>
@@ -176,6 +180,16 @@
   </div>
 </div>
 
+<!-- ── 저장된 정산 내역 ── -->
+<div class="ovl" id="ovlSet"><div class="pan">
+  <h3>저장된 정산 내역 <button class="rowbtn" onclick="closeOvl('ovlSet')">닫기</button></h3>
+  <p class="st">월·구분마다 한 건씩 저장됩니다. 다시 올려 저장하면 그 달 기록을 덮어쓰고, 잘못 저장했으면 여기서 지우면 됩니다. (프로젝트 리포트는 따로 남습니다)</p>
+  <div style="max-height:60vh;overflow:auto"><table id="setT"><thead><tr>
+    <th>정산월</th><th>구분</th><th style="text-align:right">에스원 청구</th><th style="text-align:right">비즈포탈</th><th>건수</th><th>리포트</th><th>저장</th><th></th>
+  </tr></thead><tbody></tbody></table></div>
+  <div class="msg" id="mS"></div>
+</div></div>
+
 <script>
 /* ─────────────────────────────────────────────────────────────
    접속·DB — 포탈(index.html) 로그인 세션(svc_sess) 공유. 서비스 키 없음(anon + 사용자 토큰 + RLS).
@@ -201,7 +215,7 @@ function n(v){ var x=parseFloat(String(v==null?'':v).replace(/[^\d.\-]/g,'')); r
 function fmt(v){ v=Math.round(v||0); return v?v.toLocaleString('ko-KR'):'0'; }
 function todayISO(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function msg(id,t,cls){ var e=$('#'+id); e.textContent=t||''; e.className='msg'+(cls?' '+cls:''); }
-var S={ use:null, biz:null, inst:null, maps:[], cfg:{}, settle:{} };
+var S={ use:null, biz:null, inst:null, maps:[], cfg:{}, settle:{}, settles:[] };
 
 /* SheetJS 지연 로드 (파일을 올릴 때만) */
 var XLSX_SRC='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
@@ -637,7 +651,52 @@ async function saveSettle(kind){
     var have=await sbGet('s1_settle?select=id&month=eq.'+row.month+'&kind=eq.'+row.kind);
     if(have&&have[0]){ delete row.created_by; await sbWrite('PATCH','s1_settle?id=eq.'+have[0].id,row); S.settle[kind]=have[0].id; }
     else{ var r2=await sbWrite('POST','s1_settle?select=id',[row],'return=representation'); S.settle[kind]=r2&&r2[0]?r2[0].id:null; }
-    msg(mid,'정산 저장 완료 ('+ym+' · '+(kind==='use'?'사용료':'설치비')+')','ok');
+    await loadSettles();
+    msg(mid,'정산 저장 완료 ('+ym+' · '+(kind==='use'?'사용료':'설치비')+') — 「저장 내역」에서 확인·삭제할 수 있습니다','ok');
+  }catch(e){ msg(mid,e.message,'bad'); }
+}
+/* ── 저장된 정산 불러오기·삭제 ── */
+async function loadSettles(){
+  try{ S.settles=await sbGet('s1_settle?select=id,month,kind,total,biz_total,cnt_new,cnt_end,cnt_ext,cnt_keep,report_id,created_by,updated_at&order=month.desc,kind'); }
+  catch(e){ S.settles=[]; }
+  return S.settles;
+}
+function closeOvl(id){ var e=$('#'+id); if(e) e.classList.remove('show'); }
+function openSettles(){ $('#ovlSet').classList.add('show'); msg('mS',''); loadSettles().then(renderSettles); renderSettles(); }
+function renderSettles(){
+  var rows=S.settles||[];
+  $('#setT tbody').innerHTML=rows.map(function(r){
+    var cnt=(r.kind==='use')
+      ? '신규 '+(r.cnt_new||0)+' · 해약 '+(r.cnt_end||0)+' · 연장 '+(r.cnt_ext||0)+' · 기존 '+(r.cnt_keep||0)
+      : '기본 '+(r.cnt_new||0)+' · 추가 '+(r.cnt_ext||0);
+    return '<tr><td>'+esc(String(r.month||'').slice(0,7))+'</td><td>'+(r.kind==='use'?'사용료':'설치비')+'</td>'+
+      '<td style="text-align:right">'+fmt(r.total)+'</td><td style="text-align:right">'+fmt(r.biz_total)+'</td>'+
+      '<td class="mini">'+cnt+'</td><td class="mini">'+(r.report_id? '#'+r.report_id : '—')+'</td>'+
+      '<td class="mini">'+esc(String(r.created_by||'').split('@')[0])+' · '+esc(String(r.updated_at||'').slice(0,10))+'</td>'+
+      '<td><button class="rowbtn red" onclick="delSettleId('+r.id+')">삭제</button></td></tr>';
+  }).join('')||'<tr><td colspan="8" class="mini">저장된 정산이 없습니다</td></tr>';
+}
+async function delSettleId(id){
+  var r=(S.settles||[]).filter(function(x){ return x.id===id; })[0];
+  if(!confirm('저장된 정산을 지울까요?\n'+(r? String(r.month).slice(0,7)+' · '+(r.kind==='use'?'사용료':'설치비')+' · '+fmt(r.total)+'원' : '')+
+     '\n\n화면에 올려둔 자료와 계약번호 매핑은 그대로 남습니다.')) return;
+  try{
+    await sbWrite('DELETE','s1_settle?id=eq.'+id);
+    S.settles=(S.settles||[]).filter(function(x){ return x.id!==id; });
+    if(r){ if(S.settle[r.kind==='use'?'use':'install']===id) S.settle[r.kind==='use'?'use':'install']=null; }
+    renderSettles(); msg('mS','삭제했습니다','ok');
+  }catch(e){ msg('mS',e.message,'bad'); }
+}
+async function delSettle(kind){
+  var ym=$('#ym').value, mid=kind==='use'?'mU2':'mI2';
+  if(!ym){ alert('정산월을 고르세요'); return; }
+  try{
+    var have=await sbGet('s1_settle?select=id,total&month=eq.'+ym+'-01&kind=eq.'+kind);
+    if(!have||!have[0]){ msg(mid, ym+' '+(kind==='use'?'사용료':'설치비')+' 로 저장된 정산이 없습니다','bad'); return; }
+    if(!confirm(ym+' · '+(kind==='use'?'사용료':'설치비')+' 저장분('+fmt(have[0].total)+'원)을 지울까요?\n\n화면 자료와 계약번호 매핑은 그대로 남습니다.')) return;
+    await sbWrite('DELETE','s1_settle?id=eq.'+have[0].id);
+    S.settle[kind]=null; await loadSettles(); renderSettles();
+    msg(mid,'저장분을 지웠습니다 ('+ym+' · '+(kind==='use'?'사용료':'설치비')+')','ok');
   }catch(e){ msg(mid,e.message,'bad'); }
 }
 function useRowOut(g){
@@ -814,7 +873,7 @@ document.addEventListener('DOMContentLoaded', async function(){
     var r=await Promise.all([ sbGet('s1_map?select=*&active=is.true&order=contract_no'), sbGet('s1_config?select=*') ]);
     S.maps=r[0]; (r[1]||[]).forEach(function(c){ S.cfg[c.key]=c.val; });
   }catch(e){ msg('mU','설정을 읽지 못했습니다: '+e.message,'bad'); }
-  applyCfg(); renderMaps();
+  applyCfg(); renderMaps(); loadSettles();
 });
 </script>
 </body>
