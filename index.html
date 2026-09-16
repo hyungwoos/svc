@@ -1046,6 +1046,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
   <div class="grp">도구</div>
   <button data-v="quote">📄 견적·발주 시스템</button>
   <button data-v="preport">📑 프로젝트 리포트</button>
+  <button data-v="s1">🏢 에스원 정산</button>
   <button data-v="price">💰 가격표</button>
   <button data-v="cloud">☁️ 클라우드 비용</button>
   <button data-v="csite" style="display:none">🛰️ Cloud 사이트 관리</button>
@@ -1314,6 +1315,17 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
         <a href="report.html" target="_blank" class="pill ghost" style="text-decoration:none" onclick="this.href='report.html?v='+encodeURIComponent(APP_VER)">↗ 새 창에서 열기</a>
       </div>
       <iframe id="preportFrame" title="프로젝트 리포트"
+        style="width:100%;height:calc(100vh - 150px);border:0;border-radius:10px;background:#f9f9f7"></iframe>
+    </section>
+  </div>
+
+  <div id="viewS1" class="hidden">
+    <section class="card c12" style="padding:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px 10px">
+        <div style="font-size:13px;font-weight:650">🏢 에스원 정산 <span class="ubadge sm won">₩ 금액은 원 단위</span> <span class="mini" style="color:var(--muted);font-weight:400;margin-left:6px">에스원 대금지급 리스트 + 비즈포탈 엑셀 → 등록번호 매칭 · 건수 · 설치비 · 프로젝트 리포트</span></div>
+        <a href="s1.html" target="_blank" class="pill ghost" style="text-decoration:none" onclick="this.href='s1.html?v='+encodeURIComponent(APP_VER)">↗ 새 창에서 열기</a>
+      </div>
+      <iframe id="s1Frame" title="에스원 정산"
         style="width:100%;height:calc(100vh - 150px);border:0;border-radius:10px;background:#f9f9f7"></iframe>
     </section>
   </div>
@@ -2237,8 +2249,16 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
 /* ==================================================================
    1. 데이터 로드
    ================================================================== */
+/* ---- 에스원 정산(s1.html) → 프로젝트 리포트 화면 열기 ---- */
+window.addEventListener('message', function(ev){
+  if(!ev || !ev.data || ev.data.type!=='openReport' || !ev.data.id) return;
+  var pf=document.getElementById('preportFrame');
+  if(pf) pf.src='report.html?v='+encodeURIComponent(APP_VER)+'&id='+encodeURIComponent(ev.data.id);
+  try{ switchView('preport'); }catch(e){}
+});
+
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-16 ㊿+66';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-16 ㊿+67';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -11583,7 +11603,7 @@ async function rpMakePpt(){
 
 function switchView(v){
   if(v==='mdrpoc') v='mdrops';                       // 통합 전 이름 호환
-  if((v==='ordernew'||v==='mdrnew'||v==='oinew'||v==='csite'||v==='preport') && !SB_TOKEN){ openOvl('ovlAuth'); return; }
+  if((v==='ordernew'||v==='mdrnew'||v==='oinew'||v==='csite'||v==='preport'||v==='s1') && !SB_TOKEN){ openOvl('ovlAuth'); return; }
   if(window.IS_EQUIP && !EQUIP_VIEWS[v]) v=window.EQUIP_HOME||'orders';   // 제한 계정은 허용된 화면만
   if(v==='log' && !window.IS_SUPER) v='dash';                             // 변경 이력은 슈퍼 관리자만
   if(v==='csite' && !window.IS_SUPER){ toast('권한 없음','Cloud 사이트 생성·수정은 슈퍼 관리자만 할 수 있습니다','info'); v='dash'; }
@@ -11593,7 +11613,7 @@ function switchView(v){
     b.setAttribute('aria-current', b.dataset.v===v?'true':'false');
   });
   try{ ensureGroupOpen(v); }catch(e){}
-  var dash=v==='dash', quote=v==='quote', preport=v==='preport', onew=v==='ordernew', acct=v==='account', mnew=v==='mdrnew', oinew=v==='oinew', csite=v==='csite';
+  var dash=v==='dash', quote=v==='quote', preport=v==='preport', s1v=v==='s1', onew=v==='ordernew', acct=v==='account', mnew=v==='mdrnew', oinew=v==='oinew', csite=v==='csite';
   var adminx=v==='adminx', weekly=v==='weekly', inbstat=v==='inbstat', price=v==='price', report=v==='report', churn=v==='churn', cloud=v==='cloud', crate=v==='churnrate', cflow=v==='custflow';
   if(adminx && !window.IS_SUPER){ v='dash'; dash=true; adminx=false; CUR_VIEW='dash'; }
   $('#viewChurnRate').classList.toggle('hidden',!crate);
@@ -11607,6 +11627,7 @@ function switchView(v){
   $('#viewDash').classList.toggle('hidden',!dash);
   $('#viewQuote').classList.toggle('hidden',!quote);
   $('#viewPreport').classList.toggle('hidden',!preport);
+  $('#viewS1').classList.toggle('hidden',!s1v);
   $('#viewOrderNew').classList.toggle('hidden',!onew);
   $('#viewMdrNew').classList.toggle('hidden',!mnew);
   $('#viewCsite').classList.toggle('hidden',!csite);
@@ -11615,7 +11636,7 @@ function switchView(v){
   $('#viewAdmin').classList.toggle('hidden',!adminx);
   $('#viewWeekly').classList.toggle('hidden',!weekly);
   $('#viewChannel').classList.toggle('hidden',!chv);
-  $('#viewData').classList.toggle('hidden',dash||quote||preport||onew||mnew||oinew||csite||acct||adminx||weekly||inbstat||price||report||churn||cloud||crate||cflow||!!chv);
+  $('#viewData').classList.toggle('hidden',dash||quote||preport||s1v||onew||mnew||oinew||csite||acct||adminx||weekly||inbstat||price||report||churn||cloud||crate||cflow||!!chv);
   if(csite){ renderCsite(); return; }
   if(report){ renderReport(); return; }
   if(churn){ renderChurn(); return; }
@@ -11651,6 +11672,11 @@ function switchView(v){
     if(!$('#mpDate').value) $('#mpDate').value=todayStr();
     if(!$('#mpSales').value && AUTH_USER) $('#mpSales').value='';
     setTimeout(function(){ $('#mpCompany').focus(); },50);
+    return;
+  }
+  if(s1v){
+    var sf=$('#s1Frame');
+    if(!sf.src){ sf.src='s1.html?v='+encodeURIComponent(APP_VER); }
     return;
   }
   if(preport){
