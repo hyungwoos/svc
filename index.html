@@ -2297,7 +2297,7 @@ window.addEventListener('message', function(ev){
 });
 
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-16 ㊿+82';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-16 ㊿+84';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -6112,7 +6112,7 @@ var GRIDS={
   },
   inbound:{
     title:'인바운드 목록', table:'inbound_leads',
-    cap:'원본은 구글시트 — 수정은 시트에서, 포탈은 매일 아침 자동 동기화 · 행을 누르면 상세 보기',
+    cap:'원본은 구글시트 — 수정은 시트에서, 포탈은 매일 아침 7시 자동으로 가져옵니다 (위에서 지금 가져오기·가져온 기록) · 행을 누르면 상세 보기',
     add:false, del:false, ro:true,
     rowClick:function(r){ openInbDetail(r); },
     rows:function(){
@@ -9162,6 +9162,77 @@ function goInbList(colK, val){
   switchView('inbound');
   if(colK){ DV.filters={}; DV.filters[colK]=[val]; DV.page=0; renderGrid(); }
 }
+/* ===== 인바운드 «가져온 기록» — Apps Script 가 시트에서 가져올 때마다 inbound_sync_log 에 한 줄 (SQL 74) =====
+   주간회의의 «파일명 · 시각 취합» 칩과 같은 역할. 표가 아직 없으면 inbound_leads.synced_at 으로 대신 보여줍니다 */
+var INB_LOG_OPEN=false;
+function loadInbLog(cb){
+  sbTry('inbound_sync_log?select=*&order=at.desc&limit=30').then(function(rows){
+    RAWX.inbLog=rows||[]; RAWX._inbLogAt=Date.now(); if(cb) cb();
+  });
+}
+function inbLastSync(){                       // {at, src, ok, counts, error} 또는 null
+  var L=RAWX.inbLog||[];
+  if(L.length) return L[0];
+  var last=''; (RAWX.inbound||[]).forEach(function(r){ if(r.synced_at && String(r.synced_at)>last) last=String(r.synced_at); });
+  return last? {at:last, src:'(기록 표 없음 · synced_at 기준)', ok:true, counts:null, _fallback:true} : null;
+}
+function inbAgo(v){
+  var ms=Date.now()-new Date(/[zZ]|[+\-]\d\d:?\d\d$/.test(String(v))? v : v+'Z').getTime();
+  var h=Math.floor(ms/36e5); if(h<1) return '방금'; if(h<48) return h+'시간 전'; return Math.floor(h/24)+'일 전';
+}
+function inbCounts(c){ if(!c) return ''; return Object.keys(c).sort().map(function(y){ return y+'년 '+c[y]+'건'; }).join(' · '); }
+function inbSyncBadge(){
+  var x=inbLastSync();
+  if(!x) return '<span class="mini" style="color:var(--critical,#d03b3b)">· 가져온 기록 없음</span>';
+  var h=Math.floor((Date.now()-new Date(/[zZ]|[+\-]\d\d:?\d\d$/.test(String(x.at))? x.at : x.at+'Z').getTime())/36e5);
+  var stale=h>=30, bad=(x.ok===false);
+  var col=(bad||stale)? 'color:var(--critical,#d03b3b);font-weight:700' : 'color:var(--ink-2)';
+  return '<span class="mini" style="'+col+'" title="'+esc(x.src||'')+'">· 마지막 가져오기 '+axTime(x.at)+' ('+inbAgo(x.at)+')'+
+         (x.src&&!x._fallback? ' · '+esc(x.src):'')+(x.counts? ' · '+esc(inbCounts(x.counts)):'')+
+         (bad? ' ✕ 실패':'')+(stale&&!bad? ' ⚠ 자동 동기화가 멈춘 것 같습니다':'')+'</span>';
+}
+function inbLogTable(){
+  var L=RAWX.inbLog;
+  if(L===undefined) return '<div class="mini" style="color:var(--muted);padding:6px 0">기록을 읽는 중…</div>';
+  if(!L.length) return '<div class="mini" style="color:var(--muted);padding:6px 0">아직 기록이 없습니다 — Supabase 에서 <b>SQL 74</b> 를 실행하고 Apps Script 를 새 버전으로 배포하면 다음 가져오기부터 여기에 쌓입니다.</div>';
+  return '<table class="mini" style="width:100%;border-collapse:collapse;margin-top:6px">'+
+    '<thead><tr style="color:var(--muted);text-align:left"><th style="padding:4px 8px">시각</th><th style="padding:4px 8px">방법</th><th style="padding:4px 8px">결과</th><th style="padding:4px 8px">가져온 건수</th><th style="padding:4px 8px">소요</th></tr></thead><tbody>'+
+    L.map(function(r){
+      return '<tr style="border-top:1px solid var(--line,#eee)">'+
+        '<td style="padding:4px 8px;white-space:nowrap">'+axTime(r.at)+' <span style="color:var(--muted)">('+inbAgo(r.at)+')</span></td>'+
+        '<td style="padding:4px 8px">'+esc(r.src||'')+'</td>'+
+        '<td style="padding:4px 8px">'+(r.ok? '<span style="color:var(--good,#0ca30c)">✓ 성공</span>' : '<span style="color:var(--critical,#d03b3b)">✕ 실패</span>'+(r.error? ' <span title="'+esc(r.error)+'">'+esc(String(r.error).slice(0,60))+'</span>':''))+'</td>'+
+        '<td style="padding:4px 8px">'+esc(inbCounts(r.counts))+'</td>'+
+        '<td style="padding:4px 8px;color:var(--muted)">'+(r.duration_ms? (r.duration_ms/1000).toFixed(1)+'초':'')+'</td></tr>';
+    }).join('')+'</tbody></table>';
+}
+/* 통계·목록 화면 공용: 마지막 가져오기 + 지금 가져오기 + 기록 펼치기 */
+function inbSyncPanel(){
+  return '<div class="card" style="padding:10px 14px;margin-bottom:10px">'+
+    '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'+
+      '<b style="font-size:13px">시트 → 포탈 가져오기</b>'+inbSyncBadge()+
+      '<span style="flex:1"></span>'+
+      (window.IS_VIEWER? '' : '<button class="pill" id="inbFetchP">↻ 지금 시트에서 가져오기</button>')+
+      '<button class="pill ghost" id="inbLogTg">🕘 가져온 기록'+(RAWX.inbLog&&RAWX.inbLog.length? ' ('+RAWX.inbLog.length+')':'')+'</button>'+
+    '</div>'+
+    '<div id="inbLogBox" style="display:'+(INB_LOG_OPEN?'':'none')+'">'+inbLogTable()+'</div></div>';
+}
+function inbWirePanel(host){
+  var b=host.querySelector('#inbFetchP'); if(b) b.onclick=inbRefetch;
+  var t=host.querySelector('#inbLogTg'); if(t) t.onclick=function(){
+    INB_LOG_OPEN=!INB_LOG_OPEN;
+    var box=host.querySelector('#inbLogBox'); if(box) box.style.display=INB_LOG_OPEN?'':'none';
+    if(INB_LOG_OPEN && RAWX.inbLog===undefined) loadInbLog(function(){ var bx=host.querySelector('#inbLogBox'); if(bx) bx.innerHTML=inbLogTable(); });
+  };
+}
+/* 인바운드 목록(표) 위에 붙는 패널 */
+function renderInbPanel(){
+  var host=document.getElementById('inbHost');
+  if(CUR_VIEW!=='inbound'){ if(host) host.style.display='none'; return; }
+  if(!host){ var tw=$('#dvTable').parentElement; host=document.createElement('div'); host.id='inbHost'; tw.parentElement.insertBefore(host,tw); }
+  host.style.display=''; host.innerHTML=inbSyncPanel(); inbWirePanel(host);
+  if(RAWX.inbLog===undefined) loadInbLog(function(){ if(CUR_VIEW==='inbound') renderInbPanel(); });
+}
 function renderInbStat(){
   var host=$('#inbBody');
   if(!RAWX.inbound){
@@ -9229,8 +9300,8 @@ function renderInbStat(){
     '<span class="ubadge sm">₩ 금액 단위 = 천원</span>'+
     '<span class="mini">원본: 구글시트 · 매일 아침 7시 자동 동기화</span>'+
     '<span style="flex:1"></span>'+yb+
-    '<button class="pill ghost" id="inbFetch">↻ 시트에서 다시 가져오기</button>'+
     '<button class="pill ghost" id="inbGoList">목록 보기 →</button></div>'+
+    inbSyncPanel()+
     '<div class="inb-kpis">'+
     '<div class="inb-kpi"><div class="l">유입 건수</div><div class="v">'+R.length.toLocaleString()+'건</div><div class="s">'+(INB_Y==='all'?'25년~현재 누적':INB_Y+'년')+'</div></div>'+
     '<div class="inb-kpi"><div class="l">진행중</div><div class="v">'+prog+'건</div><div class="s">방문미팅·데모·이관 포함</div></div>'+
@@ -9262,18 +9333,26 @@ function renderInbStat(){
       if(r) openInbDetail(r);
     };
   });
-  var bf=document.getElementById('inbFetch'); if(bf) bf.onclick=inbRefetch;
+  inbWirePanel(host);
+  if(RAWX.inbLog===undefined) loadInbLog(function(){ if(CUR_VIEW==='inbstat') renderInbStat(); });
   var bl=document.getElementById('inbGoList'); if(bl) bl.onclick=function(){ goInbList(); };
 }
 function inbRefetch(){
-  toast('인바운드 동기화','시트에서 다시 가져오는 중… (최대 1분)','info');
+  if(!SB_TOKEN){ openOvl('ovlAuth'); return; }
+  var b=document.getElementById('inbFetchP'); if(b){ b.disabled=true; b.textContent='가져오는 중…'; }
+  toast('인바운드 가져오기','시트에서 가져오는 중… (최대 1분)','info');
+  function done(){
+    RAWX.inbLog=undefined;                       // 기록도 새로 읽습니다
+    loadInbLog(function(){ loadInbound(function(){
+      if(CUR_VIEW==='inbstat') renderInbStat(); else if(CUR_VIEW==='inbound') renderGrid(); }); });
+  }
   fetch(WEEKLY_GAS+'?action=inbound_fetch').then(function(r){return r.json();}).then(function(j){
-    if(j&&j.ok) toast('동기화 완료', j.counts? Object.keys(j.counts).map(function(y){return y+'년 '+j.counts[y]+'건';}).join(' · '):'');
-    else toast('동기화 실패', (j&&j.error)||'', 'bad');
-    loadInbound(function(){ if(CUR_VIEW==='inbstat') renderInbStat(); else if(CUR_VIEW==='inbound') renderGrid(); });
+    if(j&&j.ok) toast('가져오기 완료', j.msg || inbCounts(j.counts) || '');
+    else toast('가져오기 실패', (j&&j.error)||'', 'bad');
+    done();
   }).catch(function(){
-    window.open(WEEKLY_GAS+'?action=inbound_fetch','_blank');
-    setTimeout(function(){ loadInbound(function(){ if(CUR_VIEW==='inbstat') renderInbStat(); else if(CUR_VIEW==='inbound') renderGrid(); }); }, 4000);
+    window.open(WEEKLY_GAS+'?action=inbound_fetch','_blank');   // CORS 차단 등 — 새 탭에서 실행
+    setTimeout(done, 5000);
   });
 }
 function openInbDetail(r){
@@ -12981,6 +13060,7 @@ function renderGrid(){
   fc.textContent='✕ 필터 해제 ('+nf+')';
   $('#dvPager').style.display=isCustom?'none':'';
   try{ renderEqPanel(); }catch(e){}
+  try{ renderInbPanel(); }catch(e){}
   if(isCustom){ g.custom(); return; }
   var bh=document.getElementById('bizHost'); if(bh) bh.style.display='none';
   $('#dvTable').parentElement.style.display='';
