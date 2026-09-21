@@ -2297,7 +2297,7 @@ window.addEventListener('message', function(ev){
 });
 
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-16 ㊿+84';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-16 ㊿+85';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -8563,10 +8563,16 @@ function prSaasHtml(){
     '<div class="pr-ob"><div class="l">ZTNA PA 월</div><div class="v" id="pvZ">—</div></div>'+
     '<div class="pr-ob fin"><div class="l">월 합계 · 연간</div><div class="v" id="pvTot">—</div></div></div>'+
     '<div class="pr-note" id="pvNote" style="margin-bottom:14px"></div>'+
-    '<h3 style="margin:0 0 6px;font-size:13.5px;border-top:1px solid var(--grid);padding-top:12px">🧮 빠른 견적 — MDR 서비스군 <small style="color:var(--muted);font-weight:400">1년 기준</small></h3>'+
+    '<h3 style="margin:0 0 6px;font-size:13.5px;border-top:1px solid var(--grid);padding-top:12px">🧮 빠른 견적 — MDR 서비스군 <small style="color:var(--muted);font-weight:400">1년 기준 · 통합 = Cloud Insights E + Add-on 24×7</small></h3>'+
     '<div class="row">'+
-    ['MDR','AV','RW','DC'].map(function(k,i){ var lab=['MDR','AV (백신)','랜섬웨어','매체제어'][i];
-      return '<label class="svc"><input type="checkbox" data-prs="'+k+'"'+(k==='MDR'?' checked':'')+'>'+lab+'</label>'; }).join('')+
+    (function(){
+      var LAB={CIE:'Cloud Insights E (단독)', MDRA:'+ MDR Add-on 24×7', MDR:'Genian MDR 통합', AV:'AV (백신)', RW:'랜섬웨어', DC:'매체제어'};
+      var ORDER=['MDR','CIE','MDRA','AV','RW','DC'];
+      var have={}; (D.services||[]).forEach(function(x){ have[x.key]=x; });
+      var def=have.MDR? 'MDR' : (have.CIE? 'CIE' : (D.services&&D.services[0]? D.services[0].key : ''));
+      return ORDER.filter(function(k){ return have[k]; }).map(function(k){
+        return '<label class="svc"><input type="checkbox" data-prs="'+k+'"'+(k===def?' checked':'')+'>'+(LAB[k]||have[k].name)+'</label>'; }).join('');
+    })()+
     ' Agent <input type="number" id="pmQty" value="100" min="1" style="width:90px">'+
     '<select id="pmWho"><option value="dist">총판가 기준</option><option value="ptn">파트너가 기준</option></select></div>'+
     '<div class="pr-out"><div class="pr-ob"><div class="l">소비자가 합계(연)</div><div class="v" id="pmCons">—</div></div>'+
@@ -8621,7 +8627,8 @@ function prSaasHtml(){
   (D.services||[]).forEach(function(s){
     var rows=s.tiers.map(function(tt,i){
       if(!prMatch(s.name+' '+tt)) return '';
-      return '<tr><td>'+tt+'</td><td class="n">'+prWon(s.cons[i])+'</td><td class="n">'+prWon(s.minD[i])+'</td><td class="n">'+prWon(s.dist[i])+'</td><td class="n">'+prWon(s.minP[i])+'</td><td class="n">'+prWon(s.ptn[i])+'</td></tr>'; }).join('');
+      var g=function(arr){ return (arr||[])[i]; };   // 파트너가 등이 아직 없는 서비스는 — 로
+      return '<tr><td>'+tt+'</td><td class="n">'+prWon(g(s.cons))+'</td><td class="n">'+prWon(g(s.minD))+'</td><td class="n">'+prWon(g(s.dist))+'</td><td class="n">'+prWon(g(s.minP))+'</td><td class="n">'+prWon(g(s.ptn))+'</td></tr>'; }).join('');
     if(!rows) return;
     t+='<div class="pr-card"><h3>'+s.icon+' '+s.name+' <small>'+s.sub+' · 원/Agent·1년 · VAT별도</small></h3>'+
       '<table class="pr"><thead><tr><th>구분(Agent)</th><th class="n">소비자가</th><th class="n">최소제안가<span class="pr-lock">🔒</span></th><th class="n">총판가<span class="pr-lock">🔒</span></th><th class="n">파트너 최소제안<span class="pr-lock">🔒</span></th><th class="n">파트너가<span class="pr-lock">🔒</span></th></tr></thead><tbody>'+rows+'</tbody></table></div>';
@@ -8702,10 +8709,19 @@ function prBindSaas(){
     var sel=[].slice.call(document.querySelectorAll('[data-prs]:checked')).map(function(x){return x.dataset.prs;});
     var qn=+$('#pmQty').value||0, who=$('#pmWho').value, ti=prTierIdx(qn), note='';
     if(!sel.length||!qn){ $('#pmCons').textContent=$('#pmSup').textContent=$('#pmUnit').textContent='—'; $('#pmNote').textContent=''; return; }
-    if(sel.indexOf('MDR')<0&&sel.indexOf('AV')<0) note='⚠ MDR 또는 AV는 필수 (랜섬웨어·매체제어 단독 구매 불가) · ';
-    var cons=0,sup=0,unit=0;
+    /* 통합(MDR) = Cloud Insights E + Add-on 이므로 함께 고르면 중복 — 통합만 계산합니다 */
+    if(sel.indexOf('MDR')>=0 && (sel.indexOf('CIE')>=0||sel.indexOf('MDRA')>=0)){
+      note+='ⓘ 통합에 Cloud Insights E·Add-on 이 이미 들어 있어 통합만 계산했습니다 · ';
+      sel=sel.filter(function(k){ return k!=='CIE'&&k!=='MDRA'; });
+    }
+    if(sel.indexOf('MDRA')>=0 && sel.indexOf('CIE')<0) note+='⚠ Add-on 24×7 은 Cloud Insights E 위에 얹는 옵션입니다 · ';
+    if(sel.indexOf('MDR')<0&&sel.indexOf('CIE')<0&&sel.indexOf('AV')<0) note+='⚠ MDR 통합·Cloud Insights E·AV 중 하나는 필수 (랜섬웨어·매체제어 단독 구매 불가) · ';
+    var cons=0,sup=0,unit=0,noPtn=[];
     sel.forEach(function(k){ var s=(D.services||[]).filter(function(x){return x.key===k;})[0]; if(!s) return;
-      var u=(who==='dist'?s.dist[ti]:s.ptn[ti]); cons+=s.cons[ti]*qn; sup+=u*qn; unit+=u; });
+      var u=(who==='dist'? (s.dist||[])[ti] : (s.ptn||[])[ti]);
+      if(typeof u!=='number'){ noPtn.push(s.name); u=(typeof (s.dist||[])[ti]==='number'? s.dist[ti]:0); }   // 파트너가 미정 → 총판가로 대신
+      cons+=((s.cons||[])[ti]||0)*qn; sup+=u*qn; unit+=u; });
+    if(noPtn.length) note+='⚠ '+noPtn.join('·')+' 은 파트너가가 아직 없어 총판가로 계산 · ';
     $('#pmCons').textContent='₩'+prWon(cons); $('#pmSup').textContent='₩'+prWon(sup); $('#pmUnit').textContent='₩'+prWon(unit);
     $('#pmNote').textContent=note+'구간 '+D.services[0].tiers[ti]+' · '+(who==='dist'?'총판':'파트너')+' 공급가 기준 · 할인은 별도 협의 · 실제 견적은 견적 시스템에서';
   }
