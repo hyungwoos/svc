@@ -2297,7 +2297,7 @@ window.addEventListener('message', function(ev){
 });
 
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-16 ㊿+79';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-16 ㊿+80';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -6198,9 +6198,13 @@ function eqIn(list){                   // PostgREST in.("A","B") — 한글·하
 }
 async function eqPatch(list, body){    // 시리얼이 많아도 URL 이 길어지지 않게 80개씩
   for(var i=0;i<list.length;i+=80) await sbWrite('PATCH','equipment_assets?serial='+eqIn(list.slice(i,i+80)), body);
+  var up={}; list.forEach(function(x){ up[String(x).toUpperCase()]=1; });
+  (RAWX.assets||[]).forEach(function(a){ if(up[String(a.serial||'').toUpperCase()]) Object.keys(body).forEach(function(k){ a[k]=body[k]; }); });
 }
 async function eqDel(list){
   for(var i=0;i<list.length;i+=80) await sbWrite('DELETE','equipment_assets?serial='+eqIn(list.slice(i,i+80)));
+  var dl={}; list.forEach(function(x){ dl[String(x).toUpperCase()]=1; });
+  RAWX.assets=(RAWX.assets||[]).filter(function(a){ return !dl[String(a.serial||'').toUpperCase()]; });
 }
 async function eqReload(){ try{ RAWX.assets=await sbTry('equipment_assets?select=*&order=serial')||RAWX.assets; }catch(e){} }
 /* 현황 한 행이 신청과 다른 점 */
@@ -6214,7 +6218,7 @@ function eqFieldDiff(o,a){
 }
 
 /* ---- 원복(되돌리기) — 일괄 작업 직전 현황을 통째로 찍어둡니다 ---- */
-var EQ_UNDO=null;
+var EQ_UNDO=null, EQ_ERR='', EQ_DIAG='';
 function eqRow(a){ var o={}; EQ_COLS.forEach(function(k){ o[k]=(a[k]===undefined? null : a[k]); }); return o; }
 function eqSnap(label){
   EQ_UNDO={ at:new Date().toISOString(), label:label,
@@ -6271,6 +6275,7 @@ async function syncOrderAssets(r, st, quiet){
     /* 1) 임시행 정리 — 진짜 시리얼이 들어왔거나, 현황에 있으면 안 되는 상태가 된 경우 */
     if((real.length || !stA) && eqHave(r).some(function(a){ return eqIsPh(a.serial); })){
       await sbWrite('DELETE','equipment_assets?order_id=eq.'+r.id+'&serial=like.'+encodeURIComponent('미등록-'+r.id+'-*'));
+      RAWX.assets=(RAWX.assets||[]).filter(function(a){ return !(String(a.order_id)===String(r.id) && eqIsPh(a.serial)); });
       out.push('임시행 정리');
     }
     /* 2) 아직 안 나간·취소된 신청인데 현황에 «임대중» 으로 남아 있으면 재고로 되돌립니다 */
@@ -6292,25 +6297,38 @@ async function syncOrderAssets(r, st, quiet){
       if(exRe.length){ await eqPatch(exRe,{status:'재고', customer:null, order_id:null, updated_at:new Date().toISOString()});
                        out.push('연결 해제 '+exRe.length+'대 재고'); }
     }
-    /* 4) 있어야 할 행 만들기 · 신청 값으로 덮어쓰기 (시리얼 기준) */
+    /* 4) 있어야 할 행 만들기 · 신청 값으로 덮어쓰기
+          시리얼에 UNIQUE 인덱스가 없어도 되도록 on_conflict(upsert) 를 쓰지 않고
+          «현황에 있으면 수정 · 없으면 새로 만들기» 로 처리합니다 */
     if(want.length){
       var isPh=!real.length;
       var gone=(stA!=='재고');                                   // 재고(출고 전)는 출고일을 넣지 않습니다
       var dep=gone? (r.install_date || String(r.created_at||'').slice(0,10) || todayS) : null;
-      var rows=want.map(function(s){
-        var o={ serial:s, model:r.model||null, usage:'임대', status:stA,
+      var mk=function(sn){
+        var o={ serial:sn, model:r.model||null, usage:'임대', status:stA,
                 customer:(stA==='회수완료'? null : (r.customer||null)),
                 channel:r.channel||null, order_id:r.id,
                 deployed_date:dep, returned_date:(stA==='회수완료'? todayS : null) };
         if(isPh) o.note='⚠ 시리얼 미입력 · 신청 #'+r.id+' ('+(r.status||'')+') 에서 자동 생성';
         return o;
-      });
-      await sbWrite('POST','equipment_assets?on_conflict=serial',rows,'resolution=merge-duplicates');
-      out.push('자산 '+rows.length+'대 '+stA+(isPh? ' (시리얼 미등록)':''));
+      };
+      var cur={}; (RAWX.assets||[]).forEach(function(a){ cur[String(a.serial||'').toUpperCase()]=a; });
+      var ins=[], upd=[];
+      want.forEach(function(sn){ (cur[sn.toUpperCase()]? upd : ins).push(sn); });
+      if(ins.length){
+        var made=await sbWrite('POST','equipment_assets?select=*', ins.map(mk), 'return=representation');
+        if(made && made.length) RAWX.assets=(RAWX.assets||[]).concat(made);
+        else RAWX.assets=(RAWX.assets||[]).concat(ins.map(mk));
+      }
+      if(upd.length){
+        var ub=mk(upd[0]); delete ub.serial; ub.updated_at=new Date().toISOString();
+        await eqPatch(upd, ub);
+      }
+      out.push('자산 '+want.length+'대 '+stA+(isPh? ' (시리얼 미등록)':'')+(ins.length? ' · 새로 만든 '+ins.length+'대':''));
     }
     if(!quiet) await eqReload();
     return out.length? ' · '+out.join(' · ') : '';
-  }catch(e){ return ' · ⚠ 자산 동기화 실패: '+String(e.message||e).slice(0,80); }
+  }catch(e){ EQ_ERR=String(e.message||e); return ' · ⚠ 자산 동기화 실패: '+EQ_ERR.slice(0,80); }
 }
 
 /* ---- 신청 ↔ 현황 대조 패널 (장비 신청 내역 · 장비 현황 화면 위에 표시) ---- */
@@ -6371,6 +6389,7 @@ function renderEqPanel(){
         ' · 취소 '+s.cancel.length+'건</span>'+
       (window.IS_VIEWER? '' : '<button class="pill" id="eqFixAll"'+(bad?'':' disabled style="opacity:.45"')+'>신청 내역 기준으로 현황 맞추기</button>')+
       (window.IS_VIEWER||!u? '' : '<button class="pill ghost" id="eqUndo" title="'+esc(u.label||'')+'">↩ 원복 ('+String(u.at||'').replace('T',' ').slice(5,16)+')</button>')+
+      (window.IS_VIEWER? '' : '<button class="pill ghost" id="eqDiag" title="동기화가 안 될 때 원인을 찾아봅니다">🩺 진단</button>')+
       '<span class="mini" id="eqMsg" style="color:var(--muted)"></span>'+
     '</div>'+
     '<div class="mini" style="margin-top:4px;color:var(--muted)">기준은 «임대 장비 신청 내역» 입니다 — 취소를 뺀 모든 신청이 현황에 «수량»대씩 있어야 하고, 상태·고객사·모델·채널은 신청 내역 값으로 맞춥니다 (출고 전이면 재고)'+
@@ -6395,11 +6414,18 @@ function renderEqPanel(){
       (window.IS_VIEWER? '' : ' <button class="pill ghost" id="eqOrphan" style="margin-left:6px">재고로 되돌리기</button>')+
       '<br><span style="color:var(--muted)">신청 기록 없이 손으로 넣었거나, 신청 행이 지워진 장비입니다 — 맞다면 그대로 두셔도 됩니다</span></div>';
   }
+  if(EQ_ERR){
+    h+='<div class="mini" style="margin-top:8px;padding:8px 10px;border-radius:8px;background:rgba(208,59,59,.08);'+
+       'color:var(--critical,#d03b3b);word-break:break-all">⚠ 마지막 동기화 오류 — '+esc(EQ_ERR)+'</div>';
+  }
+  h+='<div class="mini" id="eqDiagOut" style="margin-top:8px;padding:8px 10px;border-radius:8px;background:var(--bg-2,#f6f7f9);'+
+     'line-height:1.75;word-break:break-all;display:'+(EQ_DIAG?'':'none')+'">'+(EQ_DIAG||'')+'</div>';
   h+='</div>';
   host.innerHTML=h;
   var b=document.getElementById('eqFixAll'); if(b) b.onclick=eqFixAll;
   var b2=document.getElementById('eqOrphan'); if(b2) b2.onclick=eqOrphanFix;
   var b3=document.getElementById('eqUndo');   if(b3) b3.onclick=eqUndoRun;
+  var b4=document.getElementById('eqDiag');   if(b4) b4.onclick=eqDiagRun;
 }
 async function eqFixAll(){
   if(!SB_TOKEN){ openOvl('ovlAuth'); return; }
@@ -6421,7 +6447,50 @@ async function eqFixAll(){
   }
   await eqReload();
   if(m) m.textContent='';
+  if(!fail) EQ_ERR='';
   toast('현황 맞추기 완료', done+'건 반영'+(fail? ' · '+fail+'건 실패'+(err?' ('+err.slice(0,60)+')':'') : '')+' · ↩ 원복 가능', fail? 'bad':'ok');
+  DIRTY=true; renderGrid();
+}
+/* 동기화가 안 될 때 — 어디서 막히는지 실제로 한 번씩 해 봅니다 */
+async function eqDiagRun(){
+  var log=[];
+  function bad(t){ return '<b style="color:var(--critical,#d03b3b)">'+esc(t)+'</b>'; }
+  function put(){ EQ_DIAG=log.join('<br>');
+    var box=document.getElementById('eqDiagOut'); if(box){ box.style.display=''; box.innerHTML=EQ_DIAG; } }
+  log.push('<b>🩺 진단</b> — 포탈 버전 '+esc(APP_VER));
+  log.push('읽어온 데이터 — 신청 내역 '+((RAWX.orders||[]).length)+'건 · 장비 현황 '+((RAWX.assets||[]).length)+'대');
+  put();
+  var need=['serial','model','usage','status','customer','channel','deployed_date','returned_date','note','order_id','updated_at'];
+  var miss=[];
+  for(var i=0;i<need.length;i++){
+    try{ await sbGet('equipment_assets?select='+need[i]+'&limit=1'); }catch(e){ miss.push(need[i]); }
+  }
+  log.push(miss.length
+    ? ('① 현황 표의 열 — '+bad('없는 열: '+miss.join(', '))+' · 이 열이 없으면 동기화가 통째로 실패합니다')
+    : '① 현황 표의 열 — 정상 (order_id 포함)');
+  put();
+  if(!SB_TOKEN){ log.push('② 쓰기 권한 — '+bad('로그인이 필요합니다')); put(); return; }
+  var probe='__진단'+Date.now()+'__', okIns=false;
+  try{ await sbWrite('POST','equipment_assets',[{serial:probe,status:'재고'}]); okIns=true;
+       log.push('② 새 장비 만들기 — 정상'); }
+  catch(e){ log.push('② 새 장비 만들기 — '+bad(String(e.message||e).slice(0,240))); }
+  put();
+  if(okIns){
+    try{ await sbWrite('PATCH','equipment_assets?serial='+eqIn([probe]),{status:'재고',customer:null});
+         log.push('③ 장비 수정 — 정상'); }
+    catch(e){ log.push('③ 장비 수정 — '+bad(String(e.message||e).slice(0,240))); }
+    put();
+    try{ await sbWrite('DELETE','equipment_assets?serial='+eqIn([probe]));
+         log.push('④ 장비 삭제 — 정상'); }
+    catch(e){ log.push('④ 장비 삭제 — '+bad(String(e.message||e).slice(0,240))+' · 현황에서 «'+esc(probe)+'» 를 직접 지워주세요'); }
+    put();
+  }
+  await eqReload();
+  var s2=eqScan();
+  log.push('⑤ 대조 — 맞지 않음 '+s2.gap.length+'건'+(s2.gap.length? ' · «신청 내역 기준으로 현황 맞추기» 를 누르면 만들어집니다':' (이미 다 맞습니다)'));
+  if(s2.gap.length) log.push('　 예: '+esc(s2.gap.slice(0,3).map(function(x){ return '#'+x.o.id+' '+(x.o.customer||''); }).join(' / ')));
+  if(EQ_ERR) log.push('⑥ 마지막 동기화 오류 — '+bad(EQ_ERR));
+  put();
   DIRTY=true; renderGrid();
 }
 async function eqOrphanFix(){
