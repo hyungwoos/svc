@@ -2297,7 +2297,7 @@ window.addEventListener('message', function(ev){
 });
 
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-16 ㊿+80';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-16 ㊿+81';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -6169,7 +6169,7 @@ var GRIDS={
      · 설치완료·회수예정   → 임대중
      · 회수완료           → 회수완료
      · 취소               → 현황에서 내림 (임시행 삭제 · 실물은 재고로)
-     · 현황의 상태·고객사·모델·채널 은 신청 내역 값으로 덮어씁니다
+     · 현황의 상태·고객사·모델·채널 은 신청 내역 값으로 덮어씁니다 (회수완료도 고객사를 남깁니다)
    시리얼을 아직 모르면 «미등록-신청번호-번호» 로 수량만큼 임시 등록해 두고,
    나중에 신청 행의 «시리얼» 칸에 실제 시리얼을 넣고 저장하면 임시 행이 사라지고
    진짜 시리얼로 바뀝니다.
@@ -6211,7 +6211,7 @@ async function eqReload(){ try{ RAWX.assets=await sbTry('equipment_assets?select
 function eqFieldDiff(o,a){
   var d=[], stA=EQ_ST[o.status]||null;
   if(String(a.status||'')!==String(stA||'')) d.push('상태');
-  if(stA!=='회수완료' && String(a.customer||'')!==String(o.customer||'')) d.push('고객사');
+  if(String(a.customer||'')!==String(o.customer||'')) d.push('고객사');
   if(o.model   && String(a.model||'')  !==String(o.model))   d.push('모델');
   if(o.channel && String(a.channel||'')!==String(o.channel)) d.push('채널');
   return d;
@@ -6306,7 +6306,7 @@ async function syncOrderAssets(r, st, quiet){
       var dep=gone? (r.install_date || String(r.created_at||'').slice(0,10) || todayS) : null;
       var mk=function(sn){
         var o={ serial:sn, model:r.model||null, usage:'임대', status:stA,
-                customer:(stA==='회수완료'? null : (r.customer||null)),
+                customer:(r.customer||null),                   /* 회수완료도 고객사를 남깁니다 — 현황에서 고객사로 찾아야 하니까 */
                 channel:r.channel||null, order_id:r.id,
                 deployed_date:dep, returned_date:(stA==='회수완료'? todayS : null) };
         if(isPh) o.note='⚠ 시리얼 미입력 · 신청 #'+r.id+' ('+(r.status||'')+') 에서 자동 생성';
@@ -6322,7 +6322,13 @@ async function syncOrderAssets(r, st, quiet){
       }
       if(upd.length){
         var ub=mk(upd[0]); delete ub.serial; ub.updated_at=new Date().toISOString();
-        await eqPatch(upd, ub);
+        if(stA==='회수완료'){                       /* 이미 회수일이 있는 행은 그 날짜를 지킵니다 */
+          var hasRd=upd.filter(function(sn){ var a=cur[sn.toUpperCase()]; return a && a.returned_date; });
+          var noRd =upd.filter(function(sn){ var a=cur[sn.toUpperCase()]; return !(a && a.returned_date); });
+          var ub2=Object.assign({},ub); delete ub2.returned_date;
+          if(hasRd.length) await eqPatch(hasRd, ub2);
+          if(noRd.length)  await eqPatch(noRd,  ub);
+        } else await eqPatch(upd, ub);
       }
       out.push('자산 '+want.length+'대 '+stA+(isPh? ' (시리얼 미등록)':'')+(ins.length? ' · 새로 만든 '+ins.length+'대':''));
     }
