@@ -2297,7 +2297,7 @@ window.addEventListener('message', function(ev){
 });
 
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-16 ㊿+78';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-16 ㊿+79';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -6056,7 +6056,7 @@ var GRIDS={
   orders:{
     title:'임대 장비 신청 내역', table:'equipment_orders',
     chipsField:'channel', chipsOpts:['에스원','LGU+','조달','일반','기타'],
-    cap:'저장할 때마다 장비 현황(시리얼)에 자동 반영됩니다 — 설치완료·회수예정은 임대중, 회수완료는 회수완료 · 시리얼을 비워두면 «미등록-신청번호» 로 임시 등록 · 신규 신청은 장비 › 임대 장비 신청', add:true, del:true,
+    cap:'저장할 때마다 장비 현황에 자동 반영됩니다 — 접수·출하요청·배송중은 재고, 설치완료·회수예정은 임대중, 회수완료는 회수완료 (취소는 현황에서 내림) · 시리얼을 비워두면 «미등록-신청번호» 로 수량만큼 임시 등록 · 신규 신청은 장비 › 임대 장비 신청', add:true, del:true,
     rows:function(){ return RAWX.orders||[]; },
     cols:[
       {k:'created_at',l:'신청일',ro:true,fmt:function(v){return String(v||'').slice(0,10);}},
@@ -6081,16 +6081,21 @@ var GRIDS={
   assets:{
     title:'임대 장비 현황 (시리얼 단위)', table:'equipment_assets',
     chipsField:'channel', chipsOpts:['에스원','LGU+','조달','일반','기타'],
-    cap:'임대 장비 신청 내역과 항상 대조됩니다 — 위 «현황에 맞추기» 를 누르면 신청 내역 기준으로 빠진 장비가 채워집니다', add:true, del:true,
-    rows:function(){ return (RAWX.assets||[]).slice().sort(function(a,b){
-      var x=a.in_date||a.deployed_date||'', y=b.in_date||b.deployed_date||'';
-      if(x!==y) return String(y).localeCompare(String(x));      // 최신 위, 빈 값 아래
-      return String(a.serial||'').localeCompare(String(b.serial||'')); }); },
+    cap:'임대 장비 신청 내역과 항상 대조됩니다 — 취소를 뺀 모든 신청이 여기에 «수량»대씩 있어야 하고, 위 «신청 내역 기준으로 현황 맞추기» 로 빠진 장비를 만들 수 있습니다', add:true, del:true,
+    rows:function(){
+      var om={}; (RAWX.orders||[]).forEach(function(o){ om[String(o.id)]=o; });
+      var out=(RAWX.assets||[]).slice();
+      out.forEach(function(a){ var o=(a.order_id!=null)? om[String(a.order_id)] : null; a._ostat=o? (o.status||''):''; });
+      return out.sort(function(a,b){
+        var x=a.in_date||a.deployed_date||'', y=b.in_date||b.deployed_date||'';
+        if(x!==y) return String(y).localeCompare(String(x));      // 최신 위, 빈 값 아래
+        return String(a.serial||'').localeCompare(String(b.serial||'')); }); },
     cols:[
       {k:'serial',l:'시리얼',req:true},
       {k:'model',l:'모델',t:'select',opts:['S10_R2','S20_R2','S30H_R1','S100','S200','ES30']},
       {k:'usage',l:'구분',t:'select',opts:['임대','데모','대여','판매','하자보수']},
       {k:'status',l:'상태',t:'select',opts:['재고','임대중','회수완료','판매완료','수리중','분실','폐기']},
+      {k:'_ostat',l:'신청상태',ro:true,fmt:function(v,r){ return (r&&r.order_id==null)? '· 신청 없음' : (v||'· 신청 삭제됨'); }},
       {k:'customer',l:'고객사'},
       {k:'channel',l:'채널',t:'select',opts:['에스원','LGU+','조달','일반','기타']},
       {k:'partner',l:'파트너'},
@@ -6159,16 +6164,19 @@ var GRIDS={
 
 /* ===== 임대 장비: 신청 내역 ↔ 장비 현황 자동 대조 ==============================
    기준(원본)은 «임대 장비 신청 내역» 입니다.  현황은 신청 내역을 따라갑니다.
-     · 신청 1건 = 현황 «수량»대
-     · 설치완료·회수예정 → 임대중 / 회수완료 → 회수완료
-     · 접수·출하요청·배송중·취소 → 아직 안 나갔으므로 현황에 없어야 함
+     · 신청 1건 = 현황 «수량»대  (취소만 빼고 전부 현황에 행이 생깁니다)
+     · 접수·출하요청·배송중 → 재고   (아직 안 나갔지만 현황에는 있어야 합니다)
+     · 설치완료·회수예정   → 임대중
+     · 회수완료           → 회수완료
+     · 취소               → 현황에서 내림 (임시행 삭제 · 실물은 재고로)
      · 현황의 상태·고객사·모델·채널 은 신청 내역 값으로 덮어씁니다
    시리얼을 아직 모르면 «미등록-신청번호-번호» 로 수량만큼 임시 등록해 두고,
    나중에 신청 행의 «시리얼» 칸에 실제 시리얼을 넣고 저장하면 임시 행이 사라지고
    진짜 시리얼로 바뀝니다.
    일괄 작업(맞추기·재고 되돌리기)은 실행 직전 현황 전체를 찍어두므로 «원복» 이 됩니다.
    ---------------------------------------------------------------------------- */
-var EQ_ST={ '설치완료':'임대중', '회수예정':'임대중', '회수완료':'회수완료' };
+var EQ_ST={ '접수':'재고', '출하요청':'재고', '배송중':'재고',        /* 아직 안 나갔어도 현황에 행은 만듭니다 */
+            '설치완료':'임대중', '회수예정':'임대중', '회수완료':'회수완료' };   /* «취소» 만 현황에 두지 않습니다 */
 var EQ_COLS=['serial','model','usage','status','customer','channel','partner','in_date','deployed_date','returned_date','note','order_id'];
 function eqSerials(r){
   return String(r.serials||'').split(/[,\s]+/)
@@ -6287,13 +6295,14 @@ async function syncOrderAssets(r, st, quiet){
     /* 4) 있어야 할 행 만들기 · 신청 값으로 덮어쓰기 (시리얼 기준) */
     if(want.length){
       var isPh=!real.length;
-      var dep=r.install_date || String(r.created_at||'').slice(0,10) || todayS;
+      var gone=(stA!=='재고');                                   // 재고(출고 전)는 출고일을 넣지 않습니다
+      var dep=gone? (r.install_date || String(r.created_at||'').slice(0,10) || todayS) : null;
       var rows=want.map(function(s){
         var o={ serial:s, model:r.model||null, usage:'임대', status:stA,
                 customer:(stA==='회수완료'? null : (r.customer||null)),
                 channel:r.channel||null, order_id:r.id,
                 deployed_date:dep, returned_date:(stA==='회수완료'? todayS : null) };
-        if(isPh) o.note='⚠ 시리얼 미입력 · 신청 #'+r.id+' 에서 자동 생성';
+        if(isPh) o.note='⚠ 시리얼 미입력 · 신청 #'+r.id+' ('+(r.status||'')+') 에서 자동 생성';
         return o;
       });
       await sbWrite('POST','equipment_assets?on_conflict=serial',rows,'resolution=merge-duplicates');
@@ -6316,13 +6325,13 @@ function eqScan(){
   var byOrder={}, oid={};
   orders.forEach(function(o){ oid[String(o.id)]=o; });
   assets.forEach(function(a){ if(a.order_id!=null){ (byOrder[a.order_id]=byOrder[a.order_id]||[]).push(a); } });
-  var gap=[], ph=[], pre=[], ok=0;
+  var gap=[], ph=[], cancel=[], ok=0;
   orders.forEach(function(o){
     var want=eqWant(o), have=byOrder[o.id]||[];
-    if(!want.length){
+    if(!want.length){                                   // 취소된 신청 (또는 알 수 없는 상태)
       var stuck=have.filter(function(a){ return eqIsPh(a.serial) || a.status==='임대중'; });
-      if(stuck.length) gap.push({o:o, why:'아직 출고 전인데 현황에 '+stuck.length+'대 올라와 있음'});
-      else if(o.status!=='취소') pre.push(o);
+      if(stuck.length) gap.push({o:o, why:'취소된 신청인데 현황에 '+stuck.length+'대 남아 있음'});
+      else cancel.push(o);
       return;
     }
     var wu=want.map(function(s){ return s.toUpperCase(); });
@@ -6345,7 +6354,7 @@ function eqScan(){
     if(a.status!=='임대중') return false;
     return a.order_id==null || !oid[String(a.order_id)];
   });
-  return {orders:orders, gap:gap, ph:ph, pre:pre, ok:ok, orphan:orphan};
+  return {orders:orders, gap:gap, ph:ph, cancel:cancel, ok:ok, orphan:orphan};
 }
 function renderEqPanel(){
   if(CUR_VIEW!=='orders' && CUR_VIEW!=='assets'){
@@ -6359,12 +6368,12 @@ function renderEqPanel(){
       '<b style="font-size:13px">신청 ↔ 현황 대조</b>'+
       '<span class="mini" style="color:var(--ink-2)">신청 '+s.orders.length+'건 · 현황 반영 '+s.ok+'건 · '+
         '<b style="color:'+(bad?'var(--critical,#d03b3b)':'inherit')+'">맞지 않음 '+s.gap.length+'건</b>'+
-        ' · 아직 출고 전 '+s.pre.length+'건</span>'+
+        ' · 취소 '+s.cancel.length+'건</span>'+
       (window.IS_VIEWER? '' : '<button class="pill" id="eqFixAll"'+(bad?'':' disabled style="opacity:.45"')+'>신청 내역 기준으로 현황 맞추기</button>')+
       (window.IS_VIEWER||!u? '' : '<button class="pill ghost" id="eqUndo" title="'+esc(u.label||'')+'">↩ 원복 ('+String(u.at||'').replace('T',' ').slice(5,16)+')</button>')+
       '<span class="mini" id="eqMsg" style="color:var(--muted)"></span>'+
     '</div>'+
-    '<div class="mini" style="margin-top:4px;color:var(--muted)">기준은 «임대 장비 신청 내역» 입니다 — 현황의 상태·고객사·모델·채널을 신청 내역 값으로 맞춥니다'+
+    '<div class="mini" style="margin-top:4px;color:var(--muted)">기준은 «임대 장비 신청 내역» 입니다 — 취소를 뺀 모든 신청이 현황에 «수량»대씩 있어야 하고, 상태·고객사·모델·채널은 신청 내역 값으로 맞춥니다 (출고 전이면 재고)'+
       (u? ' · 마지막 일괄 작업은 «↩ 원복» 으로 되돌릴 수 있습니다':'')+'</div>';
   if(bad){
     h+='<div class="mini" style="margin-top:8px;color:var(--ink-2);line-height:1.7">'+
@@ -6396,9 +6405,10 @@ async function eqFixAll(){
   if(!SB_TOKEN){ openOvl('ovlAuth'); return; }
   var s=eqScan(); if(!s.gap.length) return;
   if(!confirm('신청 내역을 기준으로 장비 현황 '+s.gap.length+'건을 맞출까요?\n\n'+
-    '· 현황에 없는 장비 → 신청 내역대로 등록 (시리얼이 비어 있으면 «미등록-신청번호-번호» 로 임시 등록)\n'+
+    '· 현황에 없는 장비 → 신청 내역대로 새로 등록 (시리얼이 비어 있으면 «미등록-신청번호-번호» 로 임시 등록)\n'+
+    '· 접수·출하요청·배송중 신청 → 재고 로 등록 / 설치완료·회수예정 → 임대중 / 회수완료 → 회수완료\n'+
     '· 상태·고객사·모델·채널이 다른 장비 → 신청 내역 값으로 덮어쓰기\n'+
-    '· 아직 출고 전인데 현황에 올라와 있던 장비 → 재고로 되돌림\n'+
+    '· 취소된 신청인데 현황에 남아 있던 장비 → 재고로 되돌림\n'+
     '· 신청에 없는데 붙어 있던 장비 → 연결 해제 후 재고\n\n'+
     '실행 직전 현황을 찍어두므로 «↩ 원복» 버튼으로 되돌릴 수 있습니다.')) return;
   eqSnap('신청 내역 기준으로 현황 맞추기 ('+s.gap.length+'건)');
