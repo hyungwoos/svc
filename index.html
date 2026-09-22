@@ -1,11 +1,13 @@
 <!DOCTYPE html>
-<html lang="ko" data-theme="light">
+<html lang="ko" data-theme="light" data-look="cc">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>서비스사업부 통합 관리 포탈</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23149e40'/%3E%3Cg fill='%23fff'%3E%3Crect x='14' y='32' width='9' height='18' rx='2'/%3E%3Crect x='27.5' y='22' width='9' height='28' rx='2'/%3E%3Crect x='41' y='14' width='9' height='36' rx='2'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
 <style>
 /* ==================================================================
    토큰 — dataviz 기준 팔레트 (다크는 별도 스텝, 라이트의 반전이 아님)
@@ -1097,6 +1099,221 @@ html:not([data-look="classic"]) #viewLogin input{border-radius:var(--r-sm)!impor
   html:not([data-look="classic"]) .side{border-radius:0;width:240px}
   html:not([data-look="classic"]) .side button .ic{display:inline}   /* 폰 드로어는 넓어서 아이콘 유지 */
 }
+
+/* ==================================================================
+   리디자인 v5 — 커맨드 센터 (기본 · html[data-look="cc"])
+   · 아이콘 레일 + 플라이아웃 메뉴, 상단 커맨드 바(검색·이동·AI), 홈 = 인박스 + MRR 히어로 + 벤토 타일 + 브리핑
+   · 장비 운영 보드(칸반), 고객 360 슬라이드 패널, 모바일 하단 탭
+   · 내 계정 › 설정 › 화면 디자인에서 심플/클래식으로 전환 (svc_look)
+   ================================================================== */
+.cc-only{display:none}
+html[data-look="cc"] .cc-only{display:block}
+html[data-look="cc"]{ --r:10px; --r-sm:8px; }
+html[data-look="cc"][data-theme="light"]{ --plane:#F2F2EE; --surface:#FFFFFF; --surface-2:#F3F3EF; --ring:rgba(11,11,11,.09); --grid:#E4E4DE; --axis:#C9CAC3; --brand:#118A3A; --brand-2:#0B6B2C; --brand-t:rgba(17,138,58,.10); --muted:#6F737B; --ink:#16171A; --ink-2:#4B4E55; }
+html[data-look="cc"] body{font-family:'IBM Plex Sans KR','Pretendard Variable',Pretendard,system-ui,-apple-system,'Apple SD Gothic Neo','Malgun Gothic',sans-serif}
+html[data-look="cc"] :is(.kpi .v,.hero,.qw-hero,td.n,.num,.todo-card .v,.inb-kpi .v,.pr-ob .v,.hstat .hv){font-family:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+html[data-look="cc"] .kpi .v small{font-family:'IBM Plex Sans KR',sans-serif;letter-spacing:0}
+html[data-look="cc"] :is(.card,.kpi,.filters,.ask,.modal,.tbl-wrap){border-radius:12px}
+/* 주요 버튼 = 잉크(검정), 선택 상태 = 잉크 · 브랜드 그린은 상태·로고·진행 표시에 */
+html[data-look="cc"] .btn,html[data-look="cc"] .pill[aria-pressed="true"],html[data-look="cc"] .cbtn.pri{background:var(--ink);border-color:var(--ink);color:var(--plane)}
+html[data-look="cc"] .btn:hover{background:var(--ink);filter:brightness(1.25)}
+html[data-look="cc"] .pill:not(.ghost){border-color:var(--ring)}
+html[data-look="cc"] .pill.ghost{color:var(--ink-2)}
+html[data-look="cc"] .side button[aria-current="true"]{box-shadow:inset 2px 0 0 var(--brand)}
+
+/* ── 상단 커맨드 바 ── */
+html[data-look="cc"] .topbar{margin:-18px -26px 18px;padding:0 22px;min-height:56px;gap:12px;flex-wrap:nowrap;background:var(--surface);border-bottom:1px solid var(--grid)}
+html[data-look="cc"] .brand{gap:8px;flex:0 0 auto}
+html[data-look="cc"] .brand h1{font-size:15px;font-weight:600}
+html[data-look="cc"] .brand .sub,html[data-look="cc"] .topbar .spacer,html[data-look="cc"] #btnFind{display:none}
+html[data-look="cc"] .filters{top:calc(var(--tbh,56px) + 8px)}
+html:not([data-look="cc"]) .cmdbar{display:none}
+.cmdbar{flex:1 1 auto;max-width:640px;min-width:0;height:36px;margin:0 auto;border:1px solid var(--ring);border-radius:9px;background:var(--surface-2);display:flex;align-items:center;gap:10px;padding:0 12px;color:var(--muted);font:inherit;font-size:13px;cursor:text;text-align:left}
+.cmdbar:hover{border-color:var(--axis)}
+.cmdbar .ph{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cmdbar kbd{font:inherit;font-size:10.5px;border:1px solid var(--ring);border-radius:5px;padding:1px 6px;background:var(--surface);color:var(--muted);white-space:nowrap}
+.cmdbar svg{color:var(--brand);flex:none}
+@media (max-width:1300px){ html[data-look="cc"] .ubadge{display:none} }
+@media (max-width:1100px){ html[data-look="cc"] .brand h1{display:none} }
+
+/* ── 아이콘 레일 + 플라이아웃 ── */
+#rail{display:none}
+@media (min-width:761px){
+  html[data-look="cc"] .side{display:none!important}
+  html[data-look="cc"] body{padding-left:64px}
+  html[data-look="cc"] body:has(#side.hidden){padding-left:0}
+  html[data-look="cc"] #rail{position:fixed;left:0;top:0;bottom:0;width:64px;z-index:41;box-sizing:border-box;padding:12px 10px 14px;
+    background:var(--surface);border-right:1px solid var(--grid);display:flex;flex-direction:column;align-items:center;gap:3px;overflow:auto}
+  html[data-look="cc"] body:has(#side.hidden) #rail{display:none}
+}
+#rail .rlogo{width:36px;height:36px;border-radius:10px;background:var(--brand);color:#fff;font-weight:700;font-size:15px;display:flex;align-items:center;justify-content:center;margin-bottom:8px;cursor:pointer;flex:none}
+#rail button{width:42px;height:40px;border:0;border-radius:10px;background:transparent;color:var(--ink-2);display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;flex:none;padding:0}
+#rail button:hover{background:var(--surface-2);color:var(--ink)}
+#rail button[aria-current="true"]{background:var(--ink);color:var(--plane)}
+#rail button .rb{position:absolute;top:4px;right:5px;min-width:15px;height:15px;border-radius:8px;background:var(--critical);color:#fff;font-size:9.5px;font-weight:600;display:flex;align-items:center;justify-content:center;padding:0 3px;font-family:'IBM Plex Mono',monospace}
+#rail .rsp{flex:1}
+#rail .ravatar{width:32px;height:32px;border-radius:50%;background:var(--surface-2);color:var(--ink);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;cursor:pointer;flex:none;margin-top:4px}
+#railFly{display:none;position:fixed;z-index:160;left:68px;min-width:224px;max-width:320px;max-height:calc(100vh - 24px);overflow:auto;background:var(--surface);border:1px solid var(--ring);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.14);padding:8px}
+#railFly.on{display:block}
+#railFly .fh{font-size:11px;color:var(--muted);font-weight:600;padding:6px 10px 4px}
+#railFly button{display:flex;width:100%;text-align:left;border:0;background:transparent;padding:8px 10px;border-radius:8px;font:inherit;font-size:13px;color:var(--ink-2);cursor:pointer;gap:8px;align-items:center}
+#railFly button:hover{background:var(--surface-2);color:var(--ink)}
+#railFly button[aria-current="true"]{color:var(--ink);font-weight:600;background:var(--surface-2)}
+#railFly button .ic{display:none}
+
+/* ── 홈: 인사 + 인박스 + 히어로 ── */
+html[data-look="cc"] #noticeStack,html[data-look="cc"] #todoWrap{display:none!important}
+html[data-look="cc"] #ccHome{display:flex;flex-direction:column;gap:14px;margin-bottom:16px}
+#ccHi{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:0 2px}
+#ccHi h1{margin:0;font-size:20px;font-weight:600;letter-spacing:-.01em}
+#ccHi h1 span{color:var(--muted);font-weight:500}
+#ccRow{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:18px;align-items:stretch}
+#ccInbox{grid-column:span 8;padding:6px 0 0;display:flex;flex-direction:column}
+#ccHeroHost{grid-column:span 4;display:flex;flex-direction:column;gap:0}
+#ccHeroHost .kpi{flex:1;padding:18px 20px 14px;transform:none!important}
+#ccHeroHost .kpi .v{font-size:40px;margin-top:8px}
+#ccHeroHost .kpi .spark{height:56px;margin-top:10px}
+#ccHeroHost #goalBar{border:0!important;border-top:1px solid var(--grid)!important;border-radius:0!important;padding:12px 0 0!important;margin:12px 0 0!important;background:transparent!important}
+#ccHeroHost .arr{font-size:12.5px;color:var(--ink-2);margin-top:8px}
+#ccHeroHost .arr b{font-weight:600;color:var(--ink)}
+@media (max-width:1150px){ #ccInbox,#ccHeroHost{grid-column:span 12} }
+.ib-head{display:flex;align-items:center;justify-content:space-between;padding:8px 18px 6px;gap:8px;flex-wrap:wrap}
+.ib-head h2{margin:0;font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px}
+.ib-row{display:flex;align-items:center;gap:14px;padding:11px 18px;border-top:1px solid var(--grid)}
+.ib-row:hover{background:var(--surface-2)}
+.ib-ic{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex:none;background:var(--surface-2);color:var(--ink-2)}
+.ib-ic.warn{background:rgba(237,161,0,.14);color:#8a5200} .ib-ic.info{background:rgba(42,120,214,.12);color:#1e4fa3} .ib-ic.crit{background:rgba(208,59,59,.10);color:var(--critical)} .ib-ic.ok{background:var(--brand-t);color:var(--brand)}
+.ib-b{flex:1;min-width:0}
+.ib-t{font-size:13.5px;font-weight:500;line-height:1.45} .ib-t .num{font-weight:600}
+.ib-s{font-size:12px;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ib-acts{display:flex;gap:6px;flex:none}
+.ib-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 18px;border-top:1px solid var(--grid);font-size:12px;color:var(--muted);flex-wrap:wrap;margin-top:auto}
+.ib-foot a{cursor:pointer;font-weight:500}
+.ib-empty{padding:22px 18px;border-top:1px solid var(--grid);display:flex;align-items:center;gap:12px;color:var(--ink-2);font-size:13px}
+.cbtn{height:28px;padding:0 10px;border-radius:7px;border:1px solid var(--ring);background:var(--surface);color:var(--ink);font:inherit;font-size:12px;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.cbtn:hover{background:var(--surface-2)}
+.cbtn.pri{background:var(--ink);border-color:var(--ink);color:var(--plane)}
+.cbtn.pri:hover{filter:brightness(1.25)}
+.cbtn[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--plane)}
+.ctag{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:6px;font-size:11px;font-weight:600;background:var(--surface-2);color:var(--ink-2);white-space:nowrap}
+.ctag.ok{background:var(--brand-t);color:var(--brand)} .ctag.warn{background:rgba(237,161,0,.14);color:#8a5200} .ctag.info{background:rgba(42,120,214,.12);color:#1e4fa3} .ctag.crit{background:rgba(208,59,59,.10);color:var(--critical)}
+/* KPI 벤토 */
+html[data-look="cc"] .kpis{grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+@media (max-width:1000px){ html[data-look="cc"] .kpis{grid-template-columns:repeat(2,minmax(0,1fr))} }
+html[data-look="cc"] .kpi{padding:15px 18px;display:flex;flex-direction:column}
+html[data-look="cc"] .kpi .k{justify-content:space-between;gap:8px}
+html[data-look="cc"] .kpi .v{font-size:26px;font-weight:600}
+.stk{display:flex;height:8px;border-radius:4px;overflow:hidden;gap:2px;margin:10px 0 8px}
+.stk i{display:block;height:100%}
+.mlist{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 12px;font-size:12.5px}
+.mrow{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.mrow span:first-child{display:flex;align-items:center;gap:6px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mrow span:first-child i{width:8px;height:8px;border-radius:2px;display:inline-block;flex:none}
+.mrow .num{font-weight:600}
+.mbar{display:flex;align-items:center;gap:8px;font-size:12px;margin-top:5px}
+.mbar .l{width:72px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:none}
+.mbar .t{flex:1;height:6px;background:var(--surface-2);border-radius:3px;overflow:hidden}
+.mbar .t i{display:block;height:100%;border-radius:3px}
+.mbar .n{width:40px;text-align:right;flex:none}
+.tri{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:8px}
+.tri div b{display:block;font-size:22px;font-weight:600;line-height:1.1}
+.tri div span{font-size:11.5px;color:var(--muted)}
+.eqb-prog{display:flex;gap:3px;margin-top:5px}
+.eqb-prog i{flex:1;height:6px;border-radius:2px;background:var(--grid)}
+.eqb-prog i.on{background:var(--brand)}
+/* 오늘의 브리핑 */
+#ccBrief{background:var(--ink);color:var(--plane);border-radius:12px;padding:14px 16px;margin-bottom:12px;flex-direction:column;gap:8px}
+html[data-look="cc"] #ccBrief{display:flex}
+#ccBrief .bh{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600}
+#ccBrief .bh svg{color:#7BD79A}
+#ccBrief .bh small{margin-left:auto;font-weight:400;opacity:.65;font-size:11px}
+#ccBrief p{margin:0;font-size:13px;line-height:1.65;opacity:.92}
+#ccBrief .ba{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
+#ccBrief .cbtn{background:transparent;border-color:color-mix(in srgb,var(--plane) 28%,transparent);color:inherit}
+#ccBrief .cbtn:hover{background:color-mix(in srgb,var(--plane) 12%,transparent)}
+html[data-look="cc"] .ask{padding:14px 16px 12px}
+html[data-look="cc"] .ask-ico{display:none}
+
+/* ── 장비 운영 보드 ── */
+.eqb-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.eqb-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.eqb-bar input[type="search"]{height:30px;width:220px}
+.eqb-chips{display:flex;gap:6px;flex-wrap:wrap}
+.eqb-seg{display:inline-flex;border:1px solid var(--ring);border-radius:8px;overflow:hidden;background:var(--surface)}
+.eqb-seg button{height:30px;padding:0 12px;border:0;background:transparent;color:var(--ink-2);font:inherit;font-size:12.5px;font-weight:500;cursor:pointer}
+.eqb-seg button[aria-pressed="true"]{background:var(--ink);color:var(--plane)}
+.eqb-wrap{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;align-items:start}
+@media (max-width:1400px){ .eqb-wrap{grid-template-columns:repeat(3,minmax(0,1fr))} }
+@media (max-width:760px){ .eqb-wrap{grid-template-columns:1fr} }
+.eqb-col{background:var(--surface-2);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:8px;min-height:140px;min-width:0}
+.eqb-col.warm{background:color-mix(in srgb,#f0a020 12%,var(--surface-2))}
+.eqb-col.over{outline:2px dashed var(--brand);outline-offset:-2px;background:var(--brand-t)}
+.eqb-ch{display:flex;align-items:center;gap:6px;padding:2px 4px;font-size:12.5px;font-weight:600;white-space:nowrap;min-width:0}
+@media (max-width:1700px){ .eqb-ch .to{display:none} }
+.eqb-ch i{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
+.eqb-ch .n{color:var(--muted);font-weight:500;font-family:'IBM Plex Mono',monospace}
+.eqb-ch .to{margin-left:auto;font-size:11px;color:var(--muted);font-weight:500;white-space:nowrap}
+.eqb-card{background:var(--surface);border:1px solid var(--ring);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;cursor:grab;min-width:0}
+.eqb-card:hover{border-color:var(--axis)}
+.eqb-card.drag{opacity:.45}
+.eqb-card.hot{border-color:#D9B36A}
+.eqb-card .tp{display:flex;justify-content:space-between;align-items:center;gap:6px}
+.eqb-card .cu{font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.eqb-card .mt{font-size:12px;color:var(--muted);line-height:1.5}
+.eqb-card .sn{display:flex;gap:4px;flex-wrap:wrap;font-size:11px}
+.eqb-card .sn .eqsn{margin:0}
+.eqb-card .eqser-full{max-width:none;line-height:1.9}
+.eqb-card .ft{display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--grid);padding-top:7px;gap:6px;flex-wrap:wrap}
+.eqb-card .ft .mini{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.eqb-more{border:1px dashed var(--axis);background:transparent;border-radius:10px;height:32px;color:var(--muted);font:inherit;font-size:12px;cursor:pointer}
+.eqb-more:hover{color:var(--ink);border-color:var(--ink-2)}
+.eqb-empty{color:var(--muted);font-size:12px;text-align:center;padding:14px 6px}
+
+/* ── 고객 360 — 요약·다음 액션·탭 (모든 디자인) + 슬라이드 패널 (커맨드 센터) ── */
+.c360-sum{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:8px 0 12px}
+.c360-sum>div{background:var(--surface-2);border-radius:10px;padding:10px 12px;min-width:0}
+.c360-sum .l{font-size:11.5px;color:var(--muted);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.c360-sum .v{font-size:18px;font-weight:600;margin-top:2px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.c360-sum .v small{font-size:11.5px;font-weight:500;color:var(--muted)}
+.c360-sum>div.warn{background:rgba(237,161,0,.14)} .c360-sum>div.warn .l,.c360-sum>div.warn .v{color:#8a5200}
+.c360-sum>div.ok .v{color:var(--brand)}
+.c360-next{background:var(--ink);color:var(--plane);border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:12.5px;line-height:1.6}
+.c360-next b{display:flex;align-items:center;gap:6px;font-size:12.5px;margin-bottom:4px}
+.c360-next b svg{color:#7BD79A}
+.c360-next p{margin:0;opacity:.92}
+.c360-next .ba{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.c360-next .cbtn{background:transparent;border-color:color-mix(in srgb,var(--plane) 28%,transparent);color:inherit}
+.c360-tabs{display:flex;gap:16px;border-bottom:1px solid var(--grid);margin-bottom:12px;overflow:auto}
+.c360-tabs button{height:32px;border:0;background:transparent;font:inherit;font-size:13px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;padding:0 2px;white-space:nowrap;flex:none}
+.c360-tabs button[aria-selected="true"]{color:var(--ink);font-weight:600;border-bottom-color:var(--ink)}
+.c360-tabs button .ct{font-size:11px;color:var(--muted);margin-left:3px}
+@media (max-width:640px){ .c360-sum{grid-template-columns:repeat(2,minmax(0,1fr))} }
+html[data-look="cc"] #ovlC360{justify-content:flex-end;align-items:stretch;padding:0;background:rgba(0,0,0,.28)}
+html[data-look="cc"] #ovlC360 .modal{width:min(620px,100%)!important;height:100vh;max-height:100vh;border-radius:0;border-width:0 0 0 1px;padding:18px 22px 20px;box-shadow:-24px 0 48px -32px rgba(0,0,0,.3);animation:c360In .18s ease both;display:flex;flex-direction:column}
+@keyframes c360In{from{transform:translateX(24px);opacity:.5}to{transform:none;opacity:1}}
+html[data-look="cc"] #c360Body{max-height:none!important;flex:1;overflow:auto}
+html[data-look="cc"] #ovlC360 .mact{border-top:1px solid var(--grid);padding-top:12px;margin-top:12px}
+
+/* ── 모바일 하단 탭 ── */
+#mtabs{display:none}
+@media (max-width:760px){
+  html[data-look="cc"] #mtabs{position:fixed;left:0;right:0;bottom:0;z-index:140;display:flex;background:var(--surface);border-top:1px solid var(--grid);padding:4px 6px calc(8px + env(safe-area-inset-bottom))}
+  html[data-look="cc"] body:has(#side.hidden) #mtabs{display:none}
+  html[data-look="cc"] body{padding-bottom:74px}
+  #mtabs button{flex:1;height:52px;border:0;background:transparent;color:var(--muted);font:inherit;font-size:10.5px;font-weight:500;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;border-radius:8px}
+  #mtabs button[aria-current="true"]{color:var(--ink);font-weight:600}
+  html[data-look="cc"] .topbar{margin:-12px -12px 14px;padding:8px 12px;min-height:0;flex-wrap:wrap;gap:8px}
+  html[data-look="cc"] .cmdbar{flex:1 1 100%;order:9;height:38px;margin:0}
+  html[data-look="cc"] #btnMenu{display:none}
+  html[data-look="cc"] .ib-row{flex-wrap:wrap;align-items:flex-start}
+  html[data-look="cc"] .ib-acts{width:100%;justify-content:flex-end}
+  html[data-look="cc"] .ib-acts .cbtn{flex:1;justify-content:center;height:36px}
+  html[data-look="cc"] .ib-s{white-space:normal}
+  #ccHi h1{font-size:17px}
+  #ccHeroHost .kpi .v{font-size:32px}
+  html[data-look="cc"] .kpis{grid-template-columns:1fr 1fr}
+  html[data-look="cc"] #ovlC360 .modal{width:100%}
+}
 </style>
 </head>
 <body>
@@ -1168,6 +1385,7 @@ html:not([data-look="classic"]) #viewLogin input{border-radius:var(--r-sm)!impor
   <button data-v="chdist">📀 DLP/DRM</button>
   <button data-v="cnpns">🧷 PNS</button>
   <div class="grp">장비</div>
+  <button data-v="eqboard">🗂️ 임대 장비 운영 보드</button>
   <button data-v="ordernew">📝 임대 장비 신청</button>
   <button data-v="orders">📦 임대 장비 신청 내역</button>
   <button data-v="assets">🔧 임대 장비 현황</button>
@@ -1198,6 +1416,8 @@ html:not([data-look="classic"]) #viewLogin input{border-radius:var(--r-sm)!impor
   <button data-v="account">👤 내 계정</button>
   <button id="btnMenuEdit" style="display:none;opacity:.75">⚙ 메뉴 편집</button>
 </nav>
+<nav id="rail" class="cc-only" aria-label="주 메뉴"></nav>
+<div id="railFly" role="menu"></div>
 <div id="sideDim"></div>
 
 <div class="wrap hidden" id="app">
@@ -1208,6 +1428,7 @@ html:not([data-look="classic"]) #viewLogin input{border-radius:var(--r-sm)!impor
       <h1>서비스사업부 통합 관리 포탈</h1>
       <span class="sub" id="periodLabel"></span>
     </div>
+    <button class="cmdbar" id="cmdBar" type="button" title="검색 · 화면 이동 · AI 질문 (Ctrl+K)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/></svg><span class="ph">물어보거나 이동하세요 — «시흥도시공사 장비», «이번 달 해지», «가격표»</span><kbd>Ctrl K</kbd></button>
     <span class="ubadge" id="unitBadge"
       title="포탈에 표시되는 모든 금액은 천원 단위입니다.&#10;예) 51,104천원 = 5,110만원 (= 51,104,000원)&#10;· 입력·수정 화면과 가격표·견적서 단가는 원 단위 그대로입니다.">₩ <b>천원</b> 단위<span class="ub-long"> 표시</span></span>
     <div class="spacer"></div>
@@ -1231,12 +1452,20 @@ html:not([data-look="classic"]) #viewLogin input{border-radius:var(--r-sm)!impor
   <div id="viewDash">
   <section id="dashHero" data-w="hero">
     <div id="noticeStack"></div>
+    <div id="ccHome" class="cc-only">
+      <div id="ccHi"></div>
+      <div id="ccRow">
+        <section class="card" id="ccInbox" aria-label="인박스"></section>
+        <div id="ccHeroHost"></div>
+      </div>
+    </div>
   </section>
   <section id="todoWrap" style="margin-bottom:14px;display:none">
     <div class="todo-cards" id="todoCards"></div>
     <div class="quick-links" id="quickLinks"></div>
   </section>
   <section class="ask">
+    <div id="ccBrief" class="cc-only"></div>
     <div class="ask-row">
       <div class="ask-ico">AI</div>
       <div class="qwrap">
@@ -1437,6 +1666,25 @@ html:not([data-look="classic"]) #viewLogin input{border-radius:var(--r-sm)!impor
       <div class="tbl-wrap" style="max-height:70vh"><table id="dvTable" class="dgrid"></table></div>
       <div id="dvPager" style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:12px"></div>
     </section>
+  </div>
+
+  <!-- 임대 장비 운영 보드 (칸반) -->
+  <div id="viewEqBoard" class="hidden">
+    <div class="eqb-head">
+      <h2 style="margin:0;font-size:19px;font-weight:600;letter-spacing:-.01em">임대 장비 운영 보드</h2>
+      <span id="eqbMatch"></span>
+      <span class="mini" id="eqbHint">카드를 옆 열로 끌어다 놓으면 상태가 바뀌고 장비 현황이 따라 갱신됩니다 · 시리얼 칩을 누르면 일부 회수</span>
+      <span class="spacer"></span>
+      <div class="eqb-seg" role="group" aria-label="보기"><button aria-pressed="true">보드</button><button data-go="orders">목록</button><button data-go="assets">현황(시리얼)</button></div>
+      <button class="pill" id="eqbNew">＋ 장비 신청</button>
+    </div>
+    <div class="eqb-bar">
+      <div class="eqb-chips" id="eqbChips"></div>
+      <input type="search" id="eqbQ" placeholder="고객·시리얼·모델 검색">
+      <button class="pill ghost" id="eqbReload">↻ 다시 읽기</button>
+      <span class="mini" id="eqbCount"></span>
+    </div>
+    <div class="eqb-wrap" id="eqbCols"></div>
   </div>
 
   <div id="viewQuote" class="hidden">
@@ -1792,6 +2040,7 @@ html:not([data-look="classic"]) #viewLogin input{border-radius:var(--r-sm)!impor
 
   <div class="foot" id="foot"></div>
 </div>
+<nav id="mtabs" class="cc-only" aria-label="하단 탭"></nav>
 
 <!-- 사업 영역 · 고객사 계약 이력 -->
 <div class="ovl" id="ovlChvHist">
@@ -1819,7 +2068,7 @@ html:not([data-look="classic"]) #viewLogin input{border-radius:var(--r-sm)!impor
 <!-- 전역 검색 (Ctrl+K) -->
 <div class="ovl" id="ovlFind">
   <div class="modal" style="width:min(620px,100%)">
-    <input id="fkInput" placeholder="고객사·시리얼·사업명 검색…  (Enter: 첫 결과 열기 · Esc: 닫기)" autocomplete="off">
+    <input id="fkInput" placeholder="고객사·시리얼·사업명 검색 · 화면 이름으로 이동 · 질문…  (Enter: 첫 결과 · Esc: 닫기)" autocomplete="off">
     <div id="fkOut" style="max-height:52vh;overflow:auto;margin-top:10px"></div>
     <p class="cap" style="margin:8px 0 0">계약 · LIVE · OI · 인바운드 · MDR 운영 · 장비를 한 번에 찾습니다 — 단축키 <b>Ctrl+K</b></p>
   </div>
@@ -2441,7 +2690,7 @@ window.addEventListener('message', function(ev){
 });
 
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-16 ㊿+98';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-16 ㊿+99';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -2524,16 +2773,24 @@ function idleCheck(){
 setInterval(idleCheck, 15*1000);
 document.addEventListener('visibilitychange', function(){ if(!document.hidden) idleCheck(); });
 
-/* ---- 화면 디자인: 심플(기본) / 클래식(이전) — 이 브라우저에만 저장 ---- */
+/* ---- 화면 디자인: 커맨드 센터(기본, cc) / 심플(simple) / 클래식(classic) — 이 브라우저에만 저장 ----
+   · cc      : 아이콘 레일 + 커맨드 바 + 인박스 홈 + 장비 보드 + 고객 360 패널 (v5 CSS · html[data-look="cc"])
+   · simple  : 평면 디자인, 기존 사이드바 (v4 CSS · html:not([data-look="classic"]))
+   · classic : 이전 디자인 그대로                                                                 */
+var LOOKS={cc:'커맨드 센터 (기본)', simple:'심플', classic:'클래식 (이전 디자인)'};
+function curLook(){ var v=null; try{ v=localStorage.getItem('svc_look'); }catch(e){} return LOOKS[v]? v : 'cc'; }
+function isCC(){ return document.documentElement.getAttribute('data-look')==='cc'; }
 function applyLook(){
-  var v=null; try{ v=localStorage.getItem('svc_look'); }catch(e){}
-  if(v==='classic') document.documentElement.setAttribute('data-look','classic');
-  else document.documentElement.removeAttribute('data-look');
+  var v=curLook();
+  if(v==='simple') document.documentElement.removeAttribute('data-look');
+  else document.documentElement.setAttribute('data-look', v);
 }
 function setLook(v){
-  try{ if(v==='classic') localStorage.setItem('svc_look','classic'); else localStorage.removeItem('svc_look'); }catch(e){}
+  if(!LOOKS[v]) v='cc';
+  try{ if(v==='cc') localStorage.removeItem('svc_look'); else localStorage.setItem('svc_look',v); }catch(e){}
   applyLook();
-  try{ if(window.DATA) renderAll(); }catch(e){}
+  /* 레일·인박스 등 구조가 달라지므로 다시 읽는 편이 안전합니다 */
+  setTimeout(function(){ location.reload(); }, 350);
 }
 applyLook();
 /* 메뉴 글머리 이모지를 <span class="ic"> 로 감싸 심플 디자인에서는 숨길 수 있게 (textContent 는 그대로) */
@@ -2549,9 +2806,505 @@ function wrapNavIcons(){
 }
 function navText(b){   // 메뉴 글자만 (심플 디자인에서는 이모지 제외)
   var t=(b.textContent||'').trim(), ic=b.querySelector('.ic');
-  if(ic && !document.documentElement.hasAttribute('data-look')) t=t.replace(ic.textContent,'').trim();
+  if(ic && document.documentElement.getAttribute('data-look')!=='classic') t=t.replace(ic.textContent,'').trim();
   return t;
 }
+
+/* ==================================================================
+   커맨드 센터 (v5) — 아이콘 레일 · 커맨드 바 · 인박스 홈 · 운영 보드 · 고객 360 패널 · 모바일 탭
+   ================================================================== */
+var ICO={
+  home:'<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>',
+  chart:'<path d="M4 19h16"/><path d="M6 16V9"/><path d="M11 16V5"/><path d="M16 16v-6"/>',
+  cloud:'<path d="M7 18a4 4 0 0 1-.6-7.95A6 6 0 0 1 18 9a4.5 4.5 0 0 1-.5 9z"/>',
+  shield:'<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/>',
+  layers:'<path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/>',
+  box:'<path d="M3 8l9-4 9 4-9 4-9-4z"/><path d="M3 8v8l9 4 9-4V8"/><path d="M12 12v8"/>',
+  flask:'<path d="M9 3h6"/><path d="M10 3v6L4.5 19a1.5 1.5 0 0 0 1.3 2h12.4a1.5 1.5 0 0 0 1.3-2L14 9V3"/>',
+  target:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/>',
+  inbox:'<path d="M3 13l3-8h12l3 8v6H3z"/><path d="M3 13h5l2 3h4l2-3h5"/>',
+  scale:'<path d="M12 3v18"/><path d="M5 8l7-3 7 3"/><path d="M3 14l2-6 2 6a2 2 0 0 1-4 0z"/><path d="M17 14l2-6 2 6a2 2 0 0 1-4 0z"/>',
+  tool:'<path d="M21 7a5 5 0 0 1-6.6 4.7L6 20l-2-2 8.3-8.4A5 5 0 0 1 17 3l-3 3 2 2 3-3z"/>',
+  gear:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3"/><path d="M12 19v3"/><path d="M2 12h3"/><path d="M19 12h3"/><path d="M4.9 4.9l2.1 2.1"/><path d="M17 17l2.1 2.1"/><path d="M4.9 19.1L7 17"/><path d="M17 7l2.1-2.1"/>',
+  calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M8 3v4"/><path d="M16 3v4"/>',
+  user:'<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+  spark:'<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  check:'<path d="M5 12l5 5L20 7"/>',
+  menu:'<path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/>',
+  board:'<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="9.5" y="4" width="5" height="10" rx="1"/><rect x="16" y="4" width="5" height="13" rx="1"/>',
+  users:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.5a5 5 0 0 1 6 5"/>',
+  arrow:'<path d="M5 12h14"/><path d="M13 6l6 6-6 6"/>',
+  doc:'<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M9 13h6"/><path d="M9 17h6"/>'
+};
+function ico(name, size){ size=size||18; return '<svg width="'+size+'" height="'+size+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(ICO[name]||ICO.doc)+'</svg>'; }
+function iconFor(label, v){
+  var L=String(label||'');
+  if(v==='dash') return 'home'; if(v==='weekly') return 'calendar'; if(v==='account') return 'user'; if(v==='eqboard') return 'board';
+  if(/전체 데이터|계약|매출/.test(L)) return 'chart';
+  if(/Cloud NAC|CLOUD/i.test(L)) return 'cloud';
+  if(/MDR/.test(L)) return 'shield';
+  if(/기타|유통/.test(L)) return 'layers';
+  if(/장비/.test(L)) return 'box';
+  if(/PoC|POC|데모/.test(L)) return 'flask';
+  if(/영업|OI/.test(L)) return 'target';
+  if(/인바운드/.test(L)) return 'inbox';
+  if(/정산|목표/.test(L)) return 'scale';
+  if(/도구/.test(L)) return 'tool';
+  if(/관리자/.test(L)) return 'gear';
+  if(/주간|회의/.test(L)) return 'calendar';
+  return 'doc';
+}
+function visBtn(b){ return !!b && !b.classList.contains('mhide') && b.style.display!=='none'; }
+
+/* ---- 아이콘 레일 (사이드바 구조 menuSegments() 를 그대로 따라 만듦 · 메뉴 편집/채널 숨김 반영) ---- */
+function buildRail(){
+  var rail=document.getElementById('rail'); if(!rail || !isCC()) return;
+  var segs=[]; try{ segs=menuSegments(); }catch(e){}
+  var h='<div class="rlogo" data-v="dash" title="홈 (대시보드)">G</div>';
+  h+='<button type="button" data-v="dash" title="홈" aria-label="홈">'+ico('home')+'</button>';
+  segs.forEach(function(s){
+    if(s.grp){
+      if(s.grp.classList.contains('mhide')) return;
+      var vis=s.buttons.filter(visBtn); if(!vis.length) return;
+      h+='<button type="button" data-seg="'+esc(s.key)+'" title="'+esc(s.label)+'" aria-label="'+esc(s.label)+'" aria-haspopup="menu">'+ico(iconFor(s.label))+'</button>';
+    }else{
+      if(!visBtn(s.btn)) return;
+      var t=navText(s.btn);
+      h+='<button type="button" data-v="'+esc(s.btn.dataset.v)+'" title="'+esc(t)+'" aria-label="'+esc(t)+'">'+ico(iconFor(t, s.btn.dataset.v))+'</button>';
+    }
+  });
+  h+='<div class="rsp"></div>';
+  h+='<button type="button" data-v="account" title="내 계정 · 설정" aria-label="내 계정">'+ico('gear')+'</button>';
+  h+='<div class="ravatar" data-v="account" title="'+esc(AUTH_USER||'')+'">'+esc(((AUTH_USER||'?').split('@')[0]).slice(0,1).toUpperCase())+'</div>';
+  rail.innerHTML=h;
+  rail.querySelectorAll('[data-v]').forEach(function(b){ b.onclick=function(){ railFlyClose(); switchView(b.dataset.v); }; });
+  rail.querySelectorAll('[data-seg]').forEach(function(b){ b.onclick=function(e){ e.stopPropagation(); railFlyToggle(b, b.dataset.seg); }; });
+  railSync(CUR_VIEW);
+}
+var RAIL_OPEN=null;
+function railFlyClose(){ var f=document.getElementById('railFly'); if(f) f.classList.remove('on'); RAIL_OPEN=null; }
+function railFlyToggle(btn, key){
+  var f=document.getElementById('railFly'); if(!f) return;
+  if(RAIL_OPEN===key){ railFlyClose(); return; }
+  var seg=menuSegments().filter(function(s){ return s.key===key; })[0]; if(!seg) return;
+  var btns=(seg.buttons||[]).filter(visBtn);
+  f.innerHTML='<div class="fh">'+esc(seg.label)+'</div>'+btns.map(function(b){
+    return '<button type="button" data-v="'+esc(b.dataset.v)+'" aria-current="'+(b.dataset.v===CUR_VIEW)+'">'+esc(navText(b))+'</button>'; }).join('');
+  f.querySelectorAll('button').forEach(function(b){ b.onclick=function(){ railFlyClose(); switchView(b.dataset.v); }; });
+  var r=btn.getBoundingClientRect();
+  f.style.top='0px'; f.classList.add('on'); RAIL_OPEN=key;
+  var top=Math.max(8, Math.min(r.top, window.innerHeight - f.offsetHeight - 12));
+  f.style.top=top+'px';
+}
+document.addEventListener('click', function(e){ var f=document.getElementById('railFly'); if(f && f.classList.contains('on') && !f.contains(e.target)) railFlyClose(); });
+document.addEventListener('keydown', function(e){ if(e.key==='Escape') railFlyClose(); });
+function railSync(v){
+  var rail=document.getElementById('rail'); if(!rail) return;
+  var segs=[]; try{ segs=menuSegments(); }catch(e){}
+  var inSeg={}; segs.forEach(function(s){ if(s.grp && s.buttons.some(function(b){ return b.dataset.v===v; })) inSeg[s.key]=1; });
+  rail.querySelectorAll('button').forEach(function(b){
+    var cur = b.dataset.v? (b.dataset.v===v) : !!inSeg[b.dataset.seg];
+    b.setAttribute('aria-current', cur? 'true':'false');
+  });
+  /* 장비 그룹에 처리 대기 건수 배지 */
+  var pend=(RAWX.orders||[]).filter(function(o){ return ['접수','출하요청','배송중'].indexOf(o.status)>=0; }).length;
+  rail.querySelectorAll('[data-seg]').forEach(function(b){
+    var old=b.querySelector('.rb'); if(old) old.remove();
+    if(/장비/.test(b.dataset.seg) && pend){ var s=document.createElement('span'); s.className='rb'; s.textContent=pend>99?'99+':pend; b.appendChild(s); }
+  });
+  mtabsSync(v);
+}
+
+/* ---- 모바일 하단 탭 (≤760px) ---- */
+function buildMtabs(){
+  var m=document.getElementById('mtabs'); if(!m) return;
+  var tabs=[['dash','홈','home'],['contracts','매출','chart'],[window.IS_EQUIP? 'orders':'eqboard','장비','box'],['weekly','주간회의','calendar'],['_menu','전체','menu']];
+  if(window.IS_EQUIP) tabs[1]=['assets','현황','layers'];
+  m.innerHTML=tabs.map(function(t){ return '<button type="button" data-v="'+t[0]+'" aria-current="false">'+ico(t[2],20)+esc(t[1])+'</button>'; }).join('');
+  m.querySelectorAll('button').forEach(function(b){
+    b.onclick=function(){
+      if(b.dataset.v==='_menu'){ var open=document.getElementById('side').classList.toggle('open'); document.getElementById('sideDim').classList.toggle('on', open); return; }
+      closeDrawer(); switchView(b.dataset.v);
+    };
+  });
+  mtabsSync(CUR_VIEW);
+}
+function mtabsSync(v){
+  var m=document.getElementById('mtabs'); if(!m) return;
+  m.querySelectorAll('button').forEach(function(b){ b.setAttribute('aria-current', b.dataset.v===v? 'true':'false'); });
+}
+
+/* ---- 커맨드 바 → 전역 검색 창 (화면 이동 + 데이터 검색 + AI 질문) ---- */
+function cmdMenuHits(q){
+  var out=[], qn=fkNorm(q);
+  if(!qn) return out;
+  document.querySelectorAll('#side button[data-v]').forEach(function(b){
+    if(!visBtn(b) && b.dataset.v!=='dash' && b.dataset.v!=='account') return;
+    var t=navText(b); if(fkNorm(t).indexOf(qn)<0) return;
+    if(window.IS_EQUIP && !EQUIP_VIEWS[b.dataset.v]) return;
+    out.push({t:'이동', nm:t, sb:'화면 열기', go:(function(v){ return function(){ switchView(v); }; })(b.dataset.v), kmenu:1});
+  });
+  return out.slice(0,5);
+}
+function cmdAskHit(q){
+  q=String(q||'').trim(); if(q.length<2 || window.IS_EQUIP) return null;
+  return {t:'AI', nm:'«'+q+'» 물어보기', sb:'매출·고객·계약 데이터를 기준으로 답합니다 (Enter 대신 클릭)', kai:1,
+    go:function(){ switchView('dash'); var qi=document.getElementById('q'); if(qi){ qi.value=q; } try{ ask(q); }catch(e){} try{ document.querySelector('.ask').scrollIntoView({block:'start',behavior:'smooth'}); }catch(e){} }};
+}
+
+/* ---- 홈: 인사 · 인박스 ---- */
+function ccGreeting(n){
+  var el0=document.getElementById('ccHi'); if(!el0) return;
+  var h=new Date().getHours(), g= h<5? '늦은 시간까지 고생 많으십니다' : h<12? '좋은 아침입니다' : h<18? '좋은 오후입니다' : '좋은 저녁입니다';
+  var who=(AUTH_USER||'').split('@')[0];
+  var d=new Date(), ds=d.getFullYear()+'년 '+(d.getMonth()+1)+'월 '+d.getDate()+'일 ('+'일월화수목금토'[d.getDay()]+')';
+  var la=document.getElementById('loadedAt');
+  el0.innerHTML='<h1>'+g+(who? ', '+esc(who)+'님':'')+'. <span>'+(n>0? '오늘 처리할 일이 '+n+'건 있습니다.':'지금 처리할 일이 없습니다.')+'</span></h1>'+
+    '<span class="mini" style="display:flex;align-items:center;gap:6px"><i style="width:7px;height:7px;border-radius:50%;background:var(--brand);display:inline-block"></i>'+esc(ds)+(la&&la.textContent? ' · '+esc(la.textContent):'')+'</span>';
+}
+function ccSnoozed(key){ try{ var u=localStorage.getItem('svc_snz_'+key); return !!u && u>=todayStr(); }catch(e){ return false; } }
+function ccSnooze(key, days){
+  var d=new Date(); d.setDate(d.getDate()+days);
+  try{ localStorage.setItem('svc_snz_'+key, todayStr(d)); }catch(e){}
+  renderInbox(); toast('보류했습니다', days>=7? '다음 주에 다시 알려드립니다':'내일 다시 알려드립니다', 'info');
+}
+function ccUnsnooze(){ try{ Object.keys(localStorage).filter(function(k){ return k.indexOf('svc_snz_')===0; }).forEach(function(k){ localStorage.removeItem(k); }); }catch(e){} renderInbox(); }
+function renderInbox(){
+  if(!isCC()) return;
+  var box=document.getElementById('ccInbox'); if(!box || !window.DATA || !SB_TOKEN){ if(box) box.innerHTML=''; return; }
+  var list=idxs(), b=STATE.base, EN=expN(), EQ=!!window.IS_EQUIP;
+  var orders=RAWX.orders||[];
+  var pendL=orders.filter(function(o){ return ['접수','출하요청','배송중'].indexOf(o.status)>=0; });
+  var retL=orders.filter(function(o){ return o.status==='회수예정'; });
+  var expL=[], expAmt=0;
+  if(!EQ) list.forEach(function(k){ var r=DATA.rows[k], e=r.endIdx;
+    if(e!=null && e>=b && e<=b+EN-1 && !/해지|종료|CN전환/.test(String(r.status||''))){ expL.push(r); expAmt+=MAT[k][Math.min(e,M-1)]||r.mrr||0; } });
+  var curYm=monOf(b)+'월', bizDone=EQ || (RAWX.biz||[]).some(function(r){ return r.ym===curYm; });
+  var todayS=todayStr();
+  var oiLate=EQ? [] : (RAWX.oi||[]).filter(function(o){ return o.next_date && String(o.next_date).slice(0,10)<todayS && !/수주|실패/.test(String(o.stage||'')); });
+  var inbN=EQ? 0 : (window.__inbTodo? window.__inbTodo.n : null);
+  var dow=new Date().getDay(), toMon=(8-dow)%7, wkTxt= dow===1? '오늘':'D-'+(toMon===0?7:toMon);
+  var rows=[], zeros=[], snz=0;
+  function add(key, o){ if(ccSnoozed(key)){ snz++; return; } o.key=key; rows.push(o); }
+  function names(arr, f, n){ var u={}; arr.forEach(function(x){ var v=f(x); if(v) u[v]=1; }); var ks=Object.keys(u); return ks.slice(0,n||3).join(', ')+(ks.length>(n||3)? ' 외 '+(ks.length-(n||3))+'곳':''); }
+  if(pendL.length){
+    var oldest=pendL.map(function(o){ return String(o.created_at||'').slice(0,10); }).filter(Boolean).sort()[0];
+    var age=oldest? Math.floor((new Date(todayS)-new Date(oldest))/864e5) : 0;
+    var byCh={}; pendL.forEach(function(o){ byCh[o.channel||'기타']=(byCh[o.channel||'기타']||0)+1; });
+    add('eq', {ic:'box', cls:'warn', t:'처리 대기 장비 신청 <span class="num">'+pendL.length+'건</span>'+(age>=1? ' — 가장 오래된 건 '+age+'일 경과':''),
+      s:Object.keys(byCh).map(function(c){ return c+' '+byCh[c]; }).join(' · ')+' · '+names(pendL, function(o){ return o.customer; }),
+      acts:[{l:'보류', go:function(){ ccSnooze('eq',1); }},{l:'운영 보드 →', pri:1, go:function(){ switchView('eqboard'); }}]});
+  }
+  if(retL.length){
+    add('ret', {ic:'box', cls:'info', t:'회수 진행 중 <span class="num">'+retL.length+'건</span>',
+      s:retL.slice(0,3).map(function(o){ var all=eqWant(o).length, d=eqRetSet(o).length; return (o.customer||'')+' '+d+'/'+all+'대'; }).join(' · ')+(retL.length>3? ' 외 '+(retL.length-3)+'건':''),
+      acts:[{l:'운영 보드 →', pri:1, go:function(){ switchView('eqboard'); }}]});
+  }
+  if(expL.length){
+    var ends=expL.map(function(r){ return r.endIdx; }).sort(function(x,y){ return x-y; });
+    add('exp', {ic:'clock', cls:'info', t:EN+'개월 내 만료 계약 <span class="num">'+expL.length+'건</span> — <span class="num">'+won(expAmt)+'</span>천원/월',
+      s:names(expL, function(r){ return r.cust; })+' · 종료 '+mk(ends[0])+(ends.length>1? '~'+mk(ends[ends.length-1]):'')+' · 재약정 타깃',
+      acts:[{l:'고객 360', go:function(){ if(expL.length===1) openCust360(expL[0].cust); else goWidget('exp','계약 만료 예정'); }},{l:'재계약 타진', pri:1, go:function(){ goWidget('exp','계약 만료 예정'); }}]});
+  }
+  if(!bizDone){
+    add('biz', {ic:'scale', cls:'', t:curYm+' 비즈포탈 차액이 아직 입력되지 않았습니다', s:'엑셀을 올리면 고객사·회계매출 기준으로 자동 대조합니다',
+      acts:[{l:'다음 주에', go:function(){ ccSnooze('biz',7); }},{l:'엑셀 올리기', pri:1, go:function(){ switchView('biz'); }}]});
+  }
+  if(!EQ){
+    if(inbN>0) add('inb', {ic:'inbox', cls:'crit', t:'인바운드 미대응 <span class="num">'+inbN+'건</span>', s:'진행중인데 3개월 이상 대응 기록이 없습니다', acts:[{l:'인바운드 통계 →', pri:1, go:function(){ switchView('inbstat'); }}]});
+    else zeros.push('인바운드 미대응 '+(inbN==null? '…':'0'));
+    if(oiLate.length) add('oi', {ic:'target', cls:'warn', t:'OI 밀린 액션 <span class="num">'+oiLate.length+'건</span>', s:names(oiLate, function(o){ return o.customer; })+' · 다음 일정이 지났습니다', acts:[{l:'OI 현황 →', pri:1, go:function(){ switchView('oi'); }}]});
+    else zeros.push('OI 밀린 액션 0');
+  }
+  zeros.push('주간회의 '+wkTxt);
+  var h='<div class="ib-head"><h2>인박스 <span class="ctag'+(rows.length?' warn':' ok')+'">'+rows.length+'</span></h2><span class="mini">알림 · 할 일 · 처리 버튼</span></div>';
+  if(!rows.length) h+='<div class="ib-empty"><span class="ib-ic ok">'+ico('check',16)+'</span>처리할 알림이 없습니다. 모든 항목이 정리되어 있어요.</div>';
+  rows.forEach(function(o,i){
+    h+='<div class="ib-row" data-i="'+i+'"><span class="ib-ic '+o.cls+'">'+ico(o.ic,16)+'</span><div class="ib-b"><div class="ib-t">'+o.t+'</div><div class="ib-s" title="'+esc(o.s||'')+'">'+esc(o.s||'')+'</div></div>'+
+      '<div class="ib-acts">'+o.acts.map(function(a,j){ return '<button type="button" class="cbtn'+(a.pri?' pri':'')+'" data-i="'+i+'" data-j="'+j+'">'+esc(a.l)+'</button>'; }).join('')+'</div></div>';
+  });
+  h+='<div class="ib-foot"><span>'+zeros.map(esc).join(' · ')+'</span>'+(snz? '<a id="ibUnsnz">보류한 '+snz+'건 다시 보기</a>':'<span class="mini">주간회의는 매주 월요일 · 일요일 저녁 자동 취합</span>')+'</div>';
+  box.innerHTML=h;
+  box.querySelectorAll('.cbtn').forEach(function(bt){ bt.onclick=function(e){ e.stopPropagation(); rows[+bt.dataset.i].acts[+bt.dataset.j].go(); }; });
+  var un=document.getElementById('ibUnsnz'); if(un) un.onclick=ccUnsnooze;
+  ccGreeting(rows.length);
+  try{ railSync(CUR_VIEW); }catch(e){}
+}
+
+/* ---- 홈: KPI 뒤처리 — 첫 타일을 히어로로, 목표 막대 병합, 벤토 타일 추가 ---- */
+function ccAfterKpis(box, list, b){
+  if(!isCC()) return;
+  var host=document.getElementById('ccHeroHost'); if(!host || !box.children.length) return;
+  var gb0=document.getElementById('goalBar'); if(gb0 && host.contains(gb0)) box.parentElement.insertBefore(gb0, box);   /* 히어로를 비우기 전에 목표 막대를 꺼내 둠 */
+  var hero=box.children[0]; host.innerHTML=''; host.appendChild(hero); hero.classList.add('cc-hero');
+  /* 연환산 ARR 타일은 히어로 안 한 줄로 */
+  var arr=box.children[0];
+  if(arr && /연환산 ARR|기말 MRR/.test((arr.querySelector('.k')||{}).textContent||'')){
+    var line=document.createElement('div'); line.className='arr'; line.innerHTML=esc(arr.querySelector('.k').textContent)+' <b class="num">'+(arr.querySelector('.v')||{}).innerHTML+'</b>'; arr.remove(); hero.appendChild(line);
+  }
+  var gb=document.getElementById('goalBar'); if(gb) hero.appendChild(gb);
+  /* LIVE 타일에 제품별 막대 */
+  try{
+    var lt=[].slice.call(box.children).filter(function(c){ return /^LIVE|^활성 고객사/.test((c.querySelector('.k')||{}).textContent||''); })[0];
+    var lv=liveData(b);
+    if(lt && lv && lv.ok){
+      var per={}; lv.rows.forEach(function(x){ (per[x.line]=per[x.line]||{})[x.cust]=1; });
+      var arr2=Object.keys(per).map(function(l){ return [l, Object.keys(per[l]).length]; }).sort(function(x,y){ return y[1]-x[1]; }).slice(0,3);
+      var mx=arr2.length? arr2[0][1]:1, cols={};
+      (DATA.lines||[]).forEach(function(l){ cols[l.label]=seriesColor(l.color); });
+      var w=document.createElement('div'); w.style.marginTop='6px';
+      w.innerHTML=arr2.map(function(x){ return '<div class="mbar"><span class="l">'+esc(lline(x[0]))+'</span><span class="t"><i style="width:'+Math.round(x[1]/mx*100)+'%;background:'+(cols[x[0]]||'var(--s1)')+'"></i></span><span class="n num">'+x[1]+'</span></div>'; }).join('');
+      lt.appendChild(w);
+    }
+  }catch(e){}
+  try{ box.appendChild(ccTileChannel(list,b)); }catch(e){}
+  try{ box.appendChild(ccTileEquip()); }catch(e){}
+  if(!window.IS_EQUIP){ try{ box.appendChild(ccTilePipe()); }catch(e){} }
+  try{ box.appendChild(ccTileWeekly()); }catch(e){}
+  try{ ccBrief(list,b); }catch(e){}
+}
+function ccTileChannel(list,b){
+  var m={}, tot=0; list.forEach(function(k){ var a=MAT[k][b]||0; if(!a) return; var c=chOf(DATA.rows[k]); m[c]=(m[c]||0)+a; tot+=a; });
+  var arr=Object.keys(m).map(function(c){ return [c,m[c]]; }).sort(function(x,y){ return y[1]-x[1]; });
+  var top=arr.slice(0,4), cols=['var(--ink)','var(--ink-2)','var(--muted)','var(--axis)'];
+  var c=el('div','kpi');
+  c.innerHTML='<div class="k">채널별 MRR <span class="mini">'+esc(mk(b))+'</span></div>'+
+    '<div class="stk">'+top.map(function(x,i){ return '<i style="width:'+(tot? x[1]/tot*100:0)+'%;background:'+cols[i]+'"></i>'; }).join('')+'</div>'+
+    '<div class="mlist">'+top.map(function(x,i){ return '<div class="mrow"><span><i style="background:'+cols[i]+'"></i>'+esc(x[0])+'</span><span class="num">'+won(x[1])+'</span></div>'; }).join('')+'</div>'+
+    '<div class="d" style="margin-top:auto;padding-top:6px">단위 천원'+(top[0]&&tot? ' · '+esc(top[0][0])+' 비중 '+Math.round(top[0][1]/tot*100)+'%':'')+(arr.length>4? ' · 외 '+(arr.length-4)+'개 채널':'')+'</div>';
+  c.style.cursor='pointer'; c.title='채널별 매출 — 누르면 계약 목록'; c.setAttribute('role','button'); c.tabIndex=0;
+  c.onclick=function(){ switchView('contracts'); };
+  return c;
+}
+function ccTileEquip(){
+  var A=RAWX.assets||[], O=RAWX.orders||[];
+  var lent=A.filter(function(a){ return a.status==='임대중'; }).length, stock=A.filter(function(a){ return a.status==='재고'; }).length;
+  var live=O.filter(function(o){ return o.status!=='회수완료' && o.status!=='취소'; });
+  var prog=live.filter(function(o){ return o.status==='회수예정' || eqRetSet(o).length; });
+  var s=null; try{ s=eqScan(); }catch(e){}
+  var tag= s? (s.gap.length? '<span class="ctag warn">맞지 않음 '+s.gap.length+'</span>':'<span class="ctag ok">신청 ↔ 현황 일치</span>') : '';
+  var first=prog[0], ph='';
+  if(first){ var all=eqWant(first), done=eqRetSet(first).length;
+    ph='<div class="mrow" style="margin-top:8px;font-size:12px"><span>'+esc(first.customer||'')+' · 회수</span><span class="num mini">'+done+'/'+all.length+'대</span></div><div class="eqb-prog">'+all.map(function(sn,i){ return '<i class="'+(i<done?'on':'')+'"></i>'; }).join('')+'</div>'; }
+  var c=el('div','kpi');
+  c.innerHTML='<div class="k">임대 장비 운영 '+tag+'</div>'+
+    '<div class="tri"><div><b class="num">'+lent+'</b><span>임대중</span></div><div><b class="num">'+stock+'</b><span>재고</span></div><div><b class="num" style="color:'+(prog.length?'#8a5200':'inherit')+'">'+prog.length+'</b><span>회수 진행</span></div></div>'+ph+
+    '<div class="d" style="margin-top:auto;padding-top:6px;color:var(--brand);font-weight:500">운영 보드 열기 →</div>';
+  c.style.cursor='pointer'; c.title='임대 장비 운영 보드 (클릭)'; c.setAttribute('role','button'); c.tabIndex=0;
+  c.onclick=function(){ switchView('eqboard'); };
+  return c;
+}
+function ccTilePipe(){
+  var oi=RAWX.oi||[], today=new Date(), ym=today.getFullYear()+'-'+('0'+(today.getMonth()+1)).slice(-2);
+  var open=oi.filter(function(o){ return !/수주|계산서|종료|중지|실패/.test(String(o.stage||'')); });
+  var due=open.filter(function(o){ return String(o.expect_month||'').slice(0,7)===ym; });
+  var st={}; open.forEach(function(o){ var k=String(o.stage||'기타'); st[k]=(st[k]||0)+1; });
+  var wk=new Date(today); wk.setDate(wk.getDate()-7); var wkS=todayStr(wk);
+  var inb=RAWX.inbound===undefined? null : (RAWX.inbound||[]).filter(function(r){ return String(r.on_date||'').slice(0,10)>=wkS; }).length;
+  if(RAWX.inbound===undefined && !window.__ccInbLoad){ window.__ccInbLoad=1; try{ loadInbound(function(){ if(CUR_VIEW==='dash') try{ renderKpis(); }catch(e){} }); }catch(e){} }
+  var c=el('div','kpi');
+  c.innerHTML='<div class="k">이번 주 파이프라인 <span class="ctag info">인바운드 자동 07:00</span></div>'+
+    '<div class="tri" style="grid-template-columns:repeat(2,minmax(0,1fr))"><div><b class="num">'+(inb==null?'…':inb)+'</b><span>최근 7일 인바운드</span></div><div><b class="num">'+open.length+'</b><span>진행 중 OI</span></div></div>'+
+    '<div style="display:flex;flex-direction:column;gap:3px;font-size:12.5px;margin-top:8px">'+Object.keys(st).slice(0,3).map(function(k){ return '<div class="mrow"><span>'+esc(k)+' 단계</span><span class="num">'+st[k]+'</span></div>'; }).join('')+
+    '<div class="mrow"><span>이달 계약예상</span><span class="num" style="font-weight:600">'+due.length+'</span></div></div>';
+  c.style.cursor='pointer'; c.title='OI 현황 (클릭)'; c.setAttribute('role','button'); c.tabIndex=0;
+  c.onclick=function(){ switchView('oi'); };
+  return c;
+}
+function ccTileWeekly(){
+  var today=new Date(), dow=today.getDay(), toMon=(8-dow)%7; if(toMon===0) toMon=7;
+  var wkTxt= dow===1? '오늘':'D-'+toMon;
+  var next=new Date(today); next.setDate(next.getDate()+(dow===1? 0:toMon));
+  var c=el('div','kpi');
+  c.innerHTML='<div class="k">주간회의</div><div class="v">'+esc(wkTxt)+'</div>'+
+    '<div class="d">'+(dow===1? '오늘 회의 · 보고 화면 열기' : (next.getMonth()+1)+'월 '+next.getDate()+'일 월요일 · 일요일 저녁 자동 취합')+'</div>'+
+    '<div class="d" style="margin-top:auto;padding-top:6px;color:var(--brand);font-weight:500">주간회의 화면 →</div>';
+  c.style.cursor='pointer'; c.title='주간회의 (클릭)'; c.setAttribute('role','button'); c.tabIndex=0;
+  c.onclick=function(){ switchView('weekly'); };
+  return c;
+}
+/* ---- 오늘의 브리핑 — 숫자를 문장으로 (규칙 기반 · AI 비용 없음) + «AI로 더 자세히» ---- */
+function ccBrief(list,b){
+  var box=document.getElementById('ccBrief'); if(!box || !isCC()) return;
+  var D=KPI_D||{}, parts=[], asks=[];
+  if(window.IS_EQUIP){ box.style.display='none'; return; }
+  var mrr=D.mrr||0, pm=D.prevM||0, py=D.prevY||0;
+  if(mrr){
+    var s1=mk(b)+' MRR은 '+won(mrr)+'천원';
+    if(pm){ var d=(mrr-pm)/pm*100; s1+= Math.abs(d)<0.05? '으로 전월과 같은 수준' : '으로 전월보다 '+Math.abs(d).toFixed(1)+'% '+(d>=0?'올랐':'내렸'); }
+    if(py){ var y=(mrr-py)/py*100; s1+= (pm? ', ':'으로 ')+'전년 같은 달 대비 '+(y>=0?'+':'')+y.toFixed(1)+'%'; }
+    parts.push(s1+'입니다.'); asks.push(['왜 이렇게 됐지?', '이번 달 매출이 전월과 비교해 왜 변했는지 고객사별로 설명해줘']);
+  }
+  try{
+    var yr=yOf(b), tg=(RAWX.targets||[]).filter(function(t){ return +t.year===yr; })[0];
+    if(tg && tg.amount){ var cur=mrr*12, p=cur/tg.amount*100, gap=tg.amount/12-mrr;
+      parts.push(yr+'년 목표 ARR의 '+p.toFixed(1)+'%에 도달했고'+(gap>0? ' 남은 격차는 월 '+won(gap)+'천원입니다.' : ' 목표를 넘었습니다.'));
+      asks.push(['목표 달성 전망', '연말 목표 ARR 달성 가능성을 현재 계약과 만료 예정을 감안해서 평가해줘']); }
+  }catch(e){}
+  if(D.expRows && D.expRows.length){ var EN=expN(); var nm=D.expRows.slice(0,2).map(function(k){ return DATA.rows[k].cust; }).join('·');
+    parts.push(EN+'개월 안에 만료되는 계약 '+D.expRows.length+'건('+nm+(D.expRows.length>2?' 외':'')+')이 있어 재계약 접촉을 권합니다.'); asks.push(['곧 만료 계약', '곧 만료되는 계약을 금액 순으로 알려줘']); }
+  if(D.churnRows && D.churnRows.length) parts.push('이번 기간 해지 '+D.churnRows.length+'건이 있었습니다.');
+  var pend=(RAWX.orders||[]).filter(function(o){ return ['접수','출하요청','배송중'].indexOf(o.status)>=0; }).length;
+  if(pend) parts.push('처리 대기 장비 신청 '+pend+'건은 운영 보드에서 바로 처리할 수 있습니다.');
+  if(!parts.length){ box.style.display='none'; return; }
+  box.style.display='';
+  var la=document.getElementById('loadedAt');
+  box.innerHTML='<div class="bh">'+ico('spark',15)+'오늘의 브리핑<small>'+(la&&la.textContent? '데이터 기준 '+esc(la.textContent):'')+(AICFG&&AICFG.enabled? ' · AI 연결됨':'')+'</small></div>'+
+    '<p>'+esc(parts.join(' '))+'</p>'+
+    '<div class="ba">'+asks.slice(0,3).map(function(a,i){ return '<button type="button" class="cbtn" data-q="'+esc(a[1])+'">'+esc(a[0])+'</button>'; }).join('')+
+    (AICFG&&AICFG.enabled? '<button type="button" class="cbtn" data-q="'+esc('이번 달 매출·해지·만료·장비 상황을 한 문단으로 브리핑해줘')+'">AI로 더 자세히</button>':'')+'</div>';
+  box.querySelectorAll('[data-q]').forEach(function(bt){ bt.onclick=function(){ var qi=document.getElementById('q'); if(qi) qi.value=bt.dataset.q; try{ ask(bt.dataset.q); }catch(e){} }; });
+}
+
+/* ==================================================================
+   임대 장비 운영 보드 (칸반) — 상태 = 열, 카드 끌기 = 상태 변경 → 현황 자동 반영
+   ================================================================== */
+var EQB={ch:'', q:'', more:{}};
+var EQB_COLS=[['접수','#9A9DA5','현황 재고'],['출하요청','#1E4FA3','현황 재고'],['배송중','#8a5200','현황 재고'],['설치완료','var(--brand)','현황 임대중'],['회수예정','#D95926','칩으로 일부 회수'],['회수완료','var(--ink)','최근 90일']];
+function eqRefresh(){ if(CUR_VIEW==='eqboard') renderEqBoard(); else try{ renderGrid(); }catch(e){} }
+function renderEqBoard(){
+  var wrap=document.getElementById('eqbCols'); if(!wrap) return;
+  var O=(RAWX.orders||[]).slice(), q=fkNorm(EQB.q||'');
+  /* 채널 칩 */
+  var chs={}; O.forEach(function(o){ if(o.status!=='취소') chs[o.channel||'기타']=(chs[o.channel||'기타']||0)+1; });
+  var chipBox=document.getElementById('eqbChips');
+  chipBox.innerHTML='<button type="button" class="cbtn" data-ch="" aria-pressed="'+(EQB.ch===''? 'true':'false')+'">전체</button>'+
+    Object.keys(chs).sort(function(a,b2){ return chs[b2]-chs[a]; }).map(function(c){ return '<button type="button" class="cbtn" data-ch="'+esc(c)+'" aria-pressed="'+(EQB.ch===c? 'true':'false')+'">'+esc(c)+' <span class="num" style="opacity:.6">'+chs[c]+'</span></button>'; }).join('');
+  chipBox.querySelectorAll('button').forEach(function(bt){ bt.onclick=function(){ EQB.ch=bt.dataset.ch; renderEqBoard(); }; });
+  /* 일치 표시 */
+  try{ var s=eqScan(); document.getElementById('eqbMatch').innerHTML= s.gap.length
+      ? '<span class="ctag warn" style="cursor:pointer" title="신청 내역 화면의 대조 패널에서 맞추기">'+ico('clock',12)+' 맞지 않음 '+s.gap.length+'건 · 신청 내역에서 맞추기</span>'
+      : '<span class="ctag ok">'+ico('check',12)+' 신청 ↔ 현황 일치 · '+s.ok+'건</span>';
+    var mt=document.getElementById('eqbMatch').firstChild; if(mt && s.gap.length) mt.onclick=function(){ switchView('orders'); };
+  }catch(e){}
+  var rows=O.filter(function(o){
+    if(EQB.ch && (o.channel||'기타')!==EQB.ch) return false;
+    if(q){ var hay=fkNorm([o.customer,o.model,o.serials,o.channel,o.order_type,o.mgr_name,'#'+o.id].join(' ')); if(hay.indexOf(q)<0) return false; }
+    return true;
+  });
+  rows.sort(function(a,b2){ return String(b2.created_at||'')>String(a.created_at||'')? 1:-1; });
+  var cancel=rows.filter(function(o){ return o.status==='취소'; }).length;
+  document.getElementById('eqbCount').textContent=(rows.length-cancel)+'건'+(cancel? ' · 취소 '+cancel+'건은 보드에 안 보임':'');
+  var canEdit=!window.IS_VIEWER && !!SB_TOKEN, todayS=todayStr();
+  var h='';
+  EQB_COLS.forEach(function(col, ci){
+    var st=col[0], list=rows.filter(function(o){ return o.status===st; });
+    if(st==='회수완료'){ var cut=new Date(); cut.setDate(cut.getDate()-90); var cutS=todayStr(cut);
+      var recent=list.filter(function(o){ return String(o.returned_date||o.created_at||'').slice(0,10)>=cutS; }); var older=list.length-recent.length; list=recent; }
+    var lim=EQB.more[st]? 1e9 : (st==='설치완료'? 12 : 30);
+    h+='<section class="eqb-col'+(st==='회수예정'?' warm':'')+'" data-st="'+esc(st)+'" aria-label="'+esc(st)+'">'+
+      '<div class="eqb-ch"><i style="background:'+col[1]+'"></i>'+esc(st)+' <span class="n"'+(st==='회수완료'? ' title="최근 90일"':'')+'>'+list.length+'</span><span class="to">'+esc(col[2])+'</span></div>';
+    if(!list.length) h+='<div class="eqb-empty">'+(ci===0? '접수된 신청이 없습니다':'없음')+'</div>';
+    list.slice(0,lim).forEach(function(o){ h+=eqbCard(o, canEdit, todayS); });
+    if(list.length>lim) h+='<button type="button" class="eqb-more" data-more="'+esc(st)+'">외 '+(list.length-lim)+'건 더 보기</button>';
+    if(st==='접수' && canEdit) h+='<button type="button" class="eqb-more" data-new="1">＋ 새 신청</button>';
+    if(st==='회수완료' && older) h+='<div class="eqb-empty">90일 이전 '+older+'건은 신청 내역(목록)에서</div>';
+    h+='</section>';
+  });
+  wrap.innerHTML=h;
+  wrap.querySelectorAll('[data-more]').forEach(function(bt){ bt.onclick=function(){ EQB.more[bt.dataset.more]=1; renderEqBoard(); }; });
+  wrap.querySelectorAll('[data-new]').forEach(function(bt){ bt.onclick=function(){ switchView('ordernew'); }; });
+  wrap.querySelectorAll('[data-next]').forEach(function(bt){ bt.onclick=function(e){ e.stopPropagation(); var r=eqOrderById(bt.dataset.oid); if(r) eqSetStatus(r, bt.dataset.next); }; });
+  wrap.querySelectorAll('[data-open]').forEach(function(bt){ bt.onclick=function(e){ e.stopPropagation(); var r=eqOrderById(bt.dataset.open); if(!r) return; switchView('orders'); var sb=document.getElementById('dvSearch'); if(sb){ sb.value=r.customer||('#'+r.id); try{ renderGrid(); }catch(x){} } }; });
+  if(canEdit) eqbDnD(wrap);
+}
+function eqbCard(o, canEdit, todayS){
+  var all=eqWant(o), ret=eqRetSet(o), done=o.status==='회수완료';
+  var age=''; if(['접수','출하요청','배송중'].indexOf(o.status)>=0 && o.created_at){ var d=Math.floor((new Date(todayS)-new Date(String(o.created_at).slice(0,10)))/864e5); if(d>=1) age=' · '+d+'일'; }
+  var meta=[(o.model||'모델 미정')+' <span class="num">×'+(o.qty||all.length||1)+'</span>', o.order_type||''];
+  if(o.status==='설치완료' && o.install_date) meta.push('설치 <span class="num">'+esc(String(o.install_date).slice(0,10))+'</span>');
+  else if(o.install_date && !done) meta.push('설치희망 <span class="num">'+esc(String(o.install_date).slice(0,10))+'</span>');
+  if(done && o.returned_date) meta.push('회수일 <span class="num">'+esc(String(o.returned_date).slice(0,10))+'</span>');
+  var prog='';
+  if(!done && (o.status==='회수예정' || ret.length) && all.length){
+    prog='<div style="display:flex;align-items:center;gap:8px"><div class="eqb-prog" style="flex:1;margin:0">'+all.map(function(sn){ return '<i class="'+(ret.indexOf(sn.toUpperCase())>=0?'on':'')+'"></i>'; }).join('')+'</div><span class="num" style="font-size:12px;font-weight:600">'+ret.length+'/'+all.length+'</span></div>';
+  }
+  var idx=EQB_COLS.map(function(c){ return c[0]; }).indexOf(o.status), nextSt=idx>=0 && idx<EQB_COLS.length-1? EQB_COLS[idx+1][0] : null;
+  var ft='<div class="ft"><span class="mini" title="'+esc(o.mgr_name||o.requester||'')+'">'+esc(o.mgr_name? '담당 '+o.mgr_name : (o.requester? String(o.requester).split('@')[0] : ''))+'</span><span style="display:flex;gap:4px">'+
+    '<button type="button" class="cbtn" style="height:24px;font-size:11.5px" data-open="'+o.id+'" title="신청 내역에서 열기">✎</button>'+
+    (canEdit && nextSt? '<button type="button" class="cbtn'+(['출하요청','배송중','설치완료'].indexOf(nextSt)>=0?' pri':'')+'" style="height:24px;font-size:11.5px" data-oid="'+o.id+'" data-next="'+esc(nextSt)+'">'+esc(nextSt)+' →</button>':'')+'</span></div>';
+  return '<article class="eqb-card'+(o.status==='회수예정'?' hot':'')+'" draggable="'+(canEdit?'true':'false')+'" data-oid="'+o.id+'">'+
+    '<div class="tp"><span class="ctag">'+esc(o.channel||'기타')+'</span><span class="mini num">#'+o.id+esc(age)+'</span></div>'+
+    '<div class="cu" title="'+esc(o.customer||'')+'">'+esc(o.customer||'(고객사 없음)')+'</div>'+
+    '<div class="mt">'+meta.filter(Boolean).join(' · ')+'</div>'+prog+
+    '<div class="sn">'+eqSerialsHtml(o,{full:true})+'</div>'+ft+'</article>';
+}
+function eqbDnD(wrap){
+  var dragging=null;
+  wrap.querySelectorAll('.eqb-card').forEach(function(c){
+    c.addEventListener('dragstart', function(e){ if(e.target.closest && e.target.closest('.eqsn,.eqbar,button,input')) { e.preventDefault(); return; } dragging=c.dataset.oid; c.classList.add('drag'); try{ e.dataTransfer.setData('text/plain', dragging); e.dataTransfer.effectAllowed='move'; }catch(x){} });
+    c.addEventListener('dragend', function(){ c.classList.remove('drag'); wrap.querySelectorAll('.eqb-col.over').forEach(function(x){ x.classList.remove('over'); }); });
+  });
+  wrap.querySelectorAll('.eqb-col').forEach(function(col){
+    col.addEventListener('dragover', function(e){ if(!dragging) return; e.preventDefault(); col.classList.add('over'); });
+    col.addEventListener('dragleave', function(){ col.classList.remove('over'); });
+    col.addEventListener('drop', function(e){ e.preventDefault(); col.classList.remove('over'); var r=eqOrderById(dragging); dragging=null; if(!r) return; eqSetStatus(r, col.dataset.st); });
+  });
+}
+/* 상태 변경 — 신청 내역 표에서 상태 칸을 고쳐 저장하는 것과 같은 결과 (회수일 자동 · 현황 동기화 · 변경 이력) */
+async function eqSetStatus(r, st){
+  if(!r || !st || r.status===st) return;
+  if(!SB_TOKEN){ openOvl('ovlAuth'); return; }
+  if(window.IS_VIEWER){ toast('조회 전용 계정', '상태를 바꿀 수 없습니다', 'info'); return; }
+  var all=eqWant(r), body={status:st};
+  if(st==='회수완료'){
+    if(!confirm('#'+r.id+' '+(r.customer||'')+' — '+(all.length||r.qty||1)+'대 전부 회수완료로 처리할까요?\n(일부만 회수했으면 취소하고 카드의 시리얼 칩을 눌러 개별 회수 처리하세요)')) { renderEqBoard(); return; }
+    if(!r.returned_date) body.returned_date=todayStr();
+  }
+  if(r.status==='회수완료' && st!=='회수완료'){ body.returned_date=null; body.returned_serials=null; }
+  try{
+    await sbWrite('PATCH','equipment_orders?id=eq.'+r.id, body);
+    var from=r.status; Object.keys(body).forEach(function(k){ r[k]=body[k]; });
+    logChange('update','equipment_orders',r.id,{status:st, from:from, via:'운영 보드'});
+    DIRTY=true; renderEqBoard();
+    var x=await syncOrderAssets(r, null, true);
+    toast('상태 변경', '#'+r.id+' '+(r.customer||'')+' · '+from+' → '+st+(body.returned_date? ' · 회수일 '+body.returned_date:'')+(x? ' · '+x:''), 'ok');
+    try{ railSync(CUR_VIEW); }catch(e){}
+  }catch(e){ toast('상태 변경 실패', String(e.message||e).slice(0,100), 'bad'); renderEqBoard(); }
+}
+
+/* ---- 고객 360 — 요약 4칸 · 다음 액션 제안 · 섹션 탭 (모달 본문 위에 덧붙임) ---- */
+function c360Enhance(nm, cts, lives, ois, inbs, asts, ords){
+  var body=document.getElementById('c360Body'); if(!body) return;
+  var b=STATE.base, mrr=0, cum=0, nextEnd=null, churned=0;
+  cts.forEach(function(r){
+    var k=DATA.rows.indexOf(r); if(k>=0){ mrr+=MAT[k][b]||0; for(var j=0;j<M;j++) cum+=MAT[k][j]||0; }
+    if(/해지/.test(String(r.status||''))) churned++;
+    else if(r.endIdx!=null && r.endIdx>=b && (nextEnd==null || r.endIdx<nextEnd)) nextEnd=r.endIdx;
+  });
+  var live=ords.filter(function(o){ return o.status!=='회수완료' && o.status!=='취소'; });
+  var lent=0, retN=0; live.forEach(function(o){ var all=eqWant(o); lent+=all.length; retN+=eqRetSet(o).length; });
+  if(!live.length) lent=asts.filter(function(a){ return a.status==='임대중'; }).length;
+  var dLeft=null; if(nextEnd!=null){ var y=+mk(nextEnd).slice(0,4), m=+mk(nextEnd).slice(5,7); var endD=new Date(y, m, 0); dLeft=Math.ceil((endD-new Date())/864e5); }
+  var sum='<div class="c360-sum">'+
+    '<div><div class="l">월 MRR ('+esc(mk(b))+')</div><div class="v num">'+won(mrr)+'<small> 천원</small></div></div>'+
+    '<div><div class="l">누적 매출</div><div class="v num">'+won(cum)+'<small> 천원</small></div></div>'+
+    '<div><div class="l">임대 장비</div><div class="v num">'+lent+'<small> 대'+(retN? ' · 회수 '+retN:'')+'</small></div></div>'+
+    (dLeft!=null? '<div class="'+(dLeft<=90?'warn':'')+'"><div class="l">다음 만료</div><div class="v num">D-'+Math.max(0,dLeft)+'</div></div>' : '<div><div class="l">다음 만료</div><div class="v">—</div></div>')+'</div>';
+  /* 다음 액션 제안 (규칙) */
+  var tips=[], acts=[];
+  if(dLeft!=null && dLeft<=90){ var ec=cts.filter(function(r){ return r.endIdx===nextEnd; })[0]; tips.push((ec? lline(ec.line)+' 계약이 ':'계약이 ')+Math.max(0,dLeft)+'일 뒤 종료됩니다'+(churned? ' (과거 해지 이력 '+churned+'건)':' (해지 이력 없음)')+'.'); acts.push(['재계약 OI 만들기', function(){ closeOvl('ovlC360'); switchView('oinew'); setTimeout(function(){ var c=document.getElementById('oiCust'); if(c){ c.value=nm; } },80); }]); }
+  if(retN && retN<lent) tips.push('장비 '+lent+'대 중 '+retN+'대가 회수 진행 중입니다. 잔여 '+(lent-retN)+'대 회수 여부를 함께 확인하세요.');
+  else if(live.some(function(o){ return o.status==='회수예정'; })) tips.push('장비 회수가 예정되어 있습니다.');
+  if(live.length) acts.push(['운영 보드 열기', function(){ closeOvl('ovlC360'); EQB.q=nm; switchView('eqboard'); var qi=document.getElementById('eqbQ'); if(qi) qi.value=nm; }]);
+  var openOi=ois.filter(function(o){ return !/수주|계산서|종료|중지|실패/.test(String(o.stage||'')); });
+  if(openOi.length) tips.push('진행 중 OI '+openOi.length+'건이 있습니다'+(openOi[0].next_date? ' · 다음 일정 '+String(openOi[0].next_date).slice(0,10):'')+'.');
+  var stale=inbs.filter(function(r){ return /진행중/.test(String(r.result||'')); });
+  if(stale.length) tips.push('진행중인 인바운드 '+stale.length+'건이 남아 있습니다.');
+  if(!tips.length) tips.push(cts.length? '만료·회수·미결 항목이 없습니다. 정기 점검(분기 1회) 정도면 충분합니다.' : '계약 정보가 없는 고객사입니다 — OI·인바운드 기록을 확인하세요.');
+  var next='<div class="c360-next"><b>'+ico('spark',14)+'다음 액션 제안</b><p>'+esc(tips.join(' '))+'</p>'+(acts.length? '<div class="ba">'+acts.map(function(a,i){ return '<button type="button" class="cbtn" data-a="'+i+'">'+esc(a[0])+'</button>'; }).join('')+'</div>':'')+'</div>';
+  /* 섹션 탭 */
+  var secs=[].slice.call(body.querySelectorAll('.c360-sec'));
+  var tabs='<div class="c360-tabs" role="tablist"><button type="button" role="tab" aria-selected="true" data-t="-1">전체</button>'+secs.map(function(sc,i){ var h4=sc.querySelector('h4'); var t=h4? h4.textContent.replace(/^\S+\s/,'').replace(/\s*\d+건\s*$/,'').replace(/계약 기준.*$/,'').trim() : '섹션'; var ct=h4&&h4.querySelector('.ct')? h4.querySelector('.ct').textContent.replace('건','') : ''; return '<button type="button" role="tab" aria-selected="false" data-t="'+i+'">'+esc(t)+(ct? '<span class="ct">'+esc(ct)+'</span>':'')+'</button>'; }).join('')+'</div>';
+  var head=document.createElement('div'); head.innerHTML=sum+next+tabs;
+  body.insertBefore(head, body.firstChild);
+  head.querySelectorAll('[data-a]').forEach(function(bt){ bt.onclick=function(){ acts[+bt.dataset.a][1](); }; });
+  head.querySelectorAll('[role="tab"]').forEach(function(bt){ bt.onclick=function(){
+    head.querySelectorAll('[role="tab"]').forEach(function(x){ x.setAttribute('aria-selected', x===bt? 'true':'false'); });
+    var t=+bt.dataset.t; secs.forEach(function(sc,i){ sc.style.display=(t<0||t===i)? '':'none'; }); }; });
+}
+
 function showAuthUi(){
   try{ loadHide(); }catch(e){}
   $('#btnAuth').textContent=(AUTH_USER||'').split('@')[0]+' ▾';
@@ -2855,9 +3608,9 @@ function afterLoad(dd){
 }
 /* ---- 제한 역할(장비/POC 전용) : 포탈 안에서 해당 메뉴만 사용 ---- */
 var ROLE_VIEWS={
-  equipment:     {orders:1, assets:1, ordernew:1, weekly:1, account:1},   // (구) — equipment_poc 로 통합됨
+  equipment:     {orders:1, assets:1, ordernew:1, eqboard:1, weekly:1, account:1},   // (구) — equipment_poc 로 통합됨
   poc:           {mdrnew:1, mdrops:1, weekly:1, account:1},
-  equipment_poc: {orders:1, assets:1, ordernew:1, mdrnew:1, mdrops:1, weekly:1, account:1}
+  equipment_poc: {orders:1, assets:1, ordernew:1, eqboard:1, mdrnew:1, mdrops:1, weekly:1, account:1}
 };
 var ROLE_LABEL={equipment:'장비 관리 전용', poc:'PoC 전용', equipment_poc:'장비·PoC 전용'};
 var EQUIP_VIEWS=ROLE_VIEWS.equipment;   // 현재 계정에 허용된 화면 (아래에서 교체)
@@ -2891,6 +3644,7 @@ function enterEquipMode(d){
   $('#app').classList.remove('hidden');
   side.classList.remove('hidden');
   document.body.style.paddingLeft='';
+  try{ buildRail(); buildMtabs(); }catch(e){}
   $('#periodLabel').textContent=ROLE_LABEL[role]||'장비 관리 전용';
   switchView(EQUIP_VIEWS[CUR_VIEW]? CUR_VIEW : window.EQUIP_HOME);
 }
@@ -3048,6 +3802,7 @@ function onData(d){
   applyChannelMenu();
   try{ applyMenuConf(); }catch(e){}
   applyMenuFold();
+  try{ buildRail(); buildMtabs(); }catch(e){}
   var meBtn=document.getElementById('btnMenuEdit');
   if(meBtn && !meBtn.__b){ meBtn.__b=1; meBtn.onclick=openMenuEdit; }
   if(CUR_VIEW) try{ ensureGroupOpen(CUR_VIEW); }catch(e){}
@@ -3368,6 +4123,7 @@ function renderHero(list){
       st.appendChild(d);
     });
   }
+  try{ renderInbox(); }catch(e){}
 }
 
 /* ---- 커스텀 질문 위젯 (검색 결과 고정) ---- */
@@ -4175,6 +4931,7 @@ function renderKpis(list){
     c.querySelectorAll('button[data-expn]').forEach(function(bt){ bt.onclick=function(ev){ ev.stopPropagation(); setExpN(+bt.dataset.expn); }; });
     box.appendChild(c);
   });
+  try{ ccAfterKpis(box, list, b); }catch(e){ console.warn('cc kpis', e); }
 }
 /* ── 대시보드 타일 상세 ── 타일을 누르면 그 숫자를 만든 행을 그대로 보여줍니다 */
 var KPI_D=null;
@@ -6456,7 +7213,8 @@ async function eqReload(){ try{ RAWX.assets=await sbTry('equipment_assets?select
    EQOPEN[신청id]=펼침 상태 · EQP[신청id][시리얼]=원하는 회수 상태(true/false, 아직 저장 안 됨) */
 var EQOPEN={}, EQP={};
 function eqCanRet(r){ return !window.IS_VIEWER && ['설치완료','회수예정','회수완료'].indexOf(r.status)>=0; }
-function eqSerialsHtml(r){
+function eqSerialsHtml(r, opt){
+  opt=opt||{};
   var all=eqWant(r); if(!all.length) return r.serials? esc(String(r.serials)) : '·';
   var ret=eqRetSet(r), done=(r.status==='회수완료'), can=eqCanRet(r), pend=EQP[r.id]||{}, oid=r.id;
   var chip=function(sn){
@@ -6473,6 +7231,7 @@ function eqSerialsHtml(r){
            : '<button type="button" class="eqbar-all" title="모든 시리얼을 회수로 표시">전부 회수 표시</button> <span class="mini" style="color:var(--muted)">칩을 누르면 개별 표시</span>')+'</div>';
   }
   if(all.length===1) return chip(all[0])+(can? bar:'');
+  if(opt.full && all.length<=8) return '<span class="eqser">'+all.map(chip).join(' ')+(can? bar:'')+'</span>';   /* 운영 보드: 8대까지는 전부 펼쳐 보임 */
   var open=!!EQOPEN[oid] || nChg>0;
   return '<span class="eqser">'+chip(all[0])+' <button type="button" class="eqser-more" data-oid="'+oid+'" data-n="'+(all.length-1)+'" title="'+esc(all.join(', '))+'">'+(open? '접기 ▴' : '외 '+(all.length-1)+'대 ▾')+'</button>'+
          '<span class="eqser-full" style="display:'+(open?'block':'none')+'">'+all.slice(1).map(chip).join(' ')+(can? bar:'')+'</span></span>';
@@ -6488,18 +7247,18 @@ document.addEventListener('click', function(e){
   if(chip){ e.stopPropagation(); var oid=chip.dataset.oid, U=chip.dataset.sn, r=eqOrderById(oid); if(!r) return;
     var saved=(r.status==='회수완료')||eqRetSet(r).indexOf(U)>=0; var p=EQP[oid]=EQP[oid]||{};
     var cur=(U in p)? p[U] : saved; p[U]=!cur; if(p[U]===saved) delete p[U];
-    EQOPEN[oid]=true; renderGrid(); return; }
+    EQOPEN[oid]=true; eqRefresh(); return; }
   var all=t.closest('.eqbar-all');
   if(all){ e.stopPropagation(); var bar=all.closest('.eqbar'), oid2=bar.dataset.oid, r2=eqOrderById(oid2); if(!r2) return;
-    var p2=EQP[oid2]={}; eqWant(r2).forEach(function(sn){ p2[sn.toUpperCase()]=true; }); EQOPEN[oid2]=true; renderGrid(); return; }
+    var p2=EQP[oid2]={}; eqWant(r2).forEach(function(sn){ p2[sn.toUpperCase()]=true; }); EQOPEN[oid2]=true; eqRefresh(); return; }
   var cancel=t.closest('.eqbar-cancel');
-  if(cancel){ e.stopPropagation(); var oid3=cancel.closest('.eqbar').dataset.oid; delete EQP[oid3]; delete EQP['_d'+oid3]; renderGrid(); return; }
+  if(cancel){ e.stopPropagation(); var oid3=cancel.closest('.eqbar').dataset.oid; delete EQP[oid3]; delete EQP['_d'+oid3]; eqRefresh(); return; }
   var save=t.closest('.eqbar-save');
   if(save){ e.stopPropagation(); var bar4=save.closest('.eqbar'), oid4=bar4.dataset.oid, r4=eqOrderById(oid4); if(!r4) return;
     var dI=bar4.querySelector('.eqbar-date'), date=(dI&&dI.value)||todayStr(); var p4=EQP[oid4]||{};
     var checked=eqWant(r4).filter(function(sn){ var U=sn.toUpperCase(); var saved=(r4.status==='회수완료')||eqRetSet(r4).indexOf(U)>=0; return (U in p4)? p4[U] : saved; });
     save.disabled=true; save.textContent='저장 중…';
-    eqRetApply(r4, checked, date, '').then(function(){ delete EQP[oid4]; delete EQP['_d'+oid4]; }).catch(function(err){ toast('회수 처리 실패', String(err.message||err).slice(0,80), 'bad'); }).then(function(){ DIRTY=true; renderGrid(); });
+    eqRetApply(r4, checked, date, '').then(function(){ delete EQP[oid4]; delete EQP['_d'+oid4]; }).catch(function(err){ toast('회수 처리 실패', String(err.message||err).slice(0,80), 'bad'); }).then(function(){ DIRTY=true; eqRefresh(); });
     return; }
 });
 document.addEventListener('change', function(e){ var d=e.target; if(d && d.classList && d.classList.contains('eqbar-date')){ var oid=d.closest('.eqbar').dataset.oid; EQP['_d'+oid]=d.value; } });
@@ -6558,7 +7317,7 @@ async function eqRetSave(){
   var btn=$('#erSave'); btn.disabled=true; $('#erMsg').textContent='저장 중…';
   try{
     await eqRetApply(r, checked, date, note);
-    closeOvl('ovlEqRet'); DIRTY=true; renderGrid();
+    closeOvl('ovlEqRet'); DIRTY=true; eqRefresh();
   }catch(e){ $('#erMsg').textContent=String(e.message||e); }
   btn.disabled=false;
 }
@@ -8044,8 +8803,13 @@ function openFind(){
   ov.onmousedown=function(e){ if(e.target===ov) closeOvl('ovlFind'); };   // 바깥 클릭으로 닫기
   inp.oninput=function(){
     var q=fkNorm(inp.value), out=$('#fkOut');
-    if(q.length<2){ out.innerHTML=''; return; }
-    var src=fkSources(), seen={}; hits=[];
+    hits=[];
+    if(q.length<1){ out.innerHTML=''; return; }
+    // ⓞ 화면 이동 (메뉴 이름 매치)
+    try{ hits=hits.concat(cmdMenuHits(inp.value)); }catch(e){}
+    if(q.length<2){ out.innerHTML=hits.map(function(h,i){ return '<div class="fk-row" data-i="'+i+'"><span class="tp" style="background:var(--surface-2);color:var(--ink-2)">'+h.t+'</span><span class="nm">'+esc(h.nm||'')+'</span><span class="sb">'+esc(h.sb||'')+'</span></div>'; }).join('');
+      out.querySelectorAll('.fk-row').forEach(function(row){ row.onclick=function(){ closeOvl('ovlFind'); hits[+row.dataset.i].go(); }; }); return; }
+    var src=fkSources(), seen={};
     // ① 고객 360 후보 (고객사명 매치, 중복 제거)
     var custs={};
     src.forEach(function(s){ if(s.cust && fkNorm(s.cust).indexOf(q)>=0) custs[s.cust]=1; });
@@ -8059,8 +8823,10 @@ function openFind(){
       var key=s.t+'|'+s.nm+'|'+s.sb; if(seen[key]) return; seen[key]=1;
       hits.push(s);
     });
+    // ③ AI에게 그대로 물어보기
+    try{ var ai=cmdAskHit(inp.value); if(ai) hits.push(ai); }catch(e){}
     out.innerHTML=hits.map(function(h,i){
-      return '<div class="fk-row" data-i="'+i+'"><span class="tp"'+(h.k360?' style="background:rgba(42,120,214,.12);color:var(--s1)"':'')+'>'+h.t+'</span>'+
+      return '<div class="fk-row" data-i="'+i+'"><span class="tp"'+(h.k360?' style="background:rgba(42,120,214,.12);color:var(--s1)"':(h.kmenu?' style="background:var(--surface-2);color:var(--ink-2)"':(h.kai?' style="background:var(--ink);color:var(--plane)"':'')))+'>'+h.t+'</span>'+
         '<span class="nm">'+esc(h.nm||'')+'</span><span class="sb">'+esc(h.sb||'')+'</span></div>';
     }).join('')||'<p class="cap" style="padding:8px">결과 없음</p>';
     out.querySelectorAll('.fk-row').forEach(function(row){
@@ -8116,6 +8882,7 @@ function openCust360(name){
     sec('🔧','장비',asts.length+ords.length, tb(['구분','시리얼/발주','모델','상태','일자'],
       asts.map(function(r){ return ['자산', r.serial, r.model, r.status, r.deployed_date||r.in_date]; })
       .concat(ords.map(function(r){ return ['발주', '#'+r.id, r.model, r.status, String(r.created_at||'').slice(0,10)]; }))));
+  try{ c360Enhance(nm, cts, lives, ois, inbs, asts, ords); }catch(e){ console.warn('c360', e); }
   openOvl('ovlC360');
 }
 
@@ -8256,7 +9023,7 @@ function openMenuEdit(){
     $('#mcBody').querySelectorAll('[data-hk]').forEach(function(c){ if(c.checked) hid[c.dataset.hk]=1; else delete hid[c.dataset.hk]; });
     try{ localStorage.setItem(menuConfKey(), JSON.stringify({order:st.map(function(s){return s.key;}), hidden:hid})); }catch(e){}
     closeOvl('ovlMenu');
-    applyMenuConf(); applyChannelMenu(); applyMenuFold();
+    applyMenuConf(); applyChannelMenu(); applyMenuFold(); try{ buildRail(); }catch(e){}
     toast('메뉴 편집','저장됨 — 내 화면에만 적용됩니다');
   };
   $('#mcReset').onclick=function(){
@@ -8328,6 +9095,7 @@ function renderTodo(){
   wrap.querySelectorAll('[data-go]').forEach(function(el){
     el.onclick=function(){ switchView(el.dataset.go); };
   });
+  try{ renderInbox(); }catch(e){}
 }
 
 /* ===== 포탈 전체 글자 크기 (보통/크게/아주 크게 — 이 브라우저에 기억) ===== */
@@ -10408,16 +11176,20 @@ async function renderAccount(){
   box.appendChild(act);
   /* 설정 — 이 브라우저에만 저장 (localStorage) */
   var set=document.createElement('div'); set.style.cssText='margin-top:22px';
-  var curIdle=idleMin(), curLook=document.documentElement.hasAttribute('data-look')? 'classic':'simple';
+  var curIdle=idleMin(), look0=curLook();
   set.innerHTML='<div style="font-size:13px;font-weight:650;margin-bottom:4px">설정 <span class="mini" style="font-weight:400">— 이 브라우저에만 저장됩니다</span></div>'+
     row('자동 로그아웃', '<select id="accIdle" style="height:30px;min-width:200px">'+IDLE_OPTS.map(function(m){
         return '<option value="'+m+'"'+(m===curIdle?' selected':'')+'>'+esc(idleLabel(m))+(m? ' 동안 활동 없으면':'')+'</option>'; }).join('')+'</select>'+
       '<div class="mini" style="margin-top:5px;line-height:1.6">마우스·키보드·스크롤 입력이 정한 시간 동안 없으면 이 탭에서 자동으로 로그아웃합니다. 끝나기 1분 전에 알림이 뜹니다.</div>')+
-    row('화면 디자인', '<select id="accLook" style="height:30px;min-width:200px">'+
-        '<option value="simple"'+(curLook==='simple'?' selected':'')+'>심플 (기본)</option>'+
-        '<option value="classic"'+(curLook==='classic'?' selected':'')+'>클래식 (이전 디자인)</option></select>'+
-      '<div class="mini" style="margin-top:5px;line-height:1.6">심플: 그림자·색 채움을 줄인 평면 디자인, 메뉴 아이콘 숨김. 다크 모드·글자 크기는 상단바 버튼으로 바꿉니다.</div>');
+    row('화면 디자인', '<select id="accLook" style="height:30px;min-width:200px">'+Object.keys(LOOKS).map(function(k){ return '<option value="'+k+'"'+(k===look0?' selected':'')+'>'+esc(LOOKS[k])+'</option>'; }).join('')+'</select>'+
+      '<div class="mini" style="margin-top:5px;line-height:1.6">커맨드 센터: 아이콘 레일 + 상단 커맨드 바(검색·이동·AI) + 인박스 홈 + 장비 운영 보드 + 고객 360 패널 · 심플: 평면 디자인에 기존 사이드바 · 클래식: 이전 디자인. 바꾸면 화면을 다시 읽습니다.</div>');
+  var meb=document.getElementById('btnMenuEdit');
+  if(meb && meb.style.display!=='none'){
+    var mrow=document.createElement('div'); mrow.innerHTML=row('메뉴 편집', '<button type="button" class="pill" id="accMenuEdit">⚙ 메뉴 순서·숨김 편집</button><div class="mini" style="margin-top:5px">사이드바(심플·클래식)와 아이콘 레일(커맨드 센터)에 함께 적용됩니다 · 이 브라우저에만 저장</div>');
+    set.appendChild(mrow.firstChild);
+  }
   box.appendChild(set);
+  var ame=set.querySelector('#accMenuEdit'); if(ame) ame.onclick=function(){ try{ openMenuEdit(); }catch(e){} };
   set.querySelector('#accIdle').onchange=function(){
     var m=parseInt(this.value,10)||0;
     try{ if(m) localStorage.setItem(IDLE_KEY,String(m)); else localStorage.removeItem(IDLE_KEY); }catch(e){}
@@ -10425,8 +11197,8 @@ async function renderAccount(){
     toast('자동 로그아웃', m? idleLabel(m)+' 동안 활동이 없으면 로그아웃합니다' : '끔 — 로그인이 계속 유지됩니다', 'ok');
   };
   set.querySelector('#accLook').onchange=function(){
+    toast('화면 디자인', (LOOKS[this.value]||'')+' — 화면을 다시 읽습니다', 'ok');
     setLook(this.value);
-    toast('화면 디자인', this.value==='classic'? '클래식(이전 디자인)으로 바꿨습니다':'심플 디자인으로 바꿨습니다', 'ok');
   };
   var tip=document.createElement('p'); tip.className='cap'; tip.style.marginTop='14px';
   tip.textContent='계정 발급·권한 변경은 관리자가 Supabase 콘솔에서 처리합니다.';
@@ -11267,6 +12039,12 @@ function setupSide(){
     $('#sideDim').classList.toggle('on', open);
   };
   $('#sideDim').onclick=closeDrawer;
+  /* 커맨드 바 · 운영 보드 컨트롤 */
+  var cb=document.getElementById('cmdBar'); if(cb) cb.onclick=function(){ openFind(); };
+  var eqbNew=document.getElementById('eqbNew'); if(eqbNew) eqbNew.onclick=function(){ switchView('ordernew'); };
+  document.querySelectorAll('#viewEqBoard .eqb-seg [data-go]').forEach(function(b){ b.onclick=function(){ switchView(b.dataset.go); }; });
+  var eqbQ=document.getElementById('eqbQ'); if(eqbQ) eqbQ.oninput=function(){ EQB.q=this.value; renderEqBoard(); };
+  var eqbR=document.getElementById('eqbReload'); if(eqbR) eqbR.onclick=function(){ eqbR.disabled=true; loadFromDb().then(function(nd){ onData(nd); if(CUR_VIEW==='eqboard') renderEqBoard(); }).catch(function(e){ toast('다시 읽기 실패', String(e.message||e).slice(0,80), 'bad'); }).then(function(){ eqbR.disabled=false; }); };
   $('#dvSearch').oninput=function(){ DV.page=0; renderGrid(); };
   $('#dvFclr').onclick=clearFilters;
   window.addEventListener('resize',closeColFilter);
@@ -12777,6 +13555,9 @@ function switchView(v){
     b.setAttribute('aria-current', b.dataset.v===v?'true':'false');
   });
   try{ ensureGroupOpen(v); }catch(e){}
+  try{ railSync(v); }catch(e){}
+  var eqb=v==='eqboard';
+  $('#viewEqBoard').classList.toggle('hidden',!eqb);
   var dash=v==='dash', quote=v==='quote', preport=v==='preport', s1v=v==='s1', kkv=v==='kk', onew=v==='ordernew', acct=v==='account', mnew=v==='mdrnew', oinew=v==='oinew', csite=v==='csite';
   var adminx=v==='adminx', weekly=v==='weekly', inbstat=v==='inbstat', price=v==='price', report=v==='report', churn=v==='churn', cloud=v==='cloud', crate=v==='churnrate', cflow=v==='custflow';
   if(adminx && !window.IS_SUPER){ v='dash'; dash=true; adminx=false; CUR_VIEW='dash'; }
@@ -12801,7 +13582,8 @@ function switchView(v){
   $('#viewAdmin').classList.toggle('hidden',!adminx);
   $('#viewWeekly').classList.toggle('hidden',!weekly);
   $('#viewChannel').classList.toggle('hidden',!chv);
-  $('#viewData').classList.toggle('hidden',dash||quote||preport||s1v||kkv||onew||mnew||oinew||csite||acct||adminx||weekly||inbstat||price||report||churn||cloud||crate||cflow||!!chv);
+  $('#viewData').classList.toggle('hidden',dash||quote||preport||s1v||kkv||onew||mnew||oinew||csite||acct||adminx||weekly||inbstat||price||report||churn||cloud||crate||cflow||eqb||!!chv);
+  if(eqb){ renderEqBoard(); return; }
   if(csite){ renderCsite(); return; }
   if(report){ renderReport(); return; }
   if(churn){ renderChurn(); return; }
