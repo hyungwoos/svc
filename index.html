@@ -2297,7 +2297,7 @@ window.addEventListener('message', function(ev){
 });
 
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-16 ㊿+91';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-16 ㊿+92';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -6925,15 +6925,17 @@ function bzxLoadLib(){
     document.head.appendChild(sc);
   });
 }
+/* 엑셀 날짜 → JS Date (날짜만).  ★ SheetJS 의 cellDates 는 시간대 보정으로 «8/1 00:00» 을 «7/31 23:59:08» 로 만들어
+   8월 1일자 하위매출 84행이 7월로 밀려 통째로 빠졌습니다 → 일련번호(숫자)를 직접 날짜로 바꾸고, Date 가 와도 30분을 더해 반올림합니다 */
 function bzxDate(v){
   if(v==null||v==='') return null;
-  if(v instanceof Date) return isNaN(v)? null : v;
-  if(typeof v==='number' && v>20000 && v<80000 && window.XLSX){ var d=XLSX.SSF.parse_date_code(v); return d? new Date(d.y,d.m-1,d.d) : null; }
-  var m=String(v).match(/(\d{4})[-./](\d{1,2})/); return m? new Date(+m[1],+m[2]-1,1) : null;
+  if(v instanceof Date){ if(isNaN(v)) return null; var r=new Date(v.getTime()+30*60*1000); return new Date(r.getFullYear(),r.getMonth(),r.getDate()); }
+  if(typeof v==='number' && v>20000 && v<80000 && window.XLSX){ var d=XLSX.SSF.parse_date_code(Math.round(v*1440)/1440); return d? new Date(d.y,d.m-1,d.d) : null; }
+  var m=String(v).match(/(\d{4})[-./]\s*(\d{1,2})(?:[-./]\s*(\d{1,2}))?/); return m? new Date(+m[1],+m[2]-1,m[3]? +m[3]:1) : null;
 }
 /* 엑셀 → 행 배열. 머릿글 행을 «고객사»·«회계매출» 이 있는 줄로 찾습니다(위에 제목 줄이 있어도 됨) */
 function bzxParse(buf){
-  var wb=XLSX.read(buf,{type:'array',cellDates:true});
+  var wb=XLSX.read(buf,{type:'array'});           // cellDates 를 쓰지 않습니다 — 날짜는 bzxDate 가 일련번호에서 직접 계산
   var ws=wb.Sheets[wb.SheetNames[0]];
   var aoa=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
   var hi=-1; for(var i=0;i<Math.min(aoa.length,20);i++){ var r=aoa[i]||[]; if(r.indexOf('고객사')>=0 && r.some(function(c){ return /회계\s*매출/.test(String(c||'')); })){ hi=i; break; } }
@@ -7091,7 +7093,10 @@ function bzxRender(host){
     if(D.unit) lines.push('<b style="color:var(--critical)">⚠ '+D.unit+'</b>');
     if((D.dbCts||0)>0 && D.nearMiss && D.nearMiss.length) lines.push('비즈포탈에만 있는 회사 중 관리포탈에 <i>비슷한 이름</i>이 있는 경우 (표기 패턴 확인용): '+
       D.nearMiss.slice(0,12).map(function(x){ return esc(x.biz)+' ≈ <span style="color:var(--s1)">'+esc(x.db)+'</span> ('+Math.round(x.sim*100)+'%)'; }).join(' · '));
-    var open=bad>0.3 || (D.dbCts||0)===0 || !!D.unit;
+    if(BZX.monthCnt){ var mc=Object.keys(BZX.monthCnt).sort().map(function(k){ return k+' '+BZX.monthCnt[k]+'행'; }).join(' · ');
+      var dropped=Object.keys(BZX.monthCnt).filter(function(k){ return k!==BZX.month; }).reduce(function(a,k){ return a+BZX.monthCnt[k]; },0);
+      lines.unshift('엑셀 «예상시기» 월 분포: '+mc+(dropped? ' — 다른 달로 적힌 '+dropped+'행도 모두 대조에 넣었습니다 (엑셀은 그 달 목록이므로 날짜로 걸러내지 않습니다)':' (전부 '+BZX.month+')')); }
+    var open=bad>0.3 || (D.dbCts||0)===0 || !!D.unit || (BZX.monthCnt && Object.keys(BZX.monthCnt).length>1);
     h+='<details'+(open?' open':'')+' style="margin:0 0 10px;padding:8px 12px;border:1px dashed var(--ring);border-radius:10px;background:var(--surface-2,rgba(0,0,0,.02))"><summary class="mini" style="cursor:pointer"><b>🩺 대조 진단</b>'+
        (open? ' <span style="color:var(--critical)">— 차이가 비정상적으로 많아 자동으로 펼쳤습니다. 아래 줄을 확인하세요</span>':'')+'</summary>'+
        '<div class="mini" style="line-height:1.8;margin-top:6px">'+lines.map(function(l){ return '· '+l; }).join('<br>')+'</div></details>';
@@ -7133,7 +7138,7 @@ function bzxRender(host){
   if(BZX.showEq) h+='<div class="mini" style="margin-top:8px;line-height:1.7"><b>일치</b> — '+eqs.map(function(q){ return esc(q.name)+' '+w(q.bizAmt); }).join(' · ')+'</div>';
   if(BZX.showSkip) h+='<div class="mini" style="margin-top:8px"><b>실패·중지 행</b> (회계매출이 적혀 있어도 비교에서 뺐습니다 — 중복 등록·해지 건)<table class="pr" style="margin-top:4px"><tbody>'+skips.map(function(q){ return q.biz.filter(function(b){ return !bzxCounted(b); }).map(function(b){ return '<tr><td>'+esc(b.cust)+'</td><td>'+esc(b.proj)+'</td><td>'+esc(b.st)+'</td><td class="n">'+w(b.acc)+'</td><td class="mini">'+esc(b.why||'')+'</td></tr>'; }).join(''); }).join('')+'</tbody></table></div>';
   h+='<div style="margin-top:10px">'+helpBox('bzx','이 대조는 어떻게 계산하나요?',[
-    ['비즈포탈 쪽','진행상태가 «종료»·«계산서발행» 인 행의 «회계매출» 합 (실패·중지·취소류만 비교에서 빼고 참고로 보여줍니다). 행은 있는데 회계매출이 0 인 회사(상위 행만 있고 하위매출 미등록, 수금 변경 행)는 «비즈포탈 회계매출 0» 으로 따로 잡습니다. 대상 월은 «예상시기» 열에서 읽습니다.'],
+    ['비즈포탈 쪽','엑셀에서 쓰는 열은 «고객사»·«회계매출»·«진행상태» 셋뿐입니다. 진행상태가 «종료»·«계산서발행» 인 행의 «회계매출» 합 (실패·중지·취소류만 비교에서 빼고 참고로 보여줍니다). 행은 있는데 회계매출이 0 인 회사(상위 행만 있고 하위매출 미등록, 수금 변경 행)는 «비즈포탈 회계매출 0» 으로 따로 잡습니다. «예상시기» 는 대상 월 이름을 정할 때만 쓰고 행을 걸러내지 않습니다.'],
     ['관리포탈 쪽','이 통합 관리 포탈 DB 의 그 달 계약별 월 매출(monthly_revenue) 합 + 대금정산일이 그 달인 설치비. 비즈포탈은 설치비를 별도 행으로 잡기 때문에 같이 봐야 맞습니다. 표에서 «관리포탈» 은 항상 이 포탈, «비즈포탈» 은 올린 엑셀을 뜻합니다.'],
     ['회사 묶기','띄어쓰기·㈜·(에스원)·괄호 안 사이트명·사명 변경 별칭을 무시하고 회사 단위로 묶습니다(두산에너빌리티 사우디/괌/이집트 → 1곳). 이름이 한 글자 오타 수준으로 닮은 짝(브랜드/브랜즈, 에프엔비/에프앤비)은 금액이 달라도 한 회사로 묶어 비교하고 «⇄ 표기 차이 추정» 으로 표시합니다. 그 위에 «비즈포탈에만 있음» = 엑셀에만 있음, «관리포탈에만 있음» = 이 포탈 DB 에만 있음입니다. 이름은 전혀 다른데 양쪽 금액이 같으면 «표기 차이(추정)»로 짝을 제안합니다. «별칭 저장»을 누르면 다음 달부터 자동으로 맞춰집니다.'],
     ['사유','차이 행마다 담당자가 한 줄로 적습니다. 지난달에 같은 고객사로 적은 사유가 있으면 미리 채워 두니 확인만 하면 됩니다. 「저장」을 누르면 요약 3줄 + 고객사별 차이가 아래 «비즈포탈 차액» 표에 들어갑니다.'],
@@ -7239,9 +7244,11 @@ async function bzxOpenFile(file){
     var rows=bzxParse(buf);
     var mi=bzxMonthIdx(rows);
     if(mi.idx==null) throw new Error('«예상시기» 열에서 대상 월을 읽지 못했습니다.');
-    if(mi.months.length>1) toast('여러 달이 섞여 있음', mi.months.join(', ')+' — 가장 많은 '+mi.ym+' 기준으로 대조합니다', 'info');
-    BZX.rows=rows.filter(function(r){ return r.when && (r.when.getFullYear()+'-'+('0'+(r.when.getMonth()+1)).slice(-2))===mi.ym; });
-    BZX.file=file.name; BZX.month=mi.ym; BZX.notes={}; BZX.showEq=false; BZX.showSkip=false;
+    /* 엑셀은 이미 «그 달» 매출 목록입니다 — 고객사·회계매출·진행상태만 쓰고, 날짜 열은 대상 월 이름을 정하는 데만 씁니다.
+       (예전엔 «예상시기» 가 다른 달로 읽힌 행을 버렸는데, 날짜 해석 오류로 8/1 자 하위매출 84행이 통째로 빠지는 사고가 났습니다) */
+    if(mi.months.length>1) toast('예상시기에 여러 달이 섞여 있음', mi.months.join(', ')+' — 행은 모두 대조에 넣고 대상 월은 '+mi.ym+' 로 표시합니다', 'info');
+    BZX.rows=rows;
+    BZX.file=file.name; BZX.month=mi.ym; BZX.monthCnt=mi.cnt; BZX.notes={}; BZX.showEq=false; BZX.showSkip=false;
     BZX.res=bzxCompare(BZX.rows, mi.idx);
     msgEl.textContent='';
     renderBizMonthly();
