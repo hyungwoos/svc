@@ -2297,7 +2297,7 @@ window.addEventListener('message', function(ev){
 });
 
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-16 ㊿+88';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-16 ㊿+91';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -6952,10 +6952,15 @@ function bzxParse(buf){
 }
 /* 회사 매칭 키: (에스원)·(S1) 표기 제거 → nmKeys(별칭·괄호·(주)·공백 무시) → ㈜·재단법인·유한회사·기호도 제거. 짧은 괄호 키(지역·사이트명)는 버림 */
 var BZX_SITE=/^(중국|미국|청주|페루|괌|사우디|이집트|말레이시아|스웨덴|스웬덴|창원|대전센터|이레빌딩|판교|수원|천안|본사|물류센터)/;
+var BZX_SUFFIX=/(점|센터|지점|지사|공장|사업장|캠퍼스|본점|영업소)$/;   // «이투스 창원점» «여성긴급전화1366 세종센터» 의 꼬리 토큰
 function bzxKeys(name){
   var t=String(name||'').replace(/\((에스원|S1)\)/g,'').replace(/\s+-\s+.*$/,'');   // «○○ - 대전센터» 같은 사이트 꼬리 제거
-  var base=nmKeys(t.replace(/\([^)]*\)/g,''));
-  var par=[]; var re=/\(([^)]*)\)/g, m; while((m=re.exec(t))){ var x=m[1].trim(); if(/^구\.?\s*/.test(x) || (x.length>=5 && !BZX_SITE.test(x))) par=par.concat(nmKeys(x.replace(/^구\.?\s*/,''))); }
+  var plain=t.replace(/\([^)]*\)/g,'').trim();
+  var base=nmKeys(plain);
+  /* 띄어쓴 마지막 토큰이 사이트명(지역·○○점·○○센터)이면 뺀 이름도 키로 — 관리포탈은 «이투스(창원)», 비즈포탈은 «이투스 창원점» 식으로 적기 때문 */
+  var toks=plain.split(/\s+/); if(toks.length>=2){ var last=toks[toks.length-1]; if(BZX_SITE.test(last)||BZX_SUFFIX.test(last)) base=base.concat(nmKeys(toks.slice(0,-1).join(' '))); }
+  /* 괄호 안 표기 — 영문 약칭(SQDA·GCCL)이나 옛 이름도 키로 (3자 이상, 지역·사이트명은 제외) */
+  var par=[]; var re=/\(([^)]*)\)/g, m; while((m=re.exec(t))){ var x=m[1].trim(); if(/^구\.?\s*/.test(x) || (x.length>=3 && !BZX_SITE.test(x) && !/^(주|유|사|재)$/.test(x))) par=par.concat(nmKeys(x.replace(/^구\.?\s*/,''))); }
   return base.concat(par).map(function(k){ return k.replace(/^(㈜|재단법인|사단법인|유한회사|학교법인)|(㈜|유한회사)$/g,'').replace(/[㈜·,.\-]/g,''); }).filter(function(k){ return k.length>=2; });
 }
 function bzxMonthIdx(rows){
@@ -6967,16 +6972,18 @@ function bzxMonthIdx(rows){
 function bzxCat(q){
   var hasBiz=q.bizAmt!==0, hasDb=q.db.length>0, hasZero=q.zero&&q.zero.length>0;
   if(!hasBiz && !hasDb){ q.cat=hasZero? 'skip' : 'skip'; return; }               // 비교할 금액이 양쪽 다 없음
-  if(hasBiz && hasDb && q.diff===0){ q.cat='eq'; return; }
+  if(hasBiz && hasDb && Math.abs(q.diff)<=1){ q.diff=0; q.cat='eq'; return; }   // 12분할 반올림 1원 차이는 일치로
   if(hasBiz && hasDb){ q.cat=((q.bizFee||q.dbFee) && Math.round((q.bizAmt-q.bizFee)-(q.dbTot-q.dbFee))===0)? 'fee' : 'amt'; return; }
   if(hasBiz){ q.cat='bizonly'; return; }
   q.cat=hasZero? 'zero' : 'dbonly';                                                // 비즈포탈에 행은 있지만 회계매출 0
 }
 /* 대조 본체 */
 function bzxCompare(rows, T){
-  var ymKey=mk(T)+'-01';
-  // 포탈 쪽: 그 달 월 매출(계약별) + 정산일이 그 달인 설치비
-  var byCt={}; (RAWX.mrs||[]).forEach(function(x){ if(String(x.month).slice(0,10)===ymKey) byCt[x.contract_id]=(byCt[x.contract_id]||0)+Number(x.amount||0); });
+  // 관리포탈 쪽: 그 달 월 매출(계약별) + 정산일이 그 달인 설치비  (달은 문자열이 아니라 월 인덱스로 비교 — 형식이 달라도 안전)
+  var byCt={}, nearCnt={};
+  (RAWX.mrs||[]).forEach(function(x){ var i=dIdx(x.month); if(i==null) return;
+    if(i===T) byCt[x.contract_id]=(byCt[x.contract_id]||0)+Number(x.amount||0);
+    if(Math.abs(i-T)<=2) nearCnt[i]=(nearCnt[i]||0)+1; });
   var dbRows=[]; (DATA.rows||[]).forEach(function(r){
     var a=byCt[r._id]||0, fee=(r.fee && String(r.settle||'').slice(0,7)===mk(T))? r.fee : 0;
     if(!a && !fee) return;
@@ -7039,9 +7046,20 @@ function bzxCompare(rows, T){
     if(q.rule && q.rule.mode==='ignore'){ sum.ign++; sum.ignBiz+=q.bizAmt; sum.ignDb+=q.dbTot; return; }   // 무시 규칙: 총계에서 아예 뺌
     sum.biz+=q.bizAmt; sum.db+=q.dbTot; if(q.rule){ sum.ruled++; sum.ruledAmt+=q.diff; } });
   sum.diff=Math.round(sum.biz-sum.db);
-  return {groups:out, sum:sum, T:T};
+  /* 진단 — 차이가 비정상적으로 많을 때 어디가 문제인지 바로 보이게 */
+  var diag={ nearCnt:nearCnt, dbCts:Object.keys(byCt).length, dbRows:dbRows.length, bizCusts:0, matched:0, unit:null, nearMiss:[] };
+  var bc={}; rows.forEach(function(b){ if(bzxCounted(b) && b.acc) bc[b.cust]=1; }); diag.bizCusts=Object.keys(bc).length;
+  out.forEach(function(q){ if(q.biz.length && q.db.length) diag.matched++; });
+  if(sum.biz>0 && sum.db>0){ var r=sum.db/sum.biz; if(r>400&&r<2500) diag.unit='관리포탈 금액이 비즈포탈의 약 '+Math.round(r)+'배 — 단위(원/천원)가 다른 것 같습니다'; else if(r<1/400&&r>1/2500) diag.unit='비즈포탈 금액이 관리포탈의 약 '+Math.round(1/r)+'배 — 단위(원/천원)가 다른 것 같습니다'; }
+  var portalNames={}; (DATA.rows||[]).forEach(function(r){ if(r.cust) portalNames[r.cust]=1; }); portalNames=Object.keys(portalNames);
+  out.filter(function(q){ return q.cat==='bizonly'; }).slice(0,60).forEach(function(q){
+    var best=null,bs=0; portalNames.forEach(function(n){ var sc=bzxSim(q.bizName,n); if(sc>bs){ bs=sc; best=n; } });
+    if(best && bs>=0.5) diag.nearMiss.push({biz:q.bizName, db:best, sim:bs});
+  });
+  diag.nearMiss.sort(function(a,b){ return b.sim-a.sim; });
+  return {groups:out, sum:sum, T:T, diag:diag};
 }
-var BZX_CAT={eq:['일치','var(--ok,#2e7d32)'], fee:['설치비 인식 시점','var(--warn,#b26a00)'], amt:['금액 다름','var(--critical)'], bizonly:['비즈포탈에만 있음','var(--critical)'], dbonly:['포탈에만 있음','var(--critical)'], zero:['비즈포탈 회계매출 0','var(--warn,#b26a00)'], alias:['표기 차이(추정)','var(--s1)'], alias2:['표기 차이(추정)','var(--s1)'], aliasq:['금액만 같음(확인 필요)','var(--warn,#b26a00)'], skip:['실패·중지(참고)','var(--muted)']};
+var BZX_CAT={eq:['일치','var(--ok,#2e7d32)'], fee:['설치비 인식 시점','var(--warn,#b26a00)'], amt:['금액 다름','var(--critical)'], bizonly:['비즈포탈에만 있음','var(--critical)'], dbonly:['관리포탈에만 있음','var(--critical)'], zero:['비즈포탈 회계매출 0','var(--warn,#b26a00)'], alias:['표기 차이(추정)','var(--s1)'], alias2:['표기 차이(추정)','var(--s1)'], aliasq:['금액만 같음(확인 필요)','var(--warn,#b26a00)'], skip:['실패·중지(참고)','var(--muted)']};
 function bzxPrevNote(name){
   // 예전 달 biz_recon 에 같은 고객사 사유가 있으면 기본값으로 (같은 차이가 매달 반복될 때 다시 안 적게)
   var hit=null; (RAWX.biz||[]).forEach(function(r){ if(r.kind==='detail' && r.note && r.item && bzxKeys(r.item).some(function(k){ return bzxKeys(name).indexOf(k)>=0; })){ if(!hit || (r.id||0)>(hit.id||0)) hit=r; } });
@@ -7058,17 +7076,36 @@ function bzxRender(host){
   var h='<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:8px"><b style="font-size:15px">📥 비즈포탈 엑셀 자동 대조 — '+mk(T)+'</b><span class="mini" style="color:var(--muted)">'+esc(BZX.file)+' · '+BZX.rows.length+'행 · 파일은 저장하지 않고 이 화면에서만 씁니다</span></div>';
   h+='<div class="kpis" style="margin-bottom:12px">'+
     '<div class="kpi"><div class="k">비즈포탈 회계매출 (종료·계산서발행)</div><div class="v">'+w(S.biz/1000)+'<small>천원</small></div><div class="d">실패·중지 '+w(S.skip/1000)+'천원 제외'+(S.ign? ' · 무시 규칙 '+w(S.ignBiz/1000)+'천원 제외':'')+'</div></div>'+
-    '<div class="kpi"><div class="k">포탈 매출 (월 매출 + 설치비)</div><div class="v">'+w(S.db/1000)+'<small>천원</small></div><div class="d">'+mk(T)+' 인식 금액 · 정산일 '+mk(T)+' 설치비 포함'+(S.ign? ' · 무시 규칙 '+w(S.ignDb/1000)+'천원 제외':'')+'</div></div>'+
-    '<div class="kpi '+(S.diff>=0?'up':'down')+'"><div class="k">차액 (비즈포탈 − 포탈)</div><div class="v">'+(S.diff>0?'+':'')+w(S.diff/1000)+'<small>천원</small></div><div class="d">일치 '+(S.n.eq||0)+'곳 · 확인할 차이 '+diffs.length+'곳'+(S.n.alias? ' (표기 차이 추정 '+S.n.alias+'쌍 포함)':'')+(ruled.length? ' · 반복 규칙 '+ruled.length+'곳'+(S.ign? ' (무시 '+S.ign+')':''):'')+'</div></div></div>';
-  h+='<div style="overflow-x:auto"><table class="pr" style="width:100%;table-layout:fixed"><colgroup><col style="width:130px"><col style="width:24%"><col style="width:100px"><col style="width:100px"><col style="width:100px"><col style="width:200px"><col></colgroup><thead><tr><th>구분</th><th>고객사</th><th class="n">비즈포탈(원)</th><th class="n">포탈(원)</th><th class="n">차이(원)</th><th></th><th>사유 <span class="mini" style="color:var(--muted)">(담당자 입력 · 지난달 같은 사유는 미리 채움 · 회색 글은 자동 판단)</span></th></tr></thead><tbody>';
+    '<div class="kpi"><div class="k">관리포탈 매출 (월 매출 + 설치비)</div><div class="v">'+w(S.db/1000)+'<small>천원</small></div><div class="d">이 포탈 DB 의 '+mk(T)+' 인식 금액 · 정산일 '+mk(T)+' 설치비 포함'+(S.ign? ' · 무시 규칙 '+w(S.ignDb/1000)+'천원 제외':'')+'</div></div>'+
+    '<div class="kpi '+(S.diff>=0?'up':'down')+'"><div class="k">차액 (비즈포탈 − 관리포탈)</div><div class="v">'+(S.diff>0?'+':'')+w(S.diff/1000)+'<small>천원</small></div><div class="d">일치 '+(S.n.eq||0)+'곳 · 확인할 차이 '+diffs.length+'곳'+(S.n.alias? ' (표기 차이 추정 '+S.n.alias+'쌍 포함)':'')+(ruled.length? ' · 반복 규칙 '+ruled.length+'곳'+(S.ign? ' (무시 '+S.ign+')':''):'')+'</div></div></div>';
+  (function(){
+    var D=res.diag||{}, total=res.groups.length||1, bad=diffs.length/total;
+    var lines=[];
+    var nearTxt=Object.keys(D.nearCnt||{}).sort().map(function(i){ return mk(+i)+' '+D.nearCnt[i]+'건'; }).join(' · ');
+    lines.push('관리포탈 월 매출(monthly_revenue) '+mk(T)+': 계약 <b>'+(D.dbCts||0)+'건</b>'+(nearTxt? ' <span style="color:var(--muted)">(인접 달: '+nearTxt+')</span>':'')+
+      ((D.dbCts||0)===0? ' — <b style="color:var(--critical)">이 달 인식 금액이 하나도 없습니다. 월 매출 인식이 아직 안 돌았거나 대상 월이 다릅니다</b>':''));
+    if((D.dbCts||0)>0){
+      lines.push('비즈포탈 회계매출 있는 고객사 <b>'+(D.bizCusts||0)+'곳</b> · 이름으로 관리포탈과 붙은 회사 <b>'+(D.matched||0)+'곳</b>'+
+        ((D.bizCusts||0)>0 && (D.matched||0)/(D.bizCusts||1)<0.5? ' — <b style="color:var(--critical)">절반도 안 붙었습니다. 두 쪽 고객사 표기 방식이 체계적으로 다른 것 같습니다 (아래 비슷한 이름 목록에서 패턴을 봐 주세요)</b>':''));
+    } else lines.push('→ 관리포탈에 '+mk(T)+' 월 매출을 먼저 만들고(매출 인식·재계산) 엑셀을 다시 올리면 됩니다. 이 상태의 «비즈포탈에만 있음» 은 전부 그 때문이라 저장하지 마세요.');
+    if(D.unit) lines.push('<b style="color:var(--critical)">⚠ '+D.unit+'</b>');
+    if((D.dbCts||0)>0 && D.nearMiss && D.nearMiss.length) lines.push('비즈포탈에만 있는 회사 중 관리포탈에 <i>비슷한 이름</i>이 있는 경우 (표기 패턴 확인용): '+
+      D.nearMiss.slice(0,12).map(function(x){ return esc(x.biz)+' ≈ <span style="color:var(--s1)">'+esc(x.db)+'</span> ('+Math.round(x.sim*100)+'%)'; }).join(' · '));
+    var open=bad>0.3 || (D.dbCts||0)===0 || !!D.unit;
+    h+='<details'+(open?' open':'')+' style="margin:0 0 10px;padding:8px 12px;border:1px dashed var(--ring);border-radius:10px;background:var(--surface-2,rgba(0,0,0,.02))"><summary class="mini" style="cursor:pointer"><b>🩺 대조 진단</b>'+
+       (open? ' <span style="color:var(--critical)">— 차이가 비정상적으로 많아 자동으로 펼쳤습니다. 아래 줄을 확인하세요</span>':'')+'</summary>'+
+       '<div class="mini" style="line-height:1.8;margin-top:6px">'+lines.map(function(l){ return '· '+l; }).join('<br>')+'</div></details>';
+  })();
+  h+='<div style="overflow-x:auto"><table class="pr" style="width:100%;table-layout:fixed"><colgroup><col style="width:130px"><col style="width:24%"><col style="width:100px"><col style="width:100px"><col style="width:100px"><col style="width:200px"><col></colgroup><thead><tr><th>구분</th><th>고객사</th><th class="n">비즈포탈(원)</th><th class="n">관리포탈(원)</th><th class="n">차이(원)</th><th></th><th>사유 <span class="mini" style="color:var(--muted)">(담당자 입력 · 지난달 같은 사유는 미리 채움 · 회색 글은 자동 판단)</span></th></tr></thead><tbody>';
   if(!diffs.length) h+='<tr><td colspan="7" class="mini" style="color:var(--muted)">'+(ruled.length? '확인할 차이 없음 — 남은 차이는 모두 반복 규칙으로 처리됐습니다 ✓' : '차이 없음 — 전부 일치합니다 🎉')+'</td></tr>';
   diffs.forEach(function(q,i){
     var c=BZX_CAT[q.cat==='alias' && q.pairConf==='low'? 'aliasq' : q.cat], key=bzxNoteKey(q), note=(BZX.notes[key]!=null)? BZX.notes[key] : bzxPrevNote(q.name);
     var pairTxt=q.pair? ' ⇄ '+esc(q.pair.name) : (q.aliasHint? ' <span class="mini" style="color:var(--s1)">⇄ '+esc(q.aliasHint.db)+' (표기 차이 추정)</span>' : '');
-    var auto=q.cat==='fee'? '설치비 '+w(q.bizFee||q.dbFee)+'원 — 비즈포탈은 이 달, 포탈 정산일은 '+(q.db.filter(function(d){return d.r.fee;}).map(function(d){ return String(d.r.settle||'').slice(0,7)||'없음'; })[0]||'다른 달')
+    var auto=q.cat==='fee'? '설치비 '+w(q.bizFee||q.dbFee)+'원 — 비즈포탈은 이 달, 관리포탈 정산일은 '+(q.db.filter(function(d){return d.r.fee;}).map(function(d){ return String(d.r.settle||'').slice(0,7)||'없음'; })[0]||'다른 달')
            : q.cat==='alias'? (q.pairConf==='low'? '금액만 같고 이름은 전혀 달라 같은 회사인지 확인 필요 — 맞으면 별칭 저장, 아니면 각각 사유 기입' : '양쪽에 같은 금액 — 이름 표기만 다름(별칭 저장 권장)')
-           : (q.cat==='bizonly' && q.dbCts && q.dbCts.length)? '포탈에 고객사는 있으나 이 달 매출 없음 — 계약 '+q.dbCts.map(function(r){ return lline(r.line)+' '+(r.startRaw!=null?mk(r.startRaw):'?')+'~'+(r.endRaw!=null?mk(r.endRaw):'')+' '+(r.status||''); }).join(', ')
-           : q.cat==='bizonly'? '포탈에 이 고객사가 없음 — 계약 미등록 또는 사명이 전혀 다름'
+           : (q.cat==='bizonly' && q.dbCts && q.dbCts.length)? '관리포탈에 고객사는 있으나 이 달 매출 없음 — 계약 '+q.dbCts.map(function(r){ return lline(r.line)+' '+(r.startRaw!=null?mk(r.startRaw):'?')+'~'+(r.endRaw!=null?mk(r.endRaw):'')+' '+(r.status||''); }).join(', ')
+           : q.cat==='bizonly'? '관리포탈에 이 고객사가 없음 — 계약 미등록 또는 사명이 전혀 다름'
+           : q.cat==='dbonly'? '관리포탈(이 DB)에는 이 달 매출이 있는데 비즈포탈 엑셀에는 행이 없음 — 비즈포탈 미등록·인식 월 차이·사명 불일치 중 하나'
            : q.cat==='zero'? ('비즈포탈에 행은 있지만 회계매출이 0 — 매출액 '+w(q.zeroSales)+'원 · '+esc(q.zero.map(function(b){ return (b.st||'')+(b.why? '/'+b.why:''); }).filter(function(x,i,a){ return a.indexOf(x)===i; }).join(', '))+' (하위매출 미등록·수금 변경 행이면 비즈포탈에서 회계매출 등록 필요)')
            : (q.aliasHint && q.cat==='amt')? ('표기 차이 «'+esc(q.aliasHint.biz)+'» ⇄ «'+esc(q.aliasHint.db)+'» 로 묶어 비교 — 금액이 다릅니다') : '';
     var bizAmt=q.cat==='alias'? q.bizAmt : q.bizAmt, dbAmt=q.cat==='alias'? q.pair.dbTot : q.dbTot, diff=q.cat==='alias'? 0 : q.diff;
@@ -7081,7 +7118,7 @@ function bzxRender(host){
        '<td><input class="bzx-note" data-key="'+esc(key)+'" value="'+esc(note)+'" placeholder="'+esc(auto||'왜 다른지 한 줄로')+'" title="'+esc(auto||'')+'" style="width:100%;box-sizing:border-box;font:inherit;padding:5px 8px;border:1px solid var(--ring);border-radius:8px;background:var(--surface-2);color:inherit"></td></tr>';
     h+='<tr class="bzx-detrow" data-i="'+i+'" style="display:none"><td colspan="7" style="background:var(--surface-2,rgba(0,0,0,.02))"><div class="mini" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'+
        '<div><b>비즈포탈 행</b>'+(q.biz.length? '<table class="pr" style="margin-top:4px"><tbody>'+q.biz.map(function(b){ return '<tr><td>'+esc(b.proj)+'</td><td>'+esc(b.st)+'</td><td class="n">'+w(b.acc)+'</td><td class="mini">'+esc(b.why||'')+'</td></tr>'; }).join('')+'</tbody></table>' : '<div style="color:var(--muted)">없음</div>')+'</div>'+
-       '<div><b>포탈 계약</b>'+((q.pair? q.pair.db : q.db).length? '<table class="pr" style="margin-top:4px"><tbody>'+(q.pair? q.pair.db : q.db).map(function(d){ return '<tr><td>'+esc(d.cust)+'</td><td>'+esc(lline(d.line))+' · '+esc(d.status||'')+'</td><td class="n">'+w(d.amt)+(d.fee? ' + 설치비 '+w(d.fee):'')+'</td><td class="mini">'+esc((d.note||'').slice(0,40))+'</td></tr>'; }).join('')+'</tbody></table>' : '<div style="color:var(--muted)">이 달 매출 없음'+(q.cat==='bizonly'? ' — 계약 미등록·사명 불일치·인식 월 차이 중 하나':'')+'</div>')+'</div></div></td></tr>';
+       '<div><b>관리포탈 계약 (이 DB)</b>'+((q.pair? q.pair.db : q.db).length? '<table class="pr" style="margin-top:4px"><tbody>'+(q.pair? q.pair.db : q.db).map(function(d){ return '<tr><td>'+esc(d.cust)+'</td><td>'+esc(lline(d.line))+' · '+esc(d.status||'')+'</td><td class="n">'+w(d.amt)+(d.fee? ' + 설치비 '+w(d.fee):'')+'</td><td class="mini">'+esc((d.note||'').slice(0,40))+'</td></tr>'; }).join('')+'</tbody></table>' : '<div style="color:var(--muted)">이 달 매출 없음'+(q.cat==='bizonly'? ' — 계약 미등록·사명 불일치·인식 월 차이 중 하나':'')+'</div>')+'</div></div></td></tr>';
   });
   h+='</tbody></table></div>';
   h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px">'+
@@ -7097,8 +7134,8 @@ function bzxRender(host){
   if(BZX.showSkip) h+='<div class="mini" style="margin-top:8px"><b>실패·중지 행</b> (회계매출이 적혀 있어도 비교에서 뺐습니다 — 중복 등록·해지 건)<table class="pr" style="margin-top:4px"><tbody>'+skips.map(function(q){ return q.biz.filter(function(b){ return !bzxCounted(b); }).map(function(b){ return '<tr><td>'+esc(b.cust)+'</td><td>'+esc(b.proj)+'</td><td>'+esc(b.st)+'</td><td class="n">'+w(b.acc)+'</td><td class="mini">'+esc(b.why||'')+'</td></tr>'; }).join(''); }).join('')+'</tbody></table></div>';
   h+='<div style="margin-top:10px">'+helpBox('bzx','이 대조는 어떻게 계산하나요?',[
     ['비즈포탈 쪽','진행상태가 «종료»·«계산서발행» 인 행의 «회계매출» 합 (실패·중지·취소류만 비교에서 빼고 참고로 보여줍니다). 행은 있는데 회계매출이 0 인 회사(상위 행만 있고 하위매출 미등록, 수금 변경 행)는 «비즈포탈 회계매출 0» 으로 따로 잡습니다. 대상 월은 «예상시기» 열에서 읽습니다.'],
-    ['포탈 쪽','그 달 계약별 월 매출(monthly_revenue) 합 + 대금정산일이 그 달인 설치비. 비즈포탈은 설치비를 별도 행으로 잡기 때문에 같이 봐야 맞습니다.'],
-    ['회사 묶기','띄어쓰기·㈜·(에스원)·괄호 안 사이트명·사명 변경 별칭을 무시하고 회사 단위로 묶습니다(두산에너빌리티 사우디/괌/이집트 → 1곳). 이름이 한 글자 오타 수준으로 닮은 짝(브랜드/브랜즈, 에프엔비/에프앤비)은 금액이 달라도 한 회사로 묶어 비교하고 «⇄ 표기 차이 추정» 으로 표시합니다. 이름은 전혀 다른데 양쪽 금액이 같으면 «표기 차이(추정)»로 짝을 제안합니다. «별칭 저장»을 누르면 다음 달부터 자동으로 맞춰집니다.'],
+    ['관리포탈 쪽','이 통합 관리 포탈 DB 의 그 달 계약별 월 매출(monthly_revenue) 합 + 대금정산일이 그 달인 설치비. 비즈포탈은 설치비를 별도 행으로 잡기 때문에 같이 봐야 맞습니다. 표에서 «관리포탈» 은 항상 이 포탈, «비즈포탈» 은 올린 엑셀을 뜻합니다.'],
+    ['회사 묶기','띄어쓰기·㈜·(에스원)·괄호 안 사이트명·사명 변경 별칭을 무시하고 회사 단위로 묶습니다(두산에너빌리티 사우디/괌/이집트 → 1곳). 이름이 한 글자 오타 수준으로 닮은 짝(브랜드/브랜즈, 에프엔비/에프앤비)은 금액이 달라도 한 회사로 묶어 비교하고 «⇄ 표기 차이 추정» 으로 표시합니다. 그 위에 «비즈포탈에만 있음» = 엑셀에만 있음, «관리포탈에만 있음» = 이 포탈 DB 에만 있음입니다. 이름은 전혀 다른데 양쪽 금액이 같으면 «표기 차이(추정)»로 짝을 제안합니다. «별칭 저장»을 누르면 다음 달부터 자동으로 맞춰집니다.'],
     ['사유','차이 행마다 담당자가 한 줄로 적습니다. 지난달에 같은 고객사로 적은 사유가 있으면 미리 채워 두니 확인만 하면 됩니다. 「저장」을 누르면 요약 3줄 + 고객사별 차이가 아래 «비즈포탈 차액» 표에 들어갑니다.'],
     ['🔁 매달 반복','<b>매달 같은 이유로 생기는 차이</b>는 사유를 적고 «매달 반복»에서 종류를 고르면 규칙으로 저장돼 다음 달부터 묻지 않습니다. <b>사유 기록 반복</b> = 차액은 그대로 인정하고 저장할 때 이 사유가 자동으로 붙어 기록됨(예: 설치비 인식 시점, 분기납 인식 차이). <b>무시 반복</b> = 우리 쪽 차액이 아닌 것(다른 부서 담당자가 등록하는 조달 건 등)으로 보고 총계·고객사별 표에서 아예 빼며 기록하지 않음. 둘 다 «반복 규칙» 묶음에서 확인·해제할 수 있고, 차이 종류가 바뀌면(예: 포탈에만 있음 → 금액 다름) 다시 확인을 받습니다.'],
     ['엑셀 파일','저장하지 않습니다. 화면을 닫으면 사라지고, 다음 달에는 새 파일을 다시 올리면 됩니다.']
@@ -7167,7 +7204,7 @@ async function bzxSave(diffs){
   if(exists && !confirm(ym+' 대조 결과가 이미 있습니다. 이번 자동 대조 결과로 바꿀까요?')) return;
   var out=[
     {ym:ym, as_of:asof, kind:'sum', item:'비즈포탈 회계매출', biz:Math.round(res.sum.biz)},
-    {ym:ym, as_of:asof, kind:'sum', item:'매출시트(포탈) 매출', biz:Math.round(res.sum.db)},
+    {ym:ym, as_of:asof, kind:'sum', item:'관리포탈 매출', biz:Math.round(res.sum.db)},
     {ym:ym, as_of:asof, kind:'sum', item:'차액 총계', biz:res.sum.diff}
   ];
   // 반복 규칙으로 처리된 차이도 표에는 들어감 (사유 = 규칙 문장)
