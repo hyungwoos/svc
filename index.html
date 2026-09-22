@@ -2714,7 +2714,7 @@ window.addEventListener('message', function(ev){
 });
 
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-16 ㊿+101';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-16 ㊿+102';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -3200,7 +3200,8 @@ function renderEqDash(){
   var pm=new Date(); pm.setMonth(pm.getMonth()-1); var pym=todayStr(pm).slice(0,7);
   var lent=A.filter(function(a){ return a.status==='임대중'; }), stock=A.filter(function(a){ return a.status==='재고'; });
   var lentCust={}; lent.forEach(function(a){ if(a.customer) lentCust[a.customer]=1; });
-  var stockModel={}; stock.forEach(function(a){ var m=a.model||'미지정'; stockModel[m]=(stockModel[m]||0)+1; });
+  var retd=A.filter(function(a){ return a.status==='회수완료'; }), retdModel={}, retdCust={}, retdLast='';
+  retd.forEach(function(a){ var m=a.model||'미지정'; retdModel[m]=(retdModel[m]||0)+1; if(a.customer) retdCust[a.customer]=1; var d=String(a.returned_date||'').slice(0,10); if(d>retdLast) retdLast=d; });
   var pend=O.filter(function(o){ return ['접수','출하요청','배송중'].indexOf(o.status)>=0; });
   var pendBy={}; pend.forEach(function(o){ pendBy[o.status]=(pendBy[o.status]||0)+1; });
   var oldest=pend.map(function(o){ return String(o.created_at||'').slice(0,10); }).filter(Boolean).sort()[0];
@@ -3216,7 +3217,7 @@ function renderEqDash(){
   }
   K.innerHTML=
     tile('good', 'var(--brand)', '임대중', lent.length, '대', '고객사 '+Object.keys(lentCust).length+'곳 · 현황 기준', 'assets:임대중')+
-    tile('', 'var(--muted)', '재고', stock.length, '대', Object.keys(stockModel).sort(function(a,b){ return stockModel[b]-stockModel[a]; }).slice(0,3).map(function(m){ return esc(m)+' '+stockModel[m]; }).join(' · ')||'재고 없음', 'assets:재고')+
+    tile('', 'var(--ink-2)', '회수 장비', retd.length, '대', retd.length? Object.keys(retdModel).sort(function(a,b){ return retdModel[b]-retdModel[a]; }).slice(0,3).map(function(m){ return esc(m)+' '+retdModel[m]; }).join(' · ')+' · 고객사 '+Object.keys(retdCust).length+'곳'+(retdLast? ' · 최근 '+retdLast:'') : '회수완료 장비 없음', 'assets:회수완료')+
     tile(pend.length? (age>7? 'crit':'hot'):'', '#1E4FA3', '처리 대기', pend.length, '건', pend.length? ['접수','출하요청','배송중'].filter(function(k){ return pendBy[k]; }).map(function(k){ return k+' '+pendBy[k]; }).join(' · ')+(age>=1? ' · 최장 '+age+'일':'') : '대기 중인 신청 없음', 'col:접수')+
     tile(retL.length? 'hot':'', '#D95926', '회수 진행', retL.length, '건', retL.length? '회수 '+retDone+'/'+retAll+'대 · 시리얼 칩으로 처리':'진행 중인 회수 없음', 'col:회수예정')+
     tile('', 'var(--s1)', '이달 설치', qty(instM), '대', instM.length+'건 · 지난달 '+qty(instP)+'대', 'col:설치완료')+
