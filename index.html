@@ -2297,7 +2297,7 @@ window.addEventListener('message', function(ev){
 });
 
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-16 ㊿+86';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-16 ㊿+87';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -6056,7 +6056,7 @@ var GRIDS={
   orders:{
     title:'임대 장비 신청 내역', table:'equipment_orders',
     chipsField:'channel', chipsOpts:['에스원','LGU+','조달','일반','기타'],
-    cap:'저장할 때마다 장비 현황에 자동 반영됩니다 — 접수·출하요청·배송중은 재고, 설치완료·회수예정은 임대중, 회수완료는 회수완료 (취소는 현황에서 내림) · 시리얼을 비워두면 «미등록-신청번호» 로 수량만큼 임시 등록 · 신규 신청은 장비 › 임대 장비 신청', add:true, del:true,
+    cap:'저장할 때마다 장비 현황에 자동 반영됩니다 — 접수·출하요청·배송중은 재고, 설치완료·회수예정은 임대중, 회수완료는 회수완료 (취소는 현황에서 내림) · 상태를 회수완료로 바꾸면 회수일이 그날로 자동 입력 (수정 가능) · 시리얼을 비워두면 «미등록-신청번호» 로 수량만큼 임시 등록 · 신규 신청은 장비 › 임대 장비 신청', add:true, del:true,
     rows:function(){ return RAWX.orders||[]; },
     cols:[
       {k:'created_at',l:'신청일',ro:true,fmt:function(v){return String(v||'').slice(0,10);}},
@@ -6074,6 +6074,10 @@ var GRIDS={
       {k:'recv_name',l:'수령인'},
       {k:'ship_date',l:'수령희망',t:'date'},
       {k:'status',l:'상태',t:'select',opts:['접수','출하요청','배송중','설치완료','회수예정','회수완료','취소']},
+      {k:'returned_date',l:'회수일',t:'date',fmt:function(v,r){
+        if(v) return String(v).slice(0,10);
+        return (r&&r.status==='회수완료')? '· ⚠ 미입력' : '·';     /* 회수완료인데 날짜가 없으면 표시 */
+      }},
       {k:'serials',l:'시리얼'},
       {k:'request_note',l:'요청사항'}
     ]
@@ -6335,11 +6339,12 @@ async function syncOrderAssets(r, st, quiet){
       var isPh=!real.length;
       var gone=(stA!=='재고');                                   // 재고(출고 전)는 출고일을 넣지 않습니다
       var dep=gone? (r.install_date || String(r.created_at||'').slice(0,10) || todayS) : null;
+      var rd=(stA==='회수완료')? (String(r.returned_date||'').slice(0,10) || todayS) : null;   /* 신청의 회수일이 기준 · 없으면 오늘 */
       var mk=function(sn){
         var o={ serial:sn, model:r.model||null, usage:'임대', status:stA,
                 customer:(r.customer||null),                   /* 회수완료도 고객사를 남깁니다 — 현황에서 고객사로 찾아야 하니까 */
                 channel:r.channel||null, order_id:r.id,
-                deployed_date:dep, returned_date:(stA==='회수완료'? todayS : null) };
+                deployed_date:dep, returned_date:rd };
         if(isPh) o.note='⚠ 시리얼 미입력 · 신청 #'+r.id+' ('+(r.status||'')+') 에서 자동 생성';
         return o;
       };
@@ -6353,7 +6358,7 @@ async function syncOrderAssets(r, st, quiet){
       }
       if(upd.length){
         var ub=mk(upd[0]); delete ub.serial; ub.updated_at=new Date().toISOString();
-        if(stA==='회수완료'){                       /* 이미 회수일이 있는 행은 그 날짜를 지킵니다 */
+        if(stA==='회수완료' && !r.returned_date){   /* 신청에 회수일이 없을 때만: 이미 회수일이 있는 행은 그 날짜를 지킵니다 */
           var hasRd=upd.filter(function(sn){ var a=cur[sn.toUpperCase()]; return a && a.returned_date; });
           var noRd =upd.filter(function(sn){ var a=cur[sn.toUpperCase()]; return !(a && a.returned_date); });
           var ub2=Object.assign({},ub); delete ub2.returned_date;
@@ -13270,6 +13275,10 @@ function gridRow(r,g,editing){
         if(g.table==='equipment_assets' && body.status==='임대중' && body.returned_date &&
            confirm('상태는 «임대중»인데 회수일('+body.returned_date+')이 있습니다.\n회수일을 비우고 저장할까요?\n\n(취소 = 그대로 저장)')) body.returned_date=null;
         var eqSync=(g.table==='equipment_orders');   /* 신청 내역을 저장하면 장비 현황을 항상 다시 맞춥니다 */
+        if(eqSync && body.status==='회수완료' && r.status!=='회수완료' && !body.returned_date && !r.returned_date){
+          body.returned_date=todayStr();               /* 회수완료로 바꾸는 날 = 회수일 (나중에 회수일 칸에서 수정 가능) */
+          toast('회수일 자동 입력', body.returned_date+' — 다른 날이면 회수일 칸을 고쳐 저장하세요', 'info');
+        }
         var sideJobs=side.map(function(x){
           var o={}; o[x.col]=x.val;
           return sbWrite('PATCH',x.tbl+'?id=eq.'+x.id,o).then(function(){
