@@ -1293,6 +1293,29 @@ html[data-look="cc"] .ask-ico{display:none}
 .pr-qhead{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;margin-bottom:4px}
 :is(#viewPrice) .pr-calc{display:none}
 
+/* ── 리포트 담기 ── */
+.rpb-add{position:absolute;top:8px;right:8px;z-index:3;width:24px;height:24px;border-radius:7px;border:1px solid var(--ring);background:var(--surface);color:var(--muted);font-size:15px;line-height:1;cursor:pointer;opacity:0;transition:opacity .12s;display:flex;align-items:center;justify-content:center;padding:0}
+:is(.card,.kpi,.pr-card,.cl-detb,.answer,.inb-card,.inb-kpi):hover>.rpb-add,.rpb-add:focus{opacity:1}
+.rpb-add:hover{border-color:var(--brand);color:var(--brand);background:var(--brand-t)}
+.card:has(> .rpb-add) .card-head .whandle,.card:has(> .rpb-add) h2 .whandle{margin-right:26px}
+.rpb-cnt{margin-left:auto;min-width:18px;height:18px;border-radius:9px;background:var(--brand);color:#fff;font-size:10.5px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;padding:0 5px}
+.rpb-it{background:var(--surface);border:1px solid var(--ring);border-radius:12px;padding:12px 14px;margin-bottom:10px}
+.rpb-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.rpb-n{width:24px;height:24px;border-radius:50%;background:var(--brand);color:#fff;font-size:12px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex:none}
+.rpb-title{flex:1;min-width:220px;height:32px;border:1px solid transparent;border-radius:8px;padding:0 8px;font:inherit;font-size:14px;font-weight:600;background:transparent;color:var(--ink)}
+.rpb-title:hover,.rpb-title:focus{border-color:var(--ring);background:var(--surface-2);outline:none}
+.rpb-b{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:14px;margin-top:10px;align-items:start}
+@media (max-width:1000px){ .rpb-b{grid-template-columns:1fr} }
+.rpb-prev{min-width:0;font-size:12.5px}
+.rpb-prev .tbl-wrap table{font-size:11.5px}
+.rpb-kpis{display:flex;gap:16px;flex-wrap:wrap}
+.rpb-kpis>div b{font-size:22px;font-weight:700;display:block;margin:2px 0}
+.rpb-svg svg{max-width:100%;height:auto}
+.rpb-text{margin:6px 0 0;line-height:1.6;color:var(--ink-2)}
+.rpb-note{width:100%;min-height:76px;border:1px solid var(--ring);border-radius:9px;padding:8px 10px;font:inherit;font-size:12.5px;background:var(--surface-2);color:var(--ink);resize:vertical}
+.rpb-note.rpb-body{min-height:130px;background:var(--surface)}
+.h160{height:160px}
+
 /* ── 장비 대시보드 (요약 타일 · 차트 · 상태 보드) ── */
 .eqb-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:18px}
 .eqb-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:20px}
@@ -1747,6 +1770,7 @@ html[data-look="cc"] #ovlC360 .mact{border-top:1px solid var(--grid);padding-top
         <button class="pill ghost" id="dvCsv" title="현재 필터·정렬이 적용된 목록을 엑셀 파일로 저장">⬇ 엑셀</button>
         <button class="pill ghost" id="dvDense" title="표 밀도 — 보통/컴팩트">☰ 밀도</button>
         <button class="pill ghost" id="dvCols" title="보일 열 고르기 — 화면마다 따로 기억합니다">🧱 열</button>
+        <button class="pill ghost" id="dvRpb" title="지금 보이는 표(검색·필터·정렬 적용)를 리포트에 담습니다">＋ 리포트</button>
         <button class="pill ghost" id="dvFclr" style="display:none;border-color:var(--critical);color:var(--critical)">✕ 필터 해제</button>
         <span class="mini" id="dvMsg"></span>
         <span class="spacer"></span>
@@ -2562,6 +2586,7 @@ var Viz = (function () {
   /* ---------- 선 / 누적 영역 ---------- */
   function lines(host, cfg) {
     var f = frame(host, cfg);
+    host.__viz = { type: cfg.stacked ? 'area' : 'lines', cfg: cfg };   // 리포트 담기용 원본 데이터
     var labels = cfg.labels, series = cfg.series, n = labels.length;
     if (!n || !series.length) return;
     var fmt = cfg.fmt || String;
@@ -2634,6 +2659,7 @@ var Viz = (function () {
   /* ---------- 세로 막대 (단일 / 발산) ---------- */
   function bars(host, cfg) {
     var f = frame(host, cfg);
+    host.__viz = { type: 'bars', cfg: cfg };
     var labels = cfg.labels, series = cfg.series, n = labels.length;
     if (!n || !series.length) return;
     var fmt = cfg.fmt || String;
@@ -2785,7 +2811,7 @@ window.addEventListener('message', function(ev){
 });
 
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-16 ㊿+106';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-16 ㊿+108';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -4015,6 +4041,7 @@ function onData(d){
   try{ applyMenuConf(); }catch(e){}
   applyMenuFold();
   try{ buildRail(); buildMtabs(); }catch(e){}
+  try{ rpbBadge(); rpbInject(); }catch(e){}
   var meBtn=document.getElementById('btnMenuEdit');
   if(meBtn && !meBtn.__b){ meBtn.__b=1; meBtn.onclick=openMenuEdit; }
   if(CUR_VIEW) try{ ensureGroupOpen(CUR_VIEW); }catch(e){}
@@ -12327,6 +12354,7 @@ function setupSide(){
   $('#btnWidgets').onclick=toggleWidgetPanel;
   $('#dvCsv').onclick=function(){ exportXlsx(); };
   $('#dvCols').onclick=function(ev){ ev.stopPropagation(); openColPick(this); };
+  var dvR=document.getElementById('dvRpb'); if(dvR) dvR.onclick=function(){ try{ rpbCaptureGrid(); }catch(e){ toast('담기 실패', String(e.message||e).slice(0,80), 'bad'); } };
   $('#dvDense').onclick=function(){
     try{ localStorage.setItem(denseKey(), localStorage.getItem(denseKey())==='1'?'0':'1'); }catch(e){}
     applyDense();
@@ -13415,7 +13443,287 @@ function rpAnHtml(j, inc, tbl){
   return h;
 }
 
+
+/* ==================================================================
+   리포트 담기 — 포탈 어디서든 카드·타일·표·AI 답변을 «담아» 자유형 리포트를 만들고 PPT 로 내보냄
+   · 담은 항목: localStorage svc_rpb_<user> (사용자·브라우저별) — {id,t,title,sub,note,at,from,kpis,chart,svg,table,text}
+   · 카드 오른쪽 위 ＋ 버튼(rpbInject) · 표 화면은 «＋ 리포트» 필 · AI 답변은 답변 카드 ＋
+   · 도구 › 리포트 › «담은 항목으로 만들기» 에서 순서·제목·코멘트 편집 → PPT (월간 자동 리포트와 같은 QBR 양식)
+   ================================================================== */
+var RPB={items:null};
+function rpbKey(){ return 'svc_rpb_'+(AUTH_USER||'anon'); }
+function rpbList(){ if(!RPB.items){ try{ RPB.items=JSON.parse(localStorage.getItem(rpbKey())||'[]')||[]; }catch(e){ RPB.items=[]; } } return RPB.items; }
+function rpbSave(){ try{ localStorage.setItem(rpbKey(), JSON.stringify(RPB.items||[])); }catch(e){ toast('저장 공간 부족','담은 항목이 너무 많거나 표가 큽니다 — 일부를 지워주세요','bad'); } try{ rpbBadge(); }catch(e){} }
+function rpbAdd(it){
+  var L=rpbList(); it.id='r'+Date.now().toString(36)+Math.random().toString(36).slice(2,5); it.at=new Date().toISOString(); it.note=it.note||'';
+  L.push(it); rpbSave();
+  toast('리포트에 담았습니다 ('+L.length+')', (it.title||'')+' — 도구 › 리포트에서 순서를 정하고 PPT 로 내보내세요', 'ok');
+  if(CUR_VIEW==='report') try{ renderRpBuilder(); }catch(e){}
+}
+function rpbBadge(){
+  var n=rpbList().length;
+  var b=document.querySelector('.side button[data-v="report"]'); if(b){ var old=b.querySelector('.rpb-cnt'); if(old) old.remove(); if(n){ var s=document.createElement('span'); s.className='rpb-cnt'; s.textContent=n; b.appendChild(s); } }
+}
+function rpbTxt(el){ return el? String(el.textContent||'').replace(/\s+/g,' ').trim() : ''; }
+function rpbClean(s){ return String(s||'').replace(/^[\p{Extended_Pictographic}☀-➿️‍\s]+/u,'').replace(/\s*(펼치기|접기|＋)\s*$/,'').replace(/\s*\(클릭\)\s*$/,'').trim(); }
+function rpbTitleOf(el){
+  var h=el.querySelector('h2,h3,.k,.l'); if(!h) return '';
+  var c=h.cloneNode(true); c.querySelectorAll('button,.rpb-add,.whandle,.ukw,.ubadge,.ctag,.mini,small,.cap,.lg,.ct').forEach(function(x){ x.remove(); });
+  return rpbClean(rpbTxt(c));
+}
+function rpbTable(tbl, max){
+  max=max||200;
+  var head=[].slice.call(tbl.querySelectorAll('thead th')).map(function(th){ var c=th.cloneNode(true); c.querySelectorAll('button,.fbtn,.pr-lock').forEach(function(x){ x.remove(); }); return rpbTxt(c); });
+  var trs=[].slice.call(tbl.querySelectorAll('tbody tr')).filter(function(tr){ return tr.style.display!=='none' && !tr.classList.contains('hidden'); });
+  var total=trs.length;
+  var rows=trs.slice(0,max).map(function(tr){ return [].slice.call(tr.children).map(function(td){ var c=td.cloneNode(true); c.querySelectorAll('button,input,select,.eqbar,.eqser-more').forEach(function(x){ x.remove(); }); return rpbTxt(c); }); });
+  [].slice.call(tbl.querySelectorAll('tfoot tr')).forEach(function(tr){ rows.push([].slice.call(tr.children).map(function(td){ return rpbTxt(td); })); });
+  var keep=head.map(function(h,i){ return h!=='' || rows.some(function(r){ return (r[i]||'')!=='' && !/^[·–—-]$/.test(r[i]); }); });
+  if(head.length){ head=head.filter(function(h,i){ return keep[i]; }); rows=rows.map(function(r){ return r.filter(function(c,i){ return keep[i]!==false; }); }); }
+  return {head:head, rows:rows, total:total};
+}
+function rpbChart(box){
+  var v=box&&box.__viz; if(!v||!v.cfg||!v.cfg.labels) return null;
+  var cfg=v.cfg;
+  return {type:v.type, labels:cfg.labels.slice(), series:(cfg.series||[]).map(function(s){ return {label:s.label||'', data:(s.data||[]).map(function(x){ return Math.round((+x||0)*100)/100; })}; }),
+          money:(cfg.fmt===won||cfg.tipFmt===wonFull||cfg.fmt===clFk)};
+}
+function rpbSvg(box){
+  var svg=box&&box.querySelector('svg'); if(!svg) return null;
+  var c=svg.cloneNode(true); c.setAttribute('xmlns','http://www.w3.org/2000/svg');
+  var w=+svg.getAttribute('width')||svg.clientWidth||800, h=+svg.getAttribute('height')||svg.clientHeight||300;
+  c.setAttribute('width',w); c.setAttribute('height',h);
+  return {s:new XMLSerializer().serializeToString(c), w:w, h:h};
+}
+function rpbHbars(card){
+  var rows=[].slice.call(card.querySelectorAll('.bar-row')); if(!rows.length) return null;
+  return {head:['항목','값'], rows:rows.map(function(r){ return [rpbTxt(r.querySelector('.nm')), rpbTxt(r.querySelector('.vv'))]; }), total:rows.length};
+}
+function rpbKpiOf(el){
+  var k=el.querySelector('.k,.l'), v=el.querySelector('.v'), d=el.querySelector('.d,.pr-note,.s');
+  var kc=k? k.cloneNode(true):null; if(kc) kc.querySelectorAll('.mini,.ctag,button,.rpb-add').forEach(function(x){ x.remove(); });
+  return [rpbClean(rpbTxt(kc)), rpbTxt(v), rpbTxt(d)];
+}
+function rpbCaptureAnswer(){
+  var it={t:'ai', from:'dash', title:rpbTxt(document.getElementById('ansTitle'))||'AI 답변', kpis:[]};
+  var hero=rpbTxt(document.getElementById('ansHero')), sub=rpbTxt(document.getElementById('ansSub'));
+  if(hero) it.kpis.push([it.title, hero, sub]);
+  var ch=rpbChart(document.getElementById('ansChart')); if(ch) it.chart=ch; else { var sv=rpbSvg(document.getElementById('ansChart')); if(sv) it.svg=sv; }
+  var tb=document.getElementById('ansTable'); if(tb && tb.querySelector('tr')) it.table=rpbTable(tb, 200);
+  var say=rpbTxt(document.getElementById('aiSay')), cm=rpbTxt(document.getElementById('aiComment'));
+  it.text=[say.replace(/^AI 답변\s*/,''), cm.replace(/^AI 해석\s*/,'')].filter(Boolean).join('\n');
+  if(!it.kpis.length && !it.chart && !it.svg && !it.table && !it.text) return null;
+  return it;
+}
+function rpbCaptureEl(el){
+  if(el.id==='answer') return rpbCaptureAnswer();
+  var it={title:rpbTitleOf(el), sub:rpbTxt(el.querySelector('#clHint')||el.querySelector('.cap')), from:CUR_VIEW};
+  if(el.classList.contains('kpi')||el.classList.contains('pr-ob')||el.classList.contains('inb-kpi')){ var k=rpbKpiOf(el); it.t='kpi'; it.title=k[0]||it.title; it.kpis=[k]; it.sub=''; return it; }
+  /* 계산기 카드(입력칸 + 결과 상자) → 결과 상자만 KPI 로 */
+  var obs=[].slice.call(el.querySelectorAll('.pr-ob'));
+  if(obs.length && !el.querySelector('.chartbox') && !el.querySelector('table')){ it.t='kpi'; it.kpis=obs.map(rpbKpiOf).filter(function(k){ return k[1] && k[1]!=='—'; }); if(!it.kpis.length) it.kpis=obs.map(rpbKpiOf); return it; }
+  var boxes=[].slice.call(el.querySelectorAll('.chartbox')).filter(function(b){ return b.offsetParent!==null || !b.closest('details'); });
+  var box=boxes[0], ch=rpbChart(box);
+  if(ch) it.chart=ch; else { var sv=rpbSvg(box); if(sv) it.svg=sv; }
+  var tbl=el.querySelector('table'); if(tbl && tbl.querySelector('tr')) it.table=rpbTable(tbl, 200);
+  else { var hb=rpbHbars(el); if(hb) it.table=hb; }
+  var sum=el.querySelector('.pr-cmp-sum'); if(sum) it.text=rpbTxt(sum);
+  /* 타일형 요약(장비·클라우드 tri/mrow)만 있는 카드는 텍스트로 */
+  if(!it.chart&&!it.svg&&!it.table&&!it.text){
+    var c=el.cloneNode(true); c.querySelectorAll('h2,h3,.cap,button,.rpb-add').forEach(function(x){ x.remove(); });
+    it.text=rpbTxt(c).slice(0,1500);
+  }
+  it.t= (it.chart||it.svg)? 'chart' : it.table? 'table' : 'text';
+  return it;
+}
+/* 데이터 표 화면 — 지금 보이는(검색·필터·정렬 적용) 표를 그대로 */
+function rpbCaptureGrid(){
+  var g=GRIDS[CUR_VIEW]; if(!g) return;
+  var cols=visCols(g).filter(function(c){ return c.k && c.k[0]!=='_' || c.fmt; }), rows=gridFilteredSorted(g);
+  var q=($('#dvSearch').value||'').trim(), nf=filterCount();
+  var it={t:'table', from:CUR_VIEW, title:g.title+(q? ' — «'+q+'»':'')+(nf? ' (필터 '+nf+'개)':''), sub:rows.length+'건'+(rows.length>300? ' 중 300건':''),
+    table:{head:cols.map(function(c){ return c.l; }), rows:rows.slice(0,300).map(function(r){ return cols.map(function(c){ var t=cellText(c, r[c.k], r); return t===BLANK_LABEL? '':t; }); }), total:rows.length}};
+  rpbAdd(it);
+}
+/* ＋ 버튼 심기 — 카드·타일·AI 답변 (다시 그려질 때마다 호출해도 중복 없음) */
+var RPB_SEL=['#viewDash .grid > section[data-w]','#kpis .kpi','#ccHeroHost .kpi','#ccMoreTiles .kpi','#eqbKpis .kpi','#clSum .kpi','.eqb-charts .card','#viewCloud > #clBody > .pr-card','#viewCloud .cl-detb','#viewPrice .pr-card','#answer','#viewInb .inb-card','#viewInb .inb-kpi','#viewChannel .card','#viewChurn .pr-card','#viewChurnRate .card','#viewCustFlow .card'];
+function rpbInject(){
+  if(!SB_TOKEN) return;
+  document.querySelectorAll(RPB_SEL.join(',')).forEach(function(el){
+    if(el.querySelector(':scope > .rpb-add')) return;
+    if(el.id==='answer' && !el.classList.contains('on')) return;
+    var b=document.createElement('button'); b.type='button'; b.className='rpb-add'; b.title='리포트에 담기'; b.setAttribute('aria-label','리포트에 담기'); b.textContent='＋';
+    b.onclick=function(e){ e.stopPropagation(); e.preventDefault(); var it=rpbCaptureEl(el); if(!it){ toast('담을 내용이 없습니다','','info'); return; } if(!it.title) it.title=viewLabel(CUR_VIEW); rpbAdd(it); };
+    el.appendChild(b);
+    if(getComputedStyle(el).position==='static') el.style.position='relative';
+  });
+}
+try{ new MutationObserver(function(){ if(RPB._t) return; RPB._t=requestAnimationFrame(function(){ RPB._t=0; try{ rpbInject(); }catch(e){} }); }).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['class']}); }catch(e){}
+
+/* ---- 리포트 화면: 담은 항목 편집 + PPT ---- */
+var RPV={tab:'build', title:'서비스사업부 리포트', sub:''};
+function renderRpBuilder(){
+  var host=$('#rpBody'); if(!host) return;
+  var L=rpbList();
+  var inSt='height:34px;border:1px solid var(--ring);border-radius:9px;padding:0 10px;font:inherit;background:var(--surface)';
+  var TL={kpi:'KPI',chart:'차트',table:'표',text:'텍스트',ai:'AI 답변'};
+  var h='<div class="pr-top"><span style="font-size:19px;font-weight:600;letter-spacing:-.01em">리포트</span>'+
+    '<div class="eqb-seg" role="tablist"><button type="button" data-rpv="build" aria-pressed="true">담은 항목으로 만들기</button><button type="button" data-rpv="auto" aria-pressed="false">월간 자동 리포트</button></div>'+
+    '<span class="mini">포탈 어디서든 카드·타일·표 오른쪽 위 <b>＋</b> 를 누르면 여기에 담깁니다 · 이 브라우저·계정에만 저장</span></div>'+
+    '<div class="pr-card" style="margin-bottom:14px"><div class="pr-ctl" style="margin:0">'+
+      '<span class="pr-f"><span class="l">제목</span><input id="rpbTitle" value="'+esc(RPV.title)+'" style="'+inSt+';width:300px"></span>'+
+      '<span class="pr-f"><span class="l">표지 라벨</span><input id="rpbSub" value="'+esc(RPV.sub||thisMonthStr())+'" style="'+inSt+';width:140px"></span>'+
+      '<span class="pr-f"><span class="l">&nbsp;</span><span style="display:flex;gap:6px;flex-wrap:wrap"><button class="pill" id="rpbPpt" style="height:34px;background:var(--brand);border-color:var(--brand);color:#fff;font-weight:600"'+(L.length?'':' disabled')+'>⬇ PPT 다운로드 ('+L.length+'개 항목)</button>'+
+      '<button class="pill ghost" id="rpbText" style="height:34px">＋ 텍스트 슬라이드</button><button class="pill ghost" id="rpbClear" style="height:34px;color:var(--critical)"'+(L.length?'':' disabled')+'>전체 비우기</button></span></span>'+
+      '<span class="pr-note" id="rpbMsg" style="margin-left:auto"></span></div></div>';
+  if(!L.length){
+    h+='<div class="card" style="padding:36px;text-align:center"><div style="font-size:14px;font-weight:600;margin-bottom:6px">아직 담은 항목이 없습니다</div>'+
+      '<p class="cap" style="margin:0">홈 타일·차트, 임대 장비 대시보드, 클라우드 비용, 가격표 비교, 계약·OI 표(«＋ 리포트» 버튼), AI 답변 카드의 <b>＋</b> 로 담으세요. 담은 순서대로 슬라이드가 됩니다 — 여기서 순서·제목·코멘트를 고칠 수 있습니다.</p></div>';
+  }else{
+    h+='<div id="rpbList">'+L.map(function(it,i){
+      return '<div class="rpb-it" data-id="'+it.id+'"><div class="rpb-h"><span class="rpb-n">'+(i+1)+'</span>'+
+        '<input class="rpb-title" data-f="title" value="'+esc(it.title||'')+'" placeholder="슬라이드 제목">'+
+        '<span class="ctag">'+(TL[it.t]||it.t)+'</span><span class="mini">'+esc(viewLabel(it.from)||'')+' · '+esc(String(it.at||'').slice(5,16).replace('T',' '))+'</span>'+
+        '<span style="margin-left:auto;display:flex;gap:4px"><button type="button" class="cbtn" data-mv="-1" title="위로">▲</button><button type="button" class="cbtn" data-mv="1" title="아래로">▼</button><button type="button" class="cbtn" data-del="1" title="빼기" style="color:var(--critical)">×</button></span></div>'+
+        '<div class="rpb-b"><div class="rpb-prev" id="rpbP_'+it.id+'"></div>'+
+        '<textarea class="rpb-note" data-f="note" placeholder="슬라이드 하단 코멘트 (선택) — 예: 전월 대비 증가 원인은 에스원 신규 3건">'+esc(it.note||'')+'</textarea></div></div>';
+    }).join('')+'</div>';
+  }
+  host.innerHTML=h;
+  host.querySelectorAll('[data-rpv]').forEach(function(b){ b.onclick=function(){ RPV.tab=b.dataset.rpv; renderReport(); }; });
+  var ti=$('#rpbTitle'); if(ti) ti.oninput=function(){ RPV.title=this.value; }; var si=$('#rpbSub'); if(si) si.oninput=function(){ RPV.sub=this.value; };
+  var bt=$('#rpbText'); if(bt) bt.onclick=function(){ rpbAdd({t:'text', title:'메모', text:'', from:'report'}); };
+  var bc=$('#rpbClear'); if(bc) bc.onclick=function(){ if(!confirm('담은 항목 '+L.length+'개를 모두 비울까요?')) return; RPB.items=[]; rpbSave(); renderRpBuilder(); };
+  var bp=$('#rpbPpt'); if(bp) bp.onclick=rpbMakePpt;
+  L.forEach(function(it){ rpbPreview(it, document.getElementById('rpbP_'+it.id)); });
+  host.querySelectorAll('.rpb-it').forEach(function(row){
+    var id=row.dataset.id, it=L.filter(function(x){ return x.id===id; })[0]; if(!it) return;
+    row.querySelectorAll('[data-f]').forEach(function(inp){ inp.oninput=function(){ it[inp.dataset.f]=inp.value; }; inp.onblur=function(){ rpbSave(); }; });
+    row.querySelectorAll('[data-mv]').forEach(function(b){ b.onclick=function(){ var i=L.indexOf(it), j=i+(+b.dataset.mv); if(j<0||j>=L.length) return; L.splice(i,1); L.splice(j,0,it); rpbSave(); renderRpBuilder(); }; });
+    var d=row.querySelector('[data-del]'); if(d) d.onclick=function(){ L.splice(L.indexOf(it),1); rpbSave(); renderRpBuilder(); };
+  });
+}
+function rpbPreview(it, box){
+  if(!box) return;
+  var h='';
+  if(it.kpis&&it.kpis.length) h+='<div class="rpb-kpis">'+it.kpis.map(function(k){ return '<div><div class="mini">'+esc(k[0])+'</div><b>'+esc(k[1])+'</b><div class="mini">'+esc(k[2]||'')+'</div></div>'; }).join('')+'</div>';
+  if(it.chart) h+='<div class="chartbox h160" id="rpbC_'+it.id+'"></div>';
+  else if(it.svg) h+='<div class="rpb-svg">'+it.svg.s+'</div>';
+  if(it.table&&it.table.head){ var T=it.table; h+='<div class="tbl-wrap" style="max-height:150px"><table class="pr"><thead><tr>'+T.head.map(function(x){ return '<th>'+esc(x)+'</th>'; }).join('')+'</tr></thead><tbody>'+T.rows.slice(0,6).map(function(r){ return '<tr>'+r.map(function(c){ return '<td>'+esc(c)+'</td>'; }).join('')+'</tr>'; }).join('')+'</tbody></table></div>'+(T.rows.length>6? '<div class="mini">외 '+(T.rows.length-6)+'행 · PPT 에는 전부(최대 300행, 페이지 자동 분할)</div>':''); }
+  if(it.text && it.t!=='text') h+='<p class="rpb-text">'+esc(it.text).replace(/\n/g,'<br>')+'</p>';
+  if(it.t==='text') h+='<textarea class="rpb-note rpb-body" data-f="text" placeholder="슬라이드 본문 — 줄마다 글머리 기호가 붙습니다">'+esc(it.text||'')+'</textarea>';
+  box.innerHTML=h||'<p class="cap">미리보기 없음</p>';
+  if(it.chart){ try{ var c=it.chart, host=document.getElementById('rpbC_'+it.id), fmt=c.money? won : function(v){ return Math.round(v).toLocaleString('ko-KR'); };
+    var sers=c.series.map(function(s,i){ return {label:s.label, data:s.data, color:cssv('--s'+((i%8)+1))}; });
+    if(c.type==='bars') Viz.bars(host,{labels:c.labels, series:sers, fmt:fmt, padL:52}); else if(c.type==='area') Viz.area(host,{labels:c.labels, series:sers, fmt:fmt, padL:52}); else Viz.lines(host,{labels:c.labels, series:sers, fmt:fmt, fill:sers.length===1, padL:52}); }catch(e){} }
+  var ta=box.querySelector('.rpb-body'); if(ta){ ta.oninput=function(){ it.text=ta.value; }; ta.onblur=function(){ rpbSave(); }; }
+}
+function rpbSvgPng(svg){
+  return new Promise(function(res){
+    try{
+      var img=new Image(); var url='data:image/svg+xml;base64,'+btoa(unescape(encodeURIComponent(svg.s)));
+      img.onload=function(){ var c=document.createElement('canvas'); c.width=svg.w*2; c.height=svg.h*2; var x=c.getContext('2d'); x.fillStyle='#ffffff'; x.fillRect(0,0,c.width,c.height); x.drawImage(img,0,0,c.width,c.height); res(c.toDataURL('image/png')); };
+      img.onerror=function(){ res(null); }; img.src=url;
+    }catch(e){ res(null); }
+  });
+}
+async function rpbMakePpt(){
+  var L=rpbList(), m=$('#rpbMsg'); if(!L.length) return;
+  if(m) m.textContent='PPT 생성 중…';
+  try{
+    await rpLoadPptx();
+    var NAVY='0E2852', GRN='7EBA25', GRN2='67BF00', BAND='EFF8E5', THD='C6E0B4', INK='1F2937', MUT='6B7280', BORD='D8DEE4', F='나눔바른고딕';
+    var PAL=[GRN,NAVY,'00B3AC','F59E0B','8B5CF6','EF4444','0EA5E9','9CA3AF'];
+    var title=RPV.title||'서비스사업부 리포트', sub=RPV.sub||thisMonthStr();
+    var p=new PptxGenJS(); p.layout='LAYOUT_WIDE';
+    p.defineSlideMaster({ title:'M', background:{color:'FFFFFF'},
+      objects:[ {rect:{x:0,y:0,w:'100%',h:0.85,fill:{color:BAND}}}, {rect:{x:0.45,y:0.97,w:12.3,h:0.026,fill:{color:GRN}}}, {ellipse:{x:12.78,y:0.905,w:0.15,h:0.15,fill:{color:GRN2}}}, {image:{data:RP_IMG.logoG,x:0.42,y:7.05,w:1.12,h:0.25}} ],
+      slideNumber:{x:12.85,y:7.05,w:0.4,h:0.3,fontSize:10,color:'9AA0A6',fontFace:F} });
+    var s1=p.addSlide(); s1.background={color:NAVY};
+    s1.addImage({data:RP_IMG.pat,x:8.3,y:0,w:5.03,h:7.5});
+    s1.addText('통합 보안 플랫폼 기업, 지니언스.',{x:0.55,y:0.42,w:5,h:0.35,fontSize:11,color:'D9E2F2',fontFace:F});
+    s1.addText(title,{x:0.6,y:2.55,w:7.6,h:1.0,fontSize:33,bold:true,color:'FFFFFF',fontFace:F});
+    s1.addText(sub,{x:0.62,y:3.62,w:6,h:0.55,fontSize:20,bold:true,color:GRN,fontFace:F});
+    s1.addText(todayStr().replace(/-/g,'.')+'\n서비스사업부',{x:0.62,y:4.25,w:6,h:0.85,fontSize:14,color:'D9E2F2',fontFace:F,lineSpacing:24});
+    s1.addText('※ 금액 단위는 각 슬라이드 표기 기준(천원/원)입니다.',{x:0.62,y:5.35,w:7,h:0.32,fontSize:11,color:'A9BCD9',fontFace:F});
+    s1.addImage({data:RP_IMG.logoW,x:0.55,y:6.78,w:1.35,h:0.30});
+    var secN=0;
+    function head(s,t,sb){ secN++; s.addText(secN+'. '+(t||''),{x:0.5,y:0.13,w:11.6,h:0.62,fontSize:20,bold:true,color:NAVY,fontFace:F,valign:'middle'}); if(sb) s.addText(sb,{x:0.5,y:1.02,w:12.3,h:0.32,fontSize:11,color:MUT,fontFace:F}); }
+    function noteOf(s,it,y){ if(it.note) s.addText('➤ '+it.note,{x:0.5,y:y||6.45,w:12.3,h:0.55,fontSize:12,color:NAVY,bold:true,fontFace:F,valign:'top'}); if(it.note) s.addNotes(it.note); }
+    function kpiSlide(items){
+      var s=p.addSlide({masterName:'M'}); head(s, items.length===1? items[0].title : '요약 지표');
+      var ks=[]; items.forEach(function(it){ (it.kpis||[]).forEach(function(k){ ks.push(k); }); });
+      var n=ks.length, cols=n<=2? n : (n<=4? 2 : 3), w=(12.3-(cols-1)*0.25)/cols, hgt=n<=cols? 2.6 : 2.2;
+      ks.slice(0,6).forEach(function(k,i){ var x=0.5+(i%cols)*(w+0.25), y=1.35+Math.floor(i/cols)*(hgt+0.25);
+        s.addShape('roundRect',{x:x,y:y,w:w,h:hgt,fill:{color:'F7FAF2'},line:{color:THD,width:1},rectRadius:0.07});
+        s.addShape('rect',{x:x,y:y,w:0.07,h:hgt,fill:{color:GRN}});
+        s.addText(k[0],{x:x+0.28,y:y+0.25,w:w-0.5,h:0.4,fontSize:12,color:MUT,fontFace:F});
+        s.addText(k[1],{x:x+0.28,y:y+0.7,w:w-0.5,h:0.85,fontSize:Math.min(30, 30-Math.max(0,String(k[1]).length-14)),bold:true,color:NAVY,fontFace:F});
+        if(k[2]) s.addText(k[2],{x:x+0.28,y:y+hgt-0.75,w:w-0.5,h:0.55,fontSize:10.5,color:'4E8A1E',fontFace:F,valign:'top'}); });
+      noteOf(s, items[items.length-1]);
+    }
+    /* 표: 열 수에 맞춰 글자 크기·열 폭(내용 길이 비례) 조정, 넘치면 «(계속)» 슬라이드로 직접 나눔 */
+    function tableOn(s, T, y, ttl){
+      var nc=T.head.length, fs= nc>16? 7.5 : nc>12? 8.5 : nc>8? 9.5 : 10.5, rowH= fs<9? 0.26 : 0.3;
+      var lens=T.head.map(function(h,ci){ var m=String(h||'').length; T.rows.forEach(function(r){ m=Math.max(m, Math.min(28, String(r[ci]||'').length)); }); return Math.max(3, m); });
+      var tot=lens.reduce(function(a,b){ return a+b; },0), colW=lens.map(function(l){ return Math.max(0.55, 12.3*l/tot); }); var cw=colW.reduce(function(a,b){ return a+b; },0); colW=colW.map(function(w){ return w*12.3/cw; });
+      var per=Math.max(4, Math.floor((6.35-y)/rowH)-1);
+      function mk(rows0, ri0){ return [T.head.map(function(x){ return {text:x, options:{bold:true,color:NAVY,fill:{color:THD},fontSize:fs,fontFace:F}}; })]
+        .concat(rows0.map(function(r,ri){ var last=/^(합계|소계|총계)$/.test(String(r[0]||'')); return r.map(function(c,ci){ return {text:String(c==null?'':c), options:{fontSize:fs-0.5,color:INK,fontFace:F,bold:last,fill:{color:last?'E2EFD9':((ri+ri0)%2?'F7FAF2':'FFFFFF')},align:(ci&&/^[₩$\-−▲▼]?[\d,.\s%~]+[a-zA-Z가-힣]*$/.test(String(c||'').trim())?'right':'left')}}; }); })); }
+      var first=T.rows.slice(0,per);
+      s.addTable(mk(first,0),{x:0.5,y:y,w:12.3,colW:colW,border:{pt:0.5,color:BORD},rowH:rowH,autoPage:false,margin:0.04});
+      var k=per, pg=1;
+      while(k<T.rows.length){ var s2=p.addSlide({masterName:'M'}); s2.addText(secN+'. '+(ttl||'')+' (계속 '+(++pg)+')',{x:0.5,y:0.13,w:11.6,h:0.62,fontSize:20,bold:true,color:NAVY,fontFace:F,valign:'middle'});
+        var per2=Math.floor((6.35-1.3)/rowH)-1, chunk=T.rows.slice(k,k+per2); s2.addTable(mk(chunk,k),{x:0.5,y:1.3,w:12.3,colW:colW,border:{pt:0.5,color:BORD},rowH:rowH,autoPage:false,margin:0.04}); k+=per2; }
+      if(T.total && T.total>T.rows.length) s.addText('※ '+T.rows.length+'행만 수록 (전체 '+T.total+'행)',{x:7,y:7.02,w:5.8,h:0.3,fontSize:10,italic:true,color:MUT,fontFace:F,align:'right'});
+    }
+    var i=0;
+    while(i<L.length){
+      var it=L[i];
+      if(it.t==='kpi'){ var grp=[it], cnt=(it.kpis||[]).length; while(i+1<L.length && L[i+1].t==='kpi' && cnt+(L[i+1].kpis||[]).length<=6 && !L[i].note){ i++; grp.push(L[i]); cnt+=(L[i].kpis||[]).length; } kpiSlide(grp); i++; continue; }
+      var s=p.addSlide({masterName:'M'}); head(s, it.title, it.sub);
+      var y=it.sub? 1.4:1.3, unit=false;
+      if(it.kpis&&it.kpis.length){ var k=it.kpis[0]; s.addText([{text:k[1],options:{bold:true,fontSize:24,color:NAVY}},{text:(k[2]? '   '+k[2]:''),options:{fontSize:12,color:MUT}}],{x:0.5,y:y,w:12.3,h:0.6,fontFace:F}); y+=0.7; }
+      if(it.text && it.t!=='text'){ var lines=String(it.text).split(/\n+/).filter(Boolean).slice(0,8); s.addText(lines.map(function(x){ return {text:x, options:{bullet:{code:'25B8',color:GRN}, breakLine:true}}; }),{x:0.55,y:y,w:12.3,h:0.34*lines.length+0.1,fontSize:12.5,color:INK,fontFace:F,valign:'top',lineSpacing:20}); y+=0.34*lines.length+0.25; }
+      if(it.t==='text'){ var ls=String(it.text||'').split(/\n+/).filter(Boolean); if(ls.length) s.addText(ls.map(function(x){ return {text:x.replace(/^[-•]\s*/,''), options:{bullet:{code:'25B8',color:GRN}, breakLine:true}}; }),{x:0.55,y:y,w:12.3,h:Math.min(5.2,0.42*ls.length+0.2),fontSize:14,color:INK,fontFace:F,valign:'top',lineSpacing:26}); }
+      var chartH=it.table? 3.0 : (it.note? 4.9 : 5.5);
+      if(it.chart){
+        var c=it.chart, div=c.money? 1000:1; unit=c.money;
+        var data=c.series.map(function(sr){ return {name:sr.label||'값', labels:c.labels, values:sr.data.map(function(v){ return Math.round(v/div); })}; });
+        var type= c.type==='bars'? p.ChartType.bar : (c.type==='area'? p.ChartType.area : p.ChartType.line);
+        s.addChart(type, data, {x:0.5,y:y,w:12.3,h:chartH, barDir:'col', barGrouping:(c.type==='area'?'stacked':'clustered'), chartColors:PAL.slice(0,Math.max(1,data.length)), showLegend:data.length>1, legendPos:'b', legendFontSize:10,
+          catAxisLabelFontSize:9, valAxisLabelFontSize:9, valAxisLabelFormatCode:'#,##0', valGridLine:{color:'E5EAE0',style:'solid',size:0.5}, catAxisLabelColor:MUT, valAxisLabelColor:MUT, lineDataSymbol:'none', lineSize:2, fontFace:F});
+        y+=chartH+0.15;
+      } else if(it.svg){
+        var png=await rpbSvgPng(it.svg);
+        if(png){ var ar=it.svg.w/it.svg.h, w=12.3, h2=Math.min(chartH, w/ar); s.addImage({data:png,x:0.5,y:y,w:h2*ar>12.3? 12.3:h2*ar,h:h2}); y+=h2+0.15; }
+      }
+      if(it.table&&it.table.head&&it.table.rows.length){
+        var T=it.table; if(!unit) unit=T.head.some(function(x){ return /천원|금액|월액|MRR|ARR/.test(String(x)); });
+        if(it.chart||it.svg){ var lim=Math.floor((6.3-y)/0.3)-1; if(lim>=3 && T.rows.length<=lim) tableOn(s,T,y,it.title); else { var s2=p.addSlide({masterName:'M'}); secN--; head(s2, it.title+' — 표'); tableOn(s2,T,1.3,it.title+' — 표'); } }
+        else tableOn(s,T,y,it.title);
+      }
+      noteOf(s,it);
+      if(unit) s.addText('※ 금액 단위: 천원',{x:1.75,y:7.02,w:5.2,h:0.3,fontSize:10,italic:true,color:MUT,fontFace:F});
+      i++;
+    }
+    var fn=(title+'_'+sub).replace(/[\\/:*?"<>|]/g,' ').replace(/\s+/g,'_')+'.pptx';
+    await p.writeFile({fileName:fn});
+    if(m) m.textContent='다운로드했습니다 — '+fn;
+    toast('PPT 생성 완료', L.length+'개 항목 · '+fn, 'ok');
+  }catch(e){ if(m) m.textContent='실패: '+String(e.message||e).slice(0,120); toast('PPT 생성 실패', String(e.message||e).slice(0,100), 'bad'); }
+}
+
 function renderReport(){
+  if(RPV.tab!=='auto'){ renderRpBuilder(); return; }
+  renderReportAuto();
+  var host=$('#rpBody'); if(!host || host.querySelector('[data-rpv]')) return;
+  var bar=document.createElement('div'); bar.className='pr-top'; bar.style.marginBottom='12px';
+  bar.innerHTML='<span style="font-size:19px;font-weight:600;letter-spacing:-.01em">리포트</span><div class="eqb-seg" role="tablist"><button type="button" data-rpv="build" aria-pressed="false">담은 항목으로 만들기</button><button type="button" data-rpv="auto" aria-pressed="true">월간 자동 리포트</button></div>';
+  host.insertBefore(bar, host.firstChild);
+  bar.querySelectorAll('[data-rpv]').forEach(function(b){ b.onclick=function(){ RPV.tab=b.dataset.rpv; renderReport(); }; });
+}
+function renderReportAuto(){
   var host=$('#rpBody');
   if(!DATA||!DATA.rows||!DATA.rows.length){ host.innerHTML='<div class="cap" style="padding:40px;text-align:center">데이터를 불러오는 중…</div>'; return; }
   if(!RAWX.inbound){ loadInbound(function(){ if(CUR_VIEW==='report'&&!RP._touched) renderReport(); }); }
