@@ -990,6 +990,113 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
 #viewChurnRate details summary{cursor:pointer;font-size:11.5px;color:var(--ink-2);margin:2px 0 6px;user-select:none}
 #viewChurnRate details summary b{color:var(--s1)}
 #viewChurnRate details .crchips{margin:4px 0 6px}
+
+/* ==================================================================
+   리디자인 v4 — 심플 (기본)
+   · 그림자·유리(blur)·그라데이션·hover 들썩임 제거, 모서리 10px 로 통일, 강조색은 브랜드 그린 하나
+   · 사이드바는 화면에 붙은 평면, 메뉴 이모지 숨김, 알림 배너는 색 채움 대신 왼쪽 색선
+   · 내 계정 › 설정 › 화면 디자인에서 «클래식»(이전 디자인)으로 되돌릴 수 있음 → html[data-look="classic"]
+   ================================================================== */
+html:not([data-look="classic"]){ --r:10px; --r-sm:7px; }
+html:not([data-look="classic"])[data-theme="light"]{ --plane:#f5f5f3; --surface:#ffffff; --surface-2:#f2f2ef; --ring:rgba(11,11,11,.09); --grid:#e7e6e1; }
+html:not([data-look="classic"]) body::before{display:none}
+/* 그림자·유리·그라데이션 */
+html:not([data-look="classic"]) :is(.card,.kpi,.filters,.ask,.todo-card,.nb,.inb-kpi,.inb-card,.pr-card,.pr-calc,.wk-card,.wk-rail,.cs-act,.cs-sec,.cs-sum,.pr-ob,.cl-prev,.side,.topbar,.btn,.sug,.colf,.cbmenu,.mxpop,#dashHero){box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}
+html:not([data-look="classic"]) :is(.card,.kpi,.filters,.ask,.todo-card,.inb-kpi,.inb-card,.pr-card,.pr-calc,.wk-card,.wk-rail,.cs-act,.cs-sec,.cs-sum,.pr-ob,.cl-prev,#viewCloud .cl-drop,details.help,.crnow,.tbl-wrap,.mxdet,.pick,.inb-body){border-radius:var(--r)}
+html:not([data-look="classic"]) :is(.modal,.mxpop,.colf,.cbmenu,.sug){border-radius:12px}
+html:not([data-look="classic"]) .modal{box-shadow:0 12px 40px rgba(0,0,0,.18);padding:18px 20px}
+html:not([data-look="classic"]) .toast{box-shadow:0 6px 24px rgba(0,0,0,.12);border-radius:var(--r)}
+html:not([data-look="classic"]) :is(.pill,.chip,.quick-links button,.eqbar button,.eqser-more,.pr-ver,.ubadge,#viewCloud .cl-chip,.mxtabs button,.wk-chip,.ai-badge){border-radius:var(--r-sm)}
+html:not([data-look="classic"]) :is(.btn,#q,.frm input,.frm select,.frm textarea,.mtabs button,.seg,.cs-act,.pr-chips button,select,input[type="search"],#fkInput){border-radius:var(--r-sm)}
+html:not([data-look="classic"]) :is(.kpi,.todo-card,.nb,.pill,.btn):is(:hover,:active){transform:none}
+html:not([data-look="classic"]) :is(.kpi,.todo-card,.nb):hover{box-shadow:none}
+html:not([data-look="classic"]) .kpi:hover{border-color:var(--axis)}
+html:not([data-look="classic"]) .kpi[data-kx]:hover,html:not([data-look="classic"]) .kpi[role="button"]:hover{border-color:var(--brand);box-shadow:none}
+/* 카드·KPI */
+html:not([data-look="classic"]) .card h2{font-size:14px;font-weight:650}
+html:not([data-look="classic"]) .card h2::before{display:none}
+html:not([data-look="classic"]) .card .cap{opacity:1;color:var(--muted)}
+html:not([data-look="classic"]) .kpi::after{display:none}
+html:not([data-look="classic"]) .kpi .v{font-size:25px;font-weight:650}
+html:not([data-look="classic"]) .kpi .d .up,html:not([data-look="classic"]) .kpi .d .down{background:transparent;padding:0}
+html:not([data-look="classic"]) #heroHi{font-size:17px;font-weight:700}
+html:not([data-look="classic"]) .hero{font-size:36px;font-weight:650}
+html:not([data-look="classic"]) .todo-card .v{font-weight:700;font-size:19px}
+/* 상단바 */
+html:not([data-look="classic"]) .topbar{background:var(--plane);border-bottom:1px solid var(--grid);padding:10px 20px;margin-bottom:18px;gap:8px}
+html:not([data-look="classic"]) .brand{gap:8px;margin-right:4px}
+html:not([data-look="classic"]) .brand h1{font-size:17px;font-weight:700;letter-spacing:-.02em}
+html:not([data-look="classic"]) .brand .sub{font-size:11px}
+html:not([data-look="classic"]) .ubadge .ub-long{display:none}
+html:not([data-look="classic"]) .live{font-size:11px}
+@media (max-width:1560px){ html:not([data-look="classic"]) .live{display:none} }   /* 상단바 한 줄 유지 */
+html:not([data-look="classic"]) .pill{height:28px;padding:0 9px;font-size:12px;gap:5px}
+html:not([data-look="classic"]) .pill.ghost{border-color:transparent;color:var(--ink-2)}
+html:not([data-look="classic"]) .pill.ghost:hover{border-color:var(--ring);background:var(--surface)}
+html:not([data-look="classic"]) .ubadge{background:transparent;border-color:transparent;color:var(--muted);font-weight:600;padding:0 4px}
+html:not([data-look="classic"]) .ubadge b{color:var(--ink-2)}
+html:not([data-look="classic"]) .ubadge.won{background:transparent;border-color:transparent}
+html:not([data-look="classic"]) .ukw{background:transparent;border-color:var(--ring);color:var(--muted);font-weight:600}
+html:not([data-look="classic"]) th.wonh::after{background:transparent;color:var(--muted);font-weight:500;padding:0}
+html:not([data-look="classic"]) .live .dot{box-shadow:none}
+/* 사이드바 — 붙어 있는 평면, 메뉴 아이콘(이모지) 숨김 */
+@media (min-width:1001px){
+  html:not([data-look="classic"]) .side{left:0;top:0;bottom:0;width:206px;border-radius:0;border:0;border-right:1px solid var(--grid);background:var(--surface);padding:14px 10px}
+  html:not([data-look="classic"]) body{padding-left:206px}
+  html:not([data-look="classic"]) .topbar{margin-left:-20px}
+}
+html:not([data-look="classic"]) .side .logo{background:transparent;color:var(--ink);padding:6px 10px 14px;margin:0 0 4px;border-radius:0;font-size:14px;font-weight:700}
+html:not([data-look="classic"]) .side .logo small{color:var(--muted)}
+html:not([data-look="classic"]) .side .logo::before{background:var(--brand);width:8px;height:8px;border-radius:2px;box-shadow:none}
+html:not([data-look="classic"]) .side button{padding:7px 10px;border-radius:var(--r-sm);font-size:12.5px;font-weight:500;margin:0;gap:8px}
+html:not([data-look="classic"]) .side button[aria-current="true"]{background:var(--surface-2);color:var(--ink);font-weight:650;box-shadow:inset 2px 0 0 var(--brand)}
+html:not([data-look="classic"]) .side .grp{text-transform:none;letter-spacing:0;font-size:11px;color:var(--muted);font-weight:600;padding:12px 10px 3px}
+html:not([data-look="classic"]) .side button .ic{display:none}
+/* 알림 배너 — 색 채움 대신 왼쪽 색선 */
+html:not([data-look="classic"]) .nb{background:var(--surface);border:1px solid var(--ring);border-left:3px solid var(--s1);padding:10px 14px;border-radius:var(--r-sm)}
+html:not([data-look="classic"]) .nb-info{border-left-color:var(--s1)}
+html:not([data-look="classic"]) .nb-warn{border-left-color:var(--s4)}
+html:not([data-look="classic"]) .nb-ok{border-left-color:var(--brand)}
+/* 질문 바 */
+html:not([data-look="classic"]) .ask{background:var(--surface);padding:14px 16px 12px}
+html:not([data-look="classic"]) .ask-ico{background:var(--brand);border-radius:var(--r-sm);width:30px;height:30px;font-size:12px}
+html:not([data-look="classic"]) #q{height:38px;font-size:13.5px}
+html:not([data-look="classic"]) #q:focus{box-shadow:0 0 0 3px var(--brand-t)}
+html:not([data-look="classic"]) .btn{height:38px;padding:0 16px;font-size:13px;background:var(--brand);border:1px solid var(--brand)}
+html:not([data-look="classic"]) .btn:hover{background:var(--brand-2)}
+html:not([data-look="classic"]) .chip{border-style:solid;border-color:var(--grid);color:var(--muted);padding:4px 9px;font-size:11.5px}
+html:not([data-look="classic"]) .chip:hover{color:var(--ink);border-color:var(--axis);background:var(--surface-2)}
+html:not([data-look="classic"]) .ai-badge.on{background:transparent}
+html:not([data-look="classic"]) .ai-say,html:not([data-look="classic"]) .ai-comment{background:var(--surface)}
+html:not([data-look="classic"]) .ai-say{border-left-color:var(--brand)}
+html:not([data-look="classic"]) .ai-say .lb,html:not([data-look="classic"]) .ai-comment .lb{color:var(--brand)}
+/* 필터 바 · 서비스 칩(색 채움 → 색 점) */
+html:not([data-look="classic"]) .filters{background:var(--surface);padding:9px 12px}
+html:not([data-look="classic"]) #lineChips .pill{background:transparent!important;color:var(--ink-2)!important;border-color:var(--grid)!important;padding:0 9px 0 8px}
+html:not([data-look="classic"]) #lineChips .pill::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--c,var(--ink-2));flex:none;opacity:.3}
+html:not([data-look="classic"]) #lineChips .pill[aria-pressed="true"]{color:var(--ink)!important;border-color:color-mix(in srgb,var(--c,var(--ink)) 50%,transparent)!important;background:color-mix(in srgb,var(--c,var(--ink)) 8%,transparent)!important}
+html:not([data-look="classic"]) #lineChips .pill[aria-pressed="true"]::before{opacity:1}
+/* 표·뱃지 */
+html:not([data-look="classic"]) .tbl-wrap thead th,html:not([data-look="classic"]) .dgrid thead th{font-size:11.5px;font-weight:600;letter-spacing:0;text-transform:none}
+html:not([data-look="classic"]) .tbl-wrap tbody tr:hover td,html:not([data-look="classic"]) .dgrid tbody tr:hover td{background:var(--surface-2)}
+html:not([data-look="classic"]) .badge{border-color:transparent;border-radius:5px;font-weight:600}
+html:not([data-look="classic"]) .b-end{background:var(--surface-2)}
+/* 강조색 통일 — 선택 상태는 브랜드 그린 (차트 색은 그대로) */
+html:not([data-look="classic"]) :is(.seg button[aria-pressed="true"],.mtabs button[aria-pressed="true"],.dgrid thead th .fbtn.on,#chList thead th .fbtn.on,.colf .colf-a button.pri,#viewCustFlow .seg button[aria-pressed="true"],#viewChurnRate .seg button[aria-pressed="true"],#viewCustFlow .chip[aria-pressed="true"],#viewChurnRate .chip[aria-pressed="true"],.mxtabs button[aria-pressed="true"]){background:var(--brand);border-color:var(--brand);color:#fff}
+html:not([data-look="classic"]) .pr-calc{background:var(--surface)}
+html:not([data-look="classic"]) .pr-chips button.on{background:var(--brand);border-color:var(--brand)}
+html:not([data-look="classic"]) .cs-act .ic{font-size:18px}
+html:not([data-look="classic"]) .quick-links button{height:27px}
+html:not([data-look="classic"]) details.help{border-style:solid}
+/* 로그인 화면 */
+html:not([data-look="classic"]) #viewLogin .card{box-shadow:none!important;border-radius:12px!important}
+html:not([data-look="classic"]) #viewLogin>div>div:first-child>div:first-child{box-shadow:none!important;border-radius:12px!important}
+html:not([data-look="classic"]) #viewLogin .btn{height:42px!important;border-radius:var(--r-sm)!important}
+html:not([data-look="classic"]) #viewLogin input{border-radius:var(--r-sm)!important}
+@media (max-width:760px){
+  html:not([data-look="classic"]) .side{border-radius:0;width:240px}
+  html:not([data-look="classic"]) .side button .ic{display:inline}   /* 폰 드로어는 넓어서 아이콘 유지 */
+}
 </style>
 </head>
 <body>
@@ -2334,7 +2441,7 @@ window.addEventListener('message', function(ev){
 });
 
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-16 ㊿+97';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-16 ㊿+98';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -2387,6 +2494,63 @@ function doLogout(){
   if(!confirm('로그아웃할까요?')) return;
   clearSess(); try{ sessionStorage.removeItem(CACHE_KEY); }catch(e){}
   SB_TOKEN=null; AUTH_USER=null; location.reload();
+}
+
+/* ---- 자동 로그아웃(무활동 타임아웃) — 내 계정 › 설정, 이 브라우저에만 저장 ----
+   · 마우스·키보드·스크롤이 IDLE_KEY 분 동안 없으면 세션을 지우고 로그인 화면으로 (0 = 끔, 기본)
+   · 1분 전에 안내 토스트 · 다른 탭에 갔다 돌아오면 즉시 확인                          */
+var IDLE_KEY='svc_idle_min', IDLE_LAST=Date.now(), IDLE_WARNED=false;
+var IDLE_OPTS=[0,15,30,60,120,240,480];
+function idleMin(){ var v=0; try{ v=parseInt(localStorage.getItem(IDLE_KEY),10)||0; }catch(e){} return v>0? v:0; }
+function idleLabel(m){ return !m? '끄기 (로그인 유지)' : (m>=60? (m/60)+'시간' : m+'분'); }
+function idleTouch(){ IDLE_LAST=Date.now(); IDLE_WARNED=false; }
+['mousemove','mousedown','keydown','wheel','touchstart','scroll'].forEach(function(ev){
+  document.addEventListener(ev, idleTouch, {passive:true, capture:true});
+});
+function idleLogout(m){
+  clearSess(); try{ sessionStorage.removeItem(CACHE_KEY); }catch(e){}
+  try{ sessionStorage.setItem('svc_idle_msg', idleLabel(m)+' 동안 활동이 없어 자동 로그아웃되었습니다. 다시 로그인하세요.'); }catch(e){}
+  SB_TOKEN=null; AUTH_USER=null; location.reload();
+}
+function idleCheck(){
+  var m=idleMin(); if(!m || !SB_TOKEN) return;
+  var idle=Date.now()-IDLE_LAST, lim=m*60000;
+  if(idle>=lim){ idleLogout(m); return; }
+  if(!IDLE_WARNED && lim-idle<=60000){
+    IDLE_WARNED=true;
+    toast('곧 자동 로그아웃', '1분 더 활동이 없으면 로그아웃됩니다 — 시간은 내 계정 › 설정에서 바꿀 수 있습니다', 'info');
+  }
+}
+setInterval(idleCheck, 15*1000);
+document.addEventListener('visibilitychange', function(){ if(!document.hidden) idleCheck(); });
+
+/* ---- 화면 디자인: 심플(기본) / 클래식(이전) — 이 브라우저에만 저장 ---- */
+function applyLook(){
+  var v=null; try{ v=localStorage.getItem('svc_look'); }catch(e){}
+  if(v==='classic') document.documentElement.setAttribute('data-look','classic');
+  else document.documentElement.removeAttribute('data-look');
+}
+function setLook(v){
+  try{ if(v==='classic') localStorage.setItem('svc_look','classic'); else localStorage.removeItem('svc_look'); }catch(e){}
+  applyLook();
+  try{ if(window.DATA) renderAll(); }catch(e){}
+}
+applyLook();
+/* 메뉴 글머리 이모지를 <span class="ic"> 로 감싸 심플 디자인에서는 숨길 수 있게 (textContent 는 그대로) */
+function wrapNavIcons(){
+  var re; try{ re=new RegExp('^([\\p{Extended_Pictographic}\\u2600-\\u27BF][\\uFE0F\\u20E3]?(?:\\u200D\\p{Extended_Pictographic}\\uFE0F?)*)\\s+(\\S.*)$','u'); }catch(e){ return; }
+  document.querySelectorAll('#side button').forEach(function(b){
+    if(b.querySelector('.ic') || b.children.length) return;
+    var m=(b.textContent||'').trim().match(re); if(!m) return;
+    b.textContent='';
+    var ic=document.createElement('span'); ic.className='ic'; ic.textContent=m[1];
+    b.appendChild(ic); b.appendChild(document.createTextNode(' '+m[2]));
+  });
+}
+function navText(b){   // 메뉴 글자만 (심플 디자인에서는 이모지 제외)
+  var t=(b.textContent||'').trim(), ic=b.querySelector('.ic');
+  if(ic && !document.documentElement.hasAttribute('data-look')) t=t.replace(ic.textContent,'').trim();
+  return t;
 }
 function showAuthUi(){
   try{ loadHide(); }catch(e){}
@@ -2773,6 +2937,7 @@ function showLoginScreen(){
   $('#app').classList.add('hidden');
   $('#loading').classList.add('hidden');
   $('#viewLogin').classList.remove('hidden');
+  try{ var im=sessionStorage.getItem('svc_idle_msg'); if(im){ sessionStorage.removeItem('svc_idle_msg'); var lm=$('#lsMsg'); if(lm){ lm.style.color='var(--ink-2)'; lm.textContent=im; } } }catch(x){}
   /* 마지막으로 로그인한 이메일을 미리 채움 (이 브라우저에 기억 · 비밀번호는 저장하지 않음) → 브라우저 자동완성과 무관하게 아이디가 비지 않음 */
   var e=$('#lsEmail'); try{ var last=localStorage.getItem('svc_last_email')||''; if(e && !e.value && last) e.value=last; }catch(x){}
   setTimeout(function(){ var em=$('#lsEmail'), pw=$('#lsPw'); if(em && em.value && pw && !pw.value) pw.focus(); else if(em) em.focus(); },60);
@@ -2974,6 +3139,7 @@ function buildControls(){
     var b=el('button','pill',lline(l.label));
     b.setAttribute('aria-pressed','true');
     b.style.borderColor=seriesColor(l.color);
+    b.style.setProperty('--c', seriesColor(l.color));   // 심플 디자인: 색 점으로 표시
     b.onclick=function(){
       STATE.lines[l.label]=!STATE.lines[l.label];
       b.setAttribute('aria-pressed',STATE.lines[l.label]?'true':'false');
@@ -3042,6 +3208,7 @@ function buildControls(){
     };
   });
 
+  try{ wrapNavIcons(); }catch(e){}
   $('#btnTheme').onclick=function(){
     var l = document.documentElement.getAttribute('data-theme')==='light';
     document.documentElement.setAttribute('data-theme', l?'dark':'light');
@@ -8006,7 +8173,7 @@ function openPaste(){
 /* ===== 홈 — 오늘 할 일 카드 + 바로가기 ===== */
 function viewLabel(v){
   var b=document.querySelector('.side button[data-v="'+v+'"]');
-  return b? b.textContent.trim():v;
+  return b? navText(b):v;
 }
 function recentKey(){ return 'svc_recent_'+(AUTH_USER||'anon'); }
 
@@ -10239,6 +10406,28 @@ async function renderAccount(){
   bo.onclick=doLogout;
   act.appendChild(bp); act.appendChild(bo);
   box.appendChild(act);
+  /* 설정 — 이 브라우저에만 저장 (localStorage) */
+  var set=document.createElement('div'); set.style.cssText='margin-top:22px';
+  var curIdle=idleMin(), curLook=document.documentElement.hasAttribute('data-look')? 'classic':'simple';
+  set.innerHTML='<div style="font-size:13px;font-weight:650;margin-bottom:4px">설정 <span class="mini" style="font-weight:400">— 이 브라우저에만 저장됩니다</span></div>'+
+    row('자동 로그아웃', '<select id="accIdle" style="height:30px;min-width:200px">'+IDLE_OPTS.map(function(m){
+        return '<option value="'+m+'"'+(m===curIdle?' selected':'')+'>'+esc(idleLabel(m))+(m? ' 동안 활동 없으면':'')+'</option>'; }).join('')+'</select>'+
+      '<div class="mini" style="margin-top:5px;line-height:1.6">마우스·키보드·스크롤 입력이 정한 시간 동안 없으면 이 탭에서 자동으로 로그아웃합니다. 끝나기 1분 전에 알림이 뜹니다.</div>')+
+    row('화면 디자인', '<select id="accLook" style="height:30px;min-width:200px">'+
+        '<option value="simple"'+(curLook==='simple'?' selected':'')+'>심플 (기본)</option>'+
+        '<option value="classic"'+(curLook==='classic'?' selected':'')+'>클래식 (이전 디자인)</option></select>'+
+      '<div class="mini" style="margin-top:5px;line-height:1.6">심플: 그림자·색 채움을 줄인 평면 디자인, 메뉴 아이콘 숨김. 다크 모드·글자 크기는 상단바 버튼으로 바꿉니다.</div>');
+  box.appendChild(set);
+  set.querySelector('#accIdle').onchange=function(){
+    var m=parseInt(this.value,10)||0;
+    try{ if(m) localStorage.setItem(IDLE_KEY,String(m)); else localStorage.removeItem(IDLE_KEY); }catch(e){}
+    idleTouch();
+    toast('자동 로그아웃', m? idleLabel(m)+' 동안 활동이 없으면 로그아웃합니다' : '끔 — 로그인이 계속 유지됩니다', 'ok');
+  };
+  set.querySelector('#accLook').onchange=function(){
+    setLook(this.value);
+    toast('화면 디자인', this.value==='classic'? '클래식(이전 디자인)으로 바꿨습니다':'심플 디자인으로 바꿨습니다', 'ok');
+  };
   var tip=document.createElement('p'); tip.className='cap'; tip.style.marginTop='14px';
   tip.textContent='계정 발급·권한 변경은 관리자가 Supabase 콘솔에서 처리합니다.';
   box.appendChild(tip);
