@@ -1246,6 +1246,47 @@ html[data-look="cc"] #ccBrief{display:none}
 html[data-look="cc"] .ask{padding:14px 16px 12px}
 html[data-look="cc"] .ask-ico{display:none}
 
+/* ── 가격표 › 견적·비교 탭 ── */
+.pr-sec{margin-bottom:22px}
+.pr-sech{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+.pr-sech .no{width:22px;height:22px;border-radius:50%;background:var(--brand);color:#fff;font-size:12px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex:none}
+.pr-sech b{font-size:14.5px}
+.pr-two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:1100px){ .pr-two{grid-template-columns:1fr} }
+.pr-ctl{display:flex;gap:16px 22px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px}
+.pr-f{display:inline-flex;flex-direction:column;gap:5px}
+.pr-f .l{font-size:11.5px;color:var(--muted);font-weight:600}
+.pr-f .eqb-seg button{height:34px}
+.pr-det{border:1px solid var(--grid);border-radius:10px;padding:8px 12px;background:var(--surface-2)}
+.pr-det summary{cursor:pointer;font-size:12.5px;font-weight:600;color:var(--ink-2);list-style:none;display:flex;align-items:center;gap:8px}
+.pr-det summary::-webkit-details-marker{display:none}
+.pr-det summary::after{content:'펼치기';margin-left:auto;font-weight:400;font-size:11.5px;color:var(--muted)}
+.pr-det[open] summary::after{content:'접기'}
+.pr-verdict{margin:14px 0 12px;padding:16px 18px;border-radius:12px;border:1px solid var(--grid);background:var(--surface-2)}
+.pr-verdict .vl{font-size:11.5px;color:var(--muted);font-weight:600}
+.pr-verdict .v{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-top:4px;line-height:1.25}
+.pr-verdict .vs{font-size:12.5px;color:var(--ink-2);margin-top:6px}
+.pr-verdict.win{background:var(--brand-t);border-color:color-mix(in srgb,var(--brand) 35%,transparent)} .pr-verdict.win .v{color:var(--brand)}
+.pr-verdict.lose{background:rgba(208,59,59,.08);border-color:rgba(208,59,59,.3)} .pr-verdict.lose .v{color:var(--critical)}
+.pr-verdict.even .v{color:var(--ink-2)}
+:is(#viewPrice) .pr-out.pr-big .pr-ob .v{font-size:22px!important}
+:is(#viewPrice) .pr-out.pr-big .pr-ob .l{font-size:11.5px!important}
+.pr-qres{border:1px solid var(--grid);border-radius:12px;padding:12px 14px;background:var(--surface)}
+/* 클라우드 비용 — 요약 타일 + 접힘 섹션 */
+#viewCloud .cl-kpis{margin-bottom:18px}
+#viewCloud .cl-kpis .kpi .k{justify-content:flex-start!important}
+#viewCloud .cl-kpis .kpi .k .mini{margin-left:6px;font-weight:400}
+#viewCloud .cl-kpis .kpi .d{display:block;line-height:1.5}
+#viewCloud .cl-kpis .kpi .d .dl{font-size:11.5px}
+.cl-det{margin-bottom:12px;background:var(--surface);padding:10px 14px}
+.cl-det summary{font-size:13.5px}
+.cl-det .cl-detb{margin-top:12px}
+.cl-det .pr-card,.cl-det #clAcct,.cl-det #clLinked{border:0;padding:0;background:transparent}
+.pr-qhead{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;margin-bottom:4px}
+.pr-rec{margin-top:10px;padding:10px 12px;border-radius:10px;background:var(--surface-2);font-size:13px;line-height:1.6}
+.pr-rec b{color:var(--brand)}
+:is(#viewPrice) .pr-calc{display:none}
+
 /* ── 장비 대시보드 (요약 타일 · 차트 · 상태 보드) ── */
 .eqb-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:18px}
 .eqb-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:20px}
@@ -2738,7 +2779,7 @@ window.addEventListener('message', function(ev){
 });
 
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-16 ㊿+103';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-16 ㊿+105';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -9454,26 +9495,31 @@ function renderCloud(){
   var canEdit=!!(SB_TOKEN && !window.IS_VIEWER && (window.IS_SUPER || window.MY_ROLE==='admin'));
   var first=B.months[0], last=B.months[B.months.length-1];
   var head='<div class="pr-top">'+
-    '<span style="font-size:17px;font-weight:800">☁️ 클라우드 비용</span>'+
-    (clIsK()? '<span class="ubadge sm" title="USD 는 현재 환율로 원화 환산 · NCP 는 공급가액 · 천원 단위">₩ 천원 (현재 환율 환산)</span>'
-            : '<span class="ubadge sm won" title="AWS 세전 USD · NCP(₩ 공급가액)는 환율로 USD 환산">$ USD 세전</span>')+
-    '<span class="pr-ver">'+esc(first.replace('-','년 ')+'월')+' ~ '+esc(last.replace('-','년 ')+'월')+' · 인보이스 '+B.inv.length+'건 등록</span>'+
+    '<span style="font-size:19px;font-weight:600;letter-spacing:-.01em">클라우드 비용</span>'+
+    '<div class="eqb-seg" id="clCur" role="group" aria-label="통화"><button type="button" data-c="usd" aria-pressed="'+(!clIsK())+'">$ USD 세전</button><button type="button" data-c="krw" aria-pressed="'+clIsK()+'">₩ 천원 환산</button></div>'+
+    '<span class="pr-ver">'+esc(first.replace('-','년 ')+'월')+' ~ '+esc(last.replace('-','년 ')+'월')+' · 인보이스 '+B.inv.length+'건</span>'+
     '<span style="flex:1"></span>'+
-    '<div class="seg" id="clCur"><button data-c="usd" aria-pressed="'+(!clIsK())+'">$ USD</button><button data-c="krw" aria-pressed="'+clIsK()+'">₩ 천원</button></div>'+
     '<button class="pill ghost" id="clFxBtn" title="'+esc('출처: '+CL.fxNow.src+(CL.fxNow.when? ' · '+CL.fxNow.when:'')+' · 누르면 다시 받아옵니다')+'">환율 '+Number(CL.fxNow.rate).toLocaleString('ko-KR')+'원/$'+(CL.fxNow.live? '':' (외부 조회 실패 · '+esc(CL.fxNow.src)+')')+'</button>'+
     (canEdit? '<button class="pill" id="clAdd" style="background:var(--brand);border-color:var(--brand);color:#fff">＋ 인보이스 PDF 추가</button>':'')+
     '</div>';
+  /* 1차: 요약 타일 + 월별 추이 · 2차(접힘): MDR 인프라 · 계정 개요 · 서비스×월 표 · 인보이스 */
+  function det(k, title, inner){ var open=false; try{ open=localStorage.getItem('svc_cl_open_'+k)==='1'; }catch(e){}
+    return '<details class="pr-det cl-det" data-k="'+k+'"'+(open?' open':'')+'><summary>'+title+'</summary><div class="cl-detb">'+inner+'</div></details>'; }
   host.innerHTML=head+
-    '<div class="cl-sum" id="clSum"></div>'+
-    '<div class="pr-card" id="clMdr" style="margin-bottom:14px"></div>'+
-    '<div class="pr-card" style="margin-bottom:14px"><div id="clChips" style="display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-bottom:8px"></div>'+
+    '<div class="eqb-kpis cl-kpis" id="clSum"></div>'+
+    '<div class="pr-card" style="margin-bottom:18px"><div id="clChips" style="display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-bottom:8px"></div>'+
       '<p class="cap" id="clHint" style="margin:0 0 10px"></p>'+
       '<h3 id="clChartT">월별 비용 추이</h3><div class="cl-legend" id="clLegend"></div><div id="clChart" class="chartbox h260"></div></div>'+
-    '<div class="pr-card" id="clAcct" style="margin-bottom:14px;display:none"></div>'+
-    '<div class="pr-card" id="clLinked" style="margin-bottom:14px;display:none"></div>'+
-    '<div class="pr-card" style="margin-bottom:14px"><h3 id="clTableT">서비스 × 월 비용 내역</h3><div class="tbl-wrap" style="max-height:none"><table class="pr" id="clTable"></table></div><p class="cap" id="clNote" style="margin-top:8px"></p></div>'+
-    '<div class="pr-card" id="clInv"></div>';
+    det('mdr','MDR 서비스 인프라 월별 비용 <span class="mini">EDR(KR) + awstac</span>', '<div id="clMdr"></div>')+
+    det('acct','계정 개요 · 통합청구 연결 계정 <span class="mini" id="clAcctCap"></span>', '<div id="clAcct" style="display:none"></div><div id="clLinked" style="display:none;margin-top:12px"></div>')+
+    det('tbl','서비스 × 월 비용 내역', '<h3 id="clTableT" style="margin:0 0 8px;font-size:13px">서비스 × 월 비용 내역</h3><div class="tbl-wrap" style="max-height:none"><table class="pr" id="clTable"></table></div><p class="cap" id="clNote" style="margin-top:8px"></p>')+
+    det('inv','인보이스 등록 내역 <span class="mini">'+B.inv.length+'건 · PDF 는 읽은 뒤 보관하지 않고 파일명만</span>', '<div id="clInv"></div>');
   clSummary(B); clMdr(B); clChips(B); clChart(B); clAcctOverview(B); clLinked(B); clTable(B); clInvList(B, canEdit);
+  host.querySelectorAll('details.cl-det').forEach(function(d){
+    d.addEventListener('toggle', function(){ try{ localStorage.setItem('svc_cl_open_'+d.dataset.k, d.open?'1':'0'); }catch(e){}
+      if(d.open && d.dataset.k==='mdr') try{ clMdr(B); }catch(e){} });
+  });
+  clDetVis();
   var add=document.getElementById('clAdd'); if(add) add.onclick=function(){ clOpenAdd(); };
   host.querySelectorAll('#clCur button').forEach(function(b){ b.onclick=function(){ CL.cur=b.dataset.c; try{ localStorage.setItem('svc_cloud_cur',CL.cur); }catch(e){} renderCloud(); }; });
   var fxb=document.getElementById('clFxBtn'); if(fxb) fxb.onclick=function(){
@@ -9489,15 +9535,27 @@ function clSummary(B){
   var awsSum=clSum(awsMonth);
   var U=clUnit();
   var ncpSum=B.ncp? clSum(B.acc[B.ncp].dtotals) : 0, ncpN=B.ncp? B.acc[B.ncp].dtotals.filter(function(x){return x!=null;}).length : 0;
-  var cards=[
-    {l:'AWS '+ks.length+'개 계정 합계 ('+U+(clIsK()?' · 환율 환산':' 세전')+', '+clMonLabel(M[0])+'~'+clMonLabel(M[M.length-1])+')', v:clF(awsSum),
-     s:'최근 완전 집계월 '+clMonLabel(M[lastFull])+' '+clFk(awsMonth[lastFull])+(lastFull>0? ' · 전월비 '+clDelta(awsMonth[lastFull-1],awsMonth[lastFull]):'')},
-    B.ncp? {l:'공공기관 NCP 합계 ('+U+(clIsK()?' · 공급가액':' 환산')+')', v:clF(ncpSum), s:'월평균 '+clF(ncpSum/(ncpN||1))+(clIsK()? ' · AWS+NCP 전체 '+clFk(awsSum+ncpSum)+'천원':'')}
-         : {l:'공공기관 NCP', v:'—', s:'데이터 없음'},
-    {l:'AWS 계정별 비중', v:shares.slice(0,2).map(function(x){ return B.acc[x.k].label+' '+(x.s/awsSum*100).toFixed(0)+'%'; }).join(' · '),
-     s:shares.slice(2).map(function(x){ return B.acc[x.k].label+' '+(x.s/awsSum*100).toFixed(0)+'%'; }).join(' · ')}
-  ];
-  $('#clSum').innerHTML=cards.map(function(c){ return '<div class="pr-ob"><div class="l">'+c.l+'</div><div class="v" style="font-size:19px">'+c.v+'</div><div class="pr-note">'+c.s+'</div></div>'; }).join('');
+  var ncpLast=B.ncp? (B.acc[B.ncp].dtotals[lastFull]||0) : 0;
+  var mdrA=B.acc.edr, mdrT=B.acc.tac, mdrLast=null, mdrPrev=null;
+  if(mdrA&&mdrT){ mdrLast=(mdrA.dtotals[lastFull]||0)+(mdrT.dtotals[lastFull]||0); if(lastFull>0) mdrPrev=(mdrA.dtotals[lastFull-1]||0)+(mdrT.dtotals[lastFull-1]||0); }
+  var top=shares[0];
+  function tile(k, v, u, d){ return '<div class="kpi"><div class="k">'+k+'</div><div class="v">'+v+(u? '<small>'+u+'</small>':'')+'</div><div class="d">'+d+'</div></div>'; }
+  $('#clSum').innerHTML=
+    tile(clMonLabel(M[lastFull])+' 월 비용 <span class="mini">최근 완전 집계월</span>', clFk(awsMonth[lastFull]+ncpLast), U,
+      (lastFull>0? '전월비 '+clDelta(awsMonth[lastFull-1]+(B.ncp? (B.acc[B.ncp].dtotals[lastFull-1]||0):0), awsMonth[lastFull]+ncpLast)+' · ':'')+'AWS '+clFk(awsMonth[lastFull])+(B.ncp? ' · NCP '+clFk(ncpLast):''))+
+    tile('기간 합계 <span class="mini">'+clMonLabel(M[0])+'~'+clMonLabel(M[M.length-1])+'</span>', clFk(awsSum+ncpSum), U,
+      'AWS '+ks.length+'개 계정 '+clFk(awsSum)+(B.ncp? ' · NCP '+clFk(ncpSum)+' (월평균 '+clFk(ncpSum/(ncpN||1))+')':'')+(clIsK()? ' · 환율 환산':' 세전'))+
+    (mdrLast!=null? tile('MDR 인프라 <span class="mini">EDR + awstac · '+clMonLabel(M[lastFull])+'</span>', clFk(mdrLast), U, (mdrPrev!=null? '전월비 '+clDelta(mdrPrev,mdrLast)+' · ':'')+'전체의 '+(awsMonth[lastFull]? Math.round(mdrLast/awsMonth[lastFull]*100):0)+'%')
+                  : tile('AWS 계정', ks.length, '개', B.ncp? '+ 공공기관 NCP 1개':'NCP 없음'))+
+    tile('계정별 비중 <span class="mini">기간 합계 기준</span>', top? esc(B.acc[top.k].label)+' '+(top.s/awsSum*100).toFixed(0)+'%':'—', '',
+      shares.slice(1,4).map(function(x){ return esc(B.acc[x.k].label)+' '+(x.s/awsSum*100).toFixed(0)+'%'; }).join(' · '));
+}
+/* 접힘 섹션 안 내용이 비면(계정 1개 선택 등) 섹션 자체를 숨김 */
+function clDetVis(){
+  var m=document.getElementById('clMdr'), d1=document.querySelector('details.cl-det[data-k="mdr"]'); if(m&&d1) d1.style.display=(m.style.display==='none')? 'none':'';
+  var a=document.getElementById('clAcct'), l=document.getElementById('clLinked'), d2=document.querySelector('details.cl-det[data-k="acct"]');
+  if(d2){ var vis=(a&&a.style.display!=='none')||(l&&l.style.display!=='none'); d2.style.display=vis? '':'none';
+    var cap=document.getElementById('clAcctCap'); if(cap) cap.textContent=(a&&a.style.display!=='none')? '선택 계정 '+((CL.B&&clSelKeys(CL.B).length)||0)+'개' : (l&&l.style.display!=='none'? '통합청구 연결 계정':''); }
 }
 /* 포탈 공통 차트(Viz) — 계정이 여러 개면 누적 영역(MRR 추이와 같은 형태), 하나면 막대 */
 function clBars(el, M, series, fmt, forceBars){
@@ -9513,7 +9571,8 @@ function clMdr(B){
   var box=$('#clMdr'); var A=B.acc.edr, T=B.acc.tac;
   if(!A||!T||!A.rows.length||!T.rows.length){ box.style.display='none'; return; }
   var M=B.months;
-  box.innerHTML='<h3>MDR 서비스 인프라 월별 비용 <small>EDR(KR) + awstac · '+(clIsK()? '원화 환산 천원':'세전 USD')+'</small></h3><div class="cl-legend">'+
+  box.style.display='';
+  box.innerHTML='<p class="cap" style="margin:0 0 6px">'+(clIsK()? '원화 환산 천원':'세전 USD')+'</p><div class="cl-legend">'+
     [A,T].map(function(a){ return '<span><i style="background:'+a.color+'"></i>'+esc(a.label+' · '+a.purpose)+'</span>'; }).join('')+'</div><div id="clMdrChart" class="chartbox h220" data-h="h220"></div>'+
     '<div class="tbl-wrap" style="max-height:none;margin-top:10px"><table class="pr" id="clMdrT"></table></div>';
   clBars(document.getElementById('clMdrChart'), M, [{label:A.label,vals:A.dtotals,color:A.color},{label:T.label,vals:T.dtotals,color:T.color}], clFk, true);
@@ -9542,7 +9601,7 @@ function clChips(B){
       if(CL.mode==='ncp'){ CL.mode='aws'; CL.sel={}; CL.sel[k]=1; }
       else if(CL.sel[k]){ if(clSelKeys(B).length>1) delete CL.sel[k]; }
       else CL.sel[k]=1; }
-    clChips(B); clChart(B); clAcctOverview(B); clLinked(B); clTable(B);
+    clChips(B); clChart(B); clAcctOverview(B); clLinked(B); clTable(B); clDetVis();
   };
   var hint=$('#clHint');
   if(CL.mode==='ncp') hint.textContent='공공기관 NCP 단독 보기 (₩, 공급가액) — AWS 계정을 누르면 AWS 보기로 돌아갑니다.';
@@ -9614,7 +9673,7 @@ function clInvList(B, canEdit){
   var p=$('#clInv'); var inv=(B.inv||[]).slice();
   var byM={}; inv.forEach(function(i){ (byM[String(i.ym).slice(0,7)]=byM[String(i.ym).slice(0,7)]||[]).push(i); });
   var months=B.months.slice().reverse();
-  var h='<h3>인보이스 등록 내역 <small>월 × 계정 · PDF 는 읽은 뒤 보관하지 않고 파일명만 남깁니다</small></h3>';
+  var h='';
   if(!inv.length) h+='<p class="cap">보관된 인보이스가 없습니다'+(canEdit? ' — 위 «＋ 인보이스 PDF 추가» 로 올려주세요.':'.')+'</p>';
   else{
     h+='<div class="tbl-wrap" style="max-height:none"><table class="pr"><thead><tr><th>사용 월</th><th>계정</th><th class="n">전체합계(USD)</th><th class="n">환율</th><th class="n">공급가액(₩)</th><th class="n">총 청구(VAT 포함)</th><th>파일</th><th>올린 사람</th>'+(canEdit?'<th></th>':'')+'</tr></thead><tbody>';
@@ -9867,105 +9926,50 @@ function renderPrice(){
     loadPrice(function(){ if(CUR_VIEW==='price') renderPrice(); });
     return;
   }
-  var book=prCur(PR.seg);
+  var segBook=PR.seg==='onprem'? 'onprem':'saas';        // 견적·비교 탭은 SaaS 판(+구축형 참고)을 씁니다
+  var book=prCur(segBook);
   if(!book){
     host.innerHTML='<section class="card c12" style="max-width:640px;margin:0 auto;text-align:center;padding:40px">'+
       '<h3 style="margin:0 0 8px">💰 제품 가격표</h3><p class="cap">등록된 가격표가 없습니다 — 44_price.sql 실행이 필요합니다.</p></section>';
     return;
   }
-  var vers=prBooks(PR.seg);
+  var vers=prBooks(segBook), isCalc=PR.seg==='calc';
   var verSel='<select id="prVer" class="pill" style="height:31px;font-family:inherit">'+
-    vers.map(function(b,i){ return '<option value="'+i+'"'+(i===(PR.ver[PR.seg]||0)?' selected':'')+'>'+esc(b.label)+(i===0?' (현행)':' (이력)')+'</option>'; }).join('')+'</select>';
+    vers.map(function(b,i){ return '<option value="'+i+'"'+(i===(PR.ver[segBook]||0)?' selected':'')+'>'+esc(b.label)+(i===0?' (현행)':' (이력)')+'</option>'; }).join('')+'</select>';
+  var TABS=[['saas','SaaS 가격표'],['onprem','On-prem 가격표'],['calc','견적 · 비교']];
   var head='<div class="pr-top">'+
-    '<span style="font-size:17px;font-weight:800">💰 제품 가격표</span>'+
-    '<span class="ubadge sm won">₩ 단가는 원 단위</span>'+verSel+
-    '<span class="pr-ver">적용일 '+esc(String(book.applied||''))+' · 새 판 등록 시 자동 교체 · 이전 판은 이력</span>'+
+    '<span style="font-size:19px;font-weight:600;letter-spacing:-.01em">가격표</span>'+
+    '<div class="eqb-seg" role="tablist" aria-label="가격표 구분">'+TABS.map(function(t){ return '<button type="button" role="tab" data-prseg="'+t[0]+'" aria-pressed="'+(PR.seg===t[0])+'">'+t[1]+'</button>'; }).join('')+'</div>'+
+    '<span class="ubadge sm won">₩ 원 단위</span>'+
     '<span style="flex:1"></span>'+
-    '<input id="prQ" class="pill" style="height:33px;min-width:200px" placeholder="제품·모델명 검색" value="'+esc(PR.q)+'">'+
-    '<button class="pill'+(PR.seg==='saas'?' on':'')+'" data-prseg="saas" '+(PR.seg==='saas'?'style="background:var(--brand-t);border-color:var(--brand);color:var(--brand);font-weight:700"':'')+'>SaaS · 서비스사업본부</button>'+
-    '<button class="pill'+(PR.seg==='onprem'?' on':'')+'" data-prseg="onprem" '+(PR.seg==='onprem'?'style="background:var(--brand-t);border-color:var(--brand);color:var(--brand);font-weight:700"':'')+'>On-prem · 참고</button>'+
-    (window.IS_SUPER? '<button class="pill ghost" id="prNew">＋ 새 판 등록</button>':'')+
+    (isCalc? '<span class="pr-ver">SaaS 판 '+esc(book.label||'')+' · 적용일 '+esc(String(book.applied||''))+'</span>'
+           : '<input id="prQ" class="pill" style="height:33px;min-width:200px" placeholder="제품·모델명 검색" value="'+esc(PR.q)+'">'+verSel+'<span class="pr-ver">적용일 '+esc(String(book.applied||''))+'</span>')+
+    (window.IS_SUPER && !isCalc? '<button class="pill ghost" id="prNew">＋ 새 판 등록</button>':'')+
     '</div>';
   host.innerHTML=head+'<div id="prMain"></div>';
-  $('#prVer').onchange=function(){ PR.ver[PR.seg]=+this.value; renderPrice(); };
+  var vs=$('#prVer'); if(vs) vs.onchange=function(){ PR.ver[segBook]=+this.value; renderPrice(); };
   host.querySelectorAll('[data-prseg]').forEach(function(b){ b.onclick=function(){ PR.seg=b.dataset.prseg; renderPrice(); }; });
-  var q=$('#prQ'); q.oninput=function(){ PR.q=this.value.trim().toLowerCase(); prPaintMain(); var e2=$('#prQ'); };
+  var q=$('#prQ'); if(q) q.oninput=function(){ PR.q=this.value.trim().toLowerCase(); prPaintMain(); };
   var bn=document.getElementById('prNew');
   if(bn) bn.onclick=function(){ $('#pnMsg').textContent=''; if(!$('#pnDate').value) $('#pnDate').value=todayStr(); openOvl('ovlPrNew'); };
   prPaintMain();
 }
 function prPaintMain(){
   var main=$('#prMain'); if(!main) return;
+  if(PR.seg==='calc'){ main.innerHTML=prCalcHtml(); prBindSaas(); return; }
   main.innerHTML = PR.seg==='saas'? prSaasHtml() : prOnpremHtml();
-  if(PR.seg==='saas'){ prBindSaas(); } else { prBindOnprem(); }
+  if(PR.seg==='saas'){ document.querySelectorAll('[data-prbasis]').forEach(function(b){ b.onclick=function(){ PR.basis=b.dataset.prbasis; prPaintMain(); }; }); }
+  else prBindOnprem();
 }
 function prSaasHtml(){
-  var D=prCur('saas').data, h='';
+  var D=prCur('saas').data;
   var SUP=PR.basis==='supply';                       // Cloud NAC·ZTNA PA 표시 기준
   var RT=(D.supply_rate&&D.supply_rate.cnac)||0.5;   // 총판 공급가 = 표시가 × 50%
   function pv(v){ return typeof v==='number'? prWon(SUP? Math.round(v*RT):v) : prWon(v); }
   var basisBtn='<span style="display:inline-flex;gap:4px;margin-left:8px">'+
     '<button class="pill" data-prbasis="cons" style="height:26px;font-size:11px;'+(!SUP?'background:var(--brand-t);border-color:var(--brand);color:var(--brand);font-weight:700':'')+'">소비자가</button>'+
     '<button class="pill" data-prbasis="supply" style="height:26px;font-size:11px;'+(SUP?'background:var(--brand-t);border-color:var(--brand);color:var(--brand);font-weight:700':'')+'">총판 공급가 '+(RT*100)+'% 🔒</button></span>';
-  // 계산기 + TCO
-  h+='<div class="pr-calc">'+
-    '<h3 style="margin:0 0 6px;font-size:13.5px">🧮 빠른 견적 — Cloud NAC <small style="color:var(--muted);font-weight:400">기본 구독 + ZTNA 사용 시 PA Agent 추가</small></h3>'+
-    '<div class="row">노드 <input type="number" id="pnQty" value="300" min="1" style="width:90px">'+
-    '<select id="pnTerm"><option value="0">무약정</option><option value="1" selected>1년 약정</option><option value="2">2년</option><option value="3">3년</option></select>'+
-    '<label class="svc"><input type="checkbox" id="pnZ">+ ZTNA (PA Agent)</label>'+
-    '<span id="pnZW" style="display:none">동시접속 <input type="number" id="pnZQ" value="100" min="1" style="width:80px"></span></div>'+
-    '<div class="pr-out" style="margin-bottom:14px"><div class="pr-ob"><div class="l">Cloud NAC 월</div><div class="v" id="pvMon">—</div></div>'+
-    '<div class="pr-ob"><div class="l">ZTNA PA 월</div><div class="v" id="pvZ">—</div></div>'+
-    '<div class="pr-ob fin"><div class="l">월 합계 · 연간</div><div class="v" id="pvTot">—</div></div></div>'+
-    '<div class="pr-note" id="pvNote" style="margin-bottom:14px"></div>'+
-    '<h3 style="margin:0 0 6px;font-size:13.5px;border-top:1px solid var(--grid);padding-top:12px">🧮 빠른 견적 — MDR 서비스군 <small style="color:var(--muted);font-weight:400">1년 기준 · 통합 = Cloud Insights E + Add-on 24×7</small></h3>'+
-    '<div class="row">'+
-    (function(){
-      var LAB={CIE:'Cloud Insights E (단독)', MDRA:'+ MDR Add-on 24×7', MDR:'Genian MDR 통합', AV:'AV (백신)', RW:'랜섬웨어', DC:'매체제어'};
-      var ORDER=['MDR','CIE','MDRA','AV','RW','DC'];
-      var have={}; (D.services||[]).forEach(function(x){ have[x.key]=x; });
-      var def=have.MDR? 'MDR' : (have.CIE? 'CIE' : (D.services&&D.services[0]? D.services[0].key : ''));
-      return ORDER.filter(function(k){ return have[k]; }).map(function(k){
-        return '<label class="svc"><input type="checkbox" data-prs="'+k+'"'+(k===def?' checked':'')+'>'+(LAB[k]||have[k].name)+'</label>'; }).join('');
-    })()+
-    ' Agent <input type="number" id="pmQty" value="100" min="1" style="width:90px">'+
-    '<select id="pmWho"><option value="dist">총판가 기준</option><option value="ptn">파트너가 기준</option></select></div>'+
-    '<div class="pr-out"><div class="pr-ob"><div class="l">소비자가 합계(연)</div><div class="v" id="pmCons">—</div></div>'+
-    '<div class="pr-ob fin"><div class="l">공급가 합계(연)</div><div class="v" id="pmSup">—</div></div>'+
-    '<div class="pr-ob"><div class="l">Agent당 공급 단가 합</div><div class="v" id="pmUnit">—</div></div></div>'+
-    '<div class="pr-note" id="pmNote" style="margin-top:8px"></div></div>';
-  var inSt='height:34px;border:1px solid var(--ring);border-radius:9px;padding:0 10px;font:inherit;background:var(--surface)';
-  var yOpt=''; for(var yk=1;yk<=10;yk++) yOpt+='<option value="'+yk+'"'+(yk===5?' selected':'')+'>'+yk+'년</option>';
-  h+='<div class="pr-card" style="margin-bottom:14px"><h3>⚖️ TCO 비교 — SaaS vs 구축형 <span class="ubadge sm won">₩ 이 카드는 원 단위</span>'+
-    '<small>SaaS = 3년 약정 엔드가 + 센서(월 5·10·15만원/대 선택) · 구축형 = 라이선스+정책서버+차단센서(모델 선택, 할인가) + 유지보수 10~15%/년(2년차~)</small></h3>'+
-    '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0">'+
-    '<span style="display:inline-flex;gap:4px">'+
-      '<button class="pill" data-tcop="nac" id="tpNac">NAC</button>'+
-      '<button class="pill" data-tcop="ztna" id="tpZtna">ZTNA</button></span>'+
-    ' 노드 <input type="number" id="ptQty" value="500" min="1" style="'+inSt+';width:88px">'+
-    ' 기간 <select id="ptY" style="'+inSt+'">'+yOpt+'</select>'+
-    '<span id="ptZW" style="display:none"> 동시접속 Agent <input type="number" id="ptZQ" value="100" min="1" style="'+inSt+';width:80px"></span>'+
-    '<span>구축형 할인 <span style="display:inline-flex;gap:4px">'+
-      '<button class="pill" data-tcod="60" id="td60" style="height:30px" title="SR파트너가 영업하는 일반 채널 딜의 통상 엔드가 — SR 마진 10%p 포함">60% (SR채널)</button>'+
-      '<button class="pill" data-tcod="70" id="td70" style="height:30px" title="SR 배제선 — 직판·PR 직대응 딜의 하한가 (인바운드 견적 수준)">70% (직판·PR)</button>'+
-      '<button class="pill" data-tcod="80" id="td80" style="height:30px" title="PR 배제선 — 사실상 방어 최저가">80% (최저)</button></span></span>'+
-    '</div>'+
-    '<div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;margin:0 0 10px" class="pr-note">'+
-    '<span style="display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap">SaaS 센서(월/대) <span id="ptSsL" style="display:inline-flex;gap:6px;flex-wrap:wrap"></span><button class="pill" id="ptSsAdd" title="센서 종류 추가" style="height:26px;padding:0 9px">＋</button></span>'+
-    '<span style="display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap">구축형 센서(모델 선택) <span id="ptOsL" style="display:inline-flex;gap:6px;flex-wrap:wrap"></span><button class="pill" id="ptOsAdd" title="센서 모델 추가" style="height:26px;padding:0 9px">＋</button></span>'+
-    '</div>'+
-    '<div class="pr-out"><div class="pr-ob"><div class="l">SaaS 누적 (3년 약정 엔드가)</div><div class="v" id="ptS">—</div><div class="pr-note" id="ptSs"></div></div>'+
-    '<div class="pr-ob"><div class="l" id="ptOL">구축형 누적</div><div class="v" id="ptO">—</div><div class="pr-note" id="ptOs"></div></div>'+
-    '<div class="pr-ob fin"><div class="l">판정</div><div class="v" style="font-size:13.5px;line-height:1.4" id="ptV">—</div></div></div>'+
-    '<div class="pr-note" id="ptCfg" style="margin-top:8px"></div>'+
-    '<div id="ptB" style="margin-top:10px"></div>'+
-    '<div style="margin-top:12px;border-top:1px dashed var(--ring);padding-top:10px">'+
-      '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+
-      '<b style="font-size:12px">📄 실제 구축형 견적서(PDF)로 비교</b>'+
-      '<input type="file" id="ptQF" accept="application/pdf" style="font-size:11.5px;max-width:260px">'+
-      '<button class="pill" id="ptQGo" style="height:28px">AI 분석</button>'+
-      '<span class="pr-note">파일은 분석에만 쓰고 어디에도 저장하지 않습니다 — 새로고침하면 사라집니다</span></div>'+
-      '<div id="ptQR" style="margin-top:8px"></div></div></div>';
+  var h='';
   // 표
   var t='';
   var bLab=SUP?'공급가':'소비자가';
@@ -9993,6 +9997,76 @@ function prSaasHtml(){
   if(ar) t+='<div class="pr-card"><h3>📦 부가 서비스 <small>원/년 · VAT별도</small></h3>'+
     '<table class="pr"><thead><tr><th>구분</th><th class="n">소비자가</th><th class="n">최소제안가<span class="pr-lock">🔒</span></th><th class="n">파트너가<span class="pr-lock">🔒</span></th><th>비고</th></tr></thead><tbody>'+ar+'</tbody></table></div>';
   return h+'<div class="pr-grid">'+(t||'<div class="pr-card">검색 결과가 없습니다</div>')+'</div>';
+}
+
+/* ===== 견적 · 비교 탭 — ① 빠른 견적 ② TCO 비교(SaaS vs 구축형) ③ 실제 견적서(PDF) AI 비교
+   결과는 «판정 → 큰 숫자 → 근거» 순서로, 설정은 접힘(details) 안에 */
+function prCalcHtml(){
+  var D=prCur('saas').data, h='';
+  var inSt='height:34px;border:1px solid var(--ring);border-radius:9px;padding:0 10px;font:inherit;background:var(--surface)';
+  var yOpt=''; for(var yk=1;yk<=10;yk++) yOpt+='<option value="'+yk+'"'+(yk===5?' selected':'')+'>'+yk+'년</option>';
+  /* ① 빠른 견적 — 두 카드 나란히 */
+  h+='<div class="pr-sec"><div class="pr-sech"><span class="no">1</span><b>빠른 견적</b><span class="mini">단가표 그대로 계산 · 할인은 별도 협의 · 실제 견적은 견적·발주 시스템에서</span></div>'+
+    '<div class="pr-two">'+
+    '<div class="pr-card"><h3>Cloud NAC <small>기본 구독 · ZTNA 사용 시 PA Agent 추가</small></h3>'+
+      '<div class="row">노드 <input type="number" id="pnQty" value="300" min="1" style="width:90px">'+
+      '<select id="pnTerm"><option value="0">무약정</option><option value="1" selected>1년 약정</option><option value="2">2년</option><option value="3">3년</option></select>'+
+      '<label class="svc"><input type="checkbox" id="pnZ">+ ZTNA (PA Agent)</label>'+
+      '<span id="pnZW" style="display:none">동시접속 <input type="number" id="pnZQ" value="100" min="1" style="width:80px"></span></div>'+
+      '<div class="pr-out"><div class="pr-ob"><div class="l">Cloud NAC 월</div><div class="v" id="pvMon">—</div></div>'+
+      '<div class="pr-ob"><div class="l">ZTNA PA 월</div><div class="v" id="pvZ">—</div></div>'+
+      '<div class="pr-ob fin"><div class="l">월 합계 · 연간</div><div class="v" id="pvTot">—</div></div></div>'+
+      '<div class="pr-note" id="pvNote" style="margin-top:8px"></div></div>'+
+    '<div class="pr-card"><h3>MDR 서비스군 <small>1년 기준 · 통합 = Cloud Insights E + Add-on 24×7</small></h3>'+
+      '<div class="row">'+
+      (function(){
+        var LAB={CIE:'Cloud Insights E (단독)', MDRA:'+ MDR Add-on 24×7', MDR:'Genian MDR 통합', AV:'AV (백신)', RW:'랜섬웨어', DC:'매체제어'};
+        var ORDER=['MDR','CIE','MDRA','AV','RW','DC'];
+        var have={}; (D.services||[]).forEach(function(x){ have[x.key]=x; });
+        var def=have.MDR? 'MDR' : (have.CIE? 'CIE' : (D.services&&D.services[0]? D.services[0].key : ''));
+        return ORDER.filter(function(k){ return have[k]; }).map(function(k){
+          return '<label class="svc"><input type="checkbox" data-prs="'+k+'"'+(k===def?' checked':'')+'>'+(LAB[k]||have[k].name)+'</label>'; }).join('');
+      })()+
+      ' Agent <input type="number" id="pmQty" value="100" min="1" style="width:90px">'+
+      '<select id="pmWho"><option value="dist">총판가 기준</option><option value="ptn">파트너가 기준</option></select></div>'+
+      '<div class="pr-out"><div class="pr-ob"><div class="l">소비자가 합계(연)</div><div class="v" id="pmCons">—</div></div>'+
+      '<div class="pr-ob fin"><div class="l">공급가 합계(연)</div><div class="v" id="pmSup">—</div></div>'+
+      '<div class="pr-ob"><div class="l">Agent당 공급 단가 합</div><div class="v" id="pmUnit">—</div></div></div>'+
+      '<div class="pr-note" id="pmNote" style="margin-top:8px"></div></div>'+
+    '</div></div>';
+  /* ② TCO 비교 */
+  h+='<div class="pr-sec"><div class="pr-sech"><span class="no">2</span><b>TCO 비교 — SaaS vs 구축형</b><span class="mini">SaaS = 3년 약정 엔드가 + 센서 · 구축형 = 라이선스+정책서버+센서 할인가 + 유지보수 10~15%/년(2년차~) · 구축비·설치비 제외 · VAT별도</span></div>'+
+    '<div class="pr-card">'+
+    '<div class="pr-ctl">'+
+      '<span class="pr-f"><span class="l">제품</span><span class="eqb-seg"><button type="button" data-tcop="nac" id="tpNac">NAC</button><button type="button" data-tcop="ztna" id="tpZtna">ZTNA</button></span></span>'+
+      '<span class="pr-f"><span class="l">노드</span><input type="number" id="ptQty" value="500" min="1" style="'+inSt+';width:96px"></span>'+
+      '<span class="pr-f" id="ptZW" style="display:none"><span class="l">동시접속 Agent</span><input type="number" id="ptZQ" value="100" min="1" style="'+inSt+';width:90px"></span>'+
+      '<span class="pr-f"><span class="l">검토 기간</span><select id="ptY" style="'+inSt+'">'+yOpt+'</select></span>'+
+      '<span class="pr-f"><span class="l">구축형 할인</span><span class="eqb-seg">'+
+        '<button type="button" data-tcod="60" id="td60" title="SR파트너가 영업하는 일반 채널 딜의 통상 엔드가 — SR 마진 10%p 포함">60% SR채널</button>'+
+        '<button type="button" data-tcod="70" id="td70" title="SR 배제선 — 직판·PR 직대응 딜의 하한가 (인바운드 견적 수준)">70% 직판·PR</button>'+
+        '<button type="button" data-tcod="80" id="td80" title="PR 배제선 — 사실상 방어 최저가">80% 최저</button></span></span>'+
+    '</div>'+
+    '<details class="pr-det"><summary>센서 구성 조정 <span class="mini">SaaS 센서(월/대) · 구축형 센서 모델</span></summary>'+
+      '<div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;margin-top:8px" class="pr-note">'+
+      '<span style="display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap">SaaS 센서(월/대) <span id="ptSsL" style="display:inline-flex;gap:6px;flex-wrap:wrap"></span><button class="pill" id="ptSsAdd" title="센서 종류 추가" style="height:26px;padding:0 9px">＋</button></span>'+
+      '<span style="display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap">구축형 센서(모델 선택) <span id="ptOsL" style="display:inline-flex;gap:6px;flex-wrap:wrap"></span><button class="pill" id="ptOsAdd" title="센서 모델 추가" style="height:26px;padding:0 9px">＋</button></span>'+
+      '</div></details>'+
+    '<div class="pr-verdict" id="ptVbox"><div class="vl">판정</div><div class="v" id="ptV">—</div></div>'+
+    '<div class="pr-out pr-big"><div class="pr-ob"><div class="l">SaaS 누적 <span class="mini">3년 약정 엔드가</span></div><div class="v" id="ptS">—</div><div class="pr-note" id="ptSs"></div></div>'+
+    '<div class="pr-ob"><div class="l" id="ptOL">구축형 누적</div><div class="v" id="ptO">—</div><div class="pr-note" id="ptOs"></div></div></div>'+
+    '<div id="ptB" style="margin-top:12px"></div>'+
+    '<details class="pr-det" style="margin-top:10px"><summary>구축형 구성 · 산정 근거</summary><div class="pr-note" id="ptCfg" style="margin-top:6px"></div></details>'+
+    '</div></div>';
+  /* ③ 실제 견적서 PDF */
+  h+='<div class="pr-sec"><div class="pr-sech"><span class="no">3</span><b>실제 구축형 견적서(PDF)와 비교</b><span class="mini">AI가 견적서를 읽어 위 계산기에 자동 입력 · 파일과 결과는 저장하지 않음(새로고침 시 사라짐)</span></div>'+
+    '<div class="pr-card">'+
+      '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+
+      '<input type="file" id="ptQF" accept="application/pdf" style="font-size:12px;max-width:300px">'+
+      '<button class="pill" id="ptQGo" style="height:32px;background:var(--brand);border-color:var(--brand);color:#fff;font-weight:600">AI 분석 → 비교</button>'+
+      '<span class="pr-note">4MB 이하 PDF · 10~20초</span></div>'+
+      '<div id="ptQR" style="margin-top:12px"></div></div></div>';
+  return h;
 }
 function prOnpremHtml(){
   var D=prCur('onprem').data;
@@ -10175,11 +10249,15 @@ function prBindSaas(){
     var onLow=intro+intro*0.10*Math.max(y-1,0), onHigh=intro+intro*0.15*Math.max(y-1,0);
     $('#ptO').textContent='₩'+prWon(Math.round(onLow))+' ~ '+prWon(Math.round(onHigh));
     $('#ptOs').textContent='도입가 '+prWon(intro)+'원 + 유지보수 10~15%/년 × '+Math.max(y-1,0)+'년';
-    var verdict='—';
+    var verdict='—', vcls='';
     if(saas!=null){ var mid=(onLow+onHigh)/2, diff=Math.round((1-saas/mid)*100);
-      verdict=diff>3? y+'년 기준 SaaS가 약 '+diff+'% 저렴' : diff<-3? y+'년 기준 구축형이 약 '+(-diff)+'% 저렴' : '비슷한 수준'; }
+      if(diff>3){ verdict=y+'년 기준 SaaS가 약 '+diff+'% 저렴'; vcls='win'; }
+      else if(diff<-100){ verdict=y+'년 기준 구축형이 저렴 — SaaS가 약 '+(saas/mid).toFixed(1)+'배'; vcls='lose'; }
+      else if(diff<-3){ verdict=y+'년 기준 구축형이 약 '+(-diff)+'% 저렴'; vcls='lose'; }
+      else { verdict=y+'년 기준 비슷한 수준'; vcls='even'; } }
     if(bld.over) verdict+=(verdict==='—'?'':' · ')+'구축형 별도 협의 필요';
     $('#ptV').textContent=verdict;
+    var vb=document.getElementById('ptVbox'); if(vb) vb.className='pr-verdict '+vcls;
     var bars='', mx=0, rows=[];
     for(var k=1;k<=y;k++){
       var s=saasMon!=null? saasMon*12*k : null;
@@ -10203,71 +10281,74 @@ function prBindSaas(){
     var q=TCOQ, y=(LASTT&&LASTT.y)||(+$('#ptY').value||1);
     var mr=(typeof q.maint_rate==='number'&&q.maint_rate>0&&q.maint_rate<1)? q.maint_rate:null;
     var mrL=(mr!==null?mr:0.10), mrH=(mr!==null?mr:0.15);
-    var intro=+q.total_offer||0;
+    var intro=+q.total_offer||0, nQ=+$('#ptQty').value||0;
     var items=(q.items||[]).map(function(i){ return esc(String((i&&(i.model||i.desc))||''))+((i&&+i.qty>1)?'×'+i.qty:''); }).filter(Boolean).join(' · ');
     var saasMon=LASTT?LASTT.saasMon:null;
-    // 3·5·6년(+현재 선택 기간) 각각 비교 + 기간별 «승부 월액» (구축형 최저 누적과 동률이 되는 SaaS 월액)
+    var pn=function(v){ return nQ>0? prWon(Math.round(v/nQ))+'원/노드·월' : ''; };
+    // 기간별 비교 + 승부 월액 (구축형 최저 누적과 동률이 되는 SaaS 월액)
     var yrs=[3,5,6]; if(yrs.indexOf(y)<0) yrs.push(y); yrs.sort(function(a,b){return a-b;});
-    var recs=[];
-    var rowsH=yrs.map(function(k){
+    var recs=[], cur=null;
+    yrs.forEach(function(k){
       var oL=intro*(1+mrL*Math.max(k-1,0)), oH=intro*(1+mrH*Math.max(k-1,0));
-      var sK=saasMon!=null? saasMon*12*k : null, vv='—';
-      if(sK!=null&&intro){ var mid2=(oL+oH)/2, df=Math.round((1-sK/mid2)*100);
-        vv=df>3? 'SaaS가 약 '+df+'% 저렴' : (df<-3? '구축형이 약 '+(-df)+'% 저렴' : '비슷한 수준'); }
-      var target=intro? Math.floor(oL/(12*k)/1000)*1000 : null;      // 유지보수 최저(10%) 가정 — 이 이하면 무조건 이김
+      var sK=saasMon!=null? saasMon*12*k : null, df=null;
+      if(sK!=null&&intro){ var mid2=(oL+oH)/2; df=Math.round((1-sK/mid2)*100); }
+      var target=intro? Math.floor(oL/(12*k)/1000)*1000 : null;
       var needDisc=(target!=null&&saasMon!=null&&saasMon>target)? Math.ceil((1-target/saasMon)*100) : 0;
-      recs.push({k:k, target:target, needDisc:needDisc});
-      var nQ=+$('#ptQty').value||0;
-      return '<tr'+(k===y?' style="font-weight:700"':'')+'><td>'+k+'년'+(k===y?' ◀':'')+'</td>'+
-        '<td class="n">₩'+prWon(Math.round(oL))+(Math.round(oL)!==Math.round(oH)?' ~ '+prWon(Math.round(oH)):'')+'</td>'+
-        '<td class="n">'+(sK!=null?'₩'+prWon(sK):'—')+'</td><td>'+vv+'</td>'+
-        '<td class="n">'+(target!=null?'₩'+prWon(target)+(needDisc>0?' <span style="color:var(--critical)">(−'+needDisc+'%)</span>':'')+
-          (nQ>0?'<div class="pr-note">'+prWon(Math.round(target/nQ))+'원/노드·월</div>':''):'—')+'</td></tr>';
-    }).join('');
-    var recHtml='';
-    if(saasMon!=null&&intro){
-      var nQ2=+$('#ptQty').value||0;
-      var pn=function(v){ return nQ2>0? ' (노드당 '+prWon(Math.round(v/nQ2))+'원)' : ''; };
+      var r={k:k, oL:oL, oH:oH, sK:sK, df:df, target:target, needDisc:needDisc}; recs.push(r); if(k===y) cur=r;
+    });
+    function vtxt(df){ return df==null? '—' : (df>3? 'SaaS가 약 '+df+'% 저렴' : (df<-100? '구축형이 저렴 — SaaS가 약 '+((100-df)/100).toFixed(1)+'배' : (df<-3? '구축형이 약 '+(-df)+'% 저렴' : '비슷한 수준'))); }
+    var vcls= cur&&cur.df!=null? (cur.df>3?'win':(cur.df<-3?'lose':'even')) : '';
+    // ── 1) 판정 히어로
+    var hero='<div class="pr-verdict '+vcls+'"><div class="vl">'+y+'년 검토 기준 판정</div><div class="v">'+(cur? vtxt(cur.df):'—')+'</div>'+
+      (cur&&cur.sK!=null? '<div class="vs">SaaS 누적 <b>₩'+prWon(cur.sK)+'</b> vs 실제 견적 누적 <b>₩'+prWon(Math.round(cur.oL))+(Math.round(cur.oL)!==Math.round(cur.oH)?' ~ '+prWon(Math.round(cur.oH)):'')+'</b></div>':'')+'</div>';
+    // ── 2) 큰 숫자 3개
+    var big='<div class="pr-out pr-big">'+
+      '<div class="pr-ob"><div class="l">실제 구축형 견적 · 도입가</div><div class="v">₩'+prWon(intro)+'</div><div class="pr-note">VAT별도'+(+q.total_vat?' · VAT포함 '+prWon(+q.total_vat)+'원':'')+' · 유지보수 '+(mr!==null? (mr*100)+'%':'10~15%')+'/년(2년차~)</div></div>'+
+      '<div class="pr-ob"><div class="l">SaaS 표준 제안 · 3년 약정</div><div class="v">'+(saasMon!=null? '월 ₩'+prWon(saasMon):'—')+'</div><div class="pr-note">'+(saasMon!=null&&nQ? pn(saasMon):'')+'</div></div>';
+    // ── 3) 최적 SaaS 제안
+    var rec='';
+    if(saasMon!=null&&intro&&cur){
       var need=recs.filter(function(r){ return r.needDisc>0; });
-      var recTxt;
       if(!need.length){
-        recTxt='표준 3년 약정 단가(월 '+prWon(saasMon)+'원'+pn(saasMon)+') 그대로도 <b>모든 기간에서 SaaS가 이깁니다</b>.';
         var minT=null; recs.forEach(function(r){ if(r.target!=null&&(minT==null||r.target<minT)) minT=r.target; });
-        if(minT!=null&&minT>saasMon){
-          var up=Math.round((minT/saasMon-1)*100);
-          recTxt+=' 경쟁 구도라면 <b>월 '+prWon(minT)+'원'+pn(minT)+'</b>까지 올려 제안해도 전 기간 승 — 표준가 대비 최대 <b>+'+up+'%</b> 인상 여지. 특정 기간만 방어하면 되면 그 기간의 승부 월액 바로 아래까지 가능합니다 (가격표보다 높은 제안은 무방, 낮은 제안만 내부 협의 필요).';
-        }
+        var up=(minT!=null&&minT>saasMon)? Math.round((minT/saasMon-1)*100):0;
+        big+='<div class="pr-ob fin"><div class="l">최적 SaaS 제안</div><div class="v">표준가 그대로</div><div class="pr-note">모든 기간에서 SaaS 승'+(up>0? ' · 최대 월 ₩'+prWon(minT)+'까지(+'+up+'%) 인상 여지':'')+'</div></div>';
+        rec='표준 3년 약정 단가(월 '+prWon(saasMon)+'원) 그대로도 <b>모든 기간에서 SaaS가 이깁니다</b>.'+(up>0? ' 경쟁 구도라면 월 '+prWon(minT)+'원'+(nQ?' ('+pn(minT)+')':'')+'까지 올려 제안해도 전 기간 승입니다.':'');
       }else{
-        var w=need[need.length-1];
-        recTxt='고객 검토 기간이 '+w.k+'년이면 <b>월 '+prWon(w.target)+'원'+pn(w.target)+' 이하</b>로 제안해야 구축형을 이깁니다 (표준 월 '+prWon(saasMon)+'원'+pn(saasMon)+' 대비 약 '+w.needDisc+'% 할인 필요 — 가격표 미만 제안은 내부 협의 필요).';
-        var okRows=recs.filter(function(r){ return r.needDisc===0; });
-        if(okRows.length) recTxt+=' '+okRows.map(function(r){ return r.k; }).join('·')+'년 기준은 표준가로도 SaaS가 저렴합니다.';
+        var w=cur.needDisc>0? cur : need[need.length-1];
+        big+='<div class="pr-ob fin"><div class="l">최적 SaaS 제안 · '+w.k+'년 방어</div><div class="v">월 ₩'+prWon(w.target)+' 이하</div><div class="pr-note">'+(nQ? pn(w.target)+' · ':'')+'표준 대비 −'+w.needDisc+'% <span style="color:var(--critical)">(가격표 미만 — 내부 협의)</span></div></div>';
+        var ok=recs.filter(function(r){ return r.needDisc===0; }).map(function(r){ return r.k; });
+        rec='고객 검토 기간이 '+w.k+'년이면 <b>월 '+prWon(w.target)+'원 이하</b>로 제안해야 구축형을 이깁니다.'+(ok.length? ' '+ok.join('·')+'년 기준은 표준가로도 SaaS가 저렴합니다.':'');
       }
-      recHtml='<div style="font-size:12.5px;margin-top:8px;padding:8px 10px;border-radius:8px;background:var(--surface)">💡 <b>최적 SaaS 제안</b> — '+recTxt+
-        ' <span class="pr-note">승부 월액 = 그 기간의 구축형 총비용(유지보수 최저 10% 가정)과 같아지는 SaaS 월액. 그 이하로 제안하면 유지보수율과 무관하게 SaaS가 이기며, 구축형의 운영 인력·상면·장비 교체 비용까지 더하면 실제 우위는 더 큽니다.</span></div>';
-    }
-    m.innerHTML='<div style="border:1px solid var(--ring);border-radius:10px;padding:10px 12px;background:var(--surface-2)">'+
-      '<div style="font-size:12px;margin-bottom:4px"><b>'+esc(String(q.customer||'고객사 미상'))+'</b>'+(q.quote_date?' · '+esc(String(q.quote_date)):'')+' · '+esc(String(q._file||''))+
+    } else big+='<div class="pr-ob fin"><div class="l">최적 SaaS 제안</div><div class="v">—</div><div class="pr-note">노드 수를 입력하면 계산됩니다</div></div>';
+    big+='</div>';
+    // ── 4) 기간별 표
+    var rowsH=recs.map(function(r){
+      return '<tr'+(r.k===y?' style="font-weight:700;background:var(--brand-t)"':'')+'><td>'+r.k+'년'+(r.k===y?' ◀':'')+'</td>'+
+        '<td class="n">₩'+prWon(Math.round(r.oL))+(Math.round(r.oL)!==Math.round(r.oH)?' ~ '+prWon(Math.round(r.oH)):'')+'</td>'+
+        '<td class="n">'+(r.sK!=null?'₩'+prWon(r.sK):'—')+'</td><td>'+vtxt(r.df)+'</td>'+
+        '<td class="n">'+(r.target!=null?'₩'+prWon(r.target)+(r.needDisc>0?' <span style="color:var(--critical)">(−'+r.needDisc+'%)</span>':''):'—')+'</td></tr>';
+    }).join('');
+    var tbl='<div style="overflow-x:auto;margin-top:12px"><table class="pr"><thead><tr><th>기간</th><th class="n">실제 견적 누적 (도입가+유지보수)</th><th class="n">SaaS 누적 (표준 단가)</th><th>판정</th><th class="n">승부 월액 (이 이하면 SaaS 승)</th></tr></thead><tbody>'+rowsH+'</tbody></table></div>';
+    // ── 5) 세부 (접힘)
+    var ch=(function(){ var tl=+q.total_list, to=+q.total_offer; if(!tl||!to) return '';
+      var rr=to/tl, dd=Math.round((1-rr)*100), c;
+      if(rr<=0.22) c='PR 배제선 이하 — 방어 최저가·총판 직대응 수준';
+      else if(rr<=0.33) c='SR 배제선 수준 — 직판 또는 PR 직대응 딜 (SR 마진 자리 없음)';
+      else if(rr<=0.50) c='SR 채널 딜 범위 — SR 마진 약 '+Math.round((rr-0.30)*100)+'%p 추정';
+      else c='채널 마진 여유 충분';
+      return '<li>채널 판정: 엔드가 = 소비자가의 '+Math.round(rr*100)+'% (할인 '+dd+'%) → '+c+'</li>'; })();
+    var det='<details class="pr-det" style="margin-top:10px"><summary>견적 품목 · 산정 근거 · 채널 판정</summary><ul class="pr-note" style="margin:6px 0 0;padding-left:18px">'+
+      (items? '<li>견적 품목: '+items+'</li>':'')+
+      (saasMon!=null&&LASTT&&LASTT.sTxt? '<li>SaaS 산정: '+LASTT.sTxt+' = 월 '+prWon(saasMon)+'원</li>':'')+
+      '<li>승부 월액 = 그 기간의 구축형 총비용(유지보수 최저 10% 가정)과 같아지는 SaaS 월액. 그 이하로 제안하면 유지보수율과 무관하게 SaaS가 이기며, 운영 인력·상면·장비 교체 비용까지 더하면 실제 우위는 더 큽니다.</li>'+
+      ch+
+      '<li>견적 구성이 위 TCO 계산기에 자동 입력되었습니다'+(PR.tcoP==='ztna'?' — ZTNA 동시접속 Agent 수는 노드수로 가정했으니 실제 값으로 조정하세요.':'.')+' 파일과 결과는 저장되지 않습니다.</li></ul></details>';
+    m.innerHTML='<div class="pr-qres">'+
+      '<div class="pr-qhead"><b>'+esc(String(q.customer||'고객사 미상'))+'</b>'+(q.quote_date?' · '+esc(String(q.quote_date)):'')+' · '+esc(String(q._file||''))+
       (q._model?' <span class="pr-note">(분석: '+esc(String(q._model).replace(/^claude-/,''))+')</span>':'')+
-      ' <button class="pill" id="ptQX" style="height:22px;padding:0 8px;float:right">지우기</button></div>'+
-      (items?'<div class="pr-note">'+items+'</div>':'')+
-      '<div style="font-size:12.5px;margin-top:6px">실제 견적 도입가 <b>₩'+prWon(intro)+'</b> (VAT별도'+(+q.total_vat?' · VAT포함 '+prWon(+q.total_vat)+'원':'')+')'+
-      ' + 유지보수 '+(mr!==null? (mr*100)+'%':'10~15%')+'/년(2년차~)</div>'+
-      (saasMon!=null&&LASTT&&LASTT.sTxt?'<div class="pr-note" style="margin-top:3px">SaaS 산정 근거 — 3년 약정 단가: '+LASTT.sTxt+' = <b>월 '+prWon(saasMon)+'원</b>'+((+$('#ptQty').value||0)>0?' (노드당 '+prWon(Math.round(saasMon/(+$('#ptQty').value)))+'원/월)':'')+'</div>':'')+
-      '<div style="overflow-x:auto"><table class="pr" style="margin-top:6px"><thead><tr><th>기간</th><th class="n">실제 견적 누적 (도입가+유지보수)</th><th class="n">SaaS 누적 (3년 약정 단가)</th><th>판정</th><th class="n">승부 월액</th></tr></thead><tbody>'+rowsH+'</tbody></table></div>'+
-      recHtml+
-      (function(){                                                   // 채널 판정 — 엔드가/소비자가 비율로 어느 딜인지 추정
-        var tl=+q.total_list, to=+q.total_offer; if(!tl||!to) return '';
-        var rr=to/tl, dd=Math.round((1-rr)*100), ch;
-        if(rr<=0.22) ch='PR 배제선 이하 — 방어 최저가·총판 직대응 수준';
-        else if(rr<=0.33) ch='SR 배제선 수준 — 직판 또는 PR 직대응 딜 (SR 마진 자리 없음)';
-        else if(rr<=0.50) ch='SR 채널 딜 범위 — SR 마진 약 '+Math.round((rr-0.30)*100)+'%p 추정';
-        else ch='채널 마진 여유 충분';
-        return '<div class="pr-note" style="margin-top:4px">채널 판정: 엔드가 = 소비자가의 '+Math.round(rr*100)+'% (할인 '+dd+'%) → '+ch+'</div>';
-      })()+
-      '<div class="pr-note" style="margin-top:4px">견적 구성이 위 계산기에 자동 입력되었습니다'+
-      (PR.tcoP==='ztna'?' — ZTNA 동시접속 Agent 수는 노드수로 가정했으니 실제 값으로 조정하세요.':'.')+
-      ' 이 파일과 분석 결과는 저장되지 않습니다.</div></div>';
+      '<button class="pill" id="ptQX" style="height:24px;padding:0 9px;margin-left:auto">지우기</button></div>'+
+      hero+big+(rec? '<div class="pr-rec">'+rec+'</div>':'')+tbl+det+'</div>';
     var x=document.getElementById('ptQX');
     if(x) x.onclick=function(){ TCOQ=null; var f=document.getElementById('ptQF'); if(f) f.value=''; renderQuoteCmp(); };
   }
