@@ -6,8 +6,6 @@
 <title>서비스사업부 통합 관리 포탈</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23149e40'/%3E%3Cg fill='%23fff'%3E%3Crect x='14' y='32' width='9' height='18' rx='2'/%3E%3Crect x='27.5' y='22' width='9' height='28' rx='2'/%3E%3Crect x='41' y='14' width='9' height='36' rx='2'/%3E%3C/g%3E%3C/svg%3E">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
 <style>
 /* ==================================================================
    토큰 — dataviz 기준 팔레트 (다크는 별도 스텝, 라이트의 반전이 아님)
@@ -1109,17 +1107,13 @@ html:not([data-look="classic"]) #viewLogin input{border-radius:var(--r-sm)!impor
 .cc-only{display:none}
 html[data-look="cc"] .cc-only{display:block}
 html[data-look="cc"]{ --r:10px; --r-sm:8px; }
-html[data-look="cc"][data-theme="light"]{ --plane:#F2F2EE; --surface:#FFFFFF; --surface-2:#F3F3EF; --ring:rgba(11,11,11,.09); --grid:#E4E4DE; --axis:#C9CAC3; --brand:#118A3A; --brand-2:#0B6B2C; --brand-t:rgba(17,138,58,.10); --muted:#6F737B; --ink:#16171A; --ink-2:#4B4E55; }
-html[data-look="cc"] body{font-family:'IBM Plex Sans KR','Pretendard Variable',Pretendard,system-ui,-apple-system,'Apple SD Gothic Neo','Malgun Gothic',sans-serif}
-html[data-look="cc"] :is(.kpi .v,.hero,.qw-hero,td.n,.num,.todo-card .v,.inb-kpi .v,.pr-ob .v,.hstat .hv){font-family:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
-html[data-look="cc"] .kpi .v small{font-family:'IBM Plex Sans KR',sans-serif;letter-spacing:0}
+/* 서체·색상은 심플(㊿+98)과 동일 — Pretendard/시스템 서체, 브랜드 그린 강조. 숫자만 고정폭 자릿수 */
+html[data-look="cc"] .num{font-variant-numeric:tabular-nums}
 html[data-look="cc"] :is(.card,.kpi,.filters,.ask,.modal,.tbl-wrap){border-radius:12px}
-/* 주요 버튼 = 잉크(검정), 선택 상태 = 잉크 · 브랜드 그린은 상태·로고·진행 표시에 */
-html[data-look="cc"] .btn,html[data-look="cc"] .pill[aria-pressed="true"],html[data-look="cc"] .cbtn.pri{background:var(--ink);border-color:var(--ink);color:var(--plane)}
-html[data-look="cc"] .btn:hover{background:var(--ink);filter:brightness(1.25)}
-html[data-look="cc"] .pill:not(.ghost){border-color:var(--ring)}
+html[data-look="cc"] .cbtn.pri{background:var(--brand);border-color:var(--brand);color:#fff}
+html[data-look="cc"] .cbtn.pri:hover{background:var(--brand-2);filter:none}
+html[data-look="cc"] .cbtn[aria-pressed="true"]{background:var(--brand);border-color:var(--brand);color:#fff}
 html[data-look="cc"] .pill.ghost{color:var(--ink-2)}
-html[data-look="cc"] .side button[aria-current="true"]{box-shadow:inset 2px 0 0 var(--brand)}
 
 /* ── 상단 커맨드 바 ── */
 html[data-look="cc"] .topbar{margin:-18px -26px 18px;padding:0 22px;min-height:56px;gap:12px;flex-wrap:nowrap;background:var(--surface);border-bottom:1px solid var(--grid)}
@@ -1149,8 +1143,8 @@ html:not([data-look="cc"]) .cmdbar{display:none}
 #rail .rlogo{width:36px;height:36px;border-radius:10px;background:var(--brand);color:#fff;font-weight:700;font-size:15px;display:flex;align-items:center;justify-content:center;margin-bottom:8px;cursor:pointer;flex:none}
 #rail button{width:42px;height:40px;border:0;border-radius:10px;background:transparent;color:var(--ink-2);display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;flex:none;padding:0}
 #rail button:hover{background:var(--surface-2);color:var(--ink)}
-#rail button[aria-current="true"]{background:var(--ink);color:var(--plane)}
-#rail button .rb{position:absolute;top:4px;right:5px;min-width:15px;height:15px;border-radius:8px;background:var(--critical);color:#fff;font-size:9.5px;font-weight:600;display:flex;align-items:center;justify-content:center;padding:0 3px;font-family:'IBM Plex Mono',monospace}
+#rail button[aria-current="true"]{background:var(--brand-t);color:var(--brand)}
+#rail button .rb{position:absolute;top:4px;right:5px;min-width:15px;height:15px;border-radius:8px;background:var(--critical);color:#fff;font-size:9.5px;font-weight:600;display:flex;align-items:center;justify-content:center;padding:0 3px}
 #rail .rsp{flex:1}
 #rail .ravatar{width:32px;height:32px;border-radius:50%;background:var(--surface-2);color:var(--ink);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;cursor:pointer;flex:none;margin-top:4px}
 #railFly{display:none;position:fixed;z-index:160;left:68px;min-width:224px;max-width:320px;max-height:calc(100vh - 24px);overflow:auto;background:var(--surface);border:1px solid var(--ring);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.14);padding:8px}
@@ -1158,12 +1152,13 @@ html:not([data-look="cc"]) .cmdbar{display:none}
 #railFly .fh{font-size:11px;color:var(--muted);font-weight:600;padding:6px 10px 4px}
 #railFly button{display:flex;width:100%;text-align:left;border:0;background:transparent;padding:8px 10px;border-radius:8px;font:inherit;font-size:13px;color:var(--ink-2);cursor:pointer;gap:8px;align-items:center}
 #railFly button:hover{background:var(--surface-2);color:var(--ink)}
-#railFly button[aria-current="true"]{color:var(--ink);font-weight:600;background:var(--surface-2)}
+#railFly button[aria-current="true"]{color:var(--brand);font-weight:600;background:var(--brand-t)}
 #railFly button .ic{display:none}
 
 /* ── 홈: 인사 + 인박스 + 히어로 ── */
 html[data-look="cc"] #noticeStack,html[data-look="cc"] #todoWrap{display:none!important}
 html[data-look="cc"] #ccHome{display:flex;flex-direction:column;gap:14px;margin-bottom:16px}
+#ccHi{display:none}
 #ccHi{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:0 2px}
 #ccHi h1{margin:0;font-size:20px;font-weight:600;letter-spacing:-.01em}
 #ccHi h1 span{color:var(--muted);font-weight:500}
@@ -1192,9 +1187,9 @@ html[data-look="cc"] #ccHome{display:flex;flex-direction:column;gap:14px;margin-
 .ib-empty{padding:22px 18px;border-top:1px solid var(--grid);display:flex;align-items:center;gap:12px;color:var(--ink-2);font-size:13px}
 .cbtn{height:28px;padding:0 10px;border-radius:7px;border:1px solid var(--ring);background:var(--surface);color:var(--ink);font:inherit;font-size:12px;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
 .cbtn:hover{background:var(--surface-2)}
-.cbtn.pri{background:var(--ink);border-color:var(--ink);color:var(--plane)}
-.cbtn.pri:hover{filter:brightness(1.25)}
-.cbtn[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--plane)}
+.cbtn.pri{background:var(--brand);border-color:var(--brand);color:#fff}
+.cbtn.pri:hover{background:var(--brand-2)}
+.cbtn[aria-pressed="true"]{background:var(--brand);border-color:var(--brand);color:#fff}
 .ctag{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:6px;font-size:11px;font-weight:600;background:var(--surface-2);color:var(--ink-2);white-space:nowrap}
 .ctag.ok{background:var(--brand-t);color:var(--brand)} .ctag.warn{background:rgba(237,161,0,.14);color:#8a5200} .ctag.info{background:rgba(42,120,214,.12);color:#1e4fa3} .ctag.crit{background:rgba(208,59,59,.10);color:var(--critical)}
 /* KPI 벤토 */
@@ -1222,15 +1217,13 @@ html[data-look="cc"] .kpi .v{font-size:26px;font-weight:600}
 .eqb-prog i{flex:1;height:6px;border-radius:2px;background:var(--grid)}
 .eqb-prog i.on{background:var(--brand)}
 /* 오늘의 브리핑 */
-#ccBrief{background:var(--ink);color:var(--plane);border-radius:12px;padding:14px 16px;margin-bottom:12px;flex-direction:column;gap:8px}
-html[data-look="cc"] #ccBrief{display:flex}
-#ccBrief .bh{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600}
-#ccBrief .bh svg{color:#7BD79A}
-#ccBrief .bh small{margin-left:auto;font-weight:400;opacity:.65;font-size:11px}
-#ccBrief p{margin:0;font-size:13px;line-height:1.65;opacity:.92}
+#ccBrief{background:var(--brand-t);border:1px solid color-mix(in srgb,var(--brand) 30%,transparent);color:var(--ink);border-radius:12px;padding:14px 16px;margin-bottom:12px;flex-direction:column;gap:8px}
+html[data-look="cc"] #ccBrief{display:none}
+#ccBrief .bh{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--brand)}
+#ccBrief .bh small{margin-left:auto;font-weight:400;color:var(--muted);font-size:11px}
+#ccBrief p{margin:0;font-size:13.5px;line-height:1.7;color:var(--ink)}
 #ccBrief .ba{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
-#ccBrief .cbtn{background:transparent;border-color:color-mix(in srgb,var(--plane) 28%,transparent);color:inherit}
-#ccBrief .cbtn:hover{background:color-mix(in srgb,var(--plane) 12%,transparent)}
+#ccBrief .cbtn{background:var(--surface)}
 html[data-look="cc"] .ask{padding:14px 16px 12px}
 html[data-look="cc"] .ask-ico{display:none}
 
@@ -1241,7 +1234,7 @@ html[data-look="cc"] .ask-ico{display:none}
 .eqb-chips{display:flex;gap:6px;flex-wrap:wrap}
 .eqb-seg{display:inline-flex;border:1px solid var(--ring);border-radius:8px;overflow:hidden;background:var(--surface)}
 .eqb-seg button{height:30px;padding:0 12px;border:0;background:transparent;color:var(--ink-2);font:inherit;font-size:12.5px;font-weight:500;cursor:pointer}
-.eqb-seg button[aria-pressed="true"]{background:var(--ink);color:var(--plane)}
+.eqb-seg button[aria-pressed="true"]{background:var(--brand);color:#fff}
 .eqb-wrap{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;align-items:start}
 @media (max-width:1400px){ .eqb-wrap{grid-template-columns:repeat(3,minmax(0,1fr))} }
 @media (max-width:760px){ .eqb-wrap{grid-template-columns:1fr} }
@@ -1251,7 +1244,7 @@ html[data-look="cc"] .ask-ico{display:none}
 .eqb-ch{display:flex;align-items:center;gap:6px;padding:2px 4px;font-size:12.5px;font-weight:600;white-space:nowrap;min-width:0}
 @media (max-width:1700px){ .eqb-ch .to{display:none} }
 .eqb-ch i{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
-.eqb-ch .n{color:var(--muted);font-weight:500;font-family:'IBM Plex Mono',monospace}
+.eqb-ch .n{color:var(--muted);font-weight:500}
 .eqb-ch .to{margin-left:auto;font-size:11px;color:var(--muted);font-weight:500;white-space:nowrap}
 .eqb-card{background:var(--surface);border:1px solid var(--ring);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;cursor:grab;min-width:0}
 .eqb-card:hover{border-color:var(--axis)}
@@ -1277,15 +1270,14 @@ html[data-look="cc"] .ask-ico{display:none}
 .c360-sum .v small{font-size:11.5px;font-weight:500;color:var(--muted)}
 .c360-sum>div.warn{background:rgba(237,161,0,.14)} .c360-sum>div.warn .l,.c360-sum>div.warn .v{color:#8a5200}
 .c360-sum>div.ok .v{color:var(--brand)}
-.c360-next{background:var(--ink);color:var(--plane);border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:12.5px;line-height:1.6}
-.c360-next b{display:flex;align-items:center;gap:6px;font-size:12.5px;margin-bottom:4px}
-.c360-next b svg{color:#7BD79A}
-.c360-next p{margin:0;opacity:.92}
+.c360-next{background:var(--brand-t);border:1px solid color-mix(in srgb,var(--brand) 30%,transparent);color:var(--ink);border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:12.5px;line-height:1.6}
+.c360-next b{display:flex;align-items:center;gap:6px;font-size:12.5px;margin-bottom:4px;color:var(--brand)}
+.c360-next p{margin:0}
 .c360-next .ba{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
-.c360-next .cbtn{background:transparent;border-color:color-mix(in srgb,var(--plane) 28%,transparent);color:inherit}
+.c360-next .cbtn{background:var(--surface)}
 .c360-tabs{display:flex;gap:16px;border-bottom:1px solid var(--grid);margin-bottom:12px;overflow:auto}
 .c360-tabs button{height:32px;border:0;background:transparent;font:inherit;font-size:13px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;padding:0 2px;white-space:nowrap;flex:none}
-.c360-tabs button[aria-selected="true"]{color:var(--ink);font-weight:600;border-bottom-color:var(--ink)}
+.c360-tabs button[aria-selected="true"]{color:var(--brand);font-weight:600;border-bottom-color:var(--brand)}
 .c360-tabs button .ct{font-size:11px;color:var(--muted);margin-left:3px}
 @media (max-width:640px){ .c360-sum{grid-template-columns:repeat(2,minmax(0,1fr))} }
 html[data-look="cc"] #ovlC360{justify-content:flex-end;align-items:stretch;padding:0;background:rgba(0,0,0,.28)}
@@ -1301,7 +1293,7 @@ html[data-look="cc"] #ovlC360 .mact{border-top:1px solid var(--grid);padding-top
   html[data-look="cc"] body:has(#side.hidden) #mtabs{display:none}
   html[data-look="cc"] body{padding-bottom:74px}
   #mtabs button{flex:1;height:52px;border:0;background:transparent;color:var(--muted);font:inherit;font-size:10.5px;font-weight:500;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;border-radius:8px}
-  #mtabs button[aria-current="true"]{color:var(--ink);font-weight:600}
+  #mtabs button[aria-current="true"]{color:var(--brand);font-weight:600}
   html[data-look="cc"] .topbar{margin:-12px -12px 14px;padding:8px 12px;min-height:0;flex-wrap:wrap;gap:8px}
   html[data-look="cc"] .cmdbar{flex:1 1 100%;order:9;height:38px;margin:0}
   html[data-look="cc"] #btnMenu{display:none}
@@ -2690,7 +2682,7 @@ window.addEventListener('message', function(ev){
 });
 
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-16 ㊿+99';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-16 ㊿+100';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -2956,6 +2948,7 @@ function cmdAskHit(q){
 /* ---- 홈: 인사 · 인박스 ---- */
 function ccGreeting(n){
   var el0=document.getElementById('ccHi'); if(!el0) return;
+  el0.style.display='none'; return;   /* 인사말 없이 — 인박스 머리에 건수·읽은 시각만 */
   var h=new Date().getHours(), g= h<5? '늦은 시간까지 고생 많으십니다' : h<12? '좋은 아침입니다' : h<18? '좋은 오후입니다' : '좋은 저녁입니다';
   var who=(AUTH_USER||'').split('@')[0];
   var d=new Date(), ds=d.getFullYear()+'년 '+(d.getMonth()+1)+'월 '+d.getDate()+'일 ('+'일월화수목금토'[d.getDay()]+')';
@@ -3018,7 +3011,8 @@ function renderInbox(){
     else zeros.push('OI 밀린 액션 0');
   }
   zeros.push('주간회의 '+wkTxt);
-  var h='<div class="ib-head"><h2>인박스 <span class="ctag'+(rows.length?' warn':' ok')+'">'+rows.length+'</span></h2><span class="mini">알림 · 할 일 · 처리 버튼</span></div>';
+  var la=document.getElementById('loadedAt');
+  var h='<div class="ib-head"><h2>인박스 <span class="ctag'+(rows.length?' warn':' ok')+'">'+rows.length+'</span></h2><span class="mini" style="display:flex;align-items:center;gap:6px"><i style="width:7px;height:7px;border-radius:50%;background:var(--brand);display:inline-block"></i>'+(la&&la.textContent? esc(la.textContent):'')+' · 자동 갱신</span></div>';
   if(!rows.length) h+='<div class="ib-empty"><span class="ib-ic ok">'+ico('check',16)+'</span>처리할 알림이 없습니다. 모든 항목이 정리되어 있어요.</div>';
   rows.forEach(function(o,i){
     h+='<div class="ib-row" data-i="'+i+'"><span class="ib-ic '+o.cls+'">'+ico(o.ic,16)+'</span><div class="ib-b"><div class="ib-t">'+o.t+'</div><div class="ib-s" title="'+esc(o.s||'')+'">'+esc(o.s||'')+'</div></div>'+
@@ -3127,6 +3121,7 @@ function ccTileWeekly(){
 /* ---- 오늘의 브리핑 — 숫자를 문장으로 (규칙 기반 · AI 비용 없음) + «AI로 더 자세히» ---- */
 function ccBrief(list,b){
   var box=document.getElementById('ccBrief'); if(!box || !isCC()) return;
+  box.style.display='none'; return;   /* 오늘의 브리핑 카드는 쓰지 않음 (질문 칸·추천 질문은 그대로) */
   var D=KPI_D||{}, parts=[], asks=[];
   if(window.IS_EQUIP){ box.style.display='none'; return; }
   var mrr=D.mrr||0, pm=D.prevM||0, py=D.prevY||0;
@@ -3161,7 +3156,7 @@ function ccBrief(list,b){
    임대 장비 운영 보드 (칸반) — 상태 = 열, 카드 끌기 = 상태 변경 → 현황 자동 반영
    ================================================================== */
 var EQB={ch:'', q:'', more:{}};
-var EQB_COLS=[['접수','#9A9DA5','현황 재고'],['출하요청','#1E4FA3','현황 재고'],['배송중','#8a5200','현황 재고'],['설치완료','var(--brand)','현황 임대중'],['회수예정','#D95926','칩으로 일부 회수'],['회수완료','var(--ink)','최근 90일']];
+var EQB_COLS=[['접수','#9A9DA5','현황 재고'],['출하요청','#1E4FA3','현황 재고'],['배송중','#8a5200','현황 재고'],['설치완료','var(--brand)','현황 임대중'],['회수예정','#D95926','칩으로 일부 회수'],['회수완료','var(--ink-2)','최근 90일']];
 function eqRefresh(){ if(CUR_VIEW==='eqboard') renderEqBoard(); else try{ renderGrid(); }catch(e){} }
 function renderEqBoard(){
   var wrap=document.getElementById('eqbCols'); if(!wrap) return;
@@ -8826,7 +8821,7 @@ function openFind(){
     // ③ AI에게 그대로 물어보기
     try{ var ai=cmdAskHit(inp.value); if(ai) hits.push(ai); }catch(e){}
     out.innerHTML=hits.map(function(h,i){
-      return '<div class="fk-row" data-i="'+i+'"><span class="tp"'+(h.k360?' style="background:rgba(42,120,214,.12);color:var(--s1)"':(h.kmenu?' style="background:var(--surface-2);color:var(--ink-2)"':(h.kai?' style="background:var(--ink);color:var(--plane)"':'')))+'>'+h.t+'</span>'+
+      return '<div class="fk-row" data-i="'+i+'"><span class="tp"'+(h.k360?' style="background:rgba(42,120,214,.12);color:var(--s1)"':(h.kmenu?' style="background:var(--surface-2);color:var(--ink-2)"':(h.kai?' style="background:var(--brand);color:#fff"':'')))+'>'+h.t+'</span>'+
         '<span class="nm">'+esc(h.nm||'')+'</span><span class="sb">'+esc(h.sb||'')+'</span></div>';
     }).join('')||'<p class="cap" style="padding:8px">결과 없음</p>';
     out.querySelectorAll('.fk-row').forEach(function(row){
