@@ -2326,7 +2326,7 @@ window.addEventListener('message', function(ev){
 });
 
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-16 ㊿+94';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-16 ㊿+95';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -6108,7 +6108,7 @@ var GRIDS={
         return (r&&r.status==='회수완료')? '· ⚠ 미입력' : '·';     /* 회수완료인데 날짜가 없으면 표시 */
       }},
       {k:'returned_serials',l:'회수 현황',fmt:function(v,r){      /* 일부 회수: 회수된 시리얼 수 / 전체 (↩ 버튼으로 선택) */
-        var all=eqSerials(r||{}), ret=eqRetSet(r||{});
+        var all=eqWant(r||{}), ret=eqRetSet(r||{});
         if(!all.length) return v? String(v) : '·';
         if(r.status==='회수완료') return all.length+'/'+all.length+' 회수';
         return ret.length? (ret.length+'/'+all.length+' 일부 회수') : '·';
@@ -6120,7 +6120,7 @@ var GRIDS={
   assets:{
     title:'임대 장비 현황 (시리얼 단위)', table:'equipment_assets',
     chipsField:'channel', chipsOpts:['에스원','LGU+','조달','일반','기타'],
-    cap:'임대 장비 신청 내역과 항상 대조됩니다 — 취소를 뺀 모든 신청이 여기에 «수량»대씩 있어야 하고, 위 «신청 내역 기준으로 현황 맞추기» 로 빠진 장비를 만들 수 있습니다', add:true, del:true,
+    cap:'임대 장비 신청 내역과 항상 대조됩니다 — 임대중 장비를 ☑ 체크하고 위 «선택 장비 회수완료» 를 누르면 신청 내역(일부/전부 회수)까지 함께 반영됩니다', add:true, del:true,
     rows:function(){
       var om={}; (RAWX.orders||[]).forEach(function(o){ om[String(o.id)]=o; });
       var out=(RAWX.assets||[]).slice();
@@ -6130,6 +6130,10 @@ var GRIDS={
         if(x!==y) return String(y).localeCompare(String(x));      // 최신 위, 빈 값 아래
         return String(a.serial||'').localeCompare(String(b.serial||'')); }); },
     cols:[
+      {k:'_sel',l:'☑',ro:true,html:true,raw:true,fmt:function(v,r){      /* 임대중 장비를 체크해 «선택 장비 회수완료» */
+        if(!r || r.status!=='임대중') return '';
+        var U=String(r.serial||'').toUpperCase();
+        return '<input type="checkbox" class="eqsel" data-sn="'+esc(U)+'"'+(EQSEL[U]?' checked':'')+' title="회수 처리할 장비 선택">'; }},
       {k:'serial',l:'시리얼',req:true},
       {k:'model',l:'모델',t:'select',opts:['S10_R2','S20_R2','S30H_R1','S100','S200','ES30']},
       {k:'usage',l:'구분',t:'select',opts:['임대','데모','대여','판매','하자보수']},
@@ -6300,11 +6304,60 @@ function eqSerialStatus(o, sn){
   if(stA==='임대중' && eqRetSet(o).indexOf(String(sn||'').toUpperCase())>=0) return '회수완료';
   return stA;
 }
+/* ---- 현황 표에서 장비를 체크해 회수완료 처리 (여러 신청에 걸쳐도 한 번에) ---- */
+var EQSEL={}, EQSEL_DATE='';
+document.addEventListener('change', function(e){
+  var cb=e.target; if(!cb || !cb.classList || !cb.classList.contains('eqsel')) return;
+  var U=cb.dataset.sn; if(cb.checked) EQSEL[U]=1; else delete EQSEL[U];
+  try{ renderEqPanel(); }catch(_){}
+});
+function eqSelClear(){ EQSEL={}; document.querySelectorAll('.eqsel').forEach(function(x){ x.checked=false; }); renderEqPanel(); }
+function eqSelAllVisible(){ document.querySelectorAll('#dvTable .eqsel').forEach(function(x){ x.checked=true; EQSEL[x.dataset.sn]=1; }); renderEqPanel(); }
+async function eqBulkReturn(){
+  if(!SB_TOKEN){ openOvl('ovlAuth'); return; }
+  var sns=Object.keys(EQSEL); if(!sns.length) return;
+  var dEl=document.getElementById('eqSelDate'); var date=(dEl&&dEl.value)||todayStr(); EQSEL_DATE=date;
+  var amap={}; (RAWX.assets||[]).forEach(function(a){ amap[String(a.serial||'').toUpperCase()]=a; });
+  var byOrder={}, loose=[];
+  sns.forEach(function(U){ var a=amap[U]; if(!a){ return; } if(a.order_id!=null) (byOrder[a.order_id]=byOrder[a.order_id]||[]).push(U); else loose.push(U); });
+  var omap={}; (RAWX.orders||[]).forEach(function(o){ omap[String(o.id)]=o; });
+  var plan=Object.keys(byOrder).map(function(oid){ var o=omap[oid]; var all=o? eqWant(o) : []; var ret=o? eqRetSet(o) : [];
+    var after=all.filter(function(sn){ return ret.indexOf(sn.toUpperCase())>=0 || byOrder[oid].indexOf(sn.toUpperCase())>=0; });
+    return {oid:oid, o:o, sel:byOrder[oid], all:all, after:after, full:(o && all.length && after.length>=all.length)}; });
+  var msg='선택한 장비 '+sns.length+'대를 '+date+' 회수완료로 처리할까요?\n\n'+
+    plan.map(function(p){ return '· '+(p.o? '#'+p.oid+' '+(p.o.customer||''):'신청 #'+p.oid)+' — '+p.sel.length+'대'+(p.full? ' → 전부 회수, 신청도 회수완료' : (p.o? ' → 일부 회수 ('+p.after.length+'/'+p.all.length+')':'')); }).join('\n')+
+    (loose.length? '\n· 신청 없는 장비 '+loose.length+'대 — 현황만 회수완료':'');
+  if(!confirm(msg)) return;
+  var btn=document.getElementById('eqSelGo'); if(btn){ btn.disabled=true; btn.textContent='처리 중…'; }
+  var done=0, fail=0, err='';
+  for(var i=0;i<plan.length;i++){ var p=plan[i];
+    try{
+      if(p.o){
+        var body={ returned_serials: p.after.length? p.after.join(', ') : null };
+        if(p.full){ body.status='회수완료'; body.returned_date=p.o.returned_date||date; }
+        else if(p.o.status==='회수완료'){ body.status='설치완료'; body.returned_date=null; }
+        await sbWrite('PATCH','equipment_orders?id=eq.'+p.oid, body);
+        Object.keys(body).forEach(function(k){ p.o[k]=body[k]; });
+        logChange('update','equipment_orders',p.o.id,{returned_serials:body.returned_serials, status:body.status||p.o.status, from:'현황 체크 회수'});
+        p.o._retDates={}; p.sel.forEach(function(U){ p.o._retDates[U]=date; });
+        var x=await syncOrderAssets(p.o, null, true); delete p.o._retDates;
+        if(/⚠/.test(x)){ fail++; err=err||x; } else done+=p.sel.length;
+      } else {                                            /* 신청 행이 지워진 장비 → 현황만 */
+        await eqPatch(p.sel,{status:'회수완료', returned_date:date, updated_at:new Date().toISOString()}); done+=p.sel.length;
+      }
+    }catch(e){ fail++; err=err||String(e.message||e); }
+  }
+  if(loose.length){ try{ await eqPatch(loose,{status:'회수완료', returned_date:date, updated_at:new Date().toISOString()}); done+=loose.length; }catch(e){ fail++; err=err||String(e.message||e); } }
+  await eqReload();
+  EQSEL={};
+  toast('회수완료 처리', done+'대 처리'+(fail? ' · '+fail+'건 실패 '+err.slice(0,60):''), fail?'bad':'ok');
+  DIRTY=true; renderGrid();
+}
 var EQR={r:null};
 function eqRetOpen(r){
   if(!SB_TOKEN){ openOvl('ovlAuth'); return; }
   EQR.r=r;
-  var all=eqSerials(r), ret=eqRetSet(r), amap={};
+  var all=eqWant(r), ret=eqRetSet(r), amap={};       /* 시리얼이 없으면 «미등록-신청번호-n» 임시 시리얼로 처리 */
   (RAWX.assets||[]).forEach(function(a){ amap[String(a.serial||'').toUpperCase()]=a; });
   $('#erTitle').textContent='#'+r.id+' '+(r.customer||'')+' · '+(r.model||'')+' × '+(r.qty||all.length)+' · 현재 '+(r.status||'')+(r.returned_date? ' · 회수일 '+String(r.returned_date).slice(0,10):'');
   $('#erDate').value=todayStr(); $('#erNote').value=''; $('#erMsg').textContent='';
@@ -6320,7 +6373,7 @@ function eqRetOpen(r){
 }
 async function eqRetSave(){
   var r=EQR.r; if(!r) return;
-  var all=eqSerials(r), checked=[].slice.call(document.querySelectorAll('#erList input:checked')).map(function(x){ return x.dataset.sn; });
+  var all=eqWant(r), checked=[].slice.call(document.querySelectorAll('#erList input:checked')).map(function(x){ return x.dataset.sn; });
   var date=$('#erDate').value||todayStr(), note=$('#erNote').value.trim();
   var prev=eqRetSet(r); if(r.status==='회수완료') prev=all.slice();
   var newly=checked.filter(function(sn){ return prev.indexOf(sn)<0; });
@@ -6565,6 +6618,17 @@ function renderEqPanel(){
     h+='<div class="mini" style="margin-top:6px;color:var(--muted)">⚠ 시리얼을 몰라 «미등록-…» 으로 임시 등록해 둔 신청 '+s.ph.length+
        '건 — 신청 행의 «시리얼» 칸에 실제 시리얼을 넣고 저장하면 자동으로 바뀝니다</div>';
   }
+  if(CUR_VIEW==='assets' && !window.IS_VIEWER){
+    var nSel=Object.keys(EQSEL).length;
+    h+='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line,#e5e7eb)">'+
+      '<b class="mini">☑ 회수 처리</b>'+
+      '<span class="mini" style="color:'+(nSel?'var(--ink)':'var(--muted)')+'">임대중 장비를 체크하고 → 선택 '+nSel+'대</span>'+
+      '<label class="mini" style="display:inline-flex;align-items:center;gap:4px">회수일 <input type="date" id="eqSelDate" value="'+esc(EQSEL_DATE||todayStr())+'" style="height:26px;font:inherit;font-size:11.5px;border:1px solid var(--ring);border-radius:6px;padding:0 6px;background:var(--surface)"></label>'+
+      '<button class="pill" id="eqSelGo" style="height:28px"'+(nSel?'':' disabled style="height:28px;opacity:.45"')+'>선택 장비 회수완료</button>'+
+      '<button class="pill ghost" id="eqSelAll" style="height:28px" title="지금 화면(필터·검색 적용)에 보이는 임대중 장비 전부 선택">보이는 것 전부 선택</button>'+
+      (nSel? '<button class="pill ghost" id="eqSelClr" style="height:28px">선택 해제</button>':'')+
+      '<span class="mini" style="color:var(--muted)">여러 신청의 장비를 섞어 골라도 신청별로 «일부 회수 / 전부 회수» 로 나눠 반영됩니다</span></div>';
+  }
   if(s.orphan.length){
     h+='<div class="mini" style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--line,#e5e7eb);color:var(--ink-2)">'+
       '신청 내역에 없는데 «임대중» 인 자산 <b>'+s.orphan.length+'대</b> — '+
@@ -6585,6 +6649,10 @@ function renderEqPanel(){
   var b2=document.getElementById('eqOrphan'); if(b2) b2.onclick=eqOrphanFix;
   var b3=document.getElementById('eqUndo');   if(b3) b3.onclick=eqUndoRun;
   var b4=document.getElementById('eqDiag');   if(b4) b4.onclick=eqDiagRun;
+  var b5=document.getElementById('eqSelGo');  if(b5) b5.onclick=eqBulkReturn;
+  var b6=document.getElementById('eqSelAll'); if(b6) b6.onclick=eqSelAllVisible;
+  var b7=document.getElementById('eqSelClr'); if(b7) b7.onclick=eqSelClear;
+  var dI=document.getElementById('eqSelDate'); if(dI) dI.onchange=function(){ EQSEL_DATE=dI.value; };
 }
 async function eqFixAll(){
   if(!SB_TOKEN){ openOvl('ovlAuth'); return; }
@@ -13425,7 +13493,7 @@ function gridRow(r,g,editing){
         bq.onclick=function(){ oiLinkQuote(r); };
         act.appendChild(bq);
       }
-      if(g.table==='equipment_orders' && eqSerials(r).length && ['배송중','설치완료','회수예정','회수완료'].indexOf(r.status)>=0){
+      if(g.table==='equipment_orders' && eqWant(r).length && ['설치완료','회수예정','회수완료'].indexOf(r.status)>=0){
         var br=document.createElement('button'); br.textContent='↩'; br.title='회수 처리 — 시리얼을 골라 일부만 회수할 수 있습니다';
         br.style.color='var(--s2,#d95926)';
         br.onclick=function(){ eqRetOpen(r); };
@@ -13456,7 +13524,7 @@ function gridRow(r,g,editing){
   }
   function edit(){
     tr.innerHTML=visCols(g).map(function(c){
-      return '<td>'+(c.ro? esc(fmtCell(c,r[c.k],r)) : editCell(c,r[c.k]))+'</td>';
+      return '<td>'+(c.ro? (c.html? fmtCell(c,r[c.k],r) : esc(fmtCell(c,r[c.k],r))) : editCell(c,r[c.k]))+'</td>';
     }).join('')+'<td class="act"></td>';
     wireRowInputs(tr,g);
     var act=tr.lastChild;
