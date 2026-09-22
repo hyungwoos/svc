@@ -632,6 +632,14 @@ body{padding-left:192px}
 /* 임대 장비 시리얼 묶음 */
 .eqsn{display:inline-block;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;padding:1px 6px;border-radius:5px;background:var(--surface-2);border:1px solid var(--ring);white-space:nowrap;margin:1px 0}
 .eqsn.ret{text-decoration:line-through;color:var(--muted);opacity:.75}
+.eqsn.act{cursor:pointer}
+.eqsn.act:hover{border-color:var(--s1);color:var(--s1);opacity:1}
+.eqsn.chg{border-color:var(--s2,#d95926);box-shadow:0 0 0 2px rgba(217,89,38,.18);opacity:1;color:var(--s2,#d95926)}
+.eqbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:6px;font-size:11.5px}
+.eqbar input[type=date]{height:24px;font:inherit;font-size:11px;border:1px solid var(--ring);border-radius:6px;padding:0 5px;background:var(--surface)}
+.eqbar button{height:24px;font:inherit;font-size:11px;border:1px solid var(--ring);border-radius:999px;padding:0 9px;background:var(--surface);cursor:pointer;color:var(--ink)}
+.eqbar .eqbar-save{background:var(--s2,#d95926);border-color:var(--s2,#d95926);color:#fff}
+.eqbar .eqbar-all{color:var(--s1)}
 .eqser-more{border:1px solid var(--ring);background:var(--surface);color:var(--s1);border-radius:999px;padding:1px 8px;font:inherit;font-size:11px;cursor:pointer;vertical-align:middle}
 .eqser-more:hover{border-color:var(--s1)}
 .eqser-full{display:block;margin-top:5px;line-height:2;max-width:520px}
@@ -2326,7 +2334,7 @@ window.addEventListener('message', function(ev){
 });
 
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-16 ㊿+95';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-16 ㊿+97';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -6085,7 +6093,7 @@ var GRIDS={
   orders:{
     title:'임대 장비 신청 내역', table:'equipment_orders',
     chipsField:'channel', chipsOpts:['에스원','LGU+','조달','일반','기타'],
-    cap:'저장할 때마다 장비 현황에 자동 반영됩니다 — 접수·출하요청·배송중은 재고, 설치완료·회수예정은 임대중, 회수완료는 회수완료 (취소는 현황에서 내림) · ↩ 버튼으로 시리얼을 골라 일부만 회수 처리 (전부 회수하면 회수완료) · 시리얼을 비워두면 «미등록-신청번호» 로 수량만큼 임시 등록 · 신규 신청은 장비 › 임대 장비 신청', add:true, del:true,
+    cap:'저장할 때마다 장비 현황에 자동 반영됩니다 — 접수·출하요청·배송중은 재고, 설치완료·회수예정은 임대중, 회수완료는 회수완료 (취소는 현황에서 내림) · 시리얼 칩을 눌러 회수 표시 → «회수 처리 저장» (일부·전부 모두, ↩ 버튼은 체크 목록 방식) · 시리얼을 비워두면 «미등록-신청번호» 로 수량만큼 임시 등록 · 신규 신청은 장비 › 임대 장비 신청', add:true, del:true,
     rows:function(){ return RAWX.orders||[]; },
     cols:[
       {k:'created_at',l:'신청일',ro:true,fmt:function(v){return String(v||'').slice(0,10);}},
@@ -6120,7 +6128,7 @@ var GRIDS={
   assets:{
     title:'임대 장비 현황 (시리얼 단위)', table:'equipment_assets',
     chipsField:'channel', chipsOpts:['에스원','LGU+','조달','일반','기타'],
-    cap:'임대 장비 신청 내역과 항상 대조됩니다 — 임대중 장비를 ☑ 체크하고 위 «선택 장비 회수완료» 를 누르면 신청 내역(일부/전부 회수)까지 함께 반영됩니다', add:true, del:true,
+    cap:'신청 내역에서 자동으로 만들어지는 시리얼 단위 저장소입니다 — 신청에 붙은 장비(🔒)는 «임대 장비 신청 내역» 에서 ✎ 수정·↩ 회수 처리하면 따라옵니다 · 여기서는 신청과 무관한 재고·데모·판매 장비만 직접 등록·수정', add:true, del:true,
     rows:function(){
       var om={}; (RAWX.orders||[]).forEach(function(o){ om[String(o.id)]=o; });
       var out=(RAWX.assets||[]).slice();
@@ -6130,10 +6138,6 @@ var GRIDS={
         if(x!==y) return String(y).localeCompare(String(x));      // 최신 위, 빈 값 아래
         return String(a.serial||'').localeCompare(String(b.serial||'')); }); },
     cols:[
-      {k:'_sel',l:'☑',ro:true,html:true,raw:true,fmt:function(v,r){      /* 임대중 장비를 체크해 «선택 장비 회수완료» */
-        if(!r || r.status!=='임대중') return '';
-        var U=String(r.serial||'').toUpperCase();
-        return '<input type="checkbox" class="eqsel" data-sn="'+esc(U)+'"'+(EQSEL[U]?' checked':'')+' title="회수 처리할 장비 선택">'; }},
       {k:'serial',l:'시리얼',req:true},
       {k:'model',l:'모델',t:'select',opts:['S10_R2','S20_R2','S30H_R1','S100','S200','ES30']},
       {k:'usage',l:'구분',t:'select',opts:['임대','데모','대여','판매','하자보수']},
@@ -6281,21 +6285,57 @@ async function eqDel(list){
 }
 async function eqReload(){ try{ RAWX.assets=await sbTry('equipment_assets?select=*&order=serial')||RAWX.assets; }catch(e){} }
 /* 시리얼 묶음 표시 — 한 칸에 수십 개가 늘어지지 않게: 첫 시리얼 + «외 N대 ▾», 누르면 전부 펼침. 회수된 시리얼은 줄을 긋습니다 */
+/* 시리얼 칩 — 신청 내역에서 칩을 눌러 회수/회수취소를 표시하고, 칸 안의 «저장» 으로 반영합니다 (일부·일괄 모두)
+   EQOPEN[신청id]=펼침 상태 · EQP[신청id][시리얼]=원하는 회수 상태(true/false, 아직 저장 안 됨) */
+var EQOPEN={}, EQP={};
+function eqCanRet(r){ return !window.IS_VIEWER && ['설치완료','회수예정','회수완료'].indexOf(r.status)>=0; }
 function eqSerialsHtml(r){
-  var all=eqSerials(r); if(!all.length) return r.serials? esc(String(r.serials)) : '·';
-  var ret=eqRetSet(r), done=(r.status==='회수완료');
-  var chip=function(sn){ var isRet=done||ret.indexOf(sn)>=0; return '<span class="eqsn'+(isRet?' ret':'')+'" title="'+(isRet?'회수됨':'')+'">'+esc(sn)+'</span>'; };
-  if(all.length===1) return chip(all[0]);
-  return '<span class="eqser">'+chip(all[0])+' <button type="button" class="eqser-more" data-n="'+(all.length-1)+'" title="'+esc(all.join(', '))+'">외 '+(all.length-1)+'대 ▾</button>'+
-         '<span class="eqser-full" style="display:none">'+all.slice(1).map(chip).join(' ')+'</span></span>';
+  var all=eqWant(r); if(!all.length) return r.serials? esc(String(r.serials)) : '·';
+  var ret=eqRetSet(r), done=(r.status==='회수완료'), can=eqCanRet(r), pend=EQP[r.id]||{}, oid=r.id;
+  var chip=function(sn){
+    var U=sn.toUpperCase(), saved=done||ret.indexOf(U)>=0, want=(U in pend)? pend[U] : saved, changed=(U in pend) && pend[U]!==saved;
+    var cls='eqsn'+(want?' ret':'')+(changed?' chg':'')+(can?' act':'');
+    var tip=can? (want? '회수됨 — 누르면 회수 취소로 표시' : '임대중 — 누르면 회수로 표시') : (want? '회수됨':'');
+    return '<span class="'+cls+'" data-oid="'+oid+'" data-sn="'+esc(U)+'" title="'+tip+'">'+esc(sn)+'</span>';
+  };
+  var nChg=Object.keys(pend).filter(function(U){ var saved=done||ret.indexOf(U)>=0; return pend[U]!==saved; }).length;
+  var bar='';
+  if(can){
+    bar='<div class="eqbar" data-oid="'+oid+'">'+
+      (nChg? '<b>변경 '+nChg+'대</b> · 회수일 <input type="date" class="eqbar-date" value="'+esc(EQP['_d'+oid]||todayStr())+'"> <button type="button" class="eqbar-save">회수 처리 저장</button> <button type="button" class="eqbar-cancel">취소</button>'
+           : '<button type="button" class="eqbar-all" title="모든 시리얼을 회수로 표시">전부 회수 표시</button> <span class="mini" style="color:var(--muted)">칩을 누르면 개별 표시</span>')+'</div>';
+  }
+  if(all.length===1) return chip(all[0])+(can? bar:'');
+  var open=!!EQOPEN[oid] || nChg>0;
+  return '<span class="eqser">'+chip(all[0])+' <button type="button" class="eqser-more" data-oid="'+oid+'" data-n="'+(all.length-1)+'" title="'+esc(all.join(', '))+'">'+(open? '접기 ▴' : '외 '+(all.length-1)+'대 ▾')+'</button>'+
+         '<span class="eqser-full" style="display:'+(open?'block':'none')+'">'+all.slice(1).map(chip).join(' ')+(can? bar:'')+'</span></span>';
 }
+function eqOrderById(id){ return (RAWX.orders||[]).filter(function(o){ return String(o.id)===String(id); })[0]; }
 document.addEventListener('click', function(e){
-  var b=e.target.closest && e.target.closest('.eqser-more'); if(!b) return;
-  e.stopPropagation();
-  var f=b.parentElement.querySelector('.eqser-full'); if(!f) return;
-  var open=f.style.display!=='none'; f.style.display=open? 'none':'block';
-  b.textContent=open? ('외 '+b.dataset.n+'대 ▾') : '접기 ▴';
+  var t=e.target; if(!t || !t.closest) return;
+  var more=t.closest('.eqser-more');
+  if(more){ e.stopPropagation(); var f=more.parentElement.querySelector('.eqser-full'); if(!f) return;
+    var open=f.style.display!=='none'; f.style.display=open? 'none':'block'; more.textContent=open? ('외 '+more.dataset.n+'대 ▾') : '접기 ▴';
+    if(more.dataset.oid) EQOPEN[more.dataset.oid]=!open; return; }
+  var chip=t.closest('.eqsn.act');
+  if(chip){ e.stopPropagation(); var oid=chip.dataset.oid, U=chip.dataset.sn, r=eqOrderById(oid); if(!r) return;
+    var saved=(r.status==='회수완료')||eqRetSet(r).indexOf(U)>=0; var p=EQP[oid]=EQP[oid]||{};
+    var cur=(U in p)? p[U] : saved; p[U]=!cur; if(p[U]===saved) delete p[U];
+    EQOPEN[oid]=true; renderGrid(); return; }
+  var all=t.closest('.eqbar-all');
+  if(all){ e.stopPropagation(); var bar=all.closest('.eqbar'), oid2=bar.dataset.oid, r2=eqOrderById(oid2); if(!r2) return;
+    var p2=EQP[oid2]={}; eqWant(r2).forEach(function(sn){ p2[sn.toUpperCase()]=true; }); EQOPEN[oid2]=true; renderGrid(); return; }
+  var cancel=t.closest('.eqbar-cancel');
+  if(cancel){ e.stopPropagation(); var oid3=cancel.closest('.eqbar').dataset.oid; delete EQP[oid3]; delete EQP['_d'+oid3]; renderGrid(); return; }
+  var save=t.closest('.eqbar-save');
+  if(save){ e.stopPropagation(); var bar4=save.closest('.eqbar'), oid4=bar4.dataset.oid, r4=eqOrderById(oid4); if(!r4) return;
+    var dI=bar4.querySelector('.eqbar-date'), date=(dI&&dI.value)||todayStr(); var p4=EQP[oid4]||{};
+    var checked=eqWant(r4).filter(function(sn){ var U=sn.toUpperCase(); var saved=(r4.status==='회수완료')||eqRetSet(r4).indexOf(U)>=0; return (U in p4)? p4[U] : saved; });
+    save.disabled=true; save.textContent='저장 중…';
+    eqRetApply(r4, checked, date, '').then(function(){ delete EQP[oid4]; delete EQP['_d'+oid4]; }).catch(function(err){ toast('회수 처리 실패', String(err.message||err).slice(0,80), 'bad'); }).then(function(){ DIRTY=true; renderGrid(); });
+    return; }
 });
+document.addEventListener('change', function(e){ var d=e.target; if(d && d.classList && d.classList.contains('eqbar-date')){ var oid=d.closest('.eqbar').dataset.oid; EQP['_d'+oid]=d.value; } });
 /* 일부 회수: 신청의 returned_serials(회수된 시리얼 목록) */
 function eqRetSet(r){ return String(r.returned_serials||'').split(/[,\s]+/).map(function(s){ return s.trim().toUpperCase(); }).filter(function(s){ return s; }); }
 /* 시리얼 하나가 현황에서 가져야 할 상태 — 신청이 임대중이어도 회수된 시리얼은 회수완료 */
@@ -6303,55 +6343,6 @@ function eqSerialStatus(o, sn){
   var stA=EQ_ST[o.status]||null;
   if(stA==='임대중' && eqRetSet(o).indexOf(String(sn||'').toUpperCase())>=0) return '회수완료';
   return stA;
-}
-/* ---- 현황 표에서 장비를 체크해 회수완료 처리 (여러 신청에 걸쳐도 한 번에) ---- */
-var EQSEL={}, EQSEL_DATE='';
-document.addEventListener('change', function(e){
-  var cb=e.target; if(!cb || !cb.classList || !cb.classList.contains('eqsel')) return;
-  var U=cb.dataset.sn; if(cb.checked) EQSEL[U]=1; else delete EQSEL[U];
-  try{ renderEqPanel(); }catch(_){}
-});
-function eqSelClear(){ EQSEL={}; document.querySelectorAll('.eqsel').forEach(function(x){ x.checked=false; }); renderEqPanel(); }
-function eqSelAllVisible(){ document.querySelectorAll('#dvTable .eqsel').forEach(function(x){ x.checked=true; EQSEL[x.dataset.sn]=1; }); renderEqPanel(); }
-async function eqBulkReturn(){
-  if(!SB_TOKEN){ openOvl('ovlAuth'); return; }
-  var sns=Object.keys(EQSEL); if(!sns.length) return;
-  var dEl=document.getElementById('eqSelDate'); var date=(dEl&&dEl.value)||todayStr(); EQSEL_DATE=date;
-  var amap={}; (RAWX.assets||[]).forEach(function(a){ amap[String(a.serial||'').toUpperCase()]=a; });
-  var byOrder={}, loose=[];
-  sns.forEach(function(U){ var a=amap[U]; if(!a){ return; } if(a.order_id!=null) (byOrder[a.order_id]=byOrder[a.order_id]||[]).push(U); else loose.push(U); });
-  var omap={}; (RAWX.orders||[]).forEach(function(o){ omap[String(o.id)]=o; });
-  var plan=Object.keys(byOrder).map(function(oid){ var o=omap[oid]; var all=o? eqWant(o) : []; var ret=o? eqRetSet(o) : [];
-    var after=all.filter(function(sn){ return ret.indexOf(sn.toUpperCase())>=0 || byOrder[oid].indexOf(sn.toUpperCase())>=0; });
-    return {oid:oid, o:o, sel:byOrder[oid], all:all, after:after, full:(o && all.length && after.length>=all.length)}; });
-  var msg='선택한 장비 '+sns.length+'대를 '+date+' 회수완료로 처리할까요?\n\n'+
-    plan.map(function(p){ return '· '+(p.o? '#'+p.oid+' '+(p.o.customer||''):'신청 #'+p.oid)+' — '+p.sel.length+'대'+(p.full? ' → 전부 회수, 신청도 회수완료' : (p.o? ' → 일부 회수 ('+p.after.length+'/'+p.all.length+')':'')); }).join('\n')+
-    (loose.length? '\n· 신청 없는 장비 '+loose.length+'대 — 현황만 회수완료':'');
-  if(!confirm(msg)) return;
-  var btn=document.getElementById('eqSelGo'); if(btn){ btn.disabled=true; btn.textContent='처리 중…'; }
-  var done=0, fail=0, err='';
-  for(var i=0;i<plan.length;i++){ var p=plan[i];
-    try{
-      if(p.o){
-        var body={ returned_serials: p.after.length? p.after.join(', ') : null };
-        if(p.full){ body.status='회수완료'; body.returned_date=p.o.returned_date||date; }
-        else if(p.o.status==='회수완료'){ body.status='설치완료'; body.returned_date=null; }
-        await sbWrite('PATCH','equipment_orders?id=eq.'+p.oid, body);
-        Object.keys(body).forEach(function(k){ p.o[k]=body[k]; });
-        logChange('update','equipment_orders',p.o.id,{returned_serials:body.returned_serials, status:body.status||p.o.status, from:'현황 체크 회수'});
-        p.o._retDates={}; p.sel.forEach(function(U){ p.o._retDates[U]=date; });
-        var x=await syncOrderAssets(p.o, null, true); delete p.o._retDates;
-        if(/⚠/.test(x)){ fail++; err=err||x; } else done+=p.sel.length;
-      } else {                                            /* 신청 행이 지워진 장비 → 현황만 */
-        await eqPatch(p.sel,{status:'회수완료', returned_date:date, updated_at:new Date().toISOString()}); done+=p.sel.length;
-      }
-    }catch(e){ fail++; err=err||String(e.message||e); }
-  }
-  if(loose.length){ try{ await eqPatch(loose,{status:'회수완료', returned_date:date, updated_at:new Date().toISOString()}); done+=loose.length; }catch(e){ fail++; err=err||String(e.message||e); } }
-  await eqReload();
-  EQSEL={};
-  toast('회수완료 처리', done+'대 처리'+(fail? ' · '+fail+'건 실패 '+err.slice(0,60):''), fail?'bad':'ok');
-  DIRTY=true; renderGrid();
 }
 var EQR={r:null};
 function eqRetOpen(r){
@@ -6371,30 +6362,36 @@ function eqRetOpen(r){
   $('#erSave').onclick=eqRetSave;
   openOvl('ovlEqRet');
 }
-async function eqRetSave(){
-  var r=EQR.r; if(!r) return;
-  var all=eqWant(r), checked=[].slice.call(document.querySelectorAll('#erList input:checked')).map(function(x){ return x.dataset.sn; });
-  var date=$('#erDate').value||todayStr(), note=$('#erNote').value.trim();
-  var prev=eqRetSet(r); if(r.status==='회수완료') prev=all.slice();
+/* 회수 처리 반영 — checked = 최종적으로 «회수됨» 이어야 하는 시리얼 목록 (일부·전부 모두) */
+async function eqRetApply(r, checked, date, note){
+  var all=eqWant(r);
+  var prev=eqRetSet(r); if(r.status==='회수완료') prev=all.map(function(x){ return x.toUpperCase(); });
+  checked=checked.map(function(x){ return String(x).toUpperCase(); });
   var newly=checked.filter(function(sn){ return prev.indexOf(sn)<0; });
   var body={};
-  if(checked.length===all.length && all.length){            /* 전부 회수 → 신청 회수완료 */
+  if(checked.length>=all.length && all.length){              /* 전부 회수 → 신청 회수완료 */
     body.returned_serials=checked.join(', '); body.status='회수완료'; body.returned_date=r.returned_date||date;
   } else {                                                    /* 일부(또는 0대) 회수 → 신청은 계속 진행 중 */
     body.returned_serials=checked.length? checked.join(', ') : null;
     if(r.status==='회수완료'){ body.status='설치완료'; body.returned_date=null; }
   }
   if(note) body.request_note=(r.request_note? r.request_note+' · ':'')+'['+date+' 회수 '+checked.length+'/'+all.length+'] '+note;
+  await sbWrite('PATCH','equipment_orders?id=eq.'+r.id, body);
+  Object.keys(body).forEach(function(k){ r[k]=body[k]; });
+  logChange('update','equipment_orders',r.id,{returned_serials:body.returned_serials, status:body.status||r.status, from:'회수 처리'});
+  r._retDates={}; newly.forEach(function(sn){ r._retDates[sn]=date; });
+  var x=await syncOrderAssets(r); delete r._retDates;
+  toast('회수 처리', checked.length+'/'+all.length+'대 회수'+(body.status==='회수완료'? ' · 신청 회수완료':'')+(x? x:''), 'info');
+  return body;
+}
+async function eqRetSave(){
+  var r=EQR.r; if(!r) return;
+  var checked=[].slice.call(document.querySelectorAll('#erList input:checked')).map(function(x){ return x.dataset.sn; });
+  var date=$('#erDate').value||todayStr(), note=$('#erNote').value.trim();
   var btn=$('#erSave'); btn.disabled=true; $('#erMsg').textContent='저장 중…';
   try{
-    await sbWrite('PATCH','equipment_orders?id=eq.'+r.id, body);
-    Object.keys(body).forEach(function(k){ r[k]=body[k]; });
-    logChange('update','equipment_orders',r.id,{returned_serials:body.returned_serials, status:body.status||r.status, from:'회수 처리'});
-    r._retDates={}; newly.forEach(function(sn){ r._retDates[sn]=date; });
-    var x=await syncOrderAssets(r); delete r._retDates;
-    closeOvl('ovlEqRet');
-    toast('회수 처리', checked.length+'/'+all.length+'대 회수'+(body.status==='회수완료'? ' · 신청 회수완료':'')+(x? x:''), 'info');
-    DIRTY=true; renderGrid();
+    await eqRetApply(r, checked, date, note);
+    closeOvl('ovlEqRet'); DIRTY=true; renderGrid();
   }catch(e){ $('#erMsg').textContent=String(e.message||e); }
   btn.disabled=false;
 }
@@ -6618,17 +6615,6 @@ function renderEqPanel(){
     h+='<div class="mini" style="margin-top:6px;color:var(--muted)">⚠ 시리얼을 몰라 «미등록-…» 으로 임시 등록해 둔 신청 '+s.ph.length+
        '건 — 신청 행의 «시리얼» 칸에 실제 시리얼을 넣고 저장하면 자동으로 바뀝니다</div>';
   }
-  if(CUR_VIEW==='assets' && !window.IS_VIEWER){
-    var nSel=Object.keys(EQSEL).length;
-    h+='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line,#e5e7eb)">'+
-      '<b class="mini">☑ 회수 처리</b>'+
-      '<span class="mini" style="color:'+(nSel?'var(--ink)':'var(--muted)')+'">임대중 장비를 체크하고 → 선택 '+nSel+'대</span>'+
-      '<label class="mini" style="display:inline-flex;align-items:center;gap:4px">회수일 <input type="date" id="eqSelDate" value="'+esc(EQSEL_DATE||todayStr())+'" style="height:26px;font:inherit;font-size:11.5px;border:1px solid var(--ring);border-radius:6px;padding:0 6px;background:var(--surface)"></label>'+
-      '<button class="pill" id="eqSelGo" style="height:28px"'+(nSel?'':' disabled style="height:28px;opacity:.45"')+'>선택 장비 회수완료</button>'+
-      '<button class="pill ghost" id="eqSelAll" style="height:28px" title="지금 화면(필터·검색 적용)에 보이는 임대중 장비 전부 선택">보이는 것 전부 선택</button>'+
-      (nSel? '<button class="pill ghost" id="eqSelClr" style="height:28px">선택 해제</button>':'')+
-      '<span class="mini" style="color:var(--muted)">여러 신청의 장비를 섞어 골라도 신청별로 «일부 회수 / 전부 회수» 로 나눠 반영됩니다</span></div>';
-  }
   if(s.orphan.length){
     h+='<div class="mini" style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--line,#e5e7eb);color:var(--ink-2)">'+
       '신청 내역에 없는데 «임대중» 인 자산 <b>'+s.orphan.length+'대</b> — '+
@@ -6649,10 +6635,7 @@ function renderEqPanel(){
   var b2=document.getElementById('eqOrphan'); if(b2) b2.onclick=eqOrphanFix;
   var b3=document.getElementById('eqUndo');   if(b3) b3.onclick=eqUndoRun;
   var b4=document.getElementById('eqDiag');   if(b4) b4.onclick=eqDiagRun;
-  var b5=document.getElementById('eqSelGo');  if(b5) b5.onclick=eqBulkReturn;
-  var b6=document.getElementById('eqSelAll'); if(b6) b6.onclick=eqSelAllVisible;
-  var b7=document.getElementById('eqSelClr'); if(b7) b7.onclick=eqSelClear;
-  var dI=document.getElementById('eqSelDate'); if(dI) dI.onchange=function(){ EQSEL_DATE=dI.value; };
+
 }
 async function eqFixAll(){
   if(!SB_TOKEN){ openOvl('ovlAuth'); return; }
@@ -13498,6 +13481,13 @@ function gridRow(r,g,editing){
         br.style.color='var(--s2,#d95926)';
         br.onclick=function(){ eqRetOpen(r); };
         act.appendChild(br);
+      }
+      if(g.table==='equipment_assets' && r.order_id!=null){
+        /* 현황은 신청 내역에서 만들어지는 저장소 — 신청에 붙은 장비는 여기서 고치지 않고 신청 내역(↩ 회수 처리 · ✎)에서 고칩니다 */
+        var lk=document.createElement('button'); lk.textContent='🔒'; lk.title='신청 #'+r.order_id+' 에서 만들어진 장비 — 수정·회수는 «임대 장비 신청 내역» 에서 (↩ 회수 처리)';
+        lk.style.opacity='.6'; lk.onclick=function(){ toast('신청 내역에서 수정', '이 장비는 신청 #'+r.order_id+' 에 붙어 있습니다. 임대 장비 신청 내역에서 ✎ 또는 ↩ 회수 처리로 고치면 현황이 따라옵니다', 'info'); };
+        act.appendChild(lk);
+        return;
       }
       var be=document.createElement('button'); be.textContent='✎';
       be.onclick=function(){ edit(); };
