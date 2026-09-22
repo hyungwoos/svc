@@ -1227,8 +1227,26 @@ html[data-look="cc"] #ccBrief{display:none}
 html[data-look="cc"] .ask{padding:14px 16px 12px}
 html[data-look="cc"] .ask-ico{display:none}
 
-/* ── 장비 운영 보드 ── */
-.eqb-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+/* ── 장비 대시보드 (요약 타일 · 차트 · 상태 보드) ── */
+.eqb-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.eqb-kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;margin-bottom:12px}
+.eqb-kpis .kpi{padding:14px 16px;cursor:pointer;display:flex;flex-direction:column;gap:2px;transform:none!important}
+.eqb-kpis .kpi .k{font-size:12px;color:var(--muted);font-weight:600;display:flex;align-items:center;gap:6px}
+.eqb-kpis .kpi .v{font-size:30px;font-weight:700;letter-spacing:-.03em;line-height:1.1;margin-top:4px;font-variant-numeric:tabular-nums}
+.eqb-kpis .kpi .v small{font-size:13px;font-weight:600;color:var(--ink-2);margin-left:2px}
+.eqb-kpis .kpi .d{font-size:11.5px;color:var(--muted);margin-top:4px}
+.eqb-kpis .kpi.hot .v{color:#b45f06} .eqb-kpis .kpi.crit .v{color:var(--critical)} .eqb-kpis .kpi.good .v{color:var(--brand)}
+.eqb-kpis .kpi .k i{width:9px;height:9px;border-radius:50%;display:inline-block}
+.eqb-charts{display:grid;grid-template-columns:1.05fr 1fr 1.45fr;gap:12px;margin-bottom:16px}
+.eqb-charts .card{padding:14px 16px}
+.eqb-charts .card h2{font-size:13.5px;margin:0 0 8px;display:flex;align-items:center;gap:8px}
+.eqb-charts .card h2 .cap{margin:0;font-weight:400;font-size:11.5px}
+.eqb-charts .card h2 .lg{margin-left:auto;font-size:11px;font-weight:500;color:var(--muted);display:inline-flex;align-items:center;gap:4px}
+.eqb-charts .card h2 .lg i{width:9px;height:9px;border-radius:2px;display:inline-block;margin-left:6px}
+.eqb-kpis .kpi .k{justify-content:flex-start!important}
+.eqb-charts .bar-row{grid-template-columns:70px 1fr 60px;padding:4px 0}
+@media (max-width:1300px){ .eqb-kpis{grid-template-columns:repeat(3,minmax(0,1fr))} .eqb-charts{grid-template-columns:1fr 1fr} }
+@media (max-width:760px){ .eqb-kpis{grid-template-columns:repeat(2,minmax(0,1fr))} .eqb-charts{grid-template-columns:1fr} .eqb-kpis .kpi .v{font-size:24px} }
 .eqb-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px}
 .eqb-bar input[type="search"]{height:30px;width:220px}
 .eqb-chips{display:flex;gap:6px;flex-wrap:wrap}
@@ -1238,10 +1256,14 @@ html[data-look="cc"] .ask-ico{display:none}
 .eqb-wrap{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;align-items:start}
 @media (max-width:1400px){ .eqb-wrap{grid-template-columns:repeat(3,minmax(0,1fr))} }
 @media (max-width:760px){ .eqb-wrap{grid-template-columns:1fr} }
-.eqb-col{background:var(--surface-2);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:8px;min-height:140px;min-width:0}
+.eqb-col{background:var(--surface-2);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:8px;min-height:140px;min-width:0;max-height:calc(100vh - 120px);overflow:auto}
+.eqb-col>.eqb-ch{position:sticky;top:-10px;margin:-10px -10px 0;padding:10px 14px 8px;background:inherit;z-index:1;border-radius:12px 12px 0 0}
+.eqb-col.hl{outline:2px solid var(--brand);outline-offset:-2px}
 .eqb-col.warm{background:color-mix(in srgb,#f0a020 12%,var(--surface-2))}
 .eqb-col.over{outline:2px dashed var(--brand);outline-offset:-2px;background:var(--brand-t)}
-.eqb-ch{display:flex;align-items:center;gap:6px;padding:2px 4px;font-size:12.5px;font-weight:600;white-space:nowrap;min-width:0}
+.eqb-ch{display:flex;align-items:center;gap:7px;padding:2px 4px;font-size:13px;font-weight:700;white-space:nowrap;min-width:0}
+.eqb-ch .n{font-size:15px;font-weight:700;color:var(--ink)!important;background:var(--surface);border-radius:8px;padding:0 7px;line-height:22px}
+.eqb-ch i{width:10px;height:10px}
 @media (max-width:1700px){ .eqb-ch .to{display:none} }
 .eqb-ch i{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
 .eqb-ch .n{color:var(--muted);font-weight:500}
@@ -1251,7 +1273,10 @@ html[data-look="cc"] .ask-ico{display:none}
 .eqb-card.drag{opacity:.45}
 .eqb-card.hot{border-color:#D9B36A}
 .eqb-card .tp{display:flex;justify-content:space-between;align-items:center;gap:6px}
-.eqb-card .cu{font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.eqb-card .cu{font-size:14px;font-weight:700;letter-spacing:-.01em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.eqb-card .mt b{color:var(--ink);font-weight:600}
+.ctag.ch-s1{background:rgba(42,120,214,.12);color:#1e4fa3} .ctag.ch-lg{background:rgba(232,123,164,.16);color:#a3245f} .ctag.ch-gov{background:rgba(237,161,0,.16);color:#8a5200} .ctag.ch-gen{background:var(--brand-t);color:var(--brand)}
+.ctag.late{background:rgba(208,59,59,.10);color:var(--critical)}
 .eqb-card .mt{font-size:12px;color:var(--muted);line-height:1.5}
 .eqb-card .sn{display:flex;gap:4px;flex-wrap:wrap;font-size:11px}
 .eqb-card .sn .eqsn{margin:0}
@@ -1377,7 +1402,7 @@ html[data-look="cc"] #ovlC360 .mact{border-top:1px solid var(--grid);padding-top
   <button data-v="chdist">📀 DLP/DRM</button>
   <button data-v="cnpns">🧷 PNS</button>
   <div class="grp">장비</div>
-  <button data-v="eqboard">🗂️ 임대 장비 운영 보드</button>
+  <button data-v="eqboard">🗂️ 임대 장비 대시보드</button>
   <button data-v="ordernew">📝 임대 장비 신청</button>
   <button data-v="orders">📦 임대 장비 신청 내역</button>
   <button data-v="assets">🔧 임대 장비 현황</button>
@@ -1660,17 +1685,24 @@ html[data-look="cc"] #ovlC360 .mact{border-top:1px solid var(--grid);padding-top
     </section>
   </div>
 
-  <!-- 임대 장비 운영 보드 (칸반) -->
+  <!-- 임대 장비 대시보드 (요약 타일 + 차트 + 상태 보드) -->
   <div id="viewEqBoard" class="hidden">
     <div class="eqb-head">
-      <h2 style="margin:0;font-size:19px;font-weight:600;letter-spacing:-.01em">임대 장비 운영 보드</h2>
+      <h2 style="margin:0;font-size:19px;font-weight:600;letter-spacing:-.01em">임대 장비 대시보드</h2>
       <span id="eqbMatch"></span>
-      <span class="mini" id="eqbHint">카드를 옆 열로 끌어다 놓으면 상태가 바뀌고 장비 현황이 따라 갱신됩니다 · 시리얼 칩을 누르면 일부 회수</span>
       <span class="spacer"></span>
-      <div class="eqb-seg" role="group" aria-label="보기"><button aria-pressed="true">보드</button><button data-go="orders">목록</button><button data-go="assets">현황(시리얼)</button></div>
+      <div class="eqb-seg" role="group" aria-label="보기"><button aria-pressed="true">대시보드</button><button data-go="orders">신청 내역</button><button data-go="assets">현황(시리얼)</button></div>
       <button class="pill" id="eqbNew">＋ 장비 신청</button>
     </div>
+    <div class="eqb-kpis" id="eqbKpis"></div>
+    <div class="eqb-charts" id="eqbCharts">
+      <section class="card"><h2>채널별 임대중 <span class="cap" id="eqcChCap"></span></h2><div id="eqcCh"></div></section>
+      <section class="card"><h2>모델별 임대중 · 재고 <span class="lg"><i style="background:var(--brand)"></i>임대중 <i style="background:var(--axis)"></i>재고</span></h2><div class="chartbox h200" id="eqcModel"></div></section>
+      <section class="card"><h2>월별 설치 · 회수 <span class="cap">최근 12개월 · 대수</span><span class="lg"><i style="background:var(--s1)"></i>설치 <i style="background:var(--s2)"></i>회수</span></h2><div class="chartbox h200" id="eqcTrend"></div></section>
+    </div>
     <div class="eqb-bar">
+      <b style="font-size:14px;margin-right:4px">상태 보드</b>
+      <span class="mini" id="eqbHint">카드를 옆 열로 끌면 상태 변경 · 시리얼 칩을 누르면 일부 회수</span>
       <div class="eqb-chips" id="eqbChips"></div>
       <input type="search" id="eqbQ" placeholder="고객·시리얼·모델 검색">
       <button class="pill ghost" id="eqbReload">↻ 다시 읽기</button>
@@ -2682,7 +2714,7 @@ window.addEventListener('message', function(ev){
 });
 
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-16 ㊿+100';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-16 ㊿+101';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -2987,12 +3019,12 @@ function renderInbox(){
     var byCh={}; pendL.forEach(function(o){ byCh[o.channel||'기타']=(byCh[o.channel||'기타']||0)+1; });
     add('eq', {ic:'box', cls:'warn', t:'처리 대기 장비 신청 <span class="num">'+pendL.length+'건</span>'+(age>=1? ' — 가장 오래된 건 '+age+'일 경과':''),
       s:Object.keys(byCh).map(function(c){ return c+' '+byCh[c]; }).join(' · ')+' · '+names(pendL, function(o){ return o.customer; }),
-      acts:[{l:'보류', go:function(){ ccSnooze('eq',1); }},{l:'운영 보드 →', pri:1, go:function(){ switchView('eqboard'); }}]});
+      acts:[{l:'보류', go:function(){ ccSnooze('eq',1); }},{l:'장비 대시보드 →', pri:1, go:function(){ switchView('eqboard'); }}]});
   }
   if(retL.length){
     add('ret', {ic:'box', cls:'info', t:'회수 진행 중 <span class="num">'+retL.length+'건</span>',
       s:retL.slice(0,3).map(function(o){ var all=eqWant(o).length, d=eqRetSet(o).length; return (o.customer||'')+' '+d+'/'+all+'대'; }).join(' · ')+(retL.length>3? ' 외 '+(retL.length-3)+'건':''),
-      acts:[{l:'운영 보드 →', pri:1, go:function(){ switchView('eqboard'); }}]});
+      acts:[{l:'장비 대시보드 →', pri:1, go:function(){ switchView('eqboard'); }}]});
   }
   if(expL.length){
     var ends=expL.map(function(r){ return r.endIdx; }).sort(function(x,y){ return x-y; });
@@ -3084,8 +3116,8 @@ function ccTileEquip(){
   var c=el('div','kpi');
   c.innerHTML='<div class="k">임대 장비 운영 '+tag+'</div>'+
     '<div class="tri"><div><b class="num">'+lent+'</b><span>임대중</span></div><div><b class="num">'+stock+'</b><span>재고</span></div><div><b class="num" style="color:'+(prog.length?'#8a5200':'inherit')+'">'+prog.length+'</b><span>회수 진행</span></div></div>'+ph+
-    '<div class="d" style="margin-top:auto;padding-top:6px;color:var(--brand);font-weight:500">운영 보드 열기 →</div>';
-  c.style.cursor='pointer'; c.title='임대 장비 운영 보드 (클릭)'; c.setAttribute('role','button'); c.tabIndex=0;
+    '<div class="d" style="margin-top:auto;padding-top:6px;color:var(--brand);font-weight:500">장비 대시보드 →</div>';
+  c.style.cursor='pointer'; c.title='임대 장비 대시보드 (클릭)'; c.setAttribute('role','button'); c.tabIndex=0;
   c.onclick=function(){ switchView('eqboard'); };
   return c;
 }
@@ -3158,8 +3190,73 @@ function ccBrief(list,b){
 var EQB={ch:'', q:'', more:{}};
 var EQB_COLS=[['접수','#9A9DA5','현황 재고'],['출하요청','#1E4FA3','현황 재고'],['배송중','#8a5200','현황 재고'],['설치완료','var(--brand)','현황 임대중'],['회수예정','#D95926','칩으로 일부 회수'],['회수완료','var(--ink-2)','최근 90일']];
 function eqRefresh(){ if(CUR_VIEW==='eqboard') renderEqBoard(); else try{ renderGrid(); }catch(e){} }
+var EQ_CH_CLS={'에스원':'ch-s1','LGU+':'ch-lg','LG U+':'ch-lg','조달':'ch-gov','일반':'ch-gen'};
+function eqChTag(ch){ ch=ch||'기타'; return '<span class="ctag '+(EQ_CH_CLS[ch]||'')+'">'+esc(ch)+'</span>'; }
+function eqChColor(ch){ return ({'에스원':cssv('--s1'),'LGU+':cssv('--s5'),'LG U+':cssv('--s5'),'조달':cssv('--s4'),'일반':cssv('--s3')})[ch]||cssv('--muted'); }
+/* 대시보드 윗부분 — 요약 타일 6개 + 차트 3개 (현황 자산 + 신청 내역 기준) */
+function renderEqDash(){
+  var K=document.getElementById('eqbKpis'); if(!K) return;
+  var A=RAWX.assets||[], O=RAWX.orders||[], todayS=todayStr(), ym=todayS.slice(0,7);
+  var pm=new Date(); pm.setMonth(pm.getMonth()-1); var pym=todayStr(pm).slice(0,7);
+  var lent=A.filter(function(a){ return a.status==='임대중'; }), stock=A.filter(function(a){ return a.status==='재고'; });
+  var lentCust={}; lent.forEach(function(a){ if(a.customer) lentCust[a.customer]=1; });
+  var stockModel={}; stock.forEach(function(a){ var m=a.model||'미지정'; stockModel[m]=(stockModel[m]||0)+1; });
+  var pend=O.filter(function(o){ return ['접수','출하요청','배송중'].indexOf(o.status)>=0; });
+  var pendBy={}; pend.forEach(function(o){ pendBy[o.status]=(pendBy[o.status]||0)+1; });
+  var oldest=pend.map(function(o){ return String(o.created_at||'').slice(0,10); }).filter(Boolean).sort()[0];
+  var age=oldest? Math.floor((new Date(todayS)-new Date(oldest))/864e5):0;
+  var retL=O.filter(function(o){ return o.status==='회수예정' || (o.status!=='회수완료' && o.status!=='취소' && eqRetSet(o).length); });
+  var retAll=0, retDone=0; retL.forEach(function(o){ retAll+=eqWant(o).length; retDone+=eqRetSet(o).length; });
+  var instM=O.filter(function(o){ return ['설치완료','회수예정','회수완료'].indexOf(o.status)>=0 && String(o.install_date||'').slice(0,7)===ym; });
+  var instP=O.filter(function(o){ return ['설치완료','회수예정','회수완료'].indexOf(o.status)>=0 && String(o.install_date||'').slice(0,7)===pym; });
+  var retM=O.filter(function(o){ return o.status==='회수완료' && String(o.returned_date||'').slice(0,7)===ym; });
+  var qty=function(arr){ return arr.reduce(function(a,o){ return a+(+o.qty||eqWant(o).length||1); },0); };
+  function tile(cls, dot, k, v, u, d, go){
+    return '<div class="kpi '+cls+'" role="button" tabindex="0" data-go="'+go+'"><div class="k">'+(dot? '<i style="background:'+dot+'"></i>':'')+esc(k)+'</div><div class="v">'+v+(u? '<small>'+u+'</small>':'')+'</div><div class="d">'+d+'</div></div>';
+  }
+  K.innerHTML=
+    tile('good', 'var(--brand)', '임대중', lent.length, '대', '고객사 '+Object.keys(lentCust).length+'곳 · 현황 기준', 'assets:임대중')+
+    tile('', 'var(--muted)', '재고', stock.length, '대', Object.keys(stockModel).sort(function(a,b){ return stockModel[b]-stockModel[a]; }).slice(0,3).map(function(m){ return esc(m)+' '+stockModel[m]; }).join(' · ')||'재고 없음', 'assets:재고')+
+    tile(pend.length? (age>7? 'crit':'hot'):'', '#1E4FA3', '처리 대기', pend.length, '건', pend.length? ['접수','출하요청','배송중'].filter(function(k){ return pendBy[k]; }).map(function(k){ return k+' '+pendBy[k]; }).join(' · ')+(age>=1? ' · 최장 '+age+'일':'') : '대기 중인 신청 없음', 'col:접수')+
+    tile(retL.length? 'hot':'', '#D95926', '회수 진행', retL.length, '건', retL.length? '회수 '+retDone+'/'+retAll+'대 · 시리얼 칩으로 처리':'진행 중인 회수 없음', 'col:회수예정')+
+    tile('', 'var(--s1)', '이달 설치', qty(instM), '대', instM.length+'건 · 지난달 '+qty(instP)+'대', 'col:설치완료')+
+    tile('', 'var(--ink-2)', '이달 회수', qty(retM), '대', retM.length+'건 회수완료 · '+ym, 'col:회수완료');
+  K.querySelectorAll('[data-go]').forEach(function(t){
+    t.onclick=function(){
+      var g=t.dataset.go.split(':');
+      if(g[0]==='assets'){ switchView('assets'); var sb=document.getElementById('dvSearch'); if(sb){ sb.value=g[1]; try{ renderGrid(); }catch(e){} } return; }
+      var col=document.querySelector('.eqb-col[data-st="'+g[1]+'"]'); if(col){ col.scrollIntoView({behavior:'smooth',block:'start'}); col.classList.add('hl'); setTimeout(function(){ col.classList.remove('hl'); },1600); }
+    };
+    t.onkeydown=function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); t.click(); } };
+  });
+  /* 차트 */
+  try{
+    var byCh={}; lent.forEach(function(a){ var c=a.channel||'기타'; byCh[c]=(byCh[c]||0)+1; });
+    var chArr=Object.keys(byCh).sort(function(a,b){ return byCh[b]-byCh[a]; }).map(function(c){ return {name:c, v:byCh[c], c:eqChColor(c)}; });
+    hbars('#eqcCh', chArr, lent.length, true);
+    document.getElementById('eqcChCap').textContent=lent.length? '총 '+lent.length+'대':'';
+    var models={}; lent.forEach(function(a){ var m=a.model||'미지정'; (models[m]=models[m]||{l:0,s:0}).l++; }); stock.forEach(function(a){ var m=a.model||'미지정'; (models[m]=models[m]||{l:0,s:0}).s++; });
+    var mk2=Object.keys(models).sort(function(a,b){ return (models[b].l+models[b].s)-(models[a].l+models[a].s); }).slice(0,6);
+    var cnt=function(v){ return Math.round(v)+'대'; };
+    var hostM=document.getElementById('eqcModel');
+    if(mk2.length) Viz.bars(hostM,{labels:mk2, fmt:function(v){ return Math.round(v); }, tipFmt:cnt, maxBar:28, padL:34,
+      series:[{label:'임대중', data:mk2.map(function(m){ return models[m].l; }), color:cssv('--brand')},{label:'재고', data:mk2.map(function(m){ return models[m].s; }), color:cssv('--axis')}]});
+    else hostM.innerHTML='<p class="cap">현황 데이터 없음</p>';
+    var months=[], d=new Date(); d.setDate(1);
+    for(var i=11;i>=0;i--){ var t=new Date(d.getFullYear(), d.getMonth()-i, 1); months.push(t.getFullYear()+'-'+('0'+(t.getMonth()+1)).slice(-2)); }
+    var inst=months.map(function(){ return 0; }), rets=months.map(function(){ return 0; });
+    O.forEach(function(o){
+      var q=+o.qty||eqWant(o).length||1;
+      if(['설치완료','회수예정','회수완료'].indexOf(o.status)>=0){ var i1=months.indexOf(String(o.install_date||'').slice(0,7)); if(i1>=0) inst[i1]+=q; }
+      if(o.status==='회수완료'){ var i2=months.indexOf(String(o.returned_date||'').slice(0,7)); if(i2>=0) rets[i2]+=q; }
+    });
+    Viz.bars(document.getElementById('eqcTrend'),{labels:months.map(function(m){ return m.slice(2).replace('-','.'); }), fmt:function(v){ return Math.round(v); }, tipFmt:cnt, maxBar:16, padL:34,
+      series:[{label:'설치', data:inst, color:cssv('--s1')},{label:'회수', data:rets, color:cssv('--s2')}]});
+  }catch(e){ console.warn('eq dash charts', e); }
+}
 function renderEqBoard(){
   var wrap=document.getElementById('eqbCols'); if(!wrap) return;
+  try{ requestAnimationFrame(renderEqDash); }catch(e){}
   var O=(RAWX.orders||[]).slice(), q=fkNorm(EQB.q||'');
   /* 채널 칩 */
   var chs={}; O.forEach(function(o){ if(o.status!=='취소') chs[o.channel||'기타']=(chs[o.channel||'기타']||0)+1; });
@@ -3206,8 +3303,8 @@ function renderEqBoard(){
 }
 function eqbCard(o, canEdit, todayS){
   var all=eqWant(o), ret=eqRetSet(o), done=o.status==='회수완료';
-  var age=''; if(['접수','출하요청','배송중'].indexOf(o.status)>=0 && o.created_at){ var d=Math.floor((new Date(todayS)-new Date(String(o.created_at).slice(0,10)))/864e5); if(d>=1) age=' · '+d+'일'; }
-  var meta=[(o.model||'모델 미정')+' <span class="num">×'+(o.qty||all.length||1)+'</span>', o.order_type||''];
+  var age='', ageD=0; if(['접수','출하요청','배송중'].indexOf(o.status)>=0 && o.created_at){ ageD=Math.floor((new Date(todayS)-new Date(String(o.created_at).slice(0,10)))/864e5); if(ageD>=1) age=(ageD>7? ' <span class="ctag late">'+ageD+'일 경과</span>' : ' · '+ageD+'일'); }
+  var meta=['<b>'+esc(o.model||'모델 미정')+' ×'+(o.qty||all.length||1)+'</b>', o.order_type||''];
   if(o.status==='설치완료' && o.install_date) meta.push('설치 <span class="num">'+esc(String(o.install_date).slice(0,10))+'</span>');
   else if(o.install_date && !done) meta.push('설치희망 <span class="num">'+esc(String(o.install_date).slice(0,10))+'</span>');
   if(done && o.returned_date) meta.push('회수일 <span class="num">'+esc(String(o.returned_date).slice(0,10))+'</span>');
@@ -3220,7 +3317,7 @@ function eqbCard(o, canEdit, todayS){
     '<button type="button" class="cbtn" style="height:24px;font-size:11.5px" data-open="'+o.id+'" title="신청 내역에서 열기">✎</button>'+
     (canEdit && nextSt? '<button type="button" class="cbtn'+(['출하요청','배송중','설치완료'].indexOf(nextSt)>=0?' pri':'')+'" style="height:24px;font-size:11.5px" data-oid="'+o.id+'" data-next="'+esc(nextSt)+'">'+esc(nextSt)+' →</button>':'')+'</span></div>';
   return '<article class="eqb-card'+(o.status==='회수예정'?' hot':'')+'" draggable="'+(canEdit?'true':'false')+'" data-oid="'+o.id+'">'+
-    '<div class="tp"><span class="ctag">'+esc(o.channel||'기타')+'</span><span class="mini num">#'+o.id+esc(age)+'</span></div>'+
+    '<div class="tp">'+eqChTag(o.channel)+'<span class="mini num">#'+o.id+age+'</span></div>'+
     '<div class="cu" title="'+esc(o.customer||'')+'">'+esc(o.customer||'(고객사 없음)')+'</div>'+
     '<div class="mt">'+meta.filter(Boolean).join(' · ')+'</div>'+prog+
     '<div class="sn">'+eqSerialsHtml(o,{full:true})+'</div>'+ft+'</article>';
@@ -3251,7 +3348,7 @@ async function eqSetStatus(r, st){
   try{
     await sbWrite('PATCH','equipment_orders?id=eq.'+r.id, body);
     var from=r.status; Object.keys(body).forEach(function(k){ r[k]=body[k]; });
-    logChange('update','equipment_orders',r.id,{status:st, from:from, via:'운영 보드'});
+    logChange('update','equipment_orders',r.id,{status:st, from:from, via:'장비 대시보드'});
     DIRTY=true; renderEqBoard();
     var x=await syncOrderAssets(r, null, true);
     toast('상태 변경', '#'+r.id+' '+(r.customer||'')+' · '+from+' → '+st+(body.returned_date? ' · 회수일 '+body.returned_date:'')+(x? ' · '+x:''), 'ok');
@@ -3282,7 +3379,7 @@ function c360Enhance(nm, cts, lives, ois, inbs, asts, ords){
   if(dLeft!=null && dLeft<=90){ var ec=cts.filter(function(r){ return r.endIdx===nextEnd; })[0]; tips.push((ec? lline(ec.line)+' 계약이 ':'계약이 ')+Math.max(0,dLeft)+'일 뒤 종료됩니다'+(churned? ' (과거 해지 이력 '+churned+'건)':' (해지 이력 없음)')+'.'); acts.push(['재계약 OI 만들기', function(){ closeOvl('ovlC360'); switchView('oinew'); setTimeout(function(){ var c=document.getElementById('oiCust'); if(c){ c.value=nm; } },80); }]); }
   if(retN && retN<lent) tips.push('장비 '+lent+'대 중 '+retN+'대가 회수 진행 중입니다. 잔여 '+(lent-retN)+'대 회수 여부를 함께 확인하세요.');
   else if(live.some(function(o){ return o.status==='회수예정'; })) tips.push('장비 회수가 예정되어 있습니다.');
-  if(live.length) acts.push(['운영 보드 열기', function(){ closeOvl('ovlC360'); EQB.q=nm; switchView('eqboard'); var qi=document.getElementById('eqbQ'); if(qi) qi.value=nm; }]);
+  if(live.length) acts.push(['장비 대시보드', function(){ closeOvl('ovlC360'); EQB.q=nm; switchView('eqboard'); var qi=document.getElementById('eqbQ'); if(qi) qi.value=nm; }]);
   var openOi=ois.filter(function(o){ return !/수주|계산서|종료|중지|실패/.test(String(o.stage||'')); });
   if(openOi.length) tips.push('진행 중 OI '+openOi.length+'건이 있습니다'+(openOi[0].next_date? ' · 다음 일정 '+String(openOi[0].next_date).slice(0,10):'')+'.');
   var stale=inbs.filter(function(r){ return /진행중/.test(String(r.result||'')); });
