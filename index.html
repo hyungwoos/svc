@@ -629,6 +629,12 @@ body{padding-left:192px}
 .cl-prev .st{font-size:11px;padding:2px 8px;border-radius:999px;background:var(--surface-2);border:1px solid var(--ring)}
 .cl-prev .st.ok{color:#2e6b4f;border-color:#9fd3b6;background:#eaf6ee} .cl-prev .st.bad{color:var(--critical);border-color:rgba(208,59,59,.4);background:rgba(208,59,59,.08)} .cl-prev .st.dup{color:#8a5a00;border-color:rgba(250,178,25,.5);background:rgba(250,178,25,.12)}
 @media(max-width:1000px){ #viewCloud .cl-sum{grid-template-columns:1fr} }
+/* 임대 장비 시리얼 묶음 */
+.eqsn{display:inline-block;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;padding:1px 6px;border-radius:5px;background:var(--surface-2);border:1px solid var(--ring);white-space:nowrap;margin:1px 0}
+.eqsn.ret{text-decoration:line-through;color:var(--muted);opacity:.75}
+.eqser-more{border:1px solid var(--ring);background:var(--surface);color:var(--s1);border-radius:999px;padding:1px 8px;font:inherit;font-size:11px;cursor:pointer;vertical-align:middle}
+.eqser-more:hover{border-color:var(--s1)}
+.eqser-full{display:block;margin-top:5px;line-height:2;max-width:520px}
 /* 가격표 */
 :is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate,#viewCustFlow) .pr-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
 :is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate,#viewCustFlow) .pr-ver{font-size:11px;background:var(--surface-2);border:1px solid var(--ring);border-radius:999px;padding:3px 11px;color:var(--ink-2)}
@@ -1767,6 +1773,29 @@ input:focus,select:focus,textarea:focus{border-color:var(--brand)!important;box-
   </div>
 </div>
 
+<!-- 임대 장비 회수 처리 (일부 선택 가능) -->
+<div class="ovl" id="ovlEqRet">
+  <div class="modal" style="width:min(620px,100%)">
+    <h3>↩ 장비 회수 처리</h3>
+    <p class="cap" id="erTitle" style="margin:0 0 10px"></p>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+      <button class="pill ghost" id="erAll" style="height:28px">전체 선택</button>
+      <button class="pill ghost" id="erNone" style="height:28px">전체 해제</button>
+      <span class="mini" style="color:var(--muted)">체크된 시리얼 = 회수됨 · 일부만 체크하면 «일부 회수», 전부 체크하면 신청이 회수완료로 바뀝니다</span>
+    </div>
+    <div id="erList" style="display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;max-height:300px;overflow:auto;padding:8px 10px;border:1px solid var(--ring);border-radius:10px;background:var(--surface-2)"></div>
+    <div class="frm" style="grid-template-columns:160px 1fr;margin-top:10px">
+      <div><label>회수일 (이번에 체크한 장비)</label><input id="erDate" type="date"></div>
+      <div><label>메모 (선택)</label><input id="erNote" placeholder="예: 포트 부족으로 교체 · 사업장 철수"></div>
+    </div>
+    <div class="mact">
+      <span class="mmsg" id="erMsg"></span>
+      <button class="pill ghost" onclick="closeOvl('ovlEqRet')">취소</button>
+      <button class="pill" id="erSave">저장</button>
+    </div>
+  </div>
+</div>
+
 <!-- 인바운드 상세 -->
 <div class="ovl" id="ovlInb">
   <div class="modal" style="width:min(760px,100%)">
@@ -2297,7 +2326,7 @@ window.addEventListener('message', function(ev){
 });
 
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-16 ㊿+92';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-16 ㊿+94';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -6056,7 +6085,7 @@ var GRIDS={
   orders:{
     title:'임대 장비 신청 내역', table:'equipment_orders',
     chipsField:'channel', chipsOpts:['에스원','LGU+','조달','일반','기타'],
-    cap:'저장할 때마다 장비 현황에 자동 반영됩니다 — 접수·출하요청·배송중은 재고, 설치완료·회수예정은 임대중, 회수완료는 회수완료 (취소는 현황에서 내림) · 상태를 회수완료로 바꾸면 회수일이 그날로 자동 입력 (수정 가능) · 시리얼을 비워두면 «미등록-신청번호» 로 수량만큼 임시 등록 · 신규 신청은 장비 › 임대 장비 신청', add:true, del:true,
+    cap:'저장할 때마다 장비 현황에 자동 반영됩니다 — 접수·출하요청·배송중은 재고, 설치완료·회수예정은 임대중, 회수완료는 회수완료 (취소는 현황에서 내림) · ↩ 버튼으로 시리얼을 골라 일부만 회수 처리 (전부 회수하면 회수완료) · 시리얼을 비워두면 «미등록-신청번호» 로 수량만큼 임시 등록 · 신규 신청은 장비 › 임대 장비 신청', add:true, del:true,
     rows:function(){ return RAWX.orders||[]; },
     cols:[
       {k:'created_at',l:'신청일',ro:true,fmt:function(v){return String(v||'').slice(0,10);}},
@@ -6078,7 +6107,13 @@ var GRIDS={
         if(v) return String(v).slice(0,10);
         return (r&&r.status==='회수완료')? '· ⚠ 미입력' : '·';     /* 회수완료인데 날짜가 없으면 표시 */
       }},
-      {k:'serials',l:'시리얼'},
+      {k:'returned_serials',l:'회수 현황',fmt:function(v,r){      /* 일부 회수: 회수된 시리얼 수 / 전체 (↩ 버튼으로 선택) */
+        var all=eqSerials(r||{}), ret=eqRetSet(r||{});
+        if(!all.length) return v? String(v) : '·';
+        if(r.status==='회수완료') return all.length+'/'+all.length+' 회수';
+        return ret.length? (ret.length+'/'+all.length+' 일부 회수') : '·';
+      }},
+      {k:'serials',l:'시리얼',html:true,raw:true,fmt:function(v,r){ return eqSerialsHtml(r||{}); }},
       {k:'request_note',l:'요청사항'}
     ]
   },
@@ -6241,9 +6276,78 @@ async function eqDel(list){
   RAWX.assets=(RAWX.assets||[]).filter(function(a){ return !dl[String(a.serial||'').toUpperCase()]; });
 }
 async function eqReload(){ try{ RAWX.assets=await sbTry('equipment_assets?select=*&order=serial')||RAWX.assets; }catch(e){} }
+/* 시리얼 묶음 표시 — 한 칸에 수십 개가 늘어지지 않게: 첫 시리얼 + «외 N대 ▾», 누르면 전부 펼침. 회수된 시리얼은 줄을 긋습니다 */
+function eqSerialsHtml(r){
+  var all=eqSerials(r); if(!all.length) return r.serials? esc(String(r.serials)) : '·';
+  var ret=eqRetSet(r), done=(r.status==='회수완료');
+  var chip=function(sn){ var isRet=done||ret.indexOf(sn)>=0; return '<span class="eqsn'+(isRet?' ret':'')+'" title="'+(isRet?'회수됨':'')+'">'+esc(sn)+'</span>'; };
+  if(all.length===1) return chip(all[0]);
+  return '<span class="eqser">'+chip(all[0])+' <button type="button" class="eqser-more" data-n="'+(all.length-1)+'" title="'+esc(all.join(', '))+'">외 '+(all.length-1)+'대 ▾</button>'+
+         '<span class="eqser-full" style="display:none">'+all.slice(1).map(chip).join(' ')+'</span></span>';
+}
+document.addEventListener('click', function(e){
+  var b=e.target.closest && e.target.closest('.eqser-more'); if(!b) return;
+  e.stopPropagation();
+  var f=b.parentElement.querySelector('.eqser-full'); if(!f) return;
+  var open=f.style.display!=='none'; f.style.display=open? 'none':'block';
+  b.textContent=open? ('외 '+b.dataset.n+'대 ▾') : '접기 ▴';
+});
+/* 일부 회수: 신청의 returned_serials(회수된 시리얼 목록) */
+function eqRetSet(r){ return String(r.returned_serials||'').split(/[,\s]+/).map(function(s){ return s.trim().toUpperCase(); }).filter(function(s){ return s; }); }
+/* 시리얼 하나가 현황에서 가져야 할 상태 — 신청이 임대중이어도 회수된 시리얼은 회수완료 */
+function eqSerialStatus(o, sn){
+  var stA=EQ_ST[o.status]||null;
+  if(stA==='임대중' && eqRetSet(o).indexOf(String(sn||'').toUpperCase())>=0) return '회수완료';
+  return stA;
+}
+var EQR={r:null};
+function eqRetOpen(r){
+  if(!SB_TOKEN){ openOvl('ovlAuth'); return; }
+  EQR.r=r;
+  var all=eqSerials(r), ret=eqRetSet(r), amap={};
+  (RAWX.assets||[]).forEach(function(a){ amap[String(a.serial||'').toUpperCase()]=a; });
+  $('#erTitle').textContent='#'+r.id+' '+(r.customer||'')+' · '+(r.model||'')+' × '+(r.qty||all.length)+' · 현재 '+(r.status||'')+(r.returned_date? ' · 회수일 '+String(r.returned_date).slice(0,10):'');
+  $('#erDate').value=todayStr(); $('#erNote').value=''; $('#erMsg').textContent='';
+  $('#erList').innerHTML=all.map(function(sn){
+    var a=amap[sn], done=(r.status==='회수완료') || ret.indexOf(sn)>=0 || (a && a.status==='회수완료' && String(a.order_id)===String(r.id));
+    var sub=a? (a.status+(a.returned_date? ' · '+String(a.returned_date).slice(0,10):'')) : '현황에 없음';
+    return '<label style="display:flex;gap:8px;align-items:center;font-size:12.5px;cursor:pointer"><input type="checkbox" data-sn="'+esc(sn)+'"'+(done?' checked':'')+'> <b style="font-family:monospace">'+esc(sn)+'</b> <span class="mini" style="color:var(--muted)">'+esc(sub)+'</span></label>';
+  }).join('');
+  $('#erAll').onclick=function(){ document.querySelectorAll('#erList input').forEach(function(x){ x.checked=true; }); };
+  $('#erNone').onclick=function(){ document.querySelectorAll('#erList input').forEach(function(x){ x.checked=false; }); };
+  $('#erSave').onclick=eqRetSave;
+  openOvl('ovlEqRet');
+}
+async function eqRetSave(){
+  var r=EQR.r; if(!r) return;
+  var all=eqSerials(r), checked=[].slice.call(document.querySelectorAll('#erList input:checked')).map(function(x){ return x.dataset.sn; });
+  var date=$('#erDate').value||todayStr(), note=$('#erNote').value.trim();
+  var prev=eqRetSet(r); if(r.status==='회수완료') prev=all.slice();
+  var newly=checked.filter(function(sn){ return prev.indexOf(sn)<0; });
+  var body={};
+  if(checked.length===all.length && all.length){            /* 전부 회수 → 신청 회수완료 */
+    body.returned_serials=checked.join(', '); body.status='회수완료'; body.returned_date=r.returned_date||date;
+  } else {                                                    /* 일부(또는 0대) 회수 → 신청은 계속 진행 중 */
+    body.returned_serials=checked.length? checked.join(', ') : null;
+    if(r.status==='회수완료'){ body.status='설치완료'; body.returned_date=null; }
+  }
+  if(note) body.request_note=(r.request_note? r.request_note+' · ':'')+'['+date+' 회수 '+checked.length+'/'+all.length+'] '+note;
+  var btn=$('#erSave'); btn.disabled=true; $('#erMsg').textContent='저장 중…';
+  try{
+    await sbWrite('PATCH','equipment_orders?id=eq.'+r.id, body);
+    Object.keys(body).forEach(function(k){ r[k]=body[k]; });
+    logChange('update','equipment_orders',r.id,{returned_serials:body.returned_serials, status:body.status||r.status, from:'회수 처리'});
+    r._retDates={}; newly.forEach(function(sn){ r._retDates[sn]=date; });
+    var x=await syncOrderAssets(r); delete r._retDates;
+    closeOvl('ovlEqRet');
+    toast('회수 처리', checked.length+'/'+all.length+'대 회수'+(body.status==='회수완료'? ' · 신청 회수완료':'')+(x? x:''), 'info');
+    DIRTY=true; renderGrid();
+  }catch(e){ $('#erMsg').textContent=String(e.message||e); }
+  btn.disabled=false;
+}
 /* 현황 한 행이 신청과 다른 점 */
 function eqFieldDiff(o,a){
-  var d=[], stA=EQ_ST[o.status]||null;
+  var d=[], stA=eqSerialStatus(o, a.serial);
   if(String(a.status||'')!==String(stA||'')) d.push('상태');
   if(String(a.customer||'')!==String(o.customer||'')) d.push('고객사');
   if(o.model   && String(a.model||'')  !==String(o.model))   d.push('모델');
@@ -6349,24 +6453,29 @@ async function syncOrderAssets(r, st, quiet){
         return o;
       };
       var cur={}; (RAWX.assets||[]).forEach(function(a){ cur[String(a.serial||'').toUpperCase()]=a; });
+      /* 시리얼별 상태: 신청이 임대중이어도 «일부 회수» 된 시리얼은 회수완료 (회수일 = 이번 처리일 › 현황에 있던 날짜 › 신청 회수일 › 오늘) */
+      var retSet=(stA==='임대중')? eqRetSet(r) : [];
+      var mkFor=function(sn){
+        var o=mk(sn), U=sn.toUpperCase(), a=cur[U];
+        if(retSet.indexOf(U)>=0){ o.status='회수완료'; o.returned_date=(r._retDates&&r._retDates[U]) || (a&&a.returned_date? String(a.returned_date).slice(0,10):null) || (r.returned_date? String(r.returned_date).slice(0,10):null) || todayS; }
+        else if(stA==='회수완료'){   /* 전부 회수: 이번에 처리한 시리얼은 이번 날짜, 예전에 먼저 회수된 시리얼은 그때 날짜를 지킵니다 */
+          o.returned_date=(r._retDates&&r._retDates[U]) || (a&&a.returned_date? String(a.returned_date).slice(0,10):null) || (r.returned_date? String(r.returned_date).slice(0,10):null) || todayS; }
+        return o;
+      };
       var ins=[], upd=[];
       want.forEach(function(sn){ (cur[sn.toUpperCase()]? upd : ins).push(sn); });
       if(ins.length){
-        var made=await sbWrite('POST','equipment_assets?select=*', ins.map(mk), 'return=representation');
+        var made=await sbWrite('POST','equipment_assets?select=*', ins.map(mkFor), 'return=representation');
         if(made && made.length) RAWX.assets=(RAWX.assets||[]).concat(made);
-        else RAWX.assets=(RAWX.assets||[]).concat(ins.map(mk));
+        else RAWX.assets=(RAWX.assets||[]).concat(ins.map(mkFor));
       }
-      if(upd.length){
-        var ub=mk(upd[0]); delete ub.serial; ub.updated_at=new Date().toISOString();
-        if(stA==='회수완료' && !r.returned_date){   /* 신청에 회수일이 없을 때만: 이미 회수일이 있는 행은 그 날짜를 지킵니다 */
-          var hasRd=upd.filter(function(sn){ var a=cur[sn.toUpperCase()]; return a && a.returned_date; });
-          var noRd =upd.filter(function(sn){ var a=cur[sn.toUpperCase()]; return !(a && a.returned_date); });
-          var ub2=Object.assign({},ub); delete ub2.returned_date;
-          if(hasRd.length) await eqPatch(hasRd, ub2);
-          if(noRd.length)  await eqPatch(noRd,  ub);
-        } else await eqPatch(upd, ub);
+      if(upd.length){                                   /* 같은 값끼리 묶어 PATCH (회수일이 다르면 따로) */
+        var groups={};
+        upd.forEach(function(sn){ var b=mkFor(sn); delete b.serial; b.updated_at=new Date().toISOString(); var key=JSON.stringify([b.status,b.returned_date,b.customer,b.model,b.channel,b.deployed_date]); (groups[key]=groups[key]||{b:b,list:[]}).list.push(sn); });
+        for(var gk in groups) await eqPatch(groups[gk].list, groups[gk].b);
       }
-      out.push('자산 '+want.length+'대 '+stA+(isPh? ' (시리얼 미등록)':'')+(ins.length? ' · 새로 만든 '+ins.length+'대':''));
+      var nRet=want.filter(function(sn){ return retSet.indexOf(sn.toUpperCase())>=0; }).length;
+      out.push('자산 '+want.length+'대 '+stA+(nRet? ' (그중 '+nRet+'대 회수완료)':'')+(isPh? ' (시리얼 미등록)':'')+(ins.length? ' · 새로 만든 '+ins.length+'대':''));
     }
     if(!quiet) await eqReload();
     return out.length? ' · '+out.join(' · ') : '';
@@ -13008,6 +13117,7 @@ async function exportXlsx(){
     if(c.t==='bool') return v?'Y':'';
     if(c.won) return Math.round(Number(v||0)/1000);            // 천원 단위
     if(typeof v==='number') return v;
+    if(c.raw) return v==null?'':String(v);                       /* 시리얼처럼 화면은 요약, 엑셀은 원본 */
     if(c.fmt){ try{ var fv=c.fmt(v,r); if(fv!=null) return String(fv).replace(/<[^>]*>/g,''); }catch(e){} }
     return v==null?'':String(v);
   }); });
@@ -13287,6 +13397,7 @@ function gridRow(r,g,editing){
         return '<td'+n+'><a href="'+esc(c.href(r[c.k],r))+'" target="_blank" '+
                'style="color:var(--s1);text-decoration:none">'+esc(txt)+'</a></td>';
       }
+      if(c.html) return '<td'+n+' style="white-space:normal">'+txt+'</td>';   /* fmt 가 안전한 HTML 을 만든 열 (시리얼 묶음 등) */
       return '<td'+n+'>'+esc(txt)+'</td>';
     }).join('')+(g.ro?'':'<td class="act"></td>');
     if(g.rowClick){ tr.style.cursor='pointer'; tr.onclick=function(e){
@@ -13313,6 +13424,12 @@ function gridRow(r,g,editing){
         bq.title=r.quote_file? '연결된 견적서 바꾸기/해제' : '견적서 연결';
         bq.onclick=function(){ oiLinkQuote(r); };
         act.appendChild(bq);
+      }
+      if(g.table==='equipment_orders' && eqSerials(r).length && ['배송중','설치완료','회수예정','회수완료'].indexOf(r.status)>=0){
+        var br=document.createElement('button'); br.textContent='↩'; br.title='회수 처리 — 시리얼을 골라 일부만 회수할 수 있습니다';
+        br.style.color='var(--s2,#d95926)';
+        br.onclick=function(){ eqRetOpen(r); };
+        act.appendChild(br);
       }
       var be=document.createElement('button'); be.textContent='✎';
       be.onclick=function(){ edit(); };
