@@ -1314,6 +1314,15 @@ html[data-look="cc"] .ask-ico{display:none}
 .rpb-text{margin:6px 0 0;line-height:1.6;color:var(--ink-2)}
 .rpb-note{width:100%;min-height:76px;border:1px solid var(--ring);border-radius:9px;padding:8px 10px;font:inherit;font-size:12.5px;background:var(--surface-2);color:var(--ink);resize:vertical}
 .rpb-note.rpb-body{min-height:130px;background:var(--surface)}
+.rpb-cm{border:1px solid var(--ring);border-radius:10px;background:var(--surface-2);overflow:hidden}
+.rpb-cm .rpb-note{border:0;border-radius:0;min-height:72px;background:transparent}
+.rpb-cmh{display:flex;align-items:center;gap:8px;padding:6px 10px 0}
+.rpb-cmh .lb{font-size:11.5px;font-weight:700;color:var(--brand)}
+.rpb-cms.busy{color:var(--brand)}
+.rpb-cms.busy::after{content:'';display:inline-block;width:8px;height:8px;margin-left:6px;border-radius:50%;border:2px solid var(--brand);border-top-color:transparent;animation:rpbspin .8s linear infinite;vertical-align:-1px}
+@keyframes rpbspin{to{transform:rotate(360deg)}}
+.rpb-it.rpb-sum{border-color:var(--brand)}
+.rpb-it.rpb-sum .rpb-n{background:var(--brand);color:#fff}
 .h160{height:160px}
 
 /* ── 장비 대시보드 (요약 타일 · 차트 · 상태 보드) ── */
@@ -2811,7 +2820,7 @@ window.addEventListener('message', function(ev){
 });
 
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-16 ㊿+108';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-16 ㊿+109';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -13457,8 +13466,10 @@ function rpbSave(){ try{ localStorage.setItem(rpbKey(), JSON.stringify(RPB.items
 function rpbAdd(it){
   var L=rpbList(); it.id='r'+Date.now().toString(36)+Math.random().toString(36).slice(2,5); it.at=new Date().toISOString(); it.note=it.note||'';
   L.push(it); rpbSave();
-  toast('리포트에 담았습니다 ('+L.length+')', (it.title||'')+' — 도구 › 리포트에서 순서를 정하고 PPT 로 내보내세요', 'ok');
+  var auto = it.t!=='text' && it.t!=='ai' && !it.note;
+  toast('리포트에 담았습니다 ('+L.length+')', (it.title||'')+(auto? (AICFG.enabled? ' — AI 가 코멘트를 쓰고 있습니다':' — 코멘트 자동 작성 (규칙형)') : '')+' · 도구 › 리포트에서 PPT 로 내보내기', 'ok');
   if(CUR_VIEW==='report') try{ renderRpBuilder(); }catch(e){}
+  if(auto) try{ rpbAiComment(it); }catch(e){}       // 코멘트는 AI 가 씀 (실패·미연결이면 규칙형 문장)
 }
 function rpbBadge(){
   var n=rpbList().length;
@@ -13561,7 +13572,7 @@ function rpbInject(){
 try{ new MutationObserver(function(){ if(RPB._t) return; RPB._t=requestAnimationFrame(function(){ RPB._t=0; try{ rpbInject(); }catch(e){} }); }).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['class']}); }catch(e){}
 
 /* ---- 리포트 화면: 담은 항목 편집 + PPT ---- */
-var RPV={tab:'build', title:'서비스사업부 리포트', sub:''};
+var RPV={tab:'build', title:'서비스사업부 리포트', sub:'', autoSum:(function(){ try{ return localStorage.getItem('svc_rpb_autosum')!=='0'; }catch(e){ return true; } })()};
 function renderRpBuilder(){
   var host=$('#rpBody'); if(!host) return;
   var L=rpbList();
@@ -13569,24 +13580,30 @@ function renderRpBuilder(){
   var TL={kpi:'KPI',chart:'차트',table:'표',text:'텍스트',ai:'AI 답변'};
   var h='<div class="pr-top"><span style="font-size:19px;font-weight:600;letter-spacing:-.01em">리포트</span>'+
     '<div class="eqb-seg" role="tablist"><button type="button" data-rpv="build" aria-pressed="true">담은 항목으로 만들기</button><button type="button" data-rpv="auto" aria-pressed="false">월간 자동 리포트</button></div>'+
-    '<span class="mini">포탈 어디서든 카드·타일·표 오른쪽 위 <b>＋</b> 를 누르면 여기에 담깁니다 · 이 브라우저·계정에만 저장</span></div>'+
+    '<span class="mini">포탈 어디서든 카드·타일·표 오른쪽 위 <b>＋</b> 를 누르면 여기에 담기고, 코멘트는 <b>AI 가</b> 숫자를 읽고 씁니다 · 이 브라우저·계정에만 저장</span></div>'+
     '<div class="pr-card" style="margin-bottom:14px"><div class="pr-ctl" style="margin:0">'+
       '<span class="pr-f"><span class="l">제목</span><input id="rpbTitle" value="'+esc(RPV.title)+'" style="'+inSt+';width:300px"></span>'+
       '<span class="pr-f"><span class="l">표지 라벨</span><input id="rpbSub" value="'+esc(RPV.sub||thisMonthStr())+'" style="'+inSt+';width:140px"></span>'+
-      '<span class="pr-f"><span class="l">&nbsp;</span><span style="display:flex;gap:6px;flex-wrap:wrap"><button class="pill" id="rpbPpt" style="height:34px;background:var(--brand);border-color:var(--brand);color:#fff;font-weight:600"'+(L.length?'':' disabled')+'>⬇ PPT 다운로드 ('+L.length+'개 항목)</button>'+
+      '<span class="pr-f"><span class="l">&nbsp;</span><span style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><button class="pill" id="rpbPpt" style="height:34px;background:var(--brand);border-color:var(--brand);color:#fff;font-weight:600"'+(L.length?'':' disabled')+'>⬇ PPT 다운로드 ('+L.length+'개 항목)</button>'+
+      '<button class="pill ghost" id="rpbAiAll" style="height:34px"'+(L.length?'':' disabled')+' title="직접 고친 코멘트는 그대로 두고, 나머지 항목의 코멘트를 AI 가 다시 씁니다">✦ AI 코멘트 전체 작성</button>'+
+      '<button class="pill ghost" id="rpbAiSum" style="height:34px"'+(L.length?'':' disabled')+' title="담은 항목 전체를 읽고 첫 장 «요약» 슬라이드를 AI 가 씁니다">✦ AI 요약 슬라이드</button>'+
+      '<label class="mini" style="display:inline-flex;align-items:center;gap:5px;cursor:pointer" title="PPT 를 만들 때 요약 슬라이드가 없으면 AI 가 자동으로 넣습니다"><input type="checkbox" id="rpbAutoSum"'+(RPV.autoSum!==false?' checked':'')+'> 내보낼 때 요약 자동</label>'+
       '<button class="pill ghost" id="rpbText" style="height:34px">＋ 텍스트 슬라이드</button><button class="pill ghost" id="rpbClear" style="height:34px;color:var(--critical)"'+(L.length?'':' disabled')+'>전체 비우기</button></span></span>'+
       '<span class="pr-note" id="rpbMsg" style="margin-left:auto"></span></div></div>';
   if(!L.length){
     h+='<div class="card" style="padding:36px;text-align:center"><div style="font-size:14px;font-weight:600;margin-bottom:6px">아직 담은 항목이 없습니다</div>'+
-      '<p class="cap" style="margin:0">홈 타일·차트, 임대 장비 대시보드, 클라우드 비용, 가격표 비교, 계약·OI 표(«＋ 리포트» 버튼), AI 답변 카드의 <b>＋</b> 로 담으세요. 담은 순서대로 슬라이드가 됩니다 — 여기서 순서·제목·코멘트를 고칠 수 있습니다.</p></div>';
+      '<p class="cap" style="margin:0">홈 타일·차트, 임대 장비 대시보드, 클라우드 비용, 가격표 비교, 계약·OI 표(«＋ 리포트» 버튼), AI 답변 카드의 <b>＋</b> 로 담으세요. 담은 순서대로 슬라이드가 되고, 각 슬라이드의 코멘트와 첫 장 요약은 AI 가 데이터를 읽고 씁니다.</p></div>';
   }else{
     h+='<div id="rpbList">'+L.map(function(it,i){
-      return '<div class="rpb-it" data-id="'+it.id+'"><div class="rpb-h"><span class="rpb-n">'+(i+1)+'</span>'+
+      var isSum = it.ai==='summary', isTxt = it.t==='text' && !isSum;
+      return '<div class="rpb-it'+(isSum?' rpb-sum':'')+'" data-id="'+it.id+'"><div class="rpb-h"><span class="rpb-n">'+(i+1)+'</span>'+
         '<input class="rpb-title" data-f="title" value="'+esc(it.title||'')+'" placeholder="슬라이드 제목">'+
-        '<span class="ctag">'+(TL[it.t]||it.t)+'</span><span class="mini">'+esc(viewLabel(it.from)||'')+' · '+esc(String(it.at||'').slice(5,16).replace('T',' '))+'</span>'+
-        '<span style="margin-left:auto;display:flex;gap:4px"><button type="button" class="cbtn" data-mv="-1" title="위로">▲</button><button type="button" class="cbtn" data-mv="1" title="아래로">▼</button><button type="button" class="cbtn" data-del="1" title="빼기" style="color:var(--critical)">×</button></span></div>'+
+        '<span class="ctag">'+(isSum? 'AI 요약' : (TL[it.t]||it.t))+'</span><span class="mini">'+esc(viewLabel(it.from)||'')+' · '+esc(String(it.at||'').slice(5,16).replace('T',' '))+'</span>'+
+        '<span style="margin-left:auto;display:flex;gap:4px">'+(isSum? '<button type="button" class="cbtn" data-ai="sum" title="담은 항목 전체를 다시 읽고 요약을 새로 씁니다">↻ AI 다시 쓰기</button>':'')+'<button type="button" class="cbtn" data-mv="-1" title="위로">▲</button><button type="button" class="cbtn" data-mv="1" title="아래로">▼</button><button type="button" class="cbtn" data-del="1" title="빼기" style="color:var(--critical)">×</button></span></div>'+
         '<div class="rpb-b"><div class="rpb-prev" id="rpbP_'+it.id+'"></div>'+
-        '<textarea class="rpb-note" data-f="note" placeholder="슬라이드 하단 코멘트 (선택) — 예: 전월 대비 증가 원인은 에스원 신규 3건">'+esc(it.note||'')+'</textarea></div></div>';
+        (isSum||isTxt? '' :
+        '<div class="rpb-cm"><div class="rpb-cmh"><span class="lb">✦ AI 코멘트</span><span class="mini rpb-cms"></span><span style="margin-left:auto"><button type="button" class="cbtn" data-ai="1" title="이 항목의 숫자를 다시 읽고 코멘트를 새로 씁니다">↻ AI 다시 쓰기</button></span></div>'+
+        '<textarea class="rpb-note" data-f="note" placeholder="AI 가 이 항목의 숫자를 읽고 코멘트를 씁니다 — 필요하면 여기서 고치세요">'+esc(it.note||'')+'</textarea></div>')+'</div></div>';
     }).join('')+'</div>';
   }
   host.innerHTML=h;
@@ -13595,10 +13612,14 @@ function renderRpBuilder(){
   var bt=$('#rpbText'); if(bt) bt.onclick=function(){ rpbAdd({t:'text', title:'메모', text:'', from:'report'}); };
   var bc=$('#rpbClear'); if(bc) bc.onclick=function(){ if(!confirm('담은 항목 '+L.length+'개를 모두 비울까요?')) return; RPB.items=[]; rpbSave(); renderRpBuilder(); };
   var bp=$('#rpbPpt'); if(bp) bp.onclick=rpbMakePpt;
-  L.forEach(function(it){ rpbPreview(it, document.getElementById('rpbP_'+it.id)); });
+  var ba=$('#rpbAiAll'); if(ba) ba.onclick=function(){ ba.disabled=true; rpbAiAll({}).then(function(){ ba.disabled=false; }); };
+  var bs=$('#rpbAiSum'); if(bs) bs.onclick=function(){ bs.disabled=true; rpbAiSummary({}).then(function(){ bs.disabled=false; }); };
+  var cs=$('#rpbAutoSum'); if(cs) cs.onchange=function(){ RPV.autoSum=cs.checked; try{ localStorage.setItem('svc_rpb_autosum', cs.checked?'1':'0'); }catch(e){} };
+  L.forEach(function(it){ rpbPreview(it, document.getElementById('rpbP_'+it.id)); rpbNoteRefresh(it); });
   host.querySelectorAll('.rpb-it').forEach(function(row){
     var id=row.dataset.id, it=L.filter(function(x){ return x.id===id; })[0]; if(!it) return;
-    row.querySelectorAll('[data-f]').forEach(function(inp){ inp.oninput=function(){ it[inp.dataset.f]=inp.value; }; inp.onblur=function(){ rpbSave(); }; });
+    row.querySelectorAll('[data-f]').forEach(function(inp){ inp.oninput=function(){ it[inp.dataset.f]=inp.value; if(inp.dataset.f==='note'){ it.noteSrc='user'; rpbNoteRefresh(it); } }; inp.onblur=function(){ rpbSave(); }; });
+    var ab=row.querySelector('[data-ai]'); if(ab) ab.onclick=function(){ if(ab.dataset.ai==='sum') rpbAiSummary({}); else rpbAiComment(it,{force:true}); };
     row.querySelectorAll('[data-mv]').forEach(function(b){ b.onclick=function(){ var i=L.indexOf(it), j=i+(+b.dataset.mv); if(j<0||j>=L.length) return; L.splice(i,1); L.splice(j,0,it); rpbSave(); renderRpBuilder(); }; });
     var d=row.querySelector('[data-del]'); if(d) d.onclick=function(){ L.splice(L.indexOf(it),1); rpbSave(); renderRpBuilder(); };
   });
@@ -13627,8 +13648,161 @@ function rpbSvgPng(svg){
     }catch(e){ res(null); }
   });
 }
+/* ---- AI 코멘트: 담은 항목의 숫자를 AI 가 읽고 슬라이드 코멘트·요약을 씀 (손으로 쓰지 않음) ----
+   · 담을 때 자동(rpbAdd) · 항목별 «↻ 다시 쓰기» · 전체 작성 · 요약 슬라이드 · PPT 내보내기 전 빈 코멘트 자동 채움
+   · 중계는 기존 ask 함수 mode:'narrate'(계산 결과 해설용) → 실패 시 mode:'free' → AI 미연결이면 규칙형 문장
+   · 고객명은 기존 해설과 같이 마스킹해 보내고(AICFG.maskNames), 받은 문장에서 다시 원래 이름으로 되돌림
+   · it.noteSrc: 'ai' | 'rule' | 'user'(직접 고침 — 전체 작성 때 덮어쓰지 않음)                                   */
+RPB.busy={};
+function rpbSents(t){ return (String(t||'').replace(/\n+/g,' ').match(/[^.。!?]+[.。!?]?/g)||[]).map(function(x){ return x.trim(); }).filter(Boolean); }
+function rpbMasker(){
+  var custSet={}; try{ uniqCache('cust').forEach(function(n){ if(n) custSet[String(n)]=1; }); }catch(e){}
+  var on=!!AICFG.maskNames, alias={}, back={}, seq=0;
+  function mn(s){ if(!on) return s; s=String(s==null?'':s); var k=s.trim(); if(!custSet[k]) return s; if(!alias[k]){ var a='고객'+String.fromCharCode(65+(seq%26))+(seq>=26? Math.floor(seq/26):''); seq++; alias[k]=a; back[a]=k; } return alias[k]; }
+  function un(t){ t=String(t||''); Object.keys(back).sort(function(a,b){ return b.length-a.length; }).forEach(function(a){ t=t.split(a).join(back[a]); }); return t; }
+  return {mn:mn, un:un};
+}
+function rpbAiClean(t){
+  t=String(t==null?'':t).replace(/\r/g,'').trim();
+  t=t.replace(/^\s*(?:«[^»]*»\s*)?(?:코멘트|요약|AI\s*코멘트|슬라이드\s*코멘트)?\s*[:：]\s*/i,'').replace(/\*\*/g,'').replace(/^#+\s*/gm,'');
+  t=t.replace(/^["“]+|["”]+$/g,'').trim();
+  return t;
+}
+function rpbRuleComment(it){
+  var out=[];
+  if(it.kpis&&it.kpis.length){ out.push(it.kpis.slice(0,4).map(function(k){ return String(k[0]||'').trim()+' '+String(k[1]||'').trim()+(k[2]? ' ('+String(k[2]).trim()+')':''); }).join(' · ')); }
+  if(it.chart&&it.chart.series&&it.chart.series.length){
+    var c=it.chart, fmt=c.money? function(v){ return won(v)+'천원'; } : function(v){ return Math.round(v).toLocaleString('ko-KR'); };
+    function line(lb,d){ var n=d.length; if(!n) return; var a=d[0], b=d[n-1], mx=0; d.forEach(function(v,i){ if(v>d[mx]) mx=i; }); var ch= a? ((b-a)/Math.abs(a)*100) : null;
+      out.push(lb+' '+c.labels[0]+' '+fmt(a)+' → '+c.labels[n-1]+' '+fmt(b)+(ch!=null? ' ('+(ch>=0?'+':'')+ch.toFixed(1)+'%)':'')+', 최고 '+c.labels[mx]+' '+fmt(d[mx])+'.'); }
+    if(c.series.length>1){                                    // 여러 계열(누적 등) = 합계로 말하고, 마지막 시점 1위 계열만 덧붙임
+      var tot=c.labels.map(function(_,i){ return c.series.reduce(function(a,s){ return a+Number((s.data||[])[i]||0); },0); });
+      line('합계는', tot);
+      var last=c.series.map(function(s){ return {l:s.label||'', v:Number((s.data||[])[c.labels.length-1]||0)}; }).sort(function(a,b){ return b.v-a.v; })[0];
+      if(last&&last.v&&tot[tot.length-1]) out.push('마지막 시점 비중 1위는 '+last.l+' ('+Math.round(last.v/tot[tot.length-1]*100)+'%).');
+    } else line((c.series[0].label||'값')+'은(는)', (c.series[0].data||[]).map(Number));
+  }
+  if(it.table&&it.table.head&&it.table.rows&&it.table.rows.length){
+    var T=it.table, rows=T.rows.filter(function(r){ return !/^(합계|소계|총계)$/.test(String(r[0]||'')); });
+    var numCol=-1; for(var ci=1; ci<T.head.length; ci++){ var ok=rows.slice(0,8).filter(function(r){ return /^[₩\-−]?[\d,.]+\s*[%천원건대]*$/.test(String(r[ci]||'').trim()); }).length; if(ok>=Math.min(3,rows.length)){ numCol=ci; break; } }
+    var s='총 '+(T.total||T.rows.length)+'행';
+    var lblCol=-1; ['고객','업체','이름','명$','항목','채널','모델','서비스','파트너','구분'].some(function(re){ T.head.forEach(function(h,ci){ if(lblCol<0 && new RegExp(re).test(String(h||''))) lblCol=ci; }); return lblCol>=0; });
+    function lbl(r){ var v= lblCol>=0? r[lblCol] : ''; if(!v){ for(var k=0;k<r.length;k++){ if(k!==numCol && String(r[k]||'').trim()){ v=r[k]; break; } } } return String(v||'').trim(); }
+    if(numCol>=0){ var top=null, tv=-Infinity; rows.forEach(function(r){ var v=parseFloat(String(r[numCol]||'').replace(/[^\d.\-]/g,'')); if(isFinite(v)&&v>tv){ tv=v; top=r; } }); if(top) s+=', '+T.head[numCol]+' 기준 가장 큰 항목은 '+lbl(top)+' ('+top[numCol]+')'; }
+    out.push(s+'.');
+  }
+  if(!out.length && it.text){ var first=rpbSents(it.text)[0]||''; if(first) out.push(first.trim().slice(0,160)); }
+  return out.join(' ');
+}
+function rpbAiPayload(it, mk){
+  var ttl=it.title||'', p={
+    question:'리포트 슬라이드 «'+ttl+'» 하단에 넣을 코멘트를 한국어 평서문 2~3문장으로 써줘. 아래 데이터만 근거로 핵심 수치·변화·시사점만 쓰고, 인사말·서론·이모지·마크다운 없이 문장만 답해.',
+    restate:'', headline:'', sub:it.sub||'', chart:null, table:null, unit:'', note:'출처 화면: '+(viewLabel(it.from)||it.from||'')
+  };
+  if(it.kpis&&it.kpis.length){ p.headline=String(it.kpis[0][0]||'')+' '+String(it.kpis[0][1]||''); p.table={cols:['지표','값','비고'], rows:it.kpis.map(function(k){ return [mk.mn(k[0]), String(k[1]||''), mk.mn(k[2]||'')]; })}; }
+  if(it.chart&&it.chart.series){ var c=it.chart, div=c.money? 1000:1; p.unit=c.money? '천원(KRW)':''; p.chart={labels:(c.labels||[]).slice(-36).map(mk.mn), series:c.series.map(function(s){ return {label:s.label||'값', data:(s.data||[]).slice(-36).map(function(v){ return Math.round(Number(v||0)/div); })}; })}; }
+  if(it.table&&it.table.head){ var T=it.table, rows=T.rows.slice(0,15); p.table={cols:T.head, rows:rows.map(function(r){ return r.map(mk.mn); })}; if(T.rows.length>15) p.note+=' · 표는 '+T.rows.length+'행 중 15행만 발췌'; if(!p.unit && T.head.some(function(x){ return /천원|금액|월액|MRR|ARR/.test(String(x)); })) p.unit='천원(KRW)'; }
+  if(it.text){ p.restate=String(it.text).slice(0,900); }
+  return p;
+}
+function rpbAiSummaryPayload(L, mk){
+  var rows=L.filter(function(x){ return x.ai!=='summary'; }).map(function(x){
+    var k='';
+    if(x.kpis&&x.kpis.length) k=x.kpis.slice(0,3).map(function(q){ return q[0]+' '+q[1]; }).join(', ');
+    else if(x.chart&&x.chart.series&&x.chart.series.length){ var s=x.chart.series[0], d=s.data||[], n=d.length, div=x.chart.money?1000:1; k=(s.label||'')+' '+(x.chart.labels[0]||'')+' '+Math.round(d[0]/div).toLocaleString('ko-KR')+' → '+(x.chart.labels[n-1]||'')+' '+Math.round(d[n-1]/div).toLocaleString('ko-KR')+(x.chart.money?' 천원':''); }
+    else if(x.table&&x.table.rows) k='표 '+(x.table.total||x.table.rows.length)+'행 ('+x.table.head.slice(0,4).join('·')+')';
+    else if(x.text) k=String(x.text).replace(/\s+/g,' ').slice(0,120);
+    return [mk.mn(x.title||''), k, (x.noteSrc!=='user'&&x.note? String(x.note).slice(0,200) : String(x.note||'').slice(0,200))];
+  });
+  return {
+    question:'아래 슬라이드 목록으로 «'+(RPV.title||'리포트')+'» 첫 장 «요약» 슬라이드 본문을 써줘. 한 줄에 하나씩 3~5줄, 각 줄은 핵심 수치가 들어간 짧은 한국어 문장. 번호·글머리 기호·인사말·마크다운 없이 줄만 답해.',
+    restate:'', headline:RPV.title||'', sub:RPV.sub||thisMonthStr(), chart:null,
+    table:{cols:['슬라이드','핵심 수치','코멘트'], rows:rows}, unit:'금액은 천원(KRW)', note:'슬라이드 '+rows.length+'장'
+  };
+}
+async function rpbAiText(payload){
+  var x=null;
+  try{ x=await aiFetch({mode:'narrate', payload:payload}, 45000); }catch(e){ x=null; }
+  if(x && x.ok && x.text) return String(x.text);
+  var q=payload.question+'\n\n[데이터]'+(payload.headline? '\n대표값: '+payload.headline:'')+(payload.sub? '\n부제: '+payload.sub:'')+(payload.restate? '\n본문: '+payload.restate:'')+
+    (payload.chart? '\n차트 라벨: '+payload.chart.labels.join(', ')+payload.chart.series.map(function(s){ return '\n'+s.label+': '+s.data.join(', '); }).join(''):'')+
+    (payload.table? '\n표 열: '+payload.table.cols.join(' | ')+payload.table.rows.map(function(r){ return '\n'+r.join(' | '); }).join(''):'')+(payload.unit? '\n단위: '+payload.unit:'')+(payload.note? '\n'+payload.note:'');
+  try{ x=await aiFetch({mode:'free', question:q, digest:buildDigest()}, 45000); }catch(e){ x=null; }
+  if(x && x.ok && x.text) return String(x.text);
+  return null;
+}
+function rpbNoteRefresh(it){
+  var row=document.querySelector('.rpb-it[data-id="'+it.id+'"]'); if(!row) return;
+  var ta=row.querySelector('.rpb-note[data-f="note"]'), st=row.querySelector('.rpb-cms'), bt=row.querySelector('[data-ai]');
+  if(ta && document.activeElement!==ta) ta.value=it.note||'';
+  if(st){ var b=RPB.busy[it.id]; st.textContent= b==='busy'? 'AI 가 쓰는 중…' : b==='err'? 'AI 응답 없음 — 규칙형으로 대체' : it.noteSrc==='user'? '직접 수정' : it.noteSrc==='rule'? '규칙형 (AI 미연결)' : it.note? 'AI 작성':'—'; st.className='mini rpb-cms'+(b==='busy'?' busy':''); }
+  if(bt) bt.disabled=(RPB.busy[it.id]==='busy');
+  if(it.ai==='summary'){ var body=row.querySelector('.rpb-body'); if(body && document.activeElement!==body) body.value=it.text||''; }
+}
+async function rpbAiComment(it, opts){
+  opts=opts||{};
+  if(!it || RPB.busy[it.id]==='busy') return false;
+  if(it.noteSrc==='user' && !opts.force) return false;
+  RPB.busy[it.id]='busy'; rpbNoteRefresh(it);
+  var mk=rpbMasker(), txt=null;
+  if(AICFG.enabled){ try{ txt=await rpbAiText(rpbAiPayload(it, mk)); }catch(e){ txt=null; } }
+  if(txt){ it.note=rpbAiClean(mk.un(txt)).slice(0,600); it.noteSrc='ai'; RPB.busy[it.id]=0; }
+  else { if(!it.note || it.noteSrc!=='user'){ it.note=rpbRuleComment(it); it.noteSrc='rule'; } RPB.busy[it.id]= AICFG.enabled? 'err' : 0; }
+  rpbSave(); rpbNoteRefresh(it);
+  return !!txt;
+}
+async function rpbAiSummary(opts){
+  opts=opts||{};
+  var L=rpbList(), items=L.filter(function(x){ return x.ai!=='summary'; }); if(!items.length) return null;
+  var it=L.filter(function(x){ return x.ai==='summary'; })[0];
+  if(!it){ it={t:'text', title:'요약', text:'', from:'report', ai:'summary', id:'r'+Date.now().toString(36)+'s', at:new Date().toISOString(), note:''}; L.unshift(it); rpbSave(); if(CUR_VIEW==='report' && !opts.quiet) renderRpBuilder(); }
+  if(RPB.busy[it.id]==='busy') return it;
+  RPB.busy[it.id]='busy'; rpbNoteRefresh(it);
+  var mk=rpbMasker(), txt=null;
+  if(AICFG.enabled){ try{ txt=await rpbAiText(rpbAiSummaryPayload(L, mk)); }catch(e){ txt=null; } }
+  if(txt){ var lines=rpbAiClean(mk.un(txt)).split(/\n+/).map(function(s){ return s.replace(/^\s*(?:[-•▪▸*]|\d+[.)])\s+/,'').trim(); }).filter(Boolean); if(lines.length<2) lines=rpbSents(lines.join(' ')); it.text=lines.slice(0,6).join('\n'); it.noteSrc='ai'; RPB.busy[it.id]=0; }
+  else { it.text=items.slice(0,5).map(function(x){ var r=(x.noteSrc!=='user'? rpbRuleComment(x) : x.note)||''; return (x.title||'')+(r? ' — '+(rpbSents(r)[0]||'') : ''); }).join('\n'); it.noteSrc='rule'; RPB.busy[it.id]= AICFG.enabled? 'err':0; }
+  rpbSave(); if(CUR_VIEW==='report' && !opts.quiet) rpbNoteRefresh(it);
+  return it;
+}
+/* 전체 작성: 직접 고친 코멘트는 두고 나머지를 2개씩 병렬로 */
+async function rpbAiAll(opts){
+  opts=opts||{};
+  var L=rpbList().filter(function(x){ return x.ai!=='summary' && x.t!=='text' && x.noteSrc!=='user' && (!opts.missing || !x.note || x.noteSrc==='rule'); });
+  var m=$('#rpbMsg'), done=0, n=L.length, ok=0;
+  if(!n) return 0;
+  if(m) m.textContent='AI 코멘트 작성 중 (0/'+n+')…';
+  var q=L.slice();
+  async function worker(){ while(q.length){ var it=q.shift(); if(await rpbAiComment(it, {force:true})) ok++; done++; if(m) m.textContent='AI 코멘트 작성 중 ('+done+'/'+n+')…'; } }
+  await Promise.all([worker(), worker()]);
+  if(m) m.textContent= AICFG.enabled? ('AI 코멘트 '+ok+'/'+n+'개 작성'+(ok<n? ' · 나머지는 규칙형':'')) : '규칙형 코멘트 '+n+'개 (AI 미연결)';
+  var bp=$('#rpbPpt'); if(bp && !opts.quiet) bp.disabled=false;
+  return ok;
+}
+
+/* 연속한 KPI 타일은 한 슬라이드(최대 6칸)로 묶고, 묶음에는 AI 가 코멘트 하나를 따로 씀(it0.grpNote, 순서가 바뀌면 다시) */
+function rpbKpiGroup(L,i){ var grp=[L[i]], cnt=(L[i].kpis||[]).length; while(i+1<L.length && L[i+1].t==='kpi' && cnt+(L[i+1].kpis||[]).length<=6){ i++; grp.push(L[i]); cnt+=(L[i].kpis||[]).length; } return grp; }
+async function rpbAiGroups(){
+  var L=rpbList(), i=0, jobs=[];
+  while(i<L.length){ if(L[i].t==='kpi'){ var g=rpbKpiGroup(L,i); if(g.length>1){ var key=g.map(function(x){ return x.id; }).join('|'); if(!(g[0].grpNote&&g[0].grpNote.key===key)) jobs.push({g:g,key:key}); } i+=g.length; } else i++; }
+  if(!jobs.length) return;
+  var m=$('#rpbMsg'), mk=rpbMasker(), done=0;
+  for(var j=0;j<jobs.length;j++){ var jb=jobs[j], ks=[]; jb.g.forEach(function(x){ (x.kpis||[]).forEach(function(k){ ks.push(k); }); });
+    var pseudo={title:'요약 지표 ('+jb.g.map(function(x){ return x.title; }).join(' · ')+')', kpis:ks, from:jb.g[0].from, sub:''}, txt=null;
+    if(m) m.textContent='요약 지표 슬라이드 코멘트 작성 중 ('+(j+1)+'/'+jobs.length+')…';
+    if(AICFG.enabled){ try{ txt=await rpbAiText(rpbAiPayload(pseudo, mk)); }catch(e){ txt=null; } }
+    jb.g[0].grpNote={key:jb.key, text: txt? rpbAiClean(mk.un(txt)).slice(0,600) : jb.g.map(function(x){ return x.note||''; }).filter(Boolean).map(function(t){ return rpbSents(t)[0]||''; }).join(' ')}; done++; }
+  rpbSave();
+}
 async function rpbMakePpt(){
   var L=rpbList(), m=$('#rpbMsg'); if(!L.length) return;
+  var bp=$('#rpbPpt'); if(bp) bp.disabled=true;
+  try{
+    /* 내보내기 전: 코멘트가 비었거나 규칙형인 항목은 AI 가 먼저 씀 · 요약 슬라이드 자동(옵션) */
+    if(L.some(function(x){ return x.ai!=='summary' && x.t!=='text' && x.noteSrc!=='user' && (!x.note || (AICFG.enabled && x.noteSrc==='rule')); })) await rpbAiAll({missing:true, quiet:true});
+    await rpbAiGroups();
+    if(RPV.autoSum!==false && !L.some(function(x){ return x.ai==='summary'; })){ if(m) m.textContent='AI 요약 슬라이드 작성 중…'; await rpbAiSummary({quiet:true}); L=rpbList(); if(CUR_VIEW==='report') try{ renderRpBuilder(); m=$('#rpbMsg'); bp=$('#rpbPpt'); if(bp) bp.disabled=true; }catch(e){} }
+  }catch(e){}
   if(m) m.textContent='PPT 생성 중…';
   try{
     await rpLoadPptx();
@@ -13649,7 +13823,12 @@ async function rpbMakePpt(){
     s1.addImage({data:RP_IMG.logoW,x:0.55,y:6.78,w:1.35,h:0.30});
     var secN=0;
     function head(s,t,sb){ secN++; s.addText(secN+'. '+(t||''),{x:0.5,y:0.13,w:11.6,h:0.62,fontSize:20,bold:true,color:NAVY,fontFace:F,valign:'middle'}); if(sb) s.addText(sb,{x:0.5,y:1.02,w:12.3,h:0.32,fontSize:11,color:MUT,fontFace:F}); }
-    function noteOf(s,it,y){ if(it.note) s.addText('➤ '+it.note,{x:0.5,y:y||6.45,w:12.3,h:0.55,fontSize:12,color:NAVY,bold:true,fontFace:F,valign:'top'}); if(it.note) s.addNotes(it.note); }
+    /* 코멘트(AI 작성) — 길이에 맞춰 글자 크기·상자 높이, 하단 로고 위에 딱 맞게 */
+    function noteH(it){ var n=String(it.note||'').length; return !n? 0 : n>230? 0.95 : n>150? 0.8 : n>75? 0.62 : 0.45; }
+    function noteOf(s,it,y){ if(!it.note) return; var n=String(it.note).length, h=noteH(it), fs= n>230? 10.5 : n>150? 11 : 12;
+      s.addShape('rect',{x:0.5,y:6.98-h,w:0.06,h:h,fill:{color:GRN}});
+      s.addText(it.note,{x:0.65,y:6.98-h,w:12.15,h:h,fontSize:fs,color:NAVY,bold:n<=150,fontFace:F,valign:'middle',lineSpacingMultiple:1.05});
+      s.addNotes(it.note); }
     function kpiSlide(items){
       var s=p.addSlide({masterName:'M'}); head(s, items.length===1? items[0].title : '요약 지표');
       var ks=[]; items.forEach(function(it){ (it.kpis||[]).forEach(function(k){ ks.push(k); }); });
@@ -13660,14 +13839,15 @@ async function rpbMakePpt(){
         s.addText(k[0],{x:x+0.28,y:y+0.25,w:w-0.5,h:0.4,fontSize:12,color:MUT,fontFace:F});
         s.addText(k[1],{x:x+0.28,y:y+0.7,w:w-0.5,h:0.85,fontSize:Math.min(30, 30-Math.max(0,String(k[1]).length-14)),bold:true,color:NAVY,fontFace:F});
         if(k[2]) s.addText(k[2],{x:x+0.28,y:y+hgt-0.75,w:w-0.5,h:0.55,fontSize:10.5,color:'4E8A1E',fontFace:F,valign:'top'}); });
-      noteOf(s, items[items.length-1]);
+      noteOf(s, items.length===1? items[0] : {note:(items[0].grpNote&&items[0].grpNote.key===items.map(function(x){ return x.id; }).join('|'))? items[0].grpNote.text : items.map(function(x){ return x.note||''; }).filter(Boolean).map(function(t){ return rpbSents(t)[0]||''; }).join(' ')});
     }
     /* 표: 열 수에 맞춰 글자 크기·열 폭(내용 길이 비례) 조정, 넘치면 «(계속)» 슬라이드로 직접 나눔 */
-    function tableOn(s, T, y, ttl){
+    function tableOn(s, T, y, ttl, bottom){
+      bottom=bottom||6.35;
       var nc=T.head.length, fs= nc>16? 7.5 : nc>12? 8.5 : nc>8? 9.5 : 10.5, rowH= fs<9? 0.26 : 0.3;
       var lens=T.head.map(function(h,ci){ var m=String(h||'').length; T.rows.forEach(function(r){ m=Math.max(m, Math.min(28, String(r[ci]||'').length)); }); return Math.max(3, m); });
       var tot=lens.reduce(function(a,b){ return a+b; },0), colW=lens.map(function(l){ return Math.max(0.55, 12.3*l/tot); }); var cw=colW.reduce(function(a,b){ return a+b; },0); colW=colW.map(function(w){ return w*12.3/cw; });
-      var per=Math.max(4, Math.floor((6.35-y)/rowH)-1);
+      var per=Math.max(4, Math.floor((bottom-y)/rowH)-1);
       function mk(rows0, ri0){ return [T.head.map(function(x){ return {text:x, options:{bold:true,color:NAVY,fill:{color:THD},fontSize:fs,fontFace:F}}; })]
         .concat(rows0.map(function(r,ri){ var last=/^(합계|소계|총계)$/.test(String(r[0]||'')); return r.map(function(c,ci){ return {text:String(c==null?'':c), options:{fontSize:fs-0.5,color:INK,fontFace:F,bold:last,fill:{color:last?'E2EFD9':((ri+ri0)%2?'F7FAF2':'FFFFFF')},align:(ci&&/^[₩$\-−▲▼]?[\d,.\s%~]+[a-zA-Z가-힣]*$/.test(String(c||'').trim())?'right':'left')}}; }); })); }
       var first=T.rows.slice(0,per);
@@ -13680,13 +13860,16 @@ async function rpbMakePpt(){
     var i=0;
     while(i<L.length){
       var it=L[i];
-      if(it.t==='kpi'){ var grp=[it], cnt=(it.kpis||[]).length; while(i+1<L.length && L[i+1].t==='kpi' && cnt+(L[i+1].kpis||[]).length<=6 && !L[i].note){ i++; grp.push(L[i]); cnt+=(L[i].kpis||[]).length; } kpiSlide(grp); i++; continue; }
+      if(it.t==='kpi'){ var grp=rpbKpiGroup(L,i); kpiSlide(grp); i+=grp.length; continue; }
       var s=p.addSlide({masterName:'M'}); head(s, it.title, it.sub);
       var y=it.sub? 1.4:1.3, unit=false;
       if(it.kpis&&it.kpis.length){ var k=it.kpis[0]; s.addText([{text:k[1],options:{bold:true,fontSize:24,color:NAVY}},{text:(k[2]? '   '+k[2]:''),options:{fontSize:12,color:MUT}}],{x:0.5,y:y,w:12.3,h:0.6,fontFace:F}); y+=0.7; }
       if(it.text && it.t!=='text'){ var lines=String(it.text).split(/\n+/).filter(Boolean).slice(0,8); s.addText(lines.map(function(x){ return {text:x, options:{bullet:{code:'25B8',color:GRN}, breakLine:true}}; }),{x:0.55,y:y,w:12.3,h:0.34*lines.length+0.1,fontSize:12.5,color:INK,fontFace:F,valign:'top',lineSpacing:20}); y+=0.34*lines.length+0.25; }
       if(it.t==='text'){ var ls=String(it.text||'').split(/\n+/).filter(Boolean); if(ls.length) s.addText(ls.map(function(x){ return {text:x.replace(/^[-•]\s*/,''), options:{bullet:{code:'25B8',color:GRN}, breakLine:true}}; }),{x:0.55,y:y,w:12.3,h:Math.min(5.2,0.42*ls.length+0.2),fontSize:14,color:INK,fontFace:F,valign:'top',lineSpacing:26}); }
-      var chartH=it.table? 3.0 : (it.note? 4.9 : 5.5);
+      var bot=6.98-(noteH(it)? noteH(it)+0.12 : 0), tb=Math.min(6.35, bot-0.08);
+      var hasT=!!(it.table&&it.table.head&&it.table.rows.length), tLim=Math.floor((tb-(y+3.15))/0.3)-1;
+      var tFit= hasT && (it.chart||it.svg) && tLim>=3 && it.table.rows.length<=tLim;      // 표가 차트 아래에 들어가면 차트를 낮게, 아니면 표는 다음 슬라이드·차트는 크게
+      var chartH= tFit? 3.0 : Math.min(5.5, bot-0.15-y);
       if(it.chart){
         var c=it.chart, div=c.money? 1000:1; unit=c.money;
         var data=c.series.map(function(sr){ return {name:sr.label||'값', labels:c.labels, values:sr.data.map(function(v){ return Math.round(v/div); })}; });
@@ -13700,8 +13883,8 @@ async function rpbMakePpt(){
       }
       if(it.table&&it.table.head&&it.table.rows.length){
         var T=it.table; if(!unit) unit=T.head.some(function(x){ return /천원|금액|월액|MRR|ARR/.test(String(x)); });
-        if(it.chart||it.svg){ var lim=Math.floor((6.3-y)/0.3)-1; if(lim>=3 && T.rows.length<=lim) tableOn(s,T,y,it.title); else { var s2=p.addSlide({masterName:'M'}); secN--; head(s2, it.title+' — 표'); tableOn(s2,T,1.3,it.title+' — 표'); } }
-        else tableOn(s,T,y,it.title);
+        if(it.chart||it.svg){ if(tFit) tableOn(s,T,y,it.title,tb); else { var s2=p.addSlide({masterName:'M'}); secN--; head(s2, it.title+' — 표'); tableOn(s2,T,1.3,it.title+' — 표'); } }
+        else tableOn(s,T,y,it.title,tb);
       }
       noteOf(s,it);
       if(unit) s.addText('※ 금액 단위: 천원',{x:1.75,y:7.02,w:5.2,h:0.3,fontSize:10,italic:true,color:MUT,fontFace:F});
@@ -13712,6 +13895,7 @@ async function rpbMakePpt(){
     if(m) m.textContent='다운로드했습니다 — '+fn;
     toast('PPT 생성 완료', L.length+'개 항목 · '+fn, 'ok');
   }catch(e){ if(m) m.textContent='실패: '+String(e.message||e).slice(0,120); toast('PPT 생성 실패', String(e.message||e).slice(0,100), 'bad'); }
+  finally{ var bp2=$('#rpbPpt'); if(bp2) bp2.disabled=false; }
 }
 
 function renderReport(){
