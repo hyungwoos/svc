@@ -2844,7 +2844,7 @@ window.addEventListener('message', function(ev){
 });
 
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-16 ㊿+110';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-16 ㊿+111';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -13828,7 +13828,7 @@ function qbRun(spec){
     }
   } else {
     var sel=(spec.sel||[]).filter(function(id){ return qbCol(id); });
-    if(!sel.length) sel=base.cols.slice(0,10).map(function(c){ return c.id; });
+    if(!sel.length){ sel=base.cols.slice(0,10).map(function(c){ return c.id; }); var num=base.cols.filter(function(c){ return c.t==='num' && !c.noSum; })[0]; if(num && sel.indexOf(num.id)<0) sel.push(num.id); }   // 기본 열에 금액·수량 열 하나는 포함 (차트용)
     sel.forEach(function(id){ var c=qbCol(id); cols.push({id:id, l:(c.src===spec.base? '' : S[c.src].label+' › ')+c.l, t:c.t, won:c.won, src:c, noSum:!!c.noSum}); });
     out=rows.map(function(cr){ return sel.map(function(id){ return qbGet(cr,id); }); });
   }
@@ -13847,19 +13847,41 @@ function qbRun(spec){
   return {cols:cols, rows:out, total:total, baseN:baseN, joinedN:joinedN, filteredN:filteredN, sums:sums, warn:warn, ms:Date.now()-t0, grouped:!!(by.length||aggs.length||piv), pivot:!!piv};
 }
 /* 결과 → 차트 데이터 (묶기가 있을 때): x = 첫 묶음 열, 계열 = 집계 열(또는 피벗 열) */
-function qbChart(res){
-  if(!res || !res.grouped || !res.rows.length) return null;
-  var gi=res.cols.findIndex(function(c){ return c.group; }); if(gi<0) return null;
-  var all=res.cols.map(function(c,i){ return {c:c,i:i}; }).filter(function(x){ return !x.c.group && x.c.t==='num' && !x.c.ptot; });
-  if(!all.length) return null;
+function qbPickMeasures(all){
   var measures=all, pick=QB.chartM;                                   // 차트에 그릴 값: 선택(QB.chartM) 또는 자동
   if(pick && pick!=='all'){ measures=all.filter(function(m){ return m.c.id===pick; }); if(!measures.length) measures=all; }
   else if(!pick || pick==='auto'){ var wonM=all.filter(function(m){ return m.c.won; }); if(wonM.length && wonM.length<all.length) measures=wonM; }   // 금액과 건수가 섞이면 금액만 (축 단위가 다름)
-  var rows=res.rows.slice(0,40), labels=rows.map(function(r){ return r[gi]==null? '(없음)':String(r[gi]); });
-  var gcol=res.cols[gi], isTime= gcol.tr==='ym'||gcol.tr==='y'||gcol.tr==='q'||(gcol.src&&(gcol.src.t==='month'||gcol.src.t==='date')&&!gcol.tr);
-  var series=measures.slice(0,12).map(function(m){ return {label:m.c.l, data:rows.map(function(r){ return Number(r[m.i])||0; })}; });
-  var money=measures.every(function(m){ return m.c.won; });
-  return {type: isTime? 'lines':'bars', labels:labels, series:series, money:money, truncated:res.rows.length>40, all:all, picked:measures.length===all.length? 'all' : (measures.length===1? measures[0].c.id : 'auto')};
+  return measures;
+}
+/* 결과 → 차트 데이터
+   · 묶기(집계)가 있으면: x = 첫 묶음 열, 계열 = 집계/피벗 열
+   · 행 그대로면: x = 구분 열(고객사·서비스·월 …, 선택 가능 QB.chartX) 로 행을 합산해서 그림 — 숫자 열이 없으면 건수 */
+function qbChart(res){
+  if(!res || !res.rows.length) return null;
+  var cols=res.cols;
+  if(res.grouped){
+    var gi=cols.findIndex(function(c){ return c.group; }); if(gi<0) return null;
+    var all=cols.map(function(c,i){ return {c:c,i:i}; }).filter(function(x){ return !x.c.group && x.c.t==='num' && !x.c.ptot; });
+    if(!all.length) return null;
+    var measures=qbPickMeasures(all);
+    var rows=res.rows.slice(0,40), labels=rows.map(function(r){ return r[gi]==null? '(없음)':String(qbFmtCell(r[gi], cols[gi])||'(없음)'); });
+    var gcol=cols[gi], isTime= gcol.tr==='ym'||gcol.tr==='y'||gcol.tr==='q'||(gcol.src&&(gcol.src.t==='month'||gcol.src.t==='date')&&!gcol.tr);
+    var series=measures.slice(0,12).map(function(m){ return {label:m.c.l, data:rows.map(function(r){ return Number(r[m.i])||0; })}; });
+    return {type: isTime? 'lines':'bars', labels:labels, series:series, money:measures.every(function(m){ return m.c.won; }), truncated:res.rows.length>40, all:all, picked:measures.length===all.length? 'all' : (measures.length===1? measures[0].c.id : 'auto'), xLabel:gcol.l};
+  }
+  var xs=cols.map(function(c,i){ return {c:c,i:i}; }).filter(function(x){ return x.c.t!=='num' && x.c.t!=='bool'; });
+  if(!xs.length) return null;
+  var xi=xs.filter(function(x){ return x.c.id===QB.chartX; })[0] || xs.filter(function(x){ return !/번호|시리얼|비고|요청|메모|note/i.test(x.c.l); })[0] || xs[0];
+  var ms=cols.map(function(c,i){ return {c:c,i:i}; }).filter(function(x){ return x.c.t==='num' && !x.c.noSum; });
+  var count=!ms.length; if(count) ms=[{c:{id:'__count', l:'건수', t:'num'}, i:-1}];
+  var meas=qbPickMeasures(ms);
+  var isTime= xi.c.t==='month'||xi.c.t==='date';
+  var map={}, order=[];
+  res.rows.forEach(function(r){ var v=r[xi.i]; var k= v==null||v===''? '(없음)' : String(isTime? qbTr(v,'ym') : (qbFmtCell(v, xi.c)||v)); if(!map[k]){ map[k]=meas.map(function(){ return 0; }); order.push(k); } meas.forEach(function(m,j){ map[k][j]+= count? 1 : (Number(r[m.i])||0); }); });
+  if(isTime) order.sort(); else order.sort(function(a,b){ return map[b][0]-map[a][0]; });
+  var labels=order.slice(0,40);
+  var series=meas.slice(0,12).map(function(m,j){ return {label:m.c.l, data:labels.map(function(k){ return map[k][j]; })}; });
+  return {type: isTime? 'lines':'bars', labels:labels, series:series, money:!count && meas.every(function(m){ return m.c.won; }), truncated:order.length>40, all:ms, picked:meas.length===ms.length? 'all' : (meas.length===1? meas[0].c.id : 'auto'), xs:xs, xi:xi.c.id, xLabel:xi.c.l, merged:order.length<res.rows.length, count:count};
 }
 
 /* ---- 데이터 조합 화면 (리포트 메뉴) ---- */
@@ -13955,11 +13977,12 @@ function qbResultHtml(){
   var ch=qbChart(r);
   var h='<div class="qb-res-h"><input id="qbTitle" class="qb-title" value="'+esc(QB.title||qbAutoTitle())+'" placeholder="결과 제목">'+
     '<span class="mini qb-meta">'+r.total.toLocaleString()+'행'+(r.rows.length<r.total? ' (상위 '+r.rows.length.toLocaleString()+')':'')+' · 기준 '+r.baseN.toLocaleString()+(r.joinedN!==r.baseN? ' → 연결 후 '+r.joinedN.toLocaleString():'')+(r.filteredN!==r.joinedN? ' → 조건 후 '+r.filteredN.toLocaleString():'')+' · '+r.ms+'ms</span></div>'+
-    '<div class="qb-res-t"><div class="eqb-seg"><button type="button" data-qbv="table" aria-pressed="'+(QB.view==='table')+'">표</button><button type="button" data-qbv="chart" aria-pressed="'+(QB.view==='chart')+'"'+(ch?'':' disabled title="묶기(집계)가 있을 때 차트를 그립니다"')+'>차트</button><button type="button" data-qbv="both" aria-pressed="'+(QB.view==='both')+'"'+(ch?'':' disabled')+'>둘 다</button></div>'+
-    (ch && QB.view!=='table' && ch.all.length>1? '<select id="qbChartM" class="qb-sel" title="차트에 그릴 값"><option value="auto"'+(ch.picked==='auto'?' selected':'')+'>자동</option><option value="all"'+(ch.picked==='all'?' selected':'')+'>모든 값</option>'+ch.all.map(function(m){ return '<option value="'+m.c.id+'"'+(ch.picked===m.c.id?' selected':'')+'>'+esc(m.c.l)+'</option>'; }).join('')+'</select>' : '')+
+    '<div class="qb-res-t"><div class="eqb-seg"><button type="button" data-qbv="table" aria-pressed="'+(QB.view==='table')+'">표</button><button type="button" data-qbv="chart" aria-pressed="'+(QB.view==='chart')+'">차트</button><button type="button" data-qbv="both" aria-pressed="'+(QB.view==='both')+'">둘 다</button></div>'+
+    (ch && QB.view!=='table' && ch.xs && ch.xs.length>1? '<label class="mini qb-chk">가로축 <select id="qbChartX" class="qb-sel">'+ch.xs.map(function(x){ return '<option value="'+x.c.id+'"'+(ch.xi===x.c.id?' selected':'')+'>'+esc(x.c.l)+'</option>'; }).join('')+'</select></label>' : '')+
+    (ch && QB.view!=='table' && ch.all.length>1? '<label class="mini qb-chk">값 <select id="qbChartM" class="qb-sel" title="차트에 그릴 값"><option value="auto"'+(ch.picked==='auto'?' selected':'')+'>자동</option><option value="all"'+(ch.picked==='all'?' selected':'')+'>모든 값</option>'+ch.all.map(function(m){ return '<option value="'+m.c.id+'"'+(ch.picked===m.c.id?' selected':'')+'>'+esc(m.c.l)+'</option>'; }).join('')+'</select></label>' : '')+
     '<span style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="cbtn" id="qbSave" title="이 조합을 저장해 두고 다음에 바로 불러옵니다">'+(QB.savedId? '💾 저장(덮어쓰기)':'💾 저장')+'</button><button type="button" class="cbtn" id="qbXlsx">⬇ 엑셀</button><button type="button" class="cbtn pri" id="qbDeck">＋ PPT 슬라이드에 추가</button></span></div>';
   if(r.warn&&r.warn.length) h+='<div class="qb-warn">'+r.warn.map(function(w){ return '⚠ '+esc(w); }).join('<br>')+'</div>';
-  if((QB.view==='chart'||QB.view==='both') && ch) h+='<div class="legend" id="qbLegend">'+ch.series.map(function(sr,i){ return '<span class="li"><span class="sw" style="background:'+cssv('--s'+((i%8)+1))+'"></span>'+esc(sr.label)+'</span>'; }).join('')+(ch.money? '<span class="mini" style="margin-left:auto">단위: 천원</span>':'')+'</div><div class="chartbox h260" id="qbChart"></div>'+(ch.truncated? '<div class="mini">차트는 상위 40개 항목만</div>':'');
+  if((QB.view==='chart'||QB.view==='both') && ch) h+='<div class="legend" id="qbLegend">'+ch.series.map(function(sr,i){ return '<span class="li"><span class="sw" style="background:'+cssv('--s'+((i%8)+1))+'"></span>'+esc(sr.label)+'</span>'; }).join('')+(ch.money? '<span class="mini" style="margin-left:auto">단위: 천원</span>':'')+'</div><div class="chartbox h260" id="qbChart"></div><div class="mini">'+esc(ch.xLabel||'')+'별 '+esc(ch.series.map(function(x){ return x.label; }).join(' · '))+(ch.merged? ' — 같은 '+esc(ch.xLabel)+' 행은 '+(ch.count?'건수로 셈':'합산')+'':'')+(ch.truncated? ' · 상위 40개만':'')+'</div>';
   if(QB.view!=='chart'){
     var rows=r.rows.slice(0, QB.page);
     h+='<div class="tbl-wrap qb-tbl" style="max-height:'+(QB.view==='both'? 360:620)+'px"><table class="pr"><thead><tr>'+r.cols.map(function(c){ return '<th'+(c.t==='num'?' class="n"':'')+(c.pivot?' style="text-align:right"':'')+'>'+esc(c.l)+'</th>'; }).join('')+'</tr></thead><tbody>'+
@@ -13986,9 +14009,10 @@ function qbRunNow(){
   if(ch && cb){ try{ var fmt=ch.money? won : function(v){ return Math.round(v).toLocaleString('ko-KR'); }; var sers=ch.series.map(function(s,i){ return {label:s.label, data:s.data, color:cssv('--s'+((i%8)+1))}; });
     if(ch.type==='lines') Viz.lines(cb,{labels:ch.labels, series:sers, fmt:fmt, fill:sers.length===1, padL:56}); else Viz.bars(cb,{labels:ch.labels, series:sers, fmt:fmt, padL:56}); }catch(e){} }
   var ti=$('#qbTitle'); if(ti) ti.oninput=function(){ QB.title=this.value; };
-  host.querySelectorAll('[data-qbv]').forEach(function(b){ b.onclick=function(){ QB.view=b.dataset.qbv; qbRunNow(); }; });
+  host.querySelectorAll('[data-qbv]').forEach(function(b){ b.onclick=function(){ if(b.dataset.qbv!=='table' && !qbChart(QB.res)){ toast('차트를 그릴 수 없습니다', QB.res&&QB.res.rows.length? '고객사·서비스·월처럼 구분이 되는 열을 «보일 열» 에 넣어 주세요' : '결과 행이 없습니다', 'bad'); return; } QB.view=b.dataset.qbv; qbRunNow(); }; });
   var mb=$('#qbMore'); if(mb) mb.onclick=function(){ QB.page+=300; qbRunNow(); };
   var cm=$('#qbChartM'); if(cm) cm.onchange=function(){ QB.chartM=cm.value; qbRunNow(); };
+  var cx=$('#qbChartX'); if(cx) cx.onchange=function(){ QB.chartX=cx.value; qbRunNow(); };
   var sv=$('#qbSave'); if(sv) sv.onclick=qbSaveCur;
   var xl=$('#qbXlsx'); if(xl) xl.onclick=function(){ var r=QB.res; xlsxAoa(QB.title||qbAutoTitle(), r.cols.map(function(c){ return c.l; }), r.rows.map(function(row){ return row.map(function(v,ci){ var c=r.cols[ci]; return (c.t==='num'&&v!=null)? (c.won? Math.round(v/1000) : v) : qbFmtCell(v,c); }); })).catch(function(e){ toast('엑셀 실패', String(e.message||e).slice(0,80),'bad'); }); };
   var dk=$('#qbDeck'); if(dk) dk.onclick=qbDeckAdd;
@@ -14006,7 +14030,7 @@ function qbBindPanel(){
   p.addEventListener('change', function(e){
     var el=e.target, k=el.dataset.qb, sp=QB.spec; if(!k) return;
     var row=rowOf(el), L=row? listFor(row.kind) : null;
-    if(k==='base'){ QB.spec=qbNewSpec(el.value); QB.title=''; QB.savedId=null; qbPanelRefresh(); qbRun_(); return; }
+    if(k==='base'){ QB.spec=qbNewSpec(el.value); QB.title=''; QB.savedId=null; QB.chartM=null; QB.chartX=null; qbPanelRefresh(); qbRun_(); return; }
     if(k==='jadd'){ var cands=qbJoinCands(qbTables(sp)), c=cands[+el.value]; if(c){ sp.joins.push({t:c.t, on:c.on, fuzzy:c.fuzzy, where:[]}); qbPanelRefresh(); qbRun_(); } return; }
     if(k==='inner'){ var ji=+el.closest('.qb-join').dataset.i; sp.joins[ji].inner=el.checked; qbRun_(); return; }
     if(k==='pc'){ sp.group.pivot= el.value? {c:el.value, tr:'raw'} : null; qbPanelRefresh(); qbRun_(); return; }
@@ -14042,7 +14066,7 @@ function qbBindPanel(){
   });
 }
 /* 저장·불러오기 */
-function qbLoad(spec, name, id){ QB.chartM=null; QB.spec=JSON.parse(JSON.stringify(spec)); QB.spec.group=QB.spec.group||{by:[],aggs:[],pivot:null}; QB.spec.joins=QB.spec.joins||[]; QB.spec.filters=QB.spec.filters||[]; QB.spec.sel=QB.spec.sel||[]; QB.spec.post=QB.spec.post||[]; QB.spec.sort=QB.spec.sort||[]; QB.title=name||''; QB.savedId=id||null; QB.page=300; QB.view= (QB.spec.group.by.length||QB.spec.group.pivot)? 'both':'table'; qbPanelRefresh(); qbRunNow(); qbLibRefresh(); }
+function qbLoad(spec, name, id){ QB.chartM=null; QB.chartX=null; QB.spec=JSON.parse(JSON.stringify(spec)); QB.spec.group=QB.spec.group||{by:[],aggs:[],pivot:null}; QB.spec.joins=QB.spec.joins||[]; QB.spec.filters=QB.spec.filters||[]; QB.spec.sel=QB.spec.sel||[]; QB.spec.post=QB.spec.post||[]; QB.spec.sort=QB.spec.sort||[]; QB.title=name||''; QB.savedId=id||null; QB.page=300; QB.view= (QB.spec.group.by.length||QB.spec.group.pivot)? 'both':'table'; qbPanelRefresh(); qbRunNow(); qbLibRefresh(); }
 function qbSaveCur(){
   var L=qbSaved(), name=(QB.title||qbAutoTitle()).trim();
   var cur=QB.savedId? L.filter(function(x){ return x.id===QB.savedId; })[0] : null;
@@ -14069,7 +14093,7 @@ function qbDeckAdd(){
   var title=(QB.title||qbAutoTitle()).trim(), ch=qbChart(r), L=rpbList();
   var head=r.cols.map(function(c){ return c.l; }), rows=r.rows.slice(0,300).map(function(row){ return row.map(function(v,ci){ return qbFmtCell(v, r.cols[ci]); }); });
   if(r.sums) rows.push(r.cols.map(function(c,ci){ return ci===0? '합계' : (r.sums[ci]==null? '' : qbFmtCell(r.sums[ci], c)); }));
-  var it={t: (ch && QB.view!=='table')? 'chart':'table', title:title, sub:r.total.toLocaleString()+'행 · '+qbSpecText(QB.spec), from:'report', note:'', noteSrc:'user', spec:JSON.parse(JSON.stringify(QB.spec)),
+  var it={t: (ch && QB.view!=='table')? 'chart':'table', title:title, sub:r.total.toLocaleString()+'행 · '+qbSpecText(QB.spec), from:'report', note:'', noteSrc:'user', spec:JSON.parse(JSON.stringify(QB.spec)), chartX:QB.chartX||null, chartM:QB.chartM||null,
     table:{head:head, rows:rows, total:r.total}, chart: (ch && QB.view!=='table')? {type:ch.type, labels:ch.labels, series:ch.series, money:ch.money} : null};
   it.id='r'+Date.now().toString(36)+Math.random().toString(36).slice(2,5); it.at=new Date().toISOString(); L.push(it); rpbSave();
   QB.deckOpen=true; qbDeckRefresh(); toast('PPT 슬라이드에 추가했습니다 ('+L.length+')', title, 'ok');
