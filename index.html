@@ -1398,9 +1398,13 @@ code{font-family:ui-monospace,Menlo,monospace;font-size:11px;background:var(--su
 .eqb-col{background:var(--surface-2);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:8px;min-height:140px;min-width:0;max-height:calc(100vh - 120px);overflow:auto}
 .eqb-col>.eqb-ch{position:sticky;top:-10px;margin:-10px -10px 0;padding:10px 14px 8px;background:inherit;z-index:1;border-radius:12px 12px 0 0}
 .eqb-col.hl{outline:2px solid var(--brand);outline-offset:-2px}
-.eqb-col.empty{min-height:0;padding-bottom:6px;background:transparent;border:1px dashed var(--grid)}
-.eqb-col.empty>.eqb-ch{background:var(--plane)}
-.eqb-col.empty .eqb-empty{padding:6px}
+.eqb-col.empty{min-height:150px;padding:8px 4px;background:transparent;border:1px dashed var(--grid);align-items:center;gap:10px}
+.eqb-col.empty>.eqb-ch{position:static;margin:0;padding:4px 0;flex-direction:column;gap:8px;background:transparent}
+.eqb-col.empty .eqb-ch .n{font-size:13px;line-height:20px;padding:0 6px}
+.eqb-col.empty .lbl{writing-mode:vertical-rl;text-orientation:mixed;font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.12em}
+.eqb-plus{width:28px;height:28px;border-radius:50%;border:1px dashed var(--axis);background:transparent;color:var(--muted);font:inherit;font-size:15px;cursor:pointer;line-height:1}
+.eqb-plus:hover{color:var(--brand);border-color:var(--brand)}
+@media (max-width:760px){ .eqb-col.empty{min-height:0;flex-direction:row;padding:6px 10px} .eqb-col.empty>.eqb-ch{flex-direction:row} .eqb-col.empty .lbl{writing-mode:horizontal-tb} }
 .eqb-col.warm{background:color-mix(in srgb,#f0a020 12%,var(--surface-2))}
 .eqb-col.over{outline:2px dashed var(--brand);outline-offset:-2px;background:var(--brand-t)}
 .eqb-ch{display:flex;align-items:center;gap:7px;padding:2px 4px;font-size:13px;font-weight:700;white-space:nowrap;min-width:0}
@@ -1409,22 +1413,35 @@ code{font-family:ui-monospace,Menlo,monospace;font-size:11px;background:var(--su
 @media (max-width:1700px){ .eqb-ch .to{display:none} }
 .eqb-ch i{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
 .eqb-ch .n{color:var(--muted);font-weight:500}
-.eqb-ch .to{margin-left:auto;font-size:11px;color:var(--muted);font-weight:500;white-space:nowrap}
-.eqb-card{background:var(--surface);border:1px solid var(--ring);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;cursor:grab;min-width:0}
+.eqb-ch .to{margin-left:auto;font-size:11px;color:var(--muted);font-weight:400;white-space:nowrap}
+.eqb-col{gap:6px}
+.eqb-card{background:var(--surface);border:1px solid var(--ring);border-radius:9px;padding:9px 11px 7px;display:flex;flex-direction:column;gap:4px;cursor:grab;min-width:0}
 .eqb-card:hover{border-color:var(--axis)}
 .eqb-card.drag{opacity:.45}
-.eqb-card.hot{border-color:#D9B36A}
-.eqb-card .tp{display:flex;justify-content:space-between;align-items:center;gap:6px}
-.eqb-card .cu{font-size:14px;font-weight:700;letter-spacing:-.01em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.eqb-card .mt b{color:var(--ink);font-weight:600}
+.eqb-card .tp{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.eqb-card .cu{font-size:13.5px;font-weight:650;letter-spacing:-.01em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.eqb-card .tp .mini{flex:none}
+.eqb-card .mt b{color:var(--ink-2);font-weight:600}
+.eqb-card .mt .chn{color:var(--ink-2);font-weight:600}
+.eqb-card .sn:empty{display:none}
+.eqb-card .sn .eqsn{font-size:10.5px;padding:0 5px;line-height:18px;margin:0}
+.eqb-card .sn .eqser-more{font-size:10.5px;padding:0 7px;line-height:18px}
+.eqb-card .eqbar{margin-top:4px;font-size:11px}
+.eqb-card .eqbar button{height:22px;font-size:10.5px}
+.eqb-card .ft .acts{display:flex;gap:2px;opacity:.55;transition:opacity .12s}
+.eqb-card:hover .ft .acts,.eqb-card:focus-within .ft .acts{opacity:1}
+.eqb-card .ft .cbtn{height:22px;font-size:11px;padding:0 7px;border-color:transparent;background:transparent;color:var(--ink-2)}
+.eqb-card .ft .cbtn:hover{border-color:var(--ring);background:var(--surface-2);color:var(--ink)}
+.eqb-card .ft .cbtn.nx.pri{background:transparent;color:var(--brand);font-weight:600}
+.eqb-card .ft .cbtn.nx.pri:hover{background:var(--brand-t,rgba(20,158,64,.1));border-color:transparent}
 /* 채널 태그는 분류라서 회색 하나 — 색은 상태(경과·진행·완료)에만 */
 .ctag.ch-s1,.ctag.ch-lg,.ctag.ch-gov,.ctag.ch-gen{background:var(--surface-2);color:var(--ink-2)}
 .ctag.late{background:rgba(208,59,59,.10);color:var(--critical)}
-.eqb-card .mt{font-size:12px;color:var(--muted);line-height:1.5}
+.eqb-card .mt{font-size:11.5px;color:var(--muted);line-height:1.5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .eqb-card .sn{display:flex;gap:4px;flex-wrap:wrap;font-size:11px}
 .eqb-card .sn .eqsn{margin:0}
 .eqb-card .eqser-full{max-width:none;line-height:1.9}
-.eqb-card .ft{display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--grid);padding-top:7px;gap:6px;flex-wrap:wrap}
+.eqb-card .ft{display:flex;justify-content:space-between;align-items:center;padding-top:2px;gap:6px;min-height:22px}
 .eqb-card .ft .mini{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .eqb-more{border:1px dashed var(--axis);background:transparent;border-radius:10px;height:32px;color:var(--muted);font:inherit;font-size:12px;cursor:pointer}
 .eqb-more:hover{color:var(--ink);border-color:var(--ink-2)}
@@ -1844,8 +1861,8 @@ html[data-look="cc"] #ovlC360 .mact{border-top:1px solid var(--grid);padding-top
       <section class="card"><h2>월별 설치 · 회수 <span class="cap" id="eqcTrendCap">최근 12개월 · 대수</span><span class="lg"><i style="background:var(--s1)"></i>설치 <i style="background:var(--s2)"></i>회수</span></h2><div class="chartbox h200" id="eqcTrend"></div></section>
     </div>
     <div class="eqb-bar">
-      <b style="font-size:14px;margin-right:4px">상태 보드</b>
-      <span class="mini" id="eqbHint">카드를 옆 열로 끌면 상태 변경 · 시리얼 칩을 누르면 일부 회수</span>
+      <b style="font-size:14px;margin-right:4px" title="카드를 옆 열로 끌면 상태가 바뀝니다 · 시리얼 칩을 누르면 일부 회수 표시">상태 보드</b>
+      <span class="mini" id="eqbHint" style="display:none"></span>
       <div class="eqb-chips" id="eqbChips"></div>
       <input type="search" id="eqbQ" placeholder="고객·시리얼·모델 검색">
       <button class="pill ghost" id="eqbReload">↻ 다시 읽기</button>
@@ -2859,7 +2876,7 @@ window.addEventListener('message', function(ev){
 });
 
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-16 ㊿+112';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-16 ㊿+113';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -3473,15 +3490,23 @@ function renderEqBoard(){
   var cancel=rows.filter(function(o){ return o.status==='취소'; }).length;
   document.getElementById('eqbCount').textContent=(rows.length-cancel)+'건'+(cancel? ' · 취소 '+cancel+'건은 보드에 안 보임':'');
   var canEdit=!window.IS_VIEWER && !!SB_TOKEN, todayS=todayStr();
-  var h='';
+  var h='', tracks=[];
   EQB_COLS.forEach(function(col, ci){
-    var st=col[0], list=rows.filter(function(o){ return o.status===st; });
+    var st=col[0], list=rows.filter(function(o){ return o.status===st; }), older=0;
     if(st==='회수완료'){ var cut=new Date(); cut.setDate(cut.getDate()-90); var cutS=todayStr(cut);
-      var recent=list.filter(function(o){ return String(o.returned_date||o.created_at||'').slice(0,10)>=cutS; }); var older=list.length-recent.length; list=recent; }
+      var recent=list.filter(function(o){ return String(o.returned_date||o.created_at||'').slice(0,10)>=cutS; }); older=list.length-recent.length; list=recent; }
     var lim=EQB.more[st]? 1e9 : (st==='설치완료'? 12 : 30);
-    h+='<section class="eqb-col'+(st==='회수예정'?' warm':'')+(list.length? '':' empty')+'" data-st="'+esc(st)+'" aria-label="'+esc(st)+'">'+
-      '<div class="eqb-ch"><i style="background:'+col[1]+'"></i>'+esc(st)+' <span class="n"'+(st==='회수완료'? ' title="최근 90일"':'')+'>'+list.length+'</span><span class="to">'+esc(col[2])+'</span></div>';
-    if(!list.length) h+='<div class="eqb-empty">'+(ci===0? '접수된 신청 없음':'—')+'</div>';
+    /* 비어 있는 열은 가늘게 접어 자리만 남김(드롭은 가능) — 화면을 실제 카드가 있는 열에 몰아줌 */
+    if(!list.length){
+      tracks.push('52px');
+      h+='<section class="eqb-col empty" data-st="'+esc(st)+'" aria-label="'+esc(st)+' 0건" title="'+esc(st)+' — 0건'+(st==='회수완료'&&older? ' (90일 이전 '+older+'건은 신청 내역에서)':'')+'">'+
+        '<div class="eqb-ch slim"><i style="background:'+col[1]+'"></i><span class="n">0</span><span class="lbl">'+esc(st)+'</span></div>'+
+        (st==='접수' && canEdit? '<button type="button" class="eqb-plus" data-new="1" title="새 장비 신청">＋</button>':'')+'</section>';
+      return;
+    }
+    tracks.push('minmax(0,1fr)');
+    h+='<section class="eqb-col'+(st==='회수예정'?' warm':'')+'" data-st="'+esc(st)+'" aria-label="'+esc(st)+'">'+
+      '<div class="eqb-ch" title="'+esc(col[2])+'"><i style="background:'+col[1]+'"></i>'+esc(st)+' <span class="n">'+list.length+'</span>'+(st==='회수완료'? '<span class="to">최근 90일</span>':'')+'</div>';
     list.slice(0,lim).forEach(function(o){ h+=eqbCard(o, canEdit, todayS); });
     if(list.length>lim) h+='<button type="button" class="eqb-more" data-more="'+esc(st)+'">외 '+(list.length-lim)+'건 더 보기</button>';
     if(st==='접수' && canEdit) h+='<button type="button" class="eqb-more" data-new="1">＋ 새 신청</button>';
@@ -3489,6 +3514,8 @@ function renderEqBoard(){
     h+='</section>';
   });
   wrap.innerHTML=h;
+  var wide=tracks.filter(function(t){ return t!=='52px'; }).length;
+  wrap.style.gridTemplateColumns = (window.innerWidth>760 && (window.innerWidth>1400 || wide<=3))? tracks.join(' ') : '';   // 좁은 화면에서 열이 많으면 CSS 3열 배치로
   wrap.querySelectorAll('[data-more]').forEach(function(bt){ bt.onclick=function(){ EQB.more[bt.dataset.more]=1; renderEqBoard(); }; });
   wrap.querySelectorAll('[data-new]').forEach(function(bt){ bt.onclick=function(){ switchView('ordernew'); }; });
   wrap.querySelectorAll('[data-next]').forEach(function(bt){ bt.onclick=function(e){ e.stopPropagation(); var r=eqOrderById(bt.dataset.oid); if(r) eqSetStatus(r, bt.dataset.next); }; });
@@ -3507,14 +3534,15 @@ function eqbCard(o, canEdit, todayS){
     prog='<div style="display:flex;align-items:center;gap:8px"><div class="eqb-prog" style="flex:1;margin:0">'+all.map(function(sn){ return '<i class="'+(ret.indexOf(sn.toUpperCase())>=0?'on':'')+'"></i>'; }).join('')+'</div><span class="num" style="font-size:12px;font-weight:600">'+ret.length+'/'+all.length+'</span></div>';
   }
   var idx=EQB_COLS.map(function(c){ return c[0]; }).indexOf(o.status), nextSt=idx>=0 && idx<EQB_COLS.length-1? EQB_COLS[idx+1][0] : null;
-  var ft='<div class="ft"><span class="mini" title="'+esc(o.mgr_name||o.requester||'')+'">'+esc(o.mgr_name? '담당 '+o.mgr_name : (o.requester? String(o.requester).split('@')[0] : ''))+'</span><span style="display:flex;gap:4px">'+
-    '<button type="button" class="cbtn" style="height:24px;font-size:11.5px" data-open="'+o.id+'" title="신청 내역에서 열기">✎</button>'+
-    (canEdit && nextSt? '<button type="button" class="cbtn'+(['출하요청','배송중','설치완료'].indexOf(nextSt)>=0?' pri':'')+'" style="height:24px;font-size:11.5px" data-oid="'+o.id+'" data-next="'+esc(nextSt)+'">'+esc(nextSt)+' →</button>':'')+'</span></div>';
-  return '<article class="eqb-card'+(o.status==='회수예정'?' hot':'')+'" draggable="'+(canEdit?'true':'false')+'" data-oid="'+o.id+'">'+
-    '<div class="tp">'+eqChTag(o.channel)+'<span class="mini num">#'+o.id+age+'</span></div>'+
-    '<div class="cu" title="'+esc(o.customer||'')+'">'+esc(o.customer||'(고객사 없음)')+'</div>'+
-    '<div class="mt">'+meta.filter(Boolean).join(' · ')+'</div>'+prog+
-    '<div class="sn">'+eqSerialsHtml(o,{full:true})+'</div>'+ft+'</article>';
+  var who=o.mgr_name? o.mgr_name : (o.requester? String(o.requester).split('@')[0] : '');
+  var ft='<div class="ft"><span class="mini" title="담당 '+esc(who)+'">'+esc(who)+'</span><span class="acts">'+
+    '<button type="button" class="cbtn" data-open="'+o.id+'" title="신청 내역에서 열기·수정">✎</button>'+
+    (canEdit && nextSt? '<button type="button" class="cbtn nx'+(['출하요청','배송중','설치완료'].indexOf(nextSt)>=0?' pri':'')+'" data-oid="'+o.id+'" data-next="'+esc(nextSt)+'" title="'+esc(nextSt)+' 로 이동">'+esc(nextSt)+' →</button>':'')+'</span></div>';
+  /* 카드: 이름 한 줄 → 메타 한 줄(채널 · 모델×수량 · 유형 · 날짜) → 시리얼 칩(4개까지, 나머지 접힘) → 담당·동작. 안내 문구·채널 박스 없음 */
+  return '<article class="eqb-card" draggable="'+(canEdit?'true':'false')+'" data-oid="'+o.id+'">'+
+    '<div class="tp"><span class="cu" title="'+esc(o.customer||'')+'">'+esc(o.customer||'(고객사 없음)')+'</span><span class="mini num">#'+o.id+age+'</span></div>'+
+    '<div class="mt"><span class="chn">'+esc(o.channel||'기타')+'</span> · '+meta.filter(Boolean).join(' · ')+'</div>'+prog+
+    '<div class="sn">'+eqSerialsHtml(o,{full:true, max:4, bar:'auto'})+'</div>'+ft+'</article>';
 }
 function eqbDnD(wrap){
   var dragging=null;
@@ -7515,24 +7543,27 @@ function eqSerialsHtml(r, opt){
     return '<span class="'+cls+'" data-oid="'+oid+'" data-sn="'+esc(U)+'" title="'+tip+'">'+esc(sn)+'</span>';
   };
   var nChg=Object.keys(pend).filter(function(U){ var saved=done||ret.indexOf(U)>=0; return pend[U]!==saved; }).length;
+  /* 회수 처리 막대: 기본은 항상, bar:'auto' 면 «변경이 있을 때» 또는 «회수예정 카드» 에만 (보드에서 안내 문구 반복을 없앰) */
+  var showBar = can && (opt.bar!=='auto' || nChg>0 || r.status==='회수예정');
   var bar='';
-  if(can){
+  if(showBar){
     bar='<div class="eqbar" data-oid="'+oid+'">'+
       (nChg? '<b>변경 '+nChg+'대</b> · 회수일 <input type="date" class="eqbar-date" value="'+esc(EQP['_d'+oid]||todayStr())+'"> <button type="button" class="eqbar-save">회수 처리 저장</button> <button type="button" class="eqbar-cancel">취소</button>'
-           : '<button type="button" class="eqbar-all" title="모든 시리얼을 회수로 표시">전부 회수 표시</button> <span class="mini" style="color:var(--muted)">칩을 누르면 개별 표시</span>')+'</div>';
+           : '<button type="button" class="eqbar-all" title="모든 시리얼을 회수로 표시 — 칩을 누르면 개별 표시">전부 회수 표시</button>'+(opt.bar==='auto'? '' : ' <span class="mini" style="color:var(--muted)">칩을 누르면 개별 표시</span>'))+'</div>';
   }
-  if(all.length===1) return chip(all[0])+(can? bar:'');
-  if(opt.full && all.length<=8) return '<span class="eqser">'+all.map(chip).join(' ')+(can? bar:'')+'</span>';   /* 운영 보드: 8대까지는 전부 펼쳐 보임 */
+  var k = opt.max? Math.min(opt.max, all.length) : 1;                 /* 펼쳐 보이는 칩 수 */
+  if(all.length===1) return chip(all[0])+bar;
+  if(all.length<=k || (opt.full && !opt.max && all.length<=8)) return '<span class="eqser">'+all.map(chip).join(' ')+bar+'</span>';
   var open=!!EQOPEN[oid] || nChg>0;
-  return '<span class="eqser">'+chip(all[0])+' <button type="button" class="eqser-more" data-oid="'+oid+'" data-n="'+(all.length-1)+'" title="'+esc(all.join(', '))+'">'+(open? '접기 ▴' : '외 '+(all.length-1)+'대 ▾')+'</button>'+
-         '<span class="eqser-full" style="display:'+(open?'block':'none')+'">'+all.slice(1).map(chip).join(' ')+(can? bar:'')+'</span></span>';
+  return '<span class="eqser">'+all.slice(0,k).map(chip).join(' ')+' <button type="button" class="eqser-more" data-oid="'+oid+'" data-n="'+(all.length-k)+'" title="'+esc(all.join(', '))+'">'+(open? '접기 ▴' : '+'+(all.length-k)+' ▾')+'</button>'+
+         '<span class="eqser-full" style="display:'+(open?'block':'none')+'">'+all.slice(k).map(chip).join(' ')+bar+'</span></span>';
 }
 function eqOrderById(id){ return (RAWX.orders||[]).filter(function(o){ return String(o.id)===String(id); })[0]; }
 document.addEventListener('click', function(e){
   var t=e.target; if(!t || !t.closest) return;
   var more=t.closest('.eqser-more');
   if(more){ e.stopPropagation(); var f=more.parentElement.querySelector('.eqser-full'); if(!f) return;
-    var open=f.style.display!=='none'; f.style.display=open? 'none':'block'; more.textContent=open? ('외 '+more.dataset.n+'대 ▾') : '접기 ▴';
+    var open=f.style.display!=='none'; f.style.display=open? 'none':'block'; more.textContent=open? ((more.closest('.eqb-card')? '+':'외 ')+more.dataset.n+(more.closest('.eqb-card')? ' ▾':'대 ▾')) : '접기 ▴';
     if(more.dataset.oid) EQOPEN[more.dataset.oid]=!open; return; }
   var chip=t.closest('.eqsn.act');
   if(chip){ e.stopPropagation(); var oid=chip.dataset.oid, U=chip.dataset.sn, r=eqOrderById(oid); if(!r) return;
