@@ -1587,6 +1587,7 @@ html[data-look="cc"] #ovlC360 .mact{border-top:1px solid var(--grid);padding-top
   <button data-v="cloud">☁️ 클라우드 비용</button>
   <button data-v="csite" style="display:none">🛰️ Cloud 사이트 관리</button>
   <button data-v="report">📑 리포트</button>
+  <button data-v="aiknow">🧠 AI 지식</button>
   <div class="grp" id="grpAdmin">관리자</div>
   <button data-v="log">🕘 변경 이력</button>
   <button data-v="adminx" style="display:none">🛡️ 관리자</button>
@@ -2876,7 +2877,7 @@ window.addEventListener('message', function(ev){
 });
 
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-16 ㊿+113';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-16 ㊿+114';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -5689,7 +5690,7 @@ function aiOn(badge){
   AICFG.enabled=true;
   badge.className='ai-badge on';
   badge.innerHTML='<span class="d"></span>AI 연결됨';
-  badge.title='Claude API · 중계: Supabase Edge Function (ask)'+
+  badge.title='Claude API · 중계: Supabase Edge Function (ask v3 — DB 를 스스로 조회하는 도구 사용)'+
     '\n· 금액 계산은 전부 포탈이 DB 원본으로 직접 수행합니다'+
     '\n· AI 해설: '+(AICFG.narrate?'켜짐':'꺼짐')+
     '\n· 고객명 마스킹: '+(AICFG.maskNames?'켜짐':'꺼짐');
@@ -6004,6 +6005,23 @@ function buildDigest(){
     비즈포탈차액: (function(){
       var v=DATA.vs; if(!v||!v.ok) return null;
       return {기준월:v.month, 항목:v.items.map(function(x){ return [x.k, x.v]; })};
+    })(),
+    OI파이프라인: (function(){   // 영업기회 — 10% 초기 딜도 빠짐없이 (우리 팀은 대부분 10% 로 두고 관리)
+      var o=RAWX.oi||[]; if(!o.length) return null;
+      var open=o.filter(function(x){ return ['등록','진행','수주'].indexOf(x.stage)>=0; });
+      var st={}, ln={}, ym={}, early=0, sum=0, wsum=0;
+      open.forEach(function(x){ var a=Number(x.expect_amount)||0, p=Number(x.win_prob)||0, w=a*p/100;
+        sum+=a; wsum+=w; if(p<=10) early++;
+        var S=st[x.stage]=st[x.stage]||{건수:0,금액:0,가중:0}; S.건수++; S.금액+=a; S.가중+=w;
+        var L=ln[x.line||'미지정']=ln[x.line||'미지정']||{건수:0,금액:0,가중:0}; L.건수++; L.금액+=a; L.가중+=w;
+        var m=String(x.expect_month||'').slice(0,7)||'미정'; var Y=ym[m]=ym[m]||{건수:0,금액:0,가중:0}; Y.건수++; Y.금액+=a; Y.가중+=w; });
+      var rnd=function(o2){ Object.keys(o2).forEach(function(k){ o2[k].금액=Math.round(o2[k].금액); o2[k].가중=Math.round(o2[k].가중); }); return o2; };
+      var top=open.slice().sort(function(a,b){ return (Number(b.expect_amount)||0)-(Number(a.expect_amount)||0); }).slice(0,12)
+        .map(function(x){ return [x.customer, x.stage, (Number(x.win_prob)||0)+'%', lline(x.line||''), String(x.expect_month||'').slice(0,7), Math.round(Number(x.expect_amount)||0)]; });
+      var closed={}; o.forEach(function(x){ if(['종료','중지','실패','계산서발행'].indexOf(x.stage)>=0) closed[x.stage]=(closed[x.stage]||0)+1; });
+      return {설명:'열린 OI(등록·진행·수주) 전체. win_prob 10% 는 «초기 단계» 표시일 뿐이므로 전망·파이프라인 답변에 반드시 포함하고, 비가중 합과 가중 기대치(금액×확률)를 함께 말할 것. 금액은 원.',
+        열린건수:open.length, 초기단계_10퍼센트이하:early, 비가중금액합:Math.round(sum), 가중기대치:Math.round(wsum),
+        단계별:rnd(st), 서비스별:rnd(ln), 예상월별:rnd(ym), 상위딜:[['고객','단계','확률','서비스','예상월','예상금액(원)']].concat(top), 닫힌건:closed};
     })()
   };
 }
@@ -7437,6 +7455,13 @@ var GRIDS={
       {k:'note',l:'비고',ro:true,fmt:function(v){return String(v||'').slice(0,40);}}
     ]
   },
+  aiknow:{
+    title:'AI 지식 — AI 에게 가르치기', table:'ai_knowledge',
+    cap:'여기 적은 사실·규칙·용어는 포탈 AI 가 모든 질문에 답할 때 최우선으로 참고합니다 (SQL 78 · ask 함수 v3)', add:false, del:false,
+    custom:function(){ renderAiKnow(); },
+    rows:function(){ return RAWX.aiknow||[]; },
+    cols:[{k:'topic',l:'주제'},{k:'content',l:'내용'},{k:'active',l:'적용',t:'bool'}]
+  },
   log:{
     title:'변경 이력', table:'change_log',
     cap:'웹에서 수정한 기록 (최근 300건)', add:false, del:false, ro:true,
@@ -7975,6 +8000,30 @@ function bizHostEl(){
   var host=document.getElementById('bizHost');
   if(!host){ host=document.createElement('div'); host.id='bizHost'; tw.parentElement.insertBefore(host,tw); }
   return host;
+}
+/* ===== AI 지식 — 사람이 AI 에게 가르치는 사실·규칙·용어 (ai_knowledge · active 인 행은 매 질문의 시스템 프롬프트에 들어감) ===== */
+function renderAiKnow(){
+  var tw=$('#dvTable').parentElement; tw.style.display='none';
+  var host=bizHostEl(); host.style.display='';
+  var L=(RAWX.aiknow||[]).slice().sort(function(a,b){ return (b.id||0)-(a.id||0); }), canW=!!SB_TOKEN && !window.IS_VIEWER;
+  $('#dvCount').textContent = L.length? L.length+'개 · 적용 '+L.filter(function(x){ return x.active!==false; }).length+'개' : '';
+  var h='<div class="pr-card" style="margin-bottom:14px"><div style="font-size:13px;font-weight:650;margin-bottom:8px">AI 에게 가르치기</div>'+
+    '<div class="mini" style="margin-bottom:10px;line-height:1.7">예: «에스원 경유 계약은 설치비를 정산월에 따로 인식한다» · «MDR 은 노드가 아니라 에이전트 수로 과금» · ««위세아이텍» 은 «위세» 로도 부른다» · «분기 보고에서 매출은 천원 단위로 말한다». 짧고 사실적으로 한 줄씩. 데이터 값 자체(숫자)는 넣지 말고 규칙·용어·해석 방법을 적으세요 — 숫자는 AI 가 DB 에서 직접 봅니다.</div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start"><input id="akTopic" class="qb-in" placeholder="주제 (예: 에스원 계약)" style="width:180px;height:34px">'+
+    '<textarea id="akBody" class="qb-in" placeholder="AI 가 알아야 할 내용 (한 줄 한 사실)" style="flex:1;min-width:260px;min-height:34px;height:60px;padding:8px 10px;resize:vertical"></textarea>'+
+    '<button type="button" class="cbtn pri" id="akAdd" style="height:34px"'+(canW?'':' disabled')+'>＋ 가르치기</button></div></div>';
+  if(!L.length) h+='<div class="cap" style="padding:30px;text-align:center">아직 가르친 내용이 없습니다 — AI 는 포탈 규칙(MRR·LIVE·장비·OI)과 DB 표만 알고 있습니다</div>';
+  h+='<div class="qb-deck-list">'+L.map(function(x){ return '<div class="qb-deck-it" data-id="'+x.id+'" style="'+(x.active===false?'opacity:.55':'')+'"><span class="ctag">'+esc(x.topic||'')+'</span><span style="flex:1;min-width:240px;font-size:13px;line-height:1.55;white-space:pre-wrap">'+esc(x.content||'')+'</span>'+
+    '<span class="mini">'+esc(String(x.created_by||'').split('@')[0])+' · '+esc(String(x.created_at||'').slice(0,10))+'</span>'+
+    '<span style="display:flex;gap:4px;align-items:center"><label class="mini qb-chk"><input type="checkbox" data-ak="active"'+(x.active===false?'':' checked')+(canW?'':' disabled')+'> 적용</label><button type="button" class="cbtn" data-ak="del" style="color:var(--critical)"'+(canW?'':' disabled')+'>×</button></span></div>'; }).join('')+'</div>';
+  host.innerHTML=h;
+  function reload(){ return sbTry('ai_knowledge?select=*&order=id').then(function(rows){ RAWX.aiknow=rows||[]; renderAiKnow(); }); }
+  var add=$('#akAdd'); if(add) add.onclick=async function(){ var t=($('#akTopic').value||'').trim()||'일반', c=($('#akBody').value||'').trim(); if(!c){ toast('내용을 적어 주세요','','bad'); return; }
+    add.disabled=true; try{ await sbWrite('POST','ai_knowledge',[{topic:t, content:c, created_by:AUTH_USER||null}]); try{ logChange('insert','ai_knowledge',null,{topic:t}); }catch(e){} toast('가르쳤습니다', t+' — 다음 질문부터 반영', 'ok'); await reload(); }catch(e){ toast('저장 실패', String(e.message||e).slice(0,120), 'bad'); add.disabled=false; } };
+  host.querySelectorAll('.qb-deck-it').forEach(function(row){ var id=row.dataset.id;
+    var cb=row.querySelector('[data-ak="active"]'); if(cb) cb.onchange=async function(){ try{ await sbWrite('PATCH','ai_knowledge?id=eq.'+id,{active:cb.checked, updated_at:new Date().toISOString()}); await reload(); }catch(e){ toast('저장 실패', String(e.message||e).slice(0,120), 'bad'); } };
+    var dl=row.querySelector('[data-ak="del"]'); if(dl) dl.onclick=async function(){ if(!confirm('이 지식을 지울까요?')) return; try{ await sbWrite('DELETE','ai_knowledge?id=eq.'+id); await reload(); }catch(e){ toast('삭제 실패', String(e.message||e).slice(0,120), 'bad'); } };
+  });
 }
 function renderBizMonthly(){
   var tw=$('#dvTable').parentElement; tw.style.display='none';
@@ -14894,6 +14943,9 @@ function switchView(v){
     try{ renderTodo(); }catch(e){}
     if(DIRTY){ DIRTY=false; loadFromDb().then(onData); }
     return;
+  }
+  if(v==='aiknow' && !RAWX.aiknow){
+    sbTry('ai_knowledge?select=*&order=id').then(function(rows){ RAWX.aiknow=rows||[]; if(CUR_VIEW==='aiknow') renderGrid(); });
   }
   if(v==='log' && !RAWX.log){
     sbTry('change_log?select=*&order=id.desc&limit=300').then(function(rows){
