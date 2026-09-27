@@ -2877,7 +2877,7 @@ window.addEventListener('message', function(ev){
 });
 
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-16 ㊿+114';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-16 ㊿+115';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -5636,7 +5636,7 @@ function saveHistTurn(q,a){
 function aiEndpoint(){ return SB_URL + '/functions/v1/ask'; }
 /* 중계 함수가 응답을 주지 않으면 fetch 는 영원히 안 끝납니다.
    타임아웃을 걸어 반드시 끝나게 하고, 끝나지 않으면 내장 규칙으로 답합니다. */
-var AI_TIMEOUT_MS = 60000;   // 중계 함수(ask)의 총 예산 45초 + 여유      // 질문 1건 최대 대기 (AI가 DB를 여러 번 조회할 수 있어 넉넉히)
+var AI_TIMEOUT_MS = 90000;   // 중계 함수(ask v3.2)의 총 예산 78초 + 여유 — 함수가 예산 안에 반드시 답을 돌려주므로 여기까지 오는 일은 드묾
 var AI_PING_MS    = 12000;      // 연결 확인은 짧게
 async function aiFetch(payload, ms){
   ms = ms || (payload && payload.mode==='ping' ? AI_PING_MS : AI_TIMEOUT_MS);
@@ -5708,7 +5708,7 @@ function setAsking(on){
   ASK_TICK=setInterval(function(){
     var s=Math.round((Date.now()-ASK_T0)/1000);
     b.textContent='생각 중… '+s+'초'+(s>=8? ' · 중단':'');
-    if(s>=20 && !b._slowTold){ b._slowTold=1; toast('AI 가 오래 걸리고 있습니다','DB 를 여러 번 조회하는 질문이면 40~50초까지 걸릴 수 있어요. 버튼을 누르면 중단합니다','info'); }
+    if(s>=25 && !b._slowTold){ b._slowTold=1; toast('AI 가 오래 걸리고 있습니다','DB 를 여러 번 조회하는 질문이면 1분 가까이 걸릴 수 있어요. 버튼을 누르면 중단합니다','info'); }
   },1000);
   b._slowTold=0;
 }
@@ -5720,6 +5720,11 @@ function abortAsk(){
 }
 
 function shortQ(q){ q=String(q||''); return q.length>90? q.slice(0,90)+'…' : q; }
+/* 도구 호출 요약: run_sql×2 · customer_360 */
+function aiToolBrief(qs){
+  var n={}; (qs||[]).forEach(function(q){ n[q.tool]=(n[q.tool]||0)+1; });
+  return Object.keys(n).map(function(k){ return k+(n[k]>1?'×'+n[k]:''); }).join(' · ');
+}
 /* AI 답변은 «그 시점 데이터»로 만든 것이라, 데이터를 다시 읽으면 닫습니다.
    메뉴 이동만으로는 닫지 않습니다 — 답을 보고 다른 화면 확인하다 돌아오는 흐름은 살립니다. */
 function closeAnswer(why){
@@ -5771,7 +5776,9 @@ function ask(q){
       say.innerHTML='<span class="lb">AI</span>'+esc(cleanSay(r.text))+
         '<div style="font-size:10px;color:var(--muted);margin-top:6px;opacity:.8">'+
         esc(String(r.model||'').replace(/^claude-/,''))+
-        (r.queries&&r.queries.length? ' · DB 조회 '+r.queries.length+'회':'')+
+        (r.queries&&r.queries.length? ' · DB 조회 '+r.queries.length+'회 <span title="'+esc(r.queries.map(function(q){ return q.tool+' '+((q.ms||0)/1000).toFixed(1)+'s'+(q.error?' ✗':''); }).join(' · '))+'">('+esc(aiToolBrief(r.queries))+')</span>':'')+
+        (r.llm&&r.llm.length? ' · 모델 '+r.llm.length+'회 '+(r.llm.reduce(function(a,x){ return a+(x.ms||0); },0)/1000).toFixed(1)+'s':'')+
+        (r.cut? ' · <span style="color:#a06c00">'+esc(r.degraded? '답 미완성: '+r.cut : '도구 중단: '+r.cut)+'</span>':'')+
         (r.tried&&r.tried.length? ' · <span style="color:#a06c00">폴백: '+esc(r.tried.join(' / '))+'</span>':'')+
         (r._ms? ' · '+(r._ms/1000).toFixed(1)+'초':'')+
         ' · '+new Date().toTimeString().slice(0,5)+' 데이터 기준</div>';
