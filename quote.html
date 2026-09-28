@@ -4,6 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Genians 공식 자동 견적·발주 시스템 v5.7 PC전용</title>
+<!-- PWA: 포탈(index.html)과 같은 홈 화면 앱 범위 — manifest·sw.js 는 같은 폴더 -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#149e40">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="SVC 포탈">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<script>if('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) addEventListener('load',function(){ navigator.serviceWorker.register('sw.js').catch(function(){}); });</script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
         :root { --genians-green: #1fb53a; --border-color: #000; --gray-bg: #f8f9fa; }
@@ -189,7 +198,7 @@
     // ─────────────────────────────────────────────
     function portalSess() {
         try {
-            var s = JSON.parse(sessionStorage.getItem('svc_sess') || 'null');
+            var s = JSON.parse(sessionStorage.getItem('svc_sess') || localStorage.getItem('svc_sess') || 'null');
             if (s && s.a && s.p !== false && Math.floor(Date.now()/1000) < (s.e || 0) - 60) return s;
         } catch (e) {}
         return null;

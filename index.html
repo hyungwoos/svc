@@ -2,8 +2,16 @@
 <html lang="ko" data-theme="light" data-look="cc">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>서비스사업부 통합 관리 포탈</title>
+<!-- PWA: 홈 화면 앱 (manifest.webmanifest · sw.js · pwa-*.png · apple-touch-icon.png 를 같은 폴더에) -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#149e40">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="SVC 포탈">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23149e40'/%3E%3Cg fill='%23fff'%3E%3Crect x='14' y='32' width='9' height='18' rx='2'/%3E%3Crect x='27.5' y='22' width='9' height='28' rx='2'/%3E%3Crect x='41' y='14' width='9' height='36' rx='2'/%3E%3C/g%3E%3C/svg%3E">
 <style>
@@ -1513,6 +1521,7 @@ html[data-look="cc"] #ovlC360 .mact{border-top:1px solid var(--grid);padding-top
         <label for="lsPw" style="display:block;font-size:12px;font-weight:650;color:var(--ink-2);margin-bottom:6px">비밀번호</label>
         <input id="lsPw" name="password" type="password" autocomplete="current-password" placeholder="••••••••"
                style="width:100%;height:42px;padding:0 13px;border-radius:10px;border:1px solid var(--ring);background:var(--surface-2);font-size:14px;margin-bottom:18px">
+        <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-2);margin:-6px 0 14px;cursor:pointer;line-height:1.4"><input id="lsKeep" type="checkbox" style="width:15px;height:15px;margin:0;flex:none"><span style="white-space:nowrap;font-weight:600">로그인 유지</span><span class="mini">앱·모바일에서 닫았다 열어도 다시 로그인하지 않음</span></label>
         <button id="lsGo" type="submit" class="btn" style="width:100%;height:44px;font-size:14.5px;border-radius:11px">로그인</button>
       </form>
       <div id="lsForce" style="display:none">
@@ -2877,23 +2886,56 @@ window.addEventListener('message', function(ev){
 });
 
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-16 ㊿+117';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-16 ㊿+118';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
 
-/* ---- 로그인 세션 유지 (localStorage) ---- */
+/* ---- PWA (홈 화면 앱) — 서비스 워커 등록 · 설치 안내 ---- */
+var PWA={deferred:null};
+function pwaStandalone(){ try{ return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone===true; }catch(e){ return false; } }
+function pwaIsIOS(){ return /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1); }
+if('serviceWorker' in navigator && /^https?:$/.test(location.protocol)){
+  window.addEventListener('load', function(){ navigator.serviceWorker.register('sw.js').catch(function(){}); });
+}
+window.addEventListener('beforeinstallprompt', function(e){ e.preventDefault(); PWA.deferred=e; pwaHintSync(); });
+window.addEventListener('appinstalled', function(){ PWA.deferred=null; try{ toast('앱으로 설치됐습니다', '홈 화면의 «SVC 포탈» 아이콘으로 여세요', 'ok'); }catch(e){} pwaHintSync(); });
+function pwaInstall(){ if(!PWA.deferred) return false; var ev=PWA.deferred; ev.prompt(); ev.userChoice.then(function(){ PWA.deferred=null; pwaHintSync(); }); return true; }
+/* 설치 안내 카드 내용 (내 계정 › 설정) */
+function pwaHintHtml(){
+  if(pwaStandalone()) return '<span style="color:var(--brand);font-weight:650">지금 앱으로 실행 중입니다 ✓</span><div class="mini" style="margin-top:5px;line-height:1.6">홈 화면 아이콘으로 열린 상태입니다. 새 버전은 다음 실행 때 자동으로 반영됩니다.</div>';
+  if(PWA.deferred) return '<button type="button" class="pill" id="accPwaGo" style="background:var(--brand);border-color:var(--brand);color:#fff">📱 홈 화면에 설치</button><div class="mini" style="margin-top:5px;line-height:1.6">설치하면 주소창 없이 전체 화면 앱처럼 열립니다. 스토어 등록·다운로드 없음, 새 버전은 자동 반영.</div>';
+  if(pwaIsIOS()) return '<div style="font-size:13px;line-height:1.7">Safari 하단 <b>공유</b> 버튼 <span style="display:inline-block;border:1px solid var(--ring);border-radius:5px;padding:0 5px;font-size:11px">⎋</span> → <b>«홈 화면에 추가»</b> → 추가</div><div class="mini" style="margin-top:5px;line-height:1.6">아이폰·아이패드는 Safari 에서만 설치됩니다(Chrome 앱에서는 안 됨). 설치 후 홈 화면의 «SVC 포탈» 아이콘으로 열면 전체 화면 앱처럼 동작합니다.</div>';
+  return '<div style="font-size:13px;line-height:1.7">Chrome 주소창 오른쪽의 <b>설치</b> 아이콘, 또는 메뉴(⋮) › <b>«앱 설치»</b> / «홈 화면에 추가»</div><div class="mini" style="margin-top:5px;line-height:1.6">안드로이드·PC Chrome·Edge 에서 됩니다. 설치하면 주소창 없이 전체 화면으로 열리고 새 버전은 자동 반영됩니다.</div>';
+}
+function pwaHintSync(){ var h=document.getElementById('accPwa'); if(!h) return; h.innerHTML=pwaHintHtml(); var b=document.getElementById('accPwaGo'); if(b) b.onclick=function(){ pwaInstall(); }; }
+
+/* ---- 로그인 세션 유지 ----
+   sessionStorage 에 두면 홈 화면 앱(PWA)은 닫을 때마다 로그아웃됩니다.
+   «로그인 유지»(svc_keep · 앱/모바일에서는 기본 켬)면 localStorage 에도 복사해 두고, 시작할 때 sessionStorage 로 되살립니다
+   (위성 페이지 quote/report/s1/kk 는 sessionStorage 를 읽으므로 그대로 동작). 자동 로그아웃 설정은 그대로 적용됩니다. */
 var SESS_KEY='svc_sess';
+function keepLogin(){ try{ var v=localStorage.getItem('svc_keep'); if(v!==null) return v==='1'; }catch(e){} return pwaStandalone() || (window.matchMedia && window.matchMedia('(max-width:760px)').matches); }
+function sessRead(){
+  var s=null; try{ s=JSON.parse(sessionStorage.getItem(SESS_KEY)||'null'); }catch(e){}
+  if(!s){ try{ s=JSON.parse(localStorage.getItem(SESS_KEY)||'null'); if(s) sessionStorage.setItem(SESS_KEY, JSON.stringify(s)); }catch(e){} }
+  return s;
+}
+function sessWrite(o){
+  var j=JSON.stringify(o);
+  try{ sessionStorage.setItem(SESS_KEY, j); }catch(e){}
+  try{ if(keepLogin()) localStorage.setItem(SESS_KEY, j); else localStorage.removeItem(SESS_KEY); }catch(e){}
+}
 function saveSess(j,email,pOverride){
-  try{ sessionStorage.setItem(SESS_KEY, JSON.stringify({
+  sessWrite({
     a:j.access_token, r:j.refresh_token||null,
     e:Math.floor(Date.now()/1000)+(j.expires_in||3600), u:email,
     p:(pOverride!==undefined)? pOverride : !!(j.user&&j.user.user_metadata&&j.user.user_metadata.pw_changed)
-  })); }catch(e){}
+  });
 }
-function clearSess(){ try{ sessionStorage.removeItem(SESS_KEY); }catch(e){} }
+function clearSess(){ try{ sessionStorage.removeItem(SESS_KEY); }catch(e){} try{ localStorage.removeItem(SESS_KEY); }catch(e){} }
 async function restoreSess(){
-  var s=null; try{ s=JSON.parse(sessionStorage.getItem(SESS_KEY)||'null'); }catch(e){}
+  var s=sessRead();
   if(!s || !s.a || s.p===false) return false;      // 비밀번호 미변경 계정은 다시 로그인
   if(Math.floor(Date.now()/1000) < (s.e||0)-120){ SB_TOKEN=s.a; AUTH_USER=s.u; return true; }
   if(!s.r){ clearSess(); return false; }
@@ -2908,7 +2950,7 @@ async function restoreSess(){
 }
 /* ---- 토큰 자동 연장: 화면을 계속 켜둬도 로그인이 안 끊기게 ---- */
 async function refreshToken(){
-  var s=null; try{ s=JSON.parse(sessionStorage.getItem(SESS_KEY)||'null'); }catch(e){}
+  var s=sessRead();
   if(!s || !s.r) return false;
   try{
     var r=await fetch(SB_URL+'/auth/v1/token?grant_type=refresh_token',{
@@ -2921,7 +2963,7 @@ async function refreshToken(){
   }catch(e){ return false; }
 }
 setInterval(function(){
-  var s=null; try{ s=JSON.parse(sessionStorage.getItem(SESS_KEY)||'null'); }catch(e){}
+  var s=sessRead();
   if(!SB_TOKEN || !s || !s.e) return;
   if(Math.floor(Date.now()/1000) > (s.e - 300)) refreshToken();   // 만료 5분 전 미리 연장
 }, 60*1000);
@@ -4009,6 +4051,7 @@ function showLoginScreen(){
   try{ var im=sessionStorage.getItem('svc_idle_msg'); if(im){ sessionStorage.removeItem('svc_idle_msg'); var lm=$('#lsMsg'); if(lm){ lm.style.color='var(--ink-2)'; lm.textContent=im; } } }catch(x){}
   /* 마지막으로 로그인한 이메일을 미리 채움 (이 브라우저에 기억 · 비밀번호는 저장하지 않음) → 브라우저 자동완성과 무관하게 아이디가 비지 않음 */
   var e=$('#lsEmail'); try{ var last=localStorage.getItem('svc_last_email')||''; if(e && !e.value && last) e.value=last; }catch(x){}
+  try{ var kc=$('#lsKeep'); if(kc) kc.checked=keepLogin(); }catch(x){}   // 앱·모바일이면 기본 켬, 전에 고른 값이 있으면 그 값
   setTimeout(function(){ var em=$('#lsEmail'), pw=$('#lsPw'); if(em && em.value && pw && !pw.value) pw.focus(); else if(em) em.focus(); },60);
 }
 function enterAfterLogin(){
@@ -4029,6 +4072,7 @@ async function screenLogin(){
     var j=await r.json();
     if(!r.ok||!j.access_token) throw new Error(j.error_description||j.msg||'이메일 또는 비밀번호가 올바르지 않습니다');
     SB_TOKEN=j.access_token; AUTH_USER=em;
+    try{ var kc=$('#lsKeep'); if(kc) localStorage.setItem('svc_keep', kc.checked? '1':'0'); }catch(x){}
     saveSess(j, em);
     try{ localStorage.setItem('svc_last_email', em); }catch(x){}
     showAuthUi();
@@ -4053,7 +4097,7 @@ async function screenPw(){
       body:JSON.stringify({password:p1, data:{pw_changed:true}})});
     var j=await r.json();
     if(!r.ok) throw new Error(j.error_description||j.msg||'변경 실패');
-    try{ var s0=JSON.parse(sessionStorage.getItem(SESS_KEY)||'null'); if(s0){ s0.p=true; sessionStorage.setItem(SESS_KEY,JSON.stringify(s0)); } }catch(e){}
+    try{ var s0=sessRead(); if(s0){ s0.p=true; sessWrite(s0); } }catch(e){}
     enterAfterLogin();
   }catch(e){ m.style.color='var(--critical,#d03b3b)'; m.textContent=String(e.message||e); }
 }
@@ -4077,6 +4121,8 @@ function onErr(e){
 
 function onData(d){
   $('#side').classList.remove('hidden');
+  /* PWA 바로가기(manifest shortcuts) — index.html?v=eqboard 처럼 열리면 첫 화면을 그 메뉴로 */
+  if(!window.__pwaStart){ window.__pwaStart=1; try{ var qv=new URLSearchParams(location.search).get('v'); if(qv && qv!=='dash' && document.querySelector('#side button[data-v="'+qv+'"]')){ setTimeout(function(){ try{ switchView(qv); }catch(e){} }, 50); } }catch(e){} }
   document.body.style.paddingLeft='';
   /* 장표 셀 메모는 한 번만 읽고, 오면 장표만 다시 그립니다 */
   if(!RAWX._mxAt) loadMxMemos(function(){ try{ if(CUR_VIEW==='dash') renderMatrix(); }catch(e){} });
@@ -11581,7 +11627,7 @@ async function renderAccount(){
   var ri=ROLE_INFO[role]||['기본 (역할 미지정)','역할이 지정되지 않아 기본 권한으로 동작합니다. 관리자에게 문의하세요.'];
   var sessTxt='로그인 유지 켜짐 · 만료 시 자동 갱신';
   try{
-    var s0=JSON.parse(sessionStorage.getItem(SESS_KEY)||'null');
+    var s0=sessRead();
     if(s0 && s0.e) sessTxt='로그인 유지 켜짐 · 현재 토큰 만료 '+new Date(s0.e*1000).toLocaleString('ko-KR')+' (자동 갱신)';
   }catch(e){}
   function row(k,v){ return '<div style="display:flex;gap:14px;padding:9px 2px;border-bottom:1px solid var(--ring)">'+
@@ -11610,6 +11656,8 @@ async function renderAccount(){
       '<div class="mini" style="margin-top:5px;line-height:1.6">마우스·키보드·스크롤 입력이 정한 시간 동안 없으면 이 탭에서 자동으로 로그아웃합니다. 끝나기 1분 전에 알림이 뜹니다.</div>')+
     row('화면 디자인', '<select id="accLook" style="height:30px;min-width:200px">'+Object.keys(LOOKS).map(function(k){ return '<option value="'+k+'"'+(k===look0?' selected':'')+'>'+esc(LOOKS[k])+'</option>'; }).join('')+'</select>'+
       '<div class="mini" style="margin-top:5px;line-height:1.6">커맨드 센터: 아이콘 레일 + 상단 커맨드 바(검색·이동·AI) + 인박스 홈 + 장비 운영 보드 + 고객 360 패널 · 심플: 평면 디자인에 기존 사이드바 · 클래식: 이전 디자인. 바꾸면 화면을 다시 읽습니다.</div>');
+  var prow=document.createElement('div'); prow.innerHTML=row('📱 앱으로 설치', '<div id="accPwa">'+pwaHintHtml()+'</div>');
+  set.appendChild(prow.firstChild);
   var meb=document.getElementById('btnMenuEdit');
   if(meb && meb.style.display!=='none'){
     var mrow=document.createElement('div'); mrow.innerHTML=row('메뉴 편집', '<button type="button" class="pill" id="accMenuEdit">⚙ 메뉴 순서·숨김 편집</button><div class="mini" style="margin-top:5px">사이드바(심플·클래식)와 아이콘 레일(커맨드 센터)에 함께 적용됩니다 · 이 브라우저에만 저장</div>');
@@ -11617,6 +11665,7 @@ async function renderAccount(){
   }
   box.appendChild(set);
   var ame=set.querySelector('#accMenuEdit'); if(ame) ame.onclick=function(){ try{ openMenuEdit(); }catch(e){} };
+  var apg=set.querySelector('#accPwaGo'); if(apg) apg.onclick=function(){ pwaInstall(); };
   set.querySelector('#accIdle').onchange=function(){
     var m=parseInt(this.value,10)||0;
     try{ if(m) localStorage.setItem(IDLE_KEY,String(m)); else localStorage.removeItem(IDLE_KEY); }catch(e){}
@@ -15963,7 +16012,7 @@ async function doPwChange(){
     var j=await r.json();
     if(!r.ok) throw new Error(j.error_description||j.msg||'변경 실패');
     $('#apPw').value=$('#apPw2').value='';
-    try{ var s0=JSON.parse(sessionStorage.getItem(SESS_KEY)||'null'); if(s0){ s0.p=true; sessionStorage.setItem(SESS_KEY,JSON.stringify(s0)); } }catch(e){}
+    try{ var s0=sessRead(); if(s0){ s0.p=true; sessWrite(s0); } }catch(e){}
     msg('auMsg','비밀번호를 변경했습니다 ✅','ok');
     if(FORCE_PW){
       FORCE_PW=false;

@@ -4,6 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>임대장비 발주 · 서비스사업부 통합 관리 포탈</title>
+<!-- PWA: 포탈(index.html)과 같은 홈 화면 앱 범위 — manifest·sw.js 는 같은 폴더 -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#149e40">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="SVC 포탈">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<script>if('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) addEventListener('load',function(){ navigator.serviceWorker.register('sw.js').catch(function(){}); });</script>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23149e40'/%3E%3Cg fill='%23fff'%3E%3Crect x='14' y='32' width='9' height='18' rx='2'/%3E%3Crect x='27.5' y='22' width='9' height='28' rx='2'/%3E%3Crect x='41' y='14' width='9' height='36' rx='2'/%3E%3C/g%3E%3C/svg%3E">
 <style>
 :root{
@@ -237,7 +246,7 @@ function saveSess(j,email,pOverride){
 }
 function clearSess(){ try{ sessionStorage.removeItem(SESS_KEY); }catch(e){} }
 async function restoreSess(){
-  var s=null; try{ s=JSON.parse(sessionStorage.getItem(SESS_KEY)||'null'); }catch(e){}
+  var s=null; try{ s=JSON.parse(sessionStorage.getItem(SESS_KEY)||localStorage.getItem(SESS_KEY)||'null'); }catch(e){}
   if(!s || !s.a || s.p===false) return false;
   if(Math.floor(Date.now()/1000) < (s.e||0)-120){ TOKEN=s.a; USER=s.u; return true; }
   if(!s.r){ clearSess(); return false; }
@@ -292,7 +301,7 @@ async function changePw(){
       headers:{apikey:SB_KEY,'Content-Type':'application/json',Authorization:'Bearer '+TOKEN},
       body:JSON.stringify({password:p1,data:{pw_changed:true}})});
     if(!r.ok){ var j=await r.json(); throw new Error(j.msg||'변경 실패'); }
-    try{ var s0=JSON.parse(sessionStorage.getItem(SESS_KEY)||'null'); if(s0){ s0.p=true; sessionStorage.setItem(SESS_KEY,JSON.stringify(s0)); } }catch(e){}
+    try{ var s0=JSON.parse(sessionStorage.getItem(SESS_KEY)||localStorage.getItem(SESS_KEY)||'null'); if(s0){ s0.p=true; sessionStorage.setItem(SESS_KEY,JSON.stringify(s0)); } }catch(e){}
     msg('pwMsg','변경 완료 ✅','ok');
     setTimeout(function(){ $('#viewPw').classList.add('hidden'); enter(); },600);
   }catch(e){ msg('pwMsg',String(e.message||e),'bad'); }

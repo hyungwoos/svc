@@ -4,6 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>에스원 정산 자동화 v1.0</title>
+<!-- PWA: 포탈(index.html)과 같은 홈 화면 앱 범위 — manifest·sw.js 는 같은 폴더 -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#149e40">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="SVC 포탈">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<script>if('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) addEventListener('load',function(){ navigator.serviceWorker.register('sw.js').catch(function(){}); });</script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap');
   :root{ --gg:#1fb53a; --bd:rgba(11,11,11,.12); --muted:#52514e; --bg:#f9f9f7; --warn:#c0392b; --ok:#1e8e3e; }
@@ -239,7 +248,7 @@
    ───────────────────────────────────────────────────────────── */
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
-function sess(){ try{ var s=JSON.parse(sessionStorage.getItem('svc_sess')||'null'); if(s&&s.a&&s.p!==false&&Math.floor(Date.now()/1000)<(s.e||0)-60) return s; }catch(e){} return null; }
+function sess(){ try{ var s=JSON.parse(sessionStorage.getItem('svc_sess')||localStorage.getItem('svc_sess')||'null'); if(s&&s.a&&s.p!==false&&Math.floor(Date.now()/1000)<(s.e||0)-60) return s; }catch(e){} return null; }
 function goPortalLogin(){ if(window.top!==window.self){ alert('좌측 메뉴의 다른 탭에서 로그인한 뒤 다시 열어주세요.'); return; } location.href='index.html'; }
 function hdr(json){ var s=sess(); var h={apikey:SB_KEY, Authorization:'Bearer '+(s?s.a:SB_KEY)}; if(json) h['Content-Type']='application/json'; return h; }
 async function sbGet(q){ var r=await fetch(SB_URL+'/rest/v1/'+q,{headers:hdr()}); if(!r.ok) throw new Error('DB 읽기 실패 ('+r.status+')'); return r.json(); }
