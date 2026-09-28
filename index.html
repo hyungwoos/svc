@@ -2877,7 +2877,7 @@ window.addEventListener('message', function(ev){
 });
 
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-16 ㊿+116';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-16 ㊿+117';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -15160,6 +15160,7 @@ function readRowInputs(tr,g){
   var body={};
   tr.querySelectorAll('[data-k]').forEach(function(inp){
     var c=g.cols.filter(function(x){return x.k===inp.dataset.k;})[0];
+    if(!c || c.ro || c.k[0]==='_') return;          // 계산 열은 저장하지 않음
     var v;
     if(c.t==='bool') v=inp.checked;
     else if(c.t==='select' && c.num) v=Number(inp.value);
@@ -15865,7 +15866,8 @@ function gridAddRow(){
   if(!SB_TOKEN){ openOvl('ovlAuth'); return; }
   var t=$('#dvTable'); var tb=t.querySelector('tbody'); if(!tb) return;
   var tr=document.createElement('tr');
-  tr.innerHTML=g.cols.map(function(c){ return '<td>'+editCell(c,null)+'</td>'; }).join('')+'<td class="act"></td>';
+  // 계산 열(설치율·신청 모듈처럼 ro 또는 «_» 로 시작)은 DB 에 없는 열 — 입력칸을 만들지 않음 (PGRST204 «_fill column» 오류 원인)
+  tr.innerHTML=g.cols.map(function(c){ return '<td>'+((c.ro || c.k[0]==='_')? '<span class="mini">·</span>' : editCell(c,null))+'</td>'; }).join('')+'<td class="act"></td>';
   wireRowInputs(tr,g);
   var act=tr.lastChild;
   var bs=document.createElement('button'); bs.textContent='추가'; bs.className='sv';
