@@ -1563,6 +1563,7 @@ html[data-look="cc"] #ovlC360 .mact{border-top:1px solid var(--grid);padding-top
   <button data-v="churn">📉 해지 분석</button>
   <button data-v="churnrate">📐 해지율</button>
   <button data-v="custflow">👥 고객사 증감</button>
+  <button data-v="leadsrc">🧭 유입경로 분석</button>
   <div class="grp" data-chgrp="1">사업 영역 · Cloud NAC</div>
   <button data-v="cngen">🤝 일반 판매</button>
   <button data-v="cnpub">🏛️ 조달 판매</button>
@@ -2490,6 +2491,7 @@ html[data-look="cc"] #ovlC360 .mact{border-top:1px solid var(--grid);padding-top
           <option value="">— 선택 —</option><option>V6.0</option><option>V5.0</option>
         </select></div>
         <div><label>판매 채널</label><select id="nChannel"><option>일반</option><option>조달</option><option>LGU+</option><option>에스원</option><option>유통</option></select></div>
+        <div><label>유입경로</label><select id="nLead"><option value="">— 미지정 —</option><option>직접영업</option><option>파트너영업</option><option>인바운드</option><option>프로모션</option><option>기타</option></select></div>
         <div><label>모듈 (MDR 결합)</label><select id="nCombine"><option value="">— 없음 —</option><option>Add-on</option><option>MDR+AV</option><option>MDR+AR</option><option>MDR+AV+AR</option></select></div>
         <div><label>파트너 *</label><select id="nPtn">
           <option>지니언스(직접)</option><option>다원티에스</option><option>글로웰시스템</option>
@@ -2908,7 +2910,7 @@ window.addEventListener('message', function(ev){
 });
 
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-16 ㊿+119';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-16 ㊿+120';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -4002,6 +4004,7 @@ function buildFromRes(res){
       partner:c.biller||'미지정', ptn:c.partner||'직접(계산서)',
       ctype:c.contract_type||'', status:c.status||'', note:c.note||'',
       churn:c.churn_reason||'', saleType:c.sale_type||'', ver:c.version||'', csm:c.csm||'', channel:c.channel||'일반',
+      lead:c.lead_src||'',                                                                                  /* 유입경로 (비면 미지정) */
       combine:c.combine||'',
       startIdx:c.start_month? dIdx(c.start_month): first,
       endIdx:c.end_month? dIdx(c.end_month): last,
@@ -7218,6 +7221,7 @@ function s1NoInfo(no){
 var IND_OPTS=['기업','공공','금융','의료','미분류'];
 /* 계약 관리 선택 목록 */
 var CH_OPTS=['일반','조달','LGU+','에스원','유통'];
+var LEAD_OPTS=['직접영업','파트너영업','인바운드','프로모션','기타'];   /* 매출 유입경로 (contracts.lead_src · SQL 80) */
 var CTYPE_OPTS=['신규','재약정','추가'];
 var CSTATUS_OPTS=['신규','재약정','추가','서비스종료','해지','CN전환','통합과금'];
 var CNOTE_OPTS=['재약정 완료','재약정 예정','정부 지원','중도 해지','미연장','매월 연장 확인 필요'];
@@ -7293,6 +7297,7 @@ var GRIDS={
        fmt:function(v,r0){ return (r0&&r0._sector)||'·'; }},
       {k:'line',l:'서비스',t:'select',opts:LINE_OPTS,fmt:function(v){return lline(v);}},
       {k:'channel',l:'판매 채널',t:'select',opts:CH_OPTS},
+      {k:'lead_src',l:'유입경로',t:'select',opts:LEAD_OPTS,fmt:function(v){ return v||'·'; }},   /* 직접영업/파트너영업/인바운드/프로모션/기타 (SQL 80) */
       {k:'partner',l:'파트너',t:'list',opts:PTN_OPTS},           /* 목록에서 고르거나 직접 입력 */
       {k:'biller',l:'계산서발행처'},
       {k:'combine',l:'모듈',t:'select',opts:COMBINE_OPTS},
@@ -7587,6 +7592,13 @@ var GRIDS={
       {k:'amount',l:'수주액(천원)',t:'number',won:1,ro:true},
       {k:'note',l:'비고',ro:true,fmt:function(v){return String(v||'').slice(0,40);}}
     ]
+  },
+  leadsrc:{
+    title:'유입경로 분석', table:'contracts',
+    cap:'계약의 «유입경로»(직접영업·파트너영업·인바운드·프로모션·기타)별 매출 규모 — 값은 계약 관리 표의 유입경로 열에서 지정', add:false, del:false, ro:true,
+    custom:function(){ renderLeadSrc(); },
+    rows:function(){ return []; },
+    cols:[{k:'lead_src',l:'유입경로'}]
   },
   aiknow:{
     title:'AI 지식 — AI 에게 가르치기', table:'ai_knowledge',
@@ -8135,6 +8147,95 @@ function bizHostEl(){
   return host;
 }
 /* ===== AI 지식 — 사람이 AI 에게 가르치는 사실·규칙·용어 (ai_knowledge · active 인 행은 매 질문의 시스템 프롬프트에 들어감) ===== */
+/* ===== 유입경로 분석 (contracts.lead_src · SQL 80) — 유입경로별 매출 규모 ===== */
+var LEAD_FETCHED=false;
+function ensureLeadSrc(cb){
+  var cts=RAWX.contracts||[];
+  if(!cts.length || LEAD_FETCHED || cts.some(function(c){ return c.lead_src!==undefined; })){ if(cb) cb(); return; }
+  LEAD_FETCHED=true;   // load_all() 이 열을 명시하는 옛 버전 → id·lead_src 만 한 번 더 읽어 합침
+  sbTry('contracts?select=id,lead_src').then(function(rows){
+    if(!rows){ if(cb) cb(); return; }
+    var m={}; rows.forEach(function(r){ m[r.id]=r.lead_src||null; });
+    cts.forEach(function(c){ c.lead_src=m[c.id]||null; });
+    ((window.DATA&&DATA.rows)||[]).forEach(function(r){ r.lead=m[r._id]||''; });
+    if(cb) cb();
+  });
+}
+var LS={base:null, line:'', pick:''};
+var LEAD_COLOR={'직접영업':'--s1','파트너영업':'--s3','인바운드':'--s2','프로모션':'--s4','기타':'--muted','미지정':'--axis'};
+function leadOf(r){ return r.lead||'미지정'; }
+function renderLeadSrc(){
+  var tw=$('#dvTable').parentElement; tw.style.display='none';
+  var host=bizHostEl(); host.style.display='';
+  if(!window.DATA || !DATA.rows || !DATA.rows.length){ host.innerHTML='<div class="cap" style="padding:30px;text-align:center">데이터가 아직 없습니다</div>'; return; }
+  if(LS.base==null || LS.base>=M) LS.base=STATE.base;
+  var b=LS.base, rows=DATA.rows, SRC=LEAD_OPTS.concat(['미지정']);
+  var y0=yOf(b), yStart=Math.max(0, b-((b-yOf0Idx(y0))||0));
+  function yOf0Idx(y){ var i=dIdx(y+'-01-01'); return i==null? 0 : Math.max(0,i); }
+  yStart=yOf0Idx(y0);
+  var m12=[]; for(var i=Math.max(0,b-11); i<=b; i++) m12.push(i);
+  /* 집계 */
+  var agg={}; SRC.forEach(function(k){ agg[k]={mrr:0, ytd:0, n:0, custs:{}, newN:0, byLine:{}, trend:m12.map(function(){ return 0; }), rows:[]}; });
+  var total=0, totYtd=0, lineSet={};
+  rows.forEach(function(r,k){
+    if(LS.line && r.line!==LS.line) return;
+    var src=leadOf(r), a=agg[src]||agg['미지정'], v=MAT[k][b]||0;
+    if(v){ a.mrr+=v; total+=v; a.n++; a.custs[r.cust]=1; a.byLine[r.line]=(a.byLine[r.line]||0)+v; lineSet[r.line]=1; a.rows.push({k:k, v:v}); }
+    for(var i=yStart;i<=b;i++){ var t=MAT[k][i]||0; a.ytd+=t; totYtd+=t; }
+    m12.forEach(function(mi,j){ a.trend[j]+=MAT[k][mi]||0; });
+    if(!r.parent && r.startIdx!=null && r.startIdx>=yStart && r.startIdx<=b) a.newN++;
+  });
+  var lines=LINE_OPTS.filter(function(l){ return lineSet[l]; }).concat(Object.keys(lineSet).filter(function(l){ return LINE_OPTS.indexOf(l)<0; }));
+  var order=SRC.slice().sort(function(x,y){ return (x==='미지정')-(y==='미지정') || agg[y].mrr-agg[x].mrr; });
+  var unassigned=agg['미지정'];
+  /* 헤더 컨트롤 */
+  var mopts=''; for(var i=0;i<M;i++) mopts+='<option value="'+i+'"'+(i===b?' selected':'')+'>'+esc(mk(i))+'</option>';
+  var h='<div class="dbar" style="margin-bottom:12px;flex-wrap:wrap;gap:8px;align-items:center">'+
+    '<label class="mini">기준월 <select id="lsBase" class="qb-in" style="height:30px;width:auto">'+mopts+'</select></label>'+
+    '<label class="mini">서비스 <select id="lsLine" class="qb-in" style="height:30px;width:auto"><option value="">전체</option>'+LINE_OPTS.map(function(l){ return '<option value="'+l+'"'+(LS.line===l?' selected':'')+'>'+esc(lline(l))+'</option>'; }).join('')+'</select></label>'+
+    '<span class="mini">기준월 MRR 합계 <b>'+won(total)+'천원</b> · '+y0+'년 누적 <b>'+won(totYtd)+'천원</b> · 단위 천원</span>'+
+    (unassigned.n? '<span class="ctag warn" style="margin-left:auto" title="유입경로가 비어 있는 계약">미지정 '+unassigned.n+'건 · '+won(unassigned.mrr)+'천원</span><button type="button" class="cbtn" id="lsFix" style="height:26px;font-size:11px">계약 관리에서 지정 →</button>':'')+
+    '</div>';
+  /* 타일 */
+  h+='<div class="kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:14px">'+order.map(function(src){
+    var a=agg[src], sh=total? a.mrr/total*100 : 0, col=cssv(LEAD_COLOR[src]||'--muted');
+    return '<div class="kpi ls-tile" data-src="'+esc(src)+'" style="padding:12px 14px;cursor:pointer'+(LS.pick===src?';outline:2px solid '+col:'')+'" title="누르면 이 유입경로의 계약 목록">'+
+      '<div class="k" style="display:flex;align-items:center;gap:6px"><i style="width:9px;height:9px;border-radius:50%;background:'+col+';display:inline-block"></i>'+esc(src)+'</div>'+
+      '<div style="font-size:20px;font-weight:800;margin-top:2px">'+won(a.mrr)+'<small style="font-size:11px;font-weight:500;color:var(--muted)"> 천원 · '+sh.toFixed(1)+'%</small></div>'+
+      '<div class="mini" style="margin-top:4px">계약 '+a.n+'건 · 고객사 '+Object.keys(a.custs).length+'곳'+(a.newN? ' · 올해 신규 '+a.newN+'건':'')+'</div>'+
+      '<div class="mini">'+y0+'년 누적 '+won(a.ytd)+'천원</div></div>'; }).join('')+'</div>';
+  /* 차트 2개 */
+  h+='<div style="display:grid;grid-template-columns:minmax(260px,1fr) minmax(320px,1.4fr);gap:14px;margin-bottom:14px">'+
+    '<div class="pr-card"><div style="font-size:13px;font-weight:650;margin-bottom:8px">유입경로별 MRR <span class="mini">'+esc(mk(b))+'</span></div><div id="lsBars"></div></div>'+
+    '<div class="pr-card"><div style="font-size:13px;font-weight:650;margin-bottom:8px">최근 12개월 추이 <span class="mini">유입경로별 월 매출</span></div><div id="lsTrend" style="height:210px"></div>'+
+    '<div class="mini" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:6px">'+order.filter(function(src){ return agg[src].trend.some(function(v){ return v>0; }); }).map(function(src){ return '<span><i style="display:inline-block;width:10px;height:3px;border-radius:2px;background:'+cssv(LEAD_COLOR[src]||'--muted')+';vertical-align:middle;margin-right:4px"></i>'+esc(src)+'</span>'; }).join('')+'</div></div></div>';
+  /* 표: 유입경로 × 서비스 */
+  h+='<div class="pr-card" style="margin-bottom:14px"><div style="font-size:13px;font-weight:650;margin-bottom:8px">유입경로 × 서비스 <span class="mini">'+esc(mk(b))+' MRR · 천원</span></div>'+
+    '<div class="tbl-wrap"><table class="dgrid"><thead><tr><th>유입경로</th>'+lines.map(function(l){ return '<th class="n">'+esc(lline(l))+'</th>'; }).join('')+'<th class="n">합계</th><th class="n">비중</th><th class="n">계약</th><th class="n">고객사</th></tr></thead><tbody>'+
+    order.map(function(src){ var a=agg[src]; return '<tr><td>'+esc(src)+'</td>'+lines.map(function(l){ return '<td class="n">'+(a.byLine[l]? won(a.byLine[l]):'·')+'</td>'; }).join('')+'<td class="n"><b>'+won(a.mrr)+'</b></td><td class="n">'+(total? (a.mrr/total*100).toFixed(1)+'%':'·')+'</td><td class="n">'+a.n+'</td><td class="n">'+Object.keys(a.custs).length+'</td></tr>'; }).join('')+
+    '<tr style="font-weight:700;background:var(--surface-2)"><td>합계</td>'+lines.map(function(l){ var t=0; order.forEach(function(src){ t+=agg[src].byLine[l]||0; }); return '<td class="n">'+won(t)+'</td>'; }).join('')+'<td class="n">'+won(total)+'</td><td class="n">100%</td><td class="n">'+order.reduce(function(t,src){ return t+agg[src].n; },0)+'</td><td class="n"></td></tr>'+
+    '</tbody></table></div></div>';
+  /* 선택한 유입경로의 계약 목록 */
+  if(LS.pick && agg[LS.pick]){
+    var lst=agg[LS.pick].rows.slice().sort(function(x,y){ return y.v-x.v; });
+    h+='<div class="pr-card"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><div style="font-size:13px;font-weight:650">'+esc(LS.pick)+' — 계약 '+lst.length+'건 <span class="mini">'+esc(mk(b))+' MRR 큰 순</span></div><button type="button" class="cbtn" id="lsPickX" style="height:24px;font-size:11px;margin-left:auto">닫기</button></div>'+
+      '<div class="tbl-wrap" style="max-height:46vh"><table class="dgrid"><thead><tr><th>고객사</th><th>서비스</th><th>판매 채널</th><th>파트너</th><th>시작월</th><th>종료월</th><th class="n">MRR</th></tr></thead><tbody>'+
+      lst.slice(0,200).map(function(x){ var r=rows[x.k]; return '<tr><td>'+esc(r.cust)+(r.parent?' <span class="mini">↳부속</span>':'')+'</td><td>'+esc(lline(r.line))+'</td><td>'+esc(r.channel||'')+'</td><td>'+esc(r.ptn||'')+'</td><td>'+(r.startRaw!=null? esc(mk(r.startRaw)):'·')+'</td><td>'+(r.endRaw!=null? esc(mk(r.endRaw)):'·')+'</td><td class="n">'+won(x.v)+'</td></tr>'; }).join('')+
+      (lst.length>200? '<tr><td colspan="7" class="mini">외 '+(lst.length-200)+'건</td></tr>':'')+'</tbody></table></div></div>';
+  }
+  host.innerHTML=h;
+  /* 차트 그리기 */
+  try{ hbars('#lsBars', order.filter(function(src){ return agg[src].mrr>0; }).map(function(src){ return {name:src, v:agg[src].mrr, c:cssv(LEAD_COLOR[src]||'--muted')}; }), total, false); }catch(e){}
+  try{ var ser=order.filter(function(src){ return agg[src].trend.some(function(v){ return v>0; }); }).map(function(src){ return {label:src, data:agg[src].trend, color:cssv(LEAD_COLOR[src]||'--muted')}; });
+    if(ser.length) Viz.lines(document.getElementById('lsTrend'),{labels:m12.map(function(i){ return mk(i).slice(2).replace('-','.'); }), series:ser, fmt:won, tipFmt:wonFull, fill:false});
+    else document.getElementById('lsTrend').innerHTML='<p class="cap">데이터 없음</p>'; }catch(e){}
+  /* 이벤트 */
+  $('#lsBase').onchange=function(){ LS.base=+this.value; renderLeadSrc(); };
+  $('#lsLine').onchange=function(){ LS.line=this.value; renderLeadSrc(); };
+  var fx=$('#lsFix'); if(fx) fx.onclick=function(){ switchView('contracts'); setTimeout(function(){ try{ var sr=$('#dvSearch'); if(sr){ sr.value=''; } DV.filters={}; DV.filters.lead_src=[BLANK_LABEL]; DV.page=0; renderGrid(); }catch(e){} }, 80); };
+  host.querySelectorAll('.ls-tile').forEach(function(t){ t.onclick=function(){ LS.pick=(LS.pick===t.dataset.src)? '' : t.dataset.src; renderLeadSrc(); }; });
+  var px=$('#lsPickX'); if(px) px.onclick=function(){ LS.pick=''; renderLeadSrc(); };
+}
 var AK={log:false, q:''};   // AI 지식 화면 상태 — 기록은 기본 숨김(사용자: «학습에 업데이트만 하고 기록은 따로»)
 function renderAiKnow(){
   var tw=$('#dvTable').parentElement; tw.style.display='none';
@@ -13977,7 +14078,7 @@ function qbSources(){
             {k:'_alias',l:'별칭',t:'text',get:function(r){ return (r.aliases||[]).join(', '); }}] },
     contracts:{ label:'계약', icon:'📄', key:'id', rows:function(){ return (RAWX.contracts||[]).map(function(c){ var cu=cmap[c.customer_id]||{}; c._custName=cu.name||'?'; c._sector=cu.sector||''; c._industry=cu.industry||''; return c; }); },
       cols:[{k:'id',l:'계약 번호',t:'num'},{k:'_custName',l:'고객사',t:'text'},{k:'_industry',l:'산업군',t:'text'},{k:'_sector',l:'업종',t:'text'},
-            {k:'line',l:'서비스',t:'text',fmt:function(v){ return lline(v); }},{k:'channel',l:'판매 채널',t:'text'},{k:'partner',l:'파트너',t:'text'},{k:'biller',l:'계산서발행처',t:'text'},
+            {k:'line',l:'서비스',t:'text',fmt:function(v){ return lline(v); }},{k:'channel',l:'판매 채널',t:'text'},{k:'lead_src',l:'유입경로',t:'text'},{k:'partner',l:'파트너',t:'text'},{k:'biller',l:'계산서발행처',t:'text'},
             {k:'combine',l:'모듈',t:'text'},{k:'contract_type',l:'구분',t:'text'},{k:'status',l:'상태',t:'text'},
             {k:'_live',l:'LIVE 여부',t:'bool',get:function(r){ var d=dmap[r.id]; try{ return !!(d && liveActiveAt(d, DATA.nowIdx)); }catch(e){ return false; } }},
             {k:'start_month',l:'시작월',t:'month'},{k:'end_month',l:'종료월',t:'month'},{k:'churn_month',l:'해지월',t:'month'},{k:'churn_reason',l:'해지사유',t:'text'},
@@ -15198,6 +15299,7 @@ function switchView(v){
   if(v==='aiknow' && !RAWX.aiknow){
     sbTry('ai_knowledge?select=*&order=id').then(function(rows){ RAWX.aiknow=rows||[]; if(CUR_VIEW==='aiknow') renderGrid(); });
   }
+  if(v==='leadsrc' || v==='contracts') ensureLeadSrc(function(){ if(CUR_VIEW===v) renderGrid(); });   // load_all 이 lead_src 를 안 주는 버전이면 따로 채움
   if(v==='log' && !RAWX.log){
     sbTry('change_log?select=*&order=id.desc&limit=300').then(function(rows){
       RAWX.log=rows||[]; renderGrid();
@@ -16441,6 +16543,7 @@ async function saveEdit(){
       var ct=await sbWrite('POST','contracts?select=id',[{
         customer_id:cid, line:$('#nLine').value, partner:ptn,
         channel:$('#nChannel').value, combine: $('#nCombine').value||null,
+        lead_src:($('#nLead')&&$('#nLead').value)||null,
         version: ($('#nVer')&&$('#nVer').value)||null,
         biller:$('#nBiller').value.trim()||null, contract_type:$('#nType').value,
         note:$('#nNote').value.trim()||null,
@@ -16665,7 +16768,7 @@ function setupEdit(){
       var el=document.getElementById(i); if(el) el.value='';
     });
     var nbe=document.getElementById('nBillingEtc'); if(nbe) nbe.style.display='none';
-    var d={nInd:'기업', nLine:'Cloud', nChannel:'일반', nCombine:'', nVer:'', nPtn:'지니언스(직접)', nType:'신규', nBilling:'', nSector:''};
+    var d={nInd:'기업', nLine:'Cloud', nChannel:'일반', nLead:'', nCombine:'', nVer:'', nPtn:'지니언스(직접)', nType:'신규', nBilling:'', nSector:''};
     var nse=document.getElementById('nSectorEtc'); if(nse) nse.style.display='none';
     Object.keys(d).forEach(function(i){ var el=document.getElementById(i); if(el) el.value=d[i]; });
     if(npe) npe.style.display='none';
