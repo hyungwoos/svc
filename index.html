@@ -309,6 +309,11 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
 .b-warn{color:var(--warning);border-color:var(--warning);background:rgba(250,178,25,.10)}
 .mini{font-size:11px;color:var(--muted)}
 .hidden{display:none!important}
+/* 메뉴 권한 (user_perms) — 보기 없는 메뉴는 숨김 · 읽기 없는 화면은 안내로 덮음 */
+#side button.pdeny, #side .grp.pdeny{display:none!important}
+#permBlock{display:none;max-width:560px;margin:60px auto;padding:34px 28px;text-align:center;background:var(--surface);border:1px solid var(--ring);border-radius:16px}
+#app.perm-deny > div[id^="view"]{display:none!important}
+#app.perm-deny #permBlock{display:block}
 /* 큰 표(계약 목록 등)는 화면에 들어올 때만 배치를 계산합니다 — 대시보드 첫 그림이 크게 빨라집니다.
    화면 밖에서는 아래 크기만큼 자리만 잡아 두므로 스크롤 길이는 그대로입니다. */
 #viewDash [data-w="all"] .tbl-wrap,
@@ -1636,6 +1641,7 @@ html[data-look="cc"] #ovlC360 .mact{border-top:1px solid var(--grid);padding-top
   </div>
 
   <!-- ===================== 질문 바 ===================== -->
+  <div id="permBlock" role="alert"><div style="font-size:34px;margin-bottom:8px">🔒</div><div style="font-size:15px;font-weight:700;margin-bottom:6px">이 화면은 읽기 권한이 없습니다</div><div class="mini" id="permBlockSub" style="line-height:1.7">메뉴는 보이지만 내용은 열람할 수 없게 설정돼 있습니다. 필요하면 슈퍼 관리자에게 «읽기» 권한을 요청하세요.</div></div>
   <div id="viewDash">
   <section id="dashHero" data-w="hero">
     <div id="noticeStack"></div>
@@ -2208,6 +2214,22 @@ html[data-look="cc"] #ovlC360 .mact{border-top:1px solid var(--grid);padding-top
       <div class="tbl-wrap" style="max-height:56vh"><table id="axTable" class="dgrid"></table></div>
       <p class="cap" style="margin:10px 0 0">권한 설명 — super_admin: 전체+계정 관리+변경 이력 · admin: 조회+수정 · admin_viewer: 조회만(수정 불가)
         · poc: PoC·주간회의 메뉴만 · equipment_poc: 장비+PoC+주간회의 메뉴만 · «권한 없음»: 로그인은 되지만 제한 화면만 보입니다</p>
+
+      <div style="font-size:11px;color:var(--ink-2);opacity:.75;margin:22px 0 8px">— 메뉴 권한 (계정마다 보기 · 읽기 · 쓰기) —</div>
+      <div class="dbar" style="margin-bottom:8px;flex-wrap:wrap;gap:8px;align-items:center">
+        <select id="apUser" style="height:32px;min-width:240px;padding:0 8px;border-radius:8px;border:1px solid var(--ring);background:var(--surface-2);color:var(--ink);font-family:inherit;font-size:12.5px"><option value="">계정 선택…</option></select>
+        <span class="mini" id="apRole"></span>
+        <span style="flex:1"></span>
+        <button class="pill ghost" id="apAll" title="모든 메뉴 보기·읽기·쓰기">전부 허용</button>
+        <button class="pill ghost" id="apRead" title="모든 메뉴 보기·읽기, 쓰기 없음">읽기만</button>
+        <button class="pill ghost" id="apNone" title="모든 메뉴 숨김">전부 차단</button>
+        <select id="apCopy" style="height:32px;padding:0 8px;border-radius:8px;border:1px solid var(--ring);background:var(--surface-2);color:var(--ink);font-family:inherit;font-size:12px"><option value="">다른 계정 설정 복사…</option></select>
+        <button class="pill" id="apSave" style="background:var(--brand);border-color:var(--brand);color:#fff">💾 권한 저장</button>
+        <span class="mini" id="apMsg"></span>
+      </div>
+      <div class="tbl-wrap" style="max-height:60vh"><table id="apTable" class="dgrid"></table></div>
+      <p class="cap" style="margin:10px 0 0">보기 = 메뉴에 나타나고 화면을 열 수 있음 · 읽기 = 화면 안의 표·데이터 열람 · 쓰기 = 추가·수정·삭제. 쓰기는 읽기를, 읽기는 보기를 포함합니다.
+        행이 없는(한 번도 저장하지 않은) 계정은 역할 기본값(admin 전부 · admin_viewer 읽기까지)으로 동작하고, 슈퍼 관리자는 제한할 수 없습니다. 바뀐 권한은 그 계정이 다음에 화면을 새로 읽을 때 적용됩니다.</p>
 
       <div style="font-size:11px;color:var(--ink-2);opacity:.75;margin:22px 0 8px">— AI 사용 비용 (Anthropic) —</div>
       <div id="axBillKpi" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px"></div>
@@ -2886,7 +2908,7 @@ window.addEventListener('message', function(ev){
 });
 
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-16 ㊿+118';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-16 ㊿+119';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -2909,6 +2931,56 @@ function pwaHintHtml(){
   return '<div style="font-size:13px;line-height:1.7">Chrome 주소창 오른쪽의 <b>설치</b> 아이콘, 또는 메뉴(⋮) › <b>«앱 설치»</b> / «홈 화면에 추가»</div><div class="mini" style="margin-top:5px;line-height:1.6">안드로이드·PC Chrome·Edge 에서 됩니다. 설치하면 주소창 없이 전체 화면으로 열리고 새 버전은 자동 반영됩니다.</div>';
 }
 function pwaHintSync(){ var h=document.getElementById('accPwa'); if(!h) return; h.innerHTML=pwaHintHtml(); var b=document.getElementById('accPwaGo'); if(b) b.onclick=function(){ pwaInstall(); }; }
+
+/* ---- 계정별 메뉴 권한 (user_perms · SQL 79) — 슈퍼 관리자가 관리자 › 메뉴 권한에서 지정 ----
+   보기(v): 메뉴 표시·화면 열기 · 읽기(r): 화면 안 데이터 열람 · 쓰기(w): 추가·수정·삭제.
+   행이 없는 메뉴는 역할 기본(admin 전부 · admin_viewer 보기+읽기). super_admin 은 항상 전부. 홈·내 계정은 항상 보임. */
+var PERMS=null;                                   // {view:{v,r,w}} · null = 지정 없음
+var PERM_EXEMPT={dash:1, account:1, adminx:1, log:1, csite:1};   // 역할로만 다루는 화면
+async function loadPerms(){
+  if(!SB_TOKEN || !AUTH_USER){ PERMS=null; return null; }
+  try{
+    var rows=await sbTry('user_perms?select=view,can_view,can_read,can_write&email=eq.'+encodeURIComponent(String(AUTH_USER).toLowerCase()));
+    var m=null; (rows||[]).forEach(function(r){ m=m||{}; m[r.view]={v:r.can_view!==false, r:r.can_read!==false, w:!!r.can_write}; });
+    PERMS=m; try{ sessionStorage.setItem('svc_perms', JSON.stringify(m)); }catch(e){}
+    return m;
+  }catch(e){ PERMS=null; return null; }
+}
+function permOf(v){
+  var roleW=!window.IS_VIEWER_ROLE;
+  if(window.IS_SUPER || PERM_EXEMPT[v] || !v) return {v:true, r:true, w:roleW};
+  var p=PERMS && PERMS[v];
+  if(!p) return {v:true, r:true, w:roleW};
+  return {v:!!p.v, r:!!(p.v&&p.r), w:!!(p.v&&p.r&&p.w&&roleW)};
+}
+function canView(v){ return permOf(v).v; }
+function canRead(v){ return permOf(v).r; }
+function canWrite(v){ return permOf(v).w; }
+/* 메뉴에 반영 — 보기 없는 버튼 숨김, 버튼이 하나도 안 남은 그룹은 그룹도 숨김 */
+function applyPerms(){
+  var side=document.getElementById('side'); if(!side) return;
+  side.querySelectorAll('button[data-v]').forEach(function(b){ var v=b.dataset.v; if(PERM_EXEMPT[v]) return; b.classList.toggle('pdeny', !canView(v)); });
+  side.querySelectorAll('.grp').forEach(function(g){
+    if(g.id==='grpAdmin') return;
+    var any=false, el=g.nextElementSibling;
+    while(el && !el.classList.contains('grp')){ if(el.tagName==='BUTTON' && !el.classList.contains('pdeny') && el.style.display!=='none') any=true; el=el.nextElementSibling; }
+    g.classList.toggle('pdeny', !any);
+  });
+  try{ buildRail(); buildMtabs(); }catch(e){}
+  try{ var be=$('#btnEdit'); if(be && SB_TOKEN) be.style.display=(window.IS_VIEWER_ROLE || !canWrite('contracts'))? 'none':''; }catch(e){}
+}
+/* 화면을 열 때 — 현재 화면의 쓰기 권한을 IS_VIEWER 에 반영(기존 조회 전용 로직을 그대로 재사용) · 읽기 없으면 안내로 덮음 */
+function permEnter(v){
+  window.IS_VIEWER = !!window.IS_VIEWER_ROLE || !canWrite(v);
+  var app=document.getElementById('app'); if(app) app.classList.toggle('perm-deny', !canRead(v));
+}
+/* 쓰기 호출 공통 관문 — 현재 화면에 쓰기 권한이 없으면 저장 자체를 막음 (변경 이력·읽기용 RPC 는 예외) */
+function permWriteGuard(method, path){
+  if(!/^(POST|PATCH|PUT|DELETE)$/i.test(method)) return;
+  if(/^change_log\b|^ai_chat_history\b|^rpc\/(load_|admin_|ai_)|^user_perms\b|^ai_billing\b|^recv_presets\b/.test(path)) return;   // 이력·개인 기록·관리자 RPC 는 화면 권한과 무관
+  if(window.IS_SUPER) return;
+  if(!canWrite(CUR_VIEW)){ var b=document.querySelector('#side button[data-v="'+CUR_VIEW+'"]'); var nm=b? navText(b) : CUR_VIEW; throw new Error('쓰기 권한이 없습니다 — 「'+nm+'」 화면은 읽기만 허용돼 있습니다. 슈퍼 관리자에게 «쓰기» 권한을 요청하세요.'); }
+}
 
 /* ---- 로그인 세션 유지 ----
    sessionStorage 에 두면 홈 화면 앱(PWA)은 닫을 때마다 로그아웃됩니다.
@@ -3084,7 +3156,7 @@ function iconFor(label, v){
   if(/주간|회의/.test(L)) return 'calendar';
   return 'doc';
 }
-function visBtn(b){ return !!b && !b.classList.contains('mhide') && b.style.display!=='none'; }
+function visBtn(b){ return !!b && !b.classList.contains('mhide') && !b.classList.contains('pdeny') && b.style.display!=='none'; }
 
 /* ---- 아이콘 레일 (사이드바 구조 menuSegments() 를 그대로 따라 만듦 · 메뉴 편집/채널 숨김 반영) ---- */
 function buildRail(){
@@ -3150,6 +3222,7 @@ function buildMtabs(){
   var m=document.getElementById('mtabs'); if(!m) return;
   var tabs=[['dash','홈','home'],['contracts','매출','chart'],[window.IS_EQUIP? 'orders':'eqboard','장비','box'],['weekly','주간회의','calendar'],['_menu','전체','menu']];
   if(window.IS_EQUIP) tabs[1]=['assets','현황','layers'];
+  tabs=tabs.filter(function(t){ return t[0]==='_menu' || canView(t[0]); });
   m.innerHTML=tabs.map(function(t){ return '<button type="button" data-v="'+t[0]+'" aria-current="false">'+ico(t[2],20)+esc(t[1])+'</button>'; }).join('');
   m.querySelectorAll('button').forEach(function(b){
     b.onclick=function(){
@@ -3711,6 +3784,7 @@ async function sbAll(q){
 }
 async function sbWrite(method, path, body, prefer){
   if(!SB_TOKEN) throw new Error('로그인이 필요합니다.');
+  permWriteGuard(method, path);
   var r=await fetch(SB_URL+'/rest/v1/'+path,{
     method:method, headers:Object.assign(sbHeaders(true), prefer?{Prefer:prefer}:{}),
     body: body!==undefined? JSON.stringify(body): undefined
@@ -3813,9 +3887,11 @@ async function sbRpc(name){
   return r.json();
 }
 async function loadFromDb(){
+  var permP=loadPerms();   // 메뉴 권한은 데이터와 병렬로 (표가 없거나 행이 없으면 null = 역할 기본)
   // 1) 고속 경로: load_all() 함수로 한 번에 (10_fast_load.sql 적용 시)
   try{
     var j=await sbRpc('load_all');
+    try{ await permP; }catch(e){}
     if(j && j.customers){
       var mrsRows;
       if(j.mrsegs){
@@ -3864,6 +3940,7 @@ async function loadFromDb(){
     sbTry('install_extra?select=*&order=year,month,id')   /* 70단계 — 설치비 추가 항목(설치·철거) */
   ]);
   try{ sessionStorage.setItem(CACHE_KEY, JSON.stringify({t:Date.now(), res:res})); }catch(e){}
+  try{ await permP; }catch(e){}
   return buildFromRes(res);
 }
 function loadFromCache(){
@@ -3885,8 +3962,10 @@ function buildFromRes(res){
     targets:res[6]||[], orders:res[7]||[], assets:res[9]||[], mdrpoc:res[10]||[], mtargets:res[11]||[], oi:res[12]||[], mdrops:res[13]||[], iadj:res[14]||[], s1map:res[15]||[], iextra:res[16]||[], log:prevRawx.log||null, mrs:mrs};
   window.RAWX.price=prevRawx.price; window.RAWX.inbound=prevRawx.inbound; window.RAWX._inbAt=prevRawx._inbAt; window.RAWX.cloud=prevRawx.cloud;
   window.MY_ROLE = (res[8] && res[8].length && res[8][0].role) || '';
-  window.IS_VIEWER = (window.MY_ROLE==='viewer' || window.MY_ROLE==='admin_viewer');   // 조회 전용
+  window.IS_VIEWER_ROLE = (window.MY_ROLE==='viewer' || window.MY_ROLE==='admin_viewer');   // 역할상 조회 전용
+  window.IS_VIEWER = window.IS_VIEWER_ROLE;   // 화면마다 permEnter() 가 «쓰기 권한 없음» 을 더함
   window.IS_SUPER = window.MY_ROLE==='super_admin';
+  try{ if(PERMS===null){ var pc=sessionStorage.getItem('svc_perms'); if(pc) PERMS=JSON.parse(pc); } }catch(e){}   // 캐시 경로에서도 권한 유지
   var abtn=document.querySelector('.side button[data-v="adminx"]');
   if(abtn) abtn.style.display = window.IS_SUPER? '':'none';
   var lbtn=document.querySelector('.side button[data-v="log"]');
@@ -4121,12 +4200,13 @@ function onErr(e){
 
 function onData(d){
   $('#side').classList.remove('hidden');
+  try{ applyPerms(); }catch(e){}
   /* PWA 바로가기(manifest shortcuts) — index.html?v=eqboard 처럼 열리면 첫 화면을 그 메뉴로 */
   if(!window.__pwaStart){ window.__pwaStart=1; try{ var qv=new URLSearchParams(location.search).get('v'); if(qv && qv!=='dash' && document.querySelector('#side button[data-v="'+qv+'"]')){ setTimeout(function(){ try{ switchView(qv); }catch(e){} }, 50); } }catch(e){} }
   document.body.style.paddingLeft='';
   /* 장표 셀 메모는 한 번만 읽고, 오면 장표만 다시 그립니다 */
   if(!RAWX._mxAt) loadMxMemos(function(){ try{ if(CUR_VIEW==='dash') renderMatrix(); }catch(e){} });
-  $('#btnEdit').style.display = window.IS_VIEWER? 'none':'';
+  $('#btnEdit').style.display = (window.IS_VIEWER_ROLE || !canWrite('contracts'))? 'none':'';
   (d.rows||[]).forEach(function(r){
     if(!r.ptn){
       var p0=String(r.partner||'');
@@ -11451,9 +11531,109 @@ function renderAdmin(){
     $('#axCreate').onclick=axCreate;
     $('#abSave').onclick=abSave;
   }
+  try{ apBind(); }catch(e){}
   axLoad();
   abLoad();
 }
+/* ── 메뉴 권한 (user_perms · SQL 79) — 계정마다 보기/읽기/쓰기, 슈퍼 관리자만 ── */
+var AP={user:'', rows:{}, bound:false};
+function apMenus(){
+  var out=[], grp='';
+  Array.prototype.forEach.call($('#side').children, function(el){
+    if(el.classList && el.classList.contains('grp')){ grp=el.textContent.trim(); return; }
+    if(el.tagName!=='BUTTON') return;
+    var v=el.dataset.v; if(!v || PERM_EXEMPT[v] || el.id==='btnMenuEdit') return;
+    out.push({grp:grp, v:v, label:navText(el)});
+  });
+  return out;
+}
+function apRoleOf(email){ var u=(AX_USERS||[]).filter(function(x){ return String(x.email||'').toLowerCase()===String(email||'').toLowerCase(); })[0]; return u? (u.role||'') : ''; }
+function apDefault(role){ return (role==='admin_viewer'||role==='viewer')? {v:true,r:true,w:false} : {v:true,r:true,w:true}; }
+function apFillUsers(){
+  var sel=$('#apUser'), cp=$('#apCopy'); if(!sel) return;
+  var cur=sel.value;
+  var opts=(AX_USERS||[]).slice().sort(function(a,b){ return String(a.email||'').localeCompare(String(b.email||'')); })
+    .map(function(u){ return '<option value="'+esc(u.email||'')+'">'+esc(u.email||'')+(u.role? ' — '+esc(AX_ROLE_KO[u.role]||u.role):' — 권한 없음')+'</option>'; }).join('');
+  sel.innerHTML='<option value="">계정 선택…</option>'+opts; sel.value=cur;
+  if(cp){ cp.innerHTML='<option value="">다른 계정 설정 복사…</option>'+opts; }
+}
+async function apFetch(email){
+  var rows=await sbTry('user_perms?select=view,can_view,can_read,can_write&email=eq.'+encodeURIComponent(String(email).toLowerCase()));
+  var m={}; (rows||[]).forEach(function(r){ m[r.view]={v:r.can_view!==false, r:r.can_read!==false, w:!!r.can_write}; });
+  return {map:m, n:(rows||[]).length};
+}
+async function apLoadUser(email){
+  AP.user=email; AP.rows={};
+  var role=apRoleOf(email), d=apDefault(role);
+  $('#apRole').textContent=email? ('역할: '+(AX_ROLE_KO[role]||role||'권한 없음')) : '';
+  if(!email){ $('#apTable').innerHTML=''; return; }
+  $('#apMsg').textContent='불러오는 중…';
+  try{
+    var got=await apFetch(email);
+    apMenus().forEach(function(m){ AP.rows[m.v]=got.map[m.v]? got.map[m.v] : {v:d.v, r:d.r, w:d.w}; });
+    $('#apMsg').textContent=got.n? got.n+'개 메뉴 지정됨' : '지정 없음 — 역할 기본값 표시';
+  }catch(e){ $('#apMsg').textContent='읽기 실패: '+String(e.message||e).slice(0,100); apMenus().forEach(function(m){ AP.rows[m.v]={v:d.v,r:d.r,w:d.w}; }); }
+  apPaint();
+}
+function apSet(v,k,on){
+  var p=AP.rows[v]||{v:true,r:true,w:false};
+  if(k==='v'){ p.v=on; if(!on){ p.r=false; p.w=false; } }
+  if(k==='r'){ p.r=on; if(on) p.v=true; else p.w=false; }
+  if(k==='w'){ p.w=on; if(on){ p.r=true; p.v=true; } }
+  AP.rows[v]=p;
+}
+function apPaint(){
+  var t=$('#apTable'); if(!t) return;
+  var role=apRoleOf(AP.user), isSuper=role==='super_admin', roleRO=(role==='admin_viewer'||role==='viewer'), limited=ROLE_VIEWS[role]||null;
+  var menus=apMenus(), grp='';
+  var h='<thead><tr><th>메뉴</th><th style="width:90px;text-align:center">보기</th><th style="width:90px;text-align:center">읽기</th><th style="width:90px;text-align:center">쓰기</th><th></th></tr></thead><tbody>';
+  menus.forEach(function(m){
+    if(m.grp!==grp){ grp=m.grp; h+='<tr><td colspan="5" style="background:var(--surface-2);font-size:11px;font-weight:650;color:var(--ink-2);padding:6px 10px">'+esc(grp||'기타')+'</td></tr>'; }
+    var p=AP.rows[m.v]||{v:true,r:true,w:false};
+    var na=limited && !limited[m.v];             // 제한 역할(poc·장비)은 역할에 없는 메뉴 자체가 없음
+    var dis=isSuper||na;
+    function cb(k,on,disabled){ return '<td style="text-align:center"><input type="checkbox" data-ap="'+k+'" data-v="'+esc(m.v)+'"'+(on?' checked':'')+(disabled?' disabled':'')+' style="width:16px;height:16px"></td>'; }
+    h+='<tr'+(na?' style="opacity:.45"':'')+'><td>'+esc(m.label)+'</td>'+
+      cb('v', isSuper||(!na&&p.v), dis)+cb('r', isSuper||(!na&&p.r), dis)+cb('w', isSuper||(!na&&p.w), dis||roleRO)+
+      '<td class="mini">'+(isSuper? '슈퍼 관리자 — 제한 불가' : na? '역할('+esc(AX_ROLE_KO[role]||role)+')에 없는 메뉴' : roleRO&&p.r? '조회 전용 역할 — 쓰기 불가' : (!p.v? '숨김' : !p.r? '메뉴만 보임' : !p.w? '읽기만' : ''))+'</td></tr>';
+  });
+  h+='</tbody>';
+  t.innerHTML=h;
+  t.querySelectorAll('input[data-ap]').forEach(function(inp){ inp.onchange=function(){ apSet(inp.dataset.v, inp.dataset.ap, inp.checked); apPaint(); }; });
+}
+function apPreset(mode){
+  if(!AP.user) return;
+  var role=apRoleOf(AP.user), roleRO=(role==='admin_viewer'||role==='viewer');
+  apMenus().forEach(function(m){ AP.rows[m.v]= mode==='all'? {v:true,r:true,w:!roleRO} : mode==='read'? {v:true,r:true,w:false} : {v:false,r:false,w:false}; });
+  apPaint();
+}
+async function apSave(){
+  if(!AP.user){ toast('계정을 먼저 고르세요','','bad'); return; }
+  var role=apRoleOf(AP.user); if(role==='super_admin'){ toast('슈퍼 관리자는 제한할 수 없습니다','','info'); return; }
+  var now=new Date().toISOString(), em=String(AP.user).toLowerCase();
+  var rows=apMenus().map(function(m){ var p=AP.rows[m.v]||{v:true,r:true,w:false}; return {email:em, view:m.v, can_view:!!p.v, can_read:!!(p.v&&p.r), can_write:!!(p.v&&p.r&&p.w), updated_by:AUTH_USER||null, updated_at:now}; });
+  var b=$('#apSave'); b.disabled=true; $('#apMsg').textContent='저장 중…';
+  try{
+    await sbWrite('POST','user_perms?on_conflict=email,view', rows, 'resolution=merge-duplicates,return=minimal');
+    try{ logChange('perms','user_perms',null,{email:em, n:rows.length, hidden:rows.filter(function(r){ return !r.can_view; }).map(function(r){ return r.view; }), readonly:rows.filter(function(r){ return r.can_view&&!r.can_write; }).map(function(r){ return r.view; })}); }catch(e){}
+    $('#apMsg').textContent='저장됨 — '+em+' 은 다음에 화면을 새로 읽을 때 적용';
+    toast('메뉴 권한 저장', em, 'ok');
+    if(em===String(AUTH_USER||'').toLowerCase()){ await loadPerms(); applyPerms(); }
+  }catch(e){ $('#apMsg').textContent=String(e.message||e).slice(0,160); toast('저장 실패', String(e.message||e).slice(0,120), 'bad'); }
+  b.disabled=false;
+}
+function apBind(){
+  if(AP.bound) return; AP.bound=true;
+  $('#apUser').onchange=function(){ apLoadUser(this.value); };
+  $('#apAll').onclick=function(){ apPreset('all'); };
+  $('#apRead').onclick=function(){ apPreset('read'); };
+  $('#apNone').onclick=function(){ apPreset('none'); };
+  $('#apSave').onclick=apSave;
+  $('#apCopy').onchange=async function(){ var src=this.value; this.value=''; if(!src||!AP.user) return; if(src.toLowerCase()===String(AP.user).toLowerCase()) return;
+    try{ var got=await apFetch(src); var d=apDefault(apRoleOf(src)); apMenus().forEach(function(m){ AP.rows[m.v]=got.map[m.v]? got.map[m.v] : {v:d.v,r:d.r,w:d.w}; }); apPaint(); $('#apMsg').textContent=src+' 설정을 가져왔습니다 — 저장을 눌러야 반영'; }
+    catch(e){ toast('복사 실패', String(e.message||e).slice(0,100), 'bad'); } };
+}
+
 /* ── AI 사용 비용 (Anthropic Cost API + 충전액 기준 잔여 추정) ── */
 async function abLoad(){
   var kpi=$('#axBillKpi'), bars=$('#axBillBars');
@@ -11507,6 +11687,7 @@ async function axLoad(){
     AX_USERS=await sbWrite('POST','rpc/admin_list_users',{})||[];
     axMsg(AX_USERS.length+'개 계정');
     axPaint();
+    try{ apFillUsers(); }catch(e){}
   }catch(e){ axMsg(String(e.message||e).slice(0,120),1); $('#axTable').innerHTML=''; }
 }
 function axPaint(){
@@ -14911,6 +15092,8 @@ function switchView(v){
   if(window.IS_EQUIP && !EQUIP_VIEWS[v]) v=window.EQUIP_HOME||'orders';   // 제한 계정은 허용된 화면만
   if(v==='log' && !window.IS_SUPER) v='dash';                             // 변경 이력은 슈퍼 관리자만
   if(v==='csite' && !window.IS_SUPER){ toast('권한 없음','Cloud 사이트 생성·수정은 슈퍼 관리자만 할 수 있습니다','info'); v='dash'; }
+  if(!canView(v)){ toast('권한 없음','이 메뉴는 보기 권한이 없습니다 — 슈퍼 관리자에게 요청하세요','info'); v='dash'; }
+  permEnter(v);
   CUR_VIEW=v;
   try{ pushRecent(v); }catch(e){}
   $('#side').querySelectorAll('button').forEach(function(b){
