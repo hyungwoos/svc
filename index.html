@@ -1617,6 +1617,7 @@ html[data-look="cc"] #ovlC360 .mact{border-top:1px solid var(--grid);padding-top
 
   <div class="topbar">
     <button class="pill ghost" id="btnMenu" aria-label="메뉴">☰</button>
+    <button class="pill ghost" id="btnBack" aria-label="이전 화면" title="이전 화면으로 (브라우저·폰의 뒤로가기와 같음)" style="display:none;padding:0 10px;min-width:34px">←</button>
     <div class="brand">
       <h1>서비스사업부 통합 관리 포탈</h1>
       <span class="sub" id="periodLabel"></span>
@@ -2910,7 +2911,7 @@ window.addEventListener('message', function(ev){
 });
 
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-16 ㊿+120';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-16 ㊿+121';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -4205,7 +4206,7 @@ function onData(d){
   $('#side').classList.remove('hidden');
   try{ applyPerms(); }catch(e){}
   /* PWA 바로가기(manifest shortcuts) — index.html?v=eqboard 처럼 열리면 첫 화면을 그 메뉴로 */
-  if(!window.__pwaStart){ window.__pwaStart=1; try{ var qv=new URLSearchParams(location.search).get('v'); if(qv && qv!=='dash' && document.querySelector('#side button[data-v="'+qv+'"]')){ setTimeout(function(){ try{ switchView(qv); }catch(e){} }, 50); } }catch(e){} }
+  if(!window.__pwaStart){ window.__pwaStart=1; try{ var qv=new URLSearchParams(location.search).get('v') || (location.hash||'').replace('#',''); if(qv && qv!=='dash' && document.querySelector('#side button[data-v="'+qv+'"]')){ setTimeout(function(){ try{ switchView(qv); }catch(e){} NAV.ready=true; btnBackSync(); }, 50); } else setTimeout(function(){ NAV.ready=true; try{ history.replaceState({v:CUR_VIEW, i:0}, '', location.pathname+location.search+(CUR_VIEW==='dash'?'':'#'+CUR_VIEW)); }catch(e){} btnBackSync(); }, 60); }catch(e){ NAV.ready=true; } }
   document.body.style.paddingLeft='';
   /* 장표 셀 메모는 한 번만 읽고, 오면 장표만 다시 그립니다 */
   if(!RAWX._mxAt) loadMxMemos(function(){ try{ if(CUR_VIEW==='dash') renderMatrix(); }catch(e){} });
@@ -15187,6 +15188,31 @@ async function rpMakePpt(){
   }catch(e){ m.textContent='PPT 생성 실패: '+String(e.message||e); }
 }
 
+/* ---- 뒤로가기 — 화면 이동을 브라우저 히스토리에 남겨 상단 ← 버튼·브라우저/폰 뒤로가기·Alt+← 가 모두 이전 화면으로 ----
+   주소 해시(#oi 처럼)에 현재 화면을 적어 두므로 새로고침·링크 공유 때도 그 화면이 열립니다. */
+var NAV={i:0, pop:false, ready:false};
+function navValid(v){ return v==='dash' || !!document.querySelector('#side button[data-v="'+v+'"]'); }
+function navDepth(){ try{ return (history.state && typeof history.state.i==='number')? history.state.i : 0; }catch(e){ return 0; } }
+function navRecord(prev, v){
+  if(NAV.pop || prev===v) return;
+  try{
+    if(NAV.ready){ NAV.i++; history.pushState({v:v, i:NAV.i}, '', location.pathname+location.search+'#'+v); }
+    else history.replaceState({v:v, i:0}, '', location.pathname+location.search+(v==='dash'?'':'#'+v));
+  }catch(e){}
+  btnBackSync();
+}
+function btnBackSync(){ var b=document.getElementById('btnBack'); if(!b) return; b.style.display=(navDepth()>0 || (CUR_VIEW && CUR_VIEW!=='dash'))? 'inline-flex':'none'; }
+function goBack(){
+  if(navDepth()>0){ history.back(); return; }           // 이 포탈 안에서 쌓인 이동만 되돌림 (포탈 밖으로 나가지 않음) · popstate 가 화면을 바꿈
+  if(CUR_VIEW!=='dash') switchView('dash');
+}
+window.addEventListener('popstate', function(e){
+  var v=(e.state && e.state.v) || (location.hash||'').replace('#','') || 'dash';
+  if(!navValid(v)) v='dash';
+  NAV.pop=true; try{ switchView(v); }catch(x){} NAV.pop=false;
+  btnBackSync();
+});
+document.addEventListener('DOMContentLoaded', function(){ var b=document.getElementById('btnBack'); if(b) b.onclick=goBack; });
 function switchView(v){
   if(v==='mdrpoc') v='mdrops';                       // 통합 전 이름 호환
   if((v==='ordernew'||v==='mdrnew'||v==='oinew'||v==='csite'||v==='preport'||v==='s1'||v==='kk') && !SB_TOKEN){ openOvl('ovlAuth'); return; }
@@ -15195,6 +15221,7 @@ function switchView(v){
   if(v==='csite' && !window.IS_SUPER){ toast('권한 없음','Cloud 사이트 생성·수정은 슈퍼 관리자만 할 수 있습니다','info'); v='dash'; }
   if(!canView(v)){ toast('권한 없음','이 메뉴는 보기 권한이 없습니다 — 슈퍼 관리자에게 요청하세요','info'); v='dash'; }
   permEnter(v);
+  try{ navRecord(CUR_VIEW, v); }catch(e){}
   CUR_VIEW=v;
   try{ pushRecent(v); }catch(e){}
   $('#side').querySelectorAll('button').forEach(function(b){
