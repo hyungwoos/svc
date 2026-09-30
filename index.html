@@ -2489,7 +2489,7 @@ html[data-look="cc"] #ovlC360 .mact{border-top:1px solid var(--grid);padding-top
           <option value="DLP">DLP</option>
         </select></div>
         <div id="nVerWrap"><label>Ver. (Cloud NAC)</label><select id="nVer">
-          <option value="">— 선택 —</option><option>V6.0</option><option>V5.0</option>
+          <option value="">— 선택 —</option><option>V6.0</option><option>V5.0</option><option>ZTNA</option>
         </select></div>
         <div><label>판매 채널</label><select id="nChannel"><option>일반</option><option>조달</option><option>LGU+</option><option>에스원</option><option>유통</option></select></div>
         <div><label>유입경로</label><select id="nLead"><option value="">— 미지정 —</option><option>직접영업</option><option>파트너영업</option><option>인바운드</option><option>프로모션</option><option>기타</option></select></div>
@@ -2844,6 +2844,10 @@ function mkFuture(i){
 var LINE_LABEL={Cloud:'Cloud NAC', S1:'S1 Cloud NAC', MDR:'MDR', MDR_S1:'S1 MDR', PNS:'PNS', DRM:'DRM', DLP:'DLP',
   'Cloud NAC':'Cloud NAC', 'SSL PNS':'PNS'};
 function lline(l){ return LINE_LABEL[l]||l; }
+/* 서비스 + 버전 — Cloud NAC 은 5.0 / 6.0 (ZTNA) 이 함께 팔리므로 계약 표에서는 버전을 붙여 보여줍니다 (contracts.version: V5.0 / V6.0 / ZTNA) */
+var VER_OPTS=['V6.0','V5.0','ZTNA'];
+function verShort(v){ v=String(v||'').trim(); if(!v) return ''; if(/^ztna$/i.test(v)) return 'ZTNA'; var m=v.match(/(\d+(?:\.\d+)?)/); return m? m[1] : v; }
+function llineVer(l, ver){ var base=lline(l), vs=verShort(ver); if(!vs) return base; if(l==='Cloud'||l==='S1'||l==='Cloud NAC') return vs==='ZTNA'? base.replace('NAC','ZTNA') : base+' '+vs; return base; }
 // LIVE 시트 원문 표기 → 표준 코드
 var LIVE2CODE={'Cloud NAC':'Cloud','S1':'S1','MDR':'MDR','SSL PNS':'PNS','PNS':'PNS','DRM':'DRM','DLP':'DLP','MDR_S1':'MDR_S1','Cloud':'Cloud'};
 function qOfIdx(i){ return Math.ceil(monOf(i)/3); }
@@ -2911,7 +2915,7 @@ window.addEventListener('message', function(ev){
 });
 
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-16 ㊿+121';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-16 ㊿+122';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -7296,7 +7300,8 @@ var GRIDS={
       /* 업종은 고객사(customers.sector)에 붙는 값 — 여기서 고치면 그 고객사의 모든 계약에 함께 반영됩니다 */
       {k:'_sector',l:'업종',t:'list',opts:function(){ return SECTOR_OPTS; },tbl:'customers',ref:'customer_id',src:'sector',
        fmt:function(v,r0){ return (r0&&r0._sector)||'·'; }},
-      {k:'line',l:'서비스',t:'select',opts:LINE_OPTS,fmt:function(v){return lline(v);}},
+      {k:'line',l:'서비스',t:'select',opts:LINE_OPTS,fmt:function(v,r0){ return llineVer(v, r0&&r0.version); }},   /* Cloud NAC 5.0 / 6.0 을 구분해 표시·필터 */
+      {k:'version',l:'Ver.',t:'select',opts:VER_OPTS,fmt:function(v){ return v||'·'; }},                             /* V6.0 · V5.0 · ZTNA (Cloud NAC 계약) */
       {k:'channel',l:'판매 채널',t:'select',opts:CH_OPTS},
       {k:'lead_src',l:'유입경로',t:'select',opts:LEAD_OPTS,fmt:function(v){ return v||'·'; }},   /* 직접영업/파트너영업/인바운드/프로모션/기타 (SQL 80) */
       {k:'partner',l:'파트너',t:'list',opts:PTN_OPTS},           /* 목록에서 고르거나 직접 입력 */
@@ -7313,6 +7318,7 @@ var GRIDS={
       {k:'churn_month',l:'해지월',t:'month',fmt:function(v,r0){ return v? String(v).slice(0,7) : (/해지|종료/.test(String(r0&&r0.status||''))&&r0.end_month? String(r0.end_month).slice(0,7)+' (종료월)' : '·'); }},
       {k:'s1_no',l:'에스원 계약번호',t:'list',opts:function(){ return s1NoOpts(); }},
       {k:'mrr',l:'MRR(천원)',t:'number',won:1},
+      {k:'qty',l:'노드수',t:'number',fmt:function(v){ return v? Number(v).toLocaleString('ko-KR') : '·'; }},   /* 매출시트 «노드수» — LIVE 노드 합계의 근거 */
       {k:'csm',l:'CSM(사이트명)'},                              /* 영문 사이트명 (site name) */
       {k:'billing',l:'과금방식',t:'list',opts:BILLING_OPTS},     /* 목록에서 고르거나 직접 입력 */
       {k:'install_fee',l:'설치비(천원)',t:'number',won:1},        /* 1회성 · 주로 에스원(S1) 계약 */
@@ -14079,7 +14085,7 @@ function qbSources(){
             {k:'_alias',l:'별칭',t:'text',get:function(r){ return (r.aliases||[]).join(', '); }}] },
     contracts:{ label:'계약', icon:'📄', key:'id', rows:function(){ return (RAWX.contracts||[]).map(function(c){ var cu=cmap[c.customer_id]||{}; c._custName=cu.name||'?'; c._sector=cu.sector||''; c._industry=cu.industry||''; return c; }); },
       cols:[{k:'id',l:'계약 번호',t:'num'},{k:'_custName',l:'고객사',t:'text'},{k:'_industry',l:'산업군',t:'text'},{k:'_sector',l:'업종',t:'text'},
-            {k:'line',l:'서비스',t:'text',fmt:function(v){ return lline(v); }},{k:'channel',l:'판매 채널',t:'text'},{k:'lead_src',l:'유입경로',t:'text'},{k:'partner',l:'파트너',t:'text'},{k:'biller',l:'계산서발행처',t:'text'},
+            {k:'line',l:'서비스',t:'text',fmt:function(v){ return lline(v); }},{k:'version',l:'Ver.',t:'text'},{k:'_lineVer',l:'서비스(버전)',t:'text',get:function(r){ return llineVer(r.line, r.version); }},{k:'channel',l:'판매 채널',t:'text'},{k:'lead_src',l:'유입경로',t:'text'},{k:'partner',l:'파트너',t:'text'},{k:'biller',l:'계산서발행처',t:'text'},
             {k:'combine',l:'모듈',t:'text'},{k:'contract_type',l:'구분',t:'text'},{k:'status',l:'상태',t:'text'},
             {k:'_live',l:'LIVE 여부',t:'bool',get:function(r){ var d=dmap[r.id]; try{ return !!(d && liveActiveAt(d, DATA.nowIdx)); }catch(e){ return false; } }},
             {k:'start_month',l:'시작월',t:'month'},{k:'end_month',l:'종료월',t:'month'},{k:'churn_month',l:'해지월',t:'month'},{k:'churn_reason',l:'해지사유',t:'text'},
