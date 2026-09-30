@@ -1955,14 +1955,14 @@ html[data-look="cc"] #ovlC360 .mact{border-top:1px solid var(--grid);padding-top
       <div style="font-size:11px;color:var(--ink-2);opacity:.75;margin:6px 0 10px">— 신청자 정보 —</div>
       <div class="frm">
         <div><label>고객사명 *</label><input id="odCustomer"></div>
-        <div><label>계약번호</label><input id="odContract" placeholder="모르면 비워두세요 (생성 중)"></div>
+        <div class="od-s1"><label>계약번호</label><input id="odContract" placeholder="모르면 비워두세요 (생성 중)"></div>
         <div><label>고객 담당자 *</label><input id="odMgr"></div>
         <div><label>담당자 연락처</label><input id="odPhone" placeholder="010-0000-0000"></div>
-        <div><label>관리자 계정 (이메일)</label><input id="odAdmin"></div>
-        <div><label>설치 희망일</label><input id="odInstall" type="date"></div>
+        <div class="od-s1"><label>관리자 계정 (이메일)</label><input id="odAdmin"></div>
+        <div class="od-s1"><label>설치 희망일</label><input id="odInstall" type="date"></div>
         <div class="full"><label>고객사 주소</label><input id="odAddr"></div>
-        <div><label>서비스 에디션</label><select id="odEdition"><option>Enterprise Edition</option><option>Basic Edition</option></select></div>
-        <div><label>요청 서비스 기능</label><input id="odFeat" value="IP관리, 단말 무결성 검증"></div>
+        <div class="od-s1"><label>서비스 에디션</label><select id="odEdition"><option>Enterprise Edition</option><option>Basic Edition</option></select></div>
+        <div class="od-s1"><label>요청 서비스 기능</label><input id="odFeat" value="IP관리, 단말 무결성 검증"></div>
         <div><label>노드수</label><input id="odNodes" type="number" min="0"></div>
         <div><label>모델명</label><select id="odModel"><option>S100</option><option>S200</option><option>S10_R2</option><option>S20_R2</option><option>S30H_R1</option><option>ES30</option></select></div>
         <div><label>수량</label><input id="odQty" type="number" min="1" value="1"></div>
@@ -2915,7 +2915,7 @@ window.addEventListener('message', function(ev){
 });
 
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-16 ㊿+124';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-16 ㊿+125';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -12002,20 +12002,21 @@ async function submitOrder(){
   var cust=$('#odCustomer').value.trim(), mgr=$('#odMgr').value.trim();
   if(!cust||!mgr){ msg('odMsg','고객사명과 담당자는 필수입니다','bad'); return; }
   var btn=$('#odGo'); btn.disabled=true; msg('odMsg','접수 중…');
+  var isS1=$('#odChannel').value==='에스원';
   try{
     var row={
       channel: $('#odChannel').value, order_type: $('#odType').value,
       serials: $('#odSerials').value.trim()||null,
       requester: AUTH_USER||null,
       customer: cust,
-      contract_no: $('#odContract').value.trim()||null,
+      contract_no: isS1? ($('#odContract').value.trim()||null) : null,
       mgr_name: mgr,
       mgr_phone: $('#odPhone').value.trim()||null,
-      admin_account: $('#odAdmin').value.trim()||null,
-      install_date: $('#odInstall').value||null,
+      admin_account: isS1? ($('#odAdmin').value.trim()||null) : null,
+      install_date: isS1? ($('#odInstall').value||null) : null,
       customer_addr: $('#odAddr').value.trim()||null,
-      edition: $('#odEdition').value,
-      features: $('#odFeat').value.trim()||null,
+      edition: isS1? $('#odEdition').value : null,
+      features: isS1? ($('#odFeat').value.trim()||null) : null,
       nodes: +$('#odNodes').value||null,
       model: $('#odModel').value,
       qty: +$('#odQty').value||1,
@@ -12820,6 +12821,9 @@ function setupSide(){
     gridAddRow();
   };
   $('#odGo').onclick=submitOrder;
+  /* 계약번호·관리자 계정·설치 희망일·서비스 에디션·요청 서비스 기능은 에스원 발주에만 쓰는 칸 — 다른 채널이면 숨기고 저장값도 비움 */
+  function odS1Sync(){ var s1=$('#odChannel').value==='에스원'; document.querySelectorAll('#odFormWrap .od-s1').forEach(function(d){ d.style.display=s1? '':'none'; }); }
+  $('#odChannel').onchange=odS1Sync; odS1Sync(); window.odS1Sync=odS1Sync;
   $('#mpGo').onclick=submitMdrPoc;
   $('#oiGo').onclick=submitOi;
   $('#oiQuoteBtn').onclick=openQuotePick;
