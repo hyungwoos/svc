@@ -1617,7 +1617,7 @@ html[data-look="cc"] #ovlC360 .mact{border-top:1px solid var(--grid);padding-top
 
   <div class="topbar">
     <button class="pill ghost" id="btnMenu" aria-label="메뉴">☰</button>
-    <button class="pill ghost" id="btnBack" aria-label="이전 화면" title="이전 화면으로 (브라우저·폰의 뒤로가기와 같음)" style="display:none;padding:0 10px;min-width:34px">←</button>
+    <button class="pill ghost" id="btnBack" aria-label="이전 화면" title="이전 화면으로 — Backspace · Alt+← · 브라우저/폰 뒤로가기와 같음" style="display:none;padding:0 10px;min-width:34px">←</button>
     <div class="brand">
       <h1>서비스사업부 통합 관리 포탈</h1>
       <span class="sub" id="periodLabel"></span>
@@ -2915,7 +2915,7 @@ window.addEventListener('message', function(ev){
 });
 
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-16 ㊿+122';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-16 ㊿+123';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -15219,6 +15219,14 @@ window.addEventListener('popstate', function(e){
   btnBackSync();
 });
 document.addEventListener('DOMContentLoaded', function(){ var b=document.getElementById('btnBack'); if(b) b.onclick=goBack; });
+/* Backspace = 뒤로가기 — 글자를 입력하는 칸(input·textarea·select·편집 가능 영역)에 커서가 있을 때는 그대로 글자 지우기 */
+document.addEventListener('keydown', function(e){
+  if(e.key!=='Backspace' || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+  var a=document.activeElement, tag=a? a.tagName : '';
+  if(tag==='INPUT' || tag==='TEXTAREA' || tag==='SELECT' || (a && a.isContentEditable)) return;
+  var app=document.getElementById('app'); if(!app || app.classList.contains('hidden')) return;   // 로그인 화면 등에서는 무시
+  e.preventDefault(); goBack();
+});
 function switchView(v){
   if(v==='mdrpoc') v='mdrops';                       // 통합 전 이름 호환
   if((v==='ordernew'||v==='mdrnew'||v==='oinew'||v==='csite'||v==='preport'||v==='s1'||v==='kk') && !SB_TOKEN){ openOvl('ovlAuth'); return; }
