@@ -1964,7 +1964,7 @@ html[data-look="cc"] #ovlC360 .mact{border-top:1px solid var(--grid);padding-top
         <div><label>서비스 에디션</label><select id="odEdition"><option>Enterprise Edition</option><option>Basic Edition</option></select></div>
         <div><label>요청 서비스 기능</label><input id="odFeat" value="IP관리, 단말 무결성 검증"></div>
         <div><label>노드수</label><input id="odNodes" type="number" min="0"></div>
-        <div><label>모델명</label><select id="odModel"><option>S100</option><option>S200</option><option>S10_R2</option></select></div>
+        <div><label>모델명</label><select id="odModel"><option>S100</option><option>S200</option><option>S10_R2</option><option>S20_R2</option><option>S30H_R1</option><option>ES30</option></select></div>
         <div><label>수량</label><input id="odQty" type="number" min="1" value="1"></div>
         <div><label>단독 Pod 여부</label>
           <label style="display:flex;align-items:center;gap:8px;height:36px;cursor:pointer;font-size:13px;font-weight:500">
@@ -2915,7 +2915,7 @@ window.addEventListener('message', function(ev){
 });
 
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-16 ㊿+123';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-16 ㊿+124';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -7511,7 +7511,7 @@ var GRIDS={
       {k:'install_date',l:'설치희망',t:'date'},
       {k:'edition',l:'에디션',t:'select',opts:['Enterprise Edition','Basic Edition']},
       {k:'nodes',l:'노드',t:'number'},
-      {k:'model',l:'모델',t:'select',opts:['S100','S200','S10_R2']},
+      {k:'model',l:'모델',t:'select',opts:['S100','S200','S10_R2','S20_R2','S30H_R1','ES30']},   /* 장비 현황의 모델 목록과 동일 */
       {k:'qty',l:'수량',t:'number'},
       {k:'standalone_pod',l:'단독Pod',t:'bool',fmt:function(v){return v?'✅ 단독':'·';}},
       {k:'recv_name',l:'수령인'},
