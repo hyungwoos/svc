@@ -2306,7 +2306,7 @@ html[data-look="cc"] #ovlC360 .mact{border-top:1px solid var(--grid);padding-top
     <p class="cap" id="rnCap" style="margin:0 0 10px"></p>
     <div class="mtabs" id="rnTabs" style="margin-bottom:10px"></div>
     <div id="rnList" style="max-height:58vh;overflow:auto"></div>
-    <div class="mact"><span class="mmsg" id="rnMsg"></span><button class="pill ghost" id="rnSlack" style="display:none" title="이 목록을 슬랙 팀 채널로 보냅니다 (매월 25일 자동 알림과 같은 내용 · 미리보기 후 확인)">📣 슬랙으로 보내기</button><button class="pill ghost" id="rnXls">⬇ 엑셀</button><button class="pill ghost" onclick="closeOvl('ovlRenew')">닫기</button></div>
+    <div class="mact"><span class="mmsg" id="rnMsg"></span><button class="pill ghost" id="rnSlack" style="display:none" title="지금 보고 있는 탭의 목록만 슬랙 팀 채널로 보냅니다 (미리보기 후 확인)">📣 이 탭 슬랙으로</button><button class="pill ghost" id="rnSlackAll" style="display:none" title="세 구역(이달 만기 · 다음 달 만기 · 미처리) 전부 — 매월 25일 자동 알림과 같은 내용">📣 전체</button><button class="pill ghost" id="rnXls">⬇ 엑셀</button><button class="pill ghost" onclick="closeOvl('ovlRenew')">닫기</button></div>
   </div>
 </div>
 
@@ -9432,6 +9432,7 @@ function openRenewList(kind, T){
   var m=$('#rnMsg'); if(m){ m.textContent=''; m.className='mmsg'; }
   renderRenewList(); openOvl('ovlRenew');
 }
+function renewKindLabel(k, T){ return k==='lapsed'? '만기 지남 · 미처리' : k==='due'? mk(T)+' 만기' : mk(T+1)+' 만기'; }
 function renewFormHtml(r, act){
   var dEnd=r.endRaw, term=r.term||12, ne=dEnd+term, cancel='<button type="button" class="pill ghost" id="rnCancel">취소</button>';
   if(act==='renew') return '<div class="rn-f"><b>연장</b><span>기존 종료 '+mk(dEnd)+' · 회차 '+((r.renew||0)+1)+'회</span>'+
@@ -9490,7 +9491,8 @@ function renderRenewList(){
     var go=box.querySelector('#rnGo'); if(go) go.onclick=function(){ renewSubmit(rows.filter(function(r){ return r._id===RN.open; })[0]); };
     var cc=box.querySelector('#rnCancel'); if(cc) cc.onclick=function(){ RN.open=null; RN.act=''; renderRenewList(); };
   }
-  var sl=$('#rnSlack'); if(sl){ sl.style.display=window.IS_SUPER? '':'none'; sl.onclick=renewSlack; }
+  var sl=$('#rnSlack'); if(sl){ sl.style.display=window.IS_SUPER? '':'none'; sl.onclick=function(){ renewSlack('tab'); }; }
+  var sa=$('#rnSlackAll'); if(sa){ sa.style.display=window.IS_SUPER? '':'none'; sa.onclick=function(){ renewSlack('all'); }; }
   $('#rnXls').onclick=function(){ xlsxAoa('만기처리_'+mk(T)+'_'+RN.kind, ['고객사','서비스','채널','파트너','시작월','종료월','약정(개월)','MRR(천원)','상태','연장회차','에스원 계약번호'],
     rows.map(function(r){ return [r.cust, llineVer(r.line,r.ver), chOf(r), r.ptn||'', r.startRaw!=null? mk(r.startRaw):'', mk(r.endRaw), r.term||'', Math.round((r.mrr||0)/1000), r.status||'', r.renew||0, r.s1no||'']; })); };
 }
@@ -9556,17 +9558,22 @@ async function doAutoRenew(r, on){
   await sbWrite('PATCH','contracts?id=eq.'+r._id,{auto_renew:!!on, updated_at:new Date().toISOString()});
   await logChange('update','contracts',r._id,{action:'자동연장',on:!!on});
 }
-/* ── 슬랙 발송 (슈퍼 관리자) — Edge Function remind: 미리보기(dry) → 확인 → 발송. 서비스 키는 함수 쪽 Secrets 에만 ── */
-async function renewSlack(){
+/* ── 슬랙 발송 (슈퍼 관리자) — Edge Function remind: 미리보기(dry) → 확인 → 발송. 서비스 키는 함수 쪽 Secrets 에만
+   scope 'tab' = 지금 탭 구역만(body.only) · 'all' = 세 구역 전부(월말 크론과 동일) ── */
+async function renewSlack(scope){
   if(!window.IS_SUPER){ toast('슬랙 발송은 슈퍼 관리자만 할 수 있습니다',''); return; }
-  var m=$('#rnMsg'), bt=$('#rnSlack'); if(bt) bt.disabled=true; if(m){ m.textContent='미리보기 만드는 중…'; m.className='mmsg'; }
+  var m=$('#rnMsg'), bts=[$('#rnSlack'),$('#rnSlackAll')].filter(Boolean); bts.forEach(function(b){ b.disabled=true; }); if(m){ m.textContent='미리보기 만드는 중…'; m.className='mmsg'; }
+  var tabOnly=(scope!=='all'), tabName=renewKindLabel(RN.kind, RN.T);
   try{
     var url=SB_URL+'/functions/v1/remind', hdr={'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+SB_TOKEN};
-    var body={month:idxDate(RN.T), kind:'monthly'};
+    var body={month:idxDate(RN.T), kind:'monthly'}; if(tabOnly) body.only=RN.kind;
+    if(/^https:/.test(location.protocol+'//')) body.portal_url=location.origin+location.pathname;   /* 슬랙 메시지의 «포탈 홈 › 만기 처리» 링크 = 지금 열려 있는 이 포탈 주소 (함수 Secrets PORTAL_URL 보다 우선) */
     var pv=await fetch(url+'?dry=1',{method:'POST',headers:hdr,body:JSON.stringify(body)}).then(function(r){ return r.json(); });
     if(!pv || !pv.ok) throw new Error((pv&&pv.error)||'미리보기 실패 — remind 함수가 배포됐는지 확인');
     var c=pv.counts||{};
-    if(!confirm('슬랙 팀 채널('+(pv.channel||'')+')로 보냅니다.\n\n'+(pv.text||'')+'\n· 이달 만기 '+(c.due||0)+'건 · 다음 달 만기 '+(c.next||0)+'건 · 미처리 '+(c.lapsed||0)+'건\n\n보낼까요?')) throw new Error('취소했습니다.');
+    var lines=tabOnly? ['«'+tabName+'» 탭만 — '+(pv.total!=null? pv.total : (c[RN.kind]||0))+'건'] : ['세 구역 전부 — 이달 만기 '+(c.due||0)+'건 · 다음 달 만기 '+(c.next||0)+'건 · 미처리 '+(c.lapsed||0)+'건'];
+    if(tabOnly && pv.kinds && pv.kinds.length!==1) lines.push('⚠ 배포된 remind 함수가 구역 선택(only)을 모르는 옛 버전이라 세 구역이 전부 갑니다 — v1.2 로 올려 주세요');
+    if(!confirm('슬랙 팀 채널('+(pv.channel||'')+')로 보냅니다.\n\n'+(pv.text||'')+'\n'+lines.join('\n')+'\n\n보낼까요?')) throw new Error('취소했습니다.');
     var rr=await fetch(url,{method:'POST',headers:hdr,body:JSON.stringify(body)}).then(function(r){ return r.json(); });
     if(!rr || !rr.ok) throw new Error((rr&&rr.error)||'발송 실패');
     toast('슬랙 발송 완료 📣', String(rr.text||'').slice(0,90));
@@ -9577,7 +9584,7 @@ async function renewSlack(){
       em='remind 함수에 연결하지 못했습니다 (Failed to fetch) — ① Edge Functions 에 이름이 정확히 «remind» 인 함수가 배포돼 있는지 ② 그 함수 설정에서 «Verify JWT» 를 껐는지(ask 와 같게 — 함수가 로그인 토큰을 직접 검사합니다) 확인하세요. 방금 배포했으면 30초쯤 뒤 다시 눌러 보세요.';
     if(m){ m.textContent=em; m.className='mmsg bad'; }
   }
-  if(bt) bt.disabled=false;
+  bts.forEach(function(b){ b.disabled=false; });
 }
 /* LIVE 행의 채널 = 같은 고객·서비스의 «원계약» 중 가장 최근 것의 채널 (부속 계약은 채널 판단에 쓰지 않음 · 원계약이 없을 때만 부속 참고) */
 function liveChannel(x){
