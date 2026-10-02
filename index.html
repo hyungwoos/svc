@@ -9571,7 +9571,12 @@ async function renewSlack(){
     if(!rr || !rr.ok) throw new Error((rr&&rr.error)||'발송 실패');
     toast('슬랙 발송 완료 📣', String(rr.text||'').slice(0,90));
     if(m){ m.textContent='슬랙 발송 완료 — '+(rr.text||''); m.className='mmsg ok'; }
-  }catch(e){ if(m){ m.textContent=String(e.message||e); m.className='mmsg bad'; } }
+  }catch(e){
+    var em=String(e.message||e);
+    if(/Failed to fetch|NetworkError|Load failed|network/i.test(em))   /* 브라우저가 응답을 못 받음 = 함수가 없거나 게이트웨이가 CORS 없이 거절 */
+      em='remind 함수에 연결하지 못했습니다 (Failed to fetch) — ① Edge Functions 에 이름이 정확히 «remind» 인 함수가 배포돼 있는지 ② 그 함수 설정에서 «Verify JWT» 를 껐는지(ask 와 같게 — 함수가 로그인 토큰을 직접 검사합니다) 확인하세요. 방금 배포했으면 30초쯤 뒤 다시 눌러 보세요.';
+    if(m){ m.textContent=em; m.className='mmsg bad'; }
+  }
   if(bt) bt.disabled=false;
 }
 /* LIVE 행의 채널 = 같은 고객·서비스의 «원계약» 중 가장 최근 것의 채널 (부속 계약은 채널 판단에 쓰지 않음 · 원계약이 없을 때만 부속 참고) */
