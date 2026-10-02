@@ -46,7 +46,9 @@
         .info-right table { width: 100%; border-collapse: collapse; border: 2px solid var(--border-color); font-size: 11px; }
         .info-right th, .info-right td { border: 1px solid var(--border-color); padding: 4px; text-align: center; }
         .info-right th { background: #f0f0f0; font-weight: bold; }
-        .info-right .provider-title { writing-mode: vertical-rl; text-orientation: upright; width: 30px; letter-spacing: 5px; font-size: 13px; }
+        /* «공급자» 세로 글자 — writing-mode(세로쓰기)는 iOS Safari 가 표 안에서 글자를 옆 칸으로 밀어 그리는 버그가 있어(모바일 PDF 글씨 밀림) 글자를 한 줄씩 쌓는 방식으로 */
+        .info-right .provider-title { width: 8%; min-width: 26px; padding: 0; font-size: 13px; letter-spacing: 0; line-height: 1; vertical-align: middle; }
+        .info-right .provider-title span { display: block; line-height: 1.5; text-align: center; }
         .table-responsive { width: 100%; }
         .main-table { width: 100%; border-collapse: collapse; border: 1px solid var(--border-color); font-size: 11px; table-layout: fixed; }
         .main-table th { background: var(--genians-green); color: white; height: 35px; border: 1px solid var(--genians-green); }
@@ -310,22 +312,22 @@
         <div class="info-right">
             <table>
                 <tr>
-                    <th rowspan="4" class="provider-title">공급자</th>
-                    <th style="width: 18%;">상호</th>
-                    <td style="width: 37%; font-weight: bold;">지니언스 주식회사</td>
-                    <th style="width: 15%;">대표</th>
+                    <th rowspan="4" class="provider-title"><span>공</span><span>급</span><span>자</span></th>
+                    <th style="width: 17%;">상호</th>
+                    <td style="width: 36%; font-weight: bold;">지니언스 주식회사</td>
+                    <th style="width: 14%;">대표</th>
                     <td style="width: 25%; position: relative;">
                         <span style="position: relative; z-index: 2;">이동범</span>
-                        <img src="도장.jpg" alt="직인" style="position: absolute; top: 50%; right: -10px; transform: translateY(-50%); width: 40px; mix-blend-mode: multiply; z-index: 1;">
+                        <img src="도장.jpg" alt="직인" style="position: absolute; top: 50%; right: -4px; transform: translateY(-50%); width: 40px; max-width: none; mix-blend-mode: multiply; z-index: 1;">
                     </td>
                 </tr>
                 <tr>
                     <th>주소</th>
-                    <td colspan="3" style="text-align: left; padding-left: 10px; line-height: 1.4;">경기도 안양시 동안구 벌말로 66, 평촌역하이필드<br>A동 12층</td>
+                    <td colspan="3" style="text-align: left; padding-left: 10px; line-height: 1.4; word-break: keep-all;">경기도 안양시 동안구 벌말로 66,<br>평촌역하이필드 A동 12층</td>
                 </tr>
                 <tr>
                     <th id="siteLabel">홈페이지</th>
-                    <td id="siteCell" colspan="3" style="text-align: left; padding-left: 10px;">[www.genians.co.kr](https://www.genians.co.kr)</td>
+                    <td id="siteCell" colspan="3" style="text-align: left; padding-left: 10px;">www.genians.co.kr</td>
                 </tr>
                 <tr>
                     <th>담당자</th>
@@ -944,7 +946,7 @@
         document.getElementById('contactSuffix').innerText = '귀하';
         document.getElementById('dateLabel').innerText = po ? '발주일' : '견적일';
         document.getElementById('siteLabel').innerText = po ? '사업자' : '홈페이지';
-        document.getElementById('siteCell').innerHTML = po ? '등록번호 129-81-80148 · TEL (031) 8084-9770 · FAX (070) 4332-1683' : '[www.genians.co.kr](https://www.genians.co.kr)';
+        document.getElementById('siteCell').innerHTML = po ? '등록번호 129-81-80148 · TEL (031) 8084-9770 · FAX (070) 4332-1683' : 'www.genians.co.kr';
         document.getElementById('itemHead').innerHTML = po ? PO_HEAD : QUOTE_HEAD;
         document.getElementById('subTotalLabel').innerText = po ? '발주 총액 (부가세 별도)' : '공급가액 합계 (부가세 제외)';
         document.getElementById('grandLabel').innerText = po ? '총 합계금액 (발주 총액 + 부가세)' : '총 합계금액 (공급 제안가 + 부가세)';
