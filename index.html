@@ -766,6 +766,31 @@ body{padding-left:192px}
 .mact{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;align-items:center}
 .mmsg{flex:1;font-size:12px;color:var(--muted)}
 .mmsg.ok{color:var(--good)} .mmsg.bad{color:var(--critical)}
+/* 만기 처리 창 (㊿+127) */
+.rn-tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.rn-tbl th{position:sticky;top:0;background:var(--surface-2);color:var(--ink-2);font-weight:650;text-align:left;padding:7px 9px;font-size:11.3px;white-space:nowrap;border-bottom:1px solid var(--grid);z-index:1}
+.rn-tbl td{padding:7px 9px;border-bottom:1px solid var(--line);white-space:nowrap;vertical-align:middle}
+.rn-tbl th.n,.rn-tbl td.n{text-align:right}
+.rn-tbl tfoot td{font-weight:650;border-bottom:0;background:var(--surface-2)}
+.rn-tbl tr.rn-on td{background:var(--surface-2)}
+.rn-tbl .rn-cust{cursor:pointer;font-weight:650;color:var(--ink)} .rn-tbl .rn-cust:hover{text-decoration:underline}
+.rn-tbl .rn-acts{display:flex;gap:4px;flex-wrap:nowrap}
+.rn-f #rnGo{background:var(--brand);border-color:var(--brand);color:#fff}
+@media (max-width:760px){ .rn-tbl tr.rn-form td{padding:8px 6px} .rn-f{position:sticky;left:0;max-width:calc(100vw - 60px);box-sizing:border-box} .rn-f>span:not(.mini){flex-basis:100%} .rn-f label{flex-basis:100%} .rn-f input[type=text]{flex:1} }
+.rn-tbl tr.rn-form td{white-space:normal;background:var(--surface-2);border-bottom:2px solid var(--grid);padding:10px 12px}
+.rn-f{display:flex;gap:10px 14px;align-items:center;flex-wrap:wrap;font-size:12.5px}
+.rn-f>b{font-size:13px}
+.rn-f label{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-2)}
+.rn-f input,.rn-f select{font:inherit;font-size:12.5px;padding:5px 8px;border:1px solid var(--ring);border-radius:7px;background:var(--surface);color:var(--ink)}
+.rn-f .mini{flex-basis:100%;color:var(--muted);font-size:11.5px}
+.rn-f .pill{height:30px}
+/* LIVE 타일 전월 대비 분해 */
+.kpi .lv-delta{margin-top:7px;font-size:11.5px;color:var(--muted);display:flex;align-items:center;gap:5px;flex-wrap:wrap;line-height:1.4}
+.kpi .lv-delta b{font-size:12.5px;color:var(--ink)} .kpi .lv-delta b.up{color:var(--good)} .kpi .lv-delta b.down{color:var(--critical)}
+.kpi .lv-delta span.up,.kpi .lv-delta span.down{padding:1px 6px;border-radius:999px;font-weight:700;font-size:11px}
+.kpi .lv-delta span.up{background:rgba(12,163,12,.12);color:var(--good)} .kpi .lv-delta span.down{background:rgba(208,59,59,.12);color:var(--critical)}
+.kpi .lv-delta .why{color:var(--muted)}
+.kpi .lv-delta .lnk{font:inherit;font-size:11.5px;background:none;border:0;padding:0;color:var(--brand);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
 .pick{max-height:180px;overflow:auto;border:1px solid var(--ring);border-radius:9px;margin-top:6px}
 .pick .pi{padding:8px 11px;font-size:12.5px;cursor:pointer;border-bottom:1px solid var(--grid);display:flex;gap:8px;justify-content:space-between}
 .pick .pi:hover,.pick .pi.sel{background:var(--surface-2)}
@@ -2274,6 +2299,17 @@ html[data-look="cc"] #ovlC360 .mact{border-top:1px solid var(--grid);padding-top
 </div>
 
 <!-- 해지율 셀 내역 -->
+<!-- 만기 처리 (㊿+127) — 홈 인박스 «처리하기» · LIVE 타일 «확인중» 에서 열림. 행마다 연장 / 서비스종료 / 해지 / 자동연장 -->
+<div class="ovl" id="ovlRenew">
+  <div class="modal" style="width:min(1140px,100%)">
+    <h3 id="rnTitle">만기 처리</h3>
+    <p class="cap" id="rnCap" style="margin:0 0 10px"></p>
+    <div class="mtabs" id="rnTabs" style="margin-bottom:10px"></div>
+    <div id="rnList" style="max-height:58vh;overflow:auto"></div>
+    <div class="mact"><span class="mmsg" id="rnMsg"></span><button class="pill ghost" id="rnSlack" style="display:none" title="이 목록을 슬랙 팀 채널로 보냅니다 (매월 25일 자동 알림과 같은 내용 · 미리보기 후 확인)">📣 슬랙으로 보내기</button><button class="pill ghost" id="rnXls">⬇ 엑셀</button><button class="pill ghost" onclick="closeOvl('ovlRenew')">닫기</button></div>
+  </div>
+</div>
+
 <div class="ovl" id="ovlCr">
   <div class="modal" style="width:min(1040px,100%)">
     <h3 id="crTitle">내역</h3>
@@ -2915,7 +2951,7 @@ window.addEventListener('message', function(ev){
 });
 
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-16 ㊿+126';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-16 ㊿+127';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -3311,7 +3347,21 @@ function renderInbox(){
       s:retL.slice(0,3).map(function(o){ var all=eqWant(o).length, d=eqRetSet(o).length; return (o.customer||'')+' '+d+'/'+all+'대'; }).join(' · ')+(retL.length>3? ' 외 '+(retL.length-3)+'건':''),
       acts:[{l:'장비 대시보드 →', pri:1, go:function(){ switchView('eqboard'); }}]});
   }
-  if(expL.length){
+  /* 만기 관리 (㊿+127): 종료월이 지났는데 미처리 → 이미 LIVE 에서 빠짐 · 이달 만기 → 다음 달 1일에 빠짐. 각 행 원클릭 처리 창으로 */
+  var RS=null; if(!EQ){ try{ RS=renewScan(b); }catch(e){ RS=null; } ensureLeadSrc(function(filled){ if(filled) try{ renderInbox(); renderKpis(); }catch(e2){} }); }
+  if(RS && RS.lapsed.length){
+    var lsum=RS.lapsed.reduce(function(a,r){ return a+(r.mrr||0); },0), lrec=RS.checking.length;
+    add('rnl', {ic:'clock', cls:'crit', t:'만기 지났는데 미처리 <span class="num">'+RS.lapsed.length+'건</span> — 이미 LIVE 에서 빠졌습니다'+(lrec? ' (최근 2개월 '+lrec+'건)':''),
+      s:names(RS.lapsed, function(r){ return r.cust; })+' · 월 '+won(lsum)+'천원 · 연장이면 되살리고, 끝났으면 서비스종료·해지로 정리',
+      acts:[{l:'처리하기 →', pri:1, go:function(){ openRenewList('lapsed'); }}]});
+  }
+  if(RS && RS.due.length){
+    var dsum=RS.due.reduce(function(a,r){ return a+(r.mrr||0); },0);
+    add('rnd', {ic:'clock', cls:'warn', t:mk(b)+' 만기 <span class="num">'+RS.due.length+'건</span> — '+mk(b+1)+' 1일 LIVE 에서 빠집니다',
+      s:names(RS.due, function(r){ return r.cust; })+' · 월 '+won(dsum)+'천원'+(RS.next.length? ' · 다음 달 만기 '+RS.next.length+'건 대기':''),
+      acts:[{l:'보류', go:function(){ ccSnooze('rnd',3); }},{l:'처리하기 →', pri:1, go:function(){ openRenewList('due'); }}]});
+  }
+  if(expL.length && !(RS && EN===1 && RS.due.length)){
     var ends=expL.map(function(r){ return r.endIdx; }).sort(function(x,y){ return x-y; });
     add('exp', {ic:'clock', cls:'info', t:EN+'개월 내 만료 계약 <span class="num">'+expL.length+'건</span> — <span class="num">'+won(expAmt)+'</span>천원/월',
       s:names(expL, function(r){ return r.cust; })+' · 종료 '+mk(ends[0])+(ends.length>1? '~'+mk(ends[ends.length-1]):'')+' · 재약정 타깃',
@@ -4020,6 +4070,7 @@ function buildFromRes(res){
       total:Number(c.total_amount)||0, billing:c.billing||'', mrr:Number(c.mrr)||0,
       fee:Number(c.install_fee)||0, settle:c.settle_month||'',   /* 설치비 · 대금정산일 */
       renew:Number(c.renew_count)||0, renewHist:Array.isArray(c.renew_history)? c.renew_history : [],   /* 연장 회차 */
+      autoRenew:!!c.auto_renew, s1no:c.s1_no||'',                                                        /* 월 단위 자동연장(만기 알림 제외 · SQL 84) · 에스원 계약번호 */
       cid:c.customer_id, parent:c.parent_contract_id||null,                                              /* 부속 계약(추가 구매)이면 원계약 id */
       noCount:!!c.no_count,                                                                               /* 매출은 세되 고객사 수·신규·해지에서는 빼는 행(시트 LIVE 집계의 «중복» 등) */
       sum:sum, segs:segs
@@ -5351,6 +5402,7 @@ function renderKpis(list){
         return { k:'LIVE 고객사'+(isDb? ' ('+mk(b)+')':''), v:nCust.toLocaleString('ko-KR'), u:'곳',
                  d:'제품별 합 '+prodSum.toLocaleString('ko-KR')+(!isDb && prodSum>nCust? ' (복수 제품 '+(prodSum-nCust)+'곳)':'')+
                    (nRow>prodSum? ' · 사이트 '+nRow+'건':'')+other, open:'live',
+                 extra:(isDb && !STATE.ind && Object.keys(STATE.lines).every(function(k){ return STATE.lines[k]; }))? liveDeltaHtml(b) : '',   /* 전월 대비 분해 (신규·복귀 / 만기 미처리·해지·종료) + «확인중» — 표시용 (㊿+127) */
                  tip:(isDb? '계약 기준 자동 판정 — 원계약이 '+mk(b)+'에 유효한 회사(시작월 ≤ 기준월, 종료 전 · 해지는 해지월부터 제외 · 통합과금/추가/H/W 제외 · CN전환 포함) · 곳 = 회사 단위 · 제품별 합 = 매출시트 LIVE 산정 방식(제품마다 1곳'+(prodSum>nCust? ' · 두 제품 이상 쓰는 '+(prodSum-nCust)+'곳이 겹침':'')+') · «시트 명단» 은 예전 LIVE 고객사 탭 사본 — 차이는 LIVE 화면 «시트와 다른 곳»에서 항목별로'
                             : 'LIVE 명단 시트 기준 — 곳 = 회사 단위 · 제품별 합 = 매출시트 LIVE 고객사 산정 방식(제품마다 1곳)')+' — 누르면 LIVE 고객사 화면' };
       }
@@ -5383,6 +5435,7 @@ function renderKpis(list){
       c.onclick=function(ev){ if(ev && ev.target && ev.target.closest('button')) return; kpiOpen(t.open); }; c.onkeydown=function(ev){ if(ev.target!==c) return; if(ev.key==='Enter'||ev.key===' '){ ev.preventDefault(); kpiOpen(t.open); } }; }
     /* 타일 안의 기간 버튼(만료 예정) — 타일 클릭(명단 열기)과 분리 */
     c.querySelectorAll('button[data-expn]').forEach(function(bt){ bt.onclick=function(ev){ ev.stopPropagation(); setExpN(+bt.dataset.expn); }; });
+    c.querySelectorAll('button[data-renew]').forEach(function(bt){ bt.onclick=function(ev){ ev.stopPropagation(); openRenewList(bt.dataset.renew); }; });   /* LIVE 타일 «확인중 N건 →» */
     box.appendChild(c);
   });
   try{ ccAfterKpis(box, list, b); }catch(e){ console.warn('cc kpis', e); }
@@ -6105,6 +6158,21 @@ function buildDigest(){
     상위고객사15:topCust,
     만료예정_12개월내:exp.slice(0,20),
     해지사유별건수:churn,
+    만기관리: (function(){   // ㊿+127 — LIVE 규칙 기준 처리 대상 (홈 › 만기 처리 창 · 매월 25일 슬랙 알림과 같은 계산)
+      var S; try{ S=renewScan(b); }catch(e){ return null; }
+      var row=function(r){ return [r.cust, lline(r.line), mk(r.endRaw), Math.round(r.mrr||0), r.status||'', r.channel||'']; };
+      return {설명:'미처리 = 종료월이 지났는데 연장·해지·서비스종료 처리가 없어 이미 LIVE 에서 빠진 원계약(최근 24개월). 이달만기 = 종료월이 기준월 → 다음 달 1일 LIVE 에서 빠짐. 자동연장(auto_renew) 표시 계약은 제외. 행 = [고객사, 서비스, 종료월, MRR(원), 상태, 채널]. 처리는 포탈 홈 › 만기 처리 창에서 연장/서비스종료/해지 원클릭.',
+        미처리_건수:S.lapsed.length, 미처리_월액합:Math.round(S.lapsed.reduce(function(a,r){ return a+(r.mrr||0); },0)), 미처리:S.lapsed.slice(0,25).map(row),
+        이달만기_건수:S.due.length, 이달만기_월액합:Math.round(S.due.reduce(function(a,r){ return a+(r.mrr||0); },0)), 이달만기:S.due.slice(0,25).map(row),
+        다음달만기_건수:S.next.length, 다음달만기:S.next.slice(0,25).map(row),
+        확인중_최근2개월_미처리:S.checking.length};
+    })(),
+    LIVE증감_전월대비: (function(){   // ㊿+127 — LIVE 고객사 수가 왜 늘고 줄었는지 (회사 단위 · 표시용 분해)
+      var d; try{ d=liveDelta(b); }catch(e){ return null; } if(!d) return null;
+      return {설명:'LIVE 고객사 수(회사 단위)의 전월 대비 변화 분해. 만기미처리 = 종료월이 지나 빠졌지만 연장·해지 처리가 안 된 곳(연장 등록하면 되돌아옴). 확인중 = 그중 최근 2개월 — LIVE 숫자에는 넣지 않음.',
+        전월:d.prevN, 기준월:d.curN, 증감:d.curN-d.prevN, 늘어난곳_사유별:{신규:d.n.신규, 복귀:d.n.복귀}, 빠진곳_사유별:{만기미처리:d.n.만기, 해지:d.n.해지, 종료:d.n.종료, 예외제외:d.n.예외},
+        신규_복귀:d.added.slice(0,20).map(function(x){ return [x.cust, x.kind]; }), 빠진곳:d.removed.slice(0,20).map(function(x){ return [x.cust, x.kind]; }), 확인중:d.checking};
+    })(),
     클라우드비용: (function(){   // 도구 › 클라우드 비용 (AWS 세전 USD · NCP 공급가액 ₩)
       if(!RAWX.cloud || !RAWX.cloud.costs || !RAWX.cloud.costs.length) return null;
       var B=clBuild(); if(!B.months.length) return null;
@@ -7311,6 +7379,7 @@ var GRIDS={
       {k:'status',l:'상태',t:'select',opts:CSTATUS_OPTS},
       {k:'live_override',l:'LIVE 예외',t:'select',opts:['포함','제외'],fmt:function(v){ return v? (v==='포함'? '포함(고정)':'제외(고정)') : '·'; }},   /* 규칙보다 우선 — 비우면 규칙대로 (64단계) */
       {k:'live_override_note',l:'LIVE 예외 사유'},
+      {k:'auto_renew',l:'자동연장',t:'bool',fmt:function(v){ return v? '✅ 매월':'·'; }},   /* 월 단위 자동연장 — 만기 목록·슬랙 알림에서 제외 (SQL 84 · ㊿+127) */
       {k:'renew_count',l:'연장',ro:true,fmt:renewLabel},                /* 연장 회차 — «갱신» 탭으로 올라감 */
       {k:'churn_reason',l:'해지사유',t:'list',opts:CHURN_OPTS},
       {k:'start_month',l:'시작월',t:'month'},
@@ -8155,17 +8224,17 @@ function bizHostEl(){
 }
 /* ===== AI 지식 — 사람이 AI 에게 가르치는 사실·규칙·용어 (ai_knowledge · active 인 행은 매 질문의 시스템 프롬프트에 들어감) ===== */
 /* ===== 유입경로 분석 (contracts.lead_src · SQL 80) — 유입경로별 매출 규모 ===== */
-var LEAD_FETCHED=false;
+var LEAD_FETCHED=null;   // 마지막으로 보강한 RAWX.contracts 배열 — 새로 불러오면(배열이 바뀌면) 다시 보강 (㊿+127: 예전엔 한 번만 받아 저장 뒤 새로고침에 값이 사라졌음)
 function ensureLeadSrc(cb){
   var cts=RAWX.contracts||[];
-  if(!cts.length || LEAD_FETCHED || cts.some(function(c){ return c.lead_src!==undefined; })){ if(cb) cb(); return; }
-  LEAD_FETCHED=true;   // load_all() 이 열을 명시하는 옛 버전 → id·lead_src 만 한 번 더 읽어 합침
-  sbTry('contracts?select=id,lead_src').then(function(rows){
-    if(!rows){ if(cb) cb(); return; }
-    var m={}; rows.forEach(function(r){ m[r.id]=r.lead_src||null; });
-    cts.forEach(function(c){ c.lead_src=m[c.id]||null; });
-    ((window.DATA&&DATA.rows)||[]).forEach(function(r){ r.lead=m[r._id]||''; });
-    if(cb) cb();
+  if(!cts.length || LEAD_FETCHED===cts || cts.some(function(c){ return c.lead_src!==undefined && c.auto_renew!==undefined; })){ if(cb) cb(false); return; }
+  LEAD_FETCHED=cts;   // load_all() 이 열을 명시하는 옛 버전 → id·lead_src(·auto_renew) 만 한 번 더 읽어 합침. auto_renew 열이 아직 없으면(SQL 84 전) lead_src 만
+  sbTry('contracts?select=id,lead_src,auto_renew').then(function(rows){ return rows || sbTry('contracts?select=id,lead_src'); }).then(function(rows){
+    if(!rows){ if(cb) cb(false); return; }
+    var m={}, a={}; rows.forEach(function(r){ m[r.id]=r.lead_src||null; a[r.id]=!!r.auto_renew; });
+    cts.forEach(function(c){ c.lead_src=m[c.id]||null; c.auto_renew=!!a[c.id]; });
+    ((window.DATA&&DATA.rows)||[]).forEach(function(r){ r.lead=m[r._id]||''; r.autoRenew=!!a[r._id]; });
+    if(cb) cb(true);
   });
 }
 var LS={base:null, line:'', pick:''};
@@ -9222,11 +9291,12 @@ function liveBasis(r,T){
   if(r.endRaw===T) return st+' · 이달 만기(재약정 대기)';
   return st+' · '+mk(r.startRaw)+'~'+mk(r.endRaw);
 }
-var _liveCache={};
+var _liveCache={d:null, m:{}};
 function liveCalc(T){
   if(T==null) T=(STATE&&STATE.base!=null)? STATE.base : DATA.nowIdx;
   var ck=String(T);
-  if(_liveCache.d===DATA && _liveCache.k===ck) return _liveCache.v;   // DATA 객체가 바뀌면(새로 불러오면) 다시 계산
+  if(_liveCache.d!==DATA) _liveCache={d:DATA, m:{}};                  // DATA 객체가 바뀌면(새로 불러오면) 다시 계산 · 기준월별로 기억(전월 대비 계산 때 같이 씀)
+  if(_liveCache.m[ck]) return _liveCache.m[ck];
   var rows=DATA.rows||[], byKey={}, firstStart={};
   rows.forEach(function(r){ if(!liveRoot(r) || r.startRaw==null) return; var k=r.cust+'|'+r.line; if(firstStart[k]==null || r.startRaw<firstStart[k]) firstStart[k]=r.startRaw; });
   var kidsQ={}; rows.forEach(function(r){ if(!r.parent) return; if(r.startRaw!=null && r.startRaw>T) return; if(r.endRaw!=null && r.endRaw<T) return; kidsQ[r.parent]=(kidsQ[r.parent]||0)+(r.qty||0); });
@@ -9248,7 +9318,7 @@ function liveCalc(T){
   out.sort(function(a,b){ return String(a.line).localeCompare(String(b.line)) || String(a.cust).localeCompare(String(b.cust),'ko'); });
   var uq={}; out.forEach(function(x){ uq[x.cust]=1; });
   var v={ok:true, src:'db', T:T, rows:out, count:out.length, uniq:Object.keys(uq).length, uniqNoDup:Object.keys(uq).length};
-  _liveCache={d:DATA, k:ck, v:v}; return v;
+  _liveCache.m[ck]=v; return v;
 }
 /* 화면들이 쓰는 LIVE 데이터 — 설정(LIVE_SRC)에 따라 계약 판정 또는 시트 명단. 모양은 shapeLive() 결과와 같음 */
 function liveData(T){
@@ -9292,6 +9362,218 @@ function liveForArea(key){
 }
 /* LIVE 명단의 «곳» = 회사 이름 기준 (한 회사가 사이트를 여러 줄로 갖고 있으면 1곳) */
 function liveN(rows){ var u={}; (rows||[]).forEach(function(x){ u[x.cust]=1; }); return Object.keys(u).length; }
+
+/* ────────────────────────────────────────────────────────────────────────────
+   만기 관리 (㊿+127 · SQL 84 · Edge Function remind)
+   배경: 만기 처리가 사람 기억에 의존해 기준월이 바뀌는 날 LIVE 가 한꺼번에 빠져 보임(9월 360 → 10월 354).
+   · 처리 대상 = LIVE 규칙과 같은 원계약(liveRoot) 중 종료월이 있고 자동연장(auto_renew)이 아니며 해지·종료·통합과금·CN전환이 아닌 것
+       lapsed   = 종료월 < 기준월  → 이미 LIVE 에서 빠짐(최근 24개월) · 연장이면 되살리고 끝났으면 서비스종료/해지로 정리
+       due      = 종료월 = 기준월  → 다음 달 1일 LIVE 에서 빠짐
+       next     = 종료월 = 기준월+1 (미리 보기)
+       checking = lapsed 중 최근 2개월 — LIVE 숫자에는 넣지 않고 타일에 «확인중 N건» 으로만 표시
+   · 홈 인박스 항목(미처리 · 이달 만기) → 만기 처리 창(#ovlRenew)에서 행마다 연장 / 서비스종료 / 해지 / 자동연장 원클릭
+     (입력·수정 › 갱신·해지 탭과 같은 저장 로직 doRenew/doChurn 을 공유)
+   · 슈퍼 관리자 «📣 슬랙으로 보내기» = Edge Function remind (매월 25일 자동 발송과 같은 내용 · 미리보기 후 확인)
+   ──────────────────────────────────────────────────────────────────────────── */
+function renewEligible(r){
+  if(!liveRoot(r) || r.autoRenew || r.liveOv==='제외' || r.endRaw==null) return false;
+  return !/해지|종료|통합과금|CN전환/.test(String(r.status||'').replace(/\s/g,''));
+}
+function renewScan(T){
+  if(T==null) T=(STATE&&STATE.base!=null)? STATE.base : DATA.nowIdx;
+  var out={T:T, lapsed:[], due:[], next:[], checking:[]};
+  ((window.DATA&&DATA.rows)||[]).forEach(function(r){
+    if(!renewEligible(r)) return;
+    var e=r.endRaw;
+    if(e<T){ if(e>=T-24) out.lapsed.push(r); if(e>=T-2) out.checking.push(r); }
+    else if(e===T) out.due.push(r);
+    else if(e===T+1) out.next.push(r);
+  });
+  var srt=function(a,b){ return (a.endRaw-b.endRaw) || String(a.cust).localeCompare(String(b.cust),'ko'); };
+  ['lapsed','due','next','checking'].forEach(function(k){ out[k].sort(srt); });
+  return out;
+}
+/* LIVE 고객사 수의 전월 대비 분해 — 늘어난 곳(신규·복귀) · 빠진 곳(만기 미처리·해지·종료·예외) · 확인중. 표시용(LIVE 숫자 자체는 liveCalc 그대로) */
+function liveDelta(T){
+  if(T==null || T<1 || !DATA || !DATA.rows) return null;
+  var cur=liveCalc(T), prev=liveCalc(T-1); if(!cur||!prev) return null;
+  var cs={}, ps={}; cur.rows.forEach(function(x){ cs[x.cust]=1; }); prev.rows.forEach(function(x){ ps[x.cust]=1; });
+  var byCust={}; DATA.rows.forEach(function(r){ if(!liveRoot(r)) return; (byCust[r.cust]=byCust[r.cust]||[]).push(r); });
+  var added=[], removed=[];
+  Object.keys(cs).forEach(function(c){ if(ps[c]) return; var rs=byCust[c]||[];
+    added.push({cust:c, kind: rs.some(function(r){ return r.startRaw===T; })? '신규' : '복귀'}); });
+  Object.keys(ps).forEach(function(c){ if(cs[c]) return;
+    var rs=(byCust[c]||[]).filter(function(r){ return liveActiveAt(r,T-1); });
+    var st=rs.map(function(r){ return String(r.status||''); }).join(' '), ov=rs.map(function(r){ return r.liveOv||''; }).join(' ');
+    removed.push({cust:c, kind: /해지/.test(st)? '해지' : /종료/.test(st)? '종료' : /제외/.test(ov)? '예외' : '만기'}); });
+  var cnt=function(arr,k){ return arr.filter(function(x){ return x.kind===k; }).length; };
+  return {T:T, curN:cur.uniq, prevN:prev.uniq, added:added, removed:removed,
+          n:{신규:cnt(added,'신규'), 복귀:cnt(added,'복귀'), 만기:cnt(removed,'만기'), 해지:cnt(removed,'해지'), 종료:cnt(removed,'종료'), 예외:cnt(removed,'예외')},
+          checking:renewScan(T).checking.length};
+}
+function liveDeltaHtml(b){
+  var dd=null; try{ dd=liveDelta(b); }catch(e){ return ''; }
+  if(!dd) return '';
+  var n=dd.n, dn=dd.curN-dd.prevN;
+  var plus=[n.신규? '신규 '+n.신규:'', n.복귀? '복귀 '+n.복귀:''].filter(Boolean).join(' · ');
+  var minus=[n.만기? '만기 미처리 '+n.만기:'', n.해지? '해지 '+n.해지:'', n.종료? '종료 '+n.종료:'', n.예외? '예외 제외 '+n.예외:''].filter(Boolean).join(' · ');
+  return '<div class="lv-delta" title="LIVE 고객사 수의 전월 대비 변화를 사유별로 나눈 것 — 숫자는 회사 단위 · 만기 미처리 = 종료월이 지났는데 연장·해지·종료 처리가 없어 빠진 곳">'+
+    '전월 '+dd.prevN+' → '+dd.curN+' <b class="'+(dn>0?'up':dn<0?'down':'')+'">('+(dn>0?'+':'')+dn+')</b>'+
+    (dd.added.length? ' · <span class="up">+'+dd.added.length+'</span><span class="why">'+esc(plus)+'</span>':'')+
+    (dd.removed.length? ' · <span class="down">−'+dd.removed.length+'</span><span class="why">'+esc(minus)+'</span>':'')+
+    (dd.checking? ' · <button type="button" class="lnk" data-renew="checking" title="종료월이 최근 2개월 안에 지났는데 연장·해지 처리가 없는 계약 — LIVE 에 넣지 않고 표시만 합니다. 연장을 등록하면 되돌아옵니다">확인중 '+dd.checking+'건 →</button>':'')+
+    '</div>';
+}
+/* ── 만기 처리 창 ── */
+var RN={kind:'due', T:null, open:null, act:'', busy:false};
+function openRenewList(kind, T){
+  if(!window.DATA || !DATA.rows) return;
+  RN.kind=(kind==='checking')? 'lapsed' : (kind||'due'); RN.T=(T!=null? T : STATE.base); RN.open=null; RN.act='';
+  var m=$('#rnMsg'); if(m){ m.textContent=''; m.className='mmsg'; }
+  renderRenewList(); openOvl('ovlRenew');
+}
+function renewFormHtml(r, act){
+  var dEnd=r.endRaw, term=r.term||12, ne=dEnd+term, cancel='<button type="button" class="pill ghost" id="rnCancel">취소</button>';
+  if(act==='renew') return '<div class="rn-f"><b>연장</b><span>기존 종료 '+mk(dEnd)+' · 회차 '+((r.renew||0)+1)+'회</span>'+
+    '<label>새 종료월 <input type="month" id="rnEnd" value="'+mk(ne)+'"></label>'+
+    '<label>월 금액(천원) <input type="number" id="rnMrr" value="'+Math.round((r.mrr||0)/1000)+'" min="0" step="1" style="width:110px"></label>'+
+    '<label>메모 <input type="text" id="rnNote" placeholder="선택" style="width:180px"></label>'+
+    '<span class="mini">'+mk(dEnd+1)+'부터 새 종료월까지 월 매출을 다시 만듭니다'+(/해지|종료/.test(r.status||'')? ' · 상태는 신규로 되살림':'')+(dEnd<RN.T? ' · 지난 달 매출도 소급 생성':'')+'</span>'+
+    '<button type="button" class="pill" id="rnGo">연장 저장</button>'+cancel+'</div>';
+  if(act==='end') return '<div class="rn-f"><b>서비스종료</b><span>상태를 «서비스종료»로 바꾸고 '+mk(dEnd)+' 이후 월 매출을 지웁니다 · LIVE 에서는 '+mk(dEnd+1)+'부터 제외</span>'+
+    '<label>메모 <input type="text" id="rnNote" placeholder="선택 — 비고에 덧붙임" style="width:220px"></label>'+
+    '<button type="button" class="pill" id="rnGo">종료 저장</button>'+cancel+'</div>';
+  if(act==='churn') return '<div class="rn-f"><b>해지</b>'+
+    '<label>해지월(이 달까지 매출 인식) <input type="month" id="rnMonth" value="'+mk(dEnd)+'"></label>'+
+    '<label>사유 <select id="rnReason">'+CHURN_OPTS.map(function(o){ return '<option>'+esc(o)+'</option>'; }).join('')+'</select></label>'+
+    '<span class="mini">해지월 다음 달부터 LIVE 제외 · 해지 분석·해지율에 반영</span>'+
+    '<button type="button" class="pill" id="rnGo">해지 저장</button>'+cancel+'</div>';
+  if(act==='auto') return '<div class="rn-f"><b>자동연장</b><span>월 단위로 자동 연장되는 계약으로 표시 — 만기 목록·슬랙 알림·«확인중»에서 빠지고 LIVE 판정은 그대로입니다. 계약 관리 표 «자동연장» 열에서 언제든 끌 수 있습니다.'+
+    (dEnd<RN.T? ' <b style="color:var(--critical)">⚠ 종료월이 지나 이미 LIVE 에서 빠진 계약입니다 — LIVE 에 두려면 «연장»으로 종료월을 늘리세요.</b>':'')+'</span>'+
+    '<button type="button" class="pill" id="rnGo">자동연장 켜기</button>'+cancel+'</div>';
+  return '';
+}
+function renderRenewList(){
+  var box=$('#rnList'); if(!box || !window.DATA) return;
+  var T=RN.T, S=renewScan(T), rows=S[RN.kind]||[], W=canWrite('contracts');
+  var sum=rows.reduce(function(a,r){ return a+(r.mrr||0); },0);
+  $('#rnTitle').textContent='만기 처리 — 기준 '+mk(T);
+  var caps={lapsed:'종료월이 지났는데 연장·해지·서비스종료 처리가 없는 계약 — 이미 LIVE 고객사에서 빠져 있습니다(최근 24개월). 연장이면 «연장»으로 되살리고, 끝났으면 «서비스종료» 또는 «해지(사유)»로 정리하세요.',
+            due:'종료월이 '+mk(T)+'인 계약 — 처리하지 않으면 '+mk(T+1)+' 1일부터 LIVE 고객사에서 빠집니다.',
+            next:'종료월이 '+mk(T+1)+'인 계약 — 다음 달 안에 처리할 대상(미리 보기)입니다.'};
+  $('#rnCap').textContent=caps[RN.kind]+' 월 단위 자동연장 계약은 «자동연장»을 켜면 이 목록과 슬랙 알림에서 빠집니다.'+(W? '' : ' (계약 쓰기 권한이 없어 열람만 됩니다)');
+  $('#rnTabs').innerHTML=[['lapsed','만기 지남 · 미처리',S.lapsed.length],['due',mk(T)+' 만기',S.due.length],['next',mk(T+1)+' 만기',S.next.length]].map(function(t){
+    return '<button type="button" data-k="'+t[0]+'" aria-pressed="'+(RN.kind===t[0])+'">'+esc(t[1])+' <b class="num">'+t[2]+'</b></button>'; }).join('');
+  $('#rnTabs').querySelectorAll('button').forEach(function(b){ b.onclick=function(){ RN.kind=b.dataset.k; RN.open=null; RN.act=''; renderRenewList(); }; });
+  if(!rows.length){ box.innerHTML='<div class="ib-empty"><span class="ib-ic ok">'+ico('check',16)+'</span>처리할 계약이 없습니다.</div>'; }
+  else {
+    var h='<table class="rn-tbl"><thead><tr><th>고객사</th><th>서비스</th><th>채널 · 파트너</th><th>기간</th><th class="n">약정</th><th class="n">MRR(천원)</th><th>상태</th>'+(W? '<th>처리</th>':'')+'</tr></thead><tbody>';
+    rows.forEach(function(r){
+      var id=r._id, open=(RN.open===id);
+      h+='<tr data-id="'+id+'"'+(open?' class="rn-on"':'')+'><td><a class="rn-cust" data-c="'+esc(r.cust)+'" title="고객 360">'+esc(r.cust)+'</a>'+(r.s1no? ' <span class="mini">'+esc(r.s1no)+'</span>':'')+'</td>'+
+         '<td>'+esc(llineVer(r.line,r.ver))+'</td><td>'+esc(chOf(r))+(r.ptn&&r.ptn!=='직접(계산서)'? ' · '+esc(r.ptn):'')+'</td>'+
+         '<td>'+(r.startRaw!=null? mk(r.startRaw):'?')+' ~ <b>'+mk(r.endRaw)+'</b></td><td class="n">'+(r.term? r.term+'개월':'·')+'</td><td class="n">'+won(r.mrr)+'</td>'+
+         '<td>'+esc(r.status||'')+(r.renew? ' <span class="ubadge sm">연장 '+r.renew+'회</span>':'')+'</td>';
+      if(W) h+='<td class="rn-acts">'+[['renew','연장'],['end','서비스종료'],['churn','해지'],['auto','자동연장']].map(function(a){ return '<button type="button" class="cbtn'+(open&&RN.act===a[0]?' pri':'')+'" data-id="'+id+'" data-a="'+a[0]+'">'+a[1]+'</button>'; }).join('')+'</td>';
+      h+='</tr>';
+      if(open && W) h+='<tr class="rn-form"><td colspan="8">'+renewFormHtml(r, RN.act)+'</td></tr>';
+    });
+    h+='</tbody><tfoot><tr><td colspan="5">합계 '+rows.length+'건</td><td class="n">'+won(sum)+'</td><td colspan="2"></td></tr></tfoot></table>';
+    box.innerHTML=h;
+    box.querySelectorAll('.rn-cust').forEach(function(a){ a.onclick=function(){ closeOvl('ovlRenew'); openCust360(a.dataset.c); }; });
+    box.querySelectorAll('.rn-acts .cbtn').forEach(function(bt){ bt.onclick=function(){
+      var id=+bt.dataset.id;
+      if(RN.open===id && RN.act===bt.dataset.a){ RN.open=null; RN.act=''; } else { RN.open=id; RN.act=bt.dataset.a; }
+      renderRenewList();
+      var f=box.querySelector('.rn-form'); if(f){ try{ f.scrollIntoView({block:'nearest'}); }catch(e){} var i=f.querySelector('input,select'); if(i) i.focus(); }
+    }; });
+    var go=box.querySelector('#rnGo'); if(go) go.onclick=function(){ renewSubmit(rows.filter(function(r){ return r._id===RN.open; })[0]); };
+    var cc=box.querySelector('#rnCancel'); if(cc) cc.onclick=function(){ RN.open=null; RN.act=''; renderRenewList(); };
+  }
+  var sl=$('#rnSlack'); if(sl){ sl.style.display=window.IS_SUPER? '':'none'; sl.onclick=renewSlack; }
+  $('#rnXls').onclick=function(){ xlsxAoa('만기처리_'+mk(T)+'_'+RN.kind, ['고객사','서비스','채널','파트너','시작월','종료월','약정(개월)','MRR(천원)','상태','연장회차','에스원 계약번호'],
+    rows.map(function(r){ return [r.cust, llineVer(r.line,r.ver), chOf(r), r.ptn||'', r.startRaw!=null? mk(r.startRaw):'', mk(r.endRaw), r.term||'', Math.round((r.mrr||0)/1000), r.status||'', r.renew||0, r.s1no||'']; })); };
+}
+async function renewSubmit(r){
+  if(!r || RN.busy) return;
+  var m=$('#rnMsg'); RN.busy=true; if(m){ m.textContent='저장 중…'; m.className='mmsg'; }
+  try{
+    var act=RN.act, txt='';
+    if(act==='renew'){
+      var ne=ymFromInput($('#rnEnd').value); if(ne==null) throw new Error('새 종료월을 입력하세요.');
+      var amt=Math.round((+$('#rnMrr').value||0)*1000) || r.mrr || 0; if(!amt) throw new Error('월 금액을 입력하세요.');
+      var res=await doRenew(r, ne, amt, ($('#rnNote').value||'').trim());
+      txt='연장 '+res.rno+'회 — '+r.cust+' → '+mk(ne)+' · 월 '+won(amt)+'천원';
+    } else if(act==='end'){
+      await doEndService(r, ($('#rnNote').value||'').trim()); txt='서비스종료 — '+r.cust+' ('+mk(r.endRaw)+'까지 인식)';
+    } else if(act==='churn'){
+      var m0=ymFromInput($('#rnMonth').value), rs=$('#rnReason').value; if(m0==null||!rs) throw new Error('해지월·사유를 입력하세요.');
+      await doChurn(r, m0, rs); txt='해지 — '+r.cust+' ('+mk(m0)+'까지 인식 · '+rs+')';
+    } else if(act==='auto'){
+      await doAutoRenew(r, true); txt='자동연장 표시 — '+r.cust;
+    } else throw new Error('처리 종류를 고르세요.');
+    toast('처리 완료 ✅', txt);
+    RN.open=null; RN.act='';
+    var nd=await loadFromDb(); onData(nd);
+    if(m){ m.textContent=txt; m.className='mmsg ok'; }
+    renderRenewList();
+  }catch(e){ if(m){ m.textContent=String(e.message||e); m.className='mmsg bad'; } }
+  RN.busy=false;
+}
+/* ── 저장 로직 (입력·수정 › 갱신·해지 탭과 공유) ── */
+async function doRenew(r, ne, amt, note){
+  if(!canWrite('contracts')) throw new Error('계약 쓰기 권한이 없습니다.');
+  var from=(r.endIdx!=null? r.endIdx+1 : ne);
+  if(ne<from) throw new Error('새 종료월이 기존 종료월보다 빠릅니다.');
+  /* 연장 = 원계약 한 줄을 갱신 (회차 +1, 상태는 그대로 · 종료/해지였다면 신규로 되살림). 별도 «재약정» 행을 만들지 않습니다 */
+  var rno=(r.renew||0)+1;
+  var hist=(r.renewHist||[]).concat([{no:rno, from:idxDate(from), to:idxDate(ne), mrr:amt, prev_end:(r.endIdx!=null? idxDate(r.endIdx):null),
+             prev_mrr:r.mrr, prev_status:r.status, note:note||null, at:new Date().toISOString(), by:AUTH_USER}]);
+  var nst=/해지|종료/.test(r.status||'')? (r.ctype==='추가'? '추가':'신규') : r.status;
+  await sbWrite('PATCH','contracts?id=eq.'+r._id,{end_month:idxDate(ne), mrr:amt, status:nst, churn_reason:null, churn_month:null,
+    renew_count:rno, renew_history:hist, updated_at:new Date().toISOString()});
+  await sbWrite('DELETE','monthly_revenue?contract_id=eq.'+r._id+'&month=gte.'+idxDate(from));
+  await sbWrite('POST','monthly_revenue', monthRows(r._id,from,ne,amt));
+  await logChange('update','contracts',r._id,{action:'연장',no:rno,newEnd:idxDate(ne),amount:amt});
+  return {rno:rno, from:from};
+}
+async function doChurn(r, m0, rs){
+  if(!canWrite('contracts')) throw new Error('계약 쓰기 권한이 없습니다.');
+  await sbWrite('PATCH','contracts?id=eq.'+r._id,{status:'해지',churn_reason:rs,end_month:idxDate(m0),churn_month:idxDate(m0),updated_at:new Date().toISOString()});
+  await sbWrite('DELETE','monthly_revenue?contract_id=eq.'+r._id+'&month=gt.'+idxDate(m0));
+  await logChange('update','contracts',r._id,{action:'해지',month:idxDate(m0),reason:rs});
+}
+async function doEndService(r, note){
+  if(!canWrite('contracts')) throw new Error('계약 쓰기 권한이 없습니다.');
+  var e=(r.endRaw!=null? r.endRaw : r.endIdx); if(e==null) throw new Error('종료월이 없는 계약입니다 — 계약 관리에서 종료월을 먼저 넣으세요.');
+  var p={status:'서비스종료', updated_at:new Date().toISOString()}; if(note) p.note=[r.note, note].filter(Boolean).join(' · ');
+  await sbWrite('PATCH','contracts?id=eq.'+r._id, p);
+  await sbWrite('DELETE','monthly_revenue?contract_id=eq.'+r._id+'&month=gt.'+idxDate(e));
+  await logChange('update','contracts',r._id,{action:'서비스종료',end:idxDate(e),note:note||null});
+}
+async function doAutoRenew(r, on){
+  if(!canWrite('contracts')) throw new Error('계약 쓰기 권한이 없습니다.');
+  await sbWrite('PATCH','contracts?id=eq.'+r._id,{auto_renew:!!on, updated_at:new Date().toISOString()});
+  await logChange('update','contracts',r._id,{action:'자동연장',on:!!on});
+}
+/* ── 슬랙 발송 (슈퍼 관리자) — Edge Function remind: 미리보기(dry) → 확인 → 발송. 서비스 키는 함수 쪽 Secrets 에만 ── */
+async function renewSlack(){
+  if(!window.IS_SUPER){ toast('슬랙 발송은 슈퍼 관리자만 할 수 있습니다',''); return; }
+  var m=$('#rnMsg'), bt=$('#rnSlack'); if(bt) bt.disabled=true; if(m){ m.textContent='미리보기 만드는 중…'; m.className='mmsg'; }
+  try{
+    var url=SB_URL+'/functions/v1/remind', hdr={'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+SB_TOKEN};
+    var body={month:idxDate(RN.T), kind:'monthly'};
+    var pv=await fetch(url+'?dry=1',{method:'POST',headers:hdr,body:JSON.stringify(body)}).then(function(r){ return r.json(); });
+    if(!pv || !pv.ok) throw new Error((pv&&pv.error)||'미리보기 실패 — remind 함수가 배포됐는지 확인');
+    var c=pv.counts||{};
+    if(!confirm('슬랙 팀 채널('+(pv.channel||'')+')로 보냅니다.\n\n'+(pv.text||'')+'\n· 이달 만기 '+(c.due||0)+'건 · 다음 달 만기 '+(c.next||0)+'건 · 미처리 '+(c.lapsed||0)+'건\n\n보낼까요?')) throw new Error('취소했습니다.');
+    var rr=await fetch(url,{method:'POST',headers:hdr,body:JSON.stringify(body)}).then(function(r){ return r.json(); });
+    if(!rr || !rr.ok) throw new Error((rr&&rr.error)||'발송 실패');
+    toast('슬랙 발송 완료 📣', String(rr.text||'').slice(0,90));
+    if(m){ m.textContent='슬랙 발송 완료 — '+(rr.text||''); m.className='mmsg ok'; }
+  }catch(e){ if(m){ m.textContent=String(e.message||e); m.className='mmsg bad'; } }
+  if(bt) bt.disabled=false;
+}
 /* LIVE 행의 채널 = 같은 고객·서비스의 «원계약» 중 가장 최근 것의 채널 (부속 계약은 채널 판단에 쓰지 않음 · 원계약이 없을 때만 부속 참고) */
 function liveChannel(x){
   var best=null, bestChild=null, nm=fkNorm(x.cust);
@@ -14089,7 +14371,7 @@ function qbSources(){
             {k:'_alias',l:'별칭',t:'text',get:function(r){ return (r.aliases||[]).join(', '); }}] },
     contracts:{ label:'계약', icon:'📄', key:'id', rows:function(){ return (RAWX.contracts||[]).map(function(c){ var cu=cmap[c.customer_id]||{}; c._custName=cu.name||'?'; c._sector=cu.sector||''; c._industry=cu.industry||''; return c; }); },
       cols:[{k:'id',l:'계약 번호',t:'num'},{k:'_custName',l:'고객사',t:'text'},{k:'_industry',l:'산업군',t:'text'},{k:'_sector',l:'업종',t:'text'},
-            {k:'line',l:'서비스',t:'text',fmt:function(v){ return lline(v); }},{k:'version',l:'Ver.',t:'text'},{k:'_lineVer',l:'서비스(버전)',t:'text',get:function(r){ return llineVer(r.line, r.version); }},{k:'channel',l:'판매 채널',t:'text'},{k:'lead_src',l:'유입경로',t:'text'},{k:'partner',l:'파트너',t:'text'},{k:'biller',l:'계산서발행처',t:'text'},
+            {k:'line',l:'서비스',t:'text',fmt:function(v){ return lline(v); }},{k:'version',l:'Ver.',t:'text'},{k:'_lineVer',l:'서비스(버전)',t:'text',get:function(r){ return llineVer(r.line, r.version); }},{k:'channel',l:'판매 채널',t:'text'},{k:'lead_src',l:'유입경로',t:'text'},{k:'auto_renew',l:'자동연장',t:'bool'},{k:'partner',l:'파트너',t:'text'},{k:'biller',l:'계산서발행처',t:'text'},
             {k:'combine',l:'모듈',t:'text'},{k:'contract_type',l:'구분',t:'text'},{k:'status',l:'상태',t:'text'},
             {k:'_live',l:'LIVE 여부',t:'bool',get:function(r){ var d=dmap[r.id]; try{ return !!(d && liveActiveAt(d, DATA.nowIdx)); }catch(e){ return false; } }},
             {k:'start_month',l:'시작월',t:'month'},{k:'end_month',l:'종료월',t:'month'},{k:'churn_month',l:'해지월',t:'month'},{k:'churn_reason',l:'해지사유',t:'text'},
@@ -16623,9 +16905,7 @@ async function saveEdit(){
       var r=PK_C.sel; if(!r) throw new Error('계약을 선택하세요.');
       var m0=ymFromInput($('#cMonth').value), rs=$('#cReason').value.trim();
       if(m0==null||!rs) throw new Error('해지월·사유는 필수입니다.');
-      await sbWrite('PATCH','contracts?id=eq.'+r._id,{status:'해지',churn_reason:rs,end_month:idxDate(m0),churn_month:idxDate(m0),updated_at:new Date().toISOString()});
-      await sbWrite('DELETE','monthly_revenue?contract_id=eq.'+r._id+'&month=gt.'+idxDate(m0));
-      await logChange('update','contracts',r._id,{action:'해지',month:idxDate(m0),reason:rs});
+      await doChurn(r, m0, rs);                                   /* 홈 › 만기 처리 창과 같은 저장 로직 (㊿+127) */
       msg('eMsg','해지 처리 완료 ✅ — '+r.cust+' ('+$('#cMonth').value+'까지 인식'+(r.parent? '' : ' · '+mk(m0+1)+'부터 LIVE 제외')+')','ok');
     }
     else if(CUR_TAB==='renew'){
@@ -16634,18 +16914,7 @@ async function saveEdit(){
       if(ne==null) throw new Error('새 종료월은 필수입니다.');
       var amt=+$('#rMrr').value || r2.mrr || 0;
       if(!amt) throw new Error('연장 금액을 알 수 없습니다. 금액을 입력하세요.');
-      var from=(r2.endIdx!=null? r2.endIdx+1 : ne);
-      if(ne<from) throw new Error('새 종료월이 기존 종료월보다 빠릅니다.');
-      /* 연장 = 원계약 한 줄을 갱신 (회차 +1, 상태는 그대로 · 종료/해지였다면 신규로 되살림). 별도 «재약정» 행을 만들지 않습니다 */
-      var rno=(r2.renew||0)+1;
-      var hist=(r2.renewHist||[]).concat([{no:rno, from:idxDate(from), to:idxDate(ne), mrr:amt, prev_end:(r2.endIdx!=null? idxDate(r2.endIdx):null),
-                 prev_mrr:r2.mrr, prev_status:r2.status, note:($('#rNote')&&$('#rNote').value.trim())||null, at:new Date().toISOString(), by:AUTH_USER}]);
-      var nst=/해지|종료/.test(r2.status||'')? (r2.ctype==='추가'? '추가':'신규') : r2.status;
-      await sbWrite('PATCH','contracts?id=eq.'+r2._id,{end_month:idxDate(ne), mrr:amt, status:nst, churn_reason:null, churn_month:null,
-        renew_count:rno, renew_history:hist, updated_at:new Date().toISOString()});
-      await sbWrite('DELETE','monthly_revenue?contract_id=eq.'+r2._id+'&month=gte.'+idxDate(from));
-      await sbWrite('POST','monthly_revenue', monthRows(r2._id,from,ne,amt));
-      await logChange('update','contracts',r2._id,{action:'연장',no:rno,newEnd:idxDate(ne),amount:amt});
+      var rres=await doRenew(r2, ne, amt, ($('#rNote')&&$('#rNote').value.trim())||''), rno=rres.rno;   /* 홈 › 만기 처리 창과 같은 저장 로직 (㊿+127) */
       msg('eMsg','연장 '+rno+'회 등록 ✅ — '+r2.cust+' → '+$('#rEnd').value+' · 월 '+won(amt)+'천원','ok');
     }
     else if(CUR_TAB==='fix'){
