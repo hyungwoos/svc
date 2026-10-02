@@ -2670,9 +2670,9 @@ var Viz = (function () {
   }
 
   function tipHTML(label, items, fmt) {
-    return '<div class="vt-t">' + label + '</div>' + items.map(function (it) {
+    return '<div class="vt-t">' + String(label == null ? '' : label).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }) + '</div>' + items.map(function (it) {
       return '<div class="vt-r"><span class="vt-s" style="background:' + it.color + '"></span>' +
-        '<span class="vt-n">' + it.name + '</span><span class="vt-v">' + fmt(it.value) + '</span></div>';
+        '<span class="vt-n">' + String(it.name == null ? '' : it.name).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }) + '</span><span class="vt-v">' + fmt(it.value) + '</span></div>';
     }).join('');
   }
   function placeTip(f, tip, x) {
@@ -2915,7 +2915,7 @@ window.addEventListener('message', function(ev){
 });
 
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-16 ㊿+125';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-16 ㊿+126';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -5502,7 +5502,7 @@ function renderTrend(list){
   else host.innerHTML='<p class="cap" style="padding-top:24px">선택한 조건에 데이터가 없습니다.</p>';
 
   var tv=$('#tvTrend').querySelector('table');
-  var head='<thead><tr><th>월</th>'+series.map(function(d){return '<th class="n">'+d.label+'</th>';}).join('')+'<th class="n">합계</th></tr></thead>';
+  var head='<thead><tr><th>월</th>'+series.map(function(d){return '<th class="n">'+esc(d.label)+'</th>';}).join('')+'<th class="n">합계</th></tr></thead>';
   var body='<tbody>'+labels.map(function(lb,i){
     var sum=series.reduce(function(a,d){return a+d.data[i];},0);
     return '<tr><td>'+lb+'</td>'+series.map(function(d){return '<td class="n">'+won(d.data[i])+'</td>';}).join('')+'<td class="n"><b>'+won(sum)+'</b></td></tr>';
@@ -10403,7 +10403,7 @@ function prSaasHtml(){
       var g=function(arr){ return (arr||[])[i]; };   // 파트너가 등이 아직 없는 서비스는 — 로
       return '<tr><td>'+tt+'</td><td class="n">'+prWon(g(s.cons))+'</td><td class="n">'+prWon(g(s.minD))+'</td><td class="n">'+prWon(g(s.dist))+'</td><td class="n">'+prWon(g(s.minP))+'</td><td class="n">'+prWon(g(s.ptn))+'</td></tr>'; }).join('');
     if(!rows) return;
-    t+='<div class="pr-card"><h3>'+s.icon+' '+s.name+' <small>'+s.sub+' · 원/Agent·1년 · VAT별도</small></h3>'+
+    t+='<div class="pr-card"><h3>'+esc(s.icon)+' '+esc(s.name)+' <small>'+esc(s.sub)+' · 원/Agent·1년 · VAT별도</small></h3>'+
       '<table class="pr"><thead><tr><th>구분(Agent)</th><th class="n">소비자가</th><th class="n">최소제안가<span class="pr-lock">🔒</span></th><th class="n">총판가<span class="pr-lock">🔒</span></th><th class="n">파트너 최소제안<span class="pr-lock">🔒</span></th><th class="n">파트너가<span class="pr-lock">🔒</span></th></tr></thead><tbody>'+rows+'</tbody></table></div>';
   });
   var ar=(D.addons||[]).filter(function(r){return prMatch(r[0]);}).map(function(r){
@@ -10641,7 +10641,7 @@ function prBindSaas(){
     $('#ptSsL').innerHTML=PR.tcoSS.map(function(r,i){
       return '<span style="display:inline-flex;gap:4px;align-items:center">'+
         '<select data-ssp="'+i+'" style="'+sSt+'">'+SEN_P.map(function(pv2){ return '<option value="'+pv2+'"'+(r.p===pv2?' selected':'')+'>'+(pv2/10000)+'만원</option>'; }).join('')+'</select>'+
-        '<input type="number" data-ssq="'+i+'" value="'+r.q+'" min="0" style="'+sSt+';width:52px">대'+
+        '<input type="number" data-ssq="'+i+'" value="'+(+r.q||0)+'" min="0" style="'+sSt+';width:52px">대'+
         (PR.tcoSS.length>1?'<button data-ssx="'+i+'" class="pill" style="height:24px;padding:0 7px">×</button>':'')+'</span>';
     }).join('');
     var rows=tcoSenRowsO();
@@ -10650,7 +10650,7 @@ function prBindSaas(){
     $('#ptOsL').innerHTML=PR.tcoOS.map(function(r,i){
       return '<span style="display:inline-flex;gap:4px;align-items:center">'+
         '<select data-osm="'+i+'" style="'+sSt+'">'+rows.map(function(x){ return '<option value="'+esc(String(x[1]))+'"'+(String(x[1])===r.m?' selected':'')+'>'+esc(String(x[1]))+' · '+esc(String(x[0]))+' · '+prWon(x[2])+'원</option>'; }).join('')+'</select>'+
-        '<input type="number" data-osq="'+i+'" value="'+r.q+'" min="0" style="'+sSt+';width:52px">대'+
+        '<input type="number" data-osq="'+i+'" value="'+(+r.q||0)+'" min="0" style="'+sSt+';width:52px">대'+
         (PR.tcoOS.length>1?'<button data-osx="'+i+'" class="pill" style="height:24px;padding:0 7px">×</button>':'')+'</span>';
     }).join('');
     document.querySelectorAll('[data-ssp]').forEach(function(e){ e.onchange=function(){ PR.tcoSS[+e.dataset.ssp].p=+e.value; tco(); }; });
