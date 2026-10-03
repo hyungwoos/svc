@@ -2,6 +2,8 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
+<!-- CSP (80점 프로젝트 ② 보안): GitHub Pages 는 응답 헤더를 못 넣으므로 meta 로. 엑셀 라이브러리 CDN 만 허용. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://amzbrdhkvzsyxjfjtugu.supabase.co https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; worker-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>에스원 정산 자동화 v1.0</title>
 <!-- PWA: 포탈(index.html)과 같은 홈 화면 앱 범위 — manifest·sw.js 는 같은 폴더 -->
@@ -275,12 +277,13 @@ function msg(id,t,cls){ var e=$('#'+id); e.textContent=t||''; e.className='msg'+
 var S={ use:null, biz:null, inst:null, maps:[], cfg:{}, settle:{}, settles:[] };
 
 /* SheetJS 지연 로드 (파일을 올릴 때만) */
-var XLSX_SRC='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
 function loadXlsx(){ return new Promise(function(ok,ng){
   if(window.XLSX) return ok();
-  var sc=document.createElement('script'); sc.src=XLSX_SRC;
-  sc.onload=function(){ ok(); }; sc.onerror=function(){ ng(new Error('엑셀 읽기 라이브러리를 불러오지 못했습니다 (cdnjs 접속 확인)')); };
-  document.head.appendChild(sc);
+  /* SRI(무결성 해시, npm 배포본 sha384) + CDN 폴백 — 해시가 다르면 브라우저가 실행을 거부하고 다음 주소로 */
+  var urls=['https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js','https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js','https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js'], sri='sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw';
+  (function nx(i){ if(i>=urls.length) return ng(new Error('엑셀 라이브러리를 불러오지 못했습니다 (네트워크·사내 차단 확인)'));
+    var sc=document.createElement('script'); sc.src=urls[i]; sc.integrity=sri; sc.crossOrigin='anonymous';
+    sc.onload=function(){ ok(); }; sc.onerror=function(){ sc.remove(); nx(i+1); }; document.head.appendChild(sc); })(0);
 }); }
 function readFile(f){ return new Promise(function(ok,ng){ var r=new FileReader(); r.onload=function(){ ok(new Uint8Array(r.result)); }; r.onerror=function(){ ng(new Error('파일을 읽지 못했습니다')); }; r.readAsArrayBuffer(f); }); }
 

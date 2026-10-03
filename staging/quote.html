@@ -2,6 +2,8 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
+<!-- CSP (80점 프로젝트 ② 보안): GitHub Pages 는 응답 헤더를 못 넣으므로 meta 로. 견적 저장 Worker 주소를 바꾸면 connect-src 도 수정. 직인은 Supabase Storage(blob:). -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://amzbrdhkvzsyxjfjtugu.supabase.co https://aged-union-cdd3.choihw.workers.dev; worker-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Genians 공식 자동 견적·발주 시스템 v5.7 PC전용</title>
 <!-- PWA: 포탈(index.html)과 같은 홈 화면 앱 범위 — manifest·sw.js 는 같은 폴더 -->
@@ -212,8 +214,22 @@
         }
         location.href = 'index.html';
     }
+    // 직인(법인 도장)은 공개 저장소가 아니라 Supabase Storage 비공개 버킷(private/seal.jpg · SQL 87)에 있음 — 로그인 토큰으로만 받음.
+    // 파일이 없거나 권한이 없으면 직인 없이 출력(<img> 숨김). 올리기는 포탈 › 관리자 › 배포·운영 › GitHub 탭 «보안 자산».
+    var SB_URL = 'https://amzbrdhkvzsyxjfjtugu.supabase.co';
+    var SB_KEY = 'sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
+    var SEAL_OBJECT = 'private/seal.jpg';
+    function loadSeal() {
+        var s = portalSess(), img = document.getElementById('sealImg');
+        if (!s || !img || img.dataset.loaded) return;
+        fetch(SB_URL + '/storage/v1/object/authenticated/' + SEAL_OBJECT, { headers: { apikey: SB_KEY, Authorization: 'Bearer ' + s.a } })
+            .then(function (r) { if (!r.ok) throw new Error('seal ' + r.status); return r.blob(); })
+            .then(function (b) { img.src = URL.createObjectURL(b); img.style.display = ''; img.dataset.loaded = '1'; })
+            .catch(function () { img.style.display = 'none'; });
+    }
     function enterQuote() {
         document.getElementById('loginOverlay').style.display = 'none';
+        loadSeal();
         // 견적 데이터를 조회용으로 여는 경우(?view=)엔 종류 선택 없이 바로 진행
         const params = new URLSearchParams(window.location.search);
         if (params.get('view')) {
@@ -318,7 +334,7 @@
                     <th style="width: 14%;">대표</th>
                     <td style="width: 25%; position: relative;">
                         <span style="position: relative; z-index: 2;">이동범</span>
-                        <img src="도장.jpg" alt="직인" style="position: absolute; top: 50%; right: -4px; transform: translateY(-50%); width: 40px; max-width: none; mix-blend-mode: multiply; z-index: 1;">
+                        <img id="sealImg" alt="" style="display: none; position: absolute; top: 50%; right: -4px; transform: translateY(-50%); width: 40px; max-width: none; mix-blend-mode: multiply; z-index: 1;">
                     </td>
                 </tr>
                 <tr>
