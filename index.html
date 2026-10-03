@@ -791,6 +791,8 @@ body{padding-left:192px}
 .kpi .lv-delta span.up{background:rgba(12,163,12,.12);color:var(--good)} .kpi .lv-delta span.down{background:rgba(208,59,59,.12);color:var(--critical)}
 .kpi .lv-delta .why{color:var(--muted)}
 .kpi .lv-delta .lnk{font:inherit;font-size:11.5px;background:none;border:0;padding:0;color:var(--brand);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+#stagingBar{position:sticky;top:0;z-index:500;background:#fff3cd;color:#5c3d00;border-bottom:1px solid #f0d58c;font-size:12.5px;padding:6px 14px;text-align:center}
+#stagingBar a{color:#5c3d00;font-weight:650}
 /* 배포·운영 (㊿+128) */
 .ops-bar{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:14px;padding:10px 12px;border:1px solid var(--ring);border-radius:12px;background:var(--surface-2)}
 .ops-bar>label{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:650}
@@ -2966,12 +2968,30 @@ window.addEventListener('message', function(ev){
 });
 
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-16 ㊿+128';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-16 ㊿+129';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
 
 /* ---- PWA (홈 화면 앱) — 서비스 워커 등록 · 설치 안내 ---- */
+/* ── 스테이징 띠 · 브라우저 오류 수집 (㊿+129) ──
+   · …/staging/index.html 로 열리면 IS_STAGING — 상단에 노란 띠(운영 데이터를 쓰는 시험용 포탈임을 표시), 배포·운영의 기본 대상도 스테이징
+   · 화면에서 난 JS 오류(error · unhandledrejection)는 client_errors 표(SQL 86)에 기록 → 관리자 › 배포·운영 › 기록 탭. 같은 메시지는 세션당 1번, 최대 8건 */
+var IS_STAGING=/\/staging\//.test(location.pathname);
+if(IS_STAGING){ document.addEventListener('DOMContentLoaded', function(){ var b=document.createElement('div'); b.id='stagingBar'; b.innerHTML='🧪 <b>STAGING</b> — 시험용 포탈입니다 (운영과 같은 데이터 · 여기서 저장하면 운영에도 반영됩니다) · <a href="'+location.pathname.replace('/staging/','/')+'">운영 포탈로 →</a>'; document.body.prepend(b); document.title='[STAGING] '+document.title; }); }
+var ERRLOG={n:0, seen:{}, max:8};
+function logClientError(msg, src, line, col, stack){
+  try{
+    if(!window.SB_TOKEN || !window.AUTH_USER) return;
+    var key=String(msg||'').slice(0,120); if(!key || /ResizeObserver loop|Script error\.?$/.test(key)) return;
+    if(ERRLOG.seen[key]){ ERRLOG.seen[key]++; return; } ERRLOG.seen[key]=1;
+    if(++ERRLOG.n>ERRLOG.max) return;
+    fetch(SB_URL+'/rest/v1/client_errors', {method:'POST', headers:{'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+SB_TOKEN, Prefer:'return=minimal'},
+      body:JSON.stringify({email:AUTH_USER, ver:APP_VER, view:window.CUR_VIEW||'', msg:key.slice(0,500), url:String(src||location.href).slice(0,300), line:line||null, col:col||null, stack:String(stack||'').slice(0,2000), ua:navigator.userAgent.slice(0,200), staging:IS_STAGING})}).catch(function(){});
+  }catch(e){}
+}
+window.addEventListener('error', function(e){ logClientError(e.message, e.filename, e.lineno, e.colno, e.error&&e.error.stack); });
+window.addEventListener('unhandledrejection', function(e){ var r=e.reason; logClientError((r&&r.message)||String(r), '', null, null, r&&r.stack); });
 var PWA={deferred:null};
 function pwaStandalone(){ try{ return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone===true; }catch(e){ return false; } }
 function pwaIsIOS(){ return /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1); }
@@ -11944,7 +11964,10 @@ async function adminFetch(payload){
    · 함수가 ① 로그인 ② OPS_OWNER(지정 계정) ③ super_admin ④ PIN 을 전부 검사 — 화면은 슈퍼 관리자에게만 보이지만 실제 열쇠는 함수 쪽.
    · 탭: GitHub 배포(끌어다 놓기 → 커밋 · 이력 · 복원) · SQL 실행(읽기 전용 토글 · 결과 표) · Edge Function(코드 불러오기 · 배포 · Verify JWT) · 기록(ops_log)
    ──────────────────────────────────────────────────────────────────────────── */
-var OPS={tab:'gh', pin:'', st:null, files:[], msg:'', ghList:null, hist:null, histPath:'', fnList:null, fnSel:'', fnMeta:null, fnCode:'', fnName:'index.ts', fnVerify:false, sqlRes:null, busy:false};
+var OPS={tab:'gh', pin:'', st:null, files:[], msg:'', ghList:null, hist:null, histPath:'', fnList:null, fnSel:'', fnMeta:null, fnCode:'', fnName:'index.ts', fnVerify:false, sqlRes:null, busy:false, target:'prod', errs:null, health:null};
+function opsPrefix(){ return OPS.target==='staging'? 'staging/' : ''; }
+function stagingUrl(){ var base=location.origin+location.pathname.replace(/\/staging\//,'/').replace(/[^/]*$/,''); return base+'staging/index.html'; }
+function prodUrl(){ var base=location.origin+location.pathname.replace(/\/staging\//,'/').replace(/[^/]*$/,''); return base+'index.html'; }
 function opsUrl(){ return SB_URL+'/functions/v1/ops'; }
 async function opsCall(action, body){
   var o=Object.assign({action:action}, body||{}); if(action!=='status') o.pin=OPS.pin;
@@ -11958,7 +11981,7 @@ async function opsCall(action, body){
 }
 function opsFmtBytes(n){ n=Number(n)||0; return n>=1048576? (n/1048576).toFixed(2)+' MB' : n>=1024? Math.round(n/1024)+' KB' : n+' B'; }
 function opsVerOf(text){ var m=/var APP_VER='([^']+)'/.exec(String(text||'')); return m? m[1] : null; }
-function opsIsText(name){ return /\.(html?|js|mjs|ts|json|webmanifest|css|sql|md|txt|csv|svg|xml)$/i.test(name); }
+function opsIsText(name){ return /\.(html?|js|mjs|ts|json|webmanifest|css|sql|md|txt|csv|svg|xml|yml|yaml|gitignore)$/i.test(name) || /^\.?gitignore$/.test(name); }
 function opsSetMsg(t, cls){ OPS.msg=t||''; OPS.msgCls=cls||''; var e=document.getElementById('opsMsg'); if(e){ e.textContent=OPS.msg; e.className='mmsg'+(OPS.msgCls? ' '+OPS.msgCls:''); } }
 function opsNeedPin(){ if(!OPS.pin){ opsSetMsg('작업 PIN 을 먼저 입력하세요 (위 PIN 칸)','bad'); var p=document.getElementById('opsPin'); if(p) p.focus(); return false; } return true; }
 async function opsStatus(){
@@ -11967,10 +11990,11 @@ async function opsStatus(){
 }
 function renderOps(keep){
   var host=document.getElementById('opsHost'); if(!host) return;
+  if(IS_STAGING && !OPS._tgInit){ OPS.target='staging'; OPS._tgInit=true; }
   if(!window.IS_SUPER){ host.innerHTML='<p class="cap">슈퍼 관리자만 쓸 수 있습니다.</p>'; return; }
   var st=OPS.st;
   var h='<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><h3 style="margin:0;font-size:16px">🚀 배포·운영</h3><span class="ubadge sm">지정 계정 전용</span>'+
-    '<span class="mini" style="margin-left:auto">'+(st? (st.ok? '저장소 '+esc(st.github.repo)+' · '+esc(st.github.branch)+' · GitHub 토큰 '+(st.github.token_set?'✓':'✗')+' · Supabase 토큰 '+(st.mgmt_token_set?'✓':'✗')+' · PIN '+(st.pin_set?'설정됨':'미설정')+(st.slack? ' · 슬랙 알림 ✓':'') : '<span style="color:var(--critical)">'+esc(st.error||'')+'</span>') : '상태 확인 중…')+'</span></div>'+
+    '<span class="mini" style="margin-left:auto">'+(st? (st.ok? (st.github? '저장소 '+esc(st.github.repo)+' · '+esc(st.github.branch)+' · GitHub 토큰 '+(st.github.token_set?'✓':'✗') : 'ops 함수 응답에 저장소 정보 없음(옛 버전?)')+' · Supabase 토큰 '+(st.mgmt_token_set?'✓':'✗')+' · PIN '+(st.pin_set?'설정됨':'미설정')+(st.slack? ' · 슬랙 알림 ✓':'') : '<span style="color:var(--critical)">'+esc(st.error||'')+'</span>') : '상태 확인 중…')+'</span></div>'+
     '<p class="cap" style="margin:0 0 12px">GitHub 커밋 · SQL 실행 · Edge Function 배포를 포탈 안에서 끝냅니다. 토큰은 전부 함수(ops) Secrets 에만 있고, 여기서는 <b>작업 PIN</b> 만 넣습니다(저장하지 않음 · 5회 틀리면 15분 잠금). 모든 실행은 기록에 남습니다.</p>'+
     '<div class="ops-bar"><label>작업 PIN <input id="opsPin" type="password" autocomplete="off" inputmode="numeric" placeholder="••••" value="'+esc(OPS.pin)+'" style="width:120px"></label>'+
     '<div class="mtabs" id="opsTabs" style="margin:0">'+[['gh','GitHub 배포'],['sql','SQL 실행'],['fn','Edge Function'],['log','기록']].map(function(t){ return '<button type="button" data-t="'+t[0]+'" aria-pressed="'+(OPS.tab===t[0])+'">'+t[1]+'</button>'; }).join('')+'</div>'+
@@ -11981,23 +12005,28 @@ function renderOps(keep){
   var pin=document.getElementById('opsPin'); pin.oninput=function(){ OPS.pin=pin.value; };
   host.querySelectorAll('#opsTabs button').forEach(function(b){ b.onclick=function(){ OPS.tab=b.dataset.t; OPS.msg=''; OPS.msgCls=''; renderOps(true); }; });
   document.getElementById('opsRefresh').onclick=function(){ OPS.st=null; renderOps(true); opsStatus(); };
-  if(OPS.tab==='gh') opsGhBind(host); else if(OPS.tab==='sql') opsSqlBind(host); else if(OPS.tab==='fn') opsFnBind(host);
+  if(OPS.tab==='gh') opsGhBind(host); else if(OPS.tab==='sql') opsSqlBind(host); else if(OPS.tab==='fn') opsFnBind(host); else opsLogBind(host);
   if(!keep && !OPS.st) opsStatus();
 }
 /* ── GitHub ── */
 function opsGhHtml(){
-  var files=OPS.files, cur=APP_VER;
+  var files=OPS.files, cur=APP_VER, stg=OPS.target==='staging';
   var h='<div class="ops-grid">';
-  h+='<div><div class="ops-h">① 올릴 파일</div><div class="ops-drop" id="opsDrop" tabindex="0">여기에 파일을 끌어다 놓거나 <u>클릭해서 선택</u> — index.html · 위성 페이지 · sw.js · manifest · 이미지 (여러 개 가능)<input type="file" id="opsFile" multiple style="display:none"></div>';
+  h+='<div><div class="ops-h" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">① 올릴 파일 <span class="mtabs" style="margin:0" id="opsTarget"><button type="button" data-tg="prod" aria-pressed="'+(!stg)+'">운영</button><button type="button" data-tg="staging" aria-pressed="'+stg+'" title="staging/ 폴더에 올라가며 …/staging/index.html 에서 열립니다 (같은 DB · 상단에 STAGING 띠)">스테이징</button></span>'+(stg? '<a class="mini" href="'+esc(stagingUrl())+'" target="_blank" rel="noopener">스테이징 열기 ↗</a>':'')+'</div>'+
+     '<div class="ops-drop" id="opsDrop" tabindex="0">여기에 파일이나 <b>폴더</b>를 끌어다 놓거나 <u>클릭해서 선택</u> — index.html · 위성 페이지 · sw.js · manifest · 이미지 · tests/ 폴더 (여러 개 가능)<input type="file" id="opsFile" multiple style="display:none"><input type="file" id="opsFolder" webkitdirectory style="display:none"></div>'+
+     '<div style="margin-top:6px"><button type="button" class="cbtn" id="opsPickFolder">📁 폴더 선택</button></div>';
   if(files.length){
     h+='<table class="rn-tbl" style="margin-top:8px"><thead><tr><th>경로</th><th class="n">크기</th><th>버전</th><th></th></tr></thead><tbody>'+files.map(function(f,i){
       var ver=f.ver? (f.ver===cur? '<span class="mini">'+esc(f.ver)+' (지금과 같음)</span>' : '<b>'+esc(f.ver)+'</b> <span class="mini">← 지금 '+esc(cur)+'</span>') : '';
-      return '<tr><td><input data-i="'+i+'" class="ops-path" value="'+esc(f.path)+'" style="width:220px"></td><td class="n">'+opsFmtBytes(f.size)+'</td><td>'+ver+(f.bin? ' <span class="mini">binary</span>':'')+'</td><td><button type="button" class="cbtn" data-rm="'+i+'">빼기</button></td></tr>'; }).join('')+'</tbody></table>';
-    h+='<div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><label style="flex:1;min-width:240px">커밋 메시지 <input id="opsCommitMsg" value="'+esc(OPS.commitMsg||opsAutoMsg())+'" style="width:100%"></label><button type="button" class="pill" id="opsCommit" style="background:var(--brand);border-color:var(--brand);color:#fff">커밋 → GitHub</button></div>';
-    h+='<p class="mini" style="margin:6px 0 0">커밋 하나로 묶여 올라가고, GitHub Pages 반영까지 보통 1~2분. index.html 은 올린 뒤 이 화면을 새로고침하면 새 버전으로 바뀝니다.</p>';
+      return '<tr><td>'+(stg? '<span class="mini">staging/</span>':'')+'<input data-i="'+i+'" class="ops-path" value="'+esc(f.path)+'" style="width:220px"></td><td class="n">'+opsFmtBytes(f.size)+'</td><td>'+ver+(f.bin? ' <span class="mini">binary</span>':'')+'</td><td><button type="button" class="cbtn" data-rm="'+i+'">빼기</button></td></tr>'; }).join('')+'</tbody></table>';
+    var tops={}; files.forEach(function(f){ var seg=f.path.split('/'); if(seg.length>1) tops[seg[0]]=(tops[seg[0]]||0)+1; }); var topKeys=Object.keys(tops);
+    if(topKeys.length===1 && tops[topKeys[0]]===files.length && !/^(tests|staging|supabase|\.github|js|css|img|assets)$/.test(topKeys[0])) h+='<p class="mini" style="margin:6px 0 0">모든 파일이 «'+esc(topKeys[0])+'/» 폴더 아래에 있습니다 — 저장소 루트에 바로 두려면 <button type="button" class="cbtn" id="opsStripTop">«'+esc(topKeys[0])+'/» 떼기</button></p>';
+    h+='<div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><label style="flex:1;min-width:240px">커밋 메시지 <input id="opsCommitMsg" value="'+esc(OPS.commitMsg||opsAutoMsg())+'" style="width:100%"></label><button type="button" class="pill" id="opsCommit" style="background:'+(stg? 'var(--s3,#b26a00)':'var(--brand)')+';border-color:'+(stg? 'var(--s3,#b26a00)':'var(--brand)')+';color:#fff">'+(stg? '커밋 → 스테이징':'커밋 → 운영')+'</button></div>';
+    h+='<p class="mini" style="margin:6px 0 0">커밋 하나로 묶여 올라가고, 테스트가 통과하면 GitHub Pages 에 반영(보통 2~3분). '+(stg? '스테이징에서 확인한 뒤 «스테이징 → 운영 승격»으로 같은 파일을 운영에 올립니다.':'index.html 은 올린 뒤 이 화면을 새로고침하면 새 버전으로 바뀝니다.')+'</p>';
   }
+  h+='<div class="ops-h" style="margin-top:14px">스테이징 ↔ 운영</div><div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="cbtn" id="opsSync" title="운영에 있는 포탈 파일 전부를 staging/ 로 복사(재업로드 없이 같은 내용) — 스테이징을 운영과 똑같이 맞출 때">운영 → 스테이징 동기화</button><button type="button" class="cbtn pri" id="opsPromote" title="staging/ 에 있는 파일을 운영(루트)으로 복사 — 스테이징에서 확인이 끝났을 때">스테이징 → 운영 승격</button><a class="cbtn" href="'+esc(stagingUrl())+'" target="_blank" rel="noopener">스테이징 열기 ↗</a></div>';
   h+='</div>';
-  h+='<div><div class="ops-h">② 저장소 · 이전 버전</div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px"><button type="button" class="pill ghost" id="opsGhList">저장소 파일 보기</button><button type="button" class="pill ghost" id="opsGhHist" data-p="index.html">index.html 이력</button></div>';
+  h+='<div><div class="ops-h">② 저장소 · 이전 버전</div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px"><button type="button" class="pill ghost" id="opsGhList">저장소 파일 보기</button><button type="button" class="pill ghost" id="opsGhHist" data-p="index.html">index.html 이력</button><a class="pill ghost" href="https://github.com/'+esc((OPS.st&&OPS.st.github&&OPS.st.github.repo)||'hyungwoos/svc')+'/actions" target="_blank" rel="noopener" title="테스트·배포 진행 상황">Actions ↗</a></div>';
   if(OPS.ghList) h+='<table class="rn-tbl"><thead><tr><th>경로</th><th class="n">크기</th><th></th></tr></thead><tbody>'+OPS.ghList.map(function(f){ return '<tr><td>'+esc(f.path)+'</td><td class="n">'+opsFmtBytes(f.size)+'</td><td><button type="button" class="cbtn" data-hist="'+esc(f.path)+'">이력</button></td></tr>'; }).join('')+'</tbody></table>';
   if(OPS.hist) h+='<div class="ops-h" style="margin-top:10px">'+esc(OPS.histPath)+' — 최근 커밋</div><table class="rn-tbl"><thead><tr><th>커밋</th><th>일시</th><th>메시지</th><th></th></tr></thead><tbody>'+OPS.hist.map(function(c,i){ return '<tr><td><a href="'+esc(c.url)+'" target="_blank" rel="noopener" style="font-family:ui-monospace,monospace">'+esc(c.short)+'</a></td><td class="mini">'+esc(String(c.date||'').replace('T',' ').slice(0,16))+'</td><td>'+esc(c.message)+'</td><td>'+(i===0? '<span class="mini">현재</span>' : '<button type="button" class="cbtn" data-restore="'+esc(c.sha)+'">이 버전으로 복원</button>')+'</td></tr>'; }).join('')+'</tbody></table>';
   h+='</div></div>';
@@ -12008,15 +12037,21 @@ function opsAutoMsg(){
   return (vers.length? '포탈 '+vers[0].replace(/^.*\s/,'')+' · ' : '')+names.join(', ')+' (포탈에서 배포)';
 }
 function opsGhBind(host){
-  var drop=host.querySelector('#opsDrop'), inp=host.querySelector('#opsFile');
+  host.querySelectorAll('#opsTarget button').forEach(function(b){ b.onclick=function(){ OPS.target=b.dataset.tg; OPS.commitMsg=''; renderOps(true); }; });
+  var drop=host.querySelector('#opsDrop'), inp=host.querySelector('#opsFile'), finp=host.querySelector('#opsFolder');
   if(drop){
     drop.onclick=function(){ inp.click(); }; drop.onkeydown=function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); inp.click(); } };
     drop.ondragover=function(e){ e.preventDefault(); drop.classList.add('on'); }; drop.ondragleave=function(){ drop.classList.remove('on'); };
-    drop.ondrop=function(e){ e.preventDefault(); drop.classList.remove('on'); opsAddFiles(e.dataTransfer.files); };
+    drop.ondrop=function(e){ e.preventDefault(); drop.classList.remove('on'); opsDropItems(e.dataTransfer); };
     inp.onchange=function(){ opsAddFiles(inp.files); inp.value=''; };
+    if(finp) finp.onchange=function(){ opsAddFiles(finp.files, true); finp.value=''; };
+    var pf=host.querySelector('#opsPickFolder'); if(pf) pf.onclick=function(){ finp.click(); };
   }
+  var sy=host.querySelector('#opsSync'); if(sy) sy.onclick=function(){ opsCopy('', 'staging'); };
+  var pm=host.querySelector('#opsPromote'); if(pm) pm.onclick=function(){ opsCopy('staging', ''); };
   host.querySelectorAll('.ops-path').forEach(function(i){ i.onchange=function(){ OPS.files[+i.dataset.i].path=i.value.trim().replace(/^\/+/,''); }; });
   host.querySelectorAll('[data-rm]').forEach(function(b){ b.onclick=function(){ OPS.files.splice(+b.dataset.rm,1); OPS.commitMsg=''; renderOps(true); }; });
+  var st=host.querySelector('#opsStripTop'); if(st) st.onclick=function(){ OPS.files.forEach(function(f){ f.path=f.path.replace(/^[^/]+\//,''); }); OPS.commitMsg=''; renderOps(true); };
   var cm=host.querySelector('#opsCommitMsg'); if(cm) cm.oninput=function(){ OPS.commitMsg=cm.value; };
   var go=host.querySelector('#opsCommit'); if(go) go.onclick=opsCommit;
   var gl=host.querySelector('#opsGhList'); if(gl) gl.onclick=async function(){ if(!opsNeedPin()) return; opsSetMsg('저장소 읽는 중…'); try{ var r=await opsCall('gh_list'); OPS.ghList=r.files; opsSetMsg(r.files.length+'개 파일','ok'); renderOps(true); }catch(e){ opsSetMsg(String(e.message||e),'bad'); } };
@@ -12027,13 +12062,29 @@ function opsGhBind(host){
     try{ var r=await opsCall('gh_restore',{path:p, ref:sha}); opsSetMsg('복원 커밋 완료 — '+r.commit.slice(0,7)+(r.app_ver? ' · '+r.app_ver:'')+' · Pages 반영 1~2분','ok'); toast('GitHub 복원 완료', p+' ← '+sha.slice(0,7)); OPS.hist=null; renderOps(true); }
     catch(e){ opsSetMsg(String(e.message||e),'bad'); b.disabled=false; } }; });
 }
-function opsAddFiles(list){
+/* 끌어다 놓은 항목에 폴더가 있으면 안을 걸어 상대 경로를 유지 (tests/smoke.mjs 처럼) */
+function opsDropItems(dt){
+  var items=dt&&dt.items? [].slice.call(dt.items) : [];
+  var entries=items.map(function(it){ return it.webkitGetAsEntry? it.webkitGetAsEntry() : null; }).filter(Boolean);
+  if(!entries.length || !entries.some(function(e){ return e.isDirectory; })){ opsAddFiles(dt.files); return; }
+  var files=[], pending=0, done=function(){ if(--pending===0) opsAddFiles(files, true); };
+  function walk(entry, prefix){
+    if(entry.isFile){ pending++; entry.file(function(f){ try{ Object.defineProperty(f,'relPath',{value:prefix+f.name}); }catch(e){} files.push(f); done(); }, done); return; }
+    if(entry.isDirectory){ if(/^(\.git|node_modules|_site)$/.test(entry.name)) return; pending++; var rd=entry.createReader(); var all=[];
+      (function more(){ rd.readEntries(function(es){ if(es.length){ all=all.concat(es); more(); } else { all.forEach(function(e){ walk(e, prefix+entry.name+'/'); }); done(); } }, done); })(); }
+  }
+  entries.forEach(function(e){ walk(e, ''); });
+}
+function opsAddFiles(list, keepPath){
   var arr=[].slice.call(list||[]); if(!arr.length) return;
+  arr=arr.filter(function(f){ var p=f.relPath||f.webkitRelativePath||f.name; return !/(^|\/)(\.git|node_modules|_site|\.DS_Store)(\/|$)/.test(p); });
+  if(!arr.length) return;
   var left=arr.length;
   arr.forEach(function(f){
     var isText=opsIsText(f.name), rd=new FileReader();
     rd.onload=function(){
-      var item={path:f.name, size:f.size, bin:!isText};
+      var rel=keepPath? (f.relPath||f.webkitRelativePath||f.name) : f.name;
+      var item={path:rel.replace(/^\/+/,''), size:f.size, bin:!isText};
       if(isText){ item.content=String(rd.result||''); item.ver=/index\.html$/i.test(f.name)? opsVerOf(item.content) : null; }
       else { item.content_b64=String(rd.result||'').replace(/^data:[^;]*;base64,/,''); }
       var k=OPS.files.findIndex(function(x){ return x.path===item.path; }); if(k>=0) OPS.files[k]=item; else OPS.files.push(item);
@@ -12049,16 +12100,45 @@ async function opsCommit(){
   var idx=OPS.files.filter(function(f){ return /index\.html$/i.test(f.path); })[0];
   if(idx && idx.ver && idx.ver===APP_VER && !confirm('올리는 index.html 의 APP_VER('+idx.ver+')가 지금 실행 중인 버전과 같습니다. 그래도 커밋할까요?')) return;
   if(idx && !idx.ver && !confirm('올리는 index.html 에서 APP_VER 를 찾지 못했습니다 — 포탈 파일이 맞나요? 그래도 커밋할까요?')) return;
-  if(!confirm(OPS.files.length+'개 파일을 GitHub('+(OPS.st&&OPS.st.ok? OPS.st.github.repo+' · '+OPS.st.github.branch : '저장소')+')에 커밋합니다.\n\n'+OPS.files.map(function(f){ return '· '+f.path+' ('+opsFmtBytes(f.size)+')'; }).join('\n')+'\n\n'+message)) return;
+  if(!confirm(OPS.files.length+'개 파일을 GitHub('+(OPS.st&&OPS.st.ok&&OPS.st.github? OPS.st.github.repo+' · '+OPS.st.github.branch : '저장소')+')에 커밋합니다.\n\n'+OPS.files.map(function(f){ return '· '+f.path+' ('+opsFmtBytes(f.size)+')'; }).join('\n')+'\n\n'+message)) return;
   OPS.busy=true; var bt=document.getElementById('opsCommit'); if(bt) bt.disabled=true; opsSetMsg('커밋 중… (파일 '+OPS.files.length+'개)');
   try{
-    var r=await opsCall('gh_put',{files:OPS.files.map(function(f){ return f.bin? {path:f.path, content_b64:f.content_b64} : {path:f.path, content:f.content}; }), message:message});
-    opsSetMsg('커밋 완료 — '+r.commit.slice(0,7)+' · '+r.files.join(', ')+' · GitHub Pages 반영까지 1~2분','ok');
+    var pre=opsPrefix(), stg=OPS.target==='staging';
+    var r=await opsCall('gh_put',{files:OPS.files.map(function(f){ return f.bin? {path:pre+f.path, content_b64:f.content_b64} : {path:pre+f.path, content:f.content}; }), message:(stg? '[staging] ':'')+message});
+    opsSetMsg('커밋 완료 — '+r.commit.slice(0,7)+' · '+r.files.join(', ')+' · 테스트 통과 후 Pages 반영(2~3분)'+(stg? ' · 스테이징: '+stagingUrl():''),'ok');
     toast('GitHub 커밋 완료', r.files.join(', ')+' → '+r.commit.slice(0,7));
     OPS.files=[]; OPS.commitMsg=''; OPS.hist=null; renderOps(true);
-    if(idx) setTimeout(function(){ if(confirm('index.html 을 올렸습니다. 새 버전을 쓰려면 포탈을 새로고침해야 합니다 (Pages 반영에 1~2분 걸릴 수 있음). 지금 새로고침할까요?')) location.reload(); }, 400);
+    if(idx && !stg) setTimeout(function(){ if(confirm('index.html 을 운영에 올렸습니다. 새 버전을 쓰려면 포탈을 새로고침해야 합니다 (테스트·Pages 반영에 2~3분 걸릴 수 있음). 지금 새로고침할까요?')) location.reload(); }, 400);
+    if(idx && stg) setTimeout(function(){ if(confirm('스테이징에 올렸습니다. 2~3분 뒤 스테이징 포탈을 새 탭으로 열까요?')) window.open(stagingUrl(), '_blank'); }, 400);
   }catch(e){ opsSetMsg(String(e.message||e),'bad'); }
   OPS.busy=false; if(bt) bt.disabled=false;
+}
+async function opsCopy(src, dst){
+  if(!opsNeedPin() || OPS.busy) return;
+  var promote=(src==='staging');
+  if(!confirm(promote? '스테이징(staging/)의 포탈 파일을 운영(루트)으로 복사합니다. 운영 포탈이 스테이징과 같아집니다 — 스테이징에서 충분히 확인했나요?' : '운영(루트)의 포탈 파일을 staging/ 로 복사합니다. 스테이징이 운영과 같아집니다. 계속할까요?')) return;
+  OPS.busy=true; opsSetMsg(promote? '승격 중…':'동기화 중…');
+  try{ var r=await opsCall('gh_copy',{src:src, dst:dst}); opsSetMsg((promote? '승격 커밋 완료 — ':'동기화 커밋 완료 — ')+r.commit.slice(0,7)+' · '+r.files.length+'개 파일 · '+(r.note||''),'ok'); toast(promote? '스테이징 → 운영 승격':'운영 → 스테이징 동기화', r.files.length+'개 파일 · '+r.commit.slice(0,7)); OPS.hist=null; renderOps(true); }
+  catch(e){ opsSetMsg(String(e.message||e),'bad'); }
+  OPS.busy=false;
+}
+/* ── 시스템 점검: 포탈이 의존하는 것들이 살아 있는지 한 번에 (운영 DB 는 읽기 전용 select 1 만) ── */
+async function opsHealth(){
+  var out=[], t=function(){ return Date.now(); };
+  async function step(name, fn){ var t0=t(); try{ var r=await fn(); out.push({name:name, ok:true, ms:t()-t0, info:r||''}); }catch(e){ out.push({name:name, ok:false, ms:t()-t0, info:String(e.message||e).slice(0,140)}); } }
+  OPS.health={running:true, rows:out}; renderOps(true);
+  await step('GitHub Pages 최신 index.html', async function(){ var r=await fetch(prodUrl()+'?nocache='+Date.now(), {cache:'no-store'}); if(!r.ok) throw new Error('HTTP '+r.status); var m=/var APP_VER='([^']+)'/.exec(await r.text()); if(!m) throw new Error('APP_VER 없음'); return m[1]+(m[1]===APP_VER? ' (지금과 같음)':' ← 지금 실행 중 '+APP_VER+(IS_STAGING? ' (스테이징)':' — 새로고침 필요')); });
+  await step('Supabase REST (load_all)', async function(){ var r=await fetch(SB_URL+'/rest/v1/rpc/load_all', {method:'POST', headers:{'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+SB_TOKEN}, body:'{}'}); if(!r.ok) throw new Error('HTTP '+r.status); return 'HTTP 200'; });
+  await step('AI (ask ping)', async function(){ var r=await aiFetch({mode:'ping'}, 12000); if(!r || r.ok===false) throw new Error((r&&r.error)||'응답 없음'); return (r.model||'ok'); });
+  await step('remind (dry)', async function(){ var r=await fetch(SB_URL+'/functions/v1/remind?dry=1', {method:'POST', headers:{'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+SB_TOKEN}, body:JSON.stringify({month:idxDate(STATE.base)})}); var j=await r.json(); if(!j.ok) throw new Error(j.error||('HTTP '+r.status)); return '이달 '+(j.counts&&j.counts.due)+' · 다음 달 '+(j.counts&&j.counts.next)+' · 미처리 '+(j.counts&&j.counts.lapsed); });
+  await step('ops (status)', async function(){ var r=await opsCall('status'); return (r.github&&r.github.token_set? 'GitHub ✓':'GitHub ✗')+' · '+(r.mgmt_token_set? 'Supabase ✓':'Supabase ✗')+' · '+(r.log_ok? '기록 ✓':'기록 ✗'); });
+  if(OPS.pin) await step('운영 DB (select 1 · 읽기 전용)', async function(){ var r=await opsCall('sql_run',{sql:'select 1 as ok, now() as at', read_only:true}); return Array.isArray(r.rows)&&r.rows[0]? String(r.rows[0].at||'').slice(0,19) : 'ok'; });
+  await step('서비스 워커', async function(){ if(!('serviceWorker' in navigator)) return '미지원'; var reg=await navigator.serviceWorker.getRegistration(); return reg? (reg.active? '활성':'등록됨') : '없음 (file:// 또는 미등록)'; });
+  OPS.health={running:false, rows:out, at:new Date()}; renderOps(true);
+}
+async function opsLoadErrors(){
+  try{ var rows=await sbTry('client_errors?select=at,email,ver,view,msg,url,n&order=at.desc&limit=30'); OPS.errs=rows||[]; }catch(e){ OPS.errs=[]; }
+  renderOps(true);
 }
 /* ── SQL ── */
 function opsSqlHtml(){
@@ -12151,12 +12231,25 @@ async function opsFnDeploy(){
 }
 /* ── 기록 ── */
 function opsLogHtml(){
-  var st=OPS.st, L=(st&&st.ok&&st.recent)||[];
-  if(!st) return '<p class="cap">상태 확인 중…</p>';
-  if(!st.ok) return '<p class="cap" style="color:var(--critical)">'+esc(st.error||'')+'</p>';
-  if(!st.log_ok) return '<p class="cap">기록표(ops_log · SQL 85)가 없거나 함수에 service role 이 없어 기록을 읽지 못합니다.</p>';
-  if(!L.length) return '<p class="cap">아직 기록이 없습니다.</p>';
-  return '<table class="rn-tbl"><thead><tr><th>일시</th><th>계정</th><th>동작</th><th>대상</th><th>요약</th><th>결과</th></tr></thead><tbody>'+L.map(function(r){ return '<tr><td class="mini">'+esc(String(r.at||'').replace('T',' ').slice(0,19))+'</td><td class="mini">'+esc(r.actor)+'</td><td><code>'+esc(r.action)+'</code></td><td>'+esc(r.target||'')+'</td><td title="'+esc(r.summary||'')+'">'+esc(String(r.summary||'')).slice(0,80)+'</td><td>'+(r.ok? '<span class="up">✓</span>'+(r.ms? ' <span class="mini">'+r.ms+'ms</span>':'') : '<span style="color:var(--critical)" title="'+esc(r.error||'')+'">✗ '+esc(String(r.error||'')).slice(0,60)+'</span>')+'</td></tr>'; }).join('')+'</tbody></table>';
+  var st=OPS.st, L=(st&&st.ok&&st.recent)||[], H=OPS.health, E=OPS.errs;
+  var h='<div class="ops-h" style="display:flex;align-items:center;gap:10px">시스템 점검 <button type="button" class="cbtn" id="opsHealth"'+(H&&H.running? ' disabled':'')+'>'+(H&&H.running? '점검 중…':'지금 점검')+'</button>'+(H&&H.at? '<span class="mini">'+esc(H.at.toLocaleTimeString('ko-KR'))+'</span>':'')+'</div>';
+  if(H && H.rows.length) h+='<table class="rn-tbl" style="margin-bottom:14px"><tbody>'+H.rows.map(function(r){ return '<tr><td style="width:240px">'+esc(r.name)+'</td><td>'+(r.ok? '<span class="up">✓</span>':'<span style="color:var(--critical)">✗</span>')+' '+esc(r.info)+'</td><td class="n mini">'+r.ms+'ms</td></tr>'; }).join('')+'</tbody></table>';
+  else h+='<p class="mini" style="margin:0 0 14px">Pages 최신 버전 · Supabase REST · AI · remind · ops · (PIN 있으면) 운영 DB · 서비스 워커를 순서대로 확인합니다.</p>';
+  h+='<div class="ops-h" style="display:flex;align-items:center;gap:10px">브라우저 오류 (사용자 화면에서 난 JS 오류 · 최근 30건) <button type="button" class="cbtn" id="opsErrs">불러오기</button></div>';
+  if(E===null) h+='<p class="mini" style="margin:0 0 14px">«불러오기»를 누르면 client_errors 표(SQL 86)를 읽습니다.</p>';
+  else if(!E.length) h+='<p class="mini" style="margin:0 0 14px">기록된 오류가 없습니다 ✓</p>';
+  else h+='<table class="rn-tbl" style="margin-bottom:14px"><thead><tr><th>일시</th><th>계정</th><th>버전</th><th>화면</th><th>오류</th><th class="n">반복</th></tr></thead><tbody>'+E.map(function(r){ return '<tr><td class="mini">'+esc(String(r.at||'').replace('T',' ').slice(0,19))+'</td><td class="mini">'+esc(r.email||'')+'</td><td class="mini">'+esc(String(r.ver||'').replace(/^.*\s/,''))+'</td><td>'+esc(r.view||'')+'</td><td title="'+esc(r.msg||'')+'">'+esc(String(r.msg||'')).slice(0,100)+'</td><td class="n">'+(r.n||1)+'</td></tr>'; }).join('')+'</tbody></table>';
+  h+='<div class="ops-h">배포·운영 기록 (ops_log · 최근 30건)</div>';
+  if(!st) h+='<p class="cap">상태 확인 중…</p>';
+  else if(!st.ok) h+='<p class="cap" style="color:var(--critical)">'+esc(st.error||'')+'</p>';
+  else if(!st.log_ok) h+='<p class="cap">기록표(ops_log · SQL 85)가 없거나 함수에 service role 이 없어 기록을 읽지 못합니다.</p>';
+  else if(!L.length) h+='<p class="cap">아직 기록이 없습니다.</p>';
+  else h+='<table class="rn-tbl"><thead><tr><th>일시</th><th>계정</th><th>동작</th><th>대상</th><th>요약</th><th>결과</th></tr></thead><tbody>'+L.map(function(r){ return '<tr><td class="mini">'+esc(String(r.at||'').replace('T',' ').slice(0,19))+'</td><td class="mini">'+esc(r.actor)+'</td><td><code>'+esc(r.action)+'</code></td><td>'+esc(r.target||'')+'</td><td title="'+esc(r.summary||'')+'">'+esc(String(r.summary||'')).slice(0,80)+'</td><td>'+(r.ok? '<span class="up">✓</span>'+(r.ms? ' <span class="mini">'+r.ms+'ms</span>':'') : '<span style="color:var(--critical)" title="'+esc(r.error||'')+'">✗ '+esc(String(r.error||'')).slice(0,60)+'</span>')+'</td></tr>'; }).join('')+'</tbody></table>';
+  return h;
+}
+function opsLogBind(host){
+  var hb=host.querySelector('#opsHealth'); if(hb) hb.onclick=opsHealth;
+  var eb=host.querySelector('#opsErrs'); if(eb) eb.onclick=opsLoadErrors;
 }
 
 function renderAdmin(){
