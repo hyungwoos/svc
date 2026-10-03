@@ -3,10 +3,11 @@
    · 목적: 홈 화면 앱으로 설치되게 하고, 껍데기(HTML·아이콘)를 캐시해 오프라인·저속에서도 바로 뜨게 함
    · 원칙: HTML 은 항상 «네트워크 먼저» — index.html 을 새로 올리면 다음 실행 때 바로 새 버전 (캐시는 네트워크가 안 될 때만)
            아이콘·매니페스트는 «캐시 먼저». Supabase·Anthropic·CDN 같은 외부 요청은 건드리지 않음(데이터는 절대 캐시하지 않음)
-   · 갱신: 아래 SW_VER 를 올리면 예전 캐시가 정리됨 (index.html 만 바꿀 때는 올릴 필요 없음)
+   · 갱신: 아래 SW_VER 를 올리면 예전 캐시가 정리됨 (index.html·app.css·js 만 바꿀 때는 올릴 필요 없음 — 네트워크 먼저라 즉시 반영)
    ============================================================================ */
-const SW_VER = 'svc-pwa-1';
-const SHELL = ['./index.html', './manifest.webmanifest', './pwa-192.png', './pwa-512.png', './pwa-maskable-512.png', './apple-touch-icon.png'];
+const SW_VER = 'svc-pwa-2';   // ㊿+134: app.css · js/viz.js · js/app.js 분리 — 코드·스타일도 «네트워크 먼저 → 캐시» (버전 질의 ?v= 는 캐시 키에서 뗌)
+const SHELL = ['./index.html', './app.css', './js/viz.js', './js/app.js', './manifest.webmanifest', './pwa-192.png', './pwa-512.png', './pwa-maskable-512.png', './apple-touch-icon.png'];
+const ASSETS = /\/(app\.css|js\/[^/]+\.js)$/;
 const PAGES = /\/(index|kk|quote|report|s1|orders)\.html$/;
 
 self.addEventListener('install', (e) => {
@@ -30,6 +31,14 @@ self.addEventListener('fetch', (e) => {
       if (res && res.ok) { const copy = res.clone(); caches.open(SW_VER).then((c) => c.put(stripQuery(req), copy)); }
       return res;
     }).catch(() => caches.match(stripQuery(req)).then((hit) => hit || caches.match('./index.html')).then((hit) => hit || offlinePage())));
+    return;
+  }
+  if (ASSETS.test(path)) {
+    // 코드·스타일: 네트워크 먼저(새 버전 즉시) → 오프라인이면 마지막으로 받은 것
+    e.respondWith(fetch(req).then((res) => {
+      if (res && res.ok) { const copy = res.clone(); caches.open(SW_VER).then((c) => c.put(stripQuery(req), copy)); }
+      return res;
+    }).catch(() => caches.match(stripQuery(req))));
     return;
   }
   if (/\.(png|webmanifest|ico|svg)$/.test(path)) {

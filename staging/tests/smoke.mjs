@@ -11,8 +11,8 @@ const OUT = path.join(ROOT, 'tests', 'out'); fs.mkdirSync(OUT, { recursive: true
 const { srv, url } = await serve(DIR);
 const browser = await chromium.launch();
 const S = new Suite('smoke');
-const VIEWS = ['contracts', 'orders', 'assets', 'eqboard', 'oi', 'mdrops', 'live', 'churn', 'churnrate', 'custflow', 'leadsrc', 'price', 'cloud', 'report', 'weekly', 'inbstat', 'account', 'adminx', 'ops', 'log'];
-const VIEW_HOST = { contracts: '#viewData', orders: '#viewData', assets: '#viewData', eqboard: '#viewEqBoard', oi: '#viewData', mdrops: '#viewData', live: '#viewData', churn: '#viewChurn', churnrate: '#viewChurnRate', custflow: '#viewCustFlow', leadsrc: '#viewData', price: '#viewPrice', cloud: '#viewCloud', report: '#viewReport', weekly: '#viewWeekly', inbstat: '#viewInb', account: '#viewAccount', adminx: '#viewAdmin', ops: '#viewOps', log: '#viewData' };
+const VIEWS = ['contracts', 'orders', 'assets', 'eqboard', 'oi', 'mdrops', 'live', 'churn', 'churnrate', 'custflow', 'leadsrc', 'dcheck', 'price', 'cloud', 'report', 'weekly', 'inbstat', 'account', 'adminx', 'ops', 'log'];
+const VIEW_HOST = { contracts: '#viewData', orders: '#viewData', assets: '#viewData', eqboard: '#viewEqBoard', oi: '#viewData', mdrops: '#viewData', live: '#viewData', churn: '#viewChurn', churnrate: '#viewChurnRate', custflow: '#viewCustFlow', leadsrc: '#viewData', dcheck: '#viewData', price: '#viewPrice', cloud: '#viewCloud', report: '#viewReport', weekly: '#viewWeekly', inbstat: '#viewInb', account: '#viewAccount', adminx: '#viewAdmin', ops: '#viewOps', log: '#viewData' };
 
 const PNG1 = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');   // 1×1 PNG
 const jwt = (aal, email = 'tester@example.com') => 'h.' + Buffer.from(JSON.stringify({ sub: 'u1', email, aal, exp: 9999999999 })).toString('base64url') + '.s';   // 가짜 JWT (aal 검사용)
@@ -43,6 +43,20 @@ async function shot(page, name) { try { await page.screenshot({ path: path.join(
   await S.t('뒤로가기(←) 동작', async () => { await page.evaluate(() => switchView('dash')); await page.evaluate(() => switchView('contracts')); await page.evaluate(() => switchView('oi')); await page.waitForTimeout(200); await page.evaluate(() => goBack()); await page.waitForTimeout(400); const v = await page.evaluate(() => CUR_VIEW); assert(v === 'contracts', 'back → ' + v); });
   await S.t('만기 처리 창 열림', async () => { await page.evaluate(() => openRenewList('due')); await page.waitForTimeout(200); assert(await page.evaluate(() => document.getElementById('ovlRenew').classList.contains('on')), 'ovlRenew 닫힘'); const tabs = await page.$$eval('#rnTabs button', (b) => b.length); assert(tabs === 3, 'tabs ' + tabs); await page.evaluate(() => closeOvl('ovlRenew')); });
   await S.t('AI 요약(buildDigest) 생성', async () => { const d = await page.evaluate(() => { const D = buildDigest(); return { live: D.LIVE고객사수, keys: Object.keys(D).length, renew: !!D.만기관리 }; }); assert(d.keys > 10 && d.renew, JSON.stringify(d)); return d; });
+  await S.t('데이터 점검: 규칙 카드 · 요약 · 항목 → 바로가기', async () => {
+    await page.keyboard.press('Escape'); await page.evaluate(() => switchView('dcheck')); await page.waitForTimeout(400);
+    const n = await page.$$eval('#bizHost .dc-rule', (e) => e.length); assert(n >= 18, '규칙 ' + n);
+    const sum = await page.evaluate(() => dcSummary()); assert(typeof sum.crit === 'number' && typeof sum.warn === 'number', 'dcSummary');
+    const withItems = await page.$$eval('#bizHost .dc-rule', (e) => e.filter((x) => !/이상 없음/.test(x.textContent)).map((x) => x.querySelector('[data-dc]').dataset.dc));
+    if (withItems.length) {
+      await page.click('#bizHost [data-dc="' + withItems[0] + '"]'); await page.waitForTimeout(200);
+      const links = await page.$$('#bizHost [data-dcgo]'); assert(links.length >= 1, '항목 링크 없음');
+      await links[0].click(); await page.waitForTimeout(400);
+      assert(await page.evaluate(() => CUR_VIEW !== 'dcheck' || !!document.getElementById('ovlRenew')), '바로가기 이동 안 됨 (' + withItems[0] + ')');
+    }
+    const dig = await page.evaluate(() => buildDigest().데이터점검); assert(dig && '바로고침' in dig, 'digest 데이터점검 없음');
+    return { rules: n, crit: sum.crit, warn: sum.warn, info: sum.info, first: withItems[0] || '-' };
+  });
   await S.t('Ctrl+K 검색 열림', async () => { await page.keyboard.press('Control+k'); await page.waitForTimeout(200); assert(await page.evaluate(() => document.getElementById('ovlFind').classList.contains('on')), 'ovlFind 닫힘'); await page.keyboard.press('Escape'); });
   if (S.failed.length) await shot(page, 'smoke_fail_main');
   await ctx.close();
@@ -144,6 +158,13 @@ for (const f of ['quote.html', 'report.html', 's1.html', 'kk.html']) {
     const rows = await page.$$eval('#opsBody table tbody tr', (t) => t.map((x) => x.innerText.replace(/\s+/g, ' ').slice(0, 60)));
     assert(rows.length >= 6, 'rows ' + rows.length); assert(!errs.length, errs.join(' | ')); return rows.length + '항목';
   });
+  await S.t('배포·운영: AI 15문 점검 실행(가짜 ask) · 요약 · change_log', async () => {
+    const before = opsCalls.length;
+    await page.click('#opsAiCheck'); await page.waitForTimeout(2500);
+    const n = await page.$$eval('#opsBody table tbody tr td:first-child', (t) => t.filter((x) => /^\d+$/.test(x.textContent.trim())).length); assert(n === 15, '질문 행 ' + n);
+    const sum = await page.evaluate(() => OPS.aic && OPS.aic.summary); assert(sum && sum.total === 15 && typeof sum.pass === 'number', 'summary ' + JSON.stringify(sum));
+    assert(await page.$('#opsAiXlsx'), '엑셀 버튼 없음'); return sum.pass + '/' + sum.total + ' (mock 답이라 대부분 미통과가 정상)';
+  });
   await ctx.close();
 }
 // 7) 브라우저 오류 수집 — 화면 JS 오류가 client_errors 로 1번만 기록되는지
@@ -168,10 +189,18 @@ if (fs.existsSync(path.join(DIR, 'staging', 'index.html'))) {
 // 9) 2단계 인증(MFA) — 등록된 계정: 저장된 aal1 세션 → 코드 창 → aal2 세션 교체 · 취소 · 로그인 화면 흐름 · 내 계정 카드(끄기·켜기)
 {
   const authCalls = []; let factors = [{ id: 'f1', factor_type: 'totp', status: 'verified', friendly_name: 'SVC 포탈 2026-10-03', created_at: '2026-10-03T00:00:00Z' }];
+  let policy = { required: false, deadline: null };   // SQL 89 mfa_policy 흉내
+  const today = new Date().toISOString().slice(0, 10); const adminCalls = [];
   const mfaExtra = async (route, u, m) => {
     const J = async (o, st = 200) => { await route.fulfill({ status: st, contentType: 'application/json', body: JSON.stringify(o) }); return true; };
     const auth = route.request().headers()['authorization'] || ''; const path = u.replace(/^https?:\/\/[^/]+/, '').split('?')[0];
     const user = { id: 'u1', email: 'tester@example.com', user_metadata: { pw_changed: true }, factors };
+    const enrolled = factors.some((f) => f.status === 'verified'), aal2 = auth.includes(jwt('aal2'));
+    const mfaOk = aal2 || (enrolled ? false : !(policy.required && (!policy.deadline || policy.deadline <= today)));
+    if (path === '/rest/v1/rpc/mfa_status') return J({ email: 'tester@example.com', aal: aal2 ? 'aal2' : 'aal1', enrolled, required: policy.required, deadline: policy.deadline, today, ok: mfaOk });
+    if (path === '/rest/v1/rpc/mfa_admin_list') return J([{ email: 'a@example.com', role: 'admin', enrolled: true, factor_at: '2026-10-01T00:00:00Z', required: true, deadline: null, note: null }, { email: 'b@example.com', role: 'admin_viewer', enrolled: false, required: false, deadline: null, note: null }, { email: 'tester@example.com', role: 'super_admin', enrolled, required: policy.required, deadline: policy.deadline, note: null }]);
+    if (path === '/rest/v1/rpc/mfa_admin_set' || path === '/rest/v1/rpc/mfa_admin_reset') { const b = JSON.parse(route.request().postData() || '{}'); adminCalls.push({ fn: path.split('/').pop(), ...b }); return J(path.endsWith('reset') ? { email: b.p_email, deleted: 1 } : { email: b.p_email, required: b.p_required, deadline: b.p_deadline }); }
+    if (u.includes('/rpc/load_all') && !mfaOk) { authCalls.push('load_all:blocked'); return J({}); }   // SQL 88/89 흉내: mfa_ok 가 false 면 데이터 없음
     if (path === '/auth/v1/user') { authCalls.push('user'); return J(user); }
     let mm = /^\/auth\/v1\/factors\/([^/]+)\/(challenge|verify)$/.exec(path);
     if (mm && m === 'POST') {
@@ -180,11 +209,10 @@ if (fs.existsSync(path.join(DIR, 'staging', 'index.html'))) {
       if (b.code === '123456' && b.challenge_id === 'c-' + mm[1]) { factors = factors.map((f) => f.id === mm[1] ? { ...f, status: 'verified' } : f); return J({ access_token: jwt('aal2'), refresh_token: 'r2', expires_in: 3600, token_type: 'bearer', user }); }
       return J({ msg: 'Invalid TOTP code entered', code: 422 }, 422);
     }
-    if (path === '/auth/v1/factors' && m === 'POST') { authCalls.push('enroll'); factors = factors.concat([{ id: 'f2', factor_type: 'totp', status: 'unverified', friendly_name: 'SVC 포탈', created_at: '2026-10-03T01:00:00Z' }]); return J({ id: 'f2', type: 'totp', friendly_name: 'SVC 포탈', totp: { qr_code: 'data:image/svg+xml;utf-8,<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10" fill="#fff"/><rect x="2" y="2" width="6" height="6" fill="#000"/></svg>', secret: 'JBSWY3DPEHPK3PXP', uri: 'otpauth://totp/x' } }); }
+    if (path === '/auth/v1/factors' && m === 'POST') { authCalls.push('enroll'); factors = factors.concat([{ id: 'f2', factor_type: 'totp', status: 'unverified', friendly_name: 'SVC 포탈', created_at: '2026-10-03T01:00:00Z' }]); return J({ id: 'f2', type: 'totp', friendly_name: 'SVC 포탈', totp: { qr_code: '<?xml version="1.0"?>\n<svg width="10" height="10" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><rect x="0" y="0" width="10" height="10" style="fill:white;stroke:none"/><rect x="2" y="2" width="6" height="6" style="fill:#000;stroke:none"/></svg>', secret: 'JBSWY3DPEHPK3PXP', uri: 'otpauth://totp/x' } }); }
     mm = /^\/auth\/v1\/factors\/([^/]+)$/.exec(path);
     if (mm && m === 'DELETE') { authCalls.push('unenroll:' + mm[1]); factors = factors.filter((f) => f.id !== mm[1]); return J({ id: mm[1] }); }
     if (u.includes('grant_type=password')) { authCalls.push('password'); return J({ access_token: jwt('aal1'), refresh_token: 'r1', expires_in: 3600, token_type: 'bearer', user }); }
-    if (u.includes('/rpc/load_all') && factors.some((f) => f.status === 'verified') && !auth.includes(jwt('aal2'))) { authCalls.push('load_all:blocked'); return J({}); }   // SQL 88 흉내: 등록자는 aal2 만 데이터
     return false;
   };
   // A) 저장된 aal1 세션으로 시작 → 코드 창 → 틀림 → 맞음 → 데이터 로드
@@ -208,7 +236,7 @@ if (fs.existsSync(path.join(DIR, 'staging', 'index.html'))) {
       t = await page.$eval('#accMfa', (e) => e.textContent); assert(/꺼짐/.test(t), '끈 뒤: ' + t.slice(0, 80)); assert(authCalls.includes('unenroll:f1'), 'DELETE f1 없음');
       await page.click('#mfaOn'); await page.waitForTimeout(600);
       assert(await page.$('#accMfa img[alt="인증 앱 등록 QR"]'), 'QR 없음');
-      await page.waitForTimeout(200); const qr = await page.$eval('#accMfa img[alt="인증 앱 등록 QR"]', (e) => ({ ok: e.complete && e.naturalWidth > 0, src: e.getAttribute('src').slice(0, 40) })); assert(qr.ok, 'QR 이미지가 깨짐(# 포함 SVG data URL): ' + qr.src); assert(/JBSWY3DPEHPK3PXP/.test(await page.$eval('#accMfa', (e) => e.textContent)), '수동 키 없음');
+      await page.waitForTimeout(200); const qr = await page.$eval('#accMfa img[alt="인증 앱 등록 QR"]', (e) => ({ ok: e.complete && e.naturalWidth > 0, src: e.getAttribute('src').slice(0, 40) })); assert(qr.ok && /^data:image\/svg\+xml;charset=utf-8,/.test(qr.src), 'QR 이미지가 깨짐(GoTrue 원문 SVG 미정규화): ' + qr.src); assert(/JBSWY3DPEHPK3PXP/.test(await page.$eval('#accMfa', (e) => e.textContent)), '수동 키 없음');
       await page.fill('#mfaEnCode', '123456'); await page.click('#mfaEnGo'); await page.waitForTimeout(800);
       t = await page.$eval('#accMfa', (e) => e.textContent); assert(/켜짐/.test(t), '켠 뒤: ' + t.slice(0, 80));
       assert(authCalls.includes('enroll') && authCalls.includes('challenge:f2') && authCalls.includes('verify:f2:123456'), authCalls.join(','));
@@ -245,6 +273,45 @@ if (fs.existsSync(path.join(DIR, 'staging', 'index.html'))) {
     const { ctx, page, errs } = await open({ token: jwt('aal1') });
     await S.t('MFA: 미등록 계정은 코드 창 없이 바로 입장', async () => { assert(!(await page.$('#ovlMfa')), '코드 창이 떴음'); assert(await page.evaluate(() => !!window.DATA), 'DATA 없음'); assert(!errs.length, errs.join(' | ')); });
     await ctx.close();
+  }
+  // E) 관리자가 필수(즉시) 지정 + 미등록 → 등록 강제 창 → QR·코드 → aal2 입장
+  {
+    factors = []; policy = { required: true, deadline: null };
+    const { ctx, page, errs } = await open({ token: jwt('aal1'), extra: mfaExtra });
+    await S.t('MFA 강제: 필수(즉시)·미등록 → 등록 창 → 등록 → 입장', async () => {
+      assert(await page.$('#ovlMfa #mfaForceHost'), '강제 등록 창 없음'); assert(await page.evaluate(() => document.getElementById('app').classList.contains('hidden')), '등록 전에 앱이 열림');
+      await page.waitForTimeout(500); assert(await page.$('#mfaForceHost img[alt="인증 앱 등록 QR"]'), 'QR 없음'); assert(!(await page.$eval('#mfaEnCancel', (e) => e.offsetParent !== null)), '안쪽 취소 버튼이 보임');
+      await page.fill('#mfaEnCode', '123456'); await page.click('#mfaEnGo'); await page.waitForTimeout(2500);
+      assert(!(await page.$('#ovlMfa')), '창이 남음'); assert(await page.evaluate(() => !document.getElementById('app').classList.contains('hidden') && !!window.DATA), '앱 미표시');
+      assert(await page.evaluate(() => JSON.parse(sessionStorage.getItem('svc_sess')).a) === jwt('aal2'), 'aal2 세션 아님'); assert(!errs.length, errs.join(' | '));
+      return authCalls.filter((x) => /enroll|verify:f2/.test(x)).join(' → ');
+    });
+    await S.t('MFA 강제: 관리자 › 2단계 인증 정책 — 목록 · 필수 지정 저장 · 초기화', async () => {
+      page.on('dialog', (d) => d.accept());
+      await page.evaluate(() => switchView('adminx')); await page.waitForTimeout(900);
+      const rows = await page.$$eval('#mfTable tbody tr', (t) => t.length); assert(rows === 3, 'rows ' + rows);
+      assert(/차단 중|유예|등록/.test(await page.$eval('#mfTable', (e) => e.textContent)), '상태 표기 없음');
+      await page.check('#mfTable [data-mf-req="b@example.com"]'); await page.waitForTimeout(100);
+      const dl = await page.$eval('#mfTable [data-mf-dl="b@example.com"]', (e) => ({ v: e.value, dis: e.disabled })); assert(!dl.dis && /^\d{4}-\d{2}-\d{2}$/.test(dl.v), '기한 자동 입력 안 됨 ' + JSON.stringify(dl));
+      await page.fill('#mfTable [data-mf-note="b@example.com"]', '테스트'); await page.click('#mfTable [data-mf-save="b@example.com"]'); await page.waitForTimeout(600);
+      const set = adminCalls.find((c) => c.fn === 'mfa_admin_set'); assert(set && set.p_email === 'b@example.com' && set.p_required === true && set.p_deadline === dl.v && set.p_note === '테스트', JSON.stringify(set));
+      await page.click('#mfTable [data-mf-reset="a@example.com"]'); await page.waitForTimeout(600);
+      const rs = adminCalls.find((c) => c.fn === 'mfa_admin_reset'); assert(rs && rs.p_email === 'a@example.com', JSON.stringify(rs)); return adminCalls.map((c) => c.fn).join(',');
+    });
+    await ctx.close();
+  }
+  // F) 필수지만 기한이 남음 → 들어가되 안내 토스트
+  {
+    factors = []; const dl = new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10); policy = { required: true, deadline: dl };
+    const { ctx, page } = await open({ token: jwt('aal1'), extra: mfaExtra });
+    await S.t('MFA 강제: 유예 기간 → 입장 + 안내 토스트', async () => {
+      assert(!(await page.$('#ovlMfa')), '창이 떴음'); assert(await page.evaluate(() => !!window.DATA), 'DATA 없음');
+      const t = await page.$$eval('#toasts .toast', (e) => e.map((x) => x.textContent).join(' | ')); assert(/2단계 인증 등록이 필요/.test(t) && t.includes(dl), '토스트: ' + t.slice(0, 120));
+      await page.evaluate(() => switchView('account')); await page.waitForTimeout(700);
+      assert(/관리자 지정: 필수/.test(await page.$eval('#accMfa', (e) => e.textContent)), '카드에 필수 표시 없음'); return dl;
+    });
+    await ctx.close();
+    policy = { required: false, deadline: null };
   }
 }
 // 10) 견적서 직인 — quote.html 이 비공개 Storage 에서 로그인 토큰으로 받아 <img> 에 넣는지 · 없으면 숨김

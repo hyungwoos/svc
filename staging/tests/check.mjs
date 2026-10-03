@@ -20,9 +20,23 @@ for (const f of htmls) {
   const leak = /(service_role|sb_secret_[A-Za-z0-9_]{8,}|sbp_[a-f0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|xoxb-[0-9A-Za-z-]{10,}|sk-ant-[A-Za-z0-9_-]{20,})/.exec(src);
   say(!leak, `${f}: 비밀값 패턴 없음${leak ? ` — «${leak[1].slice(0, 24)}…»` : ''}`);
 }
-const idx = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
-const ver = /var APP_VER='(\d{4}-\d{2}-\d{2} ㊿\+\d+)'/.exec(idx);
+const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+const ver = /var APP_VER='(\d{4}-\d{2}-\d{2} ㊿\+\d+)'/.exec(html);
 say(!!ver, `APP_VER 형식 ${ver ? ver[1] : '(없음)'}`);
+// ④ 아키텍처(㊿+134): index.html(뼈대) + app.css + js/viz.js + js/app.js — 외부 js 는 node --check, 아래 검사들은 HTML+JS 합본(idx)으로
+const JS_FILES = ['js/viz.js', 'js/app.js'];
+let jsAll = '';
+for (const f of JS_FILES) {
+  const p = path.join(ROOT, f); say(fs.existsSync(p), `${f} 존재`);
+  if (!fs.existsSync(p)) continue;
+  const r = spawnSync(process.execPath, ['--check', p], { encoding: 'utf8' }); say(r.status === 0, `${f}: 문법${r.status ? ' — ' + r.stderr.split('\n').slice(0, 2).join(' | ') : ''}`);
+  const src = fs.readFileSync(p, 'utf8'); jsAll += '\n' + src;
+  const leak = /(service_role|sb_secret_[A-Za-z0-9_]{8,}|sbp_[a-f0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|xoxb-[0-9A-Za-z-]{10,}|sk-ant-[A-Za-z0-9_-]{20,})/.exec(src); say(!leak, `${f}: 비밀값 패턴 없음`);
+}
+say(fs.existsSync(path.join(ROOT, 'app.css')), 'app.css 존재');
+say(/app\.css\?v=/.test(html) && /js\/app\.js\?v=/.test(html) && /js\/viz\.js\?v=/.test(html), 'index.html 이 app.css · js/viz.js · js/app.js 를 ?v=APP_VER 로 로드');
+say(!/^\s*var APP_VER=/m.test(jsAll), 'APP_VER 정의는 index.html head 한 곳뿐');
+const idx = html + jsAll;
 // Supabase 함수 소스가 저장소에 있으면 비밀값 검사만 (deno 는 CI 에 없을 수 있음)
 const fnDir = path.join(ROOT, 'supabase', 'functions');
 if (fs.existsSync(fnDir)) for (const d of fs.readdirSync(fnDir)) { const p = path.join(fnDir, d, 'index.ts'); if (fs.existsSync(p)) { const s = fs.readFileSync(p, 'utf8'); const leak = /(sb_secret_[A-Za-z0-9_]{8,}|sbp_[a-f0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|xoxb-[0-9A-Za-z-]{10,}|sk-ant-[A-Za-z0-9_-]{20,})/.exec(s); say(!leak, `functions/${d}: 비밀값 패턴 없음`); } }
