@@ -21,21 +21,35 @@ for (const f of htmls) {
   say(!leak, `${f}: 비밀값 패턴 없음${leak ? ` — «${leak[1].slice(0, 24)}…»` : ''}`);
 }
 const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
-const ver = /var APP_VER='(\d{4}-\d{2}-\d{2} ㊿\+\d+)'/.exec(html);
-say(!!ver, `APP_VER 형식 ${ver ? ver[1] : '(없음)'}`);
-// ④ 아키텍처(㊿+134): index.html(뼈대) + app.css + js/viz.js + js/app.js — 외부 js 는 node --check, 아래 검사들은 HTML+JS 합본(idx)으로
-const JS_FILES = ['js/viz.js', 'js/app.js'];
+// ④ 아키텍처 2단계(㊿+136): 버전은 <meta name="app-ver">, 코드 목록은 <meta name="app-js"> — js/boot.js(head) · js/load.js(body 끝) 가 읽어 ?v= 로 로드. 인라인 <script>/onclick 없음 → CSP script-src 에 'unsafe-inline' 없음
+const ver = /<meta name="app-ver" content="(\d{4}-\d{2}-\d{2} ㊿\+\d+)">/.exec(html);
+say(!!ver, `APP_VER 형식(meta app-ver) ${ver ? ver[1] : '(없음)'}`);
+const jsMeta = /<meta name="app-js" content="([^"]+)">/.exec(html); const JS_LIST = jsMeta ? jsMeta[1].split(',').map((x) => x.trim()) : [];
+say(JS_LIST.length >= 10 && JS_LIST[JS_LIST.length - 1] === 'js/init.js', `app-js 목록 ${JS_LIST.length}개 · 마지막 js/init.js`);
+say(/<script src="js\/boot\.js"><\/script>/.test(html) && /<script src="js\/load\.js"><\/script>/.test(html), 'index.html 이 js/boot.js(head) · js/load.js(body 끝)만 로드');
+say(!/<script(?![^>]*\bsrc=)[^>]*>/.test(html), 'index.html 에 인라인 <script> 없음');
+say(!/ on[a-z]+="/.test(html), 'index.html 에 인라인 on* 핸들러 없음');
+const cspIdx = /<meta http-equiv="Content-Security-Policy" content="([^"]+)">/.exec(html);
+say(!!cspIdx && !/script-src[^;]*'unsafe-inline'/.test(cspIdx[1]), "index.html CSP script-src 에 'unsafe-inline' 없음");
+const JS_FILES = ['js/boot.js', 'js/load.js'].concat(JS_LIST);
 let jsAll = '';
 for (const f of JS_FILES) {
   const p = path.join(ROOT, f); say(fs.existsSync(p), `${f} 존재`);
   if (!fs.existsSync(p)) continue;
   const r = spawnSync(process.execPath, ['--check', p], { encoding: 'utf8' }); say(r.status === 0, `${f}: 문법${r.status ? ' — ' + r.stderr.split('\n').slice(0, 2).join(' | ') : ''}`);
   const src = fs.readFileSync(p, 'utf8'); jsAll += '\n' + src;
-  const leak = /(service_role|sb_secret_[A-Za-z0-9_]{8,}|sbp_[a-f0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|xoxb-[0-9A-Za-z-]{10,}|sk-ant-[A-Za-z0-9_-]{20,})/.exec(src); say(!leak, `${f}: 비밀값 패턴 없음`);
+  const leak = /(service_role|sb_secret_[A-Za-z0-9_]{8,}|sbp_[a-f0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|xoxb-[0-9A-Za-z-]{10,}|sk-ant-[A-Za-z0-9_-]{20,})/.exec(src); if (leak) say(false, `${f}: 비밀값 패턴 — «${leak[1].slice(0, 20)}…»`);
 }
 say(fs.existsSync(path.join(ROOT, 'app.css')), 'app.css 존재');
-say(/app\.css\?v=/.test(html) && /js\/app\.js\?v=/.test(html) && /js\/viz\.js\?v=/.test(html), 'index.html 이 app.css · js/viz.js · js/app.js 를 ?v=APP_VER 로 로드');
-say(!/^\s*var APP_VER=/m.test(jsAll), 'APP_VER 정의는 index.html head 한 곳뿐');
+const bootSrc = fs.existsSync(path.join(ROOT, 'js/boot.js')) ? fs.readFileSync(path.join(ROOT, 'js/boot.js'), 'utf8') : '';
+say(/^var APP_VER=/m.test(bootSrc) && !(/^\s*var APP_VER=/m.test(jsAll.replace(bootSrc, ''))), 'APP_VER 정의는 js/boot.js 한 곳뿐');
+// 선언 파일에는 즉시 실행 문장이 없어야 함(= init.js 로만) — 간단 휴리스틱: 파일 맨 왼쪽에서 시작하는 줄이 function/var/주석/닫는 괄호가 아니면 경고
+for (const f of JS_LIST) { if (f === 'js/init.js' || f === 'js/viz.js' || !fs.existsSync(path.join(ROOT, f))) continue; const lines = fs.readFileSync(path.join(ROOT, f), 'utf8').split('\n'); const bad = lines.filter((l) => /^[A-Za-z$_(\[]/.test(l) && !/^(function|async function|var|let|const)\b/.test(l)); if (bad.length) say(false, `${f}: 즉시 실행으로 보이는 최상위 줄 ${bad.length} — ${bad[0].slice(0, 60)}`); }
+// sw.js 의 SHELL 이 코드 파일을 전부 품는지
+const sw = fs.existsSync(path.join(ROOT, 'sw.js')) ? fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8') : '';
+say(JS_FILES.every((f) => sw.includes("'./" + f + "'")), 'sw.js SHELL 에 코드 파일 전부 포함');
+// 중복 최상위 선언(함수가 두 파일에 있으면 나중 것이 덮어씀) 검사
+{ const seen = new Map(), dup = []; for (const f of JS_LIST) { if (!fs.existsSync(path.join(ROOT, f))) continue; const src = fs.readFileSync(path.join(ROOT, f), 'utf8'); for (const m of src.matchAll(/^(?:async\s+)?function\s+([A-Za-z_$][\w$]*)/gm)) { if (seen.has(m[1])) dup.push(m[1] + '(' + seen.get(m[1]) + '·' + f + ')'); seen.set(m[1], f); } } say(!dup.length, `최상위 함수 이름 중복 없음${dup.length ? ' — ' + dup.slice(0, 5).join(', ') : ''}`); }
 const idx = html + jsAll;
 // Supabase 함수 소스가 저장소에 있으면 비밀값 검사만 (deno 는 CI 에 없을 수 있음)
 const fnDir = path.join(ROOT, 'supabase', 'functions');

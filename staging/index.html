@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<!-- CSP (80점 프로젝트 ② 보안): GitHub Pages 는 응답 헤더를 못 넣으므로 meta 로. 인라인 코드·onclick 때문에 'unsafe-inline', alasql(new Function) 때문에 'unsafe-eval' 이 필요 — 대신 스크립트·연결 호스트를 목록으로 제한(XSS 시 외부 유출 차단). Worker 주소나 GAS 주소가 바뀌면 여기도 수정. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' data: https://cdn.jsdelivr.net; img-src 'self' data: blob: https://amzbrdhkvzsyxjfjtugu.supabase.co; connect-src 'self' https://amzbrdhkvzsyxjfjtugu.supabase.co https://open.er-api.com https://api.frankfurter.app https://script.google.com/macros/s/AKfycbz0PDzgvgtM0ZZHEfMwEzPpgoPYidD6ElPx3oTGsgnVuveCnVA9PmYPB4WAPfr9a6DY/ https://script.googleusercontent.com https://aged-union-cdd3.choihw.workers.dev https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; worker-src 'self' blob:; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
+<!-- CSP (80점 프로젝트 ② 보안): GitHub Pages 는 응답 헤더를 못 넣으므로 meta 로. ㊿+136 부터 인라인 스크립트·onclick 이 없어 script-src 에 'unsafe-inline' 없음(스타일은 인라인 style 속성 때문에 유지) · alasql(new Function) 때문에 'unsafe-eval' 은 필요 — 대신 스크립트·연결 호스트를 목록으로 제한(XSS 시 외부 유출 차단). Worker 주소나 GAS 주소가 바뀌면 여기도 수정. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' blob: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' data: https://cdn.jsdelivr.net; img-src 'self' data: blob: https://amzbrdhkvzsyxjfjtugu.supabase.co; connect-src 'self' https://amzbrdhkvzsyxjfjtugu.supabase.co https://open.er-api.com https://api.frankfurter.app https://script.google.com/macros/s/AKfycbz0PDzgvgtM0ZZHEfMwEzPpgoPYidD6ElPx3oTGsgnVuveCnVA9PmYPB4WAPfr9a6DY/ https://script.googleusercontent.com https://aged-union-cdd3.choihw.workers.dev https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; worker-src 'self' blob:; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
 <title>서비스사업부 통합 관리 포탈</title>
 <!-- PWA: 홈 화면 앱 (manifest.webmanifest · sw.js · pwa-*.png · apple-touch-icon.png 를 같은 폴더에) -->
 <link rel="manifest" href="manifest.webmanifest">
@@ -16,12 +16,12 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23149e40'/%3E%3Cg fill='%23fff'%3E%3Crect x='14' y='32' width='9' height='18' rx='2'/%3E%3Crect x='27.5' y='22' width='9' height='28' rx='2'/%3E%3Crect x='41' y='14' width='9' height='36' rx='2'/%3E%3C/g%3E%3C/svg%3E">
-<script>
-/* 포탈 버전 — 파일을 바꿔 올릴 때마다 여기 숫자가 +1 (화면 맨 아래 표시 · app.css / js/*.js 의 ?v= 캐시 무효화 · 배포·운영이 이 값을 읽어 비교)
-   ④ 아키텍처(㊿+134): CSS 는 app.css, 코드는 js/viz.js + js/app.js 로 분리. 같은 버전 문자열로 불러와 HTML·CSS·JS 가 항상 짝이 맞음(GitHub Pages 10분 캐시 무관) */
-var APP_VER='2026-09-16 ㊿+135';
-document.write('<link rel="stylesheet" href="app.css?v='+encodeURIComponent(APP_VER)+'">');
-</script>
+<!-- 포탈 버전 — 파일을 바꿔 올릴 때마다 아래 content 의 숫자가 +1 (화면 맨 아래 표시 · app.css / js/*.js 의 ?v= 캐시 무효화 · 배포·운영이 이 값을 읽어 비교).
+     코드 파일 목록은 app-js (js/load.js 가 이 순서로 불러옴 · 마지막은 항상 js/init.js) — 파일을 더하거나 빼면 여기와 sw.js 의 SHELL 을 함께 고칠 것.
+     ④ 아키텍처 2단계(㊿+136): 인라인 스크립트·onclick 을 전부 없애 CSP script-src 에서 'unsafe-inline' 제거. -->
+<meta name="app-ver" content="2026-09-16 ㊿+136">
+<meta name="app-js" content="js/viz.js,js/core.js,js/shell.js,js/dash.js,js/ai.js,js/grids.js,js/equipment.js,js/analysis.js,js/tools.js,js/price.js,js/inbound.js,js/admin.js,js/sales.js,js/report.js,js/grid.js,js/edit.js,js/init.js">
+<script src="js/boot.js"></script>
 </head>
 <body>
 
@@ -36,7 +36,7 @@ document.write('<link rel="stylesheet" href="app.css?v='+encodeURIComponent(APP_
     </div>
     <div class="card" style="padding:26px 26px 22px;border-radius:16px;box-shadow:0 12px 34px rgba(0,0,0,.08)">
       <!-- form 으로 감싸고 name 을 붙여야 브라우저 비밀번호 관리자가 «아이디+비밀번호»를 한 쌍으로 저장·자동 완성합니다 (전에는 비밀번호만 채워지고 아이디가 비는 일이 있었음) -->
-      <form id="lsLogin" autocomplete="on" onsubmit="return false" style="margin:0">
+      <form id="lsLogin" autocomplete="on" style="margin:0">
         <label for="lsEmail" style="display:block;font-size:12px;font-weight:650;color:var(--ink-2);margin-bottom:6px">이메일</label>
         <input id="lsEmail" name="username" type="email" autocomplete="username" placeholder="name@genians.com" spellcheck="false" autocapitalize="off"
                style="width:100%;height:42px;padding:0 13px;border-radius:10px;border:1px solid var(--ring);background:var(--surface-2);font-size:14px;margin-bottom:14px">
@@ -412,7 +412,7 @@ document.write('<link rel="stylesheet" href="app.css?v='+encodeURIComponent(APP_
     <section class="card c12" style="padding:10px">
       <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px 10px">
         <div style="font-size:13px;font-weight:650">📄 견적·발주 시스템 <span class="ubadge sm won">₩ 금액은 원 단위</span> <span class="mini" style="color:var(--muted);font-weight:400;margin-left:6px">기업용 견적 · 공공용 견적 · 발주서</span></div>
-        <a href="quote.html" target="_blank" class="pill ghost" style="text-decoration:none" onclick="this.href='quote.html?v='+encodeURIComponent(APP_VER)">↗ 새 창에서 열기</a>
+        <a href="quote.html" target="_blank" class="pill ghost" style="text-decoration:none" data-sat="quote.html">↗ 새 창에서 열기</a>
       </div>
       <iframe id="quoteFrame" title="견적 시스템"
         style="width:100%;height:calc(100vh - 150px);border:0;border-radius:10px;background:#f9f9f7"></iframe>
@@ -423,7 +423,7 @@ document.write('<link rel="stylesheet" href="app.css?v='+encodeURIComponent(APP_
     <section class="card c12" style="padding:10px">
       <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px 10px">
         <div style="font-size:13px;font-weight:650">📑 프로젝트 리포트 <span class="ubadge sm won">₩ 금액은 원 단위</span> <span class="mini" style="color:var(--muted);font-weight:400;margin-left:6px">계약을 고르면 PROJECT REPORT 양식이 자동으로 채워집니다 · 저장 · PDF 발행</span></div>
-        <a href="report.html" target="_blank" class="pill ghost" style="text-decoration:none" onclick="this.href='report.html?v='+encodeURIComponent(APP_VER)">↗ 새 창에서 열기</a>
+        <a href="report.html" target="_blank" class="pill ghost" style="text-decoration:none" data-sat="report.html">↗ 새 창에서 열기</a>
       </div>
       <iframe id="preportFrame" title="프로젝트 리포트"
         style="width:100%;height:calc(100vh - 150px);border:0;border-radius:10px;background:#f9f9f7"></iframe>
@@ -434,7 +434,7 @@ document.write('<link rel="stylesheet" href="app.css?v='+encodeURIComponent(APP_
     <section class="card c12" style="padding:10px">
       <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px 10px">
         <div style="font-size:13px;font-weight:650">🏢 에스원 정산 <span class="ubadge sm won">₩ 금액은 원 단위</span> <span class="mini" style="color:var(--muted);font-weight:400;margin-left:6px">에스원 대금지급 리스트 + 비즈포탈 엑셀 → 등록번호 매칭 · 건수 · 설치비 · 프로젝트 리포트</span></div>
-        <a href="s1.html" target="_blank" class="pill ghost" style="text-decoration:none" onclick="this.href='s1.html?v='+encodeURIComponent(APP_VER)">↗ 새 창에서 열기</a>
+        <a href="s1.html" target="_blank" class="pill ghost" style="text-decoration:none" data-sat="s1.html">↗ 새 창에서 열기</a>
       </div>
       <iframe id="s1Frame" title="에스원 정산"
         style="width:100%;height:calc(100vh - 150px);border:0;border-radius:10px;background:#f9f9f7"></iframe>
@@ -445,7 +445,7 @@ document.write('<link rel="stylesheet" href="app.css?v='+encodeURIComponent(APP_
     <section class="card c12" style="padding:10px">
       <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px 10px">
         <div style="font-size:13px;font-weight:650">☁️ 카카오 정산 <span class="ubadge sm won">₩ 금액은 원 단위</span> <span class="mini" style="color:var(--muted);font-weight:400;margin-left:6px">정산 안내 메일(PDF) → SSL VPN 리스트 · 비즈포탈 대조 · 프로젝트 리포트</span></div>
-        <a href="kk.html" target="_blank" class="pill ghost" style="text-decoration:none" onclick="this.href='kk.html?v='+encodeURIComponent(APP_VER)">↗ 새 창에서 열기</a>
+        <a href="kk.html" target="_blank" class="pill ghost" style="text-decoration:none" data-sat="kk.html">↗ 새 창에서 열기</a>
       </div>
       <iframe id="kkFrame" title="카카오 정산"
         style="width:100%;height:calc(100vh - 150px);border:0;border-radius:10px;background:#f9f9f7"></iframe>
@@ -799,7 +799,7 @@ document.write('<link rel="stylesheet" href="app.css?v='+encodeURIComponent(APP_
     <div id="chvHBody"></div>
     <div class="mact">
       <span class="mmsg"></span>
-      <button class="pill ghost" onclick="closeOvl('ovlChvHist')">닫기</button>
+      <button class="pill ghost" data-close="ovlChvHist">닫기</button>
     </div>
   </div>
 </div>
@@ -812,7 +812,7 @@ document.write('<link rel="stylesheet" href="app.css?v='+encodeURIComponent(APP_
     <p class="cap" id="rnCap" style="margin:0 0 10px"></p>
     <div class="mtabs" id="rnTabs" style="margin-bottom:10px"></div>
     <div id="rnList" style="max-height:58vh;overflow:auto"></div>
-    <div class="mact"><span class="mmsg" id="rnMsg"></span><button class="pill ghost" id="rnSlack" style="display:none" title="지금 보고 있는 탭의 목록만 슬랙 팀 채널로 보냅니다 (미리보기 후 확인)">📣 이 탭 슬랙으로</button><button class="pill ghost" id="rnSlackAll" style="display:none" title="세 구역(이달 만기 · 다음 달 만기 · 미처리) 전부 — 매월 25일 자동 알림과 같은 내용">📣 전체</button><button class="pill ghost" id="rnXls">⬇ 엑셀</button><button class="pill ghost" onclick="closeOvl('ovlRenew')">닫기</button></div>
+    <div class="mact"><span class="mmsg" id="rnMsg"></span><button class="pill ghost" id="rnSlack" style="display:none" title="지금 보고 있는 탭의 목록만 슬랙 팀 채널로 보냅니다 (미리보기 후 확인)">📣 이 탭 슬랙으로</button><button class="pill ghost" id="rnSlackAll" style="display:none" title="세 구역(이달 만기 · 다음 달 만기 · 미처리) 전부 — 매월 25일 자동 알림과 같은 내용">📣 전체</button><button class="pill ghost" id="rnXls">⬇ 엑셀</button><button class="pill ghost" data-close="ovlRenew">닫기</button></div>
   </div>
 </div>
 
@@ -821,7 +821,7 @@ document.write('<link rel="stylesheet" href="app.css?v='+encodeURIComponent(APP_
     <h3 id="crTitle">내역</h3>
     <p class="cap" id="crCap" style="margin:0 0 12px"></p>
     <div id="crList" style="max-height:62vh;overflow:auto"></div>
-    <div class="mact"><span class="mmsg"></span><button class="pill ghost" id="crXls">⬇ 엑셀</button><button class="pill ghost" onclick="closeOvl('ovlCr')">닫기</button></div>
+    <div class="mact"><span class="mmsg"></span><button class="pill ghost" id="crXls">⬇ 엑셀</button><button class="pill ghost" data-close="ovlCr">닫기</button></div>
   </div>
 </div>
 
@@ -840,7 +840,7 @@ document.write('<link rel="stylesheet" href="app.css?v='+encodeURIComponent(APP_
     <h3 id="c360Title">고객 360</h3>
     <p class="cap" id="c360Cap" style="margin:0 0 12px"></p>
     <div id="c360Body" style="max-height:64vh;overflow:auto"></div>
-    <div class="mact"><span class="mmsg"></span><button class="pill ghost" onclick="closeOvl('ovlC360')">닫기</button></div>
+    <div class="mact"><span class="mmsg"></span><button class="pill ghost" data-close="ovlC360">닫기</button></div>
   </div>
 </div>
 
@@ -854,7 +854,7 @@ document.write('<link rel="stylesheet" href="app.css?v='+encodeURIComponent(APP_
     <div id="pastePrev" class="cap" style="margin-top:8px"></div>
     <div class="mact">
       <span class="mmsg" id="pasteMsg"></span>
-      <button class="pill ghost" onclick="closeOvl('ovlPaste')">취소</button>
+      <button class="pill ghost" data-close="ovlPaste">취소</button>
       <button class="pill" id="pasteGo">저장</button>
     </div>
   </div>
@@ -870,7 +870,7 @@ document.write('<link rel="stylesheet" href="app.css?v='+encodeURIComponent(APP_
     <div class="mact">
       <span class="mmsg"></span>
       <button class="pill ghost" id="mcReset">기본값 복원</button>
-      <button class="pill ghost" onclick="closeOvl('ovlMenu')">취소</button>
+      <button class="pill ghost" data-close="ovlMenu">취소</button>
       <button class="pill" id="mcSave">저장</button>
     </div>
   </div>
@@ -891,7 +891,7 @@ document.write('<link rel="stylesheet" href="app.css?v='+encodeURIComponent(APP_
     <textarea id="pnJson" style="width:100%;min-height:180px;border:1px solid var(--ring);border-radius:10px;background:var(--surface-2);color:var(--ink);padding:10px;font-family:monospace;font-size:11.5px" placeholder='{"cnac":{...},"services":[...]} 또는 {"ztna":{...},"nac":{...}}'></textarea>
     <div class="mact">
       <span class="mmsg" id="pnMsg"></span>
-      <button class="pill ghost" onclick="closeOvl('ovlPrNew')">취소</button>
+      <button class="pill ghost" data-close="ovlPrNew">취소</button>
       <button class="pill" id="pnSave">등록</button>
     </div>
   </div>
@@ -914,7 +914,7 @@ document.write('<link rel="stylesheet" href="app.css?v='+encodeURIComponent(APP_
     </div>
     <div class="mact">
       <span class="mmsg" id="erMsg"></span>
-      <button class="pill ghost" onclick="closeOvl('ovlEqRet')">취소</button>
+      <button class="pill ghost" data-close="ovlEqRet">취소</button>
       <button class="pill" id="erSave">저장</button>
     </div>
   </div>
@@ -926,7 +926,7 @@ document.write('<link rel="stylesheet" href="app.css?v='+encodeURIComponent(APP_
     <div id="inbDBody"></div>
     <div class="mact">
       <span class="mmsg"></span>
-      <button class="pill ghost" onclick="closeOvl('ovlInb')">닫기</button>
+      <button class="pill ghost" data-close="ovlInb">닫기</button>
     </div>
   </div>
 </div>
@@ -944,7 +944,7 @@ document.write('<link rel="stylesheet" href="app.css?v='+encodeURIComponent(APP_
     <div class="mact">
       <span class="mmsg" id="qpMsg"></span>
       <button class="pill ghost" id="qpUnlink" style="display:none;border-color:var(--critical);color:var(--critical)">연결 해제</button>
-      <button class="pill ghost" id="qpClose" onclick="closeOvl('ovlQuote')">닫기</button>
+      <button class="pill ghost" id="qpClose" data-close="ovlQuote">닫기</button>
       <button class="btn" style="height:36px;display:none" id="qpGo">확인</button>
     </div>
   </div>
@@ -977,7 +977,7 @@ document.write('<link rel="stylesheet" href="app.css?v='+encodeURIComponent(APP_
     <div class="mact">
       <span class="mmsg" id="auMsg"></span>
       <button class="pill ghost" id="auLogout" style="display:none;border-color:var(--critical);color:var(--critical)">로그아웃</button>
-      <button class="pill ghost" id="auClose" onclick="closeOvl('ovlAuth')">닫기</button>
+      <button class="pill ghost" id="auClose" data-close="ovlAuth">닫기</button>
       <button class="btn" style="height:36px" id="auGo">로그인</button>
     </div>
   </div>
@@ -996,7 +996,7 @@ document.write('<link rel="stylesheet" href="app.css?v='+encodeURIComponent(APP_
     <div class="tbl-wrap" style="max-height:220px"><table id="dtLog"></table></div>
     <div class="mact">
       <span class="mmsg"></span>
-      <button class="pill ghost" onclick="closeOvl('ovlDetail')">닫기</button>
+      <button class="pill ghost" data-close="ovlDetail">닫기</button>
     </div>
   </div>
 </div>
@@ -1126,15 +1126,12 @@ document.write('<link rel="stylesheet" href="app.css?v='+encodeURIComponent(APP_
 
     <div class="mact">
       <span class="mmsg" id="eMsg"></span>
-      <button class="pill ghost" onclick="OI_CONVERT=null;closeOvl('ovlEdit')">닫기</button>
+      <button class="pill ghost" data-close="ovlEdit" data-pre="oiconv">닫기</button>
       <button class="btn" style="height:36px" id="eGo">저장</button>
     </div>
   </div>
 </div>
 
-<script>
-/* 코드 로드 — js/viz.js(차트) → js/app.js(포탈 본체) 순서, 버전 질의로 캐시 무효화. document.write 라 예전처럼 순서대로 동기 실행됩니다 */
-document.write('<script src="js/viz.js?v='+encodeURIComponent(APP_VER)+'"><\/script><script src="js/app.js?v='+encodeURIComponent(APP_VER)+'"><\/script>');
-</script>
+<script src="js/load.js"></script>
 </body>
 </html>

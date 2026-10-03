@@ -1,0 +1,1597 @@
+/* ===== analysis.js — AI 지식 · 데이터 점검 · 유입경로 분석 · 월 목표 · 임대 장비 운영 보드 · 사업 영역 화면 =====
+   포탈 본체(js/app.js)를 ④ 아키텍처 2단계(㊿+136)에서 기능별로 나눈 파일. 전역 var/function 그대로 — 즉시 실행 문장은 전부 js/init.js 에.
+   로드 순서는 index.html <meta name="app-js"> (js/load.js 가 그 순서대로 ?v=APP_VER 를 붙여 불러옴) */
+
+/* ===== AI 지식 — 사람이 AI 에게 가르치는 사실·규칙·용어 (ai_knowledge · active 인 행은 매 질문의 시스템 프롬프트에 들어감) ===== */
+/* ===== 데이터 점검 (80점 프로젝트 ③ 데이터 정합성 · ㊿+133) — 메모리 데이터(DATA/RAWX)로 규칙을 돌려 어긋난 행 + 바로가기 =====
+   · 규칙 추가는 dcRules() 에 rule(id, sev, 제목, 설명, items[{label,sub,go,key}], 화면이름) 한 줄. sev: crit(바로 고침) · warn(확인) · info(참고)
+   · DB 쪽 제약(공백·목록 값 정규화 · 시리얼 UNIQUE · FK)은 SQL 90 — 이 화면은 그 전후로 «지금 어긋난 것»을 보여주는 용도 */
+var DC={open:{}, sev:''};
+function dcRules(){
+  var rows=(window.DATA&&DATA.rows)||[], T=(window.DATA&&DATA.nowIdx)||0, R=window.RAWX||{}, out=[];
+  function rule(id, sev, title, why, items, go){ out.push({id:id, sev:sev, title:title, why:why, items:items||[], go:go||''}); }
+  var goGrid=function(view,q){ return function(){ switchView(view); var e=document.getElementById('dvSearch'); if(e){ e.value=q||''; } try{ renderGrid(); }catch(x){} }; };
+  var term=function(r){ return /해지|서비스종료|종료|통합과금|CN전환/.test(String(r.status||'').replace(/\s/g,'')); };
+  var ci=function(r){ return {label:r.cust+' — '+lline(r.line), sub:(r.status||'상태 없음')+' · '+(r.startRaw!=null? mk(r.startRaw):'?')+' ~ '+(r.endRaw!=null? mk(r.endRaw):'진행')+' · #'+r._id, go:goGrid('contracts', r.cust==='?'? '':r.cust), key:r._id}; };
+  var ids={}; rows.forEach(function(r){ ids[r._id]=1; });
+  /* ── 계약 ── */
+  rule('c_nocust','crit','고객사 연결 없음','계약의 customer_id 가 고객사 표에 없음 — 화면에 «?» 로 나오고 LIVE·고객 360 에서 빠집니다. 고객사를 다시 지정하거나 계약을 삭제하세요.',
+    rows.filter(function(r){ return r.cust==='?' || !r.cid; }).map(ci), '계약 관리');
+  rule('c_parent','crit','부속 계약의 원계약이 없음','parent_contract_id 가 가리키는 계약이 없음(삭제됨) — 이 금액은 어느 원계약에도 합쳐지지 않습니다.',
+    rows.filter(function(r){ return r.parent && !ids[r.parent]; }).map(ci), '계약 관리');
+  rule('c_dates','crit','종료월이 시작월보다 앞섬','start_month > end_month — 기간·LIVE 판정이 틀어집니다.',
+    rows.filter(function(r){ return r.startRaw!=null && r.endRaw!=null && r.endRaw<r.startRaw; }).map(ci), '계약 관리');
+  var RS=null; try{ RS=renewScan(T); }catch(e){}
+  rule('c_lapsed','crit','만기 지났는데 미처리','종료월이 지났는데 연장·해지·종료 처리가 없음 — 이미 LIVE 에서 빠져 있습니다.',
+    (RS? RS.lapsed:[]).map(function(r){ var it=ci(r); it.go=function(){ openRenewList('lapsed'); }; return it; }), '홈 › 만기 처리');
+  var bad=[]; rows.forEach(function(r){ var w=[];
+    if(r.status && CSTATUS_OPTS.indexOf(r.status)<0) w.push('상태 «'+r.status+'»');
+    if(r.ctype && CTYPE_OPTS.indexOf(r.ctype)<0) w.push('계약유형 «'+r.ctype+'»');
+    if(r.channel && CH_OPTS.indexOf(r.channel)<0) w.push('채널 «'+r.channel+'»');
+    if(r.line && LINE_OPTS.indexOf(r.line)<0) w.push('서비스 «'+r.line+'»');
+    if(r.lead && LEAD_OPTS.indexOf(r.lead)<0) w.push('유입경로 «'+r.lead+'»');
+    if(r.liveOv && ['포함','제외'].indexOf(r.liveOv)<0) w.push('LIVE 예외 «'+r.liveOv+'»');
+    if(w.length){ var it=ci(r); it.sub=w.join(' · '); bad.push(it); } });
+  rule('c_vocab','warn','선택 목록에 없는 값','상태·계약유형·채널·서비스·유입경로·LIVE 예외가 목록에 없는 값(띄어쓰기·오타)이면 필터·집계·만기 판정에서 빠집니다. 표에서 목록 값으로 고르세요 — SQL 90 이 앞뒤 공백·대소문자·흔한 변형은 자동으로 정리합니다.', bad, '계약 관리');
+  rule('c_rev_after_end','warn','해지·종료 뒤에도 월 매출이 있음','상태가 해지·서비스종료인데 종료월 뒤 달에 monthly_revenue 가 남아 있음 — MRR·연 매출이 부풀려집니다. (만기 처리 창의 해지/서비스종료는 뒤 매출을 지우므로 예전 수기 처리분일 가능성)',
+    rows.filter(function(r){ return /해지|서비스종료|종료/.test(String(r.status||'').replace(/\s/g,'')) && r.endRaw!=null && r.dataLast!=null && r.dataLast>r.endRaw; }).map(function(r){ var it=ci(r); it.sub+=' · 마지막 매출 '+mk(r.dataLast); return it; }), '계약 관리');
+  rule('c_noend','warn','종료월 없음 (자동연장 아님)','진행 중 원계약인데 종료월이 비어 있고 자동연장 표시도 없음 — 만기 알림·LIVE 증감이 이 계약을 못 봅니다. 종료월을 넣거나 «자동연장»을 켜세요.',
+    rows.filter(function(r){ return liveRoot(r) && r.endRaw==null && !r.autoRenew && r.liveOv!=='제외' && !term(r); }).map(ci), '계약 관리');
+  rule('c_s1no','warn','에스원 계약인데 계약번호 없음','채널이 에스원(또는 S1 서비스)인 LIVE 계약에 s1_no 가 비어 있음 — 정산 자동 대조(에스원 정산)·만기 슬랙에 번호가 안 나옵니다.',
+    rows.filter(function(r){ return liveActiveAt(r,T) && (String(r.channel||'')==='에스원' || /^(S1|MDR_S1)$/.test(String(r.line||''))) && !r.s1no; }).map(ci), '계약 관리');
+  rule('c_live_zero','info','LIVE 인데 이달 매출 0','LIVE 로 집계되는 원계약인데 이달 monthly_revenue 가 없음 — 연납·일시납이면 정상, 월납이면 입력 누락.',
+    rows.filter(function(r,k){ return liveActiveAt(r,T) && !(MAT[k]&&MAT[k][T]) && !/일시납|연납|반년납|분기납/.test(String(r.billing||'')); }).map(function(r){ var it=ci(r); it.sub+=' · 과금 '+(r.billing||'미지정'); return it; }), '계약 관리');
+  rule('c_mrr','info','MRR 과 이달 월 매출이 다름','계약의 mrr 과 이달 monthly_revenue 가 1% 넘게 다름 — 재약정 뒤 mrr 을 안 고쳤거나 월 매출 입력 오류.',
+    rows.map(function(r,k){ return {r:r,k:k}; }).filter(function(x){ var v=(MAT[x.k]&&MAT[x.k][T])||0; return x.r.mrr>0 && v>0 && Math.abs(v-x.r.mrr)/x.r.mrr>0.01; }).map(function(x){ var it=ci(x.r); it.sub='mrr '+won(x.r.mrr)+' vs 이달 '+won(MAT[x.k][T])+' 천원'; return it; }), '계약 관리');
+  rule('c_cloud_meta','info','Cloud 계약의 버전·노드수 미입력','Cloud NAC 원계약인데 Ver. 또는 노드수가 비어 있음 — 6.0 전환율·노드 기준 분석에서 빠집니다.',
+    rows.filter(function(r){ return r.line==='Cloud' && liveActiveAt(r,T) && (!r.ver || !r.qty); }).map(function(r){ var it=ci(r); it.sub='Ver '+(r.ver||'—')+' · 노드 '+(r.qty||'—'); return it; }), '계약 관리');
+  rule('c_lead','info','유입경로 미지정','LIVE 원계약인데 유입경로가 비어 있음 — 유입경로 분석에서 «미지정»으로 묶입니다.',
+    rows.filter(function(r){ return liveActiveAt(r,T) && !r.parent && !r.lead; }).map(ci), '유입경로 분석');
+  /* ── 고객사 ── */
+  var byKey={}; (R.customers||[]).forEach(function(c){ var k=(nmKeys(c.name)||[])[0]; if(!k) return; (byKey[k]=byKey[k]||[]).push(c); });
+  var dup=[]; Object.keys(byKey).forEach(function(k){ var l=byKey[k]; if(l.length>1) dup.push({label:l.map(function(c){ return c.name; }).join(' ≈ '), sub:'id '+l.map(function(c){ return c.id; }).join(', ')+' — 같은 회사면 고객 360 에서 이름 변경/병합하고 다른 표기는 별칭으로', go:function(){ openCust360(l[0].name); }, key:k}); });
+  rule('cu_dup','warn','고객사 이름 중복 의심','정규화한 이름(㈜·공백·괄호 무시)이 같은 고객사가 2개 이상 — LIVE 고객사 수·고객 360 이 갈라집니다.', dup, '고객 360');
+  /* ── 장비 ── */
+  var sm={}; (R.assets||[]).forEach(function(a){ var sn=String(a.serial||'').trim().toUpperCase(); if(!sn||eqIsPh(sn)) return; (sm[sn]=sm[sn]||[]).push(a); });
+  var sdup=[]; Object.keys(sm).forEach(function(sn){ if(sm[sn].length>1) sdup.push({label:sn+' × '+sm[sn].length, sub:sm[sn].map(function(a){ return (a.customer||'?')+'/'+(a.status||'')+'/#'+a.id; }).join(' · '), go:goGrid('assets', sn), key:sn}); });
+  rule('eq_serial_dup','crit','장비 현황에 같은 시리얼이 여러 행','equipment_assets 에 시리얼이 중복 — 임대중 수·회수 처리가 두 번 셉니다. SQL 90 이 최근 행만 남기고 UNIQUE 인덱스를 만듭니다.', sdup, '임대 장비 현황');
+  var es=null; try{ es=eqScan(); }catch(e){}
+  rule('eq_gap','warn','신청 ↔ 현황 불일치','신청 내역과 장비 현황이 어긋남(수량·시리얼·상태) — 신청 내역 › 「신청 ↔ 현황 대조」에서 맞추기.',
+    (es? es.gap:[]).map(function(g){ return {label:(g.o.customer||'?')+' — '+(g.o.model||'')+' × '+(g.o.qty||1), sub:g.why, go:goGrid('orders', g.o.customer), key:g.o.id}; }), '임대 장비 신청 내역');
+  rule('eq_orphan','warn','신청 없이 임대중인 장비','현황에 임대중인데 어떤 신청에도 연결되지 않음(수기 입력) — 신청을 만들어 연결하거나 상태를 고치세요.',
+    (es? es.orphan:[]).map(function(a){ return {label:(a.serial||'?')+' · '+(a.model||''), sub:(a.customer||'?')+' · '+(a.channel||''), go:goGrid('assets', a.serial), key:a.id}; }), '임대 장비 현황');
+  rule('eq_noserial','info','설치완료인데 시리얼 없음','상태가 설치완료/회수예정인데 시리얼이 비어 있음(임시 «미등록-» 시리얼로만 현황에 있음) — 실제 시리얼을 넣으세요.',
+    (R.orders||[]).filter(function(o){ return /설치완료|회수예정/.test(String(o.status||'')) && !eqSerials(o).length; }).map(function(o){ return {label:(o.customer||'?')+' — '+(o.model||'')+' × '+(o.qty||1), sub:(o.status||'')+' · 설치 '+(o.install_date||'—'), go:goGrid('orders', o.customer), key:o.id}; }), '임대 장비 신청 내역');
+  var OST=['접수','출하요청','배송중','설치완료','회수예정','회수완료','취소'], OCH=['에스원','LGU+','조달','일반','기타'];
+  rule('eq_vocab','warn','장비 신청의 상태·채널 값이 목록에 없음','상태 보드·대시보드가 이 값을 못 받아 카드가 사라집니다.',
+    (R.orders||[]).filter(function(o){ return (o.status && OST.indexOf(o.status)<0) || (o.channel && OCH.indexOf(o.channel)<0); }).map(function(o){ return {label:(o.customer||'?')+' — '+(o.model||''), sub:'상태 «'+(o.status||'')+'» · 채널 «'+(o.channel||'')+'»', go:goGrid('orders', o.customer), key:o.id}; }), '임대 장비 신청 내역');
+  /* ── OI ── */
+  var nowYm=mk(T);
+  rule('oi_overdue','info','예정 월이 지난 진행 중 OI','등록·진행 단계인데 예상 시기가 이미 지남 — 단계를 바꾸거나 예상 시기를 미루세요.',
+    (R.oi||[]).filter(function(o){ return /등록|진행/.test(String(o.stage||'')) && o.expect_month && String(o.expect_month).slice(0,7)<nowYm; }).map(function(o){ return {label:(o.customer||'?')+' — '+(o.deal_name||''), sub:(o.stage||'')+' · 예정 '+String(o.expect_month).slice(0,7)+' · '+(o.owner||''), go:goGrid('oi', o.customer), key:o.id}; }), 'OI 현황');
+  return out;
+}
+var DC_SEV={crit:['🔴','바로 고쳐야 함','var(--critical,#d03b3b)'], warn:['🟠','확인 필요','#8a5200'], info:['🔵','참고','var(--muted)']};
+function dcSummary(){ var rules=dcRules(), o={crit:0,warn:0,info:0,items:{}}; rules.forEach(function(r){ if(r.items.length){ o[r.sev]+=r.items.length; o.items[r.title]=r.items.length; } }); return o; }
+function renderDataCheck(){
+  var tw=$('#dvTable').parentElement; tw.style.display='none';
+  var host=bizHostEl(); host.style.display='';
+  if(!window.DATA || !DATA.rows){ host.innerHTML='<div class="cap" style="padding:30px;text-align:center">데이터가 아직 없습니다</div>'; return; }
+  var t0=Date.now(), rules=dcRules(), ms=Date.now()-t0; DC._rules=rules;
+  var n={crit:0,warn:0,info:0}, cnt={crit:0,warn:0,info:0}, items=0;
+  rules.forEach(function(r){ if(r.items.length){ n[r.sev]++; cnt[r.sev]+=r.items.length; items+=r.items.length; } });
+  var h='<div class="dbar" style="margin-bottom:12px;flex-wrap:wrap;gap:8px;align-items:center">'+
+    '<span class="mini">규칙 '+rules.length+'개 · 어긋난 항목 <b>'+items+'</b>건 · '+ms+'ms · 데이터 '+esc(DATA.generatedAt||'')+' 기준</span>'+
+    '<span class="mtabs" style="margin:0" id="dcSev">'+[['','전체'],['crit','🔴 '+cnt.crit],['warn','🟠 '+cnt.warn],['info','🔵 '+cnt.info]].map(function(t){ return '<button type="button" data-s="'+t[0]+'" aria-pressed="'+(DC.sev===t[0])+'">'+t[1]+'</button>'; }).join('')+'</span>'+
+    '<span style="flex:1"></span><button type="button" class="pill ghost" id="dcXlsx">엑셀</button><button type="button" class="pill ghost" id="dcRefresh">↻ 다시 점검</button></div>';
+  h+='<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:14px">'+['crit','warn','info'].map(function(sv){ return '<div class="card" style="padding:12px 14px"><div class="mini">'+DC_SEV[sv][0]+' '+DC_SEV[sv][1]+'</div><div style="font-size:22px;font-weight:800;color:'+DC_SEV[sv][2]+'">'+cnt[sv]+'<span class="mini" style="font-weight:400"> 건 · 규칙 '+n[sv]+'개</span></div></div>'; }).join('')+'</div>';
+  var ord={crit:0,warn:1,info:2};
+  var list=rules.filter(function(r){ return !DC.sev || r.sev===DC.sev; }).sort(function(a,b){ return (ord[a.sev]-ord[b.sev]) || (b.items.length-a.items.length); });
+  h+=list.map(function(r){ var open=!!DC.open[r.id], ok=!r.items.length;
+    return '<div class="card dc-rule" data-sev="'+r.sev+'" style="padding:12px 14px;margin-bottom:8px'+(ok? ';opacity:.7':'')+'">'+
+      '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;cursor:'+(ok? 'default':'pointer')+'" data-dc="'+r.id+'">'+
+        '<span>'+(ok? '✅':DC_SEV[r.sev][0])+'</span><b style="font-size:13.5px">'+esc(r.title)+'</b>'+
+        '<span class="ctag'+(ok? ' ok':(r.sev==='warn'? ' warn':r.sev==='info'? ' info':' late'))+'">'+(ok? '이상 없음':r.items.length+'건')+'</span>'+
+        '<span class="mini" style="margin-left:auto">'+esc(r.go)+(ok? '':(open? ' ▴':' ▾'))+'</span></div>'+
+      '<div class="mini" style="margin:6px 0 0 26px;line-height:1.6">'+esc(r.why)+'</div>'+
+      (open&&!ok? '<table class="rn-tbl" style="margin:8px 0 0 26px;width:calc(100% - 26px)"><tbody>'+r.items.slice(0,60).map(function(it,i){ return '<tr><td><a href="#" data-dcgo="'+r.id+':'+i+'">'+esc(it.label)+'</a></td><td class="mini">'+esc(it.sub||'')+'</td></tr>'; }).join('')+(r.items.length>60? '<tr><td colspan="2" class="mini">… 외 '+(r.items.length-60)+'건 (엑셀로 전체)</td></tr>':'')+'</tbody></table>':'')+
+      '</div>'; }).join('');
+  host.innerHTML=h;
+  host.querySelectorAll('#dcSev button').forEach(function(b){ b.onclick=function(){ DC.sev=b.dataset.s; renderDataCheck(); }; });
+  host.querySelectorAll('[data-dc]').forEach(function(d){ d.onclick=function(){ var r=rules.filter(function(x){ return x.id===d.dataset.dc; })[0]; if(!r||!r.items.length) return; DC.open[r.id]=!DC.open[r.id]; renderDataCheck(); }; });
+  host.querySelectorAll('[data-dcgo]').forEach(function(a){ a.onclick=function(e){ e.preventDefault(); e.stopPropagation(); var p=a.dataset.dcgo.split(':'); var r=rules.filter(function(x){ return x.id===p[0]; })[0]; var it=r&&r.items[+p[1]]; if(it&&it.go) it.go(); }; });
+  host.querySelector('#dcRefresh').onclick=function(){ renderDataCheck(); };
+  host.querySelector('#dcXlsx').onclick=function(){ var out=[]; rules.forEach(function(r){ r.items.forEach(function(it){ out.push([DC_SEV[r.sev][1], r.title, it.label, it.sub||'', r.go]); }); }); if(!out.length){ toast('내보낼 항목이 없습니다','전부 이상 없음'); return; } xlsxAoa('데이터점검_'+new Date().toISOString().slice(0,10), ['심각도','규칙','항목','내용','고치는 화면'], out); };
+}
+/* ===== 유입경로 분석 (contracts.lead_src · SQL 80) — 유입경로별 매출 규모 ===== */
+var LEAD_FETCHED=null;   // 마지막으로 보강한 RAWX.contracts 배열 — 새로 불러오면(배열이 바뀌면) 다시 보강 (㊿+127: 예전엔 한 번만 받아 저장 뒤 새로고침에 값이 사라졌음)
+function ensureLeadSrc(cb){
+  var cts=RAWX.contracts||[];
+  if(!cts.length || LEAD_FETCHED===cts || cts.some(function(c){ return c.lead_src!==undefined && c.auto_renew!==undefined; })){ if(cb) cb(false); return; }
+  LEAD_FETCHED=cts;   // load_all() 이 열을 명시하는 옛 버전 → id·lead_src(·auto_renew) 만 한 번 더 읽어 합침. auto_renew 열이 아직 없으면(SQL 84 전) lead_src 만
+  sbTry('contracts?select=id,lead_src,auto_renew').then(function(rows){ return rows || sbTry('contracts?select=id,lead_src'); }).then(function(rows){
+    if(!rows){ if(cb) cb(false); return; }
+    var m={}, a={}; rows.forEach(function(r){ m[r.id]=r.lead_src||null; a[r.id]=!!r.auto_renew; });
+    cts.forEach(function(c){ c.lead_src=m[c.id]||null; c.auto_renew=!!a[c.id]; });
+    ((window.DATA&&DATA.rows)||[]).forEach(function(r){ r.lead=m[r._id]||''; r.autoRenew=!!a[r._id]; });
+    if(cb) cb(true);
+  });
+}
+var LS={base:null, line:'', pick:''};
+var LEAD_COLOR={'직접영업':'--s1','파트너영업':'--s3','인바운드':'--s2','프로모션':'--s4','기타':'--muted','미지정':'--axis'};
+function leadOf(r){ return r.lead||'미지정'; }
+function renderLeadSrc(){
+  var tw=$('#dvTable').parentElement; tw.style.display='none';
+  var host=bizHostEl(); host.style.display='';
+  if(!window.DATA || !DATA.rows || !DATA.rows.length){ host.innerHTML='<div class="cap" style="padding:30px;text-align:center">데이터가 아직 없습니다</div>'; return; }
+  if(LS.base==null || LS.base>=M) LS.base=STATE.base;
+  var b=LS.base, rows=DATA.rows, SRC=LEAD_OPTS.concat(['미지정']);
+  var y0=yOf(b), yStart=Math.max(0, b-((b-yOf0Idx(y0))||0));
+  function yOf0Idx(y){ var i=dIdx(y+'-01-01'); return i==null? 0 : Math.max(0,i); }
+  yStart=yOf0Idx(y0);
+  var m12=[]; for(var i=Math.max(0,b-11); i<=b; i++) m12.push(i);
+  /* 집계 */
+  var agg={}; SRC.forEach(function(k){ agg[k]={mrr:0, ytd:0, n:0, custs:{}, newN:0, byLine:{}, trend:m12.map(function(){ return 0; }), rows:[]}; });
+  var total=0, totYtd=0, lineSet={};
+  rows.forEach(function(r,k){
+    if(LS.line && r.line!==LS.line) return;
+    var src=leadOf(r), a=agg[src]||agg['미지정'], v=MAT[k][b]||0;
+    if(v){ a.mrr+=v; total+=v; a.n++; a.custs[r.cust]=1; a.byLine[r.line]=(a.byLine[r.line]||0)+v; lineSet[r.line]=1; a.rows.push({k:k, v:v}); }
+    for(var i=yStart;i<=b;i++){ var t=MAT[k][i]||0; a.ytd+=t; totYtd+=t; }
+    m12.forEach(function(mi,j){ a.trend[j]+=MAT[k][mi]||0; });
+    if(!r.parent && r.startIdx!=null && r.startIdx>=yStart && r.startIdx<=b) a.newN++;
+  });
+  var lines=LINE_OPTS.filter(function(l){ return lineSet[l]; }).concat(Object.keys(lineSet).filter(function(l){ return LINE_OPTS.indexOf(l)<0; }));
+  var order=SRC.slice().sort(function(x,y){ return (x==='미지정')-(y==='미지정') || agg[y].mrr-agg[x].mrr; });
+  var unassigned=agg['미지정'];
+  /* 헤더 컨트롤 */
+  var mopts=''; for(var i=0;i<M;i++) mopts+='<option value="'+i+'"'+(i===b?' selected':'')+'>'+esc(mk(i))+'</option>';
+  var h='<div class="dbar" style="margin-bottom:12px;flex-wrap:wrap;gap:8px;align-items:center">'+
+    '<label class="mini">기준월 <select id="lsBase" class="qb-in" style="height:30px;width:auto">'+mopts+'</select></label>'+
+    '<label class="mini">서비스 <select id="lsLine" class="qb-in" style="height:30px;width:auto"><option value="">전체</option>'+LINE_OPTS.map(function(l){ return '<option value="'+l+'"'+(LS.line===l?' selected':'')+'>'+esc(lline(l))+'</option>'; }).join('')+'</select></label>'+
+    '<span class="mini">기준월 MRR 합계 <b>'+won(total)+'천원</b> · '+y0+'년 누적 <b>'+won(totYtd)+'천원</b> · 단위 천원</span>'+
+    (unassigned.n? '<span class="ctag warn" style="margin-left:auto" title="유입경로가 비어 있는 계약">미지정 '+unassigned.n+'건 · '+won(unassigned.mrr)+'천원</span><button type="button" class="cbtn" id="lsFix" style="height:26px;font-size:11px">계약 관리에서 지정 →</button>':'')+
+    '</div>';
+  /* 타일 */
+  h+='<div class="kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:14px">'+order.map(function(src){
+    var a=agg[src], sh=total? a.mrr/total*100 : 0, col=cssv(LEAD_COLOR[src]||'--muted');
+    return '<div class="kpi ls-tile" data-src="'+esc(src)+'" style="padding:12px 14px;cursor:pointer'+(LS.pick===src?';outline:2px solid '+col:'')+'" title="누르면 이 유입경로의 계약 목록">'+
+      '<div class="k" style="display:flex;align-items:center;gap:6px"><i style="width:9px;height:9px;border-radius:50%;background:'+col+';display:inline-block"></i>'+esc(src)+'</div>'+
+      '<div style="font-size:20px;font-weight:800;margin-top:2px">'+won(a.mrr)+'<small style="font-size:11px;font-weight:500;color:var(--muted)"> 천원 · '+sh.toFixed(1)+'%</small></div>'+
+      '<div class="mini" style="margin-top:4px">계약 '+a.n+'건 · 고객사 '+Object.keys(a.custs).length+'곳'+(a.newN? ' · 올해 신규 '+a.newN+'건':'')+'</div>'+
+      '<div class="mini">'+y0+'년 누적 '+won(a.ytd)+'천원</div></div>'; }).join('')+'</div>';
+  /* 차트 2개 */
+  h+='<div style="display:grid;grid-template-columns:minmax(260px,1fr) minmax(320px,1.4fr);gap:14px;margin-bottom:14px">'+
+    '<div class="pr-card"><div style="font-size:13px;font-weight:650;margin-bottom:8px">유입경로별 MRR <span class="mini">'+esc(mk(b))+'</span></div><div id="lsBars"></div></div>'+
+    '<div class="pr-card"><div style="font-size:13px;font-weight:650;margin-bottom:8px">최근 12개월 추이 <span class="mini">유입경로별 월 매출</span></div><div id="lsTrend" style="height:210px"></div>'+
+    '<div class="mini" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:6px">'+order.filter(function(src){ return agg[src].trend.some(function(v){ return v>0; }); }).map(function(src){ return '<span><i style="display:inline-block;width:10px;height:3px;border-radius:2px;background:'+cssv(LEAD_COLOR[src]||'--muted')+';vertical-align:middle;margin-right:4px"></i>'+esc(src)+'</span>'; }).join('')+'</div></div></div>';
+  /* 표: 유입경로 × 서비스 */
+  h+='<div class="pr-card" style="margin-bottom:14px"><div style="font-size:13px;font-weight:650;margin-bottom:8px">유입경로 × 서비스 <span class="mini">'+esc(mk(b))+' MRR · 천원</span></div>'+
+    '<div class="tbl-wrap"><table class="dgrid"><thead><tr><th>유입경로</th>'+lines.map(function(l){ return '<th class="n">'+esc(lline(l))+'</th>'; }).join('')+'<th class="n">합계</th><th class="n">비중</th><th class="n">계약</th><th class="n">고객사</th></tr></thead><tbody>'+
+    order.map(function(src){ var a=agg[src]; return '<tr><td>'+esc(src)+'</td>'+lines.map(function(l){ return '<td class="n">'+(a.byLine[l]? won(a.byLine[l]):'·')+'</td>'; }).join('')+'<td class="n"><b>'+won(a.mrr)+'</b></td><td class="n">'+(total? (a.mrr/total*100).toFixed(1)+'%':'·')+'</td><td class="n">'+a.n+'</td><td class="n">'+Object.keys(a.custs).length+'</td></tr>'; }).join('')+
+    '<tr style="font-weight:700;background:var(--surface-2)"><td>합계</td>'+lines.map(function(l){ var t=0; order.forEach(function(src){ t+=agg[src].byLine[l]||0; }); return '<td class="n">'+won(t)+'</td>'; }).join('')+'<td class="n">'+won(total)+'</td><td class="n">100%</td><td class="n">'+order.reduce(function(t,src){ return t+agg[src].n; },0)+'</td><td class="n"></td></tr>'+
+    '</tbody></table></div></div>';
+  /* 선택한 유입경로의 계약 목록 */
+  if(LS.pick && agg[LS.pick]){
+    var lst=agg[LS.pick].rows.slice().sort(function(x,y){ return y.v-x.v; });
+    h+='<div class="pr-card"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><div style="font-size:13px;font-weight:650">'+esc(LS.pick)+' — 계약 '+lst.length+'건 <span class="mini">'+esc(mk(b))+' MRR 큰 순</span></div><button type="button" class="cbtn" id="lsPickX" style="height:24px;font-size:11px;margin-left:auto">닫기</button></div>'+
+      '<div class="tbl-wrap" style="max-height:46vh"><table class="dgrid"><thead><tr><th>고객사</th><th>서비스</th><th>판매 채널</th><th>파트너</th><th>시작월</th><th>종료월</th><th class="n">MRR</th></tr></thead><tbody>'+
+      lst.slice(0,200).map(function(x){ var r=rows[x.k]; return '<tr><td>'+esc(r.cust)+(r.parent?' <span class="mini">↳부속</span>':'')+'</td><td>'+esc(lline(r.line))+'</td><td>'+esc(r.channel||'')+'</td><td>'+esc(r.ptn||'')+'</td><td>'+(r.startRaw!=null? esc(mk(r.startRaw)):'·')+'</td><td>'+(r.endRaw!=null? esc(mk(r.endRaw)):'·')+'</td><td class="n">'+won(x.v)+'</td></tr>'; }).join('')+
+      (lst.length>200? '<tr><td colspan="7" class="mini">외 '+(lst.length-200)+'건</td></tr>':'')+'</tbody></table></div></div>';
+  }
+  host.innerHTML=h;
+  /* 차트 그리기 */
+  try{ hbars('#lsBars', order.filter(function(src){ return agg[src].mrr>0; }).map(function(src){ return {name:src, v:agg[src].mrr, c:cssv(LEAD_COLOR[src]||'--muted')}; }), total, false); }catch(e){}
+  try{ var ser=order.filter(function(src){ return agg[src].trend.some(function(v){ return v>0; }); }).map(function(src){ return {label:src, data:agg[src].trend, color:cssv(LEAD_COLOR[src]||'--muted')}; });
+    if(ser.length) Viz.lines(document.getElementById('lsTrend'),{labels:m12.map(function(i){ return mk(i).slice(2).replace('-','.'); }), series:ser, fmt:won, tipFmt:wonFull, fill:false});
+    else document.getElementById('lsTrend').innerHTML='<p class="cap">데이터 없음</p>'; }catch(e){}
+  /* 이벤트 */
+  $('#lsBase').onchange=function(){ LS.base=+this.value; renderLeadSrc(); };
+  $('#lsLine').onchange=function(){ LS.line=this.value; renderLeadSrc(); };
+  var fx=$('#lsFix'); if(fx) fx.onclick=function(){ switchView('contracts'); setTimeout(function(){ try{ var sr=$('#dvSearch'); if(sr){ sr.value=''; } DV.filters={}; DV.filters.lead_src=[BLANK_LABEL]; DV.page=0; renderGrid(); }catch(e){} }, 80); };
+  host.querySelectorAll('.ls-tile').forEach(function(t){ t.onclick=function(){ LS.pick=(LS.pick===t.dataset.src)? '' : t.dataset.src; renderLeadSrc(); }; });
+  var px=$('#lsPickX'); if(px) px.onclick=function(){ LS.pick=''; renderLeadSrc(); };
+}
+var AK={log:false, q:''};   // AI 지식 화면 상태 — 기록은 기본 숨김(사용자: «학습에 업데이트만 하고 기록은 따로»)
+function renderAiKnow(){
+  var tw=$('#dvTable').parentElement; tw.style.display='none';
+  var host=bizHostEl(); host.style.display='';
+  var L=(RAWX.aiknow||[]).slice().sort(function(a,b){ return (b.id||0)-(a.id||0); }), canW=!!SB_TOKEN && !window.IS_VIEWER;
+  var nOn=L.filter(function(x){ return x.active!==false; }).length;
+  $('#dvCount').textContent = L.length? '적용 중 '+nOn+'개' : '';
+  var h='<div class="pr-card" style="margin-bottom:14px;max-width:920px"><div style="font-size:13px;font-weight:650;margin-bottom:8px">AI 에게 가르치기</div>'+
+    '<div class="mini" style="margin-bottom:10px;line-height:1.7">예: «에스원 경유 계약은 설치비를 정산월에 따로 인식한다» · «MDR 은 노드가 아니라 에이전트 수로 과금» · ««위세아이텍» 은 «위세» 로도 부른다». 짧고 사실적으로 한 줄씩. 숫자 값은 넣지 말고 규칙·용어·해석 방법을 적으세요 — 숫자는 AI 가 DB 에서 직접 봅니다. 저장하면 다음 질문부터 바로 반영됩니다.</div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start"><input id="akTopic" class="qb-in" placeholder="주제 (예: 에스원 계약)" style="width:180px;height:34px">'+
+    '<textarea id="akBody" class="qb-in" placeholder="AI 가 알아야 할 내용 (한 줄 한 사실)" style="flex:1;min-width:260px;min-height:34px;height:60px;padding:8px 10px;resize:vertical"></textarea>'+
+    '<button type="button" class="cbtn pri" id="akAdd" style="height:34px"'+(canW?'':' disabled')+'>＋ 가르치기</button></div>'+
+    '<div class="mini" style="margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span>'+(L.length? '지금 AI 가 쓰는 팀 지식 '+nOn+'개'+(L.length>nOn? ' (꺼둔 것 '+(L.length-nOn)+'개)':'') : '아직 가르친 내용이 없습니다 — AI 는 포탈 규칙(MRR·LIVE·장비·OI)과 DB 표만 알고 있습니다')+'</span>'+
+    (L.length? '<button type="button" class="cbtn" id="akLog" style="height:26px;font-size:11px">'+(AK.log?'기록 닫기':'기록 보기')+'</button>':'')+'</div></div>';
+  if(AK.log && L.length){
+    var q=String(AK.q||'').trim().toLowerCase();
+    var M=q? L.filter(function(x){ return ((x.topic||'')+' '+(x.content||'')).toLowerCase().indexOf(q)>=0; }) : L;
+    h+='<div class="pr-card" style="max-width:920px"><div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap"><div style="font-size:13px;font-weight:650">가르친 기록</div><span class="mini">'+M.length+'개 · 최근 것부터 · «적용» 을 끄면 AI 가 쓰지 않습니다(기록은 남음)</span>'+
+      '<input id="akQ" class="qb-in" placeholder="찾기" value="'+esc(AK.q||'')+'" style="width:160px;height:28px;margin-left:auto"></div>'+
+      '<div class="qb-deck-list">'+M.map(function(x){ return '<div class="qb-deck-it" data-id="'+x.id+'" style="'+(x.active===false?'opacity:.55':'')+'"><span class="ctag">'+esc(x.topic||'')+'</span><span style="flex:1;min-width:240px;font-size:13px;line-height:1.55;white-space:pre-wrap">'+esc(x.content||'')+'</span>'+
+      '<span class="mini">'+esc(String(x.created_by||'').split('@')[0])+' · '+esc(String(x.created_at||'').slice(0,10))+'</span>'+
+      '<span style="display:flex;gap:4px;align-items:center"><label class="mini qb-chk"><input type="checkbox" data-ak="active"'+(x.active===false?'':' checked')+(canW?'':' disabled')+'> 적용</label><button type="button" class="cbtn" data-ak="del" style="color:var(--critical)"'+(canW?'':' disabled')+'>×</button></span></div>'; }).join('')+
+      (M.length? '' : '<div class="cap" style="padding:16px;text-align:center">찾는 내용이 없습니다</div>')+'</div></div>';
+  }
+  host.innerHTML=h;
+  function reload(){ return sbTry('ai_knowledge?select=*&order=id').then(function(rows){ RAWX.aiknow=rows||[]; renderAiKnow(); }); }
+  var add=$('#akAdd'); if(add) add.onclick=async function(){ var t=($('#akTopic').value||'').trim()||'일반', c=($('#akBody').value||'').trim(); if(!c){ toast('내용을 적어 주세요','','bad'); return; }
+    add.disabled=true; try{ await sbWrite('POST','ai_knowledge',[{topic:t, content:c, created_by:AUTH_USER||null}]); try{ logChange('insert','ai_knowledge',null,{topic:t}); }catch(e){} toast('가르쳤습니다', t+' — 다음 질문부터 반영', 'ok'); await reload(); var ta=$('#akBody'); if(ta) ta.focus(); }catch(e){ toast('저장 실패', String(e.message||e).slice(0,120), 'bad'); add.disabled=false; } };
+  var lg=$('#akLog'); if(lg) lg.onclick=function(){ AK.log=!AK.log; renderAiKnow(); };
+  var qi=$('#akQ'); if(qi){ qi.oninput=function(){ AK.q=qi.value; var v=qi.value, pos=qi.selectionStart; renderAiKnow(); var n=$('#akQ'); if(n){ n.focus(); try{ n.setSelectionRange(pos,pos); }catch(e){} } }; }
+  host.querySelectorAll('.qb-deck-it').forEach(function(row){ var id=row.dataset.id;
+    var cb=row.querySelector('[data-ak="active"]'); if(cb) cb.onchange=async function(){ try{ await sbWrite('PATCH','ai_knowledge?id=eq.'+id,{active:cb.checked, updated_at:new Date().toISOString()}); await reload(); }catch(e){ toast('저장 실패', String(e.message||e).slice(0,120), 'bad'); } };
+    var dl=row.querySelector('[data-ak="del"]'); if(dl) dl.onclick=async function(){ if(!confirm('이 지식을 지울까요?')) return; try{ await sbWrite('DELETE','ai_knowledge?id=eq.'+id); await reload(); }catch(e){ toast('삭제 실패', String(e.message||e).slice(0,120), 'bad'); } };
+  });
+}
+function renderBizMonthly(){
+  var tw=$('#dvTable').parentElement; tw.style.display='none';
+  var host=bizHostEl(); host.style.display=''; host.innerHTML='';
+  var rows=RAWX.biz||[];
+  var months=[], seen={};
+  rows.slice().sort(function(a,b){ return (b.id||0)-(a.id||0); }).forEach(function(r){
+    if(r.ym && !seen[r.ym]){ seen[r.ym]=1; months.push(r.ym); }
+  });
+  if(BIZV.edit){ renderBizEditor(host, months); return; }
+  if(BIZV.ym==null || !seen[BIZV.ym]) BIZV.ym=months[0]||null;
+  $('#dvCount').textContent = months.length? months.length+'개월 입력됨' : '';
+
+  // 월 선택 + 동작 버튼
+  var bar=document.createElement('div');
+  bar.style.cssText='display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px';
+  months.forEach(function(m){
+    var b=document.createElement('button'); b.className='pill'+(m===BIZV.ym?'':' ghost'); b.textContent=m;
+    if(m===BIZV.ym){ b.style.background='var(--s1)'; b.style.color='#fff'; b.style.borderColor='var(--s1)'; }
+    b.onclick=function(){ BIZV.ym=m; renderBizMonthly(); };
+    bar.appendChild(b);
+  });
+  if(!window.IS_VIEWER){
+    var sp=document.createElement('span'); sp.style.flex='1'; bar.appendChild(sp);
+    var bn=document.createElement('button'); bn.className='pill'; bn.textContent='＋ 새 달 입력';
+    bn.onclick=function(){ if(!SB_TOKEN){openOvl('ovlAuth');return;} BIZV.edit=true; BIZV.newMonth=true; renderBizMonthly(); };
+    bar.appendChild(bn);
+    if(BIZV.ym){
+      var be=document.createElement('button'); be.className='pill ghost'; be.textContent='✎ 이 달 수정';
+      be.onclick=function(){ if(!SB_TOKEN){openOvl('ovlAuth');return;} BIZV.edit=true; BIZV.newMonth=false; renderBizMonthly(); };
+      bar.appendChild(be);
+      var bd=document.createElement('button'); bd.className='pill ghost'; bd.textContent='🗑 이 달 삭제'; bd.style.color='var(--critical,#d03b3b)';
+      bd.onclick=async function(){
+        if(!SB_TOKEN){openOvl('ovlAuth');return;}
+        if(!confirm(BIZV.ym+' 입력을 전부 삭제할까요?')) return;
+        try{
+          await sbWrite('DELETE','biz_recon?ym=eq.'+encodeURIComponent(BIZV.ym));
+          logChange('delete','biz_recon',0,{ym:BIZV.ym});
+          RAWX.biz=(RAWX.biz||[]).filter(function(r){return r.ym!==BIZV.ym;});
+          BIZV.ym=null; renderBizMonthly();
+        }catch(e){ $('#dvMsg').textContent=String(e.message||e); }
+      };
+      bar.appendChild(bd);
+    }
+  }
+  /* 비즈포탈 엑셀 자동 대조 — 파일을 읽어 바로 비교 (저장하지 않음) */
+  var bu=document.createElement('label'); bu.className='pill'; bu.style.cssText='cursor:pointer;display:inline-flex;align-items:center;gap:6px'; bu.title='비즈포탈에서 내려받은 매출 목록(.xlsx)을 올리면 그 달 포탈 매출과 회사 단위로 자동 대조합니다 — 파일은 저장하지 않습니다';
+  bu.innerHTML='📥 비즈포탈 엑셀 올려서 자동 대조 <input type="file" id="bzxFile" accept=".xlsx,.xls,.csv" style="display:none">';
+  bu.querySelector('input').onchange=function(){ bzxOpenFile(this.files[0]); this.value=''; };
+  bar.insertBefore(bu, bar.children[months.length]||null);
+  host.appendChild(bar);
+  if(BZX.res){ bzxRender(host); }
+
+  // ── 월 목표 대비 달성률 ─────────────────────────────
+  renderTargetTable(host, rows);
+
+  if(!BIZV.ym){
+    var em=document.createElement('p'); em.className='cap';
+    em.textContent='아직 입력된 달이 없습니다. 「＋ 새 달 입력」으로 시작하세요.';
+    host.appendChild(em); return;
+  }
+  var mr=rows.filter(function(r){return r.ym===BIZV.ym;});
+  var sums=mr.filter(function(r){return r.kind==='sum';});
+  var dets=mr.filter(function(r){return r.kind==='detail';});
+  var asOf=(mr[0]&&mr[0].as_of)? String(mr[0].as_of).slice(0,10):'';
+
+  var head=document.createElement('p'); head.className='cap';
+  head.textContent=BIZV.ym+' 대조 결과'+(asOf? ' · 작성일 '+asOf:'');
+  host.appendChild(head);
+
+  var st=document.createElement('table'); st.className='dgrid'; st.style.maxWidth='560px';
+  var sb='<thead><tr><th>항목</th><th style="text-align:right">금액(천원)</th></tr></thead><tbody>';
+  sums.forEach(function(r){
+    var hl=/차액/.test(r.item||'');
+    sb+='<tr'+(hl?' style="font-weight:700;border-top:2px solid var(--axis)"':'')+'><td>'+esc(r.item)+'</td>'+
+        '<td style="text-align:right'+(hl?';color:'+((r.biz||0)>=0?'var(--good,#0ca30c)':'var(--critical,#d03b3b)'):'')+'">'+
+        Math.round(Number(r.biz||0)/1000).toLocaleString('ko-KR')+'</td></tr>';
+  });
+  st.innerHTML=sb+'</tbody>';
+  host.appendChild(st);
+
+  if(dets.length){
+    var h2=document.createElement('p'); h2.className='cap'; h2.style.marginTop='18px'; h2.innerHTML='고객사별 차이 <b style="color:var(--brand,#2a78d6)">· 단위: 천원</b>';
+    host.appendChild(h2);
+    var dt=document.createElement('table'); dt.className='dgrid';
+    var db='<thead><tr><th>고객사</th><th style="text-align:right">비즈포탈(천원)</th><th style="text-align:right">매출시트(천원)</th><th style="text-align:right">차이(천원)</th><th>사유</th></tr></thead><tbody>';
+    dets.forEach(function(r){
+      db+='<tr><td>'+esc(r.item)+'</td><td style="text-align:right">'+won(r.biz)+'</td>'+
+          '<td style="text-align:right">'+won(r.sheet)+'</td>'+
+          '<td style="text-align:right;color:'+((r.diff||0)>=0?'var(--good,#0ca30c)':'var(--critical,#d03b3b)')+'">'+won(r.diff)+'</td>'+
+          '<td style="font-size:12px;color:var(--muted)">'+esc(r.note||'')+'</td></tr>';
+    });
+    dt.innerHTML=db+'</tbody>';
+    host.appendChild(dt);
+  }
+}
+
+/* ---- 월 목표 대비 달성률 (비즈포탈 회계매출 · 매출시트 매출 두 기준) ---- */
+function bizYear(rows){
+  var y='';
+  (rows||[]).forEach(function(r){ if(r.as_of) y=String(r.as_of).slice(0,4); });
+  return +(y || new Date().getFullYear());
+}
+function bizMonthNum(ym){ var m=String(ym||'').match(/(\d+)/); return m? +m[1] : 0; }
+function bizPick(rows, ym, re){
+  var hit=(rows||[]).filter(function(r){ return r.ym===ym && r.kind==='sum' && re.test(r.item||''); })[0];
+  return hit? Number(hit.biz)||0 : null;
+}
+function renderTargetTable(host, rows){
+  var year=BIZV.year||bizYear(rows);
+  BIZV.year=year;
+  var tg={};
+  (RAWX.mtargets||[]).forEach(function(t){ if(+t.year===year) tg[+t.month]=Number(t.amount)||0; });
+
+  var box=document.createElement('section');
+  box.style.cssText='margin-bottom:22px;padding-bottom:18px;border-bottom:1px solid var(--ring)';
+
+  var hd=document.createElement('div');
+  hd.style.cssText='display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px';
+  hd.innerHTML='<b style="font-size:14px">🎯 '+year+'년 월 목표 대비 달성률</b>'+
+    '<span class="ubadge sm">₩ 천원</span>'+
+    '<span class="cap" style="margin:0">목표는 연초 기준 · 달성률 = 성과 ÷ 목표 · 금액은 모두 천원</span>';
+  if(!window.IS_VIEWER){
+    var sp=document.createElement('span'); sp.style.flex='1'; hd.appendChild(sp);
+    var be=document.createElement('button'); be.className='pill'; be.textContent='✎ 월 목표 입력';
+    be.onclick=function(){ if(!SB_TOKEN){openOvl('ovlAuth');return;} openTargetEditor(year); };
+    hd.appendChild(be);
+  }
+  box.appendChild(hd);
+
+  var t=document.createElement('table'); t.className='dgrid';
+  var h='<thead><tr><th>구분</th><th style="text-align:right">목표(천원)</th>'+
+        '<th style="text-align:right">비즈포탈 회계매출(천원)</th><th style="text-align:right">달성률</th>'+
+        '<th style="text-align:right">매출시트 매출(천원)</th><th style="text-align:right">달성률</th></tr></thead><tbody>';
+
+  function pct(v, base){
+    if(!base) return '<td style="text-align:right;color:var(--muted)">·</td>';
+    var r=v/base*100;
+    var c = r>=100? 'var(--good,#0ca30c)' : (r>=95? 'var(--warning,#fab219)' : 'var(--critical,#d03b3b)');
+    return '<td style="text-align:right;font-weight:650;color:'+c+'">'+r.toFixed(1)+'%</td>';
+  }
+  function money(v){ return v==null? '·' : won(v); }        /* 천원 단위 */
+
+  var accT=0, accB=0, accS=0, qT=0, qB=0, qS=0;
+  for(var m=1;m<=12;m++){
+    var ym=m+'월';
+    var bz=bizPick(rows, ym, /비즈포탈\s*회계매출/);
+    var sh=bizPick(rows, ym, /^매출시트\s*매출$/) ;
+    if(sh==null) sh=bizPick(rows, ym, /매출시트\s*매출/);
+    var tgt=tg[m]||0;
+    if(!tgt && bz==null && sh==null) continue;
+
+    h+='<tr><td>'+m+'월</td><td style="text-align:right">'+money(tgt||null)+'</td>'+
+       '<td style="text-align:right">'+money(bz)+'</td>'+(bz!=null? pct(bz,tgt):'<td style="text-align:right;color:var(--muted)">·</td>')+
+       '<td style="text-align:right">'+money(sh)+'</td>'+(sh!=null? pct(sh,tgt):'<td style="text-align:right;color:var(--muted)">·</td>')+'</tr>';
+
+    if(tgt>0){                                  // 목표가 있는 달만 누계에 포함
+      accT+=tgt; accB+=(bz||0); accS+=(sh||0);
+      qT+=tgt;   qB+=(bz||0);   qS+=(sh||0);
+    }
+    if(m%3===0 && qT>0){
+      h+='<tr style="background:var(--surface-2);font-weight:650"><td>'+(m/3)+'Q 누계</td>'+
+         '<td style="text-align:right">'+money(qT)+'</td><td style="text-align:right">'+money(qB)+'</td>'+pct(qB,qT)+
+         '<td style="text-align:right">'+money(qS)+'</td>'+pct(qS,qT)+'</tr>';
+      qT=0; qB=0; qS=0;
+    }
+    if(m===6 && accT){
+      h+='<tr style="background:var(--surface-2);font-weight:700"><td>상반기(1H)</td>'+
+         '<td style="text-align:right">'+money(accT)+'</td><td style="text-align:right">'+money(accB)+'</td>'+pct(accB,accT)+
+         '<td style="text-align:right">'+money(accS)+'</td>'+pct(accS,accT)+'</tr>';
+    }
+  }
+  if(accT){
+    h+='<tr style="border-top:2px solid var(--axis);font-weight:750"><td>누계</td>'+
+       '<td style="text-align:right">'+money(accT)+'</td><td style="text-align:right">'+money(accB)+'</td>'+pct(accB,accT)+
+       '<td style="text-align:right">'+money(accS)+'</td>'+pct(accS,accT)+'</tr>';
+  }
+  t.innerHTML=h+'</tbody>';
+  box.appendChild(t);
+
+  if(!accT){
+    var p0=document.createElement('p'); p0.className='cap'; p0.style.marginTop='8px';
+    p0.textContent='월 목표가 없습니다. 「✎ 월 목표 입력」으로 넣으면 달성률이 계산됩니다.';
+    box.appendChild(p0);
+  }
+  host.appendChild(box);
+}
+
+/* ---- 월 목표 입력 ---- */
+function openTargetEditor(year){
+  var tg={};
+  (RAWX.mtargets||[]).forEach(function(t){ if(+t.year===year) tg[+t.month]=Number(t.amount)||0; });
+  var ovl=document.createElement('div'); ovl.className='ovl on'; ovl.id='ovlTarget';
+  var rowsHtml='';
+  for(var m=1;m<=12;m++){
+    rowsHtml+='<div><label>'+m+'월</label><input type="number" data-m="'+m+'" min="0" step="1000000" value="'+(tg[m]||'')+'"></div>';
+  }
+  ovl.innerHTML='<div class="modal" style="width:min(560px,100%)">'+
+    '<h3>'+year+'년 월 목표</h3>'+
+    '<p class="cap">연초에 정한 월별 목표 금액을 <b>원 단위로</b> 넣으세요 (표에는 천원으로 표시). 비워두면 그 달은 달성률을 계산하지 않습니다.</p>'+
+    '<div class="frm">'+rowsHtml+'</div>'+
+    '<div class="mact"><span class="mmsg" id="tgMsg" style="flex:1"></span>'+
+    '<button class="pill ghost" id="tgCancel">취소</button>'+
+    '<button class="pill" id="tgSave" style="background:var(--s1);border-color:var(--s1);color:#fff">저장</button></div></div>';
+  document.body.appendChild(ovl);
+  ovl.querySelector('#tgCancel').onclick=function(){ ovl.remove(); };
+  ovl.querySelector('#tgSave').onclick=async function(){
+    var btn=this; btn.disabled=true;
+    var msg=ovl.querySelector('#tgMsg'); msg.textContent='저장 중…';
+    try{
+      var payload=[];
+      ovl.querySelectorAll('input[data-m]').forEach(function(inp){
+        var v=inp.value===''? null : Number(inp.value);
+        if(v!=null) payload.push({year:year, month:+inp.dataset.m, amount:v});
+      });
+      if(payload.length){
+        await sbWrite('POST','monthly_targets?on_conflict=year,month',payload,'resolution=merge-duplicates');
+      }
+      // 비운 달은 삭제
+      var keep={}; payload.forEach(function(x){ keep[x.month]=1; });
+      var del=(RAWX.mtargets||[]).filter(function(t){ return +t.year===year && !keep[+t.month]; });
+      for(var i=0;i<del.length;i++){
+        await sbWrite('DELETE','monthly_targets?year=eq.'+year+'&month=eq.'+del[i].month);
+      }
+      // 화면은 방금 입력한 값으로 즉시 갱신 (재조회가 실패해도 값이 사라지지 않게)
+      RAWX.mtargets=(RAWX.mtargets||[]).filter(function(t){ return +t.year!==year; }).concat(payload);
+      try{
+        var fresh=await sbTry('monthly_targets?select=*&order=year,month');
+        if(fresh && fresh.length) RAWX.mtargets=fresh;
+      }catch(_){}
+      logChange('update','monthly_targets',year,{months:payload.length});
+      toast('월 목표 저장 완료', year+'년 '+payload.length+'개월');
+      ovl.remove(); renderBizMonthly();
+    }catch(e){ msg.textContent=String(e.message||e); btn.disabled=false; }
+  };
+}
+
+function renderBizEditor(host, months){
+  var rows=RAWX.biz||[];
+  var editYm = BIZV.newMonth? '' : BIZV.ym;
+  var src = BIZV.newMonth
+    ? rows.filter(function(r){ return r.ym===months[0] && r.kind==='sum'; }).map(function(r){ return {item:r.item, biz:null}; })
+    : rows.filter(function(r){ return r.ym===editYm && r.kind==='sum'; });
+  if(!src.length) src=[{item:'비즈포탈 회계매출',biz:null},{item:'매출시트 매출',biz:null},{item:'차액 총계',biz:null}];
+  var dsrc = BIZV.newMonth? [] : rows.filter(function(r){ return r.ym===editYm && r.kind==='detail'; });
+  var asOf = BIZV.newMonth? todayStr() : ((rows.find(function(r){return r.ym===editYm;})||{}).as_of||'').slice(0,10);
+
+  var f=document.createElement('div'); f.style.maxWidth='760px';
+  f.innerHTML=
+    '<div class="frm" style="max-width:420px;margin-bottom:14px">'+
+      '<div><label>월 *</label><input id="bzYm" placeholder="예: 8월" value="'+esc(editYm)+'"></div>'+
+      '<div><label>작성일</label><input id="bzAsOf" type="date" value="'+esc(asOf)+'"></div>'+
+    '</div>'+
+    '<div class="cap" style="margin-bottom:6px">요약 항목 — 금액은 <b>원 단위로 입력</b> (표·대시보드에는 천원으로 표시됩니다)</div><div id="bzSums"></div>'+
+    '<button class="pill ghost" id="bzAddSum" style="margin:6px 0 16px">＋ 항목 추가</button>'+
+    '<div class="cap" style="margin-bottom:6px">고객사별 차이 (없으면 비워두세요 · 차이는 자동 계산) — <b>원 단위로 입력</b></div><div id="bzDets"></div>'+
+    '<button class="pill ghost" id="bzAddDet" style="margin:6px 0 18px">＋ 고객사 추가</button>'+
+    '<div style="display:flex;gap:10px;align-items:center">'+
+      '<span class="mini" id="bzMsg" style="flex:1"></span>'+
+      '<button class="pill ghost" id="bzCancel">취소</button>'+
+      '<button class="pill" id="bzSave" style="background:var(--s1);color:#fff;border-color:var(--s1)">저장</button>'+
+    '</div>';
+  host.appendChild(f);
+
+  function sumRow(item,amt){
+    var d=document.createElement('div'); d.style.cssText='display:flex;gap:8px;margin-bottom:6px;max-width:640px';
+    d.innerHTML='<input class="bz-item" placeholder="항목명" style="flex:2" value="'+esc(item||'')+'">'+
+      '<input class="bz-amt" placeholder="금액" style="flex:1;text-align:right" value="'+(amt==null?'':Number(amt).toLocaleString('ko-KR'))+'">';
+    var x=document.createElement('button'); x.className='pill ghost'; x.textContent='✕';
+    x.onclick=function(){ d.remove(); }; d.appendChild(x);
+    return d;
+  }
+  function detRow(r){
+    r=r||{};
+    var d=document.createElement('div'); d.style.cssText='display:flex;gap:8px;margin-bottom:6px';
+    d.innerHTML='<input class="bd-cust" placeholder="고객사" style="flex:2" value="'+esc(r.item||'')+'">'+
+      '<input class="bd-biz" placeholder="비즈포탈" style="flex:1;text-align:right" value="'+(r.biz==null?'':r.biz)+'">'+
+      '<input class="bd-sheet" placeholder="매출시트" style="flex:1;text-align:right" value="'+(r.sheet==null?'':r.sheet)+'">'+
+      '<input class="bd-note" placeholder="사유" style="flex:2" value="'+esc(r.note||'')+'">';
+    var x=document.createElement('button'); x.className='pill ghost'; x.textContent='✕';
+    x.onclick=function(){ d.remove(); }; d.appendChild(x);
+    return d;
+  }
+  src.forEach(function(r){ $('#bzSums').appendChild(sumRow(r.item,r.biz)); });
+  dsrc.forEach(function(r){ $('#bzDets').appendChild(detRow(r)); });
+  $('#bzAddSum').onclick=function(){ $('#bzSums').appendChild(sumRow('',null)); };
+  $('#bzAddDet').onclick=function(){ $('#bzDets').appendChild(detRow()); };
+  $('#bzCancel').onclick=function(){ BIZV.edit=false; renderBizMonthly(); };
+  $('#bzSave').onclick=async function(){
+    var ym=$('#bzYm').value.trim();
+    if(!ym){ $('#bzMsg').textContent='월을 입력하세요 (예: 8월)'; return; }
+    var asof=$('#bzAsOf').value||null;
+    var out=[];
+    $('#bzSums').querySelectorAll('div').forEach(function(d){
+      var it=d.querySelector('.bz-item').value.trim();
+      var amt=bizNz(d.querySelector('.bz-amt').value);
+      if(it) out.push({ym:ym, as_of:asof, kind:'sum', item:it, biz:amt});
+    });
+    $('#bzDets').querySelectorAll('div').forEach(function(d){
+      var cu=d.querySelector('.bd-cust').value.trim(); if(!cu) return;
+      var bz=bizNz(d.querySelector('.bd-biz').value), sh=bizNz(d.querySelector('.bd-sheet').value);
+      out.push({ym:ym, as_of:asof, kind:'detail', item:cu, biz:bz, sheet:sh,
+                diff:(bz!=null&&sh!=null)? bz-sh:null, note:d.querySelector('.bd-note').value.trim()||null});
+    });
+    if(!out.length){ $('#bzMsg').textContent='입력된 항목이 없습니다'; return; }
+    this.disabled=true; $('#bzMsg').textContent='저장 중…';
+    try{
+      await sbWrite('DELETE','biz_recon?ym=eq.'+encodeURIComponent(ym));
+      var ins=await sbWrite('POST','biz_recon?select=*',out,'return=representation');
+      RAWX.biz=(RAWX.biz||[]).filter(function(r){return r.ym!==ym;}).concat(ins||[]);
+      logChange('update','biz_recon',0,{ym:ym, rows:out.length});
+      toast('저장되었습니다', ym+' 비즈포탈 대조 결과');
+      DIRTY=true; BIZV.edit=false; BIZV.ym=ym;
+      renderBizMonthly();
+    }catch(e){ $('#bzMsg').textContent=String(e.message||e); this.disabled=false; }
+  };
+}
+
+/* ==================================================================
+   비즈포탈 매출 엑셀 자동 대조 (목업 · 65단계)
+   · 비즈포탈(회사 메인 포탈)에서 내려받은 매출 목록(.xlsx)을 브라우저에서 읽어 — 저장하지 않고 — 포탈 DB 의 같은 달 매출과 회사 단위로 맞춰 봅니다.
+   · 비즈포탈 쪽: 진행상태 «종료» 행의 «회계매출»만 (실패·중지는 참고로만 표시)
+   · 포탈 쪽: 그 달 monthly_revenue 합 + 대금정산일이 그 달인 설치비(install_fee)
+   · 회사 이름은 띄어쓰기·㈜·(에스원)·괄호·별칭을 무시하고 묶음. 양쪽에 같은 금액이 한쪽씩만 있으면 «표기 차이(추정)»로 짝을 제안.
+   · 사유는 담당자가 적고, 「비즈포탈 차액 표에 저장」을 누르면 기존 biz_recon 표(월 요약 + 고객사별 차이)에 들어갑니다.
+   ================================================================== */
+var BZX={rows:null, month:null, file:'', notes:{}, res:null, showEq:false, showSkip:false, showRuled:false};
+/* 비교에 넣는 행: 진행상태가 실패·중지·취소류만 빼고 전부 (종료 · 계산서발행 모두 회계매출로 인식된 행입니다)
+   — 예전엔 «종료» 만 넣어서 «계산서발행» 140여 행이 통째로 빠져 «포탈에만 있음» 으로 잡혔습니다 */
+var BZX_SKIP=/실패|중지|취소|보류|반려|삭제|드랍|드롭|lost|drop|cancel/i;
+function bzxCounted(b){ return !BZX_SKIP.test(String(b.st||'')); }
+function bzxLev(a,b){ var m=a.length,n=b.length; if(!m) return n; if(!n) return m; var prev=[],cur=[]; for(var j=0;j<=n;j++) prev[j]=j;
+  for(var i=1;i<=m;i++){ cur=[i]; for(var k=1;k<=n;k++){ cur[k]=Math.min(prev[k]+1, cur[k-1]+1, prev[k-1]+(a[i-1]===b[k-1]?0:1)); } prev=cur; } return prev[n]; }
+/* 두 회사명이 같은 회사일 가능성 0~1 — 한 글자 오타(브랜드/브랜즈 · 에프엔비/에프앤비 · 에어로페이스/에어로스페이스)를 잡습니다 */
+function bzxSim(a,b){
+  var ka=bzxKeys(a), kb=bzxKeys(b), best=0;
+  ka.forEach(function(x){ kb.forEach(function(y){
+    if(x===y){ best=1; return; }
+    var L=Math.max(x.length,y.length), l=Math.min(x.length,y.length);
+    if(l>=4 && (x.indexOf(y)>=0||y.indexOf(x)>=0)) best=Math.max(best, 0.9);
+    if(l>=4) best=Math.max(best, 1-bzxLev(x,y)/L);
+  }); });
+  return best;
+}
+/* 반복 차이 규칙(biz_rules · 65단계) — 처음 필요할 때 한 번 읽어 둠. 표가 아직 없으면 빈 배열 */
+function bzxRules(){ if(RAWX.bizRules!==undefined) return Promise.resolve(RAWX.bizRules||[]);
+  return sbTry('biz_rules?select=*&active=eq.true&order=id').then(function(r){ RAWX.bizRules=r||[]; return RAWX.bizRules; }).catch(function(){ RAWX.bizRules=[]; return []; }); }
+function bzxRuleFor(q){ var ks=bzxKeys(q.name); var hit=null;
+  (RAWX.bizRules||[]).forEach(function(r){ if(r.active===false || r.cat!==q.cat) return; if(bzxKeys(r.name).some(function(k){ return ks.indexOf(k)>=0; })) hit=r; });
+  return hit; }
+/* ── 외부 라이브러리 로더 — SRI(무결성 해시) + 다중 CDN 폴백 (80점 프로젝트 ② 보안)
+   해시는 npm 배포본(sha384)에서 계산 → jsdelivr/unpkg 는 npm 과 같은 바이트라 항상 일치, cdnjs 는 폴백. 해시가 다르면 브라우저가 실행을 거부하고 onerror → 다음 URL.
+   라이브러리 버전을 올릴 때는 해시도 함께 바꿀 것 (tests/check.mjs 가 형식을 검사). */
+var LIBS={
+  xlsx:  {label:'엑셀 라이브러리(SheetJS)', test:function(){ return !!window.XLSX; }, sri:'sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw',
+          urls:['https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js','https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js','https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js']},
+  alasql:{label:'SQL 엔진(alasql)', test:function(){ return !!window.alasql; }, sri:'sha384-R+tp+Ayg7ADMu+jC1irp5MN9ay8j2oAu058LGEUO6JumIeTBS3C97SttBKQUY2Qf',
+          urls:['https://cdn.jsdelivr.net/npm/alasql@4.19.0/dist/alasql.min.js','https://cdnjs.cloudflare.com/ajax/libs/alasql/4.19.0/alasql.min.js','https://unpkg.com/alasql@4.19.0/dist/alasql.min.js']},
+  pptx:  {label:'PPT 라이브러리(PptxGenJS)', test:function(){ return !!window.PptxGenJS; }, sri:'sha384-Cck14aA9cifjYolcnjebXRfWGkz5ltHMBiG4px/j8GS+xQcb7OhNQWZYyWjQ+UwQ',
+          urls:['https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js','https://unpkg.com/pptxgenjs@3.12.0/dist/pptxgen.bundle.js']},
+  pdfjs: {label:'PDF 읽기 라이브러리(pdf.js)', test:function(){ return !!window.pdfjsLib; }, sri:'sha384-/1qUCSGwTur9vjf/z9lmu/eCUYbpOTgSjmpbMQZ1/CtX2v/WcAIKqRv+U1DUCG6e',
+          urls:['https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js','https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js','https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js']}
+};
+var PDFJS_WORKER={sri:'sha384-SnzOobpRMLXZ52iJvZm/C0fYw0OQemTXzTjIsdsfMcrCtCEe9qgzxTd3RSklO5x2',
+  urls:['https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js','https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js','https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js']};
+function loadLib(name){
+  var L=LIBS[name]; if(!L) return Promise.reject(new Error('알 수 없는 라이브러리: '+name));
+  if(L.test()) return Promise.resolve();
+  if(L._p) return L._p;
+  L._p=new Promise(function(res,rej){
+    (function nx(i){
+      if(i>=L.urls.length){ L._p=null; return rej(new Error(L.label+'을(를) 불러오지 못했습니다 — 네트워크·사내 차단을 확인해 주세요')); }
+      var s=document.createElement('script'); s.src=L.urls[i]; s.integrity=L.sri; s.crossOrigin='anonymous';
+      s.onload=function(){ if(L.test()) res(); else { s.remove(); nx(i+1); } };
+      s.onerror=function(){ s.remove(); nx(i+1); };
+      document.head.appendChild(s);
+    })(0);
+  });
+  return L._p;
+}
+/* Web Worker 스크립트는 integrity 속성을 못 쓰므로 직접 받아 sha384 를 맞춰 본 뒤 blob URL 로 — 어긋나면 null (호출 쪽이 폴백) */
+function loadWorkerBlob(W){
+  if(W._url) return Promise.resolve(W._url);
+  if(!(window.crypto&&crypto.subtle)) return Promise.resolve(null);
+  return (function nx(i){
+    if(i>=W.urls.length) return Promise.resolve(null);
+    return fetch(W.urls[i]).then(function(r){ if(!r.ok) throw 0; return r.arrayBuffer(); })
+      .then(function(buf){ return crypto.subtle.digest('SHA-384', buf).then(function(h){
+        var b64=btoa(String.fromCharCode.apply(null, new Uint8Array(h)));
+        if('sha384-'+b64!==W.sri) throw 0;
+        W._url=URL.createObjectURL(new Blob([buf],{type:'text/javascript'})); return W._url; }); })
+      .catch(function(){ return nx(i+1); });
+  })(0);
+}
+function bzxLoadLib(){ return loadLib('xlsx'); }
+/* 엑셀 날짜 → JS Date (날짜만).  ★ SheetJS 의 cellDates 는 시간대 보정으로 «8/1 00:00» 을 «7/31 23:59:08» 로 만들어
+   8월 1일자 하위매출 84행이 7월로 밀려 통째로 빠졌습니다 → 일련번호(숫자)를 직접 날짜로 바꾸고, Date 가 와도 30분을 더해 반올림합니다 */
+function bzxDate(v){
+  if(v==null||v==='') return null;
+  if(v instanceof Date){ if(isNaN(v)) return null; var r=new Date(v.getTime()+30*60*1000); return new Date(r.getFullYear(),r.getMonth(),r.getDate()); }
+  if(typeof v==='number' && v>20000 && v<80000 && window.XLSX){ var d=XLSX.SSF.parse_date_code(Math.round(v*1440)/1440); return d? new Date(d.y,d.m-1,d.d) : null; }
+  var m=String(v).match(/(\d{4})[-./]\s*(\d{1,2})(?:[-./]\s*(\d{1,2}))?/); return m? new Date(+m[1],+m[2]-1,m[3]? +m[3]:1) : null;
+}
+/* 엑셀 → 행 배열. 머릿글 행을 «고객사»·«회계매출» 이 있는 줄로 찾습니다(위에 제목 줄이 있어도 됨) */
+function bzxParse(buf){
+  var wb=XLSX.read(buf,{type:'array'});           // cellDates 를 쓰지 않습니다 — 날짜는 bzxDate 가 일련번호에서 직접 계산
+  var ws=wb.Sheets[wb.SheetNames[0]];
+  var aoa=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
+  var hi=-1; for(var i=0;i<Math.min(aoa.length,20);i++){ var r=aoa[i]||[]; if(r.indexOf('고객사')>=0 && r.some(function(c){ return /회계\s*매출/.test(String(c||'')); })){ hi=i; break; } }
+  if(hi<0) throw new Error('머릿글에 «고객사»·«회계매출» 열이 있는 시트가 아닙니다. 비즈포탈 매출 목록을 그대로 내려받은 파일을 올려주세요.');
+  var H=aoa[hi].map(function(c){ return String(c||'').replace(/\s+/g,''); });
+  function col(re){ for(var j=0;j<H.length;j++) if(re.test(H[j])) return j; return -1; }
+  var C={no:col(/^등록번호/), kind:col(/^매출종류/), proj:col(/^프로젝트명/), cust:col(/^고객사/), ch:col(/^영업채널/), biller:col(/^계산서발행대상/), st:col(/^진행상태/),
+         sales:col(/^매출액$/), acc:col(/^회계매출/), when:col(/^예상시기/), insp:col(/^검수일/), owner:col(/^담당자/), why:col(/^변경사유/)};
+  if(C.acc<0||C.cust<0) throw new Error('«고객사» 또는 «회계매출» 열을 찾지 못했습니다.');
+  var out=[];
+  for(var i=hi+1;i<aoa.length;i++){ var r=aoa[i]||[]; if(!r[C.cust]) continue;
+    var g=function(k){ return C[k]>=0? r[C[k]] : null; };
+    out.push({no:g('no'), kind:g('kind'), proj:String(g('proj')||''), cust:String(g('cust')||'').trim(), ch:g('ch')||'', biller:g('biller')||'', st:String(g('st')||'').trim(),
+              sales:Number(g('sales'))||0, acc:Number(g('acc'))||0, when:bzxDate(g('when')), insp:bzxDate(g('insp')), owner:g('owner')||'', why:g('why')||''}); }
+  return out;
+}
+/* 회사 매칭 키: (에스원)·(S1) 표기 제거 → nmKeys(별칭·괄호·(주)·공백 무시) → ㈜·재단법인·유한회사·기호도 제거. 짧은 괄호 키(지역·사이트명)는 버림 */
+var BZX_SITE=/^(중국|미국|청주|페루|괌|사우디|이집트|말레이시아|스웨덴|스웬덴|창원|대전센터|이레빌딩|판교|수원|천안|본사|물류센터)/;
+var BZX_SUFFIX=/(점|센터|지점|지사|공장|사업장|캠퍼스|본점|영업소)$/;   // «이투스 창원점» «여성긴급전화1366 세종센터» 의 꼬리 토큰
+function bzxKeys(name){
+  var t=String(name||'').replace(/\((에스원|S1)\)/g,'').replace(/\s+-\s+.*$/,'');   // «○○ - 대전센터» 같은 사이트 꼬리 제거
+  var plain=t.replace(/\([^)]*\)/g,'').trim();
+  var base=nmKeys(plain);
+  /* 띄어쓴 마지막 토큰이 사이트명(지역·○○점·○○센터)이면 뺀 이름도 키로 — 관리포탈은 «이투스(창원)», 비즈포탈은 «이투스 창원점» 식으로 적기 때문 */
+  var toks=plain.split(/\s+/); if(toks.length>=2){ var last=toks[toks.length-1]; if(BZX_SITE.test(last)||BZX_SUFFIX.test(last)) base=base.concat(nmKeys(toks.slice(0,-1).join(' '))); }
+  /* 괄호 안 표기 — 영문 약칭(SQDA·GCCL)이나 옛 이름도 키로 (3자 이상, 지역·사이트명은 제외) */
+  var par=[]; var re=/\(([^)]*)\)/g, m; while((m=re.exec(t))){ var x=m[1].trim(); if(/^구\.?\s*/.test(x) || (x.length>=3 && !BZX_SITE.test(x) && !/^(주|유|사|재)$/.test(x))) par=par.concat(nmKeys(x.replace(/^구\.?\s*/,''))); }
+  return base.concat(par).map(function(k){ return k.replace(/^(㈜|재단법인|사단법인|유한회사|학교법인)|(㈜|유한회사)$/g,'').replace(/[㈜·,.\-]/g,''); }).filter(function(k){ return k.length>=2; });
+}
+function bzxMonthIdx(rows){
+  var cnt={}; rows.forEach(function(r){ if(r.when){ var k=r.when.getFullYear()+'-'+('0'+(r.when.getMonth()+1)).slice(-2); cnt[k]=(cnt[k]||0)+1; } });
+  var best=Object.keys(cnt).sort(function(a,b){ return cnt[b]-cnt[a]; })[0];
+  return {ym:best||null, idx:best? dIdx(best) : null, months:Object.keys(cnt).sort(), cnt:cnt};
+}
+/* 그룹 분류 — 병합 뒤에도 다시 계산할 수 있게 따로 */
+function bzxCat(q){
+  var hasBiz=q.bizAmt!==0, hasDb=q.db.length>0, hasZero=q.zero&&q.zero.length>0;
+  if(!hasBiz && !hasDb){ q.cat=hasZero? 'skip' : 'skip'; return; }               // 비교할 금액이 양쪽 다 없음
+  if(hasBiz && hasDb && Math.abs(q.diff)<=1){ q.diff=0; q.cat='eq'; return; }   // 12분할 반올림 1원 차이는 일치로
+  if(hasBiz && hasDb){ q.cat=((q.bizFee||q.dbFee) && Math.round((q.bizAmt-q.bizFee)-(q.dbTot-q.dbFee))===0)? 'fee' : 'amt'; return; }
+  if(hasBiz){ q.cat='bizonly'; return; }
+  q.cat=hasZero? 'zero' : 'dbonly';                                                // 비즈포탈에 행은 있지만 회계매출 0
+}
+/* 대조 본체 */
+function bzxCompare(rows, T){
+  // 관리포탈 쪽: 그 달 월 매출(계약별) + 정산일이 그 달인 설치비  (달은 문자열이 아니라 월 인덱스로 비교 — 형식이 달라도 안전)
+  var byCt={}, nearCnt={};
+  (RAWX.mrs||[]).forEach(function(x){ var i=dIdx(x.month); if(i==null) return;
+    if(i===T) byCt[x.contract_id]=(byCt[x.contract_id]||0)+Number(x.amount||0);
+    if(Math.abs(i-T)<=2) nearCnt[i]=(nearCnt[i]||0)+1; });
+  var dbRows=[]; (DATA.rows||[]).forEach(function(r){
+    var a=byCt[r._id]||0, fee=(r.fee && String(r.settle||'').slice(0,7)===mk(T))? r.fee : 0;
+    if(!a && !fee) return;
+    dbRows.push({r:r, cust:r.cust, line:r.line, amt:a, fee:fee, status:r.status, note:r.note});
+  });
+  // 키 → 그룹 (union)
+  var G={}, nid=0; function gid(ks){ var ids=[]; ks.forEach(function(k){ if(G[k]!=null && ids.indexOf(G[k])<0) ids.push(G[k]); }); var g=ids.length? Math.min.apply(null,ids) : (++nid);
+    if(ids.length>1) Object.keys(G).forEach(function(k){ if(ids.indexOf(G[k])>=0) G[k]=g; }); ks.forEach(function(k){ G[k]=g; }); return g; }
+  var custAl={}; (SB_RAW.customers||[]).forEach(function(c){ custAl[c.name]=c.aliases||[]; });
+  dbRows.forEach(function(d){ d.g=gid(bzxKeys(d.cust).concat((custAl[d.cust]||[]).reduce(function(a,al){ return a.concat(bzxKeys(al)); },[]))); });
+  rows.forEach(function(b){ b.g=gid(bzxKeys(b.cust)); });
+  var groups={};
+  function grp(g){ return groups[g]=groups[g]||{g:g, biz:[], db:[], names:{}}; }
+  dbRows.forEach(function(d){ var q=grp(d.g); q.db.push(d); q.names[d.cust]=1; });
+  rows.forEach(function(b){ var q=grp(b.g); q.biz.push(b); q.names[b.cust]=1; });
+  var out=[];
+  Object.keys(groups).forEach(function(k){
+    var q=groups[k];
+    var done=q.biz.filter(bzxCounted), skip=q.biz.filter(function(b){ return !bzxCounted(b); });
+    q.zero=done.filter(function(b){ return !b.acc; });            // 행은 있는데 회계매출 0 (하위매출 미등록 · 수금 변경 행 · 상위 행)
+    q.zeroSales=q.zero.reduce(function(a,b){ return a+(b.sales||0); },0);
+    q.bizAmt=done.reduce(function(a,b){ return a+b.acc; },0); q.skipAmt=skip.reduce(function(a,b){ return a+b.acc; },0);
+    q.bizFee=done.filter(function(b){ return /설치비/.test(b.proj); }).reduce(function(a,b){ return a+b.acc; },0);
+    q.dbAmt=q.db.reduce(function(a,d){ return a+d.amt; },0); q.dbFee=q.db.reduce(function(a,d){ return a+d.fee; },0);
+    q.dbTot=q.dbAmt+q.dbFee; q.diff=Math.round(q.bizAmt-q.dbTot);
+    q.name=Object.keys(q.names).sort(function(a,b){ return b.length-a.length; })[0];
+    q.bizName=(done[0]||q.biz[0]||{}).cust||q.name;
+    bzxCat(q);
+    out.push(q);
+  });
+  /* 표기 차이 병합: 비즈포탈만 ↔ 포탈만 인데 이름이 거의 같은 짝(한 글자 오타 수준)은 금액이 달라도 한 회사로 묶어 비교합니다
+     — 예전엔 금액까지 같아야 짝을 지어서, 오타 + 금액 차이면 «비즈포탈에만 있음» + «포탈에만 있음» 두 줄로 갈라졌습니다 */
+  (function(){
+    var bo=out.filter(function(q){ return q.cat==='bizonly'; }), dbo=out.filter(function(q){ return q.cat==='dbonly'; });
+    bo.forEach(function(b){
+      var best=null, bs=0, second=0;
+      dbo.forEach(function(d){ if(d.merged) return; var sc=bzxSim(b.bizName,d.name); if(sc>bs){ second=bs; bs=sc; best=d; } else if(sc>second) second=sc; });
+      if(!best || bs<0.8 || second>=0.8) return;                 // 유일하게 닮은 짝만
+      b.db=best.db; b.dbAmt=best.dbAmt; b.dbFee=best.dbFee; b.dbTot=best.dbTot; b.diff=Math.round(b.bizAmt-b.dbTot);
+      Object.keys(best.names).forEach(function(n){ b.names[n]=1; });
+      b.aliasHint={biz:b.bizName, db:best.name, sim:bs};
+      best.merged=true; bzxCat(b);
+    });
+    out=out.filter(function(q){ return !q.merged; });
+  })();
+  // 표기 차이 추정: 비즈포탈만 ↔ 포탈만 중 금액이 같은 짝(유일할 때만). 이름이 닮았거나 금액이 흔하지 않으면 «표기 차이(추정)», 아니면 «금액만 같음(확인 필요)»
+  var bo=out.filter(function(q){ return q.cat==='bizonly'; }), dbo=out.filter(function(q){ return q.cat==='dbonly'; });
+  var amtCnt={}; out.forEach(function(q){ if(q.bizAmt) amtCnt[Math.round(q.bizAmt)]=(amtCnt[Math.round(q.bizAmt)]||0)+1; if(q.dbTot) amtCnt[Math.round(q.dbTot)]=(amtCnt[Math.round(q.dbTot)]||0)+1; });
+  function similar(a,b){ var ka=bzxKeys(a), kb=bzxKeys(b); return ka.some(function(x){ return kb.some(function(y){ if(x.indexOf(y)>=0||y.indexOf(x)>=0) return true; for(var i=0;i+3<=x.length;i++){ if(y.indexOf(x.slice(i,i+3))>=0) return true; } return false; }); }); }
+  bo.forEach(function(b){ var c=dbo.filter(function(d){ return !d.pair && Math.round(d.dbTot)===Math.round(b.bizAmt); });
+    if(c.length===1){ var d=c[0], conf=(similar(b.name,d.name) || (amtCnt[Math.round(b.bizAmt)]||0)<=2)? 'high':'low';
+      b.pair=d; d.pair=b; b.pairConf=d.pairConf=conf; b.cat='alias'; d.cat='alias2'; } });
+  // 비즈포탈에만 있는 회사: 포탈에 고객사·계약은 있는지(이 달 매출만 없는지) 확인해 둠
+  out.forEach(function(q){ if(q.cat!=='bizonly') return; var ks=bzxKeys(q.name);
+    q.dbCts=(DATA.rows||[]).filter(function(r){ return !r.parent && bzxKeys(r.cust).some(function(k){ return ks.indexOf(k)>=0; }); }); });
+  // 반복 차이 규칙: 같은 회사·같은 종류의 차이면 묻지 않고 규칙의 사유를 씀
+  out.forEach(function(q){ q.rule=(['dbonly','bizonly','fee','amt','zero'].indexOf(q.cat)>=0)? bzxRuleFor(q) : null; });
+  var sum={biz:0, db:0, skip:0, n:{}, ruled:0, ruledAmt:0, ign:0, ignBiz:0, ignDb:0};
+  out.forEach(function(q){ sum.skip+=q.skipAmt; sum.n[q.cat]=(sum.n[q.cat]||0)+1;
+    if(q.rule && q.rule.mode==='ignore'){ sum.ign++; sum.ignBiz+=q.bizAmt; sum.ignDb+=q.dbTot; return; }   // 무시 규칙: 총계에서 아예 뺌
+    sum.biz+=q.bizAmt; sum.db+=q.dbTot; if(q.rule){ sum.ruled++; sum.ruledAmt+=q.diff; } });
+  sum.diff=Math.round(sum.biz-sum.db);
+  /* 진단 — 차이가 비정상적으로 많을 때 어디가 문제인지 바로 보이게 */
+  var diag={ nearCnt:nearCnt, dbCts:Object.keys(byCt).length, dbRows:dbRows.length, bizCusts:0, matched:0, unit:null, nearMiss:[] };
+  var bc={}; rows.forEach(function(b){ if(bzxCounted(b) && b.acc) bc[b.cust]=1; }); diag.bizCusts=Object.keys(bc).length;
+  out.forEach(function(q){ if(q.biz.length && q.db.length) diag.matched++; });
+  if(sum.biz>0 && sum.db>0){ var r=sum.db/sum.biz; if(r>400&&r<2500) diag.unit='관리포탈 금액이 비즈포탈의 약 '+Math.round(r)+'배 — 단위(원/천원)가 다른 것 같습니다'; else if(r<1/400&&r>1/2500) diag.unit='비즈포탈 금액이 관리포탈의 약 '+Math.round(1/r)+'배 — 단위(원/천원)가 다른 것 같습니다'; }
+  var portalNames={}; (DATA.rows||[]).forEach(function(r){ if(r.cust) portalNames[r.cust]=1; }); portalNames=Object.keys(portalNames);
+  out.filter(function(q){ return q.cat==='bizonly'; }).slice(0,60).forEach(function(q){
+    var best=null,bs=0; portalNames.forEach(function(n){ var sc=bzxSim(q.bizName,n); if(sc>bs){ bs=sc; best=n; } });
+    if(best && bs>=0.5) diag.nearMiss.push({biz:q.bizName, db:best, sim:bs});
+  });
+  diag.nearMiss.sort(function(a,b){ return b.sim-a.sim; });
+  return {groups:out, sum:sum, T:T, diag:diag};
+}
+var BZX_CAT={eq:['일치','var(--ok,#2e7d32)'], fee:['설치비 인식 시점','var(--warn,#b26a00)'], amt:['금액 다름','var(--critical)'], bizonly:['비즈포탈에만 있음','var(--critical)'], dbonly:['관리포탈에만 있음','var(--critical)'], zero:['비즈포탈 회계매출 0','var(--warn,#b26a00)'], alias:['표기 차이(추정)','var(--s1)'], alias2:['표기 차이(추정)','var(--s1)'], aliasq:['금액만 같음(확인 필요)','var(--warn,#b26a00)'], skip:['실패·중지(참고)','var(--muted)']};
+function bzxPrevNote(name){
+  // 예전 달 biz_recon 에 같은 고객사 사유가 있으면 기본값으로 (같은 차이가 매달 반복될 때 다시 안 적게)
+  var hit=null; (RAWX.biz||[]).forEach(function(r){ if(r.kind==='detail' && r.note && r.item && bzxKeys(r.item).some(function(k){ return bzxKeys(name).indexOf(k)>=0; })){ if(!hit || (r.id||0)>(hit.id||0)) hit=r; } });
+  return hit? String(hit.note).replace(/^🔁\s*/,'') : '';
+}
+function bzxNoteKey(q){ return mk(BZX.res.T)+'|'+q.name; }
+function bzxRender(host){
+  var res=BZX.res, S=res.sum, T=res.T;
+  var box=document.createElement('section'); box.id='bzxBox'; box.style.cssText='margin:6px 0 22px;padding:14px 16px;border:1px solid var(--ring);border-radius:12px;background:var(--surface)';
+  function w(v){ return Math.round(v).toLocaleString('ko-KR'); }
+  var diffsAll=res.groups.filter(function(q){ return ['fee','amt','bizonly','dbonly','alias','zero'].indexOf(q.cat)>=0; }).sort(function(a,b){ return Math.abs(b.diff)-Math.abs(a.diff); });
+  var diffs=diffsAll.filter(function(q){ return !q.rule; }), ruled=diffsAll.filter(function(q){ return q.rule; });
+  var eqs=res.groups.filter(function(q){ return q.cat==='eq'; }), skips=res.groups.filter(function(q){ return q.cat==='skip' || q.skipAmt; });
+  var h='<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:8px"><b style="font-size:15px">📥 비즈포탈 엑셀 자동 대조 — '+mk(T)+'</b><span class="mini" style="color:var(--muted)">'+esc(BZX.file)+' · '+BZX.rows.length+'행 · 파일은 저장하지 않고 이 화면에서만 씁니다</span></div>';
+  h+='<div class="kpis" style="margin-bottom:12px">'+
+    '<div class="kpi"><div class="k">비즈포탈 회계매출 (종료·계산서발행)</div><div class="v">'+w(S.biz/1000)+'<small>천원</small></div><div class="d">실패·중지 '+w(S.skip/1000)+'천원 제외'+(S.ign? ' · 무시 규칙 '+w(S.ignBiz/1000)+'천원 제외':'')+'</div></div>'+
+    '<div class="kpi"><div class="k">관리포탈 매출 (월 매출 + 설치비)</div><div class="v">'+w(S.db/1000)+'<small>천원</small></div><div class="d">이 포탈 DB 의 '+mk(T)+' 인식 금액 · 정산일 '+mk(T)+' 설치비 포함'+(S.ign? ' · 무시 규칙 '+w(S.ignDb/1000)+'천원 제외':'')+'</div></div>'+
+    '<div class="kpi '+(S.diff>=0?'up':'down')+'"><div class="k">차액 (비즈포탈 − 관리포탈)</div><div class="v">'+(S.diff>0?'+':'')+w(S.diff/1000)+'<small>천원</small></div><div class="d">일치 '+(S.n.eq||0)+'곳 · 확인할 차이 '+diffs.length+'곳'+(S.n.alias? ' (표기 차이 추정 '+S.n.alias+'쌍 포함)':'')+(ruled.length? ' · 반복 규칙 '+ruled.length+'곳'+(S.ign? ' (무시 '+S.ign+')':''):'')+'</div></div></div>';
+  (function(){
+    var D=res.diag||{}, total=res.groups.length||1, bad=diffs.length/total;
+    var lines=[];
+    var nearTxt=Object.keys(D.nearCnt||{}).sort().map(function(i){ return mk(+i)+' '+D.nearCnt[i]+'건'; }).join(' · ');
+    lines.push('관리포탈 월 매출(monthly_revenue) '+mk(T)+': 계약 <b>'+(D.dbCts||0)+'건</b>'+(nearTxt? ' <span style="color:var(--muted)">(인접 달: '+nearTxt+')</span>':'')+
+      ((D.dbCts||0)===0? ' — <b style="color:var(--critical)">이 달 인식 금액이 하나도 없습니다. 월 매출 인식이 아직 안 돌았거나 대상 월이 다릅니다</b>':''));
+    if((D.dbCts||0)>0){
+      lines.push('비즈포탈 회계매출 있는 고객사 <b>'+(D.bizCusts||0)+'곳</b> · 이름으로 관리포탈과 붙은 회사 <b>'+(D.matched||0)+'곳</b>'+
+        ((D.bizCusts||0)>0 && (D.matched||0)/(D.bizCusts||1)<0.5? ' — <b style="color:var(--critical)">절반도 안 붙었습니다. 두 쪽 고객사 표기 방식이 체계적으로 다른 것 같습니다 (아래 비슷한 이름 목록에서 패턴을 봐 주세요)</b>':''));
+    } else lines.push('→ 관리포탈에 '+mk(T)+' 월 매출을 먼저 만들고(매출 인식·재계산) 엑셀을 다시 올리면 됩니다. 이 상태의 «비즈포탈에만 있음» 은 전부 그 때문이라 저장하지 마세요.');
+    if(D.unit) lines.push('<b style="color:var(--critical)">⚠ '+D.unit+'</b>');
+    if((D.dbCts||0)>0 && D.nearMiss && D.nearMiss.length) lines.push('비즈포탈에만 있는 회사 중 관리포탈에 <i>비슷한 이름</i>이 있는 경우 (표기 패턴 확인용): '+
+      D.nearMiss.slice(0,12).map(function(x){ return esc(x.biz)+' ≈ <span style="color:var(--s1)">'+esc(x.db)+'</span> ('+Math.round(x.sim*100)+'%)'; }).join(' · '));
+    if(BZX.monthCnt){ var mc=Object.keys(BZX.monthCnt).sort().map(function(k){ return k+' '+BZX.monthCnt[k]+'행'; }).join(' · ');
+      var dropped=Object.keys(BZX.monthCnt).filter(function(k){ return k!==BZX.month; }).reduce(function(a,k){ return a+BZX.monthCnt[k]; },0);
+      lines.unshift('엑셀 «예상시기» 월 분포: '+mc+(dropped? ' — 다른 달로 적힌 '+dropped+'행도 모두 대조에 넣었습니다 (엑셀은 그 달 목록이므로 날짜로 걸러내지 않습니다)':' (전부 '+BZX.month+')')); }
+    var open=bad>0.3 || (D.dbCts||0)===0 || !!D.unit || (BZX.monthCnt && Object.keys(BZX.monthCnt).length>1);
+    h+='<details'+(open?' open':'')+' style="margin:0 0 10px;padding:8px 12px;border:1px dashed var(--ring);border-radius:10px;background:var(--surface-2,rgba(0,0,0,.02))"><summary class="mini" style="cursor:pointer"><b>🩺 대조 진단</b>'+
+       (open? ' <span style="color:var(--critical)">— 차이가 비정상적으로 많아 자동으로 펼쳤습니다. 아래 줄을 확인하세요</span>':'')+'</summary>'+
+       '<div class="mini" style="line-height:1.8;margin-top:6px">'+lines.map(function(l){ return '· '+l; }).join('<br>')+'</div></details>';
+  })();
+  h+='<div style="overflow-x:auto"><table class="pr" style="width:100%;table-layout:fixed"><colgroup><col style="width:130px"><col style="width:24%"><col style="width:100px"><col style="width:100px"><col style="width:100px"><col style="width:200px"><col></colgroup><thead><tr><th>구분</th><th>고객사</th><th class="n">비즈포탈(원)</th><th class="n">관리포탈(원)</th><th class="n">차이(원)</th><th></th><th>사유 <span class="mini" style="color:var(--muted)">(담당자 입력 · 지난달 같은 사유는 미리 채움 · 회색 글은 자동 판단)</span></th></tr></thead><tbody>';
+  if(!diffs.length) h+='<tr><td colspan="7" class="mini" style="color:var(--muted)">'+(ruled.length? '확인할 차이 없음 — 남은 차이는 모두 반복 규칙으로 처리됐습니다 ✓' : '차이 없음 — 전부 일치합니다 🎉')+'</td></tr>';
+  diffs.forEach(function(q,i){
+    var c=BZX_CAT[q.cat==='alias' && q.pairConf==='low'? 'aliasq' : q.cat], key=bzxNoteKey(q), note=(BZX.notes[key]!=null)? BZX.notes[key] : bzxPrevNote(q.name);
+    var pairTxt=q.pair? ' ⇄ '+esc(q.pair.name) : (q.aliasHint? ' <span class="mini" style="color:var(--s1)">⇄ '+esc(q.aliasHint.db)+' (표기 차이 추정)</span>' : '');
+    var auto=q.cat==='fee'? '설치비 '+w(q.bizFee||q.dbFee)+'원 — 비즈포탈은 이 달, 관리포탈 정산일은 '+(q.db.filter(function(d){return d.r.fee;}).map(function(d){ return String(d.r.settle||'').slice(0,7)||'없음'; })[0]||'다른 달')
+           : q.cat==='alias'? (q.pairConf==='low'? '금액만 같고 이름은 전혀 달라 같은 회사인지 확인 필요 — 맞으면 별칭 저장, 아니면 각각 사유 기입' : '양쪽에 같은 금액 — 이름 표기만 다름(별칭 저장 권장)')
+           : (q.cat==='bizonly' && q.dbCts && q.dbCts.length)? '관리포탈에 고객사는 있으나 이 달 매출 없음 — 계약 '+q.dbCts.map(function(r){ return lline(r.line)+' '+(r.startRaw!=null?mk(r.startRaw):'?')+'~'+(r.endRaw!=null?mk(r.endRaw):'')+' '+(r.status||''); }).join(', ')
+           : q.cat==='bizonly'? '관리포탈에 이 고객사가 없음 — 계약 미등록 또는 사명이 전혀 다름'
+           : q.cat==='dbonly'? '관리포탈(이 DB)에는 이 달 매출이 있는데 비즈포탈 엑셀에는 행이 없음 — 비즈포탈 미등록·인식 월 차이·사명 불일치 중 하나'
+           : q.cat==='zero'? ('비즈포탈에 행은 있지만 회계매출이 0 — 매출액 '+w(q.zeroSales)+'원 · '+esc(q.zero.map(function(b){ return (b.st||'')+(b.why? '/'+b.why:''); }).filter(function(x,i,a){ return a.indexOf(x)===i; }).join(', '))+' (하위매출 미등록·수금 변경 행이면 비즈포탈에서 회계매출 등록 필요)')
+           : (q.aliasHint && q.cat==='amt')? ('표기 차이 «'+esc(q.aliasHint.biz)+'» ⇄ «'+esc(q.aliasHint.db)+'» 로 묶어 비교 — 금액이 다릅니다') : '';
+    var bizAmt=q.cat==='alias'? q.bizAmt : q.bizAmt, dbAmt=q.cat==='alias'? q.pair.dbTot : q.dbTot, diff=q.cat==='alias'? 0 : q.diff;
+    h+='<tr data-i="'+i+'"><td><span class="chip" style="pointer-events:none;color:'+c[1]+';border-color:'+c[1]+'">'+c[0]+'</span></td>'+
+       '<td style="overflow-wrap:anywhere;white-space:normal"><b>'+esc(q.name)+'</b>'+pairTxt+(Object.keys(q.names).length>1 && !q.pair? '<div class="mini" style="color:var(--muted)">'+esc(Object.keys(q.names).filter(function(n){return n!==q.name;}).join(' · '))+'</div>':'')+'</td>'+
+       '<td class="n">'+(q.biz.some(bzxCounted)? w(bizAmt):'·')+'</td><td class="n">'+((q.db.length||q.pair)? w(dbAmt):'·')+'</td>'+
+       '<td class="n" style="font-weight:700;color:'+(diff===0?'var(--muted)':diff>0?'var(--ok,#2e7d32)':'var(--critical)')+'">'+(diff>0?'+':'')+w(diff)+'</td>'+
+       '<td style="white-space:normal"><div style="display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center"><button class="chip bzx-det" data-i="'+i+'" title="양쪽 원본 행 보기">내역</button>'+((q.cat==='alias'||q.aliasHint) && !window.IS_VIEWER? '<button class="chip bzx-alias" data-i="'+i+'" title="비즈포탈 표기를 포탈 고객사의 별칭으로 저장 — 다음 달부터 자동으로 맞춰짐">별칭 저장</button>':'')+
+         ((q.cat!=='alias' || q.pairConf==='low') && !window.IS_VIEWER? '<select class="chip bzx-rule" data-i="'+i+'" title="이 회사가 매달 같은 종류의 차이로 잡힐 때 어떻게 할지 — 다시 묻지 않습니다. 사유 기록 = 차액 인정·사유 자동 기록 / 무시 = 우리 차액 아님·총계와 표에서 제외" style="font:inherit;font-size:12px;cursor:pointer;width:124px;max-width:124px;box-sizing:border-box;padding-right:14px;text-overflow:ellipsis"><option value="">🔁 반복 규칙</option><option value="note">사유 기록 반복</option><option value="ignore">무시 반복</option></select>':'')+'</div></td>'+
+       '<td><input class="bzx-note" data-key="'+esc(key)+'" value="'+esc(note)+'" placeholder="'+esc(auto||'왜 다른지 한 줄로')+'" title="'+esc(auto||'')+'" style="width:100%;box-sizing:border-box;font:inherit;padding:5px 8px;border:1px solid var(--ring);border-radius:8px;background:var(--surface-2);color:inherit"></td></tr>';
+    h+='<tr class="bzx-detrow" data-i="'+i+'" style="display:none"><td colspan="7" style="background:var(--surface-2,rgba(0,0,0,.02))"><div class="mini" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'+
+       '<div><b>비즈포탈 행</b>'+(q.biz.length? '<table class="pr" style="margin-top:4px"><tbody>'+q.biz.map(function(b){ return '<tr><td>'+esc(b.proj)+'</td><td>'+esc(b.st)+'</td><td class="n">'+w(b.acc)+'</td><td class="mini">'+esc(b.why||'')+'</td></tr>'; }).join('')+'</tbody></table>' : '<div style="color:var(--muted)">없음</div>')+'</div>'+
+       '<div><b>관리포탈 계약 (이 DB)</b>'+((q.pair? q.pair.db : q.db).length? '<table class="pr" style="margin-top:4px"><tbody>'+(q.pair? q.pair.db : q.db).map(function(d){ return '<tr><td>'+esc(d.cust)+'</td><td>'+esc(lline(d.line))+' · '+esc(d.status||'')+'</td><td class="n">'+w(d.amt)+(d.fee? ' + 설치비 '+w(d.fee):'')+'</td><td class="mini">'+esc((d.note||'').slice(0,40))+'</td></tr>'; }).join('')+'</tbody></table>' : '<div style="color:var(--muted)">이 달 매출 없음'+(q.cat==='bizonly'? ' — 계약 미등록·사명 불일치·인식 월 차이 중 하나':'')+'</div>')+'</div></div></td></tr>';
+  });
+  h+='</tbody></table></div>';
+  h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px">'+
+     (ruled.length? '<button class="chip" id="bzxRuled" aria-pressed="'+BZX.showRuled+'" title="한 번 정한 규칙으로 매달 자동 처리되는 차이 — 사유 기록 반복은 저장 시 사유가 붙어 기록되고, 무시 반복은 총계·표에서 빠집니다">🔁 반복 규칙 '+ruled.length+'곳 · 기록 '+(ruled.length-S.ign)+' / 무시 '+S.ign+' '+(BZX.showRuled?'접기':'보기')+'</button>':'')+
+     '<button class="chip" id="bzxEq" aria-pressed="'+BZX.showEq+'">일치 '+eqs.length+'곳 '+(BZX.showEq?'접기':'보기')+'</button>'+
+     '<button class="chip" id="bzxSkip" aria-pressed="'+BZX.showSkip+'">실패·중지 참고 '+skips.length+'곳 · '+w(S.skip/1000)+'천원 '+(BZX.showSkip?'접기':'보기')+'</button>'+
+     '<span class="spacer" style="flex:1"></span>'+
+     (window.IS_VIEWER? '' : '<button class="pill" id="bzxSave" style="background:var(--s1);border-color:var(--s1);color:#fff">💾 비즈포탈 차액 표에 저장 ('+(T!=null? (+mk(T).slice(5,7))+'월':'')+')</button>')+
+     '<button class="pill ghost" id="bzxClose">닫기</button></div>';
+  if(BZX.showRuled && ruled.length) h+='<div class="mini" style="margin-top:8px"><b>🔁 반복 규칙으로 처리된 차이</b> — <b>사유 기록</b>은 저장 시 사유가 붙어 차액 표에 남고, <b>무시</b>는 우리 차액이 아닌 것으로 보아 총계·표에서 빠집니다. 차이 종류가 바뀌면 자동으로 다시 확인 표에 올라옵니다<table class="pr" style="margin-top:4px"><thead><tr><th>규칙</th><th>구분</th><th>고객사</th><th class="n">비즈포탈</th><th class="n">포탈</th><th class="n">차이</th><th>사유(규칙)</th><th></th></tr></thead><tbody>'+
+    ruled.map(function(q){ var c=BZX_CAT[q.cat], ig=q.rule.mode==='ignore'; return '<tr'+(ig? ' style="color:var(--muted)"':'')+'><td><span class="chip" style="pointer-events:none;'+(ig? 'color:var(--muted)':'color:var(--s1);border-color:var(--s1)')+'">'+(ig? '무시':'사유 기록')+'</span></td><td><span class="chip" style="pointer-events:none;color:'+c[1]+';border-color:'+c[1]+'">'+c[0]+'</span></td><td>'+esc(q.name)+'</td><td class="n">'+(q.bizAmt? w(q.bizAmt):'·')+'</td><td class="n">'+(q.dbTot? w(q.dbTot):'·')+'</td><td class="n">'+(q.diff>0?'+':'')+w(q.diff)+'</td><td>'+esc(q.rule.note)+' <span style="color:var(--muted)">('+String(q.rule.created_at||'').slice(0,10)+(q.rule.created_by? ' · '+esc(q.rule.created_by):'')+')</span></td><td>'+(window.IS_VIEWER? '' : '<button class="chip bzx-unrule" data-id="'+q.rule.id+'" title="규칙을 끄면 다음 대조부터 다시 확인 표에 나옵니다">규칙 해제</button>')+'</td></tr>'; }).join('')+'</tbody></table></div>';
+  if(BZX.showEq) h+='<div class="mini" style="margin-top:8px;line-height:1.7"><b>일치</b> — '+eqs.map(function(q){ return esc(q.name)+' '+w(q.bizAmt); }).join(' · ')+'</div>';
+  if(BZX.showSkip) h+='<div class="mini" style="margin-top:8px"><b>실패·중지 행</b> (회계매출이 적혀 있어도 비교에서 뺐습니다 — 중복 등록·해지 건)<table class="pr" style="margin-top:4px"><tbody>'+skips.map(function(q){ return q.biz.filter(function(b){ return !bzxCounted(b); }).map(function(b){ return '<tr><td>'+esc(b.cust)+'</td><td>'+esc(b.proj)+'</td><td>'+esc(b.st)+'</td><td class="n">'+w(b.acc)+'</td><td class="mini">'+esc(b.why||'')+'</td></tr>'; }).join(''); }).join('')+'</tbody></table></div>';
+  h+='<div style="margin-top:10px">'+helpBox('bzx','이 대조는 어떻게 계산하나요?',[
+    ['비즈포탈 쪽','엑셀에서 쓰는 열은 «고객사»·«회계매출»·«진행상태» 셋뿐입니다. 진행상태가 «종료»·«계산서발행» 인 행의 «회계매출» 합 (실패·중지·취소류만 비교에서 빼고 참고로 보여줍니다). 행은 있는데 회계매출이 0 인 회사(상위 행만 있고 하위매출 미등록, 수금 변경 행)는 «비즈포탈 회계매출 0» 으로 따로 잡습니다. «예상시기» 는 대상 월 이름을 정할 때만 쓰고 행을 걸러내지 않습니다.'],
+    ['관리포탈 쪽','이 통합 관리 포탈 DB 의 그 달 계약별 월 매출(monthly_revenue) 합 + 대금정산일이 그 달인 설치비. 비즈포탈은 설치비를 별도 행으로 잡기 때문에 같이 봐야 맞습니다. 표에서 «관리포탈» 은 항상 이 포탈, «비즈포탈» 은 올린 엑셀을 뜻합니다.'],
+    ['회사 묶기','띄어쓰기·㈜·(에스원)·괄호 안 사이트명·사명 변경 별칭을 무시하고 회사 단위로 묶습니다(두산에너빌리티 사우디/괌/이집트 → 1곳). 이름이 한 글자 오타 수준으로 닮은 짝(브랜드/브랜즈, 에프엔비/에프앤비)은 금액이 달라도 한 회사로 묶어 비교하고 «⇄ 표기 차이 추정» 으로 표시합니다. 그 위에 «비즈포탈에만 있음» = 엑셀에만 있음, «관리포탈에만 있음» = 이 포탈 DB 에만 있음입니다. 이름은 전혀 다른데 양쪽 금액이 같으면 «표기 차이(추정)»로 짝을 제안합니다. «별칭 저장»을 누르면 다음 달부터 자동으로 맞춰집니다.'],
+    ['사유','차이 행마다 담당자가 한 줄로 적습니다. 지난달에 같은 고객사로 적은 사유가 있으면 미리 채워 두니 확인만 하면 됩니다. 「저장」을 누르면 요약 3줄 + 고객사별 차이가 아래 «비즈포탈 차액» 표에 들어갑니다.'],
+    ['🔁 매달 반복','<b>매달 같은 이유로 생기는 차이</b>는 사유를 적고 «매달 반복»에서 종류를 고르면 규칙으로 저장돼 다음 달부터 묻지 않습니다. <b>사유 기록 반복</b> = 차액은 그대로 인정하고 저장할 때 이 사유가 자동으로 붙어 기록됨(예: 설치비 인식 시점, 분기납 인식 차이). <b>무시 반복</b> = 우리 쪽 차액이 아닌 것(다른 부서 담당자가 등록하는 조달 건 등)으로 보고 총계·고객사별 표에서 아예 빼며 기록하지 않음. 둘 다 «반복 규칙» 묶음에서 확인·해제할 수 있고, 차이 종류가 바뀌면(예: 포탈에만 있음 → 금액 다름) 다시 확인을 받습니다.'],
+    ['엑셀 파일','저장하지 않습니다. 화면을 닫으면 사라지고, 다음 달에는 새 파일을 다시 올리면 됩니다.']
+  ])+'</div>';
+  box.innerHTML=h; host.insertBefore(box, host.firstChild.nextSibling);
+  helpWire(box);
+  box.querySelectorAll('.bzx-note').forEach(function(inp){ inp.oninput=function(){ BZX.notes[inp.dataset.key]=inp.value; }; });
+  box.querySelectorAll('.bzx-det').forEach(function(b){ b.onclick=function(){ var r=box.querySelector('.bzx-detrow[data-i="'+b.dataset.i+'"]'); r.style.display=r.style.display==='none'? '':'none'; }; });
+  box.querySelectorAll('.bzx-alias').forEach(function(b){ b.onclick=function(){ bzxSaveAlias(diffs[+b.dataset.i]); }; });
+  box.querySelectorAll('.bzx-rule').forEach(function(sel){ sel.onchange=function(){ var m=sel.value; sel.value=''; if(m) bzxSaveRule(diffs[+sel.dataset.i], m); }; });
+  box.querySelectorAll('.bzx-unrule').forEach(function(b){ b.onclick=function(){ bzxDropRule(+b.dataset.id); }; });
+  var rb=box.querySelector('#bzxRuled'); if(rb) rb.onclick=function(){ BZX.showRuled=!BZX.showRuled; renderBizMonthly(); };
+  box.querySelector('#bzxEq').onclick=function(){ BZX.showEq=!BZX.showEq; renderBizMonthly(); };
+  box.querySelector('#bzxSkip').onclick=function(){ BZX.showSkip=!BZX.showSkip; renderBizMonthly(); };
+  box.querySelector('#bzxClose').onclick=function(){ BZX.res=null; BZX.rows=null; renderBizMonthly(); };
+  var sv=box.querySelector('#bzxSave'); if(sv) sv.onclick=function(){ bzxSave(diffs); };
+}
+async function bzxSaveRule(q, mode){
+  if(!SB_TOKEN){ openOvl('ovlAuth'); return; }
+  mode=(mode==='ignore')? 'ignore':'note';
+  var cat=(q.cat==='alias')? (q.bizAmt? 'bizonly':'dbonly') : q.cat;      // 금액만 같은 짝을 규칙으로 → 비즈포탈만/포탈만 규칙으로
+  var note=BZX.notes[bzxNoteKey(q)]; if(note==null) note=bzxPrevNote(q.name);
+  if(!note){ note=prompt('«'+q.name+'» 가 매달 «'+BZX_CAT[cat][0]+'»으로 잡힐 때 '+(mode==='ignore'? '무시하는 이유':'붙일 사유')+'를 적어주세요'); if(!note) return; BZX.notes[bzxNoteKey(q)]=note; }
+  var what=(mode==='ignore')? '무시 반복 — 우리 차액이 아닌 것으로 보고 총계·고객사별 표에서 빼며 기록하지 않습니다' : '사유 기록 반복 — 저장할 때 이 사유가 자동으로 붙어 차액 표에 기록됩니다';
+  if(!confirm('«'+q.name+'» · '+BZX_CAT[cat][0]+'\n사유: '+note+'\n\n'+what+'\n다음 달부터 같은 종류의 차이는 묻지 않습니다. 저장할까요?')) return;
+  try{
+    var ins=await sbWrite('POST','biz_rules?select=*',[{name:q.name, cat:cat, note:note, mode:mode, created_by:(window.AUTH_USER||null)}],'return=representation');
+    RAWX.bizRules=(RAWX.bizRules||[]).concat((ins||[]).map(function(r){ if(!r.mode) r.mode=mode; return r; }));
+    logChange('insert','biz_rules',(ins&&ins[0]&&ins[0].id)||0,{name:q.name, cat:cat, mode:mode, note:note});
+    toast('반복 규칙 저장', q.name+' — '+(mode==='ignore'? '무시':'사유 기록')+' · 다음 달부터 자동 처리');
+    BZX.res=bzxCompare(BZX.rows, BZX.res.T); BZX.showRuled=true; renderBizMonthly();
+  }catch(e){ var m=String(e.message||e); toast('규칙 저장 실패', /biz_rules|relation|404/.test(m)? '65_biz_rules.sql 을 먼저 실행해야 합니다' : m.slice(0,120), 'info'); }
+}
+async function bzxDropRule(id){
+  if(!SB_TOKEN){ openOvl('ovlAuth'); return; }
+  var r=(RAWX.bizRules||[]).filter(function(x){ return x.id===id; })[0]; if(!r) return;
+  if(!confirm('«'+r.name+'» 반복 규칙을 해제할까요? 다음 대조부터 다시 확인 표에 나옵니다.')) return;
+  try{
+    await sbWrite('PATCH','biz_rules?id=eq.'+id,{active:false, updated_at:new Date().toISOString()});
+    RAWX.bizRules=(RAWX.bizRules||[]).filter(function(x){ return x.id!==id; });
+    logChange('update','biz_rules',id,{active:false});
+    toast('규칙 해제', r.name);
+    BZX.res=bzxCompare(BZX.rows, BZX.res.T); renderBizMonthly();
+  }catch(e){ toast('규칙 해제 실패', String(e.message||e).slice(0,120), 'info'); }
+}
+async function bzxSaveAlias(q){
+  if(!SB_TOKEN){ openOvl('ovlAuth'); return; }
+  var dbSide=(q.pair? q.pair.db : q.db)||[], dbName=dbSide[0] && dbSide[0].cust, bizName=q.bizName||(q.biz[0] && q.biz[0].cust);
+  if(!dbName||!bizName) return;
+  var al=String(bizName).replace(/\s*\((에스원|S1)\)\s*$/,'').trim();
+  if(!confirm('«'+al+'» 를 포탈 고객사 «'+dbName+'» 의 별칭으로 저장할까요?\n다음 달부터 이 표기는 자동으로 같은 회사로 맞춰집니다.')) return;
+  try{
+    var cu=(SB_RAW.customers||[]).filter(function(c){ return c.name===dbName; })[0]; if(!cu) throw new Error('고객사 마스터에서 찾지 못했습니다');
+    var next=(cu.aliases||[]).slice(); if(next.indexOf(al)<0) next.push(al);
+    await sbWrite('PATCH','customers?id=eq.'+cu.id,{aliases:next});
+    cu.aliases=next; logChange('update','customers',cu.id,{alias_add:al, from:'비즈포탈 대조'});
+    toast('별칭 저장', al+' → '+dbName);
+    BZX.res=bzxCompare(BZX.rows, BZX.res.T); renderBizMonthly();
+  }catch(e){ toast('별칭 저장 실패', String(e.message||e), 'info'); }
+}
+async function bzxSave(diffs){
+  if(!SB_TOKEN){ openOvl('ovlAuth'); return; }
+  var res=BZX.res, T=res.T, ym=(+mk(T).slice(5,7))+'월', y=+mk(T).slice(0,4);
+  var today=todayStr(), asof=(+today.slice(0,4)===y)? today : (y+'-'+mk(T).slice(5,7)+'-'+('0'+new Date(y,+mk(T).slice(5,7),0).getDate()).slice(-2));
+  var exists=(RAWX.biz||[]).some(function(r){ return r.ym===ym; });
+  if(exists && !confirm(ym+' 대조 결과가 이미 있습니다. 이번 자동 대조 결과로 바꿀까요?')) return;
+  var out=[
+    {ym:ym, as_of:asof, kind:'sum', item:'비즈포탈 회계매출', biz:Math.round(res.sum.biz)},
+    {ym:ym, as_of:asof, kind:'sum', item:'관리포탈 매출', biz:Math.round(res.sum.db)},
+    {ym:ym, as_of:asof, kind:'sum', item:'차액 총계', biz:res.sum.diff}
+  ];
+  // 반복 규칙으로 처리된 차이도 표에는 들어감 (사유 = 규칙 문장)
+  BZX.res.groups.filter(function(q){ return q.rule && q.rule.mode!=='ignore'; }).forEach(function(q){
+    out.push({ym:ym, as_of:asof, kind:'detail', item:q.name, biz:Math.round(q.bizAmt), sheet:Math.round(q.dbTot), diff:q.diff, note:'🔁 '+q.rule.note});
+  });
+  var nIgn=BZX.res.groups.filter(function(q){ return q.rule && q.rule.mode==='ignore'; }).length;   // 요약 3줄(res.sum)은 무시 규칙을 이미 뺀 금액
+  diffs.forEach(function(q){
+    if(q.cat==='alias' && q.pairConf!=='low') return;   // 표기 차이는 금액 차이가 아니므로 표에 넣지 않음 (별칭 저장으로 해결)
+    if(q.cat==='alias'){ var note2=BZX.notes[bzxNoteKey(q)]||bzxPrevNote(q.name)||('금액만 같은 짝(확인 필요): '+q.pair.name);
+      out.push({ym:ym, as_of:asof, kind:'detail', item:q.name, biz:Math.round(q.bizAmt), sheet:0, diff:Math.round(q.bizAmt), note:note2});
+      out.push({ym:ym, as_of:asof, kind:'detail', item:q.pair.name, biz:0, sheet:Math.round(q.pair.dbTot), diff:-Math.round(q.pair.dbTot), note:note2}); return; }
+    var note=BZX.notes[bzxNoteKey(q)]; if(note==null) note=bzxPrevNote(q.name);
+    if(!note && q.cat==='fee') note='설치비 인식 시점 차이 (비즈포탈 '+mk(T)+' · 포탈 정산일 기준)';
+    out.push({ym:ym, as_of:asof, kind:'detail', item:q.name, biz:Math.round(q.bizAmt), sheet:Math.round(q.dbTot), diff:q.diff, note:note||null});
+  });
+  try{
+    await sbWrite('DELETE','biz_recon?ym=eq.'+encodeURIComponent(ym));
+    var ins=await sbWrite('POST','biz_recon?select=*',out,'return=representation');
+    RAWX.biz=(RAWX.biz||[]).filter(function(r){return r.ym!==ym;}).concat(ins||[]);
+    logChange('update','biz_recon',0,{ym:ym, rows:out.length, from:'엑셀 자동 대조', file:BZX.file, ignored_by_rule:nIgn});
+    toast('저장되었습니다', ym+' 비즈포탈 대조 결과 · 차이 '+(out.length-3)+'곳');
+    DIRTY=true; BIZV.ym=ym; BZX.res=null; BZX.rows=null; renderBizMonthly();
+  }catch(e){ toast('저장 실패', String(e.message||e), 'info'); }
+}
+async function bzxOpenFile(file){
+  if(!file) return;
+  var msgEl=$('#dvMsg'); msgEl.textContent='엑셀 읽는 중…';
+  try{
+    await bzxLoadLib(); await bzxRules();
+    var buf=await file.arrayBuffer();
+    var rows=bzxParse(buf);
+    var mi=bzxMonthIdx(rows);
+    if(mi.idx==null) throw new Error('«예상시기» 열에서 대상 월을 읽지 못했습니다.');
+    /* 엑셀은 이미 «그 달» 매출 목록입니다 — 고객사·회계매출·진행상태만 쓰고, 날짜 열은 대상 월 이름을 정하는 데만 씁니다.
+       (예전엔 «예상시기» 가 다른 달로 읽힌 행을 버렸는데, 날짜 해석 오류로 8/1 자 하위매출 84행이 통째로 빠지는 사고가 났습니다) */
+    if(mi.months.length>1) toast('예상시기에 여러 달이 섞여 있음', mi.months.join(', ')+' — 행은 모두 대조에 넣고 대상 월은 '+mi.ym+' 로 표시합니다', 'info');
+    BZX.rows=rows;
+    BZX.file=file.name; BZX.month=mi.ym; BZX.monthCnt=mi.cnt; BZX.notes={}; BZX.showEq=false; BZX.showSkip=false;
+    BZX.res=bzxCompare(BZX.rows, mi.idx);
+    msgEl.textContent='';
+    renderBizMonthly();
+  }catch(e){ msgEl.textContent=String(e.message||e); toast('엑셀 대조 실패', String(e.message||e).slice(0,120), 'info'); }
+}
+
+/* ===== 사업 영역 계약 목록 — 고객사별 최신 1건 + 이력 보기 + 열 필터 ===== */
+var CHV={key:null, all:[], q:'', filters:{}, sortK:'mrr', sortDir:-1};
+var CHV_COLS=[
+  {k:'cust',    l:'고객사', link:true, text:function(r){ return r.cust||''; }},
+  {k:'csm',     l:'CSM(사이트명)', text:function(r){ return r.csm||''; }},
+  {k:'line',    l:'서비스', text:function(r){ return lline(r.line)||''; }},
+  {k:'ptn',     l:'파트너', text:function(r){ return r.ptn||''; }},
+  {k:'partner', l:'계산서발행처', text:function(r){ return r.partner||''; }},
+  {k:'ctype',   l:'구분',   text:function(r){ return r.ctype||''; }},
+  {k:'status',  l:'상태',   text:function(r){ return r.status||''; }},
+  {k:'start',   l:'시작월', text:function(r){ return mk(r.startIdx)||''; }},
+  {k:'end',     l:'종료월', text:function(r){ return mk(r.endIdx)||''; }},
+  {k:'mrr',     l:'MRR(천원)', num:true, right:true, text:function(r){ return Math.round((r.mrr||0)/1000).toLocaleString('ko-KR'); }},
+  {k:'hist',    l:'이력',   text:function(r){ return (r._hist? r._hist.length:1)+'건'; }}
+];
+function chvText(c,r){ var t=String(c.text(r)||'').trim(); return t===''? BLANK_LABEL : t; }
+
+/* 고객사별로 «가장 최근» 계약 1건만 남기고, 나머지는 _hist 에 담는다
+   최신 기준: 시작월 → 종료월 → MRR 순 (모두 큰 쪽이 최신) */
+function chvLatest(rows){
+  var by={}, order=[];
+  rows.forEach(function(r){
+    var k=r.cust||'?';
+    if(!by[k]){ by[k]=[]; order.push(k); }
+    by[k].push(r);
+  });
+  return order.map(function(k){
+    var arr=by[k].slice().sort(function(a,b){
+      return (b.startIdx-a.startIdx) || (b.endIdx-a.endIdx) || ((b.mrr||0)-(a.mrr||0));
+    });
+    var top=Object.create(arr[0]);      // 원본을 건드리지 않고 _hist 만 얹는다
+    top._hist=arr;
+    return top;
+  });
+}
+function chvPass(r,skipK){
+  for(var k in CHV.filters){
+    if(k===skipK) continue;
+    var sel=CHV.filters[k]; if(!sel||!sel.length) continue;
+    var col=null;
+    for(var i=0;i<CHV_COLS.length;i++){ if(CHV_COLS[i].k===k){ col=CHV_COLS[i]; break; } }
+    if(!col) continue;
+    if(sel.indexOf(chvText(col,r))<0) return false;
+  }
+  return true;
+}
+function chvBase(skipK){
+  var q=(($('#chvQ')&&$('#chvQ').value)||'').trim().toLowerCase();
+  var toks=q? q.split(/\s+/).filter(Boolean):[];
+  return chvLatest(CHV.all).filter(function(r){
+    if(!chvPass(r,skipK)) return false;
+    if(!toks.length) return true;
+    var hay='';
+    CHV_COLS.forEach(function(c){ hay+=String(c.text(r)||'').replace(/\s+/g,''); });
+    (r._hist||[]).forEach(function(h){ hay+=String(h.note||'').replace(/\s+/g,''); });
+    hay=hay.toLowerCase();
+    return toks.every(function(t){ return hay.indexOf(t.replace(/\s+/g,''))>=0; });
+  });
+}
+function renderChvTable(){
+  var rows=chvBase(null);
+  if(CHV.sortK){
+    var col=null;
+    for(var i=0;i<CHV_COLS.length;i++){ if(CHV_COLS[i].k===CHV.sortK){ col=CHV_COLS[i]; break; } }
+    if(col) rows=rows.slice().sort(function(a,b){
+      if(col.num) return ((a.mrr||0)-(b.mrr||0))*CHV.sortDir;
+      if(col.k==='hist') return (((a._hist?a._hist.length:1)-(b._hist?b._hist.length:1)))*CHV.sortDir;
+      return String(col.text(a)).localeCompare(String(col.text(b)),'ko')*CHV.sortDir;
+    });
+  }
+  var nAll=chvLatest(CHV.all).length, nDup=CHV.all.length-nAll;
+  $('#chvCtCap').textContent='고객사 '+nAll.toLocaleString('ko-KR')+'곳 · 고객사마다 가장 최근 계약 1건만 표시'+
+    (nDup>0? ' · 재약정·추가 등 이전 이력 '+nDup+'건은 고객사명을 눌러서 확인 (MRR은 그 계약 1건 기준, 고객사 합계는 이력 창에서)':'');
+  $('#chvCnt').textContent=rows.length.toLocaleString('ko-KR')+'곳'+(rows.length!==nAll? ' / '+nAll+'곳':'');
+  var nf=0; for(var k in CHV.filters){ if(CHV.filters[k]&&CHV.filters[k].length) nf++; }
+  var fb=$('#chvFclr'); fb.style.display=nf? '':'none'; fb.textContent='✕ 필터 해제 ('+nf+')';
+
+  var t=$('#chvCt');
+  t.innerHTML='<thead><tr>'+CHV_COLS.map(function(c){
+      return '<th'+(c.right?' class="n"':'')+'></th>'; }).join('')+'</tr></thead>'+
+    '<tbody>'+rows.slice(0,300).map(function(r,i){
+      return '<tr data-i="'+i+'">'+CHV_COLS.map(function(c){
+        var txt=chvText(c,r); if(txt===BLANK_LABEL) txt='·';
+        if(c.link){
+          var n=(r._hist? r._hist.length:1);
+          return '<td><a href="#" class="chv-cust" data-i="'+i+'" style="color:var(--s1);font-weight:700;text-decoration:none">'+
+                 esc(txt)+'</a>'+(n>1? ' <span class="mini" style="opacity:.65">('+n+')</span>':'')+'</td>';
+        }
+        return '<td'+(c.right?' class="n"':'')+'>'+esc(txt)+'</td>';
+      }).join('')+'</tr>';
+    }).join('')+'</tbody>';
+
+  // 헤더 (정렬 + 값 골라 보기)
+  var ths=t.querySelectorAll('thead th');
+  CHV_COLS.forEach(function(c,ci){
+    var th=ths[ci];
+    var on=!!(CHV.filters[c.k] && CHV.filters[c.k].length);
+    var wrap=document.createElement('div'); wrap.className='thw';
+    var lab=document.createElement('span');
+    lab.textContent=c.l+(CHV.sortK===c.k? (CHV.sortDir>0?' ▲':' ▼'):'');
+    lab.style.cursor='pointer'; lab.title='클릭: 정렬';
+    lab.onclick=function(){
+      if(CHV.sortK===c.k) CHV.sortDir*=-1; else { CHV.sortK=c.k; CHV.sortDir=1; }
+      renderChvTable();
+    };
+    var fb2=document.createElement('button');
+    fb2.type='button'; fb2.className='fbtn'+(on?' on':''); fb2.textContent='▼';
+    fb2.title=on? '필터 적용 중 — 클릭해서 바꾸기':'값 골라 보기';
+    fb2.onclick=function(ev){
+      ev.stopPropagation();
+      var base=chvBase(c.k), cnt={}, order=[];
+      base.forEach(function(r){
+        var v=chvText(c,r);
+        if(cnt[v]===undefined){ cnt[v]=0; order.push(v); }
+        cnt[v]++;
+      });
+      openFilterPanel(fb2,{ label:c.l, order:order, cnt:cnt, num:!!c.num,
+        selected:CHV.filters[c.k]||null,
+        onApply:function(sel){
+          if(sel) CHV.filters[c.k]=sel; else delete CHV.filters[c.k];
+          renderChvTable();
+        }});
+    };
+    wrap.appendChild(lab); wrap.appendChild(fb2);
+    th.appendChild(wrap);
+  });
+
+  t.querySelectorAll('a.chv-cust').forEach(function(a){
+    a.onclick=function(ev){ ev.preventDefault(); openChvHist(rows[+a.dataset.i]); };
+  });
+}
+
+/* 고객사 계약 이력 (중복 포함) */
+function openChvHist(r){
+  if(!r) return;
+  var hist=(r._hist||[r]).slice();
+  $('#chvHTitle').textContent=r.cust||'?';
+  var b0=STATE.base, live=hist.filter(function(h){ return h.startIdx<=b0 && h.endIdx>=b0; });
+  var sum=live.reduce(function(a,h){ return a+(h.mrr||0); },0);
+  $('#chvHCap').textContent=(CH_DEFS[CHV.key]? CH_DEFS[CHV.key][0].replace(/^\S+ /,'')+' · ':'')+hist.length+'건 · 최근 계약이 위쪽입니다'+
+    (live.length? ' · '+baseLabel()+' 유효 '+live.length+'건, 합계 MRR '+won(sum)+'천원' : ' · '+baseLabel()+' 유효 계약 없음');
+  $('#chvHBody').innerHTML='<div class="tbl-wrap" style="max-height:min(58vh,460px)"><table class="dgrid">'+
+    '<thead><tr><th>서비스</th><th>파트너</th><th>계산서발행처</th><th>구분</th><th>상태</th>'+
+    '<th>시작월</th><th>종료월</th><th class="n">MRR</th><th>비고</th></tr></thead><tbody>'+
+    hist.map(function(h,i){
+      return '<tr'+(i===0?' style="background:rgba(20,158,64,.07)"':'')+'>'+
+        '<td>'+esc(lline(h.line)||'·')+'</td><td>'+esc(h.ptn||'·')+'</td><td>'+esc(h.partner||'·')+'</td>'+
+        '<td>'+esc(h.ctype||'·')+'</td><td>'+esc(h.status||'·')+'</td>'+
+        '<td>'+esc(mk(h.startIdx)||'·')+'</td><td>'+esc(mk(h.endIdx)||'·')+'</td>'+
+        '<td class="n">'+won(h.mrr||0)+'천원</td>'+
+        '<td>'+esc([h.note,h.churn].filter(Boolean).join(' · ')||'·')+'</td></tr>';
+    }).join('')+'</tbody></table></div>';
+  openOvl('ovlChvHist');
+}
+
+/* ---- 사업 영역(판매 채널) 화면 ---- */
+function chOf(r){ return r.channel||'일반'; }   // «공공»은 산업군 오인 표기 — 조달로 집계하지 않음 (48단계 SQL로 정리)
+/* [라벨, 장비 채널(''=장비 타일 없음), 설명, 매처(r)] — 제품 × 채널로 세분화 */
+var CH_DEFS={
+  cngen:['🤝 Cloud NAC · 일반 판매','',        '파트너 경유 + 직판 (Cloud NAC · 조달·LG U+ 제외)',
+         function(r){ return r.line==='Cloud' && chOf(r)!=='조달' && chOf(r)!=='LGU+'; }],   /* 조달·LG U+ 는 각각 따로 — 셋을 더하면 Cloud NAC 전체 */
+  cnpub:['🏛️ Cloud NAC · 조달 판매','조달',    '조달(공공) 사업 (Cloud NAC)',
+         function(r){ return r.line==='Cloud' && chOf(r)==='조달'; }],
+  cns1: ['🔒 Cloud NAC · 에스원','에스원',      '에스원 채널 — S1 Cloud NAC',
+         function(r){ return r.line==='S1'; }],
+  cnlgu:['📶 Cloud NAC · LG U+','LGU+',        'LG U+ 경유 판매 (Cloud NAC)',
+         function(r){ return r.line==='Cloud' && chOf(r)==='LGU+'; }],
+  chdist:['📀 DLP/DRM','',                      '블루문소프트 DLP·DRM 유통 사업',
+         function(r){ return r.line==='DRM'||r.line==='DLP'; }],
+  cnpns:['🧷 PNS','',                           'SSL PNS 사업',
+         function(r){ return r.line==='PNS'; }],
+  mdrgen:['🤝 MDR · 일반 판매','',              'MDR (에스원·LG U+ 외 전 채널)',
+         function(r){ return r.line==='MDR' && chOf(r)!=='LGU+'; }],
+  mdrs1:['🔒 MDR · 에스원','에스원',            '에스원 채널 — S1 MDR',
+         function(r){ return r.line==='MDR_S1'; }],
+  mdrlgu:['📶 MDR · LG U+','LGU+',              'LG U+ 경유 판매 (MDR)',
+         function(r){ return r.line==='MDR' && chOf(r)==='LGU+'; }]
+};
+
+/* 계약이 하나도 없는 사업 영역 메뉴는 숨기고, 계약이 생기면 자동으로 나타납니다 */
+function applyChannelMenu(){
+  if(window.IS_EQUIP || !DATA || !DATA.rows) return;
+  Object.keys(CH_DEFS).forEach(function(k){
+    var btn=document.querySelector('.side button[data-v="'+k+'"]');
+    if(!btn) return;
+    var has=false;
+    for(var i=0;i<DATA.rows.length;i++){ if(CH_DEFS[k][3](DATA.rows[i])){ has=true; break; } }
+    btn.style.display=has? '':'none';
+  });
+  // 그룹 안 버튼이 전부 숨었으면 그룹 제목도 숨김
+  document.querySelectorAll('.side .grp[data-chgrp]').forEach(function(g){
+    var el=g.nextElementSibling, vis=false;
+    while(el && !el.classList.contains('grp')){
+      if(el.tagName==='BUTTON' && el.style.display!=='none') vis=true;
+      el=el.nextElementSibling;
+    }
+    g.style.display=vis? '':'none';
+  });
+}
+/* LIVE 고객사 탭의 각 행(사이트)을 사업 영역 하나에 배정합니다 — 대시보드 «LIVE 고객사» 수와 영역별 합이 맞도록.
+   제품은 LIVE 행의 서비스, 채널은 같은 고객·서비스의 가장 최근 계약 채널(없으면 일반).
+   Cloud 는 조달/LGU+ 외 전부 일반, MDR 은 LGU+ 외 전부 일반으로 묶습니다. */
+function liveAreaKey(x){
+  var line=x.line||'';
+  if(line==='S1') return 'cns1';
+  if(line==='MDR_S1') return 'mdrs1';
+  if(line==='PNS') return 'cnpns';
+  if(line==='DRM'||line==='DLP') return 'chdist';
+  var ch=liveChannel(x);
+  if(line==='Cloud') return ch==='조달'? 'cnpub' : ch==='LGU+'? 'cnlgu' : 'cngen';   /* 일반 + 조달 + LG U+ = Cloud NAC 전체 */
+  if(line==='MDR')   return ch==='LGU+'? 'mdrlgu' : 'mdrgen';
+  return null;
+}
+/* 같은 서비스(LIVE 탭 «서비스» 열)의 영역 합계 — LIVE 탭에서 서비스로 걸렀을 때 나오는 수와 같아야 합니다 */
+var LIVE_GROUPS={ 'Cloud NAC':['cngen','cnpub','cnlgu'], 'MDR':['mdrgen','mdrlgu'] };
+function liveGroupNote(key){
+  var g=Object.keys(LIVE_GROUPS).filter(function(n){ return LIVE_GROUPS[n].indexOf(key)>=0; })[0];
+  if(!g) return 'LIVE 고객사 탭 기준';
+  var parts=LIVE_GROUPS[g].map(function(k){ return (CH_DEFS[k][0].replace(/^\S+ /,'').split(' · ')[1]||k)+' '+liveN(liveForArea(k)); });
+  var tot=LIVE_GROUPS[g].reduce(function(a,k){ return a+liveN(liveForArea(k)); },0);
+  return 'LIVE 명단 '+g+' 전체 '+tot+'곳 = '+parts.join(' + ');
+}
+/* ─────────────────────────────────────────────────────────────────────────────
+   LIVE 고객사 = 계약을 등록하면 자동으로 따라오는 결과 (64단계 · DB 함수 live_view() 와 같은 규칙)
+   · 원계약만 · 상태 통합과금/추가 아님 · 구분 추가 아님 · no_count 아님 · H/W 아님
+   · 시작월 ≤ 기준월 · (종료월 없음 | 종료월 > 기준월 | 종료월 = 기준월이면서 해지 아님) — 해지는 해지월부터 빠짐
+   · CN전환(에스원 통합 과금)은 종료월이 없으므로 항상 LIVE · live_override 포함/제외가 규칙보다 우선
+   회사 × 제품 = 1행. 최초 개시월 = 그 회사·제품의 가장 이른 원계약 시작월, 현행 = 가장 늦게 시작한 유효 계약.
+   ──────────────────────────────────────────────────────────────────────────── */
+   // 'db' = 계약으로 판정 · 'sheet' = 시트 명단(live_customers)
+var LV={T:null, diff:false};   // LIVE 메뉴 상태: 기준월(null = 대시보드 기준월) · 대조 표 펼침
+function setLiveSrc(v){ LIVE_SRC=(v==='sheet'?'sheet':'db'); try{ localStorage.setItem('svc_live_src',LIVE_SRC); }catch(e){} }
+function liveRoot(r){
+  if(!r || r.parent) return false;
+  var st=String(r.status||'');
+  if(st==='통합과금' || st==='추가' || String(r.ctype||'')==='추가') return false;
+  if(r.noCount || String(r.saleType||'')==='H/W') return false;
+  return true;
+}
+function liveActiveAt(r,T){
+  if(!liveRoot(r)) return false;
+  if(r.liveOv==='제외') return false;
+  if(r.liveOv==='포함') return true;
+  if(r.startRaw==null || r.startRaw>T) return false;
+  var e=r.endRaw;
+  if(e==null) return true;
+  if(e>T) return true;
+  return e===T && String(r.status||'')!=='해지';
+}
+function liveBasis(r,T){
+  var st=String(r.status||'');
+  if(r.liveOv==='포함') return '예외 포함'+(r.liveOvNote? ' — '+r.liveOvNote:'');
+  if(st==='CN전환') return 'CN전환(에스원 통합 과금) · 종료 없음';
+  if(r.endRaw==null) return st+' · 종료월 없음(진행 중)';
+  if(r.endRaw===T) return st+' · 이달 만기(재약정 대기)';
+  return st+' · '+mk(r.startRaw)+'~'+mk(r.endRaw);
+}
+var _liveCache={d:null, m:{}};
+function liveCalc(T){
+  if(T==null) T=(STATE&&STATE.base!=null)? STATE.base : DATA.nowIdx;
+  var ck=String(T);
+  if(_liveCache.d!==DATA) _liveCache={d:DATA, m:{}};                  // DATA 객체가 바뀌면(새로 불러오면) 다시 계산 · 기준월별로 기억(전월 대비 계산 때 같이 씀)
+  if(_liveCache.m[ck]) return _liveCache.m[ck];
+  var rows=DATA.rows||[], byKey={}, firstStart={};
+  rows.forEach(function(r){ if(!liveRoot(r) || r.startRaw==null) return; var k=r.cust+'|'+r.line; if(firstStart[k]==null || r.startRaw<firstStart[k]) firstStart[k]=r.startRaw; });
+  var kidsQ={}; rows.forEach(function(r){ if(!r.parent) return; if(r.startRaw!=null && r.startRaw>T) return; if(r.endRaw!=null && r.endRaw<T) return; kidsQ[r.parent]=(kidsQ[r.parent]||0)+(r.qty||0); });
+  rows.forEach(function(r){
+    if(!liveActiveAt(r,T)) return;
+    var k=r.cust+'|'+r.line, g=byKey[k];
+    if(!g){ g=byKey[k]={cust:r.cust, cid:r.cid, ind:r.ind||'미분류', line:r.line, prod:lline(r.line), key:'', nodes:0, ids:[], n:0, cur:null, dup:false}; }
+    g.n++; g.ids.push(r._id); g.nodes+=(r.qty||0)+(kidsQ[r._id]||0);
+    if(!g.cur || (r.startRaw||-1)>(g.cur.startRaw||-1) || ((r.startRaw||-1)===(g.cur.startRaw||-1) && r._id>g.cur._id)) g.cur=r;
+  });
+  var out=Object.keys(byKey).map(function(k){
+    var g=byKey[k], c=g.cur;
+    g.start=(firstStart[k]!=null)? mk(firstStart[k]) : (c.startRaw!=null? mk(c.startRaw):'');
+    g.curStart=c.startRaw!=null? mk(c.startRaw):''; g.end=c.endRaw!=null? mk(c.endRaw):''; g.churnMon='';
+    g.csm=c.csm||''; g.key=c.csm||''; g.partner=c.ptn||''; g.channel=c.channel||'일반'; g.saleType=c.saleType||''; g.status=c.status||'';
+    g.ov=c.liveOv||''; g.ovNote=c.liveOvNote||''; g.basis=liveBasis(c,T)+(g.n>1? ' · 유효 계약 '+g.n+'건':''); g.ctId=c._id;
+    return g;
+  });
+  out.sort(function(a,b){ return String(a.line).localeCompare(String(b.line)) || String(a.cust).localeCompare(String(b.cust),'ko'); });
+  var uq={}; out.forEach(function(x){ uq[x.cust]=1; });
+  var v={ok:true, src:'db', T:T, rows:out, count:out.length, uniq:Object.keys(uq).length, uniqNoDup:Object.keys(uq).length};
+  _liveCache.m[ck]=v; return v;
+}
+/* 화면들이 쓰는 LIVE 데이터 — 설정(LIVE_SRC)에 따라 계약 판정 또는 시트 명단. 모양은 shapeLive() 결과와 같음 */
+function liveData(T){
+  if(LIVE_SRC==='sheet'){ return (DATA&&DATA.live&&DATA.live.ok)? DATA.live : null; }
+  if(!DATA || !DATA.rows) return null;
+  return liveCalc(T);
+}
+function liveSrcLabel(){ return LIVE_SRC==='sheet'? 'LIVE 명단 시트 기준' : '계약 기준(자동 판정)'; }
+/* 회사 이름 매칭 키 — 띄어쓰기·(주)·괄호 별칭·사명 변경 별칭을 무시하고 같은 회사로 봄 */
+function nmKeys(n){
+  var ALIAS={}; (SB_RAW.customers||[]).forEach(function(c){ if(c.aliases&&c.aliases.length) ALIAS[c.name]=c.aliases; });
+  function k1(t){ var out=[], base=t.replace(/\([^)]*\)/g,''), m2; out.push(base); var re=/\(([^)]*)\)/g; while((m2=re.exec(t))) out.push(m2[1].replace(/^구\.?\s*/,'')); return out; }
+  var t=String(n||''), out=k1(t); (ALIAS[t]||[]).forEach(function(a){ out=out.concat(k1(String(a))); });
+  return out.map(function(x){ return x.replace(/^\(?주\)?|주식회사|\(주\)|\s|_/g,'').toLowerCase(); }).filter(function(x){ return x.length>=2; });
+}
+/* 계약 판정 LIVE 와 시트 명단의 차이 — LIVE 메뉴 대조 표 */
+function liveDiff(T){
+  var db=liveCalc(T), sh=(DATA.live&&DATA.live.ok)? DATA.live.rows : [];
+  var shK={}; sh.forEach(function(x){ nmKeys(x.cust).forEach(function(k){ shK[k+'|'+x.line]=x; }); });
+  var dbK={}; db.rows.forEach(function(x){ nmKeys(x.cust).forEach(function(k){ dbK[k+'|'+x.line]=x; }); });
+  var onlyDb=db.rows.filter(function(x){ return !nmKeys(x.cust).some(function(k){ return shK[k+'|'+x.line]; }); });
+  var seen={}, onlySheet=[];
+  sh.forEach(function(x){ var id=x.cust+'|'+x.line; if(seen[id]) return; seen[id]=1;
+    if(nmKeys(x.cust).some(function(k){ return dbK[k+'|'+x.line]; })) return;
+    var ks=nmKeys(x.cust), cs=(DATA.rows||[]).filter(function(r){ return !r.parent && r.line===x.line && nmKeys(r.cust).some(function(k){ return ks.indexOf(k)>=0; }); });
+    var why;
+    if(!cs.length) why='계약 없음 — 계약 미등록 또는 사명 불일치';
+    else if(cs.every(function(r){ return r.startRaw==null; })) why='계약 예정 — 시작월이 비어 있음';
+    else if(cs.some(function(r){ return r.noCount; })) why='고객 수 제외 행(no_count)';
+    else if(cs.some(function(r){ return r.liveOv==='제외'; })) why='예외 제외 — '+(cs.filter(function(r){return r.liveOv==='제외';})[0].liveOvNote||'');
+    else { var last=cs.slice().sort(function(a,b){ return (b.endRaw==null?9999:b.endRaw)-(a.endRaw==null?9999:a.endRaw); })[0];
+      why=(/해지|종료/.test(String(last.status||''))? last.status+' ' : '만기 지남 ')+(last.startRaw!=null?mk(last.startRaw):'?')+'~'+(last.endRaw!=null?mk(last.endRaw):''); }
+    onlySheet.push({cust:x.cust, line:x.line, why:why, cs:cs});
+  });
+  return {onlyDb:onlyDb, onlySheet:onlySheet, db:db, sheetN:(function(){ var u={}; sh.forEach(function(x){ u[x.cust]=1; }); return Object.keys(u).length; })(), sheetRows:sh.length};
+}
+function liveForArea(key){
+  var lv=liveData();
+  if(!lv || !lv.ok) return null;
+  return lv.rows.filter(function(x){ return liveAreaKey(x)===key; });
+}
+/* LIVE 명단의 «곳» = 회사 이름 기준 (한 회사가 사이트를 여러 줄로 갖고 있으면 1곳) */
+function liveN(rows){ var u={}; (rows||[]).forEach(function(x){ u[x.cust]=1; }); return Object.keys(u).length; }
+
+/* ────────────────────────────────────────────────────────────────────────────
+   만기 관리 (㊿+127 · SQL 84 · Edge Function remind)
+   배경: 만기 처리가 사람 기억에 의존해 기준월이 바뀌는 날 LIVE 가 한꺼번에 빠져 보임(9월 360 → 10월 354).
+   · 처리 대상 = LIVE 규칙과 같은 원계약(liveRoot) 중 종료월이 있고 자동연장(auto_renew)이 아니며 해지·종료·통합과금·CN전환이 아닌 것
+       lapsed   = 종료월 < 기준월  → 이미 LIVE 에서 빠짐(최근 24개월) · 연장이면 되살리고 끝났으면 서비스종료/해지로 정리
+       due      = 종료월 = 기준월  → 다음 달 1일 LIVE 에서 빠짐
+       next     = 종료월 = 기준월+1 (미리 보기)
+       checking = lapsed 중 최근 2개월 — LIVE 숫자에는 넣지 않고 타일에 «확인중 N건» 으로만 표시
+   · 홈 인박스 항목(미처리 · 이달 만기) → 만기 처리 창(#ovlRenew)에서 행마다 연장 / 서비스종료 / 해지 / 자동연장 원클릭
+     (입력·수정 › 갱신·해지 탭과 같은 저장 로직 doRenew/doChurn 을 공유)
+   · 슈퍼 관리자 «📣 슬랙으로 보내기» = Edge Function remind (매월 25일 자동 발송과 같은 내용 · 미리보기 후 확인)
+   ──────────────────────────────────────────────────────────────────────────── */
+function renewEligible(r){
+  if(!liveRoot(r) || r.autoRenew || r.liveOv==='제외' || r.endRaw==null) return false;
+  return !/해지|종료|통합과금|CN전환/.test(String(r.status||'').replace(/\s/g,''));
+}
+function renewScan(T){
+  if(T==null) T=(STATE&&STATE.base!=null)? STATE.base : DATA.nowIdx;
+  var out={T:T, lapsed:[], due:[], next:[], checking:[]};
+  ((window.DATA&&DATA.rows)||[]).forEach(function(r){
+    if(!renewEligible(r)) return;
+    var e=r.endRaw;
+    if(e<T){ if(e>=T-24) out.lapsed.push(r); if(e>=T-2) out.checking.push(r); }
+    else if(e===T) out.due.push(r);
+    else if(e===T+1) out.next.push(r);
+  });
+  var srt=function(a,b){ return (a.endRaw-b.endRaw) || String(a.cust).localeCompare(String(b.cust),'ko'); };
+  ['lapsed','due','next','checking'].forEach(function(k){ out[k].sort(srt); });
+  return out;
+}
+/* LIVE 고객사 수의 전월 대비 분해 — 늘어난 곳(신규·복귀) · 빠진 곳(만기 미처리·해지·종료·예외) · 확인중. 표시용(LIVE 숫자 자체는 liveCalc 그대로) */
+function liveDelta(T){
+  if(T==null || T<1 || !DATA || !DATA.rows) return null;
+  var cur=liveCalc(T), prev=liveCalc(T-1); if(!cur||!prev) return null;
+  var cs={}, ps={}; cur.rows.forEach(function(x){ cs[x.cust]=1; }); prev.rows.forEach(function(x){ ps[x.cust]=1; });
+  var byCust={}; DATA.rows.forEach(function(r){ if(!liveRoot(r)) return; (byCust[r.cust]=byCust[r.cust]||[]).push(r); });
+  var added=[], removed=[];
+  Object.keys(cs).forEach(function(c){ if(ps[c]) return; var rs=byCust[c]||[];
+    added.push({cust:c, kind: rs.some(function(r){ return r.startRaw===T; })? '신규' : '복귀'}); });
+  Object.keys(ps).forEach(function(c){ if(cs[c]) return;
+    var rs=(byCust[c]||[]).filter(function(r){ return liveActiveAt(r,T-1); });
+    var st=rs.map(function(r){ return String(r.status||''); }).join(' '), ov=rs.map(function(r){ return r.liveOv||''; }).join(' ');
+    removed.push({cust:c, kind: /해지/.test(st)? '해지' : /종료/.test(st)? '종료' : /제외/.test(ov)? '예외' : '만기'}); });
+  var cnt=function(arr,k){ return arr.filter(function(x){ return x.kind===k; }).length; };
+  return {T:T, curN:cur.uniq, prevN:prev.uniq, added:added, removed:removed,
+          n:{신규:cnt(added,'신규'), 복귀:cnt(added,'복귀'), 만기:cnt(removed,'만기'), 해지:cnt(removed,'해지'), 종료:cnt(removed,'종료'), 예외:cnt(removed,'예외')},
+          checking:renewScan(T).checking.length};
+}
+function liveDeltaHtml(b){
+  var dd=null; try{ dd=liveDelta(b); }catch(e){ return ''; }
+  if(!dd) return '';
+  var n=dd.n, dn=dd.curN-dd.prevN;
+  var plus=[n.신규? '신규 '+n.신규:'', n.복귀? '복귀 '+n.복귀:''].filter(Boolean).join(' · ');
+  var minus=[n.만기? '만기 미처리 '+n.만기:'', n.해지? '해지 '+n.해지:'', n.종료? '종료 '+n.종료:'', n.예외? '예외 제외 '+n.예외:''].filter(Boolean).join(' · ');
+  return '<div class="lv-delta" title="LIVE 고객사 수의 전월 대비 변화를 사유별로 나눈 것 — 숫자는 회사 단위 · 만기 미처리 = 종료월이 지났는데 연장·해지·종료 처리가 없어 빠진 곳">'+
+    '전월 '+dd.prevN+' → '+dd.curN+' <b class="'+(dn>0?'up':dn<0?'down':'')+'">('+(dn>0?'+':'')+dn+')</b>'+
+    (dd.added.length? ' · <span class="up">+'+dd.added.length+'</span><span class="why">'+esc(plus)+'</span>':'')+
+    (dd.removed.length? ' · <span class="down">−'+dd.removed.length+'</span><span class="why">'+esc(minus)+'</span>':'')+
+    (dd.checking? ' · <button type="button" class="lnk" data-renew="checking" title="종료월이 최근 2개월 안에 지났는데 연장·해지 처리가 없는 계약 — LIVE 에 넣지 않고 표시만 합니다. 연장을 등록하면 되돌아옵니다">확인중 '+dd.checking+'건 →</button>':'')+
+    '</div>';
+}
+/* ── 만기 처리 창 ── */
+var RN={kind:'due', T:null, open:null, act:'', busy:false};
+function openRenewList(kind, T){
+  if(!window.DATA || !DATA.rows) return;
+  RN.kind=(kind==='checking')? 'lapsed' : (kind||'due'); RN.T=(T!=null? T : STATE.base); RN.open=null; RN.act='';
+  var m=$('#rnMsg'); if(m){ m.textContent=''; m.className='mmsg'; }
+  renderRenewList(); openOvl('ovlRenew');
+}
+function renewKindLabel(k, T){ return k==='lapsed'? '만기 지남 · 미처리' : k==='due'? mk(T)+' 만기' : mk(T+1)+' 만기'; }
+function renewFormHtml(r, act){
+  var dEnd=r.endRaw, term=r.term||12, ne=dEnd+term, cancel='<button type="button" class="pill ghost" id="rnCancel">취소</button>';
+  if(act==='renew') return '<div class="rn-f"><b>연장</b><span>기존 종료 '+mk(dEnd)+' · 회차 '+((r.renew||0)+1)+'회</span>'+
+    '<label>새 종료월 <input type="month" id="rnEnd" value="'+mk(ne)+'"></label>'+
+    '<label>월 금액(천원) <input type="number" id="rnMrr" value="'+Math.round((r.mrr||0)/1000)+'" min="0" step="1" style="width:110px"></label>'+
+    '<label>메모 <input type="text" id="rnNote" placeholder="선택" style="width:180px"></label>'+
+    '<span class="mini">'+mk(dEnd+1)+'부터 새 종료월까지 월 매출을 다시 만듭니다'+(/해지|종료/.test(r.status||'')? ' · 상태는 신규로 되살림':'')+(dEnd<RN.T? ' · 지난 달 매출도 소급 생성':'')+'</span>'+
+    '<button type="button" class="pill" id="rnGo">연장 저장</button>'+cancel+'</div>';
+  if(act==='end') return '<div class="rn-f"><b>서비스종료</b><span>상태를 «서비스종료»로 바꾸고 '+mk(dEnd)+' 이후 월 매출을 지웁니다 · LIVE 에서는 '+mk(dEnd+1)+'부터 제외</span>'+
+    '<label>메모 <input type="text" id="rnNote" placeholder="선택 — 비고에 덧붙임" style="width:220px"></label>'+
+    '<button type="button" class="pill" id="rnGo">종료 저장</button>'+cancel+'</div>';
+  if(act==='churn') return '<div class="rn-f"><b>해지</b>'+
+    '<label>해지월(이 달까지 매출 인식) <input type="month" id="rnMonth" value="'+mk(dEnd)+'"></label>'+
+    '<label>사유 <select id="rnReason">'+CHURN_OPTS.map(function(o){ return '<option>'+esc(o)+'</option>'; }).join('')+'</select></label>'+
+    '<span class="mini">해지월 다음 달부터 LIVE 제외 · 해지 분석·해지율에 반영</span>'+
+    '<button type="button" class="pill" id="rnGo">해지 저장</button>'+cancel+'</div>';
+  if(act==='auto') return '<div class="rn-f"><b>자동연장</b><span>월 단위로 자동 연장되는 계약으로 표시 — 만기 목록·슬랙 알림·«확인중»에서 빠지고 LIVE 판정은 그대로입니다. 계약 관리 표 «자동연장» 열에서 언제든 끌 수 있습니다.'+
+    (dEnd<RN.T? ' <b style="color:var(--critical)">⚠ 종료월이 지나 이미 LIVE 에서 빠진 계약입니다 — LIVE 에 두려면 «연장»으로 종료월을 늘리세요.</b>':'')+'</span>'+
+    '<button type="button" class="pill" id="rnGo">자동연장 켜기</button>'+cancel+'</div>';
+  return '';
+}
+function renderRenewList(){
+  var box=$('#rnList'); if(!box || !window.DATA) return;
+  var T=RN.T, S=renewScan(T), rows=S[RN.kind]||[], W=canWrite('contracts');
+  var sum=rows.reduce(function(a,r){ return a+(r.mrr||0); },0);
+  $('#rnTitle').textContent='만기 처리 — 기준 '+mk(T);
+  var caps={lapsed:'종료월이 지났는데 연장·해지·서비스종료 처리가 없는 계약 — 이미 LIVE 고객사에서 빠져 있습니다(최근 24개월). 연장이면 «연장»으로 되살리고, 끝났으면 «서비스종료» 또는 «해지(사유)»로 정리하세요.',
+            due:'종료월이 '+mk(T)+'인 계약 — 처리하지 않으면 '+mk(T+1)+' 1일부터 LIVE 고객사에서 빠집니다.',
+            next:'종료월이 '+mk(T+1)+'인 계약 — 다음 달 안에 처리할 대상(미리 보기)입니다.'};
+  $('#rnCap').textContent=caps[RN.kind]+' 월 단위 자동연장 계약은 «자동연장»을 켜면 이 목록과 슬랙 알림에서 빠집니다.'+(W? '' : ' (계약 쓰기 권한이 없어 열람만 됩니다)');
+  $('#rnTabs').innerHTML=[['lapsed','만기 지남 · 미처리',S.lapsed.length],['due',mk(T)+' 만기',S.due.length],['next',mk(T+1)+' 만기',S.next.length]].map(function(t){
+    return '<button type="button" data-k="'+t[0]+'" aria-pressed="'+(RN.kind===t[0])+'">'+esc(t[1])+' <b class="num">'+t[2]+'</b></button>'; }).join('');
+  $('#rnTabs').querySelectorAll('button').forEach(function(b){ b.onclick=function(){ RN.kind=b.dataset.k; RN.open=null; RN.act=''; renderRenewList(); }; });
+  if(!rows.length){ box.innerHTML='<div class="ib-empty"><span class="ib-ic ok">'+ico('check',16)+'</span>처리할 계약이 없습니다.</div>'; }
+  else {
+    var h='<table class="rn-tbl"><thead><tr><th>고객사</th><th>서비스</th><th>채널 · 파트너</th><th>기간</th><th class="n">약정</th><th class="n">MRR(천원)</th><th>상태</th>'+(W? '<th>처리</th>':'')+'</tr></thead><tbody>';
+    rows.forEach(function(r){
+      var id=r._id, open=(RN.open===id);
+      h+='<tr data-id="'+id+'"'+(open?' class="rn-on"':'')+'><td><a class="rn-cust" data-c="'+esc(r.cust)+'" title="고객 360">'+esc(r.cust)+'</a>'+(r.s1no? ' <span class="mini">'+esc(r.s1no)+'</span>':'')+'</td>'+
+         '<td>'+esc(llineVer(r.line,r.ver))+'</td><td>'+esc(chOf(r))+(r.ptn&&r.ptn!=='직접(계산서)'? ' · '+esc(r.ptn):'')+'</td>'+
+         '<td>'+(r.startRaw!=null? mk(r.startRaw):'?')+' ~ <b>'+mk(r.endRaw)+'</b></td><td class="n">'+(r.term? r.term+'개월':'·')+'</td><td class="n">'+won(r.mrr)+'</td>'+
+         '<td>'+esc(r.status||'')+(r.renew? ' <span class="ubadge sm">연장 '+r.renew+'회</span>':'')+'</td>';
+      if(W) h+='<td class="rn-acts">'+[['renew','연장'],['end','서비스종료'],['churn','해지'],['auto','자동연장']].map(function(a){ return '<button type="button" class="cbtn'+(open&&RN.act===a[0]?' pri':'')+'" data-id="'+id+'" data-a="'+a[0]+'">'+a[1]+'</button>'; }).join('')+'</td>';
+      h+='</tr>';
+      if(open && W) h+='<tr class="rn-form"><td colspan="8">'+renewFormHtml(r, RN.act)+'</td></tr>';
+    });
+    h+='</tbody><tfoot><tr><td colspan="5">합계 '+rows.length+'건</td><td class="n">'+won(sum)+'</td><td colspan="2"></td></tr></tfoot></table>';
+    box.innerHTML=h;
+    box.querySelectorAll('.rn-cust').forEach(function(a){ a.onclick=function(){ closeOvl('ovlRenew'); openCust360(a.dataset.c); }; });
+    box.querySelectorAll('.rn-acts .cbtn').forEach(function(bt){ bt.onclick=function(){
+      var id=+bt.dataset.id;
+      if(RN.open===id && RN.act===bt.dataset.a){ RN.open=null; RN.act=''; } else { RN.open=id; RN.act=bt.dataset.a; }
+      renderRenewList();
+      var f=box.querySelector('.rn-form'); if(f){ try{ f.scrollIntoView({block:'nearest'}); }catch(e){} var i=f.querySelector('input,select'); if(i) i.focus(); }
+    }; });
+    var go=box.querySelector('#rnGo'); if(go) go.onclick=function(){ renewSubmit(rows.filter(function(r){ return r._id===RN.open; })[0]); };
+    var cc=box.querySelector('#rnCancel'); if(cc) cc.onclick=function(){ RN.open=null; RN.act=''; renderRenewList(); };
+  }
+  var sl=$('#rnSlack'); if(sl){ sl.style.display=window.IS_SUPER? '':'none'; sl.onclick=function(){ renewSlack('tab'); }; }
+  var sa=$('#rnSlackAll'); if(sa){ sa.style.display=window.IS_SUPER? '':'none'; sa.onclick=function(){ renewSlack('all'); }; }
+  $('#rnXls').onclick=function(){ xlsxAoa('만기처리_'+mk(T)+'_'+RN.kind, ['고객사','서비스','채널','파트너','시작월','종료월','약정(개월)','MRR(천원)','상태','연장회차','에스원 계약번호'],
+    rows.map(function(r){ return [r.cust, llineVer(r.line,r.ver), chOf(r), r.ptn||'', r.startRaw!=null? mk(r.startRaw):'', mk(r.endRaw), r.term||'', Math.round((r.mrr||0)/1000), r.status||'', r.renew||0, r.s1no||'']; })); };
+}
+async function renewSubmit(r){
+  if(!r || RN.busy) return;
+  var m=$('#rnMsg'); RN.busy=true; if(m){ m.textContent='저장 중…'; m.className='mmsg'; }
+  try{
+    var act=RN.act, txt='';
+    if(act==='renew'){
+      var ne=ymFromInput($('#rnEnd').value); if(ne==null) throw new Error('새 종료월을 입력하세요.');
+      var amt=Math.round((+$('#rnMrr').value||0)*1000) || r.mrr || 0; if(!amt) throw new Error('월 금액을 입력하세요.');
+      var res=await doRenew(r, ne, amt, ($('#rnNote').value||'').trim());
+      txt='연장 '+res.rno+'회 — '+r.cust+' → '+mk(ne)+' · 월 '+won(amt)+'천원';
+    } else if(act==='end'){
+      await doEndService(r, ($('#rnNote').value||'').trim()); txt='서비스종료 — '+r.cust+' ('+mk(r.endRaw)+'까지 인식)';
+    } else if(act==='churn'){
+      var m0=ymFromInput($('#rnMonth').value), rs=$('#rnReason').value; if(m0==null||!rs) throw new Error('해지월·사유를 입력하세요.');
+      await doChurn(r, m0, rs); txt='해지 — '+r.cust+' ('+mk(m0)+'까지 인식 · '+rs+')';
+    } else if(act==='auto'){
+      await doAutoRenew(r, true); txt='자동연장 표시 — '+r.cust;
+    } else throw new Error('처리 종류를 고르세요.');
+    toast('처리 완료 ✅', txt);
+    RN.open=null; RN.act='';
+    var nd=await loadFromDb(); onData(nd);
+    if(m){ m.textContent=txt; m.className='mmsg ok'; }
+    renderRenewList();
+  }catch(e){ if(m){ m.textContent=String(e.message||e); m.className='mmsg bad'; } }
+  RN.busy=false;
+}
+/* ── 저장 로직 (입력·수정 › 갱신·해지 탭과 공유) ── */
+async function doRenew(r, ne, amt, note){
+  if(!canWrite('contracts')) throw new Error('계약 쓰기 권한이 없습니다.');
+  var from=(r.endIdx!=null? r.endIdx+1 : ne);
+  if(ne<from) throw new Error('새 종료월이 기존 종료월보다 빠릅니다.');
+  /* 연장 = 원계약 한 줄을 갱신 (회차 +1, 상태는 그대로 · 종료/해지였다면 신규로 되살림). 별도 «재약정» 행을 만들지 않습니다 */
+  var rno=(r.renew||0)+1;
+  var hist=(r.renewHist||[]).concat([{no:rno, from:idxDate(from), to:idxDate(ne), mrr:amt, prev_end:(r.endIdx!=null? idxDate(r.endIdx):null),
+             prev_mrr:r.mrr, prev_status:r.status, note:note||null, at:new Date().toISOString(), by:AUTH_USER}]);
+  var nst=/해지|종료/.test(r.status||'')? (r.ctype==='추가'? '추가':'신규') : r.status;
+  await sbWrite('PATCH','contracts?id=eq.'+r._id,{end_month:idxDate(ne), mrr:amt, status:nst, churn_reason:null, churn_month:null,
+    renew_count:rno, renew_history:hist, updated_at:new Date().toISOString()});
+  await sbWrite('DELETE','monthly_revenue?contract_id=eq.'+r._id+'&month=gte.'+idxDate(from));
+  await sbWrite('POST','monthly_revenue', monthRows(r._id,from,ne,amt));
+  await logChange('update','contracts',r._id,{action:'연장',no:rno,newEnd:idxDate(ne),amount:amt});
+  return {rno:rno, from:from};
+}
+async function doChurn(r, m0, rs){
+  if(!canWrite('contracts')) throw new Error('계약 쓰기 권한이 없습니다.');
+  await sbWrite('PATCH','contracts?id=eq.'+r._id,{status:'해지',churn_reason:rs,end_month:idxDate(m0),churn_month:idxDate(m0),updated_at:new Date().toISOString()});
+  await sbWrite('DELETE','monthly_revenue?contract_id=eq.'+r._id+'&month=gt.'+idxDate(m0));
+  await logChange('update','contracts',r._id,{action:'해지',month:idxDate(m0),reason:rs});
+}
+async function doEndService(r, note){
+  if(!canWrite('contracts')) throw new Error('계약 쓰기 권한이 없습니다.');
+  var e=(r.endRaw!=null? r.endRaw : r.endIdx); if(e==null) throw new Error('종료월이 없는 계약입니다 — 계약 관리에서 종료월을 먼저 넣으세요.');
+  var p={status:'서비스종료', updated_at:new Date().toISOString()}; if(note) p.note=[r.note, note].filter(Boolean).join(' · ');
+  await sbWrite('PATCH','contracts?id=eq.'+r._id, p);
+  await sbWrite('DELETE','monthly_revenue?contract_id=eq.'+r._id+'&month=gt.'+idxDate(e));
+  await logChange('update','contracts',r._id,{action:'서비스종료',end:idxDate(e),note:note||null});
+}
+async function doAutoRenew(r, on){
+  if(!canWrite('contracts')) throw new Error('계약 쓰기 권한이 없습니다.');
+  await sbWrite('PATCH','contracts?id=eq.'+r._id,{auto_renew:!!on, updated_at:new Date().toISOString()});
+  await logChange('update','contracts',r._id,{action:'자동연장',on:!!on});
+}
+/* ── 슬랙 발송 (슈퍼 관리자) — Edge Function remind: 미리보기(dry) → 확인 → 발송. 서비스 키는 함수 쪽 Secrets 에만
+   scope 'tab' = 지금 탭 구역만(body.only) · 'all' = 세 구역 전부(월말 크론과 동일) ── */
+async function renewSlack(scope){
+  if(!window.IS_SUPER){ toast('슬랙 발송은 슈퍼 관리자만 할 수 있습니다',''); return; }
+  var m=$('#rnMsg'), bts=[$('#rnSlack'),$('#rnSlackAll')].filter(Boolean); bts.forEach(function(b){ b.disabled=true; }); if(m){ m.textContent='미리보기 만드는 중…'; m.className='mmsg'; }
+  var tabOnly=(scope!=='all'), tabName=renewKindLabel(RN.kind, RN.T);
+  try{
+    var url=SB_URL+'/functions/v1/remind', hdr={'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+SB_TOKEN};
+    var body={month:idxDate(RN.T), kind:'monthly'}; if(tabOnly) body.only=RN.kind;
+    if(/^https:/.test(location.protocol+'//')) body.portal_url=location.origin+location.pathname;   /* 슬랙 메시지의 «포탈 홈 › 만기 처리» 링크 = 지금 열려 있는 이 포탈 주소 (함수 Secrets PORTAL_URL 보다 우선) */
+    var pv=await fetch(url+'?dry=1',{method:'POST',headers:hdr,body:JSON.stringify(body)}).then(function(r){ return r.json(); });
+    if(!pv || !pv.ok) throw new Error((pv&&pv.error)||'미리보기 실패 — remind 함수가 배포됐는지 확인');
+    var c=pv.counts||{};
+    var lines=tabOnly? ['«'+tabName+'» 탭만 — '+(pv.total!=null? pv.total : (c[RN.kind]||0))+'건'] : ['세 구역 전부 — 이달 만기 '+(c.due||0)+'건 · 다음 달 만기 '+(c.next||0)+'건 · 미처리 '+(c.lapsed||0)+'건'];
+    if(tabOnly && pv.kinds && pv.kinds.length!==1) lines.push('⚠ 배포된 remind 함수가 구역 선택(only)을 모르는 옛 버전이라 세 구역이 전부 갑니다 — v1.2 로 올려 주세요');
+    if(!confirm('슬랙 팀 채널('+(pv.channel||'')+')로 보냅니다.\n\n'+(pv.text||'')+'\n'+lines.join('\n')+'\n\n보낼까요?')) throw new Error('취소했습니다.');
+    var rr=await fetch(url,{method:'POST',headers:hdr,body:JSON.stringify(body)}).then(function(r){ return r.json(); });
+    if(!rr || !rr.ok) throw new Error((rr&&rr.error)||'발송 실패');
+    toast('슬랙 발송 완료 📣', String(rr.text||'').slice(0,90));
+    if(m){ m.textContent='슬랙 발송 완료 — '+(rr.text||''); m.className='mmsg ok'; }
+  }catch(e){
+    var em=String(e.message||e);
+    if(/Failed to fetch|NetworkError|Load failed|network/i.test(em))   /* 브라우저가 응답을 못 받음 = 함수가 없거나 게이트웨이가 CORS 없이 거절 */
+      em='remind 함수에 연결하지 못했습니다 (Failed to fetch) — ① Edge Functions 에 이름이 정확히 «remind» 인 함수가 배포돼 있는지 ② 그 함수 설정에서 «Verify JWT» 를 껐는지(ask 와 같게 — 함수가 로그인 토큰을 직접 검사합니다) 확인하세요. 방금 배포했으면 30초쯤 뒤 다시 눌러 보세요.';
+    if(m){ m.textContent=em; m.className='mmsg bad'; }
+  }
+  bts.forEach(function(b){ b.disabled=false; });
+}
+/* LIVE 행의 채널 = 같은 고객·서비스의 «원계약» 중 가장 최근 것의 채널 (부속 계약은 채널 판단에 쓰지 않음 · 원계약이 없을 때만 부속 참고) */
+function liveChannel(x){
+  var best=null, bestChild=null, nm=fkNorm(x.cust);
+  (DATA.rows||[]).forEach(function(r){
+    if(r.line!==x.line || fkNorm(r.cust)!==nm) return;
+    if(r.parent){ if(!bestChild || (r.startIdx||0)>(bestChild.startIdx||0)) bestChild=r; return; }
+    if(!best || (r.startIdx||0)>(best.startIdx||0)) best=r;
+  });
+  var pick=best||bestChild;
+  return pick? chOf(pick) : '일반';
+}
+function renderChannelView(key){
+  var def=CH_DEFS[key], ch=def[1], match=def[3];
+  var host=$('#chBody');
+  var list=[]; DATA.rows.forEach(function(r,k){ if(match(r)) list.push(k); });
+  var b=STATE.base;
+  var mrr=monthlyTotal(list,b);
+  var act=0, custs={};
+  list.forEach(function(k){ if(MAT[k][b]>0){ act++; custs[DATA.rows[k].cust]=1; } });
+  /* 고객사 수는 LIVE 고객사 탭 기준 (대시보드와 같은 기준) — 당월 매출 기준 수는 보조 표기 */
+  var lv=liveForArea(key), lvCust={}; (lv||[]).forEach(function(x){ lvCust[x.cust]=1; });
+  var lvN=lv? Object.keys(lvCust).length : null;
+  var hasEq=!!ch;
+  var pendEq=0, rentEq=0;
+  if(hasEq){
+    (RAWX.orders||[]).forEach(function(o){ if(o.channel===ch && ['접수','출하요청','배송중','회수예정'].indexOf(o.status)>=0) pendEq++; });
+    (RAWX.assets||[]).forEach(function(a){ if(a.channel===ch && a.status==='임대중') rentEq++; });
+  }
+  function tile(k2,v2,u2,d2,kx){ return '<div class="kpi"'+(kx?' data-kx="'+kx+'"':'')+'><div class="k">'+k2+'</div><div class="v">'+v2+'<small>'+u2+'</small></div><div class="d">'+(d2||'')+'</div></div>'; }
+  var h='<div style="display:flex;align-items:baseline;gap:12px;margin:2px 2px 14px">'+
+    '<span style="font-size:18px;font-weight:800">'+def[0]+' 사업 영역</span>'+
+    '<span class="ubadge sm">₩ 금액 단위 = 천원</span>'+
+    '<span class="mini">'+esc(def[2])+' · '+baseLabel()+' 기준</span></div>';
+  h+='<div class="kpis" style="margin-bottom:16px">'+
+    tile('당월 MRR', won(mrr), '천원', '연환산 '+won(mrr*12)+'천원','cv_mrr')+
+    (lvN!=null
+      ? tile('LIVE 고객사', liveN(lv).toLocaleString('ko-KR'), '곳', (lv.length!==liveN(lv)? '사이트 기준 '+lv.length+'건 · ':'')+liveGroupNote(key),'cv_live')
+      : tile('고객사', Object.keys(custs).length.toLocaleString('ko-KR'), '곳', '당월 매출 기준','cv_cust'))+
+    (hasEq? tile('임대중 장비', rentEq, '대', pendEq? '처리 대기 요청 '+pendEq+'건':'대기 요청 없음','cv_eq')
+          : tile('비중', (monthlyTotal(idxs(),b)? (mrr/monthlyTotal(idxs(),b)*100).toFixed(1):'0')+'%','','전체 당월 매출 대비','cv_mrr'))+
+    '</div>';
+  if(key==='cnpub'){
+    var histC={}, valid={}, pubBad={}, othGov={}, indGov={};
+    DATA.rows.forEach(function(r){
+      if(r.line==='Cloud'&&chOf(r)==='조달'){
+        histC[r.cust]=1;
+        if(!/해지|종료/.test(String(r.status||'')) && (r.endIdx==null||r.endIdx>=b)) valid[r.cust]=1;
+      }
+      if(r.channel==='공공') pubBad[r.cust]=1;                       // 산업군 오인 표기 — 조달 아님, 어떤 채널 집계에도 미포함
+      if(chOf(r)==='조달'&&r.line!=='Cloud') othGov[r.line]=(othGov[r.line]||0)+1;
+      if(r.ind==='공공'&&chOf(r)!=='조달') indGov[r.cust]=1;
+    });
+    var oth=Object.keys(othGov).map(function(k3){ return lline(k3)+' '+othGov[k3]+'건'; }).join(' · ');
+    var pubN=Object.keys(pubBad).length;
+    if(pubN||oth) h+='<section class="card c12" style="margin-bottom:16px"><h2>조달 표기 확인</h2>'+
+      (pubN? '<p class="cap">⚠ 채널이 «공공»으로 입력된 고객사 '+pubN+'곳: '+esc(Object.keys(pubBad).slice(0,12).join(', '))+(pubN>12?' 외 '+(pubN-12)+'곳':'')+' — 산업군이 공공일 뿐 조달 판매가 아니면 «일반»으로, 실제 조달이면 «조달»로 수정하세요</p>':'')+
+      (oth? '<p class="cap">참고: Cloud NAC 외 제품의 조달 계약 '+oth+' — 이 화면에는 포함되지 않습니다</p>':'')+
+      '</section>';
+  }
+  h+='<div class="grid">';
+  h+='<section class="card c12"><h2>월별 매출 추이<span class="ukw">천원</span></h2><p class="cap">최근 24개월 · '+esc(def[0].replace(/^\S+ /,''))+'</p><div class="chartbox h260" id="chvTrend"></div></section>';
+  h+='<section class="card c12"><h2>계약 목록<span class="ukw">천원</span></h2><p class="cap" id="chvCtCap"></p>'+
+     '<div class="dbar" style="margin-bottom:10px">'+
+       '<input type="search" id="chvQ" placeholder="검색 — 여러 단어로 좁히기 (예: 다원 MDR)">'+
+       '<button class="pill ghost" id="chvFclr" style="display:none;border-color:var(--critical);color:var(--critical)">✕ 필터 해제</button>'+
+       '<span class="spacer"></span><span class="mini" id="chvCnt"></span>'+
+     '</div>'+
+     '<div class="tbl-wrap" style="max-height:460px"><table id="chvCt" class="dgrid"></table></div></section>';
+  h+='</div>';
+  host.innerHTML=h;
+  kxWire(host, {
+    cv_mrr:function(){ kxMrr(list, b, def[0]+' '+mk(b)+' MRR', def[0]+' 사업 영역'); },
+    cv_cust:function(){ kxCustMrr(list, b, def[0]+' 고객사', def[0]+' 사업 영역'); },
+    cv_live:function(){ kxLive(lv||[], def[0]+' LIVE 고객사', def[0]+' 사업 영역 · '+liveGroupNote(key).replace(/<[^>]+>/g,'')); },
+    cv_eq:function(){ switchView('assets'); }
+  });
+
+  // 추이 차트
+  var from=Math.max(0,b-23), labels=[], data=[];
+  for(var j=from;j<=b;j++){ labels.push(mk(j)); data.push(monthlyTotal(list,j)); }
+  try{
+    Viz.lines($('#chvTrend'),{labels:labels,series:[{label:def[0].replace(/^\S+ /,''),data:data,color:cssv('--s1')}],fmt:won,tipFmt:wonFull,fill:true});
+  }catch(e){ $('#chvTrend').innerHTML='<p class="cap">데이터가 없습니다</p>'; }
+
+  // 계약 테이블 — 고객사별 «최신 1건» 만, 나머지는 고객사 클릭으로
+  CHV.key=key; CHV.q=''; CHV.filters={}; CHV.sortK='mrr'; CHV.sortDir=-1;
+  CHV.all=list.map(function(k){ return DATA.rows[k]; });
+  $('#chvQ').oninput=function(){ renderChvTable(); };
+  $('#chvFclr').onclick=function(){ CHV.filters={}; renderChvTable(); };
+  renderChvTable();
+
+}
