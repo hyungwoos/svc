@@ -2,6 +2,8 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
+<!-- CSP (80점 프로젝트 ② 보안): GitHub Pages 는 응답 헤더를 못 넣으므로 meta 로. 외부 스크립트 없음. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://amzbrdhkvzsyxjfjtugu.supabase.co; worker-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Genians 프로젝트 리포트 v1.0</title>
 <!-- PWA: 포탈(index.html)과 같은 홈 화면 앱 범위 — manifest·sw.js 는 같은 폴더 -->

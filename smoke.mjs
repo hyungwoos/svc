@@ -180,7 +180,7 @@ if (fs.existsSync(path.join(DIR, 'staging', 'index.html'))) {
       if (b.code === '123456' && b.challenge_id === 'c-' + mm[1]) { factors = factors.map((f) => f.id === mm[1] ? { ...f, status: 'verified' } : f); return J({ access_token: jwt('aal2'), refresh_token: 'r2', expires_in: 3600, token_type: 'bearer', user }); }
       return J({ msg: 'Invalid TOTP code entered', code: 422 }, 422);
     }
-    if (path === '/auth/v1/factors' && m === 'POST') { authCalls.push('enroll'); factors = factors.concat([{ id: 'f2', factor_type: 'totp', status: 'unverified', friendly_name: 'SVC 포탈', created_at: '2026-10-03T01:00:00Z' }]); return J({ id: 'f2', type: 'totp', friendly_name: 'SVC 포탈', totp: { qr_code: 'data:image/svg+xml;utf-8,<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10" fill="#fff"/><rect x="2" y="2" width="6" height="6" fill="#000"/></svg>', secret: 'JBSWY3DPEHPK3PXP', uri: 'otpauth://totp/x' } }); }
+    if (path === '/auth/v1/factors' && m === 'POST') { authCalls.push('enroll'); factors = factors.concat([{ id: 'f2', factor_type: 'totp', status: 'unverified', friendly_name: 'SVC 포탈', created_at: '2026-10-03T01:00:00Z' }]); return J({ id: 'f2', type: 'totp', friendly_name: 'SVC 포탈', totp: { qr_code: '<?xml version="1.0"?>\n<svg width="10" height="10" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><rect x="0" y="0" width="10" height="10" style="fill:white;stroke:none"/><rect x="2" y="2" width="6" height="6" style="fill:#000;stroke:none"/></svg>', secret: 'JBSWY3DPEHPK3PXP', uri: 'otpauth://totp/x' } }); }
     mm = /^\/auth\/v1\/factors\/([^/]+)$/.exec(path);
     if (mm && m === 'DELETE') { authCalls.push('unenroll:' + mm[1]); factors = factors.filter((f) => f.id !== mm[1]); return J({ id: mm[1] }); }
     if (u.includes('grant_type=password')) { authCalls.push('password'); return J({ access_token: jwt('aal1'), refresh_token: 'r1', expires_in: 3600, token_type: 'bearer', user }); }
@@ -208,7 +208,7 @@ if (fs.existsSync(path.join(DIR, 'staging', 'index.html'))) {
       t = await page.$eval('#accMfa', (e) => e.textContent); assert(/꺼짐/.test(t), '끈 뒤: ' + t.slice(0, 80)); assert(authCalls.includes('unenroll:f1'), 'DELETE f1 없음');
       await page.click('#mfaOn'); await page.waitForTimeout(600);
       assert(await page.$('#accMfa img[alt="인증 앱 등록 QR"]'), 'QR 없음');
-      await page.waitForTimeout(200); const qr = await page.$eval('#accMfa img[alt="인증 앱 등록 QR"]', (e) => ({ ok: e.complete && e.naturalWidth > 0, src: e.getAttribute('src').slice(0, 40) })); assert(qr.ok, 'QR 이미지가 깨짐(# 포함 SVG data URL): ' + qr.src); assert(/JBSWY3DPEHPK3PXP/.test(await page.$eval('#accMfa', (e) => e.textContent)), '수동 키 없음');
+      await page.waitForTimeout(200); const qr = await page.$eval('#accMfa img[alt="인증 앱 등록 QR"]', (e) => ({ ok: e.complete && e.naturalWidth > 0, src: e.getAttribute('src').slice(0, 40) })); assert(qr.ok && /^data:image\/svg\+xml;charset=utf-8,/.test(qr.src), 'QR 이미지가 깨짐(GoTrue 원문 SVG 미정규화): ' + qr.src); assert(/JBSWY3DPEHPK3PXP/.test(await page.$eval('#accMfa', (e) => e.textContent)), '수동 키 없음');
       await page.fill('#mfaEnCode', '123456'); await page.click('#mfaEnGo'); await page.waitForTimeout(800);
       t = await page.$eval('#accMfa', (e) => e.textContent); assert(/켜짐/.test(t), '켠 뒤: ' + t.slice(0, 80));
       assert(authCalls.includes('enroll') && authCalls.includes('challenge:f2') && authCalls.includes('verify:f2:123456'), authCalls.join(','));

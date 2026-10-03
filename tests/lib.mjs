@@ -26,24 +26,25 @@ export function serve(dir = ROOT, base = '/svc') {
 }
 
 /** Supabase · CDN 가짜 응답. role: super_admin | admin | admin_viewer ... · onWrite: 쓰기 요청 기록 콜백 */
-export async function mockBackend(page, { role = 'super_admin', email = 'tester@example.com', onWrite = null, extra = null } = {}) {
+/** token: 주입할 access token(기본 'tok' · JWT 모양이면 aal 검사에 쓰임) · noSession: 세션 없이 시작(로그인 화면 테스트) */
+export async function mockBackend(page, { role = 'super_admin', email = 'tester@example.com', onWrite = null, extra = null, token = 'tok', noSession = false } = {}) {
   const data = JSON.stringify(Object.assign({}, FIX, { roles: [{ role }] }));
   await page.route('**/*supabase.co/**', async (route) => {
     const u = route.request().url(), m = route.request().method();
     if (extra) { const r = await extra(route, u, m); if (r) return; }
     const hdr = { 'content-range': '0-0/0', 'Access-Control-Expose-Headers': 'content-range' };
     if (u.includes('/rpc/load_all')) return route.fulfill({ status: 200, contentType: 'application/json', body: data });
-    if (u.includes('/auth/v1/user')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id: 'u1', email, user_metadata: { pw_changed: true } }) });
+    if (u.includes('/auth/v1/user')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id: 'u1', email, user_metadata: { pw_changed: true }, factors: [] }) });
     if (u.includes('/functions/v1/')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, text: 'mock', queries: [], mode: 'ping' }) });
     if (/POST|PATCH|DELETE|PUT/.test(m)) { if (onWrite) onWrite({ m, url: u, body: route.request().postData() }); return route.fulfill({ status: m === 'POST' ? 201 : 204, contentType: 'application/json', headers: hdr, body: '[]' }); }
     return route.fulfill({ status: 200, contentType: 'application/json', headers: hdr, body: '[]' });
   });
   await page.route(/cdn\.jsdelivr\.net|cdnjs\.cloudflare\.com|unpkg\.com/, (r) => r.fulfill({ status: 200, contentType: 'application/javascript', body: '' }));
   await page.route(/open\.er-api\.com|api\.exchangerate|api\.frankfurter/, (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"rates":{"KRW":1400}}' }));
-  await page.addInitScript(({ email }) => {
-    sessionStorage.setItem('svc_sess', JSON.stringify({ a: 'tok', r: null, e: Math.floor(Date.now() / 1000) + 3600, u: email, p: true }));
-    try { localStorage.clear(); } catch (e) { /* noop */ }
-  }, { email });
+  await page.addInitScript(({ email, token, noSession }) => {
+    try { localStorage.clear(); sessionStorage.clear(); } catch (e) { /* noop */ }
+    if (!noSession) sessionStorage.setItem('svc_sess', JSON.stringify({ a: token, r: null, e: Math.floor(Date.now() / 1000) + 3600, u: email, p: true }));
+  }, { email, token, noSession });
 }
 
 /** 페이지 오류·콘솔 오류 수집 */
