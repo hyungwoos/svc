@@ -799,10 +799,11 @@ async function sbRpc(name){
 }
 async function loadFromDb(){
   var permP=loadPerms();   // 메뉴 권한은 데이터와 병렬로 (표가 없거나 행이 없으면 null = 역할 기본)
+  var codeP=loadCodes();   // 코드 목록(code_lists · SQL 93)도 병렬로 — 표가 없으면 상수 그대로 (㊿+137)
   // 1) 고속 경로: load_all() 함수로 한 번에 (10_fast_load.sql 적용 시)
   try{
     var j=await sbRpc('load_all');
-    try{ await permP; }catch(e){}
+    try{ await permP; }catch(e){} try{ await codeP; }catch(e){}
     if(j && j.customers){
       var mrsRows;
       if(j.mrsegs){
@@ -851,7 +852,7 @@ async function loadFromDb(){
     sbTry('install_extra?select=*&order=year,month,id')   /* 70단계 — 설치비 추가 항목(설치·철거) */
   ]);
   try{ sessionStorage.setItem(CACHE_KEY, JSON.stringify({t:Date.now(), res:res})); }catch(e){}
-  try{ await permP; }catch(e){}
+  try{ await permP; }catch(e){} try{ await codeP; }catch(e){}
   return buildFromRes(res);
 }
 function loadFromCache(){
@@ -877,6 +878,7 @@ function buildFromRes(res){
   window.IS_VIEWER = window.IS_VIEWER_ROLE;   // 화면마다 permEnter() 가 «쓰기 권한 없음» 을 더함
   window.IS_SUPER = window.MY_ROLE==='super_admin';
   try{ if(PERMS===null){ var pc=sessionStorage.getItem('svc_perms'); if(pc) PERMS=JSON.parse(pc); } }catch(e){}   // 캐시 경로에서도 권한 유지
+  try{ if(CODES===null){ var cc=sessionStorage.getItem('svc_codes'); if(cc){ CODES=JSON.parse(cc); applyCodes(); } } }catch(e){}   // 캐시 경로에서도 코드 목록 유지 (㊿+137)
   var abtn=document.querySelector('.side button[data-v="adminx"]');
   if(abtn) abtn.style.display = window.IS_SUPER? '':'none';
   var obtn=document.querySelector('.side button[data-v="ops"]');

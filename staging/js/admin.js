@@ -462,6 +462,7 @@ function renderAdmin(){
   }
   try{ apBind(); }catch(e){}
   try{ mfBind(); mfLoad(); }catch(e){}
+  try{ cdBind(); cdLoad(); }catch(e){}
   axLoad();
   abLoad();
 }
@@ -665,6 +666,98 @@ async function mfAll(){
   toast('2단계 인증 전체 지정', n+'개 계정 · 기한 '+dl); mfLoad();
 }
 function mfBind(){ if(MF.bound) return; MF.bound=true; var r=$('#mfReload'); if(r) r.onclick=mfLoad; var a=$('#mfAll'); if(a) a.onclick=mfAll; }
+/* ===== 관리자 › 코드 관리 (code_lists · SQL 93 · ㊿+137) — 선택 목록을 한 곳에서 추가·숨김·순서 =====
+   저장은 code_lists 표에 직접(RLS: super_admin). 저장 뒤 loadCodes() 로 전역 *_OPTS 배열을 갱신 → 열린 표·폼에 즉시 반영. 다른 사용자는 다음 데이터 로드부터. */
+var CD={kind:'contract_status', rows:null, bound:false, showOff:false};
+function cdMsg(t,bad){ var e=$('#cdMsg'); if(e){ e.textContent=t||''; e.style.color=bad? 'var(--critical,#d03b3b)':''; } }
+function cdBind(){
+  if(CD.bound) return; CD.bound=true;
+  var k=$('#cdKind'); if(k){ k.innerHTML=Object.keys(CODE_KIND).map(function(kind){ return '<option value="'+kind+'">'+esc(CODE_KIND_LABEL[kind]||kind)+'</option>'; }).join(''); k.value=CD.kind; k.onchange=function(){ CD.kind=k.value; cdPaint(); }; }
+  var r=$('#cdReload'); if(r) r.onclick=cdLoad;
+  var so=$('#cdShowOff'); if(so) so.onchange=function(){ CD.showOff=so.checked; cdPaint(); };
+  var a=$('#cdAdd'); if(a) a.onclick=cdAdd;
+  var nv=$('#cdNewVal'); if(nv) nv.onkeydown=function(e){ if(e.key==='Enter'){ e.preventDefault(); cdAdd(); } };
+}
+async function cdLoad(){
+  cdMsg('불러오는 중…');
+  var rows=await sbTry('code_lists?select=kind,value,label,sort,active,note,updated_by,updated_at&order=kind,sort,value');
+  if(!rows || !rows.length){ CD.rows=null; cdMsg('SQL 93 이 아직 실행되지 않았습니다 (배포·운영 › SQL 탭에서 sql93 실행) — 그동안은 포탈 코드의 기본 목록을 씁니다', true); $('#cdTable').innerHTML=''; return; }
+  CD.rows=rows; var m={}; rows.forEach(function(r){ (m[r.kind]=m[r.kind]||[]).push(r); }); CODES=m; try{ sessionStorage.setItem('svc_codes', JSON.stringify(m)); }catch(e){} applyCodes();
+  cdMsg(rows.length+'개 값 · '+Object.keys(m).length+'개 목록'); cdPaint();
+}
+function cdPaint(){
+  var t=$('#cdTable'); if(!t||!CD.rows) return;
+  var list=CD.rows.filter(function(r){ return r.kind===CD.kind && (CD.showOff || r.active!==false); }).sort(function(a,b){ return (a.sort||0)-(b.sort||0) || String(a.value).localeCompare(String(b.value)); });
+  var note=CODE_KIND_NOTE[CD.kind]; var cap=$('#cdCap'); if(cap){ var w=cap.querySelector('.cd-warn'); if(w) w.remove(); if(note){ var sp=document.createElement('div'); sp.className='cd-warn'; sp.style.cssText='margin-top:6px;color:var(--s3,#8a5200)'; sp.textContent='⚠ '+note; cap.appendChild(sp); } }
+  t.innerHTML='<thead><tr><th style="width:40px">순서</th><th>값</th><th>표시 이름</th><th>메모</th><th style="width:70px">상태</th><th class="mini">수정</th><th class="act" style="width:170px"></th></tr></thead>';
+  var tb=document.createElement('tbody');
+  if(!list.length){ var tr0=document.createElement('tr'); tr0.innerHTML='<td colspan="7" class="mini" style="padding:14px">값이 없습니다 — 아래에서 추가하세요'+(CD.showOff? '':' (숨긴 값은 «숨긴 값도 보기»)')+'</td>'; tb.appendChild(tr0); }
+  list.forEach(function(r,i){
+    var tr=document.createElement('tr'); if(r.active===false) tr.style.opacity='.55';
+    var nUse=cdUsage(CD.kind, r.value);
+    tr.innerHTML='<td class="mini">'+(i+1)+'</td>'+
+      '<td><b>'+esc(r.value)+'</b>'+(nUse!=null? ' <span class="mini" style="opacity:.7">· '+nUse+'행</span>':'')+'</td>'+
+      '<td><input data-cd-label="'+esc(r.value)+'" value="'+esc(r.label||'')+'" placeholder="(값 그대로)" style="height:30px;width:100%;min-width:90px"></td>'+
+      '<td><input data-cd-note="'+esc(r.value)+'" value="'+esc(r.note||'')+'" placeholder="메모" style="height:30px;width:100%;min-width:90px"></td>'+
+      '<td>'+(r.active===false? '<span class="mini">숨김</span>':'<span style="color:var(--brand)">사용</span>')+'</td>'+
+      '<td class="mini">'+esc(String(r.updated_at||'').slice(0,10))+(r.updated_by? '<br>'+esc(r.updated_by):'')+'</td>'+
+      '<td class="act"><button type="button" class="cbtn" data-cd-up="'+esc(r.value)+'" title="위로"'+(i===0? ' disabled':'')+'>↑</button> <button type="button" class="cbtn" data-cd-down="'+esc(r.value)+'" title="아래로"'+(i===list.length-1? ' disabled':'')+'>↓</button> '+
+        '<button type="button" class="cbtn pri" data-cd-save="'+esc(r.value)+'">저장</button> '+
+        '<button type="button" class="cbtn" data-cd-tog="'+esc(r.value)+'">'+(r.active===false? '켜기':'숨기기')+'</button></td>';
+    tb.appendChild(tr);
+  });
+  t.appendChild(tb);
+  t.querySelectorAll('[data-cd-save]').forEach(function(b){ b.onclick=function(){ cdSave(b.dataset.cdSave); }; });
+  t.querySelectorAll('[data-cd-tog]').forEach(function(b){ b.onclick=function(){ cdToggle(b.dataset.cdTog); }; });
+  t.querySelectorAll('[data-cd-up]').forEach(function(b){ b.onclick=function(){ cdMove(b.dataset.cdUp, -1, list); }; });
+  t.querySelectorAll('[data-cd-down]').forEach(function(b){ b.onclick=function(){ cdMove(b.dataset.cdDown, 1, list); }; });
+}
+/* 메모리 데이터에서 그 값을 쓰는 행 수(참고용 · 표에 있는 종류만) */
+function cdUsage(kind, v){
+  var R=window.RAWX||{}; var f={contract_status:['contracts','status'], contract_type:['contracts','contract_type'], channel:['contracts','channel'], line:['contracts','line'], lead_src:['contracts','lead_src'], live_override:['contracts','live_override'], billing:['contracts','billing'], version:['contracts','version'],
+    order_status:['orders','status'], order_channel:['orders','channel'], model:['orders','model'], industry:['customers','industry']}[kind];
+  if(!f || !R[f[0]]) return null; return R[f[0]].filter(function(r){ return r[f[1]]===v; }).length;
+}
+function cdRow(v){ return (CD.rows||[]).filter(function(r){ return r.kind===CD.kind && r.value===v; })[0]; }
+async function cdPatch(v, patch, okMsg){
+  cdMsg('저장 중…');
+  try{
+    patch.updated_by=AUTH_USER||null; patch.updated_at=new Date().toISOString();
+    await sbWrite('PATCH','code_lists?kind=eq.'+encodeURIComponent(CD.kind)+'&value=eq.'+encodeURIComponent(v), patch);
+    await logChange('code_'+(patch.active===false? 'hide': patch.active===true? 'show':'edit'),'code_lists',CD.kind+':'+v, patch);
+    if(okMsg) toast('코드 관리', okMsg); await cdLoad();
+  }catch(e){ cdMsg(String(e.message||e).slice(0,140), true); }
+}
+function cdSave(v){ var t=$('#cdTable'); var q=function(a){ var e=t.querySelector('['+a+'="'+CSS.escape(v)+'"]'); return e? e.value.trim():''; }; cdPatch(v, {label:q('data-cd-label')||null, note:q('data-cd-note')||null}, CODE_KIND_LABEL[CD.kind]+' «'+v+'» 저장'); }
+function cdToggle(v){
+  var r=cdRow(v); if(!r) return; var off=r.active!==false;
+  if(off){ var n=cdUsage(CD.kind, v); if(!confirm('«'+v+'» 를 숨깁니다 — 새 입력에서 고를 수 없고 데이터 점검이 «목록에 없는 값»으로 표시합니다.'+(n? ' 지금 이 값인 행 '+n+'개는 그대로 둡니다.':'')+' 계속할까요?')) return; }
+  cdPatch(v, {active:!off}, '«'+v+'» '+(off? '숨김':'사용'));
+}
+async function cdMove(v, dir, list){
+  var i=list.findIndex(function(r){ return r.value===v; }); var j=i+dir; if(i<0||j<0||j>=list.length) return;
+  var a=list[i], b=list[j], sa=a.sort||0, sb=b.sort||0; if(sa===sb){ sb=sa+dir; }   // 같은 순서값이면 하나를 밀어 구분
+  cdMsg('순서 바꾸는 중…');
+  try{
+    await sbWrite('PATCH','code_lists?kind=eq.'+encodeURIComponent(CD.kind)+'&value=eq.'+encodeURIComponent(a.value), {sort:sb});
+    await sbWrite('PATCH','code_lists?kind=eq.'+encodeURIComponent(CD.kind)+'&value=eq.'+encodeURIComponent(b.value), {sort:sa});
+    await cdLoad();
+  }catch(e){ cdMsg(String(e.message||e).slice(0,140), true); }
+}
+async function cdAdd(){
+  var v=($('#cdNewVal').value||'').trim(), label=($('#cdNewLabel').value||'').trim()||null, note=($('#cdNewNote').value||'').trim()||null;
+  if(!v){ cdMsg('값을 입력하세요', true); $('#cdNewVal').focus(); return; }
+  if(cdRow(v)){ cdMsg('이미 있는 값입니다'+(cdRow(v).active===false? ' (숨김 상태 — «켜기»)':''), true); return; }
+  if(CODE_KIND_NOTE[CD.kind] && !confirm('⚠ '+CODE_KIND_NOTE[CD.kind]+'\n\n«'+v+'» 를 그래도 추가할까요? (저장은 되지만 화면 로직은 이 값을 모를 수 있습니다)')) return;
+  var maxSort=(CD.rows||[]).filter(function(r){ return r.kind===CD.kind; }).reduce(function(m,r){ return Math.max(m, r.sort||0); }, 0);
+  cdMsg('추가 중…');
+  try{
+    await sbWrite('POST','code_lists', {kind:CD.kind, value:v, label:label, note:note, sort:maxSort+1, active:true, updated_by:AUTH_USER||null});
+    await logChange('code_add','code_lists',CD.kind+':'+v, {label:label, note:note});
+    $('#cdNewVal').value=''; $('#cdNewLabel').value=''; $('#cdNewNote').value='';
+    toast('코드 추가', CODE_KIND_LABEL[CD.kind]+' «'+v+'»'); await cdLoad();
+  }catch(e){ cdMsg(String(e.message||e).slice(0,140), true); }
+}
 async function axLoad(){
   axMsg('불러오는 중…');
   try{

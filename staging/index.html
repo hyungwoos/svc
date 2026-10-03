@@ -19,7 +19,7 @@
 <!-- 포탈 버전 — 파일을 바꿔 올릴 때마다 아래 content 의 숫자가 +1 (화면 맨 아래 표시 · app.css / js/*.js 의 ?v= 캐시 무효화 · 배포·운영이 이 값을 읽어 비교).
      코드 파일 목록은 app-js (js/load.js 가 이 순서로 불러옴 · 마지막은 항상 js/init.js) — 파일을 더하거나 빼면 여기와 sw.js 의 SHELL 을 함께 고칠 것.
      ④ 아키텍처 2단계(㊿+136): 인라인 스크립트·onclick 을 전부 없애 CSP script-src 에서 'unsafe-inline' 제거. -->
-<meta name="app-ver" content="2026-09-16 ㊿+136">
+<meta name="app-ver" content="2026-09-16 ㊿+137">
 <meta name="app-js" content="js/viz.js,js/core.js,js/shell.js,js/dash.js,js/ai.js,js/grids.js,js/equipment.js,js/analysis.js,js/tools.js,js/price.js,js/inbound.js,js/admin.js,js/sales.js,js/report.js,js/grid.js,js/edit.js,js/init.js">
 <script src="js/boot.js"></script>
 </head>
@@ -763,6 +763,22 @@
       <div class="tbl-wrap" style="max-height:50vh"><table id="mfTable" class="dgrid"></table></div>
       <p class="cap" style="margin:10px 0 0"><b>필수</b>로 지정한 계정은 인증 앱을 등록해야 포탈을 쓸 수 있습니다 — <b>기한</b>을 두면 그날까지는 로그인할 때 안내만 뜨고, 지나면(또는 기한이 없으면) 등록 화면이 먼저 뜹니다. DB 도 같은 규칙으로 막아(SQL 89) 비밀번호만 아는 사람은 데이터를 못 봅니다.
         <b>인증 앱 초기화</b>는 폰을 잃어버린 사람용 — 등록을 지우면 다음 로그인은 비밀번호만으로 되고(필수면 다시 등록 화면), 본인에게 알려 주세요.</p>
+
+      <div style="font-size:11px;color:var(--ink-2);opacity:.75;margin:22px 0 8px">— 코드 관리 — 상태·채널·서비스 같은 선택 목록 (포탈 화면 · 데이터 점검 · DB 검증이 모두 이 목록을 봄) —</div>
+      <div class="dbar" style="margin-bottom:8px;flex-wrap:wrap;gap:8px;align-items:center">
+        <select id="cdKind" aria-label="목록 종류" style="height:32px;min-width:200px;padding:0 8px;border-radius:8px;border:1px solid var(--ring);background:var(--surface-2);color:var(--ink);font-family:inherit;font-size:12px"></select>
+        <button class="pill ghost" id="cdReload">↻ 다시 읽기</button>
+        <label class="mini" style="display:flex;align-items:center;gap:4px"><input type="checkbox" id="cdShowOff"> 숨긴 값도 보기</label>
+        <span class="mini" id="cdMsg"></span>
+      </div>
+      <div class="tbl-wrap" style="max-height:50vh"><table id="cdTable" class="dgrid"></table></div>
+      <div class="frm" style="grid-template-columns:1fr 1fr 2fr auto;margin-top:8px">
+        <div><label>새 값</label><input id="cdNewVal" placeholder="저장되는 값 (예: 유통)"></div>
+        <div><label>표시 이름 (선택)</label><input id="cdNewLabel" placeholder="비우면 값 그대로"></div>
+        <div><label>메모 (선택)</label><input id="cdNewNote" placeholder="언제·왜 추가했는지"></div>
+        <div style="display:flex;align-items:flex-end"><button class="pill" id="cdAdd" style="height:36px">＋ 추가</button></div>
+      </div>
+      <p class="cap" id="cdCap" style="margin:10px 0 0">값을 <b>숨기면</b> 새 입력에서 고를 수 없고 데이터 점검이 «목록에 없는 값»으로 잡지만, 이미 그 값인 행은 그대로 둡니다(다른 열 수정도 가능). 순서는 ↑↓ 로. 저장하면 포탈을 쓰는 모든 사람에게 다음 데이터 로드부터 적용됩니다(본인은 즉시).</p>
 
       <div style="font-size:11px;color:var(--ink-2);opacity:.75;margin:22px 0 8px">— AI 사용 비용 (Anthropic) —</div>
       <div id="axBillKpi" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px"></div>

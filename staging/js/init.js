@@ -132,7 +132,7 @@ var GRIDS={
       {k:'combine',l:'모듈',t:'select',opts:COMBINE_OPTS},
       {k:'contract_type',l:'구분',t:'select',opts:CTYPE_OPTS},
       {k:'status',l:'상태',t:'select',opts:CSTATUS_OPTS},
-      {k:'live_override',l:'LIVE 예외',t:'select',opts:['포함','제외'],fmt:function(v){ return v? (v==='포함'? '포함(고정)':'제외(고정)') : '·'; }},   /* 규칙보다 우선 — 비우면 규칙대로 (64단계) */
+      {k:'live_override',l:'LIVE 예외',t:'select',opts:LIVEOV_OPTS,fmt:function(v){ return v? (v==='포함'? '포함(고정)':'제외(고정)') : '·'; }},   /* 규칙보다 우선 — 비우면 규칙대로 (64단계) */
       {k:'live_override_note',l:'LIVE 예외 사유'},
       {k:'auto_renew',l:'자동연장',t:'bool',fmt:function(v){ return v? '✅ 매월':'·'; }},   /* 월 단위 자동연장 — 만기 목록·슬랙 알림에서 제외 (SQL 84 · ㊿+127) */
       {k:'renew_count',l:'연장',ro:true,fmt:renewLabel},                /* 연장 회차 — «갱신» 탭으로 올라감 */
@@ -322,12 +322,12 @@ var GRIDS={
   },
   orders:{
     title:'임대 장비 신청 내역', table:'equipment_orders',
-    chipsField:'channel', chipsOpts:['에스원','LGU+','조달','일반','기타'],
+    chipsField:'channel', chipsOpts:ORD_CH_OPTS,
     cap:'저장할 때마다 장비 현황에 자동 반영됩니다 — 접수·출하요청·배송중은 재고, 설치완료·회수예정은 임대중, 회수완료는 회수완료 (취소는 현황에서 내림) · 시리얼 칩을 눌러 회수 표시 → «회수 처리 저장» (일부·전부 모두, ↩ 버튼은 체크 목록 방식) · 시리얼을 비워두면 «미등록-신청번호» 로 수량만큼 임시 등록 · 신규 신청은 장비 › 임대 장비 신청', add:true, del:true,
     rows:function(){ return RAWX.orders||[]; },
     cols:[
       {k:'created_at',l:'신청일',ro:true,fmt:function(v){return String(v||'').slice(0,10);}},
-      {k:'channel',l:'채널',t:'select',opts:['에스원','LGU+','조달','일반','기타']},
+      {k:'channel',l:'채널',t:'select',opts:ORD_CH_OPTS},
       {k:'order_type',l:'유형',t:'select',opts:['신규발주','추가','교체(장애)','교체(증설)','철거·회수']},
       {k:'customer',l:'고객사',req:true},
       {k:'contract_no',l:'계약번호'},
@@ -335,12 +335,12 @@ var GRIDS={
       {k:'install_date',l:'설치희망',t:'date'},
       {k:'edition',l:'에디션',t:'select',opts:['Enterprise Edition','Basic Edition']},
       {k:'nodes',l:'노드',t:'number'},
-      {k:'model',l:'모델',t:'select',opts:['S100','S200','S10_R2','S20_R2','S30H_R1','ES30']},   /* 장비 현황의 모델 목록과 동일 */
+      {k:'model',l:'모델',t:'select',opts:MODEL_OPTS},   /* 장비 현황의 모델 목록과 동일 — code_lists model (SQL 93) */
       {k:'qty',l:'수량',t:'number'},
       {k:'standalone_pod',l:'단독Pod',t:'bool',fmt:function(v){return v?'✅ 단독':'·';}},
       {k:'recv_name',l:'수령인'},
       {k:'ship_date',l:'수령희망',t:'date'},
-      {k:'status',l:'상태',t:'select',opts:['접수','출하요청','배송중','설치완료','회수예정','회수완료','취소']},
+      {k:'status',l:'상태',t:'select',opts:ORD_STATUS_OPTS},
       {k:'returned_date',l:'회수일',t:'date',fmt:function(v,r){
         if(v) return String(v).slice(0,10);
         return (r&&r.status==='회수완료')? '· ⚠ 미입력' : '·';     /* 회수완료인데 날짜가 없으면 표시 */
@@ -357,7 +357,7 @@ var GRIDS={
   },
   assets:{
     title:'임대 장비 현황 (시리얼 단위)', table:'equipment_assets',
-    chipsField:'channel', chipsOpts:['에스원','LGU+','조달','일반','기타'],
+    chipsField:'channel', chipsOpts:ORD_CH_OPTS,
     cap:'신청 내역에서 자동으로 만들어지는 시리얼 단위 저장소입니다 — 신청에 붙은 장비(🔒)는 «임대 장비 신청 내역» 에서 ✎ 수정·↩ 회수 처리하면 따라옵니다 · 여기서는 신청과 무관한 재고·데모·판매 장비만 직접 등록·수정', add:true, del:true,
     rows:function(){
       var om={}; (RAWX.orders||[]).forEach(function(o){ om[String(o.id)]=o; });
@@ -369,12 +369,12 @@ var GRIDS={
         return String(a.serial||'').localeCompare(String(b.serial||'')); }); },
     cols:[
       {k:'serial',l:'시리얼',req:true},
-      {k:'model',l:'모델',t:'select',opts:['S10_R2','S20_R2','S30H_R1','S100','S200','ES30']},
+      {k:'model',l:'모델',t:'select',opts:MODEL_OPTS},
       {k:'usage',l:'구분',t:'select',opts:['임대','데모','대여','판매','하자보수']},
       {k:'status',l:'상태',t:'select',opts:['재고','임대중','회수완료','판매완료','수리중','분실','폐기']},
       {k:'_ostat',l:'신청상태',ro:true,fmt:function(v,r){ return (r&&r.order_id==null)? '· 신청 없음' : (v||'· 신청 삭제됨'); }},
       {k:'customer',l:'고객사'},
-      {k:'channel',l:'채널',t:'select',opts:['에스원','LGU+','조달','일반','기타']},
+      {k:'channel',l:'채널',t:'select',opts:ORD_CH_OPTS},
       {k:'partner',l:'파트너'},
       {k:'in_date',l:'입고일',t:'date'},
       {k:'deployed_date',l:'출고일',t:'date'},

@@ -329,6 +329,79 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
     await ctx.close();
   }
 }
+// 코드 목록 (code_lists · SQL 93 · ㊿+137): 표 → *_OPTS 갱신 · 관리자 › 코드 관리 · 데이터 점검 병합·mrr 채우기
+{
+  const CODE_ROWS = [
+    { kind: 'channel', value: '일반', label: null, sort: 1, active: true }, { kind: 'channel', value: '조달', label: null, sort: 2, active: true }, { kind: 'channel', value: '에스원', label: null, sort: 3, active: true },
+    { kind: 'channel', value: 'LGU+', label: null, sort: 4, active: true }, { kind: 'channel', value: '유통', label: null, sort: 5, active: true }, { kind: 'channel', value: '테스트채널', label: null, sort: 6, active: true, note: 'smoke' },
+    { kind: 'channel', value: '옛채널', label: null, sort: 99, active: false },
+    { kind: 'order_status', value: '접수', sort: 1, active: true }, { kind: 'order_status', value: '출하요청', sort: 2, active: true }, { kind: 'order_status', value: '배송중', sort: 3, active: true }, { kind: 'order_status', value: '설치완료', sort: 4, active: true }, { kind: 'order_status', value: '회수예정', sort: 5, active: true }, { kind: 'order_status', value: '회수완료', sort: 6, active: true }, { kind: 'order_status', value: '취소', sort: 7, active: true },
+    { kind: 'model', value: 'S100', sort: 1, active: true }, { kind: 'model', value: 'S200', sort: 2, active: true }, { kind: 'model', value: 'S10_R2', sort: 3, active: true }, { kind: 'model', value: 'S20_R2', sort: 4, active: true }, { kind: 'model', value: 'S30H_R1', sort: 5, active: true }, { kind: 'model', value: 'ES30', sort: 6, active: true }, { kind: 'model', value: 'S900', sort: 7, active: true, note: 'smoke' },
+    { kind: 'line', value: 'Cloud', label: 'Cloud NAC', sort: 1, active: true }, { kind: 'line', value: 'S1', label: 'S1 Cloud NAC', sort: 2, active: true }, { kind: 'line', value: 'MDR', label: 'MDR', sort: 3, active: true }, { kind: 'line', value: 'MDR_S1', label: 'S1 MDR', sort: 4, active: true }, { kind: 'line', value: 'DRM', label: 'DRM', sort: 5, active: true }, { kind: 'line', value: 'PNS', label: 'PNS', sort: 6, active: true }, { kind: 'line', value: 'DLP', label: 'DLP', sort: 7, active: true },
+  ];
+  const writes = [];
+  const { ctx, page, errs } = await open({ onWrite: (w) => writes.push(w), extra: async (route, u, m) => {
+    if (!u.includes('/rest/v1/code_lists') || m !== 'GET') return false;
+    await route.fulfill({ status: 200, contentType: 'application/json', headers: { 'content-range': '0-27/28', 'Access-Control-Expose-Headers': 'content-range' }, body: JSON.stringify(CODE_ROWS) }); return true;
+  } });
+  page.on('dialog', (d) => d.accept());
+  await S.t('코드 목록: code_lists → CH_OPTS·MODEL_OPTS 갱신 · 숨긴 값 제외 · 폼 select 반영', async () => {
+    const st = await page.evaluate(() => ({ ch: CH_OPTS.slice(), model: MODEL_OPTS.slice(), ordCh: ORD_CH_OPTS.slice(), gridOpts: GRIDS.orders.cols.filter((c) => c.k === 'model')[0].opts === MODEL_OPTS, od: [...document.querySelectorAll('#odModel option')].map((o) => o.value), codes: !!CODES, active: codeActive('channel', '옛채널'), active2: codeActive('channel', '테스트채널') }));
+    assert(st.codes, 'CODES 비어 있음'); assert(st.ch.includes('테스트채널') && !st.ch.includes('옛채널'), 'CH_OPTS ' + st.ch.join(','));
+    assert(st.model.includes('S900') && st.od.includes('S900'), 'MODEL_OPTS/#odModel ' + st.od.join(','));
+    assert(st.gridOpts, 'GRIDS.orders 모델 열이 MODEL_OPTS 배열을 참조하지 않음'); assert(st.ordCh.length === 5, 'ORD_CH_OPTS(표에 없음) 는 기본값 유지');
+    assert(st.active === false && st.active2 === true, 'codeActive');
+    assert(!errs.length, errs.join(' | ')); return st.ch.join(',');
+  });
+  await S.t('관리자 › 코드 관리: 표 · 추가(POST) · 숨기기(PATCH) · 순서(PATCH×2)', async () => {
+    await page.evaluate(() => switchView('adminx')); await page.waitForTimeout(800);
+    assert(await page.$('#cdTable tbody'), '코드 관리 표 없음'); const kinds = await page.$$eval('#cdKind option', (e) => e.length); assert(kinds >= 12, '종류 ' + kinds);
+    await page.selectOption('#cdKind', 'channel'); await page.waitForTimeout(150);
+    const rows = await page.$$eval('#cdTable tbody tr', (e) => e.map((x) => x.querySelector('td:nth-child(2) b').textContent)); assert(rows.length === 6 && rows[5] === '테스트채널', '채널 ' + rows.join(','));
+    await page.click('#cdShowOff'); await page.waitForTimeout(150);
+    const rows2 = await page.$$eval('#cdTable tbody tr', (e) => e.length); assert(rows2 === 7, '숨긴 값 포함 ' + rows2);
+    writes.length = 0; await page.fill('#cdNewVal', '새채널'); await page.fill('#cdNewNote', 'smoke'); await page.click('#cdAdd'); await page.waitForTimeout(500);
+    const add = writes.filter((w) => /code_lists/.test(w.url) && w.m === 'POST')[0]; assert(add, '추가 POST 없음 ' + JSON.stringify(writes.map((w) => w.m + ' ' + w.url.split('/rest/v1/')[1])));
+    const ab = JSON.parse(add.body); assert(ab.kind === 'channel' && ab.value === '새채널' && ab.active === true && ab.sort === 100 && ab.note === 'smoke', JSON.stringify(ab));
+    assert(writes.some((w) => /change_log/.test(w.url) && /code_add/.test(w.body)), 'change_log code_add 없음');
+    writes.length = 0; await page.click('#cdTable [data-cd-tog="테스트채널"]'); await page.waitForTimeout(500);
+    const tog = writes.filter((w) => /code_lists\?kind=eq\.channel&value=eq\.%ED%85%8C/.test(w.url) && w.m === 'PATCH')[0]; assert(tog && JSON.parse(tog.body).active === false, '숨기기 PATCH ' + JSON.stringify(writes.map((w) => w.m + ' ' + w.url.split('/rest/v1/')[1])));
+    writes.length = 0; await page.click('#cdTable [data-cd-up="조달"]'); await page.waitForTimeout(500);
+    const mv = writes.filter((w) => /code_lists/.test(w.url) && w.m === 'PATCH'); assert(mv.length === 2 && JSON.parse(mv[0].body).sort === 1 && JSON.parse(mv[1].body).sort === 2, '순서 PATCH ' + JSON.stringify(mv.map((w) => w.body)));
+    assert(!errs.length, errs.join(' | ')); return rows.length + '→' + rows2;
+  });
+  await S.t('데이터 점검: 고객사 중복 → 병합 창 → rpc merge_customers(keep, drop)', async () => {
+    await page.evaluate(() => { RAWX.customers.push({ id: 99901, name: '(주)가상고객01', aliases: [] }); switchView('dcheck'); }); await page.waitForTimeout(500);
+    const dup = await page.evaluate(() => { const r = dcRules().filter((x) => x.id === 'cu_dup')[0]; return r.items.map((i) => ({ label: i.label, act: !!i.act })); });
+    const hit = dup.filter((d) => /가상고객01/.test(d.label))[0]; assert(hit && hit.act, 'cu_dup 항목/병합 버튼 없음 ' + JSON.stringify(dup).slice(0, 200));
+    await page.click('#bizHost [data-dc="cu_dup"]'); await page.waitForTimeout(200);
+    const btn = (await page.$$('#bizHost [data-dcitem^="cu_dup:"]'))[0]; assert(btn, '항목 병합 버튼 없음'); await btn.click(); await page.waitForTimeout(200);
+    assert(await page.$('#ovlDcMerge'), '병합 창 없음'); const radios = await page.$$eval('#ovlDcMerge input[name="dcmKeep"]', (e) => e.map((x) => x.value)); assert(radios.length === 2 && radios[0] === '1', '후보 ' + radios.join(','));
+    writes.length = 0; await page.click('#ovlDcMerge #dcmGo'); await page.waitForTimeout(900);
+    const rpc = writes.filter((w) => /rpc\/merge_customers/.test(w.url))[0]; assert(rpc, 'merge_customers 호출 없음 ' + JSON.stringify(writes.map((w) => w.url.split('/rest/v1/')[1])));
+    const b = JSON.parse(rpc.body); assert(b.p_keep === 1 && b.p_drop === 99901, JSON.stringify(b));
+    assert(!(await page.$('#ovlDcMerge')), '병합 뒤 창이 닫히지 않음'); assert(!errs.length, errs.join(' | ')); return JSON.stringify(b);
+  });
+  await S.t('데이터 점검: 이달 매출 0 → mrr 로 채우기 (POST monthly_revenue · 원 단위 · change_log)', async () => {
+    writes.length = 0;
+    const exp = await page.evaluate(async () => { const r = DATA.rows.filter((x) => x.mrr > 0)[0]; await dcFillMrr([r], DATA.nowIdx); return { id: r._id, mrr: r.mrr, month: idxDate(DATA.nowIdx) }; });
+    await page.waitForTimeout(500);
+    const post = writes.filter((w) => /monthly_revenue/.test(w.url) && w.m === 'POST')[0]; assert(post, 'monthly_revenue POST 없음 ' + JSON.stringify(writes.map((w) => w.m + ' ' + w.url.split('/rest/v1/')[1])));
+    const b = JSON.parse(post.body); assert(Array.isArray(b) && b.length === 1 && b[0].contract_id === exp.id && b[0].amount === Math.round(exp.mrr) && b[0].month === exp.month, JSON.stringify(b) + ' vs ' + JSON.stringify(exp));
+    assert(writes.some((w) => /change_log/.test(w.url) && /bulk_fill/.test(w.body)), 'change_log bulk_fill 없음');
+    const dc = writes.filter((w) => /change_log/.test(w.url) && /data_check/.test(w.body)); assert(dc.length <= 1, 'data_check 로그가 세션당 1회를 넘음 ' + dc.length);
+    assert(!errs.length, errs.join(' | ')); return b[0].amount + '원';
+  });
+  await S.t('코드 목록 표 없음(SQL 93 전) → 기본값 그대로 · 코드 관리는 안내', async () => {
+    const { ctx: c2, page: p2, errs: e2 } = await open({ extra: async (route, u, m) => { if (!u.includes('/rest/v1/code_lists')) return false; await route.fulfill({ status: 404, contentType: 'application/json', body: '{"message":"relation \\"public.code_lists\\" does not exist"}' }); return true; } });
+    const st = await p2.evaluate(() => ({ codes: CODES, ch: CH_OPTS.slice() })); assert(st.codes === null && st.ch.length === 5, JSON.stringify(st));
+    await p2.evaluate(() => switchView('adminx')); await p2.waitForTimeout(800);
+    const msg = await p2.$eval('#cdMsg', (e) => e.textContent); assert(/SQL 93/.test(msg), msg);
+    assert(!e2.length, e2.join(' | ')); await c2.close(); return msg.slice(0, 30);
+  });
+  if (S.failed.length) await shot(page, 'smoke_fail_codes');
+  await ctx.close();
+}
 await browser.close(); srv.close();
 const ok = S.report();
 fs.writeFileSync(path.join(OUT, 'smoke.json'), JSON.stringify(S.results, null, 1));

@@ -11,6 +11,47 @@
    ================================================================== */
 var CUR_VIEW='dash', DIRTY=false;
 
+/* ===== 코드 목록 (code_lists 표 · SQL 93 · ㊿+137) =====
+   아래 *_OPTS 상수는 «기본값(표가 없을 때)». 로그인 뒤 loadCodes() 가 DB 의 code_lists 를 읽어 applyCodes() 로 **같은 배열 객체의 내용을 바꿔 넣음**
+   (arr.length=0 후 push) → GRIDS 열 opts·폼·데이터 점검 규칙 등 이 배열을 참조하는 모든 곳에 자동 반영. 값 추가·숨김은 관리자 › 코드 관리.
+   DB 쪽도 같은 표를 트리거로 검증(값이 바뀔 때만) 하므로 포탈·DB 가 한 목록을 봄. 주의: order_status(장비 상태 흐름 EQ_ST·상태 보드 열)·line(LIVE 규칙) 은
+   값에 화면 로직이 붙어 있어 새 값을 더하면 코드도 손봐야 함 — 코드 관리 화면에 그 안내가 있음. */
+var CODES=null;              // {kind:[{value,label,sort,active,note}]} · null = 표 없음/아직 안 읽음 → 상수 그대로
+var CODE_KIND={contract_status:'CSTATUS_OPTS', contract_type:'CTYPE_OPTS', channel:'CH_OPTS', line:'LINE_OPTS', lead_src:'LEAD_OPTS', live_override:'LIVEOV_OPTS',
+  order_status:'ORD_STATUS_OPTS', order_channel:'ORD_CH_OPTS', model:'MODEL_OPTS', billing:'BILLING_OPTS', churn_reason:'CHURN_OPTS', partner:'PTN_OPTS', industry:'IND_OPTS', version:'VER_OPTS'};
+var CODE_KIND_LABEL={contract_status:'계약 상태', contract_type:'계약 유형', channel:'판매 채널', line:'서비스', lead_src:'유입경로', live_override:'LIVE 예외',
+  order_status:'장비 신청 상태', order_channel:'장비 신청 채널', model:'장비 모델', billing:'과금 방식', churn_reason:'해지 사유', partner:'파트너', industry:'산업군', version:'Cloud 버전'};
+var CODE_KIND_NOTE={order_status:'상태 흐름(재고·임대중 판정 EQ_ST, 상태 보드 열)이 코드에 있음 — 새 값은 코드 수정도 필요', line:'LIVE·MRR 규칙과 라벨(LINE_LABEL)이 코드에 있음 — 새 서비스는 코드 수정도 필요', live_override:'포함/제외 두 값만 의미가 있음'};
+var LIVEOV_OPTS=['포함','제외'];
+var ORD_STATUS_OPTS=['접수','출하요청','배송중','설치완료','회수예정','회수완료','취소'];
+var ORD_CH_OPTS=['에스원','LGU+','조달','일반','기타'];
+var MODEL_OPTS=['S100','S200','S10_R2','S20_R2','S30H_R1','ES30'];
+async function loadCodes(){
+  if(!SB_TOKEN){ return null; }
+  try{
+    var rows=await sbTry('code_lists?select=kind,value,label,sort,active,note&order=kind,sort,value');
+    if(!rows || !rows.length){ CODES=null; return null; }   // 표 없음(SQL 93 전 · sbAll 은 404 도 [] 로 돌려줌)·비어 있음 → 상수 그대로
+    var m={}; rows.forEach(function(r){ (m[r.kind]=m[r.kind]||[]).push(r); });
+    CODES=m; try{ sessionStorage.setItem('svc_codes', JSON.stringify(m)); }catch(e){}
+    applyCodes(); return m;
+  }catch(e){ CODES=null; return null; }
+}
+function applyCodes(){
+  if(!CODES) return;
+  Object.keys(CODE_KIND).forEach(function(kind){
+    var arr=window[CODE_KIND[kind]], list=CODES[kind]; if(!Array.isArray(arr) || !list) return;
+    var vals=list.filter(function(c){ return c.active!==false; }).sort(function(a,b){ return (a.sort||0)-(b.sort||0) || String(a.value).localeCompare(String(b.value)); }).map(function(c){ return c.value; });
+    if(!vals.length) return;                           // 전부 숨기면 기본값 유지(화면이 비지 않게)
+    arr.length=0; vals.forEach(function(v){ arr.push(v); });
+    if(kind==='line' && window.LINE_LABEL) list.forEach(function(c){ if(c.label) LINE_LABEL[c.value]=c.label; });
+  });
+  fillModelSelect();
+}
+function codeList(kind){ return (CODES && CODES[kind]) || (window[CODE_KIND[kind]]||[]).map(function(v){ return {kind:kind, value:v, active:true}; }); }
+function codeActive(kind, v){ if(v==null || v==='') return true; var arr=window[CODE_KIND[kind]]; return !arr || arr.indexOf(v)>=0; }
+/* 발주 신청 폼의 모델 select (#odModel) 를 MODEL_OPTS 로 다시 채움 — 현재 값 유지 */
+function fillModelSelect(){ var s=document.getElementById('odModel'); if(!s) return; var cur=s.value; s.innerHTML=MODEL_OPTS.map(function(m){ return '<option>'+esc(m)+'</option>'; }).join(''); if(cur && MODEL_OPTS.indexOf(cur)>=0) s.value=cur; }
+
 var LINE_OPTS=['Cloud','S1','MDR','MDR_S1','DRM','PNS','DLP'];
 var PTN_OPTS=['지니언스(직접)','다원티에스','글로웰시스템','에티버스','직접(계산서)'];
 /* 에스원 계약번호 후보 — 계약(s1_no) · 에스원 정산 매핑(s1_map) · 임대 장비 신청(equipment_orders.contract_no) 을 모아 보여줍니다 */
