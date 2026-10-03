@@ -1,0 +1,14 @@
+{
+  "name": "svc-portal",
+  "private": true,
+  "description": "Genians 서비스사업부 통합 관리 포탈 — 정적 포탈 + 테스트 (실행: npm run check · npm test)",
+  "type": "module",
+  "scripts": {
+    "check": "node tests/check.mjs",
+    "test": "node tests/smoke.mjs",
+    "test:install": "npx playwright install --with-deps chromium"
+  },
+  "devDependencies": {
+    "playwright": "^1.47.0"
+  }
+}
