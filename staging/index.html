@@ -2970,7 +2970,7 @@ window.addEventListener('message', function(ev){
 });
 
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-16 ㊿+130';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-16 ㊿+131';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -3212,12 +3212,13 @@ async function mfaCardRender(host){
     host.querySelector('#mfaOn').onclick=function(){ mfaEnrollFlow(fs, host); };
   }
 }
-/* GoTrue 의 qr_code 는 SVG 원문(또는 data: 접두 원문) — '#'(색) 이나 따옴표가 섞이면 data URL 이 끊기므로 percent-encoding 으로 정규화 */
+/* GoTrue 의 qr_code 는 SVG 원문(«<?xml …?><svg …», data: 접두 없음 — 문서: «data:image/svg+xml;utf-8, 를 앞에 붙이라») — 그대로 src 에 넣으면 깨지므로 percent-encoding 한 data URL 로 정규화 (㊿+131 수정) */
 function mfaQrSrc(q){
-  q=String(q||''); if(!q) return '';
+  q=String(q||'').trim(); if(!q) return '';
   var svg=null, m=/^data:image\/svg\+xml(;[^,]*)?,([\s\S]*)$/i.exec(q);
   if(m){ if(/base64/i.test(m[1]||'')) return q; svg=m[2]; try{ svg=decodeURIComponent(svg); }catch(e){} }
-  else if(/^\s*<svg/i.test(q)) svg=q;
+  else if(/^data:/i.test(q)) return q;                 // PNG 등 다른 data URL 은 그대로
+  else if(/<svg[\s>]/i.test(q)) svg=q;                 // GoTrue 실제 응답: «<?xml version="1.0"?><svg …» 원문 (data: 접두 없음)
   if(svg===null) return q;
   return 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
 }

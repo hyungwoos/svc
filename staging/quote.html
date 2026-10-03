@@ -223,9 +223,9 @@
         var s = portalSess(), img = document.getElementById('sealImg');
         if (!s || !img || img.dataset.loaded) return;
         fetch(SB_URL + '/storage/v1/object/authenticated/' + SEAL_OBJECT, { headers: { apikey: SB_KEY, Authorization: 'Bearer ' + s.a } })
-            .then(function (r) { if (!r.ok) throw new Error('seal ' + r.status); return r.blob(); })
+            .then(function (r) { if (!r.ok) throw new Error(r.status === 400 || r.status === 404 ? 'Storage 에 private/seal.jpg 가 없음 — 포탈 › 배포·운영 › 보안 자산에서 올리세요' : r.status === 403 ? '권한 없음 — SQL 87 정책 확인' : 'HTTP ' + r.status); return r.blob(); })
             .then(function (b) { img.src = URL.createObjectURL(b); img.style.display = ''; img.dataset.loaded = '1'; })
-            .catch(function () { img.style.display = 'none'; });
+            .catch(function (e) { img.style.display = 'none'; try { console.warn('[직인] 불러오지 못함:', e && e.message); } catch (x) {} });
     }
     function enterQuote() {
         document.getElementById('loginOverlay').style.display = 'none';
