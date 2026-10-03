@@ -791,6 +791,18 @@ body{padding-left:192px}
 .kpi .lv-delta span.up{background:rgba(12,163,12,.12);color:var(--good)} .kpi .lv-delta span.down{background:rgba(208,59,59,.12);color:var(--critical)}
 .kpi .lv-delta .why{color:var(--muted)}
 .kpi .lv-delta .lnk{font:inherit;font-size:11.5px;background:none;border:0;padding:0;color:var(--brand);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+/* 배포·운영 (㊿+128) */
+.ops-bar{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:14px;padding:10px 12px;border:1px solid var(--ring);border-radius:12px;background:var(--surface-2)}
+.ops-bar>label{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:650}
+.ops-bar input{font:inherit;font-size:14px;letter-spacing:.2em;padding:5px 9px;border:1px solid var(--ring);border-radius:8px;background:var(--surface);color:var(--ink)}
+.ops-grid{display:grid;grid-template-columns:3fr 2fr;gap:18px;align-items:start}
+@media (max-width:900px){ .ops-grid{grid-template-columns:1fr} }
+.ops-h{font-size:12.5px;font-weight:700;color:var(--ink-2);margin:0 0 8px}
+.ops-drop{border:1.5px dashed var(--ring);border-radius:12px;padding:18px 16px;text-align:center;font-size:12.5px;color:var(--ink-2);cursor:pointer;background:var(--surface-2)}
+.ops-drop.on,.ops-drop:hover{border-color:var(--brand);color:var(--ink)}
+.ops-ta{width:100%;min-height:180px;resize:vertical;font:12.5px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;padding:10px 12px;border:1px solid var(--ring);border-radius:10px;background:var(--surface);color:var(--ink);box-sizing:border-box;tab-size:2}
+.ops-pre{font:12px/1.5 ui-monospace,monospace;background:var(--surface-2);border:1px solid var(--ring);border-radius:10px;padding:10px 12px;white-space:pre-wrap;max-height:40vh;overflow:auto;margin:0}
+#opsHost input[type=text],#opsHost input:not([type]),#opsHost select{font:inherit;font-size:12.5px;padding:6px 9px;border:1px solid var(--ring);border-radius:8px;background:var(--surface);color:var(--ink)}
 .pick{max-height:180px;overflow:auto;border:1px solid var(--ring);border-radius:9px;margin-top:6px}
 .pick .pi{padding:8px 11px;font-size:12.5px;cursor:pointer;border-bottom:1px solid var(--grid);display:flex;gap:8px;justify-content:space-between}
 .pick .pi:hover,.pick .pi.sel{background:var(--surface-2)}
@@ -1631,6 +1643,7 @@ html[data-look="cc"] #ovlC360 .mact{border-top:1px solid var(--grid);padding-top
   <div class="grp" id="grpAdmin">관리자</div>
   <button data-v="log">🕘 변경 이력</button>
   <button data-v="adminx" style="display:none">🛡️ 관리자</button>
+  <button data-v="ops" style="display:none">🚀 배포·운영</button>
   <button data-v="account">👤 내 계정</button>
   <button id="btnMenuEdit" style="display:none;opacity:.75">⚙ 메뉴 편집</button>
 </nav>
@@ -2221,6 +2234,8 @@ html[data-look="cc"] #ovlC360 .mact{border-top:1px solid var(--grid);padding-top
   <div id="viewChurnRate" class="hidden"><div id="crBody"></div></div>
   <div id="viewCustFlow" class="hidden"><div id="cfBody"></div></div>
 
+  <!-- 관리자 › 배포·운영 (㊿+128) — Edge Function ops 중계. 토큰은 전부 함수 Secrets, 포탈엔 PIN 입력칸만(저장 안 함) -->
+  <div id="viewOps" class="hidden"><section class="card c12" style="max-width:1120px;margin:0 auto" id="opsHost"></section></div>
   <div id="viewAdmin" class="hidden">
     <section class="card c12" style="max-width:1000px;margin:0 auto">
       <h3 style="margin:0 0 4px;font-size:16px">🛡️ 관리자 — 계정·권한 관리</h3>
@@ -2951,7 +2966,7 @@ window.addEventListener('message', function(ev){
 });
 
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-16 ㊿+127';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-16 ㊿+128';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -2979,7 +2994,7 @@ function pwaHintSync(){ var h=document.getElementById('accPwa'); if(!h) return; 
    보기(v): 메뉴 표시·화면 열기 · 읽기(r): 화면 안 데이터 열람 · 쓰기(w): 추가·수정·삭제.
    행이 없는 메뉴는 역할 기본(admin 전부 · admin_viewer 보기+읽기). super_admin 은 항상 전부. 홈·내 계정은 항상 보임. */
 var PERMS=null;                                   // {view:{v,r,w}} · null = 지정 없음
-var PERM_EXEMPT={dash:1, account:1, adminx:1, log:1, csite:1};   // 역할로만 다루는 화면
+var PERM_EXEMPT={dash:1, account:1, adminx:1, log:1, csite:1, ops:1};   // 역할로만 다루는 화면
 async function loadPerms(){
   if(!SB_TOKEN || !AUTH_USER){ PERMS=null; return null; }
   try{
@@ -4025,6 +4040,8 @@ function buildFromRes(res){
   try{ if(PERMS===null){ var pc=sessionStorage.getItem('svc_perms'); if(pc) PERMS=JSON.parse(pc); } }catch(e){}   // 캐시 경로에서도 권한 유지
   var abtn=document.querySelector('.side button[data-v="adminx"]');
   if(abtn) abtn.style.display = window.IS_SUPER? '':'none';
+  var obtn=document.querySelector('.side button[data-v="ops"]');
+  if(obtn) obtn.style.display = window.IS_SUPER? '':'none';   // 배포·운영은 슈퍼 관리자 + 함수 쪽 OPS_OWNER 지정 계정만 (㊿+128)
   var lbtn=document.querySelector('.side button[data-v="log"]');
   if(lbtn) lbtn.style.display = window.IS_SUPER? '':'none';   // 변경 이력은 슈퍼 관리자만
   var cbtn=document.querySelector('.side button[data-v="csite"]');
@@ -11921,6 +11938,227 @@ async function adminFetch(payload){
   try{ sessionStorage.removeItem(CACHE_KEY); }catch(e){}   // 권한 변경 등도 캐시 무효화
   return j;
 }
+/* ────────────────────────────────────────────────────────────────────────────
+   관리자 › 배포·운영 (㊿+128) — Edge Function ops 중계
+   · 포탈(공개 HTML)에는 토큰이 하나도 없음. GitHub·Supabase 토큰은 전부 함수 Secrets. 여기엔 «작업 PIN» 입력칸만 있고 PIN 은 메모리에만(저장 안 함).
+   · 함수가 ① 로그인 ② OPS_OWNER(지정 계정) ③ super_admin ④ PIN 을 전부 검사 — 화면은 슈퍼 관리자에게만 보이지만 실제 열쇠는 함수 쪽.
+   · 탭: GitHub 배포(끌어다 놓기 → 커밋 · 이력 · 복원) · SQL 실행(읽기 전용 토글 · 결과 표) · Edge Function(코드 불러오기 · 배포 · Verify JWT) · 기록(ops_log)
+   ──────────────────────────────────────────────────────────────────────────── */
+var OPS={tab:'gh', pin:'', st:null, files:[], msg:'', ghList:null, hist:null, histPath:'', fnList:null, fnSel:'', fnMeta:null, fnCode:'', fnName:'index.ts', fnVerify:false, sqlRes:null, busy:false};
+function opsUrl(){ return SB_URL+'/functions/v1/ops'; }
+async function opsCall(action, body){
+  var o=Object.assign({action:action}, body||{}); if(action!=='status') o.pin=OPS.pin;
+  var r;
+  try{ r=await fetch(opsUrl(), {method:'POST', headers:{'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+SB_TOKEN}, body:JSON.stringify(o)}); }
+  catch(e){ throw new Error('ops 함수에 연결하지 못했습니다 — Edge Functions 에 «ops» 가 배포돼 있고 Verify JWT 가 꺼져 있는지 확인하세요'); }
+  var j=null; try{ j=await r.json(); }catch(e){}
+  if(!j) throw new Error('ops 함수 응답을 읽지 못했습니다 ('+r.status+')');
+  if(!j.ok) throw new Error(j.error||('실패 ('+r.status+')'));
+  return j;
+}
+function opsFmtBytes(n){ n=Number(n)||0; return n>=1048576? (n/1048576).toFixed(2)+' MB' : n>=1024? Math.round(n/1024)+' KB' : n+' B'; }
+function opsVerOf(text){ var m=/var APP_VER='([^']+)'/.exec(String(text||'')); return m? m[1] : null; }
+function opsIsText(name){ return /\.(html?|js|mjs|ts|json|webmanifest|css|sql|md|txt|csv|svg|xml)$/i.test(name); }
+function opsSetMsg(t, cls){ OPS.msg=t||''; OPS.msgCls=cls||''; var e=document.getElementById('opsMsg'); if(e){ e.textContent=OPS.msg; e.className='mmsg'+(OPS.msgCls? ' '+OPS.msgCls:''); } }
+function opsNeedPin(){ if(!OPS.pin){ opsSetMsg('작업 PIN 을 먼저 입력하세요 (위 PIN 칸)','bad'); var p=document.getElementById('opsPin'); if(p) p.focus(); return false; } return true; }
+async function opsStatus(){
+  try{ OPS.st=await opsCall('status'); }catch(e){ OPS.st={ok:false, error:String(e.message||e)}; }
+  renderOps(true);
+}
+function renderOps(keep){
+  var host=document.getElementById('opsHost'); if(!host) return;
+  if(!window.IS_SUPER){ host.innerHTML='<p class="cap">슈퍼 관리자만 쓸 수 있습니다.</p>'; return; }
+  var st=OPS.st;
+  var h='<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><h3 style="margin:0;font-size:16px">🚀 배포·운영</h3><span class="ubadge sm">지정 계정 전용</span>'+
+    '<span class="mini" style="margin-left:auto">'+(st? (st.ok? '저장소 '+esc(st.github.repo)+' · '+esc(st.github.branch)+' · GitHub 토큰 '+(st.github.token_set?'✓':'✗')+' · Supabase 토큰 '+(st.mgmt_token_set?'✓':'✗')+' · PIN '+(st.pin_set?'설정됨':'미설정')+(st.slack? ' · 슬랙 알림 ✓':'') : '<span style="color:var(--critical)">'+esc(st.error||'')+'</span>') : '상태 확인 중…')+'</span></div>'+
+    '<p class="cap" style="margin:0 0 12px">GitHub 커밋 · SQL 실행 · Edge Function 배포를 포탈 안에서 끝냅니다. 토큰은 전부 함수(ops) Secrets 에만 있고, 여기서는 <b>작업 PIN</b> 만 넣습니다(저장하지 않음 · 5회 틀리면 15분 잠금). 모든 실행은 기록에 남습니다.</p>'+
+    '<div class="ops-bar"><label>작업 PIN <input id="opsPin" type="password" autocomplete="off" inputmode="numeric" placeholder="••••" value="'+esc(OPS.pin)+'" style="width:120px"></label>'+
+    '<div class="mtabs" id="opsTabs" style="margin:0">'+[['gh','GitHub 배포'],['sql','SQL 실행'],['fn','Edge Function'],['log','기록']].map(function(t){ return '<button type="button" data-t="'+t[0]+'" aria-pressed="'+(OPS.tab===t[0])+'">'+t[1]+'</button>'; }).join('')+'</div>'+
+    '<button type="button" class="pill ghost" id="opsRefresh" title="설정 상태·기록 다시 읽기">↻</button></div>'+
+    '<div id="opsBody">'+(OPS.tab==='gh'? opsGhHtml() : OPS.tab==='sql'? opsSqlHtml() : OPS.tab==='fn'? opsFnHtml() : opsLogHtml())+'</div>'+
+    '<div class="mact" style="margin-top:12px"><span class="mmsg'+(OPS.msgCls? ' '+OPS.msgCls:'')+'" id="opsMsg">'+esc(OPS.msg)+'</span></div>';
+  host.innerHTML=h;
+  var pin=document.getElementById('opsPin'); pin.oninput=function(){ OPS.pin=pin.value; };
+  host.querySelectorAll('#opsTabs button').forEach(function(b){ b.onclick=function(){ OPS.tab=b.dataset.t; OPS.msg=''; OPS.msgCls=''; renderOps(true); }; });
+  document.getElementById('opsRefresh').onclick=function(){ OPS.st=null; renderOps(true); opsStatus(); };
+  if(OPS.tab==='gh') opsGhBind(host); else if(OPS.tab==='sql') opsSqlBind(host); else if(OPS.tab==='fn') opsFnBind(host);
+  if(!keep && !OPS.st) opsStatus();
+}
+/* ── GitHub ── */
+function opsGhHtml(){
+  var files=OPS.files, cur=APP_VER;
+  var h='<div class="ops-grid">';
+  h+='<div><div class="ops-h">① 올릴 파일</div><div class="ops-drop" id="opsDrop" tabindex="0">여기에 파일을 끌어다 놓거나 <u>클릭해서 선택</u> — index.html · 위성 페이지 · sw.js · manifest · 이미지 (여러 개 가능)<input type="file" id="opsFile" multiple style="display:none"></div>';
+  if(files.length){
+    h+='<table class="rn-tbl" style="margin-top:8px"><thead><tr><th>경로</th><th class="n">크기</th><th>버전</th><th></th></tr></thead><tbody>'+files.map(function(f,i){
+      var ver=f.ver? (f.ver===cur? '<span class="mini">'+esc(f.ver)+' (지금과 같음)</span>' : '<b>'+esc(f.ver)+'</b> <span class="mini">← 지금 '+esc(cur)+'</span>') : '';
+      return '<tr><td><input data-i="'+i+'" class="ops-path" value="'+esc(f.path)+'" style="width:220px"></td><td class="n">'+opsFmtBytes(f.size)+'</td><td>'+ver+(f.bin? ' <span class="mini">binary</span>':'')+'</td><td><button type="button" class="cbtn" data-rm="'+i+'">빼기</button></td></tr>'; }).join('')+'</tbody></table>';
+    h+='<div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><label style="flex:1;min-width:240px">커밋 메시지 <input id="opsCommitMsg" value="'+esc(OPS.commitMsg||opsAutoMsg())+'" style="width:100%"></label><button type="button" class="pill" id="opsCommit" style="background:var(--brand);border-color:var(--brand);color:#fff">커밋 → GitHub</button></div>';
+    h+='<p class="mini" style="margin:6px 0 0">커밋 하나로 묶여 올라가고, GitHub Pages 반영까지 보통 1~2분. index.html 은 올린 뒤 이 화면을 새로고침하면 새 버전으로 바뀝니다.</p>';
+  }
+  h+='</div>';
+  h+='<div><div class="ops-h">② 저장소 · 이전 버전</div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px"><button type="button" class="pill ghost" id="opsGhList">저장소 파일 보기</button><button type="button" class="pill ghost" id="opsGhHist" data-p="index.html">index.html 이력</button></div>';
+  if(OPS.ghList) h+='<table class="rn-tbl"><thead><tr><th>경로</th><th class="n">크기</th><th></th></tr></thead><tbody>'+OPS.ghList.map(function(f){ return '<tr><td>'+esc(f.path)+'</td><td class="n">'+opsFmtBytes(f.size)+'</td><td><button type="button" class="cbtn" data-hist="'+esc(f.path)+'">이력</button></td></tr>'; }).join('')+'</tbody></table>';
+  if(OPS.hist) h+='<div class="ops-h" style="margin-top:10px">'+esc(OPS.histPath)+' — 최근 커밋</div><table class="rn-tbl"><thead><tr><th>커밋</th><th>일시</th><th>메시지</th><th></th></tr></thead><tbody>'+OPS.hist.map(function(c,i){ return '<tr><td><a href="'+esc(c.url)+'" target="_blank" rel="noopener" style="font-family:ui-monospace,monospace">'+esc(c.short)+'</a></td><td class="mini">'+esc(String(c.date||'').replace('T',' ').slice(0,16))+'</td><td>'+esc(c.message)+'</td><td>'+(i===0? '<span class="mini">현재</span>' : '<button type="button" class="cbtn" data-restore="'+esc(c.sha)+'">이 버전으로 복원</button>')+'</td></tr>'; }).join('')+'</tbody></table>';
+  h+='</div></div>';
+  return h;
+}
+function opsAutoMsg(){
+  var names=OPS.files.map(function(f){ return f.path; }), vers=OPS.files.map(function(f){ return f.ver; }).filter(Boolean);
+  return (vers.length? '포탈 '+vers[0].replace(/^.*\s/,'')+' · ' : '')+names.join(', ')+' (포탈에서 배포)';
+}
+function opsGhBind(host){
+  var drop=host.querySelector('#opsDrop'), inp=host.querySelector('#opsFile');
+  if(drop){
+    drop.onclick=function(){ inp.click(); }; drop.onkeydown=function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); inp.click(); } };
+    drop.ondragover=function(e){ e.preventDefault(); drop.classList.add('on'); }; drop.ondragleave=function(){ drop.classList.remove('on'); };
+    drop.ondrop=function(e){ e.preventDefault(); drop.classList.remove('on'); opsAddFiles(e.dataTransfer.files); };
+    inp.onchange=function(){ opsAddFiles(inp.files); inp.value=''; };
+  }
+  host.querySelectorAll('.ops-path').forEach(function(i){ i.onchange=function(){ OPS.files[+i.dataset.i].path=i.value.trim().replace(/^\/+/,''); }; });
+  host.querySelectorAll('[data-rm]').forEach(function(b){ b.onclick=function(){ OPS.files.splice(+b.dataset.rm,1); OPS.commitMsg=''; renderOps(true); }; });
+  var cm=host.querySelector('#opsCommitMsg'); if(cm) cm.oninput=function(){ OPS.commitMsg=cm.value; };
+  var go=host.querySelector('#opsCommit'); if(go) go.onclick=opsCommit;
+  var gl=host.querySelector('#opsGhList'); if(gl) gl.onclick=async function(){ if(!opsNeedPin()) return; opsSetMsg('저장소 읽는 중…'); try{ var r=await opsCall('gh_list'); OPS.ghList=r.files; opsSetMsg(r.files.length+'개 파일','ok'); renderOps(true); }catch(e){ opsSetMsg(String(e.message||e),'bad'); } };
+  host.querySelectorAll('[data-hist],#opsGhHist').forEach(function(b){ b.onclick=async function(){ if(!opsNeedPin()) return; var p=b.dataset.hist||b.dataset.p; opsSetMsg(p+' 이력 읽는 중…'); try{ var r=await opsCall('gh_history',{path:p, n:10}); OPS.hist=r.commits; OPS.histPath=p; opsSetMsg(r.commits.length+'건','ok'); renderOps(true); }catch(e){ opsSetMsg(String(e.message||e),'bad'); } }; });
+  host.querySelectorAll('[data-restore]').forEach(function(b){ b.onclick=async function(){ if(!opsNeedPin()) return; var sha=b.dataset.restore, p=OPS.histPath;
+    if(!confirm('«'+p+'» 을 커밋 '+sha.slice(0,7)+' 시점 내용으로 되돌려 새 커밋을 만듭니다. 계속할까요?')) return;
+    opsSetMsg('복원 중…'); b.disabled=true;
+    try{ var r=await opsCall('gh_restore',{path:p, ref:sha}); opsSetMsg('복원 커밋 완료 — '+r.commit.slice(0,7)+(r.app_ver? ' · '+r.app_ver:'')+' · Pages 반영 1~2분','ok'); toast('GitHub 복원 완료', p+' ← '+sha.slice(0,7)); OPS.hist=null; renderOps(true); }
+    catch(e){ opsSetMsg(String(e.message||e),'bad'); b.disabled=false; } }; });
+}
+function opsAddFiles(list){
+  var arr=[].slice.call(list||[]); if(!arr.length) return;
+  var left=arr.length;
+  arr.forEach(function(f){
+    var isText=opsIsText(f.name), rd=new FileReader();
+    rd.onload=function(){
+      var item={path:f.name, size:f.size, bin:!isText};
+      if(isText){ item.content=String(rd.result||''); item.ver=/index\.html$/i.test(f.name)? opsVerOf(item.content) : null; }
+      else { item.content_b64=String(rd.result||'').replace(/^data:[^;]*;base64,/,''); }
+      var k=OPS.files.findIndex(function(x){ return x.path===item.path; }); if(k>=0) OPS.files[k]=item; else OPS.files.push(item);
+      if(--left===0){ OPS.commitMsg=''; renderOps(true); }
+    };
+    rd.onerror=function(){ if(--left===0) renderOps(true); };
+    if(isText) rd.readAsText(f); else rd.readAsDataURL(f);
+  });
+}
+async function opsCommit(){
+  if(!opsNeedPin() || !OPS.files.length || OPS.busy) return;
+  var msgEl=document.getElementById('opsCommitMsg'), message=(msgEl&&msgEl.value.trim())||opsAutoMsg();
+  var idx=OPS.files.filter(function(f){ return /index\.html$/i.test(f.path); })[0];
+  if(idx && idx.ver && idx.ver===APP_VER && !confirm('올리는 index.html 의 APP_VER('+idx.ver+')가 지금 실행 중인 버전과 같습니다. 그래도 커밋할까요?')) return;
+  if(idx && !idx.ver && !confirm('올리는 index.html 에서 APP_VER 를 찾지 못했습니다 — 포탈 파일이 맞나요? 그래도 커밋할까요?')) return;
+  if(!confirm(OPS.files.length+'개 파일을 GitHub('+(OPS.st&&OPS.st.ok? OPS.st.github.repo+' · '+OPS.st.github.branch : '저장소')+')에 커밋합니다.\n\n'+OPS.files.map(function(f){ return '· '+f.path+' ('+opsFmtBytes(f.size)+')'; }).join('\n')+'\n\n'+message)) return;
+  OPS.busy=true; var bt=document.getElementById('opsCommit'); if(bt) bt.disabled=true; opsSetMsg('커밋 중… (파일 '+OPS.files.length+'개)');
+  try{
+    var r=await opsCall('gh_put',{files:OPS.files.map(function(f){ return f.bin? {path:f.path, content_b64:f.content_b64} : {path:f.path, content:f.content}; }), message:message});
+    opsSetMsg('커밋 완료 — '+r.commit.slice(0,7)+' · '+r.files.join(', ')+' · GitHub Pages 반영까지 1~2분','ok');
+    toast('GitHub 커밋 완료', r.files.join(', ')+' → '+r.commit.slice(0,7));
+    OPS.files=[]; OPS.commitMsg=''; OPS.hist=null; renderOps(true);
+    if(idx) setTimeout(function(){ if(confirm('index.html 을 올렸습니다. 새 버전을 쓰려면 포탈을 새로고침해야 합니다 (Pages 반영에 1~2분 걸릴 수 있음). 지금 새로고침할까요?')) location.reload(); }, 400);
+  }catch(e){ opsSetMsg(String(e.message||e),'bad'); }
+  OPS.busy=false; if(bt) bt.disabled=false;
+}
+/* ── SQL ── */
+function opsSqlHtml(){
+  var res=OPS.sqlRes;
+  var h='<div class="ops-h">SQL 실행 — Supabase Management API (SQL Editor 와 같은 경로) · 여러 문장·DO 블록 가능 · 결과는 마지막 문장 기준</div>';
+  h+='<textarea id="opsSql" class="ops-ta" spellcheck="false" placeholder="-- 제가 드린 sql8N 파일을 그대로 붙여 넣으세요&#10;select now();">'+esc(OPS.sql||'')+'</textarea>';
+  h+='<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px"><label class="mini" style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="opsRO"'+(OPS.sqlRO?' checked':'')+'> 읽기 전용(SELECT 확인용 · 바뀌는 건 전부 롤백)</label><span class="mini" id="opsSqlInfo">'+esc(opsSqlInfo(OPS.sql||''))+'</span><button type="button" class="pill" id="opsSqlGo" style="margin-left:auto;background:var(--brand);border-color:var(--brand);color:#fff">실행 (Ctrl+Enter)</button></div>';
+  if(res){
+    h+='<div class="ops-h" style="margin-top:12px">결과 — '+(res.row_count!=null? res.row_count+'행' : '행 없음')+(res.truncated? ' (500행까지 표시)':'')+(res.read_only? ' · 읽기 전용(롤백됨)':'')+' · '+res.ms+'ms</div>';
+    var rows=Array.isArray(res.rows)? res.rows : (res.rows==null? [] : [res.rows]);
+    if(rows.length && typeof rows[0]==='object' && rows[0]!==null){
+      var cols=Object.keys(rows[0]); rows.slice(0,200).forEach(function(r){ Object.keys(r||{}).forEach(function(k){ if(cols.indexOf(k)<0) cols.push(k); }); });
+      h+='<div style="max-height:46vh;overflow:auto"><table class="rn-tbl"><thead><tr>'+cols.map(function(c){ return '<th>'+esc(c)+'</th>'; }).join('')+'</tr></thead><tbody>'+rows.slice(0,200).map(function(r){ return '<tr>'+cols.map(function(c){ var v=r? r[c] : null; return '<td title="'+esc(v==null?'':(typeof v==='object'? JSON.stringify(v) : String(v)))+'">'+esc(v==null? '' : (typeof v==='object'? JSON.stringify(v) : String(v))).slice(0,160)+'</td>'; }).join('')+'</tr>'; }).join('')+'</tbody></table></div>'+(rows.length>200? '<p class="mini">표에는 200행까지만 — 전체는 엑셀로</p>':'')+
+         '<div style="margin-top:6px"><button type="button" class="pill ghost" id="opsSqlXls">⬇ 엑셀</button></div>';
+    } else h+='<pre class="ops-pre">'+esc(JSON.stringify(res.rows, null, 1)||'(결과 없음)').slice(0,4000)+'</pre>';
+  }
+  return h;
+}
+function opsSqlInfo(sql){
+  var body=String(sql||'').replace(/--[^\n]*/g,'').replace(/\$[a-z0-9_]*\$[\s\S]*?\$[a-z0-9_]*\$/gi,'$$…$$');
+  var n=body.split(/;\s*(?:\n|$)/).filter(function(s){ return s.trim(); }).length;
+  var t={}; var re=/\b(?:from|join|update|into|table(?:\s+if\s+(?:not\s+)?exists)?|truncate|drop\s+table(?:\s+if\s+exists)?)\s+(?:only\s+)?((?:public\.)?[a-z_][a-z0-9_]*)/gi, m;
+  while((m=re.exec(body))){ var nm=m[1].replace(/^public\./,''); if(!/^(select|where|values|set|lateral|unnest|generate_series)$/i.test(nm)) t[nm]=1; }
+  var danger=/\b(drop\s+(table|schema|function)|truncate|delete\s+from)\b/i.test(body);
+  return (n? n+'개 문장' : '')+(Object.keys(t).length? ' · 표: '+Object.keys(t).slice(0,8).join(', ') : '')+(danger? ' · ⚠ 삭제/드롭 포함':'');
+}
+function opsSqlBind(host){
+  var ta=host.querySelector('#opsSql'), info=host.querySelector('#opsSqlInfo');
+  ta.oninput=function(){ OPS.sql=ta.value; if(info) info.textContent=opsSqlInfo(ta.value); };
+  ta.onkeydown=function(e){ if((e.ctrlKey||e.metaKey) && e.key==='Enter'){ e.preventDefault(); opsSqlRun(); } if(e.key==='Tab'){ e.preventDefault(); var s=ta.selectionStart; ta.value=ta.value.slice(0,s)+'  '+ta.value.slice(ta.selectionEnd); ta.selectionStart=ta.selectionEnd=s+2; OPS.sql=ta.value; } };
+  var ro=host.querySelector('#opsRO'); ro.onchange=function(){ OPS.sqlRO=ro.checked; };
+  host.querySelector('#opsSqlGo').onclick=opsSqlRun;
+  var x=host.querySelector('#opsSqlXls'); if(x) x.onclick=function(){ var rows=OPS.sqlRes.rows||[]; var cols=Object.keys(rows[0]||{}); xlsxAoa('sql_결과_'+todayStr(), cols, rows.map(function(r){ return cols.map(function(c){ var v=r[c]; return v!=null&&typeof v==='object'? JSON.stringify(v) : v; }); })); };
+}
+async function opsSqlRun(){
+  if(!opsNeedPin() || OPS.busy) return;
+  var sql=(OPS.sql||'').trim(); if(!sql){ opsSetMsg('SQL 을 입력하세요','bad'); return; }
+  var info=opsSqlInfo(sql), ro=!!OPS.sqlRO;
+  if(!ro && !confirm('운영 DB 에 실행합니다 — '+info+'\n\n'+sql.replace(/\s+/g,' ').slice(0,300)+(sql.length>300?' …':'')+'\n\n계속할까요?')) return;
+  OPS.busy=true; var bt=document.getElementById('opsSqlGo'); if(bt) bt.disabled=true; opsSetMsg('실행 중…'); var t0=Date.now();
+  try{ var r=await opsCall('sql_run',{sql:sql, read_only:ro}); r.ms=Date.now()-t0; OPS.sqlRes=r; opsSetMsg('완료 — '+(r.row_count!=null? r.row_count+'행':'행 없음')+(ro? ' (읽기 전용·롤백)':''),'ok'); renderOps(true); }
+  catch(e){ OPS.sqlRes=null; opsSetMsg(String(e.message||e),'bad'); renderOps(true); }
+  OPS.busy=false;
+}
+/* ── Edge Function ── */
+function opsFnHtml(){
+  var L=OPS.fnList, sel=OPS.fnSel, meta=OPS.fnMeta;
+  var h='<div class="ops-grid"><div><div class="ops-h">① 함수</div>';
+  h+='<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><button type="button" class="pill ghost" id="opsFnList">목록 불러오기</button>';
+  if(L) h+='<select id="opsFnSel" style="min-width:160px"><option value="">— 함수 선택 —</option>'+L.map(function(f){ return '<option value="'+esc(f.slug)+'"'+(f.slug===sel?' selected':'')+'>'+esc(f.slug)+' · v'+esc(f.version)+(f.verify_jwt? ' · JWT검사 ON':'')+'</option>'; }).join('')+'<option value="__new"'+(sel==='__new'?' selected':'')+'>＋ 새 함수…</option></select>';
+  if(sel==='__new') h+='<input id="opsFnNew" placeholder="새 함수 이름(slug · 영문 소문자)" value="'+esc(OPS.fnNew||'')+'" style="width:200px">';
+  if(sel && sel!=='__new') h+='<button type="button" class="pill ghost" id="opsFnGet">코드 불러오기</button>';
+  h+='</div>';
+  if(meta) h+='<p class="mini" style="margin:8px 0 0">'+esc(meta.slug)+' · v'+esc(meta.version)+' · 진입점 '+esc(meta.entrypoint_path||'index.ts')+' · Verify JWT '+(meta.verify_jwt?'ON':'OFF')+' · 수정 '+esc(String(meta.updated_at||'').replace('T',' ').slice(0,16))+(OPS.fnFiles&&OPS.fnFiles.length>1? ' · 파일 '+OPS.fnFiles.length+'개(첫 파일만 편집·배포됨)':'')+'</p>';
+  h+='<div class="ops-h" style="margin-top:12px">② 코드</div><div class="ops-drop" id="opsFnDrop" tabindex="0">index.ts 파일을 끌어다 놓거나 <u>클릭</u> — 또는 아래 칸에 붙여넣기<input type="file" id="opsFnFile" accept=".ts,.js,.tsx" style="display:none"></div>';
+  h+='<textarea id="opsFnCode" class="ops-ta" spellcheck="false" style="min-height:260px;margin-top:8px" placeholder="// Deno.serve(async (req) => { … })">'+esc(OPS.fnCode||'')+'</textarea>';
+  h+='<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px"><label class="mini">파일명 <input id="opsFnName" value="'+esc(OPS.fnName||'index.ts')+'" style="width:140px"></label><label class="mini" style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="opsFnVerify"'+(OPS.fnVerify?' checked':'')+'> Verify JWT (포탈 함수는 전부 OFF)</label><span class="mini" id="opsFnInfo">'+(OPS.fnCode? (OPS.fnCode.length.toLocaleString('ko-KR')+'자'):'')+'</span><button type="button" class="pill" id="opsFnDeploy" style="margin-left:auto;background:var(--brand);border-color:var(--brand);color:#fff">배포</button>'+(sel&&sel!=='__new'? '<button type="button" class="pill ghost" id="opsFnPatch" title="코드는 그대로 두고 Verify JWT 설정만 저장">설정만 저장</button>':'')+'</div>';
+  h+='</div><div><div class="ops-h">배포 메모</div><ul class="mini" style="margin:0;padding-left:16px;line-height:1.7"><li>슬러그(이름)는 URL 이 됩니다 — <code>…/functions/v1/슬러그</code>. 한 번 만들면 못 바꿉니다.</li><li>Verify JWT 는 ask·remind·ops 모두 <b>OFF</b> — 함수가 직접 로그인 토큰을 검사합니다. ON 이면 포탈에서 Failed to fetch.</li><li>Secrets 를 바꾼 뒤에는 그 함수를 다시 배포해야 새 값을 읽습니다.</li><li>배포 뒤 10~20초 지나서 포탈에서 호출해 보세요.</li></ul></div></div>';
+  return h;
+}
+function opsFnBind(host){
+  var lb=host.querySelector('#opsFnList'); if(lb) lb.onclick=async function(){ if(!opsNeedPin()) return; opsSetMsg('함수 목록 읽는 중…'); try{ var r=await opsCall('fn_list'); OPS.fnList=r.functions; opsSetMsg(r.functions.length+'개','ok'); renderOps(true); }catch(e){ opsSetMsg(String(e.message||e),'bad'); } };
+  var sel=host.querySelector('#opsFnSel'); if(sel) sel.onchange=function(){ OPS.fnSel=sel.value; OPS.fnMeta=null; OPS.fnFiles=null; var f=(OPS.fnList||[]).filter(function(x){ return x.slug===sel.value; })[0]; if(f){ OPS.fnVerify=!!f.verify_jwt; OPS.fnName=(f.entrypoint_path||'index.ts').split('/').pop(); } renderOps(true); };
+  var nw=host.querySelector('#opsFnNew'); if(nw) nw.oninput=function(){ OPS.fnNew=nw.value.trim(); };
+  var gb=host.querySelector('#opsFnGet'); if(gb) gb.onclick=async function(){ if(!opsNeedPin()) return; opsSetMsg('코드 읽는 중…'); try{ var r=await opsCall('fn_get',{slug:OPS.fnSel}); OPS.fnMeta=r.meta; OPS.fnFiles=r.files; var f0=(r.files||[])[0]; OPS.fnCode=f0&&f0.content!=null? f0.content : ''; OPS.fnName=f0? (f0.name||'index.ts').split('/').pop() : 'index.ts'; OPS.fnVerify=!!r.meta.verify_jwt; opsSetMsg(f0? (f0.name+' · '+opsFmtBytes(f0.size)) : '코드 본문을 받지 못했습니다 (body '+r.body_status+')', f0?'ok':'bad'); renderOps(true); }catch(e){ opsSetMsg(String(e.message||e),'bad'); } };
+  var drop=host.querySelector('#opsFnDrop'), inp=host.querySelector('#opsFnFile');
+  function take(files){ var f=files&&files[0]; if(!f) return; var rd=new FileReader(); rd.onload=function(){ OPS.fnCode=String(rd.result||''); OPS.fnName=f.name; renderOps(true); }; rd.readAsText(f); }
+  drop.onclick=function(){ inp.click(); }; drop.ondragover=function(e){ e.preventDefault(); drop.classList.add('on'); }; drop.ondragleave=function(){ drop.classList.remove('on'); }; drop.ondrop=function(e){ e.preventDefault(); drop.classList.remove('on'); take(e.dataTransfer.files); }; inp.onchange=function(){ take(inp.files); inp.value=''; };
+  var ta=host.querySelector('#opsFnCode'); ta.oninput=function(){ OPS.fnCode=ta.value; var i=host.querySelector('#opsFnInfo'); if(i) i.textContent=ta.value.length.toLocaleString('ko-KR')+'자'; };
+  ta.onkeydown=function(e){ if(e.key==='Tab'){ e.preventDefault(); var s=ta.selectionStart; ta.value=ta.value.slice(0,s)+'  '+ta.value.slice(ta.selectionEnd); ta.selectionStart=ta.selectionEnd=s+2; OPS.fnCode=ta.value; } };
+  var nm=host.querySelector('#opsFnName'); nm.oninput=function(){ OPS.fnName=nm.value.trim(); };
+  var vf=host.querySelector('#opsFnVerify'); vf.onchange=function(){ OPS.fnVerify=vf.checked; };
+  host.querySelector('#opsFnDeploy').onclick=opsFnDeploy;
+  var pb=host.querySelector('#opsFnPatch'); if(pb) pb.onclick=async function(){ if(!opsNeedPin()) return; opsSetMsg('설정 저장 중…'); try{ var r=await opsCall('fn_patch',{slug:OPS.fnSel, verify_jwt:OPS.fnVerify}); opsSetMsg(r.slug+' · Verify JWT '+(r.verify_jwt?'ON':'OFF')+' 저장됨','ok'); OPS.fnList=null; }catch(e){ opsSetMsg(String(e.message||e),'bad'); } };
+}
+async function opsFnDeploy(){
+  if(!opsNeedPin() || OPS.busy) return;
+  var slug=OPS.fnSel==='__new'? (OPS.fnNew||'') : OPS.fnSel;
+  if(!/^[a-z0-9_-]{1,64}$/.test(slug)){ opsSetMsg('함수를 고르거나 새 이름(영문 소문자·숫자·-·_)을 입력하세요','bad'); return; }
+  var code=(OPS.fnCode||'').trim(); if(code.length<20){ opsSetMsg('배포할 코드가 비어 있습니다','bad'); return; }
+  if(!/Deno\.serve|serve\(/.test(code) && !confirm('코드에 Deno.serve(…) 가 보이지 않습니다. 그래도 배포할까요?')) return;
+  var isNew=OPS.fnSel==='__new';
+  if(!confirm((isNew? '새 함수 «'+slug+'» 를 만들어 배포합니다' : '«'+slug+'» 에 새 버전을 배포합니다')+'\n\n파일 '+(OPS.fnName||'index.ts')+' · '+code.length.toLocaleString('ko-KR')+'자 · Verify JWT '+(OPS.fnVerify?'ON':'OFF')+'\n\n계속할까요?')) return;
+  OPS.busy=true; var bt=document.getElementById('opsFnDeploy'); if(bt) bt.disabled=true; opsSetMsg('배포 중… (30초쯤 걸릴 수 있음)');
+  try{ var r=await opsCall('fn_deploy',{slug:slug, files:[{name:OPS.fnName||'index.ts', content:code}], verify_jwt:OPS.fnVerify, entrypoint_path:(OPS.fnMeta&&OPS.fnMeta.entrypoint_path)||undefined});
+    opsSetMsg((r.created? '새 함수 생성·':'')+'배포 완료 — '+r.slug+' v'+r.version+' · Verify JWT '+(r.verify_jwt?'ON':'OFF')+' · '+r.url,'ok'); toast('Edge Function 배포 완료', r.slug+' v'+r.version);
+    OPS.fnList=null; OPS.fnMeta=null; if(isNew){ OPS.fnSel=slug; OPS.fnNew=''; } renderOps(true); }
+  catch(e){ opsSetMsg(String(e.message||e),'bad'); }
+  OPS.busy=false; if(bt) bt.disabled=false;
+}
+/* ── 기록 ── */
+function opsLogHtml(){
+  var st=OPS.st, L=(st&&st.ok&&st.recent)||[];
+  if(!st) return '<p class="cap">상태 확인 중…</p>';
+  if(!st.ok) return '<p class="cap" style="color:var(--critical)">'+esc(st.error||'')+'</p>';
+  if(!st.log_ok) return '<p class="cap">기록표(ops_log · SQL 85)가 없거나 함수에 service role 이 없어 기록을 읽지 못합니다.</p>';
+  if(!L.length) return '<p class="cap">아직 기록이 없습니다.</p>';
+  return '<table class="rn-tbl"><thead><tr><th>일시</th><th>계정</th><th>동작</th><th>대상</th><th>요약</th><th>결과</th></tr></thead><tbody>'+L.map(function(r){ return '<tr><td class="mini">'+esc(String(r.at||'').replace('T',' ').slice(0,19))+'</td><td class="mini">'+esc(r.actor)+'</td><td><code>'+esc(r.action)+'</code></td><td>'+esc(r.target||'')+'</td><td title="'+esc(r.summary||'')+'">'+esc(String(r.summary||'')).slice(0,80)+'</td><td>'+(r.ok? '<span class="up">✓</span>'+(r.ms? ' <span class="mini">'+r.ms+'ms</span>':'') : '<span style="color:var(--critical)" title="'+esc(r.error||'')+'">✗ '+esc(String(r.error||'')).slice(0,60)+'</span>')+'</td></tr>'; }).join('')+'</tbody></table>';
+}
+
 function renderAdmin(){
   if(!window.IS_SUPER){ switchView('dash'); return; }
   var rs=$('#axRole');
@@ -15530,6 +15768,7 @@ function switchView(v){
   if((v==='ordernew'||v==='mdrnew'||v==='oinew'||v==='csite'||v==='preport'||v==='s1'||v==='kk') && !SB_TOKEN){ openOvl('ovlAuth'); return; }
   if(window.IS_EQUIP && !EQUIP_VIEWS[v]) v=window.EQUIP_HOME||'orders';   // 제한 계정은 허용된 화면만
   if(v==='log' && !window.IS_SUPER) v='dash';                             // 변경 이력은 슈퍼 관리자만
+  if(v==='ops' && !window.IS_SUPER) v='dash';                             // 배포·운영도 슈퍼 관리자만 (함수가 다시 OPS_OWNER 로 좁힘)
   if(v==='csite' && !window.IS_SUPER){ toast('권한 없음','Cloud 사이트 생성·수정은 슈퍼 관리자만 할 수 있습니다','info'); v='dash'; }
   if(!canView(v)){ toast('권한 없음','이 메뉴는 보기 권한이 없습니다 — 슈퍼 관리자에게 요청하세요','info'); v='dash'; }
   permEnter(v);
@@ -15544,7 +15783,7 @@ function switchView(v){
   var eqb=v==='eqboard';
   $('#viewEqBoard').classList.toggle('hidden',!eqb);
   var dash=v==='dash', quote=v==='quote', preport=v==='preport', s1v=v==='s1', kkv=v==='kk', onew=v==='ordernew', acct=v==='account', mnew=v==='mdrnew', oinew=v==='oinew', csite=v==='csite';
-  var adminx=v==='adminx', weekly=v==='weekly', inbstat=v==='inbstat', price=v==='price', report=v==='report', churn=v==='churn', cloud=v==='cloud', crate=v==='churnrate', cflow=v==='custflow';
+  var adminx=v==='adminx', weekly=v==='weekly', inbstat=v==='inbstat', price=v==='price', report=v==='report', churn=v==='churn', cloud=v==='cloud', crate=v==='churnrate', cflow=v==='custflow', ops=v==='ops';
   if(adminx && !window.IS_SUPER){ v='dash'; dash=true; adminx=false; CUR_VIEW='dash'; }
   $('#viewChurnRate').classList.toggle('hidden',!crate);
   $('#viewCustFlow').classList.toggle('hidden',!cflow);
@@ -15565,10 +15804,12 @@ function switchView(v){
   $('#viewOiNew').classList.toggle('hidden',!oinew);
   $('#viewAccount').classList.toggle('hidden',!acct);
   $('#viewAdmin').classList.toggle('hidden',!adminx);
+  $('#viewOps').classList.toggle('hidden',!ops);
   $('#viewWeekly').classList.toggle('hidden',!weekly);
   $('#viewChannel').classList.toggle('hidden',!chv);
-  $('#viewData').classList.toggle('hidden',dash||quote||preport||s1v||kkv||onew||mnew||oinew||csite||acct||adminx||weekly||inbstat||price||report||churn||cloud||crate||cflow||eqb||!!chv);
+  $('#viewData').classList.toggle('hidden',dash||quote||preport||s1v||kkv||onew||mnew||oinew||csite||acct||adminx||ops||weekly||inbstat||price||report||churn||cloud||crate||cflow||eqb||!!chv);
   if(eqb){ renderEqBoard(); return; }
+  if(ops){ renderOps(); return; }
   if(csite){ renderCsite(); return; }
   if(report){ renderReport(); return; }
   if(churn){ renderChurn(); return; }
