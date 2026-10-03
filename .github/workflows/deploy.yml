@@ -1,0 +1,53 @@
+# 테스트 통과 → GitHub Pages 배포 (실패하면 라이브 사이트는 이전 버전 그대로)
+#   · 저장소 Settings › Pages › Source 를 «GitHub Actions» 로 바꿔야 이 워크플로가 배포를 맡습니다
+#   · main 에 커밋될 때마다 실행 (포탈 «배포·운영» 도구의 커밋 포함) · Actions 탭에서 수동 실행도 가능
+name: test-and-deploy
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: 정적 검사 (문법 · 비밀값 · fixture)
+        run: node tests/check.mjs
+      - name: Playwright 설치
+        run: npm install --no-audit --no-fund && npx playwright install --with-deps chromium
+      - name: 스모크 테스트 (가짜 백엔드 · 운영 DB 접근 없음)
+        run: node tests/smoke.mjs
+      - name: 실패 화면 보관
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with: { name: smoke-out, path: tests/out, if-no-files-found: ignore }
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: 사이트 묶기 (테스트·설정 파일 제외)
+        run: |
+          mkdir -p _site
+          rsync -a --exclude '.git' --exclude '.github' --exclude 'tests' --exclude 'node_modules' --exclude '_site' \
+                   --exclude 'package.json' --exclude 'package-lock.json' --exclude '*.md' --exclude 'sql*.sql' --exclude 'supabase' \
+                   ./ _site/
+          echo "files: $(find _site -type f | wc -l)"
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: _site }
+      - id: deployment
+        uses: actions/deploy-pages@v4
