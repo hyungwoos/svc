@@ -2277,6 +2277,16 @@ html[data-look="cc"] #ovlC360 .mact{border-top:1px solid var(--grid);padding-top
       <p class="cap" style="margin:10px 0 0">보기 = 메뉴에 나타나고 화면을 열 수 있음 · 읽기 = 화면 안의 표·데이터 열람 · 쓰기 = 추가·수정·삭제. 쓰기는 읽기를, 읽기는 보기를 포함합니다.
         행이 없는(한 번도 저장하지 않은) 계정은 역할 기본값(admin 전부 · admin_viewer 읽기까지)으로 동작하고, 슈퍼 관리자는 제한할 수 없습니다. 바뀐 권한은 그 계정이 다음에 화면을 새로 읽을 때 적용됩니다.</p>
 
+      <div style="font-size:11px;color:var(--ink-2);opacity:.75;margin:22px 0 8px">— 2단계 인증(MFA) 정책 — 계정별 필수 지정 · 인증 앱 초기화 —</div>
+      <div class="dbar" style="margin-bottom:8px;flex-wrap:wrap;gap:8px;align-items:center">
+        <button class="pill ghost" id="mfReload">↻ 다시 읽기</button>
+        <button class="pill ghost" id="mfAll" title="등록 안 된 모든 계정을 필수로 지정하고 기한을 7일 뒤로">전체 필수 (7일 유예)</button>
+        <span class="mini" id="mfMsg"></span>
+      </div>
+      <div class="tbl-wrap" style="max-height:50vh"><table id="mfTable" class="dgrid"></table></div>
+      <p class="cap" style="margin:10px 0 0"><b>필수</b>로 지정한 계정은 인증 앱을 등록해야 포탈을 쓸 수 있습니다 — <b>기한</b>을 두면 그날까지는 로그인할 때 안내만 뜨고, 지나면(또는 기한이 없으면) 등록 화면이 먼저 뜹니다. DB 도 같은 규칙으로 막아(SQL 89) 비밀번호만 아는 사람은 데이터를 못 봅니다.
+        <b>인증 앱 초기화</b>는 폰을 잃어버린 사람용 — 등록을 지우면 다음 로그인은 비밀번호만으로 되고(필수면 다시 등록 화면), 본인에게 알려 주세요.</p>
+
       <div style="font-size:11px;color:var(--ink-2);opacity:.75;margin:22px 0 8px">— AI 사용 비용 (Anthropic) —</div>
       <div id="axBillKpi" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px"></div>
       <div id="axBillBars" style="margin-bottom:10px"></div>
@@ -2970,7 +2980,7 @@ window.addEventListener('message', function(ev){
 });
 
 /* ---------- Supabase ---------- */
-var APP_VER='2026-09-16 ㊿+131';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
+var APP_VER='2026-09-16 ㊿+132';   // 파일을 바꿔 올릴 때마다 여기 숫자가 올라갑니다 (화면 맨 아래 표시)
 var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var SB_TOKEN=null;   // 로그인하면 access_token 저장 (쓰기용)
@@ -3148,11 +3158,44 @@ async function authApi(method, path, body, tok){
 async function mfaFactors(tok){ var u=await authApi('GET','user',null,tok); return (u.factors||[]).filter(function(f){ return f.factor_type==='totp'; }); }
 function mfaVerifiedOf(fs){ return (fs||[]).filter(function(f){ return f.status==='verified' && f.factor_type==='totp'; }); }
 /* 로그인(또는 저장된 세션) 뒤 관문: 인증 앱이 등록돼 있고 토큰이 aal1 이면 코드를 받아 aal2 세션으로 교체. true=계속 · false=중단 */
+var MFA_ST=null;   // 본인 정책(rpc mfa_status · SQL 89) — {required, deadline, today, enrolled, aal}
+async function mfaPolicy(tok){
+  try{ var r=await fetch(SB_URL+'/rest/v1/rpc/mfa_status',{method:'POST', headers:authHdr(tok), body:'{}'}); if(!r.ok) return null; return await r.json(); }catch(e){ return null; }
+}
+function mfaDue(st){ return !!(st && st.required && !st.enrolled && (!st.deadline || (st.today||new Date().toISOString().slice(0,10))>=st.deadline)); }
+function mfaDaysLeft(st){ if(!st||!st.deadline) return 0; var a=new Date(st.deadline+'T00:00:00'), b=new Date((st.today||new Date().toISOString().slice(0,10))+'T00:00:00'); return Math.round((a-b)/86400000); }
 async function mfaGate(tok, email, factorsHint){
   if(sessAal(tok)==='aal2') return true;
   var fs; try{ fs=mfaVerifiedOf(factorsHint||await mfaFactors(tok)); }catch(e){ return true; }   // 조회 실패 → 통과 (DB 쪽 SQL 88 이 2차 방어)
-  if(!fs.length) return true;
-  return mfaPrompt(fs[0], tok, email);
+  if(fs.length) return mfaPrompt(fs[0], tok, email);
+  // 등록된 인증 앱이 없음 → 관리자가 이 계정을 필수로 지정했는지 (SQL 89 · 함수가 없으면 null = 선택 적용)
+  var st=await mfaPolicy(tok); MFA_ST=st;
+  if(st && st.required){
+    if(mfaDue(st)) return mfaForceEnroll(tok, email, st);      // 기한 없음/지남 → 등록해야 들어감 (DB 도 mfa_ok 가 false 라 데이터 없음)
+    MFA_WARN=st;                                                // 유예 기간 → 들어가되 안내
+  }
+  return true;
+}
+var MFA_WARN=null;
+function mfaWarnIfNeeded(){
+  var st=MFA_WARN; if(!st) return; MFA_WARN=null;
+  var d=mfaDaysLeft(st);
+  toast('2단계 인증 등록이 필요합니다', '관리자 지정 — '+st.deadline+' 까지('+(d>0? d+'일 남음':'오늘')+') 내 계정 › 보안에서 켜 주세요. 지나면 등록 전까지 포탈을 쓸 수 없습니다.', 'warn');
+}
+/* 필수 지정 + 기한 지남: 등록 창을 띄우고 끝나야 들어감 (취소 = 로그아웃) */
+function mfaForceEnroll(tok, email, st){
+  return new Promise(function(resolve){
+    var old=document.getElementById('ovlMfa'); if(old) old.remove();
+    var ov=document.createElement('div'); ov.id='ovlMfa'; ov.className='ovl on'; ov.style.cssText='z-index:100000;align-items:center';
+    ov.innerHTML='<div class="modal" style="width:min(560px,100%);padding:22px" role="dialog" aria-modal="true" aria-labelledby="mfaTitle">'+
+      '<h3 id="mfaTitle" style="margin:0 0 6px;font-size:17px">🔐 2단계 인증 등록이 필요합니다</h3>'+
+      '<p class="cap" style="margin:0 0 14px">관리자가 <b>'+esc(email||'')+'</b> 계정에 2단계 인증을 필수로 지정했습니다'+(st&&st.deadline? ' (기한 '+esc(st.deadline)+' 지남)':'')+'. 인증 앱을 등록해야 포탈을 쓸 수 있습니다 — 1분이면 끝납니다.</p>'+
+      '<div id="mfaForceHost"></div>'+
+      '<div style="margin-top:12px;display:flex;justify-content:flex-end"><button type="button" class="pill ghost" id="mfaForceCancel">나중에 (로그아웃)</button></div></div>';
+    document.body.appendChild(ov);
+    ov.querySelector('#mfaForceCancel').onclick=function(){ ov.remove(); resolve(false); };
+    mfaEnrollFlow([], ov.querySelector('#mfaForceHost'), {tok:tok, email:email, onDone:function(ok){ if(ok){ ov.remove(); resolve(true); } }});
+  });
 }
 function mfaApplySession(s, email){
   SB_TOKEN=s.access_token; if(email) AUTH_USER=email;
@@ -3200,13 +3243,15 @@ async function mfaCardRender(host){
   if(!host) return; host.innerHTML='<span class="mini">확인 중…</span>';
   var fs; try{ fs=await mfaFactors(); }catch(e){ host.innerHTML='<span class="mini" style="color:var(--critical)">상태를 읽지 못했습니다: '+esc(e.message)+'</span>'; return; }
   var vf=mfaVerifiedOf(fs), aal=sessAal();
+  var pol=await mfaPolicy(); MFA_ST=pol||MFA_ST;
+  var polHtml=(pol&&pol.required)? '<div class="mini" style="margin:0 0 6px;color:var(--s3,#b26a00)">관리자 지정: <b>필수</b>'+(pol.deadline? ' · 기한 '+esc(pol.deadline)+(!pol.enrolled? ' ('+(mfaDaysLeft(pol)>0? mfaDaysLeft(pol)+'일 남음':'지남')+')':''):'')+'</div>' : '';
   if(vf.length){
-    host.innerHTML='<div><b style="color:var(--brand)">켜짐</b> <span class="mini">· '+esc(vf[0].friendly_name||'인증 앱')+' · 등록 '+esc(String(vf[0].created_at||'').slice(0,10))+' · 이 세션 '+(aal==='aal2'? '2단계 확인됨' : '<span style="color:var(--critical)">코드 미확인</span>')+'</span></div>'+
+    host.innerHTML=polHtml+'<div><b style="color:var(--brand)">켜짐</b> <span class="mini">· '+esc(vf[0].friendly_name||'인증 앱')+' · 등록 '+esc(String(vf[0].created_at||'').slice(0,10))+' · 이 세션 '+(aal==='aal2'? '2단계 확인됨' : '<span style="color:var(--critical)">코드 미확인</span>')+'</span></div>'+
       '<div class="mini" style="margin:5px 0 8px;line-height:1.6">로그인할 때마다 인증 앱의 6자리 코드가 필요합니다. 인증 앱을 바꾸려면 끄고 다시 켜세요(코드 필요). 폰을 잃어버렸으면 슈퍼 관리자에게 해제를 요청하세요.</div>'+
       '<button type="button" class="pill ghost" id="mfaOff" style="border-color:var(--critical,#d03b3b);color:var(--critical,#d03b3b)">2단계 인증 끄기</button>';
     host.querySelector('#mfaOff').onclick=function(){ mfaDisable(vf, host); };
   } else {
-    host.innerHTML='<div><b>꺼짐</b> <span class="mini">· 비밀번호만으로 로그인</span></div>'+
+    host.innerHTML=polHtml+'<div><b>꺼짐</b> <span class="mini">· 비밀번호만으로 로그인</span></div>'+
       '<div class="mini" style="margin:5px 0 8px;line-height:1.6">인증 앱(Google Authenticator · Microsoft Authenticator · 1Password 등)을 등록하면 비밀번호가 새어도 코드 없이는 들어올 수 없습니다. 이 계정에만 적용되며 다른 사용자는 영향이 없습니다.</div>'+
       '<button type="button" class="pill" id="mfaOn">🔐 2단계 인증 켜기</button>';
     host.querySelector('#mfaOn').onclick=function(){ mfaEnrollFlow(fs, host); };
@@ -3222,12 +3267,15 @@ function mfaQrSrc(q){
   if(svg===null) return q;
   return 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
 }
-async function mfaEnrollFlow(existing, host){
+async function mfaEnrollFlow(existing, host, opts){
+  opts=opts||{}; var tok=opts.tok||null, who=opts.email||AUTH_USER;
+  var back=function(ok){ if(opts.onDone) opts.onDone(ok); else mfaCardRender(host); };
   host.innerHTML='<span class="mini">등록 준비 중…</span>';
   try{
-    for(var i=0;i<(existing||[]).length;i++) if(existing[i].status!=='verified'){ try{ await authApi('DELETE','factors/'+existing[i].id); }catch(e){} }   // 끝내지 않은 등록은 지우고 새로
+    if(!existing){ try{ existing=await mfaFactors(tok); }catch(e){ existing=[]; } }
+    for(var i=0;i<(existing||[]).length;i++) if(existing[i].status!=='verified'){ try{ await authApi('DELETE','factors/'+existing[i].id,null,tok); }catch(e){} }   // 끝내지 않은 등록은 지우고 새로
     var name='SVC 포탈 '+new Date().toISOString().slice(0,10);
-    var f=await authApi('POST','factors',{factor_type:'totp', friendly_name:name, issuer:'SVC 포탈'});
+    var f=await authApi('POST','factors',{factor_type:'totp', friendly_name:name, issuer:'SVC 포탈'},tok);
     var totp=f.totp||{};
     host.innerHTML='<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">'+
       (totp.qr_code? '<img src="'+esc(mfaQrSrc(totp.qr_code))+'" alt="인증 앱 등록 QR" style="width:168px;height:168px;background:#fff;border:1px solid var(--ring);border-radius:8px;padding:6px;flex:none">':'')+
@@ -3235,24 +3283,25 @@ async function mfaEnrollFlow(existing, host){
       '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><input id="mfaEnCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" aria-label="인증 코드" style="width:140px;height:40px;font-size:20px;letter-spacing:.3em;text-align:center"><button type="button" class="pill" id="mfaEnGo">확인하고 켜기</button><button type="button" class="pill ghost" id="mfaEnCancel">취소</button></div>'+
       '<div class="mmsg" id="mfaEnMsg" style="min-height:18px;margin-top:6px"></div></div></div>';
     var inp=host.querySelector('#mfaEnCode'), m=host.querySelector('#mfaEnMsg');
-    host.querySelector('#mfaEnCancel').onclick=async function(){ try{ await authApi('DELETE','factors/'+f.id); }catch(e){} mfaCardRender(host); };
+    host.querySelector('#mfaEnCancel').onclick=async function(){ try{ await authApi('DELETE','factors/'+f.id,null,tok); }catch(e){} back(false); };
+    if(opts.onDone) host.querySelector('#mfaEnCancel').style.display='none';   // 강제 등록 창은 바깥의 «나중에(로그아웃)» 만
     async function go(){
       var code=(inp.value||'').replace(/\D/g,''); if(code.length!==6){ m.textContent='6자리 숫자를 입력하세요'; return; }
       m.textContent='확인 중…';
       try{
-        var ch=await authApi('POST','factors/'+f.id+'/challenge',{});
-        var s=await authApi('POST','factors/'+f.id+'/verify',{challenge_id:ch.id, code:code});
-        mfaApplySession(s, AUTH_USER);
-        logChange('mfa_on','auth',AUTH_USER,{factor:name});
+        var ch=await authApi('POST','factors/'+f.id+'/challenge',{},tok);
+        var s=await authApi('POST','factors/'+f.id+'/verify',{challenge_id:ch.id, code:code},tok);
+        mfaApplySession(s, who);
+        logChange('mfa_on','auth',who,{factor:name, forced:!!opts.onDone});
         toast('2단계 인증 켜짐', '다음 로그인부터 인증 앱 코드가 필요합니다', 'ok');
-        mfaCardRender(host);
+        back(true);
       }catch(e){ m.textContent='코드가 맞지 않습니다 — 앱의 코드를 다시 확인하세요 ('+e.message+')'; inp.value=''; inp.focus(); }
     }
     host.querySelector('#mfaEnGo').onclick=go; inp.onkeydown=function(e){ if(e.key==='Enter'){ e.preventDefault(); go(); } };
     setTimeout(function(){ inp.focus(); },60);
   }catch(e){
     host.innerHTML='<span style="color:var(--critical)">등록을 시작하지 못했습니다: '+esc(e.message)+'</span> <span class="mini">— Supabase › Authentication › Multi-Factor 에서 TOTP 가 켜져 있어야 합니다</span> <button type="button" class="pill ghost" id="mfaRetry">다시</button>';
-    host.querySelector('#mfaRetry').onclick=function(){ mfaCardRender(host); };
+    host.querySelector('#mfaRetry').onclick=function(){ if(opts.onDone) mfaEnrollFlow(null, host, opts); else mfaCardRender(host); };
   }
 }
 async function mfaDisable(vf, host){
@@ -4439,6 +4488,7 @@ function onErr(e){
 }
 
 function onData(d){
+  try{ mfaWarnIfNeeded(); }catch(e){}
   $('#side').classList.remove('hidden');
   try{ applyPerms(); }catch(e){}
   /* PWA 바로가기(manifest shortcuts) — index.html?v=eqboard 처럼 열리면 첫 화면을 그 메뉴로 */
@@ -12494,6 +12544,7 @@ function renderAdmin(){
     $('#abSave').onclick=abSave;
   }
   try{ apBind(); }catch(e){}
+  try{ mfBind(); mfLoad(); }catch(e){}
   axLoad();
   abLoad();
 }
@@ -12643,6 +12694,60 @@ async function abSave(){
     abLoad();
   }catch(e){ m.textContent=String(e.message||e).slice(0,80); }
 }
+/* ── 2단계 인증 정책 (mfa_policy · SQL 89) — 슈퍼 관리자가 계정별 필수·기한 지정, 인증 앱 초기화 ── */
+var MF={rows:null, bound:false};
+function mfMsg(t,bad){ var e=$('#mfMsg'); if(e){ e.textContent=t||''; e.style.color=bad? 'var(--critical)':''; } }
+async function mfLoad(){
+  mfMsg('불러오는 중…');
+  try{ MF.rows=await sbWrite('POST','rpc/mfa_admin_list',{})||[]; mfMsg(MF.rows.length+'개 계정 · 등록 '+MF.rows.filter(function(r){ return r.enrolled; }).length+' · 필수 '+MF.rows.filter(function(r){ return r.required; }).length); mfPaint(); }
+  catch(e){ MF.rows=null; var m=String(e.message||e); mfMsg(/mfa_admin_list|404|schema cache/i.test(m)? 'SQL 89 가 아직 실행되지 않았습니다 (배포·운영 › SQL 탭에서 sql89 실행)' : m.slice(0,120), true); $('#mfTable').innerHTML=''; }
+}
+function mfPaint(){
+  var t=$('#mfTable'); if(!t||!MF.rows) return;
+  t.innerHTML='<thead><tr><th>이메일</th><th>권한</th><th>인증 앱</th><th style="width:60px">필수</th><th style="width:150px">기한</th><th>메모</th><th class="act" style="width:220px"></th></tr></thead>';
+  var tb=document.createElement('tbody');
+  MF.rows.forEach(function(r){
+    var tr=document.createElement('tr'); var me=(r.email||'').toLowerCase()===(AUTH_USER||'').toLowerCase();
+    var due=r.required && !r.enrolled && (!r.deadline || r.deadline<=new Date().toISOString().slice(0,10));
+    tr.innerHTML='<td>'+esc(r.email||'')+(me? ' <span class="mini" style="opacity:.6">(나)</span>':'')+'</td>'+
+      '<td class="mini">'+esc(AX_ROLE_KO[r.role]||r.role||'권한 없음')+'</td>'+
+      '<td>'+(r.enrolled? '<span style="color:var(--brand)">✓ 등록</span> <span class="mini">'+esc(String(r.factor_at||'').slice(0,10))+'</span>' : (r.required? '<span style="color:'+(due? 'var(--critical)':'var(--s3,#b26a00)')+'">'+(due? '미등록 · 차단 중':'미등록 · 유예')+'</span>' : '<span class="mini">미등록</span>'))+'</td>'+
+      '<td><input type="checkbox" data-mf-req="'+esc(r.email)+'"'+(r.required?' checked':'')+'></td>'+
+      '<td><input type="date" data-mf-dl="'+esc(r.email)+'" value="'+esc(r.deadline||'')+'"'+(r.required?'':' disabled')+' style="height:30px;width:140px"></td>'+
+      '<td><input data-mf-note="'+esc(r.email)+'" value="'+esc(r.note||'')+'" placeholder="메모" style="height:30px;width:100%;min-width:90px"></td>'+
+      '<td class="act"><button type="button" class="cbtn pri" data-mf-save="'+esc(r.email)+'">저장</button>'+(r.enrolled? ' <button type="button" class="cbtn" data-mf-reset="'+esc(r.email)+'" title="폰 분실 등 — 이 계정의 인증 앱 등록을 지웁니다">인증 앱 초기화</button>':'')+'</td>';
+    tb.appendChild(tr);
+  });
+  t.appendChild(tb);
+  t.querySelectorAll('[data-mf-req]').forEach(function(c){ c.onchange=function(){ var d=t.querySelector('[data-mf-dl="'+CSS.escape(c.dataset.mfReq)+'"]'); if(d){ d.disabled=!c.checked; if(c.checked && !d.value) d.value=mfPlus(7); } }; });
+  t.querySelectorAll('[data-mf-save]').forEach(function(b){ b.onclick=function(){ mfSave(b.dataset.mfSave); }; });
+  t.querySelectorAll('[data-mf-reset]').forEach(function(b){ b.onclick=function(){ mfReset(b.dataset.mfReset); }; });
+}
+function mfPlus(days){ var d=new Date(); d.setDate(d.getDate()+days); return d.toISOString().slice(0,10); }
+async function mfSave(email){
+  var t=$('#mfTable'); var q=function(sel){ return t.querySelector('['+sel+'="'+CSS.escape(email)+'"]'); };
+  var req=q('data-mf-req').checked, dl=q('data-mf-dl').value||null, note=q('data-mf-note').value.trim()||null;
+  if(req && !dl && !confirm(email+' 을(를) 기한 없이 «즉시 필수»로 지정합니다 — 다음 로그인부터 인증 앱을 등록해야 들어올 수 있습니다. 계속할까요?')) return;
+  mfMsg('저장 중…');
+  try{ await sbWrite('POST','rpc/mfa_admin_set',{p_email:email, p_required:req, p_deadline:req? dl:null, p_note:note}); toast('2단계 인증 정책 저장', email+' · '+(req? ('필수'+(dl? ' · 기한 '+dl:' · 즉시')):'선택')); mfLoad(); }
+  catch(e){ mfMsg(String(e.message||e).slice(0,120), true); }
+}
+async function mfReset(email){
+  if(!confirm(email+' 의 인증 앱 등록을 지웁니다. 다음 로그인은 비밀번호만으로 되고(필수 지정이면 다시 등록 화면), 본인에게 알려 주세요. 계속할까요?')) return;
+  mfMsg('초기화 중…');
+  try{ var r=await sbWrite('POST','rpc/mfa_admin_reset',{p_email:email}); toast('인증 앱 초기화', email+' · 삭제 '+(r&&r.deleted!=null? r.deleted:'')+'건', 'warn'); mfLoad(); }
+  catch(e){ mfMsg(String(e.message||e).slice(0,120), true); }
+}
+async function mfAll(){
+  if(!MF.rows) return; var targets=MF.rows.filter(function(r){ return !r.enrolled && !r.required; });
+  if(!targets.length){ mfMsg('지정할 계정이 없습니다 (전부 등록됐거나 이미 필수)'); return; }
+  var dl=mfPlus(7);
+  if(!confirm(targets.length+'개 계정을 2단계 인증 필수로 지정합니다 (기한 '+dl+' · 그때까지는 안내만, 지나면 등록 화면).\n\n'+targets.map(function(r){ return '· '+r.email; }).join('\n'))) return;
+  mfMsg('지정 중…'); var n=0;
+  for(var i=0;i<targets.length;i++){ try{ await sbWrite('POST','rpc/mfa_admin_set',{p_email:targets[i].email, p_required:true, p_deadline:dl, p_note:'전체 지정'}); n++; }catch(e){} }
+  toast('2단계 인증 전체 지정', n+'개 계정 · 기한 '+dl); mfLoad();
+}
+function mfBind(){ if(MF.bound) return; MF.bound=true; var r=$('#mfReload'); if(r) r.onclick=mfLoad; var a=$('#mfAll'); if(a) a.onclick=mfAll; }
 async function axLoad(){
   axMsg('불러오는 중…');
   try{
