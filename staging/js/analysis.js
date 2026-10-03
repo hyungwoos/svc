@@ -24,6 +24,10 @@ function dcRules(){
   var RS=null; try{ RS=renewScan(T); }catch(e){}
   rule('c_lapsed','crit','만기 지났는데 미처리','종료월이 지났는데 연장·해지·종료 처리가 없음 — 이미 LIVE 에서 빠져 있습니다.',
     (RS? RS.lapsed:[]).map(function(r){ var it=ci(r); it.go=function(){ openRenewList('lapsed'); }; return it; }), '홈 › 만기 처리');
+  /* 포탈(renewScan) ↔ DB(renew_watch · SQL 84) 만기 판정 대조 — 슬랙 알림(remind)은 DB 쪽을 쓰므로 두 쪽이 어긋나면 알림과 화면 숫자가 달라짐. 결과는 dcRenewSync() 가 비동기로 채움(DC.rw) */
+  var rw=DC.rw, rwItems=[];
+  if(rw && rw.T===T && rw.diff) rw.diff.forEach(function(d){ var r=rows.filter(function(x){ return x._id===d.id; })[0]; var it=r? ci(r) : {label:'#'+d.id+' '+(d.cust||''), sub:'', go:null, key:d.id}; it.sub=(d.side==='portal'? '포탈만 ':'DB(renew_watch)만 ')+'«'+d.kind+'»'+(d.other? ' · 상대쪽 «'+d.other+'»':'')+(it.sub? ' · '+it.sub:''); rwItems.push(it); });
+  rule('c_renew_sync', (!rw || rw.error || rw.pending)? 'info':'warn', '만기 판정 포탈 ↔ DB 불일치', rw? (rw.error? 'DB 쪽(renew_watch) 조회 실패 — '+rw.error+' (SQL 84 미실행이면 정상)' : '홈 «만기 처리»(포탈 계산)와 슬랙 알림(DB 함수 renew_watch)이 보는 미처리·이달·다음 달 목록이 다름 — 보통 auto_renew·live_override·상태값이 한쪽 규칙에만 걸린 경우. 포탈 '+rw.portalN+'건 vs DB '+rw.dbN+'건.') : '확인 중… (DB 함수 renew_watch 와 대조)', rwItems, '홈 › 만기 처리');
   var bad=[]; rows.forEach(function(r){ var w=[];
     if(!codeActive('contract_status', r.status)) w.push('상태 «'+r.status+'»');
     if(!codeActive('contract_type', r.ctype)) w.push('계약유형 «'+r.ctype+'»');
@@ -80,6 +84,7 @@ function renderDataCheck(){
   var tw=$('#dvTable').parentElement; tw.style.display='none';
   var host=bizHostEl(); host.style.display='';
   if(!window.DATA || !DATA.rows){ host.innerHTML='<div class="cap" style="padding:30px;text-align:center">데이터가 아직 없습니다</div>'; return; }
+  dcRenewSync();   // DB renew_watch 와 대조(비동기 · 데이터 로드마다 1회) — 도착하면 다시 그림
   var t0=Date.now(), rules=dcRules(), ms=Date.now()-t0; DC._rules=rules;
   var n={crit:0,warn:0,info:0}, cnt={crit:0,warn:0,info:0}, items=0;
   rules.forEach(function(r){ if(r.items.length){ n[r.sev]++; cnt[r.sev]+=r.items.length; items+=r.items.length; } });
@@ -109,6 +114,22 @@ function renderDataCheck(){
   host.querySelector('#dcRefresh').onclick=function(){ renderDataCheck(); };
   dcLogOnce(cnt, rules);
   host.querySelector('#dcXlsx').onclick=function(){ var out=[]; rules.forEach(function(r){ r.items.forEach(function(it){ out.push([DC_SEV[r.sev][1], r.title, it.label, it.sub||'', r.go]); }); }); if(!out.length){ toast('내보낼 항목이 없습니다','전부 이상 없음'); return; } xlsxAoa('데이터점검_'+new Date().toISOString().slice(0,10), ['심각도','규칙','항목','내용','고치는 화면'], out); };
+}
+/* 포탈 renewScan(T) ↔ DB renew_watch(p_month) 대조 — 같은 DATA 배열에 대해 1회만 호출(DC.rw.src 로 기억) · 결과 {T, portalN, dbN, diff:[{id,cust,kind,side,other}], error} */
+function dcRenewSync(){
+  var rows=(window.DATA&&DATA.rows)||[], T=(window.DATA&&DATA.nowIdx)||0;
+  if(!rows.length || !window.SB_TOKEN) return; if(DC.rw && DC.rw.src===rows && DC.rw.T===T) return;
+  DC.rw={src:rows, T:T, pending:true};
+  var RS=null; try{ RS=renewScan(T); }catch(e){ RS={lapsed:[],due:[],next:[]}; }
+  var portal={}; ['lapsed','due','next'].forEach(function(k){ (RS[k]||[]).forEach(function(r){ portal[r._id]={kind:k, cust:r.cust}; }); });
+  fetch(SB_URL+'/rest/v1/rpc/renew_watch',{method:'POST', headers:sbHeaders(true), body:JSON.stringify({p_month:idxDate(T)})}).then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); }).then(function(db){
+    var dbm={}; (db||[]).forEach(function(x){ if(/^(lapsed|due|next)$/.test(x.kind)) dbm[x.contract_id]={kind:x.kind, cust:x.customer}; });
+    var diff=[];
+    Object.keys(portal).forEach(function(id){ var d=dbm[id]; if(!d) diff.push({id:+id, cust:portal[id].cust, kind:portal[id].kind, side:'portal'}); else if(d.kind!==portal[id].kind) diff.push({id:+id, cust:portal[id].cust, kind:portal[id].kind, side:'portal', other:d.kind}); });
+    Object.keys(dbm).forEach(function(id){ if(!portal[id]) diff.push({id:+id, cust:dbm[id].cust, kind:dbm[id].kind, side:'db'}); });
+    DC.rw={src:rows, T:T, portalN:Object.keys(portal).length, dbN:Object.keys(dbm).length, diff:diff};
+    if(CUR_VIEW==='dcheck') renderDataCheck();
+  }).catch(function(e){ DC.rw={src:rows, T:T, error:String(e.message||e).slice(0,120), diff:[], portalN:Object.keys(portal).length, dbN:0}; if(CUR_VIEW==='dcheck') renderDataCheck(); });
 }
 /* 점검 결과를 세션당 1회 change_log(action 'data_check') 에 남김 — 배포 전후·날짜별 어긋남 추이를 기록 탭·AI 가 볼 수 있게 (㊿+137) */
 function dcLogOnce(cnt, rules){

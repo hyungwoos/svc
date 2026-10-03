@@ -339,8 +339,9 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
     { kind: 'model', value: 'S100', sort: 1, active: true }, { kind: 'model', value: 'S200', sort: 2, active: true }, { kind: 'model', value: 'S10_R2', sort: 3, active: true }, { kind: 'model', value: 'S20_R2', sort: 4, active: true }, { kind: 'model', value: 'S30H_R1', sort: 5, active: true }, { kind: 'model', value: 'ES30', sort: 6, active: true }, { kind: 'model', value: 'S900', sort: 7, active: true, note: 'smoke' },
     { kind: 'line', value: 'Cloud', label: 'Cloud NAC', sort: 1, active: true }, { kind: 'line', value: 'S1', label: 'S1 Cloud NAC', sort: 2, active: true }, { kind: 'line', value: 'MDR', label: 'MDR', sort: 3, active: true }, { kind: 'line', value: 'MDR_S1', label: 'S1 MDR', sort: 4, active: true }, { kind: 'line', value: 'DRM', label: 'DRM', sort: 5, active: true }, { kind: 'line', value: 'PNS', label: 'PNS', sort: 6, active: true }, { kind: 'line', value: 'DLP', label: 'DLP', sort: 7, active: true },
   ];
-  const writes = [];
+  const writes = []; let rwRows = null;   // rwRows: renew_watch 가짜 응답(테스트 중 바꿈 · null 이면 기본 [] 응답)
   const { ctx, page, errs } = await open({ onWrite: (w) => writes.push(w), extra: async (route, u, m) => {
+    if (u.includes('/rpc/renew_watch') && rwRows) { await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(rwRows) }); return true; }
     if (!u.includes('/rest/v1/code_lists') || m !== 'GET') return false;
     await route.fulfill({ status: 200, contentType: 'application/json', headers: { 'content-range': '0-27/28', 'Access-Control-Expose-Headers': 'content-range' }, body: JSON.stringify(CODE_ROWS) }); return true;
   } });
@@ -391,6 +392,17 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
     assert(writes.some((w) => /change_log/.test(w.url) && /bulk_fill/.test(w.body)), 'change_log bulk_fill 없음');
     const dc = writes.filter((w) => /change_log/.test(w.url) && /data_check/.test(w.body)); assert(dc.length <= 1, 'data_check 로그가 세션당 1회를 넘음 ' + dc.length);
     assert(!errs.length, errs.join(' | ')); return b[0].amount + '원';
+  });
+  await S.t('데이터 점검: 만기 판정 포탈 ↔ DB(renew_watch) 대조 규칙', async () => {
+    const rs = await page.evaluate(() => { const R = renewScan(DATA.nowIdx); return { lapsed: R.lapsed.map((r) => r._id), due: R.due.map((r) => r._id), next: R.next.map((r) => r._id) }; });
+    rwRows = rs.due.map((id) => ({ kind: 'due', contract_id: id, customer: 'x' })).concat([{ kind: 'lapsed', contract_id: 999999, customer: '가상DB전용' }]);
+    await page.evaluate(() => { DC.rw = null; switchView('dcheck'); }); await page.waitForTimeout(900);
+    const r = await page.evaluate(() => { const x = dcRules().filter((q) => q.id === 'c_renew_sync')[0]; return { sev: x.sev, n: x.items.length, subs: x.items.map((i) => i.sub.slice(0, 20)), rw: DC.rw && { portalN: DC.rw.portalN, dbN: DC.rw.dbN, pending: !!DC.rw.pending } }; });
+    const expect = rs.lapsed.length + rs.next.length + 1;
+    assert(r.rw && !r.rw.pending && r.rw.dbN === rs.due.length + 1, 'rw ' + JSON.stringify(r.rw));
+    assert(r.sev === 'warn' && r.n === expect, 'diff ' + r.n + ' vs ' + expect + ' ' + JSON.stringify(r.subs).slice(0, 200));
+    assert(r.subs.some((s) => /^DB\(renew_watch\)만/.test(s)) && (expect === 1 || r.subs.some((s) => /^포탈만/.test(s))), '양쪽 방향 표시 ' + JSON.stringify(r.subs).slice(0, 200));
+    assert(!errs.length, errs.join(' | ')); rwRows = null; return 'portal ' + r.rw.portalN + ' · db ' + r.rw.dbN + ' · diff ' + r.n;
   });
   await S.t('코드 목록 표 없음(SQL 93 전) → 기본값 그대로 · 코드 관리는 안내', async () => {
     const { ctx: c2, page: p2, errs: e2 } = await open({ extra: async (route, u, m) => { if (!u.includes('/rest/v1/code_lists')) return false; await route.fulfill({ status: 404, contentType: 'application/json', body: '{"message":"relation \\"public.code_lists\\" does not exist"}' }); return true; } });
