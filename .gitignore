@@ -1,0 +1,9 @@
+node_modules/
+_site/
+tests/out/
+*.log
+.DS_Store
+# 고객·매출 데이터가 들어 있는 파일은 저장소에 올리지 않습니다
+CLAUDE.md
+sql*.sql
+*.xlsx
