@@ -6,6 +6,7 @@
   "scripts": {
     "check": "node tests/check.mjs",
     "test": "node tests/smoke.mjs",
+    "test:fn": "deno check supabase/functions/*/index.ts && deno run -A tests/fn/ops.test.ts && deno run -A tests/fn/remind.test.ts && deno run -A tests/fn/aicheck.test.ts && deno run -A tests/fn/quote-worker.test.ts",
     "test:install": "npx playwright install --with-deps chromium"
   },
   "devDependencies": {

@@ -168,10 +168,18 @@ if (fs.existsSync(path.join(DIR, 'staging', 'index.html'))) {
 // 9) 2단계 인증(MFA) — 등록된 계정: 저장된 aal1 세션 → 코드 창 → aal2 세션 교체 · 취소 · 로그인 화면 흐름 · 내 계정 카드(끄기·켜기)
 {
   const authCalls = []; let factors = [{ id: 'f1', factor_type: 'totp', status: 'verified', friendly_name: 'SVC 포탈 2026-10-03', created_at: '2026-10-03T00:00:00Z' }];
+  let policy = { required: false, deadline: null };   // SQL 89 mfa_policy 흉내
+  const today = new Date().toISOString().slice(0, 10); const adminCalls = [];
   const mfaExtra = async (route, u, m) => {
     const J = async (o, st = 200) => { await route.fulfill({ status: st, contentType: 'application/json', body: JSON.stringify(o) }); return true; };
     const auth = route.request().headers()['authorization'] || ''; const path = u.replace(/^https?:\/\/[^/]+/, '').split('?')[0];
     const user = { id: 'u1', email: 'tester@example.com', user_metadata: { pw_changed: true }, factors };
+    const enrolled = factors.some((f) => f.status === 'verified'), aal2 = auth.includes(jwt('aal2'));
+    const mfaOk = aal2 || (enrolled ? false : !(policy.required && (!policy.deadline || policy.deadline <= today)));
+    if (path === '/rest/v1/rpc/mfa_status') return J({ email: 'tester@example.com', aal: aal2 ? 'aal2' : 'aal1', enrolled, required: policy.required, deadline: policy.deadline, today, ok: mfaOk });
+    if (path === '/rest/v1/rpc/mfa_admin_list') return J([{ email: 'a@example.com', role: 'admin', enrolled: true, factor_at: '2026-10-01T00:00:00Z', required: true, deadline: null, note: null }, { email: 'b@example.com', role: 'admin_viewer', enrolled: false, required: false, deadline: null, note: null }, { email: 'tester@example.com', role: 'super_admin', enrolled, required: policy.required, deadline: policy.deadline, note: null }]);
+    if (path === '/rest/v1/rpc/mfa_admin_set' || path === '/rest/v1/rpc/mfa_admin_reset') { const b = JSON.parse(route.request().postData() || '{}'); adminCalls.push({ fn: path.split('/').pop(), ...b }); return J(path.endsWith('reset') ? { email: b.p_email, deleted: 1 } : { email: b.p_email, required: b.p_required, deadline: b.p_deadline }); }
+    if (u.includes('/rpc/load_all') && !mfaOk) { authCalls.push('load_all:blocked'); return J({}); }   // SQL 88/89 흉내: mfa_ok 가 false 면 데이터 없음
     if (path === '/auth/v1/user') { authCalls.push('user'); return J(user); }
     let mm = /^\/auth\/v1\/factors\/([^/]+)\/(challenge|verify)$/.exec(path);
     if (mm && m === 'POST') {
@@ -184,7 +192,6 @@ if (fs.existsSync(path.join(DIR, 'staging', 'index.html'))) {
     mm = /^\/auth\/v1\/factors\/([^/]+)$/.exec(path);
     if (mm && m === 'DELETE') { authCalls.push('unenroll:' + mm[1]); factors = factors.filter((f) => f.id !== mm[1]); return J({ id: mm[1] }); }
     if (u.includes('grant_type=password')) { authCalls.push('password'); return J({ access_token: jwt('aal1'), refresh_token: 'r1', expires_in: 3600, token_type: 'bearer', user }); }
-    if (u.includes('/rpc/load_all') && factors.some((f) => f.status === 'verified') && !auth.includes(jwt('aal2'))) { authCalls.push('load_all:blocked'); return J({}); }   // SQL 88 흉내: 등록자는 aal2 만 데이터
     return false;
   };
   // A) 저장된 aal1 세션으로 시작 → 코드 창 → 틀림 → 맞음 → 데이터 로드
@@ -245,6 +252,45 @@ if (fs.existsSync(path.join(DIR, 'staging', 'index.html'))) {
     const { ctx, page, errs } = await open({ token: jwt('aal1') });
     await S.t('MFA: 미등록 계정은 코드 창 없이 바로 입장', async () => { assert(!(await page.$('#ovlMfa')), '코드 창이 떴음'); assert(await page.evaluate(() => !!window.DATA), 'DATA 없음'); assert(!errs.length, errs.join(' | ')); });
     await ctx.close();
+  }
+  // E) 관리자가 필수(즉시) 지정 + 미등록 → 등록 강제 창 → QR·코드 → aal2 입장
+  {
+    factors = []; policy = { required: true, deadline: null };
+    const { ctx, page, errs } = await open({ token: jwt('aal1'), extra: mfaExtra });
+    await S.t('MFA 강제: 필수(즉시)·미등록 → 등록 창 → 등록 → 입장', async () => {
+      assert(await page.$('#ovlMfa #mfaForceHost'), '강제 등록 창 없음'); assert(await page.evaluate(() => document.getElementById('app').classList.contains('hidden')), '등록 전에 앱이 열림');
+      await page.waitForTimeout(500); assert(await page.$('#mfaForceHost img[alt="인증 앱 등록 QR"]'), 'QR 없음'); assert(!(await page.$eval('#mfaEnCancel', (e) => e.offsetParent !== null)), '안쪽 취소 버튼이 보임');
+      await page.fill('#mfaEnCode', '123456'); await page.click('#mfaEnGo'); await page.waitForTimeout(2500);
+      assert(!(await page.$('#ovlMfa')), '창이 남음'); assert(await page.evaluate(() => !document.getElementById('app').classList.contains('hidden') && !!window.DATA), '앱 미표시');
+      assert(await page.evaluate(() => JSON.parse(sessionStorage.getItem('svc_sess')).a) === jwt('aal2'), 'aal2 세션 아님'); assert(!errs.length, errs.join(' | '));
+      return authCalls.filter((x) => /enroll|verify:f2/.test(x)).join(' → ');
+    });
+    await S.t('MFA 강제: 관리자 › 2단계 인증 정책 — 목록 · 필수 지정 저장 · 초기화', async () => {
+      page.on('dialog', (d) => d.accept());
+      await page.evaluate(() => switchView('adminx')); await page.waitForTimeout(900);
+      const rows = await page.$$eval('#mfTable tbody tr', (t) => t.length); assert(rows === 3, 'rows ' + rows);
+      assert(/차단 중|유예|등록/.test(await page.$eval('#mfTable', (e) => e.textContent)), '상태 표기 없음');
+      await page.check('#mfTable [data-mf-req="b@example.com"]'); await page.waitForTimeout(100);
+      const dl = await page.$eval('#mfTable [data-mf-dl="b@example.com"]', (e) => ({ v: e.value, dis: e.disabled })); assert(!dl.dis && /^\d{4}-\d{2}-\d{2}$/.test(dl.v), '기한 자동 입력 안 됨 ' + JSON.stringify(dl));
+      await page.fill('#mfTable [data-mf-note="b@example.com"]', '테스트'); await page.click('#mfTable [data-mf-save="b@example.com"]'); await page.waitForTimeout(600);
+      const set = adminCalls.find((c) => c.fn === 'mfa_admin_set'); assert(set && set.p_email === 'b@example.com' && set.p_required === true && set.p_deadline === dl.v && set.p_note === '테스트', JSON.stringify(set));
+      await page.click('#mfTable [data-mf-reset="a@example.com"]'); await page.waitForTimeout(600);
+      const rs = adminCalls.find((c) => c.fn === 'mfa_admin_reset'); assert(rs && rs.p_email === 'a@example.com', JSON.stringify(rs)); return adminCalls.map((c) => c.fn).join(',');
+    });
+    await ctx.close();
+  }
+  // F) 필수지만 기한이 남음 → 들어가되 안내 토스트
+  {
+    factors = []; const dl = new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10); policy = { required: true, deadline: dl };
+    const { ctx, page } = await open({ token: jwt('aal1'), extra: mfaExtra });
+    await S.t('MFA 강제: 유예 기간 → 입장 + 안내 토스트', async () => {
+      assert(!(await page.$('#ovlMfa')), '창이 떴음'); assert(await page.evaluate(() => !!window.DATA), 'DATA 없음');
+      const t = await page.$$eval('#toasts .toast', (e) => e.map((x) => x.textContent).join(' | ')); assert(/2단계 인증 등록이 필요/.test(t) && t.includes(dl), '토스트: ' + t.slice(0, 120));
+      await page.evaluate(() => switchView('account')); await page.waitForTimeout(700);
+      assert(/관리자 지정: 필수/.test(await page.$eval('#accMfa', (e) => e.textContent)), '카드에 필수 표시 없음'); return dl;
+    });
+    await ctx.close();
+    policy = { required: false, deadline: null };
   }
 }
 // 10) 견적서 직인 — quote.html 이 비공개 Storage 에서 로그인 토큰으로 받아 <img> 에 넣는지 · 없으면 숨김

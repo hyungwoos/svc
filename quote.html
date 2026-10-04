@@ -171,8 +171,8 @@
     [보안 관련 참고]
     접속·설정 게이트는 포탈(index.html) 로그인 세션(svc_sess)을 공유합니다.
     이 파일에는 더 이상 하드코딩된 비밀번호가 없습니다.
-    견적 데이터 접근(저장/조회)은 별도로 Worker 의 접속 비밀번호(X-Access-Password)로
-    서버 측에서 검증됩니다.
+    견적 데이터 접근(저장/조회/삭제)은 저장 서버(Worker v2)가 포탈 로그인 토큰
+    (Authorization: Bearer)을 Supabase 로 검증해 허용합니다 — 팀 공용 비밀번호는 쓰지 않습니다.
 -->
 <div id="loginOverlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f9f9f7; z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center;">
     <div style="background: #fcfcfb; border: 1px solid rgba(11,11,11,.10); padding: 40px; border-radius: 14px; text-align: center; width: 320px;">
@@ -227,6 +227,38 @@
             .then(function (b) { img.src = URL.createObjectURL(b); img.style.display = ''; img.dataset.loaded = '1'; })
             .catch(function (e) { img.style.display = 'none'; try { console.warn('[직인] 불러오지 못함:', e && e.message); } catch (x) {} });
     }
+    // 저장 서버(Worker v2) 인증 — 포탈 로그인 토큰을 Bearer 로 보냄. 만료 직전이면 포탈(부모 창)의 refreshToken() 또는 직접 갱신.
+    function sessRaw() {
+        try { return JSON.parse(sessionStorage.getItem('svc_sess') || localStorage.getItem('svc_sess') || 'null'); } catch (e) { return null; }
+    }
+    function qEsc(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+    async function qRefresh() {
+        try {   // 포탈 안(iframe)이면 포탈의 갱신 함수를 그대로 사용 — 세션 저장 위치·로그인 유지 규칙이 한곳에서 관리됨
+            if (window.parent && window.parent !== window && typeof window.parent.refreshToken === 'function') { if (await window.parent.refreshToken()) return true; }
+        } catch (e) { /* 다른 출처면 무시 */ }
+        var s = sessRaw(); if (!s || !s.r) return false;
+        try {
+            var r = await fetch(SB_URL + '/auth/v1/token?grant_type=refresh_token', { method: 'POST', headers: { apikey: SB_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: s.r }) });
+            var j = await r.json(); if (!r.ok || !j.access_token) return false;
+            var n = Object.assign({}, s, { a: j.access_token, r: j.refresh_token || s.r, e: Math.floor(Date.now() / 1000) + (j.expires_in || 3600) });
+            try { sessionStorage.setItem('svc_sess', JSON.stringify(n)); } catch (e) {}
+            try { if (localStorage.getItem('svc_sess')) localStorage.setItem('svc_sess', JSON.stringify(n)); } catch (e) {}
+            return true;
+        } catch (e) { return false; }
+    }
+    async function qToken() {
+        var s = portalSess(); if (s) return s.a;
+        if (await qRefresh()) { s = portalSess(); if (s) return s.a; }
+        throw new Error('포탈 로그인이 만료되었습니다 — 포탈을 새로고침하거나 다시 로그인해 주세요');
+    }
+    async function workerFetch(path, opts) {
+        opts = opts || {};
+        if (!workerConfig.baseUrl) throw new Error('저장 서버 주소가 없습니다 — "GitHub ▾ → 설정"에서 확인해주세요');
+        var go = async function () { var t = await qToken(); return fetch(workerConfig.baseUrl + path, Object.assign({}, opts, { headers: Object.assign({}, opts.headers || {}, { Authorization: 'Bearer ' + t }) })); };
+        var res = await go();
+        if (res.status === 401 && await qRefresh()) res = await go();
+        return res;
+    }
     function enterQuote() {
         document.getElementById('loginOverlay').style.display = 'none';
         loadSeal();
@@ -250,15 +282,14 @@
         <h3 style="margin: 0 0 5px 0;">견적 저장 서버 연동 설정</h3>
         <div style="font-size: 11px; color: #888; margin-bottom: 10px;">
             GitHub Token은 이 파일에 없고, 별도의 저장 서버(Worker)에만 보관되어 있습니다.
-            아래 <b>접속 비밀번호</b>(팀 공용)만 입력하면 저장/조회가 가능합니다.
-            이 브라우저에 저장되어 새로고침해도 다시 입력할 필요가 없습니다.
+            저장 서버는 <b>포탈 로그인</b>으로 자동 인증합니다 — 비밀번호를 입력할 필요가 없습니다.
+            (계정 역할·메뉴 권한에 따라 조회·저장·삭제가 정해집니다)
         </div>
         <label>저장 서버 주소</label>
         <input type="text" id="ghOwner" placeholder="https://xxxx.workers.dev">
-        <label>접속 비밀번호 (팀 공용)</label>
-        <input type="password" id="ghToken" placeholder="팀 관리자에게 문의">
+        <div id="ghAuthInfo" style="font-size:12px; color:#52514e; margin-top:10px; line-height:1.5;">연결 확인 전</div>
         <div style="text-align:right; margin-top:4px;">
-            <button onclick="clearStoredGithubToken()" style="background:none; border:none; color:#c0392b; font-size:11px; cursor:pointer; text-decoration:underline; padding:0;">저장된 비밀번호 삭제</button>
+            <button onclick="checkWorkerAuth()" style="background:none; border:none; color:var(--genians-green); font-size:11px; cursor:pointer; text-decoration:underline; padding:0;">연결·권한 확인</button>
         </div>
         <div style="display:flex; gap:8px; margin-top:14px;">
             <button onclick="closeGithubSettings()" style="flex:1; padding:10px; background:#ccc; border:none; border-radius:5px; cursor:pointer;">취소</button>
@@ -432,25 +463,23 @@
     // ─────────────────────────────────────────────
     // Worker 연동 설정: GitHub Token은 이제 이 파일 안에 전혀 없습니다.
     // Cloudflare Worker(baseUrl)가 Token을 서버 쪽에서만 보관하고,
-    // 이 파일은 팀 공용 비밀번호(accessPassword)로만 Worker에 요청을 보냅니다.
+    // 이 파일은 포탈 로그인 토큰(Authorization: Bearer)으로 Worker에 요청을 보냅니다 (Worker v2 · 2026-10-04).
     // ─────────────────────────────────────────────
     let workerConfig = {
-        baseUrl: 'https://aged-union-cdd3.choihw.workers.dev',
-        accessPassword: ''
+        baseUrl: 'https://aged-union-cdd3.choihw.workers.dev'
     };
     // 설정 화면 게이트: 포탈 로그인 세션으로 대체 (하드코딩 비밀번호 제거됨)
     // ─────────────────────────────────────────────
-    // 접속 비밀번호(팀 공용) 로컬 보관
-    // 이건 GitHub Token이 아니라 Worker에 접근하기 위한 팀 공용 비밀번호이므로
-    // 브라우저에 저장해도 GitHub 저장소 자체가 뚫릴 위험은 없습니다.
+    // 저장 서버 주소만 로컬 보관 (2026-10-04 · Worker v2 부터 비밀번호 없음 — 예전에 저장된 비밀번호는 읽을 때 지움)
     // ─────────────────────────────────────────────
     const GH_STORAGE_KEY = 'genians_quote_worker_config_v1';
     function loadGithubConfigFromStorage() {
         try {
             const saved = localStorage.getItem(GH_STORAGE_KEY);
             if (saved) {
-                const parsed = JSON.parse(saved);
-                workerConfig = Object.assign({}, workerConfig, parsed);
+                const parsed = JSON.parse(saved) || {};
+                if (parsed.accessPassword !== undefined) { delete parsed.accessPassword; localStorage.setItem(GH_STORAGE_KEY, JSON.stringify(parsed)); }
+                if (parsed.baseUrl) workerConfig.baseUrl = String(parsed.baseUrl).replace(/\/+$/g, '');
             }
         } catch (err) {
             console.warn('로컬 저장소를 사용할 수 없어 이번 세션에서는 설정이 저장되지 않습니다.', err);
@@ -463,13 +492,22 @@
             console.warn('로컬 저장소에 설정을 저장하지 못했습니다.', err);
         }
     }
-    function clearStoredGithubToken() {
-        workerConfig.accessPassword = '';
-        document.getElementById('ghToken').value = '';
+    async function checkWorkerAuth() {
+        var el = document.getElementById('ghAuthInfo');
+        var base = document.getElementById('ghOwner').value.trim().replace(/\/+$/g, '');
+        if (base) workerConfig.baseUrl = base;
+        el.textContent = '확인 중…';
         try {
-            localStorage.removeItem(GH_STORAGE_KEY);
-        } catch (err) { /* noop */ }
-        alert('저장된 접속 비밀번호가 삭제되었습니다.');
+            var res = await workerFetch('/whoami');
+            var j = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
+            var can = [j.read ? '조회' : null, j.write ? '저장' : null, j.delete ? '삭제' : null].filter(Boolean).join('·') || '권한 없음';
+            el.textContent = '✓ ' + (j.email || '') + ' · 역할 ' + (j.role || '없음') + ' · ' + can;
+            el.style.color = 'var(--genians-green)';
+        } catch (e) {
+            el.textContent = '✗ ' + e.message + (/Not found|404/.test(e.message) ? ' — 저장 서버가 아직 v1 입니다 (Worker v2 배포 필요)' : '');
+            el.style.color = '#c0392b';
+        }
     }
     function requestGithubSettings() {
         // 포탈 로그인 사용자만 설정 화면 진입 가능
@@ -1064,20 +1102,14 @@
         }
     });
     async function initAppAfterTypeSelected() {
-        loadGithubConfigFromStorage();   // onload 이전에 진입해도 저장된 접속 비밀번호를 먼저 읽는다
+        loadGithubConfigFromStorage();   // onload 이전에 진입해도 저장된 서버 주소를 먼저 읽는다
         addRow();
         // URL에 ?view=경로 가 있으면, 그 견적을 자동으로 불러와서 읽기 전용으로 보여줍니다.
         const params = new URLSearchParams(window.location.search);
         const viewPath = params.get('view');
         if (viewPath) {
-            if (!workerConfig.baseUrl || !workerConfig.accessPassword) {
-                alert('저장 서버 설정(접속 비밀번호)이 필요합니다. "GitHub ▾ → 설정"에서 먼저 설정해주세요.');
-                return;
-            }
             try {
-                const res = await fetch(`${workerConfig.baseUrl}/load?path=${encodeURIComponent(viewPath)}`, {
-                    headers: { 'X-Access-Password': workerConfig.accessPassword }
-                });
+                const res = await workerFetch(`/load?path=${encodeURIComponent(viewPath)}`);
                 if (!res.ok) {
                     const errResult = await res.json().catch(() => ({}));
                     throw new Error(errResult.error || `HTTP ${res.status}`);
@@ -1539,7 +1571,7 @@
     // ─────────────────────────────────────────────
     function openGithubSettings() {
         document.getElementById('ghOwner').value = workerConfig.baseUrl;
-        document.getElementById('ghToken').value = workerConfig.accessPassword;
+        var info = document.getElementById('ghAuthInfo'); if (info) { info.textContent = '포탈 로그인으로 자동 인증 — «연결·권한 확인»으로 지금 계정의 권한을 볼 수 있습니다'; info.style.color = '#52514e'; }
         document.getElementById('githubSettingsModal').style.display = 'flex';
     }
     function closeGithubSettings() {
@@ -1550,7 +1582,6 @@
     }
     function saveGithubSettings() {
         workerConfig.baseUrl = document.getElementById('ghOwner').value.trim().replace(/\/+$/g, '');
-        workerConfig.accessPassword = document.getElementById('ghToken').value.trim();
         persistGithubConfig();
         closeGithubSettings();
     }
@@ -1559,7 +1590,7 @@
     }
     // 실제 저장 로직 (Worker에 JSON 저장). 버튼 클릭과 PDF 발행 시 자동 저장에서 공용으로 사용.
     async function silentSaveToGithub() {
-        if (!workerConfig.baseUrl || !workerConfig.accessPassword) {
+        if (!workerConfig.baseUrl || !sessRaw()) {
             return { attempted: false };
         }
         const data = collectQuoteData();
@@ -1568,12 +1599,9 @@
         const timeStamp = Date.now();
         const fileName = isPo() ? `${dateStr}_${customer}_발주서_${timeStamp}.json` : `${dateStr}_${customer}_${timeStamp}.json`;
         try {
-            const res = await fetch(`${workerConfig.baseUrl}/save`, {
+            const res = await workerFetch('/save', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Access-Password': workerConfig.accessPassword
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     fileName: fileName,
                     message: `${isPo() ? '발주서' : '견적'} 저장: ${data.customerName || '고객사미입력'} (${data.quoteDate || ''})`,
@@ -1588,16 +1616,17 @@
         }
     }
     async function saveToGithub() {
-        if (!workerConfig.baseUrl || !workerConfig.accessPassword) {
-            alert('먼저 "GitHub ▾ → 설정"에서 접속 비밀번호를 입력해주세요.');
+        if (!workerConfig.baseUrl) {
+            alert('먼저 "GitHub ▾ → 설정"에서 저장 서버 주소를 확인해주세요.');
             requestGithubSettings();
             return;
         }
+        if (!sessRaw()) { alert('포탈 로그인이 필요합니다.'); return; }
         const result = await silentSaveToGithub();
         if (result.ok) {
             alert(`저장되었습니다.\n파일명: ${result.fileName}`);
         } else {
-            alert(`저장 중 오류가 발생했습니다.\n${result.error}\n\n(저장 서버 주소와 접속 비밀번호를 확인해주세요.)`);
+            alert(`저장 중 오류가 발생했습니다.\n${result.error}\n\n(저장 서버 주소와 포탈 로그인·권한을 확인해주세요 — "GitHub ▾ → 설정 → 연결·권한 확인")`);
         }
     }
     async function listGithubQuotes() {
@@ -1606,18 +1635,11 @@
             requestGithubSettings();
             return;
         }
-        if (!workerConfig.accessPassword) {
-            alert('먼저 "GitHub ▾ → 설정"에서 접속 비밀번호를 입력해주세요.');
-            requestGithubSettings();
-            return;
-        }
         const listDiv = document.getElementById('githubListBody');
         listDiv.innerHTML = '<div style="padding:15px; text-align:center; color:#888;">불러오는 중...</div>';
         document.getElementById('githubListModal').style.display = 'flex';
         try {
-            const res = await fetch(`${workerConfig.baseUrl}/list`, {
-                headers: { 'X-Access-Password': workerConfig.accessPassword }
-            });
+            const res = await workerFetch('/list');
             const result = await res.json().catch(() => ({}));
             if (!res.ok) throw new Error(result.error || `HTTP ${res.status}`);
             const jsonFiles = result.files || [];
@@ -1635,7 +1657,7 @@
                 row.style.padding = '10px 12px';
                 row.style.borderBottom = '1px solid #eee';
                 row.innerHTML = `
-                    <span style="font-size:13px; word-break:break-all;">${isPdf ? '📄 ' : '📝 '}${f.name}</span>
+                    <span style="font-size:13px; word-break:break-all;">${isPdf ? '📄 ' : '📝 '}${qEsc(f.name)}</span>
                     <span style="flex-shrink:0; display:flex; gap:6px; margin-left:10px;">
                         <button class="btn-load" style="padding:6px 12px; background:var(--genians-green); color:white; border:none; border-radius:4px; cursor:pointer; font-size:12px;">${isPdf ? '열기' : '불러오기'}</button>
                         <button class="btn-remove" style="padding:6px 10px; background:#e74c3c; color:white; border:none; border-radius:4px; cursor:pointer; font-size:12px;" title="삭제">🗑</button>
@@ -1646,7 +1668,7 @@
                 listDiv.appendChild(row);
             });
         } catch (err) {
-            listDiv.innerHTML = `<div style="padding:15px; text-align:center; color:#c0392b;">목록 조회 중 오류: ${err.message}</div>`;
+            listDiv.innerHTML = `<div style="padding:15px; text-align:center; color:#c0392b;">목록 조회 중 오류: ${qEsc(err.message)}</div>`;
         }
     }
     function loadGithubFile(filePath, fileName) {
@@ -1661,9 +1683,7 @@
     }
     async function loadGithubPdfFile(filePath, fileName) {
         try {
-            const res = await fetch(`${workerConfig.baseUrl}/load?path=${encodeURIComponent(filePath)}`, {
-                headers: { 'X-Access-Password': workerConfig.accessPassword }
-            });
+            const res = await workerFetch(`/load?path=${encodeURIComponent(filePath)}`);
             if (!res.ok) {
                 const errResult = await res.json().catch(() => ({}));
                 throw new Error(errResult.error || `HTTP ${res.status}`);
@@ -1679,12 +1699,9 @@
     async function deleteGithubFile(filePath, fileName) {
         if (!confirm(`"${fileName}" 을(를) 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
         try {
-            const res = await fetch(`${workerConfig.baseUrl}/delete`, {
+            const res = await workerFetch('/delete', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Access-Password': workerConfig.accessPassword
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     path: filePath,
                     message: `견적 삭제: ${fileName}`
