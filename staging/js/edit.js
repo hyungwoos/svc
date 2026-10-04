@@ -8,6 +8,110 @@
    ================================================================== */
 function openOvl(id){ document.getElementById(id).classList.add('on'); }
 function closeOvl(id){ document.getElementById(id).classList.remove('on'); }
+
+/* ── 창(.ovl) 공통 동작 (㊿+141 · 사용자: «닫기 버튼이 아니라 옆 공간을 클릭해도 닫히게») ──
+   · 바깥(어두운 배경) 클릭 · Esc → ovlDismiss: 창의 [data-close] 버튼 → 아래쪽 «닫기/취소» 버튼 → 없으면 숨김(정적)/제거(동적) 순서로 «원래 닫는 방법»을 그대로 씀
+   · 입력 중인 내용이 있으면 확인 후 닫음(ovlIsDirty) · 2단계 인증 창(#ovlMfa)·data-noesc 창은 바깥 클릭/Esc 로 닫지 않음
+   · 열릴 때 role=dialog·aria-modal·제목 연결 · 초점을 창 안으로 · Tab 은 창 안에서만 돎 · 닫히면 초점을 연 버튼으로 되돌림
+   init.js 끝에서 ovlInit() 이 이벤트를 등록함 */
+var OVL_SEQ=0, OVL_STATIC=null, OVL_DOWN=null;
+var OVL_SKIP_CLEAN=/^(change_log|client_errors|ai_feedback|ai_check_log|ai_chat_history)\b/;
+function ovlShown(o){ return !!(o && o.isConnected && o.classList.contains('on') && o.getClientRects().length); }
+function ovlTop(){
+  var a=Array.prototype.slice.call(document.querySelectorAll('.ovl.on')).filter(ovlShown);
+  if(!a.length) return null;
+  a.forEach(function(o,i){ o.__ord=i; });
+  a.sort(function(x,y){ return ((parseInt(getComputedStyle(x).zIndex,10)||0)-(parseInt(getComputedStyle(y).zIndex,10)||0)) || (x.__ord-y.__ord); });
+  return a[a.length-1];
+}
+function ovlCanClose(o){ return !!o && o.id!=='ovlMfa' && !o.hasAttribute('data-noesc'); }
+function ovlVal(t){ return (t.type==='checkbox'||t.type==='radio')? (t.checked?'1':'0') : String(t.value==null? '' : t.value); }
+function ovlTrackable(t){
+  if(!t || !t.closest || !/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return null;
+  if(t.id==='fkInput' || t.type==='search' || t.type==='hidden' || t.closest('[data-nodirty]')) return null;
+  return t.closest('.ovl');
+}
+function ovlMarkDirty(o){ if(typeof o==='string') o=document.getElementById(o); if(o) o.__dirty=true; }
+function ovlMarkClean(){   /* 저장 성공(sbWrite) 뒤 — 지금 값을 새 기준으로. 저장 뒤 코드가 칸을 비우는 것(사람 입력 아님)은 «입력 중»으로 치지 않음(__ti) */
+  var now=Date.now();
+  Array.prototype.forEach.call(document.querySelectorAll('.ovl.on'), function(o){
+    o.__dirty=false; o.__cleanAt=now; (o.__typed||[]).forEach(function(t){ if(t.isConnected) t.__v0=ovlVal(t); });
+  });
+}
+function ovlIsDirty(o){
+  if(!o) return false; if(o.__dirty) return true;
+  var c=o.__cleanAt||0;
+  return (o.__typed||[]).some(function(t){ return t.isConnected && o.contains(t) && !t.disabled && (t.__ti||0)>c && ovlVal(t)!==t.__v0; });
+}
+function ovlDismiss(o){
+  if(!ovlCanClose(o)) return false;
+  if(ovlIsDirty(o) && !confirm('입력하거나 바꾼 내용이 아직 저장되지 않았습니다.\n저장하지 않고 닫을까요?')) return false;
+  o.__dirty=false; (o.__typed||[]).forEach(function(t){ delete t.__v0; }); o.__typed=[];
+  var c=Array.prototype.slice.call(o.querySelectorAll('[data-close]')).filter(function(b){ return b.dataset.close===o.id; })[0];
+  if(c){ c.click(); return true; }
+  var foot=Array.prototype.slice.call(o.querySelectorAll('.mact button, .modal > div:last-child button')).filter(function(b){ return b.getClientRects().length && /^(닫기|취소|✕|×)$/.test(b.textContent.trim()); });
+  if(foot.length){ foot[foot.length-1].click(); if(!ovlShown(o)) return true; }
+  if(OVL_STATIC && OVL_STATIC.indexOf(o)>=0) o.classList.remove('on'); else o.remove();
+  return true;
+}
+function ovlFocusables(o){
+  return Array.prototype.slice.call(o.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),iframe,[contenteditable="true"],[tabindex]:not([tabindex="-1"])'))
+    .filter(function(e){ return e.getClientRects().length && getComputedStyle(e).visibility!=='hidden'; });
+}
+function ovlDialogEl(o){ return o.matches('[role=dialog]')? o : (o.querySelector('[role=dialog]') || o.querySelector('.modal') || o.firstElementChild || o); }
+function ovlOnOpen(o){
+  if(o.__open) return; o.__open=true; o.__dirty=false; o.__typed=[]; o.__cleanAt=0;
+  var ae=document.activeElement; o.__opener=(ae && ae!==document.body && !o.contains(ae))? ae : null;
+  var d=ovlDialogEl(o);
+  if(!d.hasAttribute('role')) d.setAttribute('role','dialog');
+  if(!d.hasAttribute('aria-modal')) d.setAttribute('aria-modal','true');
+  if(!d.hasAttribute('aria-labelledby') && !d.hasAttribute('aria-label')){ var h=d.querySelector('h1,h2,h3,h4'); if(h){ if(!h.id) h.id='ovlH'+(++OVL_SEQ); d.setAttribute('aria-labelledby', h.id); } }
+  if(!d.hasAttribute('tabindex')) d.setAttribute('tabindex','-1');
+  setTimeout(function(){   /* 여는 함수가 직접 초점을 준 경우(검색칸 등)는 그대로 */
+    if(!ovlShown(o) || o.contains(document.activeElement)) return;
+    try{ d.focus({preventScroll:true}); }catch(e){}
+  }, 60);
+}
+function ovlOnClose(o){
+  if(!o.__open) return; o.__open=false; var op=o.__opener; o.__opener=null;
+  setTimeout(function(){
+    var ae=document.activeElement;
+    if(op && op.isConnected && op.getClientRects().length && (!ae || ae===document.body || !ae.isConnected || o.contains(ae))){ try{ op.focus({preventScroll:true}); }catch(e){} }
+  }, 0);
+}
+function ovlTrapTab(e){
+  if(e.key!=='Tab' || e.ctrlKey || e.altKey || e.metaKey) return;
+  var o=ovlTop(); if(!o) return;
+  var F=ovlFocusables(o); if(!F.length){ e.preventDefault(); return; }
+  var i=F.indexOf(document.activeElement);
+  if(e.shiftKey){ if(i<=0){ e.preventDefault(); F[F.length-1].focus(); } }
+  else if(i<0 || i===F.length-1){ e.preventDefault(); F[0].focus(); }
+}
+function ovlWatch(o){
+  if(o.__watched) return; o.__watched=true;
+  new MutationObserver(function(){ if(o.classList.contains('on')) ovlOnOpen(o); else ovlOnClose(o); }).observe(o, {attributes:true, attributeFilter:['class']});
+  if(o.classList.contains('on')) ovlOnOpen(o);
+}
+function ovlInit(){
+  OVL_STATIC=Array.prototype.slice.call(document.querySelectorAll('.ovl'));
+  OVL_STATIC.forEach(ovlWatch);
+  new MutationObserver(function(ms){ ms.forEach(function(m){
+    Array.prototype.forEach.call(m.addedNodes, function(n){ if(n.nodeType===1 && n.classList.contains('ovl')) ovlWatch(n); });
+    Array.prototype.forEach.call(m.removedNodes, function(n){ if(n.nodeType===1 && n.classList.contains('ovl')) ovlOnClose(n); });
+  }); }).observe(document.body, {childList:true});
+  /* 바깥 클릭: 누른 곳과 뗀 곳이 둘 다 배경일 때만(창 안에서 글자를 끌어 선택하다 배경에서 놓는 경우는 닫지 않음) */
+  document.addEventListener('pointerdown', function(e){ OVL_DOWN=e.target; }, true);
+  document.addEventListener('click', function(e){
+    var o=e.target; if(!o || !o.classList || !o.classList.contains('ovl') || OVL_DOWN!==o) return;
+    if(o!==ovlTop()) return; ovlDismiss(o);
+  });
+  document.addEventListener('focusin', function(e){ var t=e.target, o=ovlTrackable(t); if(!o) return; if(t.__v0===undefined){ t.__v0=ovlVal(t); (o.__typed=o.__typed||[]).push(t); } }, true);
+  var late=function(e){ var t=e.target, o=ovlTrackable(t); if(!o || !e.isTrusted) return; t.__ti=Date.now();   /* 사람이 바꾼 시각 */
+    if(t.__v0!==undefined) return;   /* 초점 없이 바뀐 칸(Safari 체크박스 등) — 원래 값을 모르면 «바뀜»으로 */
+    t.__v0=(t.type==='checkbox'||t.type==='radio')? (t.checked?'0':'1') : '\u0001'; (o.__typed=o.__typed||[]).push(t); };
+  document.addEventListener('input', late, true); document.addEventListener('change', late, true);
+  document.addEventListener('keydown', ovlTrapTab);
+}
 function msg(id,t,cls){ var e=$('#'+id); e.textContent=t||''; e.className='mmsg'+(cls?' '+cls:''); }
 
 /* ---- 로그인 / 가입 / 비밀번호 변경 ---- */

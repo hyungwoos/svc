@@ -752,6 +752,14 @@ function dvCapRender(v, text){
   el.querySelector('.cap-more').onclick=function(){ try{ localStorage.setItem(key, open? '0':'1'); }catch(e){} dvCapRender(v, text); };
 }
 /* 데스크톱 가로 스크롤 표에서 오른쪽 고정 동작(✎/🗑) 열이 마지막 데이터 열을 덮지 않게 — 표가 넘칠 때만 마지막 데이터 열에 동작 열 너비만큼 오른쪽 여백 (⑤ UX 2단계) */
+/* ㊿+141 접근성: 눌러서 여는 타일(role=button) 안에 버튼·입력칸이 또 있으면 «버튼 속 버튼»이 되어 화면 낭독기가 안쪽 버튼을 못 읽음
+   → role=group + 이름(aria-label) 으로 바꿈. tabindex·Enter 동작은 그대로 */
+function a11yTileRole(c){
+  if(!c || c.getAttribute('role')!=='button') return;
+  if(!c.querySelector('button,a[href],input,select,textarea,[contenteditable="true"],[tabindex]:not([tabindex="-1"])')) return;
+  c.setAttribute('role','group');
+  if(!c.hasAttribute('aria-label')){ var k=c.querySelector('.k,.l,h3,h4'); c.setAttribute('aria-label', ((k&&k.textContent.trim())||(c.title||'').replace(/\s*\(클릭\)$/,'')||'항목').slice(0,60)+' — Enter: 자세히'); }
+}
 function gridActPad(){
   var t=$('#dvTable'); if(!t) return; var wrap=t.parentElement, th=t.querySelector('thead th.act');
   if(!th || window.innerWidth<=760){ t.classList.remove('act-pad'); t.style.removeProperty('--actw'); return; }

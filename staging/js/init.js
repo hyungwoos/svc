@@ -65,8 +65,8 @@ document.addEventListener('click', function(e){ var f=document.getElementById('r
 document.addEventListener('keydown', function(e){ if(e.key!=='Escape') return; railFlyClose();
   /* ⑤ UX: Esc 로 맨 위 창 닫기 (2단계 인증 창·강제 등록 창은 제외 — 취소 버튼으로만) */
   var cf=document.querySelector('.colf'); if(cf){ cf.remove(); return; }
-  var ovs=Array.prototype.slice.call(document.querySelectorAll('.ovl.on')).filter(function(o){ return o.id!=='ovlMfa' && !o.hasAttribute('data-noesc'); });
-  if(ovs.length){ var top=ovs[ovs.length-1]; if(top.id) closeOvl(top.id); else top.classList.remove('on'); } });
+  /* ㊿+141: 맨 위 창 하나만, 창의 원래 닫기 버튼으로(동적 창은 제거) · 입력 중이면 확인 — ovlDismiss(edit.js) */
+  var top=ovlTop(); if(top) ovlDismiss(top); });
 
 /* [shell.js 1605행] */
 (function(){
@@ -627,6 +627,8 @@ document.addEventListener('keydown', function(e){
   var app=document.getElementById('app'); if(!app || app.classList.contains('hidden')) return;
   e.preventDefault(); var ov=document.getElementById('ovlKeys'); if(ov) ov.classList.toggle('on');
 });   /* 예전 onsubmit="return false" */
+/* ㊿+141: 창 공통 — 바깥 클릭으로 닫기 · 입력 중 확인 · 초점 들어가기/가두기/되돌리기 (edit.js ovlInit) */
+ovlInit();
 
 /* [edit.js 15194행] */
 boot();

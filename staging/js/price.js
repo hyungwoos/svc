@@ -470,6 +470,7 @@ async function clHandleFiles(files){
     CL.parsed.push(item);
   }
   msg.textContent='';
+  if(CL.parsed.length) ovlMarkDirty('clOvl');   /* ㊿+141: 읽어 둔 인보이스가 있으면 바깥 클릭 시 확인 */
   clRenderPreview();
 }
 function clRenderPreview(){

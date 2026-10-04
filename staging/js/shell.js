@@ -684,6 +684,9 @@ async function sbAll(q){
   // 1000행 페이지네이션 — count 먼저 얻고 병렬로
   var h=await fetch(SB_URL+'/rest/v1/'+q+(q.indexOf('?')>=0?'&':'?')+'limit=1',
     {headers:Object.assign(sbHeaders(),{Prefer:'count=exact'})});
+  /* ㊿+141: 서버 오류(5xx)를 «0행»으로 넘기면 데이터가 다 사라진 것처럼 보임 → 오류로 올림.
+     401/403/404(권한·표 없음)는 예전처럼 빈 목록 — 장비 전용 계정 판별·선택 표(sbTry)가 그 동작에 기대고 있음 */
+  if(h.status>=500) throw new Error('DB 읽기 실패 ('+h.status+') — '+q.split('?')[0]);
   var total=+((h.headers.get('content-range')||'/0').split('/')[1]||0);
   if(!total) return [];
   var jobs=[];
@@ -710,6 +713,8 @@ async function sbWrite(method, path, body, prefer){
   // 저장 성공 → 이전 캐시는 옛 데이터이므로 즉시 무효화 (새로고침 시 옛 화면 방지)
   // 단, rpc/load_… 는 읽기 전용 호출이라 캐시를 지우지 않음
   if(!/^rpc\/load_/.test(path)) try{ sessionStorage.removeItem(CACHE_KEY); }catch(e){}
+  /* ㊿+141: 저장이 됐으니 열린 창의 «입력 중» 표시를 지움 (바깥 클릭·Esc 로 닫을 때 확인을 묻지 않게) — 기록용 표는 제외 */
+  if(!/^rpc\/load_/.test(path) && !OVL_SKIP_CLEAN.test(path)) try{ ovlMarkClean(); }catch(e){}
   var t=await r.text();
   return t? JSON.parse(t): null;
 }
@@ -1016,7 +1021,9 @@ function boot(skipCache){
           afterLoad(d2);
           // 로딩 사이에 다른 화면으로 이동했으면 되돌리지 않음 · 주간회의는 다시 그리지 않음
           if(keep && keep===CUR_VIEW && keep!=='dash' && keep!=='weekly' && !window.IS_EQUIP) try{ switchView(keep); }catch(e){}
-        }).catch(function(){ pl.textContent=pl.textContent.replace(' · 최신 데이터 확인 중…',''); });
+        }).catch(function(e){ pl.textContent=pl.textContent.replace(' · 최신 데이터 확인 중…','');
+          /* ㊿+141: 조용히 넘어가면 옛 사본을 최신으로 착각함 → 알림 */
+          try{ toast('최신 데이터를 불러오지 못했습니다','지금 화면은 이전 방문 때 저장한 사본입니다 — 잠시 뒤 ↻ 새로고침 ('+String(e&&e.message||e).slice(0,80)+')','warn'); }catch(x){} });
         return null;   // 아래 then 건너뜀
       }
       showLoading('데이터를 불러오는 중…');

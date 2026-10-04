@@ -471,8 +471,16 @@ function opsLogHtml(){
   else if(!st.ok) h+='<p class="cap" style="color:var(--critical)">'+esc(st.error||'')+'</p>';
   else if(!st.log_ok) h+='<p class="cap">기록표(ops_log · SQL 85)가 없거나 함수에 service role 이 없어 기록을 읽지 못합니다.</p>';
   else if(!L.length) h+='<p class="cap">아직 기록이 없습니다.</p>';
-  else h+='<table class="rn-tbl"><thead><tr><th>일시</th><th>계정</th><th>동작</th><th>대상</th><th>요약</th><th>결과</th></tr></thead><tbody>'+L.map(function(r){ return '<tr><td class="mini">'+esc(String(r.at||'').replace('T',' ').slice(0,19))+'</td><td class="mini">'+esc(r.actor)+'</td><td><code>'+esc(r.action)+'</code></td><td>'+esc(r.target||'')+'</td><td title="'+esc(r.summary||'')+'">'+esc(String(r.summary||'')).slice(0,80)+'</td><td>'+(r.ok? '<span class="up">✓</span>'+(r.ms? ' <span class="mini">'+r.ms+'ms</span>':'') : '<span style="color:var(--critical)" title="'+esc(r.error||'')+'">✗ '+esc(String(r.error||'')).slice(0,60)+'</span>')+'</td></tr>'; }).join('')+'</tbody></table>';
+  else h+='<table class="rn-tbl"><thead><tr><th>일시</th><th>계정</th><th>동작</th><th>대상</th><th>요약</th><th>결과</th></tr></thead><tbody>'+L.map(function(r){ return '<tr><td class="mini">'+esc(String(r.at||'').replace('T',' ').slice(0,19))+'</td><td class="mini">'+esc(r.actor)+'</td><td><code>'+esc(r.action)+'</code></td><td class="wrap">'+opsTgtHtml(r.target)+'</td><td class="wrap" title="'+esc(r.summary||'')+'">'+esc(String(r.summary||'')).slice(0,80)+'</td><td class="wrap">'+(r.ok? '<span class="up">✓</span>'+(r.ms? ' <span class="mini">'+r.ms+'ms</span>':'') : '<span style="color:var(--critical)" title="'+esc(r.error||'')+'">✗ '+esc(String(r.error||'')).slice(0,60)+'</span>')+'</td></tr>'; }).join('')+'</tbody></table>';
   return h;
+}
+/* ㊿+141: 기록의 «대상»이 파일 수십 개(콤마 목록)면 표가 카드 밖으로 3,000px 넘게 밀려나던 문제 — 공통 폴더 + 개수 + 앞 3개로 줄이고, 누르면 전체 */
+function opsTgtHtml(t){
+  t=String(t||''); var parts=t.split(/,\s*/).filter(Boolean);
+  if(parts.length<=3) return esc(t);
+  var m=/^([^\/]+\/)/.exec(parts[0]), pre=(m && parts.every(function(p){ return p.indexOf(m[1])===0; }))? m[1] : '';
+  var names=parts.map(function(p){ return pre? p.slice(pre.length) : p; });
+  return '<details class="ops-tgt"><summary>'+(pre? '<b>'+esc(pre)+'</b> ':'')+'파일 '+names.length+'개 — '+esc(names.slice(0,3).join(', '))+' …</summary><div class="mini">'+esc(names.join(', '))+'</div></details>';
 }
 function opsLogBind(host){
   aiCheckBind(host);
@@ -945,10 +953,10 @@ async function renderAccount(){
   var set=document.createElement('div'); set.style.cssText='margin-top:22px';
   var curIdle=idleMin(), look0=curLook();
   set.innerHTML='<div style="font-size:13px;font-weight:650;margin-bottom:4px">설정 <span class="mini" style="font-weight:400">— 이 브라우저에만 저장됩니다</span></div>'+
-    row('자동 로그아웃', '<select id="accIdle" style="height:30px;min-width:200px">'+IDLE_OPTS.map(function(m){
+    row('자동 로그아웃', '<select id="accIdle" aria-label="자동 로그아웃" style="height:30px;min-width:200px">'+IDLE_OPTS.map(function(m){
         return '<option value="'+m+'"'+(m===curIdle?' selected':'')+'>'+esc(idleLabel(m))+(m? ' 동안 활동 없으면':'')+'</option>'; }).join('')+'</select>'+
       '<div class="mini" style="margin-top:5px;line-height:1.6">마우스·키보드·스크롤 입력이 정한 시간 동안 없으면 이 탭에서 자동으로 로그아웃합니다. 끝나기 1분 전에 알림이 뜹니다.</div>')+
-    row('화면 디자인', '<select id="accLook" style="height:30px;min-width:200px">'+Object.keys(LOOKS).map(function(k){ return '<option value="'+k+'"'+(k===look0?' selected':'')+'>'+esc(LOOKS[k])+'</option>'; }).join('')+'</select>'+
+    row('화면 디자인', '<select id="accLook" aria-label="화면 디자인" style="height:30px;min-width:200px">'+Object.keys(LOOKS).map(function(k){ return '<option value="'+k+'"'+(k===look0?' selected':'')+'>'+esc(LOOKS[k])+'</option>'; }).join('')+'</select>'+
       '<div class="mini" style="margin-top:5px;line-height:1.6">커맨드 센터: 아이콘 레일 + 상단 커맨드 바(검색·이동·AI) + 인박스 홈 + 장비 운영 보드 + 고객 360 패널 · 심플: 평면 디자인에 기존 사이드바 · 클래식: 이전 디자인. 바꾸면 화면을 다시 읽습니다.</div>');
   var prow=document.createElement('div'); prow.innerHTML=row('📱 앱으로 설치', '<div id="accPwa">'+pwaHintHtml()+'</div>');
   set.appendChild(prow.firstChild);

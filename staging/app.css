@@ -774,6 +774,24 @@ kbd{display:inline-block;padding:1px 6px;border:1px solid var(--ring);border-bot
 .rn-f #rnGo{background:var(--brand);border-color:var(--brand);color:#fff}
 @media (max-width:760px){ .rn-tbl tr.rn-form td{padding:8px 6px} .rn-f{position:sticky;left:0;max-width:calc(100vw - 60px);box-sizing:border-box} .rn-f>span:not(.mini){flex-basis:100%} .rn-f label{flex-basis:100%} .rn-f input[type=text]{flex:1} }
 .rn-tbl tr.rn-form td{white-space:normal;background:var(--surface-2);border-bottom:2px solid var(--grid);padding:10px 12px}
+/* ㊿+141: 배포·운영 표 — 긴 글(파일 목록·요약·오류)은 줄바꿈해 카드 안에 두고, 긴 파일 목록은 접음(opsTgtHtml) */
+.rn-tbl td.wrap{white-space:normal;overflow-wrap:anywhere;min-width:180px}
+#opsBody > .rn-tbl td:not(.mini):not(.n){white-space:normal;overflow-wrap:anywhere}
+#opsBody .rn-tbl code{white-space:nowrap;overflow-wrap:normal}
+.ops-tgt summary{cursor:pointer;color:var(--ink)}
+.ops-tgt summary::marker{color:var(--muted)}
+.ops-tgt[open] summary{margin-bottom:4px}
+.ops-tgt .mini{line-height:1.6}
+/* ㊿+141: 창 — 열릴 때 창 자체로 초점이 가도(키보드 사용자용) 테두리는 그리지 않음 */
+.ovl [role=dialog][tabindex="-1"]:focus,.ovl .modal[tabindex="-1"]:focus{outline:none}
+/* ㊿+141: 접근성 — 작은 버튼은 보이는 모양 그대로, 누르는 영역만 24px 이상(WCAG 2.5.8) · 터치 화면은 32px */
+.kpi .lv-delta .lnk,.expseg button,.cap-more,.eqser-more,.dgrid thead th .fbtn,#chList thead th .fbtn{position:relative}
+.kpi .lv-delta .lnk::after,.expseg button::after,.cap-more::after,.eqser-more::after,.dgrid thead th .fbtn::after,#chList thead th .fbtn::after{content:'';position:absolute;left:50%;top:50%;width:max(100%,24px);height:max(100%,24px);transform:translate(-50%,-50%)}
+@media (pointer:coarse){
+  .eqb-card .ft .cbtn{position:relative}
+  .eqb-card .ft .cbtn::after{content:'';position:absolute;left:50%;top:50%;width:max(100%,32px);height:max(100%,32px);transform:translate(-50%,-50%)}
+  .dgrid thead th .fbtn::after,#chList thead th .fbtn::after,.cap-more::after,.eqser-more::after{width:max(100%,32px);height:max(100%,32px)}
+}
 .rn-f{display:flex;gap:10px 14px;align-items:center;flex-wrap:wrap;font-size:12.5px}
 .rn-f>b{font-size:13px}
 .rn-f label{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-2)}

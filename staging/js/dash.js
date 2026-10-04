@@ -1110,6 +1110,7 @@ function renderKpis(list){
     /* 타일 안의 기간 버튼(만료 예정) — 타일 클릭(명단 열기)과 분리 */
     c.querySelectorAll('button[data-expn]').forEach(function(bt){ bt.onclick=function(ev){ ev.stopPropagation(); setExpN(+bt.dataset.expn); }; });
     c.querySelectorAll('button[data-renew]').forEach(function(bt){ bt.onclick=function(ev){ ev.stopPropagation(); openRenewList(bt.dataset.renew); }; });   /* LIVE 타일 «확인중 N건 →» */
+    a11yTileRole(c);   /* ㊿+141: 안에 버튼이 있는 타일은 role=group (버튼 속 버튼 금지 · 키보드 Enter 는 그대로) */
     box.appendChild(c);
   });
   try{ ccAfterKpis(box, list, b); }catch(e){ console.warn('cc kpis', e); }

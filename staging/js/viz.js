@@ -29,6 +29,9 @@ var Viz = (function () {
     var iw = Math.max(10, W - pad.l - pad.r), ih = Math.max(10, H - pad.t - pad.b);
     var root = s('svg', { width: W, height: H, viewBox: '0 0 ' + W + ' ' + H, role: 'img' });
     root.style.display = 'block';
+    /* ㊿+141 접근성: 차트 이름(카드 제목) — 화면 낭독기가 «이미지»가 아니라 «채널별 임대중 차트»로 읽음 */
+    var lbl = cfg.label || host.getAttribute('aria-label') || (function () { var c = host.closest && host.closest('.card,section,.pr-card,.eqd-card'); var h = c && c.querySelector('h2,h3,h4,.ttl'); return h ? h.textContent.replace(/\s+/g, ' ').trim().slice(0, 80) : ''; })();
+    root.setAttribute('aria-label', (lbl || '차트') + (/차트|그래프|추이/.test(lbl) ? '' : ' 차트'));
     host.appendChild(root);
     var tip = document.createElement('div');
     tip.className = 'viz-tip';

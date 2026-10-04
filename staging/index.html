@@ -19,7 +19,7 @@
 <!-- 포탈 버전 — 파일을 바꿔 올릴 때마다 아래 content 의 숫자가 +1 (화면 맨 아래 표시 · app.css / js/*.js 의 ?v= 캐시 무효화 · 배포·운영이 이 값을 읽어 비교).
      코드 파일 목록은 app-js (js/load.js 가 이 순서로 불러옴 · 마지막은 항상 js/init.js) — 파일을 더하거나 빼면 여기와 sw.js 의 SHELL 을 함께 고칠 것.
      ④ 아키텍처 2단계(㊿+136): 인라인 스크립트·onclick 을 전부 없애 CSP script-src 에서 'unsafe-inline' 제거. -->
-<meta name="app-ver" content="2026-09-16 ㊿+140">
+<meta name="app-ver" content="2026-09-16 ㊿+141">
 <meta name="app-js" content="js/viz.js,js/core.js,js/shell.js,js/dash.js,js/ai.js,js/grids.js,js/equipment.js,js/analysis.js,js/tools.js,js/price.js,js/inbound.js,js/admin.js,js/sales.js,js/report.js,js/grid.js,js/edit.js,js/init.js">
 <script src="js/boot.js"></script>
 </head>
@@ -469,23 +469,23 @@
       </div>
       <div id="odFormWrap">
       <div class="frm" style="margin-bottom:10px">
-        <div><label>판매 채널 *</label><select id="odChannel"><option>에스원</option><option>LGU+</option><option>조달</option><option>일반</option><option>기타</option></select></div>
-        <div><label>요청 유형 *</label><select id="odType"><option>신규발주</option><option>추가</option><option>교체(장애)</option><option>교체(증설)</option><option>철거·회수</option></select></div>
+        <div><label for="odChannel">판매 채널 *</label><select id="odChannel"><option>에스원</option><option>LGU+</option><option>조달</option><option>일반</option><option>기타</option></select></div>
+        <div><label for="odType">요청 유형 *</label><select id="odType"><option>신규발주</option><option>추가</option><option>교체(장애)</option><option>교체(증설)</option><option>철거·회수</option></select></div>
       </div>
       <div style="font-size:11px;color:var(--ink-2);opacity:.75;margin:6px 0 10px">— 신청자 정보 —</div>
       <div class="frm">
-        <div><label>고객사명 *</label><input id="odCustomer"></div>
-        <div class="od-s1"><label>계약번호</label><input id="odContract" placeholder="모르면 비워두세요 (생성 중)"></div>
-        <div><label>고객 담당자 *</label><input id="odMgr"></div>
-        <div><label>담당자 연락처</label><input id="odPhone" placeholder="010-0000-0000"></div>
-        <div class="od-s1"><label>관리자 계정 (이메일)</label><input id="odAdmin"></div>
-        <div class="od-s1"><label>설치 희망일</label><input id="odInstall" type="date"></div>
-        <div class="full"><label>고객사 주소</label><input id="odAddr"></div>
-        <div class="od-s1"><label>서비스 에디션</label><select id="odEdition"><option>Enterprise Edition</option><option>Basic Edition</option></select></div>
-        <div class="od-s1"><label>요청 서비스 기능</label><input id="odFeat" value="IP관리, 단말 무결성 검증"></div>
-        <div><label>노드수</label><input id="odNodes" type="number" min="0"></div>
-        <div><label>모델명</label><select id="odModel"><option>S100</option><option>S200</option><option>S10_R2</option><option>S20_R2</option><option>S30H_R1</option><option>ES30</option></select></div>
-        <div><label>수량</label><input id="odQty" type="number" min="1" value="1"></div>
+        <div><label for="odCustomer">고객사명 *</label><input id="odCustomer"></div>
+        <div class="od-s1"><label for="odContract">계약번호</label><input id="odContract" placeholder="모르면 비워두세요 (생성 중)"></div>
+        <div><label for="odMgr">고객 담당자 *</label><input id="odMgr"></div>
+        <div><label for="odPhone">담당자 연락처</label><input id="odPhone" placeholder="010-0000-0000"></div>
+        <div class="od-s1"><label for="odAdmin">관리자 계정 (이메일)</label><input id="odAdmin"></div>
+        <div class="od-s1"><label for="odInstall">설치 희망일</label><input id="odInstall" type="date"></div>
+        <div class="full"><label for="odAddr">고객사 주소</label><input id="odAddr"></div>
+        <div class="od-s1"><label for="odEdition">서비스 에디션</label><select id="odEdition"><option>Enterprise Edition</option><option>Basic Edition</option></select></div>
+        <div class="od-s1"><label for="odFeat">요청 서비스 기능</label><input id="odFeat" value="IP관리, 단말 무결성 검증"></div>
+        <div><label for="odNodes">노드수</label><input id="odNodes" type="number" min="0"></div>
+        <div><label for="odModel">모델명</label><select id="odModel"><option>S100</option><option>S200</option><option>S10_R2</option><option>S20_R2</option><option>S30H_R1</option><option>ES30</option></select></div>
+        <div><label for="odQty">수량</label><input id="odQty" type="number" min="1" value="1"></div>
         <div><label>단독 Pod 여부</label>
           <label style="display:flex;align-items:center;gap:8px;height:36px;cursor:pointer;font-size:13px;font-weight:500">
             <input id="odPod" type="checkbox" style="width:16px;height:16px;accent-color:var(--brand,#149e40)"> 단독 Pod 구성입니다
@@ -494,14 +494,14 @@
       </div>
       <div style="font-size:11px;color:var(--ink-2);opacity:.75;margin:14px 0 10px">— 배송 관련 정보 —</div>
       <div class="frm">
-        <div class="full"><label>수령처 빠른 선택 (선택하면 아래 배송 정보가 자동 입력됩니다)</label>
+        <div class="full"><label for="odRecvPick">수령처 빠른 선택 (선택하면 아래 배송 정보가 자동 입력됩니다)</label>
           <select id="odRecvPick"><option value="">— 직접 입력 —</option></select></div>
-        <div class="full"><label>수령 주소</label><input id="odRecvAddr"></div>
-        <div><label>수령인 성명</label><input id="odRecvName"></div>
-        <div><label>수령인 연락처</label><input id="odRecvPhone"></div>
-        <div><label>수령 희망일</label><input id="odShip" type="date"></div>
-        <div><label>요청사항</label><input id="odNote" placeholder="예: GNOS 사용 가능, 퀵 발송 필요"></div>
-        <div class="full"><label>장비 시리얼 (알고 있으면 입력 · 콤마 구분)</label><input id="odSerials" placeholder="비워두면 «미등록» 으로 현황에 임시 등록되고, 나중에 신청 내역에서 채워 넣으면 자동으로 바뀝니다"></div>
+        <div class="full"><label for="odRecvAddr">수령 주소</label><input id="odRecvAddr"></div>
+        <div><label for="odRecvName">수령인 성명</label><input id="odRecvName"></div>
+        <div><label for="odRecvPhone">수령인 연락처</label><input id="odRecvPhone"></div>
+        <div><label for="odShip">수령 희망일</label><input id="odShip" type="date"></div>
+        <div><label for="odNote">요청사항</label><input id="odNote" placeholder="예: GNOS 사용 가능, 퀵 발송 필요"></div>
+        <div class="full"><label for="odSerials">장비 시리얼 (알고 있으면 입력 · 콤마 구분)</label><input id="odSerials" placeholder="비워두면 «미등록» 으로 현황에 임시 등록되고, 나중에 신청 내역에서 채워 넣으면 자동으로 바뀝니다"></div>
       </div>
       <div class="mact" style="margin-top:16px">
         <span class="mmsg" id="odMsg"></span>
@@ -530,45 +530,45 @@
         <div id="csPaneCreate">
           <div class="cs-sec"><h4><span class="no">1</span>누구 사이트인가요 <small>— 새 고객의 사이트를 만듭니다 (기존 고객 사이트는 «기존 사이트 수정»)</small></h4>
             <div class="frm">
-              <div><label>고객사 <small style="color:var(--muted)">(새 고객 이름 · 이력 표시용)</small></label><input id="csCust" placeholder="예: 한국테스트" autocomplete="off"></div>
-              <div><label>사이트명 <small style="color:var(--muted)">sitename · 접속 주소가 됩니다</small></label><input id="csName" placeholder="예: koreatest" autocapitalize="off" spellcheck="false" autocomplete="off"><div class="mini" id="csNameHint" style="color:var(--muted);margin-top:4px">영문 소문자·숫자·하이픈(-) 2~63자 · 계약의 CSM 및 이전 생성 이력과 중복을 확인합니다</div></div>
+              <div><label for="csCust">고객사 <small style="color:var(--muted)">(새 고객 이름 · 이력 표시용)</small></label><input id="csCust" placeholder="예: 한국테스트" autocomplete="off"></div>
+              <div><label for="csName">사이트명 <small style="color:var(--muted)">sitename · 접속 주소가 됩니다</small></label><input id="csName" placeholder="예: koreatest" autocapitalize="off" spellcheck="false" autocomplete="off"><div class="mini" id="csNameHint" style="color:var(--muted);margin-top:4px">영문 소문자·숫자·하이픈(-) 2~63자 · 계약의 CSM 및 이전 생성 이력과 중복을 확인합니다</div></div>
             </div>
           </div>
           <div class="cs-sec"><h4><span class="no">2</span>어떤 사이트로 만들까요</h4>
             <div class="frm">
-              <div><label>제품 <small style="color:var(--muted)">product</small></label><select id="csProd"><option value="ztna">Cloud ZTNA (ztna)</option><option value="__etc">직접 입력…</option></select><input id="csProdEtc" placeholder="제품 코드" style="display:none;margin-top:6px" autocapitalize="off"></div>
-              <div><label>에디션 <small style="color:var(--muted)">edition</small></label><select id="csEd"><option value="ent">Enterprise (ent)</option><option value="__etc">직접 입력…</option></select><input id="csEdEtc" placeholder="에디션 코드 (예: bas)" style="display:none;margin-top:6px" autocapitalize="off"></div>
-              <div><label>노드 수 <small style="color:var(--muted)">numberofdevices · 라이선스 단말 수</small></label><input id="csDev" type="number" min="1" max="100000" step="1" placeholder="예: 100"></div>
-              <div><label>화면 언어 <small style="color:var(--muted)">language</small></label><select id="csLang"><option value="ko">한국어 (ko)</option><option value="en">English (en)</option><option value="ja">日本語 (ja)</option><option value="zh">中文 (zh)</option></select></div>
-              <div><label>배포 브랜치 <small style="color:var(--muted)">branch · 어떤 버전 계열로 만들지</small></label><select id="csBranch"><option value="candidate">candidate — RC (기본)</option><option value="release">release — R (정식 릴리스)</option><option value="beta">beta — 베타</option><option value="current">current — 최신 개발</option></select></div>
-              <div class="full"><label>메모 <small style="color:var(--muted)">(선택 · 용도·담당 — 이력에 남음)</small></label><input id="csMemo" placeholder="예: OO사 PoC 2주 · 담당 홍길동"></div>
+              <div><label for="csProd">제품 <small style="color:var(--muted)">product</small></label><select id="csProd"><option value="ztna">Cloud ZTNA (ztna)</option><option value="__etc">직접 입력…</option></select><input id="csProdEtc" placeholder="제품 코드" style="display:none;margin-top:6px" autocapitalize="off"></div>
+              <div><label for="csEd">에디션 <small style="color:var(--muted)">edition</small></label><select id="csEd"><option value="ent">Enterprise (ent)</option><option value="__etc">직접 입력…</option></select><input id="csEdEtc" placeholder="에디션 코드 (예: bas)" style="display:none;margin-top:6px" autocapitalize="off"></div>
+              <div><label for="csDev">노드 수 <small style="color:var(--muted)">numberofdevices · 라이선스 단말 수</small></label><input id="csDev" type="number" min="1" max="100000" step="1" placeholder="예: 100"></div>
+              <div><label for="csLang">화면 언어 <small style="color:var(--muted)">language</small></label><select id="csLang"><option value="ko">한국어 (ko)</option><option value="en">English (en)</option><option value="ja">日本語 (ja)</option><option value="zh">中文 (zh)</option></select></div>
+              <div><label for="csBranch">배포 브랜치 <small style="color:var(--muted)">branch · 어떤 버전 계열로 만들지</small></label><select id="csBranch"><option value="candidate">candidate — RC (기본)</option><option value="release">release — R (정식 릴리스)</option><option value="beta">beta — 베타</option><option value="current">current — 최신 개발</option></select></div>
+              <div class="full"><label for="csMemo">메모 <small style="color:var(--muted)">(선택 · 용도·담당 — 이력에 남음)</small></label><input id="csMemo" placeholder="예: OO사 PoC 2주 · 담당 홍길동"></div>
             </div>
           </div>
         </div>
         <div id="csPaneUpdate" style="display:none">
           <div class="cs-sec"><h4><span class="no">1</span>어느 사이트를 고칠까요 <small>— 계약의 CSM(영문 사이트명)과 이 포탈에서 만든 사이트가 자동완성에 나옵니다</small></h4>
             <div class="frm">
-              <div><label>사이트명 <small style="color:var(--muted)">sitename · 계약 CSM 에서 고르기</small></label><input id="cuName" list="dlCsSites" placeholder="고객사 이름이나 영문명 일부를 입력하세요" autocapitalize="off" spellcheck="false" autocomplete="off"><datalist id="dlCsSites"></datalist><div class="mini" id="cuNameHint" style="color:var(--muted);margin-top:4px"></div></div>
-              <div><label>고객사 <small style="color:var(--muted)">자동 표시</small></label><input id="cuCust" readonly tabindex="-1" placeholder="사이트명을 고르면 채워집니다" style="background:var(--surface);color:var(--ink-2)"></div>
+              <div><label for="cuName">사이트명 <small style="color:var(--muted)">sitename · 계약 CSM 에서 고르기</small></label><input id="cuName" list="dlCsSites" placeholder="고객사 이름이나 영문명 일부를 입력하세요" autocapitalize="off" spellcheck="false" autocomplete="off"><datalist id="dlCsSites"></datalist><div class="mini" id="cuNameHint" style="color:var(--muted);margin-top:4px"></div></div>
+              <div><label for="cuCust">고객사 <small style="color:var(--muted)">자동 표시</small></label><input id="cuCust" readonly tabindex="-1" placeholder="사이트명을 고르면 채워집니다" style="background:var(--surface);color:var(--ink-2)"></div>
             </div>
             <div id="cuChips" class="mini" style="margin-top:10px;display:none"></div>
           </div>
           <div class="cs-sec"><h4><span class="no">2</span>무엇을 바꿀까요</h4>
             <div class="frm">
-              <div><label>라이선스 노드 수 <small style="color:var(--muted)">nodes</small></label><input id="cuNodes" type="number" min="1" max="100000" step="1" placeholder="예: 500"></div>
-              <div><label>만료일 <small style="color:var(--muted)">expiredate</small></label><input id="cuExp" type="date"></div>
-              <div><label>SRA <small style="color:var(--muted)">sra · API 항목 그대로 · 모르면 비움</small></label><input id="cuSra" type="number" min="0" step="1" placeholder="예: 10"></div>
+              <div><label for="cuNodes">라이선스 노드 수 <small style="color:var(--muted)">nodes</small></label><input id="cuNodes" type="number" min="1" max="100000" step="1" placeholder="예: 500"></div>
+              <div><label for="cuExp">만료일 <small style="color:var(--muted)">expiredate</small></label><input id="cuExp" type="date"></div>
+              <div><label for="cuSra">SRA <small style="color:var(--muted)">sra · API 항목 그대로 · 모르면 비움</small></label><input id="cuSra" type="number" min="0" step="1" placeholder="예: 10"></div>
               <div><label>&nbsp;</label><label class="mpchk" style="width:100%;height:36px;justify-content:center;margin:0;box-sizing:border-box"><input type="checkbox" id="cuMail" style="width:16px;height:16px;margin:0;padding:0"> 고객에게 안내 메일 발송 (send_mail)</label></div>
-              <div class="full"><label>메모 <small style="color:var(--muted)">(선택 · 이력에 남음)</small></label><input id="cuMemo" placeholder="예: 재약정 3년 · 노드 300→500"></div>
+              <div class="full"><label for="cuMemo">메모 <small style="color:var(--muted)">(선택 · 이력에 남음)</small></label><input id="cuMemo" placeholder="예: 재약정 3년 · 노드 300→500"></div>
             </div>
           </div>
         </div>
         <div id="csPaneCreds" style="display:none">
           <div class="cs-sec"><h4><span class="no">+</span>API 계정 추가 <small>— my.genians.co.kr 에서 발급한 키 · 저장 후에는 다시 볼 수 없습니다</small></h4>
             <div class="frm">
-              <div><label>라벨 <small style="color:var(--muted)">화면 표시 이름</small></label><input id="ccLabel" placeholder="예: 서비스사업부 공용 / 홍길동"></div>
-              <div><label>API 이메일 <small style="color:var(--muted)">apiemail</small></label><input id="ccEmail" type="email" placeholder="발급 계정 이메일" autocapitalize="off"></div>
-              <div class="full"><label>API 키 <small style="color:var(--muted)">apikey</small></label><input id="ccKey" type="password" placeholder="my.genians.co.kr 에서 복사한 키" autocomplete="off"></div>
+              <div><label for="ccLabel">라벨 <small style="color:var(--muted)">화면 표시 이름</small></label><input id="ccLabel" placeholder="예: 서비스사업부 공용 / 홍길동"></div>
+              <div><label for="ccEmail">API 이메일 <small style="color:var(--muted)">apiemail</small></label><input id="ccEmail" type="email" placeholder="발급 계정 이메일" autocapitalize="off"></div>
+              <div class="full"><label for="ccKey">API 키 <small style="color:var(--muted)">apikey</small></label><input id="ccKey" type="password" placeholder="my.genians.co.kr 에서 복사한 키" autocomplete="off"></div>
             </div>
             <div style="display:flex;gap:10px;align-items:center;margin-top:10px"><span class="mmsg" id="ccMsg" style="flex:1"></span><button class="btn" style="height:36px" id="ccAdd">🔑 계정 추가</button></div>
           </div>
@@ -577,7 +577,7 @@
           </div>
         </div>
         <div class="cs-sec" id="csSecRun"><h4><span class="no">3</span>확인하고 실행 <small>— 실제 사이트가 바뀌는 작업이라 한 번 더 묻습니다</small></h4>
-          <div class="frm"><div class="full"><label>어느 API 계정으로 부를까요 <small style="color:var(--muted)">(등록된 my.genians 계정)</small></label><select id="csCred"><option value="">불러오는 중…</option></select></div></div>
+          <div class="frm"><div class="full"><label for="csCred">어느 API 계정으로 부를까요 <small style="color:var(--muted)">(등록된 my.genians 계정)</small></label><select id="csCred"><option value="">불러오는 중…</option></select></div></div>
           <div class="cs-sum" id="csSum"></div>
           <div style="display:flex;gap:10px;align-items:center;margin-top:12px" id="csActs">
             <span class="mmsg" id="csMsg" style="flex:1"></span>
@@ -608,11 +608,11 @@
       <div id="mpFormWrap">
       <div style="font-size:11px;color:var(--ink-2);opacity:.75;margin:2px 0 10px">— 고객 정보 —</div>
       <div class="frm">
-        <div class="full"><label>회사명 *</label><input id="mpCompany"></div>
-        <div><label>고객 담당자 이름 *</label><input id="mpMgr"></div>
-        <div><label>고객 연락처</label><input id="mpPhone" placeholder="010-0000-0000"></div>
-        <div class="full"><label>고객 담당자 이메일</label><input id="mpEmail" type="email"></div>
-        <div class="full"><label>단말 및 서버 수량</label><input id="mpDev" placeholder="예: PC 100대 / 서버 5대"></div>
+        <div class="full"><label for="mpCompany">회사명 *</label><input id="mpCompany"></div>
+        <div><label for="mpMgr">고객 담당자 이름 *</label><input id="mpMgr"></div>
+        <div><label for="mpPhone">고객 연락처</label><input id="mpPhone" placeholder="010-0000-0000"></div>
+        <div class="full"><label for="mpEmail">고객 담당자 이메일</label><input id="mpEmail" type="email"></div>
+        <div class="full"><label for="mpDev">단말 및 서버 수량</label><input id="mpDev" placeholder="예: PC 100대 / 서버 5대"></div>
       </div>
       <div style="font-size:11px;color:var(--ink-2);opacity:.75;margin:16px 0 8px">— 적용 예정 모듈 —</div>
       <div style="display:flex;gap:18px;flex-wrap:wrap;padding:2px 0 2px">
@@ -623,18 +623,18 @@
       </div>
       <div style="font-size:11px;color:var(--ink-2);opacity:.75;margin:16px 0 10px">— 운영체제별 설치 수량 —</div>
       <div class="frm">
-        <div><label>Windows</label><input id="mpWin" type="number" min="0" placeholder="0"></div>
-        <div><label>Linux</label><input id="mpLinux" type="number" min="0" placeholder="0"></div>
-        <div><label>MacOS</label><input id="mpMac" type="number" min="0" placeholder="0"></div>
-        <div><label>NAC 사용여부</label><select id="mpNac"><option>사용X</option><option>사용</option></select></div>
-        <div class="full"><label>EDR Web UI 접속 계정용 이메일 주소</label><input id="mpWebui" type="email"></div>
+        <div><label for="mpWin">Windows</label><input id="mpWin" type="number" min="0" placeholder="0"></div>
+        <div><label for="mpLinux">Linux</label><input id="mpLinux" type="number" min="0" placeholder="0"></div>
+        <div><label for="mpMac">MacOS</label><input id="mpMac" type="number" min="0" placeholder="0"></div>
+        <div><label for="mpNac">NAC 사용여부</label><select id="mpNac"><option>사용X</option><option>사용</option></select></div>
+        <div class="full"><label for="mpWebui">EDR Web UI 접속 계정용 이메일 주소</label><input id="mpWebui" type="email"></div>
       </div>
       <div style="font-size:11px;color:var(--ink-2);opacity:.75;margin:16px 0 10px">— 신청 정보 —</div>
       <div class="frm">
-        <div><label>영업담당자</label><input id="mpSales"></div>
-        <div><label>영업담당자 연락처</label><input id="mpSalesPh" placeholder="010-0000-0000"></div>
-        <div><label>신청일자</label><input id="mpDate" type="date"></div>
-        <div class="full"><label>요청사항 / 비고</label><input id="mpNote" placeholder="예: 특정 기간 희망, 사전 협의 사항"></div>
+        <div><label for="mpSales">영업담당자</label><input id="mpSales"></div>
+        <div><label for="mpSalesPh">영업담당자 연락처</label><input id="mpSalesPh" placeholder="010-0000-0000"></div>
+        <div><label for="mpDate">신청일자</label><input id="mpDate" type="date"></div>
+        <div class="full"><label for="mpNote">요청사항 / 비고</label><input id="mpNote" placeholder="예: 특정 기간 희망, 사전 협의 사항"></div>
       </div>
       <div class="mact" style="margin-top:16px">
         <span class="mmsg" id="mpMsg"></span>
@@ -664,34 +664,34 @@
       </div>
       <div style="font-size:11px;color:var(--ink-2);opacity:.75;margin:2px 0 10px">— 고객사 정보 —</div>
       <div class="frm">
-        <div><label>산업군 *</label><select id="oiInd"></select></div>
-        <div><label>고객사 *</label><input id="oiCust"></div>
-        <div><label>고객 담당자 부서</label><input id="oiCDept"></div>
-        <div><label>고객 담당자 이름</label><input id="oiCName"></div>
-        <div><label>고객 담당자 이메일</label><input id="oiCEmail" type="email"></div>
-        <div><label>고객 담당자 연락처</label><input id="oiCPhone" placeholder="010-0000-0000"></div>
-        <div><label>지니언스 담당자 *</label><select id="oiOwner"></select></div>
-        <div><label>구축 파트너</label><select id="oiPartner"></select></div>
+        <div><label for="oiInd">산업군 *</label><select id="oiInd"></select></div>
+        <div><label for="oiCust">고객사 *</label><input id="oiCust"></div>
+        <div><label for="oiCDept">고객 담당자 부서</label><input id="oiCDept"></div>
+        <div><label for="oiCName">고객 담당자 이름</label><input id="oiCName"></div>
+        <div><label for="oiCEmail">고객 담당자 이메일</label><input id="oiCEmail" type="email"></div>
+        <div><label for="oiCPhone">고객 담당자 연락처</label><input id="oiCPhone" placeholder="010-0000-0000"></div>
+        <div><label for="oiOwner">지니언스 담당자 *</label><select id="oiOwner"></select></div>
+        <div><label for="oiPartner">구축 파트너</label><select id="oiPartner"></select></div>
       </div>
       <div style="font-size:11px;color:var(--ink-2);opacity:.75;margin:16px 0 10px">— 사업 관련 정보 —</div>
       <div class="frm">
-        <div><label>사업형태 *</label><select id="oiType"></select></div>
-        <div><label>사업명</label><input id="oiName" placeholder="비워두면 «고객사 + 사업형태» 로 자동 생성"></div>
-        <div><label>매출경로</label><input id="oiRoute" placeholder="예: 파트너 경유, 직판"></div>
-        <div><label>무상 유지관리 기간 (개월)</label><input id="oiFree" type="number" min="0"></div>
-        <div><label>계약 예상 시기</label><input id="oiMonth" type="month"></div>
-        <div><label>계약 예상단가 (VAT 별도)</label><input id="oiAmt" type="number" min="0" step="100000"></div>
-        <div><label>경쟁사 제안가</label><input id="oiRival" type="number" min="0" step="100000"></div>
-        <div><label>수주 가능성</label><select id="oiProb"></select></div>
-        <div class="full"><label>경쟁 현황 및 영업전략</label><input id="oiStrategy" placeholder="윈백 사업인 경우 기존 사용 제품의 제조사를 적어주세요"></div>
+        <div><label for="oiType">사업형태 *</label><select id="oiType"></select></div>
+        <div><label for="oiName">사업명</label><input id="oiName" placeholder="비워두면 «고객사 + 사업형태» 로 자동 생성"></div>
+        <div><label for="oiRoute">매출경로</label><input id="oiRoute" placeholder="예: 파트너 경유, 직판"></div>
+        <div><label for="oiFree">무상 유지관리 기간 (개월)</label><input id="oiFree" type="number" min="0"></div>
+        <div><label for="oiMonth">계약 예상 시기</label><input id="oiMonth" type="month"></div>
+        <div><label for="oiAmt">계약 예상단가 (VAT 별도)</label><input id="oiAmt" type="number" min="0" step="100000"></div>
+        <div><label for="oiRival">경쟁사 제안가</label><input id="oiRival" type="number" min="0" step="100000"></div>
+        <div><label for="oiProb">수주 가능성</label><select id="oiProb"></select></div>
+        <div class="full"><label for="oiStrategy">경쟁 현황 및 영업전략</label><input id="oiStrategy" placeholder="윈백 사업인 경우 기존 사용 제품의 제조사를 적어주세요"></div>
       </div>
       <div style="font-size:11px;color:var(--ink-2);opacity:.75;margin:16px 0 8px">— 제품군·수량 (해당 제품을 체크하고 수량을 넣으세요) —</div>
       <div id="oiProducts"></div>
       <div style="font-size:11px;color:var(--ink-2);opacity:.75;margin:16px 0 10px">— 진행 관리 —</div>
       <div class="frm">
-        <div><label>다음 할 일</label><input id="oiNext" placeholder="예: BMT 일정 조율"></div>
-        <div><label>다음 액션 예정일</label><input id="oiNextDate" type="date"></div>
-        <div class="full"><label>비고</label><input id="oiNote"></div>
+        <div><label for="oiNext">다음 할 일</label><input id="oiNext" placeholder="예: BMT 일정 조율"></div>
+        <div><label for="oiNextDate">다음 액션 예정일</label><input id="oiNextDate" type="date"></div>
+        <div class="full"><label for="oiNote">비고</label><input id="oiNote"></div>
       </div>
       <div class="mact" style="margin-top:16px">
         <span class="mmsg" id="oiMsg"></span>
@@ -724,9 +724,9 @@
       <p class="cap" style="margin:0 0 16px">슈퍼 관리자 전용 · 모든 변경은 즉시 적용되고 되돌리려면 다시 바꾸면 됩니다.</p>
       <div style="font-size:11px;color:var(--ink-2);opacity:.75;margin:2px 0 8px">— 새 계정 만들기 —</div>
       <div class="frm">
-        <div><label>이메일 *</label><input id="axEmail" type="email" placeholder="user@genians.com"></div>
-        <div><label>초기 비밀번호 * (6자 이상)</label><input id="axPw" placeholder="본인이 로그인 후 변경"></div>
-        <div><label>권한</label><select id="axRole"></select></div>
+        <div><label for="axEmail">이메일 *</label><input id="axEmail" type="email" placeholder="user@genians.com"></div>
+        <div><label for="axPw">초기 비밀번호 * (6자 이상)</label><input id="axPw" placeholder="본인이 로그인 후 변경"></div>
+        <div><label for="axRole">권한</label><select id="axRole"></select></div>
         <div style="display:flex;align-items:flex-end"><button class="pill" id="axCreate" style="height:36px">＋ 계정 생성</button></div>
       </div>
       <div style="font-size:11px;color:var(--ink-2);opacity:.75;margin:18px 0 8px">— 전체 계정 —</div>
@@ -741,13 +741,13 @@
 
       <div style="font-size:11px;color:var(--ink-2);opacity:.75;margin:22px 0 8px">— 메뉴 권한 (계정마다 보기 · 읽기 · 쓰기) —</div>
       <div class="dbar" style="margin-bottom:8px;flex-wrap:wrap;gap:8px;align-items:center">
-        <select id="apUser" style="height:32px;min-width:240px;padding:0 8px;border-radius:8px;border:1px solid var(--ring);background:var(--surface-2);color:var(--ink);font-family:inherit;font-size:12.5px"><option value="">계정 선택…</option></select>
+        <select id="apUser" aria-label="권한을 설정할 계정" style="height:32px;min-width:240px;padding:0 8px;border-radius:8px;border:1px solid var(--ring);background:var(--surface-2);color:var(--ink);font-family:inherit;font-size:12.5px"><option value="">계정 선택…</option></select>
         <span class="mini" id="apRole"></span>
         <span style="flex:1"></span>
         <button class="pill ghost" id="apAll" title="모든 메뉴 보기·읽기·쓰기">전부 허용</button>
         <button class="pill ghost" id="apRead" title="모든 메뉴 보기·읽기, 쓰기 없음">읽기만</button>
         <button class="pill ghost" id="apNone" title="모든 메뉴 숨김">전부 차단</button>
-        <select id="apCopy" style="height:32px;padding:0 8px;border-radius:8px;border:1px solid var(--ring);background:var(--surface-2);color:var(--ink);font-family:inherit;font-size:12px"><option value="">다른 계정 설정 복사…</option></select>
+        <select id="apCopy" aria-label="다른 계정 설정 복사" style="height:32px;padding:0 8px;border-radius:8px;border:1px solid var(--ring);background:var(--surface-2);color:var(--ink);font-family:inherit;font-size:12px"><option value="">다른 계정 설정 복사…</option></select>
         <button class="pill" id="apSave" style="background:var(--brand);border-color:var(--brand);color:#fff">💾 권한 저장</button>
         <span class="mini" id="apMsg"></span>
       </div>
@@ -774,9 +774,9 @@
       </div>
       <div class="tbl-wrap" style="max-height:50vh"><table id="cdTable" class="dgrid"></table></div>
       <div class="frm" style="grid-template-columns:1fr 1fr 2fr auto;margin-top:8px">
-        <div><label>새 값</label><input id="cdNewVal" placeholder="저장되는 값 (예: 유통)"></div>
-        <div><label>표시 이름 (선택)</label><input id="cdNewLabel" placeholder="비우면 값 그대로"></div>
-        <div><label>메모 (선택)</label><input id="cdNewNote" placeholder="언제·왜 추가했는지"></div>
+        <div><label for="cdNewVal">새 값</label><input id="cdNewVal" placeholder="저장되는 값 (예: 유통)"></div>
+        <div><label for="cdNewLabel">표시 이름 (선택)</label><input id="cdNewLabel" placeholder="비우면 값 그대로"></div>
+        <div><label for="cdNewNote">메모 (선택)</label><input id="cdNewNote" placeholder="언제·왜 추가했는지"></div>
         <div style="display:flex;align-items:flex-end"><button class="pill" id="cdAdd" style="height:36px">＋ 추가</button></div>
       </div>
       <p class="cap" id="cdCap" style="margin:10px 0 0">값을 <b>숨기면</b> 새 입력에서 고를 수 없고 데이터 점검이 «목록에 없는 값»으로 잡지만, 이미 그 값인 행은 그대로 둡니다(다른 열 수정도 가능). 순서는 ↑↓ 로. 저장하면 포탈을 쓰는 모든 사람에게 다음 데이터 로드부터 적용됩니다(본인은 즉시).</p>
@@ -785,8 +785,8 @@
       <div id="axBillKpi" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px"></div>
       <div id="axBillBars" style="margin-bottom:10px"></div>
       <div class="frm" style="grid-template-columns:1fr 1fr 1fr 1fr">
-        <div><label>충전 금액 (USD)</label><input id="abCredit" type="number" step="0.01" placeholder="예: 50"></div>
-        <div><label>충전일</label><input id="abDate" type="date"></div>
+        <div><label for="abCredit">충전 금액 (USD)</label><input id="abCredit" type="number" step="0.01" placeholder="예: 50"></div>
+        <div><label for="abDate">충전일</label><input id="abDate" type="date"></div>
         <div style="display:flex;align-items:flex-end"><button class="pill" id="abSave" style="height:36px">저장 후 다시 계산</button></div>
         <div style="display:flex;align-items:flex-end"><span class="mini" id="abMsg"></span></div>
       </div>
@@ -916,9 +916,9 @@
     <p class="cap" style="margin:0 0 12px">새 판을 등록하면 적용일 기준 최신 판이 현행이 되고, 이전 판은 이력으로 남습니다.<br>
       JSON 구조는 기존 판과 동일해야 합니다 — 가격 개정 파일을 받으면 변환은 관리자(또는 AI 작업)로 요청하세요.</p>
     <div class="frm" style="grid-template-columns:1fr 1fr 1fr">
-      <div><label>구분</label><select id="pnSeg"><option value="saas">SaaS (서비스사업본부)</option><option value="onprem">On-prem (솔루션사업본부)</option></select></div>
-      <div><label>판 이름 *</label><input id="pnLabel" placeholder="예: 2027-01 개정"></div>
-      <div><label>적용일 *</label><input id="pnDate" type="date"></div>
+      <div><label for="pnSeg">구분</label><select id="pnSeg"><option value="saas">SaaS (서비스사업본부)</option><option value="onprem">On-prem (솔루션사업본부)</option></select></div>
+      <div><label for="pnLabel">판 이름 *</label><input id="pnLabel" placeholder="예: 2027-01 개정"></div>
+      <div><label for="pnDate">적용일 *</label><input id="pnDate" type="date"></div>
     </div>
     <label style="font-size:12px;font-weight:650;color:var(--ink-2)">가격표 JSON *</label>
     <textarea id="pnJson" style="width:100%;min-height:180px;border:1px solid var(--ring);border-radius:10px;background:var(--surface-2);color:var(--ink);padding:10px;font-family:monospace;font-size:11.5px" placeholder='{"cnac":{...},"services":[...]} 또는 {"ztna":{...},"nac":{...}}'></textarea>
@@ -942,8 +942,8 @@
     </div>
     <div id="erList" style="display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;max-height:300px;overflow:auto;padding:8px 10px;border:1px solid var(--ring);border-radius:10px;background:var(--surface-2)"></div>
     <div class="frm" style="grid-template-columns:160px 1fr;margin-top:10px">
-      <div><label>회수일 (이번에 체크한 장비)</label><input id="erDate" type="date"></div>
-      <div><label>메모 (선택)</label><input id="erNote" placeholder="예: 포트 부족으로 교체 · 사업장 철수"></div>
+      <div><label for="erDate">회수일 (이번에 체크한 장비)</label><input id="erDate" type="date"></div>
+      <div><label for="erNote">메모 (선택)</label><input id="erNote" placeholder="예: 포트 부족으로 교체 · 사업장 철수"></div>
     </div>
     <div class="mact">
       <span class="mmsg" id="erMsg"></span>
@@ -989,16 +989,16 @@
 
     <div id="auTabLogin">
       <div class="frm">
-        <div class="full"><label>이메일</label><input id="auEmail" type="email" autocomplete="username"></div>
-        <div class="full"><label>비밀번호</label><input id="auPw" type="password" autocomplete="current-password"></div>
+        <div class="full"><label for="auEmail">이메일</label><input id="auEmail" type="email" autocomplete="username"></div>
+        <div class="full"><label for="auPw">비밀번호</label><input id="auPw" type="password" autocomplete="current-password"></div>
       </div>
     </div>
 
     <div id="auTabPw" style="display:none">
       <p class="cap">관리자에게 받은 계정으로 먼저 로그인한 뒤, 여기서 본인 비밀번호로 바꾸세요.</p>
       <div class="frm">
-        <div><label>새 비밀번호 (6자 이상)</label><input id="apPw" type="password" autocomplete="new-password"></div>
-        <div><label>새 비밀번호 확인</label><input id="apPw2" type="password" autocomplete="new-password"></div>
+        <div><label for="apPw">새 비밀번호 (6자 이상)</label><input id="apPw" type="password" autocomplete="new-password"></div>
+        <div><label for="apPw2">새 비밀번호 확인</label><input id="apPw2" type="password" autocomplete="new-password"></div>
       </div>
     </div>
 
@@ -1045,11 +1045,11 @@
 
     <div id="tabNew">
       <div class="frm">
-        <div><label>고객사 *</label><input id="nCust" list="dlCust" placeholder="기존 고객이면 자동완성"><datalist id="dlCust"></datalist></div>
-        <div><label>산업군</label><select id="nInd"><option>기업</option><option>공공</option><option>금융</option><option>의료</option><option>미분류</option></select></div>
-        <div><label>업종 <small style="color:var(--muted)">(세분 분류 · 고객사 단위)</small></label><select id="nSector"></select>
+        <div><label for="nCust">고객사 *</label><input id="nCust" list="dlCust" placeholder="기존 고객이면 자동완성"><datalist id="dlCust"></datalist></div>
+        <div><label for="nInd">산업군</label><select id="nInd"><option>기업</option><option>공공</option><option>금융</option><option>의료</option><option>미분류</option></select></div>
+        <div><label for="nSector">업종 <small style="color:var(--muted)">(세분 분류 · 고객사 단위)</small></label><select id="nSector"></select>
           <input id="nSectorEtc" placeholder="업종 직접 입력" style="display:none;margin-top:6px"></div>
-        <div><label>서비스 *</label><select id="nLine">
+        <div><label for="nLine">서비스 *</label><select id="nLine">
           <option value="Cloud">Cloud NAC</option>
           <option value="S1">S1 Cloud NAC</option>
           <option value="MDR">MDR</option>
@@ -1058,94 +1058,94 @@
           <option value="DRM">DRM</option>
           <option value="DLP">DLP</option>
         </select></div>
-        <div id="nVerWrap"><label>Ver. (Cloud NAC)</label><select id="nVer">
+        <div id="nVerWrap"><label for="nVer">Ver. (Cloud NAC)</label><select id="nVer">
           <option value="">— 선택 —</option><option>V6.0</option><option>V5.0</option><option>ZTNA</option>
         </select></div>
-        <div><label>판매 채널</label><select id="nChannel"><option>일반</option><option>조달</option><option>LGU+</option><option>에스원</option><option>유통</option></select></div>
-        <div><label>유입경로</label><select id="nLead"><option value="">— 미지정 —</option><option>직접영업</option><option>파트너영업</option><option>인바운드</option><option>프로모션</option><option>기타</option></select></div>
-        <div><label>모듈 (MDR 결합)</label><select id="nCombine"><option value="">— 없음 —</option><option>Add-on</option><option>MDR+AV</option><option>MDR+AR</option><option>MDR+AV+AR</option></select></div>
-        <div><label>파트너 *</label><select id="nPtn">
+        <div><label for="nChannel">판매 채널</label><select id="nChannel"><option>일반</option><option>조달</option><option>LGU+</option><option>에스원</option><option>유통</option></select></div>
+        <div><label for="nLead">유입경로</label><select id="nLead"><option value="">— 미지정 —</option><option>직접영업</option><option>파트너영업</option><option>인바운드</option><option>프로모션</option><option>기타</option></select></div>
+        <div><label for="nCombine">모듈 (MDR 결합)</label><select id="nCombine"><option value="">— 없음 —</option><option>Add-on</option><option>MDR+AV</option><option>MDR+AR</option><option>MDR+AV+AR</option></select></div>
+        <div><label for="nPtn">파트너 *</label><select id="nPtn">
           <option>지니언스(직접)</option><option>다원티에스</option><option>글로웰시스템</option>
           <option value="__etc">직접 입력…</option>
         </select><input id="nPtnEtc" placeholder="파트너명 직접 입력" style="display:none;margin-top:6px"></div>
-        <div><label>계산서 발행처</label><input id="nBiller" placeholder="예: 엘림넷"></div>
-        <div><label>계약 구분</label><select id="nType"><option>신규</option><option>재약정</option><option>추가</option></select></div>
-        <div><label>시작월 *</label><input id="nStart" type="month"></div>
-        <div><label>종료월 *</label><input id="nEnd" type="month"></div>
-        <div><label>월 금액(MRR, 원) *</label><input id="nMrr" type="number" min="0" step="1000"></div>
-        <div><label>수량(노드 등)</label><input id="nQty" type="number" min="0"></div>
-        <div><label>CSM (영문 사이트명)</label><input id="nCsm" placeholder="예: kumhotire" autocapitalize="off" spellcheck="false"></div>
-        <div><label>에스원 계약번호 <small style="color:var(--muted)">(N… · 에스원 정산·장비 신청에서 자동완성)</small></label>
+        <div><label for="nBiller">계산서 발행처</label><input id="nBiller" placeholder="예: 엘림넷"></div>
+        <div><label for="nType">계약 구분</label><select id="nType"><option>신규</option><option>재약정</option><option>추가</option></select></div>
+        <div><label for="nStart">시작월 *</label><input id="nStart" type="month"></div>
+        <div><label for="nEnd">종료월 *</label><input id="nEnd" type="month"></div>
+        <div><label for="nMrr">월 금액(MRR, 원) *</label><input id="nMrr" type="number" min="0" step="1000"></div>
+        <div><label for="nQty">수량(노드 등)</label><input id="nQty" type="number" min="0"></div>
+        <div><label for="nCsm">CSM (영문 사이트명)</label><input id="nCsm" placeholder="예: kumhotire" autocapitalize="off" spellcheck="false"></div>
+        <div><label for="nS1No">에스원 계약번호 <small style="color:var(--muted)">(N… · 에스원 정산·장비 신청에서 자동완성)</small></label>
           <input id="nS1No" list="dlS1No" placeholder="예: N6213654" autocapitalize="off" spellcheck="false"><datalist id="dlS1No"></datalist></div>
         <div class="full" id="nSubWrap" style="display:none">
-          <label>같은 고객사의 상위 계약 <small style="color:var(--muted)">(에스원처럼 사업장마다 계약번호가 새로 나올 때 — 고르면 그 계약의 하위로 등록)</small></label>
+          <label for="nParent">같은 고객사의 상위 계약 <small style="color:var(--muted)">(에스원처럼 사업장마다 계약번호가 새로 나올 때 — 고르면 그 계약의 하위로 등록)</small></label>
           <select id="nParent"><option value="">— 독립 계약으로 등록 —</option></select>
           <div class="cap" id="nSubCap" style="margin-top:6px"></div>
         </div>
-        <div><label>과금방식</label><select id="nBilling">
+        <div><label for="nBilling">과금방식</label><select id="nBilling">
           <option value="">— 선택 —</option><option>월납입</option><option>일시납</option><option>분기납</option><option>반년납</option><option>연납</option>
           <option value="__etc">직접 입력…</option>
         </select><input id="nBillingEtc" placeholder="과금방식 직접 입력" style="display:none;margin-top:6px"></div>
-        <div id="nFeeWrap"><label>설치비 (원) <small style="color:var(--muted)">— 1회성 · 주로 에스원 계약</small></label><input id="nFee" type="number" min="0" step="10000" placeholder="예: 100000"></div>
-        <div id="nSettleWrap"><label>대금정산일 <small style="color:var(--muted)">(설치비를 인식하는 달 · 비우면 시작월+1)</small></label><input id="nSettle" type="month"></div>
-        <div class="full"><label>비고</label><input id="nNote"></div>
+        <div id="nFeeWrap"><label for="nFee">설치비 (원) <small style="color:var(--muted)">— 1회성 · 주로 에스원 계약</small></label><input id="nFee" type="number" min="0" step="10000" placeholder="예: 100000"></div>
+        <div id="nSettleWrap"><label for="nSettle">대금정산일 <small style="color:var(--muted)">(설치비를 인식하는 달 · 비우면 시작월+1)</small></label><input id="nSettle" type="month"></div>
+        <div class="full"><label for="nNote">비고</label><input id="nNote"></div>
         <div class="full cap" id="nLivePrev" style="display:none"></div>
       </div>
     </div>
 
     <div id="tabAdd" style="display:none">
       <div class="frm">
-        <div class="full"><label>원계약 찾기 (고객사명 입력) *</label><input id="aFind" placeholder="고객사명 두 글자 이상 — 추가 구매가 붙을 기존 계약을 고릅니다">
+        <div class="full"><label for="aFind">원계약 찾기 (고객사명 입력) *</label><input id="aFind" placeholder="고객사명 두 글자 이상 — 추가 구매가 붙을 기존 계약을 고릅니다">
           <div class="pick" id="aPick"></div></div>
         <div class="full" id="aSel" style="display:none"></div>
-        <div><label>추가 종류 *</label><select id="aKind"><option>라이선스 추가</option><option>임대 센서 추가</option><option>노드 추가</option><option>기타 추가</option></select></div>
-        <div><label>추가 수량 <small style="color:var(--muted)">(노드/대)</small></label><input id="aQty" type="number" min="0" step="1"></div>
-        <div><label>시작월 *</label><input id="aStart" type="month"></div>
-        <div><label>종료월 <small style="color:var(--muted)">(비우면 원계약 만기와 같게)</small></label><input id="aEnd" type="month"></div>
-        <div><label>월 금액(원) *</label><input id="aMrr" type="number" min="0" step="1000"></div>
-        <div><label>장비 시리얼 <small style="color:var(--muted)">(센서 추가일 때 · 선택)</small></label><input id="aSerial" placeholder="예: GN-2026-0123"></div>
-        <div class="full"><label>비고</label><input id="aNote"></div>
+        <div><label for="aKind">추가 종류 *</label><select id="aKind"><option>라이선스 추가</option><option>임대 센서 추가</option><option>노드 추가</option><option>기타 추가</option></select></div>
+        <div><label for="aQty">추가 수량 <small style="color:var(--muted)">(노드/대)</small></label><input id="aQty" type="number" min="0" step="1"></div>
+        <div><label for="aStart">시작월 *</label><input id="aStart" type="month"></div>
+        <div><label for="aEnd">종료월 <small style="color:var(--muted)">(비우면 원계약 만기와 같게)</small></label><input id="aEnd" type="month"></div>
+        <div><label for="aMrr">월 금액(원) *</label><input id="aMrr" type="number" min="0" step="1000"></div>
+        <div><label for="aSerial">장비 시리얼 <small style="color:var(--muted)">(센서 추가일 때 · 선택)</small></label><input id="aSerial" placeholder="예: GN-2026-0123"></div>
+        <div class="full"><label for="aNote">비고</label><input id="aNote"></div>
         <div class="full cap">추가 구매는 원계약에 매달린 <b>부속 계약</b>으로 저장됩니다 — 고객사·서비스·채널·파트너는 원계약을 그대로 따르고, 고객사 수·LIVE·계약 수·해지에는 세지 않으며 MRR에만 더해집니다.</div>
       </div>
     </div>
 
     <div id="tabChurn" style="display:none">
       <div class="frm">
-        <div class="full"><label>계약 찾기 (고객사명 입력)</label><input id="cFind" placeholder="고객사명 두 글자 이상">
+        <div class="full"><label for="cFind">계약 찾기 (고객사명 입력)</label><input id="cFind" placeholder="고객사명 두 글자 이상">
           <div class="pick" id="cPick"></div></div>
-        <div><label>해지월 (이 달까지 매출 인식) *</label><input id="cMonth" type="month"></div>
-        <div><label>해지 사유 *</label><input id="cReason" list="dlReason"><datalist id="dlReason"></datalist></div>
+        <div><label for="cMonth">해지월 (이 달까지 매출 인식) *</label><input id="cMonth" type="month"></div>
+        <div><label for="cReason">해지 사유 *</label><input id="cReason" list="dlReason"><datalist id="dlReason"></datalist></div>
         <div class="full cap" id="cLivePrev" style="display:none"></div>
       </div>
     </div>
 
     <div id="tabRenew" style="display:none">
       <div class="frm">
-        <div class="full"><label>계약 찾기 (고객사명 입력)</label><input id="rFind" placeholder="고객사명 두 글자 이상">
+        <div class="full"><label for="rFind">계약 찾기 (고객사명 입력)</label><input id="rFind" placeholder="고객사명 두 글자 이상">
           <div class="pick" id="rPick"></div></div>
-        <div><label>새 종료월 *</label><input id="rEnd" type="month"></div>
-        <div><label>연장 구간 월 금액(원) — 비우면 기존 MRR</label><input id="rMrr" type="number" min="0" step="1000"></div>
-        <div class="full"><label>연장 메모 <small style="color:var(--muted)">(선택)</small></label><input id="rNote" placeholder="예: 3년 재약정 · 단가 조정"></div>
+        <div><label for="rEnd">새 종료월 *</label><input id="rEnd" type="month"></div>
+        <div><label for="rMrr">연장 구간 월 금액(원) — 비우면 기존 MRR</label><input id="rMrr" type="number" min="0" step="1000"></div>
+        <div class="full"><label for="rNote">연장 메모 <small style="color:var(--muted)">(선택)</small></label><input id="rNote" placeholder="예: 3년 재약정 · 단가 조정"></div>
         <div class="full cap">연장은 기존 계약 한 줄에 «연장 n회»로 쌓입니다 — 별도의 재약정 행을 만들지 않으므로 해지율·계약 수에 영향이 없습니다.</div>
       </div>
     </div>
 
     <div id="tabFix" style="display:none">
       <div class="frm">
-        <div class="full"><label>계약 찾기 (고객사명 입력)</label><input id="fFind" placeholder="고객사명 두 글자 이상">
+        <div class="full"><label for="fFind">계약 찾기 (고객사명 입력)</label><input id="fFind" placeholder="고객사명 두 글자 이상">
           <div class="pick" id="fPick"></div></div>
         <div class="full" id="fCur" style="display:none"></div>
-        <div><label>적용 시작월 *</label><input id="fFrom" type="month"></div>
-        <div><label>적용 종료월 <small style="color:var(--muted)">(비우면 계약 끝까지)</small></label><input id="fTo" type="month"></div>
-        <div><label>새 월 금액(원) *</label><input id="fMrr" type="number" min="0" step="1000"></div>
+        <div><label for="fFrom">적용 시작월 *</label><input id="fFrom" type="month"></div>
+        <div><label for="fTo">적용 종료월 <small style="color:var(--muted)">(비우면 계약 끝까지)</small></label><input id="fTo" type="month"></div>
+        <div><label for="fMrr">새 월 금액(원) *</label><input id="fMrr" type="number" min="0" step="1000"></div>
         <div><label>&nbsp;</label><p class="cap" style="margin:6px 0 0">한 달만 고치려면 시작월·종료월을 같은 달로. 그 구간만 바뀌고 앞뒤 달은 그대로입니다.</p></div>
       </div>
     </div>
 
     <div id="tabRename" style="display:none">
       <div class="frm">
-        <div><label>기존 사명 *</label><input id="xOld" list="dlAllNames" placeholder="지금 쓰고 있는 이름 (자동완성)" autocomplete="off"><datalist id="dlAllNames"></datalist></div>
-        <div><label>변경 사명 *</label><input id="xNew" list="dlCust" placeholder="새 이름 — 이미 있는 고객사 이름을 넣으면 그쪽으로 합쳐집니다" autocomplete="off"></div>
+        <div><label for="xOld">기존 사명 *</label><input id="xOld" list="dlAllNames" placeholder="지금 쓰고 있는 이름 (자동완성)" autocomplete="off"><datalist id="dlAllNames"></datalist></div>
+        <div><label for="xNew">변경 사명 *</label><input id="xNew" list="dlCust" placeholder="새 이름 — 이미 있는 고객사 이름을 넣으면 그쪽으로 합쳐집니다" autocomplete="off"></div>
         <div class="full"><label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="checkbox" id="xAlias" checked style="width:auto;height:auto;margin:0"> 기존 사명을 별칭으로 남기기 <small style="color:var(--muted)">— 검색·LIVE 대조에서 옛 이름도 같은 회사로 인식</small></label></div>
         <div class="full" id="xPrev" style="display:none"></div>
         <div class="full cap">고객사 마스터를 바꾸면 계약·월 매출·해지·LIVE·사업영역·증감 화면이 모두 새 이름으로 바뀌고, 이름을 글자로 따로 가진 표(LIVE 명단·LG U+·임대 장비 신청/현황·OI·MDR 운영·PoC·주간보고·비즈포탈 대조·인바운드)도 한 번에 같이 바뀝니다. 변경 이력(change_log)에 기존 사명이 남습니다.</div>

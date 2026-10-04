@@ -247,7 +247,7 @@ function openMenuEdit(){
       bt.onclick=function(){
         var i=+bt.dataset.i, j=bt.dataset.mv==='up'? i-1 : i+1;
         if(j<0||j>=st.length) return;
-        var t=st[i]; st[i]=st[j]; st[j]=t;
+        var t=st[i]; st[i]=st[j]; st[j]=t; ovlMarkDirty('ovlMenu');   /* ㊿+141: 순서를 바꾼 채 바깥을 누르면 확인 */
         // 체크 상태 먼저 반영
         $('#mcBody').querySelectorAll('[data-hk]').forEach(function(c){ if(c.checked) hid[c.dataset.hk]=1; else delete hid[c.dataset.hk]; });
         paint();

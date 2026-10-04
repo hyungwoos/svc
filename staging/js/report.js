@@ -787,9 +787,10 @@ function qbColOpts(spec, cur, filterFn){
   return h;
 }
 function qbOutColOpts(cols, cur){ return (cols||[]).map(function(c){ return '<option value="'+c.id+'"'+(c.id===cur?' selected':'')+'>'+esc(c.l)+'</option>'; }).join(''); }
-function qbSel(name, opts, cur, cls){ return '<select data-qb="'+name+'" class="qb-sel'+(cls? ' '+cls:'')+'">'+opts+'</select>'; }
+var QB_SEL_LBL={base:'기준 표', jadd:'표 연결', seladd:'열 추가', pc:'피벗 열', tr:'날짜 묶기 단위'};   /* ㊿+141 접근성: 이름 없는 select */
+function qbSel(name, opts, cur, cls){ return '<select data-qb="'+name+'" aria-label="'+(QB_SEL_LBL[name]||'선택')+'" class="qb-sel'+(cls? ' '+cls:'')+'">'+opts+'</select>'; }
 function qbOpOpts(cur){ return Object.keys(QB_OPS).map(function(k){ return '<option value="'+k+'"'+(k===cur?' selected':'')+'>'+QB_OPS[k]+'</option>'; }).join(''); }
-function qbTrOpts(c, cur){ if(!c || !(c.t==='month'||c.t==='date')) return ''; return '<select data-qb="tr" class="qb-sel qb-tr"><option value="raw"'+(!cur||cur==='raw'?' selected':'')+'>'+(c.t==='date'?'날짜 그대로':'월 그대로')+'</option><option value="ym"'+(cur==='ym'?' selected':'')+'>월(YYYY-MM)</option><option value="q"'+(cur==='q'?' selected':'')+'>분기</option><option value="y"'+(cur==='y'?' selected':'')+'>연도</option><option value="m"'+(cur==='m'?' selected':'')+'>월(1~12)</option></select>'; }
+function qbTrOpts(c, cur){ if(!c || !(c.t==='month'||c.t==='date')) return ''; return '<select data-qb="tr" aria-label="날짜 묶기 단위" class="qb-sel qb-tr"><option value="raw"'+(!cur||cur==='raw'?' selected':'')+'>'+(c.t==='date'?'날짜 그대로':'월 그대로')+'</option><option value="ym"'+(cur==='ym'?' selected':'')+'>월(YYYY-MM)</option><option value="q"'+(cur==='q'?' selected':'')+'>분기</option><option value="y"'+(cur==='y'?' selected':'')+'>연도</option><option value="m"'+(cur==='m'?' selected':'')+'>월(1~12)</option></select>'; }
 function qbFnOpts(c, cur){ var F=[['count','건수(행)'],['dcount','고유 개수'],['sum','합계'],['avg','평균'],['min','최소'],['max','최대'],['list','값 목록'],['first','첫 값']]; if(c && c.t!=='num') F=F.filter(function(f){ return f[0]!=='sum'&&f[0]!=='avg'; }); return F.map(function(f){ return '<option value="'+f[0]+'"'+(f[0]===cur?' selected':'')+'>'+f[1]+'</option>'; }).join(''); }
 function qbFilterRow(f, i, spec, kind){
   var c=qbCol(f.c), needV=!(f.op==='empty'||f.op==='nempty');
@@ -819,7 +820,7 @@ function qbPanelHtml(){
       '<div class="qb-join-w"><span class="mini">이 표의 조건</span>'+(j.where||[]).map(function(f,k){ return '<div class="qb-row" data-i="'+k+'" data-kind="jw'+i+'">'+qbSel('c','<optgroup label="'+esc(s.label)+'">'+s.cols.map(function(c){ return '<option value="'+c.id+'"'+(c.id===f.c?' selected':'')+'>'+esc(c.l)+'</option>'; }).join('')+'</optgroup>', f.c)+qbSel('op', qbOpOpts(f.op||'eq'), f.op,'qb-op')+((f.op==='empty'||f.op==='nempty')? '':'<input data-qb="v" class="qb-in" value="'+esc(f.v||'')+'" placeholder="값">')+'<button type="button" class="cbtn qb-x" data-qb="del">×</button></div>'; }).join('')+
       '<button type="button" class="cbtn qb-add" data-qb="jwadd">＋ 조건</button></div></div>';
   });
-  if(cands.length) h+='<select data-qb="jadd" class="qb-sel qb-addsel"><option value="">＋ 표 연결…</option>'+cands.map(function(c,i){ var ca=qbCol(c.on[0]), cb=qbCol(c.on[1]); return '<option value="'+i+'">'+esc(S[c.t].label)+' — '+esc(S[ca.src].label+' › '+ca.l)+' '+(c.fuzzy?'≈':'=')+' '+esc(cb.l)+'</option>'; }).join('')+'</select>';
+  if(cands.length) h+='<select data-qb="jadd" aria-label="표 연결" class="qb-sel qb-addsel"><option value="">＋ 표 연결…</option>'+cands.map(function(c,i){ var ca=qbCol(c.on[0]), cb=qbCol(c.on[1]); return '<option value="'+i+'">'+esc(S[c.t].label)+' — '+esc(S[ca.src].label+' › '+ca.l)+' '+(c.fuzzy?'≈':'=')+' '+esc(cb.l)+'</option>'; }).join('')+'</select>';
   else h+='<div class="mini">더 연결할 수 있는 표가 없습니다</div>';
   h+='</section>';
   /* ③ 조건 */
@@ -838,7 +839,7 @@ function qbPanelHtml(){
     var sel=(spec.sel||[]).filter(function(id){ return qbCol(id); });
     h+='<section class="qb-sec"><div class="qb-h"><span class="qb-n">5</span>보일 열<span class="mini" style="margin-left:auto">'+(sel.length? sel.length+'개':'기본 열')+'</span></div><div class="qb-chips">'+
       sel.map(function(id,i){ var c=qbCol(id); return '<span class="qb-chip" data-i="'+i+'">'+esc((c.src===spec.base?'':S[c.src].label+' › ')+c.l)+'<button type="button" data-qb="seldel" title="빼기">×</button></span>'; }).join('')+'</div>'+
-      '<select data-qb="seladd" class="qb-sel qb-addsel"><option value="">＋ 열 추가…</option>'+qbColOpts(spec, null, function(c){ return sel.indexOf(c.id)<0; })+'</select> <button type="button" class="cbtn" data-qb="selall">기준 표 전체</button> <button type="button" class="cbtn" data-qb="selclr">비우기</button></section>';
+      '<select data-qb="seladd" aria-label="열 추가" class="qb-sel qb-addsel"><option value="">＋ 열 추가…</option>'+qbColOpts(spec, null, function(c){ return sel.indexOf(c.id)<0; })+'</select> <button type="button" class="cbtn" data-qb="selall">기준 표 전체</button> <button type="button" class="cbtn" data-qb="selclr">비우기</button></section>';
   }
   /* ⑥ 결과 조건·정렬·상위 */
   h+='<section class="qb-sec"><div class="qb-h"><span class="qb-n">'+(grouped?5:6)+'</span>결과 조건 · 정렬 · 상위</div>';
@@ -860,7 +861,7 @@ function qbResultHtml(){
   if((QB.view==='chart'||QB.view==='both') && ch) h+='<div class="legend" id="qbLegend">'+ch.series.map(function(sr,i){ return '<span class="li"><span class="sw" style="background:'+cssv('--s'+((i%8)+1))+'"></span>'+esc(sr.label)+'</span>'; }).join('')+(ch.money? '<span class="mini" style="margin-left:auto">단위: 천원</span>':'')+'</div><div class="chartbox h260" id="qbChart"></div><div class="mini">'+esc(ch.xLabel||'')+'별 '+esc(ch.series.map(function(x){ return x.label; }).join(' · '))+(ch.merged? ' — 같은 '+esc(ch.xLabel)+' 행은 '+(ch.count?'건수로 셈':'합산')+'':'')+(ch.truncated? ' · 상위 40개만':'')+'</div>';
   if(QB.view!=='chart'){
     var rows=r.rows.slice(0, QB.page);
-    h+='<div class="tbl-wrap qb-tbl" style="max-height:'+(QB.view==='both'? 360:620)+'px"><table class="pr"><thead><tr>'+r.cols.map(function(c){ return '<th'+(c.t==='num'?' class="n"':'')+(c.pivot?' style="text-align:right"':'')+'>'+esc(c.l)+'</th>'; }).join('')+'</tr></thead><tbody>'+
+    h+='<div class="tbl-wrap qb-tbl" tabindex="0" role="region" aria-label="조합 결과 표" style="max-height:'+(QB.view==='both'? 360:620)+'px"><table class="pr"><thead><tr>'+r.cols.map(function(c){ return '<th'+(c.t==='num'?' class="n"':'')+(c.pivot?' style="text-align:right"':'')+'>'+esc(c.l)+'</th>'; }).join('')+'</tr></thead><tbody>'+
       rows.map(function(row){ return '<tr>'+row.map(function(v,ci){ var c=r.cols[ci]; return '<td'+(c.t==='num'?' class="n"':'')+'>'+esc(qbFmtCell(v,c))+'</td>'; }).join('')+'</tr>'; }).join('')+'</tbody>'+
       (r.sums? '<tfoot><tr>'+r.cols.map(function(c,ci){ var v=r.sums[ci]; return '<td'+(c.t==='num'?' class="n"':'')+'>'+(ci===0&&v==null? '합계' : (v==null? '' : esc(qbFmtCell(v,c))))+'</td>'; }).join('')+'</tr></tfoot>':'')+'</table></div>';
     if(r.rows.length>QB.page) h+='<div style="text-align:center;margin-top:8px"><button type="button" class="cbtn" id="qbMore">더 보기 (+300 · 남은 '+(r.rows.length-QB.page).toLocaleString()+'행)</button></div>';

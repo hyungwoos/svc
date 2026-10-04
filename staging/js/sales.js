@@ -1219,6 +1219,7 @@ function kxWire(host, map){
     if(!/클릭/.test(el0.title||'')) el0.title=(el0.title? el0.title+' · ':'')+'클릭: 이 숫자의 근거 내역';
     el0.onclick=function(ev){ if(ev.target && ev.target.isContentEditable) return; map[k](); };
     el0.onkeydown=function(ev){ if(ev.key==='Enter'){ ev.preventDefault(); map[k](); } };
+    a11yTileRole(el0);   /* ㊿+141 */
   });
 }
 var KX_H6=[{l:'고객사'},{l:'서비스'},{l:'채널'},{l:'상태'},{l:'시작월'},{l:'종료월'}];
@@ -1314,8 +1315,8 @@ function renderChurn(){
   var h='<div class="pr-card" style="margin-bottom:14px"><h3>📉 해지 분석 <span class="ubadge sm">₩ 금액 단위 = 천원</span>'+
     '<small>해지·서비스 종료 계약 기준 · 해지월 = 마지막 매출월(또는 계약 종료월)</small></h3>'+
     '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:8px 0 0">기간 '+
-    '<select id="chF" style="'+inSt+'">'+mopt(CHURN.f)+'</select> ~ '+
-    '<select id="chT" style="'+inSt+'">'+mopt(CHURN.t)+'</select>'+
+    '<select id="chF" aria-label="시작 월" style="'+inSt+'">'+mopt(CHURN.f)+'</select> ~ '+
+    '<select id="chT" aria-label="끝 월" style="'+inSt+'">'+mopt(CHURN.t)+'</select>'+
     '<button class="pill" id="chY" style="height:34px">올해</button>'+
     '<button class="pill ghost" id="chY1" style="height:34px">작년</button>'+
     '<button class="pill ghost" id="chAll" style="height:34px">전체 기간</button>'+

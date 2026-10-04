@@ -554,6 +554,116 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
     await ctx.close();
   }
 }
+// ㊿+141 UX: 창 바깥 클릭으로 닫기 · 입력 중 확인 · 초점 들어가기/가두기/되돌리기 · 배포·운영 기록 넘침 · 서버 오류 표시 · 접근성 이름
+{
+  const files = Array.from({ length: 22 }, (_, i) => 'staging/js/file' + i + '.js').join(', ');
+  const recent = Array.from({ length: 8 }, (_, i) => ({ at: '2026-10-04T05:1' + i + ':00', actor: 'tester@example.com', action: i % 2 ? 'gh_put' : 'sql_run', target: i % 2 ? 'staging/.gitignore, staging/app.css, ' + files : '59개 문장', summary: '포탈 ㊿+141 · ' + files, ok: i !== 3, error: i === 3 ? 'GitHub 422 ' + files : null, ms: 900 }));
+  const { ctx, page, errs } = await open({ extra: async (route, u) => { if (u.includes('/functions/v1/ops')) { await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, log_ok: true, github: { repo: 'x/y', branch: 'main', token_set: true }, recent }) }); return true; } return false; } });
+  const backdrop = async (sel) => { const b = await page.$eval(sel, (o) => { const m = o.querySelector('.modal') || o.firstElementChild; const r = m.getBoundingClientRect(); return { x: Math.max(4, r.left - 12), y: Math.min(window.innerHeight - 6, r.bottom + 12), mx: r.left, my: r.bottom }; }); await page.mouse.click(b.x < b.mx ? b.x : 6, b.y); await page.waitForTimeout(150); };
+  const isOn = (id) => page.evaluate((id) => { const o = document.getElementById(id); return !!(o && o.classList.contains('on')); }, id);
+  await S.t('창 바깥 클릭 → 닫힘 (단축키 창 · 고객 360) · 창 안 클릭은 유지', async () => {
+    await page.evaluate(() => document.getElementById('ovlKeys').classList.add('on')); await page.waitForTimeout(120);
+    await page.click('#ovlKeys .keys-tbl'); assert(await isOn('ovlKeys'), '창 안을 눌렀는데 닫힘');
+    await backdrop('#ovlKeys'); assert(!(await isOn('ovlKeys')), '바깥 클릭으로 안 닫힘');
+    await page.evaluate(() => { openOvl('ovlC360'); }); await page.waitForTimeout(120);
+    await page.mouse.click(30, 500); await page.waitForTimeout(150); assert(!(await isOn('ovlC360')), '고객 360 바깥 클릭으로 안 닫힘');
+    /* 창 안에서 누르고 배경에서 뗌(글자 끌어 선택) → 닫지 않음 */
+    await page.evaluate(() => document.getElementById('ovlKeys').classList.add('on')); await page.waitForTimeout(120);
+    const r = await page.$eval('#ovlKeys .keys-tbl', (e) => { const b = e.getBoundingClientRect(); return { x: b.left + 20, y: b.top + 10 }; });
+    await page.mouse.move(r.x, r.y); await page.mouse.down(); await page.mouse.move(6, 880); await page.mouse.up(); await page.waitForTimeout(150);
+    assert(await isOn('ovlKeys'), '드래그 선택이 배경에서 끝났는데 닫힘'); await page.keyboard.press('Escape'); await page.waitForTimeout(100);
+    return 'keys·c360';
+  });
+  await S.t('입력 중인 창: 바깥 클릭 → 확인(취소면 유지 · 확인이면 닫힘) · 동적 창(월 목표)은 제거', async () => {
+    await page.evaluate(() => openTargetEditor(2026)); await page.waitForTimeout(150);
+    await page.focus('#ovlTarget input[data-m="1"]'); await page.keyboard.type('5000000');
+    let dlg = null; page.once('dialog', async (d) => { dlg = d.message(); await d.dismiss(); });
+    await backdrop('#ovlTarget'); assert(dlg && /저장되지 않았습니다/.test(dlg), '확인 창 없음 ' + dlg); assert(await page.$('#ovlTarget'), '취소했는데 닫힘');
+    page.once('dialog', async (d) => { await d.accept(); }); await backdrop('#ovlTarget'); assert(!(await page.$('#ovlTarget')), '확인했는데 남음(동적 창은 제거)');
+    /* 손대지 않은 창은 묻지 않고 닫힘 */
+    await page.evaluate(() => openTargetEditor(2026)); await page.waitForTimeout(150);
+    let asked = false; const h = () => { asked = true; }; page.on('dialog', h); await backdrop('#ovlTarget'); page.off('dialog', h);
+    assert(!asked && !(await page.$('#ovlTarget')), '입력 없는데 확인을 물음/안 닫힘');
+    /* 메뉴 편집: ↑↓ 로 순서만 바꿔도 «입력 중» */
+    await page.evaluate(() => openMenuEdit()); await page.waitForTimeout(150);
+    await page.click('#mcBody [data-mv="dn"]'); dlg = null; page.once('dialog', async (d) => { dlg = d.message(); await d.dismiss(); }); await backdrop('#ovlMenu');
+    assert(dlg && (await isOn('ovlMenu')), '메뉴 순서 변경 후 확인 없음'); await page.evaluate(() => closeOvl('ovlMenu'));
+    return 'confirm·remove·clean·menu';
+  });
+  await S.t('2단계 인증 창은 바깥 클릭·Esc 로 닫히지 않음 · 저장 성공 뒤엔 확인 없이 닫힘', async () => {
+    const t = await page.evaluate(() => { const o = document.createElement('div'); o.id = 'ovlMfa'; o.className = 'ovl on'; o.style.zIndex = '100000'; o.innerHTML = '<div class="modal"><h3>코드</h3><input id="mfX"></div>'; document.body.appendChild(o); return true; });
+    await page.waitForTimeout(100); await page.mouse.click(6, 880); await page.keyboard.press('Escape'); await page.waitForTimeout(100);
+    assert(await page.$('#ovlMfa.on'), 'MFA 창이 닫힘'); await page.evaluate(() => document.getElementById('ovlMfa').remove());
+    await page.evaluate(() => openTargetEditor(2026)); await page.waitForTimeout(150);
+    await page.focus('#ovlTarget input[data-m="2"]'); await page.keyboard.type('7000000');
+    await page.evaluate(() => sbWrite('POST', 'monthly_targets', [{ year: 2026, month: 2, amount: 7000000 }]));
+    let asked = false; const h = (d) => { asked = true; d.dismiss(); }; page.on('dialog', h); await backdrop('#ovlTarget'); page.off('dialog', h);
+    assert(!asked && !(await page.$('#ovlTarget')), '저장 뒤에도 확인을 물음'); return String(t);
+  });
+  await S.t('창 초점: 열리면 창 안으로 · Tab 은 창 안에서만 · 닫히면 연 버튼으로 · role=dialog 자동', async () => {
+    await page.evaluate(() => switchView('dash')); await page.waitForTimeout(200);
+    await page.focus('#btnTheme'); await page.keyboard.press('Shift+?'); await page.waitForTimeout(200);
+    const a = await page.evaluate(() => { const o = document.getElementById('ovlKeys'); return { inside: o.contains(document.activeElement) }; }); assert(a.inside, '초점이 창 밖');
+    let out = 0; for (let i = 0; i < 12; i++) { await page.keyboard.press('Tab'); if (!(await page.evaluate(() => document.getElementById('ovlKeys').contains(document.activeElement)))) out++; }
+    await page.keyboard.press('Shift+Tab'); await page.keyboard.press('Shift+Tab');
+    if (!(await page.evaluate(() => document.getElementById('ovlKeys').contains(document.activeElement)))) out++;
+    assert(out === 0, 'Tab 이 창 밖으로 ' + out + '회');
+    await page.keyboard.press('Escape'); await page.waitForTimeout(150);
+    const back = await page.evaluate(() => document.activeElement && document.activeElement.id); assert(back === 'btnTheme', '닫힌 뒤 초점 ' + back);
+    await page.evaluate(() => openRenewList('due')); await page.waitForTimeout(300);
+    const d = await page.evaluate(() => { const m = document.querySelector('#ovlRenew .modal'); return { role: m.getAttribute('role'), modal: m.getAttribute('aria-modal'), lb: m.getAttribute('aria-labelledby'), inside: document.getElementById('ovlRenew').contains(document.activeElement) }; });
+    assert(d.role === 'dialog' && d.modal === 'true' && d.lb === 'rnTitle' && d.inside, JSON.stringify(d));
+    await page.keyboard.press('Escape'); await page.waitForTimeout(100);
+    return JSON.stringify(d);
+  });
+  await S.t('배포·운영 › 기록: 긴 파일 목록이 카드 밖으로 넘치지 않음 · 접힌 목록 펼치기', async () => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.evaluate(() => switchView('ops')); await page.waitForTimeout(700);
+    await page.evaluate(() => { OPS.tab = 'log'; renderOps(); }); await page.waitForTimeout(300);
+    const m = await page.evaluate(() => { const host = document.getElementById('opsHost').getBoundingClientRect(); const t = [...document.querySelectorAll('#opsHost table')].pop().getBoundingClientRect(); return { doc: document.documentElement.scrollWidth - window.innerWidth, over: Math.round(t.right - host.right), det: document.querySelectorAll('#opsHost details.ops-tgt').length, sum: (document.querySelector('#opsHost details.ops-tgt summary') || {}).textContent }; });
+    assert(m.doc <= 0 && m.over <= 0, '넘침 ' + JSON.stringify(m)); assert(m.det >= 4 && /staging\/.*파일 24개/.test(m.sum), JSON.stringify(m));
+    await page.click('#opsHost details.ops-tgt summary'); const open = await page.$eval('#opsHost details.ops-tgt', (d) => d.open && /file21\.js/.test(d.textContent)); assert(open, '펼쳐도 전체 목록 없음');
+    const m2 = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth); assert(m2 <= 0, '펼친 뒤 넘침 ' + m2);
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    assert(!errs.length, errs.join(' | ')); return m.sum.slice(0, 40);
+  });
+  await S.t('접근성: 이름 없는 select 0 · 차트 aria-label · 버튼 속 버튼 0 · 조합 결과 표 tabindex', async () => {
+    const bad = []; for (const v of ['churn', 'report', 'account', 'adminx', 'dash', 'eqboard', 'leadsrc']) {
+      await page.evaluate((v) => switchView(v), v); await page.waitForTimeout(350);
+      const r = await page.evaluate(() => {
+        const nm = (e) => e.getAttribute('aria-label') || e.getAttribute('aria-labelledby') || e.title || (e.id && document.querySelector('label[for="' + e.id + '"]')) || e.closest('label');
+        const sel = [...document.querySelectorAll('select')].filter((e) => e.getClientRects().length && !nm(e)).map((e) => e.id || e.dataset.qb || e.className);
+        const svg = [...document.querySelectorAll('svg[role=img]')].filter((e) => e.getClientRects().length && !e.getAttribute('aria-label') && !e.querySelector('title')).length;
+        const nest = [...document.querySelectorAll('[role=button]')].filter((e) => e.getClientRects().length && e.querySelector('button,a[href],input,select,textarea')).length;
+        return { sel, svg, nest };
+      });
+      if (r.sel.length || r.svg || r.nest) bad.push(v + ':' + JSON.stringify(r));
+    }
+    assert(!bad.length, bad.join(' | ')); return 'ok';
+  });
+  await ctx.close();
+}
+// ㊿+141: 서버 오류(5xx)는 «데이터 없음»이 아니라 오류로 보임 · 캐시로 그린 뒤 최신 로드 실패는 알림
+{
+  const { ctx, page } = await open({ extra: async (route, u) => { if (u.includes('/rpc/load_all') || /\/rest\/v1\/(customers|contracts|monthly_revenue)\b/.test(u)) { await route.fulfill({ status: 503, contentType: 'application/json', body: '{"message":"down"}' }); return true; } return false; } });
+  await S.t('DB 5xx → «데이터를 불러오지 못했습니다» (빈 화면으로 넘기지 않음)', async () => {
+    const t = await page.evaluate(() => ({ load: (document.getElementById('loading') || {}).textContent || '', data: !!window.DATA }));
+    assert(/불러오지 못했습니다/.test(t.load) && /503/.test(t.load), JSON.stringify(t).slice(0, 200)); return t.load.slice(0, 40);
+  });
+  await ctx.close();
+}
+{
+  let fail = false;
+  const { ctx, page } = await open({ extra: async (route, u) => { if (fail && (u.includes('/rpc/load_all') || /\/rest\/v1\/(customers|contracts|monthly_revenue)\b/.test(u))) { await route.fulfill({ status: 502, contentType: 'application/json', body: '{}' }); return true; } return false; } });
+  await S.t('캐시로 그린 뒤 최신 데이터 실패 → 경고 토스트', async () => {
+    /* lib 의 init 스크립트가 새로고침마다 저장소를 비우므로, 같은 페이지에서 boot() 를 다시 불러 «캐시로 먼저 그리기» 경로를 탐 */
+    const c = await page.evaluate(() => !!sessionStorage.getItem(CACHE_KEY)); assert(c, '캐시 없음');
+    fail = true; await page.evaluate(() => boot()); await page.waitForTimeout(1500);
+    const t = await page.evaluate(() => ({ data: !!window.DATA, toast: [...document.querySelectorAll('.toast')].map((e) => e.textContent).join(' | ') }));
+    assert(t.data && /최신 데이터를 불러오지 못했습니다/.test(t.toast), JSON.stringify(t).slice(0, 200)); return 'toast';
+  });
+  await ctx.close();
+}
 await browser.close(); srv.close();
 const ok = S.report();
 fs.writeFileSync(path.join(OUT, 'smoke.json'), JSON.stringify(S.results, null, 1));
