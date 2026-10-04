@@ -238,7 +238,7 @@ function renderLeadSrc(){
       '<div class="mini" style="margin-top:4px">계약 '+a.n+'건 · 고객사 '+Object.keys(a.custs).length+'곳'+(a.newN? ' · 올해 신규 '+a.newN+'건':'')+'</div>'+
       '<div class="mini">'+y0+'년 누적 '+won(a.ytd)+'천원</div></div>'; }).join('')+'</div>';
   /* 차트 2개 */
-  h+='<div style="display:grid;grid-template-columns:minmax(260px,1fr) minmax(320px,1.4fr);gap:14px;margin-bottom:14px">'+
+  h+='<div class="ls-2col">'+
     '<div class="pr-card"><div style="font-size:13.5px;font-weight:650;margin-bottom:8px">유입경로별 MRR <span class="mini">'+esc(mk(b))+'</span></div><div id="lsBars"></div></div>'+
     '<div class="pr-card"><div style="font-size:13.5px;font-weight:650;margin-bottom:8px">최근 12개월 추이 <span class="mini">유입경로별 월 매출</span></div><div id="lsTrend" style="height:210px"></div>'+
     '<div class="mini" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:6px">'+order.filter(function(src){ return agg[src].trend.some(function(v){ return v>0; }); }).map(function(src){ return '<span><i style="display:inline-block;width:10px;height:3px;border-radius:2px;background:'+cssv(LEAD_COLOR[src]||'--muted')+';vertical-align:middle;margin-right:4px"></i>'+esc(src)+'</span>'; }).join('')+'</div></div></div>';

@@ -778,8 +778,17 @@ kbd{display:inline-block;padding:1px 6px;border:1px solid var(--ring);border-bot
 @media (max-width:760px){ .rn-tbl tr.rn-form td{padding:8px 6px} .rn-f{position:sticky;left:0;max-width:calc(100vw - 60px);box-sizing:border-box} .rn-f>span:not(.mini){flex-basis:100%} .rn-f label{flex-basis:100%} .rn-f input[type=text]{flex:1} }
 .rn-tbl tr.rn-form td{white-space:normal;background:var(--surface-2);border-bottom:2px solid var(--grid);padding:10px 12px}
 /* ㊿+141: 배포·운영 표 — 긴 글(파일 목록·요약·오류)은 줄바꿈해 카드 안에 두고, 긴 파일 목록은 접음(opsTgtHtml) */
-.rn-tbl td.wrap{white-space:normal;overflow-wrap:anywhere;min-width:180px}
-#opsBody > .rn-tbl td:not(.mini):not(.n){white-space:normal;overflow-wrap:anywhere}
+.rn-tbl td.wrap{white-space:normal;word-break:keep-all;overflow-wrap:anywhere;min-width:var(--td-min,180px)}
+/* ㊿+145: 줄바꿈 칸에 최소 폭 — 옆 칸이 길면 이 칸이 한 글자 폭으로 찌그러져 글자가 세로로 쌓이던 것(AI 점검 표). 한글은 낱말(띄어쓰기) 단위로 줄바꿈 */
+#opsBody > .rn-tbl td:not(.mini):not(.n):not(.nw):not(.wrap){white-space:normal;word-break:keep-all;overflow-wrap:anywhere;min-width:var(--td-min,88px)}
+.rn-tbl td.nw{white-space:nowrap}
+/* ㊿+145 폰: 넓은 표·2단 배치가 화면 폭을 넘겨 페이지 전체가 옆으로 밀리던 곳 → 그 상자 안에서만 옆으로 밀림 */
+.ls-2col{display:grid;grid-template-columns:minmax(260px,1fr) minmax(320px,1.4fr);gap:14px;margin-bottom:14px}
+#bizHost > section{overflow-x:auto}
+@media (max-width:1100px){ .qb-wrap{grid-template-columns:minmax(0,1fr)} .qb-wrap > *{min-width:0} .qb-res-card{overflow-x:auto} }
+@media (max-width:760px){ #opsBody > .rn-tbl{display:block;overflow-x:auto} .ls-2col{grid-template-columns:minmax(0,1fr)} }
+.rn-tbl td.q-col{--td-min:150px}
+.rn-tbl td.ans-col{--td-min:260px;line-height:1.55;color:var(--ink-2)}
 #opsBody .rn-tbl code{white-space:nowrap;overflow-wrap:normal}
 .ops-tgt summary{cursor:pointer;color:var(--ink)}
 .ops-tgt summary::marker{color:var(--muted)}

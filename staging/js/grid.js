@@ -23,6 +23,57 @@ function goBack(){
 }
 
 
+/* ---- ㊿+145: 메뉴를 눌러 들어가면 그 메뉴의 «첫 화면» ----
+   · 사이드 메뉴 · 레일 · 모바일 탭 · Ctrl+K 메뉴 · 대시보드 바로가기 → navMenu(v): 그 화면의 탭 · 검색 · 펼침 · 기간 고르기를 처음 값으로, 스크롤은 맨 위
+   · 뒤로가기(← · 브라우저 · Alt+←)와 대시보드 숫자·카드를 눌러 «그 조건으로» 들어가는 이동은 switchView 그대로(이어서 보기)
+   · 처음 값 = 파일을 읽은 직후의 상태 객체 사본(viewSnapInit · init.js). 이 브라우저에 저장하는 «설정»(LIVE 판정 기준 · 통화 · 만기 개월 · 글자 크기 등)은 그대로 둠
+   · 배포·운영의 «운영/스테이징» 대상과 올릴 파일 목록은 되돌리지 않음(안전 — 고른 대상이 몰래 바뀌면 안 됨)
+   · 화면에 새 상태를 더하면 VIEW_UI 에 «화면: {객체: [키…]}» 한 줄 */
+var VIEW_UI={
+  live:{LV:['T','diff']}, churn:{CHURN:['f','t','q','fil','sk','sd','inclRenew']},
+  churnrate:{CR:['unit','base','cnd','rows','exDen','sup','from','upto','open','f']}, custflow:{CR:['unit','base','cnd','rows','exDen','sup','from','upto','open','f']},
+  leadsrc:{LS:['base','line','pick']}, dcheck:{DC:['open','sev']}, eqboard:{EQB:['ch','q','more']},
+  price:{PR:['seg','ver','op','q','basis']}, cloud:{CL:['mode','sel','months','mon']}, aiknow:{AK:['log','q']},
+  biz:{BZX:['showEq','showSkip','showRuled']}, report:{RPV:['tab']}, csite:{CS:['tab']},
+  ops:{OPS:['tab','msg','msgCls']}, adminx:{CD:['kind','showOff'], AP:['user']}
+};
+var VIEW_SNAP=null;
+function viewSnapInit(){
+  VIEW_SNAP={};
+  Object.keys(VIEW_UI).forEach(function(v){ Object.keys(VIEW_UI[v]).forEach(function(n){
+    var o=window[n]; if(!o || VIEW_SNAP[n]) return; var s={}, un=[];
+    VIEW_UI[v][n].forEach(function(k){ if(o[k]===undefined) un.push(k); else s[k]=o[k]; });
+    VIEW_SNAP[n]={json:JSON.stringify(s), undef:un};   // 처음에 없던 키는 되돌릴 때 지움
+  }); });
+}
+function viewReset(v){
+  if(!VIEW_SNAP) return;
+  var m=VIEW_UI[v]; if(m) Object.keys(m).forEach(function(n){
+    var o=window[n], sn=VIEW_SNAP[n]; if(!o || !sn) return; var s=JSON.parse(sn.json);
+    m[n].forEach(function(k){ if(sn.undef.indexOf(k)>=0) delete o[k]; else o[k]=s[k]; });
+  });
+  if(v==='churn') delete CHURN._focus;
+  if(v==='churnrate' || v==='custflow'){ delete CR.crCnd; delete CR.cfCnd; delete CR.cfSrc; }
+  /* 화면 HTML 에 그대로 남는 입력칸(다시 그리지 않는 곳) */
+  var clr={eqboard:'eqbQ', adminx:'axQ', csite:'csHistQ'}[v]; if(clr){ var q=document.getElementById(clr); if(q) q.value=''; }
+  if(v==='dash') dashResetIfChanged();
+}
+/* 대시보드: 위쪽 거르기(사업라인 · 기준월 · 단위 · 업종 · 파트너 · 상태 · 검색)가 처음과 다를 때만 «초기화»와 같은 동작 */
+function dashResetIfChanged(){
+  if(!window.DATA || window.IS_EQUIP) return;
+  var off=(DATA.lines||[]).some(function(l){ return STATE.lines[l.label]===false; });
+  var base0=(window.DASH_BASE0!=null)? window.DASH_BASE0 : STATE.base;
+  if(!off && STATE.unit==='month' && STATE.base===base0 && !STATE.ind && !STATE.partner && !STATE.status && !STATE.search) return;
+  STATE.base=base0; var b=document.getElementById('btnReset');
+  if(b && b.onclick) b.onclick(); else { try{ buildControls(); renderAll(); }catch(e){} }
+}
+function navMenu(v){
+  try{ viewReset(v); }catch(e){}
+  switchView(v);
+  try{ window.scrollTo(0, 0); }catch(e){}
+  if(v==='csite') try{ csSetTab('create'); }catch(e){}
+}
+
 /* Backspace = 뒤로가기 — 글자를 입력하는 칸(input·textarea·select·편집 가능 영역)에 커서가 있을 때는 그대로 글자 지우기 */
 
 function switchView(v){

@@ -26,7 +26,7 @@ async function adminFetch(payload){
   });
   var j=null; try{ j=await r.json(); }catch(e){}
   if(!r.ok || !j || !j.ok) throw new Error((j&&j.error)||('HTTP '+r.status));
-  try{ sessionStorage.removeItem(CACHE_KEY); }catch(e){}   // 권한 변경 등도 캐시 무효화
+  cacheDrop();   // 권한 변경 등도 캐시 무효화
   return j;
 }
 /* ────────────────────────────────────────────────────────────────────────────
@@ -532,7 +532,7 @@ function aiCheckHtml(){
   if(!A) h+='<p class="mini" style="margin:0 0 14px">모델·함수 배포 뒤 «AI 가 여전히 숫자를 맞게 말하나»를 확인합니다 — 질문 15개를 동시 3개씩 보내 2~3분 걸리고, 요약은 변경 이력(ai_check)에 남습니다. 질문·기대값은 코드의 AI_CHECK_QS.</p>';
   else h+='<table class="rn-tbl" style="margin-bottom:14px"><thead><tr><th>#</th><th>질문</th><th>기대</th><th>결과</th><th class="n">시간</th><th>모델 · 도구</th><th>답(앞부분)</th></tr></thead><tbody>'+A.rows.map(function(r,i){
       var col=r.st==='통과'? 'var(--brand)' : r.st==='대기'||r.st==='진행'? 'var(--muted)' : 'var(--critical)';
-      return '<tr><td class="mini">'+(i+1)+'</td><td>'+esc(r.q)+'</td><td class="mini">'+esc(r.l)+'</td><td style="color:'+col+'">'+(r.st==='통과'? '✓ 통과': r.st==='진행'? '⏳ 진행' : r.st==='대기'? '· 대기' : '✗ '+esc(r.st))+(r.cut? ' <span class="mini">(축약)</span>':'')+'</td><td class="n mini">'+(r.ms? (r.ms/1000).toFixed(1)+'s':'')+'</td><td class="mini">'+esc(r.model||'')+(r.tools? ' · 도구 '+r.tools:'')+'</td><td class="mini">'+esc(r.text||'')+'</td></tr>'; }).join('')+'</tbody></table>';
+      return '<tr><td class="mini">'+(i+1)+'</td><td class="q-col">'+esc(r.q)+'</td><td class="mini">'+esc(r.l)+'</td><td class="nw" style="color:'+col+'">'+(r.st==='통과'? '✓ 통과': r.st==='진행'? '⏳ 진행' : r.st==='대기'? '· 대기' : '✗ '+esc(r.st))+(r.cut? ' <span class="mini">(축약)</span>':'')+'</td><td class="n mini">'+(r.ms? (r.ms/1000).toFixed(1)+'s':'')+'</td><td class="mini">'+esc(r.model||'')+(r.tools? ' · 도구 '+r.tools:'')+'</td><td class="mini wrap ans-col">'+esc(r.text||'')+'</td></tr>'; }).join('')+'</tbody></table>';
   return h;
 }
 /* ===== AI 품질 (SQL 94 · ㊿+139): 점검 추이(포탈 수동 + 야간 자동 aicheck) · 👎 피드백 목록 ===== */
@@ -552,13 +552,13 @@ function aiqHtml(){
   else h+='<table class="rn-tbl" style="margin-bottom:14px"><thead><tr><th>일시</th><th>출처</th><th class="n">통과</th><th class="n">평균</th><th>모델</th><th>실패 질문</th></tr></thead><tbody>'+T.map(function(r){
       var rate=r.total? r.pass/r.total:0, col=rate>=0.9? 'var(--brand)': rate>=0.7? '#8a5200':'var(--critical)';
       var fl=Array.isArray(r.fails)? r.fails.map(function(f){ return typeof f==='string'? f : (f.q||''); }).filter(Boolean) : [];
-      return '<tr><td class="mini">'+esc(String(r.run_at||'').replace('T',' ').slice(0,16))+'</td><td>'+(r.source==='cron'? '🌙 자동':'🧑 수동')+'</td><td class="n" style="color:'+col+';font-weight:700">'+r.pass+'/'+r.total+'</td><td class="n mini">'+(r.avg_ms? (r.avg_ms/1000).toFixed(1)+'s':'')+'</td><td class="mini">'+esc(String(r.model||'').replace(/^claude-/,''))+'</td><td class="mini">'+esc(fl.slice(0,3).join(' · '))+(fl.length>3? ' 외 '+(fl.length-3):'')+'</td></tr>'; }).join('')+'</tbody></table>';
+      return '<tr><td class="mini">'+esc(String(r.run_at||'').replace('T',' ').slice(0,16))+'</td><td class="nw">'+(r.source==='cron'? '🌙 자동':'🧑 수동')+'</td><td class="n" style="color:'+col+';font-weight:700">'+r.pass+'/'+r.total+'</td><td class="n mini">'+(r.avg_ms? (r.avg_ms/1000).toFixed(1)+'s':'')+'</td><td class="mini">'+esc(String(r.model||'').replace(/^claude-/,''))+'</td><td class="mini wrap">'+esc(fl.slice(0,3).join(' · '))+(fl.length>3? ' 외 '+(fl.length-3):'')+'</td></tr>'; }).join('')+'</tbody></table>';
   h+='<div class="ops-h" style="display:flex;align-items:center;gap:10px">답변 피드백 <span class="mini">(홈 AI 답 밑 👍/👎 · 최근 30건)</span></div>';
   if(F===null) h+='<p class="mini" style="margin:0 0 14px">불러오는 중…</p>';
   else if(!F.length) h+='<p class="mini" style="margin:0 0 14px">아직 피드백이 없습니다. 👎 가 쌓이면 여기서 보고 AI 지식에 보강하세요.</p>';
   else { var up=F.filter(function(x){ return x.verdict==='up'; }).length, dn=F.length-up;
     h+='<p class="mini" style="margin:0 0 6px">👍 '+up+' · 👎 '+dn+'</p><table class="rn-tbl" style="margin-bottom:14px"><thead><tr><th>일시</th><th></th><th>질문</th><th>답(앞부분)</th><th>메모</th><th>누가</th></tr></thead><tbody>'+F.filter(function(x){ return x.verdict==='down'; }).concat(F.filter(function(x){ return x.verdict==='up'; }).slice(0,5)).map(function(x){
-      return '<tr><td class="mini">'+esc(String(x.created_at||'').replace('T',' ').slice(0,16))+'</td><td>'+(x.verdict==='up'? '👍':'👎')+'</td><td>'+esc(x.question||'')+'</td><td class="mini">'+esc(String(x.answer_head||'').slice(0,110))+'</td><td class="mini">'+esc(x.note||'')+'</td><td class="mini">'+esc(String(x.email||'').split('@')[0])+'</td></tr>'; }).join('')+'</tbody></table>'; }
+      return '<tr><td class="mini">'+esc(String(x.created_at||'').replace('T',' ').slice(0,16))+'</td><td class="nw">'+(x.verdict==='up'? '👍':'👎')+'</td><td class="q-col">'+esc(x.question||'')+'</td><td class="mini wrap ans-col">'+esc(String(x.answer_head||'').slice(0,110))+'</td><td class="mini wrap" style="--td-min:120px">'+esc(x.note||'')+'</td><td class="mini">'+esc(String(x.email||'').split('@')[0])+'</td></tr>'; }).join('')+'</tbody></table>'; }
   return h;
 }
 function aiCheckBind(host){

@@ -388,6 +388,39 @@ if (fs.existsSync(path.join(DIR, 'staging', 'index.html'))) {
     await ctx.close();
     policy = { required: false, deadline: null };
   }
+  // G) ㊿+145 빠른 길: 지난번 «인증 앱 없음»(m:'none')으로 기억된 세션인데 그사이 다른 기기에서 등록 → 데이터 읽기 먼저 → 뒤 확인에서 코드 창 → 맞으면 새로고침
+  {
+    factors = [{ id: 'f1', factor_type: 'totp', status: 'verified', friendly_name: 'x', created_at: '2026-10-03T00:00:00Z' }];
+    const seq = []; const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 } }); const page = await ctx.newPage();
+    await mockBackend(page, { token: jwt('aal1'), extra: async (route, u, m) => { seq.push(u.replace(/^https?:\/\/[^/]+/, '').split('?')[0]); return mfaExtra(route, u, m); } });
+    await page.addInitScript(() => { try { const s = JSON.parse(sessionStorage.getItem('svc_sess')); s.m = 'none'; sessionStorage.setItem('svc_sess', JSON.stringify(s)); } catch (e) { /* noop */ } });
+    await page.goto(url + '/index.html'); await page.waitForTimeout(1800);
+    await S.t('MFA 빠른 길(㊿+145): 기억된 «없음»이 틀려도 뒤 확인에서 코드 창 → 맞으면 새로고침', async () => {
+      const iLoad = seq.indexOf('/rest/v1/rpc/load_all'), iUser = seq.indexOf('/auth/v1/user');
+      assert(iLoad >= 0 && iUser >= 0 && iLoad < iUser, '데이터를 먼저 읽지 않음: ' + seq.slice(0, 8).join(','));
+      assert(await page.$('#ovlMfa #mfaCode'), '뒤 확인에서 코드 창이 안 뜸');
+      assert(await page.evaluate(() => (JSON.parse(sessionStorage.getItem('svc_sess')) || {}).m === ''), '«없음» 표시를 지우지 않음');
+      const nav = page.waitForEvent('framenavigated', { timeout: 6000 });
+      await page.fill('#mfaCode', '123456'); await nav;
+      assert(authCalls.includes('verify:f1:123456'), authCalls.join(',')); return seq.slice(0, 5).join(' → ');
+    });
+    await ctx.close();
+  }
+  // H) ㊿+145 빠른 길: 로그인 응답에 확인된 인증 앱이 없으면 데이터 읽기와 인증 확인을 함께 → 확인 결과 «없음»을 세션에 기억
+  {
+    factors = []; const seq = [];
+    const { ctx, page, errs } = await open({ noSession: true, extra: async (route, u, m) => { seq.push(u.replace(/^https?:\/\/[^/]+/, '').split('?')[0]); return mfaExtra(route, u, m); } });
+    await S.t('MFA 빠른 길(㊿+145): 로그인 → 데이터 먼저 · 확인은 뒤에서 · m=none 기억', async () => {
+      seq.length = 0;
+      await page.fill('#lsEmail', 'tester@example.com'); await page.fill('#lsPw', 'pw'); await page.click('#lsGo'); await page.waitForTimeout(2000);
+      const iLoad = seq.indexOf('/rest/v1/rpc/load_all'), iUser = seq.indexOf('/auth/v1/user'), iPol = seq.indexOf('/rest/v1/rpc/mfa_status');
+      assert(iLoad >= 0 && iLoad < iUser && iLoad < iPol, '순서: ' + seq.join(','));
+      assert(!(await page.$('#ovlMfa')), '코드 창이 뜸'); assert(await page.evaluate(() => !!window.DATA && window.CUR_VIEW === 'dash'), '대시보드 아님');
+      assert(await page.evaluate(() => JSON.parse(sessionStorage.getItem('svc_sess')).m) === 'none', 'm 표시 없음');
+      assert(!errs.length, errs.join(' | ')); return seq.slice(0, 6).join(' → ');
+    });
+    await ctx.close();
+  }
 }
 // 10) 견적서 직인 — quote.html 이 비공개 Storage 에서 로그인 토큰으로 받아 <img> 에 넣는지 · 없으면 숨김
 if (fs.existsSync(path.join(DIR, 'quote.html'))) {
@@ -782,6 +815,77 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
     const del = calls.find((c) => c.action === 'gh_delete'); assert(del, 'gh_delete 없음');
     assert(del.paths.sort().join('|') === 'check.mjs|js/app.js|staging/.github/workflows/deploy.yml|staging/js/app.js', del.paths.join('|'));
     assert(!errs.length, errs.join(' | ')); return del.paths.length + '개 정리';
+  });
+  await ctx.close();
+}
+// ㊿+145: 로그아웃 → 서버 왕복 없이 로그인 화면 · 로그인 → 항상 대시보드 · 메뉴는 첫 화면 · 뒤로가기는 이어서 · AI 점검 표 · 사본 쓰기 취소 · 폭 감시 1개
+{
+  let sbN = 0; let counting = false;
+  const { ctx, page, errs } = await open({ noSession: true, extra: async (route, u) => { if (counting) sbN++;
+    if (u.includes('grant_type=password')) { await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ access_token: 'tok', refresh_token: 'r1', expires_in: 3600, token_type: 'bearer', user: { id: 'u1', email: 'tester@example.com', user_metadata: { pw_changed: true } } }) }); return true; }
+    return false; } });
+  page.on('dialog', (d) => d.accept().catch(() => {}));
+  await S.t('㊿+145 로그인 → 대시보드 · 다른 메뉴에서 로그아웃 → Supabase 호출 없이 로그인 화면 · 주소의 #메뉴 지움', async () => {
+    assert(await page.evaluate(() => !document.getElementById('viewLogin').classList.contains('hidden')), '처음 로그인 화면 아님');
+    await page.fill('#lsEmail', 'tester@example.com'); await page.fill('#lsPw', 'pw'); await page.click('#lsGo'); await page.waitForTimeout(1500);
+    assert(await page.evaluate(() => window.CUR_VIEW === 'dash' && !document.getElementById('viewDash').classList.contains('hidden')), '로그인 뒤 대시보드 아님');
+    await page.evaluate(() => navMenu('contracts')); await page.waitForTimeout(400);
+    assert(await page.evaluate(() => location.hash) === '#contracts', '해시 ' + await page.evaluate(() => location.hash));
+    counting = true; sbN = 0;
+    await page.evaluate(() => { setTimeout(() => doLogout(), 0); }); await page.waitForTimeout(1500);
+    const st = await page.evaluate(() => ({ login: !document.getElementById('viewLogin').classList.contains('hidden'), hash: location.hash, sess: !!sessionStorage.getItem('svc_sess') }));
+    counting = false;
+    assert(st.login && !st.hash && !st.sess, JSON.stringify(st)); assert(sbN === 0, '로그아웃 뒤 Supabase 호출 ' + sbN + '번');
+    await page.fill('#lsEmail', 'tester@example.com'); await page.fill('#lsPw', 'pw'); await page.click('#lsGo'); await page.waitForTimeout(1500);
+    assert(await page.evaluate(() => window.CUR_VIEW === 'dash' && !location.hash), '다시 로그인 뒤 대시보드 아님');
+    assert(!errs.length, errs.join(' | ')); return 'logout→login 화면 Supabase 0회';
+  });
+  await S.t('㊿+145 주소에 #메뉴가 남은 채 로그인 화면에서 로그인해도 대시보드', async () => {
+    await page.evaluate(() => { history.replaceState(null, '', location.pathname + '#ops'); doLogout(); }); await page.waitForTimeout(1500);
+    await page.evaluate(() => history.replaceState(null, '', location.pathname + '#ops'));
+    await page.fill('#lsEmail', 'tester@example.com'); await page.fill('#lsPw', 'pw'); await page.click('#lsGo'); await page.waitForTimeout(1500);
+    const r = await page.evaluate(() => ({ v: window.CUR_VIEW, h: location.hash })); assert(r.v === 'dash' && !r.h, JSON.stringify(r)); return 'dash';
+  });
+  await S.t('㊿+145 메뉴를 누르면 첫 화면(탭·검색·스크롤) · 뒤로가기는 이어서', async () => {
+    await page.evaluate(() => navMenu('ops')); await page.waitForTimeout(500);
+    await page.click('#opsTabs [data-t="log"]'); await page.waitForTimeout(500);
+    assert(await page.evaluate(() => OPS.tab) === 'log', '기록 탭으로 안 바뀜');
+    await page.evaluate(() => navMenu('contracts')); await page.waitForTimeout(400);
+    await page.evaluate(() => goBack()); await page.waitForTimeout(600);
+    assert(await page.evaluate(() => window.CUR_VIEW === 'ops' && OPS.tab === 'log'), '뒤로가기가 이어서 보지 않음');
+    await page.evaluate(() => document.querySelector('#side button[data-v="dash"]').click()); await page.waitForTimeout(300);
+    await page.evaluate(() => document.querySelector('#side button[data-v="ops"]').click()); await page.waitForTimeout(500);
+    assert(await page.evaluate(() => OPS.tab) === 'gh', '메뉴로 들어왔는데 탭 유지: ' + await page.evaluate(() => OPS.tab));
+    await page.evaluate(() => document.querySelector('#side button[data-v="churn"]').click()); await page.waitForTimeout(500);
+    await page.evaluate(() => { CHURN.q = 'zz'; renderChurn(); window.scrollTo(0, 900); }); await page.waitForTimeout(300);
+    await page.evaluate(() => document.querySelector('#side button[data-v="dash"]').click()); await page.waitForTimeout(300);
+    await page.evaluate(() => document.querySelector('#side button[data-v="churn"]').click()); await page.waitForTimeout(500);
+    const r = await page.evaluate(() => ({ q: CHURN.q, y: Math.round(scrollY) })); assert(r.q === '' && r.y === 0, JSON.stringify(r));
+    await page.evaluate(() => { STATE.ind = '제조'; }); await page.evaluate(() => document.querySelector('#side button[data-v="dash"]').click()); await page.waitForTimeout(400);
+    assert(await page.evaluate(() => STATE.ind === '' && STATE.base === window.DASH_BASE0), '홈 거르기 초기화 안 됨');
+    assert(!errs.length, errs.join(' | ')); return 'ops 탭 · 해지 검색 · 스크롤 · 홈 거르기';
+  });
+  await S.t('㊿+145 AI 점검 표 — 질문 칸이 찌그러지지 않고 표가 카드 안에', async () => {
+    await page.setViewportSize({ width: 1920, height: 1000 });
+    await page.evaluate(() => { navMenu('ops'); OPS.tab = 'log'; const A = '이번 달(2026-10) MRR은 약 9,956만원(99,557,735원)이고, 연환산 ARR로는 11.95억원입니다. 전월(9월) 9,932만원에서 24만원 정도 늘어, 증가폭이 최근 몇 달보다 확 줄었습니다. 서비스별로는 Cloud NAC가 6,061만원';
+      OPS.aic = { running: false, at: '2026-10-04T09:00:00', rows: AI_CHECK_QS.map((x, i) => ({ q: x.q, l: x.l, st: i ? '통과' : '기대값 없음', ok: !!i, ms: 6200, model: 'claude-sonnet-5-5', tools: 1, text: A })) }; renderOps(true); });
+    await page.waitForTimeout(500);
+    const r = await page.evaluate(() => { const t = document.querySelector('#opsAiCheck').closest('#opsBody').querySelector('td.q-col').closest('table'); const card = document.getElementById('opsHost');
+      const qs = Array.from(t.querySelectorAll('td.q-col')).map((c) => c.getBoundingClientRect().width); const res = Array.from(t.querySelectorAll('td.nw')).map((c) => { const g = document.createRange(); g.selectNodeContents(c); const b = g.getBoundingClientRect(); return b.height; });   /* 칸 안 글자 높이(한 줄 ≈ 20px) */
+      return { minQ: Math.min(...qs), maxResH: Math.max(...res), over: Math.round(t.getBoundingClientRect().right - card.getBoundingClientRect().right) }; });
+    assert(r.minQ >= 140 && r.maxResH < 30 && r.over <= 2, JSON.stringify(r)); await page.setViewportSize({ width: 1440, height: 1000 }); return JSON.stringify(r);
+  });
+  await S.t('㊿+145 사본(sessionStorage) 쓰기는 나중에 · 무효화하면 예약도 취소 · 폭 감시는 1개', async () => {
+    const r = await page.evaluate(async () => {
+      cacheDrop(); cacheWriteLater([[1]]); cacheDrop(); await new Promise((ok) => setTimeout(ok, 3300)); const dropped = sessionStorage.getItem(CACHE_KEY) === null;
+      cacheWriteLater([[{ id: 1 }]]); await new Promise((ok) => setTimeout(ok, 3300)); const written = !!sessionStorage.getItem(CACHE_KEY);
+      navMenu('dash'); onData(DATA); onData(DATA); await new Promise((ok) => setTimeout(ok, 400));
+      window.__rn = 0; const orig = window.renderAll; window.renderAll = function () { window.__rn++; return orig.apply(this, arguments); };
+      return { dropped, written, wwOn: _wwOn };
+    });
+    await page.setViewportSize({ width: 1100, height: 1000 }); await page.waitForTimeout(700);
+    const n = await page.evaluate(() => window.__rn);
+    assert(r.dropped && r.written && r.wwOn && n <= 1, JSON.stringify(r) + ' renderAll×' + n); await page.setViewportSize({ width: 1440, height: 1000 }); return JSON.stringify(r) + ' 크기 바꿈 → renderAll ' + n + '번';
   });
   await ctx.close();
 }

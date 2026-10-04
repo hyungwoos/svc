@@ -700,7 +700,7 @@ function ensureGroupOpen(view){
 }
 function setupSide(){
   $('#side').querySelectorAll('button').forEach(function(b){
-    b.onclick=function(){ switchView(this.dataset.v); closeDrawer(); };
+    b.onclick=function(){ navMenu(this.dataset.v); closeDrawer(); };
   });
   $('#side').querySelectorAll('.grp').forEach(function(g){
     g.onclick=function(){

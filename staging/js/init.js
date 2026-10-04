@@ -629,6 +629,7 @@ document.addEventListener('keydown', function(e){
 });   /* 예전 onsubmit="return false" */
 /* ㊿+141: 창 공통 — 바깥 클릭으로 닫기 · 입력 중 확인 · 초점 들어가기/가두기/되돌리기 (edit.js ovlInit) */
 ovlInit();
+try{ viewSnapInit(); }catch(e){}   /* ㊿+145: 메뉴 «첫 화면» 값 — 상태 객체를 건드리기 전에 사본 */
 
 /* [edit.js 15194행] */
 boot();
