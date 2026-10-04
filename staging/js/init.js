@@ -617,7 +617,16 @@ document.addEventListener('click', function(e){
   var c=t.closest('[data-close]'); if(c){ if(c.dataset.pre==='oiconv') OI_CONVERT=null; closeOvl(c.dataset.close); return; }
   var a=t.closest('a[data-sat]'); if(a){ a.href=a.dataset.sat+'?v='+encodeURIComponent(APP_VER); }
 });
-document.addEventListener('submit', function(e){ if(e.target && e.target.id==='lsLogin') e.preventDefault(); });   /* 예전 onsubmit="return false" */
+document.addEventListener('submit', function(e){ if(e.target && e.target.id==='lsLogin') e.preventDefault(); });
+/* ⑤ UX 2단계 (㊿+139): 표 동작 열 여백은 창 크기에 따라 다시 계산 · ❔ 화면 도움말 · ? 단축키 안내 */
+onResize(function(){ if(CUR_VIEW && GRIDS[CUR_VIEW]) gridActPad(); });
+(function(){ var b=document.getElementById('dvHelp'); if(b) b.addEventListener('click', askScreenHelp); })();
+document.addEventListener('keydown', function(e){
+  if(e.key!=='?' || e.ctrlKey || e.metaKey || e.altKey) return;
+  var a=document.activeElement, tag=a? a.tagName : ''; if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||(a&&a.isContentEditable)) return;
+  var app=document.getElementById('app'); if(!app || app.classList.contains('hidden')) return;
+  e.preventDefault(); var ov=document.getElementById('ovlKeys'); if(ov) ov.classList.toggle('on');
+});   /* 예전 onsubmit="return false" */
 
 /* [edit.js 15194행] */
 boot();

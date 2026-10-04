@@ -48,6 +48,8 @@ jobs:
         run: test -f supabase/functions/ops/index.ts && deno run -A tests/fn/ops.test.ts || echo "ops 소스 없음 — 건너뜀"
       - name: remind 함수 테스트
         run: test -f supabase/functions/remind/index.ts && deno run -A tests/fn/remind.test.ts || echo "remind 소스 없음 — 건너뜀"
+      - name: aicheck 함수 테스트
+        run: test -f supabase/functions/aicheck/index.ts && deno run -A tests/fn/aicheck.test.ts || echo "aicheck 소스 없음 — 건너뜀"
   deploy:
     needs: [test, functions]
     runs-on: ubuntu-latest

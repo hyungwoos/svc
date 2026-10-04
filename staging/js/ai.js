@@ -184,7 +184,9 @@ function ask(q){
         (r.cut? ' · <span style="color:#a06c00">'+esc(r.degraded? '답 미완성: '+r.cut : '도구 중단: '+r.cut)+'</span>':'')+
         (r.tried&&r.tried.length? ' · <span style="color:#a06c00">폴백: '+esc(r.tried.join(' / '))+'</span>':'')+
         (r._ms? ' · '+(r._ms/1000).toFixed(1)+'초':'')+
-        ' · '+new Date().toTimeString().slice(0,5)+' 데이터 기준</div>';
+        ' · '+new Date().toTimeString().slice(0,5)+' 데이터 기준'+
+        '<span class="ai-fb" role="group" aria-label="이 답변 평가"><button type="button" data-fb="up" aria-label="도움이 됐어요" title="도움이 됐어요">👍</button><button type="button" data-fb="down" aria-label="틀렸거나 부족해요" title="틀렸거나 부족해요 — 무엇이 틀렸는지 적으면 AI 지식 보강에 씁니다">👎</button></span></div>';
+      aiFeedbackBind(say, q, r);
       HIST.push({q:q, a:r.text}); if(HIST.length>10) HIST.shift();
       saveHistTurn(q, r.text);                  // 계정별 누적 기억 (세션 무관)
       // 표·그래프가 도움이 되는 질문이면 포탈이 직접 계산해서 아래에 붙입니다
@@ -205,6 +207,19 @@ function ask(q){
     });
 }
 
+/* 👍/👎 — ai_feedback(SQL 94) 에 본인 행으로 기록. 👎 는 «무엇이 틀렸나» 메모(선택). 표가 없으면 토스트만. (⑥ AI 2단계 · ㊿+139) */
+function aiFeedbackBind(say, q, r){
+  say.querySelectorAll('.ai-fb button').forEach(function(b){ b.onclick=function(){ aiFeedback(b.dataset.fb, q, r, say); }; });
+}
+async function aiFeedback(verdict, q, r, say){
+  var note=null;
+  if(verdict==='down'){ note=prompt('무엇이 틀렸거나 부족했나요? (선택 — 비워도 기록됩니다)'); if(note===null) return; note=note.trim()||null; }
+  var btns=say? say.querySelectorAll('.ai-fb button') : []; btns.forEach(function(b){ b.disabled=true; b.setAttribute('aria-pressed', String(b.dataset.fb===verdict)); });
+  try{
+    await sbWrite('POST','ai_feedback',{email:AUTH_USER||'', verdict:verdict, question:String(q||'').slice(0,500), answer_head:String((r&&r.text)||'').slice(0,400), note:note, model:(r&&r.model)||null, ms:(r&&r._ms)||null, app_ver:APP_VER, view:CUR_VIEW});
+    toast(verdict==='up'? '고마워요 👍':'기록했어요 👎', verdict==='up'? '도움이 된 답으로 남겼습니다':'관리자가 배포·운영 › 기록에서 보고 AI 지식을 보강합니다');
+  }catch(e){ btns.forEach(function(b){ b.disabled=false; b.removeAttribute('aria-pressed'); }); toast('피드백 저장 실패', /ai_feedback|404|schema cache/i.test(String(e.message||e))? 'SQL 94 가 아직 실행되지 않았습니다':String(e.message||e).slice(0,120), 'warn'); }
+}
 /* 답변 패널을 열고, 화면 밖에 있으면 보이는 위치로 살짝 스크롤 */
 function revealAnswer(){
   var a=$('#answer'); if(!a) return;

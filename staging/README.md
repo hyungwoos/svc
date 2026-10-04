@@ -18,7 +18,7 @@ js/init.js            즉시 실행 문장 전부(이벤트 등록 · GRIDS 표 
 quote.html report.html s1.html kk.html orders.html   위성 페이지(iframe) — 세션은 sessionStorage['svc_sess'] 공유
 manifest.webmanifest sw.js pwa-*.png                 홈 화면 앱(PWA) — js 파일을 더하면 sw.js SHELL 도 함께
 staging/              스테이징 사본 (배포·운영 › «운영 → 스테이징 동기화» 가 만듦)
-supabase/functions/   Edge Function 소스 — ops(배포·운영) · remind(만기 슬랙)   ※ 사이트 배포엔 포함되지 않음 · ask(AI) 소스는 업무 지식(고객명·금액)이 들어 있어 공개 저장소에 두지 않음(.gitignore)
+supabase/functions/   Edge Function 소스 — ops(배포·운영) · remind(만기 슬랙) · aicheck(AI 야간 점검)   ※ 사이트 배포엔 포함되지 않음 · ask(AI) 소스는 업무 지식(고객명·금액)이 들어 있어 공개 저장소에 두지 않음(.gitignore)
 tests/                정적 검사 · 브라우저 스모크 · 함수 테스트 (아래)
 .github/workflows/deploy.yml   테스트 통과 → Pages 배포
 ```
@@ -31,7 +31,7 @@ tests/                정적 검사 · 브라우저 스모크 · 함수 테스�
 |---|---|---|
 | `npm run check` | 정적 검사 — 모든 HTML/JS 문법, 비밀값 패턴, CSP·SRI, APP_VER 한 곳, app-js ↔ sw.js SHELL 일치, 최상위 함수 이름 중복, 코드 목록(CODE_KIND) 정합, fixture 가 가상 데이터인지 | Node 20 |
 | `npm test` | 브라우저 스모크(Playwright) — 가짜 Supabase/CDN 으로 포탈을 띄워 화면 20여 개 · 만기 처리 · MFA · 배포·운영 · 코드 관리 · 데이터 점검 동작과 **쓰기 요청 본문**을 확인. 운영 DB 접근 없음 | `npm install && npm run test:install` |
-| `npm run test:fn` | Edge Function — `deno check` + ops/remind 를 가짜 외부 서비스(GitHub·Management API·Auth·Slack)로 실행해 인증 4중·동작·보호 경로·PIN 잠금·슬랙 본문 확인 | Deno 2 |
+| `npm run test:fn` | Edge Function — `deno check` + ops/remind/aicheck 를 가짜 외부 서비스(GitHub·Management API·Auth·Slack·ask)로 실행해 인증·동작·보호 경로·PIN 잠금·슬랙 본문·점검 판정 확인 | Deno 2 |
 
 `tests/fixture/load_all.json` 은 `rpc/load_all` 의 가짜 응답(고객명 «가상고객NN»). 실데이터를 fixture 로 쓰지 마세요 — `check.mjs` 가 막습니다.
 
@@ -47,5 +47,5 @@ tests/                정적 검사 · 브라우저 스모크 · 함수 테스�
 ## 백엔드(요약)
 
 - Supabase(REST/RPC + RLS) — 공개 코드에는 anon 키만, 실제 경계는 RLS. 선택 목록은 `code_lists` 표 한 곳(포탈 select · 데이터 점검 · DB 트리거 검증이 모두 참조).
-- Edge Functions: `ask`(AI 질문·도구 — 소스는 비공개 보관) · `ops`(GitHub 커밋 · SQL 실행 · 함수 배포 — 토큰은 Secrets 에만, 포탈엔 작업 PIN) · `remind`(월말 만기 슬랙).
+- Edge Functions: `ask`(AI 질문·도구 — 소스는 비공개 보관) · `ops`(GitHub 커밋 · SQL 실행 · 함수 배포 — 토큰은 Secrets 에만, 포탈엔 작업 PIN) · `remind`(월말 만기 슬랙) · `aicheck`(매일 새벽 AI 답 품질 점검 → ai_check_log · 통과율 미달 시 슬랙).
 - 모든 데이터 변경은 `change_log`, 운영 동작은 `ops_log`, 밤마다 `snap` 스키마에 스냅샷.

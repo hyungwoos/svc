@@ -105,7 +105,10 @@ for (const f of ['quote.html', 'report.html', 's1.html', 'kk.html']) {
 {
   const opsCalls = [];
   const seal = { exists: false, puts: [] };
-  const { ctx, page, errs } = await open({ extra: async (route, u, m) => {
+  const opsWrites = [];
+  const { ctx, page, errs } = await open({ onWrite: (w) => opsWrites.push(w), extra: async (route, u, m) => {
+    if (m === 'GET' && u.includes('/rest/v1/ai_check_log')) { await route.fulfill({ status: 200, contentType: 'application/json', headers: { 'content-range': '0-1/2', 'Access-Control-Expose-Headers': 'content-range' }, body: JSON.stringify([{ run_at: '2026-10-03T18:00:00', source: 'cron', pass: 11, total: 12, avg_ms: 8200, model: 'claude-sonnet-5', fails: [{ q: '다음 달 만기 계약 몇 건이야?', why: '기대값 없음' }] }, { run_at: '2026-10-02T09:00:00', source: 'portal', pass: 15, total: 15, avg_ms: 9100, model: 'claude-sonnet-5', fails: [] }]) }); return true; }
+    if (m === 'GET' && u.includes('/rest/v1/ai_feedback')) { await route.fulfill({ status: 200, contentType: 'application/json', headers: { 'content-range': '0-1/2', 'Access-Control-Expose-Headers': 'content-range' }, body: JSON.stringify([{ created_at: '2026-10-03T10:00:00', email: 'tester@example.com', verdict: 'down', question: '에스원 MRR?', answer_head: '자료 없음', note: '숫자가 빠짐' }, { created_at: '2026-10-03T09:00:00', email: 'tester@example.com', verdict: 'up', question: 'LIVE 몇 곳?', answer_head: '357곳', note: null }]) }); return true; }
     if (u.includes('/storage/v1/object/')) {   // 직인(비공개 Storage) 가짜: 올리기 전엔 400, 올린 뒤엔 PNG
       if (m === 'POST') { seal.puts.push({ ct: route.request().headers()['content-type'], upsert: route.request().headers()['x-upsert'], auth: !!route.request().headers()['authorization'] }); seal.exists = true; await route.fulfill({ status: 200, contentType: 'application/json', body: '{"Key":"private/seal.jpg"}' }); return true; }
       if (!seal.exists) { await route.fulfill({ status: 400, contentType: 'application/json', body: '{"statusCode":"404","error":"not_found","message":"Object not found"}' }); return true; }
@@ -163,8 +166,80 @@ for (const f of ['quote.html', 'report.html', 's1.html', 'kk.html']) {
     await page.click('#opsAiCheck'); await page.waitForTimeout(2500);
     const n = await page.$$eval('#opsBody table tbody tr td:first-child', (t) => t.filter((x) => /^\d+$/.test(x.textContent.trim())).length); assert(n === 15, '질문 행 ' + n);
     const sum = await page.evaluate(() => OPS.aic && OPS.aic.summary); assert(sum && sum.total === 15 && typeof sum.pass === 'number', 'summary ' + JSON.stringify(sum));
-    assert(await page.$('#opsAiXlsx'), '엑셀 버튼 없음'); return sum.pass + '/' + sum.total + ' (mock 답이라 대부분 미통과가 정상)';
+    assert(await page.$('#opsAiXlsx'), '엑셀 버튼 없음');
+    const lg = opsWrites.filter((w) => /ai_check_log/.test(w.url) && w.m === 'POST')[0]; assert(lg, 'ai_check_log POST 없음');
+    const lb = JSON.parse(lg.body); assert(lb.source === 'portal' && lb.total === 15 && Array.isArray(lb.rows) && lb.rows.length === 15 && Array.isArray(lb.fails), JSON.stringify(lb).slice(0, 160));
+    return sum.pass + '/' + sum.total + ' (mock 답이라 대부분 미통과가 정상)';
   });
+  await S.t('배포·운영 › 기록: AI 점검 추이(수동+자동) · 👎 피드백 목록', async () => {
+    await page.waitForTimeout(600);
+    const t = await page.evaluate(() => { const h = document.getElementById('opsBody').innerText; return { trend: /AI 점검 추이/.test(h), auto: /🌙 자동/.test(h) && /11\/12/.test(h), manual: /🧑 수동/.test(h) && /15\/15/.test(h), fb: /답변 피드백/.test(h) && /숫자가 빠짐/.test(h) && /👍 1 · 👎 1/.test(h) }; });
+    assert(t.trend && t.auto && t.manual && t.fb, JSON.stringify(t)); assert(!errs.length, errs.join(' | ')); return JSON.stringify(t);
+  });
+  await ctx.close();
+}
+// ⑤ UX 2단계 · ⑥ AI 2단계 (㊿+139): 동작 열 여백 · 설명 접기 · ❔ 화면 도움말 · ? 단축키 · aria-label · 👍/👎 피드백
+{
+  const writes = [];
+  const { ctx, page, errs } = await open({ onWrite: (w) => writes.push(w) });
+  await S.t('표 동작 열: 가로로 넘칠 때만 마지막 데이터 열에 여백(act-pad)', async () => {
+    const check = async (v) => { await page.evaluate((v) => switchView(v), v); await page.waitForTimeout(300); return page.evaluate(() => { const t = document.getElementById('dvTable'), w = t.parentElement; return { over: w.scrollWidth > w.clientWidth + 2, pad: t.classList.contains('act-pad'), actw: t.style.getPropertyValue('--actw'), hasAct: !!t.querySelector('thead th.act') }; }); };
+    const a = await check('contracts'); assert(!a.hasAct || a.pad === a.over, 'contracts ' + JSON.stringify(a)); if (a.pad) assert(/^\d+px$/.test(a.actw), 'actw ' + a.actw);
+    await page.setViewportSize({ width: 900, height: 900 }); await page.waitForTimeout(400);
+    const b = await check('orders'); assert(b.hasAct && b.over && b.pad && /^\d+px$/.test(b.actw), '900px orders ' + JSON.stringify(b));
+    const padPx = await page.evaluate(() => parseFloat(getComputedStyle(document.querySelector('#dvTable thead th:nth-last-child(2)')).paddingRight)); assert(padPx >= parseFloat(b.actw) + 10, '여백 ' + padPx + ' vs ' + b.actw);
+    await page.setViewportSize({ width: 1440, height: 1000 }); await page.waitForTimeout(400);
+    return JSON.stringify({ wide: a.pad, narrow: b.pad, actw: b.actw });
+  });
+  await S.t('표 설명 접기: 긴 cap → 첫 문장 + «도움말 ▾» → 펼침 기억', async () => {
+    await page.evaluate(() => { try { localStorage.removeItem('svc_capopen_orders'); } catch (e) { /* noop */ } switchView('orders'); }); await page.waitForTimeout(300);
+    const a = await page.evaluate(() => ({ len: document.querySelector('#dvCap .cap-head').textContent.length, btn: (document.querySelector('#dvCap .cap-more') || {}).textContent }));
+    assert(a.len < 120 && /도움말/.test(a.btn), JSON.stringify(a));
+    await page.click('#dvCap .cap-more'); await page.waitForTimeout(100);
+    const b = await page.evaluate(() => ({ len: document.querySelector('#dvCap .cap-head').textContent.length, btn: document.querySelector('#dvCap .cap-more').textContent, saved: localStorage.getItem('svc_capopen_orders') }));
+    assert(b.len > a.len + 40 && /접기/.test(b.btn) && b.saved === '1', JSON.stringify(b));
+    await page.evaluate(() => { switchView('assets'); switchView('orders'); }); await page.waitForTimeout(300);
+    const c = await page.evaluate(() => /접기/.test(document.querySelector('#dvCap .cap-more').textContent)); assert(c, '펼침 상태 기억 안 됨');
+    const d = await page.evaluate(() => { switchView('contracts'); return document.querySelector('#dvCap .cap-more'); }); assert(!d, '짧은 cap 에 버튼이 생김');
+    return a.len + '→' + b.len;
+  });
+  await S.t('❔ 이 화면 사용법 → 홈 AI 질문 · ? 단축키 안내 · Esc 닫기', async () => {
+    await page.evaluate(() => switchView('orders')); await page.waitForTimeout(200);
+    await page.click('#dvHelp'); await page.waitForTimeout(900);
+    const st = await page.evaluate(() => ({ v: CUR_VIEW, on: document.getElementById('answer').classList.contains('on'), title: document.getElementById('ansTitle').textContent, say: document.getElementById('aiSay').textContent }));
+    assert(st.v === 'dash' && st.on && /화면/.test(st.title) && /mock/.test(st.say), JSON.stringify(st).slice(0, 200));
+    await page.keyboard.press('Shift+?'); await page.waitForTimeout(150);
+    let on = await page.evaluate(() => document.getElementById('ovlKeys').classList.contains('on')); assert(on, '? 로 단축키 창이 안 열림');
+    const kbd = await page.$$eval('#ovlKeys kbd', (e) => e.length); assert(kbd >= 8, 'kbd ' + kbd);
+    await page.keyboard.press('Escape'); await page.waitForTimeout(150);
+    on = await page.evaluate(() => document.getElementById('ovlKeys').classList.contains('on')); assert(!on, 'Esc 로 안 닫힘');
+    await page.focus('#q'); await page.keyboard.press('Shift+?'); await page.waitForTimeout(100);
+    on = await page.evaluate(() => document.getElementById('ovlKeys').classList.contains('on')); const qv = await page.$eval('#q', (e) => e.value); assert(!on && qv === '?', '입력칸에서 ? 가 창을 열었음 / 입력값 ' + qv);
+    await page.fill('#q', '');
+    assert(!errs.length, errs.join(' | ')); return st.title.slice(0, 30);
+  });
+  await S.t('접근성: 아이콘 버튼 aria-label · focus-visible 규칙', async () => {
+    const miss = await page.$$eval('.topbar button, .dbar button, #viewOps button', (bs) => bs.filter((b) => { const t = (b.textContent || '').replace(/\s/g, ''); return b.offsetParent !== null && !b.getAttribute('aria-label') && !b.title && t.length <= 2; }).map((b) => b.id || b.className || b.textContent));
+    assert(miss.length === 0, '라벨 없는 아이콘 버튼 ' + JSON.stringify(miss));
+    const named = await page.$$eval('#btnTheme,#btnReload,#btnFont,#btnFind,#dvHelp', (e) => e.every((b) => b.getAttribute('aria-label'))); assert(named, 'aria-label 누락');
+    const fv = await page.evaluate(() => [...document.styleSheets].some((ss) => { try { return [...ss.cssRules].some((r) => /focus-visible/.test(r.selectorText || '')); } catch (e) { return false; } })); assert(fv, 'focus-visible 규칙 없음');
+    return 'ok';
+  });
+  await S.t('AI 답 👍/👎 → ai_feedback POST (본인 이메일 · 👎 메모)', async () => {
+    page.on('dialog', (d) => d.accept('숫자가 빠졌어요'));
+    await page.evaluate(() => { switchView('dash'); ask('LIVE 고객사 몇 곳이야?'); }); await page.waitForTimeout(900);
+    const fb = await page.$$('#aiSay .ai-fb button'); assert(fb.length === 2, '피드백 버튼 ' + fb.length);
+    writes.length = 0; await fb[0].click(); await page.waitForTimeout(400);
+    const up = writes.filter((w) => /ai_feedback/.test(w.url) && w.m === 'POST')[0]; assert(up, '👍 POST 없음 ' + JSON.stringify(writes.map((w) => w.url.split('/rest/v1/')[1])));
+    const ub = JSON.parse(up.body); assert(ub.verdict === 'up' && ub.email === 'tester@example.com' && /LIVE/.test(ub.question) && ub.answer_head && ub.app_ver, JSON.stringify(ub).slice(0, 200));
+    const pressed = await page.evaluate(() => [...document.querySelectorAll('#aiSay .ai-fb button')].map((b) => b.getAttribute('aria-pressed') + ':' + b.disabled)); assert(pressed[0] === 'true:true' && pressed[1] === 'false:true', JSON.stringify(pressed));
+    await page.evaluate(() => ask('에스원 MRR 은?')); await page.waitForTimeout(900);
+    writes.length = 0; const fb2 = await page.$$('#aiSay .ai-fb button'); await fb2[1].click(); await page.waitForTimeout(400);
+    const dn = writes.filter((w) => /ai_feedback/.test(w.url) && w.m === 'POST')[0]; assert(dn, '👎 POST 없음');
+    const db = JSON.parse(dn.body); assert(db.verdict === 'down' && db.note === '숫자가 빠졌어요', JSON.stringify(db).slice(0, 200));
+    assert(!errs.length, errs.join(' | ')); return ub.verdict + ' / ' + db.verdict + ' «' + db.note + '»';
+  });
+  if (S.failed.length) await shot(page, 'smoke_fail_ux2');
   await ctx.close();
 }
 // 7) 브라우저 오류 수집 — 화면 JS 오류가 client_errors 로 1번만 기록되는지

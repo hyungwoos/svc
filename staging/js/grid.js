@@ -156,7 +156,7 @@ function switchView(v){
   /* 금액 열(won:1)이 있는 표는 제목 옆에 «천원 단위» 배지를 붙입니다 */
   var hasWon=(g.cols||[]).some(function(c){ return c.won; });
   $('#dvTitle').innerHTML=esc(g.title)+(hasWon? ' <span class="ubadge sm">₩ 금액 단위 = 천원</span>':'');
-  $('#dvCap').textContent=g.cap + (hasWon? ' · 표의 금액은 천원 단위 (입력·수정 창은 원 단위)':'') + (window.IS_VIEWER? ' · 조회 전용 계정입니다':'');
+  dvCapRender(v, g.cap + (hasWon? ' · 표의 금액은 천원 단위 (입력·수정 창은 원 단위)':'') + (window.IS_VIEWER? ' · 조회 전용 계정입니다':''));
   $('#dvAdd').style.display=(g.add && !window.IS_VIEWER)?'':'none';
   $('#dvPaste').style.display=(g.add && !window.IS_VIEWER)?'':'none';
   $('#dvSearch').value='';
@@ -742,6 +742,29 @@ function renderLiveBar(lb){
   var db=lb.querySelector('#lvDiffBtn'); if(db) db.onclick=function(){ LV.diff=!LV.diff; renderGrid(); };
   helpWire(lb);
 }
+/* 표 설명(cap) — 길면(120자 초과) 첫 문장만 보이고 «도움말 ▾» 로 펼침 · 펼침 상태는 화면별로 기억 (⑤ UX 2단계 · ㊿+139) */
+function dvCapRender(v, text){
+  var el=$('#dvCap'); if(!el) return; text=String(text||'');
+  var key='svc_capopen_'+v, open=false; try{ open=localStorage.getItem(key)==='1'; }catch(e){}
+  if(text.length<=120){ el.textContent=text; return; }
+  var cut=text.search(/ — | · /); var head=cut>20? text.slice(0,cut) : text.slice(0,90)+'…';
+  el.innerHTML='<span class="cap-head">'+esc(open? text : head)+'</span> <button type="button" class="cap-more" aria-expanded="'+open+'" aria-controls="dvCap">'+(open? '접기 ▴':'도움말 ▾')+'</button>';
+  el.querySelector('.cap-more').onclick=function(){ try{ localStorage.setItem(key, open? '0':'1'); }catch(e){} dvCapRender(v, text); };
+}
+/* 데스크톱 가로 스크롤 표에서 오른쪽 고정 동작(✎/🗑) 열이 마지막 데이터 열을 덮지 않게 — 표가 넘칠 때만 마지막 데이터 열에 동작 열 너비만큼 오른쪽 여백 (⑤ UX 2단계) */
+function gridActPad(){
+  var t=$('#dvTable'); if(!t) return; var wrap=t.parentElement, th=t.querySelector('thead th.act');
+  if(!th || window.innerWidth<=760){ t.classList.remove('act-pad'); t.style.removeProperty('--actw'); return; }
+  var over=wrap.scrollWidth>wrap.clientWidth+2;
+  if(over) t.style.setProperty('--actw', th.offsetWidth+'px');
+  t.classList.toggle('act-pad', over);
+}
+/* ❔ 이 화면 사용법 — 포탈 AI(팀 지식 SQL 91 포함)에게 현재 화면 사용법을 묻고 홈 답변 칸으로 이동 */
+function askScreenHelp(){
+  var g=GRIDS[CUR_VIEW], title=g? g.title : (function(){ var b=document.querySelector('#side button[data-v="'+CUR_VIEW+'"]'); return b? navText(b) : CUR_VIEW; })();
+  var q='포탈의 «'+String(title||'').replace(/^[^\w가-힣]+/,'').trim()+'» 화면은 어떻게 쓰나요? 주요 기능과 주의할 점을 짧게 알려줘';
+  var hit=cmdAskHit(q); if(hit && hit.go) hit.go(); else toast('AI 를 쓸 수 없습니다','조회 전용 장비 계정이거나 AI 가 꺼져 있습니다','warn');
+}
 function renderGrid(){
   var g=GRIDS[CUR_VIEW]; if(!g) return;
   var isCustom=!!g.custom;
@@ -853,6 +876,7 @@ function renderGrid(){
     tr.querySelectorAll('[data-dge]').forEach(function(b){ b.onclick=function(){ var k=b.dataset.dge; if(k==='q'){ $('#dvSearch').value=''; } if(k==='f'){ DV.filters={}; DV.lens=''; } if(k==='c'){ DV.chipVal=''; } DV.page=0; renderGrid(); }; });
   }
   t.appendChild(tb);
+  gridActPad();
 
   /* 페이저 */
   var pg=$('#dvPager'); pg.innerHTML='';

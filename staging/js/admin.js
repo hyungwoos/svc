@@ -406,9 +406,12 @@ async function aiCheckRun(){
   OPS.aic.running=false; OPS.aic.at=new Date().toISOString(); OPS.aic.ms=Date.now()-t0;
   var pass=OPS.aic.rows.filter(function(r){ return r.ok; }).length, cut=OPS.aic.rows.filter(function(r){ return r.cut; }).length;
   OPS.aic.summary={pass:pass, total:OPS.aic.rows.length, avg_ms:Math.round(OPS.aic.rows.reduce(function(a,r){ return a+(r.ms||0); },0)/OPS.aic.rows.length), cut:cut, models:Array.from(new Set(OPS.aic.rows.map(function(r){ return r.model; }).filter(Boolean)))};
-  try{ logChange('ai_check','ask',APP_VER,{pass:pass, total:OPS.aic.rows.length, avg_ms:OPS.aic.summary.avg_ms, cut:cut, fails:OPS.aic.rows.filter(function(r){ return !r.ok; }).map(function(r){ return r.q+' — '+r.st; })}); }catch(e){}
+  var failsL=OPS.aic.rows.filter(function(r){ return !r.ok; }).map(function(r){ return {q:r.q, why:r.st, head:String(r.text||'').slice(0,160)}; });
+  try{ logChange('ai_check','ask',APP_VER,{pass:pass, total:OPS.aic.rows.length, avg_ms:OPS.aic.summary.avg_ms, cut:cut, fails:failsL.map(function(f){ return f.q+' — '+f.why; })}); }catch(e){}
+  /* SQL 94 ai_check_log 에도(표 없으면 조용히 건너뜀) → 기록 탭 «AI 점검 추이»에서 야간 자동 점검(aicheck)과 함께 봄 */
+  try{ await sbWrite('POST','ai_check_log',{source:'portal', app_ver:APP_VER, pass:pass, total:OPS.aic.rows.length, avg_ms:OPS.aic.summary.avg_ms, model:OPS.aic.summary.models[0]||null, fails:failsL, rows:OPS.aic.rows.map(function(r){ return {q:r.q, ok:!!r.ok, why:r.st, ms:r.ms||0, tools:r.tools||0}; }), actor:AUTH_USER||null}); AIQ.trend=null; }catch(e){}
   toast('AI 점검 끝', pass+'/'+OPS.aic.rows.length+' 통과 · 평균 '+Math.round(OPS.aic.summary.avg_ms/1000)+'초', pass===OPS.aic.rows.length? 'ok':'warn');
-  renderOps(true);
+  renderOps(true); aiqLoad();
 }
 function aiCheckHtml(){
   var A=OPS.aic;
@@ -420,7 +423,35 @@ function aiCheckHtml(){
       return '<tr><td class="mini">'+(i+1)+'</td><td>'+esc(r.q)+'</td><td class="mini">'+esc(r.l)+'</td><td style="color:'+col+'">'+(r.st==='통과'? '✓ 통과': r.st==='진행'? '⏳ 진행' : r.st==='대기'? '· 대기' : '✗ '+esc(r.st))+(r.cut? ' <span class="mini">(축약)</span>':'')+'</td><td class="n mini">'+(r.ms? (r.ms/1000).toFixed(1)+'s':'')+'</td><td class="mini">'+esc(r.model||'')+(r.tools? ' · 도구 '+r.tools:'')+'</td><td class="mini">'+esc(r.text||'')+'</td></tr>'; }).join('')+'</tbody></table>';
   return h;
 }
+/* ===== AI 품질 (SQL 94 · ㊿+139): 점검 추이(포탈 수동 + 야간 자동 aicheck) · 👎 피드백 목록 ===== */
+var AIQ={trend:null, fb:null, loading:false};
+async function aiqLoad(){
+  if(AIQ.loading) return; AIQ.loading=true;
+  var t=await sbTry('ai_check_log?select=run_at,source,pass,total,avg_ms,model,fails&order=run_at.desc&limit=7');
+  var f=await sbTry('ai_feedback?select=created_at,email,verdict,question,answer_head,note&order=created_at.desc&limit=30');
+  AIQ.trend=t||[]; AIQ.fb=f||[]; AIQ.loading=false; AIQ.at=Date.now();
+  if(CUR_VIEW==='ops' && OPS.tab==='log') renderOps(true);
+}
+function aiqHtml(){
+  var T=AIQ.trend, F=AIQ.fb;
+  var h='<div class="ops-h" style="display:flex;align-items:center;gap:10px;margin-top:14px">AI 점검 추이 <span class="mini">(포탈 15문 + 야간 자동 aicheck · 최근 7회)</span> <button type="button" class="cbtn" id="aiqReload">↻</button></div>';
+  if(T===null) h+='<p class="mini" style="margin:0 0 14px">불러오는 중…</p>';
+  else if(!T.length) h+='<p class="mini" style="margin:0 0 14px">기록이 없습니다 — SQL 94 를 실행하고 15문 점검을 돌리거나, aicheck 함수를 배포해 야간 자동 점검을 켜면 쌓입니다.</p>';
+  else h+='<table class="rn-tbl" style="margin-bottom:14px"><thead><tr><th>일시</th><th>출처</th><th class="n">통과</th><th class="n">평균</th><th>모델</th><th>실패 질문</th></tr></thead><tbody>'+T.map(function(r){
+      var rate=r.total? r.pass/r.total:0, col=rate>=0.9? 'var(--brand)': rate>=0.7? '#8a5200':'var(--critical)';
+      var fl=Array.isArray(r.fails)? r.fails.map(function(f){ return typeof f==='string'? f : (f.q||''); }).filter(Boolean) : [];
+      return '<tr><td class="mini">'+esc(String(r.run_at||'').replace('T',' ').slice(0,16))+'</td><td>'+(r.source==='cron'? '🌙 자동':'🧑 수동')+'</td><td class="n" style="color:'+col+';font-weight:700">'+r.pass+'/'+r.total+'</td><td class="n mini">'+(r.avg_ms? (r.avg_ms/1000).toFixed(1)+'s':'')+'</td><td class="mini">'+esc(String(r.model||'').replace(/^claude-/,''))+'</td><td class="mini">'+esc(fl.slice(0,3).join(' · '))+(fl.length>3? ' 외 '+(fl.length-3):'')+'</td></tr>'; }).join('')+'</tbody></table>';
+  h+='<div class="ops-h" style="display:flex;align-items:center;gap:10px">답변 피드백 <span class="mini">(홈 AI 답 밑 👍/👎 · 최근 30건)</span></div>';
+  if(F===null) h+='<p class="mini" style="margin:0 0 14px">불러오는 중…</p>';
+  else if(!F.length) h+='<p class="mini" style="margin:0 0 14px">아직 피드백이 없습니다. 👎 가 쌓이면 여기서 보고 AI 지식에 보강하세요.</p>';
+  else { var up=F.filter(function(x){ return x.verdict==='up'; }).length, dn=F.length-up;
+    h+='<p class="mini" style="margin:0 0 6px">👍 '+up+' · 👎 '+dn+'</p><table class="rn-tbl" style="margin-bottom:14px"><thead><tr><th>일시</th><th></th><th>질문</th><th>답(앞부분)</th><th>메모</th><th>누가</th></tr></thead><tbody>'+F.filter(function(x){ return x.verdict==='down'; }).concat(F.filter(function(x){ return x.verdict==='up'; }).slice(0,5)).map(function(x){
+      return '<tr><td class="mini">'+esc(String(x.created_at||'').replace('T',' ').slice(0,16))+'</td><td>'+(x.verdict==='up'? '👍':'👎')+'</td><td>'+esc(x.question||'')+'</td><td class="mini">'+esc(String(x.answer_head||'').slice(0,110))+'</td><td class="mini">'+esc(x.note||'')+'</td><td class="mini">'+esc(String(x.email||'').split('@')[0])+'</td></tr>'; }).join('')+'</tbody></table>'; }
+  return h;
+}
 function aiCheckBind(host){
+  var q=host.querySelector('#aiqReload'); if(q) q.onclick=function(){ AIQ.trend=null; AIQ.fb=null; renderOps(true); aiqLoad(); };
+  if(AIQ.trend===null && !AIQ.loading) aiqLoad();
   var b=host.querySelector('#opsAiCheck'); if(b) b.onclick=aiCheckRun;
   var x=host.querySelector('#opsAiXlsx'); if(x) x.onclick=function(){ var A=OPS.aic; if(!A) return; xlsxAoa('AI점검_'+String(A.at||'').slice(0,10), ['#','질문','기대','결과','시간(s)','모델','도구','답'], A.rows.map(function(r,i){ return [i+1, r.q, r.l, r.st, r.ms? +(r.ms/1000).toFixed(1):'', r.model||'', r.tools||0, r.text||'']; })); };
 }
@@ -434,6 +465,7 @@ function opsLogHtml(){
   else if(!E.length) h+='<p class="mini" style="margin:0 0 14px">기록된 오류가 없습니다 ✓</p>';
   else h+='<table class="rn-tbl" style="margin-bottom:14px"><thead><tr><th>일시</th><th>계정</th><th>버전</th><th>화면</th><th>오류</th><th class="n">반복</th></tr></thead><tbody>'+E.map(function(r){ return '<tr><td class="mini">'+esc(String(r.at||'').replace('T',' ').slice(0,19))+'</td><td class="mini">'+esc(r.email||'')+'</td><td class="mini">'+esc(String(r.ver||'').replace(/^.*\s/,''))+'</td><td>'+esc(r.view||'')+'</td><td title="'+esc(r.msg||'')+'">'+esc(String(r.msg||'')).slice(0,100)+'</td><td class="n">'+(r.n||1)+'</td></tr>'; }).join('')+'</tbody></table>';
   h+=aiCheckHtml();
+  h+=aiqHtml();
   h+='<div class="ops-h">배포·운영 기록 (ops_log · 최근 30건)</div>';
   if(!st) h+='<p class="cap">상태 확인 중…</p>';
   else if(!st.ok) h+='<p class="cap" style="color:var(--critical)">'+esc(st.error||'')+'</p>';
