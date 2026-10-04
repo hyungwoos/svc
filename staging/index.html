@@ -19,7 +19,7 @@
 <!-- 포탈 버전 — 파일을 바꿔 올릴 때마다 아래 content 의 숫자가 +1 (화면 맨 아래 표시 · app.css / js/*.js 의 ?v= 캐시 무효화 · 배포·운영이 이 값을 읽어 비교).
      코드 파일 목록은 app-js (js/load.js 가 이 순서로 불러옴 · 마지막은 항상 js/init.js) — 파일을 더하거나 빼면 여기와 sw.js 의 SHELL 을 함께 고칠 것.
      ④ 아키텍처 2단계(㊿+136): 인라인 스크립트·onclick 을 전부 없애 CSP script-src 에서 'unsafe-inline' 제거. -->
-<meta name="app-ver" content="2026-09-16 ㊿+139">
+<meta name="app-ver" content="2026-09-16 ㊿+140">
 <meta name="app-js" content="js/viz.js,js/core.js,js/shell.js,js/dash.js,js/ai.js,js/grids.js,js/equipment.js,js/analysis.js,js/tools.js,js/price.js,js/inbound.js,js/admin.js,js/sales.js,js/report.js,js/grid.js,js/edit.js,js/init.js">
 <script src="js/boot.js"></script>
 </head>
@@ -968,17 +968,12 @@
 <div class="ovl" id="ovlQuote">
   <div class="modal" style="width:min(620px,100%)">
     <h3>📄 견적서 불러오기</h3>
-    <p class="cap" style="margin:0 0 12px">견적 시스템에 저장된 견적서 목록입니다. 하나를 고르면 OI 등록 폼이 자동으로 채워집니다.</p>
-    <div id="qpGate" style="display:none">
-      <p class="cap" style="margin:0 0 8px">견적 저장소 접속 비밀번호가 필요합니다. (견적 시스템에서 쓰는 팀 공용 비밀번호와 같습니다 · 이 브라우저에 저장됩니다)</p>
-      <div class="frm"><div class="full"><label>접속 비밀번호</label><input id="qpPw" type="password" autocomplete="off"></div></div>
-    </div>
+    <p class="cap" style="margin:0 0 12px">견적 시스템에 저장된 견적서 목록입니다. 하나를 고르면 OI 등록 폼이 자동으로 채워집니다. (포탈 로그인으로 자동 인증)</p>
     <div id="qpList" style="max-height:min(48vh,380px);overflow:auto;border:1px solid var(--line);border-radius:10px"></div>
     <div class="mact">
       <span class="mmsg" id="qpMsg"></span>
       <button class="pill ghost" id="qpUnlink" style="display:none;border-color:var(--critical);color:var(--critical)">연결 해제</button>
       <button class="pill ghost" id="qpClose" data-close="ovlQuote">닫기</button>
-      <button class="btn" style="height:36px;display:none" id="qpGo">확인</button>
     </div>
   </div>
 </div>

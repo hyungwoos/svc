@@ -302,7 +302,8 @@ function initOiForm(){
 
 /* ===== 견적서 → OI 자동 채움 ===================================
    견적서는 견적 시스템(Worker→GitHub)에 JSON으로 저장됩니다.
-   포탈과 같은 사이트라 접속 비밀번호(localStorage)를 그대로 씁니다.       */
+   Worker v2(2026-10-04 · cloudflare/quote-worker/worker.js)부터 팀 공용 비밀번호 대신 **포탈 로그인 토큰**(Authorization: Bearer)으로 인증 —
+   Worker 가 Supabase 로 토큰·역할·메뉴 권한(quote)을 확인합니다. 예전 localStorage 의 비밀번호는 읽을 때 지웁니다. */
 var QCFG_KEY='genians_quote_worker_config_v1';
 var QCFG_DEF='https://aged-union-cdd3.choihw.workers.dev';
 /* 견적서 서비스명 → 포탈 OI 제품군 */
@@ -321,14 +322,17 @@ var OI_QUOTE=null;   // {file, date, total}
 function qCfg(){
   var o={};
   try{ o=JSON.parse(localStorage.getItem(QCFG_KEY)||'{}')||{}; }catch(e){}
-  return { base:String(o.baseUrl||QCFG_DEF).replace(/\/+$/,''), pw:o.accessPassword||'' };
+  if(o && o.accessPassword!==undefined){ try{ delete o.accessPassword; localStorage.setItem(QCFG_KEY, JSON.stringify(o)); }catch(e){} }   // 옛 팀 공용 비밀번호(평문) 정리
+  return { base:String(o.baseUrl||QCFG_DEF).replace(/\/+$/,'') };
 }
-function qSavePw(pw){
-  try{
-    var o={}; try{ o=JSON.parse(localStorage.getItem(QCFG_KEY)||'{}')||{}; }catch(e){}
-    o.accessPassword=pw; if(!o.baseUrl) o.baseUrl=QCFG_DEF;
-    localStorage.setItem(QCFG_KEY,JSON.stringify(o));
-  }catch(e){}
+/* 견적 Worker 호출 — 포탈 로그인 토큰을 Bearer 로 · 401 이면 토큰을 한 번 갱신하고 다시 시도 */
+async function qFetch(path, opts){
+  opts=opts||{}; var cfg=qCfg();
+  if(!SB_TOKEN) throw new Error('포탈 로그인이 필요합니다');
+  var go=function(){ return fetch(cfg.base+path, Object.assign({}, opts, {headers:Object.assign({}, opts.headers||{}, {Authorization:'Bearer '+SB_TOKEN})})); };
+  var res=await go();
+  if(res.status===401 && await refreshToken()) res=await go();
+  return res;
 }
 function qNum(v){ return +String(v==null?'':v).replace(/[^0-9.-]/g,'')||0; }
 /* 파일명 20260826_고객사_1756000000000.json → 보기 좋게 */
@@ -341,10 +345,6 @@ function qLabel(name){
 var QP_TARGET=null;   // null = OI 등록 폼 채우기 · {row:r} = 기존 OI 에 연결
 function openQuotePick(target){
   QP_TARGET=(target&&target.row)? target : null;
-  var cfg=qCfg();
-  $('#qpGate').style.display = cfg.pw? 'none':'';
-  $('#qpGo').style.display   = cfg.pw? 'none':'';
-  $('#qpPw').value='';
   msg('qpMsg', QP_TARGET? ('「'+(QP_TARGET.row.customer||'')+'」 OI에 연결할 견적서를 고르세요') : '');
   var ul=$('#qpUnlink');
   ul.style.display=(QP_TARGET && QP_TARGET.row.quote_file)? '':'none';
@@ -361,8 +361,7 @@ function openQuotePick(target){
   };
   $('#qpList').innerHTML='';
   openOvl('ovlQuote');
-  if(cfg.pw) qpLoadList();
-  else setTimeout(function(){ $('#qpPw').focus(); },60);
+  qpLoadList();
 }
 /* OI 현황 행 → 견적서 연결/변경 */
 function oiLinkQuote(r){
@@ -370,10 +369,9 @@ function oiLinkQuote(r){
   openQuotePick({row:r});
 }
 async function qpLoadList(){
-  var cfg=qCfg();
   $('#qpList').innerHTML='<div class="cap" style="padding:16px;text-align:center">불러오는 중…</div>';
   try{
-    var res=await fetch(cfg.base+'/list',{headers:{'X-Access-Password':cfg.pw}});
+    var res=await qFetch('/list');
     if(!res.ok){ var e=await res.json().catch(function(){return {};});
       throw new Error(e.error||('HTTP '+res.status)); }
     var out=await res.json();
@@ -393,15 +391,13 @@ async function qpLoadList(){
     if(files.length>80) msg('qpMsg','최근 80건만 표시했습니다');
   }catch(err){
     $('#qpList').innerHTML='<div class="cap" style="padding:16px;text-align:center;color:var(--critical)">목록 조회 실패: '+esc(String(err.message||err))+'</div>';
-    if(/40[13]/.test(String(err.message))){ $('#qpGate').style.display=''; $('#qpGo').style.display=''; }
   }
 }
 async function qpPick(path, name){
-  var cfg=qCfg();
   msg('qpMsg','견적서를 읽는 중…');
   try{
-    var res=await fetch(cfg.base+'/load?path='+encodeURIComponent(path),{headers:{'X-Access-Password':cfg.pw}});
-    if(!res.ok) throw new Error('HTTP '+res.status);
+    var res=await qFetch('/load?path='+encodeURIComponent(path));
+    if(!res.ok){ var e0=await res.json().catch(function(){ return {}; }); throw new Error(e0.error||('HTTP '+res.status)); }
     var data=JSON.parse(await res.text());
     if(QP_TARGET && QP_TARGET.row){
       // 기존 OI 에 연결만 — 폼은 건드리지 않음
@@ -741,12 +737,6 @@ function setupSide(){
   $('#mpGo').onclick=submitMdrPoc;
   $('#oiGo').onclick=submitOi;
   $('#oiQuoteBtn').onclick=openQuotePick;
-  $('#qpGo').onclick=function(){
-    var pw=$('#qpPw').value.trim();
-    if(!pw){ msg('qpMsg','접속 비밀번호를 입력하세요','bad'); return; }
-    qSavePw(pw); $('#qpGate').style.display='none'; $('#qpGo').style.display='none'; msg('qpMsg',''); qpLoadList();
-  };
-  $('#qpPw').onkeydown=function(e){ if(e.key==='Enter') $('#qpGo').click(); };
   $('#oiDoneList').onclick=function(){ switchView('oi'); };
   $('#oiDoneNew').onclick=function(){ $('#oiDone').style.display='none'; $('#oiFormWrap').style.display=''; $('#oiCust').focus(); };
   $('#mpDoneList').onclick=function(){ switchView('mdrops'); };

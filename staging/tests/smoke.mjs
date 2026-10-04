@@ -489,6 +489,71 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
   if (S.failed.length) await shot(page, 'smoke_fail_codes');
   await ctx.close();
 }
+// 견적 Worker v2 (2026-10-04): 비밀번호 대신 포탈 로그인 토큰(Bearer) · 401 → 토큰 갱신 후 재시도 · 옛 비밀번호 정리 · 목록 이스케이프
+{
+  const wk = []; let w401 = 0, refreshed = 0;
+  const workerRoute = async (route) => {
+    const rq = route.request(), u = rq.url(), hd = rq.headers();
+    wk.push({ m: rq.method(), path: new URL(u).pathname, auth: hd['authorization'] || '', pw: hd['x-access-password'] || '', body: rq.postData() });
+    if (w401 > 0) { w401--; return route.fulfill({ status: 401, contentType: 'application/json', body: '{"error":"로그인이 만료되었습니다"}' }); }
+    const p = new URL(u).pathname;
+    if (p === '/list') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ files: [{ name: '20261001_가상고객01_1.json', path: 'quotes/20261001_가상고객01_1.json' }, { name: '<img src=x onerror=window.__xss=1>.json', path: 'quotes/x.json' }] }) });
+    if (p === '/save') return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"path":"quotes/x.json"}' });
+    if (p === '/whoami') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, email: 'tester@example.com', role: 'super_admin', auth: 'jwt', read: true, write: true, delete: true, version: 2 }) });
+    if (p === '/load') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ customerName: '가상고객01', quoteDate: '2026-10-01', grandTotal: '1,000,000', rows: [] }) });
+    return route.fulfill({ status: 404, contentType: 'application/json', body: '{}' });
+  };
+  // (1) quote.html 단독
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } }); const page = await ctx.newPage(); const c = collect(page);
+    await mockBackend(page, { extra: async (route, u) => { if (!u.includes('/auth/v1/token')) return false; refreshed++; await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ access_token: 'tok2', refresh_token: 'r2', expires_in: 3600 }) }); return true; } });
+    await page.addInitScript(() => {   // mockBackend 의 세션에 refresh 토큰을 넣고, 옛 버전이 저장해 둔 «팀 공용 비밀번호»를 심어 둠
+      const s = JSON.parse(sessionStorage.getItem('svc_sess') || '{}'); s.r = 'r1'; sessionStorage.setItem('svc_sess', JSON.stringify(s));
+      localStorage.setItem('genians_quote_worker_config_v1', JSON.stringify({ baseUrl: 'https://aged-union-cdd3.choihw.workers.dev', accessPassword: 'old-team-pw' }));
+    });
+    await page.route(/workers\.dev/, workerRoute);
+    await page.goto(url + '/quote.html'); await page.waitForTimeout(1200);
+    await S.t('견적 Worker v2: quote.html — 옛 비밀번호 정리 · 목록/저장이 Bearer 토큰 · 비밀번호 헤더 없음 · 목록 이스케이프', async () => {
+      await page.evaluate(() => { try { selectQuoteType('enterprise'); } catch (e) { /* 이미 선택 */ } }); await page.waitForTimeout(400);
+      const cfg = await page.evaluate(() => JSON.parse(localStorage.getItem('genians_quote_worker_config_v1') || '{}'));
+      assert(cfg.baseUrl && cfg.accessPassword === undefined, '옛 비밀번호가 남아 있음 ' + JSON.stringify(cfg));
+      wk.length = 0; await page.evaluate(() => listGithubQuotes()); await page.waitForTimeout(500);
+      const l = wk.filter((w) => w.path === '/list')[0]; assert(l && l.auth === 'Bearer tok' && !l.pw, '/list 헤더 ' + JSON.stringify(l));
+      const rows = await page.$$eval('#githubListBody .btn-load', (e) => e.length); assert(rows === 2, '목록 ' + rows);
+      const xss = await page.evaluate(() => ({ img: document.querySelectorAll('#githubListBody img').length, flag: !!window.__xss })); assert(xss.img === 0 && !xss.flag, '파일 이름이 HTML 로 해석됨 ' + JSON.stringify(xss));
+      wk.length = 0; const sv = await page.evaluate(() => silentSaveToGithub()); const p = wk.filter((w) => w.path === '/save')[0];
+      assert(sv.ok && p && p.auth === 'Bearer tok' && !p.pw && /"fileName"/.test(p.body), '/save ' + JSON.stringify({ sv, p: p && { auth: p.auth, pw: p.pw } }));
+      assert(!c.errs.length, c.errs.join(' | ')); assert(!c.csp.length, c.csp.join(' | ')); return 'list·save Bearer tok';
+    });
+    await S.t('견적 Worker v2: 401 → 토큰 갱신(/auth/v1/token) → 새 토큰으로 재시도 · 설정 창 «연결·권한 확인»', async () => {
+      await page.evaluate(() => openGithubSettings()); assert(!(await page.$('#ghToken')), '비밀번호 입력칸이 남아 있음');
+      wk.length = 0; w401 = 1; refreshed = 0; await page.evaluate(() => checkWorkerAuth()); await page.waitForTimeout(500);
+      const who = wk.filter((w) => w.path === '/whoami'); assert(who.length === 2 && who[0].auth === 'Bearer tok' && who[1].auth === 'Bearer tok2' && refreshed === 1, JSON.stringify(who.map((w) => w.auth)) + ' refresh ' + refreshed);
+      const st = await page.evaluate(() => ({ a: JSON.parse(sessionStorage.getItem('svc_sess')).a, r: JSON.parse(sessionStorage.getItem('svc_sess')).r, info: document.getElementById('ghAuthInfo').textContent }));
+      assert(st.a === 'tok2' && st.r === 'r2' && /✓ tester@example.com · 역할 super_admin · 조회·저장·삭제/.test(st.info), JSON.stringify(st));
+      assert(!c.errs.length, c.errs.join(' | ')); return st.info;
+    });
+    await ctx.close();
+  }
+  // (2) 포탈 OI › 견적서 불러오기
+  {
+    const { ctx, page, errs } = await open();
+    await page.addInitScript(() => localStorage.setItem('genians_quote_worker_config_v1', JSON.stringify({ baseUrl: 'https://aged-union-cdd3.choihw.workers.dev', accessPassword: 'old-team-pw' })));
+    await page.evaluate(() => localStorage.setItem('genians_quote_worker_config_v1', JSON.stringify({ baseUrl: 'https://aged-union-cdd3.choihw.workers.dev', accessPassword: 'old-team-pw' })));
+    await page.route(/workers\.dev/, workerRoute);
+    await S.t('견적 Worker v2: 포탈 OI › 견적서 불러오기 — 비밀번호 창 없음 · Bearer · 옛 비밀번호 정리', async () => {
+      assert(!(await page.$('#qpGate')) && !(await page.$('#qpPw')), '비밀번호 입력 영역이 남아 있음');
+      wk.length = 0; await page.evaluate(() => openQuotePick()); await page.waitForTimeout(600);
+      const l = wk.filter((w) => w.path === '/list')[0]; assert(l && l.auth === 'Bearer tok' && !l.pw, '/list ' + JSON.stringify(l));
+      const n = await page.$$eval('#qpList .qp-row', (e) => e.length); assert(n === 2, '목록 ' + n);
+      const cfg = await page.evaluate(() => JSON.parse(localStorage.getItem('genians_quote_worker_config_v1') || '{}')); assert(cfg.accessPassword === undefined, '옛 비밀번호 남음');
+      wk.length = 0; await page.click('#qpList .qp-row'); await page.waitForTimeout(500);
+      const ld = wk.filter((w) => w.path === '/load')[0]; assert(ld && ld.auth === 'Bearer tok', '/load ' + JSON.stringify(ld));
+      assert(!errs.length, errs.join(' | ')); return 'list·load Bearer';
+    });
+    await ctx.close();
+  }
+}
 await browser.close(); srv.close();
 const ok = S.report();
 fs.writeFileSync(path.join(OUT, 'smoke.json'), JSON.stringify(S.results, null, 1));

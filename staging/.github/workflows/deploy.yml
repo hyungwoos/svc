@@ -50,6 +50,8 @@ jobs:
         run: test -f supabase/functions/remind/index.ts && deno run -A tests/fn/remind.test.ts || echo "remind 소스 없음 — 건너뜀"
       - name: aicheck 함수 테스트
         run: test -f supabase/functions/aicheck/index.ts && deno run -A tests/fn/aicheck.test.ts || echo "aicheck 소스 없음 — 건너뜀"
+      - name: 견적 Worker(Cloudflare) 테스트
+        run: test -f cloudflare/quote-worker/worker.js && deno run -A tests/fn/quote-worker.test.ts || echo "quote-worker 소스 없음 — 건너뜀"
   deploy:
     needs: [test, functions]
     runs-on: ubuntu-latest
@@ -62,7 +64,7 @@ jobs:
         run: |
           mkdir -p _site
           rsync -a --exclude '.git' --exclude '.github' --exclude 'tests' --exclude 'node_modules' --exclude '_site' \
-                   --exclude 'package.json' --exclude 'package-lock.json' --exclude '*.md' --exclude 'sql*.sql' --exclude 'supabase' \
+                   --exclude 'package.json' --exclude 'package-lock.json' --exclude '*.md' --exclude 'sql*.sql' --exclude 'supabase' --exclude 'cloudflare' \
                    ./ _site/
           echo "files: $(find _site -type f | wc -l)"
       - uses: actions/configure-pages@v5
