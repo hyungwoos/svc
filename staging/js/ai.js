@@ -177,7 +177,7 @@ function ask(q){
       revealAnswer();
       say.className='ai-say on';
       say.innerHTML='<span class="lb">AI</span>'+esc(cleanSay(r.text))+
-        '<div style="font-size:10px;color:var(--muted);margin-top:6px;opacity:.8">'+
+        '<div style="font-size:11px;color:var(--muted);margin-top:6px;opacity:.8">'+
         esc(String(r.model||'').replace(/^claude-/,''))+
         (r.queries&&r.queries.length? ' · DB 조회 '+r.queries.length+'회 <span title="'+esc(r.queries.map(function(q){ return q.tool+' '+((q.ms||0)/1000).toFixed(1)+'s'+(q.error?' ✗':''); }).join(' · '))+'">('+esc(aiToolBrief(r.queries))+')</span>':'')+
         (r.llm&&r.llm.length? ' · 모델 '+r.llm.length+'회 '+(r.llm.reduce(function(a,x){ return a+(x.ms||0); },0)/1000).toFixed(1)+'s':'')+
@@ -234,7 +234,7 @@ function aiRetryBtn(q){
   var say=$('#aiSay'); if(!say) return;
   say.className='ai-say on';
   say.innerHTML='<span class="lb">AI</span>AI가 답하지 못했습니다. '+
-    '<button class="pill" id="aiRetry" style="height:26px;padding:0 10px;font-size:11.5px;margin-left:6px">↻ 다시 시도</button>';
+    '<button class="pill" id="aiRetry" style="height:26px;padding:0 10px;font-size:12px;margin-left:6px">↻ 다시 시도</button>';
   var b=document.getElementById('aiRetry');
   if(b) b.onclick=function(){ ask(q); };
 }

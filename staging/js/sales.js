@@ -381,7 +381,7 @@ async function qpLoadList(){
     $('#qpList').innerHTML=files.slice(0,80).map(function(f){
       var L=qLabel(f.name);
       return '<div class="qp-row" data-path="'+esc(f.path||f.name)+'" data-name="'+esc(f.name)+'">'+
-        '<div style="min-width:0"><div style="font-weight:650;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(L.c)+'</div>'+
+        '<div style="min-width:0"><div style="font-weight:650;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(L.c)+'</div>'+
         '<div class="cap" style="font-size:11px">'+esc(L.d||'')+'</div></div>'+
         '<button class="pill ghost" type="button" style="height:28px;padding:0 12px;font-size:12px;flex:0 0 auto">불러오기</button></div>';
     }).join('');
@@ -685,6 +685,7 @@ function applyMenuFold(){
     var isOpen=!!open[name];
     g.classList.toggle('open', isOpen);
     grpButtons(g).forEach(function(b){ b.classList.toggle('clps', !isOpen); });
+    for(var el=g.nextElementSibling; el && !el.classList.contains('grp'); el=el.nextElementSibling){ if(el.classList.contains('subgrp')) el.classList.toggle('clps', !isOpen); }   /* ㊿+142 소제목도 접힘 */
   });
 }
 function ensureGroupOpen(view){

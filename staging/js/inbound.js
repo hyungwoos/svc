@@ -91,7 +91,7 @@ function openMxMemo(td, line, Y, M, label, startTab, opts){
     '<div class="act"><span class="msg" id="mxMsg"></span><span class="sp"></span>'+
     (ed&&cur? '<button class="pill ghost" id="mxDel" style="color:var(--critical,#d03b3b);border-color:rgba(208,59,59,.35)">삭제</button>':'')+
     '<button class="pill ghost" id="mxCancel">'+(ed?'취소':'닫기')+'</button>'+
-    (ed? '<button class="pill" id="mxSave" style="background:var(--brand);border-color:var(--brand);color:#fff">저장</button>':'')+
+    (ed? '<button class="pill pri" id="mxSave">저장</button>':'')+
     '</div></div>';
   document.body.appendChild(box);
   // 탭 전환
@@ -222,7 +222,7 @@ function inbLogTable(){
 function inbSyncPanel(){
   return '<div class="card" style="padding:10px 14px;margin-bottom:10px">'+
     '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'+
-      '<b style="font-size:13px">시트 → 포탈 가져오기</b>'+inbSyncBadge()+
+      '<b style="font-size:13.5px">시트 → 포탈 가져오기</b>'+inbSyncBadge()+
       '<span style="flex:1"></span>'+
       (window.IS_VIEWER? '' : '<button class="pill" id="inbFetchP">↻ 지금 시트에서 가져오기</button>')+
       '<button class="pill ghost" id="inbLogTg">🕘 가져온 기록'+(RAWX.inbLog&&RAWX.inbLog.length? ' ('+RAWX.inbLog.length+')':'')+'</button>'+
@@ -308,7 +308,7 @@ function renderInbStat(){
   }).join(' ');
   host.innerHTML=
     '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">'+
-    '<span style="font-size:17px;font-weight:800">📥 인바운드 통계</span>'+
+    '<span style="font-size:18px;font-weight:800">📥 인바운드 통계</span>'+
     '<span class="ubadge sm">₩ 금액 단위 = 천원</span>'+
     '<span class="mini">원본: 구글시트 · 매일 아침 7시 자동 동기화</span>'+
     '<span style="flex:1"></span>'+yb+
@@ -608,11 +608,11 @@ async function renderWeekly(atWeek){
   var counts=meta.counts||{};
   var weekNav=(d.weeks||[]);   // 저장된 주차 전부 (소급분 포함)
   var head='<div class="wk-head">'+
-    '<span style="font-size:17px;font-weight:800">📊 주간회의</span>'+
+    '<span style="font-size:18px;font-weight:800">📊 주간회의</span>'+
     '<span class="wk-chip wkc-blu wk-fsonly">발표 모드 · Space/↓ 다음 · ↑ 이전 · ESC 종료</span>'+
     '<select id="wkWeekSel" class="pill" style="height:31px;font-family:inherit">'+
       weekNav.map(function(w){ return '<option value="'+w+'"'+(w===WK.week?' selected':'')+'>'+w+' 주간</option>'; }).join('')+'</select>'+
-    '<span class="pill ghost" style="font-size:11.5px">'+esc(meta.file_name||'')+' · '+wkTime(meta.fetched_at)+' 취합</span>'+
+    '<span class="pill ghost" style="font-size:12px">'+esc(meta.file_name||'')+' · '+wkTime(meta.fetched_at)+' 취합</span>'+
     (meta.missing&&meta.missing.length? '<span class="wk-chip wkc-red">⚠ 누락 탭: '+esc(meta.missing.join(', '))+'</span>'
       : '<span class="wk-chip wkc-grn">누락 팀 없음 ✓</span>')+
     '<span style="flex:1"></span>'+

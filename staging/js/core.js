@@ -132,9 +132,9 @@ function pwaInstall(){ if(!PWA.deferred) return false; var ev=PWA.deferred; ev.p
 /* 설치 안내 카드 내용 (내 계정 › 설정) */
 function pwaHintHtml(){
   if(pwaStandalone()) return '<span style="color:var(--brand);font-weight:650">지금 앱으로 실행 중입니다 ✓</span><div class="mini" style="margin-top:5px;line-height:1.6">홈 화면 아이콘으로 열린 상태입니다. 새 버전은 다음 실행 때 자동으로 반영됩니다.</div>';
-  if(PWA.deferred) return '<button type="button" class="pill" id="accPwaGo" style="background:var(--brand);border-color:var(--brand);color:#fff">📱 홈 화면에 설치</button><div class="mini" style="margin-top:5px;line-height:1.6">설치하면 주소창 없이 전체 화면 앱처럼 열립니다. 스토어 등록·다운로드 없음, 새 버전은 자동 반영.</div>';
-  if(pwaIsIOS()) return '<div style="font-size:13px;line-height:1.7">Safari 하단 <b>공유</b> 버튼 <span style="display:inline-block;border:1px solid var(--ring);border-radius:5px;padding:0 5px;font-size:11px">⎋</span> → <b>«홈 화면에 추가»</b> → 추가</div><div class="mini" style="margin-top:5px;line-height:1.6">아이폰·아이패드는 Safari 에서만 설치됩니다(Chrome 앱에서는 안 됨). 설치 후 홈 화면의 «SVC 포탈» 아이콘으로 열면 전체 화면 앱처럼 동작합니다.</div>';
-  return '<div style="font-size:13px;line-height:1.7">Chrome 주소창 오른쪽의 <b>설치</b> 아이콘, 또는 메뉴(⋮) › <b>«앱 설치»</b> / «홈 화면에 추가»</div><div class="mini" style="margin-top:5px;line-height:1.6">안드로이드·PC Chrome·Edge 에서 됩니다. 설치하면 주소창 없이 전체 화면으로 열리고 새 버전은 자동 반영됩니다.</div>';
+  if(PWA.deferred) return '<button type="button" class="pill pri" id="accPwaGo">📱 홈 화면에 설치</button><div class="mini" style="margin-top:5px;line-height:1.6">설치하면 주소창 없이 전체 화면 앱처럼 열립니다. 스토어 등록·다운로드 없음, 새 버전은 자동 반영.</div>';
+  if(pwaIsIOS()) return '<div style="font-size:13.5px;line-height:1.7">Safari 하단 <b>공유</b> 버튼 <span style="display:inline-block;border:1px solid var(--ring);border-radius:5px;padding:0 5px;font-size:11px">⎋</span> → <b>«홈 화면에 추가»</b> → 추가</div><div class="mini" style="margin-top:5px;line-height:1.6">아이폰·아이패드는 Safari 에서만 설치됩니다(Chrome 앱에서는 안 됨). 설치 후 홈 화면의 «SVC 포탈» 아이콘으로 열면 전체 화면 앱처럼 동작합니다.</div>';
+  return '<div style="font-size:13.5px;line-height:1.7">Chrome 주소창 오른쪽의 <b>설치</b> 아이콘, 또는 메뉴(⋮) › <b>«앱 설치»</b> / «홈 화면에 추가»</div><div class="mini" style="margin-top:5px;line-height:1.6">안드로이드·PC Chrome·Edge 에서 됩니다. 설치하면 주소창 없이 전체 화면으로 열리고 새 버전은 자동 반영됩니다.</div>';
 }
 function pwaHintSync(){ var h=document.getElementById('accPwa'); if(!h) return; h.innerHTML=pwaHintHtml(); var b=document.getElementById('accPwaGo'); if(b) b.onclick=function(){ pwaInstall(); }; }
 
@@ -172,6 +172,7 @@ function applyPerms(){
     while(el && !el.classList.contains('grp')){ if(el.tagName==='BUTTON' && !el.classList.contains('pdeny') && el.style.display!=='none') any=true; el=el.nextElementSibling; }
     g.classList.toggle('pdeny', !any);
   });
+  try{ subgrpSync(); }catch(e){}
   try{ buildRail(); buildMtabs(); }catch(e){}
   try{ var be=$('#btnEdit'); if(be && SB_TOKEN) be.style.display=(window.IS_VIEWER_ROLE || !canWrite('contracts'))? 'none':''; }catch(e){}
 }
@@ -300,7 +301,7 @@ function mfaForceEnroll(tok, email, st){
     var old=document.getElementById('ovlMfa'); if(old) old.remove();
     var ov=document.createElement('div'); ov.id='ovlMfa'; ov.className='ovl on'; ov.style.cssText='z-index:100000;align-items:center';
     ov.innerHTML='<div class="modal" style="width:min(560px,100%);padding:22px" role="dialog" aria-modal="true" aria-labelledby="mfaTitle">'+
-      '<h3 id="mfaTitle" style="margin:0 0 6px;font-size:17px">🔐 2단계 인증 등록이 필요합니다</h3>'+
+      '<h3 id="mfaTitle" style="margin:0 0 6px;font-size:18px">🔐 2단계 인증 등록이 필요합니다</h3>'+
       '<p class="cap" style="margin:0 0 14px">관리자가 <b>'+esc(email||'')+'</b> 계정에 2단계 인증을 필수로 지정했습니다'+(st&&st.deadline? ' (기한 '+esc(st.deadline)+' 지남)':'')+'. 인증 앱을 등록해야 포탈을 쓸 수 있습니다 — 1분이면 끝납니다.</p>'+
       '<div id="mfaForceHost"></div>'+
       '<div style="margin-top:12px;display:flex;justify-content:flex-end"><button type="button" class="pill ghost" id="mfaForceCancel">나중에 (로그아웃)</button></div></div>';
@@ -319,7 +320,7 @@ function mfaPrompt(factor, tok, email){
     var old=document.getElementById('ovlMfa'); if(old) old.remove();
     var ov=document.createElement('div'); ov.id='ovlMfa'; ov.className='ovl on'; ov.style.cssText='z-index:100000;align-items:center';
     ov.innerHTML='<div class="modal" style="width:min(400px,100%);padding:22px" role="dialog" aria-modal="true" aria-labelledby="mfaTitle">'+
-      '<h3 id="mfaTitle" style="margin:0 0 6px;font-size:17px">🔐 2단계 인증</h3>'+
+      '<h3 id="mfaTitle" style="margin:0 0 6px;font-size:18px">🔐 2단계 인증</h3>'+
       '<p class="cap" style="margin:0 0 14px">'+esc(email||AUTH_USER||'')+' 계정은 인증 앱이 등록돼 있습니다. 앱(Google Authenticator · Microsoft Authenticator 등)에 표시된 <b>6자리 코드</b>를 입력하세요.</p>'+
       '<input id="mfaCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" aria-label="인증 코드 6자리" style="width:100%;height:52px;font-size:26px;letter-spacing:.35em;text-align:center;border-radius:10px;border:1px solid var(--ring);background:var(--surface-2)">'+
       '<div class="mmsg" id="mfaMsg" style="min-height:18px;margin-top:8px"></div>'+
@@ -392,7 +393,7 @@ async function mfaEnrollFlow(existing, host, opts){
     host.innerHTML='<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">'+
       (totp.qr_code? '<img src="'+esc(mfaQrSrc(totp.qr_code))+'" alt="인증 앱 등록 QR" style="width:168px;height:168px;background:#fff;border:1px solid var(--ring);border-radius:8px;padding:6px;flex:none">':'')+
       '<div style="flex:1;min-width:220px"><ol class="mini" style="margin:0 0 8px 16px;padding:0;line-height:1.8"><li>인증 앱에서 «계정 추가 → QR 스캔»</li><li>스캔이 안 되면 키를 직접 입력: <code style="user-select:all;word-break:break-all">'+esc(totp.secret||'')+'</code></li><li>앱에 뜬 6자리 코드를 아래에 입력</li></ol>'+
-      '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><input id="mfaEnCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" aria-label="인증 코드" style="width:140px;height:40px;font-size:20px;letter-spacing:.3em;text-align:center"><button type="button" class="pill" id="mfaEnGo">확인하고 켜기</button><button type="button" class="pill ghost" id="mfaEnCancel">취소</button></div>'+
+      '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><input id="mfaEnCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" aria-label="인증 코드" style="width:140px;height:40px;font-size:22px;letter-spacing:.3em;text-align:center"><button type="button" class="pill" id="mfaEnGo">확인하고 켜기</button><button type="button" class="pill ghost" id="mfaEnCancel">취소</button></div>'+
       '<div class="mmsg" id="mfaEnMsg" style="min-height:18px;margin-top:6px"></div></div></div>';
     var inp=host.querySelector('#mfaEnCode'), m=host.querySelector('#mfaEnMsg');
     host.querySelector('#mfaEnCancel').onclick=async function(){ try{ await authApi('DELETE','factors/'+f.id,null,tok); }catch(e){} back(false); };

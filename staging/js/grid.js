@@ -377,7 +377,12 @@ function openColPick(btn){
   var all=document.createElement('button'); all.className='chip'; all.textContent='전체 보기';
   all.onclick=function(){ HIDE[CUR_VIEW]=[]; saveHide(); box.remove(); renderGrid(); };
   head.appendChild(all);
+  /* ㊿+142: 끌어서 바꾼 열 너비가 있으면 한 번에 원래대로 */
+  if(Object.keys(colwGet(CUR_VIEW)).length){ var rw=document.createElement('button'); rw.className='chip'; rw.textContent='열 너비 원래대로'; rw.title='머리 칸 경계를 끌어 바꾼 너비를 모두 지웁니다';
+    rw.onclick=function(){ box.remove(); colwReset(CUR_VIEW); }; head.appendChild(rw); }
   box.appendChild(head);
+  var tip=document.createElement('div'); tip.className='mini'; tip.style.cssText='color:var(--muted);margin:-2px 0 6px'; tip.textContent='열 너비는 머리 칸 오른쪽 경계를 끌어서 바꿉니다';
+  box.appendChild(tip);
   g.cols.forEach(function(c){
     var lb=document.createElement('label');
     lb.style.cssText='display:flex;gap:7px;align-items:center;padding:4px 2px;cursor:pointer';
@@ -773,6 +778,43 @@ function askScreenHelp(){
   var q='포탈의 «'+String(title||'').replace(/^[^\w가-힣]+/,'').trim()+'» 화면은 어떻게 쓰나요? 주요 기능과 주의할 점을 짧게 알려줘';
   var hit=cmdAskHit(q); if(hit && hit.go) hit.go(); else toast('AI 를 쓸 수 없습니다','조회 전용 장비 계정이거나 AI 가 꺼져 있습니다','warn');
 }
+/* ── 표 열 너비 조절 (㊿+142 · 사용자 선택) ─────────────────────────────
+   머리 칸 오른쪽 경계를 끌면 그 열 너비가 바뀌고 화면별로 기억(localStorage svc_colw_<화면>) · 경계를 두 번 누르면 그 열만 원래대로.
+   한 열이라도 정해 두면 표를 table-layout:fixed 로 바꿔(나머지 열은 지금 자연 너비로 고정) 넘치는 글자는 «…» 로 자름 — 칸에 마우스를 올리면 전체(title). */
+var COLW_MIN=44;
+function colwGet(v){ try{ return JSON.parse(localStorage.getItem('svc_colw_'+v)||'{}')||{}; }catch(e){ return {}; } }
+function colwPut(v,m){ try{ if(m && Object.keys(m).length) localStorage.setItem('svc_colw_'+v, JSON.stringify(m)); else localStorage.removeItem('svc_colw_'+v); }catch(e){} }
+function colwFreeze(t){   /* 지금 보이는 너비로 모든 열을 고정 */
+  var ths=Array.prototype.slice.call(t.querySelectorAll('thead th'));
+  var ws=ths.map(function(th){ return th.getBoundingClientRect().width; });
+  ths.forEach(function(th,i){ th.style.width=Math.round(ws[i])+'px'; });
+  t.style.width=Math.round(ws.reduce(function(a,b){ return a+b; },0))+'px';
+  t.classList.add('colw-fixed');
+}
+function colwApply(t, v){
+  t.classList.remove('colw-fixed'); t.style.width='';
+  var m=colwGet(v), ks=Object.keys(m); if(!ks.length) return;
+  var ths=Array.prototype.slice.call(t.querySelectorAll('thead th'));
+  var ws=ths.map(function(th){ var k=th.dataset.k; return (k && m[k])? m[k] : th.getBoundingClientRect().width; });
+  ths.forEach(function(th,i){ th.style.width=Math.round(ws[i])+'px'; });
+  t.style.width=Math.round(ws.reduce(function(a,b){ return a+b; },0))+'px';
+  t.classList.add('colw-fixed');
+  /* 잘린 칸은 마우스를 올리면 전체 글자 */
+  t.querySelectorAll('tbody td:not(.act)').forEach(function(td){ if(!td.title && td.scrollWidth>td.clientWidth+1 && !td.querySelector('input,select,textarea')) td.title=td.textContent.trim(); });
+}
+function colwStart(ev, th, t, v){
+  ev.preventDefault(); ev.stopPropagation();
+  if(!t.classList.contains('colw-fixed')) colwFreeze(t);
+  var x0=ev.clientX, w0=th.getBoundingClientRect().width, tw0=t.getBoundingClientRect().width, k=th.dataset.k, h=ev.currentTarget;
+  try{ h.setPointerCapture(ev.pointerId); }catch(e){}
+  document.body.classList.add('colw-drag');
+  var mv=function(e){ var w=Math.max(COLW_MIN, Math.round(w0+e.clientX-x0)); th.style.width=w+'px'; t.style.width=Math.round(tw0+(w-w0))+'px'; };
+  var up=function(){ h.removeEventListener('pointermove',mv); h.removeEventListener('pointerup',up); h.removeEventListener('pointercancel',up); document.body.classList.remove('colw-drag');
+    var w=Math.round(th.getBoundingClientRect().width); if(Math.abs(w-w0)<2) return;
+    var m=colwGet(v); m[k]=w; colwPut(v,m); try{ gridActPad(); }catch(e){} };
+  h.addEventListener('pointermove',mv); h.addEventListener('pointerup',up); h.addEventListener('pointercancel',up);
+}
+function colwReset(v, k){ var m=colwGet(v); if(k) delete m[k]; else m={}; colwPut(v,m); renderGrid(); }
 function renderGrid(){
   var g=GRIDS[CUR_VIEW]; if(!g) return;
   var isCustom=!!g.custom;
@@ -811,7 +853,7 @@ function renderGrid(){
       btn.onclick=function(){ DV.lens=(on? '':v); DV.page=0; renderGrid(); };
       lb.appendChild(btn);
     });
-    if(zero){ var zb=document.createElement('button'); zb.type='button'; zb.className='mini'; zb.style.cssText='border:0;background:transparent;color:var(--muted);cursor:pointer;padding:0 4px;font:inherit;font-size:11.5px'; zb.textContent=DV.lensAll? '빈 관점 접기' : '+ 해당 없음 '+zero+'개'; zb.onclick=function(){ DV.lensAll=!DV.lensAll; renderGrid(); }; lb.appendChild(zb); }
+    if(zero){ var zb=document.createElement('button'); zb.type='button'; zb.className='mini'; zb.style.cssText='border:0;background:transparent;color:var(--muted);cursor:pointer;padding:0 4px;font:inherit;font-size:12px'; zb.textContent=DV.lensAll? '빈 관점 접기' : '+ 해당 없음 '+zero+'개'; zb.onclick=function(){ DV.lensAll=!DV.lensAll; renderGrid(); }; lb.appendChild(zb); }
     if(DV.lens && LENS_DESC[DV.lens]){ var dsc=document.createElement('span'); dsc.className='mini'; dsc.style.cssText='color:var(--ink-2);flex-basis:100%;margin-top:2px'; dsc.textContent='ⓘ '+LENS_DESC[DV.lens]; lb.appendChild(dsc); }
     g._lens=(DV.lens && LS[DV.lens])? LS[DV.lens].ids : null;
   } else if(CUR_VIEW==='live'){ lb.style.display='flex'; renderLiveBar(lb); g._lens=null; }
@@ -863,7 +905,12 @@ function renderGrid(){
     fb.title=on? ('필터 적용 중 ('+DV.filters[c.k].length+'개 값) — 클릭해서 바꾸기') : '값 골라 보기';
     fb.onclick=function(ev){ ev.stopPropagation(); openColFilter(fb,g,c); };
     wrap.appendChild(lab); wrap.appendChild(fb);
-    th.appendChild(wrap);
+    th.appendChild(wrap); th.dataset.k=c.k;
+    var rs=document.createElement('span'); rs.className='colrs'; rs.setAttribute('aria-hidden','true'); rs.title='끌어서 열 너비 조절 · 두 번 누르면 원래대로';
+    rs.onpointerdown=function(ev){ if(ev.button!==0) return; colwStart(ev, th, t, CUR_VIEW); };
+    rs.onclick=function(ev){ ev.stopPropagation(); };
+    rs.ondblclick=function(ev){ ev.stopPropagation(); colwReset(CUR_VIEW, c.k); };
+    th.appendChild(rs);
     tr0.appendChild(th);
   });
   if(!g.ro){ var th2=document.createElement('th'); th2.style.width='110px'; th2.className='act'; tr0.appendChild(th2); }
@@ -884,6 +931,7 @@ function renderGrid(){
     tr.querySelectorAll('[data-dge]').forEach(function(b){ b.onclick=function(){ var k=b.dataset.dge; if(k==='q'){ $('#dvSearch').value=''; } if(k==='f'){ DV.filters={}; DV.lens=''; } if(k==='c'){ DV.chipVal=''; } DV.page=0; renderGrid(); }; });
   }
   t.appendChild(tb);
+  colwApply(t, CUR_VIEW);   /* ㊿+142: 사용자가 정한 열 너비 */
   gridActPad();
 
   /* 페이저 */
@@ -892,7 +940,7 @@ function renderGrid(){
     function pbtn(txt,fn,dis,cur){
       var b=document.createElement('button');
       b.textContent=txt; b.disabled=!!dis;
-      b.style.cssText='border:1px solid var(--ring);background:'+(cur?'var(--s1)':'var(--surface-2)')+
+      b.style.cssText='border:1px solid '+(cur?'var(--brand,#149e40)':'var(--ring)')+';background:'+(cur?'var(--brand,#149e40)':'var(--surface-2)')+
         ';color:'+(cur?'#fff':'var(--ink-2)')+';border-radius:8px;padding:6px 11px;font-size:12px;cursor:pointer;font-family:inherit'+
         (dis?';opacity:.4;cursor:default':'');
       b.onclick=fn; return b;

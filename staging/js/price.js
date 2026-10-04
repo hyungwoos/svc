@@ -158,12 +158,12 @@ function renderCloud(){
   var canEdit=!!(SB_TOKEN && !window.IS_VIEWER && (window.IS_SUPER || window.MY_ROLE==='admin'));
   var first=B.months[0], last=B.months[B.months.length-1];
   var head='<div class="pr-top">'+
-    '<span style="font-size:19px;font-weight:600;letter-spacing:-.01em">클라우드 비용</span>'+
+    '<span style="font-size:18px;font-weight:600;letter-spacing:-.01em">클라우드 비용</span>'+
     '<div class="eqb-seg" id="clCur" role="group" aria-label="통화"><button type="button" data-c="usd" aria-pressed="'+(!clIsK())+'">$ USD 세전</button><button type="button" data-c="krw" aria-pressed="'+clIsK()+'">₩ 천원 환산</button></div>'+
     '<span class="pr-ver">'+esc(first.replace('-','년 ')+'월')+' ~ '+esc(last.replace('-','년 ')+'월')+' · 인보이스 '+B.inv.length+'건</span>'+
     '<span style="flex:1"></span>'+
     '<button class="pill ghost" id="clFxBtn" title="'+esc('출처: '+CL.fxNow.src+(CL.fxNow.when? ' · '+CL.fxNow.when:'')+' · 누르면 다시 받아옵니다')+'">환율 '+Number(CL.fxNow.rate).toLocaleString('ko-KR')+'원/$'+(CL.fxNow.live? '':' (외부 조회 실패 · '+esc(CL.fxNow.src)+')')+'</button>'+
-    (canEdit? '<button class="pill" id="clAdd" style="background:var(--brand);border-color:var(--brand);color:#fff">＋ 인보이스 PDF 추가</button>':'')+
+    (canEdit? '<button class="pill pri" id="clAdd">＋ 인보이스 PDF 추가</button>':'')+
     '</div>';
   /* 1차: 요약 타일 + 월별 추이 · 2차(접힘): MDR 인프라 · 계정 개요 · 서비스×월 표 · 인보이스 */
   function det(k, title, inner){ var open=false; try{ open=localStorage.getItem('svc_cl_open_'+k)==='1'; }catch(e){}
@@ -175,7 +175,7 @@ function renderCloud(){
       '<h3 id="clChartT">월별 비용 추이</h3><div class="cl-legend" id="clLegend"></div><div id="clChart" class="chartbox h260"></div></div>'+
     det('mdr','MDR 서비스 인프라 월별 비용 <span class="mini">EDR(KR) + awstac</span>', '<div id="clMdr"></div>')+
     det('acct','계정 개요 · 통합청구 연결 계정 <span class="mini" id="clAcctCap"></span>', '<div id="clAcct" style="display:none"></div><div id="clLinked" style="display:none;margin-top:12px"></div>')+
-    det('tbl','서비스 × 월 비용 내역', '<h3 id="clTableT" style="margin:0 0 8px;font-size:13px">서비스 × 월 비용 내역</h3><div class="tbl-wrap" style="max-height:none"><table class="pr" id="clTable"></table></div><p class="cap" id="clNote" style="margin-top:8px"></p>')+
+    det('tbl','서비스 × 월 비용 내역', '<h3 id="clTableT" style="margin:0 0 8px;font-size:13.5px">서비스 × 월 비용 내역</h3><div class="tbl-wrap" style="max-height:none"><table class="pr" id="clTable"></table></div><p class="cap" id="clNote" style="margin-top:8px"></p>')+
     det('inv','인보이스 등록 내역 <span class="mini">'+B.inv.length+'건 · PDF 는 읽은 뒤 보관하지 않고 파일명만</span>', '<div id="clInv"></div>');
   clSummary(B); clMdr(B); clChips(B); clChart(B); clAcctOverview(B); clLinked(B); clTable(B); clInvList(B, canEdit);
   host.querySelectorAll('details.cl-det').forEach(function(d){
@@ -493,7 +493,7 @@ function clRenderPreview(){
         '<span class="cap">서비스 '+nz.length+'행 · Sub Total '+(a.subUsd!=null? clU(a.subUsd):'?')+(a.subKrw!=null? ' / '+clW(a.subKrw):'')+'</span>'+
         (dup? '<span class="st dup">이미 있음 → 교체됨'+(dup.file_name? ' ('+esc(dup.file_name)+')':'')+'</span>':'')+
         '</div>';
-      if(nz.length) h+='<details style="margin:2px 0 6px"><summary class="cap" style="cursor:pointer">서비스 행 보기</summary><table class="pr" style="font-size:11.5px"><thead><tr><th>서비스</th><th class="n">금액(USD)</th><th class="n">Credit</th><th class="n">청구(USD)</th><th class="n">청구(₩)</th></tr></thead><tbody>'+
+      if(nz.length) h+='<details style="margin:2px 0 6px"><summary class="cap" style="cursor:pointer">서비스 행 보기</summary><table class="pr" style="font-size:12px"><thead><tr><th>서비스</th><th class="n">금액(USD)</th><th class="n">Credit</th><th class="n">청구(USD)</th><th class="n">청구(₩)</th></tr></thead><tbody>'+
         nz.map(function(r){ return '<tr><td>'+esc(clSvcKey(r.service))+'</td><td class="n">'+clU(r.usd||0)+'</td><td class="n">'+clU(r.credit||0)+'</td><td class="n">'+clU(r.billUsd||0)+'</td><td class="n">'+clW(r.krw||0)+'</td></tr>'; }).join('')+'</tbody></table></details>';
       if(a.accId) ready++;
     });
@@ -600,7 +600,7 @@ function renderPrice(){
     vers.map(function(b,i){ return '<option value="'+i+'"'+(i===(PR.ver[segBook]||0)?' selected':'')+'>'+esc(b.label)+(i===0?' (현행)':' (이력)')+'</option>'; }).join('')+'</select>';
   var TABS=[['saas','SaaS 가격표'],['onprem','On-prem 가격표'],['calc','견적 · 비교']];
   var head='<div class="pr-top">'+
-    '<span style="font-size:19px;font-weight:600;letter-spacing:-.01em">가격표</span>'+
+    '<span style="font-size:18px;font-weight:600;letter-spacing:-.01em">가격표</span>'+
     '<div class="eqb-seg" role="tablist" aria-label="가격표 구분">'+TABS.map(function(t){ return '<button type="button" role="tab" data-prseg="'+t[0]+'" aria-pressed="'+(PR.seg===t[0])+'">'+t[1]+'</button>'; }).join('')+'</div>'+
     '<span class="ubadge sm won">₩ 원 단위</span>'+
     '<span style="flex:1"></span>'+
@@ -723,7 +723,7 @@ function prCalcHtml(){
     '<div class="pr-card">'+
       '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+
       '<input type="file" id="ptQF" accept="application/pdf" style="font-size:12px;max-width:300px">'+
-      '<button class="pill" id="ptQGo" style="height:32px;background:var(--brand);border-color:var(--brand);color:#fff;font-weight:600">AI 분석 → 비교</button>'+
+      '<button class="pill pri" id="ptQGo" style="height:32px">AI 분석 → 비교</button>'+
       '<span class="pr-note">4MB 이하 PDF · 10~20초</span></div>'+
       '<div id="ptQR" style="margin-top:12px"></div></div></div>';
   return h;
@@ -885,7 +885,7 @@ function prBindSaas(){
     return {m:rec?String(rec.model):'', q:1};
   }
   function renderSen(){
-    var sSt='height:28px;border:1px solid var(--ring);border-radius:8px;padding:0 6px;font:inherit;font-size:11.5px;background:var(--surface)';
+    var sSt='height:28px;border:1px solid var(--ring);border-radius:8px;padding:0 6px;font:inherit;font-size:12px;background:var(--surface)';
     $('#ptSsL').innerHTML=PR.tcoSS.map(function(r,i){
       return '<span style="display:inline-flex;gap:4px;align-items:center">'+
         '<select data-ssp="'+i+'" style="'+sSt+'">'+SEN_P.map(function(pv2){ return '<option value="'+pv2+'"'+(r.p===pv2?' selected':'')+'>'+(pv2/10000)+'만원</option>'; }).join('')+'</select>'+

@@ -186,12 +186,14 @@ function menuSegments(){
   var out=[], kids=Array.prototype.slice.call($('#side').children);
   kids.forEach(function(el){
     if(el.classList && el.classList.contains('grp')){
-      out.push({key:'g:'+el.textContent.trim(), label:el.textContent.trim(), grp:el, buttons:[]});
+      out.push({key:'g:'+el.textContent.trim(), label:el.textContent.trim(), grp:el, buttons:[], items:[]});
+    }else if(el.classList && el.classList.contains('subgrp')){   /* ㊿+142: 그룹 안 소제목(사업 영역 › Cloud NAC/MDR/기타) — 순서 이동 때 같이 움직임 */
+      var lg=out[out.length-1]; if(lg && lg.grp) lg.items.push(el);
     }else if(el.tagName==='BUTTON'){
       var v=el.dataset.v;
       if(!v || v==='dash' || v==='account' || el.id==='btnMenuEdit') return;   // 고정 항목
       var last=out[out.length-1];
-      if(last && last.grp) last.buttons.push(el);
+      if(last && last.grp){ last.buttons.push(el); last.items.push(el); }
       else out.push({key:'b:'+v, label:el.textContent.trim(), btn:el});
     }
   });
@@ -200,13 +202,14 @@ function menuSegments(){
 function applyMenuConf(){
   if(window.IS_EQUIP) return;   // 제한 계정은 기본 메뉴 그대로
   var conf=null; try{ conf=JSON.parse(localStorage.getItem(menuConfKey())||'null'); }catch(e){}
+  conf=menuConfMigrate(conf);
   var segs=menuSegments(), side=$('#side');
   if(conf && conf.order && conf.order.length){
     var map={}; segs.forEach(function(s){ map[s.key]=s; });
     var ordered=conf.order.filter(function(k){return map[k];}).map(function(k){return map[k];});
     segs.forEach(function(s){ if(conf.order.indexOf(s.key)<0) ordered.push(s); });   // 새로 생긴 메뉴는 뒤에
     ordered.forEach(function(s){
-      if(s.grp){ side.appendChild(s.grp); s.buttons.forEach(function(b){ side.appendChild(b); }); }
+      if(s.grp){ side.appendChild(s.grp); (s.items||s.buttons).forEach(function(b){ side.appendChild(b); }); }
       else side.appendChild(s.btn);
     });
     // 고정 항목은 항상 맨 아래
@@ -221,6 +224,39 @@ function applyMenuConf(){
       s.buttons.forEach(function(b){ b.classList.toggle('mhide', h || !!hid['b:'+b.dataset.v]); });
     }else s.btn.classList.toggle('mhide', h);
   });
+  subgrpSync();
+}
+/* ㊿+142 메뉴 그룹 정리: 예전 «사업 영역 · Cloud NAC / MDR / 기타 (유통)» 3그룹 → «사업 영역» 1그룹(소제목 3개).
+   저장된 메뉴 편집(순서·숨김)을 새 그룹 이름으로 옮김 — 옛 그룹을 숨겼으면 그 안 메뉴를 하나씩 숨김 */
+var MENU_OLD_CHGRP={'g:사업 영역 · Cloud NAC':['cngen','cnpub','cns1','cnlgu'], 'g:사업 영역 · MDR':['mdrgen','mdrs1','mdrlgu'], 'g:사업 영역 · 기타 (유통)':['chdist','cnpns']};
+function menuConfMigrate(conf){
+  if(!conf) return conf; var NEW='g:사업 영역', olds=Object.keys(MENU_OLD_CHGRP), touched=false;
+  if(conf.order && conf.order.some(function(k){ return MENU_OLD_CHGRP[k]; })){
+    var seen={}; conf.order=conf.order.map(function(k){ return MENU_OLD_CHGRP[k]? NEW : k; }).filter(function(k){ if(seen[k]) return false; seen[k]=1; return true; }); touched=true; }
+  var hid=conf.hidden||{};
+  if(olds.some(function(k){ return hid[k]; })){
+    if(olds.every(function(k){ return hid[k]; })) hid[NEW]=1;
+    else olds.forEach(function(k){ if(hid[k]) MENU_OLD_CHGRP[k].forEach(function(v){ hid['b:'+v]=1; }); });
+    olds.forEach(function(k){ delete hid[k]; }); conf.hidden=hid; touched=true; }
+  if(touched) try{ localStorage.setItem(menuConfKey(), JSON.stringify(conf)); }catch(e){}
+  return conf;
+}
+/* 소제목 아래 보이는 메뉴가 하나도 없으면(권한·채널 계약 없음·메뉴 편집 숨김) 소제목도 숨김 */
+function subgrpSync(){
+  var side=document.getElementById('side'); if(!side) return;
+  side.querySelectorAll('.subgrp').forEach(function(s){
+    var el=s.nextElementSibling, vis=false;
+    while(el && !(el.classList && (el.classList.contains('grp')||el.classList.contains('subgrp')))){ if(el.tagName==='BUTTON' && visBtn(el)) vis=true; el=el.nextElementSibling; }
+    s.classList.toggle('sub-empty', !vis);
+  });
+}
+/* 메뉴 버튼의 소제목(없으면 '') — Ctrl+K·권한 표에서 «일반 판매»가 Cloud NAC 것인지 MDR 것인지 구분 */
+function navSub(b){
+  for(var el=b && b.previousElementSibling; el; el=el.previousElementSibling){
+    if(el.classList && el.classList.contains('subgrp')) return el.dataset.sub || el.textContent.trim();
+    if(el.classList && el.classList.contains('grp')) return '';
+  }
+  return '';
 }
 function openMenuEdit(){
   var conf=null; try{ conf=JSON.parse(localStorage.getItem(menuConfKey())||'null'); }catch(e){}
@@ -340,7 +376,7 @@ function applyFs(n){
   var b=document.getElementById('btnFont');
   if(b){
     b.style.background = n>0? 'var(--brand-t,rgba(46,189,87,.13))':'';
-    b.innerHTML = '가<b style="font-size:14px">A</b>'+(n===1?' 크게':n===2?' 최대':'');
+    b.innerHTML = '가<b style="font-size:13.5px">A</b>'+(n===1?' 크게':n===2?' 최대':'');
   }
 }
 

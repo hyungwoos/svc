@@ -197,7 +197,7 @@ function toggleAuthMenu(){
   m.style.cssText='position:fixed;top:'+(r.bottom+6)+'px;right:'+Math.max(10,window.innerWidth-r.right)+'px;z-index:1200;'+
     'background:var(--surface);border:1px solid var(--ring);border-radius:12px;'+
     'box-shadow:0 14px 34px -14px rgba(0,0,0,.32);padding:6px;min-width:180px';
-  var bs='display:block;width:100%;text-align:left;border:0;background:transparent;padding:9px 11px;border-radius:8px;font:inherit;font-size:13px;cursor:pointer;color:var(--ink)';
+  var bs='display:block;width:100%;text-align:left;border:0;background:transparent;padding:9px 11px;border-radius:8px;font:inherit;font-size:13.5px;cursor:pointer;color:var(--ink)';
   m.innerHTML='<div style="padding:7px 11px 5px;font-size:11px;color:var(--muted);border-bottom:1px solid var(--line);margin-bottom:4px">'+esc(AUTH_USER||'')+'</div>'+
     '<button data-a="acct" style="'+bs+'">👤 내 계정</button>'+
     '<button data-a="out" style="'+bs+';color:var(--critical,#d03b3b)">로그아웃</button>';

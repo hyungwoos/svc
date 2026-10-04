@@ -699,7 +699,7 @@ function openIfeeDetail(td, Y, M, det, adj){
        '<td class="n">'+(ed? amtIn(d.fee,'c'+(d.id||'')) : won(d.fee))+'</td>'+(ed?'<td></td>':'')+'</tr>';
   });
   /* 추가 항목 — 계약에 없는 설치·철거 비용을 고객사별로 */
-  h+='<tr class="ifhead"><td colspan="'+(ed?5:4)+'" style="background:var(--surface-2);color:var(--mut);font-size:11.5px;padding:5px 6px">'+
+  h+='<tr class="ifhead"><td colspan="'+(ed?5:4)+'" style="background:var(--surface-2);color:var(--mut);font-size:12px;padding:5px 6px">'+
      '추가 항목 — 계약에 없는 설치비·철거비 (고객사를 고르거나 직접 입력)</td></tr>';
   function exRow(e,i){
     var cust=e? e.customer:'', kind=e? e.kind:'설치비', amt=e? e.amount:'', note=e? (e.note||''):'';
@@ -712,7 +712,7 @@ function openIfeeDetail(td, Y, M, det, adj){
       '<td><input class="ifin" data-f="x'+i+'_note" type="text" value="'+esc(note)+'" placeholder="비고(선택)"'+
         ' style="width:100%;min-width:110px;font-size:12px;padding:3px 5px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)"></td>'+
       '<td class="n">'+amtIn(amt,'x'+i+'_amt')+'</td>'+
-      '<td><button class="ifdel" data-x="'+i+'" title="이 줄 지우기" style="border:none;background:none;cursor:pointer;color:var(--critical,#d03b3b);font-size:13px">✕</button></td></tr>';
+      '<td><button class="ifdel" data-x="'+i+'" title="이 줄 지우기" style="border:none;background:none;cursor:pointer;color:var(--critical,#d03b3b);font-size:13.5px">✕</button></td></tr>';
   }
   ex.forEach(function(e,i){ h+=exRow(e,i); });
   if(ed) h+='<tr id="ifAddRow"><td colspan="5" style="padding:4px 6px"><button class="pill ghost" id="ifAdd" style="font-size:12px;padding:4px 10px">＋ 설치·철거비 추가</button></td></tr>';
@@ -721,7 +721,7 @@ function openIfeeDetail(td, Y, M, det, adj){
      '<td class="n" id="ifSum">'+won(sum)+'천원</td>'+(ed?'<td></td>':'')+'</tr></tfoot></table></div>'+
      '<datalist id="dlIfeeCust"></datalist>'+
      (ed? '<div class="act" style="margin-top:6px"><span class="msg" id="ifMsg" style="font-size:12px"></span><span class="sp"></span>'+
-          '<button class="pill" id="ifSave" style="background:var(--brand);border-color:var(--brand);color:#fff">저장</button></div>'+
+          '<button class="pill pri" id="ifSave">저장</button></div>'+
           '<div class="who" style="margin-top:4px">금액은 <b>원 단위</b>로 입력합니다 (표에는 천원으로 표시) · 환급·차감이면 음수 · 고객사 옆 ↗ 를 누르면 그 계약으로 이동</div>'
         : '<div class="who" style="margin-top:6px">줄을 누르면 그 고객사의 계약 화면으로 이동 · 금액 수정은 편집 권한이 있는 계정만</div>');
   openMxMemo(td, IFEE_LINE, Y, M, '설치비', null, {detail:{html:h, count:rows.length+ex.length, sum:sum,
@@ -771,7 +771,7 @@ function ifeeWire(box, Y, M, rows, ex, td){
         IFEE_KINDS.map(function(k){ return '<option>'+k+'</option>'; }).join('')+'</select></td>'+
       '<td><input class="ifin" data-f="x'+nextX+'_note" type="text" placeholder="비고(선택)" style="width:100%;min-width:110px;font-size:12px;padding:3px 5px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)"></td>'+
       '<td class="n"><input class="ifin" data-f="x'+nextX+'_amt" type="number" step="10000" placeholder="0" style="width:104px;text-align:right;font-size:12px;padding:3px 5px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)"></td>'+
-      '<td><button class="ifdel" data-x="'+nextX+'" title="이 줄 지우기" style="border:none;background:none;cursor:pointer;color:var(--critical,#d03b3b);font-size:13px">✕</button></td>';
+      '<td><button class="ifdel" data-x="'+nextX+'" title="이 줄 지우기" style="border:none;background:none;cursor:pointer;color:var(--critical,#d03b3b);font-size:13.5px">✕</button></td>';
     var anchor=box.querySelector('#ifAddRow');
     anchor.parentNode.insertBefore(tr, anchor);
     wireRow(tr); nextX++;
@@ -967,7 +967,7 @@ function renderVs(){
     (vs.monthCount>1? ' · 최근 달만 표시 (전체는 정산·목표 › 비즈포탈 차액)':'');
   var sm=$('#vsSummary'); sm.innerHTML='';
   vs.items.forEach(function(x){
-    var row=el('div'); row.style.cssText='display:flex;justify-content:space-between;gap:12px;padding:3px 2px;font-size:13px';
+    var row=el('div'); row.style.cssText='display:flex;justify-content:space-between;gap:12px;padding:3px 2px;font-size:13.5px';
     var k=el('span','',x.k); k.style.color='var(--mut)';
     var v=el('b','',won(x.v)+'천원');
     if(/차액/.test(x.k)) v.style.color = x.v>=0? 'var(--up,#199e70)':'var(--dn,#d95926)';

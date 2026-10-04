@@ -64,7 +64,7 @@ function renderOps(keep){
   if(IS_STAGING && !OPS._tgInit){ OPS.target='staging'; OPS._tgInit=true; }
   if(!window.IS_SUPER){ host.innerHTML='<p class="cap">슈퍼 관리자만 쓸 수 있습니다.</p>'; return; }
   var st=OPS.st;
-  var h='<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><h3 style="margin:0;font-size:16px">🚀 배포·운영</h3><span class="ubadge sm">지정 계정 전용</span>'+
+  var h='<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><h3 style="margin:0;font-size:15px">🚀 배포·운영</h3><span class="ubadge sm">지정 계정 전용</span>'+
     '<span class="mini" style="margin-left:auto">'+(st? (st.ok? (st.github? '저장소 '+esc(st.github.repo)+' · '+esc(st.github.branch)+' · GitHub 토큰 '+(st.github.token_set?'✓':'✗') : 'ops 함수 응답에 저장소 정보 없음(옛 버전?)')+' · Supabase 토큰 '+(st.mgmt_token_set?'✓':'✗')+' · PIN '+(st.pin_set?'설정됨':'미설정')+(st.slack? ' · 슬랙 알림 ✓':'') : '<span style="color:var(--critical)">'+esc(st.error||'')+'</span>') : '상태 확인 중…')+'</span></div>'+
     '<p class="cap" style="margin:0 0 12px">GitHub 커밋 · SQL 실행 · Edge Function 배포를 포탈 안에서 끝냅니다. 토큰은 전부 함수(ops) Secrets 에만 있고, 여기서는 <b>작업 PIN</b> 만 넣습니다(저장하지 않음 · 5회 틀리면 15분 잠금). 모든 실행은 기록에 남습니다.</p>'+
     '<div class="ops-bar"><label>작업 PIN <input id="opsPin" type="password" autocomplete="off" inputmode="numeric" placeholder="••••" value="'+esc(OPS.pin)+'" style="width:120px"></label>'+
@@ -270,7 +270,7 @@ function opsSqlHtml(){
   var res=OPS.sqlRes;
   var h='<div class="ops-h">SQL 실행 — Supabase Management API (SQL Editor 와 같은 경로) · 여러 문장·DO 블록 가능 · 결과는 마지막 문장 기준</div>';
   h+='<textarea id="opsSql" class="ops-ta" spellcheck="false" placeholder="-- 제가 드린 sql8N 파일을 그대로 붙여 넣으세요&#10;select now();">'+esc(OPS.sql||'')+'</textarea>';
-  h+='<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px"><label class="mini" style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="opsRO"'+(OPS.sqlRO?' checked':'')+'> 읽기 전용(SELECT 확인용 · 바뀌는 건 전부 롤백)</label><span class="mini" id="opsSqlInfo">'+esc(opsSqlInfo(OPS.sql||''))+'</span><button type="button" class="pill" id="opsSqlGo" style="margin-left:auto;background:var(--brand);border-color:var(--brand);color:#fff">실행 (Ctrl+Enter)</button></div>';
+  h+='<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px"><label class="mini" style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="opsRO"'+(OPS.sqlRO?' checked':'')+'> 읽기 전용(SELECT 확인용 · 바뀌는 건 전부 롤백)</label><span class="mini" id="opsSqlInfo">'+esc(opsSqlInfo(OPS.sql||''))+'</span><button type="button" class="pill pri" id="opsSqlGo" style="margin-left:auto">실행 (Ctrl+Enter)</button></div>';
   if(res){
     h+='<div class="ops-h" style="margin-top:12px">결과 — '+(res.row_count!=null? res.row_count+'행' : '행 없음')+(res.truncated? ' (500행까지 표시)':'')+(res.read_only? ' · 읽기 전용(롤백됨)':'')+' · '+res.ms+'ms</div>';
     var rows=Array.isArray(res.rows)? res.rows : (res.rows==null? [] : [res.rows]);
@@ -320,7 +320,7 @@ function opsFnHtml(){
   if(meta) h+='<p class="mini" style="margin:8px 0 0">'+esc(meta.slug)+' · v'+esc(meta.version)+' · 진입점 '+esc(meta.entrypoint_path||'index.ts')+' · Verify JWT '+(meta.verify_jwt?'ON':'OFF')+' · 수정 '+esc(String(meta.updated_at||'').replace('T',' ').slice(0,16))+(OPS.fnFiles&&OPS.fnFiles.length>1? ' · 파일 '+OPS.fnFiles.length+'개(첫 파일만 편집·배포됨)':'')+'</p>';
   h+='<div class="ops-h" style="margin-top:12px">② 코드</div><div class="ops-drop" id="opsFnDrop" tabindex="0">index.ts 파일을 끌어다 놓거나 <u>클릭</u> — 또는 아래 칸에 붙여넣기<input type="file" id="opsFnFile" accept=".ts,.js,.tsx" style="display:none"></div>';
   h+='<textarea id="opsFnCode" class="ops-ta" spellcheck="false" style="min-height:260px;margin-top:8px" placeholder="// Deno.serve(async (req) => { … })">'+esc(OPS.fnCode||'')+'</textarea>';
-  h+='<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px"><label class="mini">파일명 <input id="opsFnName" value="'+esc(OPS.fnName||'index.ts')+'" style="width:140px"></label><label class="mini" style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="opsFnVerify"'+(OPS.fnVerify?' checked':'')+'> Verify JWT (포탈 함수는 전부 OFF)</label><span class="mini" id="opsFnInfo">'+(OPS.fnCode? (OPS.fnCode.length.toLocaleString('ko-KR')+'자'):'')+'</span><button type="button" class="pill" id="opsFnDeploy" style="margin-left:auto;background:var(--brand);border-color:var(--brand);color:#fff">배포</button>'+(sel&&sel!=='__new'? '<button type="button" class="pill ghost" id="opsFnPatch" title="코드는 그대로 두고 Verify JWT 설정만 저장">설정만 저장</button>':'')+'</div>';
+  h+='<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px"><label class="mini">파일명 <input id="opsFnName" value="'+esc(OPS.fnName||'index.ts')+'" style="width:140px"></label><label class="mini" style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="opsFnVerify"'+(OPS.fnVerify?' checked':'')+'> Verify JWT (포탈 함수는 전부 OFF)</label><span class="mini" id="opsFnInfo">'+(OPS.fnCode? (OPS.fnCode.length.toLocaleString('ko-KR')+'자'):'')+'</span><button type="button" class="pill pri" id="opsFnDeploy" style="margin-left:auto">배포</button>'+(sel&&sel!=='__new'? '<button type="button" class="pill ghost" id="opsFnPatch" title="코드는 그대로 두고 Verify JWT 설정만 저장">설정만 저장</button>':'')+'</div>';
   h+='</div><div><div class="ops-h">배포 메모</div><ul class="mini" style="margin:0;padding-left:16px;line-height:1.7"><li>슬러그(이름)는 URL 이 됩니다 — <code>…/functions/v1/슬러그</code>. 한 번 만들면 못 바꿉니다.</li><li>Verify JWT 는 ask·remind·ops 모두 <b>OFF</b> — 함수가 직접 로그인 토큰을 검사합니다. ON 이면 포탈에서 Failed to fetch.</li><li>Secrets 를 바꾼 뒤에는 그 함수를 다시 배포해야 새 값을 읽습니다.</li><li>배포 뒤 10~20초 지나서 포탈에서 호출해 보세요.</li></ul></div></div>';
   return h;
 }
@@ -514,7 +514,7 @@ function apMenus(){
     if(el.classList && el.classList.contains('grp')){ grp=el.textContent.trim(); return; }
     if(el.tagName!=='BUTTON') return;
     var v=el.dataset.v; if(!v || PERM_EXEMPT[v] || el.id==='btnMenuEdit') return;
-    out.push({grp:grp, v:v, label:navText(el)});
+    var sub=navSub(el); out.push({grp:grp+(sub? ' · '+sub:''), v:v, label:navText(el)});   /* ㊿+142: 소제목별로 묶어 표시 */
   });
   return out;
 }
@@ -623,8 +623,8 @@ async function abLoad(){
   var remain=credit? Math.round((credit-r.total_usd)*100)/100 : null;
   function box(l,v,s,warn){
     return '<div class="kpi'+(warn?'':'')+'" style="padding:11px 14px"><div style="font-size:11px;color:var(--muted);font-weight:650">'+l+'</div>'+
-      '<div style="font-size:19px;font-weight:800;margin-top:2px'+(warn?';color:var(--critical)':'')+'">'+v+'</div>'+
-      '<div style="font-size:10.5px;color:var(--muted)">'+s+'</div></div>';
+      '<div style="font-size:18px;font-weight:800;margin-top:2px'+(warn?';color:var(--critical)':'')+'">'+v+'</div>'+
+      '<div style="font-size:11px;color:var(--muted)">'+s+'</div></div>';
   }
   kpi.innerHTML=
     box('잔여 크레딧 (추정)', remain==null?'충전액 미입력':'$'+remain.toLocaleString('en-US'),
@@ -639,7 +639,7 @@ async function abLoad(){
     r.daily.map(function(d){
       return '<div title="'+d.d+' · $'+d.usd+'" style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:2px">'+
         '<div style="width:100%;border-radius:3px 3px 0 0;background:var(--brand);height:'+Math.max(2,Math.round(d.usd/mx*40))+'px"></div>'+
-        '<span style="font-size:8.5px;color:var(--muted)">'+d.d.slice(8)+'</span></div>';
+        '<span style="font-size:11px;color:var(--muted)">'+d.d.slice(8)+'</span></div>';
     }).join('')+'</div>' : '';
 }
 async function abSave(){
@@ -947,12 +947,12 @@ async function renderAccount(){
   box.appendChild(act);
   /* 보안 — 2단계 인증(인증 앱) · 계정 단위, 본인이 켬 */
   var sec=document.createElement('div'); sec.style.cssText='margin-top:22px';
-  sec.innerHTML='<div style="font-size:13px;font-weight:650;margin-bottom:4px">보안</div>'+row('🔐 2단계 인증', '<div id="accMfa"></div>');
+  sec.innerHTML='<div style="font-size:13.5px;font-weight:650;margin-bottom:4px">보안</div>'+row('🔐 2단계 인증', '<div id="accMfa"></div>');
   box.appendChild(sec); mfaCardRender(sec.querySelector('#accMfa'));
   /* 설정 — 이 브라우저에만 저장 (localStorage) */
   var set=document.createElement('div'); set.style.cssText='margin-top:22px';
   var curIdle=idleMin(), look0=curLook();
-  set.innerHTML='<div style="font-size:13px;font-weight:650;margin-bottom:4px">설정 <span class="mini" style="font-weight:400">— 이 브라우저에만 저장됩니다</span></div>'+
+  set.innerHTML='<div style="font-size:13.5px;font-weight:650;margin-bottom:4px">설정 <span class="mini" style="font-weight:400">— 이 브라우저에만 저장됩니다</span></div>'+
     row('자동 로그아웃', '<select id="accIdle" aria-label="자동 로그아웃" style="height:30px;min-width:200px">'+IDLE_OPTS.map(function(m){
         return '<option value="'+m+'"'+(m===curIdle?' selected':'')+'>'+esc(idleLabel(m))+(m? ' 동안 활동 없으면':'')+'</option>'; }).join('')+'</select>'+
       '<div class="mini" style="margin-top:5px;line-height:1.6">마우스·키보드·스크롤 입력이 정한 시간 동안 없으면 이 탭에서 자동으로 로그아웃합니다. 끝나기 1분 전에 알림이 뜹니다.</div>')+

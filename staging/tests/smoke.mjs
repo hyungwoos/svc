@@ -664,6 +664,64 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
   });
   await ctx.close();
 }
+// ㊿+142 디자인 정리: 글자 크기 7단계 · 버튼 4종 · 표 열 너비 조절 · 메뉴 «사업 영역» 한 그룹
+{
+  const { ctx, page, errs } = await open();
+  await S.t('글자 크기: 화면 글자는 7단계(11·12·12.5·13.5·15·18·22) + 큰 숫자(≥24)만 · 11px 미만 0', async () => {
+    const STEP = [11, 12, 12.5, 13.5, 15, 18, 22]; const bad = {}; let small = 0;
+    for (const v of ['dash', 'contracts', 'orders', 'eqboard', 'price', 'report', 'adminx', 'ops', 'oi', 'dcheck', 'leadsrc', 'account']) {
+      await page.evaluate((v) => switchView(v), v); await page.waitForTimeout(300);
+      const r = await page.evaluate(() => { const o = {}; document.querySelectorAll('body *').forEach((el) => { if (!el.getClientRects().length || el.closest('svg')) return; if (![...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())) return; const f = parseFloat(getComputedStyle(el).fontSize); o[f] = (o[f] || 0) + 1; }); return o; });
+      for (const f in r) { const x = +f; if (x < 11) small += r[f]; if (x < 24 && !STEP.includes(x)) bad[f] = (bad[f] || 0) + r[f]; }
+    }
+    assert(!small, '11px 미만 ' + small); assert(!Object.keys(bad).length, '단계 밖 크기 ' + JSON.stringify(bad));
+    return '7단계';
+  });
+  await S.t('버튼: 주요(초록) 색 하나 · 기본 버튼 모양 통일(높이 28 · 모서리 8 · 글자 500)', async () => {
+    await page.evaluate(() => openTargetEditor(2026)); await page.waitForTimeout(150);
+    const p = await page.evaluate(() => { const b = document.getElementById('tgSave'); const cs = getComputedStyle(b); const brand = getComputedStyle(document.documentElement).getPropertyValue('--brand').trim(); return { cls: b.className, bg: cs.backgroundColor, fw: cs.fontWeight, inline: b.getAttribute('style') || '', brand }; });
+    await page.evaluate(() => document.getElementById('ovlTarget').remove());
+    assert(/\bpri\b/.test(p.cls) && !/background/.test(p.inline) && +p.fw >= 600, JSON.stringify(p));
+    const probe = await page.evaluate(() => { const d = document.createElement('div'); d.innerHTML = '<button class="pill">a</button><button class="cbtn">b</button><button class="pill pri">c</button><button class="cbtn pri">d</button>'; document.body.appendChild(d); const r = [...d.children].map((b) => { const c = getComputedStyle(b); return [c.height, c.borderTopLeftRadius, c.fontWeight, c.backgroundColor].join(' '); }); d.remove(); return r; });
+    const [pl, cb, pp, cp] = probe.map((x) => x.split(' '));
+    assert(pl[0] === cb[0] && pl[0] === '28px' && pl[1] === cb[1] && pl[1] === '8px' && pl[2] === cb[2] && pl[2] === '500', '기본 ' + probe.join(' / '));
+    assert(pp.slice(3).join(' ') === cp.slice(3).join(' ') && pp[2] === '600', '주요 ' + probe.join(' / '));
+    return probe[2];
+  });
+  await S.t('표 열 너비: 머리 경계를 끌면 넓어지고 기억 · 정렬은 안 바뀜 · 두 번 누르면 원래대로', async () => {
+    await page.evaluate(() => { localStorage.removeItem('svc_colw_contracts'); switchView('contracts'); }); await page.waitForTimeout(300);
+    const th = await page.$('#dvTable thead th:nth-child(2)'); const k = await th.evaluate((e) => e.dataset.k);
+    const w0 = await th.evaluate((e) => e.getBoundingClientRect().width); const box = await (await th.$('.colrs')).boundingBox();
+    await page.mouse.move(box.x + 4, box.y + box.height / 2); await page.mouse.down(); await page.mouse.move(box.x + 104, box.y + box.height / 2, { steps: 5 }); await page.mouse.up(); await page.waitForTimeout(100);
+    const st = await page.evaluate(() => ({ m: JSON.parse(localStorage.getItem('svc_colw_contracts') || '{}'), sortK: DV.sortK }));
+    assert(st.m[k] >= w0 + 90 && !st.sortK, JSON.stringify({ w0, st }));
+    await page.evaluate(() => { switchView('orders'); switchView('contracts'); }); await page.waitForTimeout(250);
+    const w2 = await page.$eval('#dvTable thead th:nth-child(2)', (e) => e.getBoundingClientRect().width); const fx = await page.$eval('#dvTable', (e) => e.classList.contains('colw-fixed'));
+    assert(Math.abs(w2 - st.m[k]) <= 1 && fx, '다시 열었을 때 ' + w2);
+    await page.evaluate(() => document.querySelector('#dvTable thead th:nth-child(2) .colrs').dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))); await page.waitForTimeout(200);
+    const w3 = await page.$eval('#dvTable thead th:nth-child(2)', (e) => e.getBoundingClientRect().width); const left = await page.evaluate(() => localStorage.getItem('svc_colw_contracts'));
+    assert(Math.abs(w3 - w0) <= 1 && !left, '원래대로 ' + w3 + ' ' + left);
+    assert(!errs.length, errs.join(' | ')); return Math.round(w0) + '→' + st.m[k] + '→' + Math.round(w3);
+  });
+  await S.t('메뉴: «사업 영역» 한 그룹(소제목 Cloud NAC·MDR·기타) · 레일 아이콘 1개 · Ctrl+K 에 소제목 붙음', async () => {
+    const r = await page.evaluate(() => ({ g: [...document.querySelectorAll('#side .grp')].map((g) => g.textContent.trim()).filter((t) => /사업 영역/.test(t)), sub: [...document.querySelectorAll('#side .subgrp')].map((s) => s.dataset.sub), rail: document.querySelectorAll('#rail [data-seg^="g:사업 영역"]').length }));
+    assert(r.g.length === 1 && r.g[0] === '사업 영역' && r.sub.join('|') === 'Cloud NAC|MDR|기타 (유통)' && r.rail === 1, JSON.stringify(r));
+    const nm = await page.evaluate(() => cmdMenuHits('일반 판매').map((h) => h.nm)); assert(nm.every((x) => /·/.test(x)), JSON.stringify(nm));
+    return JSON.stringify(nm);
+  });
+  await ctx.close();
+}
+{
+  const { ctx, page, errs } = await open();
+  await S.t('메뉴 편집 예전 설정(옛 «사업 영역 · MDR» 숨김·순서) → 새 그룹으로 옮김', async () => {
+    await page.evaluate(() => { localStorage.setItem(menuConfKey(), JSON.stringify({ order: ['g:장비', 'g:사업 영역 · MDR', 'g:전체 데이터', 'g:사업 영역 · Cloud NAC'], hidden: { 'g:사업 영역 · MDR': 1 } })); applyMenuConf(); buildRail(); });
+    const r = await page.evaluate(() => ({ conf: JSON.parse(localStorage.getItem(menuConfKey())), segs: menuSegments().filter((s) => s.grp).map((s) => s.label).slice(0, 3), mdrHidden: ['mdrgen', 'mdrs1', 'mdrlgu'].every((v) => document.querySelector('#side button[data-v="' + v + '"]').classList.contains('mhide')), subMdr: document.querySelector('#side .subgrp[data-sub="MDR"]').classList.contains('sub-empty'), cn: !document.querySelector('#side button[data-v="cngen"]').classList.contains('mhide') }));
+    assert(r.conf.order.join('|') === 'g:장비|g:사업 영역|g:전체 데이터' && r.conf.hidden['b:mdrgen'] && !r.conf.hidden['g:사업 영역 · MDR'], JSON.stringify(r.conf));
+    assert(r.segs.join('|') === '장비|사업 영역|전체 데이터' && r.mdrHidden && r.subMdr && r.cn, JSON.stringify(r));
+    assert(!errs.length, errs.join(' | ')); return r.segs.join('·');
+  });
+  await ctx.close();
+}
 await browser.close(); srv.close();
 const ok = S.report();
 fs.writeFileSync(path.join(OUT, 'smoke.json'), JSON.stringify(S.results, null, 1));

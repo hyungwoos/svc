@@ -363,7 +363,7 @@ function renderEqPanel(){
   var h='<div class="card" style="padding:11px 14px;margin-bottom:10px;border-left:4px solid '+
         (bad?'var(--warning,#fab219)':'var(--good,#0ca30c)')+'">'+
     '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'+
-      '<b style="font-size:13px">신청 ↔ 현황 대조</b>'+
+      '<b style="font-size:13.5px">신청 ↔ 현황 대조</b>'+
       '<span class="mini" style="color:var(--ink-2)">신청 '+s.orders.length+'건 · 현황 반영 '+s.ok+'건 · '+
         '<b style="color:'+(bad?'var(--critical,#d03b3b)':'inherit')+'">맞지 않음 '+s.gap.length+'건</b>'+
         ' · 취소 '+s.cancel.length+'건'+(s.moved.length? ' · 이전됨 '+s.moved.length+'건':'')+'</span>'+

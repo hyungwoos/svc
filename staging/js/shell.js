@@ -34,6 +34,7 @@ function ico(name, size){ size=size||18; return '<svg width="'+size+'" height="'
 function iconFor(label, v){
   var L=String(label||'');
   if(v==='dash') return 'home'; if(v==='weekly') return 'calendar'; if(v==='account') return 'user'; if(v==='eqboard') return 'board';
+  if(/^사업 영역$/.test(L)) return 'layers';
   if(/전체 데이터|계약|매출/.test(L)) return 'chart';
   if(/Cloud NAC|CLOUD/i.test(L)) return 'cloud';
   if(/MDR/.test(L)) return 'shield';
@@ -81,8 +82,10 @@ function railFlyToggle(btn, key){
   var f=document.getElementById('railFly'); if(!f) return;
   if(RAIL_OPEN===key){ railFlyClose(); return; }
   var seg=menuSegments().filter(function(s){ return s.key===key; })[0]; if(!seg) return;
-  var btns=(seg.buttons||[]).filter(visBtn);
-  f.innerHTML='<div class="fh">'+esc(seg.label)+'</div>'+btns.map(function(b){
+  /* ㊿+142: 그룹 안 소제목(사업 영역 › Cloud NAC/MDR/기타)도 플라이아웃에 — 보이는 메뉴가 있는 소제목만 */
+  var its=(seg.items||seg.buttons||[]).filter(function(el){ return el.tagName==='BUTTON'? visBtn(el) : !el.classList.contains('sub-empty'); });
+  f.innerHTML='<div class="fh">'+esc(seg.label)+'</div>'+its.map(function(b){
+    if(b.tagName!=='BUTTON') return '<div class="fsub">'+esc(b.textContent.trim())+'</div>';
     return '<button type="button" data-v="'+esc(b.dataset.v)+'" aria-current="'+(b.dataset.v===CUR_VIEW)+'">'+esc(navText(b))+'</button>'; }).join('');
   f.querySelectorAll('button').forEach(function(b){ b.onclick=function(){ railFlyClose(); switchView(b.dataset.v); }; });
   var r=btn.getBoundingClientRect();
@@ -135,7 +138,7 @@ function cmdMenuHits(q){
   if(!qn) return out;
   document.querySelectorAll('#side button[data-v]').forEach(function(b){
     if(!visBtn(b) && b.dataset.v!=='dash' && b.dataset.v!=='account') return;
-    var t=navText(b); if(fkNorm(t).indexOf(qn)<0) return;
+    var sub=navSub(b), t=(sub? sub+' · ':'')+navText(b); if(fkNorm(t).indexOf(qn)<0) return;   /* ㊿+142: «MDR · 일반 판매» 처럼 소제목을 붙여 구분 */
     if(window.IS_EQUIP && !EQUIP_VIEWS[b.dataset.v]) return;
     out.push({t:'이동', nm:t, sb:'화면 열기', go:(function(v){ return function(){ switchView(v); }; })(b.dataset.v), kmenu:1});
   });
@@ -356,7 +359,7 @@ function ccTileEquip(){
   var c=el('div','kpi');
   c.innerHTML='<div class="k">임대 장비 운영 '+tag+'</div>'+
     '<div class="tri"><div><b class="num">'+lent+'</b><span>임대중</span></div><div><b class="num">'+stock+'</b><span>재고</span></div><div><b class="num" style="color:'+(prog.length?'#8a5200':'inherit')+'">'+prog.length+'</b><span>회수 진행</span></div></div>'+ph+
-    '<div class="d" style="margin-top:auto;padding-top:6px;color:var(--brand);font-weight:500">장비 대시보드 →</div>';
+    '<div class="d" style="margin-top:auto;padding-top:6px;color:var(--s1);font-weight:500">장비 대시보드 →</div>';
   c.style.cursor='pointer'; c.title='임대 장비 대시보드 (클릭)'; c.setAttribute('role','button'); c.tabIndex=0;
   c.onclick=function(){ switchView('eqboard'); };
   return c;
@@ -995,6 +998,7 @@ function enterEquipMode(d){
     }
     g.style.display=vis? '':'none';
   });
+  try{ subgrpSync(); }catch(e){}
   $('#btnEdit').style.display='none';
   $('#btnWidgets').style.display='none';
   showAuthUi();

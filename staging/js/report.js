@@ -276,7 +276,7 @@ function rpAnHtml(j, inc, tbl){
     var inner2=tbl('rpTblSeg',[['제품'],['산업군'],['고객사',1],['비중',1],['월 매출',1]],rows2,'활성 계약이 없습니다');
     var head2=sg.filter(function(x){ return x.top.length; }).map(function(x){
       return x.line+' → '+x.top[0].ind+' '+x.top[0].n+'개사('+(x.tot? Math.round(x.top[0].n/x.tot*100):0)+'%)'; });
-    inner2='<div class="pr-note" style="margin:0 0 9px;font-size:13px;line-height:1.9;color:var(--ink-2)">'+
+    inner2='<div class="pr-note" style="margin:0 0 9px;font-size:13.5px;line-height:1.9;color:var(--ink-2)">'+
       head2.map(function(t){ return '· '+esc(t); }).join('<br>')+'</div>'+inner2;
     inner2+='<p class="pr-note" style="margin-top:6px">제품별 상위 3개 산업군만 표시합니다. 산업군이 비어 있는 계약은 «미지정»으로 묶입니다.</p>';
     var segSrc=DATA.rows.some(function(r){ return r.sector; })?
@@ -1219,7 +1219,7 @@ function renderReport(){
   if(RPV.tab==='auto'){ qbAutoView(); return; }
   if(!QB.spec) QB.spec=qbNewSpec('contracts');
   if(host.querySelector('#qbPanel')){ qbPanelRefresh(); qbRunNow(); qbLibRefresh(); qbDeckRefresh(); return; }
-  host.innerHTML='<div class="pr-top"><span style="font-size:19px;font-weight:600;letter-spacing:-.01em">리포트</span><span class="mini">포탈 안의 표를 골라 연결(JOIN)·조건·묶기·피벗으로 조합하고 표·차트로 봅니다 — 저장해 두고 엑셀·PPT 로 내보내기</span>'+
+  host.innerHTML='<div class="pr-top"><span style="font-size:18px;font-weight:600;letter-spacing:-.01em">리포트</span><span class="mini">포탈 안의 표를 골라 연결(JOIN)·조건·묶기·피벗으로 조합하고 표·차트로 봅니다 — 저장해 두고 엑셀·PPT 로 내보내기</span>'+
     '<button type="button" class="cbtn" id="qbAuto" style="margin-left:auto" title="예전 월간 자동 리포트(고정 양식)">월간 자동 리포트 →</button></div>'+
     '<div id="qbLib"></div>'+
     '<div class="qb-wrap"><aside class="pr-card qb-panel-card"><div id="qbPanel"></div></aside><section class="pr-card qb-res-card"><div id="qbRes"></div></section></div>'+
@@ -1273,11 +1273,11 @@ function renderReportAuto(){
       '</div></div></div>';
   var rv=rpRevData(RP.j), md=rpMdrData(RP.j);
   h+='<div class="pr-card" style="margin-bottom:14px"><h3>💰 <span contenteditable spellcheck="false" id="rpRevT">'+rv.year+'년 매출 Review</span>'+rpCopyBtn('rpTblRev')+inc('rev')+'</h3>'+
-    '<div id="rpRevB" contenteditable spellcheck="false" style="font-size:13px;line-height:1.9;margin:4px 0 10px">'+rv.bullets.map(function(x){return esc(x);}).join('<br>')+'</div>'+
+    '<div id="rpRevB" contenteditable spellcheck="false" style="font-size:13.5px;line-height:1.9;margin:4px 0 10px">'+rv.bullets.map(function(x){return esc(x);}).join('<br>')+'</div>'+
     tbl('rpTblRev', rv.head, rv.rows,'매출 데이터가 없습니다')+
     '<p class="pr-note" style="margin-top:4px">단위: 천원 · 월 숫자는 해당 연도 1월부터 기준월까지 · Q=분기 소계</p></div>';
   h+='<div class="pr-card" style="margin-bottom:14px"><h3>🛡️ <span contenteditable spellcheck="false" id="rpMdrT">MDR 고객 현황</span>'+inc('mdrc')+'</h3>'+
-    '<div id="rpMdrB" contenteditable spellcheck="false" style="font-size:13px;line-height:2.0">'+md.lines.map(function(x){return esc(x);}).join('<br>')+'</div></div>';
+    '<div id="rpMdrB" contenteditable spellcheck="false" style="font-size:13.5px;line-height:2.0">'+md.lines.map(function(x){return esc(x);}).join('<br>')+'</div></div>';
   h+='<div class="pr-card" style="margin-bottom:14px"><h3><span contenteditable spellcheck="false" id="rpKT">'+d.ym+' 요약</span> <span class="ubadge sm">₩ 천원</span>'+rpCopyBtn('rpK')+inc('sum')+'</h3><div class="pr-out" id="rpK" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">'+
     kpi('월 매출(MRR)',won(d.tot)+'천원', d.prev?('전월 대비 '+pct(dif)):'','rp_mrr')+
     kpi('ARR 환산',won(d.tot*12)+'천원','','rp_mrr')+
@@ -1364,7 +1364,7 @@ function rpAddNote(){
   blk.className='pr-card rpNoteBlk'; blk.style.marginBottom='14px';
   blk.innerHTML='<h3>📝 <span class="rpNT" contenteditable spellcheck="false">특이사항·하이라이트</span>'+
     '<button class="pill" data-rpnx style="height:24px;padding:0 9px;font-size:11px;margin-left:auto">× 슬라이드 삭제</button></h3>'+
-    '<div class="rpNB" contenteditable spellcheck="false" style="min-height:70px;border:1px dashed var(--ring);border-radius:9px;padding:10px 12px;font-size:13px;line-height:1.8">· 여기에 내용을 입력하세요 (줄마다 불릿 하나)</div>';
+    '<div class="rpNB" contenteditable spellcheck="false" style="min-height:70px;border:1px dashed var(--ring);border-radius:9px;padding:10px 12px;font-size:13.5px;line-height:1.8">· 여기에 내용을 입력하세요 (줄마다 불릿 하나)</div>';
   blk.querySelector('[data-rpnx]').onclick=function(){ blk.remove(); };
   wrap.appendChild(blk); RP._touched=true;
   var b=blk.querySelector('.rpNB'); var r=document.createRange(); r.selectNodeContents(b); var sel=window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
