@@ -43,7 +43,20 @@ tests/                정적 검사 · 브라우저 스모크 · 함수 테스�
 3. `…/svc/staging/index.html` 에서 확인 → 배포·운영 «스테이징 → 운영 승격»
 4. Edge Function 은 배포·운영 › Edge Function 탭에서 소스를 붙여 배포 (Verify JWT 는 **끔** — 함수 안에서 토큰 검사) · SQL 은 SQL 탭에서
 
-저장소 Settings › Pages › Source 는 **GitHub Actions** 여야 2번이 배포를 맡습니다.
+저장소 Settings › Pages › Source 는 **GitHub Actions** 여야 2번이 배포를 맡습니다(«Deploy from a branch» 면 테스트가 실패해도 그대로 라이브에 올라감).
+
+### 파일을 어디에 두나 (2026-10-04 · ㊿+143)
+
+| 파일 | 자리 | 올리는 방법 |
+|---|---|---|
+| 사이트(index.html · app.css · js/ · 위성 · sw.js · 이미지) · `tests/*.mjs` · `tests/fixture/` | 스테이징 → 승격 | 포탈 배포·운영 › 대상 «스테이징» → 확인 → «스테이징 → 운영 승격» (테스트도 사이트와 같은 버전으로 함께 승격) |
+| 저장소 파일: `tests/fn/` · `supabase/functions/` · `cloudflare/` · `README.md` · `package.json` · `.gitignore` | **항상 루트** | 포탈에 끌어 넣으면 대상과 상관없이 루트로 커밋 (승격은 이 파일들을 옮기지 않음) |
+| `.github/workflows/deploy.yml` | 루트 | **GitHub 웹에서 직접 편집** — 포탈 토큰에 Workflows 권한이 없음 (포탈에 넣으면 «내용 복사 · GitHub 에서 열기» 안내) |
+
+- 파일 하나만 끌어 넣어도 자리를 맞춥니다: `check.mjs`·`smoke.mjs`·`lib.mjs` → `tests/` · `*.test.ts`·`_mock.ts` → `tests/fn/` · `deploy.yml` → `.github/workflows/` · `worker.js` → `cloudflare/quote-worker/`. `index.ts` 는 함수 이름을 알 수 없어 경로를 고쳐야 커밋됩니다.
+- 커밋 전에 «루트에 .mjs/.ts/.yml 이 놓임» · «index.html app-js 목록에 없는 js» 를 경고합니다.
+- 배포·운영 › GitHub › **🧹 저장소 점검**: 안 쓰는 파일(예: 옛 `js/app.js`) · 스테이징에만 있는 저장소 파일 · 루트에 없는 테스트/함수 · deploy.yml 상태를 보여 주고 정리(삭제 커밋)합니다.
+- CI 실행 환경은 `ubuntu-24.04` 고정 · Node 22 · 액션은 Node 24 로 도는 주 버전. Ubuntu 를 올릴 때는 이 줄만 바꾸고 Actions 결과를 확인하세요.
 
 ## 백엔드(요약)
 

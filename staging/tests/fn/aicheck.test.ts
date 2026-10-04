@@ -61,5 +61,12 @@ role = 'admin'; { const r = await call({ dry: true }); ok(r.status === 403, 'adm
   ok(r.j.ok && r.j.pass === 0 && r.j.fails.every((f: any) => /^오류/.test(f.why)), 'ask 오류 → 전부 «오류: …» 로 실패(함수 자체는 ok)', r.j.fails[0]?.why); mode = 'good'; }
 { expectFail = true; const r = await call({ dry: true });
   ok(r.j.ok && /ai_check_expect 404/.test(r.j.expect_err) && r.j.pass >= 11, '기대값 RPC 없음(SQL 94 전) → expect_err 표시 · 숫자 비교는 통과 처리', { err: r.j.expect_err, pass: r.j.pass }); expectFail = false; }
+{ const bgs: Promise<unknown>[] = []; (globalThis as any).EdgeRuntime = { waitUntil: (p: Promise<unknown>) => bgs.push(p) };
+  logs.length = 0; askN = 0; const r = await call({}, { token: 'cronkey-test' });
+  ok(r.status === 202 && r.j.accepted && r.j.background && logs.length === 0, '크론 호출 → 바로 202(뒤에서 실행)', r.j);
+  await Promise.all(bgs); ok(logs.length === 1 && logs[0].source === 'cron' && askN === 12, '뒤에서 끝까지 실행 → ai_check_log 기록', { logs: logs.length, askN });
+  logs.length = 0; const w = await call({ wait: true }, { token: 'cronkey-test' }); ok(w.status === 200 && w.j.pass === 12 && w.j.logged === true, '{wait:true} → 끝까지 기다려 결과');
+  const d = await call({ dry: true }); ok(d.status === 200 && d.j.dry === true && d.j.total === 12, '사용자(super) dry 는 기다려 결과(백그라운드 아님)');
+  delete (globalThis as any).EdgeRuntime; }
 ok(!calls.some((c) => c.body && /xoxb-test|cronkey-test/.test(c.body)), '슬랙 토큰·크론 키가 요청 본문에 새지 않음');
 report('aicheck');

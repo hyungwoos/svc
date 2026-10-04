@@ -1,8 +1,9 @@
-// aicheck v1.0 — 포탈 AI 야간 자동 점검 (90점 프로젝트 ⑥ AI 2단계 · 2026-10-03)
+// aicheck v1.1 — 포탈 AI 야간 자동 점검 (90점 프로젝트 ⑥ AI 2단계 · 2026-10-03)
 //   · 대표 질문 12개를 ask 함수(서비스 키 경로 · 요약은 ask 가 ai_digest 로 직접 만듦)에 동시 3개씩 보내고,
 //     답에 DB 로 계산한 기대값(ai_check_expect · SQL 94)이 들어 있는지 + 비어 있지 않은지 + 중단되지 않았는지 확인
 //   · 결과를 ai_check_log(source cron) 에 기록 → 포탈 배포·운영 › 기록 › «AI 점검 추이» · 통과율이 AICHECK_MIN(기본 0.7) 미만이면 슬랙
 //   · 인증: 서비스 키(SUPABASE_SERVICE_ROLE_KEY) 또는 AICHECK_KEY(크론용) 또는 super_admin 사용자 JWT · ?dry=1 / {dry:true} 면 기록·슬랙 없이 결과만
+//   · v1.1: 크론 호출(서비스 키·AICHECK_KEY)은 즉시 202 를 돌려주고 뒤에서 실행(EdgeRuntime.waitUntil) — pg_net 기본 대기 5초 안에 응답 · {wait:true} 면 기다림
 //   · Secrets: (필수 없음) · 선택 AICHECK_KEY · AICHECK_MIN · SLACK_BOT_TOKEN · AICHECK_SLACK_CHANNEL(없으면 SLACK_CHANNEL → C08RA3PPDH8) · PORTAL_URL · AICHECK_CONC(동시 수)
 //   · Verify JWT 는 끔(ask·remind·ops 와 같게 — 함수 안에서 토큰 검사)
 const SB_URL = Deno.env.get('SUPABASE_URL') ?? '';
@@ -113,6 +114,7 @@ Deno.serve(async (req: Request) => {
   } catch (e) { expectErr = String((e as Error).message || e).slice(0, 100); }
 
   // ── 실행 ──
+  const work = async () => {
   const t0 = Date.now();
   const res = await runCheck(expect);
   const fails = res.rows.filter((r) => !r.ok).map((r) => ({ q: r.q, why: r.why, head: r.head }));
@@ -135,5 +137,14 @@ Deno.serve(async (req: Request) => {
       } catch (e) { slack = { ok: false, error: String((e as Error).message || e) }; }
     }
   }
-  return json({ ...summary, logged, slack });
+  return { ...summary, logged, slack };
+  };
+  // 크론(Supabase Cron · pg_net)은 응답을 몇 초만 기다리므로, 서비스 키/AICHECK_KEY 로 온 호출은 바로 202 를 돌려주고 뒤에서 끝까지 실행(EdgeRuntime.waitUntil).
+  // 결과는 ai_check_log · 포탈 배포·운영 › 기록 › AI 점검 추이. {wait:true} 면 끝날 때까지 기다려 결과를 돌려줌(수동 확인용).
+  const rt = (globalThis as any).EdgeRuntime;
+  if (!dry && body.wait !== true && actor === 'cron' && rt && typeof rt.waitUntil === 'function') {
+    rt.waitUntil(work().catch((e) => console.error('[aicheck] 실패', e)));
+    return json({ ok: true, accepted: true, background: true, note: '점검을 뒤에서 실행합니다 — 1~2분 뒤 ai_check_log / 포탈 배포·운영 › 기록 › AI 점검 추이에서 확인' }, 202);
+  }
+  return json(await work());
 });
