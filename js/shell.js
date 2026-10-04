@@ -72,7 +72,7 @@ function buildRail(){
   h+='<button type="button" data-v="account" title="내 계정 · 설정" aria-label="내 계정">'+ico('gear')+'</button>';
   h+='<div class="ravatar" data-v="account" title="'+esc(AUTH_USER||'')+'">'+esc(((AUTH_USER||'?').split('@')[0]).slice(0,1).toUpperCase())+'</div>';
   rail.innerHTML=h;
-  rail.querySelectorAll('[data-v]').forEach(function(b){ b.onclick=function(){ railFlyClose(); switchView(b.dataset.v); }; });
+  rail.querySelectorAll('[data-v]').forEach(function(b){ b.onclick=function(){ railFlyClose(); navMenu(b.dataset.v); }; });
   rail.querySelectorAll('[data-seg]').forEach(function(b){ b.onclick=function(e){ e.stopPropagation(); railFlyToggle(b, b.dataset.seg); }; });
   railSync(CUR_VIEW);
 }
@@ -87,7 +87,7 @@ function railFlyToggle(btn, key){
   f.innerHTML='<div class="fh">'+esc(seg.label)+'</div>'+its.map(function(b){
     if(b.tagName!=='BUTTON') return '<div class="fsub">'+esc(b.textContent.trim())+'</div>';
     return '<button type="button" data-v="'+esc(b.dataset.v)+'" aria-current="'+(b.dataset.v===CUR_VIEW)+'">'+esc(navText(b))+'</button>'; }).join('');
-  f.querySelectorAll('button').forEach(function(b){ b.onclick=function(){ railFlyClose(); switchView(b.dataset.v); }; });
+  f.querySelectorAll('button').forEach(function(b){ b.onclick=function(){ railFlyClose(); navMenu(b.dataset.v); }; });
   var r=btn.getBoundingClientRect();
   f.style.top='0px'; f.classList.add('on'); RAIL_OPEN=key;
   var top=Math.max(8, Math.min(r.top, window.innerHeight - f.offsetHeight - 12));
@@ -122,7 +122,7 @@ function buildMtabs(){
   m.querySelectorAll('button').forEach(function(b){
     b.onclick=function(){
       if(b.dataset.v==='_menu'){ var open=document.getElementById('side').classList.toggle('open'); document.getElementById('sideDim').classList.toggle('on', open); return; }
-      closeDrawer(); switchView(b.dataset.v);
+      closeDrawer(); navMenu(b.dataset.v);
     };
   });
   mtabsSync(CUR_VIEW);
@@ -140,7 +140,7 @@ function cmdMenuHits(q){
     if(!visBtn(b) && b.dataset.v!=='dash' && b.dataset.v!=='account') return;
     var sub=navSub(b), t=(sub? sub+' · ':'')+navText(b); if(fkNorm(t).indexOf(qn)<0) return;   /* ㊿+142: «MDR · 일반 판매» 처럼 소제목을 붙여 구분 */
     if(window.IS_EQUIP && !EQUIP_VIEWS[b.dataset.v]) return;
-    out.push({t:'이동', nm:t, sb:'화면 열기', go:(function(v){ return function(){ switchView(v); }; })(b.dataset.v), kmenu:1});
+    out.push({t:'이동', nm:t, sb:'화면 열기', go:(function(v){ return function(){ navMenu(v); }; })(b.dataset.v), kmenu:1});
   });
   return out.slice(0,5);
 }
@@ -715,7 +715,7 @@ async function sbWrite(method, path, body, prefer){
   if(!r.ok) throw new Error('저장 실패 ('+r.status+'): '+(await r.text()).slice(0,220));
   // 저장 성공 → 이전 캐시는 옛 데이터이므로 즉시 무효화 (새로고침 시 옛 화면 방지)
   // 단, rpc/load_… 는 읽기 전용 호출이라 캐시를 지우지 않음
-  if(!/^rpc\/load_/.test(path)) try{ sessionStorage.removeItem(CACHE_KEY); }catch(e){}
+  if(!/^rpc\/load_/.test(path)) cacheDrop();
   /* ㊿+141: 저장이 됐으니 열린 창의 «입력 중» 표시를 지움 (바깥 클릭·Esc 로 닫을 때 확인을 묻지 않게) — 기록용 표는 제외 */
   if(!/^rpc\/load_/.test(path) && !OVL_SKIP_CLEAN.test(path)) try{ ovlMarkClean(); }catch(e){}
   var t=await r.text();
@@ -834,7 +834,7 @@ async function loadFromDb(){
         j.s1map || [],           /* 에스원 계약번호 자동완성 — load_all 에 없으면 아래에서 뒤늦게 채웁니다 */
         j.iextra || []           /* 설치비 추가 항목 — 화면을 먼저 그리고 뒤에서 채웁니다 */
       ];
-      try{ sessionStorage.setItem(CACHE_KEY, JSON.stringify({t:Date.now(), res:res0})); }catch(e){}
+      cacheWriteLater(res0);   /* ㊿+145: 큰 JSON 저장은 화면을 그린 뒤로 */
       var built=buildFromRes(res0);
       if(!j.s1map || !j.iextra) loadExtrasLater(!j.s1map, !j.iextra);   // 첫 화면을 붙잡지 않도록 뒤에서 병렬로
       return built;
@@ -859,9 +859,18 @@ async function loadFromDb(){
     sbTry('s1_map?select=contract_no,s1_name,biz_no,customer&active=is.true&order=contract_no'),   /* 68단계 — 에스원 계약번호 자동완성 */
     sbTry('install_extra?select=*&order=year,month,id')   /* 70단계 — 설치비 추가 항목(설치·철거) */
   ]);
-  try{ sessionStorage.setItem(CACHE_KEY, JSON.stringify({t:Date.now(), res:res})); }catch(e){}
+  cacheWriteLater(res);
   try{ await permP; }catch(e){} try{ await codeP; }catch(e){}
   return buildFromRes(res);
+}
+/* 다음 방문용 사본(sessionStorage) — 수 MB JSON 이라 만들고 쓰는 데 시간이 걸려, 첫 화면을 그린 다음 한가할 때 씁니다.
+   그사이 저장(sbWrite)이 있었으면 쓰지 않음(옛 데이터가 사본으로 남지 않게) */
+var CACHE_GEN=0;
+function cacheDrop(){ CACHE_GEN++; try{ sessionStorage.removeItem(CACHE_KEY); }catch(e){} }   /* 예약된 사본 쓰기까지 취소 (로그아웃 뒤 이전 사용자 데이터가 남지 않게) */
+function cacheWriteLater(res){
+  var g=++CACHE_GEN, t0=Date.now();
+  var run=function(){ if(g!==CACHE_GEN || !SB_TOKEN) return; try{ sessionStorage.setItem(CACHE_KEY, JSON.stringify({t:t0, res:res})); }catch(e){} };
+  try{ if(window.requestIdleCallback) requestIdleCallback(run, {timeout:3000}); else setTimeout(run, 400); }catch(e){ setTimeout(run, 400); }
 }
 function loadFromCache(){
   // 이전 방문 때 저장한 데이터로 즉시 그린 뒤, 백그라운드에서 최신본으로 교체
@@ -1013,6 +1022,8 @@ function enterEquipMode(d){
 function boot(skipCache){
   if(!window.__editInit){ window.__editInit=1; setupEdit(); setupSide(); }
   restoreSess().then(function(ok){
+    /* ㊿+145: 로그인 안 된 상태 → 서버에 묻지 않고 바로 로그인 화면 (예전엔 익명으로 load_all 을 한 번 불러 «빈 결과»를 확인한 뒤에야 보여 줌 — 로그아웃이 느렸던 이유) */
+    if(!ok){ showLoginScreen(); return null; }
     if(ok){
       showAuthUi();
       // 이전 방문 캐시가 있으면 즉시 그리고, 최신 데이터는 뒤에서 받아 교체
@@ -1062,6 +1073,9 @@ function showLoginScreen(){
   setTimeout(function(){ var em=$('#lsEmail'), pw=$('#lsPw'); if(em && em.value && pw && !pw.value) pw.focus(); else if(em) em.focus(); },60);
 }
 function enterAfterLogin(){
+  /* ㊿+145: 로그인하면 항상 메인 대시보드 — 주소에 남은 #메뉴 · ?v= 로 이전 화면을 열지 않음 */
+  try{ history.replaceState(null, '', location.pathname); }catch(e){}
+  CUR_VIEW='dash';
   $('#viewLogin').classList.add('hidden');
   $('#loading').classList.remove('hidden');
   document.body.style.paddingLeft='';
@@ -1082,7 +1096,8 @@ async function screenLogin(){
     try{ var kc=$('#lsKeep'); if(kc) localStorage.setItem('svc_keep', kc.checked? '1':'0'); }catch(x){}
     saveSess(j, em);
     try{ localStorage.setItem('svc_last_email', em); }catch(x){}
-    if(!(await mfaGate(j.access_token, em, j.user&&j.user.factors))){ clearSess(); SB_TOKEN=null; AUTH_USER=null; m.style.color='var(--muted)'; m.textContent='2단계 인증을 취소해 로그인하지 않았습니다'; return; }
+    var vf0=mfaVerifiedOf(j.user&&j.user.factors);   /* ㊿+145: 확인된 인증 앱이 없으면 빠른 길(확인은 데이터 읽기와 병렬) */
+    if(!(await mfaGate(j.access_token, em, j.user&&j.user.factors, {fast:!vf0.length}))){ clearSess(); SB_TOKEN=null; AUTH_USER=null; m.style.color='var(--muted)'; m.textContent='2단계 인증을 취소해 로그인하지 않았습니다'; return; }
     showAuthUi();
     var changed=j.user && j.user.user_metadata && j.user.user_metadata.pw_changed;
     if(!changed){
@@ -1155,6 +1170,7 @@ function onData(d){
   for(var j=0;j<M;j++){ var s=0; for(var i=0;i<MAT.length;i++) s+=MAT[i][j]; if(s!==0) lastData=j; }
   STATE.base = Math.min(d.nowIdx>=0? d.nowIdx : lastData, lastData);
   if(STATE.base<0) STATE.base = lastData;
+  window.DASH_BASE0=STATE.base;   /* ㊿+145: 홈 메뉴를 누르면 이 기준월로 돌아감 (navMenu) */
 
   d.lines.forEach(function(l){ STATE.lines[l.label]=true; });
 
@@ -1171,14 +1187,16 @@ function onData(d){
   $('#loading').classList.add('hidden');
   $('#app').classList.remove('hidden');
   // 레이아웃이 확정된 다음에 그려야 차트 폭이 정확합니다
-  requestAnimationFrame(function(){ renderAll(); watchWidth(); try{ renderTodo(); }catch(e){} });
+  /* ㊿+145: 첫 화면(차트·숫자)을 먼저 그리고, 할 일 카드·폭 감시는 화면이 뜬 다음 차례로 (로그인 직후 체감 속도) */
+  requestAnimationFrame(function(){ renderAll(); setTimeout(function(){ watchWidth(); try{ renderTodo(); }catch(e){} }, 0); });
 }
 
 /* 카드 폭이 바뀌면 (창 크기, 사이드바, 인쇄) 다시 그립니다 */
-var _lastW = 0;
+var _lastW = 0, _wwOn = false;
 function watchWidth(){
-  if(typeof ResizeObserver === 'undefined') return;
-  var host = document.getElementById('chTrend');
+  /* ㊿+145: 감시는 한 번만 — 예전엔 데이터를 다시 읽을 때마다(onData) 감시자가 하나씩 늘어 창 크기를 바꾸면 renderAll 이 여러 번 돌았음 */
+  if(_wwOn || typeof ResizeObserver === 'undefined') return;
+  var host = document.getElementById('chTrend'); if(!host) return; _wwOn = true;
   _lastW = host.clientWidth;
   var t;
   new ResizeObserver(function(){

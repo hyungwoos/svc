@@ -206,12 +206,15 @@ function sessWrite(o){
   try{ if(keepLogin()) localStorage.setItem(SESS_KEY, j); else localStorage.removeItem(SESS_KEY); }catch(e){}
 }
 function saveSess(j,email,pOverride){
+  var s0=null; try{ s0=sessRead(); }catch(e){}
   sessWrite({
     a:j.access_token, r:j.refresh_token||null,
     e:Math.floor(Date.now()/1000)+(j.expires_in||3600), u:email,
-    p:(pOverride!==undefined)? pOverride : !!(j.user&&j.user.user_metadata&&j.user.user_metadata.pw_changed)
+    p:(pOverride!==undefined)? pOverride : !!(j.user&&j.user.user_metadata&&j.user.user_metadata.pw_changed),
+    m:(s0 && s0.u===email && s0.m) || ''   /* ㊿+145: 'none' = 지난번 확인 때 인증 앱 없음·필수 지정 기한 전 → 다음 시작 때 확인을 기다리지 않음 */
   });
 }
+function sessMark(m){ try{ var s=sessRead(); if(s){ s.m=m||''; sessWrite(s); } }catch(e){} }
 function clearSess(){ try{ sessionStorage.removeItem(SESS_KEY); }catch(e){} try{ localStorage.removeItem(SESS_KEY); }catch(e){} }
 async function restoreSess(){
   var s=sessRead();
@@ -229,7 +232,8 @@ async function restoreSess(){
     }catch(e){ clearSess(); return false; }
   }
   // 인증 앱이 등록된 계정인데 저장된 세션이 aal1(코드 미확인)이면 코드부터 — 취소하면 로그인 화면으로
-  if(sessAal(SB_TOKEN)==='aal1' && !(await mfaGate(SB_TOKEN, AUTH_USER))){ clearSess(); SB_TOKEN=null; AUTH_USER=null; return false; }
+  // ㊿+145: 지난번 확인에서 «인증 앱 없음»(s.m='none')이면 기다리지 않고 데이터부터 — 확인은 뒤에서(mfaBgCheck)
+  if(sessAal(SB_TOKEN)==='aal1' && !(await mfaGate(SB_TOKEN, AUTH_USER, null, {fast:(sessRead()||{}).m==='none'}))){ clearSess(); SB_TOKEN=null; AUTH_USER=null; return false; }
   return true;
 }
 /* ---- 토큰 자동 연장: 화면을 계속 켜둬도 로그인이 안 끊기게 ---- */
@@ -250,9 +254,11 @@ async function refreshToken(){
 
 function doLogout(){
   if(!confirm('로그아웃할까요?')) return;
-  clearSess(); try{ sessionStorage.removeItem(CACHE_KEY); }catch(e){}
-  SB_TOKEN=null; AUTH_USER=null; location.reload();
+  clearSess(); cacheDrop();
+  SB_TOKEN=null; AUTH_USER=null; reloadHome();
 }
+/* ㊿+145: 로그아웃 뒤에는 «이전 메뉴»가 아니라 처음(대시보드)부터 — 주소의 #메뉴 · ?v= 를 떼고 다시 엽니다 */
+function reloadHome(){ try{ location.replace(location.pathname); }catch(e){ location.reload(); } }
 
 /* ---- 2단계 인증 (MFA · 인증 앱 TOTP) — Supabase Auth factors API (80점 프로젝트 ② 보안 · SQL 88) ----
    · 선택 적용: 내 계정 › 보안에서 본인이 켬. 켠 계정은 로그인 뒤 6자리 코드를 넣어야 aal2 세션을 받고,
@@ -277,8 +283,12 @@ async function mfaPolicy(tok){
 }
 function mfaDue(st){ return !!(st && st.required && !st.enrolled && (!st.deadline || (st.today||new Date().toISOString().slice(0,10))>=st.deadline)); }
 function mfaDaysLeft(st){ if(!st||!st.deadline) return 0; var a=new Date(st.deadline+'T00:00:00'), b=new Date((st.today||new Date().toISOString().slice(0,10))+'T00:00:00'); return Math.round((a-b)/86400000); }
-async function mfaGate(tok, email, factorsHint){
+async function mfaGate(tok, email, factorsHint, opt){
   if(sessAal(tok)==='aal2') return true;
+  /* ㊿+145 빠른 길: 로그인 응답에 «확인된 인증 앱»이 없거나(대부분의 계정) 지난번 확인 결과가 «없음»이면
+     인증 서버 왕복 2번(인증 앱 목록 · 필수 지정)을 기다리지 않고 바로 통과 → 데이터 읽기와 병렬로 뒤에서 확인(mfaBgCheck).
+     확인 결과 코드·등록이 필요하면 그때 창을 띄우고, 끝나면 새로고침. 보안 경계는 DB(SQL 88 mfa_ok) — aal1 토큰으론 데이터가 안 나옴 */
+  if(opt && opt.fast){ setTimeout(function(){ mfaBgCheck(tok, email); }, 0); return true; }
   var fs; try{ fs=mfaVerifiedOf(factorsHint||await mfaFactors(tok)); }catch(e){ return true; }   // 조회 실패 → 통과 (DB 쪽 SQL 88 이 2차 방어)
   if(fs.length) return mfaPrompt(fs[0], tok, email);
   // 등록된 인증 앱이 없음 → 관리자가 이 계정을 필수로 지정했는지 (SQL 89 · 함수가 없으면 null = 선택 적용)
@@ -287,7 +297,19 @@ async function mfaGate(tok, email, factorsHint){
     if(mfaDue(st)) return mfaForceEnroll(tok, email, st);      // 기한 없음/지남 → 등록해야 들어감 (DB 도 mfa_ok 가 false 라 데이터 없음)
     MFA_WARN=st;                                                // 유예 기간 → 들어가되 안내
   }
+  if(!factorsHint) sessMark('none');                            // 서버에서 직접 확인한 «없음» → 다음 새로고침은 빠른 길
   return true;
+}
+/* 뒤에서 확인 (빠른 길 다음) — 인증 앱 목록과 필수 지정을 동시에 물어봄 */
+async function mfaBgCheck(tok, email){
+  var r; try{ r=await Promise.all([mfaFactors(tok).catch(function(){ return null; }), mfaPolicy(tok)]); }catch(e){ return; }
+  if(SB_TOKEN!==tok) return;                                    // 그사이 로그아웃 · 토큰 교체
+  var fs=r[0], st=r[1], vf=mfaVerifiedOf(fs||[]); MFA_ST=st;
+  function out(){ clearSess(); SB_TOKEN=null; AUTH_USER=null; reloadHome(); }
+  if(vf.length){ sessMark(''); if(!(await mfaPrompt(vf[0], tok, email))) return out(); location.reload(); return; }
+  if(st && st.required && mfaDue(st)){ sessMark(''); if(!(await mfaForceEnroll(tok, email, st))) return out(); location.reload(); return; }
+  if(fs) sessMark('none');
+  if(st && st.required){ MFA_WARN=st; if(window.DATA) try{ mfaWarnIfNeeded(); }catch(e){} }
 }
 var MFA_WARN=null;
 function mfaWarnIfNeeded(){
@@ -439,9 +461,9 @@ function idleLabel(m){ return !m? '끄기 (로그인 유지)' : (m>=60? (m/60)+'
 function idleTouch(){ IDLE_LAST=Date.now(); IDLE_WARNED=false; }
 
 function idleLogout(m){
-  clearSess(); try{ sessionStorage.removeItem(CACHE_KEY); }catch(e){}
+  clearSess(); cacheDrop();
   try{ sessionStorage.setItem('svc_idle_msg', idleLabel(m)+' 동안 활동이 없어 자동 로그아웃되었습니다. 다시 로그인하세요.'); }catch(e){}
-  SB_TOKEN=null; AUTH_USER=null; location.reload();
+  SB_TOKEN=null; AUTH_USER=null; reloadHome();
 }
 function idleCheck(){
   var m=idleMin(); if(!m || !SB_TOKEN) return;

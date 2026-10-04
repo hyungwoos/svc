@@ -128,7 +128,7 @@ async function doLogin(){
     if(!r.ok||!j.access_token) throw new Error(j.error_description||j.msg||'이메일 또는 비밀번호가 올바르지 않습니다');
     SB_TOKEN=j.access_token; AUTH_USER=($('#auEmail').value.trim());
     saveSess(j, AUTH_USER);
-    if(!(await mfaGate(j.access_token, AUTH_USER, j.user&&j.user.factors))){ clearSess(); SB_TOKEN=null; AUTH_USER=null; msg('auMsg','2단계 인증을 취소해 로그인하지 않았습니다'); return; }
+    if(!(await mfaGate(j.access_token, AUTH_USER, j.user&&j.user.factors, {fast:!mfaVerifiedOf(j.user&&j.user.factors).length}))){ clearSess(); SB_TOKEN=null; AUTH_USER=null; msg('auMsg','2단계 인증을 취소해 로그인하지 않았습니다'); return; }
     showAuthUi();
     msg('auMsg','');
 

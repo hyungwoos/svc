@@ -365,7 +365,7 @@ function renderTodo(){
     (rec.length? '<span class="ql-l" style="margin-left:8px">최근</span>'+
       rec.map(function(v){return '<button data-go="'+v+'">'+esc(viewLabel(v))+'</button>';}).join(''):'');
   wrap.querySelectorAll('[data-go]').forEach(function(el){
-    el.onclick=function(){ switchView(el.dataset.go); };
+    el.onclick=function(){ navMenu(el.dataset.go); };   /* ㊿+145: 바로가기·최근도 메뉴처럼 첫 화면 */
   });
   try{ renderInbox(); }catch(e){}
 }
