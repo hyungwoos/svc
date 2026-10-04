@@ -775,6 +775,9 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
     assert(R.unused.map((x) => x.p).sort().join('|') === 'check.mjs|js/app.js|staging/js/app.js', JSON.stringify(R.unused));
     assert(R.stagingRepo.length === 3 && R.stagingRepo.find((x) => x.p === 'staging/README.md').root === false && R.stagingRepo.find((x) => x.p === 'staging/.github/workflows/deploy.yml').root === true, JSON.stringify(R.stagingRepo));
     assert(R.missing.includes('tests/fn/_mock.ts') && R.missing.includes('README.md') && R.wf.length >= 3, JSON.stringify({ m: R.missing, wf: R.wf }));
+    /* 저장소에 실제로 있는 deploy.yml 은 점검에서 문제 0 이어야 함(주석의 «|| echo» 글자를 잡지 않음 · ㊿+144) */
+    const wfPath = path.join(ROOT, '.github', 'workflows', 'deploy.yml');
+    if (fs.existsSync(wfPath)) { const iss = await page.evaluate((y) => opsWfIssues(y), fs.readFileSync(wfPath, 'utf8')); assert(!iss.length || /ubuntu-latest|Node 20|옛 액션|functions 잡/.test(iss.join(' ')), '저장소 deploy.yml 점검: ' + iss.join(' / ')); }
     calls.length = 0; await page.click('#opsRepoClean'); await page.waitForTimeout(500);
     const del = calls.find((c) => c.action === 'gh_delete'); assert(del, 'gh_delete 없음');
     assert(del.paths.sort().join('|') === 'check.mjs|js/app.js|staging/.github/workflows/deploy.yml|staging/js/app.js', del.paths.join('|'));

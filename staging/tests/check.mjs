@@ -94,7 +94,7 @@ if (HAS_FN) {
   say(fs.existsSync(path.join(ROOT, 'README.md')), 'README.md 존재 (사이트 배포에서는 *.md 제외)');
 } else if (!fs.existsSync(path.join(ROOT, 'README.md'))) warn('README.md 가 저장소 루트에 없음');
 // ㊿+143: 배포 설정(deploy.yml) 권고 — 실행 환경 고정 · Node · 액션 버전 · 실패 덮기 (권고는 ⚠, 실패 덮기만 ✗)
-{ const wf = path.join(ROOT, '.github', 'workflows', 'deploy.yml'); const y = fs.existsSync(wf) ? fs.readFileSync(wf, 'utf8') : '';
+{ const wf = path.join(ROOT, '.github', 'workflows', 'deploy.yml'); const y = (fs.existsSync(wf) ? fs.readFileSync(wf, 'utf8') : '').split('\n').filter((l) => !/^\s*#/.test(l)).join('\n');   /* 주석 줄은 빼고 */
   if (!y) warn('.github/workflows/deploy.yml 이 없음');
   else {
     if (/runs-on:\s*ubuntu-latest/.test(y)) warn('deploy.yml: runs-on ubuntu-latest — 2026-10-19 부터 Ubuntu 26 으로 바뀜 → ubuntu-24.04 로 고정 권장');

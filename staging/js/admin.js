@@ -72,12 +72,13 @@ function opsCheckFiles(files){   /* 커밋 전에 한 번 더 물어볼 것 */
   return warn;
 }
 function opsWfIssues(y){
-  var o=[]; y=String(y||'');
+  /* ㊿+144: 주석(#…) 줄은 빼고 봄 — 새 deploy.yml 의 설명 주석에 «|| echo» 글자가 있어 «실패를 덮음»으로 잘못 잡던 것 */
+  var o=[]; y=String(y||'').split('\n').filter(function(l){ return !/^\s*#/.test(l); }).join('\n');
   if(/runs-on:\s*ubuntu-latest/.test(y)) o.push('runs-on: ubuntu-latest — 2026-10-19 부터 Ubuntu 26 으로 바뀌어 Playwright 설치가 깨질 수 있음 → ubuntu-24.04 로 고정');
   if(/node-version:\s*['"]?20\b/.test(y)) o.push('Node 20 — 지원 종료 → 22');
   if(/actions\/(checkout|setup-node|upload-artifact)@v4\b|actions\/deploy-pages@v4\b|actions\/configure-pages@v5\b|actions\/upload-pages-artifact@v3\b/.test(y)) o.push('옛 액션 버전(Node 20 경고) → checkout@v6 · setup-node@v6 · upload-artifact@v6 · configure-pages@v6 · upload-pages-artifact@v5 · deploy-pages@v5');
   if(!/^\s+functions:/m.test(y)) o.push('functions 잡 없음 — Edge Function 테스트가 CI 에서 안 돌아감');
-  if(/\|\|\s*echo/.test(y)) o.push('«… || echo» 줄이 테스트 실패를 덮을 수 있음');
+  if(/deno run[^\n]*\|\|\s*echo/.test(y)) o.push('«deno run … || echo» 줄이 함수 테스트 실패를 덮음');
   return o;
 }
 function stagingUrl(){ var base=location.origin+location.pathname.replace(/\/staging\//,'/').replace(/[^/]*$/,''); return base+'staging/index.html'; }
