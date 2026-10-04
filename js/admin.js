@@ -35,8 +35,51 @@ async function adminFetch(payload){
    · 함수가 ① 로그인 ② OPS_OWNER(지정 계정) ③ super_admin ④ PIN 을 전부 검사 — 화면은 슈퍼 관리자에게만 보이지만 실제 열쇠는 함수 쪽.
    · 탭: GitHub 배포(끌어다 놓기 → 커밋 · 이력 · 복원) · SQL 실행(읽기 전용 토글 · 결과 표) · Edge Function(코드 불러오기 · 배포 · Verify JWT) · 기록(ops_log)
    ──────────────────────────────────────────────────────────────────────────── */
-var OPS={tab:'gh', pin:'', st:null, files:[], msg:'', ghList:null, hist:null, histPath:'', fnList:null, fnSel:'', fnMeta:null, fnCode:'', fnName:'index.ts', fnVerify:false, sqlRes:null, busy:false, target:'prod', errs:null, health:null, aic:null, seal:null};
+var OPS={tab:'gh', pin:'', st:null, files:[], msg:'', ghList:null, hist:null, histPath:'', fnList:null, fnSel:'', fnMeta:null, fnCode:'', fnName:'index.ts', fnVerify:false, sqlRes:null, busy:false, target:'prod', errs:null, health:null, aic:null, seal:null, repo:null};
 function opsPrefix(){ return OPS.target==='staging'? 'staging/' : ''; }
+/* ── ㊿+143 배포 안전장치 (2026-10-04 · check.mjs 가 루트에 잘못 올라가 Actions 가 두 번 실패한 일 뒤) ──
+   ① 파일 하나만 끌어 넣어도 자리를 맞춤: check/smoke/lib.mjs → tests/ · *.test.ts·_mock.ts → tests/fn/ · deploy.yml → .github/workflows/ · worker.js → cloudflare/quote-worker/
+   ② «저장소 파일»(.github·supabase·cloudflare·tests/fn·README·package.json·.gitignore)은 스테이징을 골라도 루트로 — 승격으로 옮겨지지 않고 CI 는 루트만 봄
+   ③ .github/workflows/* 는 포탈 토큰에 Workflows 권한이 없어 커밋에서 빼고 «복사 · GitHub 에서 열기»로 안내
+   ④ 커밋 전 경고: 루트에 .mjs/.ts/.yml 이 놓임 · 포탈이 불러오지 않는 js/ 파일
+   ⑤ 🧹 저장소 점검: 안 쓰는 파일 · 스테이징에만 있는 저장소 파일 · 루트에 없는 저장소 파일 · deploy.yml 상태 → 정리(gh_delete) */
+var OPS_REPO_RE=/^(\.github\/|supabase\/|cloudflare\/|tests\/fn\/|README\.md$|package(-lock)?\.json$|\.gitignore$)/;
+var OPS_WF_RE=/^\.github\/workflows\//;
+var OPS_REPO_NEED=['tests/fn/_mock.ts','tests/fn/ops.test.ts','tests/fn/remind.test.ts','tests/fn/aicheck.test.ts','tests/fn/quote-worker.test.ts','supabase/functions/ops/index.ts','supabase/functions/remind/index.ts','supabase/functions/aicheck/index.ts','cloudflare/quote-worker/worker.js','README.md'];
+function opsRepoFile(p){ return OPS_REPO_RE.test(String(p||'')); }
+function opsDest(p){ return (OPS.target==='staging' && !opsRepoFile(p))? 'staging/'+p : p; }
+function opsRepoName(){ return (OPS.st&&OPS.st.github&&OPS.st.github.repo)||'hyungwoos/svc'; }
+function opsRepoBranch(){ return (OPS.st&&OPS.st.github&&OPS.st.github.branch)||'main'; }
+function opsAutoPath(p){
+  p=String(p||'').replace(/^\/+/,'');
+  if(p.indexOf('/')>=0) return {path:p};
+  var dir={'check.mjs':'tests/','smoke.mjs':'tests/','lib.mjs':'tests/','load_all.json':'tests/fixture/','worker.js':'cloudflare/quote-worker/','deploy.yml':'.github/workflows/','deploy.yaml':'.github/workflows/'}[p];
+  if(!dir && (/\.test\.ts$/.test(p) || p==='_mock.ts')) dir='tests/fn/';
+  if(dir) return {path:dir+p, auto:'«'+p+'» → '+dir+' 에 자동으로 넣었습니다'};
+  if(p==='index.ts') return {path:p, bad:'어느 함수인지 경로를 supabase/functions/<함수 이름>/index.ts 로 고치세요'};
+  return {path:p};
+}
+function opsAppJs(html){
+  var m=/name="app-js" content="([^"]+)"/.exec(String(html||'')), s=m? m[1] : ((document.querySelector('meta[name="app-js"]')||{}).content||'');
+  return s.split(',').map(function(x){ return x.trim(); }).filter(Boolean).concat(['js/boot.js','js/load.js']);
+}
+function opsCheckFiles(files){   /* 커밋 전에 한 번 더 물어볼 것 */
+  var warn=[], idx=files.filter(function(f){ return f.path==='index.html'; })[0], used=opsAppJs(idx&&idx.content);
+  files.forEach(function(f){ var p=f.path;
+    if(p.indexOf('/')<0 && /\.(mjs|ts|ya?ml|sh|py)$/i.test(p)) warn.push('· '+p+' — 저장소 맨 위(루트)에 놓입니다. 앞에 tests/ 같은 폴더가 빠지지 않았나요? (Actions 는 tests/check.mjs 를 실행)');
+    if(/^js\/[^/]+\.js$/.test(p) && used.indexOf(p)<0) warn.push('· '+p+' — index.html 의 app-js 목록에 없어 포탈이 불러오지 않는 파일입니다');
+  });
+  return warn;
+}
+function opsWfIssues(y){
+  var o=[]; y=String(y||'');
+  if(/runs-on:\s*ubuntu-latest/.test(y)) o.push('runs-on: ubuntu-latest — 2026-10-19 부터 Ubuntu 26 으로 바뀌어 Playwright 설치가 깨질 수 있음 → ubuntu-24.04 로 고정');
+  if(/node-version:\s*['"]?20\b/.test(y)) o.push('Node 20 — 지원 종료 → 22');
+  if(/actions\/(checkout|setup-node|upload-artifact)@v4\b|actions\/deploy-pages@v4\b|actions\/configure-pages@v5\b|actions\/upload-pages-artifact@v3\b/.test(y)) o.push('옛 액션 버전(Node 20 경고) → checkout@v6 · setup-node@v6 · upload-artifact@v6 · configure-pages@v6 · upload-pages-artifact@v5 · deploy-pages@v5');
+  if(!/^\s+functions:/m.test(y)) o.push('functions 잡 없음 — Edge Function 테스트가 CI 에서 안 돌아감');
+  if(/\|\|\s*echo/.test(y)) o.push('«… || echo» 줄이 테스트 실패를 덮을 수 있음');
+  return o;
+}
 function stagingUrl(){ var base=location.origin+location.pathname.replace(/\/staging\//,'/').replace(/[^/]*$/,''); return base+'staging/index.html'; }
 function prodUrl(){ var base=location.origin+location.pathname.replace(/\/staging\//,'/').replace(/[^/]*$/,''); return base+'index.html'; }
 function opsUrl(){ return SB_URL+'/functions/v1/ops'; }
@@ -89,20 +132,76 @@ function opsGhHtml(){
   if(files.length){
     h+='<table class="rn-tbl" style="margin-top:8px"><thead><tr><th>경로</th><th class="n">크기</th><th>버전</th><th></th></tr></thead><tbody>'+files.map(function(f,i){
       var ver=f.ver? (f.ver===cur? '<span class="mini">'+esc(f.ver)+' (지금과 같음)</span>' : '<b>'+esc(f.ver)+'</b> <span class="mini">← 지금 '+esc(cur)+'</span>') : '';
-      return '<tr><td>'+(stg? '<span class="mini">staging/</span>':'')+'<input data-i="'+i+'" class="ops-path" value="'+esc(f.path)+'" style="width:220px"></td><td class="n">'+opsFmtBytes(f.size)+'</td><td>'+ver+(f.bin? ' <span class="mini">binary</span>':'')+'</td><td><button type="button" class="cbtn" data-rm="'+i+'">빼기</button></td></tr>'; }).join('')+'</tbody></table>';
+      var wf=OPS_WF_RE.test(f.path), repo=opsRepoFile(f.path);
+      var tag=wf? '<span class="ctag late" title="포탈 토큰에는 Workflows 권한이 없어 이 파일은 커밋에서 빠집니다">GitHub 웹에서</span> <button type="button" class="cbtn" data-wfcopy="'+i+'">내용 복사</button> <a class="cbtn" target="_blank" rel="noopener" href="https://github.com/'+esc(opsRepoName())+'/edit/'+esc(opsRepoBranch())+'/'+esc(f.path)+'">GitHub 에서 열기 ↗</a>'
+        : repo? '<span class="ctag" title="CI 는 저장소 루트만 보고, 승격은 이 파일을 옮기지 않아 대상과 상관없이 루트로 올립니다">저장소 루트</span>' : '';
+      var note=(f.auto? '<div class="mini">↪ '+esc(f.auto)+'</div>':'')+(f.bad? '<div class="mini" style="color:var(--critical)">⚠ '+esc(f.bad)+'</div>':'');
+      return '<tr><td>'+(stg && !repo? '<span class="mini">staging/</span>':'')+'<input data-i="'+i+'" class="ops-path" value="'+esc(f.path)+'" style="width:220px">'+note+'</td><td class="n">'+opsFmtBytes(f.size)+'</td><td>'+ver+(f.bin? ' <span class="mini">binary</span>':'')+(tag? ' '+tag:'')+'</td><td><button type="button" class="cbtn" data-rm="'+i+'">빼기</button></td></tr>'; }).join('')+'</tbody></table>';
     var tops={}; files.forEach(function(f){ var seg=f.path.split('/'); if(seg.length>1) tops[seg[0]]=(tops[seg[0]]||0)+1; }); var topKeys=Object.keys(tops);
     if(topKeys.length===1 && tops[topKeys[0]]===files.length && !/^(tests|staging|supabase|\.github|js|css|img|assets)$/.test(topKeys[0])) h+='<p class="mini" style="margin:6px 0 0">모든 파일이 «'+esc(topKeys[0])+'/» 폴더 아래에 있습니다 — 저장소 루트에 바로 두려면 <button type="button" class="cbtn" id="opsStripTop">«'+esc(topKeys[0])+'/» 떼기</button></p>';
     h+='<div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><label style="flex:1;min-width:240px">커밋 메시지 <input id="opsCommitMsg" value="'+esc(OPS.commitMsg||opsAutoMsg())+'" style="width:100%"></label><button type="button" class="pill" id="opsCommit" style="background:'+(stg? 'var(--s3,#b26a00)':'var(--brand)')+';border-color:'+(stg? 'var(--s3,#b26a00)':'var(--brand)')+';color:#fff">'+(stg? '커밋 → 스테이징':'커밋 → 운영')+'</button></div>';
-    h+='<p class="mini" style="margin:6px 0 0">커밋 하나로 묶여 올라가고, 테스트가 통과하면 GitHub Pages 에 반영(보통 2~3분). '+(stg? '스테이징에서 확인한 뒤 «스테이징 → 운영 승격»으로 같은 파일을 운영에 올립니다.':'index.html 은 올린 뒤 이 화면을 새로고침하면 새 버전으로 바뀝니다.')+'</p>';
+    h+='<p class="mini" style="margin:6px 0 0">커밋 하나로 묶여 올라가고, 테스트가 통과하면 GitHub Pages 에 반영(보통 2~3분). '+(stg? '스테이징에서 확인한 뒤 «스테이징 → 운영 승격»으로 같은 파일을 운영에 올립니다.':'index.html 은 올린 뒤 이 화면을 새로고침하면 새 버전으로 바뀝니다.')+' 저장소 파일(.github · supabase · cloudflare · tests/fn · README · package.json · .gitignore)은 대상과 상관없이 루트로 갑니다.</p>';
   }
   h+='<div class="ops-h" style="margin-top:14px">스테이징 ↔ 운영</div><div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="cbtn" id="opsSync" title="운영에 있는 포탈 파일 전부를 staging/ 로 복사(재업로드 없이 같은 내용) — 스테이징을 운영과 똑같이 맞출 때">운영 → 스테이징 동기화</button><button type="button" class="cbtn pri" id="opsPromote" title="staging/ 에 있는 파일을 운영(루트)으로 복사 — 스테이징에서 확인이 끝났을 때">스테이징 → 운영 승격</button><a class="cbtn" href="'+esc(stagingUrl())+'" target="_blank" rel="noopener">스테이징 열기 ↗</a></div>';
   h+='</div>';
   h+='<div><div class="ops-h">② 저장소 · 이전 버전</div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px"><button type="button" class="pill ghost" id="opsGhList">저장소 파일 보기</button><button type="button" class="pill ghost" id="opsGhHist" data-p="index.html">index.html 이력</button><a class="pill ghost" href="https://github.com/'+esc((OPS.st&&OPS.st.github&&OPS.st.github.repo)||'hyungwoos/svc')+'/actions" target="_blank" rel="noopener" title="테스트·배포 진행 상황">Actions ↗</a></div>';
+  h+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin:-2px 0 8px"><button type="button" class="pill ghost" id="opsRepoCheck" title="안 쓰는 파일 · 스테이징에만 있는 저장소 파일 · 루트에 없는 테스트/함수 · 배포 설정(deploy.yml) 상태를 확인">🧹 저장소 점검</button><a class="pill ghost" target="_blank" rel="noopener" href="https://github.com/'+esc(opsRepoName())+'/settings/pages" title="Source 가 «GitHub Actions» 여야 테스트를 통과한 버전만 배포됩니다">Pages 설정 ↗</a></div>';
+  h+=opsRepoHtml();
   if(OPS.ghList) h+='<table class="rn-tbl"><thead><tr><th>경로</th><th class="n">크기</th><th></th></tr></thead><tbody>'+OPS.ghList.map(function(f){ return '<tr><td>'+esc(f.path)+'</td><td class="n">'+opsFmtBytes(f.size)+'</td><td><button type="button" class="cbtn" data-hist="'+esc(f.path)+'">이력</button></td></tr>'; }).join('')+'</tbody></table>';
   if(OPS.hist) h+='<div class="ops-h" style="margin-top:10px">'+esc(OPS.histPath)+' — 최근 커밋</div><table class="rn-tbl"><thead><tr><th>커밋</th><th>일시</th><th>메시지</th><th></th></tr></thead><tbody>'+OPS.hist.map(function(c,i){ return '<tr><td><a href="'+esc(c.url)+'" target="_blank" rel="noopener" style="font-family:ui-monospace,monospace">'+esc(c.short)+'</a></td><td class="mini">'+esc(String(c.date||'').replace('T',' ').slice(0,16))+'</td><td>'+esc(c.message)+'</td><td>'+(i===0? '<span class="mini">현재</span>' : '<button type="button" class="cbtn" data-restore="'+esc(c.sha)+'">이 버전으로 복원</button>')+'</td></tr>'; }).join('')+'</tbody></table>';
   h+=opsSealHtml();
   h+='</div></div>';
   return h;
+}
+/* 🧹 저장소 점검 결과 */
+function opsRepoHtml(){
+  var R=OPS.repo; if(!R) return '';
+  var del=opsRepoDeletable(), h='<div class="ops-repo" style="border:1px solid var(--ring);border-radius:10px;padding:10px 12px;margin:0 0 10px">';
+  var ok=!R.unused.length && !R.stagingRepo.length && !R.missing.length && !(R.wf&&R.wf.length);
+  h+='<div class="ops-h" style="margin:0 0 6px">🧹 저장소 점검 '+(ok? '<span class="up">✓ 문제 없음</span>':'')+'</div>';
+  if(R.unused.length) h+='<div class="mini" style="margin:4px 0 2px"><b>안 쓰는 파일 '+R.unused.length+'개</b> — 지워도 됩니다</div><ul class="mini" style="margin:0 0 6px 18px;padding:0">'+R.unused.map(function(x){ return '<li><code>'+esc(x.p)+'</code> — '+esc(x.why)+'</li>'; }).join('')+'</ul>';
+  if(R.stagingRepo.length) h+='<div class="mini" style="margin:4px 0 2px"><b>스테이징 안의 저장소 파일 '+R.stagingRepo.length+'개</b> — CI 는 루트만 봐서 여기 있으면 쓰이지 않습니다</div><ul class="mini" style="margin:0 0 6px 18px;padding:0">'+R.stagingRepo.slice(0,40).map(function(x){ return '<li><code>'+esc(x.p)+'</code> — '+(x.root? '루트에 있음 · 지워도 됨' : '<span style="color:var(--critical)">루트에 없음 — 먼저 루트에 올리세요</span>')+'</li>'; }).join('')+(R.stagingRepo.length>40? '<li>… 외 '+(R.stagingRepo.length-40)+'개</li>':'')+'</ul>';
+  if(R.missing.length) h+='<div class="mini" style="margin:4px 0 2px"><b>루트에 없는 저장소 파일 '+R.missing.length+'개</b> — 함수 테스트가 CI 에서 돌지 않습니다 (저장소 파일 묶음을 끌어 넣어 커밋 · 대상 상관없이 루트로)</div><ul class="mini" style="margin:0 0 6px 18px;padding:0">'+R.missing.map(function(p){ return '<li><code>'+esc(p)+'</code></li>'; }).join('')+'</ul>';
+  if(R.wf && R.wf.length) h+='<div class="mini" style="margin:4px 0 2px"><b>배포 설정 .github/workflows/deploy.yml</b> — 새 파일을 GitHub 웹에서 붙여 넣으세요 <a target="_blank" rel="noopener" href="https://github.com/'+esc(opsRepoName())+'/edit/'+esc(opsRepoBranch())+'/.github/workflows/deploy.yml">GitHub 에서 열기 ↗</a></div><ul class="mini" style="margin:0 0 6px 18px;padding:0">'+R.wf.map(function(t){ return '<li>'+esc(t)+'</li>'; }).join('')+'</ul>';
+  else if(R.wf) h+='<div class="mini" style="margin:4px 0">배포 설정 deploy.yml ✓ (Ubuntu·Node·액션 버전·functions 잡)</div>';
+  h+='<div class="mini" style="margin:4px 0 0">Pages 배포 방식은 여기서 볼 수 없습니다 — <a target="_blank" rel="noopener" href="https://github.com/'+esc(opsRepoName())+'/settings/pages">Settings › Pages</a> 의 Source 가 <b>GitHub Actions</b> 여야 테스트를 통과한 버전만 올라갑니다.</div>';
+  if(del.length) h+='<div style="margin-top:8px"><button type="button" class="cbtn" id="opsRepoClean">지워도 되는 '+del.length+'개 정리(삭제 커밋)</button></div>';
+  return h+'</div>';
+}
+function opsRepoDeletable(){
+  var R=OPS.repo; if(!R) return [];
+  return R.unused.map(function(x){ return x.p; }).concat(R.stagingRepo.filter(function(x){ return x.root; }).map(function(x){ return x.p; }));
+}
+async function opsRepoCheck(){
+  if(!opsNeedPin() || OPS.busy) return;
+  OPS.busy=true; opsSetMsg('저장소 점검 중…');
+  try{
+    var l=await opsCall('gh_list'), paths=l.files.map(function(f){ return f.path; }), has={};
+    paths.forEach(function(p){ has[p]=1; });
+    var used=opsAppJs(), R={unused:[], stagingRepo:[], missing:[], wf:null};
+    paths.forEach(function(p){
+      var rel=p.replace(/^staging\//,''), stg=(rel!==p);
+      if(/^js\/[^/]+\.js$/.test(rel) && used.indexOf(rel)<0) R.unused.push({p:p, why:'포탈이 불러오지 않는 js (index.html app-js 목록 밖)'});
+      else if(/^(check|smoke|lib)\.mjs$/.test(rel)) R.unused.push({p:p, why:'tests/ 밖에 놓인 테스트 파일 — 실행되지 않음'});
+      else if(stg && opsRepoFile(rel)) R.stagingRepo.push({p:p, rel:rel, root:!!has[rel]});
+    });
+    R.missing=OPS_REPO_NEED.filter(function(p){ return !has[p]; });
+    if(has['.github/workflows/deploy.yml']){ try{ var g=await opsCall('gh_get',{path:'.github/workflows/deploy.yml'}); R.wf=opsWfIssues(g.content||''); }catch(e){ R.wf=['deploy.yml 을 읽지 못했습니다: '+String(e.message||e)]; } }
+    else R.wf=['.github/workflows/deploy.yml 이 없습니다'];
+    OPS.repo=R;
+    var n=R.unused.length+R.stagingRepo.length+R.missing.length+(R.wf? R.wf.length:0);
+    opsSetMsg(n? '저장소 점검 — 확인할 것 '+n+'건 (아래)' : '저장소 점검 — 문제 없음', n? '':'ok');
+  }catch(e){ opsSetMsg(String(e.message||e),'bad'); }
+  OPS.busy=false; renderOps(true);
+}
+async function opsRepoClean(){
+  if(!opsNeedPin() || OPS.busy) return;
+  var paths=opsRepoDeletable(); if(!paths.length) return;
+  if(!confirm('다음 '+paths.length+'개 파일을 저장소에서 지우는 커밋을 만듭니다 (사이트에서 쓰지 않는 파일 · Git 이력에는 남음):\n\n'+paths.slice(0,40).map(function(p){ return '· '+p; }).join('\n')+(paths.length>40? '\n… 외 '+(paths.length-40)+'개':'')+'\n\n계속할까요?')) return;
+  OPS.busy=true; opsSetMsg('정리 중…');
+  try{ var r=await opsCall('gh_delete',{paths:paths, message:'저장소 정리 — 안 쓰는 파일 '+paths.length+'개 (포탈 저장소 점검)'}); opsSetMsg('정리 커밋 완료 — '+r.commit.slice(0,7)+' · '+r.deleted.length+'개 삭제'+(r.missing&&r.missing.length? ' · 이미 없음 '+r.missing.length:''),'ok'); toast('저장소 정리', r.deleted.length+'개 파일 삭제 → '+r.commit.slice(0,7)); OPS.repo=null; OPS.ghList=null; }
+  catch(e){ opsSetMsg(String(e.message||e),'bad'); }
+  OPS.busy=false; renderOps(true);
 }
 /* ── ③ 보안 자산: 법인 직인 — 공개 저장소(도장.jpg) 대신 Supabase Storage 비공개 버킷 private/seal.jpg (SQL 87) ── */
 var SEAL_OBJECT='private/seal.jpg';
@@ -172,11 +271,16 @@ function opsGhBind(host){
   var sf=host.querySelector('#opsSealFile'); if(sf) sf.onchange=function(){ opsSealUpload(sf.files[0]); sf.value=''; };
   var sr=host.querySelector('#opsSealRm'); if(sr) sr.onclick=opsSealRm;
   var pm=host.querySelector('#opsPromote'); if(pm) pm.onclick=function(){ opsCopy('staging', ''); };
-  host.querySelectorAll('.ops-path').forEach(function(i){ i.onchange=function(){ OPS.files[+i.dataset.i].path=i.value.trim().replace(/^\/+/,''); }; });
+  host.querySelectorAll('.ops-path').forEach(function(i){ i.onchange=function(){ var f=OPS.files[+i.dataset.i]; f.path=i.value.trim().replace(/^\/+/,''); f.auto=''; if(f.path!=='index.ts') f.bad=''; OPS.commitMsg=''; renderOps(true); }; });
   host.querySelectorAll('[data-rm]').forEach(function(b){ b.onclick=function(){ OPS.files.splice(+b.dataset.rm,1); OPS.commitMsg=''; renderOps(true); }; });
-  var st=host.querySelector('#opsStripTop'); if(st) st.onclick=function(){ OPS.files.forEach(function(f){ f.path=f.path.replace(/^[^/]+\//,''); }); OPS.commitMsg=''; renderOps(true); };
+  var st=host.querySelector('#opsStripTop'); if(st) st.onclick=function(){ OPS.files.forEach(function(f){ var ap=opsAutoPath(f.path.replace(/^[^/]+\//,'')); f.path=ap.path; f.auto=ap.auto||''; f.bad=ap.bad||''; }); OPS.commitMsg=''; renderOps(true); };
   var cm=host.querySelector('#opsCommitMsg'); if(cm) cm.oninput=function(){ OPS.commitMsg=cm.value; };
   var go=host.querySelector('#opsCommit'); if(go) go.onclick=opsCommit;
+  var rc=host.querySelector('#opsRepoCheck'); if(rc) rc.onclick=opsRepoCheck;
+  var rcl=host.querySelector('#opsRepoClean'); if(rcl) rcl.onclick=opsRepoClean;
+  host.querySelectorAll('[data-wfcopy]').forEach(function(b){ b.onclick=function(){ var f=OPS.files[+b.dataset.wfcopy]; if(!f) return;
+    var done=function(){ toast('복사했습니다','GitHub 편집 화면에서 전체 선택(Ctrl+A) 후 붙여 넣고 «Commit changes»'); };
+    try{ navigator.clipboard.writeText(f.content||'').then(done, function(){ prompt('아래 내용을 복사하세요 (Ctrl+C)', f.content||''); }); }catch(e){ prompt('아래 내용을 복사하세요 (Ctrl+C)', f.content||''); } }; });
   var gl=host.querySelector('#opsGhList'); if(gl) gl.onclick=async function(){ if(!opsNeedPin()) return; opsSetMsg('저장소 읽는 중…'); try{ var r=await opsCall('gh_list'); OPS.ghList=r.files; opsSetMsg(r.files.length+'개 파일','ok'); renderOps(true); }catch(e){ opsSetMsg(String(e.message||e),'bad'); } };
   host.querySelectorAll('[data-hist],#opsGhHist').forEach(function(b){ b.onclick=async function(){ if(!opsNeedPin()) return; var p=b.dataset.hist||b.dataset.p; opsSetMsg(p+' 이력 읽는 중…'); try{ var r=await opsCall('gh_history',{path:p, n:10}); OPS.hist=r.commits; OPS.histPath=p; opsSetMsg(r.commits.length+'건','ok'); renderOps(true); }catch(e){ opsSetMsg(String(e.message||e),'bad'); } }; });
   host.querySelectorAll('[data-restore]').forEach(function(b){ b.onclick=async function(){ if(!opsNeedPin()) return; var sha=b.dataset.restore, p=OPS.histPath;
@@ -207,7 +311,8 @@ function opsAddFiles(list, keepPath){
     var isText=opsIsText(f.name), rd=new FileReader();
     rd.onload=function(){
       var rel=keepPath? (f.relPath||f.webkitRelativePath||f.name) : f.name;
-      var item={path:rel.replace(/^\/+/,''), size:f.size, bin:!isText};
+      var ap=opsAutoPath(rel);   /* ㊿+143: 파일 하나만 끌어 넣어도 tests/ 등 제자리로 */
+      var item={path:ap.path, size:f.size, bin:!isText, auto:ap.auto||'', bad:ap.bad||''};
       if(isText){ item.content=String(rd.result||''); item.ver=/index\.html$/i.test(f.name)? opsVerOf(item.content) : null; }
       else { item.content_b64=String(rd.result||'').replace(/^data:[^;]*;base64,/,''); }
       var k=OPS.files.findIndex(function(x){ return x.path===item.path; }); if(k>=0) OPS.files[k]=item; else OPS.files.push(item);
@@ -220,21 +325,27 @@ function opsAddFiles(list, keepPath){
 async function opsCommit(){
   if(!opsNeedPin() || !OPS.files.length || OPS.busy) return;
   var msgEl=document.getElementById('opsCommitMsg'), message=(msgEl&&msgEl.value.trim())||opsAutoMsg();
+  if(OPS.files.some(function(f){ return f.path==='index.ts'; })){ opsSetMsg('index.ts 의 경로를 supabase/functions/<함수 이름>/index.ts 로 고친 뒤 커밋하세요','bad'); return; }
+  var wfs=OPS.files.filter(function(f){ return OPS_WF_RE.test(f.path); }), puts=OPS.files.filter(function(f){ return !OPS_WF_RE.test(f.path); });
+  if(!puts.length){ opsSetMsg('워크플로 파일(.github/workflows)은 포탈로 올릴 수 없습니다 — 목록의 «내용 복사» → «GitHub 에서 열기»에서 붙여 넣고 Commit 하세요','bad'); return; }
+  var warn=opsCheckFiles(puts);
+  if(warn.length && !confirm('커밋 전에 확인해 주세요:\n\n'+warn.join('\n')+'\n\n그래도 커밋할까요?')) return;
   var idx=OPS.files.filter(function(f){ return /index\.html$/i.test(f.path); })[0];
   if(idx && idx.ver && idx.ver===APP_VER && !confirm('올리는 index.html 의 APP_VER('+idx.ver+')가 지금 실행 중인 버전과 같습니다. 그래도 커밋할까요?')) return;
   if(idx && !idx.ver && !confirm('올리는 index.html 에서 APP_VER 를 찾지 못했습니다 — 포탈 파일이 맞나요? 그래도 커밋할까요?')) return;
   var hasCode=OPS.files.some(function(f){ return /(^|\/)(app\.css|js\/[^/]+\.js)$/.test(f.path); });
   if(hasCode && !idx && !confirm('app.css 또는 js/ 파일만 올리고 index.html 은 없습니다. 포탈은 index.html 의 APP_VER(?v=) 로 캐시를 깨므로 index.html(버전 +1)을 함께 올리지 않으면 사용자 브라우저가 예전 코드를 계속 쓸 수 있습니다. 그래도 커밋할까요?')) return;
-  if(!confirm(OPS.files.length+'개 파일을 GitHub('+(OPS.st&&OPS.st.ok&&OPS.st.github? OPS.st.github.repo+' · '+OPS.st.github.branch : '저장소')+')에 커밋합니다.\n\n'+OPS.files.map(function(f){ return '· '+f.path+' ('+opsFmtBytes(f.size)+')'; }).join('\n')+'\n\n'+message)) return;
-  OPS.busy=true; var bt=document.getElementById('opsCommit'); if(bt) bt.disabled=true; opsSetMsg('커밋 중… (파일 '+OPS.files.length+'개)');
+  if(!confirm(puts.length+'개 파일을 GitHub('+(OPS.st&&OPS.st.ok&&OPS.st.github? OPS.st.github.repo+' · '+OPS.st.github.branch : '저장소')+')에 커밋합니다.\n\n'+puts.map(function(f){ return '· '+opsDest(f.path)+' ('+opsFmtBytes(f.size)+')'; }).join('\n')+(wfs.length? '\n\n(빠짐 — GitHub 웹에서 직접: '+wfs.map(function(f){ return f.path; }).join(', ')+')':'')+'\n\n'+message)) return;
+  OPS.busy=true; var bt=document.getElementById('opsCommit'); if(bt) bt.disabled=true; opsSetMsg('커밋 중… (파일 '+puts.length+'개)');
   try{
-    var pre=opsPrefix(), stg=OPS.target==='staging';
-    var r=await opsCall('gh_put',{files:OPS.files.map(function(f){ return f.bin? {path:pre+f.path, content_b64:f.content_b64} : {path:pre+f.path, content:f.content}; }), message:(stg? '[staging] ':'')+message});
-    opsSetMsg('커밋 완료 — '+r.commit.slice(0,7)+' · '+r.files.join(', ')+' · 테스트 통과 후 Pages 반영(2~3분)'+(stg? ' · 스테이징: '+stagingUrl():''),'ok');
+    var stg=OPS.target==='staging', anyStg=puts.some(function(f){ return opsDest(f.path)!==f.path; });
+    var r=await opsCall('gh_put',{files:puts.map(function(f){ var d=opsDest(f.path); return f.bin? {path:d, content_b64:f.content_b64} : {path:d, content:f.content}; }), message:(anyStg? '[staging] ':'')+message});
+    opsSetMsg('커밋 완료 — '+r.commit.slice(0,7)+' · '+r.files.join(', ')+' · 테스트 통과 후 Pages 반영(2~3분)'+(anyStg? ' · 스테이징: '+stagingUrl():'')+(wfs.length? ' · 워크플로 파일은 목록에 남겨 두었습니다(GitHub 웹에서 붙여 넣기)':''),'ok');
     toast('GitHub 커밋 완료', r.files.join(', ')+' → '+r.commit.slice(0,7));
-    OPS.files=[]; OPS.commitMsg=''; OPS.hist=null; renderOps(true);
+    OPS.files=wfs; OPS.commitMsg=''; OPS.hist=null; renderOps(true);
     if(idx && !stg) setTimeout(function(){ if(confirm('index.html 을 운영에 올렸습니다. 새 버전을 쓰려면 포탈을 새로고침해야 합니다 (테스트·Pages 반영에 2~3분 걸릴 수 있음). 지금 새로고침할까요?')) location.reload(); }, 400);
     if(idx && stg) setTimeout(function(){ if(confirm('스테이징에 올렸습니다. 2~3분 뒤 스테이징 포탈을 새 탭으로 열까요?')) window.open(stagingUrl(), '_blank'); }, 400);
+    OPS.repo=null;   /* 저장소가 바뀌었으니 점검 결과는 다시 */
   }catch(e){ opsSetMsg(String(e.message||e),'bad'); }
   OPS.busy=false; if(bt) bt.disabled=false;
 }

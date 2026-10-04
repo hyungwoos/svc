@@ -722,6 +722,66 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
   });
   await ctx.close();
 }
+// ㊿+143 배포 안전장치: 파일 자리 자동 · 저장소 파일은 루트 · 워크플로는 커밋에서 빼고 안내 · 커밋 전 경고 · 저장소 점검/정리
+{
+  const calls = []; const dialogs = []; let dismissNext = false;
+  const OLD_WF = "name: test-and-deploy\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-node@v4\n        with: { node-version: 20 }\n";
+  const { ctx, page, errs } = await open({ extra: async (route, u) => {
+    if (!u.includes('/functions/v1/ops')) return false;
+    let body = {}; try { body = JSON.parse(route.request().postData() || '{}'); } catch { /* noop */ }
+    calls.push(body); const A = body.action; let out = { ok: true };
+    if (A === 'status') out = { ok: true, pin_set: true, github: { repo: 'x/svc', branch: 'main', token_set: true }, mgmt_token_set: true, log_ok: true, recent: [] };
+    else if (A === 'gh_put') out = { ok: true, commit: 'abc1234def', url: 'u', files: body.files.map((f) => f.path) };
+    else if (A === 'gh_list') out = { ok: true, files: ['index.html', 'js/app.js', 'js/core.js', 'staging/js/app.js', 'check.mjs', 'tests/check.mjs', '.github/workflows/deploy.yml', 'staging/.github/workflows/deploy.yml', 'staging/README.md', 'staging/tests/fn/ops.test.ts'].map((p) => ({ path: p, size: 1, sha: 's' })) };
+    else if (A === 'gh_get') out = { ok: true, path: body.path, content: OLD_WF };
+    else if (A === 'gh_delete') out = { ok: true, commit: 'dead0002', url: 'u', deleted: body.paths, missing: [] };
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(out) }); return true; } });
+  page.on('dialog', async (d) => { dialogs.push(d.message()); if (/새로고침|열까요/.test(d.message()) || dismissNext) { dismissNext = false; await d.dismiss(); } else await d.accept(); });
+  await page.evaluate(() => switchView('ops')); await page.waitForTimeout(500);
+  await page.fill('#opsPin', '7391');
+  await S.t('배포 안전장치: 파일 하나만 넣어도 자리 자동(check.mjs→tests/ · *.test.ts→tests/fn/ · deploy.yml→.github/workflows/)', async () => {
+    await page.setInputFiles('#opsFile', [{ name: 'check.mjs', mimeType: 'text/javascript', buffer: Buffer.from('// c') }, { name: 'ops.test.ts', mimeType: 'text/plain', buffer: Buffer.from('// t') }, { name: 'deploy.yml', mimeType: 'text/yaml', buffer: Buffer.from('name: x') }]);
+    await page.waitForTimeout(400);
+    const ps = await page.evaluate(() => OPS.files.map((f) => f.path).sort());
+    assert(ps.join('|') === '.github/workflows/deploy.yml|tests/check.mjs|tests/fn/ops.test.ts', ps.join('|'));
+    const ui = await page.evaluate(() => ({ wf: !!document.querySelector('[data-wfcopy]'), root: [...document.querySelectorAll('#opsBody .ctag')].map((e) => e.textContent).join(',') }));
+    assert(ui.wf && /저장소 루트/.test(ui.root) && /GitHub 웹에서/.test(ui.root), JSON.stringify(ui)); return ps.join(' · ');
+  });
+  await S.t('배포 안전장치: 스테이징 대상이어도 저장소 파일은 루트로 · 워크플로 파일은 커밋에서 빠지고 목록에 남음', async () => {
+    await page.click('#opsTarget button[data-tg="staging"]'); await page.waitForTimeout(150);
+    await page.evaluate(() => { OPS.files.push({ path: 'README.md', size: 3, content: '# r' }, { path: 'index.html', size: 60, content: '<meta name="app-ver" content="2026-09-16 ㊿+999"><meta name="app-js" content="js/core.js,js/init.js">', ver: '2026-09-16 ㊿+999' }); renderOps(true); });
+    calls.length = 0; await page.click('#opsCommit'); await page.waitForTimeout(700);
+    const put = calls.find((c) => c.action === 'gh_put'); assert(put, 'gh_put 없음');
+    const paths = put.files.map((f) => f.path).sort();
+    assert(paths.join('|') === 'README.md|staging/index.html|staging/tests/check.mjs|tests/fn/ops.test.ts', paths.join('|'));
+    assert(/^\[staging\]/.test(put.message), put.message);
+    const left = await page.evaluate(() => OPS.files.map((f) => f.path)); assert(left.length === 1 && left[0] === '.github/workflows/deploy.yml', left.join(','));
+    return paths.join(' · ');
+  });
+  await S.t('배포 안전장치: 커밋 전 경고(루트의 .mjs · 안 쓰는 js) · index.ts 는 경로를 고쳐야 커밋', async () => {
+    await page.click('#opsTarget button[data-tg="prod"]'); await page.waitForTimeout(100);
+    await page.evaluate(() => { OPS.files = [{ path: 'foo.mjs', size: 1, content: 'x' }, { path: 'js/app.js', size: 1, content: 'x' }]; renderOps(true); });
+    calls.length = 0; dialogs.length = 0; dismissNext = true; await page.click('#opsCommit'); await page.waitForTimeout(300);
+    assert(dialogs[0] && /foo\.mjs.*루트/.test(dialogs[0]) && /js\/app\.js.*불러오지 않는/.test(dialogs[0]) && !calls.some((c) => c.action === 'gh_put'), (dialogs[0] || '').slice(0, 200));
+    await page.evaluate(() => { OPS.files = []; opsAddFiles([new File(['x'], 'index.ts')]); }); await page.waitForTimeout(300);
+    calls.length = 0; await page.click('#opsCommit'); await page.waitForTimeout(200);
+    const m = await page.$eval('#opsMsg', (e) => e.textContent); assert(/supabase\/functions/.test(m) && !calls.some((c) => c.action === 'gh_put'), m);
+    await page.evaluate(() => { OPS.files = []; renderOps(true); });
+    return 'warn·block';
+  });
+  await S.t('배포 안전장치: 🧹 저장소 점검 — 안 쓰는 파일·스테이징 저장소 파일·루트에 없는 파일·deploy.yml → 정리(gh_delete)', async () => {
+    await page.click('#opsRepoCheck'); await page.waitForTimeout(600);
+    const R = await page.evaluate(() => OPS.repo);
+    assert(R.unused.map((x) => x.p).sort().join('|') === 'check.mjs|js/app.js|staging/js/app.js', JSON.stringify(R.unused));
+    assert(R.stagingRepo.length === 3 && R.stagingRepo.find((x) => x.p === 'staging/README.md').root === false && R.stagingRepo.find((x) => x.p === 'staging/.github/workflows/deploy.yml').root === true, JSON.stringify(R.stagingRepo));
+    assert(R.missing.includes('tests/fn/_mock.ts') && R.missing.includes('README.md') && R.wf.length >= 3, JSON.stringify({ m: R.missing, wf: R.wf }));
+    calls.length = 0; await page.click('#opsRepoClean'); await page.waitForTimeout(500);
+    const del = calls.find((c) => c.action === 'gh_delete'); assert(del, 'gh_delete 없음');
+    assert(del.paths.sort().join('|') === 'check.mjs|js/app.js|staging/.github/workflows/deploy.yml|staging/js/app.js', del.paths.join('|'));
+    assert(!errs.length, errs.join(' | ')); return del.paths.length + '개 정리';
+  });
+  await ctx.close();
+}
 await browser.close(); srv.close();
 const ok = S.report();
 fs.writeFileSync(path.join(OUT, 'smoke.json'), JSON.stringify(S.results, null, 1));

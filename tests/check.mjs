@@ -88,9 +88,20 @@ if (HAS_FN) {
   say(/\.\.\/\.\.\/supabase\/functions\//.test(mock) && !/\/home\/|\/tmp\//.test(mock), 'tests/fn: 함수를 상대 경로로 불러옴(절대 경로 없음)');
   for (const f of fnTests) if (fs.existsSync(f)) { const t = fs.readFileSync(f, 'utf8'); say(!/(sb_secret_[A-Za-z0-9]{20,}|sbp_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|xoxb-[0-9]{8,}|sk-ant-[A-Za-z0-9-]{20,}|eyJhbGciOi[A-Za-z0-9._-]{60,})/.test(t), path.relative(ROOT, f) + ': 비밀값 패턴 없음'); }
   const wf = path.join(ROOT, '.github', 'workflows', 'deploy.yml'); const y = fs.existsSync(wf) ? fs.readFileSync(wf, 'utf8') : '';
-  say(/^\s+functions:/m.test(y) && /setup-deno/.test(y) && /needs:\s*\[test, functions\]/.test(y), 'deploy.yml: functions 잡(deno) 이 있고 deploy 가 test·functions 둘 다 기다림');
+  /* deploy.yml 은 포탈로 고칠 수 없어(토큰에 Workflows 권한 없음) 사이트 배포를 막지 않고 ⚠ 로 알림 */
+  if (/^\s+functions:/m.test(y) && /setup-deno/.test(y) && /needs:\s*\[test, functions\]/.test(y)) say(true, 'deploy.yml: functions 잡(deno) 이 있고 deploy 가 test·functions 둘 다 기다림');
+  else warn('deploy.yml 에 functions 잡이 없음 — 함수 테스트가 CI 에서 안 돌아감 (새 deploy.yml 을 GitHub 웹에서 붙여 넣기)');
   say(fs.existsSync(path.join(ROOT, 'README.md')), 'README.md 존재 (사이트 배포에서는 *.md 제외)');
 } else if (!fs.existsSync(path.join(ROOT, 'README.md'))) warn('README.md 가 저장소 루트에 없음');
+// ㊿+143: 배포 설정(deploy.yml) 권고 — 실행 환경 고정 · Node · 액션 버전 · 실패 덮기 (권고는 ⚠, 실패 덮기만 ✗)
+{ const wf = path.join(ROOT, '.github', 'workflows', 'deploy.yml'); const y = fs.existsSync(wf) ? fs.readFileSync(wf, 'utf8') : '';
+  if (!y) warn('.github/workflows/deploy.yml 이 없음');
+  else {
+    if (/runs-on:\s*ubuntu-latest/.test(y)) warn('deploy.yml: runs-on ubuntu-latest — 2026-10-19 부터 Ubuntu 26 으로 바뀜 → ubuntu-24.04 로 고정 권장');
+    if (/node-version:\s*['"]?20\b/.test(y)) warn('deploy.yml: Node 20(지원 종료) → 22 권장');
+    if (/actions\/(checkout|setup-node|upload-artifact)@v4\b|actions\/deploy-pages@v4\b|actions\/configure-pages@v5\b|actions\/upload-pages-artifact@v3\b/.test(y)) warn('deploy.yml: 옛 액션 버전(Node 20 경고) → checkout@v6 · setup-node@v6 · upload-artifact@v6 · configure-pages@v6 · upload-pages-artifact@v5 · deploy-pages@v5');
+    if (/deno run[^\n]*\|\|\s*echo/.test(y)) warn('deploy.yml: 함수 테스트 실패를 «|| echo» 로 덮는 줄이 있음 — 새 deploy.yml 로 교체 권장');
+  } }
 // ⑤ UX 2단계 · ⑥ AI 2단계 (㊿+139)
 { const init = fs.readFileSync(path.join(ROOT, 'js/init.js'), 'utf8');
   say(/function ovlInit\(/.test(jsAll) && /function ovlDismiss\(/.test(jsAll) && /^ovlInit\(\);/m.test(init) && init.indexOf('ovlInit();') < init.lastIndexOf('boot();') && /ovlDismiss\(top\)/.test(init), 'UX(㊿+141): 창 바깥 클릭 닫기·입력 중 확인·초점 관리(ovlInit) 가 init.js 에서 boot() 전에 등록됨 · Esc 도 ovlDismiss');
@@ -108,6 +119,7 @@ if (HAS_FN) {
   say(/function colwApply\(/.test(jsAll) && /colwApply\(t, CUR_VIEW\)/.test(jsAll) && /\.dgrid\.colw-fixed\{table-layout:fixed\}/.test(fs.readFileSync(path.join(ROOT, 'app.css'), 'utf8')), '표 열 너비 조절(colw) 연결');
   say(/class="subgrp" data-sub="Cloud NAC"/.test(html) && (html.match(/class="grp"[^>]*>사업 영역</g) || []).length === 1 && /function menuConfMigrate\(/.test(jsAll), '메뉴: «사업 영역» 한 그룹 + 소제목 · 예전 메뉴 편집 설정 옮김');
   say(!/class="pill"[^>]*style="[^"]*background:var\(--(s1|brand)\)[^"]*color:#fff/.test(html + jsAll), '버튼: 주요 버튼을 style 로 칠하지 않음(class="pill pri")'); }
+say(/function opsAutoPath\(/.test(jsAll) && /function opsDest\(/.test(jsAll) && /OPS_WF_RE/.test(jsAll) && /function opsRepoCheck\(/.test(jsAll) && /function opsCheckFiles\(/.test(jsAll), '배포·운영 안전장치(㊿+143): 파일 자리 자동 · 저장소 파일 루트 · 워크플로 제외 · 커밋 전 경고 · 저장소 점검');
 say(/id="dvHelp"/.test(html) && /id="ovlKeys"/.test(html) && /function askScreenHelp\(/.test(jsAll) && /function dvCapRender\(/.test(jsAll) && /function gridActPad\(/.test(jsAll), 'UX: ❔ 화면 도움말 · 단축키 창 · 설명 접기 · 동작 열 여백 코드 있음');
 say(/function aiFeedback\(/.test(jsAll) && /ai_feedback/.test(jsAll) && /function aiqHtml\(/.test(jsAll) && /ai_check_log/.test(jsAll), 'AI: 👍/👎 피드백 · 점검 추이 코드 있음');
 say(/\^ai_feedback\\b\|\^ai_check_log\\b/.test(jsAll), 'permWriteGuard 예외에 ai_feedback·ai_check_log');
