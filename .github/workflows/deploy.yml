@@ -3,7 +3,7 @@
 #   · main 에 커밋될 때마다 실행 (포탈 «배포·운영» 의 커밋·승격 포함) · Actions 탭에서 수동 실행도 가능
 #   · 2026-10-04 갱신(㊿+143): 실행 환경을 ubuntu-24.04 로 고정(ubuntu-latest 는 2026-10-19 부터 Ubuntu 26 으로 바뀜) ·
 #     Node 22 · 액션은 Node 24 로 도는 최신 주 버전 · 함수 테스트 실패를 «|| echo» 로 덮지 않음
-#   · 2026-10-04 갱신(㊿+147): 테스트 잡에 ESLint 정적 검사(tests/lint.mjs) 단계 추가
+#   · 2026-10-05 갱신(㊿+147): 테스트 잡에 ESLint 정적 검사(tests/lint.mjs) 단계 추가 — 파일이 루트에 없으면(승격 전) 건너뜀
 #   · 이 파일은 포탈로 커밋할 수 없습니다(포탈 토큰에 Workflows 권한 없음) — GitHub 웹에서 직접 편집
 name: test-and-deploy
 on:
@@ -30,7 +30,10 @@ jobs:
       - name: Playwright 설치
         run: npm install --no-audit --no-fund && npx playwright install --with-deps chromium
       - name: 정적 검사 2 (ESLint · 파일 간 전역 이름 지도 — 오타·없는 이름·중복 선언)
-        run: node tests/lint.mjs
+        # 스테이징 커밋은 tests/*.mjs 를 staging/tests/ 에 두고 «승격» 때 루트로 옮김 → 승격 전엔 루트에 lint.mjs 가 없을 수 있어 그땐 건너뜀
+        run: |
+          if [ -f tests/lint.mjs ]; then node tests/lint.mjs
+          else echo "건너뜀 — tests/lint.mjs 가 아직 루트에 없음(스테이징 커밋 뒤 승격 전). 승격하면 다음 실행부터 검사합니다"; fi
       - name: 스모크 테스트 (가짜 백엔드 · 운영 DB 접근 없음)
         run: node tests/smoke.mjs
       - name: 실패 화면 보관
