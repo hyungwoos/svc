@@ -364,7 +364,7 @@ if (fs.existsSync(path.join(DIR, 'staging', 'index.html'))) {
     });
     await S.t('MFA 강제: 관리자 › 2단계 인증 정책 — 목록 · 필수 지정 저장 · 초기화', async () => {
       page.on('dialog', (d) => d.accept());
-      await page.evaluate(() => switchView('adminx')); await page.waitForTimeout(900);
+      await page.evaluate(() => { switchView('adminx'); admTab('sec'); }); await page.waitForTimeout(900);
       const rows = await page.$$eval('#mfTable tbody tr', (t) => t.length); assert(rows === 3, 'rows ' + rows);
       assert(/차단 중|유예|등록/.test(await page.$eval('#mfTable', (e) => e.textContent)), '상태 표기 없음');
       await page.check('#mfTable [data-mf-req="b@example.com"]'); await page.waitForTimeout(100);
@@ -464,7 +464,7 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
     assert(!errs.length, errs.join(' | ')); return st.ch.join(',');
   });
   await S.t('관리자 › 코드 관리: 표 · 추가(POST) · 숨기기(PATCH) · 순서(PATCH×2)', async () => {
-    await page.evaluate(() => switchView('adminx')); await page.waitForTimeout(800);
+    await page.evaluate(() => { switchView('adminx'); admTab('cfg'); }); await page.waitForTimeout(800);
     assert(await page.$('#cdTable tbody'), '코드 관리 표 없음'); const kinds = await page.$$eval('#cdKind option', (e) => e.length); assert(kinds >= 12, '종류 ' + kinds);
     await page.selectOption('#cdKind', 'channel'); await page.waitForTimeout(150);
     const rows = await page.$$eval('#cdTable tbody tr', (e) => e.map((x) => x.querySelector('td:nth-child(2) b').textContent)); assert(rows.length === 6 && rows[5] === '테스트채널', '채널 ' + rows.join(','));
@@ -945,7 +945,7 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
     await page.evaluate(() => { QB.mode = 'ui'; }); return r.n + '행 · ' + r.row.slice(0, 3).join(' / ');
   });
   await S.t('㊿+147 관리자 › 2단계 인증: 역할 기본(슈퍼·관리자 필수 14일) 표시 · 끄기 저장 → mfa_role_set · 목록에 «역할 기본»', async () => {
-    await page.evaluate(() => navMenu('adminx')); await page.waitForTimeout(1200);
+    await page.evaluate(() => { navMenu('adminx'); admTab('sec'); }); await page.waitForTimeout(1200);
     const vis = await page.evaluate(() => { const b = document.getElementById('mfRole'); return !!b && b.style.display !== 'none' && /역할 기본/.test(b.textContent) && /유예 중/.test(b.textContent); });
     assert(vis, '역할 기본 칸 없음');
     assert(/역할 기본/.test(await page.$eval('#mfTable', (e) => e.textContent)), '목록에 역할 기본 표시 없음');
@@ -1033,12 +1033,12 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
     notesDb = []; writes.length = 0;
     const n = await page.evaluate(async () => { UPD.checked = false; await updSyncSeed(); return UPD_SEED.length; });
     const post = writes.filter((w) => w.m === 'POST' && /upd_notes/.test(w.url))[0]; assert(post, 'upd_notes POST 없음');
-    const pb = JSON.parse(post.body); assert(pb.length === n && pb[0].ver === '㊿+98~117' && pb[n - 1].ver === '㊿+148' && pb.every((x) => x.title && /^- /.test(x.body) && /^\d{4}-\d\d-\d\d$/.test(x.published_on)), JSON.stringify(pb.map((x) => x.ver)));
+    const pb = JSON.parse(post.body); assert(pb.length === n && pb[0].ver === '㊿+98~117' && pb[n - 1].ver === (await page.evaluate(() => (APP_VER.match(/㊿\+\d+/) || [''])[0])) && pb.every((x) => x.title && /^- /.test(x.body) && /^\d{4}-\d\d-\d\d$/.test(x.published_on)), JSON.stringify(pb.map((x) => x.ver)));
     writes.length = 0; await page.evaluate(async () => { await updSyncSeed(); }); assert(!writes.some((w) => w.m === 'POST' && /upd_notes/.test(w.url)), '이미 있으면 다시 넣지 않아야 함');
     pending = { notify: true, last_id: 0, notes: notesDb.slice(-2).reverse() };
     await page.evaluate(async () => { UPD.checked = false; await updCheck(); }); await page.waitForTimeout(200);
     const ui = await page.evaluate(() => { const o = document.getElementById('ovlUpd'); return o && { secs: o.querySelectorAll('.upd-sec').length, first: o.querySelector('.upd-sec b').textContent, dis: o.querySelector('#updDone').disabled, sub: o.querySelector('.mini').textContent, adm: o.querySelectorAll('.upd-adm').length, li: o.querySelectorAll('.upd-sec li').length }; });
-    assert(ui && ui.secs === 2 && /바로 고치기/.test(ui.first) && ui.dis && /지금까지/.test(ui.sub) && ui.adm >= 1 && ui.li >= 5, JSON.stringify(ui));
+    assert(ui && ui.secs === 2 && ui.first === notesDb[notesDb.length - 1].title && ui.dis && /지금까지/.test(ui.sub) && ui.adm >= 1 && ui.li >= 5, JSON.stringify(ui));
     await page.check('#updOk'); assert(!(await page.$eval('#updDone', (e) => e.disabled)), '체크해도 확인 비활성');
     writes.length = 0; await page.click('#updDone'); await page.waitForTimeout(400);
     const ack = writes.filter((w) => /upd_ack_set/.test(w.url))[0]; assert(ack && JSON.parse(ack.body).p_last_id === Math.max(...pending.notes.map((x) => x.id)), JSON.stringify(ack));
@@ -1051,9 +1051,25 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
     assert(!(await page.$('#ovlUpd')), '안내 대상이 아닌데 팝업');
     return n + '개 시드 · ack ' + JSON.parse(ack.body).p_last_id;
   });
+  await S.t('㊿+149 관리자 화면 탭 4개: 한 번에 한 구역만 · 탭 전환 · 메뉴를 다시 누르면 첫 탭 · 뒤로가기는 보던 탭', async () => {
+    await page.evaluate(() => navMenu('adminx')); await page.waitForTimeout(700);
+    const vis = () => page.evaluate(() => [...document.querySelectorAll('#viewAdmin .adm-pane')].filter((p) => p.getClientRects().length).map((p) => p.dataset.pane).join(','));
+    const tabs = await page.$$eval('#admTabs button', (b) => b.map((x) => x.textContent.trim()));
+    assert(tabs.length === 4 && (await vis()) === 'acct', JSON.stringify({ tabs, vis: await vis() }));
+    assert(await page.evaluate(() => { const d = document.getElementById('axNewBox'); return d && !d.open && !!document.getElementById('axTable') && document.getElementById('axTable').getClientRects().length > 0; }), '새 계정 접힘·계정 표 보임 아님');
+    await page.click('#admTabs [data-t="cfg"]'); await page.waitForTimeout(200);
+    assert((await vis()) === 'cfg' && (await page.$eval('#admTabs [data-t="cfg"]', (b) => b.getAttribute('aria-pressed'))) === 'true', 'cfg 전환 ' + (await vis()));
+    const h = await page.evaluate(() => document.querySelector('#viewAdmin section').getBoundingClientRect().height);
+    await page.evaluate(() => navMenu('dash')); await page.waitForTimeout(300); await page.evaluate(() => goBack()); await page.waitForTimeout(500);
+    assert((await page.evaluate(() => CUR_VIEW)) === 'adminx' && (await vis()) === 'cfg', '뒤로가기 → 보던 탭 아님 ' + (await vis()));
+    await page.evaluate(() => navMenu('adminx')); await page.waitForTimeout(400);
+    assert((await vis()) === 'acct', '메뉴 다시 누르면 첫 탭 아님 ' + (await vis()));
+    return tabs.join(' | ') + ' · 설정 탭 높이 ' + Math.round(h) + 'px';
+  });
   await S.t('㊿+148 관리자 › 업데이트 안내: 계정 «받기» upsert · 처음부터 다시 DELETE · 새 안내 POST · 내 계정 › 업데이트 내역', async () => {
     notifyDb = [{ email: 'sales@example.com', enabled: true }]; ackDb = [{ email: 'sales@example.com', last_id: notesDb.length - 1, acked_at: '2026-10-05T01:00:00Z' }];
-    await page.evaluate(() => switchView('adminx')); await page.waitForTimeout(900);
+    await page.evaluate(() => { switchView('adminx'); admTab('cfg'); });
+    await page.waitForFunction(() => { const u = document.getElementById('updUsers'); return u && u.textContent.includes('1건'); }, null, { timeout: 6000 }).catch(() => {});
     const t = await page.evaluate(() => { const u = document.getElementById('updUsers'), n = document.getElementById('updNotes'); return u && n && { users: u.querySelectorAll('tbody tr').length, unread: u.textContent.includes('1건'), notes: n.querySelectorAll('tbody tr').length }; });
     assert(t && t.users === 2 && t.unread && t.notes === notesDb.length, JSON.stringify(t));
     writes.length = 0; await page.check('#updUsers [data-updn="tester@example.com"]'); await page.waitForTimeout(500);

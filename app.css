@@ -1683,3 +1683,14 @@ tr.row-dim td{color:var(--muted)}
 .dcf-row.bad>label{color:var(--critical);font-weight:600}
 .dcf-bad{color:var(--critical);margin-top:4px}
 @media (max-width:760px){ .dcf-row{grid-template-columns:1fr;gap:4px} .dcf-row>label{padding-top:0} }
+
+/* ===== ㊿+149 관리자 화면 탭 ===== */
+.adm-tabs{margin:0 0 16px;flex-wrap:wrap}
+.adm-pane[hidden]{display:none!important}
+.adm-h{font-size:13.5px;font-weight:650;margin:22px 0 8px;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.adm-h.first{margin-top:2px}
+.adm-h .mini{font-weight:400}
+.adm-new{margin:0 0 4px}
+.adm-new>summary{display:inline-flex;align-items:center;gap:6px;cursor:pointer;list-style:none;font-size:12.5px;font-weight:600;color:var(--brand-ink);padding:4px 0}
+.adm-new>summary::-webkit-details-marker{display:none}
+.adm-new[open]>summary{color:var(--ink-2)}

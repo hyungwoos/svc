@@ -35,7 +35,7 @@ var VIEW_UI={
   leadsrc:{LS:['base','line','pick']}, dcheck:{DC:['open','sev']}, eqboard:{EQB:['ch','q','more']},
   price:{PR:['seg','ver','op','q','basis']}, cloud:{CL:['mode','sel','months','mon']}, aiknow:{AK:['log','q']},
   biz:{BZX:['showEq','showSkip','showRuled']}, report:{RPV:['tab']}, csite:{CS:['tab']},
-  ops:{OPS:['tab','msg','msgCls']}, adminx:{CD:['kind','showOff'], AP:['user']}
+  ops:{OPS:['tab','msg','msgCls']}, adminx:{CD:['kind','showOff'], AP:['user'], ADM:['tab']}
 };
 var VIEW_SNAP=null;
 function viewSnapInit(){
