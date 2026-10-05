@@ -6,6 +6,7 @@
 //     · 실패 = 통과율 < AICHECK_MIN · ask 호출 막힘 · 기대값(ai_check_expect) 못 읽음 · 점검 자체 오류
 //     · 실패 이유·고치는 방법은 슬랙에 넣지 않고 ai_check_log(질문별 why) · 함수 Logs · 응답(reason/hint)에
 //     · v1.2 의 «브라우저 오류·배포 실패 요약»은 슬랙에서 뺌(포탈 › 배포·운영 › 기록에서 봄)
+//     · 점검을 못 한 날(ask 막힘·기대값 못 읽음)은 ai_check_log.fails 첫 칸에 «⛔ 이유 → 해결» — 포탈 «AI 점검 추이» 실패 질문 칸에 그대로 보임
 //   · v1.3(2026-10-05): 첫 야간 실행이 «0/12 · 오류: 응답 없음 · 0.0초» — ask 가 아니라 그 앞(게이트웨이 등)에서 막힌 것으로 보이는데
 //     응답 본문에 error 칸이 없어 이유가 안 보였음 → ① 실패 이유에 HTTP 상태 + message/msg/code 를 그대로 ② 질문 전에 ask 에 ping 한 번 —
 //     안 되면 12문을 돌리지 않고 «무엇이 막혔는지 + 고치는 방법» 한 줄로 슬랙(같은 오류 12줄 대신)
@@ -199,11 +200,14 @@ Deno.serve(async (req: Request) => {
 
   const reason = failReason(res, expectErr), passed = !reason;
   const hint = reason ? fixHint(reason) : '';
+  // 포탈 «AI 점검 추이»는 실패 칸에 fails[].q 를 보여 줌 → 점검을 못 한 날은 질문 12개 대신 «왜 못 했는지 + 해결» 한 칸 (v1.4 · 포탈 수정 없이)
+  const logFails = res.blocked ? [{ q: `⛔ 점검 못 함 — ${reason} ${hint}`.trim(), why: reason, head: '' }]
+    : expectErr ? [{ q: `⛔ 기대값 못 읽음 — ${expectErr}`, why: '기대값 못 읽음', head: '' }, ...fails] : fails;
   let logged = false, slack: unknown = null;
   if (!dry) {
     try {
       const r = await fetchT(SB_URL + '/rest/v1/ai_check_log', { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: SB_SVC, Authorization: 'Bearer ' + SB_SVC, Prefer: 'return=minimal' },
-        body: JSON.stringify({ source: 'cron', app_ver: null, pass: res.pass, total: res.total, avg_ms: res.avg_ms, model: res.model, fails, rows: res.rows.map((r) => ({ q: r.q, ok: r.ok, why: r.why, ms: r.ms, tools: r.tools })), actor }) }, 10000);
+        body: JSON.stringify({ source: 'cron', app_ver: null, pass: res.pass, total: res.total, avg_ms: res.avg_ms, model: res.model, fails: logFails, rows: res.rows.map((r) => ({ q: r.q, ok: r.ok, why: r.why, ms: r.ms, tools: r.tools })), actor }) }, 10000);
       logged = r.ok;
     } catch { /* 표 없음(SQL 94 전) 등 — 결과는 응답으로 돌려줌 */ }
     if (!passed) console.warn('[aicheck] 점검 실패', reason, hint);

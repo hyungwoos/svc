@@ -663,9 +663,9 @@ async function sbAll(q){
   var pages=await Promise.all(jobs);
   return [].concat.apply([],pages);
 }
-async function sbWrite(method, path, body, prefer){
+async function sbWrite(method, path, body, prefer, asView){   /* asView(㊿+148): 다른 화면에서 저장할 때 그 표의 화면 권한으로 검사 — 예: 데이터 점검 수정 창 → 'contracts' */
   if(!SB_TOKEN) throw new Error('로그인이 필요합니다.');
-  permWriteGuard(method, path);
+  permWriteGuard(method, path, asView);
   var r=await fetch(SB_URL+'/rest/v1/'+path,{
     method:method, headers:Object.assign(sbHeaders(true), prefer?{Prefer:prefer}:{}),
     body: body!==undefined? JSON.stringify(body): undefined
@@ -1097,6 +1097,7 @@ function onErr(e){
 
 function onData(d){
   try{ mfaWarnIfNeeded(); }catch(e){}
+  if(!UPD.checked) setTimeout(function(){ try{ updCheck(); }catch(e){} }, 1500);   /* ㊿+148 업데이트 안내 팝업 — 첫 화면을 그린 뒤 1번 */
   $('#side').classList.remove('hidden');
   try{ applyPerms(); }catch(e){}
   /* PWA 바로가기(manifest shortcuts) — index.html?v=eqboard 처럼 열리면 첫 화면을 그 메뉴로 */

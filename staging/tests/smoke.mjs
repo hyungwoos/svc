@@ -52,7 +52,8 @@ async function shot(page, name) { try { await page.screenshot({ path: path.join(
       await page.click('#bizHost [data-dc="' + withItems[0] + '"]'); await page.waitForTimeout(200);
       const links = await page.$$('#bizHost [data-dcgo]'); assert(links.length >= 1, '항목 링크 없음');
       await links[0].click(); await page.waitForTimeout(400);
-      assert(await page.evaluate(() => CUR_VIEW !== 'dcheck' || !!document.getElementById('ovlRenew')), '바로가기 이동 안 됨 (' + withItems[0] + ')');
+      assert(await page.evaluate(() => CUR_VIEW !== 'dcheck' || !!document.getElementById('ovlDcFix') || document.getElementById('ovlRenew').classList.contains('on')), '항목 → 수정 창/바로가기 안 됨 (' + withItems[0] + ')');
+      await page.evaluate(() => { try { dcFixClose(); } catch (e) { /* */ } });
     }
     const dig = await page.evaluate(() => buildDigest().데이터점검); assert(dig && '바로고침' in dig, 'digest 데이터점검 없음');
     return { rules: n, crit: sum.crit, warn: sum.warn, info: sum.info, first: withItems[0] || '-' };
@@ -969,6 +970,115 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
     });
   }
   await S.t('㊿+147 오류·CSP 위반 없음', async () => { assert(!errs.length, errs.join(' | ')); assert(!csp.length, csp.join(' | ')); });
+  await ctx.close();
+}
+// ㊿+148 데이터 점검 수정 창 · 업데이트 안내 팝업
+{
+  const { FIX } = await import('./lib.mjs');
+  const writes = [], dialogs = []; let fixed = null, pending = { notify: false }, notesDb = [], notifyDb = [], ackDb = [];
+  const J = (route, o, st = 200) => route.fulfill({ status: st, contentType: 'application/json', body: JSON.stringify(o) });
+  const { ctx, page, errs } = await open({ onWrite: (w) => writes.push(w), extra: async (route, u, m) => {
+    if (u.includes('/rpc/load_all') && fixed) { const d = JSON.parse(JSON.stringify(FIX)); d.contracts.forEach((c) => { if (fixed[c.id]) Object.assign(c, fixed[c.id]); }); d.roles = [{ role: 'super_admin' }]; await J(route, d); return true; }
+    if (u.includes('/rpc/upd_pending')) { writes.push({ m, url: u, body: '' }); await J(route, pending); return true; }
+    if (u.includes('/rpc/upd_ack_set')) { writes.push({ m, url: u, body: route.request().postData() }); await J(route, { ok: true, last_id: JSON.parse(route.request().postData()).p_last_id }); return true; }
+    if (u.includes('/rest/v1/upd_notes') && m === 'GET') { await J(route, /select=ver$/.test(u.split('?')[1] || '') ? notesDb.map((n) => ({ ver: n.ver })) : notesDb); return true; }
+    if (u.includes('/rest/v1/upd_notes') && m === 'POST') { const b = JSON.parse(route.request().postData()); writes.push({ m, url: u, body: route.request().postData() }); (Array.isArray(b) ? b : [b]).forEach((x) => notesDb.push(Object.assign({ id: notesDb.length + 1, active: true }, x))); await route.fulfill({ status: 201, body: '' }); return true; }
+    if (u.includes('/rest/v1/upd_notify') && m === 'GET') { await J(route, notifyDb); return true; }
+    if (u.includes('/rest/v1/upd_ack') && m === 'GET') { await J(route, ackDb); return true; }
+    if (u.includes('/rpc/admin_list_users')) { await J(route, [{ email: 'tester@example.com', role: 'super_admin' }, { email: 'sales@example.com', role: 'admin' }]); return true; }
+    return false; } });
+  page.on('dialog', async (d) => { dialogs.push(d.message()); await d.accept(); });
+  await S.t('㊿+148 데이터 점검: 항목 → 수정 창(목록 밖 상태 표시) → 저장 PATCH(바뀐 칸만) · change_log · 다시 점검 → 다음 항목', async () => {
+    await page.evaluate(() => switchView('dcheck')); await page.waitForTimeout(400);
+    await page.click('#bizHost [data-dc="c_vocab"]'); await page.waitForTimeout(200);
+    const n0 = await page.evaluate(() => dcRules().filter((r) => r.id === 'c_vocab')[0].items.length);
+    await (await page.$$('#bizHost [data-dcgo^="c_vocab:"]'))[0].click(); await page.waitForTimeout(300);
+    const ui = await page.evaluate(() => { const o = document.getElementById('ovlDcFix'); return o && { title: o.querySelector('#dcfTitle').textContent, pos: o.querySelector('#dcfPos').textContent, bad: o.querySelectorAll('.dcf-row.bad').length, sel: [...o.querySelectorAll('#dcfForm select[data-k]')].map((x) => x.dataset.k), save: !!o.querySelector('#dcfSave'), id: dcRules().filter((r) => r.id === 'c_vocab')[0].items[0].fix.id }; });
+    assert(ui && /선택 목록/.test(ui.title) && ui.pos === '1 / ' + n0 && ui.bad >= 1 && ui.sel.includes('status') && ui.save, JSON.stringify(ui));
+    const nothing = await page.evaluate(async () => { document.getElementById('dcfSave').click(); await new Promise((r) => setTimeout(r, 100)); return document.getElementById('dcfMsg').textContent; });
+    assert(/바뀐 값이 없습니다/.test(nothing), '변경 없음 안내 ' + nothing);
+    const pick = await page.evaluate(() => { const v = {}; document.querySelectorAll('#dcfForm select[data-k]').forEach((s) => { const o = [...s.options].map((x) => x.value).filter((x) => x && codeActive({ status: 'contract_status', contract_type: 'contract_type', channel: 'channel', line: 'line', lead_src: 'lead_src', live_override: 'live_override' }[s.dataset.k], x)); s.value = o[0]; s.dispatchEvent(new Event('change', { bubbles: true })); v[s.dataset.k] = o[0]; }); return v; });
+    fixed = { [ui.id]: pick }; writes.length = 0;
+    await page.click('#dcfSave'); await page.waitForTimeout(1600);
+    const patch = writes.filter((w) => w.m === 'PATCH' && /contracts\?id=eq\./.test(w.url))[0]; assert(patch, 'PATCH 없음 ' + JSON.stringify(writes.map((w) => w.m + ' ' + w.url.split('/rest/v1/')[1])));
+    const b = JSON.parse(patch.body); assert(patch.url.includes('id=eq.' + ui.id) && b.status === pick.status && b.updated_at && Object.keys(b).every((k) => k === 'updated_at' || k in pick), JSON.stringify(b));
+    assert(writes.some((w) => /change_log/.test(w.url) && /데이터 점검/.test(w.body)), 'change_log(_via 데이터 점검) 없음');
+    const after = await page.evaluate(() => { const o = document.getElementById('ovlDcFix'); return o && { pos: o.querySelector('#dcfPos').textContent, n: dcRules().filter((r) => r.id === 'c_vocab')[0].items.length }; });
+    assert(after && after.n === n0 - 1 && after.pos === '1 / ' + (n0 - 1), '다음 항목으로 안 넘어감 ' + JSON.stringify(after) + ' n0=' + n0);
+    return n0 + '→' + after.n + ' · ' + JSON.stringify(b).slice(0, 80);
+  });
+  await S.t('㊿+148 수정 창: ◀▶ 이동 · 아직 걸리면 그대로 · 이달 매출 입력(천원 → 원 POST) · 화면에서 보기', async () => {
+    await page.evaluate(() => { dcFixClose(); dcFixOpen('c_lead', 0); }); await page.waitForTimeout(200);
+    await page.click('#dcfNext'); await page.waitForTimeout(150);
+    assert(/^2 \//.test(await page.$eval('#dcfPos', (e) => e.textContent)), '▶ 이동 안 됨');
+    await page.click('#dcfPrev'); await page.waitForTimeout(150);
+    // 저장했는데 (가짜 DB 가 그대로라) 아직 걸림 → 같은 항목 + 안내
+    const lead = await page.evaluate(() => { const s = document.querySelector('#dcfForm [data-k="lead_src"]'); s.value = LEAD_OPTS[0]; return dcRules().filter((r) => r.id === 'c_lead')[0].items[0].fix.id; });
+    fixed = null; writes.length = 0; await page.click('#dcfSave'); await page.waitForTimeout(1600);
+    const msg = await page.$eval('#dcfMsg', (e) => e.textContent);
+    assert(/아직 이 규칙에 걸립니다/.test(msg) && writes.some((w) => w.m === 'PATCH' && w.url.includes('id=eq.' + lead)), msg);
+    // c_live_zero: 이달 매출을 비워 규칙에 걸리게 한 뒤 수정 창에서 천원 입력
+    const ok = await page.evaluate(() => { const T = DATA.nowIdx; const k = DATA.rows.findIndex((r, i) => liveActiveAt(r, T) && !r.parent && MAT[i] && MAT[i][T] && !/일시납|연납|반년납|분기납/.test(String(r.billing || ''))); if (k < 0) return null; MAT[k][T] = 0; const it = dcRules().filter((r) => r.id === 'c_live_zero')[0].items; return it.length ? it.findIndex((x) => x.fix.id === DATA.rows[k]._id) : null; });
+    if (ok == null || ok < 0) return '이달 매출 0 상황을 못 만듦 — 앞 단계만 확인';
+    await page.evaluate((i) => { dcFixClose(); dcFixOpen('c_live_zero', i); }, ok); await page.waitForTimeout(200);
+    await page.fill('#dcfRev', '1234'); writes.length = 0; await page.click('#dcfSave'); await page.waitForTimeout(1500);
+    const post = writes.filter((w) => w.m === 'POST' && /monthly_revenue/.test(w.url))[0]; assert(post, 'monthly_revenue POST 없음');
+    const pb = JSON.parse(post.body); assert(pb.amount === 1234000 && pb.month && pb.contract_id, JSON.stringify(pb));
+    await page.evaluate(() => { dcFixClose(); dcFixOpen('c_s1no', 0); }); await page.waitForTimeout(200);
+    await page.click('#dcfGo'); await page.waitForTimeout(400);
+    assert(!(await page.$('#ovlDcFix')) && (await page.evaluate(() => CUR_VIEW)) === 'contracts', '화면에서 보기 → 계약 관리 아님');
+    return 'POST ' + JSON.stringify(pb);
+  });
+  await S.t('㊿+148 업데이트 안내: 슈퍼가 열면 안내문 자동 채움(오래된 것부터) · 체크된 계정에 팝업 · 확인 체크 전 비활성 · 확인 → upd_ack_set(최대 id)', async () => {
+    notesDb = []; writes.length = 0;
+    const n = await page.evaluate(async () => { UPD.checked = false; await updSyncSeed(); return UPD_SEED.length; });
+    const post = writes.filter((w) => w.m === 'POST' && /upd_notes/.test(w.url))[0]; assert(post, 'upd_notes POST 없음');
+    const pb = JSON.parse(post.body); assert(pb.length === n && pb[0].ver === '㊿+98~117' && pb[n - 1].ver === '㊿+148' && pb.every((x) => x.title && /^- /.test(x.body) && /^\d{4}-\d\d-\d\d$/.test(x.published_on)), JSON.stringify(pb.map((x) => x.ver)));
+    writes.length = 0; await page.evaluate(async () => { await updSyncSeed(); }); assert(!writes.some((w) => w.m === 'POST' && /upd_notes/.test(w.url)), '이미 있으면 다시 넣지 않아야 함');
+    pending = { notify: true, last_id: 0, notes: notesDb.slice(-2).reverse() };
+    await page.evaluate(async () => { UPD.checked = false; await updCheck(); }); await page.waitForTimeout(200);
+    const ui = await page.evaluate(() => { const o = document.getElementById('ovlUpd'); return o && { secs: o.querySelectorAll('.upd-sec').length, first: o.querySelector('.upd-sec b').textContent, dis: o.querySelector('#updDone').disabled, sub: o.querySelector('.mini').textContent, adm: o.querySelectorAll('.upd-adm').length, li: o.querySelectorAll('.upd-sec li').length }; });
+    assert(ui && ui.secs === 2 && /바로 고치기/.test(ui.first) && ui.dis && /지금까지/.test(ui.sub) && ui.adm >= 1 && ui.li >= 5, JSON.stringify(ui));
+    await page.check('#updOk'); assert(!(await page.$eval('#updDone', (e) => e.disabled)), '체크해도 확인 비활성');
+    writes.length = 0; await page.click('#updDone'); await page.waitForTimeout(400);
+    const ack = writes.filter((w) => /upd_ack_set/.test(w.url))[0]; assert(ack && JSON.parse(ack.body).p_last_id === Math.max(...pending.notes.map((x) => x.id)), JSON.stringify(ack));
+    assert(!(await page.$('#ovlUpd')), '확인 뒤 팝업이 남음');
+    // 나중에 보기 → 기록 안 함 / 안내 대상 아님 → 팝업 없음
+    await page.evaluate(async () => { UPD.checked = false; await updCheck(); }); await page.waitForTimeout(150);
+    writes.length = 0; await page.click('#updLater'); await page.waitForTimeout(200);
+    assert(!(await page.$('#ovlUpd')) && !writes.some((w) => /upd_ack_set/.test(w.url)), '나중에 보기가 확인으로 기록됨');
+    pending = { notify: false }; await page.evaluate(async () => { UPD.checked = false; await updCheck(); }); await page.waitForTimeout(150);
+    assert(!(await page.$('#ovlUpd')), '안내 대상이 아닌데 팝업');
+    return n + '개 시드 · ack ' + JSON.parse(ack.body).p_last_id;
+  });
+  await S.t('㊿+148 관리자 › 업데이트 안내: 계정 «받기» upsert · 처음부터 다시 DELETE · 새 안내 POST · 내 계정 › 업데이트 내역', async () => {
+    notifyDb = [{ email: 'sales@example.com', enabled: true }]; ackDb = [{ email: 'sales@example.com', last_id: notesDb.length - 1, acked_at: '2026-10-05T01:00:00Z' }];
+    await page.evaluate(() => switchView('adminx')); await page.waitForTimeout(900);
+    const t = await page.evaluate(() => { const u = document.getElementById('updUsers'), n = document.getElementById('updNotes'); return u && n && { users: u.querySelectorAll('tbody tr').length, unread: u.textContent.includes('1건'), notes: n.querySelectorAll('tbody tr').length }; });
+    assert(t && t.users === 2 && t.unread && t.notes === notesDb.length, JSON.stringify(t));
+    writes.length = 0; await page.check('#updUsers [data-updn="tester@example.com"]'); await page.waitForTimeout(500);
+    const up = writes.filter((w) => w.m === 'POST' && /upd_notify\?on_conflict=email/.test(w.url))[0]; assert(up && JSON.parse(up.body).email === 'tester@example.com' && JSON.parse(up.body).enabled === true, JSON.stringify(writes.map((w) => w.url)));
+    await page.waitForTimeout(400); writes.length = 0; await page.click('#updUsers [data-updreset="sales@example.com"]'); await page.waitForTimeout(500);
+    assert(writes.some((w) => w.m === 'DELETE' && /upd_ack\?email=eq\.sales%40example\.com/.test(w.url)) && dialogs.some((d) => /처음부터|다시 뜹니다/.test(d)), '처음부터 다시 DELETE 없음');
+    await page.waitForTimeout(400); await page.click('#updNew'); await page.waitForTimeout(150);
+    await page.fill('#updETitle', '시험 안내'); await page.fill('#updEBody', '- 한 줄\n- (관리자) 두 줄'); writes.length = 0; await page.click('#updESave'); await page.waitForTimeout(500);
+    const np = writes.filter((w) => w.m === 'POST' && /upd_notes/.test(w.url))[0]; assert(np && JSON.parse(np.body).title === '시험 안내' && /두 줄/.test(JSON.parse(np.body).body), '새 안내 POST 없음');
+    await page.evaluate(() => switchView('account')); await page.waitForTimeout(700);
+    const btn = await page.$$eval('#accBody button', (b) => b.map((x) => x.textContent)); assert(btn.some((x) => /업데이트 내역/.test(x)), '내 계정 버튼 없음 ' + btn.join(','));
+    await page.evaluate(() => [...document.querySelectorAll('#accBody button')].find((x) => /업데이트 내역/.test(x.textContent)).click()); await page.waitForTimeout(400);
+    const all = await page.evaluate(() => { const o = document.getElementById('ovlUpd'); return o && { secs: o.querySelectorAll('.upd-sec').length, chk: !!o.querySelector('#updOk'), close: !!o.querySelector('#updClose') }; });
+    assert(all && all.secs === notesDb.length && !all.chk && all.close, JSON.stringify(all));
+    await page.click('#updClose'); assert(!errs.length, errs.join(' | ')); return JSON.stringify(t);
+  });
+  await ctx.close();
+}
+{ // 권한: 계약 쓰기 없음(admin_viewer) → 수정 창은 보기만
+  const { ctx, page, errs } = await open({ role: 'admin_viewer' });
+  await S.t('㊿+148 수정 창 권한: 쓰기 없는 계정은 칸 비활성 · 저장 버튼 없음', async () => {
+    await page.evaluate(() => { switchView('dcheck'); }); await page.waitForTimeout(300);
+    const r = await page.evaluate(() => { const rule = dcRules().find((x) => x.items.some((i) => i.fix)); if (!rule) return null; dcFixOpen(rule.id, 0); const o = document.getElementById('ovlDcFix'); return { save: !!o.querySelector('#dcfSave'), en: [...o.querySelectorAll('#dcfForm select,#dcfForm input')].filter((e) => !e.disabled).length, note: /쓰기 권한이 없어/.test(o.textContent) }; });
+    assert(r && !r.save && r.en === 0 && r.note, JSON.stringify(r)); assert(!errs.length, errs.join(' | ')); return JSON.stringify(r);
+  });
   await ctx.close();
 }
 await browser.close(); srv.close();

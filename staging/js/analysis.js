@@ -14,45 +14,48 @@ function dcRules(){
   var term=function(r){ return /해지|서비스종료|종료|통합과금|CN전환/.test(String(r.status||'').replace(/\s/g,'')); };
   var ci=function(r){ return {label:r.cust+' — '+lline(r.line), sub:(r.status||'상태 없음')+' · '+(r.startRaw!=null? mk(r.startRaw):'?')+' ~ '+(r.endRaw!=null? mk(r.endRaw):'진행')+' · #'+r._id, go:goGrid('contracts', r.cust==='?'? '':r.cust), key:r._id}; };
   var ids={}; rows.forEach(function(r){ ids[r._id]=1; });
+  /* ㊿+148 항목을 누르면 열리는 수정 창(dcFixOpen) 스펙 — tbl·view(쓰기 권한 화면)·id·고칠 칸 f(GRIDS 열 키)·ex(추가 동작) */
+  var fxC=function(f, ex){ return function(r){ var it=ci(r); it.fix={tbl:'contracts', view:'contracts', id:r._id, f:f, ex:ex||''}; return it; }; };
+  var fxO=function(it, tbl, view, id, f){ it.fix={tbl:tbl, view:view, id:id, f:f, ex:''}; return it; };
   /* ── 계약 ── */
   rule('c_nocust','crit','고객사 연결 없음','계약의 customer_id 가 고객사 표에 없음 — 화면에 «?» 로 나오고 LIVE·고객 360 에서 빠집니다. 고객사를 다시 지정하거나 계약을 삭제하세요.',
-    rows.filter(function(r){ return r.cust==='?' || !r.cid; }).map(ci), '계약 관리');
+    rows.filter(function(r){ return r.cust==='?' || !r.cid; }).map(fxC(['customer_id'])), '계약 관리');
   rule('c_parent','crit','부속 계약의 원계약이 없음','parent_contract_id 가 가리키는 계약이 없음(삭제됨) — 이 금액은 어느 원계약에도 합쳐지지 않습니다.',
-    rows.filter(function(r){ return r.parent && !ids[r.parent]; }).map(ci), '계약 관리');
+    rows.filter(function(r){ return r.parent && !ids[r.parent]; }).map(fxC(['parent_contract_id'])), '계약 관리');
   rule('c_dates','crit','종료월이 시작월보다 앞섬','start_month > end_month — 기간·LIVE 판정이 틀어집니다.',
-    rows.filter(function(r){ return r.startRaw!=null && r.endRaw!=null && r.endRaw<r.startRaw; }).map(ci), '계약 관리');
+    rows.filter(function(r){ return r.startRaw!=null && r.endRaw!=null && r.endRaw<r.startRaw; }).map(fxC(['start_month','end_month'])), '계약 관리');
   var RS=null; try{ RS=renewScan(T); }catch(e){}
   rule('c_lapsed','crit','만기 지났는데 미처리','종료월이 지났는데 연장·해지·종료 처리가 없음 — 이미 LIVE 에서 빠져 있습니다.',
     (RS? RS.lapsed:[]).map(function(r){ var it=ci(r); it.go=function(){ openRenewList('lapsed'); }; return it; }), '홈 › 만기 처리');
   /* 포탈(renewScan) ↔ DB(renew_watch · SQL 84) 만기 판정 대조 — 슬랙 알림(remind)은 DB 쪽을 쓰므로 두 쪽이 어긋나면 알림과 화면 숫자가 달라짐. 결과는 dcRenewSync() 가 비동기로 채움(DC.rw) */
   var rw=DC.rw, rwItems=[];
-  if(rw && rw.T===T && rw.diff) rw.diff.forEach(function(d){ var r=rows.filter(function(x){ return x._id===d.id; })[0]; var it=r? ci(r) : {label:'#'+d.id+' '+(d.cust||''), sub:'', go:null, key:d.id}; it.sub=(d.side==='portal'? '포탈만 ':'DB(renew_watch)만 ')+'«'+d.kind+'»'+(d.other? ' · 상대쪽 «'+d.other+'»':'')+(it.sub? ' · '+it.sub:''); rwItems.push(it); });
+  if(rw && rw.T===T && rw.diff) rw.diff.forEach(function(d){ var r=rows.filter(function(x){ return x._id===d.id; })[0]; var it=r? fxC(['status','end_month','auto_renew','live_override'])(r) : {label:'#'+d.id+' '+(d.cust||''), sub:'', go:null, key:d.id}; it.sub=(d.side==='portal'? '포탈만 ':'DB(renew_watch)만 ')+'«'+d.kind+'»'+(d.other? ' · 상대쪽 «'+d.other+'»':'')+(it.sub? ' · '+it.sub:''); rwItems.push(it); });
   rule('c_renew_sync', (!rw || rw.error || rw.pending)? 'info':'warn', '만기 판정 포탈 ↔ DB 불일치', rw? (rw.error? 'DB 쪽(renew_watch) 조회 실패 — '+rw.error+' (SQL 84 미실행이면 정상)' : '홈 «만기 처리»(포탈 계산)와 슬랙 알림(DB 함수 renew_watch)이 보는 미처리·이달·다음 달 목록이 다름 — 보통 auto_renew·live_override·상태값이 한쪽 규칙에만 걸린 경우. 포탈 '+rw.portalN+'건 vs DB '+rw.dbN+'건.') : '확인 중… (DB 함수 renew_watch 와 대조)', rwItems, '홈 › 만기 처리');
-  var bad=[]; rows.forEach(function(r){ var w=[];
-    if(!codeActive('contract_status', r.status)) w.push('상태 «'+r.status+'»');
-    if(!codeActive('contract_type', r.ctype)) w.push('계약유형 «'+r.ctype+'»');
-    if(!codeActive('channel', r.channel)) w.push('채널 «'+r.channel+'»');
-    if(!codeActive('line', r.line)) w.push('서비스 «'+r.line+'»');
-    if(!codeActive('lead_src', r.lead)) w.push('유입경로 «'+r.lead+'»');
-    if(!codeActive('live_override', r.liveOv)) w.push('LIVE 예외 «'+r.liveOv+'»');
-    if(w.length){ var it=ci(r); it.sub=w.join(' · '); bad.push(it); } });
+  var bad=[]; rows.forEach(function(r){ var w=[], f=[];
+    if(!codeActive('contract_status', r.status)){ w.push('상태 «'+r.status+'»'); f.push('status'); }
+    if(!codeActive('contract_type', r.ctype)){ w.push('계약유형 «'+r.ctype+'»'); f.push('contract_type'); }
+    if(!codeActive('channel', r.channel)){ w.push('채널 «'+r.channel+'»'); f.push('channel'); }
+    if(!codeActive('line', r.line)){ w.push('서비스 «'+r.line+'»'); f.push('line'); }
+    if(!codeActive('lead_src', r.lead)){ w.push('유입경로 «'+r.lead+'»'); f.push('lead_src'); }
+    if(!codeActive('live_override', r.liveOv)){ w.push('LIVE 예외 «'+r.liveOv+'»'); f.push('live_override'); }
+    if(w.length){ var it=fxC(f)(r); it.sub=w.join(' · '); it.fix.bad=f; bad.push(it); } });
   rule('c_vocab','warn','선택 목록에 없는 값','상태·계약유형·채널·서비스·유입경로·LIVE 예외가 코드 목록(관리자 › 코드 관리)에 없는 값이면 필터·집계·만기 판정에서 빠집니다. 표에서 목록 값으로 고르거나, 정식 값이면 코드 관리에서 추가(또는 숨긴 값 켜기)하세요. DB 는 값이 바뀔 때 이 목록으로 검증합니다(SQL 93).', bad, '계약 관리');
   rule('c_rev_after_end','warn','해지·종료 뒤에도 월 매출이 있음','상태가 해지·서비스종료인데 종료월 뒤 달에 monthly_revenue 가 남아 있음 — MRR·연 매출이 부풀려집니다. (만기 처리 창의 해지/서비스종료는 뒤 매출을 지우므로 예전 수기 처리분일 가능성)',
-    rows.filter(function(r){ return /해지|서비스종료|종료/.test(String(r.status||'').replace(/\s/g,'')) && r.endRaw!=null && r.dataLast!=null && r.dataLast>r.endRaw; }).map(function(r){ var it=ci(r); it.sub+=' · 마지막 매출 '+mk(r.dataLast); return it; }), '계약 관리');
+    rows.filter(function(r){ return /해지|서비스종료|종료/.test(String(r.status||'').replace(/\s/g,'')) && r.endRaw!=null && r.dataLast!=null && r.dataLast>r.endRaw; }).map(function(r){ var it=fxC(['status','end_month'],'rev_after')(r); it.sub+=' · 마지막 매출 '+mk(r.dataLast); return it; }), '계약 관리');
   rule('c_noend','warn','종료월 없음 (자동연장 아님)','진행 중 원계약인데 종료월이 비어 있고 자동연장 표시도 없음 — 만기 알림·LIVE 증감이 이 계약을 못 봅니다. 종료월을 넣거나 «자동연장»을 켜세요.',
-    rows.filter(function(r){ return liveRoot(r) && r.endRaw==null && !r.autoRenew && r.liveOv!=='제외' && !term(r); }).map(ci), '계약 관리');
+    rows.filter(function(r){ return liveRoot(r) && r.endRaw==null && !r.autoRenew && r.liveOv!=='제외' && !term(r); }).map(fxC(['end_month','auto_renew'])), '계약 관리');
   rule('c_s1no','warn','에스원 계약인데 계약번호 없음','채널이 에스원(또는 S1 서비스)인 LIVE 계약에 s1_no 가 비어 있음 — 정산 자동 대조(에스원 정산)·만기 슬랙에 번호가 안 나옵니다.',
-    rows.filter(function(r){ return liveActiveAt(r,T) && (String(r.channel||'')==='에스원' || /^(S1|MDR_S1)$/.test(String(r.line||''))) && !r.s1no; }).map(ci), '계약 관리');
+    rows.filter(function(r){ return liveActiveAt(r,T) && (String(r.channel||'')==='에스원' || /^(S1|MDR_S1)$/.test(String(r.line||''))) && !r.s1no; }).map(fxC(['s1_no'])), '계약 관리');
   var lz=rows.filter(function(r,k){ return liveActiveAt(r,T) && !(MAT[k]&&MAT[k][T]) && !/일시납|연납|반년납|분기납/.test(String(r.billing||'')); });
   rule('c_live_zero','info','LIVE 인데 이달 매출 0','LIVE 로 집계되는 원계약인데 이달 monthly_revenue 가 없음 — 연납·일시납이면 정상, 월납이면 입력 누락. 아래 «mrr 로 채우기»는 mrr 이 있는 계약의 이달 매출을 mrr 금액으로 한 번에 넣습니다(확인 후).',
-    lz.map(function(r){ var it=ci(r); it.sub+=' · 과금 '+(r.billing||'미지정')+' · mrr '+(r.mrr? won(r.mrr)+' 천원':'없음'); return it; }), '계약 관리',
+    lz.map(function(r){ var it=fxC(['billing'],'rev_now')(r); it.sub+=' · 과금 '+(r.billing||'미지정')+' · mrr '+(r.mrr? won(r.mrr)+' 천원':'없음'); return it; }), '계약 관리',
     lz.some(function(r){ return r.mrr>0; }) && canWrite('contracts')? {label:'이달 매출을 mrr 로 채우기', run:function(){ dcFillMrr(lz.filter(function(r){ return r.mrr>0; }), T); }} : null);
   rule('c_mrr','info','MRR 과 이달 월 매출이 다름','계약의 mrr 과 이달 monthly_revenue 가 1% 넘게 다름 — 재약정 뒤 mrr 을 안 고쳤거나 월 매출 입력 오류.',
-    rows.map(function(r,k){ return {r:r,k:k}; }).filter(function(x){ var v=(MAT[x.k]&&MAT[x.k][T])||0; return x.r.mrr>0 && v>0 && Math.abs(v-x.r.mrr)/x.r.mrr>0.01; }).map(function(x){ var it=ci(x.r); it.sub='mrr '+won(x.r.mrr)+' vs 이달 '+won(MAT[x.k][T])+' 천원'; return it; }), '계약 관리');
+    rows.map(function(r,k){ return {r:r,k:k}; }).filter(function(x){ var v=(MAT[x.k]&&MAT[x.k][T])||0; return x.r.mrr>0 && v>0 && Math.abs(v-x.r.mrr)/x.r.mrr>0.01; }).map(function(x){ var it=fxC(['mrr'],'mrr_now')(x.r); it.fix.now=MAT[x.k][T]; it.sub='mrr '+won(x.r.mrr)+' vs 이달 '+won(MAT[x.k][T])+' 천원'; return it; }), '계약 관리');
   rule('c_cloud_meta','info','Cloud 계약의 버전·노드수 미입력','Cloud NAC 원계약인데 Ver. 또는 노드수가 비어 있음 — 6.0 전환율·노드 기준 분석에서 빠집니다.',
-    rows.filter(function(r){ return r.line==='Cloud' && liveActiveAt(r,T) && (!r.ver || !r.qty); }).map(function(r){ var it=ci(r); it.sub='Ver '+(r.ver||'—')+' · 노드 '+(r.qty||'—'); return it; }), '계약 관리');
+    rows.filter(function(r){ return r.line==='Cloud' && liveActiveAt(r,T) && (!r.ver || !r.qty); }).map(function(r){ var it=fxC(['version','qty'])(r); it.sub='Ver '+(r.ver||'—')+' · 노드 '+(r.qty||'—'); return it; }), '계약 관리');
   rule('c_lead','info','유입경로 미지정','LIVE 원계약인데 유입경로가 비어 있음 — 유입경로 분석에서 «미지정»으로 묶입니다.',
-    rows.filter(function(r){ return liveActiveAt(r,T) && !r.parent && !r.lead; }).map(ci), '유입경로 분석');
+    rows.filter(function(r){ return liveActiveAt(r,T) && !r.parent && !r.lead; }).map(fxC(['lead_src'])), '유입경로 분석');
   /* ── 고객사 ── */
   var byKey={}; (R.customers||[]).forEach(function(c){ var k=(nmKeys(c.name)||[])[0]; if(!k) return; (byKey[k]=byKey[k]||[]).push(c); });
   var cn={}; (R.contracts||[]).forEach(function(c){ cn[c.customer_id]=(cn[c.customer_id]||0)+1; });
@@ -67,15 +70,15 @@ function dcRules(){
   rule('eq_gap','warn','신청 ↔ 현황 불일치','신청 내역과 장비 현황이 어긋남(수량·시리얼·상태) — 신청 내역 › 「신청 ↔ 현황 대조」에서 맞추기.',
     (es? es.gap:[]).map(function(g){ return {label:(g.o.customer||'?')+' — '+(g.o.model||'')+' × '+(g.o.qty||1), sub:g.why, go:goGrid('orders', g.o.customer), key:g.o.id}; }), '임대 장비 신청 내역');
   rule('eq_orphan','warn','신청 없이 임대중인 장비','현황에 임대중인데 어떤 신청에도 연결되지 않음(수기 입력) — 신청을 만들어 연결하거나 상태를 고치세요.',
-    (es? es.orphan:[]).map(function(a){ return {label:(a.serial||'?')+' · '+(a.model||''), sub:(a.customer||'?')+' · '+(a.channel||''), go:goGrid('assets', a.serial), key:a.id}; }), '임대 장비 현황');
+    (es? es.orphan:[]).map(function(a){ return fxO({label:(a.serial||'?')+' · '+(a.model||''), sub:(a.customer||'?')+' · '+(a.channel||''), go:goGrid('assets', a.serial), key:a.id}, 'equipment_assets', 'assets', a.id, ['status','customer','note']); }), '임대 장비 현황');
   rule('eq_noserial','info','설치완료인데 시리얼 없음','상태가 설치완료/회수예정인데 시리얼이 비어 있음(임시 «미등록-» 시리얼로만 현황에 있음) — 실제 시리얼을 넣으세요.',
-    (R.orders||[]).filter(function(o){ return /설치완료|회수예정/.test(String(o.status||'')) && !eqSerials(o).length; }).map(function(o){ return {label:(o.customer||'?')+' — '+(o.model||'')+' × '+(o.qty||1), sub:(o.status||'')+' · 설치 '+(o.install_date||'—'), go:goGrid('orders', o.customer), key:o.id}; }), '임대 장비 신청 내역');
+    (R.orders||[]).filter(function(o){ return /설치완료|회수예정/.test(String(o.status||'')) && !eqSerials(o).length; }).map(function(o){ return fxO({label:(o.customer||'?')+' — '+(o.model||'')+' × '+(o.qty||1), sub:(o.status||'')+' · 설치 '+(o.install_date||'—'), go:goGrid('orders', o.customer), key:o.id}, 'equipment_orders', 'orders', o.id, ['serials']); }), '임대 장비 신청 내역');
   rule('eq_vocab','warn','장비 신청의 상태·채널 값이 목록에 없음','상태 보드·대시보드가 이 값을 못 받아 카드가 사라집니다. (목록: 관리자 › 코드 관리 › 장비 신청 상태·채널)',
-    (R.orders||[]).filter(function(o){ return !codeActive('order_status', o.status) || !codeActive('order_channel', o.channel); }).map(function(o){ return {label:(o.customer||'?')+' — '+(o.model||''), sub:'상태 «'+(o.status||'')+'» · 채널 «'+(o.channel||'')+'»', go:goGrid('orders', o.customer), key:o.id}; }), '임대 장비 신청 내역');
+    (R.orders||[]).filter(function(o){ return !codeActive('order_status', o.status) || !codeActive('order_channel', o.channel); }).map(function(o){ var it=fxO({label:(o.customer||'?')+' — '+(o.model||''), sub:'상태 «'+(o.status||'')+'» · 채널 «'+(o.channel||'')+'»', go:goGrid('orders', o.customer), key:o.id}, 'equipment_orders', 'orders', o.id, ['status','channel']); it.fix.bad=[!codeActive('order_status', o.status)? 'status':'', !codeActive('order_channel', o.channel)? 'channel':''].filter(Boolean); return it; }), '임대 장비 신청 내역');
   /* ── OI ── */
   var nowYm=mk(T);
   rule('oi_overdue','info','예정 월이 지난 진행 중 OI','등록·진행 단계인데 예상 시기가 이미 지남 — 단계를 바꾸거나 예상 시기를 미루세요.',
-    (R.oi||[]).filter(function(o){ return /등록|진행/.test(String(o.stage||'')) && o.expect_month && String(o.expect_month).slice(0,7)<nowYm; }).map(function(o){ return {label:(o.customer||'?')+' — '+(o.deal_name||''), sub:(o.stage||'')+' · 예정 '+String(o.expect_month).slice(0,7)+' · '+(o.owner||''), go:goGrid('oi', o.customer), key:o.id}; }), 'OI 현황');
+    (R.oi||[]).filter(function(o){ return /등록|진행/.test(String(o.stage||'')) && o.expect_month && String(o.expect_month).slice(0,7)<nowYm; }).map(function(o){ return fxO({label:(o.customer||'?')+' — '+(o.deal_name||''), sub:(o.stage||'')+' · 예정 '+String(o.expect_month).slice(0,7)+' · '+(o.owner||''), go:goGrid('oi', o.customer), key:o.id}, 'oi_deals', 'oi', o.id, ['stage','expect_month','next_action']); }), 'OI 현황');
   return out;
 }
 var DC_SEV={crit:['🔴','바로 고쳐야 함','var(--critical,#d03b3b)'], warn:['🟠','확인 필요','var(--warn-ink)'], info:['🔵','참고','var(--muted)']};
@@ -103,12 +106,14 @@ function renderDataCheck(){
         '<span class="mini" style="margin-left:auto">'+esc(r.go)+(ok? '':(open? ' ▴':' ▾'))+'</span></div>'+
       '<div class="mini" style="margin:6px 0 0 26px;line-height:1.6">'+esc(r.why)+'</div>'+
       (!ok && r.act? '<div style="margin:8px 0 0 26px"><button type="button" class="pill ghost" data-dcact="'+r.id+'">⚡ '+esc(r.act.label)+'</button></div>':'')+
+      (open&&!ok&&r.items.some(function(it){ return it.fix; })? '<div class="mini" style="margin:8px 0 0 26px">항목을 누르면 수정 창이 열립니다 — 저장하면 다음 항목으로 넘어갑니다</div>':'')+
       (open&&!ok? '<table class="rn-tbl" style="margin:8px 0 0 26px;width:calc(100% - 26px)"><tbody>'+r.items.slice(0,60).map(function(it,i){ return '<tr><td><a href="#" data-dcgo="'+r.id+':'+i+'">'+esc(it.label)+'</a></td><td class="mini">'+esc(it.sub||'')+(it.act? ' <button type="button" class="pill ghost" style="padding:1px 8px;font-size:12px" data-dcitem="'+r.id+':'+i+'">'+esc(it.act.label)+'</button>':'')+'</td></tr>'; }).join('')+(r.items.length>60? '<tr><td colspan="2" class="mini">… 외 '+(r.items.length-60)+'건 (엑셀로 전체)</td></tr>':'')+'</tbody></table>':'')+
       '</div>'; }).join('');
   host.innerHTML=h;
   host.querySelectorAll('#dcSev button').forEach(function(b){ b.onclick=function(){ DC.sev=b.dataset.s; renderDataCheck(); }; });
   host.querySelectorAll('[data-dc]').forEach(function(d){ d.onclick=function(){ var r=rules.filter(function(x){ return x.id===d.dataset.dc; })[0]; if(!r||!r.items.length) return; DC.open[r.id]=!DC.open[r.id]; renderDataCheck(); }; });
-  host.querySelectorAll('[data-dcgo]').forEach(function(a){ a.onclick=function(e){ e.preventDefault(); e.stopPropagation(); var p=a.dataset.dcgo.split(':'); var r=rules.filter(function(x){ return x.id===p[0]; })[0]; var it=r&&r.items[+p[1]]; if(it&&it.go) it.go(); }; });
+  host.querySelectorAll('[data-dcgo]').forEach(function(a){ a.onclick=function(e){ e.preventDefault(); e.stopPropagation(); var p=a.dataset.dcgo.split(':'); var r=rules.filter(function(x){ return x.id===p[0]; })[0]; var it=r&&r.items[+p[1]]; if(!it) return;
+    if(it.fix) dcFixOpen(r.id, +p[1]); else if(it.act) it.act.run(); else if(it.go) it.go(); }; });   /* ㊿+148: 고칠 수 있는 항목은 수정 창, 아니면 예전처럼 화면 이동 */
   host.querySelectorAll('[data-dcact]').forEach(function(b){ b.onclick=function(e){ e.stopPropagation(); var r=rules.filter(function(x){ return x.id===b.dataset.dcact; })[0]; if(r&&r.act) r.act.run(); }; });
   host.querySelectorAll('[data-dcitem]').forEach(function(b){ b.onclick=function(e){ e.stopPropagation(); var p=b.dataset.dcitem.split(':'); var r=rules.filter(function(x){ return x.id===p[0]; })[0]; var it=r&&r.items[+p[1]]; if(it&&it.act) it.act.run(); }; });
   host.querySelector('#dcRefresh').onclick=function(){ renderDataCheck(); };
@@ -138,6 +143,139 @@ function dcLogOnce(cnt, rules){
   try{ logChange('data_check','dcheck',APP_VER,{crit:cnt.crit, warn:cnt.warn, info:cnt.info, rules:top}); }catch(e){}
 }
 /* 고객사 병합 창 — 남길 고객사를 고르면 나머지를 하나씩 merge_customers(keep, drop) (SQL 93 · 관리자 이상 · SECURITY DEFINER) */
+/* ===== ㊿+148 데이터 점검 — 항목을 누르면 수정 창 (사용자: «데이터 점검에서 실제 바로 처리할 수 있도록» · «항목 누르면 수정 창») =====
+   · 항목의 fix = {tbl, view, id, f:[GRIDS 열 키], ex:'rev_now'|'rev_after'|'mrr_now'|'', bad:[목록 밖 값 칸]} — dcRules() 에서 붙임
+   · 칸은 그 표(GRIDS[view])의 편집 칸을 그대로 씀(editCell · 목록·날짜 동작 같음) · 고객사(customer_id)·원계약(parent_contract_id)은 전용 칸
+   · 저장 = 바뀐 칸만 PATCH(+ change_log «데이터 점검») → 데이터 다시 읽기 → 이 항목이 규칙에서 빠졌으면 같은 규칙의 다음 항목, 아직 걸리면 그대로 두고 이유 표시
+   · 쓰기 권한은 그 표의 화면 기준(canWrite(view)) — 없으면 보기만 */
+var DCF={rule:'', idx:0, busy:false};
+var DCF_RAW={contracts:'contracts', equipment_orders:'orders', equipment_assets:'assets', oi_deals:'oi'};
+function dcFixRaw(fix){ var arr=(window.RAWX&&RAWX[DCF_RAW[fix.tbl]])||[]; return arr.filter(function(x){ return x.id===fix.id; })[0]||null; }
+function dcFixCtx(fix, raw){
+  if(!raw) return '';
+  var kv=function(k,v){ return '<span class="mini" style="color:var(--muted)">'+k+'</span> '+esc(v==null||v===''? '—':String(v)); };
+  var cu=function(id){ var c=(RAWX.customers||[]).filter(function(x){ return x.id===id; })[0]; return c? c.name : '?'; };
+  var parts;
+  if(fix.tbl==='contracts') parts=[kv('고객사', cu(raw.customer_id)), kv('서비스', llineVer(raw.line, raw.version)), kv('상태', raw.status), kv('기간', String(raw.start_month||'').slice(0,7)+' ~ '+(raw.end_month? String(raw.end_month).slice(0,7):'진행')), kv('MRR', raw.mrr? won(raw.mrr)+' 천원':''), kv('채널', raw.channel), kv('계약', '#'+raw.id)];
+  else if(fix.tbl==='equipment_orders') parts=[kv('고객사', raw.customer), kv('모델', (raw.model||'')+' × '+(raw.qty||1)), kv('상태', raw.status), kv('채널', raw.channel), kv('설치', raw.install_date), kv('신청', '#'+raw.id)];
+  else if(fix.tbl==='equipment_assets') parts=[kv('시리얼', raw.serial), kv('모델', raw.model), kv('고객사', raw.customer), kv('상태', raw.status), kv('출고', raw.deployed_date), kv('행', '#'+raw.id)];
+  else parts=[kv('고객사', raw.customer), kv('사업명', raw.deal_name), kv('단계', raw.stage), kv('예상', String(raw.expect_month||'').slice(0,7)), kv('담당', raw.owner), kv('OI', '#'+raw.id)];
+  return '<div class="dcf-ctx">'+parts.join('<span class="dcf-dot">·</span>')+'</div>';
+}
+function dcFixFields(fix, raw, g){
+  var cols=(g&&g.cols)||[], T=(window.DATA&&DATA.nowIdx)||0;
+  var h=fix.f.map(function(k){
+    var bad=(fix.bad||[]).indexOf(k)>=0, cur=raw? raw[k] : null, inner='', lbl='';
+    if(k==='customer_id'){
+      lbl='고객사';
+      inner='<input id="dcfCust" list="dcfCustList" autocomplete="off" placeholder="고객사 이름 입력 후 목록에서 선택" value="">'+
+        '<datalist id="dcfCustList">'+(RAWX.customers||[]).slice().sort(function(a,b){ return String(a.name).localeCompare(String(b.name),'ko'); }).map(function(c){ return '<option value="'+esc(c.name)+'"></option>'; }).join('')+'</datalist>';
+    } else if(k==='parent_contract_id'){
+      lbl='원계약';
+      var mine=(RAWX.contracts||[]).filter(function(c){ return raw && c.customer_id===raw.customer_id && c.id!==raw.id && !c.parent_contract_id; });
+      inner='<select id="dcfParent"><option value="">— 원계약 없음 (독립 계약으로) —</option>'+mine.map(function(c){ return '<option value="'+c.id+'">#'+c.id+' · '+esc(llineVer(c.line, c.version))+' · '+esc(String(c.start_month||'').slice(0,7))+' ~ '+esc(c.end_month? String(c.end_month).slice(0,7):'진행')+' · '+esc(c.status||'')+'</option>'; }).join('')+'</select>';
+    } else {
+      var c=cols.filter(function(x){ return x.k===k; })[0]; if(!c) return '';
+      lbl=c.l; inner=editCell(c, cur);
+      if(c.won && c.t==='number') lbl+=' <span class="mini">(원 단위)</span>';
+    }
+    return '<div class="dcf-row'+(bad? ' bad':'')+'"><label>'+lbl+'</label><div class="dcf-in">'+inner+(bad? '<div class="mini dcf-bad">목록에 없는 값 «'+esc(cur==null? '':String(cur))+'» — 목록 값으로 고르세요 (정식 값이면 관리자 › 코드 관리에서 추가)</div>':'')+'</div></div>';
+  }).join('');
+  if(fix.ex==='rev_now'){
+    var mrr=raw&&raw.mrr? Math.round(raw.mrr/1000) : '';
+    h+='<div class="dcf-row"><label>'+esc(mk(T))+' 월 매출 <span class="mini">(천원)</span></label><div class="dcf-in"><input id="dcfRev" type="number" min="0" step="1" value="'+mrr+'" placeholder="천원"><div class="mini">월납이면 이달 금액을 넣고 저장 · 연납·일시납이면 위 «과금방식»만 바꾸고 이 칸은 비우세요</div></div></div>';
+  }
+  if(fix.ex==='mrr_now' && fix.now) h+='<div class="dcf-row"><label></label><div class="dcf-in"><button type="button" class="pill ghost" id="dcfUseNow">이달 월 매출 '+won(fix.now)+' 천원으로 맞추기</button></div></div>';
+  if(fix.ex==='rev_after'){
+    var n=0, sum=0, end=raw&&raw.end_month? String(raw.end_month).slice(0,7) : '';
+    var k0=(DATA.rows||[]).findIndex(function(r){ return r._id===fix.id; });
+    if(k0>=0 && MAT[k0]) MAT[k0].forEach(function(v,i){ if(v && end && mk(i)>end){ n++; sum+=v; } });
+    h+='<div class="dcf-row"><label>종료월 뒤 매출</label><div class="dcf-in"><label class="mini" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="dcfRevDel" checked> 종료월 뒤 월 매출 '+n+'개월 ('+won(sum)+' 천원) 삭제</label><div class="mini">종료월을 고치면 고친 종료월 뒤만 지웁니다</div></div></div>';
+  }
+  return h;
+}
+function dcFixClose(){ var o=document.getElementById('ovlDcFix'); if(o) o.remove(); DCF.busy=false; }
+function dcFixOpen(ruleId, idx, msg){
+  var rules=dcRules(); DC._rules=rules;
+  var rule=rules.filter(function(x){ return x.id===ruleId; })[0];
+  if(!rule || !rule.items.length){ dcFixClose(); if(rule) toast('✅ «'+rule.title+'» 모두 정리했습니다', '이 규칙에 남은 항목이 없습니다'); if(CUR_VIEW==='dcheck') renderDataCheck(); return; }
+  idx=Math.max(0, Math.min(idx||0, rule.items.length-1)); DCF.rule=ruleId; DCF.idx=idx;
+  var it=rule.items[idx], fix=it.fix;
+  if(!fix){ dcFixClose(); if(it.act) it.act.run(); else if(it.go) it.go(); return; }
+  var g=GRIDS[fix.view], raw=dcFixRaw(fix), can=canWrite(fix.view) && !window.IS_VIEWER_ROLE;
+  var ov=document.getElementById('ovlDcFix');
+  if(!ov){ ov=document.createElement('div'); ov.id='ovlDcFix'; ov.className='ovl on'; ov.style.cssText='z-index:9000;align-items:center'; document.body.appendChild(ov); }
+  var sv=DC_SEV[rule.sev]||['','',''];
+  ov.innerHTML='<div class="modal dcf" style="width:min(620px,100%);padding:20px 22px" role="dialog" aria-modal="true" aria-labelledby="dcfTitle">'+
+    '<div style="display:flex;gap:8px;align-items:center;margin-bottom:4px"><span>'+sv[0]+'</span><h3 id="dcfTitle" style="margin:0;font-size:15px;flex:1">'+esc(rule.title)+'</h3>'+
+      '<button type="button" class="pill ghost" id="dcfPrev" aria-label="이전 항목"'+(idx? '':' disabled')+'>◀</button><span class="mini" id="dcfPos">'+(idx+1)+' / '+rule.items.length+'</span><button type="button" class="pill ghost" id="dcfNext" aria-label="다음 항목"'+(idx<rule.items.length-1? '':' disabled')+'>▶</button></div>'+
+    '<div class="mini" style="line-height:1.6;margin-bottom:10px">'+esc(rule.why)+'</div>'+
+    '<div class="dcf-item"><b>'+esc(it.label)+'</b><div class="mini">'+esc(it.sub||'')+'</div>'+dcFixCtx(fix, raw)+'</div>'+
+    (raw? '<div class="dcf-form" id="dcfForm">'+dcFixFields(fix, raw, g)+'</div>' : '<p class="cap">이 행을 메모리 데이터에서 찾지 못했습니다 — «화면에서 보기»로 여세요.</p>')+
+    (can? '' : '<p class="mini" style="color:var(--warn-ink);margin:8px 0 0">이 화면(«'+esc(it.fix.view)+'»)의 쓰기 권한이 없어 보기만 됩니다.</p>')+
+    '<div class="mmsg" id="dcfMsg" style="min-height:18px;margin-top:8px">'+(msg? esc(msg):'')+'</div>'+
+    '<div class="mact" style="display:flex;gap:8px;align-items:center;margin-top:10px"><button type="button" class="pill ghost" id="dcfGo">화면에서 보기</button><span style="flex:1"></span><button type="button" class="pill ghost" id="dcfClose">닫기</button>'+(raw&&can? '<button type="button" class="pill pri" id="dcfSave">저장</button>':'')+'</div></div>';
+  var form=ov.querySelector('#dcfForm');
+  if(form){ try{ wireRowInputs(form, g); }catch(e){}
+    form.querySelectorAll('.dcf-row').forEach(function(row, i){ var lab=row.querySelector(':scope > label'), el=row.querySelector('.dcf-in input:not([type=hidden]), .dcf-in select, .dcf-in textarea'); if(lab && el && lab.textContent.trim()){ if(!el.id) el.id='dcf_f'+i; lab.htmlFor=el.id; } });   /* 칸 이름(접근성) */
+    if(!can) form.querySelectorAll('input,select,textarea,button').forEach(function(e){ e.disabled=true; }); }
+  var un=ov.querySelector('#dcfUseNow'); if(un) un.onclick=function(){ var i=form.querySelector('[data-k="mrr"]'); if(i){ i.value=String(Math.round(fix.now)); i.dispatchEvent(new Event('input',{bubbles:true})); } };
+  ov.querySelector('#dcfPrev').onclick=function(){ dcFixOpen(ruleId, idx-1); };
+  ov.querySelector('#dcfNext').onclick=function(){ dcFixOpen(ruleId, idx+1); };
+  ov.querySelector('#dcfClose').onclick=dcFixClose;
+  ov.querySelector('#dcfGo').onclick=function(){ dcFixClose(); if(it.go) it.go(); };
+  var sb=ov.querySelector('#dcfSave'); if(sb) sb.onclick=function(){ dcFixSave(rule, it, raw, g, form); };
+  if(msg){ var m=ov.querySelector('#dcfMsg'); m.style.color='var(--warn-ink)'; }
+  setTimeout(function(){ var f=form&&form.querySelector('input:not([disabled]),select:not([disabled])'); if(f) try{ f.focus(); }catch(e){} }, 30);
+}
+function dcFixNorm(k, v){ if(v==null || v==='') return ''; if(/_month$/.test(k)) return String(v).slice(0,7); if(typeof v==='boolean') return v? '1':''; return String(v); }
+async function dcFixSave(rule, it, raw, g, form){
+  if(DCF.busy) return;
+  var fix=it.fix, msgEl=document.getElementById('dcfMsg');
+  var say=function(t,bad){ if(msgEl){ msgEl.textContent=t||''; msgEl.style.color=bad? 'var(--critical)':'var(--muted)'; } };
+  var body={}, extra=[];
+  try{
+    var inp=readRowInputs(form, g);
+    Object.keys(inp).forEach(function(k){ if(fix.f.indexOf(k)>=0 && dcFixNorm(k, inp[k])!==dcFixNorm(k, raw[k])) body[k]=inp[k]; });
+  }catch(e){ say(String(e.message||e), true); return; }
+  if(fix.f.indexOf('customer_id')>=0){
+    var nm=String((form.querySelector('#dcfCust')||{}).value||'').trim();
+    if(!nm){ say('고객사를 입력하고 목록에서 고르세요', true); return; }
+    var hit=(RAWX.customers||[]).filter(function(c){ return c.name===nm; })[0];
+    if(!hit){ var key=(nmKeys(nm)||[])[0]; hit=(RAWX.customers||[]).filter(function(c){ return key && (nmKeys(c.name)||[])[0]===key; })[0]; }
+    if(!hit){ say('«'+nm+'» 는 고객사 목록에 없습니다 — 고객 360 이나 입력·수정에서 먼저 고객사를 만드세요', true); return; }
+    if(hit.id!==raw.customer_id) body.customer_id=hit.id;
+  }
+  if(fix.f.indexOf('parent_contract_id')>=0){
+    var pv=(form.querySelector('#dcfParent')||{}).value||''; var np=pv? +pv : null;
+    if(np!==(raw.parent_contract_id||null)) body.parent_contract_id=np;
+  }
+  var sm=dcFixNorm('start_month', 'start_month' in body? body.start_month : raw.start_month), em=dcFixNorm('end_month', 'end_month' in body? body.end_month : raw.end_month);
+  if(fix.tbl==='contracts' && sm && em && em<sm){ say('종료월('+em+')이 시작월('+sm+')보다 앞섭니다', true); return; }
+  var T=(window.DATA&&DATA.nowIdx)||0;
+  if(fix.ex==='rev_now'){ var rv=String((form.querySelector('#dcfRev')||{}).value||'').trim(); if(rv!==''){ var amt=Math.round(Number(rv)*1000); if(!(amt>0)){ say('이달 매출은 0보다 큰 천원 금액으로 넣으세요', true); return; } extra.push({m:'POST', p:'monthly_revenue', b:{contract_id:fix.id, month:idxDate(T), amount:amt}, d:mk(T)+' 매출 '+won(amt)+' 천원'}); } }
+  if(fix.ex==='rev_after' && (form.querySelector('#dcfRevDel')||{}).checked && em){ extra.push({m:'DELETE', p:'monthly_revenue?contract_id=eq.'+fix.id+'&month=gt.'+em+'-01', d:'종료월('+em+') 뒤 매출 삭제'}); }
+  if(!Object.keys(body).length && !extra.length){ say('바뀐 값이 없습니다', true); return; }
+  var sbtn=document.getElementById('dcfSave'); DCF.busy=true; if(sbtn) sbtn.disabled=true; say('저장 중…');
+  try{
+    if(Object.keys(body).length){
+      var pb=Object.assign({}, body); if(fix.tbl==='contracts') pb.updated_at=new Date().toISOString();
+      await sbWrite('PATCH', fix.tbl+'?id=eq.'+fix.id, pb, undefined, fix.view);
+    }
+    for(var i=0;i<extra.length;i++) await sbWrite(extra[i].m, extra[i].p, extra[i].b, undefined, fix.view);
+    try{ await logChange('update', fix.tbl, fix.id, Object.assign({_via:'데이터 점검 · '+rule.title}, body, extra.length? {_also:extra.map(function(x){ return x.d; })}:{})); }catch(e){}
+    if(fix.tbl==='equipment_orders'){ try{ await syncOrderAssets(Object.assign({}, raw, body)); }catch(e){} }
+    say('저장됨 — 다시 점검하는 중…');
+    var d=await loadFromDb(); onData(d);
+    await new Promise(function(res){ try{ ensureLeadSrc(function(){ res(); }); }catch(e){ res(); } });
+    if(CUR_VIEW==='dcheck') renderDataCheck();
+    DCF.busy=false;
+    var r2=dcRules().filter(function(x){ return x.id===rule.id; })[0], k2=r2? r2.items.findIndex(function(x){ return x.key===it.key; }) : -1;
+    if(k2>=0){ dcFixOpen(rule.id, k2, '저장했지만 아직 이 규칙에 걸립니다 — '+(r2.items[k2].sub||'값을 다시 확인하세요')); return; }
+    toast('고쳤습니다', it.label+(r2&&r2.items.length? ' · 이 규칙 남은 '+r2.items.length+'건':''));
+    dcFixOpen(rule.id, DCF.idx);
+  }catch(e){ DCF.busy=false; if(sbtn) sbtn.disabled=false; say('저장 실패: '+String(e.message||e).slice(0,200), true); }
+}
 function dcMergeDlg(list, cn){
   var old=document.getElementById('ovlDcMerge'); if(old) old.remove();
   var ov=document.createElement('div'); ov.id='ovlDcMerge'; ov.className='ovl on'; ov.style.cssText='z-index:9000;align-items:center';

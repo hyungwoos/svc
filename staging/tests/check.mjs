@@ -142,6 +142,15 @@ say(/function opsAutoPath\(/.test(jsAll) && /function opsDest\(/.test(jsAll) && 
   const css7 = fs.readFileSync(path.join(ROOT, 'app.css'), 'utf8');
   say(['--brand-solid', '--s1-ink', '--s1-solid', '--warn-ink', '--info-ink', '--critical-solid'].every((t) => (css7.match(new RegExp(t + ':', 'g')) || []).length >= 2), '색 토큰: 글자용(…-ink)·바탕용(…-solid) 라이트·다크 둘 다 정의');
   say(!/background:\s*var\(--(brand|s1)\)[^}]*color:\s*#fff/.test(css7), '흰 글자 바탕은 …-solid 토큰만(어두운 화면 대비)'); }
+/* ㊿+148: 데이터 점검 수정 창 · 업데이트 안내 팝업 */
+{ say(/function dcFixOpen\(/.test(jsAll) && /function dcFixSave\(/.test(jsAll) && /dcFixOpen\(r\.id, \+p\[1\]\)/.test(jsAll), '데이터 점검: 항목 → 수정 창(dcFixOpen) · 저장(dcFixSave)');
+  say(/async function sbWrite\(method, path, body, prefer, asView\)/.test(jsAll) && /function permWriteGuard\(method, path, asView\)/.test(jsAll), '저장 권한은 그 표의 화면 기준(sbWrite asView)');
+  say(/function updCheck\(/.test(jsAll) && /updCheck\(\)/.test(fs.readFileSync(path.join(ROOT, 'js', 'shell.js'), 'utf8')) && /id="updAdmin"/.test(html) && /function updOpenAll\(/.test(jsAll), '업데이트 안내: 로그인 팝업(onData) · 관리자 칸 · 내 계정 내역');
+  const vNow = +((/name="app-ver" content="[^"]*㊿\+(\d+)"/.exec(html) || [, 0])[1]);
+  const seeds = [...jsAll.matchAll(/\{ver:'㊿\+(\d+)(?:~(\d+))?'/g)].map((m) => [+m[1], +(m[2] || m[1])]);
+  const last = seeds[seeds.length - 1] || [0, 0];
+  if (vNow && !(last[0] <= vNow && vNow <= last[1])) warn('UPD_SEED(js/admin.js) 마지막 안내가 ㊿+' + last.join('~') + ' — 지금 버전 ㊿+' + vNow + ' 안내를 맨 끝에 추가하세요(업데이트 팝업에 안 뜸)');
+  else say(seeds.length >= 1, '업데이트 안내(UPD_SEED)에 지금 버전 ㊿+' + vNow + ' 항목 있음'); }
 say(/id="dvHelp"/.test(html) && /id="ovlKeys"/.test(html) && /function askScreenHelp\(/.test(jsAll) && /function dvCapRender\(/.test(jsAll) && /function gridActPad\(/.test(jsAll), 'UX: ❔ 화면 도움말 · 단축키 창 · 설명 접기 · 동작 열 여백 코드 있음');
 say(/function aiFeedback\(/.test(jsAll) && /ai_feedback/.test(jsAll) && /function aiqHtml\(/.test(jsAll) && /ai_check_log/.test(jsAll), 'AI: 👍/👎 피드백 · 점검 추이 코드 있음');
 say(/\^ai_feedback\\b\|\^ai_check_log\\b/.test(jsAll), 'permWriteGuard 예외에 ai_feedback·ai_check_log');

@@ -426,7 +426,7 @@ var GRIDS={
   },
   dcheck:{
     title:'데이터 점검', table:'contracts',
-    cap:'계약·고객사·장비·OI 데이터를 규칙으로 훑어 어긋난 행을 보여줍니다 (메모리 데이터 · 서버 왕복 없음) — 항목을 누르면 고칠 화면으로', add:false, del:false, ro:true,
+    cap:'계약·고객사·장비·OI 데이터를 규칙으로 훑어 어긋난 행을 보여줍니다 (메모리 데이터 · 서버 왕복 없음) — 항목을 누르면 수정 창이 열려 바로 고칩니다', add:false, del:false, ro:true,
     custom:function(){ renderDataCheck(); },
     rows:function(){ return []; },
     cols:[{k:'id',l:'규칙'}]

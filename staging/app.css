@@ -1658,3 +1658,28 @@ tr.row-dim td{color:var(--muted)}
 .mf-role-rows{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;margin-top:8px}
 .mf-role-it{display:inline-flex;align-items:center;gap:6px;font-size:12.5px}
 .crnow .mini{color:var(--ink-2)}
+
+/* ===== ㊿+148 업데이트 안내 팝업 · 데이터 점검 수정 창 ===== */
+.upd-head{display:flex;gap:12px;align-items:center;margin-bottom:6px}
+.upd-ic{font-size:24px;line-height:1}
+.upd-body{max-height:min(60vh,560px);overflow:auto;margin:10px 0 12px;padding-right:6px}
+.upd-sec{padding:12px 0;border-top:1px solid var(--ring)}
+.upd-sec:first-child{border-top:0;padding-top:2px}
+.upd-meta{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;margin-bottom:6px}
+.upd-meta b{font-size:13.5px}
+.upd-sec ul{margin:0;padding-left:18px}
+.upd-sec li,.upd-sec p{font-size:12.5px;line-height:1.65;margin:2px 0;color:var(--ink)}
+.upd-adm{display:inline-block;font-size:11px;line-height:1.5;padding:0 6px;border-radius:6px;border:1px solid var(--ring);background:var(--surface-2);color:var(--ink-2);vertical-align:1px}
+.upd-foot{display:flex;gap:8px;align-items:center;flex-wrap:wrap;border-top:1px solid var(--ring);padding-top:12px}
+.upd-chk{display:inline-flex;gap:8px;align-items:center;font-size:13.5px;font-weight:600;cursor:pointer}
+.upd-chk input{width:18px;height:18px}
+.dcf-item{padding:10px 12px;border:1px solid var(--ring);border-radius:10px;background:var(--surface-2);margin-bottom:10px}
+.dcf-ctx{display:flex;flex-wrap:wrap;gap:4px 6px;margin-top:6px;font-size:12px}
+.dcf-dot{color:var(--muted)}
+.dcf-row{display:grid;grid-template-columns:150px minmax(0,1fr);gap:10px;align-items:start;padding:5px 0}
+.dcf-row>label{font-size:12.5px;color:var(--ink-2);padding-top:6px}
+.dcf-in input:not([type=checkbox]),.dcf-in select{width:100%;max-width:380px}
+.dcf-in .cbo{display:inline-flex;width:100%;max-width:380px}
+.dcf-row.bad>label{color:var(--critical);font-weight:600}
+.dcf-bad{color:var(--critical);margin-top:4px}
+@media (max-width:760px){ .dcf-row{grid-template-columns:1fr;gap:4px} .dcf-row>label{padding-top:0} }

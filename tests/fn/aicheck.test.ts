@@ -81,7 +81,7 @@ role = 'admin'; { const r = await call({ dry: true }); ok(r.status === 403, 'adm
   ok(r.j.pass === 0 && r.j.blocked && /HTTP 401 · Invalid JWT/.test(r.j.blocked) && askN === 0 && r.j.fails.every((f: any) => /ask 호출 실패 — HTTP 401 · Invalid JWT/.test(f.why)), 'v1.3 ping 막힘(게이트웨이 401 Invalid JWT) → 질문 안 보냄 · 이유가 그대로', { blocked: r.j.blocked, askN });
   ok(slack.length === 1 && /^❌ 포탈 야간 점검 실패/.test(slack[0].text) && !/Verify JWT|401/.test(slack[0].text), '슬랙: 막혀도 «실패» 한 줄만', slack[0]?.text);
   ok(/^ask 호출 실패 — HTTP 401 · Invalid JWT$/.test(r.j.reason) && /Verify JWT/.test(r.j.hint), '이유·해결(Verify JWT 끄기)은 응답에', { reason: r.j.reason, hint: r.j.hint });
-  ok(logs.length === 1 && logs[0].pass === 0 && /Invalid JWT/.test(logs[0].fails[0].why), 'ai_check_log 에도 이유 기록');
+  ok(logs.length === 1 && logs[0].pass === 0 && /Invalid JWT/.test(logs[0].fails[0].why) && logs[0].fails.length === 1 && /^⛔ 점검 못 함 — ask 호출 실패 — HTTP 401 · Invalid JWT → 해결: .*Verify JWT/.test(logs[0].fails[0].q), 'ai_check_log: 포탈 «실패 질문» 칸에 이유+해결 한 칸', logs[0]?.fails);
   mode = 'nobody'; slack.length = 0; const r2 = await call({ wait: true }, { token: 'cronkey-test' });
   ok(/HTTP 503/.test(r2.j.blocked || '') && !/응답 없음/.test(JSON.stringify(r2.j.fails)), '본문 없는 오류도 «응답 없음» 대신 HTTP 상태', r2.j.blocked);
   mode = 'good'; }

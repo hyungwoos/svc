@@ -182,11 +182,12 @@ function permEnter(v){
   var app=document.getElementById('app'); if(app) app.classList.toggle('perm-deny', !canRead(v));
 }
 /* 쓰기 호출 공통 관문 — 현재 화면에 쓰기 권한이 없으면 저장 자체를 막음 (변경 이력·읽기용 RPC 는 예외) */
-function permWriteGuard(method, path){
+function permWriteGuard(method, path, asView){
   if(!/^(POST|PATCH|PUT|DELETE)$/i.test(method)) return;
   if(/^change_log\b|^ai_chat_history\b|^ai_feedback\b|^ai_check_log\b|^rpc\/(load_|admin_|ai_)|^user_perms\b|^ai_billing\b|^recv_presets\b/.test(path)) return;   // 이력·개인 기록·관리자 RPC 는 화면 권한과 무관
   if(window.IS_SUPER) return;
-  if(!canWrite(CUR_VIEW)){ var b=document.querySelector('#side button[data-v="'+CUR_VIEW+'"]'); var nm=b? navText(b) : CUR_VIEW; throw new Error('쓰기 권한이 없습니다 — 「'+nm+'」 화면은 읽기만 허용돼 있습니다. 슈퍼 관리자에게 «쓰기» 권한을 요청하세요.'); }
+  var pv=asView||CUR_VIEW;
+  if(!canWrite(pv)){ var b=document.querySelector('#side button[data-v="'+pv+'"]'); var nm=b? navText(b) : pv; throw new Error('쓰기 권한이 없습니다 — 「'+nm+'」 화면은 읽기만 허용돼 있습니다. 슈퍼 관리자에게 «쓰기» 권한을 요청하세요.'); }
 }
 
 /* ---- 로그인 세션 유지 ----
