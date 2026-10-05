@@ -24,9 +24,14 @@ say(!dups.length, '같은 최상위 이름을 두 파일이 선언하지 않음'
 const writes = [];
 for (const f of LIST) for (const r of through[f]) { const o = owner[r.n]; if (o && o[0] !== f && r.w) writes.push(r.n); }
 const shared = [...new Set(writes)].sort();
-const SHARED_OK = ['AUTH_USER', 'CODES', 'CUR_VIEW', 'DATA', 'DIRTY', 'HIST', 'HIST_LOADED', 'IDLE_LAST', 'IDLE_WARNED', 'INB_Y', 'LIVE_SRC', 'M', 'MAT', 'OI_CONVERT', 'PERMS', 'SB_TOKEN', 'TCOQ'];
+const SHARED_OK = [];   // ㊿+150: 17개 전부 js/state.js 의 ST.* 로 옮김 — 다른 파일이 값을 바꾸는 전역 var 는 이제 0개여야 함
 const extraShared = shared.filter((n) => !SHARED_OK.includes(n));
-say(!extraShared.length, '다른 파일이 값을 바꾸는 공유 상태 ' + shared.length + '개(목록 고정 — 새로 늘면 state 로)' + (extraShared.length ? ' — 새로 생김: ' + extraShared.join(', ') : ''));
+say(!extraShared.length, '다른 파일이 값을 바꾸는 전역 var 0개(공유 상태는 js/state.js 의 ST 에만)' + (extraShared.length ? ' — 새로 생김: ' + extraShared.join(', ') + ' → ST 로 옮기세요' : ''));
+const MOVED = ['AUTH_USER', 'CODES', 'CUR_VIEW', 'DATA', 'DIRTY', 'HIST', 'HIST_LOADED', 'IDLE_LAST', 'IDLE_WARNED', 'INB_Y', 'LIVE_SRC', 'M', 'MAT', 'OI_CONVERT', 'PERMS', 'SB_TOKEN', 'TCOQ'];
+const back = MOVED.filter((n) => owner[n]);
+say(!back.length, 'ST 로 옮긴 17개가 전역 var 로 다시 선언되지 않음' + (back.length ? ' — ' + back.join(', ') : ''));
+{ const st = fs.readFileSync(path.join(ROOT, 'js', 'state.js'), 'utf8'); const miss = MOVED.filter((n) => !new RegExp('^\\s*' + n + ':', 'm').test(st));
+  say(owner.ST && owner.ST[0] === 'js/state.js' && !miss.length, 'js/state.js 가 ST 를 선언하고 17개 키 모두 있음' + (miss.length ? ' — 없음: ' + miss.join(', ') : '')); }
 // 2) ESLint — 오타·없는 이름 · 흔한 실수
 const G = Object.assign({}, globals.browser);
 Object.keys(owner).concat(WINDOW_PROPS).forEach((n) => { G[n] = 'writable'; });

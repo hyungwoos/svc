@@ -115,7 +115,7 @@ function ovlInit(){
 function msg(id,t,cls){ var e=$('#'+id); e.textContent=t||''; e.className='mmsg'+(cls?' '+cls:''); }
 
 /* ---- 로그인 / 가입 / 비밀번호 변경 ---- */
-var AUTH_USER=null, AU_TAB='login';
+var AU_TAB='login';
 
 async function doLogin(){
   msg('auMsg','확인 중…');
@@ -126,9 +126,9 @@ async function doLogin(){
     });
     var j=await r.json();
     if(!r.ok||!j.access_token) throw new Error(j.error_description||j.msg||'이메일 또는 비밀번호가 올바르지 않습니다');
-    SB_TOKEN=j.access_token; AUTH_USER=($('#auEmail').value.trim());
-    saveSess(j, AUTH_USER);
-    if(!(await mfaGate(j.access_token, AUTH_USER, j.user&&j.user.factors, {fast:!mfaVerifiedOf(j.user&&j.user.factors).length}))){ clearSess(); SB_TOKEN=null; AUTH_USER=null; msg('auMsg','2단계 인증을 취소해 로그인하지 않았습니다'); return; }
+    ST.SB_TOKEN=j.access_token; ST.AUTH_USER=($('#auEmail').value.trim());
+    saveSess(j, ST.AUTH_USER);
+    if(!(await mfaGate(j.access_token, ST.AUTH_USER, j.user&&j.user.factors, {fast:!mfaVerifiedOf(j.user&&j.user.factors).length}))){ clearSess(); ST.SB_TOKEN=null; ST.AUTH_USER=null; msg('auMsg','2단계 인증을 취소해 로그인하지 않았습니다'); return; }
     showAuthUi();
     msg('auMsg','');
 
@@ -154,14 +154,14 @@ async function doLogin(){
 var FORCE_PW=false;
 
 async function doPwChange(){
-  if(!SB_TOKEN) return msg('auMsg','먼저 「로그인」 탭에서 로그인하세요','bad');
+  if(!ST.SB_TOKEN) return msg('auMsg','먼저 「로그인」 탭에서 로그인하세요','bad');
   var p1=$('#apPw').value, p2=$('#apPw2').value;
   if(p1.length<6) return msg('auMsg','6자 이상으로 입력하세요','bad');
   if(p1!==p2) return msg('auMsg','비밀번호 확인이 일치하지 않습니다','bad');
   msg('auMsg','변경 중…');
   try{
     var r=await fetch(SB_URL+'/auth/v1/user',{
-      method:'PUT', headers:{apikey:SB_KEY,'Content-Type':'application/json',Authorization:'Bearer '+SB_TOKEN},
+      method:'PUT', headers:{apikey:SB_KEY,'Content-Type':'application/json',Authorization:'Bearer '+ST.SB_TOKEN},
       body:JSON.stringify({password:p1, data:{pw_changed:true}})
     });
     var j=await r.json();
@@ -198,7 +198,7 @@ function toggleAuthMenu(){
     'background:var(--surface);border:1px solid var(--ring);border-radius:12px;'+
     'box-shadow:0 14px 34px -14px rgba(0,0,0,.32);padding:6px;min-width:180px';
   var bs='display:block;width:100%;text-align:left;border:0;background:transparent;padding:9px 11px;border-radius:8px;font:inherit;font-size:13.5px;cursor:pointer;color:var(--ink)';
-  m.innerHTML='<div style="padding:7px 11px 5px;font-size:11px;color:var(--muted);border-bottom:1px solid var(--line);margin-bottom:4px">'+esc(AUTH_USER||'')+'</div>'+
+  m.innerHTML='<div style="padding:7px 11px 5px;font-size:11px;color:var(--muted);border-bottom:1px solid var(--line);margin-bottom:4px">'+esc(ST.AUTH_USER||'')+'</div>'+
     '<button data-a="acct" style="'+bs+'">👤 내 계정</button>'+
     '<button data-a="out" style="'+bs+';color:var(--critical,#d03b3b)">로그아웃</button>';
   document.body.appendChild(m);
@@ -216,7 +216,7 @@ function toggleAuthMenu(){
 }
 function setupAuth(){
   $('#btnAuth').onclick=function(){
-    if(SB_TOKEN){ toggleAuthMenu(); return; }   // 로그인 상태: 내 계정/로그아웃 메뉴
+    if(ST.SB_TOKEN){ toggleAuthMenu(); return; }   // 로그인 상태: 내 계정/로그아웃 메뉴
     $('#auTabs').querySelector('[data-t="login"]').style.display='';
     $('#auLogout').style.display='none';
     setAuthTab('login');
@@ -252,7 +252,7 @@ function setupPick(inputId, pickId, store){
     var q=this.value.trim().toLowerCase(); box.innerHTML=''; store.sel=null;
     if(store===PK_C && window.cLivePreview) cLivePreview();
     if(q.length<2) return;
-    DATA.rows.map(function(r,i){return r;}).filter(function(r){
+    ST.DATA.rows.map(function(r,i){return r;}).filter(function(r){
       return r.cust.toLowerCase().indexOf(q)>=0;
     }).slice(0,30).forEach(function(r){
       var it=el('div','pi');
@@ -274,10 +274,10 @@ function setupPick(inputId, pickId, store){
 /* 추가 탭: 고른 원계약 요약 표시 (부속 계약은 원계약을 고를 수 없음 → 그 원계약으로 바꿔 줌) */
 function showAddParent(r){
   var box=$('#aSel'); if(!box) return;
-  if(r.parent){ var p=DATA.rows.filter(function(x){ return x._id===r.parent; })[0]; if(p){ PK_A.sel=p; r=p; } }
+  if(r.parent){ var p=ST.DATA.rows.filter(function(x){ return x._id===r.parent; })[0]; if(p){ PK_A.sel=p; r=p; } }
   box.style.display='';
   box.innerHTML='<label>원계약</label><div class="cap"><b>'+esc(r.cust)+'</b> · '+lline(r.line)+' · '+esc(chOf(r))+' · '+esc(r.ptn||'')+' · '+(mk(r.startIdx)||'?')+'~'+(mk(r.endIdx)||'?')+' · 월 '+won(r.mrr||0)+'천원'+
-    (r.renew? ' · 연장 '+r.renew+'회':'')+'<br>이 계약에 이미 붙은 부속 계약 '+DATA.rows.filter(function(x){ return x.parent===r._id; }).length+'건</div>';
+    (r.renew? ' · 연장 '+r.renew+'회':'')+'<br>이 계약에 이미 붙은 부속 계약 '+ST.DATA.rows.filter(function(x){ return x.parent===r._id; }).length+'건</div>';
   if(!$('#aEnd').value && r.endIdx!=null) $('#aEnd').placeholder=mk(r.endIdx);
 }
 /* 금액 수정 탭: 선택한 계약의 현재 월 금액 구간을 보여주고, 구간을 누르면 시작·종료월이 채워집니다 */
@@ -341,7 +341,7 @@ function ymFromInput(v){ // 'YYYY-MM' → idx
   return (+v.slice(0,4)-2020)*12 + (+v.slice(5,7)-6);
 }
 async function logChange(action,target,id,detail){
-  try{ await sbWrite('POST','change_log',{actor:AUTH_USER,action:action,target:target,target_id:id,detail:detail}); }catch(e){}
+  try{ await sbWrite('POST','change_log',{actor:ST.AUTH_USER,action:action,target:target,target_id:id,detail:detail}); }catch(e){}
 }
 async function ensureCustomer(name, ind, sector){
   var f=SB_RAW.customers.filter(function(c){return c.name===name;})[0];
@@ -368,7 +368,7 @@ var PK_C={sel:null}, PK_R={sel:null}, PK_F={sel:null}, PK_A={sel:null};
 var CUR_TAB='new';
 
 async function saveEdit(){
-  if(!SB_TOKEN){ msg('eMsg','먼저 로그인하세요 (우측 상단)','bad'); openOvl('ovlAuth'); return; }
+  if(!ST.SB_TOKEN){ msg('eMsg','먼저 로그인하세요 (우측 상단)','bad'); openOvl('ovlAuth'); return; }
   var btn=$('#eGo'); btn.disabled=true; msg('eMsg','저장 중…');
   try{
     if(CUR_TAB==='add'){
@@ -425,16 +425,16 @@ async function saveEdit(){
       await sbWrite('POST','monthly_revenue', monthRows(id,s0,e0,mrr));
       await logChange('insert','contracts',id,{cust:cust,mrr:mrr,from:idxDate(s0),to:idxDate(e0)});
       var subPid=+($('#nParent')&&$('#nParent').value)||null;
-      msg('eMsg','저장 완료 ✅ — '+cust+(subPid? ' (상위 계약 #'+subPid+'의 하위)':'')+' '+(e0-s0+1)+'개월'+($('#nType').value==='추가'? '' : (s0<=DATA.nowIdx? ' · LIVE 고객사에 반영됨' : ' · '+mk(s0)+'부터 LIVE 에 들어옴'))+' (대시보드·LIVE·해지율이 함께 갱신됩니다)','ok');
-      if(OI_CONVERT){
+      msg('eMsg','저장 완료 ✅ — '+cust+(subPid? ' (상위 계약 #'+subPid+'의 하위)':'')+' '+(e0-s0+1)+'개월'+($('#nType').value==='추가'? '' : (s0<=ST.DATA.nowIdx? ' · LIVE 고객사에 반영됨' : ' · '+mk(s0)+'부터 LIVE 에 들어옴'))+' (대시보드·LIVE·해지율이 함께 갱신됩니다)','ok');
+      if(ST.OI_CONVERT){
         try{
-          await sbWrite('PATCH','oi_deals?id=eq.'+OI_CONVERT.id,
+          await sbWrite('PATCH','oi_deals?id=eq.'+ST.OI_CONVERT.id,
             {contract_id:id, updated_at:new Date().toISOString()});
-          OI_CONVERT.contract_id=id;
-          logChange('update','oi_deals',OI_CONVERT.id,{계약전환:id});
-          toast('OI → 계약 전환 완료', OI_CONVERT.customer+' · 계약 #'+id);
+          ST.OI_CONVERT.contract_id=id;
+          logChange('update','oi_deals',ST.OI_CONVERT.id,{계약전환:id});
+          toast('OI → 계약 전환 완료', ST.OI_CONVERT.customer+' · 계약 #'+id);
         }catch(e2){ toast('OI 연결 실패', String(e2.message||e2).slice(0,80),'info'); }
-        OI_CONVERT=null;
+        ST.OI_CONVERT=null;
       }
       if(window.resetNewForm) window.resetNewForm();   // 다음 입력을 위해 즉시 비움
     }
@@ -646,7 +646,7 @@ function setupEdit(){
     var cust=($('#nCust').value||'').trim(), line=$('#nLine').value, type=$('#nType').value, s0=ymFromInput($('#nStart').value), e0=ymFromInput($('#nEnd').value);
     if(!cust){ box.style.display='none'; return; }
     box.style.display='';
-    var lv=(window.DATA&&DATA.rows)? liveCalc(DATA.nowIdx) : null;
+    var lv=(ST.DATA&&ST.DATA.rows)? liveCalc(ST.DATA.nowIdx) : null;
     var ks=nmKeys(cust);
     var mine=lv? lv.rows.filter(function(x){ return nmKeys(x.cust).some(function(k){ return ks.indexOf(k)>=0; }); }) : [];
     var same=mine.filter(function(x){ return x.line===line; })[0], others=mine.filter(function(x){ return x.line!==line; });
@@ -654,8 +654,8 @@ function setupEdit(){
     if(type==='추가'){ h+='구분 «추가»는 LIVE·고객사 수에 세지 않습니다. 기존 계약에 붙는 추가 구매라면 <b>«＋ 추가» 탭</b>에서 원계약을 골라 등록하세요.'; }
     else if(s0==null){ h+='시작월을 넣어야 LIVE 로 잡힙니다 (비어 있으면 «계약 예정»).'; }
     else if(same){ h+='<b>'+esc(cust)+'</b>는 이미 '+esc(lline(line))+' LIVE 입니다 ('+esc(same.basis)+'). 이 계약을 저장하면 유효 계약이 2건이 됩니다 — <b>재약정·연장이면 «갱신» 탭</b>에서 기존 계약의 종료월을 늘리는 게 맞고, 사이트가 다른 별도 계약이면 그대로 저장하세요.'; }
-    else if(others.length){ h+='<b>'+esc(cust)+'</b>는 이미 LIVE('+others.map(function(x){ return esc(lline(x.line)); }).join('·')+') 인 회사 — '+(s0>DATA.nowIdx? mk(s0)+'부터 ':'')+'<b>'+esc(lline(line))+'</b> 제품이 추가됩니다 (회사 수는 그대로, 제품별 합 +1).'; }
-    else { h+='<b>'+esc(cust)+'</b>는 '+(s0>DATA.nowIdx? '<b>'+mk(s0)+'</b>부터 ':'지금부터 ')+'<b>'+esc(lline(line))+' LIVE 고객사</b>로 들어옵니다 (신규 고객 +1)'+(e0!=null? ' · '+mk(e0)+'까지 유효, 그 뒤 연장·해지 처리 필요':'')+'.'; }
+    else if(others.length){ h+='<b>'+esc(cust)+'</b>는 이미 LIVE('+others.map(function(x){ return esc(lline(x.line)); }).join('·')+') 인 회사 — '+(s0>ST.DATA.nowIdx? mk(s0)+'부터 ':'')+'<b>'+esc(lline(line))+'</b> 제품이 추가됩니다 (회사 수는 그대로, 제품별 합 +1).'; }
+    else { h+='<b>'+esc(cust)+'</b>는 '+(s0>ST.DATA.nowIdx? '<b>'+mk(s0)+'</b>부터 ':'지금부터 ')+'<b>'+esc(lline(line))+' LIVE 고객사</b>로 들어옵니다 (신규 고객 +1)'+(e0!=null? ' · '+mk(e0)+'까지 유효, 그 뒤 연장·해지 처리 필요':'')+'.'; }
     var miss=[]; if(!(+$('#nQty').value)) miss.push('수량(노드)'); if(!($('#nCsm').value||'').trim()) miss.push('CSM');
     if(miss.length && type!=='추가') h+=' <span style="color:var(--muted)">'+miss.join('·')+' 이(가) 비어 있습니다 — LIVE 화면의 노드·CSM 열에 그대로 비어 보입니다.</span>';
     box.innerHTML=h;
@@ -667,7 +667,7 @@ function setupEdit(){
     var r=PK_C.sel, m0=ymFromInput($('#cMonth').value);
     if(!r){ box.style.display='none'; return; }
     box.style.display='';
-    var lv=(window.DATA&&DATA.rows)? liveCalc(DATA.nowIdx) : null;
+    var lv=(ST.DATA&&ST.DATA.rows)? liveCalc(ST.DATA.nowIdx) : null;
     var ks=nmKeys(r.cust), mine=lv? lv.rows.filter(function(x){ return nmKeys(x.cust).some(function(k){ return ks.indexOf(k)>=0; }); }) : [];
     var same=mine.filter(function(x){ return x.line===r.line; })[0], others=mine.filter(function(x){ return x.line!==r.line; });
     var h='🟢 <b>LIVE 영향</b> — ';
@@ -688,7 +688,7 @@ function setupEdit(){
       var inf=s1NoInfo(v); if(inf&&inf.cust) o.label=String(inf.cust).replace(/\s*\(에스원\)\s*$/,''); ds.appendChild(o); }); }
     var dr=$('#dlReason'); dr.innerHTML='';
     var seen={};
-    DATA.rows.forEach(function(r){ if(r.churn&&!seen[r.churn]){seen[r.churn]=1; var o=document.createElement('option'); o.value=r.churn; dr.appendChild(o);} });
+    ST.DATA.rows.forEach(function(r){ if(r.churn&&!seen[r.churn]){seen[r.churn]=1; var o=document.createElement('option'); o.value=r.churn; dr.appendChild(o);} });
     msg('eMsg','');
     resetNewForm();                       // 열 때마다 모든 칸 초기화 (직전 입력 잔상 제거)
     openOvl('ovlEdit');

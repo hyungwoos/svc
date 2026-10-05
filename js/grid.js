@@ -16,10 +16,10 @@ function navRecord(prev, v){
   }catch(e){}
   btnBackSync();
 }
-function btnBackSync(){ var b=document.getElementById('btnBack'); if(!b) return; b.style.display=(navDepth()>0 || (CUR_VIEW && CUR_VIEW!=='dash'))? 'inline-flex':'none'; }
+function btnBackSync(){ var b=document.getElementById('btnBack'); if(!b) return; b.style.display=(navDepth()>0 || (ST.CUR_VIEW && ST.CUR_VIEW!=='dash'))? 'inline-flex':'none'; }
 function goBack(){
   if(navDepth()>0){ history.back(); return; }           // 이 포탈 안에서 쌓인 이동만 되돌림 (포탈 밖으로 나가지 않음) · popstate 가 화면을 바꿈
-  if(CUR_VIEW!=='dash') switchView('dash');
+  if(ST.CUR_VIEW!=='dash') switchView('dash');
 }
 
 
@@ -60,8 +60,8 @@ function viewReset(v){
 }
 /* 대시보드: 위쪽 거르기(사업라인 · 기준월 · 단위 · 업종 · 파트너 · 상태 · 검색)가 처음과 다를 때만 «초기화»와 같은 동작 */
 function dashResetIfChanged(){
-  if(!window.DATA || window.IS_EQUIP) return;
-  var off=(DATA.lines||[]).some(function(l){ return STATE.lines[l.label]===false; });
+  if(!ST.DATA || window.IS_EQUIP) return;
+  var off=(ST.DATA.lines||[]).some(function(l){ return STATE.lines[l.label]===false; });
   var base0=(window.DASH_BASE0!=null)? window.DASH_BASE0 : STATE.base;
   if(!off && STATE.unit==='month' && STATE.base===base0 && !STATE.ind && !STATE.partner && !STATE.status && !STATE.search) return;
   STATE.base=base0; var b=document.getElementById('btnReset');
@@ -78,15 +78,15 @@ function navMenu(v){
 
 function switchView(v){
   if(v==='mdrpoc') v='mdrops';                       // 통합 전 이름 호환
-  if((v==='ordernew'||v==='mdrnew'||v==='oinew'||v==='csite'||v==='preport'||v==='s1'||v==='kk') && !SB_TOKEN){ openOvl('ovlAuth'); return; }
+  if((v==='ordernew'||v==='mdrnew'||v==='oinew'||v==='csite'||v==='preport'||v==='s1'||v==='kk') && !ST.SB_TOKEN){ openOvl('ovlAuth'); return; }
   if(window.IS_EQUIP && !EQUIP_VIEWS[v]) v=window.EQUIP_HOME||'orders';   // 제한 계정은 허용된 화면만
   if(v==='log' && !window.IS_SUPER) v='dash';                             // 변경 이력은 슈퍼 관리자만
   if(v==='ops' && !window.IS_SUPER) v='dash';                             // 배포·운영도 슈퍼 관리자만 (함수가 다시 OPS_OWNER 로 좁힘)
   if(v==='csite' && !window.IS_SUPER){ toast('권한 없음','Cloud 사이트 생성·수정은 슈퍼 관리자만 할 수 있습니다','info'); v='dash'; }
   if(!canView(v)){ toast('권한 없음','이 메뉴는 보기 권한이 없습니다 — 슈퍼 관리자에게 요청하세요','info'); v='dash'; }
   permEnter(v);
-  try{ navRecord(CUR_VIEW, v); }catch(e){}
-  CUR_VIEW=v;
+  try{ navRecord(ST.CUR_VIEW, v); }catch(e){}
+  ST.CUR_VIEW=v;
   try{ pushRecent(v); }catch(e){}
   $('#side').querySelectorAll('button').forEach(function(b){
     b.setAttribute('aria-current', b.dataset.v===v?'true':'false');
@@ -97,7 +97,7 @@ function switchView(v){
   $('#viewEqBoard').classList.toggle('hidden',!eqb);
   var dash=v==='dash', quote=v==='quote', preport=v==='preport', s1v=v==='s1', kkv=v==='kk', onew=v==='ordernew', acct=v==='account', mnew=v==='mdrnew', oinew=v==='oinew', csite=v==='csite';
   var adminx=v==='adminx', weekly=v==='weekly', inbstat=v==='inbstat', price=v==='price', report=v==='report', churn=v==='churn', cloud=v==='cloud', crate=v==='churnrate', cflow=v==='custflow', ops=v==='ops';
-  if(adminx && !window.IS_SUPER){ v='dash'; dash=true; adminx=false; CUR_VIEW='dash'; }
+  if(adminx && !window.IS_SUPER){ v='dash'; dash=true; adminx=false; ST.CUR_VIEW='dash'; }
   $('#viewChurnRate').classList.toggle('hidden',!crate);
   $('#viewCustFlow').classList.toggle('hidden',!cflow);
   var chv=CH_DEFS[v]||null;
@@ -156,7 +156,7 @@ function switchView(v){
     $('#mpFormWrap').style.display='';
     $('#mpDone').style.display='none';
     if(!$('#mpDate').value) $('#mpDate').value=todayStr();
-    if(!$('#mpSales').value && AUTH_USER) $('#mpSales').value='';
+    if(!$('#mpSales').value && ST.AUTH_USER) $('#mpSales').value='';
     setTimeout(function(){ $('#mpCompany').focus(); },50);
     return;
   }
@@ -186,20 +186,20 @@ function switchView(v){
   }
   if(dash){
     try{ renderTodo(); }catch(e){}
-    if(DIRTY){ DIRTY=false; loadFromDb().then(onData); }
+    if(ST.DIRTY){ ST.DIRTY=false; loadFromDb().then(onData); }
     return;
   }
   if(v==='aiknow' && !RAWX.aiknow){
-    sbTry('ai_knowledge?select=*&order=id').then(function(rows){ RAWX.aiknow=rows||[]; if(CUR_VIEW==='aiknow') renderGrid(); });
+    sbTry('ai_knowledge?select=*&order=id').then(function(rows){ RAWX.aiknow=rows||[]; if(ST.CUR_VIEW==='aiknow') renderGrid(); });
   }
-  if(v==='leadsrc' || v==='contracts') ensureLeadSrc(function(){ if(CUR_VIEW===v) renderGrid(); });   // load_all 이 lead_src 를 안 주는 버전이면 따로 채움
+  if(v==='leadsrc' || v==='contracts') ensureLeadSrc(function(){ if(ST.CUR_VIEW===v) renderGrid(); });   // load_all 이 lead_src 를 안 주는 버전이면 따로 채움
   if(v==='log' && !RAWX.log){
     sbTry('change_log?select=*&order=id.desc&limit=300').then(function(rows){
       RAWX.log=rows||[]; renderGrid();
     });
   }
   if(v==='inbound' && !RAWX.inbound){
-    loadInbound(function(){ if(CUR_VIEW==='inbound') renderGrid(); });
+    loadInbound(function(){ if(ST.CUR_VIEW==='inbound') renderGrid(); });
   }
   DV.page=0; DV.sortK=null; DV.sortDir=1; DV.chipVal=''; DV.filters={}; closeColFilter();
   var g=GRIDS[v];
@@ -401,21 +401,21 @@ var DV={page:0, per:100, sortK:null, sortDir:1, filters:{}};
 /* ===== 열 보이기/숨기기 (화면마다 따로 기억) =====
    계약처럼 열이 많은 표에서 지금 보고 싶은 열만 남깁니다. 숨겨도 값은 그대로 있고 검색·엑셀 내려받기에만 빠집니다. */
 var HIDE={};
-function hideKey(){ return 'svc_hidecols_'+(AUTH_USER||'anon'); }
+function hideKey(){ return 'svc_hidecols_'+(ST.AUTH_USER||'anon'); }
 function loadHide(){ try{ HIDE=JSON.parse(localStorage.getItem(hideKey())||'{}')||{}; }catch(e){ HIDE={}; } }
 function saveHide(){ try{ localStorage.setItem(hideKey(), JSON.stringify(HIDE)); }catch(e){} }
 function hiddenSet(view){ return (HIDE[view]||[]); }
 function visCols(g){
-  var h=hiddenSet(CUR_VIEW);
+  var h=hiddenSet(ST.CUR_VIEW);
   if(!h.length) return g.cols;
   var out=g.cols.filter(function(c){ return h.indexOf(c.k)<0; });
   return out.length? out : g.cols;      /* 전부 숨기면 아무것도 안 보이니 원래대로 */
 }
 function openColPick(btn){
-  var g=GRIDS[CUR_VIEW]; if(!g||g.custom) return;
+  var g=GRIDS[ST.CUR_VIEW]; if(!g||g.custom) return;
   closeColFilter();
   var old=document.getElementById('colPick'); if(old) old.remove();
-  var h=hiddenSet(CUR_VIEW).slice();
+  var h=hiddenSet(ST.CUR_VIEW).slice();
   var box=document.createElement('div'); box.id='colPick'; box.className='colmenu';
   box.style.cssText='position:absolute;z-index:80;background:var(--surface);border:1px solid var(--ring);border-radius:12px;'+
     'box-shadow:0 10px 30px rgba(0,0,0,.18);padding:10px;min-width:250px;max-height:60vh;overflow:auto;font-size:12px';
@@ -426,11 +426,11 @@ function openColPick(btn){
   head.style.cssText='display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap';
   head.innerHTML='<b style="font-size:12px">보일 열 고르기</b><span class="mini" style="color:var(--muted)">'+(g.cols.length-h.length)+'/'+g.cols.length+'</span>';
   var all=document.createElement('button'); all.className='chip'; all.textContent='전체 보기';
-  all.onclick=function(){ HIDE[CUR_VIEW]=[]; saveHide(); box.remove(); renderGrid(); };
+  all.onclick=function(){ HIDE[ST.CUR_VIEW]=[]; saveHide(); box.remove(); renderGrid(); };
   head.appendChild(all);
   /* ㊿+142: 끌어서 바꾼 열 너비가 있으면 한 번에 원래대로 */
-  if(Object.keys(colwGet(CUR_VIEW)).length){ var rw=document.createElement('button'); rw.className='chip'; rw.textContent='열 너비 원래대로'; rw.title='머리 칸 경계를 끌어 바꾼 너비를 모두 지웁니다';
-    rw.onclick=function(){ box.remove(); colwReset(CUR_VIEW); }; head.appendChild(rw); }
+  if(Object.keys(colwGet(ST.CUR_VIEW)).length){ var rw=document.createElement('button'); rw.className='chip'; rw.textContent='열 너비 원래대로'; rw.title='머리 칸 경계를 끌어 바꾼 너비를 모두 지웁니다';
+    rw.onclick=function(){ box.remove(); colwReset(ST.CUR_VIEW); }; head.appendChild(rw); }
   box.appendChild(head);
   var tip=document.createElement('div'); tip.className='mini'; tip.style.cssText='color:var(--muted);margin:-2px 0 6px'; tip.textContent='열 너비는 머리 칸 오른쪽 경계를 끌어서 바꿉니다';
   box.appendChild(tip);
@@ -439,10 +439,10 @@ function openColPick(btn){
     lb.style.cssText='display:flex;gap:7px;align-items:center;padding:4px 2px;cursor:pointer';
     var cb=document.createElement('input'); cb.type='checkbox'; cb.checked=h.indexOf(c.k)<0; cb.style.width='auto';
     cb.onchange=function(){
-      var cur=hiddenSet(CUR_VIEW).slice();
+      var cur=hiddenSet(ST.CUR_VIEW).slice();
       var i=cur.indexOf(c.k);
       if(cb.checked){ if(i>=0) cur.splice(i,1); } else if(i<0) cur.push(c.k);
-      HIDE[CUR_VIEW]=cur; saveHide(); renderGrid();
+      HIDE[ST.CUR_VIEW]=cur; saveHide(); renderGrid();
       head.querySelector('.mini').textContent=(g.cols.length-cur.length)+'/'+g.cols.length;
     };
     lb.appendChild(cb); lb.appendChild(document.createTextNode(c.l));
@@ -663,7 +663,7 @@ async function xlsxBook(name, sheets){                       // sheets: [{name, 
 }
 function xlsxAoa(name, head, rows){ return xlsxBook(name, [{name:'Sheet1', head:head, rows:rows}]); }
 async function exportXlsx(){
-  var g=GRIDS[CUR_VIEW]; if(!g) return;
+  var g=GRIDS[ST.CUR_VIEW]; if(!g) return;
   var rows=gridFilteredSorted(g);
   var VC=visCols(g);                                            /* 숨긴 열은 엑셀에도 빼고 내려받습니다 */
   var head=VC.map(function(c){return c.l;});
@@ -681,7 +681,7 @@ async function exportXlsx(){
   catch(e){ exportCsv(); }   // 라이브러리 차단 시 CSV 폴백
 }
 function exportCsv(){
-  var g=GRIDS[CUR_VIEW]; if(!g) return;
+  var g=GRIDS[ST.CUR_VIEW]; if(!g) return;
   var rows=gridFilteredSorted(g);
   var VC=visCols(g);
   var head=VC.map(function(c){return c.l;});
@@ -721,7 +721,7 @@ var LENS_DEFS=[
 var LENS_DESC={}; 
 function lensSets(){
   var cts=RAWX.contracts||[], cus={}; (RAWX.customers||[]).forEach(function(c){ cus[c.id]=c; });
-  var nowYm=(DATA&&DATA.nowIdx>=0? mk(DATA.nowIdx) : new Date().toISOString().slice(0,7))+'-01';
+  var nowYm=(ST.DATA&&ST.DATA.nowIdx>=0? mk(ST.DATA.nowIdx) : new Date().toISOString().slice(0,7))+'-01';
   var byId={}; cts.forEach(function(c){ byId[c.id]=c; });
   var kids={}; cts.forEach(function(c){ if(c.parent_contract_id) (kids[c.parent_contract_id]=kids[c.parent_contract_id]||[]).push(c.id); });
   var root=function(c){ return c.parent_contract_id? (byId[c.parent_contract_id]||c) : c; };
@@ -751,19 +751,19 @@ function lensSets(){
     if(c.no_count || String(c.status||'')==='통합과금' || String(c.sale_type||'')==='H/W') add('nocount',c);
     if(c.live_override) add('liveov',c);
   });
-  if(window.DATA && DATA.rows){ var lvNow=liveCalc(DATA.nowIdx); lvNow.rows.forEach(function(x){ (x.ids||[]).forEach(function(id){ var c=byId[id]; if(c) add('live',c); }); }); }
+  if(ST.DATA && ST.DATA.rows){ var lvNow=liveCalc(ST.DATA.nowIdx); lvNow.rows.forEach(function(x){ (x.ids||[]).forEach(function(id){ var c=byId[id]; if(c) add('live',c); }); }); }
   LENS_DEFS.forEach(function(d){ var u={}; Object.keys(out[d[0]].ids).forEach(function(id){ var c=byId[id]; if(c) u[c.customer_id]=1; }); out[d[0]].n=Object.keys(u).length; out[d[0]].nRows=Object.keys(out[d[0]].ids).length; });
   return out;
 }
 /* LIVE 고객사 메뉴 상단 — 보기 전환(계약 기준 / 시트 명단) · 기준월 · 요약 · 대조 표 · 도움말 */
 function renderLiveBar(lb){
-  var isDb=(LIVE_SRC!=='sheet'), T=(LV.T!=null? LV.T : STATE.base), lv=liveCalc(T), sh=(DATA.live&&DATA.live.ok)? DATA.live : null;
+  var isDb=(ST.LIVE_SRC!=='sheet'), T=(LV.T!=null? LV.T : STATE.base), lv=liveCalc(T), sh=(ST.DATA.live&&ST.DATA.live.ok)? ST.DATA.live : null;
   var perLine={}; lv.rows.forEach(function(x){ perLine[x.line]=(perLine[x.line]||0)+1; });
   var lineTxt=Object.keys(perLine).sort().map(function(l){ return lline(l)+' '+perLine[l]; }).join(' · ');
   var h='<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;width:100%">'+
     '<div class="seg" title="LIVE 고객사를 어디에서 가져올지"><button data-lsrc="db" aria-pressed="'+isDb+'" title="계약 표로 자동 판정 — 등록·해지가 그대로 반영됩니다">계약 기준(자동)</button><button data-lsrc="sheet" aria-pressed="'+(!isDb)+'" title="예전 LIVE 고객사 탭을 옮겨 둔 명단 — 대조·편집용">시트 명단</button></div>';
   if(isDb){
-    var opts=''; for(var i=DATA.nowIdx+3;i>=Math.max(0,DATA.nowIdx-36);i--){ opts+='<option value="'+i+'"'+(i===T?' selected':'')+'>'+mk(i)+(i===DATA.nowIdx?' (이번 달)':'')+'</option>'; }
+    var opts=''; for(var i=ST.DATA.nowIdx+3;i>=Math.max(0,ST.DATA.nowIdx-36);i--){ opts+='<option value="'+i+'"'+(i===T?' selected':'')+'>'+mk(i)+(i===ST.DATA.nowIdx?' (이번 달)':'')+'</option>'; }
     h+='<label class="mini" style="display:flex;align-items:center;gap:6px">기준월 <select id="lvMonth" style="font:inherit;padding:4px 6px;border:1px solid var(--ring);border-radius:8px;background:var(--surface-2);color:inherit">'+opts+'</select></label>';
     h+='<span class="mini"><b>'+mk(T)+'</b> LIVE <b>'+lv.uniq+'곳</b>(회사) · 제품별 합 <b>'+lv.count+'</b> — '+lineTxt+(sh? ' · 시트 명단 '+sh.uniq+'곳 / '+sh.count+'건':'')+'</span>';
     if(sh){ var df=liveDiff(T); var nd=df.onlyDb.length+df.onlySheet.length;
@@ -825,7 +825,7 @@ function gridActPad(){
 }
 /* ❔ 이 화면 사용법 — 포탈 AI(팀 지식 SQL 91 포함)에게 현재 화면 사용법을 묻고 홈 답변 칸으로 이동 */
 function askScreenHelp(){
-  var g=GRIDS[CUR_VIEW], title=g? g.title : (function(){ var b=document.querySelector('#side button[data-v="'+CUR_VIEW+'"]'); return b? navText(b) : CUR_VIEW; })();
+  var g=GRIDS[ST.CUR_VIEW], title=g? g.title : (function(){ var b=document.querySelector('#side button[data-v="'+ST.CUR_VIEW+'"]'); return b? navText(b) : ST.CUR_VIEW; })();
   var q='포탈의 «'+String(title||'').replace(/^[^\w가-힣]+/,'').trim()+'» 화면은 어떻게 쓰나요? 주요 기능과 주의할 점을 짧게 알려줘';
   var hit=cmdAskHit(q); if(hit && hit.go) hit.go(); else toast('AI 를 쓸 수 없습니다','조회 전용 장비 계정이거나 AI 가 꺼져 있습니다','warn');
 }
@@ -867,7 +867,7 @@ function colwStart(ev, th, t, v){
 }
 function colwReset(v, k){ var m=colwGet(v); if(k) delete m[k]; else m={}; colwPut(v,m); renderGrid(); }
 function renderGrid(){
-  var g=GRIDS[CUR_VIEW]; if(!g) return;
+  var g=GRIDS[ST.CUR_VIEW]; if(!g) return;
   var isCustom=!!g.custom;
   // 채널 칩 필터
   var cb=document.getElementById('dvChipBar');
@@ -892,7 +892,7 @@ function renderGrid(){
   var lb=document.getElementById('dvLensBar');
   if(!lb){ lb=document.createElement('div'); lb.id='dvLensBar'; lb.style.cssText='display:none;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px';
     var bar2=$('#dvSearch').parentElement; bar2.parentElement.insertBefore(lb,bar2); }
-  if(CUR_VIEW==='contracts' && !isCustom){
+  if(ST.CUR_VIEW==='contracts' && !isCustom){
     lb.style.display='flex'; lb.innerHTML='<span class="mini" style="color:var(--muted);margin-right:2px">관점</span>';
     var LS=lensSets();
     var zero=LENS_DEFS.filter(function(d){ return !LS[d[0]].n; }).length;   /* ⑤ UX: 0곳인 관점은 접어 둠 (칩 10개가 늘어서 있던 것) */
@@ -907,10 +907,10 @@ function renderGrid(){
     if(zero){ var zb=document.createElement('button'); zb.type='button'; zb.className='mini'; zb.style.cssText='border:0;background:transparent;color:var(--muted);cursor:pointer;padding:0 4px;font:inherit;font-size:12px'; zb.textContent=DV.lensAll? '빈 관점 접기' : '+ 해당 없음 '+zero+'개'; zb.onclick=function(){ DV.lensAll=!DV.lensAll; renderGrid(); }; lb.appendChild(zb); }
     if(DV.lens && LENS_DESC[DV.lens]){ var dsc=document.createElement('span'); dsc.className='mini'; dsc.style.cssText='color:var(--ink-2);flex-basis:100%;margin-top:2px'; dsc.textContent='ⓘ '+LENS_DESC[DV.lens]; lb.appendChild(dsc); }
     g._lens=(DV.lens && LS[DV.lens])? LS[DV.lens].ids : null;
-  } else if(CUR_VIEW==='live'){ lb.style.display='flex'; renderLiveBar(lb); g._lens=null; }
+  } else if(ST.CUR_VIEW==='live'){ lb.style.display='flex'; renderLiveBar(lb); g._lens=null; }
   else { lb.style.display='none'; g._lens=null; }
   ['dvSearch','dvCsv','dvCols'].forEach(function(id){ $('#'+id).style.display=isCustom?'none':''; });
-  var nHid=hiddenSet(CUR_VIEW).filter(function(k){ return g.cols.some(function(c){ return c.k===k; }); }).length;
+  var nHid=hiddenSet(ST.CUR_VIEW).filter(function(k){ return g.cols.some(function(c){ return c.k===k; }); }).length;
   var cbtn2=$('#dvCols'); if(cbtn2 && !isCustom){ cbtn2.textContent=nHid? ('🧱 열 '+(g.cols.length-nHid)+'/'+g.cols.length) : '🧱 열';
     cbtn2.style.borderColor=nHid?'var(--s1)':''; cbtn2.style.color=nHid?'var(--s1)':''; }
   var nf=filterCount();
@@ -958,9 +958,9 @@ function renderGrid(){
     wrap.appendChild(lab); wrap.appendChild(fb);
     th.appendChild(wrap); th.dataset.k=c.k;
     var rs=document.createElement('span'); rs.className='colrs'; rs.setAttribute('aria-hidden','true'); rs.title='끌어서 열 너비 조절 · 두 번 누르면 원래대로';
-    rs.onpointerdown=function(ev){ if(ev.button!==0) return; colwStart(ev, th, t, CUR_VIEW); };
+    rs.onpointerdown=function(ev){ if(ev.button!==0) return; colwStart(ev, th, t, ST.CUR_VIEW); };
     rs.onclick=function(ev){ ev.stopPropagation(); };
-    rs.ondblclick=function(ev){ ev.stopPropagation(); colwReset(CUR_VIEW, c.k); };
+    rs.ondblclick=function(ev){ ev.stopPropagation(); colwReset(ST.CUR_VIEW, c.k); };
     th.appendChild(rs);
     tr0.appendChild(th);
   });
@@ -982,7 +982,7 @@ function renderGrid(){
     tr.querySelectorAll('[data-dge]').forEach(function(b){ b.onclick=function(){ var k=b.dataset.dge; if(k==='q'){ $('#dvSearch').value=''; } if(k==='f'){ DV.filters={}; DV.lens=''; } if(k==='c'){ DV.chipVal=''; } DV.page=0; renderGrid(); }; });
   }
   t.appendChild(tb);
-  colwApply(t, CUR_VIEW);   /* ㊿+142: 사용자가 정한 열 너비 */
+  colwApply(t, ST.CUR_VIEW);   /* ㊿+142: 사용자가 정한 열 너비 */
   gridActPad();
 
   /* 페이저 */
@@ -1051,13 +1051,13 @@ function gridRow(r,g,editing){
     }; }
     if(!g.ro){
       var act=tr.lastChild;
-      if(CUR_VIEW==='contracts'){
+      if(ST.CUR_VIEW==='contracts'){
         var bv=document.createElement('button'); bv.textContent='👁'; bv.title='상세 보기';
         bv.onclick=function(){ openDetail(r); };
         act.appendChild(bv);
       }
       if(window.IS_VIEWER) return;
-      if(CUR_VIEW==='oi'){
+      if(ST.CUR_VIEW==='oi'){
         // 수주(이후) 단계 + 아직 계약 미연결 → 계약으로 전환
         if(['수주','계산서발행','종료'].indexOf(r.stage)>=0 && !r.contract_id){
           var bc=document.createElement('button'); bc.textContent='→계약'; bc.title='이 수주 건을 신규 계약으로 전환';
@@ -1090,7 +1090,7 @@ function gridRow(r,g,editing){
       if(canDel){
         var bd=document.createElement('button'); bd.textContent='🗑'; bd.className='dl';
         bd.onclick=function(){
-          if(!SB_TOKEN){ openOvl('ovlAuth'); return; }
+          if(!ST.SB_TOKEN){ openOvl('ovlAuth'); return; }
           var warn='이 행을 삭제할까요?\n'+g.cols.slice(0,2).map(function(c){return r[c.k];}).join(' · ');
           if(g.table==='contracts') warn='계약을 삭제할까요?\n'+ (r._custName||'') +' · '+lline(r.line||'')+
             '\n\n이 계약의 월별 인식 금액도 함께 삭제되고 되돌릴 수 없습니다.';
@@ -1098,8 +1098,8 @@ function gridRow(r,g,editing){
           sbWrite('DELETE',g.table+'?id=eq.'+r.id).then(function(){
             logChange('delete',g.table,r.id,{});
             toast('삭제되었습니다', g.title, 'info');
-            var arr=g.rows(); var i=(RAWX[CUR_VIEW]||[]).indexOf(r); if(i>=0) RAWX[CUR_VIEW].splice(i,1);
-            DIRTY=true; renderGrid();
+            var arr=g.rows(); var i=(RAWX[ST.CUR_VIEW]||[]).indexOf(r); if(i>=0) RAWX[ST.CUR_VIEW].splice(i,1);
+            ST.DIRTY=true; renderGrid();
           }).catch(function(e){ $('#dvMsg').textContent=String(e.message||e); });
         };
         act.appendChild(bd);
@@ -1114,7 +1114,7 @@ function gridRow(r,g,editing){
     var act=tr.lastChild;
     var bs=document.createElement('button'); bs.textContent='저장'; bs.className='sv';
     bs.onclick=function(){
-      if(!SB_TOKEN){ openOvl('ovlAuth'); return; }
+      if(!ST.SB_TOKEN){ openOvl('ovlAuth'); return; }
       try{
         var body=readRowInputs(tr,g);
         /* 다른 표에 붙는 열(예: 업종 = customers.sector)은 따로 떼어 그 표에 저장합니다 */
@@ -1149,11 +1149,11 @@ function gridRow(r,g,editing){
         return (Object.keys(body).length? sbWrite('PATCH',g.table+'?id=eq.'+r.id,body) : Promise.resolve()); }).then(function(){
           Object.keys(body).forEach(function(k){ r[k]=body[k]; });
           if(Object.keys(body).length) logChange('update',g.table,r.id,body);
-          DIRTY=true; $('#dvMsg').textContent='저장됨 ✅';
+          ST.DIRTY=true; $('#dvMsg').textContent='저장됨 ✅';
           toast('저장되었습니다', g.title);
           if(eqSync) syncOrderAssets(r).then(function(x){
             if(x){ toast('장비 현황 자동 반영', x.replace(/^ · /,''), 'info');
-                   DIRTY=true; if(CUR_VIEW==='orders'||CUR_VIEW==='assets') renderGrid(); }
+                   ST.DIRTY=true; if(ST.CUR_VIEW==='orders'||ST.CUR_VIEW==='assets') renderGrid(); }
           });
           view();
         }).catch(function(e){ $('#dvMsg').textContent=String(e.message||e); });
@@ -1168,8 +1168,8 @@ function gridRow(r,g,editing){
 }
 
 function gridAddRow(){
-  var g=GRIDS[CUR_VIEW]; if(!g||!g.add) return;
-  if(!SB_TOKEN){ openOvl('ovlAuth'); return; }
+  var g=GRIDS[ST.CUR_VIEW]; if(!g||!g.add) return;
+  if(!ST.SB_TOKEN){ openOvl('ovlAuth'); return; }
   var t=$('#dvTable'); var tb=t.querySelector('tbody'); if(!tb) return;
   var tr=document.createElement('tr');
   // 계산 열(설치율·신청 모듈처럼 ro 또는 «_» 로 시작)은 DB 에 없는 열 — 입력칸을 만들지 않음 (PGRST204 «_fill column» 오류 원인)
@@ -1193,9 +1193,9 @@ function gridAddRow(){
       }
       sbWrite('POST',g.table+'?select=*',[body],'return=representation').then(function(rows){
         toast('추가되었습니다', g.title);
-        RAWX[CUR_VIEW]=RAWX[CUR_VIEW]||[]; RAWX[CUR_VIEW].push(rows[0]);
+        RAWX[ST.CUR_VIEW]=RAWX[ST.CUR_VIEW]||[]; RAWX[ST.CUR_VIEW].push(rows[0]);
         logChange('insert',g.table,rows[0].id,body);
-        DIRTY=true; $('#dvMsg').textContent='추가됨 ✅';
+        ST.DIRTY=true; $('#dvMsg').textContent='추가됨 ✅';
         renderGrid();
       }).catch(function(e){
         var s=String(e.message||e);

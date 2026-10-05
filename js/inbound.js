@@ -16,7 +16,7 @@ function loadMxMemos(cb){
     if(cb) cb();
   }).catch(function(){ /* 51단계 SQL 미설치 — 메모 기능만 비활성 */ });
 }
-function mxCanEdit(){ return !!(SB_TOKEN && !window.IS_VIEWER); }
+function mxCanEdit(){ return !!(ST.SB_TOKEN && !window.IS_VIEWER); }
 function closeMxPop(){
   var e=document.getElementById('mxPop'); if(e) e.remove();
   document.removeEventListener('keydown', mxPopEsc);
@@ -35,15 +35,15 @@ function mxDetailRows(line, Y, M){
   var out=[];
   if(idx<0||idx>=M_TOTAL()) return out;
   (MX_LIST||idxs()).forEach(function(k){
-    var r=DATA.rows[k];
+    var r=ST.DATA.rows[k];
     if(line && r.line!==line) return;
-    var v=MAT[k][idx]; if(!v) return;
+    var v=ST.MAT[k][idx]; if(!v) return;
     out.push({k:k, cust:r.cust, line:r.line, ptn:r.ptn||'', ch:r.channel||'', st:statusOf(r)||'', ctype:r.ctype||'', amt:v});
   });
   out.sort(function(a,b){ return b.amt-a.amt; });
   return out;
 }
-function M_TOTAL(){ return (typeof M==='number')? M : 0; }
+function M_TOTAL(){ return (typeof ST.M==='number')? ST.M : 0; }
 function mxDetailHtml(rows, cellSum){
   if(!rows.length) return '<div class="ro" style="text-align:center;color:var(--muted)">이 달에 인식 금액이 있는 계약이 없습니다</div>';
   var sum=rows.reduce(function(a,x){ return a+x.amt; },0);
@@ -131,9 +131,9 @@ function openMxMemo(td, line, Y, M, label, startTab, opts){
       else{
         await sbWrite('POST','mx_memos?on_conflict=line,year,month',
           /* 합계 행은 line='' — null 이면 unique 제약에 걸리지 않아 on_conflict 가 동작하지 않습니다 (42P10) */
-          [{line:line||'', year:Y, month:M, body:body, updated_by:AUTH_USER||'', updated_at:new Date().toISOString()}],
+          [{line:line||'', year:Y, month:M, body:body, updated_by:ST.AUTH_USER||'', updated_at:new Date().toISOString()}],
           'resolution=merge-duplicates');
-        MXM[k]={line:line||'',year:Y,month:M,body:body,updated_by:AUTH_USER||'',updated_at:new Date().toISOString()};
+        MXM[k]={line:line||'',year:Y,month:M,body:body,updated_by:ST.AUTH_USER||'',updated_at:new Date().toISOString()};
         logChange('update','mx_memos',0,{cell:k});
       }
       closeMxPop(); renderMatrix(); try{ renderInstall(); }catch(e){}
@@ -240,16 +240,16 @@ function inbWirePanel(host){
 /* 인바운드 목록(표) 위에 붙는 패널 */
 function renderInbPanel(){
   var host=document.getElementById('inbHost');
-  if(CUR_VIEW!=='inbound'){ if(host) host.style.display='none'; return; }
+  if(ST.CUR_VIEW!=='inbound'){ if(host) host.style.display='none'; return; }
   if(!host){ var tw=$('#dvTable').parentElement; host=document.createElement('div'); host.id='inbHost'; tw.parentElement.insertBefore(host,tw); }
   host.style.display=''; host.innerHTML=inbSyncPanel(); inbWirePanel(host);
-  if(RAWX.inbLog===undefined) loadInbLog(function(){ if(CUR_VIEW==='inbound') renderInbPanel(); });
+  if(RAWX.inbLog===undefined) loadInbLog(function(){ if(ST.CUR_VIEW==='inbound') renderInbPanel(); });
 }
 function renderInbStat(){
   var host=$('#inbBody');
   if(!RAWX.inbound){
     host.innerHTML='<div class="cap" style="padding:40px;text-align:center">인바운드 데이터를 불러오는 중…</div>';
-    loadInbound(function(){ if(CUR_VIEW==='inbstat') renderInbStat(); });
+    loadInbound(function(){ if(ST.CUR_VIEW==='inbstat') renderInbStat(); });
     return;
   }
   var ALL=RAWX.inbound;
@@ -261,7 +261,7 @@ function renderInbStat(){
     var b0=document.getElementById('inbFetch0'); if(b0) b0.onclick=inbRefetch;
     return;
   }
-  var R=ALL.filter(function(x){ return INB_Y==='all' || String(x.y)===INB_Y; });
+  var R=ALL.filter(function(x){ return ST.INB_Y==='all' || String(x.y)===ST.INB_Y; });
   var wonL=R.filter(function(x){return x.result==='수주';});
   var amt=wonL.reduce(function(s,x){return s+(Number(x.amount)||0);},0);
   var prog=R.filter(function(x){return /진행중|방문미팅|데모|파트너사|수주 예정|26년 진행/.test(x.result||'');}).length;
@@ -276,7 +276,7 @@ function renderInbStat(){
   });
   stale.sort(function(a,b){return b[0]-a[0];});
   // 월별 추이 (선택 연도 vs 전년)
-  var curY=INB_Y==='all'? String(new Date().getFullYear()) : INB_Y;
+  var curY=ST.INB_Y==='all'? String(new Date().getFullYear()) : ST.INB_Y;
   var prvY=String(+curY-1);
   var cur={}, prv={};
   ALL.forEach(function(x){
@@ -304,7 +304,7 @@ function renderInbStat(){
   }
   var yb=['all','2026','2025'].map(function(y){
     var lab=y==='all'?'전체':y+'년';
-    return '<button class="pill" data-inby="'+y+'" style="'+(INB_Y===y?'background:var(--brand-t);border-color:var(--brand);color:var(--brand);font-weight:700':'')+'">'+lab+'</button>';
+    return '<button class="pill" data-inby="'+y+'" style="'+(ST.INB_Y===y?'background:var(--brand-t);border-color:var(--brand);color:var(--brand);font-weight:700':'')+'">'+lab+'</button>';
   }).join(' ');
   host.innerHTML=
     '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">'+
@@ -315,7 +315,7 @@ function renderInbStat(){
     '<button class="pill ghost" id="inbGoList">목록 보기 →</button></div>'+
     inbSyncPanel()+
     '<div class="inb-kpis">'+
-    '<div class="inb-kpi"><div class="l">유입 건수</div><div class="v">'+R.length.toLocaleString()+'건</div><div class="s">'+(INB_Y==='all'?'25년~현재 누적':INB_Y+'년')+'</div></div>'+
+    '<div class="inb-kpi"><div class="l">유입 건수</div><div class="v">'+R.length.toLocaleString()+'건</div><div class="s">'+(ST.INB_Y==='all'?'25년~현재 누적':ST.INB_Y+'년')+'</div></div>'+
     '<div class="inb-kpi"><div class="l">진행중</div><div class="v">'+prog+'건</div><div class="s">방문미팅·데모·이관 포함</div></div>'+
     '<div class="inb-kpi"><div class="l">수주</div><div class="v">'+wonL.length+'건</div><div class="s">전환율 '+conv+'%</div></div>'+
     '<div class="inb-kpi"><div class="l">수주액</div><div class="v">'+won(amt)+'<small style="font-size:11px;font-weight:600"> 천원</small></div><div class="s">단위: 천원</div></div>'+
@@ -334,7 +334,7 @@ function renderInbStat(){
     '<div class="inb-card"><h3>제품유형 · 문의유형</h3><div class="inb-dist">'+dist('ptype',6)+dist('qtype',4)+'</div></div>'+
     '<div class="inb-card"><h3>담당자별 처리</h3><div class="inb-dist">'+dist('owner',10)+'</div></div></div>';
   host.querySelectorAll('[data-inby]').forEach(function(b){
-    b.onclick=function(){ INB_Y=b.dataset.inby; renderInbStat(); };
+    b.onclick=function(){ ST.INB_Y=b.dataset.inby; renderInbStat(); };
   });
   host.querySelectorAll('.inb-dr').forEach(function(d){
     d.onclick=function(){ goInbList(d.dataset.k, d.dataset.v); };
@@ -346,17 +346,17 @@ function renderInbStat(){
     };
   });
   inbWirePanel(host);
-  if(RAWX.inbLog===undefined) loadInbLog(function(){ if(CUR_VIEW==='inbstat') renderInbStat(); });
+  if(RAWX.inbLog===undefined) loadInbLog(function(){ if(ST.CUR_VIEW==='inbstat') renderInbStat(); });
   var bl=document.getElementById('inbGoList'); if(bl) bl.onclick=function(){ goInbList(); };
 }
 function inbRefetch(){
-  if(!SB_TOKEN){ openOvl('ovlAuth'); return; }
+  if(!ST.SB_TOKEN){ openOvl('ovlAuth'); return; }
   var b=document.getElementById('inbFetchP'); if(b){ b.disabled=true; b.textContent='가져오는 중…'; }
   toast('인바운드 가져오기','시트에서 가져오는 중… (최대 1분)','info');
   function done(){
     RAWX.inbLog=undefined;                       // 기록도 새로 읽습니다
     loadInbLog(function(){ loadInbound(function(){
-      if(CUR_VIEW==='inbstat') renderInbStat(); else if(CUR_VIEW==='inbound') renderGrid(); }); });
+      if(ST.CUR_VIEW==='inbstat') renderInbStat(); else if(ST.CUR_VIEW==='inbound') renderGrid(); }); });
   }
   fetch(WEEKLY_GAS+'?action=inbound_fetch').then(function(r){return r.json();}).then(function(j){
     if(j&&j.ok) toast('가져오기 완료', j.msg || inbCounts(j.counts) || '');
@@ -641,7 +641,7 @@ async function renderWeekly(atWeek){
     }catch(e){}
   }
   requestAnimationFrame(wkMeasure);
-  if(!window.__wkRz){ window.__wkRz=1; window.addEventListener('resize', function(){ if(CUR_VIEW==='weekly') wkMeasure(); }); }
+  if(!window.__wkRz){ window.__wkRz=1; window.addEventListener('resize', function(){ if(ST.CUR_VIEW==='weekly') wkMeasure(); }); }
   window.__wkMeasure=wkMeasure;
 
   // ── 동작 ──

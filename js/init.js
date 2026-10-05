@@ -37,12 +37,12 @@ window.addEventListener('appinstalled', function(){ PWA.deferred=null; try{ toas
 /* [core.js 256행] */
 setInterval(function(){
   var s=sessRead();
-  if(!SB_TOKEN || !s || !s.e) return;
+  if(!ST.SB_TOKEN || !s || !s.e) return;
   if(Math.floor(Date.now()/1000) > (s.e - 300)) refreshToken();   // 만료 5분 전 미리 연장
 }, 60*1000);
 
 /* [core.js 446행] */
-var IDLE_KEY='svc_idle_min', IDLE_LAST=Date.now(), IDLE_WARNED=false;
+var IDLE_KEY='svc_idle_min';
 
 /* [core.js 451행] */
 ['mousemove','mousedown','keydown','wheel','touchstart','scroll'].forEach(function(ev){
@@ -183,19 +183,19 @@ var GRIDS={
       title:'LIVE 고객사',
       rowClick:function(r){ openCust360(r.name||r.cust); },
       rows:function(){
-        if(LIVE_SRC==='sheet') return (RAWX.live||[]).slice().sort(function(a,b){
+        if(ST.LIVE_SRC==='sheet') return (RAWX.live||[]).slice().sort(function(a,b){
           var n=String(b.start_month||'').localeCompare(String(a.start_month||''));
           return n || ((b.id||0)-(a.id||0)); });
         var lv=liveCalc(LV.T!=null? LV.T : undefined);
         return lv.rows.slice().sort(function(a,b){ return String(b.curStart||'').localeCompare(String(a.curStart||'')) || String(a.cust).localeCompare(String(b.cust),'ko'); });
       }
     };
-    Object.defineProperty(g,'cols',{get:function(){ return LIVE_SRC==='sheet'? SHEET_COLS : DB_COLS; }});
-    Object.defineProperty(g,'table',{get:function(){ return LIVE_SRC==='sheet'? 'live_customers' : ''; }});
-    Object.defineProperty(g,'ro',{get:function(){ return LIVE_SRC!=='sheet'; }});
-    Object.defineProperty(g,'add',{get:function(){ return LIVE_SRC==='sheet'; }});
-    Object.defineProperty(g,'del',{get:function(){ return LIVE_SRC==='sheet'; }});
-    Object.defineProperty(g,'cap',{get:function(){ return LIVE_SRC==='sheet'
+    Object.defineProperty(g,'cols',{get:function(){ return ST.LIVE_SRC==='sheet'? SHEET_COLS : DB_COLS; }});
+    Object.defineProperty(g,'table',{get:function(){ return ST.LIVE_SRC==='sheet'? 'live_customers' : ''; }});
+    Object.defineProperty(g,'ro',{get:function(){ return ST.LIVE_SRC!=='sheet'; }});
+    Object.defineProperty(g,'add',{get:function(){ return ST.LIVE_SRC==='sheet'; }});
+    Object.defineProperty(g,'del',{get:function(){ return ST.LIVE_SRC==='sheet'; }});
+    Object.defineProperty(g,'cap',{get:function(){ return ST.LIVE_SRC==='sheet'
       ? '예전 LIVE 고객사 탭을 옮겨 둔 명단(직접 편집) — 대조용 · 행 클릭 = 고객 360'
       : '계약을 등록하면 자동으로 따라오는 명단 — 따로 등록하지 않습니다 · 새 고객은 입력·수정 › 계약에서 신규 계약, 빠질 때는 해지 처리 · 행 클릭 = 고객 360'; }});
     return g;
@@ -482,15 +482,13 @@ document.addEventListener('click', function(e){
     var dI=bar4.querySelector('.eqbar-date'), date=(dI&&dI.value)||todayStr(); var p4=EQP[oid4]||{};
     var checked=eqWant(r4).filter(function(sn){ var U=sn.toUpperCase(); var saved=(r4.status==='회수완료')||eqRetSet(r4).indexOf(U)>=0; return (U in p4)? p4[U] : saved; });
     save.disabled=true; save.textContent='저장 중…';
-    eqRetApply(r4, checked, date, '').then(function(){ delete EQP[oid4]; delete EQP['_d'+oid4]; }).catch(function(err){ toast('회수 처리 실패', String(err.message||err).slice(0,80), 'bad'); }).then(function(){ DIRTY=true; eqRefresh(); });
+    eqRetApply(r4, checked, date, '').then(function(){ delete EQP[oid4]; delete EQP['_d'+oid4]; }).catch(function(err){ toast('회수 처리 실패', String(err.message||err).slice(0,80), 'bad'); }).then(function(){ ST.DIRTY=true; eqRefresh(); });
     return; }
 });
 
 /* [equipment.js 5204행] */
 document.addEventListener('change', function(e){ var d=e.target; if(d && d.classList && d.classList.contains('eqbar-date')){ var oid=d.closest('.eqbar').dataset.oid; EQP['_d'+oid]=d.value; } });
 
-/* [analysis.js 6775행] */
-var LIVE_SRC=(function(){ try{ return localStorage.getItem('svc_live_src')||'db'; }catch(e){ return 'db'; } })();
 
 /* [tools.js 7264행] */
 document.addEventListener('keydown',function(e){
@@ -538,13 +536,11 @@ document.addEventListener('DOMContentLoaded',function(){
       await sbWrite('POST','price_books',{seg:seg,label:lab,applied:dt,data:data});
       closeOvl('ovlPrNew'); toast('가격표 새 판 등록', lab);
       RAWX.price=null; PR.ver={saas:0,onprem:0};
-      if(CUR_VIEW==='price') renderPrice();
+      if(ST.CUR_VIEW==='price') renderPrice();
     }catch(e){ m.textContent=String(e.message||e); m.style.color='var(--critical)'; }
   };
 });
 
-/* [inbound.js 8657행] */
-var INB_Y=String(new Date().getFullYear());
 
 /* [inbound.js 9350행] */
 document.addEventListener('fullscreenchange', wkFsSync);
@@ -554,7 +550,7 @@ document.addEventListener('webkitfullscreenchange', wkFsSync);
 
 /* [inbound.js 9379행] */
 document.addEventListener('keydown',function(e){
-  if(CUR_VIEW!=='weekly') return;
+  if(ST.CUR_VIEW!=='weekly') return;
   var t=e.target && e.target.tagName;
   if(t==='INPUT'||t==='TEXTAREA'||t==='SELECT') return;
   if(e.code==='Space'){ e.preventDefault(); wkNext(); return; }
@@ -614,12 +610,12 @@ LENS_DEFS.forEach(function(d){ LENS_DESC[d[0]]=d[2]; });
 /* [index.html 인라인 onclick 대체 · ㊿+136 — CSP 에서 'unsafe-inline' 을 빼기 위해 data-close / data-sat 로 위임] */
 document.addEventListener('click', function(e){
   var t=e.target; if(!t || !t.closest) return;
-  var c=t.closest('[data-close]'); if(c){ if(c.dataset.pre==='oiconv') OI_CONVERT=null; closeOvl(c.dataset.close); return; }
+  var c=t.closest('[data-close]'); if(c){ if(c.dataset.pre==='oiconv') ST.OI_CONVERT=null; closeOvl(c.dataset.close); return; }
   var a=t.closest('a[data-sat]'); if(a){ a.href=a.dataset.sat+'?v='+encodeURIComponent(APP_VER); }
 });
 document.addEventListener('submit', function(e){ if(e.target && e.target.id==='lsLogin') e.preventDefault(); });
 /* ⑤ UX 2단계 (㊿+139): 표 동작 열 여백은 창 크기에 따라 다시 계산 · ❔ 화면 도움말 · ? 단축키 안내 */
-onResize(function(){ if(CUR_VIEW && GRIDS[CUR_VIEW]) gridActPad(); });
+onResize(function(){ if(ST.CUR_VIEW && GRIDS[ST.CUR_VIEW]) gridActPad(); });
 (function(){ var b=document.getElementById('dvHelp'); if(b) b.addEventListener('click', askScreenHelp); })();
 document.addEventListener('keydown', function(e){
   if(e.key!=='?' || e.ctrlKey || e.metaKey || e.altKey) return;

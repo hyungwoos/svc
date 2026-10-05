@@ -28,19 +28,19 @@ async function shot(page, name) { try { await page.screenshot({ path: path.join(
 // 1) 기본 로드
 {
   const { ctx, page, errs, csp } = await open();
-  await S.t('로그인 상태로 열림 · 오류 없음', async () => { assert(await page.evaluate(() => !document.getElementById('app').classList.contains('hidden') && !!window.DATA), '#app 숨김 또는 DATA 없음'); assert(!errs.length, 'pageerror: ' + errs.join(' | ')); return await page.evaluate(() => APP_VER); });
+  await S.t('로그인 상태로 열림 · 오류 없음', async () => { assert(await page.evaluate(() => !document.getElementById('app').classList.contains('hidden') && !!ST.DATA), '#app 숨김 또는 DATA 없음'); assert(!errs.length, 'pageerror: ' + errs.join(' | ')); return await page.evaluate(() => APP_VER); });
   await S.t('홈: KPI 타일·인박스', async () => { const k = await page.$$eval('#kpis .kpi, #ccHeroHost .kpi', (e) => e.length); const ib = await page.$$eval('#ccInbox .ib-row, #ccInbox .ib-empty', (e) => e.length); assert(k >= 4, 'kpi ' + k); assert(ib >= 1, 'inbox ' + ib); return { kpi: k, inbox: ib }; });
   await S.t('CSP 위반 없음(콘솔)', async () => { assert(!csp.length, csp.slice(0, 3).join(' | ')); });
   for (const v of VIEWS) {
     await S.t('화면 ' + v, async () => {
       const before = errs.length;
       await page.evaluate((v) => switchView(v), v); await page.waitForTimeout(350);
-      const cur = await page.evaluate(() => CUR_VIEW); assert(cur === v, 'CUR_VIEW=' + cur);
+      const cur = await page.evaluate(() => ST.CUR_VIEW); assert(cur === v, 'CUR_VIEW=' + cur);
       const host = VIEW_HOST[v]; const vis = await page.$eval(host, (e) => !e.classList.contains('hidden')); assert(vis, host + ' 숨김');
       if (errs.length > before) throw new Error(errs.slice(before).join(' | '));
     });
   }
-  await S.t('뒤로가기(←) 동작', async () => { await page.evaluate(() => switchView('dash')); await page.evaluate(() => switchView('contracts')); await page.evaluate(() => switchView('oi')); await page.waitForTimeout(200); await page.evaluate(() => goBack()); await page.waitForTimeout(400); const v = await page.evaluate(() => CUR_VIEW); assert(v === 'contracts', 'back → ' + v); });
+  await S.t('뒤로가기(←) 동작', async () => { await page.evaluate(() => switchView('dash')); await page.evaluate(() => switchView('contracts')); await page.evaluate(() => switchView('oi')); await page.waitForTimeout(200); await page.evaluate(() => goBack()); await page.waitForTimeout(400); const v = await page.evaluate(() => ST.CUR_VIEW); assert(v === 'contracts', 'back → ' + v); });
   await S.t('만기 처리 창 열림', async () => { await page.evaluate(() => openRenewList('due')); await page.waitForTimeout(200); assert(await page.evaluate(() => document.getElementById('ovlRenew').classList.contains('on')), 'ovlRenew 닫힘'); const tabs = await page.$$eval('#rnTabs button', (b) => b.length); assert(tabs === 3, 'tabs ' + tabs); await page.evaluate(() => closeOvl('ovlRenew')); });
   await S.t('AI 요약(buildDigest) 생성', async () => { const d = await page.evaluate(() => { const D = buildDigest(); return { live: D.LIVE고객사수, keys: Object.keys(D).length, renew: !!D.만기관리 }; }); assert(d.keys > 10 && d.renew, JSON.stringify(d)); return d; });
   await S.t('데이터 점검: 규칙 카드 · 요약 · 항목 → 바로가기', async () => {
@@ -52,7 +52,7 @@ async function shot(page, name) { try { await page.screenshot({ path: path.join(
       await page.click('#bizHost [data-dc="' + withItems[0] + '"]'); await page.waitForTimeout(200);
       const links = await page.$$('#bizHost [data-dcgo]'); assert(links.length >= 1, '항목 링크 없음');
       await links[0].click(); await page.waitForTimeout(400);
-      assert(await page.evaluate(() => CUR_VIEW !== 'dcheck' || !!document.getElementById('ovlDcFix') || document.getElementById('ovlRenew').classList.contains('on')), '항목 → 수정 창/바로가기 안 됨 (' + withItems[0] + ')');
+      assert(await page.evaluate(() => ST.CUR_VIEW !== 'dcheck' || !!document.getElementById('ovlDcFix') || document.getElementById('ovlRenew').classList.contains('on')), '항목 → 수정 창/바로가기 안 됨 (' + withItems[0] + ')');
       await page.evaluate(() => { try { dcFixClose(); } catch (e) { /* */ } });
     }
     const dig = await page.evaluate(() => buildDigest().데이터점검); assert(dig && '바로고침' in dig, 'digest 데이터점검 없음');
@@ -67,7 +67,7 @@ async function shot(page, name) { try { await page.screenshot({ path: path.join(
   const writes = [];
   const { ctx, page, errs } = await open({ onWrite: (w) => writes.push(w) });
   await S.t('만기 처리 › 연장 저장 요청 모양', async () => {
-    const r = await page.evaluate(async () => { const S = renewScan(); const row = S.due[0] || S.next[0] || S.lapsed[0] || DATA.rows.filter((x) => x.endRaw != null && !x.parent)[0]; if (!row) return null; const ne = row.endRaw + 12; const res = await doRenew(row, ne, row.mrr || 100000, 'smoke'); return { id: row._id, ne, rno: res.rno }; });
+    const r = await page.evaluate(async () => { const S = renewScan(); const row = S.due[0] || S.next[0] || S.lapsed[0] || ST.DATA.rows.filter((x) => x.endRaw != null && !x.parent)[0]; if (!row) return null; const ne = row.endRaw + 12; const res = await doRenew(row, ne, row.mrr || 100000, 'smoke'); return { id: row._id, ne, rno: res.rno }; });
     assert(r, '연장할 계약 없음');
     const patch = writes.find((w) => w.m === 'PATCH' && w.url.includes('contracts?id=eq.' + r.id)); assert(patch && /renew_count/.test(patch.body), 'PATCH 없음');
     const del = writes.find((w) => w.m === 'DELETE' && w.url.includes('monthly_revenue')); assert(del, 'DELETE 없음');
@@ -207,7 +207,7 @@ for (const f of ['quote.html', 'report.html', 's1.html', 'kk.html']) {
   await S.t('❔ 이 화면 사용법 → 홈 AI 질문 · ? 단축키 안내 · Esc 닫기', async () => {
     await page.evaluate(() => switchView('orders')); await page.waitForTimeout(200);
     await page.click('#dvHelp'); await page.waitForTimeout(900);
-    const st = await page.evaluate(() => ({ v: CUR_VIEW, on: document.getElementById('answer').classList.contains('on'), title: document.getElementById('ansTitle').textContent, say: document.getElementById('aiSay').textContent }));
+    const st = await page.evaluate(() => ({ v: ST.CUR_VIEW, on: document.getElementById('answer').classList.contains('on'), title: document.getElementById('ansTitle').textContent, say: document.getElementById('aiSay').textContent }));
     assert(st.v === 'dash' && st.on && /화면/.test(st.title) && /mock/.test(st.say), JSON.stringify(st).slice(0, 200));
     await page.keyboard.press('Shift+?'); await page.waitForTimeout(150);
     let on = await page.evaluate(() => document.getElementById('ovlKeys').classList.contains('on')); assert(on, '? 로 단축키 창이 안 열림');
@@ -299,7 +299,7 @@ if (fs.existsSync(path.join(DIR, 'staging', 'index.html'))) {
       await page.fill('#mfaCode', '000000'); await page.waitForTimeout(400);
       assert(/맞지 않습니다/.test(await page.$eval('#mfaMsg', (e) => e.textContent)), '오답 안내 없음');
       await page.fill('#mfaCode', '123456'); await page.waitForTimeout(2500);
-      assert(!(await page.$('#ovlMfa')), '코드 창이 남음'); assert(await page.evaluate(() => !document.getElementById('app').classList.contains('hidden') && !!window.DATA), '앱 미표시');
+      assert(!(await page.$('#ovlMfa')), '코드 창이 남음'); assert(await page.evaluate(() => !document.getElementById('app').classList.contains('hidden') && !!ST.DATA), '앱 미표시');
       const sess = await page.evaluate(() => JSON.parse(sessionStorage.getItem('svc_sess'))); assert(sess.a === jwt('aal2') && sess.r === 'r2', 'aal2 세션 저장 안 됨');
       assert(authCalls.includes('challenge:f1') && authCalls.includes('verify:f1:000000') && authCalls.includes('verify:f1:123456'), authCalls.join(','));
       assert(!errs.length, errs.join(' | ')); return authCalls.filter((x) => !/^user|^load_all/.test(x)).join(' → ');
@@ -339,7 +339,7 @@ if (fs.existsSync(path.join(DIR, 'staging', 'index.html'))) {
       await page.fill('#lsEmail', 'tester@example.com'); await page.fill('#lsPw', 'pw'); await page.click('#lsGo'); await page.waitForTimeout(800);
       assert(await page.$('#ovlMfa'), '코드 창 없음');
       await page.fill('#mfaCode', '123456'); await page.waitForTimeout(2500);
-      assert(await page.evaluate(() => !document.getElementById('app').classList.contains('hidden') && !!window.DATA), '앱 미표시');
+      assert(await page.evaluate(() => !document.getElementById('app').classList.contains('hidden') && !!ST.DATA), '앱 미표시');
       assert(await page.evaluate(() => JSON.parse(sessionStorage.getItem('svc_sess')).a) === jwt('aal2'), 'aal2 세션 아님'); return 'OK';
     });
     await ctx.close();
@@ -347,7 +347,7 @@ if (fs.existsSync(path.join(DIR, 'staging', 'index.html'))) {
   // D) 등록하지 않은 계정은 영향 없음 (기본 mock: factors [])
   {
     const { ctx, page, errs } = await open({ token: jwt('aal1') });
-    await S.t('MFA: 미등록 계정은 코드 창 없이 바로 입장', async () => { assert(!(await page.$('#ovlMfa')), '코드 창이 떴음'); assert(await page.evaluate(() => !!window.DATA), 'DATA 없음'); assert(!errs.length, errs.join(' | ')); });
+    await S.t('MFA: 미등록 계정은 코드 창 없이 바로 입장', async () => { assert(!(await page.$('#ovlMfa')), '코드 창이 떴음'); assert(await page.evaluate(() => !!ST.DATA), 'DATA 없음'); assert(!errs.length, errs.join(' | ')); });
     await ctx.close();
   }
   // E) 관리자가 필수(즉시) 지정 + 미등록 → 등록 강제 창 → QR·코드 → aal2 입장
@@ -358,7 +358,7 @@ if (fs.existsSync(path.join(DIR, 'staging', 'index.html'))) {
       assert(await page.$('#ovlMfa #mfaForceHost'), '강제 등록 창 없음'); assert(await page.evaluate(() => document.getElementById('app').classList.contains('hidden')), '등록 전에 앱이 열림');
       await page.waitForTimeout(500); assert(await page.$('#mfaForceHost img[alt="인증 앱 등록 QR"]'), 'QR 없음'); assert(!(await page.$eval('#mfaEnCancel', (e) => e.offsetParent !== null)), '안쪽 취소 버튼이 보임');
       await page.fill('#mfaEnCode', '123456'); await page.click('#mfaEnGo'); await page.waitForTimeout(2500);
-      assert(!(await page.$('#ovlMfa')), '창이 남음'); assert(await page.evaluate(() => !document.getElementById('app').classList.contains('hidden') && !!window.DATA), '앱 미표시');
+      assert(!(await page.$('#ovlMfa')), '창이 남음'); assert(await page.evaluate(() => !document.getElementById('app').classList.contains('hidden') && !!ST.DATA), '앱 미표시');
       assert(await page.evaluate(() => JSON.parse(sessionStorage.getItem('svc_sess')).a) === jwt('aal2'), 'aal2 세션 아님'); assert(!errs.length, errs.join(' | '));
       return authCalls.filter((x) => /enroll|verify:f2/.test(x)).join(' → ');
     });
@@ -381,7 +381,7 @@ if (fs.existsSync(path.join(DIR, 'staging', 'index.html'))) {
     factors = []; const dl = new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10); policy = { required: true, deadline: dl };
     const { ctx, page } = await open({ token: jwt('aal1'), extra: mfaExtra });
     await S.t('MFA 강제: 유예 기간 → 입장 + 안내 토스트', async () => {
-      assert(!(await page.$('#ovlMfa')), '창이 떴음'); assert(await page.evaluate(() => !!window.DATA), 'DATA 없음');
+      assert(!(await page.$('#ovlMfa')), '창이 떴음'); assert(await page.evaluate(() => !!ST.DATA), 'DATA 없음');
       const t = await page.$$eval('#toasts .toast', (e) => e.map((x) => x.textContent).join(' | ')); assert(/2단계 인증 등록이 필요/.test(t) && t.includes(dl), '토스트: ' + t.slice(0, 120));
       await page.evaluate(() => switchView('account')); await page.waitForTimeout(700);
       assert(/관리자 지정: 필수/.test(await page.$eval('#accMfa', (e) => e.textContent)), '카드에 필수 표시 없음'); return dl;
@@ -416,7 +416,7 @@ if (fs.existsSync(path.join(DIR, 'staging', 'index.html'))) {
       await page.fill('#lsEmail', 'tester@example.com'); await page.fill('#lsPw', 'pw'); await page.click('#lsGo'); await page.waitForTimeout(2000);
       const iLoad = seq.indexOf('/rest/v1/rpc/load_all'), iUser = seq.indexOf('/auth/v1/user'), iPol = seq.indexOf('/rest/v1/rpc/mfa_status');
       assert(iLoad >= 0 && iLoad < iUser && iLoad < iPol, '순서: ' + seq.join(','));
-      assert(!(await page.$('#ovlMfa')), '코드 창이 뜸'); assert(await page.evaluate(() => !!window.DATA && window.CUR_VIEW === 'dash'), '대시보드 아님');
+      assert(!(await page.$('#ovlMfa')), '코드 창이 뜸'); assert(await page.evaluate(() => !!ST.DATA && ST.CUR_VIEW === 'dash'), '대시보드 아님');
       assert(await page.evaluate(() => JSON.parse(sessionStorage.getItem('svc_sess')).m) === 'none', 'm 표시 없음');
       assert(!errs.length, errs.join(' | ')); return seq.slice(0, 6).join(' → ');
     });
@@ -456,7 +456,7 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
   } });
   page.on('dialog', (d) => d.accept());
   await S.t('코드 목록: code_lists → CH_OPTS·MODEL_OPTS 갱신 · 숨긴 값 제외 · 폼 select 반영', async () => {
-    const st = await page.evaluate(() => ({ ch: CH_OPTS.slice(), model: MODEL_OPTS.slice(), ordCh: ORD_CH_OPTS.slice(), gridOpts: GRIDS.orders.cols.filter((c) => c.k === 'model')[0].opts === MODEL_OPTS, od: [...document.querySelectorAll('#odModel option')].map((o) => o.value), codes: !!CODES, active: codeActive('channel', '옛채널'), active2: codeActive('channel', '테스트채널') }));
+    const st = await page.evaluate(() => ({ ch: CH_OPTS.slice(), model: MODEL_OPTS.slice(), ordCh: ORD_CH_OPTS.slice(), gridOpts: GRIDS.orders.cols.filter((c) => c.k === 'model')[0].opts === MODEL_OPTS, od: [...document.querySelectorAll('#odModel option')].map((o) => o.value), codes: !!ST.CODES, active: codeActive('channel', '옛채널'), active2: codeActive('channel', '테스트채널') }));
     assert(st.codes, 'CODES 비어 있음'); assert(st.ch.includes('테스트채널') && !st.ch.includes('옛채널'), 'CH_OPTS ' + st.ch.join(','));
     assert(st.model.includes('S900') && st.od.includes('S900'), 'MODEL_OPTS/#odModel ' + st.od.join(','));
     assert(st.gridOpts, 'GRIDS.orders 모델 열이 MODEL_OPTS 배열을 참조하지 않음'); assert(st.ordCh.length === 5, 'ORD_CH_OPTS(표에 없음) 는 기본값 유지');
@@ -494,7 +494,7 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
   });
   await S.t('데이터 점검: 이달 매출 0 → mrr 로 채우기 (POST monthly_revenue · 원 단위 · change_log)', async () => {
     writes.length = 0;
-    const exp = await page.evaluate(async () => { const r = DATA.rows.filter((x) => x.mrr > 0)[0]; await dcFillMrr([r], DATA.nowIdx); return { id: r._id, mrr: r.mrr, month: idxDate(DATA.nowIdx) }; });
+    const exp = await page.evaluate(async () => { const r = ST.DATA.rows.filter((x) => x.mrr > 0)[0]; await dcFillMrr([r], ST.DATA.nowIdx); return { id: r._id, mrr: r.mrr, month: idxDate(ST.DATA.nowIdx) }; });
     await page.waitForTimeout(500);
     const post = writes.filter((w) => /monthly_revenue/.test(w.url) && w.m === 'POST')[0]; assert(post, 'monthly_revenue POST 없음 ' + JSON.stringify(writes.map((w) => w.m + ' ' + w.url.split('/rest/v1/')[1])));
     const b = JSON.parse(post.body); assert(Array.isArray(b) && b.length === 1 && b[0].contract_id === exp.id && b[0].amount === Math.round(exp.mrr) && b[0].month === exp.month, JSON.stringify(b) + ' vs ' + JSON.stringify(exp));
@@ -503,7 +503,7 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
     assert(!errs.length, errs.join(' | ')); return b[0].amount + '원';
   });
   await S.t('데이터 점검: 만기 판정 포탈 ↔ DB(renew_watch) 대조 규칙', async () => {
-    const rs = await page.evaluate(() => { const R = renewScan(DATA.nowIdx); return { lapsed: R.lapsed.map((r) => r._id), due: R.due.map((r) => r._id), next: R.next.map((r) => r._id) }; });
+    const rs = await page.evaluate(() => { const R = renewScan(ST.DATA.nowIdx); return { lapsed: R.lapsed.map((r) => r._id), due: R.due.map((r) => r._id), next: R.next.map((r) => r._id) }; });
     rwRows = rs.due.map((id) => ({ kind: 'due', contract_id: id, customer: 'x' })).concat([{ kind: 'lapsed', contract_id: 999999, customer: '가상DB전용' }]);
     await page.evaluate(() => { DC.rw = null; switchView('dcheck'); }); await page.waitForTimeout(900);
     const r = await page.evaluate(() => { const x = dcRules().filter((q) => q.id === 'c_renew_sync')[0]; return { sev: x.sev, n: x.items.length, subs: x.items.map((i) => i.sub.slice(0, 20)), rw: DC.rw && { portalN: DC.rw.portalN, dbN: DC.rw.dbN, pending: !!DC.rw.pending } }; });
@@ -515,7 +515,7 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
   });
   await S.t('코드 목록 표 없음(SQL 93 전) → 기본값 그대로 · 코드 관리는 안내', async () => {
     const { ctx: c2, page: p2, errs: e2 } = await open({ extra: async (route, u, m) => { if (!u.includes('/rest/v1/code_lists')) return false; await route.fulfill({ status: 404, contentType: 'application/json', body: '{"message":"relation \\"public.code_lists\\" does not exist"}' }); return true; } });
-    const st = await p2.evaluate(() => ({ codes: CODES, ch: CH_OPTS.slice() })); assert(st.codes === null && st.ch.length === 5, JSON.stringify(st));
+    const st = await p2.evaluate(() => ({ codes: ST.CODES, ch: CH_OPTS.slice() })); assert(st.codes === null && st.ch.length === 5, JSON.stringify(st));
     await p2.evaluate(() => switchView('adminx')); await p2.waitForTimeout(800);
     const msg = await p2.$eval('#cdMsg', (e) => e.textContent); assert(/SQL 93/.test(msg), msg);
     assert(!e2.length, e2.join(' | ')); await c2.close(); return msg.slice(0, 30);
@@ -681,7 +681,7 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
 {
   const { ctx, page } = await open({ extra: async (route, u) => { if (u.includes('/rpc/load_all') || /\/rest\/v1\/(customers|contracts|monthly_revenue)\b/.test(u)) { await route.fulfill({ status: 503, contentType: 'application/json', body: '{"message":"down"}' }); return true; } return false; } });
   await S.t('DB 5xx → «데이터를 불러오지 못했습니다» (빈 화면으로 넘기지 않음)', async () => {
-    const t = await page.evaluate(() => ({ load: (document.getElementById('loading') || {}).textContent || '', data: !!window.DATA }));
+    const t = await page.evaluate(() => ({ load: (document.getElementById('loading') || {}).textContent || '', data: !!ST.DATA }));
     assert(/불러오지 못했습니다/.test(t.load) && /503/.test(t.load), JSON.stringify(t).slice(0, 200)); return t.load.slice(0, 40);
   });
   await ctx.close();
@@ -693,7 +693,7 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
     /* lib 의 init 스크립트가 새로고침마다 저장소를 비우므로, 같은 페이지에서 boot() 를 다시 불러 «캐시로 먼저 그리기» 경로를 탐 */
     const c = await page.evaluate(() => !!sessionStorage.getItem(CACHE_KEY)); assert(c, '캐시 없음');
     fail = true; await page.evaluate(() => boot()); await page.waitForTimeout(1500);
-    const t = await page.evaluate(() => ({ data: !!window.DATA, toast: [...document.querySelectorAll('.toast')].map((e) => e.textContent).join(' | ') }));
+    const t = await page.evaluate(() => ({ data: !!ST.DATA, toast: [...document.querySelectorAll('.toast')].map((e) => e.textContent).join(' | ') }));
     assert(t.data && /최신 데이터를 불러오지 못했습니다/.test(t.toast), JSON.stringify(t).slice(0, 200)); return 'toast';
   });
   await ctx.close();
@@ -829,7 +829,7 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
   await S.t('㊿+145 로그인 → 대시보드 · 다른 메뉴에서 로그아웃 → Supabase 호출 없이 로그인 화면 · 주소의 #메뉴 지움', async () => {
     assert(await page.evaluate(() => !document.getElementById('viewLogin').classList.contains('hidden')), '처음 로그인 화면 아님');
     await page.fill('#lsEmail', 'tester@example.com'); await page.fill('#lsPw', 'pw'); await page.click('#lsGo'); await page.waitForTimeout(1500);
-    assert(await page.evaluate(() => window.CUR_VIEW === 'dash' && !document.getElementById('viewDash').classList.contains('hidden')), '로그인 뒤 대시보드 아님');
+    assert(await page.evaluate(() => ST.CUR_VIEW === 'dash' && !document.getElementById('viewDash').classList.contains('hidden')), '로그인 뒤 대시보드 아님');
     await page.evaluate(() => navMenu('contracts')); await page.waitForTimeout(400);
     assert(await page.evaluate(() => location.hash) === '#contracts', '해시 ' + await page.evaluate(() => location.hash));
     counting = true; sbN = 0;
@@ -838,14 +838,14 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
     counting = false;
     assert(st.login && !st.hash && !st.sess, JSON.stringify(st)); assert(sbN === 0, '로그아웃 뒤 Supabase 호출 ' + sbN + '번');
     await page.fill('#lsEmail', 'tester@example.com'); await page.fill('#lsPw', 'pw'); await page.click('#lsGo'); await page.waitForTimeout(1500);
-    assert(await page.evaluate(() => window.CUR_VIEW === 'dash' && !location.hash), '다시 로그인 뒤 대시보드 아님');
+    assert(await page.evaluate(() => ST.CUR_VIEW === 'dash' && !location.hash), '다시 로그인 뒤 대시보드 아님');
     assert(!errs.length, errs.join(' | ')); return 'logout→login 화면 Supabase 0회';
   });
   await S.t('㊿+145 주소에 #메뉴가 남은 채 로그인 화면에서 로그인해도 대시보드', async () => {
     await page.evaluate(() => { history.replaceState(null, '', location.pathname + '#ops'); doLogout(); }); await page.waitForTimeout(1500);
     await page.evaluate(() => history.replaceState(null, '', location.pathname + '#ops'));
     await page.fill('#lsEmail', 'tester@example.com'); await page.fill('#lsPw', 'pw'); await page.click('#lsGo'); await page.waitForTimeout(1500);
-    const r = await page.evaluate(() => ({ v: window.CUR_VIEW, h: location.hash })); assert(r.v === 'dash' && !r.h, JSON.stringify(r)); return 'dash';
+    const r = await page.evaluate(() => ({ v: ST.CUR_VIEW, h: location.hash })); assert(r.v === 'dash' && !r.h, JSON.stringify(r)); return 'dash';
   });
   await S.t('㊿+145 메뉴를 누르면 첫 화면(탭·검색·스크롤) · 뒤로가기는 이어서', async () => {
     await page.evaluate(() => navMenu('ops')); await page.waitForTimeout(500);
@@ -853,7 +853,7 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
     assert(await page.evaluate(() => OPS.tab) === 'log', '기록 탭으로 안 바뀜');
     await page.evaluate(() => navMenu('contracts')); await page.waitForTimeout(400);
     await page.evaluate(() => goBack()); await page.waitForTimeout(600);
-    assert(await page.evaluate(() => window.CUR_VIEW === 'ops' && OPS.tab === 'log'), '뒤로가기가 이어서 보지 않음');
+    assert(await page.evaluate(() => ST.CUR_VIEW === 'ops' && OPS.tab === 'log'), '뒤로가기가 이어서 보지 않음');
     await page.evaluate(() => document.querySelector('#side button[data-v="dash"]').click()); await page.waitForTimeout(300);
     await page.evaluate(() => document.querySelector('#side button[data-v="ops"]').click()); await page.waitForTimeout(500);
     assert(await page.evaluate(() => OPS.tab) === 'gh', '메뉴로 들어왔는데 탭 유지: ' + await page.evaluate(() => OPS.tab));
@@ -880,7 +880,7 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
     const r = await page.evaluate(async () => {
       cacheDrop(); cacheWriteLater([[1]]); cacheDrop(); await new Promise((ok) => setTimeout(ok, 3300)); const dropped = sessionStorage.getItem(CACHE_KEY) === null;
       cacheWriteLater([[{ id: 1 }]]); await new Promise((ok) => setTimeout(ok, 3300)); const written = !!sessionStorage.getItem(CACHE_KEY);
-      navMenu('dash'); onData(DATA); onData(DATA); await new Promise((ok) => setTimeout(ok, 400));
+      navMenu('dash'); onData(ST.DATA); onData(ST.DATA); await new Promise((ok) => setTimeout(ok, 400));
       window.__rn = 0; const orig = window.renderAll; window.renderAll = function () { window.__rn++; return orig.apply(this, arguments); };
       return { dropped, written, wwOn: _wwOn };
     });
@@ -1018,7 +1018,7 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
     const msg = await page.$eval('#dcfMsg', (e) => e.textContent);
     assert(/아직 이 규칙에 걸립니다/.test(msg) && writes.some((w) => w.m === 'PATCH' && w.url.includes('id=eq.' + lead)), msg);
     // c_live_zero: 이달 매출을 비워 규칙에 걸리게 한 뒤 수정 창에서 천원 입력
-    const ok = await page.evaluate(() => { const T = DATA.nowIdx; const k = DATA.rows.findIndex((r, i) => liveActiveAt(r, T) && !r.parent && MAT[i] && MAT[i][T] && !/일시납|연납|반년납|분기납/.test(String(r.billing || ''))); if (k < 0) return null; MAT[k][T] = 0; const it = dcRules().filter((r) => r.id === 'c_live_zero')[0].items; return it.length ? it.findIndex((x) => x.fix.id === DATA.rows[k]._id) : null; });
+    const ok = await page.evaluate(() => { const T = ST.DATA.nowIdx; const k = ST.DATA.rows.findIndex((r, i) => liveActiveAt(r, T) && !r.parent && ST.MAT[i] && ST.MAT[i][T] && !/일시납|연납|반년납|분기납/.test(String(r.billing || ''))); if (k < 0) return null; ST.MAT[k][T] = 0; const it = dcRules().filter((r) => r.id === 'c_live_zero')[0].items; return it.length ? it.findIndex((x) => x.fix.id === ST.DATA.rows[k]._id) : null; });
     if (ok == null || ok < 0) return '이달 매출 0 상황을 못 만듦 — 앞 단계만 확인';
     await page.evaluate((i) => { dcFixClose(); dcFixOpen('c_live_zero', i); }, ok); await page.waitForTimeout(200);
     await page.fill('#dcfRev', '1234'); writes.length = 0; await page.click('#dcfSave'); await page.waitForTimeout(1500);
@@ -1026,7 +1026,7 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
     const pb = JSON.parse(post.body); assert(pb.amount === 1234000 && pb.month && pb.contract_id, JSON.stringify(pb));
     await page.evaluate(() => { dcFixClose(); dcFixOpen('c_s1no', 0); }); await page.waitForTimeout(200);
     await page.click('#dcfGo'); await page.waitForTimeout(400);
-    assert(!(await page.$('#ovlDcFix')) && (await page.evaluate(() => CUR_VIEW)) === 'contracts', '화면에서 보기 → 계약 관리 아님');
+    assert(!(await page.$('#ovlDcFix')) && (await page.evaluate(() => ST.CUR_VIEW)) === 'contracts', '화면에서 보기 → 계약 관리 아님');
     return 'POST ' + JSON.stringify(pb);
   });
   await S.t('㊿+148 업데이트 안내: 슈퍼가 열면 안내문 자동 채움(오래된 것부터) · 체크된 계정에 팝업 · 확인 체크 전 비활성 · 확인 → upd_ack_set(최대 id)', async () => {
@@ -1038,7 +1038,8 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
     pending = { notify: true, last_id: 0, notes: notesDb.slice(-2).reverse() };
     await page.evaluate(async () => { UPD.checked = false; await updCheck(); }); await page.waitForTimeout(200);
     const ui = await page.evaluate(() => { const o = document.getElementById('ovlUpd'); return o && { secs: o.querySelectorAll('.upd-sec').length, first: o.querySelector('.upd-sec b').textContent, dis: o.querySelector('#updDone').disabled, sub: o.querySelector('.mini').textContent, adm: o.querySelectorAll('.upd-adm').length, li: o.querySelectorAll('.upd-sec li').length }; });
-    assert(ui && ui.secs === 2 && ui.first === notesDb[notesDb.length - 1].title && ui.dis && /지금까지/.test(ui.sub) && ui.adm >= 1 && ui.li >= 5, JSON.stringify(ui));
+    const expLi = pending.notes.reduce((a, n) => a + n.body.split('\n').filter((l) => /^- /.test(l)).length, 0), expAdm = pending.notes.reduce((a, n) => a + (n.body.match(/\(관리자\)/g) || []).length, 0);
+    assert(ui && ui.secs === 2 && ui.first === notesDb[notesDb.length - 1].title && ui.dis && /지금까지/.test(ui.sub) && ui.adm === expAdm && ui.li === expLi, JSON.stringify(ui) + ' exp li ' + expLi + ' adm ' + expAdm);
     await page.check('#updOk'); assert(!(await page.$eval('#updDone', (e) => e.disabled)), '체크해도 확인 비활성');
     writes.length = 0; await page.click('#updDone'); await page.waitForTimeout(400);
     const ack = writes.filter((w) => /upd_ack_set/.test(w.url))[0]; assert(ack && JSON.parse(ack.body).p_last_id === Math.max(...pending.notes.map((x) => x.id)), JSON.stringify(ack));
@@ -1061,7 +1062,7 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
     assert((await vis()) === 'cfg' && (await page.$eval('#admTabs [data-t="cfg"]', (b) => b.getAttribute('aria-pressed'))) === 'true', 'cfg 전환 ' + (await vis()));
     const h = await page.evaluate(() => document.querySelector('#viewAdmin section').getBoundingClientRect().height);
     await page.evaluate(() => navMenu('dash')); await page.waitForTimeout(300); await page.evaluate(() => goBack()); await page.waitForTimeout(500);
-    assert((await page.evaluate(() => CUR_VIEW)) === 'adminx' && (await vis()) === 'cfg', '뒤로가기 → 보던 탭 아님 ' + (await vis()));
+    assert((await page.evaluate(() => ST.CUR_VIEW)) === 'adminx' && (await vis()) === 'cfg', '뒤로가기 → 보던 탭 아님 ' + (await vis()));
     await page.evaluate(() => navMenu('adminx')); await page.waitForTimeout(400);
     assert((await vis()) === 'acct', '메뉴 다시 누르면 첫 탭 아님 ' + (await vis()));
     return tabs.join(' | ') + ' · 설정 탭 높이 ' + Math.round(h) + 'px';

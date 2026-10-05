@@ -7,10 +7,10 @@
 function fkNorm(s){ return String(s==null?'':s).toLowerCase().replace(/\s+/g,''); }
 function fkSources(){
   var out=[];
-  (window.DATA&&DATA.rows||[]).forEach(function(r){
+  (ST.DATA&&ST.DATA.rows||[]).forEach(function(r){
     out.push({t:'계약', nm:r.cust, sb:lline(r.line)+' · '+(r.channel||'')+' · '+(r.partner||'')+' · '+(r.csm||''), go:function(){ switchView('contracts'); $('#dvSearch').value=r.cust; renderGrid(); }, cust:r.cust});
   });
-  (function(){ var lv=(window.DATA&&DATA.rows)? liveData() : null; (lv&&lv.ok? lv.rows:[]).forEach(function(r){
+  (function(){ var lv=(ST.DATA&&ST.DATA.rows)? liveData() : null; (lv&&lv.ok? lv.rows:[]).forEach(function(r){
     out.push({t:'LIVE', nm:r.cust, sb:(r.prod||'')+' · '+(r.nodes||'')+'노드'+(r.basis? ' · '+r.basis:''), go:function(){ switchView('live'); $('#dvSearch').value=r.cust; renderGrid(); }, cust:r.cust});
   }); })();
   (RAWX.oi||[]).forEach(function(r){
@@ -31,7 +31,7 @@ function fkSources(){
   return out;
 }
 function openFind(){
-  if(!SB_TOKEN || !window.DATA) return;
+  if(!ST.SB_TOKEN || !ST.DATA) return;
   if(RAWX.inbound===undefined && !window.IS_EQUIP) try{ loadInbound(function(){}); }catch(e){}
   openOvl('ovlFind');
   var inp=$('#fkInput'); inp.value=''; $('#fkOut').innerHTML='';
@@ -91,8 +91,8 @@ function openCust360(name){
     return '<table><thead><tr>'+cols.map(function(c){return '<th>'+c+'</th>';}).join('')+'</tr></thead><tbody>'+
       rows.map(function(r){ return '<tr>'+r.map(function(v){return '<td>'+esc(String(v==null||v===''?'·':v))+'</td>';}).join('')+'</tr>'; }).join('')+'</tbody></table>';
   }
-  var cts=(window.DATA&&DATA.rows||[]).filter(function(r){return c360Match(r.cust,nm);});
-  var lvAll=(window.DATA&&DATA.rows)? liveData() : null;
+  var cts=(ST.DATA&&ST.DATA.rows||[]).filter(function(r){return c360Match(r.cust,nm);});
+  var lvAll=(ST.DATA&&ST.DATA.rows)? liveData() : null;
   var lives=(lvAll&&lvAll.ok? lvAll.rows:[]).filter(function(r){return c360Match(r.cust,nm);});
   var ois=(RAWX.oi||[]).filter(function(r){return c360Match(r.customer,nm);});
   var inbs=(RAWX.inbound||[]).filter(function(r){return c360Match(r.org,nm);});
@@ -123,7 +123,7 @@ function openCust360(name){
 }
 
 /* ===== 표 밀도 (보통/컴팩트) ===== */
-function denseKey(){ return 'svc_dense_'+(AUTH_USER||'anon'); }
+function denseKey(){ return 'svc_dense_'+(ST.AUTH_USER||'anon'); }
 function applyDense(){
   var on=false; try{ on=localStorage.getItem(denseKey())==='1'; }catch(e){}
   var t=document.getElementById('dvTable'); if(t) t.classList.toggle('dense', on);
@@ -134,7 +134,7 @@ function applyDense(){
 /* ===== 엑셀 붙여넣기 대량 입력 ===== */
 function pasteCols(g){ return g.cols.filter(function(c){ return !c.ro && c.k[0]!=='_'; }); }
 function openPaste(){
-  var g=GRIDS[CUR_VIEW]; if(!g||!g.add) return;
+  var g=GRIDS[ST.CUR_VIEW]; if(!g||!g.add) return;
   var cols=pasteCols(g);
   $('#pasteCols').innerHTML='열 순서: '+cols.map(function(c){return '<b>'+esc(c.l)+'</b>';}).join(' → ')+
     ' <span class="mini">(엑셀에서 이 순서로 열을 맞춰 복사하세요 · 빈 칸은 비워둬도 됩니다)</span>';
@@ -167,7 +167,7 @@ function openPaste(){
       for(var i=0;i<rows.length;i+=100) await sbWrite('POST', g.table, rows.slice(i,i+100));
       closeOvl('ovlPaste');
       toast('붙여넣기 입력', rows.length+'행 추가됨 — '+g.title);
-      loadFromDb().then(function(nd){ onData(nd); if(GRIDS[CUR_VIEW]) renderGrid(); });
+      loadFromDb().then(function(nd){ onData(nd); if(GRIDS[ST.CUR_VIEW]) renderGrid(); });
     }catch(e){ $('#pasteMsg').textContent=String(e.message||e).slice(0,140); }
   };
   openOvl('ovlPaste');
@@ -178,10 +178,10 @@ function viewLabel(v){
   var b=document.querySelector('.side button[data-v="'+v+'"]');
   return b? navText(b):v;
 }
-function recentKey(){ return 'svc_recent_'+(AUTH_USER||'anon'); }
+function recentKey(){ return 'svc_recent_'+(ST.AUTH_USER||'anon'); }
 
 /* ===== 메뉴 편집 — 순서·숨김 (admin 이상 · 내 계정/브라우저에만 적용) ===== */
-function menuConfKey(){ return 'svc_menuconf_'+(AUTH_USER||'anon'); }
+function menuConfKey(){ return 'svc_menuconf_'+(ST.AUTH_USER||'anon'); }
 function menuSegments(){
   var out=[], kids=Array.prototype.slice.call($('#side').children);
   kids.forEach(function(el){
@@ -315,7 +315,7 @@ function pushRecent(v){
 }
 function renderTodo(){
   var wrap=document.getElementById('todoWrap'); if(!wrap) return;
-  if(!SB_TOKEN || !window.DATA || window.IS_EQUIP){ wrap.style.display='none'; return; }
+  if(!ST.SB_TOKEN || !ST.DATA || window.IS_EQUIP){ wrap.style.display='none'; return; }
   wrap.style.display='';
   var today=new Date(), t0=today.getTime(), todayS=todayStr(today);
   // ① 인바운드 장기 미대응 — 10분 캐시, 필요한 열만 가볍게 조회
@@ -329,7 +329,7 @@ function renderTodo(){
           if(last && (t0-new Date(last).getTime())/864e5>=90) n++;   // 대시보드 기준: 3개월
         }); }
         window.__inbTodo={t:t0, n:n};
-        if(CUR_VIEW==='dash') renderTodo();
+        if(ST.CUR_VIEW==='dash') renderTodo();
       });
   }
   var inbN=window.__inbTodo? window.__inbTodo.n:null;
@@ -339,7 +339,7 @@ function renderTodo(){
   }).length;
   // ③ 재약정 도래 — 60일(2개월) 안에 종료되는 계약
   var nowI=dIdx(todayS), renewN=0;
-  (DATA.rows||[]).forEach(function(r){
+  (ST.DATA.rows||[]).forEach(function(r){
     if(r._hw || /해지/.test(String(r.status||''))) return;
     if(r.endIdx!=null && r.endIdx>=nowI && r.endIdx<=nowI+2) renewN++;
   });
@@ -383,4 +383,3 @@ function applyFs(n){
 
 /* ===== 제품 가격표 — 판(개정판) 단위 관리 ===== */
 var PR={seg:'saas', ver:{saas:0,onprem:0}, op:'ztna', q:'', tcoP:'nac', tcoD:0.30};
-var TCOQ=null;
