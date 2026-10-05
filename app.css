@@ -670,7 +670,7 @@ kbd{display:inline-block;padding:1px 6px;border:1px solid var(--ring);border-bot
 :is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate,#viewCustFlow) .pr-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
 :is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate,#viewCustFlow) .pr-ver{font-size:11px;background:var(--surface-2);border:1px solid var(--ring);border-radius:999px;padding:3px 11px;color:var(--ink-2)}
 :is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate,#viewCustFlow) .pr-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
-:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate,#viewCustFlow) .pr-card{background:var(--surface);border:1px solid var(--ring);border-radius:14px;padding:15px 17px;margin-bottom:0}
+:is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate,#viewCustFlow) .pr-card{background:var(--surface);border:1px solid var(--ring);border-radius:14px;padding:15px 17px;margin-bottom:0;min-width:0}
 :is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate,#viewCustFlow) .pr-card h3{font-size:13.5px;margin:0 0 4px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;border:none;padding:0}
 :is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate,#viewCustFlow) .pr-card h3 small{color:var(--muted);font-weight:400;margin-left:auto;font-size:11px}
 :is(#viewPrice,#viewReport,#viewChurn,#viewCloud,#viewChurnRate,#viewCustFlow) table.pr{width:100%;border-collapse:collapse;font-size:12.5px}
@@ -1694,3 +1694,28 @@ tr.row-dim td{color:var(--muted)}
 .adm-new>summary{display:inline-flex;align-items:center;gap:6px;cursor:pointer;list-style:none;font-size:12.5px;font-weight:600;color:var(--brand-ink);padding:4px 0}
 .adm-new>summary::-webkit-details-marker{display:none}
 .adm-new[open]>summary{color:var(--ink-2)}
+
+/* ===== ㊿+151 스테이징 QA 창 ===== */
+.qa-head{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.qa-body{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(300px,1fr);gap:14px;align-items:start}
+.qa-frame{position:relative;overflow:hidden;background:var(--surface-2);border:1px solid var(--ring);border-radius:10px;min-height:120px}
+.qa-list{max-height:min(62vh,640px);overflow:auto;border:1px solid var(--ring);border-radius:10px;padding:4px 0}
+.qa-row{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;padding:5px 10px;border-bottom:1px solid var(--ring);font-size:12.5px}
+.qa-row:last-child{border-bottom:0}
+.qa-row.run{background:var(--brand-t)}
+.qa-row.fail{background:color-mix(in srgb, var(--critical) 8%, transparent)}
+.qa-row .qa-ic{width:18px;text-align:center;flex-shrink:0}
+.qa-row .qa-lb{flex:1 1 140px;min-width:0}
+.qa-row .qa-ms{flex-shrink:0;min-width:34px;text-align:right}
+.qa-row .qa-dt{flex:1 1 100%;padding-left:26px;line-height:1.5;color:var(--critical);overflow-wrap:anywhere}
+.qa-row.ok .qa-dt,.qa-row.warn .qa-dt{color:var(--muted)}
+.qa-foot{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px;border-top:1px solid var(--ring);padding-top:12px}
+.qa-sum{font-size:13.5px}
+@media (max-width:900px){ .qa-body{grid-template-columns:1fr} .qa-list{max-height:40vh} }
+
+/* ㊿+152 가격표가 1280px·폰에서 페이지를 옆으로 밀던 것(스테이징 QA 가 찾음) — 표(줄바꿈 없는 숫자 6열 ≈ 600~700px)가 들어갈 폭이 안 되면 카드 한 줄에 하나,
+   그래도 좁으면(폰) 카드 안에서만 옆으로 스크롤 · 넓은 화면(≈1500px 이상)은 예전처럼 두 칸 */
+#viewPrice .pr-grid{grid-template-columns:repeat(auto-fill,minmax(min(100%,700px),1fr))}
+#viewPrice .pr-grid > .pr-card{min-width:0;overflow-x:auto}
+#viewPrice .pr-top{min-width:0}
+#viewPrice .pr-top select{max-width:100%}
