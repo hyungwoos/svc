@@ -603,8 +603,20 @@ function opsLogBind(host){
   var eb=host.querySelector('#opsErrs'); if(eb) eb.onclick=opsLoadErrors;
 }
 
+/* ㊿+149 관리자 화면 탭 4개 (사용자: «너무 지저분 · 스크롤 많고 난잡») — 계정·권한 / 보안 / 설정(코드 관리·업데이트 안내) / AI 비용
+   · 메뉴를 누르면 첫 탭(viewReset · VIEW_UI.adminx.ADM) · 뒤로가기는 보던 탭 · 데이터는 예전처럼 한 번에 읽고 보이는 탭만 바꿈 */
+var ADM={tab:'acct'};
+function admTab(t){
+  if(t) ADM.tab=t;
+  if(!document.querySelector('#viewAdmin .adm-pane[data-pane="'+ADM.tab+'"]')) ADM.tab='acct';
+  document.querySelectorAll('#admTabs button').forEach(function(b){ b.setAttribute('aria-pressed', String(b.dataset.t===ADM.tab)); });
+  document.querySelectorAll('#viewAdmin .adm-pane').forEach(function(p){ p.hidden=(p.dataset.pane!==ADM.tab); });
+}
 function renderAdmin(){
   if(!window.IS_SUPER){ switchView('dash'); return; }
+  var tb=document.getElementById('admTabs');
+  if(tb && !tb.__bound){ tb.__bound=1; tb.querySelectorAll('button').forEach(function(b){ b.onclick=function(){ admTab(b.dataset.t); try{ scrollTo(0,0); }catch(e){} }; }); }
+  admTab();
   var rs=$('#axRole');
   if(!rs.options.length){
     rs.innerHTML='<option value="">권한 없음 (나중에 지정)</option>'+
@@ -1328,7 +1340,9 @@ var UPD_SEED=[
     '- 데이터 점검 항목을 누르면 수정 창이 열려 그 자리에서 고칩니다. 저장하면 다음 항목으로 넘어갑니다.',
     '- 로그인할 때 이렇게 업데이트 내용을 알려 드립니다. «모두 확인했습니다»에 체크하고 확인을 누르면 다음 업데이트 전까지 다시 뜨지 않습니다.',
     '- 지난 안내는 내 계정 › «📢 업데이트 내역»에서 언제든 다시 볼 수 있습니다.',
-    '- (관리자) 매일 새벽 3시 AI 자동 점검 결과를 슬랙에 «성공/실패» 한 줄로 알립니다.'].join('\n')}
+    '- (관리자) 매일 새벽 3시 AI 자동 점검 결과를 슬랙에 «성공/실패» 한 줄로 알립니다.'].join('\n')},
+  {ver:'㊿+149', date:'2026-10-05', title:'관리자 화면 정리', body:[
+    '- (관리자) 관리자 화면을 탭 4개(계정·권한 · 보안 · 설정 · AI 비용)로 나눠 긴 스크롤을 없앴습니다. «새 계정 만들기»는 접어 두었습니다.'].join('\n')}
 ];
 async function updFetch(path, opt){   /* 캐시를 건드리지 않는 직접 호출 — 401 이면 토큰 갱신 뒤 1회 재시도 */
   if(!SB_TOKEN) throw new Error('로그인이 필요합니다');
@@ -1399,6 +1413,7 @@ async function updOpenAll(){
 function updMsg(t, bad){ var e=document.getElementById('updMsg'); if(e){ e.textContent=t||''; e.style.color=bad? 'var(--critical)':'var(--muted)'; } }
 async function updAdminLoad(){
   var host=document.getElementById('updAdmin'); if(!host) return;
+  var seq=UPD.seq=(UPD.seq||0)+1;   /* 겹쳐 부르면 마지막 것만 그림 */
   updMsg('불러오는 중…');
   try{
     var n=await updSyncSeed(); if(n) toast('업데이트 안내', '새 안내 '+n+'건을 넣었습니다');
@@ -1408,8 +1423,9 @@ async function updAdminLoad(){
       updFetch('upd_ack?select=email,last_id,acked_at'),
       sbWrite('POST','rpc/admin_list_users',{}).catch(function(){ return null; })
     ]);
+    if(seq!==UPD.seq) return;
     UPD.rows=res[0]||[]; UPD.notify=res[1]||[]; UPD.ack=res[2]||[]; UPD.users=res[3]||[]; UPD.err='';
-  }catch(e){ UPD.rows=null; UPD.err=/404|PGRST|does not exist|schema cache/i.test(String(e.message))? 'SQL 96 이 아직 실행되지 않았습니다 — 배포·운영 › SQL 탭에서 sql96_update_notes.sql 을 실행하세요' : String(e.message||e).slice(0,200); }
+  }catch(e){ if(seq!==UPD.seq) return; UPD.rows=null; UPD.err=/404|PGRST|does not exist|schema cache/i.test(String(e.message))? 'SQL 96 이 아직 실행되지 않았습니다 — 배포·운영 › SQL 탭에서 sql96_update_notes.sql 을 실행하세요' : String(e.message||e).slice(0,200); }
   updAdminPaint();
 }
 function updAdminPaint(){

@@ -19,7 +19,7 @@
 <!-- 포탈 버전 — 파일을 바꿔 올릴 때마다 아래 content 의 숫자가 +1 (화면 맨 아래 표시 · app.css / js/*.js 의 ?v= 캐시 무효화 · 배포·운영이 이 값을 읽어 비교).
      코드 파일 목록은 app-js (js/load.js 가 이 순서로 불러옴 · 마지막은 항상 js/init.js) — 파일을 더하거나 빼면 여기와 sw.js 의 SHELL 을 함께 고칠 것.
      ④ 아키텍처 2단계(㊿+136): 인라인 스크립트·onclick 을 전부 없애 CSP script-src 에서 'unsafe-inline' 제거. -->
-<meta name="app-ver" content="2026-09-16 ㊿+148">
+<meta name="app-ver" content="2026-09-16 ㊿+149">
 <meta name="app-js" content="js/viz.js,js/core.js,js/shell.js,js/dash.js,js/ai.js,js/grids.js,js/equipment.js,js/analysis.js,js/tools.js,js/price.js,js/inbound.js,js/admin.js,js/sales.js,js/report.js,js/grid.js,js/edit.js,js/init.js">
 <script src="js/boot.js"></script>
 </head>
@@ -721,16 +721,19 @@
   <div id="viewOps" class="hidden"><section class="card c12" style="max-width:1120px;margin:0 auto" id="opsHost"></section></div>
   <div id="viewAdmin" class="hidden">
     <section class="card c12" style="max-width:1000px;margin:0 auto">
-      <h3 style="margin:0 0 4px;font-size:15px">🛡️ 관리자 — 계정·권한 관리</h3>
-      <p class="cap" style="margin:0 0 16px">슈퍼 관리자 전용 · 모든 변경은 즉시 적용되고 되돌리려면 다시 바꾸면 됩니다.</p>
-      <div style="font-size:11px;color:var(--muted);margin:2px 0 8px">— 새 계정 만들기 —</div>
-      <div class="frm">
+      <h3 style="margin:0 0 4px;font-size:15px">🛡️ 관리자</h3>
+      <p class="cap" style="margin:0 0 12px">슈퍼 관리자 전용 · 모든 변경은 즉시 적용되고 되돌리려면 다시 바꾸면 됩니다.</p>
+      <div class="mtabs adm-tabs" id="admTabs" role="tablist" aria-label="관리자 화면 구역"><button type="button" data-t="acct" aria-pressed="true">👥 계정·권한</button><button type="button" data-t="sec" aria-pressed="false">🔐 보안</button><button type="button" data-t="cfg" aria-pressed="false">⚙️ 설정</button><button type="button" data-t="bill" aria-pressed="false">💳 AI 비용</button></div>
+      <div class="adm-pane" data-pane="acct">
+      <details class="adm-new" id="axNewBox"><summary>＋ 새 계정 만들기</summary>
+      <div class="frm" style="margin-top:8px">
         <div><label for="axEmail">이메일 *</label><input id="axEmail" type="email" placeholder="user@genians.com"></div>
         <div><label for="axPw">초기 비밀번호 * (6자 이상)</label><input id="axPw" placeholder="본인이 로그인 후 변경"></div>
         <div><label for="axRole">권한</label><select id="axRole"></select></div>
         <div style="display:flex;align-items:flex-end"><button class="pill" id="axCreate" style="height:36px">＋ 계정 생성</button></div>
       </div>
-      <div style="font-size:11px;color:var(--muted);margin:18px 0 8px">— 전체 계정 —</div>
+      </details>
+      <div class="adm-h">전체 계정</div>
       <div class="dbar" style="margin-bottom:8px">
         <input type="search" id="axQ" aria-label="계정 이메일 검색" placeholder="이메일 검색">
         <button class="pill ghost" id="axReload">↻ 다시 읽기</button>
@@ -740,7 +743,7 @@
       <p class="cap" style="margin:10px 0 0">권한 설명 — super_admin: 전체+계정 관리+변경 이력 · admin: 조회+수정 · admin_viewer: 조회만(수정 불가)
         · poc: PoC·주간회의 메뉴만 · equipment_poc: 장비+PoC+주간회의 메뉴만 · «권한 없음»: 로그인은 되지만 제한 화면만 보입니다</p>
 
-      <div style="font-size:11px;color:var(--muted);margin:22px 0 8px">— 메뉴 권한 (계정마다 보기 · 읽기 · 쓰기) —</div>
+      <div class="adm-h">메뉴 권한 <span class="mini">계정마다 보기 · 읽기 · 쓰기</span></div>
       <div class="dbar" style="margin-bottom:8px;flex-wrap:wrap;gap:8px;align-items:center">
         <select id="apUser" aria-label="권한을 설정할 계정" style="height:32px;min-width:240px;padding:0 8px;border-radius:8px;border:1px solid var(--ring);background:var(--surface-2);color:var(--ink);font-family:inherit;font-size:12.5px"><option value="">계정 선택…</option></select>
         <span class="mini" id="apRole"></span>
@@ -756,7 +759,9 @@
       <p class="cap" style="margin:10px 0 0">보기 = 메뉴에 나타나고 화면을 열 수 있음 · 읽기 = 화면 안의 표·데이터 열람 · 쓰기 = 추가·수정·삭제. 쓰기는 읽기를, 읽기는 보기를 포함합니다.
         행이 없는(한 번도 저장하지 않은) 계정은 역할 기본값(admin 전부 · admin_viewer 읽기까지)으로 동작하고, 슈퍼 관리자는 제한할 수 없습니다. 바뀐 권한은 그 계정이 다음에 화면을 새로 읽을 때 적용됩니다.</p>
 
-      <div style="font-size:11px;color:var(--muted);margin:22px 0 8px">— 2단계 인증(MFA) 정책 — 계정별 필수 지정 · 인증 앱 초기화 —</div>
+      </div>
+      <div class="adm-pane" data-pane="sec" hidden>
+      <div class="adm-h first">2단계 인증(MFA) 정책 <span class="mini">역할 기본 · 계정별 필수 지정 · 인증 앱 초기화</span></div>
       <div class="dbar" style="margin-bottom:8px;flex-wrap:wrap;gap:8px;align-items:center">
         <button class="pill ghost" id="mfReload">↻ 다시 읽기</button>
         <button class="pill ghost" id="mfAll" title="등록 안 된 모든 계정을 필수로 지정하고 기한을 7일 뒤로">전체 필수 (7일 유예)</button>
@@ -767,7 +772,9 @@
       <p class="cap" style="margin:10px 0 0"><b>필수</b>로 지정한 계정은 인증 앱을 등록해야 포탈을 쓸 수 있습니다 — <b>기한</b>을 두면 그날까지는 로그인할 때 안내만 뜨고, 지나면(또는 기한이 없으면) 등록 화면이 먼저 뜹니다. DB 도 같은 규칙으로 막아(SQL 89) 비밀번호만 아는 사람은 데이터를 못 봅니다.
         <b>인증 앱 초기화</b>는 폰을 잃어버린 사람용 — 등록을 지우면 다음 로그인은 비밀번호만으로 되고(필수면 다시 등록 화면), 본인에게 알려 주세요.</p>
 
-      <div style="font-size:11px;color:var(--muted);margin:22px 0 8px">— 코드 관리 — 상태·채널·서비스 같은 선택 목록 (포탈 화면 · 데이터 점검 · DB 검증이 모두 이 목록을 봄) —</div>
+      </div>
+      <div class="adm-pane" data-pane="cfg" hidden>
+      <div class="adm-h first">코드 관리 <span class="mini">상태·채널·서비스 같은 선택 목록 — 포탈 화면·데이터 점검·DB 검증이 모두 이 목록을 봄</span></div>
       <div class="dbar" style="margin-bottom:8px;flex-wrap:wrap;gap:8px;align-items:center">
         <select id="cdKind" aria-label="목록 종류" style="height:32px;min-width:200px;padding:0 8px;border-radius:8px;border:1px solid var(--ring);background:var(--surface-2);color:var(--ink);font-family:inherit;font-size:12px"></select>
         <button class="pill ghost" id="cdReload">↻ 다시 읽기</button>
@@ -783,10 +790,12 @@
       </div>
       <p class="cap" id="cdCap" style="margin:10px 0 0">값을 <b>숨기면</b> 새 입력에서 고를 수 없고 데이터 점검이 «목록에 없는 값»으로 잡지만, 이미 그 값인 행은 그대로 둡니다(다른 열 수정도 가능). 순서는 ↑↓ 로. 저장하면 포탈을 쓰는 모든 사람에게 다음 데이터 로드부터 적용됩니다(본인은 즉시).</p>
 
-      <div style="font-size:11px;color:var(--muted);margin:22px 0 8px">— 업데이트 안내 — 로그인할 때 새 업데이트를 팝업으로 알려 줄 계정 · 안내문 (SQL 96) —</div>
+      <div class="adm-h">업데이트 안내 <span class="mini">로그인할 때 새 업데이트를 팝업으로 알려 줄 계정 · 안내문 (SQL 96)</span></div>
       <div id="updAdmin"><p class="cap">불러오는 중…</p></div>
 
-      <div style="font-size:11px;color:var(--muted);margin:22px 0 8px">— AI 사용 비용 (Anthropic) —</div>
+      </div>
+      <div class="adm-pane" data-pane="bill" hidden>
+      <div class="adm-h first">AI 사용 비용 <span class="mini">Anthropic</span></div>
       <div id="axBillKpi" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px"></div>
       <div id="axBillBars" style="margin-bottom:10px"></div>
       <div class="frm" style="grid-template-columns:1fr 1fr 1fr 1fr">
@@ -798,6 +807,7 @@
       <p class="cap" style="margin:6px 0 0">Anthropic은 잔액 조회 API가 없어 «충전액 − 충전일 이후 사용액»으로 잔여를 추정합니다 (사용액은 Cost API 실측 · 최대 5분~수 시간 지연).
         콘솔에서 <b>자동 충전(auto-reload)</b>이 켜져 있으면 충전분이 반영되지 않아 실제 잔액보다 적게 나옵니다 — 그때는 충전액 칸을 «누적 충전 합계»로 고쳐 주세요.
         Edge Function admin 의 Secrets에 <b>ANTHROPIC_ADMIN_KEY</b>(sk-ant-admin…, 콘솔 Settings→Admin keys) 추가 필요.</p>
+      </div>
     </section>
   </div>
 
