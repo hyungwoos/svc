@@ -142,6 +142,10 @@ say(/function opsAutoPath\(/.test(jsAll) && /function opsDest\(/.test(jsAll) && 
   const css7 = fs.readFileSync(path.join(ROOT, 'app.css'), 'utf8');
   say(['--brand-solid', '--s1-ink', '--s1-solid', '--warn-ink', '--info-ink', '--critical-solid'].every((t) => (css7.match(new RegExp(t + ':', 'g')) || []).length >= 2), '색 토큰: 글자용(…-ink)·바탕용(…-solid) 라이트·다크 둘 다 정의');
   say(!/background:\s*var\(--(brand|s1)\)[^}]*color:\s*#fff/.test(css7), '흰 글자 바탕은 …-solid 토큰만(어두운 화면 대비)'); }
+/* ㊿+152: QA 보고서(Claude 에게) · 가격표 폭 */
+{ const css = fs.readFileSync(path.join(ROOT, 'app.css'), 'utf8');
+  say(/function qaReport\(/.test(jsAll) && /function qaCopy\(/.test(jsAll) && /id=\\?"qaCopy\\?"/.test(jsAll) && /function qaPath\(/.test(jsAll), 'QA 보고서: 마크다운 정리 · 복사 버튼 · 요소 경로');
+  say(/#viewPrice \.pr-grid\{grid-template-columns:repeat\(auto-fill,minmax\(min\(100%,700px\),1fr\)\)\}/.test(css) && /#viewPrice \.pr-grid > \.pr-card\{min-width:0;overflow-x:auto\}/.test(css), '가격표: 좁으면 한 줄에 하나 · 카드 안에서만 스크롤(페이지 넘침 없음)'); }
 /* ㊿+151: 스테이징 QA */
 { const init = fs.readFileSync(path.join(ROOT, 'js', 'init.js'), 'utf8');
   say(/function qaOpen\(/.test(jsAll) && /function qaRun\(/.test(jsAll) && /function qaInspect\(/.test(jsAll) && /function qaKpi\(/.test(jsAll) && /id="opsQa"/.test(jsAll) && /qaBadgeHtml\(\)/.test(jsAll), '스테이징 QA: 실행·검사·숫자 비교·버튼·배지');

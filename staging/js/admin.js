@@ -1349,7 +1349,11 @@ var UPD_SEED=[
   {ver:'㊿+150', date:'2026-10-05', title:'내부 구조 정리 (모듈 전환 1단계)', body:[
     '- (관리자) 여러 화면이 함께 쓰는 상태 값 17개를 한 파일(js/state.js)로 모았습니다. 화면·기능 변화는 없습니다.'].join('\n')},
   {ver:'㊿+151', date:'2026-10-05', title:'스테이징 QA', body:[
-    '- (관리자) 배포·운영 › GitHub 탭에 «🧪 스테이징 QA» — 스테이징 포탈을 창 안에서 열어 메뉴 전부를 자동으로 눌러 보고(JS 오류·빈 화면·깨진 값·넘침·폰 폭), 핵심 숫자가 운영과 같은지 비교합니다. 통과하면 그 자리에서 승격.'].join('\n')}
+    '- (관리자) 배포·운영 › GitHub 탭에 «🧪 스테이징 QA» — 스테이징 포탈을 창 안에서 열어 메뉴 전부를 자동으로 눌러 보고(JS 오류·빈 화면·깨진 값·넘침·폰 폭), 핵심 숫자가 운영과 같은지 비교합니다. 통과하면 그 자리에서 승격.'].join('\n')},
+  {ver:'㊿+152', date:'2026-10-05', title:'가격표 화면 폭 · QA 보고서', body:[
+    '- 노트북(1280px)·휴대폰에서 가격표가 화면 옆으로 넘치던 문제를 고쳤습니다. 화면이 좁으면 표가 한 줄에 하나씩, 폰에서는 표 안에서만 옆으로 밀립니다.',
+    '- (관리자) 스테이징 QA 결과를 «📋 Claude 에게 보낼 내용 복사»로 정리해 붙여넣을 수 있습니다(화면 크기·요소 경로·오류 위치 포함).',
+    '- (관리자) 스테이징 QA 가 «불러오는 중» 화면을 실패로 잡던 것을 고쳤습니다(최대 6초 기다림).'].join('\n')}
 ];
 async function updFetch(path, opt){   /* 캐시를 건드리지 않는 직접 호출 — 401 이면 토큰 갱신 뒤 1회 재시도 */
   if(!ST.SB_TOKEN) throw new Error('로그인이 필요합니다');
@@ -1532,25 +1536,53 @@ function qaKpiDiff(a, b){
   Object.keys(b).forEach(function(k){ if(k!=='_err' && !(k in a)) onlyB++; });
   return {diffs:diffs, onlyA:onlyA, onlyB:onlyB};
 }
-/* 한 화면 검사 — 보이는 view 영역을 찾아 내용·깨진 값·넘침·세로 쌓임·위성 iframe */
+/* 요소를 짧은 경로로 (Claude 에게 전달할 때 어느 요소인지 알 수 있게) — #id 가 있으면 거기서 멈춤 */
+function qaPath(el, stop){
+  var parts=[]; for(var n=el, k=0; n && n.nodeType===1 && k<5; n=n.parentElement, k++){
+    if(n===stop) break;
+    if(n.id){ parts.unshift('#'+n.id); break; }
+    var cl=[].slice.call(n.classList||[]).filter(function(c){ return !/^(on|open|active|hidden)$/.test(c); }).slice(0,2).join('.');
+    var sib=n.parentElement? [].slice.call(n.parentElement.children).filter(function(x){ return x.tagName===n.tagName; }) : [];
+    parts.unshift(n.tagName.toLowerCase()+(cl? '.'+cl:'')+(sib.length>1? ':nth-of-type('+(sib.indexOf(n)+1)+')':''));
+  }
+  return parts.join(' > ');
+}
+var QA_LOADING=/(불러오는|읽는|확인하는|계산하는|가져오는|준비하는|만드는|그리는) 중|중…|loading/i;
+/* 한 화면 검사 — 결과는 [{m:메시지, w:경고면 true, d:[Claude 에게 넘길 진단 줄]}] */
 async function qaInspect(w, v){
-  var d=w.document, bad=[];
+  var d=w.document, out=[], add=function(m, warn, diag){ out.push({m:m, w:!!warn, d:diag||[]}); };
   var hosts=[].slice.call(d.querySelectorAll('#app [id^="view"]')).filter(function(e){ return !e.classList.contains('hidden') && qaVisible(e) && e.id!=='viewLogin'; });
-  var host=hosts[0]; if(!host) return ['화면 영역이 보이지 않음'];
-  await qaWait(function(){ return !/불러오는 중|읽는 중/.test(host.innerText||''); }, 4000, 200);
+  var host=hosts[0]; if(!host){ add('화면 영역이 보이지 않음', false, ['보이는 #view* 없음 · ST.CUR_VIEW='+(w.ST&&w.ST.CUR_VIEW)]); return out; }
+  var settled=await qaWait(function(){ var t=String(host.innerText||''); return !(t.length<300 && QA_LOADING.test(t)); }, 6000, 200);
+  if(!settled){ add('6초가 지나도 «불러오는 중»', true, ['화면: #'+host.id, '보이는 글자: '+qaText(host.innerText, 160)]); return out; }
   var sat=host.querySelector('iframe');
-  if(sat){ var ok=await qaWait(function(){ var sd=sat.contentDocument; return sd && sd.readyState==='complete' && sd.body && sd.body.innerText.trim().length>20; }, 8000, 250); if(!ok) bad.push('하위 페이지(iframe)가 뜨지 않음'); }
+  if(sat){ var ok=await qaWait(function(){ var sd=sat.contentDocument; return sd && sd.readyState==='complete' && sd.body && sd.body.innerText.trim().length>20; }, 8000, 250); if(!ok) add('하위 페이지(iframe)가 뜨지 않음', false, ['iframe src: '+String(sat.getAttribute('src')||'').slice(0,120)]); }
   var text=String(host.innerText||''), vis=[].slice.call(host.querySelectorAll('*')).filter(qaVisible).length, emptyMsg=/없습니다|없음|아직|필요합니다/.test(text);
-  if(!sat && (text.trim().length<30 || vis<5)){ if(emptyMsg) bad.push('⚠ 빈 상태 안내만 보임 — «'+qaText(text, 50)+'»'); else bad.push('빈 화면 (글자 '+text.trim().length+'자 · 요소 '+vis+'개)'); }
-  var m=/데이터를 불러오지 못했습니다[^\n]*|읽기 권한이 없[^\n]*|오류가 발생[^\n]*/.exec(text); if(m) bad.push(qaText(m[0], 80));
-  var broken=/(?:^|[^A-Za-z_])(NaN|undefined|\[object Object\])(?![A-Za-z_])/.exec(text); if(broken){ var i=broken.index; bad.push('깨진 값 «'+broken[1]+'» — …'+qaText(text.slice(Math.max(0,i-24), i+30), 60)+'…'); }
-  var over=d.documentElement.scrollWidth-w.innerWidth; if(over>1) bad.push('페이지가 옆으로 '+over+'px 넘침');
+  if(!sat && (text.trim().length<30 || vis<5)) add(emptyMsg? '빈 상태 안내만 보임 — «'+qaText(text, 50)+'»' : '빈 화면 (글자 '+text.trim().length+'자 · 요소 '+vis+'개)', emptyMsg, ['화면: #'+host.id, '보이는 글자 전체: «'+qaText(text, 200)+'»']);
+  var m=/데이터를 불러오지 못했습니다[^\n]*|읽기 권한이 없[^\n]*|오류가 발생[^\n]*/.exec(text); if(m) add(qaText(m[0], 80), false, ['화면: #'+host.id]);
+  var re=/(?:^|[^A-Za-z_])(NaN|undefined|\[object Object\])(?![A-Za-z_])/g, bm, found=[];
+  while((bm=re.exec(text)) && found.length<3) found.push(bm);
+  if(found.length){ var b0=found[0], ctx=function(x){ return '…'+qaText(text.slice(Math.max(0,x.index-40), x.index+40), 90)+'…'; };
+    var holder=null; try{ var tw=d.createTreeWalker(host, 4); for(var nd=tw.nextNode(); nd; nd=tw.nextNode()){ if(/(NaN|undefined|\[object Object\])/.test(nd.textContent) && qaVisible(nd.parentElement)){ holder=nd.parentElement; break; } } }catch(e){}
+    add('깨진 값 «'+b0[1]+'» — '+ctx(b0), false, found.map(function(x){ return '«'+x[1]+'» 주변 글자: '+ctx(x); }).concat(holder? ['들어 있는 요소: '+qaPath(holder)] : [])); }
+  var over=d.documentElement.scrollWidth-w.innerWidth;
+  if(over>1){
+    var W=w.innerWidth, wide=[].slice.call(host.querySelectorAll('*')).filter(function(e){ if(!qaVisible(e)) return false; var r=e.getBoundingClientRect(); return r.right>W+1 && r.width>0; });
+    var tops=wide.filter(function(e){ return !wide.some(function(p){ return p!==e && p.contains(e); }); }).slice(0,2);
+    var leaf=wide.filter(function(e){ return /^(TABLE|PRE|IMG|SVG|CANVAS|SELECT|INPUT|TEXTAREA|IFRAME)$/i.test(e.tagName); }).sort(function(a,b){ return b.getBoundingClientRect().width-a.getBoundingClientRect().width; }).slice(0,2);
+    var desc=function(e){ var r=e.getBoundingClientRect(), cs=w.getComputedStyle(e), x=qaPath(e)+' — 폭 '+Math.round(r.width)+'px · 오른쪽 끝 '+Math.round(r.right)+'px';
+      if(e.tagName==='TABLE'){ var tr=e.querySelector('tr'); x+=' · 열 '+(tr? tr.children.length:'?')+'개'; }
+      if(cs.display==='grid') x+=' · grid-template-columns: '+cs.gridTemplateColumns;
+      if(cs.whiteSpace==='nowrap') x+=' · white-space:nowrap'; return x; };
+    var lay=[]; if(tops[0]) for(var pa=tops[0].parentElement; pa && pa!==host.parentElement && lay.length<1; pa=pa.parentElement){ var pcs=w.getComputedStyle(pa); if(/grid|flex/.test(pcs.display)) lay.push('담고 있는 레이아웃: '+qaPath(pa)+' — display '+pcs.display+(/grid/.test(pcs.display)? ' · grid-template-columns: '+pcs.gridTemplateColumns : ' · flex-wrap '+pcs.flexWrap)+' · 폭 '+Math.round(pa.getBoundingClientRect().width)+'px'); }
+    add('페이지가 옆으로 '+over+'px 넘침', false, ['화면 폭 '+W+'px · 문서 폭 '+d.documentElement.scrollWidth+'px'].concat(tops.map(function(e){ return '넘친 바깥 요소: '+desc(e); }), lay, leaf.map(function(e){ return '가장 넓은 내용: '+desc(e); })));
+  }
   var els=[].slice.call(host.querySelectorAll('*')), seen=0, stacked=null;
   for(var k=0;k<els.length && seen<600;k++){ var el=els[k]; if(!qaVisible(el) || el.closest('svg')) continue;
     var t=[].slice.call(el.childNodes).filter(function(n){ return n.nodeType===3 && n.textContent.trim().length>=6; }).map(function(n){ return n.textContent.trim(); }).join(''); if(!t) continue; seen++;
-    var r=el.getBoundingClientRect(), fs=parseFloat(w.getComputedStyle(el).fontSize)||12; if(r.height>=fs*1.5*3 && r.width<fs*3.2){ stacked=t; break; } }
-  if(stacked) bad.push('글자가 세로로 쌓임 «'+qaText(stacked, 20)+'»');
-  return bad;
+    var r=el.getBoundingClientRect(), fs=parseFloat(w.getComputedStyle(el).fontSize)||12; if(r.height>=fs*1.5*3 && r.width<fs*3.2){ stacked={t:t, el:el, w:r.width, h:r.height}; break; } }
+  if(stacked) add('글자가 세로로 쌓임 «'+qaText(stacked.t, 20)+'»', false, [qaPath(stacked.el)+' — 폭 '+Math.round(stacked.w)+'px · 높이 '+Math.round(stacked.h)+'px', '부모: '+qaPath(stacked.el.parentElement)+' · display '+w.getComputedStyle(stacked.el.parentElement).display]);
+  return out;
 }
 function qaStep(id, label, group){ var s={id:id, label:label, group:group||'', st:'wait', ms:0, detail:''}; QA.steps.push(s); return s; }
 function qaPaint(){
@@ -1572,18 +1604,19 @@ function qaOpen(){
   ov.innerHTML='<div class="modal qa" style="width:min(1240px,100%);padding:18px 20px" role="dialog" aria-modal="true" aria-labelledby="qaTitle">'+
     '<div class="qa-head"><h3 id="qaTitle" style="margin:0;font-size:15px">🧪 스테이징 QA</h3><span class="mini" id="qaVer">스테이징을 여는 중…</span><span style="flex:1"></span><button type="button" class="pill ghost" id="qaRerun">↻ 다시 실행</button><button type="button" class="pill ghost" id="qaClose">닫기</button></div>'+
     '<div class="qa-body"><div class="qa-prev"><div class="qa-frame" id="qaFrame"></div><div class="mini" id="qaPrevCap" style="margin-top:4px">준비 중…</div></div><div class="qa-list" id="qaList" tabindex="0" aria-label="점검 항목"></div></div>'+
-    '<div class="qa-foot"><div id="qaSum" class="qa-sum">준비 중…</div><span style="flex:1"></span><button type="button" class="pill pri" id="qaPromote" disabled>스테이징 → 운영 승격 →</button></div></div>';
+    '<div class="qa-foot"><div id="qaSum" class="qa-sum">준비 중…</div><span style="flex:1"></span><button type="button" class="pill ghost" id="qaCopy" disabled title="실패·경고 내용을 화면 크기·요소 경로·오류 위치와 함께 정리해 복사 — Claude 대화창에 그대로 붙여넣으면 됩니다">📋 Claude 에게 보낼 내용 복사</button><button type="button" class="pill pri" id="qaPromote" disabled>스테이징 → 운영 승격 →</button></div></div>';
   document.body.appendChild(ov);
   ov.querySelector('#qaClose').onclick=qaClose;
   ov.querySelector('#qaRerun').onclick=function(){ qaRun(); };
   ov.querySelector('#qaPromote').onclick=function(){ qaClose(); opsCopy('staging',''); };
+  ov.querySelector('#qaCopy').onclick=qaCopy;
   qaRun();
 }
 function qaClose(){ QA.run++; QA.on=false; QA.w=null; QA.ifr=null; var ov=document.getElementById('ovlQa'); if(ov) ov.remove(); if(ST.CUR_VIEW==='ops') try{ renderOps(true); }catch(e){} }
 async function qaRun(){
   var run=++QA.run; QA.on=true; QA.errs=[]; QA.steps=[]; QA.res=null;
   var alive=function(){ return run===QA.run; };
-  var sum=document.getElementById('qaSum'), pb=document.getElementById('qaPromote'); if(pb) pb.disabled=true; if(sum) sum.textContent='실행 중…';
+  var sum=document.getElementById('qaSum'), pb=document.getElementById('qaPromote'), cb=document.getElementById('qaCopy'); if(pb) pb.disabled=true; if(cb) cb.disabled=true; if(sum) sum.textContent='실행 중…';
   var box=document.getElementById('qaFrame'); if(!box) return; box.innerHTML='';
   var ifr=document.createElement('iframe'); ifr.setAttribute('title','스테이징 포탈 미리보기'); ifr.style.cssText='position:absolute;top:0;left:0;border:0;transform-origin:0 0;background:#fff';
   QA.ifr=ifr; box.appendChild(ifr); qaFit(1280, 800); var boxH=box.clientHeight;
@@ -1592,7 +1625,9 @@ async function qaRun(){
   var w=await new Promise(function(res){ ifr.onload=function(){ res(ifr.contentWindow); }; setTimeout(function(){ res(ifr.contentWindow); }, 20000); ifr.src=qaStagingUrl(); });
   if(!alive()) return;
   QA.w=w;
-  try{ w.addEventListener('error', function(e){ QA.errs.push(String((e&&e.message)||'오류')); }); w.addEventListener('unhandledrejection', function(e){ QA.errs.push('Promise: '+String((e&&e.reason&&(e.reason.message||e.reason))||'')); }); w.document.addEventListener('securitypolicyviolation', function(e){ QA.errs.push('CSP: '+e.violatedDirective+' '+(e.blockedURI||'')); }); }catch(e){}
+  try{ w.addEventListener('error', function(e){ QA.errs.push({m:String((e&&e.message)||'오류'), at:e&&e.filename? String(e.filename).replace(/^.*\/staging\//,'').replace(/\?.*$/,'')+':'+e.lineno+':'+e.colno : '', st:String((e&&e.error&&e.error.stack)||'').split('\n').slice(0,4).join(' ⏎ ')}); });
+       w.addEventListener('unhandledrejection', function(e){ var r=e&&e.reason; QA.errs.push({m:'Promise: '+String((r&&(r.message||r))||''), at:'', st:String((r&&r.stack)||'').split('\n').slice(0,4).join(' ⏎ ')}); });
+       w.document.addEventListener('securitypolicyviolation', function(e){ QA.errs.push({m:'CSP 차단: '+e.violatedDirective+' '+(e.blockedURI||''), at:String(e.sourceFile||'').replace(/^.*\/staging\//,'')+(e.lineNumber? ':'+e.lineNumber:''), st:''}); }); }catch(e){}
   var ready=await qaWait(function(){ var app=w.document.getElementById('app'); return w.ST && w.ST.DATA && app && !app.classList.contains('hidden'); }, 30000, 250);
   s0.ms=Date.now()-t0;
   if(!alive()) return;
@@ -1600,35 +1635,41 @@ async function qaRun(){
   var verP=String(window.APP_VER||''); var vs=document.getElementById('qaVer');
   if(vs) vs.textContent='스테이징 '+(verS.match(/㊿\+\d+/)||[verS||'?'])[0]+' · '+(window.IS_STAGING? '기준(이 화면·스테이징) ':'운영(이 화면) ')+(verP.match(/㊿\+\d+/)||[verP])[0]+(verS && verS===verP? ' — 같은 버전(스테이징에 새로 올린 게 없음?)':'');
   if(!ready){ var ls=w.document&&w.document.getElementById('viewLogin'); var errCard=w.document&&w.document.querySelector('#loading .err');
-    s0.st='fail'; s0.detail=errCard? qaText(errCard.innerText, 120) : (ls && qaVisible(ls)? '로그인 화면에 머묾 — 세션이 공유되지 않음(로그인 유지가 꺼진 다른 탭?)' : (QA.errs.length? 'JS 오류: '+qaText(QA.errs[0],100) : '30초 안에 데이터가 뜨지 않음'));
+    s0.st='fail'; s0.detail=errCard? qaText(errCard.innerText, 120) : (ls && qaVisible(ls)? '로그인 화면에 머묾 — 세션이 공유되지 않음(로그인 유지가 꺼진 다른 탭?)' : (QA.errs.length? 'JS 오류: '+qaText(QA.errs[0].m,100) : '30초 안에 데이터가 뜨지 않음'));
+    s0.diag=QA.errs.slice(0,3).map(function(x){ return 'JS 오류: '+x.m+(x.at? ' @ '+x.at:'')+(x.st? ' · stack: '+x.st:''); });
     qaPaint(); return qaFinish(run); }
   s0.st='ok'; qaPaint();
   // 메뉴 목록 — 스테이징 사이드바에 보이는 것(권한·메뉴 편집 반영)
   var btns=[].slice.call(w.document.querySelectorAll('#side button[data-v]')).filter(function(b){ return (w.visBtn? w.visBtn(b) : (b.style.display!=='none' && !b.classList.contains('pdeny'))); });
-  var menus=[]; btns.forEach(function(b){ var v=b.dataset.v; if(v && menus.every(function(m){ return m.v!==v; })) menus.push({v:v, label:(w.navText? w.navText(b) : b.textContent).trim()}); });
+  var menus=[]; btns.forEach(function(b){ var v=b.dataset.v; if(v && menus.every(function(m){ return m.v!==v; })){ var sub=''; try{ sub=w.navSub? w.navSub(b) : ''; }catch(e){} menus.push({v:v, label:(sub? sub+' · ':'')+(w.navText? w.navText(b) : b.textContent).trim()}); } });
   if(!menus.some(function(m){ return m.v==='dash'; })) menus.unshift({v:'dash', label:'홈'});
   var sK=qaStep('kpi','핵심 숫자 운영 = 스테이징');
   var desk=menus.map(function(m){ return {m:m, s:qaStep('d:'+m.v, m.label, '')}; });
   var mob=menus.filter(function(m){ return QA_MOBILE.indexOf(m.v)>=0; }).map(function(m){ return {m:m, s:qaStep('m:'+m.v, m.label, '📱')}; });
   qaPaint();
   var runMenu=async function(item){
-    var m=item.m, s=item.s; s.st='run'; qaPaint(); var t=Date.now(), e0=QA.errs.length, bad=[];
+    var m=item.m, s=item.s; s.st='run'; qaPaint(); var t=Date.now(), e0=QA.errs.length, res=[];
+    var pre=function(tag, list){ list.forEach(function(x){ res.push({m:(tag? '['+tag+'] ':'')+x.m, w:x.w, d:(tag? ['관리자 탭: '+tag]:[]).concat(x.d)}); }); };
     try{
-      try{ w.navMenu(m.v); }catch(e){ bad.push('이동 오류: '+qaText(e.message||e, 100)); }
+      try{ w.navMenu(m.v); }catch(e){ res.push({m:'이동 오류: '+qaText(e.message||e, 100), w:false, d:['navMenu(\''+m.v+'\') 에서 예외: '+String(e.message||e), 'stack: '+String(e.stack||'').split('\n').slice(0,4).join(' ⏎ ')]}); }
       if(m.v==='dash'){ try{ var ab=w.document.getElementById('ccAnaBtn'); if(ab && ab.getAttribute('aria-expanded')!=='true') ab.click(); }catch(e){} }
       await qaRaf(w); await qaSleep(250);
-      if(m.v==='adminx' && w.admTab){ var tabs=['acct','sec','cfg','bill']; for(var i=0;i<tabs.length;i++){ if(!alive()) return; w.admTab(tabs[i]); await qaRaf(w); var b2=await qaInspect(w, m.v); b2.forEach(function(x){ bad.push('['+tabs[i]+'] '+x); }); } w.admTab('acct'); }
-      else bad=bad.concat(await qaInspect(w, m.v));
-      QA.errs.slice(e0).forEach(function(x){ bad.push('JS 오류: '+qaText(x, 110)); });
-    }catch(e){ bad.push('검사 오류: '+qaText(e.message||e, 100)); }
-    s.ms=Date.now()-t; s.st=!bad.length? 'ok' : bad.every(function(x){ return /^(\[\w+\] )?⚠/.test(x); })? 'warn' : 'fail'; s.detail=bad.slice(0,4).join(' · ').replace(/⚠ /g,''); qaPaint();
+      if(m.v==='adminx' && w.admTab){ var tabs=['acct','sec','cfg','bill']; for(var i=0;i<tabs.length;i++){ if(!alive()) return; w.admTab(tabs[i]); await qaRaf(w); pre(tabs[i], await qaInspect(w, m.v)); } w.admTab('acct'); }
+      else pre('', await qaInspect(w, m.v));
+      QA.errs.slice(e0).forEach(function(x){ res.push({m:'JS 오류: '+qaText(x.m, 110), w:false, d:['오류: '+x.m+(x.at? ' @ '+x.at:''), x.st? 'stack: '+x.st : ''].filter(Boolean)}); });
+    }catch(e){ res.push({m:'검사 오류: '+qaText(e.message||e, 100), w:true, d:[String(e.stack||e).slice(0,300)]}); }
+    var hard=res.filter(function(x){ return !x.w; });
+    s.ms=Date.now()-t; s.st=!res.length? 'ok' : hard.length? 'fail' : 'warn';
+    s.detail=res.slice(0,4).map(function(x){ return x.m; }).join(' · ');
+    s.diag=[].concat.apply([], res.map(function(x){ return ['• '+x.m].concat(x.d.map(function(z){ return '  - '+z; })); }));
+    s.view=m.v; s.size=w.innerWidth+'×'+w.innerHeight; qaPaint();
   };
   // 핵심 숫자
   sK.st='run'; qaPaint(); var tk=Date.now();
   try{ var a=qaKpi(window), b=qaKpi(w);
     if(a._err || b._err){ sK.st='warn'; sK.detail='비교 못 함 — '+(a._err? '이 화면: '+a._err : '')+(b._err? ' 스테이징: '+b._err : ''); }
     else { var df=qaKpiDiff(a, b); var n=Object.keys(a).length;
-      if(df.diffs.length){ sK.st='fail'; sK.detail=df.diffs.length+'개 다름 — '+df.diffs.slice(0,5).join(' · ')+(df.diffs.length>5? ' 외 '+(df.diffs.length-5):''); }
+      if(df.diffs.length){ sK.st='fail'; sK.detail=df.diffs.length+'개 다름 — '+df.diffs.slice(0,5).join(' · ')+(df.diffs.length>5? ' 외 '+(df.diffs.length-5):''); sK.diag=['기준(이 화면) → 스테이징, buildDigest() 숫자:'].concat(df.diffs.slice(0,40).map(function(x){ return '  - '+x; })); }
       else { sK.st='ok'; sK.detail=n+'개 숫자 일치'+(df.onlyB? ' · 스테이징에 새 항목 '+df.onlyB:'')+(df.onlyA? ' · 없어진 항목 '+df.onlyA:''); } }
   }catch(e){ sK.st='warn'; sK.detail=qaText(e.message||e, 100); }
   sK.ms=Date.now()-tk; qaPaint();
@@ -1647,6 +1688,8 @@ async function qaFinish(run){
   var sum=document.getElementById('qaSum'), pb=document.getElementById('qaPromote');
   if(sum) sum.innerHTML=(fails.length? '<b style="color:var(--critical)">❌ '+fails.length+'건 실패</b>' : '<b style="color:var(--ok,var(--brand-ink))">✅ 전부 통과</b>')+' <span class="mini">· '+QA.res.pass+'/'+all.length+(warns.length? ' · ⚠️ '+warns.length:'')+' · '+QA.res.verS+(fails.length? ' — 실패 항목을 고친 뒤 다시 올리고 QA 를 다시 돌리세요' : ' — 승격해도 됩니다')+'</span>';
   if(pb) pb.disabled=!!fails.length;
+  var cb=document.getElementById('qaCopy'); if(cb){ cb.disabled=false; if(fails.length||warns.length) cb.classList.remove('ghost'); }
+  if(sum && (fails.length||warns.length)) sum.innerHTML+='<div class="mini" style="margin-top:2px">«📋 Claude 에게 보낼 내용 복사» 를 눌러 Claude 대화창에 붙여넣으면 — 화면 크기·요소 경로·오류 위치까지 정리돼 있어 바로 고칠 수 있습니다</div>';
   qaPaint();
   try{ await logChange('staging_qa','staging',QA.res.verS,{pass:QA.res.pass, total:QA.res.total, fail:QA.res.fail, warn:QA.res.warn, fails:QA.res.fails.slice(0,20), prod:QA.res.verP}); }catch(e){}
   if(ST.CUR_VIEW==='ops' && OPS.tab==='gh') try{ renderOps(true); }catch(e){}
@@ -1655,4 +1698,40 @@ function qaBadgeHtml(){
   var r=QA.res; if(!r) return '<span class="mini" id="qaBadge">QA 아직 안 함</span>';
   var t=new Date(r.at), hm=('0'+t.getHours()).slice(-2)+':'+('0'+t.getMinutes()).slice(-2);
   return '<span class="ctag'+(r.fail? ' late':' ok')+'" id="qaBadge" title="'+esc(r.fails.slice(0,3).join('\n'))+'">QA '+(r.fail? '❌ '+r.fail+'건 실패':'✅ '+r.pass+'/'+r.total)+' · '+esc(r.verS)+' · '+hm+'</span>';
+}
+
+/* ── Claude 에게 넘길 보고서 (마크다운) — 실패·경고 상세 + 실행 환경 · 통과는 이름만 ── */
+function qaReport(){
+  var r=QA.res||{}, st=QA.steps||[], at=new Date(r.at||Date.now());
+  var kst=new Date(at.getTime()+9*3600e3).toISOString().replace('T',' ').slice(0,16)+' KST';
+  var ua=String(navigator.userAgent||''), br=(/Edg\/(\d+)/.exec(ua)? 'Edge '+RegExp.$1 : /Chrome\/(\d+)/.exec(ua)? 'Chrome '+RegExp.$1 : /Version\/([\d.]+).*Safari/.exec(ua)? 'Safari '+RegExp.$1 : /Firefox\/(\d+)/.exec(ua)? 'Firefox '+RegExp.$1 : ua.slice(0,60));
+  var os=/Windows NT [\d.]+/.exec(ua)||/Mac OS X [\d_]+/.exec(ua)||/Android [\d.]+/.exec(ua)||/iPhone OS [\d_]+/.exec(ua)||/CrOS|Linux/.exec(ua)||['?'];
+  var fails=st.filter(function(s){ return s.st==='fail'; }), warns=st.filter(function(s){ return s.st==='warn'; }), oks=st.filter(function(s){ return s.st==='ok'; });
+  var L=[];
+  L.push('# 포탈 스테이징 QA 결과 — '+(fails.length? '❌ 실패 '+fails.length+'건' : '✅ 실패 없음')+(warns.length? ' · ⚠ 경고 '+warns.length+'건' : '')+' ('+(r.pass||oks.length)+'/'+(r.total||st.length)+' 통과)');
+  L.push('');
+  L.push('- 스테이징: '+(r.verS||'?')+' · 기준(이 화면): '+(r.verP||'?')+(window.IS_STAGING? ' (스테이징에서 실행)' : ' (운영)')+' · '+kst);
+  L.push('- 실행: '+(ST.AUTH_USER||'?')+' · 브라우저: '+br+' · '+String(os[0]).replace(/_/g,'.')+' · 이 화면 '+window.innerWidth+'×'+window.innerHeight);
+  L.push('- 미리보기 크기: 데스크톱 1280×800 · 📱 폰 390×844 (QA 창 안 iframe)');
+  L.push('- 주소: '+location.origin+qaStagingUrl().replace(/&t=\d+/,''));
+  var block=function(title, list){ if(!list.length) return; L.push(''); L.push('## '+title); list.forEach(function(s, i){
+    L.push(''); L.push('### '+(i+1)+'. '+(s.group? s.group+' ':'')+s.label+(s.view? ' (`'+s.view+'` · '+(s.size||'')+')' : '')+(s.ms? ' · '+(s.ms/1000).toFixed(1)+'초':''));
+    (s.diag&&s.diag.length? s.diag : ['• '+(s.detail||'(내용 없음)')]).forEach(function(x){ L.push(x); }); }); };
+  block('❌ 실패', fails); block('⚠ 경고 (승격은 막지 않음)', warns);
+  L.push(''); L.push('## ✅ 통과 ('+oks.length+')'); L.push(oks.map(function(s){ return (s.group? s.group:'')+s.label; }).join(' · ') || '—');
+  L.push(''); L.push('> 검사 항목: JS 오류 · 빈 화면 · 깨진 값(NaN/undefined) · 가로 넘침 · 글자 세로 쌓임 · 하위 페이지 로드 · 핵심 숫자(buildDigest) 운영=스테이징 · 저장/발송은 누르지 않음');
+  return L.join('\n');
+}
+function qaCopy(){
+  var txt=qaReport();
+  var done=function(){ toast('복사했습니다', 'Claude 대화창에 붙여넣으세요 ('+txt.split('\n').length+'줄)'); var b=document.getElementById('qaCopy'); if(b){ var o=b.textContent; b.textContent='✓ 복사됨'; setTimeout(function(){ b.textContent=o; }, 1800); } };
+  var fallback=function(){
+    var old=document.getElementById('ovlQaTxt'); if(old) old.remove();
+    var ov=document.createElement('div'); ov.id='ovlQaTxt'; ov.className='ovl on'; ov.style.cssText='z-index:9600;align-items:center';
+    ov.innerHTML='<div class="modal" style="width:min(760px,100%);padding:18px 20px" role="dialog" aria-modal="true" aria-labelledby="qaTxtT"><h3 id="qaTxtT" style="margin:0 0 6px;font-size:15px">Claude 에게 보낼 내용</h3><p class="mini" style="margin:0 0 8px">자동 복사가 막혀 있어 아래 글을 전부 선택(Ctrl+A)해 복사(Ctrl+C)하세요.</p><textarea id="qaTxtArea" class="ops-ta" readonly aria-label="QA 보고서" style="min-height:320px"></textarea><div class="mact" style="display:flex;justify-content:flex-end;margin-top:8px"><button type="button" class="pill" id="qaTxtClose">닫기</button></div></div>';
+    document.body.appendChild(ov); var ta=ov.querySelector('#qaTxtArea'); ta.value=txt; setTimeout(function(){ ta.focus(); ta.select(); }, 30);
+    ov.querySelector('#qaTxtClose').onclick=function(){ ov.remove(); };
+  };
+  try{ if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done, fallback); else fallback(); }catch(e){ fallback(); }
+  return txt;
 }

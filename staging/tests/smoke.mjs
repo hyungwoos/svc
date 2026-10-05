@@ -1098,12 +1098,31 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
   });
   await ctx.close();
 }
+// 가격표 가짜 데이터(실제 모양 · 판 1개 · SaaS) — 가격표 폭·QA 테스트 공용
+const PB_AT = ['1~49', '50~99', '100~299', '300~499', '500~999', '1000~2999', '3000~4999', '5000~9999', '10000~'], PB_NT = ['1~100', '101~200', '201~300', '301~400', '401~500', '501~600', '601~700', '701~800', '801~900', '901~1000', '1001~1500', '1501~2000', '2001~2500', '2501~3000'];
+const pbSv = (name, base) => ({ name, icon: '🛡️', sub: '24시간 365일 관제 · Cloud Insights E 에 추가', tiers: PB_AT, cons: PB_AT.map((_, i) => base - i * 5000), minD: PB_AT.map((_, i) => Math.round((base - i * 5000) * .75)), dist: PB_AT.map((_, i) => Math.round((base - i * 5000) * .4)), minP: PB_AT.map((_, i) => Math.round((base - i * 5000) * .9)), ptn: PB_AT.map((_, i) => Math.round((base - i * 5000) * .48)) });
+const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insights E · Add-on 24×7 · MDR 통합)', applied: '2026-09-21', note: '', data: { supply_rate: { cnac: 0.5 }, cnac: { rows: PB_NT.map((t, i) => [t, 16000 - i * 900, 7200 - i * 400, 5500 - i * 300, 4800 - i * 280]) }, ztna: { rows: PB_NT.map((t, i) => [t, 13300 - i * 800, 6000 - i * 350, 4500 - i * 280, 4000 - i * 250]) }, services: [pbSv('Cloud Insights E', 86900), pbSv('MDR Add-on 24×7', 43300), pbSv('Genian MDR 통합', 130200), pbSv('AV Service', 74400)], addons: [] } }];
+// ㊿+152 가격표(실제 모양 데이터)가 1280px·폰에서 페이지를 옆으로 밀지 않음 — fixture 에 가격표가 없어 그동안 빈 화면만 검사됐음
+{
+  for (const [W, H, mob] of [[1280, 800, false], [390, 844, true]]) {
+    const ctx = await browser.newContext({ viewport: { width: W, height: H }, isMobile: mob, hasTouch: mob }); const page = await ctx.newPage(); const c = collect(page);
+    await mockBackend(page, { extra: async (route, u) => { if (!/\/rest\/v1\/price_books/.test(u)) return false; await route.fulfill({ status: 200, contentType: 'application/json', headers: { 'content-range': '0-0/1', 'Access-Control-Expose-Headers': 'content-range' }, body: JSON.stringify(PRICE_BOOK) }); return true; } });
+    await page.goto(url + '/index.html'); await page.waitForTimeout(2200);
+    await S.t('㊿+152 가격표 ' + W + 'px — 표 6개 · 페이지 옆 넘침 0 (좁으면 카드 안에서만 스크롤)', async () => {
+      await page.evaluate(() => navMenu('price')); await page.waitForTimeout(800);
+      const r = await page.evaluate(() => ({ t: document.querySelectorAll('#viewPrice table.pr').length, over: document.documentElement.scrollWidth - innerWidth, cols: getComputedStyle(document.querySelector('#viewPrice .pr-grid')).gridTemplateColumns.split(' ').length }));
+      assert(r.t >= 6 && r.over <= 1, JSON.stringify(r)); assert(!c.errs.length, c.errs.join(' | ')); return JSON.stringify(r);
+    });
+    await ctx.close();
+  }
+}
 // ㊿+151 스테이징 QA — 같은 파일을 /staging/ 경로로도 서빙(route) · 서비스 워커는 막음(route 를 가로채므로)
 {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page);
-  const writes = [], dialogs = []; let breakDcheck = false;
-  await mockBackend(page, { onWrite: (w) => writes.push(w), extra: async (route, u) => { if (!u.includes('/functions/v1/ops')) return false; const b = JSON.parse(route.request().postData() || '{}'); const out = b.action === 'status' ? { ok: true, pin_set: true, github: { repo: 'x/svc', branch: 'main', token_set: true }, recent: [] } : b.action === 'gh_copy' ? { ok: true, commit: 'c0ffee1', copied: 3 } : { ok: true }; await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(out) }); return true; } });
+  const writes = [], dialogs = []; let breakDcheck = false, breakCss = false;
+  await mockBackend(page, { onWrite: (w) => writes.push(w), extra: async (route, u) => { if (/\/rest\/v1\/price_books/.test(u)) { await route.fulfill({ status: 200, contentType: 'application/json', headers: { 'content-range': '0-0/1', 'Access-Control-Expose-Headers': 'content-range' }, body: JSON.stringify(PRICE_BOOK) }); return true; } if (!u.includes('/functions/v1/ops')) return false; const b = JSON.parse(route.request().postData() || '{}'); const out = b.action === 'status' ? { ok: true, pin_set: true, github: { repo: 'x/svc', branch: 'main', token_set: true }, recent: [] } : b.action === 'gh_copy' ? { ok: true, commit: 'c0ffee1', copied: 3 } : { ok: true }; await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(out) }); return true; } });
   await page.route('**/svc/staging/**', async (route) => { const u = new URL(route.request().url()); const rel = decodeURIComponent(u.pathname.replace('/svc/staging/', ''));
+    if (breakCss && rel === 'app.css') { await route.fulfill({ status: 200, contentType: 'text/css', body: fs.readFileSync(path.join(ROOT, rel), 'utf8') + '\n#viewPrice .pr-grid{grid-template-columns:900px 900px!important}\n' }); return; }
     if (breakDcheck && rel === 'js/analysis.js') { const src = fs.readFileSync(path.join(ROOT, rel), 'utf8') + "\nfunction renderDataCheck(){ throw new Error('QA 시험 오류'); }\n"; await route.fulfill({ status: 200, contentType: 'application/javascript', body: src }); return; }
     await route.fulfill({ path: path.join(ROOT, rel) }); });
   page.on('dialog', async (d) => { dialogs.push(d.message()); await d.dismiss(); });
@@ -1127,8 +1146,22 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
     assert(dialogs.length === 1 && /✅ 스테이징 QA 통과/.test(dialogs[0]), '승격 확인 창에 QA 통과 표시 없음 ' + dialogs[0]);
     assert(!c.errs.length, c.errs.join(' | ')); return r.res.pass + '/' + r.res.total + (r.res.warn ? ' ⚠' + r.res.warn : '') + ' · ' + kpi.d;
   });
+  await S.t('㊿+152 QA 보고서(Claude 에게): 넘침이 생기면 원인 요소 경로·폭·grid 열까지 · JS 오류는 파일:줄 · 복사 버튼', async () => {
+    breakCss = true; await page.evaluate(() => { const o = document.getElementById('ovlQa'); if (o) qaClose(); }); await page.click('#opsQa');
+    await page.waitForFunction(() => window.QA && !QA.on && QA.res, null, { timeout: 120000 });
+    const rep = await page.evaluate(() => qaReport());
+    assert(/^# 포탈 스테이징 QA 결과 — ❌ 실패 \d+건/.test(rep) && /## ❌ 실패/.test(rep) && /가격표.*\(`price` · 1280×800\)/.test(rep), rep.slice(0, 400));
+    assert(/페이지가 옆으로 \d+px 넘침/.test(rep) && /넘친 바깥 요소: .*pr-grid.* — 폭 \d+px/.test(rep) && /grid-template-columns: /.test(rep) && /화면 폭 1280px · 문서 폭 \d+px/.test(rep), '넘침 진단 부족\n' + rep.split('\n').filter((l) => /넘침|요소|폭/.test(l)).join('\n'));
+    assert(/브라우저: \S+/.test(rep) && /미리보기 크기: 데스크톱 1280×800/.test(rep) && /## ✅ 통과 \(\d+\)/.test(rep), '환경 줄 없음');
+    const cp = await page.evaluate(() => { const b = document.getElementById('qaCopy'); return { dis: b.disabled, ghost: b.classList.contains('ghost') }; }); assert(!cp.dis && !cp.ghost, '복사 버튼 비활성 ' + JSON.stringify(cp));
+    await page.evaluate(() => { window.__clip = null; try { Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: (t) => { window.__clip = t; return Promise.resolve(); } } }); } catch (e) { /* */ } });
+    await page.click('#qaCopy'); await page.waitForTimeout(200);
+    assert((await page.evaluate(() => window.__clip)) === rep, '복사된 내용이 보고서와 다름');
+    await page.click('#qaClose'); await page.waitForTimeout(200); breakCss = false;
+    return rep.split('\n').filter((l) => /넘친 바깥/.test(l))[0].slice(0, 120);
+  });
   await S.t('㊿+151 스테이징 QA: 스테이징 코드가 깨지면(데이터 점검 render 오류) 그 메뉴 ❌ · 승격 버튼 비활성 · 승격 확인 창 경고', async () => {
-    breakDcheck = true; await page.click('#opsQa');
+    breakCss = false; breakDcheck = true; await page.evaluate(() => { const o = document.getElementById('ovlQa'); if (o) qaClose(); }); await page.click('#opsQa');
     await page.waitForFunction(() => window.QA && !QA.on && QA.res, null, { timeout: 120000 });
     const r = await page.evaluate(() => ({ res: QA.res, dc: QA.steps.filter((s) => /데이터 점검/.test(s.label)).map((s) => s.st + ':' + s.detail), promote: document.getElementById('qaPromote').disabled, sum: document.getElementById('qaSum').textContent }));
     assert(r.res.fail >= 1 && r.dc.length >= 1 && r.dc.every((x) => /^fail:/.test(x) && /QA 시험 오류|빈 화면|이동 오류/.test(x)) && r.promote && /실패/.test(r.sum), JSON.stringify(r));
