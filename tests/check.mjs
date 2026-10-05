@@ -62,8 +62,8 @@ for (const f of ['manifest.webmanifest', 'sw.js']) say(fs.existsSync(path.join(R
 // ② 보안: CSP meta · 외부 스크립트는 SRI 로더로만 · 해시 형식 · MFA 관문 · 직인 파일
 for (const f of htmls) say(/<meta http-equiv="Content-Security-Policy"/.test(fs.readFileSync(path.join(ROOT, f), 'utf8')), `${f}: CSP meta 있음`);
 say((idx.match(/createElement\('script'\)/g) || []).length === 1, 'index.html: 외부 스크립트 로더는 loadLib(SRI) 하나뿐');
-const sris = [...idx.matchAll(/sri:'([^']+)'/g)].map((m) => m[1]);
-say(sris.length >= 5 && sris.every((h) => /^sha384-[A-Za-z0-9+/]{64}$/.test(h)), `index.html: SRI 해시 ${sris.length}개 형식 OK`);
+const sris = [...idx.matchAll(/sri:'([^']+)'/g)].map((m) => m[1]);   // ㊿+147: alasql 은 격리 칸(js/sqlbox.js)으로 옮겨 4개
+say(sris.length >= 4 && sris.every((h) => /^sha384-[A-Za-z0-9+/]{64}$/.test(h)), `index.html: SRI 해시 ${sris.length}개 형식 OK`);
 for (const f of ['kk.html', 's1.html']) if (htmls.includes(f)) { const t = fs.readFileSync(path.join(ROOT, f), 'utf8'); say(/sc\.integrity=sri/.test(t) && /sha384-/.test(t), `${f}: 엑셀 로더에 integrity`); }
 say((idx.match(/mfaGate\(/g) || []).length >= 4, 'index.html: MFA 관문(mfaGate) 이 로그인·세션 복원 경로에 연결됨');
 // ③ 데이터 정합성 (㊿+137): 코드 목록 — 포탈 CODE_KIND 의 모든 종류가 *_OPTS 배열로 존재 · GRIDS 에 상태/채널/모델 리터럴 배열이 남아 있지 않음(한 목록을 봐야 함) · 코드 관리 UI 마크업
@@ -128,6 +128,20 @@ say(/function opsAutoPath\(/.test(jsAll) && /function opsDest\(/.test(jsAll) && 
   say(/function mfaBgCheck\(/.test(jsAll) && /opt && opt\.fast/.test(jsAll), '2단계 인증 확인은 데이터 읽기와 병렬(빠른 길 + 뒤 확인)');
   say(/function navMenu\(/.test(jsAll) && /viewSnapInit\(\)/.test(init5) && init5.indexOf('viewSnapInit()') < init5.lastIndexOf('boot();') && (jsAll.match(/navMenu\(/g) || []).length >= 7, '메뉴 클릭 → navMenu(첫 화면) 연결');
   say(/function cacheDrop\(/.test(jsAll) && !/sessionStorage\.removeItem\(CACHE_KEY\)/.test(jsAll.replace(/function cacheDrop\(\)\{[^\n]*/, '')), '사본 무효화는 cacheDrop 하나로(예약된 쓰기까지 취소)'); }
+{ const css6 = fs.readFileSync(path.join(ROOT, 'app.css'), 'utf8');
+  say(/\.card-head\{[^}]*flex-wrap:wrap/.test(css6) && /\.card-head \.t\{flex:1 1 220px/.test(css6) && /function segScrollSel\(/.test(jsAll), '카드 머리: 제목 최소 폭 · 버튼 줄은 아랫줄로 · 고른 연도 보이기(㊿+146 폰 장표)'); }
+/* ㊿+147: CSP — 본 포탈 script-src 에 'unsafe-eval'·'unsafe-inline' 없음 · SQL 엔진은 격리 칸(sqlbox.html)만 · 색 토큰(…-solid · …-ink) */
+{ const csp7 = (/http-equiv="Content-Security-Policy" content="([^"]+)"/.exec(html) || [, ''])[1], ss = (/script-src ([^;]+)/.exec(csp7) || [, ''])[1];
+  say(ss && !/unsafe-eval|unsafe-inline/.test(ss), "index.html CSP script-src 에 'unsafe-eval'·'unsafe-inline' 없음 (㊿+147)");
+  const sb = fs.existsSync(path.join(ROOT, 'sqlbox.html')) ? fs.readFileSync(path.join(ROOT, 'sqlbox.html'), 'utf8') : '';
+  const sbCsp = (/http-equiv="Content-Security-Policy" content="([^"]+)"/.exec(sb) || [, ''])[1];
+  say(!!sb && /connect-src 'none'/.test(sbCsp) && /img-src 'none'/.test(sbCsp) && /<script src="js\/sqlbox\.js"><\/script>/.test(sb) && !/<script>/.test(sb), 'sqlbox.html: 외부 연결·이미지 막힘 · 인라인 스크립트 없음');
+  say(/setAttribute\('sandbox','allow-scripts'\)/.test(jsAll) && !/allow-same-origin/.test(jsAll) && !/alasql\(/.test(jsAll), 'SQL 실행은 sandbox(allow-scripts 만) 칸에서만 · 본 포탈 코드에 alasql 호출 없음');
+  const sbx = fs.existsSync(path.join(ROOT, 'js', 'sqlbox.js')) ? fs.readFileSync(path.join(ROOT, 'js', 'sqlbox.js'), 'utf8') : '';
+  try { new Function(sbx); say(true, 'js/sqlbox.js 문법'); } catch (e) { say(false, 'js/sqlbox.js 문법 — ' + e.message); }
+  const css7 = fs.readFileSync(path.join(ROOT, 'app.css'), 'utf8');
+  say(['--brand-solid', '--s1-ink', '--s1-solid', '--warn-ink', '--info-ink', '--critical-solid'].every((t) => (css7.match(new RegExp(t + ':', 'g')) || []).length >= 2), '색 토큰: 글자용(…-ink)·바탕용(…-solid) 라이트·다크 둘 다 정의');
+  say(!/background:\s*var\(--(brand|s1)\)[^}]*color:\s*#fff/.test(css7), '흰 글자 바탕은 …-solid 토큰만(어두운 화면 대비)'); }
 say(/id="dvHelp"/.test(html) && /id="ovlKeys"/.test(html) && /function askScreenHelp\(/.test(jsAll) && /function dvCapRender\(/.test(jsAll) && /function gridActPad\(/.test(jsAll), 'UX: ❔ 화면 도움말 · 단축키 창 · 설명 접기 · 동작 열 여백 코드 있음');
 say(/function aiFeedback\(/.test(jsAll) && /ai_feedback/.test(jsAll) && /function aiqHtml\(/.test(jsAll) && /ai_check_log/.test(jsAll), 'AI: 👍/👎 피드백 · 점검 추이 코드 있음');
 say(/\^ai_feedback\\b\|\^ai_check_log\\b/.test(jsAll), 'permWriteGuard 예외에 ai_feedback·ai_check_log');

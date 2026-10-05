@@ -550,7 +550,7 @@ function openFilterPanel(anchor,opt){
   var el=document.createElement('div');
   el.className='colf'; el.id='colfPanel';
   el.innerHTML='<div class="colf-h">'+esc(opt.label)+' — 볼 값 고르기'+
-      '<span id="colfCnt" style="float:right;font-weight:600;opacity:.65"></span></div>'+
+      '<span id="colfCnt" style="float:right;font-weight:600;color:var(--muted)"></span></div>'+
     '<input type="search" id="colfQ" placeholder="값 검색 — 찾은 뒤 「모두」 를 누르면 그것만 선택">'+
     '<div class="colf-list" id="colfList"></div>'+
     '<div class="colf-a">'+
@@ -882,7 +882,7 @@ function renderGrid(){
       var v=(op==='전체')? '':op;
       var btn=document.createElement('button');
       btn.className='pill'+(DV.chipVal===v||(!DV.chipVal&&!v)?'':' ghost');
-      if(DV.chipVal===v||(!DV.chipVal&&!v)){ btn.style.background='var(--brand,#149e40)'; btn.style.borderColor='var(--brand,#149e40)'; btn.style.color='#fff'; }
+      if(DV.chipVal===v||(!DV.chipVal&&!v)){ btn.style.background='var(--brand-solid,#107b32)'; btn.style.borderColor='var(--brand-solid,#107b32)'; btn.style.color='#fff'; }
       btn.textContent=op;
       btn.onclick=function(){ DV.chipVal=v; DV.page=0; renderGrid(); };
       cb.appendChild(btn);
@@ -991,7 +991,7 @@ function renderGrid(){
     function pbtn(txt,fn,dis,cur){
       var b=document.createElement('button');
       b.textContent=txt; b.disabled=!!dis;
-      b.style.cssText='border:1px solid '+(cur?'var(--brand,#149e40)':'var(--ring)')+';background:'+(cur?'var(--brand,#149e40)':'var(--surface-2)')+
+      b.style.cssText='border:1px solid '+(cur?'var(--brand-solid,#107b32)':'var(--ring)')+';background:'+(cur?'var(--brand-solid,#107b32)':'var(--surface-2)')+
         ';color:'+(cur?'#fff':'var(--ink-2)')+';border-radius:8px;padding:6px 11px;font-size:12px;cursor:pointer;font-family:inherit'+
         (dis?';opacity:.4;cursor:default':'');
       b.onclick=fn; return b;
@@ -1040,7 +1040,7 @@ function gridRow(r,g,editing){
       var txt=fmtCell(c,r[c.k],r);
       if(c.href && r[c.k]){
         return '<td'+n+'><a href="'+esc(c.href(r[c.k],r))+'" target="_blank" '+
-               'style="color:var(--s1);text-decoration:none">'+esc(txt)+'</a></td>';
+               'style="color:var(--s1-ink);text-decoration:none">'+esc(txt)+'</a></td>';
       }
       if(c.html) return '<td'+n+' style="white-space:normal">'+txt+'</td>';   /* fmt 가 안전한 HTML 을 만든 열 (시리얼 묶음 등) */
       return '<td'+n+'>'+esc(txt)+'</td>';

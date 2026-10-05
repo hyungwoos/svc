@@ -43,7 +43,7 @@ export async function mockBackend(page, { role = 'super_admin', email = 'tester@
   await page.route(/open\.er-api\.com|api\.exchangerate|api\.frankfurter/, (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"rates":{"KRW":1400}}' }));
   await page.addInitScript(({ email, token, noSession }) => {
     try { localStorage.clear(); sessionStorage.clear(); } catch (e) { /* noop */ }
-    if (!noSession) sessionStorage.setItem('svc_sess', JSON.stringify({ a: token, r: null, e: Math.floor(Date.now() / 1000) + 3600, u: email, p: true }));
+    try { if (!noSession) sessionStorage.setItem('svc_sess', JSON.stringify({ a: token, r: null, e: Math.floor(Date.now() / 1000) + 3600, u: email, p: true })); } catch (e) { /* 격리 칸(sandbox · 출처 없음)에선 저장소가 없음 — 무시 */ }
   }, { email, token, noSession });
 }
 

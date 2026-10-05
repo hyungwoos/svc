@@ -175,7 +175,7 @@ function renderCloud(){
       '<h3 id="clChartT">월별 비용 추이</h3><div class="cl-legend" id="clLegend"></div><div id="clChart" class="chartbox h260"></div></div>'+
     det('mdr','MDR 서비스 인프라 월별 비용 <span class="mini">EDR(KR) + awstac</span>', '<div id="clMdr"></div>')+
     det('acct','계정 개요 · 통합청구 연결 계정 <span class="mini" id="clAcctCap"></span>', '<div id="clAcct" style="display:none"></div><div id="clLinked" style="display:none;margin-top:12px"></div>')+
-    det('tbl','서비스 × 월 비용 내역', '<h3 id="clTableT" style="margin:0 0 8px;font-size:13.5px">서비스 × 월 비용 내역</h3><div class="tbl-wrap" style="max-height:none"><table class="pr" id="clTable"></table></div><p class="cap" id="clNote" style="margin-top:8px"></p>')+
+    det('tbl','서비스 × 월 비용 내역', '<h3 id="clTableT" style="margin:0 0 8px;font-size:13.5px">서비스 × 월 비용 내역</h3><div class="tbl-wrap" tabindex="0" style="max-height:none"><table class="pr" id="clTable"></table></div><p class="cap" id="clNote" style="margin-top:8px"></p>')+
     det('inv','인보이스 등록 내역 <span class="mini">'+B.inv.length+'건 · PDF 는 읽은 뒤 보관하지 않고 파일명만</span>', '<div id="clInv"></div>');
   clSummary(B); clMdr(B); clChips(B); clChart(B); clAcctOverview(B); clLinked(B); clTable(B); clInvList(B, canEdit);
   host.querySelectorAll('details.cl-det').forEach(function(d){
@@ -237,7 +237,7 @@ function clMdr(B){
   box.style.display='';
   box.innerHTML='<p class="cap" style="margin:0 0 6px">'+(clIsK()? '원화 환산 천원':'세전 USD')+'</p><div class="cl-legend">'+
     [A,T].map(function(a){ return '<span><i style="background:'+a.color+'"></i>'+esc(a.label+' · '+a.purpose)+'</span>'; }).join('')+'</div><div id="clMdrChart" class="chartbox h220" data-h="h220"></div>'+
-    '<div class="tbl-wrap" style="max-height:none;margin-top:10px"><table class="pr" id="clMdrT"></table></div>';
+    '<div class="tbl-wrap" tabindex="0" style="max-height:none;margin-top:10px"><table class="pr" id="clMdrT"></table></div>';
   clBars(document.getElementById('clMdrChart'), M, [{label:A.label,vals:A.dtotals,color:A.color},{label:T.label,vals:T.dtotals,color:T.color}], clFk, true);
   var li=M.length-1;
   var h='<thead><tr><th>계정</th>'+M.map(function(m){ return '<th class="n">'+clMonLabel(m)+'</th>'; }).join('')+'<th class="n">합계</th><th class="n">'+clMonLabel(M[li])+' 전월비</th></tr></thead><tbody>';
@@ -290,7 +290,7 @@ function clAcctOverview(B){
     return {sum:sum, html:'<tr><td><span style="display:inline-block;width:8px;height:8px;background:'+a.color+';margin-right:6px;border-radius:2px"></span>'+esc(a.purpose)+'</td>'+
       '<td>'+esc(a.email)+'<br><span class="cap">'+esc(a.acct)+' · '+esc(a.label)+'</span></td><td class="n"><b>'+clF(sum)+'</b></td><td class="n">'+clFk(sum/(nm||1))+'</td>'+
       '<td class="n">'+(sum/grand*100).toFixed(1)+'%</td><td class="n">'+clDelta(a.dtotals[li-1],a.dtotals[li])+'</td></tr>'}; }).sort(function(a,b){ return b.sum-a.sum; });
-  p.innerHTML='<h3>선택 계정 개요 <small>용도별 비용 · '+clUnit()+'</small></h3><div class="tbl-wrap" style="max-height:none"><table class="pr"><thead><tr><th>용도</th><th>계정</th><th class="n">합계</th><th class="n">월평균</th><th class="n">선택 내 비중</th><th class="n">'+clMonLabel(M[li])+' 전월비</th></tr></thead><tbody>'+
+  p.innerHTML='<h3>선택 계정 개요 <small>용도별 비용 · '+clUnit()+'</small></h3><div class="tbl-wrap" tabindex="0" style="max-height:none"><table class="pr"><thead><tr><th>용도</th><th>계정</th><th class="n">합계</th><th class="n">월평균</th><th class="n">선택 내 비중</th><th class="n">'+clMonLabel(M[li])+' 전월비</th></tr></thead><tbody>'+
     rows.map(function(r){ return r.html; }).join('')+'</tbody></table></div><p class="cap" style="margin-top:8px">비중은 현재 선택된 계정 합계 대비 · 월평균은 각 계정의 집계 월수 기준</p>';
 }
 function clLinked(B){
@@ -300,7 +300,7 @@ function clLinked(B){
   p.style.display='';
   var rows=only.linked.slice().sort(function(a,b){ return clSum(b.d)-clSum(a.d); });
   var tot=M.map(function(_,i){ return rows.reduce(function(s,r){ return s+(r.v[i]||0); },0)||null; });
-  p.innerHTML='<h3>'+esc(only.label)+' 통합청구 · 연결 계정별 비용 <small>'+clUnit()+'</small></h3><div class="tbl-wrap" style="max-height:none"><table class="pr"><thead><tr><th>연결 계정</th>'+
+  p.innerHTML='<h3>'+esc(only.label)+' 통합청구 · 연결 계정별 비용 <small>'+clUnit()+'</small></h3><div class="tbl-wrap" tabindex="0" style="max-height:none"><table class="pr"><thead><tr><th>연결 계정</th>'+
     M.map(function(m){ return '<th class="n">'+clMonLabel(m)+'</th>'; }).join('')+'<th class="n">합계</th><th class="n">'+clMonLabel(M[li])+' 전월비</th></tr></thead><tbody>'+
     rows.map(function(r){ return '<tr><td>'+esc(r.n)+'</td>'+r.d.map(function(x){ return clCell(x); }).join('')+'<td class="n"><b>'+clF(clSum(r.d))+'</b></td><td class="n">'+clDelta(r.d[li-1],r.d[li])+'</td></tr>'; }).join('')+
     '<tr class="tot"><td>합계</td>'+tot.map(function(t){ return clCell(t); }).join('')+'<td class="n">'+clF(clSum(tot))+'</td><td class="n">'+clDelta(tot[li-1],tot[li])+'</td></tr></tbody></table></div>'+
@@ -339,7 +339,7 @@ function clInvList(B, canEdit){
   var h='';
   if(!inv.length) h+='<p class="cap">보관된 인보이스가 없습니다'+(canEdit? ' — 위 «＋ 인보이스 PDF 추가» 로 올려주세요.':'.')+'</p>';
   else{
-    h+='<div class="tbl-wrap" style="max-height:none"><table class="pr"><thead><tr><th>사용 월</th><th>계정</th><th class="n">전체합계(USD)</th><th class="n">환율</th><th class="n">공급가액(₩)</th><th class="n">총 청구(VAT 포함)</th><th>파일</th><th>올린 사람</th>'+(canEdit?'<th></th>':'')+'</tr></thead><tbody>';
+    h+='<div class="tbl-wrap" tabindex="0" style="max-height:none"><table class="pr"><thead><tr><th>사용 월</th><th>계정</th><th class="n">전체합계(USD)</th><th class="n">환율</th><th class="n">공급가액(₩)</th><th class="n">총 청구(VAT 포함)</th><th>파일</th><th>올린 사람</th>'+(canEdit?'<th></th>':'')+'</tr></thead><tbody>';
     months.forEach(function(m){ (byM[m]||[]).forEach(function(i){ var a=B.acc[i.account_id]||{label:i.account_id};
       h+='<tr><td>'+m+'</td><td><span style="display:inline-block;width:8px;height:8px;background:'+(a.color||'#999')+';margin-right:6px;border-radius:2px"></span>'+esc(a.label)+(i.vendor? ' <span class="cap">· '+esc(i.vendor)+'</span>':'')+'</td>'+
         '<td class="n">'+(i.total_usd!=null? clU(i.total_usd):'–')+'</td><td class="n">'+(i.fx_rate!=null? Number(i.fx_rate).toLocaleString('ko-KR'):'–')+'</td><td class="n">'+(i.supply_krw!=null? clW(i.supply_krw):'–')+'</td><td class="n">'+(i.total_krw!=null? clW(i.total_krw):'–')+'</td>'+
@@ -375,7 +375,7 @@ function clLoadPdfjs(){
 async function clPdfLines(file){
   var lib=await clLoadPdfjs();
   var buf=await file.arrayBuffer();
-  var doc=await lib.getDocument({data:new Uint8Array(buf)}).promise;
+  var doc=await lib.getDocument({data:new Uint8Array(buf), isEvalSupported:false}).promise;   /* ㊿+147: CSP 에 'unsafe-eval' 없음 — 글꼴 그리기용 eval 시도도 안 함 */
   var out=[];
   for(var p=1;p<=doc.numPages;p++){
     var page=await doc.getPage(p), tc=await page.getTextContent();
@@ -487,7 +487,7 @@ function clRenderPreview(){
       var nz=a.rows.filter(function(r){ return (r.billUsd||0)>0 || (r.krw||0)>0; });
       h+='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0">'+
         '<span class="st '+(a.accId?'ok':'bad')+'">'+esc(a.email||'')+' ('+esc(a.acct||'?')+')</span>'+
-        '<span class="cap">→ 포탈 계정</span><select data-acc="'+ix+':'+ai+'" class="pill" style="height:26px;font:inherit;font-size:12px">'+
+        '<span class="cap">→ 포탈 계정</span><select aria-label="포탈 계정 연결" data-acc="'+ix+':'+ai+'" class="pill" style="height:26px;font:inherit;font-size:12px">'+
           '<option value="">— 선택 —</option>'+accOpts.map(function(o){ return '<option value="'+esc(o.id)+'"'+(o.id===a.accId?' selected':'')+'>'+esc(o.label)+' ('+esc(o.acct_no||'')+')</option>'; }).join('')+
           '<option value="__new">＋ 새 계정으로 등록…</option></select>'+
         '<span class="cap">서비스 '+nz.length+'행 · Sub Total '+(a.subUsd!=null? clU(a.subUsd):'?')+(a.subKrw!=null? ' / '+clW(a.subKrw):'')+'</span>'+
@@ -596,7 +596,7 @@ function renderPrice(){
     return;
   }
   var vers=prBooks(segBook), isCalc=PR.seg==='calc';
-  var verSel='<select id="prVer" class="pill" style="height:31px;font-family:inherit">'+
+  var verSel='<select id="prVer" aria-label="가격표 판" class="pill" style="height:31px;font-family:inherit">'+
     vers.map(function(b,i){ return '<option value="'+i+'"'+(i===(PR.ver[segBook]||0)?' selected':'')+'>'+esc(b.label)+(i===0?' (현행)':' (이력)')+'</option>'; }).join('')+'</select>';
   var TABS=[['saas','SaaS 가격표'],['onprem','On-prem 가격표'],['calc','견적 · 비교']];
   var head='<div class="pr-top">'+
@@ -672,7 +672,7 @@ function prCalcHtml(){
     '<div class="pr-two">'+
     '<div class="pr-card"><h3>Cloud NAC <small>기본 구독 · ZTNA 사용 시 PA Agent 추가</small></h3>'+
       '<div class="row">노드 <input type="number" id="pnQty" value="300" min="1" style="width:90px">'+
-      '<select id="pnTerm"><option value="0">무약정</option><option value="1" selected>1년 약정</option><option value="2">2년</option><option value="3">3년</option></select>'+
+      '<select id="pnTerm" aria-label="약정 기간"><option value="0">무약정</option><option value="1" selected>1년 약정</option><option value="2">2년</option><option value="3">3년</option></select>'+
       '<label class="svc"><input type="checkbox" id="pnZ">+ ZTNA (PA Agent)</label>'+
       '<span id="pnZW" style="display:none">동시접속 <input type="number" id="pnZQ" value="100" min="1" style="width:80px"></span></div>'+
       '<div class="pr-out"><div class="pr-ob"><div class="l">Cloud NAC 월</div><div class="v" id="pvMon">—</div></div>'+
@@ -690,7 +690,7 @@ function prCalcHtml(){
           return '<label class="svc"><input type="checkbox" data-prs="'+k+'"'+(k===def?' checked':'')+'>'+(LAB[k]||have[k].name)+'</label>'; }).join('');
       })()+
       ' Agent <input type="number" id="pmQty" value="100" min="1" style="width:90px">'+
-      '<select id="pmWho"><option value="dist">총판가 기준</option><option value="ptn">파트너가 기준</option></select></div>'+
+      '<select id="pmWho" aria-label="견적 대상"><option value="dist">총판가 기준</option><option value="ptn">파트너가 기준</option></select></div>'+
       '<div class="pr-out"><div class="pr-ob"><div class="l">소비자가 합계(연)</div><div class="v" id="pmCons">—</div></div>'+
       '<div class="pr-ob fin"><div class="l">공급가 합계(연)</div><div class="v" id="pmSup">—</div></div>'+
       '<div class="pr-ob"><div class="l">Agent당 공급 단가 합</div><div class="v" id="pmUnit">—</div></div></div>'+
@@ -703,7 +703,7 @@ function prCalcHtml(){
       '<span class="pr-f"><span class="l">제품</span><span class="eqb-seg"><button type="button" data-tcop="nac" id="tpNac">NAC</button><button type="button" data-tcop="ztna" id="tpZtna">ZTNA</button></span></span>'+
       '<span class="pr-f"><span class="l">노드</span><input type="number" id="ptQty" value="500" min="1" style="'+inSt+';width:96px"></span>'+
       '<span class="pr-f" id="ptZW" style="display:none"><span class="l">동시접속 Agent</span><input type="number" id="ptZQ" value="100" min="1" style="'+inSt+';width:90px"></span>'+
-      '<span class="pr-f"><span class="l">검토 기간</span><select id="ptY" style="'+inSt+'">'+yOpt+'</select></span>'+
+      '<span class="pr-f"><span class="l">검토 기간</span><select id="ptY" aria-label="검토 기간" style="'+inSt+'">'+yOpt+'</select></span>'+
       '<span class="pr-f"><span class="l">구축형 할인</span><span class="eqb-seg">'+
         '<button type="button" data-tcod="60" id="td60" title="SR파트너가 영업하는 일반 채널 딜의 통상 엔드가 — SR 마진 10%p 포함">60% SR채널</button>'+
         '<button type="button" data-tcod="70" id="td70" title="SR 배제선 — 직판·PR 직대응 딜의 하한가 (인바운드 견적 수준)">70% 직판·PR</button>'+
@@ -888,7 +888,7 @@ function prBindSaas(){
     var sSt='height:28px;border:1px solid var(--ring);border-radius:8px;padding:0 6px;font:inherit;font-size:12px;background:var(--surface)';
     $('#ptSsL').innerHTML=PR.tcoSS.map(function(r,i){
       return '<span style="display:inline-flex;gap:4px;align-items:center">'+
-        '<select data-ssp="'+i+'" style="'+sSt+'">'+SEN_P.map(function(pv2){ return '<option value="'+pv2+'"'+(r.p===pv2?' selected':'')+'>'+(pv2/10000)+'만원</option>'; }).join('')+'</select>'+
+        '<select aria-label="구독형 단가" data-ssp="'+i+'" style="'+sSt+'">'+SEN_P.map(function(pv2){ return '<option value="'+pv2+'"'+(r.p===pv2?' selected':'')+'>'+(pv2/10000)+'만원</option>'; }).join('')+'</select>'+
         '<input type="number" data-ssq="'+i+'" value="'+(+r.q||0)+'" min="0" style="'+sSt+';width:52px">대'+
         (PR.tcoSS.length>1?'<button data-ssx="'+i+'" class="pill" style="height:24px;padding:0 7px">×</button>':'')+'</span>';
     }).join('');
@@ -897,7 +897,7 @@ function prBindSaas(){
     if(!PR.tcoOS||!PR.tcoOS.length||PR.tcoOS.some(function(r){ return names.indexOf(r.m)<0; })) PR.tcoOS=[tcoOsDefault()];
     $('#ptOsL').innerHTML=PR.tcoOS.map(function(r,i){
       return '<span style="display:inline-flex;gap:4px;align-items:center">'+
-        '<select data-osm="'+i+'" style="'+sSt+'">'+rows.map(function(x){ return '<option value="'+esc(String(x[1]))+'"'+(String(x[1])===r.m?' selected':'')+'>'+esc(String(x[1]))+' · '+esc(String(x[0]))+' · '+prWon(x[2])+'원</option>'; }).join('')+'</select>'+
+        '<select aria-label="구축형 유지보수 비율" data-osm="'+i+'" style="'+sSt+'">'+rows.map(function(x){ return '<option value="'+esc(String(x[1]))+'"'+(String(x[1])===r.m?' selected':'')+'>'+esc(String(x[1]))+' · '+esc(String(x[0]))+' · '+prWon(x[2])+'원</option>'; }).join('')+'</select>'+
         '<input type="number" data-osq="'+i+'" value="'+(+r.q||0)+'" min="0" style="'+sSt+';width:52px">대'+
         (PR.tcoOS.length>1?'<button data-osx="'+i+'" class="pill" style="height:24px;padding:0 7px">×</button>':'')+'</span>';
     }).join('');

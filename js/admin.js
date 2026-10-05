@@ -61,7 +61,7 @@ function opsAutoPath(p){
 }
 function opsAppJs(html){
   var m=/name="app-js" content="([^"]+)"/.exec(String(html||'')), s=m? m[1] : ((document.querySelector('meta[name="app-js"]')||{}).content||'');
-  return s.split(',').map(function(x){ return x.trim(); }).filter(Boolean).concat(['js/boot.js','js/load.js']);
+  return s.split(',').map(function(x){ return x.trim(); }).filter(Boolean).concat(['js/boot.js','js/load.js','js/sqlbox.js']);   /* sqlbox.js = 격리 칸(sqlbox.html) 전용 · ㊿+147 */
 }
 function opsCheckFiles(files){   /* 커밋 전에 한 번 더 물어볼 것 */
   var warn=[], idx=files.filter(function(f){ return f.path==='index.html'; })[0], used=opsAppJs(idx&&idx.content);
@@ -425,7 +425,7 @@ function opsFnHtml(){
   var L=OPS.fnList, sel=OPS.fnSel, meta=OPS.fnMeta;
   var h='<div class="ops-grid"><div><div class="ops-h">① 함수</div>';
   h+='<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><button type="button" class="pill ghost" id="opsFnList">목록 불러오기</button>';
-  if(L) h+='<select id="opsFnSel" style="min-width:160px"><option value="">— 함수 선택 —</option>'+L.map(function(f){ return '<option value="'+esc(f.slug)+'"'+(f.slug===sel?' selected':'')+'>'+esc(f.slug)+' · v'+esc(f.version)+(f.verify_jwt? ' · JWT검사 ON':'')+'</option>'; }).join('')+'<option value="__new"'+(sel==='__new'?' selected':'')+'>＋ 새 함수…</option></select>';
+  if(L) h+='<select id="opsFnSel" aria-label="Edge Function" style="min-width:160px"><option value="">— 함수 선택 —</option>'+L.map(function(f){ return '<option value="'+esc(f.slug)+'"'+(f.slug===sel?' selected':'')+'>'+esc(f.slug)+' · v'+esc(f.version)+(f.verify_jwt? ' · JWT검사 ON':'')+'</option>'; }).join('')+'<option value="__new"'+(sel==='__new'?' selected':'')+'>＋ 새 함수…</option></select>';
   if(sel==='__new') h+='<input id="opsFnNew" placeholder="새 함수 이름(slug · 영문 소문자)" value="'+esc(OPS.fnNew||'')+'" style="width:200px">';
   if(sel && sel!=='__new') h+='<button type="button" class="pill ghost" id="opsFnGet">코드 불러오기</button>';
   h+='</div>';
@@ -472,8 +472,11 @@ async function opsFnDeploy(){
    · 기대값은 buildDigest() 로 계산(답과 같은 데이터) — 숫자는 천원/백만원/억원 어느 표기든 인정. 질문 추가 = AI_CHECK_QS 에 한 줄 */
 function aiHasNum(a, won){
   if(won==null || isNaN(won)) return true;
-  var t=String(a||'').replace(/\s/g,''), cands=[];
-  var k=Math.round(Number(won)/1000); cands.push(String(k), k.toLocaleString('ko-KR'));
+  var t=String(a||'').replace(/\s/g,''), cands=[], W=Number(won);
+  var k=Math.round(W/1000); cands.push(String(k), k.toLocaleString('ko-KR'));
+  /* ㊿+147: 만원·원 표기도 인정 — «약 9,956만원(99,557,735원)»을 «기대값 없음»으로 잘못 떨어뜨리던 것 (반올림·버림 둘 다) */
+  [Math.round(W/1e4), Math.floor(W/1e4)].forEach(function(m){ if(m>0) cands.push(m+'만', m.toLocaleString('ko-KR')+'만'); });
+  if(Math.abs(W)>=1000) cands.push(Math.round(W).toLocaleString('ko-KR')+'원', String(Math.round(W))+'원');
   var mm=Math.round(Number(won)/1e6); if(mm>0) cands.push(mm+'백만', mm.toLocaleString('ko-KR')+'백만');
   var ek=Number(won)/1e8; if(ek>=0.1) cands.push(ek.toFixed(1)+'억', ek.toFixed(2)+'억', (Math.round(ek*10)/10)+'억');
   return cands.some(function(c){ return c && t.indexOf(c)>=0; });
@@ -550,7 +553,7 @@ function aiqHtml(){
   if(T===null) h+='<p class="mini" style="margin:0 0 14px">불러오는 중…</p>';
   else if(!T.length) h+='<p class="mini" style="margin:0 0 14px">기록이 없습니다 — SQL 94 를 실행하고 15문 점검을 돌리거나, aicheck 함수를 배포해 야간 자동 점검을 켜면 쌓입니다.</p>';
   else h+='<table class="rn-tbl" style="margin-bottom:14px"><thead><tr><th>일시</th><th>출처</th><th class="n">통과</th><th class="n">평균</th><th>모델</th><th>실패 질문</th></tr></thead><tbody>'+T.map(function(r){
-      var rate=r.total? r.pass/r.total:0, col=rate>=0.9? 'var(--brand)': rate>=0.7? '#8a5200':'var(--critical)';
+      var rate=r.total? r.pass/r.total:0, col=rate>=0.9? 'var(--brand)': rate>=0.7? 'var(--warn-ink)':'var(--critical)';
       var fl=Array.isArray(r.fails)? r.fails.map(function(f){ return typeof f==='string'? f : (f.q||''); }).filter(Boolean) : [];
       return '<tr><td class="mini">'+esc(String(r.run_at||'').replace('T',' ').slice(0,16))+'</td><td class="nw">'+(r.source==='cron'? '🌙 자동':'🧑 수동')+'</td><td class="n" style="color:'+col+';font-weight:700">'+r.pass+'/'+r.total+'</td><td class="n mini">'+(r.avg_ms? (r.avg_ms/1000).toFixed(1)+'s':'')+'</td><td class="mini">'+esc(String(r.model||'').replace(/^claude-/,''))+'</td><td class="mini wrap">'+esc(fl.slice(0,3).join(' · '))+(fl.length>3? ' 외 '+(fl.length-3):'')+'</td></tr>'; }).join('')+'</tbody></table>';
   h+='<div class="ops-h" style="display:flex;align-items:center;gap:10px">답변 피드백 <span class="mini">(홈 AI 답 밑 👍/👎 · 최근 30건)</span></div>';
@@ -676,7 +679,7 @@ function apPaint(){
     var na=limited && !limited[m.v];             // 제한 역할(poc·장비)은 역할에 없는 메뉴 자체가 없음
     var dis=isSuper||na;
     function cb(k,on,disabled){ return '<td style="text-align:center"><input type="checkbox" data-ap="'+k+'" data-v="'+esc(m.v)+'"'+(on?' checked':'')+(disabled?' disabled':'')+' style="width:16px;height:16px"></td>'; }
-    h+='<tr'+(na?' style="opacity:.45"':'')+'><td>'+esc(m.label)+'</td>'+
+    h+='<tr'+(na?' class="row-dim"':'')+'><td>'+esc(m.label)+'</td>'+
       cb('v', isSuper||(!na&&p.v), dis)+cb('r', isSuper||(!na&&p.r), dis)+cb('w', isSuper||(!na&&p.w), dis||roleRO)+
       '<td class="mini">'+(isSuper? '슈퍼 관리자 — 제한 불가' : na? '역할('+esc(AX_ROLE_KO[role]||role)+')에 없는 메뉴' : roleRO&&p.r? '조회 전용 역할 — 쓰기 불가' : (!p.v? '숨김' : !p.r? '메뉴만 보임' : !p.w? '읽기만' : ''))+'</td></tr>';
   });
@@ -743,7 +746,7 @@ async function abLoad(){
         remain==null?'아래에 충전액·충전일을 입력하세요':'충전액 $'+credit+' − 사용 $'+r.total_usd, remain!=null&&remain<5)+
     box('이번 달 사용액','$'+Number(r.month_usd).toLocaleString('en-US'), thisMonthStr()+' 실측 (Cost API)')+
     box('기준일 이후 사용액','$'+Number(r.total_usd).toLocaleString('en-US'), r.from+' 부터 누적')+
-    (r.partial? '<div class="cap" style="grid-column:1/-1;color:var(--warning,#a06c00)">⚠ 일부 기간만 집계됐습니다 — '+esc(String(r.partial))+'</div>':'');
+    (r.partial? '<div class="cap" style="grid-column:1/-1;color:var(--warn-ink)">⚠ 일부 기간만 집계됐습니다 — '+esc(String(r.partial))+'</div>':'');
   var mx=0.01; (r.daily||[]).forEach(function(d){ mx=Math.max(mx,d.usd); });
   bars.innerHTML=(r.daily&&r.daily.length)?
     '<div class="mini" style="margin-bottom:4px">최근 14일 일별 사용액</div>'+
@@ -768,7 +771,7 @@ async function abSave(){
 var MF={rows:null, bound:false};
 function mfMsg(t,bad){ var e=$('#mfMsg'); if(e){ e.textContent=t||''; e.style.color=bad? 'var(--critical)':''; } }
 async function mfLoad(){
-  mfMsg('불러오는 중…');
+  mfMsg('불러오는 중…'); mfRoleLoad();
   try{ MF.rows=await sbWrite('POST','rpc/mfa_admin_list',{})||[]; mfMsg(MF.rows.length+'개 계정 · 등록 '+MF.rows.filter(function(r){ return r.enrolled; }).length+' · 필수 '+MF.rows.filter(function(r){ return r.required; }).length); mfPaint(); }
   catch(e){ MF.rows=null; var m=String(e.message||e); mfMsg(/mfa_admin_list|404|schema cache/i.test(m)? 'SQL 89 가 아직 실행되지 않았습니다 (배포·운영 › SQL 탭에서 sql89 실행)' : m.slice(0,120), true); $('#mfTable').innerHTML=''; }
 }
@@ -778,10 +781,12 @@ function mfPaint(){
   var tb=document.createElement('tbody');
   MF.rows.forEach(function(r){
     var tr=document.createElement('tr'); var me=(r.email||'').toLowerCase()===(AUTH_USER||'').toLowerCase();
-    var due=r.required && !r.enrolled && (!r.deadline || r.deadline<=new Date().toISOString().slice(0,10));
-    tr.innerHTML='<td>'+esc(r.email||'')+(me? ' <span class="mini" style="opacity:.6">(나)</span>':'')+'</td>'+
+    /* ㊿+147 SQL 95: 실제 적용 = 계정 지정 OR 역할 기본 (eff_* 가 없으면 SQL 95 전 — 계정 지정만) */
+    var effReq=(r.eff_required!=null)? r.eff_required : r.required, effDl=(r.eff_required!=null)? r.eff_deadline : r.deadline, byRole=/role/.test(r.source||'');
+    var due=effReq && !r.enrolled && (!effDl || effDl<=new Date().toISOString().slice(0,10));
+    tr.innerHTML='<td>'+esc(r.email||'')+(me? ' <span class="mini">(나)</span>':'')+'</td>'+
       '<td class="mini">'+esc(AX_ROLE_KO[r.role]||r.role||'권한 없음')+'</td>'+
-      '<td>'+(r.enrolled? '<span style="color:var(--brand)">✓ 등록</span> <span class="mini">'+esc(String(r.factor_at||'').slice(0,10))+'</span>' : (r.required? '<span style="color:'+(due? 'var(--critical)':'var(--s3,#b26a00)')+'">'+(due? '미등록 · 차단 중':'미등록 · 유예')+'</span>' : '<span class="mini">미등록</span>'))+'</td>'+
+      '<td>'+(r.enrolled? '<span style="color:var(--brand)">✓ 등록</span> <span class="mini">'+esc(String(r.factor_at||'').slice(0,10))+'</span>' : (effReq? '<span style="color:'+(due? 'var(--critical)':'var(--warn-ink)')+'">'+(due? '미등록 · 차단 중':'미등록 · 유예 '+esc(effDl||''))+'</span>'+(byRole? ' <span class="ctag" title="역할 기본 정책(SQL 95)으로 필수">역할 기본</span>':'') : '<span class="mini">미등록</span>'))+'</td>'+
       '<td><input type="checkbox" data-mf-req="'+esc(r.email)+'"'+(r.required?' checked':'')+'></td>'+
       '<td><input type="date" data-mf-dl="'+esc(r.email)+'" value="'+esc(r.deadline||'')+'"'+(r.required?'':' disabled')+' style="height:30px;width:140px"></td>'+
       '<td><input data-mf-note="'+esc(r.email)+'" value="'+esc(r.note||'')+'" placeholder="메모" style="height:30px;width:100%;min-width:90px"></td>'+
@@ -817,6 +822,31 @@ async function mfAll(){
   for(var i=0;i<targets.length;i++){ try{ await sbWrite('POST','rpc/mfa_admin_set',{p_email:targets[i].email, p_required:true, p_deadline:dl, p_note:'전체 지정'}); n++; }catch(e){} }
   toast('2단계 인증 전체 지정', n+'개 계정 · 기한 '+dl); mfLoad();
 }
+/* ㊿+147 SQL 95: 역할 기본 — super_admin · admin 필수 + 유예 일수 (없으면 칸을 숨김 = SQL 95 전) */
+async function mfRoleLoad(){
+  var box=$('#mfRole'); if(!box) return;
+  var rows; try{ rows=await sbWrite('POST','rpc/mfa_role_list',{})||[]; }catch(e){ box.style.display='none'; return; }
+  MF.roles=rows; box.style.display='';
+  var today=todayStr();
+  box.innerHTML='<b>역할 기본</b> <span class="mini">— 이 역할의 계정은 기한까지 인증 앱을 등록해야 합니다(계정별 지정과 합쳐 더 이른 기한 적용)</span>'+
+    '<div class="mf-role-rows">'+['super_admin','admin','admin_viewer','viewer'].map(function(role){
+      var r=rows.filter(function(x){ return x.role===role; })[0]||{role:role, required:false, grace_days:14};
+      var st=r.required? (r.deadline<=today? '<span style="color:var(--critical)">기한 지남 ('+esc(r.deadline)+')</span>' : '<span style="color:var(--warn-ink)">유예 중 · '+esc(r.deadline)+'까지</span>') : '<span class="mini">선택</span>';
+      return '<label class="mf-role-it"><input type="checkbox" data-mfr="'+role+'"'+(r.required?' checked':'')+'> '+esc(AX_ROLE_KO[role]||role)+
+        ' · 유예 <input type="number" min="0" max="180" step="1" data-mfr-g="'+role+'" value="'+(r.grace_days!=null? r.grace_days:14)+'" aria-label="'+esc(AX_ROLE_KO[role]||role)+' 유예 일수" style="width:56px;height:28px"> 일 '+st+'</label>'; }).join('')+
+    '<button type="button" class="cbtn pri" id="mfRoleSave">역할 기본 저장</button></div>';
+  $('#mfRoleSave').onclick=mfRoleSave;
+}
+async function mfRoleSave(){
+  var box=$('#mfRole'); var ch=[]; box.querySelectorAll('[data-mfr]').forEach(function(c){
+    var role=c.dataset.mfr, g=+(box.querySelector('[data-mfr-g="'+role+'"]').value||14), old=(MF.roles||[]).filter(function(x){ return x.role===role; })[0];
+    if(!old && !c.checked) return; if(old && old.required===c.checked && +old.grace_days===g) return; ch.push({role:role, req:c.checked, g:g}); });
+  if(!ch.length){ mfMsg('바뀐 것이 없습니다'); return; }
+  if(!confirm('역할 기본 2단계 인증을 바꿉니다:\n\n'+ch.map(function(x){ return '· '+(AX_ROLE_KO[x.role]||x.role)+' → '+(x.req? '필수 (유예 '+x.g+'일)':'선택'); }).join('\n')+'\n\n새로 켠 역할은 오늘부터 유예가 시작됩니다. 계속할까요?')) return;
+  mfMsg('저장 중…');
+  try{ for(var i=0;i<ch.length;i++) await sbWrite('POST','rpc/mfa_role_set',{p_role:ch[i].role, p_required:ch[i].req, p_grace_days:ch[i].g}); toast('2단계 인증 역할 기본', ch.length+'개 역할 저장'); mfLoad(); }
+  catch(e){ mfMsg(String(e.message||e).slice(0,120), true); }
+}
 function mfBind(){ if(MF.bound) return; MF.bound=true; var r=$('#mfReload'); if(r) r.onclick=mfLoad; var a=$('#mfAll'); if(a) a.onclick=mfAll; }
 /* ===== 관리자 › 코드 관리 (code_lists · SQL 93 · ㊿+137) — 선택 목록을 한 곳에서 추가·숨김·순서 =====
    저장은 code_lists 표에 직접(RLS: super_admin). 저장 뒤 loadCodes() 로 전역 *_OPTS 배열을 갱신 → 열린 표·폼에 즉시 반영. 다른 사용자는 다음 데이터 로드부터. */
@@ -840,7 +870,7 @@ async function cdLoad(){
 function cdPaint(){
   var t=$('#cdTable'); if(!t||!CD.rows) return;
   var list=CD.rows.filter(function(r){ return r.kind===CD.kind && (CD.showOff || r.active!==false); }).sort(function(a,b){ return (a.sort||0)-(b.sort||0) || String(a.value).localeCompare(String(b.value)); });
-  var note=CODE_KIND_NOTE[CD.kind]; var cap=$('#cdCap'); if(cap){ var w=cap.querySelector('.cd-warn'); if(w) w.remove(); if(note){ var sp=document.createElement('div'); sp.className='cd-warn'; sp.style.cssText='margin-top:6px;color:var(--s3,#8a5200)'; sp.textContent='⚠ '+note; cap.appendChild(sp); } }
+  var note=CODE_KIND_NOTE[CD.kind]; var cap=$('#cdCap'); if(cap){ var w=cap.querySelector('.cd-warn'); if(w) w.remove(); if(note){ var sp=document.createElement('div'); sp.className='cd-warn'; sp.style.cssText='margin-top:6px;color:var(--warn-ink)'; sp.textContent='⚠ '+note; cap.appendChild(sp); } }
   t.innerHTML='<thead><tr><th style="width:40px">순서</th><th>값</th><th>표시 이름</th><th>메모</th><th style="width:70px">상태</th><th class="mini">수정</th><th class="act" style="width:170px"></th></tr></thead>';
   var tb=document.createElement('tbody');
   if(!list.length){ var tr0=document.createElement('tr'); tr0.innerHTML='<td colspan="7" class="mini" style="padding:14px">값이 없습니다 — 아래에서 추가하세요'+(CD.showOff? '':' (숨긴 값은 «숨긴 값도 보기»)')+'</td>'; tb.appendChild(tr0); }
@@ -848,7 +878,7 @@ function cdPaint(){
     var tr=document.createElement('tr'); if(r.active===false) tr.style.opacity='.55';
     var nUse=cdUsage(CD.kind, r.value);
     tr.innerHTML='<td class="mini">'+(i+1)+'</td>'+
-      '<td><b>'+esc(r.value)+'</b>'+(nUse!=null? ' <span class="mini" style="opacity:.7">· '+nUse+'행</span>':'')+'</td>'+
+      '<td><b>'+esc(r.value)+'</b>'+(nUse!=null? ' <span class="mini">· '+nUse+'행</span>':'')+'</td>'+
       '<td><input data-cd-label="'+esc(r.value)+'" value="'+esc(r.label||'')+'" placeholder="(값 그대로)" style="height:30px;width:100%;min-width:90px"></td>'+
       '<td><input data-cd-note="'+esc(r.value)+'" value="'+esc(r.note||'')+'" placeholder="메모" style="height:30px;width:100%;min-width:90px"></td>'+
       '<td>'+(r.active===false? '<span class="mini">숨김</span>':'<span style="color:var(--brand)">사용</span>')+'</td>'+
@@ -934,7 +964,7 @@ function axPaint(){
       '<option value="">— 권한 없음 —</option>'+
       AX_ROLES.map(function(r){ return '<option value="'+r+'"'+(u.role===r?' selected':'')+'>'+r+'</option>'; }).join('')+
       '</select>';
-    tr.innerHTML='<td>'+esc(u.email||'')+(me?' <span class="mini" style="opacity:.6">(나)</span>':'')+'</td>'+
+    tr.innerHTML='<td>'+esc(u.email||'')+(me?' <span class="mini">(나)</span>':'')+'</td>'+
       '<td>'+sel+'</td>'+
       '<td class="mini">'+esc(axTime(u.last_sign_in))+'</td>'+
       '<td class="mini">'+esc(axTime(u.created_at).slice(0,10))+'</td>'+

@@ -889,6 +889,88 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
   });
   await ctx.close();
 }
+// ㊿+146: 폰 — 글자가 한 글자씩 세로로 쌓이는 곳 0 (대시보드 분석 펼침 · 데이터 점검 · 관리자 · 유입경로) · 장표 연도 탭은 고른 연도가 보임
+{
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }); const page = await ctx.newPage(); const c = collect(page);
+  await mockBackend(page, {}); await page.goto(url + '/index.html'); await page.waitForTimeout(2200);
+  const stacked = () => page.evaluate(() => { const out = []; const w = document.createTreeWalker(document.getElementById('app'), NodeFilter.SHOW_TEXT); let n;
+    while ((n = w.nextNode())) { const t = n.nodeValue.replace(/\s+/g, ''); if (t.length < 4) continue; const el = n.parentElement; if (!el || !el.offsetParent) continue;
+      const cs = getComputedStyle(el); const rg = document.createRange(); rg.selectNodeContents(n); const rr = Array.from(rg.getClientRects()).filter((x) => x.width > 0); if (!rr.length) continue;
+      const lh = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.35; const lines = Math.max(1, Math.round((Math.max(...rr.map((x) => x.bottom)) - Math.min(...rr.map((x) => x.top))) / lh));
+      if (lines >= 3 && t.length / lines < 3.2) out.push(t.slice(0, 12) + '(' + lines + '줄)'); }
+    return out; });
+  await S.t('㊿+146 폰 대시보드(분석 펼침) — 세로로 쌓인 글자 없음 · 장표 연도 탭에 고른 연도가 보임', async () => {
+    await page.evaluate(() => { const b = document.getElementById('ccAnaBtn'); if (b && b.getAttribute('aria-expanded') !== 'true') b.click(); }); await page.waitForTimeout(1200);
+    const bad = await stacked(); assert(!bad.length, bad.slice(0, 6).join(', '));
+    const seg = await page.evaluate(() => { const s = document.getElementById('segMxYear'); const b = s && s.querySelector('[aria-pressed="true"]'); if (!s || !b || !s.offsetParent) return null;
+      const sr = s.getBoundingClientRect(), br = b.getBoundingClientRect(); return { inView: br.left >= sr.left - 1 && br.right <= sr.right + 1, headH: Math.round(s.closest('.card-head').querySelector('h2').getBoundingClientRect().height) }; });
+    assert(seg && seg.inView && seg.headH < 40, JSON.stringify(seg)); assert(!c.errs.length, c.errs.join(' | ')); return JSON.stringify(seg);
+  });
+  for (const v of ['dcheck', 'adminx', 'leadsrc', 'ops']) {
+    await S.t('㊿+146 폰 ' + v + ' — 세로로 쌓인 글자 없음 · 페이지가 옆으로 밀리지 않음', async () => {
+      await page.evaluate((v) => { navMenu(v); }, v); await page.waitForTimeout(900);
+      const bad = await stacked(); const over = await page.evaluate(() => document.documentElement.scrollWidth - 390);
+      assert(!bad.length && over <= 1, JSON.stringify({ bad: bad.slice(0, 4), over })); return 'OK';
+    });
+  }
+  await ctx.close();
+}
+// ㊿+147: 100점 1차 — SQL 엔진 격리(unsafe-eval 없음) · AI 점검 만원 표기 · 색 대비 0(라이트·다크) · 관리자 MFA 역할 기본 · 칩 글자색
+{
+  const ALA = path.join(ROOT, 'node_modules', 'alasql', 'dist', 'alasql.min.js');
+  const AXE = path.join(ROOT, 'node_modules', 'axe-core', 'axe.min.js');
+  const roleCalls = []; let roleRows = [{ role: 'super_admin', required: true, grace_days: 14, since: '2026-10-05', deadline: '2026-10-19' }, { role: 'admin', required: true, grace_days: 14, since: '2026-10-05', deadline: '2026-10-19' }];
+  const { ctx, page, errs, csp } = await open({ extra: async (route, u, m) => {
+    if (u.includes('/rpc/mfa_role_list')) { await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(roleRows) }); return true; }
+    if (u.includes('/rpc/mfa_role_set')) { const b = JSON.parse(route.request().postData() || '{}'); roleCalls.push(b); await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ role: b.p_role, required: b.p_required }) }); return true; }
+    if (u.includes('/rpc/mfa_admin_list')) { await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([{ email: 'tester@example.com', role: 'super_admin', enrolled: false, required: false, deadline: null, eff_required: true, eff_deadline: '2026-10-19', source: 'role' }, { email: 'v@example.com', role: 'viewer', enrolled: false, required: false, deadline: null, eff_required: false, eff_deadline: null, source: 'none' }]) }); return true; }
+    return false; } });
+  if (fs.existsSync(ALA)) await page.route(/cdn\.jsdelivr\.net\/npm\/alasql@4\.19\.0\/dist\/alasql\.min\.js/, (r) => r.fulfill({ status: 200, contentType: 'application/javascript', headers: { 'Access-Control-Allow-Origin': '*' }, body: fs.readFileSync(ALA, 'utf8') }));
+  page.on('dialog', (d) => d.accept().catch(() => {}));
+  await S.t('㊿+147 AI 점검 숫자: 만원·원 표기 인정 · 다른 금액은 불인정 · 칩 글자색(밝은 바탕엔 검정)', async () => {
+    const r = await page.evaluate(() => ({ a: aiHasNum('이번 달 MRR은 약 9,956만원(99,557,735원)', 99557735), b: aiHasNum('99,557,735원', 99557735), c: aiHasNum('약 8,000만원', 99557735), d: inkOn('#eda100'), e: inkOn('#226bc4'), f: inkOn('rgb(27, 175, 122)') }));
+    assert(r.a && r.b && !r.c && r.d === '#111' && r.e === '#fff', JSON.stringify(r)); return JSON.stringify(r);
+  });
+  await S.t('㊿+147 리포트 SQL: 격리 칸(sandbox · 출처 없음)에서 실행 · 결과 표 · 보조 함수 · 칸 제거 · 본 포탈엔 alasql 없음', async () => {
+    if (!fs.existsSync(ALA)) return '건너뜀 — node_modules/alasql 없음(npm install)';
+    await page.evaluate(() => { navMenu('report'); }); await page.waitForTimeout(700);
+    await page.evaluate(() => { QB.mode = 'sql'; QB.sql = "SELECT SVC(ct.line) AS 서비스, NMKEY('(주)가상 고객_1') AS k, QTR('2026-05') AS q, COUNT(*) AS 계약수 FROM contracts ct GROUP BY SVC(ct.line)"; renderReport(); qbRunNow(); });
+    await page.waitForTimeout(2500);
+    const r = await page.evaluate(() => ({ n: QB.res && QB.res.rows.length, cols: QB.res && QB.res.cols.map((c) => c.id).join(','), row: QB.res && QB.res.rows[0], err: (document.getElementById('qbSqlErr') || {}).textContent || '', frames: document.querySelectorAll('iframe[sandbox]').length, ala: !!window.alasql, nk: nmKeys('(주)가상 고객_1')[0] }));
+    assert(r.n > 0 && /서비스,k,q,계약수/.test(r.cols) && r.row[1] === r.nk && r.row[2] === '2026-Q2' && !r.err && r.frames === 0 && !r.ala, JSON.stringify(r));
+    await page.evaluate(() => { QB.sql = 'SELECT nope FROM nosuch'; renderReport(); qbRunNow(); }); await page.waitForTimeout(2000);
+    const e2 = await page.evaluate(() => (document.getElementById('qbSqlErr') || {}).textContent || ''); assert(/표가 없습니다|nosuch|오류/.test(e2), '오류 안내: ' + e2);
+    const f = await page.evaluate(() => { const src = sqlboxRun.toString(); return /setAttribute\('sandbox','allow-scripts'\)/.test(src) && !/allow-same-origin/.test(src); }); assert(f, 'sandbox 속성');
+    await page.evaluate(() => { QB.mode = 'ui'; }); return r.n + '행 · ' + r.row.slice(0, 3).join(' / ');
+  });
+  await S.t('㊿+147 관리자 › 2단계 인증: 역할 기본(슈퍼·관리자 필수 14일) 표시 · 끄기 저장 → mfa_role_set · 목록에 «역할 기본»', async () => {
+    await page.evaluate(() => navMenu('adminx')); await page.waitForTimeout(1200);
+    const vis = await page.evaluate(() => { const b = document.getElementById('mfRole'); return !!b && b.style.display !== 'none' && /역할 기본/.test(b.textContent) && /유예 중/.test(b.textContent); });
+    assert(vis, '역할 기본 칸 없음');
+    assert(/역할 기본/.test(await page.$eval('#mfTable', (e) => e.textContent)), '목록에 역할 기본 표시 없음');
+    await page.uncheck('#mfRole [data-mfr="admin"]'); await page.click('#mfRoleSave'); await page.waitForTimeout(600);
+    assert(roleCalls.length === 1 && roleCalls[0].p_role === 'admin' && roleCalls[0].p_required === false && roleCalls[0].p_grace_days === 14, JSON.stringify(roleCalls));
+    return JSON.stringify(roleCalls[0]);
+  });
+  for (const theme of ['light', 'dark']) {
+    await S.t('㊿+147 색 대비(axe) ' + theme + ' — 홈(분석 펼침)·장비 보드·데이터 점검·해지율 0건', async () => {
+      if (!fs.existsSync(AXE)) return '건너뜀 — node_modules/axe-core 없음';
+      await page.evaluate((t) => { try { localStorage.setItem('svc_theme', t); applyTheme && applyTheme(t); } catch (e) { /* */ } document.documentElement.setAttribute('data-theme', t); }, theme);
+      await page.evaluate(() => { if (!document.getElementById('noAnim')) { const st = document.createElement('style'); st.id = 'noAnim'; st.textContent = '*,*::before,*::after{animation-duration:0s!important;transition:none!important}'; document.head.appendChild(st); } });
+      const bad = [];
+      for (const v of ['dash', 'eqboard', 'dcheck', 'churnrate', 'ops']) {
+        await page.evaluate((v) => { navMenu(v); if (v === 'dash') { const b = document.getElementById('ccAnaBtn'); if (b && b.getAttribute('aria-expanded') !== 'true') b.click(); } if (v === 'ops') { OPS.tab = 'log'; renderOps(true); } }, v);
+        await page.waitForTimeout(900);
+        if (!(await page.evaluate(() => !!window.axe))) await page.evaluate(fs.readFileSync(AXE, 'utf8'));   // addScriptTag 는 CSP(인라인 금지)에 막힘
+        const r = await page.evaluate(async () => { const res = await axe.run(document, { runOnly: { type: 'rule', values: ['color-contrast'] }, resultTypes: ['violations'] }); return res.violations.flatMap((x) => x.nodes.map((n) => n.target.join(' ') + ' ' + ((n.any[0] || {}).data || {}).contrastRatio)); });
+        r.slice(0, 3).forEach((x) => bad.push(v + ': ' + x));
+      }
+      assert(!bad.length, bad.slice(0, 6).join(' | ')); return '0';
+    });
+  }
+  await S.t('㊿+147 오류·CSP 위반 없음', async () => { assert(!errs.length, errs.join(' | ')); assert(!csp.length, csp.join(' | ')); });
+  await ctx.close();
+}
 await browser.close(); srv.close();
 const ok = S.report();
 fs.writeFileSync(path.join(OUT, 'smoke.json'), JSON.stringify(S.results, null, 1));
