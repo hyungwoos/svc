@@ -140,12 +140,12 @@ function renderCloud(){
   var host=$('#clBody');
   if(!RAWX.cloud){
     host.innerHTML='<div class="cap" style="padding:40px;text-align:center">클라우드 비용을 불러오는 중…</div>';
-    loadCloud(function(){ if(CUR_VIEW==='cloud') renderCloud(); });
+    loadCloud(function(){ if(ST.CUR_VIEW==='cloud') renderCloud(); });
     return;
   }
   if(!CL.fxNow){
     host.innerHTML='<div class="cap" style="padding:40px;text-align:center">현재 환율을 확인하는 중…</div>';
-    clFetchFx().then(function(){ if(CUR_VIEW==='cloud') renderCloud(); });
+    clFetchFx().then(function(){ if(ST.CUR_VIEW==='cloud') renderCloud(); });
     return;
   }
   var B=clBuild(); CL.B=B;
@@ -155,7 +155,7 @@ function renderCloud(){
     return;
   }
   if(!CL.sel) CL.sel={}; if(!Object.keys(CL.sel).length) B.awsKeys.forEach(function(k){ CL.sel[k]=1; });
-  var canEdit=!!(SB_TOKEN && !window.IS_VIEWER && (window.IS_SUPER || window.MY_ROLE==='admin'));
+  var canEdit=!!(ST.SB_TOKEN && !window.IS_VIEWER && (window.IS_SUPER || window.MY_ROLE==='admin'));
   var first=B.months[0], last=B.months[B.months.length-1];
   var head='<div class="pr-top">'+
     '<span style="font-size:18px;font-weight:600;letter-spacing:-.01em">클라우드 비용</span>'+
@@ -539,7 +539,7 @@ async function clSaveParsed(){
         var body={ym:p.ym+'-01', account_id:a.accId, vendor:p.vendor||null, file_path:null, file_name:it.name, fx_rate:p.fx||null,
           total_usd:a.subUsd!=null? a.subUsd : p.totalUsd, supply_krw:(p.accounts.length===1? p.supplyKrw : a.subKrw)||null,
           vat_krw:(p.accounts.length===1? p.vatKrw : null), total_krw:(p.accounts.length===1? p.totalKrw : null),
-          source:'pdf', uploaded_by:AUTH_USER||null, uploaded_at:new Date().toISOString()};
+          source:'pdf', uploaded_by:ST.AUTH_USER||null, uploaded_at:new Date().toISOString()};
         var rows=await sbWrite('POST','cloud_invoices?on_conflict=ym,account_id&select=id',[body],'resolution=merge-duplicates,return=representation');
         var invId=rows&&rows[0]&&rows[0].id;
         // ③ 그 달·계정의 서비스 행 교체
@@ -561,7 +561,7 @@ async function clSaveParsed(){
   }else{
     toast('일부 저장 실패', done+'건 성공 · '+fail+'건 실패 — 메시지를 확인하세요', 'warn'); btn.disabled=false;
   }
-  RAWX.cloud=null; if(CUR_VIEW==='cloud') renderCloud();
+  RAWX.cloud=null; if(ST.CUR_VIEW==='cloud') renderCloud();
 }
 
 function loadPrice(cb){
@@ -585,7 +585,7 @@ function renderPrice(){
   var host=$('#prBody');
   if(!RAWX.price){
     host.innerHTML='<div class="cap" style="padding:40px;text-align:center">가격표를 불러오는 중…</div>';
-    loadPrice(function(){ if(CUR_VIEW==='price') renderPrice(); });
+    loadPrice(function(){ if(ST.CUR_VIEW==='price') renderPrice(); });
     return;
   }
   var segBook=PR.seg==='onprem'? 'onprem':'saas';        // 견적·비교 탭은 SaaS 판(+구축형 참고)을 씁니다
@@ -978,8 +978,8 @@ function prBindSaas(){
   /* ── 실제 구축형 견적서(PDF) 비교 — 휘발성: TCOQ 메모리 변수에만 존재 ── */
   function renderQuoteCmp(){
     var m=document.getElementById('ptQR'); if(!m) return;
-    if(!TCOQ){ m.innerHTML=''; return; }
-    var q=TCOQ, y=(LASTT&&LASTT.y)||(+$('#ptY').value||1);
+    if(!ST.TCOQ){ m.innerHTML=''; return; }
+    var q=ST.TCOQ, y=(LASTT&&LASTT.y)||(+$('#ptY').value||1);
     var mr=(typeof q.maint_rate==='number'&&q.maint_rate>0&&q.maint_rate<1)? q.maint_rate:null;
     var mL=(mr!==null?mr:0.10), mH=(mr!==null?mr:0.15);
     var intro=+q.total_offer||0, nQ=+$('#ptQty').value||0, saasMon=LASTT?LASTT.saasMon:null;
@@ -1009,10 +1009,10 @@ function prBindSaas(){
     prCmpRender(document.getElementById('ptQCmp'), {y:y, n:nQ, saasMon:saasMon, intro:intro, mL:mL, mH:mH, best:best,
       cols:['SaaS · 3년 약정 표준가','실제 구축형 견적'], saasSub:(nQ? nQ+'노드 기준':''), onSub:'도입가 + 유지보수 '+(mr!==null? (mr*100)+'%':'10~15%')+'/년'});
     var x=document.getElementById('ptQX');
-    if(x) x.onclick=function(){ TCOQ=null; var f=document.getElementById('ptQF'); if(f) f.value=''; renderQuoteCmp(); };
+    if(x) x.onclick=function(){ ST.TCOQ=null; var f=document.getElementById('ptQF'); if(f) f.value=''; renderQuoteCmp(); };
   }
   function applyQuote(){
-    var q=TCOQ; if(!q) return;
+    var q=ST.TCOQ; if(!q) return;
     if(q.product==='nac'||q.product==='ztna'){
       PR.tcoP=q.product;
       document.querySelectorAll('[data-tcop]').forEach(function(x){ x.setAttribute('aria-pressed', x.dataset.tcop===q.product?'true':'false'); });
@@ -1055,9 +1055,9 @@ function prBindSaas(){
       });
       var j=await aiFetch({mode:'quote', pdf:b64});
       if(!j||!j.ok||!j.quote) throw new Error((j&&j.error)||'분석 실패');
-      TCOQ=j.quote; TCOQ._file=f.name; TCOQ._model=j.model||'';
+      ST.TCOQ=j.quote; ST.TCOQ._file=f.name; ST.TCOQ._model=j.model||'';
       applyQuote();
-      toast('견적서 분석 완료', (TCOQ.customer||'')+' → TCO 계산기에 적용');
+      toast('견적서 분석 완료', (ST.TCOQ.customer||'')+' → TCO 계산기에 적용');
     }catch(e){ m.innerHTML='<span style="color:var(--critical)">분석 실패: '+esc(String(e.message||e))+'</span>'; }
   }
   document.querySelectorAll('[data-prbasis]').forEach(function(b){

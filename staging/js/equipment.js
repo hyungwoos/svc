@@ -122,7 +122,7 @@ function eqSerialStatus(o, sn){
 }
 var EQR={r:null};
 function eqRetOpen(r){
-  if(!SB_TOKEN){ openOvl('ovlAuth'); return; }
+  if(!ST.SB_TOKEN){ openOvl('ovlAuth'); return; }
   EQR.r=r;
   var all=eqWant(r), ret=eqRetSet(r), amap={};       /* 시리얼이 없으면 «미등록-신청번호-n» 임시 시리얼로 처리 */
   (RAWX.assets||[]).forEach(function(a){ amap[String(a.serial||'').toUpperCase()]=a; });
@@ -167,7 +167,7 @@ async function eqRetSave(){
   var btn=$('#erSave'); btn.disabled=true; $('#erMsg').textContent='저장 중…';
   try{
     await eqRetApply(r, checked, date, note);
-    closeOvl('ovlEqRet'); DIRTY=true; eqRefresh();
+    closeOvl('ovlEqRet'); ST.DIRTY=true; eqRefresh();
   }catch(e){ $('#erMsg').textContent=String(e.message||e); }
   btn.disabled=false;
 }
@@ -197,7 +197,7 @@ function eqUndoGet(){
 }
 function eqUndoClear(){ EQ_UNDO=null; try{ sessionStorage.removeItem('eq_undo'); }catch(e){} }
 async function eqUndoRun(){
-  if(!SB_TOKEN){ openOvl('ovlAuth'); return; }
+  if(!ST.SB_TOKEN){ openOvl('ovlAuth'); return; }
   var u=eqUndoGet(); if(!u||!u.before) return;
   var when=String(u.at||'').replace('T',' ').slice(0,16);
   var had={}; u.before.forEach(function(a){ had[String(a.serial||'').toUpperCase()]=a; });
@@ -223,7 +223,7 @@ async function eqUndoRun(){
     eqUndoClear();
     if(m) m.textContent='';
     toast('원복 완료', added.length+'대 삭제 · '+changed.length+'대 복구');
-    DIRTY=true; renderGrid();
+    ST.DIRTY=true; renderGrid();
   }catch(e){
     if(m) m.textContent='';
     toast('원복 실패', String(e.message||e).slice(0,90), 'bad');
@@ -355,7 +355,7 @@ function eqScan(){
 }
 function own_(o){ var own=eqOwnerMap(), ser=eqSerials(o); for(var i=0;i<ser.length;i++){ if(own[ser[i]] && String(own[ser[i]].id)!==String(o.id)) return own[ser[i]]; } return null; }
 function renderEqPanel(){
-  if(CUR_VIEW!=='orders' && CUR_VIEW!=='assets'){
+  if(ST.CUR_VIEW!=='orders' && ST.CUR_VIEW!=='assets'){
     var h0=document.getElementById('eqHost'); if(h0) h0.style.display='none'; return;
   }
   var host=eqHostEl(), s=eqScan(), bad=s.gap.length>0, u=eqUndoGet();
@@ -414,7 +414,7 @@ function renderEqPanel(){
 
 }
 async function eqFixAll(){
-  if(!SB_TOKEN){ openOvl('ovlAuth'); return; }
+  if(!ST.SB_TOKEN){ openOvl('ovlAuth'); return; }
   var s=eqScan(); if(!s.gap.length) return;
   if(!confirm('신청 내역을 기준으로 장비 현황 '+s.gap.length+'건을 맞출까요?\n\n'+
     '· 현황에 없는 장비 → 신청 내역대로 새로 등록 (시리얼이 비어 있으면 «미등록-신청번호-번호» 로 임시 등록)\n'+
@@ -435,7 +435,7 @@ async function eqFixAll(){
   if(m) m.textContent='';
   if(!fail) EQ_ERR='';
   toast('현황 맞추기 완료', done+'건 반영'+(fail? ' · '+fail+'건 실패'+(err?' ('+err.slice(0,60)+')':'') : '')+' · ↩ 원복 가능', fail? 'bad':'ok');
-  DIRTY=true; renderGrid();
+  ST.DIRTY=true; renderGrid();
 }
 /* 동기화가 안 될 때 — 어디서 막히는지 실제로 한 번씩 해 봅니다 */
 async function eqDiagRun(){
@@ -455,7 +455,7 @@ async function eqDiagRun(){
     ? ('① 현황 표의 열 — '+bad('없는 열: '+miss.join(', '))+' · 이 열이 없으면 동기화가 통째로 실패합니다')
     : '① 현황 표의 열 — 정상 (order_id 포함)');
   put();
-  if(!SB_TOKEN){ log.push('② 쓰기 권한 — '+bad('로그인이 필요합니다')); put(); return; }
+  if(!ST.SB_TOKEN){ log.push('② 쓰기 권한 — '+bad('로그인이 필요합니다')); put(); return; }
   var probe='__진단'+Date.now()+'__', okIns=false;
   try{ await sbWrite('POST','equipment_assets',[{serial:probe,status:'재고'}]); okIns=true;
        log.push('② 새 장비 만들기 — 정상'); }
@@ -477,10 +477,10 @@ async function eqDiagRun(){
   if(s2.gap.length) log.push('　 예: '+esc(s2.gap.slice(0,3).map(function(x){ return '#'+x.o.id+' '+(x.o.customer||''); }).join(' / ')));
   if(EQ_ERR) log.push('⑥ 마지막 동기화 오류 — '+bad(EQ_ERR));
   put();
-  DIRTY=true; renderGrid();
+  ST.DIRTY=true; renderGrid();
 }
 async function eqOrphanFix(){
-  if(!SB_TOKEN){ openOvl('ovlAuth'); return; }
+  if(!ST.SB_TOKEN){ openOvl('ovlAuth'); return; }
   var s=eqScan(); if(!s.orphan.length) return;
   var ser=s.orphan.map(function(a){ return a.serial; });
   if(!confirm('신청 내역에 없는데 «임대중» 으로 되어 있는 자산 '+ser.length+'대를 재고로 되돌릴까요?\n\n'+
@@ -491,7 +491,7 @@ async function eqOrphanFix(){
     await eqPatch(ser,{status:'재고', customer:null, updated_at:new Date().toISOString()});
     await eqReload();
     toast('정리 완료', ser.length+'대 재고로 되돌림 · ↩ 원복 가능');
-    DIRTY=true; renderGrid();
+    ST.DIRTY=true; renderGrid();
   }catch(e){ toast('정리 실패', String(e.message||e).slice(0,80), 'bad'); }
 }
 

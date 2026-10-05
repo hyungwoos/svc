@@ -116,7 +116,7 @@ if (HAS_FN) {
   if (fs.existsSync(path.join(ROOT, 'js', 'app.js')) && !used.includes('js/app.js')) warn('js/app.js 는 ㊿+136 부터 안 쓰는 옛 파일 — 지워도 됨(공개 사이트에 그대로 올라가 있음)');
   for (const [f, t] of src) t.split('\n').forEach((ln, i) => { if (/data-zoom|:fullscreen|#viewLogin input\{height:42px;font-size:16px/.test(ln)) return; for (const m of ln.matchAll(/font-size:\s*([0-9.]+)px/g)) { if (+m[1] < 24 && !STEP.has(m[1])) off.push(f + ':' + (i + 1) + ' ' + m[1] + 'px'); } });
   say(!off.length, '글자 크기 7단계(11·12·12.5·13.5·15·18·22 + 큰 숫자) 밖 값 없음' + (off.length ? ' — ' + off.slice(0, 6).join(', ') : ''));
-  say(/function colwApply\(/.test(jsAll) && /colwApply\(t, CUR_VIEW\)/.test(jsAll) && /\.dgrid\.colw-fixed\{table-layout:fixed\}/.test(fs.readFileSync(path.join(ROOT, 'app.css'), 'utf8')), '표 열 너비 조절(colw) 연결');
+  say(/function colwApply\(/.test(jsAll) && /colwApply\(t, ST\.CUR_VIEW\)/.test(jsAll) && /\.dgrid\.colw-fixed\{table-layout:fixed\}/.test(fs.readFileSync(path.join(ROOT, 'app.css'), 'utf8')), '표 열 너비 조절(colw) 연결');
   say(/class="subgrp" data-sub="Cloud NAC"/.test(html) && (html.match(/class="grp"[^>]*>사업 영역</g) || []).length === 1 && /function menuConfMigrate\(/.test(jsAll), '메뉴: «사업 영역» 한 그룹 + 소제목 · 예전 메뉴 편집 설정 옮김');
   say(!/class="pill"[^>]*style="[^"]*background:var\(--(s1|brand)\)[^"]*color:#fff/.test(html + jsAll), '버튼: 주요 버튼을 style 로 칠하지 않음(class="pill pri")'); }
 say(/function opsAutoPath\(/.test(jsAll) && /function opsDest\(/.test(jsAll) && /OPS_WF_RE/.test(jsAll) && /function opsRepoCheck\(/.test(jsAll) && /function opsCheckFiles\(/.test(jsAll), '배포·운영 안전장치(㊿+143): 파일 자리 자동 · 저장소 파일 루트 · 워크플로 제외 · 커밋 전 경고 · 저장소 점검');
@@ -124,7 +124,7 @@ say(/function opsAutoPath\(/.test(jsAll) && /function opsDest\(/.test(jsAll) && 
 { const sh = jsAll.slice(jsAll.indexOf('function boot('), jsAll.indexOf('function boot(') + 900); const init5 = fs.readFileSync(path.join(ROOT, 'js', 'init.js'), 'utf8');
   say(/if\(!ok\)\{ showLoginScreen\(\); return null; \}/.test(sh), '시작: 로그인 안 됨 → 서버에 묻지 않고 바로 로그인 화면(익명 load_all 없음 · ㊿+145)');
   say(/function reloadHome\(/.test(jsAll) && !/AUTH_USER=null; location\.reload\(\);/.test(jsAll), '로그아웃·자동 로그아웃은 reloadHome(주소의 #메뉴 지움)');
-  say(/function enterAfterLogin\(\)\{[\s\S]{0,260}CUR_VIEW='dash'/.test(jsAll), '로그인 → 항상 대시보드');
+  say(/function enterAfterLogin\(\)\{[\s\S]{0,260}ST\.CUR_VIEW='dash'/.test(jsAll), '로그인 → 항상 대시보드');
   say(/function mfaBgCheck\(/.test(jsAll) && /opt && opt\.fast/.test(jsAll), '2단계 인증 확인은 데이터 읽기와 병렬(빠른 길 + 뒤 확인)');
   say(/function navMenu\(/.test(jsAll) && /viewSnapInit\(\)/.test(init5) && init5.indexOf('viewSnapInit()') < init5.lastIndexOf('boot();') && (jsAll.match(/navMenu\(/g) || []).length >= 7, '메뉴 클릭 → navMenu(첫 화면) 연결');
   say(/function cacheDrop\(/.test(jsAll) && !/sessionStorage\.removeItem\(CACHE_KEY\)/.test(jsAll.replace(/function cacheDrop\(\)\{[^\n]*/, '')), '사본 무효화는 cacheDrop 하나로(예약된 쓰기까지 취소)'); }
@@ -142,6 +142,11 @@ say(/function opsAutoPath\(/.test(jsAll) && /function opsDest\(/.test(jsAll) && 
   const css7 = fs.readFileSync(path.join(ROOT, 'app.css'), 'utf8');
   say(['--brand-solid', '--s1-ink', '--s1-solid', '--warn-ink', '--info-ink', '--critical-solid'].every((t) => (css7.match(new RegExp(t + ':', 'g')) || []).length >= 2), '색 토큰: 글자용(…-ink)·바탕용(…-solid) 라이트·다크 둘 다 정의');
   say(!/background:\s*var\(--(brand|s1)\)[^}]*color:\s*#fff/.test(css7), '흰 글자 바탕은 …-solid 토큰만(어두운 화면 대비)'); }
+/* ㊿+150: 공유 상태 17개 → js/state.js ST.* (모듈 전환 1단계) */
+{ const MOVED = ['AUTH_USER', 'CODES', 'CUR_VIEW', 'DATA', 'DIRTY', 'HIST', 'HIST_LOADED', 'IDLE_LAST', 'IDLE_WARNED', 'INB_Y', 'LIVE_SRC', 'M', 'MAT', 'OI_CONVERT', 'PERMS', 'SB_TOKEN', 'TCOQ'];
+  const win = JS_LIST.flatMap((f) => { const src = fs.existsSync(path.join(ROOT, f)) ? fs.readFileSync(path.join(ROOT, f), 'utf8') : ''; return MOVED.filter((n) => new RegExp('window\\.' + n + '\\b').test(src)).map((n) => f + ':' + n); });
+  say(JS_LIST[0] === 'js/state.js' && /name="app-js" content="js\/state\.js,/.test(html), 'js/state.js 가 app-js 맨 앞(다른 파일보다 먼저 로드)');
+  say(!win.length, 'window.<공유 상태> 접근 없음(ST.* 로)' + (win.length ? ' — ' + win.slice(0, 6).join(', ') : '')); }
 /* ㊿+148: 데이터 점검 수정 창 · 업데이트 안내 팝업 */
 { say(/function dcFixOpen\(/.test(jsAll) && /function dcFixSave\(/.test(jsAll) && /dcFixOpen\(r\.id, \+p\[1\]\)/.test(jsAll), '데이터 점검: 항목 → 수정 창(dcFixOpen) · 저장(dcFixSave)');
   say(/async function sbWrite\(method, path, body, prefer, asView\)/.test(jsAll) && /function permWriteGuard\(method, path, asView\)/.test(jsAll), '저장 권한은 그 표의 화면 기준(sbWrite asView)');

@@ -21,7 +21,7 @@ function axTime(v){
 async function adminFetch(payload){
   var r=await fetch(SB_URL+'/functions/v1/admin',{
     method:'POST',
-    headers:{'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+(SB_TOKEN||'')},
+    headers:{'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+(ST.SB_TOKEN||'')},
     body:JSON.stringify(payload)
   });
   var j=null; try{ j=await r.json(); }catch(e){}
@@ -87,7 +87,7 @@ function opsUrl(){ return SB_URL+'/functions/v1/ops'; }
 async function opsCall(action, body){
   var o=Object.assign({action:action}, body||{}); if(action!=='status') o.pin=OPS.pin;
   var r;
-  try{ r=await fetch(opsUrl(), {method:'POST', headers:{'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+SB_TOKEN}, body:JSON.stringify(o)}); }
+  try{ r=await fetch(opsUrl(), {method:'POST', headers:{'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+ST.SB_TOKEN}, body:JSON.stringify(o)}); }
   catch(e){ throw new Error('ops 함수에 연결하지 못했습니다 — Edge Functions 에 «ops» 가 배포돼 있고 Verify JWT 가 꺼져 있는지 확인하세요'); }
   var j=null; try{ j=await r.json(); }catch(e){}
   if(!j) throw new Error('ops 함수 응답을 읽지 못했습니다 ('+r.status+')');
@@ -218,7 +218,7 @@ function opsSealHtml(){
 }
 async function opsSealCheck(quiet){
   try{
-    var r=await fetch(SB_URL+'/storage/v1/object/authenticated/'+SEAL_OBJECT, {headers:{apikey:SB_KEY, Authorization:'Bearer '+SB_TOKEN}});
+    var r=await fetch(SB_URL+'/storage/v1/object/authenticated/'+SEAL_OBJECT, {headers:{apikey:SB_KEY, Authorization:'Bearer '+ST.SB_TOKEN}});
     if(!r.ok){ var t=''; try{ t=(await r.json()).message||''; }catch(e){} OPS.seal={ok:false, error:r.status===400||r.status===404? '아직 없음 (올리기 필요)' : r.status===403? '권한 없음 — SQL 87 정책 확인' : (r.status+' '+t)}; }
     else { var b=await r.blob(); if(OPS.seal&&OPS.seal.url) try{ URL.revokeObjectURL(OPS.seal.url); }catch(e){} OPS.seal={ok:true, size:b.size, type:b.type, url:URL.createObjectURL(b)}; }
   }catch(e){ OPS.seal={ok:false, error:'Storage 에 연결하지 못했습니다'}; }
@@ -231,7 +231,7 @@ async function opsSealUpload(file){
   if(!confirm('«'+file.name+'» ('+opsFmtBytes(file.size)+') 을 직인으로 올립니다 (private/seal.jpg · 기존 파일은 덮어씀). 견적서에 바로 반영됩니다. 계속할까요?')) return;
   opsSetMsg('직인 올리는 중…');
   try{
-    var r=await fetch(SB_URL+'/storage/v1/object/'+SEAL_OBJECT, {method:'POST', headers:{apikey:SB_KEY, Authorization:'Bearer '+SB_TOKEN, 'Content-Type':file.type, 'x-upsert':'true', 'cache-control':'3600'}, body:file});
+    var r=await fetch(SB_URL+'/storage/v1/object/'+SEAL_OBJECT, {method:'POST', headers:{apikey:SB_KEY, Authorization:'Bearer '+ST.SB_TOKEN, 'Content-Type':file.type, 'x-upsert':'true', 'cache-control':'3600'}, body:file});
     if(!r.ok){ var t=''; try{ t=(await r.json()).message||''; }catch(e){} throw new Error(r.status===403||r.status===400&&/policy|row-level/i.test(t)? '권한 없음 — SQL 87 을 실행했는지, 슈퍼 관리자인지 확인하세요' : r.status===404? 'private 버킷이 없습니다 — SQL 87 을 먼저 실행하세요' : (r.status+' '+t)); }
     logChange('seal_upload','storage','private/seal.jpg',{name:file.name, size:file.size, type:file.type});
     toast('직인 저장 완료', 'Storage private/seal.jpg');
@@ -365,9 +365,9 @@ async function opsHealth(){
   async function step(name, fn){ var t0=t(); try{ var r=await fn(); out.push({name:name, ok:true, ms:t()-t0, info:r||''}); }catch(e){ out.push({name:name, ok:false, ms:t()-t0, info:String(e.message||e).slice(0,140)}); } }
   OPS.health={running:true, rows:out}; renderOps(true);
   await step('GitHub Pages 최신 index.html', async function(){ var r=await fetch(prodUrl()+'?nocache='+Date.now(), {cache:'no-store'}); if(!r.ok) throw new Error('HTTP '+r.status); var m=opsVerOf(await r.text()); if(!m) throw new Error('APP_VER 없음'); m=[m,m]; return m[1]+(m[1]===APP_VER? ' (지금과 같음)':' ← 지금 실행 중 '+APP_VER+(IS_STAGING? ' (스테이징)':' — 새로고침 필요')); });
-  await step('Supabase REST (load_all)', async function(){ var r=await fetch(SB_URL+'/rest/v1/rpc/load_all', {method:'POST', headers:{'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+SB_TOKEN}, body:'{}'}); if(!r.ok) throw new Error('HTTP '+r.status); return 'HTTP 200'; });
+  await step('Supabase REST (load_all)', async function(){ var r=await fetch(SB_URL+'/rest/v1/rpc/load_all', {method:'POST', headers:{'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+ST.SB_TOKEN}, body:'{}'}); if(!r.ok) throw new Error('HTTP '+r.status); return 'HTTP 200'; });
   await step('AI (ask ping)', async function(){ var r=await aiFetch({mode:'ping'}, 12000); if(!r || r.ok===false) throw new Error((r&&r.error)||'응답 없음'); return (r.model||'ok'); });
-  await step('remind (dry)', async function(){ var r=await fetch(SB_URL+'/functions/v1/remind?dry=1', {method:'POST', headers:{'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+SB_TOKEN}, body:JSON.stringify({month:idxDate(STATE.base)})}); var j=await r.json(); if(!j.ok) throw new Error(j.error||('HTTP '+r.status)); return '이달 '+(j.counts&&j.counts.due)+' · 다음 달 '+(j.counts&&j.counts.next)+' · 미처리 '+(j.counts&&j.counts.lapsed); });
+  await step('remind (dry)', async function(){ var r=await fetch(SB_URL+'/functions/v1/remind?dry=1', {method:'POST', headers:{'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+ST.SB_TOKEN}, body:JSON.stringify({month:idxDate(STATE.base)})}); var j=await r.json(); if(!j.ok) throw new Error(j.error||('HTTP '+r.status)); return '이달 '+(j.counts&&j.counts.due)+' · 다음 달 '+(j.counts&&j.counts.next)+' · 미처리 '+(j.counts&&j.counts.lapsed); });
   await step('ops (status)', async function(){ var r=await opsCall('status'); return (r.github&&r.github.token_set? 'GitHub ✓':'GitHub ✗')+' · '+(r.mgmt_token_set? 'Supabase ✓':'Supabase ✗')+' · '+(r.log_ok? '기록 ✓':'기록 ✗'); });
   if(OPS.pin) await step('운영 DB (select 1 · 읽기 전용)', async function(){ var r=await opsCall('sql_run',{sql:'select 1 as ok, now() as at', read_only:true}); return Array.isArray(r.rows)&&r.rows[0]? String(r.rows[0].at||'').slice(0,19) : 'ok'; });
   await step('서비스 워커', async function(){ if(!('serviceWorker' in navigator)) return '미지원'; var reg=await navigator.serviceWorker.getRegistration(); return reg? (reg.active? '활성':'등록됨') : '없음 (file:// 또는 미등록)'; });
@@ -524,7 +524,7 @@ async function aiCheckRun(){
   var failsL=OPS.aic.rows.filter(function(r){ return !r.ok; }).map(function(r){ return {q:r.q, why:r.st, head:String(r.text||'').slice(0,160)}; });
   try{ logChange('ai_check','ask',APP_VER,{pass:pass, total:OPS.aic.rows.length, avg_ms:OPS.aic.summary.avg_ms, cut:cut, fails:failsL.map(function(f){ return f.q+' — '+f.why; })}); }catch(e){}
   /* SQL 94 ai_check_log 에도(표 없으면 조용히 건너뜀) → 기록 탭 «AI 점검 추이»에서 야간 자동 점검(aicheck)과 함께 봄 */
-  try{ await sbWrite('POST','ai_check_log',{source:'portal', app_ver:APP_VER, pass:pass, total:OPS.aic.rows.length, avg_ms:OPS.aic.summary.avg_ms, model:OPS.aic.summary.models[0]||null, fails:failsL, rows:OPS.aic.rows.map(function(r){ return {q:r.q, ok:!!r.ok, why:r.st, ms:r.ms||0, tools:r.tools||0}; }), actor:AUTH_USER||null}); AIQ.trend=null; }catch(e){}
+  try{ await sbWrite('POST','ai_check_log',{source:'portal', app_ver:APP_VER, pass:pass, total:OPS.aic.rows.length, avg_ms:OPS.aic.summary.avg_ms, model:OPS.aic.summary.models[0]||null, fails:failsL, rows:OPS.aic.rows.map(function(r){ return {q:r.q, ok:!!r.ok, why:r.st, ms:r.ms||0, tools:r.tools||0}; }), actor:ST.AUTH_USER||null}); AIQ.trend=null; }catch(e){}
   toast('AI 점검 끝', pass+'/'+OPS.aic.rows.length+' 통과 · 평균 '+Math.round(OPS.aic.summary.avg_ms/1000)+'초', pass===OPS.aic.rows.length? 'ok':'warn');
   renderOps(true); aiqLoad();
 }
@@ -545,7 +545,7 @@ async function aiqLoad(){
   var t=await sbTry('ai_check_log?select=run_at,source,pass,total,avg_ms,model,fails&order=run_at.desc&limit=7');
   var f=await sbTry('ai_feedback?select=created_at,email,verdict,question,answer_head,note&order=created_at.desc&limit=30');
   AIQ.trend=t||[]; AIQ.fb=f||[]; AIQ.loading=false; AIQ.at=Date.now();
-  if(CUR_VIEW==='ops' && OPS.tab==='log') renderOps(true);
+  if(ST.CUR_VIEW==='ops' && OPS.tab==='log') renderOps(true);
 }
 function aiqHtml(){
   var T=AIQ.trend, F=AIQ.fb;
@@ -710,14 +710,14 @@ async function apSave(){
   if(!AP.user){ toast('계정을 먼저 고르세요','','bad'); return; }
   var role=apRoleOf(AP.user); if(role==='super_admin'){ toast('슈퍼 관리자는 제한할 수 없습니다','','info'); return; }
   var now=new Date().toISOString(), em=String(AP.user).toLowerCase();
-  var rows=apMenus().map(function(m){ var p=AP.rows[m.v]||{v:true,r:true,w:false}; return {email:em, view:m.v, can_view:!!p.v, can_read:!!(p.v&&p.r), can_write:!!(p.v&&p.r&&p.w), updated_by:AUTH_USER||null, updated_at:now}; });
+  var rows=apMenus().map(function(m){ var p=AP.rows[m.v]||{v:true,r:true,w:false}; return {email:em, view:m.v, can_view:!!p.v, can_read:!!(p.v&&p.r), can_write:!!(p.v&&p.r&&p.w), updated_by:ST.AUTH_USER||null, updated_at:now}; });
   var b=$('#apSave'); b.disabled=true; $('#apMsg').textContent='저장 중…';
   try{
     await sbWrite('POST','user_perms?on_conflict=email,view', rows, 'resolution=merge-duplicates,return=minimal');
     try{ logChange('perms','user_perms',null,{email:em, n:rows.length, hidden:rows.filter(function(r){ return !r.can_view; }).map(function(r){ return r.view; }), readonly:rows.filter(function(r){ return r.can_view&&!r.can_write; }).map(function(r){ return r.view; })}); }catch(e){}
     $('#apMsg').textContent='저장됨 — '+em+' 은 다음에 화면을 새로 읽을 때 적용';
     toast('메뉴 권한 저장', em, 'ok');
-    if(em===String(AUTH_USER||'').toLowerCase()){ await loadPerms(); applyPerms(); }
+    if(em===String(ST.AUTH_USER||'').toLowerCase()){ await loadPerms(); applyPerms(); }
   }catch(e){ $('#apMsg').textContent=String(e.message||e).slice(0,160); toast('저장 실패', String(e.message||e).slice(0,120), 'bad'); }
   b.disabled=false;
 }
@@ -793,7 +793,7 @@ function mfPaint(){
   t.innerHTML='<thead><tr><th>이메일</th><th>권한</th><th>인증 앱</th><th style="width:60px">필수</th><th style="width:150px">기한</th><th>메모</th><th class="act" style="width:220px"></th></tr></thead>';
   var tb=document.createElement('tbody');
   MF.rows.forEach(function(r){
-    var tr=document.createElement('tr'); var me=(r.email||'').toLowerCase()===(AUTH_USER||'').toLowerCase();
+    var tr=document.createElement('tr'); var me=(r.email||'').toLowerCase()===(ST.AUTH_USER||'').toLowerCase();
     /* ㊿+147 SQL 95: 실제 적용 = 계정 지정 OR 역할 기본 (eff_* 가 없으면 SQL 95 전 — 계정 지정만) */
     var effReq=(r.eff_required!=null)? r.eff_required : r.required, effDl=(r.eff_required!=null)? r.eff_deadline : r.deadline, byRole=/role/.test(r.source||'');
     var due=effReq && !r.enrolled && (!effDl || effDl<=new Date().toISOString().slice(0,10));
@@ -877,7 +877,7 @@ async function cdLoad(){
   cdMsg('불러오는 중…');
   var rows=await sbTry('code_lists?select=kind,value,label,sort,active,note,updated_by,updated_at&order=kind,sort,value');
   if(!rows || !rows.length){ CD.rows=null; cdMsg('SQL 93 이 아직 실행되지 않았습니다 (배포·운영 › SQL 탭에서 sql93 실행) — 그동안은 포탈 코드의 기본 목록을 씁니다', true); $('#cdTable').innerHTML=''; return; }
-  CD.rows=rows; var m={}; rows.forEach(function(r){ (m[r.kind]=m[r.kind]||[]).push(r); }); CODES=m; try{ sessionStorage.setItem('svc_codes', JSON.stringify(m)); }catch(e){} applyCodes();
+  CD.rows=rows; var m={}; rows.forEach(function(r){ (m[r.kind]=m[r.kind]||[]).push(r); }); ST.CODES=m; try{ sessionStorage.setItem('svc_codes', JSON.stringify(m)); }catch(e){} applyCodes();
   cdMsg(rows.length+'개 값 · '+Object.keys(m).length+'개 목록'); cdPaint();
 }
 function cdPaint(){
@@ -917,7 +917,7 @@ function cdRow(v){ return (CD.rows||[]).filter(function(r){ return r.kind===CD.k
 async function cdPatch(v, patch, okMsg){
   cdMsg('저장 중…');
   try{
-    patch.updated_by=AUTH_USER||null; patch.updated_at=new Date().toISOString();
+    patch.updated_by=ST.AUTH_USER||null; patch.updated_at=new Date().toISOString();
     await sbWrite('PATCH','code_lists?kind=eq.'+encodeURIComponent(CD.kind)+'&value=eq.'+encodeURIComponent(v), patch);
     await logChange('code_'+(patch.active===false? 'hide': patch.active===true? 'show':'edit'),'code_lists',CD.kind+':'+v, patch);
     if(okMsg) toast('코드 관리', okMsg); await cdLoad();
@@ -947,7 +947,7 @@ async function cdAdd(){
   var maxSort=(CD.rows||[]).filter(function(r){ return r.kind===CD.kind; }).reduce(function(m,r){ return Math.max(m, r.sort||0); }, 0);
   cdMsg('추가 중…');
   try{
-    await sbWrite('POST','code_lists', {kind:CD.kind, value:v, label:label, note:note, sort:maxSort+1, active:true, updated_by:AUTH_USER||null});
+    await sbWrite('POST','code_lists', {kind:CD.kind, value:v, label:label, note:note, sort:maxSort+1, active:true, updated_by:ST.AUTH_USER||null});
     await logChange('code_add','code_lists',CD.kind+':'+v, {label:label, note:note});
     $('#cdNewVal').value=''; $('#cdNewLabel').value=''; $('#cdNewNote').value='';
     toast('코드 추가', CODE_KIND_LABEL[CD.kind]+' «'+v+'»'); await cdLoad();
@@ -970,7 +970,7 @@ function axPaint(){
   var tb=document.createElement('tbody');
   rows.forEach(function(u){
     var tr=document.createElement('tr');
-    var me=(u.email||'').toLowerCase()===(AUTH_USER||'').toLowerCase();
+    var me=(u.email||'').toLowerCase()===(ST.AUTH_USER||'').toLowerCase();
     var sel='<select data-ax="'+esc(u.email)+'" style="height:30px;padding:0 8px;border-radius:8px;'+
       'border:1px solid var(--ring);background:var(--surface-2);color:var(--ink);font-family:inherit;font-size:12px"'+
       (me?' disabled title="본인 권한은 여기서 바꿀 수 없습니다"':'')+'>'+
@@ -1065,7 +1065,7 @@ var ROLE_INFO={
 };
 async function renderAccount(){
   var box=$('#accBody');
-  if(!SB_TOKEN){
+  if(!ST.SB_TOKEN){
     box.innerHTML='<p class="cap">로그인이 필요합니다.</p>';
     var lb=document.createElement('button'); lb.className='pill'; lb.textContent='로그인';
     lb.onclick=function(){ openOvl('ovlAuth'); };
@@ -1074,7 +1074,7 @@ async function renderAccount(){
   box.innerHTML='<p class="cap">불러오는 중…</p>';
   var role=null;
   try{
-    var rr=await sbTry('user_roles?select=role&email=eq.'+encodeURIComponent(AUTH_USER||''));
+    var rr=await sbTry('user_roles?select=role&email=eq.'+encodeURIComponent(ST.AUTH_USER||''));
     if(rr && rr.length) role=rr[0].role;
   }catch(e){}
   var ri=ROLE_INFO[role]||['기본 (역할 미지정)','역할이 지정되지 않아 기본 권한으로 동작합니다. 관리자에게 문의하세요.'];
@@ -1087,7 +1087,7 @@ async function renderAccount(){
     '<span style="width:110px;color:var(--muted);font-size:12.5px;flex-shrink:0">'+k+'</span>'+
     '<span style="font-size:13.5px">'+v+'</span></div>'; }
   box.innerHTML=
-    row('이메일', esc(AUTH_USER||''))+
+    row('이메일', esc(ST.AUTH_USER||''))+
     row('권한', '<b>'+esc(ri[0])+'</b>'+(role? ' <span class="mini">('+esc(role)+')</span>':''))+
     row('권한 설명', '<span style="color:var(--ink-2)">'+esc(ri[1])+'</span>')+
     row('로그인 세션', '<span style="color:var(--ink-2)">'+esc(sessTxt)+'</span>');
@@ -1177,7 +1177,7 @@ async function submitOrder(){
     var row={
       channel: $('#odChannel').value, order_type: $('#odType').value,
       serials: $('#odSerials').value.trim()||null,
-      requester: AUTH_USER||null,
+      requester: ST.AUTH_USER||null,
       customer: cust,
       contract_no: isS1? ($('#odContract').value.trim()||null) : null,
       mgr_name: mgr,
@@ -1220,7 +1220,7 @@ async function submitMdrPoc(){
   try{
     var osSum=(+$('#mpWin').value||0)+(+$('#mpLinux').value||0)+(+$('#mpMac').value||0);
     var row={
-      requester: AUTH_USER||null,
+      requester: ST.AUTH_USER||null,
       customer: comp,
       svc_type: 'CLOUD',
       plan_qty: osSum||null,
@@ -1342,10 +1342,12 @@ var UPD_SEED=[
     '- 지난 안내는 내 계정 › «📢 업데이트 내역»에서 언제든 다시 볼 수 있습니다.',
     '- (관리자) 매일 새벽 3시 AI 자동 점검 결과를 슬랙에 «성공/실패» 한 줄로 알립니다.'].join('\n')},
   {ver:'㊿+149', date:'2026-10-05', title:'관리자 화면 정리', body:[
-    '- (관리자) 관리자 화면을 탭 4개(계정·권한 · 보안 · 설정 · AI 비용)로 나눠 긴 스크롤을 없앴습니다. «새 계정 만들기»는 접어 두었습니다.'].join('\n')}
+    '- (관리자) 관리자 화면을 탭 4개(계정·권한 · 보안 · 설정 · AI 비용)로 나눠 긴 스크롤을 없앴습니다. «새 계정 만들기»는 접어 두었습니다.'].join('\n')},
+  {ver:'㊿+150', date:'2026-10-05', title:'내부 구조 정리 (모듈 전환 1단계)', body:[
+    '- (관리자) 여러 화면이 함께 쓰는 상태 값 17개를 한 파일(js/state.js)로 모았습니다. 화면·기능 변화는 없습니다.'].join('\n')}
 ];
 async function updFetch(path, opt){   /* 캐시를 건드리지 않는 직접 호출 — 401 이면 토큰 갱신 뒤 1회 재시도 */
-  if(!SB_TOKEN) throw new Error('로그인이 필요합니다');
+  if(!ST.SB_TOKEN) throw new Error('로그인이 필요합니다');
   var go=function(){ return fetch(SB_URL+'/rest/v1/'+path, Object.assign({headers:sbHeaders(true)}, opt||{})); };
   var r=await go(); if(r.status===401 && await refreshToken()) r=await go();
   var t=await r.text(); if(!r.ok) throw new Error('HTTP '+r.status+' '+t.slice(0,160));
@@ -1397,7 +1399,7 @@ async function updSyncSeed(){
 }
 /* 로그인 뒤 첫 데이터 표시 때 1번 (onData) */
 async function updCheck(){
-  if(UPD.checked || !SB_TOKEN) return; UPD.checked=true;
+  if(UPD.checked || !ST.SB_TOKEN) return; UPD.checked=true;
   try{ await updSyncSeed(); }catch(e){ /* 표 없음(SQL 96 전) 등 — 조용히 */ }
   try{
     var r=await updRpc('upd_pending', {});
@@ -1474,7 +1476,7 @@ function updEditPaint(){
 }
 async function updNoteSave(v){
   try{
-    var me=AUTH_USER||'', now=new Date().toISOString(), body=Object.assign({}, v); delete body.id;
+    var me=ST.AUTH_USER||'', now=new Date().toISOString(), body=Object.assign({}, v); delete body.id;
     if(v.id){ body.updated_by=me; body.updated_at=now; await sbWrite('PATCH','upd_notes?id=eq.'+v.id, body); }
     else { body.created_by=me; body.updated_by=me; await sbWrite('POST','upd_notes', body); }
     try{ await logChange(v.id? 'upd_note_edit':'upd_note_add','upd_notes', v.id||'', {title:v.title, ver:v.ver, active:v.active}); }catch(e){}
@@ -1483,7 +1485,7 @@ async function updNoteSave(v){
 }
 async function updNotifySet(email, on){
   try{
-    await sbWrite('POST','upd_notify?on_conflict=email', {email:email, enabled:!!on, updated_by:AUTH_USER||'', updated_at:new Date().toISOString()}, 'resolution=merge-duplicates');
+    await sbWrite('POST','upd_notify?on_conflict=email', {email:email, enabled:!!on, updated_by:ST.AUTH_USER||'', updated_at:new Date().toISOString()}, 'resolution=merge-duplicates');
     try{ await logChange(on? 'upd_notify_on':'upd_notify_off','upd_notify', email, {}); }catch(e){}
     toast('업데이트 안내', email+(on? ' — 다음 로그인 때 안내합니다':' — 안내하지 않습니다')); updAdminLoad();
   }catch(e){ updMsg('저장 실패: '+String(e.message||e).slice(0,160), true); }
