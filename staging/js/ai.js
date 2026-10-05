@@ -177,12 +177,12 @@ function ask(q){
       revealAnswer();
       say.className='ai-say on';
       say.innerHTML='<span class="lb">AI</span>'+esc(cleanSay(r.text))+
-        '<div style="font-size:11px;color:var(--muted);margin-top:6px;opacity:.8">'+
+        '<div style="font-size:11px;color:var(--muted);margin-top:6px">'+
         esc(String(r.model||'').replace(/^claude-/,''))+
         (r.queries&&r.queries.length? ' · DB 조회 '+r.queries.length+'회 <span title="'+esc(r.queries.map(function(q){ return q.tool+' '+((q.ms||0)/1000).toFixed(1)+'s'+(q.error?' ✗':''); }).join(' · '))+'">('+esc(aiToolBrief(r.queries))+')</span>':'')+
         (r.llm&&r.llm.length? ' · 모델 '+r.llm.length+'회 '+(r.llm.reduce(function(a,x){ return a+(x.ms||0); },0)/1000).toFixed(1)+'s':'')+
-        (r.cut? ' · <span style="color:#a06c00">'+esc(r.degraded? '답 미완성: '+r.cut : '도구 중단: '+r.cut)+'</span>':'')+
-        (r.tried&&r.tried.length? ' · <span style="color:#a06c00">폴백: '+esc(r.tried.join(' / '))+'</span>':'')+
+        (r.cut? ' · <span style="color:var(--warn-ink)">'+esc(r.degraded? '답 미완성: '+r.cut : '도구 중단: '+r.cut)+'</span>':'')+
+        (r.tried&&r.tried.length? ' · <span style="color:var(--warn-ink)">폴백: '+esc(r.tried.join(' / '))+'</span>':'')+
         (r._ms? ' · '+(r._ms/1000).toFixed(1)+'초':'')+
         ' · '+new Date().toTimeString().slice(0,5)+' 데이터 기준'+
         '<span class="ai-fb" role="group" aria-label="이 답변 평가"><button type="button" data-fb="up" aria-label="도움이 됐어요" title="도움이 됐어요">👍</button><button type="button" data-fb="down" aria-label="틀렸거나 부족해요" title="틀렸거나 부족해요 — 무엇이 틀렸는지 적으면 AI 지식 보강에 씁니다">👎</button></span></div>';
@@ -1005,7 +1005,7 @@ function monthFilter(p){
   if(p.from!=null && p.to!=null){ var b=[]; for(var j=Math.max(0,p.from); j<=Math.min(M-1,p.to); j++) b.push(j); return b.length?b:null; }
   var out=[];
   var years = p.years.length? p.years : null;
-  for(var j=0;j<M;j++){
+  for(j=0;j<M;j++){
     var y=yOf(j), m=monOf(j);
     if(years && years.indexOf(y)<0) continue;
     if(p.months.length && p.months.indexOf(m)<0) continue;
@@ -1234,7 +1234,7 @@ function computeFromP(p){
   var lvQ=liveData();
   if(p.metric==='count' && lvQ && lvQ.ok && !mf && !(p.partners&&p.partners.length) && !(p.custs&&p.custs.length)){
     var lv=lvQ;
-    var sel=lv.rows.filter(function(x){
+    sel=lv.rows.filter(function(x){
       if(p.lines&&p.lines.length && p.lines.indexOf(x.line)<0) return false;
       if(p.ind && x.ind!==p.ind) return false;
       return true;
@@ -1344,8 +1344,8 @@ function computeFromP(p){
   /* --- 전망(추세 기반 ARR 예측) --- */
   if(p.metric==='forecast'){
     var hz = p.horizon || 60;                       // 개월 (기본 5년)
-    var b  = STATE.base;
-    var cur = monthlyTotal(list, b);                 // 기준월 MRR
+    b  = STATE.base;
+    cur = monthlyTotal(list, b);                 // 기준월 MRR
     if(!cur) return { title:scope+' · 전망', hero:'—', unit:'',
       sub:'기준월 매출이 0원이라 추세를 계산할 수 없습니다', note:'' };
 
@@ -1362,7 +1362,7 @@ function computeFromP(p){
     var labs=[], data=[], proj=[];
     for(var j6=Math.max(0,b-23); j6<=b; j6++){ labs.push(mkLabel(j6)); data.push(monthlyTotal(list,j6)); proj.push(null); }
     var step = hz>36? 6 : 3;                          // 표시 간격
-    var rows=[];
+    rows=[];
     for(var m2=step; m2<=hz; m2+=step){
       var v = cur*Math.pow(1+g, m2);
       labs.push(mk(b+m2).slice(2)); data.push(null); proj.push(v);
@@ -1395,7 +1395,7 @@ function computeFromP(p){
         chart:{type:'bar',labels:ys2,series:[{label:'연 매출',data:ys2.map(function(y){return byY2[y];}),color:cssv('--s1')}],money:true},
         table:{cols:['연도','매출'],rows:ys2.map(function(y){return [y+'년',won(byY2[y])+'천원'];})}, note:'' };
     }
-    var js = mf || (function(){ var a=[]; for(var j=Math.max(0,STATE.base-23);j<=STATE.base;j++) a.push(j); return a; })();
+    js = mf || (function(){ var a=[]; for(var j=Math.max(0,STATE.base-23);j<=STATE.base;j++) a.push(j); return a; })();
     var lab=js.map(mkLabel), dat=js.map(function(j){return monthlyTotal(list,j);});
     var sum=dat.reduce(function(a,b){return a+b;},0);
     return { title:scope+(p.avg?' · 월평균 매출':' · 월별 추이'), hero:won(p.avg? sum/js.length : sum), unit:'천원',

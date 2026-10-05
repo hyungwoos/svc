@@ -5,6 +5,7 @@ import { installFetch, loadFn, call, ok, report, J, calls } from './_mock.ts';
 const EXPECT = { month: '2026-10', due_n: 3, next_n: 2, lapsed_n: 0, live_customers: 357, live_products: 362, month_revenue: 71295828, assets_rented: 48, oi_open: 11 };
 let role = 'super_admin', mode: 'good' | 'bad' | 'error' = 'good', expectFail = false;
 const logs: any[] = [], slack: any[] = []; let askN = 0, inflight = 0, maxInflight = 0;
+let errRows: any[] = [], opsRows: any[] = [];   // v1.2 야간 운영 요약용 가짜 표
 const GOOD: Record<string, string> = {
   '이번 달 MRR 얼마야?': '이번 달 MRR 은 71,296천원(약 0.7억) 입니다.',
   'LIVE 고객사 몇 곳이야?': '2026-10 기준 LIVE 고객사는 357곳(제품별 합 362)입니다.',
@@ -34,6 +35,8 @@ installFetch(async (url, method, body, init) => {
     return J({ ok: true, text: GOOD[q] || '네.', model: 'claude-sonnet-5', queries: [{ tool: 'run_sql', ms: 300 }] });
   }
   if (url.includes('slack.com')) { slack.push(JSON.parse(body || '{}')); return J({ ok: true, ts: '1' }); }
+  if (url.includes('/rest/v1/client_errors')) return /at=gte\./.test(url) && auth.includes('svc') ? J(errRows) : J({ message: 'bad' }, 400);
+  if (url.includes('/rest/v1/ops_log')) return /ok=is\.false/.test(url) && auth.includes('svc') ? J(opsRows) : J({ message: 'bad' }, 400);
   return undefined;
 });
 Deno.env.set('SUPABASE_URL', 'https://mock.supabase.co'); Deno.env.set('SUPABASE_ANON_KEY', 'anon'); Deno.env.set('SUPABASE_SERVICE_ROLE_KEY', 'svc');
@@ -68,5 +71,14 @@ role = 'admin'; { const r = await call({ dry: true }); ok(r.status === 403, 'adm
   logs.length = 0; const w = await call({ wait: true }, { token: 'cronkey-test' }); ok(w.status === 200 && w.j.pass === 12 && w.j.logged === true, '{wait:true} → 끝까지 기다려 결과');
   const d = await call({ dry: true }); ok(d.status === 200 && d.j.dry === true && d.j.total === 12, '사용자(super) dry 는 기다려 결과(백그라운드 아님)');
   delete (globalThis as any).EdgeRuntime; }
+{ errRows = [{ email: 'a@x.kr', msg: 'TypeError: x is undefined', n: 2, staging: false }, { email: 'b@x.kr', msg: 'TypeError: x is undefined', n: 1, staging: true }];
+  opsRows = [{ action: 'gh_put', target: 'index.html', error: 'GitHub 422' }]; slack.length = 0; logs.length = 0;
+  const r = await call({ wait: true }, { token: 'cronkey-test' });
+  ok(r.j.pass === 12 && r.j.digest && r.j.digest.errors === 3 && r.j.digest.users === 2 && r.j.digest.opsFails === 1, '야간 요약: 오류 3건(2명) · 배포 실패 1건 집계', r.j.digest);
+  ok(slack.length === 1 && /AI 12\/12 통과 ✓/.test(slack[0].text) && /브라우저 오류 3건\(2명 · 스테이징 1\)/.test(slack[0].text) && /배포·운영 실패 1건/.test(slack[0].text) && /TypeError/.test(slack[0].text) && /GitHub 422/.test(slack[0].text), 'AI 는 정상이어도 오류·실패가 있으면 슬랙 한 통', slack[0]?.text);
+  errRows = []; opsRows = []; slack.length = 0; await call({ wait: true }, { token: 'cronkey-test' }); ok(slack.length === 0, '오류·실패 0 · AI 정상 → 슬랙 없음'); }
+{ const m = await import(new URL('../../supabase/functions/aicheck/index.ts', import.meta.url).href);
+  ok(m.hasNum('이번 달(2026-10) MRR은 약 9,956만원(99,557,735원)이고', 99557735) && m.hasNum('99,557,735원', 99557735) && m.hasNum('약 9955만원', 99557735), '만원·원 표기 인정(㊿+147)');
+  ok(!m.hasNum('약 8,000만원', 99557735) && !m.hasNum('자료가 없습니다', 99557735), '다른 금액·숫자 없음은 불인정'); }
 ok(!calls.some((c) => c.body && /xoxb-test|cronkey-test/.test(c.body)), '슬랙 토큰·크론 키가 요청 본문에 새지 않음');
 report('aicheck');

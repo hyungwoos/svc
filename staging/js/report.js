@@ -748,12 +748,12 @@ function qbChart(res){
   var ms=cols.map(function(c,i){ return {c:c,i:i}; }).filter(function(x){ return x.c.t==='num' && !x.c.noSum; });
   var count=!ms.length; if(count) ms=[{c:{id:'__count', l:'건수', t:'num'}, i:-1}];
   var meas=qbPickMeasures(ms);
-  var isTime= xi.c.t==='month'||xi.c.t==='date';
+  isTime= xi.c.t==='month'||xi.c.t==='date';
   var map={}, order=[];
   res.rows.forEach(function(r){ var v=r[xi.i]; var k= v==null||v===''? '(없음)' : String(isTime? qbTr(v,'ym') : (qbFmtCell(v, xi.c)||v)); if(!map[k]){ map[k]=meas.map(function(){ return 0; }); order.push(k); } meas.forEach(function(m,j){ map[k][j]+= count? 1 : (Number(r[m.i])||0); }); });
   if(isTime) order.sort(); else order.sort(function(a,b){ return map[b][0]-map[a][0]; });
-  var labels=order.slice(0,40);
-  var series=meas.slice(0,12).map(function(m,j){ return {label:m.c.l, data:labels.map(function(k){ return map[k][j]; })}; });
+  labels=order.slice(0,40);
+  series=meas.slice(0,12).map(function(m,j){ return {label:m.c.l, data:labels.map(function(k){ return map[k][j]; })}; });
   return {type: isTime? 'lines':'bars', labels:labels, series:series, money:!count && meas.every(function(m){ return m.c.won; }), truncated:order.length>40, all:ms, picked:meas.length===ms.length? 'all' : (meas.length===1? meas[0].c.id : 'auto'), xs:xs, xi:xi.c.id, xLabel:xi.c.l, merged:order.length<res.rows.length, count:count};
 }
 
@@ -844,7 +844,7 @@ function qbPanelHtml(){
   /* ⑥ 결과 조건·정렬·상위 */
   h+='<section class="qb-sec"><div class="qb-h"><span class="qb-n">'+(grouped?5:6)+'</span>결과 조건 · 정렬 · 상위</div>';
   h+='<div class="qb-sub">결과 조건 (집계 값에도)</div>'+(spec.post||[]).map(function(f,i){ return qbFilterRow(f,i,spec,'post'); }).join('')+'<button type="button" class="cbtn qb-add" data-qb="padd">＋ 결과 조건</button>';
-  h+='<div class="qb-sub">정렬</div>'+(spec.sort||[]).map(function(s,i){ return '<div class="qb-row" data-i="'+i+'" data-kind="sort">'+qbSel('c', qbOutColOpts(QB.res&&QB.res.cols, s.c), s.c)+'<select data-qb="dir" class="qb-sel qb-dir"><option value="asc"'+(s.dir!=='desc'?' selected':'')+'>오름차순 ↑</option><option value="desc"'+(s.dir==='desc'?' selected':'')+'>내림차순 ↓</option></select><button type="button" class="cbtn qb-x" data-qb="del">×</button></div>'; }).join('')+'<button type="button" class="cbtn qb-add" data-qb="sadd">＋ 정렬</button>';
+  h+='<div class="qb-sub">정렬</div>'+(spec.sort||[]).map(function(s,i){ return '<div class="qb-row" data-i="'+i+'" data-kind="sort">'+qbSel('c', qbOutColOpts(QB.res&&QB.res.cols, s.c), s.c)+'<select data-qb="dir" aria-label="정렬 방향" class="qb-sel qb-dir"><option value="asc"'+(s.dir!=='desc'?' selected':'')+'>오름차순 ↑</option><option value="desc"'+(s.dir==='desc'?' selected':'')+'>내림차순 ↓</option></select><button type="button" class="cbtn qb-x" data-qb="del">×</button></div>'; }).join('')+'<button type="button" class="cbtn qb-add" data-qb="sadd">＋ 정렬</button>';
   h+='<div class="qb-sub">상위 N행만 <input data-qb="limit" class="qb-in" type="number" min="0" style="width:80px" value="'+(spec.limit||'')+'" placeholder="전체"></div></section>';
   return h;
 }
@@ -1013,21 +1013,31 @@ function qbDeckRefresh(){ var el=$('#qbDeck2'); if(!el) return; el.innerHTML=qbD
    · 보조 함수: WON(x) 원→천원 · NMKEY(s) 회사명 매칭 키(별칭·㈜·띄어쓰기 무시) · YM(d) 'YYYY-MM' · YR(d) 연도 · QTR(d) 'YYYY-Qn' · MON(d) 월(1~12) · SVC(line) 서비스 이름 · 한글 식별자는 qbSqlKo() 가 자동 인용
    · SELECT / WITH 만 허용. 표는 복사본으로 등록하므로 원본 메모리 데이터는 바뀌지 않음                                              */
 var QB_SQL_ALIAS={customers:'cu', contracts:'ct', mrs:'m', live:'lv', orders:'o', assets:'a', oi:'oi', mdrops:'md', inbound:'ib', lg:'lg', cloud:'cl'};
-function loadAlasql(){ return loadLib('alasql'); }
-function qbSqlFns(){
-  if(!window.alasql || alasql.fn.__qb) return;
-  alasql.fn.WON=function(v){ return v==null? null : Math.round(Number(v)/1000); };
-  alasql.fn.NMKEY=function(s){ var k=nmKeys(s); return k.length? k[0] : String(s==null?'':s).toLowerCase(); };
-  alasql.fn.YM=function(d){ return d==null? null : String(d).slice(0,7); };
-  alasql.fn.YR=function(d){ return d==null? null : String(d).slice(0,4); };
-  alasql.fn.QTR=function(d){ return d==null? null : qbTr(String(d).slice(0,7),'q'); };
-  alasql.fn.MON=function(d){ return d==null? null : (+String(d).slice(5,7)||null); };
-  alasql.fn.SVC=function(l){ return l==null? null : lline(l); };
-  alasql.fn.__qb=true;
+/* ㊿+147: AlaSQL 은 SQL 을 JS 로 바꿔 실행(new Function) → 본 포탈 CSP 에서 'unsafe-eval' 을 빼고, 엔진은 격리 칸(sqlbox.html · sandbox, 출처 없음)에서만 돌림.
+   표 복사본·SQL 을 보내고 결과만 받음 — 사용자가 쓴(또는 저장해 둔) SQL 이 로그인 토큰·포탈 화면에 닿지 못함. 실행마다 새 칸(실행 뒤 제거) */
+function sqlboxRun(tables, sql, ms){
+  return new Promise(function(resolve, reject){
+    var f=document.createElement('iframe'), id='q'+Date.now()+Math.random().toString(36).slice(2), done=false, sent=false;
+    f.setAttribute('sandbox','allow-scripts'); f.setAttribute('aria-hidden','true'); f.title='SQL 엔진(격리)'; f.tabIndex=-1;
+    f.style.cssText='position:absolute;width:0;height:0;border:0;visibility:hidden';
+    function fin(){ done=true; window.removeEventListener('message', onMsg); clearTimeout(tm); try{ f.remove(); }catch(e){} }
+    function onMsg(e){
+      if(done || e.source!==f.contentWindow) return; var m=e.data||{};
+      if(m.type==='sqlbox-ready' && !sent){ sent=true;
+        var al={}; (SB_RAW.customers||[]).forEach(function(c){ if(c.aliases&&c.aliases.length) al[c.name]=c.aliases; });
+        try{ f.contentWindow.postMessage({type:'sqlbox-run', id:id, tables:tables, sql:sql, aliases:al, lineLabel:LINE_LABEL}, '*'); }catch(err){ fin(); reject(err); }
+        return; }
+      if(m.type==='sqlbox-res' && m.id===id){ fin(); if(m.ok) resolve(m.data); else reject(new Error(m.error||'SQL 실행 실패')); }
+    }
+    var tm=setTimeout(function(){ if(done) return; fin(); reject(new Error(sent? 'SQL 실행이 너무 오래 걸립니다 (60초) — 조건을 좁혀 보세요' : 'SQL 엔진 칸을 열지 못했습니다 — 새로고침 후 다시 시도해 주세요')); }, ms||60000);
+    window.addEventListener('message', onMsg);
+    f.src='sqlbox.html?v='+encodeURIComponent(APP_VER);
+    document.body.appendChild(f);
+  });
 }
-/* 소스 표 → 복사본 행(계산 열·회사명 키 포함) 을 alasql 에 등록 */
+/* 소스 표 → 복사본 행(계산 열·회사명 키 포함) — 격리 칸으로 보낼 {표 이름: 행[]} */
 function qbSqlTables(){
-  var S=qbSources(), names=Object.keys(S).filter(function(k){ return k[0]!=='_'; });
+  var S=qbSources(), names=Object.keys(S).filter(function(k){ return k[0]!=='_'; }), out={};
   names.forEach(function(t){
     var s=S[t], cols=s.cols, rows=s.rows().map(function(r){
       var o=Object.assign({}, r);
@@ -1037,8 +1047,9 @@ function qbSqlTables(){
       if(nm!==undefined){ var ks=nmKeys(nm); o._key= ks.length? ks[0] : String(nm==null?'':nm).toLowerCase(); }
       return o;
     });
-    alasql.tables[t]=new alasql.Table({data:rows});
+    out[t]=rows;
   });
+  return out;
 }
 function qbSqlStrip(sql){ return String(sql||'').replace(/\/\*[\s\S]*?\*\//g,'').replace(/--[^\n]*/g,'').trim(); }
 /* 한글 별칭·열 이름을 따옴표 없이 써도 되게 — 문자열·인용 식별자는 건너뛰고, «AS 계약 수» 처럼 띄어쓴 별칭도 하나로 묶음 */
@@ -1075,10 +1086,8 @@ async function qbSqlRun(){
   var pending=refs.filter(function(t){ var s=S[t]; if(!s.lazy) return false; var need=(t==='inbound'? RAWX.inbound===undefined : t==='cloud'? !RAWX.cloud : false); if(need && !QB._ld[t]){ QB._ld[t]=1; s.lazy(function(){ QB._ld[t]=0; qbSources._c=null; if(CUR_VIEW==='report' && QB.mode==='sql') qbSqlRun(); }); } return need; });
   if(pending.length){ host.innerHTML='<div class="cap" style="padding:30px;text-align:center">'+pending.map(function(t){ return S[t].label; }).join(', ')+' 데이터를 불러오는 중…</div>'; return; }
   host.innerHTML='<div class="cap" style="padding:30px;text-align:center">실행 중…</div>';
-  try{ await loadAlasql(); }catch(e){ fail(String(e.message||e)); host.innerHTML=''; return; }
-  qbSqlFns();
   var t0=Date.now(), data;
-  try{ qbSqlTables(); data=alasql(qbSqlKo(body.replace(/;\s*$/,''))); }
+  try{ data=await sqlboxRun(qbSqlTables(), qbSqlKo(body.replace(/;\s*$/,''))); }
   catch(e){ var m=String(e.message||e); m=m.replace(/^Parse error on line (\d+):\n?/,'문법 오류 ($1번째 줄): ').replace(/Expecting[\s\S]*$/,'').replace(/Table does not exist: (\w+)/,'표가 없습니다: $1 (표 이름은 아래 «표·열» 참고)').replace(/Column not found/,'열을 찾을 수 없습니다'); fail(m.trim()); host.innerHTML=''; QB.res=null; return; }
   if(!Array.isArray(data)) data=[{결과:data}];
   if(data.length && Array.isArray(data[0])) data=data[data.length-1];      // 여러 문장이면 마지막
@@ -1189,7 +1198,7 @@ function qbSqlPanelHtml(){
     '<div class="qb-err" id="qbSqlErr" style="display:none"></div>'+
     '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center"><button type="button" class="cbtn pri" id="qbSqlRun">▶ 실행</button>'+
     '<button type="button" class="cbtn" id="qbSqlFromUi" title="UI 빌더에 설정한 조건을 SQL 로 옮겨 옵니다">UI 조건 → SQL</button>'+
-    '<select id="qbSqlEx" class="qb-sel" style="flex:1 1 120px"><option value="">예시 SQL…</option>'+ex.map(function(e,i){ return '<option value="'+i+'">'+esc(e.name)+'</option>'; }).join('')+'</select></div>'+
+    '<select id="qbSqlEx" aria-label="SQL 예시" class="qb-sel" style="flex:1 1 120px"><option value="">예시 SQL…</option>'+ex.map(function(e,i){ return '<option value="'+i+'">'+esc(e.name)+'</option>'; }).join('')+'</select></div>'+
     '<div class="mini" style="margin-top:6px;line-height:1.6">브라우저 안 메모리 표를 조회합니다(서버 DB 아님) · SELECT/WITH 만 · 월 열은 \'YYYY-MM\' 글자 · 회사명은 <code>_key</code> 열로 연결</div></section>'+
     '<section class="qb-sec">'+qbSchemaHtml()+'</section>';
 }
@@ -1240,7 +1249,7 @@ function renderReportAuto(){
   var opts=''; for(var i=maxJ;i>=Math.max(0,maxJ-35);i--) opts+='<option value="'+i+'"'+(i===RP.j?' selected':'')+'>'+mk(i)+'</option>';
   var dif=d.prev? (d.tot/d.prev-1)*100 : 0;
   var inSt='height:34px;border:1px solid var(--ring);border-radius:9px;padding:0 10px;font:inherit;background:var(--surface)';
-  function kpi(l,v,s,kx){ return '<div class="pr-ob"><div class="l" contenteditable spellcheck="false">'+l+'</div><div class="v" contenteditable spellcheck="false">'+v+'</div><div class="pr-note" contenteditable spellcheck="false">'+(s||'&nbsp;')+'</div>'+(kx?'<a href="#" class="mini rpkx" data-kx="'+kx+'" contenteditable="false" style="display:inline-block;margin-top:4px;color:var(--s1);text-decoration:none" title="이 숫자의 근거 내역">🔍 내역</a>':'')+'</div>'; }
+  function kpi(l,v,s,kx){ return '<div class="pr-ob"><div class="l" contenteditable spellcheck="false">'+l+'</div><div class="v" contenteditable spellcheck="false">'+v+'</div><div class="pr-note" contenteditable spellcheck="false">'+(s||'&nbsp;')+'</div>'+(kx?'<a href="#" class="mini rpkx" data-kx="'+kx+'" contenteditable="false" style="display:inline-block;margin-top:4px;color:var(--s1-ink);text-decoration:none" title="이 숫자의 근거 내역">🔍 내역</a>':'')+'</div>'; }
   function inc(k){ return '<label style="font-size:11px;color:var(--muted);font-weight:400;display:inline-flex;gap:4px;align-items:center;margin-left:auto"><input type="checkbox" data-rpinc="'+k+'" checked> PPT 포함</label>'; }
   function tbl(id,head,rows2,empty){
     var h2='<div style="overflow-x:auto"><table class="pr" id="'+id+'"><thead><tr>'+
@@ -1255,7 +1264,7 @@ function renderReportAuto(){
   var h='<div class="pr-card" style="margin-bottom:14px"><h3>📑 커스텀 리포트 <span class="ubadge sm">₩ 금액 단위 = 천원</span>'+
     '<small>숫자·표·제목 전부 클릭해서 직접 수정 가능 · 자동 계산값은 시작점일 뿐입니다 · 대상월을 바꾸면 초기화됩니다</small></h3>'+
     '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:8px 0 0">'+
-    '대상월 <select id="rpM" style="'+inSt+'">'+opts+'</select>'+
+    '대상월 <select id="rpM" aria-label="월" style="'+inSt+'">'+opts+'</select>'+
     '제목 <input id="rpTitle" value="서비스사업부 월간 사업 리포트" style="'+inSt+';width:280px">'+
     '표지 라벨 <input id="rpSub" value="'+d.ym+'" style="'+inSt+';width:120px">'+
     '<button class="pill" id="rpPpt" style="height:34px">⬇ PPT 다운로드</button>'+

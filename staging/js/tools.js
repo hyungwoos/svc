@@ -68,7 +68,7 @@ function openFind(){
     // ③ AI에게 그대로 물어보기
     try{ var ai=cmdAskHit(inp.value); if(ai) hits.push(ai); }catch(e){}
     out.innerHTML=hits.map(function(h,i){
-      return '<div class="fk-row" data-i="'+i+'"><span class="tp"'+(h.k360?' style="background:rgba(42,120,214,.12);color:var(--s1)"':(h.kmenu?' style="background:var(--surface-2);color:var(--ink-2)"':(h.kai?' style="background:var(--brand);color:#fff"':'')))+'>'+h.t+'</span>'+
+      return '<div class="fk-row" data-i="'+i+'"><span class="tp"'+(h.k360?' style="background:rgba(42,120,214,.12);color:var(--s1-ink)"':(h.kmenu?' style="background:var(--surface-2);color:var(--ink-2)"':(h.kai?' style="background:var(--brand);color:#fff"':'')))+'>'+h.t+'</span>'+
         '<span class="nm">'+esc(h.nm||'')+'</span><span class="sb">'+esc(h.sb||'')+'</span></div>';
     }).join('')||'<p class="cap" style="padding:8px">결과 없음</p>';
     out.querySelectorAll('.fk-row').forEach(function(row){

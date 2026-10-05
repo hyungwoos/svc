@@ -1,4 +1,7 @@
-// aicheck v1.1 — 포탈 AI 야간 자동 점검 (90점 프로젝트 ⑥ AI 2단계 · 2026-10-03)
+// aicheck v1.2 — 포탈 AI 야간 자동 점검 (90점 프로젝트 ⑥ AI 2단계 · 2026-10-03)
+//   · v1.2(㊿+147): 야간 운영 요약 — 지난 24시간 브라우저 오류(client_errors) · 배포·운영 실패(ops_log ok=false)를 함께 모아,
+//     AI 통과율 미달 «또는» 오류·실패가 하나라도 있으면 슬랙 한 통(없으면 조용). 끄려면 Secrets AICHECK_DIGEST=0
+//   · 숫자 기대값: 만원·원 표기도 인정(포탈 aiHasNum 과 같게)
 //   · 대표 질문 12개를 ask 함수(서비스 키 경로 · 요약은 ask 가 ai_digest 로 직접 만듦)에 동시 3개씩 보내고,
 //     답에 DB 로 계산한 기대값(ai_check_expect · SQL 94)이 들어 있는지 + 비어 있지 않은지 + 중단되지 않았는지 확인
 //   · 결과를 ai_check_log(source cron) 에 기록 → 포탈 배포·운영 › 기록 › «AI 점검 추이» · 통과율이 AICHECK_MIN(기본 0.7) 미만이면 슬랙
@@ -15,6 +18,7 @@ const CONC = Math.min(5, Math.max(1, Number(Deno.env.get('AICHECK_CONC') ?? '3')
 const SLACK_TOKEN = Deno.env.get('SLACK_BOT_TOKEN') ?? '';
 const SLACK_CH = Deno.env.get('AICHECK_SLACK_CHANNEL') || Deno.env.get('SLACK_CHANNEL') || 'C08RA3PPDH8';
 const PORTAL_URL = Deno.env.get('PORTAL_URL') ?? '';
+const DIGEST = (Deno.env.get('AICHECK_DIGEST') ?? '1') !== '0';
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, GET, OPTIONS' };
 const json = (o: unknown, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { ...CORS, 'Content-Type': 'application/json' } });
 async function fetchT(url: string, init: RequestInit, ms: number) { const c = new AbortController(); const t = setTimeout(() => c.abort(), ms); try { return await fetch(url, { ...init, signal: c.signal }); } finally { clearTimeout(t); } }
@@ -24,6 +28,8 @@ export function hasNum(a: string, won: unknown): boolean {
   if (won == null || isNaN(Number(won))) return true;
   const t = String(a || '').replace(/\s/g, ''); const w = Number(won); const c: string[] = [];
   const k = Math.round(w / 1000); c.push(String(k), k.toLocaleString('ko-KR'));
+  for (const m of [Math.round(w / 1e4), Math.floor(w / 1e4)]) if (m > 0) c.push(m + '만', m.toLocaleString('ko-KR') + '만');   // 만원 표기 (포탈 aiHasNum 과 같게 · ㊿+147)
+  if (Math.abs(w) >= 1000) c.push(Math.round(w).toLocaleString('ko-KR') + '원', String(Math.round(w)) + '원');
   const mm = Math.round(w / 1e6); if (mm > 0) c.push(mm + '백만', mm.toLocaleString('ko-KR') + '백만');
   const ek = w / 1e8; if (ek >= 0.1) c.push(ek.toFixed(1) + '억', ek.toFixed(2) + '억', (Math.round(ek * 10) / 10) + '억');
   return c.some((x) => x && t.includes(x));
@@ -60,6 +66,43 @@ async function askOne(q: string): Promise<{ r: any; ms: number }> {
     if (!r.ok && j && j.ok === undefined) j.ok = false;
     return { r: j, ms: Date.now() - t0 };
   } catch (e) { return { r: { ok: false, error: String((e as Error).message || e).slice(0, 120) }, ms: Date.now() - t0 }; }
+}
+/* ── 야간 운영 요약 (v1.2) — 지난 24시간 브라우저 오류 · 배포·운영 실패 ── */
+export type Digest = { errors: number; users: number; top: { msg: string; n: number }[]; staging: number; opsFails: number; opsTop: string[]; err: string };
+export async function opsDigest(sinceIso: string): Promise<Digest> {
+  const H = { apikey: SB_SVC, Authorization: 'Bearer ' + SB_SVC };
+  const d: Digest = { errors: 0, users: 0, top: [], staging: 0, opsFails: 0, opsTop: [], err: '' };
+  try {
+    const r = await fetchT(SB_URL + '/rest/v1/client_errors?select=email,msg,n,staging&at=gte.' + encodeURIComponent(sinceIso) + '&order=at.desc&limit=500', { headers: H }, 10000);
+    if (r.ok) {
+      const rows = await r.json() as { email: string; msg: string; n: number; staging: boolean }[];
+      const by: Record<string, number> = {}, who = new Set<string>();
+      rows.forEach((x) => { const k = String(x.msg || '').slice(0, 90); by[k] = (by[k] || 0) + (Number(x.n) || 1); who.add(String(x.email || '')); if (x.staging) d.staging++; });
+      d.errors = rows.reduce((a, x) => a + (Number(x.n) || 1), 0); d.users = who.size;
+      d.top = Object.keys(by).sort((a, b) => by[b] - by[a]).slice(0, 3).map((k) => ({ msg: k, n: by[k] }));
+    } else d.err += 'client_errors ' + r.status + ' ';
+  } catch (e) { d.err += 'client_errors ' + String((e as Error).message || e).slice(0, 40) + ' '; }
+  try {
+    const r = await fetchT(SB_URL + '/rest/v1/ops_log?select=action,target,error&ok=is.false&at=gte.' + encodeURIComponent(sinceIso) + '&order=at.desc&limit=100', { headers: H }, 10000);
+    if (r.ok) {
+      const rows = await r.json() as { action: string; target: string; error: string }[];
+      d.opsFails = rows.length; d.opsTop = rows.slice(0, 3).map((x) => `${x.action}${x.target ? ' · ' + String(x.target).slice(0, 40) : ''} — ${String(x.error || '').slice(0, 70)}`);
+    } else d.err += 'ops_log ' + r.status;
+  } catch (e) { d.err += 'ops_log ' + String((e as Error).message || e).slice(0, 40); }
+  return d;
+}
+export function digestText(res: { pass: number; total: number; avg_ms: number; model: string }, fails: { q: string; why: string }[], dg: Digest | null, aiBad: boolean, expectErr: string): string {
+  const rate = res.total ? res.pass / res.total : 0;
+  const head = [`🤖 AI ${res.pass}/${res.total} 통과` + (aiBad ? ` (${Math.round(rate * 100)}% · 기준 ${Math.round(MIN_PASS * 100)}%)` : ' ✓')];
+  if (dg) { head.push(dg.errors ? `🧯 브라우저 오류 ${dg.errors}건(${dg.users}명${dg.staging ? ' · 스테이징 ' + dg.staging : ''})` : '🧯 브라우저 오류 0'); head.push(dg.opsFails ? `🚀 배포·운영 실패 ${dg.opsFails}건` : '🚀 배포·운영 실패 0'); }
+  const lines: string[] = ['🌙 포탈 야간 점검 — ' + head.join(' · ')];
+  if (aiBad) { lines.push(...fails.slice(0, 6).map((f) => `• AI: ${f.q} — ${f.why}`)); if (fails.length > 6) lines.push(`… 외 ${fails.length - 6}건`); if (res.model) lines.push(`모델 ${res.model} · 평균 ${(res.avg_ms / 1000).toFixed(1)}초`); }
+  if (dg && dg.errors) lines.push(...dg.top.map((t) => `• 오류 ×${t.n}: ${t.msg}`));
+  if (dg && dg.opsFails) lines.push(...dg.opsTop.map((t) => `• 배포·운영: ${t}`));
+  if (expectErr) lines.push(`⚠ 기대값: ${expectErr}`);
+  if (dg && dg.err) lines.push(`⚠ 요약 읽기: ${dg.err.trim()}`);
+  if (PORTAL_URL) lines.push(`${PORTAL_URL}#ops`);
+  return lines.join('\n');
 }
 export async function runCheck(expect: Expect, qs: Q[] = QS, conc = CONC): Promise<{ rows: Row[]; pass: number; total: number; avg_ms: number; model: string }> {
   const rows: Row[] = new Array(qs.length);
@@ -121,23 +164,25 @@ Deno.serve(async (req: Request) => {
   const rate = res.total ? res.pass / res.total : 0;
   const summary = { ok: true, dry, source: actor === 'cron' ? 'cron' : 'manual', actor, pass: res.pass, total: res.total, rate: Math.round(rate * 100) / 100, avg_ms: res.avg_ms, model: res.model, expect_err: expectErr || undefined, expect, fails, rows: res.rows, ms: Date.now() - t0 };
 
-  let logged = false, slack: unknown = null;
+  let logged = false, slack: unknown = null, digest: Digest | null = null;
   if (!dry) {
     try {
       const r = await fetchT(SB_URL + '/rest/v1/ai_check_log', { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: SB_SVC, Authorization: 'Bearer ' + SB_SVC, Prefer: 'return=minimal' },
         body: JSON.stringify({ source: 'cron', app_ver: null, pass: res.pass, total: res.total, avg_ms: res.avg_ms, model: res.model, fails, rows: res.rows.map((r) => ({ q: r.q, ok: r.ok, why: r.why, ms: r.ms, tools: r.tools })), actor }) }, 10000);
       logged = r.ok;
     } catch { /* 표 없음(SQL 94 전) 등 — 결과는 응답으로 돌려줌 */ }
-    if (rate < MIN_PASS && SLACK_TOKEN) {
-      const lines = fails.slice(0, 6).map((f) => `• ${f.q} — ${f.why}`).join('\n');
-      const text = `🤖 포탈 AI 야간 점검 ${res.pass}/${res.total} 통과 (${Math.round(rate * 100)}% · 기준 ${Math.round(MIN_PASS * 100)}%)` + (res.model ? ` · ${res.model}` : '') + ` · 평균 ${(res.avg_ms / 1000).toFixed(1)}초\n${lines}` + (fails.length > 6 ? `\n… 외 ${fails.length - 6}건` : '') + (expectErr ? `\n⚠ 기대값: ${expectErr}` : '') + (PORTAL_URL ? `\n${PORTAL_URL}#ops` : '');
+    const aiBad = rate < MIN_PASS;
+    digest = DIGEST ? await opsDigest(new Date(Date.now() - 24 * 3600 * 1000).toISOString()) : null;
+    const opsBad = !!digest && (digest.errors > 0 || digest.opsFails > 0);
+    if ((aiBad || opsBad) && SLACK_TOKEN) {
+      const text = digestText(res, fails, digest, aiBad, expectErr);
       try {
         const r = await fetchT('https://slack.com/api/chat.postMessage', { method: 'POST', headers: { 'Content-Type': 'application/json; charset=utf-8', Authorization: 'Bearer ' + SLACK_TOKEN }, body: JSON.stringify({ channel: SLACK_CH, text }) }, 10000);
         slack = await r.json().catch(() => null);
       } catch (e) { slack = { ok: false, error: String((e as Error).message || e) }; }
     }
   }
-  return { ...summary, logged, slack };
+  return { ...summary, logged, slack, digest };
   };
   // 크론(Supabase Cron · pg_net)은 응답을 몇 초만 기다리므로, 서비스 키/AICHECK_KEY 로 온 호출은 바로 202 를 돌려주고 뒤에서 끝까지 실행(EdgeRuntime.waitUntil).
   // 결과는 ai_check_log · 포탈 배포·운영 › 기록 › AI 점검 추이. {wait:true} 면 끝날 때까지 기다려 결과를 돌려줌(수동 확인용).

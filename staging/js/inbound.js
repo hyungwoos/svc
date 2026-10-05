@@ -373,7 +373,7 @@ function openInbDetail(r){
   $('#inbDBody').innerHTML=
     '<h3 style="margin:0 0 2px">'+esc(r.org||'?')+' <span class="mini" style="font-weight:400">— '+esc(r.result||'-')+'</span></h3>'+
     '<p class="cap" style="margin:0">'+esc(r.on_date||'')+' 접수 · '+r.y+'년 연번 '+r.no+' · '+esc(r.channel||'')+
-    (r.dup?' · <b style="color:#a06c00">중복 문의</b>':'')+'</p>'+
+    (r.dup?' · <b style="color:var(--warn-ink)">중복 문의</b>':'')+'</p>'+
     '<div class="inb-meta">'+
     '<div><b>문의 제품</b>'+esc(r.product||'-')+' <span class="mini">('+esc(r.ptype||'')+')</span></div>'+
     '<div><b>지니 담당</b>'+esc(r.owner||'-')+'</div>'+
@@ -610,7 +610,7 @@ async function renderWeekly(atWeek){
   var head='<div class="wk-head">'+
     '<span style="font-size:18px;font-weight:800">📊 주간회의</span>'+
     '<span class="wk-chip wkc-blu wk-fsonly">발표 모드 · Space/↓ 다음 · ↑ 이전 · ESC 종료</span>'+
-    '<select id="wkWeekSel" class="pill" style="height:31px;font-family:inherit">'+
+    '<select id="wkWeekSel" aria-label="주차" class="pill" style="height:31px;font-family:inherit">'+
       weekNav.map(function(w){ return '<option value="'+w+'"'+(w===WK.week?' selected':'')+'>'+w+' 주간</option>'; }).join('')+'</select>'+
     '<span class="pill ghost" style="font-size:12px">'+esc(meta.file_name||'')+' · '+wkTime(meta.fetched_at)+' 취합</span>'+
     (meta.missing&&meta.missing.length? '<span class="wk-chip wkc-red">⚠ 누락 탭: '+esc(meta.missing.join(', '))+'</span>'

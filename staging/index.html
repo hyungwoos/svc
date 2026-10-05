@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<!-- CSP (80점 프로젝트 ② 보안): GitHub Pages 는 응답 헤더를 못 넣으므로 meta 로. ㊿+136 부터 인라인 스크립트·onclick 이 없어 script-src 에 'unsafe-inline' 없음(스타일은 인라인 style 속성 때문에 유지) · alasql(new Function) 때문에 'unsafe-eval' 은 필요 — 대신 스크립트·연결 호스트를 목록으로 제한(XSS 시 외부 유출 차단). Worker 주소나 GAS 주소가 바뀌면 여기도 수정. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' blob: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' data: https://cdn.jsdelivr.net; img-src 'self' data: blob: https://amzbrdhkvzsyxjfjtugu.supabase.co; connect-src 'self' https://amzbrdhkvzsyxjfjtugu.supabase.co https://open.er-api.com https://api.frankfurter.app https://script.google.com/macros/s/AKfycbz0PDzgvgtM0ZZHEfMwEzPpgoPYidD6ElPx3oTGsgnVuveCnVA9PmYPB4WAPfr9a6DY/ https://script.googleusercontent.com https://aged-union-cdd3.choihw.workers.dev https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; worker-src 'self' blob:; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
+<!-- CSP (80점 프로젝트 ② 보안): GitHub Pages 는 응답 헤더를 못 넣으므로 meta 로. ㊿+136 부터 인라인 스크립트·onclick 이 없어 script-src 에 'unsafe-inline' 없음(스타일은 인라인 style 속성 때문에 유지) · ㊿+147 부터 'unsafe-eval' 도 없음(SQL 엔진 alasql 은 격리 칸 sqlbox.html 에서만 돌림) — 스크립트·연결 호스트를 목록으로 제한(XSS 시 외부 유출 차단). Worker 주소나 GAS 주소가 바뀌면 여기도 수정. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' blob: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' data: https://cdn.jsdelivr.net; img-src 'self' data: blob: https://amzbrdhkvzsyxjfjtugu.supabase.co; connect-src 'self' https://amzbrdhkvzsyxjfjtugu.supabase.co https://open.er-api.com https://api.frankfurter.app https://script.google.com/macros/s/AKfycbz0PDzgvgtM0ZZHEfMwEzPpgoPYidD6ElPx3oTGsgnVuveCnVA9PmYPB4WAPfr9a6DY/ https://script.googleusercontent.com https://aged-union-cdd3.choihw.workers.dev https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; worker-src 'self' blob:; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
 <title>서비스사업부 통합 관리 포탈</title>
 <!-- PWA: 홈 화면 앱 (manifest.webmanifest · sw.js · pwa-*.png · apple-touch-icon.png 를 같은 폴더에) -->
 <link rel="manifest" href="manifest.webmanifest">
@@ -19,7 +19,7 @@
 <!-- 포탈 버전 — 파일을 바꿔 올릴 때마다 아래 content 의 숫자가 +1 (화면 맨 아래 표시 · app.css / js/*.js 의 ?v= 캐시 무효화 · 배포·운영이 이 값을 읽어 비교).
      코드 파일 목록은 app-js (js/load.js 가 이 순서로 불러옴 · 마지막은 항상 js/init.js) — 파일을 더하거나 빼면 여기와 sw.js 의 SHELL 을 함께 고칠 것.
      ④ 아키텍처 2단계(㊿+136): 인라인 스크립트·onclick 을 전부 없애 CSP script-src 에서 'unsafe-inline' 제거. -->
-<meta name="app-ver" content="2026-09-16 ㊿+145">
+<meta name="app-ver" content="2026-09-16 ㊿+147">
 <meta name="app-js" content="js/viz.js,js/core.js,js/shell.js,js/dash.js,js/ai.js,js/grids.js,js/equipment.js,js/analysis.js,js/tools.js,js/price.js,js/inbound.js,js/admin.js,js/sales.js,js/report.js,js/grid.js,js/edit.js,js/init.js">
 <script src="js/boot.js"></script>
 </head>
@@ -50,10 +50,10 @@
         <div style="font-size:13.5px;font-weight:700;margin-bottom:4px">비밀번호 변경</div>
         <p class="cap" style="margin:0 0 14px">최초 로그인입니다 — 본인 비밀번호로 변경해야 사용할 수 있습니다.</p>
         <label style="display:block;font-size:12px;font-weight:650;color:var(--ink-2);margin-bottom:6px">새 비밀번호 (6자 이상)</label>
-        <input id="lsNpw1" type="password" autocomplete="new-password"
+        <input id="lsNpw1" aria-label="새 비밀번호" type="password" autocomplete="new-password"
                style="width:100%;height:42px;padding:0 13px;border-radius:10px;border:1px solid var(--ring);background:var(--surface-2);font-size:13.5px;margin-bottom:14px">
         <label style="display:block;font-size:12px;font-weight:650;color:var(--ink-2);margin-bottom:6px">새 비밀번호 확인</label>
-        <input id="lsNpw2" type="password" autocomplete="new-password"
+        <input id="lsNpw2" aria-label="새 비밀번호 확인" type="password" autocomplete="new-password"
                style="width:100%;height:42px;padding:0 13px;border-radius:10px;border:1px solid var(--ring);background:var(--surface-2);font-size:13.5px;margin-bottom:18px">
         <button id="lsPwGo" class="btn" style="width:100%;height:44px;font-size:15px;border-radius:11px">변경하고 시작하기</button>
       </div>
@@ -127,7 +127,7 @@
   <button data-v="adminx" style="display:none">🛡️ 관리자</button>
   <button data-v="ops" style="display:none">🚀 배포·운영</button>
   <button data-v="account">👤 내 계정</button>
-  <button id="btnMenuEdit" style="display:none;opacity:.75">⚙ 메뉴 편집</button>
+  <button id="btnMenuEdit" style="display:none">⚙ 메뉴 편집</button>
 </nav>
 <nav id="rail" class="cc-only" aria-label="주 메뉴"></nav>
 <div id="railFly" role="menu"></div>
@@ -184,7 +184,7 @@
     <div class="ask-row">
       <div class="ask-ico">AI</div>
       <div class="qwrap">
-        <input id="q" type="text" autocomplete="off"
+        <input id="q" aria-label="AI 에게 질문" type="text" autocomplete="off"
           placeholder="말하듯이 물어보세요 — 예: 요즘 클라우드 좀 어때?  /  제일 큰 고객 누구야?  /  곧 만료되는 계약">
         <div class="sug" id="sug"></div>
       </div>
@@ -208,7 +208,7 @@
         </div>
         <div class="card" style="padding:12px 14px">
           <div class="cap" id="ansTableCap">상세</div>
-          <div class="tbl-wrap" style="max-height:236px"><table id="ansTable"></table></div>
+          <div class="tbl-wrap" tabindex="0" style="max-height:236px"><table id="ansTable"></table></div>
         </div>
       </div>
       <div class="ai-comment" id="aiComment"></div>
@@ -224,17 +224,17 @@
     <span id="lineChips" style="display:flex;gap:6px;flex-wrap:wrap"></span>
     <span class="sep"></span>
     <span class="lbl">기준</span>
-    <select id="fUnit" style="width:auto"><option value="month">월</option><option value="quarter">분기</option><option value="year">연</option></select>
-    <select id="fBase"></select>
+    <select id="fUnit" style="width:auto" aria-label="기준 단위(월·분기·연)"><option value="month">월</option><option value="quarter">분기</option><option value="year">연</option></select>
+    <select id="fBase" aria-label="기준 기간"></select>
     <span class="sep"></span>
     <span class="lbl">산업군</span>
-    <select id="fInd"><option value="">전체</option></select>
+    <select id="fInd" aria-label="산업군"><option value="">전체</option></select>
     <span class="lbl">파트너·발행처</span>
-    <select id="fPartner"><option value="">전체</option></select>
+    <select id="fPartner" aria-label="파트너·발행처"><option value="">전체</option></select>
     <span class="lbl">상태</span>
-    <select id="fStatus"><option value="">전체</option></select>
+    <select id="fStatus" aria-label="상태"><option value="">전체</option></select>
     <span class="sep"></span>
-    <input type="search" id="fSearch" placeholder="고객명 검색…" style="width:170px">
+    <input type="search" id="fSearch" aria-label="고객명 검색" placeholder="고객명 검색…" style="width:170px">
     <button class="pill ghost" id="btnReset">초기화</button>
     <div class="spacer"></div>
     <span class="mini" id="filterCount"></span>
@@ -251,7 +251,7 @@
         <div class="t"><h2>월별 종합 장표<span class="ukw">천원</span></h2><p class="cap" id="capMx">서비스 × 월 인식 금액 · 합계 · 전년 대비</p></div>
         <div class="seg" id="segMxYear"></div>
       </div>
-      <div class="tbl-wrap" style="max-height:none"><table id="tMx"></table></div>
+      <div class="tbl-wrap" tabindex="0" style="max-height:none"><table id="tMx"></table></div>
     </section>
 
     <section class="card c12" data-w="ifee">
@@ -263,7 +263,7 @@
           <button data-m="m">월별 상세</button>
         </div>
       </div>
-      <div class="tbl-wrap" style="max-height:none"><table id="tIfee"></table></div>
+      <div class="tbl-wrap" tabindex="0" style="max-height:none"><table id="tIfee"></table></div>
     </section>
 
     <section class="card c8" data-w="trend">
@@ -317,7 +317,7 @@
         <div class="t"><h2>신규 · 해지 고객수 추이</h2><p class="cap" id="capNc">서비스 × 월 신규 / 해지 고객사 수 · 연 합계 · 전년 대비</p></div>
         <div class="seg" id="segNcYear"></div>
       </div>
-      <div class="tbl-wrap" style="max-height:none"><table id="tNc"></table></div>
+      <div class="tbl-wrap" tabindex="0" style="max-height:none"><table id="tNc"></table></div>
     </section>
 
     <section class="card c6" data-w="churn">
@@ -336,25 +336,25 @@
           <button data-m="12">12개월</button>
         </div>
       </div>
-      <div class="tbl-wrap"><table id="tExp"></table></div>
+      <div class="tbl-wrap" tabindex="0"><table id="tExp"></table></div>
     </section>
 
     <section class="card c6" id="secLg" data-w="lg" style="display:none">
       <div class="card-head"><div class="t"><h2>LG U+ 경유 판매<span class="ukw">천원</span></h2><p class="cap" id="capLg">LG 탭 · 매출은 각 서비스에 포함됨</p></div></div>
-      <div class="tbl-wrap"><table id="tLg"></table></div>
+      <div class="tbl-wrap" tabindex="0"><table id="tLg"></table></div>
     </section>
 
     <section class="card c6" id="secVs" data-w="vs" style="display:none">
       <div class="card-head"><div class="t"><h2>비즈포탈 차액<span class="ukw">천원</span></h2><p class="cap" id="capVs">회계매출(비즈포탈) vs 매출시트 차이</p></div></div>
       <div id="vsSummary" style="padding:2px 0 10px"></div>
-      <div class="tbl-wrap"><table id="tVs"></table></div>
+      <div class="tbl-wrap" tabindex="0"><table id="tVs"></table></div>
     </section>
 
     <section class="card c12" data-w="all">
       <div class="card-head">
         <div class="t"><h2>계약 목록<span class="ukw">천원</span></h2><p class="cap" id="capAll">필터 조건에 맞는 전체 계약 · 열 제목을 눌러 정렬</p></div>
       </div>
-      <div class="tbl-wrap"><table id="tAll"></table></div>
+      <div class="tbl-wrap" tabindex="0"><table id="tAll"></table></div>
     </section>
   </div>
 
@@ -380,7 +380,7 @@
         <span class="spacer"></span>
         <span class="mini" id="dvCount"></span>
       </div>
-      <div class="tbl-wrap" style="max-height:70vh"><table id="dvTable" class="dgrid"></table></div>
+      <div class="tbl-wrap" tabindex="0" style="max-height:70vh"><table id="dvTable" class="dgrid"></table></div>
       <div id="dvPager" style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:12px"></div>
     </section>
   </div>
@@ -403,7 +403,7 @@
       <b style="font-size:13.5px;margin-right:4px" title="카드를 옆 열로 끌면 상태가 바뀝니다 · 시리얼 칩을 누르면 일부 회수 표시">상태 보드</b>
       <span class="mini" id="eqbHint" style="display:none"></span>
       <div class="eqb-chips" id="eqbChips"></div>
-      <input type="search" id="eqbQ" placeholder="고객·시리얼·모델 검색">
+      <input type="search" id="eqbQ" aria-label="장비 검색" placeholder="고객·시리얼·모델 검색">
       <button class="pill ghost" id="eqbReload">↻ 다시 읽기</button>
       <span class="mini" id="eqbCount"></span>
     </div>
@@ -537,8 +537,8 @@
           </div>
           <div class="cs-sec"><h4><span class="no">2</span>어떤 사이트로 만들까요</h4>
             <div class="frm">
-              <div><label for="csProd">제품 <small style="color:var(--muted)">product</small></label><select id="csProd"><option value="ztna">Cloud ZTNA (ztna)</option><option value="__etc">직접 입력…</option></select><input id="csProdEtc" placeholder="제품 코드" style="display:none;margin-top:6px" autocapitalize="off"></div>
-              <div><label for="csEd">에디션 <small style="color:var(--muted)">edition</small></label><select id="csEd"><option value="ent">Enterprise (ent)</option><option value="__etc">직접 입력…</option></select><input id="csEdEtc" placeholder="에디션 코드 (예: bas)" style="display:none;margin-top:6px" autocapitalize="off"></div>
+              <div><label for="csProd">제품 <small style="color:var(--muted)">product</small></label><select id="csProd"><option value="ztna">Cloud ZTNA (ztna)</option><option value="__etc">직접 입력…</option></select><input id="csProdEtc" aria-label="제품 코드 직접 입력" placeholder="제품 코드" style="display:none;margin-top:6px" autocapitalize="off"></div>
+              <div><label for="csEd">에디션 <small style="color:var(--muted)">edition</small></label><select id="csEd"><option value="ent">Enterprise (ent)</option><option value="__etc">직접 입력…</option></select><input id="csEdEtc" aria-label="에디션 코드 직접 입력" placeholder="에디션 코드 (예: bas)" style="display:none;margin-top:6px" autocapitalize="off"></div>
               <div><label for="csDev">노드 수 <small style="color:var(--muted)">numberofdevices · 라이선스 단말 수</small></label><input id="csDev" type="number" min="1" max="100000" step="1" placeholder="예: 100"></div>
               <div><label for="csLang">화면 언어 <small style="color:var(--muted)">language</small></label><select id="csLang"><option value="ko">한국어 (ko)</option><option value="en">English (en)</option><option value="ja">日本語 (ja)</option><option value="zh">中文 (zh)</option></select></div>
               <div><label for="csBranch">배포 브랜치 <small style="color:var(--muted)">branch · 어떤 버전 계열로 만들지</small></label><select id="csBranch"><option value="candidate">candidate — RC (기본)</option><option value="release">release — R (정식 릴리스)</option><option value="beta">beta — 베타</option><option value="current">current — 최신 개발</option></select></div>
@@ -587,7 +587,7 @@
         </div>
       </div>
       <div style="margin-top:22px;padding-top:14px;border-top:1px solid var(--ring)">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap"><b style="font-size:13.5px">🕘 요청 이력</b><span class="mini" id="csHistCap" style="color:var(--muted)"></span><span style="flex:1"></span><input id="csHistQ" placeholder="사이트명·고객사 검색" style="height:30px;padding:0 10px;border:1px solid var(--ring);border-radius:8px;background:var(--surface-2);color:inherit;font:inherit;font-size:12px;width:200px"><button class="chip" id="csHistRefresh">↻ 새로 읽기</button></div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap"><b style="font-size:13.5px">🕘 요청 이력</b><span class="mini" id="csHistCap" style="color:var(--muted)"></span><span style="flex:1"></span><input id="csHistQ" aria-label="요청 이력 검색" placeholder="사이트명·고객사 검색" style="height:30px;padding:0 10px;border:1px solid var(--ring);border-radius:8px;background:var(--surface-2);color:inherit;font:inherit;font-size:12px;width:200px"><button class="chip" id="csHistRefresh">↻ 새로 읽기</button></div>
         <div style="overflow-x:auto"><table class="pr" id="csHist"><thead><tr><th>일시</th><th>작업</th><th>사이트명</th><th>고객사</th><th>내용</th><th>결과</th><th>메시지</th><th>요청자</th><th>API 계정</th><th>메모</th></tr></thead><tbody></tbody></table></div>
       </div>
     </section>
@@ -732,11 +732,11 @@
       </div>
       <div style="font-size:11px;color:var(--muted);margin:18px 0 8px">— 전체 계정 —</div>
       <div class="dbar" style="margin-bottom:8px">
-        <input type="search" id="axQ" placeholder="이메일 검색">
+        <input type="search" id="axQ" aria-label="계정 이메일 검색" placeholder="이메일 검색">
         <button class="pill ghost" id="axReload">↻ 다시 읽기</button>
         <span class="mini" id="axMsg"></span>
       </div>
-      <div class="tbl-wrap" style="max-height:56vh"><table id="axTable" class="dgrid"></table></div>
+      <div class="tbl-wrap" tabindex="0" style="max-height:56vh"><table id="axTable" class="dgrid"></table></div>
       <p class="cap" style="margin:10px 0 0">권한 설명 — super_admin: 전체+계정 관리+변경 이력 · admin: 조회+수정 · admin_viewer: 조회만(수정 불가)
         · poc: PoC·주간회의 메뉴만 · equipment_poc: 장비+PoC+주간회의 메뉴만 · «권한 없음»: 로그인은 되지만 제한 화면만 보입니다</p>
 
@@ -752,7 +752,7 @@
         <button class="pill pri" id="apSave">💾 권한 저장</button>
         <span class="mini" id="apMsg"></span>
       </div>
-      <div class="tbl-wrap" style="max-height:60vh"><table id="apTable" class="dgrid"></table></div>
+      <div class="tbl-wrap" tabindex="0" style="max-height:60vh"><table id="apTable" class="dgrid"></table></div>
       <p class="cap" style="margin:10px 0 0">보기 = 메뉴에 나타나고 화면을 열 수 있음 · 읽기 = 화면 안의 표·데이터 열람 · 쓰기 = 추가·수정·삭제. 쓰기는 읽기를, 읽기는 보기를 포함합니다.
         행이 없는(한 번도 저장하지 않은) 계정은 역할 기본값(admin 전부 · admin_viewer 읽기까지)으로 동작하고, 슈퍼 관리자는 제한할 수 없습니다. 바뀐 권한은 그 계정이 다음에 화면을 새로 읽을 때 적용됩니다.</p>
 
@@ -762,7 +762,8 @@
         <button class="pill ghost" id="mfAll" title="등록 안 된 모든 계정을 필수로 지정하고 기한을 7일 뒤로">전체 필수 (7일 유예)</button>
         <span class="mini" id="mfMsg"></span>
       </div>
-      <div class="tbl-wrap" style="max-height:50vh"><table id="mfTable" class="dgrid"></table></div>
+      <div id="mfRole" class="mf-role" style="display:none"></div>
+      <div class="tbl-wrap" tabindex="0" style="max-height:50vh"><table id="mfTable" class="dgrid"></table></div>
       <p class="cap" style="margin:10px 0 0"><b>필수</b>로 지정한 계정은 인증 앱을 등록해야 포탈을 쓸 수 있습니다 — <b>기한</b>을 두면 그날까지는 로그인할 때 안내만 뜨고, 지나면(또는 기한이 없으면) 등록 화면이 먼저 뜹니다. DB 도 같은 규칙으로 막아(SQL 89) 비밀번호만 아는 사람은 데이터를 못 봅니다.
         <b>인증 앱 초기화</b>는 폰을 잃어버린 사람용 — 등록을 지우면 다음 로그인은 비밀번호만으로 되고(필수면 다시 등록 화면), 본인에게 알려 주세요.</p>
 
@@ -773,7 +774,7 @@
         <label class="mini" style="display:flex;align-items:center;gap:4px"><input type="checkbox" id="cdShowOff"> 숨긴 값도 보기</label>
         <span class="mini" id="cdMsg"></span>
       </div>
-      <div class="tbl-wrap" style="max-height:50vh"><table id="cdTable" class="dgrid"></table></div>
+      <div class="tbl-wrap" tabindex="0" style="max-height:50vh"><table id="cdTable" class="dgrid"></table></div>
       <div class="frm" style="grid-template-columns:1fr 1fr 2fr auto;margin-top:8px">
         <div><label for="cdNewVal">새 값</label><input id="cdNewVal" placeholder="저장되는 값 (예: 유통)"></div>
         <div><label for="cdNewLabel">표시 이름 (선택)</label><input id="cdNewLabel" placeholder="비우면 값 그대로"></div>
@@ -862,7 +863,7 @@
 </div>
 <div class="ovl" id="ovlFind">
   <div class="modal" style="width:min(620px,100%)">
-    <input id="fkInput" placeholder="고객사·시리얼·사업명 검색 · 화면 이름으로 이동 · 질문…  (Enter: 첫 결과 · Esc: 닫기)" autocomplete="off">
+    <input id="fkInput" aria-label="전체 검색" placeholder="고객사·시리얼·사업명 검색 · 화면 이름으로 이동 · 질문…  (Enter: 첫 결과 · Esc: 닫기)" autocomplete="off">
     <div id="fkOut" style="max-height:52vh;overflow:auto;margin-top:10px"></div>
     <p class="cap" style="margin:8px 0 0">계약 · LIVE · OI · 인바운드 · MDR 운영 · 장비를 한 번에 찾습니다 — 단축키 <b>Ctrl+K</b></p>
   </div>
@@ -883,7 +884,7 @@
   <div class="modal" style="width:min(760px,100%)">
     <h3>📋 엑셀 붙여넣기로 여러 행 입력</h3>
     <p class="cap" id="pasteCols" style="margin:0 0 10px"></p>
-    <textarea id="pasteTa" style="width:100%;min-height:170px;border:1px solid var(--ring);border-radius:10px;background:var(--surface-2);color:var(--ink);padding:10px;font-family:monospace;font-size:12px"
+    <textarea id="pasteTa" aria-label="엑셀에서 붙여넣기" style="width:100%;min-height:170px;border:1px solid var(--ring);border-radius:10px;background:var(--surface-2);color:var(--ink);padding:10px;font-family:monospace;font-size:12px"
       placeholder="엑셀에서 위 열 순서대로 범위를 복사(Ctrl+C)해서 여기에 붙여넣으세요(Ctrl+V). 한 줄 = 한 행."></textarea>
     <div id="pastePrev" class="cap" style="margin-top:8px"></div>
     <div class="mact">
@@ -922,7 +923,7 @@
       <div><label for="pnDate">적용일 *</label><input id="pnDate" type="date"></div>
     </div>
     <label style="font-size:12px;font-weight:650;color:var(--ink-2)">가격표 JSON *</label>
-    <textarea id="pnJson" style="width:100%;min-height:180px;border:1px solid var(--ring);border-radius:10px;background:var(--surface-2);color:var(--ink);padding:10px;font-family:monospace;font-size:12px" placeholder='{"cnac":{...},"services":[...]} 또는 {"ztna":{...},"nac":{...}}'></textarea>
+    <textarea id="pnJson" aria-label="가격표 JSON" style="width:100%;min-height:180px;border:1px solid var(--ring);border-radius:10px;background:var(--surface-2);color:var(--ink);padding:10px;font-family:monospace;font-size:12px" placeholder='{"cnac":{...},"services":[...]} 또는 {"ztna":{...},"nac":{...}}'></textarea>
     <div class="mact">
       <span class="mmsg" id="pnMsg"></span>
       <button class="pill ghost" data-close="ovlPrNew">취소</button>
@@ -1022,7 +1023,7 @@
     <p class="cap" id="dtMeta"></p>
     <div class="chartbox h200" id="dtChart"></div>
     <div style="font-size:12px;color:var(--ink-2);opacity:.8;margin:14px 0 6px">변경 이력</div>
-    <div class="tbl-wrap" style="max-height:220px"><table id="dtLog"></table></div>
+    <div class="tbl-wrap" tabindex="0" style="max-height:220px"><table id="dtLog"></table></div>
     <div class="mact">
       <span class="mmsg"></span>
       <button class="pill ghost" data-close="ovlDetail">닫기</button>
@@ -1049,7 +1050,7 @@
         <div><label for="nCust">고객사 *</label><input id="nCust" list="dlCust" placeholder="기존 고객이면 자동완성"><datalist id="dlCust"></datalist></div>
         <div><label for="nInd">산업군</label><select id="nInd"><option>기업</option><option>공공</option><option>금융</option><option>의료</option><option>미분류</option></select></div>
         <div><label for="nSector">업종 <small style="color:var(--muted)">(세분 분류 · 고객사 단위)</small></label><select id="nSector"></select>
-          <input id="nSectorEtc" placeholder="업종 직접 입력" style="display:none;margin-top:6px"></div>
+          <input id="nSectorEtc" aria-label="업종 직접 입력" placeholder="업종 직접 입력" style="display:none;margin-top:6px"></div>
         <div><label for="nLine">서비스 *</label><select id="nLine">
           <option value="Cloud">Cloud NAC</option>
           <option value="S1">S1 Cloud NAC</option>
@@ -1068,7 +1069,7 @@
         <div><label for="nPtn">파트너 *</label><select id="nPtn">
           <option>지니언스(직접)</option><option>다원티에스</option><option>글로웰시스템</option>
           <option value="__etc">직접 입력…</option>
-        </select><input id="nPtnEtc" placeholder="파트너명 직접 입력" style="display:none;margin-top:6px"></div>
+        </select><input id="nPtnEtc" aria-label="파트너명 직접 입력" placeholder="파트너명 직접 입력" style="display:none;margin-top:6px"></div>
         <div><label for="nBiller">계산서 발행처</label><input id="nBiller" placeholder="예: 엘림넷"></div>
         <div><label for="nType">계약 구분</label><select id="nType"><option>신규</option><option>재약정</option><option>추가</option></select></div>
         <div><label for="nStart">시작월 *</label><input id="nStart" type="month"></div>
@@ -1086,7 +1087,7 @@
         <div><label for="nBilling">과금방식</label><select id="nBilling">
           <option value="">— 선택 —</option><option>월납입</option><option>일시납</option><option>분기납</option><option>반년납</option><option>연납</option>
           <option value="__etc">직접 입력…</option>
-        </select><input id="nBillingEtc" placeholder="과금방식 직접 입력" style="display:none;margin-top:6px"></div>
+        </select><input id="nBillingEtc" aria-label="과금방식 직접 입력" placeholder="과금방식 직접 입력" style="display:none;margin-top:6px"></div>
         <div id="nFeeWrap"><label for="nFee">설치비 (원) <small style="color:var(--muted)">— 1회성 · 주로 에스원 계약</small></label><input id="nFee" type="number" min="0" step="10000" placeholder="예: 100000"></div>
         <div id="nSettleWrap"><label for="nSettle">대금정산일 <small style="color:var(--muted)">(설치비를 인식하는 달 · 비우면 시작월+1)</small></label><input id="nSettle" type="month"></div>
         <div class="full"><label for="nNote">비고</label><input id="nNote"></div>

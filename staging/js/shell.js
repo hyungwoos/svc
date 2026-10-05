@@ -151,15 +151,8 @@ function cmdAskHit(q){
 }
 
 /* ---- 홈: 인사 · 인박스 ---- */
-function ccGreeting(n){
-  var el0=document.getElementById('ccHi'); if(!el0) return;
-  el0.style.display='none'; return;   /* 인사말 없이 — 인박스 머리에 건수·읽은 시각만 */
-  var h=new Date().getHours(), g= h<5? '늦은 시간까지 고생 많으십니다' : h<12? '좋은 아침입니다' : h<18? '좋은 오후입니다' : '좋은 저녁입니다';
-  var who=(AUTH_USER||'').split('@')[0];
-  var d=new Date(), ds=d.getFullYear()+'년 '+(d.getMonth()+1)+'월 '+d.getDate()+'일 ('+'일월화수목금토'[d.getDay()]+')';
-  var la=document.getElementById('loadedAt');
-  el0.innerHTML='<h1>'+g+(who? ', '+esc(who)+'님':'')+'. <span>'+(n>0? '오늘 처리할 일이 '+n+'건 있습니다.':'지금 처리할 일이 없습니다.')+'</span></h1>'+
-    '<span class="mini" style="display:flex;align-items:center;gap:6px"><i style="width:7px;height:7px;border-radius:50%;background:var(--brand);display:inline-block"></i>'+esc(ds)+(la&&la.textContent? ' · '+esc(la.textContent):'')+'</span>';
+function ccGreeting(n){   /* 인사말 카드는 쓰지 않음 — 인박스 머리에 건수·읽은 시각만 (예전 본문은 ㊿+147 에서 정리) */
+  var el0=document.getElementById('ccHi'); if(el0) el0.style.display='none';
 }
 function ccSnoozed(key){ try{ var u=localStorage.getItem('svc_snz_'+key); return !!u && u>=todayStr(); }catch(e){ return false; } }
 function ccSnooze(key, days){
@@ -358,8 +351,8 @@ function ccTileEquip(){
     ph='<div class="mrow" style="margin-top:8px;font-size:12px"><span>'+esc(first.customer||'')+' · 회수</span><span class="num mini">'+done+'/'+all.length+'대</span></div><div class="eqb-prog">'+all.map(function(sn,i){ return '<i class="'+(i<done?'on':'')+'"></i>'; }).join('')+'</div>'; }
   var c=el('div','kpi');
   c.innerHTML='<div class="k">임대 장비 운영 '+tag+'</div>'+
-    '<div class="tri"><div><b class="num">'+lent+'</b><span>임대중</span></div><div><b class="num">'+stock+'</b><span>재고</span></div><div><b class="num" style="color:'+(prog.length?'#8a5200':'inherit')+'">'+prog.length+'</b><span>회수 진행</span></div></div>'+ph+
-    '<div class="d" style="margin-top:auto;padding-top:6px;color:var(--s1);font-weight:500">장비 대시보드 →</div>';
+    '<div class="tri"><div><b class="num">'+lent+'</b><span>임대중</span></div><div><b class="num">'+stock+'</b><span>재고</span></div><div><b class="num" style="color:'+(prog.length?'var(--warn-ink)':'inherit')+'">'+prog.length+'</b><span>회수 진행</span></div></div>'+ph+
+    '<div class="d" style="margin-top:auto;padding-top:6px;color:var(--s1-ink);font-weight:500">장비 대시보드 →</div>';
   c.style.cursor='pointer'; c.title='임대 장비 대시보드 (클릭)'; c.setAttribute('role','button'); c.tabIndex=0;
   c.onclick=function(){ switchView('eqboard'); };
   return c;
@@ -394,44 +387,15 @@ function ccTileWeekly(){
   return c;
 }
 /* ---- 오늘의 브리핑 — 숫자를 문장으로 (규칙 기반 · AI 비용 없음) + «AI로 더 자세히» ---- */
-function ccBrief(list,b){
-  var box=document.getElementById('ccBrief'); if(!box || !isCC()) return;
-  box.style.display='none'; return;   /* 오늘의 브리핑 카드는 쓰지 않음 (질문 칸·추천 질문은 그대로) */
-  var D=KPI_D||{}, parts=[], asks=[];
-  if(window.IS_EQUIP){ box.style.display='none'; return; }
-  var mrr=D.mrr||0, pm=D.prevM||0, py=D.prevY||0;
-  if(mrr){
-    var s1=mk(b)+' MRR은 '+won(mrr)+'천원';
-    if(pm){ var d=(mrr-pm)/pm*100; s1+= Math.abs(d)<0.05? '으로 전월과 같은 수준' : '으로 전월보다 '+Math.abs(d).toFixed(1)+'% '+(d>=0?'올랐':'내렸'); }
-    if(py){ var y=(mrr-py)/py*100; s1+= (pm? ', ':'으로 ')+'전년 같은 달 대비 '+(y>=0?'+':'')+y.toFixed(1)+'%'; }
-    parts.push(s1+'입니다.'); asks.push(['왜 이렇게 됐지?', '이번 달 매출이 전월과 비교해 왜 변했는지 고객사별로 설명해줘']);
-  }
-  try{
-    var yr=yOf(b), tg=(RAWX.targets||[]).filter(function(t){ return +t.year===yr; })[0];
-    if(tg && tg.amount){ var cur=mrr*12, p=cur/tg.amount*100, gap=tg.amount/12-mrr;
-      parts.push(yr+'년 목표 ARR의 '+p.toFixed(1)+'%에 도달했고'+(gap>0? ' 남은 격차는 월 '+won(gap)+'천원입니다.' : ' 목표를 넘었습니다.'));
-      asks.push(['목표 달성 전망', '연말 목표 ARR 달성 가능성을 현재 계약과 만료 예정을 감안해서 평가해줘']); }
-  }catch(e){}
-  if(D.expRows && D.expRows.length){ var EN=expN(); var nm=D.expRows.slice(0,2).map(function(k){ return DATA.rows[k].cust; }).join('·');
-    parts.push(EN+'개월 안에 만료되는 계약 '+D.expRows.length+'건('+nm+(D.expRows.length>2?' 외':'')+')이 있어 재계약 접촉을 권합니다.'); asks.push(['곧 만료 계약', '곧 만료되는 계약을 금액 순으로 알려줘']); }
-  if(D.churnRows && D.churnRows.length) parts.push('이번 기간 해지 '+D.churnRows.length+'건이 있었습니다.');
-  var pend=(RAWX.orders||[]).filter(function(o){ return ['접수','출하요청','배송중'].indexOf(o.status)>=0; }).length;
-  if(pend) parts.push('처리 대기 장비 신청 '+pend+'건은 운영 보드에서 바로 처리할 수 있습니다.');
-  if(!parts.length){ box.style.display='none'; return; }
-  box.style.display='';
-  var la=document.getElementById('loadedAt');
-  box.innerHTML='<div class="bh">'+ico('spark',15)+'오늘의 브리핑<small>'+(la&&la.textContent? '데이터 기준 '+esc(la.textContent):'')+(AICFG&&AICFG.enabled? ' · AI 연결됨':'')+'</small></div>'+
-    '<p>'+esc(parts.join(' '))+'</p>'+
-    '<div class="ba">'+asks.slice(0,3).map(function(a,i){ return '<button type="button" class="cbtn" data-q="'+esc(a[1])+'">'+esc(a[0])+'</button>'; }).join('')+
-    (AICFG&&AICFG.enabled? '<button type="button" class="cbtn" data-q="'+esc('이번 달 매출·해지·만료·장비 상황을 한 문단으로 브리핑해줘')+'">AI로 더 자세히</button>':'')+'</div>';
-  box.querySelectorAll('[data-q]').forEach(function(bt){ bt.onclick=function(){ var qi=document.getElementById('q'); if(qi) qi.value=bt.dataset.q; try{ ask(bt.dataset.q); }catch(e){} }; });
+function ccBrief(list,b){   /* 오늘의 브리핑 카드는 쓰지 않음 (질문 칸·추천 질문은 그대로) — 예전 본문은 ㊿+147 에서 정리 */
+  var box=document.getElementById('ccBrief'); if(box) box.style.display='none';
 }
 
 /* ==================================================================
    임대 장비 운영 보드 (칸반) — 상태 = 열, 카드 끌기 = 상태 변경 → 현황 자동 반영
    ================================================================== */
 var EQB={ch:'', q:'', more:{}};
-var EQB_COLS=[['접수','#9A9DA5','현황 재고'],['출하요청','#1E4FA3','현황 재고'],['배송중','#8a5200','현황 재고'],['설치완료','var(--brand)','현황 임대중'],['회수예정','#D95926','칩으로 일부 회수'],['회수완료','var(--ink-2)','최근 90일']];
+var EQB_COLS=[['접수','#9A9DA5','현황 재고'],['출하요청','var(--info-ink)','현황 재고'],['배송중','var(--warn-ink)','현황 재고'],['설치완료','var(--brand)','현황 임대중'],['회수예정','#D95926','칩으로 일부 회수'],['회수완료','var(--ink-2)','최근 90일']];
 function eqRefresh(){ if(CUR_VIEW==='eqboard') renderEqBoard(); else try{ renderGrid(); }catch(e){} }
 var EQ_CH_CLS={'에스원':'ch-s1','LGU+':'ch-lg','LG U+':'ch-lg','조달':'ch-gov','일반':'ch-gen'};
 function eqChTag(ch){ ch=ch||'기타'; return '<span class="ctag '+(EQ_CH_CLS[ch]||'')+'">'+esc(ch)+'</span>'; }
@@ -460,7 +424,7 @@ function renderEqDash(){
   }
   K.innerHTML=
     tile('good', 'var(--brand)', '임대중', lent.length, '대', '고객사 '+Object.keys(lentCust).length+'곳 · 현황 기준', 'assets:임대중')+
-    tile(pend.length? (age>7? 'crit':'hot'):'', '#1E4FA3', '처리 대기', pend.length, '건', pend.length? ['접수','출하요청','배송중'].filter(function(k){ return pendBy[k]; }).map(function(k){ return k+' '+pendBy[k]; }).join(' · ')+(age>=1? ' · 최장 '+age+'일':'') : '대기 중인 신청 없음', 'col:접수')+
+    tile(pend.length? (age>7? 'crit':'hot'):'', 'var(--info-ink)', '처리 대기', pend.length, '건', pend.length? ['접수','출하요청','배송중'].filter(function(k){ return pendBy[k]; }).map(function(k){ return k+' '+pendBy[k]; }).join(' · ')+(age>=1? ' · 최장 '+age+'일':'') : '대기 중인 신청 없음', 'col:접수')+
     tile(retL.length? 'hot':'', '#D95926', '회수 진행', retL.length, '건', retL.length? '회수 '+retDone+'/'+retAll+'대 · 시리얼 칩으로 처리':'진행 중인 회수 없음', 'col:회수예정')+
     tile('', 'var(--ink-2)', '회수 장비', retd.length, '대', retd.length? Object.keys(retdModel).sort(function(a,b){ return retdModel[b]-retdModel[a]; }).slice(0,3).map(function(m){ return esc(m)+' '+retdModel[m]; }).join(' · ')+' · 고객사 '+Object.keys(retdCust).length+'곳'+(retdLast? ' · 최근 '+retdLast:'') : '회수완료 장비 없음', 'assets:회수완료');
   var tc=document.getElementById('eqcTrendCap'); if(tc) tc.textContent='이달 설치 '+qty(instM)+'대 · 회수 '+qty(retM)+'대 · 지난달 설치 '+qty(instP)+'대 · 최근 12개월';

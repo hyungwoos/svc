@@ -1,15 +1,22 @@
 {
   "name": "svc-portal",
   "private": true,
-  "description": "Genians 서비스사업부 통합 관리 포탈 — 정적 포탈 + 테스트 (실행: npm run check · npm test)",
+  "description": "Genians 서비스사업부 통합 관리 포탈 — 정적 포탈 + 테스트 (실행: npm run check · npm run lint · npm test)",
   "type": "module",
   "scripts": {
     "check": "node tests/check.mjs",
     "test": "node tests/smoke.mjs",
     "test:fn": "deno check supabase/functions/*/index.ts && deno run -A tests/fn/ops.test.ts && deno run -A tests/fn/remind.test.ts && deno run -A tests/fn/aicheck.test.ts && deno run -A tests/fn/quote-worker.test.ts",
-    "test:install": "npx playwright install --with-deps chromium"
+    "test:install": "npx playwright install --with-deps chromium",
+    "lint": "node tests/lint.mjs"
   },
   "devDependencies": {
-    "playwright": "^1.47.0"
+    "playwright": "^1.47.0",
+    "alasql": "4.19.0",
+    "axe-core": "^4.10.3",
+    "eslint": "^9.12.0",
+    "eslint-scope": "^8.4.0",
+    "espree": "^10.4.0",
+    "globals": "^15.11.0"
   }
 }

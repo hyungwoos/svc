@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<!-- ㊿+147 리포트 «SQL 직접 작성» 엔진(AlaSQL)을 격리해서 돌리는 칸.
+     AlaSQL 은 SQL 을 JS 로 바꿔 실행(new Function)하므로 'unsafe-eval' 이 필요 — 그 권한을 본 포탈(index.html)에서 빼고 여기에만 줌.
+     index.html 이 sandbox="allow-scripts"(allow-same-origin 없음)로 띄우므로 이 문서는 «출처 없음»: 로그인 토큰·저장소·포탈 화면에 손댈 수 없고,
+     아래 CSP 로 외부 연결·이미지·폼도 막힘. 포탈과는 postMessage 로 «표 + SQL → 결과» 만 주고받음(js/sqlbox.js). -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://hyungwoos.github.io 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; connect-src 'none'; img-src 'none'; style-src 'none'; font-src 'none'; frame-src 'none'; worker-src 'none'; form-action 'none'; base-uri 'none'">
+<meta name="referrer" content="no-referrer">
+<title>SQL 엔진(격리)</title>
+</head>
+<body>
+<script src="js/sqlbox.js"></script>
+</body>
+</html>

@@ -315,7 +315,7 @@ var MFA_WARN=null;
 function mfaWarnIfNeeded(){
   var st=MFA_WARN; if(!st) return; MFA_WARN=null;
   var d=mfaDaysLeft(st);
-  toast('2단계 인증 등록이 필요합니다', '관리자 지정 — '+st.deadline+' 까지('+(d>0? d+'일 남음':'오늘')+') 내 계정 › 보안에서 켜 주세요. 지나면 등록 전까지 포탈을 쓸 수 없습니다.', 'warn');
+  toast('2단계 인증 등록이 필요합니다', (/role/.test(st.source||'')? '관리자 계정 기본 정책' : '관리자 지정')+' — '+st.deadline+' 까지('+(d>0? d+'일 남음':'오늘')+') 내 계정 › 보안에서 켜 주세요. 지나면 등록 전까지 포탈을 쓸 수 없습니다.', 'warn');
 }
 /* 필수 지정 + 기한 지남: 등록 창을 띄우고 끝나야 들어감 (취소 = 로그아웃) */
 function mfaForceEnroll(tok, email, st){
@@ -379,7 +379,7 @@ async function mfaCardRender(host){
   var fs; try{ fs=await mfaFactors(); }catch(e){ host.innerHTML='<span class="mini" style="color:var(--critical)">상태를 읽지 못했습니다: '+esc(e.message)+'</span>'; return; }
   var vf=mfaVerifiedOf(fs), aal=sessAal();
   var pol=await mfaPolicy(); MFA_ST=pol||MFA_ST;
-  var polHtml=(pol&&pol.required)? '<div class="mini" style="margin:0 0 6px;color:var(--s3,#b26a00)">관리자 지정: <b>필수</b>'+(pol.deadline? ' · 기한 '+esc(pol.deadline)+(!pol.enrolled? ' ('+(mfaDaysLeft(pol)>0? mfaDaysLeft(pol)+'일 남음':'지남')+')':''):'')+'</div>' : '';
+  var polHtml=(pol&&pol.required)? '<div class="mini" style="margin:0 0 6px;color:var(--s3-ink)">관리자 지정: <b>필수</b>'+(pol.deadline? ' · 기한 '+esc(pol.deadline)+(!pol.enrolled? ' ('+(mfaDaysLeft(pol)>0? mfaDaysLeft(pol)+'일 남음':'지남')+')':''):'')+'</div>' : '';
   if(vf.length){
     host.innerHTML=polHtml+'<div><b style="color:var(--brand)">켜짐</b> <span class="mini">· '+esc(vf[0].friendly_name||'인증 앱')+' · 등록 '+esc(String(vf[0].created_at||'').slice(0,10))+' · 이 세션 '+(aal==='aal2'? '2단계 확인됨' : '<span style="color:var(--critical)">코드 미확인</span>')+'</span></div>'+
       '<div class="mini" style="margin:5px 0 8px;line-height:1.6">로그인할 때마다 인증 앱의 6자리 코드가 필요합니다. 인증 앱을 바꾸려면 끄고 다시 켜세요(코드 필요). 폰을 잃어버렸으면 슈퍼 관리자에게 해제를 요청하세요.</div>'+

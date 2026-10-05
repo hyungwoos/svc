@@ -62,6 +62,14 @@ function rangeSum(list, from, to){
 /* ==================================================================
    3. 컨트롤 구성
    ================================================================== */
+/* ㊿+147: 색 바탕 위 글자색 — 흰색과 검정 중 대비가 큰 쪽(밝은 노랑·주황·청록 칩에 흰 글자는 2~3:1) */
+function inkOn(bg){
+  try{ var c=String(bg||'').trim(), m;
+    if((m=/^#([0-9a-f]{6})$/i.exec(c))) c=m[1]; else if((m=/^rgba?\((\d+),\s*(\d+),\s*(\d+)/i.exec(c))) c=[m[1],m[2],m[3]].map(function(x){ return ('0'+(+x).toString(16)).slice(-2); }).join(''); else return '#fff';
+    var L=[0,2,4].map(function(i){ var v=parseInt(c.substr(i,2),16)/255; return v<=0.03928? v/12.92 : Math.pow((v+0.055)/1.055,2.4); });
+    var l=0.2126*L[0]+0.7152*L[1]+0.0722*L[2];
+    return (1.05/(l+0.05) >= (l+0.05)/0.05)? '#fff' : '#111'; }catch(e){ return '#fff'; }
+}
 function buildControls(){
   // 사업라인 칩
   var box=$('#lineChips'); box.innerHTML='';
@@ -73,11 +81,11 @@ function buildControls(){
     b.onclick=function(){
       STATE.lines[l.label]=!STATE.lines[l.label];
       b.setAttribute('aria-pressed',STATE.lines[l.label]?'true':'false');
-      if(STATE.lines[l.label]){ b.style.background=seriesColor(l.color); b.style.color='#fff'; }
+      if(STATE.lines[l.label]){ b.style.background=seriesColor(l.color); b.style.color=inkOn(seriesColor(l.color)); }
       else { b.style.background='transparent'; b.style.color=cssv('--muted'); }
       renderAll();
     };
-    b.style.background=seriesColor(l.color); b.style.color='#fff';
+    b.style.background=seriesColor(l.color); b.style.color=inkOn(seriesColor(l.color));
     box.appendChild(b);
   });
 
@@ -354,7 +362,7 @@ function renderQWidgets(){
         }
       }catch(e){ host.innerHTML='<p class="cap">차트를 그리지 못했습니다</p>'; }
     } else if(res && res.table && res.table.rows.length){
-      host.innerHTML='<div class="tbl-wrap" style="max-height:220px"><table><thead><tr>'+
+      host.innerHTML='<div class="tbl-wrap" tabindex="0" style="max-height:220px"><table><thead><tr>'+
         res.table.cols.map(function(c2,i){ return '<th'+(i?' class="n"':'')+'>'+esc(c2)+'</th>'; }).join('')+'</tr></thead><tbody>'+
         res.table.rows.slice(0,8).map(function(r){ return '<tr>'+r.map(function(v,i){ return '<td'+(i?' class="n"':'')+'>'+esc(v)+'</td>'; }).join('')+'</tr>'; }).join('')+
         '</tbody></table></div>'+(res.table.rows.length>8? '<p class="mini" style="margin-top:6px">상위 8행 표시 · 전체는 질문창에서</p>':'');
@@ -558,6 +566,12 @@ function toggleWidgetPanel(){
   });
 }
 
+/* ㊿+146: 버튼 줄이 화면보다 길어 옆으로 밀리는 경우(폰) 고른 버튼이 보이게 — 연도 탭은 최근 연도가 오른쪽 끝이라 그냥 두면 안 보임 */
+function segScrollSel(seg){
+  try{ if(!seg || seg.scrollWidth<=seg.clientWidth+1) return; var b=seg.querySelector('[aria-pressed="true"]'); if(!b) return;
+    var l=b.offsetLeft, r=l+b.offsetWidth; if(l>=seg.scrollLeft && r<=seg.scrollLeft+seg.clientWidth) return;
+    seg.scrollLeft=Math.max(0, r-seg.clientWidth+8); }catch(e){}
+}
 /* ---- 월별 종합 장표 (시트 첫 장표 스타일) ---- */
 var MX_YEAR=null;
 var MX_LIST=null;   // 장표를 그릴 때 쓴 계약 목록(필터 반영) — 셀 «내역 보기»가 같은 기준으로 계산합니다
@@ -583,6 +597,7 @@ function renderMatrix(list){
   if(seg) seg.querySelectorAll('button').forEach(function(b){
     b.setAttribute('aria-pressed', +b.dataset.y===MX_YEAR?'true':'false');
   });
+  segScrollSel(seg);
 
   var Y=MX_YEAR;
   $('#capMx').textContent = Y+'년 · 월별 인식 금액 · 미래 월은 계약상 예정';
@@ -707,7 +722,7 @@ function openIfeeDetail(td, Y, M, det, adj){
     return '<tr class="ifex" data-x="'+i+'" data-id="'+(e&&e.id?e.id:'')+'">'+
       '<td><input class="ifin" data-f="x'+i+'_cust" list="dlIfeeCust" type="text" value="'+esc(cust)+'" placeholder="고객사"'+
         ' style="width:100%;min-width:130px;font-size:12px;padding:3px 5px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)"></td>'+
-      '<td><select class="ifin" data-f="x'+i+'_kind" style="font-size:12px;padding:3px 4px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)">'+
+      '<td><select class="ifin" aria-label="항목 종류" data-f="x'+i+'_kind" style="font-size:12px;padding:3px 4px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)">'+
         IFEE_KINDS.map(function(k){ return '<option'+(k===kind?' selected':'')+'>'+k+'</option>'; }).join('')+'</select></td>'+
       '<td><input class="ifin" data-f="x'+i+'_note" type="text" value="'+esc(note)+'" placeholder="비고(선택)"'+
         ' style="width:100%;min-width:110px;font-size:12px;padding:3px 5px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)"></td>'+
@@ -767,7 +782,7 @@ function ifeeWire(box, Y, M, rows, ex, td){
   if(add) add.onclick=function(){
     var tr=document.createElement('tr'); tr.className='ifex'; tr.dataset.x=String(nextX); tr.dataset.id='';
     tr.innerHTML='<td><input class="ifin" data-f="x'+nextX+'_cust" list="dlIfeeCust" type="text" placeholder="고객사" style="width:100%;min-width:130px;font-size:12px;padding:3px 5px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)"></td>'+
-      '<td><select class="ifin" data-f="x'+nextX+'_kind" style="font-size:12px;padding:3px 4px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)">'+
+      '<td><select class="ifin" aria-label="항목 종류" data-f="x'+nextX+'_kind" style="font-size:12px;padding:3px 4px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)">'+
         IFEE_KINDS.map(function(k){ return '<option>'+k+'</option>'; }).join('')+'</select></td>'+
       '<td><input class="ifin" data-f="x'+nextX+'_note" type="text" placeholder="비고(선택)" style="width:100%;min-width:110px;font-size:12px;padding:3px 5px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)"></td>'+
       '<td class="n"><input class="ifin" data-f="x'+nextX+'_amt" type="number" step="10000" placeholder="0" style="width:104px;text-align:right;font-size:12px;padding:3px 5px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)"></td>'+
@@ -1086,7 +1101,7 @@ function renderKpis(list){
       d:'고객사 '+newCu+' / '+churnCu+'곳 · 이탈 MRR '+won(churnAmt)+'천원',
       cls: churnCnt>newCnt? 'down':'up', open:'nc', tip:'신규 = 원계약 시작월이 '+(STATE.unit==='month'? mk(b) : mk(f0)+'~'+mk(b))+' · 해지 = 상태 «해지» 해지월이 그 기간 (부속 계약·CND 제외 · 해지 분석·해지율 화면과 같은 기준) — 누르면 명단' },
     (function(){ var EN=expN(), eEnd=Math.min(b+EN-1,M-1);
-      var seg='<div class="expseg" style="display:flex;gap:3px;align-items:center;margin-top:8px;flex-wrap:wrap" title="만료 기간을 바꿉니다 (이 브라우저에 기억 · 아래 «만료 예정» 위젯도 같이 바뀜)"><span class="mini" style="color:var(--muted);margin-right:2px">기간</span>'+[1,2,3,6,12].map(function(n){ return '<button type="button" data-expn="'+n+'" aria-pressed="'+(n===EN)+'" style="font:inherit;font-size:11px;line-height:1;padding:4px 7px;border-radius:6px;border:1px solid var(--ring);cursor:pointer;background:'+(n===EN?'var(--s1)':'var(--surface-2)')+';color:'+(n===EN?'#fff':'var(--ink-2)')+'">'+n+'개월</button>'; }).join('')+'</div>';
+      var seg='<div class="expseg" style="display:flex;gap:3px;align-items:center;margin-top:8px;flex-wrap:wrap" title="만료 기간을 바꿉니다 (이 브라우저에 기억 · 아래 «만료 예정» 위젯도 같이 바뀜)"><span class="mini" style="color:var(--muted);margin-right:2px">기간</span>'+[1,2,3,6,12].map(function(n){ return '<button type="button" data-expn="'+n+'" aria-pressed="'+(n===EN)+'" style="font:inherit;font-size:11px;line-height:1;padding:4px 7px;border-radius:6px;border:1px solid var(--ring);cursor:pointer;background:'+(n===EN?'var(--s1-solid,#226bc4)':'var(--surface-2)')+';color:'+(n===EN?'#fff':'var(--ink-2)')+'">'+n+'개월</button>'; }).join('')+'</div>';
       return { k:EN+'개월 내 만료', v:won(expAmt), u:'천원', d: expCnt+'건 · 재약정 타깃 · '+mk(b)+'~'+mk(eEnd), cls: expCnt? 'down':'', open:'exp', extra:seg,
                tip:'종료월이 '+mk(b)+'~'+mk(eEnd)+'인 원계약(해지·종료 상태 제외) — 숫자를 누르면 명단 · 아래 버튼으로 기간 변경' }; })()
   ];
@@ -1332,6 +1347,7 @@ function renderNcWidget(list){
   var seg=$('#segNcYear');
   if(seg && !seg._built){ seg._built=1; ys.forEach(function(y){ if(y>yOf(Math.min(DATA.nowIdx>=0?DATA.nowIdx:M-1,M-1))) return; var b2=document.createElement('button'); b2.textContent=String(y); b2.dataset.y=y; b2.onclick=function(){ NC_YEAR=+this.dataset.y; renderNcWidget(); }; seg.appendChild(b2); }); }
   if(seg) seg.querySelectorAll('button').forEach(function(b2){ b2.setAttribute('aria-pressed', +b2.dataset.y===NC_YEAR?'true':'false'); });
+  segScrollSel(seg);
   var Y=NC_YEAR, lines=DATA.lines.map(function(l){return l.label;}).filter(function(lb){return STATE.lines[lb];});
   function idxOf(y,m){ return (y-2020)*12+(m-6); }
   function cnt(kind,lb,y,m){ var j=idxOf(y,m); if(j<0||j>=M) return 0; return ncCust(ncRows(list,kind,lb,j,j)); }
