@@ -3,6 +3,7 @@
 #   · main 에 커밋될 때마다 실행 (포탈 «배포·운영» 의 커밋·승격 포함) · Actions 탭에서 수동 실행도 가능
 #   · 2026-10-04 갱신(㊿+143): 실행 환경을 ubuntu-24.04 로 고정(ubuntu-latest 는 2026-10-19 부터 Ubuntu 26 으로 바뀜) ·
 #     Node 22 · 액션은 Node 24 로 도는 최신 주 버전 · 함수 테스트 실패를 «|| echo» 로 덮지 않음
+#   · 2026-10-04 갱신(㊿+147): 테스트 잡에 ESLint 정적 검사(tests/lint.mjs) 단계 추가
 #   · 이 파일은 포탈로 커밋할 수 없습니다(포탈 토큰에 Workflows 권한 없음) — GitHub 웹에서 직접 편집
 name: test-and-deploy
 on:
@@ -28,6 +29,8 @@ jobs:
         run: node tests/check.mjs
       - name: Playwright 설치
         run: npm install --no-audit --no-fund && npx playwright install --with-deps chromium
+      - name: 정적 검사 2 (ESLint · 파일 간 전역 이름 지도 — 오타·없는 이름·중복 선언)
+        run: node tests/lint.mjs
       - name: 스모크 테스트 (가짜 백엔드 · 운영 DB 접근 없음)
         run: node tests/smoke.mjs
       - name: 실패 화면 보관
