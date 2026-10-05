@@ -19,7 +19,7 @@
 <!-- 포탈 버전 — 파일을 바꿔 올릴 때마다 아래 content 의 숫자가 +1 (화면 맨 아래 표시 · app.css / js/*.js 의 ?v= 캐시 무효화 · 배포·운영이 이 값을 읽어 비교).
      코드 파일 목록은 app-js (js/load.js 가 이 순서로 불러옴 · 마지막은 항상 js/init.js) — 파일을 더하거나 빼면 여기와 sw.js 의 SHELL 을 함께 고칠 것.
      ④ 아키텍처 2단계(㊿+136): 인라인 스크립트·onclick 을 전부 없애 CSP script-src 에서 'unsafe-inline' 제거. -->
-<meta name="app-ver" content="2026-09-16 ㊿+147">
+<meta name="app-ver" content="2026-09-16 ㊿+148">
 <meta name="app-js" content="js/viz.js,js/core.js,js/shell.js,js/dash.js,js/ai.js,js/grids.js,js/equipment.js,js/analysis.js,js/tools.js,js/price.js,js/inbound.js,js/admin.js,js/sales.js,js/report.js,js/grid.js,js/edit.js,js/init.js">
 <script src="js/boot.js"></script>
 </head>
@@ -782,6 +782,9 @@
         <div style="display:flex;align-items:flex-end"><button class="pill" id="cdAdd" style="height:36px">＋ 추가</button></div>
       </div>
       <p class="cap" id="cdCap" style="margin:10px 0 0">값을 <b>숨기면</b> 새 입력에서 고를 수 없고 데이터 점검이 «목록에 없는 값»으로 잡지만, 이미 그 값인 행은 그대로 둡니다(다른 열 수정도 가능). 순서는 ↑↓ 로. 저장하면 포탈을 쓰는 모든 사람에게 다음 데이터 로드부터 적용됩니다(본인은 즉시).</p>
+
+      <div style="font-size:11px;color:var(--muted);margin:22px 0 8px">— 업데이트 안내 — 로그인할 때 새 업데이트를 팝업으로 알려 줄 계정 · 안내문 (SQL 96) —</div>
+      <div id="updAdmin"><p class="cap">불러오는 중…</p></div>
 
       <div style="font-size:11px;color:var(--muted);margin:22px 0 8px">— AI 사용 비용 (Anthropic) —</div>
       <div id="axBillKpi" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px"></div>

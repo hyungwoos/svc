@@ -618,6 +618,7 @@ function renderAdmin(){
   try{ apBind(); }catch(e){}
   try{ mfBind(); mfLoad(); }catch(e){}
   try{ cdBind(); cdLoad(); }catch(e){}
+  try{ updAdminLoad(); }catch(e){}
   axLoad();
   abLoad();
 }
@@ -1085,7 +1086,9 @@ async function renderAccount(){
   var bo=document.createElement('button'); bo.className='pill ghost'; bo.textContent='로그아웃';
   bo.style.cssText='border-color:var(--critical,#d03b3b);color:var(--critical,#d03b3b)';
   bo.onclick=doLogout;
-  act.appendChild(bp); act.appendChild(bo);
+  var bu=document.createElement('button'); bu.className='pill ghost'; bu.textContent='📢 업데이트 내역'; bu.onclick=updOpenAll;   /* ㊿+148 */
+  act.appendChild(bp); act.appendChild(bu); act.appendChild(bo);
+  act.style.flexWrap='wrap';
   box.appendChild(act);
   /* 보안 — 2단계 인증(인증 앱) · 계정 단위, 본인이 켬 */
   var sec=document.createElement('div'); sec.style.cssText='margin-top:22px';
@@ -1242,4 +1245,235 @@ async function submitMdrPoc(){
     $('#mpEdr').checked=true; ['mpAv','mpRansom','mpMedia'].forEach(function(i){ $('#'+i).checked=false; });
   }catch(e){ msg('mpMsg',String(e.message||e),'bad'); }
   btn.disabled=false;
+}
+/* ===== ㊿+148 업데이트 안내 — 로그인할 때 팝업 (SQL 96 · 사용자: «담당자를 체크해 놓으면 로그인할 때 업데이트 내용을 안내 · 다 확인했다고 체크하면 다시 안 뜨고 · 다음 업데이트면 새 내용으로 다시») =====
+   · 안내문은 아래 UPD_SEED 에 코드와 함께 실려 옴 → 슈퍼 관리자가 포탈을 열 때 DB(upd_notes)에 없는 ver 만 자동으로 넣음(관리자가 고친 내용은 덮어쓰지 않음)
+   · 대상 = 관리자 › 업데이트 안내에서 체크한 계정(upd_notify) · 확인 = upd_ack(마지막 안내 id) — 새 안내는 id 가 커서 다시 뜸
+   · 읽기 호출은 sbWrite 대신 직접 fetch(캐시를 지우지 않게) · 표가 없으면(SQL 96 전) 조용히 아무것도 안 함
+   · 새 업데이트를 낼 때: UPD_SEED 맨 끝에 {ver, date, title, body} 한 개 추가(본문은 한 줄에 하나 «- » · 관리자용은 «(관리자)»로 시작) */
+var UPD={checked:false, rows:null, users:null, notify:null, ack:null, edit:null, err:''};
+var UPD_SEED=[
+  {ver:'㊿+98~117', date:'2026-09-27', title:'화면 디자인 개편 · 임대 장비 대시보드 · 리포트', body:[
+    '- 새 화면 디자인 «커맨드 센터»가 기본이 되었습니다. 왼쪽 아이콘 메뉴와 위쪽 검색창(Ctrl+K)으로 화면 이동·AI 질문을 합니다.',
+    '- 홈 첫 화면이 «처리할 일 → MRR → 주요 지표 → AI 질문» 순서로 바뀌었고, 차트·표 분석은 «분석» 칸을 펼치면 보입니다.',
+    '- 내 계정 › 설정에서 화면 디자인(커맨드 센터·심플·클래식)과 자동 로그아웃 시간을 고를 수 있습니다.',
+    '- 장비 › 임대 장비 대시보드: 임대중·처리 대기·회수 현황과 상태 보드(카드를 끌어 다음 단계로).',
+    '- 가격표 › 견적·비교: Cloud NAC·MDR 빠른 견적, SaaS와 구축형 비용 비교, 견적서 PDF 비교.',
+    '- 클라우드 비용 화면을 요약 타일 + 월별 추이로 정리했습니다.',
+    '- 리포트: 계약·매출·장비·OI 등 포탈 데이터를 골라 합치고 묶어 표·차트로 보고, 엑셀·PPT로 내보냅니다. SQL로 직접 쓸 수도 있습니다.',
+    '- 고객 360: 요약 4칸(MRR·누적·장비·다음 만료)과 다음 할 일 제안.',
+    '- AI 지식: AI에게 팀 규칙·용어를 가르칠 수 있습니다(메뉴 «AI 지식»).',
+    '- 표에서 «행 추가» 저장이 안 되던 문제를 고쳤습니다.'].join('\n')},
+  {ver:'㊿+118', date:'2026-09-28', title:'휴대폰 홈 화면 앱 · 로그인 유지', body:[
+    '- 포탈을 앱처럼 설치할 수 있습니다. 아이폰은 Safari 공유 › 홈 화면에 추가, 안드로이드는 Chrome «앱 설치» (내 계정 › 설정 › 앱으로 설치).',
+    '- 로그인 화면에 «로그인 유지»가 생겼습니다. 휴대폰에서는 기본으로 켜집니다.'].join('\n')},
+  {ver:'㊿+119~121', date:'2026-09-29', title:'메뉴 권한 · 유입경로 · 뒤로가기', body:[
+    '- 계약에 «유입경로»(직접영업·파트너영업·인바운드·프로모션·기타) 칸이 생겼고, 전체 데이터 › 유입경로 분석에서 경로별 매출을 봅니다.',
+    '- 위쪽 «←» 버튼, 브라우저 뒤로가기, 휴대폰 뒤로 제스처로 이전 화면에 돌아갑니다. 주소에 화면 이름이 붙어 새로고침·링크 공유 때 그 화면이 열립니다.',
+    '- (관리자) 계정마다 메뉴별 보기/읽기/쓰기 권한을 정할 수 있습니다(관리자 › 메뉴 권한).'].join('\n')},
+  {ver:'㊿+122~126', date:'2026-09-30', title:'계약 노드수·버전 · 장비 모델 · 인쇄', body:[
+    '- 계약 관리에 «Ver.»(V6.0·V5.0·ZTNA)와 «노드수» 칸이 생겼습니다. 서비스가 «Cloud NAC 6.0 / 5.0»으로 구분돼 보입니다.',
+    '- 장비 모델 목록: S100·S200·S10_R2·S20_R2·S30H_R1·ES30.',
+    '- 발주 신청서의 계약번호·관리자 계정·설치 희망일·에디션·요청 기능은 판매 채널이 «에스원»일 때만 보입니다.',
+    '- 입력칸 밖에서 Backspace 키로도 뒤로 갑니다.',
+    '- 프로젝트 리포트를 인쇄할 때 아래쪽 주소·로고가 잘리던 문제를 고쳤습니다.'].join('\n')},
+  {ver:'㊿+127', date:'2026-10-02', title:'계약 만기 처리 · 견적서 모바일', body:[
+    '- 홈에 «만기 지났는데 미처리», «이달 만기» 알림이 뜨고, «처리하기»에서 연장·서비스종료·해지·자동연장을 바로 처리합니다.',
+    '- LIVE 타일에 전월 대비 늘고 준 이유(신규·복귀·해지·만기 미처리)가 나옵니다.',
+    '- 계약 관리에 «자동연장» 칸이 생겼습니다(매월 자동 연장 계약은 만기 목록에서 빠집니다).',
+    '- 휴대폰에서 만든 견적서 PDF의 «공급자» 글자 밀림과 주소 줄바꿈을 고쳤습니다.',
+    '- (관리자) 만기 처리 창에서 «슬랙으로 보내기»로 갱신 대상을 팀 슬랙에 보낼 수 있습니다.',
+    '- (관리자) AI 지식은 관리자만 쓸 수 있게 바꾸고, AI 사용량에 하루 한도를 두었습니다.'].join('\n')},
+  {ver:'㊿+128~132', date:'2026-10-03', title:'2단계 인증 · 보안 · 배포·운영', body:[
+    '- 내 계정 › 보안 › 2단계 인증: 휴대폰 인증 앱(Google Authenticator 등)으로 로그인 때 6자리 코드를 한 번 더 확인합니다.',
+    '- 견적서 직인을 로그인한 사람만 볼 수 있는 저장소로 옮겼습니다.',
+    '- 포탈에서 생기는 오류가 자동으로 기록되고, 매일 새벽 데이터가 백업됩니다(7일 보관).',
+    '- (관리자) 계정별로 2단계 인증을 «필수»로 지정하고 기한을 줄 수 있습니다.',
+    '- (관리자) 관리자 › 배포·운영: 포탈 안에서 파일 배포, DB 쿼리 실행, 서버 함수 배포(작업 PIN 필요). 스테이징(시험판)에서 먼저 확인하고 운영에 올립니다.'].join('\n')},
+  {ver:'㊿+133~136', date:'2026-10-03', title:'데이터 점검 · 화면 다듬기', body:[
+    '- 전체 데이터 › 🩺 데이터 점검: 고객사 연결 없음·만기 미처리·목록에 없는 값·에스원 계약번호 누락 등 어긋난 데이터를 모아 보여 줍니다. 바로 고칠 게 있으면 홈에 알림이 뜹니다.',
+    '- 표 검색 결과가 0건이면 «검색어 지우기 / 필터 지우기» 버튼이 나옵니다.',
+    '- 계약 관리의 관점 칩 중 0건인 것은 접혀서 한 줄로 보입니다.',
+    '- Esc 키로 맨 위 창이 닫힙니다. 경고 알림 아이콘은 주황 «!»로 바뀌었습니다.',
+    '- AI가 포탈 사용법(만기 처리·2단계 인증·리포트 등)도 답할 수 있게 했습니다.',
+    '- (관리자) AI 15문 점검: 대표 질문 15개로 AI 답이 맞는지 확인합니다(배포·운영 › 기록).'].join('\n')},
+  {ver:'㊿+137~139', date:'2026-10-03', title:'코드 관리 · 고객사 병합 · 도움말 · AI 피드백', body:[
+    '- 데이터 점검 › 고객사 이름 중복은 «병합»으로 하나로 합칠 수 있고(관리자), «LIVE인데 이달 매출 0»은 mrr 금액으로 한 번에 채울 수 있습니다.',
+    '- 표 위 «❔ 이 화면 사용법»을 누르면 AI가 그 화면 쓰는 법을 알려 줍니다.',
+    '- 입력칸 밖에서 «?» 키를 누르면 단축키 안내가 나옵니다.',
+    '- 표 설명이 길면 첫 문장만 보이고 «도움말 ▾»로 펼칩니다.',
+    '- 표를 옆으로 끝까지 밀어도 ✎/🗑 버튼이 마지막 칸을 가리지 않습니다.',
+    '- AI 답 밑 👍/👎로 답이 맞았는지 알려 주세요(👎는 메모를 남길 수 있습니다).',
+    '- 상태·채널·서비스처럼 정해진 목록에 없는 값은 저장할 때 막습니다(오타 방지).',
+    '- (관리자) 관리자 › 코드 관리: 선택 목록을 화면에서 추가·숨기기·순서 변경 — 모든 화면에 바로 반영됩니다.'].join('\n')},
+  {ver:'㊿+140~142', date:'2026-10-04', title:'견적 저장 · 창 사용성 · 화면 정리', body:[
+    '- 견적서 저장·불러오기가 공용 비밀번호 대신 포탈 로그인으로 동작합니다(비밀번호 입력 없음 · 누가 저장했는지 기록).',
+    '- 창 바깥(어두운 곳)을 눌러도 창이 닫힙니다. 입력하던 내용이 있으면 닫기 전에 물어봅니다.',
+    '- 서버 오류일 때 «데이터 없음» 대신 «불러오지 못했습니다»로 알려 줍니다.',
+    '- 글자 크기·버튼 모양을 통일했고, 회색 글씨를 더 진하게 해서 읽기 쉬워졌습니다.',
+    '- 표 머리 칸 오른쪽 경계를 끌어 열 너비를 바꿀 수 있습니다(화면별로 기억 · 경계를 두 번 누르면 원래대로).',
+    '- 메뉴의 Cloud NAC·MDR·기타(유통) 세 그룹을 «사업 영역» 한 그룹으로 합쳤습니다.'].join('\n')},
+  {ver:'㊿+143~146', date:'2026-10-04', title:'로그인 속도 · 메뉴 이동 · 휴대폰 화면', body:[
+    '- 로그인·로그아웃·새로고침이 빨라졌습니다.',
+    '- 로그인하면 항상 홈(대시보드)에서 시작합니다.',
+    '- 메뉴를 누르면 그 화면의 처음 상태(검색·탭·스크롤 초기화)로 열립니다. 뒤로가기는 보던 그대로 돌아갑니다.',
+    '- 휴대폰에서 대시보드 «월별 종합 장표» 제목이 세로로 쌓이고 연도 탭이 넘치던 문제를 고쳤습니다.',
+    '- (관리자) 배포·운영: 파일을 넣으면 저장소 자리를 자동으로 잡고, 🧹 저장소 점검으로 안 쓰는 파일을 정리합니다.'].join('\n')},
+  {ver:'㊿+147', date:'2026-10-04', title:'읽기 쉬운 색 · 관리자 2단계 인증 필수', body:[
+    '- 모든 화면·다크 모드에서 글자와 바탕의 대비를 접근성 기준(WCAG AA)에 맞췄습니다. 초록 버튼이 조금 진해졌습니다.',
+    '- 관리자 계정(super_admin·admin)은 2단계 인증이 필수입니다(적용일부터 14일 유예 · 기한 전에는 로그인할 때 안내만 뜹니다).',
+    '- 리포트의 SQL 실행을 격리된 칸에서 돌려 더 안전해졌습니다.',
+    '- AI 점검이 «9,956만원» 같은 만원 표기도 맞게 읽습니다.'].join('\n')},
+  {ver:'㊿+148', date:'2026-10-05', title:'데이터 점검에서 바로 고치기 · 업데이트 안내', body:[
+    '- 데이터 점검 항목을 누르면 수정 창이 열려 그 자리에서 고칩니다. 저장하면 다음 항목으로 넘어갑니다.',
+    '- 로그인할 때 이렇게 업데이트 내용을 알려 드립니다. «모두 확인했습니다»에 체크하고 확인을 누르면 다음 업데이트 전까지 다시 뜨지 않습니다.',
+    '- 지난 안내는 내 계정 › «📢 업데이트 내역»에서 언제든 다시 볼 수 있습니다.',
+    '- (관리자) 매일 새벽 3시 AI 자동 점검 결과를 슬랙에 «성공/실패» 한 줄로 알립니다.'].join('\n')}
+];
+async function updFetch(path, opt){   /* 캐시를 건드리지 않는 직접 호출 — 401 이면 토큰 갱신 뒤 1회 재시도 */
+  if(!SB_TOKEN) throw new Error('로그인이 필요합니다');
+  var go=function(){ return fetch(SB_URL+'/rest/v1/'+path, Object.assign({headers:sbHeaders(true)}, opt||{})); };
+  var r=await go(); if(r.status===401 && await refreshToken()) r=await go();
+  var t=await r.text(); if(!r.ok) throw new Error('HTTP '+r.status+' '+t.slice(0,160));
+  return t? JSON.parse(t) : null;
+}
+function updRpc(fn, args){ return updFetch('rpc/'+fn, {method:'POST', body:JSON.stringify(args||{})}); }
+function updBodyHtml(body){
+  var lines=String(body||'').split(/\r?\n/).map(function(x){ return x.trim(); }).filter(Boolean), h='', inList=false;
+  lines.forEach(function(l){
+    var li=/^[-•·]\s*/.test(l);
+    if(li && !inList){ h+='<ul>'; inList=true; } if(!li && inList){ h+='</ul>'; inList=false; }
+    var t=l.replace(/^[-•·]\s*/,''), adm=/^\(관리자\)\s*/.test(t); t=t.replace(/^\(관리자\)\s*/,'');
+    var x=(adm? '<span class="upd-adm">관리자</span> ':'')+esc(t);
+    h+= li? '<li>'+x+'</li>' : '<p>'+x+'</p>';
+  });
+  return h+(inList? '</ul>':'');
+}
+/* 팝업 — opt.mode: 'ack'(로그인 안내 · 확인 체크) | 'all'(내 계정 › 업데이트 내역) | 'preview'(관리자 미리보기) */
+function updShow(notes, opt){
+  opt=opt||{}; notes=(notes||[]).slice().sort(function(a,b){ return (b.id||0)-(a.id||0); });
+  var old=document.getElementById('ovlUpd'); if(old) old.remove();
+  var ov=document.createElement('div'); ov.id='ovlUpd'; ov.className='ovl on'; ov.style.cssText='z-index:9500;align-items:center';
+  var sub=opt.mode==='ack'? (opt.first? '지금까지 포탈에서 바뀐 내용입니다 ('+notes.length+'번의 업데이트)' : '지난번 확인한 뒤 바뀐 내용입니다 ('+notes.length+'건)') : opt.mode==='preview'? '관리자 미리보기 — 체크된 계정에게 이렇게 보입니다' : '지금까지의 업데이트 내역';
+  ov.innerHTML='<div class="modal upd" style="width:min(680px,100%);padding:20px 22px" role="dialog" aria-modal="true" aria-labelledby="updTitle">'+
+    '<div class="upd-head"><span class="upd-ic" aria-hidden="true">📢</span><div><h3 id="updTitle" style="margin:0;font-size:18px">포탈 업데이트 안내</h3><div class="mini">'+esc(sub)+'</div></div></div>'+
+    '<div class="upd-body" tabindex="0">'+(notes.length? notes.map(function(n,i){ return '<section class="upd-sec"><div class="upd-meta"><b>'+esc(n.title||'')+'</b>'+(i===0&&opt.mode==='ack'? '<span class="ctag ok">최신</span>':'')+'<span class="mini">'+esc(String(n.published_on||'').slice(0,10))+(n.ver? ' · '+esc(n.ver):'')+'</span></div>'+updBodyHtml(n.body)+'</section>'; }).join('') : '<p class="cap">안내가 없습니다.</p>')+'</div>'+
+    '<div class="upd-foot">'+(opt.mode==='ack'? '<label class="upd-chk"><input type="checkbox" id="updOk"> 업데이트 내용을 모두 확인했습니다</label><span style="flex:1"></span><button type="button" class="pill ghost" id="updLater">나중에 보기</button><button type="button" class="pill pri" id="updDone" disabled>확인</button>'
+      : '<span style="flex:1"></span><button type="button" class="pill" id="updClose">닫기</button>')+'</div></div>';
+  document.body.appendChild(ov);
+  var ok=ov.querySelector('#updOk'), done=ov.querySelector('#updDone');
+  if(ok) ok.onchange=function(){ done.disabled=!ok.checked; };
+  var later=ov.querySelector('#updLater'); if(later) later.onclick=function(){ ov.remove(); toast('업데이트 안내', '다음에 로그인할 때 다시 보여 드립니다', 'info'); };
+  var cl=ov.querySelector('#updClose'); if(cl) cl.onclick=function(){ ov.remove(); };
+  if(done) done.onclick=async function(){
+    var top=notes.reduce(function(a,n){ return Math.max(a, +n.id||0); }, 0); done.disabled=true;
+    try{ await updRpc('upd_ack_set', {p_last_id:top}); ov.remove(); toast('확인했습니다', '다음 업데이트가 있으면 다시 알려 드립니다'); }
+    catch(e){ done.disabled=false; toast('확인 기록 실패', String(e.message||e).slice(0,140), 'warn'); }
+  };
+  setTimeout(function(){ try{ (ok||cl||ov.querySelector('.upd-body')).focus(); }catch(e){} }, 30);
+}
+/* 슈퍼 관리자가 열 때 — DB 에 없는 ver 만 넣기(오래된 것부터 → id 가 날짜 순) */
+async function updSyncSeed(){
+  if(!window.IS_SUPER) return 0;
+  var have=await updFetch('upd_notes?select=ver');
+  var set={}; (have||[]).forEach(function(r){ if(r.ver) set[r.ver]=1; });
+  var add=UPD_SEED.filter(function(s){ return !set[s.ver]; }).map(function(s){ return {ver:s.ver, title:s.title, body:s.body, published_on:s.date, created_by:'포탈 '+(window.APP_VER||'')+' (자동)'}; });
+  if(add.length) await updFetch('upd_notes', {method:'POST', body:JSON.stringify(add), headers:Object.assign(sbHeaders(true), {Prefer:'return=minimal'})});
+  return add.length;
+}
+/* 로그인 뒤 첫 데이터 표시 때 1번 (onData) */
+async function updCheck(){
+  if(UPD.checked || !SB_TOKEN) return; UPD.checked=true;
+  try{ await updSyncSeed(); }catch(e){ /* 표 없음(SQL 96 전) 등 — 조용히 */ }
+  try{
+    var r=await updRpc('upd_pending', {});
+    if(r && r.notify && Array.isArray(r.notes) && r.notes.length) updShow(r.notes, {mode:'ack', first:!r.last_id});
+  }catch(e){ /* SQL 96 전 — 조용히 */ }
+}
+/* 내 계정 › 업데이트 내역 — 누구나 */
+async function updOpenAll(){
+  try{ var rows=await updFetch('upd_notes?select=id,ver,title,body,published_on&active=eq.true&order=id.desc'); updShow(rows||[], {mode:'all'}); }
+  catch(e){ toast('업데이트 내역', /404|PGRST|does not exist|schema cache/i.test(String(e.message))? '아직 준비되지 않았습니다 (SQL 96)' : String(e.message||e).slice(0,140), 'warn'); }
+}
+/* ── 관리자 › 업데이트 안내 ── */
+function updMsg(t, bad){ var e=document.getElementById('updMsg'); if(e){ e.textContent=t||''; e.style.color=bad? 'var(--critical)':'var(--muted)'; } }
+async function updAdminLoad(){
+  var host=document.getElementById('updAdmin'); if(!host) return;
+  updMsg('불러오는 중…');
+  try{
+    var n=await updSyncSeed(); if(n) toast('업데이트 안내', '새 안내 '+n+'건을 넣었습니다');
+    var res=await Promise.all([
+      updFetch('upd_notes?select=id,ver,title,body,published_on,active,updated_by,updated_at&order=id.desc'),
+      updFetch('upd_notify?select=email,enabled,updated_at'),
+      updFetch('upd_ack?select=email,last_id,acked_at'),
+      sbWrite('POST','rpc/admin_list_users',{}).catch(function(){ return null; })
+    ]);
+    UPD.rows=res[0]||[]; UPD.notify=res[1]||[]; UPD.ack=res[2]||[]; UPD.users=res[3]||[]; UPD.err='';
+  }catch(e){ UPD.rows=null; UPD.err=/404|PGRST|does not exist|schema cache/i.test(String(e.message))? 'SQL 96 이 아직 실행되지 않았습니다 — 배포·운영 › SQL 탭에서 sql96_update_notes.sql 을 실행하세요' : String(e.message||e).slice(0,200); }
+  updAdminPaint();
+}
+function updAdminPaint(){
+  var host=document.getElementById('updAdmin'); if(!host) return;
+  if(!UPD.rows){ host.innerHTML='<p class="cap" style="color:var(--warn-ink)">'+esc(UPD.err||'불러오지 못했습니다')+'</p><button type="button" class="pill ghost" id="updReload">↻ 다시 읽기</button>'; host.querySelector('#updReload').onclick=updAdminLoad; return; }
+  var act=UPD.rows.filter(function(r){ return r.active; });
+  var nmap={}; (UPD.notify||[]).forEach(function(x){ nmap[String(x.email).toLowerCase()]=x; });
+  var amap={}; (UPD.ack||[]).forEach(function(x){ amap[String(x.email).toLowerCase()]=x; });
+  var emails=(UPD.users||[]).map(function(u){ return {email:u.email, role:u.role}; });
+  Object.keys(nmap).forEach(function(e){ if(!emails.some(function(u){ return String(u.email).toLowerCase()===e; })) emails.push({email:nmap[e].email, role:''}); });
+  emails.sort(function(a,b){ var x=!!(nmap[String(b.email).toLowerCase()]||{}).enabled - !!(nmap[String(a.email).toLowerCase()]||{}).enabled; return x || String(a.email).localeCompare(String(b.email)); });
+  var h='<div class="dbar" style="margin-bottom:8px;flex-wrap:wrap;gap:8px;align-items:center"><button type="button" class="pill ghost" id="updReload">↻ 다시 읽기</button><button type="button" class="pill ghost" id="updPreview">👁 팝업 미리보기</button><button type="button" class="pill ghost" id="updNew">＋ 새 안내</button><span class="mini" id="updMsg">게시 '+act.length+'건 · 안내 받는 계정 '+(UPD.notify||[]).filter(function(x){ return x.enabled; }).length+'명</span></div>';
+  h+='<div class="tbl-wrap" tabindex="0" style="max-height:40vh"><table class="dgrid" id="updUsers"><thead><tr><th>계정</th><th>권한</th><th>안내 받기</th><th>안 읽은 안내</th><th>마지막 확인</th><th class="act"></th></tr></thead><tbody>'+
+    emails.map(function(u){ var k=String(u.email).toLowerCase(), on=!!(nmap[k]&&nmap[k].enabled), a=amap[k], last=a? +a.last_id : 0, unread=act.filter(function(r){ return r.id>last; }).length;
+      return '<tr><td>'+esc(u.email)+'</td><td class="mini">'+esc(u.role||'')+'</td><td><label class="mini" style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" data-updn="'+esc(u.email)+'"'+(on?' checked':'')+'> 받기</label></td>'+
+        '<td>'+(on? (unread? '<span class="ctag warn">'+unread+'건</span>':'<span class="ctag ok">다 봄</span>') : '<span class="mini">—</span>')+'</td>'+
+        '<td class="mini">'+(a? esc(String(a.acked_at||'').replace('T',' ').slice(0,16)) : '아직 없음')+'</td>'+
+        '<td class="act">'+(a? '<button type="button" class="pill ghost" data-updreset="'+esc(u.email)+'" title="확인 기록을 지워 다음 로그인 때 전체 안내를 다시 보여 줌">처음부터 다시</button>':'')+'</td></tr>'; }).join('')+'</tbody></table></div>';
+  h+='<p class="cap" style="margin:6px 0 14px">«받기»를 켠 계정은 로그인할 때 아직 확인하지 않은 안내를 팝업으로 봅니다(처음이면 지금까지 전체). «모두 확인했습니다»에 체크하고 확인하면 다음 안내 전까지 다시 뜨지 않습니다.</p>';
+  h+='<div class="tbl-wrap" tabindex="0" style="max-height:40vh"><table class="dgrid" id="updNotes"><thead><tr><th>날짜</th><th>버전</th><th>제목</th><th class="n">항목</th><th>상태</th><th class="act"></th></tr></thead><tbody>'+
+    UPD.rows.map(function(r){ var n=String(r.body||'').split(/\n/).filter(function(x){ return /^\s*[-•·]/.test(x); }).length;
+      return '<tr'+(r.active? '':' class="row-dim"')+'><td class="mini">'+esc(String(r.published_on||'').slice(0,10))+'</td><td class="mini">'+esc(r.ver||'')+'</td><td>'+esc(r.title||'')+'</td><td class="n">'+n+'</td><td>'+(r.active? '<span class="ctag ok">게시</span>':'<span class="ctag">숨김</span>')+'</td>'+
+        '<td class="act"><button type="button" class="pill ghost" data-upded="'+r.id+'">수정</button><button type="button" class="pill ghost" data-updtg="'+r.id+'">'+(r.active? '숨기기':'게시')+'</button></td></tr>'; }).join('')+'</tbody></table></div>';
+  h+='<div id="updEdit"></div>';
+  host.innerHTML=h;
+  host.querySelector('#updReload').onclick=updAdminLoad;
+  host.querySelector('#updPreview').onclick=function(){ updShow(act, {mode:'preview'}); };
+  host.querySelector('#updNew').onclick=function(){ UPD.edit={id:null, ver:'', title:'', body:'- ', published_on:new Date(Date.now()+9*3600e3).toISOString().slice(0,10)}; updEditPaint(); };
+  host.querySelectorAll('[data-updn]').forEach(function(c){ c.onchange=function(){ updNotifySet(c.dataset.updn, c.checked); }; });
+  host.querySelectorAll('[data-updreset]').forEach(function(b){ b.onclick=function(){ updAckReset(b.dataset.updreset); }; });
+  host.querySelectorAll('[data-upded]').forEach(function(b){ b.onclick=function(){ var r=UPD.rows.filter(function(x){ return String(x.id)===b.dataset.upded; })[0]; if(r){ UPD.edit=Object.assign({}, r); updEditPaint(); } }; });
+  host.querySelectorAll('[data-updtg]').forEach(function(b){ b.onclick=function(){ var r=UPD.rows.filter(function(x){ return String(x.id)===b.dataset.updtg; })[0]; if(r) updNoteSave({id:r.id, active:!r.active}); }; });
+  if(UPD.edit) updEditPaint();
+}
+function updEditPaint(){
+  var box=document.getElementById('updEdit'); if(!box) return; var e=UPD.edit;
+  if(!e){ box.innerHTML=''; return; }
+  box.innerHTML='<div class="card" style="padding:14px;margin-top:10px"><div style="font-weight:650;margin-bottom:8px">'+(e.id? '안내 수정 #'+e.id : '새 안내')+'</div>'+
+    '<div class="frm" style="grid-template-columns:1fr 1fr 2fr"><div><label for="updEDate">날짜</label><input id="updEDate" type="date" value="'+esc(String(e.published_on||'').slice(0,10))+'"></div><div><label for="updEVer">버전 (선택)</label><input id="updEVer" value="'+esc(e.ver||'')+'" placeholder="예: ㊿+149"></div><div><label for="updETitle">제목</label><input id="updETitle" value="'+esc(e.title||'')+'"></div></div>'+
+    '<div style="margin-top:8px"><label for="updEBody" class="mini">내용 — 한 줄에 하나, «- »로 시작하면 항목 · 관리자용은 «- (관리자) …»</label><textarea id="updEBody" class="ops-ta" style="min-height:180px;margin-top:4px">'+esc(e.body||'')+'</textarea></div>'+
+    '<div style="display:flex;gap:8px;margin-top:8px;justify-content:flex-end"><button type="button" class="pill ghost" id="updECancel">취소</button><button type="button" class="pill ghost" id="updEPrev">미리보기</button><button type="button" class="pill pri" id="updESave">저장</button></div></div>';
+  var val=function(){ return {id:e.id, published_on:box.querySelector('#updEDate').value||null, ver:box.querySelector('#updEVer').value.trim()||null, title:box.querySelector('#updETitle').value.trim(), body:box.querySelector('#updEBody').value.replace(/\s+$/,'')}; };
+  box.querySelector('#updECancel').onclick=function(){ UPD.edit=null; updEditPaint(); };
+  box.querySelector('#updEPrev').onclick=function(){ var v=val(); updShow([{id:1, ver:v.ver, title:v.title, body:v.body, published_on:v.published_on}], {mode:'preview'}); };
+  box.querySelector('#updESave').onclick=function(){ var v=val(); if(!v.title){ updMsg('제목을 넣으세요', true); return; } updNoteSave(v); };
+}
+async function updNoteSave(v){
+  try{
+    var me=AUTH_USER||'', now=new Date().toISOString(), body=Object.assign({}, v); delete body.id;
+    if(v.id){ body.updated_by=me; body.updated_at=now; await sbWrite('PATCH','upd_notes?id=eq.'+v.id, body); }
+    else { body.created_by=me; body.updated_by=me; await sbWrite('POST','upd_notes', body); }
+    try{ await logChange(v.id? 'upd_note_edit':'upd_note_add','upd_notes', v.id||'', {title:v.title, ver:v.ver, active:v.active}); }catch(e){}
+    UPD.edit=null; toast('업데이트 안내 저장', v.title||(v.active===false? '숨겼습니다':'게시했습니다')); updAdminLoad();
+  }catch(e){ updMsg('저장 실패: '+String(e.message||e).slice(0,160), true); }
+}
+async function updNotifySet(email, on){
+  try{
+    await sbWrite('POST','upd_notify?on_conflict=email', {email:email, enabled:!!on, updated_by:AUTH_USER||'', updated_at:new Date().toISOString()}, 'resolution=merge-duplicates');
+    try{ await logChange(on? 'upd_notify_on':'upd_notify_off','upd_notify', email, {}); }catch(e){}
+    toast('업데이트 안내', email+(on? ' — 다음 로그인 때 안내합니다':' — 안내하지 않습니다')); updAdminLoad();
+  }catch(e){ updMsg('저장 실패: '+String(e.message||e).slice(0,160), true); }
+}
+async function updAckReset(email){
+  if(!confirm(email+' 의 확인 기록을 지웁니다.\n다음 로그인 때 지금까지의 안내 전체가 다시 뜹니다. 계속할까요?')) return;
+  try{ await sbWrite('DELETE','upd_ack?email=eq.'+encodeURIComponent(email)); toast('처음부터 다시', email); updAdminLoad(); }
+  catch(e){ updMsg('실패: '+String(e.message||e).slice(0,160), true); }
 }
