@@ -1,4 +1,14 @@
-// aicheck v1.2 — 포탈 AI 야간 자동 점검 (90점 프로젝트 ⑥ AI 2단계 · 2026-10-03)
+// aicheck v1.4 — 포탈 AI 야간 자동 점검 (90점 프로젝트 ⑥ AI 2단계 · 2026-10-03)
+//   · v1.4(2026-10-05 · 사용자: «C0BQR2JCU3Z 채널로 · 상세 내용 말고 성공/실패만 간단하게»):
+//     슬랙은 매일 한 줄 — «✅ 포탈 야간 점검 성공» / «❌ 포탈 야간 점검 실패 — 포탈 › 배포·운영 › 기록에서 확인»
+//     · 채널 기본 C0BQR2JCU3Z(AICHECK_SLACK_CHANNEL 로만 바꿈 — remind 의 SLACK_CHANNEL 은 안 따름)
+//     · AICHECK_NOTIFY = all(기본 · 성공도 알림) | fail(실패만) | off
+//     · 실패 = 통과율 < AICHECK_MIN · ask 호출 막힘 · 기대값(ai_check_expect) 못 읽음 · 점검 자체 오류
+//     · 실패 이유·고치는 방법은 슬랙에 넣지 않고 ai_check_log(질문별 why) · 함수 Logs · 응답(reason/hint)에
+//     · v1.2 의 «브라우저 오류·배포 실패 요약»은 슬랙에서 뺌(포탈 › 배포·운영 › 기록에서 봄)
+//   · v1.3(2026-10-05): 첫 야간 실행이 «0/12 · 오류: 응답 없음 · 0.0초» — ask 가 아니라 그 앞(게이트웨이 등)에서 막힌 것으로 보이는데
+//     응답 본문에 error 칸이 없어 이유가 안 보였음 → ① 실패 이유에 HTTP 상태 + message/msg/code 를 그대로 ② 질문 전에 ask 에 ping 한 번 —
+//     안 되면 12문을 돌리지 않고 «무엇이 막혔는지 + 고치는 방법» 한 줄로 슬랙(같은 오류 12줄 대신)
 //   · v1.2(㊿+147): 야간 운영 요약 — 지난 24시간 브라우저 오류(client_errors) · 배포·운영 실패(ops_log ok=false)를 함께 모아,
 //     AI 통과율 미달 «또는» 오류·실패가 하나라도 있으면 슬랙 한 통(없으면 조용). 끄려면 Secrets AICHECK_DIGEST=0
 //   · 숫자 기대값: 만원·원 표기도 인정(포탈 aiHasNum 과 같게)
@@ -7,7 +17,7 @@
 //   · 결과를 ai_check_log(source cron) 에 기록 → 포탈 배포·운영 › 기록 › «AI 점검 추이» · 통과율이 AICHECK_MIN(기본 0.7) 미만이면 슬랙
 //   · 인증: 서비스 키(SUPABASE_SERVICE_ROLE_KEY) 또는 AICHECK_KEY(크론용) 또는 super_admin 사용자 JWT · ?dry=1 / {dry:true} 면 기록·슬랙 없이 결과만
 //   · v1.1: 크론 호출(서비스 키·AICHECK_KEY)은 즉시 202 를 돌려주고 뒤에서 실행(EdgeRuntime.waitUntil) — pg_net 기본 대기 5초 안에 응답 · {wait:true} 면 기다림
-//   · Secrets: (필수 없음) · 선택 AICHECK_KEY · AICHECK_MIN · SLACK_BOT_TOKEN · AICHECK_SLACK_CHANNEL(없으면 SLACK_CHANNEL → C08RA3PPDH8) · PORTAL_URL · AICHECK_CONC(동시 수)
+//   · Secrets: (필수 없음) · 선택 AICHECK_KEY · AICHECK_MIN · SLACK_BOT_TOKEN · AICHECK_SLACK_CHANNEL(기본 C0BQR2JCU3Z) · AICHECK_NOTIFY · PORTAL_URL · AICHECK_CONC(동시 수)
 //   · Verify JWT 는 끔(ask·remind·ops 와 같게 — 함수 안에서 토큰 검사)
 const SB_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SB_ANON = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
@@ -16,9 +26,10 @@ const AICHECK_KEY = Deno.env.get('AICHECK_KEY') ?? '';
 const MIN_PASS = Math.min(1, Math.max(0, Number(Deno.env.get('AICHECK_MIN') ?? '0.7') || 0.7));
 const CONC = Math.min(5, Math.max(1, Number(Deno.env.get('AICHECK_CONC') ?? '3') || 3));
 const SLACK_TOKEN = Deno.env.get('SLACK_BOT_TOKEN') ?? '';
-const SLACK_CH = Deno.env.get('AICHECK_SLACK_CHANNEL') || Deno.env.get('SLACK_CHANNEL') || 'C08RA3PPDH8';
+export const DEFAULT_CH = 'C0BQR2JCU3Z';
+const slackCh = () => Deno.env.get('AICHECK_SLACK_CHANNEL') || DEFAULT_CH;
+const notifyMode = () => { const m = (Deno.env.get('AICHECK_NOTIFY') || 'all').trim().toLowerCase(); return m === 'fail' || m === 'off' ? m : 'all'; };
 const PORTAL_URL = Deno.env.get('PORTAL_URL') ?? '';
-const DIGEST = (Deno.env.get('AICHECK_DIGEST') ?? '1') !== '0';
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, GET, OPTIONS' };
 const json = (o: unknown, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { ...CORS, 'Content-Type': 'application/json' } });
 async function fetchT(url: string, init: RequestInit, ms: number) { const c = new AbortController(); const t = setTimeout(() => c.abort(), ms); try { return await fetch(url, { ...init, signal: c.signal }); } finally { clearTimeout(t); } }
@@ -58,54 +69,76 @@ export const QS: Q[] = [
 ];
 
 type Row = { q: string; l: string; ok: boolean; why: string; ms: number; model: string; tools: number; head: string };
+/* 실패 이유 — ask 본문의 error, 없으면 게이트웨이 형식(message·msg·code)까지 · HTTP 상태를 붙임 (v1.3) */
+export function failText(status: number, j: any): string {
+  const m = String((j && (j.error || j.message || j.msg || j.error_description || j.code)) || '').slice(0, 120);
+  return (status && status !== 200 ? 'HTTP ' + status + ' · ' : '') + (m || '응답 본문 없음');
+}
+/* 고치는 방법 한 줄 — 흔한 원인별 */
+export function fixHint(why: string): string {
+  if (/^기대값 못 읽음/.test(why)) return '→ 기대값 함수(SQL 94 ai_check_expect) 확인 — 배포·운영 › SQL 에서 select ai_check_expect()';
+  if (/401/.test(why) && /jwt/i.test(why)) return '→ 해결: 포탈 배포·운영 › Edge Function › 목록 불러오기 › ask › «Verify JWT» 체크 해제 › 설정만 저장 (ask 는 함수 안에서 토큰을 직접 확인합니다)';
+  if (/401|403/.test(why)) return '→ ask 가 서비스 키를 거부 — ask 를 최신(v3.3)으로 다시 배포했는지, Verify JWT 가 꺼져 있는지 확인';
+  if (/404/.test(why)) return '→ ask 함수를 찾지 못함 — 함수 이름(ask)과 배포 상태 확인';
+  if (/ANTHROPIC_API_KEY/.test(why)) return '→ Supabase › Edge Functions › Secrets 에 ANTHROPIC_API_KEY 확인';
+  if (/5\d\d|546|WORKER|BOOT/i.test(why)) return '→ ask 함수 실행 오류 — Supabase › Edge Functions › ask › Logs 에서 03:00 무렵 기록 확인';
+  if (/abort|timed? ?out|시간/i.test(why)) return '→ ask 응답이 너무 느림 — 잠시 뒤 수동 점검(배포·운영 › 기록 › 15문 점검)으로 다시 확인';
+  if (/기대값 없음|빈 답|답 미완성/.test(why)) return '→ AI 답이 기대값과 다름 — 포탈 › 배포·운영 › 기록 › 15문 점검으로 같은 질문 확인';
+  return '→ Supabase › Edge Functions › ask › Logs 확인';
+}
+/* 질문 전에 ask 가 받는지 한 번 (ping — 모델 호출 없음) */
+export async function askPing(): Promise<{ ok: boolean; why: string }> {
+  try {
+    const r = await fetchT(SB_URL + '/functions/v1/ask', { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: SB_ANON, Authorization: 'Bearer ' + SB_SVC }, body: JSON.stringify({ mode: 'ping' }) }, 20000);
+    const j = await r.json().catch(() => ({}));
+    if (r.ok && j && j.ok) return { ok: true, why: '' };
+    return { ok: false, why: failText(r.status, j) };
+  } catch (e) { return { ok: false, why: String((e as Error).message || e).slice(0, 120) }; }
+}
 async function askOne(q: string): Promise<{ r: any; ms: number }> {
   const t0 = Date.now();
   try {
     const r = await fetchT(SB_URL + '/functions/v1/ask', { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: SB_ANON, Authorization: 'Bearer ' + SB_SVC }, body: JSON.stringify({ mode: 'chat', question: q, history: [] }) }, 75000);
     const j = await r.json().catch(() => ({ ok: false, error: 'HTTP ' + r.status }));
-    if (!r.ok && j && j.ok === undefined) j.ok = false;
+    if (!r.ok && j) { j.ok = false; j.error = failText(r.status, j); }
+    else if (j && !j.ok && !j.error) j.error = failText(r.status, j);
     return { r: j, ms: Date.now() - t0 };
   } catch (e) { return { r: { ok: false, error: String((e as Error).message || e).slice(0, 120) }, ms: Date.now() - t0 }; }
 }
-/* ── 야간 운영 요약 (v1.2) — 지난 24시간 브라우저 오류 · 배포·운영 실패 ── */
-export type Digest = { errors: number; users: number; top: { msg: string; n: number }[]; staging: number; opsFails: number; opsTop: string[]; err: string };
-export async function opsDigest(sinceIso: string): Promise<Digest> {
-  const H = { apikey: SB_SVC, Authorization: 'Bearer ' + SB_SVC };
-  const d: Digest = { errors: 0, users: 0, top: [], staging: 0, opsFails: 0, opsTop: [], err: '' };
-  try {
-    const r = await fetchT(SB_URL + '/rest/v1/client_errors?select=email,msg,n,staging&at=gte.' + encodeURIComponent(sinceIso) + '&order=at.desc&limit=500', { headers: H }, 10000);
-    if (r.ok) {
-      const rows = await r.json() as { email: string; msg: string; n: number; staging: boolean }[];
-      const by: Record<string, number> = {}, who = new Set<string>();
-      rows.forEach((x) => { const k = String(x.msg || '').slice(0, 90); by[k] = (by[k] || 0) + (Number(x.n) || 1); who.add(String(x.email || '')); if (x.staging) d.staging++; });
-      d.errors = rows.reduce((a, x) => a + (Number(x.n) || 1), 0); d.users = who.size;
-      d.top = Object.keys(by).sort((a, b) => by[b] - by[a]).slice(0, 3).map((k) => ({ msg: k, n: by[k] }));
-    } else d.err += 'client_errors ' + r.status + ' ';
-  } catch (e) { d.err += 'client_errors ' + String((e as Error).message || e).slice(0, 40) + ' '; }
-  try {
-    const r = await fetchT(SB_URL + '/rest/v1/ops_log?select=action,target,error&ok=is.false&at=gte.' + encodeURIComponent(sinceIso) + '&order=at.desc&limit=100', { headers: H }, 10000);
-    if (r.ok) {
-      const rows = await r.json() as { action: string; target: string; error: string }[];
-      d.opsFails = rows.length; d.opsTop = rows.slice(0, 3).map((x) => `${x.action}${x.target ? ' · ' + String(x.target).slice(0, 40) : ''} — ${String(x.error || '').slice(0, 70)}`);
-    } else d.err += 'ops_log ' + r.status;
-  } catch (e) { d.err += 'ops_log ' + String((e as Error).message || e).slice(0, 40); }
-  return d;
+/* ── 슬랙 한 줄 (v1.4 · 성공/실패만) ── */
+export function slackLine(ok: boolean): string {
+  if (ok) return '✅ 포탈 야간 점검 성공';
+  return '❌ 포탈 야간 점검 실패 — ' + (PORTAL_URL ? `<${PORTAL_URL}#ops|포탈 › 배포·운영 › 기록>에서 확인` : '포탈 › 배포·운영 › 기록에서 확인');
 }
-export function digestText(res: { pass: number; total: number; avg_ms: number; model: string }, fails: { q: string; why: string }[], dg: Digest | null, aiBad: boolean, expectErr: string): string {
-  const rate = res.total ? res.pass / res.total : 0;
-  const head = [`🤖 AI ${res.pass}/${res.total} 통과` + (aiBad ? ` (${Math.round(rate * 100)}% · 기준 ${Math.round(MIN_PASS * 100)}%)` : ' ✓')];
-  if (dg) { head.push(dg.errors ? `🧯 브라우저 오류 ${dg.errors}건(${dg.users}명${dg.staging ? ' · 스테이징 ' + dg.staging : ''})` : '🧯 브라우저 오류 0'); head.push(dg.opsFails ? `🚀 배포·운영 실패 ${dg.opsFails}건` : '🚀 배포·운영 실패 0'); }
-  const lines: string[] = ['🌙 포탈 야간 점검 — ' + head.join(' · ')];
-  if (aiBad) { lines.push(...fails.slice(0, 6).map((f) => `• AI: ${f.q} — ${f.why}`)); if (fails.length > 6) lines.push(`… 외 ${fails.length - 6}건`); if (res.model) lines.push(`모델 ${res.model} · 평균 ${(res.avg_ms / 1000).toFixed(1)}초`); }
-  if (dg && dg.errors) lines.push(...dg.top.map((t) => `• 오류 ×${t.n}: ${t.msg}`));
-  if (dg && dg.opsFails) lines.push(...dg.opsTop.map((t) => `• 배포·운영: ${t}`));
-  if (expectErr) lines.push(`⚠ 기대값: ${expectErr}`);
-  if (dg && dg.err) lines.push(`⚠ 요약 읽기: ${dg.err.trim()}`);
-  if (PORTAL_URL) lines.push(`${PORTAL_URL}#ops`);
-  return lines.join('\n');
+export async function notify(ok: boolean): Promise<unknown> {
+  const mode = notifyMode();
+  if (!SLACK_TOKEN || mode === 'off' || (mode === 'fail' && ok)) return null;
+  try {
+    const r = await fetchT('https://slack.com/api/chat.postMessage', { method: 'POST', headers: { 'Content-Type': 'application/json; charset=utf-8', Authorization: 'Bearer ' + SLACK_TOKEN }, body: JSON.stringify({ channel: slackCh(), text: slackLine(ok), unfurl_links: false, unfurl_media: false }) }, 10000);
+    const j = await r.json().catch(() => null) as { ok?: boolean; error?: string } | null;
+    if (!j || !j.ok) console.warn('[aicheck] 슬랙 전송 실패', slackCh(), j && j.error, j && j.error === 'not_in_channel' ? '— 채널에서 /invite @봇 필요' : '');
+    return j;
+  } catch (e) { console.warn('[aicheck] 슬랙 전송 실패', String((e as Error).message || e)); return { ok: false, error: String((e as Error).message || e) }; }
 }
-export async function runCheck(expect: Expect, qs: Q[] = QS, conc = CONC): Promise<{ rows: Row[]; pass: number; total: number; avg_ms: number; model: string }> {
+/* 실패 이유 한 줄(로그·응답용 — 슬랙에는 안 씀) */
+export function failReason(res: { pass: number; total: number; blocked?: string; rows: { ok: boolean; why: string }[] }, expectErr: string): string {
+  if (res.blocked) return 'ask 호출 실패 — ' + res.blocked;
+  const parts: string[] = [];
+  if (res.total && res.pass / res.total < MIN_PASS) {
+    const whys: Record<string, number> = {}; res.rows.filter((r) => !r.ok).forEach((r) => { whys[r.why] = (whys[r.why] || 0) + 1; });
+    parts.push(`AI ${res.pass}/${res.total} 통과(기준 ${Math.round(MIN_PASS * 100)}%) · ` + Object.keys(whys).sort((x, y) => whys[y] - whys[x]).slice(0, 3).map((w) => `${w}${whys[w] > 1 ? ' ×' + whys[w] : ''}`).join(' / '));
+  }
+  if (expectErr) parts.push('기대값 못 읽음 — ' + expectErr);
+  return parts.join(' · ');
+}
+export async function runCheck(expect: Expect, qs: Q[] = QS, conc = CONC): Promise<{ rows: Row[]; pass: number; total: number; avg_ms: number; model: string; blocked?: string }> {
   const rows: Row[] = new Array(qs.length);
+  const pg = await askPing();
+  if (!pg.ok) {
+    const why = '오류: ask 호출 실패 — ' + pg.why;
+    qs.forEach((x, k) => { rows[k] = { q: x.q, l: x.l, ok: false, why, ms: 0, model: '', tools: 0, head: '' }; });
+    return { rows, pass: 0, total: rows.length, avg_ms: 0, model: '', blocked: pg.why };
+  }
   let i = 0;
   await Promise.all(Array.from({ length: Math.min(conc, qs.length) }, async () => {
     while (i < qs.length) {
@@ -162,34 +195,31 @@ Deno.serve(async (req: Request) => {
   const res = await runCheck(expect);
   const fails = res.rows.filter((r) => !r.ok).map((r) => ({ q: r.q, why: r.why, head: r.head }));
   const rate = res.total ? res.pass / res.total : 0;
-  const summary = { ok: true, dry, source: actor === 'cron' ? 'cron' : 'manual', actor, pass: res.pass, total: res.total, rate: Math.round(rate * 100) / 100, avg_ms: res.avg_ms, model: res.model, expect_err: expectErr || undefined, expect, fails, rows: res.rows, ms: Date.now() - t0 };
+  const summary = { ok: true, dry, source: actor === 'cron' ? 'cron' : 'manual', actor, pass: res.pass, total: res.total, rate: Math.round(rate * 100) / 100, avg_ms: res.avg_ms, model: res.model, blocked: res.blocked || undefined, expect_err: expectErr || undefined, expect, fails, rows: res.rows, ms: Date.now() - t0 };
 
-  let logged = false, slack: unknown = null, digest: Digest | null = null;
+  const reason = failReason(res, expectErr), passed = !reason;
+  const hint = reason ? fixHint(reason) : '';
+  let logged = false, slack: unknown = null;
   if (!dry) {
     try {
       const r = await fetchT(SB_URL + '/rest/v1/ai_check_log', { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: SB_SVC, Authorization: 'Bearer ' + SB_SVC, Prefer: 'return=minimal' },
         body: JSON.stringify({ source: 'cron', app_ver: null, pass: res.pass, total: res.total, avg_ms: res.avg_ms, model: res.model, fails, rows: res.rows.map((r) => ({ q: r.q, ok: r.ok, why: r.why, ms: r.ms, tools: r.tools })), actor }) }, 10000);
       logged = r.ok;
     } catch { /* 표 없음(SQL 94 전) 등 — 결과는 응답으로 돌려줌 */ }
-    const aiBad = rate < MIN_PASS;
-    digest = DIGEST ? await opsDigest(new Date(Date.now() - 24 * 3600 * 1000).toISOString()) : null;
-    const opsBad = !!digest && (digest.errors > 0 || digest.opsFails > 0);
-    if ((aiBad || opsBad) && SLACK_TOKEN) {
-      const text = digestText(res, fails, digest, aiBad, expectErr);
-      try {
-        const r = await fetchT('https://slack.com/api/chat.postMessage', { method: 'POST', headers: { 'Content-Type': 'application/json; charset=utf-8', Authorization: 'Bearer ' + SLACK_TOKEN }, body: JSON.stringify({ channel: SLACK_CH, text }) }, 10000);
-        slack = await r.json().catch(() => null);
-      } catch (e) { slack = { ok: false, error: String((e as Error).message || e) }; }
-    }
+    if (!passed) console.warn('[aicheck] 점검 실패', reason, hint);
+    slack = await notify(passed);
   }
-  return { ...summary, logged, slack, digest };
+  return { ...summary, passed, reason: reason || undefined, hint: hint || undefined, logged, slack };
   };
+  // 점검 자체가 죽어도(예상 못 한 예외) 슬랙 «실패» 한 줄 — 조용히 사라지지 않게
+  const safe = () => work().catch(async (e) => { console.error('[aicheck] 실패', e); if (!dry) await notify(false); return { ok: false, dry, passed: false, error: String((e as Error).message || e).slice(0, 200) }; });
   // 크론(Supabase Cron · pg_net)은 응답을 몇 초만 기다리므로, 서비스 키/AICHECK_KEY 로 온 호출은 바로 202 를 돌려주고 뒤에서 끝까지 실행(EdgeRuntime.waitUntil).
   // 결과는 ai_check_log · 포탈 배포·운영 › 기록 › AI 점검 추이. {wait:true} 면 끝날 때까지 기다려 결과를 돌려줌(수동 확인용).
   const rt = (globalThis as any).EdgeRuntime;
   if (!dry && body.wait !== true && actor === 'cron' && rt && typeof rt.waitUntil === 'function') {
-    rt.waitUntil(work().catch((e) => console.error('[aicheck] 실패', e)));
+    rt.waitUntil(safe());
     return json({ ok: true, accepted: true, background: true, note: '점검을 뒤에서 실행합니다 — 1~2분 뒤 ai_check_log / 포탈 배포·운영 › 기록 › AI 점검 추이에서 확인' }, 202);
   }
-  return json(await work());
+  const out = await safe();
+  return json(out, out.ok === false ? 500 : 200);
 });

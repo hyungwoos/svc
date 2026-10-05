@@ -1,11 +1,10 @@
 // aicheck Edge Function 테스트 — deno run -A tests/fn/aicheck.test.ts
-//   ask · ai_check_expect · ai_check_log · Auth · Slack 전부 가짜. 인증 · 기대값 비교 · 동시 실행 · 기록 · 통과율 미달 슬랙 · dry 를 확인.
+//   ask · ai_check_expect · ai_check_log · Auth · Slack 전부 가짜. 인증 · 기대값 비교 · 동시 실행 · 기록 · 슬랙 한 줄(성공/실패 · v1.4) · dry 를 확인.
 import { installFetch, loadFn, call, ok, report, J, calls } from './_mock.ts';
 
 const EXPECT = { month: '2026-10', due_n: 3, next_n: 2, lapsed_n: 0, live_customers: 357, live_products: 362, month_revenue: 71295828, assets_rented: 48, oi_open: 11 };
-let role = 'super_admin', mode: 'good' | 'bad' | 'error' = 'good', expectFail = false;
+let role = 'super_admin', mode: 'good' | 'bad' | 'error' | 'gw401' | 'nobody' = 'good', expectFail = false;
 const logs: any[] = [], slack: any[] = []; let askN = 0, inflight = 0, maxInflight = 0;
-let errRows: any[] = [], opsRows: any[] = [];   // v1.2 야간 운영 요약용 가짜 표
 const GOOD: Record<string, string> = {
   '이번 달 MRR 얼마야?': '이번 달 MRR 은 71,296천원(약 0.7억) 입니다.',
   'LIVE 고객사 몇 곳이야?': '2026-10 기준 LIVE 고객사는 357곳(제품별 합 362)입니다.',
@@ -27,6 +26,10 @@ installFetch(async (url, method, body, init) => {
   if (url.includes('/rpc/ai_check_expect')) { if (!auth.includes('svc')) return J({ message: 'denied' }, 401); return expectFail ? J({ message: 'function not found' }, 404) : J(EXPECT); }
   if (url.includes('/rest/v1/ai_check_log')) { logs.push(JSON.parse(body || '{}')); return new Response('', { status: 201 }); }
   if (url.includes('/functions/v1/ask')) {
+    // v1.3: 질문 전 ping — 게이트웨이가 막는 경우(JWT 검사 ON + 서비스 키 거부)·본문 없는 오류 흉내
+    if (mode === 'gw401') return J({ code: 401, message: 'Invalid JWT' }, 401);
+    if (mode === 'nobody') return J({}, 503);
+    if (JSON.parse(body || '{}').mode === 'ping') return auth.includes('Bearer svc') ? J({ ok: true, version: 'v3.3' }) : J({ ok: false, error: '로그인이 필요합니다' }, 401);
     askN++; inflight++; maxInflight = Math.max(maxInflight, inflight); await new Promise((r) => setTimeout(r, 60)); inflight--;
     if (!auth.includes('Bearer svc')) return J({ ok: false, error: '인증 필요' }, 401);
     const q = JSON.parse(body || '{}').question as string;
@@ -35,12 +38,11 @@ installFetch(async (url, method, body, init) => {
     return J({ ok: true, text: GOOD[q] || '네.', model: 'claude-sonnet-5', queries: [{ tool: 'run_sql', ms: 300 }] });
   }
   if (url.includes('slack.com')) { slack.push(JSON.parse(body || '{}')); return J({ ok: true, ts: '1' }); }
-  if (url.includes('/rest/v1/client_errors')) return /at=gte\./.test(url) && auth.includes('svc') ? J(errRows) : J({ message: 'bad' }, 400);
-  if (url.includes('/rest/v1/ops_log')) return /ok=is\.false/.test(url) && auth.includes('svc') ? J(opsRows) : J({ message: 'bad' }, 400);
   return undefined;
 });
 Deno.env.set('SUPABASE_URL', 'https://mock.supabase.co'); Deno.env.set('SUPABASE_ANON_KEY', 'anon'); Deno.env.set('SUPABASE_SERVICE_ROLE_KEY', 'svc');
 Deno.env.set('AICHECK_KEY', 'cronkey-test'); Deno.env.set('SLACK_BOT_TOKEN', 'xoxb-test'); Deno.env.set('PORTAL_URL', 'https://example.github.io/svc/index.html');
+Deno.env.set('SLACK_CHANNEL', 'C08RA3PPDH8');   // remind 용 팀 채널 — aicheck 는 따르지 않아야 함
 await loadFn('aicheck');
 
 console.log('aicheck 함수');
@@ -55,10 +57,13 @@ role = 'admin'; { const r = await call({ dry: true }); ok(r.status === 403, 'adm
 { logs.length = 0; slack.length = 0; const r = await call({}, { token: 'cronkey-test' });
   ok(r.status === 200 && r.j.source === 'cron' && r.j.logged === true, 'AICHECK_KEY → 크론 경로 · ai_check_log 기록', { logged: r.j.logged, source: r.j.source });
   ok(logs.length === 1 && logs[0].source === 'cron' && logs[0].pass === 12 && logs[0].total === 12 && Array.isArray(logs[0].rows) && logs[0].rows.length === 12, 'ai_check_log 본문', logs[0] && { pass: logs[0].pass, total: logs[0].total, rows: logs[0].rows?.length });
-  ok(slack.length === 0, '통과율 100% → 슬랙 없음'); }
+  ok(slack.length === 1 && slack[0].text === '✅ 포탈 야간 점검 성공' && slack[0].channel === 'C0BQR2JCU3Z', 'v1.4 성공 → «✅ 포탈 야간 점검 성공» 한 줄 · C0BQR2JCU3Z(remind 의 SLACK_CHANNEL 무시)', slack[0]);
+  ok(slack[0].unfurl_links === false && slack[0].unfurl_media === false && r.j.passed === true && !r.j.reason, '링크 미리보기 끔 · passed true'); }
 { mode = 'bad'; logs.length = 0; slack.length = 0; const r = await call({}, { token: 'svc' });
   ok(r.j.ok && r.j.pass <= 2 && r.j.fails.length >= 10 && r.j.fails.every((f: any) => /기대값 없음/.test(f.why)), '나쁜 답 → 기대값 없음으로 실패', { pass: r.j.pass, why: r.j.fails[0]?.why });
-  ok(slack.length === 1 && /통과/.test(slack[0].text) && /기준 70%/.test(slack[0].text) && /example\.github\.io/.test(slack[0].text) && slack[0].channel === 'C08RA3PPDH8', '통과율 미달 → 슬랙(기본 채널 · 포탈 링크)', slack[0] && slack[0].text.slice(0, 80));
+  ok(slack.length === 1 && /^❌ 포탈 야간 점검 실패 — <https:\/\/example\.github\.io\/svc\/index\.html#ops\|포탈 › 배포·운영 › 기록>에서 확인$/.test(slack[0].text) && slack[0].channel === 'C0BQR2JCU3Z', '통과율 미달 → «❌ … 실패» 한 줄 + 포탈 기록 링크', slack[0]?.text);
+  ok(!/\n/.test(slack[0].text) && !/MRR|기대값|통과|기준/.test(slack[0].text), '슬랙에 질문·이유 같은 상세 없음');
+  ok(r.j.passed === false && /AI \d+\/12 통과\(기준 70%\) · 기대값 없음/.test(r.j.reason) && /15문 점검/.test(r.j.hint), '이유·고치는 방법은 응답(reason/hint)에', { reason: r.j.reason, hint: r.j.hint });
   ok(logs.length === 1 && logs[0].fails.length >= 10, '실패 목록이 기록에'); mode = 'good'; }
 { mode = 'error'; logs.length = 0; slack.length = 0; const r = await call({ dry: true });
   ok(r.j.ok && r.j.pass === 0 && r.j.fails.every((f: any) => /^오류/.test(f.why)), 'ask 오류 → 전부 «오류: …» 로 실패(함수 자체는 ok)', r.j.fails[0]?.why); mode = 'good'; }
@@ -71,12 +76,27 @@ role = 'admin'; { const r = await call({ dry: true }); ok(r.status === 403, 'adm
   logs.length = 0; const w = await call({ wait: true }, { token: 'cronkey-test' }); ok(w.status === 200 && w.j.pass === 12 && w.j.logged === true, '{wait:true} → 끝까지 기다려 결과');
   const d = await call({ dry: true }); ok(d.status === 200 && d.j.dry === true && d.j.total === 12, '사용자(super) dry 는 기다려 결과(백그라운드 아님)');
   delete (globalThis as any).EdgeRuntime; }
-{ errRows = [{ email: 'a@x.kr', msg: 'TypeError: x is undefined', n: 2, staging: false }, { email: 'b@x.kr', msg: 'TypeError: x is undefined', n: 1, staging: true }];
-  opsRows = [{ action: 'gh_put', target: 'index.html', error: 'GitHub 422' }]; slack.length = 0; logs.length = 0;
+{ mode = 'gw401'; slack.length = 0; logs.length = 0; askN = 0;
   const r = await call({ wait: true }, { token: 'cronkey-test' });
-  ok(r.j.pass === 12 && r.j.digest && r.j.digest.errors === 3 && r.j.digest.users === 2 && r.j.digest.opsFails === 1, '야간 요약: 오류 3건(2명) · 배포 실패 1건 집계', r.j.digest);
-  ok(slack.length === 1 && /AI 12\/12 통과 ✓/.test(slack[0].text) && /브라우저 오류 3건\(2명 · 스테이징 1\)/.test(slack[0].text) && /배포·운영 실패 1건/.test(slack[0].text) && /TypeError/.test(slack[0].text) && /GitHub 422/.test(slack[0].text), 'AI 는 정상이어도 오류·실패가 있으면 슬랙 한 통', slack[0]?.text);
-  errRows = []; opsRows = []; slack.length = 0; await call({ wait: true }, { token: 'cronkey-test' }); ok(slack.length === 0, '오류·실패 0 · AI 정상 → 슬랙 없음'); }
+  ok(r.j.pass === 0 && r.j.blocked && /HTTP 401 · Invalid JWT/.test(r.j.blocked) && askN === 0 && r.j.fails.every((f: any) => /ask 호출 실패 — HTTP 401 · Invalid JWT/.test(f.why)), 'v1.3 ping 막힘(게이트웨이 401 Invalid JWT) → 질문 안 보냄 · 이유가 그대로', { blocked: r.j.blocked, askN });
+  ok(slack.length === 1 && /^❌ 포탈 야간 점검 실패/.test(slack[0].text) && !/Verify JWT|401/.test(slack[0].text), '슬랙: 막혀도 «실패» 한 줄만', slack[0]?.text);
+  ok(/^ask 호출 실패 — HTTP 401 · Invalid JWT$/.test(r.j.reason) && /Verify JWT/.test(r.j.hint), '이유·해결(Verify JWT 끄기)은 응답에', { reason: r.j.reason, hint: r.j.hint });
+  ok(logs.length === 1 && logs[0].pass === 0 && /Invalid JWT/.test(logs[0].fails[0].why), 'ai_check_log 에도 이유 기록');
+  mode = 'nobody'; slack.length = 0; const r2 = await call({ wait: true }, { token: 'cronkey-test' });
+  ok(/HTTP 503/.test(r2.j.blocked || '') && !/응답 없음/.test(JSON.stringify(r2.j.fails)), '본문 없는 오류도 «응답 없음» 대신 HTTP 상태', r2.j.blocked);
+  mode = 'good'; }
+{ expectFail = true; slack.length = 0; const r = await call({ wait: true }, { token: 'cronkey-test' });
+  ok(r.j.pass >= 11 && r.j.passed === false && /기대값 못 읽음/.test(r.j.reason) && /SQL 94/.test(r.j.hint) && slack.length === 1 && /^❌/.test(slack[0].text), '기대값을 못 읽으면 통과해도 실패(숫자 확인을 못 했으므로)', { reason: r.j.reason }); expectFail = false; }
+{ Deno.env.set('AICHECK_NOTIFY', 'fail'); slack.length = 0;
+  await call({ wait: true }, { token: 'cronkey-test' }); ok(slack.length === 0, 'AICHECK_NOTIFY=fail → 성공이면 알림 없음');
+  mode = 'bad'; await call({ wait: true }, { token: 'cronkey-test' }); ok(slack.length === 1 && /^❌/.test(slack[0].text), 'AICHECK_NOTIFY=fail → 실패는 알림'); mode = 'good';
+  Deno.env.set('AICHECK_NOTIFY', 'off'); slack.length = 0; mode = 'bad'; await call({ wait: true }, { token: 'cronkey-test' }); ok(slack.length === 0, 'AICHECK_NOTIFY=off → 알림 없음'); mode = 'good';
+  Deno.env.delete('AICHECK_NOTIFY'); Deno.env.set('AICHECK_SLACK_CHANNEL', 'C0TESTCH'); slack.length = 0;
+  await call({ wait: true }, { token: 'cronkey-test' }); ok(slack.length === 1 && slack[0].channel === 'C0TESTCH', 'AICHECK_SLACK_CHANNEL 로만 채널 변경', slack[0]?.channel);
+  Deno.env.delete('AICHECK_SLACK_CHANNEL'); }
+{ const m = await import(new URL('../../supabase/functions/aicheck/index.ts', import.meta.url).href);
+  ok(m.DEFAULT_CH === 'C0BQR2JCU3Z' && m.slackLine(true) === '✅ 포탈 야간 점검 성공' && /^❌ 포탈 야간 점검 실패/.test(m.slackLine(false)), 'slackLine 두 가지');
+  ok(m.opsDigest === undefined && m.digestText === undefined, 'v1.2 상세 요약 함수 제거'); }
 { const m = await import(new URL('../../supabase/functions/aicheck/index.ts', import.meta.url).href);
   ok(m.hasNum('이번 달(2026-10) MRR은 약 9,956만원(99,557,735원)이고', 99557735) && m.hasNum('99,557,735원', 99557735) && m.hasNum('약 9955만원', 99557735), '만원·원 표기 인정(㊿+147)');
   ok(!m.hasNum('약 8,000만원', 99557735) && !m.hasNum('자료가 없습니다', 99557735), '다른 금액·숫자 없음은 불인정'); }
