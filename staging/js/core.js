@@ -109,7 +109,7 @@ var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 var ERRLOG={n:0, seen:{}, max:8};
 function logClientError(msg, src, line, col, stack){
   try{
-    if(!ST.SB_TOKEN || !ST.AUTH_USER) return;
+    if(!ST.SB_TOKEN || !ST.AUTH_USER || window.IS_QA) return;
     var key=String(msg||'').slice(0,120); if(!key || /ResizeObserver loop|Script error\.?$/.test(key)) return;
     if(ERRLOG.seen[key]){ ERRLOG.seen[key]++; return; } ERRLOG.seen[key]=1;
     if(++ERRLOG.n>ERRLOG.max) return;

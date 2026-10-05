@@ -1098,6 +1098,48 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
   });
   await ctx.close();
 }
+// ㊿+151 스테이징 QA — 같은 파일을 /staging/ 경로로도 서빙(route) · 서비스 워커는 막음(route 를 가로채므로)
+{
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page);
+  const writes = [], dialogs = []; let breakDcheck = false;
+  await mockBackend(page, { onWrite: (w) => writes.push(w), extra: async (route, u) => { if (!u.includes('/functions/v1/ops')) return false; const b = JSON.parse(route.request().postData() || '{}'); const out = b.action === 'status' ? { ok: true, pin_set: true, github: { repo: 'x/svc', branch: 'main', token_set: true }, recent: [] } : b.action === 'gh_copy' ? { ok: true, commit: 'c0ffee1', copied: 3 } : { ok: true }; await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(out) }); return true; } });
+  await page.route('**/svc/staging/**', async (route) => { const u = new URL(route.request().url()); const rel = decodeURIComponent(u.pathname.replace('/svc/staging/', ''));
+    if (breakDcheck && rel === 'js/analysis.js') { const src = fs.readFileSync(path.join(ROOT, rel), 'utf8') + "\nfunction renderDataCheck(){ throw new Error('QA 시험 오류'); }\n"; await route.fulfill({ status: 200, contentType: 'application/javascript', body: src }); return; }
+    await route.fulfill({ path: path.join(ROOT, rel) }); });
+  page.on('dialog', async (d) => { dialogs.push(d.message()); await d.dismiss(); });
+  await page.goto(url + '/index.html'); await page.waitForTimeout(2200);
+  await page.evaluate(() => switchView('ops')); await page.waitForTimeout(500);
+  await S.t('㊿+151 스테이징 QA: 버튼 → 스테이징 iframe 로그인 → 메뉴 전부 + 폰 → 핵심 숫자 일치 → 통과 · change_log · 승격 가능', async () => {
+    assert(/QA 아직 안 함/.test(await page.$eval('#qaBadge', (e) => e.textContent)), '배지 초기값');
+    writes.length = 0; await page.click('#opsQa');
+    await page.waitForFunction(() => window.QA && !QA.on && QA.res, null, { timeout: 120000 });
+    const r = await page.evaluate(() => ({ res: QA.res, steps: QA.steps.map((s) => ({ l: (s.group || '') + s.label, st: s.st, d: s.detail })), ver: document.getElementById('qaVer').textContent, promote: document.getElementById('qaPromote').disabled, isQa: QA.w && QA.w.IS_QA, stagingBar: !!(QA.w && QA.w.document.getElementById('stagingBar')) }));
+    assert(r.res.fail === 0 && r.res.total >= 30 && !r.promote, JSON.stringify({ fail: r.res.fail, total: r.res.total, promote: r.promote, fails: r.res.fails }));
+    const kpi = r.steps.find((s) => /핵심 숫자/.test(s.l)); assert(kpi && kpi.st === 'ok' && /\d+개 숫자 일치/.test(kpi.d), JSON.stringify(kpi));
+    assert(r.steps.some((s) => /^📱/.test(s.l)) && r.steps.filter((s) => s.st === 'ok').length >= 25, '메뉴/폰 단계 부족');
+    assert(r.isQa === true && r.stagingBar, 'iframe 이 ?qa=1 · staging 경로가 아님');
+    assert(/스테이징 ㊿\+\d+ · 운영\(이 화면\) ㊿\+\d+/.test(r.ver), r.ver);
+    assert(writes.some((w) => /change_log/.test(w.url) && /staging_qa/.test(w.body)), 'change_log staging_qa 없음');
+    assert(!writes.some((w) => /client_errors|upd_notes/.test(w.url)) && !writes.some((w) => /change_log/.test(w.url) && /data_check/.test(w.body)), 'QA 중 스테이징이 기록을 남김(IS_QA 게이트 실패) ' + writes.filter((w) => /client_errors|upd_notes|data_check/.test(w.url + w.body)).map((w) => w.url.split('/rest/v1/')[1]).join(','));
+    await page.click('#qaClose'); await page.waitForTimeout(300);
+    const badge = await page.$eval('#qaBadge', (e) => e.textContent); assert(/QA ✅ \d+\/\d+/.test(badge), '배지 ' + badge);
+    dialogs.length = 0; await page.fill('#opsPin', '0000'); await page.click('#opsPromote'); await page.waitForTimeout(200);
+    assert(dialogs.length === 1 && /✅ 스테이징 QA 통과/.test(dialogs[0]), '승격 확인 창에 QA 통과 표시 없음 ' + dialogs[0]);
+    assert(!c.errs.length, c.errs.join(' | ')); return r.res.pass + '/' + r.res.total + (r.res.warn ? ' ⚠' + r.res.warn : '') + ' · ' + kpi.d;
+  });
+  await S.t('㊿+151 스테이징 QA: 스테이징 코드가 깨지면(데이터 점검 render 오류) 그 메뉴 ❌ · 승격 버튼 비활성 · 승격 확인 창 경고', async () => {
+    breakDcheck = true; await page.click('#opsQa');
+    await page.waitForFunction(() => window.QA && !QA.on && QA.res, null, { timeout: 120000 });
+    const r = await page.evaluate(() => ({ res: QA.res, dc: QA.steps.filter((s) => /데이터 점검/.test(s.label)).map((s) => s.st + ':' + s.detail), promote: document.getElementById('qaPromote').disabled, sum: document.getElementById('qaSum').textContent }));
+    assert(r.res.fail >= 1 && r.dc.length >= 1 && r.dc.every((x) => /^fail:/.test(x) && /QA 시험 오류|빈 화면|이동 오류/.test(x)) && r.promote && /실패/.test(r.sum), JSON.stringify(r));
+    await page.click('#qaClose'); await page.waitForTimeout(300);
+    assert(/QA ❌ \d+건 실패/.test(await page.$eval('#qaBadge', (e) => e.textContent)), '실패 배지 없음');
+    dialogs.length = 0; await page.click('#opsPromote'); await page.waitForTimeout(200);
+    assert(dialogs.length === 1 && /⚠ 스테이징 QA 에서 \d+건 실패/.test(dialogs[0]), '경고 없음 ' + dialogs[0]);
+    breakDcheck = false; return r.dc.join(' / ').slice(0, 120);
+  });
+  await ctx.close();
+}
 await browser.close(); srv.close();
 const ok = S.report();
 fs.writeFileSync(path.join(OUT, 'smoke.json'), JSON.stringify(S.results, null, 1));

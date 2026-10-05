@@ -138,7 +138,7 @@ function dcRenewSync(){
 }
 /* 점검 결과를 세션당 1회 change_log(action 'data_check') 에 남김 — 배포 전후·날짜별 어긋남 추이를 기록 탭·AI 가 볼 수 있게 (㊿+137) */
 function dcLogOnce(cnt, rules){
-  if(DC._logged || !ST.SB_TOKEN) return; DC._logged=true;
+  if(DC._logged || !ST.SB_TOKEN || window.IS_QA) return; DC._logged=true;
   var top={}; rules.forEach(function(r){ if(r.items.length) top[r.id]=r.items.length; });
   try{ logChange('data_check','dcheck',APP_VER,{crit:cnt.crit, warn:cnt.warn, info:cnt.info, rules:top}); }catch(e){}
 }

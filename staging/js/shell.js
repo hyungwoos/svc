@@ -832,7 +832,7 @@ async function loadFromDb(){
 var CACHE_GEN=0;
 function cacheDrop(){ CACHE_GEN++; try{ sessionStorage.removeItem(CACHE_KEY); }catch(e){} }   /* 예약된 사본 쓰기까지 취소 (로그아웃 뒤 이전 사용자 데이터가 남지 않게) */
 function cacheWriteLater(res){
-  var g=++CACHE_GEN, t0=Date.now();
+  var g=++CACHE_GEN, t0=Date.now(); if(window.IS_QA) return;
   var run=function(){ if(g!==CACHE_GEN || !ST.SB_TOKEN) return; try{ sessionStorage.setItem(CACHE_KEY, JSON.stringify({t:t0, res:res})); }catch(e){} };
   try{ if(window.requestIdleCallback) requestIdleCallback(run, {timeout:3000}); else setTimeout(run, 400); }catch(e){ setTimeout(run, 400); }
 }

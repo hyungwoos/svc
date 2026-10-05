@@ -143,7 +143,7 @@ function opsGhHtml(){
     h+='<div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><label style="flex:1;min-width:240px">커밋 메시지 <input id="opsCommitMsg" value="'+esc(OPS.commitMsg||opsAutoMsg())+'" style="width:100%"></label><button type="button" class="pill" id="opsCommit" style="background:'+(stg? 'var(--s3,#b26a00)':'var(--brand)')+';border-color:'+(stg? 'var(--s3,#b26a00)':'var(--brand)')+';color:#fff">'+(stg? '커밋 → 스테이징':'커밋 → 운영')+'</button></div>';
     h+='<p class="mini" style="margin:6px 0 0">커밋 하나로 묶여 올라가고, 테스트가 통과하면 GitHub Pages 에 반영(보통 2~3분). '+(stg? '스테이징에서 확인한 뒤 «스테이징 → 운영 승격»으로 같은 파일을 운영에 올립니다.':'index.html 은 올린 뒤 이 화면을 새로고침하면 새 버전으로 바뀝니다.')+' 저장소 파일(.github · supabase · cloudflare · tests/fn · README · package.json · .gitignore)은 대상과 상관없이 루트로 갑니다.</p>';
   }
-  h+='<div class="ops-h" style="margin-top:14px">스테이징 ↔ 운영</div><div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="cbtn" id="opsSync" title="운영에 있는 포탈 파일 전부를 staging/ 로 복사(재업로드 없이 같은 내용) — 스테이징을 운영과 똑같이 맞출 때">운영 → 스테이징 동기화</button><button type="button" class="cbtn pri" id="opsPromote" title="staging/ 에 있는 파일을 운영(루트)으로 복사 — 스테이징에서 확인이 끝났을 때">스테이징 → 운영 승격</button><a class="cbtn" href="'+esc(stagingUrl())+'" target="_blank" rel="noopener">스테이징 열기 ↗</a></div>';
+  h+='<div class="ops-h" style="margin-top:14px">스테이징 ↔ 운영</div><div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="cbtn" id="opsSync" title="운영에 있는 포탈 파일 전부를 staging/ 로 복사(재업로드 없이 같은 내용) — 스테이징을 운영과 똑같이 맞출 때">운영 → 스테이징 동기화</button><button type="button" class="cbtn" id="opsQa" title="스테이징 포탈을 창 안에서 열어 메뉴 전부를 자동으로 눌러 봅니다 — JS 오류·빈 화면·깨진 값·넘침·핵심 숫자 비교 (약 30초)">🧪 스테이징 QA</button>'+qaBadgeHtml()+'<button type="button" class="cbtn pri" id="opsPromote" title="staging/ 에 있는 파일을 운영(루트)으로 복사 — 스테이징에서 확인이 끝났을 때">스테이징 → 운영 승격</button><a class="cbtn" href="'+esc(stagingUrl())+'" target="_blank" rel="noopener">스테이징 열기 ↗</a></div>';
   h+='</div>';
   h+='<div><div class="ops-h">② 저장소 · 이전 버전</div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px"><button type="button" class="pill ghost" id="opsGhList">저장소 파일 보기</button><button type="button" class="pill ghost" id="opsGhHist" data-p="index.html">index.html 이력</button><a class="pill ghost" href="https://github.com/'+esc((OPS.st&&OPS.st.github&&OPS.st.github.repo)||'hyungwoos/svc')+'/actions" target="_blank" rel="noopener" title="테스트·배포 진행 상황">Actions ↗</a></div>';
   h+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin:-2px 0 8px"><button type="button" class="pill ghost" id="opsRepoCheck" title="안 쓰는 파일 · 스테이징에만 있는 저장소 파일 · 루트에 없는 테스트/함수 · 배포 설정(deploy.yml) 상태를 확인">🧹 저장소 점검</button><a class="pill ghost" target="_blank" rel="noopener" href="https://github.com/'+esc(opsRepoName())+'/settings/pages" title="Source 가 «GitHub Actions» 여야 테스트를 통과한 버전만 배포됩니다">Pages 설정 ↗</a></div>';
@@ -272,6 +272,7 @@ function opsGhBind(host){
   var sf=host.querySelector('#opsSealFile'); if(sf) sf.onchange=function(){ opsSealUpload(sf.files[0]); sf.value=''; };
   var sr=host.querySelector('#opsSealRm'); if(sr) sr.onclick=opsSealRm;
   var pm=host.querySelector('#opsPromote'); if(pm) pm.onclick=function(){ opsCopy('staging', ''); };
+  var qb=host.querySelector('#opsQa'); if(qb) qb.onclick=function(){ qaOpen(); };
   host.querySelectorAll('.ops-path').forEach(function(i){ i.onchange=function(){ var f=OPS.files[+i.dataset.i]; f.path=i.value.trim().replace(/^\/+/,''); f.auto=''; if(f.path!=='index.ts') f.bad=''; OPS.commitMsg=''; renderOps(true); }; });
   host.querySelectorAll('[data-rm]').forEach(function(b){ b.onclick=function(){ OPS.files.splice(+b.dataset.rm,1); OPS.commitMsg=''; renderOps(true); }; });
   var st=host.querySelector('#opsStripTop'); if(st) st.onclick=function(){ OPS.files.forEach(function(f){ var ap=opsAutoPath(f.path.replace(/^[^/]+\//,'')); f.path=ap.path; f.auto=ap.auto||''; f.bad=ap.bad||''; }); OPS.commitMsg=''; renderOps(true); };
@@ -353,7 +354,8 @@ async function opsCommit(){
 async function opsCopy(src, dst){
   if(!opsNeedPin() || OPS.busy) return;
   var promote=(src==='staging');
-  if(!confirm(promote? '스테이징(staging/)의 포탈 파일을 운영(루트)으로 복사합니다. 운영 포탈이 스테이징과 같아집니다 — 스테이징에서 충분히 확인했나요?' : '운영(루트)의 포탈 파일을 staging/ 로 복사합니다. 스테이징이 운영과 같아집니다. 계속할까요?')) return;
+  var qaLine=promote? (QA.res? (QA.res.fail? '\n\n⚠ 스테이징 QA 에서 '+QA.res.fail+'건 실패('+QA.res.verS+') — 그래도 승격할까요?' : '\n\n✅ 스테이징 QA 통과 '+QA.res.pass+'/'+QA.res.total+' ('+QA.res.verS+')') : '\n\n⚠ 스테이징 QA 를 아직 실행하지 않았습니다 — «🧪 스테이징 QA» 로 먼저 점검하는 것을 권합니다') : '';
+  if(!confirm(promote? '스테이징(staging/)의 포탈 파일을 운영(루트)으로 복사합니다. 운영 포탈이 스테이징과 같아집니다 — 스테이징에서 충분히 확인했나요?'+qaLine : '운영(루트)의 포탈 파일을 staging/ 로 복사합니다. 스테이징이 운영과 같아집니다. 계속할까요?')) return;
   OPS.busy=true; opsSetMsg(promote? '승격 중…':'동기화 중…');
   try{ var r=await opsCall('gh_copy',{src:src, dst:dst}); opsSetMsg((promote? '승격 커밋 완료 — ':'동기화 커밋 완료 — ')+r.commit.slice(0,7)+' · '+r.files.length+'개 파일 · '+(r.note||''),'ok'); toast(promote? '스테이징 → 운영 승격':'운영 → 스테이징 동기화', r.files.length+'개 파일 · '+r.commit.slice(0,7)); OPS.hist=null; renderOps(true); }
   catch(e){ opsSetMsg(String(e.message||e),'bad'); }
@@ -754,11 +756,12 @@ async function abLoad(){
       '<div style="font-size:18px;font-weight:800;margin-top:2px'+(warn?';color:var(--critical)':'')+'">'+v+'</div>'+
       '<div style="font-size:11px;color:var(--muted)">'+s+'</div></div>';
   }
+  var usd=function(v){ return (v!=null && isFinite(Number(v)))? '$'+Number(v).toLocaleString('en-US') : '—'; };   /* ㊿+151: 값 없으면 $NaN 대신 — (스테이징 QA 가 잡음) */
   kpi.innerHTML=
     box('잔여 크레딧 (추정)', remain==null?'충전액 미입력':'$'+remain.toLocaleString('en-US'),
         remain==null?'아래에 충전액·충전일을 입력하세요':'충전액 $'+credit+' − 사용 $'+r.total_usd, remain!=null&&remain<5)+
-    box('이번 달 사용액','$'+Number(r.month_usd).toLocaleString('en-US'), thisMonthStr()+' 실측 (Cost API)')+
-    box('기준일 이후 사용액','$'+Number(r.total_usd).toLocaleString('en-US'), r.from+' 부터 누적')+
+    box('이번 달 사용액', usd(r.month_usd), thisMonthStr()+' 실측 (Cost API)')+
+    box('기준일 이후 사용액', usd(r.total_usd), (r.from||'—')+' 부터 누적')+
     (r.partial? '<div class="cap" style="grid-column:1/-1;color:var(--warn-ink)">⚠ 일부 기간만 집계됐습니다 — '+esc(String(r.partial))+'</div>':'');
   var mx=0.01; (r.daily||[]).forEach(function(d){ mx=Math.max(mx,d.usd); });
   bars.innerHTML=(r.daily&&r.daily.length)?
@@ -1344,7 +1347,9 @@ var UPD_SEED=[
   {ver:'㊿+149', date:'2026-10-05', title:'관리자 화면 정리', body:[
     '- (관리자) 관리자 화면을 탭 4개(계정·권한 · 보안 · 설정 · AI 비용)로 나눠 긴 스크롤을 없앴습니다. «새 계정 만들기»는 접어 두었습니다.'].join('\n')},
   {ver:'㊿+150', date:'2026-10-05', title:'내부 구조 정리 (모듈 전환 1단계)', body:[
-    '- (관리자) 여러 화면이 함께 쓰는 상태 값 17개를 한 파일(js/state.js)로 모았습니다. 화면·기능 변화는 없습니다.'].join('\n')}
+    '- (관리자) 여러 화면이 함께 쓰는 상태 값 17개를 한 파일(js/state.js)로 모았습니다. 화면·기능 변화는 없습니다.'].join('\n')},
+  {ver:'㊿+151', date:'2026-10-05', title:'스테이징 QA', body:[
+    '- (관리자) 배포·운영 › GitHub 탭에 «🧪 스테이징 QA» — 스테이징 포탈을 창 안에서 열어 메뉴 전부를 자동으로 눌러 보고(JS 오류·빈 화면·깨진 값·넘침·폰 폭), 핵심 숫자가 운영과 같은지 비교합니다. 통과하면 그 자리에서 승격.'].join('\n')}
 ];
 async function updFetch(path, opt){   /* 캐시를 건드리지 않는 직접 호출 — 401 이면 토큰 갱신 뒤 1회 재시도 */
   if(!ST.SB_TOKEN) throw new Error('로그인이 필요합니다');
@@ -1390,7 +1395,7 @@ function updShow(notes, opt){
 }
 /* 슈퍼 관리자가 열 때 — DB 에 없는 ver 만 넣기(오래된 것부터 → id 가 날짜 순) */
 async function updSyncSeed(){
-  if(!window.IS_SUPER) return 0;
+  if(!window.IS_SUPER || window.IS_QA) return 0;
   var have=await updFetch('upd_notes?select=ver');
   var set={}; (have||[]).forEach(function(r){ if(r.ver) set[r.ver]=1; });
   var add=UPD_SEED.filter(function(s){ return !set[s.ver]; }).map(function(s){ return {ver:s.ver, title:s.title, body:s.body, published_on:s.date, created_by:'포탈 '+(window.APP_VER||'')+' (자동)'}; });
@@ -1399,7 +1404,7 @@ async function updSyncSeed(){
 }
 /* 로그인 뒤 첫 데이터 표시 때 1번 (onData) */
 async function updCheck(){
-  if(UPD.checked || !ST.SB_TOKEN) return; UPD.checked=true;
+  if(UPD.checked || !ST.SB_TOKEN || window.IS_QA) return; UPD.checked=true;
   try{ await updSyncSeed(); }catch(e){ /* 표 없음(SQL 96 전) 등 — 조용히 */ }
   try{
     var r=await updRpc('upd_pending', {});
@@ -1494,4 +1499,160 @@ async function updAckReset(email){
   if(!confirm(email+' 의 확인 기록을 지웁니다.\n다음 로그인 때 지금까지의 안내 전체가 다시 뜹니다. 계속할까요?')) return;
   try{ await sbWrite('DELETE','upd_ack?email=eq.'+encodeURIComponent(email)); toast('처음부터 다시', email); updAdminLoad(); }
   catch(e){ updMsg('실패: '+String(e.message||e).slice(0,160), true); }
+}
+
+/* ===== ㊿+151 스테이징 QA — 배포 전에 스테이징 포탈을 창 안에서 열어 메뉴를 한 바퀴 자동 점검 (사용자: «스테이징에서 메뉴 한 바퀴 검증하는 QA 기능») =====
+   · 같은 출처(…/svc/staging/index.html?qa=1)를 iframe 으로 열어 contentWindow 를 직접 다룸 — 세션(sessionStorage svc_sess)이 공유돼 같은 계정으로 자동 로그인
+   · ?qa=1 → 스테이징 쪽 IS_QA: 서비스 워커 등록·데이터 사본 쓰기·브라우저 오류 기록·업데이트 팝업·데이터 점검 로그를 하지 않음(검사 결과만 여기로)
+   · 메뉴마다(사이드바에 보이는 것 전부 · 홈은 «분석» 펼침 · 관리자는 탭 4개): JS 오류 0 · 빈 화면 아님 · 깨진 값(NaN·undefined) 없음 · 가로 넘침 없음 · 글자 세로 쌓임 없음 · 위성 페이지(iframe)는 떴는지
+   · 핵심 숫자: 이 화면(운영)과 스테이징의 buildDigest() 숫자가 같은지(같은 DB 라 다르면 코드가 깨진 것 — 일부러 정의를 바꾼 배포면 사람이 판단)
+   · 폰(390px)으로 한 번 더(주요 메뉴) · 결과는 창에 표 + change_log(staging_qa) · GitHub 탭 «승격» 옆에 최근 QA 배지 · 통과 못 하면 승격 확인 창에 경고
+   · 보기 위주 — 저장·발송처럼 데이터를 바꾸는 동작은 누르지 않음 */
+var QA={run:0, on:false, res:null, steps:[], w:null, ifr:null, errs:[]};
+var QA_MOBILE=['dash','contracts','orders','eqboard','oi','dcheck','leadsrc','report','price','cloud','adminx','ops','account'];
+function qaStagingUrl(){ var dir=location.pathname.replace(/\/staging\//,'/').replace(/[^/]*$/,''); return dir+'staging/index.html?qa=1&t='+Date.now(); }
+function qaVisible(el){ return !!(el && el.getClientRects && el.getClientRects().length); }
+function qaSleep(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
+function qaRaf(w){ return new Promise(function(r){ var done=false, f=function(){ if(!done){ done=true; r(); } }; try{ w.requestAnimationFrame(function(){ w.requestAnimationFrame(f); }); }catch(e){} setTimeout(f, 400); }); }
+async function qaWait(fn, ms, step){ var t0=Date.now(); while(Date.now()-t0<ms){ try{ if(fn()) return true; }catch(e){} await qaSleep(step||150); } return false; }
+function qaText(s, n){ s=String(s==null? '':s).replace(/\s+/g,' ').trim(); return s.length>(n||90)? s.slice(0,(n||90))+'…' : s; }
+/* 이 창·스테이징 창에서 같은 방법으로 뽑는 핵심 숫자 — buildDigest() 의 숫자(깊이 2) + 행 수·월 수 */
+function qaKpi(w){
+  var out={}; try{
+    var D=w.buildDigest();
+    (function walk(o,p,d){ if(d>2 || !o) return; Object.keys(o).forEach(function(k){ if(/시간|시각|time|ms$|생성|갱신|오늘|기준일|설명|읽는법|주의/i.test(k)) return; var v=o[k], q=p? p+'.'+k : k;
+      if(typeof v==='number' && isFinite(v)) out[q]=v; else if(Array.isArray(v)) out[q+'(개수)']=v.length; else if(v && typeof v==='object') walk(v,q,d+1); }); })(D,'',0);
+    out['계약 행 수']=((w.ST&&w.ST.DATA&&w.ST.DATA.rows)||[]).length; out['월 수']=(w.ST&&w.ST.M)||0;
+  }catch(e){ out._err=String(e.message||e); }
+  return out;
+}
+function qaKpiDiff(a, b){
+  var diffs=[], onlyA=0, onlyB=0;
+  Object.keys(a).forEach(function(k){ if(k==='_err') return; if(!(k in b)) onlyA++; else if(a[k]!==b[k]) diffs.push(k+': '+a[k]+' → '+b[k]); });
+  Object.keys(b).forEach(function(k){ if(k!=='_err' && !(k in a)) onlyB++; });
+  return {diffs:diffs, onlyA:onlyA, onlyB:onlyB};
+}
+/* 한 화면 검사 — 보이는 view 영역을 찾아 내용·깨진 값·넘침·세로 쌓임·위성 iframe */
+async function qaInspect(w, v){
+  var d=w.document, bad=[];
+  var hosts=[].slice.call(d.querySelectorAll('#app [id^="view"]')).filter(function(e){ return !e.classList.contains('hidden') && qaVisible(e) && e.id!=='viewLogin'; });
+  var host=hosts[0]; if(!host) return ['화면 영역이 보이지 않음'];
+  await qaWait(function(){ return !/불러오는 중|읽는 중/.test(host.innerText||''); }, 4000, 200);
+  var sat=host.querySelector('iframe');
+  if(sat){ var ok=await qaWait(function(){ var sd=sat.contentDocument; return sd && sd.readyState==='complete' && sd.body && sd.body.innerText.trim().length>20; }, 8000, 250); if(!ok) bad.push('하위 페이지(iframe)가 뜨지 않음'); }
+  var text=String(host.innerText||''), vis=[].slice.call(host.querySelectorAll('*')).filter(qaVisible).length, emptyMsg=/없습니다|없음|아직|필요합니다/.test(text);
+  if(!sat && (text.trim().length<30 || vis<5)){ if(emptyMsg) bad.push('⚠ 빈 상태 안내만 보임 — «'+qaText(text, 50)+'»'); else bad.push('빈 화면 (글자 '+text.trim().length+'자 · 요소 '+vis+'개)'); }
+  var m=/데이터를 불러오지 못했습니다[^\n]*|읽기 권한이 없[^\n]*|오류가 발생[^\n]*/.exec(text); if(m) bad.push(qaText(m[0], 80));
+  var broken=/(?:^|[^A-Za-z_])(NaN|undefined|\[object Object\])(?![A-Za-z_])/.exec(text); if(broken){ var i=broken.index; bad.push('깨진 값 «'+broken[1]+'» — …'+qaText(text.slice(Math.max(0,i-24), i+30), 60)+'…'); }
+  var over=d.documentElement.scrollWidth-w.innerWidth; if(over>1) bad.push('페이지가 옆으로 '+over+'px 넘침');
+  var els=[].slice.call(host.querySelectorAll('*')), seen=0, stacked=null;
+  for(var k=0;k<els.length && seen<600;k++){ var el=els[k]; if(!qaVisible(el) || el.closest('svg')) continue;
+    var t=[].slice.call(el.childNodes).filter(function(n){ return n.nodeType===3 && n.textContent.trim().length>=6; }).map(function(n){ return n.textContent.trim(); }).join(''); if(!t) continue; seen++;
+    var r=el.getBoundingClientRect(), fs=parseFloat(w.getComputedStyle(el).fontSize)||12; if(r.height>=fs*1.5*3 && r.width<fs*3.2){ stacked=t; break; } }
+  if(stacked) bad.push('글자가 세로로 쌓임 «'+qaText(stacked, 20)+'»');
+  return bad;
+}
+function qaStep(id, label, group){ var s={id:id, label:label, group:group||'', st:'wait', ms:0, detail:''}; QA.steps.push(s); return s; }
+function qaPaint(){
+  var L=document.getElementById('qaList'); if(!L) return;
+  var ic={wait:'·', run:'⏳', ok:'✅', fail:'❌', warn:'⚠️', skip:'—'};
+  L.innerHTML=QA.steps.map(function(s){ return '<div class="qa-row '+s.st+'"><span class="qa-ic">'+ic[s.st]+'</span><span class="qa-lb">'+(s.group? '<span class="mini">'+esc(s.group)+' </span>':'')+esc(s.label)+'</span><span class="mini qa-ms">'+(s.ms? (s.ms/1000).toFixed(1)+'s':'')+'</span>'+(s.detail? '<div class="mini qa-dt">'+esc(s.detail)+'</div>':'')+'</div>'; }).join('');
+  var run=L.querySelector('.qa-row.run'); if(run) try{ run.scrollIntoView({block:'nearest'}); }catch(e){}
+  var cap=document.getElementById('qaPrevCap'), cur=QA.steps.filter(function(s){ return s.st==='run'; })[0], done=QA.steps.filter(function(s){ return /ok|fail|warn/.test(s.st); }).length;
+  if(cap) cap.textContent=cur? '지금: '+(cur.group? cur.group+' ':'')+cur.label+' ('+(done+1)+'/'+QA.steps.length+')' : (QA.on? '준비 중…' : '점검 끝 — 미리보기는 스테이징 홈');
+}
+function qaFit(fw, fh, keepH){
+  var box=document.getElementById('qaFrame'), ifr=QA.ifr; if(!box || !ifr) return;
+  var avail=box.clientWidth||600, s=Math.min(1, avail/fw); if(keepH){ s=Math.min(s, keepH/fh); } else box.style.height=Math.round(fh*s)+'px';
+  ifr.style.width=fw+'px'; ifr.style.height=fh+'px'; ifr.style.transform='scale('+s+')'; ifr.style.left=Math.max(0, Math.round((avail-fw*s)/2))+'px';
+}
+function qaOpen(){
+  var old=document.getElementById('ovlQa'); if(old) old.remove();
+  var ov=document.createElement('div'); ov.id='ovlQa'; ov.className='ovl on'; ov.style.cssText='z-index:9400;align-items:center';
+  ov.innerHTML='<div class="modal qa" style="width:min(1240px,100%);padding:18px 20px" role="dialog" aria-modal="true" aria-labelledby="qaTitle">'+
+    '<div class="qa-head"><h3 id="qaTitle" style="margin:0;font-size:15px">🧪 스테이징 QA</h3><span class="mini" id="qaVer">스테이징을 여는 중…</span><span style="flex:1"></span><button type="button" class="pill ghost" id="qaRerun">↻ 다시 실행</button><button type="button" class="pill ghost" id="qaClose">닫기</button></div>'+
+    '<div class="qa-body"><div class="qa-prev"><div class="qa-frame" id="qaFrame"></div><div class="mini" id="qaPrevCap" style="margin-top:4px">준비 중…</div></div><div class="qa-list" id="qaList" tabindex="0" aria-label="점검 항목"></div></div>'+
+    '<div class="qa-foot"><div id="qaSum" class="qa-sum">준비 중…</div><span style="flex:1"></span><button type="button" class="pill pri" id="qaPromote" disabled>스테이징 → 운영 승격 →</button></div></div>';
+  document.body.appendChild(ov);
+  ov.querySelector('#qaClose').onclick=qaClose;
+  ov.querySelector('#qaRerun').onclick=function(){ qaRun(); };
+  ov.querySelector('#qaPromote').onclick=function(){ qaClose(); opsCopy('staging',''); };
+  qaRun();
+}
+function qaClose(){ QA.run++; QA.on=false; QA.w=null; QA.ifr=null; var ov=document.getElementById('ovlQa'); if(ov) ov.remove(); if(ST.CUR_VIEW==='ops') try{ renderOps(true); }catch(e){} }
+async function qaRun(){
+  var run=++QA.run; QA.on=true; QA.errs=[]; QA.steps=[]; QA.res=null;
+  var alive=function(){ return run===QA.run; };
+  var sum=document.getElementById('qaSum'), pb=document.getElementById('qaPromote'); if(pb) pb.disabled=true; if(sum) sum.textContent='실행 중…';
+  var box=document.getElementById('qaFrame'); if(!box) return; box.innerHTML='';
+  var ifr=document.createElement('iframe'); ifr.setAttribute('title','스테이징 포탈 미리보기'); ifr.style.cssText='position:absolute;top:0;left:0;border:0;transform-origin:0 0;background:#fff';
+  QA.ifr=ifr; box.appendChild(ifr); qaFit(1280, 800); var boxH=box.clientHeight;
+  var s0=qaStep('open','스테이징 열기 · 로그인'); s0.st='run'; qaPaint();
+  var t0=Date.now();
+  var w=await new Promise(function(res){ ifr.onload=function(){ res(ifr.contentWindow); }; setTimeout(function(){ res(ifr.contentWindow); }, 20000); ifr.src=qaStagingUrl(); });
+  if(!alive()) return;
+  QA.w=w;
+  try{ w.addEventListener('error', function(e){ QA.errs.push(String((e&&e.message)||'오류')); }); w.addEventListener('unhandledrejection', function(e){ QA.errs.push('Promise: '+String((e&&e.reason&&(e.reason.message||e.reason))||'')); }); w.document.addEventListener('securitypolicyviolation', function(e){ QA.errs.push('CSP: '+e.violatedDirective+' '+(e.blockedURI||'')); }); }catch(e){}
+  var ready=await qaWait(function(){ var app=w.document.getElementById('app'); return w.ST && w.ST.DATA && app && !app.classList.contains('hidden'); }, 30000, 250);
+  s0.ms=Date.now()-t0;
+  if(!alive()) return;
+  var verS=''; try{ verS=String(w.APP_VER||''); }catch(e){}
+  var verP=String(window.APP_VER||''); var vs=document.getElementById('qaVer');
+  if(vs) vs.textContent='스테이징 '+(verS.match(/㊿\+\d+/)||[verS||'?'])[0]+' · '+(window.IS_STAGING? '기준(이 화면·스테이징) ':'운영(이 화면) ')+(verP.match(/㊿\+\d+/)||[verP])[0]+(verS && verS===verP? ' — 같은 버전(스테이징에 새로 올린 게 없음?)':'');
+  if(!ready){ var ls=w.document&&w.document.getElementById('viewLogin'); var errCard=w.document&&w.document.querySelector('#loading .err');
+    s0.st='fail'; s0.detail=errCard? qaText(errCard.innerText, 120) : (ls && qaVisible(ls)? '로그인 화면에 머묾 — 세션이 공유되지 않음(로그인 유지가 꺼진 다른 탭?)' : (QA.errs.length? 'JS 오류: '+qaText(QA.errs[0],100) : '30초 안에 데이터가 뜨지 않음'));
+    qaPaint(); return qaFinish(run); }
+  s0.st='ok'; qaPaint();
+  // 메뉴 목록 — 스테이징 사이드바에 보이는 것(권한·메뉴 편집 반영)
+  var btns=[].slice.call(w.document.querySelectorAll('#side button[data-v]')).filter(function(b){ return (w.visBtn? w.visBtn(b) : (b.style.display!=='none' && !b.classList.contains('pdeny'))); });
+  var menus=[]; btns.forEach(function(b){ var v=b.dataset.v; if(v && menus.every(function(m){ return m.v!==v; })) menus.push({v:v, label:(w.navText? w.navText(b) : b.textContent).trim()}); });
+  if(!menus.some(function(m){ return m.v==='dash'; })) menus.unshift({v:'dash', label:'홈'});
+  var sK=qaStep('kpi','핵심 숫자 운영 = 스테이징');
+  var desk=menus.map(function(m){ return {m:m, s:qaStep('d:'+m.v, m.label, '')}; });
+  var mob=menus.filter(function(m){ return QA_MOBILE.indexOf(m.v)>=0; }).map(function(m){ return {m:m, s:qaStep('m:'+m.v, m.label, '📱')}; });
+  qaPaint();
+  var runMenu=async function(item){
+    var m=item.m, s=item.s; s.st='run'; qaPaint(); var t=Date.now(), e0=QA.errs.length, bad=[];
+    try{
+      try{ w.navMenu(m.v); }catch(e){ bad.push('이동 오류: '+qaText(e.message||e, 100)); }
+      if(m.v==='dash'){ try{ var ab=w.document.getElementById('ccAnaBtn'); if(ab && ab.getAttribute('aria-expanded')!=='true') ab.click(); }catch(e){} }
+      await qaRaf(w); await qaSleep(250);
+      if(m.v==='adminx' && w.admTab){ var tabs=['acct','sec','cfg','bill']; for(var i=0;i<tabs.length;i++){ if(!alive()) return; w.admTab(tabs[i]); await qaRaf(w); var b2=await qaInspect(w, m.v); b2.forEach(function(x){ bad.push('['+tabs[i]+'] '+x); }); } w.admTab('acct'); }
+      else bad=bad.concat(await qaInspect(w, m.v));
+      QA.errs.slice(e0).forEach(function(x){ bad.push('JS 오류: '+qaText(x, 110)); });
+    }catch(e){ bad.push('검사 오류: '+qaText(e.message||e, 100)); }
+    s.ms=Date.now()-t; s.st=!bad.length? 'ok' : bad.every(function(x){ return /^(\[\w+\] )?⚠/.test(x); })? 'warn' : 'fail'; s.detail=bad.slice(0,4).join(' · ').replace(/⚠ /g,''); qaPaint();
+  };
+  // 핵심 숫자
+  sK.st='run'; qaPaint(); var tk=Date.now();
+  try{ var a=qaKpi(window), b=qaKpi(w);
+    if(a._err || b._err){ sK.st='warn'; sK.detail='비교 못 함 — '+(a._err? '이 화면: '+a._err : '')+(b._err? ' 스테이징: '+b._err : ''); }
+    else { var df=qaKpiDiff(a, b); var n=Object.keys(a).length;
+      if(df.diffs.length){ sK.st='fail'; sK.detail=df.diffs.length+'개 다름 — '+df.diffs.slice(0,5).join(' · ')+(df.diffs.length>5? ' 외 '+(df.diffs.length-5):''); }
+      else { sK.st='ok'; sK.detail=n+'개 숫자 일치'+(df.onlyB? ' · 스테이징에 새 항목 '+df.onlyB:'')+(df.onlyA? ' · 없어진 항목 '+df.onlyA:''); } }
+  }catch(e){ sK.st='warn'; sK.detail=qaText(e.message||e, 100); }
+  sK.ms=Date.now()-tk; qaPaint();
+  for(var i=0;i<desk.length;i++){ if(!alive()) return; await runMenu(desk[i]); }
+  // 폰 폭
+  if(mob.length){ qaFit(390, 844, boxH); await qaSleep(500); await qaRaf(w);
+    for(var j=0;j<mob.length;j++){ if(!alive()) return; await runMenu(mob[j]); }
+    qaFit(1280, 800); try{ w.navMenu('dash'); }catch(e){} }
+  qaFinish(run);
+}
+async function qaFinish(run){
+  if(run!==QA.run) return; QA.on=false;
+  var all=QA.steps.filter(function(s){ return s.st!=='skip'; }), fails=all.filter(function(s){ return s.st==='fail'; }), warns=all.filter(function(s){ return s.st==='warn'; });
+  var verS=''; try{ verS=String((QA.w&&QA.w.APP_VER)||''); }catch(e){}
+  QA.res={at:Date.now(), verS:(verS.match(/㊿\+\d+/)||[verS])[0], verP:(String(APP_VER).match(/㊿\+\d+/)||[APP_VER])[0], total:all.length, pass:all.length-fails.length-warns.length, fail:fails.length, warn:warns.length, fails:fails.map(function(s){ return (s.group? s.group+' ':'')+s.label+' — '+s.detail; })};
+  var sum=document.getElementById('qaSum'), pb=document.getElementById('qaPromote');
+  if(sum) sum.innerHTML=(fails.length? '<b style="color:var(--critical)">❌ '+fails.length+'건 실패</b>' : '<b style="color:var(--ok,var(--brand-ink))">✅ 전부 통과</b>')+' <span class="mini">· '+QA.res.pass+'/'+all.length+(warns.length? ' · ⚠️ '+warns.length:'')+' · '+QA.res.verS+(fails.length? ' — 실패 항목을 고친 뒤 다시 올리고 QA 를 다시 돌리세요' : ' — 승격해도 됩니다')+'</span>';
+  if(pb) pb.disabled=!!fails.length;
+  qaPaint();
+  try{ await logChange('staging_qa','staging',QA.res.verS,{pass:QA.res.pass, total:QA.res.total, fail:QA.res.fail, warn:QA.res.warn, fails:QA.res.fails.slice(0,20), prod:QA.res.verP}); }catch(e){}
+  if(ST.CUR_VIEW==='ops' && OPS.tab==='gh') try{ renderOps(true); }catch(e){}
+}
+function qaBadgeHtml(){
+  var r=QA.res; if(!r) return '<span class="mini" id="qaBadge">QA 아직 안 함</span>';
+  var t=new Date(r.at), hm=('0'+t.getHours()).slice(-2)+':'+('0'+t.getMinutes()).slice(-2);
+  return '<span class="ctag'+(r.fail? ' late':' ok')+'" id="qaBadge" title="'+esc(r.fails.slice(0,3).join('\n'))+'">QA '+(r.fail? '❌ '+r.fail+'건 실패':'✅ '+r.pass+'/'+r.total)+' · '+esc(r.verS)+' · '+hm+'</span>';
 }

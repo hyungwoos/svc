@@ -13,6 +13,7 @@ window.addEventListener('message', function(ev){
 
 /* [core.js 116행] */
 var IS_STAGING=/\/staging\//.test(location.pathname);
+var IS_QA=/[?&]qa=1(?:&|$)/.test(location.search);   /* ㊿+151: 스테이징 QA 가 iframe 으로 열 때 — 서비스 워커·사본·오류 기록·팝업 생략 */
 
 /* [core.js 117행] */
 if(IS_STAGING){ document.addEventListener('DOMContentLoaded', function(){ var b=document.createElement('div'); b.id='stagingBar'; b.innerHTML='🧪 <b>STAGING</b> — 시험용 포탈입니다 (운영과 같은 데이터 · 여기서 저장하면 운영에도 반영됩니다) · <a href="'+location.pathname.replace('/staging/','/')+'">운영 포탈로 →</a>'; document.body.prepend(b); document.title='[STAGING] '+document.title; }); }
@@ -24,7 +25,7 @@ window.addEventListener('error', function(e){ logClientError(e.message, e.filena
 window.addEventListener('unhandledrejection', function(e){ var r=e.reason; logClientError((r&&r.message)||String(r), '', null, null, r&&r.stack); });
 
 /* [core.js 134행] */
-if('serviceWorker' in navigator && /^https?:$/.test(location.protocol)){
+if('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !IS_QA){
   window.addEventListener('load', function(){ navigator.serviceWorker.register('sw.js').catch(function(){}); });
 }
 
