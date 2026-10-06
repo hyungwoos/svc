@@ -5,8 +5,8 @@
            아이콘·매니페스트는 «캐시 먼저». Supabase·Anthropic·CDN 같은 외부 요청은 건드리지 않음(데이터는 절대 캐시하지 않음)
    · 갱신: 아래 SW_VER 를 올리면 예전 캐시가 정리됨 (index.html·app.css·js 만 바꿀 때는 올릴 필요 없음 — 네트워크 먼저라 즉시 반영)
    ============================================================================ */
-const SW_VER = 'svc-pwa-4';   // ㊿+150: js/state.js 추가   // ㊿+136: js/ 가 기능별 파일 17개 + boot/load 로 나뉨   // ㊿+134: app.css · js/viz.js · js/app.js 분리 — 코드·스타일도 «네트워크 먼저 → 캐시» (버전 질의 ?v= 는 캐시 키에서 뗌)
-const SHELL = ['./index.html', './app.css', './js/boot.js', './js/load.js', './js/state.js', './js/viz.js', './js/core.js', './js/shell.js', './js/dash.js', './js/ai.js', './js/grids.js', './js/equipment.js', './js/analysis.js', './js/tools.js', './js/price.js', './js/inbound.js', './js/admin.js', './js/sales.js', './js/report.js', './js/grid.js', './js/edit.js', './js/init.js', './manifest.webmanifest', './pwa-192.png', './pwa-512.png', './pwa-maskable-512.png', './apple-touch-icon.png'];
+const SW_VER = 'svc-pwa-5';   // ㊿+153: ES 모듈 — js/main.js 시작 · cloud·upd·lazy 추가 · boot/load 안 씀 · ?v= 없는 코드 요청은 서버에 확인(no-cache)   // ㊿+150: js/state.js 추가   // ㊿+136: js/ 가 기능별 파일 17개 + boot/load 로 나뉨   // ㊿+134: app.css · js/viz.js · js/app.js 분리 — 코드·스타일도 «네트워크 먼저 → 캐시» (버전 질의 ?v= 는 캐시 키에서 뗌)
+const SHELL = ['./index.html', './app.css', './js/state.js', './js/viz.js', './js/core.js', './js/shell.js', './js/dash.js', './js/ai.js', './js/grids.js', './js/equipment.js', './js/analysis.js', './js/tools.js', './js/cloud.js', './js/price.js', './js/inbound.js', './js/upd.js', './js/admin.js', './js/sales.js', './js/report.js', './js/grid.js', './js/edit.js', './js/lazy.js', './js/init.js', './js/main.js', './manifest.webmanifest', './pwa-192.png', './pwa-512.png', './pwa-maskable-512.png', './apple-touch-icon.png'];
 const ASSETS = /\/(app\.css|js\/[^/]+\.js)$/;
 const PAGES = /\/(index|kk|quote|report|s1|orders)\.html$/;
 
@@ -35,7 +35,9 @@ self.addEventListener('fetch', (e) => {
   }
   if (ASSETS.test(path)) {
     // 코드·스타일: 네트워크 먼저(새 버전 즉시) → 오프라인이면 마지막으로 받은 것
-    e.respondWith(fetch(req).then((res) => {
+    // ㊿+153: ?v= 꼬리표가 없는 요청(importmap 을 모르는 옛 브라우저의 모듈 등)은 브라우저 캐시를 믿지 않고 서버에 확인(바뀐 게 없으면 304 로 가볍게)
+    const net = url.searchParams.has('v') ? req : new Request(req, { cache: 'no-cache' });
+    e.respondWith(fetch(net).then((res) => {
       if (res && res.ok) { const copy = res.clone(); caches.open(SW_VER).then((c) => c.put(stripQuery(req), copy)); }
       return res;
     }).catch(() => caches.match(stripQuery(req))));

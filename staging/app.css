@@ -1719,3 +1719,7 @@ tr.row-dim td{color:var(--muted)}
 #viewPrice .pr-grid > .pr-card{min-width:0;overflow-x:auto}
 #viewPrice .pr-top{min-width:0}
 #viewPrice .pr-top select{max-width:100%}
+/* ㊿+153 처음 열 때 불러오는 화면(리포트·관리자·가격표 — js/lazy.js) — 코드를 받는 동안 안내만 보임 */
+.lazy-wait > :not(.lazy-msg){display:none !important}
+.lazy-msg{padding:48px 16px;text-align:center;color:var(--muted);font-size:13.5px}
+.lazy-msg.bad{color:var(--critical)}

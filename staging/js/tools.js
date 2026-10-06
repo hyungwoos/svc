@@ -1,11 +1,20 @@
 /* ===== tools.js — 전역 검색 · 고객 360 · 표 밀도 · 엑셀 붙여넣기 · 메뉴 편집 · 글자 크기 =====
-   포탈 본체(js/app.js)를 ④ 아키텍처 2단계(㊿+136)에서 기능별로 나눈 파일. 전역 var/function 그대로 — 즉시 실행 문장은 전부 js/init.js 에.
-   로드 순서는 index.html <meta name="app-js"> (js/load.js 가 그 순서대로 ?v=APP_VER 를 붙여 불러옴) */
+   ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
+import { ST } from './state.js';
+import { $, lline, mk, navText } from './core.js';
+import { buildRail, c360Enhance, cmdAskHit, cmdMenuHits, dIdx, loadFromDb, onData, renderInbox, sbTry, sbWrite, toast, todayStr, visBtn } from './shell.js';
+import { esc } from './dash.js';
+import { GRIDS } from './grids.js';
+import { applyChannelMenu, liveData } from './analysis.js';
+import { goInbList, loadInbound } from './inbound.js';
+import { applyMenuFold } from './sales.js';
+import { navMenu, renderGrid, switchView } from './grid.js';
+import { closeOvl, openOvl, ovlMarkDirty } from './edit.js';
 
 
 /* ===== 전역 검색 (Ctrl+K) ===== */
-function fkNorm(s){ return String(s==null?'':s).toLowerCase().replace(/\s+/g,''); }
-function fkSources(){
+export function fkNorm(s){ return String(s==null?'':s).toLowerCase().replace(/\s+/g,''); }
+export function fkSources(){
   var out=[];
   (ST.DATA&&ST.DATA.rows||[]).forEach(function(r){
     out.push({t:'계약', nm:r.cust, sb:lline(r.line)+' · '+(r.channel||'')+' · '+(r.partner||'')+' · '+(r.csm||''), go:function(){ switchView('contracts'); $('#dvSearch').value=r.cust; renderGrid(); }, cust:r.cust});
@@ -30,7 +39,7 @@ function fkSources(){
   });
   return out;
 }
-function openFind(){
+export function openFind(){
   if(!ST.SB_TOKEN || !ST.DATA) return;
   if(RAWX.inbound===undefined && !window.IS_EQUIP) try{ loadInbound(function(){}); }catch(e){}
   openOvl('ovlFind');
@@ -79,12 +88,12 @@ function openFind(){
 
 
 /* ===== 고객 360 — 한 고객사의 모든 정보 ===== */
-function c360Match(a,b){
+export function c360Match(a,b){
   var x=fkNorm(a), y=fkNorm(b);
   if(!x||!y) return false;
   return x.indexOf(y)>=0 || y.indexOf(x)>=0;
 }
-function openCust360(name){
+export function openCust360(name){
   var nm=name;
   function tb(cols, rows){
     if(!rows.length) return '<p class="cap" style="margin:2px 0 0">없음</p>';
@@ -123,8 +132,8 @@ function openCust360(name){
 }
 
 /* ===== 표 밀도 (보통/컴팩트) ===== */
-function denseKey(){ return 'svc_dense_'+(ST.AUTH_USER||'anon'); }
-function applyDense(){
+export function denseKey(){ return 'svc_dense_'+(ST.AUTH_USER||'anon'); }
+export function applyDense(){
   var on=false; try{ on=localStorage.getItem(denseKey())==='1'; }catch(e){}
   var t=document.getElementById('dvTable'); if(t) t.classList.toggle('dense', on);
   var b=document.getElementById('dvDense');
@@ -132,8 +141,8 @@ function applyDense(){
 }
 
 /* ===== 엑셀 붙여넣기 대량 입력 ===== */
-function pasteCols(g){ return g.cols.filter(function(c){ return !c.ro && c.k[0]!=='_'; }); }
-function openPaste(){
+export function pasteCols(g){ return g.cols.filter(function(c){ return !c.ro && c.k[0]!=='_'; }); }
+export function openPaste(){
   var g=GRIDS[ST.CUR_VIEW]; if(!g||!g.add) return;
   var cols=pasteCols(g);
   $('#pasteCols').innerHTML='열 순서: '+cols.map(function(c){return '<b>'+esc(c.l)+'</b>';}).join(' → ')+
@@ -174,15 +183,15 @@ function openPaste(){
 }
 
 /* ===== 홈 — 오늘 할 일 카드 + 바로가기 ===== */
-function viewLabel(v){
+export function viewLabel(v){
   var b=document.querySelector('.side button[data-v="'+v+'"]');
   return b? navText(b):v;
 }
-function recentKey(){ return 'svc_recent_'+(ST.AUTH_USER||'anon'); }
+export function recentKey(){ return 'svc_recent_'+(ST.AUTH_USER||'anon'); }
 
 /* ===== 메뉴 편집 — 순서·숨김 (admin 이상 · 내 계정/브라우저에만 적용) ===== */
-function menuConfKey(){ return 'svc_menuconf_'+(ST.AUTH_USER||'anon'); }
-function menuSegments(){
+export function menuConfKey(){ return 'svc_menuconf_'+(ST.AUTH_USER||'anon'); }
+export function menuSegments(){
   var out=[], kids=Array.prototype.slice.call($('#side').children);
   kids.forEach(function(el){
     if(el.classList && el.classList.contains('grp')){
@@ -199,7 +208,7 @@ function menuSegments(){
   });
   return out;
 }
-function applyMenuConf(){
+export function applyMenuConf(){
   if(window.IS_EQUIP) return;   // 제한 계정은 기본 메뉴 그대로
   var conf=null; try{ conf=JSON.parse(localStorage.getItem(menuConfKey())||'null'); }catch(e){}
   conf=menuConfMigrate(conf);
@@ -228,8 +237,8 @@ function applyMenuConf(){
 }
 /* ㊿+142 메뉴 그룹 정리: 예전 «사업 영역 · Cloud NAC / MDR / 기타 (유통)» 3그룹 → «사업 영역» 1그룹(소제목 3개).
    저장된 메뉴 편집(순서·숨김)을 새 그룹 이름으로 옮김 — 옛 그룹을 숨겼으면 그 안 메뉴를 하나씩 숨김 */
-var MENU_OLD_CHGRP={'g:사업 영역 · Cloud NAC':['cngen','cnpub','cns1','cnlgu'], 'g:사업 영역 · MDR':['mdrgen','mdrs1','mdrlgu'], 'g:사업 영역 · 기타 (유통)':['chdist','cnpns']};
-function menuConfMigrate(conf){
+export var MENU_OLD_CHGRP={'g:사업 영역 · Cloud NAC':['cngen','cnpub','cns1','cnlgu'], 'g:사업 영역 · MDR':['mdrgen','mdrs1','mdrlgu'], 'g:사업 영역 · 기타 (유통)':['chdist','cnpns']};
+export function menuConfMigrate(conf){
   if(!conf) return conf; var NEW='g:사업 영역', olds=Object.keys(MENU_OLD_CHGRP), touched=false;
   if(conf.order && conf.order.some(function(k){ return MENU_OLD_CHGRP[k]; })){
     var seen={}; conf.order=conf.order.map(function(k){ return MENU_OLD_CHGRP[k]? NEW : k; }).filter(function(k){ if(seen[k]) return false; seen[k]=1; return true; }); touched=true; }
@@ -242,7 +251,7 @@ function menuConfMigrate(conf){
   return conf;
 }
 /* 소제목 아래 보이는 메뉴가 하나도 없으면(권한·채널 계약 없음·메뉴 편집 숨김) 소제목도 숨김 */
-function subgrpSync(){
+export function subgrpSync(){
   var side=document.getElementById('side'); if(!side) return;
   side.querySelectorAll('.subgrp').forEach(function(s){
     var el=s.nextElementSibling, vis=false;
@@ -251,14 +260,14 @@ function subgrpSync(){
   });
 }
 /* 메뉴 버튼의 소제목(없으면 '') — Ctrl+K·권한 표에서 «일반 판매»가 Cloud NAC 것인지 MDR 것인지 구분 */
-function navSub(b){
+export function navSub(b){
   for(var el=b && b.previousElementSibling; el; el=el.previousElementSibling){
     if(el.classList && el.classList.contains('subgrp')) return el.dataset.sub || el.textContent.trim();
     if(el.classList && el.classList.contains('grp')) return '';
   }
   return '';
 }
-function openMenuEdit(){
+export function openMenuEdit(){
   var conf=null; try{ conf=JSON.parse(localStorage.getItem(menuConfKey())||'null'); }catch(e){}
   var segs=menuSegments();
   var hid=(conf&&conf.hidden)||{};
@@ -306,14 +315,14 @@ function openMenuEdit(){
   };
   openOvl('ovlMenu');
 }
-function pushRecent(v){
+export function pushRecent(v){
   if(v==='dash'||v==='account'||v==='adminx') return;
   try{
     var a=JSON.parse(localStorage.getItem(recentKey())||'[]').filter(function(x){return x!==v;});
     a.unshift(v); localStorage.setItem(recentKey(), JSON.stringify(a.slice(0,6)));
   }catch(e){}
 }
-function renderTodo(){
+export function renderTodo(){
   var wrap=document.getElementById('todoWrap'); if(!wrap) return;
   if(!ST.SB_TOKEN || !ST.DATA || window.IS_EQUIP){ wrap.style.display='none'; return; }
   wrap.style.display='';
@@ -371,7 +380,7 @@ function renderTodo(){
 }
 
 /* ===== 포탈 전체 글자 크기 (보통/크게/아주 크게 — 이 브라우저에 기억) ===== */
-function applyFs(n){
+export function applyFs(n){
   document.body.style.zoom = n===1? '1.12' : n===2? '1.24' : '';
   var b=document.getElementById('btnFont');
   if(b){
@@ -382,4 +391,4 @@ function applyFs(n){
 
 
 /* ===== 제품 가격표 — 판(개정판) 단위 관리 ===== */
-var PR={seg:'saas', ver:{saas:0,onprem:0}, op:'ztna', q:'', tcoP:'nac', tcoD:0.30};
+export var PR={seg:'saas', ver:{saas:0,onprem:0}, op:'ztna', q:'', tcoP:'nac', tcoD:0.30};

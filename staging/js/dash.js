@@ -1,12 +1,26 @@
 /* ===== dash.js — 필터/집계 · 컨트롤 · 대시보드 렌더 · 위젯 · 월별 종합 장표 · 설치비 · KPI · 차트 =====
-   포탈 본체(js/app.js)를 ④ 아키텍처 2단계(㊿+136)에서 기능별로 나눈 파일. 전역 var/function 그대로 — 즉시 실행 문장은 전부 js/init.js 에.
-   로드 순서는 index.html <meta name="app-js"> (js/load.js 가 그 순서대로 ?v=APP_VER 를 붙여 불러옴) */
+   ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
+import { APP_VER, ST } from './state.js';
+import { Viz } from './viz.js';
+import { $, $$, baseLabel, baseRange, buildBaseSelect, cssv, el, isCC, lline, mk, mkLabel, monOf, pct, seriesColor, STATE, won, wonFull,
+  wrapNavIcons, yOf } from './core.js';
+import { boot, CACHE_KEY, ccAfterKpis, ccAnaCount, ccAnalysisOpen, ccHomeLayout, loadFromDb, onData, renderInbox, SB_RAW, sbWrite, toast } from './shell.js';
+import { abortAsk, ask, closeAnswer, isAsking, loadAiConfig, runQuery, shortQ } from './ai.js';
+import { GRIDS } from './grids.js';
+import { CH_DEFS, chOf, liveData, liveDeltaHtml, openRenewList, renderChannelView } from './analysis.js';
+import { renderTodo } from './tools.js';
+import { renderCloud } from './cloud.js';
+import { closeMxPop, mxKey, MXM, mxPlace, openMxMemo, renderInbStat } from './inbound.js';
+import { KX_H6, kxBase, renderChurn, renderChurnRate, renderCustFlow } from './sales.js';
+import { a11yTileRole, DV, renderGrid, switchView, xlsxAoa } from './grid.js';
+import { closeOvl, logChange, openOvl } from './edit.js';
+import { lazyGet } from './lazy.js';
 
 
 /* ==================================================================
    2. 필터 / 집계
    ================================================================== */
-function passes(r){
+export function passes(r){
   if(!STATE.lines[r.line]) return false;
   if(STATE.ind && r.ind!==STATE.ind) return false;
   if(STATE.partner){
@@ -20,7 +34,7 @@ function passes(r){
   }
   return true;
 }
-function statusOf(r){
+export function statusOf(r){
   var s=r.status||'';
   if(/해지|중지/.test(s)) return '해지';
   if(/서비스\s*종료/.test(s)) return '서비스 종료';
@@ -28,34 +42,34 @@ function statusOf(r){
   if(/신규/.test(s)) return '신규';
   return s||'기타';
 }
-function idxs(){ var a=[]; for(var i=0;i<ST.DATA.rows.length;i++) if(passes(ST.DATA.rows[i])) a.push(i); return a; }
+export function idxs(){ var a=[]; for(var i=0;i<ST.DATA.rows.length;i++) if(passes(ST.DATA.rows[i])) a.push(i); return a; }
 
-function monthlyTotal(list, j){ var s=0; for(var k=0;k<list.length;k++) s+=ST.MAT[list[k]][j]; return s; }
-function monthlySeries(list){ var a=new Array(ST.M); for(var j=0;j<ST.M;j++) a[j]=monthlyTotal(list,j); return a; }
-function monthlyByLine(list){
+export function monthlyTotal(list, j){ var s=0; for(var k=0;k<list.length;k++) s+=ST.MAT[list[k]][j]; return s; }
+export function monthlySeries(list){ var a=new Array(ST.M); for(var j=0;j<ST.M;j++) a[j]=monthlyTotal(list,j); return a; }
+export function monthlyByLine(list){
   var out={};
   ST.DATA.lines.forEach(function(l){ out[l.label]=new Array(ST.M).fill(0); });
   list.forEach(function(k){ var r=ST.DATA.rows[k],a=ST.MAT[k],o=out[r.line]; if(!o)return;
     for(var j=0;j<ST.M;j++) o[j]+=a[j]; });
   return out;
 }
-function groupSum(list, key, j){
+export function groupSum(list, key, j){
   var m={};
   list.forEach(function(k){ var r=ST.DATA.rows[k]; var g=(typeof key==='function')?key(r):r[key]; if(!g)g='미지정';
     m[g]=(m[g]||0)+ST.MAT[k][j]; });
   return Object.keys(m).map(function(k){return {name:k,v:m[k]};}).filter(function(x){return x.v!==0;})
     .sort(function(a,b){return b.v-a.v;});
 }
-function groupCount(list, key){
+export function groupCount(list, key){
   var m={};
   list.forEach(function(k){ var r=ST.DATA.rows[k]; var g=(typeof key==='function')?key(r):r[key]; if(!g)return;
     m[g]=(m[g]||0)+1; });
   return Object.keys(m).map(function(k){return {name:k,v:m[k]};}).sort(function(a,b){return b.v-a.v;});
 }
-function activeCustomers(list, j){
+export function activeCustomers(list, j){
   var s={}; list.forEach(function(k){ if(ST.MAT[k][j]>0) s[ST.DATA.rows[k].cust]=1; }); return Object.keys(s).length;
 }
-function rangeSum(list, from, to){
+export function rangeSum(list, from, to){
   var s=0; for(var j=Math.max(0,from); j<=Math.min(ST.M-1,to); j++) s+=monthlyTotal(list,j); return s;
 }
 
@@ -63,14 +77,14 @@ function rangeSum(list, from, to){
    3. 컨트롤 구성
    ================================================================== */
 /* ㊿+147: 색 바탕 위 글자색 — 흰색과 검정 중 대비가 큰 쪽(밝은 노랑·주황·청록 칩에 흰 글자는 2~3:1) */
-function inkOn(bg){
+export function inkOn(bg){
   try{ var c=String(bg||'').trim(), m;
     if((m=/^#([0-9a-f]{6})$/i.exec(c))) c=m[1]; else if((m=/^rgba?\((\d+),\s*(\d+),\s*(\d+)/i.exec(c))) c=[m[1],m[2],m[3]].map(function(x){ return ('0'+(+x).toString(16)).slice(-2); }).join(''); else return '#fff';
     var L=[0,2,4].map(function(i){ var v=parseInt(c.substr(i,2),16)/255; return v<=0.03928? v/12.92 : Math.pow((v+0.055)/1.055,2.4); });
     var l=0.2126*L[0]+0.7152*L[1]+0.0722*L[2];
     return (1.05/(l+0.05) >= (l+0.05)/0.05)? '#fff' : '#111'; }catch(e){ return '#fff'; }
 }
-function buildControls(){
+export function buildControls(){
   // 사업라인 칩
   var box=$('#lineChips'); box.innerHTML='';
   ST.DATA.lines.forEach(function(l){
@@ -201,7 +215,7 @@ function buildControls(){
           if(GRIDS[keep]) renderGrid();                       // 필터·정렬·페이지 유지
           else if(CH_DEFS[keep]) try{ renderChannelView(keep); }catch(e){}
           else if(keep==='inbstat') try{ renderInbStat(); }catch(e){}
-          else if(keep==='report'){ if(!RP._touched) try{ renderReport(); }catch(e){} }   // 수정 중이면 덮어쓰지 않음
+          else if(keep==='report'){ var RPm=lazyGet('report'); if(RPm && !RPm.RP._touched) try{ RPm.renderReport(); }catch(e){} }   // 수정 중이면 덮어쓰지 않음
           else if(keep==='churn') try{ renderChurn(); }catch(e){}
           else if(keep==='churnrate') try{ renderChurnRate(); }catch(e){}
           else if(keep==='custflow') try{ renderCustFlow(); }catch(e){}
@@ -242,11 +256,11 @@ function buildControls(){
   $('#foot').innerHTML = '원본: Supabase DB · <b>금액 단위: 천원</b> (입력·수정과 가격표 단가는 원 단위) · 모든 수정은 변경 이력에 기록됩니다 · 포탈 버전 '+APP_VER+
     (ST.DATA.warnings&&ST.DATA.warnings.length? '<br>⚠️ '+ST.DATA.warnings.join(' / ') : '');
 }
-function uniq(f){
+export function uniq(f){
   var s={}; ST.DATA.rows.forEach(function(r){ var v=f(r); if(v) s[v]=1; });
   return Object.keys(s).sort(function(a,b){return a.localeCompare(b,'ko');});
 }
-function fillSelect(sel, arr){
+export function fillSelect(sel, arr){
   var e=$(sel); var cur=e.value;
   e.innerHTML='<option value="">전체</option>';
   arr.forEach(function(v){ var o=el('option',null,v); o.value=v; e.appendChild(o); });
@@ -256,7 +270,7 @@ function fillSelect(sel, arr){
 /* ==================================================================
    4. 렌더
    ================================================================== */
-function renderAll(){
+export function renderAll(){
   var list=idxs();
   $('#filterCount').textContent = list.length.toLocaleString('ko-KR')+'건 선택됨';
   renderKpis(list);
@@ -279,7 +293,7 @@ function renderAll(){
 }
 
 /* ---- 대시보드 인사 + 알림 배너 ---- */
-function renderHero(list){
+export function renderHero(list){
   var el0=$('#dashHero'); if(!el0) return;
   var b=STATE.base;
   // 할 일 알림 배너 (클릭 → 해당 화면)
@@ -312,10 +326,10 @@ function renderHero(list){
 }
 
 /* ---- 커스텀 질문 위젯 (검색 결과 고정) ---- */
-function qwKey(){ return 'svc_qw_'+(ST.AUTH_USER||'anon'); }
-function qwList(){ try{ return JSON.parse(localStorage.getItem(qwKey())||'[]')||[]; }catch(e){ return []; } }
-function qwSave(l){ try{ localStorage.setItem(qwKey(), JSON.stringify(l)); }catch(e){} }
-function pinQuery(q){
+export function qwKey(){ return 'svc_qw_'+(ST.AUTH_USER||'anon'); }
+export function qwList(){ try{ return JSON.parse(localStorage.getItem(qwKey())||'[]')||[]; }catch(e){ return []; } }
+export function qwSave(l){ try{ localStorage.setItem(qwKey(), JSON.stringify(l)); }catch(e){} }
+export function pinQuery(q){
   q=String(q||'').trim();
   if(!q) return;
   if(q.length>200) q=q.slice(0,200);      // 지나치게 긴 질문은 잘라서 고정
@@ -326,12 +340,12 @@ function pinQuery(q){
   renderQWidgets(); applyWidgetOrder(); initWidgetDnD();
   toast('대시보드 위젯으로 고정했습니다', q);
 }
-function removeQWidget(id){
+export function removeQWidget(id){
   qwSave(qwList().filter(function(w){ return w.id!==id; }));
   var el0=document.querySelector('[data-w="'+id+'"]'); if(el0) el0.remove();
   toast('위젯을 제거했습니다','','info');
 }
-function renderQWidgets(){
+export function renderQWidgets(){
   var grid=document.querySelector('#viewDash .grid'); if(!grid) return;
   document.querySelectorAll('#viewDash [data-w^="q"]').forEach(function(e){ if(/^q[0-9a-z]+$/.test(e.dataset.w)) e.remove(); });
   qwList().forEach(function(w){
@@ -375,8 +389,8 @@ function renderQWidgets(){
 }
 
 /* ---- 위젯 드래그 배치 ---- */
-var DRAG_W=null;
-function initWidgetDnD(){
+export var DRAG_W=null;
+export function initWidgetDnD(){
   var grid=document.querySelector('#viewDash .grid'); if(!grid) return;
   document.querySelectorAll('#viewDash .grid > [data-w]').forEach(function(sec){
     if(sec.querySelector('.whandle')) return;
@@ -408,7 +422,7 @@ function initWidgetDnD(){
     grid.addEventListener('drop',function(e){ e.preventDefault(); });
   }
 }
-function saveWidgetOrder(){
+export function saveWidgetOrder(){
   var grid=document.querySelector('#viewDash .grid'); if(!grid) return;
   var keys=[].map.call(grid.querySelectorAll(':scope > [data-w]'),function(s){ return s.dataset.w; });
   var o=widgetPrefs(); o.__order=keys;
@@ -417,8 +431,8 @@ function saveWidgetOrder(){
 }
 /* sticky 상단바의 실제 높이를 --tbh 에 기록 — 카드 스크롤 여백 계산에 씁니다.
    상단바는 좁은 화면에서 두 줄로 접히므로 값이 고정이 아닙니다. */
-var _tbRaf=0;
-function measureTopbar(now){
+export var _tbRaf=0;
+export function measureTopbar(now){
   /* offsetHeight 읽기는 문서 전체 배치를 강제로 계산시킵니다(큰 화면에서 수백 ms).
      그래서 그리는 도중에는 바로 재지 않고 다음 프레임으로 미룹니다. */
   function run(){
@@ -433,7 +447,7 @@ function measureTopbar(now){
   _tbRaf=requestAnimationFrame(run);
 }
 /* 위젯 하나로 이동 — 꺼져 있으면 켜고, 상단바에 가리지 않게 스크롤한 뒤 잠깐 강조 */
-function goWidget(k, label){
+export function goWidget(k, label){
   if(ST.CUR_VIEW!=='dash'){ switchView('dash'); }
   try{ if(isCC()) ccAnalysisOpen(true, true); }catch(e){}
   var el0=widgetEl(k);
@@ -453,7 +467,7 @@ function goWidget(k, label){
     setTimeout(function(){ el0.classList.remove('card-flash'); }, 1700);
   });
 }
-function applyWidgetOrder(){
+export function applyWidgetOrder(){
   var o=widgetPrefs(); if(!o.__order) return;
   var grid=document.querySelector('#viewDash .grid'); if(!grid) return;
   o.__order.forEach(function(k){
@@ -464,7 +478,7 @@ function applyWidgetOrder(){
 }
 
 /* ---- 대시보드 위젯 커스터마이징 (사용자별, 이 브라우저에 저장) ---- */
-var WIDGET_DEFS=[
+export var WIDGET_DEFS=[
   ['hero','히어로 요약'],
   ['kpi','KPI 카드'], ['goal','연간 목표 진행'], ['mx','월별 종합 장표'],
   ['trend','MRR 추이'], ['year','연도별 매출'], ['line','서비스별 MRR'],
@@ -474,23 +488,23 @@ var WIDGET_DEFS=[
   ['vs','비즈포탈 차액'], ['all','계약 목록']
 ];
 // 기본으로 꺼둘 위젯 (설정에서 켜면 켜집니다)
-var WIDGET_OFF_DEFAULT={vs:1};
-function widgetKey(){ return 'svc_widgets_'+(ST.AUTH_USER||'anon'); }
-function widgetPrefs(){
+export var WIDGET_OFF_DEFAULT={vs:1};
+export function widgetKey(){ return 'svc_widgets_'+(ST.AUTH_USER||'anon'); }
+export function widgetPrefs(){
   try{ return JSON.parse(localStorage.getItem(widgetKey())||'{}')||{}; }catch(e){ return {}; }
 }
-function widgetEl(k){
+export function widgetEl(k){
   if(k==='kpi') return $('#kpis');
   if(k==='goal') return $('#goalBar');
   if(k==='hero') return $('#dashHero');
   return document.querySelector('[data-w="'+k+'"]');
 }
-function widgetOn(k, off){
+export function widgetOn(k, off){
   // 저장된 설정이 있으면 그걸 따르고, 없으면 기본값(WIDGET_OFF_DEFAULT) 적용
   if(off && Object.prototype.hasOwnProperty.call(off,k)) return off[k]!==false;
   return !WIDGET_OFF_DEFAULT[k];
 }
-function applyWidgets(){
+export function applyWidgets(){
   var off=widgetPrefs();
   WIDGET_DEFS.forEach(function(d){
     var el=widgetEl(d[0]); if(!el) return;
@@ -501,7 +515,7 @@ function applyWidgets(){
   measureTopbar();
   try{ ccAnaCount(); }catch(e){}
 }
-function toggleWidgetPanel(){
+export function toggleWidgetPanel(){
   var p=document.getElementById('widgetPanel');
   if(p){ p.remove(); return; }
   var off=widgetPrefs();
@@ -567,15 +581,15 @@ function toggleWidgetPanel(){
 }
 
 /* ㊿+146: 버튼 줄이 화면보다 길어 옆으로 밀리는 경우(폰) 고른 버튼이 보이게 — 연도 탭은 최근 연도가 오른쪽 끝이라 그냥 두면 안 보임 */
-function segScrollSel(seg){
+export function segScrollSel(seg){
   try{ if(!seg || seg.scrollWidth<=seg.clientWidth+1) return; var b=seg.querySelector('[aria-pressed="true"]'); if(!b) return;
     var l=b.offsetLeft, r=l+b.offsetWidth; if(l>=seg.scrollLeft && r<=seg.scrollLeft+seg.clientWidth) return;
     seg.scrollLeft=Math.max(0, r-seg.clientWidth+8); }catch(e){}
 }
 /* ---- 월별 종합 장표 (시트 첫 장표 스타일) ---- */
-var MX_YEAR=null;
-var MX_LIST=null;   // 장표를 그릴 때 쓴 계약 목록(필터 반영) — 셀 «내역 보기»가 같은 기준으로 계산합니다
-function renderMatrix(list){
+export var MX_YEAR=null;
+export var MX_LIST=null;   // 장표를 그릴 때 쓴 계약 목록(필터 반영) — 셀 «내역 보기»가 같은 기준으로 계산합니다
+export function renderMatrix(list){
   list=list||idxs();
   MX_LIST=list;
   var years={};
@@ -669,19 +683,19 @@ function renderMatrix(list){
    시트 수식:  그 달 = SUMIFS(S1!설치비, S1!대금정산일, "YYYY년 M월") + 손으로 더한 값
    · 앞부분은 계약의 설치비·대금정산일로 계산합니다
    · 계약에 없는 설치비·철거비는 install_extra 표에 «고객사 · 구분 · 금액» 줄 단위로 담습니다 (70단계 — 예전 install_adj 수동 조정은 여기로 옮겨졌습니다) */
-var IFEE_MODE='y';
+export var IFEE_MODE='y';
 /* 계약에 없는 설치비·철거비(추가 항목) — 고객사별 줄 단위로 install_extra 에 담깁니다 */
-function ifeeExtras(Y,M){
+export function ifeeExtras(Y,M){
   return ((window.RAWX&&RAWX.iextra)||[]).filter(function(x){ return (Y==null||+x.year===+Y) && (M==null||+x.month===+M); });
 }
-function ifeeAdj(){
+export function ifeeAdj(){
   var m={};
   ifeeExtras().forEach(function(x){ m[x.year+'|'+x.month]=(m[x.year+'|'+x.month]||0)+Number(x.amount||0); });
   return m;
 }
-var IFEE_KINDS=['설치비','철거비','추가설치','기타'];
+export var IFEE_KINDS=['설치비','철거비','추가설치','기타'];
 /* 계약 → 설치비를 인식하는 연·월. 대금정산일이 있으면 그 달, 없으면 시작월 다음 달(시트 관행) */
-function ifeeYm(r){
+export function ifeeYm(r){
   if(r.settle){
     var y=+String(r.settle).slice(0,4), m=+String(r.settle).slice(5,7);
     if(y&&m) return [y,m,false];
@@ -693,8 +707,8 @@ function ifeeYm(r){
   var t=(2020*12+5)+r.startIdx+1;
   return [Math.floor(t/12), (t%12)+1, true];
 }
-var IFEE_LINE='설치비';   // mx_memos 의 line 값 — 서비스 코드와 겹치지 않는 이름
-function openIfeeDetail(td, Y, M, det, adj){
+export var IFEE_LINE='설치비';   // mx_memos 의 line 값 — 서비스 코드와 겹치지 않는 이름
+export function openIfeeDetail(td, Y, M, det, adj){
   var rows=det.filter(function(d){ return d.y===Y && d.m===M; }).sort(function(a,b){ return b.fee-a.fee; });
   var ex=ifeeExtras(Y,M).slice();
   var a=ex.reduce(function(x,e){ return x+Number(e.amount||0); },0);
@@ -744,8 +758,8 @@ function openIfeeDetail(td, Y, M, det, adj){
     ready:function(box){ ifeeWire(box, Y, M, rows, ex, td); }}});
 }
 /* 설치비 금액을 고칠 수 있는 계정인지 — install_extra 쓰기 정책과 같은 기준 */
-function ifeeCanEdit(){ return !!ST.SB_TOKEN && !window.IS_VIEWER && (window.IS_SUPER || MY_ROLE==='admin' || MY_ROLE==='editor'); }
-function ifeeWire(box, Y, M, rows, ex, td){
+export function ifeeCanEdit(){ return !!ST.SB_TOKEN && !window.IS_VIEWER && (window.IS_SUPER || MY_ROLE==='admin' || MY_ROLE==='editor'); }
+export function ifeeWire(box, Y, M, rows, ex, td){
   box.querySelectorAll('.ifgo').forEach(function(b){ b.onclick=function(ev){ ev.stopPropagation();
     var d=rows[+b.dataset.i]; if(!d) return; closeMxPop(); switchView('contracts');
     var sInp=$('#dvSearch'); if(sInp){ sInp.value=d.cust; DV.page=0; renderGrid(); } }; });
@@ -853,7 +867,7 @@ function ifeeWire(box, Y, M, rows, ex, td){
     }catch(e){ msg.textContent=String(e.message||e).slice(0,140); save.disabled=false; }
   };
 }
-function renderInstall(){
+export function renderInstall(){
   var sec=document.querySelector('[data-w="ifee"]'); if(!sec) return;
   var t=$('#tIfee'); if(!t) return;
 
@@ -956,7 +970,7 @@ function renderInstall(){
 }
 
 /* ---- LG U+ 경유 판매 ---- */
-function renderLg(){
+export function renderLg(){
   var lg=ST.DATA.lg, sec=$('#secLg');
   if(!lg || !lg.ok || !lg.rows.length){ if(sec) sec.style.display='none'; return; }
   sec.style.display='';
@@ -974,7 +988,7 @@ function renderLg(){
 }
 
 /* ---- 비즈포탈 대사 ---- */
-function renderVs(){
+export function renderVs(){
   var vs=ST.DATA.vs, sec=$('#secVs');
   if(!vs || !vs.ok || (!vs.items.length && !vs.details.length)){ if(sec) sec.style.display='none'; return; }
   sec.style.display='';
@@ -1003,7 +1017,7 @@ function renderVs(){
 }
 
 /* ---- KPI ---- */
-function renderGoal(list){
+export function renderGoal(list){
   var box=$('#goalBar'); if(!box) return;
   var yr=yOf(STATE.base);
   var tg=(RAWX.targets||[]).filter(function(t){return +t.year===yr;})[0];
@@ -1030,7 +1044,7 @@ function renderGoal(list){
     '</div>';
 }
 
-function renderKpis(list){
+export function renderKpis(list){
   list=list||idxs();
   var b=STATE.base;
   var br=baseRange(), f0=br[0];
@@ -1131,16 +1145,16 @@ function renderKpis(list){
   try{ ccAfterKpis(box, list, b); }catch(e){ console.warn('cc kpis', e); }
 }
 /* ── 대시보드 타일 상세 ── 타일을 누르면 그 숫자를 만든 행을 그대로 보여줍니다 */
-var KPI_D=null;
+export var KPI_D=null;
 /* 만료 예정 타일의 기간(개월) — 타일 안의 1·2·3·6 버튼으로 바꾸며 이 브라우저에 기억 */
-function expN(){ var n=3; try{ n=+localStorage.getItem('svc_exp_n')||3; }catch(e){} return [1,2,3,6,12].indexOf(n)>=0? n : 3; }
-function setExpN(n){
+export function expN(){ var n=3; try{ n=+localStorage.getItem('svc_exp_n')||3; }catch(e){} return [1,2,3,6,12].indexOf(n)>=0? n : 3; }
+export function setExpN(n){
   try{ localStorage.setItem('svc_exp_n',String(n)); }catch(e){}
   STATE.expM=n;   // «만료 예정» 위젯도 같은 기간으로
   $$('#segExp button').forEach(function(b){ b.setAttribute('aria-pressed', +b.dataset.m===n? 'true':'false'); });
   try{ renderKpis(); }catch(e){} try{ renderExpiring(); }catch(e){} try{ renderTodo(); }catch(e){}
 }
-function kpiTable(title, cap, head, rows, xname, view){
+export function kpiTable(title, cap, head, rows, xname, view){
   view=view||'contracts';
   $('#crTitle').textContent=title; $('#crCap').textContent=cap;
   $('#crList').innerHTML='<table class="pr"><thead><tr>'+head.map(function(h){ return '<th'+(h.n?' class="n"':'')+'>'+esc(h.l)+'</th>'; }).join('')+'</tr></thead><tbody>'+
@@ -1149,7 +1163,7 @@ function kpiTable(title, cap, head, rows, xname, view){
   $('#crXls').onclick=function(){ xlsxAoa((xname||title).replace(/[\\/:*?"<>|]/g,' '), head.map(function(h){return h.l;}), rows.map(function(r){ return r.x||r.c.map(function(x){ return String(x).replace(/<[^>]+>/g,''); }); })); };
   openOvl('ovlCr');
 }
-function kpiOpen(kind){
+export function kpiOpen(kind){
   var D=KPI_D; if(!D) return;
   var b=D.b, rows=[], head, tot=0;
   var base=function(r){ return [esc(r.cust), esc(lline(r.line)), esc(chOf(r)), esc(r.status||'활성')+(r.renew?' <span class="ubadge sm">연장 '+r.renew+'회</span>':''), mk(r.startIdx)||'', r.endIdx!=null? mk(r.endIdx):'']; };
@@ -1185,13 +1199,13 @@ function kpiOpen(kind){
     kpiTable(EN2+'개월 내 만료 — '+rows.length+'건 · '+won(tot)+'천원', '종료월이 '+mk(b)+' ~ '+mk(Math.min(b+EN2-1,ST.M-1))+' 인 계약 (해지·서비스종료 상태 제외 · 원계약 기준) · 연장을 등록하면 여기서 빠집니다 · 기간은 타일의 1·2·3·6·12 버튼으로 · 행을 누르면 계약 화면', head, rows, '만료예정_'+EN2+'개월_'+mk(b));
   }
 }
-function deltaHtml(a,b,label){
+export function deltaHtml(a,b,label){
   if(!b) return '';
   var p=(a-b)/b*100;
   var up=p>=0;
   return '<span class="'+(up?'up':'down')+'">'+(up?'▲':'▼')+' '+Math.abs(p).toFixed(1)+'%</span> <span style="color:var(--muted)">'+label+' 대비</span>';
 }
-function sparkline(arr){
+export function sparkline(arr){
   var w=220,h=26,n=arr.length;
   var mx=Math.max.apply(null,arr), mn=Math.min.apply(null,arr);
   var rg=(mx-mn)||1;
@@ -1210,14 +1224,14 @@ function sparkline(arr){
 }
 
 /* ---- 차트 헬퍼 ---- */
-function hexA(hex,a){ return Viz.hexA(hex,a); }
-function kill(id){ /* Viz는 인스턴스를 남기지 않음 */ }
-var RESIZE_HOOKS=[];
-function onResize(fn){ RESIZE_HOOKS.push(fn); }
+export function hexA(hex,a){ return Viz.hexA(hex,a); }
+export function kill(id){ /* Viz는 인스턴스를 남기지 않음 */ }
+export var RESIZE_HOOKS=[];
+export function onResize(fn){ RESIZE_HOOKS.push(fn); }
 
 
 /* ---- MRR 추이 ---- */
-function renderTrend(list){
+export function renderTrend(list){
   list=list||idxs();
   var r=STATE.trendR;
   var to=STATE.base, from = r? Math.max(0,to-r+1) : 0;
@@ -1250,7 +1264,7 @@ function renderTrend(list){
 }
 
 /* ---- 연도별 ---- */
-function renderYear(list){
+export function renderYear(list){
   list=list||idxs();
   var ser=monthlySeries(list), by={};
   for(var j=0;j<ST.M;j++){ var y=yOf(j); by[y]=(by[y]||0)+ser[j]; }
@@ -1274,7 +1288,7 @@ function renderYear(list){
 }
 
 /* ---- 수평 막대 3종 ---- */
-function renderBars(list){
+export function renderBars(list){
   list=list||idxs();
   var b=STATE.base, tot=monthlyTotal(list,b);
   $('#capLine').textContent = mk(b)+' 기준 · 합계 '+won(tot)+'천원 (단위: 천원)';
@@ -1303,7 +1317,7 @@ function renderBars(list){
   var mxc=reasons.length?reasons[0].v:1;
   hbars('#barChurn', reasons.map(function(x){return {name:x.name,v:x.v,c:cssv('--critical')};}), mxc, true);
 }
-function hbars(sel, arr, total, isCount){
+export function hbars(sel, arr, total, isCount){
   var box=$(sel); box.innerHTML='';
   if(!arr.length){ box.appendChild(el('p','cap','해당 조건에 데이터가 없습니다.')); return; }
   var mx=Math.max.apply(null,arr.map(function(x){return Math.abs(x.v);}))||1;
@@ -1326,8 +1340,8 @@ function hbars(sel, arr, total, isCount){
    · 신규 = 원계약 시작월 (부속·CN전환 제외) · 해지 = 상태 «해지» 원계약의 해지월(종료월), 에스원 CND 제외
    · 셀 = 그 달 고객사 수(같은 회사 계약 여러 건 = 1) · 합계 줄은 회사 단위로 중복 제거 · 대시보드 필터(서비스·산업군) 적용
    · 대시보드 «당월 신규/해지» 타일 · 해지 분석 · 해지율 · 고객사 증감 화면과 같은 규칙 */
-var NC_YEAR=null;
-function ncRows(list, kind, lb, s, e){                         // kind 'new'|'lost' · lb 서비스 코드('' = 전체) · [s,e] 월 인덱스
+export var NC_YEAR=null;
+export function ncRows(list, kind, lb, s, e){                         // kind 'new'|'lost' · lb 서비스 코드('' = 전체) · [s,e] 월 인덱스
   var out=[];
   list.forEach(function(k){
     var r=ST.DATA.rows[k]; if(r.parent || r.noCount || String(r.saleType||'')==='H/W') return; if(lb && r.line!==lb) return;
@@ -1337,8 +1351,8 @@ function ncRows(list, kind, lb, s, e){                         // kind 'new'|'lo
   });
   return out;
 }
-function ncCust(ks){ var u={}; ks.forEach(function(k){ u[ST.DATA.rows[k].cust]=1; }); return Object.keys(u).length; }
-function renderNcWidget(list){
+export function ncCust(ks){ var u={}; ks.forEach(function(k){ u[ST.DATA.rows[k].cust]=1; }); return Object.keys(u).length; }
+export function renderNcWidget(list){
   list=list||idxs();
   var t=$('#tNc'); if(!t) return;
   var years={}; for(var i=0;i<ST.M;i++) years[yOf(i)]=1;
@@ -1397,7 +1411,7 @@ function renderNcWidget(list){
 }
 
 /* ---- 만료 예정 ---- */
-function renderExpiring(list){
+export function renderExpiring(list){
   list=list||idxs();
   var b=STATE.base, mm=STATE.expM;
   var rows=list.filter(function(k){
@@ -1423,20 +1437,20 @@ function renderExpiring(list){
         '<td class="n">'+won(mrr)+'</td><td class="n">'+won(r.total)+'</td></tr>';
     }).join('') : '<tr><td colspan="10" class="mini" style="padding:16px">해당 기간에 만료되는 계약이 없습니다.</td></tr>')+'</tbody>';
 }
-function statusBadge(r){
+export function statusBadge(r){
   var s=statusOf(r);
   var c = s==='신규'?'b-new' : s==='재약정'?'b-re' : s==='해지'?'b-churn' : 'b-end';
   return '<span class="badge '+c+'">'+esc(s)+'</span>'+(r.churn? ' <span class="mini">'+esc(r.churn)+'</span>':'');
 }
-function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+export function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
 
 /* ---- 전체 계약 목록 ---- */
-var ALL_COLS=[
+export var ALL_COLS=[
   {k:'line',t:'라인'},{k:'ind',t:'산업군'},{k:'cust',t:'고객사'},{k:'partner',t:'파트너'},
   {k:'ctype',t:'계약구분'},{k:'_status',t:'상태'},{k:'_start',t:'시작',n:1},{k:'_end',t:'종료',n:1},
   {k:'term',t:'개월',n:1},{k:'mrr',t:'월 MRR(천원)',n:1},{k:'total',t:'총 계약액(천원)',n:1},{k:'sum',t:'누적 인식(천원)',n:1}
 ];
-function renderAllTable(list){
+export function renderAllTable(list){
   list=list||idxs();
   var s=STATE.sortAll;
   var rows=list.slice().sort(function(a,b){
@@ -1467,7 +1481,7 @@ function renderAllTable(list){
     };
   });
 }
-function sortVal(r,k){
+export function sortVal(r,k){
   if(k==='_status') return statusOf(r);
   if(k==='_start') return r.startIdx==null?-1:r.startIdx;
   if(k==='_end') return r.endIdx==null?-1:r.endIdx;

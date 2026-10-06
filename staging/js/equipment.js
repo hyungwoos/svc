@@ -1,6 +1,11 @@
 /* ===== equipment.js — 임대 장비: 신청 ↔ 현황 대조 · 원복 · 대조 패널 · 비즈포탈 월 입력 =====
-   포탈 본체(js/app.js)를 ④ 아키텍처 2단계(㊿+136)에서 기능별로 나눈 파일. 전역 var/function 그대로 — 즉시 실행 문장은 전부 js/init.js 에.
-   로드 순서는 index.html <meta name="app-js"> (js/load.js 가 그 순서대로 ?v=APP_VER 를 붙여 불러옴) */
+   ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
+import { APP_VER, ST } from './state.js';
+import { $ } from './core.js';
+import { eqRefresh, sbGet, sbTry, sbWrite, toast, todayStr } from './shell.js';
+import { esc } from './dash.js';
+import { renderGrid } from './grid.js';
+import { closeOvl, logChange, openOvl } from './edit.js';
 
 
 /* ===== 임대 장비: 신청 내역 ↔ 장비 현황 자동 대조 ==============================
@@ -17,22 +22,22 @@
    진짜 시리얼로 바뀝니다.
    일괄 작업(맞추기·재고 되돌리기)은 실행 직전 현황 전체를 찍어두므로 «원복» 이 됩니다.
    ---------------------------------------------------------------------------- */
-var EQ_ST={ '접수':'재고', '출하요청':'재고', '배송중':'재고',        /* 아직 안 나갔어도 현황에 행은 만듭니다 */
+export var EQ_ST={ '접수':'재고', '출하요청':'재고', '배송중':'재고',        /* 아직 안 나갔어도 현황에 행은 만듭니다 */
             '설치완료':'임대중', '회수예정':'임대중', '회수완료':'회수완료' };   /* «취소» 만 현황에 두지 않습니다 */
-var EQ_COLS=['serial','model','usage','status','customer','channel','partner','in_date','deployed_date','returned_date','note','order_id'];
-function eqSerials(r){
+export var EQ_COLS=['serial','model','usage','status','customer','channel','partner','in_date','deployed_date','returned_date','note','order_id'];
+export function eqSerials(r){
   return String(r.serials||'').split(/[,\s]+/)
     .map(function(s){ return s.trim().toUpperCase(); }).filter(function(s){ return s; });
 }
-function eqIsPh(s){ return /^미등록-/.test(String(s||'')); }
+export function eqIsPh(s){ return /^미등록-/.test(String(s||'')); }
 /* 같은 시리얼이 여러 신청에 들어 있으면(장비 이전 · 재임대) 가장 최근 신청이 그 시리얼의 주인입니다.
    예) #171 크린에이스 S7DE23435FB (2024) → #242 에이티이엔지 S7DE23435FB (2025) : #242 가 주인, #171 은 «이전됨» */
-function eqNewer(a,b){
+export function eqNewer(a,b){
   var x=String(a.created_at||''), y=String(b.created_at||'');
   if(x!==y) return x>y;
   return (+a.id||0)>(+b.id||0);
 }
-function eqOwnerMap(){
+export function eqOwnerMap(){
   var own={};
   (RAWX.orders||[]).forEach(function(o){
     if(!EQ_ST[o.status]) return;                          // 취소된 신청은 주인이 못 됩니다
@@ -40,11 +45,11 @@ function eqOwnerMap(){
   });
   return own;
 }
-function eqMine(sn, r, own){            // 이 시리얼의 주인이 r 인가 (다른 신청에 없으면 r 것)
+export function eqMine(sn, r, own){            // 이 시리얼의 주인이 r 인가 (다른 신청에 없으면 r 것)
   var o=own[String(sn||'').toUpperCase()];
   return !o || String(o.id)===String(r.id);
 }
-function eqWant(r, own){                // 이 신청이 현황에 갖고 있어야 할 시리얼 목록
+export function eqWant(r, own){                // 이 신청이 현황에 갖고 있어야 할 시리얼 목록
   if(!EQ_ST[r.status]) return [];
   own=own||eqOwnerMap();
   var ser=eqSerials(r);
@@ -53,37 +58,37 @@ function eqWant(r, own){                // 이 신청이 현황에 갖고 있어
   for(var i=1;i<=q;i++) out.push('미등록-'+r.id+'-'+i);
   return out;
 }
-function eqMoved(r, own){               // 시리얼이 전부 더 최근 신청으로 넘어간 신청인가 («이전됨»)
+export function eqMoved(r, own){               // 시리얼이 전부 더 최근 신청으로 넘어간 신청인가 («이전됨»)
   if(!EQ_ST[r.status]) return false;
   var ser=eqSerials(r); if(!ser.length) return false;
   own=own||eqOwnerMap();
   return !ser.some(function(sn){ return eqMine(sn,r,own); });
 }
-function eqHave(r, own){                // 현황에서 이 신청에 붙어 있는 행 (다른 신청이 주인인 시리얼은 뺍니다)
+export function eqHave(r, own){                // 현황에서 이 신청에 붙어 있는 행 (다른 신청이 주인인 시리얼은 뺍니다)
   own=own||eqOwnerMap();
   return (RAWX.assets||[]).filter(function(a){
     return a.order_id!=null && String(a.order_id)===String(r.id) && (eqIsPh(a.serial) || eqMine(a.serial,r,own)); });
 }
-function eqIn(list){                   // PostgREST in.("A","B") — 한글·하이픈 안전하게
+export function eqIn(list){                   // PostgREST in.("A","B") — 한글·하이픈 안전하게
   return 'in.('+list.map(function(s){ return encodeURIComponent('"'+String(s).replace(/"/g,'')+'"'); }).join(',')+')';
 }
-async function eqPatch(list, body){    // 시리얼이 많아도 URL 이 길어지지 않게 80개씩
+export async function eqPatch(list, body){    // 시리얼이 많아도 URL 이 길어지지 않게 80개씩
   for(var i=0;i<list.length;i+=80) await sbWrite('PATCH','equipment_assets?serial='+eqIn(list.slice(i,i+80)), body);
   var up={}; list.forEach(function(x){ up[String(x).toUpperCase()]=1; });
   (RAWX.assets||[]).forEach(function(a){ if(up[String(a.serial||'').toUpperCase()]) Object.keys(body).forEach(function(k){ a[k]=body[k]; }); });
 }
-async function eqDel(list){
+export async function eqDel(list){
   for(var i=0;i<list.length;i+=80) await sbWrite('DELETE','equipment_assets?serial='+eqIn(list.slice(i,i+80)));
   var dl={}; list.forEach(function(x){ dl[String(x).toUpperCase()]=1; });
   RAWX.assets=(RAWX.assets||[]).filter(function(a){ return !dl[String(a.serial||'').toUpperCase()]; });
 }
-async function eqReload(){ try{ RAWX.assets=await sbTry('equipment_assets?select=*&order=serial')||RAWX.assets; }catch(e){} }
+export async function eqReload(){ try{ RAWX.assets=await sbTry('equipment_assets?select=*&order=serial')||RAWX.assets; }catch(e){} }
 /* 시리얼 묶음 표시 — 한 칸에 수십 개가 늘어지지 않게: 첫 시리얼 + «외 N대 ▾», 누르면 전부 펼침. 회수된 시리얼은 줄을 긋습니다 */
 /* 시리얼 칩 — 신청 내역에서 칩을 눌러 회수/회수취소를 표시하고, 칸 안의 «저장» 으로 반영합니다 (일부·일괄 모두)
    EQOPEN[신청id]=펼침 상태 · EQP[신청id][시리얼]=원하는 회수 상태(true/false, 아직 저장 안 됨) */
-var EQOPEN={}, EQP={};
-function eqCanRet(r){ return !window.IS_VIEWER && ['설치완료','회수예정','회수완료'].indexOf(r.status)>=0; }
-function eqSerialsHtml(r, opt){
+export var EQOPEN={}, EQP={};
+export function eqCanRet(r){ return !window.IS_VIEWER && ['설치완료','회수예정','회수완료'].indexOf(r.status)>=0; }
+export function eqSerialsHtml(r, opt){
   opt=opt||{};
   var all=eqWant(r); if(!all.length) return r.serials? esc(String(r.serials)) : '·';
   var ret=eqRetSet(r), done=(r.status==='회수완료'), can=eqCanRet(r), pend=EQP[r.id]||{}, oid=r.id;
@@ -109,19 +114,19 @@ function eqSerialsHtml(r, opt){
   return '<span class="eqser">'+all.slice(0,k).map(chip).join(' ')+' <button type="button" class="eqser-more" data-oid="'+oid+'" data-n="'+(all.length-k)+'" title="'+esc(all.join(', '))+'">'+(open? '접기 ▴' : '+'+(all.length-k)+' ▾')+'</button>'+
          '<span class="eqser-full" style="display:'+(open?'block':'none')+'">'+all.slice(k).map(chip).join(' ')+bar+'</span></span>';
 }
-function eqOrderById(id){ return (RAWX.orders||[]).filter(function(o){ return String(o.id)===String(id); })[0]; }
+export function eqOrderById(id){ return (RAWX.orders||[]).filter(function(o){ return String(o.id)===String(id); })[0]; }
 
 
 /* 일부 회수: 신청의 returned_serials(회수된 시리얼 목록) */
-function eqRetSet(r){ return String(r.returned_serials||'').split(/[,\s]+/).map(function(s){ return s.trim().toUpperCase(); }).filter(function(s){ return s; }); }
+export function eqRetSet(r){ return String(r.returned_serials||'').split(/[,\s]+/).map(function(s){ return s.trim().toUpperCase(); }).filter(function(s){ return s; }); }
 /* 시리얼 하나가 현황에서 가져야 할 상태 — 신청이 임대중이어도 회수된 시리얼은 회수완료 */
-function eqSerialStatus(o, sn){
+export function eqSerialStatus(o, sn){
   var stA=EQ_ST[o.status]||null;
   if(stA==='임대중' && eqRetSet(o).indexOf(String(sn||'').toUpperCase())>=0) return '회수완료';
   return stA;
 }
-var EQR={r:null};
-function eqRetOpen(r){
+export var EQR={r:null};
+export function eqRetOpen(r){
   if(!ST.SB_TOKEN){ openOvl('ovlAuth'); return; }
   EQR.r=r;
   var all=eqWant(r), ret=eqRetSet(r), amap={};       /* 시리얼이 없으면 «미등록-신청번호-n» 임시 시리얼로 처리 */
@@ -139,7 +144,7 @@ function eqRetOpen(r){
   openOvl('ovlEqRet');
 }
 /* 회수 처리 반영 — checked = 최종적으로 «회수됨» 이어야 하는 시리얼 목록 (일부·전부 모두) */
-async function eqRetApply(r, checked, date, note){
+export async function eqRetApply(r, checked, date, note){
   var all=eqWant(r);
   var prev=eqRetSet(r); if(r.status==='회수완료') prev=all.map(function(x){ return x.toUpperCase(); });
   checked=checked.map(function(x){ return String(x).toUpperCase(); });
@@ -160,7 +165,7 @@ async function eqRetApply(r, checked, date, note){
   toast('회수 처리', checked.length+'/'+all.length+'대 회수'+(body.status==='회수완료'? ' · 신청 회수완료':'')+(x? x:''), 'info');
   return body;
 }
-async function eqRetSave(){
+export async function eqRetSave(){
   var r=EQR.r; if(!r) return;
   var checked=[].slice.call(document.querySelectorAll('#erList input:checked')).map(function(x){ return x.dataset.sn; });
   var date=$('#erDate').value||todayStr(), note=$('#erNote').value.trim();
@@ -172,7 +177,7 @@ async function eqRetSave(){
   btn.disabled=false;
 }
 /* 현황 한 행이 신청과 다른 점 */
-function eqFieldDiff(o,a){
+export function eqFieldDiff(o,a){
   var d=[], stA=eqSerialStatus(o, a.serial);
   if(String(a.status||'')!==String(stA||'')) d.push('상태');
   if(String(a.customer||'')!==String(o.customer||'')) d.push('고객사');
@@ -182,21 +187,21 @@ function eqFieldDiff(o,a){
 }
 
 /* ---- 원복(되돌리기) — 일괄 작업 직전 현황을 통째로 찍어둡니다 ---- */
-var EQ_UNDO=null, EQ_ERR='', EQ_DIAG='';
-function eqRow(a){ var o={}; EQ_COLS.forEach(function(k){ o[k]=(a[k]===undefined? null : a[k]); }); return o; }
-function eqSnap(label){
+export var EQ_UNDO=null, EQ_ERR='', EQ_DIAG='';
+export function eqRow(a){ var o={}; EQ_COLS.forEach(function(k){ o[k]=(a[k]===undefined? null : a[k]); }); return o; }
+export function eqSnap(label){
   EQ_UNDO={ at:new Date().toISOString(), label:label,
             before:(RAWX.assets||[]).map(eqRow) };
   try{ sessionStorage.setItem('eq_undo', JSON.stringify(EQ_UNDO)); }catch(e){}
   return EQ_UNDO;
 }
-function eqUndoGet(){
+export function eqUndoGet(){
   if(EQ_UNDO) return EQ_UNDO;
   try{ var v=sessionStorage.getItem('eq_undo'); if(v) EQ_UNDO=JSON.parse(v); }catch(e){}
   return EQ_UNDO;
 }
-function eqUndoClear(){ EQ_UNDO=null; try{ sessionStorage.removeItem('eq_undo'); }catch(e){} }
-async function eqUndoRun(){
+export function eqUndoClear(){ EQ_UNDO=null; try{ sessionStorage.removeItem('eq_undo'); }catch(e){} }
+export async function eqUndoRun(){
   if(!ST.SB_TOKEN){ openOvl('ovlAuth'); return; }
   var u=eqUndoGet(); if(!u||!u.before) return;
   var when=String(u.at||'').replace('T',' ').slice(0,16);
@@ -231,7 +236,7 @@ async function eqUndoRun(){
 }
 
 /* 신청 한 건을 기준으로 현황을 맞춥니다 (항상 신청 → 현황 한 방향) */
-async function syncOrderAssets(r, st, quiet){
+export async function syncOrderAssets(r, st, quiet){
   if(st) r.status=st;
   var own=eqOwnerMap();
   var real=eqSerials(r), want=eqWant(r,own), stA=EQ_ST[r.status]||null;
@@ -309,13 +314,13 @@ async function syncOrderAssets(r, st, quiet){
 }
 
 /* ---- 신청 ↔ 현황 대조 패널 (장비 신청 내역 · 장비 현황 화면 위에 표시) ---- */
-function eqHostEl(){
+export function eqHostEl(){
   var tw=$('#dvTable').parentElement;
   var host=document.getElementById('eqHost');
   if(!host){ host=document.createElement('div'); host.id='eqHost'; tw.parentElement.insertBefore(host,tw); }
   return host;
 }
-function eqScan(){
+export function eqScan(){
   var orders=(RAWX.orders||[]), assets=(RAWX.assets||[]), own=eqOwnerMap();
   var byOrder={}, oid={};
   orders.forEach(function(o){ oid[String(o.id)]=o; });
@@ -353,8 +358,8 @@ function eqScan(){
   });
   return {orders:orders, gap:gap, ph:ph, cancel:cancel, moved:moved, ok:ok, orphan:orphan};
 }
-function own_(o){ var own=eqOwnerMap(), ser=eqSerials(o); for(var i=0;i<ser.length;i++){ if(own[ser[i]] && String(own[ser[i]].id)!==String(o.id)) return own[ser[i]]; } return null; }
-function renderEqPanel(){
+export function own_(o){ var own=eqOwnerMap(), ser=eqSerials(o); for(var i=0;i<ser.length;i++){ if(own[ser[i]] && String(own[ser[i]].id)!==String(o.id)) return own[ser[i]]; } return null; }
+export function renderEqPanel(){
   if(ST.CUR_VIEW!=='orders' && ST.CUR_VIEW!=='assets'){
     var h0=document.getElementById('eqHost'); if(h0) h0.style.display='none'; return;
   }
@@ -413,7 +418,7 @@ function renderEqPanel(){
   var b4=document.getElementById('eqDiag');   if(b4) b4.onclick=eqDiagRun;
 
 }
-async function eqFixAll(){
+export async function eqFixAll(){
   if(!ST.SB_TOKEN){ openOvl('ovlAuth'); return; }
   var s=eqScan(); if(!s.gap.length) return;
   if(!confirm('신청 내역을 기준으로 장비 현황 '+s.gap.length+'건을 맞출까요?\n\n'+
@@ -438,7 +443,7 @@ async function eqFixAll(){
   ST.DIRTY=true; renderGrid();
 }
 /* 동기화가 안 될 때 — 어디서 막히는지 실제로 한 번씩 해 봅니다 */
-async function eqDiagRun(){
+export async function eqDiagRun(){
   var log=[];
   function bad(t){ return '<b style="color:var(--critical,#d03b3b)">'+esc(t)+'</b>'; }
   function put(){ EQ_DIAG=log.join('<br>');
@@ -479,7 +484,7 @@ async function eqDiagRun(){
   put();
   ST.DIRTY=true; renderGrid();
 }
-async function eqOrphanFix(){
+export async function eqOrphanFix(){
   if(!ST.SB_TOKEN){ openOvl('ovlAuth'); return; }
   var s=eqScan(); if(!s.orphan.length) return;
   var ser=s.orphan.map(function(a){ return a.serial; });
@@ -496,9 +501,9 @@ async function eqOrphanFix(){
 }
 
 /* ---- 비즈포탈 차액: 월 단위 입력 화면 ---- */
-var BIZV={ym:null, edit:false, newMonth:false};
-function bizNz(s){ s=String(s==null?'':s).replace(/[^\d.-]/g,''); return s===''||s==='-'? null : +s; }
-function bizHostEl(){
+export var BIZV={ym:null, edit:false, newMonth:false};
+export function bizNz(s){ s=String(s==null?'':s).replace(/[^\d.-]/g,''); return s===''||s==='-'? null : +s; }
+export function bizHostEl(){
   var tw=$('#dvTable').parentElement;
   var host=document.getElementById('bizHost');
   if(!host){ host=document.createElement('div'); host.id='bizHost'; tw.parentElement.insertBefore(host,tw); }

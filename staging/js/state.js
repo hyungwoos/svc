@@ -3,7 +3,7 @@
      모듈로 바꾸면 파일 안 var 는 파일 밖에서 안 보이므로, 먼저 전부 ST.* 로 모아 둠 — 2단계에서 이 파일만 export 하면 됨.
    · 규칙: 두 파일 이상이 «값을 바꾸는» 변수는 여기에만 둔다(lint 가 새로 생기면 실패). 한 파일 안에서만 쓰는 상태는 그 파일의 var 그대로.
    · 이름은 ST (STATE 는 dash.js 의 대시보드 거르기 상태라 다름). app-js 목록 맨 앞에서 로드. */
-var ST={
+export var ST={
   /* 데이터 (core.js buildFromRes 가 채움) */
   DATA:null,            // 서버에서 받은 원본(행 shape 포함) · null = 아직 없음
   M:0,                  // 월 개수
@@ -27,3 +27,8 @@ var ST={
   IDLE_LAST:Date.now(),
   IDLE_WARNED:false
 };
+
+/* 환경 — ㊿+153: 예전 boot.js(APP_VER) · init.js(IS_STAGING · IS_QA) 에서 옮김 */
+export var APP_VER=(function(){ var m=document.querySelector('meta[name="app-ver"]'); return (m&&m.content)||'0000-00-00 ㊿+0'; })();   // 포탈 버전 — index.html <meta name="app-ver"> 한 곳
+export var IS_STAGING=/\/staging\//.test(location.pathname);
+export var IS_QA=/[?&]qa=1(?:&|$)/.test(location.search);   /* ㊿+151: 스테이징 QA 가 iframe 으로 열 때 — 서비스 워커·사본·오류 기록·팝업 생략 */

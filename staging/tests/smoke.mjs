@@ -259,7 +259,10 @@ for (const f of ['quote.html', 'report.html', 's1.html', 'kk.html']) {
 if (fs.existsSync(path.join(DIR, 'staging', 'index.html'))) {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 } }); const page = await ctx.newPage(); const c = collect(page);
   await mockBackend(page); await page.goto(url + '/staging/index.html'); await page.waitForTimeout(2200);
-  await S.t('스테이징: STAGING 띠 · 배포 기본 대상 스테이징', async () => { assert(!c.errs.length, c.errs.join(' | ')); assert(await page.$('#stagingBar'), '띠 없음'); assert(await page.evaluate(() => IS_STAGING && /STAGING/.test(document.title)), 'IS_STAGING/title'); await page.evaluate(() => switchView('ops')); await page.waitForTimeout(300); assert(await page.evaluate(() => OPS.target === 'staging'), 'target ' + await page.evaluate(() => OPS.target)); });
+  await S.t('스테이징: STAGING 띠 · 배포 기본 대상 스테이징', async () => { assert(!c.errs.length, c.errs.join(' | ')); assert(await page.$('#stagingBar'), '띠 없음'); /* ㊿+153: staging/ 은 다음 버전일 수 있음 — 모듈 전환 뒤 포탈 이름은 window.SVC 에(예전 버전은 window 에 바로) */
+    assert(await page.evaluate(() => { const W = window.SVC || window; return W.IS_STAGING && /STAGING/.test(document.title); }), 'IS_STAGING/title'); await page.evaluate(() => (window.SVC || window).switchView('ops'));
+    await page.waitForFunction(() => { const W = window.SVC || window; return W.OPS && W.OPS.target; }, null, { timeout: 8000 }).catch(() => null);   /* 관리자 코드는 처음 열 때 받음 */
+    assert(await page.evaluate(() => (window.SVC || window).OPS.target === 'staging'), 'target ' + await page.evaluate(() => ((window.SVC || window).OPS || {}).target)); });
   await ctx.close();
 } else console.log('  · staging/ 없음(건너뜀)');
 // 9) 2단계 인증(MFA) — 등록된 계정: 저장된 aal1 세션 → 코드 창 → aal2 세션 교체 · 취소 · 로그인 화면 흐름 · 내 계정 카드(끄기·켜기)
@@ -364,7 +367,7 @@ if (fs.existsSync(path.join(DIR, 'staging', 'index.html'))) {
     });
     await S.t('MFA 강제: 관리자 › 2단계 인증 정책 — 목록 · 필수 지정 저장 · 초기화', async () => {
       page.on('dialog', (d) => d.accept());
-      await page.evaluate(() => { switchView('adminx'); admTab('sec'); }); await page.waitForTimeout(900);
+      await page.evaluate(async () => { await SVC.lazyLoad('admin'); switchView('adminx'); admTab('sec'); }); await page.waitForTimeout(900);
       const rows = await page.$$eval('#mfTable tbody tr', (t) => t.length); assert(rows === 3, 'rows ' + rows);
       assert(/차단 중|유예|등록/.test(await page.$eval('#mfTable', (e) => e.textContent)), '상태 표기 없음');
       await page.check('#mfTable [data-mf-req="b@example.com"]'); await page.waitForTimeout(100);
@@ -464,7 +467,7 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
     assert(!errs.length, errs.join(' | ')); return st.ch.join(',');
   });
   await S.t('관리자 › 코드 관리: 표 · 추가(POST) · 숨기기(PATCH) · 순서(PATCH×2)', async () => {
-    await page.evaluate(() => { switchView('adminx'); admTab('cfg'); }); await page.waitForTimeout(800);
+    await page.evaluate(async () => { await SVC.lazyLoad('admin'); switchView('adminx'); admTab('cfg'); }); await page.waitForTimeout(800);
     assert(await page.$('#cdTable tbody'), '코드 관리 표 없음'); const kinds = await page.$$eval('#cdKind option', (e) => e.length); assert(kinds >= 12, '종류 ' + kinds);
     await page.selectOption('#cdKind', 'channel'); await page.waitForTimeout(150);
     const rows = await page.$$eval('#cdTable tbody tr', (e) => e.map((x) => x.querySelector('td:nth-child(2) b').textContent)); assert(rows.length === 6 && rows[5] === '테스트채널', '채널 ' + rows.join(','));
@@ -881,7 +884,7 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
       cacheDrop(); cacheWriteLater([[1]]); cacheDrop(); await new Promise((ok) => setTimeout(ok, 3300)); const dropped = sessionStorage.getItem(CACHE_KEY) === null;
       cacheWriteLater([[{ id: 1 }]]); await new Promise((ok) => setTimeout(ok, 3300)); const written = !!sessionStorage.getItem(CACHE_KEY);
       navMenu('dash'); onData(ST.DATA); onData(ST.DATA); await new Promise((ok) => setTimeout(ok, 400));
-      window.__rn = 0; const orig = window.renderAll; window.renderAll = function () { window.__rn++; return orig.apply(this, arguments); };
+      window.__rn = 0; new MutationObserver((ms) => { window.__rn += ms.length; }).observe(document.getElementById('filterCount'), { childList: true, characterData: true, subtree: true });   /* ㊿+153: 모듈 함수는 밖에서 바꿔 끼울 수 없어 renderAll 이 매번 쓰는 #filterCount 로 셈 */
       return { dropped, written, wwOn: _wwOn };
     });
     await page.setViewportSize({ width: 1100, height: 1000 }); await page.waitForTimeout(700);
@@ -929,6 +932,7 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
   if (fs.existsSync(ALA)) await page.route(/cdn\.jsdelivr\.net\/npm\/alasql@4\.19\.0\/dist\/alasql\.min\.js/, (r) => r.fulfill({ status: 200, contentType: 'application/javascript', headers: { 'Access-Control-Allow-Origin': '*' }, body: fs.readFileSync(ALA, 'utf8') }));
   page.on('dialog', (d) => d.accept().catch(() => {}));
   await S.t('㊿+147 AI 점검 숫자: 만원·원 표기 인정 · 다른 금액은 불인정 · 칩 글자색(밝은 바탕엔 검정)', async () => {
+    await page.evaluate(() => SVC.lazyLoad('admin'));   /* ㊿+153: 관리자 코드는 처음 열 때 받음 */
     const r = await page.evaluate(() => ({ a: aiHasNum('이번 달 MRR은 약 9,956만원(99,557,735원)', 99557735), b: aiHasNum('99,557,735원', 99557735), c: aiHasNum('약 8,000만원', 99557735), d: inkOn('#eda100'), e: inkOn('#226bc4'), f: inkOn('rgb(27, 175, 122)') }));
     assert(r.a && r.b && !r.c && r.d === '#111' && r.e === '#fff', JSON.stringify(r)); return JSON.stringify(r);
   });
@@ -945,7 +949,7 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
     await page.evaluate(() => { QB.mode = 'ui'; }); return r.n + '행 · ' + r.row.slice(0, 3).join(' / ');
   });
   await S.t('㊿+147 관리자 › 2단계 인증: 역할 기본(슈퍼·관리자 필수 14일) 표시 · 끄기 저장 → mfa_role_set · 목록에 «역할 기본»', async () => {
-    await page.evaluate(() => { navMenu('adminx'); admTab('sec'); }); await page.waitForTimeout(1200);
+    await page.evaluate(async () => { await SVC.lazyLoad('admin'); navMenu('adminx'); admTab('sec'); }); await page.waitForTimeout(1200);
     const vis = await page.evaluate(() => { const b = document.getElementById('mfRole'); return !!b && b.style.display !== 'none' && /역할 기본/.test(b.textContent) && /유예 중/.test(b.textContent); });
     assert(vis, '역할 기본 칸 없음');
     assert(/역할 기본/.test(await page.$eval('#mfTable', (e) => e.textContent)), '목록에 역할 기본 표시 없음');
@@ -1069,7 +1073,7 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
   });
   await S.t('㊿+148 관리자 › 업데이트 안내: 계정 «받기» upsert · 처음부터 다시 DELETE · 새 안내 POST · 내 계정 › 업데이트 내역', async () => {
     notifyDb = [{ email: 'sales@example.com', enabled: true }]; ackDb = [{ email: 'sales@example.com', last_id: notesDb.length - 1, acked_at: '2026-10-05T01:00:00Z' }];
-    await page.evaluate(() => { switchView('adminx'); admTab('cfg'); });
+    await page.evaluate(async () => { await SVC.lazyLoad('admin'); switchView('adminx'); admTab('cfg'); });
     await page.waitForFunction(() => { const u = document.getElementById('updUsers'); return u && u.textContent.includes('1건'); }, null, { timeout: 6000 }).catch(() => {});
     const t = await page.evaluate(() => { const u = document.getElementById('updUsers'), n = document.getElementById('updNotes'); return u && n && { users: u.querySelectorAll('tbody tr').length, unread: u.textContent.includes('1건'), notes: n.querySelectorAll('tbody tr').length }; });
     assert(t && t.users === 2 && t.unread && t.notes === notesDb.length, JSON.stringify(t));
@@ -1123,7 +1127,7 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
   await mockBackend(page, { onWrite: (w) => writes.push(w), extra: async (route, u) => { if (/\/rest\/v1\/price_books/.test(u)) { await route.fulfill({ status: 200, contentType: 'application/json', headers: { 'content-range': '0-0/1', 'Access-Control-Expose-Headers': 'content-range' }, body: JSON.stringify(PRICE_BOOK) }); return true; } if (!u.includes('/functions/v1/ops')) return false; const b = JSON.parse(route.request().postData() || '{}'); const out = b.action === 'status' ? { ok: true, pin_set: true, github: { repo: 'x/svc', branch: 'main', token_set: true }, recent: [] } : b.action === 'gh_copy' ? { ok: true, commit: 'c0ffee1', copied: 3 } : { ok: true }; await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(out) }); return true; } });
   await page.route('**/svc/staging/**', async (route) => { const u = new URL(route.request().url()); const rel = decodeURIComponent(u.pathname.replace('/svc/staging/', ''));
     if (breakCss && rel === 'app.css') { await route.fulfill({ status: 200, contentType: 'text/css', body: fs.readFileSync(path.join(ROOT, rel), 'utf8') + '\n#viewPrice .pr-grid{grid-template-columns:900px 900px!important}\n' }); return; }
-    if (breakDcheck && rel === 'js/analysis.js') { const src = fs.readFileSync(path.join(ROOT, rel), 'utf8') + "\nfunction renderDataCheck(){ throw new Error('QA 시험 오류'); }\n"; await route.fulfill({ status: 200, contentType: 'application/javascript', body: src }); return; }
+    if (breakDcheck && rel === 'js/analysis.js') { const src = fs.readFileSync(path.join(ROOT, rel), 'utf8') + "\nrenderDataCheck = function(){ throw new Error('QA 시험 오류'); };\n";   /* ㊿+153: 모듈이라 같은 이름 선언은 문법 오류 — 값을 바꿔 끼움(export 는 살아 있는 연결) */ await route.fulfill({ status: 200, contentType: 'application/javascript', body: src }); return; }
     await route.fulfill({ path: path.join(ROOT, rel) }); });
   page.on('dialog', async (d) => { dialogs.push(d.message()); await d.dismiss(); });
   await page.goto(url + '/index.html'); await page.waitForTimeout(2200);
@@ -1170,6 +1174,75 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
     dialogs.length = 0; await page.click('#opsPromote'); await page.waitForTimeout(200);
     assert(dialogs.length === 1 && /⚠ 스테이징 QA 에서 \d+건 실패/.test(dialogs[0]), '경고 없음 ' + dialogs[0]);
     breakDcheck = false; return r.dc.join(' / ').slice(0, 120);
+  });
+  await ctx.close();
+}
+// ㊿+153: ES 모듈 — 시작점 main.js 하나 · importmap 의 ?v= · 리포트·관리자·가격표는 처음 열 때 · window.SVC · 서비스 워커 오프라인
+{
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page);
+  const js = []; let failReport = false; const writes = [];
+  page.on('request', (r) => { const u = r.url(); if (/\/js\/[\w-]+\.js/.test(u)) js.push(u.replace(/^.*\/svc\//, '')); });
+  await page.route('**/svc/js/report.js*', (route) => (failReport ? route.fulfill({ status: 503, body: 'down' }) : route.continue()));
+  await mockBackend(page, { onWrite: (w) => writes.push(w) }); await page.goto(url + '/index.html');
+  await page.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA, null, { timeout: 15000 }); await page.waitForTimeout(400);
+  const ver = await page.evaluate(() => SVC.APP_VER); const v = encodeURIComponent(ver);
+  await S.t('㊿+153 모듈: 첫 화면에 report·admin·price 를 받지 않음 · 모든 코드 요청에 ?v=<버전> · boot.js/load.js 안 씀 · 오류 0', async () => {
+    const lazy = js.filter((u) => /js\/(report|admin|price)\.js/.test(u)); const noV = js.filter((u) => u.indexOf('?v=' + v) < 0);
+    assert(!lazy.length, '처음부터 받음: ' + lazy.join(', ')); assert(!noV.length, '?v= 없음: ' + noV.slice(0, 4).join(', '));
+    assert(!js.some((u) => /js\/(boot|load)\.js/.test(u)), 'boot/load 요청'); assert(js.some((u) => /js\/main\.js\?v=/.test(u)), 'main.js 없음');
+    assert(!c.errs.length && !c.csp.length, c.errs.concat(c.csp).join(' | '));
+    const st = await page.evaluate(() => ({ svc: Object.keys(SVC).length, win: typeof window.navMenu, same: window.navMenu === SVC.navMenu, skip: SVC.__skip.length, lazy: typeof SVC.renderReport }));
+    assert(st.svc > 800 && st.win === 'function' && st.same && st.lazy === 'undefined', JSON.stringify(st)); return js.length + '개 파일 · SVC ' + st.svc + '개 이름';
+  });
+  await S.t('㊿+153 처음 열 때 불러오기: 메뉴를 열면 그때 받고 그림 · 받는 동안 «불러오는 중…» · 두 번째는 바로', async () => {
+    await page.route('**/svc/js/price.js*', async (route) => { await new Promise((ok) => setTimeout(ok, 700)); route.continue(); });
+    await page.evaluate(() => navMenu('price')); await page.waitForTimeout(300);
+    const mid = await page.evaluate(() => { const h = document.getElementById('viewPrice'); return { wait: h.classList.contains('lazy-wait'), text: h.innerText.trim() }; });
+    assert(mid.wait && /화면을 불러오는 중/.test(mid.text) && mid.text.length < 40, '받는 중 안내 없음 ' + JSON.stringify(mid));
+    await page.waitForFunction(() => !document.getElementById('viewPrice').classList.contains('lazy-wait') && typeof SVC.renderPrice === 'function', null, { timeout: 8000 });
+    await page.waitForTimeout(200); const t = await page.$eval('#viewPrice', (e) => e.innerText); assert(/제품 가격표/.test(t) && !/불러오는 중…$/.test(t.trim()), t.slice(0, 80));
+    for (const [m, host, re] of [['report', 'viewReport', /리포트/], ['adminx', 'viewAdmin', /관리자/], ['ops', 'viewOps', /배포·운영/], ['account', 'viewAccount', /내 계정/]]) {
+      await page.evaluate((m) => navMenu(m), m); await page.waitForFunction((h) => !document.getElementById(h).classList.contains('lazy-wait'), host, { timeout: 8000 }); await page.waitForTimeout(250);
+      const tx = await page.$eval('#' + host, (e) => e.innerText); assert(re.test(tx) && tx.length > 100, m + ' 화면 ' + tx.slice(0, 60));
+    }
+    const n0 = js.length; await page.evaluate(() => navMenu('report')); const sync = await page.evaluate(() => !document.getElementById('viewReport').classList.contains('lazy-wait'));
+    assert(sync && js.length === n0, '두 번째 열기에 다시 받음 ' + (js.length - n0)); assert(!c.errs.length, c.errs.join(' | '));
+    return 'price·report·admin·ops·account';
+  });
+  await S.t('㊿+153 처음 열 때 불러오는 화면도 메뉴를 다시 누르면 «첫 화면»(코드를 받은 직후의 사본으로 되돌림)', async () => {
+    const r = await page.evaluate(async () => {
+      navMenu('price'); const seg0 = SVC.PR.seg; SVC.PR.seg = seg0 === 'saas' ? 'onprem' : 'saas'; SVC.PR.q = 'zz'; navMenu('dash'); navMenu('price'); const back = SVC.PR.seg === seg0 && !SVC.PR.q;
+      navMenu('ops'); const t0 = SVC.OPS.tab; SVC.OPS.tab = t0 === 'gh' ? 'sql' : 'gh'; navMenu('dash'); navMenu('ops'); const opsBack = SVC.OPS.tab === t0;
+      return { back, opsBack, seg0 }; });
+    assert(r.back && r.opsBack, JSON.stringify(r)); return JSON.stringify(r);
+  });
+  await S.t('㊿+153 코드 파일을 못 받으면 그 화면에 «오류가 발생 — 새로고침» · 오류 기록 · 다시 열면 다시 시도', async () => {
+    failReport = true; const ctx2 = await browser.newContext({ viewport: { width: 1280, height: 900 }, serviceWorkers: 'block' }); const p2 = await ctx2.newPage(); const w2 = [];
+    await p2.route('**/svc/js/report.js*', (route) => (failReport ? route.fulfill({ status: 503, body: 'down' }) : route.continue()));
+    await mockBackend(p2, { onWrite: (w) => w2.push(w) }); await p2.goto(url + '/index.html'); await p2.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA, null, { timeout: 15000 });
+    await p2.evaluate(() => navMenu('report')); await p2.waitForTimeout(800);
+    const t = await p2.$eval('#viewReport', (e) => e.innerText.trim()); assert(/오류가 발생/.test(t) && /새로고침/.test(t), t.slice(0, 100));
+    assert(w2.some((w) => /client_errors/.test(w.url) && /지연 모듈 report/.test(w.body)), 'client_errors 기록 없음');
+    failReport = false; await p2.evaluate(() => { navMenu('dash'); navMenu('report'); }); await p2.waitForFunction(() => typeof SVC.renderReport === 'function', null, { timeout: 8000 }); await p2.waitForTimeout(300);
+    const t2 = await p2.$eval('#viewReport', (e) => e.innerText); assert(!/오류가 발생/.test(t2) && t2.length > 100, '다시 시도 실패 ' + t2.slice(0, 80));
+    await ctx2.close(); return t.slice(0, 50);
+  });
+  await ctx.close();
+}
+{
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } }); const page = await ctx.newPage(); const c = collect(page);
+  await mockBackend(page); await page.goto(url + '/index.html');
+  await S.t('㊿+153 서비스 워커(svc-pwa-5): 코드 파일 전부 미리 저장 → 오프라인에서 다시 열어도 뜸 · 처음 열 때 받는 화면(리포트)도', async () => {
+    const until = async (fn, ms) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (await page.evaluate(fn).catch(() => false)) return true; await page.waitForTimeout(250); } return false; };   /* waitForFunction 은 Promise 를 기다리지 않음 */
+    await until(async () => { const r = await navigator.serviceWorker.getRegistration(); return !!(r && r.active && navigator.serviceWorker.controller); }, 20000);
+    await until(async () => { const ks = await caches.keys(); return ks.length === 1 && (await (await caches.open(ks[0])).keys()).length >= 28; }, 20000);
+    const keys = await page.evaluate(async () => { const ks = await caches.keys(); const c0 = await caches.open(ks[0]); return { name: ks[0], n: (await c0.keys()).length }; });
+    assert(keys.name === 'svc-pwa-5' && keys.n >= 28, JSON.stringify(keys));
+    await page.reload(); await page.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA, null, { timeout: 15000 });
+    await ctx.setOffline(true); await page.reload(); await page.waitForFunction(() => window.SVC && typeof SVC.navMenu === 'function', null, { timeout: 15000 });
+    const off = await page.evaluate(async () => { await SVC.lazyLoad('report'); return { ver: SVC.APP_VER, rep: typeof SVC.renderReport }; });
+    await ctx.setOffline(false);
+    assert(off.rep === 'function' && /㊿\+\d+/.test(off.ver), JSON.stringify(off)); return JSON.stringify(keys) + ' · 오프라인 ' + JSON.stringify(off);
   });
   await ctx.close();
 }
