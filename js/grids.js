@@ -43,10 +43,16 @@ export async function loadCodes(){
     applyCodes(); return m;
   }catch(e){ ST.CODES=null; return null; }
 }
+/* 종류 → 기본값 배열 객체 (㊿+154: 예전 window[CODE_KIND[kind]] — 모듈 이름은 window 에 없음). 배열은 이 파일 아래쪽에 선언돼 있어 부를 때 찾음 */
+export function codeArr(kind){
+  var A={CSTATUS_OPTS:CSTATUS_OPTS, CTYPE_OPTS:CTYPE_OPTS, CH_OPTS:CH_OPTS, LINE_OPTS:LINE_OPTS, LEAD_OPTS:LEAD_OPTS, LIVEOV_OPTS:LIVEOV_OPTS, ORD_STATUS_OPTS:ORD_STATUS_OPTS,
+    ORD_CH_OPTS:ORD_CH_OPTS, MODEL_OPTS:MODEL_OPTS, BILLING_OPTS:BILLING_OPTS, CHURN_OPTS:CHURN_OPTS, PTN_OPTS:PTN_OPTS, IND_OPTS:IND_OPTS, VER_OPTS:VER_OPTS};
+  return A[CODE_KIND[kind]]||null;
+}
 export function applyCodes(){
   if(!ST.CODES) return;
   Object.keys(CODE_KIND).forEach(function(kind){
-    var arr=window[CODE_KIND[kind]], list=ST.CODES[kind]; if(!Array.isArray(arr) || !list) return;
+    var arr=codeArr(kind), list=ST.CODES[kind]; if(!Array.isArray(arr) || !list) return;
     var vals=list.filter(function(c){ return c.active!==false; }).sort(function(a,b){ return (a.sort||0)-(b.sort||0) || String(a.value).localeCompare(String(b.value)); }).map(function(c){ return c.value; });
     if(!vals.length) return;                           // 전부 숨기면 기본값 유지(화면이 비지 않게)
     arr.length=0; vals.forEach(function(v){ arr.push(v); });
@@ -54,8 +60,8 @@ export function applyCodes(){
   });
   fillModelSelect();
 }
-export function codeList(kind){ return (ST.CODES && ST.CODES[kind]) || (window[CODE_KIND[kind]]||[]).map(function(v){ return {kind:kind, value:v, active:true}; }); }
-export function codeActive(kind, v){ if(v==null || v==='') return true; var arr=window[CODE_KIND[kind]]; return !arr || arr.indexOf(v)>=0; }
+export function codeList(kind){ return (ST.CODES && ST.CODES[kind]) || (codeArr(kind)||[]).map(function(v){ return {kind:kind, value:v, active:true}; }); }
+export function codeActive(kind, v){ if(v==null || v==='') return true; var arr=codeArr(kind); return !arr || arr.indexOf(v)>=0; }
 /* 발주 신청 폼의 모델 select (#odModel) 를 MODEL_OPTS 로 다시 채움 — 현재 값 유지 */
 export function fillModelSelect(){ var s=document.getElementById('odModel'); if(!s) return; var cur=s.value; s.innerHTML=MODEL_OPTS.map(function(m){ return '<option>'+esc(m)+'</option>'; }).join(''); if(cur && MODEL_OPTS.indexOf(cur)>=0) s.value=cur; }
 
@@ -63,7 +69,7 @@ export var LINE_OPTS=['Cloud','S1','MDR','MDR_S1','DRM','PNS','DLP'];
 export var PTN_OPTS=['지니언스(직접)','다원티에스','글로웰시스템','에티버스','직접(계산서)'];
 /* 에스원 계약번호 후보 — 계약(s1_no) · 에스원 정산 매핑(s1_map) · 임대 장비 신청(equipment_orders.contract_no) 을 모아 보여줍니다 */
 export function s1NoOpts(){
-  var set={}, R=window.RAWX||{};
+  var set={}, R=ST.RAWX||{};
   (R.contracts||[]).forEach(function(c){ if(c.s1_no) set[String(c.s1_no).trim()]=1; });
   (R.s1map||[]).forEach(function(m){ if(m.contract_no) set[String(m.contract_no).trim()]=1; });
   (R.orders||[]).forEach(function(o){ if(o.contract_no) set[String(o.contract_no).trim()]=1; });
@@ -73,7 +79,7 @@ export function s1NoOpts(){
 /* 계약번호로 알아낸 고객사 — 신규 등록 때 «이 번호는 ○○» 안내에 씁니다 */
 export function s1NoInfo(no){
   no=String(no||'').trim(); if(!no) return null;
-  var R=window.RAWX||{};
+  var R=ST.RAWX||{};
   var m=(R.s1map||[]).filter(function(x){ return String(x.contract_no).trim()===no; })[0];
   if(m) return {src:'에스원 정산', cust:m.customer||m.s1_name||'', biz:m.biz_no||null};
   var o=(R.orders||[]).filter(function(x){ return String(x.contract_no||'').trim()===no; })[0];
@@ -139,8 +145,8 @@ export function buildGrids(){
       add:false, del:'super',
       rowClick:function(r){ openCust360(String(r._custName||'').replace(/^↳ /,'')); },
       rows:function(){
-        var cmap={}; (RAWX.customers||[]).forEach(function(x){ cmap[x.id]=x; });
-        var out=(RAWX.contracts||[]).map(function(c){
+        var cmap={}; (ST.RAWX.customers||[]).forEach(function(x){ cmap[x.id]=x; });
+        var out=(ST.RAWX.contracts||[]).map(function(c){
         var cu=cmap[c.customer_id]||{};
         c._custName=cu.name||'?';
         c._sector=cu.sector||''; c._sectorDup=!!cu.sector_dup; c._sectorChk=!!cu.sector_check; return c; });
@@ -225,7 +231,7 @@ export function buildGrids(){
         title:'LIVE 고객사',
         rowClick:function(r){ openCust360(r.name||r.cust); },
         rows:function(){
-          if(ST.LIVE_SRC==='sheet') return (RAWX.live||[]).slice().sort(function(a,b){
+          if(ST.LIVE_SRC==='sheet') return (ST.RAWX.live||[]).slice().sort(function(a,b){
             var n=String(b.start_month||'').localeCompare(String(a.start_month||''));
             return n || ((b.id||0)-(a.id||0)); });
           var lv=liveCalc(LV.T!=null? LV.T : undefined);
@@ -245,7 +251,7 @@ export function buildGrids(){
     lg:{
       title:'LG U+ 판매', table:'lg_sales',
       cap:'LG 경유 판매 계약 (매출은 각 라인에 포함)', add:true, del:true,
-      rows:function(){ return RAWX.lg||[]; },
+      rows:function(){ return ST.RAWX.lg||[]; },
       cols:[
         {k:'customer',l:'고객사',req:true},
         {k:'partner',l:'구축파트너'},
@@ -261,7 +267,7 @@ export function buildGrids(){
       title:'비즈포탈 차액', table:'biz_recon',
       cap:'한 달에 한 번, 월 단위로 대조 결과를 입력합니다', add:false, del:false,
       custom:function(){ renderBizMonthly(); },
-      rows:function(){ return RAWX.biz||[]; },
+      rows:function(){ return ST.RAWX.biz||[]; },
       cols:[
         {k:'ym',l:'월(예:7월)',req:true},
         {k:'as_of',l:'작성일',t:'date'},
@@ -276,7 +282,7 @@ export function buildGrids(){
     targets:{
       title:'연간 목표 (ARR 기준)', table:'targets',
       cap:'목표 = 그 해 연말 ARR (12월 MRR × 12). 예: 2026년 목표 13억 = 12월 MRR 1.083억 달성 시 100%', add:true, del:true,
-      rows:function(){ return RAWX.targets||[]; },
+      rows:function(){ return ST.RAWX.targets||[]; },
       cols:[
         {k:'year',l:'연도',t:'select',num:true,req:true,opts:function(){
           var ys=[], y0=new Date().getFullYear();
@@ -292,7 +298,7 @@ export function buildGrids(){
       chipsField:'stage', chipsOpts:OI_STAGE,
       cap:'행 클릭 = 고객 360 · 진행 상태 관리 · 신규 등록은 영업 › OI 등록', add:false, del:true,
       rowClick:function(r){ openCust360(r.customer); },
-      rows:function(){ return RAWX.oi||[]; },
+      rows:function(){ return ST.RAWX.oi||[]; },
       cols:[
         {k:'created_at',l:'등록일',ro:true,fmt:function(v){return String(v||'').slice(0,10);}},
         {k:'stage',l:'진행상태',t:'select',opts:OI_STAGE},
@@ -327,8 +333,8 @@ export function buildGrids(){
       title:'MDR 운영·신청 현황', table:'mdr_ops',
       chipsField:'status', chipsOpts:['신청','대기','진행중','데모','구독','종료'],
       cap:'행 클릭 = 고객 360 · PoC 신청부터 운영까지 — 신청 → 진행중 → 데모 → 구독 · 설치율 = 설치 ÷ 계약 수량', add:true, del:true,
-      rowClick:function(r){ if(!window.IS_EQUIP) openCust360(r.customer); },
-      rows:function(){ return (RAWX.mdrops||[]).slice().sort(function(a,b){
+      rowClick:function(r){ if(!ST.IS_EQUIP) openCust360(r.customer); },
+      rows:function(){ return (ST.RAWX.mdrops||[]).slice().sort(function(a,b){
         var n=String(b.start_date||'').localeCompare(String(a.start_date||''));
         return n || ((b.id||0)-(a.id||0)); }); },
       cols:[
@@ -366,7 +372,7 @@ export function buildGrids(){
       title:'임대 장비 신청 내역', table:'equipment_orders',
       chipsField:'channel', chipsOpts:ORD_CH_OPTS,
       cap:'저장할 때마다 장비 현황에 자동 반영됩니다 — 접수·출하요청·배송중은 재고, 설치완료·회수예정은 임대중, 회수완료는 회수완료 (취소는 현황에서 내림) · 시리얼 칩을 눌러 회수 표시 → «회수 처리 저장» (일부·전부 모두, ↩ 버튼은 체크 목록 방식) · 시리얼을 비워두면 «미등록-신청번호» 로 수량만큼 임시 등록 · 신규 신청은 장비 › 임대 장비 신청', add:true, del:true,
-      rows:function(){ return RAWX.orders||[]; },
+      rows:function(){ return ST.RAWX.orders||[]; },
       cols:[
         {k:'created_at',l:'신청일',ro:true,fmt:function(v){return String(v||'').slice(0,10);}},
         {k:'channel',l:'채널',t:'select',opts:ORD_CH_OPTS},
@@ -402,8 +408,8 @@ export function buildGrids(){
       chipsField:'channel', chipsOpts:ORD_CH_OPTS,
       cap:'신청 내역에서 자동으로 만들어지는 시리얼 단위 저장소입니다 — 신청에 붙은 장비(🔒)는 «임대 장비 신청 내역» 에서 ✎ 수정·↩ 회수 처리하면 따라옵니다 · 여기서는 신청과 무관한 재고·데모·판매 장비만 직접 등록·수정', add:true, del:true,
       rows:function(){
-        var om={}; (RAWX.orders||[]).forEach(function(o){ om[String(o.id)]=o; });
-        var out=(RAWX.assets||[]).slice();
+        var om={}; (ST.RAWX.orders||[]).forEach(function(o){ om[String(o.id)]=o; });
+        var out=(ST.RAWX.assets||[]).slice();
         out.forEach(function(a){ var o=(a.order_id!=null)? om[String(a.order_id)] : null; a._ostat=o? (o.status||''):''; });
         return out.sort(function(a,b){
           var x=a.in_date||a.deployed_date||'', y=b.in_date||b.deployed_date||'';
@@ -435,7 +441,7 @@ export function buildGrids(){
       add:false, del:false, ro:true,
       rowClick:function(r){ openInbDetail(r); },
       rows:function(){
-        var out=(RAWX.inbound||[]).slice();
+        var out=(ST.RAWX.inbound||[]).slice();
         out.forEach(function(r){
           if(r._days===undefined){
             var last=[r.on_date,r.s1d,r.s2d,r.s21d,r.s3d].filter(function(d){return d&&/^\d{4}-\d{2}-\d{2}/.test(d);}).sort().pop();
@@ -484,13 +490,13 @@ export function buildGrids(){
       title:'AI 지식 — AI 에게 가르치기', table:'ai_knowledge',
       cap:'여기 적은 사실·규칙·용어는 포탈 AI 가 모든 질문에 답할 때 최우선으로 참고합니다 (SQL 78 · ask 함수 v3)', add:false, del:false,
       custom:function(){ renderAiKnow(); },
-      rows:function(){ return RAWX.aiknow||[]; },
+      rows:function(){ return ST.RAWX.aiknow||[]; },
       cols:[{k:'topic',l:'주제'},{k:'content',l:'내용'},{k:'active',l:'적용',t:'bool'}]
     },
     log:{
       title:'변경 이력', table:'change_log',
       cap:'웹에서 수정한 기록 (최근 300건)', add:false, del:false, ro:true,
-      rows:function(){ return RAWX.log||[]; },
+      rows:function(){ return ST.RAWX.log||[]; },
       cols:[
         {k:'at',l:'시각',ro:true,fmt:function(v){return String(v||'').replace('T',' ').slice(0,16);}},
         {k:'actor',l:'누가',ro:true},

@@ -3,18 +3,18 @@
 import { APP_VER, ST } from './state.js';
 import { Viz } from './viz.js';
 import { $, canView, cssv, lline, mk, navText, permEnter, STATE, won, wonFull } from './core.js';
-import { cmdAskHit, EQUIP_VIEWS, loadFromDb, onData, railSync, renderEqBoard, sbTry, sbWrite, toast, todayStr } from './shell.js';
+import { cmdAskHit, EQB, EQUIP_VIEWS, loadFromDb, onData, railSync, renderEqBoard, sbTry, sbWrite, toast, todayStr } from './shell.js';
 import { buildControls, esc, renderAll } from './dash.js';
 import { GRIDS } from './grids.js';
 import { eqRetOpen, eqWant, renderEqPanel, syncOrderAssets } from './equipment.js';
-import { CH_DEFS, ensureLeadSrc, liveCalc, liveDiff, loadLib, LV, renderChannelView, setLiveSrc } from './analysis.js';
-import { applyDense, pushRecent, renderTodo } from './tools.js';
-import { renderCloud } from './cloud.js';
+import { AK, BZX, CH_DEFS, DC, ensureLeadSrc, liveCalc, liveDiff, loadLib, LS, LV, renderChannelView, setLiveSrc } from './analysis.js';
+import { applyDense, PR, pushRecent, renderTodo } from './tools.js';
+import { CL, renderCloud } from './cloud.js';
 import { loadInbound, renderInbPanel, renderInbStat, renderWeekly } from './inbound.js';
-import { CHURN, CR, csSetTab, ensureGroupOpen, helpBox, helpWire, initOiForm, loadRecvPresets, oiLinkQuote, oiToContract, renderChurn,
+import { CHURN, CR, CS, csSetTab, ensureGroupOpen, helpBox, helpWire, initOiForm, loadRecvPresets, oiLinkQuote, oiToContract, renderChurn,
   renderChurnRate, renderCsite, renderCustFlow, renderOiTiles } from './sales.js';
 import { logChange, msg, openOvl } from './edit.js';
-import { lazyView } from './lazy.js';
+import { lazyGet, lazyView } from './lazy.js';
 
 
 /* ---- 뒤로가기 — 화면 이동을 브라우저 히스토리에 남겨 상단 ← 버튼·브라우저/폰 뒤로가기·Alt+← 가 모두 이전 화면으로 ----
@@ -52,12 +52,19 @@ export var VIEW_UI={
   ops:{OPS:['tab','msg','msgCls']}, adminx:{CD:['kind','showOff'], AP:['user'], ADM:['tab']}
 };
 export var VIEW_SNAP=null;
+/* VIEW_UI 의 상태 객체 이름 → 객체 (㊿+154: 예전 window[이름] — 모듈 이름은 window 에 없음) · 처음 열 때 받는 모듈(리포트·관리자) 것은 받은 뒤에만 */
+export function viewObj(n){
+  var M={LV:LV, CHURN:CHURN, CR:CR, LS:LS, DC:DC, EQB:EQB, PR:PR, CL:CL, AK:AK, BZX:BZX, CS:CS};
+  if(Object.prototype.hasOwnProperty.call(M, n)) return M[n];
+  var lz=n==='RPV'? lazyGet('report') : /^(OPS|CD|AP|ADM)$/.test(n)? lazyGet('admin') : null;
+  return lz? lz[n] : null;
+}
 export function viewSnapInit(){ VIEW_SNAP={}; viewSnapAdd(); }
 /* ㊿+153: 처음 열 때 불러오는 화면(리포트·관리자·가격표)의 상태 객체는 그 코드를 받은 직후에 사본(lazyHook · init.js) — 아직 없는 것은 건너뜀 */
 export function viewSnapAdd(){
   if(!VIEW_SNAP) return;
   Object.keys(VIEW_UI).forEach(function(v){ Object.keys(VIEW_UI[v]).forEach(function(n){
-    var o=window[n]; if(!o || VIEW_SNAP[n]) return; var s={}, un=[];
+    var o=viewObj(n); if(!o || VIEW_SNAP[n]) return; var s={}, un=[];
     VIEW_UI[v][n].forEach(function(k){ if(o[k]===undefined) un.push(k); else s[k]=o[k]; });
     VIEW_SNAP[n]={json:JSON.stringify(s), undef:un};   // 처음에 없던 키는 되돌릴 때 지움
   }); });
@@ -65,7 +72,7 @@ export function viewSnapAdd(){
 export function viewReset(v){
   if(!VIEW_SNAP) return;
   var m=VIEW_UI[v]; if(m) Object.keys(m).forEach(function(n){
-    var o=window[n], sn=VIEW_SNAP[n]; if(!o || !sn) return; var s=JSON.parse(sn.json);
+    var o=viewObj(n), sn=VIEW_SNAP[n]; if(!o || !sn) return; var s=JSON.parse(sn.json);
     m[n].forEach(function(k){ if(sn.undef.indexOf(k)>=0) delete o[k]; else o[k]=s[k]; });
   });
   if(v==='churn') delete CHURN._focus;
@@ -76,9 +83,9 @@ export function viewReset(v){
 }
 /* 대시보드: 위쪽 거르기(사업라인 · 기준월 · 단위 · 업종 · 파트너 · 상태 · 검색)가 처음과 다를 때만 «초기화»와 같은 동작 */
 export function dashResetIfChanged(){
-  if(!ST.DATA || window.IS_EQUIP) return;
+  if(!ST.DATA || ST.IS_EQUIP) return;
   var off=(ST.DATA.lines||[]).some(function(l){ return STATE.lines[l.label]===false; });
-  var base0=(window.DASH_BASE0!=null)? window.DASH_BASE0 : STATE.base;
+  var base0=(ST.DASH_BASE0!=null)? ST.DASH_BASE0 : STATE.base;
   if(!off && STATE.unit==='month' && STATE.base===base0 && !STATE.ind && !STATE.partner && !STATE.status && !STATE.search) return;
   STATE.base=base0; var b=document.getElementById('btnReset');
   if(b && b.onclick) b.onclick(); else { try{ buildControls(); renderAll(); }catch(e){} }
@@ -95,10 +102,10 @@ export function navMenu(v){
 export function switchView(v){
   if(v==='mdrpoc') v='mdrops';                       // 통합 전 이름 호환
   if((v==='ordernew'||v==='mdrnew'||v==='oinew'||v==='csite'||v==='preport'||v==='s1'||v==='kk') && !ST.SB_TOKEN){ openOvl('ovlAuth'); return; }
-  if(window.IS_EQUIP && !EQUIP_VIEWS[v]) v=window.EQUIP_HOME||'orders';   // 제한 계정은 허용된 화면만
-  if(v==='log' && !window.IS_SUPER) v='dash';                             // 변경 이력은 슈퍼 관리자만
-  if(v==='ops' && !window.IS_SUPER) v='dash';                             // 배포·운영도 슈퍼 관리자만 (함수가 다시 OPS_OWNER 로 좁힘)
-  if(v==='csite' && !window.IS_SUPER){ toast('권한 없음','Cloud 사이트 생성·수정은 슈퍼 관리자만 할 수 있습니다','info'); v='dash'; }
+  if(ST.IS_EQUIP && !EQUIP_VIEWS[v]) v=ST.EQUIP_HOME||'orders';   // 제한 계정은 허용된 화면만
+  if(v==='log' && !ST.IS_SUPER) v='dash';                             // 변경 이력은 슈퍼 관리자만
+  if(v==='ops' && !ST.IS_SUPER) v='dash';                             // 배포·운영도 슈퍼 관리자만 (함수가 다시 OPS_OWNER 로 좁힘)
+  if(v==='csite' && !ST.IS_SUPER){ toast('권한 없음','Cloud 사이트 생성·수정은 슈퍼 관리자만 할 수 있습니다','info'); v='dash'; }
   if(!canView(v)){ toast('권한 없음','이 메뉴는 보기 권한이 없습니다 — 슈퍼 관리자에게 요청하세요','info'); v='dash'; }
   permEnter(v);
   try{ navRecord(ST.CUR_VIEW, v); }catch(e){}
@@ -113,7 +120,7 @@ export function switchView(v){
   $('#viewEqBoard').classList.toggle('hidden',!eqb);
   var dash=v==='dash', quote=v==='quote', preport=v==='preport', s1v=v==='s1', kkv=v==='kk', onew=v==='ordernew', acct=v==='account', mnew=v==='mdrnew', oinew=v==='oinew', csite=v==='csite';
   var adminx=v==='adminx', weekly=v==='weekly', inbstat=v==='inbstat', price=v==='price', report=v==='report', churn=v==='churn', cloud=v==='cloud', crate=v==='churnrate', cflow=v==='custflow', ops=v==='ops';
-  if(adminx && !window.IS_SUPER){ v='dash'; dash=true; adminx=false; ST.CUR_VIEW='dash'; }
+  if(adminx && !ST.IS_SUPER){ v='dash'; dash=true; adminx=false; ST.CUR_VIEW='dash'; }
   $('#viewChurnRate').classList.toggle('hidden',!crate);
   $('#viewCustFlow').classList.toggle('hidden',!cflow);
   var chv=CH_DEFS[v]||null;
@@ -205,16 +212,16 @@ export function switchView(v){
     if(ST.DIRTY){ ST.DIRTY=false; loadFromDb().then(onData); }
     return;
   }
-  if(v==='aiknow' && !RAWX.aiknow){
-    sbTry('ai_knowledge?select=*&order=id').then(function(rows){ RAWX.aiknow=rows||[]; if(ST.CUR_VIEW==='aiknow') renderGrid(); });
+  if(v==='aiknow' && !ST.RAWX.aiknow){
+    sbTry('ai_knowledge?select=*&order=id').then(function(rows){ ST.RAWX.aiknow=rows||[]; if(ST.CUR_VIEW==='aiknow') renderGrid(); });
   }
   if(v==='leadsrc' || v==='contracts') ensureLeadSrc(function(){ if(ST.CUR_VIEW===v) renderGrid(); });   // load_all 이 lead_src 를 안 주는 버전이면 따로 채움
-  if(v==='log' && !RAWX.log){
+  if(v==='log' && !ST.RAWX.log){
     sbTry('change_log?select=*&order=id.desc&limit=300').then(function(rows){
-      RAWX.log=rows||[]; renderGrid();
+      ST.RAWX.log=rows||[]; renderGrid();
     });
   }
-  if(v==='inbound' && !RAWX.inbound){
+  if(v==='inbound' && !ST.RAWX.inbound){
     loadInbound(function(){ if(ST.CUR_VIEW==='inbound') renderGrid(); });
   }
   DV.page=0; DV.sortK=null; DV.sortDir=1; DV.chipVal=''; DV.filters={}; closeColFilter();
@@ -223,9 +230,9 @@ export function switchView(v){
   /* 금액 열(won:1)이 있는 표는 제목 옆에 «천원 단위» 배지를 붙입니다 */
   var hasWon=(g.cols||[]).some(function(c){ return c.won; });
   $('#dvTitle').innerHTML=esc(g.title)+(hasWon? ' <span class="ubadge sm">₩ 금액 단위 = 천원</span>':'');
-  dvCapRender(v, g.cap + (hasWon? ' · 표의 금액은 천원 단위 (입력·수정 창은 원 단위)':'') + (window.IS_VIEWER? ' · 조회 전용 계정입니다':''));
-  $('#dvAdd').style.display=(g.add && !window.IS_VIEWER)?'':'none';
-  $('#dvPaste').style.display=(g.add && !window.IS_VIEWER)?'':'none';
+  dvCapRender(v, g.cap + (hasWon? ' · 표의 금액은 천원 단위 (입력·수정 창은 원 단위)':'') + (ST.IS_VIEWER? ' · 조회 전용 계정입니다':''));
+  $('#dvAdd').style.display=(g.add && !ST.IS_VIEWER)?'':'none';
+  $('#dvPaste').style.display=(g.add && !ST.IS_VIEWER)?'':'none';
   $('#dvSearch').value='';
   renderGrid();
   applyDense();
@@ -736,7 +743,7 @@ export var LENS_DEFS=[
 ];
 export var LENS_DESC={}; 
 export function lensSets(){
-  var cts=RAWX.contracts||[], cus={}; (RAWX.customers||[]).forEach(function(c){ cus[c.id]=c; });
+  var cts=ST.RAWX.contracts||[], cus={}; (ST.RAWX.customers||[]).forEach(function(c){ cus[c.id]=c; });
   var nowYm=(ST.DATA&&ST.DATA.nowIdx>=0? mk(ST.DATA.nowIdx) : new Date().toISOString().slice(0,7))+'-01';
   var byId={}; cts.forEach(function(c){ byId[c.id]=c; });
   var kids={}; cts.forEach(function(c){ if(c.parent_contract_id) (kids[c.parent_contract_id]=kids[c.parent_contract_id]||[]).push(c.id); });
@@ -993,7 +1000,7 @@ export function renderGrid(){
     tr.innerHTML='<td colspan="'+(g.cols.length+2)+'" style="text-align:left;padding:34px 12px;color:var(--muted)"><div style="position:sticky;left:12px;width:min(520px,calc(100vw - 160px));text-align:center">'+
       (why? '<div style="font-size:13.5px">'+why+'에 맞는 행이 없습니다</div><div style="margin-top:10px;display:flex;gap:6px;justify-content:center;flex-wrap:wrap">'+
         (q? '<button type="button" class="cbtn" data-dge="q">검색어 지우기</button>':'')+((nfl||hasLens)? '<button type="button" class="cbtn" data-dge="f">필터 지우기</button>':'')+(hasChip? '<button type="button" class="cbtn" data-dge="c">전체 탭으로</button>':'')+'</div>'
-          : '<div style="font-size:13.5px">아직 데이터가 없습니다</div>'+(g.add&&!window.IS_VIEWER? '<div class="mini" style="margin-top:6px">위의 «＋ 행 추가» 로 첫 행을 넣을 수 있습니다</div>':''))+'</div></td>';
+          : '<div style="font-size:13.5px">아직 데이터가 없습니다</div>'+(g.add&&!ST.IS_VIEWER? '<div class="mini" style="margin-top:6px">위의 «＋ 행 추가» 로 첫 행을 넣을 수 있습니다</div>':''))+'</div></td>';
     tb.appendChild(tr);
     tr.querySelectorAll('[data-dge]').forEach(function(b){ b.onclick=function(){ var k=b.dataset.dge; if(k==='q'){ $('#dvSearch').value=''; } if(k==='f'){ DV.filters={}; DV.lens=''; } if(k==='c'){ DV.chipVal=''; } DV.page=0; renderGrid(); }; });
   }
@@ -1023,13 +1030,13 @@ export function renderGrid(){
 }
 
 export function openDetail(c){
-  var cu=(RAWX.customers||[]).filter(function(x){return x.id===c.customer_id;})[0]||{};
+  var cu=(ST.RAWX.customers||[]).filter(function(x){return x.id===c.customer_id;})[0]||{};
   $('#dtTitle').textContent=cu.name||'?';
   $('#dtMeta').textContent=[c.line, c.partner, c.biller, (c.start_month||'').slice(0,7)+'~'+((c.end_month||'').slice(0,7)||'?'),
     c.status||'활성', (c.renew_count? '연장 '+c.renew_count+'회':''), c.churn_reason||''].filter(Boolean).join(' · ');
   openOvl('ovlDetail');
   // 월별 금액 차트
-  var mine=(RAWX.mrs||[]).filter(function(x){return x.contract_id===c.id;});
+  var mine=(ST.RAWX.mrs||[]).filter(function(x){return x.contract_id===c.id;});
   var host=$('#dtChart'); host.innerHTML='';
   if(mine.length>=2){
     Viz.lines(host,{labels:mine.map(function(x){return String(x.month).slice(2,7).replace('-','.');}),
@@ -1072,7 +1079,7 @@ export function gridRow(r,g,editing){
         bv.onclick=function(){ openDetail(r); };
         act.appendChild(bv);
       }
-      if(window.IS_VIEWER) return;
+      if(ST.IS_VIEWER) return;
       if(ST.CUR_VIEW==='oi'){
         // 수주(이후) 단계 + 아직 계약 미연결 → 계약으로 전환
         if(['수주','계산서발행','종료'].indexOf(r.stage)>=0 && !r.contract_id){
@@ -1102,7 +1109,7 @@ export function gridRow(r,g,editing){
       var be=document.createElement('button'); be.textContent='✎';
       be.onclick=function(){ edit(); };
       act.appendChild(be);
-      var canDel = g.del===true || (g.del==='super' && window.IS_SUPER);
+      var canDel = g.del===true || (g.del==='super' && ST.IS_SUPER);
       if(canDel){
         var bd=document.createElement('button'); bd.textContent='🗑'; bd.className='dl';
         bd.onclick=function(){
@@ -1114,7 +1121,7 @@ export function gridRow(r,g,editing){
           sbWrite('DELETE',g.table+'?id=eq.'+r.id).then(function(){
             logChange('delete',g.table,r.id,{});
             toast('삭제되었습니다', g.title, 'info');
-            var arr=g.rows(); var i=(RAWX[ST.CUR_VIEW]||[]).indexOf(r); if(i>=0) RAWX[ST.CUR_VIEW].splice(i,1);
+            var arr=g.rows(); var i=(ST.RAWX[ST.CUR_VIEW]||[]).indexOf(r); if(i>=0) ST.RAWX[ST.CUR_VIEW].splice(i,1);
             ST.DIRTY=true; renderGrid();
           }).catch(function(e){ $('#dvMsg').textContent=String(e.message||e); });
         };
@@ -1156,8 +1163,8 @@ export function gridRow(r,g,editing){
             logChange('update',x.tbl,x.id,o);
             r[x.key]=x.val;
             /* 같은 고객사의 다른 계약 행에도 즉시 반영 (다시 읽지 않아도 보이게) */
-            (RAWX.customers||[]).forEach(function(cu){ if(cu.id===x.id) cu[x.col]=x.val; });
-            (RAWX.contracts||[]).forEach(function(c2){ if(c2[ (x.tbl==='customers'?'customer_id':'id') ]===x.id) c2[x.key]=x.val; });
+            (ST.RAWX.customers||[]).forEach(function(cu){ if(cu.id===x.id) cu[x.col]=x.val; });
+            (ST.RAWX.contracts||[]).forEach(function(c2){ if(c2[ (x.tbl==='customers'?'customer_id':'id') ]===x.id) c2[x.key]=x.val; });
             toast(x.label+' 저장', '이 고객사의 모든 계약에 함께 반영됩니다', 'info');
           });
         });
@@ -1199,7 +1206,7 @@ export function gridAddRow(){
       // 자산: 이미 있는 시리얼이면 새 행 대신 기존 행을 찾아 보여줌
       if(g.table==='equipment_assets' && body.serial){
         var serU=String(body.serial).trim().toUpperCase(); body.serial=serU;
-        var dup=(RAWX.assets||[]).some(function(a){ return String(a.serial||'').toUpperCase()===serU; });
+        var dup=(ST.RAWX.assets||[]).some(function(a){ return String(a.serial||'').toUpperCase()===serU; });
         if(dup){
           DV.chipVal=''; $('#dvSearch').value=serU; DV.page=0; renderGrid();
           $('#dvMsg').textContent='이미 등록된 시리얼입니다 — 아래 기존 행을 ✎ 버튼으로 수정해주세요.';
@@ -1209,7 +1216,7 @@ export function gridAddRow(){
       }
       sbWrite('POST',g.table+'?select=*',[body],'return=representation').then(function(rows){
         toast('추가되었습니다', g.title);
-        RAWX[ST.CUR_VIEW]=RAWX[ST.CUR_VIEW]||[]; RAWX[ST.CUR_VIEW].push(rows[0]);
+        ST.RAWX[ST.CUR_VIEW]=ST.RAWX[ST.CUR_VIEW]||[]; ST.RAWX[ST.CUR_VIEW].push(rows[0]);
         logChange('insert',g.table,rows[0].id,body);
         ST.DIRTY=true; $('#dvMsg').textContent='추가됨 ✅';
         renderGrid();

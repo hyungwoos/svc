@@ -29,12 +29,12 @@ export function rpMonthData(j){
   var ym=mk(j), year=+ym.slice(0,4), mon=+ym.slice(5,7);
   var ytd=0;
   for(var jj=Math.max(0,j-mon+1); jj<=j; jj++){ if(mk(jj).slice(0,4)===String(year)) for(var i2=0;i2<ST.MAT.length;i2++) ytd+=ST.MAT[i2][jj]; }
-  var mtg=0; (RAWX.mtargets||[]).forEach(function(t){ if(+t.year===year&&+t.month===mon) mtg=Number(t.amount)||0; });
-  var ytg=0; (RAWX.targets||[]).forEach(function(t){ if(+t.year===year) ytg=Number(t.amount)||0; });
-  var poc=(RAWX.mdrops||[]).filter(function(x){ return String(x.apply_date||'').slice(0,7)===ym; });
-  var inb=(RAWX.inbound||[]).filter(function(x){ return String(x.on_date||'').slice(0,7)===ym; });
+  var mtg=0; (ST.RAWX.mtargets||[]).forEach(function(t){ if(+t.year===year&&+t.month===mon) mtg=Number(t.amount)||0; });
+  var ytg=0; (ST.RAWX.targets||[]).forEach(function(t){ if(+t.year===year) ytg=Number(t.amount)||0; });
+  var poc=(ST.RAWX.mdrops||[]).filter(function(x){ return String(x.apply_date||'').slice(0,7)===ym; });
+  var inb=(ST.RAWX.inbound||[]).filter(function(x){ return String(x.on_date||'').slice(0,7)===ym; });
   var inbWon=inb.filter(function(x){ return /수주/.test(x.result||''); });
-  var oiOpen=(RAWX.oi||[]).filter(function(x){ return x.stage==='등록'||x.stage==='진행'; });
+  var oiOpen=(ST.RAWX.oi||[]).filter(function(x){ return x.stage==='등록'||x.stage==='진행'; });
   var oiSum=0, oiW=0; oiOpen.forEach(function(x){ var a=Number(x.expect_amount)||0; oiSum+=a; oiW+=a*(Number(x.win_prob)||0)/100; });
   var trend=[]; for(var t=Math.max(0,j-11); t<=j; t++){ var s=0; for(var i3=0;i3<ST.MAT.length;i3++) s+=ST.MAT[i3][t]; trend.push([mk(t),s]); }
   return {j:j, ym:ym, tot:tot, prev:prev, actCnt:Object.keys(act).length, newCt:newCt, endCt:endCt,
@@ -104,7 +104,7 @@ export function rpMdrData(j){
     return out;
   }
   var cur=yearNew(year), prv=yearNew(year-1);
-  var poc=(RAWX.mdrops||[]).filter(function(x){ return ['신청','대기','진행중','데모'].indexOf(x.status||'')>=0; });
+  var poc=(ST.RAWX.mdrops||[]).filter(function(x){ return ['신청','대기','진행중','데모'].indexOf(x.status||'')>=0; });
   var pocEp=0; poc.forEach(function(x){ pocEp+=Number(x.plan_qty)||0; });
   var actN=Object.keys(act).length, addN=Object.keys(actAdd).length;
   var lines=['총 '+actN+'개 고객사 확보 (MDR '+(actN-addN)+'개사, Add-on '+addN+'개사)'+(ep?' · '+ep.toLocaleString('ko-KR')+'개 엔드포인트 관리 중':'')];
@@ -187,7 +187,7 @@ export function rpAnSrc(j){
   function arr(m){ return Object.keys(m).map(function(k){ return {name:k, n:m[k].n, mrr:m[k].mrr}; })
     .sort(function(a,b){ return b.n-a.n || b.mrr-a.mrr; }); }
   var yr=mk(j).slice(0,4), inb={};
-  (RAWX.inbound||[]).forEach(function(x){ if(String(x.y)!==yr) return; inb[x.channel||'미기재']=(inb[x.channel||'미기재']||0)+1; });
+  (ST.RAWX.inbound||[]).forEach(function(x){ if(String(x.y)!==yr) return; inb[x.channel||'미기재']=(inb[x.channel||'미기재']||0)+1; });
   var inbArr=Object.keys(inb).map(function(k){ return {name:k, n:inb[k]}; }).sort(function(a,b){ return b.n-a.n; });
   return {ch:arr(ch), ptn:arr(pt), custN:Object.keys(all).length, mrr:mrr, inb:inbArr, inbYear:yr};
 }
@@ -501,14 +501,14 @@ export function qbColsFromGrid(gk, skip){
 }
 export function qbSources(){
   if(qbSources._c && qbSources._d===ST.DATA) return qbSources._c;
-  var cmap={}; (RAWX.customers||[]).forEach(function(c){ cmap[c.id]=c; });
+  var cmap={}; (ST.RAWX.customers||[]).forEach(function(c){ cmap[c.id]=c; });
   var dmap={}; (ST.DATA&&ST.DATA.rows||[]).forEach(function(r){ dmap[r._id]=r; });
   var S={
-    customers:{ label:'고객사', icon:'🏢', key:'id', rows:function(){ return RAWX.customers||[]; },
+    customers:{ label:'고객사', icon:'🏢', key:'id', rows:function(){ return ST.RAWX.customers||[]; },
       cols:[{k:'id',l:'고객 번호',t:'num'},{k:'name',l:'고객사',t:'text'},{k:'industry',l:'산업군',t:'text'},{k:'sector',l:'업종',t:'text'},{k:'sector_detail',l:'업종 상세',t:'text'},
-            {k:'_nct',l:'계약 수',t:'num',get:function(r){ return (RAWX.contracts||[]).filter(function(c){ return c.customer_id===r.id; }).length; }},
+            {k:'_nct',l:'계약 수',t:'num',get:function(r){ return (ST.RAWX.contracts||[]).filter(function(c){ return c.customer_id===r.id; }).length; }},
             {k:'_alias',l:'별칭',t:'text',get:function(r){ return (r.aliases||[]).join(', '); }}] },
-    contracts:{ label:'계약', icon:'📄', key:'id', rows:function(){ return (RAWX.contracts||[]).map(function(c){ var cu=cmap[c.customer_id]||{}; c._custName=cu.name||'?'; c._sector=cu.sector||''; c._industry=cu.industry||''; return c; }); },
+    contracts:{ label:'계약', icon:'📄', key:'id', rows:function(){ return (ST.RAWX.contracts||[]).map(function(c){ var cu=cmap[c.customer_id]||{}; c._custName=cu.name||'?'; c._sector=cu.sector||''; c._industry=cu.industry||''; return c; }); },
       cols:[{k:'id',l:'계약 번호',t:'num'},{k:'_custName',l:'고객사',t:'text'},{k:'_industry',l:'산업군',t:'text'},{k:'_sector',l:'업종',t:'text'},
             {k:'line',l:'서비스',t:'text',fmt:function(v){ return lline(v); }},{k:'version',l:'Ver.',t:'text'},{k:'_lineVer',l:'서비스(버전)',t:'text',get:function(r){ return llineVer(r.line, r.version); }},{k:'channel',l:'판매 채널',t:'text'},{k:'lead_src',l:'유입경로',t:'text'},{k:'auto_renew',l:'자동연장',t:'bool'},{k:'partner',l:'파트너',t:'text'},{k:'biller',l:'계산서발행처',t:'text'},
             {k:'combine',l:'모듈',t:'text'},{k:'contract_type',l:'구분',t:'text'},{k:'status',l:'상태',t:'text'},
@@ -518,24 +518,24 @@ export function qbSources(){
             {k:'install_fee',l:'설치비(천원)',t:'num',won:true},{k:'settle_month',l:'대금정산일',t:'month'},{k:'term_months',l:'계약기간(개월)',t:'num'},{k:'qty',l:'노드/수량',t:'num'},
             {k:'csm',l:'CSM(사이트명)',t:'text'},{k:'billing',l:'과금방식',t:'text'},{k:'sale_type',l:'판매유형',t:'text'},{k:'renew_count',l:'연장 회차',t:'num'},{k:'s1_no',l:'에스원 계약번호',t:'text'},
             {k:'parent_contract_id',l:'원계약 번호',t:'num'},{k:'customer_id',l:'고객 번호',t:'num'},{k:'note',l:'비고',t:'text'}] },
-    mrs:{ label:'월 매출', icon:'₩', key:null, rows:function(){ return RAWX.mrs||[]; },
+    mrs:{ label:'월 매출', icon:'₩', key:null, rows:function(){ return ST.RAWX.mrs||[]; },
       cols:[{k:'contract_id',l:'계약 번호',t:'num'},{k:'month',l:'월',t:'month'},{k:'amount',l:'금액(천원)',t:'num',won:true}] },
     live:{ label:'LIVE 고객사 (계약 기준)', icon:'🟢', key:null, rows:function(){ try{ return liveCalc().rows||[]; }catch(e){ return []; } },
       cols:[{k:'cust',l:'고객사',t:'text'},{k:'ind',l:'산업군',t:'text'},{k:'line',l:'서비스',t:'text',fmt:function(v){ return lline(v); }},{k:'channel',l:'판매 채널',t:'text'},{k:'partner',l:'파트너',t:'text'},
             {k:'nodes',l:'노드',t:'num'},{k:'start',l:'최초 개시월',t:'month'},{k:'curStart',l:'현행 시작월',t:'month'},{k:'end',l:'현행 종료월',t:'month'},{k:'csm',l:'CSM(사이트명)',t:'text'},{k:'status',l:'상태',t:'text'},{k:'ctId',l:'현행 계약 번호',t:'num'},{k:'n',l:'유효 계약 수',t:'num'}] },
-    orders:{ label:'임대 장비 신청', icon:'📦', key:'id', rows:function(){ return RAWX.orders||[]; },
+    orders:{ label:'임대 장비 신청', icon:'📦', key:'id', rows:function(){ return ST.RAWX.orders||[]; },
       cols:[{k:'id',l:'신청 번호',t:'num'}].concat(qbColsFromGrid('orders',['returned_serials']), [{k:'serials',l:'시리얼',t:'text'},{k:'_nret',l:'회수 시리얼 수',t:'num',get:function(r){ try{ return eqRetSet(r).length; }catch(e){ return 0; } }}]) },
-    assets:{ label:'장비 현황 (시리얼)', icon:'🔩', key:'serial', rows:function(){ return RAWX.assets||[]; },
+    assets:{ label:'장비 현황 (시리얼)', icon:'🔩', key:'serial', rows:function(){ return ST.RAWX.assets||[]; },
       cols:[{k:'id',l:'현황 번호',t:'num'}].concat(qbColsFromGrid('assets',['_ostat','order_id']), [{k:'order_id',l:'신청 번호',t:'num'}]) },
-    oi:{ label:'OI (영업기회)', icon:'🎯', key:'id', rows:function(){ return RAWX.oi||[]; },
+    oi:{ label:'OI (영업기회)', icon:'🎯', key:'id', rows:function(){ return ST.RAWX.oi||[]; },
       cols:[{k:'id',l:'OI 번호',t:'num'}].concat(qbColsFromGrid('oi',['products','items','quote_file','contract_id']), [{k:'contract_id',l:'전환 계약 번호',t:'num'},{k:'products',l:'제품군',t:'text',get:function(r){ return (r.products||[]).join(', '); }}]) },
-    mdrops:{ label:'MDR 운영·신청', icon:'🛡', key:'id', rows:function(){ return RAWX.mdrops||[]; },
+    mdrops:{ label:'MDR 운영·신청', icon:'🛡', key:'id', rows:function(){ return ST.RAWX.mdrops||[]; },
       cols:[{k:'id',l:'번호',t:'num'}].concat(qbColsFromGrid('mdrops',['_fill','_mods','on_rev_sheet'])) },
-    inbound:{ label:'인바운드', icon:'📥', key:'no', lazy:function(cb){ if(RAWX.inbound===undefined) loadInbound(cb); else cb(); }, rows:function(){ return RAWX.inbound||[]; },
+    inbound:{ label:'인바운드', icon:'📥', key:'no', lazy:function(cb){ if(ST.RAWX.inbound===undefined) loadInbound(cb); else cb(); }, rows:function(){ return ST.RAWX.inbound||[]; },
       cols:qbColsFromGrid('inbound',['_last','_days']).concat([{k:'no',l:'번호',t:'num'}]) },
-    lg:{ label:'LG U+ 판매', icon:'📡', key:'id', rows:function(){ return RAWX.lg||[]; }, cols:qbColsFromGrid('lg') },
-    cloud:{ label:'클라우드 비용 (월·서비스)', icon:'☁', key:null, lazy:function(cb){ if(!RAWX.cloud) loadCloud(cb); else cb(); },
-      rows:function(){ var c=RAWX.cloud||{acc:[],costs:[]}, am={}; (c.acc||[]).forEach(function(a){ am[a.id]=a; }); return (c.costs||[]).map(function(x){ var a=am[x.account_id]||{}; x._acct=a.label||('#'+x.account_id); x._vendor=a.vendor||''; x._cur=a.currency||'USD'; return x; }); },
+    lg:{ label:'LG U+ 판매', icon:'📡', key:'id', rows:function(){ return ST.RAWX.lg||[]; }, cols:qbColsFromGrid('lg') },
+    cloud:{ label:'클라우드 비용 (월·서비스)', icon:'☁', key:null, lazy:function(cb){ if(!ST.RAWX.cloud) loadCloud(cb); else cb(); },
+      rows:function(){ var c=ST.RAWX.cloud||{acc:[],costs:[]}, am={}; (c.acc||[]).forEach(function(a){ am[a.id]=a; }); return (c.costs||[]).map(function(x){ var a=am[x.account_id]||{}; x._acct=a.label||('#'+x.account_id); x._vendor=a.vendor||''; x._cur=a.currency||'USD'; return x; }); },
       cols:[{k:'ym',l:'월',t:'month'},{k:'_acct',l:'계정',t:'text'},{k:'_vendor',l:'벤더',t:'text'},{k:'service',l:'서비스',t:'text'},{k:'kind',l:'종류',t:'text'},{k:'usd',l:'USD',t:'num'},{k:'credit_usd',l:'크레딧 USD',t:'num'},
             {k:'_krwCalc',l:'원화 환산(천원)',t:'num',won:true,get:function(r){ var fx=1400; try{ fx=clFxRate(); }catch(e){} return r._cur==='KRW'? Number(r.krw||0) : Number(r.usd||0)*fx; }},{k:'krw',l:'원화 청구(천원)',t:'num',won:true},{k:'source',l:'출처',t:'text'}] }
   };
@@ -881,7 +881,7 @@ export function qbRunNow(){
   var host=$('#qbRes'); if(!host) return;
   if(QB.mode==='sql'){ qbSqlRun(); return; }
   var S=qbSources(); QB._ld=QB._ld||{};
-  var pending=qbTables(QB.spec).filter(function(t){ var s=S[t]; if(!s||!s.lazy) return false; var need=(t==='inbound'? RAWX.inbound===undefined : t==='cloud'? !RAWX.cloud : false); if(need && !QB._ld[t]){ QB._ld[t]=1; s.lazy(function(){ QB._ld[t]=0; qbSources._c=null; if(ST.CUR_VIEW==='report') qbRunNow(); }); } return need; });
+  var pending=qbTables(QB.spec).filter(function(t){ var s=S[t]; if(!s||!s.lazy) return false; var need=(t==='inbound'? ST.RAWX.inbound===undefined : t==='cloud'? !ST.RAWX.cloud : false); if(need && !QB._ld[t]){ QB._ld[t]=1; s.lazy(function(){ QB._ld[t]=0; qbSources._c=null; if(ST.CUR_VIEW==='report') qbRunNow(); }); } return need; });
   if(pending.length){ host.innerHTML='<div class="cap" style="padding:30px;text-align:center">'+pending.map(function(t){ return S[t].label; }).join(', ')+' 데이터를 불러오는 중…</div>'; return; }
   try{ QB.res=qbRun(QB.spec); }catch(e){ host.innerHTML='<div class="qb-warn">실행 오류: '+esc(String(e.message||e))+'</div>'; return; }
   qbResultDraw();
@@ -1087,7 +1087,7 @@ export async function qbSqlRun(){
   if(/;\s*\S/.test(body.replace(/;\s*$/,''))){ fail('한 번에 하나의 SELECT 만 실행합니다.'); return; }
   /* 지연 로드 표 */
   var S=qbSources(), refs=qbSqlRefs(body); QB._ld=QB._ld||{};
-  var pending=refs.filter(function(t){ var s=S[t]; if(!s.lazy) return false; var need=(t==='inbound'? RAWX.inbound===undefined : t==='cloud'? !RAWX.cloud : false); if(need && !QB._ld[t]){ QB._ld[t]=1; s.lazy(function(){ QB._ld[t]=0; qbSources._c=null; if(ST.CUR_VIEW==='report' && QB.mode==='sql') qbSqlRun(); }); } return need; });
+  var pending=refs.filter(function(t){ var s=S[t]; if(!s.lazy) return false; var need=(t==='inbound'? ST.RAWX.inbound===undefined : t==='cloud'? !ST.RAWX.cloud : false); if(need && !QB._ld[t]){ QB._ld[t]=1; s.lazy(function(){ QB._ld[t]=0; qbSources._c=null; if(ST.CUR_VIEW==='report' && QB.mode==='sql') qbSqlRun(); }); } return need; });
   if(pending.length){ host.innerHTML='<div class="cap" style="padding:30px;text-align:center">'+pending.map(function(t){ return S[t].label; }).join(', ')+' 데이터를 불러오는 중…</div>'; return; }
   host.innerHTML='<div class="cap" style="padding:30px;text-align:center">실행 중…</div>';
   var t0=Date.now(), data;
@@ -1244,7 +1244,7 @@ export function renderReport(){
 export function renderReportAuto(){
   var host=$('#rpBody');
   if(!ST.DATA||!ST.DATA.rows||!ST.DATA.rows.length){ host.innerHTML='<div class="cap" style="padding:40px;text-align:center">데이터를 불러오는 중…</div>'; return; }
-  if(!RAWX.inbound){ loadInbound(function(){ if(ST.CUR_VIEW==='report'&&!RP._touched) renderReport(); }); }
+  if(!ST.RAWX.inbound){ loadInbound(function(){ if(ST.CUR_VIEW==='report'&&!RP._touched) renderReport(); }); }
   rpAnLoad();
   var maxJ=Math.min(ST.DATA.nowIdx>=0? ST.DATA.nowIdx : ST.M-1, ST.M-1);       // 미래(계약상 예정) 월은 리포트 대상에서 제외
   if(RP.j==null||RP.j>maxJ) RP.j=maxJ;                             // 기본 = 최신달(현재월)
@@ -1317,7 +1317,7 @@ export function renderReportAuto(){
       d.poc.map(function(x){ return [x.customer||'-', x.svc_type||'-', x.status||'-', {t:x.plan_qty||'-',n:1}, x.sales_name||'-']; }),'해당 월 PoC 신청이 없습니다')+'</div>';
   var inbBy={}; d.inb.forEach(function(x){ var k=x.result||'미기재'; inbBy[k]=(inbBy[k]||0)+1; });
   var inbNote='접수 '+d.inb.length+'건'+(d.inbWon.length?' · 수주 전환 '+d.inbWon.length+'건'+(function(){var s2=0;d.inbWon.forEach(function(x){s2+=Number(x.amount)||0;});return s2?' · 수주액 합 '+won(s2)+'천원':'';})():'');
-  h+='<div class="pr-card" style="margin-bottom:14px"><h3>📨 <span contenteditable spellcheck="false">인바운드</span> <small>'+d.inb.length+'건'+(RAWX.inbound?'':' · 불러오는 중…')+'</small>'+rpCopyBtn('rpTblInb')+inc('inb')+'</h3>'+
+  h+='<div class="pr-card" style="margin-bottom:14px"><h3>📨 <span contenteditable spellcheck="false">인바운드</span> <small>'+d.inb.length+'건'+(ST.RAWX.inbound?'':' · 불러오는 중…')+'</small>'+rpCopyBtn('rpTblInb')+inc('inb')+'</h3>'+
     tbl('rpTblInb',[['상태'],['건수',1]], Object.keys(inbBy).sort(function(a,b){return inbBy[b]-inbBy[a];}).map(function(k){ return [k,{t:inbBy[k],n:1}]; }),'해당 월 인바운드가 없습니다')+
     '<p class="pr-note" id="rpInbX" contenteditable spellcheck="false" style="margin-top:6px">'+inbNote+'</p></div>';
   h+='<div class="pr-card" style="margin-bottom:14px"><h3>🎯 <span contenteditable spellcheck="false">OI 파이프라인</span> <span class="ubadge sm">₩ 천원</span><small>현재 시점 스냅샷</small>'+rpCopyBtn('rpK2')+inc('oi')+'</h3><div class="pr-out" id="rpK2" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">'+

@@ -152,8 +152,8 @@ export async function loadPerms(){
   }catch(e){ ST.PERMS=null; return null; }
 }
 export function permOf(v){
-  var roleW=!window.IS_VIEWER_ROLE;
-  if(window.IS_SUPER || PERM_EXEMPT[v] || !v) return {v:true, r:true, w:roleW};
+  var roleW=!ST.IS_VIEWER_ROLE;
+  if(ST.IS_SUPER || PERM_EXEMPT[v] || !v) return {v:true, r:true, w:roleW};
   var p=ST.PERMS && ST.PERMS[v];
   if(!p) return {v:true, r:true, w:roleW};
   return {v:!!p.v, r:!!(p.v&&p.r), w:!!(p.v&&p.r&&p.w&&roleW)};
@@ -173,18 +173,18 @@ export function applyPerms(){
   });
   try{ subgrpSync(); }catch(e){}
   try{ buildRail(); buildMtabs(); }catch(e){}
-  try{ var be=$('#btnEdit'); if(be && ST.SB_TOKEN) be.style.display=(window.IS_VIEWER_ROLE || !canWrite('contracts'))? 'none':''; }catch(e){}
+  try{ var be=$('#btnEdit'); if(be && ST.SB_TOKEN) be.style.display=(ST.IS_VIEWER_ROLE || !canWrite('contracts'))? 'none':''; }catch(e){}
 }
 /* 화면을 열 때 — 현재 화면의 쓰기 권한을 IS_VIEWER 에 반영(기존 조회 전용 로직을 그대로 재사용) · 읽기 없으면 안내로 덮음 */
 export function permEnter(v){
-  window.IS_VIEWER = !!window.IS_VIEWER_ROLE || !canWrite(v);
+  ST.IS_VIEWER = !!ST.IS_VIEWER_ROLE || !canWrite(v);
   var app=document.getElementById('app'); if(app) app.classList.toggle('perm-deny', !canRead(v));
 }
 /* 쓰기 호출 공통 관문 — 현재 화면에 쓰기 권한이 없으면 저장 자체를 막음 (변경 이력·읽기용 RPC 는 예외) */
 export function permWriteGuard(method, path, asView){
   if(!/^(POST|PATCH|PUT|DELETE)$/i.test(method)) return;
   if(/^change_log\b|^ai_chat_history\b|^ai_feedback\b|^ai_check_log\b|^rpc\/(load_|admin_|ai_)|^user_perms\b|^ai_billing\b|^recv_presets\b/.test(path)) return;   // 이력·개인 기록·관리자 RPC 는 화면 권한과 무관
-  if(window.IS_SUPER) return;
+  if(ST.IS_SUPER) return;
   var pv=asView||ST.CUR_VIEW;
   if(!canWrite(pv)){ var b=document.querySelector('#side button[data-v="'+pv+'"]'); var nm=b? navText(b) : pv; throw new Error('쓰기 권한이 없습니다 — 「'+nm+'」 화면은 읽기만 허용돼 있습니다. 슈퍼 관리자에게 «쓰기» 권한을 요청하세요.'); }
 }

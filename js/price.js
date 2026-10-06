@@ -13,12 +13,12 @@ export function loadPrice(cb){
   if(loadPrice._q){ loadPrice._q.push(cb); return; }   // 중복 호출 방지 — 한 번만 불러옴
   loadPrice._q=[cb];
   sbTry('price_books?select=id,seg,label,applied,data,note&order=applied.desc,id.desc').then(function(rows){
-    RAWX.price=rows||[];
+    ST.RAWX.price=rows||[];
     var q=loadPrice._q; loadPrice._q=null;
     q.forEach(function(f){ if(f) try{ f(); }catch(e){} });
   });
 }
-export function prBooks(seg){ return (RAWX.price||[]).filter(function(b){return b.seg===seg;}); }
+export function prBooks(seg){ return (ST.RAWX.price||[]).filter(function(b){return b.seg===seg;}); }
 export function prCur(seg){ return prBooks(seg)[PR.ver[seg]||0]||null; }
 export function prWon(v){ return typeof v==='number'? v.toLocaleString('ko-KR'):(v||'—'); }
 export function prMatch(t){ return !PR.q || String(t).toLowerCase().indexOf(PR.q)>=0; }
@@ -38,7 +38,7 @@ export function prBindNew(){
     try{
       await sbWrite('POST','price_books',{seg:seg,label:lab,applied:dt,data:data});
       closeOvl('ovlPrNew'); toast('가격표 새 판 등록', lab);
-      RAWX.price=null; PR.ver={saas:0,onprem:0};
+      ST.RAWX.price=null; PR.ver={saas:0,onprem:0};
       if(ST.CUR_VIEW==='price') renderPrice();
     }catch(e){ m.textContent=String(e.message||e); m.style.color='var(--critical)'; }
   };
@@ -46,7 +46,7 @@ export function prBindNew(){
 export function renderPrice(){
   prBindNew();
   var host=$('#prBody');
-  if(!RAWX.price){
+  if(!ST.RAWX.price){
     host.innerHTML='<div class="cap" style="padding:40px;text-align:center">가격표를 불러오는 중…</div>';
     loadPrice(function(){ if(ST.CUR_VIEW==='price') renderPrice(); });
     return;
@@ -69,7 +69,7 @@ export function renderPrice(){
     '<span style="flex:1"></span>'+
     (isCalc? '<span class="pr-ver">SaaS 판 '+esc(book.label||'')+' · 적용일 '+esc(String(book.applied||''))+'</span>'
            : '<input id="prQ" class="pill" style="height:33px;min-width:200px" placeholder="제품·모델명 검색" value="'+esc(PR.q)+'">'+verSel+'<span class="pr-ver">적용일 '+esc(String(book.applied||''))+'</span>')+
-    (window.IS_SUPER && !isCalc? '<button class="pill ghost" id="prNew">＋ 새 판 등록</button>':'')+
+    (ST.IS_SUPER && !isCalc? '<button class="pill ghost" id="prNew">＋ 새 판 등록</button>':'')+
     '</div>';
   host.innerHTML=head+'<div id="prMain"></div>';
   var vs=$('#prVer'); if(vs) vs.onchange=function(){ PR.ver[segBook]=+this.value; renderPrice(); };

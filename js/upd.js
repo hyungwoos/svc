@@ -102,7 +102,12 @@ export var UPD_SEED=[
     '- 리포트 · 가격표 · 내 계정 · 관리자 · 배포·운영 화면은 그 메뉴를 처음 열 때 받습니다. 그래서 로그인 뒤 첫 화면에 받는 코드가 약 1/3 줄었습니다.',
     '- 그 메뉴를 처음 열 때 잠깐 «화면을 불러오는 중…» 이 보일 수 있습니다. 한 번 열면 다음부터는 바로 뜹니다.',
     '- (관리자) 포탈 코드를 ES 모듈로 바꿨습니다. 파일끼리 주고받는 이름이 import/export 로 드러나서, 빠진 이름이나 잘못 쓴 이름을 배포 전에 검사기가 잡습니다.',
-    '- (관리자) 새 버전을 올리면 브라우저가 옛 파일을 섞어 쓰지 않도록 모든 코드 파일 주소에 버전 꼬리표를 붙였습니다.'].join('\n')}
+    '- (관리자) 새 버전을 올리면 브라우저가 옛 파일을 섞어 쓰지 않도록 모든 코드 파일 주소에 버전 꼬리표를 붙였습니다.'].join('\n')},
+  {ver:'㊿+154', date:'2026-10-05', title:'견적서·정산·리포트 페이지 보안 강화', body:[
+    '- 견적서 · S1 정산 · KK 정산 · 프로젝트 리포트 화면의 코드를 파일로 분리했습니다. 끼워 넣은 스크립트는 브라우저가 실행하지 않도록 막습니다. 버튼과 기능은 그대로입니다.',
+    '- 예전 «임대장비 발주» 단독 페이지(orders.html) 주소로 들어오면 포탈의 «📝 임대 장비 신청»으로 바로 넘어갑니다.',
+    '- (관리자) 두 정산 페이지에 똑같이 복사돼 있던 코드(세션·DB·엑셀·인쇄 창)를 한 곳(sat/)으로 합쳤습니다.',
+    '- (관리자) 포탈 코드가 window 전역에 기대던 부분을 모두 걷어냈습니다(공유 값은 ST · 함수는 import). 테스트·스테이징 QA 는 window.SVC 하나로 봅니다.'].join('\n')}
 ];
 export async function updFetch(path, opt){   /* 캐시를 건드리지 않는 직접 호출 — 401 이면 토큰 갱신 뒤 1회 재시도 */
   if(!ST.SB_TOKEN) throw new Error('로그인이 필요합니다');
@@ -148,7 +153,7 @@ export function updShow(notes, opt){
 }
 /* 슈퍼 관리자가 열 때 — DB 에 없는 ver 만 넣기(오래된 것부터 → id 가 날짜 순) */
 export async function updSyncSeed(){
-  if(!window.IS_SUPER || IS_QA) return 0;
+  if(!ST.IS_SUPER || IS_QA) return 0;
   var have=await updFetch('upd_notes?select=ver');
   var set={}; (have||[]).forEach(function(r){ if(r.ver) set[r.ver]=1; });
   var add=UPD_SEED.filter(function(s){ return !set[s.ver]; }).map(function(s){ return {ver:s.ver, title:s.title, body:s.body, published_on:s.date, created_by:'포탈 '+(APP_VER||'')+' (자동)'}; });

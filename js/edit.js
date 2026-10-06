@@ -256,7 +256,7 @@ export function setupPick(inputId, pickId, store){
   var inp=$('#'+inputId), box=$('#'+pickId);
   inp.oninput=function(){
     var q=this.value.trim().toLowerCase(); box.innerHTML=''; store.sel=null;
-    if(store===PK_C && window.cLivePreview) cLivePreview();
+    if(store===PK_C && FORM_FN.cLivePreview) FORM_FN.cLivePreview();
     if(q.length<2) return;
     ST.DATA.rows.map(function(r,i){return r;}).filter(function(r){
       return r.cust.toLowerCase().indexOf(q)>=0;
@@ -270,7 +270,7 @@ export function setupPick(inputId, pickId, store){
         it.classList.add('sel');
         if(store===PK_F) showFixCurrent(r);
         if(store===PK_A) showAddParent(r);
-        if(store===PK_C && window.cLivePreview) cLivePreview();
+        if(store===PK_C && FORM_FN.cLivePreview) FORM_FN.cLivePreview();
       };
       box.appendChild(it);
     });
@@ -442,7 +442,7 @@ export async function saveEdit(){
         }catch(e2){ toast('OI 연결 실패', String(e2.message||e2).slice(0,80),'info'); }
         ST.OI_CONVERT=null;
       }
-      if(window.resetNewForm) window.resetNewForm();   // 다음 입력을 위해 즉시 비움
+      if(FORM_FN.resetNewForm) FORM_FN.resetNewForm();   // 다음 입력을 위해 즉시 비움
     }
     else if(CUR_TAB==='churn'){
       var r=PK_C.sel; if(!r) throw new Error('계약을 선택하세요.');
@@ -499,7 +499,7 @@ export async function saveEdit(){
 export function renameAllNames(){
   var u={}, add=function(n){ n=String(n||'').trim(); if(n) u[n]=1; };
   (SB_RAW.customers||[]).forEach(function(c){ add(c.name); });
-  var X=window.RAWX||{};
+  var X=ST.RAWX||{};
   (X.live||[]).forEach(function(x){ add(x.name); }); (X.lg||[]).forEach(function(x){ add(x.customer); });
   (X.orders||[]).forEach(function(x){ add(x.customer); }); (X.assets||[]).forEach(function(x){ add(x.customer); });
   (X.oi||[]).forEach(function(x){ add(x.customer); }); (X.mdrops||[]).forEach(function(x){ add(x.customer); });
@@ -510,7 +510,7 @@ export function renameFillNames(){
   var names=renameAllNames(); dl.innerHTML=''; names.forEach(function(n){ var o=document.createElement('option'); o.value=n; dl.appendChild(o); }); dl._n=names.length;
 }
 export function renamePreview(xo,xn){
-  var X=window.RAWX||{}, eq=function(a){ return String(a||'').trim()===xo; };
+  var X=ST.RAWX||{}, eq=function(a){ return String(a||'').trim()===xo; };
   var cus=(SB_RAW.customers||[]).filter(function(c){ return c.name===xo; })[0];
   var cnt={
     '계약': cus? (X.contracts||[]).filter(function(c){ return c.customer_id===cus.id; }).length : 0,
@@ -538,6 +538,8 @@ export function renameShowPreview(){
 }
 
 
+/* 입력 폼 함수 — setupEdit() 안에서 만들어(폼 상태를 품음) 다른 곳에서 부를 수 있게 담아 둠 (㊿+154: 예전 window.resetNewForm 등) */
+export var FORM_FN={nFillParents:null, resetNewForm:null, nLivePreview:null, cLivePreview:null};
 export function setupEdit(){
   var nl=document.getElementById('nLine');
   function syncCombine(){
@@ -586,8 +588,8 @@ export function setupEdit(){
     var sel=document.getElementById('nParent'), wrap=document.getElementById('nSubWrap'), cap=document.getElementById('nSubCap');
     if(!sel||!wrap) return;
     var name=(document.getElementById('nCust').value||'').trim();
-    var cu=(RAWX.customers||[]).filter(function(c){ return String(c.name||'').trim()===name; })[0];
-    var list=cu? (RAWX.contracts||[]).filter(function(c){ return c.customer_id===cu.id && !c.parent_contract_id; }) : [];
+    var cu=(ST.RAWX.customers||[]).filter(function(c){ return String(c.name||'').trim()===name; })[0];
+    var list=cu? (ST.RAWX.contracts||[]).filter(function(c){ return c.customer_id===cu.id && !c.parent_contract_id; }) : [];
     list.sort(function(a,b){ return String(b.start_month||'').localeCompare(String(a.start_month||'')); });
     var keep=sel.value;
     sel.innerHTML='<option value="">— 독립 계약으로 등록 —</option>'+list.map(function(c){
@@ -618,7 +620,7 @@ export function setupEdit(){
   var nCustEl=document.getElementById('nCust'), nS1El=document.getElementById('nS1No');
   if(nCustEl){ nCustEl.addEventListener('change', nFillParents); nCustEl.addEventListener('blur', nFillParents); }
   if(nS1El){ nS1El.addEventListener('change', nS1Sync); nS1El.addEventListener('blur', nS1Sync); }
-  window.nFillParents=nFillParents;
+  FORM_FN.nFillParents=nFillParents;
 
   function resetNewForm(){
     ['nCust','nBiller','nStart','nEnd','nMrr','nQty','nNote','nPtnEtc','nCsm','nBillingEtc','nFee','nSettle','nSectorEtc','nS1No'].forEach(function(i){
@@ -645,7 +647,7 @@ export function setupEdit(){
     var asel=document.getElementById('aSel'); if(asel){ asel.style.display='none'; asel.innerHTML=''; }
     ['nLivePrev','cLivePrev'].forEach(function(i){ var el=document.getElementById(i); if(el){ el.style.display='none'; el.innerHTML=''; } });
   }
-  window.resetNewForm=resetNewForm;
+  FORM_FN.resetNewForm=resetNewForm;
   /* LIVE 영향 미리보기 — 이 계약을 저장하면 LIVE 고객사가 어떻게 바뀌는지 한 줄로 (처음 쓰는 사람도 결과를 바로 알 수 있게) */
   function nLivePreview(){
     var box=document.getElementById('nLivePrev'); if(!box) return;
@@ -667,7 +669,7 @@ export function setupEdit(){
     box.innerHTML=h;
   }
   ['nCust','nLine','nType','nStart','nEnd','nQty','nCsm'].forEach(function(i){ var e=document.getElementById(i); if(e){ e.addEventListener('input',nLivePreview); e.addEventListener('change',nLivePreview); } });
-  window.nLivePreview=nLivePreview;
+  FORM_FN.nLivePreview=nLivePreview;
   function cLivePreview(){
     var box=document.getElementById('cLivePrev'); if(!box) return;
     var r=PK_C.sel, m0=ymFromInput($('#cMonth').value);
@@ -683,7 +685,7 @@ export function setupEdit(){
       (same.n>1? ' — 같은 제품의 다른 유효 계약이 '+(same.n-1)+'건 남아 있어 제품 LIVE 는 유지됩니다' : others.length? ' (다른 제품 '+others.map(function(x){ return esc(lline(x.line)); }).join('·')+' 이 남아 회사로는 LIVE 유지 · 제품별 합 −1)' : ' (회사 수 −1 · 해지율에 «해지»로 집계)')+'.'; }
     box.innerHTML=h;
   }
-  window.cLivePreview=cLivePreview;
+  FORM_FN.cLivePreview=cLivePreview;
   var cm=document.getElementById('cMonth'); if(cm){ cm.addEventListener('input',cLivePreview); cm.addEventListener('change',cLivePreview); }
   $('#btnEdit').onclick=function(){
     // 자동완성 목록 채우기

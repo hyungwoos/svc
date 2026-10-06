@@ -17,11 +17,11 @@ export function loadMxMemos(cb){
   sbTry('mx_memos?select=*&order=year.desc,month.desc').then(function(rows){
     MXM={};
     (rows||[]).forEach(function(r){ MXM[mxKey(r.line||'', r.year, r.month)]=r; });
-    RAWX._mxAt=Date.now();
+    ST.RAWX._mxAt=Date.now();
     if(cb) cb();
   }).catch(function(){ /* 51단계 SQL 미설치 — 메모 기능만 비활성 */ });
 }
-export function mxCanEdit(){ return !!(ST.SB_TOKEN && !window.IS_VIEWER); }
+export function mxCanEdit(){ return !!(ST.SB_TOKEN && !ST.IS_VIEWER); }
 export function closeMxPop(){
   var e=document.getElementById('mxPop'); if(e) e.remove();
   document.removeEventListener('keydown', mxPopEsc);
@@ -169,7 +169,7 @@ export async function mxRemove(k, cur){
 
 export function loadInbound(cb){
   sbTry('inbound_leads?select=*&order=on_date.desc,no.desc').then(function(rows){
-    RAWX.inbound=rows||[]; RAWX._inbAt=Date.now(); if(cb) cb();
+    ST.RAWX.inbound=rows||[]; ST.RAWX._inbAt=Date.now(); if(cb) cb();
   });
 }
 export function inbLast(r){
@@ -184,13 +184,13 @@ export function goInbList(colK, val){
 export var INB_LOG_OPEN=false;
 export function loadInbLog(cb){
   sbTry('inbound_sync_log?select=*&order=at.desc&limit=30').then(function(rows){
-    RAWX.inbLog=rows||[]; RAWX._inbLogAt=Date.now(); if(cb) cb();
+    ST.RAWX.inbLog=rows||[]; ST.RAWX._inbLogAt=Date.now(); if(cb) cb();
   });
 }
 export function inbLastSync(){                       // {at, src, ok, counts, error} 또는 null
-  var L=RAWX.inbLog||[];
+  var L=ST.RAWX.inbLog||[];
   if(L.length) return L[0];
-  var last=''; (RAWX.inbound||[]).forEach(function(r){ if(r.synced_at && String(r.synced_at)>last) last=String(r.synced_at); });
+  var last=''; (ST.RAWX.inbound||[]).forEach(function(r){ if(r.synced_at && String(r.synced_at)>last) last=String(r.synced_at); });
   return last? {at:last, src:'(기록 표 없음 · synced_at 기준)', ok:true, counts:null, _fallback:true} : null;
 }
 export function inbAgo(v){
@@ -209,7 +209,7 @@ export function inbSyncBadge(){
          (bad? ' ✕ 실패':'')+(stale&&!bad? ' ⚠ 자동 동기화가 멈춘 것 같습니다':'')+'</span>';
 }
 export function inbLogTable(){
-  var L=RAWX.inbLog;
+  var L=ST.RAWX.inbLog;
   if(L===undefined) return '<div class="mini" style="color:var(--muted);padding:6px 0">기록을 읽는 중…</div>';
   if(!L.length) return '<div class="mini" style="color:var(--muted);padding:6px 0">아직 기록이 없습니다 — Supabase 에서 <b>SQL 74</b> 를 실행하고 Apps Script 를 새 버전으로 배포하면 다음 가져오기부터 여기에 쌓입니다.</div>';
   return '<table class="mini" style="width:100%;border-collapse:collapse;margin-top:6px">'+
@@ -229,8 +229,8 @@ export function inbSyncPanel(){
     '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'+
       '<b style="font-size:13.5px">시트 → 포탈 가져오기</b>'+inbSyncBadge()+
       '<span style="flex:1"></span>'+
-      (window.IS_VIEWER? '' : '<button class="pill" id="inbFetchP">↻ 지금 시트에서 가져오기</button>')+
-      '<button class="pill ghost" id="inbLogTg">🕘 가져온 기록'+(RAWX.inbLog&&RAWX.inbLog.length? ' ('+RAWX.inbLog.length+')':'')+'</button>'+
+      (ST.IS_VIEWER? '' : '<button class="pill" id="inbFetchP">↻ 지금 시트에서 가져오기</button>')+
+      '<button class="pill ghost" id="inbLogTg">🕘 가져온 기록'+(ST.RAWX.inbLog&&ST.RAWX.inbLog.length? ' ('+ST.RAWX.inbLog.length+')':'')+'</button>'+
     '</div>'+
     '<div id="inbLogBox" style="display:'+(INB_LOG_OPEN?'':'none')+'">'+inbLogTable()+'</div></div>';
 }
@@ -239,7 +239,7 @@ export function inbWirePanel(host){
   var t=host.querySelector('#inbLogTg'); if(t) t.onclick=function(){
     INB_LOG_OPEN=!INB_LOG_OPEN;
     var box=host.querySelector('#inbLogBox'); if(box) box.style.display=INB_LOG_OPEN?'':'none';
-    if(INB_LOG_OPEN && RAWX.inbLog===undefined) loadInbLog(function(){ var bx=host.querySelector('#inbLogBox'); if(bx) bx.innerHTML=inbLogTable(); });
+    if(INB_LOG_OPEN && ST.RAWX.inbLog===undefined) loadInbLog(function(){ var bx=host.querySelector('#inbLogBox'); if(bx) bx.innerHTML=inbLogTable(); });
   };
 }
 /* 인바운드 목록(표) 위에 붙는 패널 */
@@ -248,16 +248,16 @@ export function renderInbPanel(){
   if(ST.CUR_VIEW!=='inbound'){ if(host) host.style.display='none'; return; }
   if(!host){ var tw=$('#dvTable').parentElement; host=document.createElement('div'); host.id='inbHost'; tw.parentElement.insertBefore(host,tw); }
   host.style.display=''; host.innerHTML=inbSyncPanel(); inbWirePanel(host);
-  if(RAWX.inbLog===undefined) loadInbLog(function(){ if(ST.CUR_VIEW==='inbound') renderInbPanel(); });
+  if(ST.RAWX.inbLog===undefined) loadInbLog(function(){ if(ST.CUR_VIEW==='inbound') renderInbPanel(); });
 }
 export function renderInbStat(){
   var host=$('#inbBody');
-  if(!RAWX.inbound){
+  if(!ST.RAWX.inbound){
     host.innerHTML='<div class="cap" style="padding:40px;text-align:center">인바운드 데이터를 불러오는 중…</div>';
     loadInbound(function(){ if(ST.CUR_VIEW==='inbstat') renderInbStat(); });
     return;
   }
-  var ALL=RAWX.inbound;
+  var ALL=ST.RAWX.inbound;
   if(!ALL.length){
     host.innerHTML='<section class="card c12" style="max-width:640px;margin:0 auto;text-align:center;padding:40px">'+
       '<h3 style="margin:0 0 8px">📥 인바운드 관리</h3>'+
@@ -346,12 +346,12 @@ export function renderInbStat(){
   });
   host.querySelectorAll('[data-inbid]').forEach(function(a){
     a.onclick=function(){
-      var r=(RAWX.inbound||[]).filter(function(x){return String(x.id)===a.dataset.inbid;})[0];
+      var r=(ST.RAWX.inbound||[]).filter(function(x){return String(x.id)===a.dataset.inbid;})[0];
       if(r) openInbDetail(r);
     };
   });
   inbWirePanel(host);
-  if(RAWX.inbLog===undefined) loadInbLog(function(){ if(ST.CUR_VIEW==='inbstat') renderInbStat(); });
+  if(ST.RAWX.inbLog===undefined) loadInbLog(function(){ if(ST.CUR_VIEW==='inbstat') renderInbStat(); });
   var bl=document.getElementById('inbGoList'); if(bl) bl.onclick=function(){ goInbList(); };
 }
 export function inbRefetch(){
@@ -359,7 +359,7 @@ export function inbRefetch(){
   var b=document.getElementById('inbFetchP'); if(b){ b.disabled=true; b.textContent='가져오는 중…'; }
   toast('인바운드 가져오기','시트에서 가져오는 중… (최대 1분)','info');
   function done(){
-    RAWX.inbLog=undefined;                       // 기록도 새로 읽습니다
+    ST.RAWX.inbLog=undefined;                       // 기록도 새로 읽습니다
     loadInbLog(function(){ loadInbound(function(){
       if(ST.CUR_VIEW==='inbstat') renderInbStat(); else if(ST.CUR_VIEW==='inbound') renderGrid(); }); });
   }
@@ -414,7 +414,7 @@ export function wkChipCls(st){
 export function wkCustMatch(name){
   var n=String(name||'').replace(/\s+|\(.*?\)/g,'').toLowerCase();
   if(!n) return null;
-  var hit=(RAWX.customers||[]).some(function(c){
+  var hit=(ST.RAWX.customers||[]).some(function(c){
     var m=String(c.name||'').replace(/\s+|\(.*?\)/g,'').toLowerCase();
     return m && (m.indexOf(n)>=0 || n.indexOf(m)>=0);
   });
@@ -601,7 +601,7 @@ export async function renderWeekly(atWeek){
   var memoInner='';
   if(etc.length) memoInner+='<div class="mini" style="margin-bottom:8px;font-weight:700">요청 / 특이사항</div>'+tbl(etc)+'<div style="height:10px"></div>';
   if(d.prev_memo) memoInner+='<div class="ai-comment on" style="margin:0 0 8px"><b>지난주 액션</b><div class="wk-body" style="margin-top:4px">'+esc(d.prev_memo)+'</div></div>';
-  var wkCanMemo=!window.IS_EQUIP && !window.IS_VIEWER;   // 메모 저장은 admin 이상만
+  var wkCanMemo=!ST.IS_EQUIP && !ST.IS_VIEWER;   // 메모 저장은 admin 이상만
   memoInner+='<textarea id="wkMemo"'+(wkCanMemo?'':' disabled')+' style="width:100%;min-height:76px;border:1px solid var(--ring);border-radius:10px;'+
     'background:var(--surface-2);color:var(--ink);padding:10px;font-family:inherit;font-size:12.5px" '+
     'placeholder="회의에서 정한 것을 적어두면 다음 주 이 화면에 「지난주 액션」으로 표시됩니다">'+esc((meta&&meta.memo)||'')+'</textarea>'+
@@ -646,8 +646,8 @@ export async function renderWeekly(atWeek){
     }catch(e){}
   }
   requestAnimationFrame(wkMeasure);
-  if(!window.__wkRz){ window.__wkRz=1; window.addEventListener('resize', function(){ if(ST.CUR_VIEW==='weekly') wkMeasure(); }); }
-  window.__wkMeasure=wkMeasure;
+  if(!WK.rz){ WK.rz=1; window.addEventListener('resize', function(){ if(ST.CUR_VIEW==='weekly') wkMeasure(); }); }
+  WK.measure=wkMeasure;
 
   // ── 동작 ──
   WK.secs=Array.prototype.slice.call(host.querySelectorAll('[data-wksec]')).map(function(e){return e.id;});
@@ -710,7 +710,7 @@ export function wkFsSync(){
   if(b){ b.textContent = on? '⛶ 발표 종료 (ESC)' : '⛶ 발표 모드';
          b.style.background = on? 'var(--brand-t,rgba(46,189,87,.13))':''; }
   if(!on){ document.documentElement.style.removeProperty('--tbh'); }
-  try{ if(window.__wkMeasure && !on) window.__wkMeasure(); }catch(e){}
+  try{ if(WK.measure && !on) WK.measure(); }catch(e){}
 }
 export function wkGo(id){
   var el=document.getElementById(id); if(!el) return;

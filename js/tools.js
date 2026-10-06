@@ -22,26 +22,26 @@ export function fkSources(){
   (function(){ var lv=(ST.DATA&&ST.DATA.rows)? liveData() : null; (lv&&lv.ok? lv.rows:[]).forEach(function(r){
     out.push({t:'LIVE', nm:r.cust, sb:(r.prod||'')+' · '+(r.nodes||'')+'노드'+(r.basis? ' · '+r.basis:''), go:function(){ switchView('live'); $('#dvSearch').value=r.cust; renderGrid(); }, cust:r.cust});
   }); })();
-  (RAWX.oi||[]).forEach(function(r){
+  (ST.RAWX.oi||[]).forEach(function(r){
     out.push({t:'OI', nm:r.customer, sb:(r.deal_name||'')+' · '+(r.stage||'')+' · '+(r.owner||'')+' '+(r.requester||''), go:function(){ switchView('oi'); $('#dvSearch').value=r.customer; renderGrid(); }, cust:r.customer});
   });
-  (RAWX.inbound||[]).forEach(function(r){
+  (ST.RAWX.inbound||[]).forEach(function(r){
     out.push({t:'인바운드', nm:r.org, sb:(r.on_date||'')+' · '+(r.product||'')+' · '+(r.result||'')+' · '+(r.owner||'')+' '+(r.requester||''), go:function(){ goInbList(); $('#dvSearch').value=r.org; renderGrid(); }, cust:r.org});
   });
-  (RAWX.mdrops||[]).forEach(function(r){
+  (ST.RAWX.mdrops||[]).forEach(function(r){
     out.push({t:'MDR', nm:r.customer, sb:(r.svc_type||'')+' · '+(r.status||'')+' · '+(r.sales_name||'')+' '+(r.requester||'')+' '+(r.mgr_name||''), go:function(){ switchView('mdrops'); $('#dvSearch').value=r.customer; renderGrid(); }, cust:r.customer});
   });
-  (RAWX.assets||[]).forEach(function(r){
+  (ST.RAWX.assets||[]).forEach(function(r){
     out.push({t:'장비', nm:r.serial, sb:(r.model||'')+' · '+(r.status||'')+' · '+(r.customer||''), go:function(){ switchView('assets'); $('#dvSearch').value=r.serial; renderGrid(); }});
   });
-  (RAWX.orders||[]).forEach(function(r){
+  (ST.RAWX.orders||[]).forEach(function(r){
     out.push({t:'임대신청', nm:r.customer||'-', sb:(r.status||'')+' · '+(r.requester||'')+' '+(r.mgr_name||''), go:function(){ switchView('orders'); $('#dvSearch').value=r.customer||''; renderGrid(); }, cust:r.customer});
   });
   return out;
 }
 export function openFind(){
   if(!ST.SB_TOKEN || !ST.DATA) return;
-  if(RAWX.inbound===undefined && !window.IS_EQUIP) try{ loadInbound(function(){}); }catch(e){}
+  if(ST.RAWX.inbound===undefined && !ST.IS_EQUIP) try{ loadInbound(function(){}); }catch(e){}
   openOvl('ovlFind');
   var inp=$('#fkInput'); inp.value=''; $('#fkOut').innerHTML='';
   setTimeout(function(){ inp.focus(); },60);
@@ -103,14 +103,14 @@ export function openCust360(name){
   var cts=(ST.DATA&&ST.DATA.rows||[]).filter(function(r){return c360Match(r.cust,nm);});
   var lvAll=(ST.DATA&&ST.DATA.rows)? liveData() : null;
   var lives=(lvAll&&lvAll.ok? lvAll.rows:[]).filter(function(r){return c360Match(r.cust,nm);});
-  var ois=(RAWX.oi||[]).filter(function(r){return c360Match(r.customer,nm);});
-  var inbs=(RAWX.inbound||[]).filter(function(r){return c360Match(r.org,nm);});
-  var mdrs=(RAWX.mdrops||[]).filter(function(r){return c360Match(r.customer,nm);});
-  var asts=(RAWX.assets||[]).filter(function(r){return c360Match(r.customer,nm);});
-  var ords=(RAWX.orders||[]).filter(function(r){return c360Match(r.customer,nm);});
+  var ois=(ST.RAWX.oi||[]).filter(function(r){return c360Match(r.customer,nm);});
+  var inbs=(ST.RAWX.inbound||[]).filter(function(r){return c360Match(r.org,nm);});
+  var mdrs=(ST.RAWX.mdrops||[]).filter(function(r){return c360Match(r.customer,nm);});
+  var asts=(ST.RAWX.assets||[]).filter(function(r){return c360Match(r.customer,nm);});
+  var ords=(ST.RAWX.orders||[]).filter(function(r){return c360Match(r.customer,nm);});
   $('#c360Title').textContent='🏢 '+nm;
   $('#c360Cap').textContent='계약 '+cts.length+' · LIVE '+lives.length+' · OI '+ois.length+' · 인바운드 '+inbs.length+' · MDR 운영 '+mdrs.length+' · 장비 '+(asts.length+ords.length)+
-    (RAWX.inbound===undefined? ' · (인바운드는 메뉴를 한 번 연 뒤 집계됩니다)':'');
+    (ST.RAWX.inbound===undefined? ' · (인바운드는 메뉴를 한 번 연 뒤 집계됩니다)':'');
   function sec(icon,label,n,html){ return '<div class="c360-sec"><h4>'+icon+' '+label+' <span class="ct">'+n+'건</span></h4>'+html+'</div>'; }
   $('#c360Body').innerHTML=
     sec('📋','계약',cts.length, tb(['서비스','채널','파트너','구분','상태','기간','MRR(천원)'],
@@ -209,7 +209,7 @@ export function menuSegments(){
   return out;
 }
 export function applyMenuConf(){
-  if(window.IS_EQUIP) return;   // 제한 계정은 기본 메뉴 그대로
+  if(ST.IS_EQUIP) return;   // 제한 계정은 기본 메뉴 그대로
   var conf=null; try{ conf=JSON.parse(localStorage.getItem(menuConfKey())||'null'); }catch(e){}
   conf=menuConfMigrate(conf);
   var segs=menuSegments(), side=$('#side');
@@ -324,12 +324,12 @@ export function pushRecent(v){
 }
 export function renderTodo(){
   var wrap=document.getElementById('todoWrap'); if(!wrap) return;
-  if(!ST.SB_TOKEN || !ST.DATA || window.IS_EQUIP){ wrap.style.display='none'; return; }
+  if(!ST.SB_TOKEN || !ST.DATA || ST.IS_EQUIP){ wrap.style.display='none'; return; }
   wrap.style.display='';
   var today=new Date(), t0=today.getTime(), todayS=todayStr(today);
   // ① 인바운드 장기 미대응 — 10분 캐시, 필요한 열만 가볍게 조회
-  if(!window.__inbTodo || t0-window.__inbTodo.t>10*60*1000){
-    window.__inbTodo={t:t0, n:window.__inbTodo? window.__inbTodo.n:null};
+  if(!ST.INB_TODO || t0-ST.INB_TODO.t>10*60*1000){
+    ST.INB_TODO={t:t0, n:ST.INB_TODO? ST.INB_TODO.n:null};
     sbTry('inbound_leads?y=eq.'+today.getFullYear()+'&result=eq.'+encodeURIComponent('진행중')+'&select=on_date,s1d,s2d,s21d,s3d')
       .then(function(rows){
         var n=null;
@@ -337,13 +337,13 @@ export function renderTodo(){
           var last=[x.on_date,x.s1d,x.s2d,x.s21d,x.s3d].filter(function(d){return d&&/^\d{4}-\d{2}-\d{2}/.test(d);}).sort().pop();
           if(last && (t0-new Date(last).getTime())/864e5>=90) n++;   // 대시보드 기준: 3개월
         }); }
-        window.__inbTodo={t:t0, n:n};
+        ST.INB_TODO={t:t0, n:n};
         if(ST.CUR_VIEW==='dash') renderTodo();
       });
   }
-  var inbN=window.__inbTodo? window.__inbTodo.n:null;
+  var inbN=ST.INB_TODO? ST.INB_TODO.n:null;
   // ② OI 밀린 액션 — 예정일이 지났는데 아직 진행 중
-  var oiLate=(RAWX.oi||[]).filter(function(o){
+  var oiLate=(ST.RAWX.oi||[]).filter(function(o){
     return o.next_date && String(o.next_date).slice(0,10)<todayS && !/수주|실패/.test(String(o.stage||''));
   }).length;
   // ③ 재약정 도래 — 60일(2개월) 안에 종료되는 계약
