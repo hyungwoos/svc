@@ -2,7 +2,7 @@
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { APP_VER, IS_STAGING, ST } from './state.js';
 import { $, applyPerms, axTime, curLook, doLogout, esc, IDLE_KEY, IDLE_OPTS, idleLabel, idleMin, idleTouch, loadPerms, LOOKS, mfaCardRender, navText,
-  PERM_EXEMPT, pwaHintHtml, pwaInstall, rawHtml, SB_KEY, SB_URL, sessRead, setLook, STATE, tpl } from './core.js';
+  PERM_EXEMPT, pwaHintHtml, pwaInstall, rawHtml, closeBtn, SB_KEY, SB_URL, sessRead, setLook, STATE, tpl } from './core.js';
 import { cacheDrop, idxDate, ROLE_VIEWS, sbTry, sbWrite, thisMonthStr, toast, todayStr } from './shell.js';
 import { aiFetch, buildDigest } from './ai.js';
 import { applyCodes, CODE_KIND, CODE_KIND_LABEL, CODE_KIND_NOTE } from './grids.js';
@@ -104,6 +104,20 @@ export async function opsStatus(){
   try{ OPS.st=await opsCall('status'); }catch(e){ OPS.st={ok:false, error:String(e.message||e)}; }
   renderOps(true);
 }
+/* ㊿+156 펼친 목록·결과 닫기(✕ 닫기 · closeBtn) — 올릴 파일(모두 빼기) · 저장소 파일 · 커밋 이력 · 저장소 점검 · 직인 미리보기 · SQL 결과 · 시스템 점검 · 브라우저 오류 · AI 점검 */
+export function opsClose(k){
+  if(k==='files'){ OPS.files=[]; OPS.commitMsg=''; }
+  else if(k==='ghList') OPS.ghList=null;
+  else if(k==='hist'){ OPS.hist=null; OPS.histPath=''; }
+  else if(k==='repo') OPS.repo=null;
+  else if(k==='seal'){ if(OPS.seal&&OPS.seal.url){ try{ URL.revokeObjectURL(OPS.seal.url); }catch(e){} OPS.seal.url=null; } }   // 상태 줄(✓ Storage 에 있음)은 남김
+  else if(k==='sqlRes') OPS.sqlRes=null;
+  else if(k==='health'){ if(OPS.health&&OPS.health.running) return; OPS.health=null; }
+  else if(k==='errs') OPS.errs=null;
+  else if(k==='aic'){ if(OPS.aic&&OPS.aic.running) return; OPS.aic=null; }
+  else return;
+  OPS.msg=''; OPS.msgCls=''; renderOps(true);
+}
 export function renderOps(keep){
   var host=document.getElementById('opsHost'); if(!host) return;
   if(IS_STAGING && !OPS._tgInit){ OPS.target='staging'; OPS._tgInit=true; }
@@ -121,6 +135,7 @@ export function renderOps(keep){
   var pin=document.getElementById('opsPin'); pin.oninput=function(){ OPS.pin=pin.value; };
   host.querySelectorAll('#opsTabs button').forEach(function(b){ b.onclick=function(){ OPS.tab=b.dataset.t; OPS.msg=''; OPS.msgCls=''; renderOps(true); }; });
   document.getElementById('opsRefresh').onclick=function(){ OPS.st=null; renderOps(true); opsStatus(); };
+  host.querySelectorAll('[data-ops-close]').forEach(function(b){ b.onclick=function(){ opsClose(b.dataset.opsClose); }; });
   if(OPS.tab==='gh') opsGhBind(host); else if(OPS.tab==='sql') opsSqlBind(host); else if(OPS.tab==='fn') opsFnBind(host); else opsLogBind(host);
   if(!keep && !OPS.st) opsStatus();
 }
@@ -132,7 +147,8 @@ export function opsGhHtml(){
      tpl`<div class="ops-drop" id="opsDrop" tabindex="0">여기에 파일이나 <b>폴더</b>를 끌어다 놓거나 <u>클릭해서 선택</u> — index.html · app.css · js/ 폴더 · 위성 페이지 · sw.js · manifest · 이미지 · tests/ 폴더 (여러 개 가능 · index.html 과 app.css/js 는 항상 같이)<input type="file" id="opsFile" multiple style="display:none"><input type="file" id="opsFolder" webkitdirectory style="display:none"></div>`+
      tpl`<div style="margin-top:6px"><button type="button" class="cbtn" id="opsPickFolder">📁 폴더 선택</button></div>`;
   if(files.length){
-    h+=tpl`<table class="rn-tbl" style="margin-top:8px"><thead><tr><th>경로</th><th class="n">크기</th><th>버전</th><th></th></tr></thead><tbody>${rawHtml(files.map(function(f,i){
+    h+=tpl`<div class="x-head mini" style="margin-top:8px">올릴 파일 ${files.length}개${closeBtn({'data-ops-close':'files'},'고른 파일을 전부 목록에서 빼기','✕ 모두 빼기')}</div>`;
+    h+=tpl`<table class="rn-tbl" style="margin-top:4px"><thead><tr><th>경로</th><th class="n">크기</th><th>버전</th><th></th></tr></thead><tbody>${rawHtml(files.map(function(f,i){
       var ver=f.ver? (f.ver===cur? tpl`<span class="mini">${f.ver} (지금과 같음)</span>` : tpl`<b>${f.ver}</b> <span class="mini">← 지금 ${cur}</span>`) : '';
       var wf=OPS_WF_RE.test(f.path), repo=opsRepoFile(f.path);
       var tag=wf? tpl`<span class="ctag late" title="포탈 토큰에는 Workflows 권한이 없어 이 파일은 커밋에서 빠집니다">GitHub 웹에서</span> <button type="button" class="cbtn" data-wfcopy="${rawHtml(i)}">내용 복사</button> <a class="cbtn" target="_blank" rel="noopener" href="https://github.com/${opsRepoName()}/edit/${opsRepoBranch()}/${f.path}">GitHub 에서 열기 ↗</a>`
@@ -149,8 +165,8 @@ export function opsGhHtml(){
   h+=tpl`<div><div class="ops-h">② 저장소 · 이전 버전</div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px"><button type="button" class="pill ghost" id="opsGhList">저장소 파일 보기</button><button type="button" class="pill ghost" id="opsGhHist" data-p="index.html">index.html 이력</button><a class="pill ghost" href="https://github.com/${(OPS.st&&OPS.st.github&&OPS.st.github.repo)||'hyungwoos/svc'}/actions" target="_blank" rel="noopener" title="테스트·배포 진행 상황">Actions ↗</a></div>`;
   h+=tpl`<div style="display:flex;gap:6px;flex-wrap:wrap;margin:-2px 0 8px"><button type="button" class="pill ghost" id="opsRepoCheck" title="안 쓰는 파일 · 스테이징에만 있는 저장소 파일 · 루트에 없는 테스트/함수 · 배포 설정(deploy.yml) 상태를 확인">🧹 저장소 점검</button><a class="pill ghost" target="_blank" rel="noopener" href="https://github.com/${opsRepoName()}/settings/pages" title="Source 가 «GitHub Actions» 여야 테스트를 통과한 버전만 배포됩니다">Pages 설정 ↗</a></div>`;
   h+=opsRepoHtml();
-  if(OPS.ghList) h+=tpl`<table class="rn-tbl"><thead><tr><th>경로</th><th class="n">크기</th><th></th></tr></thead><tbody>${rawHtml(OPS.ghList.map(function(f){ return tpl`<tr><td>${f.path}</td><td class="n">${rawHtml(opsFmtBytes(f.size))}</td><td><button type="button" class="cbtn" data-hist="${f.path}">이력</button></td></tr>`; }).join(''))}</tbody></table>`;
-  if(OPS.hist) h+=tpl`<div class="ops-h" style="margin-top:10px">${OPS.histPath} — 최근 커밋</div><table class="rn-tbl"><thead><tr><th>커밋</th><th>일시</th><th>메시지</th><th></th></tr></thead><tbody>${rawHtml(OPS.hist.map(function(c,i){ return tpl`<tr><td><a href="${c.url}" target="_blank" rel="noopener" style="font-family:ui-monospace,monospace">${c.short}</a></td><td class="mini">${String(c.date||'').replace('T',' ').slice(0,16)}</td><td>${c.message}</td><td>${rawHtml(i===0? '<span class="mini">현재</span>' : tpl`<button type="button" class="cbtn" data-restore="${c.sha}">이 버전으로 복원</button>`)}</td></tr>`; }).join(''))}</tbody></table>`;
+  if(OPS.ghList) h+=tpl`<div class="ops-h x-head" style="margin-top:10px">저장소 파일 ${OPS.ghList.length}개${closeBtn({'data-ops-close':'ghList'},'저장소 파일 목록 닫기')}</div><table class="rn-tbl"><thead><tr><th>경로</th><th class="n">크기</th><th></th></tr></thead><tbody>${rawHtml(OPS.ghList.map(function(f){ return tpl`<tr><td>${f.path}</td><td class="n">${rawHtml(opsFmtBytes(f.size))}</td><td><button type="button" class="cbtn" data-hist="${f.path}">이력</button></td></tr>`; }).join(''))}</tbody></table>`;
+  if(OPS.hist) h+=tpl`<div class="ops-h x-head" style="margin-top:10px">${OPS.histPath} — 최근 커밋${closeBtn({'data-ops-close':'hist'},'커밋 이력 닫기')}</div><table class="rn-tbl"><thead><tr><th>커밋</th><th>일시</th><th>메시지</th><th></th></tr></thead><tbody>${rawHtml(OPS.hist.map(function(c,i){ return tpl`<tr><td><a href="${c.url}" target="_blank" rel="noopener" style="font-family:ui-monospace,monospace">${c.short}</a></td><td class="mini">${String(c.date||'').replace('T',' ').slice(0,16)}</td><td>${c.message}</td><td>${rawHtml(i===0? '<span class="mini">현재</span>' : tpl`<button type="button" class="cbtn" data-restore="${c.sha}">이 버전으로 복원</button>`)}</td></tr>`; }).join(''))}</tbody></table>`;
   h+=opsSealHtml();
   h+='</div></div>';
   return h;
@@ -160,7 +176,7 @@ export function opsRepoHtml(){
   var R=OPS.repo; if(!R) return '';
   var del=opsRepoDeletable(), h='<div class="ops-repo" style="border:1px solid var(--ring);border-radius:10px;padding:10px 12px;margin:0 0 10px">';
   var ok=!R.unused.length && !R.stagingRepo.length && !R.missing.length && !(R.wf&&R.wf.length);
-  h+=tpl`<div class="ops-h" style="margin:0 0 6px">🧹 저장소 점검 ${rawHtml(ok? '<span class="up">✓ 문제 없음</span>':'')}</div>`;
+  h+=tpl`<div class="ops-h x-head" style="margin:0 0 6px">🧹 저장소 점검 ${rawHtml(ok? '<span class="up">✓ 문제 없음</span>':'')}${closeBtn({'data-ops-close':'repo'},'저장소 점검 결과 닫기')}</div>`;
   if(R.unused.length) h+=tpl`<div class="mini" style="margin:4px 0 2px"><b>안 쓰는 파일 ${R.unused.length}개</b> — 지워도 됩니다</div><ul class="mini" style="margin:0 0 6px 18px;padding:0">${rawHtml(R.unused.map(function(x){ return tpl`<li><code>${x.p}</code> — ${x.why}</li>`; }).join(''))}</ul>`;
   if(R.stagingRepo.length) h+=tpl`<div class="mini" style="margin:4px 0 2px"><b>스테이징 안의 저장소 파일 ${R.stagingRepo.length}개</b> — CI 는 루트만 봐서 여기 있으면 쓰이지 않습니다</div><ul class="mini" style="margin:0 0 6px 18px;padding:0">${rawHtml(R.stagingRepo.slice(0,40).map(function(x){ return tpl`<li><code>${x.p}</code> — ${rawHtml(x.root? '루트에 있음 · 지워도 됨' : '<span style="color:var(--critical)">루트에 없음 — 먼저 루트에 올리세요</span>')}</li>`; }).join(''))}${rawHtml(R.stagingRepo.length>40? tpl`<li>… 외 ${R.stagingRepo.length-40}개</li>`:'')}</ul>`;
   if(R.missing.length) h+=tpl`<div class="mini" style="margin:4px 0 2px"><b>루트에 없는 저장소 파일 ${R.missing.length}개</b> — 함수 테스트가 CI 에서 돌지 않습니다 (저장소 파일 묶음을 끌어 넣어 커밋 · 대상 상관없이 루트로)</div><ul class="mini" style="margin:0 0 6px 18px;padding:0">${rawHtml(R.missing.map(function(p){ return tpl`<li><code>${p}</code></li>`; }).join(''))}</ul>`;
@@ -214,7 +230,7 @@ export function opsSealHtml(){
     tpl`<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><span id="opsSealSt" class="mini">${rawHtml(st? (st.ok? '✓ Storage 에 있음 · '+opsFmtBytes(st.size)+' · '+esc(st.type||'') : '✗ '+esc(st.error||'없음')) : '상태 미확인')}</span>`+
     tpl`<button type="button" class="cbtn" id="opsSealCheck">직인 상태 확인</button>`+
     tpl`<label class="cbtn" style="cursor:pointer">직인 이미지 올리기<input type="file" id="opsSealFile" accept="image/jpeg,image/png,image/webp" style="display:none"></label>`+
-    tpl`<button type="button" class="cbtn" id="opsSealRm" title="저장소 루트와 staging/ 의 도장.jpg 를 삭제 커밋 (Git 이력에는 남음)">저장소의 도장.jpg 삭제</button></div>`+ tpl`${rawHtml(st&&st.ok&&st.url? tpl`<div style="margin-top:6px"><img src="${st.url}" alt="직인 미리보기" style="height:48px;border:1px solid var(--line);border-radius:6px;background:#fff"></div>`:'')}`;
+    tpl`<button type="button" class="cbtn" id="opsSealRm" title="저장소 루트와 staging/ 의 도장.jpg 를 삭제 커밋 (Git 이력에는 남음)">저장소의 도장.jpg 삭제</button></div>`+ tpl`${rawHtml(st&&st.ok&&st.url? tpl`<div class="x-head" style="margin-top:6px;max-width:360px"><img src="${st.url}" alt="직인 미리보기" style="height:48px;border:1px solid var(--line);border-radius:6px;background:#fff">${closeBtn({'data-ops-close':'seal'},'직인 미리보기 닫기')}</div>`:'')}`;
 }
 export async function opsSealCheck(quiet){
   try{
@@ -386,7 +402,7 @@ export function opsSqlHtml(){
   h+=tpl`<textarea id="opsSql" class="ops-ta" spellcheck="false" placeholder="-- 제가 드린 sql8N 파일을 그대로 붙여 넣으세요&#10;select now();">${OPS.sql||''}</textarea>`;
   h+=tpl`<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px"><label class="mini" style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="opsRO"${OPS.sqlRO?' checked':''}> 읽기 전용(SELECT 확인용 · 바뀌는 건 전부 롤백)</label><span class="mini" id="opsSqlInfo">${opsSqlInfo(OPS.sql||'')}</span><button type="button" class="pill pri" id="opsSqlGo" style="margin-left:auto">실행 (Ctrl+Enter)</button></div>`;
   if(res){
-    h+=tpl`<div class="ops-h" style="margin-top:12px">결과 — ${rawHtml(res.row_count!=null? res.row_count+'행' : '행 없음')}${res.truncated? ' (500행까지 표시)':''}${res.read_only? ' · 읽기 전용(롤백됨)':''} · ${rawHtml(res.ms)}ms</div>`;
+    h+=tpl`<div class="ops-h x-head" style="margin-top:12px">결과 — ${rawHtml(res.row_count!=null? res.row_count+'행' : '행 없음')}${res.truncated? ' (500행까지 표시)':''}${res.read_only? ' · 읽기 전용(롤백됨)':''} · ${rawHtml(res.ms)}ms${closeBtn({'data-ops-close':'sqlRes'},'SQL 결과 닫기')}</div>`;
     var rows=Array.isArray(res.rows)? res.rows : (res.rows==null? [] : [res.rows]);
     if(rows.length && typeof rows[0]==='object' && rows[0]!==null){
       var cols=Object.keys(rows[0]); rows.slice(0,200).forEach(function(r){ Object.keys(r||{}).forEach(function(k){ if(cols.indexOf(k)<0) cols.push(k); }); });
@@ -532,7 +548,7 @@ export async function aiCheckRun(){
 }
 export function aiCheckHtml(){
   var A=OPS.aic;
-  var h=tpl`<div class="ops-h" style="display:flex;align-items:center;gap:10px;margin-top:14px">AI 점검 (대표 질문 15개 → ask 함수 → 기대값 확인) <button type="button" class="cbtn" id="opsAiCheck"${A&&A.running? ' disabled':''}>${A&&A.running? '점검 중…':'15문 점검 실행'}</button>`+ tpl`${rawHtml(A&&A.summary? tpl`<span class="mini">${rawHtml(A.summary.pass)}/${rawHtml(A.summary.total)} 통과 · 평균 ${Math.round(A.summary.avg_ms/1000)}초${rawHtml(A.summary.cut? ' · 예산 초과/축약 '+A.summary.cut:'')}${rawHtml(A.summary.models.length? ' · '+esc(A.summary.models.join(', ')):'')} · ${String(A.at||'').replace('T',' ').slice(0,16)}</span><button type="button" class="cbtn" id="opsAiXlsx">엑셀</button>`:'')}</div>`;
+  var h=tpl`<div class="ops-h" style="display:flex;align-items:center;gap:10px;margin-top:14px">AI 점검 (대표 질문 15개 → ask 함수 → 기대값 확인) <button type="button" class="cbtn" id="opsAiCheck"${A&&A.running? ' disabled':''}>${A&&A.running? '점검 중…':'15문 점검 실행'}</button>`+ tpl`${rawHtml(A&&A.summary? tpl`<span class="mini">${rawHtml(A.summary.pass)}/${rawHtml(A.summary.total)} 통과 · 평균 ${Math.round(A.summary.avg_ms/1000)}초${rawHtml(A.summary.cut? ' · 예산 초과/축약 '+A.summary.cut:'')}${rawHtml(A.summary.models.length? ' · '+esc(A.summary.models.join(', ')):'')} · ${String(A.at||'').replace('T',' ').slice(0,16)}</span><button type="button" class="cbtn" id="opsAiXlsx">엑셀</button>`:'')}${A&&!A.running? closeBtn({'data-ops-close':'aic'},'AI 점검 결과 닫기'):''}</div>`;
   if(!A) h+='<p class="mini" style="margin:0 0 14px">모델·함수 배포 뒤 «AI 가 여전히 숫자를 맞게 말하나»를 확인합니다 — 질문 15개를 동시 3개씩 보내 2~3분 걸리고, 요약은 변경 이력(ai_check)에 남습니다. 질문·기대값은 코드의 AI_CHECK_QS.</p>';
   else h+=tpl`<table class="rn-tbl" style="margin-bottom:14px"><thead><tr><th>#</th><th>질문</th><th>기대</th><th>결과</th><th class="n">시간</th><th>모델 · 도구</th><th>답(앞부분)</th></tr></thead><tbody>${rawHtml(A.rows.map(function(r,i){
       var col=r.st==='통과'? 'var(--brand)' : r.st==='대기'||r.st==='진행'? 'var(--muted)' : 'var(--critical)';
@@ -573,10 +589,10 @@ export function aiCheckBind(host){
 }
 export function opsLogHtml(){
   var st=OPS.st, L=(st&&st.ok&&st.recent)||[], H=OPS.health, E=OPS.errs;
-  var h=tpl`<div class="ops-h" style="display:flex;align-items:center;gap:10px">시스템 점검 <button type="button" class="cbtn" id="opsHealth"${H&&H.running? ' disabled':''}>${H&&H.running? '점검 중…':'지금 점검'}</button>${rawHtml(H&&H.at? tpl`<span class="mini">${H.at.toLocaleTimeString('ko-KR')}</span>`:'')}</div>`;
+  var h=tpl`<div class="ops-h" style="display:flex;align-items:center;gap:10px">시스템 점검 <button type="button" class="cbtn" id="opsHealth"${H&&H.running? ' disabled':''}>${H&&H.running? '점검 중…':'지금 점검'}</button>${rawHtml(H&&H.at? tpl`<span class="mini">${H.at.toLocaleTimeString('ko-KR')}</span>`:'')}${H&&!H.running&&H.rows.length? closeBtn({'data-ops-close':'health'},'점검 결과 닫기'):''}</div>`;
   if(H && H.rows.length) h+=tpl`<table class="rn-tbl" style="margin-bottom:14px"><tbody>${rawHtml(H.rows.map(function(r){ return tpl`<tr><td style="width:240px">${r.name}</td><td>${rawHtml(r.ok? '<span class="up">✓</span>':'<span style="color:var(--critical)">✗</span>')} ${r.info}</td><td class="n mini">${rawHtml(r.ms)}ms</td></tr>`; }).join(''))}</tbody></table>`;
   else h+='<p class="mini" style="margin:0 0 14px">Pages 최신 버전 · Supabase REST · AI · remind · ops · (PIN 있으면) 운영 DB · 서비스 워커를 순서대로 확인합니다.</p>';
-  h+='<div class="ops-h" style="display:flex;align-items:center;gap:10px">브라우저 오류 (사용자 화면에서 난 JS 오류 · 최근 30건) <button type="button" class="cbtn" id="opsErrs">불러오기</button></div>';
+  h+=tpl`<div class="ops-h" style="display:flex;align-items:center;gap:10px">브라우저 오류 (사용자 화면에서 난 JS 오류 · 최근 30건) <button type="button" class="cbtn" id="opsErrs">불러오기</button>${E!=null? closeBtn({'data-ops-close':'errs'},'오류 목록 닫기'):''}</div>`;
   if(E===null) h+='<p class="mini" style="margin:0 0 14px">«불러오기»를 누르면 client_errors 표(SQL 86)를 읽습니다.</p>';
   else if(!E.length) h+='<p class="mini" style="margin:0 0 14px">기록된 오류가 없습니다 ✓</p>';
   else h+=tpl`<table class="rn-tbl" style="margin-bottom:14px"><thead><tr><th>일시</th><th>계정</th><th>버전</th><th>화면</th><th>오류</th><th class="n">반복</th></tr></thead><tbody>${rawHtml(E.map(function(r){ return tpl`<tr><td class="mini">${String(r.at||'').replace('T',' ').slice(0,19)}</td><td class="mini">${r.email||''}</td><td class="mini">${String(r.ver||'').replace(/^.*\s/,'')}</td><td>${r.view||''}</td><td title="${r.msg||''}">${rawHtml(esc(String(r.msg||'')).slice(0,100))}</td><td class="n">${rawHtml(r.n||1)}</td></tr>`; }).join(''))}</tbody></table>`;

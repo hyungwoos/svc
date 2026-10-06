@@ -532,9 +532,12 @@ export function axTime(v){
 /** @param {any} s @returns {string} */
 export function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
 /** rawHtml() 이 돌려주는 «이미 HTML» 표시 */
-function RawHtml(s){ this.html=s; }
+function RawHtml(s){ this.html=s; this.toString=rawHtmlStr; }   /* ㊿+156 toString: '+' 로 이어도 HTML 그대로(예: closeBtn() 을 글자에 붙일 때) */
+function rawHtmlStr(){ return this.html; }
 /** HTML 조각을 tpl`` 안에 그대로 넣을 때 — 값은 글자로 바꿔 그대로(예전 '+' 이어 붙이기와 같음) @param {any} s @returns {RawHtml} */
 export function rawHtml(s){ return new RawHtml(String(s)); }
+/* ㊿+156 펼친 목록·결과·미리보기를 닫는 버튼 — 모양 하나(«✕ 닫기» · 줄 오른쪽 끝 .x-close) · data = {속성이름: 값}(값은 esc) · text 를 주면 글자만 바꿈(예: «✕ 모두 빼기») · tpl 안에 ${closeBtn(…)} 로 */
+export function closeBtn(data, title, text){ var a=''; Object.keys(data||{}).forEach(function(k){ a+=' '+k+'="'+esc(data[k])+'"'; }); return rawHtml(tpl`<button type="button" class="cbtn x-close" title="${title||'닫기'}" aria-label="${title||'닫기'}"${rawHtml(a)}>${text||'✕ 닫기'}</button>`); }
 /** 화면 HTML 태그 템플릿 — ${값} 은 esc, rawHtml(…) 은 그대로 @param {TemplateStringsArray} strs @param {...any} vals @returns {string} */
 export function tpl(strs, ...vals){
   var out=strs[0];

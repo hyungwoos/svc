@@ -1,7 +1,7 @@
 /* ===== equipment.js — 임대 장비: 신청 ↔ 현황 대조 · 원복 · 대조 패널 · 비즈포탈 월 입력 =====
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { APP_VER, ST } from './state.js';
-import { $, esc, rawHtml, tpl } from './core.js';
+import { $, closeBtn, esc, rawHtml, tpl } from './core.js';
 import { eqRefresh, sbGet, sbTry, sbWrite, toast, todayStr } from './shell.js';
 import { renderGrid } from './grid.js';
 import { closeOvl, logChange, openOvl } from './edit.js';
@@ -398,13 +398,14 @@ export function renderEqPanel(){
        tpl`color:var(--critical,#d03b3b);word-break:break-all">⚠ 마지막 동기화 오류 — ${EQ_ERR}</div>`;
   }
   h+=tpl`<div class="mini" id="eqDiagOut" style="margin-top:8px;padding:8px 10px;border-radius:8px;background:var(--bg-2,#f6f7f9);`+
-     tpl`line-height:1.75;word-break:break-all;display:${EQ_DIAG?'':'none'}">${rawHtml(EQ_DIAG||'')}</div>`;
+     tpl`line-height:1.75;word-break:break-all;display:${EQ_DIAG?'':'none'}"><div style="float:right;margin:0 0 4px 8px">${closeBtn({id:'eqDiagClose'},'진단 결과 닫기')}</div><div id="eqDiagBody">${rawHtml(EQ_DIAG||'')}</div></div>`;
   h+='</div>';
   host.innerHTML=h;
   var b=document.getElementById('eqFixAll'); if(b) b.onclick=eqFixAll;
   var b2=document.getElementById('eqOrphan'); if(b2) b2.onclick=eqOrphanFix;
   var b3=document.getElementById('eqUndo');   if(b3) b3.onclick=eqUndoRun;
   var b4=document.getElementById('eqDiag');   if(b4) b4.onclick=eqDiagRun;
+  var b5=document.getElementById('eqDiagClose'); if(b5) b5.onclick=function(){ EQ_DIAG=''; var box=document.getElementById('eqDiagOut'); if(box) box.style.display='none'; };   /* ㊿+156 */
 
 }
 export async function eqFixAll(){
@@ -436,7 +437,7 @@ export async function eqDiagRun(){
   var log=[];
   function bad(t){ return tpl`<b style="color:var(--critical,#d03b3b)">${t}</b>`; }
   function put(){ EQ_DIAG=log.join('<br>');
-    var box=document.getElementById('eqDiagOut'); if(box){ box.style.display=''; box.innerHTML=EQ_DIAG; } }
+    var box=document.getElementById('eqDiagOut'), body=document.getElementById('eqDiagBody'); if(box && body){ box.style.display=''; body.innerHTML=EQ_DIAG; } }
   log.push(tpl`<b>🩺 진단</b> — 포탈 버전 ${APP_VER}`);
   log.push('읽어온 데이터 — 신청 내역 '+((ST.RAWX.orders||[]).length)+'건 · 장비 현황 '+((ST.RAWX.assets||[]).length)+'대');
   put();

@@ -103,6 +103,4 @@ function sim(a,b){ a=norm(a); b=norm(b); if(!a||!b) return 0; if(a===b) return 1
   if(a.indexOf(b)>=0||b.indexOf(a)>=0) return .88;
   var ga=grams(a), gb=grams(b), hit=0, ka=Object.keys(ga), kb=Object.keys(gb);
   ka.forEach(function(k){ if(gb[k]) hit++; }); return ka.length+kb.length? 2*hit/(ka.length+kb.length):0; }
-/* 창 바깥 클릭 · Esc 로 닫기 */
-document.addEventListener('click', function(ev){ if(ev.target&&ev.target.classList&&ev.target.classList.contains('ovl')) ev.target.classList.remove('show'); });
-document.addEventListener('keydown', function(ev){ if(ev.key==='Escape') document.querySelectorAll('.ovl.show').forEach(function(o){ o.classList.remove('show'); }); });
+/* 창 바깥 클릭 · Esc 로 닫기 → sat/common.js 로 옮김(㊿+156 · 프로젝트 리포트 창도 같이) */

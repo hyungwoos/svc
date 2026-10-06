@@ -1282,6 +1282,8 @@ html[data-look="cc"] #ccHome{display:flex;flex-direction:column;gap:14px;margin-
 .ib-empty{padding:22px 18px;border-top:1px solid var(--grid);display:flex;align-items:center;gap:12px;color:var(--ink-2);font-size:13.5px}
 .cbtn{height:28px;padding:0 10px;border-radius:7px;border:1px solid var(--ring);background:var(--surface);color:var(--ink);font:inherit;font-size:12px;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
 .cbtn:hover{background:var(--surface-2)}
+.x-close{margin-left:auto;flex:none}   /* ㊿+156 펼친 목록·결과 닫기 — 머리줄(flex) 오른쪽 끝 */
+.x-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .cbtn.pri{background:var(--brand-solid);border-color:var(--brand-solid);color:#fff}
 .cbtn.pri:hover{background:var(--brand-2)}
 .cbtn[aria-pressed="true"]{background:var(--brand-solid);border-color:var(--brand-solid);color:#fff}

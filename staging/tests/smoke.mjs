@@ -1347,6 +1347,69 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
   });
   await ctx.close();
 }
+// ㊿+156: 버튼으로 펼친 목록·결과·미리보기는 «✕ 닫기»(core.js closeBtn · .x-close) 로 닫힘
+{
+  const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+  const { ctx, page, errs } = await open({ extra: async (route, u) => {
+    if (/\/storage\/v1\/object\/authenticated\//.test(u)) { await route.fulfill({ status: 200, contentType: 'image/png', body: PNG }); return true; }
+    if (!u.includes('/functions/v1/ops')) return false;
+    let body = {}; try { body = JSON.parse(route.request().postData() || '{}'); } catch { /* noop */ }
+    const A = body.action; let out = { ok: true };
+    if (A === 'status') out = { ok: true, pin_set: true, github: { repo: 'x/svc', branch: 'main', token_set: true }, mgmt_token_set: true, log_ok: true, recent: [] };
+    else if (A === 'gh_list') out = { ok: true, files: [{ path: 'index.html', size: 10 }, { path: 'js/core.js', size: 20 }, { path: 'js/boot.js', size: 5 }] };
+    else if (A === 'gh_history') out = { ok: true, commits: [{ sha: 'a'.repeat(40), short: 'aaaaaaa', date: '2026-10-05T10:00:00Z', message: '커밋 1', url: 'https://github.com/x' }] };
+    else if (A === 'gh_get') out = { ok: true, content: 'name: x' };
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(out) }); return true; } });
+  page.on('dialog', (d) => d.dismiss().catch(() => {}));
+  await page.evaluate(async () => { await SVC.lazyLoad('admin'); SVC.switchView('ops'); }); await page.waitForTimeout(600);
+  await page.fill('#opsPin', '7391');
+  const has = (k) => page.evaluate((k) => !!document.querySelector('#opsBody [data-ops-close="' + k + '"]'), k);
+  const closeIt = async (k) => { await page.click('#opsBody [data-ops-close="' + k + '"]'); await page.waitForTimeout(150); return !(await has(k)); };
+  await S.t('㊿+156 배포·운영 GitHub: 저장소 파일 보기 · index.html 이력 · 🧹 저장소 점검 · 직인 미리보기 · 올릴 파일 — 각각 «✕ 닫기» 로 닫힘', async () => {
+    const done = [];
+    await page.click('#opsGhList'); await page.waitForTimeout(400);
+    assert(await has('ghList') && await page.evaluate(() => document.querySelector('#opsBody').innerText.includes('js/core.js')), '저장소 파일 목록이 안 뜸');
+    assert(await closeIt('ghList') && await page.evaluate(() => SVC.OPS.ghList === null && !document.querySelector('#opsBody').innerText.includes('js/core.js')), '목록이 안 닫힘'); done.push('파일');
+    await page.click('#opsGhHist'); await page.waitForTimeout(400); assert(await has('hist'), '이력 안 뜸');
+    assert(await closeIt('hist') && await page.evaluate(() => SVC.OPS.hist === null && SVC.OPS.histPath === ''), '이력 안 닫힘'); done.push('이력');
+    await page.click('#opsRepoCheck'); await page.waitForTimeout(500); assert(await has('repo') && await page.evaluate(() => !!document.querySelector('#opsBody .ops-repo')), '점검 결과 안 뜸');
+    assert(await closeIt('repo') && await page.evaluate(() => !document.querySelector('#opsBody .ops-repo')), '점검 결과 안 닫힘'); done.push('점검');
+    await page.click('#opsSealCheck'); await page.waitForTimeout(500); assert(await page.evaluate(() => !!document.querySelector('#opsBody img[alt="직인 미리보기"]')) && await has('seal'), '직인 미리보기 안 뜸');
+    assert(await closeIt('seal') && await page.evaluate(() => !document.querySelector('#opsBody img[alt="직인 미리보기"]') && /✓ Storage 에 있음/.test(document.getElementById('opsSealSt').textContent)), '직인 미리보기 안 닫힘(상태 줄은 남아야)'); done.push('직인');
+    await page.evaluate(() => { SVC.OPS.files = [{ path: 'index.html', size: 3, content: 'x' }, { path: 'js/core.js', size: 3, content: 'y' }]; SVC.renderOps(true); });
+    assert(await page.evaluate(() => document.querySelector('#opsBody [data-ops-close="files"]').textContent.includes('모두 빼기')), '모두 빼기 버튼 없음');
+    assert(await closeIt('files') && await page.evaluate(() => SVC.OPS.files.length === 0), '올릴 파일이 안 비워짐'); done.push('올릴 파일');
+    return done.join(' · ');
+  });
+  await S.t('㊿+156 배포·운영 SQL 결과 · 기록 탭(시스템 점검 · 브라우저 오류 · AI 점검) 결과 «✕ 닫기» · 점검 중엔 버튼 없음', async () => {
+    await page.evaluate(() => { SVC.OPS.tab = 'sql'; SVC.OPS.sqlRes = { rows: [{ ok: 1 }], row_count: 1, ms: 5 }; SVC.renderOps(true); });
+    assert(await has('sqlRes') && await closeIt('sqlRes') && await page.evaluate(() => SVC.OPS.sqlRes === null), 'SQL 결과');
+    await page.evaluate(() => { SVC.OPS.tab = 'log'; SVC.OPS.health = { running: true, rows: [{ name: 'a', ok: true, info: 'i', ms: 1 }] }; SVC.OPS.errs = []; SVC.OPS.aic = { running: false, rows: [{ q: '질문', l: '기대', st: '통과', ok: true, ms: 1000 }], at: '2026-10-05T10:00:00Z', summary: { pass: 1, total: 1, avg_ms: 1000, cut: 0, models: [] } }; SVC.renderOps(true); });
+    assert(!(await has('health')), '점검 중인데 닫기 버튼이 있음');
+    await page.evaluate(() => { SVC.OPS.health.running = false; SVC.OPS.health.at = new Date(); SVC.renderOps(true); });
+    assert(await closeIt('health') && await page.evaluate(() => SVC.OPS.health === null), '시스템 점검');
+    assert(await closeIt('errs') && await page.evaluate(() => SVC.OPS.errs === null), '브라우저 오류');
+    assert(await closeIt('aic') && await page.evaluate(() => SVC.OPS.aic === null), 'AI 점검');
+    const btn = await page.evaluate(() => { const b = SVC.closeBtn({ 'data-x': 'a"b' }, '제목<'); return String(b); });
+    assert(btn === '<button type="button" class="cbtn x-close" title="제목&lt;" aria-label="제목&lt;" data-x="a&quot;b">✕ 닫기</button>', btn);
+    return 'SQL · 점검 · 오류 · AI';
+  });
+  await S.t('㊿+156 장비 «🩺 진단» 결과 닫기 · 프로젝트 리포트(위성) 창 Esc · 바깥 클릭으로 닫힘', async () => {
+    await page.evaluate(() => SVC.navMenu('orders')); await page.waitForTimeout(500);
+    await page.click('#eqDiag'); await page.waitForTimeout(900);
+    assert(await page.evaluate(() => getComputedStyle(document.getElementById('eqDiagOut')).display !== 'none' && /진단/.test(document.getElementById('eqDiagBody').textContent)), '진단 결과 안 뜸');
+    await page.click('#eqDiagClose'); await page.waitForTimeout(150);
+    assert(await page.evaluate(() => getComputedStyle(document.getElementById('eqDiagOut')).display === 'none'), '진단 결과 안 닫힘');
+    const ctx2 = await browser.newContext({ serviceWorkers: 'block' }); const p2 = await ctx2.newPage(); await mockBackend(p2); await p2.goto(url + '/report.html'); await p2.waitForTimeout(800);
+    await p2.evaluate(() => document.getElementById('ovlList').classList.add('show')); await p2.keyboard.press('Escape'); await p2.waitForTimeout(100);
+    const esc1 = await p2.evaluate(() => document.getElementById('ovlList').classList.contains('show'));
+    await p2.evaluate(() => document.getElementById('ovlCost').classList.add('show')); await p2.mouse.click(5, 5); await p2.waitForTimeout(100);
+    const out1 = await p2.evaluate(() => document.getElementById('ovlCost').classList.contains('show')); await ctx2.close();
+    assert(!esc1 && !out1, 'report.html 창 Esc ' + esc1 + ' · 바깥 ' + out1);
+    assert(!errs.length, errs.join(' | ')); return '진단 · 리포트 창';
+  });
+  await ctx.close();
+}
 await browser.close(); srv.close();
 const ok = S.report();
 fs.writeFileSync(path.join(OUT, 'smoke.json'), JSON.stringify(S.results, null, 1));

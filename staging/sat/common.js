@@ -80,3 +80,6 @@ var rawHtml, tpl;
   rawHtml=function(s){ return new RawHtml(String(s)); };
   tpl=function(strs){ var out=strs[0]; for(var i=1;i<strs.length;i++){ var v=arguments[i]; out+=(v instanceof RawHtml? v.html : e(v))+strs[i]; } return out; };
 })();
+/* ㊿+156 창(.ovl.show) 바깥 클릭 · Esc 로 닫기 — 예전엔 정산(s1·kk)만 · 이제 프로젝트 리포트(저장 목록 · 관리원가)도 */
+document.addEventListener('click', function(ev){ var t=ev.target; if(t&&t.classList&&t.classList.contains('ovl')) t.classList.remove('show'); });
+document.addEventListener('keydown', function(ev){ if(ev.key==='Escape') document.querySelectorAll('.ovl.show').forEach(function(o){ o.classList.remove('show'); }); });

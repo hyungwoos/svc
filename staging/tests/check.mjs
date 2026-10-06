@@ -87,6 +87,11 @@ catch (e) { say(false, '위성 페이지 검사 실패 — ' + String(e.message 
   const pk = fs.existsSync(path.join(ROOT, 'package.json')) ? fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8') : '';
   say(/"typescript":/.test(pk) && fs.existsSync(path.join(ROOT, 'tests', 'typecheck.mjs')) && /export const DECLS = \{[\s\S]*declare var XLSX[\s\S]*interface EventTarget/.test(fs.readFileSync(path.join(ROOT, 'tests', 'typecheck.mjs'), 'utf8')), '타입 검사 준비: package.json typescript · tests/typecheck.mjs · 선언 DECLS (실행은 tests/lint.mjs)');
   say(/@typedef \{Object\} AppState/.test(jsAll) && /@type \{AppState\} \*\/\s*\nexport var ST=/.test(jsAll) && /@typedef \{Object\} PortalRow/.test(jsAll) && /@typedef \{Object\} GridDef/.test(jsAll), '이름표: ST(AppState) · 데이터 행(PortalRow) · 표 정의(GridDef) 에 JSDoc 모양'); }
+// ㊿+156 펼친 목록·결과 닫기: core.js closeBtn(.x-close) · 배포·운영 opsClose 가 버튼마다 처리 · 장비 진단 · 위성 창 Esc/바깥 클릭은 sat/common.js
+{ const css = fs.readFileSync(path.join(ROOT, 'app.css'), 'utf8'); const keys = ['files', 'ghList', 'hist', 'repo', 'seal', 'sqlRes', 'health', 'errs', 'aic'];
+  say(/^export function closeBtn\(/m.test(jsAll) && /\.x-close\{/.test(css) && /export function opsClose\(k\)/.test(jsAll) && keys.every((k) => jsAll.includes("'data-ops-close':'" + k + "'") && jsAll.includes("k==='" + k + "'")) && /id:'eqDiagClose'/.test(jsAll), '닫기 버튼: closeBtn · .x-close · 배포·운영 ' + keys.length + '곳(opsClose) · 장비 진단');
+  const sc = fs.existsSync(path.join(ROOT, 'sat', 'common.js')) ? fs.readFileSync(path.join(ROOT, 'sat', 'common.js'), 'utf8') : '';
+  say(/Escape/.test(sc) && /contains\('ovl'\)/.test(sc), '위성 페이지 창: Esc · 바깥 클릭으로 닫기(sat/common.js 한 곳)'); }
 const idx = html + jsAll;
 // Supabase 함수 소스가 저장소에 있으면 비밀값 검사만 (deno 는 CI 에 없을 수 있음)
 const fnDir = path.join(ROOT, 'supabase', 'functions');
