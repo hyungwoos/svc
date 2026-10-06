@@ -108,7 +108,7 @@ export async function opsStatus(){
 export function renderOps(keep){
   var host=document.getElementById('opsHost'); if(!host) return;
   if(IS_STAGING && !OPS._tgInit){ OPS.target='staging'; OPS._tgInit=true; }
-  if(!window.IS_SUPER){ host.innerHTML='<p class="cap">슈퍼 관리자만 쓸 수 있습니다.</p>'; return; }
+  if(!ST.IS_SUPER){ host.innerHTML='<p class="cap">슈퍼 관리자만 쓸 수 있습니다.</p>'; return; }
   var st=OPS.st;
   var h='<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><h3 style="margin:0;font-size:15px">🚀 배포·운영</h3><span class="ubadge sm">지정 계정 전용</span>'+
     '<span class="mini" style="margin-left:auto">'+(st? (st.ok? (st.github? '저장소 '+esc(st.github.repo)+' · '+esc(st.github.branch)+' · GitHub 토큰 '+(st.github.token_set?'✓':'✗') : 'ops 함수 응답에 저장소 정보 없음(옛 버전?)')+' · Supabase 토큰 '+(st.mgmt_token_set?'✓':'✗')+' · PIN '+(st.pin_set?'설정됨':'미설정')+(st.slack? ' · 슬랙 알림 ✓':'') : '<span style="color:var(--critical)">'+esc(st.error||'')+'</span>') : '상태 확인 중…')+'</span></div>'+
@@ -617,7 +617,7 @@ export function admTab(t){
   document.querySelectorAll('#viewAdmin .adm-pane').forEach(function(p){ p.hidden=(p.dataset.pane!==ADM.tab); });
 }
 export function renderAdmin(){
-  if(!window.IS_SUPER){ switchView('dash'); return; }
+  if(!ST.IS_SUPER){ switchView('dash'); return; }
   var tb=document.getElementById('admTabs');
   if(tb && !tb.__bound){ tb.__bound=1; tb.querySelectorAll('button').forEach(function(b){ b.onclick=function(){ admTab(b.dataset.t); try{ scrollTo(0,0); }catch(e){} }; }); }
   admTab();
@@ -914,7 +914,7 @@ export function cdPaint(){
 }
 /* 메모리 데이터에서 그 값을 쓰는 행 수(참고용 · 표에 있는 종류만) */
 export function cdUsage(kind, v){
-  var R=window.RAWX||{}; var f={contract_status:['contracts','status'], contract_type:['contracts','contract_type'], channel:['contracts','channel'], line:['contracts','line'], lead_src:['contracts','lead_src'], live_override:['contracts','live_override'], billing:['contracts','billing'], version:['contracts','version'],
+  var R=ST.RAWX||{}; var f={contract_status:['contracts','status'], contract_type:['contracts','contract_type'], channel:['contracts','channel'], line:['contracts','line'], lead_src:['contracts','lead_src'], live_override:['contracts','live_override'], billing:['contracts','billing'], version:['contracts','version'],
     order_status:['orders','status'], order_channel:['orders','channel'], model:['orders','model'], industry:['customers','industry']}[kind];
   if(!f || !R[f[0]]) return null; return R[f[0]].filter(function(r){ return r[f[1]]===v; }).length;
 }

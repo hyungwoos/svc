@@ -21,6 +21,8 @@ import { closeOvl, logChange, openOvl, OVL_SKIP_CLEAN, ovlMarkClean, setupEdit }
 /* ==================================================================
    커맨드 센터 (v5) — 아이콘 레일 · 커맨드 바 · 인박스 홈 · 운영 보드 · 고객 360 패널 · 모바일 탭
    ================================================================== */
+/* 이 창에서 한 번만 하는 일 표시 (㊿+154: 예전 window.__ccInbLoad · __editInit · __pwaStart) */
+export var SHELL_ONCE={inb:0, edit:0, pwa:0};
 export var ICO={
   home:'<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>',
   chart:'<path d="M4 19h16"/><path d="M6 16V9"/><path d="M11 16V5"/><path d="M16 16v-6"/>',
@@ -119,7 +121,7 @@ export function railSync(v){
     b.setAttribute('aria-current', cur? 'true':'false');
   });
   /* 장비 그룹에 처리 대기 건수 배지 */
-  var pend=(RAWX.orders||[]).filter(function(o){ return ['접수','출하요청','배송중'].indexOf(o.status)>=0; }).length;
+  var pend=(ST.RAWX.orders||[]).filter(function(o){ return ['접수','출하요청','배송중'].indexOf(o.status)>=0; }).length;
   rail.querySelectorAll('[data-seg]').forEach(function(b){
     var old=b.querySelector('.rb'); if(old) old.remove();
     if(/장비/.test(b.dataset.seg) && pend){ var s=document.createElement('span'); s.className='rb'; s.textContent=pend>99?'99+':pend; b.appendChild(s); }
@@ -130,8 +132,8 @@ export function railSync(v){
 /* ---- 모바일 하단 탭 (≤760px) ---- */
 export function buildMtabs(){
   var m=document.getElementById('mtabs'); if(!m) return;
-  var tabs=[['dash','홈','home'],['contracts','매출','chart'],[window.IS_EQUIP? 'orders':'eqboard','장비','box'],['weekly','주간회의','calendar'],['_menu','전체','menu']];
-  if(window.IS_EQUIP) tabs[1]=['assets','현황','layers'];
+  var tabs=[['dash','홈','home'],['contracts','매출','chart'],[ST.IS_EQUIP? 'orders':'eqboard','장비','box'],['weekly','주간회의','calendar'],['_menu','전체','menu']];
+  if(ST.IS_EQUIP) tabs[1]=['assets','현황','layers'];
   tabs=tabs.filter(function(t){ return t[0]==='_menu' || canView(t[0]); });
   m.innerHTML=tabs.map(function(t){ return '<button type="button" data-v="'+t[0]+'" aria-current="false">'+ico(t[2],20)+esc(t[1])+'</button>'; }).join('');
   m.querySelectorAll('button').forEach(function(b){
@@ -154,13 +156,13 @@ export function cmdMenuHits(q){
   document.querySelectorAll('#side button[data-v]').forEach(function(b){
     if(!visBtn(b) && b.dataset.v!=='dash' && b.dataset.v!=='account') return;
     var sub=navSub(b), t=(sub? sub+' · ':'')+navText(b); if(fkNorm(t).indexOf(qn)<0) return;   /* ㊿+142: «MDR · 일반 판매» 처럼 소제목을 붙여 구분 */
-    if(window.IS_EQUIP && !EQUIP_VIEWS[b.dataset.v]) return;
+    if(ST.IS_EQUIP && !EQUIP_VIEWS[b.dataset.v]) return;
     out.push({t:'이동', nm:t, sb:'화면 열기', go:(function(v){ return function(){ navMenu(v); }; })(b.dataset.v), kmenu:1});
   });
   return out.slice(0,5);
 }
 export function cmdAskHit(q){
-  q=String(q||'').trim(); if(q.length<2 || window.IS_EQUIP) return null;
+  q=String(q||'').trim(); if(q.length<2 || ST.IS_EQUIP) return null;
   return {t:'AI', nm:'«'+q+'» 물어보기', sb:'매출·고객·계약 데이터를 기준으로 답합니다 (Enter 대신 클릭)', kai:1,
     go:function(){ switchView('dash'); var qi=document.getElementById('q'); if(qi){ qi.value=q; } try{ ask(q); }catch(e){} try{ document.querySelector('.ask').scrollIntoView({block:'start',behavior:'smooth'}); }catch(e){} }};
 }
@@ -179,17 +181,17 @@ export function ccUnsnooze(){ try{ Object.keys(localStorage).filter(function(k){
 export function renderInbox(){
   if(!isCC()) return;
   var box=document.getElementById('ccInbox'); if(!box || !ST.DATA || !ST.SB_TOKEN){ if(box) box.innerHTML=''; return; }
-  var list=idxs(), b=STATE.base, EN=expN(), EQ=!!window.IS_EQUIP;
-  var orders=RAWX.orders||[];
+  var list=idxs(), b=STATE.base, EN=expN(), EQ=!!ST.IS_EQUIP;
+  var orders=ST.RAWX.orders||[];
   var pendL=orders.filter(function(o){ return ['접수','출하요청','배송중'].indexOf(o.status)>=0; });
   var retL=orders.filter(function(o){ return o.status==='회수예정'; });
   var expL=[], expAmt=0;
   if(!EQ) list.forEach(function(k){ var r=ST.DATA.rows[k], e=r.endIdx;
     if(e!=null && e>=b && e<=b+EN-1 && !/해지|종료|CN전환/.test(String(r.status||''))){ expL.push(r); expAmt+=ST.MAT[k][Math.min(e,ST.M-1)]||r.mrr||0; } });
-  var curYm=monOf(b)+'월', bizDone=EQ || (RAWX.biz||[]).some(function(r){ return r.ym===curYm; });
+  var curYm=monOf(b)+'월', bizDone=EQ || (ST.RAWX.biz||[]).some(function(r){ return r.ym===curYm; });
   var todayS=todayStr();
-  var oiLate=EQ? [] : (RAWX.oi||[]).filter(function(o){ return o.next_date && String(o.next_date).slice(0,10)<todayS && !/수주|실패/.test(String(o.stage||'')); });
-  var inbN=EQ? 0 : (window.__inbTodo? window.__inbTodo.n : null);
+  var oiLate=EQ? [] : (ST.RAWX.oi||[]).filter(function(o){ return o.next_date && String(o.next_date).slice(0,10)<todayS && !/수주|실패/.test(String(o.stage||'')); });
+  var inbN=EQ? 0 : (ST.INB_TODO? ST.INB_TODO.n : null);
   var dow=new Date().getDay(), toMon=(8-dow)%7, wkTxt= dow===1? '오늘':'D-'+(toMon===0?7:toMon);
   var rows=[], zeros=[], snz=0;
   function add(key, o){ if(ccSnoozed(key)){ snz++; return; } o.key=key; rows.push(o); }
@@ -298,7 +300,7 @@ export function ccAfterKpis(box, list, b){
   var more=ccMoreHost(box);
   if(more){ more.innerHTML='';
     try{ more.appendChild(ccTileChannel(list,b)); }catch(e){}
-    if(!window.IS_EQUIP){ try{ more.appendChild(ccTilePipe()); }catch(e){} }
+    if(!ST.IS_EQUIP){ try{ more.appendChild(ccTilePipe()); }catch(e){} }
     try{ more.appendChild(ccTileWeekly()); }catch(e){}
     var mc=document.getElementById('ccMoreCnt'); if(mc) mc.textContent=more.children.length+'개 — 채널별 MRR · 파이프라인 · 주간회의'; }
   try{ ccBrief(list,b); }catch(e){}
@@ -355,7 +357,7 @@ export function ccTileChannel(list,b){
   return c;
 }
 export function ccTileEquip(){
-  var A=RAWX.assets||[], O=RAWX.orders||[];
+  var A=ST.RAWX.assets||[], O=ST.RAWX.orders||[];
   var lent=A.filter(function(a){ return a.status==='임대중'; }).length, stock=A.filter(function(a){ return a.status==='재고'; }).length;
   var live=O.filter(function(o){ return o.status!=='회수완료' && o.status!=='취소'; });
   var prog=live.filter(function(o){ return o.status==='회수예정' || eqRetSet(o).length; });
@@ -373,13 +375,13 @@ export function ccTileEquip(){
   return c;
 }
 export function ccTilePipe(){
-  var oi=RAWX.oi||[], today=new Date(), ym=today.getFullYear()+'-'+('0'+(today.getMonth()+1)).slice(-2);
+  var oi=ST.RAWX.oi||[], today=new Date(), ym=today.getFullYear()+'-'+('0'+(today.getMonth()+1)).slice(-2);
   var open=oi.filter(function(o){ return !/수주|계산서|종료|중지|실패/.test(String(o.stage||'')); });
   var due=open.filter(function(o){ return String(o.expect_month||'').slice(0,7)===ym; });
   var st={}; open.forEach(function(o){ var k=String(o.stage||'기타'); st[k]=(st[k]||0)+1; });
   var wk=new Date(today); wk.setDate(wk.getDate()-7); var wkS=todayStr(wk);
-  var inb=RAWX.inbound===undefined? null : (RAWX.inbound||[]).filter(function(r){ return String(r.on_date||'').slice(0,10)>=wkS; }).length;
-  if(RAWX.inbound===undefined && !window.__ccInbLoad){ window.__ccInbLoad=1; try{ loadInbound(function(){ if(ST.CUR_VIEW==='dash') try{ renderKpis(); }catch(e){} }); }catch(e){} }
+  var inb=ST.RAWX.inbound===undefined? null : (ST.RAWX.inbound||[]).filter(function(r){ return String(r.on_date||'').slice(0,10)>=wkS; }).length;
+  if(ST.RAWX.inbound===undefined && !SHELL_ONCE.inb){ SHELL_ONCE.inb=1; try{ loadInbound(function(){ if(ST.CUR_VIEW==='dash') try{ renderKpis(); }catch(e){} }); }catch(e){} }
   var c=el('div','kpi');
   c.innerHTML='<div class="k">이번 주 파이프라인 <span class="ctag info">인바운드 자동 07:00</span></div>'+
     '<div class="tri" style="grid-template-columns:repeat(2,minmax(0,1fr))"><div><b class="num">'+(inb==null?'…':inb)+'</b><span>최근 7일 인바운드</span></div><div><b class="num">'+open.length+'</b><span>진행 중 OI</span></div></div>'+
@@ -418,7 +420,7 @@ export function eqChColor(ch){ return ({'에스원':cssv('--s1'),'LGU+':cssv('--
 /* 대시보드 윗부분 — 요약 타일 6개 + 차트 3개 (현황 자산 + 신청 내역 기준) */
 export function renderEqDash(){
   var K=document.getElementById('eqbKpis'); if(!K) return;
-  var A=RAWX.assets||[], O=RAWX.orders||[], todayS=todayStr(), ym=todayS.slice(0,7);
+  var A=ST.RAWX.assets||[], O=ST.RAWX.orders||[], todayS=todayStr(), ym=todayS.slice(0,7);
   var pm=new Date(); pm.setMonth(pm.getMonth()-1); var pym=todayStr(pm).slice(0,7);
   var lent=A.filter(function(a){ return a.status==='임대중'; }), stock=A.filter(function(a){ return a.status==='재고'; });
   var lentCust={}; lent.forEach(function(a){ if(a.customer) lentCust[a.customer]=1; });
@@ -477,7 +479,7 @@ export function renderEqDash(){
 export function renderEqBoard(){
   var wrap=document.getElementById('eqbCols'); if(!wrap) return;
   try{ requestAnimationFrame(renderEqDash); }catch(e){}
-  var O=(RAWX.orders||[]).slice(), q=fkNorm(EQB.q||'');
+  var O=(ST.RAWX.orders||[]).slice(), q=fkNorm(EQB.q||'');
   /* 채널 칩 */
   var chs={}; O.forEach(function(o){ if(o.status!=='취소') chs[o.channel||'기타']=(chs[o.channel||'기타']||0)+1; });
   var chipBox=document.getElementById('eqbChips');
@@ -498,7 +500,7 @@ export function renderEqBoard(){
   rows.sort(function(a,b2){ return String(b2.created_at||'')>String(a.created_at||'')? 1:-1; });
   var cancel=rows.filter(function(o){ return o.status==='취소'; }).length;
   document.getElementById('eqbCount').textContent=(rows.length-cancel)+'건'+(cancel? ' · 취소 '+cancel+'건은 보드에 안 보임':'');
-  var canEdit=!window.IS_VIEWER && !!ST.SB_TOKEN, todayS=todayStr();
+  var canEdit=!ST.IS_VIEWER && !!ST.SB_TOKEN, todayS=todayStr();
   var h='', tracks=[];
   EQB_COLS.forEach(function(col, ci){
     var st=col[0], list=rows.filter(function(o){ return o.status===st; }), older=0;
@@ -569,7 +571,7 @@ export function eqbDnD(wrap){
 export async function eqSetStatus(r, st){
   if(!r || !st || r.status===st) return;
   if(!ST.SB_TOKEN){ openOvl('ovlAuth'); return; }
-  if(window.IS_VIEWER){ toast('조회 전용 계정', '상태를 바꿀 수 없습니다', 'info'); return; }
+  if(ST.IS_VIEWER){ toast('조회 전용 계정', '상태를 바꿀 수 없습니다', 'info'); return; }
   var all=eqWant(r), body={status:st};
   if(st==='회수완료'){
     if(!confirm('#'+r.id+' '+(r.customer||'')+' — '+(all.length||r.qty||1)+'대 전부 회수완료로 처리할까요?\n(일부만 회수했으면 취소하고 카드의 시리얼 칩을 눌러 개별 회수 처리하세요)')) { renderEqBoard(); return; }
@@ -725,9 +727,9 @@ export async function sbTry(q){ try{ return await sbAll(q); }catch(e){ return nu
 export function loadExtrasLater(needMap, needExtra){
   var jobs=[];
   if(needMap) jobs.push(sbTry('s1_map?select=contract_no,s1_name,biz_no,customer&active=is.true&order=contract_no')
-    .then(function(r){ if(r&&r.length) window.RAWX.s1map=r; }));
+    .then(function(r){ if(r&&r.length) ST.RAWX.s1map=r; }));
   if(needExtra) jobs.push(sbTry('install_extra?select=*&order=year,month,id')
-    .then(function(r){ if(r&&r.length){ window.RAWX.iextra=r; try{ renderInstall(); }catch(e){} } }));
+    .then(function(r){ if(r&&r.length){ ST.RAWX.iextra=r; try{ renderInstall(); }catch(e){} } }));
   /* 캐시는 다시 쓰지 않습니다 — 큰 JSON 을 한 번 더 만드느라 화면이 멈추는 것보다,
      다음에 들어올 때 이 두 표만 다시 읽는 편이 빠릅니다 */
 }
@@ -865,28 +867,28 @@ export function loadFromCache(){
 export function buildFromRes(res){
   var custs=res[0], cts=res[1], mrs=res[2];
   var LIVE=shapeLive(res[3]), LGD=shapeLg(res[4]), VSD=shapeVs(res[5]);
-  var prevRawx=window.RAWX||{};   // 별도 화면 캐시(가격표·인바운드·변경이력)는 자동 갱신에 휩쓸려 지우지 않음
-  window.RAWX={customers:custs, contracts:cts, live:res[3]||[], lg:res[4]||[], biz:res[5]||[],
+  var prevRawx=ST.RAWX||{};   // 별도 화면 캐시(가격표·인바운드·변경이력)는 자동 갱신에 휩쓸려 지우지 않음
+  ST.RAWX={customers:custs, contracts:cts, live:res[3]||[], lg:res[4]||[], biz:res[5]||[],
     targets:res[6]||[], orders:res[7]||[], assets:res[9]||[], mdrpoc:res[10]||[], mtargets:res[11]||[], oi:res[12]||[], mdrops:res[13]||[], iadj:res[14]||[], s1map:res[15]||[], iextra:res[16]||[], log:prevRawx.log||null, mrs:mrs};
-  window.RAWX.price=prevRawx.price; window.RAWX.inbound=prevRawx.inbound; window.RAWX._inbAt=prevRawx._inbAt; window.RAWX.cloud=prevRawx.cloud;
-  window.MY_ROLE = (res[8] && res[8].length && res[8][0].role) || '';
-  window.IS_VIEWER_ROLE = (window.MY_ROLE==='viewer' || window.MY_ROLE==='admin_viewer');   // 역할상 조회 전용
-  window.IS_VIEWER = window.IS_VIEWER_ROLE;   // 화면마다 permEnter() 가 «쓰기 권한 없음» 을 더함
-  window.IS_SUPER = window.MY_ROLE==='super_admin';
+  ST.RAWX.price=prevRawx.price; ST.RAWX.inbound=prevRawx.inbound; ST.RAWX._inbAt=prevRawx._inbAt; ST.RAWX.cloud=prevRawx.cloud;
+  ST.MY_ROLE = (res[8] && res[8].length && res[8][0].role) || '';
+  ST.IS_VIEWER_ROLE = (ST.MY_ROLE==='viewer' || ST.MY_ROLE==='admin_viewer');   // 역할상 조회 전용
+  ST.IS_VIEWER = ST.IS_VIEWER_ROLE;   // 화면마다 permEnter() 가 «쓰기 권한 없음» 을 더함
+  ST.IS_SUPER = ST.MY_ROLE==='super_admin';
   try{ if(ST.PERMS===null){ var pc=sessionStorage.getItem('svc_perms'); if(pc) ST.PERMS=JSON.parse(pc); } }catch(e){}   // 캐시 경로에서도 권한 유지
   try{ if(ST.CODES===null){ var cc=sessionStorage.getItem('svc_codes'); if(cc){ ST.CODES=JSON.parse(cc); applyCodes(); } } }catch(e){}   // 캐시 경로에서도 코드 목록 유지 (㊿+137)
   var abtn=document.querySelector('.side button[data-v="adminx"]');
-  if(abtn) abtn.style.display = window.IS_SUPER? '':'none';
+  if(abtn) abtn.style.display = ST.IS_SUPER? '':'none';
   var obtn=document.querySelector('.side button[data-v="ops"]');
-  if(obtn) obtn.style.display = window.IS_SUPER? '':'none';   // 배포·운영은 슈퍼 관리자 + 함수 쪽 OPS_OWNER 지정 계정만 (㊿+128)
+  if(obtn) obtn.style.display = ST.IS_SUPER? '':'none';   // 배포·운영은 슈퍼 관리자 + 함수 쪽 OPS_OWNER 지정 계정만 (㊿+128)
   var lbtn=document.querySelector('.side button[data-v="log"]');
-  if(lbtn) lbtn.style.display = window.IS_SUPER? '':'none';   // 변경 이력은 슈퍼 관리자만
+  if(lbtn) lbtn.style.display = ST.IS_SUPER? '':'none';   // 변경 이력은 슈퍼 관리자만
   var cbtn=document.querySelector('.side button[data-v="csite"]');
-  if(cbtn) cbtn.style.display = window.IS_SUPER? '':'none';   // Cloud 사이트 생성·수정은 슈퍼 관리자만 (Edge Function 도 같은 규칙)
+  if(cbtn) cbtn.style.display = ST.IS_SUPER? '':'none';   // Cloud 사이트 생성·수정은 슈퍼 관리자만 (Edge Function 도 같은 규칙)
   var ggrp=document.getElementById('grpAdmin');
-  if(ggrp) ggrp.style.display = window.IS_SUPER? '':'none';   // 「관리자」 그룹 헤더도 슈퍼만
+  if(ggrp) ggrp.style.display = ST.IS_SUPER? '':'none';   // 「관리자」 그룹 헤더도 슈퍼만
   var mbtn=document.getElementById('btnMenuEdit');
-  if(mbtn) mbtn.style.display = (window.IS_SUPER||window.MY_ROLE==='admin')? '':'none';   // 메뉴 편집은 admin 이상
+  if(mbtn) mbtn.style.display = (ST.IS_SUPER||ST.MY_ROLE==='admin')? '':'none';   // 메뉴 편집은 admin 이상
   SB_RAW.customers=custs; SB_RAW.contracts=cts;
   var cMap={}; custs.forEach(function(c){ cMap[c.id]=c; });
 
@@ -965,14 +967,14 @@ export var ROLE_LABEL={equipment:'장비 관리 전용', poc:'PoC 전용', equip
 export var EQUIP_VIEWS=ROLE_VIEWS.equipment;   // 현재 계정에 허용된 화면 (아래에서 교체)
 export function isEquipAcct(d){
   if(!ST.SB_TOKEN) return false;
-  if(ROLE_VIEWS[window.MY_ROLE]) return true;
+  if(ROLE_VIEWS[ST.MY_ROLE]) return true;
   return !d.rows.length;                // 역할 미지정 + 매출 안 보임 → 장비 전용으로 간주
 }
 export function enterEquipMode(d){
-  window.IS_EQUIP=true;
-  var role=window.MY_ROLE||'';
+  ST.IS_EQUIP=true;
+  var role=ST.MY_ROLE||'';
   EQUIP_VIEWS=ROLE_VIEWS[role]||ROLE_VIEWS.equipment;
-  window.EQUIP_HOME=Object.keys(EQUIP_VIEWS)[0];
+  ST.EQUIP_HOME=Object.keys(EQUIP_VIEWS)[0];
   ST.DATA=d; ST.M=d.monthKeys.length; ST.MAT=[];
   var side=$('#side');
   side.querySelectorAll('button').forEach(function(b){
@@ -996,10 +998,10 @@ export function enterEquipMode(d){
   document.body.style.paddingLeft='';
   try{ buildRail(); buildMtabs(); }catch(e){}
   $('#periodLabel').textContent=ROLE_LABEL[role]||'장비 관리 전용';
-  switchView(EQUIP_VIEWS[ST.CUR_VIEW]? ST.CUR_VIEW : window.EQUIP_HOME);
+  switchView(EQUIP_VIEWS[ST.CUR_VIEW]? ST.CUR_VIEW : ST.EQUIP_HOME);
 }
 export function boot(skipCache){
-  if(!window.__editInit){ window.__editInit=1; setupEdit(); setupSide(); }
+  if(!SHELL_ONCE.edit){ SHELL_ONCE.edit=1; setupEdit(); setupSide(); }
   restoreSess().then(function(ok){
     /* ㊿+145: 로그인 안 된 상태 → 서버에 묻지 않고 바로 로그인 화면 (예전엔 익명으로 load_all 을 한 번 불러 «빈 결과»를 확인한 뒤에야 보여 줌 — 로그아웃이 느렸던 이유) */
     if(!ok){ showLoginScreen(); return null; }
@@ -1014,7 +1016,7 @@ export function boot(skipCache){
           var keep=ST.CUR_VIEW;                    // 보고 있던 화면 유지한 채 데이터만 최신으로
           afterLoad(d2);
           // 로딩 사이에 다른 화면으로 이동했으면 되돌리지 않음 · 주간회의는 다시 그리지 않음
-          if(keep && keep===ST.CUR_VIEW && keep!=='dash' && keep!=='weekly' && !window.IS_EQUIP) try{ switchView(keep); }catch(e){}
+          if(keep && keep===ST.CUR_VIEW && keep!=='dash' && keep!=='weekly' && !ST.IS_EQUIP) try{ switchView(keep); }catch(e){}
         }).catch(function(e){ pl.textContent=pl.textContent.replace(' · 최신 데이터 확인 중…','');
           /* ㊿+141: 조용히 넘어가면 옛 사본을 최신으로 착각함 → 알림 */
           try{ toast('최신 데이터를 불러오지 못했습니다','지금 화면은 이전 방문 때 저장한 사본입니다 — 잠시 뒤 ↻ 새로고침 ('+String(e&&e.message||e).slice(0,80)+')','warn'); }catch(x){} });
@@ -1116,11 +1118,11 @@ export function onData(d){
   $('#side').classList.remove('hidden');
   try{ applyPerms(); }catch(e){}
   /* PWA 바로가기(manifest shortcuts) — index.html?v=eqboard 처럼 열리면 첫 화면을 그 메뉴로 */
-  if(!window.__pwaStart){ window.__pwaStart=1; try{ var qv=new URLSearchParams(location.search).get('v') || (location.hash||'').replace('#',''); if(qv && qv!=='dash' && document.querySelector('#side button[data-v="'+qv+'"]')){ setTimeout(function(){ try{ switchView(qv); }catch(e){} NAV.ready=true; btnBackSync(); }, 50); } else setTimeout(function(){ NAV.ready=true; try{ history.replaceState({v:ST.CUR_VIEW, i:0}, '', location.pathname+location.search+(ST.CUR_VIEW==='dash'?'':'#'+ST.CUR_VIEW)); }catch(e){} btnBackSync(); }, 60); }catch(e){ NAV.ready=true; } }
+  if(!SHELL_ONCE.pwa){ SHELL_ONCE.pwa=1; try{ var qv=new URLSearchParams(location.search).get('v') || (location.hash||'').replace('#',''); if(qv && qv!=='dash' && document.querySelector('#side button[data-v="'+qv+'"]')){ setTimeout(function(){ try{ switchView(qv); }catch(e){} NAV.ready=true; btnBackSync(); }, 50); } else setTimeout(function(){ NAV.ready=true; try{ history.replaceState({v:ST.CUR_VIEW, i:0}, '', location.pathname+location.search+(ST.CUR_VIEW==='dash'?'':'#'+ST.CUR_VIEW)); }catch(e){} btnBackSync(); }, 60); }catch(e){ NAV.ready=true; } }
   document.body.style.paddingLeft='';
   /* 장표 셀 메모는 한 번만 읽고, 오면 장표만 다시 그립니다 */
-  if(!RAWX._mxAt) loadMxMemos(function(){ try{ if(ST.CUR_VIEW==='dash') renderMatrix(); }catch(e){} });
-  $('#btnEdit').style.display = (window.IS_VIEWER_ROLE || !canWrite('contracts'))? 'none':'';
+  if(!ST.RAWX._mxAt) loadMxMemos(function(){ try{ if(ST.CUR_VIEW==='dash') renderMatrix(); }catch(e){} });
+  $('#btnEdit').style.display = (ST.IS_VIEWER_ROLE || !canWrite('contracts'))? 'none':'';
   (d.rows||[]).forEach(function(r){
     if(!r.ptn){
       var p0=String(r.partner||'');
@@ -1150,7 +1152,7 @@ export function onData(d){
   for(var j=0;j<ST.M;j++){ var s=0; for(var i=0;i<ST.MAT.length;i++) s+=ST.MAT[i][j]; if(s!==0) lastData=j; }
   STATE.base = Math.min(d.nowIdx>=0? d.nowIdx : lastData, lastData);
   if(STATE.base<0) STATE.base = lastData;
-  window.DASH_BASE0=STATE.base;   /* ㊿+145: 홈 메뉴를 누르면 이 기준월로 돌아감 (navMenu) */
+  ST.DASH_BASE0=STATE.base;   /* ㊿+145: 홈 메뉴를 누르면 이 기준월로 돌아감 (navMenu) */
 
   d.lines.forEach(function(l){ STATE.lines[l.label]=true; });
 
@@ -1163,7 +1165,7 @@ export function onData(d){
   var meBtn=document.getElementById('btnMenuEdit');
   if(meBtn && !meBtn.__b){ meBtn.__b=1; meBtn.onclick=openMenuEdit; }
   if(ST.CUR_VIEW) try{ ensureGroupOpen(ST.CUR_VIEW); }catch(e){}
-  window.LAST_LOAD=Date.now();
+  ST.LAST_LOAD=Date.now();
   $('#loading').classList.add('hidden');
   $('#app').classList.remove('hidden');
   // 레이아웃이 확정된 다음에 그려야 차트 폭이 정확합니다

@@ -25,7 +25,18 @@ export var ST={
   HIST_LOADED:false,
   /* 자동 로그아웃 */
   IDLE_LAST:Date.now(),
-  IDLE_WARNED:false
+  IDLE_WARNED:false,
+  /* ㊿+154: 예전엔 window 에 바로 두던 값 — 모듈 전환 마무리(window 다리 제거)로 여기로 */
+  RAWX:null,            // 표별 원본 행 {customers, contracts, orders, …} (shell.js 데이터 읽기가 채움 · 화면마다 더 읽어 붙임)
+  MY_ROLE:'',           // 로그인 계정 역할 (super_admin · admin · admin_viewer · viewer · equipment …)
+  IS_SUPER:false,       // 슈퍼 관리자
+  IS_VIEWER_ROLE:false, // 역할상 조회 전용
+  IS_VIEWER:false,      // 지금 화면에서 쓰기 못 함 (역할 + 메뉴 권한 — permEnter)
+  IS_EQUIP:false,       // 장비·PoC 제한 계정
+  EQUIP_HOME:null,      // 제한 계정의 첫 화면
+  DASH_BASE0:null,      // 홈 «처음» 기준월 (navMenu 가 되돌림)
+  LAST_LOAD:0,          // 마지막 데이터 읽기 시각(ms) — 자동 갱신 판단
+  INB_TODO:null         // 인바운드 처리할 일 수 캐시 {t, n}
 };
 
 /* 환경 — ㊿+153: 예전 boot.js(APP_VER) · init.js(IS_STAGING · IS_QA) 에서 옮김 */

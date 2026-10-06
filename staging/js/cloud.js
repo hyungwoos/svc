@@ -26,7 +26,7 @@ export function loadCloud(cb){
     sbTry('cloud_costs?select=ym,account_id,service,usd,credit_usd,krw,kind,source,invoice_id&order=ym'),
     sbTry('cloud_invoices?select=*&order=ym.desc,account_id')
   ]).then(function(r){
-    RAWX.cloud={acc:r[0]||[], costs:r[1]||[], inv:r[2]||[], _at:Date.now()};
+    ST.RAWX.cloud={acc:r[0]||[], costs:r[1]||[], inv:r[2]||[], _at:Date.now()};
     var q=loadCloud._q; loadCloud._q=null;
     q.forEach(function(f){ if(f) try{ f(); }catch(e){} });
   });
@@ -41,7 +41,7 @@ export function clSvcKey(n){
 }
 /* cloud_costs 행 → 화면용 구조 {months[], acc:{id:{label,color,currency,rows:[{n,v[]}],totals[],linked:[...]}}} */
 export function clBuild(){
-  var C=RAWX.cloud||{acc:[],costs:[],inv:[]};
+  var C=ST.RAWX.cloud||{acc:[],costs:[],inv:[]};
   var mset={}; C.costs.forEach(function(r){ if(r.kind==='service') mset[String(r.ym).slice(0,7)]=1; });
   var months=Object.keys(mset).sort();
   var mi={}; months.forEach(function(m,i){ mi[m]=i; });
@@ -105,7 +105,7 @@ export async function clFetchFx(force){
     }catch(e){}
   }
   if(!out){
-    var inv=((RAWX.cloud&&RAWX.cloud.inv)||[]).filter(function(x){ return x.fx_rate; }).sort(function(x,y){ return String(y.ym).localeCompare(String(x.ym)); })[0];
+    var inv=((ST.RAWX.cloud&&ST.RAWX.cloud.inv)||[]).filter(function(x){ return x.fx_rate; }).sort(function(x,y){ return String(y.ym).localeCompare(String(x.ym)); })[0];
     out= inv? {rate:Number(inv.fx_rate), src:'최근 인보이스 적용 환율 ('+String(inv.ym).slice(0,7)+')', when:'', at:Date.now(), live:false}
             : {rate:CL_FX_DEFAULT, src:'기본값', when:'', at:Date.now(), live:false};
   }
@@ -128,7 +128,7 @@ export function clUnit(){ return clIsK()? '천원' : 'USD'; }
 /* AI 질문 전에 클라우드 비용 데이터를 한 번 확보 (없으면 조용히 통과) */
 export function clEnsure(){
   var pf = CL.fxNow? Promise.resolve() : clFetchFx().catch(function(){});
-  var pd = RAWX.cloud? Promise.resolve() : new Promise(function(res){ var t=setTimeout(res, 4000); try{ loadCloud(function(){ clearTimeout(t); res(); }); }catch(e){ res(); } });
+  var pd = ST.RAWX.cloud? Promise.resolve() : new Promise(function(res){ var t=setTimeout(res, 4000); try{ loadCloud(function(){ clearTimeout(t); res(); }); }catch(e){ res(); } });
   return Promise.all([pf,pd]);
 }
 export var clU=function(v){ return '$'+Number(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); };
@@ -146,7 +146,7 @@ export function clMonLabel(m){ return m.slice(2,4)+'.'+m.slice(5,7); }
 
 export function renderCloud(){
   var host=$('#clBody');
-  if(!RAWX.cloud){
+  if(!ST.RAWX.cloud){
     host.innerHTML='<div class="cap" style="padding:40px;text-align:center">클라우드 비용을 불러오는 중…</div>';
     loadCloud(function(){ if(ST.CUR_VIEW==='cloud') renderCloud(); });
     return;
@@ -163,7 +163,7 @@ export function renderCloud(){
     return;
   }
   if(!CL.sel) CL.sel={}; if(!Object.keys(CL.sel).length) B.awsKeys.forEach(function(k){ CL.sel[k]=1; });
-  var canEdit=!!(ST.SB_TOKEN && !window.IS_VIEWER && (window.IS_SUPER || window.MY_ROLE==='admin'));
+  var canEdit=!!(ST.SB_TOKEN && !ST.IS_VIEWER && (ST.IS_SUPER || ST.MY_ROLE==='admin'));
   var first=B.months[0], last=B.months[B.months.length-1];
   var head='<div class="pr-top">'+
     '<span style="font-size:18px;font-weight:600;letter-spacing:-.01em">클라우드 비용</span>'+
@@ -360,14 +360,14 @@ export function clInvList(B, canEdit){
   p.querySelectorAll('[data-del]').forEach(function(b){ b.onclick=function(){ clDeleteInvoice(+b.dataset.del); }; });
 }
 export async function clDeleteInvoice(id){
-  var inv=(RAWX.cloud.inv||[]).filter(function(i){ return i.id===id; })[0]; if(!inv) return;
+  var inv=(ST.RAWX.cloud.inv||[]).filter(function(i){ return i.id===id; })[0]; if(!inv) return;
   if(!confirm(String(inv.ym).slice(0,7)+' '+inv.account_id+' 인보이스 기록과 그 달 서비스 행을 지울까요?')) return;
   try{
     await sbWrite('DELETE','cloud_costs?invoice_id=eq.'+id);
     await sbWrite('DELETE','cloud_invoices?id=eq.'+id);
     logChange('delete','cloud_invoices',id,{ym:inv.ym,account:inv.account_id});
     toast('삭제했습니다', String(inv.ym).slice(0,7)+' · '+inv.account_id);
-    RAWX.cloud=null; renderCloud();
+    ST.RAWX.cloud=null; renderCloud();
   }catch(e){ toast('삭제 실패', String(e.message||e), 'warn'); }
 }
 
@@ -438,7 +438,7 @@ export function clParseInvoice(lines){
 }
 /* 계정번호 → cloud_accounts id */
 export function clAcctByNo(no){
-  var acc=(RAWX.cloud&&RAWX.cloud.acc)||[];
+  var acc=(ST.RAWX.cloud&&ST.RAWX.cloud.acc)||[];
   return acc.filter(function(a){ return String(a.acct_no||'')===String(no); })[0]||null;
 }
 
@@ -482,8 +482,8 @@ export async function clHandleFiles(files){
   clRenderPreview();
 }
 export function clRenderPreview(){
-  var prev=document.getElementById('clPrev'), inv=(RAWX.cloud&&RAWX.cloud.inv)||[];
-  var accOpts=((RAWX.cloud&&RAWX.cloud.acc)||[]).filter(function(a){ return a.vendor!=='NCP'; });
+  var prev=document.getElementById('clPrev'), inv=(ST.RAWX.cloud&&ST.RAWX.cloud.inv)||[];
+  var accOpts=((ST.RAWX.cloud&&ST.RAWX.cloud.acc)||[]).filter(function(a){ return a.vendor!=='NCP'; });
   var h='', ready=0;
   CL.parsed.forEach(function(it,ix){
     h+='<div class="cl-prev" data-ix="'+ix+'"><h4>📄 '+esc(it.name)+' <button class="pill ghost" data-rm="'+ix+'" style="height:22px;padding:0 8px;font-size:11px;margin-left:auto">제거</button></h4>';
@@ -526,7 +526,7 @@ export async function clNewAccount(a, done, cancel){
   var id=(a.email||'acct').split('@')[0].replace(/[^a-z0-9]/gi,'').toLowerCase()||('a'+String(a.acct).slice(-4));
   try{
     await sbWrite('POST','cloud_accounts',[{id:id,label:label,acct_no:a.acct||null,email:a.email||null,purpose:purpose,color:'#'+((Math.random()*0x7fffff|0x333333)>>>0).toString(16).padStart(6,'0'),currency:'USD',vendor:'AWS',sort:50}]);
-    RAWX.cloud.acc.push({id:id,label:label,acct_no:a.acct,email:a.email,purpose:purpose,currency:'USD',vendor:'AWS',sort:50,active:true});
+    ST.RAWX.cloud.acc.push({id:id,label:label,acct_no:a.acct,email:a.email,purpose:purpose,currency:'USD',vendor:'AWS',sort:50,active:true});
     toast('계정을 등록했습니다', label+' ('+(a.acct||'')+')');
     done(id);
   }catch(e){ toast('계정 등록 실패', String(e.message||e), 'warn'); cancel(); }
@@ -569,5 +569,5 @@ export async function clSaveParsed(){
   }else{
     toast('일부 저장 실패', done+'건 성공 · '+fail+'건 실패 — 메시지를 확인하세요', 'warn'); btn.disabled=false;
   }
-  RAWX.cloud=null; if(ST.CUR_VIEW==='cloud') renderCloud();
+  ST.RAWX.cloud=null; if(ST.CUR_VIEW==='cloud') renderCloud();
 }

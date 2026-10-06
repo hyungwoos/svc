@@ -188,7 +188,7 @@ export function buildControls(){
      · 화면을 계속 켜두면: 15분마다 조용히 다시 읽음
      · 데이터가 실제로 바뀐 경우에만 다시 그리고, 그때도 필터·정렬·페이지는 유지
      · 갱신 도중 다른 화면으로 이동했으면 절대 되돌리지 않음                    */
-  window.LAST_LOAD=Date.now();
+  ST.LAST_LOAD=Date.now();
   var REFRESHING=false;
   function silentRefresh(reason){
     if(REFRESHING || !ST.SB_TOKEN || !ST.DATA) return;
@@ -198,7 +198,7 @@ export function buildControls(){
     var keep=ST.CUR_VIEW;
     var prevSnap=''; try{ prevSnap=sessionStorage.getItem(CACHE_KEY)||''; }catch(e){}
     loadFromDb().then(function(nd){
-      window.LAST_LOAD=Date.now();
+      ST.LAST_LOAD=Date.now();
       // 데이터가 그대로면 화면을 건드리지 않음 (의미 없는 다시 그리기 방지)
       var same=false;
       try{
@@ -207,7 +207,7 @@ export function buildControls(){
       }catch(e){}
       if(same){ REFRESHING=false; return; }
       closeAnswer('데이터가 갱신되어 이전 답변은 닫았습니다 — 다시 물어봐 주세요');
-      if(window.IS_EQUIP){ if(GRIDS[keep]) renderGrid(); }
+      if(ST.IS_EQUIP){ if(GRIDS[keep]) renderGrid(); }
       else{
         onData(nd);
         if(keep && keep===ST.CUR_VIEW && keep!=='dash' && keep!=='weekly'){
@@ -227,10 +227,10 @@ export function buildControls(){
     }).catch(function(){ REFRESHING=false; });
   }
   document.addEventListener('visibilitychange',function(){
-    if(document.visibilityState==='visible' && Date.now()-window.LAST_LOAD>5*60*1000) silentRefresh('focus');
+    if(document.visibilityState==='visible' && Date.now()-ST.LAST_LOAD>5*60*1000) silentRefresh('focus');
   });
   setInterval(function(){
-    if(document.visibilityState==='visible' && Date.now()-window.LAST_LOAD>15*60*1000) silentRefresh('timer');
+    if(document.visibilityState==='visible' && Date.now()-ST.LAST_LOAD>15*60*1000) silentRefresh('timer');
   }, 60*1000);
 
   $('#btnAsk').onclick=function(){ if(isAsking()){ abortAsk(); return; } ask($('#q').value); };
@@ -297,14 +297,14 @@ export function renderHero(list){
   var el0=$('#dashHero'); if(!el0) return;
   var b=STATE.base;
   // 할 일 알림 배너 (클릭 → 해당 화면)
-  var pend=(RAWX.orders||[]).filter(function(o){ return ['접수','출하요청','배송중','회수예정'].indexOf(o.status)>=0; }).length;
+  var pend=(ST.RAWX.orders||[]).filter(function(o){ return ['접수','출하요청','배송중','회수예정'].indexOf(o.status)>=0; }).length;
   var expCnt=0, expAmt=0;
   list.forEach(function(k){
     var e=ST.DATA.rows[k].endIdx;
     if(e!=null && e>=b && e<=b+expN()-1 && !/해지|종료|CN전환/.test(String(ST.DATA.rows[k].status||''))){ expCnt++; expAmt+=ST.MAT[k][Math.min(e,ST.M-1)]||ST.DATA.rows[k].mrr||0; }
   });
   var curYm=monOf(b)+'월';
-  var bizDone=(RAWX.biz||[]).some(function(r){ return r.ym===curYm; });
+  var bizDone=(ST.RAWX.biz||[]).some(function(r){ return r.ym===curYm; });
   var items=[];
   if(pend) items.push({t:'warn', ic:'📦', msg:'처리 대기 장비 요청이 <b>'+pend+'건</b> 있습니다.', go:function(){ switchView('orders'); }});
   if(expCnt) items.push({t:'info', ic:'⏳', msg:expN()+'개월 내 만료 계약이 <b>'+expCnt+'건</b> ('+won(expAmt)+'천원) 있습니다 — 재약정 타깃.', go:function(){ goWidget('exp','계약 만료 예정'); }});
@@ -686,7 +686,7 @@ export function renderMatrix(list){
 export var IFEE_MODE='y';
 /* 계약에 없는 설치비·철거비(추가 항목) — 고객사별 줄 단위로 install_extra 에 담깁니다 */
 export function ifeeExtras(Y,M){
-  return ((window.RAWX&&RAWX.iextra)||[]).filter(function(x){ return (Y==null||+x.year===+Y) && (M==null||+x.month===+M); });
+  return ((ST.RAWX&&ST.RAWX.iextra)||[]).filter(function(x){ return (Y==null||+x.year===+Y) && (M==null||+x.month===+M); });
 }
 export function ifeeAdj(){
   var m={};
@@ -758,7 +758,7 @@ export function openIfeeDetail(td, Y, M, det, adj){
     ready:function(box){ ifeeWire(box, Y, M, rows, ex, td); }}});
 }
 /* 설치비 금액을 고칠 수 있는 계정인지 — install_extra 쓰기 정책과 같은 기준 */
-export function ifeeCanEdit(){ return !!ST.SB_TOKEN && !window.IS_VIEWER && (window.IS_SUPER || MY_ROLE==='admin' || MY_ROLE==='editor'); }
+export function ifeeCanEdit(){ return !!ST.SB_TOKEN && !ST.IS_VIEWER && (ST.IS_SUPER || ST.MY_ROLE==='admin' || ST.MY_ROLE==='editor'); }
 export function ifeeWire(box, Y, M, rows, ex, td){
   box.querySelectorAll('.ifgo').forEach(function(b){ b.onclick=function(ev){ ev.stopPropagation();
     var d=rows[+b.dataset.i]; if(!d) return; closeMxPop(); switchView('contracts');
@@ -819,7 +819,7 @@ export function ifeeWire(box, Y, M, rows, ex, td){
         changed++;
         jobs.push(sbWrite('PATCH','contracts?id=eq.'+d.id,{install_fee:v, updated_at:new Date().toISOString()}).then(function(){
           logChange('update','contracts',d.id,{install_fee:v});
-          (RAWX.contracts||[]).forEach(function(c){ if(c.id===d.id) c.install_fee=v; });
+          (ST.RAWX.contracts||[]).forEach(function(c){ if(c.id===d.id) c.install_fee=v; });
           (ST.DATA.rows||[]).forEach(function(r){ if(r._id===d.id) r.fee=Number(v||0); });
         }));
       });
@@ -840,7 +840,7 @@ export function ifeeWire(box, Y, M, rows, ex, td){
           changed++;
           jobs.push(sbWrite('PATCH','install_extra?id=eq.'+id,{customer:cust, kind:kind, amount:amt, note:note, updated_by:ST.AUTH_USER||'', updated_at:new Date().toISOString()}).then(function(){
             logChange('update','install_extra',+id,{customer:cust,kind:kind,amount:amt});
-            (RAWX.iextra||[]).forEach(function(e){ if(String(e.id)===String(id)){ e.customer=cust; e.kind=kind; e.amount=amt; e.note=note; } });
+            (ST.RAWX.iextra||[]).forEach(function(e){ if(String(e.id)===String(id)){ e.customer=cust; e.kind=kind; e.amount=amt; e.note=note; } });
           }));
         }else{
           changed++;
@@ -850,13 +850,13 @@ export function ifeeWire(box, Y, M, rows, ex, td){
       if(ins.length) jobs.push(sbWrite('POST','install_extra?select=*',ins,'return=representation').then(function(out){
         logChange('insert','install_extra',0,{year:Y,month:M,rows:ins.length});
         var got=(out&&out.length)? out : ins;                 /* 응답이 비어 와도 화면에는 바로 반영 */
-        got.forEach(function(e){ (RAWX.iextra=RAWX.iextra||[]).push(e); });
+        got.forEach(function(e){ (ST.RAWX.iextra=ST.RAWX.iextra||[]).push(e); });
       }));
       Object.keys(del).forEach(function(x){
         var id=del[x]; changed++;
         jobs.push(sbWrite('DELETE','install_extra?id=eq.'+id).then(function(){
           logChange('delete','install_extra',+id,{year:Y,month:M});
-          RAWX.iextra=(RAWX.iextra||[]).filter(function(e){ return String(e.id)!==String(id); });
+          ST.RAWX.iextra=(ST.RAWX.iextra||[]).filter(function(e){ return String(e.id)!==String(id); });
         }));
       });
       if(!changed){ msg.textContent='바뀐 내용이 없습니다'; save.disabled=false; return; }
@@ -1020,7 +1020,7 @@ export function renderVs(){
 export function renderGoal(list){
   var box=$('#goalBar'); if(!box) return;
   var yr=yOf(STATE.base);
-  var tg=(RAWX.targets||[]).filter(function(t){return +t.year===yr;})[0];
+  var tg=(ST.RAWX.targets||[]).filter(function(t){return +t.year===yr;})[0];
   if(!tg||!tg.amount){ box.style.display='none'; return; }
 
   // 목표 = 그 해 연말 ARR (12월 MRR × 12)

@@ -411,7 +411,7 @@ export function buildDigest(){
         신규_복귀:d.added.slice(0,20).map(function(x){ return [x.cust, x.kind]; }), 빠진곳:d.removed.slice(0,20).map(function(x){ return [x.cust, x.kind]; }), 확인중:d.checking};
     })(),
     클라우드비용: (function(){   // 도구 › 클라우드 비용 (AWS 세전 USD · NCP 공급가액 ₩)
-      if(!RAWX.cloud || !RAWX.cloud.costs || !RAWX.cloud.costs.length) return null;
+      if(!ST.RAWX.cloud || !ST.RAWX.cloud.costs || !ST.RAWX.cloud.costs.length) return null;
       var B=clBuild(); if(!B.months.length) return null;
       var M=B.months, li=M.length-1, pi=Math.max(0,li-1);
       var acc={}; B.awsKeys.concat(B.ncp? [B.ncp]:[]).forEach(function(k){ var a=B.acc[k];
@@ -426,7 +426,7 @@ export function buildDigest(){
         계정별:acc, MDR인프라_USD:(B.acc.edr&&B.acc.tac)? {최근월:M[li], EDR:Math.round(B.acc.edr.totals[li]||0), awstac:Math.round(B.acc.tac.totals[li]||0)} : null};
     })(),
     임대장비: (function(){
-      var a=RAWX.assets||[]; if(!a.length) return null;
+      var a=ST.RAWX.assets||[]; if(!a.length) return null;
       var st={}, ch={}, us={};
       a.forEach(function(x){
         st[x.status||'미지정']=(st[x.status||'미지정']||0)+1;
@@ -436,12 +436,12 @@ export function buildDigest(){
       return {전체대수:a.length, 상태별:st, 채널별:ch, 구분별:us};
     })(),
     장비요청: (function(){
-      var o=RAWX.orders||[]; if(!o.length) return null;
+      var o=ST.RAWX.orders||[]; if(!o.length) return null;
       var st={}; o.forEach(function(x){ st[x.status||'접수']=(st[x.status||'접수']||0)+1; });
       return {전체건수:o.length, 상태별:st};
     })(),
     MDR운영현황: (function(){
-      var m=RAWX.mdrops||[]; if(!m.length) return null;
+      var m=ST.RAWX.mdrops||[]; if(!m.length) return null;
       var st={}; m.forEach(function(x){ st[x.status||'대기']=(st[x.status||'대기']||0)+1; });
       var noRev=m.filter(function(x){ return x.status==='구독' && !x.on_rev_sheet; }).length;
       return {전체건수:m.length, 상태별:st, 구독인데_매출시트_미기입:noRev,
@@ -453,7 +453,7 @@ export function buildDigest(){
       return {기준월:v.month, 항목:v.items.map(function(x){ return [x.k, x.v]; })};
     })(),
     OI파이프라인: (function(){   // 영업기회 — 10% 초기 딜도 빠짐없이 (우리 팀은 대부분 10% 로 두고 관리)
-      var o=RAWX.oi||[]; if(!o.length) return null;
+      var o=ST.RAWX.oi||[]; if(!o.length) return null;
       var open=o.filter(function(x){ return ['등록','진행','수주'].indexOf(x.stage)>=0; });
       var st={}, ln={}, ym={}, early=0, sum=0, wsum=0;
       open.forEach(function(x){ var a=Number(x.expect_amount)||0, p=Number(x.win_prob)||0, w=a*p/100;

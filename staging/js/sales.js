@@ -10,7 +10,7 @@ import { applyDense, denseKey, openFind, openPaste } from './tools.js';
 import { loadInbound } from './inbound.js';
 import { a11yTileRole, BLANK_LABEL, clearFilters, closeColFilter, DV, exportXlsx, gridAddRow, navMenu, openColPick, openFilterPanel, renderGrid,
   switchView, xlsxAoa, xlsxBook } from './grid.js';
-import { closeOvl, logChange, msg, openOvl } from './edit.js';
+import { closeOvl, FORM_FN, logChange, msg, openOvl } from './edit.js';
 
 
 /* ================= Cloud 사이트 생성·수정 (my.genians.co.kr cloudsite / cloudsite-update · Edge Function cloudsite 경유) ================= */
@@ -57,8 +57,8 @@ export function csRenderChips(x){
   if(!x.list.length && !x.hidden.length){ box.style.display='none'; box.innerHTML=''; return; }
   box.style.display='';
   var h='<span style="color:var(--muted)">포탈에서 만든 사이트 (계약 없음) — 누르면 사이트명에 입력 · ✕ 는 목록에서 숨김:</span> ';
-  h+=x.list.map(function(p){ return '<span class="chip" style="display:inline-flex;align-items:center;gap:6px;margin:3px 4px 0 0;padding-right:4px"><span class="cu-pick" data-s="'+esc(p.sitename)+'" style="cursor:pointer" title="'+esc((p.customer||'')+' · '+String(p.created_at||'').slice(0,10))+'">'+esc(p.sitename)+(p.customer? ' <span style="color:var(--muted)">'+esc(p.customer)+'</span>':'')+'</span>'+(window.IS_SUPER? '<button class="cu-hide" data-s="'+esc(p.sitename)+'" title="목록에서 숨기기 (이력은 남음)" style="border:0;background:transparent;cursor:pointer;color:var(--muted);font-size:12px;line-height:1;padding:2px 4px">✕</button>':'')+'</span>'; }).join('');
-  if(x.hidden.length) h+='<details style="display:inline-block;margin-left:6px"><summary style="cursor:pointer;color:var(--muted)">숨긴 사이트 '+x.hidden.length+'</summary>'+x.hidden.map(function(p){ return '<span class="chip" style="display:inline-flex;align-items:center;gap:6px;margin:3px 4px 0 0;opacity:.7">'+esc(p.sitename)+(window.IS_SUPER? '<button class="cu-unhide" data-s="'+esc(p.sitename)+'" title="목록에 다시 표시" style="border:0;background:transparent;cursor:pointer;color:var(--s1-ink);font-size:12px;padding:2px 4px">↩ 복구</button>':'')+'</span>'; }).join('')+'</details>';
+  h+=x.list.map(function(p){ return '<span class="chip" style="display:inline-flex;align-items:center;gap:6px;margin:3px 4px 0 0;padding-right:4px"><span class="cu-pick" data-s="'+esc(p.sitename)+'" style="cursor:pointer" title="'+esc((p.customer||'')+' · '+String(p.created_at||'').slice(0,10))+'">'+esc(p.sitename)+(p.customer? ' <span style="color:var(--muted)">'+esc(p.customer)+'</span>':'')+'</span>'+(ST.IS_SUPER? '<button class="cu-hide" data-s="'+esc(p.sitename)+'" title="목록에서 숨기기 (이력은 남음)" style="border:0;background:transparent;cursor:pointer;color:var(--muted);font-size:12px;line-height:1;padding:2px 4px">✕</button>':'')+'</span>'; }).join('');
+  if(x.hidden.length) h+='<details style="display:inline-block;margin-left:6px"><summary style="cursor:pointer;color:var(--muted)">숨긴 사이트 '+x.hidden.length+'</summary>'+x.hidden.map(function(p){ return '<span class="chip" style="display:inline-flex;align-items:center;gap:6px;margin:3px 4px 0 0;opacity:.7">'+esc(p.sitename)+(ST.IS_SUPER? '<button class="cu-unhide" data-s="'+esc(p.sitename)+'" title="목록에 다시 표시" style="border:0;background:transparent;cursor:pointer;color:var(--s1-ink);font-size:12px;padding:2px 4px">↩ 복구</button>':'')+'</span>'; }).join('')+'</details>';
   box.innerHTML=h;
   box.querySelectorAll('.cu-pick').forEach(function(el){ el.onclick=function(){ $('#cuName').value=el.dataset.s; cuSyncCust(); csPreview(); $('#cuNodes').focus(); }; });
   box.querySelectorAll('.cu-hide').forEach(function(b){ b.onclick=function(){ csHideSite(b.dataset.s, true); }; });
@@ -151,7 +151,7 @@ export function csRenderCreds(){
 export function renderCsite(){
   msg('csMsg',''); msg('ccMsg','');
   $('#csFormWrap').style.display=''; $('#csDone').style.display='none';
-  $('#csTabCreds').style.display=window.IS_SUPER? '':'none';
+  $('#csTabCreds').style.display=ST.IS_SUPER? '':'none';
   csFillSiteList();
   if(!CS.wired){
     CS.wired=true;
@@ -563,7 +563,7 @@ export async function submitOi(){
       quote_total: OI_QUOTE? OI_QUOTE.total : null
     };
     var out=await sbWrite('POST','oi_deals?select=*',[row],'return=representation');
-    RAWX.oi=RAWX.oi||[]; RAWX.oi.unshift(out[0]);
+    ST.RAWX.oi=ST.RAWX.oi||[]; ST.RAWX.oi.unshift(out[0]);
     logChange('insert','oi_deals',out[0].id,{customer:cust,deal:name});
     msg('oiMsg','');
     $('#oiDoneSum').textContent=[cust, name, row.deal_type,
@@ -613,7 +613,7 @@ export function oiToContract(r){
   }
   // 시작월 = 계약 예상 시기
   if(r.expect_month) $('#nStart').value=String(r.expect_month).slice(0,7);
-  if(window.nLivePreview) try{ nLivePreview(); }catch(e){}
+  if(FORM_FN.nLivePreview) try{ FORM_FN.nLivePreview(); }catch(e){}
   // 수량 = 제품 수량 합
   try{
     var q=(r.items||[]).reduce(function(a,x){ return a+(+x.qty||0); },0);
@@ -636,7 +636,7 @@ export function renderOiTiles(on){
     if(bar && bar.parentElement) bar.parentElement.insertBefore(host, bar);
   }
   host.style.display='';
-  var rows=(RAWX.oi||[]);
+  var rows=(ST.RAWX.oi||[]);
   var open=rows.filter(function(r){ return ['등록','진행'].indexOf(r.stage)>=0; });
   var sum=function(a){ return a.reduce(function(s,r){ return s+(Number(r.expect_amount)||0); },0); };
   var wsum=open.reduce(function(s,r){ return s+(Number(r.expect_amount)||0)*(Number(r.win_prob)||0)/100; },0);
@@ -743,7 +743,7 @@ export function setupSide(){
   $('#odGo').onclick=submitOrder;
   /* 계약번호·관리자 계정·설치 희망일·서비스 에디션·요청 서비스 기능은 에스원 발주에만 쓰는 칸 — 다른 채널이면 숨기고 저장값도 비움 */
   function odS1Sync(){ var s1=$('#odChannel').value==='에스원'; document.querySelectorAll('#odFormWrap .od-s1').forEach(function(d){ d.style.display=s1? '':'none'; }); }
-  $('#odChannel').onchange=odS1Sync; odS1Sync(); window.odS1Sync=odS1Sync;
+  $('#odChannel').onchange=odS1Sync; odS1Sync();
   $('#mpGo').onclick=submitMdrPoc;
   $('#oiGo').onclick=submitOi;
   $('#oiQuoteBtn').onclick=openQuotePick;
@@ -767,7 +767,7 @@ export function setupSide(){
   $('#dvReload').onclick=function(){
     if(ST.CUR_VIEW==='inbound'){ loadInbound(function(){ renderGrid(); }); return; }
     loadFromDb().then(function(nd){
-      if(window.IS_EQUIP){ renderGrid(); return; }   // 장비 전용: RAWX만 갱신
+      if(ST.IS_EQUIP){ renderGrid(); return; }   // 장비 전용: RAWX만 갱신
       onData(nd); if(ST.CUR_VIEW!=='dash') renderGrid();
     });
   };
@@ -1561,7 +1561,7 @@ export async function submitOrder(){
       status:'접수'
     };
     var out=await sbWrite('POST','equipment_orders?select=*',[row],'return=representation');
-    RAWX.orders=RAWX.orders||[]; RAWX.orders.unshift(out[0]);
+    ST.RAWX.orders=ST.RAWX.orders||[]; ST.RAWX.orders.unshift(out[0]);
     logChange('insert','equipment_orders',out[0].id,{customer:cust,model:row.model,qty:row.qty});
     msg('odMsg','');
     // 명시적 완료 화면
@@ -1607,7 +1607,7 @@ export async function submitMdrPoc(){
       status:'신청'
     };
     var out=await sbWrite('POST','mdr_ops?select=*',[row],'return=representation');
-    RAWX.mdrops=RAWX.mdrops||[]; RAWX.mdrops.unshift(out[0]);
+    ST.RAWX.mdrops=ST.RAWX.mdrops||[]; ST.RAWX.mdrops.unshift(out[0]);
     logChange('insert','mdr_ops',out[0].id,{company:comp,mgr:mgr});
     msg('mpMsg','');
     var mods=[row.mod_edr?'EDR+MDR':'',row.mod_av?'백신':'',row.mod_ransom?'랜섬웨어':'',row.mod_media?'매체제어':''].filter(Boolean).join('·');

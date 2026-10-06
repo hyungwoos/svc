@@ -29,6 +29,9 @@ export function stampOf(html, readJs) {
     '<!-- stamp:end -->';
   return { ver, list, eager: [...eager], lazy: mods.filter((f) => !eager.has(f)), map, hash, block };
 }
+/** 위성 페이지(quote·report·s1·kk)의 sat/….js · sat/….css 의 ?v= 꼬리표를 같은 버전으로 (㊿+154) */
+export const SAT_PAGES = ['quote.html', 'report.html', 's1.html', 'kk.html'];
+export function stampSat(html, ver) { const v = encodeURIComponent(ver); return html.replace(/((?:<script src|<link rel="stylesheet" href)="sat\/[\w-]+\.(?:js|css))\?v=[^"]*(")/g, '$1?v=' + v + '$2'); }
 export function applyStamp(html, st) {
   if (!/<!-- stamp:begin[\s\S]*?<!-- stamp:end -->/.test(html)) throw new Error('index.html 에 <!-- stamp:begin --> … <!-- stamp:end --> 가 없음');
   let out = html.replace(/<!-- stamp:begin[\s\S]*?<!-- stamp:end -->/, () => st.block);
@@ -41,7 +44,10 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const p = path.join(ROOT, 'index.html'); const html = fs.readFileSync(p, 'utf8');
   const st = stampOf(html, (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return null; } });
   const out = applyStamp(html, st);
-  if (process.argv.includes('--check')) { console.log(out === html ? '✓ stamp 최신 (' + st.ver + ')' : '✗ stamp 가 지금 버전과 다름 — node tests/stamp.mjs 실행'); process.exit(out === html ? 0 : 1); }
+  const sats = SAT_PAGES.filter((f) => fs.existsSync(path.join(ROOT, f))).map((f) => { const h = fs.readFileSync(path.join(ROOT, f), 'utf8'); return { f, h, o: stampSat(h, st.ver) }; });
+  const same = out === html && sats.every((x) => x.o === x.h);
+  if (process.argv.includes('--check')) { console.log(same ? '✓ stamp 최신 (' + st.ver + ')' : '✗ stamp 가 지금 버전과 다름 — node tests/stamp.mjs 실행'); process.exit(same ? 0 : 1); }
   if (out !== html) fs.writeFileSync(p, out);
-  console.log('stamp ' + st.ver + ' · 처음부터 ' + st.eager.length + ' · 처음 열 때 ' + st.lazy.join(', ') + (out !== html ? ' · index.html 고침' : ' · 그대로'));
+  sats.forEach((x) => { if (x.o !== x.h) fs.writeFileSync(path.join(ROOT, x.f), x.o); });
+  console.log('stamp ' + st.ver + ' · 처음부터 ' + st.eager.length + ' · 처음 열 때 ' + st.lazy.join(', ') + (out !== html ? ' · index.html 고침' : ' · 그대로') + ' · 위성 ' + sats.filter((x) => x.o !== x.h).map((x) => x.f).join(','));
 }

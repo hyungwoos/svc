@@ -11,8 +11,9 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
 const LIST = (/name="app-js" content="([^"]+)"/.exec(html) || [, ''])[1].split(',').map((s) => s.trim()).filter(Boolean);
 const EXTRA = ['js/sqlbox.js'];   // 격리 칸 전용 고전 스크립트(따로 검사)
-// window 에 직접 두는 값(로그인 역할 · 데이터 사본 · CDN 라이브러리) — 모듈 이름이 아니라 브라우저 전역
-const WINDOW_PROPS = ['RAWX', 'MY_ROLE', 'IS_SUPER', 'IS_VIEWER', 'IS_VIEWER_ROLE', 'IS_EQUIP', 'EQUIP_HOME', 'XLSX', 'PptxGenJS', 'pdfjsLib', 'cLivePreview', 'nLivePreview', 'DASH_BASE0', 'LAST_LOAD'];
+// window 에 있는 것 중 포탈이 쓰는 비브라우저 이름 — CDN 라이브러리(loadLib 이 SRI 로 받아 window 에 둠)와 window.SVC(main.js) 뿐 (㊿+154: 앱 상태는 전부 ST · 다리 제거)
+const WINDOW_PROPS = ['XLSX', 'PptxGenJS', 'pdfjsLib'];
+const WINDOW_OK = new Set(WINDOW_PROPS.concat(['SVC']));
 let fail = 0; const say = (ok, msg) => { console.log((ok ? '  ✓ ' : '  ✗ ') + msg); if (!ok) fail++; };
 const P = (src) => espree.parse(src, { ecmaVersion: 2022, sourceType: 'module', range: true, loc: true });
 const mods = {};
@@ -74,6 +75,20 @@ for (const [f, m] of Object.entries(mods)) (function walk(n) {
   for (const k of Object.keys(n)) if (k !== 'range' && k !== 'loc') walk(n[k]);
 })(m.ast);
 say(!winUse.length, 'window.<모듈 이름> 으로 쓰지 않음(import 로)' + (winUse.length ? ' — ' + winUse.slice(0, 8).join(' · ') : ''));
+// ④-2 window 에 앱 값을 두지 않음 — window.X 는 브라우저 것 · CDN 라이브러리 · SVC 만 (㊿+154)
+{ const BROWSER = new Set(Object.keys(globals.browser)); const appWin = [];
+  for (const [f, m] of Object.entries(mods)) (function walk(n) {
+    if (!n || typeof n !== 'object') return; if (Array.isArray(n)) { n.forEach(walk); return; }
+    if (n.type === 'MemberExpression' && !n.computed && n.object.type === 'Identifier' && n.object.name === 'window' && !BROWSER.has(n.property.name) && !WINDOW_OK.has(n.property.name)) appWin.push(f + ':' + n.loc.start.line + ' window.' + n.property.name);
+    for (const k of Object.keys(n)) if (k !== 'range' && k !== 'loc') walk(n[k]);
+  })(m.ast);
+  say(!appWin.length, 'window 에 앱 값을 두지 않음(공유 상태는 ST · 함수는 export) — window.X 는 브라우저 · CDN(' + WINDOW_PROPS.join('·') + ') · SVC 만' + (appWin.length ? ' — ' + appWin.slice(0, 8).join(' · ') : ''));
+  const svcUse = []; for (const [f, m] of Object.entries(mods)) { if (f === 'js/main.js') continue; let hit = false;
+    (function walk(n) { if (!n || typeof n !== 'object' || hit) return; if (Array.isArray(n)) { n.forEach(walk); return; }
+      if (n.type === 'Identifier' && n.name === 'SVC') hit = true; if (n.type === 'MemberExpression' && !n.computed && n.property.name === 'SVC') hit = true;
+      for (const k of Object.keys(n)) if (k !== 'range' && k !== 'loc') walk(n[k]); })(m.ast);
+    if (hit) svcUse.push(f); }
+  say(svcUse.length === 0 || (svcUse.length === 1 && svcUse[0] === 'js/admin.js'), 'window.SVC 는 main.js 가 만들고 포탈 코드는 쓰지 않음(스테이징 QA 가 다른 창을 볼 때만 · admin.js qaApi)' + (svcUse.filter((f) => f !== 'js/admin.js').length ? ' — ' + svcUse.join(', ') : '')); }
 // 공유 상태 (㊿+150) — 17개는 ST 안에만
 const MOVED = ['AUTH_USER', 'CODES', 'CUR_VIEW', 'DATA', 'DIRTY', 'HIST', 'HIST_LOADED', 'IDLE_LAST', 'IDLE_WARNED', 'INB_Y', 'LIVE_SRC', 'M', 'MAT', 'OI_CONVERT', 'PERMS', 'SB_TOKEN', 'TCOQ'];
 const back = MOVED.filter((n) => exp.has(n));
@@ -92,5 +107,17 @@ const eslint = new ESLint({ cwd: ROOT, overrideConfigFile: true, overrideConfig:
 const res = await eslint.lintFiles(LIST.concat(EXTRA.filter((f) => fs.existsSync(path.join(ROOT, f)))));
 const errs = []; res.forEach((r) => r.messages.forEach((m) => errs.push(path.relative(ROOT, r.filePath) + ':' + m.line + ' ' + m.ruleId + ' — ' + m.message)));
 say(!errs.length, 'ESLint ' + res.length + '개 파일 · 오류 ' + errs.length + (errs.length ? '\n      ' + errs.slice(0, 25).join('\n      ') : ''));
+// ⑥ 위성 페이지 코드(sat/*.js · 고전 스크립트 · ㊿+154) — 페이지마다 부르는 파일끼리 전역을 나눠 씀: 같은 최상위 이름을 두 파일이 선언하지 않음 · ESLint no-undef(그 페이지 파일들의 이름 + 브라우저 + 엑셀 CDN)
+{ const SATP = ['quote.html', 'report.html', 's1.html', 'kk.html'].filter((f) => fs.existsSync(path.join(ROOT, f)));
+  const pages = SATP.map((f) => ({ f, files: [...fs.readFileSync(path.join(ROOT, f), 'utf8').matchAll(/<script src="(sat\/[\w-]+\.js)[^"]*"><\/script>/g)].map((m) => m[1]) }));
+  const tops = {}; const topOf = (f) => tops[f] || (tops[f] = (() => { const ast = espree.parse(fs.readFileSync(path.join(ROOT, f), 'utf8'), { ecmaVersion: 2022, sourceType: 'script' }); const n = [];
+    for (const st of ast.body) { if (st.type === 'FunctionDeclaration') n.push(st.id.name); else if (st.type === 'VariableDeclaration') st.declarations.forEach((d) => n.push(d.id.name)); } return n; })());
+  const dup = [], G2 = {}; for (const pg of pages) { const seen = {}; for (const f of pg.files) for (const n of topOf(f)) { if (seen[n] && seen[n] !== f) dup.push(pg.f + ': ' + n + '(' + seen[n] + '·' + f + ')'); seen[n] = f; }
+    for (const f of pg.files) { G2[f] = G2[f] || {}; pg.files.forEach((g) => topOf(g).forEach((n) => { G2[f][n] = 'writable'; })); } }
+  say(!dup.length, '위성 페이지: 한 페이지가 부르는 sat/*.js 끼리 같은 최상위 이름 없음' + (dup.length ? ' — ' + dup.slice(0, 8).join(' · ') : ''));
+  const files = Object.keys(G2).sort();
+  const es2 = new ESLint({ cwd: ROOT, overrideConfigFile: true, overrideConfig: files.map((f) => ({ files: [f], languageOptions: { ecmaVersion: 2022, sourceType: 'script', globals: Object.assign({}, globals.browser, { XLSX: 'readonly' }, G2[f]) }, rules: Object.assign({}, RULES, { 'no-import-assign': 'off', 'no-redeclare': 'off' }) })) });
+  const r2 = await es2.lintFiles(files); const e2 = []; r2.forEach((r) => r.messages.forEach((m) => e2.push(path.relative(ROOT, r.filePath) + ':' + m.line + ' ' + m.ruleId + ' — ' + m.message)));
+  say(!e2.length, '위성 페이지 ESLint ' + r2.length + '개 파일 · 오류 ' + e2.length + (e2.length ? '\n      ' + e2.slice(0, 25).join('\n      ') : '')); }
 console.log(fail ? '\n정적 검사(lint) 실패 ' + fail : '\n정적 검사(lint) 통과');
 process.exit(fail ? 1 : 0);

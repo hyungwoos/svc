@@ -1,0 +1,149 @@
+/* ===== sat/quote.css — 견적서(quote.html) 스타일 (㊿+154: 페이지 안 <style> 에서 파일로) ===== */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
+:root { --genians-green: #1fb53a; --border-color: #000; --gray-bg: #f8f9fa; }
+* { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body { font-family: 'Noto Sans KR', sans-serif; background: #f9f9f7; margin: 0; padding: 20px; color: #333; }
+.toolbar { width: 210mm; margin: 0 auto 15px; background: #fcfcfb; padding: 12px 15px; border: 1px solid rgba(11,11,11,.10); border-radius: 14px; display: flex; justify-content: space-between; align-items: center; }
+@media screen { .page { box-shadow: 0 1px 6px rgba(0,0,0,.07); border: 1px solid rgba(11,11,11,.06); } }
+body.pdf-capturing .page { box-shadow: none !important; border: none !important; }
+.toolbar-actions { display: flex; gap: 8px; align-items: center; }
+.btn { padding: 9px 14px; font-weight: bold; border-radius: 9px; cursor: pointer; border: none; color: white; font-size: 13px; white-space: nowrap; }
+.btn-print { background: var(--genians-green); }
+.btn-add { background: #343a40; }
+.btn-secondary { background: #6c757d; }
+.btn-github { background: #24292e; }
+.dropdown { position: relative; display: inline-block; }
+.dropdown-menu { display: none; position: absolute; top: 115%; left: 0; background: #fff; border: 1px solid rgba(11,11,11,.12); border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,0.12); min-width: 170px; z-index: 50; overflow: hidden; }
+.dropdown-menu.open { display: block; }
+.dropdown-item { display: block; width: 100%; text-align: left; padding: 10px 14px; font-size: 13px; border: none; background: #fff; cursor: pointer; color: #333; }
+.dropdown-item:hover { background: #f2f2f2; }
+.dropdown-item input[type="file"] { display: none; }
+.page { width: 210mm; min-height: 297mm; background: white; margin: 0 auto; padding: 15mm; position: relative; }
+input, select, textarea { width: 100%; border: none; outline: none; font-family: inherit; font-size: inherit; background: transparent; padding: 2px; }
+select { border: 1px solid #ccc; background: #fff; border-radius: 3px; padding: 4px; font-size: 11px; }
+.logo-box { position: absolute; top: 15mm; left: 15mm; }
+.logo-box img { height: 35px; object-fit: contain; }
+.doc-title { font-size: 36px; font-weight: 900; text-align: center; letter-spacing: 15px; text-decoration: underline; text-underline-offset: 10px; margin-bottom: 30px; }
+.info-section { display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 12px; }
+.info-left { width: 45%; display: flex; flex-direction: column; justify-content: flex-end; gap: 10px; padding-bottom: 5px; }
+.info-left .input-line { border-bottom: 1px solid #aaa; border-radius: 0; padding-left: 5px; }
+.info-right { width: 50%; }
+.info-right table { width: 100%; border-collapse: collapse; border: 2px solid var(--border-color); font-size: 11px; }
+.info-right th, .info-right td { border: 1px solid var(--border-color); padding: 4px; text-align: center; }
+.info-right th { background: #f0f0f0; font-weight: bold; }
+/* «공급자» 세로 글자 — writing-mode(세로쓰기)는 iOS Safari 가 표 안에서 글자를 옆 칸으로 밀어 그리는 버그가 있어(모바일 PDF 글씨 밀림) 글자를 한 줄씩 쌓는 방식으로 */
+.info-right .provider-title { width: 8%; min-width: 26px; padding: 0; font-size: 13px; letter-spacing: 0; line-height: 1; vertical-align: middle; }
+.info-right .provider-title span { display: block; line-height: 1.5; text-align: center; }
+.table-responsive { width: 100%; }
+.main-table { width: 100%; border-collapse: collapse; border: 1px solid var(--border-color); font-size: 11px; table-layout: fixed; }
+.main-table th { background: var(--genians-green); color: white; height: 35px; border: 1px solid var(--genians-green); }
+.main-table td { border: 1px solid #ccc; height: 40px; padding: 2px; text-align: center; vertical-align: middle; }
+.text-right { text-align: right !important; }
+.input-num { text-align: right; }
+.custom-input { width: 100%; border: 1px solid #ccc; background: #fff; border-radius: 3px; padding: 4px; font-size: 11px; box-sizing: border-box; }
+tr.row-incomplete td { background: #fff3cd !important; }
+#incompleteWarning { color: #c0392b; font-size: 12px; font-weight: bold; margin-bottom: 6px; min-height: 16px; }
+.subtotal-box { margin-top: 15px; border: 1px solid var(--border-color); padding: 10px 15px; font-size: 13px; font-weight: bold; display: flex; justify-content: space-between; background: #fdfdfd; color: #555; }
+.amount-box { margin-top: 8px; border: 2px solid var(--border-color); padding: 15px; font-size: 16px; font-weight: bold; display: flex; justify-content: space-between; background: #fdfdfd; }
+.remarks-section { margin-top: 25px; font-size: 12px; }
+.remarks-section table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.remarks-section td { padding: 5px; vertical-align: middle; }
+.remarks-section input { font-size: 11px; width: 100%; text-align: left; }
+.remarks-section textarea { width: 100%; min-height: 120px; resize: none; border: 1px solid #eee; padding: 5px; font-size: 11px; font-family: inherit; line-height: 1.5; overflow: hidden; }
+.only-print { display: none; }
+.print-text { display: none; }
+.main-table td:first-child { line-height: 1.2; }
+.main-table td:first-child .print-text {
+    white-space: normal; word-break: keep-all; overflow-wrap: anywhere;
+    line-height: 1.2; font-size: 10px; padding: 0 2px;
+}
+.row-actions { position: absolute; right: -50px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: row; gap: 4px; }
+.row-actions button { border: none; border-radius: 50%; cursor: pointer; width: 20px; height: 20px; font-size: 11px; line-height: 1; color: white; flex-shrink: 0; }
+.btn-dup { background: var(--genians-green); }
+.btn-del { background: #e74c3c; }
+.modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9998; justify-content: center; align-items: center; }
+.modal-box { background: #fff; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+.modal-box label { display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; margin-top: 10px; }
+.modal-box input[type="text"], .modal-box input[type="password"] { border: 1px solid #ccc; border-radius: 4px; padding: 8px; font-size: 13px; }
+/* 문서 보기 모드: "불러오기"로 새 창을 열었을 때 완성본처럼 읽기 전용으로 보여줍니다 */
+body.doc-view-mode .toolbar,
+body.doc-view-mode .btn-del,
+body.doc-view-mode .btn-dup,
+body.doc-view-mode .no-print,
+body.doc-view-mode .modal-overlay { display: none !important; }
+body.doc-view-mode .only-print { display: block !important; }
+body.doc-view-mode .print-text { display: block !important; }
+body.doc-view-mode tr.row-incomplete td { background: transparent !important; }
+body.doc-view-mode #incompleteWarning { display: none !important; }
+body.doc-view-mode .info-left .input-line,
+body.doc-view-mode input,
+body.doc-view-mode textarea { border: none !important; background: transparent !important; }
+body.doc-view-mode .remarks-section textarea { border: none !important; }
+body.doc-view-mode .main-table td:first-child .print-text {
+    display: block !important; white-space: normal !important; word-break: keep-all !important;
+    overflow-wrap: anywhere !important; font-size: 9.5px !important; line-height: 1.2 !important; max-width: 100% !important;
+}
+#viewModeBar { display: none; position: fixed; top: 10px; right: 10px; z-index: 10000; gap: 6px; }
+@media print { #viewModeBar { display: none !important; } }
+/* PDF 캡처 모드: GitHub에 실제 PDF를 저장하기 위해 화면을 인쇄 화면처럼 잠깐 바꿉니다 */
+body.pdf-capturing .toolbar,
+body.pdf-capturing .btn-del,
+body.pdf-capturing .btn-dup,
+body.pdf-capturing .no-print,
+body.pdf-capturing .modal-overlay { display: none !important; }
+body.pdf-capturing .only-print { display: block !important; }
+body.pdf-capturing .print-text { display: block !important; }
+body.pdf-capturing tr.row-incomplete td { background: transparent !important; }
+body.pdf-capturing #incompleteWarning { display: none !important; }
+body.pdf-capturing .info-left .input-line,
+body.pdf-capturing input,
+body.pdf-capturing textarea { border: none !important; background: transparent !important; }
+body.pdf-capturing .remarks-section textarea { border: none !important; }
+body.pdf-capturing .main-table td:first-child .print-text {
+    display: block !important; white-space: normal !important; word-break: keep-all !important;
+    overflow-wrap: anywhere !important; font-size: 9.5px !important; line-height: 1.2 !important; max-width: 100% !important;
+}
+@media print {
+    @page { size: A4 portrait; margin: 0; }
+    html, body {
+        width: 210mm !important; height: 297mm !important; margin: 0 !important; padding: 0 !important;
+        background: #fff !important; overflow: hidden !important;
+    }
+    .page {
+        width: 210mm !important; height: 297mm !important; min-height: 297mm !important; margin: 0 auto !important;
+        padding: 15mm !important; box-shadow: none !important; position: relative !important; box-sizing: border-box !important;
+        page-break-after: avoid !important; page-break-inside: avoid !important; overflow: hidden !important;
+    }
+    .toolbar, .btn-del, .btn-dup, .no-print, .modal-overlay { display: none !important; }
+    .only-print { display: block !important; }
+    .print-text { display: block !important; }
+    tr.row-incomplete td { background: transparent !important; }
+    #incompleteWarning { display: none !important; }
+    .logo-box { position: absolute !important; top: 15mm !important; left: 15mm !important; text-align: left !important; display: block !important; margin: 0 !important; }
+    .doc-title { margin-top: 0 !important; margin-bottom: 30px !important; font-size: 36px !important; text-align: center !important; }
+    .info-section { display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; justify-content: space-between !important; gap: 0 !important; }
+    .info-left { width: 45% !important; flex: 0 0 45% !important; display: flex !important; flex-direction: column !important; justify-content: flex-end !important; }
+    .info-right { width: 50% !important; flex: 0 0 50% !important; }
+    .table-responsive { overflow: visible !important; width: 100% !important; display: block !important; }
+    .main-table { display: table !important; width: 100% !important; table-layout: fixed !important; }
+    .main-table th, .main-table td { padding: 2px !important; white-space: nowrap !important; }
+    .main-table th:first-child, .main-table td:first-child {
+        white-space: normal !important; word-break: keep-all !important; overflow-wrap: anywhere !important; line-height: 1.2 !important;
+    }
+    .main-table td:first-child .print-text {
+        display: block !important; white-space: normal !important; word-break: keep-all !important;
+        overflow-wrap: anywhere !important; font-size: 9.5px !important; line-height: 1.2 !important; max-width: 100% !important;
+    }
+    .subtotal-box { display: flex !important; flex-direction: row !important; text-align: left !important; justify-content: space-between !important; }
+    .amount-box { display: flex !important; flex-direction: row !important; text-align: left !important; justify-content: space-between !important; }
+    .remarks-section table { display: table !important; width: 100% !important; table-layout: fixed !important; }
+    .remarks-section tbody { display: table-row-group !important; width: 100% !important; }
+    .remarks-section tr { display: table-row !important; width: 100% !important; }
+    .remarks-section td { display: table-cell !important; padding: 5px !important; width: auto !important; }
+    input::placeholder, textarea::placeholder { color: transparent; }
+    .info-left .input-line, input, textarea { border: none !important; background: transparent !important; }
+    input[type="date"]::-webkit-calendar-picker-indicator { display: none; }
+    select { display: none !important; }
+    .remarks-section textarea { border: none !important; }
+    .provider-title { white-space: nowrap !important; }
+}

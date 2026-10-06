@@ -9,6 +9,8 @@ const tmp = fs.mkdtempSync(path.join(process.env.TMPDIR || '/tmp', 'svc-check-')
 let fail = 0; const say = (ok, m) => { console.log((ok ? '  ✓ ' : '  ✗ ') + m); if (!ok) fail++; };
 
 const htmls = fs.readdirSync(ROOT).filter((f) => f.endsWith('.html'));
+/** 위성 페이지 HTML + 그 페이지가 부르는 sat/*.js (㊿+154 부터 코드는 sat/ 파일에) */
+const pageCode = (f) => { const h = fs.readFileSync(path.join(ROOT, f), 'utf8'); return h + [...h.matchAll(/<script src="(sat\/[\w-]+\.js)[^"]*"><\/script>/g)].map((m) => { try { return '\n' + fs.readFileSync(path.join(ROOT, m[1]), 'utf8'); } catch (e) { return ''; } }).join(''); };
 say(htmls.includes('index.html'), 'index.html 존재');
 for (const f of htmls) {
   const src = fs.readFileSync(path.join(ROOT, f), 'utf8');
@@ -62,6 +64,23 @@ const sw = fs.existsSync(path.join(ROOT, 'sw.js')) ? fs.readFileSync(path.join(R
 say(JS_FILES.every((f) => sw.includes("'./" + f + "'")), 'sw.js SHELL 에 코드 파일 전부 포함');
 // 중복 최상위 선언(모듈은 이름이 겹치면 window.SVC 에서 하나가 가려짐 — 정확한 검사는 lint) 검사
 { const seen = new Map(), dup = []; for (const f of JS_LIST) { if (!fs.existsSync(path.join(ROOT, f))) continue; const src = fs.readFileSync(path.join(ROOT, f), 'utf8'); for (const m of src.matchAll(/^(?:export\s+)?(?:async\s+)?function\s+([A-Za-z_$][\w$]*)/gm)) { if (seen.has(m[1])) dup.push(m[1] + '(' + seen.get(m[1]) + '·' + f + ')'); seen.set(m[1], f); } } say(!dup.length, `최상위 함수 이름 중복 없음${dup.length ? ' — ' + dup.slice(0, 5).join(', ') : ''}`); }
+// ㊿+154 위성 페이지(quote·report·s1·kk): 코드는 sat/*.js 파일 · 인라인 <script>·on* 핸들러 없음 → CSP script-src 에 'unsafe-inline' 없음 · ?v= 꼬리표가 지금 버전
+try { const { SAT_PAGES, stampSat } = await import('./stamp.mjs'); const satFiles = new Set();
+  for (const f of SAT_PAGES) { const p = path.join(ROOT, f); if (!fs.existsSync(p)) continue; const h = fs.readFileSync(p, 'utf8'), h2 = h.replace(/<!--[\s\S]*?-->/g, '');
+    say(!/<script(?![^>]*\bsrc=)[^>]*>/.test(h2) && !/\son(click|change|input|error|load|submit|key\w+|blur|focus|mouse\w+)=["']/i.test(h2), f + ': 인라인 <script> · on* 핸들러 없음 (data-click 등 → sat/common.js)');
+    const css = [...h.matchAll(/<link rel="stylesheet" href="(sat\/[\w-]+\.css)\?v=[^"]*">/g)].map((m) => m[1]);
+    say(!/<style[\s>]/i.test(h2) && css.length >= 1 && css.every((c) => fs.existsSync(path.join(ROOT, c))), f + ': 스타일은 ' + css.join('·') + ' (페이지 안 <style> 없음)');
+    const c = (/http-equiv="Content-Security-Policy" content="([^"]+)"/.exec(h) || [, ''])[1]; say(/script-src 'self'/.test(c) && !/script-src[^;]*'unsafe-(inline|eval)'/.test(c), f + ": CSP script-src 에 'unsafe-inline'·'unsafe-eval' 없음");
+    const srcs = [...h.matchAll(/<script src="([^"?]+)(\?v=[^"]*)?"><\/script>/g)];
+    say(srcs.length >= 2 && srcs[0][1] === 'sat/common.js' && srcs.every((m) => /^sat\/[\w-]+\.js$/.test(m[1]) && fs.existsSync(path.join(ROOT, m[1]))), f + ': sat/common.js 먼저 · 스크립트 ' + srcs.map((m) => m[1].replace('sat/', '')).join('·'));
+    say(stampSat(h, ver ? ver[1] : '') === h, f + ': sat/*.js 의 ?v= 가 지금 버전(app-ver) — 다르면 node tests/stamp.mjs');
+    srcs.forEach((m) => satFiles.add(m[1])); }
+  for (const f of [...satFiles].sort()) { const p = path.join(ROOT, f), src = fs.readFileSync(p, 'utf8'); const q = path.join(tmp, path.basename(f).replace(/\.js$/, '.cjs')); fs.copyFileSync(p, q);
+    const r = spawnSync(process.execPath, ['--check', q], { encoding: 'utf8' }); say(r.status === 0, `${f}: 문법(고전 스크립트)${r.status ? ' — ' + r.stderr.split('\n').slice(0, 2).join(' | ') : ''}`);
+    const leak = /(service_role|sb_secret_[A-Za-z0-9_]{8,}|sbp_[a-f0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|xoxb-[0-9A-Za-z-]{10,}|sk-ant-[A-Za-z0-9_-]{20,})/.exec(src); if (leak) say(false, `${f}: 비밀값 패턴`);
+    say(!/\bon(click|change|input|error)=\\?["']/.test(src), f + ': 만드는 HTML 에도 인라인 on* 없음'); }
+  { const o = fs.existsSync(path.join(ROOT, 'orders.html')) ? fs.readFileSync(path.join(ROOT, 'orders.html'), 'utf8') : ''; if (o) say(!/<script/i.test(o) && /http-equiv="refresh" content="0; url=index\.html\?v=ordernew"/.test(o), 'orders.html(옛 발주 화면): 스크립트 없이 포탈 «임대 장비 신청»으로 넘김'); } }
+catch (e) { say(false, '위성 페이지 검사 실패 — ' + String(e.message || e).slice(0, 160)); }
 const idx = html + jsAll;
 // Supabase 함수 소스가 저장소에 있으면 비밀값 검사만 (deno 는 CI 에 없을 수 있음)
 const fnDir = path.join(ROOT, 'supabase', 'functions');
@@ -76,7 +95,7 @@ for (const f of htmls) say(/<meta http-equiv="Content-Security-Policy"/.test(fs.
 say((idx.match(/createElement\('script'\)/g) || []).length === 1, 'index.html: 외부 스크립트 로더는 loadLib(SRI) 하나뿐');
 const sris = [...idx.matchAll(/sri:'([^']+)'/g)].map((m) => m[1]);   // ㊿+147: alasql 은 격리 칸(js/sqlbox.js)으로 옮겨 4개
 say(sris.length >= 4 && sris.every((h) => /^sha384-[A-Za-z0-9+/]{64}$/.test(h)), `index.html: SRI 해시 ${sris.length}개 형식 OK`);
-for (const f of ['kk.html', 's1.html']) if (htmls.includes(f)) { const t = fs.readFileSync(path.join(ROOT, f), 'utf8'); say(/sc\.integrity=sri/.test(t) && /sha384-/.test(t), `${f}: 엑셀 로더에 integrity`); }
+for (const f of ['kk.html', 's1.html']) if (htmls.includes(f)) { const t = pageCode(f); say(/sc\.integrity=sri/.test(t) && /sha384-/.test(t), `${f}: 엑셀 로더에 integrity`); }
 say((idx.match(/mfaGate\(/g) || []).length >= 4, 'index.html: MFA 관문(mfaGate) 이 로그인·세션 복원 경로에 연결됨');
 // ③ 데이터 정합성 (㊿+137): 코드 목록 — 포탈 CODE_KIND 의 모든 종류가 *_OPTS 배열로 존재 · GRIDS 에 상태/채널/모델 리터럴 배열이 남아 있지 않음(한 목록을 봐야 함) · 코드 관리 UI 마크업
 {
@@ -184,7 +203,7 @@ say(/function aiFeedback\(/.test(jsAll) && /ai_feedback/.test(jsAll) && /functio
 say(/\^ai_feedback\\b\|\^ai_check_log\\b/.test(jsAll), 'permWriteGuard 예외에 ai_feedback·ai_check_log');
 // ② 보안 마무리 (㊿+140): 견적 Worker v2 — 팀 공용 비밀번호 제거 · 포탈 로그인 토큰
 {
-  const satQ = htmls.includes('quote.html') ? fs.readFileSync(path.join(ROOT, 'quote.html'), 'utf8') : '';
+  const satQ = htmls.includes('quote.html') ? pageCode('quote.html') : '';
   say(!/X-Access-Password/.test(jsAll) && !/X-Access-Password['"]?\s*:/.test(satQ) && !/id="ghToken"/.test(satQ), '견적 저장 서버: 포탈·quote.html 이 X-Access-Password(팀 비밀번호)를 보내지 않음');
   say(/function qFetch\(/.test(jsAll) && (!satQ || /function workerFetch\(/.test(satQ)), '견적 저장 서버: qFetch(포탈) · workerFetch(quote.html) 가 Bearer 토큰으로 호출');
   const wf = path.join(ROOT, 'cloudflare', 'quote-worker', 'worker.js');
