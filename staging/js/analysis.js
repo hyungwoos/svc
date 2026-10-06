@@ -63,12 +63,15 @@ export function dcRules(){
   rule('c_mrr','info','MRR 과 이달 월 매출이 다름','계약의 mrr 과 이달 monthly_revenue 가 1% 넘게 다름 — 재약정 뒤 mrr 을 안 고쳤거나 월 매출 입력 오류.',
     rows.map(function(r,k){ return {r:r,k:k}; }).filter(function(x){ var v=(ST.MAT[x.k]&&ST.MAT[x.k][T])||0; return x.r.mrr>0 && v>0 && Math.abs(v-x.r.mrr)/x.r.mrr>0.01; }).map(function(x){ var it=fxC(['mrr'],'mrr_now')(x.r); it.fix.now=ST.MAT[x.k][T]; it.sub='mrr '+won(x.r.mrr)+' vs 이달 '+won(ST.MAT[x.k][T])+' 천원'; return it; }), '계약 관리');
   /* ㊿+157 금액 단위 실수 의심 — 월 매출이 전월의 50배↑·1/50↓ 로 튀거나, MRR·월 매출이 1만원 미만 (천원/원을 헷갈려 넣은 경우 · 2026-10 월 4.8억 입력 사고) */
-  var odd=[]; rows.forEach(function(r,k){ var m=ST.MAT[k]||[], w=[];
-    for(var i=1;i<m.length;i++){ var a=m[i-1]||0, b=m[i]||0; if(a>0 && b>0 && (b>=a*50 || b*50<=a)){ w.push(mk(i)+' 월 매출 '+wonKo(b)+' (전월 '+wonKo(a)+')'); break; } }
-    for(var j=0;j<m.length;j++){ if(m[j]>0 && m[j]<10000){ w.push(mk(j)+' 월 매출 '+Math.round(m[j]).toLocaleString('ko-KR')+'원'); break; } }
+  /* ㊿+158 첫 달·마지막 달은 일할 계산이라 빼고 봄 — 에스원은 월말에 개시하면 첫 달이 몇 천원(예: 2,433원), 해지 달도 일할 (사용자: «에스원이 첫달은 일할 계산») */
+  var odd=[]; rows.forEach(function(r,k){ var m=ST.MAT[k]||[], w=[], f=-1, l=-1;
+    for(var x=0;x<m.length;x++){ if(m[x]>0){ if(f<0) f=x; l=x; } }
+    var part=function(i){ return i===f || i===l || i===r.startRaw || i===r.endRaw; };
+    for(var i=1;i<m.length;i++){ if(part(i) || part(i-1)) continue; var a=m[i-1]||0, b=m[i]||0; if(a>0 && b>0 && (b>=a*50 || b*50<=a)){ w.push(mk(i)+' 월 매출 '+wonKo(b)+' (전월 '+wonKo(a)+')'); break; } }
+    for(var j=0;j<m.length;j++){ if(part(j)) continue; if(m[j]>0 && m[j]<10000){ w.push(mk(j)+' 월 매출 '+Math.round(m[j]).toLocaleString('ko-KR')+'원'); break; } }
     if(r.mrr>0 && r.mrr<10000) w.push('MRR '+Math.round(r.mrr).toLocaleString('ko-KR')+'원');
     if(w.length){ var it=fxC(['mrr'])(r); it.sub=w.join(' · ')+' · '+it.sub; odd.push(it); } });
-  rule('c_amt_odd','crit','금액 단위 실수 의심','월 매출이 전월보다 50배 넘게 뛰거나 1/50 아래로 떨어진 달, 또는 1만원 미만 금액 — 천원·원을 헷갈려 넣었을 가능성이 큽니다. 여기서 MRR 을 바른 금액(천원)으로 고치면 이번 달(시작 전이면 시작월)부터 종료월까지 월 매출도 같이 맞춥니다. 지난 달 금액은 ✏️ 입력·수정 › 금액 수정에서 구간을 골라 고치세요.',
+  rule('c_amt_odd','crit','금액 단위 실수 의심','월 매출이 전월보다 50배 넘게 뛰거나 1/50 아래로 떨어진 달, 또는 1만원 미만 금액(첫 달·마지막 달은 일할 계산이라 뺌) — 천원·원을 헷갈려 넣었을 가능성이 큽니다. 여기서 MRR 을 바른 금액(천원)으로 고치면 이번 달(시작 전이면 시작월)부터 종료월까지 월 매출도 같이 맞춥니다. 지난 달 금액은 ✏️ 입력·수정 › 금액 수정에서 구간을 골라 고치세요.',
     odd, '계약 관리');
   rule('c_cloud_meta','info','Cloud 계약의 버전·노드수 미입력','Cloud NAC 원계약인데 Ver. 또는 노드수가 비어 있음 — 6.0 전환율·노드 기준 분석에서 빠집니다.',
     rows.filter(function(r){ return r.line==='Cloud' && liveActiveAt(r,T) && (!r.ver || !r.qty); }).map(function(r){ var it=fxC(['version','qty'])(r); it.sub='Ver '+(r.ver||'—')+' · 노드 '+(r.qty||'—'); return it; }), '계약 관리');

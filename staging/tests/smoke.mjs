@@ -1566,6 +1566,7 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
     await page.reload(); await fready(page); await page.evaluate(() => SVC.navMenu('dcheck')); await page.waitForTimeout(500);
     const it = await page.evaluate(() => { const x = SVC.dcRules().find((q) => q.id === 'c_amt_odd'); return x && x.sev + ' ' + x.items.map((i) => i.label + ' | ' + i.sub).join(' / '); });
     assert(it && /^crit/.test(it) && /가상고객_만기지남/.test(it) && /4\.8억원/.test(it) && /MRR 480원/.test(it), '규칙 ' + it);
+    assert(!/가상고객_에스원(일할|해지)/.test(it), '에스원 일할 계산(첫 달 2,433원 · 해지 달 3,000원)을 실수로 잡음 ' + it);
     await page.evaluate(() => { const x = SVC.dcRules().find((q) => q.id === 'c_amt_odd'); SVC.dcFixOpen('c_amt_odd', x.items.findIndex((i) => /가상고객_만기지남/.test(i.label)), ''); }); await page.waitForTimeout(300);
     assert((await page.$eval('#dcfForm [data-k="mrr"]', (e) => e.value)) === '0.48', 'MRR 칸(천원) ' + (await page.$eval('#dcfForm [data-k="mrr"]', (e) => e.value)));
     await page.fill('#dcfForm [data-k="mrr"]', '480'); await page.click('#dcfSave'); await page.waitForTimeout(1600);

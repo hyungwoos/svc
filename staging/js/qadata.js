@@ -140,11 +140,12 @@ function qaScenarios(){
       var p0=badge(); await h.gridEdit('orders', '가상고객05', [['상태', '설치완료']]);
       await h.until(function(){ return db.t.equipment_assets.filter(function(a){ return /^TSTN/.test(a.serial) && a.status==='임대중'; }).length===2; }, 6000, '설치완료 → 현황 임대중');
       h.ok(badge()===p0-1, '왼쪽 장비 «처리 대기» 숫자가 그대로 '+p0+' → '+badge()); return '접수 2대 재고 → 설치완료 임대중 · 대기 '+p0+'→'+badge(); }},
-    {id:'dcheck', label:'데이터 점검 «금액 단위 실수 의심» — 실제 사고 상태(월 4.8억 · MRR 480원) 잡고 복구', run:async function(h, db){
+    {id:'dcheck', label:'데이터 점검 «금액 단위 실수 의심» — 실제 사고 상태(월 4.8억 · MRR 480원) 잡고 복구 · 에스원 일할 계산은 안 잡음', run:async function(h, db){
       h.dlg(); var c=db.byCust('가상고객_만기지남')[0]; c.end_month=qaYm(h.T+11); c.mrr=480; c.renew_count=1;
       for(var i=h.T;i<=h.T+11;i++) db.t.monthly_revenue.push({contract_id:c.id, month:qaYm(i), amount:480000000});
       await h.reload(); navMenu('dcheck'); await h.sleep(300);
       var R=dcRules().filter(function(x){ return x.id==='c_amt_odd'; })[0], k=R? R.items.findIndex(function(x){ return /가상고객_만기지남/.test(x.label); }) : -1; h.ok(R && R.sev==='crit' && k>=0, '규칙이 못 잡음');
+      h.ok(!R.items.some(function(x){ return /가상고객_에스원(일할|해지)/.test(x.label); }), '에스원 일할 계산(첫 달·해지 달 몇 천원)을 실수로 잡음');
       dcFixOpen('c_amt_odd', k, ''); await h.sleep(250); h.ok(h.must('#dcfForm [data-k="mrr"]').value==='0.48', 'MRR 칸이 천원이 아님');
       h.fill('#dcfForm [data-k="mrr"]', '480'); h.click('#dcfSave'); await h.until(function(){ return db.rev(c.id)[h.ym(h.T+11)]===480000; }, 8000, '월 매출 복구');
       h.ok(db.ct(c.id).mrr===480000, 'mrr '+db.ct(c.id).mrr); var ov=document.getElementById('ovlDcFix'); if(ov) ov.remove(); return '잡음 → MRR 480 → 이번 달~종료월 480,000원'; }},
