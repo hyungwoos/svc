@@ -81,6 +81,12 @@ try { const { SAT_PAGES, stampSat } = await import('./stamp.mjs'); const satFile
     say(!/\bon(click|change|input|error)=\\?["']/.test(src), f + ': 만드는 HTML 에도 인라인 on* 없음'); }
   { const o = fs.existsSync(path.join(ROOT, 'orders.html')) ? fs.readFileSync(path.join(ROOT, 'orders.html'), 'utf8') : ''; if (o) say(!/<script/i.test(o) && /http-equiv="refresh" content="0; url=index\.html\?v=ordernew"/.test(o), 'orders.html(옛 발주 화면): 스크립트 없이 포탈 «임대 장비 신청»으로 넘김'); } }
 catch (e) { say(false, '위성 페이지 검사 실패 — ' + String(e.message || e).slice(0, 160)); }
+// ㊿+155 «화면 만드는 방식 개선» · «이름표»: tpl``/rawHtml/esc 는 core.js 한 곳 · 타입 검사 파일(typecheck.mjs — 선언도 그 안에: 승격이 .ts 를 안 옮김) · package.json 에 typescript
+{ const core = fs.existsSync(path.join(ROOT, 'js', 'core.js')) ? fs.readFileSync(path.join(ROOT, 'js', 'core.js'), 'utf8') : '';
+  say(/^export function tpl\(strs, \.\.\.vals\)/m.test(core) && /^export function rawHtml\(/m.test(core) && /^export function esc\(/m.test(core) && (jsAll.match(/^export function esc\(/gm) || []).length === 1, 'tpl``·rawHtml·esc 는 js/core.js 에 하나씩');
+  const pk = fs.existsSync(path.join(ROOT, 'package.json')) ? fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8') : '';
+  say(/"typescript":/.test(pk) && fs.existsSync(path.join(ROOT, 'tests', 'typecheck.mjs')) && /export const DECLS = \{[\s\S]*declare var XLSX[\s\S]*interface EventTarget/.test(fs.readFileSync(path.join(ROOT, 'tests', 'typecheck.mjs'), 'utf8')), '타입 검사 준비: package.json typescript · tests/typecheck.mjs · 선언 DECLS (실행은 tests/lint.mjs)');
+  say(/@typedef \{Object\} AppState/.test(jsAll) && /@type \{AppState\} \*\/\s*\nexport var ST=/.test(jsAll) && /@typedef \{Object\} PortalRow/.test(jsAll) && /@typedef \{Object\} GridDef/.test(jsAll), '이름표: ST(AppState) · 데이터 행(PortalRow) · 표 정의(GridDef) 에 JSDoc 모양'); }
 const idx = html + jsAll;
 // Supabase 함수 소스가 저장소에 있으면 비밀값 검사만 (deno 는 CI 에 없을 수 있음)
 const fnDir = path.join(ROOT, 'supabase', 'functions');

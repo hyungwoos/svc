@@ -4,7 +4,7 @@
 //     ② 처음 열 때 불러오는 모듈(js/lazy.js 의 import())을 다른 모듈이 바로 import 하지 않음 — 하면 처음부터 같이 내려와 지연 로드가 깨짐
 //     ③ 파일을 읽을 때(최상위 var 초기값) 다른 파일 이름을 쓰지 않음 — 모듈은 읽는 순서가 고전 스크립트와 달라 아직 비어 있을 수 있음(시작 코드는 init.js start())
 //     ④ window.<모듈 이름> 으로 쓰지 않음(import 로) · import 한 이름에 값 넣지 않음(ESLint no-import-assign)
-//     ⑤ ESLint no-undef 등 — 오타·없는 이름
+//     ⑤ ESLint no-undef 등 — 오타·없는 이름 · ⑥ 위성 페이지 sat/*.js · 화면 HTML 은 tpl`` (㊿+155) · ⑦ 타입 검사(tests/typecheck.mjs · ㊿+155)
 import fs from 'node:fs'; import path from 'node:path'; import { fileURLToPath } from 'node:url';
 import { ESLint } from 'eslint'; import globals from 'globals'; import * as espree from 'espree'; import * as eslintScope from 'eslint-scope';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -89,6 +89,20 @@ say(!winUse.length, 'window.<모듈 이름> 으로 쓰지 않음(import 로)' + 
       for (const k of Object.keys(n)) if (k !== 'range' && k !== 'loc') walk(n[k]); })(m.ast);
     if (hit) svcUse.push(f); }
   say(svcUse.length === 0 || (svcUse.length === 1 && svcUse[0] === 'js/admin.js'), 'window.SVC 는 main.js 가 만들고 포탈 코드는 쓰지 않음(스테이징 QA 가 다른 창을 볼 때만 · admin.js qaApi)' + (svcUse.filter((f) => f !== 'js/admin.js').length ? ' — ' + svcUse.join(', ') : '')); }
+// ⑤ 화면 HTML 은 tpl`` 로 (㊿+155) — '<태그…' 글자를 '+' 로 이어 붙이는 식이 없음 · rawHtml(…)(HTML 조각을 그대로 넣는 곳) 개수는 알려 줌
+const htmlConcat = (src, sourceType) => { const out = []; const ast = espree.parse(src, { ecmaVersion: 2022, sourceType, range: true, loc: true });
+  const sv = (n) => (n.type === 'Literal' && typeof n.value === 'string' ? n.value : null);
+  (function walk(n, p) { if (!n || typeof n !== 'object') return; if (Array.isArray(n)) { n.forEach((x) => walk(x, p)); return; }
+    if (n.type === 'BinaryExpression' && n.operator === '+' && !(p && p.type === 'BinaryExpression' && p.operator === '+' && p.left === n)) {
+      const parts = []; let x = n; while (x.type === 'BinaryExpression' && x.operator === '+') { parts.unshift(x.right); x = x.left; } parts.unshift(x);
+      if (parts.some((q) => { const v = sv(q); return v != null && /<[a-zA-Z!/]/.test(v); })) out.push(n.loc.start.line); }
+    for (const k of Object.keys(n)) if (k !== 'range' && k !== 'loc') walk(n[k], n); })(ast, null);
+  return out; };
+{ const bad = [], rawN = {}; let rawT = 0;
+  for (const [f, m] of Object.entries(mods)) { htmlConcat(m.src, 'module').forEach((l) => bad.push(f + ':' + l)); const c = (m.src.match(/\brawHtml\(/g) || []).length; if (c) { rawN[path.basename(f)] = c; rawT += c; } }
+  for (const f of fs.existsSync(path.join(ROOT, 'sat')) ? fs.readdirSync(path.join(ROOT, 'sat')).filter((x) => x.endsWith('.js')) : []) { const src = fs.readFileSync(path.join(ROOT, 'sat', f), 'utf8'); htmlConcat(src, 'script').forEach((l) => bad.push('sat/' + f + ':' + l)); const c = (src.match(/\brawHtml\(/g) || []).length; if (c) { rawN['sat/' + f] = c; rawT += c; } }
+  say(!bad.length, "화면 HTML 은 tpl`` 로 — '<태그' 글자를 '+' 로 이어 붙이는 식 0개" + (bad.length ? ' — ' + bad.length + '곳: ' + bad.slice(0, 10).join(' · ') + ' (core.js tpl · 위성은 sat/common.js tpl)' : ''));
+  console.log('  · rawHtml(…) ' + rawT + '곳 — HTML 조각을 그대로 넣는 자리(새로 쓸 때 DB·사용자 글자는 rawHtml 이 아니라 ${값} 으로): ' + Object.entries(rawN).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, v]) => k + ' ' + v).join(' · ')); }
 // 공유 상태 (㊿+150) — 17개는 ST 안에만
 const MOVED = ['AUTH_USER', 'CODES', 'CUR_VIEW', 'DATA', 'DIRTY', 'HIST', 'HIST_LOADED', 'IDLE_LAST', 'IDLE_WARNED', 'INB_Y', 'LIVE_SRC', 'M', 'MAT', 'OI_CONVERT', 'PERMS', 'SB_TOKEN', 'TCOQ'];
 const back = MOVED.filter((n) => exp.has(n));
@@ -119,5 +133,9 @@ say(!errs.length, 'ESLint ' + res.length + '개 파일 · 오류 ' + errs.length
   const es2 = new ESLint({ cwd: ROOT, overrideConfigFile: true, overrideConfig: files.map((f) => ({ files: [f], languageOptions: { ecmaVersion: 2022, sourceType: 'script', globals: Object.assign({}, globals.browser, { XLSX: 'readonly' }, G2[f]) }, rules: Object.assign({}, RULES, { 'no-import-assign': 'off', 'no-redeclare': 'off' }) })) });
   const r2 = await es2.lintFiles(files); const e2 = []; r2.forEach((r) => r.messages.forEach((m) => e2.push(path.relative(ROOT, r.filePath) + ':' + m.line + ' ' + m.ruleId + ' — ' + m.message)));
   say(!e2.length, '위성 페이지 ESLint ' + r2.length + '개 파일 · 오류 ' + e2.length + (e2.length ? '\n      ' + e2.slice(0, 25).join('\n      ') : '')); }
+// ⑦ 타입 검사(㊿+155 «이름표») — TypeScript checkJs: 없는 이름 · 함수 인자 수 · 객체에 없는 속성(오타) · JSDoc 으로 모양을 적은 값(ST · PortalData · GridDef · ParsedQ · QbCol …)
+{ const { typecheck } = await import('./typecheck.mjs'); const r = await typecheck(ROOT);
+  if (r.skipped) say(false, '타입 검사 못 함 — ' + r.skipped + ' (package.json devDependencies 의 typescript)');
+  else say(!r.errors.length, '타입 검사(TypeScript ' + r.version + ') ' + r.files + '개 파일 · 오류 ' + r.errors.length + (r.errors.length ? '\n      ' + r.errors.slice(0, 20).join('\n      ') : '')); }
 console.log(fail ? '\n정적 검사(lint) 실패 ' + fail : '\n정적 검사(lint) 통과');
 process.exit(fail ? 1 : 0);

@@ -70,3 +70,13 @@ var SAT=(function(){
   });
   return { act:act, has:has, parse:parse, run:run };
 })();
+
+/* ===== HTML 만들기 — 특수문자 자동 처리 (포탈 js/core.js 의 tpl · rawHtml 과 같은 규칙 · ㊿+155) =====
+   · tpl`…${값}…` : ${} 안의 값은 자동으로 & < > " 처리 · 이미 만든 HTML 조각만 rawHtml(…) 로 그대로 */
+var rawHtml, tpl;
+(function(){
+  function RawHtml(s){ this.html=s; }
+  function e(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  rawHtml=function(s){ return new RawHtml(String(s)); };
+  tpl=function(strs){ var out=strs[0]; for(var i=1;i<strs.length;i++){ var v=arguments[i]; out+=(v instanceof RawHtml? v.html : e(v))+strs[i]; } return out; };
+})();

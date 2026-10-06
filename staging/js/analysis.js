@@ -2,9 +2,9 @@
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { APP_VER, IS_QA, ST } from './state.js';
 import { Viz } from './viz.js';
-import { $, baseLabel, canWrite, cssv, lline, llineVer, mk, SB_KEY, SB_URL, STATE, won, wonFull, yOf } from './core.js';
+import { $, baseLabel, canWrite, cssv, esc, lline, llineVer, mk, rawHtml, SB_KEY, SB_URL, STATE, tpl, won, wonFull, yOf } from './core.js';
 import { dIdx, ico, idxDate, loadFromDb, onData, SB_RAW, sbHeaders, sbTry, sbWrite, toast, todayStr } from './shell.js';
-import { esc, hbars, idxs, monthlyTotal } from './dash.js';
+import { hbars, idxs, monthlyTotal } from './dash.js';
 import { CHURN_OPTS, codeActive, GRIDS, LEAD_OPTS, LINE_OPTS } from './grids.js';
 import { bizHostEl, bizNz, BIZV, eqIsPh, eqScan, eqSerials, syncOrderAssets } from './equipment.js';
 import { fkNorm, openCust360, subgrpSync } from './tools.js';
@@ -101,24 +101,21 @@ export function renderDataCheck(){
   var t0=Date.now(), rules=dcRules(), ms=Date.now()-t0; DC._rules=rules;
   var n={crit:0,warn:0,info:0}, cnt={crit:0,warn:0,info:0}, items=0;
   rules.forEach(function(r){ if(r.items.length){ n[r.sev]++; cnt[r.sev]+=r.items.length; items+=r.items.length; } });
-  var h='<div class="dbar" style="margin-bottom:12px;flex-wrap:wrap;gap:8px;align-items:center">'+
-    '<span class="mini">규칙 '+rules.length+'개 · 어긋난 항목 <b>'+items+'</b>건 · '+ms+'ms · 데이터 '+esc(ST.DATA.generatedAt||'')+' 기준</span>'+
-    '<span class="mtabs" style="margin:0" id="dcSev">'+[['','전체'],['crit','🔴 '+cnt.crit],['warn','🟠 '+cnt.warn],['info','🔵 '+cnt.info]].map(function(t){ return '<button type="button" data-s="'+t[0]+'" aria-pressed="'+(DC.sev===t[0])+'">'+t[1]+'</button>'; }).join('')+'</span>'+
-    '<span style="flex:1"></span><button type="button" class="pill ghost" id="dcXlsx">엑셀</button><button type="button" class="pill ghost" id="dcRefresh">↻ 다시 점검</button></div>';
-  h+='<div class="dc-sev" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:14px">'+['crit','warn','info'].map(function(sv){ return '<div class="card" style="padding:12px 14px"><div class="mini">'+DC_SEV[sv][0]+' '+DC_SEV[sv][1]+'</div><div style="font-size:22px;font-weight:800;color:'+DC_SEV[sv][2]+'">'+cnt[sv]+'<span class="mini" style="font-weight:400"> 건 · 규칙 '+n[sv]+'개</span></div></div>'; }).join('')+'</div>';
+  var h=tpl`<div class="dbar" style="margin-bottom:12px;flex-wrap:wrap;gap:8px;align-items:center">`+
+    tpl`<span class="mini">규칙 ${rules.length}개 · 어긋난 항목 <b>${rawHtml(items)}</b>건 · ${rawHtml(ms)}ms · 데이터 ${ST.DATA.generatedAt||''} 기준</span>`+
+    tpl`<span class="mtabs" style="margin:0" id="dcSev">${rawHtml([['','전체'],['crit','🔴 '+cnt.crit],['warn','🟠 '+cnt.warn],['info','🔵 '+cnt.info]].map(function(t){ return tpl`<button type="button" data-s="${rawHtml(t[0])}" aria-pressed="${DC.sev===t[0]}">${rawHtml(t[1])}</button>`; }).join(''))}</span>`+
+    tpl`<span style="flex:1"></span><button type="button" class="pill ghost" id="dcXlsx">엑셀</button><button type="button" class="pill ghost" id="dcRefresh">↻ 다시 점검</button></div>`;
+  h+=tpl`<div class="dc-sev" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:14px">${rawHtml(['crit','warn','info'].map(function(sv){ return tpl`<div class="card" style="padding:12px 14px"><div class="mini">${rawHtml(DC_SEV[sv][0])} ${rawHtml(DC_SEV[sv][1])}</div><div style="font-size:22px;font-weight:800;color:${rawHtml(DC_SEV[sv][2])}">${rawHtml(cnt[sv])}<span class="mini" style="font-weight:400"> 건 · 규칙 ${rawHtml(n[sv])}개</span></div></div>`; }).join(''))}</div>`;
   var ord={crit:0,warn:1,info:2};
   var list=rules.filter(function(r){ return !DC.sev || r.sev===DC.sev; }).sort(function(a,b){ return (ord[a.sev]-ord[b.sev]) || (b.items.length-a.items.length); });
   h+=list.map(function(r){ var open=!!DC.open[r.id], ok=!r.items.length;
-    return '<div class="card dc-rule" data-sev="'+r.sev+'" style="padding:12px 14px;margin-bottom:8px">'+
-      '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;cursor:'+(ok? 'default':'pointer')+'" data-dc="'+r.id+'">'+
-        '<span>'+(ok? '✅':DC_SEV[r.sev][0])+'</span><b style="font-size:13.5px">'+esc(r.title)+'</b>'+
-        '<span class="ctag'+(ok? ' ok':(r.sev==='warn'? ' warn':r.sev==='info'? ' info':' late'))+'">'+(ok? '이상 없음':r.items.length+'건')+'</span>'+
-        '<span class="mini" style="margin-left:auto">'+esc(r.go)+(ok? '':(open? ' ▴':' ▾'))+'</span></div>'+
-      '<div class="mini" style="margin:6px 0 0 26px;line-height:1.6">'+esc(r.why)+'</div>'+
-      (!ok && r.act? '<div style="margin:8px 0 0 26px"><button type="button" class="pill ghost" data-dcact="'+r.id+'">⚡ '+esc(r.act.label)+'</button></div>':'')+
-      (open&&!ok&&r.items.some(function(it){ return it.fix; })? '<div class="mini" style="margin:8px 0 0 26px">항목을 누르면 수정 창이 열립니다 — 저장하면 다음 항목으로 넘어갑니다</div>':'')+
-      (open&&!ok? '<table class="rn-tbl" style="margin:8px 0 0 26px;width:calc(100% - 26px)"><tbody>'+r.items.slice(0,60).map(function(it,i){ return '<tr><td><a href="#" data-dcgo="'+r.id+':'+i+'">'+esc(it.label)+'</a></td><td class="mini">'+esc(it.sub||'')+(it.act? ' <button type="button" class="pill ghost" style="padding:1px 8px;font-size:12px" data-dcitem="'+r.id+':'+i+'">'+esc(it.act.label)+'</button>':'')+'</td></tr>'; }).join('')+(r.items.length>60? '<tr><td colspan="2" class="mini">… 외 '+(r.items.length-60)+'건 (엑셀로 전체)</td></tr>':'')+'</tbody></table>':'')+
-      '</div>'; }).join('');
+    return tpl`<div class="card dc-rule" data-sev="${rawHtml(r.sev)}" style="padding:12px 14px;margin-bottom:8px">`+
+      tpl`<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;cursor:${ok? 'default':'pointer'}" data-dc="${rawHtml(r.id)}">`+
+        tpl`<span>${rawHtml(ok? '✅':DC_SEV[r.sev][0])}</span><b style="font-size:13.5px">${r.title}</b>`+
+        tpl`<span class="ctag${ok? ' ok':(r.sev==='warn'? ' warn':r.sev==='info'? ' info':' late')}">${rawHtml(ok? '이상 없음':r.items.length+'건')}</span>`+
+        tpl`<span class="mini" style="margin-left:auto">${r.go}${ok? '':(open? ' ▴':' ▾')}</span></div>`+
+      tpl`<div class="mini" style="margin:6px 0 0 26px;line-height:1.6">${r.why}</div>`+ tpl`${rawHtml(!ok && r.act? tpl`<div style="margin:8px 0 0 26px"><button type="button" class="pill ghost" data-dcact="${rawHtml(r.id)}">⚡ ${r.act.label}</button></div>`:'')}`+ tpl`${rawHtml(open&&!ok&&r.items.some(function(it){ return it.fix; })? '<div class="mini" style="margin:8px 0 0 26px">항목을 누르면 수정 창이 열립니다 — 저장하면 다음 항목으로 넘어갑니다</div>':'')}`+ tpl`${rawHtml(open&&!ok? tpl`<table class="rn-tbl" style="margin:8px 0 0 26px;width:calc(100% - 26px)"><tbody>${rawHtml(r.items.slice(0,60).map(function(it,i){ return tpl`<tr><td><a href="#" data-dcgo="${rawHtml(r.id)}:${rawHtml(i)}">${it.label}</a></td><td class="mini">${it.sub||''}${rawHtml(it.act? tpl` <button type="button" class="pill ghost" style="padding:1px 8px;font-size:12px" data-dcitem="${rawHtml(r.id)}:${rawHtml(i)}">${it.act.label}</button>`:'')}</td></tr>`; }).join(''))}${rawHtml(r.items.length>60? tpl`<tr><td colspan="2" class="mini">… 외 ${r.items.length-60}건 (엑셀로 전체)</td></tr>`:'')}</tbody></table>`:'')}`+
+      tpl`</div>`; }).join('');
   host.innerHTML=h;
   host.querySelectorAll('#dcSev button').forEach(function(b){ b.onclick=function(){ DC.sev=b.dataset.s; renderDataCheck(); }; });
   host.querySelectorAll('[data-dc]').forEach(function(d){ d.onclick=function(){ var r=rules.filter(function(x){ return x.id===d.dataset.dc; })[0]; if(!r||!r.items.length) return; DC.open[r.id]=!DC.open[r.id]; renderDataCheck(); }; });
@@ -163,14 +160,14 @@ export var DCF_RAW={contracts:'contracts', equipment_orders:'orders', equipment_
 export function dcFixRaw(fix){ var arr=(ST.RAWX&&ST.RAWX[DCF_RAW[fix.tbl]])||[]; return arr.filter(function(x){ return x.id===fix.id; })[0]||null; }
 export function dcFixCtx(fix, raw){
   if(!raw) return '';
-  var kv=function(k,v){ return '<span class="mini" style="color:var(--muted)">'+k+'</span> '+esc(v==null||v===''? '—':String(v)); };
+  var kv=function(k,v){ return tpl`<span class="mini" style="color:var(--muted)">${rawHtml(k)}</span> ${v==null||v===''? '—':String(v)}`; };
   var cu=function(id){ var c=(ST.RAWX.customers||[]).filter(function(x){ return x.id===id; })[0]; return c? c.name : '?'; };
   var parts;
   if(fix.tbl==='contracts') parts=[kv('고객사', cu(raw.customer_id)), kv('서비스', llineVer(raw.line, raw.version)), kv('상태', raw.status), kv('기간', String(raw.start_month||'').slice(0,7)+' ~ '+(raw.end_month? String(raw.end_month).slice(0,7):'진행')), kv('MRR', raw.mrr? won(raw.mrr)+' 천원':''), kv('채널', raw.channel), kv('계약', '#'+raw.id)];
   else if(fix.tbl==='equipment_orders') parts=[kv('고객사', raw.customer), kv('모델', (raw.model||'')+' × '+(raw.qty||1)), kv('상태', raw.status), kv('채널', raw.channel), kv('설치', raw.install_date), kv('신청', '#'+raw.id)];
   else if(fix.tbl==='equipment_assets') parts=[kv('시리얼', raw.serial), kv('모델', raw.model), kv('고객사', raw.customer), kv('상태', raw.status), kv('출고', raw.deployed_date), kv('행', '#'+raw.id)];
   else parts=[kv('고객사', raw.customer), kv('사업명', raw.deal_name), kv('단계', raw.stage), kv('예상', String(raw.expect_month||'').slice(0,7)), kv('담당', raw.owner), kv('OI', '#'+raw.id)];
-  return '<div class="dcf-ctx">'+parts.join('<span class="dcf-dot">·</span>')+'</div>';
+  return tpl`<div class="dcf-ctx">${rawHtml(parts.join('<span class="dcf-dot">·</span>'))}</div>`;
 }
 export function dcFixFields(fix, raw, g){
   var cols=(g&&g.cols)||[], T=(ST.DATA&&ST.DATA.nowIdx)||0;
@@ -178,29 +175,29 @@ export function dcFixFields(fix, raw, g){
     var bad=(fix.bad||[]).indexOf(k)>=0, cur=raw? raw[k] : null, inner='', lbl='';
     if(k==='customer_id'){
       lbl='고객사';
-      inner='<input id="dcfCust" list="dcfCustList" autocomplete="off" placeholder="고객사 이름 입력 후 목록에서 선택" value="">'+
-        '<datalist id="dcfCustList">'+(ST.RAWX.customers||[]).slice().sort(function(a,b){ return String(a.name).localeCompare(String(b.name),'ko'); }).map(function(c){ return '<option value="'+esc(c.name)+'"></option>'; }).join('')+'</datalist>';
+      inner=tpl`<input id="dcfCust" list="dcfCustList" autocomplete="off" placeholder="고객사 이름 입력 후 목록에서 선택" value="">`+
+        tpl`<datalist id="dcfCustList">${rawHtml((ST.RAWX.customers||[]).slice().sort(function(a,b){ return String(a.name).localeCompare(String(b.name),'ko'); }).map(function(c){ return tpl`<option value="${c.name}"></option>`; }).join(''))}</datalist>`;
     } else if(k==='parent_contract_id'){
       lbl='원계약';
       var mine=(ST.RAWX.contracts||[]).filter(function(c){ return raw && c.customer_id===raw.customer_id && c.id!==raw.id && !c.parent_contract_id; });
-      inner='<select id="dcfParent"><option value="">— 원계약 없음 (독립 계약으로) —</option>'+mine.map(function(c){ return '<option value="'+c.id+'">#'+c.id+' · '+esc(llineVer(c.line, c.version))+' · '+esc(String(c.start_month||'').slice(0,7))+' ~ '+esc(c.end_month? String(c.end_month).slice(0,7):'진행')+' · '+esc(c.status||'')+'</option>'; }).join('')+'</select>';
+      inner=tpl`<select id="dcfParent"><option value="">— 원계약 없음 (독립 계약으로) —</option>${rawHtml(mine.map(function(c){ return tpl`<option value="${rawHtml(c.id)}">#${rawHtml(c.id)} · ${llineVer(c.line, c.version)} · ${String(c.start_month||'').slice(0,7)} ~ ${c.end_month? String(c.end_month).slice(0,7):'진행'} · ${c.status||''}</option>`; }).join(''))}</select>`;
     } else {
       var c=cols.filter(function(x){ return x.k===k; })[0]; if(!c) return '';
       lbl=c.l; inner=editCell(c, cur);
       if(c.won && c.t==='number') lbl+=' <span class="mini">(원 단위)</span>';
     }
-    return '<div class="dcf-row'+(bad? ' bad':'')+'"><label>'+lbl+'</label><div class="dcf-in">'+inner+(bad? '<div class="mini dcf-bad">목록에 없는 값 «'+esc(cur==null? '':String(cur))+'» — 목록 값으로 고르세요 (정식 값이면 관리자 › 코드 관리에서 추가)</div>':'')+'</div></div>';
+    return tpl`<div class="dcf-row${bad? ' bad':''}"><label>${rawHtml(lbl)}</label><div class="dcf-in">${rawHtml(inner)}${rawHtml(bad? tpl`<div class="mini dcf-bad">목록에 없는 값 «${cur==null? '':String(cur)}» — 목록 값으로 고르세요 (정식 값이면 관리자 › 코드 관리에서 추가)</div>`:'')}</div></div>`;
   }).join('');
   if(fix.ex==='rev_now'){
     var mrr=raw&&raw.mrr? Math.round(raw.mrr/1000) : '';
-    h+='<div class="dcf-row"><label>'+esc(mk(T))+' 월 매출 <span class="mini">(천원)</span></label><div class="dcf-in"><input id="dcfRev" type="number" min="0" step="1" value="'+mrr+'" placeholder="천원"><div class="mini">월납이면 이달 금액을 넣고 저장 · 연납·일시납이면 위 «과금방식»만 바꾸고 이 칸은 비우세요</div></div></div>';
+    h+=tpl`<div class="dcf-row"><label>${mk(T)} 월 매출 <span class="mini">(천원)</span></label><div class="dcf-in"><input id="dcfRev" type="number" min="0" step="1" value="${rawHtml(mrr)}" placeholder="천원"><div class="mini">월납이면 이달 금액을 넣고 저장 · 연납·일시납이면 위 «과금방식»만 바꾸고 이 칸은 비우세요</div></div></div>`;
   }
-  if(fix.ex==='mrr_now' && fix.now) h+='<div class="dcf-row"><label></label><div class="dcf-in"><button type="button" class="pill ghost" id="dcfUseNow">이달 월 매출 '+won(fix.now)+' 천원으로 맞추기</button></div></div>';
+  if(fix.ex==='mrr_now' && fix.now) h+=tpl`<div class="dcf-row"><label></label><div class="dcf-in"><button type="button" class="pill ghost" id="dcfUseNow">이달 월 매출 ${won(fix.now)} 천원으로 맞추기</button></div></div>`;
   if(fix.ex==='rev_after'){
     var n=0, sum=0, end=raw&&raw.end_month? String(raw.end_month).slice(0,7) : '';
     var k0=(ST.DATA.rows||[]).findIndex(function(r){ return r._id===fix.id; });
     if(k0>=0 && ST.MAT[k0]) ST.MAT[k0].forEach(function(v,i){ if(v && end && mk(i)>end){ n++; sum+=v; } });
-    h+='<div class="dcf-row"><label>종료월 뒤 매출</label><div class="dcf-in"><label class="mini" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="dcfRevDel" checked> 종료월 뒤 월 매출 '+n+'개월 ('+won(sum)+' 천원) 삭제</label><div class="mini">종료월을 고치면 고친 종료월 뒤만 지웁니다</div></div></div>';
+    h+=tpl`<div class="dcf-row"><label>종료월 뒤 매출</label><div class="dcf-in"><label class="mini" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="dcfRevDel" checked> 종료월 뒤 월 매출 ${rawHtml(n)}개월 (${won(sum)} 천원) 삭제</label><div class="mini">종료월을 고치면 고친 종료월 뒤만 지웁니다</div></div></div>`;
   }
   return h;
 }
@@ -216,15 +213,13 @@ export function dcFixOpen(ruleId, idx, msg){
   var ov=document.getElementById('ovlDcFix');
   if(!ov){ ov=document.createElement('div'); ov.id='ovlDcFix'; ov.className='ovl on'; ov.style.cssText='z-index:9000;align-items:center'; document.body.appendChild(ov); }
   var sv=DC_SEV[rule.sev]||['','',''];
-  ov.innerHTML='<div class="modal dcf" style="width:min(620px,100%);padding:20px 22px" role="dialog" aria-modal="true" aria-labelledby="dcfTitle">'+
-    '<div style="display:flex;gap:8px;align-items:center;margin-bottom:4px"><span>'+sv[0]+'</span><h3 id="dcfTitle" style="margin:0;font-size:15px;flex:1">'+esc(rule.title)+'</h3>'+
-      '<button type="button" class="pill ghost" id="dcfPrev" aria-label="이전 항목"'+(idx? '':' disabled')+'>◀</button><span class="mini" id="dcfPos">'+(idx+1)+' / '+rule.items.length+'</span><button type="button" class="pill ghost" id="dcfNext" aria-label="다음 항목"'+(idx<rule.items.length-1? '':' disabled')+'>▶</button></div>'+
-    '<div class="mini" style="line-height:1.6;margin-bottom:10px">'+esc(rule.why)+'</div>'+
-    '<div class="dcf-item"><b>'+esc(it.label)+'</b><div class="mini">'+esc(it.sub||'')+'</div>'+dcFixCtx(fix, raw)+'</div>'+
-    (raw? '<div class="dcf-form" id="dcfForm">'+dcFixFields(fix, raw, g)+'</div>' : '<p class="cap">이 행을 메모리 데이터에서 찾지 못했습니다 — «화면에서 보기»로 여세요.</p>')+
-    (can? '' : '<p class="mini" style="color:var(--warn-ink);margin:8px 0 0">이 화면(«'+esc(it.fix.view)+'»)의 쓰기 권한이 없어 보기만 됩니다.</p>')+
-    '<div class="mmsg" id="dcfMsg" style="min-height:18px;margin-top:8px">'+(msg? esc(msg):'')+'</div>'+
-    '<div class="mact" style="display:flex;gap:8px;align-items:center;margin-top:10px"><button type="button" class="pill ghost" id="dcfGo">화면에서 보기</button><span style="flex:1"></span><button type="button" class="pill ghost" id="dcfClose">닫기</button>'+(raw&&can? '<button type="button" class="pill pri" id="dcfSave">저장</button>':'')+'</div></div>';
+  ov.innerHTML=tpl`<div class="modal dcf" style="width:min(620px,100%);padding:20px 22px" role="dialog" aria-modal="true" aria-labelledby="dcfTitle">`+
+    tpl`<div style="display:flex;gap:8px;align-items:center;margin-bottom:4px"><span>${rawHtml(sv[0])}</span><h3 id="dcfTitle" style="margin:0;font-size:15px;flex:1">${rule.title}</h3>`+
+      tpl`<button type="button" class="pill ghost" id="dcfPrev" aria-label="이전 항목"${idx? '':' disabled'}>◀</button><span class="mini" id="dcfPos">${rawHtml(idx+1)} / ${rule.items.length}</span><button type="button" class="pill ghost" id="dcfNext" aria-label="다음 항목"${idx<rule.items.length-1? '':' disabled'}>▶</button></div>`+
+    tpl`<div class="mini" style="line-height:1.6;margin-bottom:10px">${rule.why}</div>`+
+    tpl`<div class="dcf-item"><b>${it.label}</b><div class="mini">${it.sub||''}</div>${rawHtml(dcFixCtx(fix, raw))}</div>`+ tpl`${rawHtml(raw? tpl`<div class="dcf-form" id="dcfForm">${rawHtml(dcFixFields(fix, raw, g))}</div>` : '<p class="cap">이 행을 메모리 데이터에서 찾지 못했습니다 — «화면에서 보기»로 여세요.</p>')}`+ tpl`${rawHtml(can? '' : tpl`<p class="mini" style="color:var(--warn-ink);margin:8px 0 0">이 화면(«${it.fix.view}»)의 쓰기 권한이 없어 보기만 됩니다.</p>`)}`+
+    tpl`<div class="mmsg" id="dcfMsg" style="min-height:18px;margin-top:8px">${rawHtml(msg? esc(msg):'')}</div>`+
+    tpl`<div class="mact" style="display:flex;gap:8px;align-items:center;margin-top:10px"><button type="button" class="pill ghost" id="dcfGo">화면에서 보기</button><span style="flex:1"></span><button type="button" class="pill ghost" id="dcfClose">닫기</button>${rawHtml(raw&&can? '<button type="button" class="pill pri" id="dcfSave">저장</button>':'')}</div></div>`;
   var form=ov.querySelector('#dcfForm');
   if(form){ try{ wireRowInputs(form, g); }catch(e){}
     form.querySelectorAll('.dcf-row').forEach(function(row, i){ var lab=row.querySelector(':scope > label'), el=row.querySelector('.dcf-in input:not([type=hidden]), .dcf-in select, .dcf-in textarea'); if(lab && el && lab.textContent.trim()){ if(!el.id) el.id='dcf_f'+i; lab.htmlFor=el.id; } });   /* 칸 이름(접근성) */
@@ -289,17 +284,17 @@ export async function dcFixSave(rule, it, raw, g, form){
 export function dcMergeDlg(list, cn){
   var old=document.getElementById('ovlDcMerge'); if(old) old.remove();
   var ov=document.createElement('div'); ov.id='ovlDcMerge'; ov.className='ovl on'; ov.style.cssText='z-index:9000;align-items:center';
-  ov.innerHTML='<div class="modal" style="width:min(520px,100%);padding:22px" role="dialog" aria-modal="true" aria-labelledby="dcmTitle">'+
-    '<h3 id="dcmTitle" style="margin:0 0 6px;font-size:18px">고객사 병합</h3>'+
-    '<p class="cap" style="margin:0 0 12px">남길 고객사를 고르세요. 나머지 고객사의 <b>계약·월 매출·장비 신청/현황·OI·인바운드·MDR</b> 은 남길 고객사로 옮겨지고, 그 이름은 <b>별칭</b>으로 남습니다(검색·자동 매칭에 계속 잡힘). 되돌리려면 change_log 의 merge_customers 기록을 참고해 수동으로.</p>'+
-    '<div id="dcmList" style="display:grid;gap:6px">'+list.map(function(c,i){ return '<label style="display:flex;gap:10px;align-items:center;padding:8px 10px;border:1px solid var(--ring);border-radius:10px;cursor:pointer"><input type="radio" name="dcmKeep" value="'+c.id+'"'+(i===0? ' checked':'')+'><span style="flex:1"><b>'+esc(c.name)+'</b> <span class="mini">#'+c.id+' · 계약 '+(cn[c.id]||0)+'건'+(c.aliases&&c.aliases.length? ' · 별칭 '+esc(c.aliases.join(', ')):'')+'</span></span></label>'; }).join('')+'</div>'+
-    '<div class="mmsg" id="dcmMsg" style="min-height:18px;margin-top:8px"></div>'+
-    '<div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end"><button type="button" class="pill ghost" id="dcmCancel">취소</button><button type="button" class="pill" id="dcmGo">병합</button></div></div>';
+  ov.innerHTML=tpl`<div class="modal" style="width:min(520px,100%);padding:22px" role="dialog" aria-modal="true" aria-labelledby="dcmTitle">`+
+    tpl`<h3 id="dcmTitle" style="margin:0 0 6px;font-size:18px">고객사 병합</h3>`+
+    tpl`<p class="cap" style="margin:0 0 12px">남길 고객사를 고르세요. 나머지 고객사의 <b>계약·월 매출·장비 신청/현황·OI·인바운드·MDR</b> 은 남길 고객사로 옮겨지고, 그 이름은 <b>별칭</b>으로 남습니다(검색·자동 매칭에 계속 잡힘). 되돌리려면 change_log 의 merge_customers 기록을 참고해 수동으로.</p>`+
+    tpl`<div id="dcmList" style="display:grid;gap:6px">${rawHtml(list.map(function(c,i){ return tpl`<label style="display:flex;gap:10px;align-items:center;padding:8px 10px;border:1px solid var(--ring);border-radius:10px;cursor:pointer"><input type="radio" name="dcmKeep" value="${rawHtml(c.id)}"${i===0? ' checked':''}><span style="flex:1"><b>${c.name}</b> <span class="mini">#${rawHtml(c.id)} · 계약 ${rawHtml(cn[c.id]||0)}건${rawHtml(c.aliases&&c.aliases.length? ' · 별칭 '+esc(c.aliases.join(', ')):'')}</span></span></label>`; }).join(''))}</div>`+
+    tpl`<div class="mmsg" id="dcmMsg" style="min-height:18px;margin-top:8px"></div>`+
+    tpl`<div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end"><button type="button" class="pill ghost" id="dcmCancel">취소</button><button type="button" class="pill" id="dcmGo">병합</button></div></div>`;
   document.body.appendChild(ov);
   var msgEl=ov.querySelector('#dcmMsg'); function say(t,bad){ msgEl.textContent=t||''; msgEl.style.color=bad? 'var(--critical,#d03b3b)':'var(--muted)'; }
   ov.querySelector('#dcmCancel').onclick=function(){ ov.remove(); };
   ov.querySelector('#dcmGo').onclick=async function(){
-    var keep=+(ov.querySelector('input[name="dcmKeep"]:checked')||{}).value; if(!keep){ say('남길 고객사를 고르세요', true); return; }
+    var keep=+(ov.querySelector('input[name="dcmKeep"]:checked')||{value:''}).value; if(!keep){ say('남길 고객사를 고르세요', true); return; }
     var drops=list.filter(function(c){ return c.id!==keep; }); var keepC=list.filter(function(c){ return c.id===keep; })[0];
     if(!confirm('«'+keepC.name+'» 를 남기고 '+drops.map(function(c){ return '«'+c.name+'»'; }).join(', ')+' 를 합칩니다. 계속할까요?')) return;
     this.disabled=true; say('병합 중…');
@@ -367,42 +362,40 @@ export function renderLeadSrc(){
     if(!r.parent && r.startIdx!=null && r.startIdx>=yStart && r.startIdx<=b) a.newN++;
   });
   var lines=LINE_OPTS.filter(function(l){ return lineSet[l]; }).concat(Object.keys(lineSet).filter(function(l){ return LINE_OPTS.indexOf(l)<0; }));
-  var order=SRC.slice().sort(function(x,y){ return (x==='미지정')-(y==='미지정') || agg[y].mrr-agg[x].mrr; });
+  var order=SRC.slice().sort(function(x,y){ return Number(x==='미지정')-Number(y==='미지정') || agg[y].mrr-agg[x].mrr; });
   var unassigned=agg['미지정'];
   /* 헤더 컨트롤 */
-  var mopts=''; for(i=0;i<ST.M;i++) mopts+='<option value="'+i+'"'+(i===b?' selected':'')+'>'+esc(mk(i))+'</option>';
-  var h='<div class="dbar" style="margin-bottom:12px;flex-wrap:wrap;gap:8px;align-items:center">'+
-    '<label class="mini">기준월 <select id="lsBase" class="qb-in" style="height:30px;width:auto">'+mopts+'</select></label>'+
-    '<label class="mini">서비스 <select id="lsLine" class="qb-in" style="height:30px;width:auto"><option value="">전체</option>'+LINE_OPTS.map(function(l){ return '<option value="'+l+'"'+(LS.line===l?' selected':'')+'>'+esc(lline(l))+'</option>'; }).join('')+'</select></label>'+
-    '<span class="mini">기준월 MRR 합계 <b>'+won(total)+'천원</b> · '+y0+'년 누적 <b>'+won(totYtd)+'천원</b> · 단위 천원</span>'+
-    (unassigned.n? '<span class="ctag warn" style="margin-left:auto" title="유입경로가 비어 있는 계약">미지정 '+unassigned.n+'건 · '+won(unassigned.mrr)+'천원</span><button type="button" class="cbtn" id="lsFix" style="height:26px;font-size:11px">계약 관리에서 지정 →</button>':'')+
-    '</div>';
+  var mopts=''; for(i=0;i<ST.M;i++) mopts+=tpl`<option value="${rawHtml(i)}"${i===b?' selected':''}>${mk(i)}</option>`;
+  var h=tpl`<div class="dbar" style="margin-bottom:12px;flex-wrap:wrap;gap:8px;align-items:center">`+
+    tpl`<label class="mini">기준월 <select id="lsBase" class="qb-in" style="height:30px;width:auto">${rawHtml(mopts)}</select></label>`+
+    tpl`<label class="mini">서비스 <select id="lsLine" class="qb-in" style="height:30px;width:auto"><option value="">전체</option>${rawHtml(LINE_OPTS.map(function(l){ return tpl`<option value="${rawHtml(l)}"${LS.line===l?' selected':''}>${lline(l)}</option>`; }).join(''))}</select></label>`+
+    tpl`<span class="mini">기준월 MRR 합계 <b>${won(total)}천원</b> · ${rawHtml(y0)}년 누적 <b>${won(totYtd)}천원</b> · 단위 천원</span>`+ tpl`${rawHtml(unassigned.n? tpl`<span class="ctag warn" style="margin-left:auto" title="유입경로가 비어 있는 계약">미지정 ${rawHtml(unassigned.n)}건 · ${won(unassigned.mrr)}천원</span><button type="button" class="cbtn" id="lsFix" style="height:26px;font-size:11px">계약 관리에서 지정 →</button>`:'')}`+
+    tpl`</div>`;
   /* 타일 */
-  h+='<div class="kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:14px">'+order.map(function(src){
+  h+=tpl`<div class="kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:14px">${rawHtml(order.map(function(src){
     var a=agg[src], sh=total? a.mrr/total*100 : 0, col=cssv(LEAD_COLOR[src]||'--muted');
-    return '<div class="kpi ls-tile" data-src="'+esc(src)+'" style="padding:12px 14px;cursor:pointer'+(LS.pick===src?';outline:2px solid '+col:'')+'" title="누르면 이 유입경로의 계약 목록">'+
-      '<div class="k" style="display:flex;align-items:center;gap:6px"><i style="width:9px;height:9px;border-radius:50%;background:'+col+';display:inline-block"></i>'+esc(src)+'</div>'+
-      '<div style="font-size:22px;font-weight:800;margin-top:2px">'+won(a.mrr)+' <small style="font-size:11px;font-weight:500;color:var(--muted);white-space:nowrap">천원 · '+sh.toFixed(1)+'%</small></div>'+
-      '<div class="mini" style="margin-top:4px">계약 '+a.n+'건 · 고객사 '+Object.keys(a.custs).length+'곳'+(a.newN? ' · 올해 신규 '+a.newN+'건':'')+'</div>'+
-      '<div class="mini">'+y0+'년 누적 '+won(a.ytd)+'천원</div></div>'; }).join('')+'</div>';
+    return tpl`<div class="kpi ls-tile" data-src="${src}" style="padding:12px 14px;cursor:pointer${rawHtml(LS.pick===src?';outline:2px solid '+col:'')}" title="누르면 이 유입경로의 계약 목록">`+
+      tpl`<div class="k" style="display:flex;align-items:center;gap:6px"><i style="width:9px;height:9px;border-radius:50%;background:${rawHtml(col)};display:inline-block"></i>${src}</div>`+
+      tpl`<div style="font-size:22px;font-weight:800;margin-top:2px">${won(a.mrr)} <small style="font-size:11px;font-weight:500;color:var(--muted);white-space:nowrap">천원 · ${sh.toFixed(1)}%</small></div>`+
+      tpl`<div class="mini" style="margin-top:4px">계약 ${rawHtml(a.n)}건 · 고객사 ${Object.keys(a.custs).length}곳${rawHtml(a.newN? ' · 올해 신규 '+a.newN+'건':'')}</div>`+
+      tpl`<div class="mini">${rawHtml(y0)}년 누적 ${won(a.ytd)}천원</div></div>`; }).join(''))}`+ tpl`</div>`;
   /* 차트 2개 */
-  h+='<div class="ls-2col">'+
-    '<div class="pr-card"><div style="font-size:13.5px;font-weight:650;margin-bottom:8px">유입경로별 MRR <span class="mini">'+esc(mk(b))+'</span></div><div id="lsBars"></div></div>'+
-    '<div class="pr-card"><div style="font-size:13.5px;font-weight:650;margin-bottom:8px">최근 12개월 추이 <span class="mini">유입경로별 월 매출</span></div><div id="lsTrend" style="height:210px"></div>'+
-    '<div class="mini" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:6px">'+order.filter(function(src){ return agg[src].trend.some(function(v){ return v>0; }); }).map(function(src){ return '<span><i style="display:inline-block;width:10px;height:3px;border-radius:2px;background:'+cssv(LEAD_COLOR[src]||'--muted')+';vertical-align:middle;margin-right:4px"></i>'+esc(src)+'</span>'; }).join('')+'</div></div></div>';
+  h+=tpl`<div class="ls-2col">`+
+    tpl`<div class="pr-card"><div style="font-size:13.5px;font-weight:650;margin-bottom:8px">유입경로별 MRR <span class="mini">${mk(b)}</span></div><div id="lsBars"></div></div>`+
+    tpl`<div class="pr-card"><div style="font-size:13.5px;font-weight:650;margin-bottom:8px">최근 12개월 추이 <span class="mini">유입경로별 월 매출</span></div><div id="lsTrend" style="height:210px"></div>`+
+    tpl`<div class="mini" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:6px">${rawHtml(order.filter(function(src){ return agg[src].trend.some(function(v){ return v>0; }); }).map(function(src){ return tpl`<span><i style="display:inline-block;width:10px;height:3px;border-radius:2px;background:${rawHtml(cssv(LEAD_COLOR[src]||'--muted'))};vertical-align:middle;margin-right:4px"></i>${src}</span>`; }).join(''))}</div></div></div>`;
   /* 표: 유입경로 × 서비스 */
-  h+='<div class="pr-card" style="margin-bottom:14px"><div style="font-size:13.5px;font-weight:650;margin-bottom:8px">유입경로 × 서비스 <span class="mini">'+esc(mk(b))+' MRR · 천원</span></div>'+
-    '<div class="tbl-wrap" tabindex="0"><table class="dgrid"><thead><tr><th>유입경로</th>'+lines.map(function(l){ return '<th class="n">'+esc(lline(l))+'</th>'; }).join('')+'<th class="n">합계</th><th class="n">비중</th><th class="n">계약</th><th class="n">고객사</th></tr></thead><tbody>'+
-    order.map(function(src){ var a=agg[src]; return '<tr><td>'+esc(src)+'</td>'+lines.map(function(l){ return '<td class="n">'+(a.byLine[l]? won(a.byLine[l]):'·')+'</td>'; }).join('')+'<td class="n"><b>'+won(a.mrr)+'</b></td><td class="n">'+(total? (a.mrr/total*100).toFixed(1)+'%':'·')+'</td><td class="n">'+a.n+'</td><td class="n">'+Object.keys(a.custs).length+'</td></tr>'; }).join('')+
-    '<tr style="font-weight:700;background:var(--surface-2)"><td>합계</td>'+lines.map(function(l){ var t=0; order.forEach(function(src){ t+=agg[src].byLine[l]||0; }); return '<td class="n">'+won(t)+'</td>'; }).join('')+'<td class="n">'+won(total)+'</td><td class="n">100%</td><td class="n">'+order.reduce(function(t,src){ return t+agg[src].n; },0)+'</td><td class="n"></td></tr>'+
-    '</tbody></table></div></div>';
+  h+=tpl`<div class="pr-card" style="margin-bottom:14px"><div style="font-size:13.5px;font-weight:650;margin-bottom:8px">유입경로 × 서비스 <span class="mini">${mk(b)} MRR · 천원</span></div>`+
+    tpl`<div class="tbl-wrap" tabindex="0"><table class="dgrid"><thead><tr><th>유입경로</th>${rawHtml(lines.map(function(l){ return tpl`<th class="n">${lline(l)}</th>`; }).join(''))}<th class="n">합계</th><th class="n">비중</th><th class="n">계약</th><th class="n">고객사</th></tr></thead><tbody>`+
+    tpl`${rawHtml(order.map(function(src){ var a=agg[src]; return tpl`<tr><td>${src}</td>${rawHtml(lines.map(function(l){ return tpl`<td class="n">${a.byLine[l]? won(a.byLine[l]):'·'}</td>`; }).join(''))}<td class="n"><b>${won(a.mrr)}</b></td><td class="n">${rawHtml(total? (a.mrr/total*100).toFixed(1)+'%':'·')}</td><td class="n">${rawHtml(a.n)}</td><td class="n">${Object.keys(a.custs).length}</td></tr>`; }).join(''))}`+
+    tpl`<tr style="font-weight:700;background:var(--surface-2)"><td>합계</td>${rawHtml(lines.map(function(l){ var t=0; order.forEach(function(src){ t+=agg[src].byLine[l]||0; }); return tpl`<td class="n">${won(t)}</td>`; }).join(''))}<td class="n">${won(total)}</td><td class="n">100%</td><td class="n">${rawHtml(order.reduce(function(t,src){ return t+agg[src].n; },0))}</td><td class="n"></td></tr>`+
+    tpl`</tbody></table></div></div>`;
   /* 선택한 유입경로의 계약 목록 */
   if(LS.pick && agg[LS.pick]){
     var lst=agg[LS.pick].rows.slice().sort(function(x,y){ return y.v-x.v; });
-    h+='<div class="pr-card"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><div style="font-size:13.5px;font-weight:650">'+esc(LS.pick)+' — 계약 '+lst.length+'건 <span class="mini">'+esc(mk(b))+' MRR 큰 순</span></div><button type="button" class="cbtn" id="lsPickX" style="height:24px;font-size:11px;margin-left:auto">닫기</button></div>'+
-      '<div class="tbl-wrap" tabindex="0" style="max-height:46vh"><table class="dgrid"><thead><tr><th>고객사</th><th>서비스</th><th>판매 채널</th><th>파트너</th><th>시작월</th><th>종료월</th><th class="n">MRR</th></tr></thead><tbody>'+
-      lst.slice(0,200).map(function(x){ var r=rows[x.k]; return '<tr><td>'+esc(r.cust)+(r.parent?' <span class="mini">↳부속</span>':'')+'</td><td>'+esc(lline(r.line))+'</td><td>'+esc(r.channel||'')+'</td><td>'+esc(r.ptn||'')+'</td><td>'+(r.startRaw!=null? esc(mk(r.startRaw)):'·')+'</td><td>'+(r.endRaw!=null? esc(mk(r.endRaw)):'·')+'</td><td class="n">'+won(x.v)+'</td></tr>'; }).join('')+
-      (lst.length>200? '<tr><td colspan="7" class="mini">외 '+(lst.length-200)+'건</td></tr>':'')+'</tbody></table></div></div>';
+    h+=tpl`<div class="pr-card"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><div style="font-size:13.5px;font-weight:650">${LS.pick} — 계약 ${lst.length}건 <span class="mini">${mk(b)} MRR 큰 순</span></div><button type="button" class="cbtn" id="lsPickX" style="height:24px;font-size:11px;margin-left:auto">닫기</button></div>`+
+      tpl`<div class="tbl-wrap" tabindex="0" style="max-height:46vh"><table class="dgrid"><thead><tr><th>고객사</th><th>서비스</th><th>판매 채널</th><th>파트너</th><th>시작월</th><th>종료월</th><th class="n">MRR</th></tr></thead><tbody>`+
+      tpl`${rawHtml(lst.slice(0,200).map(function(x){ var r=rows[x.k]; return tpl`<tr><td>${r.cust}${rawHtml(r.parent?' <span class="mini">↳부속</span>':'')}</td><td>${lline(r.line)}</td><td>${r.channel||''}</td><td>${r.ptn||''}</td><td>${rawHtml(r.startRaw!=null? esc(mk(r.startRaw)):'·')}</td><td>${rawHtml(r.endRaw!=null? esc(mk(r.endRaw)):'·')}</td><td class="n">${won(x.v)}</td></tr>`; }).join(''))}`+ tpl`${rawHtml(lst.length>200? tpl`<tr><td colspan="7" class="mini">외 ${lst.length-200}건</td></tr>`:'')}</tbody></table></div></div>`;
   }
   host.innerHTML=h;
   /* 차트 그리기 */
@@ -424,22 +417,20 @@ export function renderAiKnow(){
   var L=(ST.RAWX.aiknow||[]).slice().sort(function(a,b){ return (b.id||0)-(a.id||0); }), canW=!!ST.SB_TOKEN && !ST.IS_VIEWER;
   var nOn=L.filter(function(x){ return x.active!==false; }).length;
   $('#dvCount').textContent = L.length? '적용 중 '+nOn+'개' : '';
-  var h='<div class="pr-card" style="margin-bottom:14px;max-width:920px"><div style="font-size:13.5px;font-weight:650;margin-bottom:8px">AI 에게 가르치기</div>'+
-    '<div class="mini" style="margin-bottom:10px;line-height:1.7">예: «에스원 경유 계약은 설치비를 정산월에 따로 인식한다» · «MDR 은 노드가 아니라 에이전트 수로 과금» · ««위세아이텍» 은 «위세» 로도 부른다». 짧고 사실적으로 한 줄씩. 숫자 값은 넣지 말고 규칙·용어·해석 방법을 적으세요 — 숫자는 AI 가 DB 에서 직접 봅니다. 저장하면 다음 질문부터 바로 반영됩니다.</div>'+
-    '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start"><input id="akTopic" class="qb-in" placeholder="주제 (예: 에스원 계약)" style="width:180px;height:34px">'+
-    '<textarea id="akBody" class="qb-in" placeholder="AI 가 알아야 할 내용 (한 줄 한 사실)" style="flex:1;min-width:260px;min-height:34px;height:60px;padding:8px 10px;resize:vertical"></textarea>'+
-    '<button type="button" class="cbtn pri" id="akAdd" style="height:34px"'+(canW?'':' disabled')+'>＋ 가르치기</button></div>'+
-    '<div class="mini" style="margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span>'+(L.length? '지금 AI 가 쓰는 팀 지식 '+nOn+'개'+(L.length>nOn? ' (꺼둔 것 '+(L.length-nOn)+'개)':'') : '아직 가르친 내용이 없습니다 — AI 는 포탈 규칙(MRR·LIVE·장비·OI)과 DB 표만 알고 있습니다')+'</span>'+
-    (L.length? '<button type="button" class="cbtn" id="akLog" style="height:26px;font-size:11px">'+(AK.log?'기록 닫기':'기록 보기')+'</button>':'')+'</div></div>';
+  var h=tpl`<div class="pr-card" style="margin-bottom:14px;max-width:920px"><div style="font-size:13.5px;font-weight:650;margin-bottom:8px">AI 에게 가르치기</div>`+
+    tpl`<div class="mini" style="margin-bottom:10px;line-height:1.7">예: «에스원 경유 계약은 설치비를 정산월에 따로 인식한다» · «MDR 은 노드가 아니라 에이전트 수로 과금» · ««위세아이텍» 은 «위세» 로도 부른다». 짧고 사실적으로 한 줄씩. 숫자 값은 넣지 말고 규칙·용어·해석 방법을 적으세요 — 숫자는 AI 가 DB 에서 직접 봅니다. 저장하면 다음 질문부터 바로 반영됩니다.</div>`+
+    tpl`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start"><input id="akTopic" class="qb-in" placeholder="주제 (예: 에스원 계약)" style="width:180px;height:34px">`+
+    tpl`<textarea id="akBody" class="qb-in" placeholder="AI 가 알아야 할 내용 (한 줄 한 사실)" style="flex:1;min-width:260px;min-height:34px;height:60px;padding:8px 10px;resize:vertical"></textarea>`+
+    tpl`<button type="button" class="cbtn pri" id="akAdd" style="height:34px"${canW?'':' disabled'}>＋ 가르치기</button></div>`+
+    tpl`<div class="mini" style="margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span>${rawHtml(L.length? '지금 AI 가 쓰는 팀 지식 '+nOn+'개'+(L.length>nOn? ' (꺼둔 것 '+(L.length-nOn)+'개)':'') : '아직 가르친 내용이 없습니다 — AI 는 포탈 규칙(MRR·LIVE·장비·OI)과 DB 표만 알고 있습니다')}</span>`+ tpl`${rawHtml(L.length? tpl`<button type="button" class="cbtn" id="akLog" style="height:26px;font-size:11px">${AK.log?'기록 닫기':'기록 보기'}</button>`:'')}</div></div>`;
   if(AK.log && L.length){
     var q=String(AK.q||'').trim().toLowerCase();
     var M=q? L.filter(function(x){ return ((x.topic||'')+' '+(x.content||'')).toLowerCase().indexOf(q)>=0; }) : L;
-    h+='<div class="pr-card" style="max-width:920px"><div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap"><div style="font-size:13.5px;font-weight:650">가르친 기록</div><span class="mini">'+M.length+'개 · 최근 것부터 · «적용» 을 끄면 AI 가 쓰지 않습니다(기록은 남음)</span>'+
-      '<input id="akQ" class="qb-in" placeholder="찾기" value="'+esc(AK.q||'')+'" style="width:160px;height:28px;margin-left:auto"></div>'+
-      '<div class="qb-deck-list">'+M.map(function(x){ return '<div class="qb-deck-it" data-id="'+x.id+'" style="'+(x.active===false?'opacity:.55':'')+'"><span class="ctag">'+esc(x.topic||'')+'</span><span style="flex:1;min-width:240px;font-size:13.5px;line-height:1.55;white-space:pre-wrap">'+esc(x.content||'')+'</span>'+
-      '<span class="mini">'+esc(String(x.created_by||'').split('@')[0])+' · '+esc(String(x.created_at||'').slice(0,10))+'</span>'+
-      '<span style="display:flex;gap:4px;align-items:center"><label class="mini qb-chk"><input type="checkbox" data-ak="active"'+(x.active===false?'':' checked')+(canW?'':' disabled')+'> 적용</label><button type="button" class="cbtn" data-ak="del" style="color:var(--critical)"'+(canW?'':' disabled')+'>×</button></span></div>'; }).join('')+
-      (M.length? '' : '<div class="cap" style="padding:16px;text-align:center">찾는 내용이 없습니다</div>')+'</div></div>';
+    h+=tpl`<div class="pr-card" style="max-width:920px"><div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap"><div style="font-size:13.5px;font-weight:650">가르친 기록</div><span class="mini">${M.length}개 · 최근 것부터 · «적용» 을 끄면 AI 가 쓰지 않습니다(기록은 남음)</span>`+
+      tpl`<input id="akQ" class="qb-in" placeholder="찾기" value="${AK.q||''}" style="width:160px;height:28px;margin-left:auto"></div>`+
+      tpl`<div class="qb-deck-list">${rawHtml(M.map(function(x){ return tpl`<div class="qb-deck-it" data-id="${rawHtml(x.id)}" style="${x.active===false?'opacity:.55':''}"><span class="ctag">${x.topic||''}</span><span style="flex:1;min-width:240px;font-size:13.5px;line-height:1.55;white-space:pre-wrap">${x.content||''}</span>`+
+      tpl`<span class="mini">${String(x.created_by||'').split('@')[0]} · ${String(x.created_at||'').slice(0,10)}</span>`+
+      tpl`<span style="display:flex;gap:4px;align-items:center"><label class="mini qb-chk"><input type="checkbox" data-ak="active"${x.active===false?'':' checked'}${canW?'':' disabled'}> 적용</label><button type="button" class="cbtn" data-ak="del" style="color:var(--critical)"${canW?'':' disabled'}>×</button></span></div>`; }).join(''))}`+ tpl`${rawHtml(M.length? '' : '<div class="cap" style="padding:16px;text-align:center">찾는 내용이 없습니다</div>')}</div></div>`;
   }
   host.innerHTML=h;
   function reload(){ return sbTry('ai_knowledge?select=*&order=id').then(function(rows){ ST.RAWX.aiknow=rows||[]; renderAiKnow(); }); }
@@ -525,11 +516,11 @@ export function renderBizMonthly(){
   var sb='<thead><tr><th>항목</th><th style="text-align:right">금액(천원)</th></tr></thead><tbody>';
   sums.forEach(function(r){
     var hl=/차액/.test(r.item||'');
-    sb+='<tr'+(hl?' style="font-weight:700;border-top:2px solid var(--axis)"':'')+'><td>'+esc(r.item)+'</td>'+
-        '<td style="text-align:right'+(hl?';color:'+((r.biz||0)>=0?'var(--good,#0ca30c)':'var(--critical,#d03b3b)'):'')+'">'+
-        Math.round(Number(r.biz||0)/1000).toLocaleString('ko-KR')+'</td></tr>';
+    sb+=tpl`<tr${rawHtml(hl?' style="font-weight:700;border-top:2px solid var(--axis)"':'')}><td>${r.item}</td>`+
+        tpl`<td style="text-align:right${rawHtml(hl?';color:'+((r.biz||0)>=0?'var(--good,#0ca30c)':'var(--critical,#d03b3b)'):'')}">`+
+        tpl`${rawHtml(Math.round(Number(r.biz||0)/1000).toLocaleString('ko-KR'))}</td></tr>`;
   });
-  st.innerHTML=sb+'</tbody>';
+  st.innerHTML=tpl`${rawHtml(sb)}</tbody>`;
   host.appendChild(st);
 
   if(dets.length){
@@ -538,12 +529,12 @@ export function renderBizMonthly(){
     var dt=document.createElement('table'); dt.className='dgrid';
     var db='<thead><tr><th>고객사</th><th style="text-align:right">비즈포탈(천원)</th><th style="text-align:right">매출시트(천원)</th><th style="text-align:right">차이(천원)</th><th>사유</th></tr></thead><tbody>';
     dets.forEach(function(r){
-      db+='<tr><td>'+esc(r.item)+'</td><td style="text-align:right">'+won(r.biz)+'</td>'+
-          '<td style="text-align:right">'+won(r.sheet)+'</td>'+
-          '<td style="text-align:right;color:'+((r.diff||0)>=0?'var(--good,#0ca30c)':'var(--critical,#d03b3b)')+'">'+won(r.diff)+'</td>'+
-          '<td style="font-size:12px;color:var(--muted)">'+esc(r.note||'')+'</td></tr>';
+      db+=tpl`<tr><td>${r.item}</td><td style="text-align:right">${won(r.biz)}</td>`+
+          tpl`<td style="text-align:right">${won(r.sheet)}</td>`+
+          tpl`<td style="text-align:right;color:${(r.diff||0)>=0?'var(--good,#0ca30c)':'var(--critical,#d03b3b)'}">${won(r.diff)}</td>`+
+          tpl`<td style="font-size:12px;color:var(--muted)">${r.note||''}</td></tr>`;
     });
-    dt.innerHTML=db+'</tbody>';
+    dt.innerHTML=tpl`${rawHtml(db)}</tbody>`;
     host.appendChild(dt);
   }
 }
@@ -570,9 +561,9 @@ export function renderTargetTable(host, rows){
 
   var hd=document.createElement('div');
   hd.style.cssText='display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px';
-  hd.innerHTML='<b style="font-size:13.5px">🎯 '+year+'년 월 목표 대비 달성률</b>'+
-    '<span class="ubadge sm">₩ 천원</span>'+
-    '<span class="cap" style="margin:0">목표는 연초 기준 · 달성률 = 성과 ÷ 목표 · 금액은 모두 천원</span>';
+  hd.innerHTML=tpl`<b style="font-size:13.5px">🎯 ${rawHtml(year)}년 월 목표 대비 달성률</b>`+
+    tpl`<span class="ubadge sm">₩ 천원</span>`+
+    tpl`<span class="cap" style="margin:0">목표는 연초 기준 · 달성률 = 성과 ÷ 목표 · 금액은 모두 천원</span>`;
   if(!ST.IS_VIEWER){
     var sp=document.createElement('span'); sp.style.flex='1'; hd.appendChild(sp);
     var be=document.createElement('button'); be.className='pill'; be.textContent='✎ 월 목표 입력';
@@ -582,15 +573,15 @@ export function renderTargetTable(host, rows){
   box.appendChild(hd);
 
   var t=document.createElement('table'); t.className='dgrid';
-  var h='<thead><tr><th>구분</th><th style="text-align:right">목표(천원)</th>'+
-        '<th style="text-align:right">비즈포탈 회계매출(천원)</th><th style="text-align:right">달성률</th>'+
-        '<th style="text-align:right">매출시트 매출(천원)</th><th style="text-align:right">달성률</th></tr></thead><tbody>';
+  var h=tpl`<thead><tr><th>구분</th><th style="text-align:right">목표(천원)</th>`+
+        tpl`<th style="text-align:right">비즈포탈 회계매출(천원)</th><th style="text-align:right">달성률</th>`+
+        tpl`<th style="text-align:right">매출시트 매출(천원)</th><th style="text-align:right">달성률</th></tr></thead><tbody>`;
 
   function pct(v, base){
     if(!base) return '<td style="text-align:right;color:var(--muted)">·</td>';
     var r=v/base*100;
     var c = r>=100? 'var(--good,#0ca30c)' : (r>=95? 'var(--warning,#fab219)' : 'var(--critical,#d03b3b)');
-    return '<td style="text-align:right;font-weight:650;color:'+c+'">'+r.toFixed(1)+'%</td>';
+    return tpl`<td style="text-align:right;font-weight:650;color:${rawHtml(c)}">${r.toFixed(1)}%</td>`;
   }
   function money(v){ return v==null? '·' : won(v); }        /* 천원 단위 */
 
@@ -603,32 +594,32 @@ export function renderTargetTable(host, rows){
     var tgt=tg[m]||0;
     if(!tgt && bz==null && sh==null) continue;
 
-    h+='<tr><td>'+m+'월</td><td style="text-align:right">'+money(tgt||null)+'</td>'+
-       '<td style="text-align:right">'+money(bz)+'</td>'+(bz!=null? pct(bz,tgt):'<td style="text-align:right;color:var(--muted)">·</td>')+
-       '<td style="text-align:right">'+money(sh)+'</td>'+(sh!=null? pct(sh,tgt):'<td style="text-align:right;color:var(--muted)">·</td>')+'</tr>';
+    h+=tpl`<tr><td>${rawHtml(m)}월</td><td style="text-align:right">${rawHtml(money(tgt||null))}</td>`+
+       tpl`<td style="text-align:right">${rawHtml(money(bz))}</td>${rawHtml(bz!=null? pct(bz,tgt):'<td style="text-align:right;color:var(--muted)">·</td>')}`+
+       tpl`<td style="text-align:right">${rawHtml(money(sh))}</td>${rawHtml(sh!=null? pct(sh,tgt):'<td style="text-align:right;color:var(--muted)">·</td>')}</tr>`;
 
     if(tgt>0){                                  // 목표가 있는 달만 누계에 포함
       accT+=tgt; accB+=(bz||0); accS+=(sh||0);
       qT+=tgt;   qB+=(bz||0);   qS+=(sh||0);
     }
     if(m%3===0 && qT>0){
-      h+='<tr style="background:var(--surface-2);font-weight:650"><td>'+(m/3)+'Q 누계</td>'+
-         '<td style="text-align:right">'+money(qT)+'</td><td style="text-align:right">'+money(qB)+'</td>'+pct(qB,qT)+
-         '<td style="text-align:right">'+money(qS)+'</td>'+pct(qS,qT)+'</tr>';
+      h+=tpl`<tr style="background:var(--surface-2);font-weight:650"><td>${m/3}Q 누계</td>`+
+         tpl`<td style="text-align:right">${rawHtml(money(qT))}</td><td style="text-align:right">${rawHtml(money(qB))}</td>${rawHtml(pct(qB,qT))}`+
+         tpl`<td style="text-align:right">${rawHtml(money(qS))}</td>${rawHtml(pct(qS,qT))}</tr>`;
       qT=0; qB=0; qS=0;
     }
     if(m===6 && accT){
-      h+='<tr style="background:var(--surface-2);font-weight:700"><td>상반기(1H)</td>'+
-         '<td style="text-align:right">'+money(accT)+'</td><td style="text-align:right">'+money(accB)+'</td>'+pct(accB,accT)+
-         '<td style="text-align:right">'+money(accS)+'</td>'+pct(accS,accT)+'</tr>';
+      h+=tpl`<tr style="background:var(--surface-2);font-weight:700"><td>상반기(1H)</td>`+
+         tpl`<td style="text-align:right">${rawHtml(money(accT))}</td><td style="text-align:right">${rawHtml(money(accB))}</td>${rawHtml(pct(accB,accT))}`+
+         tpl`<td style="text-align:right">${rawHtml(money(accS))}</td>${rawHtml(pct(accS,accT))}</tr>`;
     }
   }
   if(accT){
-    h+='<tr style="border-top:2px solid var(--axis);font-weight:750"><td>누계</td>'+
-       '<td style="text-align:right">'+money(accT)+'</td><td style="text-align:right">'+money(accB)+'</td>'+pct(accB,accT)+
-       '<td style="text-align:right">'+money(accS)+'</td>'+pct(accS,accT)+'</tr>';
+    h+=tpl`<tr style="border-top:2px solid var(--axis);font-weight:750"><td>누계</td>`+
+       tpl`<td style="text-align:right">${rawHtml(money(accT))}</td><td style="text-align:right">${rawHtml(money(accB))}</td>${rawHtml(pct(accB,accT))}`+
+       tpl`<td style="text-align:right">${rawHtml(money(accS))}</td>${rawHtml(pct(accS,accT))}</tr>`;
   }
-  t.innerHTML=h+'</tbody>';
+  t.innerHTML=tpl`${rawHtml(h)}</tbody>`;
   box.appendChild(t);
 
   if(!accT){
@@ -646,15 +637,15 @@ export function openTargetEditor(year){
   var ovl=document.createElement('div'); ovl.className='ovl on'; ovl.id='ovlTarget';
   var rowsHtml='';
   for(var m=1;m<=12;m++){
-    rowsHtml+='<div><label>'+m+'월</label><input type="number" data-m="'+m+'" min="0" step="1000000" value="'+(tg[m]||'')+'"></div>';
+    rowsHtml+=tpl`<div><label>${rawHtml(m)}월</label><input type="number" data-m="${rawHtml(m)}" min="0" step="1000000" value="${rawHtml(tg[m]||'')}"></div>`;
   }
-  ovl.innerHTML='<div class="modal" style="width:min(560px,100%)">'+
-    '<h3>'+year+'년 월 목표</h3>'+
-    '<p class="cap">연초에 정한 월별 목표 금액을 <b>원 단위로</b> 넣으세요 (표에는 천원으로 표시). 비워두면 그 달은 달성률을 계산하지 않습니다.</p>'+
-    '<div class="frm">'+rowsHtml+'</div>'+
-    '<div class="mact"><span class="mmsg" id="tgMsg" style="flex:1"></span>'+
-    '<button class="pill ghost" id="tgCancel">취소</button>'+
-    '<button class="pill pri" id="tgSave">저장</button></div></div>';
+  ovl.innerHTML=tpl`<div class="modal" style="width:min(560px,100%)">`+
+    tpl`<h3>${rawHtml(year)}년 월 목표</h3>`+
+    tpl`<p class="cap">연초에 정한 월별 목표 금액을 <b>원 단위로</b> 넣으세요 (표에는 천원으로 표시). 비워두면 그 달은 달성률을 계산하지 않습니다.</p>`+
+    tpl`<div class="frm">${rawHtml(rowsHtml)}</div>`+
+    tpl`<div class="mact"><span class="mmsg" id="tgMsg" style="flex:1"></span>`+
+    tpl`<button class="pill ghost" id="tgCancel">취소</button>`+
+    tpl`<button class="pill pri" id="tgSave">저장</button></div></div>`;
   document.body.appendChild(ovl);
   ovl.querySelector('#tgCancel').onclick=function(){ ovl.remove(); };
   ovl.querySelector('#tgSave').onclick=async function(){
@@ -700,25 +691,25 @@ export function renderBizEditor(host, months){
 
   var f=document.createElement('div'); f.style.maxWidth='760px';
   f.innerHTML=
-    '<div class="frm" style="max-width:420px;margin-bottom:14px">'+
-      '<div><label>월 *</label><input id="bzYm" placeholder="예: 8월" value="'+esc(editYm)+'"></div>'+
-      '<div><label>작성일</label><input id="bzAsOf" type="date" value="'+esc(asOf)+'"></div>'+
-    '</div>'+
-    '<div class="cap" style="margin-bottom:6px">요약 항목 — 금액은 <b>원 단위로 입력</b> (표·대시보드에는 천원으로 표시됩니다)</div><div id="bzSums"></div>'+
-    '<button class="pill ghost" id="bzAddSum" style="margin:6px 0 16px">＋ 항목 추가</button>'+
-    '<div class="cap" style="margin-bottom:6px">고객사별 차이 (없으면 비워두세요 · 차이는 자동 계산) — <b>원 단위로 입력</b></div><div id="bzDets"></div>'+
-    '<button class="pill ghost" id="bzAddDet" style="margin:6px 0 18px">＋ 고객사 추가</button>'+
-    '<div style="display:flex;gap:10px;align-items:center">'+
-      '<span class="mini" id="bzMsg" style="flex:1"></span>'+
-      '<button class="pill ghost" id="bzCancel">취소</button>'+
-      '<button class="pill pri" id="bzSave">저장</button>'+
-    '</div>';
+    tpl`<div class="frm" style="max-width:420px;margin-bottom:14px">`+
+      tpl`<div><label>월 *</label><input id="bzYm" placeholder="예: 8월" value="${editYm}"></div>`+
+      tpl`<div><label>작성일</label><input id="bzAsOf" type="date" value="${asOf}"></div>`+
+    tpl`</div>`+
+    tpl`<div class="cap" style="margin-bottom:6px">요약 항목 — 금액은 <b>원 단위로 입력</b> (표·대시보드에는 천원으로 표시됩니다)</div><div id="bzSums"></div>`+
+    tpl`<button class="pill ghost" id="bzAddSum" style="margin:6px 0 16px">＋ 항목 추가</button>`+
+    tpl`<div class="cap" style="margin-bottom:6px">고객사별 차이 (없으면 비워두세요 · 차이는 자동 계산) — <b>원 단위로 입력</b></div><div id="bzDets"></div>`+
+    tpl`<button class="pill ghost" id="bzAddDet" style="margin:6px 0 18px">＋ 고객사 추가</button>`+
+    tpl`<div style="display:flex;gap:10px;align-items:center">`+
+      tpl`<span class="mini" id="bzMsg" style="flex:1"></span>`+
+      tpl`<button class="pill ghost" id="bzCancel">취소</button>`+
+      tpl`<button class="pill pri" id="bzSave">저장</button>`+
+    tpl`</div>`;
   host.appendChild(f);
 
   function sumRow(item,amt){
     var d=document.createElement('div'); d.style.cssText='display:flex;gap:8px;margin-bottom:6px;max-width:640px';
-    d.innerHTML='<input class="bz-item" placeholder="항목명" style="flex:2" value="'+esc(item||'')+'">'+
-      '<input class="bz-amt" placeholder="금액" style="flex:1;text-align:right" value="'+(amt==null?'':Number(amt).toLocaleString('ko-KR'))+'">';
+    d.innerHTML=tpl`<input class="bz-item" placeholder="항목명" style="flex:2" value="${item||''}">`+
+      tpl`<input class="bz-amt" placeholder="금액" style="flex:1;text-align:right" value="${rawHtml(amt==null?'':Number(amt).toLocaleString('ko-KR'))}">`;
     var x=document.createElement('button'); x.className='pill ghost'; x.textContent='✕';
     x.onclick=function(){ d.remove(); }; d.appendChild(x);
     return d;
@@ -726,10 +717,10 @@ export function renderBizEditor(host, months){
   function detRow(r){
     r=r||{};
     var d=document.createElement('div'); d.style.cssText='display:flex;gap:8px;margin-bottom:6px';
-    d.innerHTML='<input class="bd-cust" placeholder="고객사" style="flex:2" value="'+esc(r.item||'')+'">'+
-      '<input class="bd-biz" placeholder="비즈포탈" style="flex:1;text-align:right" value="'+(r.biz==null?'':r.biz)+'">'+
-      '<input class="bd-sheet" placeholder="매출시트" style="flex:1;text-align:right" value="'+(r.sheet==null?'':r.sheet)+'">'+
-      '<input class="bd-note" placeholder="사유" style="flex:2" value="'+esc(r.note||'')+'">';
+    d.innerHTML=tpl`<input class="bd-cust" placeholder="고객사" style="flex:2" value="${r.item||''}">`+
+      tpl`<input class="bd-biz" placeholder="비즈포탈" style="flex:1;text-align:right" value="${rawHtml(r.biz==null?'':r.biz)}">`+
+      tpl`<input class="bd-sheet" placeholder="매출시트" style="flex:1;text-align:right" value="${rawHtml(r.sheet==null?'':r.sheet)}">`+
+      tpl`<input class="bd-note" placeholder="사유" style="flex:2" value="${r.note||''}">`;
     var x=document.createElement('button'); x.className='pill ghost'; x.textContent='✕';
     x.onclick=function(){ d.remove(); }; d.appendChild(x);
     return d;
@@ -849,7 +840,7 @@ export function bzxLoadLib(){ return loadLib('xlsx'); }
    8월 1일자 하위매출 84행이 7월로 밀려 통째로 빠졌습니다 → 일련번호(숫자)를 직접 날짜로 바꾸고, Date 가 와도 30분을 더해 반올림합니다 */
 export function bzxDate(v){
   if(v==null||v==='') return null;
-  if(v instanceof Date){ if(isNaN(v)) return null; var r=new Date(v.getTime()+30*60*1000); return new Date(r.getFullYear(),r.getMonth(),r.getDate()); }
+  if(v instanceof Date){ if(isNaN(v.getTime())) return null; var r=new Date(v.getTime()+30*60*1000); return new Date(r.getFullYear(),r.getMonth(),r.getDate()); }
   if(typeof v==='number' && v>20000 && v<80000 && window.XLSX){ var d=XLSX.SSF.parse_date_code(Math.round(v*1440)/1440); return d? new Date(d.y,d.m-1,d.d) : null; }
   var m=String(v).match(/(\d{4})[-./]\s*(\d{1,2})(?:[-./]\s*(\d{1,2}))?/); return m? new Date(+m[1],+m[2]-1,m[3]? +m[3]:1) : null;
 }
@@ -941,7 +932,7 @@ export function bzxCompare(rows, T){
   (function(){
     var bo=out.filter(function(q){ return q.cat==='bizonly'; }), dbo=out.filter(function(q){ return q.cat==='dbonly'; });
     bo.forEach(function(b){
-      var best=null, bs=0, second=0;
+      var best=/** @type {any} */ (null), bs=0, second=0;
       dbo.forEach(function(d){ if(d.merged) return; var sc=bzxSim(b.bizName,d.name); if(sc>bs){ second=bs; bs=sc; best=d; } else if(sc>second) second=sc; });
       if(!best || bs<0.8 || second>=0.8) return;                 // 유일하게 닮은 짝만
       b.db=best.db; b.dbAmt=best.dbAmt; b.dbFee=best.dbFee; b.dbTot=best.dbTot; b.diff=Math.round(b.bizAmt-b.dbTot);
@@ -984,7 +975,7 @@ export function bzxCompare(rows, T){
 export var BZX_CAT={eq:['일치','var(--ok,#2e7d32)'], fee:['설치비 인식 시점','var(--warn,#b26a00)'], amt:['금액 다름','var(--critical)'], bizonly:['비즈포탈에만 있음','var(--critical)'], dbonly:['관리포탈에만 있음','var(--critical)'], zero:['비즈포탈 회계매출 0','var(--warn,#b26a00)'], alias:['표기 차이(추정)','var(--s1)'], alias2:['표기 차이(추정)','var(--s1)'], aliasq:['금액만 같음(확인 필요)','var(--warn,#b26a00)'], skip:['실패·중지(참고)','var(--muted)']};
 export function bzxPrevNote(name){
   // 예전 달 biz_recon 에 같은 고객사 사유가 있으면 기본값으로 (같은 차이가 매달 반복될 때 다시 안 적게)
-  var hit=null; (ST.RAWX.biz||[]).forEach(function(r){ if(r.kind==='detail' && r.note && r.item && bzxKeys(r.item).some(function(k){ return bzxKeys(name).indexOf(k)>=0; })){ if(!hit || (r.id||0)>(hit.id||0)) hit=r; } });
+  var hit=/** @type {any} */ (null); (ST.RAWX.biz||[]).forEach(function(r){ if(r.kind==='detail' && r.note && r.item && bzxKeys(r.item).some(function(k){ return bzxKeys(name).indexOf(k)>=0; })){ if(!hit || (r.id||0)>(hit.id||0)) hit=r; } });
   return hit? String(hit.note).replace(/^🔁\s*/,'') : '';
 }
 export function bzxNoteKey(q){ return mk(BZX.res.T)+'|'+q.name; }
@@ -995,37 +986,34 @@ export function bzxRender(host){
   var diffsAll=res.groups.filter(function(q){ return ['fee','amt','bizonly','dbonly','alias','zero'].indexOf(q.cat)>=0; }).sort(function(a,b){ return Math.abs(b.diff)-Math.abs(a.diff); });
   var diffs=diffsAll.filter(function(q){ return !q.rule; }), ruled=diffsAll.filter(function(q){ return q.rule; });
   var eqs=res.groups.filter(function(q){ return q.cat==='eq'; }), skips=res.groups.filter(function(q){ return q.cat==='skip' || q.skipAmt; });
-  var h='<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:8px"><b style="font-size:15px">📥 비즈포탈 엑셀 자동 대조 — '+mk(T)+'</b><span class="mini" style="color:var(--muted)">'+esc(BZX.file)+' · '+BZX.rows.length+'행 · 파일은 저장하지 않고 이 화면에서만 씁니다</span></div>';
-  h+='<div class="kpis" style="margin-bottom:12px">'+
-    '<div class="kpi"><div class="k">비즈포탈 회계매출 (종료·계산서발행)</div><div class="v">'+w(S.biz/1000)+'<small>천원</small></div><div class="d">실패·중지 '+w(S.skip/1000)+'천원 제외'+(S.ign? ' · 무시 규칙 '+w(S.ignBiz/1000)+'천원 제외':'')+'</div></div>'+
-    '<div class="kpi"><div class="k">관리포탈 매출 (월 매출 + 설치비)</div><div class="v">'+w(S.db/1000)+'<small>천원</small></div><div class="d">이 포탈 DB 의 '+mk(T)+' 인식 금액 · 정산일 '+mk(T)+' 설치비 포함'+(S.ign? ' · 무시 규칙 '+w(S.ignDb/1000)+'천원 제외':'')+'</div></div>'+
-    '<div class="kpi '+(S.diff>=0?'up':'down')+'"><div class="k">차액 (비즈포탈 − 관리포탈)</div><div class="v">'+(S.diff>0?'+':'')+w(S.diff/1000)+'<small>천원</small></div><div class="d">일치 '+(S.n.eq||0)+'곳 · 확인할 차이 '+diffs.length+'곳'+(S.n.alias? ' (표기 차이 추정 '+S.n.alias+'쌍 포함)':'')+(ruled.length? ' · 반복 규칙 '+ruled.length+'곳'+(S.ign? ' (무시 '+S.ign+')':''):'')+'</div></div></div>';
+  var h=tpl`<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:8px"><b style="font-size:15px">📥 비즈포탈 엑셀 자동 대조 — ${mk(T)}</b><span class="mini" style="color:var(--muted)">${BZX.file} · ${BZX.rows.length}행 · 파일은 저장하지 않고 이 화면에서만 씁니다</span></div>`;
+  h+=tpl`<div class="kpis" style="margin-bottom:12px">`+
+    tpl`<div class="kpi"><div class="k">비즈포탈 회계매출 (종료·계산서발행)</div><div class="v">${rawHtml(w(S.biz/1000))}<small>천원</small></div><div class="d">실패·중지 ${rawHtml(w(S.skip/1000))}천원 제외${rawHtml(S.ign? ' · 무시 규칙 '+w(S.ignBiz/1000)+'천원 제외':'')}</div></div>`+
+    tpl`<div class="kpi"><div class="k">관리포탈 매출 (월 매출 + 설치비)</div><div class="v">${rawHtml(w(S.db/1000))}<small>천원</small></div><div class="d">이 포탈 DB 의 ${mk(T)} 인식 금액 · 정산일 ${mk(T)} 설치비 포함${rawHtml(S.ign? ' · 무시 규칙 '+w(S.ignDb/1000)+'천원 제외':'')}</div></div>`+
+    tpl`<div class="kpi ${S.diff>=0?'up':'down'}"><div class="k">차액 (비즈포탈 − 관리포탈)</div><div class="v">${S.diff>0?'+':''}${rawHtml(w(S.diff/1000))}<small>천원</small></div><div class="d">일치 ${rawHtml(S.n.eq||0)}곳 · 확인할 차이 ${diffs.length}곳${rawHtml(S.n.alias? ' (표기 차이 추정 '+S.n.alias+'쌍 포함)':'')}${rawHtml(ruled.length? ' · 반복 규칙 '+ruled.length+'곳'+(S.ign? ' (무시 '+S.ign+')':''):'')}</div></div></div>`;
   (function(){
     var D=res.diag||{}, total=res.groups.length||1, bad=diffs.length/total;
     var lines=[];
     var nearTxt=Object.keys(D.nearCnt||{}).sort().map(function(i){ return mk(+i)+' '+D.nearCnt[i]+'건'; }).join(' · ');
-    lines.push('관리포탈 월 매출(monthly_revenue) '+mk(T)+': 계약 <b>'+(D.dbCts||0)+'건</b>'+(nearTxt? ' <span style="color:var(--muted)">(인접 달: '+nearTxt+')</span>':'')+
-      ((D.dbCts||0)===0? ' — <b style="color:var(--critical)">이 달 인식 금액이 하나도 없습니다. 월 매출 인식이 아직 안 돌았거나 대상 월이 다릅니다</b>':''));
+    lines.push(tpl`관리포탈 월 매출(monthly_revenue) ${mk(T)}: 계약 <b>${rawHtml(D.dbCts||0)}건</b>${rawHtml(nearTxt? tpl` <span style="color:var(--muted)">(인접 달: ${rawHtml(nearTxt)})</span>`:'')}`+ tpl`${rawHtml((D.dbCts||0)===0? ' — <b style="color:var(--critical)">이 달 인식 금액이 하나도 없습니다. 월 매출 인식이 아직 안 돌았거나 대상 월이 다릅니다</b>':'')}`);
     if((D.dbCts||0)>0){
-      lines.push('비즈포탈 회계매출 있는 고객사 <b>'+(D.bizCusts||0)+'곳</b> · 이름으로 관리포탈과 붙은 회사 <b>'+(D.matched||0)+'곳</b>'+
-        ((D.bizCusts||0)>0 && (D.matched||0)/(D.bizCusts||1)<0.5? ' — <b style="color:var(--critical)">절반도 안 붙었습니다. 두 쪽 고객사 표기 방식이 체계적으로 다른 것 같습니다 (아래 비슷한 이름 목록에서 패턴을 봐 주세요)</b>':''));
+      lines.push(tpl`비즈포탈 회계매출 있는 고객사 <b>${rawHtml(D.bizCusts||0)}곳</b> · 이름으로 관리포탈과 붙은 회사 <b>${rawHtml(D.matched||0)}곳</b>`+ tpl`${rawHtml((D.bizCusts||0)>0 && (D.matched||0)/(D.bizCusts||1)<0.5? ' — <b style="color:var(--critical)">절반도 안 붙었습니다. 두 쪽 고객사 표기 방식이 체계적으로 다른 것 같습니다 (아래 비슷한 이름 목록에서 패턴을 봐 주세요)</b>':'')}`);
     } else lines.push('→ 관리포탈에 '+mk(T)+' 월 매출을 먼저 만들고(매출 인식·재계산) 엑셀을 다시 올리면 됩니다. 이 상태의 «비즈포탈에만 있음» 은 전부 그 때문이라 저장하지 마세요.');
-    if(D.unit) lines.push('<b style="color:var(--critical)">⚠ '+D.unit+'</b>');
-    if((D.dbCts||0)>0 && D.nearMiss && D.nearMiss.length) lines.push('비즈포탈에만 있는 회사 중 관리포탈에 <i>비슷한 이름</i>이 있는 경우 (표기 패턴 확인용): '+
-      D.nearMiss.slice(0,12).map(function(x){ return esc(x.biz)+' ≈ <span style="color:var(--s1-ink)">'+esc(x.db)+'</span> ('+Math.round(x.sim*100)+'%)'; }).join(' · '));
+    if(D.unit) lines.push(tpl`<b style="color:var(--critical)">⚠ ${rawHtml(D.unit)}</b>`);
+    if((D.dbCts||0)>0 && D.nearMiss && D.nearMiss.length) lines.push(tpl`비즈포탈에만 있는 회사 중 관리포탈에 <i>비슷한 이름</i>이 있는 경우 (표기 패턴 확인용): `+
+      tpl`${rawHtml(D.nearMiss.slice(0,12).map(function(x){ return tpl`${x.biz} ≈ <span style="color:var(--s1-ink)">${x.db}</span> (${Math.round(x.sim*100)}%)`; }).join(' · '))}`);
     if(BZX.monthCnt){ var mc=Object.keys(BZX.monthCnt).sort().map(function(k){ return k+' '+BZX.monthCnt[k]+'행'; }).join(' · ');
       var dropped=Object.keys(BZX.monthCnt).filter(function(k){ return k!==BZX.month; }).reduce(function(a,k){ return a+BZX.monthCnt[k]; },0);
       lines.unshift('엑셀 «예상시기» 월 분포: '+mc+(dropped? ' — 다른 달로 적힌 '+dropped+'행도 모두 대조에 넣었습니다 (엑셀은 그 달 목록이므로 날짜로 걸러내지 않습니다)':' (전부 '+BZX.month+')')); }
     var open=bad>0.3 || (D.dbCts||0)===0 || !!D.unit || (BZX.monthCnt && Object.keys(BZX.monthCnt).length>1);
-    h+='<details'+(open?' open':'')+' style="margin:0 0 10px;padding:8px 12px;border:1px dashed var(--ring);border-radius:10px;background:var(--surface-2,rgba(0,0,0,.02))"><summary class="mini" style="cursor:pointer"><b>🩺 대조 진단</b>'+
-       (open? ' <span style="color:var(--critical)">— 차이가 비정상적으로 많아 자동으로 펼쳤습니다. 아래 줄을 확인하세요</span>':'')+'</summary>'+
-       '<div class="mini" style="line-height:1.8;margin-top:6px">'+lines.map(function(l){ return '· '+l; }).join('<br>')+'</div></details>';
+    h+=tpl`<details${open?' open':''} style="margin:0 0 10px;padding:8px 12px;border:1px dashed var(--ring);border-radius:10px;background:var(--surface-2,rgba(0,0,0,.02))"><summary class="mini" style="cursor:pointer"><b>🩺 대조 진단</b>`+ tpl`${rawHtml(open? ' <span style="color:var(--critical)">— 차이가 비정상적으로 많아 자동으로 펼쳤습니다. 아래 줄을 확인하세요</span>':'')}</summary>`+
+       tpl`<div class="mini" style="line-height:1.8;margin-top:6px">${rawHtml(lines.map(function(l){ return '· '+l; }).join('<br>'))}</div></details>`;
   })();
   h+='<div style="overflow-x:auto"><table class="pr" style="width:100%;table-layout:fixed"><colgroup><col style="width:130px"><col style="width:24%"><col style="width:100px"><col style="width:100px"><col style="width:100px"><col style="width:200px"><col></colgroup><thead><tr><th>구분</th><th>고객사</th><th class="n">비즈포탈(원)</th><th class="n">관리포탈(원)</th><th class="n">차이(원)</th><th></th><th>사유 <span class="mini" style="color:var(--muted)">(담당자 입력 · 지난달 같은 사유는 미리 채움 · 회색 글은 자동 판단)</span></th></tr></thead><tbody>';
-  if(!diffs.length) h+='<tr><td colspan="7" class="mini" style="color:var(--muted)">'+(ruled.length? '확인할 차이 없음 — 남은 차이는 모두 반복 규칙으로 처리됐습니다 ✓' : '차이 없음 — 전부 일치합니다 🎉')+'</td></tr>';
+  if(!diffs.length) h+=tpl`<tr><td colspan="7" class="mini" style="color:var(--muted)">${ruled.length? '확인할 차이 없음 — 남은 차이는 모두 반복 규칙으로 처리됐습니다 ✓' : '차이 없음 — 전부 일치합니다 🎉'}</td></tr>`;
   diffs.forEach(function(q,i){
     var c=BZX_CAT[q.cat==='alias' && q.pairConf==='low'? 'aliasq' : q.cat], key=bzxNoteKey(q), note=(BZX.notes[key]!=null)? BZX.notes[key] : bzxPrevNote(q.name);
-    var pairTxt=q.pair? ' ⇄ '+esc(q.pair.name) : (q.aliasHint? ' <span class="mini" style="color:var(--s1-ink)">⇄ '+esc(q.aliasHint.db)+' (표기 차이 추정)</span>' : '');
+    var pairTxt=q.pair? ' ⇄ '+esc(q.pair.name) : (q.aliasHint? tpl` <span class="mini" style="color:var(--s1-ink)">⇄ ${q.aliasHint.db} (표기 차이 추정)</span>` : '');
     var auto=q.cat==='fee'? '설치비 '+w(q.bizFee||q.dbFee)+'원 — 비즈포탈은 이 달, 관리포탈 정산일은 '+(q.db.filter(function(d){return d.r.fee;}).map(function(d){ return String(d.r.settle||'').slice(0,7)||'없음'; })[0]||'다른 달')
            : q.cat==='alias'? (q.pairConf==='low'? '금액만 같고 이름은 전혀 달라 같은 회사인지 확인 필요 — 맞으면 별칭 저장, 아니면 각각 사유 기입' : '양쪽에 같은 금액 — 이름 표기만 다름(별칭 저장 권장)')
            : (q.cat==='bizonly' && q.dbCts && q.dbCts.length)? '관리포탈에 고객사는 있으나 이 달 매출 없음 — 계약 '+q.dbCts.map(function(r){ return lline(r.line)+' '+(r.startRaw!=null?mk(r.startRaw):'?')+'~'+(r.endRaw!=null?mk(r.endRaw):'')+' '+(r.status||''); }).join(', ')
@@ -1034,37 +1022,34 @@ export function bzxRender(host){
            : q.cat==='zero'? ('비즈포탈에 행은 있지만 회계매출이 0 — 매출액 '+w(q.zeroSales)+'원 · '+esc(q.zero.map(function(b){ return (b.st||'')+(b.why? '/'+b.why:''); }).filter(function(x,i,a){ return a.indexOf(x)===i; }).join(', '))+' (하위매출 미등록·수금 변경 행이면 비즈포탈에서 회계매출 등록 필요)')
            : (q.aliasHint && q.cat==='amt')? ('표기 차이 «'+esc(q.aliasHint.biz)+'» ⇄ «'+esc(q.aliasHint.db)+'» 로 묶어 비교 — 금액이 다릅니다') : '';
     var bizAmt=q.cat==='alias'? q.bizAmt : q.bizAmt, dbAmt=q.cat==='alias'? q.pair.dbTot : q.dbTot, diff=q.cat==='alias'? 0 : q.diff;
-    h+='<tr data-i="'+i+'"><td><span class="chip" style="pointer-events:none;color:'+c[1]+';border-color:'+c[1]+'">'+c[0]+'</span></td>'+
-       '<td style="overflow-wrap:anywhere;white-space:normal"><b>'+esc(q.name)+'</b>'+pairTxt+(Object.keys(q.names).length>1 && !q.pair? '<div class="mini" style="color:var(--muted)">'+esc(Object.keys(q.names).filter(function(n){return n!==q.name;}).join(' · '))+'</div>':'')+'</td>'+
-       '<td class="n">'+(q.biz.some(bzxCounted)? w(bizAmt):'·')+'</td><td class="n">'+((q.db.length||q.pair)? w(dbAmt):'·')+'</td>'+
-       '<td class="n" style="font-weight:700;color:'+(diff===0?'var(--muted)':diff>0?'var(--ok,#2e7d32)':'var(--critical)')+'">'+(diff>0?'+':'')+w(diff)+'</td>'+
-       '<td style="white-space:normal"><div style="display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center"><button class="chip bzx-det" data-i="'+i+'" title="양쪽 원본 행 보기">내역</button>'+((q.cat==='alias'||q.aliasHint) && !ST.IS_VIEWER? '<button class="chip bzx-alias" data-i="'+i+'" title="비즈포탈 표기를 포탈 고객사의 별칭으로 저장 — 다음 달부터 자동으로 맞춰짐">별칭 저장</button>':'')+
-         ((q.cat!=='alias' || q.pairConf==='low') && !ST.IS_VIEWER? '<select class="chip bzx-rule" data-i="'+i+'" title="이 회사가 매달 같은 종류의 차이로 잡힐 때 어떻게 할지 — 다시 묻지 않습니다. 사유 기록 = 차액 인정·사유 자동 기록 / 무시 = 우리 차액 아님·총계와 표에서 제외" style="font:inherit;font-size:12px;cursor:pointer;width:124px;max-width:124px;box-sizing:border-box;padding-right:14px;text-overflow:ellipsis"><option value="">🔁 반복 규칙</option><option value="note">사유 기록 반복</option><option value="ignore">무시 반복</option></select>':'')+'</div></td>'+
-       '<td><input class="bzx-note" data-key="'+esc(key)+'" value="'+esc(note)+'" placeholder="'+esc(auto||'왜 다른지 한 줄로')+'" title="'+esc(auto||'')+'" style="width:100%;box-sizing:border-box;font:inherit;padding:5px 8px;border:1px solid var(--ring);border-radius:8px;background:var(--surface-2);color:inherit"></td></tr>';
-    h+='<tr class="bzx-detrow" data-i="'+i+'" style="display:none"><td colspan="7" style="background:var(--surface-2,rgba(0,0,0,.02))"><div class="mini" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'+
-       '<div><b>비즈포탈 행</b>'+(q.biz.length? '<table class="pr" style="margin-top:4px"><tbody>'+q.biz.map(function(b){ return '<tr><td>'+esc(b.proj)+'</td><td>'+esc(b.st)+'</td><td class="n">'+w(b.acc)+'</td><td class="mini">'+esc(b.why||'')+'</td></tr>'; }).join('')+'</tbody></table>' : '<div style="color:var(--muted)">없음</div>')+'</div>'+
-       '<div><b>관리포탈 계약 (이 DB)</b>'+((q.pair? q.pair.db : q.db).length? '<table class="pr" style="margin-top:4px"><tbody>'+(q.pair? q.pair.db : q.db).map(function(d){ return '<tr><td>'+esc(d.cust)+'</td><td>'+esc(lline(d.line))+' · '+esc(d.status||'')+'</td><td class="n">'+w(d.amt)+(d.fee? ' + 설치비 '+w(d.fee):'')+'</td><td class="mini">'+esc((d.note||'').slice(0,40))+'</td></tr>'; }).join('')+'</tbody></table>' : '<div style="color:var(--muted)">이 달 매출 없음'+(q.cat==='bizonly'? ' — 계약 미등록·사명 불일치·인식 월 차이 중 하나':'')+'</div>')+'</div></div></td></tr>';
+    h+=tpl`<tr data-i="${rawHtml(i)}"><td><span class="chip" style="pointer-events:none;color:${rawHtml(c[1])};border-color:${rawHtml(c[1])}">${rawHtml(c[0])}</span></td>`+
+       tpl`<td style="overflow-wrap:anywhere;white-space:normal"><b>${q.name}</b>${rawHtml(pairTxt)}${rawHtml(Object.keys(q.names).length>1 && !q.pair? tpl`<div class="mini" style="color:var(--muted)">${Object.keys(q.names).filter(function(n){return n!==q.name;}).join(' · ')}</div>`:'')}</td>`+
+       tpl`<td class="n">${rawHtml(q.biz.some(bzxCounted)? w(bizAmt):'·')}</td><td class="n">${rawHtml((q.db.length||q.pair)? w(dbAmt):'·')}</td>`+
+       tpl`<td class="n" style="font-weight:700;color:${diff===0?'var(--muted)':diff>0?'var(--ok,#2e7d32)':'var(--critical)'}">${diff>0?'+':''}${rawHtml(w(diff))}</td>`+
+       tpl`<td style="white-space:normal"><div style="display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center"><button class="chip bzx-det" data-i="${rawHtml(i)}" title="양쪽 원본 행 보기">내역</button>${rawHtml((q.cat==='alias'||q.aliasHint) && !ST.IS_VIEWER? tpl`<button class="chip bzx-alias" data-i="${rawHtml(i)}" title="비즈포탈 표기를 포탈 고객사의 별칭으로 저장 — 다음 달부터 자동으로 맞춰짐">별칭 저장</button>`:'')}`+ tpl`${rawHtml((q.cat!=='alias' || q.pairConf==='low') && !ST.IS_VIEWER? tpl`<select class="chip bzx-rule" data-i="${rawHtml(i)}" title="이 회사가 매달 같은 종류의 차이로 잡힐 때 어떻게 할지 — 다시 묻지 않습니다. 사유 기록 = 차액 인정·사유 자동 기록 / 무시 = 우리 차액 아님·총계와 표에서 제외" style="font:inherit;font-size:12px;cursor:pointer;width:124px;max-width:124px;box-sizing:border-box;padding-right:14px;text-overflow:ellipsis"><option value="">🔁 반복 규칙</option><option value="note">사유 기록 반복</option><option value="ignore">무시 반복</option></select>`:'')}</div></td>`+
+       tpl`<td><input class="bzx-note" data-key="${key}" value="${note}" placeholder="${auto||'왜 다른지 한 줄로'}" title="${auto||''}" style="width:100%;box-sizing:border-box;font:inherit;padding:5px 8px;border:1px solid var(--ring);border-radius:8px;background:var(--surface-2);color:inherit"></td></tr>`;
+    h+=tpl`<tr class="bzx-detrow" data-i="${rawHtml(i)}" style="display:none"><td colspan="7" style="background:var(--surface-2,rgba(0,0,0,.02))"><div class="mini" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">`+
+       tpl`<div><b>비즈포탈 행</b>${rawHtml(q.biz.length? tpl`<table class="pr" style="margin-top:4px"><tbody>${rawHtml(q.biz.map(function(b){ return tpl`<tr><td>${b.proj}</td><td>${b.st}</td><td class="n">${rawHtml(w(b.acc))}</td><td class="mini">${b.why||''}</td></tr>`; }).join(''))}</tbody></table>` : '<div style="color:var(--muted)">없음</div>')}</div>`+
+       tpl`<div><b>관리포탈 계약 (이 DB)</b>${rawHtml((q.pair? q.pair.db : q.db).length? tpl`<table class="pr" style="margin-top:4px"><tbody>${rawHtml((q.pair? q.pair.db : q.db).map(function(d){ return tpl`<tr><td>${d.cust}</td><td>${lline(d.line)} · ${d.status||''}</td><td class="n">${rawHtml(w(d.amt))}${rawHtml(d.fee? ' + 설치비 '+w(d.fee):'')}</td><td class="mini">${(d.note||'').slice(0,40)}</td></tr>`; }).join(''))}</tbody></table>` : tpl`<div style="color:var(--muted)">이 달 매출 없음${q.cat==='bizonly'? ' — 계약 미등록·사명 불일치·인식 월 차이 중 하나':''}</div>`)}</div></div></td></tr>`;
   });
   h+='</tbody></table></div>';
-  h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px">'+
-     (ruled.length? '<button class="chip" id="bzxRuled" aria-pressed="'+BZX.showRuled+'" title="한 번 정한 규칙으로 매달 자동 처리되는 차이 — 사유 기록 반복은 저장 시 사유가 붙어 기록되고, 무시 반복은 총계·표에서 빠집니다">🔁 반복 규칙 '+ruled.length+'곳 · 기록 '+(ruled.length-S.ign)+' / 무시 '+S.ign+' '+(BZX.showRuled?'접기':'보기')+'</button>':'')+
-     '<button class="chip" id="bzxEq" aria-pressed="'+BZX.showEq+'">일치 '+eqs.length+'곳 '+(BZX.showEq?'접기':'보기')+'</button>'+
-     '<button class="chip" id="bzxSkip" aria-pressed="'+BZX.showSkip+'">실패·중지 참고 '+skips.length+'곳 · '+w(S.skip/1000)+'천원 '+(BZX.showSkip?'접기':'보기')+'</button>'+
-     '<span class="spacer" style="flex:1"></span>'+
-     (ST.IS_VIEWER? '' : '<button class="pill pri" id="bzxSave">💾 비즈포탈 차액 표에 저장 ('+(T!=null? (+mk(T).slice(5,7))+'월':'')+')</button>')+
-     '<button class="pill ghost" id="bzxClose">닫기</button></div>';
-  if(BZX.showRuled && ruled.length) h+='<div class="mini" style="margin-top:8px"><b>🔁 반복 규칙으로 처리된 차이</b> — <b>사유 기록</b>은 저장 시 사유가 붙어 차액 표에 남고, <b>무시</b>는 우리 차액이 아닌 것으로 보아 총계·표에서 빠집니다. 차이 종류가 바뀌면 자동으로 다시 확인 표에 올라옵니다<table class="pr" style="margin-top:4px"><thead><tr><th>규칙</th><th>구분</th><th>고객사</th><th class="n">비즈포탈</th><th class="n">포탈</th><th class="n">차이</th><th>사유(규칙)</th><th></th></tr></thead><tbody>'+
-    ruled.map(function(q){ var c=BZX_CAT[q.cat], ig=q.rule.mode==='ignore'; return '<tr'+(ig? ' style="color:var(--muted)"':'')+'><td><span class="chip" style="pointer-events:none;'+(ig? 'color:var(--muted)':'color:var(--s1-ink);border-color:var(--s1)')+'">'+(ig? '무시':'사유 기록')+'</span></td><td><span class="chip" style="pointer-events:none;color:'+c[1]+';border-color:'+c[1]+'">'+c[0]+'</span></td><td>'+esc(q.name)+'</td><td class="n">'+(q.bizAmt? w(q.bizAmt):'·')+'</td><td class="n">'+(q.dbTot? w(q.dbTot):'·')+'</td><td class="n">'+(q.diff>0?'+':'')+w(q.diff)+'</td><td>'+esc(q.rule.note)+' <span style="color:var(--muted)">('+String(q.rule.created_at||'').slice(0,10)+(q.rule.created_by? ' · '+esc(q.rule.created_by):'')+')</span></td><td>'+(ST.IS_VIEWER? '' : '<button class="chip bzx-unrule" data-id="'+q.rule.id+'" title="규칙을 끄면 다음 대조부터 다시 확인 표에 나옵니다">규칙 해제</button>')+'</td></tr>'; }).join('')+'</tbody></table></div>';
-  if(BZX.showEq) h+='<div class="mini" style="margin-top:8px;line-height:1.7"><b>일치</b> — '+eqs.map(function(q){ return esc(q.name)+' '+w(q.bizAmt); }).join(' · ')+'</div>';
-  if(BZX.showSkip) h+='<div class="mini" style="margin-top:8px"><b>실패·중지 행</b> (회계매출이 적혀 있어도 비교에서 뺐습니다 — 중복 등록·해지 건)<table class="pr" style="margin-top:4px"><tbody>'+skips.map(function(q){ return q.biz.filter(function(b){ return !bzxCounted(b); }).map(function(b){ return '<tr><td>'+esc(b.cust)+'</td><td>'+esc(b.proj)+'</td><td>'+esc(b.st)+'</td><td class="n">'+w(b.acc)+'</td><td class="mini">'+esc(b.why||'')+'</td></tr>'; }).join(''); }).join('')+'</tbody></table></div>';
-  h+='<div style="margin-top:10px">'+helpBox('bzx','이 대조는 어떻게 계산하나요?',[
+  h+=tpl`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px">`+ tpl`${rawHtml(ruled.length? tpl`<button class="chip" id="bzxRuled" aria-pressed="${rawHtml(BZX.showRuled)}" title="한 번 정한 규칙으로 매달 자동 처리되는 차이 — 사유 기록 반복은 저장 시 사유가 붙어 기록되고, 무시 반복은 총계·표에서 빠집니다">🔁 반복 규칙 ${ruled.length}곳 · 기록 ${ruled.length-S.ign} / 무시 ${rawHtml(S.ign)} ${BZX.showRuled?'접기':'보기'}</button>`:'')}`+
+     tpl`<button class="chip" id="bzxEq" aria-pressed="${rawHtml(BZX.showEq)}">일치 ${eqs.length}곳 ${BZX.showEq?'접기':'보기'}</button>`+
+     tpl`<button class="chip" id="bzxSkip" aria-pressed="${rawHtml(BZX.showSkip)}">실패·중지 참고 ${skips.length}곳 · ${rawHtml(w(S.skip/1000))}천원 ${BZX.showSkip?'접기':'보기'}</button>`+
+     tpl`<span class="spacer" style="flex:1"></span>`+ tpl`${rawHtml(ST.IS_VIEWER? '' : tpl`<button class="pill pri" id="bzxSave">💾 비즈포탈 차액 표에 저장 (${rawHtml(T!=null? (+mk(T).slice(5,7))+'월':'')})</button>`)}`+
+     tpl`<button class="pill ghost" id="bzxClose">닫기</button></div>`;
+  if(BZX.showRuled && ruled.length) h+=tpl`<div class="mini" style="margin-top:8px"><b>🔁 반복 규칙으로 처리된 차이</b> — <b>사유 기록</b>은 저장 시 사유가 붙어 차액 표에 남고, <b>무시</b>는 우리 차액이 아닌 것으로 보아 총계·표에서 빠집니다. 차이 종류가 바뀌면 자동으로 다시 확인 표에 올라옵니다<table class="pr" style="margin-top:4px"><thead><tr><th>규칙</th><th>구분</th><th>고객사</th><th class="n">비즈포탈</th><th class="n">포탈</th><th class="n">차이</th><th>사유(규칙)</th><th></th></tr></thead><tbody>`+
+    tpl`${rawHtml(ruled.map(function(q){ var c=BZX_CAT[q.cat], ig=q.rule.mode==='ignore'; return tpl`<tr${rawHtml(ig? ' style="color:var(--muted)"':'')}><td><span class="chip" style="pointer-events:none;${ig? 'color:var(--muted)':'color:var(--s1-ink);border-color:var(--s1)'}">${ig? '무시':'사유 기록'}</span></td><td><span class="chip" style="pointer-events:none;color:${rawHtml(c[1])};border-color:${rawHtml(c[1])}">${rawHtml(c[0])}</span></td><td>${q.name}</td><td class="n">${rawHtml(q.bizAmt? w(q.bizAmt):'·')}</td><td class="n">${rawHtml(q.dbTot? w(q.dbTot):'·')}</td><td class="n">${q.diff>0?'+':''}${rawHtml(w(q.diff))}</td><td>${q.rule.note} <span style="color:var(--muted)">(${rawHtml(String(q.rule.created_at||'').slice(0,10))}${rawHtml(q.rule.created_by? ' · '+esc(q.rule.created_by):'')})</span></td><td>${rawHtml(ST.IS_VIEWER? '' : tpl`<button class="chip bzx-unrule" data-id="${rawHtml(q.rule.id)}" title="규칙을 끄면 다음 대조부터 다시 확인 표에 나옵니다">규칙 해제</button>`)}</td></tr>`; }).join(''))}</tbody></table></div>`;
+  if(BZX.showEq) h+=tpl`<div class="mini" style="margin-top:8px;line-height:1.7"><b>일치</b> — ${rawHtml(eqs.map(function(q){ return esc(q.name)+' '+w(q.bizAmt); }).join(' · '))}</div>`;
+  if(BZX.showSkip) h+=tpl`<div class="mini" style="margin-top:8px"><b>실패·중지 행</b> (회계매출이 적혀 있어도 비교에서 뺐습니다 — 중복 등록·해지 건)<table class="pr" style="margin-top:4px"><tbody>${rawHtml(skips.map(function(q){ return q.biz.filter(function(b){ return !bzxCounted(b); }).map(function(b){ return tpl`<tr><td>${b.cust}</td><td>${b.proj}</td><td>${b.st}</td><td class="n">${rawHtml(w(b.acc))}</td><td class="mini">${b.why||''}</td></tr>`; }).join(''); }).join(''))}</tbody></table></div>`;
+  h+=tpl`<div style="margin-top:10px">${rawHtml(helpBox('bzx','이 대조는 어떻게 계산하나요?',[
     ['비즈포탈 쪽','엑셀에서 쓰는 열은 «고객사»·«회계매출»·«진행상태» 셋뿐입니다. 진행상태가 «종료»·«계산서발행» 인 행의 «회계매출» 합 (실패·중지·취소류만 비교에서 빼고 참고로 보여줍니다). 행은 있는데 회계매출이 0 인 회사(상위 행만 있고 하위매출 미등록, 수금 변경 행)는 «비즈포탈 회계매출 0» 으로 따로 잡습니다. «예상시기» 는 대상 월 이름을 정할 때만 쓰고 행을 걸러내지 않습니다.'],
     ['관리포탈 쪽','이 통합 관리 포탈 DB 의 그 달 계약별 월 매출(monthly_revenue) 합 + 대금정산일이 그 달인 설치비. 비즈포탈은 설치비를 별도 행으로 잡기 때문에 같이 봐야 맞습니다. 표에서 «관리포탈» 은 항상 이 포탈, «비즈포탈» 은 올린 엑셀을 뜻합니다.'],
     ['회사 묶기','띄어쓰기·㈜·(에스원)·괄호 안 사이트명·사명 변경 별칭을 무시하고 회사 단위로 묶습니다(두산에너빌리티 사우디/괌/이집트 → 1곳). 이름이 한 글자 오타 수준으로 닮은 짝(브랜드/브랜즈, 에프엔비/에프앤비)은 금액이 달라도 한 회사로 묶어 비교하고 «⇄ 표기 차이 추정» 으로 표시합니다. 그 위에 «비즈포탈에만 있음» = 엑셀에만 있음, «관리포탈에만 있음» = 이 포탈 DB 에만 있음입니다. 이름은 전혀 다른데 양쪽 금액이 같으면 «표기 차이(추정)»로 짝을 제안합니다. «별칭 저장»을 누르면 다음 달부터 자동으로 맞춰집니다.'],
     ['사유','차이 행마다 담당자가 한 줄로 적습니다. 지난달에 같은 고객사로 적은 사유가 있으면 미리 채워 두니 확인만 하면 됩니다. 「저장」을 누르면 요약 3줄 + 고객사별 차이가 아래 «비즈포탈 차액» 표에 들어갑니다.'],
     ['🔁 매달 반복','<b>매달 같은 이유로 생기는 차이</b>는 사유를 적고 «매달 반복»에서 종류를 고르면 규칙으로 저장돼 다음 달부터 묻지 않습니다. <b>사유 기록 반복</b> = 차액은 그대로 인정하고 저장할 때 이 사유가 자동으로 붙어 기록됨(예: 설치비 인식 시점, 분기납 인식 차이). <b>무시 반복</b> = 우리 쪽 차액이 아닌 것(다른 부서 담당자가 등록하는 조달 건 등)으로 보고 총계·고객사별 표에서 아예 빼며 기록하지 않음. 둘 다 «반복 규칙» 묶음에서 확인·해제할 수 있고, 차이 종류가 바뀌면(예: 포탈에만 있음 → 금액 다름) 다시 확인을 받습니다.'],
     ['엑셀 파일','저장하지 않습니다. 화면을 닫으면 사라지고, 다음 달에는 새 파일을 다시 올리면 됩니다.']
-  ])+'</div>';
+  ]))}`+ tpl`</div>`;
   box.innerHTML=h; host.insertBefore(box, host.firstChild.nextSibling);
   helpWire(box);
   box.querySelectorAll('.bzx-note').forEach(function(inp){ inp.oninput=function(){ BZX.notes[inp.dataset.key]=inp.value; }; });
@@ -1253,19 +1238,19 @@ export function renderChvTable(){
   var fb=$('#chvFclr'); fb.style.display=nf? '':'none'; fb.textContent='✕ 필터 해제 ('+nf+')';
 
   var t=$('#chvCt');
-  t.innerHTML='<thead><tr>'+CHV_COLS.map(function(c){
-      return '<th'+(c.right?' class="n"':'')+'></th>'; }).join('')+'</tr></thead>'+
-    '<tbody>'+rows.slice(0,300).map(function(r,i){
-      return '<tr data-i="'+i+'">'+CHV_COLS.map(function(c){
+  t.innerHTML=tpl`<thead><tr>${rawHtml(CHV_COLS.map(function(c){
+      return tpl`<th${rawHtml(c.right?' class="n"':'')}></th>`; }).join(''))}`+ tpl`</tr></thead>`+
+    tpl`<tbody>${rawHtml(rows.slice(0,300).map(function(r,i){
+      return tpl`<tr data-i="${rawHtml(i)}">${rawHtml(CHV_COLS.map(function(c){
         var txt=chvText(c,r); if(txt===BLANK_LABEL) txt='·';
         if(c.link){
           var n=(r._hist? r._hist.length:1);
-          return '<td><a href="#" class="chv-cust" data-i="'+i+'" style="color:var(--s1-ink);font-weight:700;text-decoration:none">'+
-                 esc(txt)+'</a>'+(n>1? ' <span class="mini">('+n+')</span>':'')+'</td>';
+          return tpl`<td><a href="#" class="chv-cust" data-i="${rawHtml(i)}" style="color:var(--s1-ink);font-weight:700;text-decoration:none">`+
+                 tpl`${txt}</a>${rawHtml(n>1? tpl` <span class="mini">(${rawHtml(n)})</span>`:'')}</td>`;
         }
-        return '<td'+(c.right?' class="n"':'')+'>'+esc(txt)+'</td>';
-      }).join('')+'</tr>';
-    }).join('')+'</tbody>';
+        return tpl`<td${rawHtml(c.right?' class="n"':'')}>${txt}</td>`;
+      }).join(''))}`+ tpl`</tr>`;
+    }).join(''))}`+ tpl`</tbody>`;
 
   // 헤더 (정렬 + 값 골라 보기)
   var ths=t.querySelectorAll('thead th');
@@ -1316,17 +1301,17 @@ export function openChvHist(r){
   var sum=live.reduce(function(a,h){ return a+(h.mrr||0); },0);
   $('#chvHCap').textContent=(CH_DEFS[CHV.key]? CH_DEFS[CHV.key][0].replace(/^\S+ /,'')+' · ':'')+hist.length+'건 · 최근 계약이 위쪽입니다'+
     (live.length? ' · '+baseLabel()+' 유효 '+live.length+'건, 합계 MRR '+won(sum)+'천원' : ' · '+baseLabel()+' 유효 계약 없음');
-  $('#chvHBody').innerHTML='<div class="tbl-wrap" tabindex="0" style="max-height:min(58vh,460px)"><table class="dgrid">'+
-    '<thead><tr><th>서비스</th><th>파트너</th><th>계산서발행처</th><th>구분</th><th>상태</th>'+
-    '<th>시작월</th><th>종료월</th><th class="n">MRR</th><th>비고</th></tr></thead><tbody>'+
-    hist.map(function(h,i){
-      return '<tr'+(i===0?' style="background:rgba(20,158,64,.07)"':'')+'>'+
-        '<td>'+esc(lline(h.line)||'·')+'</td><td>'+esc(h.ptn||'·')+'</td><td>'+esc(h.partner||'·')+'</td>'+
-        '<td>'+esc(h.ctype||'·')+'</td><td>'+esc(h.status||'·')+'</td>'+
-        '<td>'+esc(mk(h.startIdx)||'·')+'</td><td>'+esc(mk(h.endIdx)||'·')+'</td>'+
-        '<td class="n">'+won(h.mrr||0)+'천원</td>'+
-        '<td>'+esc([h.note,h.churn].filter(Boolean).join(' · ')||'·')+'</td></tr>';
-    }).join('')+'</tbody></table></div>';
+  $('#chvHBody').innerHTML=tpl`<div class="tbl-wrap" tabindex="0" style="max-height:min(58vh,460px)"><table class="dgrid">`+
+    tpl`<thead><tr><th>서비스</th><th>파트너</th><th>계산서발행처</th><th>구분</th><th>상태</th>`+
+    tpl`<th>시작월</th><th>종료월</th><th class="n">MRR</th><th>비고</th></tr></thead><tbody>`+
+    tpl`${rawHtml(hist.map(function(h,i){
+      return tpl`<tr${rawHtml(i===0?' style="background:rgba(20,158,64,.07)"':'')}>`+
+        tpl`<td>${lline(h.line)||'·'}</td><td>${h.ptn||'·'}</td><td>${h.partner||'·'}</td>`+
+        tpl`<td>${h.ctype||'·'}</td><td>${h.status||'·'}</td>`+
+        tpl`<td>${mk(h.startIdx)||'·'}</td><td>${mk(h.endIdx)||'·'}</td>`+
+        tpl`<td class="n">${won(h.mrr||0)}천원</td>`+
+        tpl`<td>${[h.note,h.churn].filter(Boolean).join(' · ')||'·'}</td></tr>`;
+    }).join(''))}`+ tpl`</tbody></table></div>`;
   openOvl('ovlChvHist');
 }
 
@@ -1559,12 +1544,9 @@ export function liveDeltaHtml(b){
   var n=dd.n, dn=dd.curN-dd.prevN;
   var plus=[n.신규? '신규 '+n.신규:'', n.복귀? '복귀 '+n.복귀:''].filter(Boolean).join(' · ');
   var minus=[n.만기? '만기 미처리 '+n.만기:'', n.해지? '해지 '+n.해지:'', n.종료? '종료 '+n.종료:'', n.예외? '예외 제외 '+n.예외:''].filter(Boolean).join(' · ');
-  return '<div class="lv-delta" title="LIVE 고객사 수의 전월 대비 변화를 사유별로 나눈 것 — 숫자는 회사 단위 · 만기 미처리 = 종료월이 지났는데 연장·해지·종료 처리가 없어 빠진 곳">'+
-    '전월 '+dd.prevN+' → '+dd.curN+' <b class="'+(dn>0?'up':dn<0?'down':'')+'">('+(dn>0?'+':'')+dn+')</b>'+
-    (dd.added.length? ' · <span class="up">+'+dd.added.length+'</span><span class="why">'+esc(plus)+'</span>':'')+
-    (dd.removed.length? ' · <span class="down">−'+dd.removed.length+'</span><span class="why">'+esc(minus)+'</span>':'')+
-    (dd.checking? ' · <button type="button" class="lnk" data-renew="checking" title="종료월이 최근 2개월 안에 지났는데 연장·해지 처리가 없는 계약 — LIVE 에 넣지 않고 표시만 합니다. 연장을 등록하면 되돌아옵니다">확인중 '+dd.checking+'건 →</button>':'')+
-    '</div>';
+  return tpl`<div class="lv-delta" title="LIVE 고객사 수의 전월 대비 변화를 사유별로 나눈 것 — 숫자는 회사 단위 · 만기 미처리 = 종료월이 지났는데 연장·해지·종료 처리가 없어 빠진 곳">`+
+    tpl`전월 ${rawHtml(dd.prevN)} → ${rawHtml(dd.curN)} <b class="${dn>0?'up':dn<0?'down':''}">(${dn>0?'+':''}${rawHtml(dn)})</b>`+ tpl`${rawHtml(dd.added.length? tpl` · <span class="up">+${dd.added.length}</span><span class="why">${plus}</span>`:'')}`+ tpl`${rawHtml(dd.removed.length? tpl` · <span class="down">−${dd.removed.length}</span><span class="why">${minus}</span>`:'')}`+ tpl`${rawHtml(dd.checking? tpl` · <button type="button" class="lnk" data-renew="checking" title="종료월이 최근 2개월 안에 지났는데 연장·해지 처리가 없는 계약 — LIVE 에 넣지 않고 표시만 합니다. 연장을 등록하면 되돌아옵니다">확인중 ${rawHtml(dd.checking)}건 →</button>`:'')}`+
+    tpl`</div>`;
 }
 /* ── 만기 처리 창 ── */
 export var RN={kind:'due', T:null, open:null, act:'', busy:false};
@@ -1577,23 +1559,22 @@ export function openRenewList(kind, T){
 export function renewKindLabel(k, T){ return k==='lapsed'? '만기 지남 · 미처리' : k==='due'? mk(T)+' 만기' : mk(T+1)+' 만기'; }
 export function renewFormHtml(r, act){
   var dEnd=r.endRaw, term=r.term||12, ne=dEnd+term, cancel='<button type="button" class="pill ghost" id="rnCancel">취소</button>';
-  if(act==='renew') return '<div class="rn-f"><b>연장</b><span>기존 종료 '+mk(dEnd)+' · 회차 '+((r.renew||0)+1)+'회</span>'+
-    '<label>새 종료월 <input type="month" id="rnEnd" value="'+mk(ne)+'"></label>'+
-    '<label>월 금액(천원) <input type="number" id="rnMrr" value="'+Math.round((r.mrr||0)/1000)+'" min="0" step="1" style="width:110px"></label>'+
-    '<label>메모 <input type="text" id="rnNote" placeholder="선택" style="width:180px"></label>'+
-    '<span class="mini">'+mk(dEnd+1)+'부터 새 종료월까지 월 매출을 다시 만듭니다'+(/해지|종료/.test(r.status||'')? ' · 상태는 신규로 되살림':'')+(dEnd<RN.T? ' · 지난 달 매출도 소급 생성':'')+'</span>'+
-    '<button type="button" class="pill" id="rnGo">연장 저장</button>'+cancel+'</div>';
-  if(act==='end') return '<div class="rn-f"><b>서비스종료</b><span>상태를 «서비스종료»로 바꾸고 '+mk(dEnd)+' 이후 월 매출을 지웁니다 · LIVE 에서는 '+mk(dEnd+1)+'부터 제외</span>'+
-    '<label>메모 <input type="text" id="rnNote" placeholder="선택 — 비고에 덧붙임" style="width:220px"></label>'+
-    '<button type="button" class="pill" id="rnGo">종료 저장</button>'+cancel+'</div>';
-  if(act==='churn') return '<div class="rn-f"><b>해지</b>'+
-    '<label>해지월(이 달까지 매출 인식) <input type="month" id="rnMonth" value="'+mk(dEnd)+'"></label>'+
-    '<label>사유 <select id="rnReason">'+CHURN_OPTS.map(function(o){ return '<option>'+esc(o)+'</option>'; }).join('')+'</select></label>'+
-    '<span class="mini">해지월 다음 달부터 LIVE 제외 · 해지 분석·해지율에 반영</span>'+
-    '<button type="button" class="pill" id="rnGo">해지 저장</button>'+cancel+'</div>';
-  if(act==='auto') return '<div class="rn-f"><b>자동연장</b><span>월 단위로 자동 연장되는 계약으로 표시 — 만기 목록·슬랙 알림·«확인중»에서 빠지고 LIVE 판정은 그대로입니다. 계약 관리 표 «자동연장» 열에서 언제든 끌 수 있습니다.'+
-    (dEnd<RN.T? ' <b style="color:var(--critical)">⚠ 종료월이 지나 이미 LIVE 에서 빠진 계약입니다 — LIVE 에 두려면 «연장»으로 종료월을 늘리세요.</b>':'')+'</span>'+
-    '<button type="button" class="pill" id="rnGo">자동연장 켜기</button>'+cancel+'</div>';
+  if(act==='renew') return tpl`<div class="rn-f"><b>연장</b><span>기존 종료 ${mk(dEnd)} · 회차 ${rawHtml((r.renew||0)+1)}회</span>`+
+    tpl`<label>새 종료월 <input type="month" id="rnEnd" value="${mk(ne)}"></label>`+
+    tpl`<label>월 금액(천원) <input type="number" id="rnMrr" value="${Math.round((r.mrr||0)/1000)}" min="0" step="1" style="width:110px"></label>`+
+    tpl`<label>메모 <input type="text" id="rnNote" placeholder="선택" style="width:180px"></label>`+
+    tpl`<span class="mini">${mk(dEnd+1)}부터 새 종료월까지 월 매출을 다시 만듭니다${/해지|종료/.test(r.status||'')? ' · 상태는 신규로 되살림':''}${dEnd<RN.T? ' · 지난 달 매출도 소급 생성':''}</span>`+
+    tpl`<button type="button" class="pill" id="rnGo">연장 저장</button>${rawHtml(cancel)}</div>`;
+  if(act==='end') return tpl`<div class="rn-f"><b>서비스종료</b><span>상태를 «서비스종료»로 바꾸고 ${mk(dEnd)} 이후 월 매출을 지웁니다 · LIVE 에서는 ${mk(dEnd+1)}부터 제외</span>`+
+    tpl`<label>메모 <input type="text" id="rnNote" placeholder="선택 — 비고에 덧붙임" style="width:220px"></label>`+
+    tpl`<button type="button" class="pill" id="rnGo">종료 저장</button>${rawHtml(cancel)}</div>`;
+  if(act==='churn') return tpl`<div class="rn-f"><b>해지</b>`+
+    tpl`<label>해지월(이 달까지 매출 인식) <input type="month" id="rnMonth" value="${mk(dEnd)}"></label>`+
+    tpl`<label>사유 <select id="rnReason">${rawHtml(CHURN_OPTS.map(function(o){ return tpl`<option>${o}</option>`; }).join(''))}</select></label>`+
+    tpl`<span class="mini">해지월 다음 달부터 LIVE 제외 · 해지 분석·해지율에 반영</span>`+
+    tpl`<button type="button" class="pill" id="rnGo">해지 저장</button>${rawHtml(cancel)}</div>`;
+  if(act==='auto') return tpl`<div class="rn-f"><b>자동연장</b><span>월 단위로 자동 연장되는 계약으로 표시 — 만기 목록·슬랙 알림·«확인중»에서 빠지고 LIVE 판정은 그대로입니다. 계약 관리 표 «자동연장» 열에서 언제든 끌 수 있습니다.`+ tpl`${rawHtml(dEnd<RN.T? ' <b style="color:var(--critical)">⚠ 종료월이 지나 이미 LIVE 에서 빠진 계약입니다 — LIVE 에 두려면 «연장»으로 종료월을 늘리세요.</b>':'')}</span>`+
+    tpl`<button type="button" class="pill" id="rnGo">자동연장 켜기</button>${rawHtml(cancel)}</div>`;
   return '';
 }
 export function renderRenewList(){
@@ -1606,22 +1587,22 @@ export function renderRenewList(){
             next:'종료월이 '+mk(T+1)+'인 계약 — 다음 달 안에 처리할 대상(미리 보기)입니다.'};
   $('#rnCap').textContent=caps[RN.kind]+' 월 단위 자동연장 계약은 «자동연장»을 켜면 이 목록과 슬랙 알림에서 빠집니다.'+(W? '' : ' (계약 쓰기 권한이 없어 열람만 됩니다)');
   $('#rnTabs').innerHTML=[['lapsed','만기 지남 · 미처리',S.lapsed.length],['due',mk(T)+' 만기',S.due.length],['next',mk(T+1)+' 만기',S.next.length]].map(function(t){
-    return '<button type="button" data-k="'+t[0]+'" aria-pressed="'+(RN.kind===t[0])+'">'+esc(t[1])+' <b class="num">'+t[2]+'</b></button>'; }).join('');
+    return tpl`<button type="button" data-k="${rawHtml(t[0])}" aria-pressed="${RN.kind===t[0]}">${t[1]} <b class="num">${rawHtml(t[2])}</b></button>`; }).join('');
   $('#rnTabs').querySelectorAll('button').forEach(function(b){ b.onclick=function(){ RN.kind=b.dataset.k; RN.open=null; RN.act=''; renderRenewList(); }; });
-  if(!rows.length){ box.innerHTML='<div class="ib-empty"><span class="ib-ic ok">'+ico('check',16)+'</span>처리할 계약이 없습니다.</div>'; }
+  if(!rows.length){ box.innerHTML=tpl`<div class="ib-empty"><span class="ib-ic ok">${rawHtml(ico('check',16))}</span>처리할 계약이 없습니다.</div>`; }
   else {
-    var h='<table class="rn-tbl"><thead><tr><th>고객사</th><th>서비스</th><th>채널 · 파트너</th><th>기간</th><th class="n">약정</th><th class="n">MRR(천원)</th><th>상태</th>'+(W? '<th>처리</th>':'')+'</tr></thead><tbody>';
+    var h=tpl`<table class="rn-tbl"><thead><tr><th>고객사</th><th>서비스</th><th>채널 · 파트너</th><th>기간</th><th class="n">약정</th><th class="n">MRR(천원)</th><th>상태</th>${rawHtml(W? '<th>처리</th>':'')}</tr></thead><tbody>`;
     rows.forEach(function(r){
       var id=r._id, open=(RN.open===id);
-      h+='<tr data-id="'+id+'"'+(open?' class="rn-on"':'')+'><td><a class="rn-cust" data-c="'+esc(r.cust)+'" title="고객 360">'+esc(r.cust)+'</a>'+(r.s1no? ' <span class="mini">'+esc(r.s1no)+'</span>':'')+'</td>'+
-         '<td>'+esc(llineVer(r.line,r.ver))+'</td><td>'+esc(chOf(r))+(r.ptn&&r.ptn!=='직접(계산서)'? ' · '+esc(r.ptn):'')+'</td>'+
-         '<td>'+(r.startRaw!=null? mk(r.startRaw):'?')+' ~ <b>'+mk(r.endRaw)+'</b></td><td class="n">'+(r.term? r.term+'개월':'·')+'</td><td class="n">'+won(r.mrr)+'</td>'+
-         '<td>'+esc(r.status||'')+(r.renew? ' <span class="ubadge sm">연장 '+r.renew+'회</span>':'')+'</td>';
-      if(W) h+='<td class="rn-acts">'+[['renew','연장'],['end','서비스종료'],['churn','해지'],['auto','자동연장']].map(function(a){ return '<button type="button" class="cbtn'+(open&&RN.act===a[0]?' pri':'')+'" data-id="'+id+'" data-a="'+a[0]+'">'+a[1]+'</button>'; }).join('')+'</td>';
+      h+=tpl`<tr data-id="${rawHtml(id)}"${rawHtml(open?' class="rn-on"':'')}><td><a class="rn-cust" data-c="${r.cust}" title="고객 360">${r.cust}</a>${rawHtml(r.s1no? tpl` <span class="mini">${r.s1no}</span>`:'')}</td>`+
+         tpl`<td>${llineVer(r.line,r.ver)}</td><td>${chOf(r)}${rawHtml(r.ptn&&r.ptn!=='직접(계산서)'? ' · '+esc(r.ptn):'')}</td>`+
+         tpl`<td>${r.startRaw!=null? mk(r.startRaw):'?'} ~ <b>${mk(r.endRaw)}</b></td><td class="n">${rawHtml(r.term? r.term+'개월':'·')}</td><td class="n">${won(r.mrr)}</td>`+
+         tpl`<td>${r.status||''}${rawHtml(r.renew? tpl` <span class="ubadge sm">연장 ${rawHtml(r.renew)}회</span>`:'')}</td>`;
+      if(W) h+=tpl`<td class="rn-acts">${rawHtml([['renew','연장'],['end','서비스종료'],['churn','해지'],['auto','자동연장']].map(function(a){ return tpl`<button type="button" class="cbtn${open&&RN.act===a[0]?' pri':''}" data-id="${rawHtml(id)}" data-a="${rawHtml(a[0])}">${rawHtml(a[1])}</button>`; }).join(''))}</td>`;
       h+='</tr>';
-      if(open && W) h+='<tr class="rn-form"><td colspan="8">'+renewFormHtml(r, RN.act)+'</td></tr>';
+      if(open && W) h+=tpl`<tr class="rn-form"><td colspan="8">${rawHtml(renewFormHtml(r, RN.act))}</td></tr>`;
     });
-    h+='</tbody><tfoot><tr><td colspan="5">합계 '+rows.length+'건</td><td class="n">'+won(sum)+'</td><td colspan="2"></td></tr></tfoot></table>';
+    h+=tpl`</tbody><tfoot><tr><td colspan="5">합계 ${rows.length}건</td><td class="n">${won(sum)}</td><td colspan="2"></td></tr></tfoot></table>`;
     box.innerHTML=h;
     box.querySelectorAll('.rn-cust').forEach(function(a){ a.onclick=function(){ closeOvl('ovlRenew'); openCust360(a.dataset.c); }; });
     box.querySelectorAll('.rn-acts .cbtn').forEach(function(bt){ bt.onclick=function(){
@@ -1756,19 +1737,17 @@ export function renderChannelView(key){
     (ST.RAWX.orders||[]).forEach(function(o){ if(o.channel===ch && ['접수','출하요청','배송중','회수예정'].indexOf(o.status)>=0) pendEq++; });
     (ST.RAWX.assets||[]).forEach(function(a){ if(a.channel===ch && a.status==='임대중') rentEq++; });
   }
-  function tile(k2,v2,u2,d2,kx){ return '<div class="kpi"'+(kx?' data-kx="'+kx+'"':'')+'><div class="k">'+k2+'</div><div class="v">'+v2+'<small>'+u2+'</small></div><div class="d">'+(d2||'')+'</div></div>'; }
-  var h='<div style="display:flex;align-items:baseline;gap:12px;margin:2px 2px 14px">'+
-    '<span style="font-size:18px;font-weight:800">'+def[0]+' 사업 영역</span>'+
-    '<span class="ubadge sm">₩ 금액 단위 = 천원</span>'+
-    '<span class="mini">'+esc(def[2])+' · '+baseLabel()+' 기준</span></div>';
-  h+='<div class="kpis" style="margin-bottom:16px">'+
-    tile('당월 MRR', won(mrr), '천원', '연환산 '+won(mrr*12)+'천원','cv_mrr')+
-    (lvN!=null
+  function tile(k2,v2,u2,d2,kx){ return tpl`<div class="kpi"${rawHtml(kx?' data-kx="'+kx+'"':'')}><div class="k">${rawHtml(k2)}</div><div class="v">${rawHtml(v2)}<small>${rawHtml(u2)}</small></div><div class="d">${rawHtml(d2||'')}</div></div>`; }
+  var h=tpl`<div style="display:flex;align-items:baseline;gap:12px;margin:2px 2px 14px">`+
+    tpl`<span style="font-size:18px;font-weight:800">${rawHtml(def[0])} 사업 영역</span>`+
+    tpl`<span class="ubadge sm">₩ 금액 단위 = 천원</span>`+
+    tpl`<span class="mini">${def[2]} · ${baseLabel()} 기준</span></div>`;
+  h+=tpl`<div class="kpis" style="margin-bottom:16px">`+
+    tpl`${rawHtml(tile('당월 MRR', won(mrr), '천원', '연환산 '+won(mrr*12)+'천원','cv_mrr'))}`+ tpl`${rawHtml(lvN!=null
       ? tile('LIVE 고객사', liveN(lv).toLocaleString('ko-KR'), '곳', (lv.length!==liveN(lv)? '사이트 기준 '+lv.length+'건 · ':'')+liveGroupNote(key),'cv_live')
-      : tile('고객사', Object.keys(custs).length.toLocaleString('ko-KR'), '곳', '당월 매출 기준','cv_cust'))+
-    (hasEq? tile('임대중 장비', rentEq, '대', pendEq? '처리 대기 요청 '+pendEq+'건':'대기 요청 없음','cv_eq')
-          : tile('비중', (monthlyTotal(idxs(),b)? (mrr/monthlyTotal(idxs(),b)*100).toFixed(1):'0')+'%','','전체 당월 매출 대비','cv_mrr'))+
-    '</div>';
+      : tile('고객사', Object.keys(custs).length.toLocaleString('ko-KR'), '곳', '당월 매출 기준','cv_cust'))}`+ tpl`${rawHtml(hasEq? tile('임대중 장비', rentEq, '대', pendEq? '처리 대기 요청 '+pendEq+'건':'대기 요청 없음','cv_eq')
+          : tile('비중', (monthlyTotal(idxs(),b)? (mrr/monthlyTotal(idxs(),b)*100).toFixed(1):'0')+'%','','전체 당월 매출 대비','cv_mrr'))}`+
+    tpl`</div>`;
   if(key==='cnpub'){
     var histC={}, valid={}, pubBad={}, othGov={}, indGov={};
     ST.DATA.rows.forEach(function(r){
@@ -1782,20 +1761,18 @@ export function renderChannelView(key){
     });
     var oth=Object.keys(othGov).map(function(k3){ return lline(k3)+' '+othGov[k3]+'건'; }).join(' · ');
     var pubN=Object.keys(pubBad).length;
-    if(pubN||oth) h+='<section class="card c12" style="margin-bottom:16px"><h2>조달 표기 확인</h2>'+
-      (pubN? '<p class="cap">⚠ 채널이 «공공»으로 입력된 고객사 '+pubN+'곳: '+esc(Object.keys(pubBad).slice(0,12).join(', '))+(pubN>12?' 외 '+(pubN-12)+'곳':'')+' — 산업군이 공공일 뿐 조달 판매가 아니면 «일반»으로, 실제 조달이면 «조달»로 수정하세요</p>':'')+
-      (oth? '<p class="cap">참고: Cloud NAC 외 제품의 조달 계약 '+oth+' — 이 화면에는 포함되지 않습니다</p>':'')+
-      '</section>';
+    if(pubN||oth) h+=tpl`<section class="card c12" style="margin-bottom:16px"><h2>조달 표기 확인</h2>`+ tpl`${rawHtml(pubN? tpl`<p class="cap">⚠ 채널이 «공공»으로 입력된 고객사 ${rawHtml(pubN)}곳: ${Object.keys(pubBad).slice(0,12).join(', ')}${rawHtml(pubN>12?' 외 '+(pubN-12)+'곳':'')} — 산업군이 공공일 뿐 조달 판매가 아니면 «일반»으로, 실제 조달이면 «조달»로 수정하세요</p>`:'')}`+ tpl`${rawHtml(oth? tpl`<p class="cap">참고: Cloud NAC 외 제품의 조달 계약 ${rawHtml(oth)} — 이 화면에는 포함되지 않습니다</p>`:'')}`+
+      tpl`</section>`;
   }
   h+='<div class="grid">';
-  h+='<section class="card c12"><h2>월별 매출 추이<span class="ukw">천원</span></h2><p class="cap">최근 24개월 · '+esc(def[0].replace(/^\S+ /,''))+'</p><div class="chartbox h260" id="chvTrend"></div></section>';
-  h+='<section class="card c12"><h2>계약 목록<span class="ukw">천원</span></h2><p class="cap" id="chvCtCap"></p>'+
-     '<div class="dbar" style="margin-bottom:10px">'+
-       '<input type="search" id="chvQ" placeholder="검색 — 여러 단어로 좁히기 (예: 다원 MDR)">'+
-       '<button class="pill ghost" id="chvFclr" style="display:none;border-color:var(--critical);color:var(--critical)">✕ 필터 해제</button>'+
-       '<span class="spacer"></span><span class="mini" id="chvCnt"></span>'+
-     '</div>'+
-     '<div class="tbl-wrap" tabindex="0" style="max-height:460px"><table id="chvCt" class="dgrid"></table></div></section>';
+  h+=tpl`<section class="card c12"><h2>월별 매출 추이<span class="ukw">천원</span></h2><p class="cap">최근 24개월 · ${def[0].replace(/^\S+ /,'')}</p><div class="chartbox h260" id="chvTrend"></div></section>`;
+  h+=tpl`<section class="card c12"><h2>계약 목록<span class="ukw">천원</span></h2><p class="cap" id="chvCtCap"></p>`+
+     tpl`<div class="dbar" style="margin-bottom:10px">`+
+       tpl`<input type="search" id="chvQ" placeholder="검색 — 여러 단어로 좁히기 (예: 다원 MDR)">`+
+       tpl`<button class="pill ghost" id="chvFclr" style="display:none;border-color:var(--critical);color:var(--critical)">✕ 필터 해제</button>`+
+       tpl`<span class="spacer"></span><span class="mini" id="chvCnt"></span>`+
+     tpl`</div>`+
+     tpl`<div class="tbl-wrap" tabindex="0" style="max-height:460px"><table id="chvCt" class="dgrid"></table></div></section>`;
   h+='</div>';
   host.innerHTML=h;
   kxWire(host, {

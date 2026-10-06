@@ -1,9 +1,8 @@
 /* ===== edit.js — 입력·수정(Supabase 쓰기) · 로그인 모달 · 계약 검색 · 저장 동작 · 사명 변경 · boot =====
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { ST } from './state.js';
-import { $, clearSess, doLogout, el, lline, mfaGate, mfaVerifiedOf, mk, saveSess, SB_KEY, SB_URL, sessRead, sessWrite, won } from './core.js';
+import { $, clearSess, doLogout, el, esc, lline, mfaGate, mfaVerifiedOf, mk, rawHtml, saveSess, SB_KEY, SB_URL, sessRead, sessWrite, tpl, won } from './core.js';
 import { afterLoad, idxDate, loadFromDb, onData, onErr, SB_RAW, sbWrite, showAuthUi, showLoading, toast } from './shell.js';
-import { esc } from './dash.js';
 import { s1NoInfo, s1NoOpts } from './grids.js';
 import { chOf, doChurn, doRenew, liveCalc, nmKeys } from './analysis.js';
 import { switchView } from './grid.js';
@@ -204,9 +203,9 @@ export function toggleAuthMenu(){
     'background:var(--surface);border:1px solid var(--ring);border-radius:12px;'+
     'box-shadow:0 14px 34px -14px rgba(0,0,0,.32);padding:6px;min-width:180px';
   var bs='display:block;width:100%;text-align:left;border:0;background:transparent;padding:9px 11px;border-radius:8px;font:inherit;font-size:13.5px;cursor:pointer;color:var(--ink)';
-  m.innerHTML='<div style="padding:7px 11px 5px;font-size:11px;color:var(--muted);border-bottom:1px solid var(--line);margin-bottom:4px">'+esc(ST.AUTH_USER||'')+'</div>'+
-    '<button data-a="acct" style="'+bs+'">👤 내 계정</button>'+
-    '<button data-a="out" style="'+bs+';color:var(--critical,#d03b3b)">로그아웃</button>';
+  m.innerHTML=tpl`<div style="padding:7px 11px 5px;font-size:11px;color:var(--muted);border-bottom:1px solid var(--line);margin-bottom:4px">${ST.AUTH_USER||''}</div>`+
+    tpl`<button data-a="acct" style="${rawHtml(bs)}">👤 내 계정</button>`+
+    tpl`<button data-a="out" style="${rawHtml(bs)};color:var(--critical,#d03b3b)">로그아웃</button>`;
   document.body.appendChild(m);
   m.querySelectorAll('button').forEach(function(b){
     b.onmouseenter=function(){ b.style.background='var(--surface-2)'; };
@@ -262,8 +261,8 @@ export function setupPick(inputId, pickId, store){
       return r.cust.toLowerCase().indexOf(q)>=0;
     }).slice(0,30).forEach(function(r){
       var it=el('div','pi');
-      it.innerHTML='<span>'+esc(r.cust)+' <small>'+lline(r.line)+' · '+(r.status||'활성')+(r.renew? ' · 연장 '+r.renew+'회':'')+'</small></span>'+
-                   '<small>'+(mk(r.startIdx)||'?')+'~'+(mk(r.endIdx)||'?')+' · '+won(r.mrr||0)+'천원</small>';
+      it.innerHTML=tpl`<span>${r.cust} <small>${lline(r.line)} · ${rawHtml(r.status||'활성')}${rawHtml(r.renew? ' · 연장 '+r.renew+'회':'')}</small></span>`+
+                   tpl`<small>${rawHtml(mk(r.startIdx)||'?')}~${rawHtml(mk(r.endIdx)||'?')} · ${won(r.mrr||0)}천원</small>`;
       it.onclick=function(){
         store.sel=r;
         box.querySelectorAll('.pi').forEach(function(x){x.classList.remove('sel');});
@@ -282,8 +281,7 @@ export function showAddParent(r){
   var box=$('#aSel'); if(!box) return;
   if(r.parent){ var p=ST.DATA.rows.filter(function(x){ return x._id===r.parent; })[0]; if(p){ PK_A.sel=p; r=p; } }
   box.style.display='';
-  box.innerHTML='<label>원계약</label><div class="cap"><b>'+esc(r.cust)+'</b> · '+lline(r.line)+' · '+esc(chOf(r))+' · '+esc(r.ptn||'')+' · '+(mk(r.startIdx)||'?')+'~'+(mk(r.endIdx)||'?')+' · 월 '+won(r.mrr||0)+'천원'+
-    (r.renew? ' · 연장 '+r.renew+'회':'')+'<br>이 계약에 이미 붙은 부속 계약 '+ST.DATA.rows.filter(function(x){ return x.parent===r._id; }).length+'건</div>';
+  box.innerHTML=tpl`<label>원계약</label><div class="cap"><b>${r.cust}</b> · ${lline(r.line)} · ${chOf(r)} · ${r.ptn||''} · ${rawHtml(mk(r.startIdx)||'?')}~${rawHtml(mk(r.endIdx)||'?')} · 월 ${won(r.mrr||0)}천원`+ tpl`${rawHtml(r.renew? ' · 연장 '+r.renew+'회':'')}<br>이 계약에 이미 붙은 부속 계약 ${ST.DATA.rows.filter(function(x){ return x.parent===r._id; }).length}건</div>`;
   if(!$('#aEnd').value && r.endIdx!=null) $('#aEnd').placeholder=mk(r.endIdx);
 }
 /* 금액 수정 탭: 선택한 계약의 현재 월 금액 구간을 보여주고, 구간을 누르면 시작·종료월이 채워집니다 */
@@ -292,10 +290,10 @@ export function showFixCurrent(r){
   var segs=(r.segs||[]).slice();
   if(!segs.length){ box.style.display=''; box.innerHTML='<label>현재 금액</label><div class="cap">인식 금액 행이 없습니다</div>'; return; }
   box.style.display='';
-  box.innerHTML='<label>현재 금액 구간 <small style="color:var(--muted)">(누르면 그 구간이 입력칸에 채워집니다)</small></label>'+
-    '<div class="pick" style="max-height:120px">'+segs.map(function(sg,i){
-      return '<div class="pi" data-i="'+i+'"><span>'+mk(sg[0])+' ~ '+mk(sg[1])+' <small>'+(sg[1]-sg[0]+1)+'개월</small></span><small>월 '+won(sg[2])+'천원</small></div>';
-    }).join('')+'</div>';
+  box.innerHTML=tpl`<label>현재 금액 구간 <small style="color:var(--muted)">(누르면 그 구간이 입력칸에 채워집니다)</small></label>`+
+    tpl`<div class="pick" style="max-height:120px">${rawHtml(segs.map(function(sg,i){
+      return tpl`<div class="pi" data-i="${rawHtml(i)}"><span>${mk(sg[0])} ~ ${mk(sg[1])} <small>${rawHtml(sg[1]-sg[0]+1)}개월</small></span><small>월 ${won(sg[2])}천원</small></div>`;
+    }).join(''))}`+ tpl`</div>`;
   box.querySelectorAll('.pi').forEach(function(el0){
     el0.onclick=function(){
       var sg=segs[+el0.dataset.i]; if(!sg) return;
@@ -310,7 +308,7 @@ export var SECTOR_OPTS=['IT·소프트웨어','금융·보험','기계·금속·
 export function fillSectorSel(){
   var sel=document.getElementById('nSector'); if(!sel || sel._filled) return; sel._filled=1;
   var h='<option value="">— 선택 (모르면 비워두세요) —</option>';
-  SECTOR_OPTS.forEach(function(o){ h+='<option>'+esc(o)+'</option>'; });
+  SECTOR_OPTS.forEach(function(o){ h+=tpl`<option>${o}</option>`; });
   h+='<option value="__etc">직접 입력…</option>';
   sel.innerHTML=h;
   var etc=document.getElementById('nSectorEtc');
@@ -533,8 +531,7 @@ export function renameShowPreview(){
   if(!xo){ box.style.display='none'; return; }
   var pv=renamePreview(xo,xn);
   box.style.display='';
-  box.innerHTML='<label>바뀌는 곳</label><div class="cap">'+(pv.total? esc(pv.lines.join(' · ').replace(/· /g,''))+(pv.master?'':' <b style="color:var(--critical)">(고객사 마스터에는 없는 이름 — 다른 표만 바뀜)</b>') : '<b style="color:var(--critical)">이 이름은 어디에도 없습니다</b>')+
-    (pv.merge? '<br><b style="color:var(--warn,#b26a00)">⚠ «'+esc(xn)+'» 고객사가 이미 있습니다 → 계약을 그쪽으로 옮겨 하나로 합칩니다</b> (주간보고·PoC·인바운드는 서버에서 함께 바뀌며 실행 후 건수로 표시)':'')+'</div>';
+  box.innerHTML=tpl`<label>바뀌는 곳</label><div class="cap">${rawHtml(pv.total? esc(pv.lines.join(' · ').replace(/· /g,''))+(pv.master?'':' <b style="color:var(--critical)">(고객사 마스터에는 없는 이름 — 다른 표만 바뀜)</b>') : '<b style="color:var(--critical)">이 이름은 어디에도 없습니다</b>')}`+ tpl`${rawHtml(pv.merge? tpl`<br><b style="color:var(--warn,#b26a00)">⚠ «${xn}» 고객사가 이미 있습니다 → 계약을 그쪽으로 옮겨 하나로 합칩니다</b> (주간보고·PoC·인바운드는 서버에서 함께 바뀌며 실행 후 건수로 표시)`:'')}</div>`;
 }
 
 
@@ -592,14 +589,13 @@ export function setupEdit(){
     var list=cu? (ST.RAWX.contracts||[]).filter(function(c){ return c.customer_id===cu.id && !c.parent_contract_id; }) : [];
     list.sort(function(a,b){ return String(b.start_month||'').localeCompare(String(a.start_month||'')); });
     var keep=sel.value;
-    sel.innerHTML='<option value="">— 독립 계약으로 등록 —</option>'+list.map(function(c){
-      return '<option value="'+c.id+'">#'+c.id+' · '+lline(c.line||'')+' · '+String(c.start_month||'').slice(0,7)+'~'+(String(c.end_month||'').slice(0,7)||'무약정')+
-             (c.s1_no? ' · '+esc(c.s1_no):'')+(c.qty? ' · '+c.qty+'노드':'')+'</option>';
-    }).join('');
+    sel.innerHTML=tpl`<option value="">— 독립 계약으로 등록 —</option>${rawHtml(list.map(function(c){
+      return tpl`<option value="${rawHtml(c.id)}">#${rawHtml(c.id)} · ${lline(c.line||'')} · ${rawHtml(String(c.start_month||'').slice(0,7))}~${rawHtml(String(c.end_month||'').slice(0,7)||'무약정')}`+ tpl`${rawHtml(c.s1_no? ' · '+esc(c.s1_no):'')}${rawHtml(c.qty? ' · '+c.qty+'노드':'')}</option>`;
+    }).join(''))}`;
     if(keep && sel.querySelector('option[value="'+keep+'"]')) sel.value=keep;
     wrap.style.display=list.length? '':'none';
     if(cap) cap.innerHTML=list.length
-      ? '이 고객사에 계약이 <b>'+list.length+'건</b> 있습니다. 같은 고객사인데 계약번호가 새로 나온 건이면 위에서 상위 계약을 고르세요 — 목록에서 ↳ 로 붙어 보이고, 고객사 수·LIVE 에는 한 번만 셉니다.'
+      ? tpl`이 고객사에 계약이 <b>${list.length}건</b> 있습니다. 같은 고객사인데 계약번호가 새로 나온 건이면 위에서 상위 계약을 고르세요 — 목록에서 ↳ 로 붙어 보이고, 고객사 수·LIVE 에는 한 번만 셉니다.`
       : '';
   }
   /* 에스원 계약번호를 넣으면 그 번호가 어디서 온 것인지 알려주고, 고객사가 비어 있으면 채워 줍니다 */
@@ -613,9 +609,7 @@ export function setupEdit(){
       if(cu && !cu.value.trim()){ cu.value=nm; cu.dispatchEvent(new Event('input')); }
     }
     nFillParents();                                   /* 먼저 목록·안내를 새로 그린 뒤 */
-    if(info && cap) cap.innerHTML='<b>'+esc(el.value.trim())+'</b> — '+esc(info.src)+'에 있는 번호'+
-      (nm? ' (고객사 '+esc(nm)+(info.biz? ' · 비즈포탈 '+info.biz:'')+')':'') +
-      (cap.innerHTML? '<br>'+cap.innerHTML : '');     /* 안내 문구 위에 덧붙입니다 */
+    if(info && cap) cap.innerHTML=tpl`<b>${el.value.trim()}</b> — ${info.src}에 있는 번호`+ tpl`${rawHtml(nm? ' (고객사 '+esc(nm)+(info.biz? ' · 비즈포탈 '+info.biz:'')+')':'')}`+ tpl`${rawHtml(cap.innerHTML? tpl`<br>${rawHtml(cap.innerHTML)}` : '')}`;     /* 안내 문구 위에 덧붙입니다 */
   }
   var nCustEl=document.getElementById('nCust'), nS1El=document.getElementById('nS1No');
   if(nCustEl){ nCustEl.addEventListener('change', nFillParents); nCustEl.addEventListener('blur', nFillParents); }
@@ -636,10 +630,10 @@ export function setupEdit(){
     var nsc=document.getElementById('nSubCap'); if(nsc) nsc.innerHTML='';
     syncCombine(); syncVer(); syncFee();
     // 계약 찾기 상태도 초기화
-    [['cFind','cPick',PK_C],['rFind','rPick',PK_R],['fFind','fPick',PK_F],['aFind','aPick',PK_A]].forEach(function(x){
-      var f=document.getElementById(x[0]); if(f) f.value='';
-      var pk=document.getElementById(x[1]); if(pk) pk.innerHTML='';
-      if(x[2]) x[2].sel=null;
+    [{find:'cFind', pick:'cPick', store:PK_C},{find:'rFind', pick:'rPick', store:PK_R},{find:'fFind', pick:'fPick', store:PK_F},{find:'aFind', pick:'aPick', store:PK_A}].forEach(function(x){
+      var f=document.getElementById(x.find); if(f) f.value='';
+      var pk=document.getElementById(x.pick); if(pk) pk.innerHTML='';
+      if(x.store) x.store.sel=null;
     });
     ['cMonth','cReason','rEnd','rMrr','rNote','fFrom','fMrr','aQty','aStart','aEnd','aMrr','aSerial','aNote'].forEach(function(i){
       var el=document.getElementById(i); if(el) el.value='';
@@ -661,11 +655,11 @@ export function setupEdit(){
     var h='🟢 <b>LIVE 영향</b> — ';
     if(type==='추가'){ h+='구분 «추가»는 LIVE·고객사 수에 세지 않습니다. 기존 계약에 붙는 추가 구매라면 <b>«＋ 추가» 탭</b>에서 원계약을 골라 등록하세요.'; }
     else if(s0==null){ h+='시작월을 넣어야 LIVE 로 잡힙니다 (비어 있으면 «계약 예정»).'; }
-    else if(same){ h+='<b>'+esc(cust)+'</b>는 이미 '+esc(lline(line))+' LIVE 입니다 ('+esc(same.basis)+'). 이 계약을 저장하면 유효 계약이 2건이 됩니다 — <b>재약정·연장이면 «갱신» 탭</b>에서 기존 계약의 종료월을 늘리는 게 맞고, 사이트가 다른 별도 계약이면 그대로 저장하세요.'; }
-    else if(others.length){ h+='<b>'+esc(cust)+'</b>는 이미 LIVE('+others.map(function(x){ return esc(lline(x.line)); }).join('·')+') 인 회사 — '+(s0>ST.DATA.nowIdx? mk(s0)+'부터 ':'')+'<b>'+esc(lline(line))+'</b> 제품이 추가됩니다 (회사 수는 그대로, 제품별 합 +1).'; }
-    else { h+='<b>'+esc(cust)+'</b>는 '+(s0>ST.DATA.nowIdx? '<b>'+mk(s0)+'</b>부터 ':'지금부터 ')+'<b>'+esc(lline(line))+' LIVE 고객사</b>로 들어옵니다 (신규 고객 +1)'+(e0!=null? ' · '+mk(e0)+'까지 유효, 그 뒤 연장·해지 처리 필요':'')+'.'; }
+    else if(same){ h+=tpl`<b>${cust}</b>는 이미 ${lline(line)} LIVE 입니다 (${same.basis}). 이 계약을 저장하면 유효 계약이 2건이 됩니다 — <b>재약정·연장이면 «갱신» 탭</b>에서 기존 계약의 종료월을 늘리는 게 맞고, 사이트가 다른 별도 계약이면 그대로 저장하세요.`; }
+    else if(others.length){ h+=tpl`<b>${cust}</b>는 이미 LIVE(${rawHtml(others.map(function(x){ return esc(lline(x.line)); }).join('·'))}) 인 회사 — ${rawHtml(s0>ST.DATA.nowIdx? mk(s0)+'부터 ':'')}<b>${lline(line)}</b> 제품이 추가됩니다 (회사 수는 그대로, 제품별 합 +1).`; }
+    else { h+=tpl`<b>${cust}</b>는 ${rawHtml(s0>ST.DATA.nowIdx? tpl`<b>${mk(s0)}</b>부터 `:'지금부터 ')}<b>${lline(line)} LIVE 고객사</b>로 들어옵니다 (신규 고객 +1)${rawHtml(e0!=null? ' · '+mk(e0)+'까지 유효, 그 뒤 연장·해지 처리 필요':'')}.`; }
     var miss=[]; if(!(+$('#nQty').value)) miss.push('수량(노드)'); if(!($('#nCsm').value||'').trim()) miss.push('CSM');
-    if(miss.length && type!=='추가') h+=' <span style="color:var(--muted)">'+miss.join('·')+' 이(가) 비어 있습니다 — LIVE 화면의 노드·CSM 열에 그대로 비어 보입니다.</span>';
+    if(miss.length && type!=='추가') h+=tpl` <span style="color:var(--muted)">${rawHtml(miss.join('·'))} 이(가) 비어 있습니다 — LIVE 화면의 노드·CSM 열에 그대로 비어 보입니다.</span>`;
     box.innerHTML=h;
   }
   ['nCust','nLine','nType','nStart','nEnd','nQty','nCsm'].forEach(function(i){ var e=document.getElementById(i); if(e){ e.addEventListener('input',nLivePreview); e.addEventListener('change',nLivePreview); } });
@@ -681,8 +675,7 @@ export function setupEdit(){
     var h='🟢 <b>LIVE 영향</b> — ';
     if(r.parent) h+='부속 계약(추가 구매)이라 LIVE·고객사 수에는 변화가 없고 MRR 만 줄어듭니다.';
     else if(!same) h+='이 계약은 지금 LIVE 로 잡혀 있지 않습니다 — 해지 처리해도 LIVE 수는 그대로입니다.';
-    else { h+='<b>'+esc(r.cust)+'</b> '+esc(lline(r.line))+' 은 '+(m0!=null? '<b>'+mk(m0)+'</b>까지 LIVE, <b>'+mk(m0+1)+'</b>부터 ':'해지월 다음 달부터 ')+'LIVE 에서 빠집니다'+
-      (same.n>1? ' — 같은 제품의 다른 유효 계약이 '+(same.n-1)+'건 남아 있어 제품 LIVE 는 유지됩니다' : others.length? ' (다른 제품 '+others.map(function(x){ return esc(lline(x.line)); }).join('·')+' 이 남아 회사로는 LIVE 유지 · 제품별 합 −1)' : ' (회사 수 −1 · 해지율에 «해지»로 집계)')+'.'; }
+    else { h+=tpl`<b>${r.cust}</b> ${lline(r.line)} 은 ${rawHtml(m0!=null? tpl`<b>${mk(m0)}</b>까지 LIVE, <b>${mk(m0+1)}</b>부터 `:'해지월 다음 달부터 ')}LIVE 에서 빠집니다`+ tpl`${rawHtml(same.n>1? ' — 같은 제품의 다른 유효 계약이 '+(same.n-1)+'건 남아 있어 제품 LIVE 는 유지됩니다' : others.length? ' (다른 제품 '+others.map(function(x){ return esc(lline(x.line)); }).join('·')+' 이 남아 회사로는 LIVE 유지 · 제품별 합 −1)' : ' (회사 수 −1 · 해지율에 «해지»로 집계)')}.`; }
     box.innerHTML=h;
   }
   FORM_FN.cLivePreview=cLivePreview;

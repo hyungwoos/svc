@@ -1,9 +1,9 @@
 /* ===== inbound.js — 인바운드 관리 · 장표 메모 · 주간회의 =====
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { ST } from './state.js';
-import { $, axTime, lline, won } from './core.js';
+import { $, axTime, esc, lline, rawHtml, tpl, won } from './core.js';
 import { SB_RAW, sbTry, sbWrite, toast, todayStr } from './shell.js';
-import { esc, idxs, MX_LIST, renderInstall, renderMatrix, statusOf } from './dash.js';
+import { idxs, MX_LIST, renderInstall, renderMatrix, statusOf } from './dash.js';
 import { DV, renderGrid, switchView, xlsxBook } from './grid.js';
 import { logChange, openOvl } from './edit.js';
 
@@ -55,12 +55,12 @@ export function mxDetailHtml(rows, cellSum){
   var h='<div class="mxdet"><table><thead><tr><th>고객사</th><th>서비스</th><th>파트너</th><th>채널</th><th>상태</th><th class="n">월 금액(천원)</th></tr></thead><tbody>';
   rows.slice(0,300).forEach(function(x,i){
     var stc=/해지|중지/.test(x.st)? ' style="color:var(--critical)"' : '';
-    h+='<tr data-i="'+i+'" title="계약 화면에서 «'+esc(x.cust)+'» 보기"><td><b>'+esc(x.cust)+'</b></td><td>'+esc(lline(x.line))+'</td>'+
-       '<td>'+esc(x.ptn)+'</td><td>'+esc(x.ch)+'</td><td'+stc+'>'+esc(x.st)+'</td><td class="n">'+won(x.amt)+'</td></tr>';
+    h+=tpl`<tr data-i="${rawHtml(i)}" title="계약 화면에서 «${x.cust}» 보기"><td><b>${x.cust}</b></td><td>${lline(x.line)}</td>`+
+       tpl`<td>${x.ptn}</td><td>${x.ch}</td><td${rawHtml(stc)}>${x.st}</td><td class="n">${won(x.amt)}</td></tr>`;
   });
-  h+='</tbody><tfoot><tr><td colspan="5">합계 '+rows.length+'건'+(rows.length>300? ' (상위 300건 표시)':'')+'</td><td class="n">'+won(sum)+'</td></tr></tfoot></table></div>';
+  h+=tpl`</tbody><tfoot><tr><td colspan="5">합계 ${rows.length}건${rows.length>300? ' (상위 300건 표시)':''}</td><td class="n">${won(sum)}</td></tr></tfoot></table></div>`;
   if(cellSum!=null && Math.round(cellSum)!==Math.round(sum))
-    h+='<div class="who" style="color:var(--critical);margin-top:6px">⚠ 셀 금액('+won(cellSum)+')과 내역 합계('+won(sum)+')가 다릅니다 — 화면을 새로고침해 주세요</div>';
+    h+=tpl`<div class="who" style="color:var(--critical);margin-top:6px">⚠ 셀 금액(${won(cellSum)})과 내역 합계(${won(sum)})가 다릅니다 — 화면을 새로고침해 주세요</div>`;
   else h+='<div class="who" style="margin-top:6px">셀 금액과 내역 합계가 일치합니다 · 줄을 누르면 그 고객사의 계약 화면으로 이동</div>';
   return h;
 }
@@ -82,22 +82,19 @@ export function openMxMemo(td, line, Y, M, label, startTab, opts){
   var box=document.createElement('div'); box.className='mxpop'+(tab==='det'?' wide':''); box.id='mxPop';
   var when=cur&&cur.updated_at? String(cur.updated_at).replace('T',' ').slice(0,16):'';
   box.innerHTML=
-    '<h4>'+esc(label)+' · '+Y+'년 '+M+'월</h4>'+
-    '<div class="mxtabs">'+
-      '<button data-t="det" aria-pressed="'+(tab==='det')+'">📋 내역 '+det.length+'건 · '+won(cellSum)+'천원</button>'+
-      '<button data-t="memo" aria-pressed="'+(tab==='memo')+'">📝 특이사항 메모'+(cur? ' <span class="dot"></span>':'')+'</button>'+
-    '</div>'+
-    '<div id="mxPaneDet"'+(tab==='det'?'':' hidden')+'>'+detHtml+
-      '<div class="act"><span class="sp"></span><button class="pill ghost" id="mxClose2">닫기</button></div></div>'+
-    '<div id="mxPaneMemo"'+(tab==='memo'?'':' hidden')+'>'+
-    '<div class="who">'+(cur? esc(cur.updated_by||'')+(when? ' · '+when+' 수정':'') : '아직 메모가 없습니다')+'</div>'+
-    (ed? '<textarea id="mxTa" placeholder="예)\nVS. 25년12월 -28,733원\n#. 해지 -443,533원\n1. 대신엔에스(와이드넷) : 191,000 > 19,100 (-171,900)\n#. 신규 +414,800원\n1. 서울대학교관악학생생활관 : 242,000원">'+esc(cur?cur.body:'')+'</textarea>'
-       : '<div class="ro">'+(cur? esc(cur.body) : '내용이 없습니다')+'</div>')+
-    '<div class="act"><span class="msg" id="mxMsg"></span><span class="sp"></span>'+
-    (ed&&cur? '<button class="pill ghost" id="mxDel" style="color:var(--critical,#d03b3b);border-color:rgba(208,59,59,.35)">삭제</button>':'')+
-    '<button class="pill ghost" id="mxCancel">'+(ed?'취소':'닫기')+'</button>'+
-    (ed? '<button class="pill pri" id="mxSave">저장</button>':'')+
-    '</div></div>';
+    tpl`<h4>${label} · ${rawHtml(Y)}년 ${rawHtml(M)}월</h4>`+
+    tpl`<div class="mxtabs">`+
+      tpl`<button data-t="det" aria-pressed="${tab==='det'}">📋 내역 ${det.length}건 · ${won(cellSum)}천원</button>`+
+      tpl`<button data-t="memo" aria-pressed="${tab==='memo'}">📝 특이사항 메모${rawHtml(cur? ' <span class="dot"></span>':'')}</button>`+
+    tpl`</div>`+
+    tpl`<div id="mxPaneDet"${tab==='det'?'':' hidden'}>${rawHtml(detHtml)}`+
+      tpl`<div class="act"><span class="sp"></span><button class="pill ghost" id="mxClose2">닫기</button></div></div>`+
+    tpl`<div id="mxPaneMemo"${tab==='memo'?'':' hidden'}>`+
+    tpl`<div class="who">${rawHtml(cur? esc(cur.updated_by||'')+(when? ' · '+when+' 수정':'') : '아직 메모가 없습니다')}</div>`+ tpl`${rawHtml(ed? tpl`<textarea id="mxTa" placeholder="예)\nVS. 25년12월 -28,733원\n#. 해지 -443,533원\n1. 대신엔에스(와이드넷) : 191,000 > 19,100 (-171,900)\n#. 신규 +414,800원\n1. 서울대학교관악학생생활관 : 242,000원">${cur?cur.body:''}</textarea>`
+       : tpl`<div class="ro">${rawHtml(cur? esc(cur.body) : '내용이 없습니다')}</div>`)}`+
+    tpl`<div class="act"><span class="msg" id="mxMsg"></span><span class="sp"></span>`+ tpl`${rawHtml(ed&&cur? '<button class="pill ghost" id="mxDel" style="color:var(--critical,#d03b3b);border-color:rgba(208,59,59,.35)">삭제</button>':'')}`+
+    tpl`<button class="pill ghost" id="mxCancel">${ed?'취소':'닫기'}</button>`+ tpl`${rawHtml(ed? '<button class="pill pri" id="mxSave">저장</button>':'')}`+
+    tpl`</div></div>`;
   document.body.appendChild(box);
   // 탭 전환
   box.querySelectorAll('.mxtabs button').forEach(function(b){
@@ -204,35 +201,32 @@ export function inbSyncBadge(){
   var h=Math.floor((Date.now()-new Date(/[zZ]|[+\-]\d\d:?\d\d$/.test(String(x.at))? x.at : x.at+'Z').getTime())/36e5);
   var stale=h>=30, bad=(x.ok===false);
   var col=(bad||stale)? 'color:var(--critical,#d03b3b);font-weight:700' : 'color:var(--ink-2)';
-  return '<span class="mini" style="'+col+'" title="'+esc(x.src||'')+'">· 마지막 가져오기 '+axTime(x.at)+' ('+inbAgo(x.at)+')'+
-         (x.src&&!x._fallback? ' · '+esc(x.src):'')+(x.counts? ' · '+esc(inbCounts(x.counts)):'')+
-         (bad? ' ✕ 실패':'')+(stale&&!bad? ' ⚠ 자동 동기화가 멈춘 것 같습니다':'')+'</span>';
+  return tpl`<span class="mini" style="${rawHtml(col)}" title="${x.src||''}">· 마지막 가져오기 ${axTime(x.at)} (${inbAgo(x.at)})`+ tpl`${rawHtml(x.src&&!x._fallback? ' · '+esc(x.src):'')}${rawHtml(x.counts? ' · '+esc(inbCounts(x.counts)):'')}`+ tpl`${bad? ' ✕ 실패':''}${stale&&!bad? ' ⚠ 자동 동기화가 멈춘 것 같습니다':''}</span>`;
 }
 export function inbLogTable(){
   var L=ST.RAWX.inbLog;
   if(L===undefined) return '<div class="mini" style="color:var(--muted);padding:6px 0">기록을 읽는 중…</div>';
   if(!L.length) return '<div class="mini" style="color:var(--muted);padding:6px 0">아직 기록이 없습니다 — Supabase 에서 <b>SQL 74</b> 를 실행하고 Apps Script 를 새 버전으로 배포하면 다음 가져오기부터 여기에 쌓입니다.</div>';
-  return '<table class="mini" style="width:100%;border-collapse:collapse;margin-top:6px">'+
-    '<thead><tr style="color:var(--muted);text-align:left"><th style="padding:4px 8px">시각</th><th style="padding:4px 8px">방법</th><th style="padding:4px 8px">결과</th><th style="padding:4px 8px">가져온 건수</th><th style="padding:4px 8px">소요</th></tr></thead><tbody>'+
-    L.map(function(r){
-      return '<tr style="border-top:1px solid var(--line,#eee)">'+
-        '<td style="padding:4px 8px;white-space:nowrap">'+axTime(r.at)+' <span style="color:var(--muted)">('+inbAgo(r.at)+')</span></td>'+
-        '<td style="padding:4px 8px">'+esc(r.src||'')+'</td>'+
-        '<td style="padding:4px 8px">'+(r.ok? '<span style="color:var(--good,#0ca30c)">✓ 성공</span>' : '<span style="color:var(--critical,#d03b3b)">✕ 실패</span>'+(r.error? ' <span title="'+esc(r.error)+'">'+esc(String(r.error).slice(0,60))+'</span>':''))+'</td>'+
-        '<td style="padding:4px 8px">'+esc(inbCounts(r.counts))+'</td>'+
-        '<td style="padding:4px 8px;color:var(--muted)">'+(r.duration_ms? (r.duration_ms/1000).toFixed(1)+'초':'')+'</td></tr>';
-    }).join('')+'</tbody></table>';
+  return tpl`<table class="mini" style="width:100%;border-collapse:collapse;margin-top:6px">`+
+    tpl`<thead><tr style="color:var(--muted);text-align:left"><th style="padding:4px 8px">시각</th><th style="padding:4px 8px">방법</th><th style="padding:4px 8px">결과</th><th style="padding:4px 8px">가져온 건수</th><th style="padding:4px 8px">소요</th></tr></thead><tbody>`+
+    tpl`${rawHtml(L.map(function(r){
+      return tpl`<tr style="border-top:1px solid var(--line,#eee)">`+
+        tpl`<td style="padding:4px 8px;white-space:nowrap">${axTime(r.at)} <span style="color:var(--muted)">(${inbAgo(r.at)})</span></td>`+
+        tpl`<td style="padding:4px 8px">${r.src||''}</td>`+
+        tpl`<td style="padding:4px 8px">${rawHtml(r.ok? '<span style="color:var(--good,#0ca30c)">✓ 성공</span>' : tpl`<span style="color:var(--critical,#d03b3b)">✕ 실패</span>${rawHtml(r.error? tpl` <span title="${r.error}">${String(r.error).slice(0,60)}</span>`:'')}`)}</td>`+
+        tpl`<td style="padding:4px 8px">${inbCounts(r.counts)}</td>`+
+        tpl`<td style="padding:4px 8px;color:var(--muted)">${rawHtml(r.duration_ms? (r.duration_ms/1000).toFixed(1)+'초':'')}</td></tr>`;
+    }).join(''))}`+ tpl`</tbody></table>`;
 }
 /* 통계·목록 화면 공용: 마지막 가져오기 + 지금 가져오기 + 기록 펼치기 */
 export function inbSyncPanel(){
-  return '<div class="card" style="padding:10px 14px;margin-bottom:10px">'+
-    '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'+
-      '<b style="font-size:13.5px">시트 → 포탈 가져오기</b>'+inbSyncBadge()+
-      '<span style="flex:1"></span>'+
-      (ST.IS_VIEWER? '' : '<button class="pill" id="inbFetchP">↻ 지금 시트에서 가져오기</button>')+
-      '<button class="pill ghost" id="inbLogTg">🕘 가져온 기록'+(ST.RAWX.inbLog&&ST.RAWX.inbLog.length? ' ('+ST.RAWX.inbLog.length+')':'')+'</button>'+
-    '</div>'+
-    '<div id="inbLogBox" style="display:'+(INB_LOG_OPEN?'':'none')+'">'+inbLogTable()+'</div></div>';
+  return tpl`<div class="card" style="padding:10px 14px;margin-bottom:10px">`+
+    tpl`<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">`+
+      tpl`<b style="font-size:13.5px">시트 → 포탈 가져오기</b>${rawHtml(inbSyncBadge())}`+
+      tpl`<span style="flex:1"></span>`+ tpl`${rawHtml(ST.IS_VIEWER? '' : '<button class="pill" id="inbFetchP">↻ 지금 시트에서 가져오기</button>')}`+
+      tpl`<button class="pill ghost" id="inbLogTg">🕘 가져온 기록${rawHtml(ST.RAWX.inbLog&&ST.RAWX.inbLog.length? ' ('+ST.RAWX.inbLog.length+')':'')}</button>`+
+    tpl`</div>`+
+    tpl`<div id="inbLogBox" style="display:${INB_LOG_OPEN?'':'none'}">${rawHtml(inbLogTable())}</div></div>`;
 }
 export function inbWirePanel(host){
   var b=host.querySelector('#inbFetchP'); if(b) b.onclick=inbRefetch;
@@ -259,10 +253,10 @@ export function renderInbStat(){
   }
   var ALL=ST.RAWX.inbound;
   if(!ALL.length){
-    host.innerHTML='<section class="card c12" style="max-width:640px;margin:0 auto;text-align:center;padding:40px">'+
-      '<h3 style="margin:0 0 8px">📥 인바운드 관리</h3>'+
-      '<p class="cap">아직 데이터가 없습니다 — 43_inbound.sql 실행과 Apps Script 코드 교체·배포가 필요합니다.</p>'+
-      '<button class="pill" id="inbFetch0">↻ 지금 시트에서 가져오기</button></section>';
+    host.innerHTML=tpl`<section class="card c12" style="max-width:640px;margin:0 auto;text-align:center;padding:40px">`+
+      tpl`<h3 style="margin:0 0 8px">📥 인바운드 관리</h3>`+
+      tpl`<p class="cap">아직 데이터가 없습니다 — 43_inbound.sql 실행과 Apps Script 코드 교체·배포가 필요합니다.</p>`+
+      tpl`<button class="pill" id="inbFetch0">↻ 지금 시트에서 가져오기</button></section>`;
     var b0=document.getElementById('inbFetch0'); if(b0) b0.onclick=inbRefetch;
     return;
   }
@@ -292,10 +286,10 @@ export function renderInbStat(){
   var mx=1; for(var m=1;m<=12;m++) mx=Math.max(mx,cur[m]||0,prv[m]||0);
   var bars='';
   for(m=1;m<=12;m++){
-    bars+='<div class="inb-bc"><div class="c">'+(cur[m]||'')+'</div><div class="bb">'+
-      '<div class="b" style="height:'+Math.round((cur[m]||0)/mx*88)+'px"></div>'+
-      '<div class="b prev" style="height:'+Math.round((prv[m]||0)/mx*88)+'px"></div>'+
-      '</div><div class="n">'+m+'월</div></div>';
+    bars+=tpl`<div class="inb-bc"><div class="c">${rawHtml(cur[m]||'')}</div><div class="bb">`+
+      tpl`<div class="b" style="height:${Math.round((cur[m]||0)/mx*88)}px"></div>`+
+      tpl`<div class="b prev" style="height:${Math.round((prv[m]||0)/mx*88)}px"></div>`+
+      tpl`</div><div class="n">${rawHtml(m)}월</div></div>`;
   }
   function dist(key, top){
     var c={};
@@ -303,41 +297,40 @@ export function renderInbStat(){
     var arr=Object.keys(c).map(function(k){return [k,c[k]];}).sort(function(a,b){return b[1]-a[1];}).slice(0,top);
     var mm=arr.length?arr[0][1]:1;
     return arr.map(function(a){
-      return '<div class="inb-dr" data-k="'+key+'" data-v="'+esc(a[0])+'"><span class="nm" title="'+esc(a[0])+'">'+esc(a[0])+'</span>'+
-        '<span class="tr"><i style="width:'+Math.round(a[1]/mm*100)+'%"></i></span><span class="ct">'+a[1]+'건</span></div>';
+      return tpl`<div class="inb-dr" data-k="${rawHtml(key)}" data-v="${a[0]}"><span class="nm" title="${a[0]}">${a[0]}</span>`+
+        tpl`<span class="tr"><i style="width:${Math.round(a[1]/mm*100)}%"></i></span><span class="ct">${rawHtml(a[1])}건</span></div>`;
     }).join('');
   }
   var yb=['all','2026','2025'].map(function(y){
     var lab=y==='all'?'전체':y+'년';
-    return '<button class="pill" data-inby="'+y+'" style="'+(ST.INB_Y===y?'background:var(--brand-t);border-color:var(--brand);color:var(--brand);font-weight:700':'')+'">'+lab+'</button>';
+    return tpl`<button class="pill" data-inby="${rawHtml(y)}" style="${ST.INB_Y===y?'background:var(--brand-t);border-color:var(--brand);color:var(--brand);font-weight:700':''}">${rawHtml(lab)}</button>`;
   }).join(' ');
   host.innerHTML=
-    '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">'+
-    '<span style="font-size:18px;font-weight:800">📥 인바운드 통계</span>'+
-    '<span class="ubadge sm">₩ 금액 단위 = 천원</span>'+
-    '<span class="mini">원본: 구글시트 · 매일 아침 7시 자동 동기화</span>'+
-    '<span style="flex:1"></span>'+yb+
-    '<button class="pill ghost" id="inbGoList">목록 보기 →</button></div>'+
-    inbSyncPanel()+
-    '<div class="inb-kpis">'+
-    '<div class="inb-kpi"><div class="l">유입 건수</div><div class="v">'+R.length.toLocaleString()+'건</div><div class="s">'+(ST.INB_Y==='all'?'25년~현재 누적':ST.INB_Y+'년')+'</div></div>'+
-    '<div class="inb-kpi"><div class="l">진행중</div><div class="v">'+prog+'건</div><div class="s">방문미팅·데모·이관 포함</div></div>'+
-    '<div class="inb-kpi"><div class="l">수주</div><div class="v">'+wonL.length+'건</div><div class="s">전환율 '+conv+'%</div></div>'+
-    '<div class="inb-kpi"><div class="l">수주액</div><div class="v">'+won(amt)+'<small style="font-size:11px;font-weight:600"> 천원</small></div><div class="s">단위: 천원</div></div>'+
-    '<div class="inb-kpi warn"><div class="l">3개월+ 무응답</div><div class="v">'+stale.length+'건</div><div class="s">진행중인데 대응 기록이 오래됨</div></div></div>'+
-    '<div class="inb-2">'+
-    '<div class="inb-card"><h3>월별 유입 추이 <small><span style="color:var(--brand)">■</span> '+curY+'년 · <span style="color:var(--muted)">■</span> '+prvY+'년</small></h3><div class="inb-bars">'+bars+'</div></div>'+
-    '<div class="inb-card"><h3>⚠ 오래 머문 진행중 <small>마지막 대응 후 3개월 경과 · 월요일 아침 슬랙 리마인드</small></h3>'+
-    '<div class="inb-stale" style="max-height:150px;overflow:auto">'+
-    (stale.slice(0,30).map(function(a){
-      return '<a data-inbid="'+a[1].id+'"><span><b>'+esc(a[1].org)+'</b> · '+esc(a[1].product||'')+' <span class="mini">'+esc(a[1].owner||'')+'</span></span><span class="dd">'+a[0]+'일</span></a>';
-    }).join('')||'<div class="mini" style="padding:8px">없음 🎉</div>')+'</div></div></div>'+
-    '<div class="inb-2">'+
-    '<div class="inb-card"><h3>상태 분포 <small>클릭하면 목록으로 이동</small></h3><div class="inb-dist">'+dist('result',10)+'</div></div>'+
-    '<div class="inb-card"><h3>산업군 <small>클릭하면 목록으로 이동</small></h3><div class="inb-dist">'+dist('industry',10)+'</div></div></div>'+
-    '<div class="inb-2">'+
-    '<div class="inb-card"><h3>제품유형 · 문의유형</h3><div class="inb-dist">'+dist('ptype',6)+dist('qtype',4)+'</div></div>'+
-    '<div class="inb-card"><h3>담당자별 처리</h3><div class="inb-dist">'+dist('owner',10)+'</div></div></div>';
+    tpl`<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">`+
+    tpl`<span style="font-size:18px;font-weight:800">📥 인바운드 통계</span>`+
+    tpl`<span class="ubadge sm">₩ 금액 단위 = 천원</span>`+
+    tpl`<span class="mini">원본: 구글시트 · 매일 아침 7시 자동 동기화</span>`+
+    tpl`<span style="flex:1"></span>${rawHtml(yb)}`+
+    tpl`<button class="pill ghost" id="inbGoList">목록 보기 →</button></div>`+
+    tpl`${rawHtml(inbSyncPanel())}`+
+    tpl`<div class="inb-kpis">`+
+    tpl`<div class="inb-kpi"><div class="l">유입 건수</div><div class="v">${rawHtml(R.length.toLocaleString())}건</div><div class="s">${rawHtml(ST.INB_Y==='all'?'25년~현재 누적':ST.INB_Y+'년')}</div></div>`+
+    tpl`<div class="inb-kpi"><div class="l">진행중</div><div class="v">${rawHtml(prog)}건</div><div class="s">방문미팅·데모·이관 포함</div></div>`+
+    tpl`<div class="inb-kpi"><div class="l">수주</div><div class="v">${wonL.length}건</div><div class="s">전환율 ${rawHtml(conv)}%</div></div>`+
+    tpl`<div class="inb-kpi"><div class="l">수주액</div><div class="v">${won(amt)}<small style="font-size:11px;font-weight:600"> 천원</small></div><div class="s">단위: 천원</div></div>`+
+    tpl`<div class="inb-kpi warn"><div class="l">3개월+ 무응답</div><div class="v">${stale.length}건</div><div class="s">진행중인데 대응 기록이 오래됨</div></div></div>`+
+    tpl`<div class="inb-2">`+
+    tpl`<div class="inb-card"><h3>월별 유입 추이 <small><span style="color:var(--brand)">■</span> ${rawHtml(curY)}년 · <span style="color:var(--muted)">■</span> ${rawHtml(prvY)}년</small></h3><div class="inb-bars">${rawHtml(bars)}</div></div>`+
+    tpl`<div class="inb-card"><h3>⚠ 오래 머문 진행중 <small>마지막 대응 후 3개월 경과 · 월요일 아침 슬랙 리마인드</small></h3>`+
+    tpl`<div class="inb-stale" style="max-height:150px;overflow:auto">`+ tpl`${rawHtml(stale.slice(0,30).map(function(a){
+      return tpl`<a data-inbid="${rawHtml(a[1].id)}"><span><b>${a[1].org}</b> · ${a[1].product||''} <span class="mini">${a[1].owner||''}</span></span><span class="dd">${rawHtml(a[0])}일</span></a>`;
+    }).join('')||'<div class="mini" style="padding:8px">없음 🎉</div>')}`+ tpl`</div></div></div>`+
+    tpl`<div class="inb-2">`+
+    tpl`<div class="inb-card"><h3>상태 분포 <small>클릭하면 목록으로 이동</small></h3><div class="inb-dist">${rawHtml(dist('result',10))}</div></div>`+
+    tpl`<div class="inb-card"><h3>산업군 <small>클릭하면 목록으로 이동</small></h3><div class="inb-dist">${rawHtml(dist('industry',10))}</div></div></div>`+
+    tpl`<div class="inb-2">`+
+    tpl`<div class="inb-card"><h3>제품유형 · 문의유형</h3><div class="inb-dist">${rawHtml(dist('ptype',6))}${rawHtml(dist('qtype',4))}</div></div>`+
+    tpl`<div class="inb-card"><h3>담당자별 처리</h3><div class="inb-dist">${rawHtml(dist('owner',10))}</div></div></div>`;
   host.querySelectorAll('[data-inby]').forEach(function(b){
     b.onclick=function(){ ST.INB_Y=b.dataset.inby; renderInbStat(); };
   });
@@ -376,26 +369,21 @@ export function openInbDetail(r){
   var steps=[['1차',r.s1,r.s1d],['2차',r.s2,r.s2d],['2-1차',r.s21,r.s21d],['3차',r.s3,r.s3d]]
     .filter(function(s){return s[1]||s[2];});
   $('#inbDBody').innerHTML=
-    '<h3 style="margin:0 0 2px">'+esc(r.org||'?')+' <span class="mini" style="font-weight:400">— '+esc(r.result||'-')+'</span></h3>'+
-    '<p class="cap" style="margin:0">'+esc(r.on_date||'')+' 접수 · '+r.y+'년 연번 '+r.no+' · '+esc(r.channel||'')+
-    (r.dup?' · <b style="color:var(--warn-ink)">중복 문의</b>':'')+'</p>'+
-    '<div class="inb-meta">'+
-    '<div><b>문의 제품</b>'+esc(r.product||'-')+' <span class="mini">('+esc(r.ptype||'')+')</span></div>'+
-    '<div><b>지니 담당</b>'+esc(r.owner||'-')+'</div>'+
-    '<div><b>노드수</b>'+esc(r.nodes||'-')+'</div>'+
-    '<div><b>요청자</b>'+esc(r.requester||'-')+'</div>'+
-    '<div><b>부서</b>'+esc(r.dept||'-')+'</div>'+
-    '<div><b>기 고객</b>'+esc(r.existing||'-')+'</div>'+
-    '<div><b>이메일</b>'+esc(r.email||'-')+'</div>'+
-    '<div><b>연락처</b>'+esc(r.phone||'-')+'</div>'+
-    (r.biz_no?'<div><b>영업현황 번호</b>'+esc(r.biz_no)+'</div>':'')+
-    (r.amount?'<div><b>수주액</b>'+won(r.amount)+'천원</div>':'')+
-    '</div>'+
-    '<div class="inb-body">'+esc(r.content||'(요청내용 없음)')+'</div>'+
-    (steps.length?'<div class="inb-tl">'+steps.map(function(s){
-      return '<div class="st"><b>'+s[0]+'</b> '+esc(s[1]||'')+'<div class="d">'+esc(s[2]||'')+'</div></div>';
-    }).join('')+'</div>':'')+
-    (r.note?'<div class="mini" style="margin-top:6px">비고: '+esc(r.note)+'</div>':'');
+    tpl`<h3 style="margin:0 0 2px">${r.org||'?'} <span class="mini" style="font-weight:400">— ${r.result||'-'}</span></h3>`+
+    tpl`<p class="cap" style="margin:0">${r.on_date||''} 접수 · ${rawHtml(r.y)}년 연번 ${r.no} · ${r.channel||''}`+ tpl`${rawHtml(r.dup?' · <b style="color:var(--warn-ink)">중복 문의</b>':'')}</p>`+
+    tpl`<div class="inb-meta">`+
+    tpl`<div><b>문의 제품</b>${r.product||'-'} <span class="mini">(${r.ptype||''})</span></div>`+
+    tpl`<div><b>지니 담당</b>${r.owner||'-'}</div>`+
+    tpl`<div><b>노드수</b>${r.nodes||'-'}</div>`+
+    tpl`<div><b>요청자</b>${r.requester||'-'}</div>`+
+    tpl`<div><b>부서</b>${r.dept||'-'}</div>`+
+    tpl`<div><b>기 고객</b>${r.existing||'-'}</div>`+
+    tpl`<div><b>이메일</b>${r.email||'-'}</div>`+
+    tpl`<div><b>연락처</b>${r.phone||'-'}</div>`+ tpl`${rawHtml(r.biz_no?tpl`<div><b>영업현황 번호</b>${r.biz_no}</div>`:'')}`+ tpl`${rawHtml(r.amount?tpl`<div><b>수주액</b>${won(r.amount)}천원</div>`:'')}`+
+    tpl`</div>`+
+    tpl`<div class="inb-body">${r.content||'(요청내용 없음)'}</div>`+ tpl`${rawHtml(steps.length?tpl`<div class="inb-tl">${rawHtml(steps.map(function(s){
+      return tpl`<div class="st"><b>${rawHtml(s[0])}</b> ${s[1]||''}<div class="d">${s[2]||''}</div></div>`;
+    }).join(''))}`+ tpl`</div>`:'')}`+ tpl`${rawHtml(r.note?tpl`<div class="mini" style="margin-top:6px">비고: ${r.note}</div>`:'')}`;
   openOvl('ovlInb');
 }
 
@@ -507,16 +495,16 @@ export async function renderWeekly(atWeek){
       d=await sbWrite('POST', atWeek? 'rpc/load_weekly_at':'rpc/load_weekly', atWeek? {p_week:atWeek}:{});
       WK_CACHE[ck]={t:Date.now(), d:d};
     }catch(e){
-      host.innerHTML='<section class="card c12"><h3 style="margin:0 0 6px">📊 주간회의</h3>'+
-        '<p class="cap">데이터를 불러오지 못했습니다 — 40_weekly.sql 실행 여부를 확인하세요.<br>'+esc(String(e.message||e))+'</p></section>';
+      host.innerHTML=tpl`<section class="card c12"><h3 style="margin:0 0 6px">📊 주간회의</h3>`+
+        tpl`<p class="cap">데이터를 불러오지 못했습니다 — 40_weekly.sql 실행 여부를 확인하세요.<br>${String(e.message||e)}</p></section>`;
       return;
     }
   }
   if(!d || !d.items || !d.items.length){
-    host.innerHTML='<section class="card c12" style="max-width:640px;margin:0 auto;text-align:center;padding:40px">'+
-      '<h3 style="margin:0 0 8px">📊 주간회의</h3>'+
-      '<p class="cap">아직 취합된 주간보고가 없습니다.<br>매주 일요일 19시에 자동으로 가져오며, 지금 바로 가져올 수도 있습니다.</p>'+
-      '<button class="pill" id="wkFetch0" style="margin-top:10px">↻ 시트에서 지금 가져오기</button></section>';
+    host.innerHTML=tpl`<section class="card c12" style="max-width:640px;margin:0 auto;text-align:center;padding:40px">`+
+      tpl`<h3 style="margin:0 0 8px">📊 주간회의</h3>`+
+      tpl`<p class="cap">아직 취합된 주간보고가 없습니다.<br>매주 일요일 19시에 자동으로 가져오며, 지금 바로 가져올 수도 있습니다.</p>`+
+      tpl`<button class="pill" id="wkFetch0" style="margin-top:10px">↻ 시트에서 지금 가져오기</button></section>`;
     var b0=document.getElementById('wkFetch0');
     if(b0) b0.onclick=wkRefetch;
     return;
@@ -536,10 +524,10 @@ export async function renderWeekly(atWeek){
 
   var no=0, railPerf=[], railPlan=[], bodyH='';
   function card(id,title,whos,cnt,inner,plan){
-    return '<div class="wk-card'+(plan?' plan':'')+'" id="'+id+'" data-wksec="1">'+
-      '<h2><span class="no">'+(++no)+'</span>'+esc(title)+
-      (whos||[]).map(function(w){ return '<span class="who">'+esc(w)+'</span>'; }).join('')+
-      '<small>'+cnt+'건</small></h2>'+inner+'</div>';
+    return tpl`<div class="wk-card${plan?' plan':''}" id="${rawHtml(id)}" data-wksec="1">`+
+      tpl`<h2><span class="no">${++no}</span>${title}`+
+      tpl`${rawHtml((whos||[]).map(function(w){ return tpl`<span class="who">${w}</span>`; }).join(''))}`+
+      tpl`<small>${rawHtml(cnt)}건</small></h2>${rawHtml(inner)}</div>`;
   }
   function owners(list){
     var o=[],s={};
@@ -551,31 +539,30 @@ export async function renderWeekly(atWeek){
     opts=opts||{};
     // 칩(상태/구분)이 하나도 없는 목록이면 칩 열 자체를 뺀다
     var hasChips=list.some(function(x){ return (opts.tagChip && x.section) || x.status; });
-    return '<table class="wk-tbl">'+list.map(function(x){
+    return tpl`<table class="wk-tbl">${rawHtml(list.map(function(x){
       var chips='';
-      if(opts.tagChip && x.section) chips='<span class="wk-chip wkc-blu">'+esc(x.section)+'</span>';
-      else if(x.status) chips='<span class="wk-chip '+wkChipCls(x.status)+'">'+esc(x.status)+'</span>';
+      if(opts.tagChip && x.section) chips=tpl`<span class="wk-chip wkc-blu">${x.section}</span>`;
+      else if(x.status) chips=tpl`<span class="wk-chip ${rawHtml(wkChipCls(x.status))}">${x.status}</span>`;
       var extra='';
       if(opts.contract){
         var ok=wkCustMatch(x.customer);
-        extra='<td style="width:74px">'+(ok===null?'·':
-          ok? '<span class="wk-chip wkc-grn">일치✓</span>':'<span class="wk-chip wkc-red">미입력</span>')+'</td>';
+        extra=tpl`<td style="width:74px">${rawHtml(ok===null?'·':
+          ok? '<span class="wk-chip wkc-grn">일치✓</span>':'<span class="wk-chip wkc-red">미입력</span>')}`+ tpl`</td>`;
       }
-      var amt=(x.expect_amt!=null&&x.expect_amt!=='')? ' <b style="white-space:nowrap">· '+x.expect_amt+'백만</b>':'';
-      var due=x.due? ' <span class="wk-chip wkc-gry">'+esc(String(x.due).slice(0,10))+'</span>':'';
-      var iss=x.issue_ref? ' <span class="mini">'+esc(x.issue_ref)+'</span>':'';
-      return '<tr>'+
-        (hasChips? '<td style="width:78px">'+(chips||'·')+'</td>':'')+
-        '<td style="width:132px"><b style="font-weight:650">'+esc(x.customer||'·')+'</b></td>'+
-        '<td style="width:100px;color:var(--ink-2)">'+esc(String(x.owner||'·').replace(/\n/g,'·'))+'</td>'+
-        '<td><div class="wk-body">'+esc(x.content||'')+'</div>'+ (amt||due||iss? '<div class="mini" style="margin-top:2px">'+amt+due+iss+'</div>':'')+'</td>'+
-        extra+'</tr>';
-    }).join('')+'</table>';
+      var amt=(x.expect_amt!=null&&x.expect_amt!=='')? tpl` <b style="white-space:nowrap">· ${rawHtml(x.expect_amt)}백만</b>`:'';
+      var due=x.due? tpl` <span class="wk-chip wkc-gry">${String(x.due).slice(0,10)}</span>`:'';
+      var iss=x.issue_ref? tpl` <span class="mini">${x.issue_ref}</span>`:'';
+      return tpl`<tr>`+ tpl`${rawHtml(hasChips? tpl`<td style="width:78px">${rawHtml(chips||'·')}</td>`:'')}`+
+        tpl`<td style="width:132px"><b style="font-weight:650">${x.customer||'·'}</b></td>`+
+        tpl`<td style="width:100px;color:var(--ink-2)">${String(x.owner||'·').replace(/\n/g,'·')}</td>`+
+        tpl`<td><div class="wk-body">${x.content||''}</div>${rawHtml(amt||due||iss? tpl`<div class="mini" style="margin-top:2px">${rawHtml(amt)}${rawHtml(due)}${rawHtml(iss)}</div>`:'')}</td>`+
+        tpl`${rawHtml(extra)}</tr>`;
+    }).join(''))}`+ tpl`</table>`;
   }
 
   // ── 전주 실적 ──
-  bodyH+='<div class="wk-phase"><span class="pt">전주 실적</span><span class="ln"></span>'+
-    '<span class="mini">사업팀 → MSS팀 순서로 보고</span></div>';
+  bodyH+=tpl`<div class="wk-phase"><span class="pt">전주 실적</span><span class="ln"></span>`+
+    tpl`<span class="mini">사업팀 → MSS팀 순서로 보고</span></div>`;
   secs.forEach(function(g){
     var list=rows('실적',g.team,g.sec);
     var id='wks'+no;
@@ -586,8 +573,8 @@ export async function renderWeekly(atWeek){
 
   // ── 금주 계획 ──
   var planBiz=rows('계획','사업팀'), planMss=rows('계획','MSS팀');
-  bodyH+='<div class="wk-phase"><span class="pt">금주 계획</span><span class="ln"></span>'+
-    '<span class="mini">같은 순서로 한 바퀴</span></div>';
+  bodyH+=tpl`<div class="wk-phase"><span class="pt">금주 계획</span><span class="ln"></span>`+
+    tpl`<span class="mini">같은 순서로 한 바퀴</span></div>`;
   if(planBiz.length){ var id1='wks'+no;
     bodyH+=card(id1,'사업팀',[],planBiz.length,tbl(planBiz,{tagChip:true}),true);
     railPlan.push({id:id1,label:'사업팀'}); }
@@ -599,43 +586,42 @@ export async function renderWeekly(atWeek){
   var etc=rows('특이');
   var memoId='wks'+no;
   var memoInner='';
-  if(etc.length) memoInner+='<div class="mini" style="margin-bottom:8px;font-weight:700">요청 / 특이사항</div>'+tbl(etc)+'<div style="height:10px"></div>';
-  if(d.prev_memo) memoInner+='<div class="ai-comment on" style="margin:0 0 8px"><b>지난주 액션</b><div class="wk-body" style="margin-top:4px">'+esc(d.prev_memo)+'</div></div>';
+  if(etc.length) memoInner+=tpl`<div class="mini" style="margin-bottom:8px;font-weight:700">요청 / 특이사항</div>${rawHtml(tbl(etc))}<div style="height:10px"></div>`;
+  if(d.prev_memo) memoInner+=tpl`<div class="ai-comment on" style="margin:0 0 8px"><b>지난주 액션</b><div class="wk-body" style="margin-top:4px">${d.prev_memo}</div></div>`;
   var wkCanMemo=!ST.IS_EQUIP && !ST.IS_VIEWER;   // 메모 저장은 admin 이상만
-  memoInner+='<textarea id="wkMemo"'+(wkCanMemo?'':' disabled')+' style="width:100%;min-height:76px;border:1px solid var(--ring);border-radius:10px;'+
-    'background:var(--surface-2);color:var(--ink);padding:10px;font-family:inherit;font-size:12.5px" '+
-    'placeholder="회의에서 정한 것을 적어두면 다음 주 이 화면에 「지난주 액션」으로 표시됩니다">'+esc((meta&&meta.memo)||'')+'</textarea>'+
-    '<div style="display:flex;gap:8px;margin-top:8px;align-items:center"><span class="mini" id="wkMemoMsg"></span>'+
-    '<span style="flex:1"></span>'+(wkCanMemo?'<button class="pill" id="wkMemoSave">메모 저장</button>':'<span class="mini">메모 저장은 관리자만</span>')+'</div>';
+  memoInner+=tpl`<textarea id="wkMemo"${wkCanMemo?'':' disabled'} style="width:100%;min-height:76px;border:1px solid var(--ring);border-radius:10px;`+
+    tpl`background:var(--surface-2);color:var(--ink);padding:10px;font-family:inherit;font-size:12.5px" `+
+    tpl`placeholder="회의에서 정한 것을 적어두면 다음 주 이 화면에 「지난주 액션」으로 표시됩니다">${(meta&&meta.memo)||''}</textarea>`+
+    tpl`<div style="display:flex;gap:8px;margin-top:8px;align-items:center"><span class="mini" id="wkMemoMsg"></span>`+
+    tpl`<span style="flex:1"></span>${rawHtml(wkCanMemo?'<button class="pill" id="wkMemoSave">메모 저장</button>':'<span class="mini">메모 저장은 관리자만</span>')}</div>`;
   bodyH+=card(memoId,'회의 메모',[],etc.length,memoInner);
 
   // ── 헤더 + 레일 조립 ──
   var counts=meta.counts||{};
   var weekNav=(d.weeks||[]);   // 저장된 주차 전부 (소급분 포함)
-  var head='<div class="wk-head">'+
-    '<span style="font-size:18px;font-weight:800">📊 주간회의</span>'+
-    '<span class="wk-chip wkc-blu wk-fsonly">발표 모드 · Space/↓ 다음 · ↑ 이전 · ESC 종료</span>'+
-    '<select id="wkWeekSel" aria-label="주차" class="pill" style="height:31px;font-family:inherit">'+
-      weekNav.map(function(w){ return '<option value="'+w+'"'+(w===WK.week?' selected':'')+'>'+w+' 주간</option>'; }).join('')+'</select>'+
-    '<span class="pill ghost" style="font-size:12px">'+esc(meta.file_name||'')+' · '+wkTime(meta.fetched_at)+' 취합</span>'+
-    (meta.missing&&meta.missing.length? '<span class="wk-chip wkc-red">⚠ 누락 탭: '+esc(meta.missing.join(', '))+'</span>'
-      : '<span class="wk-chip wkc-grn">누락 팀 없음 ✓</span>')+
-    '<span style="flex:1"></span>'+
-    '<span class="mini">'+Object.keys(counts).map(function(k){return k+' '+counts[k]+'건';}).join(' · ')+'</span>'+
-    '<button class="pill ghost" id="wkZoom" title="글자 크기 — 보통 → 크게 → 아주 크게">가<span style="font-size:15px;font-weight:800">A</span> 글자 크기</button>'+
-    '<button class="pill ghost" id="wkFs" title="보고 화면만 전체화면으로 — 사이드바·상단바 없이 발표 (ESC 또는 F로 종료)">⛶ 발표 모드</button>'+
-    '<button class="pill ghost" id="wkFetch">↻ 다시 가져오기</button>'+
-    '<button class="pill ghost" id="wkUniCopy" title="전사 «주간 업무보고» 서비스사업부 탭 양식(9열)으로 복사 — 시트의 「통합(자동)」 탭과 같은 내용 · 계약현황은 포탈 DB에서 자동 생성">📋 통합 양식 복사</button>'+
-    '<button class="pill ghost" id="wkUniXls" title="같은 양식을 엑셀 파일로">⬇ 통합 양식</button>'+
-    '<button class="pill" id="wkNext">▶ 다음 (Space)</button></div>';
+  var head=tpl`<div class="wk-head">`+
+    tpl`<span style="font-size:18px;font-weight:800">📊 주간회의</span>`+
+    tpl`<span class="wk-chip wkc-blu wk-fsonly">발표 모드 · Space/↓ 다음 · ↑ 이전 · ESC 종료</span>`+
+    tpl`<select id="wkWeekSel" aria-label="주차" class="pill" style="height:31px;font-family:inherit">`+
+      tpl`${rawHtml(weekNav.map(function(w){ return tpl`<option value="${rawHtml(w)}"${w===WK.week?' selected':''}>${rawHtml(w)} 주간</option>`; }).join(''))}</select>`+
+    tpl`<span class="pill ghost" style="font-size:12px">${meta.file_name||''} · ${rawHtml(wkTime(meta.fetched_at))} 취합</span>`+ tpl`${rawHtml(meta.missing&&meta.missing.length? tpl`<span class="wk-chip wkc-red">⚠ 누락 탭: ${meta.missing.join(', ')}</span>`
+      : '<span class="wk-chip wkc-grn">누락 팀 없음 ✓</span>')}`+
+    tpl`<span style="flex:1"></span>`+
+    tpl`<span class="mini">${rawHtml(Object.keys(counts).map(function(k){return k+' '+counts[k]+'건';}).join(' · '))}</span>`+
+    tpl`<button class="pill ghost" id="wkZoom" title="글자 크기 — 보통 → 크게 → 아주 크게">가<span style="font-size:15px;font-weight:800">A</span> 글자 크기</button>`+
+    tpl`<button class="pill ghost" id="wkFs" title="보고 화면만 전체화면으로 — 사이드바·상단바 없이 발표 (ESC 또는 F로 종료)">⛶ 발표 모드</button>`+
+    tpl`<button class="pill ghost" id="wkFetch">↻ 다시 가져오기</button>`+
+    tpl`<button class="pill ghost" id="wkUniCopy" title="전사 «주간 업무보고» 서비스사업부 탭 양식(9열)으로 복사 — 시트의 「통합(자동)」 탭과 같은 내용 · 계약현황은 포탈 DB에서 자동 생성">📋 통합 양식 복사</button>`+
+    tpl`<button class="pill ghost" id="wkUniXls" title="같은 양식을 엑셀 파일로">⬇ 통합 양식</button>`+
+    tpl`<button class="pill" id="wkNext">▶ 다음 (Space)</button></div>`;
 
-  var rail='<div class="wk-rail"><div class="ph">전주 실적</div>'+
-    railPerf.map(function(r){ return '<a data-go="'+r.id+'">'+esc(r.label)+'<small>'+esc(r.who)+'</small></a>'; }).join('')+
-    '<div class="ph">금주 계획</div>'+
-    railPlan.map(function(r){ return '<a data-go="'+r.id+'">'+esc(r.label)+'</a>'; }).join('')+
-    '<div class="ph">마무리</div><a data-go="'+memoId+'">회의 메모</a></div>';
+  var rail=tpl`<div class="wk-rail"><div class="ph">전주 실적</div>`+
+    tpl`${rawHtml(railPerf.map(function(r){ return tpl`<a data-go="${rawHtml(r.id)}">${r.label}<small>${r.who}</small></a>`; }).join(''))}`+
+    tpl`<div class="ph">금주 계획</div>`+
+    tpl`${rawHtml(railPlan.map(function(r){ return tpl`<a data-go="${rawHtml(r.id)}">${r.label}</a>`; }).join(''))}`+
+    tpl`<div class="ph">마무리</div><a data-go="${rawHtml(memoId)}">회의 메모</a></div>`;
 
-  host.innerHTML=head+'<div class="wk-wrap">'+rail+'<div id="wkMain">'+bodyH+'</div></div>';
+  host.innerHTML=tpl`${rawHtml(head)}<div class="wk-wrap">${rawHtml(rail)}<div id="wkMain">${rawHtml(bodyH)}</div></div>`;
 
   // 상단 제목 바·주간 헤더의 실제 높이를 재서 고정 위치를 맞춤 (제목 바 밑에 숨지 않게)
   function wkMeasure(){
@@ -662,7 +648,7 @@ export async function renderWeekly(atWeek){
     var lb=document.getElementById('wkZoom');
     if(lb){
       lb.style.background = z>0? 'var(--brand-t,rgba(46,189,87,.13))':'';
-      lb.innerHTML='가<span style="font-size:15px;font-weight:800">A</span> '+(z===1?'크게':z===2?'최대':'글자 크기');
+      lb.innerHTML=tpl`가<span style="font-size:15px;font-weight:800">A</span> ${z===1?'크게':z===2?'최대':'글자 크기'}`;
     }
   }
   var wkZ=0; try{ wkZ=+(localStorage.getItem('svc_wk_zoom')||0); }catch(e){}

@@ -2,10 +2,10 @@
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { IS_QA, ST } from './state.js';
 import { Viz } from './viz.js';
-import { $, applyPerms, canView, canWrite, clearSess, cssv, el, isCC, keepLogin, LIVE2CODE, lline, loadPerms, mfaGate, mfaVerifiedOf,
-  mfaWarnIfNeeded, mk, monOf, navText, permWriteGuard, refreshToken, restoreSess, saveSess, SB_KEY, SB_URL, seriesColor, sessRead, sessWrite, STATE,
-  won } from './core.js';
-import { buildControls, esc, expN, goWidget, hbars, idxs, renderAll, renderInstall, renderKpis, renderMatrix } from './dash.js';
+import { $, applyPerms, canView, canWrite, clearSess, cssv, el, esc, isCC, keepLogin, LIVE2CODE, lline, loadPerms, mfaGate, mfaVerifiedOf,
+  mfaWarnIfNeeded, mk, monOf, navText, permWriteGuard, rawHtml, refreshToken, restoreSess, saveSess, SB_KEY, SB_URL, seriesColor, sessRead,
+  sessWrite, STATE, tpl, won } from './core.js';
+import { buildControls, expN, goWidget, hbars, idxs, renderAll, renderInstall, renderKpis, renderMatrix } from './dash.js';
 import { ask } from './ai.js';
 import { applyCodes, loadCodes } from './grids.js';
 import { eqOrderById, eqRetSet, eqScan, eqSerialsHtml, eqWant, syncOrderAssets } from './equipment.js';
@@ -47,7 +47,7 @@ export var ICO={
   arrow:'<path d="M5 12h14"/><path d="M13 6l6 6-6 6"/>',
   doc:'<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M9 13h6"/><path d="M9 17h6"/>'
 };
-export function ico(name, size){ size=size||18; return '<svg width="'+size+'" height="'+size+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(ICO[name]||ICO.doc)+'</svg>'; }
+export function ico(name, size){ size=size||18; return tpl`<svg width="${rawHtml(size)}" height="${rawHtml(size)}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${rawHtml(ICO[name]||ICO.doc)}</svg>`; }
 export function iconFor(label, v){
   var L=String(label||'');
   if(v==='dash') return 'home'; if(v==='weekly') return 'calendar'; if(v==='account') return 'user'; if(v==='eqboard') return 'board';
@@ -73,21 +73,21 @@ export function buildRail(){
   var rail=document.getElementById('rail'); if(!rail || !isCC()) return;
   var segs=[]; try{ segs=menuSegments(); }catch(e){}
   var h='<div class="rlogo" data-v="dash" title="홈 (대시보드)">G</div>';
-  h+='<button type="button" data-v="dash" title="홈" aria-label="홈">'+ico('home')+'</button>';
+  h+=tpl`<button type="button" data-v="dash" title="홈" aria-label="홈">${rawHtml(ico('home'))}</button>`;
   segs.forEach(function(s){
     if(s.grp){
       if(s.grp.classList.contains('mhide')) return;
       var vis=s.buttons.filter(visBtn); if(!vis.length) return;
-      h+='<button type="button" data-seg="'+esc(s.key)+'" title="'+esc(s.label)+'" aria-label="'+esc(s.label)+'" aria-haspopup="menu">'+ico(iconFor(s.label))+'</button>';
+      h+=tpl`<button type="button" data-seg="${s.key}" title="${s.label}" aria-label="${s.label}" aria-haspopup="menu">${rawHtml(ico(iconFor(s.label)))}</button>`;
     }else{
       if(!visBtn(s.btn)) return;
       var t=navText(s.btn);
-      h+='<button type="button" data-v="'+esc(s.btn.dataset.v)+'" title="'+esc(t)+'" aria-label="'+esc(t)+'">'+ico(iconFor(t, s.btn.dataset.v))+'</button>';
+      h+=tpl`<button type="button" data-v="${s.btn.dataset.v}" title="${t}" aria-label="${t}">${rawHtml(ico(iconFor(t, s.btn.dataset.v)))}</button>`;
     }
   });
   h+='<div class="rsp"></div>';
-  h+='<button type="button" data-v="account" title="내 계정 · 설정" aria-label="내 계정">'+ico('gear')+'</button>';
-  h+='<div class="ravatar" data-v="account" title="'+esc(ST.AUTH_USER||'')+'">'+esc(((ST.AUTH_USER||'?').split('@')[0]).slice(0,1).toUpperCase())+'</div>';
+  h+=tpl`<button type="button" data-v="account" title="내 계정 · 설정" aria-label="내 계정">${rawHtml(ico('gear'))}</button>`;
+  h+=tpl`<div class="ravatar" data-v="account" title="${ST.AUTH_USER||''}">${((ST.AUTH_USER||'?').split('@')[0]).slice(0,1).toUpperCase()}</div>`;
   rail.innerHTML=h;
   rail.querySelectorAll('[data-v]').forEach(function(b){ b.onclick=function(){ railFlyClose(); navMenu(b.dataset.v); }; });
   rail.querySelectorAll('[data-seg]').forEach(function(b){ b.onclick=function(e){ e.stopPropagation(); railFlyToggle(b, b.dataset.seg); }; });
@@ -101,9 +101,9 @@ export function railFlyToggle(btn, key){
   var seg=menuSegments().filter(function(s){ return s.key===key; })[0]; if(!seg) return;
   /* ㊿+142: 그룹 안 소제목(사업 영역 › Cloud NAC/MDR/기타)도 플라이아웃에 — 보이는 메뉴가 있는 소제목만 */
   var its=(seg.items||seg.buttons||[]).filter(function(el){ return el.tagName==='BUTTON'? visBtn(el) : !el.classList.contains('sub-empty'); });
-  f.innerHTML='<div class="fh">'+esc(seg.label)+'</div>'+its.map(function(b){
-    if(b.tagName!=='BUTTON') return '<div class="fsub">'+esc(b.textContent.trim())+'</div>';
-    return '<button type="button" data-v="'+esc(b.dataset.v)+'" aria-current="'+(b.dataset.v===ST.CUR_VIEW)+'">'+esc(navText(b))+'</button>'; }).join('');
+  f.innerHTML=tpl`<div class="fh">${seg.label}</div>${rawHtml(its.map(function(b){
+    if(b.tagName!=='BUTTON') return tpl`<div class="fsub">${b.textContent.trim()}</div>`;
+    return tpl`<button type="button" data-v="${b.dataset.v}" aria-current="${b.dataset.v===ST.CUR_VIEW}">${navText(b)}</button>`; }).join(''))}`;
   f.querySelectorAll('button').forEach(function(b){ b.onclick=function(){ railFlyClose(); navMenu(b.dataset.v); }; });
   var r=btn.getBoundingClientRect();
   f.style.top='0px'; f.classList.add('on'); RAIL_OPEN=key;
@@ -135,7 +135,7 @@ export function buildMtabs(){
   var tabs=[['dash','홈','home'],['contracts','매출','chart'],[ST.IS_EQUIP? 'orders':'eqboard','장비','box'],['weekly','주간회의','calendar'],['_menu','전체','menu']];
   if(ST.IS_EQUIP) tabs[1]=['assets','현황','layers'];
   tabs=tabs.filter(function(t){ return t[0]==='_menu' || canView(t[0]); });
-  m.innerHTML=tabs.map(function(t){ return '<button type="button" data-v="'+t[0]+'" aria-current="false">'+ico(t[2],20)+esc(t[1])+'</button>'; }).join('');
+  m.innerHTML=tabs.map(function(t){ return tpl`<button type="button" data-v="${rawHtml(t[0])}" aria-current="false">${rawHtml(ico(t[2],20))}${t[1]}</button>`; }).join('');
   m.querySelectorAll('button').forEach(function(b){
     b.onclick=function(){
       if(b.dataset.v==='_menu'){ var open=document.getElementById('side').classList.toggle('open'); document.getElementById('sideDim').classList.toggle('on', open); return; }
@@ -198,14 +198,14 @@ export function renderInbox(){
   function names(arr, f, n){ var u={}; arr.forEach(function(x){ var v=f(x); if(v) u[v]=1; }); var ks=Object.keys(u); return ks.slice(0,n||3).join(', ')+(ks.length>(n||3)? ' 외 '+(ks.length-(n||3))+'곳':''); }
   if(pendL.length){
     var oldest=pendL.map(function(o){ return String(o.created_at||'').slice(0,10); }).filter(Boolean).sort()[0];
-    var age=oldest? Math.floor((new Date(todayS)-new Date(oldest))/864e5) : 0;
+    var age=oldest? Math.floor((new Date(todayS).getTime()-new Date(oldest).getTime())/864e5) : 0;
     var byCh={}; pendL.forEach(function(o){ byCh[o.channel||'기타']=(byCh[o.channel||'기타']||0)+1; });
-    add('eq', {ic:'box', cls:'warn', t:'처리 대기 장비 신청 <span class="num">'+pendL.length+'건</span>'+(age>=1? ' — 가장 오래된 건 '+age+'일 경과':''),
+    add('eq', {ic:'box', cls:'warn', t:tpl`처리 대기 장비 신청 <span class="num">${pendL.length}건</span>${rawHtml(age>=1? ' — 가장 오래된 건 '+age+'일 경과':'')}`,
       s:Object.keys(byCh).map(function(c){ return c+' '+byCh[c]; }).join(' · ')+' · '+names(pendL, function(o){ return o.customer; }),
       acts:[{l:'보류', go:function(){ ccSnooze('eq',1); }},{l:'장비 대시보드 →', pri:1, go:function(){ switchView('eqboard'); }}]});
   }
   if(retL.length){
-    add('ret', {ic:'box', cls:'info', t:'회수 진행 중 <span class="num">'+retL.length+'건</span>',
+    add('ret', {ic:'box', cls:'info', t:tpl`회수 진행 중 <span class="num">${retL.length}건</span>`,
       s:retL.slice(0,3).map(function(o){ var all=eqWant(o).length, d=eqRetSet(o).length; return (o.customer||'')+' '+d+'/'+all+'대'; }).join(' · ')+(retL.length>3? ' 외 '+(retL.length-3)+'건':''),
       acts:[{l:'장비 대시보드 →', pri:1, go:function(){ switchView('eqboard'); }}]});
   }
@@ -213,24 +213,24 @@ export function renderInbox(){
   var RS=null; if(!EQ){ try{ RS=renewScan(b); }catch(e){ RS=null; } ensureLeadSrc(function(filled){ if(filled) try{ renderInbox(); renderKpis(); }catch(e2){} }); }
   if(RS && RS.lapsed.length){
     var lsum=RS.lapsed.reduce(function(a,r){ return a+(r.mrr||0); },0), lrec=RS.checking.length;
-    add('rnl', {ic:'clock', cls:'crit', t:'만기 지났는데 미처리 <span class="num">'+RS.lapsed.length+'건</span> — 이미 LIVE 에서 빠졌습니다'+(lrec? ' (최근 2개월 '+lrec+'건)':''),
+    add('rnl', {ic:'clock', cls:'crit', t:tpl`만기 지났는데 미처리 <span class="num">${RS.lapsed.length}건</span> — 이미 LIVE 에서 빠졌습니다${rawHtml(lrec? ' (최근 2개월 '+lrec+'건)':'')}`,
       s:names(RS.lapsed, function(r){ return r.cust; })+' · 월 '+won(lsum)+'천원 · 연장이면 되살리고, 끝났으면 서비스종료·해지로 정리',
       acts:[{l:'처리하기 →', pri:1, go:function(){ openRenewList('lapsed'); }}]});
   }
   if(RS && RS.due.length){
     var dsum=RS.due.reduce(function(a,r){ return a+(r.mrr||0); },0);
-    add('rnd', {ic:'clock', cls:'warn', t:mk(b)+' 만기 <span class="num">'+RS.due.length+'건</span> — '+mk(b+1)+' 1일 LIVE 에서 빠집니다',
+    add('rnd', {ic:'clock', cls:'warn', t:tpl`${mk(b)} 만기 <span class="num">${RS.due.length}건</span> — ${mk(b+1)} 1일 LIVE 에서 빠집니다`,
       s:names(RS.due, function(r){ return r.cust; })+' · 월 '+won(dsum)+'천원'+(RS.next.length? ' · 다음 달 만기 '+RS.next.length+'건 대기':''),
       acts:[{l:'보류', go:function(){ ccSnooze('rnd',3); }},{l:'처리하기 →', pri:1, go:function(){ openRenewList('due'); }}]});
   }
   /* 데이터 점검 (㊿+133): 바로 고쳐야 할 항목이 있으면 한 줄 */
   if(!EQ){ var DS=null; try{ DS=dcSummary(); }catch(e){}
-    if(DS && DS.crit){ add('dc', {ic:'scale', cls:'crit', t:'데이터 점검 — 바로 고칠 항목 <span class="num">'+DS.crit+'건</span>'+(DS.warn? ' · 확인 필요 '+DS.warn+'건':''),
+    if(DS && DS.crit){ add('dc', {ic:'scale', cls:'crit', t:tpl`데이터 점검 — 바로 고칠 항목 <span class="num">${rawHtml(DS.crit)}건</span>${rawHtml(DS.warn? ' · 확인 필요 '+DS.warn+'건':'')}`,
       s:Object.keys(DS.items).filter(function(k){ return DS.items[k]; }).slice(0,3).map(function(k){ return k+' '+DS.items[k]; }).join(' · '),
       acts:[{l:'보류', go:function(){ ccSnooze('dc',3); }},{l:'점검 화면 →', pri:1, go:function(){ switchView('dcheck'); }}]}); } }
   if(expL.length && !(RS && EN===1 && RS.due.length)){
     var ends=expL.map(function(r){ return r.endIdx; }).sort(function(x,y){ return x-y; });
-    add('exp', {ic:'clock', cls:'info', t:EN+'개월 내 만료 계약 <span class="num">'+expL.length+'건</span> — <span class="num">'+won(expAmt)+'</span>천원/월',
+    add('exp', {ic:'clock', cls:'info', t:tpl`${rawHtml(EN)}개월 내 만료 계약 <span class="num">${expL.length}건</span> — <span class="num">${won(expAmt)}</span>천원/월`,
       s:names(expL, function(r){ return r.cust; })+' · 종료 '+mk(ends[0])+(ends.length>1? '~'+mk(ends[ends.length-1]):'')+' · 재약정 타깃',
       acts:[{l:'고객 360', go:function(){ if(expL.length===1) openCust360(expL[0].cust); else goWidget('exp','계약 만료 예정'); }},{l:'재계약 타진', pri:1, go:function(){ goWidget('exp','계약 만료 예정'); }}]});
   }
@@ -239,20 +239,20 @@ export function renderInbox(){
       acts:[{l:'다음 주에', go:function(){ ccSnooze('biz',7); }},{l:'엑셀 올리기', pri:1, go:function(){ switchView('biz'); }}]});
   }
   if(!EQ){
-    if(inbN>0) add('inb', {ic:'inbox', cls:'crit', t:'인바운드 미대응 <span class="num">'+inbN+'건</span>', s:'진행중인데 3개월 이상 대응 기록이 없습니다', acts:[{l:'인바운드 통계 →', pri:1, go:function(){ switchView('inbstat'); }}]});
+    if(inbN>0) add('inb', {ic:'inbox', cls:'crit', t:tpl`인바운드 미대응 <span class="num">${rawHtml(inbN)}건</span>`, s:'진행중인데 3개월 이상 대응 기록이 없습니다', acts:[{l:'인바운드 통계 →', pri:1, go:function(){ switchView('inbstat'); }}]});
     else zeros.push('인바운드 미대응 '+(inbN==null? '…':'0'));
-    if(oiLate.length) add('oi', {ic:'target', cls:'warn', t:'OI 밀린 액션 <span class="num">'+oiLate.length+'건</span>', s:names(oiLate, function(o){ return o.customer; })+' · 다음 일정이 지났습니다', acts:[{l:'OI 현황 →', pri:1, go:function(){ switchView('oi'); }}]});
+    if(oiLate.length) add('oi', {ic:'target', cls:'warn', t:tpl`OI 밀린 액션 <span class="num">${oiLate.length}건</span>`, s:names(oiLate, function(o){ return o.customer; })+' · 다음 일정이 지났습니다', acts:[{l:'OI 현황 →', pri:1, go:function(){ switchView('oi'); }}]});
     else zeros.push('OI 밀린 액션 0');
   }
   zeros.push('주간회의 '+wkTxt);
   var la=document.getElementById('loadedAt');
-  var h='<div class="ib-head"><h2>인박스 <span class="ctag'+(rows.length?' warn':' ok')+'">'+rows.length+'</span></h2><span class="mini" style="display:flex;align-items:center;gap:6px"><i style="width:7px;height:7px;border-radius:50%;background:var(--brand);display:inline-block"></i>'+(la&&la.textContent? esc(la.textContent):'')+' · 자동 갱신</span></div>';
-  if(!rows.length) h+='<div class="ib-empty"><span class="ib-ic ok">'+ico('check',16)+'</span>처리할 알림이 없습니다. 모든 항목이 정리되어 있어요.</div>';
+  var h=tpl`<div class="ib-head"><h2>인박스 <span class="ctag${rows.length?' warn':' ok'}">${rows.length}</span></h2><span class="mini" style="display:flex;align-items:center;gap:6px"><i style="width:7px;height:7px;border-radius:50%;background:var(--brand);display:inline-block"></i>${rawHtml(la&&la.textContent? esc(la.textContent):'')} · 자동 갱신</span></div>`;
+  if(!rows.length) h+=tpl`<div class="ib-empty"><span class="ib-ic ok">${rawHtml(ico('check',16))}</span>처리할 알림이 없습니다. 모든 항목이 정리되어 있어요.</div>`;
   rows.forEach(function(o,i){
-    h+='<div class="ib-row" data-i="'+i+'"><span class="ib-ic '+o.cls+'">'+ico(o.ic,16)+'</span><div class="ib-b"><div class="ib-t">'+o.t+'</div><div class="ib-s" title="'+esc(o.s||'')+'">'+esc(o.s||'')+'</div></div>'+
-      '<div class="ib-acts">'+o.acts.map(function(a,j){ return '<button type="button" class="cbtn'+(a.pri?' pri':'')+'" data-i="'+i+'" data-j="'+j+'">'+esc(a.l)+'</button>'; }).join('')+'</div></div>';
+    h+=tpl`<div class="ib-row" data-i="${rawHtml(i)}"><span class="ib-ic ${rawHtml(o.cls)}">${rawHtml(ico(o.ic,16))}</span><div class="ib-b"><div class="ib-t">${rawHtml(o.t)}</div><div class="ib-s" title="${o.s||''}">${o.s||''}</div></div>`+
+      tpl`<div class="ib-acts">${rawHtml(o.acts.map(function(a,j){ return tpl`<button type="button" class="cbtn${a.pri?' pri':''}" data-i="${rawHtml(i)}" data-j="${rawHtml(j)}">${a.l}</button>`; }).join(''))}</div></div>`;
   });
-  h+='<div class="ib-foot"><span>'+zeros.map(esc).join(' · ')+'</span>'+(snz? '<a id="ibUnsnz">보류한 '+snz+'건 다시 보기</a>':'<span class="mini">주간회의는 매주 월요일 · 일요일 저녁 자동 취합</span>')+'</div>';
+  h+=tpl`<div class="ib-foot"><span>${rawHtml(zeros.map(esc).join(' · '))}</span>${rawHtml(snz? tpl`<a id="ibUnsnz">보류한 ${rawHtml(snz)}건 다시 보기</a>`:'<span class="mini">주간회의는 매주 월요일 · 일요일 저녁 자동 취합</span>')}</div>`;
   box.innerHTML=h;
   box.querySelectorAll('.cbtn').forEach(function(bt){ bt.onclick=function(e){ e.stopPropagation(); rows[+bt.dataset.i].acts[+bt.dataset.j].go(); }; });
   var un=document.getElementById('ibUnsnz'); if(un) un.onclick=ccUnsnooze;
@@ -269,7 +269,7 @@ export function ccAfterKpis(box, list, b){
   /* 연환산 ARR 타일은 히어로 안 한 줄로 */
   var arr=box.children[0];
   if(arr && /연환산 ARR|기말 MRR/.test((arr.querySelector('.k')||{}).textContent||'')){
-    var line=document.createElement('div'); line.className='arr'; line.innerHTML=esc(arr.querySelector('.k').textContent)+' <b class="num">'+(arr.querySelector('.v')||{}).innerHTML+'</b>'; arr.remove(); hero.appendChild(line);
+    var line=document.createElement('div'); line.className='arr'; line.innerHTML=tpl`${arr.querySelector('.k').textContent} <b class="num">${rawHtml((arr.querySelector('.v')||{}).innerHTML)}</b>`; arr.remove(); hero.appendChild(line);
   }
   var gb=document.getElementById('goalBar'); if(gb) hero.appendChild(gb);
   /* LIVE 타일에 제품별 막대 */
@@ -278,11 +278,11 @@ export function ccAfterKpis(box, list, b){
     var lv=liveData(b);
     if(lt && lv && lv.ok){
       var per={}; lv.rows.forEach(function(x){ (per[x.line]=per[x.line]||{})[x.cust]=1; });
-      var arr2=Object.keys(per).map(function(l){ return [l, Object.keys(per[l]).length]; }).sort(function(x,y){ return y[1]-x[1]; }).slice(0,3);
-      var mx=arr2.length? arr2[0][1]:1, cols={};
+      var arr2=Object.keys(per).map(function(l){ return {line:l, n:Object.keys(per[l]).length}; }).sort(function(x,y){ return y.n-x.n; }).slice(0,3);
+      var mx=arr2.length? arr2[0].n:1, cols={};
       (ST.DATA.lines||[]).forEach(function(l){ cols[l.label]=seriesColor(l.color); });
       var w=document.createElement('div'); w.style.marginTop='6px';
-      w.innerHTML=arr2.map(function(x){ return '<div class="mbar"><span class="l">'+esc(lline(x[0]))+'</span><span class="t"><i style="width:'+Math.round(x[1]/mx*100)+'%;background:'+(cols[x[0]]||'var(--s1)')+'"></i></span><span class="n num">'+x[1]+'</span></div>'; }).join('');
+      w.innerHTML=arr2.map(function(x){ return tpl`<div class="mbar"><span class="l">${lline(x.line)}</span><span class="t"><i style="width:${Math.round(x.n/mx*100)}%;background:${rawHtml(cols[x.line]||'var(--s1)')}"></i></span><span class="n num">${rawHtml(x.n)}</span></div>`; }).join('');
       lt.appendChild(w);
     }
   }catch(e){}
@@ -291,7 +291,7 @@ export function ccAfterKpis(box, list, b){
     var yoy=[].slice.call(box.children).filter(function(c){ return /전년/.test((c.querySelector('.k')||{}).textContent||''); })[0];
     if(yoy){ var hd=hero.querySelector('.d'), vv=yoy.querySelector('.v'), yd=yoy.querySelector('.d');
       if(hd && vv){ var sp=document.createElement('span'); sp.className='yoy';
-        sp.innerHTML=(hd.textContent.trim()? ' · ':'')+esc(yoy.querySelector('.k').textContent)+' <b class="'+(yd&&yd.classList.contains('up')?'up':(yd&&yd.classList.contains('down')?'down':''))+'">'+vv.innerHTML+'</b>'; hd.appendChild(sp); }
+        sp.innerHTML=tpl`${rawHtml((hd.textContent.trim()? ' · ':'')+esc(yoy.querySelector('.k').textContent))} <b class="${yd&&yd.classList.contains('up')?'up':(yd&&yd.classList.contains('down')?'down':'')}">${rawHtml(vv.innerHTML)}</b>`; hd.appendChild(sp); }
       yoy.remove(); }
   }catch(e){}
   /* 1차 타일 4개: LIVE · 신규/해지 · 만료 · 장비 운영 */
@@ -348,10 +348,10 @@ export function ccTileChannel(list,b){
   var arr=Object.keys(m).map(function(c){ return [c,m[c]]; }).sort(function(x,y){ return y[1]-x[1]; });
   var top=arr.slice(0,4), cols=['var(--ink)','var(--ink-2)','var(--muted)','var(--axis)'];
   var c=el('div','kpi');
-  c.innerHTML='<div class="k">채널별 MRR <span class="mini">'+esc(mk(b))+'</span></div>'+
-    '<div class="stk">'+top.map(function(x,i){ return '<i style="width:'+(tot? x[1]/tot*100:0)+'%;background:'+cols[i]+'"></i>'; }).join('')+'</div>'+
-    '<div class="mlist">'+top.map(function(x,i){ return '<div class="mrow"><span><i style="background:'+cols[i]+'"></i>'+esc(x[0])+'</span><span class="num">'+won(x[1])+'</span></div>'; }).join('')+'</div>'+
-    '<div class="d" style="margin-top:auto;padding-top:6px">단위 천원'+(top[0]&&tot? ' · '+esc(top[0][0])+' 비중 '+Math.round(top[0][1]/tot*100)+'%':'')+(arr.length>4? ' · 외 '+(arr.length-4)+'개 채널':'')+'</div>';
+  c.innerHTML=tpl`<div class="k">채널별 MRR <span class="mini">${mk(b)}</span></div>`+
+    tpl`<div class="stk">${rawHtml(top.map(function(x,i){ return tpl`<i style="width:${tot? x[1]/tot*100:0}%;background:${rawHtml(cols[i])}"></i>`; }).join(''))}</div>`+
+    tpl`<div class="mlist">${rawHtml(top.map(function(x,i){ return tpl`<div class="mrow"><span><i style="background:${rawHtml(cols[i])}"></i>${x[0]}</span><span class="num">${won(x[1])}</span></div>`; }).join(''))}</div>`+
+    tpl`<div class="d" style="margin-top:auto;padding-top:6px">단위 천원${rawHtml(top[0]&&tot? ' · '+esc(top[0][0])+' 비중 '+Math.round(top[0][1]/tot*100)+'%':'')}${rawHtml(arr.length>4? ' · 외 '+(arr.length-4)+'개 채널':'')}</div>`;
   c.style.cursor='pointer'; c.title='채널별 매출 — 누르면 계약 목록'; c.setAttribute('role','button'); c.tabIndex=0;
   c.onclick=function(){ switchView('contracts'); };
   return c;
@@ -362,14 +362,14 @@ export function ccTileEquip(){
   var live=O.filter(function(o){ return o.status!=='회수완료' && o.status!=='취소'; });
   var prog=live.filter(function(o){ return o.status==='회수예정' || eqRetSet(o).length; });
   var s=null; try{ s=eqScan(); }catch(e){}
-  var tag= s? (s.gap.length? '<span class="ctag warn">맞지 않음 '+s.gap.length+'</span>':'<span class="ctag ok">신청 ↔ 현황 일치</span>') : '';
+  var tag= s? (s.gap.length? tpl`<span class="ctag warn">맞지 않음 ${s.gap.length}</span>`:'<span class="ctag ok">신청 ↔ 현황 일치</span>') : '';
   var first=prog[0], ph='';
   if(first){ var all=eqWant(first), done=eqRetSet(first).length;
-    ph='<div class="mrow" style="margin-top:8px;font-size:12px"><span>'+esc(first.customer||'')+' · 회수</span><span class="num mini">'+done+'/'+all.length+'대</span></div><div class="eqb-prog">'+all.map(function(sn,i){ return '<i class="'+(i<done?'on':'')+'"></i>'; }).join('')+'</div>'; }
+    ph=tpl`<div class="mrow" style="margin-top:8px;font-size:12px"><span>${first.customer||''} · 회수</span><span class="num mini">${rawHtml(done)}/${all.length}대</span></div><div class="eqb-prog">${rawHtml(all.map(function(sn,i){ return tpl`<i class="${i<done?'on':''}"></i>`; }).join(''))}</div>`; }
   var c=el('div','kpi');
-  c.innerHTML='<div class="k">임대 장비 운영 '+tag+'</div>'+
-    '<div class="tri"><div><b class="num">'+lent+'</b><span>임대중</span></div><div><b class="num">'+stock+'</b><span>재고</span></div><div><b class="num" style="color:'+(prog.length?'var(--warn-ink)':'inherit')+'">'+prog.length+'</b><span>회수 진행</span></div></div>'+ph+
-    '<div class="d" style="margin-top:auto;padding-top:6px;color:var(--s1-ink);font-weight:500">장비 대시보드 →</div>';
+  c.innerHTML=tpl`<div class="k">임대 장비 운영 ${rawHtml(tag)}</div>`+
+    tpl`<div class="tri"><div><b class="num">${rawHtml(lent)}</b><span>임대중</span></div><div><b class="num">${rawHtml(stock)}</b><span>재고</span></div><div><b class="num" style="color:${prog.length?'var(--warn-ink)':'inherit'}">${prog.length}</b><span>회수 진행</span></div></div>${rawHtml(ph)}`+
+    tpl`<div class="d" style="margin-top:auto;padding-top:6px;color:var(--s1-ink);font-weight:500">장비 대시보드 →</div>`;
   c.style.cursor='pointer'; c.title='임대 장비 대시보드 (클릭)'; c.setAttribute('role','button'); c.tabIndex=0;
   c.onclick=function(){ switchView('eqboard'); };
   return c;
@@ -383,10 +383,10 @@ export function ccTilePipe(){
   var inb=ST.RAWX.inbound===undefined? null : (ST.RAWX.inbound||[]).filter(function(r){ return String(r.on_date||'').slice(0,10)>=wkS; }).length;
   if(ST.RAWX.inbound===undefined && !SHELL_ONCE.inb){ SHELL_ONCE.inb=1; try{ loadInbound(function(){ if(ST.CUR_VIEW==='dash') try{ renderKpis(); }catch(e){} }); }catch(e){} }
   var c=el('div','kpi');
-  c.innerHTML='<div class="k">이번 주 파이프라인 <span class="ctag info">인바운드 자동 07:00</span></div>'+
-    '<div class="tri" style="grid-template-columns:repeat(2,minmax(0,1fr))"><div><b class="num">'+(inb==null?'…':inb)+'</b><span>최근 7일 인바운드</span></div><div><b class="num">'+open.length+'</b><span>진행 중 OI</span></div></div>'+
-    '<div style="display:flex;flex-direction:column;gap:3px;font-size:12.5px;margin-top:8px">'+Object.keys(st).slice(0,3).map(function(k){ return '<div class="mrow"><span>'+esc(k)+' 단계</span><span class="num">'+st[k]+'</span></div>'; }).join('')+
-    '<div class="mrow"><span>이달 계약예상</span><span class="num" style="font-weight:600">'+due.length+'</span></div></div>';
+  c.innerHTML=tpl`<div class="k">이번 주 파이프라인 <span class="ctag info">인바운드 자동 07:00</span></div>`+
+    tpl`<div class="tri" style="grid-template-columns:repeat(2,minmax(0,1fr))"><div><b class="num">${rawHtml(inb==null?'…':inb)}</b><span>최근 7일 인바운드</span></div><div><b class="num">${open.length}</b><span>진행 중 OI</span></div></div>`+
+    tpl`<div style="display:flex;flex-direction:column;gap:3px;font-size:12.5px;margin-top:8px">${rawHtml(Object.keys(st).slice(0,3).map(function(k){ return tpl`<div class="mrow"><span>${k} 단계</span><span class="num">${rawHtml(st[k])}</span></div>`; }).join(''))}`+
+    tpl`<div class="mrow"><span>이달 계약예상</span><span class="num" style="font-weight:600">${due.length}</span></div></div>`;
   c.style.cursor='pointer'; c.title='OI 현황 (클릭)'; c.setAttribute('role','button'); c.tabIndex=0;
   c.onclick=function(){ switchView('oi'); };
   return c;
@@ -396,9 +396,9 @@ export function ccTileWeekly(){
   var wkTxt= dow===1? '오늘':'D-'+toMon;
   var next=new Date(today); next.setDate(next.getDate()+(dow===1? 0:toMon));
   var c=el('div','kpi');
-  c.innerHTML='<div class="k">주간회의</div><div class="v">'+esc(wkTxt)+'</div>'+
-    '<div class="d">'+(dow===1? '오늘 회의 · 보고 화면 열기' : (next.getMonth()+1)+'월 '+next.getDate()+'일 월요일 · 일요일 저녁 자동 취합')+'</div>'+
-    '<div class="d" style="margin-top:auto;padding-top:6px;color:var(--brand);font-weight:500">주간회의 화면 →</div>';
+  c.innerHTML=tpl`<div class="k">주간회의</div><div class="v">${wkTxt}</div>`+
+    tpl`<div class="d">${rawHtml(dow===1? '오늘 회의 · 보고 화면 열기' : (next.getMonth()+1)+'월 '+next.getDate()+'일 월요일 · 일요일 저녁 자동 취합')}</div>`+
+    tpl`<div class="d" style="margin-top:auto;padding-top:6px;color:var(--brand);font-weight:500">주간회의 화면 →</div>`;
   c.style.cursor='pointer'; c.title='주간회의 (클릭)'; c.setAttribute('role','button'); c.tabIndex=0;
   c.onclick=function(){ switchView('weekly'); };
   return c;
@@ -415,7 +415,7 @@ export var EQB={ch:'', q:'', more:{}};
 export var EQB_COLS=[['접수','#9A9DA5','현황 재고'],['출하요청','var(--info-ink)','현황 재고'],['배송중','var(--warn-ink)','현황 재고'],['설치완료','var(--brand)','현황 임대중'],['회수예정','#D95926','칩으로 일부 회수'],['회수완료','var(--ink-2)','최근 90일']];
 export function eqRefresh(){ if(ST.CUR_VIEW==='eqboard') renderEqBoard(); else try{ renderGrid(); }catch(e){} }
 export var EQ_CH_CLS={'에스원':'ch-s1','LGU+':'ch-lg','LG U+':'ch-lg','조달':'ch-gov','일반':'ch-gen'};
-export function eqChTag(ch){ ch=ch||'기타'; return '<span class="ctag '+(EQ_CH_CLS[ch]||'')+'">'+esc(ch)+'</span>'; }
+export function eqChTag(ch){ ch=ch||'기타'; return tpl`<span class="ctag ${rawHtml(EQ_CH_CLS[ch]||'')}">${ch}</span>`; }
 export function eqChColor(ch){ return ({'에스원':cssv('--s1'),'LGU+':cssv('--s5'),'LG U+':cssv('--s5'),'조달':cssv('--s4'),'일반':cssv('--s3')})[ch]||cssv('--muted'); }
 /* 대시보드 윗부분 — 요약 타일 6개 + 차트 3개 (현황 자산 + 신청 내역 기준) */
 export function renderEqDash(){
@@ -429,7 +429,7 @@ export function renderEqDash(){
   var pend=O.filter(function(o){ return ['접수','출하요청','배송중'].indexOf(o.status)>=0; });
   var pendBy={}; pend.forEach(function(o){ pendBy[o.status]=(pendBy[o.status]||0)+1; });
   var oldest=pend.map(function(o){ return String(o.created_at||'').slice(0,10); }).filter(Boolean).sort()[0];
-  var age=oldest? Math.floor((new Date(todayS)-new Date(oldest))/864e5):0;
+  var age=oldest? Math.floor((new Date(todayS).getTime()-new Date(oldest).getTime())/864e5):0;
   var retL=O.filter(function(o){ return o.status==='회수예정' || (o.status!=='회수완료' && o.status!=='취소' && eqRetSet(o).length); });
   var retAll=0, retDone=0; retL.forEach(function(o){ retAll+=eqWant(o).length; retDone+=eqRetSet(o).length; });
   var instM=O.filter(function(o){ return ['설치완료','회수예정','회수완료'].indexOf(o.status)>=0 && String(o.install_date||'').slice(0,7)===ym; });
@@ -437,7 +437,7 @@ export function renderEqDash(){
   var retM=O.filter(function(o){ return o.status==='회수완료' && String(o.returned_date||'').slice(0,7)===ym; });
   var qty=function(arr){ return arr.reduce(function(a,o){ return a+(+o.qty||eqWant(o).length||1); },0); };
   function tile(cls, dot, k, v, u, d, go){
-    return '<div class="kpi '+cls+'" role="button" tabindex="0" data-go="'+go+'"><div class="k">'+(dot? '<i style="background:'+dot+'"></i>':'')+esc(k)+'</div><div class="v">'+v+(u? '<small>'+u+'</small>':'')+'</div><div class="d">'+d+'</div></div>';
+    return tpl`<div class="kpi ${rawHtml(cls)}" role="button" tabindex="0" data-go="${rawHtml(go)}"><div class="k">${rawHtml(dot? tpl`<i style="background:${rawHtml(dot)}"></i>`:'')}${k}</div><div class="v">${rawHtml(v)}${rawHtml(u? tpl`<small>${rawHtml(u)}</small>`:'')}</div><div class="d">${rawHtml(d)}</div></div>`;
   }
   K.innerHTML=
     tile('good', 'var(--brand)', '임대중', lent.length, '대', '고객사 '+Object.keys(lentCust).length+'곳 · 현황 기준', 'assets:임대중')+
@@ -463,7 +463,7 @@ export function renderEqDash(){
     var mk2=Object.keys(models).sort(function(a,b){ return (models[b].l+models[b].s+models[b].r)-(models[a].l+models[a].s+models[a].r); }).slice(0,6);
     var cnt=function(v){ return Math.round(v)+'대'; };
     var hostM=document.getElementById('eqcModel');
-    hostM.innerHTML= mk2.length? '<div class="h">모델별 (임대중 · 재고 · 회수)</div>'+mk2.map(function(m){ var x=models[m]; return '<div class="mrow"><span>'+esc(m)+'</span><span class="num" style="font-weight:500;color:var(--ink-2)"><b style="color:var(--ink)">'+x.l+'</b> · '+x.s+' · '+x.r+'</span></div>'; }).join('') : '';
+    hostM.innerHTML= mk2.length? tpl`<div class="h">모델별 (임대중 · 재고 · 회수)</div>${rawHtml(mk2.map(function(m){ var x=models[m]; return tpl`<div class="mrow"><span>${m}</span><span class="num" style="font-weight:500;color:var(--ink-2)"><b style="color:var(--ink)">${rawHtml(x.l)}</b> · ${rawHtml(x.s)} · ${rawHtml(x.r)}</span></div>`; }).join(''))}` : '';
     var months=[], d=new Date(); d.setDate(1);
     for(var i=11;i>=0;i--){ var t=new Date(d.getFullYear(), d.getMonth()-i, 1); months.push(t.getFullYear()+'-'+('0'+(t.getMonth()+1)).slice(-2)); }
     var inst=months.map(function(){ return 0; }), rets=months.map(function(){ return 0; });
@@ -483,13 +483,13 @@ export function renderEqBoard(){
   /* 채널 칩 */
   var chs={}; O.forEach(function(o){ if(o.status!=='취소') chs[o.channel||'기타']=(chs[o.channel||'기타']||0)+1; });
   var chipBox=document.getElementById('eqbChips');
-  chipBox.innerHTML='<button type="button" class="cbtn" data-ch="" aria-pressed="'+(EQB.ch===''? 'true':'false')+'">전체</button>'+
-    Object.keys(chs).sort(function(a,b2){ return chs[b2]-chs[a]; }).map(function(c){ return '<button type="button" class="cbtn" data-ch="'+esc(c)+'" aria-pressed="'+(EQB.ch===c? 'true':'false')+'">'+esc(c)+' <span class="num" style="opacity:.6">'+chs[c]+'</span></button>'; }).join('');
+  chipBox.innerHTML=tpl`<button type="button" class="cbtn" data-ch="" aria-pressed="${EQB.ch===''? 'true':'false'}">전체</button>`+
+    tpl`${rawHtml(Object.keys(chs).sort(function(a,b2){ return chs[b2]-chs[a]; }).map(function(c){ return tpl`<button type="button" class="cbtn" data-ch="${c}" aria-pressed="${EQB.ch===c? 'true':'false'}">${c} <span class="num" style="opacity:.6">${rawHtml(chs[c])}</span></button>`; }).join(''))}`;
   chipBox.querySelectorAll('button').forEach(function(bt){ bt.onclick=function(){ EQB.ch=bt.dataset.ch; renderEqBoard(); }; });
   /* 일치 표시 */
   try{ var s=eqScan(); document.getElementById('eqbMatch').innerHTML= s.gap.length
-      ? '<span class="ctag warn" style="cursor:pointer" title="신청 내역 화면의 대조 패널에서 맞추기">'+ico('clock',12)+' 맞지 않음 '+s.gap.length+'건 · 신청 내역에서 맞추기</span>'
-      : '<span class="ctag ok">'+ico('check',12)+' 신청 ↔ 현황 일치 · '+s.ok+'건</span>';
+      ? tpl`<span class="ctag warn" style="cursor:pointer" title="신청 내역 화면의 대조 패널에서 맞추기">${rawHtml(ico('clock',12))} 맞지 않음 ${s.gap.length}건 · 신청 내역에서 맞추기</span>`
+      : tpl`<span class="ctag ok">${rawHtml(ico('check',12))} 신청 ↔ 현황 일치 · ${rawHtml(s.ok)}건</span>`;
     var mt=document.getElementById('eqbMatch').firstChild; if(mt && s.gap.length) mt.onclick=function(){ switchView('orders'); };
   }catch(e){}
   var rows=O.filter(function(o){
@@ -510,18 +510,17 @@ export function renderEqBoard(){
     /* 비어 있는 열은 가늘게 접어 자리만 남김(드롭은 가능) — 화면을 실제 카드가 있는 열에 몰아줌 */
     if(!list.length){
       tracks.push('52px');
-      h+='<section class="eqb-col empty" data-st="'+esc(st)+'" aria-label="'+esc(st)+' 0건" title="'+esc(st)+' — 0건'+(st==='회수완료'&&older? ' (90일 이전 '+older+'건은 신청 내역에서)':'')+'">'+
-        '<div class="eqb-ch slim"><i style="background:'+col[1]+'"></i><span class="n">0</span><span class="lbl">'+esc(st)+'</span></div>'+
-        (st==='접수' && canEdit? '<button type="button" class="eqb-plus" data-new="1" title="새 장비 신청">＋</button>':'')+'</section>';
+      h+=tpl`<section class="eqb-col empty" data-st="${st}" aria-label="${st} 0건" title="${st} — 0건${rawHtml(st==='회수완료'&&older? ' (90일 이전 '+older+'건은 신청 내역에서)':'')}">`+
+        tpl`<div class="eqb-ch slim"><i style="background:${rawHtml(col[1])}"></i><span class="n">0</span><span class="lbl">${st}</span></div>`+ tpl`${rawHtml(st==='접수' && canEdit? '<button type="button" class="eqb-plus" data-new="1" title="새 장비 신청">＋</button>':'')}</section>`;
       return;
     }
     tracks.push('minmax(0,1fr)');
-    h+='<section class="eqb-col'+(st==='회수예정'?' warm':'')+'" data-st="'+esc(st)+'" aria-label="'+esc(st)+'">'+
-      '<div class="eqb-ch" title="'+esc(col[2])+'"><i style="background:'+col[1]+'"></i>'+esc(st)+' <span class="n">'+list.length+'</span>'+(st==='회수완료'? '<span class="to">최근 90일</span>':'')+'</div>';
+    h+=tpl`<section class="eqb-col${st==='회수예정'?' warm':''}" data-st="${st}" aria-label="${st}">`+
+      tpl`<div class="eqb-ch" title="${col[2]}"><i style="background:${rawHtml(col[1])}"></i>${st} <span class="n">${list.length}</span>${rawHtml(st==='회수완료'? '<span class="to">최근 90일</span>':'')}</div>`;
     list.slice(0,lim).forEach(function(o){ h+=eqbCard(o, canEdit, todayS); });
-    if(list.length>lim) h+='<button type="button" class="eqb-more" data-more="'+esc(st)+'">외 '+(list.length-lim)+'건 더 보기</button>';
+    if(list.length>lim) h+=tpl`<button type="button" class="eqb-more" data-more="${st}">외 ${list.length-lim}건 더 보기</button>`;
     if(st==='접수' && canEdit) h+='<button type="button" class="eqb-more" data-new="1">＋ 새 신청</button>';
-    if(st==='회수완료' && older) h+='<div class="eqb-empty">90일 이전 '+older+'건은 신청 내역(목록)에서</div>';
+    if(st==='회수완료' && older) h+=tpl`<div class="eqb-empty">90일 이전 ${rawHtml(older)}건은 신청 내역(목록)에서</div>`;
     h+='</section>';
   });
   wrap.innerHTML=h;
@@ -535,25 +534,24 @@ export function renderEqBoard(){
 }
 export function eqbCard(o, canEdit, todayS){
   var all=eqWant(o), ret=eqRetSet(o), done=o.status==='회수완료';
-  var age='', ageD=0; if(['접수','출하요청','배송중'].indexOf(o.status)>=0 && o.created_at){ ageD=Math.floor((new Date(todayS)-new Date(String(o.created_at).slice(0,10)))/864e5); if(ageD>=1) age=(ageD>7? ' <span class="ctag late">'+ageD+'일 경과</span>' : ' · '+ageD+'일'); }
-  var meta=['<b>'+esc(o.model||'모델 미정')+' ×'+(o.qty||all.length||1)+'</b>', o.order_type||''];
-  if(o.status==='설치완료' && o.install_date) meta.push('설치 <span class="num">'+esc(String(o.install_date).slice(0,10))+'</span>');
-  else if(o.install_date && !done) meta.push('설치희망 <span class="num">'+esc(String(o.install_date).slice(0,10))+'</span>');
-  if(done && o.returned_date) meta.push('회수일 <span class="num">'+esc(String(o.returned_date).slice(0,10))+'</span>');
+  var age='', ageD=0; if(['접수','출하요청','배송중'].indexOf(o.status)>=0 && o.created_at){ ageD=Math.floor((new Date(todayS).getTime()-new Date(String(o.created_at).slice(0,10)).getTime())/864e5); if(ageD>=1) age=(ageD>7? tpl` <span class="ctag late">${rawHtml(ageD)}일 경과</span>` : ' · '+ageD+'일'); }
+  var meta=[tpl`<b>${o.model||'모델 미정'} ×${rawHtml(o.qty||all.length||1)}</b>`, o.order_type||''];
+  if(o.status==='설치완료' && o.install_date) meta.push(tpl`설치 <span class="num">${String(o.install_date).slice(0,10)}</span>`);
+  else if(o.install_date && !done) meta.push(tpl`설치희망 <span class="num">${String(o.install_date).slice(0,10)}</span>`);
+  if(done && o.returned_date) meta.push(tpl`회수일 <span class="num">${String(o.returned_date).slice(0,10)}</span>`);
   var prog='';
   if(!done && (o.status==='회수예정' || ret.length) && all.length){
-    prog='<div style="display:flex;align-items:center;gap:8px"><div class="eqb-prog" style="flex:1;margin:0">'+all.map(function(sn){ return '<i class="'+(ret.indexOf(sn.toUpperCase())>=0?'on':'')+'"></i>'; }).join('')+'</div><span class="num" style="font-size:12px;font-weight:600">'+ret.length+'/'+all.length+'</span></div>';
+    prog=tpl`<div style="display:flex;align-items:center;gap:8px"><div class="eqb-prog" style="flex:1;margin:0">${rawHtml(all.map(function(sn){ return tpl`<i class="${ret.indexOf(sn.toUpperCase())>=0?'on':''}"></i>`; }).join(''))}</div><span class="num" style="font-size:12px;font-weight:600">${ret.length}/${all.length}</span></div>`;
   }
   var idx=EQB_COLS.map(function(c){ return c[0]; }).indexOf(o.status), nextSt=idx>=0 && idx<EQB_COLS.length-1? EQB_COLS[idx+1][0] : null;
   var who=o.mgr_name? o.mgr_name : (o.requester? String(o.requester).split('@')[0] : '');
-  var ft='<div class="ft"><span class="mini" title="담당 '+esc(who)+'">'+esc(who)+'</span><span class="acts">'+
-    '<button type="button" class="cbtn" data-open="'+o.id+'" title="신청 내역에서 열기·수정">✎</button>'+
-    (canEdit && nextSt? '<button type="button" class="cbtn nx'+(['출하요청','배송중','설치완료'].indexOf(nextSt)>=0?' pri':'')+'" data-oid="'+o.id+'" data-next="'+esc(nextSt)+'" title="'+esc(nextSt)+' 로 이동">'+esc(nextSt)+' →</button>':'')+'</span></div>';
+  var ft=tpl`<div class="ft"><span class="mini" title="담당 ${who}">${who}</span><span class="acts">`+
+    tpl`<button type="button" class="cbtn" data-open="${rawHtml(o.id)}" title="신청 내역에서 열기·수정">✎</button>`+ tpl`${rawHtml(canEdit && nextSt? tpl`<button type="button" class="cbtn nx${['출하요청','배송중','설치완료'].indexOf(nextSt)>=0?' pri':''}" data-oid="${rawHtml(o.id)}" data-next="${nextSt}" title="${nextSt} 로 이동">${nextSt} →</button>`:'')}</span></div>`;
   /* 카드: 이름 한 줄 → 메타 한 줄(채널 · 모델×수량 · 유형 · 날짜) → 시리얼 칩(4개까지, 나머지 접힘) → 담당·동작. 안내 문구·채널 박스 없음 */
-  return '<article class="eqb-card" draggable="'+(canEdit?'true':'false')+'" data-oid="'+o.id+'">'+
-    '<div class="tp"><span class="cu" title="'+esc(o.customer||'')+'">'+esc(o.customer||'(고객사 없음)')+'</span><span class="mini num">#'+o.id+age+'</span></div>'+
-    '<div class="mt"><span class="chn">'+esc(o.channel||'기타')+'</span> · '+meta.filter(Boolean).join(' · ')+'</div>'+prog+
-    '<div class="sn">'+eqSerialsHtml(o,{full:true, max:4, bar:'auto'})+'</div>'+ft+'</article>';
+  return tpl`<article class="eqb-card" draggable="${canEdit?'true':'false'}" data-oid="${rawHtml(o.id)}">`+
+    tpl`<div class="tp"><span class="cu" title="${o.customer||''}">${o.customer||'(고객사 없음)'}</span><span class="mini num">#${rawHtml(o.id)}${rawHtml(age)}</span></div>`+
+    tpl`<div class="mt"><span class="chn">${o.channel||'기타'}</span> · ${rawHtml(meta.filter(Boolean).join(' · '))}</div>${rawHtml(prog)}`+
+    tpl`<div class="sn">${rawHtml(eqSerialsHtml(o,{full:true, max:4, bar:'auto'}))}</div>${rawHtml(ft)}</article>`;
 }
 export function eqbDnD(wrap){
   var dragging=null;
@@ -601,12 +599,11 @@ export function c360Enhance(nm, cts, lives, ois, inbs, asts, ords){
   var live=ords.filter(function(o){ return o.status!=='회수완료' && o.status!=='취소'; });
   var lent=0, retN=0; live.forEach(function(o){ var all=eqWant(o); lent+=all.length; retN+=eqRetSet(o).length; });
   if(!live.length) lent=asts.filter(function(a){ return a.status==='임대중'; }).length;
-  var dLeft=null; if(nextEnd!=null){ var y=+mk(nextEnd).slice(0,4), m=+mk(nextEnd).slice(5,7); var endD=new Date(y, m, 0); dLeft=Math.ceil((endD-new Date())/864e5); }
-  var sum='<div class="c360-sum">'+
-    '<div><div class="l">월 MRR ('+esc(mk(b))+')</div><div class="v num">'+won(mrr)+'<small> 천원</small></div></div>'+
-    '<div><div class="l">누적 매출</div><div class="v num">'+won(cum)+'<small> 천원</small></div></div>'+
-    '<div><div class="l">임대 장비</div><div class="v num">'+lent+'<small> 대'+(retN? ' · 회수 '+retN:'')+'</small></div></div>'+
-    (dLeft!=null? '<div class="'+(dLeft<=90?'warn':'')+'"><div class="l">다음 만료</div><div class="v num">D-'+Math.max(0,dLeft)+'</div></div>' : '<div><div class="l">다음 만료</div><div class="v">—</div></div>')+'</div>';
+  var dLeft=null; if(nextEnd!=null){ var y=+mk(nextEnd).slice(0,4), m=+mk(nextEnd).slice(5,7); var endD=new Date(y, m, 0); dLeft=Math.ceil((endD.getTime()-Date.now())/864e5); }
+  var sum=tpl`<div class="c360-sum">`+
+    tpl`<div><div class="l">월 MRR (${mk(b)})</div><div class="v num">${won(mrr)}<small> 천원</small></div></div>`+
+    tpl`<div><div class="l">누적 매출</div><div class="v num">${won(cum)}<small> 천원</small></div></div>`+
+    tpl`<div><div class="l">임대 장비</div><div class="v num">${rawHtml(lent)}<small> 대${rawHtml(retN? ' · 회수 '+retN:'')}</small></div></div>`+ tpl`${rawHtml(dLeft!=null? tpl`<div class="${dLeft<=90?'warn':''}"><div class="l">다음 만료</div><div class="v num">D-${Math.max(0,dLeft)}</div></div>` : '<div><div class="l">다음 만료</div><div class="v">—</div></div>')}</div>`;
   /* 다음 액션 제안 (규칙) */
   var tips=[], acts=[];
   if(dLeft!=null && dLeft<=90){ var ec=cts.filter(function(r){ return r.endIdx===nextEnd; })[0]; tips.push((ec? lline(ec.line)+' 계약이 ':'계약이 ')+Math.max(0,dLeft)+'일 뒤 종료됩니다'+(churned? ' (과거 해지 이력 '+churned+'건)':' (해지 이력 없음)')+'.'); acts.push(['재계약 OI 만들기', function(){ closeOvl('ovlC360'); switchView('oinew'); setTimeout(function(){ var c=document.getElementById('oiCust'); if(c){ c.value=nm; } },80); }]); }
@@ -618,10 +615,10 @@ export function c360Enhance(nm, cts, lives, ois, inbs, asts, ords){
   var stale=inbs.filter(function(r){ return /진행중/.test(String(r.result||'')); });
   if(stale.length) tips.push('진행중인 인바운드 '+stale.length+'건이 남아 있습니다.');
   if(!tips.length) tips.push(cts.length? '만료·회수·미결 항목이 없습니다. 정기 점검(분기 1회) 정도면 충분합니다.' : '계약 정보가 없는 고객사입니다 — OI·인바운드 기록을 확인하세요.');
-  var next='<div class="c360-next"><b>'+ico('spark',14)+'다음 액션 제안</b><p>'+esc(tips.join(' '))+'</p>'+(acts.length? '<div class="ba">'+acts.map(function(a,i){ return '<button type="button" class="cbtn" data-a="'+i+'">'+esc(a[0])+'</button>'; }).join('')+'</div>':'')+'</div>';
+  var next=tpl`<div class="c360-next"><b>${rawHtml(ico('spark',14))}다음 액션 제안</b><p>${tips.join(' ')}</p>${rawHtml(acts.length? tpl`<div class="ba">${rawHtml(acts.map(function(a,i){ return tpl`<button type="button" class="cbtn" data-a="${rawHtml(i)}">${a[0]}</button>`; }).join(''))}</div>`:'')}</div>`;
   /* 섹션 탭 */
   var secs=[].slice.call(body.querySelectorAll('.c360-sec'));
-  var tabs='<div class="c360-tabs" role="tablist"><button type="button" role="tab" aria-selected="true" data-t="-1">전체</button>'+secs.map(function(sc,i){ var h4=sc.querySelector('h4'); var t=h4? h4.textContent.replace(/^\S+\s/,'').replace(/\s*\d+건\s*$/,'').replace(/계약 기준.*$/,'').trim() : '섹션'; var ct=h4&&h4.querySelector('.ct')? h4.querySelector('.ct').textContent.replace('건','') : ''; return '<button type="button" role="tab" aria-selected="false" data-t="'+i+'">'+esc(t)+(ct? '<span class="ct">'+esc(ct)+'</span>':'')+'</button>'; }).join('')+'</div>';
+  var tabs=tpl`<div class="c360-tabs" role="tablist"><button type="button" role="tab" aria-selected="true" data-t="-1">전체</button>${rawHtml(secs.map(function(sc,i){ var h4=sc.querySelector('h4'); var t=h4? h4.textContent.replace(/^\S+\s/,'').replace(/\s*\d+건\s*$/,'').replace(/계약 기준.*$/,'').trim() : '섹션'; var ct=h4&&h4.querySelector('.ct')? h4.querySelector('.ct').textContent.replace('건','') : ''; return tpl`<button type="button" role="tab" aria-selected="false" data-t="${rawHtml(i)}">${t}${rawHtml(ct? tpl`<span class="ct">${ct}</span>`:'')}</button>`; }).join(''))}</div>`;
   var head=document.createElement('div'); head.innerHTML=sum+next+tabs;
   body.insertBefore(head, body.firstChild);
   head.querySelectorAll('[data-a]').forEach(function(bt){ bt.onclick=function(){ acts[+bt.dataset.a][1](); }; });
@@ -642,8 +639,8 @@ export function toast(title, sub, type){
   var box=document.getElementById('toasts');
   if(!box){ box=document.createElement('div'); box.id='toasts'; document.body.appendChild(box); }
   var t=document.createElement('div'); t.className='toast '+(type||'ok');
-  t.innerHTML='<span class="ti">'+(type==='bad'?'✕':type==='warn'?'!':(type==='info'?'i':'✓'))+'</span>'+
-    '<span><b>'+esc(title)+'</b>'+(sub?'<span class="tm">'+esc(sub)+'</span>':'')+'</span>';
+  t.innerHTML=tpl`<span class="ti">${type==='bad'?'✕':type==='warn'?'!':(type==='info'?'i':'✓')}</span>`+
+    tpl`<span><b>${title}</b>${rawHtml(sub?tpl`<span class="tm">${sub}</span>`:'')}</span>`;
   box.appendChild(t);
   setTimeout(function(){ t.classList.add('out'); setTimeout(function(){ t.remove(); },260); }, 4000);
 }
@@ -651,7 +648,7 @@ export function toast(title, sub, type){
 export function showLoading(t){
   $('#app').classList.add('hidden');
   var l=$('#loading'); l.classList.remove('hidden');
-  l.innerHTML='<div class="spin"></div><div>'+t+'</div>';
+  l.innerHTML=tpl`<div class="spin"></div><div>${rawHtml(t)}</div>`;
 }
 
 export function sbHeaders(json){
@@ -898,7 +895,7 @@ export function buildFromRes(res){
   var maxIdx=0;
   var rows=cts.map(function(c){
     var list=(byCt[c.id]||[]);
-    var segs=[], cur=null, sum=0, first=null, last=null;
+    var segs=[], sum=0, first=null, last=null, cur=/** @type {?{s:number, e:number, v:number}} */ (null);   /* 같은 금액이 이어지는 구간 */
     list.forEach(function(x){
       var i=dIdx(x.month), v=Number(x.amount);
       if(i==null||!v) return;
@@ -1107,9 +1104,9 @@ export async function screenPw(){
 }
 
 export function onErr(e){
-  $('#loading').innerHTML = '<div class="card err" style="max-width:620px">'+
-    '<h2>데이터를 불러오지 못했습니다</h2><p class="cap">'+String(e&&e.message||e)+'</p>'+
-    '<p class="cap">네트워크 상태와 Supabase 프로젝트 상태(일시정지 여부)를 확인해 주세요.</p></div>';
+  $('#loading').innerHTML = tpl`<div class="card err" style="max-width:620px">`+
+    tpl`<h2>데이터를 불러오지 못했습니다</h2><p class="cap">${rawHtml(String(e&&e.message||e))}</p>`+
+    tpl`<p class="cap">네트워크 상태와 Supabase 프로젝트 상태(일시정지 여부)를 확인해 주세요.</p></div>`;
 }
 
 export function onData(d){

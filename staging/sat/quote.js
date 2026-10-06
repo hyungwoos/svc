@@ -632,7 +632,7 @@ function applyDocMode(type) {
                         : '추가적인 내용을 입력하세요. (출력 시 테두리는 보이지 않습니다.)';
     // 담당자(발주자) 목록: 발주서에서는 발주 담당도 고를 수 있게
     const sel = document.getElementById('managerSelect'); const cur = sel.value;
-    sel.innerHTML = '<option value="">' + (po ? '발주자 선택' : '담당자 선택') + '</option>';
+    sel.innerHTML = tpl`<option value="">${po ? '발주자 선택' : '담당자 선택'}</option>`;
     (po ? PO_MANAGERS.concat(managerList) : managerList).forEach(m => { const o = document.createElement('option'); o.value = m.contact; o.textContent = m.name; sel.appendChild(o); });
     sel.value = cur; if (sel.value !== cur) sel.value = '';
     if (po && !sel.value) sel.value = PO_MANAGERS[0].contact;   // 발주서는 기본 담당자 김민정 대리 (변경 가능)

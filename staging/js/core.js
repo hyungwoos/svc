@@ -2,7 +2,6 @@
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { APP_VER, IS_QA, IS_STAGING, ST } from './state.js';
 import { buildMtabs, buildRail, cacheDrop, dIdx, sbTry, toast } from './shell.js';
-import { esc } from './dash.js';
 import { subgrpSync } from './tools.js';
 import { logChange } from './edit.js';
 /* ==================================================================
@@ -282,7 +281,7 @@ export async function mfaPolicy(tok){
   try{ var r=await fetch(SB_URL+'/rest/v1/rpc/mfa_status',{method:'POST', headers:authHdr(tok), body:'{}'}); if(!r.ok) return null; return await r.json(); }catch(e){ return null; }
 }
 export function mfaDue(st){ return !!(st && st.required && !st.enrolled && (!st.deadline || (st.today||new Date().toISOString().slice(0,10))>=st.deadline)); }
-export function mfaDaysLeft(st){ if(!st||!st.deadline) return 0; var a=new Date(st.deadline+'T00:00:00'), b=new Date((st.today||new Date().toISOString().slice(0,10))+'T00:00:00'); return Math.round((a-b)/86400000); }
+export function mfaDaysLeft(st){ if(!st||!st.deadline) return 0; var a=new Date(st.deadline+'T00:00:00'), b=new Date((st.today||new Date().toISOString().slice(0,10))+'T00:00:00'); return Math.round((a.getTime()-b.getTime())/86400000); }
 export async function mfaGate(tok, email, factorsHint, opt){
   if(sessAal(tok)==='aal2') return true;
   /* ㊿+145 빠른 길: 로그인 응답에 «확인된 인증 앱»이 없거나(대부분의 계정) 지난번 확인 결과가 «없음»이면
@@ -322,11 +321,11 @@ export function mfaForceEnroll(tok, email, st){
   return new Promise(function(resolve){
     var old=document.getElementById('ovlMfa'); if(old) old.remove();
     var ov=document.createElement('div'); ov.id='ovlMfa'; ov.className='ovl on'; ov.style.cssText='z-index:100000;align-items:center';
-    ov.innerHTML='<div class="modal" style="width:min(560px,100%);padding:22px" role="dialog" aria-modal="true" aria-labelledby="mfaTitle">'+
-      '<h3 id="mfaTitle" style="margin:0 0 6px;font-size:18px">🔐 2단계 인증 등록이 필요합니다</h3>'+
-      '<p class="cap" style="margin:0 0 14px">관리자가 <b>'+esc(email||'')+'</b> 계정에 2단계 인증을 필수로 지정했습니다'+(st&&st.deadline? ' (기한 '+esc(st.deadline)+' 지남)':'')+'. 인증 앱을 등록해야 포탈을 쓸 수 있습니다 — 1분이면 끝납니다.</p>'+
-      '<div id="mfaForceHost"></div>'+
-      '<div style="margin-top:12px;display:flex;justify-content:flex-end"><button type="button" class="pill ghost" id="mfaForceCancel">나중에 (로그아웃)</button></div></div>';
+    ov.innerHTML=tpl`<div class="modal" style="width:min(560px,100%);padding:22px" role="dialog" aria-modal="true" aria-labelledby="mfaTitle">`+
+      tpl`<h3 id="mfaTitle" style="margin:0 0 6px;font-size:18px">🔐 2단계 인증 등록이 필요합니다</h3>`+
+      tpl`<p class="cap" style="margin:0 0 14px">관리자가 <b>${email||''}</b> 계정에 2단계 인증을 필수로 지정했습니다${rawHtml(st&&st.deadline? ' (기한 '+esc(st.deadline)+' 지남)':'')}. 인증 앱을 등록해야 포탈을 쓸 수 있습니다 — 1분이면 끝납니다.</p>`+
+      tpl`<div id="mfaForceHost"></div>`+
+      tpl`<div style="margin-top:12px;display:flex;justify-content:flex-end"><button type="button" class="pill ghost" id="mfaForceCancel">나중에 (로그아웃)</button></div></div>`;
     document.body.appendChild(ov);
     ov.querySelector('#mfaForceCancel').onclick=function(){ ov.remove(); resolve(false); };
     mfaEnrollFlow([], ov.querySelector('#mfaForceHost'), {tok:tok, email:email, onDone:function(ok){ if(ok){ ov.remove(); resolve(true); } }});
@@ -341,12 +340,12 @@ export function mfaPrompt(factor, tok, email){
   return new Promise(function(resolve){
     var old=document.getElementById('ovlMfa'); if(old) old.remove();
     var ov=document.createElement('div'); ov.id='ovlMfa'; ov.className='ovl on'; ov.style.cssText='z-index:100000;align-items:center';
-    ov.innerHTML='<div class="modal" style="width:min(400px,100%);padding:22px" role="dialog" aria-modal="true" aria-labelledby="mfaTitle">'+
-      '<h3 id="mfaTitle" style="margin:0 0 6px;font-size:18px">🔐 2단계 인증</h3>'+
-      '<p class="cap" style="margin:0 0 14px">'+esc(email||ST.AUTH_USER||'')+' 계정은 인증 앱이 등록돼 있습니다. 앱(Google Authenticator · Microsoft Authenticator 등)에 표시된 <b>6자리 코드</b>를 입력하세요.</p>'+
-      '<input id="mfaCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" aria-label="인증 코드 6자리" style="width:100%;height:52px;font-size:26px;letter-spacing:.35em;text-align:center;border-radius:10px;border:1px solid var(--ring);background:var(--surface-2)">'+
-      '<div class="mmsg" id="mfaMsg" style="min-height:18px;margin-top:8px"></div>'+
-      '<div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end"><button type="button" class="pill ghost" id="mfaCancel">취소</button><button type="button" class="pill" id="mfaGo">확인</button></div></div>';
+    ov.innerHTML=tpl`<div class="modal" style="width:min(400px,100%);padding:22px" role="dialog" aria-modal="true" aria-labelledby="mfaTitle">`+
+      tpl`<h3 id="mfaTitle" style="margin:0 0 6px;font-size:18px">🔐 2단계 인증</h3>`+
+      tpl`<p class="cap" style="margin:0 0 14px">${email||ST.AUTH_USER||''} 계정은 인증 앱이 등록돼 있습니다. 앱(Google Authenticator · Microsoft Authenticator 등)에 표시된 <b>6자리 코드</b>를 입력하세요.</p>`+
+      tpl`<input id="mfaCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" aria-label="인증 코드 6자리" style="width:100%;height:52px;font-size:26px;letter-spacing:.35em;text-align:center;border-radius:10px;border:1px solid var(--ring);background:var(--surface-2)">`+
+      tpl`<div class="mmsg" id="mfaMsg" style="min-height:18px;margin-top:8px"></div>`+
+      tpl`<div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end"><button type="button" class="pill ghost" id="mfaCancel">취소</button><button type="button" class="pill" id="mfaGo">확인</button></div></div>`;
     document.body.appendChild(ov);
     var inp=ov.querySelector('#mfaCode'), msgEl=ov.querySelector('#mfaMsg'), go=ov.querySelector('#mfaGo'), ch=null, busy=false, fails=0;
     function say(t,bad){ msgEl.textContent=t||''; msgEl.style.color=bad? 'var(--critical,#d03b3b)':'var(--muted)'; }
@@ -376,19 +375,19 @@ export function mfaPrompt(factor, tok, email){
 /* 내 계정 › 보안 카드 — 상태 · 켜기(QR 등록) · 끄기 */
 export async function mfaCardRender(host){
   if(!host) return; host.innerHTML='<span class="mini">확인 중…</span>';
-  var fs; try{ fs=await mfaFactors(); }catch(e){ host.innerHTML='<span class="mini" style="color:var(--critical)">상태를 읽지 못했습니다: '+esc(e.message)+'</span>'; return; }
+  var fs; try{ fs=await mfaFactors(); }catch(e){ host.innerHTML=tpl`<span class="mini" style="color:var(--critical)">상태를 읽지 못했습니다: ${e.message}</span>`; return; }
   var vf=mfaVerifiedOf(fs), aal=sessAal();
   var pol=await mfaPolicy(); MFA_ST=pol||MFA_ST;
-  var polHtml=(pol&&pol.required)? '<div class="mini" style="margin:0 0 6px;color:var(--s3-ink)">관리자 지정: <b>필수</b>'+(pol.deadline? ' · 기한 '+esc(pol.deadline)+(!pol.enrolled? ' ('+(mfaDaysLeft(pol)>0? mfaDaysLeft(pol)+'일 남음':'지남')+')':''):'')+'</div>' : '';
+  var polHtml=(pol&&pol.required)? tpl`<div class="mini" style="margin:0 0 6px;color:var(--s3-ink)">관리자 지정: <b>필수</b>${rawHtml(pol.deadline? ' · 기한 '+esc(pol.deadline)+(!pol.enrolled? ' ('+(mfaDaysLeft(pol)>0? mfaDaysLeft(pol)+'일 남음':'지남')+')':''):'')}</div>` : '';
   if(vf.length){
-    host.innerHTML=polHtml+'<div><b style="color:var(--brand)">켜짐</b> <span class="mini">· '+esc(vf[0].friendly_name||'인증 앱')+' · 등록 '+esc(String(vf[0].created_at||'').slice(0,10))+' · 이 세션 '+(aal==='aal2'? '2단계 확인됨' : '<span style="color:var(--critical)">코드 미확인</span>')+'</span></div>'+
-      '<div class="mini" style="margin:5px 0 8px;line-height:1.6">로그인할 때마다 인증 앱의 6자리 코드가 필요합니다. 인증 앱을 바꾸려면 끄고 다시 켜세요(코드 필요). 폰을 잃어버렸으면 슈퍼 관리자에게 해제를 요청하세요.</div>'+
-      '<button type="button" class="pill ghost" id="mfaOff" style="border-color:var(--critical,#d03b3b);color:var(--critical,#d03b3b)">2단계 인증 끄기</button>';
+    host.innerHTML=tpl`${rawHtml(polHtml)}<div><b style="color:var(--brand)">켜짐</b> <span class="mini">· ${vf[0].friendly_name||'인증 앱'} · 등록 ${String(vf[0].created_at||'').slice(0,10)} · 이 세션 ${rawHtml(aal==='aal2'? '2단계 확인됨' : '<span style="color:var(--critical)">코드 미확인</span>')}</span></div>`+
+      tpl`<div class="mini" style="margin:5px 0 8px;line-height:1.6">로그인할 때마다 인증 앱의 6자리 코드가 필요합니다. 인증 앱을 바꾸려면 끄고 다시 켜세요(코드 필요). 폰을 잃어버렸으면 슈퍼 관리자에게 해제를 요청하세요.</div>`+
+      tpl`<button type="button" class="pill ghost" id="mfaOff" style="border-color:var(--critical,#d03b3b);color:var(--critical,#d03b3b)">2단계 인증 끄기</button>`;
     host.querySelector('#mfaOff').onclick=function(){ mfaDisable(vf, host); };
   } else {
-    host.innerHTML=polHtml+'<div><b>꺼짐</b> <span class="mini">· 비밀번호만으로 로그인</span></div>'+
-      '<div class="mini" style="margin:5px 0 8px;line-height:1.6">인증 앱(Google Authenticator · Microsoft Authenticator · 1Password 등)을 등록하면 비밀번호가 새어도 코드 없이는 들어올 수 없습니다. 이 계정에만 적용되며 다른 사용자는 영향이 없습니다.</div>'+
-      '<button type="button" class="pill" id="mfaOn">🔐 2단계 인증 켜기</button>';
+    host.innerHTML=tpl`${rawHtml(polHtml)}<div><b>꺼짐</b> <span class="mini">· 비밀번호만으로 로그인</span></div>`+
+      tpl`<div class="mini" style="margin:5px 0 8px;line-height:1.6">인증 앱(Google Authenticator · Microsoft Authenticator · 1Password 등)을 등록하면 비밀번호가 새어도 코드 없이는 들어올 수 없습니다. 이 계정에만 적용되며 다른 사용자는 영향이 없습니다.</div>`+
+      tpl`<button type="button" class="pill" id="mfaOn">🔐 2단계 인증 켜기</button>`;
     host.querySelector('#mfaOn').onclick=function(){ mfaEnrollFlow(fs, host); };
   }
 }
@@ -412,11 +411,10 @@ export async function mfaEnrollFlow(existing, host, opts){
     var name='SVC 포탈 '+new Date().toISOString().slice(0,10);
     var f=await authApi('POST','factors',{factor_type:'totp', friendly_name:name, issuer:'SVC 포탈'},tok);
     var totp=f.totp||{};
-    host.innerHTML='<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">'+
-      (totp.qr_code? '<img src="'+esc(mfaQrSrc(totp.qr_code))+'" alt="인증 앱 등록 QR" style="width:168px;height:168px;background:#fff;border:1px solid var(--ring);border-radius:8px;padding:6px;flex:none">':'')+
-      '<div style="flex:1;min-width:220px"><ol class="mini" style="margin:0 0 8px 16px;padding:0;line-height:1.8"><li>인증 앱에서 «계정 추가 → QR 스캔»</li><li>스캔이 안 되면 키를 직접 입력: <code style="user-select:all;word-break:break-all">'+esc(totp.secret||'')+'</code></li><li>앱에 뜬 6자리 코드를 아래에 입력</li></ol>'+
-      '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><input id="mfaEnCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" aria-label="인증 코드" style="width:140px;height:40px;font-size:22px;letter-spacing:.3em;text-align:center"><button type="button" class="pill" id="mfaEnGo">확인하고 켜기</button><button type="button" class="pill ghost" id="mfaEnCancel">취소</button></div>'+
-      '<div class="mmsg" id="mfaEnMsg" style="min-height:18px;margin-top:6px"></div></div></div>';
+    host.innerHTML=tpl`<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">`+ tpl`${rawHtml(totp.qr_code? tpl`<img src="${mfaQrSrc(totp.qr_code)}" alt="인증 앱 등록 QR" style="width:168px;height:168px;background:#fff;border:1px solid var(--ring);border-radius:8px;padding:6px;flex:none">`:'')}`+
+      tpl`<div style="flex:1;min-width:220px"><ol class="mini" style="margin:0 0 8px 16px;padding:0;line-height:1.8"><li>인증 앱에서 «계정 추가 → QR 스캔»</li><li>스캔이 안 되면 키를 직접 입력: <code style="user-select:all;word-break:break-all">${totp.secret||''}</code></li><li>앱에 뜬 6자리 코드를 아래에 입력</li></ol>`+
+      tpl`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><input id="mfaEnCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" aria-label="인증 코드" style="width:140px;height:40px;font-size:22px;letter-spacing:.3em;text-align:center"><button type="button" class="pill" id="mfaEnGo">확인하고 켜기</button><button type="button" class="pill ghost" id="mfaEnCancel">취소</button></div>`+
+      tpl`<div class="mmsg" id="mfaEnMsg" style="min-height:18px;margin-top:6px"></div></div></div>`;
     var inp=host.querySelector('#mfaEnCode'), m=host.querySelector('#mfaEnMsg');
     host.querySelector('#mfaEnCancel').onclick=async function(){ try{ await authApi('DELETE','factors/'+f.id,null,tok); }catch(e){} back(false); };
     if(opts.onDone) host.querySelector('#mfaEnCancel').style.display='none';   // 강제 등록 창은 바깥의 «나중에(로그아웃)» 만
@@ -435,7 +433,7 @@ export async function mfaEnrollFlow(existing, host, opts){
     host.querySelector('#mfaEnGo').onclick=go; inp.onkeydown=function(e){ if(e.key==='Enter'){ e.preventDefault(); go(); } };
     setTimeout(function(){ inp.focus(); },60);
   }catch(e){
-    host.innerHTML='<span style="color:var(--critical)">등록을 시작하지 못했습니다: '+esc(e.message)+'</span> <span class="mini">— Supabase › Authentication › Multi-Factor 에서 TOTP 가 켜져 있어야 합니다</span> <button type="button" class="pill ghost" id="mfaRetry">다시</button>';
+    host.innerHTML=tpl`<span style="color:var(--critical)">등록을 시작하지 못했습니다: ${e.message}</span> <span class="mini">— Supabase › Authentication › Multi-Factor 에서 TOTP 가 켜져 있어야 합니다</span> <button type="button" class="pill ghost" id="mfaRetry">다시</button>`;
     host.querySelector('#mfaRetry').onclick=function(){ if(opts.onDone) mfaEnrollFlow(null, host, opts); else mfaCardRender(host); };
   }
 }
@@ -519,7 +517,27 @@ export function navText(b){   // 메뉴 글자만 (심플 디자인에서는 이
 export function axTime(v){
   if(!v) return '·';
   var d=new Date(/[zZ]|[+\-]\d\d:?\d\d$/.test(String(v))? v : v+'Z');   // 시간대 없으면 UTC 로 간주
-  if(isNaN(d)) return String(v).replace('T',' ').slice(0,16);
+  if(isNaN(d.getTime())) return String(v).replace('T',' ').slice(0,16);
   var p=function(n){ return (n<10?'0':'')+n; };
   return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes());
+}
+
+/* ===== HTML 만들기 — 특수문자 자동 처리 (㊿+155 «화면 만드는 방식 개선») =====
+   · esc(값): 글자 안의 & < > " 를 HTML 이 아닌 글자로 (예전부터 쓰던 것 · ㊿+155 에 dash.js 에서 여기로)
+   · tpl`…${값}…`: 화면 HTML 을 만드는 태그 템플릿 — ${} 안의 값은 «자동으로» esc 됨 → DB·사용자 글자를 빠뜨려도 안전
+     이미 만든 HTML 조각(다른 tpl`` 결과 · 태그를 직접 쓴 문자열)을 넣을 때만 rawHtml(…) 로 «이건 HTML» 이라고 밝힘
+     예: tpl`<td title="${r.note}">${r.cust}</td>` · tpl`<ul>${rawHtml(rows.map(rowHtml).join(''))}</ul>`
+   · 규칙(tests/lint.mjs): HTML 을 '+' 로 이어 붙이지 않고 tpl`` 로 · rawHtml(…) 은 개수를 세어 알려 줌(늘면 «HTML 이 맞는지» 확인)
+   · 이름이 짧지 않은 이유: 이 포탈 코드에 h · html · raw 라는 지역 변수가 많아서 겹치지 않는 이름으로 */
+/** @param {any} s @returns {string} */
+export function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+/** rawHtml() 이 돌려주는 «이미 HTML» 표시 */
+function RawHtml(s){ this.html=s; }
+/** HTML 조각을 tpl`` 안에 그대로 넣을 때 — 값은 글자로 바꿔 그대로(예전 '+' 이어 붙이기와 같음) @param {any} s @returns {RawHtml} */
+export function rawHtml(s){ return new RawHtml(String(s)); }
+/** 화면 HTML 태그 템플릿 — ${값} 은 esc, rawHtml(…) 은 그대로 @param {TemplateStringsArray} strs @param {...any} vals @returns {string} */
+export function tpl(strs, ...vals){
+  var out=strs[0];
+  for(var i=0;i<vals.length;i++){ var v=vals[i]; out+=(v instanceof RawHtml? v.html : esc(v))+strs[i+1]; }
+  return out;
 }

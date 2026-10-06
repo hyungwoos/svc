@@ -2,9 +2,8 @@
    ㊿+153: price.js 에서 나눔 — 포탈 AI 가 클라우드 숫자(clBuild·clFxRate)를 쓰므로 처음부터 불러오고, 가격표(price.js)는 처음 열 때 불러옴 */
 import { ST } from './state.js';
 import { Viz } from './viz.js';
-import { $, cssv } from './core.js';
+import { $, cssv, esc, rawHtml, tpl } from './core.js';
 import { sbTry, sbWrite, toast } from './shell.js';
-import { esc } from './dash.js';
 import { loadLib, loadWorkerBlob, PDFJS_WORKER } from './analysis.js';
 import { logChange, ovlMarkDirty } from './edit.js';
 
@@ -18,16 +17,18 @@ export var CL={mode:'aws', sel:null, months:null, mon:'all',
   cur:(function(){ try{ return localStorage.getItem('svc_cloud_cur')||'usd'; }catch(e){ return 'usd'; } })(),   // 통화 표시 usd|krw (이 브라우저 설정)
   fxNow:null};   // sel = 선택된 AWS 계정 id 집합
 
+/** 읽는 중이면 기다리는 콜백들 (한 번만 읽기) @type {?Function[]} */
+var CLOUD_WAIT=null;
 export function loadCloud(cb){
-  if(loadCloud._q){ loadCloud._q.push(cb); return; }
-  loadCloud._q=[cb];
+  if(CLOUD_WAIT){ CLOUD_WAIT.push(cb); return; }
+  CLOUD_WAIT=[cb];
   Promise.all([
     sbTry('cloud_accounts?select=*&order=sort,id'),
     sbTry('cloud_costs?select=ym,account_id,service,usd,credit_usd,krw,kind,source,invoice_id&order=ym'),
     sbTry('cloud_invoices?select=*&order=ym.desc,account_id')
   ]).then(function(r){
     ST.RAWX.cloud={acc:r[0]||[], costs:r[1]||[], inv:r[2]||[], _at:Date.now()};
-    var q=loadCloud._q; loadCloud._q=null;
+    var q=CLOUD_WAIT; CLOUD_WAIT=null;
     q.forEach(function(f){ if(f) try{ f(); }catch(e){} });
   });
 }
@@ -62,7 +63,7 @@ export function clBuild(){
     a.totals[i]=(a.totals[i]||0)+val;
   });
   // 색은 저장된 hex 대신 포탈 공통 시리즈 팔레트(--s1~--s8)를 정렬 순서대로 씁니다 — 다른 차트와 톤을 맞추기 위해
-  Object.keys(acc).sort(function(x,y){ return (acc[x].vendor==='NCP')-(acc[y].vendor==='NCP') || acc[x].sort-acc[y].sort; })
+  Object.keys(acc).sort(function(x,y){ return Number(acc[x].vendor==='NCP')-Number(acc[y].vendor==='NCP') || acc[x].sort-acc[y].sort; })
     .forEach(function(k,i){ acc[k].color=cssv('--s'+((i%8)+1))||acc[k].color; });
   Object.keys(acc).forEach(function(k){
     var a=acc[k];
@@ -135,12 +136,12 @@ export var clU=function(v){ return '$'+Number(v).toLocaleString('en-US',{minimum
 export var clUk=function(v){ return '$'+Math.round(v).toLocaleString('en-US'); };
 export var clW=function(v){ return '₩'+Math.round(v).toLocaleString('ko-KR'); };
 export function clSum(a){ return a.reduce(function(s,x){ return s+(x||0); },0); }
-export function clCell(v){ if(v==null) return '<td class="n z">–</td>'; if(Math.abs(v)<(clIsK()?0.5:0.005)) return '<td class="n z">0</td>'; return '<td class="n">'+clF(v)+'</td>'; }
+export function clCell(v){ if(v==null) return '<td class="n z">–</td>'; if(Math.abs(v)<(clIsK()?0.5:0.005)) return '<td class="n z">0</td>'; return tpl`<td class="n">${clF(v)}</td>`; }
 export function clDelta(prev,cur){
   if(prev==null||cur==null) return '<span class="dl flat">–</span>';
   var d=cur-prev; if(Math.abs(d)<(clIsK()?0.5:0.005)) return '<span class="dl flat">±0</span>';
   var p=prev? Math.abs(d/prev*100).toFixed(1)+'%':'';
-  return '<span class="dl '+(d>0?'up':'down')+'">'+(d>0?'▲':'▼')+' '+clF(Math.abs(d))+(p?' ('+p+')':'')+'</span>';
+  return tpl`<span class="dl ${d>0?'up':'down'}">${d>0?'▲':'▼'} ${clF(Math.abs(d))}${rawHtml(p?' ('+p+')':'')}</span>`;
 }
 export function clMonLabel(m){ return m.slice(2,4)+'.'+m.slice(5,7); }
 
@@ -158,33 +159,32 @@ export function renderCloud(){
   }
   var B=clBuild(); CL.B=B;
   if(!B.months.length){
-    host.innerHTML='<section class="card c12" style="max-width:640px;margin:0 auto;text-align:center;padding:40px">'+
-      '<h3 style="margin:0 0 8px">☁️ 클라우드 비용</h3><p class="cap">데이터가 없습니다 — 54_cloud_cost.sql 실행이 필요합니다.</p></section>';
+    host.innerHTML=tpl`<section class="card c12" style="max-width:640px;margin:0 auto;text-align:center;padding:40px">`+
+      tpl`<h3 style="margin:0 0 8px">☁️ 클라우드 비용</h3><p class="cap">데이터가 없습니다 — 54_cloud_cost.sql 실행이 필요합니다.</p></section>`;
     return;
   }
   if(!CL.sel) CL.sel={}; if(!Object.keys(CL.sel).length) B.awsKeys.forEach(function(k){ CL.sel[k]=1; });
   var canEdit=!!(ST.SB_TOKEN && !ST.IS_VIEWER && (ST.IS_SUPER || ST.MY_ROLE==='admin'));
   var first=B.months[0], last=B.months[B.months.length-1];
-  var head='<div class="pr-top">'+
-    '<span style="font-size:18px;font-weight:600;letter-spacing:-.01em">클라우드 비용</span>'+
-    '<div class="eqb-seg" id="clCur" role="group" aria-label="통화"><button type="button" data-c="usd" aria-pressed="'+(!clIsK())+'">$ USD 세전</button><button type="button" data-c="krw" aria-pressed="'+clIsK()+'">₩ 천원 환산</button></div>'+
-    '<span class="pr-ver">'+esc(first.replace('-','년 ')+'월')+' ~ '+esc(last.replace('-','년 ')+'월')+' · 인보이스 '+B.inv.length+'건</span>'+
-    '<span style="flex:1"></span>'+
-    '<button class="pill ghost" id="clFxBtn" title="'+esc('출처: '+CL.fxNow.src+(CL.fxNow.when? ' · '+CL.fxNow.when:'')+' · 누르면 다시 받아옵니다')+'">환율 '+Number(CL.fxNow.rate).toLocaleString('ko-KR')+'원/$'+(CL.fxNow.live? '':' (외부 조회 실패 · '+esc(CL.fxNow.src)+')')+'</button>'+
-    (canEdit? '<button class="pill pri" id="clAdd">＋ 인보이스 PDF 추가</button>':'')+
-    '</div>';
+  var head=tpl`<div class="pr-top">`+
+    tpl`<span style="font-size:18px;font-weight:600;letter-spacing:-.01em">클라우드 비용</span>`+
+    tpl`<div class="eqb-seg" id="clCur" role="group" aria-label="통화"><button type="button" data-c="usd" aria-pressed="${!clIsK()}">$ USD 세전</button><button type="button" data-c="krw" aria-pressed="${rawHtml(clIsK())}">₩ 천원 환산</button></div>`+
+    tpl`<span class="pr-ver">${first.replace('-','년 ')+'월'} ~ ${last.replace('-','년 ')+'월'} · 인보이스 ${B.inv.length}건</span>`+
+    tpl`<span style="flex:1"></span>`+
+    tpl`<button class="pill ghost" id="clFxBtn" title="${'출처: '+CL.fxNow.src+(CL.fxNow.when? ' · '+CL.fxNow.when:'')+' · 누르면 다시 받아옵니다'}">환율 ${rawHtml(Number(CL.fxNow.rate).toLocaleString('ko-KR'))}원/$${rawHtml(CL.fxNow.live? '':' (외부 조회 실패 · '+esc(CL.fxNow.src)+')')}</button>`+ tpl`${rawHtml(canEdit? '<button class="pill pri" id="clAdd">＋ 인보이스 PDF 추가</button>':'')}`+
+    tpl`</div>`;
   /* 1차: 요약 타일 + 월별 추이 · 2차(접힘): MDR 인프라 · 계정 개요 · 서비스×월 표 · 인보이스 */
   function det(k, title, inner){ var open=false; try{ open=localStorage.getItem('svc_cl_open_'+k)==='1'; }catch(e){}
-    return '<details class="pr-det cl-det" data-k="'+k+'"'+(open?' open':'')+'><summary>'+title+'</summary><div class="cl-detb">'+inner+'</div></details>'; }
-  host.innerHTML=head+
-    '<div class="eqb-kpis cl-kpis" id="clSum"></div>'+
-    '<div class="pr-card" style="margin-bottom:18px"><div id="clChips" style="display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-bottom:8px"></div>'+
-      '<p class="cap" id="clHint" style="margin:0 0 10px"></p>'+
-      '<h3 id="clChartT">월별 비용 추이</h3><div class="cl-legend" id="clLegend"></div><div id="clChart" class="chartbox h260"></div></div>'+
-    det('mdr','MDR 서비스 인프라 월별 비용 <span class="mini">EDR(KR) + awstac</span>', '<div id="clMdr"></div>')+
-    det('acct','계정 개요 · 통합청구 연결 계정 <span class="mini" id="clAcctCap"></span>', '<div id="clAcct" style="display:none"></div><div id="clLinked" style="display:none;margin-top:12px"></div>')+
-    det('tbl','서비스 × 월 비용 내역', '<h3 id="clTableT" style="margin:0 0 8px;font-size:13.5px">서비스 × 월 비용 내역</h3><div class="tbl-wrap" tabindex="0" style="max-height:none"><table class="pr" id="clTable"></table></div><p class="cap" id="clNote" style="margin-top:8px"></p>')+
-    det('inv','인보이스 등록 내역 <span class="mini">'+B.inv.length+'건 · PDF 는 읽은 뒤 보관하지 않고 파일명만</span>', '<div id="clInv"></div>');
+    return tpl`<details class="pr-det cl-det" data-k="${rawHtml(k)}"${open?' open':''}><summary>${rawHtml(title)}</summary><div class="cl-detb">${rawHtml(inner)}</div></details>`; }
+  host.innerHTML=tpl`${rawHtml(head)}`+
+    tpl`<div class="eqb-kpis cl-kpis" id="clSum"></div>`+
+    tpl`<div class="pr-card" style="margin-bottom:18px"><div id="clChips" style="display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-bottom:8px"></div>`+
+      tpl`<p class="cap" id="clHint" style="margin:0 0 10px"></p>`+
+      tpl`<h3 id="clChartT">월별 비용 추이</h3><div class="cl-legend" id="clLegend"></div><div id="clChart" class="chartbox h260"></div></div>`+
+    tpl`${rawHtml(det('mdr','MDR 서비스 인프라 월별 비용 <span class="mini">EDR(KR) + awstac</span>', '<div id="clMdr"></div>'))}`+
+    tpl`${rawHtml(det('acct','계정 개요 · 통합청구 연결 계정 <span class="mini" id="clAcctCap"></span>', '<div id="clAcct" style="display:none"></div><div id="clLinked" style="display:none;margin-top:12px"></div>'))}`+
+    tpl`${rawHtml(det('tbl','서비스 × 월 비용 내역', '<h3 id="clTableT" style="margin:0 0 8px;font-size:13.5px">서비스 × 월 비용 내역</h3><div class="tbl-wrap" tabindex="0" style="max-height:none"><table class="pr" id="clTable"></table></div><p class="cap" id="clNote" style="margin-top:8px"></p>'))}`+
+    tpl`${rawHtml(det('inv',tpl`인보이스 등록 내역 <span class="mini">${B.inv.length}건 · PDF 는 읽은 뒤 보관하지 않고 파일명만</span>`, '<div id="clInv"></div>'))}`;
   clSummary(B); clMdr(B); clChips(B); clChart(B); clAcctOverview(B); clLinked(B); clTable(B); clInvList(B, canEdit);
   host.querySelectorAll('details.cl-det').forEach(function(d){
     d.addEventListener('toggle', function(){ try{ localStorage.setItem('svc_cl_open_'+d.dataset.k, d.open?'1':'0'); }catch(e){}
@@ -210,13 +210,13 @@ export function clSummary(B){
   var mdrA=B.acc.edr, mdrT=B.acc.tac, mdrLast=null, mdrPrev=null;
   if(mdrA&&mdrT){ mdrLast=(mdrA.dtotals[lastFull]||0)+(mdrT.dtotals[lastFull]||0); if(lastFull>0) mdrPrev=(mdrA.dtotals[lastFull-1]||0)+(mdrT.dtotals[lastFull-1]||0); }
   var top=shares[0];
-  function tile(k, v, u, d){ return '<div class="kpi"><div class="k">'+k+'</div><div class="v">'+v+(u? '<small>'+u+'</small>':'')+'</div><div class="d">'+d+'</div></div>'; }
+  function tile(k, v, u, d){ return tpl`<div class="kpi"><div class="k">${rawHtml(k)}</div><div class="v">${rawHtml(v)}${rawHtml(u? tpl`<small>${rawHtml(u)}</small>`:'')}</div><div class="d">${rawHtml(d)}</div></div>`; }
   $('#clSum').innerHTML=
-    tile(clMonLabel(M[lastFull])+' 월 비용 <span class="mini">최근 완전 집계월</span>', clFk(awsMonth[lastFull]+ncpLast), U,
+    tile(tpl`${rawHtml(clMonLabel(M[lastFull]))} 월 비용 <span class="mini">최근 완전 집계월</span>`, clFk(awsMonth[lastFull]+ncpLast), U,
       (lastFull>0? '전월비 '+clDelta(awsMonth[lastFull-1]+(B.ncp? (B.acc[B.ncp].dtotals[lastFull-1]||0):0), awsMonth[lastFull]+ncpLast)+' · ':'')+'AWS '+clFk(awsMonth[lastFull])+(B.ncp? ' · NCP '+clFk(ncpLast):''))+
-    tile('기간 합계 <span class="mini">'+clMonLabel(M[0])+'~'+clMonLabel(M[M.length-1])+'</span>', clFk(awsSum+ncpSum), U,
+    tile(tpl`기간 합계 <span class="mini">${rawHtml(clMonLabel(M[0]))}~${rawHtml(clMonLabel(M[M.length-1]))}</span>`, clFk(awsSum+ncpSum), U,
       'AWS '+ks.length+'개 계정 '+clFk(awsSum)+(B.ncp? ' · NCP '+clFk(ncpSum)+' (월평균 '+clFk(ncpSum/(ncpN||1))+')':'')+(clIsK()? ' · 환율 환산':' 세전'))+
-    (mdrLast!=null? tile('MDR 인프라 <span class="mini">EDR + awstac · '+clMonLabel(M[lastFull])+'</span>', clFk(mdrLast), U, (mdrPrev!=null? '전월비 '+clDelta(mdrPrev,mdrLast)+' · ':'')+'전체의 '+(awsMonth[lastFull]? Math.round(mdrLast/awsMonth[lastFull]*100):0)+'%')
+    (mdrLast!=null? tile(tpl`MDR 인프라 <span class="mini">EDR + awstac · ${rawHtml(clMonLabel(M[lastFull]))}</span>`, clFk(mdrLast), U, (mdrPrev!=null? '전월비 '+clDelta(mdrPrev,mdrLast)+' · ':'')+'전체의 '+(awsMonth[lastFull]? Math.round(mdrLast/awsMonth[lastFull]*100):0)+'%')
                   : tile('AWS 계정', ks.length, '개', B.ncp? '+ 공공기관 NCP 1개':'NCP 없음'))+
     tile('계정별 비중 <span class="mini">기간 합계 기준</span>', top? esc(B.acc[top.k].label)+' '+(top.s/awsSum*100).toFixed(0)+'%':'—', '',
       shares.slice(1,4).map(function(x){ return esc(B.acc[x.k].label)+' '+(x.s/awsSum*100).toFixed(0)+'%'; }).join(' · '));
@@ -243,16 +243,16 @@ export function clMdr(B){
   if(!A||!T||!A.rows.length||!T.rows.length){ box.style.display='none'; return; }
   var M=B.months;
   box.style.display='';
-  box.innerHTML='<p class="cap" style="margin:0 0 6px">'+(clIsK()? '원화 환산 천원':'세전 USD')+'</p><div class="cl-legend">'+
-    [A,T].map(function(a){ return '<span><i style="background:'+a.color+'"></i>'+esc(a.label+' · '+a.purpose)+'</span>'; }).join('')+'</div><div id="clMdrChart" class="chartbox h220" data-h="h220"></div>'+
-    '<div class="tbl-wrap" tabindex="0" style="max-height:none;margin-top:10px"><table class="pr" id="clMdrT"></table></div>';
+  box.innerHTML=tpl`<p class="cap" style="margin:0 0 6px">${clIsK()? '원화 환산 천원':'세전 USD'}</p><div class="cl-legend">`+
+    tpl`${rawHtml([A,T].map(function(a){ return tpl`<span><i style="background:${rawHtml(a.color)}"></i>${a.label+' · '+a.purpose}</span>`; }).join(''))}</div><div id="clMdrChart" class="chartbox h220" data-h="h220"></div>`+
+    tpl`<div class="tbl-wrap" tabindex="0" style="max-height:none;margin-top:10px"><table class="pr" id="clMdrT"></table></div>`;
   clBars(document.getElementById('clMdrChart'), M, [{label:A.label,vals:A.dtotals,color:A.color},{label:T.label,vals:T.dtotals,color:T.color}], clFk, true);
   var li=M.length-1;
-  var h='<thead><tr><th>계정</th>'+M.map(function(m){ return '<th class="n">'+clMonLabel(m)+'</th>'; }).join('')+'<th class="n">합계</th><th class="n">'+clMonLabel(M[li])+' 전월비</th></tr></thead><tbody>';
-  function row(a){ return '<tr><td><span style="display:inline-block;width:8px;height:8px;background:'+a.color+';margin-right:6px;border-radius:2px"></span>'+esc(a.label+' · '+a.purpose)+'</td>'+
-    a.dtotals.map(function(v){ return clCell(v); }).join('')+'<td class="n"><b>'+clF(clSum(a.dtotals))+'</b></td><td class="n">'+clDelta(a.dtotals[li-1],a.dtotals[li])+'</td></tr>'; }
+  var h=tpl`<thead><tr><th>계정</th>${rawHtml(M.map(function(m){ return tpl`<th class="n">${rawHtml(clMonLabel(m))}</th>`; }).join(''))}<th class="n">합계</th><th class="n">${rawHtml(clMonLabel(M[li]))} 전월비</th></tr></thead><tbody>`;
+  function row(a){ return tpl`<tr><td><span style="display:inline-block;width:8px;height:8px;background:${rawHtml(a.color)};margin-right:6px;border-radius:2px"></span>${a.label+' · '+a.purpose}</td>`+
+    tpl`${rawHtml(a.dtotals.map(function(v){ return clCell(v); }).join(''))}<td class="n"><b>${clF(clSum(a.dtotals))}</b></td><td class="n">${rawHtml(clDelta(a.dtotals[li-1],a.dtotals[li]))}</td></tr>`; }
   var comb=M.map(function(_,i){ return (A.dtotals[i]==null&&T.dtotals[i]==null)? null : (A.dtotals[i]||0)+(T.dtotals[i]||0); });
-  h+=row(A)+row(T)+'<tr class="tot"><td>합계</td>'+comb.map(function(v){ return clCell(v); }).join('')+'<td class="n">'+clF(clSum(comb))+'</td><td class="n">'+clDelta(comb[li-1],comb[li])+'</td></tr></tbody>';
+  h+=tpl`${rawHtml(row(A)+row(T))}<tr class="tot"><td>합계</td>${rawHtml(comb.map(function(v){ return clCell(v); }).join(''))}<td class="n">${clF(clSum(comb))}</td><td class="n">${rawHtml(clDelta(comb[li-1],comb[li]))}</td></tr></tbody>`;
   document.getElementById('clMdrT').innerHTML=h;
 }
 export function clSelKeys(B){ return B.awsKeys.filter(function(k){ return CL.sel[k]; }); }
@@ -260,9 +260,9 @@ export function clChips(B){
   var box=$('#clChips'); var ks=clSelKeys(B);
   var h='<span class="cap" style="font-weight:650;margin-right:4px">AWS 계정 (다중 선택)</span>';
   B.awsKeys.forEach(function(k){ var a=B.acc[k];
-    h+='<button class="cl-chip'+(CL.mode==='aws'&&CL.sel[k]?' on':'')+'" data-k="'+k+'" style="--c:'+a.color+'" title="'+esc(a.purpose)+'"><i></i>'+esc(a.label)+'</button>'; });
-  h+='<button class="cl-chip util'+(CL.mode==='aws'&&ks.length===B.awsKeys.length?' on':'')+'" data-all="1">전체 선택</button>';
-  if(B.ncp) h+='<button class="cl-chip util'+(CL.mode==='ncp'?' on':'')+'" data-ncp="1">공공기관 NCP</button>';
+    h+=tpl`<button class="cl-chip${CL.mode==='aws'&&CL.sel[k]?' on':''}" data-k="${rawHtml(k)}" style="--c:${rawHtml(a.color)}" title="${a.purpose}"><i></i>${a.label}</button>`; });
+  h+=tpl`<button class="cl-chip util${CL.mode==='aws'&&ks.length===B.awsKeys.length?' on':''}" data-all="1">전체 선택</button>`;
+  if(B.ncp) h+=tpl`<button class="cl-chip util${CL.mode==='ncp'?' on':''}" data-ncp="1">공공기관 NCP</button>`;
   box.innerHTML=h;
   box.onclick=function(e){
     var b=e.target.closest('button'); if(!b) return;
@@ -283,7 +283,7 @@ export function clChart(B){
   var isN=CL.mode==='ncp', M=B.months;
   var series=isN? [{label:B.acc[B.ncp].label,color:B.acc[B.ncp].color,vals:B.acc[B.ncp].dtotals}]
                 : clSelKeys(B).map(function(k){ var a=B.acc[k]; return {label:a.label+' · '+a.purpose,color:a.color,vals:a.dtotals}; });
-  $('#clLegend').innerHTML=series.map(function(s){ return '<span><i style="background:'+s.color+'"></i>'+esc(s.label)+'</span>'; }).join('');
+  $('#clLegend').innerHTML=series.map(function(s){ return tpl`<span><i style="background:${rawHtml(s.color)}"></i>${s.label}</span>`; }).join('');
   clBars(document.getElementById('clChart'), M, series, clFk);
   var ks=clSelKeys(B);
   var U=clUnit();
@@ -295,11 +295,11 @@ export function clAcctOverview(B){
   p.style.display='';
   var grand=ks.reduce(function(s,k){ return s+clSum(B.acc[k].dtotals); },0);
   var rows=ks.map(function(k){ var a=B.acc[k], sum=clSum(a.dtotals), nm=a.dtotals.filter(function(x){ return x!=null; }).length;
-    return {sum:sum, html:'<tr><td><span style="display:inline-block;width:8px;height:8px;background:'+a.color+';margin-right:6px;border-radius:2px"></span>'+esc(a.purpose)+'</td>'+
-      '<td>'+esc(a.email)+'<br><span class="cap">'+esc(a.acct)+' · '+esc(a.label)+'</span></td><td class="n"><b>'+clF(sum)+'</b></td><td class="n">'+clFk(sum/(nm||1))+'</td>'+
-      '<td class="n">'+(sum/grand*100).toFixed(1)+'%</td><td class="n">'+clDelta(a.dtotals[li-1],a.dtotals[li])+'</td></tr>'}; }).sort(function(a,b){ return b.sum-a.sum; });
-  p.innerHTML='<h3>선택 계정 개요 <small>용도별 비용 · '+clUnit()+'</small></h3><div class="tbl-wrap" tabindex="0" style="max-height:none"><table class="pr"><thead><tr><th>용도</th><th>계정</th><th class="n">합계</th><th class="n">월평균</th><th class="n">선택 내 비중</th><th class="n">'+clMonLabel(M[li])+' 전월비</th></tr></thead><tbody>'+
-    rows.map(function(r){ return r.html; }).join('')+'</tbody></table></div><p class="cap" style="margin-top:8px">비중은 현재 선택된 계정 합계 대비 · 월평균은 각 계정의 집계 월수 기준</p>';
+    return {sum:sum, html:tpl`<tr><td><span style="display:inline-block;width:8px;height:8px;background:${rawHtml(a.color)};margin-right:6px;border-radius:2px"></span>${a.purpose}</td>`+
+      tpl`<td>${a.email}<br><span class="cap">${a.acct} · ${a.label}</span></td><td class="n"><b>${clF(sum)}</b></td><td class="n">${clFk(sum/(nm||1))}</td>`+
+      tpl`<td class="n">${(sum/grand*100).toFixed(1)}%</td><td class="n">${rawHtml(clDelta(a.dtotals[li-1],a.dtotals[li]))}</td></tr>`}; }).sort(function(a,b){ return b.sum-a.sum; });
+  p.innerHTML=tpl`<h3>선택 계정 개요 <small>용도별 비용 · ${clUnit()}</small></h3><div class="tbl-wrap" tabindex="0" style="max-height:none"><table class="pr"><thead><tr><th>용도</th><th>계정</th><th class="n">합계</th><th class="n">월평균</th><th class="n">선택 내 비중</th><th class="n">${rawHtml(clMonLabel(M[li]))} 전월비</th></tr></thead><tbody>`+
+    tpl`${rawHtml(rows.map(function(r){ return r.html; }).join(''))}</tbody></table></div><p class="cap" style="margin-top:8px">비중은 현재 선택된 계정 합계 대비 · 월평균은 각 계정의 집계 월수 기준</p>`;
 }
 export function clLinked(B){
   var p=$('#clLinked'), ks=clSelKeys(B), M=B.months, li=M.length-1;
@@ -308,11 +308,11 @@ export function clLinked(B){
   p.style.display='';
   var rows=only.linked.slice().sort(function(a,b){ return clSum(b.d)-clSum(a.d); });
   var tot=M.map(function(_,i){ return rows.reduce(function(s,r){ return s+(r.v[i]||0); },0)||null; });
-  p.innerHTML='<h3>'+esc(only.label)+' 통합청구 · 연결 계정별 비용 <small>'+clUnit()+'</small></h3><div class="tbl-wrap" tabindex="0" style="max-height:none"><table class="pr"><thead><tr><th>연결 계정</th>'+
-    M.map(function(m){ return '<th class="n">'+clMonLabel(m)+'</th>'; }).join('')+'<th class="n">합계</th><th class="n">'+clMonLabel(M[li])+' 전월비</th></tr></thead><tbody>'+
-    rows.map(function(r){ return '<tr><td>'+esc(r.n)+'</td>'+r.d.map(function(x){ return clCell(x); }).join('')+'<td class="n"><b>'+clF(clSum(r.d))+'</b></td><td class="n">'+clDelta(r.d[li-1],r.d[li])+'</td></tr>'; }).join('')+
-    '<tr class="tot"><td>합계</td>'+tot.map(function(t){ return clCell(t); }).join('')+'<td class="n">'+clF(clSum(tot))+'</td><td class="n">'+clDelta(tot[li-1],tot[li])+'</td></tr></tbody></table></div>'+
-    '<p class="cap" style="margin-top:8px">통합청구서의 계정별 요금 기준 · «–»는 해당 월 청구 내역 없음</p>';
+  p.innerHTML=tpl`<h3>${only.label} 통합청구 · 연결 계정별 비용 <small>${clUnit()}</small></h3><div class="tbl-wrap" tabindex="0" style="max-height:none"><table class="pr"><thead><tr><th>연결 계정</th>`+
+    tpl`${rawHtml(M.map(function(m){ return tpl`<th class="n">${rawHtml(clMonLabel(m))}</th>`; }).join(''))}<th class="n">합계</th><th class="n">${rawHtml(clMonLabel(M[li]))} 전월비</th></tr></thead><tbody>`+
+    tpl`${rawHtml(rows.map(function(r){ return tpl`<tr><td>${r.n}</td>${rawHtml(r.d.map(function(x){ return clCell(x); }).join(''))}<td class="n"><b>${clF(clSum(r.d))}</b></td><td class="n">${rawHtml(clDelta(r.d[li-1],r.d[li]))}</td></tr>`; }).join(''))}`+
+    tpl`<tr class="tot"><td>합계</td>${rawHtml(tot.map(function(t){ return clCell(t); }).join(''))}<td class="n">${clF(clSum(tot))}</td><td class="n">${rawHtml(clDelta(tot[li-1],tot[li]))}</td></tr></tbody></table></div>`+
+    tpl`<p class="cap" style="margin-top:8px">통합청구서의 계정별 요금 기준 · «–»는 해당 월 청구 내역 없음</p>`;
 }
 export function clTable(B){
   var isN=CL.mode==='ncp', ks=clSelKeys(B), M=B.months, li=M.length-1;
@@ -329,10 +329,10 @@ export function clTable(B){
   }
   rows.forEach(function(r){ r.sum=clSum(r.d); }); rows.sort(function(a,b){ return b.sum-a.sum; });
   var multi=!isN&&ks.length>1;
-  var tag=function(src){ return (multi&&src)? src.map(function(k){ return '<span title="'+esc(B.acc[k].label)+'" style="display:inline-block;width:8px;height:8px;background:'+B.acc[k].color+';margin-right:4px;border-radius:2px"></span>'; }).join('') : ''; };
-  var h='<thead><tr><th>서비스</th>'+M.map(function(m){ return '<th class="n">'+clMonLabel(m)+'</th>'; }).join('')+'<th class="n">합계</th><th class="n">'+clMonLabel(M[li])+' 전월비</th></tr></thead><tbody>';
-  h+=rows.map(function(r){ return '<tr><td>'+tag(r.src)+esc(r.n)+'</td>'+r.d.map(function(x){ return clCell(x); }).join('')+'<td class="n"><b>'+clF(r.sum)+'</b></td><td class="n">'+clDelta(r.d[li-1],r.d[li])+'</td></tr>'; }).join('');
-  h+='<tr class="tot"><td>합계</td>'+totals.map(function(t){ return clCell(t); }).join('')+'<td class="n">'+clF(clSum(totals))+'</td><td class="n">'+clDelta(totals[li-1],totals[li])+'</td></tr></tbody>';
+  var tag=function(src){ return (multi&&src)? src.map(function(k){ return tpl`<span title="${B.acc[k].label}" style="display:inline-block;width:8px;height:8px;background:${rawHtml(B.acc[k].color)};margin-right:4px;border-radius:2px"></span>`; }).join('') : ''; };
+  var h=tpl`<thead><tr><th>서비스</th>${rawHtml(M.map(function(m){ return tpl`<th class="n">${rawHtml(clMonLabel(m))}</th>`; }).join(''))}<th class="n">합계</th><th class="n">${rawHtml(clMonLabel(M[li]))} 전월비</th></tr></thead><tbody>`;
+  h+=rows.map(function(r){ return tpl`<tr><td>${rawHtml(tag(r.src))}${r.n}</td>${rawHtml(r.d.map(function(x){ return clCell(x); }).join(''))}<td class="n"><b>${clF(r.sum)}</b></td><td class="n">${rawHtml(clDelta(r.d[li-1],r.d[li]))}</td></tr>`; }).join('');
+  h+=tpl`<tr class="tot"><td>합계</td>${rawHtml(totals.map(function(t){ return clCell(t); }).join(''))}<td class="n">${clF(clSum(totals))}</td><td class="n">${rawHtml(clDelta(totals[li-1],totals[li]))}</td></tr></tbody>`;
   document.getElementById('clTable').innerHTML=h;
   var a1=ks.length===1? B.acc[ks[0]] : null;
   var U2=clUnit();
@@ -345,15 +345,14 @@ export function clInvList(B, canEdit){
   var byM={}; inv.forEach(function(i){ (byM[String(i.ym).slice(0,7)]=byM[String(i.ym).slice(0,7)]||[]).push(i); });
   var months=B.months.slice().reverse();
   var h='';
-  if(!inv.length) h+='<p class="cap">보관된 인보이스가 없습니다'+(canEdit? ' — 위 «＋ 인보이스 PDF 추가» 로 올려주세요.':'.')+'</p>';
+  if(!inv.length) h+=tpl`<p class="cap">보관된 인보이스가 없습니다${canEdit? ' — 위 «＋ 인보이스 PDF 추가» 로 올려주세요.':'.'}</p>`;
   else{
-    h+='<div class="tbl-wrap" tabindex="0" style="max-height:none"><table class="pr"><thead><tr><th>사용 월</th><th>계정</th><th class="n">전체합계(USD)</th><th class="n">환율</th><th class="n">공급가액(₩)</th><th class="n">총 청구(VAT 포함)</th><th>파일</th><th>올린 사람</th>'+(canEdit?'<th></th>':'')+'</tr></thead><tbody>';
+    h+=tpl`<div class="tbl-wrap" tabindex="0" style="max-height:none"><table class="pr"><thead><tr><th>사용 월</th><th>계정</th><th class="n">전체합계(USD)</th><th class="n">환율</th><th class="n">공급가액(₩)</th><th class="n">총 청구(VAT 포함)</th><th>파일</th><th>올린 사람</th>${rawHtml(canEdit?'<th></th>':'')}</tr></thead><tbody>`;
     months.forEach(function(m){ (byM[m]||[]).forEach(function(i){ var a=B.acc[i.account_id]||{label:i.account_id};
-      h+='<tr><td>'+m+'</td><td><span style="display:inline-block;width:8px;height:8px;background:'+(a.color||'#999')+';margin-right:6px;border-radius:2px"></span>'+esc(a.label)+(i.vendor? ' <span class="cap">· '+esc(i.vendor)+'</span>':'')+'</td>'+
-        '<td class="n">'+(i.total_usd!=null? clU(i.total_usd):'–')+'</td><td class="n">'+(i.fx_rate!=null? Number(i.fx_rate).toLocaleString('ko-KR'):'–')+'</td><td class="n">'+(i.supply_krw!=null? clW(i.supply_krw):'–')+'</td><td class="n">'+(i.total_krw!=null? clW(i.total_krw):'–')+'</td>'+
-        '<td class="cap">'+(i.file_name? '📄 '+esc(i.file_name) : esc(i.source||''))+'</td>'+
-        '<td class="cap">'+esc((i.uploaded_by||'').split('@')[0])+' · '+String(i.uploaded_at||'').slice(0,10)+'</td>'+
-        (canEdit? '<td><button class="pill ghost" data-del="'+i.id+'" style="height:24px;padding:0 8px;font-size:11px;color:var(--critical)">삭제</button></td>':'')+'</tr>'; }); });
+      h+=tpl`<tr><td>${rawHtml(m)}</td><td><span style="display:inline-block;width:8px;height:8px;background:${rawHtml(a.color||'#999')};margin-right:6px;border-radius:2px"></span>${a.label}${rawHtml(i.vendor? tpl` <span class="cap">· ${i.vendor}</span>`:'')}</td>`+
+        tpl`<td class="n">${rawHtml(i.total_usd!=null? clU(i.total_usd):'–')}</td><td class="n">${rawHtml(i.fx_rate!=null? Number(i.fx_rate).toLocaleString('ko-KR'):'–')}</td><td class="n">${rawHtml(i.supply_krw!=null? clW(i.supply_krw):'–')}</td><td class="n">${rawHtml(i.total_krw!=null? clW(i.total_krw):'–')}</td>`+
+        tpl`<td class="cap">${rawHtml(i.file_name? '📄 '+esc(i.file_name) : esc(i.source||''))}</td>`+
+        tpl`<td class="cap">${(i.uploaded_by||'').split('@')[0]} · ${rawHtml(String(i.uploaded_at||'').slice(0,10))}</td>`+ tpl`${rawHtml(canEdit? tpl`<td><button class="pill ghost" data-del="${rawHtml(i.id)}" style="height:24px;padding:0 8px;font-size:11px;color:var(--critical)">삭제</button></td>`:'')}</tr>`; }); });
     h+='</tbody></table></div>';
   }
   p.innerHTML=h;
@@ -372,11 +371,12 @@ export async function clDeleteInvoice(id){
 }
 
 /* ---------- PDF 읽기 ---------- */
+var PDFJS_READY=false;   // 워커까지 준비됨
 export function clLoadPdfjs(){
-  if(window.pdfjsLib && clLoadPdfjs._w) return Promise.resolve(window.pdfjsLib);
+  if(window.pdfjsLib && PDFJS_READY) return Promise.resolve(window.pdfjsLib);
   return loadLib('pdfjs').then(function(){ return loadWorkerBlob(PDFJS_WORKER); }).then(function(u){
     try{ window.pdfjsLib.GlobalWorkerOptions.workerSrc=u||PDFJS_WORKER.urls[0]; }catch(e){}   // 검증 실패 시 pdf.js 가 원격 URL 로 가짜 워커(메인 스레드) 폴백
-    clLoadPdfjs._w=true; return window.pdfjsLib;
+    PDFJS_READY=true; return window.pdfjsLib;
   }, function(e){ throw new Error('pdf.js 를 불러오지 못했습니다 (네트워크 차단?)'); });
 }
 /* PDF → 줄 배열 (같은 y 좌표의 글자 조각을 한 줄로) */
@@ -446,11 +446,11 @@ export function clAcctByNo(no){
 export function clOpenAdd(){
   var old=document.getElementById('clOvl'); if(old) old.remove();
   var ov=document.createElement('div'); ov.className='ovl on'; ov.id='clOvl';
-  ov.innerHTML='<div class="modal" style="width:min(860px,100%)"><h3>인보이스 PDF 추가</h3>'+
-    '<p class="cap">클라이온 AWS 인보이스 PDF 를 올리면 브라우저에서 사용기간·계정·서비스별 금액을 읽어 표에 넣습니다. <b>PDF 파일 자체는 저장하지 않습니다</b>(읽은 값과 파일명만 기록). 같은 달·같은 계정이 이미 있으면 새 값으로 교체되고, 여러 파일을 한 번에 올릴 수 있습니다.</p>'+
-    '<div class="cl-drop" id="clDrop">여기에 PDF 를 끌어다 놓거나 클릭해서 선택<br><span class="cap">application/pdf · 최대 20MB</span><input type="file" id="clFile" accept="application/pdf" multiple style="display:none"></div>'+
-    '<div id="clPrev"></div>'+
-    '<div class="mact"><span class="mmsg" id="clMsg"></span><button class="pill ghost" id="clClose">닫기</button><button class="btn" style="height:36px" id="clSave" disabled>저장</button></div></div>';
+  ov.innerHTML=tpl`<div class="modal" style="width:min(860px,100%)"><h3>인보이스 PDF 추가</h3>`+
+    tpl`<p class="cap">클라이온 AWS 인보이스 PDF 를 올리면 브라우저에서 사용기간·계정·서비스별 금액을 읽어 표에 넣습니다. <b>PDF 파일 자체는 저장하지 않습니다</b>(읽은 값과 파일명만 기록). 같은 달·같은 계정이 이미 있으면 새 값으로 교체되고, 여러 파일을 한 번에 올릴 수 있습니다.</p>`+
+    tpl`<div class="cl-drop" id="clDrop">여기에 PDF 를 끌어다 놓거나 클릭해서 선택<br><span class="cap">application/pdf · 최대 20MB</span><input type="file" id="clFile" accept="application/pdf" multiple style="display:none"></div>`+
+    tpl`<div id="clPrev"></div>`+
+    tpl`<div class="mact"><span class="mmsg" id="clMsg"></span><button class="pill ghost" id="clClose">닫기</button><button class="btn" style="height:36px" id="clSave" disabled>저장</button></div></div>`;
   document.body.appendChild(ov);
   var drop=document.getElementById('clDrop'), inp=document.getElementById('clFile');
   drop.onclick=function(){ inp.click(); };
@@ -486,26 +486,25 @@ export function clRenderPreview(){
   var accOpts=((ST.RAWX.cloud&&ST.RAWX.cloud.acc)||[]).filter(function(a){ return a.vendor!=='NCP'; });
   var h='', ready=0;
   CL.parsed.forEach(function(it,ix){
-    h+='<div class="cl-prev" data-ix="'+ix+'"><h4>📄 '+esc(it.name)+' <button class="pill ghost" data-rm="'+ix+'" style="height:22px;padding:0 8px;font-size:11px;margin-left:auto">제거</button></h4>';
-    if(it.error){ h+='<span class="st bad">읽기 실패</span> <span class="cap">'+esc(it.error)+'</span></div>'; return; }
+    h+=tpl`<div class="cl-prev" data-ix="${rawHtml(ix)}"><h4>📄 ${it.name} <button class="pill ghost" data-rm="${rawHtml(ix)}" style="height:22px;padding:0 8px;font-size:11px;margin-left:auto">제거</button></h4>`;
+    if(it.error){ h+=tpl`<span class="st bad">읽기 실패</span> <span class="cap">${it.error}</span></div>`; return; }
     var p=it.parsed;
-    h+='<div class="cap" style="margin-bottom:6px">사용기간 <b>'+esc(p.ym||'?')+'</b> · 청구일 '+esc(p.billDate||'?')+' · 환율 '+(p.fx||'?')+' · 전체합계 '+(p.totalUsd!=null? clU(p.totalUsd):'?')+' · 공급가액 '+(p.supplyKrw!=null? clW(p.supplyKrw):'?')+' · VAT 포함 '+(p.totalKrw!=null? clW(p.totalKrw):'?')+(p.vendor? ' · '+esc(p.vendor):'')+'</div>';
+    h+=tpl`<div class="cap" style="margin-bottom:6px">사용기간 <b>${p.ym||'?'}</b> · 청구일 ${p.billDate||'?'} · 환율 ${rawHtml(p.fx||'?')} · 전체합계 ${rawHtml(p.totalUsd!=null? clU(p.totalUsd):'?')} · 공급가액 ${rawHtml(p.supplyKrw!=null? clW(p.supplyKrw):'?')} · VAT 포함 ${rawHtml(p.totalKrw!=null? clW(p.totalKrw):'?')}${rawHtml(p.vendor? ' · '+esc(p.vendor):'')}</div>`;
     p.accounts.forEach(function(a,ai){
       var dup=inv.filter(function(x){ return String(x.ym).slice(0,7)===p.ym && x.account_id===a.accId; })[0];
       var nz=a.rows.filter(function(r){ return (r.billUsd||0)>0 || (r.krw||0)>0; });
-      h+='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0">'+
-        '<span class="st '+(a.accId?'ok':'bad')+'">'+esc(a.email||'')+' ('+esc(a.acct||'?')+')</span>'+
-        '<span class="cap">→ 포탈 계정</span><select aria-label="포탈 계정 연결" data-acc="'+ix+':'+ai+'" class="pill" style="height:26px;font:inherit;font-size:12px">'+
-          '<option value="">— 선택 —</option>'+accOpts.map(function(o){ return '<option value="'+esc(o.id)+'"'+(o.id===a.accId?' selected':'')+'>'+esc(o.label)+' ('+esc(o.acct_no||'')+')</option>'; }).join('')+
-          '<option value="__new">＋ 새 계정으로 등록…</option></select>'+
-        '<span class="cap">서비스 '+nz.length+'행 · Sub Total '+(a.subUsd!=null? clU(a.subUsd):'?')+(a.subKrw!=null? ' / '+clW(a.subKrw):'')+'</span>'+
-        (dup? '<span class="st dup">이미 있음 → 교체됨'+(dup.file_name? ' ('+esc(dup.file_name)+')':'')+'</span>':'')+
-        '</div>';
-      if(nz.length) h+='<details style="margin:2px 0 6px"><summary class="cap" style="cursor:pointer">서비스 행 보기</summary><table class="pr" style="font-size:12px"><thead><tr><th>서비스</th><th class="n">금액(USD)</th><th class="n">Credit</th><th class="n">청구(USD)</th><th class="n">청구(₩)</th></tr></thead><tbody>'+
-        nz.map(function(r){ return '<tr><td>'+esc(clSvcKey(r.service))+'</td><td class="n">'+clU(r.usd||0)+'</td><td class="n">'+clU(r.credit||0)+'</td><td class="n">'+clU(r.billUsd||0)+'</td><td class="n">'+clW(r.krw||0)+'</td></tr>'; }).join('')+'</tbody></table></details>';
+      h+=tpl`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0">`+
+        tpl`<span class="st ${a.accId?'ok':'bad'}">${a.email||''} (${a.acct||'?'})</span>`+
+        tpl`<span class="cap">→ 포탈 계정</span><select aria-label="포탈 계정 연결" data-acc="${rawHtml(ix)}:${rawHtml(ai)}" class="pill" style="height:26px;font:inherit;font-size:12px">`+
+          tpl`<option value="">— 선택 —</option>${rawHtml(accOpts.map(function(o){ return tpl`<option value="${o.id}"${o.id===a.accId?' selected':''}>${o.label} (${o.acct_no||''})</option>`; }).join(''))}`+
+          tpl`<option value="__new">＋ 새 계정으로 등록…</option></select>`+
+        tpl`<span class="cap">서비스 ${nz.length}행 · Sub Total ${rawHtml(a.subUsd!=null? clU(a.subUsd):'?')}${rawHtml(a.subKrw!=null? ' / '+clW(a.subKrw):'')}</span>`+ tpl`${rawHtml(dup? tpl`<span class="st dup">이미 있음 → 교체됨${rawHtml(dup.file_name? ' ('+esc(dup.file_name)+')':'')}</span>`:'')}`+
+        tpl`</div>`;
+      if(nz.length) h+=tpl`<details style="margin:2px 0 6px"><summary class="cap" style="cursor:pointer">서비스 행 보기</summary><table class="pr" style="font-size:12px"><thead><tr><th>서비스</th><th class="n">금액(USD)</th><th class="n">Credit</th><th class="n">청구(USD)</th><th class="n">청구(₩)</th></tr></thead><tbody>`+
+        tpl`${rawHtml(nz.map(function(r){ return tpl`<tr><td>${clSvcKey(r.service)}</td><td class="n">${rawHtml(clU(r.usd||0))}</td><td class="n">${rawHtml(clU(r.credit||0))}</td><td class="n">${rawHtml(clU(r.billUsd||0))}</td><td class="n">${rawHtml(clW(r.krw||0))}</td></tr>`; }).join(''))}</tbody></table></details>`;
       if(a.accId) ready++;
     });
-    if(p.warnings.length) h+='<div class="cap" style="color:var(--critical)">⚠ '+p.warnings.map(esc).join(' · ')+'</div>';
+    if(p.warnings.length) h+=tpl`<div class="cap" style="color:var(--critical)">⚠ ${rawHtml(p.warnings.map(esc).join(' · '))}</div>`;
     h+='</div>';
   });
   prev.innerHTML=h;

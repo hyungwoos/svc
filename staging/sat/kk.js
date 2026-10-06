@@ -165,16 +165,16 @@ function renderRun(){
     var tag=r.mapped? '<span class="tag map">매핑</span>' : '<span class="tag need">고객사 확인</span>';
     if(r.isNew) tag+=' <span class="tag new">신규</span>';
     var cust=r.mapped? esc(r.cust)
-      : '<input type="text" value="'+esc(r.cust)+'" placeholder="고객사 입력" style="width:150px" data-change="setCust('+i+',this.value)">';
-    var pick='<select class="pick" data-change="pickBiz('+i+',this.value)"><option value="">— 선택 —</option>'+
-      (K.bizPool||[]).map(function(b){ return '<option value="'+b.no+'"'+(r.biz&&r.biz.no===b.no?' selected':'')+'>'+esc(b.no+' · '+(b.cust||b.proj).slice(0,22)+' · '+fmt(b.acc))+'</option>'; }).join('')+'</select>';
+      : tpl`<input type="text" value="${r.cust}" placeholder="고객사 입력" style="width:150px" data-change="setCust(${rawHtml(i)},this.value)">`;
+    var pick=tpl`<select class="pick" data-change="pickBiz(${rawHtml(i)},this.value)"><option value="">— 선택 —</option>`+
+      tpl`${rawHtml((K.bizPool||[]).map(function(b){ return tpl`<option value="${rawHtml(b.no)}"${r.biz&&r.biz.no===b.no?' selected':''}>${b.no+' · '+(b.cust||b.proj).slice(0,22)+' · '+fmt(b.acc)}</option>`; }).join(''))}</select>`;
     var tr=document.createElement('tr'); tr.className='st-'+st+' kkrow';
-    tr.innerHTML='<td>'+tag+'</td><td>'+cust+'</td><td class="mini">'+esc(r.code)+'<div class="mini" style="color:#98a2ab">'+esc(String(r.project).slice(0,34))+'</div></td>'+
-      '<td class="n">'+r.qty+'</td><td class="n">'+fmt(r.unit)+'</td><td class="n">'+fmt(r.amt)+'</td>'+
-      '<td class="mini">'+(r.termNo||1)+'/'+(r.termTotal||1)+'</td>'+
-      '<td class="mini">'+esc(r.start||'')+(r.end? ' ~ '+esc(r.end):'')+'</td>'+
-      '<td>'+pick+'</td><td class="n">'+(r.biz? fmt(r.biz.acc):'')+'</td>'+
-      '<td><input type="text" value="'+esc(r.note||'')+'" placeholder="비고" style="width:140px" data-change="setNote('+i+',this.value)"></td>';
+    tr.innerHTML=tpl`<td>${rawHtml(tag)}</td><td>${rawHtml(cust)}</td><td class="mini">${r.code}<div class="mini" style="color:#98a2ab">${String(r.project).slice(0,34)}</div></td>`+
+      tpl`<td class="n">${rawHtml(r.qty)}</td><td class="n">${rawHtml(fmt(r.unit))}</td><td class="n">${rawHtml(fmt(r.amt))}</td>`+
+      tpl`<td class="mini">${rawHtml(r.termNo||1)}/${rawHtml(r.termTotal||1)}</td>`+
+      tpl`<td class="mini">${r.start||''}${rawHtml(r.end? ' ~ '+esc(r.end):'')}</td>`+
+      tpl`<td>${rawHtml(pick)}</td><td class="n">${rawHtml(r.biz? fmt(r.biz.acc):'')}</td>`+
+      tpl`<td><input type="text" value="${r.note||''}" placeholder="비고" style="width:140px" data-change="setNote(${rawHtml(i)},this.value)"></td>`;
     tb.appendChild(tr);
   });
   $('#kRes').classList.remove('hidden');
@@ -348,15 +348,14 @@ function renderSettles(){
   var rows=(K.settles||[]).slice();
   $('#setList').innerHTML=rows.map(function(r){
     var ym=String(r.month||'').slice(0,7), um=String(r.use_month||'').slice(0,7);
-    return '<div class="setmon"><span class="ym">'+esc(ym)+' 청구</span><span class="sum">'+(um? um+' 이용분':'')+'</span></div>'+
-      '<div class="setrow"><span class="kind u">구독료</span><span class="amt">'+fmt(r.total)+'원</span>'+
-      '<span class="diff '+(Math.abs(Number(r.total||0)-Number(r.biz_total||0))<1?'ok':'bad')+'">'+
-        (Math.abs(Number(r.total||0)-Number(r.biz_total||0))<1? '대조 일치':'차액 '+fmt(Number(r.total||0)-Number(r.biz_total||0)))+'</span>'+
-      '<span class="cnt">고객사 '+(r.cnt||0)+'곳 · 신규 '+(r.cnt_new||0)+' · 해약 '+(r.cnt_end||0)+'</span>'+
-      '<span class="who">'+esc(String(r.created_by||'').split('@')[0])+' '+esc(String(r.updated_at||'').slice(5,10))+(r.report_id? ' · 리포트 #'+r.report_id:'')+'</span>'+
-      '<span class="acts"><button class="rowbtn" data-click="restoreSettle('+r.id+')">불러오기</button>'+
-      '<button class="rowbtn red" data-click="delSettleId('+r.id+')">삭제</button></span></div>';
-  }).join('')||'<div class="mini" style="padding:14px 4px;color:#888">'+(K.settleErr? '읽기 실패 — 아래 메시지를 확인하세요':'저장된 정산이 없습니다')+'</div>';
+    return tpl`<div class="setmon"><span class="ym">${ym} 청구</span><span class="sum">${rawHtml(um? um+' 이용분':'')}</span></div>`+
+      tpl`<div class="setrow"><span class="kind u">구독료</span><span class="amt">${rawHtml(fmt(r.total))}원</span>`+
+      tpl`<span class="diff ${Math.abs(Number(r.total||0)-Number(r.biz_total||0))<1?'ok':'bad'}">`+ tpl`${rawHtml(Math.abs(Number(r.total||0)-Number(r.biz_total||0))<1? '대조 일치':'차액 '+fmt(Number(r.total||0)-Number(r.biz_total||0)))}</span>`+
+      tpl`<span class="cnt">고객사 ${rawHtml(r.cnt||0)}곳 · 신규 ${rawHtml(r.cnt_new||0)} · 해약 ${rawHtml(r.cnt_end||0)}</span>`+
+      tpl`<span class="who">${String(r.created_by||'').split('@')[0]} ${String(r.updated_at||'').slice(5,10)}${rawHtml(r.report_id? ' · 리포트 #'+r.report_id:'')}</span>`+
+      tpl`<span class="acts"><button class="rowbtn" data-click="restoreSettle(${rawHtml(r.id)})">불러오기</button>`+
+      tpl`<button class="rowbtn red" data-click="delSettleId(${rawHtml(r.id)})">삭제</button></span></div>`;
+  }).join('')||tpl`<div class="mini" style="padding:14px 4px;color:#888">${K.settleErr? '읽기 실패 — 아래 메시지를 확인하세요':'저장된 정산이 없습니다'}</div>`;
 }
 function restBar(t){ var b=$('#restBar'); if(!t){ b.classList.add('hidden'); return; } $('#restTxt').innerHTML=t; b.classList.remove('hidden'); }
 function clearRestored(){
@@ -387,7 +386,7 @@ async function restoreSettle(id){
     K.total=r.total; K.settleId=r.id;
     $('#cNew').value=r.cnt_new||0; $('#cEnd').value=r.cnt_end||0;
     renderRun(); closeOvl('ovlSet');
-    restBar('<b>저장된 정산을 보는 중</b> — '+esc(String(r.month||'').slice(0,7))+' 청구 · '+fmt(r.total)+'원 · 새로 만들려면 PDF를 올리거나 오른쪽에서 치우세요');
+    restBar(tpl`<b>저장된 정산을 보는 중</b> — ${String(r.month||'').slice(0,7)} 청구 · ${rawHtml(fmt(r.total))}원 · 새로 만들려면 PDF를 올리거나 오른쪽에서 치우세요`);
     msg('mK2','저장된 정산을 불러왔습니다','ok');
   }catch(e){ msg('mS',e.message,'bad'); }
 }
@@ -418,13 +417,13 @@ function renderMaps(){
   var list=(K.maps||[]).filter(function(m){ return !q || ((m.project_code||'')+' '+(m.customer||'')+' '+(m.kakao_project||'')).toLowerCase().indexOf(q)>=0; });
   $('#mCnt').textContent=list.length+' / '+(K.maps||[]).length+'건';
   $('#tMap tbody').innerHTML=list.map(function(m){
-    return '<tr><td class="mini">'+esc(m.project_code)+'</td>'+
-      '<td><input type="text" value="'+esc(m.customer||'')+'" style="width:100%" data-change="editMap('+m.id+',\'customer\',this.value)"></td>'+
-      '<td class="mini" title="'+esc(m.kakao_project||'')+'">'+esc(String(m.kakao_project||'').slice(0,40))+'</td>'+
-      '<td><input type="date" value="'+esc(String(m.start_date||'').slice(0,10))+'" data-change="editMap('+m.id+',\'start_date\',this.value)"></td>'+
-      '<td><input type="date" value="'+esc(String(m.end_date||'').slice(0,10))+'" data-change="editMap('+m.id+',\'end_date\',this.value)"></td>'+
-      '<td><input type="number" value="'+(m.term_total||1)+'" style="width:56px" data-change="editMap('+m.id+',\'term_total\',this.value)"></td>'+
-      '<td><button class="rowbtn red" data-click="delMap('+m.id+')">삭제</button></td></tr>';
+    return tpl`<tr><td class="mini">${m.project_code}</td>`+
+      tpl`<td><input type="text" value="${m.customer||''}" style="width:100%" data-change="editMap(${rawHtml(m.id)},'customer',this.value)"></td>`+
+      tpl`<td class="mini" title="${m.kakao_project||''}">${String(m.kakao_project||'').slice(0,40)}</td>`+
+      tpl`<td><input type="date" value="${String(m.start_date||'').slice(0,10)}" data-change="editMap(${rawHtml(m.id)},'start_date',this.value)"></td>`+
+      tpl`<td><input type="date" value="${String(m.end_date||'').slice(0,10)}" data-change="editMap(${rawHtml(m.id)},'end_date',this.value)"></td>`+
+      tpl`<td><input type="number" value="${rawHtml(m.term_total||1)}" style="width:56px" data-change="editMap(${rawHtml(m.id)},'term_total',this.value)"></td>`+
+      tpl`<td><button class="rowbtn red" data-click="delMap(${rawHtml(m.id)})">삭제</button></td></tr>`;
   }).join('')||'<tr><td colspan="7" class="mini">저장된 매핑이 없습니다</td></tr>';
 }
 async function editMap(id,k,v){
@@ -455,7 +454,7 @@ $('#ym').addEventListener('change',function(){
     $('#um').value=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
   if(K.rows){ calcTerms(); renderRun(); }
   var has=(K.settles||[]).filter(function(v){ return String(v.month||'').slice(0,7)===ym; });
-  restBar(has.length? '<b>'+esc(ym)+'</b> 청구분이 이미 저장되어 있습니다 — '+fmt(has[0].total)+'원 &nbsp;<span class="lnk" data-click="openSettles()">저장 내역 열기</span>' : '');
+  restBar(has.length? tpl`<b>${ym}</b> 청구분이 이미 저장되어 있습니다 — ${rawHtml(fmt(has[0].total))}원 &nbsp;<span class="lnk" data-click="openSettles()">저장 내역 열기</span>` : '');
 });
 document.addEventListener('DOMContentLoaded', async function(){
   if(!sess()) return;

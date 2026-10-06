@@ -203,7 +203,7 @@ function countUse(){
   $('#cNew').value=nNew; $('#cEnd').value=nEnd; $('#cExt').value=nExt; $('#cKeep').value=nac.length-nNew-nEnd-nExt;
   var extHint=(S.use.bizUse||[]).filter(function(b){ return /연장|재약정/.test(b.proj); }).length;
   $('#cWhy').innerHTML='신규 = 기산일자가 '+(ym||'정산월')+'(또는 노란색) · 해약 = 해약일자·현재상태(붉은색) · 연장 = 계약일자만 '+(ym||'정산월')+'인 건'+
-    (extHint?' <span class="lnk" title="비즈포탈 프로젝트명에 연장·재약정이 들어간 건">(비즈포탈에 «연장» 표기 '+extHint+'건 있음)</span>':'')+' — 모두 직접 고칠 수 있습니다';
+    (extHint?tpl` <span class="lnk" title="비즈포탈 프로젝트명에 연장·재약정이 들어간 건">(비즈포탈에 «연장» 표기 ${rawHtml(extHint)}건 있음)</span>`:'')+' — 모두 직접 고칠 수 있습니다';
 }
 function matchInst(){
   var biz=(S.biz||[]).filter(function(b){ return b.kind==='install'; });
@@ -241,10 +241,10 @@ function renderUse(){
   var diffs=nac.filter(function(g){ return g.biz && Math.abs(g.diff)>=1; }).length;
   var fee=Math.round((nacSum+dkSum)*n(S.cfg.fee&&S.cfg.fee.rate||5)/100);
   $('#uTiles').innerHTML=
-    tile('클라우드NAC', fmt(nacSum)+' <span class="mini">'+nac.length+'건</span>')+
-    tile('디바이스키퍼(임대 포함)', fmt(dkSum)+' <span class="mini">'+dk.length+'건</span>')+
+    tile('클라우드NAC', tpl`${rawHtml(fmt(nacSum))} <span class="mini">${nac.length}건</span>`)+
+    tile('디바이스키퍼(임대 포함)', tpl`${rawHtml(fmt(dkSum))} <span class="mini">${dk.length}건</span>`)+
     tile('에스원 청구 총액', fmt(nacSum+dkSum))+
-    tile('비즈포탈 회계매출', fmt(bizUse+bizSet)+' <span class="mini">'+((S.use.bizUse||[]).length+(S.use.bizSettle||[]).length)+'건</span>')+
+    tile('비즈포탈 회계매출', tpl`${rawHtml(fmt(bizUse+bizSet))} <span class="mini">${rawHtml((S.use.bizUse||[]).length+(S.use.bizSettle||[]).length)}건</span>`)+
     tile('차액', fmt((nacSum+dkSum)-(bizUse+bizSet)), Math.abs((nacSum+dkSum)-(bizUse+bizSet))<1?'ok':'bad')+
     tile('미매칭 / 금액 차이', need+' / '+diffs, (need+diffs)?'bad':'ok')+
     tile('파트너 수수료 '+(S.cfg.fee&&S.cfg.fee.rate||5)+'%', fmt(fee));
@@ -263,15 +263,14 @@ function renderUse(){
     var by={map:'<span class="tag map">저장된 매핑</span>',name:'<span class="tag">이름 일치</span>',amt:'<span class="tag amt">금액 일치</span>',pick:'<span class="tag map">직접 선택</span>'}[g.by]||'<span class="tag need">확인 필요</span>';
     var many=g.biz && nac.filter(function(x){ return x.biz&&x.biz.no===g.biz.no; }).length>1;
     if(many) by+=' <span class="tag">묶음</span>';
-    var pick='<select class="pick" data-i="'+i+'" data-change="pickBiz(this)"><option value="">— 선택 —</option>'+
-      g.cand.map(function(c){ return '<option value="'+c.b.no+'"'+(g.biz&&g.biz.no===c.b.no?' selected':'')+'>'+esc(c.b.no+' · '+(c.b.cust||c.b.name)+' · '+fmt(c.b.acc))+'</option>'; }).join('')+
-      (g.biz && !g.cand.some(function(c){ return c.b.no===g.biz.no; })?'<option value="'+g.biz.no+'" selected>'+esc(g.biz.no+' · '+g.biz.cust)+'</option>':'')+'</select>';
+    var pick=tpl`<select class="pick" data-i="${rawHtml(i)}" data-change="pickBiz(this)"><option value="">— 선택 —</option>`+
+      tpl`${rawHtml(g.cand.map(function(c){ return tpl`<option value="${rawHtml(c.b.no)}"${g.biz&&g.biz.no===c.b.no?' selected':''}>${c.b.no+' · '+(c.b.cust||c.b.name)+' · '+fmt(c.b.acc)}</option>`; }).join(''))}`+ tpl`${rawHtml(g.biz && !g.cand.some(function(c){ return c.b.no===g.biz.no; })?tpl`<option value="${rawHtml(g.biz.no)}" selected>${g.biz.no+' · '+g.biz.cust}</option>`:'')}</select>`;
     var tr=document.createElement('tr'); tr.className='st-'+st;
-    tr.innerHTML='<td>'+tags+by+'</td><td>'+esc(g.nm)+'</td><td>'+esc(g.cno||'')+'</td>'+
-      '<td class="mini">'+esc(g.lines.map(function(l){ return l.svc; }).join(' + '))+'</td>'+
-      '<td class="n">'+fmt(g.amt)+'</td><td>'+pick+'</td><td>'+esc(g.biz?g.biz.cust:'')+'</td>'+
-      '<td class="n">'+(g.biz?fmt(g.biz.acc):'')+'</td>'+
-      '<td class="n" style="color:'+(g.biz&&Math.abs(g.diff)>=1?'var(--warn)':'#999')+'">'+(g.biz?(g.diff?fmt(g.diff):'0'):'')+'</td>';
+    tr.innerHTML=tpl`<td>${rawHtml(tags)}${rawHtml(by)}</td><td>${g.nm}</td><td>${g.cno||''}</td>`+
+      tpl`<td class="mini">${g.lines.map(function(l){ return l.svc; }).join(' + ')}</td>`+
+      tpl`<td class="n">${rawHtml(fmt(g.amt))}</td><td>${rawHtml(pick)}</td><td>${g.biz?g.biz.cust:''}</td>`+
+      tpl`<td class="n">${rawHtml(g.biz?fmt(g.biz.acc):'')}</td>`+
+      tpl`<td class="n" style="color:${g.biz&&Math.abs(g.diff)>=1?'var(--warn)':'#999'}">${rawHtml(g.biz?(g.diff?fmt(g.diff):'0'):'')}</td>`;
     tb.appendChild(tr);
   });
   $('#uRes').classList.remove('hidden');
@@ -291,9 +290,9 @@ function renderInst(){
   var need=S.inst.filter(function(r){ return !r.biz; }).length;
   var buy=n($('#buyTotal').value);
   $('#iTiles').innerHTML=
-    tile('설치 건수', S.inst.length+'건 <span class="mini">기본 '+S.inst.reduce(function(a,r){return a+r.base;},0)+' · 추가 '+S.inst.reduce(function(a,r){return a+r.extra;},0)+'</span>')+
+    tile('설치 건수', tpl`${S.inst.length}건 <span class="mini">기본 ${rawHtml(S.inst.reduce(function(a,r){return a+r.base;},0))} · 추가 ${rawHtml(S.inst.reduce(function(a,r){return a+r.extra;},0))}</span>`)+
     tile('에스원 청구액', fmt(sum))+
-    tile('비즈포탈 설치비', fmt(bizSum)+' <span class="mini">'+(S.instBiz||[]).length+'건</span>')+
+    tile('비즈포탈 설치비', tpl`${rawHtml(fmt(bizSum))} <span class="mini">${(S.instBiz||[]).length}건</span>`)+
     tile('차액', fmt(sum-bizSum), Math.abs(sum-bizSum)<1?'ok':'bad')+
     tile('미매칭', need+'건', need?'bad':'ok')+
     tile('매입(업체 지급)', fmt(buy))+
@@ -302,15 +301,15 @@ function renderInst(){
   S.inst.forEach(function(r,i){
     var st=!r.biz?'need':(Math.abs(r.diff)>=1?'diff':'auto');
     var by={name:'<span class="tag">이름 일치</span>',amt:'<span class="tag amt">금액 일치</span>',pick:'<span class="tag map">선택</span>'}[r.by]||'<span class="tag need">확인 필요</span>';
-    var pick='<select class="pick" data-i="'+i+'" data-change="pickInst(this)"><option value="">— 선택 —</option>'+
-      r.cand.map(function(c){ return '<option value="'+c.b.no+'"'+(r.biz&&r.biz.no===c.b.no?' selected':'')+'>'+esc(c.b.no+' · '+(c.b.cust||c.b.name)+' · '+fmt(c.b.acc))+'</option>'; }).join('')+'</select>';
+    var pick=tpl`<select class="pick" data-i="${rawHtml(i)}" data-change="pickInst(this)"><option value="">— 선택 —</option>`+
+      tpl`${rawHtml(r.cand.map(function(c){ return tpl`<option value="${rawHtml(c.b.no)}"${r.biz&&r.biz.no===c.b.no?' selected':''}>${c.b.no+' · '+(c.b.cust||c.b.name)+' · '+fmt(c.b.acc)}</option>`; }).join(''))}</select>`;
     var tr=document.createElement('tr'); tr.className='st-'+st;
-    tr.innerHTML='<td>'+by+'</td><td>'+esc(String(r.idate||''))+'</td><td>'+esc(r.cno)+'</td><td>'+esc(r.nm)+'</td>'+
-      '<td class="mini">'+esc(r.work+' '+r.spec)+'</td>'+
-      '<td class="n"><input type="number" value="'+r.base+'" style="width:52px" data-change="setInst('+i+',\'base\',this.value)"></td>'+
-      '<td class="n"><input type="number" value="'+r.extra+'" style="width:52px" data-change="setInst('+i+',\'extra\',this.value)"></td>'+
-      '<td class="n">'+fmt(r.amt)+'</td><td>'+pick+'</td><td class="n">'+(r.biz?fmt(r.biz.acc):'')+'</td>'+
-      '<td class="n">'+fmt(r.buy||0)+'</td><td class="mini">'+esc(r.note)+'</td>';
+    tr.innerHTML=tpl`<td>${rawHtml(by)}</td><td>${String(r.idate||'')}</td><td>${r.cno}</td><td>${r.nm}</td>`+
+      tpl`<td class="mini">${r.work+' '+r.spec}</td>`+
+      tpl`<td class="n"><input type="number" value="${rawHtml(r.base)}" style="width:52px" data-change="setInst(${rawHtml(i)},'base',this.value)"></td>`+
+      tpl`<td class="n"><input type="number" value="${rawHtml(r.extra)}" style="width:52px" data-change="setInst(${rawHtml(i)},'extra',this.value)"></td>`+
+      tpl`<td class="n">${rawHtml(fmt(r.amt))}</td><td>${rawHtml(pick)}</td><td class="n">${rawHtml(r.biz?fmt(r.biz.acc):'')}</td>`+
+      tpl`<td class="n">${rawHtml(fmt(r.buy||0))}</td><td class="mini">${r.note}</td>`;
     tb.appendChild(tr);
   });
   $('#iRes').classList.remove('hidden');
@@ -531,23 +530,23 @@ function renderSettles(){
   rows.forEach(function(r){ var m=String(r.month||'').slice(0,7); if(!byM[m]){ byM[m]=[]; order.push(m); } byM[m].push(r); });
   var html=order.map(function(m){
     var tot=byM[m].reduce(function(a,r){ return a+Number(r.total||0); },0);
-    return '<div class="setmon"><span class="ym">'+esc(m)+'</span><span class="sum">합계 '+fmt(tot)+'원</span></div>'+
-      byM[m].map(function(r){
+    return tpl`<div class="setmon"><span class="ym">${m}</span><span class="sum">합계 ${rawHtml(fmt(tot))}원</span></div>`+
+      tpl`${rawHtml(byM[m].map(function(r){
         var cnt=(r.kind==='use')
           ? '신규 '+(r.cnt_new||0)+' · 해약 '+(r.cnt_end||0)+' · 연장 '+(r.cnt_ext||0)+' · 기존 '+(r.cnt_keep||0)
           : '기본 '+(r.cnt_new||0)+'건 · 추가 '+(r.cnt_ext||0)+'건'+(r.buy_amount? ' · 매입 '+fmt(r.buy_amount)+'원':'');
         var diff=Number(r.total||0)-Number(r.biz_total||0);
-        return '<div class="setrow">'+
-          '<span class="kind '+(r.kind==='use'?'u':'i')+'">'+(r.kind==='use'?'사용료':'설치비')+'</span>'+
-          '<span class="amt">'+fmt(r.total)+'원</span>'+
-          '<span class="diff '+(Math.abs(diff)<1?'ok':'bad')+'" title="비즈포탈 회계매출 '+fmt(r.biz_total)+'원">'+(Math.abs(diff)<1? '대조 일치':'차액 '+fmt(diff))+'</span>'+
-          '<span class="cnt">'+esc(cnt)+'</span>'+
-          '<span class="who">'+esc(String(r.created_by||'').split('@')[0])+' '+esc(String(r.updated_at||'').slice(5,10))+(r.report_id? ' · 리포트 #'+r.report_id:'')+'</span>'+
-          '<span class="acts"><button class="rowbtn" data-click="restoreSettle('+r.id+')">불러오기</button>'+
-          '<button class="rowbtn red" data-click="delSettleId('+r.id+')">삭제</button></span></div>';
-      }).join('');
+        return tpl`<div class="setrow">`+
+          tpl`<span class="kind ${r.kind==='use'?'u':'i'}">${r.kind==='use'?'사용료':'설치비'}</span>`+
+          tpl`<span class="amt">${rawHtml(fmt(r.total))}원</span>`+
+          tpl`<span class="diff ${Math.abs(diff)<1?'ok':'bad'}" title="비즈포탈 회계매출 ${rawHtml(fmt(r.biz_total))}원">${rawHtml(Math.abs(diff)<1? '대조 일치':'차액 '+fmt(diff))}</span>`+
+          tpl`<span class="cnt">${cnt}</span>`+
+          tpl`<span class="who">${String(r.created_by||'').split('@')[0]} ${String(r.updated_at||'').slice(5,10)}${rawHtml(r.report_id? ' · 리포트 #'+r.report_id:'')}</span>`+
+          tpl`<span class="acts"><button class="rowbtn" data-click="restoreSettle(${rawHtml(r.id)})">불러오기</button>`+
+          tpl`<button class="rowbtn red" data-click="delSettleId(${rawHtml(r.id)})">삭제</button></span></div>`;
+      }).join(''))}`;
   }).join('');
-  $('#setList').innerHTML=html||'<div class="mini" style="padding:14px 4px;color:#888">'+(S.settleErr? '읽기 실패 — 아래 메시지를 확인하세요' : '저장된 정산이 없습니다')+'</div>';
+  $('#setList').innerHTML=html||tpl`<div class="mini" style="padding:14px 4px;color:#888">${S.settleErr? '읽기 실패 — 아래 메시지를 확인하세요' : '저장된 정산이 없습니다'}</div>`;
 }
 /* 저장된 정산을 화면으로 되살립니다 — 엑셀을 다시 올리지 않아도 그때 결과를 그대로 봅니다(읽기용) */
 /* 불러온(저장된) 정산을 화면에서 치우고 처음 상태로 */
@@ -593,7 +592,7 @@ async function restoreSettle(id){
       $('#cNew').value=r.cnt_new||0; $('#cEnd').value=r.cnt_end||0; $('#cExt').value=r.cnt_ext||0; $('#cKeep').value=r.cnt_keep||0;
       document.querySelector('.tab[data-t="use"]').click();
       $('#mU2').dataset.keep='1';
-      restBar('<b>저장된 정산을 보는 중</b> — '+esc(ym)+' 사용료 · '+fmt(r.total)+'원 (저장 '+esc(String(r.updated_at||'').slice(0,10))+') · 새로 대조하려면 엑셀을 올리거나 오른쪽에서 치우세요');
+      restBar(tpl`<b>저장된 정산을 보는 중</b> — ${ym} 사용료 · ${rawHtml(fmt(r.total))}원 (저장 ${String(r.updated_at||'').slice(0,10)}) · 새로 대조하려면 엑셀을 올리거나 오른쪽에서 치우세요`);
       msg('mU2','저장된 정산을 불러왔습니다 ('+ym+' · '+fmt(r.total)+'원)','ok');
     }else{
       S.inst=(p.rows||[]).map(function(x){
@@ -609,7 +608,7 @@ async function restoreSettle(id){
       renderInst();
       document.querySelector('.tab[data-t="inst"]').click();
       $('#mI2').dataset.keep='1';
-      restBar('<b>저장된 정산을 보는 중</b> — '+esc(ym)+' 설치비 · '+fmt(r.total)+'원 (저장 '+esc(String(r.updated_at||'').slice(0,10))+') · 새로 대조하려면 엑셀을 올리거나 오른쪽에서 치우세요');
+      restBar(tpl`<b>저장된 정산을 보는 중</b> — ${ym} 설치비 · ${rawHtml(fmt(r.total))}원 (저장 ${String(r.updated_at||'').slice(0,10)}) · 새로 대조하려면 엑셀을 올리거나 오른쪽에서 치우세요`);
       msg('mI2','저장된 설치비 정산을 불러왔습니다 ('+ym+' · '+fmt(r.total)+'원)','ok');
     }
     closeOvl('ovlSet');
@@ -723,11 +722,11 @@ function renderMaps(){
   var list=S.maps.filter(function(m){ return !q || ((m.contract_no||'')+' '+(m.s1_name||'')+' '+(m.customer||'')+' '+(m.biz_no||'')).toLowerCase().indexOf(q)>=0; });
   $('#mCnt').textContent=list.length+' / '+S.maps.length+'건';
   $('#tMap tbody').innerHTML=list.slice(0,400).map(function(m){
-    return '<tr><td>'+esc(m.contract_no)+'</td><td>'+esc(m.s1_name||'')+'</td>'+
-      '<td><input type="number" value="'+(m.biz_no||'')+'" style="width:96px" data-change="editMap('+m.id+',\'biz_no\',this.value)"></td>'+
-      '<td><input type="text" value="'+esc(m.customer||'')+'" style="width:150px" data-change="editMap('+m.id+',\'customer\',this.value)"></td>'+
-      '<td>'+esc(m.product||'')+'</td><td class="mini">'+esc(String(m.updated_at||'').slice(0,10))+'</td>'+
-      '<td><button class="btn line" style="padding:3px 8px" data-click="delMap('+m.id+')">삭제</button></td></tr>';
+    return tpl`<tr><td>${m.contract_no}</td><td>${m.s1_name||''}</td>`+
+      tpl`<td><input type="number" value="${rawHtml(m.biz_no||'')}" style="width:96px" data-change="editMap(${rawHtml(m.id)},'biz_no',this.value)"></td>`+
+      tpl`<td><input type="text" value="${m.customer||''}" style="width:150px" data-change="editMap(${rawHtml(m.id)},'customer',this.value)"></td>`+
+      tpl`<td>${m.product||''}</td><td class="mini">${String(m.updated_at||'').slice(0,10)}</td>`+
+      tpl`<td><button class="btn line" style="padding:3px 8px" data-click="delMap(${rawHtml(m.id)})">삭제</button></td></tr>`;
   }).join('')||'<tr><td colspan="7" class="mini">저장된 매핑이 없습니다 — 사용료 정산에서 «매칭 저장»을 누르면 쌓입니다.</td></tr>';
 }
 /* 매핑·장비 신청의 계약번호를 포탈 계약 표(contracts.s1_no)에 채웁니다 (71단계 함수) */
@@ -808,9 +807,9 @@ $('#ym').addEventListener('change',function(){
   else if(S.use&&S.use.nac){ countUse(); renderUse(); }
   saveBadge();
   var has=(S.settles||[]).filter(function(v){ return String(v.month||'').slice(0,7)===ym; });
-  restBar(has.length? '<b>'+esc(ym)+'</b> 에 저장된 정산이 '+has.length+'건 있습니다 — '+
-          has.map(function(v){ return (v.kind==='use'?'사용료 ':'설치비 ')+fmt(v.total)+'원'; }).join(' · ')+
-          ' &nbsp;<span class="lnk" data-click="openSettles()">저장 내역 열기</span>' : '');
+  restBar(has.length? tpl`<b>${ym}</b> 에 저장된 정산이 ${has.length}건 있습니다 — `+
+          tpl`${rawHtml(has.map(function(v){ return (v.kind==='use'?'사용료 ':'설치비 ')+fmt(v.total)+'원'; }).join(' · '))}`+
+          tpl` &nbsp;<span class="lnk" data-click="openSettles()">저장 내역 열기</span>` : '');
   if(!has.length) msg('mU', ym+' 기준으로 바꿨습니다 — 엑셀 두 개를 올리면 대조합니다');
 });
 $('#onlyTodo').addEventListener('change',renderUse);

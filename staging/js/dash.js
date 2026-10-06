@@ -2,8 +2,8 @@
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { APP_VER, ST } from './state.js';
 import { Viz } from './viz.js';
-import { $, $$, baseLabel, baseRange, buildBaseSelect, cssv, el, isCC, lline, mk, mkLabel, monOf, pct, seriesColor, STATE, won, wonFull,
-  wrapNavIcons, yOf } from './core.js';
+import { $, $$, baseLabel, baseRange, buildBaseSelect, cssv, el, esc, isCC, lline, mk, mkLabel, monOf, pct, rawHtml, seriesColor, STATE, tpl, won,
+  wonFull, wrapNavIcons, yOf } from './core.js';
 import { boot, CACHE_KEY, ccAfterKpis, ccAnaCount, ccAnalysisOpen, ccHomeLayout, loadFromDb, onData, renderInbox, SB_RAW, sbWrite, toast } from './shell.js';
 import { abortAsk, ask, closeAnswer, isAsking, loadAiConfig, runQuery, shortQ } from './ai.js';
 import { GRIDS } from './grids.js';
@@ -84,6 +84,7 @@ export function inkOn(bg){
     var l=0.2126*L[0]+0.7152*L[1]+0.0722*L[2];
     return (1.05/(l+0.05) >= (l+0.05)/0.05)? '#fff' : '#111'; }catch(e){ return '#fff'; }
 }
+var CTRL_RZ=false;   // 창 크기 바뀌면 다시 그리기 — 한 번만 연결
 export function buildControls(){
   // 사업라인 칩
   var box=$('#lineChips'); box.innerHTML='';
@@ -247,14 +248,13 @@ export function buildControls(){
   if(isCC()){ var mb=el('button','chip chip-more', cb.classList.contains('all')? '접기 ▴':'예시 더 보기 ▾'); mb.type='button';
     mb.onclick=function(){ var all=cb.classList.toggle('all'); mb.textContent= all? '접기 ▴':'예시 더 보기 ▾'; }; cb.appendChild(mb); }
 
-  if(!buildControls._rz){ buildControls._rz=1; onResize(function(){ if(ST.DATA) renderAll(); }); }
+  if(!CTRL_RZ){ CTRL_RZ=true; onResize(function(){ if(ST.DATA) renderAll(); }); }
   loadAiConfig();
 
   (function(){ var nP=ST.DATA.rows.filter(function(r){return !r.parent;}).length, nC=ST.DATA.rows.length-nP;
     $('#periodLabel').textContent = ST.DATA.monthKeys[0]+' ~ '+ST.DATA.monthKeys[ST.M-1]+' · 계약 '+nP.toLocaleString('ko-KR')+'건'+(nC? ' (+부속 '+nC+')':''); })();
   $('#loadedAt').textContent = '읽은 시각 '+ST.DATA.generatedAt;
-  $('#foot').innerHTML = '원본: Supabase DB · <b>금액 단위: 천원</b> (입력·수정과 가격표 단가는 원 단위) · 모든 수정은 변경 이력에 기록됩니다 · 포탈 버전 '+APP_VER+
-    (ST.DATA.warnings&&ST.DATA.warnings.length? '<br>⚠️ '+ST.DATA.warnings.join(' / ') : '');
+  $('#foot').innerHTML = tpl`원본: Supabase DB · <b>금액 단위: 천원</b> (입력·수정과 가격표 단가는 원 단위) · 모든 수정은 변경 이력에 기록됩니다 · 포탈 버전 ${rawHtml(APP_VER)}`+ tpl`${rawHtml(ST.DATA.warnings&&ST.DATA.warnings.length? tpl`<br>⚠️ ${rawHtml(ST.DATA.warnings.join(' / '))}` : '')}`;
 }
 export function uniq(f){
   var s={}; ST.DATA.rows.forEach(function(r){ var v=f(r); if(v) s[v]=1; });
@@ -306,8 +306,8 @@ export function renderHero(list){
   var curYm=monOf(b)+'월';
   var bizDone=(ST.RAWX.biz||[]).some(function(r){ return r.ym===curYm; });
   var items=[];
-  if(pend) items.push({t:'warn', ic:'📦', msg:'처리 대기 장비 요청이 <b>'+pend+'건</b> 있습니다.', go:function(){ switchView('orders'); }});
-  if(expCnt) items.push({t:'info', ic:'⏳', msg:expN()+'개월 내 만료 계약이 <b>'+expCnt+'건</b> ('+won(expAmt)+'천원) 있습니다 — 재약정 타깃.', go:function(){ goWidget('exp','계약 만료 예정'); }});
+  if(pend) items.push({t:'warn', ic:'📦', msg:tpl`처리 대기 장비 요청이 <b>${rawHtml(pend)}건</b> 있습니다.`, go:function(){ switchView('orders'); }});
+  if(expCnt) items.push({t:'info', ic:'⏳', msg:tpl`${rawHtml(expN())}개월 내 만료 계약이 <b>${rawHtml(expCnt)}건</b> (${won(expAmt)}천원) 있습니다 — 재약정 타깃.`, go:function(){ goWidget('exp','계약 만료 예정'); }});
   if(!bizDone) items.push({t:'warn', ic:'⚖️', msg:'이번 달('+curYm+') 비즈포탈 차액이 아직 입력되지 않았습니다.', go:function(){ switchView('biz'); }});
   var st=$('#noticeStack'); st.innerHTML='';
   if(!items.length){
@@ -317,7 +317,7 @@ export function renderHero(list){
   }else{
     items.forEach(function(it){
       var d=document.createElement('div'); d.className='nb nb-'+it.t;
-      d.innerHTML='<span class="ni">'+it.ic+'</span><span style="flex:1">'+it.msg+'</span><span class="na">확인 →</span>';
+      d.innerHTML=tpl`<span class="ni">${rawHtml(it.ic)}</span><span style="flex:1">${rawHtml(it.msg)}</span><span class="na">확인 →</span>`;
       d.onclick=it.go;
       st.appendChild(d);
     });
@@ -352,21 +352,19 @@ export function renderQWidgets(){
     var res=null; try{ res=runQuery(w.q); }catch(e){}
     var sec=document.createElement('section');
     sec.className='card c6'; sec.dataset.w=w.id;
-    sec.innerHTML='<div class="qw-head"><div class="t">'+
-      '<h2 style="font-size:13.5px">📌 '+esc(shortQ((res&&res.title)||w.q))+'</h2>'+
-      '<p class="cap" style="margin:2px 0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(w.q)+'">'+esc(shortQ(w.q))+'</p></div>'+
-      '<button class="qw-btn" data-a="rf" title="새로고침">↻</button>'+
-      '<button class="qw-btn" data-a="rm" title="위젯 제거">✕</button></div>'+
-      ((res&&res.hero)? '<div class="qw-hero">'+esc(res.hero)+'<small> '+esc(res.unit||'')+'</small></div>':'')+
-      ((res&&res.sub)? '<p class="cap" style="margin:-4px 0 8px">'+esc(res.sub)+'</p>':'')+
-      '<div id="qwc_'+w.id+'" style="min-height:60px"></div>';
+    sec.innerHTML=tpl`<div class="qw-head"><div class="t">`+
+      tpl`<h2 style="font-size:13.5px">📌 ${shortQ((res&&res.title)||w.q)}</h2>`+
+      tpl`<p class="cap" style="margin:2px 0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${w.q}">${shortQ(w.q)}</p></div>`+
+      tpl`<button class="qw-btn" data-a="rf" title="새로고침">↻</button>`+
+      tpl`<button class="qw-btn" data-a="rm" title="위젯 제거">✕</button></div>`+ tpl`${rawHtml((res&&res.hero)? tpl`<div class="qw-hero">${res.hero}<small> ${res.unit||''}</small></div>`:'')}`+ tpl`${rawHtml((res&&res.sub)? tpl`<p class="cap" style="margin:-4px 0 8px">${res.sub}</p>`:'')}`+
+      tpl`<div id="qwc_${rawHtml(w.id)}" style="min-height:60px"></div>`;
     grid.appendChild(sec);
     var host=document.getElementById('qwc_'+w.id);
     if(res && res.chart && res.chart.labels && res.chart.labels.length){
       var c=res.chart, fmt=c.money? won : function(v){ return Math.round(v)+'건'; };
       try{
         if(c.horizontal){
-          host.innerHTML='<div id="qwb_'+w.id+'" style="overflow:auto;max-height:220px"></div>';
+          host.innerHTML=tpl`<div id="qwb_${rawHtml(w.id)}" style="overflow:auto;max-height:220px"></div>`;
           var tot=c.series[0].data.reduce(function(a,b2){ return a+b2; },0);
           hbars('#qwb_'+w.id, c.labels.map(function(nm,i){ return {name:nm, v:c.series[0].data[i], c:c.series[0].color}; }), tot, !c.money);
         }else{
@@ -376,10 +374,10 @@ export function renderQWidgets(){
         }
       }catch(e){ host.innerHTML='<p class="cap">차트를 그리지 못했습니다</p>'; }
     } else if(res && res.table && res.table.rows.length){
-      host.innerHTML='<div class="tbl-wrap" tabindex="0" style="max-height:220px"><table><thead><tr>'+
-        res.table.cols.map(function(c2,i){ return '<th'+(i?' class="n"':'')+'>'+esc(c2)+'</th>'; }).join('')+'</tr></thead><tbody>'+
-        res.table.rows.slice(0,8).map(function(r){ return '<tr>'+r.map(function(v,i){ return '<td'+(i?' class="n"':'')+'>'+esc(v)+'</td>'; }).join('')+'</tr>'; }).join('')+
-        '</tbody></table></div>'+(res.table.rows.length>8? '<p class="mini" style="margin-top:6px">상위 8행 표시 · 전체는 질문창에서</p>':'');
+      host.innerHTML=tpl`<div class="tbl-wrap" tabindex="0" style="max-height:220px"><table><thead><tr>`+
+        tpl`${rawHtml(res.table.cols.map(function(c2,i){ return tpl`<th${rawHtml(i?' class="n"':'')}>${c2}</th>`; }).join(''))}</tr></thead><tbody>`+
+        tpl`${rawHtml(res.table.rows.slice(0,8).map(function(r){ return tpl`<tr>${rawHtml(r.map(function(v,i){ return tpl`<td${rawHtml(i?' class="n"':'')}>${v}</td>`; }).join(''))}</tr>`; }).join(''))}`+
+        tpl`</tbody></table></div>${rawHtml(res.table.rows.length>8? '<p class="mini" style="margin-top:6px">상위 8행 표시 · 전체는 질문창에서</p>':'')}`;
     } else if(!res || !res.hero){
       host.innerHTML='<p class="cap" style="padding-top:14px">표시할 데이터가 없습니다</p>';
     }
@@ -410,7 +408,7 @@ export function initWidgetDnD(){
   });
   if(!grid.__dnd){
     grid.__dnd=1;
-    grid.addEventListener('dragover',function(e){
+    grid.addEventListener('dragover',function(/** @type {MouseEvent} */ e){
       if(!DRAG_W) return;
       e.preventDefault();
       var tgt=e.target.closest? e.target.closest('[data-w]'):null;
@@ -524,26 +522,26 @@ export function toggleWidgetPanel(){
     'border:1px solid var(--ring);border-radius:14px;box-shadow:0 14px 40px rgba(0,0,0,.16);padding:14px 16px';
   var h='<div style="font-size:12.5px;font-weight:700;margin-bottom:10px">⊞ 대시보드 위젯</div>';
   WIDGET_DEFS.forEach(function(d){
-    h+='<label style="display:flex;gap:8px;align-items:center;padding:4px 0;font-size:12.5px;cursor:pointer">'+
-       '<input type="checkbox" data-wk="'+d[0]+'" '+(widgetOn(d[0],off)?'checked':'')+' style="width:15px;height:15px"> '+esc(d[1])+'</label>';
+    h+=tpl`<label style="display:flex;gap:8px;align-items:center;padding:4px 0;font-size:12.5px;cursor:pointer">`+
+       tpl`<input type="checkbox" data-wk="${rawHtml(d[0])}" ${widgetOn(d[0],off)?'checked':''} style="width:15px;height:15px"> ${d[1]}</label>`;
   });
   var qws=qwList();
   if(qws.length){
     h+='<div style="font-size:11px;color:var(--muted);letter-spacing:.08em;margin:10px 0 4px">고정한 질문</div>';
     qws.forEach(function(w){
-      h+='<div style="display:flex;gap:6px;align-items:center;padding:3px 0;font-size:12px">'+
-         '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📌 '+esc(w.q)+'</span>'+
-         '<button class="qw-btn" data-qrm="'+w.id+'" style="width:22px;height:22px">✕</button></div>';
+      h+=tpl`<div style="display:flex;gap:6px;align-items:center;padding:3px 0;font-size:12px">`+
+         tpl`<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📌 ${w.q}</span>`+
+         tpl`<button class="qw-btn" data-qrm="${rawHtml(w.id)}" style="width:22px;height:22px">✕</button></div>`;
     });
   }
   if(qws.length){
-    h+='<button class="pill ghost" id="wpQClear" style="width:100%;justify-content:center;margin-top:6px;'+
-       'border-color:var(--critical,#d03b3b);color:var(--critical,#d03b3b)">고정 질문 모두 지우기</button>';
+    h+=tpl`<button class="pill ghost" id="wpQClear" style="width:100%;justify-content:center;margin-top:6px;`+
+       tpl`border-color:var(--critical,#d03b3b);color:var(--critical,#d03b3b)">고정 질문 모두 지우기</button>`;
   }
   h+='<button class="pill ghost" id="wpForget" style="width:100%;justify-content:center;margin-top:6px">🧠 AI 대화 기억 지우기</button>';
-  h+='<div style="display:flex;gap:8px;margin-top:10px"><button class="pill ghost" id="wpAll" style="flex:1;justify-content:center">모두 표시</button>'+
-     '<button class="pill" id="wpClose" style="flex:1;justify-content:center">닫기</button></div>'+
-     '<div class="mini" style="margin-top:8px;color:var(--muted)">내 계정·이 브라우저에만 적용됩니다</div>';
+  h+=tpl`<div style="display:flex;gap:8px;margin-top:10px"><button class="pill ghost" id="wpAll" style="flex:1;justify-content:center">모두 표시</button>`+
+     tpl`<button class="pill" id="wpClose" style="flex:1;justify-content:center">닫기</button></div>`+
+     tpl`<div class="mini" style="margin-top:8px;color:var(--muted)">내 계정·이 브라우저에만 적용됩니다</div>`;
   p.innerHTML=h;
   document.body.appendChild(p);
   p.querySelectorAll('input[data-wk]').forEach(function(cb){
@@ -603,7 +601,7 @@ export function renderMatrix(list){
     seg._built=1;
     ys.forEach(function(y){
       var b=document.createElement('button');
-      b.textContent=String(y); b.dataset.y=y;
+      b.textContent=String(y); b.dataset.y=String(y);
       b.onclick=function(){ MX_YEAR=+this.dataset.y; renderMatrix(); };
       seg.appendChild(b);
     });
@@ -630,7 +628,7 @@ export function renderMatrix(list){
   var t=$('#tMx'); t.innerHTML='';
   var thead=document.createElement('thead');
   var h='<tr><th>구분</th>';
-  for(var m=1;m<=12;m++) h+='<th class="n">'+m+'월</th>';
+  for(var m=1;m<=12;m++) h+=tpl`<th class="n">${rawHtml(m)}월</th>`;
   h+='<th class="n" style="border-left:1px solid var(--ring)">연 합계</th><th class="n">전년비</th></tr>';
   thead.innerHTML=h;
   t.appendChild(thead);
@@ -646,8 +644,8 @@ export function renderMatrix(list){
       /* 셀 메모(특이사항) — 있으면 우상단에 삼각 표시, 마우스 올리면 내용 미리보기 */
       var mk=MXM[mxKey(lb,Y,m)];
       var tip=mk? ' title="'+esc(String(mk.body).slice(0,400))+'\n\n(클릭: 내역 보기 · 메모 수정)"' : ' title="클릭: 이 달 계약 내역 보기 · 특이사항 메모"';
-      tds+='<td class="n mxc'+(mk?' mxm':'')+'"'+(fut?' style="color:var(--muted)"':'')+
-        ' data-mxl="'+esc(lb||'')+'" data-mxm="'+m+'"'+tip+'>'+num(v)+'</td>';
+      tds+=tpl`<td class="n mxc${mk?' mxm':''}"${rawHtml(fut?' style="color:var(--muted)"':'')}`+
+        tpl` data-mxl="${lb||''}" data-mxm="${rawHtml(m)}"${rawHtml(tip)}>${rawHtml(num(v))}</td>`;
     }
     for(var m2=1;m2<=12;m2++) prev+=cell(lb,Y-1,m2);
     var yoy=prev? ((sum-prev)/prev*100) : null;
@@ -655,9 +653,9 @@ export function renderMatrix(list){
     var yoyCls=yoy==null? '' : (yoy>=0?'up':'down');
     var tr=document.createElement('tr');
     if(strong) tr.style.cssText='font-weight:700;border-top:2px solid var(--axis);background:var(--surface-2)';
-    tr.innerHTML='<td>'+esc(label)+'</td>'+tds+
-      '<td class="n" style="border-left:1px solid var(--ring);font-weight:650">'+num(sum)+'</td>'+
-      '<td class="n '+yoyCls+'">'+yoyTxt+'</td>';
+    tr.innerHTML=tpl`<td>${label}</td>${rawHtml(tds)}`+
+      tpl`<td class="n" style="border-left:1px solid var(--ring);font-weight:650">${rawHtml(num(sum))}</td>`+
+      tpl`<td class="n ${rawHtml(yoyCls)}">${rawHtml(yoyTxt)}</td>`;
     tb.appendChild(tr);
   }
   lines.forEach(function(lb){ rowHtml(lline(lb), lb, false); });
@@ -716,43 +714,42 @@ export function openIfeeDetail(td, Y, M, det, adj){
   var ed=ifeeCanEdit();
   /* 금액은 «원 단위»로 입력합니다 — 표에는 천원으로 보이지만 입력·저장은 원 단위(입력·수정 창과 같은 규칙) */
   function amtIn(v, key){
-    return '<input class="ifin" data-f="'+key+'" type="number" step="10000" value="'+(v===''||v==null?'':v)+'" placeholder="0" '+
-           'style="width:104px;text-align:right;font-size:12px;padding:3px 5px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)">';
+    return tpl`<input class="ifin" data-f="${rawHtml(key)}" type="number" step="10000" value="${rawHtml(v===''||v==null?'':v)}" placeholder="0" `+
+           tpl`style="width:104px;text-align:right;font-size:12px;padding:3px 5px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)">`;
   }
-  var h='<div class="mxdet"><table><thead><tr><th style="min-width:150px">고객사</th><th>구분·서비스</th><th>근거</th><th class="n">설치비(원)</th>'+(ed?'<th></th>':'')+'</tr></thead><tbody>';
+  var h=tpl`<div class="mxdet"><table><thead><tr><th style="min-width:150px">고객사</th><th>구분·서비스</th><th>근거</th><th class="n">설치비(원)</th>${rawHtml(ed?'<th></th>':'')}</tr></thead><tbody>`;
   rows.forEach(function(d,i){
-    h+='<tr data-i="'+i+'" data-cid="'+(d.id||'')+'"><td><b>'+esc(d.cust)+'</b>'+
-       ' <button class="ifgo" data-i="'+i+'" title="계약 화면에서 보기" style="border:none;background:none;cursor:pointer;color:var(--mut)">↗</button></td>'+
-       '<td>'+esc(lline(d.line))+'</td>'+
-       '<td style="color:var(--mut)">'+(d.guess? '시작월+1 (대금정산일 없음)':'계약 · 대금정산일')+'</td>'+
-       '<td class="n">'+(ed? amtIn(d.fee,'c'+(d.id||'')) : won(d.fee))+'</td>'+(ed?'<td></td>':'')+'</tr>';
+    h+=tpl`<tr data-i="${rawHtml(i)}" data-cid="${rawHtml(d.id||'')}"><td><b>${d.cust}</b>`+
+       tpl` <button class="ifgo" data-i="${rawHtml(i)}" title="계약 화면에서 보기" style="border:none;background:none;cursor:pointer;color:var(--mut)">↗</button></td>`+
+       tpl`<td>${lline(d.line)}</td>`+
+       tpl`<td style="color:var(--mut)">${d.guess? '시작월+1 (대금정산일 없음)':'계약 · 대금정산일'}</td>`+
+       tpl`<td class="n">${rawHtml(ed? amtIn(d.fee,'c'+(d.id||'')) : won(d.fee))}</td>${rawHtml(ed?'<td></td>':'')}</tr>`;
   });
   /* 추가 항목 — 계약에 없는 설치·철거 비용을 고객사별로 */
-  h+='<tr class="ifhead"><td colspan="'+(ed?5:4)+'" style="background:var(--surface-2);color:var(--mut);font-size:12px;padding:5px 6px">'+
-     '추가 항목 — 계약에 없는 설치비·철거비 (고객사를 고르거나 직접 입력)</td></tr>';
+  h+=tpl`<tr class="ifhead"><td colspan="${ed?5:4}" style="background:var(--surface-2);color:var(--mut);font-size:12px;padding:5px 6px">`+
+     tpl`추가 항목 — 계약에 없는 설치비·철거비 (고객사를 고르거나 직접 입력)</td></tr>`;
   function exRow(e,i){
     var cust=e? e.customer:'', kind=e? e.kind:'설치비', amt=e? e.amount:'', note=e? (e.note||''):'';
-    if(!ed) return '<tr><td><b>'+esc(cust)+'</b></td><td>'+esc(kind)+'</td><td style="color:var(--mut)">'+esc(note||'추가 항목')+'</td><td class="n">'+won(amt)+'</td></tr>';
-    return '<tr class="ifex" data-x="'+i+'" data-id="'+(e&&e.id?e.id:'')+'">'+
-      '<td><input class="ifin" data-f="x'+i+'_cust" list="dlIfeeCust" type="text" value="'+esc(cust)+'" placeholder="고객사"'+
-        ' style="width:100%;min-width:130px;font-size:12px;padding:3px 5px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)"></td>'+
-      '<td><select class="ifin" aria-label="항목 종류" data-f="x'+i+'_kind" style="font-size:12px;padding:3px 4px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)">'+
-        IFEE_KINDS.map(function(k){ return '<option'+(k===kind?' selected':'')+'>'+k+'</option>'; }).join('')+'</select></td>'+
-      '<td><input class="ifin" data-f="x'+i+'_note" type="text" value="'+esc(note)+'" placeholder="비고(선택)"'+
-        ' style="width:100%;min-width:110px;font-size:12px;padding:3px 5px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)"></td>'+
-      '<td class="n">'+amtIn(amt,'x'+i+'_amt')+'</td>'+
-      '<td><button class="ifdel" data-x="'+i+'" title="이 줄 지우기" style="border:none;background:none;cursor:pointer;color:var(--critical,#d03b3b);font-size:13.5px">✕</button></td></tr>';
+    if(!ed) return tpl`<tr><td><b>${cust}</b></td><td>${kind}</td><td style="color:var(--mut)">${note||'추가 항목'}</td><td class="n">${won(amt)}</td></tr>`;
+    return tpl`<tr class="ifex" data-x="${rawHtml(i)}" data-id="${rawHtml(e&&e.id?e.id:'')}">`+
+      tpl`<td><input class="ifin" data-f="x${rawHtml(i)}_cust" list="dlIfeeCust" type="text" value="${cust}" placeholder="고객사"`+
+        tpl` style="width:100%;min-width:130px;font-size:12px;padding:3px 5px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)"></td>`+
+      tpl`<td><select class="ifin" aria-label="항목 종류" data-f="x${rawHtml(i)}_kind" style="font-size:12px;padding:3px 4px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)">`+
+        tpl`${rawHtml(IFEE_KINDS.map(function(k){ return tpl`<option${k===kind?' selected':''}>${rawHtml(k)}</option>`; }).join(''))}</select></td>`+
+      tpl`<td><input class="ifin" data-f="x${rawHtml(i)}_note" type="text" value="${note}" placeholder="비고(선택)"`+
+        tpl` style="width:100%;min-width:110px;font-size:12px;padding:3px 5px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)"></td>`+
+      tpl`<td class="n">${rawHtml(amtIn(amt,'x'+i+'_amt'))}</td>`+
+      tpl`<td><button class="ifdel" data-x="${rawHtml(i)}" title="이 줄 지우기" style="border:none;background:none;cursor:pointer;color:var(--critical,#d03b3b);font-size:13.5px">✕</button></td></tr>`;
   }
   ex.forEach(function(e,i){ h+=exRow(e,i); });
   if(ed) h+='<tr id="ifAddRow"><td colspan="5" style="padding:4px 6px"><button class="pill ghost" id="ifAdd" style="font-size:12px;padding:4px 10px">＋ 설치·철거비 추가</button></td></tr>';
   if(!rows.length && !ex.length && !ed) h+='<tr><td colspan="4" style="text-align:center;color:var(--muted)">이 달 설치비 내역이 없습니다</td></tr>';
-  h+='</tbody><tfoot><tr><td colspan="'+(ed?3:2)+'">계약 '+rows.length+'건'+(ex.length? ' + 추가 '+ex.length+'건':'')+'</td>'+
-     '<td class="n" id="ifSum">'+won(sum)+'천원</td>'+(ed?'<td></td>':'')+'</tr></tfoot></table></div>'+
-     '<datalist id="dlIfeeCust"></datalist>'+
-     (ed? '<div class="act" style="margin-top:6px"><span class="msg" id="ifMsg" style="font-size:12px"></span><span class="sp"></span>'+
-          '<button class="pill pri" id="ifSave">저장</button></div>'+
-          '<div class="who" style="margin-top:4px">금액은 <b>원 단위</b>로 입력합니다 (표에는 천원으로 표시) · 환급·차감이면 음수 · 고객사 옆 ↗ 를 누르면 그 계약으로 이동</div>'
-        : '<div class="who" style="margin-top:6px">줄을 누르면 그 고객사의 계약 화면으로 이동 · 금액 수정은 편집 권한이 있는 계정만</div>');
+  h+=tpl`</tbody><tfoot><tr><td colspan="${ed?3:2}">계약 ${rows.length}건${rawHtml(ex.length? ' + 추가 '+ex.length+'건':'')}</td>`+
+     tpl`<td class="n" id="ifSum">${won(sum)}천원</td>${rawHtml(ed?'<td></td>':'')}</tr></tfoot></table></div>`+
+     tpl`<datalist id="dlIfeeCust"></datalist>`+ tpl`${rawHtml(ed? tpl`<div class="act" style="margin-top:6px"><span class="msg" id="ifMsg" style="font-size:12px"></span><span class="sp"></span>`+
+          tpl`<button class="pill pri" id="ifSave">저장</button></div>`+
+          tpl`<div class="who" style="margin-top:4px">금액은 <b>원 단위</b>로 입력합니다 (표에는 천원으로 표시) · 환급·차감이면 음수 · 고객사 옆 ↗ 를 누르면 그 계약으로 이동</div>`
+        : '<div class="who" style="margin-top:6px">줄을 누르면 그 고객사의 계약 화면으로 이동 · 금액 수정은 편집 권한이 있는 계정만</div>')}`;
   openMxMemo(td, IFEE_LINE, Y, M, '설치비', null, {detail:{html:h, count:rows.length+ex.length, sum:sum,
     go:function(i){ var d=rows[i]; if(!d) return; switchView('contracts'); var sInp=$('#dvSearch'); if(sInp){ sInp.value=d.cust; DV.page=0; renderGrid(); } },
     ready:function(box){ ifeeWire(box, Y, M, rows, ex, td); }}});
@@ -795,12 +792,12 @@ export function ifeeWire(box, Y, M, rows, ex, td){
   var add=box.querySelector('#ifAdd');
   if(add) add.onclick=function(){
     var tr=document.createElement('tr'); tr.className='ifex'; tr.dataset.x=String(nextX); tr.dataset.id='';
-    tr.innerHTML='<td><input class="ifin" data-f="x'+nextX+'_cust" list="dlIfeeCust" type="text" placeholder="고객사" style="width:100%;min-width:130px;font-size:12px;padding:3px 5px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)"></td>'+
-      '<td><select class="ifin" aria-label="항목 종류" data-f="x'+nextX+'_kind" style="font-size:12px;padding:3px 4px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)">'+
-        IFEE_KINDS.map(function(k){ return '<option>'+k+'</option>'; }).join('')+'</select></td>'+
-      '<td><input class="ifin" data-f="x'+nextX+'_note" type="text" placeholder="비고(선택)" style="width:100%;min-width:110px;font-size:12px;padding:3px 5px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)"></td>'+
-      '<td class="n"><input class="ifin" data-f="x'+nextX+'_amt" type="number" step="10000" placeholder="0" style="width:104px;text-align:right;font-size:12px;padding:3px 5px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)"></td>'+
-      '<td><button class="ifdel" data-x="'+nextX+'" title="이 줄 지우기" style="border:none;background:none;cursor:pointer;color:var(--critical,#d03b3b);font-size:13.5px">✕</button></td>';
+    tr.innerHTML=tpl`<td><input class="ifin" data-f="x${rawHtml(nextX)}_cust" list="dlIfeeCust" type="text" placeholder="고객사" style="width:100%;min-width:130px;font-size:12px;padding:3px 5px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)"></td>`+
+      tpl`<td><select class="ifin" aria-label="항목 종류" data-f="x${rawHtml(nextX)}_kind" style="font-size:12px;padding:3px 4px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)">`+
+        tpl`${rawHtml(IFEE_KINDS.map(function(k){ return tpl`<option>${rawHtml(k)}</option>`; }).join(''))}</select></td>`+
+      tpl`<td><input class="ifin" data-f="x${rawHtml(nextX)}_note" type="text" placeholder="비고(선택)" style="width:100%;min-width:110px;font-size:12px;padding:3px 5px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)"></td>`+
+      tpl`<td class="n"><input class="ifin" data-f="x${rawHtml(nextX)}_amt" type="number" step="10000" placeholder="0" style="width:104px;text-align:right;font-size:12px;padding:3px 5px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)"></td>`+
+      tpl`<td><button class="ifdel" data-x="${rawHtml(nextX)}" title="이 줄 지우기" style="border:none;background:none;cursor:pointer;color:var(--critical,#d03b3b);font-size:13.5px">✕</button></td>`;
     var anchor=box.querySelector('#ifAddRow');
     anchor.parentNode.insertBefore(tr, anchor);
     wireRow(tr); nextX++;
@@ -909,9 +906,9 @@ export function renderInstall(){
 
   if(IFEE_MODE==='y'){
     html+='<thead><tr><th>연도</th>';
-    for(var m=1;m<=12;m++) html+='<th class="n">'+m+'월</th>';
-    html+='<th class="n" style="border-left:1px solid var(--ring)">연 합계</th>'+
-          '<th class="n">그중 추가</th></tr></thead><tbody>';
+    for(var m=1;m<=12;m++) html+=tpl`<th class="n">${rawHtml(m)}월</th>`;
+    html+=tpl`<th class="n" style="border-left:1px solid var(--ring)">연 합계</th>`+
+          tpl`<th class="n">그중 추가</th></tr></thead><tbody>`;
     var gTot=0, gAdj=0, gm=[];
     for(var i=0;i<=12;i++) gm[i]=0;
     years.forEach(function(Y){
@@ -920,38 +917,38 @@ export function renderInstall(){
         var v=cell[Y+'|'+m]||0; sum+=v; gm[m]+=v;
         var mk=MXM[mxKey(IFEE_LINE,Y,m)];
         var tip=mk? ' title="'+esc(String(mk.body).slice(0,400))+'\n\n(클릭: 내역 보기 · 메모 수정)"' : ' title="클릭: 이 달 설치비 내역 · 특이사항 메모"';
-        tds+='<td class="n ifc'+(mk?' mxm':'')+'" data-y="'+Y+'" data-m="'+m+'"'+tip+'>'+n(v)+'</td>';
+        tds+=tpl`<td class="n ifc${mk?' mxm':''}" data-y="${rawHtml(Y)}" data-m="${rawHtml(m)}"${rawHtml(tip)}>${rawHtml(n(v))}</td>`;
         a+=adj[Y+'|'+m]||0;
       }
       gTot+=sum; gAdj+=a;
-      html+='<tr><td><b>'+Y+'</b></td>'+tds+
-        '<td class="n" style="border-left:1px solid var(--ring);font-weight:650">'+n(sum)+'</td>'+
-        '<td class="n" style="color:var(--mut)">'+n(a)+'</td></tr>';
+      html+=tpl`<tr><td><b>${rawHtml(Y)}</b></td>${rawHtml(tds)}`+
+        tpl`<td class="n" style="border-left:1px solid var(--ring);font-weight:650">${rawHtml(n(sum))}</td>`+
+        tpl`<td class="n" style="color:var(--mut)">${rawHtml(n(a))}</td></tr>`;
     });
     var gtds='';
-    for(var m3=1;m3<=12;m3++) gtds+='<td class="n">'+n(gm[m3])+'</td>';
-    html+='<tr style="font-weight:700;border-top:2px solid var(--axis);background:var(--surface-2)">'+
-      '<td>합계</td>'+gtds+
-      '<td class="n" style="border-left:1px solid var(--ring)">'+n(gTot)+'</td>'+
-      '<td class="n" style="color:var(--mut)">'+n(gAdj)+'</td></tr></tbody>';
+    for(var m3=1;m3<=12;m3++) gtds+=tpl`<td class="n">${rawHtml(n(gm[m3]))}</td>`;
+    html+=tpl`<tr style="font-weight:700;border-top:2px solid var(--axis);background:var(--surface-2)">`+
+      tpl`<td>합계</td>${rawHtml(gtds)}`+
+      tpl`<td class="n" style="border-left:1px solid var(--ring)">${rawHtml(n(gTot))}</td>`+
+      tpl`<td class="n" style="color:var(--mut)">${rawHtml(n(gAdj))}</td></tr></tbody>`;
   }else{
     det.sort(function(a,b){ return (b.y-a.y)||(b.m-a.m)||(b.fee-a.fee); });
-    html+='<thead><tr><th>인식월</th><th>고객사</th><th>서비스</th>'+
-          '<th class="n">설치비(천원)</th><th>근거</th></tr></thead><tbody>';
+    html+=tpl`<thead><tr><th>인식월</th><th>고객사</th><th>서비스</th>`+
+          tpl`<th class="n">설치비(천원)</th><th>근거</th></tr></thead><tbody>`;
     det.slice(0,400).forEach(function(d){
-      html+='<tr><td>'+d.y+'-'+('0'+d.m).slice(-2)+'</td><td>'+esc(d.cust)+'</td>'+
-        '<td>'+lline(d.line)+'</td><td class="n">'+n(d.fee)+'</td>'+
-        '<td style="color:var(--mut)">'+(d.guess? '시작월+1 (대금정산일 없음)':'대금정산일')+'</td></tr>';
+      html+=tpl`<tr><td>${rawHtml(d.y)}-${rawHtml(('0'+d.m).slice(-2))}</td><td>${d.cust}</td>`+
+        tpl`<td>${lline(d.line)}</td><td class="n">${rawHtml(n(d.fee))}</td>`+
+        tpl`<td style="color:var(--mut)">${d.guess? '시작월+1 (대금정산일 없음)':'대금정산일'}</td></tr>`;
     });
     pend.forEach(function(d){
-      html+='<tr style="color:var(--mut)"><td>미정</td><td>'+esc(d.cust)+'</td><td>'+lline(d.line)+'</td><td class="n">'+n(d.fee)+'</td>'+
-        '<td>대금정산일 없음 · 아직 시작 전 — 계약에 대금정산일을 넣으면 그 달에 반영</td></tr>';
+      html+=tpl`<tr style="color:var(--mut)"><td>미정</td><td>${d.cust}</td><td>${lline(d.line)}</td><td class="n">${rawHtml(n(d.fee))}</td>`+
+        tpl`<td>대금정산일 없음 · 아직 시작 전 — 계약에 대금정산일을 넣으면 그 달에 반영</td></tr>`;
     });
     ifeeExtras().slice().sort(function(a,b){ return (b.year-a.year)||(b.month-a.month)||String(a.customer).localeCompare(String(b.customer),'ko'); })
       .forEach(function(e){
-        html+='<tr style="background:var(--surface-2)"><td>'+e.year+'-'+('0'+e.month).slice(-2)+'</td>'+
-          '<td>'+esc(e.customer)+'</td><td>'+esc(e.kind||'')+'</td>'+
-          '<td class="n">'+n(e.amount)+'</td><td style="color:var(--mut)">추가 항목'+(e.note? ' · '+esc(e.note):'')+'</td></tr>';
+        html+=tpl`<tr style="background:var(--surface-2)"><td>${rawHtml(e.year)}-${rawHtml(('0'+e.month).slice(-2))}</td>`+
+          tpl`<td>${e.customer}</td><td>${e.kind||''}</td>`+
+          tpl`<td class="n">${rawHtml(n(e.amount))}</td><td style="color:var(--mut)">추가 항목${rawHtml(e.note? ' · '+esc(e.note):'')}</td></tr>`;
       });
     html+='</tbody>';
   }
@@ -980,8 +977,8 @@ export function renderLg(){
   thead.innerHTML='<tr><th>고객사</th><th>제품</th><th style="text-align:right">노드</th><th>기간</th><th style="text-align:right">월액</th></tr>';
   lg.rows.forEach(function(x){
     var tr=document.createElement('tr');
-    tr.innerHTML='<td>'+esc(x.cust)+'</td><td>'+esc(x.prod)+'</td><td style="text-align:right">'+(x.nodes||'-')+
-      '</td><td>'+(x.start||'-')+'~'+(x.end||'무약정')+'</td><td style="text-align:right">'+won(x.fee)+'천원</td>';
+    tr.innerHTML=tpl`<td>${x.cust}</td><td>${x.prod}</td><td style="text-align:right">${rawHtml(x.nodes||'-')}`+
+      tpl`</td><td>${rawHtml(x.start||'-')}~${rawHtml(x.end||'무약정')}</td><td style="text-align:right">${won(x.fee)}천원</td>`;
     tb.appendChild(tr);
   });
   t.appendChild(thead); t.appendChild(tb);
@@ -1008,8 +1005,8 @@ export function renderVs(){
     thead.innerHTML='<tr><th>고객사</th><th style="text-align:right">비즈포탈</th><th style="text-align:right">매출시트</th><th style="text-align:right">차이</th><th>사유</th></tr>';
     vs.details.forEach(function(x){
       var tr=document.createElement('tr');
-      tr.innerHTML='<td>'+esc(x.cust)+'</td><td style="text-align:right">'+won(x.biz)+'천원</td><td style="text-align:right">'+won(x.sheet)+
-        '천원</td><td style="text-align:right">'+won(x.diff)+'천원</td><td style="font-size:12px;color:var(--mut)">'+esc(x.note)+'</td>';
+      tr.innerHTML=tpl`<td>${x.cust}</td><td style="text-align:right">${won(x.biz)}천원</td><td style="text-align:right">${won(x.sheet)}`+
+        tpl`천원</td><td style="text-align:right">${won(x.diff)}천원</td><td style="font-size:12px;color:var(--mut)">${x.note}</td>`;
       tb.appendChild(tr);
     });
     t.appendChild(thead); t.appendChild(tb);
@@ -1032,16 +1029,15 @@ export function renderGoal(list){
 
   box.style.display='';
   box.innerHTML=
-    '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:9px">'+
-      '<div style="font-size:12.5px;font-weight:650">🎯 '+yr+'년 목표 ARR '+won(tg.amount)+'천원'+
-        '<span style="font-weight:500;color:var(--muted)"> · 필요 12월 MRR '+won(needMrr)+'천원</span></div>'+
-      '<div style="font-size:12px;color:var(--ink-2)">현재 ARR <b style="color:var(--ink)">'+won(curArr)+'천원 ('+p1.toFixed(1)+'%)</b>'+
-      (decArr? ' · 12월 계약분 기준 '+won(decArr)+'천원 ('+p2.toFixed(1)+'%)':'')+'</div></div>'+
-    '<div style="position:relative;height:14px;border-radius:7px;background:var(--surface-2);overflow:hidden">'+
-      '<div style="position:absolute;left:0;top:0;bottom:0;width:'+Math.max(p1,p2)+'%;background:var(--glow)"></div>'+
-      '<div style="position:absolute;left:0;top:0;bottom:0;width:'+p1+'%;background:'+(p1>=100?'var(--good)':'var(--s1)')+';border-radius:0 7px 7px 0"></div>'+
-      '<div style="position:absolute;left:calc(100% - 2px);top:0;bottom:0;width:2px;background:var(--axis)"></div>'+
-    '</div>';
+    tpl`<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:9px">`+
+      tpl`<div style="font-size:12.5px;font-weight:650">🎯 ${rawHtml(yr)}년 목표 ARR ${won(tg.amount)}천원`+
+        tpl`<span style="font-weight:500;color:var(--muted)"> · 필요 12월 MRR ${won(needMrr)}천원</span></div>`+
+      tpl`<div style="font-size:12px;color:var(--ink-2)">현재 ARR <b style="color:var(--ink)">${won(curArr)}천원 (${p1.toFixed(1)}%)</b>`+ tpl`${rawHtml(decArr? ' · 12월 계약분 기준 '+won(decArr)+'천원 ('+p2.toFixed(1)+'%)':'')}</div></div>`+
+    tpl`<div style="position:relative;height:14px;border-radius:7px;background:var(--surface-2);overflow:hidden">`+
+      tpl`<div style="position:absolute;left:0;top:0;bottom:0;width:${Math.max(p1,p2)}%;background:var(--glow)"></div>`+
+      tpl`<div style="position:absolute;left:0;top:0;bottom:0;width:${rawHtml(p1)}%;background:${p1>=100?'var(--good)':'var(--s1)'};border-radius:0 7px 7px 0"></div>`+
+      tpl`<div style="position:absolute;left:calc(100% - 2px);top:0;bottom:0;width:2px;background:var(--axis)"></div>`+
+    tpl`</div>`;
 }
 
 export function renderKpis(list){
@@ -1115,7 +1111,7 @@ export function renderKpis(list){
       d:'고객사 '+newCu+' / '+churnCu+'곳 · 이탈 MRR '+won(churnAmt)+'천원',
       cls: churnCnt>newCnt? 'down':'up', open:'nc', tip:'신규 = 원계약 시작월이 '+(STATE.unit==='month'? mk(b) : mk(f0)+'~'+mk(b))+' · 해지 = 상태 «해지» 해지월이 그 기간 (부속 계약·CND 제외 · 해지 분석·해지율 화면과 같은 기준) — 누르면 명단' },
     (function(){ var EN=expN(), eEnd=Math.min(b+EN-1,ST.M-1);
-      var seg='<div class="expseg" style="display:flex;gap:3px;align-items:center;margin-top:8px;flex-wrap:wrap" title="만료 기간을 바꿉니다 (이 브라우저에 기억 · 아래 «만료 예정» 위젯도 같이 바뀜)"><span class="mini" style="color:var(--muted);margin-right:2px">기간</span>'+[1,2,3,6,12].map(function(n){ return '<button type="button" data-expn="'+n+'" aria-pressed="'+(n===EN)+'" style="font:inherit;font-size:11px;line-height:1;padding:4px 7px;border-radius:6px;border:1px solid var(--ring);cursor:pointer;background:'+(n===EN?'var(--s1-solid,#226bc4)':'var(--surface-2)')+';color:'+(n===EN?'#fff':'var(--ink-2)')+'">'+n+'개월</button>'; }).join('')+'</div>';
+      var seg=tpl`<div class="expseg" style="display:flex;gap:3px;align-items:center;margin-top:8px;flex-wrap:wrap" title="만료 기간을 바꿉니다 (이 브라우저에 기억 · 아래 «만료 예정» 위젯도 같이 바뀜)"><span class="mini" style="color:var(--muted);margin-right:2px">기간</span>${rawHtml([1,2,3,6,12].map(function(n){ return tpl`<button type="button" data-expn="${rawHtml(n)}" aria-pressed="${n===EN}" style="font:inherit;font-size:11px;line-height:1;padding:4px 7px;border-radius:6px;border:1px solid var(--ring);cursor:pointer;background:${n===EN?'var(--s1-solid,#226bc4)':'var(--surface-2)'};color:${n===EN?'#fff':'var(--ink-2)'}">${rawHtml(n)}개월</button>`; }).join(''))}</div>`;
       return { k:EN+'개월 내 만료', v:won(expAmt), u:'천원', d: expCnt+'건 · 재약정 타깃 · '+mk(b)+'~'+mk(eEnd), cls: expCnt? 'down':'', open:'exp', extra:seg,
                tip:'종료월이 '+mk(b)+'~'+mk(eEnd)+'인 원계약(해지·종료 상태 제외) — 숫자를 누르면 명단 · 아래 버튼으로 기간 변경' }; })()
   ];
@@ -1130,7 +1126,7 @@ export function renderKpis(list){
   tiles.forEach(function(t){
     var c=el('div','kpi');
     c.appendChild(el('div','k',t.k));
-    var v=el('div','v'); v.innerHTML=t.v+(t.u?'<small>'+t.u+'</small>':''); c.appendChild(v);
+    var v=el('div','v'); v.innerHTML=t.v+(t.u?tpl`<small>${rawHtml(t.u)}</small>`:''); c.appendChild(v);
     var d=el('div','d'+(t.cls?' '+t.cls:'')); d.innerHTML=t.d||''; c.appendChild(d);
     if(t.extra){ var ex=document.createElement('div'); ex.innerHTML=t.extra; c.appendChild(ex.firstChild); }
     if(t.spark) c.appendChild(sparkline(t.spark));
@@ -1157,8 +1153,8 @@ export function setExpN(n){
 export function kpiTable(title, cap, head, rows, xname, view){
   view=view||'contracts';
   $('#crTitle').textContent=title; $('#crCap').textContent=cap;
-  $('#crList').innerHTML='<table class="pr"><thead><tr>'+head.map(function(h){ return '<th'+(h.n?' class="n"':'')+'>'+esc(h.l)+'</th>'; }).join('')+'</tr></thead><tbody>'+
-    rows.map(function(r){ return '<tr'+(r._cust?' data-c="'+esc(r._cust)+'" style="cursor:pointer"':'')+'>'+r.c.map(function(x,i){ return '<td'+(head[i].n?' class="n"':'')+'>'+x+'</td>'; }).join('')+'</tr>'; }).join('')+'</tbody></table>';
+  $('#crList').innerHTML=tpl`<table class="pr"><thead><tr>${rawHtml(head.map(function(h){ return tpl`<th${rawHtml(h.n?' class="n"':'')}>${h.l}</th>`; }).join(''))}</tr></thead><tbody>`+
+    tpl`${rawHtml(rows.map(function(r){ return tpl`<tr${rawHtml(r._cust?' data-c="'+esc(r._cust)+'" style="cursor:pointer"':'')}>${rawHtml(r.c.map(function(x,i){ return tpl`<td${rawHtml(head[i].n?' class="n"':'')}>${rawHtml(x)}</td>`; }).join(''))}</tr>`; }).join(''))}</tbody></table>`;
   $('#crList').querySelectorAll('tr[data-c]').forEach(function(tr){ tr.onclick=function(){ closeOvl('ovlCr'); switchView(view); var sb=$('#dvSearch'); if(sb){ sb.value=tr.dataset.c; try{ renderGrid(); }catch(e){} } }; });
   $('#crXls').onclick=function(){ xlsxAoa((xname||title).replace(/[\\/:*?"<>|]/g,' '), head.map(function(h){return h.l;}), rows.map(function(r){ return r.x||r.c.map(function(x){ return String(x).replace(/<[^>]+>/g,''); }); })); };
   openOvl('ovlCr');
@@ -1166,7 +1162,7 @@ export function kpiTable(title, cap, head, rows, xname, view){
 export function kpiOpen(kind){
   var D=KPI_D; if(!D) return;
   var b=D.b, rows=[], head, tot=0;
-  var base=function(r){ return [esc(r.cust), esc(lline(r.line)), esc(chOf(r)), esc(r.status||'활성')+(r.renew?' <span class="ubadge sm">연장 '+r.renew+'회</span>':''), mk(r.startIdx)||'', r.endIdx!=null? mk(r.endIdx):'']; };
+  var base=function(r){ return [esc(r.cust), esc(lline(r.line)), esc(chOf(r)), esc(r.status||'활성')+(r.renew?tpl` <span class="ubadge sm">연장 ${rawHtml(r.renew)}회</span>`:''), mk(r.startIdx)||'', r.endIdx!=null? mk(r.endIdx):'']; };
   var H6=[{l:'고객사'},{l:'서비스'},{l:'채널'},{l:'상태'},{l:'시작월'},{l:'종료월'}];
   if(kind==='live'){ switchView('live'); return; }
   if(kind==='mrr'){
@@ -1203,7 +1199,7 @@ export function deltaHtml(a,b,label){
   if(!b) return '';
   var p=(a-b)/b*100;
   var up=p>=0;
-  return '<span class="'+(up?'up':'down')+'">'+(up?'▲':'▼')+' '+Math.abs(p).toFixed(1)+'%</span> <span style="color:var(--muted)">'+label+' 대비</span>';
+  return tpl`<span class="${up?'up':'down'}">${up?'▲':'▼'} ${Math.abs(p).toFixed(1)}%</span> <span style="color:var(--muted)">${rawHtml(label)} 대비</span>`;
 }
 export function sparkline(arr){
   var w=220,h=26,n=arr.length;
@@ -1255,11 +1251,11 @@ export function renderTrend(list){
   else host.innerHTML='<p class="cap" style="padding-top:24px">선택한 조건에 데이터가 없습니다.</p>';
 
   var tv=$('#tvTrend').querySelector('table');
-  var head='<thead><tr><th>월</th>'+series.map(function(d){return '<th class="n">'+esc(d.label)+'</th>';}).join('')+'<th class="n">합계</th></tr></thead>';
-  var body='<tbody>'+labels.map(function(lb,i){
+  var head=tpl`<thead><tr><th>월</th>${rawHtml(series.map(function(d){return tpl`<th class="n">${d.label}</th>`;}).join(''))}<th class="n">합계</th></tr></thead>`;
+  var body=tpl`<tbody>${rawHtml(labels.map(function(lb,i){
     var sum=series.reduce(function(a,d){return a+d.data[i];},0);
-    return '<tr><td>'+lb+'</td>'+series.map(function(d){return '<td class="n">'+won(d.data[i])+'</td>';}).join('')+'<td class="n"><b>'+won(sum)+'</b></td></tr>';
-  }).reverse().join('')+'</tbody>';
+    return tpl`<tr><td>${rawHtml(lb)}</td>${rawHtml(series.map(function(d){return tpl`<td class="n">${won(d.data[i])}</td>`;}).join(''))}<td class="n"><b>${won(sum)}</b></td></tr>`;
+  }).reverse().join(''))}`+ tpl`</tbody>`;
   tv.innerHTML=head+body;
 }
 
@@ -1276,15 +1272,15 @@ export function renderYear(list){
     series:[{label:'연 매출', data:vals, colorAt:function(i){
       return +years[i]>nowY? Viz.hexA(cssv('--s1'),.42) : cssv('--s1'); }}],
     extra:function(i){ var pv=i>0?vals[i-1]:0;
-      return pv? '<div class="vt-x">전년 대비 '+pct((vals[i]-pv)/pv*100)+'</div>'
+      return pv? tpl`<div class="vt-x">전년 대비 ${pct((vals[i]-pv)/pv*100)}</div>`
                : (+years[i]>nowY? '<div class="vt-x">계약 기준 예정 금액</div>':''); }
   });
   var tv=$('#tvYear').querySelector('table');
-  tv.innerHTML='<thead><tr><th>연도</th><th class="n">매출</th><th class="n">전년비</th></tr></thead><tbody>'+
-    years.map(function(y,i){ var p=i>0?vals[i-1]:0;
-      return '<tr><td>'+y+(+y>nowY?' <span class="badge b-warn">예정</span>':'')+'</td><td class="n">'+won(vals[i])+
-      '</td><td class="n '+(p&&vals[i]>=p?'up':'down')+'">'+(p?pct((vals[i]-p)/p*100):'—')+'</td></tr>'; }).join('')+
-    '</tbody>';
+  tv.innerHTML=tpl`<thead><tr><th>연도</th><th class="n">매출</th><th class="n">전년비</th></tr></thead><tbody>`+
+    tpl`${rawHtml(years.map(function(y,i){ var p=i>0?vals[i-1]:0;
+      return tpl`<tr><td>${rawHtml(y)}${rawHtml(+y>nowY?' <span class="badge b-warn">예정</span>':'')}</td><td class="n">${won(vals[i])}`+
+      tpl`</td><td class="n ${p&&vals[i]>=p?'up':'down'}">${p?pct((vals[i]-p)/p*100):'—'}</td></tr>`; }).join(''))}`+
+    tpl`</tbody>`;
 }
 
 /* ---- 수평 막대 3종 ---- */
@@ -1359,24 +1355,24 @@ export function renderNcWidget(list){
   var ys=Object.keys(years).map(Number).sort(), nowI=STATE.base;
   if(NC_YEAR==null) NC_YEAR=yOf(STATE.base);
   var seg=$('#segNcYear');
-  if(seg && !seg._built){ seg._built=1; ys.forEach(function(y){ if(y>yOf(Math.min(ST.DATA.nowIdx>=0?ST.DATA.nowIdx:ST.M-1,ST.M-1))) return; var b2=document.createElement('button'); b2.textContent=String(y); b2.dataset.y=y; b2.onclick=function(){ NC_YEAR=+this.dataset.y; renderNcWidget(); }; seg.appendChild(b2); }); }
+  if(seg && !seg._built){ seg._built=1; ys.forEach(function(y){ if(y>yOf(Math.min(ST.DATA.nowIdx>=0?ST.DATA.nowIdx:ST.M-1,ST.M-1))) return; var b2=document.createElement('button'); b2.textContent=String(y); b2.dataset.y=String(y); b2.onclick=function(){ NC_YEAR=+this.dataset.y; renderNcWidget(); }; seg.appendChild(b2); }); }
   if(seg) seg.querySelectorAll('button').forEach(function(b2){ b2.setAttribute('aria-pressed', +b2.dataset.y===NC_YEAR?'true':'false'); });
   segScrollSel(seg);
   var Y=NC_YEAR, lines=ST.DATA.lines.map(function(l){return l.label;}).filter(function(lb){return STATE.lines[lb];});
   function idxOf(y,m){ return (y-2020)*12+(m-6); }
   function cnt(kind,lb,y,m){ var j=idxOf(y,m); if(j<0||j>=ST.M) return 0; return ncCust(ncRows(list,kind,lb,j,j)); }
   function yearCnt(kind,lb,y){ var s0=Math.max(0,idxOf(y,1)), e0=Math.min(ST.M-1,idxOf(y,12)); if(e0<s0) return 0; return ncCust(ncRows(list,kind,lb,s0,e0)); }
-  var h='<thead><tr><th>구분</th>'; for(var m=1;m<=12;m++) h+='<th class="n">'+m+'월</th>';
+  var h='<thead><tr><th>구분</th>'; for(var m=1;m<=12;m++) h+=tpl`<th class="n">${rawHtml(m)}월</th>`;
   h+='<th class="n" style="border-left:1px solid var(--ring)">연 합계</th><th class="n">전년</th><th class="n">전년비</th></tr></thead><tbody>';
   function row(kind,label,lb,strong,color){
     var tds='', anyV=false;
     for(var m=1;m<=12;m++){ var j=idxOf(Y,m), v=cnt(kind,lb,Y,m); if(v) anyV=true;
-      tds+='<td class="n ncc"'+(j>nowI?' style="color:var(--muted)"':'')+' data-k="'+kind+'" data-l="'+esc(lb||'')+'" data-m="'+m+'" title="클릭: '+Y+'년 '+m+'월 '+(kind==='new'?'신규':'해지')+' 명단">'+(v? '<b style="color:'+color+'">'+v+'</b>':'<span style="color:var(--muted)">·</span>')+'</td>'; }
+      tds+=tpl`<td class="n ncc"${rawHtml(j>nowI?' style="color:var(--muted)"':'')} data-k="${rawHtml(kind)}" data-l="${lb||''}" data-m="${rawHtml(m)}" title="클릭: ${rawHtml(Y)}년 ${rawHtml(m)}월 ${kind==='new'?'신규':'해지'} 명단">${rawHtml(v? tpl`<b style="color:${rawHtml(color)}">${rawHtml(v)}</b>`:'<span style="color:var(--muted)">·</span>')}</td>`; }
     var sum=yearCnt(kind,lb,Y), prev=yearCnt(kind,lb,Y-1), yoy=prev? (sum-prev)/prev*100 : null;
     if(!anyV && !sum && !prev && !strong) return '';
-    return '<tr'+(strong?' style="font-weight:700;border-top:2px solid var(--axis);background:var(--surface-2)"':'')+'><td>'+esc(label)+'</td>'+tds+
-      '<td class="n ncc" data-k="'+kind+'" data-l="'+esc(lb||'')+'" data-m="0" style="border-left:1px solid var(--ring);font-weight:650" title="클릭: '+Y+'년 전체 명단">'+(sum? '<b>'+sum+'</b>':'·')+'</td><td class="n" style="color:var(--muted)">'+(prev||'·')+'</td>'+
-      '<td class="n '+(yoy==null?'':(kind==='new'? (yoy>=0?'up':'down') : (yoy<=0?'up':'down')))+'">'+(yoy==null?'—':(yoy>=0?'+':'')+yoy.toFixed(0)+'%')+'</td></tr>';
+    return tpl`<tr${rawHtml(strong?' style="font-weight:700;border-top:2px solid var(--axis);background:var(--surface-2)"':'')}><td>${label}</td>${rawHtml(tds)}`+
+      tpl`<td class="n ncc" data-k="${rawHtml(kind)}" data-l="${lb||''}" data-m="0" style="border-left:1px solid var(--ring);font-weight:650" title="클릭: ${rawHtml(Y)}년 전체 명단">${rawHtml(sum? tpl`<b>${rawHtml(sum)}</b>`:'·')}</td><td class="n" style="color:var(--muted)">${rawHtml(prev||'·')}</td>`+
+      tpl`<td class="n ${yoy==null?'':(kind==='new'? (yoy>=0?'up':'down') : (yoy<=0?'up':'down'))}">${rawHtml(yoy==null?'—':(yoy>=0?'+':'')+yoy.toFixed(0)+'%')}</td></tr>`;
   }
   h+='<tr><td colspan="16" style="background:var(--surface-2);font-weight:700;color:var(--ok,#2e7d32)">＋ 신규 고객사</td></tr>';
   lines.forEach(function(lb){ h+=row('new', lline(lb), lb, false, 'var(--ok,#2e7d32)'); });
@@ -1387,9 +1383,9 @@ export function renderNcWidget(list){
   // 순증
   var nets='', nsum=0, psum=0;
   for(var m3=1;m3<=12;m3++){ var j3=idxOf(Y,m3), n3=cnt('new','',Y,m3)-cnt('lost','',Y,m3); nsum+=n3;
-    nets+='<td class="n ncc" data-k="net" data-l="" data-m="'+m3+'" title="클릭: '+Y+'년 '+m3+'월 신규·해지 명단"'+(j3>nowI?' style="color:var(--muted)"':'')+'>'+(n3? '<b style="color:'+(n3>0?'var(--ok,#2e7d32)':'var(--critical)')+'">'+(n3>0?'+':'')+n3+'</b>':'<span style="color:var(--muted)">·</span>')+'</td>'; }
+    nets+=tpl`<td class="n ncc" data-k="net" data-l="" data-m="${rawHtml(m3)}" title="클릭: ${rawHtml(Y)}년 ${rawHtml(m3)}월 신규·해지 명단"${rawHtml(j3>nowI?' style="color:var(--muted)"':'')}>${rawHtml(n3? tpl`<b style="color:${n3>0?'var(--ok,#2e7d32)':'var(--critical)'}">${n3>0?'+':''}${rawHtml(n3)}</b>`:'<span style="color:var(--muted)">·</span>')}</td>`; }
   psum=yearCnt('new','',Y-1)-yearCnt('lost','',Y-1); nsum=yearCnt('new','',Y)-yearCnt('lost','',Y);
-  h+='<tr style="font-weight:700;border-top:2px solid var(--axis)"><td>순증 (신규 − 해지)</td>'+nets+'<td class="n ncc" data-k="net" data-l="" data-m="0" style="border-left:1px solid var(--ring)" title="클릭: '+Y+'년 신규·해지 명단"><b>'+(nsum>0?'+':'')+nsum+'</b></td><td class="n" style="color:var(--muted)">'+(psum>0?'+':'')+psum+'</td><td class="n"></td></tr>';
+  h+=tpl`<tr style="font-weight:700;border-top:2px solid var(--axis)"><td>순증 (신규 − 해지)</td>${rawHtml(nets)}<td class="n ncc" data-k="net" data-l="" data-m="0" style="border-left:1px solid var(--ring)" title="클릭: ${rawHtml(Y)}년 신규·해지 명단"><b>${nsum>0?'+':''}${rawHtml(nsum)}</b></td><td class="n" style="color:var(--muted)">${psum>0?'+':''}${rawHtml(psum)}</td><td class="n"></td></tr>`;
   h+='</tbody>';
   t.innerHTML=h;
   var cap=$('#capNc'); if(cap) cap.textContent=Y+'년 · 셀 = 그 달 고객사 수(회사 단위) · 신규 = 그 달 시작한 원계약의 고객사(기존 고객의 다른 서비스·재계약 포함 — 첫 계약만 세는 «고객사 증감»의 신규보다 많을 수 있음) · 해지 = 상태 «해지» 해지월(CND 전환 고객 제외) · 미래 월은 계약상 예정(회색) · 셀을 누르면 명단';
@@ -1425,24 +1421,22 @@ export function renderExpiring(list){
   $('#capExp').textContent = mk(b)+' 이후 '+mm+'개월 내 만료 '+rows.length+'건 · 해당 MRR 합계 '+won(amt)+'천원 · 원계약 기준(부속 계약은 원계약과 함께 만료) · 위 타일과 같은 수';
 
   var t=$('#tExp');
-  t.innerHTML='<thead><tr><th>만료월</th><th>남은 개월</th><th>서비스</th><th>산업군</th><th>고객사</th><th>파트너</th>'+
-    '<th>계약구분</th><th>상태</th><th class="n">월 MRR(천원)</th><th class="n">총 계약액(천원)</th></tr></thead><tbody>'+
-    (rows.length? rows.map(function(k){
+  t.innerHTML=tpl`<thead><tr><th>만료월</th><th>남은 개월</th><th>서비스</th><th>산업군</th><th>고객사</th><th>파트너</th>`+
+    tpl`<th>계약구분</th><th>상태</th><th class="n">월 MRR(천원)</th><th class="n">총 계약액(천원)</th></tr></thead><tbody>`+ tpl`${rawHtml(rows.length? rows.map(function(k){
       var r=ST.DATA.rows[k]; var left=r.endIdx-b;
       var mrr=ST.MAT[k][Math.min(r.endIdx,ST.M-1)]||r.mrr||0;
       var cls = left<=1? 'b-churn' : left<=3? 'b-warn' : 'b-end';
-      return '<tr><td>'+mk(r.endIdx)+'</td><td><span class="badge '+cls+'">'+left+'개월</span></td>'+
-        '<td>'+lline(r.line)+'</td><td>'+r.ind+'</td><td><b>'+esc(r.cust)+'</b></td><td>'+esc(r.partner)+'</td>'+
-        '<td>'+esc(r.ctype||'-')+'</td><td>'+statusBadge(r)+'</td>'+
-        '<td class="n">'+won(mrr)+'</td><td class="n">'+won(r.total)+'</td></tr>';
-    }).join('') : '<tr><td colspan="10" class="mini" style="padding:16px">해당 기간에 만료되는 계약이 없습니다.</td></tr>')+'</tbody>';
+      return tpl`<tr><td>${mk(r.endIdx)}</td><td><span class="badge ${rawHtml(cls)}">${rawHtml(left)}개월</span></td>`+
+        tpl`<td>${lline(r.line)}</td><td>${r.ind}</td><td><b>${r.cust}</b></td><td>${r.partner}</td>`+
+        tpl`<td>${r.ctype||'-'}</td><td>${rawHtml(statusBadge(r))}</td>`+
+        tpl`<td class="n">${won(mrr)}</td><td class="n">${won(r.total)}</td></tr>`;
+    }).join('') : '<tr><td colspan="10" class="mini" style="padding:16px">해당 기간에 만료되는 계약이 없습니다.</td></tr>')}`+ tpl`</tbody>`;
 }
 export function statusBadge(r){
   var s=statusOf(r);
   var c = s==='신규'?'b-new' : s==='재약정'?'b-re' : s==='해지'?'b-churn' : 'b-end';
-  return '<span class="badge '+c+'">'+esc(s)+'</span>'+(r.churn? ' <span class="mini">'+esc(r.churn)+'</span>':'');
+  return tpl`<span class="badge ${rawHtml(c)}">${s}</span>${rawHtml(r.churn? tpl` <span class="mini">${r.churn}</span>`:'')}`;
 }
-export function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
 
 /* ---- 전체 계약 목록 ---- */
 export var ALL_COLS=[
@@ -1459,18 +1453,18 @@ export function renderAllTable(list){
     if(va<vb) return -s.d; if(va>vb) return s.d; return 0;
   }).slice(0,600);
   var t=$('#tAll');
-  var head='<thead><tr>'+ALL_COLS.map(function(c){
+  var head=tpl`<thead><tr>${rawHtml(ALL_COLS.map(function(c){
     var on = s.k===c.k;
-    return '<th class="'+(c.n?'n':'')+'" data-k="'+c.k+'" style="cursor:pointer">'+c.t+(on?(s.d>0?' ▲':' ▼'):'')+'</th>';
-  }).join('')+'</tr></thead>';
-  var body='<tbody>'+rows.map(function(k){
+    return tpl`<th class="${c.n?'n':''}" data-k="${rawHtml(c.k)}" style="cursor:pointer">${rawHtml(c.t)}${on?(s.d>0?' ▲':' ▼'):''}</th>`;
+  }).join(''))}`+ tpl`</tr></thead>`;
+  var body=tpl`<tbody>${rawHtml(rows.map(function(k){
     var r=ST.DATA.rows[k];
-    return '<tr>'+
-      '<td>'+lline(r.line)+'</td><td>'+esc(r.ind)+'</td><td><b>'+esc(r.cust)+'</b>'+(r.csm?' <span class="mini">'+esc(r.csm)+'</span>':'')+'</td>'+
-      '<td>'+esc(r.partner)+'</td><td>'+esc(r.ctype||'-')+'</td><td>'+statusBadge(r)+'</td>'+
-      '<td class="n">'+(r.startIdx!=null?mk(r.startIdx):'-')+'</td><td class="n">'+(r.endIdx!=null?mk(r.endIdx):'-')+'</td>'+
-      '<td class="n">'+(r.term||'-')+'</td><td class="n">'+won(r.mrr)+'</td><td class="n">'+won(r.total)+'</td><td class="n">'+won(r.sum)+'</td></tr>';
-  }).join('')+'</tbody>';
+    return tpl`<tr>`+
+      tpl`<td>${lline(r.line)}</td><td>${r.ind}</td><td><b>${r.cust}</b>${rawHtml(r.csm?tpl` <span class="mini">${r.csm}</span>`:'')}</td>`+
+      tpl`<td>${r.partner}</td><td>${r.ctype||'-'}</td><td>${rawHtml(statusBadge(r))}</td>`+
+      tpl`<td class="n">${r.startIdx!=null?mk(r.startIdx):'-'}</td><td class="n">${r.endIdx!=null?mk(r.endIdx):'-'}</td>`+
+      tpl`<td class="n">${rawHtml(r.term||'-')}</td><td class="n">${won(r.mrr)}</td><td class="n">${won(r.total)}</td><td class="n">${won(r.sum)}</td></tr>`;
+  }).join(''))}`+ tpl`</tbody>`;
   t.innerHTML=head+body;
   $('#capAll').textContent='필터 조건 '+list.length.toLocaleString('ko-KR')+'건'+(list.length>600?' (상위 600건 표시)':'')+' · 열 제목을 눌러 정렬';
   t.querySelectorAll('th').forEach(function(th){

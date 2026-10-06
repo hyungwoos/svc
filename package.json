@@ -8,7 +8,8 @@
     "test": "node tests/smoke.mjs",
     "test:fn": "deno check supabase/functions/*/index.ts && deno run -A tests/fn/ops.test.ts && deno run -A tests/fn/remind.test.ts && deno run -A tests/fn/aicheck.test.ts && deno run -A tests/fn/quote-worker.test.ts",
     "test:install": "npx playwright install --with-deps chromium",
-    "lint": "node tests/lint.mjs"
+    "lint": "node tests/lint.mjs",
+    "typecheck": "node tests/typecheck.mjs"
   },
   "devDependencies": {
     "playwright": "^1.47.0",
@@ -17,6 +18,7 @@
     "eslint": "^9.12.0",
     "eslint-scope": "^8.4.0",
     "espree": "^10.4.0",
-    "globals": "^15.11.0"
+    "globals": "^15.11.0",
+    "typescript": "^5.9.3"
   }
 }
