@@ -45,8 +45,8 @@ function delivData(tr) { return { model: tr.querySelector('.d-model').value, cos
 function addBuy(d) {
     d = d || {};
     var tb = $('#tBuy tbody'), tr = document.createElement('tr');
-    var opts = '<option value="">직접입력</option>'; for (var p = 5; p <= 60; p += 5) opts += '<option value="' + p + '">' + p + '%</option>';
-    tr.innerHTML = '<td class="c1 bold idx"></td><td><input class="ctr b-name" placeholder="회사명"></td><td><input class="ctr b-desc"></td><td class="r"><input class="num b-qty"></td><td class="r" style="position:relative"><input class="num money b-tot" placeholder="0"><div class="ratebox no-print"><span style="font-size:9px;color:#777">수수료</span><select class="b-rate">' + opts + '</select><input class="b-ratem" placeholder="%" title="5% 단위가 아니면 직접 입력" style="display:none"></div></td><td style="position:relative"><textarea class="b-term" rows="1" style="text-align:center;font-size:10px"></textarea><div class="rowact no-print"><button class="dup" title="복제" data-click="dupBuy(this)">＋</button><button class="del" title="삭제" data-click="delRow(this)">×</button></div></td>';
+    var opts = '<option value="">직접입력</option>'; for (var p = 5; p <= 60; p += 5) opts += tpl`<option value="${rawHtml(p)}">${rawHtml(p)}%</option>`;
+    tr.innerHTML = tpl`<td class="c1 bold idx"></td><td><input class="ctr b-name" placeholder="회사명"></td><td><input class="ctr b-desc"></td><td class="r"><input class="num b-qty"></td><td class="r" style="position:relative"><input class="num money b-tot" placeholder="0"><div class="ratebox no-print"><span style="font-size:9px;color:#777">수수료</span><select class="b-rate">${rawHtml(opts)}</select><input class="b-ratem" placeholder="%" title="5% 단위가 아니면 직접 입력" style="display:none"></div></td><td style="position:relative"><textarea class="b-term" rows="1" style="text-align:center;font-size:10px"></textarea><div class="rowact no-print"><button class="dup" title="복제" data-click="dupBuy(this)">＋</button><button class="del" title="삭제" data-click="delRow(this)">×</button></div></td>`;
     tb.appendChild(tr);
     tr.querySelector('.b-name').value = d.name || ''; tr.querySelector('.b-desc').value = d.desc || ''; tr.querySelector('.b-qty').value = d.qty || ''; tr.querySelector('.b-tot').value = d.tot ? fmt(d.tot) : ''; tr.querySelector('.b-term').value = d.term || '';
     var rate = d.rate == null ? '' : String(d.rate);
@@ -125,7 +125,7 @@ async function loadAll() {
     R.byCust = {}; R.customers.forEach(function (c) { R.byCust[c.id] = c.name; });
     fillModelList();
     var names = {}; R.contracts.forEach(function (c) { var nm = R.byCust[c.customer_id]; if (nm) names[nm] = 1; });
-    $('#dlCust').innerHTML = Object.keys(names).sort().map(function (nm) { return '<option value="' + esc(nm) + '">'; }).join('');
+    $('#dlCust').innerHTML = Object.keys(names).sort().map(function (nm) { return tpl`<option value="${nm}">`; }).join('');
     var who = (s.u || '').split('@')[0]; if (WRITERS[who]) setV('writer', WRITERS[who]);   // 로그인 계정으로 기본 선택 (김민정·최형우·송기영)
 }
 $('#qCust').addEventListener('change', function () { pickCustomer(this.value); });
@@ -136,10 +136,10 @@ function pickCustomer(name) {
     var rows = R.contracts.filter(function (c) { return ids.indexOf(c.customer_id) >= 0; });
     var live = rows.filter(function (c) { return ['해지', '서비스종료', 'CN전환'].indexOf(c.status) < 0; });
     var old = rows.length - live.length;
-    $('#chips').innerHTML = live.map(function (c) {
-        return '<span class="chip" data-id="' + c.id + '">' + esc(c.contract_type || c.status || '') + ' · ' + esc(LINE_MODEL[c.line] || c.line || '') + (c.qty ? ' ' + fmt(c.qty) + '노드' : '') + '<small> ' + esc(ym(c.start_month)) + '~' + esc(ym(c.end_month) || '무약정') + ' · ' + esc(c.billing || '') + (c.mrr ? ' · 월 ' + fmt(c.mrr) + '원' : '') + '</small></span>';
-    }).join('') + (old ? '<span class="chip" style="cursor:default;color:#999">종료·해지 ' + old + '건 제외</span>' : '') +
-        '<span class="chip" data-settle="1" title="이 고객의 이 달 전체 매출을 합산(에스원 월 대금 등)">Σ 월 정산(집계)</span>';
+    $('#chips').innerHTML = tpl`${rawHtml(live.map(function (c) {
+        return tpl`<span class="chip" data-id="${rawHtml(c.id)}">${c.contract_type || c.status || ''} · ${LINE_MODEL[c.line] || c.line || ''}${rawHtml(c.qty ? ' ' + fmt(c.qty) + '노드' : '')}<small> ${ym(c.start_month)}~${ym(c.end_month) || '무약정'} · ${c.billing || ''}${rawHtml(c.mrr ? ' · 월 ' + fmt(c.mrr) + '원' : '')}</small></span>`;
+    }).join('') + (old ? tpl`<span class="chip" style="cursor:default;color:#999">종료·해지 ${rawHtml(old)}건 제외</span>` : ''))}`+
+        tpl`<span class="chip" data-settle="1" title="이 고객의 이 달 전체 매출을 합산(에스원 월 대금 등)">Σ 월 정산(집계)</span>`;
     setV('customer', name);
     var prev = R.reports.find(function (r) { return r.customer === name; });
     $('#hint').innerHTML = live.length ? '계약을 누르면 자동으로 채워집니다.' + (prev ? ' 이 고객의 이전 리포트(' + esc(prev.title || '') + ')에서 담당자·매출흐름·매입내역을 이어받습니다.' : '') : '진행 중 계약이 없습니다. 「Σ 월 정산」 또는 직접 입력으로 작성하세요.';
@@ -307,8 +307,8 @@ function renderList() {
     var rows = R.reports.filter(function (r) { return !q || ((r.customer || '') + ' ' + (r.title || '')).toLowerCase().indexOf(q) >= 0; }).slice(0, 200);
     $('#lstSt').textContent = rows.length + '건';
     $('#lstT tbody').innerHTML = rows.map(function (r) {
-        return '<tr><td>' + esc(String(r.updated_at || '').slice(0, 10)) + '</td><td>' + esc(r.customer) + '</td><td>' + esc(KIND_LABEL[r.kind] || r.kind) + '</td><td>' + esc(ym(r.report_month)) + '</td><td>' + esc(r.title || '') + '</td><td style="text-align:right">' + fmt(r.amount) + '</td><td><span class="tag ' + (r.status === 'issued' ? 'issued' : '') + '">' + (r.status === 'issued' ? '발행' : '작성중') + '</span></td>' +
-            '<td style="white-space:nowrap"><button class="rowbtn" data-click="loadReport(' + r.id + ')">열기</button> <button class="rowbtn" data-click="cloneReport(' + r.id + ')" title="다음 달 리포트로 복제">복제</button> <button class="rowbtn red" data-click="delReport(' + r.id + ')">삭제</button></td></tr>';
+        return tpl`<tr><td>${String(r.updated_at || '').slice(0, 10)}</td><td>${r.customer}</td><td>${KIND_LABEL[r.kind] || r.kind}</td><td>${ym(r.report_month)}</td><td>${r.title || ''}</td><td style="text-align:right">${rawHtml(fmt(r.amount))}</td><td><span class="tag ${r.status === 'issued' ? 'issued' : ''}">${r.status === 'issued' ? '발행' : '작성중'}</span></td>`+
+            tpl`<td style="white-space:nowrap"><button class="rowbtn" data-click="loadReport(${rawHtml(r.id)})">열기</button> <button class="rowbtn" data-click="cloneReport(${rawHtml(r.id)})" title="다음 달 리포트로 복제">복제</button> <button class="rowbtn red" data-click="delReport(${rawHtml(r.id)})">삭제</button></td></tr>`;
     }).join('') || '<tr><td colspan="8" style="color:#888">저장된 리포트가 없습니다</td></tr>';
 }
 async function loadReport(id) {
@@ -346,25 +346,25 @@ function openCost() { $('#ovlCost').classList.add('show'); COST_NEW = []; render
 function renderCost() {
     var st = $('#costSt');
     var html = (COST_NEW.length ? '<tr><td colspan="9" style="background:#fff3cd;font-size:11px;color:#7a5c00">새 항목 (연도 · 구분 · 품목명 · 매입단가 · 관리원가 · 기준 · 비고 · 근거) — 확인 후 「새 항목 저장」</td></tr>' : '') + COST_NEW.map(function (c, i) {
-        return '<tr style="background:#fffbe6"><td><input value="' + esc(c.year) + '" data-input="costSet(' + i + ',\'year\',this.value)"></td><td><select data-change="costSet(' + i + ',\'category\',this.value)" style="border:1px solid #ddd;border-radius:5px;background:#fff"><option' + (c.category === 'HW' ? ' selected' : '') + '>HW</option><option' + (c.category !== 'HW' ? ' selected' : '') + '>SW</option></select></td><td><input value="' + esc(c.item) + '" data-input="costSet(' + i + ',\'item\',this.value)"></td><td><input value="' + esc(c.purchase_cost || '') + '" data-input="costSet(' + i + ',\'purchase_cost\',this.value)" style="text-align:right" placeholder="HW만"></td><td><input value="' + esc(c.unit_cost) + '" data-input="costSet(' + i + ',\'unit_cost\',this.value)" style="text-align:right"></td><td><input value="' + esc(c.unit || '노드/년') + '" data-input="costSet(' + i + ',\'unit\',this.value)"></td><td><input value="' + esc(c.note || '') + '" data-input="costSet(' + i + ',\'note\',this.value)"></td><td><input value="' + esc(c.source || '') + '" data-input="costSet(' + i + ',\'source\',this.value)"></td><td><button class="rowbtn red" data-click="costDel(' + i + ')">빼기</button></td></tr>';
+        return tpl`<tr style="background:#fffbe6"><td><input value="${c.year}" data-input="costSet(${rawHtml(i)},'year',this.value)"></td><td><select data-change="costSet(${rawHtml(i)},'category',this.value)" style="border:1px solid #ddd;border-radius:5px;background:#fff"><option${c.category === 'HW' ? ' selected' : ''}>HW</option><option${c.category !== 'HW' ? ' selected' : ''}>SW</option></select></td><td><input value="${c.item}" data-input="costSet(${rawHtml(i)},'item',this.value)"></td><td><input value="${c.purchase_cost || ''}" data-input="costSet(${rawHtml(i)},'purchase_cost',this.value)" style="text-align:right" placeholder="HW만"></td><td><input value="${c.unit_cost}" data-input="costSet(${rawHtml(i)},'unit_cost',this.value)" style="text-align:right"></td><td><input value="${c.unit || '노드/년'}" data-input="costSet(${rawHtml(i)},'unit',this.value)"></td><td><input value="${c.note || ''}" data-input="costSet(${rawHtml(i)},'note',this.value)"></td><td><input value="${c.source || ''}" data-input="costSet(${rawHtml(i)},'source',this.value)"></td><td><button class="rowbtn red" data-click="costDel(${rawHtml(i)})">빼기</button></td></tr>`;
     }).join('');
     // 공지 표와 같은 모양(구분 · 품목명 · 매입단가 · 연도별 관리원가)으로 피벗
     var years = []; R.costs.forEach(function (c) { if (years.indexOf(c.year) < 0) years.push(c.year); }); years.sort();
     var groups = {}, order = [];
     R.costs.forEach(function (c) { var key = (c.category || 'SW') + '|' + c.item; if (!groups[key]) { groups[key] = { category: c.category || 'SW', item: c.item, purchase_cost: c.purchase_cost, note: c.note, unit: c.unit, by: {}, ids: [] }; order.push(key); } groups[key].by[c.year] = c; groups[key].ids.push(c.id); if (c.purchase_cost) groups[key].purchase_cost = c.purchase_cost; if (c.note) groups[key].note = c.note; });
     order.sort(function (a, b) { var ga = groups[a], gb = groups[b]; if (ga.category !== gb.category) return ga.category === 'HW' ? -1 : 1; return String(ga.item).localeCompare(String(gb.item), 'ko', { numeric: true }); });
-    $('#costT thead').innerHTML = '<tr><th style="width:50px">구분</th><th>품목명</th><th style="width:100px">매입단가</th>' + years.map(function (y) { return '<th style="width:110px;text-align:right">' + String(y).slice(2) + '년 관리원가</th>'; }).join('') + '<th style="width:70px">기준</th><th>비고(적용 규칙)</th><th style="width:60px"></th></tr>';
+    $('#costT thead').innerHTML = tpl`<tr><th style="width:50px">구분</th><th>품목명</th><th style="width:100px">매입단가</th>${rawHtml(years.map(function (y) { return tpl`<th style="width:110px;text-align:right">${rawHtml(String(y).slice(2))}년 관리원가</th>`; }).join(''))}<th style="width:70px">기준</th><th>비고(적용 규칙)</th><th style="width:60px"></th></tr>`;
     var last = null;
     html += order.map(function (k) {
         var g = groups[k]; var sep = last && last !== g.category ? ' style="border-top:2px solid #333"' : ''; last = g.category;
-        return '<tr' + sep + '><td><b>' + esc(g.category) + '</b></td><td>' + esc(g.item) + '</td><td style="text-align:right;color:#777">' + (g.purchase_cost ? fmt(g.purchase_cost) : '') + '</td>' +
-            years.map(function (y) { var c = g.by[y]; return '<td style="text-align:right' + (c ? '' : ';color:#bbb') + '">' + (c ? fmt(c.unit_cost) : '-') + '</td>'; }).join('') +
-            '<td>' + esc(g.unit || '') + '</td><td style="font-size:11px;color:#555">' + esc(g.note || '') + '</td><td><button class="rowbtn red" data-click="costDelMany([' + g.ids.join(',') + '])">삭제</button></td></tr>';
+        return tpl`<tr${rawHtml(sep)}><td><b>${g.category}</b></td><td>${g.item}</td><td style="text-align:right;color:#777">${rawHtml(g.purchase_cost ? fmt(g.purchase_cost) : '')}</td>`+
+            tpl`${rawHtml(years.map(function (y) { var c = g.by[y]; return tpl`<td style="text-align:right${c ? '' : ';color:#bbb'}">${rawHtml(c ? fmt(c.unit_cost) : '-')}</td>`; }).join(''))}`+
+            tpl`<td>${g.unit || ''}</td><td style="font-size:11px;color:#555">${g.note || ''}</td><td><button class="rowbtn red" data-click="costDelMany([${rawHtml(g.ids.join(','))}])">삭제</button></td></tr>`;
     }).join('');
     $('#costT tbody').innerHTML = html || '<tr><td colspan="9" style="color:#888">등록된 기준이 없습니다</td></tr>';
     if (!st.textContent) st.textContent = R.costs.length + '건 등록';
 }
-function fillModelList() { var seen = {}; var opts = ['Cloud NAC', 'Cloud ZTNA']; R.costs.forEach(function (c) { if (!seen[c.item]) { seen[c.item] = 1; opts.push(c.item); } }); $('#dlModel').innerHTML = opts.map(function (o) { return '<option value="' + esc(o) + '">'; }).join(''); }
+function fillModelList() { var seen = {}; var opts = ['Cloud NAC', 'Cloud ZTNA']; R.costs.forEach(function (c) { if (!seen[c.item]) { seen[c.item] = 1; opts.push(c.item); } }); $('#dlModel').innerHTML = opts.map(function (o) { return tpl`<option value="${o}">`; }).join(''); }
 function costAddRow() { COST_NEW.unshift({ year: new Date().getFullYear(), category: 'SW', item: '', purchase_cost: '', unit_cost: '', unit: '노드/년', note: '', source: '' }); renderCost(); }
 async function costFromPdf() {
     var f = $('#costPdf').files && $('#costPdf').files[0], st = $('#costSt');

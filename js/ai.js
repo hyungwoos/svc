@@ -2,9 +2,9 @@
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { APP_VER, ST } from './state.js';
 import { Viz } from './viz.js';
-import { $, $$, cssv, el, lline, mk, mkLabel, monOf, pct, refreshToken, SB_KEY, SB_URL, seriesColor, STATE, won, wonFull, yOf } from './core.js';
+import { $, $$, cssv, el, esc, lline, mk, mkLabel, monOf, pct, rawHtml, refreshToken, SB_KEY, SB_URL, seriesColor, STATE, tpl, won, wonFull, yOf } from './core.js';
 import { sbGet, sbWrite, toast } from './shell.js';
-import { activeCustomers, esc, groupCount, hbars, monthlySeries, monthlyTotal, pinQuery, statusOf, uniq } from './dash.js';
+import { activeCustomers, groupCount, hbars, monthlySeries, monthlyTotal, pinQuery, statusOf, uniq } from './dash.js';
 import { dcSummary, liveData, liveDelta, liveSrcLabel, renewScan } from './analysis.js';
 import { CL, clBuild, clEnsure, clFxRate, clSum } from './cloud.js';
 import { openOvl } from './edit.js';
@@ -13,6 +13,7 @@ import { openOvl } from './edit.js';
 /* ==================================================================
    5. 자연어 질문 엔진 (규칙형 · 외부 API 불필요)
    ================================================================== */
+/** 사업 라인 별칭 — [찾는 정규식, 라인 코드] @type {Array<[RegExp, string]>} */
 export var LINE_ALIAS=[
   [/\bdrm\b|디알엠|문서보안/i,'DRM'],
   [/\bdlp\b|디엘피|정보유출/i,'DLP'],
@@ -181,16 +182,11 @@ export function ask(q){
       if(!r || !r.ok || !r.text){ localAnswer(q,'⚠ AI가 답하지 못해 내장 규칙(간단 패턴)으로 답했습니다 — AI 답변이 아닙니다. '+String((r&&r.error)||'').slice(0,100)); return; }
       revealAnswer();
       say.className='ai-say on';
-      say.innerHTML='<span class="lb">AI</span>'+esc(cleanSay(r.text))+
-        '<div style="font-size:11px;color:var(--muted);margin-top:6px">'+
-        esc(String(r.model||'').replace(/^claude-/,''))+
-        (r.queries&&r.queries.length? ' · DB 조회 '+r.queries.length+'회 <span title="'+esc(r.queries.map(function(q){ return q.tool+' '+((q.ms||0)/1000).toFixed(1)+'s'+(q.error?' ✗':''); }).join(' · '))+'">('+esc(aiToolBrief(r.queries))+')</span>':'')+
-        (r.llm&&r.llm.length? ' · 모델 '+r.llm.length+'회 '+(r.llm.reduce(function(a,x){ return a+(x.ms||0); },0)/1000).toFixed(1)+'s':'')+
-        (r.cut? ' · <span style="color:var(--warn-ink)">'+esc(r.degraded? '답 미완성: '+r.cut : '도구 중단: '+r.cut)+'</span>':'')+
-        (r.tried&&r.tried.length? ' · <span style="color:var(--warn-ink)">폴백: '+esc(r.tried.join(' / '))+'</span>':'')+
-        (r._ms? ' · '+(r._ms/1000).toFixed(1)+'초':'')+
-        ' · '+new Date().toTimeString().slice(0,5)+' 데이터 기준'+
-        '<span class="ai-fb" role="group" aria-label="이 답변 평가"><button type="button" data-fb="up" aria-label="도움이 됐어요" title="도움이 됐어요">👍</button><button type="button" data-fb="down" aria-label="틀렸거나 부족해요" title="틀렸거나 부족해요 — 무엇이 틀렸는지 적으면 AI 지식 보강에 씁니다">👎</button></span></div>';
+      say.innerHTML=tpl`<span class="lb">AI</span>${cleanSay(r.text)}`+
+        tpl`<div style="font-size:11px;color:var(--muted);margin-top:6px">`+
+        tpl`${String(r.model||'').replace(/^claude-/,'')}`+ tpl`${rawHtml(r.queries&&r.queries.length? tpl` · DB 조회 ${r.queries.length}회 <span title="${r.queries.map(function(q){ return q.tool+' '+((q.ms||0)/1000).toFixed(1)+'s'+(q.error?' ✗':''); }).join(' · ')}">(${aiToolBrief(r.queries)})</span>`:'')}`+ tpl`${rawHtml(r.llm&&r.llm.length? ' · 모델 '+r.llm.length+'회 '+(r.llm.reduce(function(a,x){ return a+(x.ms||0); },0)/1000).toFixed(1)+'s':'')}`+ tpl`${rawHtml(r.cut? tpl` · <span style="color:var(--warn-ink)">${r.degraded? '답 미완성: '+r.cut : '도구 중단: '+r.cut}</span>`:'')}`+ tpl`${rawHtml(r.tried&&r.tried.length? tpl` · <span style="color:var(--warn-ink)">폴백: ${r.tried.join(' / ')}</span>`:'')}`+ tpl`${rawHtml(r._ms? ' · '+(r._ms/1000).toFixed(1)+'초':'')}`+
+        tpl` · ${rawHtml(new Date().toTimeString().slice(0,5))} 데이터 기준`+
+        tpl`<span class="ai-fb" role="group" aria-label="이 답변 평가"><button type="button" data-fb="up" aria-label="도움이 됐어요" title="도움이 됐어요">👍</button><button type="button" data-fb="down" aria-label="틀렸거나 부족해요" title="틀렸거나 부족해요 — 무엇이 틀렸는지 적으면 AI 지식 보강에 씁니다">👎</button></span></div>`;
       aiFeedbackBind(say, q, r);
       ST.HIST.push({q:q, a:r.text}); if(ST.HIST.length>10) ST.HIST.shift();
       saveHistTurn(q, r.text);                  // 계정별 누적 기억 (세션 무관)
@@ -238,8 +234,8 @@ export function revealAnswer(){
 export function aiRetryBtn(q){
   var say=$('#aiSay'); if(!say) return;
   say.className='ai-say on';
-  say.innerHTML='<span class="lb">AI</span>AI가 답하지 못했습니다. '+
-    '<button class="pill" id="aiRetry" style="height:26px;padding:0 10px;font-size:12px;margin-left:6px">↻ 다시 시도</button>';
+  say.innerHTML=tpl`<span class="lb">AI</span>AI가 답하지 못했습니다. `+
+    tpl`<button class="pill" id="aiRetry" style="height:26px;padding:0 10px;font-size:12px;margin-left:6px">↻ 다시 시도</button>`;
   var b=document.getElementById('aiRetry');
   if(b) b.onclick=function(){ ask(q); };
 }
@@ -305,7 +301,7 @@ export function showClarify(q, plan){
       if(x && x.ok && x.text){
         $('#ansSub').textContent='';
         box.className='ai-comment on';
-        box.innerHTML='<span class="lb">AI 답변</span>'+esc(x.text).replace(/\n/g,'<br>');
+        box.innerHTML=tpl`<span class="lb">AI 답변</span>${rawHtml(esc(x.text).replace(/\n/g,'<br>'))}`;
       } else {
         box.className='ai-comment';
         $('#ansSub').textContent = plan.clarify || '질문을 조금 더 구체적으로 알려주세요.';
@@ -500,7 +496,7 @@ export function requestNarrate(q, plan, res){
   };
   aiFetch({mode:'narrate', payload:payload})
     .then(function(x){
-      if(x && x.ok && x.text){ box.className='ai-comment on'; box.innerHTML='<span class="lb">AI 코멘트</span>'+esc(x.text); }
+      if(x && x.ok && x.text){ box.className='ai-comment on'; box.innerHTML=tpl`<span class="lb">AI 코멘트</span>${x.text}`; }
       else box.className='ai-comment';
     })
     .catch(function(){ box.className='ai-comment'; });
@@ -679,9 +675,9 @@ export function isFollowUp(q, p){
   return /(별로|별|만|은|는|도|쪽)$/.test(s) || s.length <= 5;
 }
 
+/** 이어지는 질문 — 앞 질문 조건에 이번 질문에서 바뀐 것만 덮어씀 @param {ParsedQ} prev @param {ParsedQ} cur @returns {ParsedQ} */
 export function mergeP(prev, cur){
-  var m = {};
-  Object.keys(prev).forEach(function(k){ m[k] = prev[k]; });
+  var m = Object.assign({}, prev);
   ['years','months','lines','partners','custs'].forEach(function(k){ if (cur[k] && cur[k].length) m[k] = cur[k]; });
   ['quarter','half','relN','from','to','ind','topN','groupBy','horizon','compareBy','compareItems']
     .forEach(function(k){ if (cur[k] !== null && cur[k] !== undefined && cur[k] !== '' ) m[k] = cur[k]; });
@@ -692,8 +688,23 @@ export function mergeP(prev, cur){
   return m;
 }
 
+/** 질문 해석 결과 (parseRaw · mergeP · ㊿+155 이름표)
+ * @typedef {Object} ParsedQ
+ * @property {string} raw 질문 원문
+ * @property {number[]} years @property {number[]} months @property {?number} quarter @property {?number} half
+ * @property {?number} relN 최근 N개월 @property {?number} from 시작 월 인덱스(STATE.base 와 같은 눈금) @property {?number} to 끝 월 인덱스
+ * @property {boolean} [_recentAuto] 요즘/현재 라는 말로 최근 6개월을 자동으로 잡음 @property {boolean} [avg] 월평균 @property {boolean} [bottom] 하위 N
+ * @property {number[]} [quarters] 비교용 분기 여러 개 @property {string[]} [ptns] 파트너(정해진 이름) 여러 개
+ * @property {string[]} lines 사업 라인 코드 @property {?string} ind 업종 @property {string[]} partners @property {string[]} custs
+ * @property {?string} partner @property {?string} cust @property {string[]} statuses
+ * @property {?number} topN @property {?string} groupBy @property {string} metric @property {boolean} metricExplicit @property {?number} horizon
+ * @property {?string} compareBy @property {?string[]} compareItems @property {string[]} unresolved @property {number} hits 조건이 잡힌 수
+ * @property {boolean} followUp 앞 질문을 이어받음 @property {?string} focus @property {string} [restate] 사람이 읽는 조건 요약
+ */
+/** @param {string} q @returns {ParsedQ} */
 export function parseRaw(q){
   var raw = q, s = nrmQ(q);
+  /** @type {ParsedQ} */
   var p = { raw: raw, years: [], months: [], quarter: null, half: null, relN: null, from: null, to: null,
     lines: [], ind: null, partners: [], custs: [], partner: null, cust: null, statuses: [],
     topN: null, groupBy: null, metric: 'sum', metricExplicit: false, horizon: null,
@@ -1001,7 +1012,7 @@ export function hl(text, term){
   // 정규화 인덱스는 원문과 어긋날 수 있어, 원문에서 다시 찾습니다
   var j = text.toLowerCase().indexOf(term.toLowerCase());
   if (j < 0) return t;
-  return esc(text.slice(0,j)) + '<b>' + esc(text.slice(j, j+term.length)) + '</b>' + esc(text.slice(j+term.length));
+  return tpl`${text.slice(0,j)}<b>${text.slice(j, j+term.length)}</b>${text.slice(j+term.length)}`;
 }
 
 export function monthFilter(p){
@@ -1239,13 +1250,13 @@ export function computeFromP(p){
   var lvQ=liveData();
   if(p.metric==='count' && lvQ && lvQ.ok && !mf && !(p.partners&&p.partners.length) && !(p.custs&&p.custs.length)){
     var lv=lvQ;
-    sel=lv.rows.filter(function(x){
+    var lvSel=lv.rows.filter(function(x){   /* LIVE 행 (위의 sel 은 계약 인덱스라 이름을 나눔) */
       if(p.lines&&p.lines.length && p.lines.indexOf(x.line)<0) return false;
       if(p.ind && x.ind!==p.ind) return false;
       return true;
     });
     var uq={},uqND={},gInd={},gLine={},nodes=0;
-    sel.forEach(function(x){ uq[x.cust]=1; if(!x.dup) uqND[x.cust]=1;
+    lvSel.forEach(function(x){ uq[x.cust]=1; if(!x.dup) uqND[x.cust]=1;
       gInd[x.ind]=(gInd[x.ind]||0)+1; gLine[x.line]=(gLine[x.line]||0)+1; nodes+=x.nodes||0; });
     var useInd = (p.groupBy==='ind') || (!!(p.lines&&p.lines.length) && p.groupBy!=='line');
     var g0 = useInd? gInd : gLine;
@@ -1254,13 +1265,13 @@ export function computeFromP(p){
     return {
       title:(sc0.length? sc0.join(' · ')+' · ':'')+'LIVE 고객사 · '+liveSrcLabel(),
       hero: Object.keys(uq).length.toLocaleString('ko-KR'), unit:'곳',
-      sub: '서비스 기준 '+sel.length.toLocaleString('ko-KR')+'건 (한 고객사가 여러 서비스를 쓰면 서비스마다 1건)'+
+      sub: '서비스 기준 '+lvSel.length.toLocaleString('ko-KR')+'건 (한 고객사가 여러 서비스를 쓰면 서비스마다 1건)'+
            (Object.keys(uqND).length!==Object.keys(uq).length? ' · 중복표시 제외 '+Object.keys(uqND).length+'곳':'')+
            (nodes? ' · 노드 '+nodes.toLocaleString('ko-KR')+'개':''),
       chart:{type:'bar', labels:arr0.map(function(x){return lline(x[0]);}),
              series:[{label:useInd?'산업군':'제품군', data:arr0.map(function(x){return x[1];}), color:cssv('--s1')}], money:false},
       table:{cols:[useInd?'산업군':'제품군','건수','비중'],
-             rows:arr0.map(function(x){return [lline(x[0]), x[1]+'건', (x[1]/sel.length*100).toFixed(1)+'%'];})},
+             rows:arr0.map(function(x){return [lline(x[0]), x[1]+'건', (x[1]/lvSel.length*100).toFixed(1)+'%'];})},
       note:(lv.src==='db'? '계약 데이터로 자동 판정한 LIVE 고객사입니다 (회사×제품 단위 · 기준 '+mk(lv.T)+').' : 'LIVE 고객사 탭을 그대로 셉니다 (사이트 단위).')+' 기간이나 파트너를 지정하면 월별 금액 기준으로 계산합니다.'
     };
   }
@@ -1367,11 +1378,11 @@ export function computeFromP(p){
     var labs=[], data=[], proj=[];
     for(var j6=Math.max(0,b-23); j6<=b; j6++){ labs.push(mkLabel(j6)); data.push(monthlyTotal(list,j6)); proj.push(null); }
     var step = hz>36? 6 : 3;                          // 표시 간격
-    rows=[];
+    var projRows=[];   /* 전망 표 (앞 분기의 rows 는 계약 인덱스라 이름을 나눔) */
     for(var m2=step; m2<=hz; m2+=step){
       var v = cur*Math.pow(1+g, m2);
       labs.push(mk(b+m2).slice(2)); data.push(null); proj.push(v);
-      rows.push([mk(b+m2), won(Math.round(v))+'천원', won(Math.round(v*12))+'천원']);
+      projRows.push([mk(b+m2), won(Math.round(v))+'천원', won(Math.round(v*12))+'천원']);
     }
     var endMrr = cur*Math.pow(1+g, hz);
     var yrs = (hz/12);
@@ -1384,7 +1395,7 @@ export function computeFromP(p){
         {label:'실적', data:data, color:cssv('--s1')},
         {label:'전망', data:proj, color:cssv('--s4')}
       ]},
-      table:{cols:['시점','예상 MRR','예상 ARR'], rows:rows},
+      table:{cols:['시점','예상 MRR','예상 ARR'], rows:projRows},
       note:'※ 최근 '+win+'개월 성장률이 그대로 이어진다고 가정한 단순 추정입니다. 신규 수주·해지·가격 변동은 반영되지 않습니다.'+
            (contracted? ' 참고로 '+mk(contractedIdx)+' 시점에 계약상 확정된 금액은 '+won(contracted)+'천원입니다.' : '')
     };
@@ -1439,7 +1450,7 @@ export function showAnswer(q,res){
   }
   ph.onclick=function(){ pinQuery(q); };
   var rs=$('#ansRestate');
-  if(res.restate){ rs.className='restate on'; rs.innerHTML='이렇게 이해했어요 — <b>'+esc(res.restate)+'</b>'; }
+  if(res.restate){ rs.className='restate on'; rs.innerHTML=tpl`이렇게 이해했어요 — <b>${res.restate}</b>`; }
   else rs.className='restate';
   $('#aiComment').className='ai-comment';
   var sg=$('#ansSuggest'); sg.innerHTML='';
@@ -1455,7 +1466,7 @@ export function showAnswer(q,res){
 /* 답변의 숫자·그래프·표 부분 (대화 답변 아래에 붙습니다) */
 export function renderAnswerBody(res, q){
   $('#ansTitle').textContent=shortQ(res.title||'');
-  $('#ansHero').innerHTML=esc(res.hero)+(res.unit?'<span class="u">'+res.unit+'</span>':'');
+  $('#ansHero').innerHTML=esc(res.hero)+(res.unit?tpl`<span class="u">${rawHtml(res.unit)}</span>`:'');
   $('#ansSub').textContent=res.sub||'';
   $('#ansNote').textContent=res.note||'';
 
@@ -1492,7 +1503,7 @@ export function renderAnswerBody(res, q){
   var t=$('#ansTable');
   if(res.table && res.table.rows.length){
     $('#ansTableCap').textContent='상세 ('+res.table.rows.length+'행)';
-    t.innerHTML='<thead><tr>'+res.table.cols.map(function(c2,i){return '<th'+(i?' class="n"':'')+'>'+esc(c2)+'</th>';}).join('')+'</tr></thead>'+
-      '<tbody>'+res.table.rows.map(function(r){return '<tr>'+r.map(function(v,i){return '<td'+(i?' class="n"':'')+'>'+esc(v)+'</td>';}).join('')+'</tr>';}).join('')+'</tbody>';
+    t.innerHTML=tpl`<thead><tr>${rawHtml(res.table.cols.map(function(c2,i){return tpl`<th${rawHtml(i?' class="n"':'')}>${c2}</th>`;}).join(''))}</tr></thead>`+
+      tpl`<tbody>${rawHtml(res.table.rows.map(function(r){return tpl`<tr>${rawHtml(r.map(function(v,i){return tpl`<td${rawHtml(i?' class="n"':'')}>${v}</td>`;}).join(''))}</tr>`;}).join(''))}</tbody>`;
   } else { $('#ansTableCap').textContent='상세'; t.innerHTML='<tbody><tr><td class="mini">표시할 상세 데이터가 없습니다.</td></tr></tbody>'; }
 }

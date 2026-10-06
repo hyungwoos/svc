@@ -1,9 +1,8 @@
 /* ===== equipment.js — 임대 장비: 신청 ↔ 현황 대조 · 원복 · 대조 패널 · 비즈포탈 월 입력 =====
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { APP_VER, ST } from './state.js';
-import { $ } from './core.js';
+import { $, esc, rawHtml, tpl } from './core.js';
 import { eqRefresh, sbGet, sbTry, sbWrite, toast, todayStr } from './shell.js';
-import { esc } from './dash.js';
 import { renderGrid } from './grid.js';
 import { closeOvl, logChange, openOvl } from './edit.js';
 
@@ -96,23 +95,22 @@ export function eqSerialsHtml(r, opt){
     var U=sn.toUpperCase(), saved=done||ret.indexOf(U)>=0, want=(U in pend)? pend[U] : saved, changed=(U in pend) && pend[U]!==saved;
     var cls='eqsn'+(want?' ret':'')+(changed?' chg':'')+(can?' act':'');
     var tip=can? (want? '회수됨 — 누르면 회수 취소로 표시' : '임대중 — 누르면 회수로 표시') : (want? '회수됨':'');
-    return '<span class="'+cls+'" data-oid="'+oid+'" data-sn="'+esc(U)+'" title="'+tip+'">'+esc(sn)+'</span>';
+    return tpl`<span class="${rawHtml(cls)}" data-oid="${rawHtml(oid)}" data-sn="${U}" title="${rawHtml(tip)}">${sn}</span>`;
   };
   var nChg=Object.keys(pend).filter(function(U){ var saved=done||ret.indexOf(U)>=0; return pend[U]!==saved; }).length;
   /* 회수 처리 막대: 기본은 항상, bar:'auto' 면 «변경이 있을 때» 또는 «회수예정 카드» 에만 (보드에서 안내 문구 반복을 없앰) */
   var showBar = can && (opt.bar!=='auto' || nChg>0 || r.status==='회수예정');
   var bar='';
   if(showBar){
-    bar='<div class="eqbar" data-oid="'+oid+'">'+
-      (nChg? '<b>변경 '+nChg+'대</b> · 회수일 <input type="date" class="eqbar-date" value="'+esc(EQP['_d'+oid]||todayStr())+'"> <button type="button" class="eqbar-save">회수 처리 저장</button> <button type="button" class="eqbar-cancel">취소</button>'
-           : '<button type="button" class="eqbar-all" title="모든 시리얼을 회수로 표시 — 칩을 누르면 개별 표시">전부 회수 표시</button>'+(opt.bar==='auto'? '' : ' <span class="mini" style="color:var(--muted)">칩을 누르면 개별 표시</span>'))+'</div>';
+    bar=tpl`<div class="eqbar" data-oid="${rawHtml(oid)}">`+ tpl`${rawHtml(nChg? tpl`<b>변경 ${rawHtml(nChg)}대</b> · 회수일 <input type="date" class="eqbar-date" value="${EQP['_d'+oid]||todayStr()}"> <button type="button" class="eqbar-save">회수 처리 저장</button> <button type="button" class="eqbar-cancel">취소</button>`
+           : tpl`<button type="button" class="eqbar-all" title="모든 시리얼을 회수로 표시 — 칩을 누르면 개별 표시">전부 회수 표시</button>${rawHtml(opt.bar==='auto'? '' : ' <span class="mini" style="color:var(--muted)">칩을 누르면 개별 표시</span>')}`)}`+ tpl`</div>`;
   }
   var k = opt.max? Math.min(opt.max, all.length) : 1;                 /* 펼쳐 보이는 칩 수 */
   if(all.length===1) return chip(all[0])+bar;
-  if(all.length<=k || (opt.full && !opt.max && all.length<=8)) return '<span class="eqser">'+all.map(chip).join(' ')+bar+'</span>';
+  if(all.length<=k || (opt.full && !opt.max && all.length<=8)) return tpl`<span class="eqser">${rawHtml(all.map(chip).join(' '))}${rawHtml(bar)}</span>`;
   var open=!!EQOPEN[oid] || nChg>0;
-  return '<span class="eqser">'+all.slice(0,k).map(chip).join(' ')+' <button type="button" class="eqser-more" data-oid="'+oid+'" data-n="'+(all.length-k)+'" title="'+esc(all.join(', '))+'">'+(open? '접기 ▴' : '+'+(all.length-k)+' ▾')+'</button>'+
-         '<span class="eqser-full" style="display:'+(open?'block':'none')+'">'+all.slice(k).map(chip).join(' ')+bar+'</span></span>';
+  return tpl`<span class="eqser">${rawHtml(all.slice(0,k).map(chip).join(' '))} <button type="button" class="eqser-more" data-oid="${rawHtml(oid)}" data-n="${all.length-k}" title="${all.join(', ')}">${rawHtml(open? '접기 ▴' : '+'+(all.length-k)+' ▾')}</button>`+
+         tpl`<span class="eqser-full" style="display:${open?'block':'none'}">${rawHtml(all.slice(k).map(chip).join(' '))}${rawHtml(bar)}</span></span>`;
 }
 export function eqOrderById(id){ return (ST.RAWX.orders||[]).filter(function(o){ return String(o.id)===String(id); })[0]; }
 
@@ -136,7 +134,7 @@ export function eqRetOpen(r){
   $('#erList').innerHTML=all.map(function(sn){
     var a=amap[sn], done=(r.status==='회수완료') || ret.indexOf(sn)>=0 || (a && a.status==='회수완료' && String(a.order_id)===String(r.id));
     var sub=a? (a.status+(a.returned_date? ' · '+String(a.returned_date).slice(0,10):'')) : '현황에 없음';
-    return '<label style="display:flex;gap:8px;align-items:center;font-size:12.5px;cursor:pointer"><input type="checkbox" data-sn="'+esc(sn)+'"'+(done?' checked':'')+'> <b style="font-family:monospace">'+esc(sn)+'</b> <span class="mini" style="color:var(--muted)">'+esc(sub)+'</span></label>';
+    return tpl`<label style="display:flex;gap:8px;align-items:center;font-size:12.5px;cursor:pointer"><input type="checkbox" data-sn="${sn}"${done?' checked':''}> <b style="font-family:monospace">${sn}</b> <span class="mini" style="color:var(--muted)">${sub}</span></label>`;
   }).join('');
   $('#erAll').onclick=function(){ document.querySelectorAll('#erList input').forEach(function(x){ x.checked=true; }); };
   $('#erNone').onclick=function(){ document.querySelectorAll('#erList input').forEach(function(x){ x.checked=false; }); };
@@ -365,51 +363,42 @@ export function renderEqPanel(){
   }
   var host=eqHostEl(), s=eqScan(), bad=s.gap.length>0, u=eqUndoGet();
   host.style.display='';
-  var h='<div class="card" style="padding:11px 14px;margin-bottom:10px;border-left:4px solid '+
-        (bad?'var(--warning,#fab219)':'var(--good,#0ca30c)')+'">'+
-    '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'+
-      '<b style="font-size:13.5px">신청 ↔ 현황 대조</b>'+
-      '<span class="mini" style="color:var(--ink-2)">신청 '+s.orders.length+'건 · 현황 반영 '+s.ok+'건 · '+
-        '<b style="color:'+(bad?'var(--critical,#d03b3b)':'inherit')+'">맞지 않음 '+s.gap.length+'건</b>'+
-        ' · 취소 '+s.cancel.length+'건'+(s.moved.length? ' · 이전됨 '+s.moved.length+'건':'')+'</span>'+
-      (ST.IS_VIEWER? '' : '<button class="pill" id="eqFixAll"'+(bad?'':' disabled style="opacity:.45"')+'>신청 내역 기준으로 현황 맞추기</button>')+
-      (ST.IS_VIEWER||!u? '' : '<button class="pill ghost" id="eqUndo" title="'+esc(u.label||'')+'">↩ 원복 ('+String(u.at||'').replace('T',' ').slice(5,16)+')</button>')+
-      (ST.IS_VIEWER? '' : '<button class="pill ghost" id="eqDiag" title="동기화가 안 될 때 원인을 찾아봅니다">🩺 진단</button>')+
-      '<span class="mini" id="eqMsg" style="color:var(--muted)"></span>'+
-    '</div>'+
-    '<div class="mini" style="margin-top:4px;color:var(--muted)">기준은 «임대 장비 신청 내역» 입니다 — 취소를 뺀 모든 신청이 현황에 «수량»대씩 있어야 하고, 상태·고객사·모델·채널은 신청 내역 값으로 맞춥니다 (출고 전이면 재고)'+
-      (u? ' · 마지막 일괄 작업은 «↩ 원복» 으로 되돌릴 수 있습니다':'')+'</div>';
+  var h=tpl`<div class="card" style="padding:11px 14px;margin-bottom:10px;border-left:4px solid `+ tpl`${bad?'var(--warning,#fab219)':'var(--good,#0ca30c)'}">`+
+    tpl`<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">`+
+      tpl`<b style="font-size:13.5px">신청 ↔ 현황 대조</b>`+
+      tpl`<span class="mini" style="color:var(--ink-2)">신청 ${s.orders.length}건 · 현황 반영 ${rawHtml(s.ok)}건 · `+
+        tpl`<b style="color:${bad?'var(--critical,#d03b3b)':'inherit'}">맞지 않음 ${s.gap.length}건</b>`+
+        tpl` · 취소 ${s.cancel.length}건${rawHtml(s.moved.length? ' · 이전됨 '+s.moved.length+'건':'')}</span>`+ tpl`${rawHtml(ST.IS_VIEWER? '' : tpl`<button class="pill" id="eqFixAll"${rawHtml(bad?'':' disabled style="opacity:.45"')}>신청 내역 기준으로 현황 맞추기</button>`)}`+ tpl`${rawHtml(ST.IS_VIEWER||!u? '' : tpl`<button class="pill ghost" id="eqUndo" title="${u.label||''}">↩ 원복 (${rawHtml(String(u.at||'').replace('T',' ').slice(5,16))})</button>`)}`+ tpl`${rawHtml(ST.IS_VIEWER? '' : '<button class="pill ghost" id="eqDiag" title="동기화가 안 될 때 원인을 찾아봅니다">🩺 진단</button>')}`+
+      tpl`<span class="mini" id="eqMsg" style="color:var(--muted)"></span>`+
+    tpl`</div>`+
+    tpl`<div class="mini" style="margin-top:4px;color:var(--muted)">기준은 «임대 장비 신청 내역» 입니다 — 취소를 뺀 모든 신청이 현황에 «수량»대씩 있어야 하고, 상태·고객사·모델·채널은 신청 내역 값으로 맞춥니다 (출고 전이면 재고)`+ tpl`${u? ' · 마지막 일괄 작업은 «↩ 원복» 으로 되돌릴 수 있습니다':''}</div>`;
   if(bad){
-    h+='<div class="mini" style="margin-top:8px;color:var(--ink-2);line-height:1.7">'+
-      s.gap.slice(0,20).map(function(x){
-        return '· <b>#'+x.o.id+'</b> '+esc(x.o.customer||'(고객사 없음)')+' — '+esc(x.o.status||'')+' · '+
-               esc(x.o.model||'')+' × '+(x.o.qty||1)+' → '+esc(x.why);
-      }).join('<br>')+
-      (s.gap.length>20? '<br>… 외 '+(s.gap.length-20)+'건':'')+'</div>';
+    h+=tpl`<div class="mini" style="margin-top:8px;color:var(--ink-2);line-height:1.7">`+
+      tpl`${rawHtml(s.gap.slice(0,20).map(function(x){
+        return tpl`· <b>#${rawHtml(x.o.id)}</b> ${x.o.customer||'(고객사 없음)'} — ${x.o.status||''} · `+
+               tpl`${x.o.model||''} × ${rawHtml(x.o.qty||1)} → ${x.why}`;
+      }).join('<br>'))}`+ tpl`${rawHtml(s.gap.length>20? tpl`<br>… 외 ${s.gap.length-20}건`:'')}</div>`;
   }
   if(s.moved.length){
-    h+='<div class="mini" style="margin-top:6px;color:var(--muted)">↪ 장비가 더 최근 신청으로 넘어간 신청 '+s.moved.length+'건 — '+
-       esc(s.moved.slice(0,6).map(function(o){ var nx=own_(o); return '#'+o.id+' '+(o.customer||'')+' → #'+(nx? nx.id+' '+(nx.customer||''):'?'); }).join(' / '))+
-       (s.moved.length>6? ' 외 '+(s.moved.length-6)+'건':'')+' · 같은 시리얼은 가장 최근 신청이 주인이라 현황에는 새 고객사로 보입니다</div>';
+    h+=tpl`<div class="mini" style="margin-top:6px;color:var(--muted)">↪ 장비가 더 최근 신청으로 넘어간 신청 ${s.moved.length}건 — `+
+       tpl`${s.moved.slice(0,6).map(function(o){ var nx=own_(o); return '#'+o.id+' '+(o.customer||'')+' → #'+(nx? nx.id+' '+(nx.customer||''):'?'); }).join(' / ')}`+ tpl`${rawHtml(s.moved.length>6? ' 외 '+(s.moved.length-6)+'건':'')} · 같은 시리얼은 가장 최근 신청이 주인이라 현황에는 새 고객사로 보입니다</div>`;
   }
   if(s.ph.length){
-    h+='<div class="mini" style="margin-top:6px;color:var(--muted)">⚠ 시리얼을 몰라 «미등록-…» 으로 임시 등록해 둔 신청 '+s.ph.length+
-       '건 — 신청 행의 «시리얼» 칸에 실제 시리얼을 넣고 저장하면 자동으로 바뀝니다</div>';
+    h+=tpl`<div class="mini" style="margin-top:6px;color:var(--muted)">⚠ 시리얼을 몰라 «미등록-…» 으로 임시 등록해 둔 신청 ${s.ph.length}`+
+       tpl`건 — 신청 행의 «시리얼» 칸에 실제 시리얼을 넣고 저장하면 자동으로 바뀝니다</div>`;
   }
   if(s.orphan.length){
-    h+='<div class="mini" style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--line,#e5e7eb);color:var(--ink-2)">'+
-      '신청 내역에 없는데 «임대중» 인 자산 <b>'+s.orphan.length+'대</b> — '+
-      esc(s.orphan.slice(0,8).map(function(a){ return a.serial; }).join(', '))+
-      (s.orphan.length>8? ' 외 '+(s.orphan.length-8)+'대':'')+
-      (ST.IS_VIEWER? '' : ' <button class="pill ghost" id="eqOrphan" style="margin-left:6px">재고로 되돌리기</button>')+
-      '<br><span style="color:var(--muted)">신청 기록 없이 손으로 넣었거나, 신청 행이 지워진 장비입니다 — 맞다면 그대로 두셔도 됩니다</span></div>';
+    h+=tpl`<div class="mini" style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--line,#e5e7eb);color:var(--ink-2)">`+
+      tpl`신청 내역에 없는데 «임대중» 인 자산 <b>${s.orphan.length}대</b> — `+
+      tpl`${s.orphan.slice(0,8).map(function(a){ return a.serial; }).join(', ')}`+ tpl`${rawHtml(s.orphan.length>8? ' 외 '+(s.orphan.length-8)+'대':'')}`+ tpl`${rawHtml(ST.IS_VIEWER? '' : ' <button class="pill ghost" id="eqOrphan" style="margin-left:6px">재고로 되돌리기</button>')}`+
+      tpl`<br><span style="color:var(--muted)">신청 기록 없이 손으로 넣었거나, 신청 행이 지워진 장비입니다 — 맞다면 그대로 두셔도 됩니다</span></div>`;
   }
   if(EQ_ERR){
-    h+='<div class="mini" style="margin-top:8px;padding:8px 10px;border-radius:8px;background:rgba(208,59,59,.08);'+
-       'color:var(--critical,#d03b3b);word-break:break-all">⚠ 마지막 동기화 오류 — '+esc(EQ_ERR)+'</div>';
+    h+=tpl`<div class="mini" style="margin-top:8px;padding:8px 10px;border-radius:8px;background:rgba(208,59,59,.08);`+
+       tpl`color:var(--critical,#d03b3b);word-break:break-all">⚠ 마지막 동기화 오류 — ${EQ_ERR}</div>`;
   }
-  h+='<div class="mini" id="eqDiagOut" style="margin-top:8px;padding:8px 10px;border-radius:8px;background:var(--bg-2,#f6f7f9);'+
-     'line-height:1.75;word-break:break-all;display:'+(EQ_DIAG?'':'none')+'">'+(EQ_DIAG||'')+'</div>';
+  h+=tpl`<div class="mini" id="eqDiagOut" style="margin-top:8px;padding:8px 10px;border-radius:8px;background:var(--bg-2,#f6f7f9);`+
+     tpl`line-height:1.75;word-break:break-all;display:${EQ_DIAG?'':'none'}">${rawHtml(EQ_DIAG||'')}</div>`;
   h+='</div>';
   host.innerHTML=h;
   var b=document.getElementById('eqFixAll'); if(b) b.onclick=eqFixAll;
@@ -445,10 +434,10 @@ export async function eqFixAll(){
 /* 동기화가 안 될 때 — 어디서 막히는지 실제로 한 번씩 해 봅니다 */
 export async function eqDiagRun(){
   var log=[];
-  function bad(t){ return '<b style="color:var(--critical,#d03b3b)">'+esc(t)+'</b>'; }
+  function bad(t){ return tpl`<b style="color:var(--critical,#d03b3b)">${t}</b>`; }
   function put(){ EQ_DIAG=log.join('<br>');
     var box=document.getElementById('eqDiagOut'); if(box){ box.style.display=''; box.innerHTML=EQ_DIAG; } }
-  log.push('<b>🩺 진단</b> — 포탈 버전 '+esc(APP_VER));
+  log.push(tpl`<b>🩺 진단</b> — 포탈 버전 ${APP_VER}`);
   log.push('읽어온 데이터 — 신청 내역 '+((ST.RAWX.orders||[]).length)+'건 · 장비 현황 '+((ST.RAWX.assets||[]).length)+'대');
   put();
   var need=['serial','model','usage','status','customer','channel','deployed_date','returned_date','note','order_id','updated_at'];

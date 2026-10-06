@@ -1,9 +1,8 @@
 /* ===== upd.js — 로그인할 때 업데이트 안내 팝업 · 안내문 시드(UPD_SEED) =====
    ㊿+153: admin.js 에서 나눔 — 모든 계정이 로그인 때 쓰므로 처음부터 불러옴. 관리자 › 업데이트 안내 화면(updAdmin*)은 admin.js 에 그대로 */
 import { APP_VER, IS_QA, ST } from './state.js';
-import { refreshToken, SB_URL } from './core.js';
+import { esc, rawHtml, refreshToken, SB_URL, tpl } from './core.js';
 import { sbHeaders, toast } from './shell.js';
-import { esc } from './dash.js';
 
 /* ===== ㊿+148 업데이트 안내 — 로그인할 때 팝업 (SQL 96 · 사용자: «담당자를 체크해 놓으면 로그인할 때 업데이트 내용을 안내 · 다 확인했다고 체크하면 다시 안 뜨고 · 다음 업데이트면 새 내용으로 다시») =====
    · 안내문은 아래 UPD_SEED 에 코드와 함께 실려 옴 → 슈퍼 관리자가 포탈을 열 때 DB(upd_notes)에 없는 ver 만 자동으로 넣음(관리자가 고친 내용은 덮어쓰지 않음)
@@ -107,7 +106,11 @@ export var UPD_SEED=[
     '- 견적서 · S1 정산 · KK 정산 · 프로젝트 리포트 화면의 코드를 파일로 분리했습니다. 끼워 넣은 스크립트는 브라우저가 실행하지 않도록 막습니다. 버튼과 기능은 그대로입니다.',
     '- 예전 «임대장비 발주» 단독 페이지(orders.html) 주소로 들어오면 포탈의 «📝 임대 장비 신청»으로 바로 넘어갑니다.',
     '- (관리자) 두 정산 페이지에 똑같이 복사돼 있던 코드(세션·DB·엑셀·인쇄 창)를 한 곳(sat/)으로 합쳤습니다.',
-    '- (관리자) 포탈 코드가 window 전역에 기대던 부분을 모두 걷어냈습니다(공유 값은 ST · 함수는 import). 테스트·스테이징 QA 는 window.SVC 하나로 봅니다.'].join('\n')}
+    '- (관리자) 포탈 코드가 window 전역에 기대던 부분을 모두 걷어냈습니다(공유 값은 ST · 함수는 import). 테스트·스테이징 QA 는 window.SVC 하나로 봅니다.'].join('\n')},
+  {ver:'㊿+155', date:'2026-10-05', title:'고객 360 계약 기간 표시 · 화면 코드 정리', body:[
+    '- 고객 360 창의 «계약» 표에서 «기간» 이 늘 비어 있던 것을 고쳤습니다. 이제 시작월 ~ 종료월이 보입니다.',
+    '- (관리자) 화면 HTML 을 만드는 코드를 전부 tpl`` 템플릿으로 바꿨습니다. 글자 속 특수문자(< > & ")는 자동으로 처리되어, 처리를 빠뜨려 화면이 깨지거나 엉뚱한 HTML 이 끼어드는 일이 없습니다. 바꾸기 전·후 67개 화면의 HTML 이 똑같은지 확인했습니다.',
+    '- (관리자) 타입 검사(TypeScript)를 배포 전 검사에 넣었습니다. 공유 상태(ST) · 계약 행 · 표 정의 · AI 질문 해석 결과에 모양(이름표)을 적어 두어, 키 이름을 잘못 쓰면 배포 전에 잡힙니다. 위의 고객 360 문제도 이 검사로 찾았습니다.'].join('\n')}
 ];
 export async function updFetch(path, opt){   /* 캐시를 건드리지 않는 직접 호출 — 401 이면 토큰 갱신 뒤 1회 재시도 */
   if(!ST.SB_TOKEN) throw new Error('로그인이 필요합니다');
@@ -124,7 +127,7 @@ export function updBodyHtml(body){
     if(li && !inList){ h+='<ul>'; inList=true; } if(!li && inList){ h+='</ul>'; inList=false; }
     var t=l.replace(/^[-•·]\s*/,''), adm=/^\(관리자\)\s*/.test(t); t=t.replace(/^\(관리자\)\s*/,'');
     var x=(adm? '<span class="upd-adm">관리자</span> ':'')+esc(t);
-    h+= li? '<li>'+x+'</li>' : '<p>'+x+'</p>';
+    h+= li? tpl`<li>${rawHtml(x)}</li>` : tpl`<p>${rawHtml(x)}</p>`;
   });
   return h+(inList? '</ul>':'');
 }
@@ -134,11 +137,11 @@ export function updShow(notes, opt){
   var old=document.getElementById('ovlUpd'); if(old) old.remove();
   var ov=document.createElement('div'); ov.id='ovlUpd'; ov.className='ovl on'; ov.style.cssText='z-index:9500;align-items:center';
   var sub=opt.mode==='ack'? (opt.first? '지금까지 포탈에서 바뀐 내용입니다 ('+notes.length+'번의 업데이트)' : '지난번 확인한 뒤 바뀐 내용입니다 ('+notes.length+'건)') : opt.mode==='preview'? '관리자 미리보기 — 체크된 계정에게 이렇게 보입니다' : '지금까지의 업데이트 내역';
-  ov.innerHTML='<div class="modal upd" style="width:min(680px,100%);padding:20px 22px" role="dialog" aria-modal="true" aria-labelledby="updTitle">'+
-    '<div class="upd-head"><span class="upd-ic" aria-hidden="true">📢</span><div><h3 id="updTitle" style="margin:0;font-size:18px">포탈 업데이트 안내</h3><div class="mini">'+esc(sub)+'</div></div></div>'+
-    '<div class="upd-body" tabindex="0">'+(notes.length? notes.map(function(n,i){ return '<section class="upd-sec"><div class="upd-meta"><b>'+esc(n.title||'')+'</b>'+(i===0&&opt.mode==='ack'? '<span class="ctag ok">최신</span>':'')+'<span class="mini">'+esc(String(n.published_on||'').slice(0,10))+(n.ver? ' · '+esc(n.ver):'')+'</span></div>'+updBodyHtml(n.body)+'</section>'; }).join('') : '<p class="cap">안내가 없습니다.</p>')+'</div>'+
-    '<div class="upd-foot">'+(opt.mode==='ack'? '<label class="upd-chk"><input type="checkbox" id="updOk"> 업데이트 내용을 모두 확인했습니다</label><span style="flex:1"></span><button type="button" class="pill ghost" id="updLater">나중에 보기</button><button type="button" class="pill pri" id="updDone" disabled>확인</button>'
-      : '<span style="flex:1"></span><button type="button" class="pill" id="updClose">닫기</button>')+'</div></div>';
+  ov.innerHTML=tpl`<div class="modal upd" style="width:min(680px,100%);padding:20px 22px" role="dialog" aria-modal="true" aria-labelledby="updTitle">`+
+    tpl`<div class="upd-head"><span class="upd-ic" aria-hidden="true">📢</span><div><h3 id="updTitle" style="margin:0;font-size:18px">포탈 업데이트 안내</h3><div class="mini">${sub}</div></div></div>`+
+    tpl`<div class="upd-body" tabindex="0">${rawHtml(notes.length? notes.map(function(n,i){ return tpl`<section class="upd-sec"><div class="upd-meta"><b>${n.title||''}</b>${rawHtml(i===0&&opt.mode==='ack'? '<span class="ctag ok">최신</span>':'')}<span class="mini">${String(n.published_on||'').slice(0,10)}${rawHtml(n.ver? ' · '+esc(n.ver):'')}</span></div>${rawHtml(updBodyHtml(n.body))}</section>`; }).join('') : '<p class="cap">안내가 없습니다.</p>')}</div>`+
+    tpl`<div class="upd-foot">${rawHtml(opt.mode==='ack'? '<label class="upd-chk"><input type="checkbox" id="updOk"> 업데이트 내용을 모두 확인했습니다</label><span style="flex:1"></span><button type="button" class="pill ghost" id="updLater">나중에 보기</button><button type="button" class="pill pri" id="updDone" disabled>확인</button>'
+      : '<span style="flex:1"></span><button type="button" class="pill" id="updClose">닫기</button>')}`+ tpl`</div></div>`;
   document.body.appendChild(ov);
   var ok=ov.querySelector('#updOk'), done=ov.querySelector('#updDone');
   if(ok) ok.onchange=function(){ done.disabled=!ok.checked; };

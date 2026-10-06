@@ -1,9 +1,8 @@
 /* ===== tools.js — 전역 검색 · 고객 360 · 표 밀도 · 엑셀 붙여넣기 · 메뉴 편집 · 글자 크기 =====
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { ST } from './state.js';
-import { $, lline, mk, navText } from './core.js';
+import { $, lline, mk, navText, rawHtml, tpl } from './core.js';
 import { buildRail, c360Enhance, cmdAskHit, cmdMenuHits, dIdx, loadFromDb, onData, renderInbox, sbTry, sbWrite, toast, todayStr, visBtn } from './shell.js';
-import { esc } from './dash.js';
 import { GRIDS } from './grids.js';
 import { applyChannelMenu, liveData } from './analysis.js';
 import { goInbList, loadInbound } from './inbound.js';
@@ -58,7 +57,7 @@ export function openFind(){
     if(q.length<1){ out.innerHTML=''; return; }
     // ⓞ 화면 이동 (메뉴 이름 매치)
     try{ hits=hits.concat(cmdMenuHits(inp.value)); }catch(e){}
-    if(q.length<2){ out.innerHTML=hits.map(function(h,i){ return '<div class="fk-row" data-i="'+i+'"><span class="tp" style="background:var(--surface-2);color:var(--ink-2)">'+h.t+'</span><span class="nm">'+esc(h.nm||'')+'</span><span class="sb">'+esc(h.sb||'')+'</span></div>'; }).join('');
+    if(q.length<2){ out.innerHTML=hits.map(function(h,i){ return tpl`<div class="fk-row" data-i="${rawHtml(i)}"><span class="tp" style="background:var(--surface-2);color:var(--ink-2)">${rawHtml(h.t)}</span><span class="nm">${h.nm||''}</span><span class="sb">${h.sb||''}</span></div>`; }).join('');
       out.querySelectorAll('.fk-row').forEach(function(row){ row.onclick=function(){ closeOvl('ovlFind'); hits[+row.dataset.i].go(); }; }); return; }
     var src=fkSources(), seen={};
     // ① 고객 360 후보 (고객사명 매치, 중복 제거)
@@ -77,8 +76,8 @@ export function openFind(){
     // ③ AI에게 그대로 물어보기
     try{ var ai=cmdAskHit(inp.value); if(ai) hits.push(ai); }catch(e){}
     out.innerHTML=hits.map(function(h,i){
-      return '<div class="fk-row" data-i="'+i+'"><span class="tp"'+(h.k360?' style="background:rgba(42,120,214,.12);color:var(--s1-ink)"':(h.kmenu?' style="background:var(--surface-2);color:var(--ink-2)"':(h.kai?' style="background:var(--brand);color:#fff"':'')))+'>'+h.t+'</span>'+
-        '<span class="nm">'+esc(h.nm||'')+'</span><span class="sb">'+esc(h.sb||'')+'</span></div>';
+      return tpl`<div class="fk-row" data-i="${rawHtml(i)}"><span class="tp"${rawHtml(h.k360?' style="background:rgba(42,120,214,.12);color:var(--s1-ink)"':(h.kmenu?' style="background:var(--surface-2);color:var(--ink-2)"':(h.kai?' style="background:var(--brand);color:#fff"':'')))}>${rawHtml(h.t)}</span>`+
+        tpl`<span class="nm">${h.nm||''}</span><span class="sb">${h.sb||''}</span></div>`;
     }).join('')||'<p class="cap" style="padding:8px">결과 없음</p>';
     out.querySelectorAll('.fk-row').forEach(function(row){
       row.onclick=function(){ closeOvl('ovlFind'); hits[+row.dataset.i].go(); };
@@ -97,8 +96,8 @@ export function openCust360(name){
   var nm=name;
   function tb(cols, rows){
     if(!rows.length) return '<p class="cap" style="margin:2px 0 0">없음</p>';
-    return '<table><thead><tr>'+cols.map(function(c){return '<th>'+c+'</th>';}).join('')+'</tr></thead><tbody>'+
-      rows.map(function(r){ return '<tr>'+r.map(function(v){return '<td>'+esc(String(v==null||v===''?'·':v))+'</td>';}).join('')+'</tr>'; }).join('')+'</tbody></table>';
+    return tpl`<table><thead><tr>${rawHtml(cols.map(function(c){return tpl`<th>${rawHtml(c)}</th>`;}).join(''))}</tr></thead><tbody>`+
+      tpl`${rawHtml(rows.map(function(r){ return tpl`<tr>${rawHtml(r.map(function(v){return tpl`<td>${String(v==null||v===''?'·':v)}</td>`;}).join(''))}</tr>`; }).join(''))}</tbody></table>`;
   }
   var cts=(ST.DATA&&ST.DATA.rows||[]).filter(function(r){return c360Match(r.cust,nm);});
   var lvAll=(ST.DATA&&ST.DATA.rows)? liveData() : null;
@@ -111,12 +110,13 @@ export function openCust360(name){
   $('#c360Title').textContent='🏢 '+nm;
   $('#c360Cap').textContent='계약 '+cts.length+' · LIVE '+lives.length+' · OI '+ois.length+' · 인바운드 '+inbs.length+' · MDR 운영 '+mdrs.length+' · 장비 '+(asts.length+ords.length)+
     (ST.RAWX.inbound===undefined? ' · (인바운드는 메뉴를 한 번 연 뒤 집계됩니다)':'');
-  function sec(icon,label,n,html){ return '<div class="c360-sec"><h4>'+icon+' '+label+' <span class="ct">'+n+'건</span></h4>'+html+'</div>'; }
+  function sec(icon,label,n,html){ return tpl`<div class="c360-sec"><h4>${rawHtml(icon)} ${rawHtml(label)} <span class="ct">${rawHtml(n)}건</span></h4>${rawHtml(html)}</div>`; }
   $('#c360Body').innerHTML=
     sec('📋','계약',cts.length, tb(['서비스','채널','파트너','구분','상태','기간','MRR(천원)'],
-      cts.map(function(r){ return [(r.parent? '↳ ':'')+lline(r.line), r.channel, r.partner, r.ctype||r.contract_type, r.status,
-        (r.start||'')+' ~ '+(r.end||''), r.mrr? Math.round(Number(r.mrr)/1000).toLocaleString('ko-KR'):'' ]; })))+
-    sec('🟢','LIVE'+(lvAll&&lvAll.src==='db'? ' <span class="mini" style="font-weight:400;color:var(--muted)">계약 기준 '+mk(lvAll.T)+'</span>':''),lives.length, tb(['제품','서비스','노드','최초 개시','현행 종료','근거'],
+      cts.map(function(r){ return [(r.parent? '↳ ':'')+lline(r.line), r.channel, r.partner, r.ctype, r.status,
+        /* ㊿+155: 예전엔 r.start · r.end(없는 키)를 읽어 «기간» 이 늘 빈칸이었음 — 계약 행은 월 인덱스(startIdx · endIdx) */
+        (r.startIdx!=null? mk(r.startIdx):'')+' ~ '+(r.endIdx!=null? mk(r.endIdx):''), r.mrr? Math.round(Number(r.mrr)/1000).toLocaleString('ko-KR'):'' ]; })))+
+    sec('🟢','LIVE'+(lvAll&&lvAll.src==='db'? tpl` <span class="mini" style="font-weight:400;color:var(--muted)">계약 기준 ${mk(lvAll.T)}</span>`:''),lives.length, tb(['제품','서비스','노드','최초 개시','현행 종료','근거'],
       lives.map(function(r){ return [r.prod, lline(r.line), r.nodes, r.start||'', r.end||'', r.basis||(r.dup?'중복표시':'')]; })))+
     sec('🎯','OI (영업기회)',ois.length, tb(['사업명','상태','예상시기','예상단가(천원)','담당'],
       ois.map(function(r){ return [r.deal_name, r.stage, String(r.expect_month||'').slice(0,7), r.expect_amount? Math.round(Number(r.expect_amount)/1000).toLocaleString('ko-KR'):'', r.owner]; })))+
@@ -145,8 +145,8 @@ export function pasteCols(g){ return g.cols.filter(function(c){ return !c.ro && 
 export function openPaste(){
   var g=GRIDS[ST.CUR_VIEW]; if(!g||!g.add) return;
   var cols=pasteCols(g);
-  $('#pasteCols').innerHTML='열 순서: '+cols.map(function(c){return '<b>'+esc(c.l)+'</b>';}).join(' → ')+
-    ' <span class="mini">(엑셀에서 이 순서로 열을 맞춰 복사하세요 · 빈 칸은 비워둬도 됩니다)</span>';
+  $('#pasteCols').innerHTML=tpl`열 순서: ${rawHtml(cols.map(function(c){return tpl`<b>${c.l}</b>`;}).join(' → '))}`+
+    tpl` <span class="mini">(엑셀에서 이 순서로 열을 맞춰 복사하세요 · 빈 칸은 비워둬도 됩니다)</span>`;
   $('#pasteTa').value=''; $('#pastePrev').textContent=''; $('#pasteMsg').textContent='';
   function parse(){
     var lines=$('#pasteTa').value.split(/\r?\n/).filter(function(l){return l.trim();});
@@ -276,15 +276,15 @@ export function openMenuEdit(){
   function paint(){
     var h='';
     st.forEach(function(s,i){
-      h+='<div class="mc-row"><button class="mv" data-mv="up" data-i="'+i+'">↑</button>'+
-        '<button class="mv" data-mv="dn" data-i="'+i+'">↓</button>'+
-        '<span class="nm"><b>'+esc(s.label)+'</b></span>'+
-        '<label><input type="checkbox" data-hk="'+esc(s.key)+'"'+(hid[s.key]?' checked':'')+'>숨김</label></div>';
+      h+=tpl`<div class="mc-row"><button class="mv" data-mv="up" data-i="${rawHtml(i)}">↑</button>`+
+        tpl`<button class="mv" data-mv="dn" data-i="${rawHtml(i)}">↓</button>`+
+        tpl`<span class="nm"><b>${s.label}</b></span>`+
+        tpl`<label><input type="checkbox" data-hk="${s.key}"${hid[s.key]?' checked':''}>숨김</label></div>`;
       if(s.grp) s.buttons.forEach(function(b){
         var v=b.dataset.v;
         if(v==='adminx') return;   // 관리자 메뉴는 권한으로만 제어
-        h+='<div class="mc-row child"><span class="nm">'+esc(b.textContent.trim())+'</span>'+
-          '<label><input type="checkbox" data-hk="b:'+esc(v)+'"'+(hid['b:'+v]?' checked':'')+'>숨김</label></div>';
+        h+=tpl`<div class="mc-row child"><span class="nm">${b.textContent.trim()}</span>`+
+          tpl`<label><input type="checkbox" data-hk="b:${v}"${hid['b:'+v]?' checked':''}>숨김</label></div>`;
       });
     });
     $('#mcBody').innerHTML=h;
@@ -356,8 +356,8 @@ export function renderTodo(){
   var dow=today.getDay(), toMon=(8-dow)%7;
   var wkTxt= dow===1? '오늘':'D-'+(toMon===0?7:toMon);
   function card(cls,icon,label,val,sub,go){
-    return '<div class="todo-card '+cls+'" data-go="'+go+'"><div class="l">'+icon+' '+label+'</div>'+
-      '<div class="v">'+val+'</div><div class="s">'+sub+'</div></div>';
+    return tpl`<div class="todo-card ${rawHtml(cls)}" data-go="${rawHtml(go)}"><div class="l">${rawHtml(icon)} ${rawHtml(label)}</div>`+
+      tpl`<div class="v">${rawHtml(val)}</div><div class="s">${rawHtml(sub)}</div></div>`;
   }
   document.getElementById('todoCards').innerHTML=
     card(inbN>0?'crit':'ok','📥','인바운드 미대응', inbN==null?'…':inbN+'건', inbN>0?'진행중인데 3개월+ 대응 없음':'밀린 건 없음','inbstat')+
@@ -369,10 +369,9 @@ export function renderTodo(){
   var rec=[]; try{ rec=JSON.parse(localStorage.getItem(recentKey())||'[]'); }catch(e){}
   rec=rec.filter(function(v){return fav.indexOf(v)<0;}).slice(0,3);
   document.getElementById('quickLinks').innerHTML=
-    '<span class="ql-l">바로가기</span>'+
-    fav.map(function(v){return '<button data-go="'+v+'">'+esc(viewLabel(v))+'</button>';}).join('')+
-    (rec.length? '<span class="ql-l" style="margin-left:8px">최근</span>'+
-      rec.map(function(v){return '<button data-go="'+v+'">'+esc(viewLabel(v))+'</button>';}).join(''):'');
+    tpl`<span class="ql-l">바로가기</span>`+
+    tpl`${rawHtml(fav.map(function(v){return tpl`<button data-go="${rawHtml(v)}">${viewLabel(v)}</button>`;}).join(''))}`+ tpl`${rawHtml(rec.length? tpl`<span class="ql-l" style="margin-left:8px">최근</span>`+
+      tpl`${rawHtml(rec.map(function(v){return tpl`<button data-go="${rawHtml(v)}">${viewLabel(v)}</button>`;}).join(''))}`:'')}`;
   wrap.querySelectorAll('[data-go]').forEach(function(el){
     el.onclick=function(){ navMenu(el.dataset.go); };   /* ㊿+145: 바로가기·최근도 메뉴처럼 첫 화면 */
   });
@@ -385,7 +384,7 @@ export function applyFs(n){
   var b=document.getElementById('btnFont');
   if(b){
     b.style.background = n>0? 'var(--brand-t,rgba(46,189,87,.13))':'';
-    b.innerHTML = '가<b style="font-size:13.5px">A</b>'+(n===1?' 크게':n===2?' 최대':'');
+    b.innerHTML = tpl`가<b style="font-size:13.5px">A</b>${n===1?' 크게':n===2?' 최대':''}`;
   }
 }
 

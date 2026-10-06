@@ -3,7 +3,7 @@
    원래 app.js 에 있던 순서 그대로 아래 start() 안에 모았습니다 — main.js 가 모든 파일을 읽은 뒤 start() 를 한 번 부릅니다. 각 문장 위 주석 [파일 N행] 은 원래 위치.
    ★ 새 즉시 실행 코드(이벤트 등록·초기화)는 start() 끝(boot() 앞)에 추가하세요. 선언만 있는 함수는 해당 도메인 파일에. */
 import { APP_VER, IS_QA, IS_STAGING, ST } from './state.js';
-import { applyLook, idleCheck, idleTouch, logClientError, PWA, pwaHintSync, refreshToken, sessRead } from './core.js';
+import { applyLook, idleCheck, idleTouch, logClientError, PWA, pwaHintSync, rawHtml, refreshToken, sessRead, tpl } from './core.js';
 import { boot, eqRefresh, railFlyClose, screenLogin, screenPw, toast, todayStr } from './shell.js';
 import { measureTopbar, onResize, RESIZE_HOOKS } from './dash.js';
 import { buildGrids, GRIDS } from './grids.js';
@@ -26,7 +26,7 @@ export function start(){
   });
 
   /* [core.js 117행] */
-  if(IS_STAGING){ document.addEventListener('DOMContentLoaded', function(){ var b=document.createElement('div'); b.id='stagingBar'; b.innerHTML='🧪 <b>STAGING</b> — 시험용 포탈입니다 (운영과 같은 데이터 · 여기서 저장하면 운영에도 반영됩니다) · <a href="'+location.pathname.replace('/staging/','/')+'">운영 포탈로 →</a>'; document.body.prepend(b); document.title='[STAGING] '+document.title; }); }
+  if(IS_STAGING){ document.addEventListener('DOMContentLoaded', function(){ var b=document.createElement('div'); b.id='stagingBar'; b.innerHTML=tpl`🧪 <b>STAGING</b> — 시험용 포탈입니다 (운영과 같은 데이터 · 여기서 저장하면 운영에도 반영됩니다) · <a href="${rawHtml(location.pathname.replace('/staging/','/'))}">운영 포탈로 →</a>`; document.body.prepend(b); document.title='[STAGING] '+document.title; }); }
 
   /* [core.js 129행] */
   window.addEventListener('error', function(e){ logClientError(e.message, e.filename, e.lineno, e.colno, e.error&&e.error.stack); });

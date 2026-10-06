@@ -1328,6 +1328,25 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
     await page.goto(url + '/orders.html'); await page.waitForURL(/index\.html\?v=ordernew/, { timeout: 5000 }); const u = page.url(); await ctx.close(); return u.replace(/^.*\/svc\//, '');
   });
 }
+// ㊿+155: 화면 HTML 은 tpl`` (특수문자 자동 처리) · 타입 검사로 찾은 고객 360 «기간» 빈칸 수정
+{
+  const { ctx, page } = await open();
+  await S.t('㊿+155 tpl``: ${값} 은 자동 esc · rawHtml(…) 만 그대로 · null/undefined 는 빈칸 · 숫자 그대로 · 위성 페이지 tpl 도 같은 규칙', async () => {
+    const r = await page.evaluate(() => { const t = SVC.tpl, R = SVC.rawHtml; const x = '<img src=x onerror=alert(1)> & "q"';
+      return { a: t`<b title="${x}">${x}</b>`, b: t`<ul>${R('<li>1</li>')}</ul>`, c: t`[${null}][${undefined}][${0}][${12.5}]`, d: t`${R(t`<i>${'<'}</i>`)}`, e: SVC.esc('<a href="x">&</a>') }; });
+    assert(r.a === '<b title="&lt;img src=x onerror=alert(1)&gt; &amp; &quot;q&quot;">&lt;img src=x onerror=alert(1)&gt; &amp; &quot;q&quot;</b>', r.a);
+    assert(r.b === '<ul><li>1</li></ul>' && r.c === '[][][0][12.5]' && r.d === '<i>&lt;</i>' && r.e === '&lt;a href=&quot;x&quot;&gt;&amp;&lt;/a&gt;', JSON.stringify(r));
+    const ctx2 = await browser.newContext({ serviceWorkers: 'block' }); const p2 = await ctx2.newPage(); await mockBackend(p2); await p2.goto(url + '/report.html'); await p2.waitForTimeout(800);
+    const sat = await p2.evaluate(() => tpl`<b>${'<x>'}</b>${rawHtml('<i>y</i>')}`); await ctx2.close();
+    assert(sat === '<b>&lt;x&gt;</b><i>y</i>', 'sat ' + sat); return r.a.slice(0, 60);
+  });
+  await S.t('㊿+155 고객 360 «계약» 표의 기간이 채워짐 (예전엔 없는 키 r.start·r.end 를 읽어 늘 « ~ » — 타입 검사가 찾음)', async () => {
+    await page.evaluate(() => SVC.openCust360(SVC.ST.DATA.rows[0].cust)); await page.waitForTimeout(400);
+    const per = await page.evaluate(() => [...document.querySelectorAll('#c360Body .c360-sec')][0].querySelectorAll('tbody tr td:nth-child(6)')[0].textContent);
+    assert(/^\d{4}-\d{2} ~ \d{4}-\d{2}$/.test(per), '기간 «' + per + '»'); return per;
+  });
+  await ctx.close();
+}
 await browser.close(); srv.close();
 const ok = S.report();
 fs.writeFileSync(path.join(OUT, 'smoke.json'), JSON.stringify(S.results, null, 1));

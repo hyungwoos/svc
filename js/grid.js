@@ -2,9 +2,9 @@
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { APP_VER, ST } from './state.js';
 import { Viz } from './viz.js';
-import { $, canView, cssv, lline, mk, navText, permEnter, STATE, won, wonFull } from './core.js';
+import { $, canView, cssv, esc, lline, mk, navText, permEnter, rawHtml, STATE, tpl, won, wonFull } from './core.js';
 import { cmdAskHit, EQB, EQUIP_VIEWS, loadFromDb, onData, railSync, renderEqBoard, sbTry, sbWrite, toast, todayStr } from './shell.js';
-import { buildControls, esc, renderAll } from './dash.js';
+import { buildControls, renderAll } from './dash.js';
 import { GRIDS } from './grids.js';
 import { eqRetOpen, eqWant, renderEqPanel, syncOrderAssets } from './equipment.js';
 import { AK, BZX, CH_DEFS, DC, ensureLeadSrc, liveCalc, liveDiff, loadLib, LS, LV, renderChannelView, setLiveSrc } from './analysis.js';
@@ -88,7 +88,7 @@ export function dashResetIfChanged(){
   var base0=(ST.DASH_BASE0!=null)? ST.DASH_BASE0 : STATE.base;
   if(!off && STATE.unit==='month' && STATE.base===base0 && !STATE.ind && !STATE.partner && !STATE.status && !STATE.search) return;
   STATE.base=base0; var b=document.getElementById('btnReset');
-  if(b && b.onclick) b.onclick(); else { try{ buildControls(); renderAll(); }catch(e){} }
+  if(b && b.onclick) b.onclick.call(b); else { try{ buildControls(); renderAll(); }catch(e){} }
 }
 export function navMenu(v){
   try{ viewReset(v); }catch(e){}
@@ -258,21 +258,21 @@ export function editCell(c,v){
     var same=opts.filter(function(o){ return nz(o)===nz(cv); })[0];
     if(cv && same!==undefined) cv=same;
     else if(cv && opts.indexOf(cv)<0) opts.splice(1,0,cv);           // 정말 없는 값만 보존
-    return '<select data-k="'+c.k+'">'+opts.map(function(o){
+    return tpl`<select data-k="${rawHtml(c.k)}">${rawHtml(opts.map(function(o){
       var lb=(c.k==='line')? lline(o) : (o===''? '— 없음 —' : o);
-      return '<option value="'+esc(o)+'"'+(cv===o?' selected':'')+'>'+esc(lb)+'</option>';}).join('')+'</select>';
+      return tpl`<option value="${o}"${cv===o?' selected':''}>${lb}</option>`;}).join(''))}`+ tpl`</select>`;
   }
   if(c.t==='list'){
     /* 목록에서 고르거나 직접 입력 — 칸을 누르면(또는 ▾) 값이 이미 있어도 전체 목록이 열립니다 */
-    return '<span class="cbo"><input type="text" class="cbi" data-k="'+c.k+'" autocomplete="off" value="'+esc(v==null?'':String(v))+'">'+
-           '<button type="button" class="cbb" tabindex="-1" title="목록 열기">▾</button></span>';
+    return tpl`<span class="cbo"><input type="text" class="cbi" data-k="${rawHtml(c.k)}" autocomplete="off" value="${v==null?'':String(v)}">`+
+           tpl`<button type="button" class="cbb" tabindex="-1" title="목록 열기">▾</button></span>`;
   }
-  if(c.t==='bool') return '<input type="checkbox" data-k="'+c.k+'"'+(v?' checked':'')+'>';
+  if(c.t==='bool') return tpl`<input type="checkbox" data-k="${rawHtml(c.k)}"${v?' checked':''}>`;
   var ty=c.t==='month'?'month':c.t==='date'?'date':c.t==='number'?'number':'text';
   var val=v==null?'':(c.t==='month'?String(v).slice(0,7):c.t==='date'?String(v).slice(0,10):v);
   /* 금액 열은 «원 단위로 입력»임을 입력칸에서도 알 수 있게 안내 */
   var hint=(c.won&&c.t==='number')? ' placeholder="원 단위" title="원 단위로 입력하세요 — 목록·대시보드에는 천원으로 표시됩니다"':'';
-  return '<input type="'+ty+'" data-k="'+c.k+'" value="'+esc(String(val))+'"'+hint+'>';
+  return tpl`<input type="${rawHtml(ty)}" data-k="${rawHtml(c.k)}" value="${String(val)}"${rawHtml(hint)}>`;
 }
 /* 편집 행의 입력칸 보조 동작
    · 날짜 칸: 값이 있으면 옆에 ✕(비우기) — 브라우저 날짜 입력은 지우는 법이 잘 안 보입니다
@@ -310,8 +310,8 @@ export function comboWire(inp, opts, onPick){
     var m=document.createElement('div'); m.className='cbmenu'; m.id='cbMenu';
     if(!list.length) m.innerHTML='<div class="hint">목록에 없는 값입니다 — 그대로 입력하면 저장됩니다</div>';
     else m.innerHTML=list.map(function(o){
-      return '<div class="it'+(o===cur?' cur':'')+'" data-v="'+esc(o)+'">'+esc(o)+'</div>'; }).join('')+
-      (cur && opts.indexOf(cur)<0? '<div class="sep"></div><div class="hint">지금 값 「'+esc(cur)+'」 은 목록에 없지만 그대로 저장됩니다</div>':'')+
+      return tpl`<div class="it${o===cur?' cur':''}" data-v="${o}">${o}</div>`; }).join('')+
+      (cur && opts.indexOf(cur)<0? tpl`<div class="sep"></div><div class="hint">지금 값 「${cur}」 은 목록에 없지만 그대로 저장됩니다</div>`:'')+
       (cur? '<div class="sep"></div><div class="it" data-v="">— 비우기 —</div>':'');
     document.body.appendChild(m);
     CB.inp=inp; comboPlace();
@@ -447,7 +447,7 @@ export function openColPick(btn){
   box.style.top=(r.bottom+window.scrollY+6)+'px';
   var head=document.createElement('div');
   head.style.cssText='display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap';
-  head.innerHTML='<b style="font-size:12px">보일 열 고르기</b><span class="mini" style="color:var(--muted)">'+(g.cols.length-h.length)+'/'+g.cols.length+'</span>';
+  head.innerHTML=tpl`<b style="font-size:12px">보일 열 고르기</b><span class="mini" style="color:var(--muted)">${g.cols.length-h.length}/${g.cols.length}</span>`;
   var all=document.createElement('button'); all.className='chip'; all.textContent='전체 보기';
   all.onclick=function(){ HIDE[ST.CUR_VIEW]=[]; saveHide(); box.remove(); renderGrid(); };
   head.appendChild(all);
@@ -572,17 +572,17 @@ export function openFilterPanel(anchor,opt){
 
   var el=document.createElement('div');
   el.className='colf'; el.id='colfPanel';
-  el.innerHTML='<div class="colf-h">'+esc(opt.label)+' — 볼 값 고르기'+
-      '<span id="colfCnt" style="float:right;font-weight:600;color:var(--muted)"></span></div>'+
-    '<input type="search" id="colfQ" placeholder="값 검색 — 찾은 뒤 「모두」 를 누르면 그것만 선택">'+
-    '<div class="colf-list" id="colfList"></div>'+
-    '<div class="colf-a">'+
-      '<button type="button" id="colfAll" title="검색 중이면 검색 결과만 선택, 아니면 전체 선택">모두</button>'+
-      '<button type="button" id="colfNone" title="선택 전부 해제">해제</button>'+
-      '<span style="flex:1"></span>'+
-      '<button type="button" id="colfCancel">취소</button>'+
-      '<button type="button" class="pri" id="colfOk">적용</button>'+
-    '</div>';
+  el.innerHTML=tpl`<div class="colf-h">${opt.label} — 볼 값 고르기`+
+      tpl`<span id="colfCnt" style="float:right;font-weight:600;color:var(--muted)"></span></div>`+
+    tpl`<input type="search" id="colfQ" placeholder="값 검색 — 찾은 뒤 「모두」 를 누르면 그것만 선택">`+
+    tpl`<div class="colf-list" id="colfList"></div>`+
+    tpl`<div class="colf-a">`+
+      tpl`<button type="button" id="colfAll" title="검색 중이면 검색 결과만 선택, 아니면 전체 선택">모두</button>`+
+      tpl`<button type="button" id="colfNone" title="선택 전부 해제">해제</button>`+
+      tpl`<span style="flex:1"></span>`+
+      tpl`<button type="button" id="colfCancel">취소</button>`+
+      tpl`<button type="button" class="pri" id="colfOk">적용</button>`+
+    tpl`</div>`;
   document.body.appendChild(el);
 
   function paint(){
@@ -594,8 +594,8 @@ export function openFilterPanel(anchor,opt){
     if(hd) hd.textContent=nsel+' / '+order.length+' 선택'+(q? ' · 검색 '+vis.length+'개':'');
     if(!vis.length){ list.innerHTML='<div class="cap" style="padding:10px;text-align:center">해당하는 값이 없습니다</div>'; return; }
     list.innerHTML=vis.map(function(v){
-      return '<label class="colf-i"><input type="checkbox" data-v="'+esc(v)+'"'+(picked[v]?' checked':'')+'>'+
-        '<span class="t" title="'+esc(v)+'">'+esc(v)+'</span><span class="n">'+(cnt[v]||0)+'</span></label>';
+      return tpl`<label class="colf-i"><input type="checkbox" data-v="${v}"${picked[v]?' checked':''}>`+
+        tpl`<span class="t" title="${v}">${v}</span><span class="n">${rawHtml(cnt[v]||0)}</span></label>`;
     }).join('');
     list.querySelectorAll('input[data-v]').forEach(function(i){
       i.onchange=function(){ if(i.checked) picked[i.dataset.v]=1; else delete picked[i.dataset.v];
@@ -783,30 +783,30 @@ export function renderLiveBar(lb){
   var isDb=(ST.LIVE_SRC!=='sheet'), T=(LV.T!=null? LV.T : STATE.base), lv=liveCalc(T), sh=(ST.DATA.live&&ST.DATA.live.ok)? ST.DATA.live : null;
   var perLine={}; lv.rows.forEach(function(x){ perLine[x.line]=(perLine[x.line]||0)+1; });
   var lineTxt=Object.keys(perLine).sort().map(function(l){ return lline(l)+' '+perLine[l]; }).join(' · ');
-  var h='<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;width:100%">'+
-    '<div class="seg" title="LIVE 고객사를 어디에서 가져올지"><button data-lsrc="db" aria-pressed="'+isDb+'" title="계약 표로 자동 판정 — 등록·해지가 그대로 반영됩니다">계약 기준(자동)</button><button data-lsrc="sheet" aria-pressed="'+(!isDb)+'" title="예전 LIVE 고객사 탭을 옮겨 둔 명단 — 대조·편집용">시트 명단</button></div>';
+  var h=tpl`<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;width:100%">`+
+    tpl`<div class="seg" title="LIVE 고객사를 어디에서 가져올지"><button data-lsrc="db" aria-pressed="${rawHtml(isDb)}" title="계약 표로 자동 판정 — 등록·해지가 그대로 반영됩니다">계약 기준(자동)</button><button data-lsrc="sheet" aria-pressed="${!isDb}" title="예전 LIVE 고객사 탭을 옮겨 둔 명단 — 대조·편집용">시트 명단</button></div>`;
   if(isDb){
-    var opts=''; for(var i=ST.DATA.nowIdx+3;i>=Math.max(0,ST.DATA.nowIdx-36);i--){ opts+='<option value="'+i+'"'+(i===T?' selected':'')+'>'+mk(i)+(i===ST.DATA.nowIdx?' (이번 달)':'')+'</option>'; }
-    h+='<label class="mini" style="display:flex;align-items:center;gap:6px">기준월 <select id="lvMonth" style="font:inherit;padding:4px 6px;border:1px solid var(--ring);border-radius:8px;background:var(--surface-2);color:inherit">'+opts+'</select></label>';
-    h+='<span class="mini"><b>'+mk(T)+'</b> LIVE <b>'+lv.uniq+'곳</b>(회사) · 제품별 합 <b>'+lv.count+'</b> — '+lineTxt+(sh? ' · 시트 명단 '+sh.uniq+'곳 / '+sh.count+'건':'')+'</span>';
+    var opts=''; for(var i=ST.DATA.nowIdx+3;i>=Math.max(0,ST.DATA.nowIdx-36);i--){ opts+=tpl`<option value="${rawHtml(i)}"${i===T?' selected':''}>${mk(i)}${i===ST.DATA.nowIdx?' (이번 달)':''}</option>`; }
+    h+=tpl`<label class="mini" style="display:flex;align-items:center;gap:6px">기준월 <select id="lvMonth" style="font:inherit;padding:4px 6px;border:1px solid var(--ring);border-radius:8px;background:var(--surface-2);color:inherit">${rawHtml(opts)}</select></label>`;
+    h+=tpl`<span class="mini"><b>${mk(T)}</b> LIVE <b>${rawHtml(lv.uniq)}곳</b>(회사) · 제품별 합 <b>${rawHtml(lv.count)}</b> — ${rawHtml(lineTxt)}${rawHtml(sh? ' · 시트 명단 '+sh.uniq+'곳 / '+sh.count+'건':'')}</span>`;
     if(sh){ var df=liveDiff(T); var nd=df.onlyDb.length+df.onlySheet.length;
-      h+='<button class="chip" id="lvDiffBtn" aria-pressed="'+LV.diff+'" title="계약 기준과 시트 명단이 다른 곳만 보기">'+(nd? '⚠ 시트와 다른 곳 '+nd:'✓ 시트 명단과 일치')+'</button>'; }
+      h+=tpl`<button class="chip" id="lvDiffBtn" aria-pressed="${rawHtml(LV.diff)}" title="계약 기준과 시트 명단이 다른 곳만 보기">${rawHtml(nd? '⚠ 시트와 다른 곳 '+nd:'✓ 시트 명단과 일치')}</button>`; }
   } else {
-    h+='<span class="mini">시트 명단 <b>'+(sh?sh.uniq:0)+'곳</b> / '+(sh?sh.count:0)+'건 · 계약 기준 '+mk(T)+' '+lv.uniq+'곳</span>';
+    h+=tpl`<span class="mini">시트 명단 <b>${rawHtml(sh?sh.uniq:0)}곳</b> / ${rawHtml(sh?sh.count:0)}건 · 계약 기준 ${mk(T)} ${rawHtml(lv.uniq)}곳</span>`;
   }
-  h+='<span class="mini" style="color:var(--muted)">'+(isDb? '따로 등록하지 않습니다 — 계약이 등록·해지되면 자동으로 바뀝니다':'이 명단은 직접 고쳐야 하며 대시보드에는 쓰이지 않습니다')+'</span></div>';
+  h+=tpl`<span class="mini" style="color:var(--muted)">${isDb? '따로 등록하지 않습니다 — 계약이 등록·해지되면 자동으로 바뀝니다':'이 명단은 직접 고쳐야 하며 대시보드에는 쓰이지 않습니다'}</span></div>`;
   if(isDb && sh && LV.diff){
     var d=liveDiff(T);
     function rowsOf(arr, kind){ if(!arr.length) return '<tr><td colspan="4" class="mini" style="color:var(--muted)">없음</td></tr>';
-      return arr.map(function(x){ return '<tr><td>'+esc(x.cust)+'</td><td>'+esc(lline(x.line))+'</td><td>'+esc(kind==='db'? (x.basis||'') : x.why)+'</td><td>'+(kind==='db'? '시트 LIVE 탭에 추가하면 같아짐' : (/계약 없음/.test(x.why)? '계약을 등록하거나 사명을 맞춤(사명 변경 기능)' : /계약 예정/.test(x.why)? '시작하면 계약 화면에서 시작월 입력' : /no_count/.test(x.why)? '매출만 세는 행 — 시트에서도 «중복»으로 빼는 행이라 정상' : /예외 제외/.test(x.why)? '계약의 LIVE 예외 «제외» 지정 — 의도한 것' : /해지|종료/.test(x.why)? '시트 명단에서 빼야 함' : /만기/.test(x.why)? '재약정이면 연장 등록, 끝났으면 해지 처리' : '계약 화면 확인'))+'</td></tr>'; }).join(''); }
-    h+='<div style="flex-basis:100%;margin-top:6px;padding:10px 12px;border:1px solid var(--ring);border-radius:10px;background:var(--surface-2,rgba(0,0,0,.02))">'+
-      '<div class="mini" style="margin-bottom:6px"><b>계약 기준 '+mk(T)+'</b> '+d.db.uniq+'곳 vs <b>시트 명단</b> '+d.sheetN+'곳 — 이름은 띄어쓰기·(주)·괄호·별칭을 무시하고 맞춰 봤습니다. 아래 항목이 0이 되면 두 숫자가 같아집니다.</div>'+
-      '<div style="overflow-x:auto"><table class="pr"><thead><tr><th>고객사</th><th>서비스</th><th>왜 다른가</th><th>어떻게 맞추나</th></tr></thead><tbody>'+
-      '<tr><td colspan="4" style="background:var(--surface)"><b>계약으로는 LIVE 인데 시트 명단에 없음 — '+d.onlyDb.length+'</b></td></tr>'+rowsOf(d.onlyDb,'db')+
-      '<tr><td colspan="4" style="background:var(--surface)"><b>시트 명단에는 있는데 계약으로는 LIVE 아님 — '+d.onlySheet.length+'</b></td></tr>'+rowsOf(d.onlySheet,'sheet')+
-      '</tbody></table></div></div>';
+      return arr.map(function(x){ return tpl`<tr><td>${x.cust}</td><td>${lline(x.line)}</td><td>${kind==='db'? (x.basis||'') : x.why}</td><td>${kind==='db'? '시트 LIVE 탭에 추가하면 같아짐' : (/계약 없음/.test(x.why)? '계약을 등록하거나 사명을 맞춤(사명 변경 기능)' : /계약 예정/.test(x.why)? '시작하면 계약 화면에서 시작월 입력' : /no_count/.test(x.why)? '매출만 세는 행 — 시트에서도 «중복»으로 빼는 행이라 정상' : /예외 제외/.test(x.why)? '계약의 LIVE 예외 «제외» 지정 — 의도한 것' : /해지|종료/.test(x.why)? '시트 명단에서 빼야 함' : /만기/.test(x.why)? '재약정이면 연장 등록, 끝났으면 해지 처리' : '계약 화면 확인')}</td></tr>`; }).join(''); }
+    h+=tpl`<div style="flex-basis:100%;margin-top:6px;padding:10px 12px;border:1px solid var(--ring);border-radius:10px;background:var(--surface-2,rgba(0,0,0,.02))">`+
+      tpl`<div class="mini" style="margin-bottom:6px"><b>계약 기준 ${mk(T)}</b> ${rawHtml(d.db.uniq)}곳 vs <b>시트 명단</b> ${rawHtml(d.sheetN)}곳 — 이름은 띄어쓰기·(주)·괄호·별칭을 무시하고 맞춰 봤습니다. 아래 항목이 0이 되면 두 숫자가 같아집니다.</div>`+
+      tpl`<div style="overflow-x:auto"><table class="pr"><thead><tr><th>고객사</th><th>서비스</th><th>왜 다른가</th><th>어떻게 맞추나</th></tr></thead><tbody>`+
+      tpl`<tr><td colspan="4" style="background:var(--surface)"><b>계약으로는 LIVE 인데 시트 명단에 없음 — ${d.onlyDb.length}</b></td></tr>${rawHtml(rowsOf(d.onlyDb,'db'))}`+
+      tpl`<tr><td colspan="4" style="background:var(--surface)"><b>시트 명단에는 있는데 계약으로는 LIVE 아님 — ${d.onlySheet.length}</b></td></tr>${rawHtml(rowsOf(d.onlySheet,'sheet'))}`+
+      tpl`</tbody></table></div></div>`;
   }
-  h+='<div style="flex-basis:100%">'+helpBox('live', 'LIVE 고객사는 어떻게 정해지나요?', [
+  h+=tpl`<div style="flex-basis:100%">${rawHtml(helpBox('live', 'LIVE 고객사는 어떻게 정해지나요?', [
     ['계약 기준(자동)', '계약 표에서 <b>기준월에 유효한 원계약</b>이 있는 회사를 제품마다 1행으로 보여줍니다. 시작월 ≤ 기준월이고, 종료월이 없거나 기준월 이후면 LIVE. <b>해지</b>는 해지월부터 빠지고, 만기 달(종료월 = 기준월)은 아직 LIVE(재약정 대기)로 봅니다.'],
     ['빠지는 계약', '부속 계약(추가 구매)·상태 «통합과금»(에스원 CND 묶음 과금)·«추가»·고객 수 제외 행(no_count)·판매형태 H/W. 시작월이 비어 있으면 «계약 예정»으로 LIVE 아님.'],
     ['CN전환', 'CND(DeviceKeeper)에서 S1 Basic 으로 바뀌어 에스원 통합 과금으로 계속 쓰는 고객 — 종료월이 없으므로 항상 LIVE.'],
@@ -814,7 +814,7 @@ export function renderLiveBar(lb){
     ['예외', '규칙으로 안 잡히는 경우(무상 시범, 파트너 내부용 등)는 계약 행의 «LIVE 예외»를 포함/제외로 두면 규칙보다 우선합니다. 예외 열에 사유가 보입니다.'],
     ['등록·삭제', '따로 등록하지 않습니다. 새 고객 → 입력·수정 › 계약에서 신규 계약(시작월·노드·CSM 입력) · 빠질 때 → 상태 «해지»와 해지월. 저장하면 LIVE·대시보드·해지율이 한 번에 바뀝니다.'],
     ['시트 명단', '예전 매출시트 «LIVE 고객사» 탭을 옮겨 둔 표(대조용). «시트와 다른 곳» 버튼으로 두 기준의 차이를 항목별로 볼 수 있습니다.']
-  ], '기준월을 바꾸면 그 시점의 LIVE 명단이 나옵니다 — 시트로는 못 보던 과거 시점 비교가 됩니다.')+'</div>';
+  ], '기준월을 바꾸면 그 시점의 LIVE 명단이 나옵니다 — 시트로는 못 보던 과거 시점 비교가 됩니다.'))}`+ tpl`</div>`;
   lb.innerHTML=h;
   lb.querySelectorAll('button[data-lsrc]').forEach(function(b){ b.onclick=function(){ setLiveSrc(b.dataset.lsrc); DV.page=0; DV.filters={}; DV.sortK=null; switchView('live'); }; });
   var ms=lb.querySelector('#lvMonth'); if(ms) ms.onchange=function(){ LV.T=+ms.value; DV.page=0; renderGrid(); };
@@ -827,7 +827,7 @@ export function dvCapRender(v, text){
   var key='svc_capopen_'+v, open=false; try{ open=localStorage.getItem(key)==='1'; }catch(e){}
   if(text.length<=120){ el.textContent=text; return; }
   var cut=text.search(/ — | · /); var head=cut>20? text.slice(0,cut) : text.slice(0,90)+'…';
-  el.innerHTML='<span class="cap-head">'+esc(open? text : head)+'</span> <button type="button" class="cap-more" aria-expanded="'+open+'" aria-controls="dvCap">'+(open? '접기 ▴':'도움말 ▾')+'</button>';
+  el.innerHTML=tpl`<span class="cap-head">${open? text : head}</span> <button type="button" class="cap-more" aria-expanded="${rawHtml(open)}" aria-controls="dvCap">${open? '접기 ▴':'도움말 ▾'}</button>`;
   el.querySelector('.cap-more').onclick=function(){ try{ localStorage.setItem(key, open? '0':'1'); }catch(e){} dvCapRender(v, text); };
 }
 /* 데스크톱 가로 스크롤 표에서 오른쪽 고정 동작(✎/🗑) 열이 마지막 데이터 열을 덮지 않게 — 표가 넘칠 때만 마지막 데이터 열에 동작 열 너비만큼 오른쪽 여백 (⑤ UX 2단계) */
@@ -923,7 +923,7 @@ export function renderGrid(){
       var v=op[0], on=(DV.lens||'')===v;
       if(v && !LS[v].n && !DV.lensAll) return;
       var btn=document.createElement('button'); btn.className='chip'; btn.setAttribute('aria-pressed', on?'true':'false'); btn.textContent=op[1]; btn.title=op[2];
-      if(v && !LS[v].n){ btn.disabled=true; btn.style.opacity=.45; }
+      if(v && !LS[v].n){ btn.disabled=true; btn.style.opacity='.45'; }
       btn.onclick=function(){ DV.lens=(on? '':v); DV.page=0; renderGrid(); };
       lb.appendChild(btn);
     });
@@ -997,10 +997,8 @@ export function renderGrid(){
     var q=($('#dvSearch').value||'').trim(), nfl=filterCount(), hasLens=!!DV.lens, hasChip=!!DV.chipVal;
     var why=q? '검색어 «'+esc(q)+'»' : (nfl? '열 필터 '+nfl+'개' : hasLens? '관점 필터' : hasChip? '«'+esc(DV.chipVal)+'» 탭' : '');
     var tr=document.createElement('tr'); tr.className='dg-empty';
-    tr.innerHTML='<td colspan="'+(g.cols.length+2)+'" style="text-align:left;padding:34px 12px;color:var(--muted)"><div style="position:sticky;left:12px;width:min(520px,calc(100vw - 160px));text-align:center">'+
-      (why? '<div style="font-size:13.5px">'+why+'에 맞는 행이 없습니다</div><div style="margin-top:10px;display:flex;gap:6px;justify-content:center;flex-wrap:wrap">'+
-        (q? '<button type="button" class="cbtn" data-dge="q">검색어 지우기</button>':'')+((nfl||hasLens)? '<button type="button" class="cbtn" data-dge="f">필터 지우기</button>':'')+(hasChip? '<button type="button" class="cbtn" data-dge="c">전체 탭으로</button>':'')+'</div>'
-          : '<div style="font-size:13.5px">아직 데이터가 없습니다</div>'+(g.add&&!ST.IS_VIEWER? '<div class="mini" style="margin-top:6px">위의 «＋ 행 추가» 로 첫 행을 넣을 수 있습니다</div>':''))+'</div></td>';
+    tr.innerHTML=tpl`<td colspan="${rawHtml(g.cols.length+2)}" style="text-align:left;padding:34px 12px;color:var(--muted)"><div style="position:sticky;left:12px;width:min(520px,calc(100vw - 160px));text-align:center">`+ tpl`${rawHtml(why? tpl`<div style="font-size:13.5px">${rawHtml(why)}에 맞는 행이 없습니다</div><div style="margin-top:10px;display:flex;gap:6px;justify-content:center;flex-wrap:wrap">`+ tpl`${rawHtml(q? '<button type="button" class="cbtn" data-dge="q">검색어 지우기</button>':'')}${rawHtml((nfl||hasLens)? '<button type="button" class="cbtn" data-dge="f">필터 지우기</button>':'')}${rawHtml(hasChip? '<button type="button" class="cbtn" data-dge="c">전체 탭으로</button>':'')}</div>`
+          : tpl`<div style="font-size:13.5px">아직 데이터가 없습니다</div>${rawHtml(g.add&&!ST.IS_VIEWER? '<div class="mini" style="margin-top:6px">위의 «＋ 행 추가» 로 첫 행을 넣을 수 있습니다</div>':'')}`)}`+ tpl`</div></td>`;
     tb.appendChild(tr);
     tr.querySelectorAll('[data-dge]').forEach(function(b){ b.onclick=function(){ var k=b.dataset.dge; if(k==='q'){ $('#dvSearch').value=''; } if(k==='f'){ DV.filters={}; DV.lens=''; } if(k==='c'){ DV.chipVal=''; } DV.page=0; renderGrid(); }; });
   }
@@ -1047,11 +1045,10 @@ export function openDetail(c){
   var t=$('#dtLog'); t.innerHTML='<tbody><tr><td class="mini">불러오는 중…</td></tr></tbody>';
   sbTry('change_log?select=*&target_id=eq.'+c.id+'&order=id.desc&limit=50').then(function(rows){
     rows=rows||[];
-    t.innerHTML='<thead><tr><th>시각</th><th>누가</th><th>동작</th><th>내용</th></tr></thead><tbody>'+
-      (rows.length? rows.map(function(x){
-        return '<tr><td>'+String(x.at||'').replace('T',' ').slice(0,16)+'</td><td>'+esc(x.actor||'')+
-          '</td><td>'+esc(x.action||'')+'</td><td class="mini">'+esc(x.detail?JSON.stringify(x.detail).slice(0,90):'')+'</td></tr>';
-      }).join('') : '<tr><td colspan="4" class="mini">웹에서 수정한 기록이 없습니다 (최초 이관 데이터)</td></tr>')+'</tbody>';
+    t.innerHTML=tpl`<thead><tr><th>시각</th><th>누가</th><th>동작</th><th>내용</th></tr></thead><tbody>`+ tpl`${rawHtml(rows.length? rows.map(function(x){
+        return tpl`<tr><td>${rawHtml(String(x.at||'').replace('T',' ').slice(0,16))}</td><td>${x.actor||''}`+
+          tpl`</td><td>${x.action||''}</td><td class="mini">${x.detail?JSON.stringify(x.detail).slice(0,90):''}</td></tr>`;
+      }).join('') : '<tr><td colspan="4" class="mini">웹에서 수정한 기록이 없습니다 (최초 이관 데이터)</td></tr>')}`+ tpl`</tbody>`;
   });
 }
 
@@ -1062,11 +1059,11 @@ export function gridRow(r,g,editing){
       var n=c.t==='number'?' class="n"':'';
       var txt=fmtCell(c,r[c.k],r);
       if(c.href && r[c.k]){
-        return '<td'+n+'><a href="'+esc(c.href(r[c.k],r))+'" target="_blank" '+
-               'style="color:var(--s1-ink);text-decoration:none">'+esc(txt)+'</a></td>';
+        return tpl`<td${rawHtml(n)}><a href="${c.href(r[c.k],r)}" target="_blank" `+
+               tpl`style="color:var(--s1-ink);text-decoration:none">${txt}</a></td>`;
       }
-      if(c.html) return '<td'+n+' style="white-space:normal">'+txt+'</td>';   /* fmt 가 안전한 HTML 을 만든 열 (시리얼 묶음 등) */
-      return '<td'+n+'>'+esc(txt)+'</td>';
+      if(c.html) return tpl`<td${rawHtml(n)} style="white-space:normal">${rawHtml(txt)}</td>`;   /* fmt 가 안전한 HTML 을 만든 열 (시리얼 묶음 등) */
+      return tpl`<td${rawHtml(n)}>${txt}</td>`;
     }).join('')+(g.ro?'':'<td class="act"></td>');
     if(g.rowClick){ tr.style.cursor='pointer'; tr.onclick=function(e){
       if(e.target.closest('button')||e.target.closest('input')||e.target.closest('select')||e.target.closest('a')) return;
@@ -1130,9 +1127,9 @@ export function gridRow(r,g,editing){
     }
   }
   function edit(){
-    tr.innerHTML=visCols(g).map(function(c){
-      return '<td>'+(c.ro? (c.html? fmtCell(c,r[c.k],r) : esc(fmtCell(c,r[c.k],r))) : editCell(c,r[c.k]))+'</td>';
-    }).join('')+'<td class="act"></td>';
+    tr.innerHTML=tpl`${rawHtml(visCols(g).map(function(c){
+      return tpl`<td>${rawHtml(c.ro? (c.html? fmtCell(c,r[c.k],r) : esc(fmtCell(c,r[c.k],r))) : editCell(c,r[c.k]))}</td>`;
+    }).join(''))}`+ tpl`<td class="act"></td>`;
     wireRowInputs(tr,g);
     var act=tr.lastChild;
     var bs=document.createElement('button'); bs.textContent='저장'; bs.className='sv';
@@ -1196,7 +1193,7 @@ export function gridAddRow(){
   var t=$('#dvTable'); var tb=t.querySelector('tbody'); if(!tb) return;
   var tr=document.createElement('tr');
   // 계산 열(설치율·신청 모듈처럼 ro 또는 «_» 로 시작)은 DB 에 없는 열 — 입력칸을 만들지 않음 (PGRST204 «_fill column» 오류 원인)
-  tr.innerHTML=g.cols.map(function(c){ return '<td>'+((c.ro || c.k[0]==='_')? '<span class="mini">·</span>' : editCell(c,null))+'</td>'; }).join('')+'<td class="act"></td>';
+  tr.innerHTML=tpl`${rawHtml(g.cols.map(function(c){ return tpl`<td>${rawHtml((c.ro || c.k[0]==='_')? '<span class="mini">·</span>' : editCell(c,null))}</td>`; }).join(''))}<td class="act"></td>`;
   wireRowInputs(tr,g);
   var act=tr.lastChild;
   var bs=document.createElement('button'); bs.textContent='추가'; bs.className='sv';

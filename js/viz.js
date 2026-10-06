@@ -1,4 +1,5 @@
 /* Viz — 의존성 없는 초경량 SVG 차트 (index.html 에서 분리 · ④ 아키텍처 ㊿+134) */
+import { rawHtml, tpl } from './core.js';
 /* ==================================================================
    Viz — 의존성 없는 초경량 SVG 차트 (dataviz 마크 규격 준수)
    · 얇은 마크 / 2px 선 / 데이터 끝 4px 라운드 / 채움 사이 2px 서피스 간격
@@ -81,10 +82,10 @@ export var Viz = (function () {
   }
 
   function tipHTML(label, items, fmt) {
-    return '<div class="vt-t">' + String(label == null ? '' : label).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }) + '</div>' + items.map(function (it) {
-      return '<div class="vt-r"><span class="vt-s" style="background:' + it.color + '"></span>' +
-        '<span class="vt-n">' + String(it.name == null ? '' : it.name).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }) + '</span><span class="vt-v">' + fmt(it.value) + '</span></div>';
-    }).join('');
+    return tpl`<div class="vt-t">${rawHtml(String(label == null ? '' : label).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }))}</div>${rawHtml(items.map(function (it) {
+      return tpl`<div class="vt-r"><span class="vt-s" style="background:${rawHtml(it.color)}"></span>`+
+        tpl`<span class="vt-n">${rawHtml(String(it.name == null ? '' : it.name).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }))}</span><span class="vt-v">${rawHtml(fmt(it.value))}</span></div>`;
+    }).join(''))}`;
   }
   function placeTip(f, tip, x) {
     var w = tip.offsetWidth, left = x + 14;
@@ -149,7 +150,7 @@ export var Viz = (function () {
 
     var hit = s('rect', { x: f.pad.l, y: f.pad.t, width: f.iw, height: f.ih, fill: 'transparent' });
     f.root.appendChild(hit);
-    hit.addEventListener('mousemove', function (ev) {
+    hit.addEventListener('mousemove', function (/** @type {MouseEvent} */ ev) {
       var r = f.root.getBoundingClientRect();
       var i = Math.max(0, Math.min(n - 1, Math.floor((ev.clientX - r.left - f.pad.l) / band)));
       var x = X(i);
@@ -159,11 +160,11 @@ export var Viz = (function () {
       var items = series.map(function (sr) { return { name: sr.label, color: sr.color, value: sr.data[i] || 0 }; }).reverse();
       if (series.length > 1) items.push({ name: '합계', color: 'transparent', value: series.reduce(function (a, sr) { return a + (sr.data[i] || 0); }, 0) });
       f.tip.innerHTML = tipHTML(labels[i], items, tfmt);
-      f.tip.style.opacity = 1;
+      f.tip.style.opacity = '1';
       placeTip(f, f.tip, x);
     });
     hit.addEventListener('mouseleave', function () {
-      cross.setAttribute('opacity', 0); marks.setAttribute('opacity', 0); f.tip.style.opacity = 0;
+      cross.setAttribute('opacity', 0); marks.setAttribute('opacity', 0); f.tip.style.opacity = '0';
     });
   }
 
@@ -205,9 +206,9 @@ export var Viz = (function () {
           p.setAttribute('opacity', .82);
           var items = series.map(function (s2) { return { name: s2.label, color: s2.colorAt ? s2.colorAt(i) : s2.color, value: s2.data[i] || 0 }; });
           f.tip.innerHTML = tipHTML(labels[i], items, tfmt) + (cfg.extra ? cfg.extra(i) : '');
-          f.tip.style.opacity = 1; placeTip(f, f.tip, cx);
+          f.tip.style.opacity = '1'; placeTip(f, f.tip, cx);
         });
-        p.addEventListener('mouseleave', function () { p.removeAttribute('opacity'); f.tip.style.opacity = 0; });
+        p.addEventListener('mouseleave', function () { p.removeAttribute('opacity'); f.tip.style.opacity = '0'; });
         f.root.appendChild(p);
       });
     });

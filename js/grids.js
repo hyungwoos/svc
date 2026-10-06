@@ -1,9 +1,8 @@
 /* ===== grids.js — 선택 목록(LINE_OPTS 등) · 표 정의(GRIDS · buildGrids) · 데모 데이터 =====
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { ST } from './state.js';
-import { LINE_LABEL, lline, llineVer, VER_OPTS } from './core.js';
+import { LINE_LABEL, lline, llineVer, tpl, VER_OPTS } from './core.js';
 import { sbTry } from './shell.js';
-import { esc } from './dash.js';
 import { eqRetSet, eqSerialsHtml, eqWant } from './equipment.js';
 import { liveCalc, LV, renderAiKnow, renderBizMonthly, renderDataCheck, renderLeadSrc } from './analysis.js';
 import { openCust360 } from './tools.js';
@@ -38,7 +37,7 @@ export async function loadCodes(){
   try{
     var rows=await sbTry('code_lists?select=kind,value,label,sort,active,note&order=kind,sort,value');
     if(!rows || !rows.length){ ST.CODES=null; return null; }   // 표 없음(SQL 93 전 · sbAll 은 404 도 [] 로 돌려줌)·비어 있음 → 상수 그대로
-    var m={}; rows.forEach(function(r){ (m[r.kind]=m[r.kind]||[]).push(r); });
+    var m=/** @type {Object<string, import('./state.js').CodeItem[]>} */ ({}); rows.forEach(function(r){ (m[r.kind]=m[r.kind]||[]).push(r); });
     ST.CODES=m; try{ sessionStorage.setItem('svc_codes', JSON.stringify(m)); }catch(e){}
     applyCodes(); return m;
   }catch(e){ ST.CODES=null; return null; }
@@ -63,7 +62,7 @@ export function applyCodes(){
 export function codeList(kind){ return (ST.CODES && ST.CODES[kind]) || (codeArr(kind)||[]).map(function(v){ return {kind:kind, value:v, active:true}; }); }
 export function codeActive(kind, v){ if(v==null || v==='') return true; var arr=codeArr(kind); return !arr || arr.indexOf(v)>=0; }
 /* 발주 신청 폼의 모델 select (#odModel) 를 MODEL_OPTS 로 다시 채움 — 현재 값 유지 */
-export function fillModelSelect(){ var s=document.getElementById('odModel'); if(!s) return; var cur=s.value; s.innerHTML=MODEL_OPTS.map(function(m){ return '<option>'+esc(m)+'</option>'; }).join(''); if(cur && MODEL_OPTS.indexOf(cur)>=0) s.value=cur; }
+export function fillModelSelect(){ var s=document.getElementById('odModel'); if(!s) return; var cur=s.value; s.innerHTML=MODEL_OPTS.map(function(m){ return tpl`<option>${m}</option>`; }).join(''); if(cur && MODEL_OPTS.indexOf(cur)>=0) s.value=cur; }
 
 export var LINE_OPTS=['Cloud','S1','MDR','MDR_S1','DRM','PNS','DLP'];
 export var PTN_OPTS=['지니언스(직접)','다원티에스','글로웰시스템','에티버스','직접(계산서)'];
@@ -136,6 +135,22 @@ export var OI_PARTNERS=['다원티에스','글로웰시스템','에티버스','�
 
 /* ===== 표 정의 GRIDS — 화면 이름 → {제목·표·열·행 만들기} (㊿+153: init.js 에서 옮김)
    만드는 중에 OI_PROB.map 같은 호출이 있어 파일을 읽을 때가 아니라 시작할 때(init.js start → buildGrids) 만듦 */
+/** 표 화면 정의 하나 (GRIDS[화면] — grid.js renderGrid 가 그림 · ㊿+155 이름표)
+ * @typedef {Object} GridDef
+ * @property {string} title 화면 제목 @property {string} table Supabase 표 이름 @property {string} cap 표 위 설명
+ * @property {boolean|string} add 행 추가 허용 @property {boolean|string} del 삭제 허용 ('super' = 슈퍼 관리자만) @property {boolean} [ro] 읽기 전용
+ * @property {function(): any[]} rows 그릴 행 @property {GridCol[]} cols 열 @property {function(any): void} [rowClick] 행 누름
+ * @property {function(): void} [custom] 표 대신 그리는 화면(데이터 점검 등) @property {string} [chipsField] 위쪽 칩으로 거를 열 @property {any} [chipsOpts] 칩 값 목록
+ * @property {?Object<string, any>} [_lens] 관점 필터(계약 메뉴)로 남길 행 id — grid.js 가 그릴 때 붙임
+ */
+/** 표 열 하나
+ * @typedef {Object} GridCol
+ * @property {string} k 행의 키 @property {string} l 머리글 @property {boolean|number} [ro] 고칠 수 없음 @property {string} [t] 입력 종류(select·list·bool·num·date…)
+ * @property {any} [opts] 고를 값(배열 또는 함수) @property {string} [tbl] 다른 표에 저장 @property {string} [ref] 그 표의 연결 키 @property {string} [src] 그 표의 열
+ * @property {function(any, any=): any} [fmt] 셀 표시 @property {boolean|number} [won] 원 단위 @property {boolean|number} [req] 필수 @property {boolean|number} [num] 숫자
+ * @property {any} [href] 링크 @property {boolean|number} [html] fmt 결과가 HTML @property {boolean|number} [raw] 원본 그대로
+ */
+/** @type {?Object<string, GridDef>} */
 export var GRIDS=null;
 export function buildGrids(){
   GRIDS={
@@ -227,7 +242,7 @@ export function buildGrids(){
         {k:'basis',l:'LIVE 근거'},
         {k:'ov',l:'예외',fmt:function(v,r){ return v? (v+(r&&r.ovNote? ' — '+r.ovNote:'')) : '·'; }}
       ];
-      var g={
+      var g=/** @type {GridDef} */ ({
         title:'LIVE 고객사',
         rowClick:function(r){ openCust360(r.name||r.cust); },
         rows:function(){
@@ -237,7 +252,7 @@ export function buildGrids(){
           var lv=liveCalc(LV.T!=null? LV.T : undefined);
           return lv.rows.slice().sort(function(a,b){ return String(b.curStart||'').localeCompare(String(a.curStart||'')) || String(a.cust).localeCompare(String(b.cust),'ko'); });
         }
-      };
+      });
       Object.defineProperty(g,'cols',{get:function(){ return ST.LIVE_SRC==='sheet'? SHEET_COLS : DB_COLS; }});
       Object.defineProperty(g,'table',{get:function(){ return ST.LIVE_SRC==='sheet'? 'live_customers' : ''; }});
       Object.defineProperty(g,'ro',{get:function(){ return ST.LIVE_SRC!=='sheet'; }});
