@@ -1,13 +1,14 @@
 /* ===== tools.js — 전역 검색 · 고객 360 · 표 밀도 · 엑셀 붙여넣기 · 메뉴 편집 · 글자 크기 =====
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { ST } from './state.js';
-import { $, lline, mk, navText, rawHtml, tpl } from './core.js';
+import { $, amtWhy, lline, mk, navText, rawHtml, tpl, wonKo } from './core.js';
 import { buildRail, c360Enhance, cmdAskHit, cmdMenuHits, dIdx, loadFromDb, onData, renderInbox, sbTry, sbWrite, toast, todayStr, visBtn } from './shell.js';
 import { GRIDS } from './grids.js';
 import { applyChannelMenu, liveData } from './analysis.js';
 import { goInbList, loadInbound } from './inbound.js';
 import { applyMenuFold } from './sales.js';
 import { navMenu, renderGrid, switchView } from './grid.js';
+import { syncOrderAssets } from './equipment.js';
 import { closeOvl, openOvl, ovlMarkDirty } from './edit.js';
 
 
@@ -145,7 +146,7 @@ export function pasteCols(g){ return g.cols.filter(function(c){ return !c.ro && 
 export function openPaste(){
   var g=GRIDS[ST.CUR_VIEW]; if(!g||!g.add) return;
   var cols=pasteCols(g);
-  $('#pasteCols').innerHTML=tpl`열 순서: ${rawHtml(cols.map(function(c){return tpl`<b>${c.l}</b>`;}).join(' → '))}`+
+  $('#pasteCols').innerHTML=tpl`열 순서: ${rawHtml(cols.map(function(c){return tpl`<b>${c.l}</b>`;}).join(' → '))}`+ tpl`${rawHtml(cols.some(function(c){ return c.won; })? ' <span class="mini"><b>금액은 천원</b>(표와 같은 단위)</span>' : '')}`+
     tpl` <span class="mini">(엑셀에서 이 순서로 열을 맞춰 복사하세요 · 빈 칸은 비워둬도 됩니다)</span>`;
   $('#pasteTa').value=''; $('#pastePrev').textContent=''; $('#pasteMsg').textContent='';
   function parse(){
@@ -155,7 +156,7 @@ export function openPaste(){
       cols.forEach(function(c,i){
         var v=(cells[i]||'').trim();
         if(v===''){ row[c.k]=null; return; }
-        if(c.t==='number'){ var n=parseFloat(v.replace(/[^\d.\-]/g,'')); row[c.k]=isNaN(n)?null:n; }
+        if(c.t==='number'){ var n=parseFloat(v.replace(/[^\d.\-]/g,'')); row[c.k]=isNaN(n)?null:(c.won? Math.round(n*1000) : n); }   /* 금액 열은 천원으로 붙여넣기 → 원 (㊿+157) */
         else if(c.t==='month'){ var m=v.match(/(\d{4})[.\-\/년\s]*(\d{1,2})/); row[c.k]=m? m[1]+'-'+('0'+m[2]).slice(-2)+'-01':null; }
         else if(c.t==='bool'){ row[c.k]=/^(o|y|true|1|예|중복)$/i.test(v); }
         else row[c.k]=v;
@@ -165,15 +166,24 @@ export function openPaste(){
   }
   $('#pasteTa').oninput=function(){
     var rows=parse();
-    $('#pastePrev').textContent=rows.length? rows.length+'행 인식됨 — 첫 행: '+JSON.stringify(rows[0]).slice(0,140):'';
+    /* ㊿+157 첫 행을 «열 이름: 값»으로 · 금액은 읽기 쉬운 금액(= 48만원)으로 보여 줌 */
+    $('#pastePrev').textContent=rows.length? rows.length+'행 인식됨 — 첫 행: '+cols.map(function(c){ var v=rows[0][c.k]; return v==null? '' : c.l.replace(/\(천원\)/,'')+' '+(c.won? wonKo(v) : String(v)); }).filter(Boolean).join(' · ').slice(0,220):'';
   };
   $('#pasteGo').onclick=async function(){
     var rows=parse();
     if(!rows.length){ $('#pasteMsg').textContent='붙여넣은 내용이 없습니다'; return; }
+    /* ㊿+157 금액이 이상한 행(1만원 미만 · 월 금액 1억↑ · 1,000억↑)이 있으면 먼저 보여 주고 묻기 — 원으로 된 시트를 그대로 붙이면 1000배가 됨 */
+    var odd=[]; rows.forEach(function(r, i){ cols.forEach(function(c){ if(!c.won || !r[c.k]) return; var why=amtWhy(r[c.k], 0, /^(mrr|monthly_fee)$/.test(c.k)) || (Math.abs(r[c.k])>=1e11? '1,000억원 이상입니다':''); if(why) odd.push((i+1)+'행 '+c.l.replace(/\(천원\)/,'')+' '+wonKo(r[c.k])+' — '+why); }); });
+    if(odd.length && !confirm('금액이 이상해 보이는 칸이 '+odd.length+'개 있습니다 (금액은 «천원» 단위로 붙여넣기):\n\n'+odd.slice(0,5).join('\n')+(odd.length>5? '\n… 외 '+(odd.length-5)+'개':'')+'\n\n그래도 추가할까요?')) return;
     if(!confirm(rows.length+'행을 「'+g.title+'」에 추가할까요?')) return;
     $('#pasteMsg').textContent='저장 중…';
     try{
-      for(var i=0;i<rows.length;i+=100) await sbWrite('POST', g.table, rows.slice(i,i+100));
+      for(var i=0;i<rows.length;i+=100){
+        if(g.table==='equipment_orders'){   /* ㊿+157 붙여넣은 신청도 장비 현황에 바로 반영 */
+          var got=await sbWrite('POST', g.table+'?select=*', rows.slice(i,i+100), 'return=representation');
+          for(var j=0;j<(got||[]).length;j++){ try{ ST.RAWX.orders=(ST.RAWX.orders||[]).concat([got[j]]); await syncOrderAssets(got[j], null, true); }catch(e){} }
+        } else await sbWrite('POST', g.table, rows.slice(i,i+100));
+      }
       closeOvl('ovlPaste');
       toast('붙여넣기 입력', rows.length+'행 추가됨 — '+g.title);
       loadFromDb().then(function(nd){ onData(nd); if(GRIDS[ST.CUR_VIEW]) renderGrid(); });

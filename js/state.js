@@ -76,4 +76,5 @@ export var ST={
 /* 환경 — ㊿+153: 예전 boot.js(APP_VER) · init.js(IS_STAGING · IS_QA) 에서 옮김 */
 export var APP_VER=(function(){ var m=document.querySelector('meta[name="app-ver"]'); return (m&&m.content)||'0000-00-00 ㊿+0'; })();   // 포탈 버전 — index.html <meta name="app-ver"> 한 곳
 export var IS_STAGING=/\/staging\//.test(location.pathname);
-export var IS_QA=/[?&]qa=1(?:&|$)/.test(location.search);   /* ㊿+151: 스테이징 QA 가 iframe 으로 열 때 — 서비스 워커·사본·오류 기록·팝업 생략 */
+export var IS_QA=/[?&]qa=(?:1|data)(?:&|$)/.test(location.search);   /* ㊿+151: 스테이징 QA 가 iframe 으로 열 때 — 서비스 워커·사본·오류 기록·팝업 생략 */
+export var IS_QA_DATA=/[?&]qa=data(?:&|$)/.test(location.search);   /* ㊿+157: QA «데이터 입력·수정» — 가짜 DB(js/qadb.js · js/qadata.js)로만 동작 */

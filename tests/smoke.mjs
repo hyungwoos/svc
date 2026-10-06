@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { ROOT, serve, mockBackend, collect, Suite, assert } from './lib.mjs';
+import { FakeDB, fakeBackend, seedData, nowIdx, idxYm } from './fakedb.mjs';
 
 const DIR = process.env.SMOKE_DIR || ROOT;
 const OUT = path.join(ROOT, 'tests', 'out'); fs.mkdirSync(OUT, { recursive: true });
@@ -1142,6 +1143,10 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
     assert(r.steps.some((s) => /^📱/.test(s.l)) && r.steps.filter((s) => s.st === 'ok').length >= 25, '메뉴/폰 단계 부족');
     assert(r.isQa === true && r.stagingBar, 'iframe 이 ?qa=1 · staging 경로가 아님');
     assert(/스테이징 ㊿\+\d+ · 운영\(이 화면\) ㊿\+\d+/.test(r.ver), r.ver);
+    /* ㊿+157 «데이터 입력·수정» 단계 — 가짜 DB 로 다시 열어 시나리오 전부 통과 · 실제(여기선 mockBackend) 쪽으로는 한 건도 안 씀 · 이 창의 로그인 그대로 */
+    const dsteps = r.steps.filter((s) => /^🧾/.test(s.l)); assert(dsteps.length >= 8 && dsteps.every((s) => s.st === 'ok'), '데이터 입력·수정 단계 ' + JSON.stringify(dsteps.filter((s) => s.st !== 'ok')));
+    assert(!writes.some((w) => /\/rest\/v1\/(contracts|monthly_revenue|equipment_|oi_deals|install_extra|monthly_targets|targets|customers)/.test(w.url)), 'QA 데이터 단계가 DB 로 씀 ' + writes.map((w) => w.url.split('/rest/v1/')[1]).join(','));
+    assert((await page.evaluate(() => JSON.parse(sessionStorage.getItem('svc_sess')).a)) === 'tok', '이 창의 로그인 세션이 바뀜');
     assert(writes.some((w) => /change_log/.test(w.url) && /staging_qa/.test(w.body)), 'change_log staging_qa 없음');
     assert(!writes.some((w) => /client_errors|upd_notes/.test(w.url)) && !writes.some((w) => /change_log/.test(w.url) && /data_check/.test(w.body)), 'QA 중 스테이징이 기록을 남김(IS_QA 게이트 실패) ' + writes.filter((w) => /client_errors|upd_notes|data_check/.test(w.url + w.body)).map((w) => w.url.split('/rest/v1/')[1]).join(','));
     await page.click('#qaClose'); await page.waitForTimeout(300);
@@ -1409,6 +1414,182 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
     assert(!errs.length, errs.join(' | ')); return '진단 · 리포트 창';
   });
   await ctx.close();
+}
+// ㊿+157: 금액 입력은 전부 천원(표시와 같은 단위) · 저장은 원 · 이상한 금액 확인 · 계약 표 ✎ 의 MRR·기간·상태 → 월 매출도 맞춤
+//   «저장하면 실제로 바뀌는» 가짜 DB(tests/fakedb.mjs)로 사람처럼 입력 → 저장 → DB 값(원) · 다시 읽은 화면 · 합계 · LIVE 를 대조 (2026-10 월 4.8억 입력 사고 재현 포함)
+{
+  const T = nowIdx(), YM = (i) => idxYm(i).slice(0, 7), ix = (s) => (+s.slice(0, 4) - 2020) * 12 + (+s.slice(5, 7) - 6);
+  async function fboot() {
+    const db = new FakeDB(seedData()); const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' }); const page = await ctx.newPage();
+    const errs = [], dialogs = []; page.on('pageerror', (e) => errs.push(String(e).slice(0, 200)));
+    page.on('dialog', (d) => { dialogs.push(d.message().replace(/\s+/g, ' ')); (page.__dlg ? page.__dlg(d) : d.accept()).catch(() => {}); });
+    await fakeBackend(page, db); await page.goto(url + '/index.html'); await fready(page);
+    return { db, ctx, page, errs, dialogs };
+  }
+  async function fready(page) { await page.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA && SVC.ST.DATA.rows.length, null, { timeout: 20000 }); await page.waitForTimeout(400); }
+  const cOf = (db, name) => { const cu = db.t.customers.find((c) => c.name === name); return db.t.contracts.filter((c) => c.customer_id === cu.id); };
+  const psum = (page, i) => page.evaluate((i) => SVC.ST.DATA.rows.reduce((a, r) => a + r.segs.reduce((b, sg) => b + (sg[0] <= i && i <= sg[1] ? sg[2] : 0), 0), 0), i);
+  const liveN = (page, i) => page.evaluate((i) => SVC.liveCalc(i).uniq, i);
+  async function openEdit(page, tab) { if (!(await page.$('#ovlEdit.on'))) { await page.evaluate(() => SVC.switchView('dash')); await page.click('#btnEdit'); await page.waitForTimeout(150); } await page.click('#eTabs button[data-t="' + tab + '"]'); await page.waitForTimeout(80); }
+  async function pick(page, find, pk, cust) { await page.fill('#' + find, cust); await page.waitForTimeout(120); await page.click('#' + pk + ' .pi'); await page.waitForTimeout(80); }
+  async function saveEdit(page) { await page.click('#eGo'); await page.waitForFunction(() => { const m = document.getElementById('eMsg'); return m && /✅|bad/.test(m.textContent + ' ' + m.className) && !document.getElementById('eGo').disabled; }, null, { timeout: 10000 }); await page.waitForTimeout(300); return page.$eval('#eMsg', (e) => e.textContent); }
+  async function gridEdit(page, view, cust, pairs) {
+    await page.evaluate((v) => SVC.switchView(v), view); await page.fill('#dvSearch', cust); await page.waitForTimeout(350);
+    await page.click('#dvTable tbody tr:has-text("' + cust + '") button:has-text("✎")'); await page.waitForTimeout(150);
+    const info = await page.evaluate((pairs) => { const tr = [...document.querySelectorAll('#dvTable tbody tr')].find((x) => x.querySelector('button.sv')); const hs = [...document.querySelectorAll('#dvTable thead th')].map((h) => h.textContent.trim()); const out = {};
+      for (const [h, v] of pairs) { const k = hs.findIndex((x) => x.startsWith(h)); const el = tr.children[k].querySelector('input,select'); out[h] = el.value; el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); }
+      const hint = tr.querySelector('.amt-hint'); out._hint = hint ? hint.textContent : ''; return out; }, pairs);
+    await page.click('#dvTable button.sv'); await page.waitForTimeout(1300); return info;
+  }
+  await S.t('㊿+157 ?qa=data 가짜 DB 모드: Supabase 로 나가는 요청 0 · 로그인·저장소 분리(토큰 qa-fake) · QA 시나리오 전부 통과', async () => {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, serviceWorkers: 'block' }); const page = await ctx.newPage();
+    const real = [], errs = []; page.on('pageerror', (e) => errs.push(String(e).slice(0, 200))); page.on('dialog', (d) => { errs.push('네이티브 창: ' + d.message().slice(0, 80)); d.dismiss(); });
+    await page.route('**/*supabase.co/**', (r) => { real.push(r.request().method() + ' ' + r.request().url().slice(0, 90)); r.abort(); });
+    await page.route(/cdn\.jsdelivr\.net|cdnjs\.cloudflare\.com|unpkg\.com/, (r) => r.fulfill({ status: 200, contentType: 'application/javascript', body: '' }));
+    await page.addInitScript(() => { try { sessionStorage.setItem('svc_sess', JSON.stringify({ a: 'REAL-TOKEN', r: null, e: Math.floor(Date.now() / 1000) + 3600, u: 'real@example.com', p: true })); } catch (e) { /* noop */ } });
+    await page.goto(url + '/index.html?qa=data'); await fready(page);
+    const who = await page.evaluate(() => ({ t: SVC.ST.SB_TOKEN, u: SVC.ST.AUTH_USER, bar: !!document.getElementById('qaDataBar') }));
+    const list = await page.evaluate(() => SVC.qaDataList()), out = [];
+    for (let i = 0; i < list.length; i++) { const r = await page.evaluate((i) => SVC.qaDataRun(i), i); out.push((r.ok ? '✓' : '✗ ' + list[i].id + ': ' + r.detail)); }
+    await ctx.close();
+    assert(who.t === 'qa-fake' && who.u === 'qa@fake.local' && who.bar, '가짜 세션·안내 띠 ' + JSON.stringify(who));
+    assert(!real.length, 'Supabase 로 나간 요청 ' + real.slice(0, 3).join(' | '));
+    assert(list.length >= 7 && out.every((x) => x === '✓'), out.filter((x) => x !== '✓').join(' / ')); assert(!errs.length, errs.join(' | '));
+    return list.length + '개 시나리오 · 실제 요청 0';
+  });
+  await S.t('㊿+157 금액 도우미: kwToWon(천원→원) · wonToKw · wonKo(읽기 쉬운 금액) · amtWhy(5배·1/5·1만원 미만·월 1억↑)', async () => {
+    const { ctx, page } = await fboot();
+    const r = await page.evaluate(() => ({ a: [SVC.kwToWon('480'), SVC.kwToWon('52.8'), SVC.kwToWon('1,200'), SVC.kwToWon(''), SVC.kwToWon('x')], b: [SVC.wonToKw(480000), SVC.wonToKw(52800), SVC.wonToKw(null)],
+      c: [SVC.wonKo(480000000), SVC.wonKo(480000), SVC.wonKo(52800), SVC.wonKo(9000)], d: [SVC.amtWhy(480000000, 300000, true), SVC.amtWhy(480, 500000, true), SVC.amtWhy(500000, 400000, true), SVC.amtWhy(150000000, 0, true), SVC.amtWhy(150000000, 0, false)] }));
+    await ctx.close();
+    assert(JSON.stringify(r.a) === JSON.stringify([480000, 52800, 1200000, null, null]), 'kwToWon ' + JSON.stringify(r.a));
+    assert(JSON.stringify(r.b) === JSON.stringify(['480', '52.8', '']), 'wonToKw ' + JSON.stringify(r.b));
+    assert(JSON.stringify(r.c) === JSON.stringify(['4.8억원', '48만원', '5.3만원', '9,000원']), 'wonKo ' + JSON.stringify(r.c));
+    assert(/1,600배/.test(r.d[0]) && /1만원 미만/.test(r.d[1]) && r.d[2] === '' && /1억원/.test(r.d[3]) && r.d[4] === '', 'amtWhy ' + JSON.stringify(r.d)); return r.c.join(' · ');
+  });
+  await S.t('㊿+157 만기 처리 › 연장: «480» = 48만원 저장 · «480000»(원으로 착각) 은 «1,600배» 확인 창 → 취소하면 저장 안 됨 (2026-10 실제 사고)', async () => {
+    const { db, ctx, page, dialogs } = await fboot(); const c = cOf(db, '가상고객_만기지남')[0];
+    page.__dlg = (d) => (/단위입니다/.test(d.message()) ? d.dismiss() : d.accept());
+    await page.evaluate(() => SVC.openRenewList('lapsed')); await page.waitForTimeout(250);
+    await page.click('#rnList tr[data-id="' + c.id + '"] .cbtn[data-a="renew"]'); await page.waitForTimeout(120);
+    assert((await page.$eval('#rnMrr', (e) => e.value)) === '300', '미리 채움(천원) ' + (await page.$eval('#rnMrr', (e) => e.value)));
+    await page.fill('#rnMrr', '480000'); await page.fill('#rnEnd', YM(T + 11));
+    const hint = await page.$eval('#rnMrr + .amt-hint', (e) => ({ t: e.textContent, w: e.classList.contains('warn') })); assert(hint.w && /4\.8억원/.test(hint.t) && /1,600배/.test(hint.t), '환산 ' + JSON.stringify(hint));
+    await page.click('#rnGo'); await page.waitForTimeout(700);
+    assert(db.ct(c.id).mrr === 300000 && db.ct(c.id).renew_count === 0 && dialogs.some((x) => /1,600배/.test(x)), '취소했는데 저장됨 ' + db.ct(c.id).mrr);
+    await page.fill('#rnMrr', '480'); await page.click('#rnGo'); await page.waitForTimeout(900);
+    const d = db.ct(c.id), rv = db.rev(c.id); await ctx.close();
+    assert(d.mrr === 480000 && d.renew_count === 1 && rv[YM(T)] === 480000 && rv[YM(T + 11)] === 480000 && d.end_month.slice(0, 7) === YM(T + 11), 'DB ' + d.mrr + ' · ' + rv[YM(T)]);
+    return '취소 → 그대로 · 480 → 480,000원 × 12개월';
+  });
+  await S.t('㊿+157 계약 표 ✎: MRR 칸은 천원(«500» 표시) · 480 저장 → 48만원 + 이번 달~종료월 월 매출도 맞춤 · 확인 창 «취소»면 아무것도 안 바뀜', async () => {
+    const { db, ctx, page, dialogs } = await fboot(); const c = cOf(db, '가상고객07')[0], m0 = c.mrr;
+    page.__dlg = (d) => (/같이 맞춥니다/.test(d.message()) ? d.dismiss() : d.accept());
+    const i1 = await gridEdit(page, 'contracts', '가상고객07', [['MRR', '999']]);
+    assert(i1.MRR === String(m0 / 1000) && db.ct(c.id).mrr === m0 && db.rev(c.id)[YM(T)] === m0 && dialogs.length === 1, '취소 ' + JSON.stringify(i1) + ' ' + db.ct(c.id).mrr);
+    page.__dlg = null; const c2 = cOf(db, '가상고객_이달만기')[0];
+    const i2 = await gridEdit(page, 'contracts', '가상고객_이달만기', [['MRR', '480']]);
+    const s0 = await psum(page, T); const d = db.ct(c2.id);
+    assert(i2.MRR === '500' && d.mrr === 480000 && db.rev(c2.id)[YM(T)] === 480000, 'MRR ' + JSON.stringify(i2) + ' → ' + d.mrr + ' · 월 ' + db.rev(c2.id)[YM(T)]);
+    assert(dialogs.some((x) => /같이 맞춥니다/.test(x) && /50만원 → 48만원/.test(x)), '맞춤 확인 창 ' + dialogs.slice(-1));
+    await page.reload(); await fready(page); const s1 = await psum(page, T); await ctx.close();
+    assert(s1 === s0, '다시 읽은 합계가 다름 ' + s0 + ' / ' + s1); return 'MRR 칸 «' + i2.MRR + '» → 480,000원 · 이달 장표 반영';
+  });
+  await S.t('㊿+157 계약 표 ✎: 종료월 당김 → 뒤 매출 삭제 · 늘림 → 늘린 달을 MRR 로 채움 · 상태 «해지» → 해지월 뒤 매출 삭제', async () => {
+    const { db, ctx, page } = await fboot();
+    const a = cOf(db, '가상고객04')[0], ea = ix(a.end_month); await gridEdit(page, 'contracts', '가상고객04', [['종료월', YM(ea - 3)]]);
+    const ra = db.rev(a.id); assert(!Object.keys(ra).some((k) => k > YM(ea - 3)) && ra[YM(ea - 3)], '당김 ' + Object.keys(ra).slice(-4));
+    const b = cOf(db, '가상고객05')[0], eb = ix(b.end_month); await gridEdit(page, 'contracts', '가상고객05', [['종료월', YM(eb + 6)]]);
+    const rb = db.rev(b.id); assert(rb[YM(eb + 1)] === b.mrr && rb[YM(eb + 6)] === b.mrr && !rb[YM(eb + 7)], '늘림 ' + Object.keys(rb).slice(-3));
+    const c = cOf(db, '가상고객06')[0]; await gridEdit(page, 'contracts', '가상고객06', [['상태', '해지'], ['해지월', YM(T)], ['해지사유', '비용이슈']]);
+    const rc = db.rev(c.id); await ctx.close(); assert(db.ct(c.id).status === '해지' && rc[YM(T)] && !rc[YM(T + 1)], '해지 ' + Object.keys(rc).slice(-3));
+    return '당김 · 늘림 · 해지';
+  });
+  await S.t('㊿+157 계약 표 ✎ 경계: 연도 오타로 기간을 통째로 1년 당김 → 새 기간 밖 매출 없음 · 빈 달만 예전 MRR 로 채움 · 시작>종료는 저장 안 함 · 해지 계약은 늘려도 매출 안 만듦', async () => {
+    const { db, ctx, page, dialogs } = await fboot();
+    const a = cOf(db, '가상고객08')[0], s0 = ix(a.start_month), e0 = ix(a.end_month), m0 = a.mrr;
+    await gridEdit(page, 'contracts', '가상고객08', [['시작월', YM(s0 - 12)], ['종료월', YM(e0 - 12)]]);
+    const ra = db.rev(a.id), ks = Object.keys(ra);
+    assert(ks.length && ks[0] === YM(s0 - 12) && ks[ks.length - 1] === YM(e0 - 12) && ks.every((k) => ra[k] === m0) && ks.length === e0 - s0 + 1, '당긴 기간 ' + ks[0] + '~' + ks[ks.length - 1] + ' · ' + ks.length + '개월');
+    const b = cOf(db, '가상고객09')[0], bs = ix(b.start_month), be = ix(b.end_month);
+    const n0 = dialogs.length; await gridEdit(page, 'contracts', '가상고객09', [['종료월', YM(bs - 2)]]);
+    assert(db.ct(b.id).end_month.slice(0, 7) === YM(be) && dialogs.length === n0 && /시작월/.test(await page.$eval('#dvMsg', (e) => e.textContent)), '시작>종료가 저장됨');
+    await page.click('#dvTable button:has-text("취소")').catch(() => {});
+    const h = cOf(db, '가상고객_해지')[0], he = ix(h.end_month), hn = Object.keys(db.rev(h.id)).length;
+    await gridEdit(page, 'contracts', '가상고객_해지', [['종료월', YM(he + 3)]]);
+    await ctx.close(); assert(Object.keys(db.rev(h.id)).length === hn, '해지 계약에 매출이 생김'); return '당김 · 막음 · 해지 그대로';
+  });
+  await S.t('㊿+157 붙여넣기: 원으로 된 시트를 그대로 붙이면(1000배) «금액이 이상해 보이는 칸» 확인 → 취소하면 추가 안 됨 · 미리보기는 «= 15억원» 처럼', async () => {
+    const { db, ctx, page, dialogs } = await fboot(); page.__dlg = (d) => (/이상해 보이는/.test(d.message()) ? d.dismiss() : d.accept());
+    await page.evaluate(() => SVC.switchView('targets')); await page.waitForTimeout(250); await page.evaluate(() => SVC.openPaste());
+    const yr = new Date().getFullYear() + 2, heads = await page.evaluate(() => SVC.pasteCols(SVC.GRIDS.targets).map((c) => c.k));
+    await page.fill('#pasteTa', heads.map((k) => (k === 'year' ? String(yr) : k === 'amount' ? '1500000000' : '')).join('\t'));
+    const prev = await page.$eval('#pastePrev', (e) => e.textContent); await page.click('#pasteGo'); await page.waitForTimeout(600);
+    const t = db.t.targets.find((x) => +x.year === yr); await ctx.close();
+    assert(/1,500,000억원|150조|억원/.test(prev) && !t && dialogs.some((x) => /이상해 보이는/.test(x)), '미리보기 «' + prev + '» · 저장 ' + JSON.stringify(t));
+    return prev.slice(0, 60);
+  });
+  await S.t('㊿+157 입력·수정 (천원 칸): 신규 385 · 에스원 설치비 2000 · 추가 90 · 갱신 550 · 금액 수정 700 · 해지 — DB 는 원 · LIVE · 이번 달 합계', async () => {
+    const { db, ctx, page } = await fboot(); const l0 = await liveN(page, T), s0 = await psum(page, T);
+    await openEdit(page, 'new'); await page.fill('#nCust', '가상고객_신규'); await page.fill('#nStart', YM(T)); await page.fill('#nEnd', YM(T + 11)); await page.fill('#nMrr', '385');
+    assert(/38\.5만원/.test(await page.$eval('#nMrr + .amt-hint', (e) => e.textContent)), '환산 표시'); await saveEdit(page);
+    const n1 = cOf(db, '가상고객_신규')[0]; assert(n1.mrr === 385000 && n1.total_amount === 4620000 && Object.keys(db.rev(n1.id)).length === 12, '신규 ' + n1.mrr);
+    await openEdit(page, 'new'); await page.fill('#nCust', '가상고객_에스원2'); await page.selectOption('#nLine', 'S1'); await page.dispatchEvent('#nLine', 'change'); await page.fill('#nStart', YM(T)); await page.fill('#nEnd', YM(T + 23)); await page.fill('#nMrr', '1200'); await page.fill('#nFee', '2000'); await saveEdit(page);
+    const n2 = cOf(db, '가상고객_에스원2')[0]; assert(n2.mrr === 1200000 && n2.install_fee === 2000000, '에스원 ' + n2.mrr + '/' + n2.install_fee);
+    await openEdit(page, 'add'); await pick(page, 'aFind', 'aPick', '가상고객_MDR'); await page.fill('#aQty', '30'); await page.fill('#aStart', YM(T)); await page.fill('#aMrr', '90'); await saveEdit(page);
+    const kid = cOf(db, '가상고객_MDR').filter((c) => c.parent_contract_id).sort((x, y) => y.id - x.id)[0]; assert(kid.mrr === 90000, '추가 ' + kid.mrr);
+    const r0 = cOf(db, '가상고객_이달만기')[0]; await openEdit(page, 'renew'); await pick(page, 'rFind', 'rPick', '가상고객_이달만기'); await page.fill('#rEnd', YM(T + 12)); await page.fill('#rMrr', '550'); await saveEdit(page);
+    assert(db.ct(r0.id).mrr === 550000 && db.rev(r0.id)[YM(T)] === 500000 && db.rev(r0.id)[YM(T + 1)] === 550000, '갱신');
+    const f0 = cOf(db, '가상고객01')[0], fm0 = f0.mrr; await openEdit(page, 'fix'); await pick(page, 'fFind', 'fPick', '가상고객01'); await page.fill('#fFrom', YM(T)); await page.fill('#fMrr', '700'); await saveEdit(page);
+    assert(db.ct(f0.id).mrr === 700000 && db.rev(f0.id)[YM(T)] === 700000, '금액 수정');
+    const h0 = cOf(db, '가상고객03')[0]; await openEdit(page, 'churn'); await pick(page, 'cFind', 'cPick', '가상고객03'); await page.fill('#cMonth', YM(T)); await page.fill('#cReason', '비용이슈'); await saveEdit(page);
+    assert(db.ct(h0.id).status === '해지' && !db.rev(h0.id)[YM(T + 1)], '해지');
+    await page.reload(); await fready(page);
+    const s1 = await psum(page, T), want = s0 + 385000 + 1200000 + 90000 + (700000 - fm0); const l1 = await liveN(page, T); await ctx.close();
+    assert(s1 === want, '이번 달 합계 ' + s1 + ' ≠ ' + want); assert(l1 === l0 + 1, 'LIVE ' + l0 + '→' + l1 + ' (신규 2 − 이번 달 해지 1 · 해지는 해지월부터 LIVE 제외)');
+    return '합계 +' + (s1 - s0).toLocaleString('ko-KR') + '원 · LIVE ' + l0 + '→' + l1;
+  });
+  await S.t('㊿+157 장비: 신청 폼 접수 즉시 현황(재고) 생김 · 붙여넣기 신청도 현황 반영', async () => {
+    const { db, ctx, page } = await fboot();
+    await page.evaluate(() => SVC.switchView('ordernew')); await page.waitForTimeout(250); await page.fill('#odCustomer', '가상고객05'); await page.fill('#odMgr', '담당자B'); await page.fill('#odQty', '2'); await page.fill('#odSerials', 'TSTN0001, TSTN0002'); await page.click('#odGo'); await page.waitForTimeout(800);
+    const a1 = db.t.equipment_assets.filter((a) => /^TSTN/.test(a.serial)).map((a) => a.status + ':' + a.customer);
+    assert(a1.length === 2 && a1.every((x) => x.startsWith('재고')), '폼 ' + JSON.stringify(a1));
+    await page.evaluate(() => SVC.switchView('orders')); await page.waitForTimeout(250); await page.evaluate(() => SVC.openPaste());
+    const heads = await page.evaluate(() => SVC.pasteCols(SVC.GRIDS.orders).map((c) => c.k)); const line = (o) => heads.map((k) => o[k] || '').join('\t');
+    await page.fill('#pasteTa', line({ channel: '일반', order_type: '신규발주', customer: '가상고객09', model: 'S100', qty: '1', serials: 'TSTP0002', status: '설치완료' })); await page.click('#pasteGo'); await page.waitForTimeout(1300);
+    const a2 = db.t.equipment_assets.find((a) => a.serial === 'TSTP0002'); await ctx.close(); assert(a2 && a2.status === '임대중' && a2.customer === '가상고객09', '붙여넣기 ' + JSON.stringify(a2));
+    return '폼 2대 재고 · 붙여넣기 1대 임대중';
+  });
+  await S.t('㊿+157 데이터 점검 «금액 단위 실수 의심»: 실제 사고와 같은 상태(월 4.8억 · MRR 480원)를 잡고 · 수정 창에서 MRR 480(천원) → 이번 달~종료월 월 매출까지 복구', async () => {
+    const { db, ctx, page } = await fboot(); const c = cOf(db, '가상고객_만기지남')[0]; c.end_month = idxYm(T + 11); c.mrr = 480; c.renew_count = 1;
+    for (let i = T; i <= T + 11; i++) db.t.monthly_revenue.push({ contract_id: c.id, month: idxYm(i), amount: 480000000 });
+    await page.reload(); await fready(page); await page.evaluate(() => SVC.navMenu('dcheck')); await page.waitForTimeout(500);
+    const it = await page.evaluate(() => { const x = SVC.dcRules().find((q) => q.id === 'c_amt_odd'); return x && x.sev + ' ' + x.items.map((i) => i.label + ' | ' + i.sub).join(' / '); });
+    assert(it && /^crit/.test(it) && /가상고객_만기지남/.test(it) && /4\.8억원/.test(it) && /MRR 480원/.test(it), '규칙 ' + it);
+    await page.evaluate(() => { const x = SVC.dcRules().find((q) => q.id === 'c_amt_odd'); SVC.dcFixOpen('c_amt_odd', x.items.findIndex((i) => /가상고객_만기지남/.test(i.label)), ''); }); await page.waitForTimeout(300);
+    assert((await page.$eval('#dcfForm [data-k="mrr"]', (e) => e.value)) === '0.48', 'MRR 칸(천원) ' + (await page.$eval('#dcfForm [data-k="mrr"]', (e) => e.value)));
+    await page.fill('#dcfForm [data-k="mrr"]', '480'); await page.click('#dcfSave'); await page.waitForTimeout(1600);
+    const d = db.ct(c.id), rv = db.rev(c.id); const left = await page.evaluate(() => SVC.dcRules().find((q) => q.id === 'c_amt_odd').items.length); await ctx.close();
+    assert(d.mrr === 480000 && rv[YM(T)] === 480000 && rv[YM(T + 11)] === 480000 && left === 0, '복구 ' + d.mrr + ' · ' + rv[YM(T)] + ' · 남은 ' + left);
+    return it.slice(0, 90);
+  });
+  await S.t('㊿+157 설치비 칸 · 월 목표 · OI 예상단가 · 연간 목표 붙여넣기 — 전부 천원으로 입력 → DB 는 원', async () => {
+    const { db, ctx, page } = await fboot(); const c = cOf(db, '가상고객_에스원')[0]; const y = +c.settle_month.slice(0, 4), m = +c.settle_month.slice(5, 7);
+    await page.evaluate(() => { SVC.navMenu('dash'); try { SVC.ccAnalysisOpen(true, true); } catch (e) { /* noop */ } const w = document.querySelector('[data-w="ifee"]'); if (w) { w.classList.remove('w-off'); w.scrollIntoView(); } }); await page.waitForTimeout(500);
+    await page.click('td.ifc[data-y="' + y + '"][data-m="' + m + '"]'); await page.waitForTimeout(350);
+    assert((await page.$eval('.ifin[data-f="c' + c.id + '"]', (e) => e.value)) === '2000', '설치비 칸(천원)');
+    await page.fill('.ifin[data-f="c' + c.id + '"]', '2500'); await page.click('#ifSave'); await page.waitForTimeout(700); assert(db.ct(c.id).install_fee === 2500000, '설치비 ' + db.ct(c.id).install_fee);
+    const yr = new Date().getFullYear(); await page.evaluate((y) => SVC.openTargetEditor(y), yr); await page.waitForTimeout(250);
+    assert((await page.$eval('#ovlTarget input[data-m="1"]', (e) => e.value)) === '90000', '월 목표 칸(천원)'); await page.fill('#ovlTarget input[data-m="1"]', '95000'); await page.click('#tgSave'); await page.waitForTimeout(600);
+    assert(db.t.monthly_targets.find((x) => x.year === yr && x.month === 1).amount === 95000000, '월 목표');
+    await page.evaluate(() => SVC.switchView('oinew')); await page.waitForTimeout(250); await page.fill('#oiCust', '가상고객_OI2'); await page.fill('#oiAmt', '12000'); await page.click('#oiGo'); await page.waitForTimeout(700);
+    assert(db.t.oi_deals.find((x) => x.customer === '가상고객_OI2').expect_amount === 12000000, 'OI');
+    await page.evaluate(() => SVC.switchView('targets')); await page.waitForTimeout(250); await page.evaluate(() => SVC.openPaste());
+    assert(/금액은 천원/.test(await page.$eval('#pasteCols', (e) => e.textContent)), '붙여넣기 안내');
+    const heads = await page.evaluate(() => SVC.pasteCols(SVC.GRIDS.targets).map((c) => c.k)); await page.fill('#pasteTa', heads.map((k) => (k === 'year' ? String(yr + 1) : k === 'amount' ? '1,500,000' : '')).join('\t'));
+    await page.click('#pasteGo'); await page.waitForTimeout(1000); const t = db.t.targets.find((x) => +x.year === yr + 1); await ctx.close();
+    assert(t && t.amount === 1500000000, '연간 목표 ' + (t && t.amount)); return '설치비 · 월 목표 · OI · 붙여넣기';
+  });
 }
 await browser.close(); srv.close();
 const ok = S.report();

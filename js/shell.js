@@ -413,7 +413,7 @@ export function ccBrief(list,b){   /* 오늘의 브리핑 카드는 쓰지 않�
    ================================================================== */
 export var EQB={ch:'', q:'', more:{}};
 export var EQB_COLS=[['접수','#9A9DA5','현황 재고'],['출하요청','var(--info-ink)','현황 재고'],['배송중','var(--warn-ink)','현황 재고'],['설치완료','var(--brand)','현황 임대중'],['회수예정','#D95926','칩으로 일부 회수'],['회수완료','var(--ink-2)','최근 90일']];
-export function eqRefresh(){ if(ST.CUR_VIEW==='eqboard') renderEqBoard(); else try{ renderGrid(); }catch(e){} }
+export function eqRefresh(){ if(ST.CUR_VIEW==='eqboard') renderEqBoard(); else try{ renderGrid(); }catch(e){} try{ railSync(ST.CUR_VIEW); }catch(e){} }   /* ㊿+157 장비 «처리 대기» 빨간 숫자도 */
 export var EQ_CH_CLS={'에스원':'ch-s1','LGU+':'ch-lg','LG U+':'ch-lg','조달':'ch-gov','일반':'ch-gen'};
 export function eqChTag(ch){ ch=ch||'기타'; return tpl`<span class="ctag ${rawHtml(EQ_CH_CLS[ch]||'')}">${ch}</span>`; }
 export function eqChColor(ch){ return ({'에스원':cssv('--s1'),'LGU+':cssv('--s5'),'LG U+':cssv('--s5'),'조달':cssv('--s4'),'일반':cssv('--s3')})[ch]||cssv('--muted'); }

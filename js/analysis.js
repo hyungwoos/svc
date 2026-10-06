@@ -2,14 +2,14 @@
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { APP_VER, IS_QA, ST } from './state.js';
 import { Viz } from './viz.js';
-import { $, baseLabel, canWrite, cssv, esc, lline, llineVer, mk, rawHtml, SB_KEY, SB_URL, STATE, tpl, won, wonFull, yOf } from './core.js';
+import { $, amtGuard, amtHint, baseLabel, canWrite, cssv, esc, kwToWon, lline, llineVer, mk, rawHtml, SB_KEY, SB_URL, STATE, tpl, won, wonFull, wonKo, wonToKw, yOf } from './core.js';
 import { dIdx, ico, idxDate, loadFromDb, onData, SB_RAW, sbHeaders, sbTry, sbWrite, toast, todayStr } from './shell.js';
 import { hbars, idxs, monthlyTotal } from './dash.js';
 import { CHURN_OPTS, codeActive, GRIDS, LEAD_OPTS, LINE_OPTS } from './grids.js';
 import { bizHostEl, bizNz, BIZV, eqIsPh, eqScan, eqSerials, syncOrderAssets } from './equipment.js';
 import { fkNorm, openCust360, subgrpSync } from './tools.js';
 import { helpBox, helpWire, kxCustMrr, kxLive, kxMrr, kxWire } from './sales.js';
-import { BLANK_LABEL, DV, editCell, openFilterPanel, readRowInputs, renderGrid, switchView, wireRowInputs, xlsxAoa } from './grid.js';
+import { BLANK_LABEL, ctRevPlan, DV, editCell, openFilterPanel, readRowInputs, renderGrid, switchView, wireRowInputs, xlsxAoa } from './grid.js';
 import { closeOvl, logChange, monthRows, openOvl, ymFromInput } from './edit.js';
 
 /* ===== AI 지식 — 사람이 AI 에게 가르치는 사실·규칙·용어 (ai_knowledge · active 인 행은 매 질문의 시스템 프롬프트에 들어감) ===== */
@@ -62,6 +62,14 @@ export function dcRules(){
     lz.some(function(r){ return r.mrr>0; }) && canWrite('contracts')? {label:'이달 매출을 mrr 로 채우기', run:function(){ dcFillMrr(lz.filter(function(r){ return r.mrr>0; }), T); }} : null);
   rule('c_mrr','info','MRR 과 이달 월 매출이 다름','계약의 mrr 과 이달 monthly_revenue 가 1% 넘게 다름 — 재약정 뒤 mrr 을 안 고쳤거나 월 매출 입력 오류.',
     rows.map(function(r,k){ return {r:r,k:k}; }).filter(function(x){ var v=(ST.MAT[x.k]&&ST.MAT[x.k][T])||0; return x.r.mrr>0 && v>0 && Math.abs(v-x.r.mrr)/x.r.mrr>0.01; }).map(function(x){ var it=fxC(['mrr'],'mrr_now')(x.r); it.fix.now=ST.MAT[x.k][T]; it.sub='mrr '+won(x.r.mrr)+' vs 이달 '+won(ST.MAT[x.k][T])+' 천원'; return it; }), '계약 관리');
+  /* ㊿+157 금액 단위 실수 의심 — 월 매출이 전월의 50배↑·1/50↓ 로 튀거나, MRR·월 매출이 1만원 미만 (천원/원을 헷갈려 넣은 경우 · 2026-10 월 4.8억 입력 사고) */
+  var odd=[]; rows.forEach(function(r,k){ var m=ST.MAT[k]||[], w=[];
+    for(var i=1;i<m.length;i++){ var a=m[i-1]||0, b=m[i]||0; if(a>0 && b>0 && (b>=a*50 || b*50<=a)){ w.push(mk(i)+' 월 매출 '+wonKo(b)+' (전월 '+wonKo(a)+')'); break; } }
+    for(var j=0;j<m.length;j++){ if(m[j]>0 && m[j]<10000){ w.push(mk(j)+' 월 매출 '+Math.round(m[j]).toLocaleString('ko-KR')+'원'); break; } }
+    if(r.mrr>0 && r.mrr<10000) w.push('MRR '+Math.round(r.mrr).toLocaleString('ko-KR')+'원');
+    if(w.length){ var it=fxC(['mrr'])(r); it.sub=w.join(' · ')+' · '+it.sub; odd.push(it); } });
+  rule('c_amt_odd','crit','금액 단위 실수 의심','월 매출이 전월보다 50배 넘게 뛰거나 1/50 아래로 떨어진 달, 또는 1만원 미만 금액 — 천원·원을 헷갈려 넣었을 가능성이 큽니다. 여기서 MRR 을 바른 금액(천원)으로 고치면 이번 달(시작 전이면 시작월)부터 종료월까지 월 매출도 같이 맞춥니다. 지난 달 금액은 ✏️ 입력·수정 › 금액 수정에서 구간을 골라 고치세요.',
+    odd, '계약 관리');
   rule('c_cloud_meta','info','Cloud 계약의 버전·노드수 미입력','Cloud NAC 원계약인데 Ver. 또는 노드수가 비어 있음 — 6.0 전환율·노드 기준 분석에서 빠집니다.',
     rows.filter(function(r){ return r.line==='Cloud' && liveActiveAt(r,T) && (!r.ver || !r.qty); }).map(function(r){ var it=fxC(['version','qty'])(r); it.sub='Ver '+(r.ver||'—')+' · 노드 '+(r.qty||'—'); return it; }), '계약 관리');
   rule('c_lead','info','유입경로 미지정','LIVE 원계약인데 유입경로가 비어 있음 — 유입경로 분석에서 «미지정»으로 묶입니다.',
@@ -184,13 +192,13 @@ export function dcFixFields(fix, raw, g){
     } else {
       var c=cols.filter(function(x){ return x.k===k; })[0]; if(!c) return '';
       lbl=c.l; inner=editCell(c, cur);
-      if(c.won && c.t==='number') lbl+=' <span class="mini">(원 단위)</span>';
+      if(c.won && c.t==='number') lbl=tpl`${lbl.replace(/\(천원\)$/,'')} <span class="mini">(천원)</span>`;
     }
     return tpl`<div class="dcf-row${bad? ' bad':''}"><label>${rawHtml(lbl)}</label><div class="dcf-in">${rawHtml(inner)}${rawHtml(bad? tpl`<div class="mini dcf-bad">목록에 없는 값 «${cur==null? '':String(cur)}» — 목록 값으로 고르세요 (정식 값이면 관리자 › 코드 관리에서 추가)</div>`:'')}</div></div>`;
   }).join('');
   if(fix.ex==='rev_now'){
-    var mrr=raw&&raw.mrr? Math.round(raw.mrr/1000) : '';
-    h+=tpl`<div class="dcf-row"><label>${mk(T)} 월 매출 <span class="mini">(천원)</span></label><div class="dcf-in"><input id="dcfRev" type="number" min="0" step="1" value="${rawHtml(mrr)}" placeholder="천원"><div class="mini">월납이면 이달 금액을 넣고 저장 · 연납·일시납이면 위 «과금방식»만 바꾸고 이 칸은 비우세요</div></div></div>`;
+    var mrr=raw&&raw.mrr? wonToKw(raw.mrr) : '';
+    h+=tpl`<div class="dcf-row"><label>${mk(T)} 월 매출 <span class="mini">(천원)</span></label><div class="dcf-in"><input id="dcfRev" type="number" min="0" step="any" value="${mrr}" placeholder="천원"><div class="mini">월납이면 이달 금액을 넣고 저장 · 연납·일시납이면 위 «과금방식»만 바꾸고 이 칸은 비우세요</div></div></div>`;
   }
   if(fix.ex==='mrr_now' && fix.now) h+=tpl`<div class="dcf-row"><label></label><div class="dcf-in"><button type="button" class="pill ghost" id="dcfUseNow">이달 월 매출 ${won(fix.now)} 천원으로 맞추기</button></div></div>`;
   if(fix.ex==='rev_after'){
@@ -224,7 +232,8 @@ export function dcFixOpen(ruleId, idx, msg){
   if(form){ try{ wireRowInputs(form, g); }catch(e){}
     form.querySelectorAll('.dcf-row').forEach(function(row, i){ var lab=row.querySelector(':scope > label'), el=row.querySelector('.dcf-in input:not([type=hidden]), .dcf-in select, .dcf-in textarea'); if(lab && el && lab.textContent.trim()){ if(!el.id) el.id='dcf_f'+i; lab.htmlFor=el.id; } });   /* 칸 이름(접근성) */
     if(!can) form.querySelectorAll('input,select,textarea,button').forEach(function(e){ e.disabled=true; }); }
-  var un=ov.querySelector('#dcfUseNow'); if(un) un.onclick=function(){ var i=form.querySelector('[data-k="mrr"]'); if(i){ i.value=String(Math.round(fix.now)); i.dispatchEvent(new Event('input',{bubbles:true})); } };
+  var un=ov.querySelector('#dcfUseNow'); if(un) un.onclick=function(){ var i=form.querySelector('[data-k="mrr"]'); if(i){ i.value=wonToKw(fix.now); i.dispatchEvent(new Event('input',{bubbles:true})); } };   /* 칸은 천원 (㊿+157) */
+  amtHint(ov.querySelector('#dcfRev'), raw&&raw.mrr, true);
   ov.querySelector('#dcfPrev').onclick=function(){ dcFixOpen(ruleId, idx-1); };
   ov.querySelector('#dcfNext').onclick=function(){ dcFixOpen(ruleId, idx+1); };
   ov.querySelector('#dcfClose').onclick=dcFixClose;
@@ -238,7 +247,7 @@ export async function dcFixSave(rule, it, raw, g, form){
   if(DCF.busy) return;
   var fix=it.fix, msgEl=document.getElementById('dcfMsg');
   var say=function(t,bad){ if(msgEl){ msgEl.textContent=t||''; msgEl.style.color=bad? 'var(--critical)':'var(--muted)'; } };
-  var body={}, extra=[];
+  var body={}, extra=/** @type {Array<{m:string, p:string, b?:any, d?:string}>} */ ([]);
   try{
     var inp=readRowInputs(form, g);
     Object.keys(inp).forEach(function(k){ if(fix.f.indexOf(k)>=0 && dcFixNorm(k, inp[k])!==dcFixNorm(k, raw[k])) body[k]=inp[k]; });
@@ -258,8 +267,13 @@ export async function dcFixSave(rule, it, raw, g, form){
   var sm=dcFixNorm('start_month', 'start_month' in body? body.start_month : raw.start_month), em=dcFixNorm('end_month', 'end_month' in body? body.end_month : raw.end_month);
   if(fix.tbl==='contracts' && sm && em && em<sm){ say('종료월('+em+')이 시작월('+sm+')보다 앞섭니다', true); return; }
   var T=(ST.DATA&&ST.DATA.nowIdx)||0;
-  if(fix.ex==='rev_now'){ var rv=String((form.querySelector('#dcfRev')||{}).value||'').trim(); if(rv!==''){ var amt=Math.round(Number(rv)*1000); if(!(amt>0)){ say('이달 매출은 0보다 큰 천원 금액으로 넣으세요', true); return; } extra.push({m:'POST', p:'monthly_revenue', b:{contract_id:fix.id, month:idxDate(T), amount:amt}, d:mk(T)+' 매출 '+won(amt)+' 천원'}); } }
+  if(fix.ex==='rev_now'){ var rv=String((form.querySelector('#dcfRev')||{}).value||'').trim(); if(rv!==''){ var amt=kwToWon(rv)||0; if(amt>0 && !amtGuard(amt, raw&&raw.mrr, mk(T)+' 월 매출', true)){ say('저장하지 않았습니다 — 금액을 확인하세요', true); return; } if(!(amt>0)){ say('이달 매출은 0보다 큰 천원 금액으로 넣으세요', true); return; } extra.push({m:'POST', p:'monthly_revenue', b:{contract_id:fix.id, month:idxDate(T), amount:amt}, d:mk(T)+' 매출 '+won(amt)+' 천원'}); } }
   if(fix.ex==='rev_after' && (form.querySelector('#dcfRevDel')||{}).checked && em){ extra.push({m:'DELETE', p:'monthly_revenue?contract_id=eq.'+fix.id+'&month=gt.'+em+'-01', d:'종료월('+em+') 뒤 매출 삭제'}); }
+  /* ㊿+157 금액(천원 칸) 확인 · 계약의 MRR·기간·상태를 바꾸면 월 매출도 같이 맞춤(계약 표 ✎ 와 같은 규칙 · ctRevPlan) */
+  if(body.mrr!=null && Number(body.mrr)!==Number(raw&&raw.mrr||0) && !amtGuard(body.mrr, raw&&raw.mrr, 'MRR', true)){ say('저장하지 않았습니다 — 금액을 확인하세요', true); return; }
+  if(fix.tbl==='contracts' && raw && Object.keys(body).length){ var rp=ctRevPlan(raw, body, {noMrr: fix.ex==='mrr_now'}); if(rp.bad){ say(rp.bad, true); return; }   /* «이달 월 매출로 MRR 맞추기»는 MRR 만 (월 매출이 기준) */
+    if(rp.ops.length){ if(!confirm('월 매출(월별 종합 장표)도 같이 맞춥니다:\n\n'+rp.lines.join('\n')+'\n\n[확인] 함께 저장 · [취소] 저장하지 않음')){ say('저장하지 않았습니다', true); return; }
+      extra=extra.concat(rp.ops.map(function(o){ return {m:o.m, p:o.p, b:o.b, d:'월 매출 맞춤'}; })); } }
   if(!Object.keys(body).length && !extra.length){ say('바뀐 값이 없습니다', true); return; }
   var sbtn=document.getElementById('dcfSave'); DCF.busy=true; if(sbtn) sbtn.disabled=true; say('저장 중…');
   try{
@@ -637,16 +651,17 @@ export function openTargetEditor(year){
   var ovl=document.createElement('div'); ovl.className='ovl on'; ovl.id='ovlTarget';
   var rowsHtml='';
   for(var m=1;m<=12;m++){
-    rowsHtml+=tpl`<div><label>${rawHtml(m)}월</label><input type="number" data-m="${rawHtml(m)}" min="0" step="1000000" value="${rawHtml(tg[m]||'')}"></div>`;
+    rowsHtml+=tpl`<div><label>${rawHtml(m)}월</label><input type="number" data-m="${rawHtml(m)}" min="0" step="any" placeholder="천원" value="${tg[m]? wonToKw(tg[m]) : ''}"></div>`;
   }
   ovl.innerHTML=tpl`<div class="modal" style="width:min(560px,100%)">`+
     tpl`<h3>${rawHtml(year)}년 월 목표</h3>`+
-    tpl`<p class="cap">연초에 정한 월별 목표 금액을 <b>원 단위로</b> 넣으세요 (표에는 천원으로 표시). 비워두면 그 달은 달성률을 계산하지 않습니다.</p>`+
+    tpl`<p class="cap">연초에 정한 월별 목표 금액을 <b>천원 단위로</b> 넣으세요 (표와 같은 단위 · 1억원 → 100000). 비워두면 그 달은 달성률을 계산하지 않습니다.</p>`+
     tpl`<div class="frm">${rawHtml(rowsHtml)}</div>`+
     tpl`<div class="mact"><span class="mmsg" id="tgMsg" style="flex:1"></span>`+
     tpl`<button class="pill ghost" id="tgCancel">취소</button>`+
     tpl`<button class="pill pri" id="tgSave">저장</button></div></div>`;
   document.body.appendChild(ovl);
+  ovl.querySelectorAll('input[data-m]').forEach(function(i){ amtHint(i, null, false); });
   ovl.querySelector('#tgCancel').onclick=function(){ ovl.remove(); };
   ovl.querySelector('#tgSave').onclick=async function(){
     var btn=this; btn.disabled=true;
@@ -654,7 +669,7 @@ export function openTargetEditor(year){
     try{
       var payload=[];
       ovl.querySelectorAll('input[data-m]').forEach(function(inp){
-        var v=inp.value===''? null : Number(inp.value);
+        var v=kwToWon(inp.value);   /* 칸은 천원 (㊿+157) */
         if(v!=null) payload.push({year:year, month:+inp.dataset.m, amount:v});
       });
       if(payload.length){
@@ -695,9 +710,9 @@ export function renderBizEditor(host, months){
       tpl`<div><label>월 *</label><input id="bzYm" placeholder="예: 8월" value="${editYm}"></div>`+
       tpl`<div><label>작성일</label><input id="bzAsOf" type="date" value="${asOf}"></div>`+
     tpl`</div>`+
-    tpl`<div class="cap" style="margin-bottom:6px">요약 항목 — 금액은 <b>원 단위로 입력</b> (표·대시보드에는 천원으로 표시됩니다)</div><div id="bzSums"></div>`+
+    tpl`<div class="cap" style="margin-bottom:6px">요약 항목 — 금액은 <b>천원 단위로 입력</b> (표와 같은 단위)</div><div id="bzSums"></div>`+
     tpl`<button class="pill ghost" id="bzAddSum" style="margin:6px 0 16px">＋ 항목 추가</button>`+
-    tpl`<div class="cap" style="margin-bottom:6px">고객사별 차이 (없으면 비워두세요 · 차이는 자동 계산) — <b>원 단위로 입력</b></div><div id="bzDets"></div>`+
+    tpl`<div class="cap" style="margin-bottom:6px">고객사별 차이 (없으면 비워두세요 · 차이는 자동 계산) — <b>천원 단위로 입력</b></div><div id="bzDets"></div>`+
     tpl`<button class="pill ghost" id="bzAddDet" style="margin:6px 0 18px">＋ 고객사 추가</button>`+
     tpl`<div style="display:flex;gap:10px;align-items:center">`+
       tpl`<span class="mini" id="bzMsg" style="flex:1"></span>`+
@@ -709,7 +724,7 @@ export function renderBizEditor(host, months){
   function sumRow(item,amt){
     var d=document.createElement('div'); d.style.cssText='display:flex;gap:8px;margin-bottom:6px;max-width:640px';
     d.innerHTML=tpl`<input class="bz-item" placeholder="항목명" style="flex:2" value="${item||''}">`+
-      tpl`<input class="bz-amt" placeholder="금액" style="flex:1;text-align:right" value="${rawHtml(amt==null?'':Number(amt).toLocaleString('ko-KR'))}">`;
+      tpl`<input class="bz-amt" placeholder="금액(천원)" style="flex:1;text-align:right" value="${amt==null?'':(Math.round(Number(amt))/1000).toLocaleString('ko-KR',{maximumFractionDigits:3})}">`;
     var x=document.createElement('button'); x.className='pill ghost'; x.textContent='✕';
     x.onclick=function(){ d.remove(); }; d.appendChild(x);
     return d;
@@ -718,8 +733,8 @@ export function renderBizEditor(host, months){
     r=r||{};
     var d=document.createElement('div'); d.style.cssText='display:flex;gap:8px;margin-bottom:6px';
     d.innerHTML=tpl`<input class="bd-cust" placeholder="고객사" style="flex:2" value="${r.item||''}">`+
-      tpl`<input class="bd-biz" placeholder="비즈포탈" style="flex:1;text-align:right" value="${rawHtml(r.biz==null?'':r.biz)}">`+
-      tpl`<input class="bd-sheet" placeholder="매출시트" style="flex:1;text-align:right" value="${rawHtml(r.sheet==null?'':r.sheet)}">`+
+      tpl`<input class="bd-biz" placeholder="비즈포탈(천원)" style="flex:1;text-align:right" value="${r.biz==null?'':wonToKw(r.biz)}">`+
+      tpl`<input class="bd-sheet" placeholder="매출시트(천원)" style="flex:1;text-align:right" value="${r.sheet==null?'':wonToKw(r.sheet)}">`+
       tpl`<input class="bd-note" placeholder="사유" style="flex:2" value="${r.note||''}">`;
     var x=document.createElement('button'); x.className='pill ghost'; x.textContent='✕';
     x.onclick=function(){ d.remove(); }; d.appendChild(x);
@@ -737,12 +752,12 @@ export function renderBizEditor(host, months){
     var out=[];
     $('#bzSums').querySelectorAll('div').forEach(function(d){
       var it=d.querySelector('.bz-item').value.trim();
-      var amt=bizNz(d.querySelector('.bz-amt').value);
+      var amt=kwToWon(bizNz(d.querySelector('.bz-amt').value));   /* 칸은 천원 (㊿+157) */
       if(it) out.push({ym:ym, as_of:asof, kind:'sum', item:it, biz:amt});
     });
     $('#bzDets').querySelectorAll('div').forEach(function(d){
       var cu=d.querySelector('.bd-cust').value.trim(); if(!cu) return;
-      var bz=bizNz(d.querySelector('.bd-biz').value), sh=bizNz(d.querySelector('.bd-sheet').value);
+      var bz=kwToWon(bizNz(d.querySelector('.bd-biz').value)), sh=kwToWon(bizNz(d.querySelector('.bd-sheet').value));
       out.push({ym:ym, as_of:asof, kind:'detail', item:cu, biz:bz, sheet:sh,
                 diff:(bz!=null&&sh!=null)? bz-sh:null, note:d.querySelector('.bd-note').value.trim()||null});
     });
@@ -1561,7 +1576,7 @@ export function renewFormHtml(r, act){
   var dEnd=r.endRaw, term=r.term||12, ne=dEnd+term, cancel='<button type="button" class="pill ghost" id="rnCancel">취소</button>';
   if(act==='renew') return tpl`<div class="rn-f"><b>연장</b><span>기존 종료 ${mk(dEnd)} · 회차 ${rawHtml((r.renew||0)+1)}회</span>`+
     tpl`<label>새 종료월 <input type="month" id="rnEnd" value="${mk(ne)}"></label>`+
-    tpl`<label>월 금액(천원) <input type="number" id="rnMrr" value="${Math.round((r.mrr||0)/1000)}" min="0" step="1" style="width:110px"></label>`+
+    tpl`<label>월 금액(천원) <input type="number" id="rnMrr" value="${wonToKw(r.mrr||0)}" data-prev="${rawHtml(r.mrr||0)}" min="0" step="any" style="width:110px"></label>`+
     tpl`<label>메모 <input type="text" id="rnNote" placeholder="선택" style="width:180px"></label>`+
     tpl`<span class="mini">${mk(dEnd+1)}부터 새 종료월까지 월 매출을 다시 만듭니다${/해지|종료/.test(r.status||'')? ' · 상태는 신규로 되살림':''}${dEnd<RN.T? ' · 지난 달 매출도 소급 생성':''}</span>`+
     tpl`<button type="button" class="pill" id="rnGo">연장 저장</button>${rawHtml(cancel)}</div>`;
@@ -1571,7 +1586,7 @@ export function renewFormHtml(r, act){
   if(act==='churn') return tpl`<div class="rn-f"><b>해지</b>`+
     tpl`<label>해지월(이 달까지 매출 인식) <input type="month" id="rnMonth" value="${mk(dEnd)}"></label>`+
     tpl`<label>사유 <select id="rnReason">${rawHtml(CHURN_OPTS.map(function(o){ return tpl`<option>${o}</option>`; }).join(''))}</select></label>`+
-    tpl`<span class="mini">해지월 다음 달부터 LIVE 제외 · 해지 분석·해지율에 반영</span>`+
+    tpl`<span class="mini">해지월부터 LIVE 제외(매출은 해지월까지 인식) · 해지 분석·해지율에 반영</span>`+
     tpl`<button type="button" class="pill" id="rnGo">해지 저장</button>${rawHtml(cancel)}</div>`;
   if(act==='auto') return tpl`<div class="rn-f"><b>자동연장</b><span>월 단위로 자동 연장되는 계약으로 표시 — 만기 목록·슬랙 알림·«확인중»에서 빠지고 LIVE 판정은 그대로입니다. 계약 관리 표 «자동연장» 열에서 언제든 끌 수 있습니다.`+ tpl`${rawHtml(dEnd<RN.T? ' <b style="color:var(--critical)">⚠ 종료월이 지나 이미 LIVE 에서 빠진 계약입니다 — LIVE 에 두려면 «연장»으로 종료월을 늘리세요.</b>':'')}</span>`+
     tpl`<button type="button" class="pill" id="rnGo">자동연장 켜기</button>${rawHtml(cancel)}</div>`;
@@ -1609,7 +1624,7 @@ export function renderRenewList(){
       var id=+bt.dataset.id;
       if(RN.open===id && RN.act===bt.dataset.a){ RN.open=null; RN.act=''; } else { RN.open=id; RN.act=bt.dataset.a; }
       renderRenewList();
-      var f=box.querySelector('.rn-form'); if(f){ try{ f.scrollIntoView({block:'nearest'}); }catch(e){} var i=f.querySelector('input,select'); if(i) i.focus(); }
+      var f=box.querySelector('.rn-form'); if(f){ try{ f.scrollIntoView({block:'nearest'}); }catch(e){} amtHint(f.querySelector('#rnMrr'), null, true); var i=f.querySelector('input,select'); if(i) i.focus(); }
     }; });
     var go=box.querySelector('#rnGo'); if(go) go.onclick=function(){ renewSubmit(rows.filter(function(r){ return r._id===RN.open; })[0]); };
     var cc=box.querySelector('#rnCancel'); if(cc) cc.onclick=function(){ RN.open=null; RN.act=''; renderRenewList(); };
@@ -1626,7 +1641,8 @@ export async function renewSubmit(r){
     var act=RN.act, txt='';
     if(act==='renew'){
       var ne=ymFromInput($('#rnEnd').value); if(ne==null) throw new Error('새 종료월을 입력하세요.');
-      var amt=Math.round((+$('#rnMrr').value||0)*1000) || r.mrr || 0; if(!amt) throw new Error('월 금액을 입력하세요.');
+      var amt=kwToWon($('#rnMrr').value) || r.mrr || 0; if(!amt) throw new Error('월 금액을 입력하세요.');
+      if(!amtGuard(amt, r.mrr, '연장 월 금액', true)) throw new Error('저장하지 않았습니다 — 월 금액을 확인하세요 (천원 단위 · 48만원 → 480).');
       var res=await doRenew(r, ne, amt, ($('#rnNote').value||'').trim());
       txt='연장 '+res.rno+'회 — '+r.cust+' → '+mk(ne)+' · 월 '+won(amt)+'천원';
     } else if(act==='end'){

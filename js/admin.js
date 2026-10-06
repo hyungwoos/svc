@@ -1417,7 +1417,33 @@ export async function qaRun(){
   if(mob.length){ qaFit(390, 844, boxH); await qaSleep(500); await qaRaf(w);
     for(var j=0;j<mob.length;j++){ if(!alive()) return; await runMenu(mob[j]); }
     qaFit(1280, 800); try{ qaApi(w).navMenu('dash'); }catch(e){} }
+  await qaDataPhase(run);
   qaFinish(run);
+}
+/* ===== ㊿+157 QA «데이터 입력·수정» — 같은 스테이징을 ?qa=data(가짜 DB · js/qadata.js)로 다시 열어, 그 버전에 들어 있는 시나리오를 차례로 실행
+   · 칸 채우기 → 저장 → 가짜 DB 값(원) · 다시 읽은 화면 · 합계 · LIVE 대조 — 운영 DB 에는 아무것도 쓰지 않음(가짜 창은 저장소·로그인도 분리)
+   · 스테이징이 옛 버전이라 시나리오가 없으면 «—» (건너뜀) */
+export function qaDataUrl(){ return qaStagingUrl().replace('qa=1', 'qa=data'); }
+export async function qaDataPhase(run){
+  var alive=function(){ return run===QA.run; }, ifr=QA.ifr; if(!ifr) return;
+  var s0=qaStep('data:open', '가짜 DB 로 다시 열기', '🧾'); s0.st='run'; qaPaint(); var t0=Date.now();
+  var w=await new Promise(function(res){ ifr.onload=function(){ res(ifr.contentWindow); }; setTimeout(function(){ res(ifr.contentWindow); }, 20000); ifr.src=qaDataUrl(); });
+  if(!alive()) return;
+  var errs=[]; try{ w.addEventListener('error', function(e){ errs.push(String((e&&e.message)||'오류')+(e&&e.filename? ' @ '+String(e.filename).replace(/^.*\/staging\//,'').replace(/\?.*$/,'')+':'+e.lineno : '')); });
+    w.addEventListener('unhandledrejection', function(e){ var r=e&&e.reason; errs.push('Promise: '+String((r&&(r.message||r))||'')); }); }catch(e){}
+  var ready=await qaWait(function(){ var a=qaApi(w); return a.ST && a.ST.DATA && a.ST.DATA.rows && a.ST.DATA.rows.length; }, 30000, 250);
+  s0.ms=Date.now()-t0; if(!alive()) return;
+  var api=qaApi(w);
+  if(!api || !api.qaDataList){ s0.st='skip'; s0.detail='이 스테이징 버전에는 데이터 입력·수정 점검이 없음(㊿+157 부터)'; qaPaint(); return; }
+  if(!ready){ s0.st='fail'; s0.detail=errs.length? 'JS 오류: '+qaText(errs[0], 100) : '30초 안에 가짜 데이터가 뜨지 않음'; s0.diag=errs.slice(0,4); qaPaint(); return; }
+  if(api.QA_DATA_MSG){ s0.st='warn'; s0.detail=api.QA_DATA_MSG; qaPaint(); return; }
+  s0.st='ok'; s0.detail='가짜 DB · 계약 '+api.QADB.t.contracts.length+'건 (운영 DB 에는 쓰지 않음)'; qaPaint();
+  var list=api.qaDataList(), steps=list.map(function(x){ return qaStep('data:'+x.id, x.label, '🧾'); }); qaPaint();
+  for(var i=0;i<list.length;i++){ if(!alive()) return; var st=steps[i]; st.st='run'; qaPaint(); var e0=errs.length, r;
+    try{ r=await api.qaDataRun(i); }catch(e){ r={ok:false, detail:String(e.message||e), diag:[]}; }
+    var je=errs.slice(e0);
+    st.ms=r.ms||0; st.st=r.skip? 'skip' : (r.ok && !je.length)? 'ok' : 'fail'; st.detail=qaText((je.length && r.ok? 'JS 오류: '+je[0] : r.detail)||'', 160); st.view='qa:data';
+    st.diag=(r.diag||[]).map(function(x){ return '  - '+x; }).concat(je.slice(0,3).map(function(x){ return '  - JS 오류: '+x; })); qaPaint(); }
 }
 export async function qaFinish(run){
   if(run!==QA.run) return; QA.on=false;

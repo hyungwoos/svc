@@ -1284,6 +1284,8 @@ html[data-look="cc"] #ccHome{display:flex;flex-direction:column;gap:14px;margin-
 .cbtn:hover{background:var(--surface-2)}
 .x-close{margin-left:auto;flex:none}   /* ㊿+156 펼친 목록·결과 닫기 — 머리줄(flex) 오른쪽 끝 */
 .x-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.amt-hint{display:block;font-size:11px;line-height:1.35;color:var(--muted);margin-top:2px;white-space:normal}   /* ㊿+157 금액 칸 아래 환산 «= 48만원» */
+.amt-hint.warn{color:var(--critical);font-weight:600}
 .cbtn.pri{background:var(--brand-solid);border-color:var(--brand-solid);color:#fff}
 .cbtn.pri:hover{background:var(--brand-2)}
 .cbtn[aria-pressed="true"]{background:var(--brand-solid);border-color:var(--brand-solid);color:#fff}

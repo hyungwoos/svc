@@ -2,7 +2,7 @@
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { APP_VER, ST } from './state.js';
 import { Viz } from './viz.js';
-import { $, $$, baseLabel, baseRange, buildBaseSelect, cssv, el, esc, isCC, lline, mk, mkLabel, monOf, pct, rawHtml, seriesColor, STATE, tpl, won,
+import { $, $$, kwToWon, wonToKw, baseLabel, baseRange, buildBaseSelect, cssv, el, esc, isCC, lline, mk, mkLabel, monOf, pct, rawHtml, seriesColor, STATE, tpl, won,
   wonFull, wrapNavIcons, yOf } from './core.js';
 import { boot, CACHE_KEY, ccAfterKpis, ccAnaCount, ccAnalysisOpen, ccHomeLayout, loadFromDb, onData, renderInbox, SB_RAW, sbWrite, toast } from './shell.js';
 import { abortAsk, ask, closeAnswer, isAsking, loadAiConfig, runQuery, shortQ } from './ai.js';
@@ -254,7 +254,7 @@ export function buildControls(){
   (function(){ var nP=ST.DATA.rows.filter(function(r){return !r.parent;}).length, nC=ST.DATA.rows.length-nP;
     $('#periodLabel').textContent = ST.DATA.monthKeys[0]+' ~ '+ST.DATA.monthKeys[ST.M-1]+' · 계약 '+nP.toLocaleString('ko-KR')+'건'+(nC? ' (+부속 '+nC+')':''); })();
   $('#loadedAt').textContent = '읽은 시각 '+ST.DATA.generatedAt;
-  $('#foot').innerHTML = tpl`원본: Supabase DB · <b>금액 단위: 천원</b> (입력·수정과 가격표 단가는 원 단위) · 모든 수정은 변경 이력에 기록됩니다 · 포탈 버전 ${rawHtml(APP_VER)}`+ tpl`${rawHtml(ST.DATA.warnings&&ST.DATA.warnings.length? tpl`<br>⚠️ ${rawHtml(ST.DATA.warnings.join(' / '))}` : '')}`;
+  $('#foot').innerHTML = tpl`원본: Supabase DB · <b>금액 단위: 천원</b> (입력도 천원 · 가격표·견적 단가만 원) · 모든 수정은 변경 이력에 기록됩니다 · 포탈 버전 ${rawHtml(APP_VER)}`+ tpl`${rawHtml(ST.DATA.warnings&&ST.DATA.warnings.length? tpl`<br>⚠️ ${rawHtml(ST.DATA.warnings.join(' / '))}` : '')}`;
 }
 export function uniq(f){
   var s={}; ST.DATA.rows.forEach(function(r){ var v=f(r); if(v) s[v]=1; });
@@ -712,12 +712,12 @@ export function openIfeeDetail(td, Y, M, det, adj){
   var a=ex.reduce(function(x,e){ return x+Number(e.amount||0); },0);
   var sum=rows.reduce(function(x,d){ return x+d.fee; },0)+a;
   var ed=ifeeCanEdit();
-  /* 금액은 «원 단위»로 입력합니다 — 표에는 천원으로 보이지만 입력·저장은 원 단위(입력·수정 창과 같은 규칙) */
+  /* 금액은 «천원 단위»로 입력합니다 (㊿+157 — 표와 같은 단위 · 저장은 원) */
   function amtIn(v, key){
-    return tpl`<input class="ifin" data-f="${rawHtml(key)}" type="number" step="10000" value="${rawHtml(v===''||v==null?'':v)}" placeholder="0" `+
+    return tpl`<input class="ifin" data-f="${rawHtml(key)}" type="number" step="any" value="${v===''||v==null?'':wonToKw(v)}" placeholder="천원" `+
            tpl`style="width:104px;text-align:right;font-size:12px;padding:3px 5px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)">`;
   }
-  var h=tpl`<div class="mxdet"><table><thead><tr><th style="min-width:150px">고객사</th><th>구분·서비스</th><th>근거</th><th class="n">설치비(원)</th>${rawHtml(ed?'<th></th>':'')}</tr></thead><tbody>`;
+  var h=tpl`<div class="mxdet"><table><thead><tr><th style="min-width:150px">고객사</th><th>구분·서비스</th><th>근거</th><th class="n">설치비(천원)</th>${rawHtml(ed?'<th></th>':'')}</tr></thead><tbody>`;
   rows.forEach(function(d,i){
     h+=tpl`<tr data-i="${rawHtml(i)}" data-cid="${rawHtml(d.id||'')}"><td><b>${d.cust}</b>`+
        tpl` <button class="ifgo" data-i="${rawHtml(i)}" title="계약 화면에서 보기" style="border:none;background:none;cursor:pointer;color:var(--mut)">↗</button></td>`+
@@ -748,7 +748,7 @@ export function openIfeeDetail(td, Y, M, det, adj){
      tpl`<td class="n" id="ifSum">${won(sum)}천원</td>${rawHtml(ed?'<td></td>':'')}</tr></tfoot></table></div>`+
      tpl`<datalist id="dlIfeeCust"></datalist>`+ tpl`${rawHtml(ed? tpl`<div class="act" style="margin-top:6px"><span class="msg" id="ifMsg" style="font-size:12px"></span><span class="sp"></span>`+
           tpl`<button class="pill pri" id="ifSave">저장</button></div>`+
-          tpl`<div class="who" style="margin-top:4px">금액은 <b>원 단위</b>로 입력합니다 (표에는 천원으로 표시) · 환급·차감이면 음수 · 고객사 옆 ↗ 를 누르면 그 계약으로 이동</div>`
+          tpl`<div class="who" style="margin-top:4px">금액은 <b>천원 단위</b>로 입력합니다 (100만원 → 1000) · 환급·차감이면 음수 · 고객사 옆 ↗ 를 누르면 그 계약으로 이동</div>`
         : '<div class="who" style="margin-top:6px">줄을 누르면 그 고객사의 계약 화면으로 이동 · 금액 수정은 편집 권한이 있는 계정만</div>')}`;
   openMxMemo(td, IFEE_LINE, Y, M, '설치비', null, {detail:{html:h, count:rows.length+ex.length, sum:sum,
     go:function(i){ var d=rows[i]; if(!d) return; switchView('contracts'); var sInp=$('#dvSearch'); if(sInp){ sInp.value=d.cust; DV.page=0; renderGrid(); } },
@@ -770,7 +770,7 @@ export function ifeeWire(box, Y, M, rows, ex, td){
       var f=i.dataset.f;
       if(f.indexOf('_amt')<0 && f.charAt(0)!=='c') return;
       var tr=i.closest('tr'); if(tr && tr.dataset.x!==undefined && del[tr.dataset.x]) return;
-      t+=Number(i.value||0);
+      t+=kwToWon(i.value)||0;
     });
     var el=box.querySelector('#ifSum'); if(el) el.textContent=won(t)+'천원';
   }
@@ -796,7 +796,7 @@ export function ifeeWire(box, Y, M, rows, ex, td){
       tpl`<td><select class="ifin" aria-label="항목 종류" data-f="x${rawHtml(nextX)}_kind" style="font-size:12px;padding:3px 4px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)">`+
         tpl`${rawHtml(IFEE_KINDS.map(function(k){ return tpl`<option>${rawHtml(k)}</option>`; }).join(''))}</select></td>`+
       tpl`<td><input class="ifin" data-f="x${rawHtml(nextX)}_note" type="text" placeholder="비고(선택)" style="width:100%;min-width:110px;font-size:12px;padding:3px 5px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)"></td>`+
-      tpl`<td class="n"><input class="ifin" data-f="x${rawHtml(nextX)}_amt" type="number" step="10000" placeholder="0" style="width:104px;text-align:right;font-size:12px;padding:3px 5px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)"></td>`+
+      tpl`<td class="n"><input class="ifin" data-f="x${rawHtml(nextX)}_amt" type="number" step="any" placeholder="천원" style="width:104px;text-align:right;font-size:12px;padding:3px 5px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)"></td>`+
       tpl`<td><button class="ifdel" data-x="${rawHtml(nextX)}" title="이 줄 지우기" style="border:none;background:none;cursor:pointer;color:var(--critical,#d03b3b);font-size:13.5px">✕</button></td>`;
     var anchor=box.querySelector('#ifAddRow');
     anchor.parentNode.insertBefore(tr, anchor);
@@ -811,7 +811,7 @@ export function ifeeWire(box, Y, M, rows, ex, td){
       /* ① 계약 설치비 */
       rows.forEach(function(d){
         var inp=box.querySelector('.ifin[data-f="c'+d.id+'"]'); if(!inp||!d.id) return;
-        var v=inp.value===''? null : Number(inp.value);
+        var v=kwToWon(inp.value);
         if(Number(v||0)===Number(d.fee||0)) return;
         changed++;
         jobs.push(sbWrite('PATCH','contracts?id=eq.'+d.id,{install_fee:v, updated_at:new Date().toISOString()}).then(function(){
@@ -826,7 +826,7 @@ export function ifeeWire(box, Y, M, rows, ex, td){
         var x=tr.dataset.x, id=tr.dataset.id;
         if(del[x]) return;
         var g=function(f){ var e=box.querySelector('.ifin[data-f="x'+x+'_'+f+'"]'); return e? e.value : ''; };
-        var cust=String(g('cust')||'').trim(), amt=g('amt')===''? null : Number(g('amt'));
+        var cust=String(g('cust')||'').trim(), amt=kwToWon(g('amt'));
         var kind=g('kind')||'설치비', note=String(g('note')||'').trim()||null;
         if(!cust && !amt) return;
         if(!cust){ throw new Error('추가 항목의 고객사를 입력하세요'); }
