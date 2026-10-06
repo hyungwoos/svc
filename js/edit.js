@@ -1,49 +1,55 @@
 /* ===== edit.js — 입력·수정(Supabase 쓰기) · 로그인 모달 · 계약 검색 · 저장 동작 · 사명 변경 · boot =====
-   포탈 본체(js/app.js)를 ④ 아키텍처 2단계(㊿+136)에서 기능별로 나눈 파일. 전역 var/function 그대로 — 즉시 실행 문장은 전부 js/init.js 에.
-   로드 순서는 index.html <meta name="app-js"> (js/load.js 가 그 순서대로 ?v=APP_VER 를 붙여 불러옴) */
+   ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
+import { ST } from './state.js';
+import { $, clearSess, doLogout, el, lline, mfaGate, mfaVerifiedOf, mk, saveSess, SB_KEY, SB_URL, sessRead, sessWrite, won } from './core.js';
+import { afterLoad, idxDate, loadFromDb, onData, onErr, SB_RAW, sbWrite, showAuthUi, showLoading, toast } from './shell.js';
+import { esc } from './dash.js';
+import { s1NoInfo, s1NoOpts } from './grids.js';
+import { chOf, doChurn, doRenew, liveCalc, nmKeys } from './analysis.js';
+import { switchView } from './grid.js';
 
 
 /* ==================================================================
    입력·수정 (Supabase 쓰기)
    ================================================================== */
-function openOvl(id){ document.getElementById(id).classList.add('on'); }
-function closeOvl(id){ document.getElementById(id).classList.remove('on'); }
+export function openOvl(id){ document.getElementById(id).classList.add('on'); }
+export function closeOvl(id){ document.getElementById(id).classList.remove('on'); }
 
 /* ── 창(.ovl) 공통 동작 (㊿+141 · 사용자: «닫기 버튼이 아니라 옆 공간을 클릭해도 닫히게») ──
    · 바깥(어두운 배경) 클릭 · Esc → ovlDismiss: 창의 [data-close] 버튼 → 아래쪽 «닫기/취소» 버튼 → 없으면 숨김(정적)/제거(동적) 순서로 «원래 닫는 방법»을 그대로 씀
    · 입력 중인 내용이 있으면 확인 후 닫음(ovlIsDirty) · 2단계 인증 창(#ovlMfa)·data-noesc 창은 바깥 클릭/Esc 로 닫지 않음
    · 열릴 때 role=dialog·aria-modal·제목 연결 · 초점을 창 안으로 · Tab 은 창 안에서만 돎 · 닫히면 초점을 연 버튼으로 되돌림
    init.js 끝에서 ovlInit() 이 이벤트를 등록함 */
-var OVL_SEQ=0, OVL_STATIC=null, OVL_DOWN=null;
-var OVL_SKIP_CLEAN=/^(change_log|client_errors|ai_feedback|ai_check_log|ai_chat_history)\b/;
-function ovlShown(o){ return !!(o && o.isConnected && o.classList.contains('on') && o.getClientRects().length); }
-function ovlTop(){
+export var OVL_SEQ=0, OVL_STATIC=null, OVL_DOWN=null;
+export var OVL_SKIP_CLEAN=/^(change_log|client_errors|ai_feedback|ai_check_log|ai_chat_history)\b/;
+export function ovlShown(o){ return !!(o && o.isConnected && o.classList.contains('on') && o.getClientRects().length); }
+export function ovlTop(){
   var a=Array.prototype.slice.call(document.querySelectorAll('.ovl.on')).filter(ovlShown);
   if(!a.length) return null;
   a.forEach(function(o,i){ o.__ord=i; });
   a.sort(function(x,y){ return ((parseInt(getComputedStyle(x).zIndex,10)||0)-(parseInt(getComputedStyle(y).zIndex,10)||0)) || (x.__ord-y.__ord); });
   return a[a.length-1];
 }
-function ovlCanClose(o){ return !!o && o.id!=='ovlMfa' && !o.hasAttribute('data-noesc'); }
-function ovlVal(t){ return (t.type==='checkbox'||t.type==='radio')? (t.checked?'1':'0') : String(t.value==null? '' : t.value); }
-function ovlTrackable(t){
+export function ovlCanClose(o){ return !!o && o.id!=='ovlMfa' && !o.hasAttribute('data-noesc'); }
+export function ovlVal(t){ return (t.type==='checkbox'||t.type==='radio')? (t.checked?'1':'0') : String(t.value==null? '' : t.value); }
+export function ovlTrackable(t){
   if(!t || !t.closest || !/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return null;
   if(t.id==='fkInput' || t.type==='search' || t.type==='hidden' || t.closest('[data-nodirty]')) return null;
   return t.closest('.ovl');
 }
-function ovlMarkDirty(o){ if(typeof o==='string') o=document.getElementById(o); if(o) o.__dirty=true; }
-function ovlMarkClean(){   /* 저장 성공(sbWrite) 뒤 — 지금 값을 새 기준으로. 저장 뒤 코드가 칸을 비우는 것(사람 입력 아님)은 «입력 중»으로 치지 않음(__ti) */
+export function ovlMarkDirty(o){ if(typeof o==='string') o=document.getElementById(o); if(o) o.__dirty=true; }
+export function ovlMarkClean(){   /* 저장 성공(sbWrite) 뒤 — 지금 값을 새 기준으로. 저장 뒤 코드가 칸을 비우는 것(사람 입력 아님)은 «입력 중»으로 치지 않음(__ti) */
   var now=Date.now();
   Array.prototype.forEach.call(document.querySelectorAll('.ovl.on'), function(o){
     o.__dirty=false; o.__cleanAt=now; (o.__typed||[]).forEach(function(t){ if(t.isConnected) t.__v0=ovlVal(t); });
   });
 }
-function ovlIsDirty(o){
+export function ovlIsDirty(o){
   if(!o) return false; if(o.__dirty) return true;
   var c=o.__cleanAt||0;
   return (o.__typed||[]).some(function(t){ return t.isConnected && o.contains(t) && !t.disabled && (t.__ti||0)>c && ovlVal(t)!==t.__v0; });
 }
-function ovlDismiss(o){
+export function ovlDismiss(o){
   if(!ovlCanClose(o)) return false;
   if(ovlIsDirty(o) && !confirm('입력하거나 바꾼 내용이 아직 저장되지 않았습니다.\n저장하지 않고 닫을까요?')) return false;
   o.__dirty=false; (o.__typed||[]).forEach(function(t){ delete t.__v0; }); o.__typed=[];
@@ -54,12 +60,12 @@ function ovlDismiss(o){
   if(OVL_STATIC && OVL_STATIC.indexOf(o)>=0) o.classList.remove('on'); else o.remove();
   return true;
 }
-function ovlFocusables(o){
+export function ovlFocusables(o){
   return Array.prototype.slice.call(o.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),iframe,[contenteditable="true"],[tabindex]:not([tabindex="-1"])'))
     .filter(function(e){ return e.getClientRects().length && getComputedStyle(e).visibility!=='hidden'; });
 }
-function ovlDialogEl(o){ return o.matches('[role=dialog]')? o : (o.querySelector('[role=dialog]') || o.querySelector('.modal') || o.firstElementChild || o); }
-function ovlOnOpen(o){
+export function ovlDialogEl(o){ return o.matches('[role=dialog]')? o : (o.querySelector('[role=dialog]') || o.querySelector('.modal') || o.firstElementChild || o); }
+export function ovlOnOpen(o){
   if(o.__open) return; o.__open=true; o.__dirty=false; o.__typed=[]; o.__cleanAt=0;
   var ae=document.activeElement; o.__opener=(ae && ae!==document.body && !o.contains(ae))? ae : null;
   var d=ovlDialogEl(o);
@@ -72,14 +78,14 @@ function ovlOnOpen(o){
     try{ d.focus({preventScroll:true}); }catch(e){}
   }, 60);
 }
-function ovlOnClose(o){
+export function ovlOnClose(o){
   if(!o.__open) return; o.__open=false; var op=o.__opener; o.__opener=null;
   setTimeout(function(){
     var ae=document.activeElement;
     if(op && op.isConnected && op.getClientRects().length && (!ae || ae===document.body || !ae.isConnected || o.contains(ae))){ try{ op.focus({preventScroll:true}); }catch(e){} }
   }, 0);
 }
-function ovlTrapTab(e){
+export function ovlTrapTab(e){
   if(e.key!=='Tab' || e.ctrlKey || e.altKey || e.metaKey) return;
   var o=ovlTop(); if(!o) return;
   var F=ovlFocusables(o); if(!F.length){ e.preventDefault(); return; }
@@ -87,12 +93,12 @@ function ovlTrapTab(e){
   if(e.shiftKey){ if(i<=0){ e.preventDefault(); F[F.length-1].focus(); } }
   else if(i<0 || i===F.length-1){ e.preventDefault(); F[0].focus(); }
 }
-function ovlWatch(o){
+export function ovlWatch(o){
   if(o.__watched) return; o.__watched=true;
   new MutationObserver(function(){ if(o.classList.contains('on')) ovlOnOpen(o); else ovlOnClose(o); }).observe(o, {attributes:true, attributeFilter:['class']});
   if(o.classList.contains('on')) ovlOnOpen(o);
 }
-function ovlInit(){
+export function ovlInit(){
   OVL_STATIC=Array.prototype.slice.call(document.querySelectorAll('.ovl'));
   OVL_STATIC.forEach(ovlWatch);
   new MutationObserver(function(ms){ ms.forEach(function(m){
@@ -112,12 +118,12 @@ function ovlInit(){
   document.addEventListener('input', late, true); document.addEventListener('change', late, true);
   document.addEventListener('keydown', ovlTrapTab);
 }
-function msg(id,t,cls){ var e=$('#'+id); e.textContent=t||''; e.className='mmsg'+(cls?' '+cls:''); }
+export function msg(id,t,cls){ var e=$('#'+id); e.textContent=t||''; e.className='mmsg'+(cls?' '+cls:''); }
 
 /* ---- 로그인 / 가입 / 비밀번호 변경 ---- */
-var AU_TAB='login';
+export var AU_TAB='login';
 
-async function doLogin(){
+export async function doLogin(){
   msg('auMsg','확인 중…');
   try{
     var r=await fetch(SB_URL+'/auth/v1/token?grant_type=password',{
@@ -151,9 +157,9 @@ async function doLogin(){
   }catch(e){ msg('auMsg',String(e.message||e),'bad'); }
 }
 
-var FORCE_PW=false;
+export var FORCE_PW=false;
 
-async function doPwChange(){
+export async function doPwChange(){
   if(!ST.SB_TOKEN) return msg('auMsg','먼저 「로그인」 탭에서 로그인하세요','bad');
   var p1=$('#apPw').value, p2=$('#apPw2').value;
   if(p1.length<6) return msg('auMsg','6자 이상으로 입력하세요','bad');
@@ -178,7 +184,7 @@ async function doPwChange(){
   }catch(e){ msg('auMsg',String(e.message||e),'bad'); }
 }
 
-function setAuthTab(t){
+export function setAuthTab(t){
   AU_TAB=t;
   $('#auTabs').querySelectorAll('button').forEach(function(b){
     b.setAttribute('aria-pressed', b.dataset.t===t?'true':'false');
@@ -189,7 +195,7 @@ function setAuthTab(t){
   msg('auMsg','');
 }
 
-function toggleAuthMenu(){
+export function toggleAuthMenu(){
   var old=document.getElementById('authMenu');
   if(old){ old.remove(); return; }
   var r=$('#btnAuth').getBoundingClientRect();
@@ -214,7 +220,7 @@ function toggleAuthMenu(){
     });
   },0);
 }
-function setupAuth(){
+export function setupAuth(){
   $('#btnAuth').onclick=function(){
     if(ST.SB_TOKEN){ toggleAuthMenu(); return; }   // 로그인 상태: 내 계정/로그아웃 메뉴
     $('#auTabs').querySelector('[data-t="login"]').style.display='';
@@ -243,10 +249,10 @@ function setupAuth(){
 }
 
 /* ---- 계약 검색 위젯 ---- */
-function ctLabel(r){
+export function ctLabel(r){
   return r.cust+' · '+lline(r.line)+' · '+(mk(r.startIdx)||'?')+'~'+(mk(r.endIdx)||'?')+' · '+won(r.mrr||0)+'천원';
 }
-function setupPick(inputId, pickId, store){
+export function setupPick(inputId, pickId, store){
   var inp=$('#'+inputId), box=$('#'+pickId);
   inp.oninput=function(){
     var q=this.value.trim().toLowerCase(); box.innerHTML=''; store.sel=null;
@@ -272,7 +278,7 @@ function setupPick(inputId, pickId, store){
 }
 
 /* 추가 탭: 고른 원계약 요약 표시 (부속 계약은 원계약을 고를 수 없음 → 그 원계약으로 바꿔 줌) */
-function showAddParent(r){
+export function showAddParent(r){
   var box=$('#aSel'); if(!box) return;
   if(r.parent){ var p=ST.DATA.rows.filter(function(x){ return x._id===r.parent; })[0]; if(p){ PK_A.sel=p; r=p; } }
   box.style.display='';
@@ -281,7 +287,7 @@ function showAddParent(r){
   if(!$('#aEnd').value && r.endIdx!=null) $('#aEnd').placeholder=mk(r.endIdx);
 }
 /* 금액 수정 탭: 선택한 계약의 현재 월 금액 구간을 보여주고, 구간을 누르면 시작·종료월이 채워집니다 */
-function showFixCurrent(r){
+export function showFixCurrent(r){
   var box=$('#fCur'); if(!box) return;
   var segs=(r.segs||[]).slice();
   if(!segs.length){ box.style.display=''; box.innerHTML='<label>현재 금액</label><div class="cap">인식 금액 행이 없습니다</div>'; return; }
@@ -299,9 +305,9 @@ function showFixCurrent(r){
   });
 }
 /* 업종(세분 분류) 선택지 — 50단계 분류 체계와 같은 이름을 씁니다 (집계가 한 이름으로 모이도록) */
-var SECTOR_OPTS=['IT·소프트웨어','금융·보험','기계·금속·부품','전자·전기','바이오·제약·의료','반도체·디스플레이','자동차·모빌리티',
+export var SECTOR_OPTS=['IT·소프트웨어','금융·보험','기계·금속·부품','전자·전기','바이오·제약·의료','반도체·디스플레이','자동차·모빌리티',
   '유통·소비재','화학·소재','공공·행정','건설·엔지니어링','미디어·콘텐츠·게임','전문서비스','에너지·환경','교육·연구','물류·운송','방산·항공','기타'];
-function fillSectorSel(){
+export function fillSectorSel(){
   var sel=document.getElementById('nSector'); if(!sel || sel._filled) return; sel._filled=1;
   var h='<option value="">— 선택 (모르면 비워두세요) —</option>';
   SECTOR_OPTS.forEach(function(o){ h+='<option>'+esc(o)+'</option>'; });
@@ -310,13 +316,13 @@ function fillSectorSel(){
   var etc=document.getElementById('nSectorEtc');
   sel.addEventListener('change', function(){ etc.style.display = sel.value==='__etc'? '' : 'none'; if(sel.value==='__etc') etc.focus(); });
 }
-function nSectorVal(){
+export function nSectorVal(){
   var sel=document.getElementById('nSector'); if(!sel) return '';
   if(sel.value==='__etc') return (document.getElementById('nSectorEtc').value||'').trim();
   return sel.value||'';
 }
 /* 고객사 칸에 기존 고객을 고르면 그 고객의 산업군·업종을 자동으로 채웁니다 */
-function syncCustMeta(){
+export function syncCustMeta(){
   var name=($('#nCust').value||'').trim(); if(!name) return;
   var c=(SB_RAW.customers||[]).filter(function(x){ return x.name===name; })[0]; if(!c) return;
   if(c.industry){ var ind=$('#nInd'); if(ind) ind.value=c.industry; }
@@ -328,7 +334,7 @@ function syncCustMeta(){
 }
 
 /* 과금방식 select: «직접 입력…» 이면 옆 입력칸 값을 씁니다 */
-function nBillingVal(){
+export function nBillingVal(){
   var sel=$('#nBilling'); if(!sel) return '';
   if(sel.value==='__etc') return ($('#nBillingEtc').value||'').trim();
   return sel.value||'';
@@ -336,14 +342,14 @@ function nBillingVal(){
 
 
 /* ---- 공통 쓰기 도우미 ---- */
-function ymFromInput(v){ // 'YYYY-MM' → idx
+export function ymFromInput(v){ // 'YYYY-MM' → idx
   if(!v) return null;
   return (+v.slice(0,4)-2020)*12 + (+v.slice(5,7)-6);
 }
-async function logChange(action,target,id,detail){
+export async function logChange(action,target,id,detail){
   try{ await sbWrite('POST','change_log',{actor:ST.AUTH_USER,action:action,target:target,target_id:id,detail:detail}); }catch(e){}
 }
-async function ensureCustomer(name, ind, sector){
+export async function ensureCustomer(name, ind, sector){
   var f=SB_RAW.customers.filter(function(c){return c.name===name;})[0];
   if(f){
     if(sector && sector!==(f.sector||'')){          // 폼에서 업종을 골랐고 기존 값과 다르면 고객사 업종 갱신
@@ -357,17 +363,17 @@ async function ensureCustomer(name, ind, sector){
   SB_RAW.customers.push({id:r[0].id,name:name,industry:ind,sector:sector||null});
   return r[0].id;
 }
-function monthRows(ctId, fromIdx, toIdx, amount){
+export function monthRows(ctId, fromIdx, toIdx, amount){
   var out=[];
   for(var i=fromIdx;i<=toIdx;i++) out.push({contract_id:ctId, month:idxDate(i), amount:amount});
   return out;
 }
 
 /* ---- 저장 동작 ---- */
-var PK_C={sel:null}, PK_R={sel:null}, PK_F={sel:null}, PK_A={sel:null};
-var CUR_TAB='new';
+export var PK_C={sel:null}, PK_R={sel:null}, PK_F={sel:null}, PK_A={sel:null};
+export var CUR_TAB='new';
 
-async function saveEdit(){
+export async function saveEdit(){
   if(!ST.SB_TOKEN){ msg('eMsg','먼저 로그인하세요 (우측 상단)','bad'); openOvl('ovlAuth'); return; }
   var btn=$('#eGo'); btn.disabled=true; msg('eMsg','저장 중…');
   try{
@@ -490,7 +496,7 @@ async function saveEdit(){
   btn.disabled=false;
 }
 /* ---- 사명 변경: 자동완성 목록 · 영향 미리보기 ---- */
-function renameAllNames(){
+export function renameAllNames(){
   var u={}, add=function(n){ n=String(n||'').trim(); if(n) u[n]=1; };
   (SB_RAW.customers||[]).forEach(function(c){ add(c.name); });
   var X=window.RAWX||{};
@@ -499,11 +505,11 @@ function renameAllNames(){
   (X.oi||[]).forEach(function(x){ add(x.customer); }); (X.mdrops||[]).forEach(function(x){ add(x.customer); });
   return Object.keys(u).sort(function(a,b){ return a.localeCompare(b,'ko'); });
 }
-function renameFillNames(){
+export function renameFillNames(){
   var dl=$('#dlAllNames'); if(!dl||dl._n===renameAllNames().length) return;
   var names=renameAllNames(); dl.innerHTML=''; names.forEach(function(n){ var o=document.createElement('option'); o.value=n; dl.appendChild(o); }); dl._n=names.length;
 }
-function renamePreview(xo,xn){
+export function renamePreview(xo,xn){
   var X=window.RAWX||{}, eq=function(a){ return String(a||'').trim()===xo; };
   var cus=(SB_RAW.customers||[]).filter(function(c){ return c.name===xo; })[0];
   var cnt={
@@ -521,7 +527,7 @@ function renamePreview(xo,xn){
   var merge=!!(xn && (SB_RAW.customers||[]).some(function(c){ return c.name===xn && c.name!==xo; }));
   return {cnt:cnt, lines:lines, total:total, merge:merge, master:!!cus};
 }
-function renameShowPreview(){
+export function renameShowPreview(){
   var box=$('#xPrev'); if(!box) return;
   var xo=($('#xOld').value||'').trim(), xn=($('#xNew').value||'').trim();
   if(!xo){ box.style.display='none'; return; }
@@ -532,7 +538,7 @@ function renameShowPreview(){
 }
 
 
-function setupEdit(){
+export function setupEdit(){
   var nl=document.getElementById('nLine');
   function syncCombine(){
     var v=(nl&&nl.value)||'', cb=document.getElementById('nCombine');
@@ -717,7 +723,7 @@ function setupEdit(){
   setupAuth();
 }
 
-function makeDemo(){
+export function makeDemo(){
   var lines=[{label:'Cloud',color:1},{label:'S1',color:2},{label:'MDR',color:3},{label:'PNS',color:4},{label:'MDR_S1',color:5}];
   var inds=['기업','공공'];
   var partners=['다원티에스','글로웰시스템','엘림넷','카카오엔터프라이즈','에스원(S1)','LG U+','금호타이어','지니언스'];

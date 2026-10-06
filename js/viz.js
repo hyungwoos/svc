@@ -4,7 +4,7 @@
    · 얇은 마크 / 2px 선 / 데이터 끝 4px 라운드 / 채움 사이 2px 서피스 간격
    · 크로스헤어 + 툴팁 기본 제공 / 그리드·축은 후퇴
    ================================================================== */
-var Viz = (function () {
+export var Viz = (function () {
   var NS = 'http://www.w3.org/2000/svg';
   function s(t, a) { var e = document.createElementNS(NS, t); for (var k in a) if (a[k] != null) e.setAttribute(k, a[k]); return e; }
   function cv(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }

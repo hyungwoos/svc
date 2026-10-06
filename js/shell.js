@@ -1,12 +1,27 @@
 /* ===== shell.js — 커맨드 센터(레일·커맨드 바·인박스·홈 위계) · 데이터 빌드(buildFromRes) · 고객 360 보강 · 토스트 · 제한 역할 · 로그인 화면 =====
-   포탈 본체(js/app.js)를 ④ 아키텍처 2단계(㊿+136)에서 기능별로 나눈 파일. 전역 var/function 그대로 — 즉시 실행 문장은 전부 js/init.js 에.
-   로드 순서는 index.html <meta name="app-js"> (js/load.js 가 그 순서대로 ?v=APP_VER 를 붙여 불러옴) */
+   ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
+import { IS_QA, ST } from './state.js';
+import { Viz } from './viz.js';
+import { $, applyPerms, canView, canWrite, clearSess, cssv, el, isCC, keepLogin, LIVE2CODE, lline, loadPerms, mfaGate, mfaVerifiedOf,
+  mfaWarnIfNeeded, mk, monOf, navText, permWriteGuard, refreshToken, restoreSess, saveSess, SB_KEY, SB_URL, seriesColor, sessRead, sessWrite, STATE,
+  won } from './core.js';
+import { buildControls, esc, expN, goWidget, hbars, idxs, renderAll, renderInstall, renderKpis, renderMatrix } from './dash.js';
+import { ask } from './ai.js';
+import { applyCodes, loadCodes } from './grids.js';
+import { eqOrderById, eqRetSet, eqScan, eqSerialsHtml, eqWant, syncOrderAssets } from './equipment.js';
+import { applyChannelMenu, chOf, dcSummary, ensureLeadSrc, liveData, openRenewList, renewScan } from './analysis.js';
+import { applyMenuConf, fkNorm, menuSegments, navSub, openCust360, openMenuEdit, renderTodo, subgrpSync } from './tools.js';
+import { loadInbound, loadMxMemos } from './inbound.js';
+import { UPD, updCheck } from './upd.js';
+import { applyMenuFold, closeDrawer, ensureGroupOpen, setupSide } from './sales.js';
+import { btnBackSync, loadHide, NAV, navMenu, renderGrid, switchView } from './grid.js';
+import { closeOvl, logChange, openOvl, OVL_SKIP_CLEAN, ovlMarkClean, setupEdit } from './edit.js';
 
 
 /* ==================================================================
    커맨드 센터 (v5) — 아이콘 레일 · 커맨드 바 · 인박스 홈 · 운영 보드 · 고객 360 패널 · 모바일 탭
    ================================================================== */
-var ICO={
+export var ICO={
   home:'<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>',
   chart:'<path d="M4 19h16"/><path d="M6 16V9"/><path d="M11 16V5"/><path d="M16 16v-6"/>',
   cloud:'<path d="M7 18a4 4 0 0 1-.6-7.95A6 6 0 0 1 18 9a4.5 4.5 0 0 1-.5 9z"/>',
@@ -30,8 +45,8 @@ var ICO={
   arrow:'<path d="M5 12h14"/><path d="M13 6l6 6-6 6"/>',
   doc:'<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M9 13h6"/><path d="M9 17h6"/>'
 };
-function ico(name, size){ size=size||18; return '<svg width="'+size+'" height="'+size+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(ICO[name]||ICO.doc)+'</svg>'; }
-function iconFor(label, v){
+export function ico(name, size){ size=size||18; return '<svg width="'+size+'" height="'+size+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(ICO[name]||ICO.doc)+'</svg>'; }
+export function iconFor(label, v){
   var L=String(label||'');
   if(v==='dash') return 'home'; if(v==='weekly') return 'calendar'; if(v==='account') return 'user'; if(v==='eqboard') return 'board';
   if(/^사업 영역$/.test(L)) return 'layers';
@@ -49,10 +64,10 @@ function iconFor(label, v){
   if(/주간|회의/.test(L)) return 'calendar';
   return 'doc';
 }
-function visBtn(b){ return !!b && !b.classList.contains('mhide') && !b.classList.contains('pdeny') && b.style.display!=='none'; }
+export function visBtn(b){ return !!b && !b.classList.contains('mhide') && !b.classList.contains('pdeny') && b.style.display!=='none'; }
 
 /* ---- 아이콘 레일 (사이드바 구조 menuSegments() 를 그대로 따라 만듦 · 메뉴 편집/채널 숨김 반영) ---- */
-function buildRail(){
+export function buildRail(){
   var rail=document.getElementById('rail'); if(!rail || !isCC()) return;
   var segs=[]; try{ segs=menuSegments(); }catch(e){}
   var h='<div class="rlogo" data-v="dash" title="홈 (대시보드)">G</div>';
@@ -76,9 +91,9 @@ function buildRail(){
   rail.querySelectorAll('[data-seg]').forEach(function(b){ b.onclick=function(e){ e.stopPropagation(); railFlyToggle(b, b.dataset.seg); }; });
   railSync(ST.CUR_VIEW);
 }
-var RAIL_OPEN=null;
-function railFlyClose(){ var f=document.getElementById('railFly'); if(f) f.classList.remove('on'); RAIL_OPEN=null; }
-function railFlyToggle(btn, key){
+export var RAIL_OPEN=null;
+export function railFlyClose(){ var f=document.getElementById('railFly'); if(f) f.classList.remove('on'); RAIL_OPEN=null; }
+export function railFlyToggle(btn, key){
   var f=document.getElementById('railFly'); if(!f) return;
   if(RAIL_OPEN===key){ railFlyClose(); return; }
   var seg=menuSegments().filter(function(s){ return s.key===key; })[0]; if(!seg) return;
@@ -95,7 +110,7 @@ function railFlyToggle(btn, key){
 }
 
 
-function railSync(v){
+export function railSync(v){
   var rail=document.getElementById('rail'); if(!rail) return;
   var segs=[]; try{ segs=menuSegments(); }catch(e){}
   var inSeg={}; segs.forEach(function(s){ if(s.grp && s.buttons.some(function(b){ return b.dataset.v===v; })) inSeg[s.key]=1; });
@@ -113,7 +128,7 @@ function railSync(v){
 }
 
 /* ---- 모바일 하단 탭 (≤760px) ---- */
-function buildMtabs(){
+export function buildMtabs(){
   var m=document.getElementById('mtabs'); if(!m) return;
   var tabs=[['dash','홈','home'],['contracts','매출','chart'],[window.IS_EQUIP? 'orders':'eqboard','장비','box'],['weekly','주간회의','calendar'],['_menu','전체','menu']];
   if(window.IS_EQUIP) tabs[1]=['assets','현황','layers'];
@@ -127,13 +142,13 @@ function buildMtabs(){
   });
   mtabsSync(ST.CUR_VIEW);
 }
-function mtabsSync(v){
+export function mtabsSync(v){
   var m=document.getElementById('mtabs'); if(!m) return;
   m.querySelectorAll('button').forEach(function(b){ b.setAttribute('aria-current', b.dataset.v===v? 'true':'false'); });
 }
 
 /* ---- 커맨드 바 → 전역 검색 창 (화면 이동 + 데이터 검색 + AI 질문) ---- */
-function cmdMenuHits(q){
+export function cmdMenuHits(q){
   var out=[], qn=fkNorm(q);
   if(!qn) return out;
   document.querySelectorAll('#side button[data-v]').forEach(function(b){
@@ -144,24 +159,24 @@ function cmdMenuHits(q){
   });
   return out.slice(0,5);
 }
-function cmdAskHit(q){
+export function cmdAskHit(q){
   q=String(q||'').trim(); if(q.length<2 || window.IS_EQUIP) return null;
   return {t:'AI', nm:'«'+q+'» 물어보기', sb:'매출·고객·계약 데이터를 기준으로 답합니다 (Enter 대신 클릭)', kai:1,
     go:function(){ switchView('dash'); var qi=document.getElementById('q'); if(qi){ qi.value=q; } try{ ask(q); }catch(e){} try{ document.querySelector('.ask').scrollIntoView({block:'start',behavior:'smooth'}); }catch(e){} }};
 }
 
 /* ---- 홈: 인사 · 인박스 ---- */
-function ccGreeting(n){   /* 인사말 카드는 쓰지 않음 — 인박스 머리에 건수·읽은 시각만 (예전 본문은 ㊿+147 에서 정리) */
+export function ccGreeting(n){   /* 인사말 카드는 쓰지 않음 — 인박스 머리에 건수·읽은 시각만 (예전 본문은 ㊿+147 에서 정리) */
   var el0=document.getElementById('ccHi'); if(el0) el0.style.display='none';
 }
-function ccSnoozed(key){ try{ var u=localStorage.getItem('svc_snz_'+key); return !!u && u>=todayStr(); }catch(e){ return false; } }
-function ccSnooze(key, days){
+export function ccSnoozed(key){ try{ var u=localStorage.getItem('svc_snz_'+key); return !!u && u>=todayStr(); }catch(e){ return false; } }
+export function ccSnooze(key, days){
   var d=new Date(); d.setDate(d.getDate()+days);
   try{ localStorage.setItem('svc_snz_'+key, todayStr(d)); }catch(e){}
   renderInbox(); toast('보류했습니다', days>=7? '다음 주에 다시 알려드립니다':'내일 다시 알려드립니다', 'info');
 }
-function ccUnsnooze(){ try{ Object.keys(localStorage).filter(function(k){ return k.indexOf('svc_snz_')===0; }).forEach(function(k){ localStorage.removeItem(k); }); }catch(e){} renderInbox(); }
-function renderInbox(){
+export function ccUnsnooze(){ try{ Object.keys(localStorage).filter(function(k){ return k.indexOf('svc_snz_')===0; }).forEach(function(k){ localStorage.removeItem(k); }); }catch(e){} renderInbox(); }
+export function renderInbox(){
   if(!isCC()) return;
   var box=document.getElementById('ccInbox'); if(!box || !ST.DATA || !ST.SB_TOKEN){ if(box) box.innerHTML=''; return; }
   var list=idxs(), b=STATE.base, EN=expN(), EQ=!!window.IS_EQUIP;
@@ -244,7 +259,7 @@ function renderInbox(){
 }
 
 /* ---- 홈: KPI 뒤처리 — 첫 타일을 히어로로, 목표 막대 병합, 벤토 타일 추가 ---- */
-function ccAfterKpis(box, list, b){
+export function ccAfterKpis(box, list, b){
   if(!isCC()) return;
   var host=document.getElementById('ccHeroHost'); if(!host || !box.children.length) return;
   var gb0=document.getElementById('goalBar'); if(gb0 && host.contains(gb0)) box.parentElement.insertBefore(gb0, box);   /* 히어로를 비우기 전에 목표 막대를 꺼내 둠 */
@@ -290,9 +305,9 @@ function ccAfterKpis(box, list, b){
   try{ ccAnaCount(); }catch(e){}
 }
 /* ---- 홈 위계: 접힘 섹션 (지표 더 보기 · 분석) — 상태는 이 브라우저에 기억 ---- */
-function ccPref(k){ try{ return localStorage.getItem(k)==='1'; }catch(e){ return false; } }
-function ccPrefSet(k,v){ try{ if(v) localStorage.setItem(k,'1'); else localStorage.removeItem(k); }catch(e){} }
-function ccMoreHost(kpis){
+export function ccPref(k){ try{ return localStorage.getItem(k)==='1'; }catch(e){ return false; } }
+export function ccPrefSet(k,v){ try{ if(v) localStorage.setItem(k,'1'); else localStorage.removeItem(k); }catch(e){} }
+export function ccMoreHost(kpis){
   var m=document.getElementById('ccMore');
   if(!m){
     m=document.createElement('div'); m.id='ccMore';
@@ -303,7 +318,7 @@ function ccMoreHost(kpis){
   }
   return m.querySelector('#ccMoreTiles');
 }
-function ccHomeLayout(){
+export function ccHomeLayout(){
   if(!isCC() || document.getElementById('ccAnalysis')) return;
   var vd=document.getElementById('viewDash'); if(!vd) return;
   var flt=vd.querySelector('.filters'), grid=vd.querySelector('.grid'); if(!flt||!grid) return;
@@ -314,19 +329,19 @@ function ccHomeLayout(){
   sec.querySelector('#ccAnaBtn').onclick=function(){ ccAnalysisOpen(!sec.classList.contains('open')); };
   ccAnalysisOpen(ccPref('svc_cc_ana'), true);
 }
-function ccAnalysisOpen(open, silent){
+export function ccAnalysisOpen(open, silent){
   var sec=document.getElementById('ccAnalysis'); if(!sec) return;
   sec.classList.toggle('open', !!open);
   var b=document.getElementById('ccAnaBtn'); if(b) b.setAttribute('aria-expanded', open? 'true':'false');
   ccPrefSet('svc_cc_ana', !!open);
   if(open && !silent && ST.DATA){ requestAnimationFrame(function(){ try{ renderAll(); }catch(e){} }); }
 }
-function ccAnaCount(){
+export function ccAnaCount(){
   var c=document.getElementById('ccAnaCnt'); if(!c) return;
   var n=document.querySelectorAll('#viewDash .grid > section:not(.w-off)').length;
   c.textContent=(n? n+'개 위젯 · ':'')+'서비스·기간·산업군 필터 · 월별 종합 장표 · 계약 목록';
 }
-function ccTileChannel(list,b){
+export function ccTileChannel(list,b){
   var m={}, tot=0; list.forEach(function(k){ var a=ST.MAT[k][b]||0; if(!a) return; var c=chOf(ST.DATA.rows[k]); m[c]=(m[c]||0)+a; tot+=a; });
   var arr=Object.keys(m).map(function(c){ return [c,m[c]]; }).sort(function(x,y){ return y[1]-x[1]; });
   var top=arr.slice(0,4), cols=['var(--ink)','var(--ink-2)','var(--muted)','var(--axis)'];
@@ -339,7 +354,7 @@ function ccTileChannel(list,b){
   c.onclick=function(){ switchView('contracts'); };
   return c;
 }
-function ccTileEquip(){
+export function ccTileEquip(){
   var A=RAWX.assets||[], O=RAWX.orders||[];
   var lent=A.filter(function(a){ return a.status==='임대중'; }).length, stock=A.filter(function(a){ return a.status==='재고'; }).length;
   var live=O.filter(function(o){ return o.status!=='회수완료' && o.status!=='취소'; });
@@ -357,7 +372,7 @@ function ccTileEquip(){
   c.onclick=function(){ switchView('eqboard'); };
   return c;
 }
-function ccTilePipe(){
+export function ccTilePipe(){
   var oi=RAWX.oi||[], today=new Date(), ym=today.getFullYear()+'-'+('0'+(today.getMonth()+1)).slice(-2);
   var open=oi.filter(function(o){ return !/수주|계산서|종료|중지|실패/.test(String(o.stage||'')); });
   var due=open.filter(function(o){ return String(o.expect_month||'').slice(0,7)===ym; });
@@ -374,7 +389,7 @@ function ccTilePipe(){
   c.onclick=function(){ switchView('oi'); };
   return c;
 }
-function ccTileWeekly(){
+export function ccTileWeekly(){
   var today=new Date(), dow=today.getDay(), toMon=(8-dow)%7; if(toMon===0) toMon=7;
   var wkTxt= dow===1? '오늘':'D-'+toMon;
   var next=new Date(today); next.setDate(next.getDate()+(dow===1? 0:toMon));
@@ -387,21 +402,21 @@ function ccTileWeekly(){
   return c;
 }
 /* ---- 오늘의 브리핑 — 숫자를 문장으로 (규칙 기반 · AI 비용 없음) + «AI로 더 자세히» ---- */
-function ccBrief(list,b){   /* 오늘의 브리핑 카드는 쓰지 않음 (질문 칸·추천 질문은 그대로) — 예전 본문은 ㊿+147 에서 정리 */
+export function ccBrief(list,b){   /* 오늘의 브리핑 카드는 쓰지 않음 (질문 칸·추천 질문은 그대로) — 예전 본문은 ㊿+147 에서 정리 */
   var box=document.getElementById('ccBrief'); if(box) box.style.display='none';
 }
 
 /* ==================================================================
    임대 장비 운영 보드 (칸반) — 상태 = 열, 카드 끌기 = 상태 변경 → 현황 자동 반영
    ================================================================== */
-var EQB={ch:'', q:'', more:{}};
-var EQB_COLS=[['접수','#9A9DA5','현황 재고'],['출하요청','var(--info-ink)','현황 재고'],['배송중','var(--warn-ink)','현황 재고'],['설치완료','var(--brand)','현황 임대중'],['회수예정','#D95926','칩으로 일부 회수'],['회수완료','var(--ink-2)','최근 90일']];
-function eqRefresh(){ if(ST.CUR_VIEW==='eqboard') renderEqBoard(); else try{ renderGrid(); }catch(e){} }
-var EQ_CH_CLS={'에스원':'ch-s1','LGU+':'ch-lg','LG U+':'ch-lg','조달':'ch-gov','일반':'ch-gen'};
-function eqChTag(ch){ ch=ch||'기타'; return '<span class="ctag '+(EQ_CH_CLS[ch]||'')+'">'+esc(ch)+'</span>'; }
-function eqChColor(ch){ return ({'에스원':cssv('--s1'),'LGU+':cssv('--s5'),'LG U+':cssv('--s5'),'조달':cssv('--s4'),'일반':cssv('--s3')})[ch]||cssv('--muted'); }
+export var EQB={ch:'', q:'', more:{}};
+export var EQB_COLS=[['접수','#9A9DA5','현황 재고'],['출하요청','var(--info-ink)','현황 재고'],['배송중','var(--warn-ink)','현황 재고'],['설치완료','var(--brand)','현황 임대중'],['회수예정','#D95926','칩으로 일부 회수'],['회수완료','var(--ink-2)','최근 90일']];
+export function eqRefresh(){ if(ST.CUR_VIEW==='eqboard') renderEqBoard(); else try{ renderGrid(); }catch(e){} }
+export var EQ_CH_CLS={'에스원':'ch-s1','LGU+':'ch-lg','LG U+':'ch-lg','조달':'ch-gov','일반':'ch-gen'};
+export function eqChTag(ch){ ch=ch||'기타'; return '<span class="ctag '+(EQ_CH_CLS[ch]||'')+'">'+esc(ch)+'</span>'; }
+export function eqChColor(ch){ return ({'에스원':cssv('--s1'),'LGU+':cssv('--s5'),'LG U+':cssv('--s5'),'조달':cssv('--s4'),'일반':cssv('--s3')})[ch]||cssv('--muted'); }
 /* 대시보드 윗부분 — 요약 타일 6개 + 차트 3개 (현황 자산 + 신청 내역 기준) */
-function renderEqDash(){
+export function renderEqDash(){
   var K=document.getElementById('eqbKpis'); if(!K) return;
   var A=RAWX.assets||[], O=RAWX.orders||[], todayS=todayStr(), ym=todayS.slice(0,7);
   var pm=new Date(); pm.setMonth(pm.getMonth()-1); var pym=todayStr(pm).slice(0,7);
@@ -459,7 +474,7 @@ function renderEqDash(){
       series:[{label:'설치', data:inst, color:cssv('--s1')},{label:'회수', data:rets, color:cssv('--s2')}]});
   }catch(e){ console.warn('eq dash charts', e); }
 }
-function renderEqBoard(){
+export function renderEqBoard(){
   var wrap=document.getElementById('eqbCols'); if(!wrap) return;
   try{ requestAnimationFrame(renderEqDash); }catch(e){}
   var O=(RAWX.orders||[]).slice(), q=fkNorm(EQB.q||'');
@@ -516,7 +531,7 @@ function renderEqBoard(){
   wrap.querySelectorAll('[data-open]').forEach(function(bt){ bt.onclick=function(e){ e.stopPropagation(); var r=eqOrderById(bt.dataset.open); if(!r) return; switchView('orders'); var sb=document.getElementById('dvSearch'); if(sb){ sb.value=r.customer||('#'+r.id); try{ renderGrid(); }catch(x){} } }; });
   if(canEdit) eqbDnD(wrap);
 }
-function eqbCard(o, canEdit, todayS){
+export function eqbCard(o, canEdit, todayS){
   var all=eqWant(o), ret=eqRetSet(o), done=o.status==='회수완료';
   var age='', ageD=0; if(['접수','출하요청','배송중'].indexOf(o.status)>=0 && o.created_at){ ageD=Math.floor((new Date(todayS)-new Date(String(o.created_at).slice(0,10)))/864e5); if(ageD>=1) age=(ageD>7? ' <span class="ctag late">'+ageD+'일 경과</span>' : ' · '+ageD+'일'); }
   var meta=['<b>'+esc(o.model||'모델 미정')+' ×'+(o.qty||all.length||1)+'</b>', o.order_type||''];
@@ -538,7 +553,7 @@ function eqbCard(o, canEdit, todayS){
     '<div class="mt"><span class="chn">'+esc(o.channel||'기타')+'</span> · '+meta.filter(Boolean).join(' · ')+'</div>'+prog+
     '<div class="sn">'+eqSerialsHtml(o,{full:true, max:4, bar:'auto'})+'</div>'+ft+'</article>';
 }
-function eqbDnD(wrap){
+export function eqbDnD(wrap){
   var dragging=null;
   wrap.querySelectorAll('.eqb-card').forEach(function(c){
     c.addEventListener('dragstart', function(e){ if(e.target.closest && e.target.closest('.eqsn,.eqbar,button,input')) { e.preventDefault(); return; } dragging=c.dataset.oid; c.classList.add('drag'); try{ e.dataTransfer.setData('text/plain', dragging); e.dataTransfer.effectAllowed='move'; }catch(x){} });
@@ -551,7 +566,7 @@ function eqbDnD(wrap){
   });
 }
 /* 상태 변경 — 신청 내역 표에서 상태 칸을 고쳐 저장하는 것과 같은 결과 (회수일 자동 · 현황 동기화 · 변경 이력) */
-async function eqSetStatus(r, st){
+export async function eqSetStatus(r, st){
   if(!r || !st || r.status===st) return;
   if(!ST.SB_TOKEN){ openOvl('ovlAuth'); return; }
   if(window.IS_VIEWER){ toast('조회 전용 계정', '상태를 바꿀 수 없습니다', 'info'); return; }
@@ -573,7 +588,7 @@ async function eqSetStatus(r, st){
 }
 
 /* ---- 고객 360 — 요약 4칸 · 다음 액션 제안 · 섹션 탭 (모달 본문 위에 덧붙임) ---- */
-function c360Enhance(nm, cts, lives, ois, inbs, asts, ords){
+export function c360Enhance(nm, cts, lives, ois, inbs, asts, ords){
   var body=document.getElementById('c360Body'); if(!body) return;
   var b=STATE.base, mrr=0, cum=0, nextEnd=null, churned=0;
   cts.forEach(function(r){
@@ -613,7 +628,7 @@ function c360Enhance(nm, cts, lives, ois, inbs, asts, ords){
     var t=+bt.dataset.t; secs.forEach(function(sc,i){ sc.style.display=(t<0||t===i)? '':'none'; }); }; });
 }
 
-function showAuthUi(){
+export function showAuthUi(){
   try{ loadHide(); }catch(e){}
   $('#btnAuth').textContent=(ST.AUTH_USER||'').split('@')[0]+' ▾';
   $('#btnAuth').title='내 계정 · 로그아웃';
@@ -621,7 +636,7 @@ function showAuthUi(){
 }
 
 /* ---- 토스트 알림 ---- */
-function toast(title, sub, type){
+export function toast(title, sub, type){
   var box=document.getElementById('toasts');
   if(!box){ box=document.createElement('div'); box.id='toasts'; document.body.appendChild(box); }
   var t=document.createElement('div'); t.className='toast '+(type||'ok');
@@ -631,23 +646,23 @@ function toast(title, sub, type){
   setTimeout(function(){ t.classList.add('out'); setTimeout(function(){ t.remove(); },260); }, 4000);
 }
 
-function showLoading(t){
+export function showLoading(t){
   $('#app').classList.add('hidden');
   var l=$('#loading'); l.classList.remove('hidden');
   l.innerHTML='<div class="spin"></div><div>'+t+'</div>';
 }
 
-function sbHeaders(json){
+export function sbHeaders(json){
   var h={apikey:SB_KEY, Authorization:'Bearer '+(ST.SB_TOKEN||SB_KEY)};
   if(json) h['Content-Type']='application/json';
   return h;
 }
-async function sbGet(q){
+export async function sbGet(q){
   var r=await fetch(SB_URL+'/rest/v1/'+q,{headers:sbHeaders()});
   if(!r.ok) throw new Error('DB 읽기 실패 ('+r.status+'): '+(await r.text()).slice(0,180));
   return r.json();
 }
-async function sbAll(q){
+export async function sbAll(q){
   // 1000행 페이지네이션 — count 먼저 얻고 병렬로
   var h=await fetch(SB_URL+'/rest/v1/'+q+(q.indexOf('?')>=0?'&':'?')+'limit=1',
     {headers:Object.assign(sbHeaders(),{Prefer:'count=exact'})});
@@ -663,7 +678,7 @@ async function sbAll(q){
   var pages=await Promise.all(jobs);
   return [].concat.apply([],pages);
 }
-async function sbWrite(method, path, body, prefer, asView){   /* asView(㊿+148): 다른 화면에서 저장할 때 그 표의 화면 권한으로 검사 — 예: 데이터 점검 수정 창 → 'contracts' */
+export async function sbWrite(method, path, body, prefer, asView){   /* asView(㊿+148): 다른 화면에서 저장할 때 그 표의 화면 권한으로 검사 — 예: 데이터 점검 수정 창 → 'contracts' */
   if(!ST.SB_TOKEN) throw new Error('로그인이 필요합니다.');
   permWriteGuard(method, path, asView);
   var r=await fetch(SB_URL+'/rest/v1/'+path,{
@@ -687,27 +702,27 @@ async function sbWrite(method, path, body, prefer, asView){   /* asView(㊿+148)
 }
 
 /* 오늘 날짜(현지 시각 기준) — toISOString() 은 UTC 라서 한국에서 아침 9시 전에는 «어제»가 나옵니다 */
-function todayStr(d){ d=d||new Date(); return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); }
-function thisMonthStr(){ return todayStr().slice(0,7); }
-function dIdx(dateStr){  // 'YYYY-MM-…' → 월 인덱스 (2020-06 = 0)
+export function todayStr(d){ d=d||new Date(); return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); }
+export function thisMonthStr(){ return todayStr().slice(0,7); }
+export function dIdx(dateStr){  // 'YYYY-MM-…' → 월 인덱스 (2020-06 = 0)
   if(!dateStr) return null;
   var y=+String(dateStr).slice(0,4), m=+String(dateStr).slice(5,7);
   if(!y||!m) return null;
   return (y-2020)*12+(m-6);
 }
-function idxDate(i){  // 인덱스 → 'YYYY-MM-01'
+export function idxDate(i){  // 인덱스 → 'YYYY-MM-01'
   var t=(2020*12+5)+i, y=Math.floor(t/12), m=(t%12)+1;
   return y+'-'+('0'+m).slice(-2)+'-01';
 }
 
-var SB_RAW={customers:[],contracts:[]};   // 편집 화면에서 재사용
+export var SB_RAW={customers:[],contracts:[]};   // 편집 화면에서 재사용
 
-function sbYm(v){ return v? String(v).slice(0,7):''; }
-async function sbTry(q){ try{ return await sbAll(q); }catch(e){ return null; } }
+export function sbYm(v){ return v? String(v).slice(0,7):''; }
+export async function sbTry(q){ try{ return await sbAll(q); }catch(e){ return null; } }
 /* 첫 화면을 늦추지 않으려고 부가 표는 나중에 병렬로 읽어 채웁니다
    · s1_map    : 계약의 «에스원 계약번호» 자동완성 목록 (없어도 화면은 정상)
    · install_extra : 설치비 현황의 추가 항목 (오면 그 카드만 다시 그림) */
-function loadExtrasLater(needMap, needExtra){
+export function loadExtrasLater(needMap, needExtra){
   var jobs=[];
   if(needMap) jobs.push(sbTry('s1_map?select=contract_no,s1_name,biz_no,customer&active=is.true&order=contract_no')
     .then(function(r){ if(r&&r.length) window.RAWX.s1map=r; }));
@@ -717,7 +732,7 @@ function loadExtrasLater(needMap, needExtra){
      다음에 들어올 때 이 두 표만 다시 읽는 편이 빠릅니다 */
 }
 
-function shapeLive(rows){
+export function shapeLive(rows){
   if(!rows||!rows.length) return null;
   var out=rows.map(function(r){ return {ind:r.industry||'미분류',cust:r.name,key:r.mss_key||'',
     prod:r.product||'미분류',line:(LIVE2CODE[String(r.line||'').trim()]||r.line||''),nodes:Number(r.nodes)||0,
@@ -726,7 +741,7 @@ function shapeLive(rows){
   out.forEach(function(x){ uq[x.cust]=1; if(!x.dup)uqND[x.cust]=1; });
   return {ok:true,count:out.length,uniq:Object.keys(uq).length,uniqNoDup:Object.keys(uqND).length,rows:out};
 }
-function shapeLg(rows){
+export function shapeLg(rows){
   if(!rows||!rows.length) return null;
   var fee=0;
   var out=rows.map(function(r){ fee+=Number(r.monthly_fee)||0;
@@ -734,7 +749,7 @@ function shapeLg(rows){
       start:sbYm(r.start_month),end:sbYm(r.end_month),months:Number(r.months)||0,fee:Number(r.monthly_fee)||0}; });
   return {ok:true,count:out.length,feeSum:fee,rows:out};
 }
-function shapeVs(rows){
+export function shapeVs(rows){
   if(!rows||!rows.length) return null;
   // 여러 달이 들어있으면 «가장 최근 달» 만 대시보드에 보여줍니다 (과거는 정산·목표 › 비즈포탈 차액에서)
   function mNum(r){
@@ -762,14 +777,14 @@ function shapeVs(rows){
   })()};
 }
 
-var CACHE_KEY='svc_cache_v1';
-async function sbRpc(name){
+export var CACHE_KEY='svc_cache_v1';
+export async function sbRpc(name){
   var r=await fetch(SB_URL+'/rest/v1/rpc/'+name,{
     method:'POST', headers:sbHeaders(true), body:'{}'});
   if(!r.ok) throw new Error('rpc '+name+' '+r.status);
   return r.json();
 }
-async function loadFromDb(){
+export async function loadFromDb(){
   var permP=loadPerms();   // 메뉴 권한은 데이터와 병렬로 (표가 없거나 행이 없으면 null = 역할 기본)
   var codeP=loadCodes();   // 코드 목록(code_lists · SQL 93)도 병렬로 — 표가 없으면 상수 그대로 (㊿+137)
   // 1) 고속 경로: load_all() 함수로 한 번에 (10_fast_load.sql 적용 시)
@@ -829,14 +844,14 @@ async function loadFromDb(){
 }
 /* 다음 방문용 사본(sessionStorage) — 수 MB JSON 이라 만들고 쓰는 데 시간이 걸려, 첫 화면을 그린 다음 한가할 때 씁니다.
    그사이 저장(sbWrite)이 있었으면 쓰지 않음(옛 데이터가 사본으로 남지 않게) */
-var CACHE_GEN=0;
-function cacheDrop(){ CACHE_GEN++; try{ sessionStorage.removeItem(CACHE_KEY); }catch(e){} }   /* 예약된 사본 쓰기까지 취소 (로그아웃 뒤 이전 사용자 데이터가 남지 않게) */
-function cacheWriteLater(res){
-  var g=++CACHE_GEN, t0=Date.now(); if(window.IS_QA) return;
+export var CACHE_GEN=0;
+export function cacheDrop(){ CACHE_GEN++; try{ sessionStorage.removeItem(CACHE_KEY); }catch(e){} }   /* 예약된 사본 쓰기까지 취소 (로그아웃 뒤 이전 사용자 데이터가 남지 않게) */
+export function cacheWriteLater(res){
+  var g=++CACHE_GEN, t0=Date.now(); if(IS_QA) return;
   var run=function(){ if(g!==CACHE_GEN || !ST.SB_TOKEN) return; try{ sessionStorage.setItem(CACHE_KEY, JSON.stringify({t:t0, res:res})); }catch(e){} };
   try{ if(window.requestIdleCallback) requestIdleCallback(run, {timeout:3000}); else setTimeout(run, 400); }catch(e){ setTimeout(run, 400); }
 }
-function loadFromCache(){
+export function loadFromCache(){
   // 이전 방문 때 저장한 데이터로 즉시 그린 뒤, 백그라운드에서 최신본으로 교체
   try{
     var c=JSON.parse(sessionStorage.getItem(CACHE_KEY)||'null');
@@ -847,7 +862,7 @@ function loadFromCache(){
   }catch(e){}
   return null;
 }
-function buildFromRes(res){
+export function buildFromRes(res){
   var custs=res[0], cts=res[1], mrs=res[2];
   var LIVE=shapeLive(res[3]), LGD=shapeLg(res[4]), VSD=shapeVs(res[5]);
   var prevRawx=window.RAWX||{};   // 별도 화면 캐시(가격표·인바운드·변경이력)는 자동 갱신에 휩쓸려 지우지 않음
@@ -936,24 +951,24 @@ function buildFromRes(res){
   };
 }
 
-function afterLoad(dd){
+export function afterLoad(dd){
   if(isEquipAcct(dd)){ enterEquipMode(dd); return; }
   onData(dd);
 }
 /* ---- 제한 역할(장비/POC 전용) : 포탈 안에서 해당 메뉴만 사용 ---- */
-var ROLE_VIEWS={
+export var ROLE_VIEWS={
   equipment:     {orders:1, assets:1, ordernew:1, eqboard:1, weekly:1, account:1},   // (구) — equipment_poc 로 통합됨
   poc:           {mdrnew:1, mdrops:1, weekly:1, account:1},
   equipment_poc: {orders:1, assets:1, ordernew:1, eqboard:1, mdrnew:1, mdrops:1, weekly:1, account:1}
 };
-var ROLE_LABEL={equipment:'장비 관리 전용', poc:'PoC 전용', equipment_poc:'장비·PoC 전용'};
-var EQUIP_VIEWS=ROLE_VIEWS.equipment;   // 현재 계정에 허용된 화면 (아래에서 교체)
-function isEquipAcct(d){
+export var ROLE_LABEL={equipment:'장비 관리 전용', poc:'PoC 전용', equipment_poc:'장비·PoC 전용'};
+export var EQUIP_VIEWS=ROLE_VIEWS.equipment;   // 현재 계정에 허용된 화면 (아래에서 교체)
+export function isEquipAcct(d){
   if(!ST.SB_TOKEN) return false;
   if(ROLE_VIEWS[window.MY_ROLE]) return true;
   return !d.rows.length;                // 역할 미지정 + 매출 안 보임 → 장비 전용으로 간주
 }
-function enterEquipMode(d){
+export function enterEquipMode(d){
   window.IS_EQUIP=true;
   var role=window.MY_ROLE||'';
   EQUIP_VIEWS=ROLE_VIEWS[role]||ROLE_VIEWS.equipment;
@@ -983,7 +998,7 @@ function enterEquipMode(d){
   $('#periodLabel').textContent=ROLE_LABEL[role]||'장비 관리 전용';
   switchView(EQUIP_VIEWS[ST.CUR_VIEW]? ST.CUR_VIEW : window.EQUIP_HOME);
 }
-function boot(skipCache){
+export function boot(skipCache){
   if(!window.__editInit){ window.__editInit=1; setupEdit(); setupSide(); }
   restoreSess().then(function(ok){
     /* ㊿+145: 로그인 안 된 상태 → 서버에 묻지 않고 바로 로그인 화면 (예전엔 익명으로 load_all 을 한 번 불러 «빈 결과»를 확인한 뒤에야 보여 줌 — 로그아웃이 느렸던 이유) */
@@ -1024,7 +1039,7 @@ function boot(skipCache){
 }
 
 /* ---- 로그인 전용 화면 ---- */
-function showLoginScreen(){
+export function showLoginScreen(){
   $('#side').classList.add('hidden');
   document.body.style.paddingLeft='0';
   $('#app').classList.add('hidden');
@@ -1036,7 +1051,7 @@ function showLoginScreen(){
   try{ var kc=$('#lsKeep'); if(kc) kc.checked=keepLogin(); }catch(x){}   // 앱·모바일이면 기본 켬, 전에 고른 값이 있으면 그 값
   setTimeout(function(){ var em=$('#lsEmail'), pw=$('#lsPw'); if(em && em.value && pw && !pw.value) pw.focus(); else if(em) em.focus(); },60);
 }
-function enterAfterLogin(){
+export function enterAfterLogin(){
   /* ㊿+145: 로그인하면 항상 메인 대시보드 — 주소에 남은 #메뉴 · ?v= 로 이전 화면을 열지 않음 */
   try{ history.replaceState(null, '', location.pathname); }catch(e){}
   ST.CUR_VIEW='dash';
@@ -1046,7 +1061,7 @@ function enterAfterLogin(){
   showLoading('로그인 완료 — 데이터를 불러오는 중…');
   loadFromDb().then(afterLoad).catch(onErr);
 }
-async function screenLogin(){
+export async function screenLogin(){
   var em=$('#lsEmail').value.trim(), pw=$('#lsPw').value, m=$('#lsMsg');
   if(!em||!pw){ m.textContent='이메일과 비밀번호를 입력하세요'; return; }
   m.style.color='var(--muted)'; m.textContent='확인 중…';
@@ -1073,7 +1088,7 @@ async function screenLogin(){
     enterAfterLogin();
   }catch(e){ m.style.color='var(--critical,#d03b3b)'; m.textContent=String(e.message||e); }
 }
-async function screenPw(){
+export async function screenPw(){
   var p1=$('#lsNpw1').value, p2=$('#lsNpw2').value, m=$('#lsMsg');
   if(p1.length<6){ m.style.color='var(--critical,#d03b3b)'; m.textContent='6자 이상으로 입력하세요'; return; }
   if(p1!==p2){ m.style.color='var(--critical,#d03b3b)'; m.textContent='비밀번호 확인이 일치하지 않습니다'; return; }
@@ -1089,13 +1104,13 @@ async function screenPw(){
   }catch(e){ m.style.color='var(--critical,#d03b3b)'; m.textContent=String(e.message||e); }
 }
 
-function onErr(e){
+export function onErr(e){
   $('#loading').innerHTML = '<div class="card err" style="max-width:620px">'+
     '<h2>데이터를 불러오지 못했습니다</h2><p class="cap">'+String(e&&e.message||e)+'</p>'+
     '<p class="cap">네트워크 상태와 Supabase 프로젝트 상태(일시정지 여부)를 확인해 주세요.</p></div>';
 }
 
-function onData(d){
+export function onData(d){
   try{ mfaWarnIfNeeded(); }catch(e){}
   if(!UPD.checked) setTimeout(function(){ try{ updCheck(); }catch(e){} }, 1500);   /* ㊿+148 업데이트 안내 팝업 — 첫 화면을 그린 뒤 1번 */
   $('#side').classList.remove('hidden');
@@ -1157,8 +1172,8 @@ function onData(d){
 }
 
 /* 카드 폭이 바뀌면 (창 크기, 사이드바, 인쇄) 다시 그립니다 */
-var _lastW = 0, _wwOn = false;
-function watchWidth(){
+export var _lastW = 0, _wwOn = false;
+export function watchWidth(){
   /* ㊿+145: 감시는 한 번만 — 예전엔 데이터를 다시 읽을 때마다(onData) 감시자가 하나씩 늘어 창 크기를 바꾸면 renderAll 이 여러 번 돌았음 */
   if(_wwOn || typeof ResizeObserver === 'undefined') return;
   var host = document.getElementById('chTrend'); if(!host) return; _wwOn = true;
@@ -1170,4 +1185,13 @@ function watchWidth(){
     _lastW = w;
     clearTimeout(t); t = setTimeout(function(){ renderAll(); }, 120);
   }).observe(host);
+}
+
+/* ---- 리포트 «PPT 슬라이드에 담은 항목» 목록 — 사이드 메뉴 배지(rpbBadge)가 처음부터 필요해서 여기 (㊿+153: report.js 에서 옮김 · 리포트 화면은 처음 열 때 불러옴) ---- */
+export var RPB={items:null};
+export function rpbKey(){ return 'svc_rpb_'+(ST.AUTH_USER||'anon'); }
+export function rpbList(){ if(!RPB.items){ try{ RPB.items=JSON.parse(localStorage.getItem(rpbKey())||'[]')||[]; }catch(e){ RPB.items=[]; } } return RPB.items; }
+export function rpbBadge(){
+  var n=rpbList().length;
+  var b=document.querySelector('.side button[data-v="report"]'); if(b){ var old=b.querySelector('.rpb-cnt'); if(old) old.remove(); if(n){ var s=document.createElement('span'); s.className='rpb-cnt'; s.textContent=n; b.appendChild(s); } }
 }

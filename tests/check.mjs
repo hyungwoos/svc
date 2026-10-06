@@ -12,7 +12,7 @@ const htmls = fs.readdirSync(ROOT).filter((f) => f.endsWith('.html'));
 say(htmls.includes('index.html'), 'index.html 존재');
 for (const f of htmls) {
   const src = fs.readFileSync(path.join(ROOT, f), 'utf8');
-  const blocks = [...src.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)].map((m) => m[1]).filter((b) => b.trim());
+  const blocks = [...src.matchAll(/<script(?![^>]*\bsrc=)(?![^>]*type="importmap")[^>]*>([\s\S]*?)<\/script>/g)].map((m) => m[1]).filter((b) => b.trim());   /* importmap 은 JSON — 아래에서 따로 */
   let bad = 0;
   blocks.forEach((b, i) => { const p = path.join(tmp, `${f}.${i}.js`); fs.writeFileSync(p, b); const r = spawnSync(process.execPath, ['--check', p], { encoding: 'utf8' }); if (r.status !== 0) { bad++; console.log('    ' + r.stderr.split('\n').slice(0, 3).join(' | ')); } });
   say(bad === 0, `${f}: 스크립트 ${blocks.length}블록 문법${bad ? ` — 오류 ${bad}` : ''}`);
@@ -21,35 +21,47 @@ for (const f of htmls) {
   say(!leak, `${f}: 비밀값 패턴 없음${leak ? ` — «${leak[1].slice(0, 24)}…»` : ''}`);
 }
 const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
-// ④ 아키텍처 2단계(㊿+136): 버전은 <meta name="app-ver">, 코드 목록은 <meta name="app-js"> — js/boot.js(head) · js/load.js(body 끝) 가 읽어 ?v= 로 로드. 인라인 <script>/onclick 없음 → CSP script-src 에 'unsafe-inline' 없음
+// ④ 아키텍처 2단계(㊿+136) → ES 모듈(㊿+153): 버전은 <meta name="app-ver">, 코드 목록은 <meta name="app-js">. 시작점은 <script type="module" src="js/main.js?v="> 하나 ·
+//   각 모듈 주소의 ?v= 는 <script type="importmap"> (tests/stamp.mjs 가 만들고 CSP 에 그 sha256) · 인라인 스크립트는 그 importmap 하나뿐 → script-src 에 'unsafe-inline' 없음
 const ver = /<meta name="app-ver" content="(\d{4}-\d{2}-\d{2} ㊿\+\d+)">/.exec(html);
 say(!!ver, `APP_VER 형식(meta app-ver) ${ver ? ver[1] : '(없음)'}`);
 const jsMeta = /<meta name="app-js" content="([^"]+)">/.exec(html); const JS_LIST = jsMeta ? jsMeta[1].split(',').map((x) => x.trim()) : [];
-say(JS_LIST.length >= 10 && JS_LIST[JS_LIST.length - 1] === 'js/init.js', `app-js 목록 ${JS_LIST.length}개 · 마지막 js/init.js`);
-say(/<script src="js\/boot\.js"><\/script>/.test(html) && /<script src="js\/load\.js"><\/script>/.test(html), 'index.html 이 js/boot.js(head) · js/load.js(body 끝)만 로드');
-say(!/<script(?![^>]*\bsrc=)[^>]*>/.test(html), 'index.html 에 인라인 <script> 없음');
+say(JS_LIST.length >= 10 && JS_LIST[JS_LIST.length - 1] === 'js/main.js' && JS_LIST.includes('js/init.js') && JS_LIST[0] === 'js/state.js', `app-js 목록 ${JS_LIST.length}개 · 처음 js/state.js · init.js 있음 · 마지막 js/main.js(시작점)`);
+{ const scripts = [...html.matchAll(/<script\b[^>]*>/g)].map((m) => m[0]);
+  const mains = scripts.filter((t) => /type="module"/.test(t));
+  say(mains.length === 1 && /src="js\/main\.js\?v=[^"]+"/.test(mains[0]) && scripts.every((t) => /type="(module|importmap)"/.test(t)), 'index.html 이 js/main.js(모듈) 하나만 부름 · 고전 <script src> 없음(boot.js·load.js 안 씀)');
+  const maps = [...html.matchAll(/<script type="importmap">([\s\S]*?)<\/script>/g)];
+  let mapOk = maps.length === 1; try { const j = JSON.parse(maps[0][1]); mapOk = mapOk && JS_LIST.filter((f) => f !== 'js/main.js').every((f) => j.imports['./' + f] === './' + f + '?v=' + encodeURIComponent(ver ? ver[1] : '')); } catch (e) { mapOk = false; }
+  say(mapOk, 'importmap: app-js 의 모든 모듈 → ?v=<app-ver> (새 버전이면 새 주소)');
+  say(scripts.length === maps.length + mains.length, 'index.html 에 인라인 <script> 는 importmap 하나뿐'); }
+try { const { stampOf, applyStamp } = await import('./stamp.mjs');
+  const st = stampOf(html, (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return null; } });
+  say(applyStamp(html, st) === html, 'stamp 최신 — app.css·importmap·modulepreload·main.js 의 ?v= 와 CSP 해시가 지금 app-ver · app-js 와 같음 (다르면 node tests/stamp.mjs)');
+  say(st.lazy.length >= 3, '처음 열 때 불러오는 모듈 ' + st.lazy.length + '개 (' + st.lazy.join(', ') + ') · 처음부터 ' + st.eager.length + '개'); }
+catch (e) { say(false, 'tests/stamp.mjs 를 못 씀 — ' + String(e.message || e).slice(0, 120)); }
 say(!/ on[a-z]+="/.test(html), 'index.html 에 인라인 on* 핸들러 없음');
 const cspIdx = /<meta http-equiv="Content-Security-Policy" content="([^"]+)">/.exec(html);
 say(!!cspIdx && !/script-src[^;]*'unsafe-inline'/.test(cspIdx[1]), "index.html CSP script-src 에 'unsafe-inline' 없음");
-const JS_FILES = ['js/boot.js', 'js/load.js'].concat(JS_LIST);
+const JS_FILES = JS_LIST.slice();
 let jsAll = '';
 for (const f of JS_FILES) {
   const p = path.join(ROOT, f); say(fs.existsSync(p), `${f} 존재`);
   if (!fs.existsSync(p)) continue;
-  const r = spawnSync(process.execPath, ['--check', p], { encoding: 'utf8' }); say(r.status === 0, `${f}: 문법${r.status ? ' — ' + r.stderr.split('\n').slice(0, 2).join(' | ') : ''}`);
+  const q = path.join(tmp, path.basename(f).replace(/\.js$/, '.mjs')); fs.copyFileSync(p, q);   /* .mjs = ES 모듈로 문법 검사 */
+  const r = spawnSync(process.execPath, ['--check', q], { encoding: 'utf8' }); say(r.status === 0, `${f}: 문법(모듈)${r.status ? ' — ' + r.stderr.split('\n').slice(0, 2).join(' | ') : ''}`);
   const src = fs.readFileSync(p, 'utf8'); jsAll += '\n' + src;
   const leak = /(service_role|sb_secret_[A-Za-z0-9_]{8,}|sbp_[a-f0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|xoxb-[0-9A-Za-z-]{10,}|sk-ant-[A-Za-z0-9_-]{20,})/.exec(src); if (leak) say(false, `${f}: 비밀값 패턴 — «${leak[1].slice(0, 20)}…»`);
 }
 say(fs.existsSync(path.join(ROOT, 'app.css')), 'app.css 존재');
-const bootSrc = fs.existsSync(path.join(ROOT, 'js/boot.js')) ? fs.readFileSync(path.join(ROOT, 'js/boot.js'), 'utf8') : '';
-say(/^var APP_VER=/m.test(bootSrc) && !(/^\s*var APP_VER=/m.test(jsAll.replace(bootSrc, ''))), 'APP_VER 정의는 js/boot.js 한 곳뿐');
-// 선언 파일에는 즉시 실행 문장이 없어야 함(= init.js 로만) — 간단 휴리스틱: 파일 맨 왼쪽에서 시작하는 줄이 function/var/주석/닫는 괄호가 아니면 경고
-for (const f of JS_LIST) { if (f === 'js/init.js' || f === 'js/viz.js' || !fs.existsSync(path.join(ROOT, f))) continue; const lines = fs.readFileSync(path.join(ROOT, f), 'utf8').split('\n'); const bad = lines.filter((l) => /^[A-Za-z$_(\[]/.test(l) && !/^(function|async function|var|let|const)\b/.test(l)); if (bad.length) say(false, `${f}: 즉시 실행으로 보이는 최상위 줄 ${bad.length} — ${bad[0].slice(0, 60)}`); }
+{ const stSrc = fs.existsSync(path.join(ROOT, 'js/state.js')) ? fs.readFileSync(path.join(ROOT, 'js/state.js'), 'utf8') : '';
+  say(/^export var APP_VER=/m.test(stSrc) && (jsAll.match(/^\s*(?:export )?var APP_VER=/gm) || []).length === 1, 'APP_VER 정의는 js/state.js 한 곳뿐(meta app-ver 를 읽음)'); }
+// 선언 파일에는 즉시 실행 문장이 없어야 함(= init.js start() 로만) — 간단 휴리스틱(정확한 검사는 tests/lint.mjs): 파일 맨 왼쪽에서 시작하는 줄이 import/export/function/var/주석/닫는 괄호가 아니면 실패
+for (const f of JS_LIST) { if (/js\/(init|viz|main)\.js$/.test(f) || !fs.existsSync(path.join(ROOT, f))) continue; const lines = fs.readFileSync(path.join(ROOT, f), 'utf8').split('\n'); const bad = lines.filter((l) => /^[A-Za-z$_(\[]/.test(l) && !/^(?:export\s+)?(function|async function|var|let|const)\b|^import\b/.test(l)); if (bad.length) say(false, `${f}: 즉시 실행으로 보이는 최상위 줄 ${bad.length} — ${bad[0].slice(0, 60)}`); }
 // sw.js 의 SHELL 이 코드 파일을 전부 품는지
 const sw = fs.existsSync(path.join(ROOT, 'sw.js')) ? fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8') : '';
 say(JS_FILES.every((f) => sw.includes("'./" + f + "'")), 'sw.js SHELL 에 코드 파일 전부 포함');
-// 중복 최상위 선언(함수가 두 파일에 있으면 나중 것이 덮어씀) 검사
-{ const seen = new Map(), dup = []; for (const f of JS_LIST) { if (!fs.existsSync(path.join(ROOT, f))) continue; const src = fs.readFileSync(path.join(ROOT, f), 'utf8'); for (const m of src.matchAll(/^(?:async\s+)?function\s+([A-Za-z_$][\w$]*)/gm)) { if (seen.has(m[1])) dup.push(m[1] + '(' + seen.get(m[1]) + '·' + f + ')'); seen.set(m[1], f); } } say(!dup.length, `최상위 함수 이름 중복 없음${dup.length ? ' — ' + dup.slice(0, 5).join(', ') : ''}`); }
+// 중복 최상위 선언(모듈은 이름이 겹치면 window.SVC 에서 하나가 가려짐 — 정확한 검사는 lint) 검사
+{ const seen = new Map(), dup = []; for (const f of JS_LIST) { if (!fs.existsSync(path.join(ROOT, f))) continue; const src = fs.readFileSync(path.join(ROOT, f), 'utf8'); for (const m of src.matchAll(/^(?:export\s+)?(?:async\s+)?function\s+([A-Za-z_$][\w$]*)/gm)) { if (seen.has(m[1])) dup.push(m[1] + '(' + seen.get(m[1]) + '·' + f + ')'); seen.set(m[1], f); } } say(!dup.length, `최상위 함수 이름 중복 없음${dup.length ? ' — ' + dup.slice(0, 5).join(', ') : ''}`); }
 const idx = html + jsAll;
 // Supabase 함수 소스가 저장소에 있으면 비밀값 검사만 (deno 는 CI 에 없을 수 있음)
 const fnDir = path.join(ROOT, 'supabase', 'functions');
@@ -69,7 +81,7 @@ say((idx.match(/mfaGate\(/g) || []).length >= 4, 'index.html: MFA 관문(mfaGate
 // ③ 데이터 정합성 (㊿+137): 코드 목록 — 포탈 CODE_KIND 의 모든 종류가 *_OPTS 배열로 존재 · GRIDS 에 상태/채널/모델 리터럴 배열이 남아 있지 않음(한 목록을 봐야 함) · 코드 관리 UI 마크업
 {
   const ck = /var CODE_KIND=\{([\s\S]*?)\};/.exec(jsAll); const kinds = ck ? [...ck[1].matchAll(/(\w+):'(\w+)'/g)] : [];
-  say(kinds.length >= 12 && kinds.every((m) => new RegExp('^var ' + m[2] + '=\\[', 'm').test(jsAll)), `코드 목록: CODE_KIND ${kinds.length}종 모두 *_OPTS 배열 있음`);
+  say(kinds.length >= 12 && kinds.every((m) => new RegExp('^(?:export )?var ' + m[2] + '=\\[', 'm').test(jsAll)), `코드 목록: CODE_KIND ${kinds.length}종 모두 *_OPTS 배열 있음`);
   const init = fs.existsSync(path.join(ROOT, 'js/init.js')) ? fs.readFileSync(path.join(ROOT, 'js/init.js'), 'utf8') : '';
   say(!/opts:\['접수','출하요청'|opts:\['에스원','LGU\+'|opts:\['S1[0-9]|opts:\['S100'|chipsOpts:\['에스원'/.test(init), 'GRIDS: 장비 상태·채널·모델 목록은 리터럴이 아니라 ORD_STATUS_OPTS/ORD_CH_OPTS/MODEL_OPTS 참조');
   say(/id="cdTable"/.test(html) && /function cdLoad\(/.test(jsAll) && /function loadCodes\(/.test(jsAll) && /loadCodes\(\)/.test(jsAll.replace(/function loadCodes\(\)/, '')), '코드 관리 UI(#cdTable·cdLoad) · loadCodes 가 데이터 로드에 연결됨');
@@ -104,7 +116,7 @@ if (HAS_FN) {
   } }
 // ⑤ UX 2단계 · ⑥ AI 2단계 (㊿+139)
 { const init = fs.readFileSync(path.join(ROOT, 'js/init.js'), 'utf8');
-  say(/function ovlInit\(/.test(jsAll) && /function ovlDismiss\(/.test(jsAll) && /^ovlInit\(\);/m.test(init) && init.indexOf('ovlInit();') < init.lastIndexOf('boot();') && /ovlDismiss\(top\)/.test(init), 'UX(㊿+141): 창 바깥 클릭 닫기·입력 중 확인·초점 관리(ovlInit) 가 init.js 에서 boot() 전에 등록됨 · Esc 도 ovlDismiss');
+  say(/function ovlInit\(/.test(jsAll) && /function ovlDismiss\(/.test(jsAll) && /^\s*ovlInit\(\);/m.test(init) && init.indexOf('ovlInit();') < init.lastIndexOf('boot();') && /ovlDismiss\(top\)/.test(init), 'UX(㊿+141): 창 바깥 클릭 닫기·입력 중 확인·초점 관리(ovlInit) 가 init.js 에서 boot() 전에 등록됨 · Esc 도 ovlDismiss');
   say(/ovlMarkClean\(\)/.test(jsAll.slice(jsAll.indexOf('async function sbWrite('), jsAll.indexOf('async function sbWrite(') + 2500)), 'UX(㊿+141): 저장 성공(sbWrite) 뒤 «입력 중» 표시 지움');
   say(/h\.status>=500\) throw/.test(jsAll), '데이터 로드: 서버 오류(5xx)를 빈 목록으로 넘기지 않음(sbAll)');
   say(/function opsTgtHtml\(/.test(jsAll) && /\.rn-tbl td\.wrap\{/.test(fs.readFileSync(path.join(ROOT, 'app.css'), 'utf8')), '배포·운영 기록: 긴 파일 목록 접기 · 줄바꿈(카드 밖 넘침 방지)'); }
@@ -149,7 +161,7 @@ say(/function opsAutoPath\(/.test(jsAll) && /function opsDest\(/.test(jsAll) && 
 /* ㊿+151: 스테이징 QA */
 { const init = fs.readFileSync(path.join(ROOT, 'js', 'init.js'), 'utf8');
   say(/function qaOpen\(/.test(jsAll) && /function qaRun\(/.test(jsAll) && /function qaInspect\(/.test(jsAll) && /function qaKpi\(/.test(jsAll) && /id="opsQa"/.test(jsAll) && /qaBadgeHtml\(\)/.test(jsAll), '스테이징 QA: 실행·검사·숫자 비교·버튼·배지');
-  say(/^var IS_QA=/m.test(init) && /serviceWorker\.register[\s\S]{0,40}/.test(init) && /test\(location\.protocol\) && !IS_QA\)/.test(init), 'IS_QA(?qa=1) — 서비스 워커 등록 생략');
+  say(/^export var IS_QA=/m.test(fs.readFileSync(path.join(ROOT, 'js', 'state.js'), 'utf8')) && /serviceWorker\.register[\s\S]{0,40}/.test(init) && /test\(location\.protocol\) && !IS_QA\)/.test(init), 'IS_QA(?qa=1) — 서비스 워커 등록 생략');
   const gated = ['function logClientError', 'function cacheWriteLater', 'async function updCheck', 'function dcLogOnce', 'async function updSyncSeed'].filter((f) => { const i = jsAll.indexOf(f); return i < 0 || !/IS_QA/.test(jsAll.slice(i, i + 260)); });
   say(!gated.length, 'IS_QA 게이트: 오류 기록·사본 쓰기·업데이트 팝업·점검 로그·안내 시드' + (gated.length ? ' — 빠짐: ' + gated.join(', ') : ''));
   say(/qaLine/.test(jsAll) && /스테이징 QA 를 아직 실행하지 않았습니다/.test(jsAll), '승격 확인 창에 QA 상태'); }

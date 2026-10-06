@@ -1,43 +1,47 @@
 /* ===== core.js — 공통 유틸 · 데이터 로드 · Supabase · PWA · 메뉴 권한 · 세션 · 2단계 인증 · 자동 로그아웃 · 화면 디자인 =====
-   포탈 본체(js/app.js)를 ④ 아키텍처 2단계(㊿+136)에서 기능별로 나눈 파일. 전역 var/function 그대로 — 즉시 실행 문장은 전부 js/init.js 에.
-   로드 순서는 index.html <meta name="app-js"> (js/load.js 가 그 순서대로 ?v=APP_VER 를 붙여 불러옴) */
+   ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
+import { APP_VER, IS_QA, IS_STAGING, ST } from './state.js';
+import { buildMtabs, buildRail, cacheDrop, dIdx, sbTry, toast } from './shell.js';
+import { esc } from './dash.js';
+import { subgrpSync } from './tools.js';
+import { logChange } from './edit.js';
 /* ==================================================================
    0. 공통 유틸
    ================================================================== */
-var CH = {};              // Chart 인스턴스
-var HIDDEN = {};          // 라인 legend 토글
-var STATE = { lines:{}, base:0, unit:'month', ind:'', partner:'', status:'', search:'', trendR:24, expM:3, sortAll:{k:'mrr',d:-1} };
+export var CH = {};              // Chart 인스턴스
+export var HIDDEN = {};          // 라인 legend 토글
+export var STATE = { lines:{}, base:0, unit:'month', ind:'', partner:'', status:'', search:'', trendR:24, expM:3, sortAll:{k:'mrr',d:-1} };
 
-function $(s){ return document.querySelector(s); }
-function $$(s){ return Array.prototype.slice.call(document.querySelectorAll(s)); }
-function cssv(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
-function el(t,c,x){ var e=document.createElement(t); if(c)e.className=c; if(x!=null)e.textContent=x; return e; }
+export function $(s){ return document.querySelector(s); }
+export function $$(s){ return Array.prototype.slice.call(document.querySelectorAll(s)); }
+export function cssv(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+export function el(t,c,x){ var e=document.createElement(t); if(c)e.className=c; if(x!=null)e.textContent=x; return e; }
 
 /* 포탈 전체 금액 표시 단위 = 천원 (원 단위 이하는 표시하지 않음)
    · won(v)     → 천원 숫자만 (예: 150,000)  — 호출부에서 '천원' 을 붙입니다
    · wonFull(v) → 천원 + 단위 (예: 150,000천원)
    · 가격표·견적서의 단가는 원 단위 유지 (prWon 사용) */
-function won(v){ return Math.round(Number(v||0)/1000).toLocaleString('ko-KR'); }
-function wonFull(v){ return Math.round(Number(v||0)/1000).toLocaleString('ko-KR')+'천원'; }
-function pct(v){ return (v>0?'+':'')+v.toFixed(1)+'%'; }
-function mk(i){ return ST.DATA.monthKeys[i]||mkFuture(i); }
+export function won(v){ return Math.round(Number(v||0)/1000).toLocaleString('ko-KR'); }
+export function wonFull(v){ return Math.round(Number(v||0)/1000).toLocaleString('ko-KR')+'천원'; }
+export function pct(v){ return (v>0?'+':'')+v.toFixed(1)+'%'; }
+export function mk(i){ return ST.DATA.monthKeys[i]||mkFuture(i); }
 // 데이터 범위를 넘어선 미래 월 라벨 (전망에서 사용)
-function mkFuture(i){
+export function mkFuture(i){
   if(i==null||i<0) return '';
   var t=(2020*12+5)+i;
   return Math.floor(t/12)+'-'+('0'+((t%12)+1)).slice(-2);
 }
-var LINE_LABEL={Cloud:'Cloud NAC', S1:'S1 Cloud NAC', MDR:'MDR', MDR_S1:'S1 MDR', PNS:'PNS', DRM:'DRM', DLP:'DLP',
+export var LINE_LABEL={Cloud:'Cloud NAC', S1:'S1 Cloud NAC', MDR:'MDR', MDR_S1:'S1 MDR', PNS:'PNS', DRM:'DRM', DLP:'DLP',
   'Cloud NAC':'Cloud NAC', 'SSL PNS':'PNS'};
-function lline(l){ return LINE_LABEL[l]||l; }
+export function lline(l){ return LINE_LABEL[l]||l; }
 /* 서비스 + 버전 — Cloud NAC 은 5.0 / 6.0 (ZTNA) 이 함께 팔리므로 계약 표에서는 버전을 붙여 보여줍니다 (contracts.version: V5.0 / V6.0 / ZTNA) */
-var VER_OPTS=['V6.0','V5.0','ZTNA'];
-function verShort(v){ v=String(v||'').trim(); if(!v) return ''; if(/^ztna$/i.test(v)) return 'ZTNA'; var m=v.match(/(\d+(?:\.\d+)?)/); return m? m[1] : v; }
-function llineVer(l, ver){ var base=lline(l), vs=verShort(ver); if(!vs) return base; if(l==='Cloud'||l==='S1'||l==='Cloud NAC') return vs==='ZTNA'? base.replace('NAC','ZTNA') : base+' '+vs; return base; }
+export var VER_OPTS=['V6.0','V5.0','ZTNA'];
+export function verShort(v){ v=String(v||'').trim(); if(!v) return ''; if(/^ztna$/i.test(v)) return 'ZTNA'; var m=v.match(/(\d+(?:\.\d+)?)/); return m? m[1] : v; }
+export function llineVer(l, ver){ var base=lline(l), vs=verShort(ver); if(!vs) return base; if(l==='Cloud'||l==='S1'||l==='Cloud NAC') return vs==='ZTNA'? base.replace('NAC','ZTNA') : base+' '+vs; return base; }
 // LIVE 시트 원문 표기 → 표준 코드
-var LIVE2CODE={'Cloud NAC':'Cloud','S1':'S1','MDR':'MDR','SSL PNS':'PNS','PNS':'PNS','DRM':'DRM','DLP':'DLP','MDR_S1':'MDR_S1','Cloud':'Cloud'};
-function qOfIdx(i){ return Math.ceil(monOf(i)/3); }
-function baseRange(){ // 현재 단위 기준 [시작, 끝] 월 인덱스 (끝 = STATE.base)
+export var LIVE2CODE={'Cloud NAC':'Cloud','S1':'S1','MDR':'MDR','SSL PNS':'PNS','PNS':'PNS','DRM':'DRM','DLP':'DLP','MDR_S1':'MDR_S1','Cloud':'Cloud'};
+export function qOfIdx(i){ return Math.ceil(monOf(i)/3); }
+export function baseRange(){ // 현재 단위 기준 [시작, 끝] 월 인덱스 (끝 = STATE.base)
   var b=STATE.base;
   if(STATE.unit==='quarter'){
     var s=dIdx(yOf(b)+'-'+('0'+((qOfIdx(b)-1)*3+1)).slice(-2));
@@ -49,13 +53,13 @@ function baseRange(){ // 현재 단위 기준 [시작, 끝] 월 인덱스 (끝 =
   }
   return [b,b];
 }
-function baseLabel(){
+export function baseLabel(){
   var b=STATE.base;
   if(STATE.unit==='quarter') return yOf(b)+'년 '+qOfIdx(b)+'분기';
   if(STATE.unit==='year') return yOf(b)+'년';
   return mk(b);
 }
-function buildBaseSelect(){
+export function buildBaseSelect(){
   var sel=$('#fBase'); sel.innerHTML='';
   var i,o;
   if(STATE.unit==='month'){
@@ -84,10 +88,10 @@ function buildBaseSelect(){
     sel.value=STATE.base;
   }
 }
-function mkLabel(i){ var k=mk(i); return k? k.slice(2).replace('-','.') : ''; }
-function yOf(i){ return +mk(i).slice(0,4); }
-function monOf(i){ return +mk(i).slice(5,7); }
-function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
+export function mkLabel(i){ var k=mk(i); return k? k.slice(2).replace('-','.') : ''; }
+export function yOf(i){ return +mk(i).slice(0,4); }
+export function monOf(i){ return +mk(i).slice(5,7); }
+export function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
 
 /* ==================================================================
    1. 데이터 로드
@@ -96,9 +100,9 @@ function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
 
 
 /* ---------- Supabase ---------- */
-/* APP_VER 는 index.html <head> 의 인라인 스크립트에서 정의됩니다 (④ 아키텍처 · ㊿+134 — app.css/js 의 ?v= 캐시 무효화와 배포·운영 버전 비교가 그 값을 씀) */
-var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
-var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
+/* APP_VER 는 js/state.js 가 index.html <meta name="app-ver"> 에서 읽습니다 (app.css/js 의 ?v= 캐시 무효화 — tests/stamp.mjs · 배포·운영 버전 비교가 그 값을 씀) */
+export var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
+export var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
 
 /* ---- PWA (홈 화면 앱) — 서비스 워커 등록 · 설치 안내 ---- */
 /* ── 스테이징 띠 · 브라우저 오류 수집 (㊿+129) ──
@@ -106,10 +110,10 @@ var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
    · 화면에서 난 JS 오류(error · unhandledrejection)는 client_errors 표(SQL 86)에 기록 → 관리자 › 배포·운영 › 기록 탭. 같은 메시지는 세션당 1번, 최대 8건 */
 
 
-var ERRLOG={n:0, seen:{}, max:8};
-function logClientError(msg, src, line, col, stack){
+export var ERRLOG={n:0, seen:{}, max:8};
+export function logClientError(msg, src, line, col, stack){
   try{
-    if(!ST.SB_TOKEN || !ST.AUTH_USER || window.IS_QA) return;
+    if(!ST.SB_TOKEN || !ST.AUTH_USER || IS_QA) return;
     var key=String(msg||'').slice(0,120); if(!key || /ResizeObserver loop|Script error\.?$/.test(key)) return;
     if(ERRLOG.seen[key]){ ERRLOG.seen[key]++; return; } ERRLOG.seen[key]=1;
     if(++ERRLOG.n>ERRLOG.max) return;
@@ -119,26 +123,26 @@ function logClientError(msg, src, line, col, stack){
 }
 
 
-var PWA={deferred:null};
-function pwaStandalone(){ try{ return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone===true; }catch(e){ return false; } }
-function pwaIsIOS(){ return /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1); }
+export var PWA={deferred:null};
+export function pwaStandalone(){ try{ return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone===true; }catch(e){ return false; } }
+export function pwaIsIOS(){ return /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1); }
 
 
-function pwaInstall(){ if(!PWA.deferred) return false; var ev=PWA.deferred; ev.prompt(); ev.userChoice.then(function(){ PWA.deferred=null; pwaHintSync(); }); return true; }
+export function pwaInstall(){ if(!PWA.deferred) return false; var ev=PWA.deferred; ev.prompt(); ev.userChoice.then(function(){ PWA.deferred=null; pwaHintSync(); }); return true; }
 /* 설치 안내 카드 내용 (내 계정 › 설정) */
-function pwaHintHtml(){
+export function pwaHintHtml(){
   if(pwaStandalone()) return '<span style="color:var(--brand);font-weight:650">지금 앱으로 실행 중입니다 ✓</span><div class="mini" style="margin-top:5px;line-height:1.6">홈 화면 아이콘으로 열린 상태입니다. 새 버전은 다음 실행 때 자동으로 반영됩니다.</div>';
   if(PWA.deferred) return '<button type="button" class="pill pri" id="accPwaGo">📱 홈 화면에 설치</button><div class="mini" style="margin-top:5px;line-height:1.6">설치하면 주소창 없이 전체 화면 앱처럼 열립니다. 스토어 등록·다운로드 없음, 새 버전은 자동 반영.</div>';
   if(pwaIsIOS()) return '<div style="font-size:13.5px;line-height:1.7">Safari 하단 <b>공유</b> 버튼 <span style="display:inline-block;border:1px solid var(--ring);border-radius:5px;padding:0 5px;font-size:11px">⎋</span> → <b>«홈 화면에 추가»</b> → 추가</div><div class="mini" style="margin-top:5px;line-height:1.6">아이폰·아이패드는 Safari 에서만 설치됩니다(Chrome 앱에서는 안 됨). 설치 후 홈 화면의 «SVC 포탈» 아이콘으로 열면 전체 화면 앱처럼 동작합니다.</div>';
   return '<div style="font-size:13.5px;line-height:1.7">Chrome 주소창 오른쪽의 <b>설치</b> 아이콘, 또는 메뉴(⋮) › <b>«앱 설치»</b> / «홈 화면에 추가»</div><div class="mini" style="margin-top:5px;line-height:1.6">안드로이드·PC Chrome·Edge 에서 됩니다. 설치하면 주소창 없이 전체 화면으로 열리고 새 버전은 자동 반영됩니다.</div>';
 }
-function pwaHintSync(){ var h=document.getElementById('accPwa'); if(!h) return; h.innerHTML=pwaHintHtml(); var b=document.getElementById('accPwaGo'); if(b) b.onclick=function(){ pwaInstall(); }; }
+export function pwaHintSync(){ var h=document.getElementById('accPwa'); if(!h) return; h.innerHTML=pwaHintHtml(); var b=document.getElementById('accPwaGo'); if(b) b.onclick=function(){ pwaInstall(); }; }
 
 /* ---- 계정별 메뉴 권한 (user_perms · SQL 79) — 슈퍼 관리자가 관리자 › 메뉴 권한에서 지정 ----
    보기(v): 메뉴 표시·화면 열기 · 읽기(r): 화면 안 데이터 열람 · 쓰기(w): 추가·수정·삭제.
    행이 없는 메뉴는 역할 기본(admin 전부 · admin_viewer 보기+읽기). super_admin 은 항상 전부. 홈·내 계정은 항상 보임. */
-var PERM_EXEMPT={dash:1, account:1, adminx:1, log:1, csite:1, ops:1};   // 역할로만 다루는 화면
-async function loadPerms(){
+export var PERM_EXEMPT={dash:1, account:1, adminx:1, log:1, csite:1, ops:1};   // 역할로만 다루는 화면
+export async function loadPerms(){
   if(!ST.SB_TOKEN || !ST.AUTH_USER){ ST.PERMS=null; return null; }
   try{
     var rows=await sbTry('user_perms?select=view,can_view,can_read,can_write&email=eq.'+encodeURIComponent(String(ST.AUTH_USER).toLowerCase()));
@@ -147,18 +151,18 @@ async function loadPerms(){
     return m;
   }catch(e){ ST.PERMS=null; return null; }
 }
-function permOf(v){
+export function permOf(v){
   var roleW=!window.IS_VIEWER_ROLE;
   if(window.IS_SUPER || PERM_EXEMPT[v] || !v) return {v:true, r:true, w:roleW};
   var p=ST.PERMS && ST.PERMS[v];
   if(!p) return {v:true, r:true, w:roleW};
   return {v:!!p.v, r:!!(p.v&&p.r), w:!!(p.v&&p.r&&p.w&&roleW)};
 }
-function canView(v){ return permOf(v).v; }
-function canRead(v){ return permOf(v).r; }
-function canWrite(v){ return permOf(v).w; }
+export function canView(v){ return permOf(v).v; }
+export function canRead(v){ return permOf(v).r; }
+export function canWrite(v){ return permOf(v).w; }
 /* 메뉴에 반영 — 보기 없는 버튼 숨김, 버튼이 하나도 안 남은 그룹은 그룹도 숨김 */
-function applyPerms(){
+export function applyPerms(){
   var side=document.getElementById('side'); if(!side) return;
   side.querySelectorAll('button[data-v]').forEach(function(b){ var v=b.dataset.v; if(PERM_EXEMPT[v]) return; b.classList.toggle('pdeny', !canView(v)); });
   side.querySelectorAll('.grp').forEach(function(g){
@@ -172,12 +176,12 @@ function applyPerms(){
   try{ var be=$('#btnEdit'); if(be && ST.SB_TOKEN) be.style.display=(window.IS_VIEWER_ROLE || !canWrite('contracts'))? 'none':''; }catch(e){}
 }
 /* 화면을 열 때 — 현재 화면의 쓰기 권한을 IS_VIEWER 에 반영(기존 조회 전용 로직을 그대로 재사용) · 읽기 없으면 안내로 덮음 */
-function permEnter(v){
+export function permEnter(v){
   window.IS_VIEWER = !!window.IS_VIEWER_ROLE || !canWrite(v);
   var app=document.getElementById('app'); if(app) app.classList.toggle('perm-deny', !canRead(v));
 }
 /* 쓰기 호출 공통 관문 — 현재 화면에 쓰기 권한이 없으면 저장 자체를 막음 (변경 이력·읽기용 RPC 는 예외) */
-function permWriteGuard(method, path, asView){
+export function permWriteGuard(method, path, asView){
   if(!/^(POST|PATCH|PUT|DELETE)$/i.test(method)) return;
   if(/^change_log\b|^ai_chat_history\b|^ai_feedback\b|^ai_check_log\b|^rpc\/(load_|admin_|ai_)|^user_perms\b|^ai_billing\b|^recv_presets\b/.test(path)) return;   // 이력·개인 기록·관리자 RPC 는 화면 권한과 무관
   if(window.IS_SUPER) return;
@@ -189,19 +193,19 @@ function permWriteGuard(method, path, asView){
    sessionStorage 에 두면 홈 화면 앱(PWA)은 닫을 때마다 로그아웃됩니다.
    «로그인 유지»(svc_keep · 앱/모바일에서는 기본 켬)면 localStorage 에도 복사해 두고, 시작할 때 sessionStorage 로 되살립니다
    (위성 페이지 quote/report/s1/kk 는 sessionStorage 를 읽으므로 그대로 동작). 자동 로그아웃 설정은 그대로 적용됩니다. */
-var SESS_KEY='svc_sess';
-function keepLogin(){ try{ var v=localStorage.getItem('svc_keep'); if(v!==null) return v==='1'; }catch(e){} return pwaStandalone() || (window.matchMedia && window.matchMedia('(max-width:760px)').matches); }
-function sessRead(){
+export var SESS_KEY='svc_sess';
+export function keepLogin(){ try{ var v=localStorage.getItem('svc_keep'); if(v!==null) return v==='1'; }catch(e){} return pwaStandalone() || (window.matchMedia && window.matchMedia('(max-width:760px)').matches); }
+export function sessRead(){
   var s=null; try{ s=JSON.parse(sessionStorage.getItem(SESS_KEY)||'null'); }catch(e){}
   if(!s){ try{ s=JSON.parse(localStorage.getItem(SESS_KEY)||'null'); if(s) sessionStorage.setItem(SESS_KEY, JSON.stringify(s)); }catch(e){} }
   return s;
 }
-function sessWrite(o){
+export function sessWrite(o){
   var j=JSON.stringify(o);
   try{ sessionStorage.setItem(SESS_KEY, j); }catch(e){}
   try{ if(keepLogin()) localStorage.setItem(SESS_KEY, j); else localStorage.removeItem(SESS_KEY); }catch(e){}
 }
-function saveSess(j,email,pOverride){
+export function saveSess(j,email,pOverride){
   var s0=null; try{ s0=sessRead(); }catch(e){}
   sessWrite({
     a:j.access_token, r:j.refresh_token||null,
@@ -210,9 +214,9 @@ function saveSess(j,email,pOverride){
     m:(s0 && s0.u===email && s0.m) || ''   /* ㊿+145: 'none' = 지난번 확인 때 인증 앱 없음·필수 지정 기한 전 → 다음 시작 때 확인을 기다리지 않음 */
   });
 }
-function sessMark(m){ try{ var s=sessRead(); if(s){ s.m=m||''; sessWrite(s); } }catch(e){} }
-function clearSess(){ try{ sessionStorage.removeItem(SESS_KEY); }catch(e){} try{ localStorage.removeItem(SESS_KEY); }catch(e){} }
-async function restoreSess(){
+export function sessMark(m){ try{ var s=sessRead(); if(s){ s.m=m||''; sessWrite(s); } }catch(e){} }
+export function clearSess(){ try{ sessionStorage.removeItem(SESS_KEY); }catch(e){} try{ localStorage.removeItem(SESS_KEY); }catch(e){} }
+export async function restoreSess(){
   var s=sessRead();
   if(!s || !s.a || s.p===false) return false;      // 비밀번호 미변경 계정은 다시 로그인
   if(Math.floor(Date.now()/1000) < (s.e||0)-120){ ST.SB_TOKEN=s.a; ST.AUTH_USER=s.u; }
@@ -233,7 +237,7 @@ async function restoreSess(){
   return true;
 }
 /* ---- 토큰 자동 연장: 화면을 계속 켜둬도 로그인이 안 끊기게 ---- */
-async function refreshToken(){
+export async function refreshToken(){
   var s=sessRead();
   if(!s || !s.r) return false;
   try{
@@ -248,38 +252,38 @@ async function refreshToken(){
 }
 
 
-function doLogout(){
+export function doLogout(){
   if(!confirm('로그아웃할까요?')) return;
   clearSess(); cacheDrop();
   ST.SB_TOKEN=null; ST.AUTH_USER=null; reloadHome();
 }
 /* ㊿+145: 로그아웃 뒤에는 «이전 메뉴»가 아니라 처음(대시보드)부터 — 주소의 #메뉴 · ?v= 를 떼고 다시 엽니다 */
-function reloadHome(){ try{ location.replace(location.pathname); }catch(e){ location.reload(); } }
+export function reloadHome(){ try{ location.replace(location.pathname); }catch(e){ location.reload(); } }
 
 /* ---- 2단계 인증 (MFA · 인증 앱 TOTP) — Supabase Auth factors API (80점 프로젝트 ② 보안 · SQL 88) ----
    · 선택 적용: 내 계정 › 보안에서 본인이 켬. 켠 계정은 로그인 뒤 6자리 코드를 넣어야 aal2 세션을 받고,
      SQL 88 의 restrictive 정책(mfa_ok)이 aal1 토큰의 데이터 접근을 DB 단에서 막음(등록하지 않은 계정은 영향 없음).
    · 저장된 세션(로그인 유지)이 aal1 인데 인증 앱이 등록돼 있으면 시작할 때 코드를 요구(restoreSess).
    · 복구: 폰을 잃어버리면 슈퍼 관리자가 배포·운영 › SQL 에서 auth.mfa_factors 행을 지움(SQL 88 끝 주석). */
-function b64urlJson(p){ p=String(p||'').replace(/-/g,'+').replace(/_/g,'/'); while(p.length%4) p+='='; var bin=atob(p), u=new Uint8Array(bin.length); for(var i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i); return JSON.parse(new TextDecoder().decode(u)); }
-function sessAal(tok){ try{ return b64urlJson(String(tok||ST.SB_TOKEN||'').split('.')[1]).aal||'aal1'; }catch(e){ return 'aal1'; } }
-function authHdr(tok){ return {apikey:SB_KEY, 'Content-Type':'application/json', Authorization:'Bearer '+(tok||ST.SB_TOKEN)}; }
-async function authApi(method, path, body, tok){
+export function b64urlJson(p){ p=String(p||'').replace(/-/g,'+').replace(/_/g,'/'); while(p.length%4) p+='='; var bin=atob(p), u=new Uint8Array(bin.length); for(var i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i); return JSON.parse(new TextDecoder().decode(u)); }
+export function sessAal(tok){ try{ return b64urlJson(String(tok||ST.SB_TOKEN||'').split('.')[1]).aal||'aal1'; }catch(e){ return 'aal1'; } }
+export function authHdr(tok){ return {apikey:SB_KEY, 'Content-Type':'application/json', Authorization:'Bearer '+(tok||ST.SB_TOKEN)}; }
+export async function authApi(method, path, body, tok){
   var r=await fetch(SB_URL+'/auth/v1/'+path, {method:method, headers:authHdr(tok), body:body? JSON.stringify(body) : undefined});
   var j=null; try{ j=await r.json(); }catch(e){ j={}; }
   if(!r.ok){ var e2=new Error((j&&(j.msg||j.error_description||j.message||j.error))||('인증 서버 오류 '+r.status)); e2.status=r.status; throw e2; }
   return j||{};
 }
-async function mfaFactors(tok){ var u=await authApi('GET','user',null,tok); return (u.factors||[]).filter(function(f){ return f.factor_type==='totp'; }); }
-function mfaVerifiedOf(fs){ return (fs||[]).filter(function(f){ return f.status==='verified' && f.factor_type==='totp'; }); }
+export async function mfaFactors(tok){ var u=await authApi('GET','user',null,tok); return (u.factors||[]).filter(function(f){ return f.factor_type==='totp'; }); }
+export function mfaVerifiedOf(fs){ return (fs||[]).filter(function(f){ return f.status==='verified' && f.factor_type==='totp'; }); }
 /* 로그인(또는 저장된 세션) 뒤 관문: 인증 앱이 등록돼 있고 토큰이 aal1 이면 코드를 받아 aal2 세션으로 교체. true=계속 · false=중단 */
-var MFA_ST=null;   // 본인 정책(rpc mfa_status · SQL 89) — {required, deadline, today, enrolled, aal}
-async function mfaPolicy(tok){
+export var MFA_ST=null;   // 본인 정책(rpc mfa_status · SQL 89) — {required, deadline, today, enrolled, aal}
+export async function mfaPolicy(tok){
   try{ var r=await fetch(SB_URL+'/rest/v1/rpc/mfa_status',{method:'POST', headers:authHdr(tok), body:'{}'}); if(!r.ok) return null; return await r.json(); }catch(e){ return null; }
 }
-function mfaDue(st){ return !!(st && st.required && !st.enrolled && (!st.deadline || (st.today||new Date().toISOString().slice(0,10))>=st.deadline)); }
-function mfaDaysLeft(st){ if(!st||!st.deadline) return 0; var a=new Date(st.deadline+'T00:00:00'), b=new Date((st.today||new Date().toISOString().slice(0,10))+'T00:00:00'); return Math.round((a-b)/86400000); }
-async function mfaGate(tok, email, factorsHint, opt){
+export function mfaDue(st){ return !!(st && st.required && !st.enrolled && (!st.deadline || (st.today||new Date().toISOString().slice(0,10))>=st.deadline)); }
+export function mfaDaysLeft(st){ if(!st||!st.deadline) return 0; var a=new Date(st.deadline+'T00:00:00'), b=new Date((st.today||new Date().toISOString().slice(0,10))+'T00:00:00'); return Math.round((a-b)/86400000); }
+export async function mfaGate(tok, email, factorsHint, opt){
   if(sessAal(tok)==='aal2') return true;
   /* ㊿+145 빠른 길: 로그인 응답에 «확인된 인증 앱»이 없거나(대부분의 계정) 지난번 확인 결과가 «없음»이면
      인증 서버 왕복 2번(인증 앱 목록 · 필수 지정)을 기다리지 않고 바로 통과 → 데이터 읽기와 병렬로 뒤에서 확인(mfaBgCheck).
@@ -297,7 +301,7 @@ async function mfaGate(tok, email, factorsHint, opt){
   return true;
 }
 /* 뒤에서 확인 (빠른 길 다음) — 인증 앱 목록과 필수 지정을 동시에 물어봄 */
-async function mfaBgCheck(tok, email){
+export async function mfaBgCheck(tok, email){
   var r; try{ r=await Promise.all([mfaFactors(tok).catch(function(){ return null; }), mfaPolicy(tok)]); }catch(e){ return; }
   if(ST.SB_TOKEN!==tok) return;                                    // 그사이 로그아웃 · 토큰 교체
   var fs=r[0], st=r[1], vf=mfaVerifiedOf(fs||[]); MFA_ST=st;
@@ -307,14 +311,14 @@ async function mfaBgCheck(tok, email){
   if(fs) sessMark('none');
   if(st && st.required){ MFA_WARN=st; if(ST.DATA) try{ mfaWarnIfNeeded(); }catch(e){} }
 }
-var MFA_WARN=null;
-function mfaWarnIfNeeded(){
+export var MFA_WARN=null;
+export function mfaWarnIfNeeded(){
   var st=MFA_WARN; if(!st) return; MFA_WARN=null;
   var d=mfaDaysLeft(st);
   toast('2단계 인증 등록이 필요합니다', (/role/.test(st.source||'')? '관리자 계정 기본 정책' : '관리자 지정')+' — '+st.deadline+' 까지('+(d>0? d+'일 남음':'오늘')+') 내 계정 › 보안에서 켜 주세요. 지나면 등록 전까지 포탈을 쓸 수 없습니다.', 'warn');
 }
 /* 필수 지정 + 기한 지남: 등록 창을 띄우고 끝나야 들어감 (취소 = 로그아웃) */
-function mfaForceEnroll(tok, email, st){
+export function mfaForceEnroll(tok, email, st){
   return new Promise(function(resolve){
     var old=document.getElementById('ovlMfa'); if(old) old.remove();
     var ov=document.createElement('div'); ov.id='ovlMfa'; ov.className='ovl on'; ov.style.cssText='z-index:100000;align-items:center';
@@ -328,12 +332,12 @@ function mfaForceEnroll(tok, email, st){
     mfaEnrollFlow([], ov.querySelector('#mfaForceHost'), {tok:tok, email:email, onDone:function(ok){ if(ok){ ov.remove(); resolve(true); } }});
   });
 }
-function mfaApplySession(s, email){
+export function mfaApplySession(s, email){
   ST.SB_TOKEN=s.access_token; if(email) ST.AUTH_USER=email;
   var s0=sessRead(); saveSess(s, ST.AUTH_USER, (s0&&s0.p!==undefined)? s0.p : undefined);
 }
 /* 코드 입력 창 — 로그인 화면·로딩 화면 위에도 떠야 하므로 z-index 를 크게. 취소 = 로그인 중단 */
-function mfaPrompt(factor, tok, email){
+export function mfaPrompt(factor, tok, email){
   return new Promise(function(resolve){
     var old=document.getElementById('ovlMfa'); if(old) old.remove();
     var ov=document.createElement('div'); ov.id='ovlMfa'; ov.className='ovl on'; ov.style.cssText='z-index:100000;align-items:center';
@@ -370,7 +374,7 @@ function mfaPrompt(factor, tok, email){
   });
 }
 /* 내 계정 › 보안 카드 — 상태 · 켜기(QR 등록) · 끄기 */
-async function mfaCardRender(host){
+export async function mfaCardRender(host){
   if(!host) return; host.innerHTML='<span class="mini">확인 중…</span>';
   var fs; try{ fs=await mfaFactors(); }catch(e){ host.innerHTML='<span class="mini" style="color:var(--critical)">상태를 읽지 못했습니다: '+esc(e.message)+'</span>'; return; }
   var vf=mfaVerifiedOf(fs), aal=sessAal();
@@ -389,7 +393,7 @@ async function mfaCardRender(host){
   }
 }
 /* GoTrue 의 qr_code 는 SVG 원문(«<?xml …?><svg …», data: 접두 없음 — 문서: «data:image/svg+xml;utf-8, 를 앞에 붙이라») — 그대로 src 에 넣으면 깨지므로 percent-encoding 한 data URL 로 정규화 (㊿+131 수정) */
-function mfaQrSrc(q){
+export function mfaQrSrc(q){
   q=String(q||'').trim(); if(!q) return '';
   var svg=null, m=/^data:image\/svg\+xml(;[^,]*)?,([\s\S]*)$/i.exec(q);
   if(m){ if(/base64/i.test(m[1]||'')) return q; svg=m[2]; try{ svg=decodeURIComponent(svg); }catch(e){} }
@@ -398,7 +402,7 @@ function mfaQrSrc(q){
   if(svg===null) return q;
   return 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
 }
-async function mfaEnrollFlow(existing, host, opts){
+export async function mfaEnrollFlow(existing, host, opts){
   opts=opts||{}; var tok=opts.tok||null, who=opts.email||ST.AUTH_USER;
   var back=function(ok){ if(opts.onDone) opts.onDone(ok); else mfaCardRender(host); };
   host.innerHTML='<span class="mini">등록 준비 중…</span>';
@@ -435,7 +439,7 @@ async function mfaEnrollFlow(existing, host, opts){
     host.querySelector('#mfaRetry').onclick=function(){ if(opts.onDone) mfaEnrollFlow(null, host, opts); else mfaCardRender(host); };
   }
 }
-async function mfaDisable(vf, host){
+export async function mfaDisable(vf, host){
   if(!confirm('2단계 인증을 끕니다. 비밀번호만으로 로그인할 수 있게 됩니다. 계속할까요?')) return;
   host.innerHTML='<span class="mini">끄는 중…</span>';
   try{
@@ -451,17 +455,18 @@ async function mfaDisable(vf, host){
    · 마우스·키보드·스크롤이 IDLE_KEY 분 동안 없으면 세션을 지우고 로그인 화면으로 (0 = 끔, 기본)
    · 1분 전에 안내 토스트 · 다른 탭에 갔다 돌아오면 즉시 확인                          */
 
-var IDLE_OPTS=[0,15,30,60,120,240,480];
-function idleMin(){ var v=0; try{ v=parseInt(localStorage.getItem(IDLE_KEY),10)||0; }catch(e){} return v>0? v:0; }
-function idleLabel(m){ return !m? '끄기 (로그인 유지)' : (m>=60? (m/60)+'시간' : m+'분'); }
-function idleTouch(){ ST.IDLE_LAST=Date.now(); ST.IDLE_WARNED=false; }
+export var IDLE_KEY='svc_idle_min';   // ㊿+153: init.js 에서 옮김
+export var IDLE_OPTS=[0,15,30,60,120,240,480];
+export function idleMin(){ var v=0; try{ v=parseInt(localStorage.getItem(IDLE_KEY),10)||0; }catch(e){} return v>0? v:0; }
+export function idleLabel(m){ return !m? '끄기 (로그인 유지)' : (m>=60? (m/60)+'시간' : m+'분'); }
+export function idleTouch(){ ST.IDLE_LAST=Date.now(); ST.IDLE_WARNED=false; }
 
-function idleLogout(m){
+export function idleLogout(m){
   clearSess(); cacheDrop();
   try{ sessionStorage.setItem('svc_idle_msg', idleLabel(m)+' 동안 활동이 없어 자동 로그아웃되었습니다. 다시 로그인하세요.'); }catch(e){}
   ST.SB_TOKEN=null; ST.AUTH_USER=null; reloadHome();
 }
-function idleCheck(){
+export function idleCheck(){
   var m=idleMin(); if(!m || !ST.SB_TOKEN) return;
   var idle=Date.now()-ST.IDLE_LAST, lim=m*60000;
   if(idle>=lim){ idleLogout(m); return; }
@@ -476,15 +481,15 @@ function idleCheck(){
    · cc      : 아이콘 레일 + 커맨드 바 + 인박스 홈 + 장비 보드 + 고객 360 패널 (v5 CSS · html[data-look="cc"])
    · simple  : 평면 디자인, 기존 사이드바 (v4 CSS · html:not([data-look="classic"]))
    · classic : 이전 디자인 그대로                                                                 */
-var LOOKS={cc:'커맨드 센터 (기본)', simple:'심플', classic:'클래식 (이전 디자인)'};
-function curLook(){ var v=null; try{ v=localStorage.getItem('svc_look'); }catch(e){} return LOOKS[v]? v : 'cc'; }
-function isCC(){ return document.documentElement.getAttribute('data-look')==='cc'; }
-function applyLook(){
+export var LOOKS={cc:'커맨드 센터 (기본)', simple:'심플', classic:'클래식 (이전 디자인)'};
+export function curLook(){ var v=null; try{ v=localStorage.getItem('svc_look'); }catch(e){} return LOOKS[v]? v : 'cc'; }
+export function isCC(){ return document.documentElement.getAttribute('data-look')==='cc'; }
+export function applyLook(){
   var v=curLook();
   if(v==='simple') document.documentElement.removeAttribute('data-look');
   else document.documentElement.setAttribute('data-look', v);
 }
-function setLook(v){
+export function setLook(v){
   if(!LOOKS[v]) v='cc';
   try{ if(v==='cc') localStorage.removeItem('svc_look'); else localStorage.setItem('svc_look',v); }catch(e){}
   applyLook();
@@ -493,7 +498,7 @@ function setLook(v){
 }
 
 /* 메뉴 글머리 이모지를 <span class="ic"> 로 감싸 심플 디자인에서는 숨길 수 있게 (textContent 는 그대로) */
-function wrapNavIcons(){
+export function wrapNavIcons(){
   var re; try{ re=new RegExp('^([\\p{Extended_Pictographic}\\u2600-\\u27BF][\\uFE0F\\u20E3]?(?:\\u200D\\p{Extended_Pictographic}\\uFE0F?)*)\\s+(\\S.*)$','u'); }catch(e){ return; }
   document.querySelectorAll('#side button').forEach(function(b){
     if(b.querySelector('.ic') || b.children.length) return;
@@ -503,8 +508,18 @@ function wrapNavIcons(){
     b.appendChild(ic); b.appendChild(document.createTextNode(' '+m[2]));
   });
 }
-function navText(b){   // 메뉴 글자만 (심플 디자인에서는 이모지 제외)
+export function navText(b){   // 메뉴 글자만 (심플 디자인에서는 이모지 제외)
   var t=(b.textContent||'').trim(), ic=b.querySelector('.ic');
   if(ic && document.documentElement.getAttribute('data-look')!=='classic') t=t.replace(ic.textContent,'').trim();
   return t;
+}
+
+/* ㊿+153: admin.js 에서 옮김 — 인바운드 등 여러 화면이 씀(관리자 화면은 처음 열 때만 불러오므로) */
+/* DB의 UTC 시각 → 보는 사람 시간대(한국이면 KST)로 */
+export function axTime(v){
+  if(!v) return '·';
+  var d=new Date(/[zZ]|[+\-]\d\d:?\d\d$/.test(String(v))? v : v+'Z');   // 시간대 없으면 UTC 로 간주
+  if(isNaN(d)) return String(v).replace('T',' ').slice(0,16);
+  var p=function(n){ return (n<10?'0':'')+n; };
+  return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes());
 }

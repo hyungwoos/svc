@@ -1,12 +1,19 @@
 /* ===== ai.js — 자연어 질문 엔진 · AI 요약(buildDigest) · 규칙형 해석기 · 자동완성 =====
-   포탈 본체(js/app.js)를 ④ 아키텍처 2단계(㊿+136)에서 기능별로 나눈 파일. 전역 var/function 그대로 — 즉시 실행 문장은 전부 js/init.js 에.
-   로드 순서는 index.html <meta name="app-js"> (js/load.js 가 그 순서대로 ?v=APP_VER 를 붙여 불러옴) */
+   ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
+import { APP_VER, ST } from './state.js';
+import { Viz } from './viz.js';
+import { $, $$, cssv, el, lline, mk, mkLabel, monOf, pct, refreshToken, SB_KEY, SB_URL, seriesColor, STATE, won, wonFull, yOf } from './core.js';
+import { sbGet, sbWrite, toast } from './shell.js';
+import { activeCustomers, esc, groupCount, hbars, monthlySeries, monthlyTotal, pinQuery, statusOf, uniq } from './dash.js';
+import { dcSummary, liveData, liveDelta, liveSrcLabel, renewScan } from './analysis.js';
+import { CL, clBuild, clEnsure, clFxRate, clSum } from './cloud.js';
+import { openOvl } from './edit.js';
 
 
 /* ==================================================================
    5. 자연어 질문 엔진 (규칙형 · 외부 API 불필요)
    ================================================================== */
-var LINE_ALIAS=[
+export var LINE_ALIAS=[
   [/\bdrm\b|디알엠|문서보안/i,'DRM'],
   [/\bdlp\b|디엘피|정보유출/i,'DLP'],
   [/클라우드|cloud|클라우|클라드|나크|nac/i,'Cloud'],
@@ -15,9 +22,9 @@ var LINE_ALIAS=[
   [/\bpns\b|피엔에스|알림서비스|푸시/i,'PNS'],
   [/\bs1\b|에스원|세콤/i,'S1']
 ];
-var AICFG = {enabled:false, narrate:true, maskNames:true, model:''};
+export var AICFG = {enabled:false, narrate:true, maskNames:true, model:''};
 /* 계정별 대화 기억 — DB(ai_chat_history)에서 최근 문답을 불러옵니다 (최초 1회) */
-function loadHist(){
+export function loadHist(){
   if(ST.HIST_LOADED || !ST.SB_TOKEN) return Promise.resolve();
   ST.HIST_LOADED=true;
   return sbGet('ai_chat_history?select=q,a&order=id.desc&limit=8').catch(function(){ return null; }).then(function(rows){
@@ -28,18 +35,18 @@ function loadHist(){
   });
 }
 /* 문답 한 턴을 계정 기억에 저장 (실패해도 조용히 넘어감) */
-function saveHistTurn(q,a){
+export function saveHistTurn(q,a){
   if(!ST.SB_TOKEN) return;
   try{ sbWrite('POST','ai_chat_history',[{q:q, a:String(a||'').slice(0,2000), email:ST.AUTH_USER||null}])
         .catch(function(){}); }catch(e){}
 }
 
-function aiEndpoint(){ return SB_URL + '/functions/v1/ask'; }
+export function aiEndpoint(){ return SB_URL + '/functions/v1/ask'; }
 /* 중계 함수가 응답을 주지 않으면 fetch 는 영원히 안 끝납니다.
    타임아웃을 걸어 반드시 끝나게 하고, 끝나지 않으면 내장 규칙으로 답합니다. */
-var AI_TIMEOUT_MS = 90000;   // 중계 함수(ask v3.2)의 총 예산 78초 + 여유 — 함수가 예산 안에 반드시 답을 돌려주므로 여기까지 오는 일은 드묾
-var AI_PING_MS    = 12000;      // 연결 확인은 짧게
-async function aiFetch(payload, ms){
+export var AI_TIMEOUT_MS = 90000;   // 중계 함수(ask v3.2)의 총 예산 78초 + 여유 — 함수가 예산 안에 반드시 답을 돌려주므로 여기까지 오는 일은 드묾
+export var AI_PING_MS    = 12000;      // 연결 확인은 짧게
+export async function aiFetch(payload, ms){
   ms = ms || (payload && payload.mode==='ping' ? AI_PING_MS : AI_TIMEOUT_MS);
   var ctl = (typeof AbortController!=='undefined') ? new AbortController() : null;
   var timedOut=false;
@@ -67,9 +74,9 @@ async function aiFetch(payload, ms){
     throw e;
   }finally{ clearTimeout(t); if(AI_CUR===ctl) AI_CUR=null; }
 }
-var AI_CUR=null;             // 진행 중인 chat 요청의 AbortController
-var ASK_T0=0, ASK_TICK=null; // «생각 중… n초» 표시용
-function loadAiConfig(){
+export var AI_CUR=null;             // 진행 중인 chat 요청의 AbortController
+export var ASK_T0=0, ASK_TICK=null; // «생각 중… n초» 표시용
+export function loadAiConfig(){
   var badge=$('#aiBadge');
   if(!ST.SB_TOKEN){
     badge.className='ai-badge'; badge.textContent='규칙형';
@@ -87,7 +94,7 @@ function loadAiConfig(){
       badge.title='Claude 연결이 없어 내장 규칙형으로 동작합니다.\n'+m;
     });
 }
-function aiOn(badge){
+export function aiOn(badge){
   AICFG.enabled=true;
   badge.className='ai-badge on';
   badge.innerHTML='<span class="d"></span>AI 연결됨';
@@ -98,7 +105,7 @@ function aiOn(badge){
   $('#q').placeholder='아무렇게나 물어보세요 — 예: 요즘 클라우드 좀 어때? 제일 큰 고객 누구야? 곧 재약정 챙겨야 할 데 있어?';
 }
 
-function setAsking(on){
+export function setAsking(on){
   var b=$('#btnAsk');
   if(ASK_TICK){ clearInterval(ASK_TICK); ASK_TICK=null; }
   b.disabled=false;                         // 기다리는 동안에도 눌러서 «중단» 할 수 있게
@@ -113,22 +120,22 @@ function setAsking(on){
   },1000);
   b._slowTold=0;
 }
-function isAsking(){ return $('#btnAsk').classList.contains('asking'); }
-function abortAsk(){
+export function isAsking(){ return $('#btnAsk').classList.contains('asking'); }
+export function abortAsk(){
   if(AI_CUR){ try{ AI_CUR.abort(); }catch(e){} }
   setAsking(false);
   var say=$('#aiSay'); if(say){ say.className='ai-say on'; say.innerHTML='<span class="lb">AI</span>중단했습니다.'; }
 }
 
-function shortQ(q){ q=String(q||''); return q.length>90? q.slice(0,90)+'…' : q; }
+export function shortQ(q){ q=String(q||''); return q.length>90? q.slice(0,90)+'…' : q; }
 /* 도구 호출 요약: run_sql×2 · customer_360 */
-function aiToolBrief(qs){
+export function aiToolBrief(qs){
   var n={}; (qs||[]).forEach(function(q){ n[q.tool]=(n[q.tool]||0)+1; });
   return Object.keys(n).map(function(k){ return k+(n[k]>1?'×'+n[k]:''); }).join(' · ');
 }
 /* AI 답변은 «그 시점 데이터»로 만든 것이라, 데이터를 다시 읽으면 닫습니다.
    메뉴 이동만으로는 닫지 않습니다 — 답을 보고 다른 화면 확인하다 돌아오는 흐름은 살립니다. */
-function closeAnswer(why){
+export function closeAnswer(why){
   var a=$('#answer'); if(!a || !a.classList.contains('on')) return;
   /* 질문이 진행 중(생각 중…)이면 닫지 않습니다 — 자동 새로고침이 겹치면 답이 와도 보이지 않던 문제 */
   if(typeof isAsking==='function' && isAsking()) return;
@@ -140,7 +147,7 @@ function closeAnswer(why){
   var g=document.getElementById('ansGrid'); if(g) g.style.display='none';
   if(why) toast('AI 답변을 닫았습니다', why, 'info');
 }
-function ask(q){
+export function ask(q){
   q=(q||'').trim();
   if(!q){ $('#answer').classList.remove('on'); return; }
   $('#q').value='';            // 물어본 뒤에는 입력칸을 비웁니다
@@ -206,10 +213,10 @@ function ask(q){
 }
 
 /* 👍/👎 — ai_feedback(SQL 94) 에 본인 행으로 기록. 👎 는 «무엇이 틀렸나» 메모(선택). 표가 없으면 토스트만. (⑥ AI 2단계 · ㊿+139) */
-function aiFeedbackBind(say, q, r){
+export function aiFeedbackBind(say, q, r){
   say.querySelectorAll('.ai-fb button').forEach(function(b){ b.onclick=function(){ aiFeedback(b.dataset.fb, q, r, say); }; });
 }
-async function aiFeedback(verdict, q, r, say){
+export async function aiFeedback(verdict, q, r, say){
   var note=null;
   if(verdict==='down'){ note=prompt('무엇이 틀렸거나 부족했나요? (선택 — 비워도 기록됩니다)'); if(note===null) return; note=note.trim()||null; }
   var btns=say? say.querySelectorAll('.ai-fb button') : []; btns.forEach(function(b){ b.disabled=true; b.setAttribute('aria-pressed', String(b.dataset.fb===verdict)); });
@@ -219,7 +226,7 @@ async function aiFeedback(verdict, q, r, say){
   }catch(e){ btns.forEach(function(b){ b.disabled=false; b.removeAttribute('aria-pressed'); }); toast('피드백 저장 실패', /ai_feedback|404|schema cache/i.test(String(e.message||e))? 'SQL 94 가 아직 실행되지 않았습니다':String(e.message||e).slice(0,120), 'warn'); }
 }
 /* 답변 패널을 열고, 화면 밖에 있으면 보이는 위치로 살짝 스크롤 */
-function revealAnswer(){
+export function revealAnswer(){
   var a=$('#answer'); if(!a) return;
   a.classList.add('on');
   try{
@@ -228,7 +235,7 @@ function revealAnswer(){
   }catch(e){}
 }
 /* AI 호출이 실패했을 때 «다시 시도» 버튼을 답변 영역에 붙입니다 */
-function aiRetryBtn(q){
+export function aiRetryBtn(q){
   var say=$('#aiSay'); if(!say) return;
   say.className='ai-say on';
   say.innerHTML='<span class="lb">AI</span>AI가 답하지 못했습니다. '+
@@ -238,7 +245,7 @@ function aiRetryBtn(q){
 }
 
 /* 답변에 JSON/코드펜스가 섞여 오면 사람이 읽을 문장만 남깁니다 */
-function cleanSay(t){
+export function cleanSay(t){
   t=String(t==null?'':t).trim();
   // ```json { "answer": "..." } ``` 형태면 answer 만 뽑기
   var m=t.match(/\{[\s\S]*"answer"\s*:\s*"([\s\S]*?)"\s*,\s*"view"/);
@@ -251,8 +258,8 @@ function cleanSay(t){
   t=t.replace(/```[\s\S]*?```/g,'').trim();     // 남은 코드블록 제거
   return t;
 }
-function clearSay(){ var e=$('#aiSay'); if(e){ e.className='ai-say'; e.innerHTML=''; } }
-function localAnswer(q, note){
+export function clearSay(){ var e=$('#aiSay'); if(e){ e.className='ai-say'; e.innerHTML=''; } }
+export function localAnswer(q, note){
   clearSay();
   $('#q').value='';
   var res;
@@ -262,7 +269,7 @@ function localAnswer(q, note){
   showAnswer(q,res);
 }
 
-function onPlan(q, r){
+export function onPlan(q, r){
   if(!r || !r.ok){
     localAnswer(q, 'AI가 해석하지 못해 내장 규칙으로 답했습니다. ('+String((r&&r.error)||'?').slice(0,140)+')');
     return;
@@ -283,7 +290,7 @@ function onPlan(q, r){
   if(AICFG.narrate) requestNarrate(q, plan, res);
 }
 
-function showClarify(q, plan){
+export function showClarify(q, plan){
   // 정해진 조회 유형에 안 맞는 질문 → 데이터 요약을 주고 자유롭게 답하게 합니다
   showAnswer(q, {
     title: q, hero:'', unit:'',
@@ -311,7 +318,7 @@ function showClarify(q, plan){
 }
 
 /* ---- 자유 질문용 데이터 요약 (전부 포탈이 직접 계산) ---- */
-function buildDigest(){
+export function buildDigest(){
   var b=STATE.base, all=ST.DATA.rows.map(function(r,i){return i;});
   function tot(list,j){ return Math.round(monthlyTotal(list,j)); }
   function byKey(field){
@@ -466,7 +473,7 @@ function buildDigest(){
 }
 
 /* ---- 계산 결과를 AI에게 보내 한국어 코멘트 받기 ---- */
-function requestNarrate(q, plan, res){
+export function requestNarrate(q, plan, res){
   var box=$('#aiComment');
   box.className='ai-comment on loading'; box.textContent='코멘트를 쓰는 중…';
   var custSet={}; uniqCache('cust').forEach(function(n){ custSet[n]=1; });
@@ -500,19 +507,19 @@ function requestNarrate(q, plan, res){
 }
 
 /* ---- 이름 매칭 (표기 흔들림·오타 허용) ---- */
-function nrm(s){
+export function nrm(s){
   return String(s==null?'':s).toLowerCase()
     .replace(/주식회사|㈜|\(주\)|\(유\)|유한회사|아이앤씨/g,'')
     .replace(/[\s\-_·.,'"()\[\]\/]/g,'');
 }
-function bigr(s){ var a={}; for(var i=0;i<s.length-1;i++) a[s.substr(i,2)]=1; return a; }
-function dice(a,b){
+export function bigr(s){ var a={}; for(var i=0;i<s.length-1;i++) a[s.substr(i,2)]=1; return a; }
+export function dice(a,b){
   if(a.length<2||b.length<2) return a===b?1:0;
   var A=bigr(a),B=bigr(b),ka=Object.keys(A),kb=Object.keys(B),hit=0;
   ka.forEach(function(k){ if(B[k]) hit++; });
   return 2*hit/(ka.length+kb.length);
 }
-function resolveEntity(s, kind){
+export function resolveEntity(s, kind){
   var qn=nrm(s); if(qn.length<1) return null;
   var list=uniqCache(kind), best=null, bs=0;
   for(var i=0;i<list.length;i++){
@@ -526,8 +533,8 @@ function resolveEntity(s, kind){
   }
   return bs>=0.56 ? best : null;
 }
-var UNRESOLVED=[];
-function resolveMany(arr, kind){
+export var UNRESOLVED=[];
+export function resolveMany(arr, kind){
   var out=[];
   (arr||[]).forEach(function(s){
     var m=resolveEntity(s,kind);
@@ -538,16 +545,16 @@ function resolveMany(arr, kind){
 }
 
 /* ---- LLM 조회계획 -> 내부 파라미터 ---- */
-function ymIdx(k){
+export function ymIdx(k){
   var m=String(k||'').match(/(\d{4})\D+(\d{1,2})/);
   if(!m) return null;
   return (+m[1]-2020)*12 + (+m[2]-6);
 }
-var INTENT_MAP={sum:'sum',trend:'trend',rank:'rank',share:'share',growth:'growth',count:'count',
+export var INTENT_MAP={sum:'sum',trend:'trend',rank:'rank',share:'share',growth:'growth',count:'count',
   churn:'churn','new':'new',renew:'renew',expiring:'expiring',contracts:'contracts',compare:'compare',
   forecast:'forecast'};
 
-function planToP(plan){
+export function planToP(plan){
   UNRESOLVED=[];
   var p={raw:plan.restate||'', years:[], months:[], quarter:null, half:null, relN:null, from:null, to:null,
          lines:[], ind:null, partners:[], custs:[], partner:null, cust:null, statuses:[],
@@ -600,11 +607,11 @@ function planToP(plan){
 
 /* ---------- 규칙형 해석기 (외부 호출 0) ---------- */
 
-var STOP = {'매출':1,'실적':1,'금액':1,'얼마':1,'올해':1,'작년':1,'내년':1,'추이':1,'비중':1,'순위':1,
+export var STOP = {'매출':1,'실적':1,'금액':1,'얼마':1,'올해':1,'작년':1,'내년':1,'추이':1,'비중':1,'순위':1,
   '고객':1,'고객사':1,'파트너':1,'산업군':1,'해지':1,'신규':1,'재약정':1,'계약':1,'만료':1,'성장':1,
   '알려줘':1,'보여줘':1,'어때':1,'누구':1,'누가':1,'어디':1,'상위':1,'최근':1,'요즘':1,'기준':1,'현재':1};
 
-var RX = {
+export var RX = {
   money:  /매출|매액|매상|금액|돈|수익|실적|얼마|얼만|얼마야|얼마니|얼마냐|얼마임|얼마정도|어느정도|얼마나돼|얼마나됨|얼마나했|얼마했|총액|총합|합계|누적|다합|달성|벌었|벌어|버는|벌고|번돈|판매|세일즈|수입|수주액|계약액|매출액수|mrr|arr|나왔|찍었|찍은|규모|외형|볼륨|토탈|얼마치/,
   count:  /몇(건|곳|개|군데|개사|명|사|업체|회사|고객|사이트)|건수|개수|고객수|고객사수|업체수|회사수|거래처수|계정수|계약수|사이트수|라이브|live|활성|액티브|active|유지중|유지되|구독중|사용중|이용중|운영중|살아있|남아있|총고객|전체고객|몇이|숫자|얼마나많|얼마나되는|몇군데/,
   growth: /성장|성장률|성장세|증가율|증감|늘었|늘어|늘었나|늘고|늘어난|줄었|줄어|줄고|줄어든|올랐|올라갔|떨어졌|떨어져|감소|상승|하락|증가|급증|급감|추락|껑충|yoy|전년대비|작년대비|작년보다|전년비|재작년보다|얼마나컸|얼마나늘|얼마나줄|몇프로늘|몇퍼늘|몇프로줄|몇프로|몇퍼센트|좋아졌|나빠졌|개선|악화|커졌|작아졌|배로|갑절|반토막|성장중|주춤|정체/,
@@ -627,13 +634,13 @@ var RX = {
   bizvs:  /비즈포탈|비즈포털|회계매출|대사|매출차이|차액|왜다르|왜달라|안맞|불일치/
 };
 
-function nrmQ(s){ return String(s||'').toLowerCase().replace(/\s+/g,''); }
-function stripJosa(t){
+export function nrmQ(s){ return String(s||'').toLowerCase().replace(/\s+/g,''); }
+export function stripJosa(t){
   return String(t).replace(/(은|는|이|가|을|를|의|에서|에게|에|도|랑|이랑|와|과|보다|만|까지|부터|한테|께|로|으로)$/,'');
 }
 
 /** 문장에서 고객사/파트너 이름을 찾아냅니다 (표기 흔들림·오타 허용) */
-function findEntities(q, kind){
+export function findEntities(q, kind){
   var list = uniqCache(kind), qn = nrm(q), out = [];
   list.slice().sort(function(a,b){ return nrm(b).length - nrm(a).length; }).forEach(function(n){
     var nn = nrm(n);
@@ -653,9 +660,9 @@ function findEntities(q, kind){
   return bs >= 0.62 ? [best] : [];
 }
 
-var Q_LAST = null;
+export var Q_LAST = null;
 
-function parseQ(q){
+export function parseQ(q){
   var p = parseRaw(q);
   if (Q_LAST && isFollowUp(q, p)) p = mergeP(Q_LAST, p);
   p.restate = describeP(p);
@@ -663,7 +670,7 @@ function parseQ(q){
   return p;
 }
 
-function isFollowUp(q, p){
+export function isFollowUp(q, p){
   var s = nrmQ(q).replace(/[?!.]+$/,'');
   if (/^(그럼|그러면|그리고|그건|여기서|이중에|거기서|그다음|반대로|그러면요)/.test(s)) return true;
   var hasPeriod = p.years.length || p.months.length || p.quarter || p.half || p.relN || p.from != null;
@@ -672,7 +679,7 @@ function isFollowUp(q, p){
   return /(별로|별|만|은|는|도|쪽)$/.test(s) || s.length <= 5;
 }
 
-function mergeP(prev, cur){
+export function mergeP(prev, cur){
   var m = {};
   Object.keys(prev).forEach(function(k){ m[k] = prev[k]; });
   ['years','months','lines','partners','custs'].forEach(function(k){ if (cur[k] && cur[k].length) m[k] = cur[k]; });
@@ -685,7 +692,7 @@ function mergeP(prev, cur){
   return m;
 }
 
-function parseRaw(q){
+export function parseRaw(q){
   var raw = q, s = nrmQ(q);
   var p = { raw: raw, years: [], months: [], quarter: null, half: null, relN: null, from: null, to: null,
     lines: [], ind: null, partners: [], custs: [], partner: null, cust: null, statuses: [],
@@ -860,7 +867,7 @@ function parseRaw(q){
 }
 
 /** 사람이 읽는 해석 문장 */
-function describeP(p){
+export function describeP(p){
   var per;
   if (p.metric === 'compare' && p.compareBy === 'year') per = '연도 비교';
   else if (p.relN) per = '최근 ' + p.relN + '개월';
@@ -891,7 +898,7 @@ function describeP(p){
 }
 
 /** 못 알아들었을 때 띄울 후보 질문 */
-function suggestFor(p){
+export function suggestFor(p){
   var out = [];
   var who = p.custs[0] || p.partners[0] || (p.lines[0] || '');
   if (who) { out.push(who + ' 매출 추이'); out.push(who + ' 계약 만료 예정'); }
@@ -902,11 +909,11 @@ function suggestFor(p){
   return out.filter(function(v,i,a){ return a.indexOf(v) === i; }).slice(0, 4);
 }
 
-var _uc={};
-function uniqCache(k){ if(!_uc[k]) _uc[k]=uniq(function(r){return r[k];}); return _uc[k]; }
+export var _uc={};
+export function uniqCache(k){ if(!_uc[k]) _uc[k]=uniq(function(r){return r[k];}); return _uc[k]; }
 
 /* ---------- 입력 자동완성 ---------- */
-var TEMPLATES = [
+export var TEMPLATES = [
   '올해 매출 어때?','작년보다 얼마나 늘었어?','최근 6개월 추이 보여줘','제일 큰 고객 누구야?',
   '파트너별 top10','산업군별 비중','공공 비중이 얼마나 돼?','올해 해지 고객 몇 곳?',
   '해지 사유 알려줘','곧 재약정 챙겨야 할 데 있어?','6개월 내 만료 계약','제일 큰 계약 5개',
@@ -914,9 +921,9 @@ var TEMPLATES = [
   '월평균 얼마야?','역대 총매출','하위 5개 파트너','연내 만료되는 계약','live 고객사 수',
   'LG로 판매한 거 뭐 있어?','비즈포탈이랑 차이 왜 나?','효자 제품 뭐야?','클라우드 고객 몇 곳?'
 ];
-var SUG = { items: [], sel: -1 };
+export var SUG = { items: [], sel: -1 };
 
-function setupSuggest(){
+export function setupSuggest(){
   var q = $('#q'), box = $('#sug'), t;
   q.oninput = function(){ clearTimeout(t); var v = this.value; t = setTimeout(function(){ renderSuggest(v); }, 90); };
   q.onfocus = function(){ if (this.value.trim()) renderSuggest(this.value); };
@@ -932,14 +939,14 @@ function setupSuggest(){
     }
   };
 }
-function hideSuggest(){ $('#sug').classList.remove('on'); SUG.sel = -1; }
-function moveSel(d){
+export function hideSuggest(){ $('#sug').classList.remove('on'); SUG.sel = -1; }
+export function moveSel(d){
   var n = SUG.items.length; if (!n) return;
   SUG.sel = (SUG.sel + d + n + 1) % (n + 1) - 1;
   if (SUG.sel < 0) SUG.sel = d > 0 ? 0 : n - 1;
   $$('#sug .it').forEach(function(el2,i){ el2.classList.toggle('sel', i === SUG.sel); });
 }
-function renderSuggest(v){
+export function renderSuggest(v){
   var box = $('#sug');
   var s = String(v || '').trim();
   if (s.length < 1) { hideSuggest(); return; }
@@ -987,7 +994,7 @@ function renderSuggest(v){
   });
   box.classList.add('on');
 }
-function hl(text, term){
+export function hl(text, term){
   var t = esc(text), tn = nrm(text), qn = nrm(term);
   var i = tn.indexOf(qn);
   if (i < 0 || !qn) return t;
@@ -997,7 +1004,7 @@ function hl(text, term){
   return esc(text.slice(0,j)) + '<b>' + esc(text.slice(j, j+term.length)) + '</b>' + esc(text.slice(j+term.length));
 }
 
-function monthFilter(p){
+export function monthFilter(p){
   // 반환: 월 인덱스 배열
   if(p.relN){ var a=[]; for(var i=Math.max(0,STATE.base-p.relN+1); i<=STATE.base; i++) a.push(i); return a; }
   if(p.from!=null && p.to!=null){ var b=[]; for(var j=Math.max(0,p.from); j<=Math.min(ST.M-1,p.to); j++) b.push(j); return b.length?b:null; }
@@ -1014,7 +1021,7 @@ function monthFilter(p){
   if(!years && !p.months.length && !p.quarter && !p.half) return null; // 기간 미지정
   return out;
 }
-function rowFilter(p){
+export function rowFilter(p){
   return ST.DATA.rows.map(function(r,i){return i;}).filter(function(i){
     var r=ST.DATA.rows[i];
     if(p.lines.length && p.lines.indexOf(r.line)<0) return false;
@@ -1029,7 +1036,7 @@ function rowFilter(p){
     return true;
   });
 }
-function scopeText(p){
+export function scopeText(p){
   var t=[];
   if(p.ptns && p.ptns.length) t.push('파트너 '+p.ptns.join('+'));
   if(p.years.length) t.push(p.years.join(', ')+'년');
@@ -1049,7 +1056,7 @@ function scopeText(p){
   return t.length? t.join(' · ') : '전체 기간 · 전체 라인';
 }
 
-function runQuery(q){
+export function runQuery(q){
   var p = parseQ(q);
   if (p.avg && !p.years.length && p.from == null && !p.relN && !p.quarter && !p.half) p.relN = 12;
   var res = computeFromP(p);
@@ -1058,7 +1065,7 @@ function runQuery(q){
   return res;
 }
 
-function computeFromP(p){
+export function computeFromP(p){
   var q0 = String(p.raw||'').toLowerCase().replace(/\s+/g,'');
   if(RX.lgu.test(q0) && ST.DATA.lg && ST.DATA.lg.ok){
     var lg=ST.DATA.lg;
@@ -1420,9 +1427,9 @@ function computeFromP(p){
     note: js2? '' : '기간을 지정하지 않아 기준월 기준으로 답했습니다. "2025년" 처럼 연도를 넣으면 합계로 계산합니다.'
   };
 }
-function gbLabel(k){ return {partner:'파트너',biller:'계산서 발행처',ind:'산업군',line:'서비스',cust:'고객사',churn:'해지 사유',month:'월',year:'연도',channel:'사업 영역',status:'계약 상태'}[k]||k; }
+export function gbLabel(k){ return {partner:'파트너',biller:'계산서 발행처',ind:'산업군',line:'서비스',cust:'고객사',churn:'해지 사유',month:'월',year:'연도',channel:'사업 영역',status:'계약 상태'}[k]||k; }
 
-function showAnswer(q,res){
+export function showAnswer(q,res){
   revealAnswer();
   var ph=document.getElementById('ansPin');
   if(!ph){
@@ -1446,7 +1453,7 @@ function showAnswer(q,res){
 }
 
 /* 답변의 숫자·그래프·표 부분 (대화 답변 아래에 붙습니다) */
-function renderAnswerBody(res, q){
+export function renderAnswerBody(res, q){
   $('#ansTitle').textContent=shortQ(res.title||'');
   $('#ansHero').innerHTML=esc(res.hero)+(res.unit?'<span class="u">'+res.unit+'</span>':'');
   $('#ansSub').textContent=res.sub||'';

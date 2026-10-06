@@ -1,24 +1,26 @@
 /* ===== admin.js — 관리자(계정·권한·MFA 정책) · 배포·운영 · AI 점검 · 내 계정 · 수령처 =====
-   포탈 본체(js/app.js)를 ④ 아키텍처 2단계(㊿+136)에서 기능별로 나눈 파일. 전역 var/function 그대로 — 즉시 실행 문장은 전부 js/init.js 에.
-   로드 순서는 index.html <meta name="app-js"> (js/load.js 가 그 순서대로 ?v=APP_VER 를 붙여 불러옴) */
+   ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
+import { APP_VER, IS_STAGING, ST } from './state.js';
+import { $, applyPerms, axTime, curLook, doLogout, IDLE_KEY, IDLE_OPTS, idleLabel, idleMin, idleTouch, loadPerms, LOOKS, mfaCardRender, navText,
+  PERM_EXEMPT, pwaHintHtml, pwaInstall, SB_KEY, SB_URL, sessRead, setLook, STATE } from './core.js';
+import { cacheDrop, idxDate, ROLE_VIEWS, sbTry, sbWrite, thisMonthStr, toast, todayStr } from './shell.js';
+import { esc } from './dash.js';
+import { aiFetch, buildDigest } from './ai.js';
+import { applyCodes, CODE_KIND, CODE_KIND_LABEL, CODE_KIND_NOTE } from './grids.js';
+import { navSub, openMenuEdit } from './tools.js';
+import { UPD, updFetch, updOpenAll, updShow, updSyncSeed } from './upd.js';
+import { switchView, xlsxAoa } from './grid.js';
+import { logChange, openOvl, setAuthTab } from './edit.js';
 
 
 /* ===== 관리자 (super_admin 전용) — 계정·권한 관리 ===== */
-var AX_ROLES=['super_admin','admin','admin_viewer','poc','equipment_poc'];
-var AX_ROLE_KO={super_admin:'슈퍼 관리자',admin:'관리자 (조회+수정)',admin_viewer:'관리자-조회 전용',
+export var AX_ROLES=['super_admin','admin','admin_viewer','poc','equipment_poc'];
+export var AX_ROLE_KO={super_admin:'슈퍼 관리자',admin:'관리자 (조회+수정)',admin_viewer:'관리자-조회 전용',
   poc:'PoC 전용',equipment_poc:'장비·PoC 전용',
   editor:'(구) 편집자→관리자',viewer:'(구) 조회→관리자-조회',equipment:'(구) 장비→장비·PoC'};
-var AX_USERS=[];
-function axMsg(t,bad){ var e=$('#axMsg'); e.textContent=t||''; e.style.color=bad?'var(--critical)':'var(--ink-2)'; }
-/* DB의 UTC 시각 → 보는 사람 시간대(한국이면 KST)로 */
-function axTime(v){
-  if(!v) return '·';
-  var d=new Date(/[zZ]|[+\-]\d\d:?\d\d$/.test(String(v))? v : v+'Z');   // 시간대 없으면 UTC 로 간주
-  if(isNaN(d)) return String(v).replace('T',' ').slice(0,16);
-  var p=function(n){ return (n<10?'0':'')+n; };
-  return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes());
-}
-async function adminFetch(payload){
+export var AX_USERS=[];
+export function axMsg(t,bad){ var e=$('#axMsg'); e.textContent=t||''; e.style.color=bad?'var(--critical)':'var(--ink-2)'; }
+export async function adminFetch(payload){
   var r=await fetch(SB_URL+'/functions/v1/admin',{
     method:'POST',
     headers:{'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+(ST.SB_TOKEN||'')},
@@ -35,22 +37,22 @@ async function adminFetch(payload){
    · 함수가 ① 로그인 ② OPS_OWNER(지정 계정) ③ super_admin ④ PIN 을 전부 검사 — 화면은 슈퍼 관리자에게만 보이지만 실제 열쇠는 함수 쪽.
    · 탭: GitHub 배포(끌어다 놓기 → 커밋 · 이력 · 복원) · SQL 실행(읽기 전용 토글 · 결과 표) · Edge Function(코드 불러오기 · 배포 · Verify JWT) · 기록(ops_log)
    ──────────────────────────────────────────────────────────────────────────── */
-var OPS={tab:'gh', pin:'', st:null, files:[], msg:'', ghList:null, hist:null, histPath:'', fnList:null, fnSel:'', fnMeta:null, fnCode:'', fnName:'index.ts', fnVerify:false, sqlRes:null, busy:false, target:'prod', errs:null, health:null, aic:null, seal:null, repo:null};
-function opsPrefix(){ return OPS.target==='staging'? 'staging/' : ''; }
+export var OPS={tab:'gh', pin:'', st:null, files:[], msg:'', ghList:null, hist:null, histPath:'', fnList:null, fnSel:'', fnMeta:null, fnCode:'', fnName:'index.ts', fnVerify:false, sqlRes:null, busy:false, target:'prod', errs:null, health:null, aic:null, seal:null, repo:null};
+export function opsPrefix(){ return OPS.target==='staging'? 'staging/' : ''; }
 /* ── ㊿+143 배포 안전장치 (2026-10-04 · check.mjs 가 루트에 잘못 올라가 Actions 가 두 번 실패한 일 뒤) ──
    ① 파일 하나만 끌어 넣어도 자리를 맞춤: check/smoke/lib.mjs → tests/ · *.test.ts·_mock.ts → tests/fn/ · deploy.yml → .github/workflows/ · worker.js → cloudflare/quote-worker/
    ② «저장소 파일»(.github·supabase·cloudflare·tests/fn·README·package.json·.gitignore)은 스테이징을 골라도 루트로 — 승격으로 옮겨지지 않고 CI 는 루트만 봄
    ③ .github/workflows/* 는 포탈 토큰에 Workflows 권한이 없어 커밋에서 빼고 «복사 · GitHub 에서 열기»로 안내
    ④ 커밋 전 경고: 루트에 .mjs/.ts/.yml 이 놓임 · 포탈이 불러오지 않는 js/ 파일
    ⑤ 🧹 저장소 점검: 안 쓰는 파일 · 스테이징에만 있는 저장소 파일 · 루트에 없는 저장소 파일 · deploy.yml 상태 → 정리(gh_delete) */
-var OPS_REPO_RE=/^(\.github\/|supabase\/|cloudflare\/|tests\/fn\/|README\.md$|package(-lock)?\.json$|\.gitignore$)/;
-var OPS_WF_RE=/^\.github\/workflows\//;
-var OPS_REPO_NEED=['tests/fn/_mock.ts','tests/fn/ops.test.ts','tests/fn/remind.test.ts','tests/fn/aicheck.test.ts','tests/fn/quote-worker.test.ts','supabase/functions/ops/index.ts','supabase/functions/remind/index.ts','supabase/functions/aicheck/index.ts','cloudflare/quote-worker/worker.js','README.md'];
-function opsRepoFile(p){ return OPS_REPO_RE.test(String(p||'')); }
-function opsDest(p){ return (OPS.target==='staging' && !opsRepoFile(p))? 'staging/'+p : p; }
-function opsRepoName(){ return (OPS.st&&OPS.st.github&&OPS.st.github.repo)||'hyungwoos/svc'; }
-function opsRepoBranch(){ return (OPS.st&&OPS.st.github&&OPS.st.github.branch)||'main'; }
-function opsAutoPath(p){
+export var OPS_REPO_RE=/^(\.github\/|supabase\/|cloudflare\/|tests\/fn\/|README\.md$|package(-lock)?\.json$|\.gitignore$)/;
+export var OPS_WF_RE=/^\.github\/workflows\//;
+export var OPS_REPO_NEED=['tests/fn/_mock.ts','tests/fn/ops.test.ts','tests/fn/remind.test.ts','tests/fn/aicheck.test.ts','tests/fn/quote-worker.test.ts','supabase/functions/ops/index.ts','supabase/functions/remind/index.ts','supabase/functions/aicheck/index.ts','cloudflare/quote-worker/worker.js','README.md'];
+export function opsRepoFile(p){ return OPS_REPO_RE.test(String(p||'')); }
+export function opsDest(p){ return (OPS.target==='staging' && !opsRepoFile(p))? 'staging/'+p : p; }
+export function opsRepoName(){ return (OPS.st&&OPS.st.github&&OPS.st.github.repo)||'hyungwoos/svc'; }
+export function opsRepoBranch(){ return (OPS.st&&OPS.st.github&&OPS.st.github.branch)||'main'; }
+export function opsAutoPath(p){
   p=String(p||'').replace(/^\/+/,'');
   if(p.indexOf('/')>=0) return {path:p};
   var dir={'check.mjs':'tests/','smoke.mjs':'tests/','lib.mjs':'tests/','load_all.json':'tests/fixture/','worker.js':'cloudflare/quote-worker/','deploy.yml':'.github/workflows/','deploy.yaml':'.github/workflows/'}[p];
@@ -59,11 +61,11 @@ function opsAutoPath(p){
   if(p==='index.ts') return {path:p, bad:'어느 함수인지 경로를 supabase/functions/<함수 이름>/index.ts 로 고치세요'};
   return {path:p};
 }
-function opsAppJs(html){
+export function opsAppJs(html){
   var m=/name="app-js" content="([^"]+)"/.exec(String(html||'')), s=m? m[1] : ((document.querySelector('meta[name="app-js"]')||{}).content||'');
-  return s.split(',').map(function(x){ return x.trim(); }).filter(Boolean).concat(['js/boot.js','js/load.js','js/sqlbox.js']);   /* sqlbox.js = 격리 칸(sqlbox.html) 전용 · ㊿+147 */
+  return s.split(',').map(function(x){ return x.trim(); }).filter(Boolean).concat(['js/sqlbox.js']);   /* sqlbox.js = 격리 칸(sqlbox.html) 전용 · ㊿+147 · ㊿+153 부터 boot.js·load.js 는 안 씀(🧹 저장소 점검이 «안 쓰는 파일» 로 보여 줌) */
 }
-function opsCheckFiles(files){   /* 커밋 전에 한 번 더 물어볼 것 */
+export function opsCheckFiles(files){   /* 커밋 전에 한 번 더 물어볼 것 */
   var warn=[], idx=files.filter(function(f){ return f.path==='index.html'; })[0], used=opsAppJs(idx&&idx.content);
   files.forEach(function(f){ var p=f.path;
     if(p.indexOf('/')<0 && /\.(mjs|ts|ya?ml|sh|py)$/i.test(p)) warn.push('· '+p+' — 저장소 맨 위(루트)에 놓입니다. 앞에 tests/ 같은 폴더가 빠지지 않았나요? (Actions 는 tests/check.mjs 를 실행)');
@@ -71,7 +73,7 @@ function opsCheckFiles(files){   /* 커밋 전에 한 번 더 물어볼 것 */
   });
   return warn;
 }
-function opsWfIssues(y){
+export function opsWfIssues(y){
   /* ㊿+144: 주석(#…) 줄은 빼고 봄 — 새 deploy.yml 의 설명 주석에 «|| echo» 글자가 있어 «실패를 덮음»으로 잘못 잡던 것 */
   var o=[]; y=String(y||'').split('\n').filter(function(l){ return !/^\s*#/.test(l); }).join('\n');
   if(/runs-on:\s*ubuntu-latest/.test(y)) o.push('runs-on: ubuntu-latest — 2026-10-19 부터 Ubuntu 26 으로 바뀌어 Playwright 설치가 깨질 수 있음 → ubuntu-24.04 로 고정');
@@ -81,10 +83,10 @@ function opsWfIssues(y){
   if(/deno run[^\n]*\|\|\s*echo/.test(y)) o.push('«deno run … || echo» 줄이 함수 테스트 실패를 덮음');
   return o;
 }
-function stagingUrl(){ var base=location.origin+location.pathname.replace(/\/staging\//,'/').replace(/[^/]*$/,''); return base+'staging/index.html'; }
-function prodUrl(){ var base=location.origin+location.pathname.replace(/\/staging\//,'/').replace(/[^/]*$/,''); return base+'index.html'; }
-function opsUrl(){ return SB_URL+'/functions/v1/ops'; }
-async function opsCall(action, body){
+export function stagingUrl(){ var base=location.origin+location.pathname.replace(/\/staging\//,'/').replace(/[^/]*$/,''); return base+'staging/index.html'; }
+export function prodUrl(){ var base=location.origin+location.pathname.replace(/\/staging\//,'/').replace(/[^/]*$/,''); return base+'index.html'; }
+export function opsUrl(){ return SB_URL+'/functions/v1/ops'; }
+export async function opsCall(action, body){
   var o=Object.assign({action:action}, body||{}); if(action!=='status') o.pin=OPS.pin;
   var r;
   try{ r=await fetch(opsUrl(), {method:'POST', headers:{'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+ST.SB_TOKEN}, body:JSON.stringify(o)}); }
@@ -94,16 +96,16 @@ async function opsCall(action, body){
   if(!j.ok) throw new Error(j.error||('실패 ('+r.status+')'));
   return j;
 }
-function opsFmtBytes(n){ n=Number(n)||0; return n>=1048576? (n/1048576).toFixed(2)+' MB' : n>=1024? Math.round(n/1024)+' KB' : n+' B'; }
-function opsVerOf(text){ var t=String(text||''); var m=/name="app-ver" content="([^"]+)"/.exec(t) || /var APP_VER='([^']+)'/.exec(t); return m? m[1] : null; }   /* ㊿+136: <meta name="app-ver"> (예전 인라인 var 도 인식) */
-function opsIsText(name){ return /\.(html?|js|mjs|ts|json|webmanifest|css|sql|md|txt|csv|svg|xml|yml|yaml|gitignore)$/i.test(name) || /^\.?gitignore$/.test(name); }
-function opsSetMsg(t, cls){ OPS.msg=t||''; OPS.msgCls=cls||''; var e=document.getElementById('opsMsg'); if(e){ e.textContent=OPS.msg; e.className='mmsg'+(OPS.msgCls? ' '+OPS.msgCls:''); } }
-function opsNeedPin(){ if(!OPS.pin){ opsSetMsg('작업 PIN 을 먼저 입력하세요 (위 PIN 칸)','bad'); var p=document.getElementById('opsPin'); if(p) p.focus(); return false; } return true; }
-async function opsStatus(){
+export function opsFmtBytes(n){ n=Number(n)||0; return n>=1048576? (n/1048576).toFixed(2)+' MB' : n>=1024? Math.round(n/1024)+' KB' : n+' B'; }
+export function opsVerOf(text){ var t=String(text||''); var m=/name="app-ver" content="([^"]+)"/.exec(t) || /var APP_VER='([^']+)'/.exec(t); return m? m[1] : null; }   /* ㊿+136: <meta name="app-ver"> (예전 인라인 var 도 인식) */
+export function opsIsText(name){ return /\.(html?|js|mjs|ts|json|webmanifest|css|sql|md|txt|csv|svg|xml|yml|yaml|gitignore)$/i.test(name) || /^\.?gitignore$/.test(name); }
+export function opsSetMsg(t, cls){ OPS.msg=t||''; OPS.msgCls=cls||''; var e=document.getElementById('opsMsg'); if(e){ e.textContent=OPS.msg; e.className='mmsg'+(OPS.msgCls? ' '+OPS.msgCls:''); } }
+export function opsNeedPin(){ if(!OPS.pin){ opsSetMsg('작업 PIN 을 먼저 입력하세요 (위 PIN 칸)','bad'); var p=document.getElementById('opsPin'); if(p) p.focus(); return false; } return true; }
+export async function opsStatus(){
   try{ OPS.st=await opsCall('status'); }catch(e){ OPS.st={ok:false, error:String(e.message||e)}; }
   renderOps(true);
 }
-function renderOps(keep){
+export function renderOps(keep){
   var host=document.getElementById('opsHost'); if(!host) return;
   if(IS_STAGING && !OPS._tgInit){ OPS.target='staging'; OPS._tgInit=true; }
   if(!window.IS_SUPER){ host.innerHTML='<p class="cap">슈퍼 관리자만 쓸 수 있습니다.</p>'; return; }
@@ -124,7 +126,7 @@ function renderOps(keep){
   if(!keep && !OPS.st) opsStatus();
 }
 /* ── GitHub ── */
-function opsGhHtml(){
+export function opsGhHtml(){
   var files=OPS.files, cur=APP_VER, stg=OPS.target==='staging';
   var h='<div class="ops-grid">';
   h+='<div><div class="ops-h" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">① 올릴 파일 <span class="mtabs" style="margin:0" id="opsTarget"><button type="button" data-tg="prod" aria-pressed="'+(!stg)+'">운영</button><button type="button" data-tg="staging" aria-pressed="'+stg+'" title="staging/ 폴더에 올라가며 …/staging/index.html 에서 열립니다 (같은 DB · 상단에 STAGING 띠)">스테이징</button></span>'+(stg? '<a class="mini" href="'+esc(stagingUrl())+'" target="_blank" rel="noopener">스테이징 열기 ↗</a>':'')+'</div>'+
@@ -155,7 +157,7 @@ function opsGhHtml(){
   return h;
 }
 /* 🧹 저장소 점검 결과 */
-function opsRepoHtml(){
+export function opsRepoHtml(){
   var R=OPS.repo; if(!R) return '';
   var del=opsRepoDeletable(), h='<div class="ops-repo" style="border:1px solid var(--ring);border-radius:10px;padding:10px 12px;margin:0 0 10px">';
   var ok=!R.unused.length && !R.stagingRepo.length && !R.missing.length && !(R.wf&&R.wf.length);
@@ -169,11 +171,11 @@ function opsRepoHtml(){
   if(del.length) h+='<div style="margin-top:8px"><button type="button" class="cbtn" id="opsRepoClean">지워도 되는 '+del.length+'개 정리(삭제 커밋)</button></div>';
   return h+'</div>';
 }
-function opsRepoDeletable(){
+export function opsRepoDeletable(){
   var R=OPS.repo; if(!R) return [];
   return R.unused.map(function(x){ return x.p; }).concat(R.stagingRepo.filter(function(x){ return x.root; }).map(function(x){ return x.p; }));
 }
-async function opsRepoCheck(){
+export async function opsRepoCheck(){
   if(!opsNeedPin() || OPS.busy) return;
   OPS.busy=true; opsSetMsg('저장소 점검 중…');
   try{
@@ -195,7 +197,7 @@ async function opsRepoCheck(){
   }catch(e){ opsSetMsg(String(e.message||e),'bad'); }
   OPS.busy=false; renderOps(true);
 }
-async function opsRepoClean(){
+export async function opsRepoClean(){
   if(!opsNeedPin() || OPS.busy) return;
   var paths=opsRepoDeletable(); if(!paths.length) return;
   if(!confirm('다음 '+paths.length+'개 파일을 저장소에서 지우는 커밋을 만듭니다 (사이트에서 쓰지 않는 파일 · Git 이력에는 남음):\n\n'+paths.slice(0,40).map(function(p){ return '· '+p; }).join('\n')+(paths.length>40? '\n… 외 '+(paths.length-40)+'개':'')+'\n\n계속할까요?')) return;
@@ -205,8 +207,8 @@ async function opsRepoClean(){
   OPS.busy=false; renderOps(true);
 }
 /* ── ③ 보안 자산: 법인 직인 — 공개 저장소(도장.jpg) 대신 Supabase Storage 비공개 버킷 private/seal.jpg (SQL 87) ── */
-var SEAL_OBJECT='private/seal.jpg';
-function opsSealHtml(){
+export var SEAL_OBJECT='private/seal.jpg';
+export function opsSealHtml(){
   var st=OPS.seal;
   return '<div class="ops-h" style="margin-top:14px">③ 보안 자산 — 법인 직인</div>'+
     '<p class="mini" style="margin:0 0 6px">견적서(quote.html)의 직인은 공개 저장소가 아니라 Storage 비공개 버킷 <b>private/seal.jpg</b> 에서 로그인한 사용자만 받습니다(SQL 87). 여기서 올린 뒤, 저장소에 남아 있는 도장.jpg 를 지우세요.</p>'+
@@ -216,7 +218,7 @@ function opsSealHtml(){
     '<button type="button" class="cbtn" id="opsSealRm" title="저장소 루트와 staging/ 의 도장.jpg 를 삭제 커밋 (Git 이력에는 남음)">저장소의 도장.jpg 삭제</button></div>'+
     (st&&st.ok&&st.url? '<div style="margin-top:6px"><img src="'+esc(st.url)+'" alt="직인 미리보기" style="height:48px;border:1px solid var(--line);border-radius:6px;background:#fff"></div>':'');
 }
-async function opsSealCheck(quiet){
+export async function opsSealCheck(quiet){
   try{
     var r=await fetch(SB_URL+'/storage/v1/object/authenticated/'+SEAL_OBJECT, {headers:{apikey:SB_KEY, Authorization:'Bearer '+ST.SB_TOKEN}});
     if(!r.ok){ var t=''; try{ t=(await r.json()).message||''; }catch(e){} OPS.seal={ok:false, error:r.status===400||r.status===404? '아직 없음 (올리기 필요)' : r.status===403? '권한 없음 — SQL 87 정책 확인' : (r.status+' '+t)}; }
@@ -225,7 +227,7 @@ async function opsSealCheck(quiet){
   if(!quiet) opsSetMsg(OPS.seal.ok? '직인이 Storage 에 있습니다':'직인: '+OPS.seal.error, OPS.seal.ok?'ok':'bad');
   renderOps(true);
 }
-async function opsSealUpload(file){
+export async function opsSealUpload(file){
   if(!file) return; if(!/^image\/(jpeg|png|webp)$/.test(file.type)){ opsSetMsg('JPG · PNG · WebP 이미지만 올릴 수 있습니다','bad'); return; }
   if(file.size>2*1024*1024){ opsSetMsg('2MB 이하 이미지로 올려 주세요','bad'); return; }
   if(!confirm('«'+file.name+'» ('+opsFmtBytes(file.size)+') 을 직인으로 올립니다 (private/seal.jpg · 기존 파일은 덮어씀). 견적서에 바로 반영됩니다. 계속할까요?')) return;
@@ -238,7 +240,7 @@ async function opsSealUpload(file){
     await opsSealCheck(true); opsSetMsg('직인을 Storage 에 저장했습니다 — 이제 «저장소의 도장.jpg 삭제»를 눌러 공개 저장소에서 지우세요','ok');
   }catch(e){ opsSetMsg(String(e.message||e),'bad'); }
 }
-async function opsSealRm(){
+export async function opsSealRm(){
   if(!opsNeedPin() || OPS.busy) return;
   if(!(OPS.seal&&OPS.seal.ok) && !confirm('Storage 에 직인이 아직 확인되지 않았습니다. 저장소에서 지우면 견적서에 직인이 안 나올 수 있습니다. 그래도 지울까요?')) return;
   OPS.busy=true; opsSetMsg('저장소에서 도장 파일 찾는 중…');
@@ -252,11 +254,11 @@ async function opsSealRm(){
   }catch(e){ opsSetMsg(String(e.message||e),'bad'); }
   OPS.busy=false;
 }
-function opsAutoMsg(){
+export function opsAutoMsg(){
   var names=OPS.files.map(function(f){ return f.path; }), vers=OPS.files.map(function(f){ return f.ver; }).filter(Boolean);
   return (vers.length? '포탈 '+vers[0].replace(/^.*\s/,'')+' · ' : '')+names.join(', ')+' (포탈에서 배포)';
 }
-function opsGhBind(host){
+export function opsGhBind(host){
   host.querySelectorAll('#opsTarget button').forEach(function(b){ b.onclick=function(){ OPS.target=b.dataset.tg; OPS.commitMsg=''; renderOps(true); }; });
   var drop=host.querySelector('#opsDrop'), inp=host.querySelector('#opsFile'), finp=host.querySelector('#opsFolder');
   if(drop){
@@ -292,7 +294,7 @@ function opsGhBind(host){
     catch(e){ opsSetMsg(String(e.message||e),'bad'); b.disabled=false; } }; });
 }
 /* 끌어다 놓은 항목에 폴더가 있으면 안을 걸어 상대 경로를 유지 (tests/smoke.mjs 처럼) */
-function opsDropItems(dt){
+export function opsDropItems(dt){
   var items=dt&&dt.items? [].slice.call(dt.items) : [];
   var entries=items.map(function(it){ return it.webkitGetAsEntry? it.webkitGetAsEntry() : null; }).filter(Boolean);
   if(!entries.length || !entries.some(function(e){ return e.isDirectory; })){ opsAddFiles(dt.files); return; }
@@ -304,7 +306,7 @@ function opsDropItems(dt){
   }
   entries.forEach(function(e){ walk(e, ''); });
 }
-function opsAddFiles(list, keepPath){
+export function opsAddFiles(list, keepPath){
   var arr=[].slice.call(list||[]); if(!arr.length) return;
   arr=arr.filter(function(f){ var p=f.relPath||f.webkitRelativePath||f.name; return !/(^|\/)(\.git|node_modules|_site|\.DS_Store)(\/|$)/.test(p); });
   if(!arr.length) return;
@@ -324,7 +326,7 @@ function opsAddFiles(list, keepPath){
     if(isText) rd.readAsText(f); else rd.readAsDataURL(f);
   });
 }
-async function opsCommit(){
+export async function opsCommit(){
   if(!opsNeedPin() || !OPS.files.length || OPS.busy) return;
   var msgEl=document.getElementById('opsCommitMsg'), message=(msgEl&&msgEl.value.trim())||opsAutoMsg();
   if(OPS.files.some(function(f){ return f.path==='index.ts'; })){ opsSetMsg('index.ts 의 경로를 supabase/functions/<함수 이름>/index.ts 로 고친 뒤 커밋하세요','bad'); return; }
@@ -351,7 +353,7 @@ async function opsCommit(){
   }catch(e){ opsSetMsg(String(e.message||e),'bad'); }
   OPS.busy=false; if(bt) bt.disabled=false;
 }
-async function opsCopy(src, dst){
+export async function opsCopy(src, dst){
   if(!opsNeedPin() || OPS.busy) return;
   var promote=(src==='staging');
   var qaLine=promote? (QA.res? (QA.res.fail? '\n\n⚠ 스테이징 QA 에서 '+QA.res.fail+'건 실패('+QA.res.verS+') — 그래도 승격할까요?' : '\n\n✅ 스테이징 QA 통과 '+QA.res.pass+'/'+QA.res.total+' ('+QA.res.verS+')') : '\n\n⚠ 스테이징 QA 를 아직 실행하지 않았습니다 — «🧪 스테이징 QA» 로 먼저 점검하는 것을 권합니다') : '';
@@ -362,7 +364,7 @@ async function opsCopy(src, dst){
   OPS.busy=false;
 }
 /* ── 시스템 점검: 포탈이 의존하는 것들이 살아 있는지 한 번에 (운영 DB 는 읽기 전용 select 1 만) ── */
-async function opsHealth(){
+export async function opsHealth(){
   var out=[], t=function(){ return Date.now(); };
   async function step(name, fn){ var t0=t(); try{ var r=await fn(); out.push({name:name, ok:true, ms:t()-t0, info:r||''}); }catch(e){ out.push({name:name, ok:false, ms:t()-t0, info:String(e.message||e).slice(0,140)}); } }
   OPS.health={running:true, rows:out}; renderOps(true);
@@ -375,12 +377,12 @@ async function opsHealth(){
   await step('서비스 워커', async function(){ if(!('serviceWorker' in navigator)) return '미지원'; var reg=await navigator.serviceWorker.getRegistration(); return reg? (reg.active? '활성':'등록됨') : '없음 (file:// 또는 미등록)'; });
   OPS.health={running:false, rows:out, at:new Date()}; renderOps(true);
 }
-async function opsLoadErrors(){
+export async function opsLoadErrors(){
   try{ var rows=await sbTry('client_errors?select=at,email,ver,view,msg,url,n&order=at.desc&limit=30'); OPS.errs=rows||[]; }catch(e){ OPS.errs=[]; }
   renderOps(true);
 }
 /* ── SQL ── */
-function opsSqlHtml(){
+export function opsSqlHtml(){
   var res=OPS.sqlRes;
   var h='<div class="ops-h">SQL 실행 — Supabase Management API (SQL Editor 와 같은 경로) · 여러 문장·DO 블록 가능 · 결과는 마지막 문장 기준</div>';
   h+='<textarea id="opsSql" class="ops-ta" spellcheck="false" placeholder="-- 제가 드린 sql8N 파일을 그대로 붙여 넣으세요&#10;select now();">'+esc(OPS.sql||'')+'</textarea>';
@@ -396,7 +398,7 @@ function opsSqlHtml(){
   }
   return h;
 }
-function opsSqlInfo(sql){
+export function opsSqlInfo(sql){
   var body=String(sql||'').replace(/--[^\n]*/g,'').replace(/\$[a-z0-9_]*\$[\s\S]*?\$[a-z0-9_]*\$/gi,'$$…$$');
   var n=body.split(/;\s*(?:\n|$)/).filter(function(s){ return s.trim(); }).length;
   var t={}; var re=/\b(?:from|join|update|into|table(?:\s+if\s+(?:not\s+)?exists)?|truncate|drop\s+table(?:\s+if\s+exists)?)\s+(?:only\s+)?((?:public\.)?[a-z_][a-z0-9_]*)/gi, m;
@@ -404,7 +406,7 @@ function opsSqlInfo(sql){
   var danger=/\b(drop\s+(table|schema|function)|truncate|delete\s+from)\b/i.test(body);
   return (n? n+'개 문장' : '')+(Object.keys(t).length? ' · 표: '+Object.keys(t).slice(0,8).join(', ') : '')+(danger? ' · ⚠ 삭제/드롭 포함':'');
 }
-function opsSqlBind(host){
+export function opsSqlBind(host){
   var ta=host.querySelector('#opsSql'), info=host.querySelector('#opsSqlInfo');
   ta.oninput=function(){ OPS.sql=ta.value; if(info) info.textContent=opsSqlInfo(ta.value); };
   ta.onkeydown=function(e){ if((e.ctrlKey||e.metaKey) && e.key==='Enter'){ e.preventDefault(); opsSqlRun(); } if(e.key==='Tab'){ e.preventDefault(); var s=ta.selectionStart; ta.value=ta.value.slice(0,s)+'  '+ta.value.slice(ta.selectionEnd); ta.selectionStart=ta.selectionEnd=s+2; OPS.sql=ta.value; } };
@@ -412,7 +414,7 @@ function opsSqlBind(host){
   host.querySelector('#opsSqlGo').onclick=opsSqlRun;
   var x=host.querySelector('#opsSqlXls'); if(x) x.onclick=function(){ var rows=OPS.sqlRes.rows||[]; var cols=Object.keys(rows[0]||{}); xlsxAoa('sql_결과_'+todayStr(), cols, rows.map(function(r){ return cols.map(function(c){ var v=r[c]; return v!=null&&typeof v==='object'? JSON.stringify(v) : v; }); })); };
 }
-async function opsSqlRun(){
+export async function opsSqlRun(){
   if(!opsNeedPin() || OPS.busy) return;
   var sql=(OPS.sql||'').trim(); if(!sql){ opsSetMsg('SQL 을 입력하세요','bad'); return; }
   var info=opsSqlInfo(sql), ro=!!OPS.sqlRO;
@@ -423,7 +425,7 @@ async function opsSqlRun(){
   OPS.busy=false;
 }
 /* ── Edge Function ── */
-function opsFnHtml(){
+export function opsFnHtml(){
   var L=OPS.fnList, sel=OPS.fnSel, meta=OPS.fnMeta;
   var h='<div class="ops-grid"><div><div class="ops-h">① 함수</div>';
   h+='<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><button type="button" class="pill ghost" id="opsFnList">목록 불러오기</button>';
@@ -438,7 +440,7 @@ function opsFnHtml(){
   h+='</div><div><div class="ops-h">배포 메모</div><ul class="mini" style="margin:0;padding-left:16px;line-height:1.7"><li>슬러그(이름)는 URL 이 됩니다 — <code>…/functions/v1/슬러그</code>. 한 번 만들면 못 바꿉니다.</li><li>Verify JWT 는 ask·remind·ops 모두 <b>OFF</b> — 함수가 직접 로그인 토큰을 검사합니다. ON 이면 포탈에서 Failed to fetch.</li><li>Secrets 를 바꾼 뒤에는 그 함수를 다시 배포해야 새 값을 읽습니다.</li><li>배포 뒤 10~20초 지나서 포탈에서 호출해 보세요.</li></ul></div></div>';
   return h;
 }
-function opsFnBind(host){
+export function opsFnBind(host){
   var lb=host.querySelector('#opsFnList'); if(lb) lb.onclick=async function(){ if(!opsNeedPin()) return; opsSetMsg('함수 목록 읽는 중…'); try{ var r=await opsCall('fn_list'); OPS.fnList=r.functions; opsSetMsg(r.functions.length+'개','ok'); renderOps(true); }catch(e){ opsSetMsg(String(e.message||e),'bad'); } };
   var sel=host.querySelector('#opsFnSel'); if(sel) sel.onchange=function(){ OPS.fnSel=sel.value; OPS.fnMeta=null; OPS.fnFiles=null; var f=(OPS.fnList||[]).filter(function(x){ return x.slug===sel.value; })[0]; if(f){ OPS.fnVerify=!!f.verify_jwt; OPS.fnName=(f.entrypoint_path||'index.ts').split('/').pop(); } renderOps(true); };
   var nw=host.querySelector('#opsFnNew'); if(nw) nw.oninput=function(){ OPS.fnNew=nw.value.trim(); };
@@ -453,7 +455,7 @@ function opsFnBind(host){
   host.querySelector('#opsFnDeploy').onclick=opsFnDeploy;
   var pb=host.querySelector('#opsFnPatch'); if(pb) pb.onclick=async function(){ if(!opsNeedPin()) return; opsSetMsg('설정 저장 중…'); try{ var r=await opsCall('fn_patch',{slug:OPS.fnSel, verify_jwt:OPS.fnVerify}); opsSetMsg(r.slug+' · Verify JWT '+(r.verify_jwt?'ON':'OFF')+' 저장됨','ok'); OPS.fnList=null; }catch(e){ opsSetMsg(String(e.message||e),'bad'); } };
 }
-async function opsFnDeploy(){
+export async function opsFnDeploy(){
   if(!opsNeedPin() || OPS.busy) return;
   var slug=OPS.fnSel==='__new'? (OPS.fnNew||'') : OPS.fnSel;
   if(!/^[a-z0-9_-]{1,64}$/.test(slug)){ opsSetMsg('함수를 고르거나 새 이름(영문 소문자·숫자·-·_)을 입력하세요','bad'); return; }
@@ -472,7 +474,7 @@ async function opsFnDeploy(){
 /* ── AI 점검 (⑥ · ㊿+135): 대표 질문 15개를 실제 ask 함수에 보내고, 답에 포탈이 계산한 기대 값·단어가 들어 있는지 확인 — 배포·운영 › 기록 탭
    · 목적: 모델/함수 배포 뒤 «AI 가 여전히 숫자를 맞게 말하나»를 5분 안에 확인. 결과 요약은 change_log(ai_check)에 남겨 추이 비교.
    · 기대값은 buildDigest() 로 계산(답과 같은 데이터) — 숫자는 천원/백만원/억원 어느 표기든 인정. 질문 추가 = AI_CHECK_QS 에 한 줄 */
-function aiHasNum(a, won){
+export function aiHasNum(a, won){
   if(won==null || isNaN(won)) return true;
   var t=String(a||'').replace(/\s/g,''), cands=[], W=Number(won);
   var k=Math.round(W/1000); cands.push(String(k), k.toLocaleString('ko-KR'));
@@ -483,8 +485,8 @@ function aiHasNum(a, won){
   var ek=Number(won)/1e8; if(ek>=0.1) cands.push(ek.toFixed(1)+'억', ek.toFixed(2)+'억', (Math.round(ek*10)/10)+'억');
   return cands.some(function(c){ return c && t.indexOf(c)>=0; });
 }
-function aiHasCount(a, n){ if(n==null) return true; var t=String(a||'').replace(/\s/g,''); if(n===0) return /없|0건|0곳|0개|않습니다/.test(t); return t.indexOf(String(n))>=0; }
-var AI_CHECK_QS=[
+export function aiHasCount(a, n){ if(n==null) return true; var t=String(a||'').replace(/\s/g,''); if(n===0) return /없|0건|0곳|0개|않습니다/.test(t); return t.indexOf(String(n))>=0; }
+export var AI_CHECK_QS=[
   {q:'이번 달 MRR 얼마야?',                 l:'기준월 MRR 숫자',      exp:function(D,a){ return aiHasNum(a, D.기준월MRR); }},
   {q:'LIVE 고객사 몇 곳이야?',               l:'LIVE 고객사 수',       exp:function(D,a){ return aiHasCount(a, D.LIVE고객사수); }},
   {q:'서비스별 MRR 알려줘',                   l:'Cloud·MDR 언급',       exp:function(D,a){ return /cloud|클라우드|nac/i.test(a) && /mdr/i.test(a); }},
@@ -501,7 +503,7 @@ var AI_CHECK_QS=[
   {q:'MRR 성장률이 어때?',                   l:'퍼센트 표기',          exp:function(D,a){ return /%|퍼센트/.test(a); }},
   {q:'포탈에서 2단계 인증은 어떻게 켜?',       l:'사용법 안내(팀 지식)', exp:function(D,a){ return /내 계정|보안|인증 앱|2단계|OTP|Authenticator/i.test(a); }}
 ];
-async function aiCheckRun(){
+export async function aiCheckRun(){
   if(OPS.aic && OPS.aic.running) return;
   var D; try{ D=buildDigest(); }catch(e){ opsSetMsg('요약(digest) 계산 실패: '+e.message,'bad'); return; }
   OPS.aic={running:true, rows:AI_CHECK_QS.map(function(x){ return {q:x.q, l:x.l, st:'대기'}; }), at:null}; renderOps(true);
@@ -530,7 +532,7 @@ async function aiCheckRun(){
   toast('AI 점검 끝', pass+'/'+OPS.aic.rows.length+' 통과 · 평균 '+Math.round(OPS.aic.summary.avg_ms/1000)+'초', pass===OPS.aic.rows.length? 'ok':'warn');
   renderOps(true); aiqLoad();
 }
-function aiCheckHtml(){
+export function aiCheckHtml(){
   var A=OPS.aic;
   var h='<div class="ops-h" style="display:flex;align-items:center;gap:10px;margin-top:14px">AI 점검 (대표 질문 15개 → ask 함수 → 기대값 확인) <button type="button" class="cbtn" id="opsAiCheck"'+(A&&A.running? ' disabled':'')+'>'+(A&&A.running? '점검 중…':'15문 점검 실행')+'</button>'+
     (A&&A.summary? '<span class="mini">'+A.summary.pass+'/'+A.summary.total+' 통과 · 평균 '+Math.round(A.summary.avg_ms/1000)+'초'+(A.summary.cut? ' · 예산 초과/축약 '+A.summary.cut:'')+(A.summary.models.length? ' · '+esc(A.summary.models.join(', ')):'')+' · '+esc(String(A.at||'').replace('T',' ').slice(0,16))+'</span><button type="button" class="cbtn" id="opsAiXlsx">엑셀</button>':'')+'</div>';
@@ -541,15 +543,15 @@ function aiCheckHtml(){
   return h;
 }
 /* ===== AI 품질 (SQL 94 · ㊿+139): 점검 추이(포탈 수동 + 야간 자동 aicheck) · 👎 피드백 목록 ===== */
-var AIQ={trend:null, fb:null, loading:false};
-async function aiqLoad(){
+export var AIQ={trend:null, fb:null, loading:false};
+export async function aiqLoad(){
   if(AIQ.loading) return; AIQ.loading=true;
   var t=await sbTry('ai_check_log?select=run_at,source,pass,total,avg_ms,model,fails&order=run_at.desc&limit=7');
   var f=await sbTry('ai_feedback?select=created_at,email,verdict,question,answer_head,note&order=created_at.desc&limit=30');
   AIQ.trend=t||[]; AIQ.fb=f||[]; AIQ.loading=false; AIQ.at=Date.now();
   if(ST.CUR_VIEW==='ops' && OPS.tab==='log') renderOps(true);
 }
-function aiqHtml(){
+export function aiqHtml(){
   var T=AIQ.trend, F=AIQ.fb;
   var h='<div class="ops-h" style="display:flex;align-items:center;gap:10px;margin-top:14px">AI 점검 추이 <span class="mini">(포탈 15문 + 야간 자동 aicheck · 최근 7회)</span> <button type="button" class="cbtn" id="aiqReload">↻</button></div>';
   if(T===null) h+='<p class="mini" style="margin:0 0 14px">불러오는 중…</p>';
@@ -566,13 +568,13 @@ function aiqHtml(){
       return '<tr><td class="mini">'+esc(String(x.created_at||'').replace('T',' ').slice(0,16))+'</td><td class="nw">'+(x.verdict==='up'? '👍':'👎')+'</td><td class="q-col">'+esc(x.question||'')+'</td><td class="mini wrap ans-col">'+esc(String(x.answer_head||'').slice(0,110))+'</td><td class="mini wrap" style="--td-min:120px">'+esc(x.note||'')+'</td><td class="mini">'+esc(String(x.email||'').split('@')[0])+'</td></tr>'; }).join('')+'</tbody></table>'; }
   return h;
 }
-function aiCheckBind(host){
+export function aiCheckBind(host){
   var q=host.querySelector('#aiqReload'); if(q) q.onclick=function(){ AIQ.trend=null; AIQ.fb=null; renderOps(true); aiqLoad(); };
   if(AIQ.trend===null && !AIQ.loading) aiqLoad();
   var b=host.querySelector('#opsAiCheck'); if(b) b.onclick=aiCheckRun;
   var x=host.querySelector('#opsAiXlsx'); if(x) x.onclick=function(){ var A=OPS.aic; if(!A) return; xlsxAoa('AI점검_'+String(A.at||'').slice(0,10), ['#','질문','기대','결과','시간(s)','모델','도구','답'], A.rows.map(function(r,i){ return [i+1, r.q, r.l, r.st, r.ms? +(r.ms/1000).toFixed(1):'', r.model||'', r.tools||0, r.text||'']; })); };
 }
-function opsLogHtml(){
+export function opsLogHtml(){
   var st=OPS.st, L=(st&&st.ok&&st.recent)||[], H=OPS.health, E=OPS.errs;
   var h='<div class="ops-h" style="display:flex;align-items:center;gap:10px">시스템 점검 <button type="button" class="cbtn" id="opsHealth"'+(H&&H.running? ' disabled':'')+'>'+(H&&H.running? '점검 중…':'지금 점검')+'</button>'+(H&&H.at? '<span class="mini">'+esc(H.at.toLocaleTimeString('ko-KR'))+'</span>':'')+'</div>';
   if(H && H.rows.length) h+='<table class="rn-tbl" style="margin-bottom:14px"><tbody>'+H.rows.map(function(r){ return '<tr><td style="width:240px">'+esc(r.name)+'</td><td>'+(r.ok? '<span class="up">✓</span>':'<span style="color:var(--critical)">✗</span>')+' '+esc(r.info)+'</td><td class="n mini">'+r.ms+'ms</td></tr>'; }).join('')+'</tbody></table>';
@@ -592,14 +594,14 @@ function opsLogHtml(){
   return h;
 }
 /* ㊿+141: 기록의 «대상»이 파일 수십 개(콤마 목록)면 표가 카드 밖으로 3,000px 넘게 밀려나던 문제 — 공통 폴더 + 개수 + 앞 3개로 줄이고, 누르면 전체 */
-function opsTgtHtml(t){
+export function opsTgtHtml(t){
   t=String(t||''); var parts=t.split(/,\s*/).filter(Boolean);
   if(parts.length<=3) return esc(t);
   var m=/^([^\/]+\/)/.exec(parts[0]), pre=(m && parts.every(function(p){ return p.indexOf(m[1])===0; }))? m[1] : '';
   var names=parts.map(function(p){ return pre? p.slice(pre.length) : p; });
   return '<details class="ops-tgt"><summary>'+(pre? '<b>'+esc(pre)+'</b> ':'')+'파일 '+names.length+'개 — '+esc(names.slice(0,3).join(', '))+' …</summary><div class="mini">'+esc(names.join(', '))+'</div></details>';
 }
-function opsLogBind(host){
+export function opsLogBind(host){
   aiCheckBind(host);
   var hb=host.querySelector('#opsHealth'); if(hb) hb.onclick=opsHealth;
   var eb=host.querySelector('#opsErrs'); if(eb) eb.onclick=opsLoadErrors;
@@ -607,14 +609,14 @@ function opsLogBind(host){
 
 /* ㊿+149 관리자 화면 탭 4개 (사용자: «너무 지저분 · 스크롤 많고 난잡») — 계정·권한 / 보안 / 설정(코드 관리·업데이트 안내) / AI 비용
    · 메뉴를 누르면 첫 탭(viewReset · VIEW_UI.adminx.ADM) · 뒤로가기는 보던 탭 · 데이터는 예전처럼 한 번에 읽고 보이는 탭만 바꿈 */
-var ADM={tab:'acct'};
-function admTab(t){
+export var ADM={tab:'acct'};
+export function admTab(t){
   if(t) ADM.tab=t;
   if(!document.querySelector('#viewAdmin .adm-pane[data-pane="'+ADM.tab+'"]')) ADM.tab='acct';
   document.querySelectorAll('#admTabs button').forEach(function(b){ b.setAttribute('aria-pressed', String(b.dataset.t===ADM.tab)); });
   document.querySelectorAll('#viewAdmin .adm-pane').forEach(function(p){ p.hidden=(p.dataset.pane!==ADM.tab); });
 }
-function renderAdmin(){
+export function renderAdmin(){
   if(!window.IS_SUPER){ switchView('dash'); return; }
   var tb=document.getElementById('admTabs');
   if(tb && !tb.__bound){ tb.__bound=1; tb.querySelectorAll('button').forEach(function(b){ b.onclick=function(){ admTab(b.dataset.t); try{ scrollTo(0,0); }catch(e){} }; }); }
@@ -637,8 +639,8 @@ function renderAdmin(){
   abLoad();
 }
 /* ── 메뉴 권한 (user_perms · SQL 79) — 계정마다 보기/읽기/쓰기, 슈퍼 관리자만 ── */
-var AP={user:'', rows:{}, bound:false};
-function apMenus(){
+export var AP={user:'', rows:{}, bound:false};
+export function apMenus(){
   var out=[], grp='';
   Array.prototype.forEach.call($('#side').children, function(el){
     if(el.classList && el.classList.contains('grp')){ grp=el.textContent.trim(); return; }
@@ -648,9 +650,9 @@ function apMenus(){
   });
   return out;
 }
-function apRoleOf(email){ var u=(AX_USERS||[]).filter(function(x){ return String(x.email||'').toLowerCase()===String(email||'').toLowerCase(); })[0]; return u? (u.role||'') : ''; }
-function apDefault(role){ return (role==='admin_viewer'||role==='viewer')? {v:true,r:true,w:false} : {v:true,r:true,w:true}; }
-function apFillUsers(){
+export function apRoleOf(email){ var u=(AX_USERS||[]).filter(function(x){ return String(x.email||'').toLowerCase()===String(email||'').toLowerCase(); })[0]; return u? (u.role||'') : ''; }
+export function apDefault(role){ return (role==='admin_viewer'||role==='viewer')? {v:true,r:true,w:false} : {v:true,r:true,w:true}; }
+export function apFillUsers(){
   var sel=$('#apUser'), cp=$('#apCopy'); if(!sel) return;
   var cur=sel.value;
   var opts=(AX_USERS||[]).slice().sort(function(a,b){ return String(a.email||'').localeCompare(String(b.email||'')); })
@@ -658,12 +660,12 @@ function apFillUsers(){
   sel.innerHTML='<option value="">계정 선택…</option>'+opts; sel.value=cur;
   if(cp){ cp.innerHTML='<option value="">다른 계정 설정 복사…</option>'+opts; }
 }
-async function apFetch(email){
+export async function apFetch(email){
   var rows=await sbTry('user_perms?select=view,can_view,can_read,can_write&email=eq.'+encodeURIComponent(String(email).toLowerCase()));
   var m={}; (rows||[]).forEach(function(r){ m[r.view]={v:r.can_view!==false, r:r.can_read!==false, w:!!r.can_write}; });
   return {map:m, n:(rows||[]).length};
 }
-async function apLoadUser(email){
+export async function apLoadUser(email){
   AP.user=email; AP.rows={};
   var role=apRoleOf(email), d=apDefault(role);
   $('#apRole').textContent=email? ('역할: '+(AX_ROLE_KO[role]||role||'권한 없음')) : '';
@@ -676,14 +678,14 @@ async function apLoadUser(email){
   }catch(e){ $('#apMsg').textContent='읽기 실패: '+String(e.message||e).slice(0,100); apMenus().forEach(function(m){ AP.rows[m.v]={v:d.v,r:d.r,w:d.w}; }); }
   apPaint();
 }
-function apSet(v,k,on){
+export function apSet(v,k,on){
   var p=AP.rows[v]||{v:true,r:true,w:false};
   if(k==='v'){ p.v=on; if(!on){ p.r=false; p.w=false; } }
   if(k==='r'){ p.r=on; if(on) p.v=true; else p.w=false; }
   if(k==='w'){ p.w=on; if(on){ p.r=true; p.v=true; } }
   AP.rows[v]=p;
 }
-function apPaint(){
+export function apPaint(){
   var t=$('#apTable'); if(!t) return;
   var role=apRoleOf(AP.user), isSuper=role==='super_admin', roleRO=(role==='admin_viewer'||role==='viewer'), limited=ROLE_VIEWS[role]||null;
   var menus=apMenus(), grp='';
@@ -702,13 +704,13 @@ function apPaint(){
   t.innerHTML=h;
   t.querySelectorAll('input[data-ap]').forEach(function(inp){ inp.onchange=function(){ apSet(inp.dataset.v, inp.dataset.ap, inp.checked); apPaint(); }; });
 }
-function apPreset(mode){
+export function apPreset(mode){
   if(!AP.user) return;
   var role=apRoleOf(AP.user), roleRO=(role==='admin_viewer'||role==='viewer');
   apMenus().forEach(function(m){ AP.rows[m.v]= mode==='all'? {v:true,r:true,w:!roleRO} : mode==='read'? {v:true,r:true,w:false} : {v:false,r:false,w:false}; });
   apPaint();
 }
-async function apSave(){
+export async function apSave(){
   if(!AP.user){ toast('계정을 먼저 고르세요','','bad'); return; }
   var role=apRoleOf(AP.user); if(role==='super_admin'){ toast('슈퍼 관리자는 제한할 수 없습니다','','info'); return; }
   var now=new Date().toISOString(), em=String(AP.user).toLowerCase();
@@ -723,7 +725,7 @@ async function apSave(){
   }catch(e){ $('#apMsg').textContent=String(e.message||e).slice(0,160); toast('저장 실패', String(e.message||e).slice(0,120), 'bad'); }
   b.disabled=false;
 }
-function apBind(){
+export function apBind(){
   if(AP.bound) return; AP.bound=true;
   $('#apUser').onchange=function(){ apLoadUser(this.value); };
   $('#apAll').onclick=function(){ apPreset('all'); };
@@ -736,7 +738,7 @@ function apBind(){
 }
 
 /* ── AI 사용 비용 (Anthropic Cost API + 충전액 기준 잔여 추정) ── */
-async function abLoad(){
+export async function abLoad(){
   var kpi=$('#axBillKpi'), bars=$('#axBillBars');
   kpi.innerHTML='<div class="cap">AI 사용 비용을 불러오는 중…</div>'; bars.innerHTML='';
   var bill=null;
@@ -773,7 +775,7 @@ async function abLoad(){
         '<span style="font-size:11px;color:var(--muted)">'+d.d.slice(8)+'</span></div>';
     }).join('')+'</div>' : '';
 }
-async function abSave(){
+export async function abSave(){
   var c=+$('#abCredit').value||0, d=$('#abDate').value, m=$('#abMsg');
   if(!d){ m.textContent='충전일을 입력하세요'; return; }
   m.textContent='저장 중…';
@@ -784,14 +786,14 @@ async function abSave(){
   }catch(e){ m.textContent=String(e.message||e).slice(0,80); }
 }
 /* ── 2단계 인증 정책 (mfa_policy · SQL 89) — 슈퍼 관리자가 계정별 필수·기한 지정, 인증 앱 초기화 ── */
-var MF={rows:null, bound:false};
-function mfMsg(t,bad){ var e=$('#mfMsg'); if(e){ e.textContent=t||''; e.style.color=bad? 'var(--critical)':''; } }
-async function mfLoad(){
+export var MF={rows:null, bound:false};
+export function mfMsg(t,bad){ var e=$('#mfMsg'); if(e){ e.textContent=t||''; e.style.color=bad? 'var(--critical)':''; } }
+export async function mfLoad(){
   mfMsg('불러오는 중…'); mfRoleLoad();
   try{ MF.rows=await sbWrite('POST','rpc/mfa_admin_list',{})||[]; mfMsg(MF.rows.length+'개 계정 · 등록 '+MF.rows.filter(function(r){ return r.enrolled; }).length+' · 필수 '+MF.rows.filter(function(r){ return r.required; }).length); mfPaint(); }
   catch(e){ MF.rows=null; var m=String(e.message||e); mfMsg(/mfa_admin_list|404|schema cache/i.test(m)? 'SQL 89 가 아직 실행되지 않았습니다 (배포·운영 › SQL 탭에서 sql89 실행)' : m.slice(0,120), true); $('#mfTable').innerHTML=''; }
 }
-function mfPaint(){
+export function mfPaint(){
   var t=$('#mfTable'); if(!t||!MF.rows) return;
   t.innerHTML='<thead><tr><th>이메일</th><th>권한</th><th>인증 앱</th><th style="width:60px">필수</th><th style="width:150px">기한</th><th>메모</th><th class="act" style="width:220px"></th></tr></thead>';
   var tb=document.createElement('tbody');
@@ -814,8 +816,8 @@ function mfPaint(){
   t.querySelectorAll('[data-mf-save]').forEach(function(b){ b.onclick=function(){ mfSave(b.dataset.mfSave); }; });
   t.querySelectorAll('[data-mf-reset]').forEach(function(b){ b.onclick=function(){ mfReset(b.dataset.mfReset); }; });
 }
-function mfPlus(days){ var d=new Date(); d.setDate(d.getDate()+days); return d.toISOString().slice(0,10); }
-async function mfSave(email){
+export function mfPlus(days){ var d=new Date(); d.setDate(d.getDate()+days); return d.toISOString().slice(0,10); }
+export async function mfSave(email){
   var t=$('#mfTable'); var q=function(sel){ return t.querySelector('['+sel+'="'+CSS.escape(email)+'"]'); };
   var req=q('data-mf-req').checked, dl=q('data-mf-dl').value||null, note=q('data-mf-note').value.trim()||null;
   if(req && !dl && !confirm(email+' 을(를) 기한 없이 «즉시 필수»로 지정합니다 — 다음 로그인부터 인증 앱을 등록해야 들어올 수 있습니다. 계속할까요?')) return;
@@ -823,13 +825,13 @@ async function mfSave(email){
   try{ await sbWrite('POST','rpc/mfa_admin_set',{p_email:email, p_required:req, p_deadline:req? dl:null, p_note:note}); toast('2단계 인증 정책 저장', email+' · '+(req? ('필수'+(dl? ' · 기한 '+dl:' · 즉시')):'선택')); mfLoad(); }
   catch(e){ mfMsg(String(e.message||e).slice(0,120), true); }
 }
-async function mfReset(email){
+export async function mfReset(email){
   if(!confirm(email+' 의 인증 앱 등록을 지웁니다. 다음 로그인은 비밀번호만으로 되고(필수 지정이면 다시 등록 화면), 본인에게 알려 주세요. 계속할까요?')) return;
   mfMsg('초기화 중…');
   try{ var r=await sbWrite('POST','rpc/mfa_admin_reset',{p_email:email}); toast('인증 앱 초기화', email+' · 삭제 '+(r&&r.deleted!=null? r.deleted:'')+'건', 'warn'); mfLoad(); }
   catch(e){ mfMsg(String(e.message||e).slice(0,120), true); }
 }
-async function mfAll(){
+export async function mfAll(){
   if(!MF.rows) return; var targets=MF.rows.filter(function(r){ return !r.enrolled && !r.required; });
   if(!targets.length){ mfMsg('지정할 계정이 없습니다 (전부 등록됐거나 이미 필수)'); return; }
   var dl=mfPlus(7);
@@ -839,7 +841,7 @@ async function mfAll(){
   toast('2단계 인증 전체 지정', n+'개 계정 · 기한 '+dl); mfLoad();
 }
 /* ㊿+147 SQL 95: 역할 기본 — super_admin · admin 필수 + 유예 일수 (없으면 칸을 숨김 = SQL 95 전) */
-async function mfRoleLoad(){
+export async function mfRoleLoad(){
   var box=$('#mfRole'); if(!box) return;
   var rows; try{ rows=await sbWrite('POST','rpc/mfa_role_list',{})||[]; }catch(e){ box.style.display='none'; return; }
   MF.roles=rows; box.style.display='';
@@ -853,7 +855,7 @@ async function mfRoleLoad(){
     '<button type="button" class="cbtn pri" id="mfRoleSave">역할 기본 저장</button></div>';
   $('#mfRoleSave').onclick=mfRoleSave;
 }
-async function mfRoleSave(){
+export async function mfRoleSave(){
   var box=$('#mfRole'); var ch=[]; box.querySelectorAll('[data-mfr]').forEach(function(c){
     var role=c.dataset.mfr, g=+(box.querySelector('[data-mfr-g="'+role+'"]').value||14), old=(MF.roles||[]).filter(function(x){ return x.role===role; })[0];
     if(!old && !c.checked) return; if(old && old.required===c.checked && +old.grace_days===g) return; ch.push({role:role, req:c.checked, g:g}); });
@@ -863,12 +865,12 @@ async function mfRoleSave(){
   try{ for(var i=0;i<ch.length;i++) await sbWrite('POST','rpc/mfa_role_set',{p_role:ch[i].role, p_required:ch[i].req, p_grace_days:ch[i].g}); toast('2단계 인증 역할 기본', ch.length+'개 역할 저장'); mfLoad(); }
   catch(e){ mfMsg(String(e.message||e).slice(0,120), true); }
 }
-function mfBind(){ if(MF.bound) return; MF.bound=true; var r=$('#mfReload'); if(r) r.onclick=mfLoad; var a=$('#mfAll'); if(a) a.onclick=mfAll; }
+export function mfBind(){ if(MF.bound) return; MF.bound=true; var r=$('#mfReload'); if(r) r.onclick=mfLoad; var a=$('#mfAll'); if(a) a.onclick=mfAll; }
 /* ===== 관리자 › 코드 관리 (code_lists · SQL 93 · ㊿+137) — 선택 목록을 한 곳에서 추가·숨김·순서 =====
    저장은 code_lists 표에 직접(RLS: super_admin). 저장 뒤 loadCodes() 로 전역 *_OPTS 배열을 갱신 → 열린 표·폼에 즉시 반영. 다른 사용자는 다음 데이터 로드부터. */
-var CD={kind:'contract_status', rows:null, bound:false, showOff:false};
-function cdMsg(t,bad){ var e=$('#cdMsg'); if(e){ e.textContent=t||''; e.style.color=bad? 'var(--critical,#d03b3b)':''; } }
-function cdBind(){
+export var CD={kind:'contract_status', rows:null, bound:false, showOff:false};
+export function cdMsg(t,bad){ var e=$('#cdMsg'); if(e){ e.textContent=t||''; e.style.color=bad? 'var(--critical,#d03b3b)':''; } }
+export function cdBind(){
   if(CD.bound) return; CD.bound=true;
   var k=$('#cdKind'); if(k){ k.innerHTML=Object.keys(CODE_KIND).map(function(kind){ return '<option value="'+kind+'">'+esc(CODE_KIND_LABEL[kind]||kind)+'</option>'; }).join(''); k.value=CD.kind; k.onchange=function(){ CD.kind=k.value; cdPaint(); }; }
   var r=$('#cdReload'); if(r) r.onclick=cdLoad;
@@ -876,14 +878,14 @@ function cdBind(){
   var a=$('#cdAdd'); if(a) a.onclick=cdAdd;
   var nv=$('#cdNewVal'); if(nv) nv.onkeydown=function(e){ if(e.key==='Enter'){ e.preventDefault(); cdAdd(); } };
 }
-async function cdLoad(){
+export async function cdLoad(){
   cdMsg('불러오는 중…');
   var rows=await sbTry('code_lists?select=kind,value,label,sort,active,note,updated_by,updated_at&order=kind,sort,value');
   if(!rows || !rows.length){ CD.rows=null; cdMsg('SQL 93 이 아직 실행되지 않았습니다 (배포·운영 › SQL 탭에서 sql93 실행) — 그동안은 포탈 코드의 기본 목록을 씁니다', true); $('#cdTable').innerHTML=''; return; }
   CD.rows=rows; var m={}; rows.forEach(function(r){ (m[r.kind]=m[r.kind]||[]).push(r); }); ST.CODES=m; try{ sessionStorage.setItem('svc_codes', JSON.stringify(m)); }catch(e){} applyCodes();
   cdMsg(rows.length+'개 값 · '+Object.keys(m).length+'개 목록'); cdPaint();
 }
-function cdPaint(){
+export function cdPaint(){
   var t=$('#cdTable'); if(!t||!CD.rows) return;
   var list=CD.rows.filter(function(r){ return r.kind===CD.kind && (CD.showOff || r.active!==false); }).sort(function(a,b){ return (a.sort||0)-(b.sort||0) || String(a.value).localeCompare(String(b.value)); });
   var note=CODE_KIND_NOTE[CD.kind]; var cap=$('#cdCap'); if(cap){ var w=cap.querySelector('.cd-warn'); if(w) w.remove(); if(note){ var sp=document.createElement('div'); sp.className='cd-warn'; sp.style.cssText='margin-top:6px;color:var(--warn-ink)'; sp.textContent='⚠ '+note; cap.appendChild(sp); } }
@@ -911,13 +913,13 @@ function cdPaint(){
   t.querySelectorAll('[data-cd-down]').forEach(function(b){ b.onclick=function(){ cdMove(b.dataset.cdDown, 1, list); }; });
 }
 /* 메모리 데이터에서 그 값을 쓰는 행 수(참고용 · 표에 있는 종류만) */
-function cdUsage(kind, v){
+export function cdUsage(kind, v){
   var R=window.RAWX||{}; var f={contract_status:['contracts','status'], contract_type:['contracts','contract_type'], channel:['contracts','channel'], line:['contracts','line'], lead_src:['contracts','lead_src'], live_override:['contracts','live_override'], billing:['contracts','billing'], version:['contracts','version'],
     order_status:['orders','status'], order_channel:['orders','channel'], model:['orders','model'], industry:['customers','industry']}[kind];
   if(!f || !R[f[0]]) return null; return R[f[0]].filter(function(r){ return r[f[1]]===v; }).length;
 }
-function cdRow(v){ return (CD.rows||[]).filter(function(r){ return r.kind===CD.kind && r.value===v; })[0]; }
-async function cdPatch(v, patch, okMsg){
+export function cdRow(v){ return (CD.rows||[]).filter(function(r){ return r.kind===CD.kind && r.value===v; })[0]; }
+export async function cdPatch(v, patch, okMsg){
   cdMsg('저장 중…');
   try{
     patch.updated_by=ST.AUTH_USER||null; patch.updated_at=new Date().toISOString();
@@ -926,13 +928,13 @@ async function cdPatch(v, patch, okMsg){
     if(okMsg) toast('코드 관리', okMsg); await cdLoad();
   }catch(e){ cdMsg(String(e.message||e).slice(0,140), true); }
 }
-function cdSave(v){ var t=$('#cdTable'); var q=function(a){ var e=t.querySelector('['+a+'="'+CSS.escape(v)+'"]'); return e? e.value.trim():''; }; cdPatch(v, {label:q('data-cd-label')||null, note:q('data-cd-note')||null}, CODE_KIND_LABEL[CD.kind]+' «'+v+'» 저장'); }
-function cdToggle(v){
+export function cdSave(v){ var t=$('#cdTable'); var q=function(a){ var e=t.querySelector('['+a+'="'+CSS.escape(v)+'"]'); return e? e.value.trim():''; }; cdPatch(v, {label:q('data-cd-label')||null, note:q('data-cd-note')||null}, CODE_KIND_LABEL[CD.kind]+' «'+v+'» 저장'); }
+export function cdToggle(v){
   var r=cdRow(v); if(!r) return; var off=r.active!==false;
   if(off){ var n=cdUsage(CD.kind, v); if(!confirm('«'+v+'» 를 숨깁니다 — 새 입력에서 고를 수 없고 데이터 점검이 «목록에 없는 값»으로 표시합니다.'+(n? ' 지금 이 값인 행 '+n+'개는 그대로 둡니다.':'')+' 계속할까요?')) return; }
   cdPatch(v, {active:!off}, '«'+v+'» '+(off? '숨김':'사용'));
 }
-async function cdMove(v, dir, list){
+export async function cdMove(v, dir, list){
   var i=list.findIndex(function(r){ return r.value===v; }); var j=i+dir; if(i<0||j<0||j>=list.length) return;
   var a=list[i], b=list[j], sa=a.sort||0, sb=b.sort||0; if(sa===sb){ sb=sa+dir; }   // 같은 순서값이면 하나를 밀어 구분
   cdMsg('순서 바꾸는 중…');
@@ -942,7 +944,7 @@ async function cdMove(v, dir, list){
     await cdLoad();
   }catch(e){ cdMsg(String(e.message||e).slice(0,140), true); }
 }
-async function cdAdd(){
+export async function cdAdd(){
   var v=($('#cdNewVal').value||'').trim(), label=($('#cdNewLabel').value||'').trim()||null, note=($('#cdNewNote').value||'').trim()||null;
   if(!v){ cdMsg('값을 입력하세요', true); $('#cdNewVal').focus(); return; }
   if(cdRow(v)){ cdMsg('이미 있는 값입니다'+(cdRow(v).active===false? ' (숨김 상태 — «켜기»)':''), true); return; }
@@ -956,7 +958,7 @@ async function cdAdd(){
     toast('코드 추가', CODE_KIND_LABEL[CD.kind]+' «'+v+'»'); await cdLoad();
   }catch(e){ cdMsg(String(e.message||e).slice(0,140), true); }
 }
-async function axLoad(){
+export async function axLoad(){
   axMsg('불러오는 중…');
   try{
     AX_USERS=await sbWrite('POST','rpc/admin_list_users',{})||[];
@@ -965,7 +967,7 @@ async function axLoad(){
     try{ apFillUsers(); }catch(e){}
   }catch(e){ axMsg(String(e.message||e).slice(0,120),1); $('#axTable').innerHTML=''; }
 }
-function axPaint(){
+export function axPaint(){
   var q=($('#axQ').value||'').trim().toLowerCase();
   var rows=AX_USERS.filter(function(u){ return !q || String(u.email||'').toLowerCase().indexOf(q)>=0; });
   var t=$('#axTable');
@@ -1022,7 +1024,7 @@ function axPaint(){
     };
   });
 }
-async function axCreate(){
+export async function axCreate(){
   var em=$('#axEmail').value.trim().toLowerCase(), pw=$('#axPw').value, role=$('#axRole').value;
   if(!em || pw.length<6){ axMsg('이메일과 6자 이상 비밀번호를 입력하세요',1); return; }
   var btn=$('#axCreate'); btn.disabled=true; axMsg('계정 생성 중…');
@@ -1034,7 +1036,7 @@ async function axCreate(){
   }catch(e){ axMsg(String(e.message||e).slice(0,140),1); }
   btn.disabled=false;
 }
-async function axResetPw(em){
+export async function axResetPw(em){
   var pw=prompt(em+' 의 새 비밀번호 (6자 이상):');
   if(pw==null) return;
   if(String(pw).length<6){ axMsg('6자 이상이어야 합니다',1); return; }
@@ -1044,7 +1046,7 @@ async function axResetPw(em){
     axMsg(out.msg); toast('비밀번호 초기화', em,'info');
   }catch(e){ axMsg(String(e.message||e).slice(0,140),1); }
 }
-async function axDelete(em){
+export async function axDelete(em){
   if(!confirm(em+' 계정을 삭제할까요?\n로그인이 즉시 막히고 되돌릴 수 없습니다.')) return;
   axMsg('삭제 중…');
   try{
@@ -1055,7 +1057,7 @@ async function axDelete(em){
 }
 
 /* ---- 내 계정 ---- */
-var ROLE_INFO={
+export var ROLE_INFO={
   super_admin:  ['슈퍼 관리자','포탈의 모든 기능을 사용합니다 — 전체 데이터 조회·수정, 계정·권한 관리, 가격표 새 판 등록, 변경 이력, AI 사용 비용 확인까지.'],
   admin:        ['관리자','모든 화면을 조회하고 수정할 수 있습니다 (계약·장비·OI·주간회의 메모 등). 계정 관리와 변경 이력은 슈퍼 관리자 전용입니다.'],
   admin_viewer: ['관리자 — 조회 전용','모든 화면을 볼 수 있지만 어떤 데이터도 수정할 수 없습니다.'],
@@ -1066,7 +1068,7 @@ var ROLE_INFO={
   viewer:    ['(구) 조회 전용','admin_viewer 로 통합 예정입니다.'],
   equipment: ['(구) 장비 전용','equipment_poc 로 통합 예정입니다.']
 };
-async function renderAccount(){
+export async function renderAccount(){
   var box=$('#accBody');
   if(!ST.SB_TOKEN){
     box.innerHTML='<p class="cap">로그인이 필요합니다.</p>';
@@ -1143,286 +1145,9 @@ async function renderAccount(){
   box.appendChild(tip);
 }
 
-/* ---- 수령처 프리셋 (DB recv_presets · 로그인 필요) ---- */
-var RECV_PRESETS=null;
-function loadRecvPresets(){
-  if(RECV_PRESETS) return;
-  sbTry('recv_presets?select=*&order=sort').then(function(rows){
-    if(!rows || !rows.length) return;
-    RECV_PRESETS=rows;
-    var sel=$('#odRecvPick'); if(!sel) return;
-    sel.innerHTML='<option value="">— 직접 입력 —</option>';
-    var groups={};
-    rows.forEach(function(r){
-      if(!groups[r.grp]){ groups[r.grp]=document.createElement('optgroup'); groups[r.grp].label=r.grp; sel.appendChild(groups[r.grp]); }
-      var o=document.createElement('option');
-      o.value=r.id; o.textContent=r.name+(r.grp!=='지니언스'&&r.grp!=='본사(서울)'? '':'');
-      groups[r.grp].appendChild(o);
-    });
-    sel.onchange=function(){
-      var v=this.value;
-      var r=(RECV_PRESETS||[]).filter(function(x){ return String(x.id)===v; })[0];
-      if(!r) return;
-      $('#odRecvAddr').value=r.addr||'';
-      $('#odRecvName').value=(r.name||'').replace(/\s*\(.*\)$/,'').replace(/\s(부장|차장|과장|대리|사원|팀장)$/,'');
-      $('#odRecvPhone').value=r.phone||'';
-    };
-  });
-}
-
-function openOrderForm(){ switchView('ordernew'); }
-async function submitOrder(){
-  var cust=$('#odCustomer').value.trim(), mgr=$('#odMgr').value.trim();
-  if(!cust||!mgr){ msg('odMsg','고객사명과 담당자는 필수입니다','bad'); return; }
-  var btn=$('#odGo'); btn.disabled=true; msg('odMsg','접수 중…');
-  var isS1=$('#odChannel').value==='에스원';
-  try{
-    var row={
-      channel: $('#odChannel').value, order_type: $('#odType').value,
-      serials: $('#odSerials').value.trim()||null,
-      requester: ST.AUTH_USER||null,
-      customer: cust,
-      contract_no: isS1? ($('#odContract').value.trim()||null) : null,
-      mgr_name: mgr,
-      mgr_phone: $('#odPhone').value.trim()||null,
-      admin_account: isS1? ($('#odAdmin').value.trim()||null) : null,
-      install_date: isS1? ($('#odInstall').value||null) : null,
-      customer_addr: $('#odAddr').value.trim()||null,
-      edition: isS1? $('#odEdition').value : null,
-      features: isS1? ($('#odFeat').value.trim()||null) : null,
-      nodes: +$('#odNodes').value||null,
-      model: $('#odModel').value,
-      qty: +$('#odQty').value||1,
-      standalone_pod: $('#odPod').checked,
-      recv_addr: $('#odRecvAddr').value.trim()||null,
-      recv_name: $('#odRecvName').value.trim()||null,
-      recv_phone: $('#odRecvPhone').value.trim()||null,
-      ship_date: $('#odShip').value||null,
-      request_note: $('#odNote').value.trim()||null,
-      status:'접수'
-    };
-    var out=await sbWrite('POST','equipment_orders?select=*',[row],'return=representation');
-    RAWX.orders=RAWX.orders||[]; RAWX.orders.unshift(out[0]);
-    logChange('insert','equipment_orders',out[0].id,{customer:cust,model:row.model,qty:row.qty});
-    msg('odMsg','');
-    // 명시적 완료 화면
-    $('#odDoneSum').textContent=[row.channel, cust, row.model+' × '+row.qty, row.order_type, row.standalone_pod?'단독 Pod':''].filter(Boolean).join(' · ');
-    $('#odFormWrap').style.display='none';
-    $('#odDone').style.display='';
-    toast('발주 신청 접수 완료', cust+' · '+row.model+' × '+row.qty);
-    ['odCustomer','odContract','odMgr','odPhone','odAdmin','odInstall','odAddr','odNodes','odRecvAddr','odRecvName','odRecvPhone','odShip','odNote','odSerials'].forEach(function(i){ $('#'+i).value=''; });
-    $('#odQty').value='1'; $('#odPod').checked=false;
-  }catch(e){ msg('odMsg',String(e.message||e),'bad'); }
-  btn.disabled=false;
-}
-
-async function submitMdrPoc(){
-  var comp=$('#mpCompany').value.trim(), mgr=$('#mpMgr').value.trim();
-  if(!comp||!mgr){ msg('mpMsg','회사명과 고객 담당자 이름은 필수입니다','bad'); return; }
-  var btn=$('#mpGo'); btn.disabled=true; msg('mpMsg','접수 중…');
-  try{
-    var osSum=(+$('#mpWin').value||0)+(+$('#mpLinux').value||0)+(+$('#mpMac').value||0);
-    var row={
-      requester: ST.AUTH_USER||null,
-      customer: comp,
-      svc_type: 'CLOUD',
-      plan_qty: osSum||null,
-      license: 'EDR'+($('#mpRansom').checked?'+RANSOMWARE':'')+($('#mpAv').checked?'+AV':''),
-      mgr_name: mgr,
-      mgr_phone: $('#mpPhone').value.trim()||null,
-      mgr_email: $('#mpEmail').value.trim()||null,
-      device_count: $('#mpDev').value.trim()||null,
-      mod_edr: $('#mpEdr').checked,
-      mod_av: $('#mpAv').checked,
-      mod_ransom: $('#mpRansom').checked,
-      mod_media: $('#mpMedia').checked,
-      os_win: $('#mpWin').value===''? null : +$('#mpWin').value,
-      os_linux: $('#mpLinux').value===''? null : +$('#mpLinux').value,
-      os_mac: $('#mpMac').value===''? null : +$('#mpMac').value,
-      webui_email: $('#mpWebui').value.trim()||null,
-      nac_use: $('#mpNac').value,
-      sales_name: $('#mpSales').value.trim()||null,
-      sales_phone: $('#mpSalesPh').value.trim()||null,
-      apply_date: $('#mpDate').value||null,
-      note: $('#mpNote').value.trim()||null,
-      status:'신청'
-    };
-    var out=await sbWrite('POST','mdr_ops?select=*',[row],'return=representation');
-    RAWX.mdrops=RAWX.mdrops||[]; RAWX.mdrops.unshift(out[0]);
-    logChange('insert','mdr_ops',out[0].id,{company:comp,mgr:mgr});
-    msg('mpMsg','');
-    var mods=[row.mod_edr?'EDR+MDR':'',row.mod_av?'백신':'',row.mod_ransom?'랜섬웨어':'',row.mod_media?'매체제어':''].filter(Boolean).join('·');
-    $('#mpDoneSum').textContent=[comp, mgr, row.device_count||'', mods].filter(Boolean).join(' · ');
-    $('#mpFormWrap').style.display='none';
-    $('#mpDone').style.display='';
-    toast('POC 신청 접수 완료', comp+' · '+(mods||'모듈 미선택'));
-    ['mpCompany','mpMgr','mpPhone','mpEmail','mpDev','mpWin','mpLinux','mpMac','mpWebui','mpSales','mpSalesPh','mpNote'].forEach(function(i){ $('#'+i).value=''; });
-    $('#mpEdr').checked=true; ['mpAv','mpRansom','mpMedia'].forEach(function(i){ $('#'+i).checked=false; });
-  }catch(e){ msg('mpMsg',String(e.message||e),'bad'); }
-  btn.disabled=false;
-}
-/* ===== ㊿+148 업데이트 안내 — 로그인할 때 팝업 (SQL 96 · 사용자: «담당자를 체크해 놓으면 로그인할 때 업데이트 내용을 안내 · 다 확인했다고 체크하면 다시 안 뜨고 · 다음 업데이트면 새 내용으로 다시») =====
-   · 안내문은 아래 UPD_SEED 에 코드와 함께 실려 옴 → 슈퍼 관리자가 포탈을 열 때 DB(upd_notes)에 없는 ver 만 자동으로 넣음(관리자가 고친 내용은 덮어쓰지 않음)
-   · 대상 = 관리자 › 업데이트 안내에서 체크한 계정(upd_notify) · 확인 = upd_ack(마지막 안내 id) — 새 안내는 id 가 커서 다시 뜸
-   · 읽기 호출은 sbWrite 대신 직접 fetch(캐시를 지우지 않게) · 표가 없으면(SQL 96 전) 조용히 아무것도 안 함
-   · 새 업데이트를 낼 때: UPD_SEED 맨 끝에 {ver, date, title, body} 한 개 추가(본문은 한 줄에 하나 «- » · 관리자용은 «(관리자)»로 시작) */
-var UPD={checked:false, rows:null, users:null, notify:null, ack:null, edit:null, err:''};
-var UPD_SEED=[
-  {ver:'㊿+98~117', date:'2026-09-27', title:'화면 디자인 개편 · 임대 장비 대시보드 · 리포트', body:[
-    '- 새 화면 디자인 «커맨드 센터»가 기본이 되었습니다. 왼쪽 아이콘 메뉴와 위쪽 검색창(Ctrl+K)으로 화면 이동·AI 질문을 합니다.',
-    '- 홈 첫 화면이 «처리할 일 → MRR → 주요 지표 → AI 질문» 순서로 바뀌었고, 차트·표 분석은 «분석» 칸을 펼치면 보입니다.',
-    '- 내 계정 › 설정에서 화면 디자인(커맨드 센터·심플·클래식)과 자동 로그아웃 시간을 고를 수 있습니다.',
-    '- 장비 › 임대 장비 대시보드: 임대중·처리 대기·회수 현황과 상태 보드(카드를 끌어 다음 단계로).',
-    '- 가격표 › 견적·비교: Cloud NAC·MDR 빠른 견적, SaaS와 구축형 비용 비교, 견적서 PDF 비교.',
-    '- 클라우드 비용 화면을 요약 타일 + 월별 추이로 정리했습니다.',
-    '- 리포트: 계약·매출·장비·OI 등 포탈 데이터를 골라 합치고 묶어 표·차트로 보고, 엑셀·PPT로 내보냅니다. SQL로 직접 쓸 수도 있습니다.',
-    '- 고객 360: 요약 4칸(MRR·누적·장비·다음 만료)과 다음 할 일 제안.',
-    '- AI 지식: AI에게 팀 규칙·용어를 가르칠 수 있습니다(메뉴 «AI 지식»).',
-    '- 표에서 «행 추가» 저장이 안 되던 문제를 고쳤습니다.'].join('\n')},
-  {ver:'㊿+118', date:'2026-09-28', title:'휴대폰 홈 화면 앱 · 로그인 유지', body:[
-    '- 포탈을 앱처럼 설치할 수 있습니다. 아이폰은 Safari 공유 › 홈 화면에 추가, 안드로이드는 Chrome «앱 설치» (내 계정 › 설정 › 앱으로 설치).',
-    '- 로그인 화면에 «로그인 유지»가 생겼습니다. 휴대폰에서는 기본으로 켜집니다.'].join('\n')},
-  {ver:'㊿+119~121', date:'2026-09-29', title:'메뉴 권한 · 유입경로 · 뒤로가기', body:[
-    '- 계약에 «유입경로»(직접영업·파트너영업·인바운드·프로모션·기타) 칸이 생겼고, 전체 데이터 › 유입경로 분석에서 경로별 매출을 봅니다.',
-    '- 위쪽 «←» 버튼, 브라우저 뒤로가기, 휴대폰 뒤로 제스처로 이전 화면에 돌아갑니다. 주소에 화면 이름이 붙어 새로고침·링크 공유 때 그 화면이 열립니다.',
-    '- (관리자) 계정마다 메뉴별 보기/읽기/쓰기 권한을 정할 수 있습니다(관리자 › 메뉴 권한).'].join('\n')},
-  {ver:'㊿+122~126', date:'2026-09-30', title:'계약 노드수·버전 · 장비 모델 · 인쇄', body:[
-    '- 계약 관리에 «Ver.»(V6.0·V5.0·ZTNA)와 «노드수» 칸이 생겼습니다. 서비스가 «Cloud NAC 6.0 / 5.0»으로 구분돼 보입니다.',
-    '- 장비 모델 목록: S100·S200·S10_R2·S20_R2·S30H_R1·ES30.',
-    '- 발주 신청서의 계약번호·관리자 계정·설치 희망일·에디션·요청 기능은 판매 채널이 «에스원»일 때만 보입니다.',
-    '- 입력칸 밖에서 Backspace 키로도 뒤로 갑니다.',
-    '- 프로젝트 리포트를 인쇄할 때 아래쪽 주소·로고가 잘리던 문제를 고쳤습니다.'].join('\n')},
-  {ver:'㊿+127', date:'2026-10-02', title:'계약 만기 처리 · 견적서 모바일', body:[
-    '- 홈에 «만기 지났는데 미처리», «이달 만기» 알림이 뜨고, «처리하기»에서 연장·서비스종료·해지·자동연장을 바로 처리합니다.',
-    '- LIVE 타일에 전월 대비 늘고 준 이유(신규·복귀·해지·만기 미처리)가 나옵니다.',
-    '- 계약 관리에 «자동연장» 칸이 생겼습니다(매월 자동 연장 계약은 만기 목록에서 빠집니다).',
-    '- 휴대폰에서 만든 견적서 PDF의 «공급자» 글자 밀림과 주소 줄바꿈을 고쳤습니다.',
-    '- (관리자) 만기 처리 창에서 «슬랙으로 보내기»로 갱신 대상을 팀 슬랙에 보낼 수 있습니다.',
-    '- (관리자) AI 지식은 관리자만 쓸 수 있게 바꾸고, AI 사용량에 하루 한도를 두었습니다.'].join('\n')},
-  {ver:'㊿+128~132', date:'2026-10-03', title:'2단계 인증 · 보안 · 배포·운영', body:[
-    '- 내 계정 › 보안 › 2단계 인증: 휴대폰 인증 앱(Google Authenticator 등)으로 로그인 때 6자리 코드를 한 번 더 확인합니다.',
-    '- 견적서 직인을 로그인한 사람만 볼 수 있는 저장소로 옮겼습니다.',
-    '- 포탈에서 생기는 오류가 자동으로 기록되고, 매일 새벽 데이터가 백업됩니다(7일 보관).',
-    '- (관리자) 계정별로 2단계 인증을 «필수»로 지정하고 기한을 줄 수 있습니다.',
-    '- (관리자) 관리자 › 배포·운영: 포탈 안에서 파일 배포, DB 쿼리 실행, 서버 함수 배포(작업 PIN 필요). 스테이징(시험판)에서 먼저 확인하고 운영에 올립니다.'].join('\n')},
-  {ver:'㊿+133~136', date:'2026-10-03', title:'데이터 점검 · 화면 다듬기', body:[
-    '- 전체 데이터 › 🩺 데이터 점검: 고객사 연결 없음·만기 미처리·목록에 없는 값·에스원 계약번호 누락 등 어긋난 데이터를 모아 보여 줍니다. 바로 고칠 게 있으면 홈에 알림이 뜹니다.',
-    '- 표 검색 결과가 0건이면 «검색어 지우기 / 필터 지우기» 버튼이 나옵니다.',
-    '- 계약 관리의 관점 칩 중 0건인 것은 접혀서 한 줄로 보입니다.',
-    '- Esc 키로 맨 위 창이 닫힙니다. 경고 알림 아이콘은 주황 «!»로 바뀌었습니다.',
-    '- AI가 포탈 사용법(만기 처리·2단계 인증·리포트 등)도 답할 수 있게 했습니다.',
-    '- (관리자) AI 15문 점검: 대표 질문 15개로 AI 답이 맞는지 확인합니다(배포·운영 › 기록).'].join('\n')},
-  {ver:'㊿+137~139', date:'2026-10-03', title:'코드 관리 · 고객사 병합 · 도움말 · AI 피드백', body:[
-    '- 데이터 점검 › 고객사 이름 중복은 «병합»으로 하나로 합칠 수 있고(관리자), «LIVE인데 이달 매출 0»은 mrr 금액으로 한 번에 채울 수 있습니다.',
-    '- 표 위 «❔ 이 화면 사용법»을 누르면 AI가 그 화면 쓰는 법을 알려 줍니다.',
-    '- 입력칸 밖에서 «?» 키를 누르면 단축키 안내가 나옵니다.',
-    '- 표 설명이 길면 첫 문장만 보이고 «도움말 ▾»로 펼칩니다.',
-    '- 표를 옆으로 끝까지 밀어도 ✎/🗑 버튼이 마지막 칸을 가리지 않습니다.',
-    '- AI 답 밑 👍/👎로 답이 맞았는지 알려 주세요(👎는 메모를 남길 수 있습니다).',
-    '- 상태·채널·서비스처럼 정해진 목록에 없는 값은 저장할 때 막습니다(오타 방지).',
-    '- (관리자) 관리자 › 코드 관리: 선택 목록을 화면에서 추가·숨기기·순서 변경 — 모든 화면에 바로 반영됩니다.'].join('\n')},
-  {ver:'㊿+140~142', date:'2026-10-04', title:'견적 저장 · 창 사용성 · 화면 정리', body:[
-    '- 견적서 저장·불러오기가 공용 비밀번호 대신 포탈 로그인으로 동작합니다(비밀번호 입력 없음 · 누가 저장했는지 기록).',
-    '- 창 바깥(어두운 곳)을 눌러도 창이 닫힙니다. 입력하던 내용이 있으면 닫기 전에 물어봅니다.',
-    '- 서버 오류일 때 «데이터 없음» 대신 «불러오지 못했습니다»로 알려 줍니다.',
-    '- 글자 크기·버튼 모양을 통일했고, 회색 글씨를 더 진하게 해서 읽기 쉬워졌습니다.',
-    '- 표 머리 칸 오른쪽 경계를 끌어 열 너비를 바꿀 수 있습니다(화면별로 기억 · 경계를 두 번 누르면 원래대로).',
-    '- 메뉴의 Cloud NAC·MDR·기타(유통) 세 그룹을 «사업 영역» 한 그룹으로 합쳤습니다.'].join('\n')},
-  {ver:'㊿+143~146', date:'2026-10-04', title:'로그인 속도 · 메뉴 이동 · 휴대폰 화면', body:[
-    '- 로그인·로그아웃·새로고침이 빨라졌습니다.',
-    '- 로그인하면 항상 홈(대시보드)에서 시작합니다.',
-    '- 메뉴를 누르면 그 화면의 처음 상태(검색·탭·스크롤 초기화)로 열립니다. 뒤로가기는 보던 그대로 돌아갑니다.',
-    '- 휴대폰에서 대시보드 «월별 종합 장표» 제목이 세로로 쌓이고 연도 탭이 넘치던 문제를 고쳤습니다.',
-    '- (관리자) 배포·운영: 파일을 넣으면 저장소 자리를 자동으로 잡고, 🧹 저장소 점검으로 안 쓰는 파일을 정리합니다.'].join('\n')},
-  {ver:'㊿+147', date:'2026-10-04', title:'읽기 쉬운 색 · 관리자 2단계 인증 필수', body:[
-    '- 모든 화면·다크 모드에서 글자와 바탕의 대비를 접근성 기준(WCAG AA)에 맞췄습니다. 초록 버튼이 조금 진해졌습니다.',
-    '- 관리자 계정(super_admin·admin)은 2단계 인증이 필수입니다(적용일부터 14일 유예 · 기한 전에는 로그인할 때 안내만 뜹니다).',
-    '- 리포트의 SQL 실행을 격리된 칸에서 돌려 더 안전해졌습니다.',
-    '- AI 점검이 «9,956만원» 같은 만원 표기도 맞게 읽습니다.'].join('\n')},
-  {ver:'㊿+148', date:'2026-10-05', title:'데이터 점검에서 바로 고치기 · 업데이트 안내', body:[
-    '- 데이터 점검 항목을 누르면 수정 창이 열려 그 자리에서 고칩니다. 저장하면 다음 항목으로 넘어갑니다.',
-    '- 로그인할 때 이렇게 업데이트 내용을 알려 드립니다. «모두 확인했습니다»에 체크하고 확인을 누르면 다음 업데이트 전까지 다시 뜨지 않습니다.',
-    '- 지난 안내는 내 계정 › «📢 업데이트 내역»에서 언제든 다시 볼 수 있습니다.',
-    '- (관리자) 매일 새벽 3시 AI 자동 점검 결과를 슬랙에 «성공/실패» 한 줄로 알립니다.'].join('\n')},
-  {ver:'㊿+149', date:'2026-10-05', title:'관리자 화면 정리', body:[
-    '- (관리자) 관리자 화면을 탭 4개(계정·권한 · 보안 · 설정 · AI 비용)로 나눠 긴 스크롤을 없앴습니다. «새 계정 만들기»는 접어 두었습니다.'].join('\n')},
-  {ver:'㊿+150', date:'2026-10-05', title:'내부 구조 정리 (모듈 전환 1단계)', body:[
-    '- (관리자) 여러 화면이 함께 쓰는 상태 값 17개를 한 파일(js/state.js)로 모았습니다. 화면·기능 변화는 없습니다.'].join('\n')},
-  {ver:'㊿+151', date:'2026-10-05', title:'스테이징 QA', body:[
-    '- (관리자) 배포·운영 › GitHub 탭에 «🧪 스테이징 QA» — 스테이징 포탈을 창 안에서 열어 메뉴 전부를 자동으로 눌러 보고(JS 오류·빈 화면·깨진 값·넘침·폰 폭), 핵심 숫자가 운영과 같은지 비교합니다. 통과하면 그 자리에서 승격.'].join('\n')},
-  {ver:'㊿+152', date:'2026-10-05', title:'가격표 화면 폭 · QA 보고서', body:[
-    '- 노트북(1280px)·휴대폰에서 가격표가 화면 옆으로 넘치던 문제를 고쳤습니다. 화면이 좁으면 표가 한 줄에 하나씩, 폰에서는 표 안에서만 옆으로 밀립니다.',
-    '- (관리자) 스테이징 QA 결과를 «📋 Claude 에게 보낼 내용 복사»로 정리해 붙여넣을 수 있습니다(화면 크기·요소 경로·오류 위치 포함).',
-    '- (관리자) 스테이징 QA 가 «불러오는 중» 화면을 실패로 잡던 것을 고쳤습니다(최대 6초 기다림).'].join('\n')}
-];
-async function updFetch(path, opt){   /* 캐시를 건드리지 않는 직접 호출 — 401 이면 토큰 갱신 뒤 1회 재시도 */
-  if(!ST.SB_TOKEN) throw new Error('로그인이 필요합니다');
-  var go=function(){ return fetch(SB_URL+'/rest/v1/'+path, Object.assign({headers:sbHeaders(true)}, opt||{})); };
-  var r=await go(); if(r.status===401 && await refreshToken()) r=await go();
-  var t=await r.text(); if(!r.ok) throw new Error('HTTP '+r.status+' '+t.slice(0,160));
-  return t? JSON.parse(t) : null;
-}
-function updRpc(fn, args){ return updFetch('rpc/'+fn, {method:'POST', body:JSON.stringify(args||{})}); }
-function updBodyHtml(body){
-  var lines=String(body||'').split(/\r?\n/).map(function(x){ return x.trim(); }).filter(Boolean), h='', inList=false;
-  lines.forEach(function(l){
-    var li=/^[-•·]\s*/.test(l);
-    if(li && !inList){ h+='<ul>'; inList=true; } if(!li && inList){ h+='</ul>'; inList=false; }
-    var t=l.replace(/^[-•·]\s*/,''), adm=/^\(관리자\)\s*/.test(t); t=t.replace(/^\(관리자\)\s*/,'');
-    var x=(adm? '<span class="upd-adm">관리자</span> ':'')+esc(t);
-    h+= li? '<li>'+x+'</li>' : '<p>'+x+'</p>';
-  });
-  return h+(inList? '</ul>':'');
-}
-/* 팝업 — opt.mode: 'ack'(로그인 안내 · 확인 체크) | 'all'(내 계정 › 업데이트 내역) | 'preview'(관리자 미리보기) */
-function updShow(notes, opt){
-  opt=opt||{}; notes=(notes||[]).slice().sort(function(a,b){ return (b.id||0)-(a.id||0); });
-  var old=document.getElementById('ovlUpd'); if(old) old.remove();
-  var ov=document.createElement('div'); ov.id='ovlUpd'; ov.className='ovl on'; ov.style.cssText='z-index:9500;align-items:center';
-  var sub=opt.mode==='ack'? (opt.first? '지금까지 포탈에서 바뀐 내용입니다 ('+notes.length+'번의 업데이트)' : '지난번 확인한 뒤 바뀐 내용입니다 ('+notes.length+'건)') : opt.mode==='preview'? '관리자 미리보기 — 체크된 계정에게 이렇게 보입니다' : '지금까지의 업데이트 내역';
-  ov.innerHTML='<div class="modal upd" style="width:min(680px,100%);padding:20px 22px" role="dialog" aria-modal="true" aria-labelledby="updTitle">'+
-    '<div class="upd-head"><span class="upd-ic" aria-hidden="true">📢</span><div><h3 id="updTitle" style="margin:0;font-size:18px">포탈 업데이트 안내</h3><div class="mini">'+esc(sub)+'</div></div></div>'+
-    '<div class="upd-body" tabindex="0">'+(notes.length? notes.map(function(n,i){ return '<section class="upd-sec"><div class="upd-meta"><b>'+esc(n.title||'')+'</b>'+(i===0&&opt.mode==='ack'? '<span class="ctag ok">최신</span>':'')+'<span class="mini">'+esc(String(n.published_on||'').slice(0,10))+(n.ver? ' · '+esc(n.ver):'')+'</span></div>'+updBodyHtml(n.body)+'</section>'; }).join('') : '<p class="cap">안내가 없습니다.</p>')+'</div>'+
-    '<div class="upd-foot">'+(opt.mode==='ack'? '<label class="upd-chk"><input type="checkbox" id="updOk"> 업데이트 내용을 모두 확인했습니다</label><span style="flex:1"></span><button type="button" class="pill ghost" id="updLater">나중에 보기</button><button type="button" class="pill pri" id="updDone" disabled>확인</button>'
-      : '<span style="flex:1"></span><button type="button" class="pill" id="updClose">닫기</button>')+'</div></div>';
-  document.body.appendChild(ov);
-  var ok=ov.querySelector('#updOk'), done=ov.querySelector('#updDone');
-  if(ok) ok.onchange=function(){ done.disabled=!ok.checked; };
-  var later=ov.querySelector('#updLater'); if(later) later.onclick=function(){ ov.remove(); toast('업데이트 안내', '다음에 로그인할 때 다시 보여 드립니다', 'info'); };
-  var cl=ov.querySelector('#updClose'); if(cl) cl.onclick=function(){ ov.remove(); };
-  if(done) done.onclick=async function(){
-    var top=notes.reduce(function(a,n){ return Math.max(a, +n.id||0); }, 0); done.disabled=true;
-    try{ await updRpc('upd_ack_set', {p_last_id:top}); ov.remove(); toast('확인했습니다', '다음 업데이트가 있으면 다시 알려 드립니다'); }
-    catch(e){ done.disabled=false; toast('확인 기록 실패', String(e.message||e).slice(0,140), 'warn'); }
-  };
-  setTimeout(function(){ try{ (ok||cl||ov.querySelector('.upd-body')).focus(); }catch(e){} }, 30);
-}
-/* 슈퍼 관리자가 열 때 — DB 에 없는 ver 만 넣기(오래된 것부터 → id 가 날짜 순) */
-async function updSyncSeed(){
-  if(!window.IS_SUPER || window.IS_QA) return 0;
-  var have=await updFetch('upd_notes?select=ver');
-  var set={}; (have||[]).forEach(function(r){ if(r.ver) set[r.ver]=1; });
-  var add=UPD_SEED.filter(function(s){ return !set[s.ver]; }).map(function(s){ return {ver:s.ver, title:s.title, body:s.body, published_on:s.date, created_by:'포탈 '+(window.APP_VER||'')+' (자동)'}; });
-  if(add.length) await updFetch('upd_notes', {method:'POST', body:JSON.stringify(add), headers:Object.assign(sbHeaders(true), {Prefer:'return=minimal'})});
-  return add.length;
-}
-/* 로그인 뒤 첫 데이터 표시 때 1번 (onData) */
-async function updCheck(){
-  if(UPD.checked || !ST.SB_TOKEN || window.IS_QA) return; UPD.checked=true;
-  try{ await updSyncSeed(); }catch(e){ /* 표 없음(SQL 96 전) 등 — 조용히 */ }
-  try{
-    var r=await updRpc('upd_pending', {});
-    if(r && r.notify && Array.isArray(r.notes) && r.notes.length) updShow(r.notes, {mode:'ack', first:!r.last_id});
-  }catch(e){ /* SQL 96 전 — 조용히 */ }
-}
-/* 내 계정 › 업데이트 내역 — 누구나 */
-async function updOpenAll(){
-  try{ var rows=await updFetch('upd_notes?select=id,ver,title,body,published_on&active=eq.true&order=id.desc'); updShow(rows||[], {mode:'all'}); }
-  catch(e){ toast('업데이트 내역', /404|PGRST|does not exist|schema cache/i.test(String(e.message))? '아직 준비되지 않았습니다 (SQL 96)' : String(e.message||e).slice(0,140), 'warn'); }
-}
 /* ── 관리자 › 업데이트 안내 ── */
-function updMsg(t, bad){ var e=document.getElementById('updMsg'); if(e){ e.textContent=t||''; e.style.color=bad? 'var(--critical)':'var(--muted)'; } }
-async function updAdminLoad(){
+export function updMsg(t, bad){ var e=document.getElementById('updMsg'); if(e){ e.textContent=t||''; e.style.color=bad? 'var(--critical)':'var(--muted)'; } }
+export async function updAdminLoad(){
   var host=document.getElementById('updAdmin'); if(!host) return;
   var seq=UPD.seq=(UPD.seq||0)+1;   /* 겹쳐 부르면 마지막 것만 그림 */
   updMsg('불러오는 중…');
@@ -1439,7 +1164,7 @@ async function updAdminLoad(){
   }catch(e){ if(seq!==UPD.seq) return; UPD.rows=null; UPD.err=/404|PGRST|does not exist|schema cache/i.test(String(e.message))? 'SQL 96 이 아직 실행되지 않았습니다 — 배포·운영 › SQL 탭에서 sql96_update_notes.sql 을 실행하세요' : String(e.message||e).slice(0,200); }
   updAdminPaint();
 }
-function updAdminPaint(){
+export function updAdminPaint(){
   var host=document.getElementById('updAdmin'); if(!host) return;
   if(!UPD.rows){ host.innerHTML='<p class="cap" style="color:var(--warn-ink)">'+esc(UPD.err||'불러오지 못했습니다')+'</p><button type="button" class="pill ghost" id="updReload">↻ 다시 읽기</button>'; host.querySelector('#updReload').onclick=updAdminLoad; return; }
   var act=UPD.rows.filter(function(r){ return r.active; });
@@ -1471,7 +1196,7 @@ function updAdminPaint(){
   host.querySelectorAll('[data-updtg]').forEach(function(b){ b.onclick=function(){ var r=UPD.rows.filter(function(x){ return String(x.id)===b.dataset.updtg; })[0]; if(r) updNoteSave({id:r.id, active:!r.active}); }; });
   if(UPD.edit) updEditPaint();
 }
-function updEditPaint(){
+export function updEditPaint(){
   var box=document.getElementById('updEdit'); if(!box) return; var e=UPD.edit;
   if(!e){ box.innerHTML=''; return; }
   box.innerHTML='<div class="card" style="padding:14px;margin-top:10px"><div style="font-weight:650;margin-bottom:8px">'+(e.id? '안내 수정 #'+e.id : '새 안내')+'</div>'+
@@ -1483,7 +1208,7 @@ function updEditPaint(){
   box.querySelector('#updEPrev').onclick=function(){ var v=val(); updShow([{id:1, ver:v.ver, title:v.title, body:v.body, published_on:v.published_on}], {mode:'preview'}); };
   box.querySelector('#updESave').onclick=function(){ var v=val(); if(!v.title){ updMsg('제목을 넣으세요', true); return; } updNoteSave(v); };
 }
-async function updNoteSave(v){
+export async function updNoteSave(v){
   try{
     var me=ST.AUTH_USER||'', now=new Date().toISOString(), body=Object.assign({}, v); delete body.id;
     if(v.id){ body.updated_by=me; body.updated_at=now; await sbWrite('PATCH','upd_notes?id=eq.'+v.id, body); }
@@ -1492,14 +1217,14 @@ async function updNoteSave(v){
     UPD.edit=null; toast('업데이트 안내 저장', v.title||(v.active===false? '숨겼습니다':'게시했습니다')); updAdminLoad();
   }catch(e){ updMsg('저장 실패: '+String(e.message||e).slice(0,160), true); }
 }
-async function updNotifySet(email, on){
+export async function updNotifySet(email, on){
   try{
     await sbWrite('POST','upd_notify?on_conflict=email', {email:email, enabled:!!on, updated_by:ST.AUTH_USER||'', updated_at:new Date().toISOString()}, 'resolution=merge-duplicates');
     try{ await logChange(on? 'upd_notify_on':'upd_notify_off','upd_notify', email, {}); }catch(e){}
     toast('업데이트 안내', email+(on? ' — 다음 로그인 때 안내합니다':' — 안내하지 않습니다')); updAdminLoad();
   }catch(e){ updMsg('저장 실패: '+String(e.message||e).slice(0,160), true); }
 }
-async function updAckReset(email){
+export async function updAckReset(email){
   if(!confirm(email+' 의 확인 기록을 지웁니다.\n다음 로그인 때 지금까지의 안내 전체가 다시 뜹니다. 계속할까요?')) return;
   try{ await sbWrite('DELETE','upd_ack?email=eq.'+encodeURIComponent(email)); toast('처음부터 다시', email); updAdminLoad(); }
   catch(e){ updMsg('실패: '+String(e.message||e).slice(0,160), true); }
@@ -1512,32 +1237,34 @@ async function updAckReset(email){
    · 핵심 숫자: 이 화면(운영)과 스테이징의 buildDigest() 숫자가 같은지(같은 DB 라 다르면 코드가 깨진 것 — 일부러 정의를 바꾼 배포면 사람이 판단)
    · 폰(390px)으로 한 번 더(주요 메뉴) · 결과는 창에 표 + change_log(staging_qa) · GitHub 탭 «승격» 옆에 최근 QA 배지 · 통과 못 하면 승격 확인 창에 경고
    · 보기 위주 — 저장·발송처럼 데이터를 바꾸는 동작은 누르지 않음 */
-var QA={run:0, on:false, res:null, steps:[], w:null, ifr:null, errs:[]};
-var QA_MOBILE=['dash','contracts','orders','eqboard','oi','dcheck','leadsrc','report','price','cloud','adminx','ops','account'];
-function qaStagingUrl(){ var dir=location.pathname.replace(/\/staging\//,'/').replace(/[^/]*$/,''); return dir+'staging/index.html?qa=1&t='+Date.now(); }
-function qaVisible(el){ return !!(el && el.getClientRects && el.getClientRects().length); }
-function qaSleep(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
-function qaRaf(w){ return new Promise(function(r){ var done=false, f=function(){ if(!done){ done=true; r(); } }; try{ w.requestAnimationFrame(function(){ w.requestAnimationFrame(f); }); }catch(e){} setTimeout(f, 400); }); }
-async function qaWait(fn, ms, step){ var t0=Date.now(); while(Date.now()-t0<ms){ try{ if(fn()) return true; }catch(e){} await qaSleep(step||150); } return false; }
-function qaText(s, n){ s=String(s==null? '':s).replace(/\s+/g,' ').trim(); return s.length>(n||90)? s.slice(0,(n||90))+'…' : s; }
+export var QA={run:0, on:false, res:null, steps:[], w:null, ifr:null, errs:[]};
+export var QA_MOBILE=['dash','contracts','orders','eqboard','oi','dcheck','leadsrc','report','price','cloud','adminx','ops','account'];
+/* ㊿+153: 들여다보는 창의 포탈 함수·상태 — 모듈 전환 뒤에는 window.SVC 에(예전 버전은 window 에 바로) */
+export function qaApi(w){ try{ return (w && w.SVC) || w; }catch(e){ return w; } }
+export function qaStagingUrl(){ var dir=location.pathname.replace(/\/staging\//,'/').replace(/[^/]*$/,''); return dir+'staging/index.html?qa=1&t='+Date.now(); }
+export function qaVisible(el){ return !!(el && el.getClientRects && el.getClientRects().length); }
+export function qaSleep(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
+export function qaRaf(w){ return new Promise(function(r){ var done=false, f=function(){ if(!done){ done=true; r(); } }; try{ w.requestAnimationFrame(function(){ w.requestAnimationFrame(f); }); }catch(e){} setTimeout(f, 400); }); }
+export async function qaWait(fn, ms, step){ var t0=Date.now(); while(Date.now()-t0<ms){ try{ if(fn()) return true; }catch(e){} await qaSleep(step||150); } return false; }
+export function qaText(s, n){ s=String(s==null? '':s).replace(/\s+/g,' ').trim(); return s.length>(n||90)? s.slice(0,(n||90))+'…' : s; }
 /* 이 창·스테이징 창에서 같은 방법으로 뽑는 핵심 숫자 — buildDigest() 의 숫자(깊이 2) + 행 수·월 수 */
-function qaKpi(w){
+export function qaKpi(w){
   var out={}; try{
-    var D=w.buildDigest();
+    var D=qaApi(w).buildDigest();
     (function walk(o,p,d){ if(d>2 || !o) return; Object.keys(o).forEach(function(k){ if(/시간|시각|time|ms$|생성|갱신|오늘|기준일|설명|읽는법|주의/i.test(k)) return; var v=o[k], q=p? p+'.'+k : k;
       if(typeof v==='number' && isFinite(v)) out[q]=v; else if(Array.isArray(v)) out[q+'(개수)']=v.length; else if(v && typeof v==='object') walk(v,q,d+1); }); })(D,'',0);
-    out['계약 행 수']=((w.ST&&w.ST.DATA&&w.ST.DATA.rows)||[]).length; out['월 수']=(w.ST&&w.ST.M)||0;
+    out['계약 행 수']=((qaApi(w).ST&&qaApi(w).ST.DATA&&qaApi(w).ST.DATA.rows)||[]).length; out['월 수']=(qaApi(w).ST&&qaApi(w).ST.M)||0;
   }catch(e){ out._err=String(e.message||e); }
   return out;
 }
-function qaKpiDiff(a, b){
+export function qaKpiDiff(a, b){
   var diffs=[], onlyA=0, onlyB=0;
   Object.keys(a).forEach(function(k){ if(k==='_err') return; if(!(k in b)) onlyA++; else if(a[k]!==b[k]) diffs.push(k+': '+a[k]+' → '+b[k]); });
   Object.keys(b).forEach(function(k){ if(k!=='_err' && !(k in a)) onlyB++; });
   return {diffs:diffs, onlyA:onlyA, onlyB:onlyB};
 }
 /* 요소를 짧은 경로로 (Claude 에게 전달할 때 어느 요소인지 알 수 있게) — #id 가 있으면 거기서 멈춤 */
-function qaPath(el, stop){
+export function qaPath(el, stop){
   var parts=[]; for(var n=el, k=0; n && n.nodeType===1 && k<5; n=n.parentElement, k++){
     if(n===stop) break;
     if(n.id){ parts.unshift('#'+n.id); break; }
@@ -1547,12 +1274,12 @@ function qaPath(el, stop){
   }
   return parts.join(' > ');
 }
-var QA_LOADING=/(불러오는|읽는|확인하는|계산하는|가져오는|준비하는|만드는|그리는) 중|중…|loading/i;
+export var QA_LOADING=/(불러오는|읽는|확인하는|계산하는|가져오는|준비하는|만드는|그리는) 중|중…|loading/i;
 /* 한 화면 검사 — 결과는 [{m:메시지, w:경고면 true, d:[Claude 에게 넘길 진단 줄]}] */
-async function qaInspect(w, v){
+export async function qaInspect(w, v){
   var d=w.document, out=[], add=function(m, warn, diag){ out.push({m:m, w:!!warn, d:diag||[]}); };
   var hosts=[].slice.call(d.querySelectorAll('#app [id^="view"]')).filter(function(e){ return !e.classList.contains('hidden') && qaVisible(e) && e.id!=='viewLogin'; });
-  var host=hosts[0]; if(!host){ add('화면 영역이 보이지 않음', false, ['보이는 #view* 없음 · ST.CUR_VIEW='+(w.ST&&w.ST.CUR_VIEW)]); return out; }
+  var host=hosts[0]; if(!host){ add('화면 영역이 보이지 않음', false, ['보이는 #view* 없음 · ST.CUR_VIEW='+(qaApi(w).ST&&qaApi(w).ST.CUR_VIEW)]); return out; }
   var settled=await qaWait(function(){ var t=String(host.innerText||''); return !(t.length<300 && QA_LOADING.test(t)); }, 6000, 200);
   if(!settled){ add('6초가 지나도 «불러오는 중»', true, ['화면: #'+host.id, '보이는 글자: '+qaText(host.innerText, 160)]); return out; }
   var sat=host.querySelector('iframe');
@@ -1584,8 +1311,8 @@ async function qaInspect(w, v){
   if(stacked) add('글자가 세로로 쌓임 «'+qaText(stacked.t, 20)+'»', false, [qaPath(stacked.el)+' — 폭 '+Math.round(stacked.w)+'px · 높이 '+Math.round(stacked.h)+'px', '부모: '+qaPath(stacked.el.parentElement)+' · display '+w.getComputedStyle(stacked.el.parentElement).display]);
   return out;
 }
-function qaStep(id, label, group){ var s={id:id, label:label, group:group||'', st:'wait', ms:0, detail:''}; QA.steps.push(s); return s; }
-function qaPaint(){
+export function qaStep(id, label, group){ var s={id:id, label:label, group:group||'', st:'wait', ms:0, detail:''}; QA.steps.push(s); return s; }
+export function qaPaint(){
   var L=document.getElementById('qaList'); if(!L) return;
   var ic={wait:'·', run:'⏳', ok:'✅', fail:'❌', warn:'⚠️', skip:'—'};
   L.innerHTML=QA.steps.map(function(s){ return '<div class="qa-row '+s.st+'"><span class="qa-ic">'+ic[s.st]+'</span><span class="qa-lb">'+(s.group? '<span class="mini">'+esc(s.group)+' </span>':'')+esc(s.label)+'</span><span class="mini qa-ms">'+(s.ms? (s.ms/1000).toFixed(1)+'s':'')+'</span>'+(s.detail? '<div class="mini qa-dt">'+esc(s.detail)+'</div>':'')+'</div>'; }).join('');
@@ -1593,12 +1320,12 @@ function qaPaint(){
   var cap=document.getElementById('qaPrevCap'), cur=QA.steps.filter(function(s){ return s.st==='run'; })[0], done=QA.steps.filter(function(s){ return /ok|fail|warn/.test(s.st); }).length;
   if(cap) cap.textContent=cur? '지금: '+(cur.group? cur.group+' ':'')+cur.label+' ('+(done+1)+'/'+QA.steps.length+')' : (QA.on? '준비 중…' : '점검 끝 — 미리보기는 스테이징 홈');
 }
-function qaFit(fw, fh, keepH){
+export function qaFit(fw, fh, keepH){
   var box=document.getElementById('qaFrame'), ifr=QA.ifr; if(!box || !ifr) return;
   var avail=box.clientWidth||600, s=Math.min(1, avail/fw); if(keepH){ s=Math.min(s, keepH/fh); } else box.style.height=Math.round(fh*s)+'px';
   ifr.style.width=fw+'px'; ifr.style.height=fh+'px'; ifr.style.transform='scale('+s+')'; ifr.style.left=Math.max(0, Math.round((avail-fw*s)/2))+'px';
 }
-function qaOpen(){
+export function qaOpen(){
   var old=document.getElementById('ovlQa'); if(old) old.remove();
   var ov=document.createElement('div'); ov.id='ovlQa'; ov.className='ovl on'; ov.style.cssText='z-index:9400;align-items:center';
   ov.innerHTML='<div class="modal qa" style="width:min(1240px,100%);padding:18px 20px" role="dialog" aria-modal="true" aria-labelledby="qaTitle">'+
@@ -1612,8 +1339,8 @@ function qaOpen(){
   ov.querySelector('#qaCopy').onclick=qaCopy;
   qaRun();
 }
-function qaClose(){ QA.run++; QA.on=false; QA.w=null; QA.ifr=null; var ov=document.getElementById('ovlQa'); if(ov) ov.remove(); if(ST.CUR_VIEW==='ops') try{ renderOps(true); }catch(e){} }
-async function qaRun(){
+export function qaClose(){ QA.run++; QA.on=false; QA.w=null; QA.ifr=null; var ov=document.getElementById('ovlQa'); if(ov) ov.remove(); if(ST.CUR_VIEW==='ops') try{ renderOps(true); }catch(e){} }
+export async function qaRun(){
   var run=++QA.run; QA.on=true; QA.errs=[]; QA.steps=[]; QA.res=null;
   var alive=function(){ return run===QA.run; };
   var sum=document.getElementById('qaSum'), pb=document.getElementById('qaPromote'), cb=document.getElementById('qaCopy'); if(pb) pb.disabled=true; if(cb) cb.disabled=true; if(sum) sum.textContent='실행 중…';
@@ -1628,20 +1355,20 @@ async function qaRun(){
   try{ w.addEventListener('error', function(e){ QA.errs.push({m:String((e&&e.message)||'오류'), at:e&&e.filename? String(e.filename).replace(/^.*\/staging\//,'').replace(/\?.*$/,'')+':'+e.lineno+':'+e.colno : '', st:String((e&&e.error&&e.error.stack)||'').split('\n').slice(0,4).join(' ⏎ ')}); });
        w.addEventListener('unhandledrejection', function(e){ var r=e&&e.reason; QA.errs.push({m:'Promise: '+String((r&&(r.message||r))||''), at:'', st:String((r&&r.stack)||'').split('\n').slice(0,4).join(' ⏎ ')}); });
        w.document.addEventListener('securitypolicyviolation', function(e){ QA.errs.push({m:'CSP 차단: '+e.violatedDirective+' '+(e.blockedURI||''), at:String(e.sourceFile||'').replace(/^.*\/staging\//,'')+(e.lineNumber? ':'+e.lineNumber:''), st:''}); }); }catch(e){}
-  var ready=await qaWait(function(){ var app=w.document.getElementById('app'); return w.ST && w.ST.DATA && app && !app.classList.contains('hidden'); }, 30000, 250);
+  var ready=await qaWait(function(){ var app=w.document.getElementById('app'); return qaApi(w).ST && qaApi(w).ST.DATA && app && !app.classList.contains('hidden'); }, 30000, 250);
   s0.ms=Date.now()-t0;
   if(!alive()) return;
-  var verS=''; try{ verS=String(w.APP_VER||''); }catch(e){}
-  var verP=String(window.APP_VER||''); var vs=document.getElementById('qaVer');
-  if(vs) vs.textContent='스테이징 '+(verS.match(/㊿\+\d+/)||[verS||'?'])[0]+' · '+(window.IS_STAGING? '기준(이 화면·스테이징) ':'운영(이 화면) ')+(verP.match(/㊿\+\d+/)||[verP])[0]+(verS && verS===verP? ' — 같은 버전(스테이징에 새로 올린 게 없음?)':'');
+  var verS=''; try{ verS=String(qaApi(w).APP_VER||''); }catch(e){}
+  var verP=String(APP_VER||''); var vs=document.getElementById('qaVer');
+  if(vs) vs.textContent='스테이징 '+(verS.match(/㊿\+\d+/)||[verS||'?'])[0]+' · '+(IS_STAGING? '기준(이 화면·스테이징) ':'운영(이 화면) ')+(verP.match(/㊿\+\d+/)||[verP])[0]+(verS && verS===verP? ' — 같은 버전(스테이징에 새로 올린 게 없음?)':'');
   if(!ready){ var ls=w.document&&w.document.getElementById('viewLogin'); var errCard=w.document&&w.document.querySelector('#loading .err');
     s0.st='fail'; s0.detail=errCard? qaText(errCard.innerText, 120) : (ls && qaVisible(ls)? '로그인 화면에 머묾 — 세션이 공유되지 않음(로그인 유지가 꺼진 다른 탭?)' : (QA.errs.length? 'JS 오류: '+qaText(QA.errs[0].m,100) : '30초 안에 데이터가 뜨지 않음'));
     s0.diag=QA.errs.slice(0,3).map(function(x){ return 'JS 오류: '+x.m+(x.at? ' @ '+x.at:'')+(x.st? ' · stack: '+x.st:''); });
     qaPaint(); return qaFinish(run); }
   s0.st='ok'; qaPaint();
   // 메뉴 목록 — 스테이징 사이드바에 보이는 것(권한·메뉴 편집 반영)
-  var btns=[].slice.call(w.document.querySelectorAll('#side button[data-v]')).filter(function(b){ return (w.visBtn? w.visBtn(b) : (b.style.display!=='none' && !b.classList.contains('pdeny'))); });
-  var menus=[]; btns.forEach(function(b){ var v=b.dataset.v; if(v && menus.every(function(m){ return m.v!==v; })){ var sub=''; try{ sub=w.navSub? w.navSub(b) : ''; }catch(e){} menus.push({v:v, label:(sub? sub+' · ':'')+(w.navText? w.navText(b) : b.textContent).trim()}); } });
+  var btns=[].slice.call(w.document.querySelectorAll('#side button[data-v]')).filter(function(b){ return (qaApi(w).visBtn? qaApi(w).visBtn(b) : (b.style.display!=='none' && !b.classList.contains('pdeny'))); });
+  var menus=[]; btns.forEach(function(b){ var v=b.dataset.v; if(v && menus.every(function(m){ return m.v!==v; })){ var sub=''; try{ sub=qaApi(w).navSub? qaApi(w).navSub(b) : ''; }catch(e){} menus.push({v:v, label:(sub? sub+' · ':'')+(qaApi(w).navText? qaApi(w).navText(b) : b.textContent).trim()}); } });
   if(!menus.some(function(m){ return m.v==='dash'; })) menus.unshift({v:'dash', label:'홈'});
   var sK=qaStep('kpi','핵심 숫자 운영 = 스테이징');
   var desk=menus.map(function(m){ return {m:m, s:qaStep('d:'+m.v, m.label, '')}; });
@@ -1651,10 +1378,10 @@ async function qaRun(){
     var m=item.m, s=item.s; s.st='run'; qaPaint(); var t=Date.now(), e0=QA.errs.length, res=[];
     var pre=function(tag, list){ list.forEach(function(x){ res.push({m:(tag? '['+tag+'] ':'')+x.m, w:x.w, d:(tag? ['관리자 탭: '+tag]:[]).concat(x.d)}); }); };
     try{
-      try{ w.navMenu(m.v); }catch(e){ res.push({m:'이동 오류: '+qaText(e.message||e, 100), w:false, d:['navMenu(\''+m.v+'\') 에서 예외: '+String(e.message||e), 'stack: '+String(e.stack||'').split('\n').slice(0,4).join(' ⏎ ')]}); }
+      try{ qaApi(w).navMenu(m.v); }catch(e){ res.push({m:'이동 오류: '+qaText(e.message||e, 100), w:false, d:['navMenu(\''+m.v+'\') 에서 예외: '+String(e.message||e), 'stack: '+String(e.stack||'').split('\n').slice(0,4).join(' ⏎ ')]}); }
       if(m.v==='dash'){ try{ var ab=w.document.getElementById('ccAnaBtn'); if(ab && ab.getAttribute('aria-expanded')!=='true') ab.click(); }catch(e){} }
       await qaRaf(w); await qaSleep(250);
-      if(m.v==='adminx' && w.admTab){ var tabs=['acct','sec','cfg','bill']; for(var i=0;i<tabs.length;i++){ if(!alive()) return; w.admTab(tabs[i]); await qaRaf(w); pre(tabs[i], await qaInspect(w, m.v)); } w.admTab('acct'); }
+      if(m.v==='adminx' && await qaWait(function(){ return !!qaApi(w).admTab; }, 6000, 100)){   /* ㊿+153: 관리자 코드는 처음 열 때 받음 — 받을 때까지 */ var tabs=['acct','sec','cfg','bill']; for(var i=0;i<tabs.length;i++){ if(!alive()) return; qaApi(w).admTab(tabs[i]); await qaRaf(w); pre(tabs[i], await qaInspect(w, m.v)); } qaApi(w).admTab('acct'); }
       else pre('', await qaInspect(w, m.v));
       QA.errs.slice(e0).forEach(function(x){ res.push({m:'JS 오류: '+qaText(x.m, 110), w:false, d:['오류: '+x.m+(x.at? ' @ '+x.at:''), x.st? 'stack: '+x.st : ''].filter(Boolean)}); });
     }catch(e){ res.push({m:'검사 오류: '+qaText(e.message||e, 100), w:true, d:[String(e.stack||e).slice(0,300)]}); }
@@ -1677,13 +1404,13 @@ async function qaRun(){
   // 폰 폭
   if(mob.length){ qaFit(390, 844, boxH); await qaSleep(500); await qaRaf(w);
     for(var j=0;j<mob.length;j++){ if(!alive()) return; await runMenu(mob[j]); }
-    qaFit(1280, 800); try{ w.navMenu('dash'); }catch(e){} }
+    qaFit(1280, 800); try{ qaApi(w).navMenu('dash'); }catch(e){} }
   qaFinish(run);
 }
-async function qaFinish(run){
+export async function qaFinish(run){
   if(run!==QA.run) return; QA.on=false;
   var all=QA.steps.filter(function(s){ return s.st!=='skip'; }), fails=all.filter(function(s){ return s.st==='fail'; }), warns=all.filter(function(s){ return s.st==='warn'; });
-  var verS=''; try{ verS=String((QA.w&&QA.w.APP_VER)||''); }catch(e){}
+  var verS=''; try{ verS=String((QA.w&&qaApi(QA.w).APP_VER)||''); }catch(e){}
   QA.res={at:Date.now(), verS:(verS.match(/㊿\+\d+/)||[verS])[0], verP:(String(APP_VER).match(/㊿\+\d+/)||[APP_VER])[0], total:all.length, pass:all.length-fails.length-warns.length, fail:fails.length, warn:warns.length, fails:fails.map(function(s){ return (s.group? s.group+' ':'')+s.label+' — '+s.detail; })};
   var sum=document.getElementById('qaSum'), pb=document.getElementById('qaPromote');
   if(sum) sum.innerHTML=(fails.length? '<b style="color:var(--critical)">❌ '+fails.length+'건 실패</b>' : '<b style="color:var(--ok,var(--brand-ink))">✅ 전부 통과</b>')+' <span class="mini">· '+QA.res.pass+'/'+all.length+(warns.length? ' · ⚠️ '+warns.length:'')+' · '+QA.res.verS+(fails.length? ' — 실패 항목을 고친 뒤 다시 올리고 QA 를 다시 돌리세요' : ' — 승격해도 됩니다')+'</span>';
@@ -1694,14 +1421,14 @@ async function qaFinish(run){
   try{ await logChange('staging_qa','staging',QA.res.verS,{pass:QA.res.pass, total:QA.res.total, fail:QA.res.fail, warn:QA.res.warn, fails:QA.res.fails.slice(0,20), prod:QA.res.verP}); }catch(e){}
   if(ST.CUR_VIEW==='ops' && OPS.tab==='gh') try{ renderOps(true); }catch(e){}
 }
-function qaBadgeHtml(){
+export function qaBadgeHtml(){
   var r=QA.res; if(!r) return '<span class="mini" id="qaBadge">QA 아직 안 함</span>';
   var t=new Date(r.at), hm=('0'+t.getHours()).slice(-2)+':'+('0'+t.getMinutes()).slice(-2);
   return '<span class="ctag'+(r.fail? ' late':' ok')+'" id="qaBadge" title="'+esc(r.fails.slice(0,3).join('\n'))+'">QA '+(r.fail? '❌ '+r.fail+'건 실패':'✅ '+r.pass+'/'+r.total)+' · '+esc(r.verS)+' · '+hm+'</span>';
 }
 
 /* ── Claude 에게 넘길 보고서 (마크다운) — 실패·경고 상세 + 실행 환경 · 통과는 이름만 ── */
-function qaReport(){
+export function qaReport(){
   var r=QA.res||{}, st=QA.steps||[], at=new Date(r.at||Date.now());
   var kst=new Date(at.getTime()+9*3600e3).toISOString().replace('T',' ').slice(0,16)+' KST';
   var ua=String(navigator.userAgent||''), br=(/Edg\/(\d+)/.exec(ua)? 'Edge '+RegExp.$1 : /Chrome\/(\d+)/.exec(ua)? 'Chrome '+RegExp.$1 : /Version\/([\d.]+).*Safari/.exec(ua)? 'Safari '+RegExp.$1 : /Firefox\/(\d+)/.exec(ua)? 'Firefox '+RegExp.$1 : ua.slice(0,60));
@@ -1710,7 +1437,7 @@ function qaReport(){
   var L=[];
   L.push('# 포탈 스테이징 QA 결과 — '+(fails.length? '❌ 실패 '+fails.length+'건' : '✅ 실패 없음')+(warns.length? ' · ⚠ 경고 '+warns.length+'건' : '')+' ('+(r.pass||oks.length)+'/'+(r.total||st.length)+' 통과)');
   L.push('');
-  L.push('- 스테이징: '+(r.verS||'?')+' · 기준(이 화면): '+(r.verP||'?')+(window.IS_STAGING? ' (스테이징에서 실행)' : ' (운영)')+' · '+kst);
+  L.push('- 스테이징: '+(r.verS||'?')+' · 기준(이 화면): '+(r.verP||'?')+(IS_STAGING? ' (스테이징에서 실행)' : ' (운영)')+' · '+kst);
   L.push('- 실행: '+(ST.AUTH_USER||'?')+' · 브라우저: '+br+' · '+String(os[0]).replace(/_/g,'.')+' · 이 화면 '+window.innerWidth+'×'+window.innerHeight);
   L.push('- 미리보기 크기: 데스크톱 1280×800 · 📱 폰 390×844 (QA 창 안 iframe)');
   L.push('- 주소: '+location.origin+qaStagingUrl().replace(/&t=\d+/,''));
@@ -1722,7 +1449,7 @@ function qaReport(){
   L.push(''); L.push('> 검사 항목: JS 오류 · 빈 화면 · 깨진 값(NaN/undefined) · 가로 넘침 · 글자 세로 쌓임 · 하위 페이지 로드 · 핵심 숫자(buildDigest) 운영=스테이징 · 저장/발송은 누르지 않음');
   return L.join('\n');
 }
-function qaCopy(){
+export function qaCopy(){
   var txt=qaReport();
   var done=function(){ toast('복사했습니다', 'Claude 대화창에 붙여넣으세요 ('+txt.split('\n').length+'줄)'); var b=document.getElementById('qaCopy'); if(b){ var o=b.textContent; b.textContent='✓ 복사됨'; setTimeout(function(){ b.textContent=o; }, 1800); } };
   var fallback=function(){

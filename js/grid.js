@@ -1,14 +1,28 @@
 /* ===== grid.js — 뒤로가기 · 콤보 입력 · 열 보이기 · 열 필터 · 데이터 그리드 렌더 =====
-   포탈 본체(js/app.js)를 ④ 아키텍처 2단계(㊿+136)에서 기능별로 나눈 파일. 전역 var/function 그대로 — 즉시 실행 문장은 전부 js/init.js 에.
-   로드 순서는 index.html <meta name="app-js"> (js/load.js 가 그 순서대로 ?v=APP_VER 를 붙여 불러옴) */
+   ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
+import { APP_VER, ST } from './state.js';
+import { Viz } from './viz.js';
+import { $, canView, cssv, lline, mk, navText, permEnter, STATE, won, wonFull } from './core.js';
+import { cmdAskHit, EQUIP_VIEWS, loadFromDb, onData, railSync, renderEqBoard, sbTry, sbWrite, toast, todayStr } from './shell.js';
+import { buildControls, esc, renderAll } from './dash.js';
+import { GRIDS } from './grids.js';
+import { eqRetOpen, eqWant, renderEqPanel, syncOrderAssets } from './equipment.js';
+import { CH_DEFS, ensureLeadSrc, liveCalc, liveDiff, loadLib, LV, renderChannelView, setLiveSrc } from './analysis.js';
+import { applyDense, pushRecent, renderTodo } from './tools.js';
+import { renderCloud } from './cloud.js';
+import { loadInbound, renderInbPanel, renderInbStat, renderWeekly } from './inbound.js';
+import { CHURN, CR, csSetTab, ensureGroupOpen, helpBox, helpWire, initOiForm, loadRecvPresets, oiLinkQuote, oiToContract, renderChurn,
+  renderChurnRate, renderCsite, renderCustFlow, renderOiTiles } from './sales.js';
+import { logChange, msg, openOvl } from './edit.js';
+import { lazyView } from './lazy.js';
 
 
 /* ---- 뒤로가기 — 화면 이동을 브라우저 히스토리에 남겨 상단 ← 버튼·브라우저/폰 뒤로가기·Alt+← 가 모두 이전 화면으로 ----
    주소 해시(#oi 처럼)에 현재 화면을 적어 두므로 새로고침·링크 공유 때도 그 화면이 열립니다. */
-var NAV={i:0, pop:false, ready:false};
-function navValid(v){ return v==='dash' || !!document.querySelector('#side button[data-v="'+v+'"]'); }
-function navDepth(){ try{ return (history.state && typeof history.state.i==='number')? history.state.i : 0; }catch(e){ return 0; } }
-function navRecord(prev, v){
+export var NAV={i:0, pop:false, ready:false};
+export function navValid(v){ return v==='dash' || !!document.querySelector('#side button[data-v="'+v+'"]'); }
+export function navDepth(){ try{ return (history.state && typeof history.state.i==='number')? history.state.i : 0; }catch(e){ return 0; } }
+export function navRecord(prev, v){
   if(NAV.pop || prev===v) return;
   try{
     if(NAV.ready){ NAV.i++; history.pushState({v:v, i:NAV.i}, '', location.pathname+location.search+'#'+v); }
@@ -16,8 +30,8 @@ function navRecord(prev, v){
   }catch(e){}
   btnBackSync();
 }
-function btnBackSync(){ var b=document.getElementById('btnBack'); if(!b) return; b.style.display=(navDepth()>0 || (ST.CUR_VIEW && ST.CUR_VIEW!=='dash'))? 'inline-flex':'none'; }
-function goBack(){
+export function btnBackSync(){ var b=document.getElementById('btnBack'); if(!b) return; b.style.display=(navDepth()>0 || (ST.CUR_VIEW && ST.CUR_VIEW!=='dash'))? 'inline-flex':'none'; }
+export function goBack(){
   if(navDepth()>0){ history.back(); return; }           // 이 포탈 안에서 쌓인 이동만 되돌림 (포탈 밖으로 나가지 않음) · popstate 가 화면을 바꿈
   if(ST.CUR_VIEW!=='dash') switchView('dash');
 }
@@ -29,7 +43,7 @@ function goBack(){
    · 처음 값 = 파일을 읽은 직후의 상태 객체 사본(viewSnapInit · init.js). 이 브라우저에 저장하는 «설정»(LIVE 판정 기준 · 통화 · 만기 개월 · 글자 크기 등)은 그대로 둠
    · 배포·운영의 «운영/스테이징» 대상과 올릴 파일 목록은 되돌리지 않음(안전 — 고른 대상이 몰래 바뀌면 안 됨)
    · 화면에 새 상태를 더하면 VIEW_UI 에 «화면: {객체: [키…]}» 한 줄 */
-var VIEW_UI={
+export var VIEW_UI={
   live:{LV:['T','diff']}, churn:{CHURN:['f','t','q','fil','sk','sd','inclRenew']},
   churnrate:{CR:['unit','base','cnd','rows','exDen','sup','from','upto','open','f']}, custflow:{CR:['unit','base','cnd','rows','exDen','sup','from','upto','open','f']},
   leadsrc:{LS:['base','line','pick']}, dcheck:{DC:['open','sev']}, eqboard:{EQB:['ch','q','more']},
@@ -37,16 +51,18 @@ var VIEW_UI={
   biz:{BZX:['showEq','showSkip','showRuled']}, report:{RPV:['tab']}, csite:{CS:['tab']},
   ops:{OPS:['tab','msg','msgCls']}, adminx:{CD:['kind','showOff'], AP:['user'], ADM:['tab']}
 };
-var VIEW_SNAP=null;
-function viewSnapInit(){
-  VIEW_SNAP={};
+export var VIEW_SNAP=null;
+export function viewSnapInit(){ VIEW_SNAP={}; viewSnapAdd(); }
+/* ㊿+153: 처음 열 때 불러오는 화면(리포트·관리자·가격표)의 상태 객체는 그 코드를 받은 직후에 사본(lazyHook · init.js) — 아직 없는 것은 건너뜀 */
+export function viewSnapAdd(){
+  if(!VIEW_SNAP) return;
   Object.keys(VIEW_UI).forEach(function(v){ Object.keys(VIEW_UI[v]).forEach(function(n){
     var o=window[n]; if(!o || VIEW_SNAP[n]) return; var s={}, un=[];
     VIEW_UI[v][n].forEach(function(k){ if(o[k]===undefined) un.push(k); else s[k]=o[k]; });
     VIEW_SNAP[n]={json:JSON.stringify(s), undef:un};   // 처음에 없던 키는 되돌릴 때 지움
   }); });
 }
-function viewReset(v){
+export function viewReset(v){
   if(!VIEW_SNAP) return;
   var m=VIEW_UI[v]; if(m) Object.keys(m).forEach(function(n){
     var o=window[n], sn=VIEW_SNAP[n]; if(!o || !sn) return; var s=JSON.parse(sn.json);
@@ -59,7 +75,7 @@ function viewReset(v){
   if(v==='dash') dashResetIfChanged();
 }
 /* 대시보드: 위쪽 거르기(사업라인 · 기준월 · 단위 · 업종 · 파트너 · 상태 · 검색)가 처음과 다를 때만 «초기화»와 같은 동작 */
-function dashResetIfChanged(){
+export function dashResetIfChanged(){
   if(!ST.DATA || window.IS_EQUIP) return;
   var off=(ST.DATA.lines||[]).some(function(l){ return STATE.lines[l.label]===false; });
   var base0=(window.DASH_BASE0!=null)? window.DASH_BASE0 : STATE.base;
@@ -67,7 +83,7 @@ function dashResetIfChanged(){
   STATE.base=base0; var b=document.getElementById('btnReset');
   if(b && b.onclick) b.onclick(); else { try{ buildControls(); renderAll(); }catch(e){} }
 }
-function navMenu(v){
+export function navMenu(v){
   try{ viewReset(v); }catch(e){}
   switchView(v);
   try{ window.scrollTo(0, 0); }catch(e){}
@@ -76,7 +92,7 @@ function navMenu(v){
 
 /* Backspace = 뒤로가기 — 글자를 입력하는 칸(input·textarea·select·편집 가능 영역)에 커서가 있을 때는 그대로 글자 지우기 */
 
-function switchView(v){
+export function switchView(v){
   if(v==='mdrpoc') v='mdrops';                       // 통합 전 이름 호환
   if((v==='ordernew'||v==='mdrnew'||v==='oinew'||v==='csite'||v==='preport'||v==='s1'||v==='kk') && !ST.SB_TOKEN){ openOvl('ovlAuth'); return; }
   if(window.IS_EQUIP && !EQUIP_VIEWS[v]) v=window.EQUIP_HOME||'orders';   // 제한 계정은 허용된 화면만
@@ -122,19 +138,19 @@ function switchView(v){
   $('#viewChannel').classList.toggle('hidden',!chv);
   $('#viewData').classList.toggle('hidden',dash||quote||preport||s1v||kkv||onew||mnew||oinew||csite||acct||adminx||ops||weekly||inbstat||price||report||churn||cloud||crate||cflow||eqb||!!chv);
   if(eqb){ renderEqBoard(); return; }
-  if(ops){ renderOps(); return; }
+  if(ops){ lazyView('admin','viewOps','renderOps'); return; }
   if(csite){ renderCsite(); return; }
-  if(report){ renderReport(); return; }
+  if(report){ lazyView('report','viewReport','renderReport'); return; }
   if(churn){ renderChurn(); return; }
   if(crate){ renderChurnRate(); return; }
   if(cflow){ renderCustFlow(); return; }
-  if(price){ renderPrice(); return; }
+  if(price){ lazyView('price','viewPrice','renderPrice'); return; }
   if(cloud){ renderCloud(); return; }
   if(inbstat){ renderInbStat(); return; }
   if(weekly){ renderWeekly(); return; }
-  if(adminx){ renderAdmin(); return; }
+  if(adminx){ lazyView('admin','viewAdmin','renderAdmin'); return; }
   if(chv){ renderChannelView(v); return; }
-  if(acct){ renderAccount(); return; }
+  if(acct){ lazyView('admin','viewAccount','renderAccount'); return; }
   if(onew){
     msg('odMsg','');
     $('#odFormWrap').style.display='';
@@ -215,7 +231,7 @@ function switchView(v){
   applyDense();
 }
 
-function fmtCell(c,v,r){
+export function fmtCell(c,v,r){
   if(c.fmt) return c.fmt(v,r);
   if(v===null||v===undefined||v==='') return '·';
   if(c.t==='month') return String(v).slice(0,7);
@@ -224,7 +240,7 @@ function fmtCell(c,v,r){
   if(c.t==='number') return (c.won? Math.round(Number(v)/1000):Number(v)).toLocaleString('ko-KR');
   return String(v);
 }
-function editCell(c,v){
+export function editCell(c,v){
   /* 참고: 금액 열(c.won)은 화면 표시만 천원 단위이며, 입력·저장 값은 원 단위 그대로입니다 */
   if(c.t==='select'){
     var opts=(typeof c.opts==='function'? c.opts():c.opts).slice();
@@ -256,14 +272,14 @@ function editCell(c,v){
    · 임대 장비: 상태를 «임대중»으로 바꾸면 회수일을 비우고, «회수완료»로 바꾸면 회수일이 비어 있을 때 오늘을 넣습니다 */
 /* ===== 목록형 입력칸(콤보) =====
    칸을 누르면 전체 목록이 뜨고, 글자를 치면 그에 맞게 좁혀집니다. 목록에 없는 값도 그대로 입력해 저장할 수 있습니다. */
-var CB={inp:null, off:null};
-function comboClose(){
+export var CB={inp:null, off:null};
+export function comboClose(){
   var m=document.getElementById('cbMenu'); if(m) m.remove();
   if(CB.off){ document.removeEventListener('mousedown', CB.off, true); CB.off=null; }
   CB.inp=null;
 }
 /* 열려 있는 목록을 입력칸 아래(또는 위)에 다시 붙입니다 — 표를 스크롤해도 따라다니게 */
-function comboPlace(){
+export function comboPlace(){
   var m=document.getElementById('cbMenu'), inp=CB.inp;
   if(!m || !inp || !document.body.contains(inp)) return;
   var r=inp.getBoundingClientRect();
@@ -275,7 +291,7 @@ function comboPlace(){
   if(below<180 && r.top>below){ m.style.top=''; m.style.bottom=(window.innerHeight-r.top+4)+'px'; }
   else { m.style.bottom=''; m.style.top=(r.bottom+4)+'px'; }
 }
-function comboWire(inp, opts, onPick){
+export function comboWire(inp, opts, onPick){
   opts=(opts||[]).map(function(o){ return String(o); });
   var box=inp.closest('.cbo') || inp.parentElement;
   var btn=box? box.querySelector('.cbb') : null;
@@ -352,7 +368,7 @@ function comboWire(inp, opts, onPick){
 /* 목록 안에서 굴린 스크롤은 그대로 두고, 화면·표를 스크롤하면 위치만 따라갑니다 (예전에는 닫혔습니다) */
 
 
-function wireRowInputs(tr,g){
+export function wireRowInputs(tr,g){
   /* 목록형(콤보) 칸 연결 — 열 정의의 opts 를 그때그때 읽습니다(계약번호처럼 값이 늘어나는 목록 때문) */
   tr.querySelectorAll('input.cbi[data-k]').forEach(function(inp){
     var c=((g&&g.cols)||[]).filter(function(x){ return x.k===inp.dataset.k; })[0];
@@ -378,7 +394,7 @@ function wireRowInputs(tr,g){
     });
   }
 }
-function readRowInputs(tr,g){
+export function readRowInputs(tr,g){
   var body={};
   tr.querySelectorAll('[data-k]').forEach(function(inp){
     var c=g.cols.filter(function(x){return x.k===inp.dataset.k;})[0];
@@ -396,22 +412,22 @@ function readRowInputs(tr,g){
   return body;
 }
 
-var DV={page:0, per:100, sortK:null, sortDir:1, filters:{}};
+export var DV={page:0, per:100, sortK:null, sortDir:1, filters:{}};
 
 /* ===== 열 보이기/숨기기 (화면마다 따로 기억) =====
    계약처럼 열이 많은 표에서 지금 보고 싶은 열만 남깁니다. 숨겨도 값은 그대로 있고 검색·엑셀 내려받기에만 빠집니다. */
-var HIDE={};
-function hideKey(){ return 'svc_hidecols_'+(ST.AUTH_USER||'anon'); }
-function loadHide(){ try{ HIDE=JSON.parse(localStorage.getItem(hideKey())||'{}')||{}; }catch(e){ HIDE={}; } }
-function saveHide(){ try{ localStorage.setItem(hideKey(), JSON.stringify(HIDE)); }catch(e){} }
-function hiddenSet(view){ return (HIDE[view]||[]); }
-function visCols(g){
+export var HIDE={};
+export function hideKey(){ return 'svc_hidecols_'+(ST.AUTH_USER||'anon'); }
+export function loadHide(){ try{ HIDE=JSON.parse(localStorage.getItem(hideKey())||'{}')||{}; }catch(e){ HIDE={}; } }
+export function saveHide(){ try{ localStorage.setItem(hideKey(), JSON.stringify(HIDE)); }catch(e){} }
+export function hiddenSet(view){ return (HIDE[view]||[]); }
+export function visCols(g){
   var h=hiddenSet(ST.CUR_VIEW);
   if(!h.length) return g.cols;
   var out=g.cols.filter(function(c){ return h.indexOf(c.k)<0; });
   return out.length? out : g.cols;      /* 전부 숨기면 아무것도 안 보이니 원래대로 */
 }
-function openColPick(btn){
+export function openColPick(btn){
   var g=GRIDS[ST.CUR_VIEW]; if(!g||g.custom) return;
   closeColFilter();
   var old=document.getElementById('colPick'); if(old) old.remove();
@@ -458,8 +474,8 @@ function openColPick(btn){
 }
 
 /* ===== 열 필터 (구글시트식 «값 골라 보기») ===== */
-var BLANK_LABEL='(빈 값)';
-function cellText(c,v,r){
+export var BLANK_LABEL='(빈 값)';
+export function cellText(c,v,r){
   var t;
   /* 계산 열(업종·설치율·경과일 등)은 fmt 가 행 전체를 봐야 값이 나옵니다 —
      행을 넘기지 않으면 모든 행이 «(빈 값)» 으로 잡힙니다 */
@@ -468,10 +484,10 @@ function cellText(c,v,r){
   if(t==='' || t==='·') t=BLANK_LABEL;
   return t;
 }
-function filterCount(){ var n=0; for(var k in DV.filters){ if(DV.filters[k]&&DV.filters[k].length) n++; } return n; }
-function clearFilters(){ DV.filters={}; DV.lens=''; DV.page=0; renderGrid(); }
+export function filterCount(){ var n=0; for(var k in DV.filters){ if(DV.filters[k]&&DV.filters[k].length) n++; } return n; }
+export function clearFilters(){ DV.filters={}; DV.lens=''; DV.page=0; renderGrid(); }
 /* skipK 열의 필터만 빼고 나머지 조건을 통과하는지 */
-function passFilters(r,g,skipK){
+export function passFilters(r,g,skipK){
   for(var k in DV.filters){
     if(k===skipK) continue;
     var sel=DV.filters[k]; if(!sel||!sel.length) continue;
@@ -483,7 +499,7 @@ function passFilters(r,g,skipK){
   return true;
 }
 /* 검색어·칩만 적용한 행 (필터 후보값 계산용) */
-function baseRows(g,skipK){
+export function baseRows(g,skipK){
   var q=($('#dvSearch').value||'').trim().toLowerCase();
   var toks=q? q.split(/\s+/).filter(Boolean):[];
   return g.rows().filter(function(r){
@@ -501,20 +517,20 @@ function baseRows(g,skipK){
   });
 }
 
-function closeColFilter(){
+export function closeColFilter(){
   var el=document.getElementById('colfPanel');
   if(el) el.remove();
   document.removeEventListener('mousedown',colfOutside,true);
   document.removeEventListener('keydown',colfEsc,true);
 }
-function colfOutside(e){
+export function colfOutside(e){
   var el=document.getElementById('colfPanel');
   if(el && !el.contains(e.target)) closeColFilter();
 }
-function colfEsc(e){ if(e.key==='Escape') closeColFilter(); }
+export function colfEsc(e){ if(e.key==='Escape') closeColFilter(); }
 
 /* 열의 값 목록을 세어서 범용 패널을 띄운다 */
-function openColFilter(anchor,g,c){
+export function openColFilter(anchor,g,c){
   var rows=baseRows(g,c.k);
   var cnt={}, order=[];
   rows.forEach(function(r){
@@ -534,7 +550,7 @@ function openColFilter(anchor,g,c){
 
 /* 범용 «값 골라 보기» 패널 — 계약 그리드와 사업 영역 표가 함께 씁니다
    opt = {label, order:[값], cnt:{값:개수}, num, selected:[]|null, onApply(sel|null)} */
-function openFilterPanel(anchor,opt){
+export function openFilterPanel(anchor,opt){
   closeColFilter();
   var order=opt.order.slice(), cnt=opt.cnt||{};
   order.sort(function(a,b){
@@ -612,7 +628,7 @@ function openFilterPanel(anchor,opt){
   },0);
 }
 
-function gridFilteredSorted(g){
+export function gridFilteredSorted(g){
   // 검색 개선: 공백 무시 + 여러 단어 AND + 표시명(예: MDR_S1→S1 MDR)도 함께 검색
   var q=($('#dvSearch').value||'').trim().toLowerCase();
   var toks=q? q.split(/\s+/).filter(Boolean):[];
@@ -646,8 +662,8 @@ function gridFilteredSorted(g){
   return rows;
 }
 
-function loadXlsxLib(){ return loadLib('xlsx'); }
-async function xlsxBook(name, sheets){                       // sheets: [{name, head, rows}]
+export function loadXlsxLib(){ return loadLib('xlsx'); }
+export async function xlsxBook(name, sheets){                       // sheets: [{name, head, rows}]
   await loadXlsxLib();
   var wb=XLSX.utils.book_new();
   sheets.forEach(function(sh,si){
@@ -661,8 +677,8 @@ async function xlsxBook(name, sheets){                       // sheets: [{name, 
   });
   XLSX.writeFile(wb, name.replace(/[\\/:*?"<>|]/g,'_')+'_'+todayStr()+'.xlsx');
 }
-function xlsxAoa(name, head, rows){ return xlsxBook(name, [{name:'Sheet1', head:head, rows:rows}]); }
-async function exportXlsx(){
+export function xlsxAoa(name, head, rows){ return xlsxBook(name, [{name:'Sheet1', head:head, rows:rows}]); }
+export async function exportXlsx(){
   var g=GRIDS[ST.CUR_VIEW]; if(!g) return;
   var rows=gridFilteredSorted(g);
   var VC=visCols(g);                                            /* 숨긴 열은 엑셀에도 빼고 내려받습니다 */
@@ -680,7 +696,7 @@ async function exportXlsx(){
   try{ await xlsxAoa(g.title.replace(/\s+/g,'_'), head, aoa); }
   catch(e){ exportCsv(); }   // 라이브러리 차단 시 CSV 폴백
 }
-function exportCsv(){
+export function exportCsv(){
   var g=GRIDS[ST.CUR_VIEW]; if(!g) return;
   var rows=gridFilteredSorted(g);
   var VC=visCols(g);
@@ -705,7 +721,7 @@ function exportCsv(){
 
 /* ── 계약 메뉴 «관점» 필터 ─────────────────────────────────────────────
    각 관점은 해당하는 계약 id 집합을 만들어 표를 그 계약들로만 좁힙니다. 부속 계약은 원계약과 함께 보입니다. */
-var LENS_DEFS=[
+export var LENS_DEFS=[
   ['multi','여러 제품 쓰는 고객사','유효한 원계약이 두 제품 이상인 고객사의 모든 계약'],
   ['kids','부속 계약 있는 고객사','라이선스·센서 추가(부속 계약)가 붙어 있는 원계약과 그 부속들'],
   ['dup','중복 등록 의심','같은 고객사·같은 서비스의 원계약이 같은 기간에 겹치는 것 (연장은 한 줄로 합쳐지고, [사이트명] 표기가 있는 별도 사이트는 제외)'],
@@ -718,8 +734,8 @@ var LENS_DEFS=[
   ['liveov','LIVE 예외 지정','규칙과 무관하게 LIVE 에 «포함» 또는 «제외»로 고정한 계약 (사유는 LIVE 예외 사유 열)'],
   ['live','지금 LIVE 인 계약','이번 달 LIVE 고객사로 판정되는 원계약 (LIVE 고객사 메뉴와 같은 규칙)']
 ];
-var LENS_DESC={}; 
-function lensSets(){
+export var LENS_DESC={}; 
+export function lensSets(){
   var cts=RAWX.contracts||[], cus={}; (RAWX.customers||[]).forEach(function(c){ cus[c.id]=c; });
   var nowYm=(ST.DATA&&ST.DATA.nowIdx>=0? mk(ST.DATA.nowIdx) : new Date().toISOString().slice(0,7))+'-01';
   var byId={}; cts.forEach(function(c){ byId[c.id]=c; });
@@ -756,7 +772,7 @@ function lensSets(){
   return out;
 }
 /* LIVE 고객사 메뉴 상단 — 보기 전환(계약 기준 / 시트 명단) · 기준월 · 요약 · 대조 표 · 도움말 */
-function renderLiveBar(lb){
+export function renderLiveBar(lb){
   var isDb=(ST.LIVE_SRC!=='sheet'), T=(LV.T!=null? LV.T : STATE.base), lv=liveCalc(T), sh=(ST.DATA.live&&ST.DATA.live.ok)? ST.DATA.live : null;
   var perLine={}; lv.rows.forEach(function(x){ perLine[x.line]=(perLine[x.line]||0)+1; });
   var lineTxt=Object.keys(perLine).sort().map(function(l){ return lline(l)+' '+perLine[l]; }).join(' · ');
@@ -799,7 +815,7 @@ function renderLiveBar(lb){
   helpWire(lb);
 }
 /* 표 설명(cap) — 길면(120자 초과) 첫 문장만 보이고 «도움말 ▾» 로 펼침 · 펼침 상태는 화면별로 기억 (⑤ UX 2단계 · ㊿+139) */
-function dvCapRender(v, text){
+export function dvCapRender(v, text){
   var el=$('#dvCap'); if(!el) return; text=String(text||'');
   var key='svc_capopen_'+v, open=false; try{ open=localStorage.getItem(key)==='1'; }catch(e){}
   if(text.length<=120){ el.textContent=text; return; }
@@ -810,13 +826,13 @@ function dvCapRender(v, text){
 /* 데스크톱 가로 스크롤 표에서 오른쪽 고정 동작(✎/🗑) 열이 마지막 데이터 열을 덮지 않게 — 표가 넘칠 때만 마지막 데이터 열에 동작 열 너비만큼 오른쪽 여백 (⑤ UX 2단계) */
 /* ㊿+141 접근성: 눌러서 여는 타일(role=button) 안에 버튼·입력칸이 또 있으면 «버튼 속 버튼»이 되어 화면 낭독기가 안쪽 버튼을 못 읽음
    → role=group + 이름(aria-label) 으로 바꿈. tabindex·Enter 동작은 그대로 */
-function a11yTileRole(c){
+export function a11yTileRole(c){
   if(!c || c.getAttribute('role')!=='button') return;
   if(!c.querySelector('button,a[href],input,select,textarea,[contenteditable="true"],[tabindex]:not([tabindex="-1"])')) return;
   c.setAttribute('role','group');
   if(!c.hasAttribute('aria-label')){ var k=c.querySelector('.k,.l,h3,h4'); c.setAttribute('aria-label', ((k&&k.textContent.trim())||(c.title||'').replace(/\s*\(클릭\)$/,'')||'항목').slice(0,60)+' — Enter: 자세히'); }
 }
-function gridActPad(){
+export function gridActPad(){
   var t=$('#dvTable'); if(!t) return; var wrap=t.parentElement, th=t.querySelector('thead th.act');
   if(!th || window.innerWidth<=760){ t.classList.remove('act-pad'); t.style.removeProperty('--actw'); return; }
   var over=wrap.scrollWidth>wrap.clientWidth+2;
@@ -824,7 +840,7 @@ function gridActPad(){
   t.classList.toggle('act-pad', over);
 }
 /* ❔ 이 화면 사용법 — 포탈 AI(팀 지식 SQL 91 포함)에게 현재 화면 사용법을 묻고 홈 답변 칸으로 이동 */
-function askScreenHelp(){
+export function askScreenHelp(){
   var g=GRIDS[ST.CUR_VIEW], title=g? g.title : (function(){ var b=document.querySelector('#side button[data-v="'+ST.CUR_VIEW+'"]'); return b? navText(b) : ST.CUR_VIEW; })();
   var q='포탈의 «'+String(title||'').replace(/^[^\w가-힣]+/,'').trim()+'» 화면은 어떻게 쓰나요? 주요 기능과 주의할 점을 짧게 알려줘';
   var hit=cmdAskHit(q); if(hit && hit.go) hit.go(); else toast('AI 를 쓸 수 없습니다','조회 전용 장비 계정이거나 AI 가 꺼져 있습니다','warn');
@@ -832,17 +848,17 @@ function askScreenHelp(){
 /* ── 표 열 너비 조절 (㊿+142 · 사용자 선택) ─────────────────────────────
    머리 칸 오른쪽 경계를 끌면 그 열 너비가 바뀌고 화면별로 기억(localStorage svc_colw_<화면>) · 경계를 두 번 누르면 그 열만 원래대로.
    한 열이라도 정해 두면 표를 table-layout:fixed 로 바꿔(나머지 열은 지금 자연 너비로 고정) 넘치는 글자는 «…» 로 자름 — 칸에 마우스를 올리면 전체(title). */
-var COLW_MIN=44;
-function colwGet(v){ try{ return JSON.parse(localStorage.getItem('svc_colw_'+v)||'{}')||{}; }catch(e){ return {}; } }
-function colwPut(v,m){ try{ if(m && Object.keys(m).length) localStorage.setItem('svc_colw_'+v, JSON.stringify(m)); else localStorage.removeItem('svc_colw_'+v); }catch(e){} }
-function colwFreeze(t){   /* 지금 보이는 너비로 모든 열을 고정 */
+export var COLW_MIN=44;
+export function colwGet(v){ try{ return JSON.parse(localStorage.getItem('svc_colw_'+v)||'{}')||{}; }catch(e){ return {}; } }
+export function colwPut(v,m){ try{ if(m && Object.keys(m).length) localStorage.setItem('svc_colw_'+v, JSON.stringify(m)); else localStorage.removeItem('svc_colw_'+v); }catch(e){} }
+export function colwFreeze(t){   /* 지금 보이는 너비로 모든 열을 고정 */
   var ths=Array.prototype.slice.call(t.querySelectorAll('thead th'));
   var ws=ths.map(function(th){ return th.getBoundingClientRect().width; });
   ths.forEach(function(th,i){ th.style.width=Math.round(ws[i])+'px'; });
   t.style.width=Math.round(ws.reduce(function(a,b){ return a+b; },0))+'px';
   t.classList.add('colw-fixed');
 }
-function colwApply(t, v){
+export function colwApply(t, v){
   t.classList.remove('colw-fixed'); t.style.width='';
   var m=colwGet(v), ks=Object.keys(m); if(!ks.length) return;
   var ths=Array.prototype.slice.call(t.querySelectorAll('thead th'));
@@ -853,7 +869,7 @@ function colwApply(t, v){
   /* 잘린 칸은 마우스를 올리면 전체 글자 */
   t.querySelectorAll('tbody td:not(.act)').forEach(function(td){ if(!td.title && td.scrollWidth>td.clientWidth+1 && !td.querySelector('input,select,textarea')) td.title=td.textContent.trim(); });
 }
-function colwStart(ev, th, t, v){
+export function colwStart(ev, th, t, v){
   ev.preventDefault(); ev.stopPropagation();
   if(!t.classList.contains('colw-fixed')) colwFreeze(t);
   var x0=ev.clientX, w0=th.getBoundingClientRect().width, tw0=t.getBoundingClientRect().width, k=th.dataset.k, h=ev.currentTarget;
@@ -865,8 +881,8 @@ function colwStart(ev, th, t, v){
     var m=colwGet(v); m[k]=w; colwPut(v,m); try{ gridActPad(); }catch(e){} };
   h.addEventListener('pointermove',mv); h.addEventListener('pointerup',up); h.addEventListener('pointercancel',up);
 }
-function colwReset(v, k){ var m=colwGet(v); if(k) delete m[k]; else m={}; colwPut(v,m); renderGrid(); }
-function renderGrid(){
+export function colwReset(v, k){ var m=colwGet(v); if(k) delete m[k]; else m={}; colwPut(v,m); renderGrid(); }
+export function renderGrid(){
   var g=GRIDS[ST.CUR_VIEW]; if(!g) return;
   var isCustom=!!g.custom;
   // 채널 칩 필터
@@ -1006,7 +1022,7 @@ function renderGrid(){
   }
 }
 
-function openDetail(c){
+export function openDetail(c){
   var cu=(RAWX.customers||[]).filter(function(x){return x.id===c.customer_id;})[0]||{};
   $('#dtTitle').textContent=cu.name||'?';
   $('#dtMeta').textContent=[c.line, c.partner, c.biller, (c.start_month||'').slice(0,7)+'~'+((c.end_month||'').slice(0,7)||'?'),
@@ -1032,7 +1048,7 @@ function openDetail(c){
   });
 }
 
-function gridRow(r,g,editing){
+export function gridRow(r,g,editing){
   var tr=document.createElement('tr');
   function view(){
     tr.innerHTML=visCols(g).map(function(c){
@@ -1167,7 +1183,7 @@ function gridRow(r,g,editing){
   return tr;
 }
 
-function gridAddRow(){
+export function gridAddRow(){
   var g=GRIDS[ST.CUR_VIEW]; if(!g||!g.add) return;
   if(!ST.SB_TOKEN){ openOvl('ovlAuth'); return; }
   var t=$('#dvTable'); var tb=t.querySelector('tbody'); if(!tb) return;

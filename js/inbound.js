@@ -1,14 +1,19 @@
 /* ===== inbound.js — 인바운드 관리 · 장표 메모 · 주간회의 =====
-   포탈 본체(js/app.js)를 ④ 아키텍처 2단계(㊿+136)에서 기능별로 나눈 파일. 전역 var/function 그대로 — 즉시 실행 문장은 전부 js/init.js 에.
-   로드 순서는 index.html <meta name="app-js"> (js/load.js 가 그 순서대로 ?v=APP_VER 를 붙여 불러옴) */
+   ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
+import { ST } from './state.js';
+import { $, axTime, lline, won } from './core.js';
+import { SB_RAW, sbTry, sbWrite, toast, todayStr } from './shell.js';
+import { esc, idxs, MX_LIST, renderInstall, renderMatrix, statusOf } from './dash.js';
+import { DV, renderGrid, switchView, xlsxBook } from './grid.js';
+import { logChange, openOvl } from './edit.js';
 
 
 /* ===== 인바운드 관리 — 통계 + 목록 (원본: 구글시트, 매일 아침 자동 동기화) ===== */
 
 /* ===== 월별 종합 장표 셀 메모 ===== */
-var MXM={};                       // 'line|Y|M' → {id, body, updated_by, updated_at}
-function mxKey(line,Y,M){ return (line||'')+'|'+Y+'|'+M; }
-function loadMxMemos(cb){
+export var MXM={};                       // 'line|Y|M' → {id, body, updated_by, updated_at}
+export function mxKey(line,Y,M){ return (line||'')+'|'+Y+'|'+M; }
+export function loadMxMemos(cb){
   sbTry('mx_memos?select=*&order=year.desc,month.desc').then(function(rows){
     MXM={};
     (rows||[]).forEach(function(r){ MXM[mxKey(r.line||'', r.year, r.month)]=r; });
@@ -16,13 +21,13 @@ function loadMxMemos(cb){
     if(cb) cb();
   }).catch(function(){ /* 51단계 SQL 미설치 — 메모 기능만 비활성 */ });
 }
-function mxCanEdit(){ return !!(ST.SB_TOKEN && !window.IS_VIEWER); }
-function closeMxPop(){
+export function mxCanEdit(){ return !!(ST.SB_TOKEN && !window.IS_VIEWER); }
+export function closeMxPop(){
   var e=document.getElementById('mxPop'); if(e) e.remove();
   document.removeEventListener('keydown', mxPopEsc);
 }
-function mxPopEsc(e){ if(e.key==='Escape') closeMxPop(); }
-function mxPlace(box, td){
+export function mxPopEsc(e){ if(e.key==='Escape') closeMxPop(); }
+export function mxPlace(box, td){
   var r=td.getBoundingClientRect(), w=box.offsetWidth, h=box.offsetHeight;
   box.style.left=Math.min(Math.max(8, r.left-w/2+r.width/2), innerWidth-w-8)+'px';
   var top=(r.bottom+h+12>innerHeight? Math.max(8, r.top-h-8) : r.bottom+8);
@@ -30,7 +35,7 @@ function mxPlace(box, td){
   box.style.top=top+'px';
 }
 /* 장표 셀 하나에 들어간 계약들 — 장표와 같은 필터(MX_LIST)로 계산 */
-function mxDetailRows(line, Y, M){
+export function mxDetailRows(line, Y, M){
   var idx=(Y-2020)*12+(M-6);
   var out=[];
   if(idx<0||idx>=M_TOTAL()) return out;
@@ -43,8 +48,8 @@ function mxDetailRows(line, Y, M){
   out.sort(function(a,b){ return b.amt-a.amt; });
   return out;
 }
-function M_TOTAL(){ return (typeof ST.M==='number')? ST.M : 0; }
-function mxDetailHtml(rows, cellSum){
+export function M_TOTAL(){ return (typeof ST.M==='number')? ST.M : 0; }
+export function mxDetailHtml(rows, cellSum){
   if(!rows.length) return '<div class="ro" style="text-align:center;color:var(--muted)">이 달에 인식 금액이 있는 계약이 없습니다</div>';
   var sum=rows.reduce(function(a,x){ return a+x.amt; },0);
   var h='<div class="mxdet"><table><thead><tr><th>고객사</th><th>서비스</th><th>파트너</th><th>채널</th><th>상태</th><th class="n">월 금액(천원)</th></tr></thead><tbody>';
@@ -60,7 +65,7 @@ function mxDetailHtml(rows, cellSum){
   return h;
 }
 /* opts.detail = {html, count, sum, go(i)}  — 설치비처럼 다른 내역을 같은 팝업에 얹을 때 */
-function openMxMemo(td, line, Y, M, label, startTab, opts){
+export function openMxMemo(td, line, Y, M, label, startTab, opts){
   closeMxPop();
   opts=opts||{};
   var k=mxKey(line,Y,M), cur=MXM[k], ed=mxCanEdit();
@@ -154,7 +159,7 @@ function openMxMemo(td, line, Y, M, label, startTab, opts){
     catch(e){ msg.textContent=String(e.message||e).slice(0,90); }
   };
 }
-async function mxRemove(k, cur){
+export async function mxRemove(k, cur){
   if(!cur) return;
   await sbWrite('DELETE','mx_memos?year=eq.'+cur.year+'&month=eq.'+cur.month+
     '&line=eq.'+encodeURIComponent(cur.line||''));
@@ -162,38 +167,38 @@ async function mxRemove(k, cur){
   logChange('delete','mx_memos',0,{cell:k});
 }
 
-function loadInbound(cb){
+export function loadInbound(cb){
   sbTry('inbound_leads?select=*&order=on_date.desc,no.desc').then(function(rows){
     RAWX.inbound=rows||[]; RAWX._inbAt=Date.now(); if(cb) cb();
   });
 }
-function inbLast(r){
+export function inbLast(r){
   return [r.on_date,r.s1d,r.s2d,r.s21d,r.s3d].filter(function(d){return d&&/^\d{4}-\d{2}-\d{2}/.test(d);}).sort().pop()||'';
 }
-function goInbList(colK, val){
+export function goInbList(colK, val){
   switchView('inbound');
   if(colK){ DV.filters={}; DV.filters[colK]=[val]; DV.page=0; renderGrid(); }
 }
 /* ===== 인바운드 «가져온 기록» — Apps Script 가 시트에서 가져올 때마다 inbound_sync_log 에 한 줄 (SQL 74) =====
    주간회의의 «파일명 · 시각 취합» 칩과 같은 역할. 표가 아직 없으면 inbound_leads.synced_at 으로 대신 보여줍니다 */
-var INB_LOG_OPEN=false;
-function loadInbLog(cb){
+export var INB_LOG_OPEN=false;
+export function loadInbLog(cb){
   sbTry('inbound_sync_log?select=*&order=at.desc&limit=30').then(function(rows){
     RAWX.inbLog=rows||[]; RAWX._inbLogAt=Date.now(); if(cb) cb();
   });
 }
-function inbLastSync(){                       // {at, src, ok, counts, error} 또는 null
+export function inbLastSync(){                       // {at, src, ok, counts, error} 또는 null
   var L=RAWX.inbLog||[];
   if(L.length) return L[0];
   var last=''; (RAWX.inbound||[]).forEach(function(r){ if(r.synced_at && String(r.synced_at)>last) last=String(r.synced_at); });
   return last? {at:last, src:'(기록 표 없음 · synced_at 기준)', ok:true, counts:null, _fallback:true} : null;
 }
-function inbAgo(v){
+export function inbAgo(v){
   var ms=Date.now()-new Date(/[zZ]|[+\-]\d\d:?\d\d$/.test(String(v))? v : v+'Z').getTime();
   var h=Math.floor(ms/36e5); if(h<1) return '방금'; if(h<48) return h+'시간 전'; return Math.floor(h/24)+'일 전';
 }
-function inbCounts(c){ if(!c) return ''; return Object.keys(c).sort().map(function(y){ return y+'년 '+c[y]+'건'; }).join(' · '); }
-function inbSyncBadge(){
+export function inbCounts(c){ if(!c) return ''; return Object.keys(c).sort().map(function(y){ return y+'년 '+c[y]+'건'; }).join(' · '); }
+export function inbSyncBadge(){
   var x=inbLastSync();
   if(!x) return '<span class="mini" style="color:var(--critical,#d03b3b)">· 가져온 기록 없음</span>';
   var h=Math.floor((Date.now()-new Date(/[zZ]|[+\-]\d\d:?\d\d$/.test(String(x.at))? x.at : x.at+'Z').getTime())/36e5);
@@ -203,7 +208,7 @@ function inbSyncBadge(){
          (x.src&&!x._fallback? ' · '+esc(x.src):'')+(x.counts? ' · '+esc(inbCounts(x.counts)):'')+
          (bad? ' ✕ 실패':'')+(stale&&!bad? ' ⚠ 자동 동기화가 멈춘 것 같습니다':'')+'</span>';
 }
-function inbLogTable(){
+export function inbLogTable(){
   var L=RAWX.inbLog;
   if(L===undefined) return '<div class="mini" style="color:var(--muted);padding:6px 0">기록을 읽는 중…</div>';
   if(!L.length) return '<div class="mini" style="color:var(--muted);padding:6px 0">아직 기록이 없습니다 — Supabase 에서 <b>SQL 74</b> 를 실행하고 Apps Script 를 새 버전으로 배포하면 다음 가져오기부터 여기에 쌓입니다.</div>';
@@ -219,7 +224,7 @@ function inbLogTable(){
     }).join('')+'</tbody></table>';
 }
 /* 통계·목록 화면 공용: 마지막 가져오기 + 지금 가져오기 + 기록 펼치기 */
-function inbSyncPanel(){
+export function inbSyncPanel(){
   return '<div class="card" style="padding:10px 14px;margin-bottom:10px">'+
     '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'+
       '<b style="font-size:13.5px">시트 → 포탈 가져오기</b>'+inbSyncBadge()+
@@ -229,7 +234,7 @@ function inbSyncPanel(){
     '</div>'+
     '<div id="inbLogBox" style="display:'+(INB_LOG_OPEN?'':'none')+'">'+inbLogTable()+'</div></div>';
 }
-function inbWirePanel(host){
+export function inbWirePanel(host){
   var b=host.querySelector('#inbFetchP'); if(b) b.onclick=inbRefetch;
   var t=host.querySelector('#inbLogTg'); if(t) t.onclick=function(){
     INB_LOG_OPEN=!INB_LOG_OPEN;
@@ -238,14 +243,14 @@ function inbWirePanel(host){
   };
 }
 /* 인바운드 목록(표) 위에 붙는 패널 */
-function renderInbPanel(){
+export function renderInbPanel(){
   var host=document.getElementById('inbHost');
   if(ST.CUR_VIEW!=='inbound'){ if(host) host.style.display='none'; return; }
   if(!host){ var tw=$('#dvTable').parentElement; host=document.createElement('div'); host.id='inbHost'; tw.parentElement.insertBefore(host,tw); }
   host.style.display=''; host.innerHTML=inbSyncPanel(); inbWirePanel(host);
   if(RAWX.inbLog===undefined) loadInbLog(function(){ if(ST.CUR_VIEW==='inbound') renderInbPanel(); });
 }
-function renderInbStat(){
+export function renderInbStat(){
   var host=$('#inbBody');
   if(!RAWX.inbound){
     host.innerHTML='<div class="cap" style="padding:40px;text-align:center">인바운드 데이터를 불러오는 중…</div>';
@@ -349,7 +354,7 @@ function renderInbStat(){
   if(RAWX.inbLog===undefined) loadInbLog(function(){ if(ST.CUR_VIEW==='inbstat') renderInbStat(); });
   var bl=document.getElementById('inbGoList'); if(bl) bl.onclick=function(){ goInbList(); };
 }
-function inbRefetch(){
+export function inbRefetch(){
   if(!ST.SB_TOKEN){ openOvl('ovlAuth'); return; }
   var b=document.getElementById('inbFetchP'); if(b){ b.disabled=true; b.textContent='가져오는 중…'; }
   toast('인바운드 가져오기','시트에서 가져오는 중… (최대 1분)','info');
@@ -367,7 +372,7 @@ function inbRefetch(){
     setTimeout(done, 5000);
   });
 }
-function openInbDetail(r){
+export function openInbDetail(r){
   var steps=[['1차',r.s1,r.s1d],['2차',r.s2,r.s2d],['2-1차',r.s21,r.s21d],['3차',r.s3,r.s3d]]
     .filter(function(s){return s[1]||s[2];});
   $('#inbDBody').innerHTML=
@@ -395,18 +400,18 @@ function openInbDetail(r){
 }
 
 /* ===== 주간회의 — 주간업무보고 자동 취합 화면 ===== */
-var WEEKLY_GAS='https://script.google.com/macros/s/AKfycbz0PDzgvgtM0ZZHEfMwEzPpgoPYidD6ElPx3oTGsgnVuveCnVA9PmYPB4WAPfr9a6DY/exec';
-var WK={data:null, week:null, secs:[]};
-var WK_BIZ_ORDER=['계약현황','영업','기획','마케팅','기획·마케팅'];
-function wkTime(v){ return v? axTime(v):'·'; }
-function wkChipCls(st){
+export var WEEKLY_GAS='https://script.google.com/macros/s/AKfycbz0PDzgvgtM0ZZHEfMwEzPpgoPYidD6ElPx3oTGsgnVuveCnVA9PmYPB4WAPfr9a6DY/exec';
+export var WK={data:null, week:null, secs:[]};
+export var WK_BIZ_ORDER=['계약현황','영업','기획','마케팅','기획·마케팅'];
+export function wkTime(v){ return v? axTime(v):'·'; }
+export function wkChipCls(st){
   st=String(st||'');
   if(/완료/.test(st)) return 'wkc-grn';
   if(/진행|접수/.test(st)) return 'wkc-yel';
   if(/보류|중지|대기/.test(st)) return 'wkc-gry';
   return 'wkc-gry';
 }
-function wkCustMatch(name){
+export function wkCustMatch(name){
   var n=String(name||'').replace(/\s+|\(.*?\)/g,'').toLowerCase();
   if(!n) return null;
   var hit=(RAWX.customers||[]).some(function(c){
@@ -420,15 +425,15 @@ function wkCustMatch(name){
    열: A 전주 · B 구분(팀) · C 구분 · D 업무세부내용 · E 고객명 · F 담당자 · G 예상매출(백만) · H 관련부서/파트너 · I 비고
    · 계약현황은 포탈 DB에서 자동 생성 (전주에 등록된 신규·추가 계약 + 연장 회차)
    · 영업·기획·마케팅·MSS팀 항목은 취합된 주간보고(weekly_reports)의 «전주 실적» 을 그대로 옮김 */
-function wkUnifiedWindow(){
+export function wkUnifiedWindow(){
   var wk=WK.week? new Date(WK.week+'T00:00:00') : new Date();
   var end=new Date(wk); end.setDate(end.getDate()-1);          // 보고일 전날까지
   var start=new Date(end); start.setDate(start.getDate()-6);   // 7일 창
   var f=function(d){ return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); };
   return {s:f(start), e:f(end)};
 }
-function wkTermTxt(m){ m=Number(m)||0; if(!m) return ''; return (m%12===0)? (m/12)+'년' : m+'개월'; }
-function wkContractRows(win){
+export function wkTermTxt(m){ m=Number(m)||0; if(!m) return ''; return (m%12===0)? (m/12)+'년' : m+'개월'; }
+export function wkContractRows(win){
   var out=[], cmap={}; (SB_RAW.customers||[]).forEach(function(c){ cmap[c.id]=c; });
   (SB_RAW.contracts||[]).forEach(function(c){
     var cu=cmap[c.customer_id]||{}, nm=cu.name||'?';
@@ -449,7 +454,7 @@ function wkContractRows(win){
   });
   return out;
 }
-function wkUnifiedRows(){
+export function wkUnifiedRows(){
   var win=wkUnifiedWindow(), items=(WK.data&&WK.data.items)||[];
   var rows=[['전주','구분','','업무세부내용','고객명','담당자','예상매출','관련부서/파트너','비고']];
   function split(content){ var m=String(content||'').match(/^([\s\S]*?)\n\(비고\)\s*([\s\S]*)$/); return m? [m[1],m[2]] : [String(content||''),'']; }
@@ -475,22 +480,22 @@ function wkUnifiedRows(){
   });
   return rows.concat(body);
 }
-function wkUnifiedTsv(rows){
+export function wkUnifiedTsv(rows){
   return rows.map(function(r){ return r.map(function(c){ var s=String(c==null?'':c); return /[\t\n"]/.test(s)? '"'+s.replace(/"/g,'""')+'"' : s; }).join('\t'); }).join('\n');
 }
-async function wkUnifiedCopy(){
+export async function wkUnifiedCopy(){
   var rows=wkUnifiedRows(); if(rows.length<2){ toast('통합 양식','옮길 항목이 없습니다','warn'); return; }
   try{ await navigator.clipboard.writeText(wkUnifiedTsv(rows)); toast('통합 양식 복사 완료', (rows.length-1)+'줄 — 전사 주간보고 «서비스사업부» 탭 A1 에 붙여넣기'); }
   catch(e){ var ta=document.createElement('textarea'); ta.value=wkUnifiedTsv(rows); document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast('통합 양식 복사 완료', (rows.length-1)+'줄'); }
 }
-function wkUnifiedXlsx(){
+export function wkUnifiedXlsx(){
   var rows=wkUnifiedRows(); if(rows.length<2){ toast('통합 양식','옮길 항목이 없습니다','warn'); return; }
   var nm='주간업무보고_서비스사업부_'+(WK.week||todayStr());
   xlsxBook(nm, [{name:'서비스사업부', head:rows[0], rows:rows.slice(1), widths:[12,17,16,92,24,15,19,19,23]}]);
 }
 
-var WK_CACHE={};   // 주차별 캐시 — 주 1회 바뀌는 데이터라 10분 캐시로 즉시 표시
-async function renderWeekly(atWeek){
+export var WK_CACHE={};   // 주차별 캐시 — 주 1회 바뀌는 데이터라 10분 캐시로 즉시 표시
+export async function renderWeekly(atWeek){
   var host=$('#wkBody');
   var ck=atWeek||'', cc=WK_CACHE[ck];
   var d=null;
@@ -686,8 +691,8 @@ async function renderWeekly(atWeek){
   function msgTo(id,t){ var e=document.getElementById(id); if(e) e.textContent=t; }
 }
 /* 주간회의 발표(전체화면) 모드 — 보고 화면만 화면 전체에 띄웁니다 */
-function wkFsOn(){ return !!(document.fullscreenElement||document.webkitFullscreenElement); }
-function wkToggleFs(){
+export function wkFsOn(){ return !!(document.fullscreenElement||document.webkitFullscreenElement); }
+export function wkToggleFs(){
   var vw=document.getElementById('viewWeekly'); if(!vw) return;
   try{
     if(wkFsOn()){ (document.exitFullscreen||document.webkitExitFullscreen).call(document); return; }
@@ -699,7 +704,7 @@ function wkToggleFs(){
 }
 
 
-function wkFsSync(){
+export function wkFsSync(){
   var on=wkFsOn();
   var b=document.getElementById('wkFs');
   if(b){ b.textContent = on? '⛶ 발표 종료 (ESC)' : '⛶ 발표 모드';
@@ -707,19 +712,19 @@ function wkFsSync(){
   if(!on){ document.documentElement.style.removeProperty('--tbh'); }
   try{ if(window.__wkMeasure && !on) window.__wkMeasure(); }catch(e){}
 }
-function wkGo(id){
+export function wkGo(id){
   var el=document.getElementById(id); if(!el) return;
   el.scrollIntoView({behavior:'smooth',block:'start'});
   document.querySelectorAll('.wk-rail a').forEach(function(a){ a.classList.toggle('on',a.dataset.go===id); });
 }
-function wkNext(){
+export function wkNext(){
   var cur=document.querySelector('.wk-rail a.on');
   var links=Array.prototype.slice.call(document.querySelectorAll('.wk-rail a'));
   var i=cur? links.indexOf(cur):-1;
   var nx=links[Math.min(i+1,links.length-1)];
   if(nx) wkGo(nx.dataset.go);
 }
-function wkPrev(){
+export function wkPrev(){
   var cur=document.querySelector('.wk-rail a.on');
   var links=Array.prototype.slice.call(document.querySelectorAll('.wk-rail a'));
   var i=cur? links.indexOf(cur):links.length;
@@ -727,7 +732,7 @@ function wkPrev(){
   if(pv) wkGo(pv.dataset.go);
 }
 
-async function wkRefetch(){
+export async function wkRefetch(){
   toast('주간보고 취합','시트에서 가져오는 중… (수십 초 걸릴 수 있습니다)','info');
   try{
     var r=await fetch(WEEKLY_GAS+'?action=weekly_fetch');
