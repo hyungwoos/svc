@@ -22,6 +22,8 @@ import * as m_sales from './sales.js';
 import * as m_grid from './grid.js';
 import * as m_edit from './edit.js';
 import * as m_lazy from './lazy.js';
+import * as m_qadb from './qadb.js';
+import * as m_qadata from './qadata.js';
 import * as m_init from './init.js';
 
 var SVC={};
@@ -31,7 +33,8 @@ function expose(ns){
     Object.defineProperty(SVC, k, {get:function(){ return ns[k]; }, enumerable:true, configurable:true});
   });
 }
-[m_state, m_viz, m_core, m_shell, m_dash, m_ai, m_grids, m_equipment, m_analysis, m_tools, m_cloud, m_inbound, m_upd, m_sales, m_grid, m_edit, m_lazy].forEach(expose);
+[m_state, m_viz, m_core, m_shell, m_dash, m_ai, m_grids, m_equipment, m_analysis, m_tools, m_cloud, m_inbound, m_upd, m_sales, m_grid, m_edit, m_lazy, m_qadb, m_qadata].forEach(expose);
 m_lazy.lazyHook(function(name, ns){ expose(ns); });
 Object.defineProperty(window, 'SVC', {value:SVC, enumerable:false, configurable:false, writable:false});
+if(m_state.IS_QA_DATA) m_qadata.qaDataInstall();   /* ㊿+157 ?qa=data — 시작 전에 가짜 DB 로 바꿔 끼움(운영 DB 에 닿지 않음) */
 m_init.start();

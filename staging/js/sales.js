@@ -1,13 +1,14 @@
 /* ===== sales.js — Cloud 사이트 · OI · 견적→OI · 수주→계약 · 사이드바 접기 · 해지 분석 =====
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { ST } from './state.js';
-import { $, doLogout, esc, lline, mk, rawHtml, refreshToken, SB_KEY, SB_URL, tpl, won } from './core.js';
-import { dIdx, EQB, loadFromDb, onData, renderEqBoard, SB_RAW, sbTry, sbWrite, toast, todayStr } from './shell.js';
+import { $, amtHint, doLogout, esc, kwToWon, lline, mk, rawHtml, refreshToken, SB_KEY, SB_URL, tpl, won, wonToKw } from './core.js';
+import { dIdx, EQB, loadFromDb, onData, railSync, renderEqBoard, SB_RAW, sbTry, sbWrite, toast, todayStr } from './shell.js';
 import { kpiTable, toggleWidgetPanel } from './dash.js';
 import { OI_IND, OI_OWNERS, OI_PARTNERS, OI_PROB, OI_PRODUCTS, OI_TYPE } from './grids.js';
 import { CH_DEFS, chOf } from './analysis.js';
 import { applyDense, denseKey, openFind, openPaste } from './tools.js';
 import { loadInbound } from './inbound.js';
+import { syncOrderAssets } from './equipment.js';
 import { a11yTileRole, BLANK_LABEL, clearFilters, closeColFilter, DV, exportXlsx, gridAddRow, navMenu, openColPick, openFilterPanel, renderGrid,
   switchView, xlsxAoa, xlsxBook } from './grid.js';
 import { closeOvl, FORM_FN, logChange, msg, openOvl } from './edit.js';
@@ -462,7 +463,7 @@ export function oiApplyQuote(data, path, name){
   // 금액 — OI 예상단가는 VAT 별도
   var supply=qNum(data.supplyTotal);
   if(!supply) supply=Math.round(qNum(data.grandTotal)/1.1);
-  if(supply) $('#oiAmt').value=supply;
+  if(supply){ $('#oiAmt').value=wonToKw(supply); $('#oiAmt').dispatchEvent(new Event('input')); }   /* 칸은 천원 (㊿+157) */
 
   // 제품군 · 수량
   var rows=data.rows||[], hasPublic=false, etcs=[];
@@ -545,8 +546,8 @@ export async function submitOi(){
       partner: $('#oiPartner').value.trim()||null,
       free_months: $('#oiFree').value===''? null : +$('#oiFree').value,
       expect_month: $('#oiMonth').value? $('#oiMonth').value+'-01' : null,
-      expect_amount: $('#oiAmt').value===''? null : +$('#oiAmt').value,
-      rival_price: $('#oiRival').value===''? null : +$('#oiRival').value,
+      expect_amount: kwToWon($('#oiAmt').value),     /* 칸은 천원 (㊿+157) */
+      rival_price: kwToWon($('#oiRival').value),
       strategy: $('#oiStrategy').value.trim()||null,
       products: prods,
       items: items,
@@ -742,6 +743,7 @@ export function setupSide(){
   $('#odChannel').onchange=odS1Sync; odS1Sync();
   $('#mpGo').onclick=submitMdrPoc;
   $('#oiGo').onclick=submitOi;
+  amtHint($('#oiAmt'), null, false); amtHint($('#oiRival'), null, false);   /* ㊿+157 «= 1,200만원» */
   $('#oiQuoteBtn').onclick=openQuotePick;
   $('#oiDoneList').onclick=function(){ switchView('oi'); };
   $('#oiDoneNew').onclick=function(){ $('#oiDone').style.display='none'; $('#oiFormWrap').style.display=''; $('#oiCust').focus(); };
@@ -1550,6 +1552,9 @@ export async function submitOrder(){
     var out=await sbWrite('POST','equipment_orders?select=*',[row],'return=representation');
     ST.RAWX.orders=ST.RAWX.orders||[]; ST.RAWX.orders.unshift(out[0]);
     logChange('insert','equipment_orders',out[0].id,{customer:cust,model:row.model,qty:row.qty});
+    /* ㊿+157 접수하자마자 장비 현황에도 행을 만듦(접수·출하요청·배송중 = 재고 · 시리얼이 없으면 «미등록-신청번호-n») — 예전엔 표에서 ✎ 저장하거나 «맞추기»를 눌러야 생겼음 */
+    try{ await syncOrderAssets(out[0], null, true); }catch(e){ console.warn('현황 반영', e); }
+    try{ railSync(ST.CUR_VIEW); }catch(e){}
     msg('odMsg','');
     // 명시적 완료 화면
     $('#odDoneSum').textContent=[row.channel, cust, row.model+' × '+row.qty, row.order_type, row.standalone_pod?'단독 Pod':''].filter(Boolean).join(' · ');

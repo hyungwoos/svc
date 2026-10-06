@@ -2,8 +2,8 @@
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { APP_VER, ST } from './state.js';
 import { Viz } from './viz.js';
-import { $, canView, cssv, esc, lline, mk, navText, permEnter, rawHtml, STATE, tpl, won, wonFull } from './core.js';
-import { cmdAskHit, EQB, EQUIP_VIEWS, loadFromDb, onData, railSync, renderEqBoard, sbTry, sbWrite, toast, todayStr } from './shell.js';
+import { $, amtGuard, amtHint, canView, cssv, esc, kwToWon, lline, mk, navText, permEnter, rawHtml, STATE, tpl, won, wonFull, wonKo, wonToKw } from './core.js';
+import { cmdAskHit, dIdx, EQB, EQUIP_VIEWS, idxDate, loadFromDb, onData, railSync, renderEqBoard, sbTry, sbWrite, toast, todayStr } from './shell.js';
 import { buildControls, renderAll } from './dash.js';
 import { GRIDS } from './grids.js';
 import { eqRetOpen, eqWant, renderEqPanel, syncOrderAssets } from './equipment.js';
@@ -13,7 +13,7 @@ import { CL, renderCloud } from './cloud.js';
 import { loadInbound, renderInbPanel, renderInbStat, renderWeekly } from './inbound.js';
 import { CHURN, CR, CS, csSetTab, ensureGroupOpen, helpBox, helpWire, initOiForm, loadRecvPresets, oiLinkQuote, oiToContract, renderChurn,
   renderChurnRate, renderCsite, renderCustFlow, renderOiTiles } from './sales.js';
-import { logChange, msg, openOvl } from './edit.js';
+import { logChange, monthRows, msg, openOvl } from './edit.js';
 import { lazyGet, lazyView } from './lazy.js';
 
 
@@ -230,7 +230,7 @@ export function switchView(v){
   /* 금액 열(won:1)이 있는 표는 제목 옆에 «천원 단위» 배지를 붙입니다 */
   var hasWon=(g.cols||[]).some(function(c){ return c.won; });
   $('#dvTitle').innerHTML=esc(g.title)+(hasWon? ' <span class="ubadge sm">₩ 금액 단위 = 천원</span>':'');
-  dvCapRender(v, g.cap + (hasWon? ' · 표의 금액은 천원 단위 (입력·수정 창은 원 단위)':'') + (ST.IS_VIEWER? ' · 조회 전용 계정입니다':''));
+  dvCapRender(v, g.cap + (hasWon? ' · 금액은 보기·입력 모두 천원 단위':'') + (ST.IS_VIEWER? ' · 조회 전용 계정입니다':''));
   $('#dvAdd').style.display=(g.add && !ST.IS_VIEWER)?'':'none';
   $('#dvPaste').style.display=(g.add && !ST.IS_VIEWER)?'':'none';
   $('#dvSearch').value='';
@@ -248,7 +248,7 @@ export function fmtCell(c,v,r){
   return String(v);
 }
 export function editCell(c,v){
-  /* 참고: 금액 열(c.won)은 화면 표시만 천원 단위이며, 입력·저장 값은 원 단위 그대로입니다 */
+  /* 금액 열(c.won): 표시도 입력도 천원(㊿+157 — 예전엔 입력만 원이라 머리글 «(천원)» 과 어긋났음) · 저장은 원(readRowInputs 가 ×1000) */
   if(c.t==='select'){
     var opts=(typeof c.opts==='function'? c.opts():c.opts).slice();
     if(!c.req && opts.indexOf('')<0) opts.unshift('');              // 비울 수 있게
@@ -269,10 +269,11 @@ export function editCell(c,v){
   }
   if(c.t==='bool') return tpl`<input type="checkbox" data-k="${rawHtml(c.k)}"${v?' checked':''}>`;
   var ty=c.t==='month'?'month':c.t==='date'?'date':c.t==='number'?'number':'text';
-  var val=v==null?'':(c.t==='month'?String(v).slice(0,7):c.t==='date'?String(v).slice(0,10):v);
-  /* 금액 열은 «원 단위로 입력»임을 입력칸에서도 알 수 있게 안내 */
-  var hint=(c.won&&c.t==='number')? ' placeholder="원 단위" title="원 단위로 입력하세요 — 목록·대시보드에는 천원으로 표시됩니다"':'';
-  return tpl`<input type="${rawHtml(ty)}" data-k="${rawHtml(c.k)}" value="${String(val)}"${rawHtml(hint)}>`;
+  var isWon=(c.won && c.t==='number');
+  var val=v==null?'':(c.t==='month'?String(v).slice(0,7):c.t==='date'?String(v).slice(0,10):isWon? wonToKw(v):v);
+  /* 금액 열은 «천원 단위» — 칸 아래 실시간 환산(amtHint · wireRowInputs) · data-prev = 지금 값(원, 이상 금액 확인용) */
+  if(isWon) return tpl`<input type="number" step="any" data-k="${rawHtml(c.k)}" data-won="1" data-prev="${v==null?'':String(v)}" value="${String(val)}" placeholder="천원" title="천원 단위로 입력하세요 (48만원 → 480)">`;
+  return tpl`<input type="${rawHtml(ty)}" data-k="${rawHtml(c.k)}" value="${String(val)}">`;
 }
 /* 편집 행의 입력칸 보조 동작
    · 날짜 칸: 값이 있으면 옆에 ✕(비우기) — 브라우저 날짜 입력은 지우는 법이 잘 안 보입니다
@@ -389,6 +390,7 @@ export function wireRowInputs(tr,g){
     var sync=function(){ x.style.display = inp.value? '' : 'none'; };
     inp.addEventListener('input', sync); inp.addEventListener('change', sync); sync();
   });
+  tr.querySelectorAll('input[data-won]').forEach(function(inp){ amtHint(inp, null, /^(mrr|monthly_fee)$/.test(inp.dataset.k)); });   /* ㊿+157 «= 48만원» */
   if(g && g.table==='equipment_assets'){
     var st=tr.querySelector('select[data-k="status"]'), rd=tr.querySelector('input[data-k="returned_date"]');
     if(st && rd) st.addEventListener('change', function(){
@@ -409,6 +411,7 @@ export function readRowInputs(tr,g){
     var v;
     if(c.t==='bool') v=inp.checked;
     else if(c.t==='select' && c.num) v=Number(inp.value);
+    else if(c.t==='number' && c.won) v=kwToWon(inp.value);           /* 천원 칸 → 원 (㊿+157) */
     else if(c.t==='number') v=inp.value===''? null: Number(inp.value);
     else if(c.t==='month') v=inp.value? inp.value+'-01': null;
     else if(c.t==='date') v=inp.value||null;
@@ -1119,7 +1122,7 @@ export function gridRow(r,g,editing){
             logChange('delete',g.table,r.id,{});
             toast('삭제되었습니다', g.title, 'info');
             var arr=g.rows(); var i=(ST.RAWX[ST.CUR_VIEW]||[]).indexOf(r); if(i>=0) ST.RAWX[ST.CUR_VIEW].splice(i,1);
-            ST.DIRTY=true; renderGrid();
+            ST.DIRTY=true; try{ railSync(ST.CUR_VIEW); }catch(e){} renderGrid();
           }).catch(function(e){ $('#dvMsg').textContent=String(e.message||e); });
         };
         act.appendChild(bd);
@@ -1149,6 +1152,14 @@ export function gridRow(r,g,editing){
         });
         if(g.table==='equipment_assets' && body.status==='임대중' && body.returned_date &&
            confirm('상태는 «임대중»인데 회수일('+body.returned_date+')이 있습니다.\n회수일을 비우고 저장할까요?\n\n(취소 = 그대로 저장)')) body.returned_date=null;
+        /* ㊿+157 금액 칸이 바뀌었으면 이상한 금액인지 한 번 확인 (이전의 5배↑·1/5↓ · 1만원 미만 · 월 1억원 이상) */
+        var wonCols=g.cols.filter(function(c){ return c.won && c.t==='number' && (c.k in body) && Number(body[c.k]||0)!==Number(r[c.k]||0); });
+        for(var wi=0; wi<wonCols.length; wi++){ var wc=wonCols[wi]; if(!amtGuard(body[wc.k], r[wc.k], wc.l.replace(/\(천원\)/,''), /^(mrr|monthly_fee)$/.test(wc.k))) return; }
+        /* ㊿+157 계약의 MRR·시작월·종료월·상태(해지·종료)를 바꾸면 월 매출(월별 종합 장표)도 같이 맞춤 — 무엇을 바꾸는지 먼저 보여 주고 확인 */
+        var revPlan=(g.table==='contracts')? ctRevPlan(r, body) : null;
+        if(revPlan && revPlan.bad){ $('#dvMsg').textContent=revPlan.bad+' — 저장하지 않았습니다'; toast('저장하지 않았습니다', revPlan.bad, 'info'); return; }
+        if(revPlan && revPlan.ops.length && !confirm('월 매출(월별 종합 장표)도 같이 맞춥니다:\n\n'+revPlan.lines.join('\n')+'\n\n[확인] 계약과 월 매출을 함께 저장\n[취소] 저장하지 않음 (월 매출만 따로 고치려면 ✏️ 입력·수정 › 금액 수정)')) return;
+        if(revPlan && !revPlan.ops.length && revPlan.lines.length) toast('월 매출은 그대로', revPlan.lines.join(' ').replace(/^· /,''), 'info');
         var eqSync=(g.table==='equipment_orders');   /* 신청 내역을 저장하면 장비 현황을 항상 다시 맞춥니다 */
         if(eqSync && body.status==='회수완료' && r.status!=='회수완료' && !body.returned_date && !r.returned_date){
           body.returned_date=todayStr();               /* 회수완료로 바꾸는 날 = 회수일 (나중에 회수일 칸에서 수정 가능) */
@@ -1171,6 +1182,11 @@ export function gridRow(r,g,editing){
           if(Object.keys(body).length) logChange('update',g.table,r.id,body);
           ST.DIRTY=true; $('#dvMsg').textContent='저장됨 ✅';
           toast('저장되었습니다', g.title);
+          try{ railSync(ST.CUR_VIEW); }catch(e){}   /* ㊿+157 왼쪽 장비 아이콘의 «처리 대기» 빨간 숫자도 바로 (예전엔 장비 대시보드에서 바꿀 때만 줄었음) */
+          if(revPlan && revPlan.ops.length) ctRevApply(r.id, revPlan).then(function(){
+            toast('월 매출도 맞췄습니다', revPlan.lines.length+'건 — 월별 종합 장표에 반영', 'info');
+            return loadFromDb().then(function(nd){ onData(nd); if(GRIDS[ST.CUR_VIEW]) renderGrid(); });
+          }).catch(function(e){ $('#dvMsg').textContent='계약은 저장됐지만 월 매출 맞추기 실패: '+String(e.message||e); });
           if(eqSync) syncOrderAssets(r).then(function(x){
             if(x){ toast('장비 현황 자동 반영', x.replace(/^ · /,''), 'info');
                    ST.DIRTY=true; if(ST.CUR_VIEW==='orders'||ST.CUR_VIEW==='assets') renderGrid(); }
@@ -1187,6 +1203,48 @@ export function gridRow(r,g,editing){
   return tr;
 }
 
+/* ===== ㊿+157 계약을 표에서 고칠 때 월 매출(monthly_revenue · 월별 종합 장표)도 맞추는 계획 (사용자 결정 «같이 맞춤»)
+   c = 저장 전 계약 원본(RAWX.contracts 행) · body = 저장할 값(원) → {ops:[{m,p,b}], lines:[사람이 읽는 설명], bad:'막을 이유'}
+   · 종료월을 당김 → 그 뒤 매출 삭제 · 시작월을 늦춤 → 그 앞 매출 삭제 · 상태를 해지·서비스종료로 → 해지월(없으면 종료월) 뒤 매출 삭제
+   · MRR 변경 → 이번 달(시작 전이면 시작월)부터 종료월까지 새 금액으로 덮어씀 · 이미 끝난 계약이면 그대로(안내만)
+   · 종료월을 늘림 / 시작월을 앞당김 → 새 기간 안에서 «매출이 비어 있는 달만» 채움(있는 금액은 안 건드림 · 지난 달은 예전 MRR · 해지·종료 계약은 안 채움) */
+export function ctRevPlan(c, body, opt){
+  var T=(ST.DATA&&ST.DATA.nowIdx)||0, has=function(k){ return Object.prototype.hasOwnProperty.call(body,k); };
+  var ix=function(v){ return v? dIdx(v) : null; };
+  var oS=ix(c.start_month), oE=ix(c.end_month), nS=has('start_month')? ix(body.start_month) : oS, nE=has('end_month')? ix(body.end_month) : oE;
+  var oM=Number(c.mrr)||0, nM=has('mrr')? (Number(body.mrr)||0) : oM;
+  var endish=function(st){ return /해지|서비스종료|종료/.test(String(st||'').replace(/\s/g,'')); };
+  var nSt=has('status')? body.status : c.status, toTerm=has('status') && endish(body.status) && !endish(c.status), isTerm=endish(nSt);
+  var ops=/** @type {Array<{m:string, p:string, b?:any}>} */ ([]), lines=[], P='monthly_revenue?contract_id=eq.'+c.id, cutAfter=null;
+  if(nS!=null && nE!=null && nE<nS) return {ops:ops, lines:lines, bad:'종료월('+mk(nE)+')이 시작월('+mk(nS)+')보다 앞섭니다'};
+  var have={}; (ST.RAWX.mrs||[]).forEach(function(x){ if(x.contract_id===c.id && Number(x.amount)) have[dIdx(x.month)]=1; });
+  var mon=Object.keys(have).map(Number), first=mon.length? Math.min.apply(null, mon) : null, last=mon.length? Math.max.apply(null, mon) : null;
+  var put=function(a, b, amt, why){ if(a==null || b==null || b<a || !(amt>0)) return; ops.push({m:'DELETE', p:P+'&month=gte.'+idxDate(a)+'&month=lte.'+idxDate(b)}); ops.push({m:'POST', p:'monthly_revenue', b:monthRows(c.id, a, b, amt)});
+    for(var i=a;i<=b;i++) have[i]=1; lines.push('· '+mk(a)+(b>a? ' ~ '+mk(b) : '')+' 월 '+won(amt)+'천원('+wonKo(amt)+') — '+why); };
+  var gap=function(a, b, why){   /* 비어 있는 달만 채움 — 이번 달 앞은 예전 MRR(없으면 새 MRR) · 이번 달부터는 새 MRR */
+    if(a==null || b==null || b<a || isTerm) return; var rows=[], n=0;
+    for(var i=a;i<=b;i++){ if(have[i]) continue; var amt=(i<T && oM>0)? oM : nM; if(!(amt>0)) continue; rows.push({contract_id:c.id, month:idxDate(i), amount:amt}); have[i]=1; n++; }
+    if(!n) return; ops.push({m:'POST', p:'monthly_revenue', b:rows}); lines.push('· '+mk(a)+(b>a? ' ~ '+mk(b) : '')+' 중 비어 있던 '+n+'개월 채움 — '+why); };
+  var after=function(e, why){ if(e==null || last==null || last<=e || (cutAfter!=null && cutAfter<=e)) return; cutAfter=e; ops.push({m:'DELETE', p:P+'&month=gt.'+idxDate(e)}); for(var i=e+1;i<=last;i++) delete have[i]; lines.push('· '+mk(e+1)+' 부터 매출 삭제 — '+why); };
+  if(nE!=null && oE!==nE) after(nE, '종료월 '+mk(nE));
+  if(nS!=null && first!=null && first<nS && oS!==nS){ ops.push({m:'DELETE', p:P+'&month=lt.'+idxDate(nS)}); for(var j=first;j<nS;j++) delete have[j]; lines.push('· '+mk(nS)+' 앞 매출 삭제 — 시작월 '+mk(nS)); }
+  if(toTerm){ var ce=has('churn_month')&&body.churn_month? ix(body.churn_month) : (ix(c.churn_month)!=null? ix(c.churn_month) : nE);
+    if(ce==null) lines.push('· 해지월·종료월이 없어 월 매출은 그대로입니다 — 해지월을 넣으면 그 뒤 매출을 지웁니다'); else after(ce, '상태 «'+body.status+'»'); }
+  var to=(nE!=null? nE : last);
+  if(nM!==oM && nM>0 && !isTerm && !(opt&&opt.noMrr)){
+    var a0=Math.max(T, nS!=null? nS : T);
+    if(to!=null && a0<=to) put(a0, to, nM, 'MRR '+wonKo(oM)+' → '+wonKo(nM));
+    else if(to==null) lines.push('· 종료월·월 매출이 없어 월 매출은 만들지 않았습니다 — 기간은 ✏️ 입력·수정 › 갱신/금액 수정');
+    else lines.push('· 이미 끝난 계약이라 월 매출은 그대로입니다 — 지난 달 금액은 ✏️ 입력·수정 › 금액 수정');
+  }
+  if(nE!=null && oE!=null && nE>oE) gap(Math.max(oE+1, nS!=null? nS : oE+1), nE, '종료월 '+mk(oE)+' → '+mk(nE));
+  if(nS!=null && oS!=null && nS<oS) gap(nS, nE!=null? Math.min(oS-1, nE) : oS-1, '시작월 '+mk(oS)+' → '+mk(nS));
+  return {ops:ops, lines:lines, bad:''};
+}
+export async function ctRevApply(id, plan, via){
+  for(var i=0;i<plan.ops.length;i++){ var o=plan.ops[i]; await sbWrite(o.m, o.p, o.b, undefined, 'contracts'); }
+  try{ await logChange('update','monthly_revenue',id,{_via:via||'계약 표 ✎', 맞춤:plan.lines}); }catch(e){}
+}
 export function gridAddRow(){
   var g=GRIDS[ST.CUR_VIEW]; if(!g||!g.add) return;
   if(!ST.SB_TOKEN){ openOvl('ovlAuth'); return; }
@@ -1211,11 +1269,15 @@ export function gridAddRow(){
           return;
         }
       }
+      var addWon=g.cols.filter(function(c){ return c.won && c.t==='number' && body[c.k]; });   /* ㊿+157 새 행의 금액도 확인 */
+      for(var ai=0; ai<addWon.length; ai++){ if(!amtGuard(body[addWon[ai].k], 0, addWon[ai].l.replace(/\(천원\)/,''), /^(mrr|monthly_fee)$/.test(addWon[ai].k))) return; }
       sbWrite('POST',g.table+'?select=*',[body],'return=representation').then(function(rows){
         toast('추가되었습니다', g.title);
+        if(g.table==='equipment_orders' && rows && rows[0]) syncOrderAssets(rows[0], null, true).catch(function(){});   /* 신청 → 현황 바로 반영 */
         ST.RAWX[ST.CUR_VIEW]=ST.RAWX[ST.CUR_VIEW]||[]; ST.RAWX[ST.CUR_VIEW].push(rows[0]);
         logChange('insert',g.table,rows[0].id,body);
         ST.DIRTY=true; $('#dvMsg').textContent='추가됨 ✅';
+        try{ railSync(ST.CUR_VIEW); }catch(e){}
         renderGrid();
       }).catch(function(e){
         var s=String(e.message||e);

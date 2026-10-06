@@ -19,9 +19,44 @@ export function el(t,c,x){ var e=document.createElement(t); if(c)e.className=c; 
 /* 포탈 전체 금액 표시 단위 = 천원 (원 단위 이하는 표시하지 않음)
    · won(v)     → 천원 숫자만 (예: 150,000)  — 호출부에서 '천원' 을 붙입니다
    · wonFull(v) → 천원 + 단위 (예: 150,000천원)
-   · 가격표·견적서의 단가는 원 단위 유지 (prWon 사용) */
+   · 가격표·견적서의 단가는 원 단위 유지 (prWon 사용)
+   · ㊿+157 금액 입력 칸도 천원(kwToWon/wonToKw) — 아래 */
 export function won(v){ return Math.round(Number(v||0)/1000).toLocaleString('ko-KR'); }
 export function wonFull(v){ return Math.round(Number(v||0)/1000).toLocaleString('ko-KR')+'천원'; }
+/* ===== ㊿+157 금액 «입력»도 천원 — 화면 표시와 같은 단위 (사용자 결정 2026-10-06 · 2026-10 월 4.8억 입력 사고)
+   예전엔 입력·수정·표 ✎·월 목표·설치비는 원, 만기 처리·데이터 점검은 천원이라 같은 사람이 단위를 헷갈렸음.
+   · 칸에는 천원(소수 가능: 52.8 = 52,800원) · DB 에는 원(×1000) — kwToWon / wonToKw
+   · 칸 아래 실시간 환산(amtHint): «= 48만원 · 480,000원» · 저장 직전 이상한 금액 확인(amtGuard): 이전의 5배↑·1/5↓ · 1만원 미만 · 월 1억원 이상 */
+export function kwToWon(v){ if(v==null) return null; var s=String(v).replace(/[,\s]/g,''); if(s==='') return null; var n=Number(s); return isFinite(n)? Math.round(n*1000) : null; }
+export function wonToKw(w){ if(w==null || w==='') return ''; var n=Number(w); if(!isFinite(n)) return ''; return String(Math.round(n*1000)/1e6); }   /* 52800 → '52.8' · 소수 원도 그대로 되돌아감 */
+export function wonKo(w){   /* 읽기 쉬운 금액 — 4.8억원 · 48만원 · 5.3만원 · 9,000원 */
+  var n=Math.round(Number(w)||0), a=Math.abs(n), sg=n<0? '−':'';
+  var t=function(x,d){ return String(Math.round(x*Math.pow(10,d))/Math.pow(10,d)).replace(/\B(?=(\d{3})+(?!\d))/g,','); };
+  if(a>=1e8) return sg+t(a/1e8, a>=1e10? 0 : 2)+'억원';
+  if(a>=1e4) return sg+t(a/1e4, a>=1e6? 0 : 1)+'만원';
+  return sg+a.toLocaleString('ko-KR')+'원';
+}
+export function amtWhy(newWon, prevWon, monthly){   /* 이상한 금액이면 이유 글자 · 아니면 '' */
+  var n=Math.abs(Number(newWon)||0), p=Math.abs(Number(prevWon)||0);
+  if(!n) return '';
+  if(n<10000) return '1만원 미만입니다';
+  if(p>0 && n>=p*5) return '이전 금액('+wonKo(p)+')의 '+(Math.round(n/p*10)/10).toLocaleString('ko-KR')+'배입니다';
+  if(p>0 && n*5<=p) return '이전 금액('+wonKo(p)+')의 1/'+(Math.round(p/n*10)/10).toLocaleString('ko-KR')+'입니다';
+  if(monthly!==false && !p && n>=1e8) return '월 1억원 이상입니다';
+  return '';
+}
+export function amtGuard(newWon, prevWon, what, monthly){   /* 저장 직전 확인 — true = 그대로 진행 */
+  var why=amtWhy(newWon, prevWon, monthly); if(!why) return true;
+  return confirm((what||'금액')+' '+wonKo(newWon)+' ('+wonFull(newWon)+') — '+why+'.\n\n금액 칸은 «천원» 단위입니다 (48만원 → 480).\n이대로 저장할까요?');
+}
+export function amtHint(inp, prevWon, monthly){   /* 금액 칸 바로 아래 실시간 환산 · 이상하면 빨간 글씨 */
+  if(!inp || inp.__amtHint) return; inp.__amtHint=true;
+  var h=document.createElement('span'); h.className='amt-hint'; h.setAttribute('aria-live','polite');
+  inp.insertAdjacentElement('afterend', h);
+  var upd=function(){ var w=kwToWon(inp.value); if(w==null){ h.textContent='천원 단위'; h.classList.remove('warn'); return; }
+    var why=amtWhy(w, prevWon!=null? prevWon : inp.dataset.prev, monthly); h.textContent='= '+wonKo(w)+(Math.abs(w)>=1e4? ' · '+w.toLocaleString('ko-KR')+'원':'')+(why? ' — ⚠ '+why : ''); h.classList.toggle('warn', !!why); };
+  inp.addEventListener('input', upd); inp.addEventListener('change', upd); upd();
+}
 export function pct(v){ return (v>0?'+':'')+v.toFixed(1)+'%'; }
 export function mk(i){ return ST.DATA.monthKeys[i]||mkFuture(i); }
 // 데이터 범위를 넘어선 미래 월 라벨 (전망에서 사용)

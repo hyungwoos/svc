@@ -1,7 +1,7 @@
 /* ===== edit.js — 입력·수정(Supabase 쓰기) · 로그인 모달 · 계약 검색 · 저장 동작 · 사명 변경 · boot =====
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { ST } from './state.js';
-import { $, clearSess, doLogout, el, esc, lline, mfaGate, mfaVerifiedOf, mk, rawHtml, saveSess, SB_KEY, SB_URL, sessRead, sessWrite, tpl, won } from './core.js';
+import { $, amtGuard, amtHint, clearSess, doLogout, el, esc, kwToWon, lline, mfaGate, mfaVerifiedOf, mk, rawHtml, saveSess, SB_KEY, SB_URL, sessRead, sessWrite, tpl, won, wonToKw } from './core.js';
 import { afterLoad, idxDate, loadFromDb, onData, onErr, SB_RAW, sbWrite, showAuthUi, showLoading, toast } from './shell.js';
 import { s1NoInfo, s1NoOpts } from './grids.js';
 import { chOf, doChurn, doRenew, liveCalc, nmKeys } from './analysis.js';
@@ -265,6 +265,8 @@ export function setupPick(inputId, pickId, store){
                    tpl`<small>${rawHtml(mk(r.startIdx)||'?')}~${rawHtml(mk(r.endIdx)||'?')} · ${won(r.mrr||0)}천원</small>`;
       it.onclick=function(){
         store.sel=r;
+        /* ㊿+157 금액 칸 환산 «= 48만원» 의 «이전 금액» = 고른 계약의 MRR */
+        var pm=(store===PK_R)? $('#rMrr') : (store===PK_F)? $('#fMrr') : null; if(pm){ pm.dataset.prev=String(r.mrr||''); pm.dispatchEvent(new Event('input')); }
         box.querySelectorAll('.pi').forEach(function(x){x.classList.remove('sel');});
         it.classList.add('sel');
         if(store===PK_F) showFixCurrent(r);
@@ -297,7 +299,7 @@ export function showFixCurrent(r){
   box.querySelectorAll('.pi').forEach(function(el0){
     el0.onclick=function(){
       var sg=segs[+el0.dataset.i]; if(!sg) return;
-      $('#fFrom').value=mk(sg[0]); $('#fTo').value=mk(sg[1]); $('#fMrr').value=sg[2]; $('#fMrr').focus();
+      $('#fFrom').value=mk(sg[0]); $('#fTo').value=mk(sg[1]); $('#fMrr').value=wonToKw(sg[2]); $('#fMrr').dispatchEvent(new Event('input')); $('#fMrr').focus();
       box.querySelectorAll('.pi').forEach(function(x){x.classList.remove('sel');}); el0.classList.add('sel');
     };
   });
@@ -377,8 +379,9 @@ export async function saveEdit(){
   try{
     if(CUR_TAB==='add'){
       var pa=PK_A.sel; if(!pa) throw new Error('원계약을 선택하세요.');
-      var as0=ymFromInput($('#aStart').value), ae0=ymFromInput($('#aEnd').value), amrr=+$('#aMrr').value;
+      var as0=ymFromInput($('#aStart').value), ae0=ymFromInput($('#aEnd').value), amrr=kwToWon($('#aMrr').value)||0;   /* 칸은 천원 (㊿+157) */
       if(as0==null||!amrr) throw new Error('시작월·월 금액은 필수입니다.');
+      if(!amtGuard(amrr, 0, '추가 월 금액', true)) throw new Error('저장하지 않았습니다 — 금액을 확인하세요.');
       if(ae0==null) ae0=(pa.endIdx!=null? pa.endIdx : as0+11);
       if(ae0<as0) throw new Error('종료월이 시작월보다 빠릅니다.');
       var akind=$('#aKind').value, aq=+$('#aQty').value||null, aser=($('#aSerial').value||'').trim();
@@ -398,9 +401,12 @@ export async function saveEdit(){
       ['aQty','aStart','aEnd','aMrr','aSerial','aNote'].forEach(function(i){ $('#'+i).value=''; });
     }
     else if(CUR_TAB==='new'){
-      var cust=$('#nCust').value.trim(), mrr=+$('#nMrr').value;
+      var cust=$('#nCust').value.trim(), mrr=kwToWon($('#nMrr').value)||0;   /* 칸은 천원 (㊿+157) */
       var s0=ymFromInput($('#nStart').value), e0=ymFromInput($('#nEnd').value);
       if(!cust||!mrr||s0==null||e0==null) throw new Error('고객사·시작월·종료월·월 금액은 필수입니다.');
+      if(!amtGuard(mrr, 0, '월 금액', true)) throw new Error('저장하지 않았습니다 — 금액을 확인하세요.');
+      var nFeeW=kwToWon($('#nFee').value);
+      if(nFeeW && !amtGuard(nFeeW, 0, '설치비', false)) throw new Error('저장하지 않았습니다 — 설치비를 확인하세요.');
       if(e0<s0) throw new Error('종료월이 시작월보다 빠릅니다.');
       var ptn=$('#nPtn').value;
       if(ptn==='__etc'){
@@ -421,7 +427,7 @@ export async function saveEdit(){
         s1_no:($('#nS1No').value||'').trim()||null,
         parent_contract_id: (+($('#nParent')&&$('#nParent').value)||null),   /* 같은 고객사 아래 계약번호별 하위 등록 */
         billing:nBillingVal()||null,
-        install_fee: $('#nFee').value===''? null : +$('#nFee').value,
+        install_fee: nFeeW,
         settle_month: $('#nSettle').value? $('#nSettle').value+'-01' : ($('#nFee').value? idxDate(s0+1) : null),
         total_amount:mrr*(e0-s0+1), mrr:mrr
       }],'return=representation');
@@ -447,21 +453,23 @@ export async function saveEdit(){
       var m0=ymFromInput($('#cMonth').value), rs=$('#cReason').value.trim();
       if(m0==null||!rs) throw new Error('해지월·사유는 필수입니다.');
       await doChurn(r, m0, rs);                                   /* 홈 › 만기 처리 창과 같은 저장 로직 (㊿+127) */
-      msg('eMsg','해지 처리 완료 ✅ — '+r.cust+' ('+$('#cMonth').value+'까지 인식'+(r.parent? '' : ' · '+mk(m0+1)+'부터 LIVE 제외')+')','ok');
+      msg('eMsg','해지 처리 완료 ✅ — '+r.cust+' ('+$('#cMonth').value+'까지 인식'+(r.parent? '' : ' · '+mk(m0)+'부터 LIVE 제외')+')','ok');
     }
     else if(CUR_TAB==='renew'){
       var r2=PK_R.sel; if(!r2) throw new Error('계약을 선택하세요.');
       var ne=ymFromInput($('#rEnd').value);
       if(ne==null) throw new Error('새 종료월은 필수입니다.');
-      var amt=+$('#rMrr').value || r2.mrr || 0;
+      var amt=kwToWon($('#rMrr').value) || r2.mrr || 0;   /* 칸은 천원 (㊿+157) */
       if(!amt) throw new Error('연장 금액을 알 수 없습니다. 금액을 입력하세요.');
+      if(!amtGuard(amt, r2.mrr, '연장 월 금액', true)) throw new Error('저장하지 않았습니다 — 금액을 확인하세요.');
       var rres=await doRenew(r2, ne, amt, ($('#rNote')&&$('#rNote').value.trim())||''), rno=rres.rno;   /* 홈 › 만기 처리 창과 같은 저장 로직 (㊿+127) */
       msg('eMsg','연장 '+rno+'회 등록 ✅ — '+r2.cust+' → '+$('#rEnd').value+' · 월 '+won(amt)+'천원','ok');
     }
     else if(CUR_TAB==='fix'){
       var r3=PK_F.sel; if(!r3) throw new Error('계약을 선택하세요.');
-      var f0=ymFromInput($('#fFrom').value), f1=ymFromInput($('#fTo').value), na=+$('#fMrr').value;
-      if(f0==null||isNaN(na)||$('#fMrr').value==='') throw new Error('적용 시작월·새 금액은 필수입니다. (0원도 됩니다)');
+      var f0=ymFromInput($('#fFrom').value), f1=ymFromInput($('#fTo').value), na=kwToWon($('#fMrr').value);   /* 칸은 천원 (㊿+157) */
+      if(f0==null||na==null) throw new Error('적용 시작월·새 금액은 필수입니다. (0원도 됩니다)');
+      if(na && !amtGuard(na, r3.mrr, '새 월 금액', true)) throw new Error('저장하지 않았습니다 — 금액을 확인하세요.');
       var endI=(r3.endIdx!=null? r3.endIdx : r3.dataLast);
       if(f1==null) f1=endI;                                   // 비우면 계약 끝까지
       if(f1<f0) throw new Error('적용 종료월이 시작월보다 빠릅니다.');
@@ -675,7 +683,7 @@ export function setupEdit(){
     var h='🟢 <b>LIVE 영향</b> — ';
     if(r.parent) h+='부속 계약(추가 구매)이라 LIVE·고객사 수에는 변화가 없고 MRR 만 줄어듭니다.';
     else if(!same) h+='이 계약은 지금 LIVE 로 잡혀 있지 않습니다 — 해지 처리해도 LIVE 수는 그대로입니다.';
-    else { h+=tpl`<b>${r.cust}</b> ${lline(r.line)} 은 ${rawHtml(m0!=null? tpl`<b>${mk(m0)}</b>까지 LIVE, <b>${mk(m0+1)}</b>부터 `:'해지월 다음 달부터 ')}LIVE 에서 빠집니다`+ tpl`${rawHtml(same.n>1? ' — 같은 제품의 다른 유효 계약이 '+(same.n-1)+'건 남아 있어 제품 LIVE 는 유지됩니다' : others.length? ' (다른 제품 '+others.map(function(x){ return esc(lline(x.line)); }).join('·')+' 이 남아 회사로는 LIVE 유지 · 제품별 합 −1)' : ' (회사 수 −1 · 해지율에 «해지»로 집계)')}.`; }
+    else { h+=tpl`<b>${r.cust}</b> ${lline(r.line)} 은 ${rawHtml(m0!=null? tpl`<b>${mk(m0)}</b>부터 `:'해지월부터 ')}LIVE 에서 빠집니다${rawHtml(m0!=null? tpl` (매출은 ${mk(m0)}까지 인식)`:'')}`+ tpl`${rawHtml(same.n>1? ' — 같은 제품의 다른 유효 계약이 '+(same.n-1)+'건 남아 있어 제품 LIVE 는 유지됩니다' : others.length? ' (다른 제품 '+others.map(function(x){ return esc(lline(x.line)); }).join('·')+' 이 남아 회사로는 LIVE 유지 · 제품별 합 −1)' : ' (회사 수 −1 · 해지율에 «해지»로 집계)')}.`; }
     box.innerHTML=h;
   }
   FORM_FN.cLivePreview=cLivePreview;
@@ -710,6 +718,8 @@ export function setupEdit(){
       msg('eMsg','');
     };
   });
+  /* ㊿+157 금액 칸(천원) 아래 실시간 환산 */
+  ['nMrr','aMrr','rMrr','fMrr'].forEach(function(i){ amtHint(document.getElementById(i), null, true); }); amtHint(document.getElementById('nFee'), null, false);
   setupPick('cFind','cPick',PK_C);
   setupPick('rFind','rPick',PK_R);
   setupPick('fFind','fPick',PK_F);

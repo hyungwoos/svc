@@ -92,6 +92,17 @@ catch (e) { say(false, '위성 페이지 검사 실패 — ' + String(e.message 
   say(/^export function closeBtn\(/m.test(jsAll) && /\.x-close\{/.test(css) && /export function opsClose\(k\)/.test(jsAll) && keys.every((k) => jsAll.includes("'data-ops-close':'" + k + "'") && jsAll.includes("k==='" + k + "'")) && /id:'eqDiagClose'/.test(jsAll), '닫기 버튼: closeBtn · .x-close · 배포·운영 ' + keys.length + '곳(opsClose) · 장비 진단');
   const sc = fs.existsSync(path.join(ROOT, 'sat', 'common.js')) ? fs.readFileSync(path.join(ROOT, 'sat', 'common.js'), 'utf8') : '';
   say(/Escape/.test(sc) && /contains\('ovl'\)/.test(sc), '위성 페이지 창: Esc · 바깥 클릭으로 닫기(sat/common.js 한 곳)'); }
+// ㊿+157 금액 입력 = 천원 (화면 표시와 같은 단위 · 저장은 원) · 이상 금액 확인 · 계약 표 ✎ → 월 매출 맞춤 · 단위 실수 점검 규칙
+{ const lbl = ['nMrr', 'aMrr', 'rMrr', 'fMrr', 'nFee', 'oiAmt'].filter((id) => !new RegExp('<label for="' + id + '">[^<]*천원').test(html));
+  say(!lbl.length, '금액 입력칸 라벨이 «천원» (입력·수정 4칸 · 설치비 · OI 예상단가)' + (lbl.length ? ' — 아님: ' + lbl.join(', ') : ''));
+  say(/^export function kwToWon\(/m.test(jsAll) && /^export function amtGuard\(/m.test(jsAll) && /^export function amtHint\(/m.test(jsAll) && /v=kwToWon\(inp\.value\)/.test(jsAll) && /wonToKw\(v\)/.test(jsAll), '천원 ↔ 원 변환(kwToWon·wonToKw) · 이상 금액 확인(amtGuard) · 칸 아래 환산(amtHint) · 표 ✎ 칸도 천원');
+  say(!/<b>원 단위로|(?<!천)원 단위로 입력|placeholder="원 단위"/.test(jsAll + html), '«원 단위로 입력» 안내가 남아 있지 않음');
+  say(/export function ctRevPlan\(c, body, opt\)/.test(jsAll) && /revPlan=\(g\.table==='contracts'\)\? ctRevPlan\(r, body\)/.test(jsAll) && /rule\('c_amt_odd','crit'/.test(jsAll), '계약 표 ✎ → 월 매출 맞춤(ctRevPlan) · 데이터 점검 «금액 단위 실수 의심»');
+  say(/await syncOrderAssets\(out\[0\], null, true\)/.test(jsAll), '장비 신청 접수 → 현황 바로 반영');
+  say(fs.existsSync(path.join(ROOT, 'tests', 'fakedb.mjs')), '가짜 DB(tests/fakedb.mjs) — 입력·수정 점검용');
+  /* 스테이징 QA «데이터 입력·수정»: ?qa=data → 가짜 DB(js/qadb.js) · 시작 전에 끼움(main.js) · Supabase 요청은 전부 가로챔 · QA 가 이 단계를 부름 */
+  const mainJs = fs.existsSync(path.join(ROOT, 'js', 'main.js')) ? fs.readFileSync(path.join(ROOT, 'js', 'main.js'), 'utf8') : '';
+  say(/export var IS_QA_DATA=/.test(jsAll) && /if\(m_state\.IS_QA_DATA\) m_qadata\.qaDataInstall\(\);\s*\n[^\n]*\n?m_init\.start\(\);|if\(m_state\.IS_QA_DATA\) m_qadata\.qaDataInstall\(\);[^\n]*\nm_init\.start\(\);/.test(mainJs) && /u\.indexOf\(SB_URL\)===0\) return Promise\.resolve\(qaRespond/.test(jsAll) && /await qaDataPhase\(run\);/.test(jsAll) && /export function qaDataList\(/.test(jsAll), 'QA «데이터 입력·수정»: ?qa=data 가짜 DB 를 시작 전에 끼움 · Supabase 요청 가로채기 · QA 가 이 단계 실행'); }
 const idx = html + jsAll;
 // Supabase 함수 소스가 저장소에 있으면 비밀값 검사만 (deno 는 CI 에 없을 수 있음)
 const fnDir = path.join(ROOT, 'supabase', 'functions');
