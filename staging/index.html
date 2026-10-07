@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <!-- CSP (80점 프로젝트 ② 보안): GitHub Pages 는 응답 헤더를 못 넣으므로 meta 로. ㊿+136 부터 인라인 스크립트·onclick 이 없어 script-src 에 'unsafe-inline' 없음(스타일은 인라인 style 속성 때문에 유지) · ㊿+147 부터 'unsafe-eval' 도 없음(SQL 엔진 alasql 은 격리 칸 sqlbox.html 에서만 돌림) — 스크립트·연결 호스트를 목록으로 제한(XSS 시 외부 유출 차단). Worker 주소나 GAS 주소가 바뀌면 여기도 수정. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-5epfZ/chww+I8TcOJjbScIHe/AsC2+ft7J2TXkB68aU=' blob: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' data: https://cdn.jsdelivr.net; img-src 'self' data: blob: https://amzbrdhkvzsyxjfjtugu.supabase.co; connect-src 'self' https://amzbrdhkvzsyxjfjtugu.supabase.co https://open.er-api.com https://api.frankfurter.app https://script.google.com/macros/s/AKfycbz0PDzgvgtM0ZZHEfMwEzPpgoPYidD6ElPx3oTGsgnVuveCnVA9PmYPB4WAPfr9a6DY/ https://script.googleusercontent.com https://aged-union-cdd3.choihw.workers.dev https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; worker-src 'self' blob:; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-vQatTrKcqROKSswDZUARbmPaR8uYVUo24laSG3JnYrQ=' blob: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' data: https://cdn.jsdelivr.net; img-src 'self' data: blob: https://amzbrdhkvzsyxjfjtugu.supabase.co; connect-src 'self' https://amzbrdhkvzsyxjfjtugu.supabase.co https://open.er-api.com https://api.frankfurter.app https://script.google.com/macros/s/AKfycbz0PDzgvgtM0ZZHEfMwEzPpgoPYidD6ElPx3oTGsgnVuveCnVA9PmYPB4WAPfr9a6DY/ https://script.googleusercontent.com https://aged-union-cdd3.choihw.workers.dev https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; worker-src 'self' blob:; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
 <title>서비스사업부 통합 관리 포탈</title>
 <!-- PWA: 홈 화면 앱 (manifest.webmanifest · sw.js · pwa-*.png · apple-touch-icon.png 를 같은 폴더에) -->
 <link rel="manifest" href="manifest.webmanifest">
@@ -20,32 +20,32 @@
      코드 파일 목록은 app-js (ES 모듈 · ㊿+153) — 파일을 더하거나 빼면 여기와 sw.js 의 SHELL 을 함께 고치고 node tests/stamp.mjs 로 아래 stamp 묶음을 다시 만들 것.
      시작점은 js/main.js 하나(나머지는 import 로 따라옴) · 리포트·관리자·가격표는 처음 열 때(js/lazy.js).
      ④ 아키텍처 2단계(㊿+136): 인라인 스크립트·onclick 을 전부 없애 CSP script-src 에서 'unsafe-inline' 제거 · 인라인은 importmap 하나뿐이고 CSP 해시로 허용. -->
-<meta name="app-ver" content="2026-09-16 ㊿+158">
+<meta name="app-ver" content="2026-09-16 ㊿+159">
 <meta name="app-js" content="js/state.js,js/viz.js,js/core.js,js/shell.js,js/dash.js,js/ai.js,js/grids.js,js/equipment.js,js/analysis.js,js/tools.js,js/cloud.js,js/price.js,js/inbound.js,js/upd.js,js/admin.js,js/sales.js,js/report.js,js/grid.js,js/edit.js,js/qadb.js,js/qadata.js,js/lazy.js,js/init.js,js/main.js">
 <!-- stamp:begin — tests/stamp.mjs 가 app-ver · app-js 로 만든 부분(손으로 고치지 말 것 · 버전을 올린 뒤 다시 실행 · tests/check.mjs 가 확인) -->
-<link rel="stylesheet" href="app.css?v=2026-09-16%20%E3%8A%BF%2B158">
-<script type="importmap">{"imports":{"./js/state.js":"./js/state.js?v=2026-09-16%20%E3%8A%BF%2B158","./js/viz.js":"./js/viz.js?v=2026-09-16%20%E3%8A%BF%2B158","./js/core.js":"./js/core.js?v=2026-09-16%20%E3%8A%BF%2B158","./js/shell.js":"./js/shell.js?v=2026-09-16%20%E3%8A%BF%2B158","./js/dash.js":"./js/dash.js?v=2026-09-16%20%E3%8A%BF%2B158","./js/ai.js":"./js/ai.js?v=2026-09-16%20%E3%8A%BF%2B158","./js/grids.js":"./js/grids.js?v=2026-09-16%20%E3%8A%BF%2B158","./js/equipment.js":"./js/equipment.js?v=2026-09-16%20%E3%8A%BF%2B158","./js/analysis.js":"./js/analysis.js?v=2026-09-16%20%E3%8A%BF%2B158","./js/tools.js":"./js/tools.js?v=2026-09-16%20%E3%8A%BF%2B158","./js/cloud.js":"./js/cloud.js?v=2026-09-16%20%E3%8A%BF%2B158","./js/price.js":"./js/price.js?v=2026-09-16%20%E3%8A%BF%2B158","./js/inbound.js":"./js/inbound.js?v=2026-09-16%20%E3%8A%BF%2B158","./js/upd.js":"./js/upd.js?v=2026-09-16%20%E3%8A%BF%2B158","./js/admin.js":"./js/admin.js?v=2026-09-16%20%E3%8A%BF%2B158","./js/sales.js":"./js/sales.js?v=2026-09-16%20%E3%8A%BF%2B158","./js/report.js":"./js/report.js?v=2026-09-16%20%E3%8A%BF%2B158","./js/grid.js":"./js/grid.js?v=2026-09-16%20%E3%8A%BF%2B158","./js/edit.js":"./js/edit.js?v=2026-09-16%20%E3%8A%BF%2B158","./js/qadb.js":"./js/qadb.js?v=2026-09-16%20%E3%8A%BF%2B158","./js/qadata.js":"./js/qadata.js?v=2026-09-16%20%E3%8A%BF%2B158","./js/lazy.js":"./js/lazy.js?v=2026-09-16%20%E3%8A%BF%2B158","./js/init.js":"./js/init.js?v=2026-09-16%20%E3%8A%BF%2B158"}}</script>
-<link rel="modulepreload" href="js/state.js?v=2026-09-16%20%E3%8A%BF%2B158">
-<link rel="modulepreload" href="js/viz.js?v=2026-09-16%20%E3%8A%BF%2B158">
-<link rel="modulepreload" href="js/core.js?v=2026-09-16%20%E3%8A%BF%2B158">
-<link rel="modulepreload" href="js/shell.js?v=2026-09-16%20%E3%8A%BF%2B158">
-<link rel="modulepreload" href="js/dash.js?v=2026-09-16%20%E3%8A%BF%2B158">
-<link rel="modulepreload" href="js/ai.js?v=2026-09-16%20%E3%8A%BF%2B158">
-<link rel="modulepreload" href="js/grids.js?v=2026-09-16%20%E3%8A%BF%2B158">
-<link rel="modulepreload" href="js/equipment.js?v=2026-09-16%20%E3%8A%BF%2B158">
-<link rel="modulepreload" href="js/analysis.js?v=2026-09-16%20%E3%8A%BF%2B158">
-<link rel="modulepreload" href="js/tools.js?v=2026-09-16%20%E3%8A%BF%2B158">
-<link rel="modulepreload" href="js/cloud.js?v=2026-09-16%20%E3%8A%BF%2B158">
-<link rel="modulepreload" href="js/inbound.js?v=2026-09-16%20%E3%8A%BF%2B158">
-<link rel="modulepreload" href="js/upd.js?v=2026-09-16%20%E3%8A%BF%2B158">
-<link rel="modulepreload" href="js/sales.js?v=2026-09-16%20%E3%8A%BF%2B158">
-<link rel="modulepreload" href="js/grid.js?v=2026-09-16%20%E3%8A%BF%2B158">
-<link rel="modulepreload" href="js/edit.js?v=2026-09-16%20%E3%8A%BF%2B158">
-<link rel="modulepreload" href="js/qadb.js?v=2026-09-16%20%E3%8A%BF%2B158">
-<link rel="modulepreload" href="js/qadata.js?v=2026-09-16%20%E3%8A%BF%2B158">
-<link rel="modulepreload" href="js/lazy.js?v=2026-09-16%20%E3%8A%BF%2B158">
-<link rel="modulepreload" href="js/init.js?v=2026-09-16%20%E3%8A%BF%2B158">
-<script type="module" src="js/main.js?v=2026-09-16%20%E3%8A%BF%2B158"></script>
+<link rel="stylesheet" href="app.css?v=2026-09-16%20%E3%8A%BF%2B159">
+<script type="importmap">{"imports":{"./js/state.js":"./js/state.js?v=2026-09-16%20%E3%8A%BF%2B159","./js/viz.js":"./js/viz.js?v=2026-09-16%20%E3%8A%BF%2B159","./js/core.js":"./js/core.js?v=2026-09-16%20%E3%8A%BF%2B159","./js/shell.js":"./js/shell.js?v=2026-09-16%20%E3%8A%BF%2B159","./js/dash.js":"./js/dash.js?v=2026-09-16%20%E3%8A%BF%2B159","./js/ai.js":"./js/ai.js?v=2026-09-16%20%E3%8A%BF%2B159","./js/grids.js":"./js/grids.js?v=2026-09-16%20%E3%8A%BF%2B159","./js/equipment.js":"./js/equipment.js?v=2026-09-16%20%E3%8A%BF%2B159","./js/analysis.js":"./js/analysis.js?v=2026-09-16%20%E3%8A%BF%2B159","./js/tools.js":"./js/tools.js?v=2026-09-16%20%E3%8A%BF%2B159","./js/cloud.js":"./js/cloud.js?v=2026-09-16%20%E3%8A%BF%2B159","./js/price.js":"./js/price.js?v=2026-09-16%20%E3%8A%BF%2B159","./js/inbound.js":"./js/inbound.js?v=2026-09-16%20%E3%8A%BF%2B159","./js/upd.js":"./js/upd.js?v=2026-09-16%20%E3%8A%BF%2B159","./js/admin.js":"./js/admin.js?v=2026-09-16%20%E3%8A%BF%2B159","./js/sales.js":"./js/sales.js?v=2026-09-16%20%E3%8A%BF%2B159","./js/report.js":"./js/report.js?v=2026-09-16%20%E3%8A%BF%2B159","./js/grid.js":"./js/grid.js?v=2026-09-16%20%E3%8A%BF%2B159","./js/edit.js":"./js/edit.js?v=2026-09-16%20%E3%8A%BF%2B159","./js/qadb.js":"./js/qadb.js?v=2026-09-16%20%E3%8A%BF%2B159","./js/qadata.js":"./js/qadata.js?v=2026-09-16%20%E3%8A%BF%2B159","./js/lazy.js":"./js/lazy.js?v=2026-09-16%20%E3%8A%BF%2B159","./js/init.js":"./js/init.js?v=2026-09-16%20%E3%8A%BF%2B159"}}</script>
+<link rel="modulepreload" href="js/state.js?v=2026-09-16%20%E3%8A%BF%2B159">
+<link rel="modulepreload" href="js/viz.js?v=2026-09-16%20%E3%8A%BF%2B159">
+<link rel="modulepreload" href="js/core.js?v=2026-09-16%20%E3%8A%BF%2B159">
+<link rel="modulepreload" href="js/shell.js?v=2026-09-16%20%E3%8A%BF%2B159">
+<link rel="modulepreload" href="js/dash.js?v=2026-09-16%20%E3%8A%BF%2B159">
+<link rel="modulepreload" href="js/ai.js?v=2026-09-16%20%E3%8A%BF%2B159">
+<link rel="modulepreload" href="js/grids.js?v=2026-09-16%20%E3%8A%BF%2B159">
+<link rel="modulepreload" href="js/equipment.js?v=2026-09-16%20%E3%8A%BF%2B159">
+<link rel="modulepreload" href="js/analysis.js?v=2026-09-16%20%E3%8A%BF%2B159">
+<link rel="modulepreload" href="js/tools.js?v=2026-09-16%20%E3%8A%BF%2B159">
+<link rel="modulepreload" href="js/cloud.js?v=2026-09-16%20%E3%8A%BF%2B159">
+<link rel="modulepreload" href="js/inbound.js?v=2026-09-16%20%E3%8A%BF%2B159">
+<link rel="modulepreload" href="js/upd.js?v=2026-09-16%20%E3%8A%BF%2B159">
+<link rel="modulepreload" href="js/sales.js?v=2026-09-16%20%E3%8A%BF%2B159">
+<link rel="modulepreload" href="js/grid.js?v=2026-09-16%20%E3%8A%BF%2B159">
+<link rel="modulepreload" href="js/edit.js?v=2026-09-16%20%E3%8A%BF%2B159">
+<link rel="modulepreload" href="js/qadb.js?v=2026-09-16%20%E3%8A%BF%2B159">
+<link rel="modulepreload" href="js/qadata.js?v=2026-09-16%20%E3%8A%BF%2B159">
+<link rel="modulepreload" href="js/lazy.js?v=2026-09-16%20%E3%8A%BF%2B159">
+<link rel="modulepreload" href="js/init.js?v=2026-09-16%20%E3%8A%BF%2B159">
+<script type="module" src="js/main.js?v=2026-09-16%20%E3%8A%BF%2B159"></script>
 <!-- stamp:end -->
 </head>
 <body>
@@ -219,6 +219,7 @@
     <div class="chips" id="chips"></div>
 
     <div class="answer" id="answer">
+      <div class="ans-x"><button type="button" class="cbtn x-close" id="ansClose" title="AI 답변 닫기 — 다른 메뉴로 가도 닫힙니다" aria-label="AI 답변 닫기">✕ 닫기</button></div>
       <div class="ai-say" id="aiSay"></div>
       <div class="restate" id="ansRestate"></div>
       <div class="ans-head">
@@ -1165,8 +1166,12 @@
           <div class="pick" id="rPick"></div></div>
         <div><label for="rEnd">새 종료월 *</label><input id="rEnd" type="month"></div>
         <div><label for="rMrr">연장 구간 월 금액(천원) — 비우면 기존 MRR</label><input id="rMrr" type="number" min="0" step="any" placeholder="천원"></div>
+        <div><label for="rQty">노드수 — 비우면 그대로</label><input id="rQty" type="number" min="0" step="1" placeholder="그대로"></div>
         <div class="full"><label for="rNote">연장 메모 <small style="color:var(--muted)">(선택)</small></label><input id="rNote" placeholder="예: 3년 재약정 · 단가 조정"></div>
-        <div class="full cap">연장은 기존 계약 한 줄에 «연장 n회»로 쌓입니다 — 별도의 재약정 행을 만들지 않으므로 해지율·계약 수에 영향이 없습니다.</div>
+        <div class="full" id="rMates" style="display:none"></div>
+        <div class="full cap" id="rPrev" aria-live="polite"></div>
+        <div class="full" id="rUndo" style="display:none"></div>
+        <div class="full cap">연장은 기존 계약 한 줄에 «연장 n회»로 쌓입니다 — 별도의 재약정 행을 만들지 않으므로 해지율·계약 수에 영향이 없고, 기존 종료월까지의 월 매출은 바뀌지 않습니다(다음 달부터만 새 금액). 신규+추가를 합쳐 재약정했으면 원계약을 연장하면서 «같이 끝나는 추가 계약»을 체크하세요.</div>
       </div>
     </div>
 

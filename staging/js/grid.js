@@ -15,6 +15,7 @@ import { CHURN, CR, CS, csSetTab, ensureGroupOpen, helpBox, helpWire, initOiForm
   renderChurnRate, renderCsite, renderCustFlow, renderOiTiles } from './sales.js';
 import { logChange, monthRows, msg, openOvl } from './edit.js';
 import { lazyGet, lazyView } from './lazy.js';
+import { closeAnswer } from './ai.js';
 
 
 /* ---- 뒤로가기 — 화면 이동을 브라우저 히스토리에 남겨 상단 ← 버튼·브라우저/폰 뒤로가기·Alt+← 가 모두 이전 화면으로 ----
@@ -109,6 +110,7 @@ export function switchView(v){
   if(!canView(v)){ toast('권한 없음','이 메뉴는 보기 권한이 없습니다 — 슈퍼 관리자에게 요청하세요','info'); v='dash'; }
   permEnter(v);
   try{ navRecord(ST.CUR_VIEW, v); }catch(e){}
+  if(ST.CUR_VIEW==='dash' && v!=='dash'){ try{ closeAnswer(); }catch(e){} }   /* ㊿+159 홈을 떠나면 AI 답변 닫기 (생각 중이면 그대로) */
   ST.CUR_VIEW=v;
   try{ pushRecent(v); }catch(e){}
   $('#side').querySelectorAll('button').forEach(function(b){

@@ -135,11 +135,14 @@ export function aiToolBrief(qs){
   return Object.keys(n).map(function(k){ return k+(n[k]>1?'×'+n[k]:''); }).join(' · ');
 }
 /* AI 답변은 «그 시점 데이터»로 만든 것이라, 데이터를 다시 읽으면 닫습니다.
-   메뉴 이동만으로는 닫지 않습니다 — 답을 보고 다른 화면 확인하다 돌아오는 흐름은 살립니다. */
-export function closeAnswer(why){
+   ㊿+159 (사용자: «다른 메뉴 갔다와도 남아있네») — 홈에서 다른 메뉴로 가도 닫고(grid.js switchView), 답변 위 «✕ 닫기»로도 닫음.
+   force: ✕ 닫기 — 생각 중이면 질문을 멈추고 닫음 */
+export var AI_SEQ={n:0, closed:0};   /* 질문 번호 · ✕ 로 닫은 마지막 번호 — 닫은 뒤 늦게 온 답은 화면에 다시 열지 않음 */
+export function closeAnswer(why, force){
   var a=$('#answer'); if(!a || !a.classList.contains('on')) return;
   /* 질문이 진행 중(생각 중…)이면 닫지 않습니다 — 자동 새로고침이 겹치면 답이 와도 보이지 않던 문제 */
-  if(typeof isAsking==='function' && isAsking()) return;
+  if(typeof isAsking==='function' && isAsking()){ if(!force) return; AI_SEQ.closed=AI_SEQ.n; try{ abortAsk(); }catch(e){} }
+  if(force) AI_SEQ.closed=AI_SEQ.n;
   a.classList.remove('on');
   try{ clearSay(); }catch(e){}
   var t=$('#ansTitle'); if(t) t.textContent='';
@@ -156,6 +159,7 @@ export function ask(q){
   if(!AICFG.enabled){ localAnswer(q); return; }
 
   setAsking(true);
+  var mySeq=++AI_SEQ.n, gone=function(){ return AI_SEQ.closed>=mySeq; };   /* ✕ 로 닫았으면 늦게 온 답·오류는 조용히 버림 */
   // 답변 자리를 먼저 열고 "생각 중" 표시
   $('#answer').classList.add('on');
   $('#ansRestate').className='restate';
@@ -169,6 +173,7 @@ export function ask(q){
 
   // 최후 안전장치 — 어떤 이유로든 체인이 끝나지 않아도 버튼은 반드시 풀립니다
   var guard=setTimeout(function(){
+    if(gone()) return;
     if(isAsking()){
       setAsking(false);
       localAnswer(q,'⚠ AI가 응답하지 않아 내장 규칙으로 답했습니다 — 잠시 후 다시 물어봐 주세요.');
@@ -178,7 +183,7 @@ export function ask(q){
     return aiFetch({mode:'chat', question:q, digest:buildDigest(), history:ST.HIST.slice(-6)});
   })
     .then(function(r){
-      clearTimeout(guard); setAsking(false);
+      clearTimeout(guard); if(gone()) return; setAsking(false);
       if(!r || !r.ok || !r.text){ localAnswer(q,'⚠ AI가 답하지 못해 내장 규칙(간단 패턴)으로 답했습니다 — AI 답변이 아닙니다. '+String((r&&r.error)||'').slice(0,100)); return; }
       revealAnswer();
       say.className='ai-say on';
@@ -200,7 +205,7 @@ export function ask(q){
       }
     })
     .catch(function(e){
-      clearTimeout(guard); setAsking(false);
+      clearTimeout(guard); if(gone()) return; setAsking(false);
       if(/^요청을 중단했습니다/.test(String(e&&e.message||''))){ $('#q').value=q; return; }   // 사용자가 끊음 → 질문 복원 (타임아웃은 아래로)
       if(/로그인이 만료/.test(String(e&&e.message||''))){ $('#q').value=q; toast('로그인이 만료되었습니다','다시 로그인하면 질문이 그대로 남아 있습니다','warn'); openOvl('ovlAuth'); return; }
       localAnswer(q,'⚠ AI 호출 실패 — 이 답은 AI가 아니라 내장 규칙(간단 패턴)입니다. ('+String(e&&e.message||e).slice(0,120)+')');

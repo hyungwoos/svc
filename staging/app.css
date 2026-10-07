@@ -222,6 +222,7 @@ a[data-kxs]{text-decoration:underline dotted;text-underline-offset:3px}
 
 .answer{margin-top:14px;border-top:1px solid var(--ring);padding-top:14px;display:none}
 .answer.on{display:block}
+.ans-x{display:flex;justify-content:flex-end;margin:-6px 0 2px}   /* ㊿+159 AI 답변 닫기 */
 .ans-head{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap}
 .ans-title{font-size:12px;color:var(--muted);flex:1 0 100%}
 .hero{font-size:44px;font-weight:720;letter-spacing:-.035em;line-height:1.04;font-variant-numeric:tabular-nums}
