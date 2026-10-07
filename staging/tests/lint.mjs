@@ -14,7 +14,8 @@ const EXTRA = ['js/sqlbox.js'];   // 격리 칸 전용 고전 스크립트(따�
 // window 에 있는 것 중 포탈이 쓰는 비브라우저 이름 — CDN 라이브러리(loadLib 이 SRI 로 받아 window 에 둠)와 window.SVC(main.js) 뿐 (㊿+154: 앱 상태는 전부 ST · 다리 제거)
 const WINDOW_PROPS = ['XLSX', 'PptxGenJS', 'pdfjsLib'];
 const WINDOW_OK = new Set(WINDOW_PROPS.concat(['SVC']));
-let fail = 0; const say = (ok, msg) => { console.log((ok ? '  ✓ ' : '  ✗ ') + msg); if (!ok) fail++; };
+const ghErr = (title, m) => { if (process.env.GITHUB_ACTIONS) console.log('::error title=' + title + '::' + String(m).replace(/%/g, '%25').replace(/\r?\n/g, '%0A').slice(0, 900)); };   /* ㊿+158 실패를 Actions 요약 화면(로그인 없이 보임)에 주석으로 */
+let fail = 0; const say = (ok, msg) => { console.log((ok ? '  ✓ ' : '  ✗ ') + msg); if (!ok) { fail++; ghErr('정적 검사(lint) 실패', msg); } };
 const P = (src) => espree.parse(src, { ecmaVersion: 2022, sourceType: 'module', range: true, loc: true });
 const mods = {};
 for (const f of LIST) { const src = fs.readFileSync(path.join(ROOT, f), 'utf8'); const ast = P(src); mods[f] = { src, ast, sm: eslintScope.analyze(ast, { ecmaVersion: 2022, sourceType: 'module' }) }; }

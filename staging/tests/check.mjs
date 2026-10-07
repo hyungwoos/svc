@@ -6,7 +6,8 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const tmp = fs.mkdtempSync(path.join(process.env.TMPDIR || '/tmp', 'svc-check-'));
-let fail = 0; const say = (ok, m) => { console.log((ok ? '  ✓ ' : '  ✗ ') + m); if (!ok) fail++; };
+const ghErr = (title, m) => { if (process.env.GITHUB_ACTIONS) console.log('::error title=' + title + '::' + String(m).replace(/%/g, '%25').replace(/\r?\n/g, '%0A').slice(0, 900)); };   /* ㊿+158 실패를 Actions 요약 화면(로그인 없이 보임)에 주석으로 */
+let fail = 0; const say = (ok, m) => { console.log((ok ? '  ✓ ' : '  ✗ ') + m); if (!ok) { fail++; ghErr('정적 검사 실패', m); } };
 
 const htmls = fs.readdirSync(ROOT).filter((f) => f.endsWith('.html'));
 /** 위성 페이지 HTML + 그 페이지가 부르는 sat/*.js (㊿+154 부터 코드는 sat/ 파일에) */
