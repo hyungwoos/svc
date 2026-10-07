@@ -1323,7 +1323,8 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
       if (await more.isVisible()) { const h0 = await page.evaluate(() => document.body.innerHTML.length); await more.click(); await page.waitForTimeout(100); }
       const [pop] = await Promise.all([page.waitForEvent('popup'), page.evaluate(() => printDoc({ title: '시험 정산서', sub: 'smoke', cols: [{ l: '고객' }, { l: '금액', n: 1 }], rows: [['가상고객01', 1000]] }))]);
       await pop.waitForLoadState(); const btns = await pop.$$eval('[data-pd]', (b) => b.map((x) => x.dataset.pd)); assert(btns.join() === 'print,close', '인쇄 창 버튼 ' + btns);
-      const closed = pop.waitForEvent('close'); await pop.click('[data-pd="close"]'); await closed;
+      /* ㊿+158 닫기 버튼은 창 자체를 닫으므로 click 이 끝나기를 기다리면 가끔 «page closed» (부하가 큰 CI) — 누르기는 창 안에서 다음 틱에, 우리는 close 만 기다림 */
+      const closed = pop.waitForEvent('close', { timeout: 10000 }); await pop.evaluate(() => { setTimeout(() => document.querySelector('[data-pd="close"]').click(), 0); }); await closed;
       assert(!c.errs.length, c.errs.join(' | ')); return 'data-* ' + n + '개 · 인쇄 창 닫기 OK';
     });
     await ctx.close();
@@ -1566,6 +1567,7 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
     await page.reload(); await fready(page); await page.evaluate(() => SVC.navMenu('dcheck')); await page.waitForTimeout(500);
     const it = await page.evaluate(() => { const x = SVC.dcRules().find((q) => q.id === 'c_amt_odd'); return x && x.sev + ' ' + x.items.map((i) => i.label + ' | ' + i.sub).join(' / '); });
     assert(it && /^crit/.test(it) && /가상고객_만기지남/.test(it) && /4\.8억원/.test(it) && /MRR 480원/.test(it), '규칙 ' + it);
+    assert(!/가상고객_에스원(일할|해지)/.test(it), '에스원 일할 계산(첫 달 2,433원 · 해지 달 3,000원)을 실수로 잡음 ' + it);
     await page.evaluate(() => { const x = SVC.dcRules().find((q) => q.id === 'c_amt_odd'); SVC.dcFixOpen('c_amt_odd', x.items.findIndex((i) => /가상고객_만기지남/.test(i.label)), ''); }); await page.waitForTimeout(300);
     assert((await page.$eval('#dcfForm [data-k="mrr"]', (e) => e.value)) === '0.48', 'MRR 칸(천원) ' + (await page.$eval('#dcfForm [data-k="mrr"]', (e) => e.value)));
     await page.fill('#dcfForm [data-k="mrr"]', '480'); await page.click('#dcfSave'); await page.waitForTimeout(1600);

@@ -140,7 +140,8 @@ export function qaSeed(d){
       parent_contract_id:null, qty:100, version:'V6.0', combine:null, csm:null, s1_no:null, live_override:null, churn_reason:null, churn_month:null, note:null, lead_src:null}, o);
     c.id=900+contracts.length; c.start_month=qaYm(o.s); c.end_month=o.e==null? null : qaYm(o.e); c.term_months=o.e==null? null : o.e-o.s+1; c.total_amount=o.e==null? null : o.mrr*(o.e-o.s+1);
     var to=o.revTo!=null? o.revTo : (o.e==null? T+12 : o.e); for(var i=o.s;i<=to;i++) mr.push({contract_id:c.id, month:qaYm(i), amount:o.mrr});
-    delete c.s; delete c.e; delete c.revTo; contracts.push(c); return c.id; };
+    if(o.revAt) Object.keys(o.revAt).forEach(function(i){ mr.forEach(function(x){ if(x.contract_id===c.id && x.month===qaYm(+i)) x.amount=o.revAt[i]; }); });   /* 특정 달만 다른 금액(일할 계산 등) */
+    delete c.s; delete c.e; delete c.revTo; delete c.revAt; contracts.push(c); return c.id; };
   /* 만기 지남(미처리) — 2026-10 실제 사고와 같은 모양: 12개월 · 월 30만원 · 지난달 종료 */
   ct({customer_id:cust('가상고객_만기지남'), line:'Cloud', s:T-12, e:T-1, mrr:300000, qty:50});
   ct({customer_id:cust('가상고객_이달만기'), line:'Cloud', s:T-11, e:T, mrr:500000});
@@ -153,6 +154,9 @@ export function qaSeed(d){
   ct({customer_id:cust('가상고객_예정'), line:'Cloud', s:T+2, e:T+13, mrr:600000});
   ct({customer_id:cust('가상고객_LGU','기업','유통·소비재'), line:'Cloud', channel:'LGU+', s:T-8, e:T+4, mrr:330000});
   for(var k=1;k<=16;k++) ct({customer_id:cust('가상고객'+String(k).padStart(2,'0')), line:k%4===0? 'MDR':'Cloud', channel:k%3===0? '유통':'일반', partner:k%3===0? '다원티에스':'직접(계산서)', s:T-20+k, e:T+4+k, mrr:100000*(1+(k%7))+15000*k});
+  /* ㊿+158 에스원 일할 계산 — 월말 개시라 첫 달 2,433원 · 해지 달 3,000원 (데이터 점검 «금액 단위 실수 의심»에 걸리면 안 됨) */
+  var sp=T-10; ct({customer_id:cust('가상고객_에스원일할','기업','금융·보험'), line:'S1', channel:'에스원', biller:'에스원', s:sp, e:T+25, mrr:73000, s1_no:'S1-0002', revAt:(function(){ var o={}; o[sp]=2433; return o; })()});
+  var hs=T-9, he=T-2; ct({customer_id:cust('가상고객_에스원해지','기업','금융·보험'), line:'S1', channel:'에스원', biller:'에스원', s:hs, e:he, mrr:90000, status:'해지', churn_reason:'비용이슈', churn_month:qaYm(he), s1_no:'S1-0003', revAt:(function(){ var o={}; o[hs]=2900; o[he]=3000; return o; })()});
   var inst=qaYm(T-8).slice(0,8)+'10';
   var orders=[
     {id:300, channel:'LGU+', order_type:'신규발주', customer:'가상고객_LGU', model:'S100', qty:2, serials:'TST0000001, TST0000002', status:'설치완료', install_date:inst, created_at:qaYm(T-8)+'T00:00:00', returned_date:null, returned_serials:null, request_note:''},

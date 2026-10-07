@@ -65,6 +65,8 @@ export class Suite {
   get failed() { return this.results.filter((r) => !r.ok); }
   report() {
     const f = this.failed.length, n = this.results.length;
+    /* ㊿+158 실패한 시험을 Actions 요약 화면 «Annotations» 에 (로그는 로그인해야 보이지만 주석은 공개 화면에 보임) */
+    if (process.env.GITHUB_ACTIONS) this.failed.slice(0, 10).forEach((r) => console.log('::error title=' + this.name + ' 실패::' + (r.label + ' — ' + r.error).replace(/%/g, '%25').replace(/\r?\n/g, '%0A').slice(0, 900)));
     console.log(`\n${this.name}: ${n - f}/${n} 통과${f ? ` · 실패 ${f}` : ''}`);
     return f === 0;
   }
