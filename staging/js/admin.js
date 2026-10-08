@@ -46,7 +46,7 @@ export function opsPrefix(){ return OPS.target==='staging'? 'staging/' : ''; }
    ⑤ 🧹 저장소 점검: 안 쓰는 파일 · 스테이징에만 있는 저장소 파일 · 루트에 없는 저장소 파일 · deploy.yml 상태 → 정리(gh_delete) */
 export var OPS_REPO_RE=/^(\.github\/|supabase\/|cloudflare\/|tests\/fn\/|README\.md$|package(-lock)?\.json$|\.gitignore$)/;
 export var OPS_WF_RE=/^\.github\/workflows\//;
-export var OPS_REPO_NEED=['tests/fn/_mock.ts','tests/fn/ops.test.ts','tests/fn/remind.test.ts','tests/fn/aicheck.test.ts','tests/fn/quote-worker.test.ts','supabase/functions/ops/index.ts','supabase/functions/remind/index.ts','supabase/functions/aicheck/index.ts','cloudflare/quote-worker/worker.js','README.md'];
+export var OPS_REPO_NEED=['tests/fn/_mock.ts','tests/fn/ops.test.ts','tests/fn/remind.test.ts','tests/fn/aicheck.test.ts','tests/fn/quote-worker.test.ts','supabase/functions/ops/index.ts','supabase/functions/remind/index.ts','supabase/functions/aicheck/index.ts','supabase/functions/export/index.ts','tests/fn/export.test.ts','cloudflare/quote-worker/worker.js','README.md'];
 export function opsRepoFile(p){ return OPS_REPO_RE.test(String(p||'')); }
 export function opsDest(p){ return (OPS.target==='staging' && !opsRepoFile(p))? 'staging/'+p : p; }
 export function opsRepoName(){ return (OPS.st&&OPS.st.github&&OPS.st.github.repo)||'hyungwoos/svc'; }
@@ -84,6 +84,7 @@ export function opsWfIssues(y){
   if(/actions\/(checkout|setup-node|upload-artifact)@v4\b|actions\/deploy-pages@v4\b|actions\/configure-pages@v5\b|actions\/upload-pages-artifact@v3\b/.test(y)) o.push('옛 액션 버전(Node 20 경고) → checkout@v6 · setup-node@v6 · upload-artifact@v6 · configure-pages@v6 · upload-pages-artifact@v5 · deploy-pages@v5');
   if(!/^\s+functions:/m.test(y)) o.push('functions 잡 없음 — Edge Function 테스트가 CI 에서 안 돌아감');
   if(/deno run[^\n]*\|\|\s*echo/.test(y)) o.push('«deno run … || echo» 줄이 함수 테스트 실패를 덮음');
+  if(/^\s+functions:/m.test(y) && !/tests\/fn\/export\.test\.ts/.test(y)) o.push('export 함수 테스트 줄 없음 (㊿+164) — «run_t supabase/functions/export/index.ts tests/fn/export.test.ts» 한 줄 추가');
   return o;
 }
 export function stagingUrl(){ var base=location.origin+location.pathname.replace(/\/staging\//,'/').replace(/[^/]*$/,''); return base+'staging/index.html'; }
@@ -653,6 +654,7 @@ export function renderAdmin(){
   try{ mfBind(); mfLoad(); }catch(e){}
   try{ cdBind(); cdLoad(); }catch(e){}
   try{ updAdminLoad(); }catch(e){}
+  try{ API.made=null; apiLoad(); }catch(e){}   /* ㊿+164 외부 연동 — 다시 열면 발급 직후 보이던 키 원문은 지움 */
   axLoad();
   abLoad();
 }
@@ -1398,7 +1400,7 @@ export async function qaRun(){
       try{ qaApi(w).navMenu(m.v); }catch(e){ res.push({m:'이동 오류: '+qaText(e.message||e, 100), w:false, d:['navMenu(\''+m.v+'\') 에서 예외: '+String(e.message||e), 'stack: '+String(e.stack||'').split('\n').slice(0,4).join(' ⏎ ')]}); }
       if(m.v==='dash'){ try{ var ab=w.document.getElementById('ccAnaBtn'); if(ab && ab.getAttribute('aria-expanded')!=='true') ab.click(); }catch(e){} }
       await qaRaf(w); await qaSleep(250);
-      if(m.v==='adminx' && await qaWait(function(){ return !!qaApi(w).admTab; }, 6000, 100)){   /* ㊿+153: 관리자 코드는 처음 열 때 받음 — 받을 때까지 */ var tabs=['acct','sec','cfg','bill']; for(var i=0;i<tabs.length;i++){ if(!alive()) return; qaApi(w).admTab(tabs[i]); await qaRaf(w); pre(tabs[i], await qaInspect(w, m.v)); } qaApi(w).admTab('acct'); }
+      if(m.v==='adminx' && await qaWait(function(){ return !!qaApi(w).admTab; }, 6000, 100)){   /* ㊿+153: 관리자 코드는 처음 열 때 받음 — 받을 때까지 */ var tabs=['acct','sec','cfg','bill','api']; for(var i=0;i<tabs.length;i++){ if(!alive()) return; qaApi(w).admTab(tabs[i]); await qaRaf(w); pre(tabs[i], await qaInspect(w, m.v)); } qaApi(w).admTab('acct'); }
       else pre('', await qaInspect(w, m.v));
       QA.errs.slice(e0).forEach(function(x){ res.push({m:'JS 오류: '+qaText(x.m, 110), w:false, d:['오류: '+x.m+(x.at? ' @ '+x.at:''), x.st? 'stack: '+x.st : ''].filter(Boolean)}); });
     }catch(e){ res.push({m:'검사 오류: '+qaText(e.message||e, 100), w:true, d:[String(e.stack||e).slice(0,300)]}); }
@@ -1504,4 +1506,104 @@ export function qaCopy(){
   };
   try{ if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done, fallback); else fallback(); }catch(e){ fallback(); }
   return txt;
+}
+
+/* ── ㊿+164 🔌 외부 연동 API 키 (SQL 102 · Edge Function export) — 사용자: «외부 시스템에서 포탈 정보를 가져가는 기능» 1번(읽기 전용 API)
+   · 시스템마다 키 한 개 · 범위(계약·월 매출·고객사·월 매출 합계) · 고객사명 포함 여부 · 유효 기간 · 폐기 · 최근 호출 기록
+   · 키 원문은 발급 직후 이 화면에서 한 번만 보임(DB 에는 SHA-256 만) — 관리자 화면을 다시 열면 사라짐 */
+export var API={keys:null, log:null, made:null, err:'', busy:false};
+export var API_SCOPES=[['contracts','계약','고객사 · 서비스 · 구분 · 상태 · 기간 · MRR · 노드 (비고·연장 이력 제외)'],['revenue','월 매출','계약별 월 금액(원)'],['customers','고객사','id · 이름(옵션) · 산업군'],['mrr','월 매출 합계','월별 · 서비스별 합계(포탈 «월 MRR»과 같은 원천)'],
+  ['poc','MDR PoC·운영','고객사 · 서비스유형 · 상태(신청~데모 = PoC · 구독 · 종료) · 계약수량 · 설치 수 · 라이선스 · 모듈 · 시작일 (고객 담당자·연락처·진행 메모 제외)'],
+  ['orders','장비 신청','신청일 · 유형 · 고객사 · 모델 · 수량 · 상태 · 시리얼 · 회수 (수령인·연락처·주소·요청사항 제외)'],
+  ['assets','장비 현황','시리얼 · 모델 · 구분 · 상태 · 고객사 · 출고·회수일 (비고 제외)']];
+export function apiBase(){ return SB_URL+'/functions/v1/export'; }
+export function apiScopeLabel(s){ var x=API_SCOPES.filter(function(a){ return a[0]===s; })[0]; return x? x[1] : s; }
+export async function apiLoad(){
+  try{ API.keys=await sbWrite('POST','rpc/api_key_list',{})||[]; API.log=await sbWrite('POST','rpc/api_access_recent',{p_limit:30})||[]; API.err=''; }
+  catch(e){ var m=String((e&&e.message)||e); API.keys=null; API.log=null; API.err=/\(404\)|PGRST202|Could not find the function/.test(m)? 'SQL 102 를 먼저 실행하세요 — API 키 표와 함수가 아직 없습니다.' : m; }
+  apiPaint();
+}
+export function apiSnippets(key){
+  var b=apiBase(), k=key||'<발급받은 키>';
+  return [['curl', 'curl -H "X-API-Key: '+k+'" "'+b+'/contracts?updated_since=2026-10-01"'],
+    ['Apps Script', "var res = UrlFetchApp.fetch('"+b+"/mrr?from=2026-01&to=2026-12', {headers: {'X-API-Key': PropertiesService.getScriptProperties().getProperty('SVC_API_KEY')}});\nvar data = JSON.parse(res.getContentText()).data;"],
+    ['Python', "import requests\nr = requests.get('"+b+"/revenue', headers={'X-API-Key': KEY}, params={'from': '2026-01', 'to': '2026-12'})\nrows = r.json()['data']"],
+    ['엑셀용 CSV', 'curl -H "X-API-Key: '+k+'" "'+b+'/contracts?format=csv" -o contracts.csv']];
+}
+export function apiPaint(){
+  var box=document.getElementById('apiBox'); if(!box) return;
+  var h=tpl`<p class="cap" style="margin:0 0 10px">다른 시스템(ERP · BI · 시트 등)이 포탈 데이터를 <b>읽기 전용</b>으로 가져가는 주소입니다 — <code>${apiBase()}/&lt;자료&gt;</code> · 헤더 <code>X-API-Key</code> · 금액은 원 · 월은 YYYY-MM · 분당 60회 · 모든 호출이 아래 기록에 남습니다. 시스템마다 키를 따로 주면 하나만 바로 끊을 수 있습니다.</p>`;
+  if(API.err) h+=tpl`<p class="cap" style="color:var(--critical);margin:0 0 10px">⚠ ${API.err}</p>`;
+  if(API.made){
+    var mk0=API.made;
+    h+=tpl`<div class="api-made" role="status"><b>새 키 — «${mk0.name}»</b> <span class="mini">이 화면을 벗어나면 다시 볼 수 없습니다. 지금 복사해서 그 시스템 담당자에게 안전하게(메신저 1:1 · 비밀번호 관리자) 전하세요. 채팅방·메일 본문·GitHub 에는 붙이지 마세요.</span>`+
+      tpl`<div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap"><code id="apiKeyText" class="api-key">${mk0.key}</code><button type="button" class="pill" id="apiCopy">복사</button><button type="button" class="pill ghost" id="apiMadeOk">전달했어요 · 숨기기</button></div>`+
+      tpl`<pre class="api-code">${apiSnippets(mk0.key)[0][1]}</pre></div>`;
+  }
+  h+=tpl`<details class="api-new" id="apiNewBox"${rawHtml(API.keys && !API.keys.length? ' open':'')}><summary><b>＋ 새 키 발급</b></summary><div class="frm" style="grid-template-columns:1.4fr 1fr 1fr;margin-top:8px">`+
+    tpl`<div><label for="apiName">어느 시스템인지</label><input id="apiName" maxlength="60" placeholder="예: 회계 ERP · 경영 BI · 영업팀 시트"></div>`+
+    tpl`<div><label for="apiDays">유효 기간</label><select id="apiDays"><option value="90">90일</option><option value="180">180일</option><option value="365" selected>1년</option><option value="0">무기한</option></select></div>`+
+    tpl`<div><label for="apiNote">메모 (선택)</label><input id="apiNote" maxlength="120" placeholder="담당자 · 용도"></div></div>`+
+    tpl`<div class="api-scopes" role="group" aria-label="가져갈 데이터">${rawHtml(API_SCOPES.map(function(s){ return tpl`<label><input type="checkbox" class="apiScope" value="${s[0]}"${rawHtml(['contracts','revenue','mrr'].indexOf(s[0])>=0? ' checked':'')}> <b>${s[1]}</b> <span class="mini">${s[2]}</span></label>`; }).join(''))}`+
+    tpl`<label><input type="checkbox" id="apiNames" checked> <b>고객사명 포함</b> <span class="mini">끄면 고객사 id 만 (이름이 필요 없는 집계용 시스템)</span></label></div>`+
+    tpl`<div style="display:flex;gap:8px;align-items:center;margin-top:8px"><button type="button" class="pill" id="apiCreate">키 발급</button><span class="mini" id="apiMsg"></span></div></details>`;
+  var ks=API.keys||[];
+  h+=tpl`<div class="adm-h">발급한 키 <span class="mini">${ks.length}개 · 사용 중 ${ks.filter(function(k){ return k.active; }).length}</span> <button type="button" class="pill ghost" id="apiReload" style="margin-left:auto">↻ 다시 읽기</button></div>`;
+  h+=ks.length? tpl`<div class="tbl-wrap" tabindex="0"><table class="dgrid" id="apiKeys"><thead><tr><th>시스템</th><th>키 앞자리</th><th>가져가는 데이터</th><th>고객사명</th><th>만료</th><th>마지막 사용</th><th class="n">7일 호출</th><th>상태</th><th></th></tr></thead><tbody>${rawHtml(ks.map(function(k){
+      var st=k.revoked_at? tpl`<span class="ctag">폐기 ${String(k.revoked_at).slice(0,10)}</span>` : k.expired? '<span class="ctag late">만료</span>' : '<span class="ctag ok">사용 중</span>';
+      return tpl`<tr data-key="${k.id}"><td><b>${k.name}</b>${rawHtml(k.note? tpl`<div class="mini">${k.note}</div>`:'')}</td><td><code>${k.prefix}…</code></td><td>${(k.scopes||[]).map(apiScopeLabel).join(' · ')}</td><td>${k.names? '포함':'빼고'}</td>`+
+        tpl`<td>${k.expires_at? String(k.expires_at).slice(0,10) : '무기한'}</td><td class="mini">${k.last_used_at? String(k.last_used_at).replace('T',' ').slice(0,16) : '아직 없음'}</td><td class="n">${rawHtml(String(k.calls_7d||0))}${rawHtml(k.errors_7d? tpl` <span class="mini" style="color:var(--critical)">(거부 ${k.errors_7d})</span>`:'')}</td><td>${rawHtml(st)}</td>`+
+        tpl`<td>${rawHtml(k.revoked_at? '' : tpl`<button type="button" class="cbtn" data-revoke="${k.id}">폐기</button>`)}</td></tr>`; }).join(''))}</tbody></table></div>` : (API.keys? '<p class="cap">아직 발급한 키가 없습니다.</p>' : '');
+  var lg=API.log||[];
+  h+=tpl`<div class="adm-h">최근 호출 <span class="mini">최근 30건 · 180일 지나면 지움</span></div>`;
+  h+=lg.length? tpl`<div class="tbl-wrap" tabindex="0" style="max-height:40vh"><table class="dgrid" id="apiLog"><thead><tr><th>시각</th><th>키</th><th>자료</th><th>조건</th><th class="n">행</th><th>결과</th><th>IP</th><th class="n">ms</th></tr></thead><tbody>${rawHtml(lg.map(function(l){
+      var ok=l.status>=200 && l.status<300;
+      return tpl`<tr><td class="mini">${String(l.at||'').replace('T',' ').slice(0,19)}</td><td>${l.key_name||''}</td><td>${l.resource||''}</td><td class="mini">${String(l.query||'').slice(0,60)}</td><td class="n">${rawHtml(String(l.rows||0))}</td><td><span class="ctag ${rawHtml(ok? 'ok':'late')}">${String(l.status)}</span></td><td class="mini">${l.ip||''}</td><td class="n mini">${rawHtml(String(l.ms||0))}</td></tr>`; }).join(''))}</tbody></table></div>` : '<p class="cap">아직 호출이 없습니다.</p>';
+  h+=tpl`<details class="api-help"><summary><b>사용법 · 주소 · 예시</b></summary><ul class="mini" style="line-height:1.8;margin:6px 0">`+
+    tpl`<li><code>GET ${apiBase()}</code> — 이 키로 볼 수 있는 자료 · 단위</li>`+
+    tpl`<li><code>/contracts</code> — 계약 · <code>updated_since=2026-10-01</code>(그 뒤 바뀐 것만) · <code>line=Cloud</code> · <code>status=재약정</code></li>`+
+    tpl`<li><code>/revenue</code> — 월 매출 · <code>from=2026-01&amp;to=2026-12</code>(기본 최근 12개월) · <code>contract_id=</code></li>`+
+    tpl`<li><code>/customers</code> — 고객사 · <code>/mrr</code> — 월 매출 합계 · <code>month=2026-10</code> 또는 <code>from~to</code></li>`+
+    tpl`<li><code>/poc</code> — MDR PoC·운영 · <code>status=신청,대기,진행중,데모</code>(PoC 단계) · <code>svc_type</code> · <code>since=2026-10-01</code>(신청일)</li>`+
+    tpl`<li><code>/orders</code> — 장비 신청 · <code>status</code> · <code>order_type</code> · <code>since</code> · <code>/assets</code> — 장비 현황(시리얼) · <code>status=임대중</code> · <code>model</code> · <code>updated_since</code></li>`+
+    tpl`<li>공통: <code>limit</code>(기본 1000 · 최대 5000) · <code>offset</code> · 응답의 <code>next_offset</code> 으로 다음 쪽 · <code>format=csv</code></li>`+
+    tpl`<li>오류: 401 키 없음·모름·폐기·만료 · 403 범위 밖 · 429 분당 60회 넘음 · 키는 주소(<code>?key=</code>)로 보내면 거부</li></ul>`+
+    tpl`${rawHtml(apiSnippets(null).map(function(s){ return tpl`<div class="mini" style="margin-top:6px"><b>${s[0]}</b></div><pre class="api-code">${s[1]}</pre>`; }).join(''))}</details>`;
+  box.innerHTML=h;
+  apiBindBox(box);
+}
+export function apiBindBox(box){
+  var g=function(id){ return box.querySelector('#'+id); };
+  var rl=g('apiReload'); if(rl) rl.onclick=apiLoad;
+  var cr=g('apiCreate'); if(cr) cr.onclick=apiCreate;
+  var cp=g('apiCopy'); if(cp) cp.onclick=function(){ var t=(API.made&&API.made.key)||''; var done=function(){ toast('키 복사', '붙여 넣을 곳에만 붙이세요 — 채팅방·메일 본문·GitHub 금지'); };
+    try{ navigator.clipboard.writeText(t).then(done, function(){ prompt('아래 키를 복사하세요 (Ctrl+C)', t); }); }catch(e){ prompt('아래 키를 복사하세요 (Ctrl+C)', t); } };
+  var mo=g('apiMadeOk'); if(mo) mo.onclick=function(){ API.made=null; apiPaint(); };
+  box.querySelectorAll('[data-revoke]').forEach(function(b){ b.onclick=function(){ apiRevoke(Number(b.getAttribute('data-revoke'))); }; });
+}
+export async function apiCreate(){
+  if(API.busy) return;
+  var box=document.getElementById('apiBox'), msg=box&&box.querySelector('#apiMsg');
+  var say=function(t, bad){ if(msg){ msg.textContent=t; msg.style.color=bad? 'var(--critical)':''; } };
+  var name=String(($('#apiName')||{}).value||'').trim(), days=Number(($('#apiDays')||{}).value||365), note=String(($('#apiNote')||{}).value||'').trim();
+  var scopes=[].slice.call(box.querySelectorAll('.apiScope')).filter(function(c){ return c.checked; }).map(function(c){ return c.value; });
+  var names=!!(/** @type {any} */ ($('#apiNames')||{})).checked;
+  if(!name) return say('어느 시스템인지 이름을 넣으세요', true);
+  if(!scopes.length) return say('가져갈 데이터를 하나 이상 고르세요', true);
+  API.busy=true; say('발급 중…');
+  try{
+    var r=await sbWrite('POST','rpc/api_key_create',{p_name:name, p_scopes:scopes, p_names:names, p_days:days, p_note:note||null});
+    API.made={name:r.name||name, key:r.key, prefix:r.prefix};
+    try{ logChange('insert','api_keys',r.id,{name:name, scopes:scopes, names:names, days:days}); }catch(e){}
+    toast('API 키 발급', name+' — 지금 복사하세요 (다시 볼 수 없음)');
+    await apiLoad();
+  }catch(e){ say(String((e&&e.message)||e), true); }
+  API.busy=false;
+}
+export async function apiRevoke(id){
+  var k=(API.keys||[]).filter(function(x){ return x.id===id; })[0]; if(!k) return;
+  if(!confirm('«'+k.name+'» 키('+k.prefix+'…)를 폐기합니다.\n\n이 키를 쓰는 시스템은 바로 401(폐기된 키)을 받습니다 — 되살릴 수 없고, 계속 쓰려면 새 키를 발급해야 합니다.\n\n폐기할까요?')) return;
+  try{ await sbWrite('POST','rpc/api_key_revoke',{p_id:id}); try{ logChange('update','api_keys',id,{action:'폐기', name:k.name}); }catch(e){} toast('API 키 폐기', k.name+' ('+k.prefix+'…)', 'warn'); }
+  catch(e){ toast('폐기 실패', String((e&&e.message)||e), 'bad'); }
+  await apiLoad();
 }

@@ -828,7 +828,7 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
     assert(R.missing.includes('tests/fn/_mock.ts') && R.missing.includes('README.md') && R.wf.length >= 3, JSON.stringify({ m: R.missing, wf: R.wf }));
     /* 저장소에 실제로 있는 deploy.yml 은 점검에서 문제 0 이어야 함(주석의 «|| echo» 글자를 잡지 않음 · ㊿+144) */
     const wfPath = path.join(ROOT, '.github', 'workflows', 'deploy.yml');
-    if (fs.existsSync(wfPath)) { const iss = await page.evaluate((y) => SVC.opsWfIssues(y), fs.readFileSync(wfPath, 'utf8')); assert(!iss.length || /ubuntu-latest|Node 20|옛 액션|functions 잡/.test(iss.join(' ')), '저장소 deploy.yml 점검: ' + iss.join(' / ')); }
+    if (fs.existsSync(wfPath)) { const iss = await page.evaluate((y) => SVC.opsWfIssues(y), fs.readFileSync(wfPath, 'utf8')); assert(!iss.length || /ubuntu-latest|Node 20|옛 액션|functions 잡|export 함수 테스트/.test(iss.join(' ')), '저장소 deploy.yml 점검: ' + iss.join(' / ')); }
     calls.length = 0; await page.click('#opsRepoClean'); await page.waitForTimeout(500);
     const del = calls.find((c) => c.action === 'gh_delete'); assert(del, 'gh_delete 없음');
     assert(del.paths.sort().join('|') === 'check.mjs|js/app.js|staging/.github/workflows/deploy.yml|staging/2_repo/supabase/functions/ops/index.ts|staging/js/app.js', del.paths.join('|'));
@@ -993,9 +993,16 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
 // ㊿+148 데이터 점검 수정 창 · 업데이트 안내 팝업
 {
   const { FIX } = await import('./lib.mjs');
-  const writes = [], dialogs = []; let fixed = null, pending = { notify: false }, notesDb = [], notifyDb = [], ackDb = [];
+  const writes = [], dialogs = []; let fixed = null, pending = { notify: false }, notesDb = [], notifyDb = [], ackDb = [], apiKeysDb = null, apiLogDb = [];
   const J = (route, o, st = 200) => route.fulfill({ status: st, contentType: 'application/json', body: JSON.stringify(o) });
   const { ctx, page, errs } = await open({ onWrite: (w) => writes.push(w), extra: async (route, u, m) => {
+    /* ㊿+164 외부 연동 API 키 — apiKeysDb 가 null 이면 «SQL 102 전»(함수 없음 404) */
+    if (/\/rpc\/(api_key_list|api_access_recent|api_key_create|api_key_revoke)/.test(u)) { const fn = /\/rpc\/(\w+)/.exec(u)[1], b = JSON.parse(route.request().postData() || '{}'); writes.push({ m, url: u, body: route.request().postData() });
+      if (!apiKeysDb) { await J(route, { code: 'PGRST202', message: 'Could not find the function public.' + fn }, 404); return true; }
+      if (fn === 'api_key_list') { await J(route, apiKeysDb); return true; }
+      if (fn === 'api_access_recent') { await J(route, apiLogDb); return true; }
+      if (fn === 'api_key_create') { const id = apiKeysDb.length + 1, key = 'svc_' + String(id).repeat(64).slice(0, 64); apiKeysDb.unshift({ id, name: b.p_name, prefix: key.slice(0, 12), scopes: b.p_scopes, names: b.p_names, note: b.p_note, expires_at: b.p_days ? '2027-10-08T00:00:00Z' : null, active: true, revoked_at: null, expired: false, last_used_at: null, use_count: 0, calls_7d: 0, errors_7d: 0 }); await J(route, { id, name: b.p_name, key, prefix: key.slice(0, 12) }); return true; }
+      if (fn === 'api_key_revoke') { const k = apiKeysDb.find((x) => x.id === b.p_id); k.active = false; k.revoked_at = '2026-10-08T09:00:00Z'; await J(route, { id: k.id, revoked_at: k.revoked_at }); return true; } }
     if (u.includes('/rpc/load_all') && fixed) { const d = JSON.parse(JSON.stringify(FIX)); d.contracts.forEach((c) => { if (fixed[c.id]) Object.assign(c, fixed[c.id]); }); d.roles = [{ role: 'super_admin' }]; await J(route, d); return true; }
     if (u.includes('/rpc/upd_pending')) { writes.push({ m, url: u, body: '' }); await J(route, pending); return true; }
     if (u.includes('/rpc/upd_ack_set')) { writes.push({ m, url: u, body: route.request().postData() }); await J(route, { ok: true, last_id: JSON.parse(route.request().postData()).p_last_id }); return true; }
@@ -1074,7 +1081,7 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
     await page.evaluate(() => SVC.navMenu('adminx')); await page.waitForTimeout(700);
     const vis = () => page.evaluate(() => [...document.querySelectorAll('#viewAdmin .adm-pane')].filter((p) => p.getClientRects().length).map((p) => p.dataset.pane).join(','));
     const tabs = await page.$$eval('#admTabs button', (b) => b.map((x) => x.textContent.trim()));
-    assert(tabs.length === 4 && (await vis()) === 'acct', JSON.stringify({ tabs, vis: await vis() }));
+    assert(tabs.length === 5 && (await vis()) === 'acct', JSON.stringify({ tabs, vis: await vis() }));
     assert(await page.evaluate(() => { const d = document.getElementById('axNewBox'); return d && !d.open && !!document.getElementById('axTable') && document.getElementById('axTable').getClientRects().length > 0; }), '새 계정 접힘·계정 표 보임 아님');
     await page.click('#admTabs [data-t="cfg"]'); await page.waitForTimeout(200);
     assert((await vis()) === 'cfg' && (await page.$eval('#admTabs [data-t="cfg"]', (b) => b.getAttribute('aria-pressed'))) === 'true', 'cfg 전환 ' + (await vis()));
@@ -1084,6 +1091,33 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
     await page.evaluate(() => SVC.navMenu('adminx')); await page.waitForTimeout(400);
     assert((await vis()) === 'acct', '메뉴 다시 누르면 첫 탭 아님 ' + (await vis()));
     return tabs.join(' | ') + ' · 설정 탭 높이 ' + Math.round(h) + 'px';
+  });
+  await S.t('㊿+164 관리자 › 🔌 외부 연동: SQL 102 전이면 안내 · 키 발급(이름·범위 필수) → 원문 한 번만 · 복사 · 목록 · 폐기 확인 → 폐기 · 다시 열면 원문 사라짐', async () => {
+    apiKeysDb = null; await page.evaluate(() => SVC.navMenu('adminx')); await page.waitForTimeout(500); await page.click('#admTabs [data-t="api"]'); await page.waitForTimeout(300);
+    const pre = await page.$eval('#apiBox', (e) => e.textContent); assert(/SQL 102 를 먼저 실행/.test(pre), 'SQL 102 전 안내 없음 ' + pre.slice(0, 120));
+    apiKeysDb = []; apiLogDb = [{ id: 1, at: '2026-10-08T09:10:00Z', key_id: null, key_name: 'svc_ffffffff…', resource: 'contracts', query: '', rows: 0, status: 401, ip: '203.0.113.9', ms: 3 }];
+    await page.evaluate(() => SVC.apiLoad()); await page.waitForTimeout(300);
+    assert(await page.$eval('#apiNewBox', (e) => e.open) && /아직 발급한 키가 없습니다/.test(await page.$eval('#apiBox', (e) => e.textContent)), '키 없을 때 발급 칸이 열려 있지 않음');
+    assert((await page.$$eval('#apiLog tbody tr', (r) => r.length)) === 1 && /401/.test(await page.$eval('#apiLog', (e) => e.textContent)), '호출 기록 표');
+    writes.length = 0; await page.click('#apiCreate'); await page.waitForTimeout(150);
+    assert(/이름/.test(await page.$eval('#apiMsg', (e) => e.textContent)) && !writes.some((w) => /api_key_create/.test(w.url)), '이름 없이 발급됨');
+    await page.fill('#apiName', '가상 ERP'); await page.evaluate(() => document.querySelectorAll('#apiBox .apiScope').forEach((c) => { c.checked = false; })); await page.click('#apiCreate'); await page.waitForTimeout(150);
+    assert(/하나 이상/.test(await page.$eval('#apiMsg', (e) => e.textContent)) && !writes.some((w) => /api_key_create/.test(w.url)), '범위 없이 발급됨');
+    await page.check('#apiBox .apiScope[value="contracts"]'); await page.check('#apiBox .apiScope[value="mrr"]'); await page.uncheck('#apiNames'); await page.selectOption('#apiDays', '90'); await page.fill('#apiNote', '회계팀');
+    await page.click('#apiCreate'); await page.waitForTimeout(500);
+    const cw = writes.find((w) => /api_key_create/.test(w.url)); const cb = JSON.parse(cw.body);
+    assert(cb.p_name === '가상 ERP' && cb.p_scopes.join() === 'contracts,mrr' && cb.p_names === false && cb.p_days === 90 && cb.p_note === '회계팀', '발급 요청 ' + cw.body);
+    const made = await page.evaluate(() => ({ key: (document.getElementById('apiKeyText') || {}).textContent, curl: (document.querySelector('.api-made .api-code') || {}).textContent, rows: [...document.querySelectorAll('#apiKeys tbody tr')].map((r) => r.textContent) }));
+    assert(/^svc_1{64}$/.test(made.key) && /X-API-Key: svc_1{64}/.test(made.curl) && /functions\/v1\/export\/contracts/.test(made.curl), '원문·예시 ' + JSON.stringify(made).slice(0, 200));
+    assert(made.rows.length === 1 && /가상 ERP/.test(made.rows[0]) && /계약 · 월 매출 합계/.test(made.rows[0]) && /빼고/.test(made.rows[0]) && /사용 중/.test(made.rows[0]), '목록 ' + made.rows[0]);
+    await page.click('#apiMadeOk'); await page.waitForTimeout(100); assert(!(await page.$('#apiKeyText')), '숨기기 뒤에도 원문이 보임');
+    dialogs.length = 0; writes.length = 0; await page.click('#apiKeys [data-revoke="1"]'); await page.waitForTimeout(400);
+    assert(/폐기/.test(dialogs[0] || '') && /되살릴 수 없/.test(dialogs[0] || '') && JSON.parse(writes.find((w) => /api_key_revoke/.test(w.url)).body).p_id === 1, '폐기 확인·요청 ' + (dialogs[0] || '').slice(0, 80));
+    assert(/폐기 2026-10-08/.test(await page.$eval('#apiKeys', (e) => e.textContent)) && !(await page.$('#apiKeys [data-revoke="1"]')), '폐기 표시');
+    assert(!(await page.$eval('#apiNewBox', (e) => e.open)), '키가 있으면 발급 칸은 접힘'); await page.click('#apiNewBox summary'); await page.fill('#apiName', '가상 BI'); await page.click('#apiCreate'); await page.waitForTimeout(400); assert(await page.$('#apiKeyText'), '두 번째 발급 원문 없음');
+    await page.evaluate(() => SVC.navMenu('dash')); await page.waitForTimeout(200); await page.evaluate(() => SVC.navMenu('adminx')); await page.waitForTimeout(500);
+    assert(!(await page.$('#apiKeyText')) && !(await page.evaluate(() => SVC.API.made)), '관리자 화면을 다시 열어도 원문이 남음');
+    assert(!errs.length, errs.join(' | ')); return '발급 2 · 폐기 1 · 원문 한 번만';
   });
   await S.t('㊿+148 관리자 › 업데이트 안내: 계정 «받기» upsert · 처음부터 다시 DELETE · 새 안내 POST · 내 계정 › 업데이트 내역', async () => {
     notifyDb = [{ email: 'sales@example.com', enabled: true }]; ackDb = [{ email: 'sales@example.com', last_id: notesDb.length - 1, acked_at: '2026-10-05T01:00:00Z' }];
