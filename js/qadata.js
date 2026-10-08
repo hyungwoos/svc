@@ -183,7 +183,7 @@ function qaScenarios(){
       h.fill('#rnMrr', '270'); h.fill('#rnEnd', h.ym(e0+12)); h.ok(/그대로/.test(h.must('#rnPrev').textContent), '미리보기에 «그대로» 없음: '+h.must('#rnPrev').textContent);
       h.click('#rnGo'); await h.until(function(){ return db.ct(id).renew_count===1 && db.rev(id)[h.ym(e0+12)]===270000 && /재약정 통합/.test(db.ct(id+1).note||''); }, 6000, '연장 저장(계약 · 월 매출 · 추가 계약)');
       var c=db.ct(id), rv=db.rev(id), kid=db.ct(id+1);
-      h.ok(c.mrr===270000 && c.qty===270 && h.ix(c.end_month)===e0+12 && c.status==='재약정' && c.contract_type==='신규', '원계약: mrr '+c.mrr+' · 노드 '+c.qty+' · 종료 '+c.end_month+' · '+c.contract_type+'|'+c.status);
+      h.ok(c.mrr===270000 && c.qty===270 && h.ix(c.end_month)===e0+12 && c.status==='재약정' && c.contract_type==='재약정', '원계약: mrr '+c.mrr+' · 노드 '+c.qty+' · 종료 '+c.end_month+' · '+c.contract_type+'|'+c.status);
       h.ok(past()===p0 && rv[h.ym(e0+1)]===270000 && rv[h.ym(e0+12)]===270000, '월 매출: 지난 달이 바뀌었거나 새 기간이 270 이 아님 — 전 '+p0+' / 후 '+past()+' · '+h.ym(e0+1)+'='+rv[h.ym(e0+1)]+' · '+h.ym(e0+12)+'='+rv[h.ym(e0+12)]);
       h.ok(/재약정 통합/.test(kid.note||'') && kid.status==='추가' && !db.rev(id+1)[h.ym(e0+1)], '추가 계약: '+kid.status+' · '+kid.note);
       h.ok(db.t.contracts.length===n0 && db.monthSum(qaYm(e0))===s0, '재약정 행이 따로 생겼거나 '+h.ym(e0)+' 합계가 바뀜');
@@ -196,9 +196,9 @@ function qaScenarios(){
       h.ok(db.ct(id).renew_count===2, '두 번째 연장 안 됨'); document.getElementById('ovlEdit').classList.remove('on'); await h.reload();
       var R=dcRules().filter(function(x){ return x.id==='c_renew_dup'; })[0], it=R && R.items.filter(function(x){ return x.label.indexOf(NM)>=0; })[0]; h.ok(it && it.act, '데이터 점검 «연장이 짧은 사이에 두 번»이 못 잡음');
       await h.openEdit('renew'); await pickBy('연장 '); h.click('#rUndoGo'); await h.until(function(){ return db.ct(id).renew_count===1 && !db.rev(id)[h.ym(e0+13)] && h.q('#rUndoGo'); }, 6000, '되돌리기 1회');
-      c=db.ct(id); rv=db.rev(id); h.ok(c.status==='재약정', '1번 되돌린 뒤(연장 1회 남음) 상태 '+c.status); h.ok(h.ix(c.end_month)===e0+12 && c.mrr===270000 && rv[h.ym(e0+12)]===270000 && !rv[h.ym(e0+13)] && past()===p0, '되돌리기 1: 종료 '+c.end_month+' · '+h.ym(e0+13)+' '+rv[h.ym(e0+13)]);
+      c=db.ct(id); rv=db.rev(id); h.ok(c.status==='재약정' && c.contract_type==='재약정', '1번 되돌린 뒤(연장 1회 남음) '+c.contract_type+'|'+c.status); h.ok(h.ix(c.end_month)===e0+12 && c.mrr===270000 && rv[h.ym(e0+12)]===270000 && !rv[h.ym(e0+13)] && past()===p0, '되돌리기 1: 종료 '+c.end_month+' · '+h.ym(e0+13)+' '+rv[h.ym(e0+13)]);
       await h.until(function(){ return h.q('#rUndoGo'); }, 3000, '되돌리기 버튼 다시'); h.click('#rUndoGo'); await h.until(function(){ return db.ct(id).renew_count===0 && !db.rev(id)[h.ym(e0+1)] && !/재약정 통합/.test(db.ct(id+1).note||''); }, 6000, '되돌리기 2회');
-      c=db.ct(id); rv=db.rev(id); h.ok(c.status==='신규', '연장 0회로 되돌린 뒤 상태 '+c.status); h.ok(c.mrr===240000 && c.qty===240 && h.ix(c.end_month)===e0 && !rv[h.ym(e0+1)] && past()===p0 && !(c.renew_history||[]).length, '되돌리기 2: mrr '+c.mrr+' · 노드 '+c.qty+' · 종료 '+c.end_month);
+      c=db.ct(id); rv=db.rev(id); h.ok(c.status==='신규' && c.contract_type==='신규', '연장 0회로 되돌린 뒤 '+c.contract_type+'|'+c.status); h.ok(c.mrr===240000 && c.qty===240 && h.ix(c.end_month)===e0 && !rv[h.ym(e0+1)] && past()===p0 && !(c.renew_history||[]).length, '되돌리기 2: mrr '+c.mrr+' · 노드 '+c.qty+' · 종료 '+c.end_month);
       h.ok(!/재약정 통합/.test(db.ct(id+1).note||''), '추가 계약의 «재약정 통합» 표시가 안 돌아옴');
       document.getElementById('ovlEdit').classList.remove('on');
       return '연장 270노드·추가 통합 · 지난 달 그대로 · 겹침 확인 · 2회 → 1회 → 0회'; }}

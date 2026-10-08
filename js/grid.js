@@ -7,7 +7,7 @@ import { cmdAskHit, dIdx, EQB, EQUIP_VIEWS, idxDate, loadFromDb, onData, railSyn
 import { buildControls, renderAll } from './dash.js';
 import { GRIDS } from './grids.js';
 import { eqRetOpen, eqWant, renderEqPanel, syncOrderAssets } from './equipment.js';
-import { AK, BZX, CH_DEFS, DC, ensureLeadSrc, liveCalc, liveDiff, loadLib, LS, LV, renderChannelView, setLiveSrc } from './analysis.js';
+import { AK, BZX, CH_DEFS, ctOrig, DC, ensureLeadSrc, liveCalc, liveDiff, loadLib, LS, LV, renderChannelView, setLiveSrc } from './analysis.js';
 import { applyDense, PR, pushRecent, renderTodo } from './tools.js';
 import { CL, renderCloud } from './cloud.js';
 import { loadInbound, renderInbPanel, renderInbStat, renderWeekly } from './inbound.js';
@@ -1040,7 +1040,7 @@ export function ctPeriods(c, mine){
   var ym=function(v){ return v? String(v).slice(0,7) : ''; };
   var amtAt=function(m){ var x=(mine||[]).filter(function(r){ return String(r.month).slice(0,7)===m; })[0]; return x? Number(x.amount) : null; };
   var e0=h[0]||{}, s0=ym(c.start_month), end0=ym(e0.prev_end) || (ym(e0.from)? ymAdd(ym(e0.from), -1) : '');
-  var out=[{k:'최초', from:s0, to:end0, mrr:(e0.prev_mrr!=null? Number(e0.prev_mrr) : amtAt(s0)), qty:(e0.prev_qty!=null? e0.prev_qty : null), info:(c.contract_type? '구분 '+c.contract_type : '')}];
+  var out=[{k:'최초', from:s0, to:end0, mrr:(e0.prev_mrr!=null? Number(e0.prev_mrr) : amtAt(s0)), qty:(e0.prev_qty!=null? e0.prev_qty : null), info:(ctOrig(c)? '구분 '+ctOrig(c) : '')}];   /* ㊿+163 연장으로 «재약정»이 돼도 최초 줄은 처음 구분 */
   h.forEach(function(e, i){
     var last=out[out.length-1], from=ym(e.from) || (last.to? ymAdd(last.to, 1) : ''), to=ym(e.to || e.new_end);
     var mg=e.merged, info=[String(e.at||'').slice(0,10), e.by||'', /migration|sheet-sync/i.test(String(e.by||''))? '시트 이관' : '',
