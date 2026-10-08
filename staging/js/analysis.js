@@ -1601,7 +1601,7 @@ export function renewFormHtml(r, act){
     tpl`<label>새 종료월 <input type="month" id="rnEnd" value="${mk(ne)}"></label>`+
     tpl`<label>월 금액(천원) <input type="number" id="rnMrr" value="${wonToKw(r.mrr||0)}" data-prev="${rawHtml(r.mrr||0)}" min="0" step="any" style="width:110px"></label>`+
     tpl`<label>노드수 <input type="number" id="rnQty" value="${rawHtml(q0!=null? q0:'')}" min="0" step="1" style="width:90px" placeholder="그대로"></label>`+
-    tpl`<label>메모 <input type="text" id="rnNote" placeholder="선택" style="width:180px"></label>`+
+    tpl`<label>메모 <input type="text" id="rnNote" placeholder="선택 — 비고에 덧붙임" style="width:200px"></label>`+
     tpl`${rawHtml(renewMatesHtml(r, mates, 'rn'))}`+
     tpl`<span class="mini rn-prev"><span id="rnPrev">${renewPrevText(r, ne, r.mrr||0, q0, mates)}</span>${/해지|종료/.test(r.status||'')? ' · 해지·종료였던 계약을 되살림':''}${dEnd<RN.T? ' · 지난 달 매출도 소급 생성':''}</span>`+
     tpl`<button type="button" class="pill" id="rnGo">연장 저장</button>${rawHtml(cancel)}</div>`;
@@ -1773,12 +1773,16 @@ export async function doRenew(r, ne, amt, note, opt){
            prev_churn_reason:raw.churn_reason||null, prev_churn_month:raw.churn_month||null,
            note:note||null, at:new Date().toISOString(), by:ST.AUTH_USER};
   if(qty!=null) ent.qty=qty;
+  /* ㊿+162 메모는 계약 관리 «비고»에도 덧붙임 (같은 글이 이미 있으면 그대로) · 되돌리면 그 메모만 뺌 */
+  var memo=String(note||'').trim(), note0=(raw.note!==undefined? raw.note : r.note)||null;
+  if(memo) ent.prev_note=note0;
   if(prevRev.length) ent.prev_rev=prevRev;
   if(mates.length) ent.merged=mates.map(function(x){ var xr=ctRawOf(x._id)||{}; return {id:x._id, prev_status:(xr.status!==undefined? xr.status : x.status)||null, prev_note:(xr.note!==undefined? xr.note : x.note)||null}; });
   var hist=(Array.isArray(raw.renew_history)? raw.renew_history : (r.renewHist||[])).concat([ent]);
   var nst=renewStatus(r);   /* ㊿+160 연장하면 상태 «재약정»(구분은 처음 그대로) · 추가 계약은 «추가» 유지 */
   var body={end_month:idxDate(ne), mrr:amt, status:nst, churn_reason:null, churn_month:null, renew_count:rno, renew_history:hist, updated_at:new Date().toISOString()};
   if(qty!=null) body.qty=qty;
+  if(memo && (' · '+(note0||'')+' · ').indexOf(' · '+memo+' · ')<0){ body.note=[note0, memo].filter(Boolean).join(' · '); ent.note_added=true; }   /* 덧붙였을 때만 표시 — 되돌리기는 이 표시가 있을 때만 뺌 */
   await sbWrite('PATCH','contracts?id=eq.'+r._id, body);
   await sbWrite('DELETE','monthly_revenue?contract_id=eq.'+r._id+'&month=gte.'+idxDate(from));
   await sbWrite('POST','monthly_revenue', monthRows(r._id,from,ne,amt));
@@ -1803,6 +1807,9 @@ export function renewUndoPlan(r){
   var pend=('prev_end_raw' in h)? h.prev_end_raw : (h.prev_end||null);   /* ㊿+159 이후 기록은 계약의 종료월 칸 그대로(무약정이면 비움) */
   var body={end_month:pend, mrr:Number(h.prev_mrr)||0, status:st, renew_count:n-1, renew_history:hist.slice(0,-1), updated_at:new Date().toISOString()};
   if('qty' in h && 'prev_qty' in h) body.qty=h.prev_qty;   /* 연장 때 노드수를 바꾼 경우만 (그 뒤 따로 고친 노드수는 그대로) */
+  /* ㊿+162 연장 메모를 비고에 덧붙였던 기록이면 그 메모 한 조각만 뺌 (그 뒤 따로 쓴 비고는 그대로) */
+  var noteCur=String((raw.note!==undefined? raw.note : r.note)||''), noteMm=String(h.note||'').trim(), noteAt=(h.note_added && noteMm)? noteCur.lastIndexOf(noteMm) : -1;
+  if(noteAt>=0){ body.note=[noteCur.slice(0,noteAt).replace(/\s*·\s*$/,''), noteCur.slice(noteAt+noteMm.length).replace(/^\s*·\s*/,'')].filter(Boolean).join(' · ')||null; }
   if('prev_churn_reason' in h){ body.churn_reason=h.prev_churn_reason; body.churn_month=h.prev_churn_month==null? null : h.prev_churn_month; }
   else if(/해지/.test(st)){ body.churn_reason=raw.churn_reason||null; body.churn_month=h.prev_end||null; }
   var restore=Array.isArray(h.prev_rev)? h.prev_rev : [], merged=Array.isArray(h.merged)? h.merged : [];
@@ -1812,6 +1819,7 @@ export function renewUndoPlan(r){
   if('qty' in body && Number(body.qty||0)!==Number(raw.qty!=null? raw.qty : r.qty||0)) lines.push('노드수 '+(raw.qty!=null? raw.qty : r.qty||0)+' → '+(body.qty==null? '비움' : body.qty));
   if(st!==(raw.status||r.status||'')) lines.push('상태 '+(raw.status||r.status||'')+' → '+st);
   lines.push('월 매출: '+mk(from)+'부터 '+del+'개월 삭제'+(restore.length? ' · 연장 전에 있던 '+restore.length+'개월 복구' : '')+' — '+mk(from-1)+'까지는 그대로');
+  if('note' in body) lines.push('비고에서 연장 메모 «'+h.note+'» 빼기');
   if(merged.length) lines.push('합쳤던 추가 계약 '+merged.map(function(x){ return '#'+x.id; }).join('·')+' 의 «재약정 통합» 표시 되돌림');
   return {n:n, from:from, body:body, restore:restore, merged:merged, lines:lines};
 }

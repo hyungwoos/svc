@@ -1715,7 +1715,7 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
     assert(o1 === o0 && db.ct(open).end_month === null, '무약정 되돌리기 ' + db.ct(open).end_month);
     assert(!errs.length, errs.join(' | ')); return '목록 2건(부속 체크 · 따로 등록 미체크) · 옛 행 거부 · 무약정 그대로';
   });
-  await S.t('㊿+160 연장하면 상태 «재약정»(구분은 그대로) · 해지였던 계약도 재약정으로 되살림 · 추가 계약은 «추가» · 계약 상세 👁 에 «계약 기간 · 연장 이력»(최초 + 회차 · 시트 이관 기록 포함)', async () => {
+  await S.t('㊿+160 연장하면 상태 «재약정»(구분은 그대로) · 해지였던 계약도 재약정으로 되살림 · 추가 계약은 «추가» · 계약 상세 👁 에 «계약 기간 · 연장 이력»(최초 + 회차 · 시트 이관 기록 포함) · ㊿+161 고객 360 계약 표에도 연장', async () => {
     const prep = (db) => { const r = addMerge(db), o = db.t.contracts.find((c) => c.customer_id === db.t.customers.find((x) => x.name === '가상고객02').id);
       o.renew_count = 1; o.contract_type = '재약정'; o.status = '재약정'; o.renew_history = [{ renew_no: 1, new_end: o.end_month, mrr: o.mrr, merged: 973, by: 'migration-57' }]; return { ...r, mig: o.id }; };
     const { db, ctx, page, errs, info } = await fbootWith(prep), { id, e0, mig } = info;
@@ -1729,9 +1729,45 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
     assert(/구분 신규/.test(d1.meta) && /상태 재약정/.test(d1.meta) && /연장 1회/.test(d1.meta) && /52노드/.test(d1.meta), '상세 머리 ' + d1.meta);
     assert(d1.rows.length === 2 && d1.rows[0].startsWith('최초 | ' + YM(T - 14) + ' ~ ' + YM(e0) + ' | 240 | 240') && d1.rows[1].startsWith('연장 1회 | ' + YM(e0 + 1) + ' ~ ' + YM(e0 + 12) + ' | 141 | 52'), '연장 이력 ' + JSON.stringify(d1.rows));
     await page.evaluate(() => SVC.closeOvl('ovlDetail'));
-    const d2 = await det(mig); await ctx.close();
+    const d2 = await det(mig); await page.evaluate(() => SVC.closeOvl('ovlDetail'));
+    /* ㊿+161 고객 360 계약 표: «연장» 칸 + 연장한 계약 아래 한 줄(최초 → 연장 n회 · 기간 · 월 금액 · 노드) */
+    const c3 = await page.evaluate((id) => { const r = SVC.ST.DATA.rows.find((x) => x._id === id); SVC.openCust360(r.cust); const t = document.querySelector('#c360Body .c360-sec table');
+      return { head: [...t.querySelectorAll('thead th')].map((e) => e.textContent).join('|'), rows: [...t.querySelectorAll('tbody tr')].map((tr) => (tr.className || '-') + ':' + [...tr.children].map((td) => td.textContent.trim()).join(' | ')) }; }, id);
+    await ctx.close();
+    assert(c3.head === '서비스|채널|파트너|구분|상태|기간|연장|MRR(천원)', c3.head);
+    const main = c3.rows.findIndex((x) => /^c360-has:/.test(x) && / \| 1회 \| 141$/.test(x));
+    assert(main >= 0 && c3.rows[main + 1] === 'c360-rn:최초 ' + YM(T - 14) + '~' + YM(e0) + ' · 240 · 240노드→연장 1회 ' + YM(e0 + 1) + '~' + YM(e0 + 12) + ' · 141 · 52노드', '고객 360 ' + JSON.stringify(c3.rows));
+    assert(c3.rows.filter((x) => /^c360-rn:/.test(x)).length === 1, '연장 안 한 계약에도 줄이 붙음 ' + JSON.stringify(c3.rows));
     assert(d2.rows.length === 2 && /^연장 1회/.test(d2.rows[1]) && /시트 이관/.test(d2.rows[1]) && /재약정 행 #973 합침/.test(d2.rows[1]), '이관 기록 ' + JSON.stringify(d2.rows));
     assert(!errs.length, errs.join(' | ')); return d1.rows.join(' / ').slice(0, 110);
+  });
+  await S.t('㊿+162 연장 메모 → 계약 관리 «비고»에 덧붙임(같은 글이면 그대로) · 되돌리면 그 메모만 빠짐 · 고객 360 계약 행을 누르면 계약 상세(연장 이력)', async () => {
+    const prep = (db) => { const r = addMerge(db); db.t.contracts.find((c) => c.id === r.id).note = '정부 지원'; return r; };
+    const { db, ctx, page, errs, dialogs, info } = await fbootWith(prep), { id, e0 } = info;
+    const renew = (ne, memo) => page.evaluate(async ({ id, ne, memo }) => { const r = SVC.ST.DATA.rows.find((x) => x._id === id); await SVC.doRenew(r, ne, 250000, memo, {}); SVC.onData(await SVC.loadFromDb()); }, { id, ne, memo });
+    await renew(e0 + 12, '3년 재약정 · 단가 조정');
+    assert(db.ct(id).note === '정부 지원 · 3년 재약정 · 단가 조정', '비고 ' + db.ct(id).note);
+    await renew(e0 + 24, '정부 지원');
+    assert(db.ct(id).note === '정부 지원 · 3년 재약정 · 단가 조정', '같은 글 두 번 ' + db.ct(id).note);
+    await page.evaluate((id) => { const c = SVC.ST.RAWX.contracts.find((x) => x.id === id); c.note = c.note + ' · 담당 변경'; }, id);
+    db.ct(id).note = db.ct(id).note + ' · 담당 변경';
+    const undo = () => page.evaluate(async (id) => SVC.renewUndoFlow(SVC.ST.DATA.rows.find((x) => x._id === id)), id);
+    assert(await undo() === true && db.ct(id).note === '정부 지원 · 3년 재약정 · 단가 조정 · 담당 변경', '되돌리기 1(같은 글이라 안 붙었던 메모) ' + db.ct(id).note);
+    assert(await undo() === true && db.ct(id).note === '정부 지원 · 담당 변경' && /비고에서 연장 메모 «3년 재약정 · 단가 조정» 빼기/.test(dialogs.join(' ')), '되돌리기 2 ' + db.ct(id).note + ' / ' + dialogs.slice(-1)[0]);
+    await renew(e0 + 12, '재약정 완료');
+    const c3 = await page.evaluate(async (id) => { const r = SVC.ST.DATA.rows.find((x) => x._id === id); SVC.openCust360(r.cust); await new Promise((f) => setTimeout(f, 200));
+      const tr = document.querySelector('#c360Body tr[data-c360ct="' + id + '"]'); const sub = tr && tr.nextElementSibling; (sub || tr).click(); await new Promise((f) => setTimeout(f, 300));
+      const top = document.getElementById('ovlDetail'); return { has: !!tr, sub: sub ? sub.className : '', open: top.classList.contains('on'), c360: document.getElementById('ovlC360').classList.contains('on'),
+        title: document.getElementById('dtTitle').textContent, rows: [...document.querySelectorAll('#dtRenew tbody tr')].map((x) => x.children[0].textContent + ' ' + x.children[1].textContent),
+        z: getComputedStyle(top).zIndex + '/' + getComputedStyle(document.getElementById('ovlC360')).zIndex, after: [...document.querySelectorAll('.ovl.on')].map((e) => e.id).join(',') }; }, id);
+    assert(c3.has && c3.sub === 'c360-rn' && c3.open && c3.c360 && c3.title === '가상고객_통합' && c3.rows.join('|') === '최초 ' + YM(T - 14) + ' ~ ' + YM(e0) + '|연장 1회 ' + YM(e0 + 1) + ' ~ ' + YM(e0 + 12), '고객 360 → 상세 ' + JSON.stringify(c3));
+    const top = await page.evaluate(() => { const a = document.getElementById('ovlDetail'), b = document.getElementById('ovlC360'); return !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_PRECEDING); });
+    assert(top, '계약 상세가 고객 360 뒤에 깔림');
+    await page.keyboard.press('Escape'); await page.waitForTimeout(200);
+    const back = await page.evaluate(() => [document.getElementById('ovlDetail').classList.contains('on'), document.getElementById('ovlC360').classList.contains('on')].join());
+    await ctx.close();
+    assert(back === 'false,true', 'Esc 뒤 ' + back);
+    assert(!errs.length, errs.join(' | ')); return '비고 «' + db.ct(id).note + '» · 고객 360 → 상세 ' + c3.rows.length + '줄';
   });
   await S.t('㊿+159 홈 AI 답변: «✕ 닫기» · 다른 메뉴로 가면 닫힘(돌아와도 없음) · 생각 중엔 메뉴를 옮겨도 유지 · 생각 중 ✕ 는 멈추고 닫음', async () => {
     let slow = 0;
