@@ -3,6 +3,7 @@
 import { installFetch, loadFn, call, ok, report, J, calls } from './_mock.ts';
 
 const EXPECT = { month: '2026-10', due_n: 3, next_n: 2, lapsed_n: 0, live_customers: 357, live_products: 362, month_revenue: 71295828, assets_rented: 48, oi_open: 11 };
+let gwConflict = 0;
 let role = 'super_admin', mode: 'good' | 'bad' | 'error' | 'gw401' | 'nobody' = 'good', expectFail = false;
 const logs: any[] = [], slack: any[] = []; let askN = 0, inflight = 0, maxInflight = 0;
 const GOOD: Record<string, string> = {
@@ -26,6 +27,9 @@ installFetch(async (url, method, body, init) => {
   if (url.includes('/rpc/ai_check_expect')) { if (!auth.includes('svc')) return J({ message: 'denied' }, 401); return expectFail ? J({ message: 'function not found' }, 404) : J(EXPECT); }
   if (url.includes('/rest/v1/ai_check_log')) { logs.push(JSON.parse(body || '{}')); return new Response('', { status: 201 }); }
   if (url.includes('/functions/v1/ask')) {
+    // v1.5: Supabase 새 API 키 게이트웨이 흉내 — apikey 와 Authorization 의 키가 다르면 401 «Conflicting API keys» (2026-10 실제 야간 실패)
+    const apikey = String((init?.headers as Record<string, string>)?.apikey || '');
+    if (apikey !== auth.replace(/^Bearer\s+/i, '')) { gwConflict++; return J({ message: 'Conflicting API keys' }, 401); }
     // v1.3: 질문 전 ping — 게이트웨이가 막는 경우(JWT 검사 ON + 서비스 키 거부)·본문 없는 오류 흉내
     if (mode === 'gw401') return J({ code: 401, message: 'Invalid JWT' }, 401);
     if (mode === 'nobody') return J({}, 503);
@@ -101,4 +105,9 @@ role = 'admin'; { const r = await call({ dry: true }); ok(r.status === 403, 'adm
   ok(m.hasNum('이번 달(2026-10) MRR은 약 9,956만원(99,557,735원)이고', 99557735) && m.hasNum('99,557,735원', 99557735) && m.hasNum('약 9955만원', 99557735), '만원·원 표기 인정(㊿+147)');
   ok(!m.hasNum('약 8,000만원', 99557735) && !m.hasNum('자료가 없습니다', 99557735), '다른 금액·숫자 없음은 불인정'); }
 ok(!calls.some((c) => c.body && /xoxb-test|cronkey-test/.test(c.body)), '슬랙 토큰·크론 키가 요청 본문에 새지 않음');
+// v1.5 — ask 를 부를 때 apikey·Authorization 이 같은 서비스 키 (새 키 체계 게이트웨이 «Conflicting API keys» 401 방지) · 안내 문구
+{ gwConflict = 0; const r = await call({ dry: true }); ok(r.j.ok && r.j.pass === 12 && gwConflict === 0, 'v1.5: ask 호출 헤더가 같은 키 → 게이트웨이 거부 0', { gwConflict, pass: r.j.pass });
+  const mod = await import('../../supabase/functions/aicheck/index.ts');
+  ok(/v1\.5/.test(mod.fixHint('ask 호출 실패 — HTTP 401 · Conflicting API keys')), 'fixHint: Conflicting API keys → aicheck v1.5 안내', mod.fixHint('ask 호출 실패 — HTTP 401 · Conflicting API keys'));
+  ok(/한 번 더 배포/.test(mod.fixHint('ask 호출 실패 — OpenRouter API 키가 거부되었습니다 — Supabase › Edge Functions › Secrets 의 OPENROUTER_API_KEY 값을 확인하세요')), 'fixHint: OpenRouter 키 거부 → Secret 확인 + ask 다시 배포'); }
 report('aicheck');

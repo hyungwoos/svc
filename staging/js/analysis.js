@@ -50,7 +50,7 @@ export function dcRules(){
   var revOn=function(x, m){ return (x.segs||[]).some(function(sg){ return sg[2] && sg[0]<=m && m<=sg[1]; }); };
   var ovl=[]; rows.forEach(function(a){ if(!a.renew || a.parent) return; var h=(a.renewHist||[])[(a.renewHist||[]).length-1]; if(!h || !h.from || rnImp(h)) return;
     var f=dIdx(h.from), e=(a.endRaw!=null? a.endRaw : a.endIdx); if(e==null || e<f) return;
-    rows.forEach(function(b){ if(b._id===a._id || b.parent || b.cid!==a.cid || b.line!==a.line) return; if(b.ctype==='추가' || !(b.ctype==='재약정' || b.status==='재약정')) return;
+    rows.forEach(function(b){ if(b._id===a._id || b.parent || b.cid!==a.cid || b.line!==a.line) return; if(b.ctype==='추가' || !(b.ctype==='재약정' || (b.status==='재약정' && !b.renew))) return;   /* ㊿+160 연장으로 상태가 «재약정»이 된 행은 따로 만든 재약정 행이 아님 */
       var bs=(b.startRaw!=null? b.startRaw : b.startIdx); if(bs==null || bs<f || bs>e) return;
       var n=0; for(var m=f;m<=e;m++) if(revOn(a, m) && revOn(b, m)) n++; if(!n) return;   /* 두 계약 모두 월 매출이 있는 달만 */
       var it=ci(b); it.sub='#'+a._id+' 연장 '+a.renew+'회('+mk(f)+'~'+mk(e)+') 와 겹치는 재약정 행 #'+b._id+'('+mk(bs)+'~'+(b.endRaw!=null? mk(b.endRaw):'')+' · 월 '+won(b.mrr||0)+'천원) · 두 번 잡힌 달 '+n+'개월 — 하나만 남기세요'; ovl.push(it); }); });
@@ -1603,7 +1603,7 @@ export function renewFormHtml(r, act){
     tpl`<label>노드수 <input type="number" id="rnQty" value="${rawHtml(q0!=null? q0:'')}" min="0" step="1" style="width:90px" placeholder="그대로"></label>`+
     tpl`<label>메모 <input type="text" id="rnNote" placeholder="선택" style="width:180px"></label>`+
     tpl`${rawHtml(renewMatesHtml(r, mates, 'rn'))}`+
-    tpl`<span class="mini rn-prev"><span id="rnPrev">${renewPrevText(r, ne, r.mrr||0, q0, mates)}</span>${/해지|종료/.test(r.status||'')? ' · 상태는 신규로 되살림':''}${dEnd<RN.T? ' · 지난 달 매출도 소급 생성':''}</span>`+
+    tpl`<span class="mini rn-prev"><span id="rnPrev">${renewPrevText(r, ne, r.mrr||0, q0, mates)}</span>${/해지|종료/.test(r.status||'')? ' · 해지·종료였던 계약을 되살림':''}${dEnd<RN.T? ' · 지난 달 매출도 소급 생성':''}</span>`+
     tpl`<button type="button" class="pill" id="rnGo">연장 저장</button>${rawHtml(cancel)}</div>`;
   }
   if(act==='end') return tpl`<div class="rn-f"><b>서비스종료</b><span>상태를 «서비스종료»로 바꾸고 ${mk(dEnd)} 이후 월 매출을 지웁니다 · LIVE 에서는 ${mk(dEnd+1)}부터 제외</span>`+
@@ -1723,6 +1723,7 @@ export function renewPrevText(r, ne, amt, qty, mates){
   if(re!=null) out.push(mk(re)+'까지 월 매출은 그대로');
   out.push(mk(from)+'~'+mk(ne)+' '+(ne-from+1)+'개월 월 '+won(amt||0)+'천원');
   if(qty!=null && qty!==(r.qty||0)) out.push('노드 '+(r.qty||0)+' → '+qty);
+  var ns=renewStatus(r); if(ns!==(r.status||'')) out.push('상태 '+(r.status||'없음')+' → '+ns);
   if(mates && mates.length) out.push('추가 '+mates.length+'건은 '+mk(re)+'에 끝(재약정 통합)');
   out.push('재약정 행은 따로 만들지 않음');
   return out.join(' · ');
@@ -1744,6 +1745,14 @@ export function renewOpts(r, p, host){
   var merge=[].slice.call(host.querySelectorAll('.'+p+'Mate')).filter(function(cb){ return cb.checked; }).map(function(cb){ return +cb.value; });
   return {qty:(q!=null && isFinite(q) && q>=0)? q : null, merge:merge};
 }
+/** ㊿+160 연장한 계약의 상태 — 원계약은 «재약정»(종료·해지였어도 되살림) · 추가 계약은 «추가» · CN전환·통합과금 등 특수 상태는 그대로
+    (사용자 2026-10-08: 연장하면 상태만 재약정, 구분은 처음 들어온 대로) */
+export function renewStatus(r){
+  var st=String(r.status||'');
+  if(r.ctype==='추가' || st==='추가') return '추가';
+  if(!st || /^(신규|재약정)$/.test(st) || /해지|종료/.test(st)) return '재약정';
+  return st;
+}
 /* ── 저장 로직 (입력·수정 › 갱신·해지 탭과 공유) ── */
 export async function doRenew(r, ne, amt, note, opt){
   if(!canWrite('contracts')) throw new Error('계약 쓰기 권한이 없습니다.');
@@ -1754,7 +1763,7 @@ export async function doRenew(r, ne, amt, note, opt){
   if(cur) r=cur;
   var from=renewFrom(r, ne), re=renewEnd(r);
   if(ne<from) throw new Error('새 종료월이 기존 종료월보다 빠릅니다.');
-  /* 연장 = 원계약 한 줄을 갱신 (회차 +1, 상태는 그대로 · 종료/해지였다면 신규로 되살림). 별도 «재약정» 행을 만들지 않습니다 */
+  /* 연장 = 원계약 한 줄을 갱신 (회차 +1 · 상태 «재약정»(㊿+160) · 종료/해지였어도 되살림). 별도 «재약정» 행을 만들지 않습니다 */
   var rno=(r.renew||0)+1, k=ctRowIdx(r), mat=(k>=0 && ST.MAT[k])||[], prevRev=[];
   for(var m=from;m<mat.length;m++) if(mat[m]) prevRev.push({m:idxDate(m), v:mat[m]});   // 연장 전에 이미 있던 달(보통 없음) — 되돌리기에서 그대로 복구
   var mates=renewMates(r).filter(function(x){ return (opt.merge||[]).indexOf(x._id)>=0; });
@@ -1767,7 +1776,7 @@ export async function doRenew(r, ne, amt, note, opt){
   if(prevRev.length) ent.prev_rev=prevRev;
   if(mates.length) ent.merged=mates.map(function(x){ var xr=ctRawOf(x._id)||{}; return {id:x._id, prev_status:(xr.status!==undefined? xr.status : x.status)||null, prev_note:(xr.note!==undefined? xr.note : x.note)||null}; });
   var hist=(Array.isArray(raw.renew_history)? raw.renew_history : (r.renewHist||[])).concat([ent]);
-  var nst=/해지|종료/.test(r.status||'')? (r.ctype==='추가'? '추가':'신규') : r.status;
+  var nst=renewStatus(r);   /* ㊿+160 연장하면 상태 «재약정»(구분은 처음 그대로) · 추가 계약은 «추가» 유지 */
   var body={end_month:idxDate(ne), mrr:amt, status:nst, churn_reason:null, churn_month:null, renew_count:rno, renew_history:hist, updated_at:new Date().toISOString()};
   if(qty!=null) body.qty=qty;
   await sbWrite('PATCH','contracts?id=eq.'+r._id, body);
@@ -1790,6 +1799,7 @@ export function renewUndoPlan(r){
   var from=dIdx(h.from), k=ctRowIdx(r), mat=(k>=0 && ST.MAT[k])||[], del=0;
   for(var m=from;m<mat.length;m++) if(mat[m]) del++;
   var st=(h.prev_status!=null? h.prev_status : (raw.status||r.status||''));
+  if(n-1>0 && st==='신규') st='재약정';   /* ㊿+160 아직 연장이 남아 있으면 «재약정» (예전 기록의 prev_status 는 «신규»로 남아 있음) */
   var pend=('prev_end_raw' in h)? h.prev_end_raw : (h.prev_end||null);   /* ㊿+159 이후 기록은 계약의 종료월 칸 그대로(무약정이면 비움) */
   var body={end_month:pend, mrr:Number(h.prev_mrr)||0, status:st, renew_count:n-1, renew_history:hist.slice(0,-1), updated_at:new Date().toISOString()};
   if('qty' in h && 'prev_qty' in h) body.qty=h.prev_qty;   /* 연장 때 노드수를 바꾼 경우만 (그 뒤 따로 고친 노드수는 그대로) */

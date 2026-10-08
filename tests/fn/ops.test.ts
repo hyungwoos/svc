@@ -14,6 +14,8 @@ const TREE = [
 ];
 const b64 = (s: string) => { const u = new TextEncoder().encode(s); let bin = ''; u.forEach((c) => bin += String.fromCharCode(c)); return btoa(bin); };
 const treePosts: string[][] = [];
+let blobInFlight = 0, blobMax = 0, blobPosts = 0;
+let lastDeployMeta: any = null;
 
 installFetch(async (url, method, body, init) => {
   if (url.includes('/auth/v1/user')) return J({ id: 'u1', email });
@@ -28,7 +30,7 @@ installFetch(async (url, method, body, init) => {
     if (url.includes('/git/trees') && method === 'POST') { treePosts.push(JSON.parse(body!).tree.map((e: any) => e.path + '←' + e.sha)); return J({ sha: 'newtree' }, 201); }
     if (url.includes('/git/blobs/b1')) return J({ encoding: 'base64', content: b64('<html><meta name="app-ver" content="2026-09-16 ㊿+137"></html>') });
     if (url.includes('/git/blobs/b8')) return J({ encoding: 'base64', content: b64("<html><script>var APP_VER='2026-09-16 ㊿+129';</script></html>") });
-    if (url.includes('/git/blobs') && method === 'POST') return J({ sha: 'nb' + calls.length }, 201);
+    if (url.includes('/git/blobs') && method === 'POST') { blobPosts++; blobInFlight++; blobMax = Math.max(blobMax, blobInFlight); await new Promise((r) => setTimeout(r, 30)); blobInFlight--; return J({ sha: 'nb' + calls.length }, 201); }
     if (url.includes('/git/ref/heads/')) return J({ object: { sha: 'headsha' } });
     if (url.includes('/git/commits/headsha')) return J({ tree: { sha: 'treesha' } });
     if (url.includes('/git/commits') && method === 'POST') return J({ sha: 'c0ffee1234567' }, 201);
@@ -40,8 +42,8 @@ installFetch(async (url, method, body, init) => {
     if (url.endsWith('/database/query')) { const b = JSON.parse(body!); if (/boom/.test(b.query)) return J({ message: 'syntax error at boom' }, 400); return J([{ kind: 'due', n: 9 }], 201); }
     if (/\/functions$/.test(url)) return J([{ slug: 'ask', name: 'ask', version: 60, verify_jwt: false, entrypoint_path: 'index.ts' }, { slug: 'remind', name: 'remind', version: 3, verify_jwt: false, entrypoint_path: 'index.ts' }]);
     if (/\/functions\/remind\/body$/.test(url)) { const fd = new FormData(); fd.append('file', new Blob(['// remind code'], { type: 'text/plain' }), 'index.ts'); const r = new Response(fd); return new Response(await r.text(), { status: 200, headers: { 'content-type': r.headers.get('content-type')! } }); }
-    if (/\/functions\/remind$/.test(url) && method === 'GET') return J({ slug: 'remind', name: 'remind', version: 3, verify_jwt: false, entrypoint_path: 'index.ts' });
-    if (url.includes('/functions/deploy?slug=')) { const fd = init!.body as FormData; const meta = JSON.parse(await (fd.get('metadata') as Blob).text()); return J({ slug: new URL(url).searchParams.get('slug'), version: 4, verify_jwt: meta.verify_jwt, entrypoint_path: meta.entrypoint_path }, 201); }
+    if (/\/functions\/remind$/.test(url) && method === 'GET') return J({ slug: 'remind', name: 'remind', version: 3, verify_jwt: false, entrypoint_path: 'file:///tmp/user_fn_x_2/source/file:///tmp/user_fn_x_1/source/index.ts' });
+    if (url.includes('/functions/deploy?slug=')) { const fd = init!.body as FormData; const meta = JSON.parse(await (fd.get('metadata') as Blob).text()); lastDeployMeta = meta; return J({ slug: new URL(url).searchParams.get('slug'), version: 4, verify_jwt: meta.verify_jwt, entrypoint_path: meta.entrypoint_path }, 201); }
     if (url.endsWith('/secrets') && method === 'GET') return J([{ name: 'SLACK_BOT_TOKEN', value: 'x' }]);
     return J({ message: 'not mocked ' + url }, 404);
   }
@@ -63,6 +65,18 @@ console.log('ops 함수');
 { const r = await call(P({ action: 'gh_get', path: 'staging/index.html' })); ok(r.j.ok && r.j.app_ver === '2026-09-16 ㊿+129', 'gh_get: 옛 var APP_VER 도 인식', r.j.app_ver); }
 { treePosts.length = 0; const r = await call(P({ action: 'gh_put', files: [{ path: 'index.html', content: '<html>x</html>' }, { path: 'js/app.js', content: 'var a=1;' }], message: 'test' }));
   ok(r.j.ok && r.j.commit === 'c0ffee1234567' && treePosts.length === 1 && treePosts[0].length === 2, 'gh_put: 파일 2개 → 커밋 1개', treePosts[0]); }
+// v1.5 커밋 빠르게 — 내용이 같은 파일은 건너뜀(git blob SHA 비교) · 바뀐 파일은 동시에 업로드 · 전부 같으면 커밋 안 함
+{ const mod = await import('../../supabase/functions/ops/index.ts');
+  const sha = await mod.gitBlobSha(b64('hello\n')); ok(sha === 'ce013625030ba8dba906f756967f9e9ca394464a', 'gitBlobSha = git hash-object 와 같음', sha);
+  TREE.push({ path: 'js/same.js', type: 'blob', sha: await mod.gitBlobSha(b64('var same=1;\n')), size: 12, mode: '100644' });
+  treePosts.length = 0; blobPosts = 0;
+  const r = await call(P({ action: 'gh_put', files: [{ path: 'js/same.js', content: 'var same=1;\n' }, { path: 'js/new.js', content: 'var n=2;' }], message: 'skip' }));
+  ok(r.j.ok && treePosts[0]?.length === 1 && treePosts[0][0].startsWith('js/new.js') && blobPosts === 1 && r.j.skipped?.[0] === 'js/same.js' && r.j.files?.join() === 'js/new.js', 'gh_put: 같은 내용 파일은 건너뛰고 바뀐 것만 커밋', { files: r.j.files, skipped: r.j.skipped, blobPosts });
+  treePosts.length = 0; const r2 = await call(P({ action: 'gh_put', files: [{ path: 'js/same.js', content: 'var same=1;\n' }], message: 'none' }));
+  ok(!r2.j.ok && /바뀐 파일이 없습니다/.test(r2.j.error) && !treePosts.length, 'gh_put: 전부 같으면 커밋하지 않음', r2.j.error);
+  blobMax = 0; blobPosts = 0; const many = Array.from({ length: 16 }, (_, i) => ({ path: 'js/f' + i + '.js', content: 'var x' + i + '=1;' }));
+  const t0 = Date.now(); const r3 = await call(P({ action: 'gh_put', files: many, message: 'many' })); const ms = Date.now() - t0;
+  ok(r3.j.ok && blobPosts === 16 && blobMax >= 4 && blobMax <= 6 && treePosts.slice(-1)[0].length === 16, '파일 16개 → 동시에 올림(최대 6) · 커밋 1개', { blobMax, ms }); }
 { treePosts.length = 0; const r = await call(P({ action: 'gh_copy', src: '', dst: 'staging' }));
   const paths = (treePosts[0] || []).map((x) => x.split('←')[0]);
   ok(r.j.ok && paths.includes('staging/js/app.js') && paths.includes('staging/app.css') && paths.includes('staging/index.html') && !paths.some((p) => /^staging\/(tests|supabase|\.github)\//.test(p)), 'gh_copy 루트→staging: js/·app.css 포함 · tests/supabase/.github 제외', paths); }
@@ -80,6 +94,7 @@ console.log('ops 함수');
 { const r = await call(P({ action: 'fn_list' })); ok(r.j.ok && JSON.stringify(r.j).includes('remind'), 'fn_list'); }
 { const r = await call(P({ action: 'fn_get', slug: 'remind' })); ok(r.j.ok && /remind code/.test(JSON.stringify(r.j)), 'fn_get: 코드 본문(multipart)'); }
 { const r = await call(P({ action: 'fn_deploy', slug: 'remind', files: [{ path: 'index.ts', content: '// v2' }], verify_jwt: false })); ok(r.j.ok && (r.j.version === 4 || /4/.test(JSON.stringify(r.j))), 'fn_deploy', Object.keys(r.j)); }
+ok(lastDeployMeta && lastDeployMeta.entrypoint_path === 'index.ts', 'fn_deploy: 진입점은 파일 이름만(예전 file:///… 경로가 겹치지 않음)', lastDeployMeta && lastDeployMeta.entrypoint_path);
 { const r = await call(P({ action: 'secrets_list' })); ok(r.j.ok && JSON.stringify(r.j).includes('SLACK_BOT_TOKEN') && !JSON.stringify(r.j).includes('"value"'), 'secrets_list: 이름만(값 없음)'); }
 { const r = await call(P({ action: 'secrets_set', name: 'SUPABASE_X', value: 'v' })); ok(!r.j.ok, 'secrets_set: SUPABASE_ 접두 거부', r.j.error); }
 // 거부 경로

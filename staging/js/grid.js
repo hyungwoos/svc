@@ -1032,11 +1032,28 @@ export function renderGrid(){
   }
 }
 
+/** 'YYYY-MM' 에 n 달 더하기 */
+export function ymAdd(ym, n){ if(!ym) return ''; var t=(+ym.slice(0,4))*12+(+ym.slice(5,7)-1)+n; return Math.floor(t/12)+'-'+('0'+(t%12+1)).slice(-2); }
+/** ㊿+160 계약 상세의 «계약 기간 · 연장 이력» 행 — 최초 + 연장 회차별 (포탈 연장 기록 · 시트 이관 기록 둘 다) */
+export function ctPeriods(c, mine){
+  var h=Array.isArray(c.renew_history)? c.renew_history : []; if(!h.length) return [];
+  var ym=function(v){ return v? String(v).slice(0,7) : ''; };
+  var amtAt=function(m){ var x=(mine||[]).filter(function(r){ return String(r.month).slice(0,7)===m; })[0]; return x? Number(x.amount) : null; };
+  var e0=h[0]||{}, s0=ym(c.start_month), end0=ym(e0.prev_end) || (ym(e0.from)? ymAdd(ym(e0.from), -1) : '');
+  var out=[{k:'최초', from:s0, to:end0, mrr:(e0.prev_mrr!=null? Number(e0.prev_mrr) : amtAt(s0)), qty:(e0.prev_qty!=null? e0.prev_qty : null), info:(c.contract_type? '구분 '+c.contract_type : '')}];
+  h.forEach(function(e, i){
+    var last=out[out.length-1], from=ym(e.from) || (last.to? ymAdd(last.to, 1) : ''), to=ym(e.to || e.new_end);
+    var mg=e.merged, info=[String(e.at||'').slice(0,10), e.by||'', /migration|sheet-sync/i.test(String(e.by||''))? '시트 이관' : '',
+      Array.isArray(mg)? '추가 '+mg.length+'건 통합' : (mg? '재약정 행 #'+mg+' 합침' : ''), e.note||''].filter(Boolean).join(' · ');
+    out.push({k:'연장 '+(e.no||e.renew_no||i+1)+'회', from:from, to:to, mrr:(e.mrr!=null? Number(e.mrr) : amtAt(from)), qty:(e.qty!=null? e.qty : (i===h.length-1 && c.qty? c.qty : null)), info:info});
+  });
+  return out;
+}
 export function openDetail(c){
   var cu=(ST.RAWX.customers||[]).filter(function(x){return x.id===c.customer_id;})[0]||{};
   $('#dtTitle').textContent=cu.name||'?';
   $('#dtMeta').textContent=[c.line, c.partner, c.biller, (c.start_month||'').slice(0,7)+'~'+((c.end_month||'').slice(0,7)||'?'),
-    c.status||'활성', (c.renew_count? '연장 '+c.renew_count+'회':''), c.churn_reason||''].filter(Boolean).join(' · ');
+    (c.contract_type? '구분 '+c.contract_type : ''), '상태 '+(c.status||'활성'), (c.renew_count? '연장 '+c.renew_count+'회':''), (c.qty? Number(c.qty).toLocaleString('ko-KR')+'노드':''), c.churn_reason||''].filter(Boolean).join(' · ');
   openOvl('ovlDetail');
   // 월별 금액 차트
   var mine=(ST.RAWX.mrs||[]).filter(function(x){return x.contract_id===c.id;});
@@ -1046,6 +1063,12 @@ export function openDetail(c){
       series:[{label:'월 금액',data:mine.map(function(x){return Number(x.amount);}),color:cssv('--s1')}],
       fmt:won, tipFmt:wonFull, fill:true});
   } else host.innerHTML='<p class="cap">월별 금액 데이터가 없습니다.</p>';
+  // ㊿+160 계약 기간 · 연장 이력 (최초 + 연장 회차별 기간·월 금액·노드) — «기간만 늘어난 것처럼 보임» 대신 회차가 보이게
+  var rb=document.getElementById('dtRenew');
+  if(rb){ var ps=ctPeriods(c, mine);
+    rb.innerHTML=ps.length? tpl`<div style="font-size:12px;color:var(--ink-2);opacity:.8;margin:14px 0 6px">계약 기간 · 연장 이력</div>`+
+      tpl`<div class="tbl-wrap" tabindex="0"><table class="rn-tbl"><thead><tr><th>회차</th><th>기간</th><th class="n">월 금액(천원)</th><th class="n">노드</th><th>처리</th></tr></thead><tbody>${rawHtml(ps.map(function(p){
+        return tpl`<tr><td><b>${p.k}</b></td><td>${p.from||'?'} ~ ${p.to||'?'}</td><td class="n">${rawHtml(p.mrr!=null? won(p.mrr) : '·')}</td><td class="n">${rawHtml(p.qty!=null? Number(p.qty).toLocaleString('ko-KR') : '·')}</td><td class="mini">${p.info}</td></tr>`; }).join(''))}</tbody></table></div>` : ''; }
   // 변경 이력
   var t=$('#dtLog'); t.innerHTML='<tbody><tr><td class="mini">불러오는 중…</td></tr></tbody>';
   sbTry('change_log?select=*&target_id=eq.'+c.id+'&order=id.desc&limit=50').then(function(rows){

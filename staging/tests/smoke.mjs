@@ -770,7 +770,7 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
     calls.push(body); const A = body.action; let out = { ok: true };
     if (A === 'status') out = { ok: true, pin_set: true, github: { repo: 'x/svc', branch: 'main', token_set: true }, mgmt_token_set: true, log_ok: true, recent: [] };
     else if (A === 'gh_put') out = { ok: true, commit: 'abc1234def', url: 'u', files: body.files.map((f) => f.path) };
-    else if (A === 'gh_list') out = { ok: true, files: ['index.html', 'js/app.js', 'js/core.js', 'staging/js/app.js', 'check.mjs', 'tests/check.mjs', '.github/workflows/deploy.yml', 'staging/.github/workflows/deploy.yml', 'staging/README.md', 'staging/tests/fn/ops.test.ts'].map((p) => ({ path: p, size: 1, sha: 's' })) };
+    else if (A === 'gh_list') out = { ok: true, files: ['index.html', 'js/app.js', 'js/core.js', 'staging/js/app.js', 'check.mjs', 'tests/check.mjs', '.github/workflows/deploy.yml', 'staging/.github/workflows/deploy.yml', 'staging/README.md', 'staging/tests/fn/ops.test.ts', 'staging/2_repo/supabase/functions/ops/index.ts'].map((p) => ({ path: p, size: 1, sha: 's' })) };
     else if (A === 'gh_get') out = { ok: true, path: body.path, content: OLD_WF };
     else if (A === 'gh_delete') out = { ok: true, commit: 'dead0002', url: 'u', deleted: body.paths, missing: [] };
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(out) }); return true; } });
@@ -784,6 +784,18 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
     assert(ps.join('|') === '.github/workflows/deploy.yml|tests/check.mjs|tests/fn/ops.test.ts', ps.join('|'));
     const ui = await page.evaluate(() => ({ wf: !!document.querySelector('[data-wfcopy]'), root: [...document.querySelectorAll('#opsBody .ctag')].map((e) => e.textContent).join(',') }));
     assert(ui.wf && /저장소 루트/.test(ui.root) && /GitHub 웹에서/.test(ui.root), JSON.stringify(ui)); return ps.join(' · ');
+  });
+  await S.t('㊿+160 배포 안전장치: 묶음 폴더(1_github/ · 2_repo/)째 넣어도 이름 자동으로 뗌 → 저장소 파일은 루트 · 사이트 파일은 staging/', async () => {
+    const keep = await page.evaluate(() => SVC.OPS.files.slice());
+    const ap = await page.evaluate(() => ['2_repo/supabase/functions/ops/index.ts', '2_repo/tests/fn/ops.test.ts', '1_github/js/grid.js', '1_github/index.html', '1_github/check.mjs', 'js/x_github/a.js'].map((p) => SVC.opsAutoPath(p)));
+    const ps = ap.map((x) => x.path).join('|');
+    assert(ps === 'supabase/functions/ops/index.ts|tests/fn/ops.test.ts|js/grid.js|index.html|tests/check.mjs|js/x_github/a.js', ps);
+    assert(/«2_repo\/» 폴더 이름은 떼고/.test(ap[0].auto) && /tests\//.test(ap[4].auto) && !ap[5].auto, JSON.stringify(ap));
+    await page.evaluate(() => { SVC.OPS.target = 'staging'; SVC.OPS.files = [{ path: '2_repo/supabase/functions/ops/index.ts', size: 1, content: 'x' }]; });
+    const dest = await page.evaluate(() => SVC.opsDest(SVC.opsAutoPath('2_repo/supabase/functions/ops/index.ts').path) + ' · ' + SVC.opsDest(SVC.opsAutoPath('1_github/js/grid.js').path));
+    assert(dest === 'supabase/functions/ops/index.ts · staging/js/grid.js', dest);
+    await page.evaluate((k) => { SVC.OPS.target = 'prod'; SVC.OPS.files = k; SVC.renderOps(true); }, keep);
+    return dest;
   });
   await S.t('배포 안전장치: 스테이징 대상이어도 저장소 파일은 루트로 · 워크플로 파일은 커밋에서 빠지고 목록에 남음', async () => {
     await page.click('#opsTarget button[data-tg="staging"]'); await page.waitForTimeout(150);
@@ -810,7 +822,8 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
   await S.t('배포 안전장치: 🧹 저장소 점검 — 안 쓰는 파일·스테이징 저장소 파일·루트에 없는 파일·deploy.yml → 정리(gh_delete)', async () => {
     await page.click('#opsRepoCheck'); await page.waitForTimeout(600);
     const R = await page.evaluate(() => SVC.OPS.repo);
-    assert(R.unused.map((x) => x.p).sort().join('|') === 'check.mjs|js/app.js|staging/js/app.js', JSON.stringify(R.unused));
+    assert(R.unused.map((x) => x.p).sort().join('|') === 'check.mjs|js/app.js|staging/2_repo/supabase/functions/ops/index.ts|staging/js/app.js', JSON.stringify(R.unused));
+    assert(/제자리\(supabase\/functions\/ops\/index\.ts\)에 없음/.test(R.unused.find((x) => /2_repo/.test(x.p)).why), JSON.stringify(R.unused));
     assert(R.stagingRepo.length === 3 && R.stagingRepo.find((x) => x.p === 'staging/README.md').root === false && R.stagingRepo.find((x) => x.p === 'staging/.github/workflows/deploy.yml').root === true, JSON.stringify(R.stagingRepo));
     assert(R.missing.includes('tests/fn/_mock.ts') && R.missing.includes('README.md') && R.wf.length >= 3, JSON.stringify({ m: R.missing, wf: R.wf }));
     /* 저장소에 실제로 있는 deploy.yml 은 점검에서 문제 0 이어야 함(주석의 «|| echo» 글자를 잡지 않음 · ㊿+144) */
@@ -818,7 +831,7 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
     if (fs.existsSync(wfPath)) { const iss = await page.evaluate((y) => SVC.opsWfIssues(y), fs.readFileSync(wfPath, 'utf8')); assert(!iss.length || /ubuntu-latest|Node 20|옛 액션|functions 잡/.test(iss.join(' ')), '저장소 deploy.yml 점검: ' + iss.join(' / ')); }
     calls.length = 0; await page.click('#opsRepoClean'); await page.waitForTimeout(500);
     const del = calls.find((c) => c.action === 'gh_delete'); assert(del, 'gh_delete 없음');
-    assert(del.paths.sort().join('|') === 'check.mjs|js/app.js|staging/.github/workflows/deploy.yml|staging/js/app.js', del.paths.join('|'));
+    assert(del.paths.sort().join('|') === 'check.mjs|js/app.js|staging/.github/workflows/deploy.yml|staging/2_repo/supabase/functions/ops/index.ts|staging/js/app.js', del.paths.join('|'));
     assert(!errs.length, errs.join(' | ')); return del.paths.length + '개 정리';
   });
   await ctx.close();
@@ -1629,7 +1642,7 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
     await page.click('#rnGo'); await page.waitForFunction(({ id, kid }) => /재약정 통합/.test(document.getElementById('rnMsg').textContent + '') || document.getElementById('rnMsg').className.includes('ok'), { id, kid }, { timeout: 8000 });
     await page.waitForTimeout(300);
     const c = db.ct(id), rv = db.rev(id), k = db.ct(kid); await ctx.close();
-    assert(c.renew_count === 1 && c.mrr === 270000 && c.qty === 270 && ix(c.end_month) === e0 + 12, '원계약 ' + JSON.stringify({ n: c.renew_count, mrr: c.mrr, qty: c.qty, end: c.end_month }));
+    assert(c.renew_count === 1 && c.mrr === 270000 && c.qty === 270 && ix(c.end_month) === e0 + 12 && c.status === '재약정' && c.contract_type === '신규', '원계약 ' + JSON.stringify({ n: c.renew_count, mrr: c.mrr, qty: c.qty, end: c.end_month, ct: c.contract_type, st: c.status }));
     assert(pastOf(db, id, e0) === p0, '그 전 달 월 매출이 바뀜');
     assert(rv[YM(e0 + 1)] === 270000 && rv[YM(e0 + 12)] === 270000 && !rv[YM(e0 + 13)], '새 기간 월 매출');
     assert(/재약정 통합 → #/.test(k.note || '') && k.status === '추가' && JSON.stringify(db.rev(kid)) === k0, '추가 계약 ' + k.status + ' · ' + k.note);
@@ -1664,7 +1677,7 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
     assert(db.ct(id).renew_count === 2 && ix(db.ct(id).end_month) === e0 + 24, '두 번 연장 준비');
     const R = await page.evaluate(() => { const r = SVC.dcRules().find((x) => x.id === 'c_renew_dup'); return r ? r.items.map((x) => x.label + ' | ' + x.sub + ' | ' + (x.act ? x.act.label : '')) : null; });
     assert(R && R.length === 1 && /가상고객_통합/.test(R[0]) && /연장 2회/.test(R[0]) && /되돌리기/.test(R[0]), '데이터 점검 ' + JSON.stringify(R));
-    await openEdit(page, 'renew'); await page.fill('#rFind', '가상고객_통합'); await page.waitForTimeout(120); await page.click('#rPick .pi:has-text("신규")'); await page.waitForTimeout(120);
+    await openEdit(page, 'renew'); await page.fill('#rFind', '가상고객_통합'); await page.waitForTimeout(120); await page.click('#rPick .pi:has-text("연장 ")'); await page.waitForTimeout(120);
     assert(await page.$('#rUndoGo'), '되돌리기 버튼 없음');
     await page.click('#rUndoGo'); await page.waitForFunction((id) => document.querySelector('#rUndo') && /연장 1회/.test(document.querySelector('#rUndo').textContent), id, { timeout: 8000 });
     const u1 = db.ct(id), d1 = dialogs.slice(-1)[0] || '';
@@ -1701,6 +1714,24 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
     const o1 = JSON.stringify({ e: db.ct(open).end_month, rv: db.rev(open) }); await ctx.close();
     assert(o1 === o0 && db.ct(open).end_month === null, '무약정 되돌리기 ' + db.ct(open).end_month);
     assert(!errs.length, errs.join(' | ')); return '목록 2건(부속 체크 · 따로 등록 미체크) · 옛 행 거부 · 무약정 그대로';
+  });
+  await S.t('㊿+160 연장하면 상태 «재약정»(구분은 그대로) · 해지였던 계약도 재약정으로 되살림 · 추가 계약은 «추가» · 계약 상세 👁 에 «계약 기간 · 연장 이력»(최초 + 회차 · 시트 이관 기록 포함)', async () => {
+    const prep = (db) => { const r = addMerge(db), o = db.t.contracts.find((c) => c.customer_id === db.t.customers.find((x) => x.name === '가상고객02').id);
+      o.renew_count = 1; o.contract_type = '재약정'; o.status = '재약정'; o.renew_history = [{ renew_no: 1, new_end: o.end_month, mrr: o.mrr, merged: 973, by: 'migration-57' }]; return { ...r, mig: o.id }; };
+    const { db, ctx, page, errs, info } = await fbootWith(prep), { id, e0, mig } = info;
+    const st = await page.evaluate(() => [SVC.renewStatus({ status: '신규', ctype: '신규' }), SVC.renewStatus({ status: '해지', ctype: '신규' }), SVC.renewStatus({ status: '서비스종료', ctype: '재약정' }), SVC.renewStatus({ status: '추가', ctype: '추가' }), SVC.renewStatus({ status: 'CN전환', ctype: '신규' })]);
+    assert(st.join() === '재약정,재약정,재약정,추가,CN전환', '상태 규칙 ' + st.join());
+    await page.evaluate(async ({ id, ne }) => { const r = SVC.ST.DATA.rows.find((x) => x._id === id); await SVC.doRenew(r, ne, 141000, '', { qty: 52 }); const nd = await SVC.loadFromDb(); SVC.onData(nd); }, { id, ne: e0 + 12 });
+    assert(db.ct(id).status === '재약정' && db.ct(id).contract_type === '신규', '연장 뒤 ' + db.ct(id).contract_type + '|' + db.ct(id).status);
+    const det = async (cid) => { await page.evaluate((cid) => { const c = SVC.ST.RAWX.contracts.find((x) => x.id === cid); SVC.openDetail(c); }, cid); await page.waitForTimeout(300);
+      return page.evaluate(() => ({ meta: document.getElementById('dtMeta').textContent, rows: [...document.querySelectorAll('#dtRenew tbody tr')].map((tr) => [...tr.children].map((td) => td.textContent.trim()).join(' | ')) })); };
+    const d1 = await det(id);
+    assert(/구분 신규/.test(d1.meta) && /상태 재약정/.test(d1.meta) && /연장 1회/.test(d1.meta) && /52노드/.test(d1.meta), '상세 머리 ' + d1.meta);
+    assert(d1.rows.length === 2 && d1.rows[0].startsWith('최초 | ' + YM(T - 14) + ' ~ ' + YM(e0) + ' | 240 | 240') && d1.rows[1].startsWith('연장 1회 | ' + YM(e0 + 1) + ' ~ ' + YM(e0 + 12) + ' | 141 | 52'), '연장 이력 ' + JSON.stringify(d1.rows));
+    await page.evaluate(() => SVC.closeOvl('ovlDetail'));
+    const d2 = await det(mig); await ctx.close();
+    assert(d2.rows.length === 2 && /^연장 1회/.test(d2.rows[1]) && /시트 이관/.test(d2.rows[1]) && /재약정 행 #973 합침/.test(d2.rows[1]), '이관 기록 ' + JSON.stringify(d2.rows));
+    assert(!errs.length, errs.join(' | ')); return d1.rows.join(' / ').slice(0, 110);
   });
   await S.t('㊿+159 홈 AI 답변: «✕ 닫기» · 다른 메뉴로 가면 닫힘(돌아와도 없음) · 생각 중엔 메뉴를 옮겨도 유지 · 생각 중 ✕ 는 멈추고 닫음', async () => {
     let slow = 0;

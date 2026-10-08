@@ -109,6 +109,9 @@ catch (e) { say(false, '위성 페이지 검사 실패 — ' + String(e.message 
   say(/rule\('c_renew_dup','warn'/.test(jsAll) && /rule\('c_renew_overlap','warn'/.test(jsAll), '데이터 점검: «연장이 짧은 사이에 두 번» · «연장한 계약과 겹치는 재약정 행»');
   say(['rQty', 'rMates', 'rPrev', 'rUndo'].every((id) => html.includes('id="' + id + '"')) && /renewOpts\(r2, 'r', \$\('#tabRenew'\)\)/.test(jsAll) && /newOverlap\(cust, \$\('#nLine'\)\.value/.test(jsAll), '입력·수정: 갱신 탭 노드수·합치기·미리보기·되돌리기 · 신규 등록 기간 겹침 확인');
   say(html.includes('id="ansClose"') && /closeAnswer\('', true\)/.test(jsAll) && /if\(ST\.CUR_VIEW==='dash' && v!=='dash'\)\{ try\{ closeAnswer\(\); \}/.test(jsAll), 'AI 답변: ✕ 닫기 · 홈을 떠나면 닫힘'); }
+say(/^export var OPS_PKG_RE=/m.test(jsAll) && /OPS_PKG_RE\.test\(rel\)/.test(jsAll), '배포·운영(㊿+160): 묶음 폴더(1_github/ · 2_repo/) 이름 자동으로 뗌 · 저장소 점검이 이름 붙은 채 올라간 파일을 잡음');
+// ㊿+160 연장하면 상태 «재약정»(구분 그대로) · 계약 상세에 «계약 기간 · 연장 이력»
+say(/^export function renewStatus\(r\)/m.test(jsAll) && /var nst=renewStatus\(r\);/.test(jsAll) && /^export function ctPeriods\(c, mine\)/m.test(jsAll) && html.includes('id="dtRenew"'), '연장: 상태 «재약정»(renewStatus) · 계약 상세 연장 이력(ctPeriods · #dtRenew)');
 const idx = html + jsAll;
 // Supabase 함수 소스가 저장소에 있으면 비밀값 검사만 (deno 는 CI 에 없을 수 있음)
 const fnDir = path.join(ROOT, 'supabase', 'functions');

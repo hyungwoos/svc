@@ -1,4 +1,7 @@
-// aicheck v1.4 — 포탈 AI 야간 자동 점검 (90점 프로젝트 ⑥ AI 2단계 · 2026-10-03)
+// aicheck v1.5 — 포탈 AI 야간 자동 점검 (90점 프로젝트 ⑥ AI 2단계 · 2026-10-03)
+//   · v1.5(2026-10-07 · 야간 점검이 매일 «HTTP 401 · Conflicting API keys»): Supabase 새 API 키(sb_publishable/sb_secret)에서는
+//     ask 를 부를 때 apikey(공개 키)와 Authorization(서비스 키)이 서로 다른 키면 게이트웨이가 거부함 → 둘 다 서비스 키로 (askHdr)
+//     · 실패 안내(fixHint)에 «Conflicting API keys» 경우 추가 · ask 최신 버전 표기 v3.4
 //   · v1.4(2026-10-05 · 사용자: «C0BQR2JCU3Z 채널로 · 상세 내용 말고 성공/실패만 간단하게»):
 //     슬랙은 매일 한 줄 — «✅ 포탈 야간 점검 성공» / «❌ 포탈 야간 점검 실패 — 포탈 › 배포·운영 › 기록에서 확인»
 //     · 채널 기본 C0BQR2JCU3Z(AICHECK_SLACK_CHANNEL 로만 바꿈 — remind 의 SLACK_CHANNEL 은 안 따름)
@@ -78,8 +81,10 @@ export function failText(status: number, j: any): string {
 /* 고치는 방법 한 줄 — 흔한 원인별 */
 export function fixHint(why: string): string {
   if (/^기대값 못 읽음/.test(why)) return '→ 기대값 함수(SQL 94 ai_check_expect) 확인 — 배포·운영 › SQL 에서 select ai_check_expect()';
+  if (/conflicting api keys/i.test(why)) return '→ aicheck 를 v1.5 이상으로 다시 배포 (ask 를 부를 때 apikey·Authorization 을 같은 서비스 키로 보냄 — Supabase 새 API 키에서 서로 다르면 거부)';
+  if (/OPENROUTER_API_KEY|크레딧|사용 한도/.test(why)) return '→ Supabase › Edge Functions › Secrets 의 AI 키(OPENROUTER_API_KEY) 확인 — Secret 을 바꿨으면 ask 를 한 번 더 배포해야 반영됩니다';
   if (/401/.test(why) && /jwt/i.test(why)) return '→ 해결: 포탈 배포·운영 › Edge Function › 목록 불러오기 › ask › «Verify JWT» 체크 해제 › 설정만 저장 (ask 는 함수 안에서 토큰을 직접 확인합니다)';
-  if (/401|403/.test(why)) return '→ ask 가 서비스 키를 거부 — ask 를 최신(v3.3)으로 다시 배포했는지, Verify JWT 가 꺼져 있는지 확인';
+  if (/401|403/.test(why)) return '→ ask 가 서비스 키를 거부 — ask 를 최신(v3.4)으로 다시 배포했는지, Verify JWT 가 꺼져 있는지 확인';
   if (/404/.test(why)) return '→ ask 함수를 찾지 못함 — 함수 이름(ask)과 배포 상태 확인';
   if (/ANTHROPIC_API_KEY/.test(why)) return '→ Supabase › Edge Functions › Secrets 에 ANTHROPIC_API_KEY 확인';
   if (/5\d\d|546|WORKER|BOOT/i.test(why)) return '→ ask 함수 실행 오류 — Supabase › Edge Functions › ask › Logs 에서 03:00 무렵 기록 확인';
@@ -88,9 +93,11 @@ export function fixHint(why: string): string {
   return '→ Supabase › Edge Functions › ask › Logs 확인';
 }
 /* 질문 전에 ask 가 받는지 한 번 (ping — 모델 호출 없음) */
+/* ask 호출 헤더 — apikey·Authorization 둘 다 서비스 키(같은 키) · 예전처럼 apikey 에 공개 키를 넣으면 새 키 체계에서 «Conflicting API keys» 401 (v1.5) */
+export const askHdr = () => ({ 'Content-Type': 'application/json', apikey: SB_SVC, Authorization: 'Bearer ' + SB_SVC });
 export async function askPing(): Promise<{ ok: boolean; why: string }> {
   try {
-    const r = await fetchT(SB_URL + '/functions/v1/ask', { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: SB_ANON, Authorization: 'Bearer ' + SB_SVC }, body: JSON.stringify({ mode: 'ping' }) }, 20000);
+    const r = await fetchT(SB_URL + '/functions/v1/ask', { method: 'POST', headers: askHdr(), body: JSON.stringify({ mode: 'ping' }) }, 20000);
     const j = await r.json().catch(() => ({}));
     if (r.ok && j && j.ok) return { ok: true, why: '' };
     return { ok: false, why: failText(r.status, j) };
@@ -99,7 +106,7 @@ export async function askPing(): Promise<{ ok: boolean; why: string }> {
 async function askOne(q: string): Promise<{ r: any; ms: number }> {
   const t0 = Date.now();
   try {
-    const r = await fetchT(SB_URL + '/functions/v1/ask', { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: SB_ANON, Authorization: 'Bearer ' + SB_SVC }, body: JSON.stringify({ mode: 'chat', question: q, history: [] }) }, 75000);
+    const r = await fetchT(SB_URL + '/functions/v1/ask', { method: 'POST', headers: askHdr(), body: JSON.stringify({ mode: 'chat', question: q, history: [] }) }, 75000);
     const j = await r.json().catch(() => ({ ok: false, error: 'HTTP ' + r.status }));
     if (!r.ok && j) { j.ok = false; j.error = failText(r.status, j); }
     else if (j && !j.ok && !j.error) j.error = failText(r.status, j);

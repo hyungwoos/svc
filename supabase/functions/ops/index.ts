@@ -1,5 +1,5 @@
 // ============================================================================
-//  Supabase Edge Function: ops  (v1.4 · 2026-10-03 · APP_VER 를 <meta name="app-ver"> 에서도 읽음(㊿+136) · v1.3 gh_copy 하위 폴더 · v1.2 gh_delete · v1.1 gh_copy)
+//  Supabase Edge Function: ops  (v1.5.1 · 2026-10-08 · 함수 배포 진입점은 파일 이름만(경로 겹침 고침) · v1.5 2026-10-07 · 커밋 빠르게: 바뀌지 않은 파일은 건너뛰고(내용 SHA 비교) 바뀐 파일은 6개씩 동시에 올림 · v1.4 2026-10-03 · APP_VER 를 <meta name="app-ver"> 에서도 읽음(㊿+136) · v1.3 gh_copy 하위 폴더 · v1.2 gh_delete · v1.1 gh_copy)
 //   포탈 «관리자 › 배포·운영» 화면 뒤의 단일 중계 함수 — 포탈(공개 HTML)에는 어떤 토큰도 두지 않고 전부 여기 Secrets 에만.
 //     · GitHub   : 저장소 파일 목록/내용 · 여러 파일을 커밋 하나로(Git Data API: blob → tree → commit → ref) · 파일 이력 · 이전 버전 복원
 //     · Supabase : SQL 실행(Management API /database/query · 읽기 전용 토글) · Edge Function 목록/코드 조회/배포/Verify JWT · Secrets 이름 조회/설정/삭제
@@ -89,19 +89,38 @@ async function ghBlobText(sha: string): Promise<string> {
   if (b.encoding !== 'base64') return String(b.content || '');
   return b64dec(String(b.content || ''));
 }
+/* v1.5 git 이 쓰는 blob SHA-1 («blob <크기>\0» + 내용) — 저장소에 이미 같은 내용이 있으면 올리지 않음 */
+export async function gitBlobSha(content_b64: string): Promise<string> {
+  const body = b64bytes(content_b64), head = new TextEncoder().encode('blob ' + body.length + '\0');
+  const all = new Uint8Array(head.length + body.length); all.set(head); all.set(body, head.length);
+  const h = new Uint8Array(await crypto.subtle.digest('SHA-1', all));
+  return Array.from(h).map((x) => x.toString(16).padStart(2, '0')).join('');
+}
+/** 동시에 n 개씩 — 순서는 입력 순서대로 돌려줌 */
+async function pool<T, R>(items: T[], n: number, fn: (x: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(items.length); let i = 0;
+  await Promise.all(Array.from({ length: Math.min(n, items.length) }, async () => { while (i < items.length) { const k = i++; out[k] = await fn(items[k]); } }));
+  return out;
+}
 async function ghCommitFiles(files: { path: string; content_b64: string }[], message: string, actor: string) {
   const ref = await gh(`/repos/${GH_REPO}/git/ref/heads/${encodeURIComponent(GH_BRANCH)}`);
   const headSha = ref.object.sha as string;
   const head = await gh(`/repos/${GH_REPO}/git/commits/${headSha}`);
-  const tree: unknown[] = [];
-  for (const f of files) {
+  /* v1.5 ① 지금 저장소 트리(한 번)와 내용 SHA 를 비교해 바뀐 파일만 ② 바뀐 파일은 6개씩 동시에 blob 업로드 (예전: 전부 하나씩 차례로) */
+  const have = new Map<string, string>();
+  try { for (const e of await ghTree(head.tree.sha as string)) if (e.type === 'blob') have.set(e.path, e.sha); } catch { /* 트리를 못 읽으면 전부 올림 */ }
+  const shas = await Promise.all(files.map((f) => gitBlobSha(f.content_b64)));
+  const changed = files.map((f, k) => ({ ...f, path: f.path.replace(/^\/+/, ''), sha: shas[k] })).filter((f) => have.get(f.path) !== f.sha);
+  const skipped = files.map((f) => f.path.replace(/^\/+/, '')).filter((p) => !changed.some((c) => c.path === p));
+  if (!changed.length) throw new Error('바뀐 파일이 없습니다 — 저장소에 이미 같은 내용이 있어 커밋하지 않았습니다 (' + skipped.length + '개)');
+  const tree = await pool(changed, 6, async (f) => {
     const blob = await gh(`/repos/${GH_REPO}/git/blobs`, { method: 'POST', body: JSON.stringify({ content: f.content_b64, encoding: 'base64' }) }, 60000);
-    tree.push({ path: f.path.replace(/^\/+/, ''), mode: '100644', type: 'blob', sha: blob.sha });
-  }
+    return { path: f.path, mode: '100644', type: 'blob', sha: blob.sha };
+  });
   const newTree = await gh(`/repos/${GH_REPO}/git/trees`, { method: 'POST', body: JSON.stringify({ base_tree: head.tree.sha, tree }) });
   const commit = await gh(`/repos/${GH_REPO}/git/commits`, { method: 'POST', body: JSON.stringify({ message, tree: newTree.sha, parents: [headSha], author: { name: 'SVC 포탈', email: actor, date: new Date().toISOString() } }) });
   await gh(`/repos/${GH_REPO}/git/refs/heads/${encodeURIComponent(GH_BRANCH)}`, { method: 'PATCH', body: JSON.stringify({ sha: commit.sha, force: false }) });
-  return { sha: commit.sha as string, url: `https://github.com/${GH_REPO}/commit/${commit.sha}`, parent: headSha };
+  return { sha: commit.sha as string, url: `https://github.com/${GH_REPO}/commit/${commit.sha}`, parent: headSha, files: changed.map((f) => f.path), skipped };
 }
 
 // ── Supabase Management API ──
@@ -186,9 +205,9 @@ Deno.serve(async (req: Request) => {
         });
         const message = String(body.message || `포탈에서 배포 (${norm.map((f: any) => f.path).join(', ')})`).slice(0, 500);
         const c = await ghCommitFiles(norm, message, actor);
-        target = norm.map((f: any) => f.path).join(', '); summary = message; detail = { sha: c.sha, parent: c.parent };
+        target = c.files.join(', '); summary = message + (c.skipped.length ? ` (그대로 ${c.skipped.length}개 건너뜀)` : ''); detail = { sha: c.sha, parent: c.parent, skipped: c.skipped };
         notify = `🚀 GitHub 커밋 — ${target}\n${message}\n${c.url}`;
-        out = { commit: c.sha, url: c.url, files: norm.map((f: any) => f.path), note: 'GitHub Pages 반영까지 보통 1~2분' }; break;
+        out = { commit: c.sha, url: c.url, files: c.files, skipped: c.skipped, note: 'GitHub Pages 반영까지 보통 1~2분' + (c.skipped.length ? ` · 내용이 같은 ${c.skipped.length}개는 건너뜀` : '') }; break;
       }
       case 'gh_copy': {
         /* 한 폴더의 파일을 다른 폴더로 복사한 커밋 — blob 은 재업로드 없이 sha 로 재사용. src/dst = '' (루트) 또는 'staging'
@@ -303,6 +322,8 @@ Deno.serve(async (req: Request) => {
         if (exists && body.verify_jwt == null) verify = !!cur.json?.verify_jwt;
         if (!entry) entry = (exists && cur.json?.entrypoint_path) ? String(cur.json.entrypoint_path) : 'index.ts';
         const entryBase = entry.split('/').pop() || 'index.ts';
+        /* v1.5.1 진입점은 파일 이름만 — Supabase 가 돌려주는 entrypoint_path 는 «file:///tmp/…/source/index.ts» 전체 경로라 그대로 다시 보내면 배포할 때마다 경로가 겹겹이 길어짐 */
+        entry = entryBase;
         const fd = new FormData();
         const meta: Record<string, unknown> = { name: String(body.name || cur.json?.name || slug), entrypoint_path: entry, verify_jwt: verify };
         if (exists && cur.json?.import_map_path) meta.import_map_path = cur.json.import_map_path;
