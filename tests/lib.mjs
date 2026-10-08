@@ -58,6 +58,7 @@ export function collect(page) {
 export class Suite {
   constructor(name) { this.name = name; this.results = []; }
   async t(label, fn) {
+    if (process.env.SMOKE_ONLY && !label.includes(process.env.SMOKE_ONLY)) return;   // 개발용: 이름에 이 글자가 든 시험만 (CI 는 안 씀)
     const t0 = Date.now();
     try { const info = await fn(); this.results.push({ label, ok: true, ms: Date.now() - t0, info }); console.log(`  ✓ ${label}${info ? ' — ' + (typeof info === 'string' ? info : JSON.stringify(info)).slice(0, 120) : ''}`); }
     catch (e) { this.results.push({ label, ok: false, ms: Date.now() - t0, error: String(e && e.message || e).slice(0, 400) }); console.log(`  ✗ ${label} — ${String(e && e.message || e).slice(0, 300)}`); }

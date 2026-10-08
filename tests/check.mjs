@@ -104,6 +104,16 @@ catch (e) { say(false, '위성 페이지 검사 실패 — ' + String(e.message 
   /* 스테이징 QA «데이터 입력·수정»: ?qa=data → 가짜 DB(js/qadb.js) · 시작 전에 끼움(main.js) · Supabase 요청은 전부 가로챔 · QA 가 이 단계를 부름 */
   const mainJs = fs.existsSync(path.join(ROOT, 'js', 'main.js')) ? fs.readFileSync(path.join(ROOT, 'js', 'main.js'), 'utf8') : '';
   say(/export var IS_QA_DATA=/.test(jsAll) && /if\(m_state\.IS_QA_DATA\) m_qadata\.qaDataInstall\(\);\s*\n[^\n]*\n?m_init\.start\(\);|if\(m_state\.IS_QA_DATA\) m_qadata\.qaDataInstall\(\);[^\n]*\nm_init\.start\(\);/.test(mainJs) && /u\.indexOf\(SB_URL\)===0\) return Promise\.resolve\(qaRespond/.test(jsAll) && /await qaDataPhase\(run\);/.test(jsAll) && /export function qaDataList\(/.test(jsAll), 'QA «데이터 입력·수정»: ?qa=data 가짜 DB 를 시작 전에 끼움 · Supabase 요청 가로채기 · QA 가 이 단계 실행'); }
+// ㊿+159 재약정(연장) — 원계약 한 줄 «연장 n회» 유지 · 노드수 · 같이 끝나는 추가 계약 합치기 · 마지막 연장 되돌리기 · 겹치는 재약정 행 확인 · 점검 규칙 2개 · AI 답변 닫기
+{ say(/^export function renewMates\(r\)/m.test(jsAll) && /^export function renewUndoPlan\(r\)/m.test(jsAll) && /^export async function doUndoRenew\(r, plan\)/m.test(jsAll) && /^export async function doRenew\(r, ne, amt, note, opt\)/m.test(jsAll) && /prev_rev/.test(jsAll) && /prev_qty/.test(jsAll), '연장: 노드수·합치기(renewMates) · 이력에 이전 값(prev_qty·prev_rev) · 마지막 연장 되돌리기(renewUndoPlan·doUndoRenew)');
+  say(/rule\('c_renew_dup','warn'/.test(jsAll) && /rule\('c_renew_overlap','warn'/.test(jsAll), '데이터 점검: «연장이 짧은 사이에 두 번» · «연장한 계약과 겹치는 재약정 행»');
+  say(['rQty', 'rMates', 'rPrev', 'rUndo'].every((id) => html.includes('id="' + id + '"')) && /renewOpts\(r2, 'r', \$\('#tabRenew'\)\)/.test(jsAll) && /newOverlap\(cust, \$\('#nLine'\)\.value/.test(jsAll), '입력·수정: 갱신 탭 노드수·합치기·미리보기·되돌리기 · 신규 등록 기간 겹침 확인');
+  say(html.includes('id="ansClose"') && /closeAnswer\('', true\)/.test(jsAll) && /if\(ST\.CUR_VIEW==='dash' && v!=='dash'\)\{ try\{ closeAnswer\(\); \}/.test(jsAll), 'AI 답변: ✕ 닫기 · 홈을 떠나면 닫힘'); }
+say(/^export var OPS_PKG_RE=/m.test(jsAll) && /OPS_PKG_RE\.test\(rel\)/.test(jsAll), '배포·운영(㊿+160): 묶음 폴더(1_github/ · 2_repo/) 이름 자동으로 뗌 · 저장소 점검이 이름 붙은 채 올라간 파일을 잡음');
+say(/^export function c360RenewLine\(r\)/m.test(jsAll) && /'기간','연장','MRR\(천원\)'/.test(jsAll), '고객 360(㊿+161): 계약 표 «연장» 칸 + 연장한 계약 아래 회차별 기간·월 금액·노드');
+say(/if\(memo\) ent\.prev_note=note0;/.test(jsAll) && /noteCur\.lastIndexOf\(noteMm\)/.test(jsAll) && /data-c360ct/.test(jsAll), '연장 메모 → 비고(㊿+162 · 되돌리면 그 메모만 뺌) · 고객 360 계약 행 → 계약 상세');
+// ㊿+160 연장하면 상태 «재약정»(구분 그대로) · 계약 상세에 «계약 기간 · 연장 이력»
+say(/^export function renewStatus\(r\)/m.test(jsAll) && /var nst=renewStatus\(r\);/.test(jsAll) && /^export function ctPeriods\(c, mine\)/m.test(jsAll) && html.includes('id="dtRenew"'), '연장: 상태 «재약정»(renewStatus) · 계약 상세 연장 이력(ctPeriods · #dtRenew)');
 const idx = html + jsAll;
 // Supabase 함수 소스가 저장소에 있으면 비밀값 검사만 (deno 는 CI 에 없을 수 있음)
 const fnDir = path.join(ROOT, 'supabase', 'functions');

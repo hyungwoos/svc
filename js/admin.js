@@ -51,8 +51,12 @@ export function opsRepoFile(p){ return OPS_REPO_RE.test(String(p||'')); }
 export function opsDest(p){ return (OPS.target==='staging' && !opsRepoFile(p))? 'staging/'+p : p; }
 export function opsRepoName(){ return (OPS.st&&OPS.st.github&&OPS.st.github.repo)||'hyungwoos/svc'; }
 export function opsRepoBranch(){ return (OPS.st&&OPS.st.github&&OPS.st.github.branch)||'main'; }
+/* ㊿+160 전달 묶음 폴더(1_github/ · 2_repo/ …)를 통째로 끌어 넣으면 그 이름은 자동으로 뗌 — «떼기»를 잊어 staging/2_repo/… 로 올라간 일 */
+export var OPS_PKG_RE=/^\d+_(github|repo)\//;
 export function opsAutoPath(p){
   p=String(p||'').replace(/^\/+/,'');
+  var pk=OPS_PKG_RE.exec(p);
+  if(pk && p.length>pk[0].length){ var r=opsAutoPath(p.slice(pk[0].length)); return {path:r.path, auto:'«'+pk[0]+'» 폴더 이름은 떼고 넣었습니다'+(r.auto? ' · '+r.auto:''), bad:r.bad}; }
   if(p.indexOf('/')>=0) return {path:p};
   var dir={'check.mjs':'tests/','smoke.mjs':'tests/','lib.mjs':'tests/','load_all.json':'tests/fixture/','worker.js':'cloudflare/quote-worker/','deploy.yml':'.github/workflows/','deploy.yaml':'.github/workflows/'}[p];
   if(!dir && (/\.test\.ts$/.test(p) || p==='_mock.ts')) dir='tests/fn/';
@@ -199,7 +203,8 @@ export async function opsRepoCheck(){
     var used=opsAppJs(), R={unused:[], stagingRepo:[], missing:[], wf:null};
     paths.forEach(function(p){
       var rel=p.replace(/^staging\//,''), stg=(rel!==p);
-      if(/^js\/[^/]+\.js$/.test(rel) && used.indexOf(rel)<0) R.unused.push({p:p, why:'포탈이 불러오지 않는 js (index.html app-js 목록 밖)'});
+      if(OPS_PKG_RE.test(rel)){ var inner=rel.replace(OPS_PKG_RE,''), home=(stg && !opsRepoFile(inner))? 'staging/'+inner : inner; R.unused.push({p:p, why:'묶음 폴더 이름(«'+rel.split('/')[0]+'/»)이 붙은 채 올라가 쓰이지 않음 — '+(has[home]? '제자리('+home+')에 있음' : '제자리('+home+')에 없음 · 묶음을 다시 올리세요')}); }
+      else if(/^js\/[^/]+\.js$/.test(rel) && used.indexOf(rel)<0) R.unused.push({p:p, why:'포탈이 불러오지 않는 js (index.html app-js 목록 밖)'});
       else if(/^(check|smoke|lib)\.mjs$/.test(rel)) R.unused.push({p:p, why:'tests/ 밖에 놓인 테스트 파일 — 실행되지 않음'});
       else if(stg && opsRepoFile(rel)) R.stagingRepo.push({p:p, rel:rel, root:!!has[rel]});
     });

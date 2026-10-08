@@ -222,6 +222,7 @@ a[data-kxs]{text-decoration:underline dotted;text-underline-offset:3px}
 
 .answer{margin-top:14px;border-top:1px solid var(--ring);padding-top:14px;display:none}
 .answer.on{display:block}
+.ans-x{display:flex;justify-content:flex-end;margin:-6px 0 2px}   /* ㊿+159 AI 답변 닫기 */
 .ans-head{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap}
 .ans-title{font-size:12px;color:var(--muted);flex:1 0 100%}
 .hero{font-size:44px;font-weight:720;letter-spacing:-.035em;line-height:1.04;font-variant-numeric:tabular-nums}
@@ -614,6 +615,12 @@ kbd{display:inline-block;padding:1px 6px;border:1px solid var(--ring);border-bot
 .c360-sec th{background:var(--surface-2);text-align:left;padding:5px 8px;font-size:11px;color:var(--ink-2);white-space:nowrap}
 .c360-sec td{padding:5px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
 .c360-sec tr:last-child td{border-bottom:0}
+.c360-sec tr.c360-has td{border-bottom:0}
+.c360-sec tr[data-c360ct],.c360-sec tr.c360-rn{cursor:pointer}
+.c360-sec tr[data-c360ct]:hover td,.c360-sec tr[data-c360ct]:hover+tr.c360-rn td,.c360-sec tr[data-c360ct]:focus-visible td{background:var(--surface-2)}
+.c360-sec tr.c360-rn td{white-space:normal;padding:0 8px 7px 22px;font-size:11px;color:var(--ink-2);line-height:1.7}
+.c360-rp{white-space:nowrap}
+.c360-ra{margin:0 6px;color:var(--muted)}
 /* 표 밀도 — 컴팩트 */
 .dgrid.dense td{padding:3px 7px!important;font-size:12px}
 .dgrid.dense th{padding:5px 7px!important}

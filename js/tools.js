@@ -1,13 +1,13 @@
 /* ===== tools.js — 전역 검색 · 고객 360 · 표 밀도 · 엑셀 붙여넣기 · 메뉴 편집 · 글자 크기 =====
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { ST } from './state.js';
-import { $, amtWhy, lline, mk, navText, rawHtml, tpl, wonKo } from './core.js';
+import { $, amtWhy, lline, mk, navText, rawHtml, tpl, won, wonKo } from './core.js';
 import { buildRail, c360Enhance, cmdAskHit, cmdMenuHits, dIdx, loadFromDb, onData, renderInbox, sbTry, sbWrite, toast, todayStr, visBtn } from './shell.js';
 import { GRIDS } from './grids.js';
-import { applyChannelMenu, liveData } from './analysis.js';
+import { applyChannelMenu, ctRawOf, liveData } from './analysis.js';
 import { goInbList, loadInbound } from './inbound.js';
 import { applyMenuFold } from './sales.js';
-import { navMenu, renderGrid, switchView } from './grid.js';
+import { ctPeriods, navMenu, openDetail, renderGrid, switchView } from './grid.js';
 import { syncOrderAssets } from './equipment.js';
 import { closeOvl, openOvl, ovlMarkDirty } from './edit.js';
 
@@ -93,12 +93,22 @@ export function c360Match(a,b){
   if(!x||!y) return false;
   return x.indexOf(y)>=0 || y.indexOf(x)>=0;
 }
+/* ㊿+161 고객 360 계약 표의 연장 — 연장한 계약 바로 아래 한 줄: 최초 → 연장 n회 (기간 · 월 금액(천원) · 노드) · 계약 상세(ctPeriods)와 같은 값 */
+export function c360RenewLine(r){
+  if(!r || !(r.renew>0 || (r.renewHist||[]).length)) return '';
+  var raw=ctRawOf(r._id) || {start_month:(r.startIdx!=null? mk(r.startIdx)+'-01' : null), contract_type:r.ctype, renew_history:r.renewHist, qty:r.qty};
+  var mine=((ST.RAWX&&ST.RAWX.mrs)||[]).filter(function(x){ return x.contract_id===r._id; });
+  var ps=ctPeriods(raw, mine); if(!ps.length) return '';
+  return ps.map(function(p){ return tpl`<span class="c360-rp"><b>${p.k}</b> ${p.from||'?'}~${p.to||'?'}${rawHtml(p.mrr!=null? ' · '+won(p.mrr) : '')}${rawHtml(p.qty!=null? ' · '+Number(p.qty).toLocaleString('ko-KR')+'노드' : '')}</span>`; }).join(tpl`<span class="c360-ra">→</span>`);
+}
 export function openCust360(name){
   var nm=name;
-  function tb(cols, rows){
+  /* sub[i] — i번째 행 바로 아래에 붙일 한 줄(계약 표의 연장 이력) · ids[i] — 누르면 그 계약 상세(㊿+162) */
+  function tb(cols, rows, sub, ids){
     if(!rows.length) return '<p class="cap" style="margin:2px 0 0">없음</p>';
     return tpl`<table><thead><tr>${rawHtml(cols.map(function(c){return tpl`<th>${rawHtml(c)}</th>`;}).join(''))}</tr></thead><tbody>`+
-      tpl`${rawHtml(rows.map(function(r){ return tpl`<tr>${rawHtml(r.map(function(v){return tpl`<td>${String(v==null||v===''?'·':v)}</td>`;}).join(''))}</tr>`; }).join(''))}</tbody></table>`;
+      tpl`${rawHtml(rows.map(function(r,i){ var s=sub&&sub[i], id=ids&&ids[i]; return tpl`<tr${rawHtml(s? ' class="c360-has"':'')}${rawHtml(id!=null? tpl` data-c360ct="${id}" tabindex="0" title="계약 상세 — 계약 기간 · 연장 이력 · 월별 금액 · 변경 이력"`:'')}>${rawHtml(r.map(function(v){return tpl`<td>${String(v==null||v===''?'·':v)}</td>`;}).join(''))}</tr>`+
+        (s? tpl`<tr class="c360-rn"><td colspan="${rawHtml(cols.length)}">${rawHtml(s)}</td></tr>` : ''); }).join(''))}</tbody></table>`;
   }
   var cts=(ST.DATA&&ST.DATA.rows||[]).filter(function(r){return c360Match(r.cust,nm);});
   var lvAll=(ST.DATA&&ST.DATA.rows)? liveData() : null;
@@ -113,10 +123,11 @@ export function openCust360(name){
     (ST.RAWX.inbound===undefined? ' · (인바운드는 메뉴를 한 번 연 뒤 집계됩니다)':'');
   function sec(icon,label,n,html){ return tpl`<div class="c360-sec"><h4>${rawHtml(icon)} ${rawHtml(label)} <span class="ct">${rawHtml(n)}건</span></h4>${rawHtml(html)}</div>`; }
   $('#c360Body').innerHTML=
-    sec('📋','계약',cts.length, tb(['서비스','채널','파트너','구분','상태','기간','MRR(천원)'],
+    sec('📋','계약',cts.length, tb(['서비스','채널','파트너','구분','상태','기간','연장','MRR(천원)'],
       cts.map(function(r){ return [(r.parent? '↳ ':'')+lline(r.line), r.channel, r.partner, r.ctype, r.status,
         /* ㊿+155: 예전엔 r.start · r.end(없는 키)를 읽어 «기간» 이 늘 빈칸이었음 — 계약 행은 월 인덱스(startIdx · endIdx) */
-        (r.startIdx!=null? mk(r.startIdx):'')+' ~ '+(r.endIdx!=null? mk(r.endIdx):''), r.mrr? Math.round(Number(r.mrr)/1000).toLocaleString('ko-KR'):'' ]; })))+
+        (r.startIdx!=null? mk(r.startIdx):'')+' ~ '+(r.endIdx!=null? mk(r.endIdx):''), r.renew>0? r.renew+'회' : '', r.mrr? Math.round(Number(r.mrr)/1000).toLocaleString('ko-KR'):'' ]; }),
+      cts.map(function(r){ try{ return c360RenewLine(r); }catch(e){ return ''; } }), cts.map(function(r){ return r._id; })))+
     sec('🟢','LIVE'+(lvAll&&lvAll.src==='db'? tpl` <span class="mini" style="font-weight:400;color:var(--muted)">계약 기준 ${mk(lvAll.T)}</span>`:''),lives.length, tb(['제품','서비스','노드','최초 개시','현행 종료','근거'],
       lives.map(function(r){ return [r.prod, lline(r.line), r.nodes, r.start||'', r.end||'', r.basis||(r.dup?'중복표시':'')]; })))+
     sec('🎯','OI (영업기회)',ois.length, tb(['사업명','상태','예상시기','예상단가(천원)','담당'],
@@ -128,6 +139,12 @@ export function openCust360(name){
     sec('🔧','장비',asts.length+ords.length, tb(['구분','시리얼/발주','모델','상태','일자'],
       asts.map(function(r){ return ['자산', r.serial, r.model, r.status, r.deployed_date||r.in_date]; })
       .concat(ords.map(function(r){ return ['발주', '#'+r.id, r.model, r.status, String(r.created_at||'').slice(0,10)]; }))));
+  /* ㊿+162 계약 행(과 그 아래 연장 줄)을 누르면 계약 상세 — 고객 360 위에 열리고, 닫으면 고객 360 으로 돌아옴 */
+  $('#c360Body').querySelectorAll('tr[data-c360ct]').forEach(function(tr){
+    var go=function(){ var c=ctRawOf(Number(tr.getAttribute('data-c360ct'))); if(c) openDetail(c); else toast('계약 상세', '이 계약 원본을 아직 불러오지 못했습니다 — 잠시 뒤 다시 눌러 주세요', 'info'); };
+    tr.onclick=go; tr.onkeydown=function(e){ if(e.key==='Enter'){ e.preventDefault(); go(); } };
+    var nx=tr.nextElementSibling; if(nx && nx.classList.contains('c360-rn')) nx.onclick=go;
+  });
   try{ c360Enhance(nm, cts, lives, ois, inbs, asts, ords); }catch(e){ console.warn('c360', e); }
   openOvl('ovlC360');
 }

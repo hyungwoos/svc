@@ -770,7 +770,7 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
     calls.push(body); const A = body.action; let out = { ok: true };
     if (A === 'status') out = { ok: true, pin_set: true, github: { repo: 'x/svc', branch: 'main', token_set: true }, mgmt_token_set: true, log_ok: true, recent: [] };
     else if (A === 'gh_put') out = { ok: true, commit: 'abc1234def', url: 'u', files: body.files.map((f) => f.path) };
-    else if (A === 'gh_list') out = { ok: true, files: ['index.html', 'js/app.js', 'js/core.js', 'staging/js/app.js', 'check.mjs', 'tests/check.mjs', '.github/workflows/deploy.yml', 'staging/.github/workflows/deploy.yml', 'staging/README.md', 'staging/tests/fn/ops.test.ts'].map((p) => ({ path: p, size: 1, sha: 's' })) };
+    else if (A === 'gh_list') out = { ok: true, files: ['index.html', 'js/app.js', 'js/core.js', 'staging/js/app.js', 'check.mjs', 'tests/check.mjs', '.github/workflows/deploy.yml', 'staging/.github/workflows/deploy.yml', 'staging/README.md', 'staging/tests/fn/ops.test.ts', 'staging/2_repo/supabase/functions/ops/index.ts'].map((p) => ({ path: p, size: 1, sha: 's' })) };
     else if (A === 'gh_get') out = { ok: true, path: body.path, content: OLD_WF };
     else if (A === 'gh_delete') out = { ok: true, commit: 'dead0002', url: 'u', deleted: body.paths, missing: [] };
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(out) }); return true; } });
@@ -784,6 +784,18 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
     assert(ps.join('|') === '.github/workflows/deploy.yml|tests/check.mjs|tests/fn/ops.test.ts', ps.join('|'));
     const ui = await page.evaluate(() => ({ wf: !!document.querySelector('[data-wfcopy]'), root: [...document.querySelectorAll('#opsBody .ctag')].map((e) => e.textContent).join(',') }));
     assert(ui.wf && /저장소 루트/.test(ui.root) && /GitHub 웹에서/.test(ui.root), JSON.stringify(ui)); return ps.join(' · ');
+  });
+  await S.t('㊿+160 배포 안전장치: 묶음 폴더(1_github/ · 2_repo/)째 넣어도 이름 자동으로 뗌 → 저장소 파일은 루트 · 사이트 파일은 staging/', async () => {
+    const keep = await page.evaluate(() => SVC.OPS.files.slice());
+    const ap = await page.evaluate(() => ['2_repo/supabase/functions/ops/index.ts', '2_repo/tests/fn/ops.test.ts', '1_github/js/grid.js', '1_github/index.html', '1_github/check.mjs', 'js/x_github/a.js'].map((p) => SVC.opsAutoPath(p)));
+    const ps = ap.map((x) => x.path).join('|');
+    assert(ps === 'supabase/functions/ops/index.ts|tests/fn/ops.test.ts|js/grid.js|index.html|tests/check.mjs|js/x_github/a.js', ps);
+    assert(/«2_repo\/» 폴더 이름은 떼고/.test(ap[0].auto) && /tests\//.test(ap[4].auto) && !ap[5].auto, JSON.stringify(ap));
+    await page.evaluate(() => { SVC.OPS.target = 'staging'; SVC.OPS.files = [{ path: '2_repo/supabase/functions/ops/index.ts', size: 1, content: 'x' }]; });
+    const dest = await page.evaluate(() => SVC.opsDest(SVC.opsAutoPath('2_repo/supabase/functions/ops/index.ts').path) + ' · ' + SVC.opsDest(SVC.opsAutoPath('1_github/js/grid.js').path));
+    assert(dest === 'supabase/functions/ops/index.ts · staging/js/grid.js', dest);
+    await page.evaluate((k) => { SVC.OPS.target = 'prod'; SVC.OPS.files = k; SVC.renderOps(true); }, keep);
+    return dest;
   });
   await S.t('배포 안전장치: 스테이징 대상이어도 저장소 파일은 루트로 · 워크플로 파일은 커밋에서 빠지고 목록에 남음', async () => {
     await page.click('#opsTarget button[data-tg="staging"]'); await page.waitForTimeout(150);
@@ -810,7 +822,8 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
   await S.t('배포 안전장치: 🧹 저장소 점검 — 안 쓰는 파일·스테이징 저장소 파일·루트에 없는 파일·deploy.yml → 정리(gh_delete)', async () => {
     await page.click('#opsRepoCheck'); await page.waitForTimeout(600);
     const R = await page.evaluate(() => SVC.OPS.repo);
-    assert(R.unused.map((x) => x.p).sort().join('|') === 'check.mjs|js/app.js|staging/js/app.js', JSON.stringify(R.unused));
+    assert(R.unused.map((x) => x.p).sort().join('|') === 'check.mjs|js/app.js|staging/2_repo/supabase/functions/ops/index.ts|staging/js/app.js', JSON.stringify(R.unused));
+    assert(/제자리\(supabase\/functions\/ops\/index\.ts\)에 없음/.test(R.unused.find((x) => /2_repo/.test(x.p)).why), JSON.stringify(R.unused));
     assert(R.stagingRepo.length === 3 && R.stagingRepo.find((x) => x.p === 'staging/README.md').root === false && R.stagingRepo.find((x) => x.p === 'staging/.github/workflows/deploy.yml').root === true, JSON.stringify(R.stagingRepo));
     assert(R.missing.includes('tests/fn/_mock.ts') && R.missing.includes('README.md') && R.wf.length >= 3, JSON.stringify({ m: R.missing, wf: R.wf }));
     /* 저장소에 실제로 있는 deploy.yml 은 점검에서 문제 0 이어야 함(주석의 «|| echo» 글자를 잡지 않음 · ㊿+144) */
@@ -818,7 +831,7 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
     if (fs.existsSync(wfPath)) { const iss = await page.evaluate((y) => SVC.opsWfIssues(y), fs.readFileSync(wfPath, 'utf8')); assert(!iss.length || /ubuntu-latest|Node 20|옛 액션|functions 잡/.test(iss.join(' ')), '저장소 deploy.yml 점검: ' + iss.join(' / ')); }
     calls.length = 0; await page.click('#opsRepoClean'); await page.waitForTimeout(500);
     const del = calls.find((c) => c.action === 'gh_delete'); assert(del, 'gh_delete 없음');
-    assert(del.paths.sort().join('|') === 'check.mjs|js/app.js|staging/.github/workflows/deploy.yml|staging/js/app.js', del.paths.join('|'));
+    assert(del.paths.sort().join('|') === 'check.mjs|js/app.js|staging/.github/workflows/deploy.yml|staging/2_repo/supabase/functions/ops/index.ts|staging/js/app.js', del.paths.join('|'));
     assert(!errs.length, errs.join(' | ')); return del.paths.length + '개 정리';
   });
   await ctx.close();
@@ -1591,6 +1604,190 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
     const heads = await page.evaluate(() => SVC.pasteCols(SVC.GRIDS.targets).map((c) => c.k)); await page.fill('#pasteTa', heads.map((k) => (k === 'year' ? String(yr + 1) : k === 'amount' ? '1,500,000' : '')).join('\t'));
     await page.click('#pasteGo'); await page.waitForTimeout(1000); const t = db.t.targets.find((x) => +x.year === yr + 1); await ctx.close();
     assert(t && t.amount === 1500000000, '연간 목표 ' + (t && t.amount)); return '설치비 · 월 목표 · OI · 붙여넣기';
+  });
+  // ㊿+159 재약정(연장) — 실제 문의와 같은 모양: 신규 240노드(월 240) + 추가 30노드(월 42) · 같은 달 만기 → 270노드 월 270 으로 재약정
+  //   연장은 원계약 한 줄(«연장 n회») · 그 전 달 월 매출은 그대로 · 추가 계약은 합치기 · 겹치는 재약정 행 확인 · 두 번 연장 → 점검 · 되돌리기
+  async function fbootWith(prep, opt) {
+    const db = new FakeDB(seedData()); const info = prep ? prep(db) : null;
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' }); const page = await ctx.newPage();
+    const errs = [], dialogs = []; page.on('pageerror', (e) => errs.push(String(e).slice(0, 200)));
+    page.on('dialog', (d) => { dialogs.push(d.message().replace(/\s+/g, ' ')); (page.__dlg ? page.__dlg(d) : d.accept()).catch(() => {}); });
+    await fakeBackend(page, db, opt || {}); await page.goto(url + '/index.html'); await fready(page);
+    return { db, ctx, page, errs, dialogs, info };
+  }
+  const addMerge = (db) => {
+    const cu = Math.max(...db.t.customers.map((c) => c.id)) + 1, id = Math.max(...db.t.contracts.map((c) => c.id)) + 1, e0 = T - 3;
+    db.t.customers.push({ id: cu, name: '가상고객_통합', industry: '기업', sector: 'IT·소프트웨어', aliases: [] });
+    const base = { customer_id: cu, line: 'Cloud', partner: '직접(계산서)', biller: null, channel: '일반', billing: '월납입', install_fee: null, settle_month: null, renew_count: 0, renew_history: [], auto_renew: false, version: 'V6.0', combine: null, csm: null, s1_no: null, live_override: null, churn_reason: null, churn_month: null, note: null, lead_src: null };
+    db.t.contracts.push({ ...base, id, contract_type: '신규', status: '신규', parent_contract_id: null, qty: 240, mrr: 240000, start_month: idxYm(T - 14), end_month: idxYm(e0), term_months: 12, total_amount: 2880000 });
+    db.t.contracts.push({ ...base, id: id + 1, contract_type: '추가', status: '추가', parent_contract_id: id, qty: 30, mrr: 42000, start_month: idxYm(T - 8), end_month: idxYm(e0), term_months: 6, total_amount: 252000 });
+    for (let i = T - 14; i <= e0; i++) db.t.monthly_revenue.push({ contract_id: id, month: idxYm(i), amount: 240000 });
+    for (let i = T - 8; i <= e0; i++) db.t.monthly_revenue.push({ contract_id: id + 1, month: idxYm(i), amount: 42000 });
+    return { id, kid: id + 1, e0 };
+  };
+  const pastOf = (db, id, e0) => { const r = db.rev(id); return JSON.stringify(Object.keys(r).filter((k) => k <= YM(e0)).map((k) => k + '=' + r[k])); };
+  const reloadData = (page) => page.evaluate(async () => { const nd = await SVC.loadFromDb(); SVC.onData(nd); }).then(() => page.waitForTimeout(250));
+  await S.t('㊿+159 만기 처리 › 연장: 노드 240+30=270 · 같이 끝나는 추가 계약 합치기(체크 끄면 240) · 그 전 달 월 매출 그대로 · 재약정 행 안 생김 · 추가 계약은 원래 종료월에 끝', async () => {
+    const { db, ctx, page, errs, info } = await fbootWith(addMerge), { id, kid, e0 } = info;
+    const p0 = pastOf(db, id, e0), n0 = db.t.contracts.length, s0 = db.monthSum(idxYm(e0)), k0 = JSON.stringify(db.rev(kid));
+    await page.evaluate(() => SVC.openRenewList('lapsed')); await page.waitForTimeout(250);
+    await page.click('#rnList tr[data-id="' + id + '"] .cbtn[data-a="renew"]'); await page.waitForTimeout(200);
+    const f0 = await page.evaluate(() => ({ q: document.getElementById('rnQty').value, m: [...document.querySelectorAll('#rnList .rnMate')].map((c) => c.value + ':' + c.checked), pv: document.getElementById('rnPrev').textContent }));
+    assert(f0.q === '270' && f0.m.join() === kid + ':true', '처음 폼 ' + JSON.stringify(f0));
+    await page.click('#rnList .rnMate'); const q1 = await page.$eval('#rnQty', (e) => e.value); await page.click('#rnList .rnMate'); const q2 = await page.$eval('#rnQty', (e) => e.value);
+    assert(q1 === '240' && q2 === '270', '체크 끄고 켜기 → 노드 ' + q1 + ' / ' + q2);
+    await page.fill('#rnMrr', '270'); await page.fill('#rnEnd', YM(e0 + 12)); await page.waitForTimeout(80);
+    const pv = await page.$eval('#rnPrev', (e) => e.textContent);
+    assert(pv.includes(YM(e0) + '까지 월 매출은 그대로') && pv.includes(YM(e0 + 1) + '~' + YM(e0 + 12) + ' 12개월 월 270천원') && /노드 240 → 270/.test(pv) && /재약정 행은 따로 만들지 않음/.test(pv), '미리보기 ' + pv);
+    await page.click('#rnGo'); await page.waitForFunction(({ id, kid }) => /재약정 통합/.test(document.getElementById('rnMsg').textContent + '') || document.getElementById('rnMsg').className.includes('ok'), { id, kid }, { timeout: 8000 });
+    await page.waitForTimeout(300);
+    const c = db.ct(id), rv = db.rev(id), k = db.ct(kid); await ctx.close();
+    assert(c.renew_count === 1 && c.mrr === 270000 && c.qty === 270 && ix(c.end_month) === e0 + 12 && c.status === '재약정' && c.contract_type === '신규', '원계약 ' + JSON.stringify({ n: c.renew_count, mrr: c.mrr, qty: c.qty, end: c.end_month, ct: c.contract_type, st: c.status }));
+    assert(pastOf(db, id, e0) === p0, '그 전 달 월 매출이 바뀜');
+    assert(rv[YM(e0 + 1)] === 270000 && rv[YM(e0 + 12)] === 270000 && !rv[YM(e0 + 13)], '새 기간 월 매출');
+    assert(/재약정 통합 → #/.test(k.note || '') && k.status === '추가' && JSON.stringify(db.rev(kid)) === k0, '추가 계약 ' + k.status + ' · ' + k.note);
+    const cs = (i) => (db.rev(id)[YM(i)] || 0) + (db.rev(kid)[YM(i)] || 0);
+    assert(db.t.contracts.length === n0 && db.monthSum(idxYm(e0)) === s0 && cs(e0) === 282000 && cs(e0 + 1) === 270000, '재약정 행 ' + (db.t.contracts.length - n0) + ' · 고객 합계 ' + cs(e0) + ' → ' + cs(e0 + 1));
+    const h = c.renew_history[0]; assert(h.prev_qty === 240 && h.qty === 270 && h.prev_mrr === 240000 && h.merged && h.merged[0].id === kid, '연장 기록 ' + JSON.stringify(h).slice(0, 200));
+    assert(!errs.length, errs.join(' | ')); return YM(e0) + '까지 240+42 그대로 · ' + YM(e0 + 1) + '~ 270 · 노드 270 · 추가 통합';
+  });
+  await S.t('㊿+159 신규 등록: 연장한 계약과 같은 기간의 «재약정» 행 → «겹치는 계약» 확인 · 취소면 저장 안 됨 · 확인하면 저장되고 데이터 점검 «겹치는 재약정 행»이 잡음', async () => {
+    const { db, ctx, page, errs, dialogs, info } = await fbootWith(addMerge), { id, kid, e0 } = info;
+    await page.evaluate(async ({ id, kid, ne }) => { const r = SVC.ST.DATA.rows.find((x) => x._id === id); await SVC.doRenew(r, ne, 270000, '', { qty: 270, merge: [kid] }); }, { id, kid, ne: e0 + 12 }); await reloadData(page);
+    const n0 = db.t.contracts.length;
+    const fillNew = async () => { await openEdit(page, 'new'); await page.fill('#nCust', '가상고객_통합'); await page.selectOption('#nType', '재약정'); await page.fill('#nStart', YM(e0 + 1)); await page.fill('#nEnd', YM(e0 + 12)); await page.fill('#nMrr', '270'); };
+    page.__dlg = (d) => (/겹치는 계약/.test(d.message()) ? d.dismiss() : d.accept());
+    await fillNew(); await page.click('#eGo'); await page.waitForTimeout(700);
+    const m1 = await page.$eval('#eMsg', (e) => e.textContent);
+    assert(db.t.contracts.length === n0 && /갱신/.test(m1) && dialogs.some((x) => /겹치는 계약/.test(x) && /#\d+ 신규/.test(x) && /12개월/.test(x) && /두 번 잡힙니다/.test(x)), '취소했는데 저장됨 / 안내 ' + m1 + ' / ' + dialogs.slice(-1));
+    page.__dlg = null; await saveEdit(page); assert(db.t.contracts.length === n0 + 1, '확인했는데 저장 안 됨');
+    await page.evaluate(() => document.getElementById('ovlEdit').classList.remove('on')); await reloadData(page);
+    const R = await page.evaluate(() => { const r = SVC.dcRules().find((x) => x.id === 'c_renew_overlap'); return r ? { sev: r.sev, items: r.items.map((x) => x.label + ' | ' + x.sub) } : null; });
+    await ctx.close();
+    assert(R && R.sev === 'warn' && R.items.some((x) => /가상고객_통합/.test(x) && /#\d+ 연장 1회/.test(x)), '데이터 점검 ' + JSON.stringify(R));
+    assert(!errs.length, errs.join(' | ')); return '취소 → 그대로 · 확인 → 저장 + 점검 1건';
+  });
+  await S.t('㊿+159 «↩ 마지막 연장 되돌리기»: 두 번 연장(중복) → 데이터 점검 «연장이 짧은 사이에 두 번» → 갱신 탭에서 2번 되돌리면 처음과 같음 · 이관 기록은 못 되돌린다고 안내', async () => {
+    const prep = (db) => { const r = addMerge(db); const o = db.t.contracts.find((c) => c.customer_id === db.t.customers.find((x) => x.name === '가상고객01').id); o.renew_count = 1; o.renew_history = [{ no: 1, from: o.start_month, to: o.end_month, mrr: o.mrr, by: 'sheet-sync' }]; return r; };
+    const { db, ctx, page, errs, dialogs, info } = await fbootWith(prep), { id, kid, e0 } = info;
+    const snap = () => { const c = db.ct(id), k = db.ct(kid); return JSON.stringify({ e: c.end_month, m: c.mrr, q: c.qty, s: c.status, n: c.renew_count, h: c.renew_history.length, rv: db.rev(id), kn: k.note, ks: k.status }); };
+    const s0 = snap();
+    await page.evaluate(async ({ id, kid, e0 }) => { let r = SVC.ST.DATA.rows.find((x) => x._id === id); await SVC.doRenew(r, e0 + 12, 270000, '', { qty: 270, merge: [kid] }); const nd = await SVC.loadFromDb(); SVC.onData(nd);
+      r = SVC.ST.DATA.rows.find((x) => x._id === id); await SVC.doRenew(r, e0 + 24, 270000, '', {}); }, { id, kid, e0 }); await reloadData(page);
+    assert(db.ct(id).renew_count === 2 && ix(db.ct(id).end_month) === e0 + 24, '두 번 연장 준비');
+    const R = await page.evaluate(() => { const r = SVC.dcRules().find((x) => x.id === 'c_renew_dup'); return r ? r.items.map((x) => x.label + ' | ' + x.sub + ' | ' + (x.act ? x.act.label : '')) : null; });
+    assert(R && R.length === 1 && /가상고객_통합/.test(R[0]) && /연장 2회/.test(R[0]) && /되돌리기/.test(R[0]), '데이터 점검 ' + JSON.stringify(R));
+    await openEdit(page, 'renew'); await page.fill('#rFind', '가상고객_통합'); await page.waitForTimeout(120); await page.click('#rPick .pi:has-text("연장 ")'); await page.waitForTimeout(120);
+    assert(await page.$('#rUndoGo'), '되돌리기 버튼 없음');
+    await page.click('#rUndoGo'); await page.waitForFunction((id) => document.querySelector('#rUndo') && /연장 1회/.test(document.querySelector('#rUndo').textContent), id, { timeout: 8000 });
+    const u1 = db.ct(id), d1 = dialogs.slice(-1)[0] || '';
+    assert(u1.renew_count === 1 && ix(u1.end_month) === e0 + 12 && u1.mrr === 270000 && u1.qty === 270 && !db.rev(id)[YM(e0 + 13)] && db.rev(id)[YM(e0 + 12)] === 270000, '1번 되돌린 뒤 ' + JSON.stringify({ n: u1.renew_count, e: u1.end_month }));
+    assert(/연장 2회 → 1회/.test(d1) && d1.includes('종료월 ' + YM(e0 + 24) + ' → ' + YM(e0 + 12)) && d1.includes(YM(e0 + 12) + '까지는 그대로'), '확인 창 ' + d1);
+    await page.click('#rUndoGo'); await page.waitForFunction(() => !document.querySelector('#rUndoGo') || /연장 0회/.test(document.querySelector('#eMsg').textContent), null, { timeout: 8000 }); await page.waitForTimeout(200);
+    const d2 = dialogs.slice(-1)[0] || '';
+    assert(snap() === s0, '두 번 되돌린 뒤 처음과 다름\n' + s0 + '\n' + snap());
+    assert(/노드수 270 → 240/.test(d2) && /#\d+ 의 «재약정 통합» 표시 되돌림/.test(d2), '두 번째 확인 창 ' + d2);
+    await page.fill('#rFind', '가상고객01'); await page.waitForTimeout(120); await page.click('#rPick .pi'); await page.waitForTimeout(120);
+    const mig = await page.evaluate(() => ({ btn: !!document.getElementById('rUndoGo'), t: (document.getElementById('rUndo') || {}).textContent || '' }));
+    await ctx.close();
+    assert(!mig.btn && /자동으로 되돌릴 수 없습니다/.test(mig.t), '이관 기록 ' + JSON.stringify(mig));
+    assert(!errs.length, errs.join(' | ')); return '2회 → 1회 → 0회 = 처음 상태 · 이관 기록 안내';
+  });
+  await S.t('㊿+159 연장 경계: 다른 사이트 원계약의 추가·사이트별 하위 계약은 합치기 목록에 안 나옴 · 따로 등록된 추가는 체크 안 된 채로 · 옛 행으로 두 번 저장 막음 · 무약정 계약 되돌리면 종료월 다시 비움', async () => {
+    const prep = (db) => { const r = addMerge(db), cu = db.ct(r.id).customer_id, b = { ...db.ct(r.kid) };
+      const site2 = r.id + 10, add2 = r.id + 11, sub = r.id + 12, loose = r.id + 13, open = r.id + 14;
+      db.t.contracts.push({ ...db.ct(r.id), id: site2, renew_history: [], csm: 'SITE-B' }, { ...b, id: add2, parent_contract_id: site2 }, { ...b, id: sub, contract_type: '신규', status: '신규', qty: 5 }, { ...b, id: loose, parent_contract_id: null, qty: 7 });
+      const ocu = Math.max(...db.t.customers.map((c) => c.id)) + 1; db.t.customers.push({ id: ocu, name: '가상고객_무약정', industry: '기업', sector: 'IT·소프트웨어', aliases: [] });
+      db.t.contracts.push({ ...db.ct(r.id), id: open, customer_id: ocu, end_month: null, term_months: null, total_amount: null, renew_history: [] });
+      for (let i = T - 14; i <= T + 2; i++) db.t.monthly_revenue.push({ contract_id: open, month: idxYm(i), amount: 240000 });
+      void cu; return { ...r, site2, add2, sub, loose, open }; };
+    const { db, ctx, page, errs, info } = await fbootWith(prep), { id, kid, e0, add2, sub, loose, open } = info;
+    const m = await page.evaluate((id) => { const r = SVC.ST.DATA.rows.find((x) => x._id === id); const ms = SVC.renewMates(r); return { ids: ms.map((x) => x._id), q0: SVC.renewQty0(r, ms), html: SVC.renewMatesHtml(r, ms, 'rn') }; }, id);
+    assert(m.ids.includes(kid) && m.ids.includes(loose) && !m.ids.includes(add2) && !m.ids.includes(sub), '합치기 목록 ' + JSON.stringify(m.ids));
+    assert(m.q0 === 270 && new RegExp('value="' + kid + '"[^>]*checked').test(m.html) && !new RegExp('value="' + loose + '"[^>]*checked').test(m.html) && /따로 등록/.test(m.html), '기본 체크 ' + m.q0);
+    const stale = await page.evaluate(async ({ id, ne }) => { const r = SVC.ST.DATA.rows.find((x) => x._id === id); await SVC.doRenew(r, ne, 270000, '', {}); const nd = await SVC.loadFromDb(); SVC.onData(nd);
+      try { await SVC.doRenew(r, ne + 12, 270000, '', {}); return 'saved'; } catch (e) { return String(e.message); } }, { id, ne: e0 + 12 });
+    assert(/방금 바뀌었습니다/.test(stale) && db.ct(id).renew_count === 1, '옛 행으로 두 번째 저장 ' + stale + ' · 회차 ' + db.ct(id).renew_count);
+    const o0 = JSON.stringify({ e: db.ct(open).end_month, rv: db.rev(open) });
+    await page.evaluate(async ({ open, ne }) => { const r = SVC.ST.DATA.rows.find((x) => x._id === open); await SVC.doRenew(r, ne, 300000, '', {}); const nd = await SVC.loadFromDb(); SVC.onData(nd);
+      const r2 = SVC.ST.DATA.rows.find((x) => x._id === open); await SVC.doUndoRenew(r2, SVC.renewUndoPlan(r2)); }, { open, ne: T + 12 });
+    const o1 = JSON.stringify({ e: db.ct(open).end_month, rv: db.rev(open) }); await ctx.close();
+    assert(o1 === o0 && db.ct(open).end_month === null, '무약정 되돌리기 ' + db.ct(open).end_month);
+    assert(!errs.length, errs.join(' | ')); return '목록 2건(부속 체크 · 따로 등록 미체크) · 옛 행 거부 · 무약정 그대로';
+  });
+  await S.t('㊿+160 연장하면 상태 «재약정»(구분은 그대로) · 해지였던 계약도 재약정으로 되살림 · 추가 계약은 «추가» · 계약 상세 👁 에 «계약 기간 · 연장 이력»(최초 + 회차 · 시트 이관 기록 포함) · ㊿+161 고객 360 계약 표에도 연장', async () => {
+    const prep = (db) => { const r = addMerge(db), o = db.t.contracts.find((c) => c.customer_id === db.t.customers.find((x) => x.name === '가상고객02').id);
+      o.renew_count = 1; o.contract_type = '재약정'; o.status = '재약정'; o.renew_history = [{ renew_no: 1, new_end: o.end_month, mrr: o.mrr, merged: 973, by: 'migration-57' }]; return { ...r, mig: o.id }; };
+    const { db, ctx, page, errs, info } = await fbootWith(prep), { id, e0, mig } = info;
+    const st = await page.evaluate(() => [SVC.renewStatus({ status: '신규', ctype: '신규' }), SVC.renewStatus({ status: '해지', ctype: '신규' }), SVC.renewStatus({ status: '서비스종료', ctype: '재약정' }), SVC.renewStatus({ status: '추가', ctype: '추가' }), SVC.renewStatus({ status: 'CN전환', ctype: '신규' })]);
+    assert(st.join() === '재약정,재약정,재약정,추가,CN전환', '상태 규칙 ' + st.join());
+    await page.evaluate(async ({ id, ne }) => { const r = SVC.ST.DATA.rows.find((x) => x._id === id); await SVC.doRenew(r, ne, 141000, '', { qty: 52 }); const nd = await SVC.loadFromDb(); SVC.onData(nd); }, { id, ne: e0 + 12 });
+    assert(db.ct(id).status === '재약정' && db.ct(id).contract_type === '신규', '연장 뒤 ' + db.ct(id).contract_type + '|' + db.ct(id).status);
+    const det = async (cid) => { await page.evaluate((cid) => { const c = SVC.ST.RAWX.contracts.find((x) => x.id === cid); SVC.openDetail(c); }, cid); await page.waitForTimeout(300);
+      return page.evaluate(() => ({ meta: document.getElementById('dtMeta').textContent, rows: [...document.querySelectorAll('#dtRenew tbody tr')].map((tr) => [...tr.children].map((td) => td.textContent.trim()).join(' | ')) })); };
+    const d1 = await det(id);
+    assert(/구분 신규/.test(d1.meta) && /상태 재약정/.test(d1.meta) && /연장 1회/.test(d1.meta) && /52노드/.test(d1.meta), '상세 머리 ' + d1.meta);
+    assert(d1.rows.length === 2 && d1.rows[0].startsWith('최초 | ' + YM(T - 14) + ' ~ ' + YM(e0) + ' | 240 | 240') && d1.rows[1].startsWith('연장 1회 | ' + YM(e0 + 1) + ' ~ ' + YM(e0 + 12) + ' | 141 | 52'), '연장 이력 ' + JSON.stringify(d1.rows));
+    await page.evaluate(() => SVC.closeOvl('ovlDetail'));
+    const d2 = await det(mig); await page.evaluate(() => SVC.closeOvl('ovlDetail'));
+    /* ㊿+161 고객 360 계약 표: «연장» 칸 + 연장한 계약 아래 한 줄(최초 → 연장 n회 · 기간 · 월 금액 · 노드) */
+    const c3 = await page.evaluate((id) => { const r = SVC.ST.DATA.rows.find((x) => x._id === id); SVC.openCust360(r.cust); const t = document.querySelector('#c360Body .c360-sec table');
+      return { head: [...t.querySelectorAll('thead th')].map((e) => e.textContent).join('|'), rows: [...t.querySelectorAll('tbody tr')].map((tr) => (tr.className || '-') + ':' + [...tr.children].map((td) => td.textContent.trim()).join(' | ')) }; }, id);
+    await ctx.close();
+    assert(c3.head === '서비스|채널|파트너|구분|상태|기간|연장|MRR(천원)', c3.head);
+    const main = c3.rows.findIndex((x) => /^c360-has:/.test(x) && / \| 1회 \| 141$/.test(x));
+    assert(main >= 0 && c3.rows[main + 1] === 'c360-rn:최초 ' + YM(T - 14) + '~' + YM(e0) + ' · 240 · 240노드→연장 1회 ' + YM(e0 + 1) + '~' + YM(e0 + 12) + ' · 141 · 52노드', '고객 360 ' + JSON.stringify(c3.rows));
+    assert(c3.rows.filter((x) => /^c360-rn:/.test(x)).length === 1, '연장 안 한 계약에도 줄이 붙음 ' + JSON.stringify(c3.rows));
+    assert(d2.rows.length === 2 && /^연장 1회/.test(d2.rows[1]) && /시트 이관/.test(d2.rows[1]) && /재약정 행 #973 합침/.test(d2.rows[1]), '이관 기록 ' + JSON.stringify(d2.rows));
+    assert(!errs.length, errs.join(' | ')); return d1.rows.join(' / ').slice(0, 110);
+  });
+  await S.t('㊿+162 연장 메모 → 계약 관리 «비고»에 덧붙임(같은 글이면 그대로) · 되돌리면 그 메모만 빠짐 · 고객 360 계약 행을 누르면 계약 상세(연장 이력)', async () => {
+    const prep = (db) => { const r = addMerge(db); db.t.contracts.find((c) => c.id === r.id).note = '정부 지원'; return r; };
+    const { db, ctx, page, errs, dialogs, info } = await fbootWith(prep), { id, e0 } = info;
+    const renew = (ne, memo) => page.evaluate(async ({ id, ne, memo }) => { const r = SVC.ST.DATA.rows.find((x) => x._id === id); await SVC.doRenew(r, ne, 250000, memo, {}); SVC.onData(await SVC.loadFromDb()); }, { id, ne, memo });
+    await renew(e0 + 12, '3년 재약정 · 단가 조정');
+    assert(db.ct(id).note === '정부 지원 · 3년 재약정 · 단가 조정', '비고 ' + db.ct(id).note);
+    await renew(e0 + 24, '정부 지원');
+    assert(db.ct(id).note === '정부 지원 · 3년 재약정 · 단가 조정', '같은 글 두 번 ' + db.ct(id).note);
+    await page.evaluate((id) => { const c = SVC.ST.RAWX.contracts.find((x) => x.id === id); c.note = c.note + ' · 담당 변경'; }, id);
+    db.ct(id).note = db.ct(id).note + ' · 담당 변경';
+    const undo = () => page.evaluate(async (id) => SVC.renewUndoFlow(SVC.ST.DATA.rows.find((x) => x._id === id)), id);
+    assert(await undo() === true && db.ct(id).note === '정부 지원 · 3년 재약정 · 단가 조정 · 담당 변경', '되돌리기 1(같은 글이라 안 붙었던 메모) ' + db.ct(id).note);
+    assert(await undo() === true && db.ct(id).note === '정부 지원 · 담당 변경' && /비고에서 연장 메모 «3년 재약정 · 단가 조정» 빼기/.test(dialogs.join(' ')), '되돌리기 2 ' + db.ct(id).note + ' / ' + dialogs.slice(-1)[0]);
+    await renew(e0 + 12, '재약정 완료');
+    const c3 = await page.evaluate(async (id) => { const r = SVC.ST.DATA.rows.find((x) => x._id === id); SVC.openCust360(r.cust); await new Promise((f) => setTimeout(f, 200));
+      const tr = document.querySelector('#c360Body tr[data-c360ct="' + id + '"]'); const sub = tr && tr.nextElementSibling; (sub || tr).click(); await new Promise((f) => setTimeout(f, 300));
+      const top = document.getElementById('ovlDetail'); return { has: !!tr, sub: sub ? sub.className : '', open: top.classList.contains('on'), c360: document.getElementById('ovlC360').classList.contains('on'),
+        title: document.getElementById('dtTitle').textContent, rows: [...document.querySelectorAll('#dtRenew tbody tr')].map((x) => x.children[0].textContent + ' ' + x.children[1].textContent),
+        z: getComputedStyle(top).zIndex + '/' + getComputedStyle(document.getElementById('ovlC360')).zIndex, after: [...document.querySelectorAll('.ovl.on')].map((e) => e.id).join(',') }; }, id);
+    assert(c3.has && c3.sub === 'c360-rn' && c3.open && c3.c360 && c3.title === '가상고객_통합' && c3.rows.join('|') === '최초 ' + YM(T - 14) + ' ~ ' + YM(e0) + '|연장 1회 ' + YM(e0 + 1) + ' ~ ' + YM(e0 + 12), '고객 360 → 상세 ' + JSON.stringify(c3));
+    const top = await page.evaluate(() => { const a = document.getElementById('ovlDetail'), b = document.getElementById('ovlC360'); return !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_PRECEDING); });
+    assert(top, '계약 상세가 고객 360 뒤에 깔림');
+    await page.keyboard.press('Escape'); await page.waitForTimeout(200);
+    const back = await page.evaluate(() => [document.getElementById('ovlDetail').classList.contains('on'), document.getElementById('ovlC360').classList.contains('on')].join());
+    await ctx.close();
+    assert(back === 'false,true', 'Esc 뒤 ' + back);
+    assert(!errs.length, errs.join(' | ')); return '비고 «' + db.ct(id).note + '» · 고객 360 → 상세 ' + c3.rows.length + '줄';
+  });
+  await S.t('㊿+159 홈 AI 답변: «✕ 닫기» · 다른 메뉴로 가면 닫힘(돌아와도 없음) · 생각 중엔 메뉴를 옮겨도 유지 · 생각 중 ✕ 는 멈추고 닫음', async () => {
+    let slow = 0;
+    const extra = async (route, u) => { if (u.includes('/functions/v1/ask') && slow) { await new Promise((r) => setTimeout(r, slow)); await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, text: 'mock 늦은 답', queries: [] }) }).catch(() => {}); return true; } return false; };
+    const { ctx, page, errs } = await fbootWith(null, { extra });
+    const st = () => page.evaluate(() => ({ on: document.getElementById('answer').classList.contains('on'), say: document.getElementById('aiSay').textContent, asking: SVC.isAsking(), x: !!document.getElementById('ansClose') }));
+    await page.evaluate(() => SVC.ask('이번 달 MRR?')); await page.waitForFunction(() => /mock/.test(document.getElementById('aiSay').textContent), null, { timeout: 8000 });
+    const a = await st(); assert(a.on && a.x, '답 ' + JSON.stringify(a));
+    await page.evaluate(() => { SVC.switchView('contracts'); SVC.switchView('dash'); }); await page.waitForTimeout(150);
+    const b = await st(); assert(!b.on, '다른 메뉴 갔다 와도 남아 있음');
+    await page.evaluate(() => SVC.ask('이번 달 MRR?')); await page.waitForFunction(() => /mock/.test(document.getElementById('aiSay').textContent), null, { timeout: 8000 });
+    await page.click('#ansClose'); const c = await st(); assert(!c.on, '✕ 닫기로 안 닫힘');
+    slow = 1500; await page.evaluate(() => SVC.ask('천천히')); await page.waitForTimeout(200);
+    await page.evaluate(() => { SVC.switchView('orders'); SVC.switchView('dash'); }); await page.waitForTimeout(100);
+    const d = await st(); assert(d.on && d.asking, '생각 중인데 닫힘 ' + JSON.stringify(d));
+    await page.waitForFunction(() => /늦은 답/.test(document.getElementById('aiSay').textContent), null, { timeout: 8000 });
+    await page.evaluate(() => SVC.ask('또 천천히')); await page.waitForTimeout(200); await page.click('#ansClose'); await page.waitForTimeout(100);
+    const e = await st(); await page.waitForTimeout(1600); const f = await st(); await ctx.close();
+    assert(!e.on && !e.asking && !f.on, '생각 중 ✕ ' + JSON.stringify({ e, f }));
+    assert(!errs.length, errs.join(' | ')); return '✕ · 메뉴 이동 · 생각 중 유지 · 멈춤';
   });
 }
 await browser.close(); srv.close();

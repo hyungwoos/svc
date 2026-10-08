@@ -162,7 +162,46 @@ function qaScenarios(){
       switchView('targets'); await h.sleep(200); openPaste(); var heads=pasteCols(GRIDS.targets).map(function(x){ return x.k; });
       h.fill('#pasteTa', heads.map(function(k){ return k==='year'? String(yr+2) : k==='amount'? '1500000000' : ''; }).join('\t')); h.click('#pasteGo'); await h.sleep(400);
       h.ok(h.asked(/이상해 보이는/) && !db.t.targets.some(function(x){ return +x.year===yr+2; }), '원으로 된 값을 붙여도 확인 창 없이 추가됨');
-      document.getElementById('ovlPaste').classList.remove('on'); return '설치비 2,500 · 월 목표 95,000 · OI 12,000(천원) → 원 · 붙여넣기 이상 금액 확인'; }}
+      document.getElementById('ovlPaste').classList.remove('on'); return '설치비 2,500 · 월 목표 95,000 · OI 12,000(천원) → 원 · 붙여넣기 이상 금액 확인'; }},
+    {id:'renewMerge', label:'재약정 — 신규 240노드 + 추가 30노드 → 연장 270노드(합치기) · 지난 달 매출 그대로 · 겹치는 재약정 행 확인 · 두 번 연장 → 점검 · 되돌리기 ×2', run:async function(h, db){
+      h.dlg(); var T=h.T, e0=T-3, mx=function(a){ return a.reduce(function(m, x){ return Math.max(m, +x.id||0); }, 0); }, cu=mx(db.t.customers)+1, id=mx(db.t.contracts)+1, NM='가상고객_재약정통합';
+      db.t.customers.push({id:cu, name:NM, industry:'기업', sector:'IT·소프트웨어', aliases:[]});
+      var base={customer_id:cu, line:'Cloud', partner:'직접(계산서)', biller:null, channel:'일반', billing:'월납입', install_fee:null, settle_month:null, renew_count:0, renew_history:[], auto_renew:false,
+        version:'V6.0', combine:null, csm:null, s1_no:null, live_override:null, churn_reason:null, churn_month:null, note:null, lead_src:null};
+      db.t.contracts.push(Object.assign({}, base, {id:id, contract_type:'신규', status:'신규', parent_contract_id:null, qty:240, mrr:240000, start_month:qaYm(T-14), end_month:qaYm(e0), term_months:12, total_amount:2880000}));
+      db.t.contracts.push(Object.assign({}, base, {id:id+1, contract_type:'추가', status:'추가', parent_contract_id:id, qty:30, mrr:42000, start_month:qaYm(T-8), end_month:qaYm(e0), term_months:6, total_amount:252000}));
+      for(var i=T-14;i<=e0;i++) db.t.monthly_revenue.push({contract_id:id, month:qaYm(i), amount:240000});
+      for(var j=T-8;j<=e0;j++) db.t.monthly_revenue.push({contract_id:id+1, month:qaYm(j), amount:42000});
+      await h.reload();
+      var past=function(){ var r=db.rev(id); return JSON.stringify(Object.keys(r).filter(function(k){ return k<=h.ym(e0); }).map(function(k){ return k+'='+r[k]; })); };
+      var p0=past(), n0=db.t.contracts.length, s0=db.monthSum(qaYm(e0));
+      var pickBy=async function(word){ h.fill('#rFind', NM); await h.sleep(80); var it=[].slice.call(document.querySelectorAll('#rPick .pi')).filter(function(x){ return x.textContent.indexOf(word)>=0; })[0]; h.ok(it, '갱신 목록에 «'+word+'» 행 없음'); it.click(); await h.sleep(80); };
+      /* ① 만기 처리 › 연장 — 노드 240+30 · 추가 계약 체크 · 미리보기 «그대로» */
+      openRenewList('lapsed'); await h.sleep(200); h.click('#rnList tr[data-id="'+id+'"] .cbtn[data-a="renew"]'); await h.sleep(150);
+      h.ok(h.must('#rnQty').value==='270', '노드수 기본값이 240+30 이 아님: '+h.must('#rnQty').value);
+      var mate=/** @type {any} */ (h.must('#rnList .rnMate')); h.ok(mate.checked && +mate.value===id+1, '같이 끝나는 추가 계약이 안 보임');
+      h.fill('#rnMrr', '270'); h.fill('#rnEnd', h.ym(e0+12)); h.ok(/그대로/.test(h.must('#rnPrev').textContent), '미리보기에 «그대로» 없음: '+h.must('#rnPrev').textContent);
+      h.click('#rnGo'); await h.until(function(){ return db.ct(id).renew_count===1 && db.rev(id)[h.ym(e0+12)]===270000 && /재약정 통합/.test(db.ct(id+1).note||''); }, 6000, '연장 저장(계약 · 월 매출 · 추가 계약)');
+      var c=db.ct(id), rv=db.rev(id), kid=db.ct(id+1);
+      h.ok(c.mrr===270000 && c.qty===270 && h.ix(c.end_month)===e0+12 && c.status==='재약정' && c.contract_type==='신규', '원계약: mrr '+c.mrr+' · 노드 '+c.qty+' · 종료 '+c.end_month+' · '+c.contract_type+'|'+c.status);
+      h.ok(past()===p0 && rv[h.ym(e0+1)]===270000 && rv[h.ym(e0+12)]===270000, '월 매출: 지난 달이 바뀌었거나 새 기간이 270 이 아님 — 전 '+p0+' / 후 '+past()+' · '+h.ym(e0+1)+'='+rv[h.ym(e0+1)]+' · '+h.ym(e0+12)+'='+rv[h.ym(e0+12)]);
+      h.ok(/재약정 통합/.test(kid.note||'') && kid.status==='추가' && !db.rev(id+1)[h.ym(e0+1)], '추가 계약: '+kid.status+' · '+kid.note);
+      h.ok(db.t.contracts.length===n0 && db.monthSum(qaYm(e0))===s0, '재약정 행이 따로 생겼거나 '+h.ym(e0)+' 합계가 바뀜');
+      /* ② 신규 등록으로 같은 기간 «재약정» 행 → 겹침 확인 창 (취소 → 저장 안 됨) */
+      h.dlg(function(m){ return !/겹치는 계약/.test(m); });
+      await h.openEdit('new'); h.fill('#nCust', NM); h.fill('#nType', '재약정'); h.fill('#nStart', h.ym(e0+1)); h.fill('#nEnd', h.ym(e0+12)); h.fill('#nMrr', '270'); h.click('#eGo'); await h.sleep(500);
+      h.ok(h.asked(/겹치는 계약/) && db.t.contracts.length===n0, '겹치는 재약정 행이 확인 없이 저장됨');
+      /* ③ 갱신 탭으로 한 번 더 연장(중복 실수) → 데이터 점검이 잡음 → 되돌리기 두 번 */
+      h.dlg(); await h.openEdit('renew'); await pickBy('연장 '); h.fill('#rEnd', h.ym(e0+24)); h.fill('#rMrr', '270'); await h.save();
+      h.ok(db.ct(id).renew_count===2, '두 번째 연장 안 됨'); document.getElementById('ovlEdit').classList.remove('on'); await h.reload();
+      var R=dcRules().filter(function(x){ return x.id==='c_renew_dup'; })[0], it=R && R.items.filter(function(x){ return x.label.indexOf(NM)>=0; })[0]; h.ok(it && it.act, '데이터 점검 «연장이 짧은 사이에 두 번»이 못 잡음');
+      await h.openEdit('renew'); await pickBy('연장 '); h.click('#rUndoGo'); await h.until(function(){ return db.ct(id).renew_count===1 && !db.rev(id)[h.ym(e0+13)] && h.q('#rUndoGo'); }, 6000, '되돌리기 1회');
+      c=db.ct(id); rv=db.rev(id); h.ok(c.status==='재약정', '1번 되돌린 뒤(연장 1회 남음) 상태 '+c.status); h.ok(h.ix(c.end_month)===e0+12 && c.mrr===270000 && rv[h.ym(e0+12)]===270000 && !rv[h.ym(e0+13)] && past()===p0, '되돌리기 1: 종료 '+c.end_month+' · '+h.ym(e0+13)+' '+rv[h.ym(e0+13)]);
+      await h.until(function(){ return h.q('#rUndoGo'); }, 3000, '되돌리기 버튼 다시'); h.click('#rUndoGo'); await h.until(function(){ return db.ct(id).renew_count===0 && !db.rev(id)[h.ym(e0+1)] && !/재약정 통합/.test(db.ct(id+1).note||''); }, 6000, '되돌리기 2회');
+      c=db.ct(id); rv=db.rev(id); h.ok(c.status==='신규', '연장 0회로 되돌린 뒤 상태 '+c.status); h.ok(c.mrr===240000 && c.qty===240 && h.ix(c.end_month)===e0 && !rv[h.ym(e0+1)] && past()===p0 && !(c.renew_history||[]).length, '되돌리기 2: mrr '+c.mrr+' · 노드 '+c.qty+' · 종료 '+c.end_month);
+      h.ok(!/재약정 통합/.test(db.ct(id+1).note||''), '추가 계약의 «재약정 통합» 표시가 안 돌아옴');
+      document.getElementById('ovlEdit').classList.remove('on');
+      return '연장 270노드·추가 통합 · 지난 달 그대로 · 겹침 확인 · 2회 → 1회 → 0회'; }}
   ];
 }
 /** 시나리오 이름 목록 [{id, label}] */

@@ -4,7 +4,7 @@ import { ST } from './state.js';
 import { $, amtGuard, amtHint, clearSess, doLogout, el, esc, kwToWon, lline, mfaGate, mfaVerifiedOf, mk, rawHtml, saveSess, SB_KEY, SB_URL, sessRead, sessWrite, tpl, won, wonToKw } from './core.js';
 import { afterLoad, idxDate, loadFromDb, onData, onErr, SB_RAW, sbWrite, showAuthUi, showLoading, toast } from './shell.js';
 import { s1NoInfo, s1NoOpts } from './grids.js';
-import { chOf, doChurn, doRenew, liveCalc, nmKeys } from './analysis.js';
+import { chOf, doChurn, doRenew, liveCalc, nmKeys, renewMates, renewMatesHtml, renewOpts, renewQty0, renewUndoFlow, renewUndoPlan, renewWire } from './analysis.js';
 import { switchView } from './grid.js';
 
 
@@ -270,6 +270,7 @@ export function setupPick(inputId, pickId, store){
         box.querySelectorAll('.pi').forEach(function(x){x.classList.remove('sel');});
         it.classList.add('sel');
         if(store===PK_F) showFixCurrent(r);
+        if(store===PK_R) showRenewPick(r);
         if(store===PK_A) showAddParent(r);
         if(store===PK_C && FORM_FN.cLivePreview) FORM_FN.cLivePreview();
       };
@@ -278,6 +279,39 @@ export function setupPick(inputId, pickId, store){
   };
 }
 
+/* ㊿+159 갱신 탭: 고른 계약의 노드수 · 같이 끝나는 추가 계약(합치기) · 미리보기 · 마지막 연장 되돌리기 */
+export function showRenewPick(r){
+  var host=$('#tabRenew'), mb=$('#rMates'), ub=$('#rUndo'), qt=$('#rQty');
+  var mates=renewMates(r), q0=renewQty0(r, mates);
+  if(qt){ qt.value=q0!=null? String(q0) : ''; qt.placeholder=r.qty? r.qty+' (그대로)' : '그대로'; }
+  if(mb){ var mh=renewMatesHtml(r, mates, 'r'); mb.innerHTML=mh; mb.style.display=mh? '' : 'none'; }
+  if(ub){
+    if(!r.renew){ ub.style.display='none'; ub.innerHTML=''; }
+    else {
+      var h=(r.renewHist||[])[(r.renewHist||[]).length-1]||{}, plan=renewUndoPlan(r);
+      ub.style.display='';
+      ub.innerHTML=tpl`<label>연장 기록</label><div class="cap">이 계약은 <b>연장 ${rawHtml(r.renew)}회</b> · 마지막 연장 ${String(h.from||'').slice(0,7)}~${String(h.to||'').slice(0,7)} 월 ${won(h.mrr||0)}천원`+
+        tpl`${rawHtml(h.at? ' ('+esc(String(h.at).slice(0,10))+(h.by? ' · '+esc(h.by):'')+')' : '')}<br>`+
+        tpl`${rawHtml(plan.bad? tpl`<span class="mini">${plan.bad}</span>` : tpl`잘못 연장했거나 두 번 들어갔으면 <button type="button" class="pill ghost" id="rUndoGo">↩ 마지막 연장 되돌리기</button> <span class="mini">— 연장 전 종료월·MRR·노드수로 돌아가고 그 전 달 월 매출은 그대로</span>`)}</div>`;
+      var ug=$('#rUndoGo'); if(ug) ug.onclick=async function(){
+        ug.disabled=true;
+        try{ if(await renewUndoFlow(r)){ var nr=ST.DATA.rows.filter(function(x){ return x._id===r._id; })[0]; PK_R.sel=nr||null; if(nr) showRenewPick(nr); msg('eMsg','연장 되돌림 ✅ — '+r.cust+' 연장 '+(nr? nr.renew : r.renew-1)+'회','ok'); } }
+        catch(e){ msg('eMsg', String(e.message||e), 'bad'); }
+        ug.disabled=false;
+      };
+    }
+  }
+  renewWire(r, 'r', host);
+}
+/** 신규 등록 — 같은 고객·서비스 원계약과 월 매출 기간이 겹치는지 (재약정 행을 따로 만들어 매출이 두 번 잡히는 것 막기 · ㊿+159) */
+export function newOverlap(cust, line, s0, e0, type, parentId){
+  if(type==='추가' || parentId || s0==null || e0==null) return [];
+  var ks=nmKeys(cust);
+  return ((ST.DATA&&ST.DATA.rows)||[]).filter(function(r){ return !r.parent && r.line===line && nmKeys(r.cust).some(function(k){ return ks.indexOf(k)>=0; }); }).map(function(r){
+    var n=(r.segs||[]).reduce(function(a, sg){ return a+(sg[2]? Math.max(0, Math.min(sg[1], e0)-Math.max(sg[0], s0)+1) : 0); }, 0);
+    return {r:r, n:n};
+  }).filter(function(x){ return x.n>0; });
+}
 /* 추가 탭: 고른 원계약 요약 표시 (부속 계약은 원계약을 고를 수 없음 → 그 원계약으로 바꿔 줌) */
 export function showAddParent(r){
   var box=$('#aSel'); if(!box) return;
@@ -408,6 +442,11 @@ export async function saveEdit(){
       var nFeeW=kwToWon($('#nFee').value);
       if(nFeeW && !amtGuard(nFeeW, 0, '설치비', false)) throw new Error('저장하지 않았습니다 — 설치비를 확인하세요.');
       if(e0<s0) throw new Error('종료월이 시작월보다 빠릅니다.');
+      var ovl=newOverlap(cust, $('#nLine').value, s0, e0, $('#nType').value, +($('#nParent')&&$('#nParent').value)||null);
+      if(ovl.length && !confirm('같은 고객·서비스에 이 기간('+mk(s0)+'~'+mk(e0)+')과 월 매출이 겹치는 계약이 있습니다:\n'+
+          ovl.map(function(x){ var r=x.r; return ' • #'+r._id+' '+(r.ctype||r.status||'')+' '+(mk(r.startIdx)||'?')+'~'+(mk(r.endIdx)||'?')+' · 월 '+won(r.mrr||0)+'천원'+(r.renew? ' · 연장 '+r.renew+'회':'')+' — 겹치는 달 '+x.n+'개월'; }).join('\n')+
+          '\n\n재약정·연장이면 저장하지 말고 «갱신» 탭에서 그 계약을 연장하세요 — 재약정 행을 따로 만들면 겹치는 달 월 매출이 두 번 잡힙니다.\n사이트가 다른 별도 계약이면 «확인»으로 저장하세요.'))
+        throw new Error('저장하지 않았습니다 — 재약정·연장이면 «갱신» 탭에서 기존 계약을 연장하세요.');
       var ptn=$('#nPtn').value;
       if(ptn==='__etc'){
         ptn=$('#nPtnEtc').value.trim();
@@ -462,8 +501,11 @@ export async function saveEdit(){
       var amt=kwToWon($('#rMrr').value) || r2.mrr || 0;   /* 칸은 천원 (㊿+157) */
       if(!amt) throw new Error('연장 금액을 알 수 없습니다. 금액을 입력하세요.');
       if(!amtGuard(amt, r2.mrr, '연장 월 금액', true)) throw new Error('저장하지 않았습니다 — 금액을 확인하세요.');
-      var rres=await doRenew(r2, ne, amt, ($('#rNote')&&$('#rNote').value.trim())||''), rno=rres.rno;   /* 홈 › 만기 처리 창과 같은 저장 로직 (㊿+127) */
-      msg('eMsg','연장 '+rno+'회 등록 ✅ — '+r2.cust+' → '+$('#rEnd').value+' · 월 '+won(amt)+'천원','ok');
+      var ro=renewOpts(r2, 'r', $('#tabRenew'));   /* ㊿+159 노드수 · 같이 끝나는 추가 계약 합치기 */
+      var rres=await doRenew(r2, ne, amt, ($('#rNote')&&$('#rNote').value.trim())||'', ro), rno=rres.rno;   /* 홈 › 만기 처리 창과 같은 저장 로직 (㊿+127) */
+      ['rMates','rUndo','rPick'].forEach(function(i){ var e=document.getElementById(i); if(e){ if(i!=='rPick') e.style.display='none'; e.innerHTML=''; } });
+      PK_R.sel=null; var rpv2=document.getElementById('rPrev'); if(rpv2) rpv2.textContent='';   /* ㊿+159 같은 화면에서 «저장»을 또 눌러 옛 행으로 두 번 연장하지 않게 — 계약을 다시 고르게 */
+      msg('eMsg','연장 '+rno+'회 등록 ✅ — '+r2.cust+' → '+$('#rEnd').value+' · 월 '+won(amt)+'천원'+(ro.qty!=null && ro.qty!==(r2.qty||0)? ' · '+ro.qty+'노드':'')+(rres.merged? ' · 추가 '+rres.merged+'건 통합':'')+' (그 전 달 월 매출은 그대로)','ok');
     }
     else if(CUR_TAB==='fix'){
       var r3=PK_F.sel; if(!r3) throw new Error('계약을 선택하세요.');
@@ -643,9 +685,11 @@ export function setupEdit(){
       var pk=document.getElementById(x.pick); if(pk) pk.innerHTML='';
       if(x.store) x.store.sel=null;
     });
-    ['cMonth','cReason','rEnd','rMrr','rNote','fFrom','fMrr','aQty','aStart','aEnd','aMrr','aSerial','aNote'].forEach(function(i){
+    ['cMonth','cReason','rEnd','rMrr','rQty','rNote','fFrom','fMrr','aQty','aStart','aEnd','aMrr','aSerial','aNote'].forEach(function(i){
       var el=document.getElementById(i); if(el) el.value='';
     });
+    ['rMates','rUndo'].forEach(function(i){ var el=document.getElementById(i); if(el){ el.style.display='none'; el.innerHTML=''; } });
+    var rpv=document.getElementById('rPrev'); if(rpv) rpv.textContent='';
     var asel=document.getElementById('aSel'); if(asel){ asel.style.display='none'; asel.innerHTML=''; }
     ['nLivePrev','cLivePrev'].forEach(function(i){ var el=document.getElementById(i); if(el){ el.style.display='none'; el.innerHTML=''; } });
   }

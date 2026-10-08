@@ -235,6 +235,7 @@ export function buildControls(){
   }, 60*1000);
 
   $('#btnAsk').onclick=function(){ if(isAsking()){ abortAsk(); return; } ask($('#q').value); };
+  var ax=document.getElementById('ansClose'); if(ax) ax.onclick=function(){ closeAnswer('', true); };   /* ㊿+159 AI 답변 ✕ 닫기 */
   $('#q').addEventListener('keydown',function(e){   // Enter 로 질문 (자동완성 끄면서 빠졌던 기능 복원)
     if(e.key==='Enter' && !e.isComposing){ e.preventDefault(); ask(this.value); }
   });
