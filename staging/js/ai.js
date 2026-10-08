@@ -1205,7 +1205,7 @@ export function computeFromP(p){
     var sel = list.filter(function(k){
       var r=ST.DATA.rows[k];
       if(want==='해지') { if(!(/해지|중지/.test(r.status||'')||r.churn)) return false; }
-      else if(want==='신규'){ if(!/신규/.test((r.ctype||'')+(r.status||''))) return false; }
+      else if(want==='신규'){ var h0=(r.renewHist||[])[0], ct0=(h0 && h0.prev_ctype!=null)? h0.prev_ctype : (r.ctype||''); if(!/신규/.test(ct0+(r.status||''))) return false; }   /* ㊿+163 연장으로 «재약정»이 된 계약도 처음 «신규»였으면 신규 */
       else { if(!/재약정|갱신/.test((r.ctype||'')+(r.status||''))) return false; }
       if(mf){ // 기간: 해지=종료월, 신규/재약정=시작월
         var pivot = (want==='해지')? r._l : r._f;
