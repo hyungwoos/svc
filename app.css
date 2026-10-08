@@ -1734,3 +1734,13 @@ tr.row-dim td{color:var(--muted)}
 .lazy-wait > :not(.lazy-msg){display:none !important}
 .lazy-msg{padding:48px 16px;text-align:center;color:var(--muted);font-size:13.5px}
 .lazy-msg.bad{color:var(--critical)}
+/* ㊿+164 관리자 › 🔌 외부 연동 API */
+.api-made{border:1px solid var(--s3,#b26a00);background:color-mix(in srgb,var(--s3,#b26a00) 8%,transparent);border-radius:10px;padding:10px 12px;margin:0 0 12px}
+.api-key{font-family:ui-monospace,monospace;font-size:12px;padding:6px 8px;border-radius:6px;background:var(--surface-2);word-break:break-all;user-select:all}
+.api-code{font-family:ui-monospace,monospace;font-size:11px;background:var(--surface-2);border-radius:8px;padding:8px 10px;margin:6px 0 0;white-space:pre-wrap;word-break:break-all}
+.api-new,.api-help{border:1px solid var(--ring);border-radius:10px;padding:8px 12px;margin:0 0 12px}
+.api-new summary,.api-help summary{cursor:pointer}
+.api-scopes{display:grid;gap:4px;margin-top:8px;font-size:12px}
+.api-scopes label{display:flex;gap:6px;align-items:baseline}
+#apiBox code{word-break:break-all}
+.api-scopes label b{white-space:nowrap;flex:none}
