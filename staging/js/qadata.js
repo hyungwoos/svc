@@ -136,7 +136,7 @@ function qaScenarios(){
     {id:'equip', label:'장비 — 신청 접수 → 현황 재고 · 신청 내역 ✎ 설치완료 → 임대중 + 처리 대기 숫자 감소', run:async function(h, db){
       h.dlg(); navMenu('ordernew'); await h.sleep(200); h.fill('#odCustomer', '가상고객05'); h.fill('#odMgr', '담당자B'); h.fill('#odQty', '2'); h.fill('#odSerials', 'TSTN0001, TSTN0002'); h.click('#odGo');
       await h.until(function(){ return db.t.equipment_assets.filter(function(a){ return /^TSTN/.test(a.serial) && a.status==='재고'; }).length===2; }, 6000, '접수 → 현황 재고 2대');
-      var badge=function(){ var b=document.querySelector('#rail [data-seg] .rb, #rail .gn-gh .gn-bd:not([hidden])'); return b? +b.textContent : 0; };   /* ㊿+166 지니언스 사이드바는 그룹 제목의 .gn-bd */
+      var badge=function(){ var b=document.querySelector('#rail [data-seg] .rb, #rail [data-eq] .gn-bd:not([hidden])'); return b? +b.textContent : 0; };   /* ㊿+167 지니언스 상단 메뉴는 «장비» 묶음 버튼(data-eq)의 .gn-bd */
       var p0=badge(); await h.gridEdit('orders', '가상고객05', [['상태', '설치완료']]);
       await h.until(function(){ return db.t.equipment_assets.filter(function(a){ return /^TSTN/.test(a.serial) && a.status==='임대중'; }).length===2; }, 6000, '설치완료 → 현황 임대중');
       h.ok(badge()===p0-1, '왼쪽 장비 «처리 대기» 숫자가 그대로 '+p0+' → '+badge()); return '접수 2대 재고 → 설치완료 임대중 · 대기 '+p0+'→'+badge(); }},

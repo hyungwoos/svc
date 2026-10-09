@@ -22,7 +22,7 @@ import { closeOvl, logChange, openOvl, OVL_SKIP_CLEAN, ovlMarkClean, setupEdit }
    커맨드 센터 (v5) — 아이콘 레일 · 커맨드 바 · 인박스 홈 · 운영 보드 · 고객 360 패널 · 모바일 탭
    ================================================================== */
 /* 이 창에서 한 번만 하는 일 표시 (㊿+154: 예전 window.__ccInbLoad · __editInit · __pwaStart) */
-export var SHELL_ONCE={inb:0, edit:0, pwa:0};
+export var SHELL_ONCE={inb:0, edit:0, pwa:0, gnm:0};
 export var ICO={
   home:'<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>',
   chart:'<path d="M4 19h16"/><path d="M6 16V9"/><path d="M11 16V5"/><path d="M16 16v-6"/>',
@@ -71,7 +71,8 @@ export function visBtn(b){ return !!b && !b.classList.contains('mhide') && !b.cl
 /* ---- 아이콘 레일 (사이드바 구조 menuSegments() 를 그대로 따라 만듦 · 메뉴 편집/채널 숨김 반영) ---- */
 export function buildRail(){
   var rail=document.getElementById('rail'); if(!rail || !isCC()) return;
-  if(isGN()){ buildGnSide(rail); return; }
+  if(isGN()){ buildGnNav(rail); return; }
+  if(rail.parentElement!==document.body) document.body.insertBefore(rail, document.getElementById('railFly'));   /* 지니언스 → 커맨드 센터로 바꾸면 레일을 제자리로 */
   var segs=[]; try{ segs=menuSegments(); }catch(e){}
   var h='<div class="rlogo" data-v="dash" title="홈 (대시보드)">G</div>';
   h+=tpl`<button type="button" data-v="dash" title="홈" aria-label="홈">${rawHtml(ico('home'))}</button>`;
@@ -95,7 +96,7 @@ export function buildRail(){
   railSync(ST.CUR_VIEW);
 }
 export var RAIL_OPEN=null;
-export function railFlyClose(){ var f=document.getElementById('railFly'); if(f) f.classList.remove('on'); RAIL_OPEN=null; }
+export function railFlyClose(){ var f=document.getElementById('railFly'); if(f) f.classList.remove('on'); RAIL_OPEN=null; try{ if(GN_NAV.open) gnMenuClose(); }catch(e){} }
 export function railFlyToggle(btn, key){
   var f=document.getElementById('railFly'); if(!f) return;
   if(RAIL_OPEN===key){ railFlyClose(); return; }
@@ -113,56 +114,115 @@ export function railFlyToggle(btn, key){
 }
 
 
-/* ---- ㊿+166 «지니언스» 사이드바 — 레일 자리(#rail)에 글자 메뉴. 구조는 menuSegments() 그대로(메뉴 편집·채널 숨김·권한 반영)
-   · 그룹 제목을 누르면 접기/펼치기(이 브라우저에 기억 · svc_gn_fold) · 지금 화면이 든 그룹은 접혀 있어도 펼쳐 보임
-   · 배지: 홈 = 인박스 건수 · 데이터 점검 = 바로 고칠 항목 · 장비 그룹 = 처리 대기 신청 · 인바운드 목록 = 미대응 ---- */
+/* ---- ㊿+167 «지니언스» 상단 메뉴 (㊿+166 의 왼쪽 사이드바를 대신) — #rail 을 상단바(.topbar) 첫 줄로 옮겨 차콜 메뉴 막대로
+   · 구조는 menuSegments() 그대로(메뉴 편집·채널 숨김·권한 반영) · 그룹이 많아 묶음: PoC·데모+영업+인바운드 = «영업», 정산·목표+도구 = «정산·도구», 관리자 = 오른쪽 «관리»
+   · 묶음 버튼을 누르면 큰 펼침 메뉴(#gnMenu · 그룹/소제목마다 한 칸) · 다른 묶음에 마우스를 올리면 바로 옮겨 감 · Esc·바깥 클릭·이동하면 닫힘 · ↓ 로 첫 항목
+   · 배지: 홈 = 인박스 건수 · 데이터 점검 = 바로 고칠 항목 · 임대 장비 대시보드 = 처리 대기 · 인바운드 목록 = 미대응 → 묶음 버튼엔 합계 ---- */
 export var GN_ICO={dash:'home', weekly:'calendar', contracts:'doc', live:'target', churn:'chart', churnrate:'chart', custflow:'users', leadsrc:'arrow', dcheck:'check',
   cngen:'cloud', cnpub:'cloud', cns1:'cloud', cnlgu:'cloud', mdrgen:'shield', mdrs1:'shield', mdrlgu:'shield', chdist:'layers', cnpns:'layers',
   eqboard:'board', ordernew:'doc', orders:'box', assets:'box', mdrnew:'flask', mdrops:'flask', oinew:'target', oi:'target', inbstat:'chart', inbound:'inbox',
   biz:'scale', targets:'target', quote:'doc', preport:'doc', s1:'scale', kk:'scale', price:'doc', cloud:'cloud', csite:'cloud', report:'doc', aiknow:'spark',
   log:'clock', adminx:'gear', ops:'tool', account:'user'};
-export var GN_FOLD_DEF={'g:사업 영역':1, 'g:정산·목표':1, 'g:도구':1, 'g:관리자':1};
+export var GN_MERGE={'g:PoC·데모':'영업', 'g:영업':'영업', 'g:인바운드':'영업', 'g:정산·목표':'정산·도구', 'g:도구':'정산·도구', 'g:관리자':'관리'};
 export var GN_BADGE={inb:null, dc:null, inbound:null};
-export function gnFold(){ var f=null; try{ f=JSON.parse(localStorage.getItem('svc_gn_fold')||'null'); }catch(e){} return (f && typeof f==='object')? f : GN_FOLD_DEF; }
-export function gnFoldSet(key, folded){ var f=Object.assign({}, gnFold()); if(folded) f[key]=1; else delete f[key]; try{ localStorage.setItem('svc_gn_fold', JSON.stringify(f)); }catch(e){} }
-export function buildGnSide(rail){
+export var GN_NAV={menus:{}, open:null};
+export function buildGnNav(rail){
+  var tb=document.querySelector('#app .topbar');
+  if(tb && rail.parentElement!==tb) tb.insertBefore(rail, tb.firstChild);   /* 상단바 첫 줄 — sticky 높이(--tbh)에 같이 들어감 */
   var segs=[]; try{ segs=menuSegments(); }catch(e){}
-  var fold=gnFold();
-  function item(v, t){ return tpl`<button type="button" class="gn-it" data-v="${v}" aria-current="false" title="${t}">${rawHtml(ico(GN_ICO[v]||iconFor(t, v), 17))}<span class="gn-l">${t}</span><span class="gn-bd" hidden></span></button>`; }
-  /* 로고: 넓은 화면은 심볼+글자, 좁은 데스크톱(≤1180px · 아이콘만 보이는 사이드바)은 심볼만 */
-  var h=tpl`<a class="gn-logo" data-v="dash" href="#" aria-label="Genians — 홈"><svg class="gn-lw" viewBox="0 0 587.2 133.4" aria-hidden="true"><use href="#gnLogo"/></svg><svg class="gn-lm" viewBox="0 0 171.1 133.4" aria-hidden="true"><use href="#gnMark"/></svg></a>`;
-  h+=tpl`<div class="gn-ws"><span class="gn-wsi">S</span><span class="gn-wst"><b>서비스사업부</b><small>통합 관리 포탈</small></span></div><div class="gn-nav">`;
-  h+=item('dash','홈');
+  var tops=[], menus={}, seen={};
   segs.forEach(function(s){
     if(s.grp){
       if(s.grp.classList.contains('mhide')) return;
       var its=(s.items||s.buttons||[]).filter(function(el){ return el.tagName==='BUTTON'? visBtn(el) : !el.classList.contains('sub-empty'); });
       if(!its.some(function(el){ return el.tagName==='BUTTON'; })) return;
-      var body=its.map(function(b){ return b.tagName!=='BUTTON'? tpl`<div class="gn-sub">${b.textContent.trim()}</div>` : item(b.dataset.v, navText(b)); }).join('');
-      h+=tpl`<div class="gn-grp${fold[s.key]?' fold':''}" data-g="${s.key}"><button type="button" class="gn-gh" data-seg="${s.key}" aria-expanded="${!fold[s.key]}" title="${s.label}"><span class="gn-l">${s.label}</span><span class="gn-bd" hidden></span><svg class="gn-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="gn-gb">${rawHtml(body)}</div></div>`;
+      /* 소제목(사업 영역 › Cloud NAC/MDR/기타)이 있으면 소제목마다 한 칸 */
+      var cols=[], cur=null;
+      its.forEach(function(el){
+        if(el.tagName!=='BUTTON'){ cur={t:el.textContent.trim(), items:[]}; cols.push(cur); return; }
+        if(!cur){ cur={t:s.label, items:[]}; cols.push(cur); }
+        cur.items.push({v:el.dataset.v, t:navText(el)});
+      });
+      cols=cols.filter(function(c){ return c.items.length; });
+      var mk2=GN_MERGE[s.key]? 'm:'+GN_MERGE[s.key] : s.key, lab=GN_MERGE[s.key]||s.label;
+      if(!menus[mk2]){ menus[mk2]={key:mk2, label:lab, cols:[]}; if(!seen[mk2]){ seen[mk2]=1; tops.push({seg:mk2}); } }
+      if(GN_MERGE[s.key] && cols.length===1) cols[0].t=s.label;
+      menus[mk2].cols=menus[mk2].cols.concat(cols);
     }else{
       if(!visBtn(s.btn)) return;
-      h+=item(s.btn.dataset.v, navText(s.btn));
+      tops.push({v:s.btn.dataset.v, t:navText(s.btn)});
     }
   });
+  GN_NAV.menus=menus; GN_NAV.open=null;
+  var chev='<svg class="gn-chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
+  function topBtn(o){
+    if(o.v) return tpl`<button type="button" class="gn-tb" data-v="${o.v}" title="${o.t}" aria-current="false">${o.t}<span class="gn-bd" hidden></span></button>`;
+    var m=menus[o.seg];
+    return tpl`<button type="button" class="gn-tb" data-seg="${o.seg}"${rawHtml(/장비/.test(o.seg)? ' data-eq="1"':'')} aria-haspopup="true" aria-expanded="false" aria-controls="gnMenu" aria-current="false" title="${m.label} — 눌러서 화면 목록">${m.label}<span class="gn-bd" hidden></span>${rawHtml(chev)}</button>`;
+  }
+  var adm=tops.filter(function(o){ return o.seg==='m:관리'; })[0];
+  var h=tpl`<div class="gn-bar"><a class="gn-logo" data-v="dash" href="#" aria-label="Genians — 홈"><svg class="gn-lw" viewBox="0 0 587.2 133.4" aria-hidden="true"><use href="#gnLogo"/></svg><svg class="gn-lm" viewBox="0 0 171.1 133.4" aria-hidden="true"><use href="#gnMark"/></svg></a>`;
+  h+=tpl`<nav class="gn-tabs" aria-label="주 메뉴">${rawHtml(topBtn({v:'dash', t:'홈'}))}${rawHtml(tops.filter(function(o){ return o!==adm; }).map(topBtn).join(''))}</nav>`;
   var me=String(ST.AUTH_USER||'');
-  h+=tpl`</div><div class="gn-me"><span class="gn-av">${(me.split('@')[0]||'?').slice(0,1).toUpperCase()}</span><span class="gn-wst"><b>${me.split('@')[0]||'로그인'}</b><small>${me.indexOf('@')>0? '@'+me.split('@')[1] : ''}</small></span><button type="button" class="gn-set" data-v="account" title="내 계정 · 설정" aria-label="내 계정 · 설정">${rawHtml(ico('gear',17))}</button></div>`;
+  h+=tpl`<div class="gn-right">${rawHtml(adm? topBtn(adm) : '')}<button type="button" class="gn-me" data-v="account" title="내 계정 · 설정" aria-label="내 계정 · 설정 (${me})"><span class="gn-av">${(me.split('@')[0]||'?').slice(0,1).toUpperCase()}</span><span class="gn-wst"><b>${me.split('@')[0]||'로그인'}</b><small>${me.indexOf('@')>0? '@'+me.split('@')[1] : ''}</small></span></button></div></div>`;
+  h+=tpl`<div class="gn-menu" id="gnMenu" role="menu" hidden></div>`;
   rail.innerHTML=h;
-  rail.querySelectorAll('[data-v]').forEach(function(b){ b.onclick=function(e){ e.preventDefault(); navMenu(b.dataset.v); }; });
-  rail.querySelectorAll('.gn-gh').forEach(function(b){ b.onclick=function(){
-    var g=b.parentElement, f=!g.classList.contains('fold'); g.classList.toggle('fold', f); g.classList.remove('peek'); b.setAttribute('aria-expanded', f? 'false':'true'); gnFoldSet(b.dataset.seg, f); }; });
+  /* 역할 나누기(㊿+167): 위 검색 바 = 화면 이동·검색 · 홈 질문 칸 = AI 분석 */
+  try{ var ph=document.querySelector('#cmdBar .ph'); if(ph) ph.textContent='화면 이동 · 고객사·계약 검색 — «시흥도시공사», «가격표», «해지율»';
+    var q0=document.getElementById('q'); if(q0) q0.placeholder='AI 분석 — 매출·고객·계약 데이터로 답합니다 (예: 요즘 클라우드 어때? · 곧 재약정할 곳은?)'; }catch(e){}
+  rail.querySelectorAll('.gn-bar [data-v]').forEach(function(b){ b.onclick=function(e){ e.preventDefault(); gnMenuClose(); navMenu(b.dataset.v); }; });
+  rail.querySelectorAll('.gn-tb[data-seg]').forEach(function(b){
+    b.onclick=function(e){ e.stopPropagation(); if(GN_NAV.open===b.dataset.seg) gnMenuClose(); else gnMenuOpen(b); };
+    b.onmouseenter=function(){ if(GN_NAV.open && GN_NAV.open!==b.dataset.seg) gnMenuOpen(b); };
+    b.onkeydown=function(e){ if(e.key==='ArrowDown'){ e.preventDefault(); gnMenuOpen(b); var f=document.querySelector('#gnMenu .gn-mi'); if(f) f.focus(); } };
+  });
+  if(!SHELL_ONCE.gnm){ SHELL_ONCE.gnm=1;
+    document.addEventListener('click', function(e){ var r=document.getElementById('rail'); if(GN_NAV.open && r && !r.contains(e.target)) gnMenuClose(); });
+    document.addEventListener('keydown', function(e){ if(e.key==='Escape' && GN_NAV.open){ var k=GN_NAV.open; gnMenuClose(); var b=document.querySelector('#rail .gn-tb[data-seg="'+k.replace(/["\\]/g,'')+'"]'); if(b) b.focus(); } });
+  }
   railSync(ST.CUR_VIEW);
 }
-export function gnSideSync(rail, v){
-  rail.querySelectorAll('.gn-it').forEach(function(b){ b.setAttribute('aria-current', b.dataset.v===v? 'true':'false'); });
-  rail.querySelectorAll('.gn-grp').forEach(function(g){
-    var has=!!g.querySelector('.gn-it[aria-current="true"]'); g.classList.toggle('cur', has); g.classList.toggle('peek', has && g.classList.contains('fold')); });
+export function gnMenuClose(){
+  var m=document.getElementById('gnMenu'); if(m){ m.hidden=true; m.innerHTML=''; }
+  document.querySelectorAll('#rail .gn-tb[aria-expanded="true"]').forEach(function(b){ b.setAttribute('aria-expanded','false'); });
+  GN_NAV.open=null;
+}
+export function gnMenuOpen(btn){
+  var m=document.getElementById('gnMenu'), rail=document.getElementById('rail'), d=GN_NAV.menus[btn.dataset.seg]; if(!m || !rail || !d) return;
+  document.querySelectorAll('#rail .gn-tb[aria-expanded="true"]').forEach(function(b){ b.setAttribute('aria-expanded','false'); });
+  var bdOf=gnBadges(), v0=ST.CUR_VIEW;
+  m.innerHTML=tpl`<div class="gn-mh"><b>${d.label}</b><span>${rawHtml(String(d.cols.reduce(function(a,c){ return a+c.items.length; },0)))}개 화면</span></div><div class="gn-cols">${rawHtml(d.cols.map(function(c){
+    return tpl`<div class="gn-sec${c.items.length>5?' wide':''}"><div class="gn-st">${c.t}</div><div class="gn-sl">${rawHtml(c.items.map(function(it){ var n=bdOf[it.v]||0;
+      return tpl`<button type="button" class="gn-mi" role="menuitem" data-v="${it.v}" aria-current="${it.v===v0?'true':'false'}">${rawHtml(ico(GN_ICO[it.v]||iconFor(it.t, it.v), 16))}<span class="gn-l">${it.t}</span>${rawHtml(n? tpl`<span class="gn-bd hot">${rawHtml(n>99?'99+':String(n))}</span>` : '')}</button>`; }).join(''))}</div></div>`; }).join(''))}</div>`;
+  m.hidden=false; btn.setAttribute('aria-expanded','true'); GN_NAV.open=btn.dataset.seg;
+  var rr=rail.getBoundingClientRect(), br=btn.getBoundingClientRect(), w=m.offsetWidth, left=br.left-rr.left;
+  if(btn.closest('.gn-right')) left=br.right-rr.left-w;
+  m.style.left=Math.max(12, Math.min(left, rr.width-w-12))+'px';
+  var its=[].slice.call(m.querySelectorAll('.gn-mi'));
+  its.forEach(function(b, i){
+    b.onclick=function(){ gnMenuClose(); navMenu(b.dataset.v); };
+    b.onkeydown=function(e){
+      if(e.key==='ArrowDown' || e.key==='ArrowUp'){ e.preventDefault(); var j=(i+(e.key==='ArrowDown'?1:-1)+its.length)%its.length; its[j].focus(); }
+      else if(e.key==='Tab'){ gnMenuClose(); }
+    };
+  });
+}
+/* 화면별 배지 숫자 (펼침 메뉴 · 묶음 버튼 합계) */
+export function gnBadges(){
   var pend=(ST.RAWX.orders||[]).filter(function(o){ return ['접수','출하요청','배송중'].indexOf(o.status)>=0; }).length;
-  function bd(sel, n, hot){ var b=rail.querySelector(sel); if(!b) return; var s=b.querySelector('.gn-bd'); if(!s) return; s.hidden=!n; s.textContent=n>99?'99+':String(n||''); s.classList.toggle('hot', !!hot); }
-  bd('.gn-it[data-v="dash"]', GN_BADGE.inb, GN_BADGE.inb>0);
-  bd('.gn-it[data-v="dcheck"]', GN_BADGE.dc, true);
-  bd('.gn-it[data-v="inbound"]', GN_BADGE.inbound, true);
-  rail.querySelectorAll('.gn-gh').forEach(function(g){ var s=g.querySelector('.gn-bd'), n=/장비/.test(g.dataset.seg)? pend : 0; if(!s) return; s.hidden=!n; s.textContent=n>99?'99+':String(n||''); s.classList.add('hot'); });
+  return {dcheck:GN_BADGE.dc||0, inbound:GN_BADGE.inbound||0, eqboard:pend};
+}
+export function gnNavSync(rail, v){
+  var bdOf=gnBadges();
+  function setBd(b, n, hot){ var s=b.querySelector('.gn-bd'); if(!s) return; s.hidden=!n; s.textContent=n>99?'99+':String(n||''); s.classList.toggle('hot', !!hot); }
+  rail.querySelectorAll('.gn-tb').forEach(function(b){
+    if(b.dataset.v){ b.setAttribute('aria-current', b.dataset.v===v? 'true':'false'); if(b.dataset.v==='dash') setBd(b, GN_BADGE.inb, GN_BADGE.inb>0); return; }
+    var d=GN_NAV.menus[b.dataset.seg]; if(!d) return;
+    var vs=[]; d.cols.forEach(function(c){ c.items.forEach(function(it){ vs.push(it.v); }); });
+    b.setAttribute('aria-current', vs.indexOf(v)>=0? 'true':'false');
+    setBd(b, vs.reduce(function(a,x){ return a+(bdOf[x]||0); },0), true);
+  });
+  var me=rail.querySelector('.gn-me'); if(me) me.setAttribute('aria-current', v==='account'? 'true':'false');
   gnTitleSync(v);
 }
 /* 상단바 왼쪽 — 지금 화면 이름 + 한 줄(홈: 날짜 · 읽은 시각 / 그 밖: 메뉴 그룹) */
@@ -178,7 +238,7 @@ export function gnTitleSync(v){
 
 export function railSync(v){
   var rail=document.getElementById('rail'); if(!rail) return;
-  if(rail.querySelector('.gn-nav')){ gnSideSync(rail, v); mtabsSync(v); return; }
+  if(rail.querySelector('.gn-bar')){ gnNavSync(rail, v); mtabsSync(v); return; }
   var segs=[]; try{ segs=menuSegments(); }catch(e){}
   var inSeg={}; segs.forEach(function(s){ if(s.grp && s.buttons.some(function(b){ return b.dataset.v===v; })) inSeg[s.key]=1; });
   rail.querySelectorAll('button').forEach(function(b){
@@ -265,12 +325,12 @@ export function renderInbox(){
     var oldest=pendL.map(function(o){ return String(o.created_at||'').slice(0,10); }).filter(Boolean).sort()[0];
     var age=oldest? Math.floor((new Date(todayS).getTime()-new Date(oldest).getTime())/864e5) : 0;
     var byCh={}; pendL.forEach(function(o){ byCh[o.channel||'기타']=(byCh[o.channel||'기타']||0)+1; });
-    add('eq', {ic:'box', cls:'warn', t:tpl`처리 대기 장비 신청 <span class="num">${pendL.length}건</span>${rawHtml(age>=1? ' — 가장 오래된 건 '+age+'일 경과':'')}`,
+    add('eq', {lv:age>=3?1:2, ic:'box', cls:'warn', t:tpl`처리 대기 장비 신청 <span class="num">${pendL.length}건</span>${rawHtml(age>=1? ' — 가장 오래된 건 '+age+'일 경과':'')}`,
       s:Object.keys(byCh).map(function(c){ return c+' '+byCh[c]; }).join(' · ')+' · '+names(pendL, function(o){ return o.customer; }),
       acts:[{l:'보류', go:function(){ ccSnooze('eq',1); }},{l:'장비 대시보드 →', pri:1, go:function(){ switchView('eqboard'); }}]});
   }
   if(retL.length){
-    add('ret', {ic:'box', cls:'info', t:tpl`회수 진행 중 <span class="num">${retL.length}건</span>`,
+    add('ret', {lv:3, ic:'box', cls:'info', t:tpl`회수 진행 중 <span class="num">${retL.length}건</span>`,
       s:retL.slice(0,3).map(function(o){ var all=eqWant(o).length, d=eqRetSet(o).length; return (o.customer||'')+' '+d+'/'+all+'대'; }).join(' · ')+(retL.length>3? ' 외 '+(retL.length-3)+'건':''),
       acts:[{l:'장비 대시보드 →', pri:1, go:function(){ switchView('eqboard'); }}]});
   }
@@ -278,51 +338,58 @@ export function renderInbox(){
   var RS=null; if(!EQ){ try{ RS=renewScan(b); }catch(e){ RS=null; } ensureLeadSrc(function(filled){ if(filled) try{ renderInbox(); renderKpis(); }catch(e2){} }); }
   if(RS && RS.lapsed.length){
     var lsum=RS.lapsed.reduce(function(a,r){ return a+(r.mrr||0); },0), lrec=RS.checking.length;
-    add('rnl', {ic:'clock', cls:'crit', t:tpl`만기 지났는데 미처리 <span class="num">${RS.lapsed.length}건</span> — 이미 LIVE 에서 빠졌습니다${rawHtml(lrec? ' (최근 2개월 '+lrec+'건)':'')}`,
+    add('rnl', {lv:1, ic:'clock', cls:'crit', t:tpl`만기 지났는데 미처리 <span class="num">${RS.lapsed.length}건</span> — 이미 LIVE 에서 빠졌습니다${rawHtml(lrec? ' (최근 2개월 '+lrec+'건)':'')}`,
       s:names(RS.lapsed, function(r){ return r.cust; })+' · 월 '+won(lsum)+'천원 · 연장이면 되살리고, 끝났으면 서비스종료·해지로 정리',
       acts:[{l:'처리하기 →', pri:1, go:function(){ openRenewList('lapsed'); }}]});
   }
   if(RS && RS.due.length){
     var dsum=RS.due.reduce(function(a,r){ return a+(r.mrr||0); },0);
-    add('rnd', {ic:'clock', cls:'warn', t:tpl`${mk(b)} 만기 <span class="num">${RS.due.length}건</span> — ${mk(b+1)} 1일 LIVE 에서 빠집니다`,
+    add('rnd', {lv:2, ic:'clock', cls:'warn', t:tpl`${mk(b)} 만기 <span class="num">${RS.due.length}건</span> — ${mk(b+1)} 1일 LIVE 에서 빠집니다`,
       s:names(RS.due, function(r){ return r.cust; })+' · 월 '+won(dsum)+'천원'+(RS.next.length? ' · 다음 달 만기 '+RS.next.length+'건 대기':''),
       acts:[{l:'보류', go:function(){ ccSnooze('rnd',3); }},{l:'처리하기 →', pri:1, go:function(){ openRenewList('due'); }}]});
   }
   /* 데이터 점검 (㊿+133): 바로 고쳐야 할 항목이 있으면 한 줄 */
   if(!EQ){ var DS=null; try{ DS=dcSummary(); }catch(e){}
-    if(DS && DS.crit){ add('dc', {ic:'scale', cls:'crit', t:tpl`데이터 점검 — 바로 고칠 항목 <span class="num">${rawHtml(DS.crit)}건</span>${rawHtml(DS.warn? ' · 확인 필요 '+DS.warn+'건':'')}`,
+    if(DS && DS.crit){ add('dc', {lv:1, ic:'scale', cls:'crit', t:tpl`데이터 점검 — 바로 고칠 항목 <span class="num">${rawHtml(DS.crit)}건</span>${rawHtml(DS.warn? ' · 확인 필요 '+DS.warn+'건':'')}`,
       s:Object.keys(DS.items).filter(function(k){ return DS.items[k]; }).slice(0,3).map(function(k){ return k+' '+DS.items[k]; }).join(' · '),
       acts:[{l:'보류', go:function(){ ccSnooze('dc',3); }},{l:'점검 화면 →', pri:1, go:function(){ switchView('dcheck'); }}]}); } }
   if(expL.length && !(RS && EN===1 && RS.due.length)){
     var ends=expL.map(function(r){ return r.endIdx; }).sort(function(x,y){ return x-y; });
-    add('exp', {ic:'clock', cls:'info', t:tpl`${rawHtml(EN)}개월 내 만료 계약 <span class="num">${expL.length}건</span> — <span class="num">${won(expAmt)}</span>천원/월`,
+    add('exp', {lv:3, ic:'clock', cls:'info', t:tpl`${rawHtml(EN)}개월 내 만료 계약 <span class="num">${expL.length}건</span> — <span class="num">${won(expAmt)}</span>천원/월`,
       s:names(expL, function(r){ return r.cust; })+' · 종료 '+mk(ends[0])+(ends.length>1? '~'+mk(ends[ends.length-1]):'')+' · 재약정 타깃',
       acts:[{l:'고객 360', go:function(){ if(expL.length===1) openCust360(expL[0].cust); else goWidget('exp','계약 만료 예정'); }},{l:'재계약 타진', pri:1, go:function(){ goWidget('exp','계약 만료 예정'); }}]});
   }
   if(!bizDone){
-    add('biz', {ic:'scale', cls:'', t:curYm+' 비즈포탈 차액이 아직 입력되지 않았습니다', s:'엑셀을 올리면 고객사·회계매출 기준으로 자동 대조합니다',
+    add('biz', {lv:2, ic:'scale', cls:'', t:curYm+' 비즈포탈 차액이 아직 입력되지 않았습니다', s:'엑셀을 올리면 고객사·회계매출 기준으로 자동 대조합니다',
       acts:[{l:'다음 주에', go:function(){ ccSnooze('biz',7); }},{l:'엑셀 올리기', pri:1, go:function(){ switchView('biz'); }}]});
   }
   if(!EQ){
-    if(inbN>0) add('inb', {ic:'inbox', cls:'crit', t:tpl`인바운드 미대응 <span class="num">${rawHtml(inbN)}건</span>`, s:'진행중인데 3개월 이상 대응 기록이 없습니다', acts:[{l:'인바운드 통계 →', pri:1, go:function(){ switchView('inbstat'); }}]});
+    if(inbN>0) add('inb', {lv:1, ic:'inbox', cls:'crit', t:tpl`인바운드 미대응 <span class="num">${rawHtml(inbN)}건</span>`, s:'진행중인데 3개월 이상 대응 기록이 없습니다', acts:[{l:'인바운드 통계 →', pri:1, go:function(){ switchView('inbstat'); }}]});
     else zeros.push('인바운드 미대응 '+(inbN==null? '…':'0'));
-    if(oiLate.length) add('oi', {ic:'target', cls:'warn', t:tpl`OI 밀린 액션 <span class="num">${oiLate.length}건</span>`, s:names(oiLate, function(o){ return o.customer; })+' · 다음 일정이 지났습니다', acts:[{l:'OI 현황 →', pri:1, go:function(){ switchView('oi'); }}]});
+    if(oiLate.length) add('oi', {lv:2, ic:'target', cls:'warn', t:tpl`OI 밀린 액션 <span class="num">${oiLate.length}건</span>`, s:names(oiLate, function(o){ return o.customer; })+' · 다음 일정이 지났습니다', acts:[{l:'OI 현황 →', pri:1, go:function(){ switchView('oi'); }}]});
     else zeros.push('OI 밀린 액션 0');
   }
   zeros.push('주간회의 '+wkTxt);
-  var la=document.getElementById('loadedAt');
-  var h=tpl`<div class="ib-head"><h2>인박스 <span class="ctag${rows.length?' warn':' ok'}">${rows.length}</span></h2><span class="mini" style="display:flex;align-items:center;gap:6px"><i style="width:7px;height:7px;border-radius:50%;background:var(--brand);display:inline-block"></i>${rawHtml(la&&la.textContent? esc(la.textContent):'')} · 자동 갱신</span></div>`;
+  var la=document.getElementById('loadedAt'), GNI=isGN();
+  function rowHtml(o,i){ return tpl`<div class="ib-row" data-i="${rawHtml(i)}"><span class="ib-ic ${rawHtml(o.cls)}">${rawHtml(ico(o.ic,16))}</span><div class="ib-b"><div class="ib-t">${rawHtml(o.t)}</div><div class="ib-s" title="${o.s||''}">${o.s||''}</div></div>`+
+      tpl`<div class="ib-acts">${rawHtml(o.acts.map(function(a,j){ return tpl`<button type="button" class="cbtn${a.pri?' pri':''}" data-i="${rawHtml(i)}" data-j="${rawHtml(j)}">${a.l}</button>`; }).join(''))}</div></div>`; }
+  var h=tpl`<div class="ib-head"><h2>${GNI? '오늘 처리할 일' : '인박스'} <span class="ctag${rows.length?' warn':' ok'}">${rows.length}</span></h2><span class="mini" style="display:flex;align-items:center;gap:6px"><i style="width:7px;height:7px;border-radius:50%;background:var(--brand);display:inline-block"></i>${rawHtml(la&&la.textContent? esc(la.textContent):'')} · 자동 갱신</span></div>`;
   if(!rows.length) h+=tpl`<div class="ib-empty"><span class="ib-ic ok">${rawHtml(ico('check',16))}</span>처리할 알림이 없습니다. 모든 항목이 정리되어 있어요.</div>`;
-  rows.forEach(function(o,i){
-    h+=tpl`<div class="ib-row" data-i="${rawHtml(i)}"><span class="ib-ic ${rawHtml(o.cls)}">${rawHtml(ico(o.ic,16))}</span><div class="ib-b"><div class="ib-t">${rawHtml(o.t)}</div><div class="ib-s" title="${o.s||''}">${o.s||''}</div></div>`+
-      tpl`<div class="ib-acts">${rawHtml(o.acts.map(function(a,j){ return tpl`<button type="button" class="cbtn${a.pri?' pri':''}" data-i="${rawHtml(i)}" data-j="${rawHtml(j)}">${a.l}</button>`; }).join(''))}</div></div>`;
-  });
-  h+=tpl`<div class="ib-foot"><span>${rawHtml(zeros.map(esc).join(' · '))}</span>${rawHtml(snz? tpl`<a id="ibUnsnz">보류한 ${rawHtml(snz)}건 다시 보기</a>`:'<span class="mini">주간회의는 매주 월요일 · 일요일 저녁 자동 취합</span>')}</div>`;
+  else if(GNI){
+    /* ㊿+167 지니언스: 급한 정도로 세 칸 — 즉시 처리(만기 지남·바로 고칠 데이터·미대응·오래된 장비 신청) / 확인 필요(이달 만기·정산·밀린 영업) / 예정(회수 진행·만료 예정) */
+    var LANES=[[1,'즉시 처리','crit','오늘 처리'],[2,'확인 필요','warn','이번 달 안에'],[3,'예정','info','미리 챙길 일']];
+    h+=tpl`<div class="ib-lanes">${rawHtml(LANES.map(function(L){
+      var mine=rows.map(function(o,i){ return [o,i]; }).filter(function(x){ return (x[0].lv||2)===L[0]; });
+      return tpl`<section class="ib-lane ${rawHtml(L[2])}" aria-label="${L[1]} ${rawHtml(mine.length)}건"><div class="ib-lh"><i></i><b>${L[1]}</b><span class="num">${rawHtml(mine.length)}</span><span class="ib-lsub">${L[3]}</span></div>`+
+        tpl`${rawHtml(mine.length? mine.map(function(x){ return rowHtml(x[0], x[1]); }).join('') : tpl`<div class="ib-none">${rawHtml(ico('check',14))}없음</div>`)}</section>`; }).join(''))}</div>`;
+  }
+  else rows.forEach(function(o,i){ h+=rowHtml(o,i); });
+  h+=tpl`<div class="ib-foot"><span>${rawHtml(zeros.map(esc).join(' · '))}</span>${rawHtml(snz? tpl`<a id="ibUnsnz">보류한 ${rawHtml(snz)}건 다시 보기</a>`:(GNI? '' : '<span class="mini">주간회의는 매주 월요일 · 일요일 저녁 자동 취합</span>'))}</div>`;
   box.innerHTML=h;
   box.querySelectorAll('.cbtn').forEach(function(bt){ bt.onclick=function(e){ e.stopPropagation(); rows[+bt.dataset.i].acts[+bt.dataset.j].go(); }; });
   var un=document.getElementById('ibUnsnz'); if(un) un.onclick=ccUnsnooze;
   ccGreeting(rows.length);
-  GN_BADGE.inb=rows.length; GN_BADGE.inbound=inbN||0; GN_BADGE.dc=(!EQ && DS && DS.crit)||0;   /* ㊿+166 지니언스 사이드바 배지 */
+  GN_BADGE.inb=rows.filter(function(o){ return o.lv===1; }).length; GN_BADGE.inbound=inbN||0; GN_BADGE.dc=(!EQ && DS && DS.crit)||0;   /* ㊿+167 지니언스 상단 메뉴 배지 — 홈 = «즉시 처리» 건수 */
   try{ railSync(ST.CUR_VIEW); }catch(e){}
 }
 
@@ -371,6 +438,10 @@ export function ccAfterKpis(box, list, b){
     var mc=document.getElementById('ccMoreCnt'); if(mc) mc.textContent=more.children.length+'개 — 채널별 MRR · 파이프라인 · 주간회의'; }
   try{ ccBrief(list,b); }catch(e){}
   try{ ccAnaCount(); }catch(e){}
+  /* ㊿+167 지니언스: «오늘 처리할 일»(인박스) 아래 «사업 현황» 제목 — 숫자 카드 묶음과 할 일을 나눔 */
+  if(isGN()){ var row=document.getElementById('ccRow'), hb=document.getElementById('gnBizH');
+    if(row && !hb){ hb=document.createElement('div'); hb.id='gnBizH'; hb.className='gn-sech'; row.insertBefore(hb, host); }
+    if(hb) hb.innerHTML=tpl`<h2>사업 현황</h2><span>${mk(b)} 기준 · 금액 단위 천원</span>`; }
 }
 /* ---- 홈 위계: 접힘 섹션 (지표 더 보기 · 분석) — 상태는 이 브라우저에 기억 ---- */
 export function ccPref(k){ try{ return localStorage.getItem(k)==='1'; }catch(e){ return false; } }

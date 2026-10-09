@@ -2,7 +2,7 @@
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { APP_VER, ST } from './state.js';
 import { Viz } from './viz.js';
-import { $, $$, cssv, el, esc, lline, mk, mkLabel, monOf, pct, rawHtml, refreshToken, SB_KEY, SB_URL, seriesColor, STATE, tpl, won, wonFull, yOf } from './core.js';
+import { $, $$, cssv, el, esc, isGN, lline, mk, mkLabel, monOf, pct, rawHtml, refreshToken, SB_KEY, SB_URL, seriesColor, STATE, tpl, won, wonFull, yOf } from './core.js';
 import { sbGet, sbWrite, toast } from './shell.js';
 import { activeCustomers, groupCount, hbars, monthlySeries, monthlyTotal, pinQuery, statusOf, uniq } from './dash.js';
 import { dcSummary, liveData, liveDelta, liveSrcLabel, renewScan } from './analysis.js';
@@ -103,7 +103,8 @@ export function aiOn(badge){
     '\n· 금액 계산은 전부 포탈이 DB 원본으로 직접 수행합니다'+
     '\n· AI 해설: '+(AICFG.narrate?'켜짐':'꺼짐')+
     '\n· 고객명 마스킹: '+(AICFG.maskNames?'켜짐':'꺼짐');
-  $('#q').placeholder='아무렇게나 물어보세요 — 예: 요즘 클라우드 좀 어때? 제일 큰 고객 누구야? 곧 재약정 챙겨야 할 데 있어?';
+  $('#q').placeholder= isGN()? 'AI 분석 — 매출·고객·계약 데이터로 답합니다 (예: 요즘 클라우드 어때? · 곧 재약정할 곳은?)'   /* ㊿+167 지니언스: 위 검색 바(이동·검색)와 역할을 나눔 */
+    : '아무렇게나 물어보세요 — 예: 요즘 클라우드 좀 어때? 제일 큰 고객 누구야? 곧 재약정 챙겨야 할 데 있어?';
 }
 
 export function setAsking(on){

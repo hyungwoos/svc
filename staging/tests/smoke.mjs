@@ -1825,47 +1825,72 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
     assert(!errs.length, errs.join(' | ')); return '✕ · 메뉴 이동 · 생각 중 유지 · 멈춤';
   });
 }
-// ㊿+166: 새 디자인 «지니언스»(기본) — 정식 로고 · 글자 사이드바(그룹 접기) · 상단 화면 제목 · 홈 히어로 타원 목표 트랙 · 새 로그인 화면
+// ㊿+166~167: 새 디자인 «지니언스»(기본) — 정식 로고 · 상단 메뉴(묶음 + 펼침 메뉴 · ㊿+167) · 상단 화면 제목 · 홈(오늘 처리할 일 3칸 → 사업 현황) · 타원 목표 트랙 · 새 로그인 화면 · 2단계 인증 창
 {
   const { ctx, page, errs } = await open();
   await page.evaluate(() => SVC.ST.RAWX.targets = [{ year: 2026, amount: 2000000000 }]); await page.evaluate(() => { SVC.renderAll(); SVC.switchView('dash'); }); await page.waitForTimeout(400);
-  await S.t('㊿+166 지니언스 기본: data-skin=gn + data-look=cc(커맨드 센터 기능 그대로) · 사이드바 = 정식 로고 + 메뉴 글자 + 그룹 · 화면 디자인 목록 맨 앞', async () => {
-    const r = await page.evaluate(() => ({ skin: document.documentElement.getAttribute('data-skin'), look: document.documentElement.getAttribute('data-look'), cc: SVC.isCC(), gn: SVC.isGN(), cur: SVC.curLook(), keys: Object.keys(SVC.LOOKS).join(','),
-      logo: !!document.querySelector('#rail .gn-logo use[href="#gnLogo"]') && !!document.getElementById('gnLogo'), its: document.querySelectorAll('#rail .gn-it').length, grp: [...document.querySelectorAll('#rail .gn-gh')].map((b) => b.dataset.seg).join('|'),
-      w: Math.round(document.getElementById('rail').getBoundingClientRect().width), home: (document.querySelector('#rail .gn-it[aria-current="true"]') || {}).dataset.v, ttl: document.getElementById('gnTitle').textContent, inbox: !!document.querySelector('#ccInbox .ib-head') }));
+  await S.t('㊿+166 지니언스 기본: data-skin=gn + data-look=cc(커맨드 센터 기능 그대로) · ㊿+167 상단 메뉴 = 정식 로고 + 묶음 버튼(상단바 첫 줄) · 화면 디자인 목록 맨 앞', async () => {
+    const r = await page.evaluate(() => { const rail = document.getElementById('rail'), tb = document.querySelector('#app .topbar');
+      return { skin: document.documentElement.getAttribute('data-skin'), look: document.documentElement.getAttribute('data-look'), cc: SVC.isCC(), gn: SVC.isGN(), cur: SVC.curLook(), keys: Object.keys(SVC.LOOKS).join(','),
+        inTop: rail.parentElement === tb && tb.firstElementChild === rail, logo: !!rail.querySelector('.gn-logo use[href="#gnLogo"]') && !!document.getElementById('gnLogo'),
+        tabs: [...rail.querySelectorAll('.gn-tabs .gn-tb')].map((b) => b.dataset.v || b.dataset.seg).join('|'), right: [...rail.querySelectorAll('.gn-right .gn-tb')].map((b) => b.dataset.seg).join('|'),
+        left: Math.round(rail.getBoundingClientRect().left), w: Math.round(rail.getBoundingClientRect().width), W: document.documentElement.clientWidth, pad: getComputedStyle(document.body).paddingLeft,
+        home: (rail.querySelector('.gn-tb[aria-current="true"]') || {}).dataset.v, ttl: document.getElementById('gnTitle').textContent }; });
     assert(r.skin === 'gn' && r.look === 'cc' && r.cc && r.gn && r.cur === 'gn' && /^gn,cc,simple,classic$/.test(r.keys), JSON.stringify(r));
-    assert(r.logo && r.its > 20 && /g:전체 데이터/.test(r.grp) && /g:장비/.test(r.grp) && r.w >= 240 && r.home === 'dash' && r.ttl === '홈' && r.inbox, JSON.stringify(r));
-    return r.its + '개 메뉴 · 그룹 ' + r.grp.split('|').length;
+    assert(r.inTop && r.logo && /^dash\|weekly\|g:전체 데이터\|g:사업 영역\|g:장비\|m:영업\|m:정산·도구$/.test(r.tabs) && r.right === 'm:관리' && r.left === 0 && r.w === r.W && r.pad === '0px' && r.home === 'dash' && r.ttl === '홈', JSON.stringify(r));
+    return r.tabs.split('|').length + '개 묶음 + 관리';
   });
-  await S.t('㊿+166 사이드바: 메뉴 누르면 이동 · 상단 제목 바뀜 · 그룹 제목 누르면 접힘(기억) · 접힌 그룹 안 화면이면 펼쳐 보임 · 배지(홈 = 인박스 건수)', async () => {
-    await page.click('#rail .gn-it[data-v="contracts"]'); await page.waitForTimeout(400);
-    const a = await page.evaluate(() => ({ v: SVC.ST.CUR_VIEW, cur: (document.querySelector('#rail .gn-it[aria-current="true"]') || {}).dataset.v, ttl: document.getElementById('gnTitle').textContent, sub: document.getElementById('gnSub').textContent }));
-    assert(a.v === 'contracts' && a.cur === 'contracts' && a.ttl === '계약' && /전체 데이터/.test(a.sub), JSON.stringify(a));
-    const gh = '#rail .gn-gh[data-seg="g:전체 데이터"]';
-    await page.click(gh); await page.waitForTimeout(150);
-    const b = await page.evaluate((s) => { const g = document.querySelector(s).parentElement; return { fold: g.classList.contains('fold'), peek: g.classList.contains('peek'), exp: document.querySelector(s).getAttribute('aria-expanded'), vis: getComputedStyle(g.querySelector('.gn-gb')).display !== 'none', saved: JSON.parse(localStorage.getItem('svc_gn_fold') || '{}')['g:전체 데이터'] }; }, gh);
-    assert(b.fold && b.exp === 'false' && b.saved === 1 && !b.vis, '접기 ' + JSON.stringify(b));
-    await page.evaluate(() => SVC.railSync('contracts')); const c = await page.evaluate((s) => { const g = document.querySelector(s).parentElement; return { peek: g.classList.contains('peek'), vis: getComputedStyle(g.querySelector('.gn-gb')).display !== 'none' }; }, gh);
-    await page.click('#rail .gn-it[data-v="dash"]'); await page.waitForTimeout(300);
-    const d = await page.evaluate((s) => { const g = document.querySelector(s).parentElement; return { vis: getComputedStyle(g.querySelector('.gn-gb')).display !== 'none' }; }, gh);
-    await page.click(gh); await page.waitForTimeout(100);
-    const e = await page.evaluate(() => ({ saved: JSON.parse(localStorage.getItem('svc_gn_fold') || '{}')['g:전체 데이터'], bd: (document.querySelector('#rail .gn-it[data-v="dash"] .gn-bd') || {}).textContent, ib: (document.querySelector('#ccInbox .ib-head .ctag') || {}).textContent }));
-    assert(c.vis && !d.vis && e.saved === undefined && e.bd === e.ib && +e.ib > 0, JSON.stringify({ c, d, e }));
-    return '이동 · 제목 «계약» · 접기/펼침 · 배지 ' + e.bd;
+  await S.t('㊿+167 상단 메뉴: 묶음 누르면 펼침(소제목·그룹마다 칸) · 항목 누르면 이동·닫힘 · 지금 화면 묶음 표시 · 다른 묶음에 마우스 → 옮겨 감 · Esc·바깥 클릭 닫힘 · ↓ 첫 항목 · 배지 합계', async () => {
+    const seg = (k) => '#rail .gn-tb[data-seg="' + k + '"]';
+    await page.click(seg('g:사업 영역')); await page.waitForTimeout(150);
+    const a = await page.evaluate(() => { const m = document.getElementById('gnMenu'); return { open: !m.hidden, exp: document.querySelector('#rail .gn-tb[data-seg="g:사업 영역"]').getAttribute('aria-expanded'), cols: [...m.querySelectorAll('.gn-st')].map((x) => x.textContent).join('|'), n: m.querySelectorAll('.gn-mi').length, inView: m.getBoundingClientRect().right <= document.documentElement.clientWidth }; });
+    assert(a.open && a.exp === 'true' && /Cloud NAC/.test(a.cols) && /MDR/.test(a.cols) && a.n >= 3 && a.inView, '사업 영역 ' + JSON.stringify(a));
+    await page.hover(seg('m:영업')); await page.waitForTimeout(120);
+    const b = await page.evaluate(() => ({ cols: [...document.querySelectorAll('#gnMenu .gn-st')].map((x) => x.textContent).join('|'), e1: document.querySelector('#rail .gn-tb[data-seg="g:사업 영역"]').getAttribute('aria-expanded') }));
+    assert(/PoC·데모/.test(b.cols) && /영업/.test(b.cols) && /인바운드/.test(b.cols) && b.e1 === 'false', '영업 묶음 ' + JSON.stringify(b));
+    await page.click('#gnMenu .gn-mi[data-v="oi"]'); await page.waitForTimeout(300);
+    const c = await page.evaluate(() => ({ v: SVC.ST.CUR_VIEW, open: !document.getElementById('gnMenu').hidden, cur: (document.querySelector('#rail .gn-tb[aria-current="true"]') || {}).dataset.seg, ttl: document.getElementById('gnTitle').textContent }));
+    assert(c.v === 'oi' && !c.open && c.cur === 'm:영업' && c.ttl === 'OI 현황', '이동 ' + JSON.stringify(c));
+    await page.click(seg('g:전체 데이터')); await page.waitForTimeout(100); await page.keyboard.press('Escape'); await page.waitForTimeout(100);
+    const d1 = await page.evaluate(() => document.getElementById('gnMenu').hidden);
+    await page.click(seg('g:전체 데이터')); await page.waitForTimeout(100); await page.mouse.click(700, 600); await page.waitForTimeout(100);
+    const d2 = await page.evaluate(() => document.getElementById('gnMenu').hidden);
+    await page.focus(seg('g:장비')); await page.keyboard.press('ArrowDown'); await page.waitForTimeout(100);
+    const d3 = await page.evaluate(() => document.activeElement && document.activeElement.classList.contains('gn-mi') && document.activeElement === document.querySelector('#gnMenu .gn-mi'));
+    await page.keyboard.press('Escape');
+    const bd = await page.evaluate(() => { const g = (s) => { const b = document.querySelector(s + ' .gn-bd'); return b && !b.hidden ? +b.textContent : 0; };
+      return { eq: g('#rail .gn-tb[data-eq]'), pend: (SVC.ST.RAWX.orders || []).filter((o) => ['접수', '출하요청', '배송중'].indexOf(o.status) >= 0).length, home: g('#rail .gn-tb[data-v="dash"]'), lane1: document.querySelectorAll('#ccInbox .ib-lane.crit .ib-row').length }; });
+    assert(d1 && d2 && d3 && bd.eq === bd.pend && bd.home === bd.lane1, JSON.stringify({ d1, d2, d3, bd }));
+    assert(!errs.length, errs.join(' | ')); return 'OI 로 이동 · 배지 장비 ' + bd.eq + ' · 홈 ' + bd.home;
   });
-  await S.t('㊿+166 홈: 히어로가 인박스 왼쪽 · 목표 ARR 타원 트랙(현재 % · 같은 숫자 4줄) · 질문 바가 타일 다음 · 지표 3칸 펼쳐 보임', async () => {
-    const r = await page.evaluate(() => { const h = document.querySelector('#ccHeroHost .kpi').getBoundingClientRect(), i = document.getElementById('ccInbox').getBoundingClientRect(), k = document.getElementById('kpis').getBoundingClientRect(), a = document.querySelector('#viewDash .ask').getBoundingClientRect(), m = document.getElementById('ccMoreTiles').getBoundingClientRect();
-      const t = document.querySelector('#ccHeroHost #goalBar .gn-trk .t1'); return { left: h.left < i.left, ask: a.top > k.bottom && a.top < m.top, more: m.height > 50, dash: t && t.getAttribute('stroke-dasharray'), txt: (document.querySelector('#goalBar .gn-gtx') || {}).textContent || '', label: (document.querySelector('#goalBar .gn-trk') || { getAttribute: () => '' }).getAttribute('aria-label') }; });
-    assert(r.left && r.ask && r.more && /^\d+(\.\d)? 100$/.test(r.dash || '') && /목표 ARR/.test(r.txt) && /현재 ARR/.test(r.txt) && /필요 12월 MRR/.test(r.txt) && /목표 ARR 대비 현재/.test(r.label), JSON.stringify(r));
-    return r.dash;
+  await S.t('㊿+167 홈: 오늘 처리할 일(전체 폭 · 즉시 처리/확인 필요/예정 3칸) → 사업 현황 제목 → MRR 카드(옅은 연두) 옆 타일 4 → AI 분석 → 지표 3 · 목표 ARR 타원 트랙 · 검색 바와 AI 칸 역할 문구', async () => {
+    await page.evaluate(() => SVC.switchView('dash')); await page.waitForTimeout(300);
+    const r = await page.evaluate(() => { const R = (s) => document.querySelector(s).getBoundingClientRect(); const ib = R('#ccInbox'), bh = R('#gnBizH'), h = R('#ccHeroHost .kpi'), k = R('#kpis'), a = R('#viewDash .ask'), m = R('#ccMoreTiles');
+      const lanes = [...document.querySelectorAll('#ccInbox .ib-lane')].map((l) => l.querySelector('.ib-lh b').textContent + ':' + l.querySelectorAll('.ib-row').length).join('|');
+      const t = document.querySelector('#ccHeroHost #goalBar .gn-trk .t1'); const bg = getComputedStyle(document.querySelector('#ccHeroHost .kpi')).backgroundImage;
+      return { lanes, rows: document.querySelectorAll('#ccInbox .ib-row').length, cnt: +document.querySelector('#ccInbox .ib-head .ctag').textContent, full: ib.width > 1300, order: ib.bottom < bh.top && bh.bottom < h.top, side: Math.abs(h.top - k.top) < 2 && h.right < k.left, ask: a.top > Math.max(h.bottom, k.bottom) && a.bottom < m.top,
+        light: /gradient/.test(bg), dash: t && t.getAttribute('stroke-dasharray'), txt: (document.querySelector('#goalBar .gn-gtx') || {}).textContent || '', ph: document.querySelector('#cmdBar .ph').textContent, q: document.getElementById('q').placeholder, h2: document.querySelector('#ccInbox .ib-head h2').textContent }; });
+    assert(/^즉시 처리:\d+\|확인 필요:\d+\|예정:\d+$/.test(r.lanes) && r.rows === r.cnt && r.full && r.order && r.side && r.ask && r.light && /오늘 처리할 일/.test(r.h2), JSON.stringify(r));
+    assert(/^\d+(\.\d)? 100$/.test(r.dash || '') && /목표 ARR/.test(r.txt) && /현재 ARR/.test(r.txt) && /필요 12월 MRR/.test(r.txt) && /^화면 이동/.test(r.ph) && /^AI 분석/.test(r.q), JSON.stringify(r));
+    return r.lanes;
   });
-  await S.t('㊿+166 «커맨드 센터»로 바꾸면 예전 아이콘 레일 · 지니언스 표시 없음 · 다시 기본으로', async () => {
-    await page.evaluate(() => { localStorage.setItem('svc_look', 'cc'); SVC.applyLook(); SVC.buildRail(); });
-    const a = await page.evaluate(() => ({ skin: document.documentElement.getAttribute('data-skin'), look: document.documentElement.getAttribute('data-look'), rlogo: !!document.querySelector('#rail .rlogo'), gn: !!document.querySelector('#rail .gn-nav'), seg: document.querySelectorAll('#rail [data-seg]').length, ttl: getComputedStyle(document.querySelector('.gn-ttl')).display }));
-    await page.evaluate(() => { localStorage.removeItem('svc_look'); SVC.applyLook(); SVC.buildRail(); });
-    const b = await page.evaluate(() => ({ skin: document.documentElement.getAttribute('data-skin'), gn: !!document.querySelector('#rail .gn-nav') }));
-    assert(a.skin === null && a.look === 'cc' && a.rlogo && !a.gn && a.seg > 3 && a.ttl === 'none' && b.skin === 'gn' && b.gn, JSON.stringify({ a, b }));
+  await S.t('㊿+166 «커맨드 센터»로 바꾸면 예전 아이콘 레일(제자리 · 왼쪽) · 지니언스 표시 없음 · 인박스는 한 줄 목록 · 다시 기본으로', async () => {
+    await page.evaluate(() => { localStorage.setItem('svc_look', 'cc'); SVC.applyLook(); SVC.buildRail(); SVC.renderInbox(); });
+    const a = await page.evaluate(() => ({ skin: document.documentElement.getAttribute('data-skin'), look: document.documentElement.getAttribute('data-look'), rlogo: !!document.querySelector('#rail .rlogo'), gn: !!document.querySelector('#rail .gn-bar'), body: document.getElementById('rail').parentElement === document.body, seg: document.querySelectorAll('#rail [data-seg]').length, ttl: getComputedStyle(document.querySelector('.gn-ttl')).display, lanes: document.querySelectorAll('#ccInbox .ib-lanes').length, h2: document.querySelector('#ccInbox .ib-head h2').textContent }));
+    await page.evaluate(() => { localStorage.removeItem('svc_look'); SVC.applyLook(); SVC.buildRail(); SVC.renderInbox(); });
+    const b = await page.evaluate(() => ({ skin: document.documentElement.getAttribute('data-skin'), gn: !!document.querySelector('#rail .gn-bar'), inTop: document.getElementById('rail').parentElement === document.querySelector('#app .topbar'), lanes: document.querySelectorAll('#ccInbox .ib-lanes').length }));
+    assert(a.skin === null && a.look === 'cc' && a.rlogo && !a.gn && a.body && a.seg > 3 && a.ttl === 'none' && a.lanes === 0 && /^인박스/.test(a.h2) && b.skin === 'gn' && b.gn && b.inTop && b.lanes === 1, JSON.stringify({ a, b }));
     assert(!errs.length, errs.join(' | ')); return 'cc ↔ gn';
+  });
+  await S.t('㊿+167 2단계 인증 창: 6칸 숫자 상자(진짜 입력칸 #mfaCode 하나) · 30초 링 · 입력하면 칸에 숫자 · 틀리면 흔들림 · 등록 창은 QR + 3단계 + 키 복사', async () => {
+    await page.evaluate(() => { SVC.mfaPrompt({ id: 'f1' }, 'tok', 'tester@example.com'); }); await page.waitForTimeout(300);
+    await page.type('#mfaCode', '12'); await page.waitForTimeout(100);
+    const a = await page.evaluate(() => ({ cells: document.querySelectorAll('#ovlMfa .otp-cells span').length, txt: [...document.querySelectorAll('#ovlMfa .otp-cells span')].map((s) => s.textContent).join(''), ring: !!document.querySelector('#ovlMfa .mfa-ring .r1[stroke-dasharray]'), sec: document.querySelector('#ovlMfa .mfa-sec').textContent, inputs: document.querySelectorAll('#ovlMfa input').length }));
+    await page.evaluate(() => { const i = document.getElementById('mfaCode'); i.value = '12'; }); await page.click('#mfaGo'); await page.waitForTimeout(100);
+    const bad = await page.evaluate(() => document.querySelector('#ovlMfa .otp').classList.contains('bad') && /6자리/.test(document.getElementById('mfaMsg').textContent));
+    await page.click('#mfaCancel'); await page.waitForTimeout(100);
+    assert(a.cells === 6 && a.txt === '12' && a.ring && /\d+초/.test(a.sec) && a.inputs === 1 && bad && !(await page.$('#ovlMfa')), JSON.stringify({ a, bad }));
+    return a.sec;
   });
   await ctx.close();
   await S.t('㊿+166 로그인 화면: 정식 로고 · 같은 칸(lsEmail·lsPw·lsKeep 스위치·lsGo) · 날짜·버전 · 폰은 위아래(가로 넘침 없음) · 로그인 동작 그대로', async () => {

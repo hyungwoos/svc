@@ -116,8 +116,8 @@ say(/^export function renewCtype\(r\)/m.test(jsAll) && /contract_type:renewCtype
 say(/^export async function apiCreate\(\)/m.test(jsAll) && /rpc\/api_key_create/.test(jsAll) && html.includes('data-pane="api"') && html.includes('id="apiBox"'), '관리자 › 외부 연동 API 키(㊿+164 · 발급·폐기·호출 기록 · SQL 102 · 함수 export)');
 { const css = fs.readFileSync(path.join(ROOT, 'app.css'), 'utf8');
   say(/<symbol id="gnLogo"/.test(html) && /<symbol id="gnMark"/.test(html) && /id="viewLogin" class="hidden lg"/.test(html) && /id="lgDate"/.test(html) && /id="gnTitle"/.test(html) && /data-skin="gn"/.test(html)
-    && /export var LOOKS=\{gn:/.test(jsAll) && /export function isGN\(/.test(jsAll) && /export function buildGnSide\(/.test(jsAll) && /class="gn-trk"/.test(jsAll)
-    && /html\[data-skin="gn"\] #rail \.gn-it/.test(css) && /\.lg-stage\{/.test(css) && !/html:not\(\[data-look="classic"\]\) #viewLogin \.card/.test(css), '새 디자인 «지니언스»(㊿+166 · 기본 · 정식 로고 심볼 · 글자 사이드바 · 타원 목표 트랙 · 새 로그인 화면)'); }
+    && /export var LOOKS=\{gn:/.test(jsAll) && /export function isGN\(/.test(jsAll) && /export function buildGnNav\(/.test(jsAll) && /export function gnMenuOpen\(/.test(jsAll) && /class="gn-trk"/.test(jsAll) && /class="ib-lanes"/.test(jsAll) && /id="gnBizH"|hb\.id='gnBizH'/.test(jsAll)
+    && /html\[data-skin="gn"\] #rail \.gn-tb\{/.test(css) && /html\[data-skin="gn"\] \.ib-lanes\{/.test(css) && /\.lg-stage\{/.test(css) && !/html:not\(\[data-look="classic"\]\) #viewLogin \.card/.test(css) && !/lg-sub/.test(html), '새 디자인 «지니언스»(㊿+166~167 · 기본 · 정식 로고 심볼 · 상단 메뉴 + 펼침 메뉴 · 오늘 처리할 일 3칸 · 사업 현황 · 타원 목표 트랙 · 새 로그인 화면)'); }
 say(fs.existsSync(path.join(ROOT, 'supabase/functions/export/index.ts')) && fs.existsSync(path.join(ROOT, 'tests/fn/export.test.ts')), 'export 함수 소스 · 테스트 있음');
 // ㊿+160 연장하면 상태 «재약정»(구분 그대로) · 계약 상세에 «계약 기간 · 연장 이력»
 say(/^export function renewStatus\(r\)/m.test(jsAll) && /var nst=renewStatus\(r\);/.test(jsAll) && /^export function ctPeriods\(c, mine\)/m.test(jsAll) && html.includes('id="dtRenew"'), '연장: 상태 «재약정»(renewStatus) · 계약 상세 연장 이력(ctPeriods · #dtRenew)');
@@ -185,7 +185,7 @@ if (HAS_FN) {
   const used = ((/name="app-js" content="([^"]+)"/.exec(html) || [])[1] || '').split(',').map((x) => x.trim()).filter((x) => x && !/viz\.js$/.test(x) && fs.existsSync(path.join(ROOT, x)));
   const src = [['app.css', fs.readFileSync(path.join(ROOT, 'app.css'), 'utf8')], ['index.html', html]].concat(used.map((f) => [f, fs.readFileSync(path.join(ROOT, f), 'utf8')]));
   if (fs.existsSync(path.join(ROOT, 'js', 'app.js')) && !used.includes('js/app.js')) warn('js/app.js 는 ㊿+136 부터 안 쓰는 옛 파일 — 지워도 됨(공개 사이트에 그대로 올라가 있음)');
-  for (const [f, t] of src) t.split('\n').forEach((ln, i) => { if (/data-zoom|:fullscreen|#viewLogin input\{height:42px;font-size:16px/.test(ln)) return; for (const m of ln.matchAll(/font-size:\s*([0-9.]+)px/g)) { if (+m[1] < 24 && !STEP.has(m[1])) off.push(f + ':' + (i + 1) + ' ' + m[1] + 'px'); } });
+  for (const [f, t] of src) t.split('\n').forEach((ln, i) => { if (/data-zoom|:fullscreen|#viewLogin input\{height:42px;font-size:16px|^\.otp-in\{/.test(ln)) return;   /* .otp-in = 2단계 인증 숫자 칸(투명 · iOS 확대 방지 16px · ㊿+167) */ for (const m of ln.matchAll(/font-size:\s*([0-9.]+)px/g)) { if (+m[1] < 24 && !STEP.has(m[1])) off.push(f + ':' + (i + 1) + ' ' + m[1] + 'px'); } });
   say(!off.length, '글자 크기 7단계(11·12·12.5·13.5·15·18·22 + 큰 숫자) 밖 값 없음' + (off.length ? ' — ' + off.slice(0, 6).join(', ') : ''));
   say(/function colwApply\(/.test(jsAll) && /colwApply\(t, ST\.CUR_VIEW\)/.test(jsAll) && /\.dgrid\.colw-fixed\{table-layout:fixed\}/.test(fs.readFileSync(path.join(ROOT, 'app.css'), 'utf8')), '표 열 너비 조절(colw) 연결');
   say(/class="subgrp" data-sub="Cloud NAC"/.test(html) && (html.match(/class="grp"[^>]*>사업 영역</g) || []).length === 1 && /function menuConfMigrate\(/.test(jsAll), '메뉴: «사업 영역» 한 그룹 + 소제목 · 예전 메뉴 편집 설정 옮김');
