@@ -2,7 +2,7 @@
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { APP_VER, ST } from './state.js';
 import { Viz } from './viz.js';
-import { $, $$, kwToWon, wonToKw, baseLabel, baseRange, buildBaseSelect, cssv, el, esc, isCC, lline, mk, mkLabel, monOf, pct, rawHtml, seriesColor, STATE, tpl, won,
+import { $, $$, kwToWon, wonToKw, baseLabel, baseRange, buildBaseSelect, cssv, el, esc, isCC, isGN, lline, mk, mkLabel, monOf, pct, rawHtml, seriesColor, STATE, tpl, won,
   wonFull, wrapNavIcons, yOf } from './core.js';
 import { boot, CACHE_KEY, ccAfterKpis, ccAnaCount, ccAnalysisOpen, ccHomeLayout, loadFromDb, onData, renderInbox, SB_RAW, sbWrite, toast } from './shell.js';
 import { abortAsk, ask, closeAnswer, isAsking, loadAiConfig, runQuery, shortQ } from './ai.js';
@@ -1029,6 +1029,16 @@ export function renderGoal(list){
   var needMrr = tg.amount / 12;                              // 달성에 필요한 12월 MRR
 
   box.style.display='';
+  /* ㊿+166 지니언스: 로고 모양 타원 트랙(현재 ARR · 연한 줄 = 12월 계약분) + 같은 숫자 4줄 */
+  if(isGN()){
+    var trk=function(cls, p){ return tpl`<rect class="${rawHtml(cls)}" x="6" y="6" width="120" height="66" rx="33" pathLength="100" stroke-dasharray="${rawHtml(Math.max(0,Math.min(100,p)).toFixed(1))} 100"/>`; };
+    box.innerHTML=tpl`<div class="gn-goal"><svg class="gn-trk" viewBox="0 0 132 78" role="img" aria-label="${rawHtml(yr)}년 목표 ARR 대비 현재 ${rawHtml(p1.toFixed(1))}%">`+
+      tpl`<rect class="t0" x="6" y="6" width="120" height="66" rx="33"/>${rawHtml(decArr>curArr? trk('t2', p2) : '')}${rawHtml(trk(p1>=100?'t1 done':'t1', p1))}`+
+      tpl`<text x="66" y="47" text-anchor="middle">${rawHtml(p1>=99.95? '100' : p1.toFixed(1))}%</text></svg>`+
+      tpl`<div class="gn-gtx"><b>🎯 ${rawHtml(yr)}년 목표 ARR ${won(tg.amount)}천원</b><span>현재 ARR <b>${won(curArr)}천원</b> (${rawHtml(p1.toFixed(1))}%)</span>`+
+      tpl`${rawHtml(decArr? tpl`<span>12월 계약분 기준 ${won(decArr)}천원 (${rawHtml(p2.toFixed(1))}%)</span>` : '')}<span>필요 12월 MRR <b>${won(needMrr)}천원</b></span></div></div>`;
+    return;
+  }
   box.innerHTML=
     tpl`<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:9px">`+
       tpl`<div style="font-size:12.5px;font-weight:650">🎯 ${rawHtml(yr)}년 목표 ARR ${won(tg.amount)}천원`+

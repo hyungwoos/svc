@@ -2,7 +2,7 @@
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { IS_QA, ST } from './state.js';
 import { Viz } from './viz.js';
-import { $, applyPerms, canView, canWrite, clearSess, cssv, el, esc, isCC, keepLogin, LIVE2CODE, lline, loadPerms, mfaGate, mfaVerifiedOf,
+import { $, applyPerms, canView, canWrite, clearSess, cssv, el, esc, isCC, isGN, keepLogin, LIVE2CODE, lline, loadPerms, mfaGate, mfaVerifiedOf,
   mfaWarnIfNeeded, mk, monOf, navText, permWriteGuard, rawHtml, refreshToken, restoreSess, saveSess, SB_KEY, SB_URL, seriesColor, sessRead,
   sessWrite, STATE, tpl, won } from './core.js';
 import { buildControls, expN, goWidget, hbars, idxs, renderAll, renderInstall, renderKpis, renderMatrix } from './dash.js';
@@ -71,6 +71,7 @@ export function visBtn(b){ return !!b && !b.classList.contains('mhide') && !b.cl
 /* ---- 아이콘 레일 (사이드바 구조 menuSegments() 를 그대로 따라 만듦 · 메뉴 편집/채널 숨김 반영) ---- */
 export function buildRail(){
   var rail=document.getElementById('rail'); if(!rail || !isCC()) return;
+  if(isGN()){ buildGnSide(rail); return; }
   var segs=[]; try{ segs=menuSegments(); }catch(e){}
   var h='<div class="rlogo" data-v="dash" title="홈 (대시보드)">G</div>';
   h+=tpl`<button type="button" data-v="dash" title="홈" aria-label="홈">${rawHtml(ico('home'))}</button>`;
@@ -112,8 +113,72 @@ export function railFlyToggle(btn, key){
 }
 
 
+/* ---- ㊿+166 «지니언스» 사이드바 — 레일 자리(#rail)에 글자 메뉴. 구조는 menuSegments() 그대로(메뉴 편집·채널 숨김·권한 반영)
+   · 그룹 제목을 누르면 접기/펼치기(이 브라우저에 기억 · svc_gn_fold) · 지금 화면이 든 그룹은 접혀 있어도 펼쳐 보임
+   · 배지: 홈 = 인박스 건수 · 데이터 점검 = 바로 고칠 항목 · 장비 그룹 = 처리 대기 신청 · 인바운드 목록 = 미대응 ---- */
+export var GN_ICO={dash:'home', weekly:'calendar', contracts:'doc', live:'target', churn:'chart', churnrate:'chart', custflow:'users', leadsrc:'arrow', dcheck:'check',
+  cngen:'cloud', cnpub:'cloud', cns1:'cloud', cnlgu:'cloud', mdrgen:'shield', mdrs1:'shield', mdrlgu:'shield', chdist:'layers', cnpns:'layers',
+  eqboard:'board', ordernew:'doc', orders:'box', assets:'box', mdrnew:'flask', mdrops:'flask', oinew:'target', oi:'target', inbstat:'chart', inbound:'inbox',
+  biz:'scale', targets:'target', quote:'doc', preport:'doc', s1:'scale', kk:'scale', price:'doc', cloud:'cloud', csite:'cloud', report:'doc', aiknow:'spark',
+  log:'clock', adminx:'gear', ops:'tool', account:'user'};
+export var GN_FOLD_DEF={'g:사업 영역':1, 'g:정산·목표':1, 'g:도구':1, 'g:관리자':1};
+export var GN_BADGE={inb:null, dc:null, inbound:null};
+export function gnFold(){ var f=null; try{ f=JSON.parse(localStorage.getItem('svc_gn_fold')||'null'); }catch(e){} return (f && typeof f==='object')? f : GN_FOLD_DEF; }
+export function gnFoldSet(key, folded){ var f=Object.assign({}, gnFold()); if(folded) f[key]=1; else delete f[key]; try{ localStorage.setItem('svc_gn_fold', JSON.stringify(f)); }catch(e){} }
+export function buildGnSide(rail){
+  var segs=[]; try{ segs=menuSegments(); }catch(e){}
+  var fold=gnFold();
+  function item(v, t){ return tpl`<button type="button" class="gn-it" data-v="${v}" aria-current="false" title="${t}">${rawHtml(ico(GN_ICO[v]||iconFor(t, v), 17))}<span class="gn-l">${t}</span><span class="gn-bd" hidden></span></button>`; }
+  /* 로고: 넓은 화면은 심볼+글자, 좁은 데스크톱(≤1180px · 아이콘만 보이는 사이드바)은 심볼만 */
+  var h=tpl`<a class="gn-logo" data-v="dash" href="#" aria-label="Genians — 홈"><svg class="gn-lw" viewBox="0 0 587.2 133.4" aria-hidden="true"><use href="#gnLogo"/></svg><svg class="gn-lm" viewBox="0 0 171.1 133.4" aria-hidden="true"><use href="#gnMark"/></svg></a>`;
+  h+=tpl`<div class="gn-ws"><span class="gn-wsi">S</span><span class="gn-wst"><b>서비스사업부</b><small>통합 관리 포탈</small></span></div><div class="gn-nav">`;
+  h+=item('dash','홈');
+  segs.forEach(function(s){
+    if(s.grp){
+      if(s.grp.classList.contains('mhide')) return;
+      var its=(s.items||s.buttons||[]).filter(function(el){ return el.tagName==='BUTTON'? visBtn(el) : !el.classList.contains('sub-empty'); });
+      if(!its.some(function(el){ return el.tagName==='BUTTON'; })) return;
+      var body=its.map(function(b){ return b.tagName!=='BUTTON'? tpl`<div class="gn-sub">${b.textContent.trim()}</div>` : item(b.dataset.v, navText(b)); }).join('');
+      h+=tpl`<div class="gn-grp${fold[s.key]?' fold':''}" data-g="${s.key}"><button type="button" class="gn-gh" data-seg="${s.key}" aria-expanded="${!fold[s.key]}" title="${s.label}"><span class="gn-l">${s.label}</span><span class="gn-bd" hidden></span><svg class="gn-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="gn-gb">${rawHtml(body)}</div></div>`;
+    }else{
+      if(!visBtn(s.btn)) return;
+      h+=item(s.btn.dataset.v, navText(s.btn));
+    }
+  });
+  var me=String(ST.AUTH_USER||'');
+  h+=tpl`</div><div class="gn-me"><span class="gn-av">${(me.split('@')[0]||'?').slice(0,1).toUpperCase()}</span><span class="gn-wst"><b>${me.split('@')[0]||'로그인'}</b><small>${me.indexOf('@')>0? '@'+me.split('@')[1] : ''}</small></span><button type="button" class="gn-set" data-v="account" title="내 계정 · 설정" aria-label="내 계정 · 설정">${rawHtml(ico('gear',17))}</button></div>`;
+  rail.innerHTML=h;
+  rail.querySelectorAll('[data-v]').forEach(function(b){ b.onclick=function(e){ e.preventDefault(); navMenu(b.dataset.v); }; });
+  rail.querySelectorAll('.gn-gh').forEach(function(b){ b.onclick=function(){
+    var g=b.parentElement, f=!g.classList.contains('fold'); g.classList.toggle('fold', f); g.classList.remove('peek'); b.setAttribute('aria-expanded', f? 'false':'true'); gnFoldSet(b.dataset.seg, f); }; });
+  railSync(ST.CUR_VIEW);
+}
+export function gnSideSync(rail, v){
+  rail.querySelectorAll('.gn-it').forEach(function(b){ b.setAttribute('aria-current', b.dataset.v===v? 'true':'false'); });
+  rail.querySelectorAll('.gn-grp').forEach(function(g){
+    var has=!!g.querySelector('.gn-it[aria-current="true"]'); g.classList.toggle('cur', has); g.classList.toggle('peek', has && g.classList.contains('fold')); });
+  var pend=(ST.RAWX.orders||[]).filter(function(o){ return ['접수','출하요청','배송중'].indexOf(o.status)>=0; }).length;
+  function bd(sel, n, hot){ var b=rail.querySelector(sel); if(!b) return; var s=b.querySelector('.gn-bd'); if(!s) return; s.hidden=!n; s.textContent=n>99?'99+':String(n||''); s.classList.toggle('hot', !!hot); }
+  bd('.gn-it[data-v="dash"]', GN_BADGE.inb, GN_BADGE.inb>0);
+  bd('.gn-it[data-v="dcheck"]', GN_BADGE.dc, true);
+  bd('.gn-it[data-v="inbound"]', GN_BADGE.inbound, true);
+  rail.querySelectorAll('.gn-gh').forEach(function(g){ var s=g.querySelector('.gn-bd'), n=/장비/.test(g.dataset.seg)? pend : 0; if(!s) return; s.hidden=!n; s.textContent=n>99?'99+':String(n||''); s.classList.add('hot'); });
+  gnTitleSync(v);
+}
+/* 상단바 왼쪽 — 지금 화면 이름 + 한 줄(홈: 날짜 · 읽은 시각 / 그 밖: 메뉴 그룹) */
+export function gnTitleSync(v){
+  var t=document.getElementById('gnTitle'), s=document.getElementById('gnSub'); if(!t || !s) return;
+  var b=[].slice.call(document.querySelectorAll('#side button[data-v]')).filter(function(x){ return x.dataset.v===(v||'dash'); })[0];
+  var name= v==='dash'||!v? '홈' : (b? navText(b) : '');
+  var grp='';
+  if(b && v!=='dash'){ var sub=navSub(b); for(var el=b.previousElementSibling; el; el=el.previousElementSibling){ if(el.classList && el.classList.contains('grp')){ grp=el.textContent.trim(); break; } } grp=[grp, sub].filter(Boolean).join(' › '); }
+  if(v==='dash'||!v){ var d=new Date(), la=document.getElementById('loadedAt'); grp=(d.getMonth()+1)+'월 '+d.getDate()+'일 ('+'일월화수목금토'.charAt(d.getDay())+')'+(la && la.textContent? ' · '+la.textContent.replace(/\d{4}-\d\d-\d\d\s*/,'') : ''); }
+  t.textContent=name; s.textContent=grp;
+}
+
 export function railSync(v){
   var rail=document.getElementById('rail'); if(!rail) return;
+  if(rail.querySelector('.gn-nav')){ gnSideSync(rail, v); mtabsSync(v); return; }
   var segs=[]; try{ segs=menuSegments(); }catch(e){}
   var inSeg={}; segs.forEach(function(s){ if(s.grp && s.buttons.some(function(b){ return b.dataset.v===v; })) inSeg[s.key]=1; });
   rail.querySelectorAll('button').forEach(function(b){
@@ -257,6 +322,7 @@ export function renderInbox(){
   box.querySelectorAll('.cbtn').forEach(function(bt){ bt.onclick=function(e){ e.stopPropagation(); rows[+bt.dataset.i].acts[+bt.dataset.j].go(); }; });
   var un=document.getElementById('ibUnsnz'); if(un) un.onclick=ccUnsnooze;
   ccGreeting(rows.length);
+  GN_BADGE.inb=rows.length; GN_BADGE.inbound=inbN||0; GN_BADGE.dc=(!EQ && DS && DS.crit)||0;   /* ㊿+166 지니언스 사이드바 배지 */
   try{ railSync(ST.CUR_VIEW); }catch(e){}
 }
 
@@ -1048,6 +1114,10 @@ export function showLoginScreen(){
   /* 마지막으로 로그인한 이메일을 미리 채움 (이 브라우저에 기억 · 비밀번호는 저장하지 않음) → 브라우저 자동완성과 무관하게 아이디가 비지 않음 */
   var e=$('#lsEmail'); try{ var last=localStorage.getItem('svc_last_email')||''; if(e && !e.value && last) e.value=last; }catch(x){}
   try{ var kc=$('#lsKeep'); if(kc) kc.checked=keepLogin(); }catch(x){}   // 앱·모바일이면 기본 켬, 전에 고른 값이 있으면 그 값
+  /* ㊿+166 로그인 화면 아래 줄: 오늘 날짜 · 포탈 버전 */
+  try{ var d0=new Date(), ld=$('#lgDate'), lv=$('#lgVer'), mv=document.querySelector('meta[name="app-ver"]');
+    if(ld) ld.textContent=(d0.getMonth()+1)+'월 '+d0.getDate()+'일 '+'일월화수목금토'.charAt(d0.getDay())+'요일';
+    if(lv && mv) lv.textContent='포탈 '+String(mv.content||'').replace(/^\S+\s+/,''); }catch(x){}
   setTimeout(function(){ var em=$('#lsEmail'), pw=$('#lsPw'); if(em && em.value && pw && !pw.value) pw.focus(); else if(em) em.focus(); },60);
 }
 export function enterAfterLogin(){

@@ -114,6 +114,10 @@ say(/^export function c360RenewLine\(r\)/m.test(jsAll) && /'기간','연장','MR
 say(/if\(memo\) ent\.prev_note=note0;/.test(jsAll) && /noteCur\.lastIndexOf\(noteMm\)/.test(jsAll) && /data-c360ct/.test(jsAll), '연장 메모 → 비고(㊿+162 · 되돌리면 그 메모만 뺌) · 고객 360 계약 행 → 계약 상세');
 say(/^export function renewCtype\(r\)/m.test(jsAll) && /contract_type:renewCtype\(r\)/.test(jsAll) && /prev_ctype:/.test(jsAll) && /^export function ctOrig\(r\)/m.test(jsAll), '연장하면 구분도 «재약정»(㊿+163 · 처음 구분은 prev_ctype · 되돌리면 원래대로)');
 say(/^export async function apiCreate\(\)/m.test(jsAll) && /rpc\/api_key_create/.test(jsAll) && html.includes('data-pane="api"') && html.includes('id="apiBox"'), '관리자 › 외부 연동 API 키(㊿+164 · 발급·폐기·호출 기록 · SQL 102 · 함수 export)');
+{ const css = fs.readFileSync(path.join(ROOT, 'app.css'), 'utf8');
+  say(/<symbol id="gnLogo"/.test(html) && /<symbol id="gnMark"/.test(html) && /id="viewLogin" class="hidden lg"/.test(html) && /id="lgDate"/.test(html) && /id="gnTitle"/.test(html) && /data-skin="gn"/.test(html)
+    && /export var LOOKS=\{gn:/.test(jsAll) && /export function isGN\(/.test(jsAll) && /export function buildGnSide\(/.test(jsAll) && /class="gn-trk"/.test(jsAll)
+    && /html\[data-skin="gn"\] #rail \.gn-it/.test(css) && /\.lg-stage\{/.test(css) && !/html:not\(\[data-look="classic"\]\) #viewLogin \.card/.test(css), '새 디자인 «지니언스»(㊿+166 · 기본 · 정식 로고 심볼 · 글자 사이드바 · 타원 목표 트랙 · 새 로그인 화면)'); }
 say(fs.existsSync(path.join(ROOT, 'supabase/functions/export/index.ts')) && fs.existsSync(path.join(ROOT, 'tests/fn/export.test.ts')), 'export 함수 소스 · 테스트 있음');
 // ㊿+160 연장하면 상태 «재약정»(구분 그대로) · 계약 상세에 «계약 기간 · 연장 이력»
 say(/^export function renewStatus\(r\)/m.test(jsAll) && /var nst=renewStatus\(r\);/.test(jsAll) && /^export function ctPeriods\(c, mine\)/m.test(jsAll) && html.includes('id="dtRenew"'), '연장: 상태 «재약정»(renewStatus) · 계약 상세 연장 이력(ctPeriods · #dtRenew)');

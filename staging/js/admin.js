@@ -1138,12 +1138,12 @@ export async function renderAccount(){
         return tpl`<option value="${rawHtml(m)}"${m===curIdle?' selected':''}>${idleLabel(m)}${m? ' 동안 활동 없으면':''}</option>`; }).join(''))}`+ tpl`</select>`+
       tpl`<div class="mini" style="margin-top:5px;line-height:1.6">마우스·키보드·스크롤 입력이 정한 시간 동안 없으면 이 탭에서 자동으로 로그아웃합니다. 끝나기 1분 전에 알림이 뜹니다.</div>`))}`+
     tpl`${rawHtml(row('화면 디자인', tpl`<select id="accLook" aria-label="화면 디자인" style="height:30px;min-width:200px">${rawHtml(Object.keys(LOOKS).map(function(k){ return tpl`<option value="${rawHtml(k)}"${k===look0?' selected':''}>${LOOKS[k]}</option>`; }).join(''))}</select>`+
-      tpl`<div class="mini" style="margin-top:5px;line-height:1.6">커맨드 센터: 아이콘 레일 + 상단 커맨드 바(검색·이동·AI) + 인박스 홈 + 장비 운영 보드 + 고객 360 패널 · 심플: 평면 디자인에 기존 사이드바 · 클래식: 이전 디자인. 바꾸면 화면을 다시 읽습니다.</div>`))}`;
+      tpl`<div class="mini" style="margin-top:5px;line-height:1.6">지니언스: 정식 로고 · 브랜드 색 · 글자 메뉴(그룹 접기) — 기능은 커맨드 센터와 같음 · 커맨드 센터: 아이콘 레일 + 상단 커맨드 바(검색·이동·AI) + 인박스 홈 + 장비 운영 보드 + 고객 360 패널 · 심플: 평면 디자인에 기존 사이드바 · 클래식: 이전 디자인. 바꾸면 화면을 다시 읽습니다.</div>`))}`;
   var prow=document.createElement('div'); prow.innerHTML=row('📱 앱으로 설치', tpl`<div id="accPwa">${rawHtml(pwaHintHtml())}</div>`);
   set.appendChild(prow.firstChild);
   var meb=document.getElementById('btnMenuEdit');
   if(meb && meb.style.display!=='none'){
-    var mrow=document.createElement('div'); mrow.innerHTML=row('메뉴 편집', '<button type="button" class="pill" id="accMenuEdit">⚙ 메뉴 순서·숨김 편집</button><div class="mini" style="margin-top:5px">사이드바(심플·클래식)와 아이콘 레일(커맨드 센터)에 함께 적용됩니다 · 이 브라우저에만 저장</div>');
+    var mrow=document.createElement('div'); mrow.innerHTML=row('메뉴 편집', '<button type="button" class="pill" id="accMenuEdit">⚙ 메뉴 순서·숨김 편집</button><div class="mini" style="margin-top:5px">사이드바(지니언스·심플·클래식)와 아이콘 레일(커맨드 센터)에 함께 적용됩니다 · 이 브라우저에만 저장</div>');
     set.appendChild(mrow.firstChild);
   }
   box.appendChild(set);

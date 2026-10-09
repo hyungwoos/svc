@@ -514,17 +514,21 @@ export function idleCheck(){
    · cc      : 아이콘 레일 + 커맨드 바 + 인박스 홈 + 장비 보드 + 고객 360 패널 (v5 CSS · html[data-look="cc"])
    · simple  : 평면 디자인, 기존 사이드바 (v4 CSS · html:not([data-look="classic"]))
    · classic : 이전 디자인 그대로                                                                 */
-export var LOOKS={cc:'커맨드 센터 (기본)', simple:'심플', classic:'클래식 (이전 디자인)'};
-export function curLook(){ var v=null; try{ v=localStorage.getItem('svc_look'); }catch(e){} return LOOKS[v]? v : 'cc'; }
+/* ㊿+166 «지니언스»(gn) = 새 기본 — 구조는 커맨드 센터 그대로(data-look="cc") + 정식 로고·브랜드 색·글자 메뉴(data-skin="gn")
+   · isCC() 는 gn 에서도 참(인박스·히어로·고객 360 패널 등 커맨드 센터 기능을 그대로 씀) · gn 만 다른 곳은 isGN() */
+export var LOOKS={gn:'지니언스 (기본)', cc:'커맨드 센터', simple:'심플', classic:'클래식 (이전 디자인)'};
+export function curLook(){ var v=null; try{ v=localStorage.getItem('svc_look'); }catch(e){} return LOOKS[v]? v : 'gn'; }
 export function isCC(){ return document.documentElement.getAttribute('data-look')==='cc'; }
+export function isGN(){ return document.documentElement.getAttribute('data-skin')==='gn'; }
 export function applyLook(){
-  var v=curLook();
-  if(v==='simple') document.documentElement.removeAttribute('data-look');
-  else document.documentElement.setAttribute('data-look', v);
+  var v=curLook(), h=document.documentElement;
+  if(v==='simple') h.removeAttribute('data-look');
+  else h.setAttribute('data-look', v==='gn'? 'cc' : v);
+  if(v==='gn') h.setAttribute('data-skin','gn'); else h.removeAttribute('data-skin');
 }
 export function setLook(v){
-  if(!LOOKS[v]) v='cc';
-  try{ if(v==='cc') localStorage.removeItem('svc_look'); else localStorage.setItem('svc_look',v); }catch(e){}
+  if(!LOOKS[v]) v='gn';
+  try{ if(v==='gn') localStorage.removeItem('svc_look'); else localStorage.setItem('svc_look',v); }catch(e){}
   applyLook();
   /* 레일·인박스 등 구조가 달라지므로 다시 읽는 편이 안전합니다 */
   setTimeout(function(){ location.reload(); }, 350);
