@@ -119,9 +119,9 @@ export function openCust360(name){
   var asts=(ST.RAWX.assets||[]).filter(function(r){return c360Match(r.customer,nm);});
   var ords=(ST.RAWX.orders||[]).filter(function(r){return c360Match(r.customer,nm);});
   $('#c360Title').textContent='🏢 '+nm;
-  $('#c360Cap').textContent='계약 '+cts.length+' · LIVE '+lives.length+' · OI '+ois.length+' · 인바운드 '+inbs.length+' · MDR 운영 '+mdrs.length+' · 장비 '+(asts.length+ords.length)+
+  $('#c360Cap').textContent='계약 '+cts.length+'건 · LIVE '+lives.length+'건 · OI '+ois.length+'건 · 인바운드 '+inbs.length+'건 · MDR 운영 '+mdrs.length+'건 · 장비 현황 '+asts.length+'대(임대중 '+asts.filter(function(a){ return a.status==='임대중'; }).length+'대) · 장비 신청 '+ords.length+'건'+
     (ST.RAWX.inbound===undefined? ' · (인바운드는 메뉴를 한 번 연 뒤 집계됩니다)':'');
-  function sec(icon,label,n,html){ return tpl`<div class="c360-sec"><h4>${rawHtml(icon)} ${rawHtml(label)} <span class="ct">${rawHtml(n)}건</span></h4>${rawHtml(html)}</div>`; }
+  function sec(icon,label,n,html){ return tpl`<div class="c360-sec"><h4>${rawHtml(icon)} ${rawHtml(label)} <span class="ct">${rawHtml(typeof n==='string'? n : n+'건')}</span></h4>${rawHtml(html)}</div>`; }   /* ㊿+168 n 이 글자면 단위 포함(장비 = 대) */
   $('#c360Body').innerHTML=
     sec('📋','계약',cts.length, tb(['서비스','채널','파트너','구분','상태','기간','연장','MRR(천원)'],
       cts.map(function(r){ return [(r.parent? '↳ ':'')+lline(r.line), r.channel, r.partner, r.ctype, r.status,
@@ -136,9 +136,12 @@ export function openCust360(name){
       inbs.map(function(r){ return [r.on_date, r.product, r.qtype, r.result, r.owner]; })))+
     sec('🛰️','MDR 운영·PoC',mdrs.length, tb(['유형','상태','라이선스','시작일','설치/계약'],
       mdrs.map(function(r){ return [r.svc_type, r.status, r.license, r.start_date, (r.agents_total||0)+'/'+(r.plan_qty||0)]; })))+
-    sec('🔧','장비',asts.length+ords.length, tb(['구분','시리얼/발주','모델','상태','일자'],
-      asts.map(function(r){ return ['자산', r.serial, r.model, r.status, r.deployed_date||r.in_date]; })
-      .concat(ords.map(function(r){ return ['발주', '#'+r.id, r.model, r.status, String(r.created_at||'').slice(0,10)]; }))));
+    /* ㊿+168 장비: 실물(시리얼 현황 · 대)과 신청(발주) 이력(건)을 나눔 — 미등록 시리얼은 «보완 필요» */
+    sec('🔧','장비',asts.filter(function(a){ return a.status==='임대중'; }).length+'대 임대중',
+      tpl`<div class="c360-sub">장비 현황(시리얼) · ${rawHtml(asts.length)}대</div>`+ tb(['시리얼','모델','상태','설치·입고일','신청'],
+        asts.map(function(r){ var ph=/^미등록-/.test(String(r.serial||'')); return [ph? '미등록 시리얼 (보완 필요)' : r.serial, r.model, r.status, r.deployed_date||r.in_date, r.order_id? '#'+r.order_id : '']; }))+
+      tpl`<div class="c360-sub">신청(발주) 이력 · ${rawHtml(ords.length)}건</div>`+ tb(['신청','모델','수량','상태','신청일','회수'],
+        ords.map(function(r){ var rs=String(r.returned_serials||'').split(/[,\s]+/).filter(Boolean).length; return ['#'+r.id, r.model, (r.qty||'')+(r.qty?'대':''), r.status, String(r.created_at||'').slice(0,10), r.status==='회수완료'? '전체 회수' : (rs? '부분 회수 '+rs+'대' : '')]; })));
   /* ㊿+162 계약 행(과 그 아래 연장 줄)을 누르면 계약 상세 — 고객 360 위에 열리고, 닫으면 고객 360 으로 돌아옴 */
   $('#c360Body').querySelectorAll('tr[data-c360ct]').forEach(function(tr){
     var go=function(){ var c=ctRawOf(Number(tr.getAttribute('data-c360ct'))); if(c) openDetail(c); else toast('계약 상세', '이 계약 원본을 아직 불러오지 못했습니다 — 잠시 뒤 다시 눌러 주세요', 'info'); };

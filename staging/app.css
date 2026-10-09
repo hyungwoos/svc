@@ -1909,7 +1909,7 @@ html[data-skin="gn"] .chip{border-radius:999px}
 .gn-slogo{display:none}
 @media (min-width:761px){
   html[data-skin="gn"] body:not(:has(#side.hidden)){padding-left:0}
-  html[data-skin="gn"] .topbar #rail{position:relative;inset:auto;width:auto;height:auto;flex:0 0 calc(100% + 52px);margin:0 -26px;padding:0 26px;display:block;overflow:visible;
+  html[data-skin="gn"] .topbar #rail{position:relative;inset:auto;width:auto;height:auto;flex:0 0 calc(100% + 52px);min-width:0;max-width:calc(100% + 52px);margin:0 -26px;padding:0 26px;display:block;overflow:visible;
     background:var(--surface);border:0;border-bottom:1px solid var(--grid);box-sizing:border-box;z-index:5}
   html[data-skin="gn"] .topbar{flex-wrap:wrap;row-gap:0;column-gap:12px;padding:0 26px}
   html[data-skin="gn"] .topbar>:not(#rail){margin-top:12px;margin-bottom:12px}
@@ -2130,4 +2130,48 @@ html[data-skin="gn"] :is(#c360,.c360){border-radius:22px 0 0 22px}
   html[data-skin="gn"] .gn-ttl{flex:0 0 auto;min-width:0}
   html[data-skin="gn"] .topbar .spacer{display:block;flex:1}
 }
+/* ── ㊿+168 1차: 고객 360 요약 탭 · 다음 행동 · 장비 네 칸 / 사업 영역 보기 전환 / 정산 미입력 / 단위·용어 (모든 디자인) ── */
+.c360-next ul{margin:2px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:3px}
+.c360-next li{line-height:1.6}
+.c360-next li b{display:inline;color:inherit;font-size:inherit;margin:0;font-weight:700}
+.c360-next .cbtn.pri{background:var(--brand-solid);border-color:var(--brand-solid);color:#fff}
+.c360-sum .mini{font-size:12px;color:var(--ink-2);margin-top:2px;line-height:1.4}
+.c360-summ h4{font-size:13.5px;margin:0 0 6px;display:flex;gap:8px;align-items:baseline}
+.c360-summ h4 .ct{font-size:12px;color:var(--muted);font-weight:400}
+.c360-summ table{width:100%;border-collapse:collapse;font-size:12.5px}
+.c360-summ th{background:var(--surface-2);text-align:left;padding:6px 8px;font-size:12px;color:var(--ink-2);white-space:nowrap}
+.c360-summ th.n,.c360-summ td.n{text-align:right}
+.c360-summ td{padding:6px 8px;border-bottom:1px solid var(--grid);white-space:nowrap}
+.c360-summ tr[data-c360sum]{cursor:pointer}
+.c360-summ tr[data-c360sum]:hover td,.c360-summ tr[data-c360sum]:focus-visible td{background:var(--surface-2)}
+.c360-eq4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.c360-eq4>div{background:var(--surface-2);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:2px}
+.c360-eq4 b{font-size:18px;font-weight:700}
+.c360-eq4 span{font-size:12px;color:var(--ink-2)}
+.c360-sub{font-size:12.5px;font-weight:700;color:var(--ink-2);margin:8px 0 4px}
+@media (max-width:640px){ .c360-eq4{grid-template-columns:repeat(2,minmax(0,1fr))} .c360-summ{overflow-x:auto} }
+#chvMode{margin-bottom:8px}
+#chvMode button b{font-weight:800;margin-left:2px}
+.ubadge[hidden]{display:none!important}
+.ubadge[role="button"]:hover{border-color:var(--axis)}
+.ubadge[role="button"]:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.terms{margin:8px 0 0;display:grid;grid-template-columns:minmax(120px,auto) 1fr;gap:10px 16px;font-size:13.5px;line-height:1.6}
+.terms dt{font-weight:700;color:var(--ink)}
+.terms dd{margin:0;color:var(--ink-2)}
+@media (max-width:560px){ .terms{grid-template-columns:1fr;gap:2px} .terms dd{margin-bottom:8px} }
+/* 정산 달성률 — 입력 상태 */
+.biz-tg td{vertical-align:top}
+.biz-miss{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:6px;background:rgba(237,161,0,.16);color:var(--warn-ink);font-size:12px;font-weight:700}
+.biz-na{color:var(--muted)}
+.biz-ok{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:6px;background:var(--brand-t);color:var(--brand-ink,var(--brand));font-size:12px;font-weight:700}
+.biz-part{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:6px;background:rgba(42,120,214,.12);color:var(--info-ink);font-size:12px;font-weight:700;white-space:nowrap}
+.biz-sub{font-size:12px;color:var(--ink-2);font-weight:400;margin-top:2px;white-space:nowrap}
+.biz-up{color:var(--good)} .biz-mid{color:var(--warn-ink)} .biz-dn{color:var(--critical)}
+.biz-tg tr.biz-q td,.biz-tg tr.biz-h td{background:var(--surface-2);font-weight:650}
+.biz-tg tr.biz-y td{border-top:2px solid var(--axis);font-weight:750}
+html:not([data-theme="light"]) .biz-miss{color:#f0b84a;background:rgba(237,161,0,.12)}
+.c360-summ-w{overflow-x:auto;max-width:100%}
+.c360-summ td.mini{white-space:normal;min-width:72px}
+.c360-summ td .st{display:block;font-size:12px;color:var(--muted)}
+.c360-summ td .st:empty{display:none}
 /* ==== ㊿+166 새 디자인 end ==== */

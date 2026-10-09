@@ -5,16 +5,16 @@ import { Viz } from './viz.js';
 import { $, applyPerms, canView, canWrite, clearSess, cssv, el, esc, isCC, isGN, keepLogin, LIVE2CODE, lline, loadPerms, mfaGate, mfaVerifiedOf,
   mfaWarnIfNeeded, mk, monOf, navText, permWriteGuard, rawHtml, refreshToken, restoreSess, saveSess, SB_KEY, SB_URL, seriesColor, sessRead,
   sessWrite, STATE, tpl, won } from './core.js';
-import { buildControls, expN, goWidget, hbars, idxs, renderAll, renderInstall, renderKpis, renderMatrix } from './dash.js';
+import { buildControls, expN, expScan, goWidget, hbars, idxs, renderAll, renderInstall, renderKpis, renderMatrix } from './dash.js';
 import { ask } from './ai.js';
 import { applyCodes, loadCodes } from './grids.js';
 import { eqOrderById, eqRetSet, eqScan, eqSerialsHtml, eqWant, syncOrderAssets } from './equipment.js';
-import { applyChannelMenu, chOf, dcSummary, ensureLeadSrc, liveData, openRenewList, renewScan } from './analysis.js';
+import { applyChannelMenu, chOf, ctRawOf, ctSuccessor, dcSummary, ensureLeadSrc, liveData, openRenewList, renewScan } from './analysis.js';
 import { applyMenuConf, fkNorm, menuSegments, navSub, openCust360, openMenuEdit, renderTodo, subgrpSync } from './tools.js';
 import { loadInbound, loadMxMemos } from './inbound.js';
 import { UPD, updCheck } from './upd.js';
 import { applyMenuFold, closeDrawer, ensureGroupOpen, setupSide } from './sales.js';
-import { btnBackSync, loadHide, NAV, navMenu, renderGrid, switchView } from './grid.js';
+import { btnBackSync, loadHide, NAV, navMenu, openDetail, renderGrid, switchView } from './grid.js';
 import { closeOvl, logChange, openOvl, OVL_SKIP_CLEAN, ovlMarkClean, setupEdit } from './edit.js';
 
 
@@ -236,7 +236,35 @@ export function gnTitleSync(v){
   t.textContent=name; s.textContent=grp;
 }
 
+/* ㊿+168 금액 단위 안내 — 화면마다 실제 단위(가격표 = 원 · 금액 없는 화면은 숨김 · 주간보고 예상매출 = 백만원) · 누르면 용어 설명 */
+export var UNIT_NONE={ordernew:1, orders:1, assets:1, eqboard:1, inbound:1, inbstat:1, mdrnew:1, mdrops:1, log:1, account:1, adminx:1, ops:1, aiknow:1, csite:1, kk:1, s1:1, quote:1, preport:1};
+export function unitSync(v){
+  var u=document.getElementById('unitBadge'); if(!u) return;
+  if(!u.__terms){ u.__terms=1; u.setAttribute('role','button'); u.tabIndex=0; u.style.cursor='pointer';
+    u.onclick=function(){ openTerms(); }; u.onkeydown=function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); openTerms(); } }; }
+  var mode= v==='price'? 'won' : (UNIT_NONE[v]? 'none' : (v==='weekly'? 'weekly' : 'kw'));
+  u.dataset.unit=mode; u.hidden=(mode==='none');
+  if(mode==='won'){ u.innerHTML=tpl`₩ <b>원</b> 단위<span class="ub-long"> · VAT별도</span>`; u.title='가격표는 원 단위입니다 (원/노드·월 · 원/Agent·년 등 표마다 표시 · VAT별도). 포탈의 다른 화면은 천원 단위 — 누르면 용어 설명'; }
+  else if(mode==='weekly'){ u.innerHTML=tpl`₩ <b>천원</b> 단위<span class="ub-long"> · 예상매출 백만원</span>`; u.title='주간회의의 금액은 천원 단위, 주간보고 «예상매출»은 시트 그대로 백만원 단위입니다 — 누르면 용어 설명'; }
+  else { u.innerHTML=tpl`₩ <b>천원</b> 단위<span class="ub-long"> 표시</span>`; u.title='포탈의 금액은 천원 단위입니다 (입력도 천원 · 저장은 원) — 예) 480천원 = 480,000원 · 가격표·견적만 원 단위 · 누르면 MRR·매출·ARR 용어 설명'; }
+}
+export function openTerms(){
+  var old=document.getElementById('ovlTerms'); if(old){ old.remove(); }
+  var ov=document.createElement('div'); ov.id='ovlTerms'; ov.className='ovl on';
+  var D=[['금액 단위','포탈 금액은 천원 단위입니다 — 입력도 천원(480 → 480,000원), 저장은 원. 가격표·견적서는 원 단위(VAT별도), 주간보고 «예상매출»은 백만원.'],
+    ['계약 MRR','계약서의 월 금액(계약 1건). 계약 목록 · 고객 360의 «계약 월 금액».'],
+    ['당월 인식 매출 (홈의 «당월 MRR»)','기준월에 월 매출표에 잡힌 금액의 합 — 부속 계약 포함, 시작·종료·해지 월을 반영. 사업 영역의 «고객 합계 · 당월 매출»도 같은 값.'],
+    ['연환산 ARR','당월 인식 매출 × 12. 목표 ARR 진행은 12월 계약분(12월 MRR × 12)도 함께 표시.'],
+    ['비즈포탈 회계매출','회계 시스템에 잡힌 매출(세금계산서 기준). 포탈 매출과의 차이는 정산 › 비즈포탈 차액에서 고객사별로 대조.'],
+    ['곳 · 건 · 대','고객사 수는 «곳», 계약·신청·알림 대상은 «건», 실물 장비는 «대».']];
+  ov.innerHTML=tpl`<div class="modal" role="dialog" aria-modal="true" aria-labelledby="termsT" style="width:min(560px,100%)"><h3 id="termsT">단위 · 용어</h3><dl class="terms">${rawHtml(D.map(function(x){ return tpl`<dt>${x[0]}</dt><dd>${x[1]}</dd>`; }).join(''))}</dl>`+
+    tpl`<div class="mact"><button type="button" class="pill" id="termsX">닫기</button></div></div>`;
+  document.body.appendChild(ov);
+  var x=ov.querySelector('#termsX'); x.onclick=function(){ ov.remove(); }; ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  setTimeout(function(){ x.focus(); }, 30);
+}
 export function railSync(v){
+  try{ unitSync(v); }catch(e){}
   var rail=document.getElementById('rail'); if(!rail) return;
   if(rail.querySelector('.gn-bar')){ gnNavSync(rail, v); mtabsSync(v); return; }
   var segs=[]; try{ segs=menuSegments(); }catch(e){}
@@ -310,9 +338,8 @@ export function renderInbox(){
   var orders=ST.RAWX.orders||[];
   var pendL=orders.filter(function(o){ return ['접수','출하요청','배송중'].indexOf(o.status)>=0; });
   var retL=orders.filter(function(o){ return o.status==='회수예정'; });
-  var expL=[], expAmt=0;
-  if(!EQ) list.forEach(function(k){ var r=ST.DATA.rows[k], e=r.endIdx;
-    if(e!=null && e>=b && e<=b+EN-1 && !/해지|종료|CN전환/.test(String(r.status||''))){ expL.push(r); expAmt+=ST.MAT[k][Math.min(e,ST.M-1)]||r.mrr||0; } });
+  /* ㊿+168 만료 = 사업 현황 타일 · 만료 예정 위젯과 같은 공통 집계(expScan — 원계약만 · 부속은 함께 만료) */
+  var XS=EQ? {rows:[], amt:0, custN:0} : expScan(list, b, EN), expL=XS.rows.map(function(k){ return ST.DATA.rows[k]; }), expAmt=XS.amt;
   var curYm=monOf(b)+'월', bizDone=EQ || (ST.RAWX.biz||[]).some(function(r){ return r.ym===curYm; });
   var todayS=todayStr();
   var oiLate=EQ? [] : (ST.RAWX.oi||[]).filter(function(o){ return o.next_date && String(o.next_date).slice(0,10)<todayS && !/수주|실패/.test(String(o.stage||'')); });
@@ -355,7 +382,7 @@ export function renderInbox(){
       acts:[{l:'보류', go:function(){ ccSnooze('dc',3); }},{l:'점검 화면 →', pri:1, go:function(){ switchView('dcheck'); }}]}); } }
   if(expL.length && !(RS && EN===1 && RS.due.length)){
     var ends=expL.map(function(r){ return r.endIdx; }).sort(function(x,y){ return x-y; });
-    add('exp', {lv:3, ic:'clock', cls:'info', t:tpl`${rawHtml(EN)}개월 내 만료 계약 <span class="num">${expL.length}건</span> — <span class="num">${won(expAmt)}</span>천원/월`,
+    add('exp', {lv:3, ic:'clock', cls:'info', t:tpl`${rawHtml(EN)}개월 내 만료 원계약 <span class="num">${expL.length}건</span> · 고객사 ${rawHtml(XS.custN)}곳 — 월 <span class="num">${won(expAmt)}</span>천원`,
       s:names(expL, function(r){ return r.cust; })+' · 종료 '+mk(ends[0])+(ends.length>1? '~'+mk(ends[ends.length-1]):'')+' · 재약정 타깃',
       acts:[{l:'고객 360', go:function(){ if(expL.length===1) openCust360(expL[0].cust); else goWidget('exp','계약 만료 예정'); }},{l:'재계약 타진', pri:1, go:function(){ goWidget('exp','계약 만료 예정'); }}]});
   }
@@ -724,44 +751,98 @@ export async function eqSetStatus(r, st){
   }catch(e){ toast('상태 변경 실패', String(e.message||e).slice(0,100), 'bad'); renderEqBoard(); }
 }
 
-/* ---- 고객 360 — 요약 4칸 · 다음 액션 제안 · 섹션 탭 (모달 본문 위에 덧붙임) ---- */
+/* ---- 고객 360 — 요약 4칸 · 다음 액션 제안 · 섹션 탭 (모달 본문 위에 덧붙임) ----
+   ㊿+168: 제안 전에 후속 계약(ctSuccessor) · 진행 중 OI 를 먼저 확인 — 재약정이 등록돼 있으면 «재약정 등록됨 → 후속 계약 보기»,
+   같은 갱신 OI 가 있으면 그 OI 로, 관계가 불확실하면 «후속 계약 확인 필요» (자동 확정 안 함) · 계약 만료만으로 장비 회수를 권하지 않음
+   장비 숫자는 «현재 임대중(시리얼 현황) · 회수 예정(회수예정 신청 중 아직 안 돌아온 대수) · 회수 완료 · 신청 이력(건)» 으로 나눔 */
+export function c360Equip(asts, ords){
+  var lentA=asts.filter(function(a){ return a.status==='임대중'; }), doneA=asts.filter(function(a){ return a.status==='회수완료'; });
+  var retPend=0, retOrd=[], partial=[], open=[];
+  ords.forEach(function(o){
+    if(o.status==='회수예정'){ var all=eqWant(o), dn=eqRetSet(o); var left=all.filter(function(s){ return dn.indexOf(String(s).toUpperCase())<0; }).length; retPend+=left; retOrd.push(o); }
+    else if(o.status==='설치완료' && eqRetSet(o).length) partial.push(o);
+    else if(['접수','출하요청','배송중'].indexOf(o.status)>=0) open.push(o);
+  });
+  var lent=lentA.length, src='현황';
+  if(!asts.length && ords.length){ src='신청'; ords.forEach(function(o){ if(o.status==='설치완료'||o.status==='회수예정'){ var all=eqWant(o), dn=eqRetSet(o); lent+=all.filter(function(s){ return dn.indexOf(String(s).toUpperCase())<0; }).length; } }); }
+  return {lent:lent, src:src, retPend:retPend, retOrd:retOrd, retDone:doneA.length, partial:partial, open:open,
+    ordN:ords.filter(function(o){ return o.status!=='취소'; }).length, ph:asts.filter(function(a){ return /^미등록-/.test(String(a.serial||'')); }).length};
+}
+/* 표 화면으로 가서 검색어로 좁힘 (상세에서 돌아와도 검색어 유지는 grid 쪽 규칙) */
+export function gridGo(view, q){
+  switchView(view);
+  setTimeout(function(){ var s=document.getElementById('dvSearch'); if(s && q!=null){ s.value=q; try{ renderGrid(); }catch(e){} } }, 30);
+}
 export function c360Enhance(nm, cts, lives, ois, inbs, asts, ords){
   var body=document.getElementById('c360Body'); if(!body) return;
-  var b=STATE.base, mrr=0, cum=0, nextEnd=null, churned=0;
+  var b=STATE.base, mrr=0, cum=0, churned=0;
   cts.forEach(function(r){
     var k=ST.DATA.rows.indexOf(r); if(k>=0){ mrr+=ST.MAT[k][b]||0; for(var j=0;j<ST.M;j++) cum+=ST.MAT[k][j]||0; }
     if(/해지/.test(String(r.status||''))) churned++;
-    else if(r.endIdx!=null && r.endIdx>=b && (nextEnd==null || r.endIdx<nextEnd)) nextEnd=r.endIdx;
   });
-  var live=ords.filter(function(o){ return o.status!=='회수완료' && o.status!=='취소'; });
-  var lent=0, retN=0; live.forEach(function(o){ var all=eqWant(o); lent+=all.length; retN+=eqRetSet(o).length; });
-  if(!live.length) lent=asts.filter(function(a){ return a.status==='임대중'; }).length;
+  /* 갱신 판단 대상 = 기준월 이후 끝나는 원계약(해지·중지·종료 제외) — 후속 계약이 확인된 계약·자동연장은 «다음 만료»에서 뺌 */
+  var roots=cts.filter(function(r){ return !r.parent && r.endIdx!=null && r.endIdx>=b && !/해지|중지|종료|CN전환/.test(String(r.status||'')); });
+  var succ=new Map(); roots.forEach(function(r){ var s=null; try{ s=ctSuccessor(r); }catch(e){} if(s) succ.set(r, s); });
+  var pending=roots.filter(function(r){ var s=succ.get(r); return !(s && s.sure) && !r.autoRenew; }).sort(function(x,y){ return x.endIdx-y.endIdx; });
+  var ec=pending[0]||null, nextEnd=ec? ec.endIdx : null;
+  var EQ=c360Equip(asts, ords);
   var dLeft=null; if(nextEnd!=null){ var y=+mk(nextEnd).slice(0,4), m=+mk(nextEnd).slice(5,7); var endD=new Date(y, m, 0); dLeft=Math.ceil((endD.getTime()-Date.now())/864e5); }
   var sum=tpl`<div class="c360-sum">`+
-    tpl`<div><div class="l">월 MRR (${mk(b)})</div><div class="v num">${won(mrr)}<small> 천원</small></div></div>`+
+    tpl`<div><div class="l">월 MRR</div><div class="v num">${won(mrr)}<small> 천원</small></div><div class="mini">${mk(b)} 인식 금액</div></div>`+
     tpl`<div><div class="l">누적 매출</div><div class="v num">${won(cum)}<small> 천원</small></div></div>`+
-    tpl`<div><div class="l">임대 장비</div><div class="v num">${rawHtml(lent)}<small> 대${rawHtml(retN? ' · 회수 '+retN:'')}</small></div></div>`+ tpl`${rawHtml(dLeft!=null? tpl`<div class="${dLeft<=90?'warn':''}"><div class="l">다음 만료</div><div class="v num">D-${Math.max(0,dLeft)}</div></div>` : '<div><div class="l">다음 만료</div><div class="v">—</div></div>')}</div>`;
-  /* 다음 액션 제안 (규칙) */
+    tpl`<div title="현재 임대중 = 장비 현황(시리얼)에서 임대중 · 회수 예정 = 회수예정 신청 중 아직 회수 안 된 대수 · 신청 = 발주(신청) 이력 건수(취소 제외)"><div class="l">임대중 장비${rawHtml(EQ.src==='신청'? ' (신청 기준)':'')}</div><div class="v num">${rawHtml(EQ.lent)}<small> 대</small></div>`+
+      tpl`<div class="mini">회수 예정 ${rawHtml(EQ.retPend)}대 · 완료 ${rawHtml(EQ.retDone)}대</div></div>`+
+    tpl`${rawHtml(dLeft!=null? tpl`<div class="${dLeft<=90?'warn':''}" title="재약정이 등록되지 않은 계약 중 가장 먼저 끝나는 계약"><div class="l">다음 만료</div><div class="v num">D-${Math.max(0,dLeft)}</div><div class="mini">${lline(ec.line)} · ${mk(nextEnd)}</div></div>` : tpl`<div><div class="l">다음 만료</div><div class="v">—</div><div class="mini">${roots.length? '모두 재약정 등록·자동연장' : '진행 중 계약 없음'}</div></div>`)}</div>`;
+  /* 다음 행동 제안 */
   var tips=[], acts=[];
-  if(dLeft!=null && dLeft<=90){ var ec=cts.filter(function(r){ return r.endIdx===nextEnd; })[0]; tips.push((ec? lline(ec.line)+' 계약이 ':'계약이 ')+Math.max(0,dLeft)+'일 뒤 종료됩니다'+(churned? ' (과거 해지 이력 '+churned+'건)':' (해지 이력 없음)')+'.'); acts.push(['재계약 OI 만들기', function(){ closeOvl('ovlC360'); switchView('oinew'); setTimeout(function(){ var c=document.getElementById('oiCust'); if(c){ c.value=nm; } },80); }]); }
-  if(retN && retN<lent) tips.push('장비 '+lent+'대 중 '+retN+'대가 회수 진행 중입니다. 잔여 '+(lent-retN)+'대 회수 여부를 함께 확인하세요.');
-  else if(live.some(function(o){ return o.status==='회수예정'; })) tips.push('장비 회수가 예정되어 있습니다.');
-  if(live.length) acts.push(['장비 대시보드', function(){ closeOvl('ovlC360'); EQB.q=nm; switchView('eqboard'); var qi=document.getElementById('eqbQ'); if(qi) qi.value=nm; }]);
   var openOi=ois.filter(function(o){ return !/수주|계산서|종료|중지|실패/.test(String(o.stage||'')); });
-  if(openOi.length) tips.push('진행 중 OI '+openOi.length+'건이 있습니다'+(openOi[0].next_date? ' · 다음 일정 '+String(openOi[0].next_date).slice(0,10):'')+'.');
+  function goSucc(r){ return function(){ var c=ctRawOf(r._id); if(c) openDetail(c); else toast('계약 상세','이 계약 원본을 아직 불러오지 못했습니다 — 잠시 뒤 다시 눌러 주세요','info'); }; }
+  roots.forEach(function(r){ var s=succ.get(r); if(s && s.sure && r.endIdx-b<=6){
+    tips.push(tpl`<b>재약정 등록됨</b> — ${lline(r.line)} ${mk(r.startIdx)}~${mk(r.endIdx)} 다음 계약 ${mk(s.row.startIdx)}~${s.row.endIdx!=null? mk(s.row.endIdx):''} (${s.row.status||s.row.ctype||''})`);
+    if(acts.length<4) acts.push(['후속 계약 보기 ('+mk(s.row.startIdx)+'~)', goSucc(s.row)]); } });
+  if(ec && dLeft!=null && dLeft<=90){
+    var s0=succ.get(ec);
+    var lead=tpl`${lline(ec.line)} 계약이 <b>${rawHtml(Math.max(0,dLeft))}일 뒤</b>(${mk(ec.endIdx)}) 끝납니다${rawHtml(churned? ' · 과거 해지 이력 '+churned+'건':'')}.`;
+    if(s0 && !s0.sure){ tips.push(tpl`${rawHtml(lead)} <b>후속 계약 확인 필요</b> — ${s0.row.cust} ${lline(s0.row.line)} ${mk(s0.row.startIdx)}~ 계약이 같은 갱신인지 확인하세요(자동으로 연결하지 않음).`);
+      acts.push(['후보 계약 보기 ('+mk(s0.row.startIdx)+'~)', goSucc(s0.row)]); }
+    else if(openOi.length){ tips.push(tpl`${rawHtml(lead)} 진행 중 OI «${openOi[0].deal_name||'영업기회'}»(${openOi[0].stage||''}) — 그 OI 로 갱신을 진행하세요.`);
+      acts.push(['진행 중 OI 보기', function(){ closeOvl('ovlC360'); gridGo('oi', nm); }]); }
+    else { tips.push(tpl`${rawHtml(lead)} 등록된 후속 계약·진행 중 OI 가 없습니다.`);
+      acts.push(['재계약 OI 만들기', function(){ closeOvl('ovlC360'); switchView('oinew'); setTimeout(function(){ var c=document.getElementById('oiCust'); if(c){ c.value=nm; } },80); }]); }
+    if(EQ.lent) tips.push(tpl`임대 장비 ${rawHtml(EQ.lent)}대는 재약정하면 그대로 씁니다 — 종료가 확정될 때만 회수 신청을 하세요.`);
+  }
+  if(EQ.retPend) tips.push(tpl`회수 예정 장비 ${rawHtml(EQ.retPend)}대(신청 ${rawHtml(EQ.retOrd.map(function(o){ return '#'+o.id; }).join(', '))}) — 장비 대시보드에서 회수 처리.`);
+  if(EQ.partial.length) tips.push(tpl`부분 회수된 신청 ${rawHtml(EQ.partial.length)}건 — 남은 장비를 계속 쓸지 확인하세요.`);
+  if(EQ.open.length) tips.push(tpl`처리 대기 장비 신청 ${rawHtml(EQ.open.length)}건(${rawHtml(EQ.open.map(function(o){ return o.status; }).join('·'))}).`);
+  if(EQ.ph) tips.push(tpl`시리얼 미등록 장비 ${rawHtml(EQ.ph)}대 — 시리얼 보완이 필요합니다.`);
+  if(EQ.retPend || EQ.partial.length || EQ.open.length || EQ.ph) acts.push(['장비 대시보드', function(){ closeOvl('ovlC360'); EQB.q=nm; switchView('eqboard'); var qi=document.getElementById('eqbQ'); if(qi) qi.value=nm; }]);
+  if(openOi.length && !(ec && dLeft!=null && dLeft<=90)) tips.push(tpl`진행 중 OI ${rawHtml(openOi.length)}건${rawHtml(openOi[0].next_date? ' · 다음 일정 '+esc(String(openOi[0].next_date).slice(0,10)):'')}.`);
   var stale=inbs.filter(function(r){ return /진행중/.test(String(r.result||'')); });
-  if(stale.length) tips.push('진행중인 인바운드 '+stale.length+'건이 남아 있습니다.');
+  if(stale.length) tips.push(tpl`진행중인 인바운드 ${rawHtml(stale.length)}건이 남아 있습니다.`);
   if(!tips.length) tips.push(cts.length? '만료·회수·미결 항목이 없습니다. 정기 점검(분기 1회) 정도면 충분합니다.' : '계약 정보가 없는 고객사입니다 — OI·인바운드 기록을 확인하세요.');
-  var next=tpl`<div class="c360-next"><b>${rawHtml(ico('spark',14))}다음 액션 제안</b><p>${tips.join(' ')}</p>${rawHtml(acts.length? tpl`<div class="ba">${rawHtml(acts.map(function(a,i){ return tpl`<button type="button" class="cbtn" data-a="${rawHtml(i)}">${a[0]}</button>`; }).join(''))}</div>`:'')}</div>`;
+  var next=tpl`<div class="c360-next"><b>${rawHtml(ico('spark',14))}다음 행동 제안</b><ul>${rawHtml(tips.map(function(x){ return tpl`<li>${rawHtml(x)}</li>`; }).join(''))}</ul>${rawHtml(acts.length? tpl`<div class="ba">${rawHtml(acts.map(function(a,i){ return tpl`<button type="button" class="cbtn${i===0?' pri':''}" data-a="${rawHtml(i)}">${a[0]}</button>`; }).join(''))}</div>`:'')}</div>`;
+  /* 요약 탭(기본): 지금 유효한 계약 + 시작 예정 + 장비 네 칸 · 상세는 기존 탭 */
+  var valid=cts.filter(function(r){ return r.startIdx!=null && r.startIdx<=b && (r.endIdx==null || r.endIdx>=b) && !/해지|중지/.test(String(r.status||'')); });
+  var upc=cts.filter(function(r){ return r.startIdx!=null && r.startIdx>b; });
+  function line(r, tag){ var k=ST.DATA.rows.indexOf(r), a=k>=0? (ST.MAT[k][b]||0) : 0; var s=succ.get(r);
+    return tpl`<tr data-c360sum="${rawHtml(r._id)}" tabindex="0" title="계약 상세"><td><span class="ctag ${rawHtml(tag==='유효'?'ok':'info')}">${rawHtml(r.parent? '추가 계약' : tag)}</span></td><td>${lline(r.line)}<span class="st">${r.status||r.ctype||''}</span></td><td>${mk(r.startIdx)} ~ ${r.endIdx!=null? mk(r.endIdx):'—'}</td>`+
+      tpl`<td class="n">${tag==='유효'? won(a) : '—'}</td><td class="n">${won(r.mrr||0)}</td><td class="mini">${rawHtml(r.autoRenew? '자동연장' : (s? (s.sure? '재약정 등록됨' : '후속 계약 확인 필요') : ''))}</td></tr>`; }
+  var summ=tpl`<div class="c360-summ"><h4>지금 계약 <span class="ct">유효 ${rawHtml(valid.length)}건${rawHtml(upc.length? ' · 시작 예정 '+upc.length+'건':'')} · 금액 단위 천원</span></h4>`+
+    tpl`${rawHtml(valid.length||upc.length? tpl`<div class="c360-summ-w"><table><thead><tr><th>구분</th><th>서비스 · 계약 상태</th><th>기간</th><th class="n" title="기준월(${mk(b)})에 인식되는 금액">${mk(b)} 인식</th><th class="n" title="계약서 기준 월 금액">월 금액</th><th>갱신</th></tr></thead><tbody>${rawHtml(valid.map(function(r){ return line(r,'유효'); }).concat(upc.map(function(r){ return line(r,'시작 예정'); })).join(''))}</tbody></table></div>` : '<p class="cap" style="margin:2px 0 0">기준월에 유효한 계약이 없습니다 — «계약» 탭에서 이력을 확인하세요.</p>')}`+
+    tpl`<h4 style="margin-top:14px">장비 <span class="ct">상세는 «장비» 탭</span></h4><div class="c360-eq4"><div><b class="num">${rawHtml(EQ.lent)}</b><span>현재 임대중 (대)</span></div><div><b class="num">${rawHtml(EQ.retPend)}</b><span>회수 예정 (대)</span></div><div><b class="num">${rawHtml(EQ.retDone)}</b><span>회수 완료 (대)</span></div><div><b class="num">${rawHtml(EQ.ordN)}</b><span>신청(발주) 이력 (건)</span></div></div></div>`;
   /* 섹션 탭 */
   var secs=[].slice.call(body.querySelectorAll('.c360-sec'));
-  var tabs=tpl`<div class="c360-tabs" role="tablist"><button type="button" role="tab" aria-selected="true" data-t="-1">전체</button>${rawHtml(secs.map(function(sc,i){ var h4=sc.querySelector('h4'); var t=h4? h4.textContent.replace(/^\S+\s/,'').replace(/\s*\d+건\s*$/,'').replace(/계약 기준.*$/,'').trim() : '섹션'; var ct=h4&&h4.querySelector('.ct')? h4.querySelector('.ct').textContent.replace('건','') : ''; return tpl`<button type="button" role="tab" aria-selected="false" data-t="${rawHtml(i)}">${t}${rawHtml(ct? tpl`<span class="ct">${ct}</span>`:'')}</button>`; }).join(''))}</div>`;
+  var tabs=tpl`<div class="c360-tabs" role="tablist"><button type="button" role="tab" aria-selected="true" data-t="-2">요약</button>${rawHtml(secs.map(function(sc,i){ var h4=sc.querySelector('h4'); var t=h4? h4.textContent.replace(/^\S+\s/,'').replace(/\s*[\d,]+\s*(건|대|곳)(\s*임대중)?\s*$/,'').replace(/계약 기준.*$/,'').trim() : '섹션'; var ct=h4&&h4.querySelector('.ct')? h4.querySelector('.ct').textContent.replace('건','').replace(/\s*임대중$/,'') : ''; return tpl`<button type="button" role="tab" aria-selected="false" data-t="${rawHtml(i)}">${t}${rawHtml(ct? tpl`<span class="ct">${ct}</span>`:'')}</button>`; }).join(''))}<button type="button" role="tab" aria-selected="false" data-t="-1">전체</button></div>`;
   var head=document.createElement('div'); head.innerHTML=sum+next+tabs;
   body.insertBefore(head, body.firstChild);
+  var sv=document.createElement('div'); sv.className='c360-summary-pane'; sv.innerHTML=summ; head.appendChild(sv);
   head.querySelectorAll('[data-a]').forEach(function(bt){ bt.onclick=function(){ acts[+bt.dataset.a][1](); }; });
+  sv.querySelectorAll('tr[data-c360sum]').forEach(function(tr){ var go=function(){ var c=ctRawOf(Number(tr.getAttribute('data-c360sum'))); if(c) openDetail(c); }; tr.onclick=go; tr.onkeydown=function(e){ if(e.key==='Enter'){ e.preventDefault(); go(); } }; });
+  function show(t){ sv.style.display= t===-2? '' : 'none'; secs.forEach(function(sc,i){ sc.style.display=(t===-1||t===i)? '':'none'; }); }
   head.querySelectorAll('[role="tab"]').forEach(function(bt){ bt.onclick=function(){
     head.querySelectorAll('[role="tab"]').forEach(function(x){ x.setAttribute('aria-selected', x===bt? 'true':'false'); });
-    var t=+bt.dataset.t; secs.forEach(function(sc,i){ sc.style.display=(t<0||t===i)? '':'none'; }); }; });
+    show(+bt.dataset.t); }; });
+  show(-2);
 }
 
 export function showAuthUi(){

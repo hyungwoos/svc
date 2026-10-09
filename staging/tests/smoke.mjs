@@ -1908,6 +1908,79 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
     return out.join(' · ');
   });
 }
+// ㊿+168 1차: 집계 기준(만료 = 공통 집계) · 사업 영역 기준월 보기 · 고객 360 후속 계약/OI/장비 구분 · 정산 미입력·0원 · 화면별 단위
+//   오늘 날짜 기준 상대 월로 만든 검증 사례(가상 «검증_» 고객)를 픽스처에 덧붙여 가짜 DB 로 읽음 — 운영 데이터와 무관
+{
+  const { FIX } = await import('./lib.mjs');
+  const now = new Date(), T0 = now.getFullYear() * 12 + now.getMonth();
+  const ym = (o) => { const x = T0 + o; return Math.floor(x / 12) + '-' + String(x % 12 + 1).padStart(2, '0'); };
+  const F = JSON.parse(JSON.stringify(FIX)), base = F.contracts[0];
+  const C = (id, cid, line, ch, ctype, st, s, e, mrr, parent) => Object.assign({}, base, { id, customer_id: cid, line, channel: ch, contract_type: ctype, status: st, start_month: ym(s) + '-01', end_month: ym(e) + '-01', mrr, qty: 100, parent_contract_id: parent || null, partner: '직접', biller: '직접', sale_type: ctype === '신규' ? '신규' : ctype, total_amount: mrr * 12 });
+  [[901, '검증_재약정'], [902, '검증_부속'], [903, '검증_종료추가'], [904, '검증_후보'], [905, '검증_OI'], [906, '검증_장비']].forEach(([id, name]) => F.customers.push({ id, name, industry: '공공', aliases: [] }));
+  const cs = [C(9011, 901, 'Cloud', '조달', '재약정', '재약정', -33, 2, 300000), C(9012, 901, 'Cloud', '조달', '재약정', '재약정', 3, 38, 320000),
+    C(9021, 902, 'Cloud', '일반', '신규', '활성', -23, 1, 200000), C(9022, 902, 'Cloud', '일반', '추가', '추가', -16, 1, 50000, 9021),
+    C(9031, 903, 'Cloud', '조달', '신규', '활성', -21, 14, 150000), C(9032, 903, 'Cloud', '조달', '추가', '추가', -9, -4, 30000, 9031),
+    C(9041, 904, 'MDR', '일반', '신규', '활성', -24, 1, 100000), C(9042, 904, 'Cloud', '일반', '신규', '활성', 5, 16, 120000),
+    C(9051, 905, 'Cloud', '일반', '신규', '활성', -21, 2, 90000), C(9061, 906, 'Cloud', '일반', '신규', '활성', -33, 1, 110000)];
+  F.contracts.push(...cs); cs.forEach((c) => F.mrsegs.push([c.id, c.start_month, c.end_month, c.mrr]));
+  F.oi.push({ id: 905, customer: '검증_OI', stage: '제안', prob: 50, amount: 90000000, line: 'Cloud', owner: '담당자B', created_at: ym(-1) + '-01', expected_month: ym(2) + '-01', deal_name: '검증_OI 재계약' });
+  const O = (id, model, qty, serials, status, ret) => ({ id, channel: '일반', order_type: '신규발주', customer: '검증_장비', model, qty, serials, status, install_date: ym(-30) + '-10', created_at: ym(-30) + '-02T00:00:00', returned_date: null, returned_serials: ret, request_note: '' });
+  F.orders.push(O(9601, 'S100', 3, 'VF0000001, VF0000002, VF0000003', '설치완료', 'VF0000001'), O(9602, 'S200', 2, 'VF0000004, VF0000005', '회수예정', 'VF0000004'), O(9603, 'S100', 1, '', '접수', null));
+  const A = (id, sn, st, oid) => ({ id, serial: sn, model: 'S100', usage: '임대', status: st, customer: '검증_장비', channel: '일반', order_id: oid, deployed_date: ym(-30) + '-10', returned_date: null, note: null });
+  F.assets.push(A(9701, 'VF0000001', '회수완료', 9601), A(9702, 'VF0000002', '임대중', 9601), A(9703, 'VF0000003', '임대중', 9601), A(9704, 'VF0000004', '회수완료', 9602), A(9705, 'VF0000005', '임대중', 9602), A(9706, '미등록-9603-1', '재고', 9603));
+  const PY = now.getFullYear() - 1, Bz = (m, item, v) => ({ ym: m + '월', kind: 'sum', item, biz: v, sheet: null, diff: null, note: null, as_of: PY + '-' + String(m + 1).padStart(2, '0') + '-05' });
+  F.biz = [Bz(7, '비즈포탈 회계매출', 70000000), Bz(7, '매출시트 매출', 72000000), Bz(8, '비즈포탈 회계매출', 78000000), Bz(8, '매출시트 매출', 0)];
+  F.mtargets = (F.mtargets || []).concat(Array.from({ length: 12 }, (_, i) => ({ year: PY, month: i + 1, amount: 80000000 })));
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page);
+  await mockBackend(page, { extra: async (route, u) => { if (u.includes('/rpc/load_all')) { await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(Object.assign({}, F, { roles: [{ role: 'super_admin' }] })) }); return true; } return false; } });
+  await page.goto(url + '/index.html'); await page.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA, null, { timeout: 15000 }); await page.waitForTimeout(600);
+  await S.t('㊿+168 만료 집계: 사업 현황 타일 = 오늘 처리할 일 = 만료 예정 위젯 = 타일 목록(건수·금액·고객사) · 부속 계약 제외(비고 «함께 만료») · 후속 계약 비고', async () => {
+    const r = await page.evaluate(() => { const S = SVC, list = S.idxs(), xs = S.expScan(list); const tile = [...document.querySelectorAll('#kpis .kpi')].find((k) => /개월 내 만료/.test(k.textContent));
+      const ib = [...document.querySelectorAll('#ccInbox .ib-row')].find((x) => /만료 원계약/.test(x.textContent)); S.renderExpiring(list); const cap = document.getElementById('capExp').textContent;
+      S.kpiOpen('exp'); const rows = [...document.querySelectorAll('#crList tbody tr')], title = document.getElementById('crTitle').textContent, notes = rows.map((tr) => tr.children[7].textContent).join('|'); S.closeOvl('ovlCr');
+      const kids = xs.rows.filter((k) => S.ST.DATA.rows[k].parent).length;
+      return { n: xs.rows.length, amt: S.won(xs.amt), cust: xs.custN, tile: tile.querySelector('.v').textContent + ' ' + tile.querySelector('.d').textContent, ib: ib ? ib.textContent : '', cap, rows: rows.length, title, notes, kids }; });
+    const has = (s) => s.includes(r.n + '건') && s.includes(r.amt);
+    assert(r.kids === 0 && has(r.tile) && has(r.ib) && has(r.cap) && r.rows === r.n && has(r.title) && r.ib.includes('고객사 ' + r.cust + '곳') && r.title.includes('고객사 ' + r.cust + '곳'), JSON.stringify(r));
+    assert(/부속 1건 함께 만료/.test(r.notes) && /재약정 등록됨/.test(r.notes) && /후속 계약 확인 필요/.test(r.notes), '비고 ' + r.notes);
+    return r.n + '건 · ' + r.amt + '천원 · ' + r.cust + '곳';
+  });
+  await S.t('㊿+168 사업 영역(조달): 기본 «현재 유효» — 기준월 유효 계약의 고객 합계(=당월 MRR) · 현행 기간 · 갱신 상태(재약정 등록됨) · 종료된 추가 계약이 대표로 안 나옴 · «시작 예정» · «전체 이력» 기준월 상태', async () => {
+    await page.evaluate(() => { localStorage.removeItem('svc_chv_mode'); SVC.switchView('cnpub'); }); await page.waitForTimeout(500);
+    const r = await page.evaluate(() => { const rows = () => [...document.querySelectorAll('#chvCt tbody tr')].map((tr) => [...tr.children].map((td) => td.textContent.trim()));
+      const mode = document.querySelector('#chvMode [aria-pressed="true"]').dataset.m, cur = rows(); const tile = SVC.won(SVC.monthlyTotal(SVC.CHV.all.map((x) => SVC.ST.DATA.rows.indexOf(x)), SVC.STATE.base));
+      const sum = SVC.chvCurRows(SVC.CHV.all, SVC.STATE.base).reduce((a, x) => a + (x._sum || 0), 0);
+      document.querySelector('#chvMode button[data-m="next"]').click(); const nx = rows(); document.querySelector('#chvMode button[data-m="all"]').click(); const al = rows(); document.querySelector('#chvMode button[data-m="cur"]').click();
+      return { mode, re: cur.find((x) => /^검증_재약정/.test(x[0])), ad: cur.find((x) => /^검증_종료추가/.test(x[0])), tile, sum: SVC.won(sum), nx: nx.filter((x) => /^검증_/.test(x[0])), al: al.filter((x) => /^검증_종료추가/.test(x[0])).map((x) => x[1]) }; });
+    assert(r.mode === 'cur' && r.re && /재약정 등록됨/.test(r.re[5]) && r.re[6] === '300' && r.ad && r.ad[6] === '150' && /~/.test(r.ad[4]) && r.tile === r.sum, JSON.stringify(r));
+    assert(r.nx.length === 1 && /^검증_재약정/.test(r.nx[0][0]) && r.al.some((x) => /추가 계약 · 종료/.test(x)) && r.al.includes('유효'), JSON.stringify(r));
+    return '고객 합계 ' + r.sum + ' = 당월 MRR ' + r.tile;
+  });
+  await S.t('㊿+168 고객 360: 재약정 등록 → «후속 계약 보기»(재계약 OI 제안 없음) · 서비스가 다른 후보 → «후속 계약 확인 필요» · 진행 중 OI → 그 OI 로 · 장비 = 임대중/회수 예정/회수 완료/신청 · 기본 탭 요약', async () => {
+    const one = (nm) => page.evaluate((nm) => { SVC.openCust360(nm); const n = document.querySelector('#c360Body .c360-next'); const o = { tips: n.textContent, acts: [...n.querySelectorAll('.cbtn')].map((x) => x.textContent).join('|'), eq: [...document.querySelectorAll('#c360Body .c360-eq4 b')].map((x) => x.textContent).join('/'), tab: document.querySelector('#c360Body [role="tab"][aria-selected="true"]').textContent, secHidden: [...document.querySelectorAll('#c360Body .c360-sec')].every((s) => s.style.display === 'none') }; SVC.closeOvl('ovlC360'); return o; }, nm);
+    const a = await one('검증_재약정'), b = await one('검증_후보'), o = await one('검증_OI'), e = await one('검증_장비');
+    assert(/재약정 등록됨/.test(a.tips) && /후속 계약 보기/.test(a.acts) && !/재계약 OI/.test(a.acts) && a.tab === '요약' && a.secHidden, '재약정 ' + JSON.stringify(a));
+    assert(/후속 계약 확인 필요/.test(b.tips) && /후보 계약 보기/.test(b.acts), '후보 ' + JSON.stringify(b));
+    assert(/진행 중 OI/.test(o.tips) && /진행 중 OI 보기/.test(o.acts) && !/재계약 OI 만들기/.test(o.acts), 'OI ' + JSON.stringify(o));
+    assert(e.eq === '3/1/2/3' && /재약정하면 그대로/.test(e.tips) && /미등록/.test(e.tips) && /부분 회수/.test(e.tips), '장비 ' + JSON.stringify(e));
+    return '장비 ' + e.eq;
+  });
+  await S.t('㊿+168 정산 달성률: 미입력 달은 0 이 아님 · 분기 «잠정 · 3개월 중 2개월 입력» + 입력 월 기준 달성률 + 기간 목표 대비 · 입력 없는 분기 «미집계» · 입력된 0 은 0', async () => {
+    await page.evaluate(() => SVC.switchView('biz')); await page.waitForTimeout(400);
+    const r = await page.evaluate(() => [...document.querySelectorAll('.biz-tg tbody tr')].map((tr) => [...tr.children].map((td) => td.textContent.trim())));
+    const q3 = r.find((x) => x[0] === '3분기'), q4 = r.find((x) => x[0] === '4분기'), m8 = r.find((x) => x[0] === '8월'), m9 = r.find((x) => x[0] === '9월');
+    assert(q3 && /잠정 · 3개월 중 2개월 입력/.test(q3[1]) && /^92\.5%/.test(q3[4]) && /기간 목표 대비 61\.7%/.test(q3[4]) && q4 && q4[1] === '미집계' && q4[4] === '미집계' && m8 && m8[5] === '0' && m8[6] === '0.0%' && m9 && m9[1] === '미입력' && m9[3] === '—', JSON.stringify({ q3, q4, m8, m9 }));
+    return q3[4];
+  });
+  await S.t('㊿+168 단위: 상단 단위 안내가 화면마다(홈 천원 · 가격표 원·VAT별도 · 장비 신청 내역 숨김 · 주간회의 백만원 안내) · 누르면 용어 설명(MRR·당월 인식·ARR·회계매출·곳/건/대)', async () => {
+    const u = {}; for (const v of ['dash', 'price', 'orders', 'weekly']) { await page.evaluate((v) => SVC.switchView(v), v); await page.waitForTimeout(200); u[v] = await page.evaluate(() => { const b = document.getElementById('unitBadge'); return b.hidden ? '숨김' : b.textContent; }); }
+    await page.evaluate(() => SVC.switchView('dash')); await page.click('#unitBadge'); await page.waitForTimeout(100);
+    const terms = await page.evaluate(() => [...document.querySelectorAll('#ovlTerms dt')].map((x) => x.textContent).join('|')); await page.keyboard.press('Escape');
+    assert(/천원/.test(u.dash) && /원 단위/.test(u.price) && /VAT/.test(u.price) && u.orders === '숨김' && /백만원/.test(u.weekly) && /계약 MRR/.test(terms) && /당월 인식/.test(terms) && /ARR/.test(terms) && /회계매출/.test(terms) && /곳 · 건 · 대/.test(terms), JSON.stringify({ u, terms }));
+    assert(!c.errs.length, c.errs.join(' | ')); return JSON.stringify(u);
+  });
+  await ctx.close();
+}
 await browser.close(); srv.close();
 const ok = S.report();
 fs.writeFileSync(path.join(OUT, 'smoke.json'), JSON.stringify(S.results, null, 1));
