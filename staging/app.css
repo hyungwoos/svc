@@ -2276,4 +2276,79 @@ html[data-skin="gn"] #gnSum{order:0;grid-column:1/-1;display:grid;grid-template-
 @media (max-width:1100px){ html[data-skin="gn"] #btnFont{padding:0 9px} html[data-skin="gn"] .topbar .gn-ttl #gnSub{display:none} }
 /* 표 칸 안 «해당 없음»(읽기 프로그램용) — absolute 면 가로 스크롤 상자 밖으로 새어 페이지가 넓어짐 → 칸 안에 1px 로 */
 .dgrid td .sr{position:static!important;display:inline-block;vertical-align:top}
+/* ===== ㊿+170 3차 — 입력 단계 · 영업/인바운드 보기 · 리포트/해지율/점검 · 폰 ===== */
+.wz-steps{display:flex;gap:6px;flex-wrap:wrap;list-style:none;margin:0 0 16px;padding:0;counter-reset:none}
+.wz-steps li{flex:1 1 0;min-width:110px}
+.wz-steps button{display:flex;align-items:center;gap:8px;width:100%;height:40px;padding:0 12px;border:1px solid var(--grid);border-radius:10px;background:var(--surface);color:var(--muted);font:inherit;font-size:14px;font-weight:600;cursor:pointer;text-align:left}
+.wz-steps button b{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--surface-2);color:var(--ink-2);font-size:12px;flex:none}
+.wz-steps button[aria-current="step"]{border-color:var(--brand-solid);color:var(--ink);box-shadow:inset 0 -3px 0 var(--brand-solid)}
+.wz-steps button[aria-current="step"] b{background:var(--brand-solid);color:#fff}
+.wz-steps button.done{color:var(--ink-2)}
+.wz-steps button.done b{background:var(--brand-t);color:var(--brand-ink,var(--brand))}
+.wz-steps button:focus-visible{outline:2px solid var(--s1);outline-offset:2px}
+.wz-step[hidden]{display:none!important}
+.wz-nav{margin-top:18px;display:flex;align-items:center;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.wz-nav .mmsg{margin-right:auto}
+.wz-nav [hidden]{display:none!important}
+.wz-err{margin-top:4px;font-size:13px;font-weight:600;color:var(--critical)}
+[aria-invalid="true"]{border-color:var(--critical)!important}
+.wz-dup{margin-top:6px;padding:8px 10px;border-radius:8px;background:rgba(237,161,0,.12);color:var(--warn-ink);font-size:13px;font-weight:600;line-height:1.45}
+.wz-sum{display:grid;gap:12px}
+.wz-sum section{border:1px solid var(--grid);border-radius:12px;padding:10px 14px}
+.wz-sum h4{display:flex;align-items:center;gap:8px;margin:0 0 6px;font-size:14px}
+.wz-sum h4 .cap-more{margin-left:auto;font-size:13px}
+.wz-sum dl{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:4px 14px;margin:0;font-size:14px}
+.wz-sum dl div{display:contents}
+.wz-sum dt{color:var(--muted);font-weight:600}
+.wz-sum dd{margin:0;color:var(--ink);overflow-wrap:anywhere}
+.wz-note{margin:14px 0 0;padding:10px 12px;border-radius:10px;background:rgba(42,120,214,.08);color:var(--info-ink);font-size:13px;font-weight:600;line-height:1.5}
+@media (max-width:760px){ .wz-steps li{min-width:0} .wz-steps button{padding:0 8px;font-size:13px} .wz-steps button span{display:none} }
+/* 리포트: 템플릿 먼저 · 조합은 «조합 바꾸기» · SQL 은 고급 분석 */
+.qb-tpl{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;margin:4px 0 12px}
+.qb-tc{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:12px 14px;border:1px solid var(--grid);border-radius:12px;background:var(--surface);color:var(--ink);font:inherit;text-align:left;cursor:pointer;min-width:0}
+.qb-tc b{font-size:14px;font-weight:700;line-height:1.35}
+.qb-tc span{font-size:12px;color:var(--muted);line-height:1.4}
+.qb-tc:hover{border-color:var(--axis)}
+.qb-tc.on{border-color:var(--brand-solid);box-shadow:inset 0 0 0 1px var(--brand-solid)}
+.qb-tc.auto{background:var(--surface-2)}
+.qb-tc:focus-visible{outline:2px solid var(--s1);outline-offset:2px}
+.qb-wrap.nobuild{grid-template-columns:minmax(0,1fr)}
+.qb-wrap.nobuild .qb-panel-card{display:none}
+.qb-adv{border-top:1px dashed var(--grid);padding-top:10px}
+.qb-adv-h{display:flex;align-items:center;gap:8px;justify-content:space-between;margin-bottom:8px}
+/* 해지율: 적용 기준 한 줄 · 고급 설정 접기 */
+.cr-applied{margin:0 0 10px;padding:9px 12px;border-radius:10px;background:var(--surface-2);font-size:13px;color:var(--ink-2);line-height:1.5}
+.cr-applied b{margin-right:6px;color:var(--ink)}
+.cr-adv{margin-top:8px}
+.cr-adv>summary{cursor:pointer;font-size:13px;font-weight:600;color:var(--ink-2);padding:4px 0}
+.cr-adv[open]>summary{margin-bottom:6px}
+/* 데이터 점검: 문제 · 업무 영향 · 대상 · 해결 행동 */
+.dc-dl{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:4px 12px;margin:8px 0 0 26px;font-size:13px;line-height:1.5}
+.dc-dl div{display:contents}
+.dc-dl dt{color:var(--muted);font-weight:600}
+.dc-dl dd{margin:0;color:var(--ink-2);min-width:0}
+.dc-dl .dc-bulk{margin-left:6px;height:26px;font-size:13px}
+.dc-ok{margin:6px 0 0 26px;color:var(--muted)}
+.dc-tech{margin:6px 0 0 26px}
+.dc-tech>summary{cursor:pointer;font-size:12px;color:var(--muted)}
+.dc-okall{margin-top:6px}
+.dc-okall>summary{cursor:pointer;padding:8px 2px;font-size:13px;font-weight:600;color:var(--muted)}
+/* 빠른 보기 */
+.qv-bar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.qv-bar[hidden]{display:none!important}
+.qv-bar .chip.zero b{font-weight:500}
+.qv-bar .chip[aria-pressed="true"]{background:var(--brand-solid);border-color:var(--brand-solid);color:#fff}
+.qv-cfg{min-width:280px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.qv-cfg label{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:600;color:var(--ink-2)}
+.qv-cfg input,.qv-cfg select{height:34px;border:1px solid var(--ring);border-radius:8px;padding:0 8px;background:var(--surface-2);color:var(--ink);font:inherit}
+.qv-cfg .pa{display:flex;gap:6px;justify-content:flex-end}
+.qv-cfg .pa button{width:auto}
+/* 폰(손가락): 누르는 자리 24px 이상 */
+@media (pointer:coarse){
+  .eqsn.act{display:inline-flex;align-items:center;min-height:26px;padding:0 8px}
+  a.crk,a.chv-cust{display:inline-block;min-height:24px;line-height:24px;padding:0 2px}
+  #dvLensBar button.mini{min-height:28px}
+}
+/* 폰 위 띠: «＋ 등록» 하나로(계약 등록·변경도 그 안) — 한 줄 + 검색 줄 */
+@media (max-width:760px){ html[data-skin="gn"] .topbar #btnEdit{display:none!important} html[data-skin="gn"] .topbar #btnFont{padding:0 8px} }
 /* ==== ㊿+166 새 디자인 end ==== */

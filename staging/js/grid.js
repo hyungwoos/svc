@@ -10,9 +10,9 @@ import { eqRetOpen, eqWant, renderEqPanel, syncOrderAssets } from './equipment.j
 import { AK, BZX, CH_DEFS, ctOrig, DC, ensureLeadSrc, liveCalc, liveDiff, loadLib, LS, LV, renderChannelView, setLiveSrc } from './analysis.js';
 import { applyDense, PR, pushRecent, renderTodo } from './tools.js';
 import { CL, renderCloud } from './cloud.js';
-import { loadInbound, renderInbPanel, renderInbStat, renderWeekly } from './inbound.js';
+import { inbLast, loadInbound, renderInbPanel, renderInbStat, renderWeekly } from './inbound.js';
 import { CHURN, CR, CS, csSetTab, ensureGroupOpen, helpBox, helpWire, initOiForm, loadRecvPresets, oiLinkQuote, oiToContract, renderChurn,
-  renderChurnRate, renderCsite, renderCustFlow, renderOiTiles } from './sales.js';
+  renderChurnRate, renderCsite, renderCustFlow, renderOiTiles, wzReset } from './sales.js';
 import { logChange, monthRows, msg, openOvl } from './edit.js';
 import { lazyGet, lazyView } from './lazy.js';
 import { closeAnswer } from './ai.js';
@@ -46,7 +46,7 @@ export function goBack(){
    · 화면에 새 상태를 더하면 VIEW_UI 에 «화면: {객체: [키…]}» 한 줄 */
 export var VIEW_UI={
   live:{LV:['T','diff']}, churn:{CHURN:['f','t','q','fil','sk','sd','inclRenew']},
-  churnrate:{CR:['unit','base','cnd','rows','exDen','sup','from','upto','open','f']}, custflow:{CR:['unit','base','cnd','rows','exDen','sup','from','upto','open','f']},
+  churnrate:{CR:['unit','base','cnd','rows','exDen','sup','from','upto','open','f','adv']}, custflow:{CR:['unit','base','cnd','rows','exDen','sup','from','upto','open','f']},
   leadsrc:{LS:['base','line','pick']}, dcheck:{DC:['open','sev']}, eqboard:{EQB:['ch','q','more','only']},
   price:{PR:['seg','ver','op','q','basis']}, cloud:{CL:['mode','sel','months','mon']}, aiknow:{AK:['log','q']},
   biz:{BZX:['showEq','showSkip','showRuled']}, report:{RPV:['tab']}, csite:{CS:['tab']},
@@ -164,6 +164,7 @@ export function switchView(v){
   if(chv){ renderChannelView(v); return; }
   if(acct){ lazyView('admin','viewAccount','renderAccount'); return; }
   if(onew){
+    try{ wzReset('od'); }catch(e){}
     msg('odMsg','');
     $('#odFormWrap').style.display='';
     $('#odDone').style.display='none';
@@ -172,6 +173,7 @@ export function switchView(v){
     return;
   }
   if(oinew){
+    try{ wzReset('oi'); }catch(e){}
     msg('oiMsg','');
     $('#oiFormWrap').style.display='';
     $('#oiDone').style.display='none';
@@ -180,6 +182,7 @@ export function switchView(v){
     return;
   }
   if(mnew){
+    try{ wzReset('mp'); }catch(e){}
     msg('mpMsg','');
     $('#mpFormWrap').style.display='';
     $('#mpDone').style.display='none';
@@ -500,6 +503,65 @@ export function stBadge(txt){
   if(/회수예정|출하요청|배송중|계약예정|진행|접수|수리중/.test(s)) return 'warn';
   if(/신규|활성|재약정|추가|통합과금|설치완료|임대중|수주|LIVE|대응/.test(s)) return 'ok';
   return 'info';
+}
+
+/* ===== ㊿+170 영업·인바운드 빠른 보기 — 내 담당 · 오늘 할 일 · 기한 초과 · 다음 행동 없음 · 장기 미접촉 / 첫 대응 지연
+   · 기준(일수 · 내 이름)은 «기준» 버튼에서 바꾸고 내 브라우저에 저장(svc_qv_계정) · 홈 «오늘 처리할 일»도 같은 기준·같은 목록 */
+export function qvKey(){ return 'svc_qv_'+(ST.AUTH_USER||'anon'); }
+export function qvCfg(){ var d={me:'', oiIdle:30, inbFirst:3, inbIdle:90}; try{ var s=JSON.parse(localStorage.getItem(qvKey())||'{}')||{}; Object.keys(d).forEach(function(k){ if(s[k]!=null && s[k]!=='') d[k]=s[k]; }); }catch(e){} d.oiIdle=+d.oiIdle||30; d.inbFirst=+d.inbFirst||3; d.inbIdle=+d.inbIdle||90; return d; }
+export function qvSave(c){ try{ localStorage.setItem(qvKey(), JSON.stringify(c)); }catch(e){} }
+/** 진행 중인 OI — 수주·계산서발행·종료·중지·실패가 아닌 것 (OI 타일 · 홈 · 빠른 보기 공통) */
+export function oiOpen(r){ return !/수주|계산서|종료|중지|실패/.test(String(r && r.stage || '')); }
+export function daysSince(d){ if(!d) return null; var t=new Date(String(d).slice(0,10)).getTime(); return isNaN(t)? null : Math.floor((Date.now()-t)/864e5); }
+export function inbIdleHit(r, C){ C=C||qvCfg(); if(String(r.y||'')!==String(new Date().getFullYear()) || r.result!=='진행중') return false; var d=daysSince(inbLast(r)); return d!=null && d>=C.inbIdle; }
+export function qvDefs(v){
+  var C=qvCfg(), today=todayStr();
+  var me=['me','내 담당', C.me? '담당 «'+C.me+'»' : '«기준»에서 내 이름을 고르면 내 담당만', function(r){ return !!C.me && String(r.owner||'').indexOf(C.me)>=0; }];
+  if(v==='oi') return [me,
+    ['today','오늘 할 일','다음 할 일 예정일이 오늘(진행 중)', function(r){ return oiOpen(r) && String(r.next_date||'').slice(0,10)===today; }],
+    ['late','기한 초과','예정일이 지났는데 진행 중', function(r){ return oiOpen(r) && !!r.next_date && String(r.next_date).slice(0,10)<today; }],
+    ['nonext','다음 행동 없음','진행 중인데 다음 할 일 또는 예정일이 비어 있음', function(r){ return oiOpen(r) && (!r.next_action || !r.next_date); }],
+    ['idle','장기 미접촉', C.oiIdle+'일 넘게 수정 없음(진행 중)', function(r){ var d=daysSince(r.updated_at||r.created_at); return oiOpen(r) && d!=null && d>=C.oiIdle; }]];
+  if(v==='inbound') return [me,
+    ['first','첫 대응 지연','접수 '+C.inbFirst+'일이 지났는데 1차 대응 기록 없음(진행중)', function(r){ var d=daysSince(r.on_date); return r.result==='진행중' && !r.s1d && d!=null && d>=C.inbFirst; }],
+    ['idle','장기 미접촉','올해 진행중인데 마지막 대응이 '+C.inbIdle+'일 이상 — 홈 «인바운드 미대응»과 같은 기준', function(r){ return inbIdleHit(r, C); }],
+    ['open','진행중 전체','결과가 «진행중»', function(r){ return r.result==='진행중'; }]];
+  return null;
+}
+export function qvGo(view, key){
+  switchView(view);
+  var d=(qvDefs(view)||[]).filter(function(x){ return x[0]===key; })[0];
+  if(d){ DV.pre={label:d[1]+' — '+d[2], fn:d[3], qv:key}; DV.page=0; renderGrid(); }
+}
+export function qvBar(g, rows){
+  var qb=document.getElementById('dvQvBar'), defs=qvDefs(ST.CUR_VIEW);
+  if(!qb){ qb=document.createElement('div'); qb.id='dvQvBar'; qb.className='qv-bar'; var bar=$('#dvSearch').parentElement; bar.parentElement.insertBefore(qb, bar); }
+  if(!defs || g.custom){ qb.hidden=true; qb.innerHTML=''; return; }
+  qb.hidden=false; var all=g.rows();
+  qb.innerHTML=tpl`<span class="wv-l">빠른 보기</span>${rawHtml(defs.map(function(d){ var n=all.filter(d[3]).length, on=!!(DV.pre && DV.pre.qv===d[0]);
+      return tpl`<button type="button" class="chip${n? '':' zero'}" data-qv="${d[0]}" aria-pressed="${on?'true':'false'}" title="${d[2]}">${d[1]} <b class="num">${String(n)}</b></button>`; }).join(''))}`+
+    tpl`<button type="button" class="cbtn" id="qvCfgBtn" aria-haspopup="dialog" title="빠른 보기 기준 — 내 이름 · 장기 미접촉 일수 · 첫 대응 일수">${rawHtml(ico('gear',14))} 기준</button>`;
+  qb.querySelectorAll('[data-qv]').forEach(function(b){ b.onclick=function(){ var k=b.dataset.qv;
+    if(k==='me' && !qvCfg().me){ qvCfgOpen(/** @type {any} */(document.getElementById('qvCfgBtn'))); return; }
+    if(DV.pre && DV.pre.qv===k){ DV.pre=null; DV.page=0; renderGrid(); } else qvGo(ST.CUR_VIEW, k); }; });
+  /** @type {any} */(document.getElementById('qvCfgBtn')).onclick=function(){ qvCfgOpen(this); };
+}
+export function qvCfgOpen(btn){
+  var old=document.getElementById('qvCfg'); if(old){ old.remove(); return; }
+  var C=qvCfg(), owners={}; (ST.RAWX.oi||[]).concat(ST.RAWX.inbound||[]).forEach(function(r){ String(r.owner||'').split(/[,/]/).forEach(function(o){ o=o.trim(); if(o) owners[o]=1; }); });
+  var m=document.createElement('div'); m.id='qvCfg'; m.className='rmenu qv-cfg'; m.setAttribute('role','dialog'); m.setAttribute('aria-label','빠른 보기 기준');
+  m.innerHTML=tpl`<b>빠른 보기 기준</b><label>내 이름(담당자 칸 값)<select id="qvMe"><option value="">— 고르기 —</option>${rawHtml(Object.keys(owners).sort(function(a,b){ return a.localeCompare(b,'ko'); }).map(function(o){ return tpl`<option${rawHtml(o===C.me?' selected':'')}>${o}</option>`; }).join(''))}</select></label>`+
+    tpl`<label>OI 장기 미접촉 (일)<input id="qvOi" type="number" min="1" max="365" value="${String(C.oiIdle)}"></label><label>인바운드 첫 대응 지연 (일)<input id="qvIf" type="number" min="1" max="60" value="${String(C.inbFirst)}"></label>`+
+    tpl`<label>인바운드 장기 미접촉 (일)<input id="qvIi" type="number" min="7" max="365" value="${String(C.inbIdle)}"></label><div class="pa"><button type="button" class="pill ghost" id="qvX">취소</button><button type="button" class="pill pri" id="qvOk">저장</button></div>`;
+  document.body.appendChild(m);
+  var r=btn.getBoundingClientRect(); m.style.top=(r.bottom+6)+'px'; m.style.left=Math.max(8, Math.min(r.left, window.innerWidth-m.offsetWidth-8))+'px';
+  var close=function(){ m.remove(); document.removeEventListener('keydown', key, true); btn.focus(); };
+  var key=function(e){ if(e.key==='Escape'){ e.preventDefault(); e.stopPropagation(); close(); } };
+  document.addEventListener('keydown', key, true);
+  /** @type {any} */(m.querySelector('#qvX')).onclick=close;
+  /** @type {any} */(m.querySelector('#qvOk')).onclick=function(){ var v=function(id){ return /** @type {any} */(document.getElementById(id)).value; };
+    qvSave({me:v('qvMe'), oiIdle:+v('qvOi')||30, inbFirst:+v('qvIf')||3, inbIdle:+v('qvIi')||90}); close(); DV.pre=null; renderGrid(); toast('빠른 보기 기준 저장', '이 브라우저에만 적용 · 홈 «오늘 처리할 일»도 같은 기준', 'info'); };
+  setTimeout(function(){ var f=/** @type {any} */(m.querySelector('select')); if(f) f.focus(); }, 0);
 }
 
 
@@ -996,7 +1058,9 @@ export function renderGrid(){
       var btn=document.createElement('button');
       btn.className='pill'+(DV.chipVal===v||(!DV.chipVal&&!v)?'':' ghost');
       if(DV.chipVal===v||(!DV.chipVal&&!v)){ btn.style.background='var(--brand-solid,#107b32)'; btn.style.borderColor='var(--brand-solid,#107b32)'; btn.style.color='#fff'; }
-      btn.textContent=op;
+      var cn=v? g.rows().filter(function(x){ return String(x[g.chipsField]||'')===v; }) : g.rows();   /* ㊿+170 칩마다 건수(OI = 단계별 요약 · 금액은 툴팁) */
+      btn.innerHTML=tpl`${op} <span class="num">${String(cn.length)}</span>`;
+      if(ST.CUR_VIEW==='oi'){ var am=cn.reduce(function(a,x){ return a+(+x.expect_amount||0); },0); btn.title=op+' '+cn.length+'건 · 예상 '+won(am)+'천원'; }
       btn.onclick=function(){ DV.chipVal=v; DV.page=0; renderGrid(); };
       cb.appendChild(btn);
     });
@@ -1033,7 +1097,8 @@ export function renderGrid(){
   /* ㊿+169 홈 알림에서 넘어온 조건 — 이름표 + ✕ */
   var pb=document.getElementById('dvPreBar');
   if(!pb){ pb=document.createElement('div'); pb.id='dvPreBar'; pb.className='pre-bar'; var bar4=$('#dvSearch').parentElement; bar4.parentElement.insertBefore(pb, bar4); }
-  if(DV.pre && !isCustom){ pb.hidden=false; pb.innerHTML=tpl`<span class="ctag info">${rawHtml(ico('filter',13))} ${DV.pre.label}</span><button type="button" class="cbtn" id="dvPreX" aria-label="조건 해제 — ${DV.pre.label}">조건 해제</button>`;
+  try{ qvBar(g); }catch(e){ console.warn('빠른 보기', e); }
+  if(DV.pre && !isCustom && !DV.pre.qv){ pb.hidden=false; pb.innerHTML=tpl`<span class="ctag info">${rawHtml(ico('filter',13))} ${DV.pre.label}</span><button type="button" class="cbtn" id="dvPreX" aria-label="조건 해제 — ${DV.pre.label}">조건 해제</button>`;
     document.getElementById('dvPreX').onclick=function(){ DV.pre=null; DV.page=0; renderGrid(); }; }
   else { pb.hidden=true; pb.innerHTML=''; }
   ['dvSearch','dvCsv','dvCols'].forEach(function(id){ $('#'+id).style.display=isCustom?'none':''; });
@@ -1047,7 +1112,7 @@ export function renderGrid(){
   $('#dvPager').style.display=isCustom?'none':'';
   try{ renderEqPanel(); }catch(e){}
   try{ renderInbPanel(); }catch(e){}
-  if(isCustom){ g.custom(); return; }
+  if(isCustom){ var dc0=document.getElementById('dvCount'); if(dc0){ dc0.textContent=''; dc0.title=''; } g.custom(); return; }   /* ㊿+170 이전 표의 «n행» 글자가 남지 않게 */
   var bh=document.getElementById('bizHost'); if(bh) bh.style.display='none';
   $('#dvTable').parentElement.style.display='';
   var rows=gridFilteredSorted(g);

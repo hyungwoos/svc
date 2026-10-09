@@ -1,7 +1,7 @@
 /* ===== sales.js — Cloud 사이트 · OI · 견적→OI · 수주→계약 · 사이드바 접기 · 해지 분석 =====
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { ST } from './state.js';
-import { $, amtHint, doLogout, esc, kwToWon, lline, mk, rawHtml, refreshToken, SB_KEY, SB_URL, tpl, won, wonToKw } from './core.js';
+import { $, amtHint, canView, canWrite, doLogout, esc, kwToWon, lline, mk, rawHtml, refreshToken, SB_KEY, SB_URL, tpl, won, wonToKw } from './core.js';
 import { dIdx, EQB, loadFromDb, onData, railSync, renderEqBoard, SB_RAW, sbTry, sbWrite, toast, todayStr } from './shell.js';
 import { kpiTable, toggleWidgetPanel } from './dash.js';
 import { OI_IND, OI_OWNERS, OI_PARTNERS, OI_PROB, OI_PRODUCTS, OI_TYPE } from './grids.js';
@@ -9,7 +9,7 @@ import { CH_DEFS, chOf } from './analysis.js';
 import { applyDense, denseKey, openFind, openPaste } from './tools.js';
 import { loadInbound } from './inbound.js';
 import { syncOrderAssets } from './equipment.js';
-import { a11yTileRole, BLANK_LABEL, clearFilters, closeColFilter, DV, exportXlsx, gridAddRow, navMenu, openColPick, openFilterPanel, renderGrid,
+import { a11yTileRole, BLANK_LABEL, clearFilters, closeColFilter, DV, exportXlsx, gridAddRow, navMenu, oiOpen, openColPick, openFilterPanel, renderGrid, rowMenu,
   switchView, xlsxAoa, xlsxBook } from './grid.js';
 import { closeOvl, FORM_FN, logChange, msg, openOvl } from './edit.js';
 
@@ -591,8 +591,14 @@ export var OIP2LINE={'Cloud NAC':'Cloud','S1 Cloud NAC':'S1','MDR':'MDR','S1 MDR
   'PNS':'PNS','DRM':'DRM','DLP':'DLP'};
 export function oiToContract(r){
   if(!ST.SB_TOKEN){ openOvl('ovlAuth'); return; }
+  /* ㊿+170 전환 전 중복 확인 — 같은 고객사의 지금 유효한 계약 · 이미 다른 OI 가 전환해 둔 계약 */
+  var key=String(r.customer||'').replace(/\s|\(주\)|주식회사/g,'').toLowerCase(), b0=(ST.DATA && ST.DATA.nowIdx!=null)? ST.DATA.nowIdx : null;
+  var cur=(ST.DATA && ST.DATA.rows||[]).filter(function(x){ return String(x.cust||'').replace(/\s|\(주\)|주식회사/g,'').toLowerCase()===key && !/해지|중지|종료/.test(String(x.status||'')) && (b0==null || x.endIdx==null || x.endIdx>=b0); });
+  var linked=(ST.RAWX.oi||[]).filter(function(o){ return o!==r && o.contract_id && String(o.customer||'').replace(/\s|\(주\)|주식회사/g,'').toLowerCase()===key; });
+  var warn=(cur.length? '\n\n⚠ 같은 고객사의 유효 계약 '+cur.length+'건: '+cur.slice(0,3).map(function(x){ return lline(x.line)+' '+mk(x.startIdx)+'~'+(x.endIdx!=null? mk(x.endIdx):''); }).join(' / ')+'\n   → 기존 계약에 더하는 것이면 «추가», 기간 연장이면 «갱신» 탭을 쓰세요' : '')+
+    (linked.length? '\n\n⚠ 이 고객사의 다른 OI 가 이미 계약으로 전환됨: '+linked.slice(0,2).map(function(o){ return '#'+o.id+' → 계약 #'+o.contract_id; }).join(', ') : '');
   if(!confirm(r.customer+' · '+(r.deal_name||'')+'\n이 수주 건을 신규 계약으로 전환할까요?\n\n'+
-    '계약 입력창이 OI 내용으로 채워져 열립니다. 금액(MRR)·기간을 확인하고 저장하세요.')) return;
+    '계약 입력창이 OI 내용으로 채워져 열립니다. 금액(MRR)·기간을 확인하고 저장하세요.'+warn)) return;
   $('#btnEdit').click();                              // 열면서 폼이 초기화됨
   $('#eTabs').querySelector('button[data-t="new"]').click();
   ST.OI_CONVERT=r;                                       // 초기화 이후에 지정
@@ -635,7 +641,7 @@ export function renderOiTiles(on){
   }
   host.style.display='';
   var rows=(ST.RAWX.oi||[]);
-  var open=rows.filter(function(r){ return ['등록','진행'].indexOf(r.stage)>=0; });
+  var open=rows.filter(oiOpen);   /* ㊿+170 진행 중 = 수주·계산서발행·종료·중지·실패 아님 (홈 · 빠른 보기와 같은 기준) */
   var sum=function(a){ return a.reduce(function(s,r){ return s+(Number(r.expect_amount)||0); },0); };
   var wsum=open.reduce(function(s,r){ return s+(Number(r.expect_amount)||0)*(Number(r.win_prob)||0)/100; },0);
   var now=new Date(), q=Math.floor(now.getMonth()/3), qs=new Date(now.getFullYear(), q*3, 1), qe=new Date(now.getFullYear(), q*3+3, 1);
@@ -746,11 +752,13 @@ export function setupSide(){
   amtHint($('#oiAmt'), null, false); amtHint($('#oiRival'), null, false);   /* ㊿+157 «= 1,200만원» */
   $('#oiQuoteBtn').onclick=openQuotePick;
   $('#oiDoneList').onclick=function(){ switchView('oi'); };
-  $('#oiDoneNew').onclick=function(){ $('#oiDone').style.display='none'; $('#oiFormWrap').style.display=''; $('#oiCust').focus(); };
+  $('#oiDoneNew').onclick=function(){ $('#oiDone').style.display='none'; $('#oiFormWrap').style.display=''; wzReset('oi'); $('#oiCust').focus(); };
   $('#mpDoneList').onclick=function(){ switchView('mdrops'); };
-  $('#mpDoneNew').onclick=function(){ $('#mpDone').style.display='none'; $('#mpFormWrap').style.display=''; $('#mpCompany').focus(); };
+  $('#mpDoneNew').onclick=function(){ $('#mpDone').style.display='none'; $('#mpFormWrap').style.display=''; wzReset('mp'); $('#mpCompany').focus(); };
   $('#odDoneList').onclick=function(){ switchView('orders'); };
-  $('#odDoneNew').onclick=function(){ $('#odDone').style.display='none'; $('#odFormWrap').style.display=''; $('#odCustomer').focus(); };
+  $('#odDoneNew').onclick=function(){ $('#odDone').style.display='none'; $('#odFormWrap').style.display=''; wzReset('od'); $('#odCustomer').focus(); };
+  ['od','oi','mp'].forEach(function(k){ try{ wzInit(k); }catch(e){ console.warn('입력 단계', k, e); } });   /* ㊿+170 입력 단계 */
+  var bn=document.getElementById('btnNew'); if(bn) bn.onclick=function(e){ e.stopPropagation(); openNewMenu(bn); };
   $('#btnLogout').onclick=doLogout;
   $('#btnWidgets').onclick=toggleWidgetPanel;
   $('#dvCsv').onclick=function(){ exportXlsx(); };
@@ -908,6 +916,15 @@ export function crSummary(){
   G.forEach(function(g){ var sel=CR.f[g.k]||[]; if(!sel.length) return; var lab={}; g.opts.forEach(function(o){lab[o[0]]=o[1];}); parts.push(g.l+': '+sel.map(function(v){return lab[v]||v;}).join('·')); });
   return parts.length? parts.join(' / ') : '전체 계약';
 }
+/** ㊿+170 해지율 «적용 기준» 한 줄 — 지금 숫자가 어떤 규칙으로 계산됐는지 */
+export function crApplied(isPortal, isSheet){
+  var nf=Object.keys(CR.f||{}).filter(function(k){ return (CR.f[k]||[]).length; });
+  var p=[isPortal? '포탈 기준' : isSheet? '매출시트 기준' : '사용자 설정',
+    '분모 '+({valid:'계약 유효 고객사',rev:'과금 고객사',cum:'누적고객'}[CR.base]||CR.base), CR.rows? '계약 행 단위':'고객사 단위',
+    '지원사업 '+({all:'포함',ex:'제외',only:'만'}[CR.sup]||''), 'CND '+(CR.cnd?'포함':'제외'), '기준월 '+mk(crMaxJ()),
+    nf.length? '필터 '+nf.length+'개' : '필터 없음'];
+  return esc(p.join(' · '));
+}
 export function renderChurnRate(){
   if(CR.crCnd==null) CR.crCnd=CR.cnd; CR.cnd=CR.crCnd;
   var host=$('#crBody');
@@ -926,17 +943,20 @@ export function renderChurnRate(){
      ['CND 전환 고객','CND = Cloud NAC DeviceKeeper. 예전에 에스원으로 납품하던 제품인데 단종되어 전부 S1 Cloud NAC Basic으로 교체됐고, 과금은 에스원에 한 건으로 묶어 받습니다(«에스원 통합과금» 행). 이 고객들은 <b>LIVE 고객으로 항상 포함</b>합니다(기본). 다만 옛 DeviceKeeper 계약의 해지는 매출시트 규칙대로 해지 건수에 넣지 않습니다. «제외»는 매출시트 통계 탭이 CND를 통째로 빼고 계산한 값과 맞출 때만 쓰세요.'],
      ['분모가 작을 때','시작 활성이 20곳 미만(PNS·DRM·초기 MDR)이면 한 곳 차이가 10%p 이상 움직입니다. 그런 칸은 비율보다 «7곳 중 2곳»처럼 건수로 읽어 주세요.']
    ],'모든 숫자는 «계약» 메뉴의 데이터로 계산하며, 파란 숫자를 누르면 그 칸을 만든 계약 명단이 열립니다. 제품별·사업영역별 표의 오른쪽 «합계 → 전체» 열은 두 제품을 함께 쓰는 고객사 때문에 생기는 차이를 보여줍니다.');
-  /* 계산 규칙 */
+  /* 계산 규칙 — ㊿+170 기본(기간 · 기준월)만 펼치고, 분모·단위·CND·지원사업은 «고급 설정»에 접어 둠 · 맨 위에 «적용 기준» 한 줄 */
+  h+=tpl`<div class="cr-applied" role="note"><b>적용 기준</b> ${rawHtml(crApplied(isPortal, isSheet))}</div>`;
   h+=tpl`<div class="pr-card crpanel" style="margin-bottom:12px">`+
      tpl`<div class="crrow">`+
        tpl`${rawHtml(crSeg('기간','unit',[['year','연도'],['half','반기'],['quarter','분기']],CR.unit))}`+
+       tpl`<div class="crseg"><span>기준월</span><select id="crUpto" aria-label="기준월">${rawHtml((function(){ var o=''; for(var j=maxAll;j>=Math.max(0,maxAll-35);j--) o+=tpl`<option value="${rawHtml(j)}"${j===crMaxJ()?' selected':''}>${mk(j)}</option>`; return o; })())}</select></div>`+
+     tpl`</div>`+
+     tpl`<details class="cr-adv"${rawHtml(CR.adv?' open':'')} id="crAdv"><summary>고급 설정 — 분모 · 단위 · CND · 지원사업 ${rawHtml(isPortal? '(지금: 포탈 기준)' : isSheet? '(지금: 매출시트 기준)' : '<b>(바꾼 값 있음)</b>')}</summary><div class="crrow">`+
        tpl`${rawHtml(crSeg('지원사업','sup',[['all','포함','지원사업 고객을 포함해 계산하고 표 안에서 지원사업/그 외로 나눠 보여줍니다'],['ex','제외','지원사업(판매형태 정부 지원) 계약을 분모·분자에서 모두 뺍니다'],['only','지원사업만','지원사업 계약만 봅니다']],CR.sup))}`+
        tpl`${rawHtml(crSeg('분모','base',[['valid','계약 유효','시작월 ≤ 그 달 ≤ 종료월인 고객사 · 해지 고객사는 해지월 말에 빠짐 (CN전환 제외)'],['rev','과금','그 달에 인식 금액이 있는 고객사'],['cum','누적고객','통계 탭 방식: 신규 누계 − 해지 누계 (만기 종료는 안 뺌)'],['sheet','시트 LIVE 규칙','매출시트 LIVE 고객사 산정 방식: 계약구분·계약상세 글자로 판단(신규·재약정·CN전환), 날짜 없는 행 포함, 해지는 해지월 전까지']],CR.base))}`+
        tpl`${rawHtml(crSeg('단위','rows',[['cust','고객사'],['rows','계약 행','통계 탭은 계약 행 수']],CR.rows?'rows':'cust'))}`+
        tpl`${rawHtml(crSeg('CND 전환 고객','cnd',[['in','포함 (기본)','DeviceKeeper→S1 Basic 전환 고객을 LIVE 고객으로 셉니다 · 해지 집계는 어차피 CND를 빼므로 분모에만 영향'],['ex','제외','매출시트 통계 탭이 CND를 통째로 빼고 계산한 것과 맞출 때만']],CR.cnd?'in':'ex'))}`+
        tpl`${rawHtml(crSeg('지원 제외율 분모','exDen',[['org','지원 제외 활성'],['all','전체 활성','통계 탭 장표 방식']],CR.exDen))}`+
-       tpl`<div class="crseg"><span>기준월</span><select id="crUpto" aria-label="기준월">${rawHtml((function(){ var o=''; for(var j=maxAll;j>=Math.max(0,maxAll-35);j--) o+=tpl`<option value="${rawHtml(j)}"${j===crMaxJ()?' selected':''}>${mk(j)}</option>`; return o; })())}</select></div>`+
-     tpl`</div>`+
+     tpl`</div></details>`+
      tpl`<div class="crrow crfilters">${rawHtml(G.filter(function(g){return !g.more;}).map(crChips).join(''))}`+
        tpl`<details${CR.open?' open':''} id="crMore"><summary>업종 · 파트너 · 과금방식 · S1 서비스 종류 ${rawHtml(G.filter(function(g){return g.more&&(CR.f[g.k]||[]).length;}).length? '<b>선택됨</b>':'')}</summary>${rawHtml(G.filter(function(g){return g.more;}).map(crChips).join(''))}</details>`+
      tpl`</div></div>`;
@@ -992,6 +1012,7 @@ export function renderChurnRate(){
   host.querySelectorAll('button.chip[data-fclr]').forEach(function(b){ b.onclick=function(){ CR.f[b.dataset.fclr]=[]; CR.open=!!(host.querySelector('#crMore')||{}).open; renderChurnRate(); }; });
   var up=$('#crUpto'); if(up) up.onchange=function(){ CR.upto=+up.value; renderChurnRate(); };
   var det=$('#crMore'); if(det) det.ontoggle=function(){ CR.open=det.open; };
+  var adv=/** @type {any} */($('#crAdv')); if(adv) adv.ontoggle=function(){ CR.adv=adv.open; };
   host.querySelectorAll('a.crk').forEach(function(a){ a.onclick=function(ev){ ev.preventDefault(); crOpen(a.dataset); }; });
 }
 /* 셀 내역 팝업 */
@@ -1611,4 +1632,144 @@ export async function submitMdrPoc(){
     $('#mpEdr').checked=true; ['mpAv','mpRansom','mpMedia'].forEach(function(i){ $('#'+i).checked=false; });
   }catch(e){ msg('mpMsg',String(e.message||e),'bad'); }
   btn.disabled=false;
+}
+
+/* ===== ㊿+170 입력 흐름 — 장비 신청 · OI 등록 · PoC 신청을 단계로 (사용자: 기본 → 조건 → 금액/배송 → 확인)
+   · 칸(id)·저장 코드는 그대로 — 기존 칸을 단계 상자로 옮기기만 함(스크립트·QA 가 쓰는 id 유지)
+   · «다음»에서 그 단계 필수 칸·형식(이메일 등)을 바로 확인 · 고객사를 넣으면 같은 고객사의 진행 중 건(중복 의심)을 칸 아래에 알려 줌(막지 않음)
+   · 마지막 «확인» 단계: 넣은 값 요약 + 저장하면 생기는 일(슬랙 알림 등) → 그때만 저장 버튼
+   · 저장 중엔 버튼 잠금(두 번 저장 방지 · 예전과 같음) · 실패하면 값 그대로(예전과 같음) */
+export var WZ_DEF={
+  od:{wrap:'odFormWrap', go:'odGo', msg:'odMsg', first:'odCustomer', cust:'odCustomer',
+    notice:'«발주 신청»을 누르면 DB 에 저장되고 슬랙 #service-managed 채널로 알림이 갑니다 · 장비 현황에도 바로 «재고»로 행이 생깁니다(시리얼이 없으면 «미등록 시리얼»)',
+    steps:[['기본',['odChannel','odType','odCustomer','odContract','odMgr','odPhone','odAddr']],
+      ['조건',['odModel','odQty','odNodes','odPod','odEdition','odFeat','odAdmin','odInstall','odSerials']],
+      ['배송',['odRecvPick','odRecvAddr','odRecvName','odRecvPhone','odShip','odNote']], ['확인',[]]],
+    req:{odCustomer:'고객사명', odMgr:'고객 담당자'}},
+  oi:{wrap:'oiFormWrap', go:'oiGo', msg:'oiMsg', first:'oiCust', cust:'oiCust',
+    notice:'«OI 등록»을 누르면 OI 현황에 «등록» 단계로 저장됩니다 · 슬랙 알림은 가지 않습니다',
+    steps:[['기본',['oiQuoteBtn','oiInd','oiCust','oiOwner','oiPartner','oiCDept','oiCName','oiCEmail','oiCPhone']],
+      ['조건',['oiType','oiName','oiRoute','oiFree','oiProducts','oiStrategy']],
+      ['금액·일정',['oiMonth','oiAmt','oiRival','oiProb','oiNext','oiNextDate','oiNote']], ['확인',[]]],
+    req:{oiCust:'고객사'}},
+  mp:{wrap:'mpFormWrap', go:'mpGo', msg:'mpMsg', first:'mpCompany', cust:'mpCompany',
+    notice:'«POC 신청»을 누르면 DB 에 저장되고 슬랙 채널로 알림이 갑니다 · 운영·신청 현황에 «신청»으로 등록됩니다',
+    steps:[['기본',['mpCompany','mpMgr','mpPhone','mpEmail','mpDev']], ['조건',['mpEdr','mpWin','mpLinux','mpMac','mpNac','mpWebui']],
+      ['신청 정보',['mpSales','mpSalesPh','mpDate','mpNote']], ['확인',[]]],
+    req:{mpCompany:'회사명', mpMgr:'고객 담당자 이름'}}
+};
+export var WZ={};
+/** 칸 하나를 담고 있는 상자(라벨 + 입력) */
+export function wzBox(id){
+  var e=document.getElementById(id); if(!e) return null;
+  if(id==='oiQuoteBtn') return e.parentElement;
+  if(id==='oiProducts') return e;
+  if(id==='mpEdr') return e.closest('div');
+  return e.closest('.frm > div') || e.parentElement;
+}
+export function wzLabel(id){
+  var l=/** @type {any} */(document.querySelector('label[for="'+id+'"]')); var t=l? l.textContent : '';
+  if(!t){ var b=wzBox(id), x=b && b.querySelector('label'); t=x? x.textContent : id; }
+  return String(t).replace(/\s*\*\s*$/,'').replace(/\s*\(.*$/,'').trim();
+}
+export function wzVal(id){
+  var e=/** @type {any} */(document.getElementById(id)); if(!e) return '';
+  if(id==='oiProducts') return [].slice.call(e.querySelectorAll('.oi-prow')).filter(function(r){ var c=r.querySelector('input[data-oip]'); return c && c.checked; }).map(function(r){ var c=r.querySelector('input[data-oip]'), q=r.querySelector('.oi-qty'), et=r.querySelector('.oi-etc'); return (c.dataset.oip==='__etc'? (et&&et.value)||'기타' : c.dataset.oip)+(q&&q.value? ' '+q.value : ''); }).join(', ');
+  if(id==='mpEdr') return [['mpEdr','EDR+MDR'],['mpAv','안티바이러스'],['mpRansom','안티랜섬웨어'],['mpMedia','매체제어']].filter(function(x){ var c=/** @type {any} */(document.getElementById(x[0])); return c && c.checked; }).map(function(x){ return x[1]; }).join(' · ');
+  if(id==='oiQuoteBtn'){ var tg=document.getElementById('oiQuoteTag'); return OI_QUOTE && tg? tg.textContent : ''; }
+  if(e.type==='checkbox') return e.checked? '예' : '';
+  if(e.tagName==='SELECT'){ var o=e.options[e.selectedIndex]; return o && e.value!==''? o.textContent : ''; }
+  return String(e.value||'').trim();
+}
+export function wzInit(key){
+  var D=WZ_DEF[key], wrap=document.getElementById(D.wrap); if(!wrap || WZ[key]) return;
+  var go=document.getElementById(D.go), ms=document.getElementById(D.msg);
+  var head=document.createElement('ol'); head.className='wz-steps';
+  var steps=D.steps.map(function(s, i){
+    var sec=document.createElement('section'); sec.className='wz-step'; sec.dataset.s=String(i); sec.setAttribute('aria-label', (i+1)+'단계 '+s[0]);
+    var grid=document.createElement('div'); grid.className='frm'; sec.appendChild(grid);
+    s[1].forEach(function(id){ var b=wzBox(id); if(!b) return; if(/^(oiQuoteBtn|oiProducts|mpEdr)$/.test(id)) b.classList.add('full'); grid.appendChild(b); });
+    var li=document.createElement('li'); li.innerHTML=tpl`<button type="button" data-s="${String(i)}"><b>${String(i+1)}</b>${s[0]}</button>`; head.appendChild(li);
+    return sec;
+  });
+  var last=steps[steps.length-1]; last.querySelector('.frm').remove();
+  last.insertAdjacentHTML('beforeend', tpl`<div class="wz-sum" id="${key}WzSum"></div><p class="wz-note" role="note">${D.notice}</p>`);
+  var nav=document.createElement('div'); nav.className='wz-nav mact';
+  nav.innerHTML='<button type="button" class="pill ghost wz-prev">이전</button><button type="button" class="pill pri wz-next">다음</button>';
+  if(ms) nav.insertBefore(ms, nav.firstChild); if(go) nav.appendChild(go);
+  /* 옛 소제목·빈 상자 정리 후 새 구조 */
+  [].slice.call(wrap.children).forEach(function(ch){ if(ch.querySelector && !ch.querySelector('input,select,textarea,button') ) ch.remove(); else if(ch.classList && (ch.classList.contains('frm') || ch.classList.contains('mact')) && !ch.querySelector('input,select,textarea')) ch.remove(); });
+  wrap.appendChild(head); steps.forEach(function(s){ wrap.appendChild(s); }); wrap.appendChild(nav);
+  var W=WZ[key]={i:0, steps:steps, head:head, nav:nav, go:go};
+  head.querySelectorAll('button').forEach(function(b){ b.onclick=function(){ var t=+b.dataset.s; if(t<=W.i || wzCheck(key, t)) wzGo(key, t); }; });
+  /** @type {any} */(nav.querySelector('.wz-prev')).onclick=function(){ wzGo(key, W.i-1); };
+  /** @type {any} */(nav.querySelector('.wz-next')).onclick=function(){ if(wzCheck(key, W.i+1)) wzGo(key, W.i+1); };
+  Object.keys(D.req).forEach(function(id){ var e=document.getElementById(id); if(e){ e.setAttribute('aria-required','true'); e.addEventListener('input', function(){ wzErr(id, ''); }); } });
+  /* 기존 고객사에서 고르기(자동완성) + 중복 의심 알림 */
+  var ce=/** @type {any} */(document.getElementById(D.cust));
+  if(ce){ ce.setAttribute('list','dlCustAll'); ce.setAttribute('autocomplete','off'); var tmr=0; ce.addEventListener('input', function(){ clearTimeout(tmr); tmr=setTimeout(function(){ wzDup(key); }, 250); }); ce.addEventListener('focus', wzCustList); }
+  wzGo(key, 0);
+}
+export function wzCustList(){
+  var dl=document.getElementById('dlCustAll'); if(!dl){ dl=document.createElement('datalist'); dl.id='dlCustAll'; document.body.appendChild(dl); }
+  var seen={}, out=[]; (ST.RAWX.customers||[]).forEach(function(c){ if(c.name && !seen[c.name]){ seen[c.name]=1; out.push(c.name); } });
+  out.sort(function(a,b){ return a.localeCompare(b,'ko'); });
+  if(dl.childElementCount!==out.length) dl.innerHTML=out.map(function(n){ return tpl`<option value="${n}"></option>`; }).join('');
+}
+export function wzErr(id, t){
+  var e=document.getElementById(id); if(!e) return; var b=wzBox(id), x=document.getElementById(id+'Err');
+  if(!t){ if(x) x.remove(); e.removeAttribute('aria-invalid'); e.removeAttribute('aria-describedby'); return; }
+  if(!x){ x=document.createElement('div'); x.id=id+'Err'; x.className='wz-err'; if(b) b.appendChild(x); }
+  x.textContent=t; e.setAttribute('aria-invalid','true'); e.setAttribute('aria-describedby', id+'Err');
+}
+/** to 단계로 가기 전에 지금까지 단계의 필수 칸·형식 확인 */
+export function wzCheck(key, to){
+  var D=WZ_DEF[key], W=WZ[key], bad=/** @type {any} */(null);
+  for(var s=0; s<Math.min(to, D.steps.length-1); s++){
+    D.steps[s][1].forEach(function(id){ var e=/** @type {any} */(document.getElementById(id)); if(!e) return;
+      var t=''; if(D.req[id] && !String(e.value||'').trim()) t=D.req[id]+'은(는) 꼭 넣어야 합니다';
+      else if(e.type==='email' && e.value && !e.checkValidity()) t='이메일 형식이 아닙니다 (예: name@company.com)';
+      else if(e.type==='number' && e.value!=='' && !e.checkValidity()) t='숫자 범위를 확인하세요';
+      wzErr(id, t); if(t && !bad) bad={s:s, id:id}; });
+    if(bad) break;
+  }
+  if(bad){ if(bad.s!==W.i) wzGo(key, bad.s); var f=/** @type {any} */(document.getElementById(bad.id)); if(f) f.focus(); return false; }
+  return true;
+}
+export function wzGo(key, i){
+  var D=WZ_DEF[key], W=WZ[key]; if(!W) return; i=Math.max(0, Math.min(D.steps.length-1, i)); W.i=i;
+  W.steps.forEach(function(s, k){ s.hidden=(k!==i); });
+  W.head.querySelectorAll('button').forEach(function(b){ var k=+b.dataset.s; b.setAttribute('aria-current', k===i? 'step':'false'); b.classList.toggle('done', k<i); });
+  /** @type {any} */(W.nav.querySelector('.wz-prev')).hidden=(i===0);
+  var lastStep=(i===D.steps.length-1); /** @type {any} */(W.nav.querySelector('.wz-next')).hidden=lastStep; if(W.go) W.go.hidden=!lastStep;
+  if(lastStep) wzSummary(key);
+}
+export function wzSummary(key){
+  var D=WZ_DEF[key], box=document.getElementById(key+'WzSum'); if(!box) return;
+  box.innerHTML=D.steps.slice(0,-1).map(function(s, k){
+    var rows=s[1].map(function(id){ var b=wzBox(id); if(!b || b.style.display==='none') return ''; var v=wzVal(id); return v? tpl`<div><dt>${wzLabel(id)}</dt><dd>${v}</dd></div>` : ''; }).join('');
+    return tpl`<section><h4>${String(k+1)}. ${s[0]} <button type="button" class="cap-more" data-s="${String(k)}">고치기</button></h4><dl>${rawHtml(rows || '<div><dd class="mini">넣은 값 없음</dd></div>')}</dl></section>`; }).join('');
+  box.querySelectorAll('[data-s]').forEach(function(b){ /** @type {any} */(b).onclick=function(){ wzGo(key, +(/** @type {any} */(b).dataset.s)); }; });
+}
+export function wzReset(key){ var D=WZ_DEF[key]; if(!WZ[key]) wzInit(key); Object.keys(D.req).forEach(function(id){ wzErr(id,''); }); var dp=document.getElementById(key+'WzDup'); if(dp) dp.remove(); wzGo(key, 0); }
+/** 같은 고객사의 진행 중 건 — 중복 신청·등록 의심(막지 않음) */
+export function wzDup(key){
+  var D=WZ_DEF[key], ce=/** @type {any} */(document.getElementById(D.cust)); if(!ce) return; var v=String(ce.value||'').replace(/\s/g,'').toLowerCase();
+  var old=document.getElementById(key+'WzDup'); if(old) old.remove(); if(v.length<2) return;
+  var same=function(n){ return String(n||'').replace(/\s/g,'').toLowerCase()===v; }, hits=[], lab='';
+  if(key==='od'){ hits=(ST.RAWX.orders||[]).filter(function(o){ return same(o.customer) && ['접수','출하요청','배송중'].indexOf(o.status)>=0; }).map(function(o){ return '#'+o.id+' '+o.status+' · '+(o.model||'')+' ×'+(o.qty||1)+' · '+String(o.created_at||'').slice(0,10); }); lab='처리 대기 장비 신청'; }
+  if(key==='oi'){ hits=(ST.RAWX.oi||[]).filter(function(o){ return same(o.customer) && !/수주|계산서|종료|중지|실패/.test(String(o.stage||'')); }).map(function(o){ return '#'+o.id+' '+(o.deal_name||'')+' · '+(o.stage||''); }); lab='진행 중 OI'; }
+  if(key==='mp'){ hits=(ST.RAWX.mdrops||[]).filter(function(o){ return same(o.customer) && !/종료|취소|해지/.test(String(o.status||'')); }).map(function(o){ return '#'+o.id+' '+(o.status||'')+' · '+String(o.apply_date||o.created_at||'').slice(0,10); }); lab='진행 중 PoC·운영'; }
+  if(!hits.length) return;
+  var b=wzBox(D.cust); if(!b) return; var x=document.createElement('div'); x.id=key+'WzDup'; x.className='wz-dup'; x.setAttribute('role','status');
+  x.textContent='같은 고객사의 '+lab+' '+hits.length+'건이 있습니다 — '+hits.slice(0,3).join(' / ')+(hits.length>3? ' 외 '+(hits.length-3)+'건':'')+' · 중복이 아니면 그대로 진행하세요';
+  b.appendChild(x);
+}
+/* ㊿+170 위쪽 «＋ 등록» — 무엇을 등록하는지 이름이 붙은 메뉴 (계약 · 영업기회 · 장비 · PoC) */
+export function openNewMenu(btn){
+  var it=[];
+  if(!ST.IS_VIEWER && canWrite('contracts')) it.push({l:'계약 등록', ic:'doc', go:function(){ $('#btnEdit').click(); var t=/** @type {any} */(document.querySelector('#eTabs button[data-t="new"]')); if(t) t.click(); }},
+    {l:'계약 변경 — 갱신·추가·해지·금액', ic:'edit', go:function(){ $('#btnEdit').click(); var t=/** @type {any} */(document.querySelector('#eTabs button[data-t="renew"]')); if(t) t.click(); }});
+  [['oinew','영업기회(OI) 등록','target'],['ordernew','장비 신청','box'],['mdrnew','PoC 신청','shield']].forEach(function(x){ if(canView(x[0])) it.push({l:x[1], ic:x[2], go:function(){ navMenu(x[0]); }}); });
+  if(it.length) rowMenu(btn, it);
 }

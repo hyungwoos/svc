@@ -7,7 +7,7 @@ import { GRIDS } from './grids.js';
 import { applyChannelMenu, ctRawOf, liveData } from './analysis.js';
 import { goInbList, loadInbound } from './inbound.js';
 import { applyMenuFold } from './sales.js';
-import { ctPeriods, navMenu, openDetail, renderGrid, switchView } from './grid.js';
+import { ctPeriods, navMenu, oiOpen, openDetail, qvCfg, renderGrid, switchView } from './grid.js';
 import { syncOrderAssets } from './equipment.js';
 import { closeOvl, openOvl, ovlMarkDirty } from './edit.js';
 
@@ -375,7 +375,7 @@ export function renderTodo(){
         var n=null;
         if(rows){ n=0; rows.forEach(function(x){
           var last=[x.on_date,x.s1d,x.s2d,x.s21d,x.s3d].filter(function(d){return d&&/^\d{4}-\d{2}-\d{2}/.test(d);}).sort().pop();
-          if(last && (t0-new Date(last).getTime())/864e5>=90) n++;   // 대시보드 기준: 3개월
+          if(last && (t0-new Date(last).getTime())/864e5>=qvCfg().inbIdle) n++;   // 대시보드 기준: 기본 90일 (㊿+170 «빠른 보기 › 기준»에서 바꿈 · 인바운드 «장기 미접촉»과 같은 기준)
         }); }
         ST.INB_TODO={t:t0, n:n};
         if(ST.CUR_VIEW==='dash') renderTodo();
@@ -384,7 +384,7 @@ export function renderTodo(){
   var inbN=ST.INB_TODO? ST.INB_TODO.n:null;
   // ② OI 밀린 액션 — 예정일이 지났는데 아직 진행 중
   var oiLate=(ST.RAWX.oi||[]).filter(function(o){
-    return o.next_date && String(o.next_date).slice(0,10)<todayS && !/수주|실패/.test(String(o.stage||''));
+    return o.next_date && String(o.next_date).slice(0,10)<todayS && oiOpen(o);
   }).length;
   // ③ 재약정 도래 — 60일(2개월) 안에 종료되는 계약
   var nowI=dIdx(todayS), renewN=0;

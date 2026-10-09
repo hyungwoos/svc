@@ -17,6 +17,25 @@ import { closeOvl, logChange, monthRows, openOvl, ymFromInput } from './edit.js'
    · 규칙 추가는 dcRules() 에 rule(id, sev, 제목, 설명, items[{label,sub,go,key}], 화면이름) 한 줄. sev: crit(바로 고침) · warn(확인) · info(참고)
    · DB 쪽 제약(공백·목록 값 정규화 · 시리얼 UNIQUE · FK)은 SQL 90 — 이 화면은 그 전후로 «지금 어긋난 것»을 보여주는 용도 */
 export var DC={open:{}, sev:''};
+/* ㊿+170 데이터 점검 — 규칙마다 «업무 영향»(무엇이 틀려 보이는지) · 기술 설명(why)은 관리자만 */
+export var DC_IMPACT={c_nocust:'고객 360·LIVE 고객 수에서 빠지고 화면에 «?»로 보입니다', c_parent:'부속 계약이 원계약과 묶이지 않아 만료·재약정 판단이 틀어집니다', c_dates:'기간·LIVE·월 매출 판정이 틀어집니다',
+  c_lapsed:'이미 LIVE 에서 빠져 고객 수·MRR 이 줄어 보입니다 — 연장이면 되살려야 합니다', c_renew_dup:'연장 회차·만기가 두 번 잡혀 만기 처리가 틀어집니다', c_renew_overlap:'같은 기간 매출이 두 번 잡혀 MRR 이 부풀 수 있습니다',
+  c_renew_sync:'홈 «만기 처리» 숫자와 슬랙 만기 알림이 다를 수 있습니다', c_vocab:'필터·집계에서 따로 묶이거나 빠집니다', c_rev_after_end:'해지·종료 뒤 매출이 남아 MRR·연 매출이 부풀려집니다',
+  c_noend:'만료 예정·만기 처리 목록에서 빠집니다', c_s1no:'에스원 정산 대조에서 짝을 찾지 못합니다', c_live_zero:'이달 MRR 이 실제보다 적게 보입니다(월납이면 입력 누락)',
+  c_mrr:'계약 MRR 과 월 매출 중 어느 쪽이 맞는지 불분명 — 재계약 제안 금액이 틀릴 수 있습니다', c_amt_odd:'매출·목표 달성률이 크게 틀립니다(천원·원 단위 실수)', c_cloud_meta:'6.0 전환율·노드 기준 분석에서 빠집니다',
+  c_lead:'유입경로 분석에서 «미지정»으로 묶입니다', cu_dup:'같은 회사가 두 곳으로 세어져 고객 수·고객 360 이 나뉩니다', eq_serial_dup:'임대중 대수·회수 처리가 두 번 셉니다',
+  eq_gap:'장비 대시보드·고객 360 장비 수가 신청과 다릅니다', eq_orphan:'어느 신청에도 안 묶여 회수 대상에서 빠질 수 있습니다', eq_noserial:'실제 장비를 찾거나 회수할 때 시리얼을 모릅니다',
+  eq_vocab:'상태 보드·대시보드에서 카드가 사라집니다', oi_overdue:'파이프라인·이번 분기 예상에 지난 건이 섞입니다'};
+/** ㊿+170 일괄 수정 미리 보기 — 무엇이 바뀌는지 표로 보여 주고, 사람이 «n건 반영»을 눌러야만 실행(자동 실행 없음) */
+export function previewDlg(o){
+  var ov=document.getElementById('ovlPrev');
+  if(!ov){ ov=document.createElement('div'); ov.className='ovl'; ov.id='ovlPrev'; ov.innerHTML='<div class="modal" style="width:min(760px,100%)" role="dialog" aria-modal="true" aria-labelledby="pvT"><h3 id="pvT"></h3><p class="cap" id="pvI"></p><div class="tbl-wrap" style="max-height:50vh;overflow:auto"><table class="dgrid" id="pvTb"></table></div><div class="mact"><span class="mmsg" id="pvM"></span><button type="button" class="pill ghost" data-close="ovlPrev">취소</button><button type="button" class="pill pri" id="pvOk"></button></div></div>'; document.body.appendChild(ov); }
+  /** @type {any} */(document.getElementById('pvT')).textContent=o.title; /** @type {any} */(document.getElementById('pvI')).textContent=o.intro||'';
+  /** @type {any} */(document.getElementById('pvTb')).innerHTML=tpl`<thead><tr>${rawHtml(o.head.map(function(x){ return tpl`<th>${x}</th>`; }).join(''))}</tr></thead><tbody>${rawHtml(o.rows.slice(0,300).map(function(r){ return tpl`<tr>${rawHtml(r.map(function(v){ return tpl`<td>${String(v==null?'':v)}</td>`; }).join(''))}</tr>`; }).join(''))}</tbody>`;
+  var ok=/** @type {any} */(document.getElementById('pvOk')); ok.textContent=o.ok; ok.disabled=false; /** @type {any} */(document.getElementById('pvM')).textContent=o.rows.length>300? '처음 300건만 보입니다 (전체 '+o.rows.length+'건 반영)' : '';
+  ok.onclick=function(){ ok.disabled=true; closeOvl('ovlPrev'); o.run(); };
+  openOvl('ovlPrev');
+}
 export function dcRules(){
   var rows=(ST.DATA&&ST.DATA.rows)||[], T=(ST.DATA&&ST.DATA.nowIdx)||0, R=ST.RAWX||{}, out=[];
   function rule(id, sev, title, why, items, go, act){ out.push({id:id, sev:sev, title:title, why:why, items:items||[], go:go||'', act:act||null}); }   // act: {label,run} = 규칙 전체에 대한 일괄 동작 버튼(선택)
@@ -132,19 +151,27 @@ export function renderDataCheck(){
   rules.forEach(function(r){ if(r.items.length){ n[r.sev]++; cnt[r.sev]+=r.items.length; items+=r.items.length; } });
   var h=tpl`<div class="dbar" style="margin-bottom:12px;flex-wrap:wrap;gap:8px;align-items:center">`+
     tpl`<span class="mini">규칙 ${rules.length}개 · 어긋난 항목 <b>${rawHtml(items)}</b>건 · ${rawHtml(ms)}ms · 데이터 ${ST.DATA.generatedAt||''} 기준</span>`+
-    tpl`<span class="mtabs" style="margin:0" id="dcSev">${rawHtml([['','전체'],['crit','🔴 '+cnt.crit],['warn','🟠 '+cnt.warn],['info','🔵 '+cnt.info]].map(function(t){ return tpl`<button type="button" data-s="${rawHtml(t[0])}" aria-pressed="${DC.sev===t[0]}">${rawHtml(t[1])}</button>`; }).join(''))}</span>`+
+    tpl`<span class="mtabs" style="margin:0" id="dcSev">${rawHtml([['','전체'],['crit','바로 고칠 '+cnt.crit],['warn','확인 '+cnt.warn],['info','참고 '+cnt.info]].map(function(t){ return tpl`<button type="button" data-s="${rawHtml(t[0])}" aria-pressed="${DC.sev===t[0]}">${rawHtml(t[1])}</button>`; }).join(''))}</span>`+
     tpl`<span style="flex:1"></span><button type="button" class="pill ghost" id="dcXlsx">엑셀</button><button type="button" class="pill ghost" id="dcRefresh">↻ 다시 점검</button></div>`;
   h+=tpl`<div class="dc-sev" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:14px">${rawHtml(['crit','warn','info'].map(function(sv){ return tpl`<div class="card" style="padding:12px 14px"><div class="mini">${rawHtml(DC_SEV[sv][0])} ${rawHtml(DC_SEV[sv][1])}</div><div style="font-size:22px;font-weight:800;color:${rawHtml(DC_SEV[sv][2])}">${rawHtml(cnt[sv])}<span class="mini" style="font-weight:400"> 건 · 규칙 ${rawHtml(n[sv])}개</span></div></div>`; }).join(''))}</div>`;
   var ord={crit:0,warn:1,info:2};
-  var list=rules.filter(function(r){ return !DC.sev || r.sev===DC.sev; }).sort(function(a,b){ return (ord[a.sev]-ord[b.sev]) || (b.items.length-a.items.length); });
-  h+=list.map(function(r){ var open=!!DC.open[r.id], ok=!r.items.length;
+  /* ㊿+170 문제 있는 규칙 먼저(심각도 → 건수) · 이상 없는 규칙은 맨 아래 접힘 */
+  var list=rules.filter(function(r){ return !DC.sev || r.sev===DC.sev; }).sort(function(a,b){ return ((a.items.length? 0:1)-(b.items.length? 0:1)) || (ord[a.sev]-ord[b.sev]) || (b.items.length-a.items.length); });
+  var nOk=list.filter(function(r){ return !r.items.length; }).length;
+  var ADM=ST.IS_SUPER || /^(admin|super_admin)$/.test(String(ST.MY_ROLE||''));
+  var cardOf=function(r){ var open=!!DC.open[r.id], ok=!r.items.length, imp=DC_IMPACT[r.id]||'';
     return tpl`<div class="card dc-rule" data-sev="${rawHtml(r.sev)}" style="padding:12px 14px;margin-bottom:8px">`+
       tpl`<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;cursor:${ok? 'default':'pointer'}" data-dc="${rawHtml(r.id)}">`+
         tpl`<span>${rawHtml(ok? '✅':DC_SEV[r.sev][0])}</span><b style="font-size:14px">${r.title}</b>`+
         tpl`<span class="ctag${ok? ' ok':(r.sev==='warn'? ' warn':r.sev==='info'? ' info':' late')}">${rawHtml(ok? '이상 없음':r.items.length+'건')}</span>`+
         tpl`<span class="mini" style="margin-left:auto">${r.go}${ok? '':(open? ' ▴':' ▾')}</span></div>`+
-      tpl`<div class="mini" style="margin:6px 0 0 26px;line-height:1.6">${r.why}</div>`+ tpl`${rawHtml(!ok && r.act? tpl`<div style="margin:8px 0 0 26px"><button type="button" class="pill ghost" data-dcact="${rawHtml(r.id)}">⚡ ${r.act.label}</button></div>`:'')}`+ tpl`${rawHtml(open&&!ok&&r.items.some(function(it){ return it.fix; })? '<div class="mini" style="margin:8px 0 0 26px">항목을 누르면 수정 창이 열립니다 — 저장하면 다음 항목으로 넘어갑니다</div>':'')}`+ tpl`${rawHtml(open&&!ok? tpl`<table class="rn-tbl" style="margin:8px 0 0 26px;width:calc(100% - 26px)"><tbody>${rawHtml(r.items.slice(0,60).map(function(it,i){ return tpl`<tr><td><a href="#" data-dcgo="${rawHtml(r.id)}:${rawHtml(i)}">${it.label}</a></td><td class="mini">${it.sub||''}${rawHtml(it.act? tpl` <button type="button" class="pill ghost" style="padding:1px 8px;font-size:12px" data-dcitem="${rawHtml(r.id)}:${rawHtml(i)}">${it.act.label}</button>`:'')}</td></tr>`; }).join(''))}${rawHtml(r.items.length>60? tpl`<tr><td colspan="2" class="mini">… 외 ${r.items.length-60}건 (엑셀로 전체)</td></tr>`:'')}</tbody></table>`:'')}`+
-      tpl`</div>`; }).join('');
+      /* ㊿+170 문제(제목) · 업무 영향 · 대상 · 해결 행동 — DB·SQL 설명(why)은 관리자에게만 «기술 상세» */
+      tpl`${rawHtml(ok? (imp? tpl`<div class="mini dc-ok">${imp} — 지금은 이상 없음</div>` : '') : tpl`<dl class="dc-dl">${rawHtml(imp? tpl`<div><dt>업무 영향</dt><dd>${imp}</dd></div>` : '')}<div><dt>대상</dt><dd>${String(r.items.length)}건 — ${r.items.slice(0,3).map(function(it){ return it.label; }).join(' · ')}${r.items.length>3? ' 외 '+(r.items.length-3)+'건' : ''}</dd></div>`+
+        tpl`<div><dt>해결 행동</dt><dd>${r.go? r.go+'에서 고치기' : '항목별로 확인'}${r.items.some(function(it){ return it.fix; })? ' · 항목을 누르면 바로 수정 창' : ''}${rawHtml(r.act? tpl` <button type="button" class="pill ghost dc-bulk" data-dcact="${rawHtml(r.id)}">${r.act.label.replace(/^[⚡↩]\s*/,'')} — 미리 보기</button>` : '')}</dd></div></dl>`)}`+
+      tpl`${rawHtml(ADM? tpl`<details class="dc-tech"><summary>기술 상세 (관리자)</summary><div class="mini">${r.why}</div></details>` : '')}`+ tpl`${rawHtml(open&&!ok&&r.items.some(function(it){ return it.fix; })? '<div class="mini" style="margin:8px 0 0 26px">항목을 누르면 수정 창이 열립니다 — 저장하면 다음 항목으로 넘어갑니다</div>':'')}`+ tpl`${rawHtml(open&&!ok? tpl`<table class="rn-tbl" style="margin:8px 0 0 26px;width:calc(100% - 26px)"><tbody>${rawHtml(r.items.slice(0,60).map(function(it,i){ return tpl`<tr><td><a href="#" data-dcgo="${rawHtml(r.id)}:${rawHtml(i)}">${it.label}</a></td><td class="mini">${it.sub||''}${rawHtml(it.act? tpl` <button type="button" class="pill ghost" style="padding:1px 8px;font-size:12px" data-dcitem="${rawHtml(r.id)}:${rawHtml(i)}">${it.act.label}</button>`:'')}</td></tr>`; }).join(''))}${rawHtml(r.items.length>60? tpl`<tr><td colspan="2" class="mini">… 외 ${r.items.length-60}건 (엑셀로 전체)</td></tr>`:'')}</tbody></table>`:'')}`+
+      tpl`</div>`; };
+  h+=list.filter(function(r){ return r.items.length; }).map(cardOf).join('');
+  if(nOk) h+=tpl`<details class="dc-okall"${rawHtml(DC.okOpen?' open':'')}><summary>이상 없는 규칙 ${String(nOk)}개</summary>${rawHtml(list.filter(function(r){ return !r.items.length; }).map(cardOf).join(''))}</details>`;
   host.innerHTML=h;
   host.querySelectorAll('#dcSev button').forEach(function(b){ b.onclick=function(){ DC.sev=b.dataset.s; renderDataCheck(); }; });
   host.querySelectorAll('[data-dc]').forEach(function(d){ d.onclick=function(){ var r=rules.filter(function(x){ return x.id===d.dataset.dc; })[0]; if(!r||!r.items.length) return; DC.open[r.id]=!DC.open[r.id]; renderDataCheck(); }; });
@@ -153,6 +180,7 @@ export function renderDataCheck(){
   host.querySelectorAll('[data-dcact]').forEach(function(b){ b.onclick=function(e){ e.stopPropagation(); var r=rules.filter(function(x){ return x.id===b.dataset.dcact; })[0]; if(r&&r.act) r.act.run(); }; });
   host.querySelectorAll('[data-dcitem]').forEach(function(b){ b.onclick=function(e){ e.stopPropagation(); var p=b.dataset.dcitem.split(':'); var r=rules.filter(function(x){ return x.id===p[0]; })[0]; var it=r&&r.items[+p[1]]; if(it&&it.act) it.act.run(); }; });
   host.querySelector('#dcRefresh').onclick=function(){ renderDataCheck(); };
+  var oka=/** @type {any} */(host.querySelector('.dc-okall')); if(oka) oka.ontoggle=function(){ DC.okOpen=oka.open; };
   dcLogOnce(cnt, rules);
   host.querySelector('#dcXlsx').onclick=function(){ var out=[]; rules.forEach(function(r){ r.items.forEach(function(it){ out.push([DC_SEV[r.sev][1], r.title, it.label, it.sub||'', r.go]); }); }); if(!out.length){ toast('내보낼 항목이 없습니다','전부 이상 없음'); return; } xlsxAoa('데이터점검_'+new Date().toISOString().slice(0,10), ['심각도','규칙','항목','내용','고치는 화면'], out); };
 }
@@ -350,7 +378,11 @@ export async function dcFillMrr(rows, T){
   if(!rows.length) return;
   var ym=mk(T), body=rows.map(function(r){ return {contract_id:r._id, month:idxDate(T), amount:Math.round(r.mrr)}; });   // r.mrr · monthly_revenue.amount 모두 «원»
   var sum=rows.reduce(function(a,r){ return a+(r.mrr||0); }, 0);
-  if(!confirm(ym+' 월 매출을 mrr 금액으로 '+rows.length+'건 넣습니다 (합계 '+won(sum)+' 천원).\n연납·일시납·분기납·반년납 계약은 이미 제외돼 있습니다. 계속할까요?')) return;
+  /* ㊿+170 미리 보기 창에서 확인한 뒤에만 실행 */
+  previewDlg({title:ym+' 월 매출을 MRR 로 채우기 — 미리 보기', intro:rows.length+'건 · 합계 '+won(sum)+' 천원을 월 매출(monthly_revenue)에 넣습니다. 연납·일시납·분기납·반년납 계약은 이미 뺐습니다. 맞으면 아래 버튼을 누르세요.',
+    head:['고객사','서비스','상태','월','넣을 금액(천원)'], rows:rows.map(function(r){ return [r.cust, lline(r.line), r.status||'', ym, won(r.mrr||0)]; }), ok:rows.length+'건 반영', run:function(){ dcFillMrrRun(rows, T, body, ym, sum); }});
+}
+export async function dcFillMrrRun(rows, T, body, ym, sum){
   try{
     await sbWrite('POST','monthly_revenue', body);
     await logChange('bulk_fill','monthly_revenue',ym,{n:rows.length, sum:sum, ids:rows.map(function(r){ return r._id; }).slice(0,200)});

@@ -4,7 +4,7 @@ import { APP_VER, ST } from './state.js';
 import { Viz } from './viz.js';
 import { $, cssv, esc, LINE_LABEL, lline, llineVer, mk, pct, rawHtml, tpl, won } from './core.js';
 import { dIdx, RPB, rpbBadge, rpbKey, rpbList, SB_RAW, thisMonthStr, toast, todayStr } from './shell.js';
-import { idxs } from './dash.js';
+import { expAmtOf, expEligible, idxs } from './dash.js';
 import { GRIDS } from './grids.js';
 import { eqRetSet } from './equipment.js';
 import { chOf, liveActiveAt, liveCalc, loadLib, nmKeys } from './analysis.js';
@@ -366,7 +366,7 @@ export function rpAnHtml(j, inc, tbl){
    · 만드는 곳: 리포트(데이터 조합) 결과 «＋ PPT 슬라이드에 추가» (qbDeckAdd) · 내보내기 rpbMakePpt()
    ================================================================== */
 export function rpbSave(){ try{ localStorage.setItem(rpbKey(), JSON.stringify(RPB.items||[])); }catch(e){ toast('저장 공간 부족','담은 항목이 너무 많거나 표가 큽니다 — 일부를 지워주세요','bad'); } try{ rpbBadge(); }catch(e){} }
-export var RPV={tab:'build', title:'서비스사업부 리포트', sub:'', ai:false};
+export var RPV={tab:'build', title:'서비스사업부 리포트', sub:'', ai:false, build:false};
 export function rpbSents(t){ return (String(t||'').replace(/\n+/g,' ').match(/[^.。!?]+[.。!?]?/g)||[]).map(function(x){ return x.trim(); }).filter(Boolean); }
 export function rpbSvgPng(svg){
   return new Promise(function(res){
@@ -514,6 +514,9 @@ export function qbSources(){
             {k:'line',l:'서비스',t:'text',fmt:function(v){ return lline(v); }},{k:'version',l:'Ver.',t:'text'},{k:'_lineVer',l:'서비스(버전)',t:'text',get:function(r){ return llineVer(r.line, r.version); }},{k:'channel',l:'판매 채널',t:'text'},{k:'lead_src',l:'유입경로',t:'text'},{k:'auto_renew',l:'자동연장',t:'bool'},{k:'partner',l:'파트너',t:'text'},{k:'biller',l:'계산서발행처',t:'text'},
             {k:'combine',l:'모듈',t:'text'},{k:'contract_type',l:'구분',t:'text'},{k:'status',l:'상태',t:'text'},
             {k:'_live',l:'LIVE 여부',t:'bool',get:function(r){ var d=dmap[r.id]; try{ return !!(d && liveActiveAt(d, ST.DATA.nowIdx)); }catch(e){ return false; } }},
+            /* ㊿+170 홈 «N개월 내 만료»와 같은 대상(원계약 · 부속·집계 제외·H/W·해지/중지/종료 빼고) · 금액 = 종료월 월 금액 — 리포트 숫자를 홈·목록과 맞춤 */
+            {k:'_expRoot',l:'만료 집계 대상(원계약)',t:'bool',get:function(r){ var d=dmap[r.id]; try{ return !!(d && expEligible(d)); }catch(e){ return false; } }},
+            {k:'_expAmt',l:'종료월 월 금액(천원)',t:'num',won:true,get:function(r){ var d=dmap[r.id], k=d? ST.DATA.rows.indexOf(d) : -1; return k>=0? expAmtOf(k) : 0; }},
             {k:'start_month',l:'시작월',t:'month'},{k:'end_month',l:'종료월',t:'month'},{k:'churn_month',l:'해지월',t:'month'},{k:'churn_reason',l:'해지사유',t:'text'},
             {k:'mrr',l:'MRR(천원)',t:'num',won:true},{k:'_sum',l:'누적 매출(천원)',t:'num',won:true,get:function(r){ var d=dmap[r.id]; return d? d.sum : 0; }},
             {k:'install_fee',l:'설치비(천원)',t:'num',won:true},{k:'settle_month',l:'대금정산일',t:'month'},{k:'term_months',l:'계약기간(개월)',t:'num'},{k:'qty',l:'노드/수량',t:'num'},
@@ -782,8 +785,8 @@ export var QB_PRESETS=[
      group:{by:[{c:'mrs.month',tr:'ym'}], aggs:[{fn:'sum',c:'mrs.amount',alias:'매출'}], pivot:{c:'contracts.line'}}, post:[], sort:[{c:'g0',dir:'asc'}], limit:0}},
   {id:'p_ch_month', name:'채널 × 설치 월 — 장비 설치 대수 (피벗)', spec:{base:'orders', joins:[], filters:[{c:'orders.status',op:'in',v:'설치완료, 회수예정, 회수완료'}], sel:[],
      group:{by:[{c:'orders.channel'}], aggs:[{fn:'sum',c:'orders.qty',alias:'설치 대수'}], pivot:{c:'orders.install_date',tr:'ym'}}, post:[], sort:[{c:'ptot',dir:'desc'}], limit:0}},
-  {id:'p_expire', name:'3개월 내 만료 계약 + 고객 산업군·임대 장비', spec:{base:'contracts', joins:[{t:'customers',on:['contracts.customer_id','customers.id']},{t:'assets',on:['contracts._custName','assets.customer'],fuzzy:true,where:[{c:'assets.status',op:'eq',v:'임대중'}]}], filters:[{c:'contracts.end_month',op:'between',v:'@이번달',v2:'@3개월후'}], sel:[],
-     group:{by:[{c:'contracts._custName'},{c:'contracts.line'},{c:'contracts.end_month'},{c:'customers.industry'}], aggs:[{fn:'sum',c:'contracts.mrr',alias:'MRR'},{fn:'dcount',c:'assets.serial',alias:'임대중 장비(대)'}], pivot:null}, post:[], sort:[{c:'g2',dir:'asc'}], limit:0}},
+  {id:'p_expire', name:'3개월 내 만료 원계약 + 고객 산업군·임대 장비', spec:{base:'contracts', joins:[{t:'customers',on:['contracts.customer_id','customers.id']},{t:'assets',on:['contracts._custName','assets.customer'],fuzzy:true,where:[{c:'assets.status',op:'eq',v:'임대중'}]}], filters:[{c:'contracts.end_month',op:'between',v:'@이번달',v2:'@2개월후'},{c:'contracts._expRoot',op:'eq',v:'true'}], sel:[],
+     group:{by:[{c:'contracts.id'},{c:'contracts._custName'},{c:'contracts.line'},{c:'contracts.end_month'},{c:'customers.industry'}], aggs:[{fn:'max',c:'contracts._expAmt',alias:'종료월 월 금액'},{fn:'dcount',c:'assets.serial',alias:'임대중 장비(대)'}], pivot:null}, post:[], sort:[{c:'g3',dir:'asc'}], limit:0}},   /* ㊿+170 계약마다 한 줄(장비 연결로 금액이 부풀지 않게 max) — 행 수·금액 합계 = 홈 «3개월 내 만료» */
   {id:'p_ind_live', name:'산업군별 LIVE 고객 수 · 노드', spec:{base:'live', joins:[], filters:[], sel:[], group:{by:[{c:'live.ind'}], aggs:[{fn:'dcount',c:'live.cust',alias:'LIVE 고객 수'},{fn:'sum',c:'live.nodes',alias:'노드 합계'}], pivot:null}, post:[], sort:[{c:'a0',dir:'desc'}], limit:0}},
   {id:'p_return', name:'회수 예정 장비 목록 (신청 ↔ 현황)', spec:{base:'assets', joins:[{t:'orders',on:['assets.order_id','orders.id'],inner:true}], filters:[{c:'orders.status',op:'eq',v:'회수예정'}], sel:['assets.serial','assets.model','assets.status','assets.customer','assets.channel','assets.deployed_date','orders.id','orders.status','orders.returned_date','orders.request_note'],
      group:{by:[],aggs:[],pivot:null}, post:[], sort:[{c:'assets.customer',dir:'asc'}], limit:0}},
@@ -811,7 +814,10 @@ export function qbFilterRow(f, i, spec, kind){
     tpl`<button type="button" class="cbtn qb-x" data-qb="del" title="빼기">×</button></div>`;
 }
 export function qbDistinct(spec, cid){ var c=qbCol(cid); if(!c) return []; var S=qbSources(), rows=S[c.src].rows(), u={}, out=[]; for(var i=0;i<rows.length && out.length<=200;i++){ var v=qbRaw(rows[i],c); if(v==null||v==='') continue; var k=String(v); if(!u[k]){ u[k]=1; out.push(k); } } return out.sort(function(a,b){ return a.localeCompare(b,'ko'); }); }
-export function qbModeHtml(){ return tpl`<div class="qb-mode"><div class="eqb-seg"><button type="button" data-qbmode="ui" aria-pressed="${QB.mode!=='sql'}">UI 로 조합</button><button type="button" data-qbmode="sql" aria-pressed="${QB.mode==='sql'}">SQL 직접 작성</button></div></div>`; }
+export function qbModeHtml(){   /* ㊿+170 SQL 은 «고급 분석» 으로 — 조합 화면 맨 위가 아니라 맨 아래 접힌 버튼 · SQL 화면이면 «← 조합으로» */
+  if(QB.mode==='sql') return tpl`<div class="qb-mode qb-adv-h"><b>고급 분석 · SQL 직접 작성</b><button type="button" class="cbtn" data-qbmode="ui">← 조합 화면으로</button></div>`;
+  return ''; }
+export function qbAdvHtml(){ return QB.mode==='sql'? '' : tpl`<section class="qb-sec qb-adv"><button type="button" class="cbtn" data-qbmode="sql" title="표 이름·열 이름을 아는 분용 — SELECT 만 실행(읽기 전용)">고급 분석 — SQL 직접 작성 ›</button></section>`; }
 export function qbPanelHtml(){
   if(QB.mode==='sql') return qbModeHtml()+qbSqlPanelHtml();
   var spec=QB.spec, S=qbSources(), have=qbTables(spec), G=spec.group||{by:[],aggs:[]};
@@ -855,6 +861,7 @@ export function qbPanelHtml(){
   h+=tpl`<div class="qb-sub">결과 조건 (집계 값에도)</div>${rawHtml((spec.post||[]).map(function(f,i){ return qbFilterRow(f,i,spec,'post'); }).join(''))}<button type="button" class="cbtn qb-add" data-qb="padd">＋ 결과 조건</button>`;
   h+=tpl`<div class="qb-sub">정렬</div>${rawHtml((spec.sort||[]).map(function(s,i){ return tpl`<div class="qb-row" data-i="${rawHtml(i)}" data-kind="sort">${rawHtml(qbSel('c', qbOutColOpts(QB.res&&QB.res.cols, s.c), s.c))}<select data-qb="dir" aria-label="정렬 방향" class="qb-sel qb-dir"><option value="asc"${s.dir!=='desc'?' selected':''}>오름차순 ↑</option><option value="desc"${s.dir==='desc'?' selected':''}>내림차순 ↓</option></select><button type="button" class="cbtn qb-x" data-qb="del">×</button></div>`; }).join(''))}<button type="button" class="cbtn qb-add" data-qb="sadd">＋ 정렬</button>`;
   h+=tpl`<div class="qb-sub">상위 N행만 <input data-qb="limit" class="qb-in" type="number" min="0" style="width:80px" value="${rawHtml(spec.limit||'')}" placeholder="전체"></div></section>`;
+  h+=qbAdvHtml();
   return h;
 }
 export function qbResultHtml(){
@@ -910,7 +917,7 @@ export function qbResultDraw(){
 export function qbPanelSyncCols(){ var p=$('#qbPanel'); if(!p||!QB.res) return; p.querySelectorAll('.qb-row[data-kind="sort"] select[data-qb="c"], .qb-row[data-kind="post"] select[data-qb="c"]').forEach(function(sel){ var cur=sel.value; sel.innerHTML=(sel.closest('.qb-row').dataset.kind==='post'? '<option value="">열…</option>':'')+qbOutColOpts(QB.res.cols, cur); if(cur && !QB.res.cols.some(function(c){ return c.id===cur; })) sel.value=''; }); }
 export var QB_T=null;
 export function qbRun_(){ clearTimeout(QB_T); QB_T=setTimeout(function(){ QB.page=300; qbRunNow(); }, 180); }
-export function qbPanelRefresh(){ var p=$('#qbPanel'); if(!p) return; p.innerHTML=qbPanelHtml(); if(QB.mode==='sql') qbSqlBind(); }
+export function qbPanelRefresh(){ var p=$('#qbPanel'); if(!p) return; p.innerHTML=qbPanelHtml(); if(QB.mode==='sql') qbSqlBind(); qbBuildSync(); }
 export function qbBindPanel(){
   var p=$('#qbPanel'); if(!p || p._qb) return; p._qb=1;
   function rowOf(el){ var r=el.closest('.qb-row'); return r? {kind:r.dataset.kind, i:+r.dataset.i} : null; }
@@ -966,18 +973,27 @@ export function qbSaveCur(){
   else { var id='q'+Date.now().toString(36); L.push({id:id, name:nm, spec:payload.spec, sql:payload.sql, at:new Date().toISOString()}); QB.savedId=id; }
   QB.title=nm; qbSavedSet(L); qbLibRefresh(); var ti=$('#qbTitle'); if(ti) ti.value=nm; var sv=$('#qbSave'); if(sv) sv.textContent='💾 저장(덮어쓰기)'; toast('저장했습니다', nm, 'ok');
 }
+/* ㊿+170 템플릿 먼저 — 자주 쓰는 리포트(카드)를 고르면 바로 결과 · 조건을 바꾸려면 «조합 바꾸기» · SQL 은 조합 화면 맨 아래 «고급 분석» */
+export var QB_TPL_SUB={p_cust:'고객사마다 계약 수 · MRR · 임대중 장비', p_line_month:'최근 12개월 · 서비스별 월 매출', p_ch_month:'채널 × 설치 월 · 장비 대수', p_expire:'만료 예정 원계약 + 산업군 · 장비',
+  p_ind_live:'산업군별 LIVE 고객 · 노드', p_return:'회수예정 신청의 장비 목록', p_oi:'OI 진행상태별 건수 · 예상 금액', p_cloud:'클라우드 계정 × 월 비용'};
 export function qbLibHtml(){
-  var L=qbSaved(), h='<div class="qb-lib"><span class="mini" style="font-weight:600">저장한 조합</span>';
-  if(!L.length) h+='<span class="mini">없음 — 결과 위 «저장» 으로 보관</span>';
-  L.forEach(function(x){ h+=tpl`<span class="qb-chip${x.id===QB.savedId?' on':''}" data-load="${rawHtml(x.id)}">${rawHtml(x.sql? '<code>SQL</code> ':'')}${x.name}<button type="button" data-qdel="${rawHtml(x.id)}" title="삭제">×</button></span>`; });
-  h+=tpl`<span class="qb-lib-sep"></span><span class="mini" style="font-weight:600">예시</span>${rawHtml(QB_PRESETS.map(function(p){ return tpl`<span class="qb-chip ghost" data-preset="${rawHtml(p.id)}">${p.name}</span>`; }).join(''))}</div>`;
+  var L=qbSaved(), h=tpl`<div class="qb-tpl" role="group" aria-label="리포트 템플릿">${rawHtml(QB_PRESETS.map(function(p){ var on=(QB.title===p.name && !QB.savedId);
+      return tpl`<button type="button" class="qb-tc${rawHtml(on?' on':'')}" data-preset="${rawHtml(p.id)}"${rawHtml(on?' aria-current="true"':'')}><b>${p.name}</b><span>${QB_TPL_SUB[p.id]||''}</span></button>`; }).join(''))}`+
+    tpl`<button type="button" class="qb-tc auto" id="qbAuto2"><b>월간 자동 리포트</b><span>고정 양식 · 매출·고객·장비·인바운드 한 번에</span></button></div>`;
+  h+='<div class="qb-lib"><span class="mini" style="font-weight:600">내가 저장한 리포트</span>';
+  if(!L.length) h+='<span class="mini">없음 — 결과 위 «저장»으로 보관하면 여기에 생깁니다</span>';
+  L.forEach(function(x){ h+=tpl`<span class="qb-chip${x.id===QB.savedId?' on':''}" data-load="${rawHtml(x.id)}">${rawHtml(x.sql? '<code>SQL</code> ':'')}${x.name}<button type="button" data-qdel="${rawHtml(x.id)}" title="삭제" aria-label="${x.name} 삭제">×</button></span>`; });
+  h+=tpl`<span style="flex:1"></span><button type="button" class="cbtn${rawHtml(RPV.build?' pri':'')}" id="qbBuildTg" aria-expanded="${RPV.build?'true':'false'}" aria-controls="qbPanel">${RPV.build? '조합 닫기' : '조합 바꾸기 — 표·조건·묶기'}</button></div>`;
   return h;
 }
 export function qbLibRefresh(){ var el=$('#qbLib'); if(!el) return; el.innerHTML=qbLibHtml();
   el.querySelectorAll('[data-load]').forEach(function(c){ c.onclick=function(e){ if(e.target.closest('[data-qdel]')) return; var x=qbSaved().filter(function(y){ return y.id===c.dataset.load; })[0]; if(!x) return; if(x.sql) qbLoadSql(x.sql, x.name, x.id); else qbLoad(x.spec, x.name, x.id); }; });
   el.querySelectorAll('[data-qdel]').forEach(function(b){ b.onclick=function(){ var L=qbSaved(), x=L.filter(function(y){ return y.id===b.dataset.qdel; })[0]; if(!x || !confirm('«'+x.name+'» 을 삭제할까요?')) return; qbSavedSet(L.filter(function(y){ return y.id!==x.id; })); if(QB.savedId===x.id) QB.savedId=null; qbLibRefresh(); }; });
-  el.querySelectorAll('[data-preset]').forEach(function(c){ c.onclick=function(){ var p=QB_PRESETS.filter(function(x){ return x.id===c.dataset.preset; })[0]; if(p) qbLoad(p.spec, p.name, null); }; });
+  el.querySelectorAll('[data-preset]').forEach(function(c){ c.onclick=function(){ var p=QB_PRESETS.filter(function(x){ return x.id===c.dataset.preset; })[0]; if(p){ qbLoad(p.spec, p.name, null); qbLibRefresh(); } }; });
+  var a2=document.getElementById('qbAuto2'); if(a2) a2.onclick=function(){ RPV.tab='auto'; renderReport(); };
+  var bt=document.getElementById('qbBuildTg'); if(bt) bt.onclick=function(){ RPV.build=!RPV.build; qbBuildSync(); qbLibRefresh(); };
 }
+export function qbBuildSync(){ var w=document.querySelector('#rpBody .qb-wrap'); if(w) w.classList.toggle('nobuild', !RPV.build && QB.mode!=='sql'); }
 /* PPT 덱 — 결과를 슬라이드 항목으로 (rpbMakePpt 재사용, AI 코멘트 없음) */
 export function qbDeckAdd(){
   var r=QB.res; if(!r||!r.rows.length){ toast('추가할 결과가 없습니다','', 'bad'); return; }
@@ -1233,14 +1249,14 @@ export function renderReport(){
   if(!ST.DATA||!ST.DATA.rows){ host.innerHTML='<div class="cap" style="padding:40px;text-align:center">데이터를 불러오는 중…</div>'; return; }
   if(RPV.tab==='auto'){ qbAutoView(); return; }
   if(!QB.spec) QB.spec=qbNewSpec('contracts');
-  if(host.querySelector('#qbPanel')){ qbPanelRefresh(); qbRunNow(); qbLibRefresh(); qbDeckRefresh(); return; }
-  host.innerHTML=tpl`<div class="pr-top"><span style="font-size:18px;font-weight:600;letter-spacing:-.01em">리포트</span><span class="mini">포탈 안의 표를 골라 연결(JOIN)·조건·묶기·피벗으로 조합하고 표·차트로 봅니다 — 저장해 두고 엑셀·PPT 로 내보내기</span>`+
+  if(host.querySelector('#qbPanel')){ qbPanelRefresh(); qbRunNow(); qbLibRefresh(); qbDeckRefresh(); qbBuildSync(); return; }
+  host.innerHTML=tpl`<div class="pr-top"><span style="font-size:18px;font-weight:600;letter-spacing:-.01em">리포트</span><span class="mini">템플릿을 고르면 바로 결과가 나옵니다</span><span class="mini">포탈 안의 표를 골라 연결(JOIN)·조건·묶기·피벗으로 조합하고 표·차트로 봅니다 — 저장해 두고 엑셀·PPT 로 내보내기</span>`+
     tpl`<button type="button" class="cbtn" id="qbAuto" style="margin-left:auto" title="예전 월간 자동 리포트(고정 양식)">월간 자동 리포트 →</button></div>`+
     tpl`<div id="qbLib"></div>`+
     tpl`<div class="qb-wrap"><aside class="pr-card qb-panel-card"><div id="qbPanel"></div></aside><section class="pr-card qb-res-card"><div id="qbRes"></div></section></div>`+
     tpl`<div class="pr-card" id="qbDeck2" style="margin-top:14px"></div>`;
   $('#qbAuto').onclick=function(){ RPV.tab='auto'; renderReport(); };
-  qbPanelRefresh(); qbBindPanel(); qbLibRefresh(); qbDeckRefresh(); qbRunNow();
+  qbPanelRefresh(); qbBindPanel(); qbLibRefresh(); qbDeckRefresh(); qbRunNow(); qbBuildSync();
 }
 
 export function renderReportAuto(){

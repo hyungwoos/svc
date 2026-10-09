@@ -14,7 +14,7 @@ import { applyMenuConf, fkNorm, freqTop, menuSegments, navSub, openMenuEdit, ren
 import { loadInbound, loadMxMemos } from './inbound.js';
 import { UPD, updCheck } from './upd.js';
 import { applyMenuFold, closeDrawer, ensureGroupOpen, setupSide } from './sales.js';
-import { btnBackSync, gridGoPre, loadHide, NAV, navMenu, openDetail, renderGrid, switchView } from './grid.js';
+import { btnBackSync, gridGoPre, loadHide, NAV, navMenu, oiOpen, openDetail, qvCfg, qvGo, renderGrid, switchView } from './grid.js';
 import { closeOvl, logChange, openOvl, OVL_SKIP_CLEAN, ovlMarkClean, setupEdit, toggleAuthMenu } from './edit.js';
 
 
@@ -63,7 +63,7 @@ export var ICO={
   plus:'<path d="M12 5v14"/><path d="M5 12h14"/>'
 };
 /* ㊿+169 아이콘 한 가지 모양 — 위쪽·표 도구 버튼의 이모지/기호(✏️ ⊞ ↻ ⬇ 🧱 ☰ ❔ 📋)를 같은 선 아이콘 + 글자로 (id·이름표는 그대로) */
-export var UI_ICO={btnEdit:['edit','입력·수정'], btnWidgets:['board','위젯'], btnReload:['reload','새로고침'], btnFind:['spark','검색'],
+export var UI_ICO={btnEdit:['edit','계약 입력·수정'], btnNew:['plus','등록'], btnWidgets:['board','위젯'], btnReload:['reload','새로고침'], btnFind:['spark','검색'],
   dvAdd:['plus','행 추가'], dvPaste:['doc','붙여넣기 입력'], dvReload:['reload','다시 읽기'], dvCsv:['down','엑셀'], dvDense:['menu','밀도'], dvHelp:['spark','']};
 export function icoLbl(name, label){ return ico(name,15)+(label? tpl`<span>${label}</span>` : ''); }
 export function uiIconize(){
@@ -398,7 +398,7 @@ export function renderInbox(){
   var XS=EQ? {rows:[], amt:0, custN:0} : expScan(list, b, EN), expL=XS.rows.map(function(k){ return ST.DATA.rows[k]; }), expAmt=XS.amt;
   var curYm=monOf(b)+'월', bizDone=EQ || (ST.RAWX.biz||[]).some(function(r){ return r.ym===curYm; });
   var todayS=todayStr();
-  var oiLate=EQ? [] : (ST.RAWX.oi||[]).filter(function(o){ return o.next_date && String(o.next_date).slice(0,10)<todayS && !/수주|실패/.test(String(o.stage||'')); });
+  var oiLate=EQ? [] : (ST.RAWX.oi||[]).filter(function(o){ return o.next_date && String(o.next_date).slice(0,10)<todayS && oiOpen(o); });   /* ㊿+170 진행 중 = 수주·계산서발행·종료·중지·실패 아님(OI 타일·빠른 보기와 같은 기준) */
   var inbN=EQ? 0 : (ST.INB_TODO? ST.INB_TODO.n : null);
   var dow=new Date().getDay(), toMon=(8-dow)%7, wkTxt= dow===1? '오늘':'D-'+(toMon===0?7:toMon);
   var rows=[], zeros=[], snz=0;
@@ -457,16 +457,15 @@ export function renderInbox(){
       acts:[{l:'다음 주에', go:function(){ ccSnooze('biz',7); }},{l:'비즈포탈 엑셀 올리기', pri:1, go:function(){ switchView('biz'); }}]});
   }
   if(!EQ){
-    if(inbN>0){ var yr=new Date().getFullYear(), t90=Date.now();
-      add('inb', {lv:1, ic:'inbox', cls:'crit', n:inbN, t:tpl`인바운드 미대응 <span class="num">${rawHtml(inbN)}건</span>`, s:'진행중인데 3개월 이상 대응 기록이 없습니다',
-      who:'올해 진행중 인바운드', own:'인바운드 담당', due:'오늘', imp:'3개월 넘게 대응 기록 없음 — 놓친 문의일 수 있음',
-      acts:[{l:'미대응 '+inbN+'건 보기', pri:1, go:function(){ gridGoPre('inbound', '미대응 — 올해 진행중인데 3개월 넘게 기록 없음', function(x){ if(String(x.y||'')!==String(yr) || x.result!=='진행중') return false;
-        var last=[x.on_date,x.s1d,x.s2d,x.s21d,x.s3d].filter(function(d){ return d && /^\d{4}-\d{2}-\d{2}/.test(d); }).sort().pop(); return !!last && (t90-new Date(last).getTime())/864e5>=90; }); }}]}); }
+    if(inbN>0){
+      add('inb', {lv:1, ic:'inbox', cls:'crit', n:inbN, t:tpl`인바운드 미대응 <span class="num">${rawHtml(inbN)}건</span>`, s:'진행중인데 '+qvCfg().inbIdle+'일 이상 대응 기록이 없습니다',
+      who:'올해 진행중 인바운드', own:'인바운드 담당', due:'오늘', imp:qvCfg().inbIdle+'일 넘게 대응 기록 없음 — 놓친 문의일 수 있음',
+      acts:[{l:'미대응 '+inbN+'건 보기', pri:1, go:function(){ qvGo('inbound', 'idle'); }}]}); }
     else zeros.push('인바운드 미대응 '+(inbN==null? '…':'0'));
     if(oiLate.length){ var od=oiLate.map(function(o){ return String(o.next_date).slice(0,10); }).sort()[0], oAmt=oiLate.reduce(function(a,o){ return a+(+o.expect_amount||0); },0);
       add('oi', {lv:2, ic:'target', cls:'warn', n:oiLate.length, t:tpl`OI 밀린 액션 <span class="num">${oiLate.length}건</span>`, s:names(oiLate, function(o){ return o.customer; })+' · 다음 일정이 지났습니다',
       who:names(oiLate, function(o){ return o.customer; }), own:names(oiLate, function(o){ return o.owner; }, 2)||'', due:'예정일 지남 (가장 오래된 '+od+')', imp:oAmt? '예상 금액 '+won(oAmt)+'천원' : '다음 할 일 일정 갱신 필요',
-      acts:[{l:'일정 지난 OI '+oiLate.length+'건 보기', pri:1, go:function(){ gridGoPre('oi', '다음 일정이 지난 OI', function(o){ return o.next_date && String(o.next_date).slice(0,10)<todayS && !/수주|실패/.test(String(o.stage||'')); }); }}]}); }
+      acts:[{l:'일정 지난 OI '+oiLate.length+'건 보기', pri:1, go:function(){ qvGo('oi', 'late'); }}]}); }
     else zeros.push('OI 밀린 액션 0');
   }
   zeros.push('주간회의 '+wkTxt);
@@ -1309,6 +1308,7 @@ export function enterEquipMode(d){
   });
   try{ subgrpSync(); }catch(e){}
   $('#btnEdit').style.display='none';
+  var bn0=document.getElementById('btnNew'); if(bn0) bn0.style.display='none';
   $('#btnWidgets').style.display='none';
   showAuthUi();
   $('#loading').classList.add('hidden');
@@ -1446,6 +1446,7 @@ export function onData(d){
   /* 장표 셀 메모는 한 번만 읽고, 오면 장표만 다시 그립니다 */
   if(!ST.RAWX._mxAt) loadMxMemos(function(){ try{ if(ST.CUR_VIEW==='dash') renderMatrix(); }catch(e){} });
   $('#btnEdit').style.display = (ST.IS_VIEWER_ROLE || !canWrite('contracts'))? 'none':'';
+  var bnw=document.getElementById('btnNew'); if(bnw) bnw.style.display = ST.IS_VIEWER_ROLE? 'none':'';   /* ㊿+170 «＋ 등록» (메뉴 안 항목은 권한별) */
   (d.rows||[]).forEach(function(r){
     if(!r.ptn){
       var p0=String(r.partner||'');

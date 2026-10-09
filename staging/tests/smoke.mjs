@@ -496,10 +496,13 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
     const b = JSON.parse(rpc.body); assert(b.p_keep === 1 && b.p_drop === 99901, JSON.stringify(b));
     assert(!(await page.$('#ovlDcMerge')), '병합 뒤 창이 닫히지 않음'); assert(!errs.length, errs.join(' | ')); return JSON.stringify(b);
   });
-  await S.t('데이터 점검: 이달 매출 0 → mrr 로 채우기 (POST monthly_revenue · 원 단위 · change_log)', async () => {
+  await S.t('데이터 점검: 이달 매출 0 → mrr 로 채우기 — 미리 보기 창에서 «반영»을 눌러야 씀(㊿+170) (POST monthly_revenue · 원 단위 · change_log)', async () => {
     writes.length = 0;
     const exp = await page.evaluate(async () => { const r = SVC.ST.DATA.rows.filter((x) => x.mrr > 0)[0]; await SVC.dcFillMrr([r], SVC.ST.DATA.nowIdx); return { id: r._id, mrr: r.mrr, month: SVC.idxDate(SVC.ST.DATA.nowIdx) }; });
-    await page.waitForTimeout(500);
+    /* ㊿+170 바로 쓰지 않고 미리 보기 창 → «1건 반영»을 눌러야 씀 */
+    await page.waitForTimeout(150); const pv = await page.evaluate(() => ({ on: document.getElementById('ovlPrev').classList.contains('on'), rows: document.querySelectorAll('#pvTb tbody tr').length, ok: document.getElementById('pvOk').textContent }));
+    assert(pv.on && pv.rows === 1 && pv.ok === '1건 반영' && !writes.some((w) => /monthly_revenue/.test(w.url)), '미리 보기 ' + JSON.stringify(pv));
+    await page.click('#pvOk'); await page.waitForTimeout(500);
     const post = writes.filter((w) => /monthly_revenue/.test(w.url) && w.m === 'POST')[0]; assert(post, 'monthly_revenue POST 없음 ' + JSON.stringify(writes.map((w) => w.m + ' ' + w.url.split('/rest/v1/')[1])));
     const b = JSON.parse(post.body); assert(Array.isArray(b) && b.length === 1 && b[0].contract_id === exp.id && b[0].amount === Math.round(exp.mrr) && b[0].month === exp.month, JSON.stringify(b) + ' vs ' + JSON.stringify(exp));
     assert(writes.some((w) => /change_log/.test(w.url) && /bulk_fill/.test(w.body)), 'change_log bulk_fill 없음');
@@ -1599,7 +1602,9 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
   });
   await S.t('㊿+157 장비: 신청 폼 접수 즉시 현황(재고) 생김 · 붙여넣기 신청도 현황 반영', async () => {
     const { db, ctx, page } = await fboot();
-    await page.evaluate(() => SVC.switchView('ordernew')); await page.waitForTimeout(250); await page.fill('#odCustomer', '가상고객05'); await page.fill('#odMgr', '담당자B'); await page.fill('#odQty', '2'); await page.fill('#odSerials', 'TSTN0001, TSTN0002'); await page.click('#odGo'); await page.waitForTimeout(800);
+    await page.evaluate(() => SVC.switchView('ordernew')); await page.waitForTimeout(250); await page.fill('#odCustomer', '가상고객05'); await page.fill('#odMgr', '담당자B');
+    await page.click('#odFormWrap .wz-next'); await page.fill('#odQty', '2'); await page.fill('#odSerials', 'TSTN0001, TSTN0002'); await page.click('#odFormWrap .wz-next'); await page.click('#odFormWrap .wz-next');   /* ㊿+170 단계: 기본 → 조건 → 배송 → 확인 */
+    await page.click('#odGo'); await page.waitForTimeout(800);
     const a1 = db.t.equipment_assets.filter((a) => /^TSTN/.test(a.serial)).map((a) => a.status + ':' + a.customer);
     assert(a1.length === 2 && a1.every((x) => x.startsWith('재고')), '폼 ' + JSON.stringify(a1));
     await page.evaluate(() => SVC.switchView('orders')); await page.waitForTimeout(250); await page.evaluate(() => SVC.openPaste());
@@ -1631,7 +1636,8 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
     const yr = new Date().getFullYear(); await page.evaluate((y) => SVC.openTargetEditor(y), yr); await page.waitForTimeout(250);
     assert((await page.$eval('#ovlTarget input[data-m="1"]', (e) => e.value)) === '90000', '월 목표 칸(천원)'); await page.fill('#ovlTarget input[data-m="1"]', '95000'); await page.click('#tgSave'); await page.waitForTimeout(600);
     assert(db.t.monthly_targets.find((x) => x.year === yr && x.month === 1).amount === 95000000, '월 목표');
-    await page.evaluate(() => SVC.switchView('oinew')); await page.waitForTimeout(250); await page.fill('#oiCust', '가상고객_OI2'); await page.fill('#oiAmt', '12000'); await page.click('#oiGo'); await page.waitForTimeout(700);
+    await page.evaluate(() => SVC.switchView('oinew')); await page.waitForTimeout(250); await page.fill('#oiCust', '가상고객_OI2'); await page.click('#oiFormWrap .wz-next'); await page.click('#oiFormWrap .wz-next');
+    await page.fill('#oiAmt', '12000'); await page.click('#oiFormWrap .wz-next'); await page.click('#oiGo'); await page.waitForTimeout(700);
     assert(db.t.oi_deals.find((x) => x.customer === '가상고객_OI2').expect_amount === 12000000, 'OI');
     await page.evaluate(() => SVC.switchView('targets')); await page.waitForTimeout(250); await page.evaluate(() => SVC.openPaste());
     assert(/금액은 천원/.test(await page.$eval('#pasteCols', (e) => e.textContent)), '붙여넣기 안내');
@@ -2046,16 +2052,17 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
       return { cells, xsN: xs.rows.length, head, n: rows.length, meta, btns, top }; });
     const m = /주의 항목 (\d+)종 · 대상 (\d+)건/.exec(r.head);
     assert(r.cells.length === 4 && r.cells[2] === 'exp:' + r.xsN && m && +m[1] === r.n && r.meta && r.top && !r.btns.some((b) => /처리하기|대시보드 →|OI 현황 →|^재계약 타진$/.test(b)) && r.btns.some((b) => /일정 지난 OI \d+건 보기/.test(b)), JSON.stringify(r));
-    const oiN = await page.evaluate(() => { const t = new Date().toISOString().slice(0, 10); return SVC.ST.RAWX.oi.filter((o) => o.next_date && String(o.next_date).slice(0, 10) < t && !/수주|실패/.test(String(o.stage || ''))).length; });
+    const oiN = await page.evaluate(() => { const t = SVC.todayStr(); return SVC.ST.RAWX.oi.filter((o) => o.next_date && String(o.next_date).slice(0, 10) < t && SVC.oiOpen(o)).length; });
     const lane = await page.evaluate(() => { const b = [...document.querySelectorAll('#ccInbox .cbtn.pri')].find((x) => /일정 지난 OI/.test(x.textContent)); const row = b.closest('.ib-row'), ln = row.closest('.ib-lane');
       return { hid: row.hidden, more: !!ln.querySelector('.ib-more'), shown: [...ln.querySelectorAll('.ib-row')].filter((x) => !x.hidden).length, lv: ln.querySelector('.ib-more') && ln.querySelector('.ib-more').dataset.lv }; });
     if (lane.hid) { await page.click('#ccInbox .ib-more[data-lv="' + lane.lv + '"]'); await page.waitForTimeout(150); }
     const opened = await page.evaluate(() => { const b = [...document.querySelectorAll('#ccInbox .cbtn.pri')].find((x) => /일정 지난 OI/.test(x.textContent)); return !b.closest('.ib-row').hidden; });
     assert(!lane.hid || (lane.more && lane.shown === 2 && opened), '칸 접기 ' + JSON.stringify({ lane, opened }));
     await page.click('#ccInbox .cbtn.pri:has-text("일정 지난 OI")'); await page.waitForTimeout(400);
-    const g = await page.evaluate(() => ({ v: SVC.ST.CUR_VIEW, pre: document.getElementById('dvPreBar').textContent, rows: document.querySelectorAll('#dvTable tbody tr:not(.dg-empty)').length }));
-    await page.click('#dvPreX'); await page.waitForTimeout(150); const all = await page.evaluate(() => document.querySelectorAll('#dvTable tbody tr').length);
-    assert(g.v === 'oi' && /다음 일정이 지난 OI/.test(g.pre) && g.rows === oiN && all > oiN, JSON.stringify({ g, oiN, all }));
+    /* ㊿+170 OI 는 «빠른 보기 › 기한 초과» 칩이 눌린 채로 열림(같은 기준 oiOpen) — 칩을 다시 누르면 해제 */
+    const g = await page.evaluate(() => ({ v: SVC.ST.CUR_VIEW, pre: (document.querySelector('#dvQvBar [aria-pressed="true"]') || {}).textContent || document.getElementById('dvPreBar').textContent, rows: document.querySelectorAll('#dvTable tbody tr:not(.dg-empty)').length }));
+    await page.click('#dvQvBar [aria-pressed="true"]'); await page.waitForTimeout(150); const all = await page.evaluate(() => document.querySelectorAll('#dvTable tbody tr').length);
+    assert(g.v === 'oi' && /기한 초과/.test(g.pre) && g.rows === oiN && all > oiN, JSON.stringify({ g, oiN, all }));
     return r.head;
   });
   await S.t('㊿+169 장비: 타일 이름에 범위(현황·대 / 신청·건) · «회수 완료 n대 / 대상 n대» · 타일 = 보드 같은 건수 · 빈 열 안 접힘 · 시리얼 칩 = 상세(바뀌지 않음) · 미등록 시리얼 표시 · 회수 처리 미리 보기(부분/전체/없음) → 저장 → 되돌리기', async () => {
@@ -2105,6 +2112,105 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
     assert(!c.errs.length, c.errs.join(' | ')); return mn.cols + ' · 자주 ' + mn.fq;
   });
   await ctx.close();
+}
+// ㊿+170 3차: 입력 단계(필수·형식 즉시 확인 · 중복 의심 · 확인 단계 + 알림 안내 · 두 번 저장 방지 · 실패 시 값 유지) · «＋ 등록» · 영업/인바운드 빠른 보기 · 전환 중복 확인 · 리포트 템플릿 · 해지율 적용 기준 · 데이터 점검 · 폰 위 띠
+{
+  const { FIX } = await import('./lib.mjs');
+  const now = new Date(), dAgo = (n) => new Date(now.getTime() - n * 864e5).toISOString().slice(0, 10), yr = now.getFullYear();
+  const F = JSON.parse(JSON.stringify(FIX));
+  F.oi.push({ id: 9911, customer: '검증_OI3', stage: '진행', win_prob: 30, owner: '담당자C', deal_name: '검증 기한', expect_amount: 30000000, next_date: dAgo(5), next_action: '회신', created_at: dAgo(40), updated_at: dAgo(40) });
+  const INB = [{ id: 1, no: 1, y: yr, on_date: dAgo(5), org: '검증_첫대응', owner: '담당자C', result: '진행중', s1d: null },
+    { id: 2, no: 2, y: yr, on_date: dAgo(200), s1d: dAgo(120), org: '검증_장기', owner: '담당자A', result: '진행중' },
+    { id: 3, no: 3, y: yr, on_date: dAgo(30), s1d: dAgo(29), org: '검증_완료', owner: '담당자A', result: '완료' }];
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page);
+  const writes = [], gets = []; let failNext = 1, postN = 0; const dialogs = []; page.on('dialog', (d) => { dialogs.push(d.message()); d.dismiss(); });
+  await mockBackend(page, { onWrite: (w) => writes.push(w.m + ' ' + w.url), extra: async (route, u, m) => {
+    if (u.includes('/rpc/load_all')) { await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(Object.assign({}, F, { roles: [{ role: 'super_admin' }] })) }); return true; }
+    if (/inbound_leads/.test(u) && m === 'GET') { gets.push(u); await route.fulfill({ status: 200, contentType: 'application/json', headers: { 'content-range': '0-' + (INB.length - 1) + '/' + INB.length, 'Access-Control-Expose-Headers': 'content-range' }, body: JSON.stringify(INB) }); return true; }
+    if (/equipment_orders/.test(u) && m === 'POST') { postN++; await new Promise((r) => setTimeout(r, 300)); if (failNext) { failNext = 0; await route.fulfill({ status: 500, contentType: 'application/json', body: '{"message":"테스트 실패"}' }); return true; }
+      const row = JSON.parse(route.request().postData())[0]; await route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify([Object.assign({ id: 9990 }, row)]) }); return true; }
+    return false; } });
+  await page.goto(url + '/index.html'); await page.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA, null, { timeout: 15000 }); await page.waitForTimeout(600);
+  await S.t('㊿+170 장비 신청 단계: 기본 → 조건 → 배송 → 확인 · 필수 칸 바로 확인 · 같은 고객사 대기 신청 알림 · 확인 단계에만 저장 버튼 + 슬랙 알림 안내 · 두 번 눌러도 1번 · 실패하면 값 그대로', async () => {
+    await page.evaluate(() => SVC.navMenu('ordernew')); await page.waitForTimeout(250);
+    const s0 = await page.evaluate(() => ({ steps: [...document.querySelectorAll('#odFormWrap .wz-steps button')].map((b) => b.textContent.replace(/^\d/, '')).join('|'), go: getComputedStyle(document.getElementById('odGo')).display, vis: !document.querySelector('#odFormWrap .wz-step[data-s="0"]').hidden }));
+    await page.click('#odFormWrap .wz-next'); await page.waitForTimeout(80);
+    const e0 = await page.evaluate(() => ({ err: (document.getElementById('odCustomerErr') || {}).textContent || '', inv: document.getElementById('odCustomer').getAttribute('aria-invalid'), foc: document.activeElement.id, step: document.querySelector('#odFormWrap .wz-steps [aria-current="step"]').dataset.s }));
+    await page.fill('#odCustomer', '가상고객01'); await page.waitForTimeout(350);
+    const dup = await page.evaluate(() => (document.getElementById('odWzDup') || {}).textContent || '');
+    await page.fill('#odMgr', '검증담당'); await page.click('#odFormWrap .wz-next'); await page.click('#odFormWrap .wz-next'); await page.click('#odFormWrap .wz-next'); await page.waitForTimeout(80);
+    const s3 = await page.evaluate(() => ({ sum: document.getElementById('odWzSum').textContent, note: document.querySelector('#odFormWrap .wz-note').textContent, go: getComputedStyle(document.getElementById('odGo')).display }));
+    assert(s0.steps === '기본|조건|배송|확인' && s0.go === 'none' && s0.vis && /꼭 넣어야/.test(e0.err) && e0.inv === 'true' && e0.foc === 'odCustomer' && e0.step === '0' && /처리 대기 장비 신청 \d+건/.test(dup), JSON.stringify({ s0, e0, dup }));
+    assert(/가상고객01/.test(s3.sum) && /검증담당/.test(s3.sum) && /슬랙/.test(s3.note) && s3.go !== 'none', JSON.stringify(s3));
+    postN = 0; await page.evaluate(() => { const b = document.getElementById('odGo'); b.click(); b.click(); }); await page.waitForTimeout(700);
+    const f1 = await page.evaluate(() => ({ msg: document.getElementById('odMsg').textContent, cust: document.getElementById('odCustomer').value, mgr: document.getElementById('odMgr').value, done: getComputedStyle(document.getElementById('odDone')).display, dis: document.getElementById('odGo').disabled }));
+    await page.click('#odGo'); await page.waitForTimeout(900);
+    const f2 = await page.evaluate(() => ({ done: getComputedStyle(document.getElementById('odDone')).display }));
+    assert(postN === 2 && /테스트 실패|500/.test(f1.msg) && f1.cust === '가상고객01' && f1.mgr === '검증담당' && f1.done === 'none' && !f1.dis && f2.done !== 'none', JSON.stringify({ postN, f1, f2 }));
+    return '4단계 · 실패 뒤 값 유지 · 저장 ' + postN + '번(첫 번은 실패)';
+  });
+  await S.t('㊿+170 «＋ 등록»: 계약 등록 · 계약 변경 · 영업기회 · 장비 · PoC 이름이 붙은 메뉴 → 계약 등록 = 입력 창 «신규» · OI 등록 이메일 형식 즉시 확인', async () => {
+    await page.evaluate(() => SVC.navMenu('dash')); await page.waitForTimeout(200);
+    await page.click('#btnNew'); await page.waitForTimeout(120);
+    const items = await page.evaluate(() => [...document.querySelectorAll('#rowMenu [role="menuitem"]')].map((b) => b.textContent.trim()).join('|'));
+    await page.click('#rowMenu [role="menuitem"]:has-text("계약 등록")'); await page.waitForTimeout(200);
+    const ed = await page.evaluate(() => ({ on: document.getElementById('ovlEdit').classList.contains('on'), tab: (document.querySelector('#eTabs [aria-pressed="true"]') || {}).dataset.t }));
+    await page.evaluate(() => SVC.closeOvl('ovlEdit'));
+    await page.evaluate(() => SVC.navMenu('oinew')); await page.waitForTimeout(200); await page.fill('#oiCust', '검증_새고객'); await page.fill('#oiCEmail', 'not-an-email'); await page.click('#oiFormWrap .wz-next'); await page.waitForTimeout(80);
+    const em = await page.evaluate(() => ({ err: (document.getElementById('oiCEmailErr') || {}).textContent || '', step: document.querySelector('#oiFormWrap [aria-current="step"]').dataset.s }));
+    assert(/계약 등록\|계약 변경.*\|영업기회\(OI\) 등록\|장비 신청\|PoC 신청/.test(items) && ed.on && ed.tab === 'new' && /이메일 형식/.test(em.err) && em.step === '0', JSON.stringify({ items, ed, em }));
+    return items.split('|').length + '개 메뉴';
+  });
+  await S.t('㊿+170 영업·인바운드 빠른 보기: 건수 = 거른 목록 · «기준»에서 내 이름·일수 저장 · 첫 대응 지연 ≠ 장기 미접촉 · 홈 «인바운드 미대응» = 장기 미접촉 · «다시 조회»는 시트를 안 건드림 · OI → 계약 전환 때 같은 고객사 유효 계약 알림', async () => {
+    await page.evaluate(() => SVC.navMenu('oi')); await page.waitForTimeout(300);
+    const chips = async () => page.evaluate(() => Object.fromEntries([...document.querySelectorAll('#dvQvBar [data-qv]')].map((b) => [b.dataset.qv, +b.querySelector('b').textContent])));
+    const c1 = await chips(); await page.click('#dvQvBar [data-qv="late"]'); await page.waitForTimeout(150);
+    const lateRows = await page.evaluate(() => document.querySelectorAll('#dvTable tbody tr:not(.dg-empty)').length);
+    await page.click('#qvCfgBtn'); await page.waitForTimeout(100); await page.selectOption('#qvMe', '담당자C'); await page.fill('#qvOi', '20'); await page.click('#qvOk'); await page.waitForTimeout(150);
+    const c2 = await chips(); await page.click('#dvQvBar [data-qv="me"]'); await page.waitForTimeout(150);
+    const meRows = await page.evaluate(() => [...document.querySelectorAll('#dvTable tbody tr')].map((tr) => tr.textContent).filter((x) => /담당자C/.test(x)).length);
+    assert(c1.late >= 1 && lateRows === c1.late && c2.me === 1 && meRows === 1 && c2.idle >= c1.idle, JSON.stringify({ c1, c2, lateRows, meRows }));
+    await page.evaluate(() => SVC.navMenu('inbound')); await page.waitForTimeout(500);
+    gets.length = 0; await page.click('#inbReloadP'); await page.waitForTimeout(500); const ci = await chips();
+    const btns = await page.evaluate(() => [...document.querySelectorAll('#inbHost button')].map((b) => b.textContent.trim()).join('|'));
+    assert(ci.first === 1 && ci.idle === 1 && ci.open === 2 && gets.length >= 1 && /다시 조회/.test(btns) && /시트에서 가져와 반영/.test(btns), JSON.stringify({ ci, gets: gets.length, btns }));
+    await page.evaluate(() => { SVC.ST.INB_TODO = { t: Date.now(), n: 1 }; SVC.navMenu('dash'); }); await page.waitForTimeout(300);
+    const ib = await page.evaluate(() => [...document.querySelectorAll('#ccInbox .cbtn.pri')].map((b) => b.textContent).find((x) => /미대응/.test(x)) || '');
+    await page.evaluate(() => { const b = [...document.querySelectorAll('#ccInbox .cbtn.pri')].find((x) => /미대응/.test(x.textContent)); if (b) b.click(); }); await page.waitForTimeout(400);
+    const iv = await page.evaluate(() => ({ v: SVC.ST.CUR_VIEW, on: (document.querySelector('#dvQvBar [aria-pressed="true"]') || {}).dataset, rows: document.querySelectorAll('#dvTable tbody tr:not(.dg-empty)').length }));
+    assert(/미대응 1건 보기/.test(ib) && iv.v === 'inbound' && iv.on && iv.on.qv === 'idle' && iv.rows === 1, JSON.stringify({ ib, iv }));
+    dialogs.length = 0; await page.evaluate(() => { SVC.wvSet('oi', '전체'); SVC.navMenu('oi'); }); await page.waitForTimeout(250);
+    await page.click('#dvTable tbody tr:has-text("가상고객06") button[data-act="toContract"]'); await page.waitForTimeout(150);
+    assert(dialogs.length === 1 && /같은 고객사의 유효 계약 \d+건/.test(dialogs[0]), '전환 확인 ' + dialogs[0]);
+    return JSON.stringify(ci);
+  });
+  await S.t('㊿+170 리포트(템플릿 먼저 · 조합은 접힘 · SQL 은 고급 분석) · 해지율(적용 기준 한 줄 · 고급 설정 접힘) · 데이터 점검(문제 먼저 · 업무 영향/대상/해결 행동 · 기술 상세는 관리자 · 일괄 수정은 미리 보기)', async () => {
+    await page.evaluate(() => SVC.navMenu('report')); await page.waitForFunction(() => document.querySelector('#rpBody .qb-tc'), null, { timeout: 8000 });
+    const r0 = await page.evaluate(() => ({ n: document.querySelectorAll('#rpBody .qb-tc').length, nob: document.querySelector('#rpBody .qb-wrap').classList.contains('nobuild'), topSql: !!document.querySelector('#qbPanel .qb-mode [data-qbmode="sql"]'), advSql: !!document.querySelector('#qbPanel .qb-adv [data-qbmode="sql"]') }));
+    await page.click('#rpBody .qb-tc[data-preset="p_oi"]'); await page.waitForTimeout(300);
+    const r1 = await page.evaluate(() => ({ title: SVC.QB.title, on: !!document.querySelector('#rpBody .qb-tc.on[data-preset="p_oi"]'), rows: SVC.QB.res && SVC.QB.res.rows.length }));
+    await page.click('#qbBuildTg'); await page.waitForTimeout(150); const r2 = await page.evaluate(() => getComputedStyle(document.querySelector('#rpBody .qb-panel-card')).display);
+    assert(r0.n >= 9 && r0.nob && !r0.topSql && r0.advSql && /OI 진행상태별/.test(r1.title) && r1.on && r1.rows > 0 && r2 !== 'none', JSON.stringify({ r0, r1, r2 }));
+    await page.evaluate(() => SVC.navMenu('churnrate')); await page.waitForTimeout(400);
+    const cr = await page.evaluate(() => ({ ap: document.querySelector('.cr-applied').textContent, adv: document.getElementById('crAdv').open, segs: document.querySelectorAll('#crAdv .crseg').length }));
+    assert(/적용 기준/.test(cr.ap) && /분모 계약 유효/.test(cr.ap) && /기준월 \d{4}-\d{2}/.test(cr.ap) && !cr.adv && cr.segs === 5, JSON.stringify(cr));
+    await page.evaluate(() => SVC.navMenu('dcheck')); await page.waitForTimeout(400);
+    const dc = await page.evaluate(() => { const cards = [...document.querySelectorAll('#bizHost .dc-rule')]; const first = cards[0];
+      return { firstHas: first && !first.closest('.dc-okall'), dts: first ? [...first.querySelectorAll('.dc-dl dt')].map((x) => x.textContent).join('|') : '', ok: !!document.querySelector('.dc-okall'), tech: !!document.querySelector('.dc-tech'), bulk: [...document.querySelectorAll('.dc-bulk')].map((b) => b.textContent).join('|') }; });
+    assert(dc.firstHas && /대상\|해결 행동/.test(dc.dts) && dc.ok && dc.tech && (!dc.bulk || /미리 보기/.test(dc.bulk)), JSON.stringify(dc));
+    assert(!c.errs.length, c.errs.join(' | ')); return dc.dts;
+  });
+  await ctx.close();
+  const ctxM = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, serviceWorkers: 'block' }); const pm = await ctxM.newPage();
+  await mockBackend(pm); await pm.goto(url + '/index.html'); await pm.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA, null, { timeout: 15000 }); await pm.waitForTimeout(500);
+  await S.t('㊿+170 폰 위 띠: «＋ 등록» 하나(계약 입력·수정은 메뉴 안) · 요약 4칸이 처리할 일보다 먼저 · 장비 칩 누르는 자리 24px 이상', async () => {
+    const r = await pm.evaluate(() => ({ edit: getComputedStyle(document.getElementById('btnEdit')).display, nw: getComputedStyle(document.getElementById('btnNew')).display, sum: document.getElementById('gnSum').getBoundingClientRect().bottom <= document.getElementById('ccInbox').getBoundingClientRect().top }));
+    await pm.evaluate(() => SVC.navMenu('eqboard')); await pm.waitForTimeout(500);
+    const chip = await pm.evaluate(() => { const c = document.querySelector('.eqsn.act'); return c ? Math.round(c.getBoundingClientRect().height) : 0; });
+    assert(r.edit === 'none' && r.nw !== 'none' && r.sum && chip >= 24, JSON.stringify({ r, chip }));
+    return '칩 ' + chip + 'px';
+  });
+  await ctxM.close();
 }
 await browser.close(); srv.close();
 const ok = S.report();

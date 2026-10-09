@@ -222,14 +222,18 @@ export function inbLogTable(){
 export function inbSyncPanel(){
   return tpl`<div class="card" style="padding:10px 14px;margin-bottom:10px">`+
     tpl`<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">`+
-      tpl`<b style="font-size:14px">시트 → 포탈 가져오기</b>${rawHtml(inbSyncBadge())}`+
-      tpl`<span style="flex:1"></span>`+ tpl`${rawHtml(ST.IS_VIEWER? '' : '<button class="pill" id="inbFetchP">↻ 지금 시트에서 가져오기</button>')}`+
+      tpl`<b style="font-size:14px">원본(구글시트) → 포탈</b>${rawHtml(inbSyncBadge())}`+
+      tpl`<span class="mini" style="color:var(--muted)">· 포탈 목록 읽은 시각 ${rawHtml(ST.RAWX._inbAt? esc(new Date(ST.RAWX._inbAt).toTimeString().slice(0,5)) : '—')}</span>`+
+      tpl`<span style="flex:1"></span>`+
+      tpl`<button class="pill ghost" id="inbReloadP" title="포탈 DB 에 이미 들어온 인바운드를 다시 읽기만 합니다 (시트·DB 를 바꾸지 않음)">다시 조회</button>`+
+      tpl`${rawHtml(ST.IS_VIEWER? '' : '<button class="pill" id="inbFetchP" title="구글시트 원본을 지금 가져와 포탈 DB 에 반영합니다 (매일 아침 7시 자동과 같은 작업 · 최대 1분)">시트에서 가져와 반영…</button>')}`+
       tpl`<button class="pill ghost" id="inbLogTg">🕘 가져온 기록${rawHtml(ST.RAWX.inbLog&&ST.RAWX.inbLog.length? ' ('+ST.RAWX.inbLog.length+')':'')}</button>`+
     tpl`</div>`+
     tpl`<div id="inbLogBox" style="display:${INB_LOG_OPEN?'':'none'}">${rawHtml(inbLogTable())}</div></div>`;
 }
 export function inbWirePanel(host){
-  var b=host.querySelector('#inbFetchP'); if(b) b.onclick=inbRefetch;
+  var b=host.querySelector('#inbFetchP'); if(b) b.onclick=function(){ if(confirm('구글시트 원본을 지금 가져와 포탈 DB 에 반영할까요?\n(매일 아침 7시 자동 가져오기와 같은 작업 · 시트에서 지운 행은 포탈에서도 바뀔 수 있음)')) inbRefetch(); };
+  var rl=host.querySelector('#inbReloadP'); if(rl) rl.onclick=function(){ rl.disabled=true; ST.RAWX.inbLog=undefined; loadInbLog(function(){ loadInbound(function(){ toast('다시 조회', '포탈 DB 의 인바운드 '+(ST.RAWX.inbound||[]).length+'건을 다시 읽었습니다(시트는 그대로)', 'info'); if(ST.CUR_VIEW==='inbstat') renderInbStat(); else if(ST.CUR_VIEW==='inbound') renderGrid(); }); }); };
   var t=host.querySelector('#inbLogTg'); if(t) t.onclick=function(){
     INB_LOG_OPEN=!INB_LOG_OPEN;
     var box=host.querySelector('#inbLogBox'); if(box) box.style.display=INB_LOG_OPEN?'':'none';
