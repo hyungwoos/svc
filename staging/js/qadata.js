@@ -9,7 +9,7 @@ import { SB_URL } from './core.js';
 import { qaDb, qaSeed, qaNow, qaYm, qaIdx } from './qadb.js';
 import { loadFromDb, onData, ccAnalysisOpen } from './shell.js';
 import { dcFixOpen, dcRules, liveCalc, openRenewList, openTargetEditor } from './analysis.js';
-import { navMenu, switchView } from './grid.js';
+import { navMenu, switchView, wvSet } from './grid.js';
 import { GRIDS } from './grids.js';
 import { openPaste, pasteCols } from './tools.js';
 
@@ -75,9 +75,10 @@ function qaHelp(log){
     pick:async function(find, pk, cust){ h.fill('#'+find, cust); await qaPause(80); h.click('#'+pk+' .pi'); await qaPause(60); },
     save:async function(){ h.click('#eGo'); await h.until(function(){ var m=document.getElementById('eMsg'); return m && /✅|bad/.test(m.textContent+' '+m.className) && !document.getElementById('eGo').disabled; }, 10000, '입력·수정 저장'); var m=document.getElementById('eMsg'); if(/bad/.test(m.className)) throw new Error('저장 실패: '+m.textContent); await qaPause(150); return m.textContent; },
     gridEdit:async function(view, cust, pairs){
+      wvSet(view, '전체');   /* ㊿+169 업무 보기 — 모든 열이 보이는 «전체»에서 고침 */
       switchView(view); await qaPause(150); h.fill('#dvSearch', cust); await qaPause(250);
       var tr=[].slice.call(document.querySelectorAll('#dvTable tbody tr')).filter(function(x){ return x.textContent.indexOf(cust)>=0; })[0]; h.ok(tr, '표에 «'+cust+'» 행 없음');
-      var be=[].slice.call(tr.querySelectorAll('button')).filter(function(b){ return b.textContent==='✎'; })[0]; h.ok(be, '✎ 버튼 없음'); be.click(); await qaPause(120);
+      var be=tr.querySelector('button[data-act="edit"]'); h.ok(be, '수정 버튼 없음'); be.click(); await qaPause(120);
       var ed=[].slice.call(document.querySelectorAll('#dvTable tbody tr')).filter(function(x){ return x.querySelector('button.sv'); })[0]; h.ok(ed, '수정 칸이 안 열림');
       var hs=[].slice.call(document.querySelectorAll('#dvTable thead th')).map(function(x){ return x.textContent.trim(); }), before={};
       pairs.forEach(function(p){ var k=hs.findIndex(function(x){ return x.indexOf(p[0])===0; }); h.ok(k>=0, '열 없음: '+p[0]); var el=ed.children[k].querySelector('input,select'); h.ok(el, '칸 없음: '+p[0]); before[p[0]]=el.value; h.fill(el, p[1]); });

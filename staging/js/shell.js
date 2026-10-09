@@ -5,17 +5,17 @@ import { Viz } from './viz.js';
 import { $, applyPerms, canView, canWrite, clearSess, cssv, el, esc, isCC, isGN, keepLogin, LIVE2CODE, lline, loadPerms, mfaGate, mfaVerifiedOf,
   mfaWarnIfNeeded, mk, monOf, navText, permWriteGuard, rawHtml, refreshToken, restoreSess, saveSess, SB_KEY, SB_URL, seriesColor, sessRead,
   sessWrite, STATE, tpl, won } from './core.js';
-import { buildControls, expN, expScan, goWidget, hbars, idxs, renderAll, renderInstall, renderKpis, renderMatrix } from './dash.js';
+import { buildControls, expN, expScan, hbars, idxs, kpiOpen, monthlyTotal, renderAll, renderInstall, renderKpis, renderMatrix } from './dash.js';
 import { ask } from './ai.js';
 import { applyCodes, loadCodes } from './grids.js';
-import { eqOrderById, eqRetSet, eqScan, eqSerialsHtml, eqWant, syncOrderAssets } from './equipment.js';
+import { eqCanRet, eqOrderById, eqRetOpen, eqRetSet, eqScan, eqSerialsHtml, eqWant, syncOrderAssets } from './equipment.js';
 import { applyChannelMenu, chOf, ctRawOf, ctSuccessor, dcSummary, ensureLeadSrc, liveData, openRenewList, renewScan } from './analysis.js';
-import { applyMenuConf, fkNorm, menuSegments, navSub, openCust360, openMenuEdit, renderTodo, subgrpSync } from './tools.js';
+import { applyMenuConf, fkNorm, freqTop, menuSegments, navSub, openMenuEdit, renderTodo, subgrpSync, viewLabel } from './tools.js';
 import { loadInbound, loadMxMemos } from './inbound.js';
 import { UPD, updCheck } from './upd.js';
 import { applyMenuFold, closeDrawer, ensureGroupOpen, setupSide } from './sales.js';
-import { btnBackSync, loadHide, NAV, navMenu, openDetail, renderGrid, switchView } from './grid.js';
-import { closeOvl, logChange, openOvl, OVL_SKIP_CLEAN, ovlMarkClean, setupEdit } from './edit.js';
+import { btnBackSync, gridGoPre, loadHide, NAV, navMenu, openDetail, renderGrid, switchView } from './grid.js';
+import { closeOvl, logChange, openOvl, OVL_SKIP_CLEAN, ovlMarkClean, setupEdit, toggleAuthMenu } from './edit.js';
 
 
 /* ==================================================================
@@ -45,8 +45,32 @@ export var ICO={
   board:'<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="9.5" y="4" width="5" height="10" rx="1"/><rect x="16" y="4" width="5" height="13" rx="1"/>',
   users:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.5a5 5 0 0 1 6 5"/>',
   arrow:'<path d="M5 12h14"/><path d="M13 6l6 6-6 6"/>',
-  doc:'<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M9 13h6"/><path d="M9 17h6"/>'
+  doc:'<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M9 13h6"/><path d="M9 17h6"/>',
+  eye:'<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  edit:'<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>',
+  more:'<circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/>',
+  trash:'<path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/>',
+  clip:'<path d="M20 11l-8.5 8.5a5 5 0 0 1-7-7L13 4a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3L14 7"/>',
+  undo:'<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>',
+  lock:'<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+  filter:'<path d="M3 5h18l-7 8v6l-4 2v-8z"/>',
+  cols:'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/><path d="M15 4v16"/>',
+  down:'<path d="M12 4v12"/><path d="M6 11l6 6 6-6"/><path d="M5 20h14"/>',
+  reload:'<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/>',
+  star:'<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>',
+  moon:'<path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/>',
+  sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="M5 5l1.5 1.5"/><path d="M17.5 17.5L19 19"/><path d="M5 19l1.5-1.5"/><path d="M17.5 6.5L19 5"/>',
+  plus:'<path d="M12 5v14"/><path d="M5 12h14"/>'
 };
+/* ㊿+169 아이콘 한 가지 모양 — 위쪽·표 도구 버튼의 이모지/기호(✏️ ⊞ ↻ ⬇ 🧱 ☰ ❔ 📋)를 같은 선 아이콘 + 글자로 (id·이름표는 그대로) */
+export var UI_ICO={btnEdit:['edit','입력·수정'], btnWidgets:['board','위젯'], btnReload:['reload','새로고침'], btnFind:['spark','검색'],
+  dvAdd:['plus','행 추가'], dvPaste:['doc','붙여넣기 입력'], dvReload:['reload','다시 읽기'], dvCsv:['down','엑셀'], dvDense:['menu','밀도'], dvHelp:['spark','']};
+export function icoLbl(name, label){ return ico(name,15)+(label? tpl`<span>${label}</span>` : ''); }
+export function uiIconize(){
+  Object.keys(UI_ICO).forEach(function(id){ var b=document.getElementById(id); if(b && !b.querySelector('svg')){ b.innerHTML=icoLbl(UI_ICO[id][0], UI_ICO[id][1]); b.classList.add('icb'); } });
+  themeBtnSync();
+}
+export function themeBtnSync(){ var b=document.getElementById('btnTheme'); if(!b) return; var dark=document.documentElement.getAttribute('data-theme')==='dark'; b.innerHTML=icoLbl(dark? 'sun':'moon', dark? '라이트':'다크'); b.classList.add('icb'); }
 export function ico(name, size){ size=size||18; return tpl`<svg width="${rawHtml(size)}" height="${rawHtml(size)}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${rawHtml(ICO[name]||ICO.doc)}</svg>`; }
 export function iconFor(label, v){
   var L=String(label||'');
@@ -164,13 +188,15 @@ export function buildGnNav(rail){
   var h=tpl`<div class="gn-bar"><a class="gn-logo" data-v="dash" href="#" aria-label="Genians — 홈"><svg class="gn-lw" viewBox="0 0 587.2 133.4" aria-hidden="true"><use href="#gnLogo"/></svg><svg class="gn-lm" viewBox="0 0 171.1 133.4" aria-hidden="true"><use href="#gnMark"/></svg></a>`;
   h+=tpl`<nav class="gn-tabs" aria-label="주 메뉴">${rawHtml(topBtn({v:'dash', t:'홈'}))}${rawHtml(tops.filter(function(o){ return o!==adm; }).map(topBtn).join(''))}</nav>`;
   var me=String(ST.AUTH_USER||'');
-  h+=tpl`<div class="gn-right">${rawHtml(adm? topBtn(adm) : '')}<button type="button" class="gn-me" data-v="account" title="내 계정 · 설정" aria-label="내 계정 · 설정 (${me})"><span class="gn-av">${(me.split('@')[0]||'?').slice(0,1).toUpperCase()}</span><span class="gn-wst"><b>${me.split('@')[0]||'로그인'}</b><small>${me.indexOf('@')>0? '@'+me.split('@')[1] : ''}</small></span></button></div></div>`;
+  h+=tpl`<div class="gn-right">${rawHtml(adm? topBtn(adm) : '')}<button type="button" class="gn-me" data-v="account" title="내 계정 · 로그아웃" aria-label="내 계정 메뉴 (${me})"><span class="gn-av">${(me.split('@')[0]||'?').slice(0,1).toUpperCase()}</span><span class="gn-wst"><b>${me.split('@')[0]||'로그인'}</b><small>${me.indexOf('@')>0? '@'+me.split('@')[1] : ''}</small></span></button></div></div>`;
   h+=tpl`<div class="gn-menu" id="gnMenu" role="menu" hidden></div>`;
   rail.innerHTML=h;
   /* 역할 나누기(㊿+167): 위 검색 바 = 화면 이동·검색 · 홈 질문 칸 = AI 분석 */
   try{ var ph=document.querySelector('#cmdBar .ph'); if(ph) ph.textContent='화면 이동 · 고객사·계약 검색 — «시흥도시공사», «가격표», «해지율»';
     var q0=document.getElementById('q'); if(q0) q0.placeholder='AI 분석 — 매출·고객·계약 데이터로 답합니다 (예: 요즘 클라우드 어때? · 곧 재약정할 곳은?)'; }catch(e){}
-  rail.querySelectorAll('.gn-bar [data-v]').forEach(function(b){ b.onclick=function(e){ e.preventDefault(); gnMenuClose(); navMenu(b.dataset.v); }; });
+  rail.querySelectorAll('.gn-bar [data-v]').forEach(function(b){ b.onclick=function(e){ e.preventDefault(); gnMenuClose();
+    if(b.classList.contains('gn-me') && ST.SB_TOKEN){ e.stopPropagation(); b.setAttribute('aria-haspopup','menu'); toggleAuthMenu(b); return; }   /* ㊿+169 계정 진입점 하나: 내 계정 · 로그아웃 */
+    navMenu(b.dataset.v); }; });
   rail.querySelectorAll('.gn-tb[data-seg]').forEach(function(b){
     b.onclick=function(e){ e.stopPropagation(); if(GN_NAV.open===b.dataset.seg) gnMenuClose(); else gnMenuOpen(b); };
     b.onmouseenter=function(){ if(GN_NAV.open && GN_NAV.open!==b.dataset.seg) gnMenuOpen(b); };
@@ -194,6 +220,10 @@ export function gnMenuOpen(btn){
   m.innerHTML=tpl`<div class="gn-mh"><b>${d.label}</b><span>${rawHtml(String(d.cols.reduce(function(a,c){ return a+c.items.length; },0)))}개 화면</span></div><div class="gn-cols">${rawHtml(d.cols.map(function(c){
     return tpl`<div class="gn-sec${c.items.length>5?' wide':''}"><div class="gn-st">${c.t}</div><div class="gn-sl">${rawHtml(c.items.map(function(it){ var n=bdOf[it.v]||0;
       return tpl`<button type="button" class="gn-mi" role="menuitem" data-v="${it.v}" aria-current="${it.v===v0?'true':'false'}">${rawHtml(ico(GN_ICO[it.v]||iconFor(it.t, it.v), 16))}<span class="gn-l">${it.t}</span>${rawHtml(n? tpl`<span class="gn-bd hot">${rawHtml(n>99?'99+':String(n))}</span>` : '')}</button>`; }).join(''))}</div></div>`; }).join(''))}</div>`;
+  /* ㊿+169 자주 쓰는 화면 — 어느 묶음을 열어도 맨 아래에 (이 브라우저에서 많이 연 순 · 5개) */
+  var fq=freqTop(5).filter(function(v){ return v!==v0; });
+  if(fq.length) m.insertAdjacentHTML('beforeend', tpl`<div class="gn-mf"><div class="gn-st">${rawHtml(ico('star',13))} 자주 쓰는 화면</div><div class="gn-fl">${rawHtml(fq.map(function(v){ var t0=viewLabel(v);
+    return tpl`<button type="button" class="gn-mi gn-fq" role="menuitem" data-v="${v}">${rawHtml(ico(GN_ICO[v]||iconFor(t0, v), 15))}<span class="gn-l">${t0}</span></button>`; }).join(''))}</div></div>`);
   m.hidden=false; btn.setAttribute('aria-expanded','true'); GN_NAV.open=btn.dataset.seg;
   var rr=rail.getBoundingClientRect(), br=btn.getBoundingClientRect(), w=m.offsetWidth, left=br.left-rr.left;
   if(btn.closest('.gn-right')) left=br.right-rr.left-w;
@@ -331,6 +361,32 @@ export function ccSnooze(key, days){
   renderInbox(); toast('보류했습니다', days>=7? '다음 주에 다시 알려드립니다':'내일 다시 알려드립니다', 'info');
 }
 export function ccUnsnooze(){ try{ Object.keys(localStorage).filter(function(k){ return k.indexOf('svc_snz_')===0; }).forEach(function(k){ localStorage.removeItem(k); }); }catch(e){} renderInbox(); }
+export var IB_OPEN={};
+/* ㊿+169 홈 맨 위 요약 한 줄 — 매출 · 고객 · 만료 위험 · 처리 필요 (숫자는 아래 사업 현황 타일·처리할 일과 같은 계산) · 폰에서는 이 줄이 먼저 */
+export function gnSumRender(rows){
+  var host=document.getElementById('gnSum'), box=document.getElementById('ccInbox');
+  if(!isGN() || !box || !ST.DATA || ST.IS_EQUIP){ if(host) host.remove(); return; }
+  if(!host){ host=document.createElement('div'); host.id='gnSum'; host.className='gn-sum'; box.parentElement.insertBefore(host, box); }
+  var list=idxs(), b=STATE.base, EN=expN(), m0=monthlyTotal(list,b), m1=b>0? monthlyTotal(list,b-1) : 0, d=m1? (m0-m1)/m1*100 : null;
+  var lv=null; try{ lv=liveData(b); }catch(e){} var uq={}, ps=0, per={};
+  if(lv && lv.ok) lv.rows.forEach(function(x){ if(STATE.lines[x.line]===false) return; if(STATE.ind && x.ind!==STATE.ind) return; uq[x.cust]=1; (per[x.line]=per[x.line]||{})[x.cust]=1; });
+  Object.keys(per).forEach(function(l){ ps+=Object.keys(per[l]).length; }); var nC=Object.keys(uq).length;
+  var XS=expScan(list,b,EN), l1=rows.filter(function(o){ return o.lv===1; }), l2=rows.filter(function(o){ return o.lv===2; });
+  var n1=l1.reduce(function(a,o){ return a+(+o.n||0); },0), n2=l2.reduce(function(a,o){ return a+(+o.n||0); },0);
+  function cell(k, cls, lab, v, u, sub, tip){ return tpl`<button type="button" class="gs-c ${rawHtml(cls)}" data-k="${k}" title="${tip}"><span class="gs-l">${lab}</span><span class="gs-v"><b class="num">${v}</b><small>${u}</small></span><span class="gs-s">${sub}</span></button>`; }
+  host.innerHTML=tpl`<h2 class="sr">요약</h2>`+
+    cell('mrr','', '당월 매출(MRR) · '+mk(b), won(m0), '천원', d==null? '전월 자료 없음' : '전월 대비 '+(d>=0?'+':'')+d.toFixed(1)+'%', '기준월 인식 매출(천원) — 눌러서 사업 현황으로')+
+    cell('live','', 'LIVE 고객', String(nC), '곳', '제품별 합 '+ps+(ps>nC? ' (두 제품 이상 '+(ps-nC)+'곳)':''), '회사 수 기준 — 눌러서 LIVE 고객사 목록')+
+    cell('exp', XS.rows.length? 'warn':'', EN+'개월 내 만료 위험', String(XS.rows.length), '건', '고객사 '+XS.custN+'곳 · 월 '+won(XS.amt)+'천원', '원계약 기준(부속 계약 제외) — 눌러서 같은 목록')+
+    cell('todo', l1.length? 'crit':'', '처리 필요', String(n1+n2), '건', '즉시 '+l1.length+'종 '+n1+'건 · 확인 '+l2.length+'종 '+n2+'건', '오늘 처리할 일의 즉시·확인 칸 대상 건수 — 눌러서 처리할 일로');
+  host.querySelectorAll('.gs-c').forEach(function(c){ c.onclick=function(){ var k=c.dataset.k;
+    if(k==='mrr'){ var h=document.getElementById('gnBizH')||document.getElementById('ccHeroHost'); if(h) h.scrollIntoView({behavior:'smooth', block:'start'}); }
+    else if(k==='live') switchView('live');
+    else if(k==='exp') kpiOpen('exp');
+    else { box.scrollIntoView({behavior:'smooth', block:'start'}); var f=box.querySelector('.ib-lane.crit .cbtn.pri, .ib-lane .cbtn.pri'); if(f) setTimeout(function(){ f.focus(); }, 300); } }; });
+}
+/** 장비 보드를 «처리 대기» 또는 «회수 진행»만 보이게 — 홈 알림·요약 타일과 같은 기준 */
+export function eqbOnly(kind){ EQB.only=kind; switchView('eqboard'); }
 export function renderInbox(){
   if(!isCC()) return;
   var box=document.getElementById('ccInbox'); if(!box || !ST.DATA || !ST.SB_TOKEN){ if(box) box.innerHTML=''; return; }
@@ -352,68 +408,93 @@ export function renderInbox(){
     var oldest=pendL.map(function(o){ return String(o.created_at||'').slice(0,10); }).filter(Boolean).sort()[0];
     var age=oldest? Math.floor((new Date(todayS).getTime()-new Date(oldest).getTime())/864e5) : 0;
     var byCh={}; pendL.forEach(function(o){ byCh[o.channel||'기타']=(byCh[o.channel||'기타']||0)+1; });
-    add('eq', {lv:age>=3?1:2, ic:'box', cls:'warn', t:tpl`처리 대기 장비 신청 <span class="num">${pendL.length}건</span>${rawHtml(age>=1? ' — 가장 오래된 건 '+age+'일 경과':'')}`,
+    var pq=pendL.reduce(function(a,o){ return a+(+o.qty||eqWant(o).length||1); },0);
+    add('eq', {lv:age>=3?1:2, ic:'box', cls:'warn', n:pendL.length, t:tpl`처리 대기 장비 신청 <span class="num">${pendL.length}건</span>${rawHtml(age>=1? ' — 가장 오래된 건 '+age+'일 경과':'')}`,
       s:Object.keys(byCh).map(function(c){ return c+' '+byCh[c]; }).join(' · ')+' · '+names(pendL, function(o){ return o.customer; }),
-      acts:[{l:'보류', go:function(){ ccSnooze('eq',1); }},{l:'장비 대시보드 →', pri:1, go:function(){ switchView('eqboard'); }}]});
+      who:names(pendL, function(o){ return o.customer; }), own:names(pendL, function(o){ return o.mgr_name || (o.requester? String(o.requester).split('@')[0] : ''); }, 2)||'',
+      due:age>=3? '오늘 — '+age+'일째 대기' : '3일 안', imp:'출고 대기 '+pq+'대 · '+Object.keys(byCh).map(function(c){ return c+' '+byCh[c]; }).join(' · '),
+      acts:[{l:'보류', go:function(){ ccSnooze('eq',1); }},{l:'대기 신청 '+pendL.length+'건 보기', pri:1, go:function(){ eqbOnly('pend'); }}]});
   }
   if(retL.length){
-    add('ret', {lv:3, ic:'box', cls:'info', t:tpl`회수 진행 중 <span class="num">${retL.length}건</span>`,
+    var rA=0, rD=0; retL.forEach(function(o){ rA+=eqWant(o).length; rD+=eqRetSet(o).length; });
+    add('ret', {lv:3, ic:'box', cls:'info', n:retL.length, t:tpl`회수 진행 중 <span class="num">${retL.length}건</span>`,
       s:retL.slice(0,3).map(function(o){ var all=eqWant(o).length, d=eqRetSet(o).length; return (o.customer||'')+' '+d+'/'+all+'대'; }).join(' · ')+(retL.length>3? ' 외 '+(retL.length-3)+'건':''),
-      acts:[{l:'장비 대시보드 →', pri:1, go:function(){ switchView('eqboard'); }}]});
+      who:names(retL, function(o){ return o.customer; }), own:names(retL, function(o){ return o.mgr_name || (o.requester? String(o.requester).split('@')[0] : ''); }, 2)||'', due:'회수 일정대로', imp:'회수 완료 '+rD+'대 / 대상 '+rA+'대',
+      acts:[{l:'회수 진행 '+retL.length+'건 보기', pri:1, go:function(){ eqbOnly('ret'); }}]});
   }
   /* 만기 관리 (㊿+127): 종료월이 지났는데 미처리 → 이미 LIVE 에서 빠짐 · 이달 만기 → 다음 달 1일에 빠짐. 각 행 원클릭 처리 창으로 */
   var RS=null; if(!EQ){ try{ RS=renewScan(b); }catch(e){ RS=null; } ensureLeadSrc(function(filled){ if(filled) try{ renderInbox(); renderKpis(); }catch(e2){} }); }
   if(RS && RS.lapsed.length){
     var lsum=RS.lapsed.reduce(function(a,r){ return a+(r.mrr||0); },0), lrec=RS.checking.length;
-    add('rnl', {lv:1, ic:'clock', cls:'crit', t:tpl`만기 지났는데 미처리 <span class="num">${RS.lapsed.length}건</span> — 이미 LIVE 에서 빠졌습니다${rawHtml(lrec? ' (최근 2개월 '+lrec+'건)':'')}`,
+    add('rnl', {lv:1, ic:'clock', cls:'crit', n:RS.lapsed.length, t:tpl`만기 지났는데 미처리 <span class="num">${RS.lapsed.length}건</span> — 이미 LIVE 에서 빠졌습니다${rawHtml(lrec? ' (최근 2개월 '+lrec+'건)':'')}`,
       s:names(RS.lapsed, function(r){ return r.cust; })+' · 월 '+won(lsum)+'천원 · 연장이면 되살리고, 끝났으면 서비스종료·해지로 정리',
-      acts:[{l:'처리하기 →', pri:1, go:function(){ openRenewList('lapsed'); }}]});
+      who:names(RS.lapsed, function(r){ return r.cust; }), own:'', due:'지금 — 종료월이 지남', imp:'월 '+won(lsum)+'천원 · LIVE 에서 빠짐',
+      acts:[{l:'만기 지난 '+RS.lapsed.length+'건 연장·종료 처리', pri:1, go:function(){ openRenewList('lapsed'); }}]});
   }
   if(RS && RS.due.length){
     var dsum=RS.due.reduce(function(a,r){ return a+(r.mrr||0); },0);
-    add('rnd', {lv:2, ic:'clock', cls:'warn', t:tpl`${mk(b)} 만기 <span class="num">${RS.due.length}건</span> — ${mk(b+1)} 1일 LIVE 에서 빠집니다`,
+    add('rnd', {lv:2, ic:'clock', cls:'warn', n:RS.due.length, t:tpl`${mk(b)} 만기 <span class="num">${RS.due.length}건</span> — ${mk(b+1)} 1일 LIVE 에서 빠집니다`,
       s:names(RS.due, function(r){ return r.cust; })+' · 월 '+won(dsum)+'천원'+(RS.next.length? ' · 다음 달 만기 '+RS.next.length+'건 대기':''),
-      acts:[{l:'보류', go:function(){ ccSnooze('rnd',3); }},{l:'처리하기 →', pri:1, go:function(){ openRenewList('due'); }}]});
+      who:names(RS.due, function(r){ return r.cust; }), own:'', due:mk(b)+' 말까지 ('+mk(b+1)+' 1일 LIVE 제외)', imp:'월 '+won(dsum)+'천원'+(RS.next.length? ' · 다음 달 만기 '+RS.next.length+'건 대기':''),
+      acts:[{l:'보류', go:function(){ ccSnooze('rnd',3); }},{l:'이달 만기 '+RS.due.length+'건 처리', pri:1, go:function(){ openRenewList('due'); }}]});
   }
   /* 데이터 점검 (㊿+133): 바로 고쳐야 할 항목이 있으면 한 줄 */
   if(!EQ){ var DS=null; try{ DS=dcSummary(); }catch(e){}
-    if(DS && DS.crit){ add('dc', {lv:1, ic:'scale', cls:'crit', t:tpl`데이터 점검 — 바로 고칠 항목 <span class="num">${rawHtml(DS.crit)}건</span>${rawHtml(DS.warn? ' · 확인 필요 '+DS.warn+'건':'')}`,
-      s:Object.keys(DS.items).filter(function(k){ return DS.items[k]; }).slice(0,3).map(function(k){ return k+' '+DS.items[k]; }).join(' · '),
-      acts:[{l:'보류', go:function(){ ccSnooze('dc',3); }},{l:'점검 화면 →', pri:1, go:function(){ switchView('dcheck'); }}]}); } }
+    if(DS && DS.crit){ var dcs=Object.keys(DS.items).filter(function(k){ return DS.items[k]; }).slice(0,3).map(function(k){ return k+' '+DS.items[k]; }).join(' · ');
+      add('dc', {lv:1, ic:'scale', cls:'crit', n:DS.crit, t:tpl`데이터 점검 — 바로 고칠 항목 <span class="num">${rawHtml(DS.crit)}건</span>${rawHtml(DS.warn? ' · 확인 필요 '+DS.warn+'건':'')}`,
+      s:dcs, who:dcs, own:'관리자', due:'오늘', imp:'매출·LIVE·만기 숫자가 틀리게 나올 수 있음',
+      acts:[{l:'보류', go:function(){ ccSnooze('dc',3); }},{l:'바로 고칠 '+DS.crit+'건 보기', pri:1, go:function(){ switchView('dcheck'); }}]}); } }
   if(expL.length && !(RS && EN===1 && RS.due.length)){
     var ends=expL.map(function(r){ return r.endIdx; }).sort(function(x,y){ return x-y; });
-    add('exp', {lv:3, ic:'clock', cls:'info', t:tpl`${rawHtml(EN)}개월 내 만료 원계약 <span class="num">${expL.length}건</span> · 고객사 ${rawHtml(XS.custN)}곳 — 월 <span class="num">${won(expAmt)}</span>천원`,
+    add('exp', {lv:3, ic:'clock', cls:'info', n:expL.length, t:tpl`${rawHtml(EN)}개월 내 만료 원계약 <span class="num">${expL.length}건</span> · 고객사 ${rawHtml(XS.custN)}곳 — 월 <span class="num">${won(expAmt)}</span>천원`,
       s:names(expL, function(r){ return r.cust; })+' · 종료 '+mk(ends[0])+(ends.length>1? '~'+mk(ends[ends.length-1]):'')+' · 재약정 타깃',
-      acts:[{l:'고객 360', go:function(){ if(expL.length===1) openCust360(expL[0].cust); else goWidget('exp','계약 만료 예정'); }},{l:'재계약 타진', pri:1, go:function(){ goWidget('exp','계약 만료 예정'); }}]});
+      who:names(expL, function(r){ return r.cust; }), own:'', due:'종료 '+mk(ends[0])+(ends.length>1? '~'+mk(ends[ends.length-1]):''), imp:'월 '+won(expAmt)+'천원 · 재약정 대상',
+      acts:[{l:'만료 원계약 '+expL.length+'건 보기', pri:1, go:function(){ kpiOpen('exp'); }}]});
   }
   if(!bizDone){
-    add('biz', {lv:2, ic:'scale', cls:'', t:curYm+' 비즈포탈 차액이 아직 입력되지 않았습니다', s:'엑셀을 올리면 고객사·회계매출 기준으로 자동 대조합니다',
-      acts:[{l:'다음 주에', go:function(){ ccSnooze('biz',7); }},{l:'엑셀 올리기', pri:1, go:function(){ switchView('biz'); }}]});
+    add('biz', {lv:2, ic:'scale', cls:'', n:1, t:curYm+' 비즈포탈 차액이 아직 입력되지 않았습니다', s:'엑셀을 올리면 고객사·회계매출 기준으로 자동 대조합니다',
+      who:curYm+' 비즈포탈 차액', own:'정산 담당', due:curYm+' 마감 전', imp:'정산·목표 달성률이 «미입력»으로 남음',
+      acts:[{l:'다음 주에', go:function(){ ccSnooze('biz',7); }},{l:'비즈포탈 엑셀 올리기', pri:1, go:function(){ switchView('biz'); }}]});
   }
   if(!EQ){
-    if(inbN>0) add('inb', {lv:1, ic:'inbox', cls:'crit', t:tpl`인바운드 미대응 <span class="num">${rawHtml(inbN)}건</span>`, s:'진행중인데 3개월 이상 대응 기록이 없습니다', acts:[{l:'인바운드 통계 →', pri:1, go:function(){ switchView('inbstat'); }}]});
+    if(inbN>0){ var yr=new Date().getFullYear(), t90=Date.now();
+      add('inb', {lv:1, ic:'inbox', cls:'crit', n:inbN, t:tpl`인바운드 미대응 <span class="num">${rawHtml(inbN)}건</span>`, s:'진행중인데 3개월 이상 대응 기록이 없습니다',
+      who:'올해 진행중 인바운드', own:'인바운드 담당', due:'오늘', imp:'3개월 넘게 대응 기록 없음 — 놓친 문의일 수 있음',
+      acts:[{l:'미대응 '+inbN+'건 보기', pri:1, go:function(){ gridGoPre('inbound', '미대응 — 올해 진행중인데 3개월 넘게 기록 없음', function(x){ if(String(x.y||'')!==String(yr) || x.result!=='진행중') return false;
+        var last=[x.on_date,x.s1d,x.s2d,x.s21d,x.s3d].filter(function(d){ return d && /^\d{4}-\d{2}-\d{2}/.test(d); }).sort().pop(); return !!last && (t90-new Date(last).getTime())/864e5>=90; }); }}]}); }
     else zeros.push('인바운드 미대응 '+(inbN==null? '…':'0'));
-    if(oiLate.length) add('oi', {lv:2, ic:'target', cls:'warn', t:tpl`OI 밀린 액션 <span class="num">${oiLate.length}건</span>`, s:names(oiLate, function(o){ return o.customer; })+' · 다음 일정이 지났습니다', acts:[{l:'OI 현황 →', pri:1, go:function(){ switchView('oi'); }}]});
+    if(oiLate.length){ var od=oiLate.map(function(o){ return String(o.next_date).slice(0,10); }).sort()[0], oAmt=oiLate.reduce(function(a,o){ return a+(+o.expect_amount||0); },0);
+      add('oi', {lv:2, ic:'target', cls:'warn', n:oiLate.length, t:tpl`OI 밀린 액션 <span class="num">${oiLate.length}건</span>`, s:names(oiLate, function(o){ return o.customer; })+' · 다음 일정이 지났습니다',
+      who:names(oiLate, function(o){ return o.customer; }), own:names(oiLate, function(o){ return o.owner; }, 2)||'', due:'예정일 지남 (가장 오래된 '+od+')', imp:oAmt? '예상 금액 '+won(oAmt)+'천원' : '다음 할 일 일정 갱신 필요',
+      acts:[{l:'일정 지난 OI '+oiLate.length+'건 보기', pri:1, go:function(){ gridGoPre('oi', '다음 일정이 지난 OI', function(o){ return o.next_date && String(o.next_date).slice(0,10)<todayS && !/수주|실패/.test(String(o.stage||'')); }); }}]}); }
     else zeros.push('OI 밀린 액션 0');
   }
   zeros.push('주간회의 '+wkTxt);
   var la=document.getElementById('loadedAt'), GNI=isGN();
-  function rowHtml(o,i){ return tpl`<div class="ib-row" data-i="${rawHtml(i)}"><span class="ib-ic ${rawHtml(o.cls)}">${rawHtml(ico(o.ic,16))}</span><div class="ib-b"><div class="ib-t">${rawHtml(o.t)}</div><div class="ib-s" title="${o.s||''}">${o.s||''}</div></div>`+
+  /* ㊿+169 지니언스: 할 일마다 대상 · 담당 · 기한 · 영향 → 다음 행동(구체적인 버튼 이름) */
+  function metaHtml(o){ var m=[['대상',o.who],['담당',o.own||'미지정'],['기한',o.due],['영향',o.imp]].filter(function(x){ return x[1]; });
+    return tpl`<dl class="ib-meta">${rawHtml(m.map(function(x){ return tpl`<div${rawHtml(x[0]==='담당' && !o.own? ' class="none" title="계약·장비 신청에 담당자 칸이 없거나 비어 있습니다"':'')}><dt>${x[0]}</dt><dd>${x[1]}</dd></div>`; }).join(''))}</dl>`; }
+  function rowHtml(o,i,hid){ return tpl`<div class="ib-row" data-i="${rawHtml(i)}"${rawHtml(hid? ' hidden':'')}><span class="ib-ic ${rawHtml(o.cls)}">${rawHtml(ico(o.ic,16))}</span><div class="ib-b"><div class="ib-t">${rawHtml(o.t)}</div>${rawHtml(GNI && o.who? metaHtml(o) : tpl`<div class="ib-s" title="${o.s||''}">${o.s||''}</div>`)}</div>`+
       tpl`<div class="ib-acts">${rawHtml(o.acts.map(function(a,j){ return tpl`<button type="button" class="cbtn${a.pri?' pri':''}" data-i="${rawHtml(i)}" data-j="${rawHtml(j)}">${a.l}</button>`; }).join(''))}</div></div>`; }
-  var h=tpl`<div class="ib-head"><h2>${GNI? '오늘 처리할 일' : '인박스'} <span class="ctag${rows.length?' warn':' ok'}">${rows.length}</span></h2><span class="mini" style="display:flex;align-items:center;gap:6px"><i style="width:7px;height:7px;border-radius:50%;background:var(--brand);display:inline-block"></i>${rawHtml(la&&la.textContent? esc(la.textContent):'')} · 자동 갱신</span></div>`;
+  var tgtN=rows.reduce(function(a,o){ return a+(+o.n||0); },0);
+  var h=tpl`<div class="ib-head"><h2>${GNI? '오늘 처리할 일' : '인박스'} <span class="ctag${rows.length?' warn':' ok'}" data-n="${rawHtml(rows.length)}">${rawHtml(GNI? (rows.length? '주의 항목 '+rows.length+'종 · 대상 '+tgtN+'건' : '없음') : String(rows.length))}</span></h2><span class="mini" style="display:flex;align-items:center;gap:6px"><i style="width:7px;height:7px;border-radius:50%;background:var(--brand);display:inline-block"></i>${rawHtml(la&&la.textContent? esc(la.textContent):'')} · 자동 갱신</span></div>`;
   if(!rows.length) h+=tpl`<div class="ib-empty"><span class="ib-ic ok">${rawHtml(ico('check',16))}</span>처리할 알림이 없습니다. 모든 항목이 정리되어 있어요.</div>`;
   else if(GNI){
     /* ㊿+167 지니언스: 급한 정도로 세 칸 — 즉시 처리(만기 지남·바로 고칠 데이터·미대응·오래된 장비 신청) / 확인 필요(이달 만기·정산·밀린 영업) / 예정(회수 진행·만료 예정) */
     var LANES=[[1,'즉시 처리','crit','오늘 처리'],[2,'확인 필요','warn','이번 달 안에'],[3,'예정','info','미리 챙길 일']];
     h+=tpl`<div class="ib-lanes">${rawHtml(LANES.map(function(L){
       var mine=rows.map(function(o,i){ return [o,i]; }).filter(function(x){ return (x[0].lv||2)===L[0]; });
-      return tpl`<section class="ib-lane ${rawHtml(L[2])}" aria-label="${L[1]} ${rawHtml(mine.length)}건"><div class="ib-lh"><i></i><b>${L[1]}</b><span class="num">${rawHtml(mine.length)}</span><span class="ib-lsub">${L[3]}</span></div>`+
-        tpl`${rawHtml(mine.length? mine.map(function(x){ return rowHtml(x[0], x[1]); }).join('') : tpl`<div class="ib-none">${rawHtml(ico('check',14))}없음</div>`)}</section>`; }).join(''))}</div>`;
+      var open=!!IB_OPEN[L[0]], more=Math.max(0, mine.length-2);   /* 칸마다 2개까지 보이고 나머지는 «더 보기» */
+      return tpl`<section class="ib-lane ${rawHtml(L[2])}" aria-label="${L[1]} ${rawHtml(mine.length)}종"><div class="ib-lh"><i></i><b>${L[1]}</b><span class="num">${rawHtml(mine.length)}</span><span class="ib-lsub">${L[3]}</span></div>`+
+        tpl`${rawHtml(mine.length? mine.map(function(x, j){ return rowHtml(x[0], x[1], j>=2 && !open); }).join('') : tpl`<div class="ib-none">${rawHtml(ico('check',14))}없음</div>`)}`+
+        tpl`${rawHtml(more? tpl`<button type="button" class="ib-more" data-lv="${rawHtml(L[0])}" aria-expanded="${open?'true':'false'}">${open? '접기' : '그 밖에 '+more+'종 더 보기'}</button>` : '')}</section>`; }).join(''))}</div>`;
   }
   else rows.forEach(function(o,i){ h+=rowHtml(o,i); });
   h+=tpl`<div class="ib-foot"><span>${rawHtml(zeros.map(esc).join(' · '))}</span>${rawHtml(snz? tpl`<a id="ibUnsnz">보류한 ${rawHtml(snz)}건 다시 보기</a>`:(GNI? '' : '<span class="mini">주간회의는 매주 월요일 · 일요일 저녁 자동 취합</span>'))}</div>`;
   box.innerHTML=h;
   box.querySelectorAll('.cbtn').forEach(function(bt){ bt.onclick=function(e){ e.stopPropagation(); rows[+bt.dataset.i].acts[+bt.dataset.j].go(); }; });
+  box.querySelectorAll('.ib-more').forEach(function(bt){ bt.onclick=function(){ IB_OPEN[bt.dataset.lv]=!IB_OPEN[bt.dataset.lv]; renderInbox(); var nb=box.querySelector('.ib-more[data-lv="'+bt.dataset.lv+'"]'); if(nb) nb.focus(); }; });
+  try{ gnSumRender(rows); }catch(e){}
   var un=document.getElementById('ibUnsnz'); if(un) un.onclick=ccUnsnooze;
   ccGreeting(rows.length);
   GN_BADGE.inb=rows.filter(function(o){ return o.lv===1; }).length; GN_BADGE.inbound=inbN||0; GN_BADGE.dc=(!EQ && DS && DS.crit)||0;   /* ㊿+167 지니언스 상단 메뉴 배지 — 홈 = «즉시 처리» 건수 */
@@ -549,7 +630,7 @@ export function ccTilePipe(){
   var c=el('div','kpi');
   c.innerHTML=tpl`<div class="k">이번 주 파이프라인 <span class="ctag info">인바운드 자동 07:00</span></div>`+
     tpl`<div class="tri" style="grid-template-columns:repeat(2,minmax(0,1fr))"><div><b class="num">${rawHtml(inb==null?'…':inb)}</b><span>최근 7일 인바운드</span></div><div><b class="num">${open.length}</b><span>진행 중 OI</span></div></div>`+
-    tpl`<div style="display:flex;flex-direction:column;gap:3px;font-size:12.5px;margin-top:8px">${rawHtml(Object.keys(st).slice(0,3).map(function(k){ return tpl`<div class="mrow"><span>${k} 단계</span><span class="num">${rawHtml(st[k])}</span></div>`; }).join(''))}`+
+    tpl`<div style="display:flex;flex-direction:column;gap:3px;font-size:13px;margin-top:8px">${rawHtml(Object.keys(st).slice(0,3).map(function(k){ return tpl`<div class="mrow"><span>${k} 단계</span><span class="num">${rawHtml(st[k])}</span></div>`; }).join(''))}`+
     tpl`<div class="mrow"><span>이달 계약예상</span><span class="num" style="font-weight:600">${due.length}</span></div></div>`;
   c.style.cursor='pointer'; c.title='OI 현황 (클릭)'; c.setAttribute('role','button'); c.tabIndex=0;
   c.onclick=function(){ switchView('oi'); };
@@ -575,8 +656,11 @@ export function ccBrief(list,b){   /* 오늘의 브리핑 카드는 쓰지 않�
 /* ==================================================================
    임대 장비 운영 보드 (칸반) — 상태 = 열, 카드 끌기 = 상태 변경 → 현황 자동 반영
    ================================================================== */
-export var EQB={ch:'', q:'', more:{}};
-export var EQB_COLS=[['접수','#9A9DA5','현황 재고'],['출하요청','var(--info-ink)','현황 재고'],['배송중','var(--warn-ink)','현황 재고'],['설치완료','var(--brand)','현황 임대중'],['회수예정','#D95926','칩으로 일부 회수'],['회수완료','var(--ink-2)','최근 90일']];
+export var EQB={ch:'', q:'', more:{}, only:''};
+/* ㊿+169 요약 타일 · 홈 알림과 같은 기준(보드를 이 조건으로만 거름) */
+export var EQB_ONLY={pend:['처리 대기 — 접수·출하요청·배송중', function(o){ return ['접수','출하요청','배송중'].indexOf(o.status)>=0; }],
+  ret:['회수 진행 — 회수예정 · 일부 회수된 신청', function(o){ return o.status==='회수예정' || (o.status!=='회수완료' && o.status!=='취소' && eqRetSet(o).length>0); }]};
+export var EQB_COLS=[['접수','#9A9DA5','현황 재고'],['출하요청','var(--info-ink)','현황 재고'],['배송중','var(--warn-ink)','현황 재고'],['설치완료','var(--brand)','현황 임대중'],['회수예정','#D95926','«회수 처리»로 일부·전부 회수'],['회수완료','var(--ink-2)','최근 90일']];
 export function eqRefresh(){ if(ST.CUR_VIEW==='eqboard') renderEqBoard(); else try{ renderGrid(); }catch(e){} try{ railSync(ST.CUR_VIEW); }catch(e){} }   /* ㊿+157 장비 «처리 대기» 빨간 숫자도 */
 export var EQ_CH_CLS={'에스원':'ch-s1','LGU+':'ch-lg','LG U+':'ch-lg','조달':'ch-gov','일반':'ch-gen'};
 export function eqChTag(ch){ ch=ch||'기타'; return tpl`<span class="ctag ${rawHtml(EQ_CH_CLS[ch]||'')}">${ch}</span>`; }
@@ -594,7 +678,7 @@ export function renderEqDash(){
   var pendBy={}; pend.forEach(function(o){ pendBy[o.status]=(pendBy[o.status]||0)+1; });
   var oldest=pend.map(function(o){ return String(o.created_at||'').slice(0,10); }).filter(Boolean).sort()[0];
   var age=oldest? Math.floor((new Date(todayS).getTime()-new Date(oldest).getTime())/864e5):0;
-  var retL=O.filter(function(o){ return o.status==='회수예정' || (o.status!=='회수완료' && o.status!=='취소' && eqRetSet(o).length); });
+  var retL=O.filter(EQB_ONLY.ret[1]);
   var retAll=0, retDone=0; retL.forEach(function(o){ retAll+=eqWant(o).length; retDone+=eqRetSet(o).length; });
   var instM=O.filter(function(o){ return ['설치완료','회수예정','회수완료'].indexOf(o.status)>=0 && String(o.install_date||'').slice(0,7)===ym; });
   var instP=O.filter(function(o){ return ['설치완료','회수예정','회수완료'].indexOf(o.status)>=0 && String(o.install_date||'').slice(0,7)===pym; });
@@ -603,17 +687,19 @@ export function renderEqDash(){
   function tile(cls, dot, k, v, u, d, go){
     return tpl`<div class="kpi ${rawHtml(cls)}" role="button" tabindex="0" data-go="${rawHtml(go)}"><div class="k">${rawHtml(dot? tpl`<i style="background:${rawHtml(dot)}"></i>`:'')}${k}</div><div class="v">${rawHtml(v)}${rawHtml(u? tpl`<small>${rawHtml(u)}</small>`:'')}</div><div class="d">${rawHtml(d)}</div></div>`;
   }
+  /* ㊿+169 범위를 이름에 — 장비(대) = 현황(시리얼) 기준 · 신청(건) = 신청 내역 기준 · 누르면 같은 조건의 목록(숫자 그대로) */
   K.innerHTML=
-    tile('good', 'var(--brand)', '임대중', lent.length, '대', '고객사 '+Object.keys(lentCust).length+'곳 · 현황 기준', 'assets:임대중')+
-    tile(pend.length? (age>7? 'crit':'hot'):'', 'var(--info-ink)', '처리 대기', pend.length, '건', pend.length? ['접수','출하요청','배송중'].filter(function(k){ return pendBy[k]; }).map(function(k){ return k+' '+pendBy[k]; }).join(' · ')+(age>=1? ' · 최장 '+age+'일':'') : '대기 중인 신청 없음', 'col:접수')+
-    tile(retL.length? 'hot':'', '#D95926', '회수 진행', retL.length, '건', retL.length? '회수 '+retDone+'/'+retAll+'대 · 시리얼 칩으로 처리':'진행 중인 회수 없음', 'col:회수예정')+
-    tile('', 'var(--ink-2)', '회수 장비', retd.length, '대', retd.length? Object.keys(retdModel).sort(function(a,b){ return retdModel[b]-retdModel[a]; }).slice(0,3).map(function(m){ return esc(m)+' '+retdModel[m]; }).join(' · ')+' · 고객사 '+Object.keys(retdCust).length+'곳'+(retdLast? ' · 최근 '+retdLast:'') : '회수완료 장비 없음', 'assets:회수완료');
+    tile('good', 'var(--brand)', '임대중 · 현황', lent.length, '대', '고객사 '+Object.keys(lentCust).length+'곳 · 시리얼 기준', 'assets:임대중')+
+    tile(pend.length? (age>7? 'crit':'hot'):'', 'var(--info-ink)', '처리 대기 · 신청', pend.length, '건', pend.length? qty(pend)+'대 · '+['접수','출하요청','배송중'].filter(function(k){ return pendBy[k]; }).map(function(k){ return k+' '+pendBy[k]; }).join(' · ')+(age>=1? ' · 최장 '+age+'일':'') : '대기 중인 신청 없음', 'only:pend')+
+    tile(retL.length? 'hot':'', '#D95926', '회수 진행 · 신청', retL.length, '건', retL.length? '회수 완료 '+retDone+'대 / 대상 '+retAll+'대':'진행 중인 회수 없음', 'only:ret')+
+    tile('', 'var(--ink-2)', '회수 완료 · 현황', retd.length, '대', retd.length? Object.keys(retdModel).sort(function(a,b){ return retdModel[b]-retdModel[a]; }).slice(0,3).map(function(m){ return esc(m)+' '+retdModel[m]; }).join(' · ')+' · 고객사 '+Object.keys(retdCust).length+'곳'+(retdLast? ' · 최근 '+retdLast:'') : '회수완료 장비 없음', 'assets:회수완료');
   var tc=document.getElementById('eqcTrendCap'); if(tc) tc.textContent='이달 설치 '+qty(instM)+'대 · 회수 '+qty(retM)+'대 · 지난달 설치 '+qty(instP)+'대 · 최근 12개월';
   K.querySelectorAll('[data-go]').forEach(function(t){
     t.onclick=function(){
       var g=t.dataset.go.split(':');
-      if(g[0]==='assets'){ switchView('assets'); var sb=document.getElementById('dvSearch'); if(sb){ sb.value=g[1]; try{ renderGrid(); }catch(e){} } return; }
-      var col=document.querySelector('.eqb-col[data-st="'+g[1]+'"]'); if(col){ col.scrollIntoView({behavior:'smooth',block:'start'}); col.classList.add('hl'); setTimeout(function(){ col.classList.remove('hl'); },1600); }
+      if(g[0]==='assets'){ var st0=g[1]; gridGoPre('assets', '장비 현황 · 상태 '+st0, function(a){ return a.status===st0; }); return; }
+      EQB.only=(EQB.only===g[1]? '' : g[1]); EQB.ch=''; EQB.q=''; var qi=/** @type {any} */(document.getElementById('eqbQ')); if(qi) qi.value=''; renderEqBoard();
+      var bw=document.getElementById('eqbCols'); if(bw && EQB.only) bw.scrollIntoView({behavior:'smooth', block:'start'});
     };
     t.onkeydown=function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); t.click(); } };
   });
@@ -621,7 +707,7 @@ export function renderEqDash(){
   try{
     var byCh={}; lent.forEach(function(a){ var c=a.channel||'기타'; byCh[c]=(byCh[c]||0)+1; });
     var chArr=Object.keys(byCh).sort(function(a,b){ return byCh[b]-byCh[a]; }).map(function(c){ return {name:c, v:byCh[c], c:cssv('--brand')}; });
-    hbars('#eqcCh', chArr, lent.length, true);
+    hbars('#eqcCh', chArr, lent.length, '대');
     document.getElementById('eqcChCap').textContent=lent.length? '총 '+lent.length+'대':'';
     var models={}; lent.forEach(function(a){ var m=a.model||'미지정'; (models[m]=models[m]||{l:0,s:0,r:0}).l++; }); stock.forEach(function(a){ var m=a.model||'미지정'; (models[m]=models[m]||{l:0,s:0,r:0}).s++; }); retd.forEach(function(a){ var m=a.model||'미지정'; (models[m]=models[m]||{l:0,s:0,r:0}).r++; });
     var mk2=Object.keys(models).sort(function(a,b){ return (models[b].l+models[b].s+models[b].r)-(models[a].l+models[a].s+models[a].r); }).slice(0,6);
@@ -650,13 +736,17 @@ export function renderEqBoard(){
   chipBox.innerHTML=tpl`<button type="button" class="cbtn" data-ch="" aria-pressed="${EQB.ch===''? 'true':'false'}">전체</button>`+
     tpl`${rawHtml(Object.keys(chs).sort(function(a,b2){ return chs[b2]-chs[a]; }).map(function(c){ return tpl`<button type="button" class="cbtn" data-ch="${c}" aria-pressed="${EQB.ch===c? 'true':'false'}">${c} <span class="num" style="opacity:.6">${rawHtml(chs[c])}</span></button>`; }).join(''))}`;
   chipBox.querySelectorAll('button').forEach(function(bt){ bt.onclick=function(){ EQB.ch=bt.dataset.ch; renderEqBoard(); }; });
+  if(EQB_ONLY[EQB.only]){ var oc=document.createElement('span'); oc.className='eqb-only'; oc.innerHTML=tpl`<span class="ctag info">${rawHtml(ico('filter',13))} ${EQB_ONLY[EQB.only][0]}</span><button type="button" class="cbtn" aria-label="조건 해제 — 전체 보드 보기">조건 해제</button>`;
+    /** @type {any} */(oc.querySelector('button')).onclick=function(){ EQB.only=''; renderEqBoard(); }; chipBox.insertBefore(oc, chipBox.firstChild); }
   /* 일치 표시 */
   try{ var s=eqScan(); document.getElementById('eqbMatch').innerHTML= s.gap.length
       ? tpl`<span class="ctag warn" style="cursor:pointer" title="신청 내역 화면의 대조 패널에서 맞추기">${rawHtml(ico('clock',12))} 맞지 않음 ${s.gap.length}건 · 신청 내역에서 맞추기</span>`
       : tpl`<span class="ctag ok">${rawHtml(ico('check',12))} 신청 ↔ 현황 일치 · ${rawHtml(s.ok)}건</span>`;
     var mt=document.getElementById('eqbMatch').firstChild; if(mt && s.gap.length) mt.onclick=function(){ switchView('orders'); };
   }catch(e){}
+  var only=EQB_ONLY[EQB.only]||null;
   var rows=O.filter(function(o){
+    if(only && !only[1](o)) return false;
     if(EQB.ch && (o.channel||'기타')!==EQB.ch) return false;
     if(q){ var hay=fkNorm([o.customer,o.model,o.serials,o.channel,o.order_type,o.mgr_name,'#'+o.id].join(' ')); if(hay.indexOf(q)<0) return false; }
     return true;
@@ -671,29 +761,24 @@ export function renderEqBoard(){
     if(st==='회수완료'){ var cut=new Date(); cut.setDate(cut.getDate()-90); var cutS=todayStr(cut);
       var recent=list.filter(function(o){ return String(o.returned_date||o.created_at||'').slice(0,10)>=cutS; }); older=list.length-recent.length; list=recent; }
     var lim=EQB.more[st]? 1e9 : (st==='설치완료'? 12 : 30);
-    /* 비어 있는 열은 가늘게 접어 자리만 남김(드롭은 가능) — 화면을 실제 카드가 있는 열에 몰아줌 */
-    if(!list.length){
-      tracks.push('52px');
-      h+=tpl`<section class="eqb-col empty" data-st="${st}" aria-label="${st} 0건" title="${st} — 0건${rawHtml(st==='회수완료'&&older? ' (90일 이전 '+older+'건은 신청 내역에서)':'')}">`+
-        tpl`<div class="eqb-ch slim"><i style="background:${rawHtml(col[1])}"></i><span class="n">0</span><span class="lbl">${st}</span></div>`+ tpl`${rawHtml(st==='접수' && canEdit? '<button type="button" class="eqb-plus" data-new="1" title="새 장비 신청">＋</button>':'')}</section>`;
-      return;
-    }
+    /* ㊿+169 빈 열도 같은 폭으로 남김(접지 않음) — 드롭할 자리 · «없음» 표시 */
     tracks.push('minmax(0,1fr)');
-    h+=tpl`<section class="eqb-col${st==='회수예정'?' warm':''}" data-st="${st}" aria-label="${st}">`+
+    h+=tpl`<section class="eqb-col${st==='회수예정'?' warm':''}${list.length? '':' none'}" data-st="${st}" aria-label="${st} ${rawHtml(list.length)}건">`+
       tpl`<div class="eqb-ch" title="${col[2]}"><i style="background:${rawHtml(col[1])}"></i>${st} <span class="n">${list.length}</span>${rawHtml(st==='회수완료'? '<span class="to">최근 90일</span>':'')}</div>`;
+    if(!list.length) h+=tpl`<div class="eqb-empty">없음${rawHtml(st==='회수완료'&&older? ' · 90일 이전 '+older+'건은 신청 내역에서':'')}${rawHtml(canEdit? '<br><span class="mini">끌어서 옮길 수 있음</span>':'')}</div>`;
     list.slice(0,lim).forEach(function(o){ h+=eqbCard(o, canEdit, todayS); });
     if(list.length>lim) h+=tpl`<button type="button" class="eqb-more" data-more="${st}">외 ${list.length-lim}건 더 보기</button>`;
     if(st==='접수' && canEdit) h+='<button type="button" class="eqb-more" data-new="1">＋ 새 신청</button>';
-    if(st==='회수완료' && older) h+=tpl`<div class="eqb-empty">90일 이전 ${rawHtml(older)}건은 신청 내역(목록)에서</div>`;
+    if(st==='회수완료' && older && list.length) h+=tpl`<div class="eqb-empty">90일 이전 ${rawHtml(older)}건은 신청 내역(목록)에서</div>`;
     h+='</section>';
   });
   wrap.innerHTML=h;
-  var wide=tracks.filter(function(t){ return t!=='52px'; }).length;
-  wrap.style.gridTemplateColumns = (window.innerWidth>760 && (window.innerWidth>1400 || wide<=3))? tracks.join(' ') : '';   // 좁은 화면에서 열이 많으면 CSS 3열 배치로
+  wrap.style.gridTemplateColumns = '';   // ㊿+169 열 너비는 CSS(넓으면 6열 · 좁으면 3열 · 폰 1열) — 빈 열도 같은 폭
   wrap.querySelectorAll('[data-more]').forEach(function(bt){ bt.onclick=function(){ EQB.more[bt.dataset.more]=1; renderEqBoard(); }; });
   wrap.querySelectorAll('[data-new]').forEach(function(bt){ bt.onclick=function(){ switchView('ordernew'); }; });
   wrap.querySelectorAll('[data-next]').forEach(function(bt){ bt.onclick=function(e){ e.stopPropagation(); var r=eqOrderById(bt.dataset.oid); if(r) eqSetStatus(r, bt.dataset.next); }; });
-  wrap.querySelectorAll('[data-open]').forEach(function(bt){ bt.onclick=function(e){ e.stopPropagation(); var r=eqOrderById(bt.dataset.open); if(!r) return; switchView('orders'); var sb=document.getElementById('dvSearch'); if(sb){ sb.value=r.customer||('#'+r.id); try{ renderGrid(); }catch(x){} } }; });
+  wrap.querySelectorAll('[data-open]').forEach(function(bt){ bt.onclick=function(e){ e.stopPropagation(); var r=eqOrderById(bt.dataset.open); if(!r) return; gridGoPre('orders', '신청 #'+r.id+' '+(r.customer||''), function(x){ return String(x.id)===String(r.id); }); }; });
+  wrap.querySelectorAll('[data-ret]').forEach(function(bt){ bt.onclick=function(e){ e.stopPropagation(); var r=eqOrderById(bt.dataset.ret); if(r) eqRetOpen(r); }; });
   if(canEdit) eqbDnD(wrap);
 }
 export function eqbCard(o, canEdit, todayS){
@@ -710,12 +795,14 @@ export function eqbCard(o, canEdit, todayS){
   var idx=EQB_COLS.map(function(c){ return c[0]; }).indexOf(o.status), nextSt=idx>=0 && idx<EQB_COLS.length-1? EQB_COLS[idx+1][0] : null;
   var who=o.mgr_name? o.mgr_name : (o.requester? String(o.requester).split('@')[0] : '');
   var ft=tpl`<div class="ft"><span class="mini" title="담당 ${who}">${who}</span><span class="acts">`+
-    tpl`<button type="button" class="cbtn" data-open="${rawHtml(o.id)}" title="신청 내역에서 열기·수정">✎</button>`+ tpl`${rawHtml(canEdit && nextSt? tpl`<button type="button" class="cbtn nx${['출하요청','배송중','설치완료'].indexOf(nextSt)>=0?' pri':''}" data-oid="${rawHtml(o.id)}" data-next="${nextSt}" title="${nextSt} 로 이동">${nextSt} →</button>`:'')}</span></div>`;
+    tpl`<button type="button" class="cbtn ab" data-open="${rawHtml(o.id)}" title="신청 내역에서 열기·수정" aria-label="신청 #${rawHtml(o.id)} 신청 내역에서 열기·수정">${rawHtml(ico('edit',14))}</button>`+
+    tpl`${rawHtml(canEdit && eqCanRet(o) && all.length? tpl`<button type="button" class="cbtn" data-ret="${rawHtml(o.id)}" title="시리얼을 골라 일부·전부 회수 또는 회수 취소">${done? '회수 취소…' : '회수 처리'}</button>`:'')}`+
+    tpl`${rawHtml(canEdit && nextSt && nextSt!=='회수완료'? tpl`<button type="button" class="cbtn nx${['출하요청','배송중','설치완료'].indexOf(nextSt)>=0?' pri':''}" data-oid="${rawHtml(o.id)}" data-next="${nextSt}" title="${nextSt} 로 이동">${nextSt} →</button>`:'')}</span></div>`;
   /* 카드: 이름 한 줄 → 메타 한 줄(채널 · 모델×수량 · 유형 · 날짜) → 시리얼 칩(4개까지, 나머지 접힘) → 담당·동작. 안내 문구·채널 박스 없음 */
   return tpl`<article class="eqb-card" draggable="${canEdit?'true':'false'}" data-oid="${rawHtml(o.id)}">`+
     tpl`<div class="tp"><span class="cu" title="${o.customer||''}">${o.customer||'(고객사 없음)'}</span><span class="mini num">#${rawHtml(o.id)}${rawHtml(age)}</span></div>`+
     tpl`<div class="mt"><span class="chn">${o.channel||'기타'}</span> · ${rawHtml(meta.filter(Boolean).join(' · '))}</div>${rawHtml(prog)}`+
-    tpl`<div class="sn">${rawHtml(eqSerialsHtml(o,{full:true, max:4, bar:'auto'}))}</div>${rawHtml(ft)}</article>`;
+    tpl`<div class="sn">${rawHtml(eqSerialsHtml(o,{full:true, max:4}))}</div>${rawHtml(ft)}</article>`;
 }
 export function eqbDnD(wrap){
   var dragging=null;
@@ -736,19 +823,33 @@ export async function eqSetStatus(r, st){
   if(ST.IS_VIEWER){ toast('조회 전용 계정', '상태를 바꿀 수 없습니다', 'info'); return; }
   var all=eqWant(r), body={status:st};
   if(st==='회수완료'){
-    if(!confirm('#'+r.id+' '+(r.customer||'')+' — '+(all.length||r.qty||1)+'대 전부 회수완료로 처리할까요?\n(일부만 회수했으면 취소하고 카드의 시리얼 칩을 눌러 개별 회수 처리하세요)')) { renderEqBoard(); return; }
+    if(!confirm('#'+r.id+' '+(r.customer||'')+' — '+(all.length||r.qty||1)+'대 전부 회수완료로 처리할까요?\n(일부만 회수했으면 취소하고 카드의 «회수 처리» 버튼에서 시리얼을 고르세요)')) { renderEqBoard(); return; }
     if(!r.returned_date) body.returned_date=todayStr();
   }
   if(r.status==='회수완료' && st!=='회수완료'){ body.returned_date=null; body.returned_serials=null; }
+  var prev={status:r.status, returned_date:r.returned_date||null, returned_serials:r.returned_serials||null};   /* ㊿+169 되돌리기 · 실패 복구 */
   try{
     await sbWrite('PATCH','equipment_orders?id=eq.'+r.id, body);
     var from=r.status; Object.keys(body).forEach(function(k){ r[k]=body[k]; });
     logChange('update','equipment_orders',r.id,{status:st, from:from, via:'장비 대시보드'});
     ST.DIRTY=true; renderEqBoard();
     var x=await syncOrderAssets(r, null, true);
-    toast('상태 변경', '#'+r.id+' '+(r.customer||'')+' · '+from+' → '+st+(body.returned_date? ' · 회수일 '+body.returned_date:'')+(x? ' · '+x:''), 'ok');
+    if(/자산 동기화 실패/.test(x||'')){
+      try{ await sbWrite('PATCH','equipment_orders?id=eq.'+r.id, prev); Object.keys(prev).forEach(function(k){ r[k]=prev[k]; }); await syncOrderAssets(r, null, true); }catch(e3){}
+      toast('상태 변경 실패 — 원래대로 되돌렸습니다', String(x).replace(/^ · /,''), 'bad'); renderEqBoard(); return;
+    }
+    toast('상태 변경', '#'+r.id+' '+(r.customer||'')+' · '+from+' → '+st+(body.returned_date? ' · 회수일 '+body.returned_date:'')+(x? ' · '+x:''), 'ok',
+      {l:'되돌리기', go:function(){ eqSetBack(r, prev, st); }});
     try{ railSync(ST.CUR_VIEW); }catch(e){}
-  }catch(e){ toast('상태 변경 실패', String(e.message||e).slice(0,100), 'bad'); renderEqBoard(); }
+  }catch(e){ toast('상태 변경 실패 — 바뀐 것 없음', String(e.message||e).slice(0,100), 'bad'); renderEqBoard(); }
+}
+/** ㊿+169 상태 변경 되돌리기 */
+export async function eqSetBack(r, prev, st){
+  try{ await sbWrite('PATCH','equipment_orders?id=eq.'+r.id, prev); Object.keys(prev).forEach(function(k){ r[k]=prev[k]; });
+    logChange('update','equipment_orders',r.id,{status:prev.status, from:st, via:'장비 대시보드 · 되돌리기'});
+    var x=await syncOrderAssets(r, null, true); ST.DIRTY=true; renderEqBoard(); try{ railSync(ST.CUR_VIEW); }catch(e){}
+    toast('되돌렸습니다', '#'+r.id+' '+(r.customer||'')+' · '+st+' → '+prev.status+(x? ' · '+x:''), 'info');
+  }catch(e){ toast('되돌리기 실패', String(e.message||e).slice(0,100), 'bad'); renderEqBoard(); }
 }
 
 /* ---- 고객 360 — 요약 4칸 · 다음 액션 제안 · 섹션 탭 (모달 본문 위에 덧붙임) ----
@@ -832,7 +933,7 @@ export function c360Enhance(nm, cts, lives, ois, inbs, asts, ords){
     tpl`<h4 style="margin-top:14px">장비 <span class="ct">상세는 «장비» 탭</span></h4><div class="c360-eq4"><div><b class="num">${rawHtml(EQ.lent)}</b><span>현재 임대중 (대)</span></div><div><b class="num">${rawHtml(EQ.retPend)}</b><span>회수 예정 (대)</span></div><div><b class="num">${rawHtml(EQ.retDone)}</b><span>회수 완료 (대)</span></div><div><b class="num">${rawHtml(EQ.ordN)}</b><span>신청(발주) 이력 (건)</span></div></div></div>`;
   /* 섹션 탭 */
   var secs=[].slice.call(body.querySelectorAll('.c360-sec'));
-  var tabs=tpl`<div class="c360-tabs" role="tablist"><button type="button" role="tab" aria-selected="true" data-t="-2">요약</button>${rawHtml(secs.map(function(sc,i){ var h4=sc.querySelector('h4'); var t=h4? h4.textContent.replace(/^\S+\s/,'').replace(/\s*[\d,]+\s*(건|대|곳)(\s*임대중)?\s*$/,'').replace(/계약 기준.*$/,'').trim() : '섹션'; var ct=h4&&h4.querySelector('.ct')? h4.querySelector('.ct').textContent.replace('건','').replace(/\s*임대중$/,'') : ''; return tpl`<button type="button" role="tab" aria-selected="false" data-t="${rawHtml(i)}">${t}${rawHtml(ct? tpl`<span class="ct">${ct}</span>`:'')}</button>`; }).join(''))}<button type="button" role="tab" aria-selected="false" data-t="-1">전체</button></div>`;
+  var tabs=tpl`<div class="c360-tabs" role="tablist"><button type="button" role="tab" aria-selected="true" data-t="-2">요약</button>${rawHtml(secs.map(function(sc,i){ var h4=sc.querySelector('h4'); var t=h4&&h4.dataset.l? h4.dataset.l : h4? h4.textContent.replace(/^\S+\s/,'').replace(/\s*[\d,]+\s*(건|대|곳)(\s*임대중)?\s*$/,'').replace(/계약 기준.*$/,'').trim() : '섹션'; var ct=h4&&h4.querySelector('.ct')? h4.querySelector('.ct').textContent.replace('건','').replace(/\s*임대중$/,'') : ''; return tpl`<button type="button" role="tab" aria-selected="false" data-t="${rawHtml(i)}">${t}${rawHtml(ct? tpl`<span class="ct">${ct}</span>`:'')}</button>`; }).join(''))}<button type="button" role="tab" aria-selected="false" data-t="-1">전체</button></div>`;
   var head=document.createElement('div'); head.innerHTML=sum+next+tabs;
   body.insertBefore(head, body.firstChild);
   var sv=document.createElement('div'); sv.className='c360-summary-pane'; sv.innerHTML=summ; head.appendChild(sv);
@@ -848,19 +949,22 @@ export function c360Enhance(nm, cts, lives, ois, inbs, asts, ords){
 export function showAuthUi(){
   try{ loadHide(); }catch(e){}
   $('#btnAuth').textContent=(ST.AUTH_USER||'').split('@')[0]+' ▾';
-  $('#btnAuth').title='내 계정 · 로그아웃';
+  $('#btnAuth').title='내 계정 · 로그아웃'; $('#btnAuth').classList.add('in');
   $('#btnLogout').style.display='none';   // 로그아웃은 계정 메뉴 안으로 이동
 }
 
 /* ---- 토스트 알림 ---- */
-export function toast(title, sub, type){
+export function toast(title, sub, type, act){
   var box=document.getElementById('toasts');
-  if(!box){ box=document.createElement('div'); box.id='toasts'; document.body.appendChild(box); }
+  if(!box){ box=document.createElement('div'); box.id='toasts'; box.setAttribute('role','status'); box.setAttribute('aria-live','polite'); document.body.appendChild(box); }
   var t=document.createElement('div'); t.className='toast '+(type||'ok');
   t.innerHTML=tpl`<span class="ti">${type==='bad'?'✕':type==='warn'?'!':(type==='info'?'i':'✓')}</span>`+
     tpl`<span><b>${title}</b>${rawHtml(sub?tpl`<span class="tm">${sub}</span>`:'')}</span>`;
+  /* ㊿+169 되돌리기 같은 동작 하나 — 10초 동안 */
+  if(act && act.go){ var b=document.createElement('button'); b.type='button'; b.className='tact'; b.textContent=act.l||'되돌리기';
+    b.onclick=function(){ b.disabled=true; t.classList.add('out'); setTimeout(function(){ t.remove(); },260); act.go(); }; t.appendChild(b); }
   box.appendChild(t);
-  setTimeout(function(){ t.classList.add('out'); setTimeout(function(){ t.remove(); },260); }, 4000);
+  setTimeout(function(){ t.classList.add('out'); setTimeout(function(){ t.remove(); },260); }, act? 10000 : 4000);
 }
 
 export function showLoading(t){

@@ -705,15 +705,15 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
 // ㊿+142 디자인 정리: 글자 크기 7단계 · 버튼 4종 · 표 열 너비 조절 · 메뉴 «사업 영역» 한 그룹
 {
   const { ctx, page, errs } = await open();
-  await S.t('글자 크기: 화면 글자는 7단계(11·12·12.5·13.5·15·18·22) + 큰 숫자(≥24)만 · 11px 미만 0', async () => {
-    const STEP = [11, 12, 12.5, 13.5, 15, 18, 22]; const bad = {}; let small = 0;
+  await S.t('글자 크기: 화면 글자는 6단계(보조 12·13 · 본문 14·15 · 제목 18·22) + 큰 숫자(≥24)만 · 12px 미만 0 (㊿+169)', async () => {
+    const STEP = [12, 13, 14, 15, 18, 22]; const bad = {}; let small = 0;
     for (const v of ['dash', 'contracts', 'orders', 'eqboard', 'price', 'report', 'adminx', 'ops', 'oi', 'dcheck', 'leadsrc', 'account']) {
       await page.evaluate((v) => SVC.switchView(v), v); await page.waitForTimeout(300);
       const r = await page.evaluate(() => { const o = {}; document.querySelectorAll('body *').forEach((el) => { if (!el.getClientRects().length || el.closest('svg')) return; if (![...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())) return; const f = parseFloat(getComputedStyle(el).fontSize); o[f] = (o[f] || 0) + 1; }); return o; });
-      for (const f in r) { const x = +f; if (x < 11) small += r[f]; if (x < 24 && !STEP.includes(x)) bad[f] = (bad[f] || 0) + r[f]; }
+      for (const f in r) { const x = +f; if (x < 12) small += r[f]; if (x < 24 && !STEP.includes(x)) bad[f] = (bad[f] || 0) + r[f]; }
     }
-    assert(!small, '11px 미만 ' + small); assert(!Object.keys(bad).length, '단계 밖 크기 ' + JSON.stringify(bad));
-    return '7단계';
+    assert(!small, '12px 미만 ' + small); assert(!Object.keys(bad).length, '단계 밖 크기 ' + JSON.stringify(bad));
+    return '6단계';
   });
   await S.t('버튼: 주요(초록) 색 하나 · 기본 버튼 모양 통일(높이 28 · 모서리 8 · 글자 500)', async () => {
     await page.evaluate(() => SVC.openTargetEditor(2026)); await page.waitForTimeout(150);
@@ -1482,8 +1482,8 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
   async function pick(page, find, pk, cust) { await page.fill('#' + find, cust); await page.waitForTimeout(120); await page.click('#' + pk + ' .pi'); await page.waitForTimeout(80); }
   async function saveEdit(page) { await page.click('#eGo'); await page.waitForFunction(() => { const m = document.getElementById('eMsg'); return m && /✅|bad/.test(m.textContent + ' ' + m.className) && !document.getElementById('eGo').disabled; }, null, { timeout: 10000 }); await page.waitForTimeout(300); return page.$eval('#eMsg', (e) => e.textContent); }
   async function gridEdit(page, view, cust, pairs) {
-    await page.evaluate((v) => SVC.switchView(v), view); await page.fill('#dvSearch', cust); await page.waitForTimeout(350);
-    await page.click('#dvTable tbody tr:has-text("' + cust + '") button:has-text("✎")'); await page.waitForTimeout(150);
+    await page.evaluate((v) => { SVC.wvSet(v, '전체'); SVC.switchView(v); }, view); await page.fill('#dvSearch', cust); await page.waitForTimeout(350);   /* ㊿+169 업무 보기 «전체» = 모든 열 */
+    await page.click('#dvTable tbody tr:has-text("' + cust + '") button[data-act="edit"]'); await page.waitForTimeout(150);
     const info = await page.evaluate((pairs) => { const tr = [...document.querySelectorAll('#dvTable tbody tr')].find((x) => x.querySelector('button.sv')); const hs = [...document.querySelectorAll('#dvTable thead th')].map((h) => h.textContent.trim()); const out = {};
       for (const [h, v] of pairs) { const k = hs.findIndex((x) => x.startsWith(h)); const el = tr.children[k].querySelector('input,select'); out[h] = el.value; el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); }
       const hint = tr.querySelector('.amt-hint'); out._hint = hint ? hint.textContent : ''; return out; }, pairs);
@@ -1868,8 +1868,8 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
     const r = await page.evaluate(() => { const R = (s) => document.querySelector(s).getBoundingClientRect(); const ib = R('#ccInbox'), bh = R('#gnBizH'), h = R('#ccHeroHost .kpi'), k = R('#kpis'), a = R('#viewDash .ask'), m = R('#ccMoreTiles');
       const lanes = [...document.querySelectorAll('#ccInbox .ib-lane')].map((l) => l.querySelector('.ib-lh b').textContent + ':' + l.querySelectorAll('.ib-row').length).join('|');
       const t = document.querySelector('#ccHeroHost #goalBar .gn-trk .t1'); const bg = getComputedStyle(document.querySelector('#ccHeroHost .kpi')).backgroundImage;
-      return { lanes, rows: document.querySelectorAll('#ccInbox .ib-row').length, cnt: +document.querySelector('#ccInbox .ib-head .ctag').textContent, full: ib.width > 1300, order: ib.bottom < bh.top && bh.bottom < h.top, side: Math.abs(h.top - k.top) < 2 && h.right < k.left, ask: a.top > Math.max(h.bottom, k.bottom) && a.bottom < m.top,
-        light: /gradient/.test(bg), dash: t && t.getAttribute('stroke-dasharray'), txt: (document.querySelector('#goalBar .gn-gtx') || {}).textContent || '', ph: document.querySelector('#cmdBar .ph').textContent, q: document.getElementById('q').placeholder, h2: document.querySelector('#ccInbox .ib-head h2').textContent }; });
+      return { lanes, rows: document.querySelectorAll('#ccInbox .ib-row').length, cnt: +document.querySelector('#ccInbox .ib-head .ctag').dataset.n, full: ib.width > 1300, order: ib.bottom < bh.top && bh.bottom < h.top, side: Math.abs(h.top - k.top) < 2 && h.right < k.left, ask: a.top > Math.max(h.bottom, k.bottom) && a.bottom < m.top,
+        light: (() => { const m = getComputedStyle(document.querySelector('#ccHeroHost .kpi')).backgroundColor.match(/\d+/g).map(Number); return !/gradient/.test(bg) && m[0] > 200 && m[1] > 200 && m[2] > 200; })(),   /* ㊿+169 그라데이션 없이 옅은 단색 */ dash: t && t.getAttribute('stroke-dasharray'), txt: (document.querySelector('#goalBar .gn-gtx') || {}).textContent || '', ph: document.querySelector('#cmdBar .ph').textContent, q: document.getElementById('q').placeholder, h2: document.querySelector('#ccInbox .ib-head h2').textContent }; });
     assert(/^즉시 처리:\d+\|확인 필요:\d+\|예정:\d+$/.test(r.lanes) && r.rows === r.cnt && r.full && r.order && r.side && r.ask && r.light && /오늘 처리할 일/.test(r.h2), JSON.stringify(r));
     assert(/^\d+(\.\d)? 100$/.test(r.dash || '') && /목표 ARR/.test(r.txt) && /현재 ARR/.test(r.txt) && /필요 12월 MRR/.test(r.txt) && /^화면 이동/.test(r.ph) && /^AI 분석/.test(r.q), JSON.stringify(r));
     return r.lanes;
@@ -1978,6 +1978,131 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
     const terms = await page.evaluate(() => [...document.querySelectorAll('#ovlTerms dt')].map((x) => x.textContent).join('|')); await page.keyboard.press('Escape');
     assert(/천원/.test(u.dash) && /원 단위/.test(u.price) && /VAT/.test(u.price) && u.orders === '숨김' && /백만원/.test(u.weekly) && /계약 MRR/.test(terms) && /당월 인식/.test(terms) && /ARR/.test(terms) && /회계매출/.test(terms) && /곳 · 건 · 대/.test(terms), JSON.stringify({ u, terms }));
     assert(!c.errs.length, c.errs.join(' | ')); return JSON.stringify(u);
+  });
+  await ctx.close();
+}
+// ㊿+169 2차: 계약·OI 표 기본 보기(업무 보기 · 고정 열 · 상태 배지 · 미입력/해당 없음 · 아이콘 버튼 이름 · 삭제는 더보기) · 목록 상태 유지 · 홈 밀도 · 장비 상태·수량·조작 · 공통 디자인
+//   가짜 DB(FIX + 가상 «검증_» 행) — 운영 데이터와 무관 · 쓰기는 가짜 응답
+{
+  const { FIX } = await import('./lib.mjs');
+  const now = new Date(), d10 = new Date(now.getTime() - 10 * 864e5).toISOString().slice(0, 10);
+  const F = JSON.parse(JSON.stringify(FIX));
+  F.oi.push({ id: 9901, customer: '검증_OI2', stage: '진행', prob: 50, win_prob: 50, owner: '담당A', deal_name: '검증 갱신', expect_amount: 50000000, next_date: d10, next_action: '제안서 회신', created_at: d10 });
+  F.orders[0].mgr_name = '장비담당';
+  F.orders.push({ id: 9700, channel: '일반', order_type: '신규발주', customer: '검증_미등록', model: 'S100', qty: 1, serials: '', status: '접수', created_at: d10 + 'T00:00:00', install_date: null, returned_date: null, returned_serials: null, request_note: '' });
+  F.assets.push({ id: 9800, serial: '미등록-9700-1', model: 'S100', usage: '임대', status: '재고', customer: '검증_미등록', channel: '일반', order_id: 9700, deployed_date: null, returned_date: null, note: '⚠ 시리얼 미입력' });
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page);
+  const writes = [];
+  await mockBackend(page, { onWrite: (w) => writes.push(w.m + ' ' + w.url), extra: async (route, u) => { if (u.includes('/rpc/load_all')) { await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(Object.assign({}, F, { roles: [{ role: 'super_admin' }] })) }); return true; } return false; } });
+  await page.goto(url + '/index.html'); await page.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA, null, { timeout: 15000 }); await page.waitForTimeout(600);
+  await S.t('㊿+169 계약 표: 기본 «운영» 보기(고객사·상태 맨 앞 고정) · 갱신/정산/전체 · 고른 보기·보기별 열 설정 기억 · 상태 = 글자+배지 · «—» 미입력 / 빈칸 해당 없음 · 아이콘 버튼 이름 · 삭제는 «더보기»', async () => {
+    await page.evaluate(() => SVC.navMenu('contracts')); await page.waitForTimeout(300);
+    const hs = () => page.evaluate(() => [...document.querySelectorAll('#dvTable thead th')].map((h) => h.textContent.replace(/[▼▲]/g, '').trim()).filter(Boolean));
+    const a = await page.evaluate(() => { const t = document.getElementById('dvTable'), p1 = t.querySelector('tbody td.pin1'), p2 = t.querySelector('tbody td.pin2');
+      return { wv: [...document.querySelectorAll('#dvWvBar [data-wv]')].map((b) => b.textContent + (b.getAttribute('aria-pressed') === 'true' ? '*' : '')).join('|'), sticky: p1 && getComputedStyle(p1).position, p2l: p2 && p2.getBoundingClientRect().left - p1.getBoundingClientRect().right,
+        badge: !!t.querySelector('tbody td.pin2 .ctag'), nil: !!t.querySelector('td.nil[title="미입력"]'), na: !!t.querySelector('td.na[title="해당 없음"]'),
+        acts: [...t.querySelectorAll('tbody tr:first-child td.act button')].map((b) => b.dataset.act + ':' + (b.getAttribute('aria-label') ? 'L' : '-') + ':' + b.textContent.trim()).join('|') }; });
+    const h1 = await hs();
+    assert(a.wv === '운영*|갱신|정산|전체' && h1.length === 10 && h1[0] === '고객사' && h1[1] === '상태' && a.sticky === 'sticky' && Math.abs(a.p2l) < 2 && a.badge && a.nil && a.na, JSON.stringify({ a, h1 }));
+    assert(a.acts === 'view:L:|edit:L:|more:L:', '버튼 ' + a.acts);
+    await page.click('#dvTable tbody tr:first-child button[data-act="more"]'); await page.waitForTimeout(100);
+    const m = await page.evaluate(() => ({ items: [...document.querySelectorAll('#rowMenu [role="menuitem"]')].map((b) => b.textContent.trim()).join('|'), foc: document.activeElement && document.activeElement.closest('#rowMenu') ? 1 : 0 }));
+    await page.keyboard.press('Escape'); await page.waitForTimeout(80);
+    const m2 = await page.evaluate(() => ({ gone: !document.getElementById('rowMenu'), back: document.activeElement && document.activeElement.dataset.act }));
+    assert(m.items === '삭제…' && m.foc && m2.gone && m2.back === 'more', JSON.stringify({ m, m2 }));
+    await page.click('#dvWvBar [data-wv="갱신"]'); await page.waitForTimeout(150); const h2 = await hs();
+    await page.click('#dvWvBar [data-wv="정산"]'); await page.waitForTimeout(150);
+    await page.click('#dvCols'); await page.waitForTimeout(100); await page.click('#colPick label:has-text("과금방식") input'); await page.waitForTimeout(150); await page.mouse.click(5, 300); const h3 = await hs();
+    await page.click('#dvWvBar [data-wv="운영"]'); await page.waitForTimeout(100); const h4 = await hs();
+    await page.click('#dvWvBar [data-wv="정산"]'); await page.waitForTimeout(100); const h5 = await hs();
+    await page.click('#dvWvBar [data-wv="전체"]'); await page.waitForTimeout(150); const h6 = await hs();
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem(SVC.wvKey()) || '{}').contracts);
+    assert(h2.includes('자동연장') && h2.includes('해지사유') && !h2.includes('계산서발행처') && !h3.includes('과금방식') && h3.includes('계산서발행처') && h4.length === 10 && !h5.includes('과금방식') && h6.length === 27 && saved === '전체', JSON.stringify({ h2, h3, h5: h5.length, h6: h6.length, saved }));
+    return '운영 10열 · 전체 27열';
+  });
+  await S.t('㊿+169 목록 상태 유지: 검색·정렬·스크롤 → 다른 화면 → «뒤로» 오면 그대로 · 메뉴로 다시 들어오면 처음부터', async () => {
+    await page.setViewportSize({ width: 1440, height: 600 });
+    await page.evaluate(() => { SVC.wvSet('contracts', '운영'); SVC.navMenu('contracts'); }); await page.waitForTimeout(250);
+    await page.fill('#dvSearch', '가상'); await page.waitForTimeout(150);
+    await page.click('#dvTable thead th[data-k="mrr"] .thw > span'); await page.waitForTimeout(150);
+    await page.evaluate(() => window.scrollTo(0, 400)); await page.waitForTimeout(100);
+    const before = await page.evaluate(() => ({ q: document.getElementById('dvSearch').value, k: SVC.DV.sortK, y: Math.round(window.scrollY), first: document.querySelector('#dvTable tbody tr td').textContent }));
+    await page.evaluate(() => SVC.switchView('oi')); await page.waitForTimeout(250);
+    await page.goBack(); await page.waitForTimeout(500);
+    const back = await page.evaluate(() => ({ v: SVC.ST.CUR_VIEW, q: document.getElementById('dvSearch').value, k: SVC.DV.sortK, y: Math.round(window.scrollY), first: document.querySelector('#dvTable tbody tr td').textContent }));
+    await page.evaluate(() => { SVC.navMenu('oi'); SVC.navMenu('contracts'); }); await page.waitForTimeout(200);
+    const fresh = await page.evaluate(() => ({ q: document.getElementById('dvSearch').value, k: SVC.DV.sortK }));
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    assert(before.q === '가상' && before.k === 'mrr' && back.v === 'contracts' && back.q === '가상' && back.k === 'mrr' && Math.abs(back.y - before.y) < 30 && back.first === before.first && fresh.q === '' && fresh.k === null, JSON.stringify({ before, back, fresh }));
+    return '뒤로 = 그대로 · 메뉴 = 처음';
+  });
+  await S.t('㊿+169 홈: 맨 위 요약(매출·고객·만료 위험·처리 필요) · «주의 항목 n종 · 대상 n건» · 할 일마다 대상/담당/기한/영향 · 구체적인 버튼 · 칸마다 2개 + 더 보기 · 알림 → 걸러진 목록(같은 건수)', async () => {
+    await page.evaluate(() => SVC.navMenu('dash')); await page.waitForTimeout(400);
+    const r = await page.evaluate(() => { const cells = [...document.querySelectorAll('#gnSum .gs-c')].map((c) => c.dataset.k + ':' + c.querySelector('.gs-v b').textContent);
+      const xs = SVC.expScan(SVC.idxs()); const head = document.querySelector('#ccInbox .ib-head .ctag').textContent; const rows = [...document.querySelectorAll('#ccInbox .ib-row')];
+      const meta = rows.every((x) => [...x.querySelectorAll('.ib-meta dt')].map((d) => d.textContent).join('') === '대상담당기한영향');
+      const btns = [...document.querySelectorAll('#ccInbox .cbtn.pri')].map((b) => b.textContent);
+      const top = document.getElementById('gnSum').getBoundingClientRect().bottom <= document.getElementById('ccInbox').getBoundingClientRect().top;
+      return { cells, xsN: xs.rows.length, head, n: rows.length, meta, btns, top }; });
+    const m = /주의 항목 (\d+)종 · 대상 (\d+)건/.exec(r.head);
+    assert(r.cells.length === 4 && r.cells[2] === 'exp:' + r.xsN && m && +m[1] === r.n && r.meta && r.top && !r.btns.some((b) => /처리하기|대시보드 →|OI 현황 →|^재계약 타진$/.test(b)) && r.btns.some((b) => /일정 지난 OI \d+건 보기/.test(b)), JSON.stringify(r));
+    const oiN = await page.evaluate(() => { const t = new Date().toISOString().slice(0, 10); return SVC.ST.RAWX.oi.filter((o) => o.next_date && String(o.next_date).slice(0, 10) < t && !/수주|실패/.test(String(o.stage || ''))).length; });
+    const lane = await page.evaluate(() => { const b = [...document.querySelectorAll('#ccInbox .cbtn.pri')].find((x) => /일정 지난 OI/.test(x.textContent)); const row = b.closest('.ib-row'), ln = row.closest('.ib-lane');
+      return { hid: row.hidden, more: !!ln.querySelector('.ib-more'), shown: [...ln.querySelectorAll('.ib-row')].filter((x) => !x.hidden).length, lv: ln.querySelector('.ib-more') && ln.querySelector('.ib-more').dataset.lv }; });
+    if (lane.hid) { await page.click('#ccInbox .ib-more[data-lv="' + lane.lv + '"]'); await page.waitForTimeout(150); }
+    const opened = await page.evaluate(() => { const b = [...document.querySelectorAll('#ccInbox .cbtn.pri')].find((x) => /일정 지난 OI/.test(x.textContent)); return !b.closest('.ib-row').hidden; });
+    assert(!lane.hid || (lane.more && lane.shown === 2 && opened), '칸 접기 ' + JSON.stringify({ lane, opened }));
+    await page.click('#ccInbox .cbtn.pri:has-text("일정 지난 OI")'); await page.waitForTimeout(400);
+    const g = await page.evaluate(() => ({ v: SVC.ST.CUR_VIEW, pre: document.getElementById('dvPreBar').textContent, rows: document.querySelectorAll('#dvTable tbody tr:not(.dg-empty)').length }));
+    await page.click('#dvPreX'); await page.waitForTimeout(150); const all = await page.evaluate(() => document.querySelectorAll('#dvTable tbody tr').length);
+    assert(g.v === 'oi' && /다음 일정이 지난 OI/.test(g.pre) && g.rows === oiN && all > oiN, JSON.stringify({ g, oiN, all }));
+    return r.head;
+  });
+  await S.t('㊿+169 장비: 타일 이름에 범위(현황·대 / 신청·건) · «회수 완료 n대 / 대상 n대» · 타일 = 보드 같은 건수 · 빈 열 안 접힘 · 시리얼 칩 = 상세(바뀌지 않음) · 미등록 시리얼 표시 · 회수 처리 미리 보기(부분/전체/없음) → 저장 → 되돌리기', async () => {
+    await page.evaluate(() => SVC.navMenu('eqboard')); await page.waitForTimeout(500);
+    const t = await page.evaluate(() => [...document.querySelectorAll('#eqbKpis .kpi')].map((k) => k.querySelector('.k').textContent.trim() + '=' + k.querySelector('.v').textContent.trim() + '|' + k.querySelector('.d').textContent.trim()));
+    const pendN = +/=(\d+)/.exec(t[1])[1];
+    await page.click('#eqbKpis .kpi[data-go="only:pend"]'); await page.waitForTimeout(250);
+    const p = await page.evaluate(() => ({ cards: document.querySelectorAll('#eqbCols .eqb-card').length, chip: (document.querySelector('#eqbChips .eqb-only') || {}).textContent || '', w: [...document.querySelectorAll('#eqbCols .eqb-col')].map((c) => Math.round(c.getBoundingClientRect().width)) }));
+    await page.click('#eqbChips .eqb-only button'); await page.waitForTimeout(200);
+    const ph = await page.evaluate(() => { const c = document.querySelector('.eqsn.ph'); return c ? c.textContent : ''; });
+    const o303 = await page.evaluate(() => SVC.eqOrderById(303).returned_serials || '');
+    await page.click('.eqb-card[data-oid="303"] .eqsn.act >> nth=0'); await page.waitForTimeout(150);
+    const pop = await page.evaluate(() => ({ on: !!document.getElementById('eqSnPop'), txt: (document.getElementById('eqSnPop') || {}).textContent || '', same: (SVC.eqOrderById(303).returned_serials || '') }));
+    await page.keyboard.press('Escape'); await page.waitForTimeout(80);
+    assert(/임대중 · 현황=\d+대/.test(t[0]) && /처리 대기 · 신청=\d+건/.test(t[1]) && /회수 진행 · 신청=\d+건\|회수 완료 \d+대 \/ 대상 \d+대/.test(t[2]) && /회수 완료 · 현황=\d+대/.test(t[3]), JSON.stringify(t));
+    assert(p.cards === pendN && /처리 대기/.test(p.chip) && Math.min(...p.w) / Math.max(...p.w) > 0.8 && ph === '미등록 시리얼 1' && pop.on && /현황 상태/.test(pop.txt) && pop.same === o303 && !(await page.evaluate(() => !!document.getElementById('eqSnPop'))), JSON.stringify({ p, pendN, ph, pop }));
+    await page.click('.eqb-card[data-oid="303"] [data-ret="303"]'); await page.waitForTimeout(200);
+    const st = async () => page.evaluate(() => ({ s: document.getElementById('erSum').className.replace('er-sum ', ''), b: document.getElementById('erSave').textContent, dis: document.getElementById('erSave').disabled }));
+    const s0 = await st(); await page.click('#erList input >> nth=0'); const s1 = await st(); await page.click('#erAll'); const s2 = await st(); await page.click('#erNone'); await page.click('#erList input >> nth=0'); const s3 = await st();
+    writes.length = 0; await page.click('#erSave'); await page.waitForTimeout(700);
+    const after = await page.evaluate(() => ({ rs: SVC.eqOrderById(303).returned_serials, open: document.getElementById('ovlEqRet').classList.contains('on'), undo: !!document.querySelector('.toast .tact') }));
+    await page.click('.toast .tact'); await page.waitForTimeout(700);
+    const undone = await page.evaluate(() => SVC.eqOrderById(303).returned_serials || '');
+    assert(s0.s === 'none' && s0.dis && s1.s === 'part' && /부분 회수/.test(s1.b) && s2.s === 'all' && /전체 회수/.test(s2.b) && s3.s === 'part' && after.rs && !after.open && after.undo && undone === o303 && writes.some((w) => /PATCH .*equipment_orders/.test(w)), JSON.stringify({ s0, s1, s2, s3, after, undone, o303, w: writes.slice(0, 4) }));
+    return t.map((x) => x.split('|')[0]).join(' · ');
+  });
+  await S.t('㊿+169 공통: 글자 아이콘 → 같은 선 아이콘(도구 버튼) · 위젯은 홈에서만 · 계정 진입점 하나(오른쪽 위) · 정산·도구 묶음 정리(정산·목표 5 / 도구 5~6 — Cloud 사이트 관리는 슈퍼 관리자만) + 자주 쓰는 화면 · LIVE «제품별 합» 설명 · 장비 채널 막대 단위 «대»', async () => {
+    await page.evaluate(() => SVC.navMenu('dash')); await page.waitForTimeout(250);
+    const w1 = await page.evaluate(() => getComputedStyle(document.getElementById('btnWidgets')).display !== 'none');
+    await page.evaluate(() => SVC.navMenu('contracts')); await page.waitForTimeout(200);
+    const r = await page.evaluate(() => ({ w2: getComputedStyle(document.getElementById('btnWidgets')).display, auth: getComputedStyle(document.getElementById('btnAuth')).display,
+      tools: ['dvReload', 'dvCsv', 'dvDense', 'dvCols', 'btnEdit', 'btnReload', 'btnTheme'].map((id) => { const b = document.getElementById(id); return id + ':' + (b.querySelector('svg') ? 'svg' : '-') + ':' + (/[\u{1F300}-\u{1FAFF}☀-➿⊞↻⬇☰]/u.test(b.textContent) ? 'emoji' : 'ok'); }).join(' ') }));
+    await page.click('#rail .gn-me'); await page.waitForTimeout(120);
+    const am = await page.evaluate(() => (document.getElementById('authMenu') || {}).textContent || '');
+    await page.keyboard.press('Escape'); await page.waitForTimeout(80);
+    const amGone = await page.evaluate(() => !document.getElementById('authMenu') && document.activeElement && document.activeElement.classList.contains('gn-me'));
+    assert(amGone, '계정 메뉴 Esc 로 닫힘 · 초점 복귀');
+    await page.evaluate(() => { ['biz', 'biz', 'price', 'oi'].forEach((v) => SVC.switchView(v)); SVC.navMenu('dash'); }); await page.waitForTimeout(200);
+    await page.click('#rail .gn-tb[data-seg="m:정산·도구"]'); await page.waitForTimeout(150);
+    const mn = await page.evaluate(() => ({ cols: [...document.querySelectorAll('#gnMenu .gn-sec')].map((s) => s.querySelector('.gn-st').textContent + ':' + s.querySelectorAll('.gn-mi').length).join('|'), s1: [...document.querySelectorAll('#gnMenu .gn-sec')][0].textContent.includes('에스원 정산'), fq: [...document.querySelectorAll('#gnMenu .gn-mf .gn-mi')].map((b) => b.dataset.v).join(',') }));
+    await page.keyboard.press('Escape');
+    const live = await page.evaluate(() => [...document.querySelectorAll('#kpis .kpi')].map((k) => k.textContent).find((x) => /LIVE/.test(x)) || '');
+    await page.evaluate(() => SVC.navMenu('eqboard')); await page.waitForTimeout(400);
+    const bar = await page.evaluate(() => [...document.querySelectorAll('#eqcCh .vv')].map((x) => x.textContent).join(' '));
+    assert(w1 && r.w2 === 'none' && r.auth === 'none' && !/-|emoji/.test(r.tools.replace(/[a-zA-Z]+:/g, (x) => x)) && /내 계정/.test(am) && /로그아웃/.test(am), JSON.stringify({ w1, r, am }));
+    assert(/^정산·목표:5\|도구:[56]$/.test(mn.cols) && mn.s1 && /biz/.test(mn.fq) && /제품별 합 \d+ — (회사 수와 같음|두 제품 이상)/.test(live) && /\d+대/.test(bar) && !/건/.test(bar), JSON.stringify({ mn, live: live.slice(0, 120), bar }));
+    assert(!c.errs.length, c.errs.join(' | ')); return mn.cols + ' · 자주 ' + mn.fq;
   });
   await ctx.close();
 }

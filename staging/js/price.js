@@ -91,8 +91,8 @@ export function prSaasHtml(){
   var RT=(D.supply_rate&&D.supply_rate.cnac)||0.5;   // 총판 공급가 = 표시가 × 50%
   function pv(v){ return typeof v==='number'? prWon(SUP? Math.round(v*RT):v) : prWon(v); }
   var basisBtn=tpl`<span style="display:inline-flex;gap:4px;margin-left:8px">`+
-    tpl`<button class="pill" data-prbasis="cons" style="height:26px;font-size:11px;${!SUP?'background:var(--brand-t);border-color:var(--brand);color:var(--brand);font-weight:700':''}">소비자가</button>`+
-    tpl`<button class="pill" data-prbasis="supply" style="height:26px;font-size:11px;${SUP?'background:var(--brand-t);border-color:var(--brand);color:var(--brand);font-weight:700':''}">총판 공급가 ${RT*100}% 🔒</button></span>`;
+    tpl`<button class="pill" data-prbasis="cons" style="height:26px;font-size:12px;${!SUP?'background:var(--brand-t);border-color:var(--brand);color:var(--brand);font-weight:700':''}">소비자가</button>`+
+    tpl`<button class="pill" data-prbasis="supply" style="height:26px;font-size:12px;${SUP?'background:var(--brand-t);border-color:var(--brand);color:var(--brand);font-weight:700':''}">총판 공급가 ${RT*100}% 🔒</button></span>`;
   var h='';
   // 표
   var t='';

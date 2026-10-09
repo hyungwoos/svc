@@ -4,7 +4,7 @@ import { APP_VER, ST } from './state.js';
 import { Viz } from './viz.js';
 import { $, $$, kwToWon, wonToKw, baseLabel, baseRange, buildBaseSelect, cssv, el, esc, isCC, isGN, lline, mk, mkLabel, monOf, pct, rawHtml, seriesColor, STATE, tpl, won,
   wonFull, wrapNavIcons, yOf } from './core.js';
-import { boot, CACHE_KEY, ccAfterKpis, ccAnaCount, ccAnalysisOpen, ccHomeLayout, loadFromDb, onData, renderInbox, SB_RAW, sbWrite, toast } from './shell.js';
+import { boot, CACHE_KEY, ccAfterKpis, ccAnaCount, ccAnalysisOpen, ccHomeLayout, loadFromDb, onData, renderInbox, SB_RAW, sbWrite, themeBtnSync, toast, uiIconize } from './shell.js';
 import { abortAsk, ask, closeAnswer, isAsking, loadAiConfig, runQuery, shortQ } from './ai.js';
 import { GRIDS } from './grids.js';
 import { CH_DEFS, chOf, ctSuccessor, liveData, liveDeltaHtml, openRenewList, renderChannelView } from './analysis.js';
@@ -161,11 +161,11 @@ export function buildControls(){
     };
   });
 
-  try{ wrapNavIcons(); ccHomeLayout(); }catch(e){}
+  try{ wrapNavIcons(); ccHomeLayout(); uiIconize(); }catch(e){}
   $('#btnTheme').onclick=function(){
     var l = document.documentElement.getAttribute('data-theme')==='light';
     document.documentElement.setAttribute('data-theme', l?'dark':'light');
-    this.textContent = l? '◐ 라이트' : '◐ 다크';
+    themeBtnSync();
     try{ localStorage.setItem('svc_theme', l?'dark':'light'); }catch(e){}
     renderAll();
   };
@@ -174,7 +174,7 @@ export function buildControls(){
     var th=localStorage.getItem('svc_theme');
     if(th==='dark'){
       document.documentElement.setAttribute('data-theme','dark');
-      $('#btnTheme').textContent='◐ 라이트';
+      themeBtnSync();
     }
   }catch(e){}
   $('#btnReload').onclick=function(){
@@ -350,7 +350,7 @@ export function renderQWidgets(){
     var sec=document.createElement('section');
     sec.className='card c6'; sec.dataset.w=w.id;
     sec.innerHTML=tpl`<div class="qw-head"><div class="t">`+
-      tpl`<h2 style="font-size:13.5px">📌 ${shortQ((res&&res.title)||w.q)}</h2>`+
+      tpl`<h2 style="font-size:14px">📌 ${shortQ((res&&res.title)||w.q)}</h2>`+
       tpl`<p class="cap" style="margin:2px 0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${w.q}">${shortQ(w.q)}</p></div>`+
       tpl`<button class="qw-btn" data-a="rf" title="새로고침">↻</button>`+
       tpl`<button class="qw-btn" data-a="rm" title="위젯 제거">✕</button></div>`+ tpl`${rawHtml((res&&res.hero)? tpl`<div class="qw-hero">${res.hero}<small> ${res.unit||''}</small></div>`:'')}`+ tpl`${rawHtml((res&&res.sub)? tpl`<p class="cap" style="margin:-4px 0 8px">${res.sub}</p>`:'')}`+
@@ -517,14 +517,14 @@ export function toggleWidgetPanel(){
   p=document.createElement('div'); p.id='widgetPanel';
   p.style.cssText='position:fixed;top:56px;right:18px;z-index:1300;width:238px;background:var(--surface);'+
     'border:1px solid var(--ring);border-radius:14px;box-shadow:0 14px 40px rgba(0,0,0,.16);padding:14px 16px';
-  var h='<div style="font-size:12.5px;font-weight:700;margin-bottom:10px">⊞ 대시보드 위젯</div>';
+  var h='<div style="font-size:13px;font-weight:700;margin-bottom:10px">⊞ 대시보드 위젯</div>';
   WIDGET_DEFS.forEach(function(d){
-    h+=tpl`<label style="display:flex;gap:8px;align-items:center;padding:4px 0;font-size:12.5px;cursor:pointer">`+
+    h+=tpl`<label style="display:flex;gap:8px;align-items:center;padding:4px 0;font-size:13px;cursor:pointer">`+
        tpl`<input type="checkbox" data-wk="${rawHtml(d[0])}" ${widgetOn(d[0],off)?'checked':''} style="width:15px;height:15px"> ${d[1]}</label>`;
   });
   var qws=qwList();
   if(qws.length){
-    h+='<div style="font-size:11px;color:var(--muted);letter-spacing:.08em;margin:10px 0 4px">고정한 질문</div>';
+    h+='<div style="font-size:12px;color:var(--muted);letter-spacing:.08em;margin:10px 0 4px">고정한 질문</div>';
     qws.forEach(function(w){
       h+=tpl`<div style="display:flex;gap:6px;align-items:center;padding:3px 0;font-size:12px">`+
          tpl`<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📌 ${w.q}</span>`+
@@ -736,7 +736,7 @@ export function openIfeeDetail(td, Y, M, det, adj){
       tpl`<td><input class="ifin" data-f="x${rawHtml(i)}_note" type="text" value="${note}" placeholder="비고(선택)"`+
         tpl` style="width:100%;min-width:110px;font-size:12px;padding:3px 5px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)"></td>`+
       tpl`<td class="n">${rawHtml(amtIn(amt,'x'+i+'_amt'))}</td>`+
-      tpl`<td><button class="ifdel" data-x="${rawHtml(i)}" title="이 줄 지우기" style="border:none;background:none;cursor:pointer;color:var(--critical,#d03b3b);font-size:13.5px">✕</button></td></tr>`;
+      tpl`<td><button class="ifdel" data-x="${rawHtml(i)}" title="이 줄 지우기" style="border:none;background:none;cursor:pointer;color:var(--critical,#d03b3b);font-size:14px">✕</button></td></tr>`;
   }
   ex.forEach(function(e,i){ h+=exRow(e,i); });
   if(ed) h+='<tr id="ifAddRow"><td colspan="5" style="padding:4px 6px"><button class="pill ghost" id="ifAdd" style="font-size:12px;padding:4px 10px">＋ 설치·철거비 추가</button></td></tr>';
@@ -794,7 +794,7 @@ export function ifeeWire(box, Y, M, rows, ex, td){
         tpl`${rawHtml(IFEE_KINDS.map(function(k){ return tpl`<option>${rawHtml(k)}</option>`; }).join(''))}</select></td>`+
       tpl`<td><input class="ifin" data-f="x${rawHtml(nextX)}_note" type="text" placeholder="비고(선택)" style="width:100%;min-width:110px;font-size:12px;padding:3px 5px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)"></td>`+
       tpl`<td class="n"><input class="ifin" data-f="x${rawHtml(nextX)}_amt" type="number" step="any" placeholder="천원" style="width:104px;text-align:right;font-size:12px;padding:3px 5px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)"></td>`+
-      tpl`<td><button class="ifdel" data-x="${rawHtml(nextX)}" title="이 줄 지우기" style="border:none;background:none;cursor:pointer;color:var(--critical,#d03b3b);font-size:13.5px">✕</button></td>`;
+      tpl`<td><button class="ifdel" data-x="${rawHtml(nextX)}" title="이 줄 지우기" style="border:none;background:none;cursor:pointer;color:var(--critical,#d03b3b);font-size:14px">✕</button></td>`;
     var anchor=box.querySelector('#ifAddRow');
     anchor.parentNode.insertBefore(tr, anchor);
     wireRow(tr); nextX++;
@@ -990,7 +990,7 @@ export function renderVs(){
     (vs.monthCount>1? ' · 최근 달만 표시 (전체는 정산·목표 › 비즈포탈 차액)':'');
   var sm=$('#vsSummary'); sm.innerHTML='';
   vs.items.forEach(function(x){
-    var row=el('div'); row.style.cssText='display:flex;justify-content:space-between;gap:12px;padding:3px 2px;font-size:13.5px';
+    var row=el('div'); row.style.cssText='display:flex;justify-content:space-between;gap:12px;padding:3px 2px;font-size:14px';
     var k=el('span','',x.k); k.style.color='var(--mut)';
     var v=el('b','',won(x.v)+'천원');
     if(/차액/.test(x.k)) v.style.color = x.v>=0? 'var(--up,#199e70)':'var(--dn,#d95926)';
@@ -1037,7 +1037,7 @@ export function renderGoal(list){
   }
   box.innerHTML=
     tpl`<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:9px">`+
-      tpl`<div style="font-size:12.5px;font-weight:650">🎯 ${rawHtml(yr)}년 목표 ARR ${won(tg.amount)}천원`+
+      tpl`<div style="font-size:13px;font-weight:650">🎯 ${rawHtml(yr)}년 목표 ARR ${won(tg.amount)}천원`+
         tpl`<span style="font-weight:500;color:var(--muted)"> · 필요 12월 MRR ${won(needMrr)}천원</span></div>`+
       tpl`<div style="font-size:12px;color:var(--ink-2)">현재 ARR <b style="color:var(--ink)">${won(curArr)}천원 (${p1.toFixed(1)}%)</b>`+ tpl`${rawHtml(decArr? ' · 12월 계약분 기준 '+won(decArr)+'천원 ('+p2.toFixed(1)+'%)':'')}</div></div>`+
     tpl`<div style="position:relative;height:14px;border-radius:7px;background:var(--surface-2);overflow:hidden">`+
@@ -1105,7 +1105,7 @@ export function renderKpis(list){
         var isDb=(lv.src==='db'), other='';
         if(isDb && ST.DATA.live && ST.DATA.live.ok){ var su={}; selOf(ST.DATA.live.rows).forEach(function(x){ su[x.cust]=1; }); var sn=Object.keys(su).length; other=' · 시트 명단 '+sn+(sn!==nCust? ' ('+(nCust-sn>0?'+':'')+(nCust-sn)+')':' ✓'); }
         return { k:'LIVE 고객사'+(isDb? ' ('+mk(b)+')':''), v:nCust.toLocaleString('ko-KR'), u:'곳',
-                 d:'제품별 합 '+prodSum.toLocaleString('ko-KR')+(!isDb && prodSum>nCust? ' (복수 제품 '+(prodSum-nCust)+'곳)':'')+
+                 d:'제품별 합 '+prodSum.toLocaleString('ko-KR')+(prodSum>nCust? ' — 두 제품 이상 쓰는 '+(prodSum-nCust)+'곳을 제품마다 셈' : ' — 회사 수와 같음(겹침 없음)')+   /* ㊿+169 고객 수(곳) ≠ 제품별 합 이유를 글로 */
                    (nRow>prodSum? ' · 사이트 '+nRow+'건':'')+other, open:'live',
                  extra:(isDb && !STATE.ind && Object.keys(STATE.lines).every(function(k){ return STATE.lines[k]; }))? liveDeltaHtml(b) : '',   /* 전월 대비 분해 (신규·복귀 / 만기 미처리·해지·종료) + «확인중» — 표시용 (㊿+127) */
                  tip:(isDb? '계약 기준 자동 판정 — 원계약이 '+mk(b)+'에 유효한 회사(시작월 ≤ 기준월, 종료 전 · 해지는 해지월부터 제외 · 통합과금/추가/H/W 제외 · CN전환 포함) · 곳 = 회사 단위 · 제품별 합 = 매출시트 LIVE 산정 방식(제품마다 1곳'+(prodSum>nCust? ' · 두 제품 이상 쓰는 '+(prodSum-nCust)+'곳이 겹침':'')+') · «시트 명단» 은 예전 LIVE 고객사 탭 사본 — 차이는 LIVE 화면 «시트와 다른 곳»에서 항목별로'
@@ -1117,7 +1117,7 @@ export function renderKpis(list){
       d:'고객사 '+newCu+' / '+churnCu+'곳 · 이탈 MRR '+won(churnAmt)+'천원',
       cls: churnCnt>newCnt? 'down':'up', open:'nc', tip:'신규 = 원계약 시작월이 '+(STATE.unit==='month'? mk(b) : mk(f0)+'~'+mk(b))+' · 해지 = 상태 «해지» 해지월이 그 기간 (부속 계약·CND 제외 · 해지 분석·해지율 화면과 같은 기준) — 누르면 명단' },
     (function(){ var EN=expN(), eEnd=Math.min(b+EN-1,ST.M-1);
-      var seg=tpl`<div class="expseg" style="display:flex;gap:3px;align-items:center;margin-top:8px;flex-wrap:wrap" title="만료 기간을 바꿉니다 (이 브라우저에 기억 · 아래 «만료 예정» 위젯도 같이 바뀜)"><span class="mini" style="color:var(--muted);margin-right:2px">기간</span>${rawHtml([1,2,3,6,12].map(function(n){ return tpl`<button type="button" data-expn="${rawHtml(n)}" aria-pressed="${n===EN}" style="font:inherit;font-size:11px;line-height:1;padding:4px 7px;border-radius:6px;border:1px solid var(--ring);cursor:pointer;background:${n===EN?'var(--s1-solid,#226bc4)':'var(--surface-2)'};color:${n===EN?'#fff':'var(--ink-2)'}">${rawHtml(n)}개월</button>`; }).join(''))}</div>`;
+      var seg=tpl`<div class="expseg" style="display:flex;gap:3px;align-items:center;margin-top:8px;flex-wrap:wrap" title="만료 기간을 바꿉니다 (이 브라우저에 기억 · 아래 «만료 예정» 위젯도 같이 바뀜)"><span class="mini" style="color:var(--muted);margin-right:2px">기간</span>${rawHtml([1,2,3,6,12].map(function(n){ return tpl`<button type="button" data-expn="${rawHtml(n)}" aria-pressed="${n===EN}" style="font:inherit;font-size:12px;line-height:1;padding:4px 7px;border-radius:6px;border:1px solid var(--ring);cursor:pointer;background:${n===EN?'var(--s1-solid,#226bc4)':'var(--surface-2)'};color:${n===EN?'#fff':'var(--ink-2)'}">${rawHtml(n)}개월</button>`; }).join(''))}</div>`;
       return { k:EN+'개월 내 만료', v:won(expAmt), u:'천원', d: expCnt+'건 · 재약정 타깃 · '+mk(b)+'~'+mk(eEnd), cls: expCnt? 'down':'', open:'exp', extra:seg,
                tip:'종료월이 '+mk(b)+'~'+mk(eEnd)+'인 원계약(해지·종료 상태 제외) — 숫자를 누르면 명단 · 아래 버튼으로 기간 변경' }; })()
   ];
@@ -1357,7 +1357,7 @@ export function hbars(sel, arr, total, isCount){
     var tr=el('div','tr'); var fl=el('div','fl');
     fl.style.width=Math.max(1.5,Math.abs(x.v)/mx*100)+'%'; fl.style.background=x.c;
     tr.appendChild(fl);
-    var vv=el('div','vv', isCount? x.v+'건' : won(x.v));
+    var vv=el('div','vv', isCount? x.v+(typeof isCount==='string'? isCount : '건') : won(x.v));   /* ㊿+169 단위를 넘겨받음(장비 = 대) */
     if(!isCount && total) vv.title=wonFull(x.v)+' · '+(x.v/total*100).toFixed(1)+'%';
     row.appendChild(nm); row.appendChild(tr); row.appendChild(vv);
     box.appendChild(row);

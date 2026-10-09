@@ -711,7 +711,7 @@ export function apPaint(){
   var menus=apMenus(), grp='';
   var h='<thead><tr><th>메뉴</th><th style="width:90px;text-align:center">보기</th><th style="width:90px;text-align:center">읽기</th><th style="width:90px;text-align:center">쓰기</th><th></th></tr></thead><tbody>';
   menus.forEach(function(m){
-    if(m.grp!==grp){ grp=m.grp; h+=tpl`<tr><td colspan="5" style="background:var(--surface-2);font-size:11px;font-weight:650;color:var(--ink-2);padding:6px 10px">${grp||'기타'}</td></tr>`; }
+    if(m.grp!==grp){ grp=m.grp; h+=tpl`<tr><td colspan="5" style="background:var(--surface-2);font-size:12px;font-weight:650;color:var(--ink-2);padding:6px 10px">${grp||'기타'}</td></tr>`; }
     var p=AP.rows[m.v]||{v:true,r:true,w:false};
     var na=limited && !limited[m.v];             // 제한 역할(poc·장비)은 역할에 없는 메뉴 자체가 없음
     var dis=isSuper||na;
@@ -774,9 +774,9 @@ export async function abLoad(){
   var credit=bill? Number(bill.credit_usd)||0 : 0;
   var remain=credit? Math.round((credit-r.total_usd)*100)/100 : null;
   function box(l,v,s,warn){
-    return tpl`<div class="kpi${warn?'':''}" style="padding:11px 14px"><div style="font-size:11px;color:var(--muted);font-weight:650">${rawHtml(l)}</div>`+
+    return tpl`<div class="kpi${warn?'':''}" style="padding:11px 14px"><div style="font-size:12px;color:var(--muted);font-weight:650">${rawHtml(l)}</div>`+
       tpl`<div style="font-size:18px;font-weight:800;margin-top:2px${warn?';color:var(--critical)':''}">${rawHtml(v)}</div>`+
-      tpl`<div style="font-size:11px;color:var(--muted)">${rawHtml(s)}</div></div>`;
+      tpl`<div style="font-size:12px;color:var(--muted)">${rawHtml(s)}</div></div>`;
   }
   var usd=function(v){ return (v!=null && isFinite(Number(v)))? '$'+Number(v).toLocaleString('en-US') : '—'; };   /* ㊿+151: 값 없으면 $NaN 대신 — (스테이징 QA 가 잡음) */
   kpi.innerHTML=
@@ -792,7 +792,7 @@ export async function abLoad(){
     tpl`${rawHtml(r.daily.map(function(d){
       return tpl`<div title="${rawHtml(d.d)} · $${rawHtml(d.usd)}" style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:2px">`+
         tpl`<div style="width:100%;border-radius:3px 3px 0 0;background:var(--brand);height:${Math.max(2,Math.round(d.usd/mx*40))}px"></div>`+
-        tpl`<span style="font-size:11px;color:var(--muted)">${rawHtml(d.d.slice(8))}</span></div>`;
+        tpl`<span style="font-size:12px;color:var(--muted)">${rawHtml(d.d.slice(8))}</span></div>`;
     }).join(''))}`+ tpl`</div>` : '';
 }
 export async function abSave(){
@@ -1108,8 +1108,8 @@ export async function renderAccount(){
     if(s0 && s0.e) sessTxt='로그인 유지 켜짐 · 현재 토큰 만료 '+new Date(s0.e*1000).toLocaleString('ko-KR')+' (자동 갱신)';
   }catch(e){}
   function row(k,v){ return tpl`<div style="display:flex;gap:14px;padding:9px 2px;border-bottom:1px solid var(--ring)">`+
-    tpl`<span style="width:110px;color:var(--muted);font-size:12.5px;flex-shrink:0">${rawHtml(k)}</span>`+
-    tpl`<span style="font-size:13.5px">${rawHtml(v)}</span></div>`; }
+    tpl`<span style="width:110px;color:var(--muted);font-size:13px;flex-shrink:0">${rawHtml(k)}</span>`+
+    tpl`<span style="font-size:14px">${rawHtml(v)}</span></div>`; }
   box.innerHTML=
     row('이메일', esc(ST.AUTH_USER||''))+
     row('권한', tpl`<b>${ri[0]}</b>${rawHtml(role? tpl` <span class="mini">(${role})</span>`:'')}`)+
@@ -1128,12 +1128,12 @@ export async function renderAccount(){
   box.appendChild(act);
   /* 보안 — 2단계 인증(인증 앱) · 계정 단위, 본인이 켬 */
   var sec=document.createElement('div'); sec.style.cssText='margin-top:22px';
-  sec.innerHTML=tpl`<div style="font-size:13.5px;font-weight:650;margin-bottom:4px">보안</div>${rawHtml(row('🔐 2단계 인증', '<div id="accMfa"></div>'))}`;
+  sec.innerHTML=tpl`<div style="font-size:14px;font-weight:650;margin-bottom:4px">보안</div>${rawHtml(row('🔐 2단계 인증', '<div id="accMfa"></div>'))}`;
   box.appendChild(sec); mfaCardRender(sec.querySelector('#accMfa'));
   /* 설정 — 이 브라우저에만 저장 (localStorage) */
   var set=document.createElement('div'); set.style.cssText='margin-top:22px';
   var curIdle=idleMin(), look0=curLook();
-  set.innerHTML=tpl`<div style="font-size:13.5px;font-weight:650;margin-bottom:4px">설정 <span class="mini" style="font-weight:400">— 이 브라우저에만 저장됩니다</span></div>`+
+  set.innerHTML=tpl`<div style="font-size:14px;font-weight:650;margin-bottom:4px">설정 <span class="mini" style="font-weight:400">— 이 브라우저에만 저장됩니다</span></div>`+
     tpl`${rawHtml(row('자동 로그아웃', tpl`<select id="accIdle" aria-label="자동 로그아웃" style="height:30px;min-width:200px">${rawHtml(IDLE_OPTS.map(function(m){
         return tpl`<option value="${rawHtml(m)}"${m===curIdle?' selected':''}>${idleLabel(m)}${m? ' 동안 활동 없으면':''}</option>`; }).join(''))}`+ tpl`</select>`+
       tpl`<div class="mini" style="margin-top:5px;line-height:1.6">마우스·키보드·스크롤 입력이 정한 시간 동안 없으면 이 탭에서 자동으로 로그아웃합니다. 끝나기 1분 전에 알림이 뜹니다.</div>`))}`+

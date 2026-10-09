@@ -2,7 +2,7 @@
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { ST } from './state.js';
 import { $, amtWhy, lline, mk, navText, rawHtml, tpl, won, wonKo } from './core.js';
-import { buildRail, c360Enhance, cmdAskHit, cmdMenuHits, dIdx, loadFromDb, onData, renderInbox, sbTry, sbWrite, toast, todayStr, visBtn } from './shell.js';
+import { buildRail, c360Enhance, cmdAskHit, cmdMenuHits, dIdx, ico, loadFromDb, onData, renderInbox, sbTry, sbWrite, toast, todayStr, visBtn } from './shell.js';
 import { GRIDS } from './grids.js';
 import { applyChannelMenu, ctRawOf, liveData } from './analysis.js';
 import { goInbList, loadInbound } from './inbound.js';
@@ -121,7 +121,9 @@ export function openCust360(name){
   $('#c360Title').textContent='🏢 '+nm;
   $('#c360Cap').textContent='계약 '+cts.length+'건 · LIVE '+lives.length+'건 · OI '+ois.length+'건 · 인바운드 '+inbs.length+'건 · MDR 운영 '+mdrs.length+'건 · 장비 현황 '+asts.length+'대(임대중 '+asts.filter(function(a){ return a.status==='임대중'; }).length+'대) · 장비 신청 '+ords.length+'건'+
     (ST.RAWX.inbound===undefined? ' · (인바운드는 메뉴를 한 번 연 뒤 집계됩니다)':'');
-  function sec(icon,label,n,html){ return tpl`<div class="c360-sec"><h4>${rawHtml(icon)} ${rawHtml(label)} <span class="ct">${rawHtml(typeof n==='string'? n : n+'건')}</span></h4>${rawHtml(html)}</div>`; }   /* ㊿+168 n 이 글자면 단위 포함(장비 = 대) */
+  /* ㊿+169 섹션 머리: 이모지 대신 같은 모양 선 아이콘 · data-l = 탭 이름 */
+  var SEC_ICO={'📋':'doc','🟢':'check','🎯':'target','📥':'inbox','🛰️':'shield','🔧':'box'};
+  function sec(icon,label,n,html){ return tpl`<div class="c360-sec"><h4 data-l="${String(label).replace(/<[^>]*>.*$/,'').trim()}">${rawHtml(SEC_ICO[icon]? ico(SEC_ICO[icon],15) : icon)} ${rawHtml(label)} <span class="ct">${rawHtml(typeof n==='string'? n : n+'건')}</span></h4>${rawHtml(html)}</div>`; }   /* ㊿+168 n 이 글자면 단위 포함(장비 = 대) */
   $('#c360Body').innerHTML=
     sec('📋','계약',cts.length, tb(['서비스','채널','파트너','구분','상태','기간','연장','MRR(천원)'],
       cts.map(function(r){ return [(r.parent? '↳ ':'')+lline(r.line), r.channel, r.partner, r.ctype, r.status,
@@ -350,7 +352,15 @@ export function pushRecent(v){
   try{
     var a=JSON.parse(localStorage.getItem(recentKey())||'[]').filter(function(x){return x!==v;});
     a.unshift(v); localStorage.setItem(recentKey(), JSON.stringify(a.slice(0,6)));
+    var f=JSON.parse(localStorage.getItem(freqKey())||'{}')||{}; f[v]=(f[v]||0)+1; localStorage.setItem(freqKey(), JSON.stringify(f));   /* ㊿+169 자주 쓰는 화면 */
   }catch(e){}
+}
+export function freqKey(){ return 'svc_freq_'+(ST.AUTH_USER||'anon'); }
+/** 많이 연 화면 n개 — 지금 메뉴에 보이는 것만 */
+export function freqTop(n){
+  try{ var f=JSON.parse(localStorage.getItem(freqKey())||'{}')||{};
+    return Object.keys(f).filter(function(v){ var b=document.querySelector('#side button[data-v="'+v+'"]'); return !!b && visBtn(b); }).sort(function(x,y){ return f[y]-f[x]; }).slice(0, n||5); }
+  catch(e){ return []; }
 }
 export function renderTodo(){
   var wrap=document.getElementById('todoWrap'); if(!wrap) return;
@@ -414,7 +424,7 @@ export function applyFs(n){
   var b=document.getElementById('btnFont');
   if(b){
     b.style.background = n>0? 'var(--brand-t,rgba(46,189,87,.13))':'';
-    b.innerHTML = tpl`가<b style="font-size:13.5px">A</b>${n===1?' 크게':n===2?' 최대':''}`;
+    b.innerHTML = tpl`가<b style="font-size:14px">A</b>${n===1?' 크게':n===2?' 최대':''}`;
   }
 }
 

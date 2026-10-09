@@ -2,7 +2,7 @@
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { APP_VER, IS_QA, ST } from './state.js';
 import { Viz } from './viz.js';
-import { $, amtGuard, amtHint, baseLabel, canWrite, cssv, esc, kwToWon, lline, llineVer, mk, rawHtml, SB_KEY, SB_URL, STATE, tpl, won, wonFull, wonKo, wonToKw, yOf } from './core.js';
+import { $, amtGuard, amtHint, baseLabel, canWrite, cssv, esc, isGN, kwToWon, lline, llineVer, mk, rawHtml, SB_KEY, SB_URL, STATE, tpl, won, wonFull, wonKo, wonToKw, yOf } from './core.js';
 import { dIdx, ico, idxDate, loadFromDb, onData, SB_RAW, sbHeaders, sbTry, sbWrite, toast, todayStr } from './shell.js';
 import { hbars, idxs, monthlyTotal } from './dash.js';
 import { CHURN_OPTS, codeActive, GRIDS, LEAD_OPTS, LINE_OPTS } from './grids.js';
@@ -140,7 +140,7 @@ export function renderDataCheck(){
   h+=list.map(function(r){ var open=!!DC.open[r.id], ok=!r.items.length;
     return tpl`<div class="card dc-rule" data-sev="${rawHtml(r.sev)}" style="padding:12px 14px;margin-bottom:8px">`+
       tpl`<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;cursor:${ok? 'default':'pointer'}" data-dc="${rawHtml(r.id)}">`+
-        tpl`<span>${rawHtml(ok? '✅':DC_SEV[r.sev][0])}</span><b style="font-size:13.5px">${r.title}</b>`+
+        tpl`<span>${rawHtml(ok? '✅':DC_SEV[r.sev][0])}</span><b style="font-size:14px">${r.title}</b>`+
         tpl`<span class="ctag${ok? ' ok':(r.sev==='warn'? ' warn':r.sev==='info'? ' info':' late')}">${rawHtml(ok? '이상 없음':r.items.length+'건')}</span>`+
         tpl`<span class="mini" style="margin-left:auto">${r.go}${ok? '':(open? ' ▴':' ▾')}</span></div>`+
       tpl`<div class="mini" style="margin:6px 0 0 26px;line-height:1.6">${r.why}</div>`+ tpl`${rawHtml(!ok && r.act? tpl`<div style="margin:8px 0 0 26px"><button type="button" class="pill ghost" data-dcact="${rawHtml(r.id)}">⚡ ${r.act.label}</button></div>`:'')}`+ tpl`${rawHtml(open&&!ok&&r.items.some(function(it){ return it.fix; })? '<div class="mini" style="margin:8px 0 0 26px">항목을 누르면 수정 창이 열립니다 — 저장하면 다음 항목으로 넘어갑니다</div>':'')}`+ tpl`${rawHtml(open&&!ok? tpl`<table class="rn-tbl" style="margin:8px 0 0 26px;width:calc(100% - 26px)"><tbody>${rawHtml(r.items.slice(0,60).map(function(it,i){ return tpl`<tr><td><a href="#" data-dcgo="${rawHtml(r.id)}:${rawHtml(i)}">${it.label}</a></td><td class="mini">${it.sub||''}${rawHtml(it.act? tpl` <button type="button" class="pill ghost" style="padding:1px 8px;font-size:12px" data-dcitem="${rawHtml(r.id)}:${rawHtml(i)}">${it.act.label}</button>`:'')}</td></tr>`; }).join(''))}${rawHtml(r.items.length>60? tpl`<tr><td colspan="2" class="mini">… 외 ${r.items.length-60}건 (엑셀로 전체)</td></tr>`:'')}</tbody></table>`:'')}`+
@@ -404,23 +404,23 @@ export function renderLeadSrc(){
   var h=tpl`<div class="dbar" style="margin-bottom:12px;flex-wrap:wrap;gap:8px;align-items:center">`+
     tpl`<label class="mini">기준월 <select id="lsBase" class="qb-in" style="height:30px;width:auto">${rawHtml(mopts)}</select></label>`+
     tpl`<label class="mini">서비스 <select id="lsLine" class="qb-in" style="height:30px;width:auto"><option value="">전체</option>${rawHtml(LINE_OPTS.map(function(l){ return tpl`<option value="${rawHtml(l)}"${LS.line===l?' selected':''}>${lline(l)}</option>`; }).join(''))}</select></label>`+
-    tpl`<span class="mini">기준월 MRR 합계 <b>${won(total)}천원</b> · ${rawHtml(y0)}년 누적 <b>${won(totYtd)}천원</b> · 단위 천원</span>`+ tpl`${rawHtml(unassigned.n? tpl`<span class="ctag warn" style="margin-left:auto" title="유입경로가 비어 있는 계약">미지정 ${rawHtml(unassigned.n)}건 · ${won(unassigned.mrr)}천원</span><button type="button" class="cbtn" id="lsFix" style="height:26px;font-size:11px">계약 관리에서 지정 →</button>`:'')}`+
+    tpl`<span class="mini">기준월 MRR 합계 <b>${won(total)}천원</b> · ${rawHtml(y0)}년 누적 <b>${won(totYtd)}천원</b> · 단위 천원</span>`+ tpl`${rawHtml(unassigned.n? tpl`<span class="ctag warn" style="margin-left:auto" title="유입경로가 비어 있는 계약">미지정 ${rawHtml(unassigned.n)}건 · ${won(unassigned.mrr)}천원</span><button type="button" class="cbtn" id="lsFix" style="height:26px;font-size:12px">계약 관리에서 지정 →</button>`:'')}`+
     tpl`</div>`;
   /* 타일 */
   h+=tpl`<div class="kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:14px">${rawHtml(order.map(function(src){
     var a=agg[src], sh=total? a.mrr/total*100 : 0, col=cssv(LEAD_COLOR[src]||'--muted');
     return tpl`<div class="kpi ls-tile" data-src="${src}" style="padding:12px 14px;cursor:pointer${rawHtml(LS.pick===src?';outline:2px solid '+col:'')}" title="누르면 이 유입경로의 계약 목록">`+
       tpl`<div class="k" style="display:flex;align-items:center;gap:6px"><i style="width:9px;height:9px;border-radius:50%;background:${rawHtml(col)};display:inline-block"></i>${src}</div>`+
-      tpl`<div style="font-size:22px;font-weight:800;margin-top:2px">${won(a.mrr)} <small style="font-size:11px;font-weight:500;color:var(--muted);white-space:nowrap">천원 · ${sh.toFixed(1)}%</small></div>`+
+      tpl`<div style="font-size:22px;font-weight:800;margin-top:2px">${won(a.mrr)} <small style="font-size:12px;font-weight:500;color:var(--muted);white-space:nowrap">천원 · ${sh.toFixed(1)}%</small></div>`+
       tpl`<div class="mini" style="margin-top:4px">계약 ${rawHtml(a.n)}건 · 고객사 ${Object.keys(a.custs).length}곳${rawHtml(a.newN? ' · 올해 신규 '+a.newN+'건':'')}</div>`+
       tpl`<div class="mini">${rawHtml(y0)}년 누적 ${won(a.ytd)}천원</div></div>`; }).join(''))}`+ tpl`</div>`;
   /* 차트 2개 */
   h+=tpl`<div class="ls-2col">`+
-    tpl`<div class="pr-card"><div style="font-size:13.5px;font-weight:650;margin-bottom:8px">유입경로별 MRR <span class="mini">${mk(b)}</span></div><div id="lsBars"></div></div>`+
-    tpl`<div class="pr-card"><div style="font-size:13.5px;font-weight:650;margin-bottom:8px">최근 12개월 추이 <span class="mini">유입경로별 월 매출</span></div><div id="lsTrend" style="height:210px"></div>`+
+    tpl`<div class="pr-card"><div style="font-size:14px;font-weight:650;margin-bottom:8px">유입경로별 MRR <span class="mini">${mk(b)}</span></div><div id="lsBars"></div></div>`+
+    tpl`<div class="pr-card"><div style="font-size:14px;font-weight:650;margin-bottom:8px">최근 12개월 추이 <span class="mini">유입경로별 월 매출</span></div><div id="lsTrend" style="height:210px"></div>`+
     tpl`<div class="mini" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:6px">${rawHtml(order.filter(function(src){ return agg[src].trend.some(function(v){ return v>0; }); }).map(function(src){ return tpl`<span><i style="display:inline-block;width:10px;height:3px;border-radius:2px;background:${rawHtml(cssv(LEAD_COLOR[src]||'--muted'))};vertical-align:middle;margin-right:4px"></i>${src}</span>`; }).join(''))}</div></div></div>`;
   /* 표: 유입경로 × 서비스 */
-  h+=tpl`<div class="pr-card" style="margin-bottom:14px"><div style="font-size:13.5px;font-weight:650;margin-bottom:8px">유입경로 × 서비스 <span class="mini">${mk(b)} MRR · 천원</span></div>`+
+  h+=tpl`<div class="pr-card" style="margin-bottom:14px"><div style="font-size:14px;font-weight:650;margin-bottom:8px">유입경로 × 서비스 <span class="mini">${mk(b)} MRR · 천원</span></div>`+
     tpl`<div class="tbl-wrap" tabindex="0"><table class="dgrid"><thead><tr><th>유입경로</th>${rawHtml(lines.map(function(l){ return tpl`<th class="n">${lline(l)}</th>`; }).join(''))}<th class="n">합계</th><th class="n">비중</th><th class="n">계약</th><th class="n">고객사</th></tr></thead><tbody>`+
     tpl`${rawHtml(order.map(function(src){ var a=agg[src]; return tpl`<tr><td>${src}</td>${rawHtml(lines.map(function(l){ return tpl`<td class="n">${a.byLine[l]? won(a.byLine[l]):'·'}</td>`; }).join(''))}<td class="n"><b>${won(a.mrr)}</b></td><td class="n">${rawHtml(total? (a.mrr/total*100).toFixed(1)+'%':'·')}</td><td class="n">${rawHtml(a.n)}</td><td class="n">${Object.keys(a.custs).length}</td></tr>`; }).join(''))}`+
     tpl`<tr style="font-weight:700;background:var(--surface-2)"><td>합계</td>${rawHtml(lines.map(function(l){ var t=0; order.forEach(function(src){ t+=agg[src].byLine[l]||0; }); return tpl`<td class="n">${won(t)}</td>`; }).join(''))}<td class="n">${won(total)}</td><td class="n">100%</td><td class="n">${rawHtml(order.reduce(function(t,src){ return t+agg[src].n; },0))}</td><td class="n"></td></tr>`+
@@ -428,7 +428,7 @@ export function renderLeadSrc(){
   /* 선택한 유입경로의 계약 목록 */
   if(LS.pick && agg[LS.pick]){
     var lst=agg[LS.pick].rows.slice().sort(function(x,y){ return y.v-x.v; });
-    h+=tpl`<div class="pr-card"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><div style="font-size:13.5px;font-weight:650">${LS.pick} — 계약 ${lst.length}건 <span class="mini">${mk(b)} MRR 큰 순</span></div><button type="button" class="cbtn" id="lsPickX" style="height:24px;font-size:11px;margin-left:auto">닫기</button></div>`+
+    h+=tpl`<div class="pr-card"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><div style="font-size:14px;font-weight:650">${LS.pick} — 계약 ${lst.length}건 <span class="mini">${mk(b)} MRR 큰 순</span></div><button type="button" class="cbtn" id="lsPickX" style="height:24px;font-size:12px;margin-left:auto">닫기</button></div>`+
       tpl`<div class="tbl-wrap" tabindex="0" style="max-height:46vh"><table class="dgrid"><thead><tr><th>고객사</th><th>서비스</th><th>판매 채널</th><th>파트너</th><th>시작월</th><th>종료월</th><th class="n">MRR</th></tr></thead><tbody>`+
       tpl`${rawHtml(lst.slice(0,200).map(function(x){ var r=rows[x.k]; return tpl`<tr><td>${r.cust}${rawHtml(r.parent?' <span class="mini">↳부속</span>':'')}</td><td>${lline(r.line)}</td><td>${r.channel||''}</td><td>${r.ptn||''}</td><td>${rawHtml(r.startRaw!=null? esc(mk(r.startRaw)):'·')}</td><td>${rawHtml(r.endRaw!=null? esc(mk(r.endRaw)):'·')}</td><td class="n">${won(x.v)}</td></tr>`; }).join(''))}`+ tpl`${rawHtml(lst.length>200? tpl`<tr><td colspan="7" class="mini">외 ${lst.length-200}건</td></tr>`:'')}</tbody></table></div></div>`;
   }
@@ -452,18 +452,18 @@ export function renderAiKnow(){
   var L=(ST.RAWX.aiknow||[]).slice().sort(function(a,b){ return (b.id||0)-(a.id||0); }), canW=!!ST.SB_TOKEN && !ST.IS_VIEWER;
   var nOn=L.filter(function(x){ return x.active!==false; }).length;
   $('#dvCount').textContent = L.length? '적용 중 '+nOn+'개' : '';
-  var h=tpl`<div class="pr-card" style="margin-bottom:14px;max-width:920px"><div style="font-size:13.5px;font-weight:650;margin-bottom:8px">AI 에게 가르치기</div>`+
+  var h=tpl`<div class="pr-card" style="margin-bottom:14px;max-width:920px"><div style="font-size:14px;font-weight:650;margin-bottom:8px">AI 에게 가르치기</div>`+
     tpl`<div class="mini" style="margin-bottom:10px;line-height:1.7">예: «에스원 경유 계약은 설치비를 정산월에 따로 인식한다» · «MDR 은 노드가 아니라 에이전트 수로 과금» · ««위세아이텍» 은 «위세» 로도 부른다». 짧고 사실적으로 한 줄씩. 숫자 값은 넣지 말고 규칙·용어·해석 방법을 적으세요 — 숫자는 AI 가 DB 에서 직접 봅니다. 저장하면 다음 질문부터 바로 반영됩니다.</div>`+
     tpl`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start"><input id="akTopic" class="qb-in" placeholder="주제 (예: 에스원 계약)" style="width:180px;height:34px">`+
     tpl`<textarea id="akBody" class="qb-in" placeholder="AI 가 알아야 할 내용 (한 줄 한 사실)" style="flex:1;min-width:260px;min-height:34px;height:60px;padding:8px 10px;resize:vertical"></textarea>`+
     tpl`<button type="button" class="cbtn pri" id="akAdd" style="height:34px"${canW?'':' disabled'}>＋ 가르치기</button></div>`+
-    tpl`<div class="mini" style="margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span>${rawHtml(L.length? '지금 AI 가 쓰는 팀 지식 '+nOn+'개'+(L.length>nOn? ' (꺼둔 것 '+(L.length-nOn)+'개)':'') : '아직 가르친 내용이 없습니다 — AI 는 포탈 규칙(MRR·LIVE·장비·OI)과 DB 표만 알고 있습니다')}</span>`+ tpl`${rawHtml(L.length? tpl`<button type="button" class="cbtn" id="akLog" style="height:26px;font-size:11px">${AK.log?'기록 닫기':'기록 보기'}</button>`:'')}</div></div>`;
+    tpl`<div class="mini" style="margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span>${rawHtml(L.length? '지금 AI 가 쓰는 팀 지식 '+nOn+'개'+(L.length>nOn? ' (꺼둔 것 '+(L.length-nOn)+'개)':'') : '아직 가르친 내용이 없습니다 — AI 는 포탈 규칙(MRR·LIVE·장비·OI)과 DB 표만 알고 있습니다')}</span>`+ tpl`${rawHtml(L.length? tpl`<button type="button" class="cbtn" id="akLog" style="height:26px;font-size:12px">${AK.log?'기록 닫기':'기록 보기'}</button>`:'')}</div></div>`;
   if(AK.log && L.length){
     var q=String(AK.q||'').trim().toLowerCase();
     var M=q? L.filter(function(x){ return ((x.topic||'')+' '+(x.content||'')).toLowerCase().indexOf(q)>=0; }) : L;
-    h+=tpl`<div class="pr-card" style="max-width:920px"><div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap"><div style="font-size:13.5px;font-weight:650">가르친 기록</div><span class="mini">${M.length}개 · 최근 것부터 · «적용» 을 끄면 AI 가 쓰지 않습니다(기록은 남음)</span>`+
+    h+=tpl`<div class="pr-card" style="max-width:920px"><div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap"><div style="font-size:14px;font-weight:650">가르친 기록</div><span class="mini">${M.length}개 · 최근 것부터 · «적용» 을 끄면 AI 가 쓰지 않습니다(기록은 남음)</span>`+
       tpl`<input id="akQ" class="qb-in" placeholder="찾기" value="${AK.q||''}" style="width:160px;height:28px;margin-left:auto"></div>`+
-      tpl`<div class="qb-deck-list">${rawHtml(M.map(function(x){ return tpl`<div class="qb-deck-it" data-id="${rawHtml(x.id)}" style="${x.active===false?'opacity:.55':''}"><span class="ctag">${x.topic||''}</span><span style="flex:1;min-width:240px;font-size:13.5px;line-height:1.55;white-space:pre-wrap">${x.content||''}</span>`+
+      tpl`<div class="qb-deck-list">${rawHtml(M.map(function(x){ return tpl`<div class="qb-deck-it" data-id="${rawHtml(x.id)}" style="${x.active===false?'opacity:.55':''}"><span class="ctag">${x.topic||''}</span><span style="flex:1;min-width:240px;font-size:14px;line-height:1.55;white-space:pre-wrap">${x.content||''}</span>`+
       tpl`<span class="mini">${String(x.created_by||'').split('@')[0]} · ${String(x.created_at||'').slice(0,10)}</span>`+
       tpl`<span style="display:flex;gap:4px;align-items:center"><label class="mini qb-chk"><input type="checkbox" data-ak="active"${x.active===false?'':' checked'}${canW?'':' disabled'}> 적용</label><button type="button" class="cbtn" data-ak="del" style="color:var(--critical)"${canW?'':' disabled'}>×</button></span></div>`; }).join(''))}`+ tpl`${rawHtml(M.length? '' : '<div class="cap" style="padding:16px;text-align:center">찾는 내용이 없습니다</div>')}</div></div>`;
   }
@@ -605,7 +605,7 @@ export function renderTargetTable(host, rows){
 
   var hd=document.createElement('div');
   hd.style.cssText='display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px';
-  hd.innerHTML=tpl`<b style="font-size:13.5px">${rawHtml(year)}년 월 목표 대비 달성률</b>`+
+  hd.innerHTML=tpl`<b style="font-size:14px">${rawHtml(year)}년 월 목표 대비 달성률</b>`+
     tpl`<span class="ubadge sm">₩ 천원</span>`+
     tpl`<span class="cap" style="margin:0">달성률 = 입력된 달끼리 비교(입력 월 기준) · 작은 줄 = 기간 전체 목표 대비 현재 누계 · 미입력 달은 0원으로 치지 않음${rawHtml(latest? ' · 최신 반영 '+esc(latest) : '')}</span>`;
   if(!ST.IS_VIEWER){
@@ -1824,7 +1824,7 @@ export function renewMates(r){
 export function renewQty0(r, mates){ var q=(r.qty||0)+mates.filter(function(x){ return x.parent===r._id; }).reduce(function(a, x){ return a+(x.qty||0); }, 0); return q>0? q : null; }   /* 기본 체크(=이 계약의 부속)만 더함 */
 export function renewMatesHtml(r, mates, p){
   if(!mates.length) return '';
-  return tpl`<div class="rn-mates" style="flex-basis:100%;font-size:12.5px;line-height:1.7"><b>같이 끝나는 추가 계약</b> — 체크하면 이 연장에 합칩니다 (노드수에 더함 · 그 계약은 ${mk(renewEnd(r))}에 끝난 것으로 «재약정 통합» 표시 · 이탈 아님 · 월 매출은 그대로) · 이 계약에 붙은 추가는 미리 체크, 따로 등록된 추가는 직접 체크<br>`+
+  return tpl`<div class="rn-mates" style="flex-basis:100%;font-size:13px;line-height:1.7"><b>같이 끝나는 추가 계약</b> — 체크하면 이 연장에 합칩니다 (노드수에 더함 · 그 계약은 ${mk(renewEnd(r))}에 끝난 것으로 «재약정 통합» 표시 · 이탈 아님 · 월 매출은 그대로) · 이 계약에 붙은 추가는 미리 체크, 따로 등록된 추가는 직접 체크<br>`+
     tpl`${rawHtml(mates.map(function(x){ return tpl`<label style="margin-right:14px"><input type="checkbox" class="${rawHtml(p)}Mate" value="${rawHtml(x._id)}" data-q="${rawHtml(x.qty||0)}"${rawHtml(x.parent===r._id? ' checked':'')}> #${rawHtml(x._id)} ${x.ctype||x.status||'추가'}${rawHtml(x.parent===r._id? '':' (따로 등록)')} · ${rawHtml(x.qty||0)}노드 · 월 ${won(x.mrr||0)}천원 · ~${mk(x.endRaw!=null? x.endRaw : x.endIdx)}</label>`; }).join(''))}</div>`;
 }
 /** 새 월 매출을 쓰기 시작하는 달 — 기존 종료월 다음 달 · 종료월·매출이 없으면 시작월(없으면 새 종료월) */
@@ -2055,7 +2055,7 @@ export function renderChannelView(key){
   }
   function tile(k2,v2,u2,d2,kx){ return tpl`<div class="kpi"${rawHtml(kx?' data-kx="'+kx+'"':'')}><div class="k">${rawHtml(k2)}</div><div class="v">${rawHtml(v2)}<small>${rawHtml(u2)}</small></div><div class="d">${rawHtml(d2||'')}</div></div>`; }
   var h=tpl`<div style="display:flex;align-items:baseline;gap:12px;margin:2px 2px 14px">`+
-    tpl`<span style="font-size:18px;font-weight:800">${rawHtml(def[0])} 사업 영역</span>`+
+    tpl`<span style="font-size:18px;font-weight:800">${rawHtml(isGN()? def[0].replace(/^[^\w가-힣]+\s*/,'') : def[0])} 사업 영역</span>`+
     tpl`<span class="ubadge sm">₩ 금액 단위 = 천원</span>`+
     tpl`<span class="mini">${def[2]} · ${baseLabel()} 기준</span></div>`;
   h+=tpl`<div class="kpis" style="margin-bottom:16px">`+

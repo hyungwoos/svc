@@ -194,17 +194,18 @@ export function setAuthTab(t){
   msg('auMsg','');
 }
 
-export function toggleAuthMenu(){
+export function toggleAuthMenu(anchor){
   var old=document.getElementById('authMenu');
   if(old){ old.remove(); return; }
-  var r=$('#btnAuth').getBoundingClientRect();
+  var A=anchor||$('#btnAuth');   /* ㊿+169 지니언스: 오른쪽 위 계정 버튼 하나로(예전 «이름 ▾» 버튼과 중복이던 진입점 정리) */
+  var r=A.getBoundingClientRect();
   var m=document.createElement('div'); m.id='authMenu';
   m.style.cssText='position:fixed;top:'+(r.bottom+6)+'px;right:'+Math.max(10,window.innerWidth-r.right)+'px;z-index:1200;'+
     'background:var(--surface);border:1px solid var(--ring);border-radius:12px;'+
     'box-shadow:0 14px 34px -14px rgba(0,0,0,.32);padding:6px;min-width:180px';
-  var bs='display:block;width:100%;text-align:left;border:0;background:transparent;padding:9px 11px;border-radius:8px;font:inherit;font-size:13.5px;cursor:pointer;color:var(--ink)';
-  m.innerHTML=tpl`<div style="padding:7px 11px 5px;font-size:11px;color:var(--muted);border-bottom:1px solid var(--line);margin-bottom:4px">${ST.AUTH_USER||''}</div>`+
-    tpl`<button data-a="acct" style="${rawHtml(bs)}">👤 내 계정</button>`+
+  var bs='display:block;width:100%;text-align:left;border:0;background:transparent;padding:9px 11px;border-radius:8px;font:inherit;font-size:14px;cursor:pointer;color:var(--ink)';
+  m.innerHTML=tpl`<div style="padding:7px 11px 5px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--line);margin-bottom:4px">${ST.AUTH_USER||''}</div>`+
+    tpl`<button data-a="acct" style="${rawHtml(bs)}">내 계정 · 설정</button>`+
     tpl`<button data-a="out" style="${rawHtml(bs)};color:var(--critical,#d03b3b)">로그아웃</button>`;
   document.body.appendChild(m);
   m.querySelectorAll('button').forEach(function(b){
@@ -215,8 +216,11 @@ export function toggleAuthMenu(){
   m.querySelector('[data-a="out"]').onclick=function(){ m.remove(); doLogout(); };
   setTimeout(function(){
     document.addEventListener('click', function h(e){
-      if(!m.contains(e.target) && e.target.id!=='btnAuth'){ m.remove(); document.removeEventListener('click',h); }
+      if(!m.contains(e.target) && !A.contains(e.target)){ m.remove(); document.removeEventListener('click',h); }
     });
+    document.addEventListener('keydown', function k(e){ if(!document.body.contains(m)){ document.removeEventListener('keydown',k); return; }   /* ㊿+169 Esc 로 닫고 버튼으로 초점 */
+      if(e.key==='Escape'){ e.preventDefault(); m.remove(); document.removeEventListener('keydown',k); A.focus(); } });
+    var f=/** @type {any} */(m.querySelector('button')); if(f) f.focus();
   },0);
 }
 export function setupAuth(){

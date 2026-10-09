@@ -389,8 +389,8 @@ export async function qpLoadList(){
     $('#qpList').innerHTML=files.slice(0,80).map(function(f){
       var L=qLabel(f.name);
       return tpl`<div class="qp-row" data-path="${f.path||f.name}" data-name="${f.name}">`+
-        tpl`<div style="min-width:0"><div style="font-weight:650;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${L.c}</div>`+
-        tpl`<div class="cap" style="font-size:11px">${L.d||''}</div></div>`+
+        tpl`<div style="min-width:0"><div style="font-weight:650;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${L.c}</div>`+
+        tpl`<div class="cap" style="font-size:12px">${L.d||''}</div></div>`+
         tpl`<button class="pill ghost" type="button" style="height:28px;padding:0 12px;font-size:12px;flex:0 0 auto">불러오기</button></div>`;
     }).join('');
     $('#qpList').querySelectorAll('.qp-row').forEach(function(r){
@@ -434,7 +434,7 @@ export function oiAddEtcRow(prodName, qty){
   row.innerHTML=tpl`<label class="mpchk" style="min-width:190px"><input type="checkbox" data-oip="__etc"> 직접 입력</label>`+
     tpl`<input class="oi-etc" placeholder="제품명" disabled style="flex:1;max-width:220px">`+
     tpl`<input class="oi-qty" type="number" min="1" placeholder="수량" disabled>`+
-    tpl`<button class="pill ghost" type="button" style="height:26px;padding:0 9px;font-size:11px" title="행 삭제">✕</button>`;
+    tpl`<button class="pill ghost" type="button" style="height:26px;padding:0 9px;font-size:12px" title="행 삭제">✕</button>`;
   var cb=row.querySelector('input[data-oip]');
   cb.onchange=function(){
     row.querySelectorAll('.oi-qty,.oi-etc').forEach(function(i){ i.disabled=!cb.checked; if(!cb.checked) i.value=''; });
@@ -1370,7 +1370,7 @@ export function renderChurn(){
   if(lKeys.length>1){
     var rsAll={}; inRL.forEach(function(x){ rsAll[x.reason]=(rsAll[x.reason]||0)+1; });
     var rsKeys=Object.keys(rsAll).sort(function(a,b2){ return rsAll[b2]-rsAll[a]; });
-    h+=tpl`<details style="margin-top:10px"><summary style="cursor:pointer;color:var(--s1-ink);font-size:12.5px">사유 × 제품 표 펼치기</summary><div style="overflow-x:auto;margin-top:6px"><table class="pr"><thead><tr><th>해지 사유</th>${rawHtml(lKeys.map(function(k2){ return tpl`<th class="n">${k2}</th>`; }).join(''))}<th class="n">합계</th></tr></thead><tbody>`+
+    h+=tpl`<details style="margin-top:10px"><summary style="cursor:pointer;color:var(--s1-ink);font-size:13px">사유 × 제품 표 펼치기</summary><div style="overflow-x:auto;margin-top:6px"><table class="pr"><thead><tr><th>해지 사유</th>${rawHtml(lKeys.map(function(k2){ return tpl`<th class="n">${k2}</th>`; }).join(''))}<th class="n">합계</th></tr></thead><tbody>`+
       tpl`${rawHtml(rsKeys.map(function(r2){ return tpl`<tr><td>${r2}</td>${rawHtml(lKeys.map(function(k2){ var v=byL[k2].rs[r2]||0; return tpl`<td class="n"${rawHtml(v?'':' style="color:var(--muted)"')}>${rawHtml(v||'–')}</td>`; }).join(''))}<td class="n"><b>${rawHtml(rsAll[r2])}</b></td></tr>`; }).join(''))}`+
       tpl`</tbody></table></div></details>`;
   }
@@ -1382,7 +1382,7 @@ export function renderChurn(){
         tpl`<td>${k2}${on?' ✓':''}</td><td class="n">${rawHtml(o.n)}</td><td class="n">${totN?Math.round(o.n/totN*100):0}%</td>`+
         tpl`<td class="n">${rawHtml(Math.round(o.amt/1000).toLocaleString('ko-KR'))}</td><td class="n">${rawHtml(Math.round(o.amt*12/1000).toLocaleString('ko-KR'))}</td></tr>`;
     }).join('') || '<tr><td colspan="5" class="cap">해당 기간 해지가 없습니다</td></tr>')}`+
-    tpl`</tbody></table></div>`+ tpl`${rawHtml((CHURN.fil.reason&&CHURN.fil.reason.length)?tpl`<p class="pr-note" style="margin-top:6px"><button class="pill" id="chRsClr" style="height:24px;padding:0 9px;font-size:11px">✕ 사유 필터 해제 (${CHURN.fil.reason.join(', ')})</button></p>`:'')}</div>`;
+    tpl`</tbody></table></div>`+ tpl`${rawHtml((CHURN.fil.reason&&CHURN.fil.reason.length)?tpl`<p class="pr-note" style="margin-top:6px"><button class="pill" id="chRsClr" style="height:24px;padding:0 9px;font-size:12px">✕ 사유 필터 해제 (${CHURN.fil.reason.join(', ')})</button></p>`:'')}</div>`;
   var nFil=(CHURN.q?1:0); for(var fk in CHURN.fil){ if(CHURN.fil[fk]&&CHURN.fil[fk].length) nFil++; }
   var sArrow=function(k2){ return CHURN.sk===k2? (CHURN.sd>0?' ▲':' ▼') : ''; };
   var cols=CH_COLS;

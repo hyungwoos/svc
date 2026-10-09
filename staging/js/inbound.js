@@ -222,7 +222,7 @@ export function inbLogTable(){
 export function inbSyncPanel(){
   return tpl`<div class="card" style="padding:10px 14px;margin-bottom:10px">`+
     tpl`<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">`+
-      tpl`<b style="font-size:13.5px">시트 → 포탈 가져오기</b>${rawHtml(inbSyncBadge())}`+
+      tpl`<b style="font-size:14px">시트 → 포탈 가져오기</b>${rawHtml(inbSyncBadge())}`+
       tpl`<span style="flex:1"></span>`+ tpl`${rawHtml(ST.IS_VIEWER? '' : '<button class="pill" id="inbFetchP">↻ 지금 시트에서 가져오기</button>')}`+
       tpl`<button class="pill ghost" id="inbLogTg">🕘 가져온 기록${rawHtml(ST.RAWX.inbLog&&ST.RAWX.inbLog.length? ' ('+ST.RAWX.inbLog.length+')':'')}</button>`+
     tpl`</div>`+
@@ -317,7 +317,7 @@ export function renderInbStat(){
     tpl`<div class="inb-kpi"><div class="l">유입 건수</div><div class="v">${rawHtml(R.length.toLocaleString())}건</div><div class="s">${rawHtml(ST.INB_Y==='all'?'25년~현재 누적':ST.INB_Y+'년')}</div></div>`+
     tpl`<div class="inb-kpi"><div class="l">진행중</div><div class="v">${rawHtml(prog)}건</div><div class="s">방문미팅·데모·이관 포함</div></div>`+
     tpl`<div class="inb-kpi"><div class="l">수주</div><div class="v">${wonL.length}건</div><div class="s">전환율 ${rawHtml(conv)}%</div></div>`+
-    tpl`<div class="inb-kpi"><div class="l">수주액</div><div class="v">${won(amt)}<small style="font-size:11px;font-weight:600"> 천원</small></div><div class="s">단위: 천원</div></div>`+
+    tpl`<div class="inb-kpi"><div class="l">수주액</div><div class="v">${won(amt)}<small style="font-size:12px;font-weight:600"> 천원</small></div><div class="s">단위: 천원</div></div>`+
     tpl`<div class="inb-kpi warn"><div class="l">3개월+ 무응답</div><div class="v">${stale.length}건</div><div class="s">진행중인데 대응 기록이 오래됨</div></div></div>`+
     tpl`<div class="inb-2">`+
     tpl`<div class="inb-card"><h3>월별 유입 추이 <small><span style="color:var(--brand)">■</span> ${rawHtml(curY)}년 · <span style="color:var(--muted)">■</span> ${rawHtml(prvY)}년</small></h3><div class="inb-bars">${rawHtml(bars)}</div></div>`+
@@ -590,7 +590,7 @@ export async function renderWeekly(atWeek){
   if(d.prev_memo) memoInner+=tpl`<div class="ai-comment on" style="margin:0 0 8px"><b>지난주 액션</b><div class="wk-body" style="margin-top:4px">${d.prev_memo}</div></div>`;
   var wkCanMemo=!ST.IS_EQUIP && !ST.IS_VIEWER;   // 메모 저장은 admin 이상만
   memoInner+=tpl`<textarea id="wkMemo"${wkCanMemo?'':' disabled'} style="width:100%;min-height:76px;border:1px solid var(--ring);border-radius:10px;`+
-    tpl`background:var(--surface-2);color:var(--ink);padding:10px;font-family:inherit;font-size:12.5px" `+
+    tpl`background:var(--surface-2);color:var(--ink);padding:10px;font-family:inherit;font-size:13px" `+
     tpl`placeholder="회의에서 정한 것을 적어두면 다음 주 이 화면에 「지난주 액션」으로 표시됩니다">${(meta&&meta.memo)||''}</textarea>`+
     tpl`<div style="display:flex;gap:8px;margin-top:8px;align-items:center"><span class="mini" id="wkMemoMsg"></span>`+
     tpl`<span style="flex:1"></span>${rawHtml(wkCanMemo?'<button class="pill" id="wkMemoSave">메모 저장</button>':'<span class="mini">메모 저장은 관리자만</span>')}</div>`;

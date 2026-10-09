@@ -287,7 +287,7 @@ export function rpAnHtml(j, inc, tbl){
     var inner2=tbl('rpTblSeg',[['제품'],['산업군'],['고객사',1],['비중',1],['월 매출',1]],rows2,'활성 계약이 없습니다');
     var head2=sg.filter(function(x){ return x.top.length; }).map(function(x){
       return x.line+' → '+x.top[0].ind+' '+x.top[0].n+'개사('+(x.tot? Math.round(x.top[0].n/x.tot*100):0)+'%)'; });
-    inner2=tpl`<div class="pr-note" style="margin:0 0 9px;font-size:13.5px;line-height:1.9;color:var(--ink-2)">`+
+    inner2=tpl`<div class="pr-note" style="margin:0 0 9px;font-size:14px;line-height:1.9;color:var(--ink-2)">`+
       tpl`${rawHtml(head2.map(function(t){ return '· '+esc(t); }).join('<br>'))}</div>${rawHtml(inner2)}`;
     inner2+='<p class="pr-note" style="margin-top:6px">제품별 상위 3개 산업군만 표시합니다. 산업군이 비어 있는 계약은 «미지정»으로 묶입니다.</p>';
     var segSrc=ST.DATA.rows.some(function(r){ return r.sector; })?
@@ -1256,14 +1256,14 @@ export function renderReportAuto(){
   var dif=d.prev? (d.tot/d.prev-1)*100 : 0;
   var inSt='height:34px;border:1px solid var(--ring);border-radius:9px;padding:0 10px;font:inherit;background:var(--surface)';
   function kpi(l,v,s,kx){ return tpl`<div class="pr-ob"><div class="l" contenteditable spellcheck="false">${rawHtml(l)}</div><div class="v" contenteditable spellcheck="false">${rawHtml(v)}</div><div class="pr-note" contenteditable spellcheck="false">${rawHtml(s||'&nbsp;')}</div>${rawHtml(kx?tpl`<a href="#" class="mini rpkx" data-kx="${rawHtml(kx)}" contenteditable="false" style="display:inline-block;margin-top:4px;color:var(--s1-ink);text-decoration:none" title="이 숫자의 근거 내역">🔍 내역</a>`:'')}</div>`; }
-  function inc(k){ return tpl`<label style="font-size:11px;color:var(--muted);font-weight:400;display:inline-flex;gap:4px;align-items:center;margin-left:auto"><input type="checkbox" data-rpinc="${rawHtml(k)}" checked> PPT 포함</label>`; }
+  function inc(k){ return tpl`<label style="font-size:12px;color:var(--muted);font-weight:400;display:inline-flex;gap:4px;align-items:center;margin-left:auto"><input type="checkbox" data-rpinc="${rawHtml(k)}" checked> PPT 포함</label>`; }
   function tbl(id,head,rows2,empty){
     var h2=tpl`<div style="overflow-x:auto"><table class="pr" id="${rawHtml(id)}"><thead><tr>`+
       tpl`${rawHtml(head.map(function(x){ return tpl`<th${rawHtml(x[1]?' class="n"':'')} contenteditable spellcheck="false">${rawHtml(x[0])}</th>`; }).join(''))}`+
       tpl`<th class="rpCtl" style="width:30px"></th></tr></thead><tbody>`+
       tpl`${rawHtml(rows2.map(function(cells){ return tpl`<tr>${rawHtml(cells.map(function(c){ return tpl`<td${rawHtml(c&&c.n?' class="n"':'')} contenteditable spellcheck="false">${String((c&&c.t!==undefined)?c.t:c)}</td>`; }).join(''))}`+
         tpl`<td class="rpCtl"><button data-rpdel title="행 삭제" style="border:none;background:none;cursor:pointer;color:var(--muted)">×</button></td></tr>`; }).join(''))}`+ tpl`</tbody></table></div>`+
-      tpl`<div style="margin-top:6px;display:flex;gap:8px;align-items:center"><button class="pill" data-rpadd="${rawHtml(id)}" style="height:24px;padding:0 9px;font-size:11px">＋ 행 추가</button>`+ tpl`${rawHtml(rows2.length?'':tpl`<span class="pr-note">${rawHtml(empty)} — 필요하면 직접 행을 추가하세요</span>`)}</div>`;
+      tpl`<div style="margin-top:6px;display:flex;gap:8px;align-items:center"><button class="pill" data-rpadd="${rawHtml(id)}" style="height:24px;padding:0 9px;font-size:12px">＋ 행 추가</button>`+ tpl`${rawHtml(rows2.length?'':tpl`<span class="pr-note">${rawHtml(empty)} — 필요하면 직접 행을 추가하세요</span>`)}</div>`;
     return h2;
   }
   var h=tpl`<div class="pr-card" style="margin-bottom:14px"><h3>📑 커스텀 리포트 <span class="ubadge sm">₩ 금액 단위 = 천원</span>`+
@@ -1286,11 +1286,11 @@ export function renderReportAuto(){
       tpl`</div></div></div>`;
   var rv=rpRevData(RP.j), md=rpMdrData(RP.j);
   h+=tpl`<div class="pr-card" style="margin-bottom:14px"><h3>💰 <span contenteditable spellcheck="false" id="rpRevT">${rawHtml(rv.year)}년 매출 Review</span>${rawHtml(rpCopyBtn('rpTblRev'))}${rawHtml(inc('rev'))}</h3>`+
-    tpl`<div id="rpRevB" contenteditable spellcheck="false" style="font-size:13.5px;line-height:1.9;margin:4px 0 10px">${rawHtml(rv.bullets.map(function(x){return esc(x);}).join('<br>'))}</div>`+
+    tpl`<div id="rpRevB" contenteditable spellcheck="false" style="font-size:14px;line-height:1.9;margin:4px 0 10px">${rawHtml(rv.bullets.map(function(x){return esc(x);}).join('<br>'))}</div>`+
     tpl`${rawHtml(tbl('rpTblRev', rv.head, rv.rows,'매출 데이터가 없습니다'))}`+
     tpl`<p class="pr-note" style="margin-top:4px">단위: 천원 · 월 숫자는 해당 연도 1월부터 기준월까지 · Q=분기 소계</p></div>`;
   h+=tpl`<div class="pr-card" style="margin-bottom:14px"><h3>🛡️ <span contenteditable spellcheck="false" id="rpMdrT">MDR 고객 현황</span>${rawHtml(inc('mdrc'))}</h3>`+
-    tpl`<div id="rpMdrB" contenteditable spellcheck="false" style="font-size:13.5px;line-height:2.0">${rawHtml(md.lines.map(function(x){return esc(x);}).join('<br>'))}</div></div>`;
+    tpl`<div id="rpMdrB" contenteditable spellcheck="false" style="font-size:14px;line-height:2.0">${rawHtml(md.lines.map(function(x){return esc(x);}).join('<br>'))}</div></div>`;
   h+=tpl`<div class="pr-card" style="margin-bottom:14px"><h3><span contenteditable spellcheck="false" id="rpKT">${d.ym} 요약</span> <span class="ubadge sm">₩ 천원</span>${rawHtml(rpCopyBtn('rpK'))}${rawHtml(inc('sum'))}</h3><div class="pr-out" id="rpK" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">`+
     tpl`${rawHtml(kpi('월 매출(MRR)',won(d.tot)+'천원', d.prev?('전월 대비 '+pct(dif)):'','rp_mrr'))}`+
     tpl`${rawHtml(kpi('ARR 환산',won(d.tot*12)+'천원','','rp_mrr'))}`+
@@ -1301,7 +1301,7 @@ export function renderReportAuto(){
     tpl`</div></div>`;
   var tr=''; var mx=Math.max.apply(null,d.trend.map(function(x){return x[1];}).concat([1]));
   d.trend.forEach(function(x){
-    tr+=tpl`<div style="display:flex;align-items:center;gap:8px;margin:2px 0;font-size:11px"><span style="width:52px;color:var(--muted)">${rawHtml(x[0])}</span>`+
+    tr+=tpl`<div style="display:flex;align-items:center;gap:8px;margin:2px 0;font-size:12px"><span style="width:52px;color:var(--muted)">${rawHtml(x[0])}</span>`+
       tpl`<div style="flex:1"><div style="height:9px;border-radius:4px;background:${x[0]===d.ym?'var(--brand)':'var(--brand-t)'};width:${Math.round(Number(x[1])/mx*100)}%"></div></div>`+
       tpl`<span style="width:98px;text-align:right;color:var(--ink-2)">${won(x[1])}</span></div>`;
   });
@@ -1376,13 +1376,13 @@ export function rpAddNote(){
   var blk=document.createElement('div');
   blk.className='pr-card rpNoteBlk'; blk.style.marginBottom='14px';
   blk.innerHTML=tpl`<h3>📝 <span class="rpNT" contenteditable spellcheck="false">특이사항·하이라이트</span>`+
-    tpl`<button class="pill" data-rpnx style="height:24px;padding:0 9px;font-size:11px;margin-left:auto">× 슬라이드 삭제</button></h3>`+
-    tpl`<div class="rpNB" contenteditable spellcheck="false" style="min-height:70px;border:1px dashed var(--ring);border-radius:9px;padding:10px 12px;font-size:13.5px;line-height:1.8">· 여기에 내용을 입력하세요 (줄마다 불릿 하나)</div>`;
+    tpl`<button class="pill" data-rpnx style="height:24px;padding:0 9px;font-size:12px;margin-left:auto">× 슬라이드 삭제</button></h3>`+
+    tpl`<div class="rpNB" contenteditable spellcheck="false" style="min-height:70px;border:1px dashed var(--ring);border-radius:9px;padding:10px 12px;font-size:14px;line-height:1.8">· 여기에 내용을 입력하세요 (줄마다 불릿 하나)</div>`;
   blk.querySelector('[data-rpnx]').onclick=function(){ blk.remove(); };
   wrap.appendChild(blk); RP._touched=true;
   var b=blk.querySelector('.rpNB'); var r=document.createRange(); r.selectNodeContents(b); var sel=window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
 }
-export function rpCopyBtn(id){ return tpl` <button class="pill" data-rpcopy="${rawHtml(id)}" style="height:24px;padding:0 9px;font-size:11px">📋 복사</button>`; }
+export function rpCopyBtn(id){ return tpl` <button class="pill" data-rpcopy="${rawHtml(id)}" style="height:24px;padding:0 9px;font-size:12px">📋 복사</button>`; }
 export function rpCopy(id, btn){
   var el=document.getElementById(id); if(!el) return;
   var target=/** @type {any} */ (el), tmp=/** @type {any} */ (null);

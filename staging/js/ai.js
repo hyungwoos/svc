@@ -189,7 +189,7 @@ export function ask(q){
       revealAnswer();
       say.className='ai-say on';
       say.innerHTML=tpl`<span class="lb">AI</span>${cleanSay(r.text)}`+
-        tpl`<div style="font-size:11px;color:var(--muted);margin-top:6px">`+
+        tpl`<div style="font-size:12px;color:var(--muted);margin-top:6px">`+
         tpl`${String(r.model||'').replace(/^claude-/,'')}`+ tpl`${rawHtml(r.queries&&r.queries.length? tpl` · DB 조회 ${r.queries.length}회 <span title="${r.queries.map(function(q){ return q.tool+' '+((q.ms||0)/1000).toFixed(1)+'s'+(q.error?' ✗':''); }).join(' · ')}">(${aiToolBrief(r.queries)})</span>`:'')}`+ tpl`${rawHtml(r.llm&&r.llm.length? ' · 모델 '+r.llm.length+'회 '+(r.llm.reduce(function(a,x){ return a+(x.ms||0); },0)/1000).toFixed(1)+'s':'')}`+ tpl`${rawHtml(r.cut? tpl` · <span style="color:var(--warn-ink)">${r.degraded? '답 미완성: '+r.cut : '도구 중단: '+r.cut}</span>`:'')}`+ tpl`${rawHtml(r.tried&&r.tried.length? tpl` · <span style="color:var(--warn-ink)">폴백: ${r.tried.join(' / ')}</span>`:'')}`+ tpl`${rawHtml(r._ms? ' · '+(r._ms/1000).toFixed(1)+'초':'')}`+
         tpl` · ${rawHtml(new Date().toTimeString().slice(0,5))} 데이터 기준`+
         tpl`<span class="ai-fb" role="group" aria-label="이 답변 평가"><button type="button" data-fb="up" aria-label="도움이 됐어요" title="도움이 됐어요">👍</button><button type="button" data-fb="down" aria-label="틀렸거나 부족해요" title="틀렸거나 부족해요 — 무엇이 틀렸는지 적으면 AI 지식 보강에 씁니다">👎</button></span></div>`;
