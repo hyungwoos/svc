@@ -11,7 +11,7 @@ import { chOf, liveActiveAt, liveCalc, loadLib, nmKeys } from './analysis.js';
 import { clFxRate, loadCloud } from './cloud.js';
 import { loadInbound } from './inbound.js';
 import { churnRows, kxChurn, kxCustMrr, kxMrr, kxOi, kxSimple, kxWire } from './sales.js';
-import { xlsxAoa } from './grid.js';
+import { oiOpen, xlsxAoa } from './grid.js';
 
 
 /* ===== 리포트 — 커스텀 리포트 빌더 (모든 값 클릭 수정 · 행 추가 · 자유 슬라이드 → PPT) ===== */
@@ -34,11 +34,11 @@ export function rpMonthData(j){
   var poc=(ST.RAWX.mdrops||[]).filter(function(x){ return String(x.apply_date||'').slice(0,7)===ym; });
   var inb=(ST.RAWX.inbound||[]).filter(function(x){ return String(x.on_date||'').slice(0,7)===ym; });
   var inbWon=inb.filter(function(x){ return /수주/.test(x.result||''); });
-  var oiOpen=(ST.RAWX.oi||[]).filter(function(x){ return x.stage==='등록'||x.stage==='진행'; });
-  var oiSum=0, oiW=0; oiOpen.forEach(function(x){ var a=Number(x.expect_amount)||0; oiSum+=a; oiW+=a*(Number(x.win_prob)||0)/100; });
+  var oiOp=(ST.RAWX.oi||[]).filter(oiOpen);   /* ㊿+178 진행 중 OI = 포탈 공통 기준(grid.js oiOpen) */
+  var oiSum=0, oiW=0; oiOp.forEach(function(x){ var a=Number(x.expect_amount)||0; oiSum+=a; oiW+=a*(Number(x.win_prob)||0)/100; });
   var trend=[]; for(var t=Math.max(0,j-11); t<=j; t++){ var s=0; for(var i3=0;i3<ST.MAT.length;i3++) s+=ST.MAT[i3][t]; trend.push([mk(t),s]); }
   return {j:j, ym:ym, tot:tot, prev:prev, actCnt:Object.keys(act).length, newCt:newCt, endCt:endCt,
-    ytd:ytd, mtg:mtg, ytg:ytg, poc:poc, inb:inb, inbWon:inbWon, oiOpen:oiOpen, oiSum:oiSum, oiW:oiW, trend:trend};
+    ytd:ytd, mtg:mtg, ytg:ytg, poc:poc, inb:inb, inbWon:inbWon, oiOpen:oiOp, oiSum:oiSum, oiW:oiW, trend:trend};
 }
 export function rpTotAt(idx){ if(idx==null||idx<0||idx>=ST.M) return 0; var s=0; for(var i=0;i<ST.MAT.length;i++) s+=ST.MAT[i][idx]; return s; }
 /* QBR «매출 Review» — 헤드라인 불릿 + 제품별×월별 매출 표 (해당 연도) */

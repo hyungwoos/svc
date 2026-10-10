@@ -1,4 +1,8 @@
-// aicheck v1.5 — 포탈 AI 야간 자동 점검 (90점 프로젝트 ⑥ AI 2단계 · 2026-10-03)
+// aicheck v1.6 — 포탈 AI 야간 자동 점검 (90점 프로젝트 ⑥ AI 2단계 · 2026-10-03)
+//   · v1.6(2026-10-10 · ㊿+178 «숫자 기준 하나로»): 채점을 숫자로 — 예전엔 «2026» 안에 «2»가 들어 있으면 «2건» 통과 · 금액은 아무 금액이나 통과 · 연도 · % 는 표기만 보면 통과
+//     · 건수: 단위(건 · 곳 · 개 · 대 · 명)가 붙은 숫자와 정확히 같아야 · 년/월/일/% 앞 숫자는 셈하지 않음
+//     · 금액: 답의 금액(억 · 천만 · 백만 · 만 · 천원 · 원)을 원으로 바꿔 기대값과 ±1% 안 · OI 는 진행 중 건수(oi_open) · 연도별은 SQL 110 rev_years(작년 합 ±2%)
+//     · 성장률은 «숫자 %» · 에스원은 금액 표기 — 기대값이 없으면(SQL 110 전) 예전 규칙
 //   · v1.5(2026-10-07 · 야간 점검이 매일 «HTTP 401 · Conflicting API keys»): Supabase 새 API 키(sb_publishable/sb_secret)에서는
 //     ask 를 부를 때 apikey(공개 키)와 Authorization(서비스 키)이 서로 다른 키면 게이트웨이가 거부함 → 둘 다 서비스 키로 (askHdr)
 //     · 실패 안내(fixHint)에 «Conflicting API keys» 경우 추가 · ask 최신 버전 표기 v3.4
@@ -38,7 +42,24 @@ const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers
 const json = (o: unknown, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { ...CORS, 'Content-Type': 'application/json' } });
 async function fetchT(url: string, init: RequestInit, ms: number) { const c = new AbortController(); const t = setTimeout(() => c.abort(), ms); try { return await fetch(url, { ...init, signal: c.signal }); } finally { clearTimeout(t); } }
 
-/* ── 기대값 비교 (포탈 aiHasNum/aiHasCount 와 같은 규칙) ── */
+/* ── 기대값 비교 (포탈 aiHasNum/aiHasCount/aiNums/aiNear 와 같은 규칙 · v1.6) ── */
+const UNIT_W: Record<string, number> = { '억': 1e8, '천만': 1e7, '백만': 1e6, '만': 1e4, '만원': 1e4, '천원': 1e3, '원': 1 };
+/** 답 속 숫자들 — {v: 값, u: 바로 뒤 단위} · «1억 2,345만» 은 한 금액으로 */
+export function nums(a: string): { v: number; u: string }[] {
+  const out: { v: number; u: string }[] = []; const t = String(a || '');
+  for (const m of t.matchAll(/(\d[\d,]*(?:\.\d+)?)\s*억\s*(\d[\d,]*(?:\.\d+)?)\s*만/g)) out.push({ v: Number(m[1].replace(/,/g, '')) * 1e8 + Number(m[2].replace(/,/g, '')) * 1e4, u: '원' });
+  for (const m of t.matchAll(/(\d[\d,]*(?:\.\d+)?)\s*(억|천만|백만|만원|만|천원|원|건|곳|개사|개|대|명|년|월|일|%|시|분|초)?/g)) {
+    const v = Number(m[1].replace(/,/g, '')); if (isNaN(v)) continue; const u = m[2] || '';
+    if (UNIT_W[u]) out.push({ v: v * UNIT_W[u], u: '원' }); else out.push({ v, u });
+  }
+  return out;
+}
+/** 금액이 기대값(원)과 ±tol 안인가 */
+export function near(a: string, won: unknown, tol = 0.01): boolean {
+  if (won == null || isNaN(Number(won))) return true; const w = Number(won);
+  if (w === 0) return /0원|없/.test(String(a || ''));
+  return nums(a).some((x) => x.u === '원' && Math.abs(x.v - w) <= Math.abs(w) * tol);
+}
 export function hasNum(a: string, won: unknown): boolean {
   if (won == null || isNaN(Number(won))) return true;
   const t = String(a || '').replace(/\s/g, ''); const w = Number(won); const c: string[] = [];
@@ -50,25 +71,35 @@ export function hasNum(a: string, won: unknown): boolean {
   return c.some((x) => x && t.includes(x));
 }
 export function hasCount(a: string, n: unknown): boolean {
-  if (n == null) return true; const t = String(a || '').replace(/\s/g, ''); const v = Number(n);
-  if (v === 0) return /없|0건|0곳|0개|않습니다/.test(t);
-  return t.includes(String(v));
+  if (n == null) return true; const t = String(a || ''); const v = Number(n);
+  if (v === 0) return /없|(^|[^\d.,])0\s*(건|곳|개|대|명)|않습니다/.test(t);
+  const ns = nums(t), unit = ns.filter((x) => /^(건|곳|개사|개|대|명)$/.test(x.u));
+  if (unit.length) return unit.some((x) => x.v === v);
+  return ns.some((x) => x.v === v && x.u === '');   // 단위 없는 숫자만(년 · 월 · % · 금액 앞 숫자는 셈하지 않음)
+}
+/** 연도별: 작년 합이 ±2% 안 + 연도 둘 이상 — rev_years 가 없으면(SQL 110 전) 연도 표기만 */
+export function yearsOk(E: Expect, a: string): boolean {
+  const ry = (E.rev_years || null) as Record<string, number> | null;
+  const ys = Object.keys(ry || {}).sort();
+  if (!ys.length) return /20\d{2}/.test(a);
+  const named = ys.filter((y) => a.includes(y)).length, prev = String(Number(String(E.month || '').slice(0, 4)) - 1);
+  return named >= Math.min(2, ys.length) && (!ry || ry[prev] == null || near(a, ry[prev], 0.02));
 }
 type Expect = Record<string, unknown>;
 type Q = { q: string; l: string; check: (E: Expect, a: string) => boolean };
 export const QS: Q[] = [
   // MRR 은 ask 가 ai_digest(DB 함수)로 만든 요약을 보고 답하므로 월 매출 단순 합계와 정의가 다를 수 있음 → 합계 일치 또는 «금액 표기가 있음» 이면 통과(정확 비교는 포탈 15문 점검이 담당)
-  { q: '이번 달 MRR 얼마야?', l: '이달 월 매출(합계 또는 금액 표기)', check: (E, a) => hasNum(a, E.month_revenue) || /\d[\d,.]*\s*(천원|백만|억|만원|원)/.test(a) },
+  { q: '이번 달 MRR 얼마야?', l: '이달 월 매출 ±1%', check: (E, a) => near(a, E.month_revenue, 0.01) },
   { q: 'LIVE 고객사 몇 곳이야?', l: 'LIVE 고객사 수', check: (E, a) => hasCount(a, E.live_customers) },
   { q: '서비스별 MRR 알려줘', l: 'Cloud·MDR 언급', check: (_E, a) => /cloud|클라우드|nac/i.test(a) && /mdr/i.test(a) },
   { q: '만기 지났는데 미처리인 계약 몇 건이야?', l: '미처리 건수', check: (E, a) => hasCount(a, E.lapsed_n) },
   { q: '이번 달 만기 계약 몇 건이야?', l: '이달 만기 건수', check: (E, a) => hasCount(a, E.due_n) },
   { q: '다음 달 만기 계약 몇 건이야?', l: '다음 달 만기 건수', check: (E, a) => hasCount(a, E.next_n) },
   { q: '지금 임대중인 장비가 몇 대야?', l: '임대중 장비 수', check: (E, a) => hasCount(a, E.assets_rented) },
-  { q: 'OI 파이프라인 어때?', l: '건수 + 가중 금액', check: (_E, a) => /건/.test(a) && /가중|기대|금액|원/.test(a) },
-  { q: '연도별 매출 추이 알려줘', l: '연도 표기', check: (_E, a) => /20\d{2}/.test(a) },
-  { q: '에스원 채널 MRR 은 얼마야?', l: '에스원 언급 + 숫자', check: (_E, a) => /에스원|S1/i.test(a) && /\d/.test(a) },
-  { q: 'MRR 성장률이 어때?', l: '퍼센트 표기', check: (_E, a) => /%|퍼센트/.test(a) },
+  { q: 'OI 파이프라인 어때?', l: '진행 중 건수 + 가중 금액', check: (E, a) => hasCount(a, E.oi_open) && /가중|기대/.test(a) },
+  { q: '연도별 매출 추이 알려줘', l: '연도 둘 이상 + 작년 합 ±2%', check: (E, a) => yearsOk(E, a) },
+  { q: '에스원 채널 MRR 은 얼마야?', l: '에스원 언급 + 금액', check: (_E, a) => /에스원|S1/i.test(a) && nums(a).some((x) => x.u === '원') },
+  { q: 'MRR 성장률이 어때?', l: '숫자 %', check: (_E, a) => /\d+(\.\d+)?\s*%/.test(a) },
   { q: '포탈에서 2단계 인증은 어떻게 켜?', l: '사용법 안내(팀 지식)', check: (_E, a) => /내 계정|보안|인증 앱|2단계|OTP|Authenticator/i.test(a) },
 ];
 

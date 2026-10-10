@@ -8,7 +8,8 @@ import { activeCustomers, groupCount, hbars, monthlySeries, monthlyTotal, pinQue
 import { dcSummary, liveData, liveDelta, liveSrcLabel, renewScan } from './analysis.js';
 import { CL, clBuild, clEnsure, clFxRate, clSum } from './cloud.js';
 import { openOvl } from './edit.js';
-import { aiHistory, aipOpen, aipSync, ansBlank, homePh, ansClear, ansStateSet, homeAfter, homeBeforeAsk, homeLocal, homeMetaAI, localIntent } from './home.js';
+import { aiHistory, aipOpen, aipSync, ansBlank, homePh, ansClear, ansStateSet, homeAfter, homeB, homeBeforeAsk, homeLocal, homeMetaAI, localIntent } from './home.js';
+import { oiOpen } from './grid.js';
 
 
 /* ==================================================================
@@ -100,10 +101,11 @@ export function aiOn(badge){
   AICFG.enabled=true;
   badge.className='ai-badge on';
   badge.innerHTML='<span class="d"></span>AI 연결됨';
-  badge.title='Claude API · 중계: Supabase Edge Function (ask v3 — DB 를 스스로 조회하는 도구 사용)'+
-    '\n· 금액 계산은 전부 포탈이 DB 원본으로 직접 수행합니다'+
-    '\n· AI 해설: '+(AICFG.narrate?'켜짐':'꺼짐')+
-    '\n· 고객명 마스킹: '+(AICFG.maskNames?'켜짐':'꺼짐');
+  /* ㊿+178 안내를 실제와 같게 — 예전 배지의 «마스킹 켜짐» 표시는 실제로 쓰이지 않는 설정이었음(AI 는 DB 를 직접 조회하므로 고객사 이름을 봄) */
+  badge.title='AI 연결 — 회사 AI 키로 Supabase Edge Function(ask)이 중계'+
+    '\n· AI 는 답을 만들려고 포탈 DB 를 직접 조회합니다(고객사 이름 · 금액 포함). 포탈도 화면 요약(상위 고객 · 만기 등)을 함께 보냅니다'+
+    '\n· 문장 답 = AI 가 DB 조회 결과로 · 답 밑 표 · 그래프 = 포탈이 직접 계산 — «근거 보기»에서 AI 가 한 조회를 볼 수 있음'+
+    '\n· 질문 · 답은 계정별 대화 기록에 남습니다(다음 질문의 맥락)';
   $('#q').placeholder= isGN()? homePh()   /* ㊿+171 지니언스: 가운데 입력칸 하나로 검색·질문 */
     : '아무렇게나 물어보세요 — 예: 요즘 클라우드 좀 어때? 제일 큰 고객 누구야? 곧 재약정 챙겨야 할 데 있어?';
 }
@@ -197,8 +199,9 @@ export function ask(q, opt){
       say.innerHTML=tpl`<span class="lb">AI</span>${cleanSay(r.text)}`+
         tpl`<div style="font-size:12px;color:var(--muted);margin-top:6px">`+
         tpl`${String(r.model||'').replace(/^claude-/,'')}`+ tpl`${rawHtml(r.queries&&r.queries.length? tpl` · DB 조회 ${r.queries.length}회 <span title="${r.queries.map(function(q){ return q.tool+' '+((q.ms||0)/1000).toFixed(1)+'s'+(q.error?' ✗':''); }).join(' · ')}">(${aiToolBrief(r.queries)})</span>`:'')}`+ tpl`${rawHtml(r.llm&&r.llm.length? ' · 모델 '+r.llm.length+'회 '+(r.llm.reduce(function(a,x){ return a+(x.ms||0); },0)/1000).toFixed(1)+'s':'')}`+ tpl`${rawHtml(r.cut? tpl` · <span style="color:var(--warn-ink)">${r.degraded? '답 미완성: '+r.cut : '도구 중단: '+r.cut}</span>`:'')}`+ tpl`${rawHtml(r.tried&&r.tried.length? tpl` · <span style="color:var(--warn-ink)">폴백: ${r.tried.join(' / ')}</span>`:'')}`+ tpl`${rawHtml(r._ms? ' · '+(r._ms/1000).toFixed(1)+'초':'')}`+
-        tpl` · ${rawHtml(new Date().toTimeString().slice(0,5))} 데이터 기준`+
-        tpl`<span class="ai-fb" role="group" aria-label="이 답변 평가"><button type="button" data-fb="up" aria-label="도움이 됐어요" title="도움이 됐어요">👍</button><button type="button" data-fb="down" aria-label="틀렸거나 부족해요" title="틀렸거나 부족해요 — 무엇이 틀렸는지 적으면 AI 지식 보강에 씁니다">👎</button></span></div>`;
+        tpl` · ${rawHtml(new Date().toTimeString().slice(0,5))} 답함${rawHtml(ST.LAST_LOAD? ' · 화면 요약은 '+esc(new Date(ST.LAST_LOAD).toTimeString().slice(0,5))+' 에 읽은 데이터' : '')}`+
+        tpl`<span class="ai-fb" role="group" aria-label="이 답변 평가"><button type="button" data-fb="up" aria-label="도움이 됐어요" title="도움이 됐어요">👍</button><button type="button" data-fb="down" aria-label="틀렸거나 부족해요" title="틀렸거나 부족해요 — 무엇이 틀렸는지 적으면 AI 지식 보강에 씁니다">👎</button></span></div>`+aiSrcHtml(r.queries);
+      r._ctx=(opt.ctx && opt.ctx.text) || null;
       aiFeedbackBind(say, q, r);
       ST.HIST.push({q:q, a:r.text}); if(ST.HIST.length>10) ST.HIST.shift();
       saveHistTurn(q, r.text);                  // 계정별 누적 기억 (세션 무관)
@@ -222,6 +225,17 @@ export function ask(q, opt){
     });
 }
 
+/** ㊿+178 근거 — AI 가 한 DB 조회(도구 · SQL/조건 앞부분 · 행 수 · 시간 · 오류). ask 응답 queries[{tool, args, ms, rows, error}] */
+export function aiQArg(q){ var a=q && q.args; if(a==null) return ''; if(typeof a==='string') return a; return String(a.sql||a.query||a.q||a.name||a.customer||JSON.stringify(a)); }
+export function aiSrcHtml(qs){
+  if(!qs || !qs.length) return tpl`<div class="ai-src0">DB 조회 없이 포탈이 보낸 화면 요약만으로 답했습니다</div>`;
+  return tpl`<details class="ai-src"><summary>근거 보기 — AI 가 한 DB 조회 ${String(qs.length)}회</summary><ol>${rawHtml(qs.map(function(q){
+    var arg=aiQArg(q).replace(/\s+/g,' ').trim();
+    return tpl`<li><b>${q.tool||''}</b>${rawHtml(q.rows!=null? tpl` · ${String(q.rows)}행` : '')} · ${((q.ms||0)/1000).toFixed(1)}초${rawHtml(q.error? tpl` · <span class="bad">오류 ${String(q.error).slice(0,80)}</span>` : '')}${rawHtml(arg? tpl`<code>${arg.slice(0,600)}${arg.length>600? '…' : ''}</code>` : '')}</li>`; }).join(''))}</ol>`+
+    tpl`<p>문장 답은 위 조회 결과로 AI 가 만든 것 · 아래 표 · 그래프는 포탈이 화면 데이터로 직접 계산한 것입니다. 숫자가 다르면 👎 로 알려 주세요.</p></details>`;
+}
+/** 👎 신고에 함께 남길 조회 요약(SQL 110 queries) */
+export function aiQBrief(qs){ return (qs||[]).slice(0,12).map(function(q){ return {tool:q.tool||'', arg:aiQArg(q).replace(/\s+/g,' ').slice(0,1200), rows:q.rows!=null? q.rows : null, ms:q.ms||null, error:q.error? String(q.error).slice(0,200) : null}; }); }
 /* 👍/👎 — ai_feedback(SQL 94) 에 본인 행으로 기록. 👎 는 «무엇이 틀렸나» 메모(선택). 표가 없으면 토스트만. (⑥ AI 2단계 · ㊿+139) */
 export function aiFeedbackBind(say, q, r){
   say.querySelectorAll('.ai-fb button').forEach(function(b){ b.onclick=function(){ aiFeedback(b.dataset.fb, q, r, say); }; });
@@ -231,7 +245,11 @@ export async function aiFeedback(verdict, q, r, say){
   if(verdict==='down'){ note=prompt('무엇이 틀렸거나 부족했나요? (선택 — 비워도 기록됩니다)'); if(note===null) return; note=note.trim()||null; }
   var btns=say? say.querySelectorAll('.ai-fb button') : []; btns.forEach(function(b){ b.disabled=true; b.setAttribute('aria-pressed', String(b.dataset.fb===verdict)); });
   try{
-    await sbWrite('POST','ai_feedback',{email:ST.AUTH_USER||'', verdict:verdict, question:String(q||'').slice(0,500), answer_head:String((r&&r.text)||'').slice(0,400), note:note, model:(r&&r.model)||null, ms:(r&&r._ms)||null, app_ver:APP_VER, view:ST.CUR_VIEW});
+    var base={email:ST.AUTH_USER||'', verdict:verdict, question:String(q||'').slice(0,500), answer_head:String((r&&r.text)||'').slice(0,400), note:note, model:(r&&r.model)||null, ms:(r&&r._ms)||null, app_ver:APP_VER, view:ST.CUR_VIEW};
+    /* ㊿+178 SQL 110: 답 전체 · AI 가 한 조회 · 화면 조건 — 관리자가 같은 상황을 다시 볼 수 있게 (SQL 110 전이면 예전 칸만) */
+    var full=Object.assign({}, base, {answer:String((r&&r.text)||'').slice(0,8000), queries:aiQBrief(r&&r.queries), ctx:r&&r._ctx? String(r._ctx).slice(0,2000) : null});
+    try{ await sbWrite('POST','ai_feedback',full); }
+    catch(e1){ if(!/PGRST204|column|\(400\)/.test(String(/** @type {any} */(e1).message||e1))) throw e1; await sbWrite('POST','ai_feedback',base); }
     toast(verdict==='up'? '고마워요 👍':'기록했어요 👎', verdict==='up'? '도움이 된 답으로 남겼습니다':'관리자가 배포·운영 › 기록에서 보고 AI 지식을 보강합니다');
   }catch(e){ btns.forEach(function(b){ b.disabled=false; b.removeAttribute('aria-pressed'); }); toast('피드백 저장 실패', /ai_feedback|404|schema cache/i.test(String(e.message||e))? 'SQL 94 가 아직 실행되지 않았습니다':String(e.message||e).slice(0,120), 'warn'); }
 }
@@ -325,7 +343,8 @@ export function showClarify(q, plan){
 
 /* ---- 자유 질문용 데이터 요약 (전부 포탈이 직접 계산) ---- */
 export function buildDigest(){
-  var b=STATE.base, all=ST.DATA.rows.map(function(r,i){return i;});
+  /* ㊿+178 기준월 = 이번 달(홈 · 추천 질문과 같은 homeB) — 예전엔 대시보드에서 고른 «분석 기준월»(STATE.base)이라, 그걸 바꿔 두면 «이번 달 MRR» 답이 달라졌음 */
+  var b=homeB(), all=ST.DATA.rows.map(function(r,i){return i;});
   function tot(list,j){ return Math.round(monthlyTotal(list,j)); }
   function byKey(field){
     var agg={};
@@ -376,7 +395,10 @@ export function buildDigest(){
     최근12개월_연환산성장률_퍼센트:Math.round((Math.pow(1+gM,12)-1)*10000)/100,
     전망_포탈계산:fc,
     전망_주의:'전망 값은 포탈이 최근 '+win+'개월 성장률로 이미 계산한 결과입니다. 직접 다시 계산하지 말고 이 값을 그대로 쓰세요. 신규 수주·해지는 반영되지 않았습니다.',
-    기준월:mk(b), 데이터기간:[ST.DATA.monthKeys[0], ST.DATA.monthKeys[ST.M-1]],
+    기준월:mk(b), 기준월_설명:'이번 달(오늘이 속한 달 · 홈 숫자와 같음). «이번 달 · 지금»은 이 달로 답할 것',
+    화면분석월: STATE.base!==b && STATE.base>=0 && STATE.base<ST.M? {월:mk(STATE.base), MRR:tot(all,STATE.base), 설명:'사용자가 사업 분석에서 고른 달 — 사용자가 그 달을 물을 때만'} : null,
+    데이터_읽은시각: ST.LAST_LOAD? new Date(ST.LAST_LOAD).toISOString() : null,
+    데이터기간:[ST.DATA.monthKeys[0], ST.DATA.monthKeys[ST.M-1]],
     기준월MRR:cur, 현재ARR:cur*12,
     계약건수:ST.DATA.rows.length,
     LIVE고객사수: (function(){ var lv=liveData(b); return (lv&&lv.ok)? lv.uniqNoDup : null; })(),
@@ -460,7 +482,8 @@ export function buildDigest(){
     })(),
     OI파이프라인: (function(){   // 영업기회 — 10% 초기 딜도 빠짐없이 (우리 팀은 대부분 10% 로 두고 관리)
       var o=ST.RAWX.oi||[]; if(!o.length) return null;
-      var open=o.filter(function(x){ return ['등록','진행','수주'].indexOf(x.stage)>=0; });
+      var open=o.filter(oiOpen);   /* ㊿+178 진행 중 = 포탈 «OI 현황 · 홈»과 같은 기준(등록·진행) — 수주는 아래 «수주확정»으로 따로 */
+      var wonOi=o.filter(function(x){ return x.stage==='수주'; });
       var st={}, ln={}, ym={}, early=0, sum=0, wsum=0;
       open.forEach(function(x){ var a=Number(x.expect_amount)||0, p=Number(x.win_prob)||0, w=a*p/100;
         sum+=a; wsum+=w; if(p<=10) early++;
@@ -471,7 +494,8 @@ export function buildDigest(){
       var top=open.slice().sort(function(a,b){ return (Number(b.expect_amount)||0)-(Number(a.expect_amount)||0); }).slice(0,12)
         .map(function(x){ return [x.customer, x.stage, (Number(x.win_prob)||0)+'%', lline(x.line||''), String(x.expect_month||'').slice(0,7), Math.round(Number(x.expect_amount)||0)]; });
       var closed={}; o.forEach(function(x){ if(['종료','중지','실패','계산서발행'].indexOf(x.stage)>=0) closed[x.stage]=(closed[x.stage]||0)+1; });
-      return {설명:'열린 OI(등록·진행·수주) 전체. win_prob 10% 는 «초기 단계» 표시일 뿐이므로 전망·파이프라인 답변에 반드시 포함하고, 비가중 합과 가중 기대치(금액×확률)를 함께 말할 것. 금액은 원.',
+      return {수주확정:{건수:wonOi.length, 금액:Math.round(wonOi.reduce(function(s2,x){ return s2+(Number(x.expect_amount)||0); },0)), 설명:'단계 «수주»(계약 전환 전) — 진행 중 건수에 넣지 말 것'},
+        설명:'진행 중 OI(등록·진행 — 포탈 OI 현황 «진행 중» 타일과 같은 수) 전체. win_prob 10% 는 «초기 단계» 표시일 뿐이므로 전망·파이프라인 답변에 반드시 포함하고, 비가중 합과 가중 기대치(금액×확률)를 함께 말할 것. 금액은 원.',
         열린건수:open.length, 초기단계_10퍼센트이하:early, 비가중금액합:Math.round(sum), 가중기대치:Math.round(wsum),
         단계별:rnd(st), 서비스별:rnd(ln), 예상월별:rnd(ym), 상위딜:[['고객','단계','확률','서비스','예상월','예상금액(원)']].concat(top), 닫힌건:closed};
     })()

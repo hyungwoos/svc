@@ -156,6 +156,13 @@ say(/^export function tickMemo\(/m.test(jsAll) && /^export function cssvKey\(/m.
     && /^async function qdbBeforePrint\(/m.test(qd) && /if \(\(await qdbBeforePrint\(\)\) === false\) return;/.test(qj) && /<script src="sat\/qdb\.js[^"]*"><\/script>/.test(qh) && /id="quoteNoRow"/.test(qh)
     && /^export function quoteOpen\(/m.test(jsAll) && /quotes:\{[^\n]*\n\s*title:'견적 목록', table:'quotes'/.test(jsAll) && html.includes('data-v="quotes"'),
   '㊿+177 Slack 예약 발송(기본 꺼짐 · 서버는 DB 예약 · 일회용 번호 · 꺼짐/오래된 글이면 안 보냄 · 보낼 글은 포탈 계산 · 스테이징은 안 씀) · 견적 DB(저장 · 발행 때 저장+발송 · 견적 번호 표시 · 견적 목록 · OI 에서 열기)'); }
+// ㊿+178 AI 품질 — 근거 표시 · 👎 신고 전체 · 지식 제안/반영 · 숫자 기준(이번 달 · 진행 중 OI) · 채점(건수 단위 · 금액 ±)
+{ const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
+  const ai = rd('js/ai.js'), ac = rd('supabase/functions/aicheck/index.ts');
+  say(/^export function aiSrcHtml\(/m.test(ai) && /var b=homeB\(\), all=/.test(ai) && /var open=o\.filter\(oiOpen\);/.test(ai) && !/고객명 마스킹/.test(ai) && /queries:aiQBrief\(/.test(ai)
+    && /filter\(oiOpen\)/.test(rd('js/report.js')) && /^export function aiHasCount\(a, n\)\{\n/m.test(jsAll) && /^export function aiNear\(/m.test(jsAll) && /data-aiq="know"/.test(jsAll) && /data-ak="ok"/.test(jsAll)
+    && (!ac || (/export function near\(/.test(ac) && /check: \(E, a\) => near\(a, E\.month_revenue, 0\.01\)/.test(ac) && !/t\.includes\(String\(v\)\)/.test(ac))),
+  '㊿+178 AI: 답 근거(조회 · 행 수) · 👎 에 답 전체 · 조회 · 화면 조건 · 지식 제안 → 슈퍼 관리자 반영 · 이번 달 = homeB · 진행 중 OI = oiOpen(AI · 리포트) · 채점 = 단위 붙은 건수 · 금액 ±1% (포탈 15문 · aicheck v1.6)'); }
 // ㊿+160 연장하면 상태 «재약정»(구분 그대로) · 계약 상세에 «계약 기간 · 연장 이력»
 say(/^export function renewStatus\(r\)/m.test(jsAll) && /var nst=renewStatus\(r\);/.test(jsAll) && /^export function ctPeriods\(c, mine\)/m.test(jsAll) && html.includes('id="dtRenew"'), '연장: 상태 «재약정»(renewStatus) · 계약 상세 연장 이력(ctPeriods · #dtRenew)');
 const idx = html + jsAll;

@@ -2747,4 +2747,19 @@ html[data-skin="gn"] #rail .gn-right .ntf-btn:hover{border-color:var(--ink-2)}
 /* ==== ㊿+177 견적 고르기 창 — 포탈 DB / GitHub 구분 ==== */
 .qp-sec{padding:8px 12px 6px;font-size:12px;font-weight:700;color:var(--muted);background:var(--surface-2);border-bottom:1px solid var(--line)}
 .qp-row:focus-visible{outline:2px solid var(--s1-solid);outline-offset:-2px}
+/* ==== ㊿+178 AI 답 근거 · 신고 처리 · 지식 제안 ==== */
+.ai-src{margin-top:8px;font-size:13px;color:var(--ink-2);border-top:1px dashed var(--grid);padding-top:6px}
+.ai-src summary{cursor:pointer;color:var(--ink-2);font-weight:600;min-height:28px;display:flex;align-items:center}
+.ai-src summary:focus-visible{outline:2px solid var(--s1-solid);outline-offset:2px;border-radius:4px}
+.ai-src ol{margin:6px 0 4px;padding-left:20px;display:flex;flex-direction:column;gap:6px}
+.ai-src li{line-height:1.5}
+.ai-src code,.aiq-qs code{display:block;margin-top:2px;padding:4px 8px;border-radius:6px;background:var(--surface-2);color:var(--ink);font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere;max-height:9em;overflow:auto}
+.ai-src p{margin:4px 0 0;font-size:12px;color:var(--muted)}
+.ai-src .bad,.aiq-qs .bad{color:var(--critical)}
+.ai-src0{margin-top:6px;font-size:12px;color:var(--muted)}
+.aiq-fb details summary{cursor:pointer}
+.aiq-full{white-space:pre-wrap;margin:6px 0;color:var(--ink);font-size:13px;line-height:1.5}
+.aiq-qs{margin:4px 0;padding-left:18px;font-size:12px}
+.aiq-fb tr.aiq-new td:first-child{box-shadow:inset 3px 0 0 var(--warn-ink)}
+.ak-props{border-color:var(--warn-ink)}
 /* ==== ㊿+166 새 디자인 end ==== */

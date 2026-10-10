@@ -110,4 +110,12 @@ ok(!calls.some((c) => c.body && /xoxb-test|cronkey-test/.test(c.body)), '슬랙 
   const mod = await import('../../supabase/functions/aicheck/index.ts');
   ok(/v1\.5/.test(mod.fixHint('ask 호출 실패 — HTTP 401 · Conflicting API keys')), 'fixHint: Conflicting API keys → aicheck v1.5 안내', mod.fixHint('ask 호출 실패 — HTTP 401 · Conflicting API keys'));
   ok(/한 번 더 배포/.test(mod.fixHint('ask 호출 실패 — OpenRouter API 키가 거부되었습니다 — Supabase › Edge Functions › Secrets 의 OPENROUTER_API_KEY 값을 확인하세요')), 'fixHint: OpenRouter 키 거부 → Secret 확인 + ask 다시 배포'); }
+console.log('채점 규칙 v1.6 (㊿+178)');
+{ const M = await import(new URL('../../supabase/functions/aicheck/index.ts', import.meta.url).href);
+  ok(!M.hasCount('2026년 3월 만기는 5건입니다', 2) && !M.hasCount('2026-10 기준 7건', 2) && M.hasCount('이달 만기 2건(재약정 1)', 2) && !M.hasCount('3월 만기 5건', 3), '건수: «2026» · «3월» 안의 숫자는 셈하지 않음 · 단위 붙은 숫자와 정확히');
+  ok(M.hasCount('LIVE 고객사는 357곳', 357) && M.hasCount('총 48 대', 48) && M.hasCount('미처리 계약은 없습니다', 0) && !M.hasCount('10건', 0), '건수: 곳 · 대 · 0 은 «없음»');
+  ok(M.near('MRR 은 71,296천원', 71295828) && M.near('약 7,130만원', 71295828) && M.near('0.71억', 71295828) && !M.near('MRR 은 65,000천원', 71295828) && !M.near('2026년 10월', 71295828), '금액: 천원 · 만원 · 억을 원으로 바꿔 ±1% · 아무 금액이나 통과 안 됨');
+  ok(M.near('1억 2,345만원', 123450000) && M.nums('1억 2,345만원').some((x: any) => x.v === 123450000), '금액: «1억 2,345만» 은 한 금액');
+  const E = { month: '2026-10', rev_years: { '2024': 610000000, '2025': 740000000, '2026': 680000000 } };
+  ok(M.yearsOk(E, '2024년 6.1억 → 2025년 7.4억 → 2026년 6.8억') && !M.yearsOk(E, '2025년 9.9억 · 2026년 6.8억') && !M.yearsOk(E, '2025년이 좋았습니다') && M.yearsOk({ month: '2026-10' }, '2025년'), '연도별: 작년 합 ±2% + 연도 둘 · 기대값 없으면 연도 표기만'); }
 report('aicheck');

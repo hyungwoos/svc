@@ -8,7 +8,7 @@ import { applyCodes, CODE_KIND, CODE_KIND_LABEL, CODE_KIND_NOTE } from './grids.
 import { navSub, openMenuEdit } from './tools.js';
 import { UPD, updFetch, updOpenAll, updShow, updSyncSeed } from './upd.js';
 import { switchView, viewLabelOf, xlsxAoa } from './grid.js';
-import { logChange, openOvl, setAuthTab } from './edit.js';
+import { closeOvl, logChange, openOvl, setAuthTab } from './edit.js';
 import { loadInbound } from './inbound.js';
 import { NTF, ntfAdminRender, opsItems, opsLoad } from './notify.js';
 
@@ -583,22 +583,42 @@ export function aiHasNum(a, won){
   var ek=Number(won)/1e8; if(ek>=0.1) cands.push(ek.toFixed(1)+'억', ek.toFixed(2)+'억', (Math.round(ek*10)/10)+'억');
   return cands.some(function(c){ return c && t.indexOf(c)>=0; });
 }
-export function aiHasCount(a, n){ if(n==null) return true; var t=String(a||'').replace(/\s/g,''); if(n===0) return /없|0건|0곳|0개|않습니다/.test(t); return t.indexOf(String(n))>=0; }
+/* ㊿+178 채점을 숫자로(야간 aicheck v1.6 과 같은 규칙) — 예전엔 «2026» 안의 «2»로 «2건» 통과 · 금액은 표기만 보면 통과 */
+export var AI_UNIT_W={'억':1e8, '천만':1e7, '백만':1e6, '만':1e4, '만원':1e4, '천원':1e3, '원':1};
+export function aiNums(a){
+  var out=[], t=String(a||''), m, re1=/(\d[\d,]*(?:\.\d+)?)\s*억\s*(\d[\d,]*(?:\.\d+)?)\s*만/g, re2=/(\d[\d,]*(?:\.\d+)?)\s*(억|천만|백만|만원|만|천원|원|건|곳|개사|개|대|명|년|월|일|%|시|분|초)?/g;
+  while((m=re1.exec(t))) out.push({v:Number(m[1].replace(/,/g,''))*1e8+Number(m[2].replace(/,/g,''))*1e4, u:'원'});
+  while((m=re2.exec(t))){ var v=Number(m[1].replace(/,/g,'')); if(isNaN(v)) continue; var u=m[2]||''; out.push(AI_UNIT_W[u]? {v:v*AI_UNIT_W[u], u:'원'} : {v:v, u:u}); }
+  return out;
+}
+export function aiNear(a, won, tol){ if(won==null || isNaN(won)) return true; var w=Number(won); tol=tol==null? 0.01 : tol; if(w===0) return /0원|없/.test(String(a||'')); return aiNums(a).some(function(x){ return x.u==='원' && Math.abs(x.v-w)<=Math.abs(w)*tol; }); }
+export function aiHasCount(a, n){
+  if(n==null) return true; var t=String(a||''), v=Number(n);
+  if(v===0) return /없|(^|[^\d.,])0\s*(건|곳|개|대|명)|않습니다/.test(t);
+  var ns=aiNums(t), unit=ns.filter(function(x){ return /^(건|곳|개사|개|대|명)$/.test(x.u); });
+  if(unit.length) return unit.some(function(x){ return x.v===v; });
+  return ns.some(function(x){ return x.v===v && x.u===''; });
+}
+export function aiYearsOk(D, a){
+  var Y=D.연도별매출||{}, ys=Object.keys(Y).sort(); if(!ys.length) return /20\d{2}/.test(a);
+  var named=ys.filter(function(y){ return String(a).indexOf(y)>=0; }).length, prev=String(+String(D.기준월||'').slice(0,4)-1);
+  return named>=Math.min(2, ys.length) && (Y[prev]==null || aiNear(a, Y[prev], 0.02));
+}
 export var AI_CHECK_QS=[
-  {q:'이번 달 MRR 얼마야?',                 l:'기준월 MRR 숫자',      exp:function(D,a){ return aiHasNum(a, D.기준월MRR); }},
+  {q:'이번 달 MRR 얼마야?',                 l:'이번 달 MRR ±1%',      exp:function(D,a){ return aiNear(a, D.기준월MRR, 0.01) || aiHasNum(a, D.기준월MRR); }},
   {q:'LIVE 고객사 몇 곳이야?',               l:'LIVE 고객사 수',       exp:function(D,a){ return aiHasCount(a, D.LIVE고객사수); }},
   {q:'서비스별 MRR 알려줘',                   l:'Cloud·MDR 언급',       exp:function(D,a){ return /cloud|클라우드|nac/i.test(a) && /mdr/i.test(a); }},
   {q:'상위 고객사 5곳 알려줘',                l:'1위 고객사 이름',      exp:function(D,a){ var t=(D.상위고객사15||[])[0]; var nm=t&&(t.고객사||t.cust||t.name||t[0]); return !nm || String(a).indexOf(String(nm).replace(/\(.*?\)/g,'').trim().slice(0,3))>=0; }},
   {q:'만기 지났는데 미처리인 계약 몇 건이야?', l:'미처리 건수',          exp:function(D,a){ var m=D.만기관리; return !m || aiHasCount(a, m.미처리_건수); }},
   {q:'이번 달 만기 계약 알려줘',              l:'이달 만기 건수',       exp:function(D,a){ var m=D.만기관리; return !m || aiHasCount(a, m.이달만기_건수); }},
   {q:'지난달 대비 LIVE 가 왜 바뀌었어?',       l:'증감 사유 단어',       exp:function(D,a){ return /신규|해지|만기|복귀|변화\s*없|같|동일|증감/.test(a); }},
-  {q:'OI 파이프라인 어때?',                   l:'건수 + 가중 금액',     exp:function(D,a){ return !D.OI파이프라인 || (/건/.test(a) && /가중|기대|금액|원/.test(a)); }},
+  {q:'OI 파이프라인 어때?',                   l:'진행 중 건수 + 가중',  exp:function(D,a){ return !D.OI파이프라인 || (aiHasCount(a, D.OI파이프라인.열린건수) && /가중|기대/.test(a)); }},
   {q:'해지 사유별로 몇 건이야?',              l:'해지 사유 이름',       exp:function(D,a){ var c=D.해지사유별건수||{}; var ks=Object.keys(c); return !ks.length || ks.some(function(k){ return String(a).indexOf(k)>=0; }); }},
-  {q:'연도별 매출 추이 알려줘',               l:'연도 표기',            exp:function(D,a){ return /20\d{2}/.test(a); }},
-  {q:'에스원 채널 MRR 은 얼마야?',            l:'에스원 언급 + 숫자',   exp:function(D,a){ return /에스원|S1/i.test(a) && /\d/.test(a); }},
+  {q:'연도별 매출 추이 알려줘',               l:'연도 둘 + 작년 합 ±2%', exp:function(D,a){ return aiYearsOk(D, a); }},
+  {q:'에스원 채널 MRR 은 얼마야?',            l:'에스원 언급 + 금액',   exp:function(D,a){ return /에스원|S1/i.test(a) && aiNums(a).some(function(x){ return x.u==='원'; }); }},
   {q:'데이터 점검에서 바로 고칠 항목 몇 건이야?', l:'데이터 점검 건수',  exp:function(D,a){ var d=D.데이터점검; return !d || aiHasCount(a, d.바로고침); }},
   {q:'3개월 안에 만료되는 계약 뭐 있어?',      l:'월 표기',              exp:function(D,a){ return /\d{4}-\d{2}|\d+월|없/.test(a); }},
-  {q:'MRR 성장률이 어때?',                   l:'퍼센트 표기',          exp:function(D,a){ return /%|퍼센트/.test(a); }},
+  {q:'MRR 성장률이 어때?',                   l:'숫자 %',               exp:function(D,a){ return /\d+(\.\d+)?\s*%/.test(a); }},
   {q:'포탈에서 2단계 인증은 어떻게 켜?',       l:'사용법 안내(팀 지식)', exp:function(D,a){ return /내 계정|보안|인증 앱|2단계|OTP|Authenticator/i.test(a); }}
 ];
 export async function aiCheckRun(){
@@ -644,7 +664,10 @@ export var AIQ={trend:null, fb:null, loading:false};
 export async function aiqLoad(){
   if(AIQ.loading) return; AIQ.loading=true;
   var t=await sbTry('ai_check_log?select=run_at,source,pass,total,avg_ms,model,fails&order=run_at.desc&limit=7');
-  var f=await sbTry('ai_feedback?select=created_at,email,verdict,question,answer_head,note&order=created_at.desc&limit=30');
+  /* ㊿+178 SQL 110: 답 전체 · AI 조회 · 화면 조건 · 처리 상태 — 없으면 예전 칸만 */
+  var f=await sbTry('ai_feedback?select=id,created_at,email,verdict,question,answer_head,answer,note,queries,ctx,status,handled_by,handled_at,knowledge_id&order=created_at.desc&limit=40');
+  AIQ.v2=f!==null;
+  if(f===null) f=await sbTry('ai_feedback?select=created_at,email,verdict,question,answer_head,note&order=created_at.desc&limit=30');
   AIQ.trend=t||[]; AIQ.fb=f||[]; AIQ.loading=false; AIQ.at=Date.now();
   if(ST.CUR_VIEW==='ops' && OPS.tab==='log') renderOps(true);
 }
@@ -657,16 +680,55 @@ export function aiqHtml(){
       var rate=r.total? r.pass/r.total:0, col=rate>=0.9? 'var(--brand)': rate>=0.7? 'var(--warn-ink)':'var(--critical)';
       var fl=Array.isArray(r.fails)? r.fails.map(function(f){ return typeof f==='string'? f : (f.q||''); }).filter(Boolean) : [];
       return tpl`<tr><td class="mini">${String(r.run_at||'').replace('T',' ').slice(0,16)}</td><td class="nw">${r.source==='cron'? '🌙 자동':'🧑 수동'}</td><td class="n" style="color:${rawHtml(col)};font-weight:700">${rawHtml(r.pass)}/${rawHtml(r.total)}</td><td class="n mini">${rawHtml(r.avg_ms? (r.avg_ms/1000).toFixed(1)+'s':'')}</td><td class="mini">${String(r.model||'').replace(/^claude-/,'')}</td><td class="mini wrap">${fl.slice(0,3).join(' · ')}${rawHtml(fl.length>3? ' 외 '+(fl.length-3):'')}</td></tr>`; }).join(''))}`+ tpl`</tbody></table>`;
-  h+='<div class="ops-h" style="display:flex;align-items:center;gap:10px">답변 피드백 <span class="mini">(홈 AI 답 밑 👍/👎 · 최근 30건)</span></div>';
+  h+='<div class="ops-h" style="display:flex;align-items:center;gap:10px">답변 피드백 <span class="mini">(홈 AI 답 밑 👍/👎 · 최근 40건 · 👎 는 «지식으로…»로 AI 지식 보강)</span></div>';
   if(F===null) h+='<p class="mini" style="margin:0 0 14px">불러오는 중…</p>';
   else if(!F.length) h+='<p class="mini" style="margin:0 0 14px">아직 피드백이 없습니다. 👎 가 쌓이면 여기서 보고 AI 지식에 보강하세요.</p>';
-  else { var up=F.filter(function(x){ return x.verdict==='up'; }).length, dn=F.length-up;
-    h+=tpl`<p class="mini" style="margin:0 0 6px">👍 ${rawHtml(up)} · 👎 ${rawHtml(dn)}</p><table class="rn-tbl" style="margin-bottom:14px"><thead><tr><th>일시</th><th></th><th>질문</th><th>답(앞부분)</th><th>메모</th><th>누가</th></tr></thead><tbody>${rawHtml(F.filter(function(x){ return x.verdict==='down'; }).concat(F.filter(function(x){ return x.verdict==='up'; }).slice(0,5)).map(function(x){
-      return tpl`<tr><td class="mini">${String(x.created_at||'').replace('T',' ').slice(0,16)}</td><td class="nw">${x.verdict==='up'? '👍':'👎'}</td><td class="q-col">${x.question||''}</td><td class="mini wrap ans-col">${String(x.answer_head||'').slice(0,110)}</td><td class="mini wrap" style="--td-min:120px">${x.note||''}</td><td class="mini">${String(x.email||'').split('@')[0]}</td></tr>`; }).join(''))}`+ tpl`</tbody></table>`; }
+  else { var up=F.filter(function(x){ return x.verdict==='up'; }).length, dn=F.length-up, nNew=F.filter(function(x){ return x.verdict==='down' && (x.status||'새로')==='새로'; }).length;
+    var canH=AIQ.v2 && (ST.IS_SUPER || ST.MY_ROLE==='admin');
+    var rowsF=F.filter(function(x){ return x.verdict==='down'; }).sort(function(a,b){ return ((a.status||'새로')==='새로'? 0:1)-((b.status||'새로')==='새로'? 0:1); }).concat(F.filter(function(x){ return x.verdict==='up'; }).slice(0,5));
+    AIQ.rows=rowsF;
+    h+=tpl`<p class="mini" style="margin:0 0 6px">👍 ${rawHtml(up)} · 👎 ${rawHtml(dn)}${rawHtml(AIQ.v2? tpl` · 처리 안 한 👎 <b>${String(nNew)}</b>` : ' · (SQL 110 을 실행하면 답 전체 · AI 조회 · 처리 상태가 남습니다)')}</p><table class="rn-tbl aiq-fb" style="margin-bottom:14px"><thead><tr><th>일시</th><th></th><th>질문</th><th>답</th><th>메모</th><th>누가</th>${rawHtml(AIQ.v2? '<th>처리</th>' : '')}</tr></thead><tbody>${rawHtml(rowsF.map(function(x, i){
+      var st=x.status||'새로', full=x.answer||x.answer_head||'', qs=Array.isArray(x.queries)? x.queries : [];
+      var ans=full.length>110 || qs.length || x.ctx? tpl`<details><summary>${full.slice(0,110)}${full.length>110? '…' : ''}</summary><div class="aiq-full">${full}</div>${rawHtml(x.ctx? tpl`<div class="mini">화면 조건: ${x.ctx}</div>` : '')}${rawHtml(qs.length? tpl`<ol class="aiq-qs">${rawHtml(qs.map(function(q){ return tpl`<li><b>${q.tool||''}</b>${rawHtml(q.rows!=null? ' · '+esc(String(q.rows))+'행' : '')}${rawHtml(q.error? tpl` · <span class="bad">${String(q.error).slice(0,80)}</span>` : '')}${rawHtml(q.arg? tpl`<code>${String(q.arg).slice(0,400)}</code>` : '')}</li>`; }).join(''))}</ol>` : '')}</details>` : tpl`${full}`;
+      var act=!AIQ.v2 || x.verdict!=='down'? '' : canH? (st==='새로' || st==='보류'? tpl`<button type="button" class="cbtn" data-aiq="know" data-i="${String(i)}">지식으로…</button> <button type="button" class="cbtn" data-aiq="done" data-i="${String(i)}">처리됨</button>${rawHtml(st==='새로'? tpl` <button type="button" class="cbtn" data-aiq="hold" data-i="${String(i)}">보류</button>` : '')}` : tpl`<span class="mini">${st}${x.knowledge_id? ' · 지식 #'+x.knowledge_id : ''} · ${String(x.handled_by||'').split('@')[0]}</span>`) : tpl`<span class="mini">${st}</span>`;
+      return tpl`<tr class="${rawHtml(st==='새로' && x.verdict==='down'? 'aiq-new' : '')}"><td class="mini">${String(x.created_at||'').replace('T',' ').slice(0,16)}</td><td class="nw">${x.verdict==='up'? '👍':'👎'}</td><td class="q-col">${x.question||''}</td><td class="mini wrap ans-col">${rawHtml(ans)}</td><td class="mini wrap" style="--td-min:120px">${x.note||''}</td><td class="mini">${String(x.email||'').split('@')[0]}</td>${rawHtml(AIQ.v2? tpl`<td class="nw">${rawHtml(act)}</td>` : '')}</tr>`; }).join(''))}`+ tpl`</tbody></table>`; }
   return h;
+}
+/** ㊿+178 👎 처리 — 상태만(SQL 110 트리거가 질문 · 답은 못 바꾸게 막음) */
+export async function aiqSet(x, st, kid){
+  var body=/** @type {any} */({status:st}); if(kid) body.knowledge_id=kid;
+  await sbWrite('PATCH','ai_feedback?id=eq.'+x.id, body, 'return=minimal', 'ops');
+  x.status=st; if(kid) x.knowledge_id=kid; x.handled_by=ST.AUTH_USER;
+}
+/** ㊿+178 👎 → AI 지식(슈퍼 관리자는 바로 반영 · 관리자는 제안) */
+export function aiqKnow(x){
+  var m=document.getElementById('ovlAiqKnow');
+  if(!m){ m=document.createElement('div'); m.className='ovl'; m.id='ovlAiqKnow'; m.setAttribute('role','dialog'); m.setAttribute('aria-modal','true'); m.setAttribute('aria-labelledby','aiqKH'); document.body.appendChild(m); }
+  m.innerHTML=tpl`<div class="modal" style="width:min(640px,100%)"><h3 id="aiqKH">👎 신고로 AI 지식 ${ST.IS_SUPER? '반영' : '제안'}</h3>`+
+    tpl`<p class="cap">질문: <b>${x.question||''}</b>${rawHtml(x.note? tpl`<br>메모: ${x.note}` : '')}</p>`+
+    tpl`<div class="frm"><div><label for="aiqT">주제</label><input id="aiqT" value="${'답 보강'}"></div><div class="full"><label for="aiqC">AI 가 알아야 할 내용 (한 줄 한 사실 · 숫자 값은 넣지 말 것 — 계산은 DB 로)</label><textarea id="aiqC" rows="4">${x.note||''}</textarea></div></div>`+
+    tpl`<p class="mini">${ST.IS_SUPER? '저장하면 바로 AI 에 들어갑니다(다음 질문부터).' : '저장하면 «제안»으로 남고, 슈퍼 관리자가 «반영»해야 AI 에 들어갑니다.'} 이 신고는 «처리»로 바뀝니다.</p>`+
+    tpl`<div class="mact"><span class="mmsg" id="aiqKMsg" role="status"></span><button type="button" class="pill ghost" data-close="ovlAiqKnow">취소</button><button type="button" class="pill" id="aiqKGo">${ST.IS_SUPER? '반영' : '제안'}</button></div></div>`;
+  openOvl('ovlAiqKnow'); setTimeout(function(){ var c=/** @type {any} */(m.querySelector('#aiqC')); if(c) c.focus(); }, 30);
+  /** @type {any} */(m.querySelector('#aiqKGo')).onclick=async function(){
+    var t=String(/** @type {any} */(m.querySelector('#aiqT')).value||'').trim()||'답 보강', c=String(/** @type {any} */(m.querySelector('#aiqC')).value||'').trim(), msg=/** @type {any} */(m.querySelector('#aiqKMsg'));
+    if(c.length<5){ msg.textContent='내용을 적어 주세요(5자 이상)'; msg.className='mmsg bad'; return; }
+    this.disabled=true;
+    try{
+      var out=await sbWrite('POST','ai_knowledge?select=id,status,active',[{topic:t, content:c, from_feedback:x.id, created_by:ST.AUTH_USER||null}],'return=representation','aiknow');
+      var k=(out||[])[0]; await aiqSet(x, '처리', k && k.id);
+      ST.RAWX.aiknow=null; logChange('insert','ai_knowledge',k? k.id : null,{topic:t, from_feedback:x.id, status:k && k.status});
+      closeOvl('ovlAiqKnow'); toast(k && k.status==='반영'? 'AI 지식에 반영했습니다' : 'AI 지식으로 제안했습니다', t+(k && k.status==='제안'? ' — 슈퍼 관리자가 반영하면 AI 에 들어갑니다' : ' — 다음 질문부터'), 'ok'); renderOps(true);
+    }catch(e){ msg.textContent=String(/** @type {any} */(e).message||e).slice(0,160); msg.className='mmsg bad'; this.disabled=false; }
+  };
 }
 export function aiCheckBind(host){
   var q=host.querySelector('#aiqReload'); if(q) q.onclick=function(){ AIQ.trend=null; AIQ.fb=null; renderOps(true); aiqLoad(); };
+  host.querySelectorAll('[data-aiq]').forEach(function(b){ /** @type {any} */(b).onclick=async function(){
+    var x=(AIQ.rows||[])[+/** @type {any} */(b).dataset.i]; if(!x) return; var a=/** @type {any} */(b).dataset.aiq;
+    if(a==='know'){ aiqKnow(x); return; }
+    try{ await aiqSet(x, a==='done'? '처리' : '보류'); renderOps(true); }catch(e){ toast('처리하지 못했습니다', String(/** @type {any} */(e).message||e).slice(0,140), 'bad'); }
+  }; });
   if(AIQ.trend===null && !AIQ.loading) aiqLoad();
   var b=host.querySelector('#opsAiCheck'); if(b) b.onclick=aiCheckRun;
   var x=host.querySelector('#opsAiXlsx'); if(x) x.onclick=function(){ var A=OPS.aic; if(!A) return; xlsxAoa('AI점검_'+String(A.at||'').slice(0,10), ['#','질문','기대','결과','시간(s)','모델','도구','답'], A.rows.map(function(r,i){ return [i+1, r.q, r.l, r.st, r.ms? +(r.ms/1000).toFixed(1):'', r.model||'', r.tools||0, r.text||'']; })); };

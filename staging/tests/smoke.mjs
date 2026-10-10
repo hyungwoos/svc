@@ -3109,6 +3109,95 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
     return 'grid 2 · 수주 PATCH · 📄 → 견적 화면 · OI 연결 q:Q-2610-002';
   });
 }
+// ㊿+178 AI 품질 — 답 근거 · 👎 신고 전체(SQL 110 전 대비) · 지식 제안 → 반영 · 신고 «지식으로…» · 같은 숫자(이번 달 · 진행 중 OI) · 채점 규칙
+{
+  const { FIX } = await import('./lib.mjs');
+  const mk8 = async (o) => {
+    o = Object.assign({ role: 'super_admin', know: [], fb: [], fb400: false }, o || {});
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page);
+    const st = { writes: [], dialogs: [], fbPosts: 0 };
+    page.on('dialog', (d) => { st.dialogs.push(d.message()); d.type() === 'prompt' ? d.accept('합계가 틀려요') : d.accept(); });
+    await mockBackend(page, { role: o.role, onWrite: (x) => st.writes.push(x), extra: async (route, u, m) => {
+      if (u.includes('/rpc/load_all')) { await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(Object.assign({}, FIX, { roles: [{ role: o.role }] })) }); return true; }
+      if (u.includes('/functions/v1/ask')) { const b = JSON.parse(route.request().postData() || '{}'); if (b.mode === 'ping') return false;
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, text: 'LIVE 고객사는 29곳입니다.', model: 'claude-sonnet-5', queries: [{ tool: 'run_sql', args: { sql: 'select count(distinct customer_id) from live_view()' }, rows: 1, ms: 420 }, { tool: 'customer_360', args: { name: '가상고객01' }, rows: 3, ms: 210, error: null }] }) }); return true; }
+      if (/\/rest\/v1\/ai_feedback/.test(u) && m === 'POST' && o.fb400 && !st.fbPosts++) { await route.fulfill({ status: 400, contentType: 'application/json', body: '{"code":"PGRST204","message":"Could not find the \'answer\' column of \'ai_feedback\' in the schema cache"}' }); return true; }
+      const JR = (rows) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'content-range': rows.length ? '0-' + (rows.length - 1) + '/' + rows.length : '*/0', 'Access-Control-Expose-Headers': 'content-range' }, body: JSON.stringify(rows) });
+      if (/\/rest\/v1\/ai_knowledge/.test(u) && m === 'GET') { await JR(o.know); return true; }
+      if (/\/rest\/v1\/ai_knowledge/.test(u) && m === 'POST') { st.writes.push({ m, url: u, body: route.request().postData() }); await route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify([{ id: 77, status: o.role === 'super_admin' ? '반영' : '제안' }]) }); return true; }
+      if (/\/rest\/v1\/ai_feedback/.test(u) && m === 'GET') { await JR(o.fb); return true; }
+      return false; } });
+    await page.goto(url + '/index.html'); await page.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA && SVC.AICFG.enabled, null, { timeout: 15000 }); await page.waitForTimeout(300);
+    return { ctx, page, c, st };
+  };
+  await S.t('㊿+178 AI 답 근거 · 신고: «근거 보기» = AI 가 한 DB 조회(도구 · SQL · 행 수) · 배지 안내에 «마스킹» 없음 / 👎 = 답 전체 · 조회 · 메모 POST · SQL 110 전(칸 없음 400)이면 예전 칸으로 다시', async () => {
+    const A = await mk8({ fb400: true });
+    await A.page.evaluate(() => SVC.ask('LIVE 고객사 몇 곳이야?')); await A.page.waitForSelector('#aiSay details.ai-src', { timeout: 8000 });
+    const r = await A.page.evaluate(() => { const d = document.querySelector('#aiSay details.ai-src'); d.open = true; return { sum: d.querySelector('summary').textContent, li: [...d.querySelectorAll('li')].map((x) => x.textContent), badge: document.querySelector('.ai-badge') ? document.querySelector('.ai-badge').title : '' }; });
+    await A.page.click('#aiSay .ai-fb button[data-fb="down"]'); await A.page.waitForTimeout(700);
+    const posts = A.st.writes.filter((w) => /ai_feedback/.test(w.url) && w.m === 'POST').map((w) => JSON.parse(w.body));
+    assert(/AI 가 한 DB 조회 2회/.test(r.sum) && /run_sql · 1행/.test(r.li[0]) && /select count\(distinct customer_id\) from live_view\(\)/.test(r.li[0]) && /customer_360 · 3행/.test(r.li[1]) && !/마스킹/.test(r.badge) && /DB 를 직접 조회/.test(r.badge), 'src ' + JSON.stringify(r));
+    assert(A.st.fbPosts === 2 && posts.length === 1 && posts[0].note === '합계가 틀려요' && !('answer' in posts[0]) && posts[0].answer_head === 'LIVE 고객사는 29곳입니다.', 'fallback ' + JSON.stringify({ n: A.st.fbPosts, posts }));
+    await A.ctx.close();
+    const B = await mk8();
+    await B.page.evaluate(() => SVC.ask('LIVE 고객사 몇 곳이야?')); await B.page.waitForSelector('#aiSay .ai-fb', { timeout: 8000 });
+    await B.page.click('#aiSay .ai-fb button[data-fb="down"]'); await B.page.waitForTimeout(600);
+    const p2 = B.st.writes.filter((w) => /ai_feedback/.test(w.url) && w.m === 'POST').map((w) => JSON.parse(w.body))[0];
+    assert(p2 && p2.answer === 'LIVE 고객사는 29곳입니다.' && p2.queries.length === 2 && /live_view/.test(p2.queries[0].arg) && p2.queries[1].rows === 3 && p2.verdict === 'down' && !B.c.errs.length, 'full ' + JSON.stringify(p2));
+    await B.ctx.close();
+    return r.sum;
+  });
+  await S.t('㊿+178 같은 숫자: AI 요약의 기준월 = 이번 달(사업 분석 기준월을 바꿔도) · 화면분석월 따로 / 진행 중 OI = OI 현황 «진행 중» = 리포트(수주는 «수주확정»으로 따로) / 채점: «2026» · «3월» 숫자로 건수 통과 안 됨 · 금액 ±1%', async () => {
+    const A = await mk8();
+    const r = await A.page.evaluate(async () => { await SVC.lazyLoad('report'); await SVC.lazyLoad('admin'); const b0 = SVC.homeB(); SVC.STATE.base = Math.max(0, b0 - 3); const D = SVC.buildDigest(); const oiN = (SVC.ST.RAWX.oi || []).filter(SVC.oiOpen).length, won = (SVC.ST.RAWX.oi || []).filter((x) => x.stage === '수주').length;
+      const rp = SVC.rpMonthData(b0); SVC.STATE.base = b0;
+      return { base: D.기준월, now: SVC.mk(b0), scr: D.화면분석월 && D.화면분석월.월, scrWant: SVC.mk(Math.max(0, b0 - 3)), open: D.OI파이프라인 && D.OI파이프라인.열린건수, oiN, won: D.OI파이프라인 && D.OI파이프라인.수주확정.건수, wonN: won, rpOi: rp.oiOpen.length,
+        c: [SVC.aiHasCount('2026년 3월 만기는 5건입니다', 2), SVC.aiHasCount('이달 만기 2건(재약정 1)', 2), SVC.aiHasCount('3월 만기 5건', 3), SVC.aiHasCount('없습니다', 0)].join(),
+        n: [SVC.aiNear('71,296천원', 71295828), SVC.aiNear('65,000천원', 71295828), SVC.aiNear('약 7,130만원', 71295828)].join() }; });
+    assert(r.base === r.now && r.scr === r.scrWant && r.open === r.oiN && r.won === r.wonN && r.rpOi === r.oiN && r.c === 'false,true,false,true' && r.n === 'true,false,true' && !A.c.errs.length, JSON.stringify(r));
+    await A.ctx.close();
+    return '이번 달 ' + r.base + ' · 진행 중 OI ' + r.oiN + ' · 수주 ' + r.wonN;
+  });
+  const K = (id, topic, st, by, act) => ({ id, topic, content: topic + ' 내용', active: act != null ? act : st === '반영', status: st, created_by: by, proposed_by: st === '반영' ? null : by, created_at: '2026-10-09T01:00:00Z' });
+  await S.t('㊿+178 AI 지식 제안 → 반영(SQL 110): 관리자 = «＋ 제안하기» · 제안 목록(반영 버튼 없음 · 내 제안만 지우기) · 반영된 지식 «적용» 잠김 / 슈퍼 관리자 = «반영» · «거절»(확인 창) → PATCH status', async () => {
+    const know = [K(1, '기존', '반영', 'boss@example.com'), K(2, '남의 제안', '제안', 'ed@example.com'), K(3, '내 제안', '제안', 'tester@example.com')];
+    const A = await mk8({ role: 'admin', know });
+    await A.page.evaluate(() => SVC.switchView('aiknow')); await A.page.waitForSelector('.ak-props', { timeout: 8000 });
+    const a = await A.page.evaluate(() => ({ add: document.getElementById('akAdd').textContent, props: [...document.querySelectorAll('.ak-props .qb-deck-it')].map((x) => x.textContent + '|ok:' + !!x.querySelector('[data-ak="ok"]') + '|del:' + !!x.querySelector('[data-ak="del"]')) }));
+    await A.page.fill('#akTopic', '용어'); await A.page.fill('#akBody', '위세아이텍은 위세로도 부른다'); await A.page.click('#akAdd'); await A.page.waitForTimeout(500);
+    const toast1 = await A.page.$$eval('.toast', (t) => t.map((x) => x.textContent).join(' / '));
+    await A.page.evaluate(() => { SVC.AK.log = true; SVC.renderAiKnow(); }); await A.page.waitForTimeout(100);
+    const lock = await A.page.evaluate(() => { const r = document.querySelector('.qb-deck-it[data-id="1"] [data-ak="active"]'); return r && r.disabled; });
+    assert(a.add === '＋ 제안하기' && a.props.length === 2 && a.props.every((x) => /ok:false/.test(x)) && /남의 제안.*del:false/.test(a.props.find((x) => /남의 제안/.test(x))) && /내 제안.*del:true/.test(a.props.find((x) => /내 제안/.test(x))) && /제안했습니다/.test(toast1) && lock === true, 'admin ' + JSON.stringify({ a, toast1, lock }));
+    await A.ctx.close();
+    const B = await mk8({ role: 'super_admin', know });
+    await B.page.evaluate(() => SVC.switchView('aiknow')); await B.page.waitForSelector('.ak-props', { timeout: 8000 });
+    const add2 = await B.page.$eval('#akAdd', (e) => e.textContent);
+    await B.page.click('.ak-props .qb-deck-it[data-id="2"] [data-ak="ok"]'); await B.page.waitForTimeout(400);
+    await B.page.click('.ak-props .qb-deck-it[data-id="3"] [data-ak="no"]'); await B.page.waitForTimeout(400);
+    const pw = B.st.writes.filter((w) => /ai_knowledge\?id=eq\./.test(w.url) && w.m === 'PATCH').map((w) => w.url.split('id=eq.')[1] + ':' + JSON.parse(w.body).status);
+    assert(add2 === '＋ 가르치기' && pw.join() === '2:반영,3:거절' && B.st.dialogs.some((d) => /모든 사람의 AI 답에 쓰입니다/.test(d)) && !B.c.errs.length, 'super ' + JSON.stringify({ add2, pw, d: B.st.dialogs }));
+    await B.ctx.close();
+    return '관리자 제안 · 슈퍼 반영/거절';
+  });
+  await S.t('㊿+178 신고 처리(배포·운영 › 기록): 👎 «새로» 먼저 · 답 전체/조회는 펼쳐 보기 · «지식으로…» → 창(메모가 내용) → ai_knowledge POST(from_feedback) + 신고 «처리»(knowledge_id) / «보류»', async () => {
+    const fb = [{ id: 11, created_at: '2026-10-10T01:00:00Z', email: 'ed@example.com', verdict: 'down', question: '이번 달 MRR?', answer_head: 'MRR 은 1억', answer: 'MRR 은 1억 입니다 — 긴 답 '.repeat(8), note: 'S1 제외해야 함', queries: [{ tool: 'run_sql', arg: 'select sum(amount) from monthly_revenue', rows: 1 }], ctx: '화면: 계약 · 필터 Cloud', status: '새로' },
+      { id: 12, created_at: '2026-10-10T02:00:00Z', email: 'ed@example.com', verdict: 'down', question: 'LIVE?', answer_head: '29', note: null, queries: [], status: '처리', handled_by: 'boss@example.com', knowledge_id: 5 },
+      { id: 13, created_at: '2026-10-10T03:00:00Z', email: 'ed@example.com', verdict: 'up', question: '좋아', answer_head: 'ok', status: '처리' }];
+    const A = await mk8({ fb });
+    await A.page.evaluate(() => { SVC.switchView('ops'); }); await A.page.waitForFunction(() => SVC.OPS && document.getElementById('opsTabs'), null, { timeout: 8000 });
+    await A.page.evaluate(() => { SVC.OPS.tab = 'log'; SVC.renderOps(true); }); await A.page.waitForSelector('.aiq-fb [data-aiq="know"]', { timeout: 10000 });
+    const t = await A.page.evaluate(() => ({ rows: [...document.querySelectorAll('.aiq-fb tbody tr')].map((r) => r.className + '|' + r.textContent.slice(0, 40)), det: !!document.querySelector('.aiq-fb details .aiq-qs code') }));
+    await A.page.click('.aiq-fb [data-aiq="know"]'); await A.page.waitForSelector('#ovlAiqKnow.on, #ovlAiqKnow', { timeout: 4000 }); await A.page.waitForTimeout(200);
+    const pre = await A.page.$eval('#aiqC', (e) => e.value);
+    await A.page.click('#aiqKGo'); await A.page.waitForTimeout(600);
+    const kp = A.st.writes.filter((w) => /ai_knowledge/.test(w.url) && w.m === 'POST').map((w) => JSON.parse(w.body)[0])[0];
+    const fp = A.st.writes.filter((w) => /ai_feedback\?id=eq\.11/.test(w.url) && w.m === 'PATCH').map((w) => JSON.parse(w.body))[0];
+    assert(/aiq-new/.test(t.rows[0]) && /이번 달 MRR/.test(t.rows[0]) && t.det && pre === 'S1 제외해야 함' && kp && kp.content === 'S1 제외해야 함' && kp.from_feedback === 11 && fp && fp.status === '처리' && fp.knowledge_id === 77 && !A.c.errs.length, JSON.stringify({ t, pre, kp, fp, errs: A.c.errs }));
+    await A.ctx.close();
+    return '지식 #77 · 신고 처리';
+  });
+}
 await browser.close(); srv.close();
 const ok = S.report();
 fs.writeFileSync(path.join(OUT, 'smoke.json'), JSON.stringify(S.results, null, 1));
