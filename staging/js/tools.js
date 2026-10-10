@@ -1,7 +1,7 @@
 /* ===== tools.js — 전역 검색 · 고객 360 · 표 밀도 · 엑셀 붙여넣기 · 메뉴 편집 · 글자 크기 =====
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { ST } from './state.js';
-import { $, amtWhy, lline, mk, navText, rawHtml, tpl, won, wonKo } from './core.js';
+import { $, amtWhy, isCC, lline, mk, navText, rawHtml, tpl, won, wonKo } from './core.js';
 import { buildRail, c360Enhance, dIdx, ico, loadFromDb, onData, renderInbox, sbTry, sbWrite, toast, todayStr, visBtn } from './shell.js';
 import { GRIDS } from './grids.js';
 import { applyChannelMenu, ctRawOf, liveData } from './analysis.js';
@@ -14,7 +14,9 @@ import { homeSearchOpen, rcPush } from './home.js';
 
 
 /* ===== 전역 검색 (Ctrl+K) ===== */
-export function fkNorm(s){ return String(s==null?'':s).toLowerCase().replace(/\s+/g,''); }
+/* ㊿+173 성능: 같은 글자는 다시 바꾸지 않음(고객사 이름 비교가 수십만 번 — 순수 함수라 결과는 같음) */
+export var FKN=new Map();
+export function fkNorm(s){ var k=String(s==null?'':s), v=FKN.get(k); if(v!==undefined) return v; v=k.toLowerCase().replace(/\s+/g,''); if(FKN.size>50000) FKN.clear(); FKN.set(k, v); return v; }
 export function fkSources(){
   var out=[];
   (ST.DATA&&ST.DATA.rows||[]).forEach(function(r){
@@ -345,6 +347,8 @@ export function renderTodo(){
         if(ST.CUR_VIEW==='dash') renderTodo();
       });
   }
+  /* ㊿+173 성능: 커맨드 센터 · 지니언스 화면에는 이 카드 줄이 없음(#todoWrap 숨김) — 홈 목록(renderInbox)만 */
+  if(isCC()){ try{ renderInbox(); }catch(e){} return; }
   var inbN=ST.INB_TODO? ST.INB_TODO.n:null;
   // ② OI 밀린 액션 — 예정일이 지났는데 아직 진행 중
   var oiLate=(ST.RAWX.oi||[]).filter(function(o){

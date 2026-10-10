@@ -2456,6 +2456,245 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
   });
   await pc.close();
 }
+// ㊿+173 성능 — 같은 숫자로 더 빨리: 계산 사본(tickMemo) · CSS 변수 사본 · 숨은 상세는 펼칠 때 · 목록 처음 30행 → 나머지 · 장비 보드 열마다 8장 → 나머지 · 로그인 확인과 데이터 요청 동시 · 실사용 속도 기록(client_perf)
+{
+  const { FIX } = await import('./lib.mjs');
+  const F = JSON.parse(JSON.stringify(FIX));
+  const baseC = F.contracts.slice(), baseM = F.mrsegs.slice(), baseO = F.orders.slice();
+  for (let k = 1; k <= 3; k++) {   /* 계약 160 · 신청 48 (가상 데이터 복제 — 이름은 그대로 가상) */
+    baseC.forEach((c) => F.contracts.push(Object.assign({}, c, { id: c.id + k * 100000 })));
+    baseM.forEach((m) => F.mrsegs.push([m[0] + k * 100000, m[1], m[2], m[3]]));
+    baseO.forEach((o) => F.orders.push(Object.assign({}, o, { id: o.id + k * 100000, serials: o.serials ? o.serials.split(/[,\s]+/).filter(Boolean).map((s) => s + 'K' + k).join(', ') : o.serials })));
+  }
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page);
+  const calls = []; const perfPosts = []; let perfStatus = 201, userDelay = 250;
+  await mockBackend(page, { extra: async (route, u, m) => {
+    const p = u.replace(/^https:\/\/[^/]+/, '').split('?')[0]; calls.push(p + ' ' + m);
+    if (u.includes('/rpc/load_all')) { await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(Object.assign({}, F, { roles: [{ role: 'super_admin' }] })) }); return true; }
+    if (u.includes('/auth/v1/user')) { await new Promise((r) => setTimeout(r, userDelay)); await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id: 'u1', email: 'tester@example.com', user_metadata: { pw_changed: true }, factors: [] }) }); return true; }
+    if (/\/rest\/v1\/client_perf/.test(u) && m === 'POST') { perfPosts.push(route.request().postData() || ''); await route.fulfill({ status: perfStatus, contentType: 'application/json', body: '[]' }); return true; }
+    if (/\/rest\/v1\/client_perf/.test(u) && m === 'GET') { const now = Date.now(); const rows = []; for (let i = 0; i < 20; i++) rows.push({ at: new Date(now - i * 36e5).toISOString(), email: 'tester@example.com', ver: '2026-09-16 ㊿+173', kind: 'boot', view: 'dash', ms: 1000 + i * 100, net_ms: 400 + i * 10, rows: 160, detail: null }); for (let i = 0; i < 10; i++) rows.push({ at: new Date(now - i * 36e5).toISOString(), email: 'tester@example.com', ver: '2026-09-16 ㊿+173', kind: 'nav', view: 'orders', ms: 200 + i * 400, net_ms: null, rows: null, detail: null }); await route.fulfill({ status: 200, contentType: 'application/json', headers: { 'content-range': '0-29/30', 'Access-Control-Expose-Headers': 'content-range' }, body: JSON.stringify(rows) }); return true; }
+    if (/\/rpc\/client_perf_trim/.test(u)) { await route.fulfill({ status: 200, contentType: 'application/json', body: '3' }); return true; }
+    return false; } });
+  await page.goto(url + '/index.html'); await page.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA && document.querySelectorAll('#gnSum .gs-c').length === 3, null, { timeout: 15000 }); await page.waitForTimeout(800);
+  await S.t('㊿+173 로그인 확인(사용자 · 2단계 인증)과 데이터 요청을 동시에 · 데이터는 한 번만 받음', async () => {
+    const iU = calls.findIndex((x) => /\/auth\/v1\/user GET/.test(x)), iL = calls.findIndex((x) => /rpc\/load_all/.test(x)), nL = calls.filter((x) => /rpc\/load_all/.test(x)).length;
+    assert(iL >= 0 && iU >= 0 && iL < iU && nL === 1, JSON.stringify({ iU, iL, nL, first: calls.slice(0, 6) }));
+    return '데이터 요청 #' + (iL + 1) + ' · 사용자 확인 #' + (iU + 1);
+  });
+  await S.t('㊿+173 홈(지니언스)에서 접힌 «사업 현황 상세» 차트 · 표는 그리지 않음 — 숫자(KPI_D)는 계산 · 펼치면 그 자리에서 그림 · 접힌 상태로 재약정 목록 열림', async () => {
+    await page.evaluate(() => { SVC.homeDetail(false); SVC.navMenu('dash'); }); await page.waitForTimeout(200);
+    const a = await page.evaluate(() => { SVC.renderAll(); return { dirty: SVC.DASH_DIRTY.v, kpiTiles: document.querySelectorAll('#kpis .kpi').length, kd: !!SVC.KPI_D && SVC.KPI_D.mrr > 0, sum: document.getElementById('gnSum').textContent }; });
+    await page.evaluate(() => SVC.kpiOpen('expNeed')); await page.waitForTimeout(150);
+    const ov = await page.evaluate(() => document.getElementById('ovlCr').classList.contains('on') && document.querySelectorAll('#crList tbody tr').length); await page.evaluate(() => SVC.closeOvl('ovlCr'));
+    await page.evaluate(() => SVC.homeDetail(true)); await page.waitForTimeout(500);
+    const b = await page.evaluate(() => ({ dirty: SVC.DASH_DIRTY.v, kpiTiles: document.querySelectorAll('#kpis .kpi').length, sum: document.getElementById('gnSum').textContent }));
+    await page.evaluate(() => SVC.homeDetail(false));
+    assert(a.dirty && a.kd && b.kpiTiles > 0 && !b.dirty && a.sum === b.sum && ov > 0, JSON.stringify({ a: Object.assign({}, a, { sum: 0 }), b: Object.assign({}, b, { sum: 0 }), ov }));
+    return '접힘: 그리기 미룸 · 펼침: 타일 ' + b.kpiTiles;
+  });
+  await S.t('㊿+173 목록: 처음 30행 먼저 → 곧 나머지(쪽당 100행 그대로 · 같은 순서) · 다른 메뉴 갔다 와서 스크롤 위치로 돌아갈 때는 한 번에 · 정렬 · 검색해도 같은 행', async () => {
+    await page.evaluate(() => { SVC.viewResetHard('contracts'); }); await page.waitForTimeout(0);
+    const first = await page.evaluate(() => { SVC.navMenu('dash'); SVC.navMenu('contracts'); return document.querySelectorAll('#dvTable tbody tr').length; });
+    await page.waitForTimeout(500);
+    const full = await page.evaluate(() => ({ n: document.querySelectorAll('#dvTable tbody tr').length, txt: [...document.querySelectorAll('#dvTable tbody tr')].map((t) => t.textContent).join('|') }));
+    const flush = await page.evaluate(() => { SVC.gridFlush(); return { n: document.querySelectorAll('#dvTable tbody tr').length, txt: [...document.querySelectorAll('#dvTable tbody tr')].map((t) => t.textContent).join('|') }; });   /* 한 번에 그린 것과 같은 행 · 같은 순서 */
+    full.want = flush.n; const want = flush.txt === full.txt ? 100 : -1;
+    await page.evaluate(() => window.scrollTo(0, 1500)); await page.waitForTimeout(100); const y0 = await page.evaluate(() => Math.round(scrollY));
+    const back = await page.evaluate(() => { SVC.navMenu('oi'); SVC.navMenu('contracts'); return document.querySelectorAll('#dvTable tbody tr').length; });
+    await page.waitForTimeout(300); const y1 = await page.evaluate(() => Math.round(scrollY));
+    assert(first === 30 && full.n === full.want && full.n === 100 && want === 100 && back === 100 && Math.abs(y1 - y0) < 30, JSON.stringify({ first, full: { n: full.n, want: full.want }, back, y0, y1 }));
+    return '30 → ' + full.n + '행 · 돌아오면 ' + back + '행 한 번에';
+  });
+  await S.t('㊿+173 장비 보드: 열마다 처음 8장 → 곧 나머지(더 보기 규칙 그대로) · 나중에 붙은 카드의 버튼도 동작(신청 내역에서 열기)', async () => {
+    const a = await page.evaluate(() => { SVC.navMenu('eqboard'); return [...document.querySelectorAll('.eqb-col')].map((c) => c.querySelectorAll('.eqb-card').length); });
+    await page.waitForTimeout(500);
+    const b = await page.evaluate(() => [...document.querySelectorAll('.eqb-col')].map((c) => c.querySelectorAll('.eqb-card').length + (c.querySelector('.eqb-mk') ? '+mk' : '')));
+    const exp = await page.evaluate(() => { const R = SVC.ST.RAWX.orders.filter((o) => o.status !== '취소'); return SVC.EQB_COLS.map((col) => { let l = R.filter((o) => o.status === col[0]); return String(Math.min(l.length, SVC.EQB.more[col[0]] ? 1e9 : (col[0] === '설치완료' ? 12 : 30))); }); });
+    const late = await page.evaluate(() => { const col = [...document.querySelectorAll('.eqb-col')].find((c) => c.querySelectorAll('.eqb-card').length > 8); const card = col && col.querySelectorAll('.eqb-card')[9]; const bt = card && card.querySelector('[data-open]'); if (!bt) return null; const id = bt.dataset.open; bt.click(); return { id, v: SVC.ST.CUR_VIEW, pre: SVC.DV.pre && SVC.DV.pre.label }; });
+    assert(a.some((n) => n === 8) && a.every((n) => n <= 8) && JSON.stringify(b) === JSON.stringify(exp) && late && late.v === 'orders' && new RegExp('신청 #' + late.id).test(late.pre || ''), JSON.stringify({ a, b, exp, late }));
+    await page.evaluate(() => SVC.navMenu('dash'));
+    return '처음 ' + a.join('/') + ' → ' + b.join('/');
+  });
+  await S.t('㊿+173 계산 사본은 같은 계산 묶음 안에서만(다음 단계엔 새로) · 신청 행을 고친 뒤 시리얼 주인이 바로 바뀜 · CSS 변수 사본은 테마를 바꾸면 그 자리에서 새 값', async () => {
+    const r = await page.evaluate(async () => {
+      const O = SVC.ST.RAWX.orders, o1 = O.find((o) => o.status === '설치완료' && SVC.eqSerials(o).length), sn = SVC.eqSerials(o1)[0];
+      const own0 = SVC.eqOwnerMap()[sn] && SVC.eqOwnerMap()[sn].id;
+      const o2 = Object.assign({}, o1, { id: 999999, created_at: '2099-01-01T00:00:00', serials: sn }); O.push(o2);   /* 같은 동기 실행 · 행 수가 바뀜 → 그 자리에서 새로 */
+      const ownA = SVC.eqOwnerMap()[sn].id; O.pop();
+      await new Promise((ok) => setTimeout(ok, 0));
+      const ownB = SVC.eqOwnerMap()[sn].id;
+      const prev = o1.serials; o1.serials = 'ZZTEST1'; const fresh = SVC.eqOwnerMapFresh(); const gone = !fresh[sn] || fresh[sn].id !== o1.id; o1.serials = prev; await new Promise((ok) => setTimeout(ok, 0));
+      const html = document.documentElement, t0 = html.getAttribute('data-theme'); const c0 = SVC.cssv('--surface'); html.setAttribute('data-theme', t0 === 'dark' ? 'light' : 'dark'); const c1 = SVC.cssv('--surface'); html.setAttribute('data-theme', t0 || 'light'); if (!t0) html.removeAttribute('data-theme'); const c2 = SVC.cssv('--surface');
+      return { own0, ownA, ownB, gone, c0, c1, c2 };
+    });
+    assert(r.ownA === 999999 && r.ownB === r.own0 && r.gone && r.c0 !== r.c1 && r.c2 === r.c0, JSON.stringify(r));
+    return '시리얼 주인 ' + r.own0 + ' → 999999 → ' + r.ownB + ' · 색 ' + r.c0 + '→' + r.c1;
+  });
+  await S.t('㊿+173 실사용 속도 기록: 처음 열기 · 메뉴 이동 시간만(고객 · 계약 내용 없음) 30초마다 · 창을 숨길 때 보냄 · 표가 없으면(404) 그만 · 관리자 «포탈 속도(실사용)» 중앙값 · 느린 쪽', async () => {
+    await page.evaluate(() => { SVC.navMenu('contracts'); SVC.navMenu('oi'); SVC.navMenu('dash'); }); await page.waitForTimeout(300);
+    await page.evaluate(() => SVC.perfFlush()); await page.waitForTimeout(300);
+    const body = perfPosts.join('\n'), recs = perfPosts.flatMap((p) => JSON.parse(p));
+    const kinds = recs.map((x) => x.kind + ':' + x.view).join(',');
+    const leak = /가상고객|검증_|TST\d/.test(body);
+    perfStatus = 404; await page.evaluate(() => { SVC.navMenu('orders'); SVC.navMenu('dash'); }); await page.waitForTimeout(300); await page.evaluate(() => SVC.perfFlush()); await page.waitForTimeout(300);
+    const n1 = perfPosts.length; await page.evaluate(() => { SVC.navMenu('live'); }); await page.waitForTimeout(300); await page.evaluate(() => SVC.perfFlush()); await page.waitForTimeout(200);
+    const off = await page.evaluate(() => SVC.PERF.off); const n2 = perfPosts.length;
+    assert(/boot:dash/.test(kinds) && /nav:contracts/.test(kinds) && /nav:oi/.test(kinds) && recs.every((x) => x.email === 'tester@example.com' && x.ms >= 0) && !leak && off && n2 === n1, JSON.stringify({ kinds, leak, off, n1, n2 }));
+    await page.evaluate(() => SVC.navMenu('ops')); await page.waitForTimeout(500); await page.click('#opsTabs [data-t="log"]'); await page.waitForTimeout(300);
+    await page.click('#opsPerf'); await page.waitForTimeout(500);
+    const t = await page.evaluate(() => { const h = [...document.querySelectorAll('.ops-h')].find((x) => /포탈 속도/.test(x.textContent)); const tb = h && h.nextElementSibling && h.nextElementSibling.nextElementSibling; return { head: h && h.textContent, rows: tb ? [...tb.querySelectorAll('tbody tr')].map((r) => r.textContent).join(' / ') : '' }; });
+    assert(/30건/.test(t.head) && /90일 지난 3건 정리/.test(t.head) && /처음 열기.*20.*2\.00초/.test(t.rows) && /메뉴 › 임대 장비 신청 내역102\.20초3\.40초/.test(t.rows), JSON.stringify(t));
+    await page.evaluate(() => SVC.navMenu('dash'));
+    assert(!c.errs.length, c.errs.join(' | '));
+    return kinds.split(',').slice(0, 4).join(' · ');
+  });
+  await ctx.close();
+}
+// ㊿+174 알림함 · 처리 담당 · Slack(기본 꺼짐 — 눌러서 확인할 때만) — 가상 데이터 · 모의 응답 · 외부 발송 0
+{
+  const { FIX } = await import('./lib.mjs');
+  const mkCtx = async (opt) => {
+    opt = Object.assign({ role: 'super_admin', set: null, sqlOk: true, w: 1440, asg: [] }, opt || {});
+    const ctx = await browser.newContext({ viewport: { width: opt.w, height: 900 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page);
+    const st = { writes: [], fn: [], set: opt.set, asg: opt.asg, dialogs: [], acceptDlg: true };
+    page.on('dialog', (d) => { st.dialogs.push(d.message()); if (d.type() === 'prompt') d.dismiss(); else if (st.acceptDlg) d.accept(); else d.dismiss(); });
+    const J = (route, rows) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'content-range': rows.length ? '0-' + (rows.length - 1) + '/' + rows.length : '0-0/0', 'Access-Control-Expose-Headers': 'content-range' }, body: JSON.stringify(rows) });
+    await mockBackend(page, { role: opt.role, onWrite: (x) => st.writes.push(x), extra: async (route, u, m) => {
+      if (u.includes('/rpc/load_all')) { await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(Object.assign({}, FIX, { roles: [{ role: opt.role }] })) }); return true; }
+      if (/\/rest\/v1\/(notify_settings|notify_reads|work_assign|notify_log)/.test(u) && m === 'GET') {
+        if (!opt.sqlOk) { await route.fulfill({ status: 404, contentType: 'application/json', body: '{"code":"42P01","message":"relation does not exist"}' }); return true; }
+        if (/notify_settings/.test(u)) { await J(route, st.set ? [st.set] : []); return true; }
+        if (/work_assign/.test(u)) { await J(route, st.asg); return true; }
+        await J(route, []); return true; }
+      if (u.includes('/functions/v1/notify')) { st.fn.push(route.request().postData() || ''); await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, results: [{ target: 'team:C0TEST1234', ok: true }, { target: 'dm:tester@example.com', ok: true }] }) }); return true; }
+      return false; } });
+    await page.goto(url + '/index.html'); await page.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA && SVC.NTF.at > 0, null, { timeout: 15000 }); await page.waitForTimeout(500);
+    return { ctx, page, c, st };
+  };
+  const SET = { id: 1, renew_days: [60, 30], eq_days: 3, month_end_days: 31, renew_emails: ['tester@example.com'], eq_emails: ['tester@example.com'], biz_emails: ['tester@example.com'], dc_emails: [], slack_on: false, team_channel: 'C0TEST1234' };
+
+  await S.t('㊿+174 알림함: 종(검색 · AI 대화 옆) · 읽지 않은 «나에게» 수 · 나에게/팀 전체 · 장비 처리 지연(접수 뒤 3일) · 월말 마감 · 재약정은 홈 «재약정 대응 필요»와 같은 행 · 읽음은 계정별(notify_reads) · Esc 로 닫으면 종으로', async () => {
+    const { ctx, page, c, st } = await mkCtx({ set: SET });
+    const a = await page.evaluate(() => { const b = document.getElementById('ntfBtn'), it = SVC.ntfItems();
+      const ren = it.filter((x) => x.kind === 'renew'), rows = SVC.ST.DATA.rows;
+      const bad = ren.filter((x) => { const r = rows.find((y) => y._id === x.id); const s = SVC.ctSuccessor(r); return !r || !SVC.expEligible(r) || r.autoRenew || (s && s.sure); }).length;
+      return { vis: !!b && !b.hidden && b.getBoundingClientRect().width > 0, prev: b && b.previousElementSibling && b.previousElementSibling.id, badge: b && (b.querySelector('b.num') || {}).textContent, unread: SVC.ntfUnread(), kinds: it.map((x) => x.kind).join(','), eq: it.filter((x) => x.kind === 'eq').map((x) => x.id).join(','), ren: ren.length, bad, me: it.filter((x) => x.me).length }; });
+    assert(a.vis && (a.prev === 'aipOpenBtn' || a.prev === 'cmdBar') && a.badge === String(a.unread) && a.unread === a.me && /eq/.test(a.kinds) && /biz/.test(a.kinds) && a.eq.split(',').length === 3 && a.bad === 0, JSON.stringify(a));
+    await page.click('#ntfBtn'); await page.waitForTimeout(250);
+    const p = await page.evaluate(() => ({ open: !document.getElementById('ntfPanel').hidden, tabs: [...document.querySelectorAll('#ntfPanel [data-tab]')].map((t) => t.textContent.replace(/\s+/g, ' ').trim()), items: document.querySelectorAll('#ntfPanel .ntf-it').length, slack: !!document.getElementById('ntfSlack'), focus: document.activeElement && document.activeElement.dataset.tab }));
+    const before = st.writes.length; await page.click('#ntfPanel [data-rd="0"]'); await page.waitForTimeout(300);
+    const w = st.writes.slice(before).find((x) => /notify_reads/.test(x.url)); const body = w ? JSON.parse(w.body) : null;
+    const after = await page.evaluate(() => ({ unread: SVC.ntfUnread(), badge: (document.querySelector('#ntfBtn b.num') || {}).textContent || '0' }));
+    await page.click('#ntfAllRead'); await page.waitForTimeout(300);
+    const all = await page.evaluate(() => ({ unread: SVC.ntfUnread(), badge: !!document.querySelector('#ntfBtn b.num') }));
+    await page.keyboard.press('Escape'); await page.waitForTimeout(200);
+    const esc = await page.evaluate(() => ({ hid: document.getElementById('ntfPanel').hidden, focus: document.activeElement && document.activeElement.id }));
+    assert(p.open && p.tabs.length === 2 && /^나에게/.test(p.tabs[0]) && /^팀 전체/.test(p.tabs[1]) && p.items === a.me && !p.slack && p.focus === 'me', JSON.stringify(p));
+    assert(w && w.m === 'POST' && body && body[0].email === 'tester@example.com' && /^(eq|biz|renew|lapsed|dc):/.test(body[0].key) && !/가상고객/.test(w.body) && after.unread === a.unread - 1, JSON.stringify({ w: w && w.body, after }));
+    assert(all.unread === 0 && !all.badge && esc.hid && esc.focus === 'ntfBtn' && !st.fn.length && !c.errs.length, JSON.stringify({ all, esc, fn: st.fn.length, errs: c.errs }));
+    await ctx.close();
+    return '항목 ' + a.kinds.split(',').length + ' · 나에게 ' + a.me + ' · 재약정 ' + a.ren + '(홈 기준과 같음)';
+  });
+
+  await S.t('㊿+174 처리 담당: 장비 신청 «담당 지정» → work_assign 에만 저장(신청서 · 고객 담당자 그대로) · 확인 창에 전/후 · 변경 이력 · 남에게 주면 내 «나에게»에서 빠지고 그 사람에게 · 홈 우선 업무 «담당»도 처리 담당 · 해제', async () => {
+    const { ctx, page, c, st } = await mkCtx({ set: SET });
+    const id = await page.evaluate(() => { const x = SVC.ntfItems().find((y) => y.kind === 'eq'); return x && x.id; });
+    await page.evaluate((i) => { const x = SVC.ntfItems().find((y) => y.kind === 'eq' && y.id === i); SVC.ntfAssignOpen(x); }, id); await page.waitForTimeout(250);
+    const dlg = await page.evaluate(() => ({ on: document.getElementById('ovlNtfAsg').classList.contains('on'), cap: document.querySelector('#ovlNtfAsg .cap').textContent, opts: [...document.querySelectorAll('#naList option')].map((o) => o.value) }));
+    await page.fill('#naEm', 'Other@Example.com'); st.dialogs.length = 0; const w0 = st.writes.length;
+    await page.click('#naSave'); await page.waitForTimeout(400);
+    const ws = st.writes.slice(w0), wa = ws.find((x) => /work_assign/.test(x.url)), eqw = ws.find((x) => /equipment_orders/.test(x.url)), lg = ws.find((x) => /change_log/.test(x.url));
+    const it = await page.evaluate((i) => { const x = SVC.ntfItems().find((y) => y.kind === 'eq' && y.id === i); return { me: x.me, asg: x.asg, to: x.to, detail: x.detail, on: document.getElementById('ovlNtfAsg').classList.contains('on'), own: [...document.querySelectorAll('.hm-own')].map((e) => e.textContent).join('|') }; }, id);
+    assert(dlg.on && /고객 담당자/.test(dlg.cap) && dlg.opts.includes('tester@example.com'), JSON.stringify(dlg));
+    assert(wa && wa.m === 'POST' && /on_conflict=kind,ref/.test(wa.url) && JSON.parse(wa.body)[0].assignee === 'other@example.com' && JSON.parse(wa.body)[0].ref === String(id) && !eqw && lg && /work_assign/.test(lg.body), JSON.stringify(ws.map((x) => x.m + ' ' + x.url.replace(/^https:\/\/[^/]+/, '') + ' ' + (x.body || '').slice(0, 80))));
+    assert(/전: \(없음\)/.test(st.dialogs[0] || '') && /후: other@example.com/.test(st.dialogs[0] || '') && !it.me && it.asg === 'other@example.com' && it.to[0] === 'other@example.com' && /처리 담당 other/.test(it.detail) && !it.on && /(^|\|)other(,|\||$)/.test(it.own), JSON.stringify({ d: st.dialogs, it }));
+    await page.evaluate((i) => { const x = SVC.ntfItems().find((y) => y.kind === 'eq' && y.id === i); SVC.ntfAssignOpen(x); }, id); await page.waitForTimeout(200);
+    const w1 = st.writes.length; await page.click('#naClear'); await page.waitForTimeout(400);
+    const del = st.writes.slice(w1).find((x) => /work_assign/.test(x.url));
+    const back = await page.evaluate((i) => SVC.ntfItems().find((y) => y.kind === 'eq' && y.id === i).me, id);
+    assert(del && del.m === 'DELETE' && /kind=eq\.eq&ref=eq\./.test(del.url) && back === true && !c.errs.length, JSON.stringify({ del: del && del.url, back, errs: c.errs }));
+    await ctx.close();
+    return '신청 #' + id + ' → other → 해제';
+  });
+
+  await S.t('㊿+174 Slack 기본 꺼짐: 설정이 없거나 꺼져 있으면 «Slack 으로 보내기» 없음 · 불러도 안 보냄 / 켜도 열 때 · 읽을 때 자동 발송 0 — 미리 보기 → «보내기» → 확인 «취소»면 안 보냄 · «확인» 때만 1번(팀 채널 = 설정 · DM = 받는 사람)', async () => {
+    const off = await mkCtx({ set: null });
+    const o = await off.page.evaluate(async () => { SVC.ntfOpen(); const slackBtn = !!document.getElementById('ntfSlack'); SVC.ntfClose(); await SVC.ntfSlackOpen(); return { slackBtn, on: SVC.ntfSet().slack_on, dlg: !!(document.getElementById('ovlNtfSlack') && document.getElementById('ovlNtfSlack').classList.contains('on')) }; });
+    await off.page.evaluate(() => SVC.navMenu('adminx')); await off.page.waitForTimeout(600); await off.page.click('#admTabs [data-t="cfg"]'); await off.page.waitForTimeout(200);
+    const oa = await off.page.evaluate(() => ({ form: !!document.querySelector('#ntfAdmin #nsDays'), chk: document.querySelector('#ntfAdmin #nsSlack') && document.querySelector('#ntfAdmin #nsSlack').checked, go: !!document.getElementById('nsSlackGo') }));
+    assert(!o.slackBtn && o.on === false && !o.dlg && oa.form && oa.chk === false && !oa.go && !off.st.fn.length, JSON.stringify({ o, oa, fn: off.st.fn.length }));
+    await off.ctx.close();
+    const on = await mkCtx({ set: Object.assign({}, SET, { slack_on: true }) });
+    await on.page.evaluate(() => { SVC.navMenu('contracts'); SVC.navMenu('dash'); SVC.ntfLoad(true); }); await on.page.waitForTimeout(600);
+    const n0 = on.st.fn.length;
+    await on.page.click('#ntfBtn'); await on.page.waitForTimeout(200);
+    const has = await on.page.evaluate(() => !!document.getElementById('ntfSlack'));
+    await on.page.click('#ntfSlack'); await on.page.waitForTimeout(400);
+    const pv = await on.page.evaluate(() => ({ on: document.getElementById('ovlNtfSlack').classList.contains('on'), pre: document.querySelector('#ovlNtfSlack .ntf-pre').textContent, dms: [...document.querySelectorAll('#ovlNtfSlack .ntf-dm li')].map((l) => l.textContent) }));
+    on.st.acceptDlg = false; await on.page.click('#slGo'); await on.page.waitForTimeout(300); const n1 = on.st.fn.length;
+    on.st.acceptDlg = true; await on.page.click('#slGo'); await on.page.waitForTimeout(500);
+    const sent = on.st.fn.slice(n1).map((x) => JSON.parse(x)); const msg = await on.page.evaluate(() => document.getElementById('slMsg').textContent);
+    assert(n0 === 0 && has && pv.on && /포탈 알림/.test(pv.pre) && pv.dms.length === 1 && /tester@example\.com/.test(pv.dms[0]) && n1 === 0, JSON.stringify({ n0, has, pv, n1 }));
+    assert(sent.length === 1 && sent[0].team.channel === 'C0TEST1234' && sent[0].dms.length === 1 && sent[0].dms[0].email === 'tester@example.com' && /2곳 보냄/.test(msg) && !on.c.errs.length, JSON.stringify({ sent: sent.map((x) => ({ t: x.team && x.team.channel, d: x.dms.map((d) => d.email) })), msg, errs: on.c.errs }));
+    await on.ctx.close();
+    return '꺼짐: 버튼 0 · 호출 0 / 켜짐: 취소 0 · 확인 1';
+  });
+
+  await S.t('㊿+174 관리자 › 설정 › 알림 · Slack: 바뀐 것만 확인 창에 · Slack 켜기는 «자동 발송 없음» 확인 한 번 더 · 잘못된 채널 · 기준은 저장 안 함 · 저장하면 PATCH notify_settings + 변경 이력', async () => {
+    const { ctx, page, c, st } = await mkCtx({ set: Object.assign({}, SET, { month_end_days: 5 }) });
+    await page.evaluate(() => SVC.ntfGoSettings()); await page.waitForTimeout(900);
+    const shown = await page.evaluate(() => { const h = document.getElementById('ntfAdmin'); return { vis: !!h && h.getBoundingClientRect().height > 0, pane: h && h.closest('.adm-pane').dataset.pane, hidden: h && h.closest('.adm-pane').hidden, days: document.getElementById('nsDays').value }; });
+    await page.fill('#nsCh', 'bad channel'); const w0 = st.writes.length; await page.click('#nsSave'); await page.waitForTimeout(200);
+    const m1 = await page.evaluate(() => document.getElementById('nsMsg').textContent); const w1 = st.writes.length;
+    await page.fill('#nsCh', 'C0TEST1234'); await page.fill('#nsDays', '60, 30, 400'); await page.click('#nsSave'); await page.waitForTimeout(200);
+    const m2 = await page.evaluate(() => document.getElementById('nsMsg').textContent); const w2 = st.writes.length;
+    await page.fill('#nsDays', '90, 30'); await page.fill('#nsEq', '5'); await page.check('#nsSlack'); st.dialogs.length = 0;
+    await page.click('#nsSave'); await page.waitForTimeout(500);
+    const pw = st.writes.slice(w2).find((x) => /notify_settings/.test(x.url)), lg = st.writes.slice(w2).find((x) => /change_log/.test(x.url));
+    const b = pw && JSON.parse(pw.body);
+    const after = await page.evaluate(() => ({ on: SVC.ntfSet().slack_on, go: !!document.getElementById('nsSlackGo') }));
+    assert(shown.vis && shown.pane === 'cfg' && !shown.hidden && shown.days === '60, 30', JSON.stringify(shown));
+    assert(/채널 ID/.test(m1) && w1 === w0 && /1~365/.test(m2) && w2 === w1, JSON.stringify({ m1, m2, w0, w1, w2 }));
+    assert(st.dialogs.length === 2 && /자동으로 보내지 않고/.test(st.dialogs[0]) && /renew_days: 60, 30 → 90, 30/.test(st.dialogs[1]) && /eq_days: 3 → 5/.test(st.dialogs[1]) && /slack_on: false → true/.test(st.dialogs[1]) && !/renew_emails/.test(st.dialogs[1]), JSON.stringify(st.dialogs));
+    assert(pw && pw.m === 'PATCH' && /id=eq\.1/.test(pw.url) && JSON.stringify(b.renew_days) === '[90,30]' && b.eq_days === 5 && b.slack_on === true && lg && after.on && after.go && !c.errs.length, JSON.stringify({ b, lg: !!lg, after, errs: c.errs }));
+    await ctx.close();
+    return '확인 2번(켜기 · 변경 3가지) → PATCH 1';
+  });
+
+  await S.t('㊿+174 SQL 105 전(표 없음 · 404): 기본 기준으로 알림함 동작 · 읽음은 이 브라우저에만(DB 쓰기 0) · 담당 지정 · Slack · 설정 저장 버튼 꺼짐 / 조회 전용 계정: 담당 지정 · 설정 · Slack 없음', async () => {
+    const pre = await mkCtx({ sqlOk: false });
+    const a = await pre.page.evaluate(() => { SVC.ntfOpen(); return { n: SVC.ntfItems().length, foot: document.querySelector('#ntfPanel .ntf-f').textContent, asg: !!document.querySelector('#ntfPanel [data-asg]'), slack: !!document.getElementById('ntfSlack'), tab: SVC.NTF.tab }; });
+    const w0 = pre.st.writes.length; await pre.page.evaluate(() => SVC.ntfMark(SVC.ntfItems().map((x) => x.key), true)); await pre.page.waitForTimeout(300);
+    const ls = await pre.page.evaluate(() => { try { return JSON.parse(localStorage.getItem('svc_ntf_read_tester@example.com') || '[]').length; } catch (e) { return -1; } });
+    const w1 = pre.st.writes.filter((x) => /notify_/.test(x.url)).length, wM = pre.st.writes.length;
+    await pre.page.evaluate(() => SVC.ntfGoSettings()); await pre.page.waitForTimeout(800);
+    const dis = await pre.page.evaluate(() => document.getElementById('nsSave') && document.getElementById('nsSave').disabled);
+    assert(a.n > 0 && /SQL 105 전/.test(a.foot) && !a.asg && !a.slack && a.tab === 'team' && ls === a.n && w1 === 0 && wM === w0 && dis === true && !pre.c.errs.length, JSON.stringify({ a, ls, w1, dis, errs: pre.c.errs }));
+    await pre.ctx.close();
+    const v = await mkCtx({ role: 'admin_viewer', set: SET });
+    const b = await v.page.evaluate(() => { SVC.ntfOpen(); return { items: document.querySelectorAll('#ntfPanel .ntf-it').length, asg: !!document.querySelector('#ntfPanel [data-asg]'), set: !!document.getElementById('ntfSet'), slack: !!document.getElementById('ntfSlack'), can: SVC.ntfCanAssign() }; });
+    assert(b.items > 0 && !b.asg && !b.set && !b.slack && !b.can && !v.c.errs.length, JSON.stringify(b));
+    await v.ctx.close();
+    return 'SQL 전 항목 ' + a.n + '(이 브라우저 읽음) · 조회 전용: 보기만';
+  });
+
+  await S.t('㊿+174 폭 390 · 768 · 1024: 종이 보이고 알림함이 화면 안(폰은 아래에서 올라오는 시트) · 옆 넘침 0 · 항목 «열기»는 그 화면으로(장비 → 신청 내역 · 조건 표시)', async () => {
+    const out = [];
+    for (const w of [390, 768, 1024]) {
+      const { ctx, page, c } = await mkCtx({ set: SET, w });
+      await page.click('#ntfBtn'); await page.waitForTimeout(250);
+      const r = await page.evaluate(() => { const p = document.getElementById('ntfPanel').getBoundingClientRect(), b = document.getElementById('ntfBtn').getBoundingClientRect(); return { inX: p.left >= 0 && p.right <= innerWidth + 0.5, inY: p.bottom <= innerHeight + 0.5, sheet: document.getElementById('ntfPanel').classList.contains('sheet'), bw: b.width, ov: document.documentElement.scrollWidth - innerWidth }; });
+      if (w === 1024) { await page.click('#ntfPanel [data-tab="team"]'); const i = await page.evaluate(() => SVC.ntfItems().findIndex((x) => x.kind === 'eq')); await page.click(`#ntfPanel [data-go="${i}"]`); await page.waitForTimeout(400);
+        r.go = await page.evaluate(() => ({ v: SVC.ST.CUR_VIEW, pre: !!SVC.DV.pre && SVC.DV.pre.label, rows: document.querySelectorAll('#dvTable tbody tr').length, closed: document.getElementById('ntfPanel').hidden })); }
+      out.push(w + ':' + JSON.stringify(r));
+      assert(r.inX && r.inY && r.bw > 0 && r.ov <= 1 && (w > 760 || r.sheet) && !c.errs.length, w + ' ' + JSON.stringify(r) + c.errs.join('|'));
+      if (r.go) assert(r.go.v === 'orders' && /신청 #/.test(r.go.pre) && r.go.rows === 1 && r.go.closed, JSON.stringify(r.go));
+      await ctx.close();
+    }
+    return out.map((x) => x.slice(0, 40)).join(' · ');
+  });
+}
 await browser.close(); srv.close();
 const ok = S.report();
 fs.writeFileSync(path.join(OUT, 'smoke.json'), JSON.stringify(S.results, null, 1));

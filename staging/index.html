@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <!-- CSP (80점 프로젝트 ② 보안): GitHub Pages 는 응답 헤더를 못 넣으므로 meta 로. ㊿+136 부터 인라인 스크립트·onclick 이 없어 script-src 에 'unsafe-inline' 없음(스타일은 인라인 style 속성 때문에 유지) · ㊿+147 부터 'unsafe-eval' 도 없음(SQL 엔진 alasql 은 격리 칸 sqlbox.html 에서만 돌림) — 스크립트·연결 호스트를 목록으로 제한(XSS 시 외부 유출 차단). Worker 주소나 GAS 주소가 바뀌면 여기도 수정. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-6DeUu+vv7PFw/DeC97wpqBB5ZGjS8rZMHIfxL/rHQ4M=' blob: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' data: https://cdn.jsdelivr.net; img-src 'self' data: blob: https://amzbrdhkvzsyxjfjtugu.supabase.co; connect-src 'self' https://amzbrdhkvzsyxjfjtugu.supabase.co https://open.er-api.com https://api.frankfurter.app https://script.google.com/macros/s/AKfycbz0PDzgvgtM0ZZHEfMwEzPpgoPYidD6ElPx3oTGsgnVuveCnVA9PmYPB4WAPfr9a6DY/ https://script.googleusercontent.com https://aged-union-cdd3.choihw.workers.dev https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; worker-src 'self' blob:; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-4EpW9HsY/VwyO1VOYVDAzCEBgGK8YU6QPmX4bqk8Ksg=' blob: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' data: https://cdn.jsdelivr.net; img-src 'self' data: blob: https://amzbrdhkvzsyxjfjtugu.supabase.co; connect-src 'self' https://amzbrdhkvzsyxjfjtugu.supabase.co https://open.er-api.com https://api.frankfurter.app https://script.google.com/macros/s/AKfycbz0PDzgvgtM0ZZHEfMwEzPpgoPYidD6ElPx3oTGsgnVuveCnVA9PmYPB4WAPfr9a6DY/ https://script.googleusercontent.com https://aged-union-cdd3.choihw.workers.dev https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; worker-src 'self' blob:; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
 <title>서비스사업부 통합 관리 포탈</title>
 <!-- PWA: 홈 화면 앱 (manifest.webmanifest · sw.js · pwa-*.png · apple-touch-icon.png 를 같은 폴더에) -->
 <link rel="manifest" href="manifest.webmanifest">
@@ -20,33 +20,34 @@
      코드 파일 목록은 app-js (ES 모듈 · ㊿+153) — 파일을 더하거나 빼면 여기와 sw.js 의 SHELL 을 함께 고치고 node tests/stamp.mjs 로 아래 stamp 묶음을 다시 만들 것.
      시작점은 js/main.js 하나(나머지는 import 로 따라옴) · 리포트·관리자·가격표는 처음 열 때(js/lazy.js).
      ④ 아키텍처 2단계(㊿+136): 인라인 스크립트·onclick 을 전부 없애 CSP script-src 에서 'unsafe-inline' 제거 · 인라인은 importmap 하나뿐이고 CSP 해시로 허용. -->
-<meta name="app-ver" content="2026-09-16 ㊿+172">
-<meta name="app-js" content="js/state.js,js/viz.js,js/core.js,js/shell.js,js/dash.js,js/ai.js,js/home.js,js/grids.js,js/equipment.js,js/analysis.js,js/tools.js,js/cloud.js,js/price.js,js/inbound.js,js/upd.js,js/admin.js,js/sales.js,js/report.js,js/grid.js,js/edit.js,js/qadb.js,js/qadata.js,js/lazy.js,js/init.js,js/main.js">
+<meta name="app-ver" content="2026-09-16 ㊿+174">
+<meta name="app-js" content="js/state.js,js/viz.js,js/core.js,js/shell.js,js/dash.js,js/ai.js,js/home.js,js/notify.js,js/grids.js,js/equipment.js,js/analysis.js,js/tools.js,js/cloud.js,js/price.js,js/inbound.js,js/upd.js,js/admin.js,js/sales.js,js/report.js,js/grid.js,js/edit.js,js/qadb.js,js/qadata.js,js/lazy.js,js/init.js,js/main.js">
 <!-- stamp:begin — tests/stamp.mjs 가 app-ver · app-js 로 만든 부분(손으로 고치지 말 것 · 버전을 올린 뒤 다시 실행 · tests/check.mjs 가 확인) -->
-<link rel="stylesheet" href="app.css?v=2026-09-16%20%E3%8A%BF%2B172">
-<script type="importmap">{"imports":{"./js/state.js":"./js/state.js?v=2026-09-16%20%E3%8A%BF%2B172","./js/viz.js":"./js/viz.js?v=2026-09-16%20%E3%8A%BF%2B172","./js/core.js":"./js/core.js?v=2026-09-16%20%E3%8A%BF%2B172","./js/shell.js":"./js/shell.js?v=2026-09-16%20%E3%8A%BF%2B172","./js/dash.js":"./js/dash.js?v=2026-09-16%20%E3%8A%BF%2B172","./js/ai.js":"./js/ai.js?v=2026-09-16%20%E3%8A%BF%2B172","./js/home.js":"./js/home.js?v=2026-09-16%20%E3%8A%BF%2B172","./js/grids.js":"./js/grids.js?v=2026-09-16%20%E3%8A%BF%2B172","./js/equipment.js":"./js/equipment.js?v=2026-09-16%20%E3%8A%BF%2B172","./js/analysis.js":"./js/analysis.js?v=2026-09-16%20%E3%8A%BF%2B172","./js/tools.js":"./js/tools.js?v=2026-09-16%20%E3%8A%BF%2B172","./js/cloud.js":"./js/cloud.js?v=2026-09-16%20%E3%8A%BF%2B172","./js/price.js":"./js/price.js?v=2026-09-16%20%E3%8A%BF%2B172","./js/inbound.js":"./js/inbound.js?v=2026-09-16%20%E3%8A%BF%2B172","./js/upd.js":"./js/upd.js?v=2026-09-16%20%E3%8A%BF%2B172","./js/admin.js":"./js/admin.js?v=2026-09-16%20%E3%8A%BF%2B172","./js/sales.js":"./js/sales.js?v=2026-09-16%20%E3%8A%BF%2B172","./js/report.js":"./js/report.js?v=2026-09-16%20%E3%8A%BF%2B172","./js/grid.js":"./js/grid.js?v=2026-09-16%20%E3%8A%BF%2B172","./js/edit.js":"./js/edit.js?v=2026-09-16%20%E3%8A%BF%2B172","./js/qadb.js":"./js/qadb.js?v=2026-09-16%20%E3%8A%BF%2B172","./js/qadata.js":"./js/qadata.js?v=2026-09-16%20%E3%8A%BF%2B172","./js/lazy.js":"./js/lazy.js?v=2026-09-16%20%E3%8A%BF%2B172","./js/init.js":"./js/init.js?v=2026-09-16%20%E3%8A%BF%2B172"}}</script>
-<link rel="modulepreload" href="js/state.js?v=2026-09-16%20%E3%8A%BF%2B172">
-<link rel="modulepreload" href="js/viz.js?v=2026-09-16%20%E3%8A%BF%2B172">
-<link rel="modulepreload" href="js/core.js?v=2026-09-16%20%E3%8A%BF%2B172">
-<link rel="modulepreload" href="js/shell.js?v=2026-09-16%20%E3%8A%BF%2B172">
-<link rel="modulepreload" href="js/dash.js?v=2026-09-16%20%E3%8A%BF%2B172">
-<link rel="modulepreload" href="js/ai.js?v=2026-09-16%20%E3%8A%BF%2B172">
-<link rel="modulepreload" href="js/home.js?v=2026-09-16%20%E3%8A%BF%2B172">
-<link rel="modulepreload" href="js/grids.js?v=2026-09-16%20%E3%8A%BF%2B172">
-<link rel="modulepreload" href="js/equipment.js?v=2026-09-16%20%E3%8A%BF%2B172">
-<link rel="modulepreload" href="js/analysis.js?v=2026-09-16%20%E3%8A%BF%2B172">
-<link rel="modulepreload" href="js/tools.js?v=2026-09-16%20%E3%8A%BF%2B172">
-<link rel="modulepreload" href="js/cloud.js?v=2026-09-16%20%E3%8A%BF%2B172">
-<link rel="modulepreload" href="js/inbound.js?v=2026-09-16%20%E3%8A%BF%2B172">
-<link rel="modulepreload" href="js/upd.js?v=2026-09-16%20%E3%8A%BF%2B172">
-<link rel="modulepreload" href="js/sales.js?v=2026-09-16%20%E3%8A%BF%2B172">
-<link rel="modulepreload" href="js/grid.js?v=2026-09-16%20%E3%8A%BF%2B172">
-<link rel="modulepreload" href="js/edit.js?v=2026-09-16%20%E3%8A%BF%2B172">
-<link rel="modulepreload" href="js/qadb.js?v=2026-09-16%20%E3%8A%BF%2B172">
-<link rel="modulepreload" href="js/qadata.js?v=2026-09-16%20%E3%8A%BF%2B172">
-<link rel="modulepreload" href="js/lazy.js?v=2026-09-16%20%E3%8A%BF%2B172">
-<link rel="modulepreload" href="js/init.js?v=2026-09-16%20%E3%8A%BF%2B172">
-<script type="module" src="js/main.js?v=2026-09-16%20%E3%8A%BF%2B172"></script>
+<link rel="stylesheet" href="app.css?v=2026-09-16%20%E3%8A%BF%2B174">
+<script type="importmap">{"imports":{"./js/state.js":"./js/state.js?v=2026-09-16%20%E3%8A%BF%2B174","./js/viz.js":"./js/viz.js?v=2026-09-16%20%E3%8A%BF%2B174","./js/core.js":"./js/core.js?v=2026-09-16%20%E3%8A%BF%2B174","./js/shell.js":"./js/shell.js?v=2026-09-16%20%E3%8A%BF%2B174","./js/dash.js":"./js/dash.js?v=2026-09-16%20%E3%8A%BF%2B174","./js/ai.js":"./js/ai.js?v=2026-09-16%20%E3%8A%BF%2B174","./js/home.js":"./js/home.js?v=2026-09-16%20%E3%8A%BF%2B174","./js/notify.js":"./js/notify.js?v=2026-09-16%20%E3%8A%BF%2B174","./js/grids.js":"./js/grids.js?v=2026-09-16%20%E3%8A%BF%2B174","./js/equipment.js":"./js/equipment.js?v=2026-09-16%20%E3%8A%BF%2B174","./js/analysis.js":"./js/analysis.js?v=2026-09-16%20%E3%8A%BF%2B174","./js/tools.js":"./js/tools.js?v=2026-09-16%20%E3%8A%BF%2B174","./js/cloud.js":"./js/cloud.js?v=2026-09-16%20%E3%8A%BF%2B174","./js/price.js":"./js/price.js?v=2026-09-16%20%E3%8A%BF%2B174","./js/inbound.js":"./js/inbound.js?v=2026-09-16%20%E3%8A%BF%2B174","./js/upd.js":"./js/upd.js?v=2026-09-16%20%E3%8A%BF%2B174","./js/admin.js":"./js/admin.js?v=2026-09-16%20%E3%8A%BF%2B174","./js/sales.js":"./js/sales.js?v=2026-09-16%20%E3%8A%BF%2B174","./js/report.js":"./js/report.js?v=2026-09-16%20%E3%8A%BF%2B174","./js/grid.js":"./js/grid.js?v=2026-09-16%20%E3%8A%BF%2B174","./js/edit.js":"./js/edit.js?v=2026-09-16%20%E3%8A%BF%2B174","./js/qadb.js":"./js/qadb.js?v=2026-09-16%20%E3%8A%BF%2B174","./js/qadata.js":"./js/qadata.js?v=2026-09-16%20%E3%8A%BF%2B174","./js/lazy.js":"./js/lazy.js?v=2026-09-16%20%E3%8A%BF%2B174","./js/init.js":"./js/init.js?v=2026-09-16%20%E3%8A%BF%2B174"}}</script>
+<link rel="modulepreload" href="js/state.js?v=2026-09-16%20%E3%8A%BF%2B174">
+<link rel="modulepreload" href="js/viz.js?v=2026-09-16%20%E3%8A%BF%2B174">
+<link rel="modulepreload" href="js/core.js?v=2026-09-16%20%E3%8A%BF%2B174">
+<link rel="modulepreload" href="js/shell.js?v=2026-09-16%20%E3%8A%BF%2B174">
+<link rel="modulepreload" href="js/dash.js?v=2026-09-16%20%E3%8A%BF%2B174">
+<link rel="modulepreload" href="js/ai.js?v=2026-09-16%20%E3%8A%BF%2B174">
+<link rel="modulepreload" href="js/home.js?v=2026-09-16%20%E3%8A%BF%2B174">
+<link rel="modulepreload" href="js/notify.js?v=2026-09-16%20%E3%8A%BF%2B174">
+<link rel="modulepreload" href="js/grids.js?v=2026-09-16%20%E3%8A%BF%2B174">
+<link rel="modulepreload" href="js/equipment.js?v=2026-09-16%20%E3%8A%BF%2B174">
+<link rel="modulepreload" href="js/analysis.js?v=2026-09-16%20%E3%8A%BF%2B174">
+<link rel="modulepreload" href="js/tools.js?v=2026-09-16%20%E3%8A%BF%2B174">
+<link rel="modulepreload" href="js/cloud.js?v=2026-09-16%20%E3%8A%BF%2B174">
+<link rel="modulepreload" href="js/inbound.js?v=2026-09-16%20%E3%8A%BF%2B174">
+<link rel="modulepreload" href="js/upd.js?v=2026-09-16%20%E3%8A%BF%2B174">
+<link rel="modulepreload" href="js/sales.js?v=2026-09-16%20%E3%8A%BF%2B174">
+<link rel="modulepreload" href="js/grid.js?v=2026-09-16%20%E3%8A%BF%2B174">
+<link rel="modulepreload" href="js/edit.js?v=2026-09-16%20%E3%8A%BF%2B174">
+<link rel="modulepreload" href="js/qadb.js?v=2026-09-16%20%E3%8A%BF%2B174">
+<link rel="modulepreload" href="js/qadata.js?v=2026-09-16%20%E3%8A%BF%2B174">
+<link rel="modulepreload" href="js/lazy.js?v=2026-09-16%20%E3%8A%BF%2B174">
+<link rel="modulepreload" href="js/init.js?v=2026-09-16%20%E3%8A%BF%2B174">
+<script type="module" src="js/main.js?v=2026-09-16%20%E3%8A%BF%2B174"></script>
 <!-- stamp:end -->
 </head>
 <body data-view="dash">
@@ -819,6 +820,9 @@
         <div style="display:flex;align-items:flex-end"><button class="pill" id="cdAdd" style="height:36px">＋ 추가</button></div>
       </div>
       <p class="cap" id="cdCap" style="margin:10px 0 0">값을 <b>숨기면</b> 새 입력에서 고를 수 없고 데이터 점검이 «목록에 없는 값»으로 잡지만, 이미 그 값인 행은 그대로 둡니다(다른 열 수정도 가능). 순서는 ↑↓ 로. 저장하면 포탈을 쓰는 모든 사람에게 다음 데이터 로드부터 적용됩니다(본인은 즉시).</p>
+
+      <div class="adm-h">알림 · Slack <span class="mini">알림함 기준 · 받는 사람 · Slack(기본 꺼짐 — 켜도 «보내기»를 눌러 확인할 때만 보냄) · SQL 105</span></div>
+      <div id="ntfAdmin"><p class="cap">불러오는 중…</p></div>
 
       <div class="adm-h">업데이트 안내 <span class="mini">로그인할 때 새 업데이트를 팝업으로 알려 줄 계정 · 안내문 (SQL 96)</span></div>
       <div id="updAdmin"><p class="cap">불러오는 중…</p></div>

@@ -1,5 +1,5 @@
 /* Viz — 의존성 없는 초경량 SVG 차트 (index.html 에서 분리 · ④ 아키텍처 ㊿+134) */
-import { rawHtml, tpl } from './core.js';
+import { cssv, rawHtml, tpl } from './core.js';
 /* ==================================================================
    Viz — 의존성 없는 초경량 SVG 차트 (dataviz 마크 규격 준수)
    · 얇은 마크 / 2px 선 / 데이터 끝 4px 라운드 / 채움 사이 2px 서피스 간격
@@ -8,7 +8,7 @@ import { rawHtml, tpl } from './core.js';
 export var Viz = (function () {
   var NS = 'http://www.w3.org/2000/svg';
   function s(t, a) { var e = document.createElementNS(NS, t); for (var k in a) if (a[k] != null) e.setAttribute(k, a[k]); return e; }
-  function cv(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+  function cv(n) { return cssv(n); }   /* ㊿+173 사본(core.js cssv) */
   function hexA(hex, a) {
     hex = (hex || '#000').trim().replace('#', '');
     if (hex.length === 3) hex = hex.split('').map(function (c) { return c + c; }).join('');
@@ -214,7 +214,17 @@ export var Viz = (function () {
     });
   }
 
+  /* ㊿+173 성능: 화면 배치가 끝난 뒤(ResizeObserver — 그리기 직전 단계)에 그림 — 화면을 만들던 도중 폭을 읽으면 문서 전체 배치를 그 자리에서 다시 계산해서 느림.
+     숨어 있으면(폭 0) 보일 때까지 기다림 · 지원하지 않는 브라우저는 바로 그림 */
+  function afterLayout(host, fn) {
+    if (!host) return;
+    if (host._vzRO) { host._vzRO.disconnect(); host._vzRO = null; }
+    if (typeof ResizeObserver === 'undefined') { fn(); return; }
+    var ro = new ResizeObserver(function (ents) { var w = ents[0] && ents[0].contentRect.width; if (!w) return; ro.disconnect(); host._vzRO = null; try { fn(); } catch (e) { /* 그리기 실패는 차트 칸만 비움 */ } });
+    host._vzRO = ro; ro.observe(host);
+  }
   return {
+    afterLayout: afterLayout,
     lines: lines,
     bars: bars,
     area: function (h, c) { c.stacked = true; c.fill = true; lines(h, c); },

@@ -10,7 +10,7 @@ import { GRIDS } from './grids.js';
 import { CH_DEFS, chOf, ctSuccessor, liveData, liveDeltaHtml, openRenewList, renderChannelView } from './analysis.js';
 import { renderTodo } from './tools.js';
 import { renderCloud } from './cloud.js';
-import { aipStale, askFrom, homeB, homeSetup } from './home.js';
+import { aipStale, askFrom, homeB, homeDetailOpen, homeOn, homeSetup } from './home.js';
 import { closeMxPop, mxKey, MXM, mxPlace, openMxMemo, renderInbStat } from './inbound.js';
 import { KX_H6, kxBase, renderChurn, renderChurnRate, renderCustFlow } from './sales.js';
 import { a11yTileRole, DV, renderGrid, switchView, xlsxAoa } from './grid.js';
@@ -273,9 +273,19 @@ export function fillSelect(sel, arr){
 /* ==================================================================
    4. 렌더
    ================================================================== */
+/* ㊿+173 성능: 보이지 않는 대시보드 차트 · 표는 그리지 않고 «다시 그릴 것» 표시만 — 홈(지니언스)에서 «사업 현황 상세 · 분석»을 펼치거나
+   홈으로 돌아올 때 그림(homeDetail · switchView). 숫자 계산(KPI_D 등 다른 곳이 쓰는 값)은 그대로 */
+export var DASH_DIRTY={v:false};
+export function dashDetailShown(){
+  if(ST.CUR_VIEW && ST.CUR_VIEW!=='dash') return false;
+  if(isGN() && homeOn()) return !!homeDetailOpen();   /* 지니언스 홈: «사업 현황 상세 · 분석»을 펼쳐 둔 때만(이 브라우저 기억) */
+  return true;
+}
 export function renderAll(){
   var list=idxs();
   $('#filterCount').textContent = list.length.toLocaleString('ko-KR')+'건 선택됨';
+  if(!dashDetailShown()){ DASH_DIRTY.v=true; renderKpis(list, true); renderHero(list); return; }
+  DASH_DIRTY.v=false;
   renderKpis(list);
   renderGoal(list);
   renderTrend(list);
@@ -1049,7 +1059,7 @@ export function renderGoal(list){
     tpl`</div>`;
 }
 
-export function renderKpis(list){
+export function renderKpis(list, dataOnly){
   list=list||idxs();
   var b=STATE.base;
   var br=baseRange(), f0=br[0];
@@ -1086,6 +1096,7 @@ export function renderKpis(list){
   var ser=monthlySeries(list);
   var series24=ser.slice(Math.max(0,b-23), b+1);
   KPI_D={list:list, b:b, f0:f0, newRows:newRows, churnRows:churnRows, expRows:expRows, mrr:mrr, prevY:prevY, prevM:prevM, perSum:perSum, perPy:perPy, span:span};
+  if(dataOnly) return;   /* ㊿+173 숫자만(타일 · 작은 그래프는 보일 때 그림) */
 
   var tiles=[
     { k:'당월 MRR ('+mk(b)+')', v:won(mrr), u:'천원', d: prevM? deltaHtml(mrr,prevM,'전월'):'', spark:series24, open:'mrr', tip:'기준월에 인식된 월 금액 합계 (계약별 월 매출표 · 부속 계약 포함) — 누르면 고객사별 내역' },

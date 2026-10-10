@@ -1,7 +1,7 @@
 /* ===== equipment.js — 임대 장비: 신청 ↔ 현황 대조 · 원복 · 대조 패널 · 비즈포탈 월 입력 =====
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { APP_VER, ST } from './state.js';
-import { $, closeBtn, esc, rawHtml, tpl } from './core.js';
+import { $, closeBtn, esc, rawHtml, tickMemo, TICK, tpl } from './core.js';
 import { eqRefresh, sbGet, sbTry, sbWrite, toast, todayStr } from './shell.js';
 import { gridGoPre, renderGrid } from './grid.js';
 import { closeOvl, logChange, openOvl } from './edit.js';
@@ -24,9 +24,14 @@ import { closeOvl, logChange, openOvl } from './edit.js';
 export var EQ_ST={ '접수':'재고', '출하요청':'재고', '배송중':'재고',        /* 아직 안 나갔어도 현황에 행은 만듭니다 */
             '설치완료':'임대중', '회수예정':'임대중', '회수완료':'회수완료' };   /* «취소» 만 현황에 두지 않습니다 */
 export var EQ_COLS=['serial','model','usage','status','customer','channel','partner','in_date','deployed_date','returned_date','note','order_id'];
+/* ㊿+173 성능: 신청 행마다 시리얼 칸 글자를 나눈 결과를 기억(같은 글자면 다시 나누지 않음 · 고치면 글자가 달라져 새로) — 돌려줄 때는 사본 */
+export var EQ_SER=new WeakMap();
 export function eqSerials(r){
-  return String(r.serials||'').split(/[,\s]+/)
-    .map(function(s){ return s.trim().toUpperCase(); }).filter(function(s){ return s; });
+  var raw=String(r.serials||''), c=(r && typeof r==='object')? EQ_SER.get(r) : null;
+  if(c && c.s===raw) return c.v.slice();
+  var v=raw.split(/[,\s]+/).map(function(s){ return s.trim().toUpperCase(); }).filter(function(s){ return s; });
+  if(r && typeof r==='object') EQ_SER.set(r, {s:raw, v:v});
+  return v.slice();
 }
 export function eqIsPh(s){ return /^미등록-/.test(String(s||'')); }
 /* 같은 시리얼이 여러 신청에 들어 있으면(장비 이전 · 재임대) 가장 최근 신청이 그 시리얼의 주인입니다.
@@ -36,13 +41,19 @@ export function eqNewer(a,b){
   if(x!==y) return x>y;
   return (+a.id||0)>(+b.id||0);
 }
+/** 쓰기(현황 맞추기) 직전에는 사본 없이 새로 — 같은 동기 실행 안에서 신청 행을 고친 직후일 수 있음 */
+export function eqOwnerMapFresh(){ if(TICK.m) TICK.m.delete('eqOwn'); return eqOwnerMap(); }
 export function eqOwnerMap(){
-  var own={};
-  (ST.RAWX.orders||[]).forEach(function(o){
-    if(!EQ_ST[o.status]) return;                          // 취소된 신청은 주인이 못 됩니다
-    eqSerials(o).forEach(function(sn){ if(!own[sn] || eqNewer(o,own[sn])) own[sn]=o; });
+  var orders=ST.RAWX.orders||[];
+  /* ㊿+173 성능: 같은 계산 묶음 안에서는 한 번만(신청마다 다시 만들던 것 — 신청 수의 제곱으로 느려졌음) */
+  return tickMemo('eqOwn', [orders, orders.length], function(){
+    var own={};
+    orders.forEach(function(o){
+      if(!EQ_ST[o.status]) return;                          // 취소된 신청은 주인이 못 됩니다
+      eqSerials(o).forEach(function(sn){ if(!own[sn] || eqNewer(o,own[sn])) own[sn]=o; });
+    });
+    return own;
   });
-  return own;
 }
 export function eqMine(sn, r, own){            // 이 시리얼의 주인이 r 인가 (다른 신청에 없으면 r 것)
   var o=own[String(sn||'').toUpperCase()];
@@ -65,7 +76,11 @@ export function eqMoved(r, own){               // 시리얼이 전부 더 최근
 }
 export function eqHave(r, own){                // 현황에서 이 신청에 붙어 있는 행 (다른 신청이 주인인 시리얼은 뺍니다)
   own=own||eqOwnerMap();
-  return (ST.RAWX.assets||[]).filter(function(a){
+  var assets=ST.RAWX.assets||[];
+  /* ㊿+173 성능: 신청 번호별 현황 행 목록(원래 순서 그대로) — 신청마다 현황 전체를 훑던 것 */
+  var by=tickMemo('eqAsByOrd', [assets, assets.length], function(){
+    var m=new Map(); assets.forEach(function(a){ if(a.order_id==null) return; var k=String(a.order_id), l=m.get(k); if(!l) m.set(k, l=[]); l.push(a); }); return m; });
+  return (by.get(String(r.id))||[]).filter(function(a){
     return a.order_id!=null && String(a.order_id)===String(r.id) && (eqIsPh(a.serial) || eqMine(a.serial,r,own)); });
 }
 export function eqIn(list){                   // PostgREST in.("A","B") — 한글·하이픈 안전하게
@@ -292,7 +307,7 @@ export async function eqUndoRun(){
 /* 신청 한 건을 기준으로 현황을 맞춥니다 (항상 신청 → 현황 한 방향) */
 export async function syncOrderAssets(r, st, quiet){
   if(st) r.status=st;
-  var own=eqOwnerMap();
+  var own=eqOwnerMapFresh();
   var real=eqSerials(r), want=eqWant(r,own), stA=EQ_ST[r.status]||null;
   var todayS=todayStr(), out=[];
   try{

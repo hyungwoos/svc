@@ -2,7 +2,7 @@
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { APP_VER, IS_QA, ST } from './state.js';
 import { Viz } from './viz.js';
-import { $, amtGuard, amtHint, baseLabel, canWrite, cssv, esc, isGN, kwToWon, lline, llineVer, mk, rawHtml, SB_KEY, SB_URL, STATE, tpl, won, wonFull, wonKo, wonToKw, yOf } from './core.js';
+import { $, amtGuard, amtHint, baseLabel, canWrite, cssv, esc, isGN, kwToWon, lline, llineVer, mk, rawHtml, SB_KEY, SB_URL, STATE, tickMemo, tpl, won, wonFull, wonKo, wonToKw, yOf } from './core.js';
 import { dIdx, ico, idxDate, loadFromDb, onData, SB_RAW, sbHeaders, sbTry, sbWrite, toast, todayStr } from './shell.js';
 import { hbars, idxs, monthlyTotal } from './dash.js';
 import { CHURN_OPTS, codeActive, GRIDS, LEAD_OPTS, LINE_OPTS } from './grids.js';
@@ -1623,7 +1623,9 @@ export function liveData(T){
 export function liveSrcLabel(){ return ST.LIVE_SRC==='sheet'? 'LIVE 명단 시트 기준' : '계약 기준(자동 판정)'; }
 /* 회사 이름 매칭 키 — 띄어쓰기·(주)·괄호 별칭·사명 변경 별칭을 무시하고 같은 회사로 봄 */
 export function nmKeys(n){
-  var ALIAS={}; (SB_RAW.customers||[]).forEach(function(c){ if(c.aliases&&c.aliases.length) ALIAS[c.name]=c.aliases; });
+  var CU=SB_RAW.customers||[];
+  /* ㊿+173 성능: 별칭 표는 같은 계산 묶음 안에서 한 번만(이름마다 고객 전체로 다시 만들던 것) */
+  var ALIAS=tickMemo('nmAlias', [CU, CU.length], function(){ var A={}; CU.forEach(function(c){ if(c.aliases&&c.aliases.length) A[c.name]=c.aliases; }); return A; });
   function k1(t){ var out=[], base=t.replace(/\([^)]*\)/g,''), m2; out.push(base); var re=/\(([^)]*)\)/g; while((m2=re.exec(t))) out.push(m2[1].replace(/^구\.?\s*/,'')); return out; }
   var t=String(n||''), out=k1(t); (ALIAS[t]||[]).forEach(function(a){ out=out.concat(k1(String(a))); });
   return out.map(function(x){ return x.replace(/^\(?주\)?|주식회사|\(주\)|\s|_/g,'').toLowerCase(); }).filter(function(x){ return x.length>=2; });
@@ -1675,14 +1677,23 @@ export function liveN(rows){ var u={}; (rows||[]).forEach(function(x){ u[x.cust]
 export function ctSuccessor(r){
   if(!r || r.endIdx==null || !ST.DATA || !ST.DATA.rows) return null;
   /** @type {any} */ var best=null; /** @type {any} */ var maybe=null; var me=fkNorm(r.cust);
-  ST.DATA.rows.forEach(function(x){
-    if(x===r || x.parent || x.startIdx==null || r.startIdx==null || x.startIdx<=r.startIdx) return;
-    if(/해지|중지/.test(String(x.status||''))) return;
-    var gap=x.startIdx-r.endIdx; if(gap<-1 || gap>12) return;
-    var same=me && fkNorm(x.cust)===me;
-    if(same && x.line===r.line && gap<=2){ if(!best || x.startIdx<best.startIdx) best=x; return; }
-    if(same || c360Match(x.cust, r.cust)){ if(!maybe || x.startIdx<maybe.startIdx) maybe=x; }
-  });
+  if(r.startIdx==null) return null;
+  /* ㊿+173 성능: 시작월별 묶음(원래 행 순서 그대로)에서 종료월 −1 ~ +12 달만 봄 — 계약마다 전체 계약을 훑던 것과 같은 결과
+     (같은 시작월이면 먼저 나온 행 · 시작월이 빠른 것이 이김 — 달 순서대로 보므로 그대로) */
+  var rows=ST.DATA.rows;
+  var byStart=tickMemo('ctByStart', [rows, rows.length], function(){
+    var m=new Map(); rows.forEach(function(x){ if(x.parent || x.startIdx==null) return; var l=m.get(x.startIdx); if(!l) m.set(x.startIdx, l=[]); l.push(x); }); return m; });
+  for(var s0=r.endIdx-1; s0<=r.endIdx+12; s0++){
+    var bucket=byStart.get(s0); if(!bucket) continue;
+    for(var i=0;i<bucket.length;i++){ var x=bucket[i];
+      if(x===r || x.parent || x.startIdx==null || x.startIdx<=r.startIdx) continue;
+      if(/해지|중지/.test(String(x.status||''))) continue;
+      var gap=x.startIdx-r.endIdx; if(gap<-1 || gap>12) continue;
+      var same=me && fkNorm(x.cust)===me;
+      if(same && x.line===r.line && gap<=2){ if(!best || x.startIdx<best.startIdx) best=x; continue; }
+      if(same || c360Match(x.cust, r.cust)){ if(!maybe || x.startIdx<maybe.startIdx) maybe=x; }
+    }
+  }
   return best? {row:best, sure:true} : (maybe? {row:maybe, sure:false} : null);
 }
 export function renewEligible(r){

@@ -3,7 +3,7 @@
    원래 app.js 에 있던 순서 그대로 아래 start() 안에 모았습니다 — main.js 가 모든 파일을 읽은 뒤 start() 를 한 번 부릅니다. 각 문장 위 주석 [파일 N행] 은 원래 위치.
    ★ 새 즉시 실행 코드(이벤트 등록·초기화)는 start() 끝(boot() 앞)에 추가하세요. 선언만 있는 함수는 해당 도메인 파일에. */
 import { APP_VER, IS_QA, IS_STAGING, ST } from './state.js';
-import { applyLook, idleCheck, idleTouch, logClientError, PWA, pwaHintSync, rawHtml, refreshToken, sessRead, tpl } from './core.js';
+import { applyLook, idleCheck, idleTouch, logClientError, perfFlush, PWA, pwaHintSync, rawHtml, refreshToken, sessRead, tpl } from './core.js';
 import { boot, railFlyClose, screenLogin, screenPw, toast } from './shell.js';
 import { measureTopbar, onResize, RESIZE_HOOKS } from './dash.js';
 import { buildGrids, GRIDS } from './grids.js';
@@ -39,6 +39,9 @@ export function start(){
 
   /* [core.js 130행] */
   window.addEventListener('unhandledrejection', function(e){ var r=e.reason; logClientError((r&&r.message)||String(r), '', null, null, r&&r.stack); });
+  /* ㊿+173 실사용 속도 기록은 창을 숨기거나 닫을 때 한 번에 */
+  window.addEventListener('pagehide', function(){ perfFlush(true); });
+  document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='hidden') perfFlush(true); });
 
   /* [core.js 134행] */
   if('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !IS_QA){

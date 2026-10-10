@@ -12,7 +12,7 @@
 import { ST } from './state.js';
 import { cssv, esc, isGN, lline, mk, navText, rawHtml, STATE, tpl, won, wonFull } from './core.js';
 import { ccPref, ccPrefSet, ccUnsnooze, ico, sbTry, toast, visBtn } from './shell.js';
-import { expNote, kpiOpen, monthlyTotal, onResize, renderAll, renewNeedScan } from './dash.js';
+import { DASH_DIRTY, expNote, kpiOpen, monthlyTotal, onResize, renderAll, renewNeedScan } from './dash.js';
 import { abortAsk, ask, isAsking } from './ai.js';
 import { liveData, openRenewList } from './analysis.js';
 import { dashResetIfChanged, DV, gridFilteredSorted, gridGoPre, meMatch, myOwner, navMenu, oiOpen, qvCfg, qvDefs, qvSave, switchView, wvCur } from './grid.js';
@@ -53,8 +53,10 @@ export function placeSearchBtn(){
   var cmd=document.getElementById('cmdBar'), op=aipOpenBtn(), right=document.querySelector('#rail .gn-right'), tb=document.querySelector('#app .topbar');
   if(!cmd || !tb) return;
   var wide=isGN() && !!right && window.innerWidth>760;
-  function toTop(){ var ub=document.getElementById('unitBadge'); if(cmd.parentElement!==tb) tb.insertBefore(cmd, ub||null); if(op && op.parentElement!==tb) tb.insertBefore(op, cmd.nextSibling); }
-  if(wide){ if(cmd.parentElement!==right) right.insertBefore(cmd, right.firstChild); if(op && op.parentElement!==right) right.insertBefore(op, cmd.nextSibling);
+  var nb=document.getElementById('ntfBtn');   /* ㊿+174 알림 종 — 검색 · AI 대화 바로 뒤 */
+  function bell(){ var ref=op||cmd; if(nb && ref.parentElement && (nb.parentElement!==ref.parentElement || nb.previousElementSibling!==ref)) ref.parentElement.insertBefore(nb, ref.nextSibling); }
+  function toTop(){ var ub=document.getElementById('unitBadge'); if(cmd.parentElement!==tb) tb.insertBefore(cmd, ub||null); if(op && op.parentElement!==tb) tb.insertBefore(op, cmd.nextSibling); bell(); }
+  if(wide){ if(cmd.parentElement!==right) right.insertBefore(cmd, right.firstChild); if(op && op.parentElement!==right) right.insertBefore(op, cmd.nextSibling); bell();
     /* 위 메뉴 묶음이 잘리면(좁은 노트북 폭) 검색 · AI 대화는 아래 띠로 — 메뉴가 먼저 */
     var tabs=document.querySelector('#rail .gn-tabs'); if(tabs && tabs.scrollWidth>tabs.clientWidth+1) toTop(); }
   else toTop();
@@ -515,7 +517,7 @@ export function homeTrend(){
     tpl`<div class="chartbox gt-c" id="gnTrendC" role="img" aria-label="최근 ${String(labs.length)}개월 매출 추이 — ${labs[0]} ${won(dat[0])}천원에서 ${labs[labs.length-1]} ${won(dat[dat.length-1])}천원"></div>`+
     tpl`<button type="button" class="gt-more" id="gnDetailBtn" aria-expanded="${open?'true':'false'}" aria-controls="ccHeroHost">${open? '사업 현황 상세 · 분석 접기 ▴' : '사업 현황 상세 · 분석 펼치기 ▾'}<span class="mini">목표 ARR · LIVE 제품별 · 만료 기간 · 신규/해지 · 장비 · 채널 · 월별 장표</span></button>`;
   var c=document.getElementById('gnTrendC');
-  try{ if(c) Viz.lines(c, {labels:labs, series:[{label:'월 매출', data:dat, color:cssv('--s1')}], fmt:won, tipFmt:wonFull, fill:true}); }catch(e){}
+  if(c) Viz.afterLayout(c, function(){ Viz.lines(c, {labels:labs, series:[{label:'월 매출', data:dat, color:cssv('--s1')}], fmt:won, tipFmt:wonFull, fill:true}); });   /* ㊿+173 배치가 끝난 뒤 그림 */
   var db=document.getElementById('gnDetailBtn'); if(db) db.onclick=function(){ homeDetail(!homeDetailOpen(), true); };
 }
 export function homeDetailOpen(){ return ccPref('svc_home_detail'); }
@@ -619,6 +621,8 @@ export function homeTodo(rows, zeros, snz){
 /** 홈 전체 그리기(renderInbox 가 부름) */
 export function homeRender(rows, zeros, snz){
   if(!homeOn()) return;
+  /* ㊿+173 성능: 다른 화면에 있을 때는 숫자만 받아 두고 그리지 않음 — 홈으로 오면 renderTodo → renderInbox 가 다시 부름 */
+  if(ST.CUR_VIEW && ST.CUR_VIEW!=='dash'){ HOME.rows=rows||[]; HOME.zeros=zeros||[]; HOME.snz=snz||0; DASH_DIRTY.v=true; return; }
   ['gnLinks','gnModeH'].forEach(function(id){ var x=document.getElementById(id); if(x) x.remove(); });
   var vd=document.getElementById('viewDash'); if(vd){ vd.removeAttribute('data-hm'); vd.classList.toggle('hm-detail', homeDetailOpen()); } document.body.classList.toggle('hm-detail-on', homeDetailOpen());
   try{ homeSum(); }catch(e){ console.warn('home sum', e); }

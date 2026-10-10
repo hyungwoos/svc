@@ -13,7 +13,32 @@ export var STATE = { lines:{}, base:0, unit:'month', ind:'', partner:'', status:
 
 export function $(s){ return document.querySelector(s); }
 export function $$(s){ return Array.prototype.slice.call(document.querySelectorAll(s)); }
-export function cssv(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+/* ㊿+173 성능: CSS 변수 값 사본 — getComputedStyle 은 바로 앞에서 화면을 바꿨으면 문서 전체 스타일을 다시 계산하게 해 차트마다 수십~수백 ms.
+   열쇠 = <html> 의 속성 전부(테마 · 디자인 · 글자 크기 style · class) + 밝게/어둡게 설정 — 속성 읽기는 스타일 계산을 일으키지 않음 · 바뀌면 그 자리에서 비움
+   빈 값(스타일 시트 읽기 전)은 담지 않음 */
+export var CSSV={m:new Map(), k:'', mq:null};
+export function cssvKey(){
+  var h=document.documentElement, a=h.attributes, k='';
+  for(var i=0;i<a.length;i++) k+=a[i].name+'='+a[i].value+';';
+  if(CSSV.mq===null){ try{ CSSV.mq=window.matchMedia('(prefers-color-scheme: dark)'); }catch(e){ CSSV.mq=false; } }
+  return k+(CSSV.mq && CSSV.mq.matches? 'D' : 'L')+document.styleSheets.length;
+}
+export function cssv(n){
+  var k=cssvKey(); if(k!==CSSV.k){ CSSV.m.clear(); CSSV.k=k; }
+  var v=CSSV.m.get(n); if(v!==undefined) return v;
+  v=getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  if(v) CSSV.m.set(n, v);
+  return v;
+}
+/** ㊿+173 성능: 한 번의 계산 묶음(같은 동기 실행) 안에서만 쓰는 사본 — 다음 마이크로태스크에서 비움.
+    deps(배열 · 참조 비교)가 바뀌면 그 자리에서 다시 만듦 — 데이터를 새로 읽거나 행이 늘고 줄면 같은 묶음 안에서도 새로 */
+export var TICK={m:null};
+export function tickMemo(key, deps, build){
+  if(!TICK.m){ TICK.m=new Map(); Promise.resolve().then(function(){ TICK.m=null; }); }
+  var c=TICK.m.get(key);
+  if(c && c.d.length===deps.length && c.d.every(function(x, i){ return x===deps[i]; })) return c.v;
+  var v=build(); TICK.m.set(key, {d:deps.slice(), v:v}); return v;
+}
 export function el(t,c,x){ var e=document.createElement(t); if(c)e.className=c; if(x!=null)e.textContent=x; return e; }
 
 /* 포탈 전체 금액 표시 단위 = 천원 (원 단위 이하는 표시하지 않음)
@@ -156,6 +181,43 @@ export function logClientError(msg, src, line, col, stack){
   }catch(e){}
 }
 
+
+/* ── ㊿+173 실사용 속도 기록 (client_perf · SQL 104) ──
+   · 첫 화면(로그인 상태로 열기 → 홈 숫자가 그려질 때까지) · 메뉴 이동(누른 뒤 화면이 그려질 때까지) 시간만 — 고객 · 계약 내용은 담지 않음
+   · 세션당 최대 30건 · 30초마다 또는 창을 닫을 때 한 번에 보냄 · 표가 없으면(SQL 104 전) 조용히 그만둠
+   · 관리자 › 배포·운영 › 기록 «포탈 속도(실사용)»에서 화면별 중앙값 · 느린 쪽(90%) */
+export var PERF={q:[], n:0, max:30, off:false, t:null, boot:null, ld:null, last:{}};
+export function perfNet(name){
+  try{ var es=performance.getEntriesByType('resource').filter(function(e){ return e.name.indexOf(name)>=0; }); var e=es[es.length-1]; return e? Math.round(e.duration) : null; }catch(e){ return null; }
+}
+export function perfDev(){
+  var n=/** @type {any} */(navigator), c=n.connection||{};
+  return {cpu:n.hardwareConcurrency||null, mem:n.deviceMemory||null, net:c.effectiveType||null, w:window.innerWidth};
+}
+export function perfRec(kind, view, ms, extra){
+  try{
+    if(PERF.off || IS_QA || !(ms>=0) || PERF.n>=PERF.max) return;
+    PERF.n++; var r=Object.assign({kind:kind, view:view||'', ms:Math.round(ms), ver:APP_VER}, extra||{});
+    PERF.last[kind+':'+(view||'')]=r; PERF.q.push(r);
+    if(!PERF.t) PERF.t=setTimeout(perfFlush, 30000);
+    if(PERF.q.length>=10) perfFlush();
+  }catch(e){}
+}
+export function perfFlush(keep){
+  try{
+    if(PERF.t){ clearTimeout(PERF.t); PERF.t=null; }
+    if(!PERF.q.length || PERF.off || !ST.SB_TOKEN || !ST.AUTH_USER) return;
+    var rows=PERF.q.splice(0).map(function(r){ return {email:ST.AUTH_USER, ver:r.ver, kind:r.kind, view:r.view, ms:r.ms, net_ms:r.net_ms==null? null : r.net_ms, rows:r.rows==null? null : r.rows, detail:r.detail||null}; });
+    fetch(SB_URL+'/rest/v1/client_perf', {method:'POST', keepalive:!!keep, headers:{'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+ST.SB_TOKEN, Prefer:'return=minimal'}, body:JSON.stringify(rows)})
+      .then(function(res){ if([400,401,403,404].indexOf(res.status)>=0) PERF.off=true; }).catch(function(){});   /* 표가 없거나(SQL 104 전) 권한이 없으면 이 세션은 그만 */
+  }catch(e){}
+}
+/** 메뉴 이동 시간 — 누른 뒤 두 번째 그리기(화면이 실제로 바뀐 뒤)까지 */
+export function perfNav(v){
+  if(PERF.off || IS_QA || typeof requestAnimationFrame==='undefined') return;
+  var t0=performance.now();
+  requestAnimationFrame(function(){ requestAnimationFrame(function(){ perfRec('nav', v, performance.now()-t0); }); });
+}
 
 export var PWA={deferred:null};
 export function pwaStandalone(){ try{ return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone===true; }catch(e){ return false; } }

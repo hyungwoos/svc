@@ -1,7 +1,7 @@
 /* ===== sales.js — Cloud 사이트 · OI · 견적→OI · 수주→계약 · 사이드바 접기 · 해지 분석 =====
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { ST } from './state.js';
-import { $, amtHint, canView, canWrite, doLogout, esc, kwToWon, lline, mk, rawHtml, refreshToken, SB_KEY, SB_URL, tpl, won, wonToKw } from './core.js';
+import { $, amtHint, canView, canWrite, doLogout, esc, kwToWon, lline, mk, rawHtml, refreshToken, SB_KEY, SB_URL, tickMemo, tpl, won, wonToKw } from './core.js';
 import { dIdx, EQB, loadFromDb, onData, railSync, renderEqBoard, SB_RAW, sbTry, sbWrite, toast, todayStr } from './shell.js';
 import { kpiTable, toggleWidgetPanel } from './dash.js';
 import { OI_IND, OI_OWNERS, OI_PARTNERS, OI_PROB, OI_PRODUCTS, OI_TYPE } from './grids.js';
@@ -867,10 +867,15 @@ export function crEligible(r){
   return true;
 }
 export function crIsSup(r){ return /지원/.test(String(r.saleType||'')); }
+/* ㊿+173 성능: 해지율 · 고객 증감은 기간마다 같은 «대상 계약»(규칙 + 필터)을 처음부터 다시 걸렀음 — 같은 계산 묶음 안에서는 한 번만(행 순서 · 행 번호 그대로) */
+export function crPool(match){
+  var rows=ST.DATA.rows;
+  return tickMemo('crPool', [rows, rows.length, match, CR.base, CR.sup, CR.cnd, JSON.stringify(CR.f||{}), CR_G], function(){
+    var out=[]; rows.forEach(function(r, i){ if(crEligible(r) && match(r)) out.push(i); }); return out; });
+}
 export function crActive(t, match){
-  var out=[];
-  ST.DATA.rows.forEach(function(r,i){
-    if(!crEligible(r) || !match(r)) return;
+  var out=[], rows=ST.DATA.rows;
+  crPool(match).forEach(function(i){ var r=rows[i];
     if(CR.base==='rev'){ if(ST.MAT[i][t]>0) out.push(r); return; }
     if(CR.base==='sheet'){                                                                                          // 매출시트 LIVE 규칙: 상태 글자 기준 (신규·재약정·CN전환 = LIVE, 서비스종료·추가 = 아님, 해지는 해지월 전까지) · 날짜 없는 행도 포함
       var st0=String(r.status||''); if(st0==='추가' || /종료/.test(st0)) return;
@@ -887,9 +892,8 @@ export function crActive(t, match){
   return out;
 }
 export function crLost(s,e,match){
-  var out=[];
-  ST.DATA.rows.forEach(function(r){
-    if(!crEligible(r) || !match(r)) return;
+  var out=[], rows=ST.DATA.rows;
+  crPool(match).forEach(function(i){ var r=rows[i];
     if(String(r.status||'')!=='해지') return;
     if(r.line==='S1' && String(r.saleType||'')==='CND') return;          // CND(DeviceKeeper) 해지는 매출시트 규칙대로 해지 집계에서 항상 제외
     var x=r.endIdx!=null? r.endIdx : r._l; if(x==null) return;
@@ -1054,9 +1058,9 @@ export function crOpen(d){
    신규 = 그 기간에 첫 계약을 시작한 고객사 · 해지 = 상태 «해지» 종료월이 그 기간인 고객사
    기타 조정 = 기말 − (기초 + 신규 − 해지): 약정 만기 뒤 재약정 없이 끝난 고객, 데이터 보정 등 */
 export function crNew(s,e,match){
-  var first={};
-  ST.DATA.rows.forEach(function(r){
-    if(!crEligible(r) || !match(r) || r.startIdx==null) return;
+  var first={}, rows=ST.DATA.rows;
+  crPool(match).forEach(function(i){ var r=rows[i];
+    if(r.startIdx==null) return;
     var k=r.cust; if(!first[k] || r.startIdx<first[k].startIdx) first[k]=r;
   });
   return Object.keys(first).map(function(k){ return first[k]; }).filter(function(r){ return r.startIdx>=s && r.startIdx<=e; });

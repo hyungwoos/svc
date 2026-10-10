@@ -2,9 +2,9 @@
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { APP_VER, ST } from './state.js';
 import { Viz } from './viz.js';
-import { $, amtGuard, amtHint, canView, cssv, esc, kwToWon, lline, mk, navText, permEnter, rawHtml, STATE, tpl, won, wonFull, wonKo, wonToKw } from './core.js';
+import { $, amtGuard, amtHint, canView, cssv, esc, kwToWon, lline, mk, navText, perfNav, permEnter, rawHtml, STATE, tpl, won, wonFull, wonKo, wonToKw } from './core.js';
 import { cmdAskHit, dIdx, EQB, EQUIP_VIEWS, ico, idxDate, loadFromDb, onData, railSync, renderEqBoard, sbTry, sbWrite, toast, todayStr } from './shell.js';
-import { buildControls, renderAll } from './dash.js';
+import { buildControls, DASH_DIRTY, dashDetailShown, renderAll } from './dash.js';
 import { GRIDS } from './grids.js';
 import { eqRetOpen, eqWant, renderEqPanel, syncOrderAssets } from './equipment.js';
 import { AK, BZX, CH_DEFS, ctOrig, DC, ensureLeadSrc, liveCalc, liveDiff, loadLib, LS, LV, renderChannelView, setLiveSrc } from './analysis.js';
@@ -96,6 +96,7 @@ export var VSCROLL={};
 export var CUSTCTX={c:''};
 export var CUST_VIEWS={contracts:1, live:1, oi:1, inbound:1, orders:1, assets:1, mdrops:1};
 export function navMenu(v){
+  try{ perfNav(v); }catch(e){}   /* ㊿+173 실사용 속도 */
   if(CUSTCTX.c && CUST_VIEWS[v]){ custGo(v, CUSTCTX.c); return; }
   NAV.menu=true;
   switchView(v);
@@ -253,6 +254,7 @@ export function switchView(v){
   }
   if(dash){
     try{ renderTodo(); }catch(e){}
+    if(DASH_DIRTY.v && dashDetailShown()) try{ renderAll(); }catch(e){}   /* ㊿+173 다른 화면에 있는 동안 미뤄 둔 차트 · 표 */
     if(ST.DIRTY){ ST.DIRTY=false; loadFromDb().then(onData); }
     return;
   }
@@ -281,6 +283,7 @@ export function switchView(v){
   $('#dvAdd').style.display=(g.add && !ST.IS_VIEWER)?'':'none';
   $('#dvPaste').style.display=(g.add && !ST.IS_VIEWER)?'':'none';
   $('#dvSearch').value=mem? mem.q : '';
+  if(mem && mem.sy>0) DV.full=true;   /* ㊿+173 스크롤 위치로 돌아갈 때는 행을 한 번에(아래쪽 위치가 잘리지 않게) */
   renderGrid();
   applyDense();
   if(mem) setTimeout(function(){ try{ window.scrollTo(0, mem.sy); var tw=$('#dvTable').parentElement; if(tw) tw.scrollLeft=mem.sx; }catch(e){} }, 0);
@@ -470,7 +473,7 @@ export function readRowInputs(tr,g){
   return body;
 }
 
-export var DV={page:0, per:100, sortK:null, sortDir:1, filters:{}};
+export var DV={page:0, per:100, sortK:null, sortDir:1, filters:{}, full:false};
 
 /* ===== ㊿+169 업무 보기 — 계약·OI 표를 «하는 일»별 열 묶음으로 (사용자: 표 기본 보기 재설계 · 운영/갱신/정산/전체 · 개인 저장)
    · 보기마다 보일 열·순서가 다름 — 열 설정에서 바꾸면 그 보기에만 내 브라우저에 저장(HIDE['contracts@운영']) · «전체»는 예전 열 설정(HIDE['contracts']) 그대로
@@ -1039,6 +1042,19 @@ export function gridActPad(){
   if(over) t.style.setProperty('--actw', th.offsetWidth+'px');
   t.classList.toggle('act-pad', over);
 }
+/* ㊿+173 성능: 표를 새로 그린 직후 폭을 읽으면 큰 표 전체 배치를 그 자리에서 한 번 더 계산 — 배치가 끝난 뒤(ResizeObserver)에 읽고 고침.
+   읽기(넘침 · 동작 열 폭 · 고정 열 폭)를 먼저 모두 하고 쓰기는 그다음 */
+export var GLAY={ro:null};
+export var GRID_GEN={n:0};
+/** 지금 쪽의 행을 모두 그린 상태로(이어 붙이기를 기다리는 중이면 바로) — 시험 · 인쇄 등 */
+export function gridFlush(){ if(GRID_GEN.n && ST.CUR_VIEW && GRIDS[ST.CUR_VIEW] && !GRIDS[ST.CUR_VIEW].custom){ DV.full=true; renderGrid(); } }
+export function gridLayoutLater(){
+  var t=$('#dvTable'); if(!t) return;
+  var run=function(){ var t2=$('#dvTable'); if(!t2) return; var p1=t2.querySelector('thead th.pin1'), w1=p1? p1.offsetWidth : 0; gridActPad(); t2.style.setProperty('--pin1w', w1+'px'); };
+  if(typeof ResizeObserver==='undefined'){ run(); return; }
+  if(!GLAY.ro) GLAY.ro=new ResizeObserver(function(ents){ var e=ents[0]; if(!e || !e.contentRect.width) return; GLAY.ro.disconnect(); try{ run(); }catch(err){} });
+  GLAY.ro.disconnect(); GLAY.ro.observe(t);
+}
 /* ❔ 이 화면 사용법 — 포탈 AI(팀 지식 SQL 91 포함)에게 현재 화면 사용법을 묻고 홈 답변 칸으로 이동 */
 export function askScreenHelp(){
   var g=GRIDS[ST.CUR_VIEW], title=g? g.title : (function(){ var b=document.querySelector('#side button[data-v="'+ST.CUR_VIEW+'"]'); return b? navText(b) : ST.CUR_VIEW; })();
@@ -1206,7 +1222,15 @@ export function renderGrid(){
   t.appendChild(thead);
 
   var tb=document.createElement('tbody');
-  pageRows.forEach(function(r){ tb.appendChild(gridRow(r,g,false)); });
+  /* ㊿+173 성능: 쪽당 100행 중 처음 30행을 먼저 그려 화면을 바로 보여 주고, 나머지는 첫 그리기 직후에 이어 붙임(같은 행 · 같은 순서).
+     저장해 둔 스크롤 위치로 돌아가는 경우(DV.full)와 40행 이하는 한 번에 */
+  var FIRST=(DV.full || pageRows.length<=40)? pageRows.length : 30, GEN=++GRID_GEN.n;
+  pageRows.slice(0, FIRST).forEach(function(r){ tb.appendChild(gridRow(r,g,false)); });
+  if(FIRST<pageRows.length){ var rest=pageRows.slice(FIRST);
+    var more=function(){ if(GEN!==GRID_GEN.n || !tb.isConnected) return; var fr=document.createDocumentFragment(); rest.forEach(function(r){ fr.appendChild(gridRow(r,g,false)); }); tb.appendChild(fr); gridLayoutLater(); };
+    var later=function(){ try{ if(window.requestIdleCallback) window.requestIdleCallback(more, {timeout:180}); else setTimeout(more, 30); }catch(e){ setTimeout(more, 30); } };   /* 첫 그리기가 끝나고 한가할 때(늦어도 0.2초) */
+    if(typeof requestAnimationFrame!=='undefined') requestAnimationFrame(later); else later(); }
+  DV.full=false;
   if(!pageRows.length){   /* 빈 상태 (⑤ UX): 왜 비었는지 + 한 번에 되돌리는 버튼 */
     var q=($('#dvSearch').value||'').trim(), nfl=filterCount(), hasLens=!!DV.lens, hasChip=!!DV.chipVal;
     var why=q? '검색어 «'+esc(q)+'»' : (nfl? '열 필터 '+nfl+'개' : hasLens? '관점 필터' : hasChip? '«'+esc(DV.chipVal)+'» 탭' : DV.pre? '조건 «'+esc(DV.pre.label)+'»' : '');
@@ -1218,8 +1242,7 @@ export function renderGrid(){
   }
   t.appendChild(tb);
   colwApply(t, ST.CUR_VIEW);   /* ㊿+142: 사용자가 정한 열 너비 */
-  gridActPad();
-  pinSync(t);
+  gridLayoutLater();   /* ㊿+173 동작 열 여백 · 고정 열 폭은 배치가 끝난 뒤 */
 
   /* 페이저 */
   var pg=$('#dvPager'); pg.innerHTML='';

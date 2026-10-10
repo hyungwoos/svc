@@ -1,16 +1,16 @@
 /* ===== admin.js — 관리자(계정·권한·MFA 정책) · 배포·운영 · AI 점검 · 내 계정 · 수령처 =====
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { APP_VER, IS_STAGING, ST } from './state.js';
-import { $, applyPerms, axTime, curLook, doLogout, esc, IDLE_KEY, IDLE_OPTS, idleLabel, idleMin, idleTouch, loadPerms, LOOKS, mfaCardRender, navText,
-  PERM_EXEMPT, pwaHintHtml, pwaInstall, rawHtml, closeBtn, SB_KEY, SB_URL, sessRead, setLook, STATE, tpl } from './core.js';
-import { cacheDrop, idxDate, ROLE_VIEWS, sbTry, sbWrite, thisMonthStr, toast, todayStr } from './shell.js';
+import { $, applyPerms, axTime, closeBtn, curLook, doLogout, esc, IDLE_KEY, IDLE_OPTS, idleLabel, idleMin, idleTouch, loadPerms, LOOKS, mfaCardRender, navText, PERF, PERM_EXEMPT, pwaHintHtml, pwaInstall, rawHtml, SB_KEY, SB_URL, sessRead, setLook, STATE, tpl } from './core.js';
+import { cacheDrop, idxDate, ROLE_VIEWS, sbHeaders, sbTry, sbWrite, thisMonthStr, toast, todayStr } from './shell.js';
 import { aiFetch, buildDigest } from './ai.js';
 import { applyCodes, CODE_KIND, CODE_KIND_LABEL, CODE_KIND_NOTE } from './grids.js';
 import { navSub, openMenuEdit } from './tools.js';
 import { UPD, updFetch, updOpenAll, updShow, updSyncSeed } from './upd.js';
-import { switchView, xlsxAoa } from './grid.js';
+import { switchView, viewLabelOf, xlsxAoa } from './grid.js';
 import { logChange, openOvl, setAuthTab } from './edit.js';
 import { loadInbound } from './inbound.js';
+import { ntfAdminRender } from './notify.js';
 
 
 /* ===== 관리자 (super_admin 전용) — 계정·권한 관리 ===== */
@@ -398,6 +398,41 @@ export async function opsHealth(){
   await step('서비스 워커', async function(){ if(!('serviceWorker' in navigator)) return '미지원'; var reg=await navigator.serviceWorker.getRegistration(); return reg? (reg.active? '활성':'등록됨') : '없음 (file:// 또는 미등록)'; });
   OPS.health={running:false, rows:out, at:new Date()}; renderOps(true);
 }
+/* ㊿+173 포탈 속도(실사용 · client_perf · SQL 104) — 최근 7일 · 처음 열기 / 다시 읽기 / 화면별 메뉴 이동의 중앙값 · 느린 쪽(90%) · 버전별 처음 열기 */
+export var PERFV={rows:null, err:'', trim:0};
+export function perfPct(a, p){ if(!a.length) return null; var b=a.slice().sort(function(x,y){ return x-y; }); return b[Math.min(b.length-1, Math.floor(p*(b.length-1)+0.5))]; }
+export async function opsLoadPerf(){
+  PERFV.err=''; PERFV.rows=[];
+  try{ var tr=await fetch(SB_URL+'/rest/v1/rpc/client_perf_trim', {method:'POST', headers:sbHeaders(true), body:'{}'}); PERFV.trim=tr.ok? (+(await tr.json())||0) : 0; }catch(e){ PERFV.trim=0; }
+  var since=new Date(Date.now()-7*864e5).toISOString();
+  var rows=await sbTry('client_perf?select=at,email,ver,kind,view,ms,net_ms,rows,detail&at=gte.'+encodeURIComponent(since)+'&order=at.desc&limit=5000');
+  if(rows===null){ PERFV.err='client_perf 표(SQL 104)가 없거나 읽을 권한이 없습니다'; PERFV.rows=null; } else PERFV.rows=rows;
+  renderOps(true);
+}
+export function perfSecs(ms){ return ms==null? '—' : (ms/1000).toFixed(ms<10000? 2 : 1)+'초'; }
+export function opsPerfHtml(){
+  var R=PERFV.rows, me=PERF.last||{};
+  var h=tpl`<div class="ops-h" style="display:flex;align-items:center;gap:10px">포탈 속도 (실사용 · 최근 7일) <button type="button" class="cbtn" id="opsPerf">불러오기</button>${rawHtml(R? tpl`<span class="mini">${String(R.length)}건${PERFV.trim? ' · 90일 지난 '+PERFV.trim+'건 정리' : ''}</span>` : '')}</div>`;
+  var mine=Object.keys(me).map(function(k){ var r=me[k]; return (r.kind==='boot'? '처음 열기' : r.kind==='reload'? '다시 읽기 '+(viewLabelOf(r.view)||'') : viewLabelOf(r.view))+' '+perfSecs(r.ms)+(r.net_ms!=null? '(데이터 '+perfSecs(r.net_ms)+')' : ''); });
+  h+=tpl`<p class="mini" style="margin:0 0 8px">이 브라우저 이번 세션: ${mine.length? mine.slice(0,8).join(' · ') : '아직 기록 없음'}</p>`;
+  if(PERFV.err) return h+tpl`<p class="mini" style="margin:0 0 14px;color:var(--critical)">${PERFV.err}</p>`;
+  if(!R) return h+tpl`<p class="mini" style="margin:0 0 14px">«불러오기»를 누르면 사용자 브라우저에서 잰 시간(처음 열기 · 메뉴 이동 · 다시 읽기)을 화면별로 묶어 보여 줍니다. 업무 내용은 기록하지 않습니다.</p>`;
+  if(!R.length) return h+tpl`<p class="mini" style="margin:0 0 14px">최근 7일 기록이 없습니다.</p>`;
+  function grp(f){ var m={}; R.forEach(function(r){ var k=f(r); if(k==null) return; (m[k]=m[k]||[]).push(r); }); return m; }
+  function line(label, a){ var ms=a.map(function(r){ return r.ms; }), nt=a.map(function(r){ return r.net_ms; }).filter(function(x){ return x!=null; });
+    var p90=perfPct(ms,0.9); return tpl`<tr><td>${label}</td><td class="n">${String(a.length)}</td><td class="n">${perfSecs(perfPct(ms,0.5))}</td><td class="n${rawHtml(p90>3000? ' warn' : '')}">${perfSecs(p90)}</td><td class="n">${nt.length? perfSecs(perfPct(nt,0.5)) : '—'}</td><td class="n">${String(new Set(a.map(function(r){ return r.email; })).size)}</td></tr>`; }
+  var body='';
+  var B=R.filter(function(r){ return r.kind==='boot'; }), RL=R.filter(function(r){ return r.kind==='reload'; });
+  if(B.length) body+=line('처음 열기 (홈이 그려질 때까지)', B);
+  if(RL.length) body+=line('다시 읽기 (저장 뒤 · 새로고침)', RL);
+  var N=grp(function(r){ return r.kind==='nav'? r.view : null; });
+  Object.keys(N).sort(function(a,b){ return N[b].length-N[a].length; }).slice(0,14).forEach(function(v){ body+=line('메뉴 › '+(viewLabelOf(v)||v), N[v]); });
+  h+=tpl`<table class="rn-tbl" style="margin-bottom:8px"><thead><tr><th>구분</th><th class="n">건수</th><th class="n">중앙값</th><th class="n">느린 쪽(90%)</th><th class="n">데이터 받기(중앙값)</th><th class="n">사용자</th></tr></thead><tbody>${rawHtml(body)}</tbody></table>`;
+  var V=grp(function(r){ return r.kind==='boot'? r.ver : null; }), vs=Object.keys(V).sort().reverse().slice(0,4);
+  if(vs.length>1) h+=tpl`<p class="mini" style="margin:0 0 14px">버전별 처음 열기 중앙값: ${vs.map(function(v){ return v.replace(/^\S+\s+/,'')+' '+perfSecs(perfPct(V[v].map(function(r){ return r.ms; }),0.5))+' ('+V[v].length+'건)'; }).join(' · ')}</p>`;
+  else h+=tpl`<p class="mini" style="margin:0 0 14px">느린 쪽(90%) = 10번 중 가장 느린 1번 정도 · 3초를 넘으면 노란색</p>`;
+  return h;
+}
 export async function opsLoadErrors(){
   try{ var rows=await sbTry('client_errors?select=at,email,ver,view,msg,url,n&order=at.desc&limit=30'); OPS.errs=rows||[]; }catch(e){ OPS.errs=[]; }
   renderOps(true);
@@ -603,6 +638,7 @@ export function opsLogHtml(){
   if(E===null) h+='<p class="mini" style="margin:0 0 14px">«불러오기»를 누르면 client_errors 표(SQL 86)를 읽습니다.</p>';
   else if(!E.length) h+='<p class="mini" style="margin:0 0 14px">기록된 오류가 없습니다 ✓</p>';
   else h+=tpl`<table class="rn-tbl" style="margin-bottom:14px"><thead><tr><th>일시</th><th>계정</th><th>버전</th><th>화면</th><th>오류</th><th class="n">반복</th></tr></thead><tbody>${rawHtml(E.map(function(r){ return tpl`<tr><td class="mini">${String(r.at||'').replace('T',' ').slice(0,19)}</td><td class="mini">${r.email||''}</td><td class="mini">${String(r.ver||'').replace(/^.*\s/,'')}</td><td>${r.view||''}</td><td title="${r.msg||''}">${rawHtml(esc(String(r.msg||'')).slice(0,100))}</td><td class="n">${rawHtml(r.n||1)}</td></tr>`; }).join(''))}</tbody></table>`;
+  h+=opsPerfHtml();
   h+=aiCheckHtml();
   h+=aiqHtml();
   h+='<div class="ops-h">배포·운영 기록 (ops_log · 최근 30건)</div>';
@@ -625,6 +661,7 @@ export function opsLogBind(host){
   aiCheckBind(host);
   var hb=host.querySelector('#opsHealth'); if(hb) hb.onclick=opsHealth;
   var eb=host.querySelector('#opsErrs'); if(eb) eb.onclick=opsLoadErrors;
+  var pb=host.querySelector('#opsPerf'); if(pb) pb.onclick=opsLoadPerf;
 }
 
 /* ㊿+149 관리자 화면 탭 4개 (사용자: «너무 지저분 · 스크롤 많고 난잡») — 계정·권한 / 보안 / 설정(코드 관리·업데이트 안내) / AI 비용
@@ -653,6 +690,7 @@ export function renderAdmin(){
   }
   try{ apBind(); }catch(e){}
   try{ omBind(); omLoad(); }catch(e){}   /* ㊿+172 담당자 연결 */
+  try{ ntfAdminRender(); }catch(e){}   /* ㊿+174 알림 · Slack(기본 꺼짐) */
   try{ mfBind(); mfLoad(); }catch(e){}
   try{ cdBind(); cdLoad(); }catch(e){}
   try{ updAdminLoad(); }catch(e){}

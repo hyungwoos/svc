@@ -2662,4 +2662,46 @@ html[data-skin="gn"] #rail .gn-right .cmdbar kbd{display:inline-block}
 @media (max-width:380px){ html[data-skin="gn"] .gn-ttl:has(.vreset:not([hidden])) .gn-tmark{display:none} }
 /* ㊿+172 고객 증감 «지금 보는 기준» — 결과를 내려 봐도 위에 남음(해지율 «적용 기준»과 같게) · 불투명 바탕 */
 #viewCustFlow .crnow,.crnow{position:sticky;top:var(--tbh,64px);z-index:6;background:linear-gradient(var(--brand-t,rgba(42,120,214,.08)),var(--brand-t,rgba(42,120,214,.08))),var(--plane,var(--surface));box-shadow:0 1px 0 var(--grid)}
+/* ==== ㊿+173 성능 · 운영 ==== */
+/* 포탈 속도(실사용) 표 — 느린 쪽 3초 넘으면 노란색 */
+.rn-tbl td.n.warn{color:var(--warn-ink);font-weight:700}
+/* ==== ㊿+174 알림함 · Slack(기본 꺼짐) ==== */
+.ntf-btn{display:inline-flex;align-items:center;gap:5px;position:relative}
+.ntf-btn[hidden]{display:none!important}
+.ntf-btn b.num{min-width:18px;height:18px;border-radius:9px;background:var(--critical-solid);color:#fff;font-size:12px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;padding:0 5px;line-height:1}
+html[data-skin="gn"] #rail .gn-right .ntf-btn{width:auto;height:34px;margin:0 4px;padding:0 10px;border:1px solid var(--ring);border-radius:17px;background:var(--surface);color:var(--ink)}
+html[data-skin="gn"] #rail .gn-right .ntf-btn:hover{border-color:var(--ink-2)}
+.ntf-panel{position:fixed;z-index:170;width:min(460px,calc(100vw - 24px));max-height:min(72vh,640px);display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--ring);border-radius:14px;box-shadow:0 18px 48px rgba(0,0,0,.22);overflow:hidden}
+.ntf-panel[hidden]{display:none}
+.ntf-panel.sheet{left:0!important;right:0;bottom:0;top:auto!important;width:100%!important;max-height:82vh;border-radius:16px 16px 0 0}
+.ntf-h{display:flex;align-items:center;gap:8px;padding:12px 12px 10px 16px;border-bottom:1px solid var(--grid);flex-wrap:wrap}
+.ntf-h h2{margin:0 auto 0 0;font-size:15px}
+.ntf-h .seg button{height:30px;padding:0 10px;font-size:13px}
+.ntf-list{margin:0;padding:4px 0;overflow:auto;flex:1}
+.ntf-ul{list-style:none;margin:0;padding:0}
+.ntf-g{margin:0;padding:10px 16px 4px;font-size:12px;font-weight:700;color:var(--muted)}
+.ntf-it{display:grid;grid-template-columns:10px minmax(0,1fr);gap:4px 10px;padding:9px 14px 10px 16px;border-top:1px solid var(--grid)}
+.ntf-ul .ntf-it:first-child{border-top:0}
+.ntf-it .dot{width:8px;height:8px;border-radius:4px;margin-top:6px;background:var(--warn-ink)}
+.ntf-it.hi .dot{background:var(--critical-solid)}
+.ntf-it.read .dot{background:transparent;border:1px solid var(--ring)}
+.ntf-it .tx{min-width:0;display:flex;flex-direction:column;gap:2px}
+.ntf-it .tx b{font-size:14px;font-weight:650;color:var(--ink);overflow-wrap:anywhere}
+.ntf-it.read .tx b{font-weight:500;color:var(--ink-2)}
+.ntf-it .tx span{font-size:13px;color:var(--muted);overflow-wrap:anywhere}
+.ntf-it .ac{grid-column:2;display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+.ntf-it .ntf-rd[aria-pressed="true"]{color:var(--muted)}
+.ntf-empty{padding:28px 16px;font-size:14px;color:var(--ink-2);text-align:center;line-height:1.6}
+.ntf-f{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:10px 12px 12px 16px;border-top:1px solid var(--grid);font-size:12px;color:var(--muted)}
+.ntf-f span{margin-right:auto}
+.ntf-sw{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:13px;margin:10px 0 6px}
+.ntf-pre{white-space:pre-wrap;font:inherit;font-size:13px;line-height:1.55;background:var(--surface-2);border:1px solid var(--grid);border-radius:10px;padding:10px 12px;margin:0 0 6px;max-height:34vh;overflow:auto;color:var(--ink)}
+.ntf-dm{margin:0 0 4px;padding-left:20px;font-size:13px;color:var(--ink-2);max-height:20vh;overflow:auto}
+.ntf-frm{grid-template-columns:repeat(3,minmax(0,1fr))}
+.ntf-frm small{display:block;margin-top:3px;font-size:12px;line-height:1.45}
+.ntf-frm .ntf-sw{margin:2px 0 0}
+@media (max-width:760px){ .ntf-frm{grid-template-columns:1fr} .ntf-it .ac .cbtn{height:32px} }
+.ntf-it .ntf-rd[aria-pressed="true"]::before{content:'✓ '}
+.ntf-frm .ntf-sw label{display:inline-flex;align-items:center;gap:8px;margin:0;font-size:14px;color:var(--ink)}
+.ntf-frm .ntf-sw input[type=checkbox]{width:18px;height:18px;padding:0}
 /* ==== ㊿+166 새 디자인 end ==== */
