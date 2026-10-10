@@ -1,8 +1,8 @@
 /* ===== sales.js — Cloud 사이트 · OI · 견적→OI · 수주→계약 · 사이드바 접기 · 해지 분석 =====
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
-import { ST } from './state.js';
+import { APP_VER, ST } from './state.js';
 import { $, amtHint, canView, canWrite, doLogout, esc, kwToWon, lline, mk, rawHtml, refreshToken, SB_KEY, SB_URL, tickMemo, tpl, won, wonToKw } from './core.js';
-import { dIdx, EQB, loadFromDb, onData, railSync, renderEqBoard, SB_RAW, sbTry, sbWrite, toast, todayStr } from './shell.js';
+import { dIdx, EQB, loadFromDb, onData, railSync, renderEqBoard, SB_RAW, sbHeaders, sbTry, sbWrite, toast, todayStr } from './shell.js';
 import { kpiTable, toggleWidgetPanel } from './dash.js';
 import { OI_IND, OI_OWNERS, OI_PARTNERS, OI_PROB, OI_PRODUCTS, OI_TYPE } from './grids.js';
 import { CH_DEFS, chOf } from './analysis.js';
@@ -325,7 +325,27 @@ export var QPROD_MAP={
   'Cloud NAC V5.0':'Cloud NAC'
 };
 export var QMGR_MAP={'kholong':'송기영 부장','choihw':'최형우 차장'};
-export var OI_QUOTE=null;   // {file, date, total}
+export var OI_QUOTE=null;   // {file, date, total, qid?}
+
+/* ── ㊿+177 견적을 포탈 DB 에(quotes · SQL 109) — 목록(영업 › 견적 목록) · 견적 화면 열기 · OI 연결 ── */
+export var QUOTES={ok:null, at:0};
+export var QUOTE_COLS='id,quote_no,doc_type,qtype,customer_name,customer_id,oi_id,quote_date,manager,supply_total,grand_total,status,parent_id,note,created_by,created_at,updated_at,sent_at,won_at,lost_at';
+export async function quotesLoad(){
+  try{ var r=await fetch(SB_URL+'/rest/v1/quotes?select='+QUOTE_COLS+'&order=id.desc&limit=2000', {headers:sbHeaders()}); QUOTES.ok=r.ok; ST.RAWX.quotes=r.ok? ((await r.json())||[]) : []; }
+  catch(e){ ST.RAWX.quotes=[]; }
+  QUOTES.at=Date.now();
+  if(ST.CUR_VIEW==='quotes'){ renderGrid(); if(QUOTES.ok===false) toast('견적 목록이 비어 있습니다','SQL 109(견적 DB)를 실행하면 견적 화면의 «💾 저장» · «PDF 발행»이 여기에 쌓입니다','info'); }
+}
+/** 견적 화면(포탈 안)을 DB 견적(qid=번호) 또는 OI 연결(oi=번호)로 열기 */
+export function quoteOpen(q){
+  var fr=/** @type {any} */($('#quoteFrame')), w=null; try{ w=fr.getAttribute('src')? fr.contentWindow : null; }catch(e){ w=null; }
+  var m=/^qid=(\d+)$/.exec(q);
+  if(m && w && typeof w.qdbOpen==='function' && w.__quoteInit){ switchView('quote'); w.qdbOpen(+m[1], false); return; }   /* 이미 열린 견적 화면 — 저장 안 한 내용은 거기서 확인 */
+  if(w && w.__quoteInit){ var dirty=false; try{ dirty=w.QDB && w.QDB.id? w.qdbSig()!==w.QDB.saved : !!String((w.document.getElementById('customerName')||{}).value||'').trim(); }catch(e){}
+    if(dirty && !confirm('견적 화면에 저장하지 않은 내용이 있습니다. 새로 열까요?')) return; }
+  fr.src='quote.html?v='+encodeURIComponent(APP_VER)+'&'+q;
+  switchView('quote');
+}
 
 export function qCfg(){
   var o={};
@@ -359,6 +379,14 @@ export function openQuotePick(target){
   ul.onclick=function(){
     var r=QP_TARGET.row;
     if(!confirm(r.customer+' OI의 견적서 연결을 해제할까요?\n(견적서 파일 자체는 지워지지 않습니다)')) return;
+    if(/^q:/.test(String(r.quote_file||''))){   /* ㊿+177 포탈 DB 견적 — 견적의 OI 번호를 비우면 OI 칸은 DB 가 맞춤(이 OI 의 다른 견적이 있으면 그것으로) */
+      sbWrite('PATCH','quotes?quote_no=eq.'+encodeURIComponent(String(r.quote_file).slice(2))+'&oi_id=eq.'+r.id,{oi_id:null},'return=minimal')
+        .then(function(){ return sbTry('oi_deals?select=quote_file,quote_date,quote_total&id=eq.'+r.id); })
+        .then(function(x){ var o=(x||[])[0]||{quote_file:null,quote_date:null,quote_total:null}; r.quote_file=o.quote_file; r.quote_date=o.quote_date; r.quote_total=o.quote_total; ST.RAWX.quotes=null;
+          toast('견적서 연결 해제', r.customer+(o.quote_file? ' — 이 OI 의 다른 견적('+String(o.quote_file).slice(2)+')으로' : ''),'info'); closeOvl('ovlQuote'); renderGrid(); })
+        .catch(function(e){ msg('qpMsg',String(e.message||e),'bad'); });
+      return;
+    }
     sbWrite('PATCH','oi_deals?id=eq.'+r.id,{quote_file:null,quote_date:null,quote_total:null,updated_at:new Date().toISOString()})
       .then(function(){
         r.quote_file=null; r.quote_date=null; r.quote_total=null;
@@ -378,6 +406,14 @@ export function oiLinkQuote(r){
 }
 export async function qpLoadList(){
   $('#qpList').innerHTML='<div class="cap" style="padding:16px;text-align:center">불러오는 중…</div>';
+  /* ㊿+177 포탈 DB 견적(SQL 109)을 먼저 — 고르면 견적 번호(q:Q-…)로 연결 */
+  var dbRows=null;
+  if(QUOTES.ok!==false){ try{ var rq=await fetch(SB_URL+'/rest/v1/quotes?select=id,quote_no,customer_name,quote_date,grand_total,status,oi_id&doc_type=eq.quote&order=id.desc&limit=40', {headers:sbHeaders()}); if(rq.ok) dbRows=await rq.json(); else if(rq.status===404) QUOTES.ok=false; }catch(e){} }
+  var dbHtml=(dbRows && dbRows.length)? tpl`<div class="qp-sec">포탈 DB 견적</div>${rawHtml(dbRows.map(function(x){
+      return tpl`<div class="qp-row" data-qid="${String(x.id)}"><div style="min-width:0"><div style="font-weight:650;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${x.quote_no||''} · ${x.customer_name}</div>`+
+        tpl`<div class="cap" style="font-size:12px">${String(x.quote_date||'')} · ${Math.round(+x.grand_total||0).toLocaleString('ko-KR')}원 · ${x.status}${x.oi_id? ' · OI #'+x.oi_id+' 연결됨' : ''}</div></div>`+
+        tpl`<button class="pill ghost" type="button" style="height:28px;padding:0 12px;font-size:12px;flex:0 0 auto">고르기</button></div>`; }).join(''))}<div class="qp-sec">GitHub 저장 견적(예전)</div>` : '';
+  var bindDb=function(){ $('#qpList').querySelectorAll('.qp-row[data-qid]').forEach(function(r){ /** @type {any} */(r).onclick=function(){ qpPickDb(+/** @type {any} */(r).dataset.qid); }; }); };   /* 키보드는 안의 «고르기» 단추(누르면 이 행으로 올라옴) */
   try{
     var res=await qFetch('/list');
     if(!res.ok){ var e=await res.json().catch(function(){return {};});
@@ -385,21 +421,42 @@ export async function qpLoadList(){
     var out=await res.json();
     var files=(out.files||[]).filter(function(f){ return /\.json$/i.test(f.name||''); });
     files.sort(function(a,b){ return String(b.name).localeCompare(String(a.name)); });
-    if(!files.length){ $('#qpList').innerHTML='<div class="cap" style="padding:16px;text-align:center">저장된 견적서가 없습니다.</div>'; return; }
-    $('#qpList').innerHTML=files.slice(0,80).map(function(f){
+    if(!files.length){ $('#qpList').innerHTML=dbHtml+tpl`<div class="cap" style="padding:16px;text-align:center">저장된 견적서가 없습니다.</div>`; bindDb(); return; }
+    $('#qpList').innerHTML=dbHtml+files.slice(0,80).map(function(f){
       var L=qLabel(f.name);
       return tpl`<div class="qp-row" data-path="${f.path||f.name}" data-name="${f.name}">`+
         tpl`<div style="min-width:0"><div style="font-weight:650;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${L.c}</div>`+
         tpl`<div class="cap" style="font-size:12px">${L.d||''}</div></div>`+
         tpl`<button class="pill ghost" type="button" style="height:28px;padding:0 12px;font-size:12px;flex:0 0 auto">불러오기</button></div>`;
     }).join('');
-    $('#qpList').querySelectorAll('.qp-row').forEach(function(r){
+    $('#qpList').querySelectorAll('.qp-row[data-path]').forEach(function(r){
       r.onclick=function(){ qpPick(r.dataset.path, r.dataset.name); };
     });
+    bindDb();
     if(files.length>80) msg('qpMsg','최근 80건만 표시했습니다');
   }catch(err){
-    $('#qpList').innerHTML=tpl`<div class="cap" style="padding:16px;text-align:center;color:var(--critical)">목록 조회 실패: ${String(err.message||err)}</div>`;
+    $('#qpList').innerHTML=dbHtml+tpl`<div class="cap" style="padding:16px;text-align:center;color:var(--critical)">${dbHtml? 'GitHub 저장 견적' : '목록'} 조회 실패: ${String(err.message||err)}</div>`; bindDb();
   }
+}
+/** ㊿+177 포탈 DB 견적 고르기 — 기존 OI 에 연결(견적의 OI 번호를 바꾸면 OI 칸은 DB 가 맞춤) · 또는 OI 등록 폼 채우기 */
+export async function qpPickDb(id){
+  msg('qpMsg','견적을 읽는 중…');
+  try{
+    var r=await fetch(SB_URL+'/rest/v1/quotes?select=id,quote_no,data,quote_date,grand_total,oi_id&id=eq.'+id, {headers:sbHeaders()});
+    var x=r.ok? ((await r.json())||[])[0] : null; if(!x) throw new Error('견적이 없거나 볼 권한이 없습니다');
+    var ref='q:'+(x.quote_no||'#'+x.id);
+    if(QP_TARGET && QP_TARGET.row){
+      var o=QP_TARGET.row;
+      if(x.oi_id && x.oi_id!==o.id && !confirm((x.quote_no||'')+' 은(는) 지금 OI #'+x.oi_id+' 에 연결돼 있습니다. 이 OI(#'+o.id+')로 옮길까요?')){ msg('qpMsg',''); return; }
+      await sbWrite('PATCH','quotes?id=eq.'+x.id, {oi_id:o.id}, 'return=minimal');
+      o.quote_file=ref; o.quote_date=x.quote_date; o.quote_total=x.grand_total; ST.RAWX.quotes=null;
+      if(x.oi_id && x.oi_id!==o.id){ var o2=(ST.RAWX.oi||[]).filter(function(y){ return y.id===x.oi_id; })[0]; if(o2 && o2.quote_file===ref){ o2.quote_file=null; o2.quote_date=null; o2.quote_total=null; } }
+      closeOvl('ovlQuote'); toast('견적서 연결됨', (o.customer||'')+' ← '+(x.quote_no||'')); renderGrid(); return;
+    }
+    oiApplyQuote(Object.assign({}, x.data||{}), ref, x.quote_no||ref);
+    if(OI_QUOTE) OI_QUOTE.qid=x.id;
+    closeOvl('ovlQuote'); toast('견적서 불러옴', x.quote_no||'');
+  }catch(e){ msg('qpMsg','불러오기 실패: '+String(/** @type {any} */(e).message||e),'bad'); }
 }
 export async function qpPick(path, name){
   msg('qpMsg','견적서를 읽는 중…');
@@ -562,6 +619,7 @@ export async function submitOi(){
     };
     var out=await sbWrite('POST','oi_deals?select=*',[row],'return=representation');
     ST.RAWX.oi=ST.RAWX.oi||[]; ST.RAWX.oi.unshift(out[0]);
+    if(OI_QUOTE && OI_QUOTE.qid && out[0]) sbWrite('PATCH','quotes?id=eq.'+OI_QUOTE.qid, {oi_id:out[0].id}, 'return=minimal').then(function(){ ST.RAWX.quotes=null; }).catch(function(){});   /* ㊿+177 견적 쪽에도 OI 번호 */
     logChange('insert','oi_deals',out[0].id,{customer:cust,deal:name});
     msg('oiMsg','');
     $('#oiDoneSum').textContent=[cust, name, row.deal_type,

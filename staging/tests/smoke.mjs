@@ -2697,6 +2697,7 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
 }
 // ㊿+175 운영 · 안정성 — 옛 탭 막기 · 동시 수정 · 저장 확인 · 다시 시도 · 운영 상태(알림함) · 운영 되돌리기 (가짜 DB · 모의 응답 · 외부 발송 0)
 {
+  const CUR = /<meta name="app-ver" content="([^"]+)">/.exec(fs.readFileSync(path.join(DIR, 'index.html'), 'utf8'))[1], CURN = CUR.split(' ')[1];   /* 지금 버전(㊿+n) — 버전을 올려도 시험은 그대로 */
   const verRoute = async (page, st) => page.route(/index\.html\?vw=/, async (r) => { const res = await r.fetch(); let t = await res.text(); if (st.ver) t = t.replace(/name="app-ver" content="[^"]+"/, 'name="app-ver" content="' + st.ver + '"'); await r.fulfill({ status: 200, contentType: 'text/html', body: t }); });
   await S.t('㊿+175 옛 탭 막기: 서버에 새 버전 → 화면 아래 띠 · 업무 저장은 막음(요청 0) · 기록(change_log)은 통과 · 같아지면 띠 사라짐 · 서버가 더 옛것(되돌림)이면 1분 넘게 계속될 때만 · 저장 직전에도 확인', async () => {
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page);
@@ -2717,7 +2718,7 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
     const a5 = await page.evaluate(async () => { SVC.VW.at = 0; let m = null; try { await SVC.sbWrite('PATCH', 'oi_deals?id=eq.1', { stage: 'x' }); } catch (e) { m = e.message; } return { m, stale: SVC.VW.stale }; });
     await page.waitForTimeout(200);
     assert(!a0.stale && !a0.bar && a0.latest, 'same ' + JSON.stringify(a0));
-    assert(a1.stale && /새 버전\(㊿\+999\)/.test(a1.bar) && /이 탭은 ㊿\+175/.test(a1.bar) && a1.role === 'status', 'newer ' + JSON.stringify(a1));
+    assert(a1.stale && /새 버전\(㊿\+999\)/.test(a1.bar) && a1.bar.includes('이 탭은 ' + CURN) && a1.role === 'status', 'newer ' + JSON.stringify(a1));
     assert(a2.e1 && a2.e1.st && /저장하지 않았습니다/.test(a2.e1.m) && a2.ok2 === true && !w2.some((x) => /contracts/.test(x)) && w2.some((x) => /^POST change_log/.test(x)), 'block ' + JSON.stringify({ a2, w2 }));
     assert(!a3.stale && !a3.bar && a4.s1 === false && a4.s2 === true && /운영 버전이 ㊿\+1/.test(a4.bar || ''), 'older ' + JSON.stringify({ a3, a4 }));
     assert(a5.stale && /새 버전\(㊿\+998\)/.test(a5.m || '') && !writes.some((x) => /oi_deals/.test(x)) && !c.errs.length, 'before-write ' + JSON.stringify({ a5, writes, errs: c.errs }));
@@ -2785,7 +2786,7 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
     return { v: 1, at: new Date(now).toISOString(), snap: { schema: true, last_day: ymd, days: [ymd], rows: { contracts: 100, customers: 40, monthly_revenue: 5000 } }, live_rows: { contracts: 90, customers: 40, monthly_revenue: 4990 },
       cron: [{ name: 'svc-snap-nightly', active: true, last_status: 'succeeded', last_start: new Date(now - 26 * 36e5).toISOString() }, { name: 'aicheck-nightly', active: true, last_status: 'failed', last_start: new Date(now - 20 * 36e5).toISOString(), last_msg: 'ERROR: boom' }],
       aicheck: { last_cron: { run_at: new Date(now - 50 * 36e5).toISOString(), source: 'cron', pass: 15, total: 15 } }, errors: { n24: 23, n7: 30, users24: 3, top: [{ msg: 'TypeError: x is null', cnt: 20, users: 3 }] },
-      vers: [{ ver: '2026-09-16 ㊿+175', users: 4 }, { ver: '2026-09-16 ㊿+173', users: 2 }] }; };
+      vers: [{ ver: CUR, users: 4 }, { ver: '2026-09-16 ㊿+173', users: 2 }] }; };
   await S.t('㊿+175 운영 상태(SQL 106 ops_status · 슈퍼 관리자만): 야간 백업 30시간 넘게 없음 · 자동 작업 실패 · 계약 행 수 급감 · 야간 AI 점검 오래됨 · 브라우저 오류 23건 · 옛 버전 2명 → 알림함 «운영 상태» · Slack 보내기에서는 빠짐 · 시스템 점검에도 / 관리자 아님 = 부르지 않음', async () => {
     const run = async (role, sqlOk) => {
       const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page); let called = 0;
@@ -2804,7 +2805,7 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
     const pane = await S1.page.evaluate(() => [...document.querySelectorAll('#ntfPanel .ntf-g')].map((x) => x.textContent));
     await S1.page.click('#ntfPanel [data-go="0"]'); await S1.page.waitForFunction(() => SVC.ST.CUR_VIEW === 'ops' && document.querySelector('#opsTabs'), null, { timeout: 8000 }); await S1.page.waitForTimeout(300);
     const ops = await S1.page.evaluate(() => ({ v: SVC.ST.CUR_VIEW, tab: (document.querySelector('#opsTabs [aria-pressed="true"], #opsTabs .on') || {}).textContent || '' }));
-    await S1.page.route(/github\.io|githubusercontent/, (r) => r.fulfill({ status: 200, contentType: 'text/html', body: '<meta name="app-ver" content="2026-09-16 ㊿+175">' }));
+    await S1.page.route(/github\.io|githubusercontent/, (r) => r.fulfill({ status: 200, contentType: 'text/html', body: '<meta name="app-ver" content="' + CUR + '">' }));
     await S1.page.evaluate(() => { SVC.opsHealth(); }); await S1.page.waitForFunction(() => SVC.OPS.health && !SVC.OPS.health.running, null, { timeout: 20000 });
     const hl = await S1.page.evaluate(() => (SVC.OPS.health && SVC.OPS.health.rows || []).filter((x) => /운영 상태/.test(x.name)).map((x) => (x.ok ? 'ok ' : 'bad ') + x.info).join(''));
     assert(S1.r.n === 6 && S1.r.me && /야간 백업이 \d+시간째 없습니다/.test(t) && /자동 작업 실패 — aicheck-nightly/.test(t) && /계약 행이 마지막 백업보다 10건 적습니다/.test(t) && !/월 매출 행/.test(t) && /야간 AI 점검이 5\d시간째/.test(t) && /브라우저 오류 23건/.test(t) && /옛 버전 탭으로 쓰는 사람 2명/.test(t) && !S1.r.slack, 'items ' + JSON.stringify(S1.r));
@@ -2839,6 +2840,273 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
     assert(n1 === 0 && last.length === 2 && last[0] === 'gh_rollback:dry:bbbb' && last[1] === 'gh_rollback:bbbb:head=' + 'h'.repeat(40) && calls.some((x) => /^dialog:운영 포탈을 되돌립니다/.test(x)) && /되돌리기 커밋 완료/.test(msg) && !c.errs.length, JSON.stringify({ n1, last, msg, calls: calls.slice(-6), errs: c.errs }));
     await ctx.close();
     return '이력 3 → 미리 보기 ㊿+175 → ㊿+174 · 취소 0 · 확인 1';
+  });
+}
+// ㊿+176 정산(A-1) — 비즈포탈 차액 연도 · 월 마감 · 수정 이력 · 에스원/카카오 정산 마감 · 리포트 발행 잠금 (가짜 DB · SQL 107 함수는 시험용 흉내 · 외부 발송 0)
+{
+  const CY = new Date().getFullYear(), K = (y, m) => y + '-' + String(m).padStart(2, '0');
+  const fakeClose = (db, log) => {   /* SQL 107 함수 흉내 — 마감 확인 · 지우고 넣기 한 번에 · 바뀌기 전 내용을 doc_hist 에 */
+    const locked = (kind, k) => db.table('period_locks').some((x) => x.kind === kind && x.period === k);
+    const hist = (o) => db.table('doc_hist').push(Object.assign({ id: db.nextId('doc_hist'), at: new Date(Date.now() + db.table('doc_hist').length * 1000).toISOString(), actor: 'tester@example.com' }, o));
+    db.rpc.is_super_admin = () => true;
+    db.rpc.biz_month_replace = (b) => { const k = K(b.p_y, b.p_m); log.push('replace ' + k + ' ' + (b.p_note || '')); if (locked('biz', k)) throw new Error(k + ' 비즈포탈 차액은 마감됐습니다');
+      const old = db.table('biz_recon').filter((r) => +r.y === b.p_y && r.ym === b.p_m + '월'); db.t.biz_recon = db.table('biz_recon').filter((r) => !old.includes(r));
+      const ins = b.p_rows.map((r) => Object.assign({}, r, { id: db.nextId('biz_recon'), y: b.p_y, ym: b.p_m + '월' })); db.t.biz_recon.push(...ins);
+      hist({ kind: 'biz_recon', ref: k, period: k, op: /^restore/.test(b.p_note || '') ? 'restore' : old.length ? 'replace' : 'insert', old: old.length ? old : null, note: b.p_note || null }); return ins; };
+    db.rpc.biz_month_delete = (b) => { const k = K(b.p_y, b.p_m); log.push('delete ' + k); if (locked('biz', k)) throw new Error(k + ' 비즈포탈 차액은 마감됐습니다');
+      const old = db.table('biz_recon').filter((r) => +r.y === b.p_y && r.ym === b.p_m + '월'); db.t.biz_recon = db.table('biz_recon').filter((r) => !old.includes(r)); hist({ kind: 'biz_recon', ref: k, period: k, op: 'delete', old }); return old.length; };
+    db.rpc.period_lock = (b) => { log.push('lock ' + b.p_kind + ' ' + b.p_period); if (!locked(b.p_kind, b.p_period)) db.table('period_locks').push({ kind: b.p_kind, period: b.p_period, locked_by: 'tester@example.com', locked_at: new Date().toISOString(), note: b.p_note }); return true; };
+    db.rpc.period_unlock = (b) => { log.push('unlock ' + b.p_kind + ' ' + b.p_period + ' ' + b.p_reason); if (String(b.p_reason || '').trim().length < 2) throw new Error('사유'); db.t.period_locks = db.table('period_locks').filter((x) => !(x.kind === b.p_kind && x.period === b.p_period)); return true; };
+    db.rpc.report_reopen = (b) => { log.push('reopen ' + b.p_id + ' ' + b.p_reason); const r = db.table('project_reports').find((x) => x.id === b.p_id); if (!r || r.status !== 'issued') return false; r.status = 'draft'; return true; };
+  };
+  const ctxOf = async (db, f, w = 1440) => { const ctx = await browser.newContext({ viewport: { width: w, height: 1000 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page); const dlg = [];
+    page.on('dialog', async (d) => { dlg.push(d.type() + ':' + d.message().split('\n')[0]); if (d.type() === 'prompt') await d.accept('시험 사유'); else if (d.type() === 'alert') await d.dismiss(); else await d.accept(); });
+    await fakeBackend(page, db); await page.goto(url + '/' + f); return { ctx, page, c, dlg }; };
+
+  await S.t('㊿+176 비즈포탈 차액 연도: 같은 «8월»이 해마다 따로(연도-월) · 예전 행(연도 칸 없음)은 작성일로 해 추정 · 고쳐 저장하면 그 해 그 달만 바꿈(다른 해 그대로 · DELETE 직접 요청 0) · 지우기도 그 해만 · 홈 «이번 달 입력됨»도 해까지', async () => {
+    const log = [], B = (id, y, m, item, v, asof) => ({ id, y, ym: m + '월', kind: 'sum', item, biz: v, sheet: null, diff: null, note: null, as_of: asof });
+    const db = new FakeDB(Object.assign(seedData(), { biz_recon: [B(9001, CY - 2, 8, '비즈포탈 회계매출', 50000000, K(CY - 2, 9) + '-05'), B(9002, CY - 2, 8, '매출시트 매출', 51000000, K(CY - 2, 9) + '-05'),
+      B(9003, CY - 1, 8, '비즈포탈 회계매출', 60000000, K(CY - 1, 9) + '-05'), B(9004, CY - 1, 8, '매출시트 매출', 61000000, K(CY - 1, 9) + '-05'), Object.assign(B(9005, null, 12, '비즈포탈 회계매출', 7000000, CY + '-01-05'), { y: undefined })] })); fakeClose(db, log);
+    const { ctx, page, c } = await ctxOf(db, 'index.html');
+    await page.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA, null, { timeout: 15000 }); await page.evaluate(() => SVC.switchView('biz')); await page.waitForFunction(() => SVC.BIZL.at > 0, null, { timeout: 8000 }); await page.waitForTimeout(300);
+    const pills = () => page.evaluate(() => [...document.querySelectorAll('#bizHost .pill, .biz-host .pill')].map((b) => b.textContent.trim()).filter((t) => /월/.test(t) && !/입력|수정|삭제|마감|대조/.test(t)));
+    const p0 = await pills(), has = await page.evaluate((cy) => [SVC.bizHas(cy - 1, 8), SVC.bizHas(cy - 2, 8), SVC.bizHas(cy, 8), SVC.bizHas(cy - 1, 12)], CY);
+    assert(JSON.stringify(p0) === JSON.stringify([(CY - 1) + '년 12월', (CY - 1) + '년 8월', (CY - 2) + '년 8월']) && has.join() === 'true,true,false,true', 'pills ' + JSON.stringify({ p0, has }));
+    await page.click('text=' + (CY - 1) + '년 8월'); await page.click('text=✎ 이 달 수정'); await page.waitForTimeout(200);
+    const ym0 = await page.$eval('#bzYm', (e) => e.value); await page.fill('#bzSums .bz-amt >> nth=0', '65000'); await page.click('#bzSave'); await page.waitForTimeout(700);
+    const rows = db.table('biz_recon'), o2 = rows.filter((r) => r.y === CY - 2).map((r) => r.id).join(), n1 = rows.filter((r) => r.y === CY - 1 && r.ym === '8월'), h1 = db.table('doc_hist').slice(-1)[0];
+    assert(ym0 === K(CY - 1, 8) && log[0] === 'replace ' + K(CY - 1, 8) + ' ' && o2 === '9001,9002' && n1.length === 2 && n1.some((r) => r.biz === 65000000) && h1 && h1.op === 'replace' && h1.old.length === 2 && !db.writes.some((w) => w.method === 'DELETE' && w.table === 'biz_recon'), 'save ' + JSON.stringify({ ym0, log, o2, n1, h1 }));
+    const p1 = await pills(); await page.click('text=' + (CY - 2) + '년 8월'); await page.click('text=🗑 이 달 삭제'); await page.waitForTimeout(600);
+    const left = db.table('biz_recon').map((r) => r.y + ':' + r.ym).sort().join(), p2 = await pills();
+    assert(log[1] === 'delete ' + K(CY - 2, 8) && !/9001|9002/.test(db.table('biz_recon').map((r) => r.id).join()) && left.includes((CY - 1) + ':8월') && JSON.stringify(p2) === JSON.stringify([(CY - 1) + '년 12월', (CY - 1) + '년 8월']) && p1.length === 3, 'delete ' + JSON.stringify({ log, left, p2 }));
+    assert(!c.errs.length, c.errs.join('|')); await ctx.close();
+    return p0.join(' · ') + ' → 저장 · 지우기는 그 해만';
+  });
+
+  await S.t('㊿+176 비즈포탈 월 마감 · 이력: «이 달 마감» → 🔒 · 수정/삭제 숨김 · 새 달 입력으로도 그 달 저장 안 됨 / 이력(고침 전 내용) · 마감된 달은 되돌리기 없음 / 슈퍼 관리자 «마감 풀기»(사유) → 이력에서 «이 판으로 되돌리기» = 전 값 + 되돌림 기록', async () => {
+    const log = [], B = (id, m, item, v) => ({ id, y: CY - 1, ym: m + '월', kind: 'sum', item, biz: v, sheet: null, diff: null, note: null, as_of: K(CY - 1, m + 1) + '-05' });
+    const db = new FakeDB(Object.assign(seedData(), { biz_recon: [B(9101, 8, '비즈포탈 회계매출', 60000000), B(9102, 8, '매출시트 매출', 61000000)] })); fakeClose(db, log);
+    const { ctx, page, c, dlg } = await ctxOf(db, 'index.html');
+    await page.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA, null, { timeout: 15000 }); await page.evaluate(() => SVC.switchView('biz')); await page.waitForFunction(() => SVC.BIZL.at > 0 && document.getElementById('bizLockBtn'), null, { timeout: 8000 });
+    await page.evaluate(() => { SVC.BIZV.edit = true; SVC.BIZV.newMonth = false; SVC.renderBizMonthly(); }); await page.fill('#bzSums .bz-amt >> nth=0', '65000'); await page.click('#bzSave'); await page.waitForTimeout(600);
+    await page.click('#bizLockBtn'); await page.waitForTimeout(500);
+    const L = await page.evaluate(() => { const t = [...document.querySelectorAll('button')].map((b) => b.textContent); return { badge: (document.querySelector('.biz-lock') || {}).textContent || '', edit: t.some((x) => /이 달 수정/.test(x)), del: t.some((x) => /이 달 삭제/.test(x)), un: !!document.getElementById('bizUnlock'), pill: t.some((x) => /8월 🔒/.test(x)) }; });
+    assert(log.includes('lock biz ' + K(CY - 1, 8)) && /🔒 마감 · tester/.test(L.badge) && !L.edit && !L.del && L.un && L.pill && dlg.some((x) => /^confirm:.*마감합니다/.test(x)), 'lock ' + JSON.stringify({ L, log, dlg }));
+    await page.click('text=＋ 새 달 입력'); await page.waitForTimeout(150); await page.fill('#bzYm', K(CY - 1, 8)); await page.fill('#bzSums .bz-amt >> nth=0', '1'); const nLog = log.length; await page.click('#bzSave'); await page.waitForTimeout(300);
+    const bm = await page.$eval('#bzMsg', (e) => e.textContent); await page.click('#bzCancel'); await page.waitForTimeout(150);
+    assert(/마감됐습니다/.test(bm) && log.length === nLog && db.table('biz_recon').some((r) => r.biz === 65000000), 'blocked ' + bm);
+    await page.click('#bizHist'); await page.waitForTimeout(400);
+    const H1 = await page.evaluate(() => ({ rows: [...document.querySelectorAll('#ovlBizHist tbody tr')].map((r) => r.textContent), btn: document.querySelectorAll('#ovlBizHist [data-bh]').length, cap: document.getElementById('bhCap').textContent, on: document.getElementById('ovlBizHist').classList.contains('on') }));
+    await page.keyboard.press('Escape'); await page.waitForTimeout(150);
+    assert(H1.on && H1.rows.length === 1 && /고침/.test(H1.rows[0]) && /60,000|60000/.test(H1.rows[0]) && H1.btn === 0 && /마감 풀기/.test(H1.cap), 'hist-locked ' + JSON.stringify(H1));
+    await page.click('#bizUnlock'); await page.waitForTimeout(500);
+    const U = await page.evaluate(() => ({ un: !!document.getElementById('bizUnlock'), edit: [...document.querySelectorAll('button')].some((b) => /이 달 수정/.test(b.textContent)) }));
+    assert(log.includes('unlock biz ' + K(CY - 1, 8) + ' 시험 사유') && !U.un && U.edit && !db.table('period_locks').length, 'unlock ' + JSON.stringify({ U, log }));
+    await page.click('#bizHist'); await page.waitForTimeout(400); await page.click('#ovlBizHist [data-bh="0"]'); await page.waitForTimeout(700);
+    const after = db.table('biz_recon').filter((r) => r.ym === '8월').map((r) => r.biz).sort().join(), last = db.table('doc_hist').slice(-1)[0];
+    assert(after === '60000000,61000000' && last.op === 'restore' && /^restore #1/.test(last.note) && last.old.some((r) => r.biz === 65000000) && log.some((x) => /^replace .* restore #1/.test(x)), 'restore ' + JSON.stringify({ after, last, log }));
+    assert(!c.errs.length, c.errs.join('|')); await ctx.close();
+    return log.join(' / ');
+  });
+
+  for (const [f, kind, table] of [['s1.html', 's1', 's1_settle'], ['kk.html', 'kk', 'kk_settle']]) {
+    await S.t('㊿+176 위성 ' + f + ' 월 마감 · 이력: 마감된 달 머리 🔒 · 그 달 «삭제» 없음 · 지우기 시도도 막힘(요청 0) · 마감 안 된 달 «🔒 마감…» → period_lock · «마감 풀기…»(사유) · 이력 → «이 판으로 되돌리기» = 그때 값으로 PATCH', async () => {
+      const log = [], m8 = K(CY - 1, 8), m7 = K(CY - 1, 7), now = new Date().toISOString();
+      const S0 = (id, m, total) => ({ id, month: m + '-01', kind: 'use', total, biz_total: total, cnt_new: 1, cnt_end: 0, cnt_ext: 0, cnt_keep: 3, created_by: 'tester@example.com', updated_at: now });
+      const db = new FakeDB(Object.assign(seedData(), { [table]: [S0(1, m8, 1000), S0(2, m7, 2000)], period_locks: [{ kind, period: m8, locked_by: 'boss@example.com', locked_at: now, note: null }],
+        doc_hist: [{ id: 1, at: now, actor: 'staff@example.com', kind: table, ref: '2', period: m7, op: 'update', old: Object.assign(S0(2, m7, 1500), { report_id: 9 }), note: null }] })); fakeClose(db, log);
+      const { ctx, page, c, dlg } = await ctxOf(db, f); await page.waitForFunction(() => window.CLS && CLS.ok === true && CLS.sup === true, null, { timeout: 10000 });
+      await page.click('[data-click="openSettles()"]'); await page.waitForTimeout(500);
+      const V = await page.evaluate(([m8, m7]) => { const mon = [...document.querySelectorAll('#setList .setmon')].map((x) => x.textContent); const rows = [...document.querySelectorAll('#setList .setrow')];
+        return { mon, del: rows.map((r) => !!r.querySelector('[data-click^="delSettleId"]')), hist: rows.map((r) => !!r.querySelector('[data-click^="clsHist"]')), m8: mon.find((x) => x.includes(m8)), m7: mon.find((x) => x.includes(m7)) }; }, [m8, m7]);
+      assert(/🔒 마감 · boss/.test(V.m8) && /마감 풀기/.test(V.m8) && /🔒 마감…/.test(V.m7) && V.del.join() === 'false,true' && V.hist.join() === 'true,true', 'list ' + JSON.stringify(V));
+      const w0 = db.writes.length; await page.evaluate(() => delSettleId(1)); await page.waitForTimeout(300); const ms = await page.$eval('#mS', (e) => e.textContent);
+      assert(/마감됐습니다/.test(ms) && db.writes.length === w0 && db.table(table).length === 2, 'del-block ' + ms);
+      await page.click('#setList [data-click="clsHist(2)"]'); await page.waitForTimeout(400);
+      const H = await page.evaluate(() => ({ on: document.getElementById('ovlHist').classList.contains('show'), rows: [...document.querySelectorAll('#ovlHist tbody tr')].map((r) => r.textContent), role: document.querySelector('#ovlHist .pan').getAttribute('role') }));
+      await page.click('#ovlHist [data-click="clsRestore(0)"]'); await page.waitForTimeout(600);
+      const r2 = db.table(table).find((x) => x.id === 2), pw = db.writes.filter((w) => w.method === 'PATCH' && w.table === table).slice(-1)[0];
+      assert(H.on && H.role === 'dialog' && H.rows.length === 1 && /고침/.test(H.rows[0]) && /1,500/.test(H.rows[0]) && r2.total === 1500 && pw && !('id' in pw.body) && !('report_id' in pw.body) && !('created_by' in pw.body), 'restore ' + JSON.stringify({ H, r2, pw }));
+      await page.click('[data-click="openSettles()"]').catch(() => {}); await page.waitForTimeout(300);
+      await page.click('#setList [data-click="clsLock(\'' + m7 + '\')"]'); await page.waitForTimeout(500);
+      await page.click('#setList [data-click="clsUnlock(\'' + m8 + '\')"]'); await page.waitForTimeout(500);
+      const V2 = await page.evaluate(() => [...document.querySelectorAll('#setList .setrow')].map((r) => !!r.querySelector('[data-click^="delSettleId"]')).join());
+      assert(log.includes('lock ' + kind + ' ' + m7) && log.includes('unlock ' + kind + ' ' + m8 + ' 시험 사유') && V2 === 'true,false' && dlg.some((x) => /^prompt:.*사유/.test(x)), 'lock/unlock ' + JSON.stringify({ log, V2, dlg }));
+      assert(!c.errs.length && !c.csp.length, c.errs.concat(c.csp).join('|')); await ctx.close();
+      return log.join(' / ');
+    });
+  }
+
+  await S.t('㊿+176 위성 report.html 발행 잠금: 발행된 리포트 = 저장 버튼 꺼짐 · 🔒 발행됨 · 저장 · 삭제 요청 0 / 슈퍼 관리자 «발행 취소…»(사유) → report_reopen / «PDF 발행» = 저장된 리포트에 status issued 한 번 → 잠김', async () => {
+    const log = [], now = new Date().toISOString();
+    const P = (id, st) => ({ id, contract_id: null, customer: '가상고객01', kind: 'install', report_month: K(CY - 1, 8) + '-01', report_no: 'R-' + id, title: '시험 리포트', amount: 1000, status: st, payload: { customer: '가상고객01', month: K(CY - 1, 8) }, updated_at: now, created_by: 'tester@example.com' });
+    const db = new FakeDB(Object.assign(seedData(), { project_reports: [P(7, 'issued'), P(8, 'draft')] })); fakeClose(db, log);
+    const { ctx, page, c, dlg } = await ctxOf(db, 'report.html'); await page.waitForFunction(() => window.CLS && CLS.ok === true && CLS.sup === true && window.R && R.reports && R.reports.length === 2, null, { timeout: 10000 });
+    await page.evaluate(() => { window.print = () => { window.__printed = (window.__printed || 0) + 1; }; R.id = 7; R.status = 'issued'; rpStateSync(); });
+    const A = await page.evaluate(() => ({ dis: document.getElementById('btnSave').disabled, st: document.getElementById('rpState').textContent }));
+    const w0 = db.writes.length; await page.evaluate(async () => { await saveReport(); await delReport(7); }); await page.waitForTimeout(300); const w1 = db.writes.length;
+    assert(A.dis && /🔒 발행됨/.test(A.st) && /발행 취소/.test(A.st) && /이력/.test(A.st) && w1 === w0 && dlg.some((x) => /^alert:발행한 리포트는 지울 수 없습니다/.test(x)), 'issued ' + JSON.stringify({ A, w0, w1, dlg }));
+    await page.click('#rpState [data-click="clsReopen(7)"]'); await page.waitForTimeout(600);
+    const B = await page.evaluate(() => ({ st: R.status, dis: document.getElementById('btnSave').disabled }));
+    assert(log.includes('reopen 7 시험 사유') && db.table('project_reports').find((x) => x.id === 7).status === 'draft' && B.st === 'draft' && !B.dis, 'reopen ' + JSON.stringify({ B, log }));
+    await page.evaluate(async () => { R.id = 8; R.status = 'draft'; document.getElementById('btnSave').textContent = '저장됨 ✓'; await printReport(); });
+    const C2 = await page.evaluate(() => ({ st: R.status, dis: document.getElementById('btnSave').disabled, pr: window.__printed })), pw = db.writes.filter((w) => w.method === 'PATCH' && w.table === 'project_reports');
+    assert(C2.st === 'issued' && C2.dis && C2.pr === 1 && pw.length === 1 && pw[0].body.status === 'issued' && db.table('project_reports').find((x) => x.id === 8).status === 'issued', 'print ' + JSON.stringify({ C2, pw }));
+    assert(!c.errs.length && !c.csp.length, c.errs.concat(c.csp).join('|')); await ctx.close();
+    return '잠김 · 발행 취소 · 발행 1번';
+  });
+}
+// ㊿+177 Slack 예약 발송(설정 · 보낼 글 저장) · 견적을 포탈 DB 에(견적 화면 저장 · 번호 · 발행 = 발송 · 발송 뒤 새 번호 · 목록 · OI 연결) — 가짜 DB · 외부 발송 0
+{
+  const { FIX } = await import('./lib.mjs');
+  const SET7 = { id: 1, renew_days: [60, 30], eq_days: 3, month_end_days: 5, renew_emails: ['tester@example.com'], eq_emails: [], biz_emails: [], dc_emails: [], slack_on: true, team_channel: 'C0TEST1234', auto_on: false, auto_days: [1], auto_time: '09:00', auto_dm: false };
+  const mk7 = async (o) => {
+    o = Object.assign({ role: 'super_admin', set: SET7, staging: false }, o || {});
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page);
+    const st = { writes: [], dialogs: [], set: o.set };
+    page.on('dialog', (d) => { st.dialogs.push(d.message()); d.accept(); });
+    await mockBackend(page, { role: o.role, onWrite: (x) => st.writes.push(x), extra: async (route, u, m) => {
+      if (u.includes('/rpc/load_all')) { await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(Object.assign({}, FIX, { roles: [{ role: o.role }] })) }); return true; }
+      if (/\/rest\/v1\/notify_settings/.test(u) && m === 'GET') { await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(st.set ? [st.set] : []) }); return true; }
+      if (/\/rest\/v1\/notify_snapshot/.test(u) && m === 'GET') { await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([{ at: '2026-10-09T09:20:00Z', n: 3, by_email: 'boss@example.com' }]) }); return true; }
+      return false; } });
+    await page.goto(url + (o.staging ? '/staging/index.html' : '/index.html')); await page.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA && SVC.NTF.at > 0, null, { timeout: 15000 }); await page.waitForTimeout(500);
+    return { ctx, page, c, st };
+  };
+  await S.t('㊿+177 Slack 예약 발송 설정: 기본 꺼짐(요일 · 시각 잠김 · 보낼 글 안 씀) → 켜고 수 08:30 · DM → 확인 창(자동으로 보냄 · 72시간) → PATCH 예약 칸 + 보낼 글(알림함 계산) 1번 · 다음 발송 표시 / Slack 끄면 예약 못 켬 / 다음 예약 시각 계산(한국 시각) / SQL 108 전이면 안내만', async () => {
+    const A = await mk7();
+    const snap0 = A.st.writes.filter((x) => /notify_snapshot/.test(x.url)).length;
+    await A.page.evaluate(() => SVC.ntfGoSettings()); await A.page.waitForSelector('#nsAutoBox', { timeout: 8000 }); await A.page.waitForTimeout(300);
+    const L0 = await A.page.evaluate(() => ({ on: document.getElementById('nsAuto').checked, dis: document.getElementById('nsD1').disabled && document.getElementById('nsTime').disabled, mon: document.getElementById('nsD1').checked, info: document.getElementById('nsAutoInfo').textContent }));
+    await A.page.check('#nsAuto'); await A.page.click('label.ntf-day:has(#nsD1)'); await A.page.click('label.ntf-day:has(#nsD3)'); await A.page.selectOption('#nsTime', '08:30'); await A.page.check('#nsAutoDm');
+    const w0 = A.st.writes.length; await A.page.click('#nsSave'); await A.page.waitForTimeout(800);
+    const pw = A.st.writes.slice(w0).find((x) => /notify_settings/.test(x.url)), sn = A.st.writes.slice(w0).filter((x) => /notify_snapshot/.test(x.url));
+    const b = pw && JSON.parse(pw.body), sb = sn[0] && JSON.parse(sn[0].body);
+    const info = await A.page.evaluate(() => document.getElementById('nsAutoInfo').textContent);
+    assert(!L0.on && L0.dis && L0.mon && /꺼져 있음/.test(L0.info) && /10\/09 18:20 · 3건/.test(L0.info) && snap0 === 0, 'off ' + JSON.stringify({ L0, snap0 }));
+    assert(A.st.dialogs.length === 2 && /예약 발송을 켭니다 — 매주 수 08:30\(한국 시각\) 팀 채널 C0TEST1234 \+ 받는 사람 개인 DM/.test(A.st.dialogs[0]) && /확인 없이 자동으로 보냅니다/.test(A.st.dialogs[0]) && /72시간/.test(A.st.dialogs[0]) && /auto_on: false → true/.test(A.st.dialogs[1]), 'dialogs ' + JSON.stringify(A.st.dialogs));
+    assert(pw && b.auto_on === true && JSON.stringify(b.auto_days) === '[3]' && b.auto_time === '08:30' && b.auto_dm === true && sn.length === 1 && /on_conflict=id/.test(sn[0].url) && sb.id === 1 && /🔔 포탈 알림/.test(sb.team.text) && Array.isArray(sb.dms) && sb.n === sb.team.n && /다음 발송: \d+\/\d+\(수\) 08:30/.test(info), 'save ' + JSON.stringify({ b, sb: sb && { n: sb.n, dms: sb.dms.length }, info }));
+    await A.page.uncheck('#nsSlack'); const w1 = A.st.writes.length; await A.page.click('#nsSave'); await A.page.waitForTimeout(200);
+    const m1 = await A.page.$eval('#nsMsg', (e) => e.textContent);
+    const nx = await A.page.evaluate(() => { const S = { auto_on: true, auto_days: [1], auto_time: '09:00' }; return [SVC.ntfAutoNext(S, Date.UTC(2026, 9, 10, 13, 0)).label, SVC.ntfAutoNext(S, Date.UTC(2026, 9, 11, 23, 0)).label, SVC.ntfAutoNext(S, Date.UTC(2026, 9, 12, 0, 30)).label, SVC.ntfAutoWhen({ auto_days: [1, 2, 3, 4, 5], auto_time: '09:00' })]; });
+    assert(/Slack 사용»을 켜야/.test(m1) && A.st.writes.length === w1 && nx.join('|') === '10/12(월) 09:00|10/12(월) 09:00|10/19(월) 09:00|평일 매일 09:00' && !A.c.errs.length, JSON.stringify({ m1, nx, errs: A.c.errs }));
+    await A.ctx.close();
+    const B = await mk7({ set: Object.assign({}, SET7, { auto_on: true }) }); await B.page.waitForTimeout(300);
+    const C = await mk7({ role: 'admin', set: Object.assign({}, SET7, { auto_on: true }) }); await C.page.waitForTimeout(300);
+    const sB = B.st.writes.filter((x) => /notify_snapshot/.test(x.url)).length, sC = C.st.writes.filter((x) => /notify_snapshot/.test(x.url)).length;
+    const old = { ...SET7 }; delete old.auto_on; delete old.auto_days; delete old.auto_time; delete old.auto_dm;
+    const D = await mk7({ set: old }); await D.page.evaluate(() => SVC.ntfGoSettings()); await D.page.waitForSelector('#nsSave', { timeout: 8000 }); await D.page.waitForTimeout(200);
+    const dh = await D.page.evaluate(() => ({ box: !!document.getElementById('nsAutoBox'), hint: /SQL 108/.test(document.getElementById('ntfAdmin').textContent) }));
+    assert(sB === 1 && sC === 0 && !dh.box && dh.hint && !B.c.errs.length && !C.c.errs.length && !D.c.errs.length, JSON.stringify({ sB, sC, dh }));
+    await B.ctx.close(); await C.ctx.close(); await D.ctx.close();
+    return '켜기 → PATCH + 보낼 글 1 · 관리자(슈퍼 아님) 0 · ' + nx[0];
+  });
+
+  /* 견적 DB — 가짜 DB 에 SQL 109 트리거 흉내(번호 · 상태 · 발송 뒤 잠금 · OI 칸) */
+  const qTrig = (db) => async (route, u, m) => {
+    if (/workers\.dev/.test(u)) { await route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' }); return true; }
+    if (!/\/rest\/v1\/quotes(\?|$)/.test(u) || m === 'GET') return false;
+    const req = route.request(); let body = req.postData();
+    if (m === 'POST') { const arr = [].concat(JSON.parse(body)); arr.forEach((b) => { const ym = String(b.quote_date || '2026-10-01').slice(2, 7).replace('-', ''); db.qseq = db.qseq || {}; db.qseq[ym] = (db.qseq[ym] || 0) + 1; b.quote_no = b.doc_type === 'po' ? null : 'Q-' + ym + '-' + String(db.qseq[ym]).padStart(3, '0'); b.status = b.status || '작성'; b.created_by = 'tester@example.com'; }); body = JSON.stringify(arr); }
+    if (m === 'PATCH') { const id = +((/id=eq\.(\d+)/.exec(u) || [])[1]); const cur = db.table('quotes').find((x) => x.id === id); const b = JSON.parse(body);
+      if (cur && cur.status !== '작성' && ('data' in b || 'grand_total' in b)) { await route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ message: cur.quote_no + ' 은(는) 이미 발송한 견적이라 내용을 고칠 수 없습니다' }) }); return true; }
+      if (b.status === '발송' && cur && !cur.sent_at) b.sent_at = new Date().toISOString(); body = JSON.stringify(b); }
+    const r = db.handle(m, u, req.headers()['prefer'], body, 'super_admin');
+    db.table('quotes').forEach((q) => { if (q.oi_id) { const o = db.table('oi_deals').find((x) => x.id === q.oi_id); if (o) { o.quote_file = 'q:' + q.quote_no; o.quote_total = q.grand_total; } } });
+    await route.fulfill({ status: r.status, contentType: 'application/json', body: r.body }); return true;
+  };
+  const qOpen = async (db, q) => { const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page); const dlg = [];
+    page.on('dialog', (d) => { dlg.push(d.type() + ':' + d.message().split('\n')[0]); d.accept(); });
+    await fakeBackend(page, db, { extra: qTrig(db) }); await page.goto(url + '/quote.html' + (q || '')); await page.waitForTimeout(900);
+    await page.evaluate(() => { window.print = () => { window.__printed = (window.__printed || 0) + 1; }; });
+    return { ctx, page, c, dlg }; };
+  const qState = (page) => page.evaluate(() => ({ no: document.getElementById('quoteNoTxt').textContent, row: getComputedStyle(document.getElementById('quoteNoRow')).display, st: document.getElementById('qdbState').textContent, id: QDB.id, status: QDB.status }));
+
+  await S.t('㊿+177 견적 DB(견적 화면): «💾 저장» → 번호 Q-YYMM-001(문서에 표시) · 다시 저장 = 같은 번호 고침 · PDF 발행 = 저장 + «발송» · 발송 뒤 고치면 확인 → 새 번호(이전과 이어짐) · 📋 견적 목록 → 불러오기 · Esc', async () => {
+    const db = new FakeDB(seedData()); const { ctx, page, c, dlg } = await qOpen(db);
+    await page.evaluate(() => selectQuoteType('enterprise')); await page.waitForTimeout(300);
+    await page.fill('#customerName', '가상고객01'); await page.fill('#quoteDate', '2026-10-05');
+    await page.click('[data-click="qdbSaveClick()"]'); await page.waitForTimeout(500);
+    const a = await qState(page), q1 = db.table('quotes')[0];
+    await page.fill('#contactPersonName', '가상 담당'); await page.waitForTimeout(50); const dirty = (await qState(page)).st;
+    await page.click('[data-click="qdbSaveClick()"]'); await page.waitForTimeout(500);
+    const b = await qState(page), nQ = db.table('quotes').length, pat = db.writes.filter((w) => w.method === 'PATCH' && w.table === 'quotes').length;
+    assert(a.no === 'Q-2610-001' && a.row === 'flex' && /Q-2610-001 · 작성/.test(a.st) && q1 && q1.customer_name === '가상고객01' && q1.qtype === 'enterprise' && q1.data && q1.data.customerName === '가상고객01', 'save1 ' + JSON.stringify({ a, q1: q1 && { n: q1.quote_no, c: q1.customer_name } }));
+    assert(/고친 내용 저장 안 됨/.test(dirty) && b.no === 'Q-2610-001' && nQ === 1 && pat === 1 && db.table('quotes')[0].data.contactPerson === '가상 담당', 'save2 ' + JSON.stringify({ dirty, b, nQ, pat }));
+    await page.evaluate(() => prepareAndPrint()); await page.waitForTimeout(800);
+    const p1 = await qState(page), pr = await page.evaluate(() => window.__printed);
+    assert(p1.status === '발송' && /발송/.test(p1.st) && db.table('quotes')[0].status === '발송' && db.table('quotes')[0].sent_at && pr === 1, 'print ' + JSON.stringify({ p1, pr }));
+    await page.fill('#customerName', '가상고객01 본사'); dlg.length = 0;
+    await page.click('[data-click="qdbSaveClick()"]'); await page.waitForTimeout(600);
+    const n2 = await qState(page), rows = db.table('quotes');
+    assert(dlg.some((x) => /^confirm:Q-2610-001 은\(는\) 이미 발송한 견적입니다/.test(x)) && n2.no === 'Q-2610-002' && rows.length === 2 && rows[1].parent_id === rows[0].id && rows[0].customer_name === '가상고객01' && rows[1].customer_name === '가상고객01 본사', 'new-no ' + JSON.stringify({ dlg, n2, rows: rows.map((x) => [x.id, x.quote_no, x.parent_id, x.status]) }));
+    await page.click('[data-click="qdbList()"]'); await page.waitForTimeout(500);
+    const L = await page.evaluate(() => ({ open: getComputedStyle(document.getElementById('qdbListModal')).display, rows: [...document.querySelectorAll('#qdbListBody tbody tr')].map((r) => r.textContent) }));
+    await page.click('#qdbListBody tbody tr:nth-child(2) .qdb-open'); await page.waitForTimeout(500);
+    const back = await qState(page), cust = await page.$eval('#customerName', (e) => e.value), closed = await page.evaluate(() => getComputedStyle(document.getElementById('qdbListModal')).display);
+    await page.click('[data-click="qdbList()"]'); await page.waitForTimeout(300); await page.keyboard.press('Escape'); await page.waitForTimeout(100);
+    const esc = await page.evaluate(() => getComputedStyle(document.getElementById('qdbListModal')).display);
+    assert(L.open === 'flex' && L.rows.length === 2 && /Q-2610-002/.test(L.rows[0]) && /발송/.test(L.rows[1]) && back.no === 'Q-2610-001' && back.status === '발송' && cust === '가상고객01' && closed === 'none' && esc === 'none', 'list ' + JSON.stringify({ L, back, cust, closed, esc }));
+    assert(!c.errs.length && !c.csp.length, c.errs.concat(c.csp).join('|')); await ctx.close();
+    return 'Q-2610-001 → 발송 → 새 번호 Q-2610-002';
+  });
+
+  await S.t('㊿+177 견적 DB 주소: ?oi=1 → 고객사명 = OI 고객사 · 저장하면 그 OI 에 연결(OI «견적서» = q:번호) / ?qid= → 그 견적 불러오기(종류 고르기 없이) / ?view=q:번호 → 읽기 전용 / 표 없음(404) → 안내만 · 발행은 예전처럼', async () => {
+    const db = new FakeDB(seedData());
+    const A = await qOpen(db, '?oi=1'); await A.page.evaluate(() => selectQuoteType('enterprise')); await A.page.waitForTimeout(700);
+    const c1 = await A.page.$eval('#customerName', (e) => e.value), s1 = (await qState(A.page)).st;
+    await A.page.click('[data-click="qdbSaveClick()"]'); await A.page.waitForTimeout(500);
+    const q = db.table('quotes')[0], oi = db.table('oi_deals').find((x) => x.id === 1);
+    assert(c1 === '가상고객_OI' && /OI #1 가상고객_OI 연결/.test(s1) && q && q.oi_id === 1 && oi.quote_file === 'q:' + q.quote_no && !A.c.errs.length, JSON.stringify({ c1, s1, q: q && [q.quote_no, q.oi_id], oi: oi.quote_file }));
+    await A.ctx.close();
+    const B = await qOpen(db, '?qid=' + q.id); await B.page.waitForTimeout(800);
+    const b = await B.page.evaluate(() => ({ ovl: getComputedStyle(document.getElementById('quoteTypeOverlay')).display, cust: document.getElementById('customerName').value, no: document.getElementById('quoteNoTxt').textContent, view: document.body.classList.contains('doc-view-mode') }));
+    await B.ctx.close();
+    const C = await qOpen(db, '?view=q:' + encodeURIComponent(q.quote_no)); await C.page.waitForTimeout(800);
+    const cv = await C.page.evaluate(() => ({ view: document.body.classList.contains('doc-view-mode'), no: document.getElementById('quoteNoTxt').textContent })); await C.ctx.close();
+    assert(b.ovl === 'none' && b.cust === '가상고객_OI' && b.no === q.quote_no && !b.view && cv.view && cv.no === q.quote_no, JSON.stringify({ b, cv }));
+    const db2 = new FakeDB(seedData()); const D = await qOpen(db2); await D.page.route(/\/rest\/v1\/quotes/, (r) => r.fulfill({ status: 404, contentType: 'application/json', body: '{"code":"PGRST205","message":"Could not find the table"}' }));
+    await D.page.evaluate(() => selectQuoteType('enterprise')); await D.page.waitForTimeout(300); await D.page.fill('#customerName', '가상고객02');
+    await D.page.click('[data-click="qdbSaveClick()"]'); await D.page.waitForTimeout(400);
+    await D.page.evaluate(() => prepareAndPrint()); await D.page.waitForTimeout(600);
+    const d = await D.page.evaluate(() => ({ ok: QDB.ok, pr: window.__printed }));
+    assert(D.dlg.some((x) => /SQL 109/.test(x)) && d.ok === false && d.pr === 1 && !D.c.errs.length, JSON.stringify({ dlg: D.dlg, d }));
+    await D.ctx.close();
+    return 'OI 연결 · qid · view · 404 안내';
+  });
+
+  await S.t('㊿+177 포탈 «견적 목록»(영업): 번호 · 고객사 · 합계(원) · 상태 배지 · 📄 = 견적 화면(포탈 안)에서 그 견적 · 상태만 고쳐 저장(PATCH quotes) / OI 현황: ＋ = 이 OI 로 견적 만들기 · «견적서 연결» 창에 포탈 DB 견적 → 고르면 견적의 OI 번호(PATCH quotes) · OI «견적서» 칸 q:번호', async () => {
+    const seed = seedData(); const now = new Date().toISOString();
+    seed.quotes = [{ id: 1, quote_no: 'Q-2610-001', doc_type: 'quote', qtype: 'enterprise', customer_name: '가상고객01', quote_date: '2026-10-05', grand_total: 1100000, status: '발송', data: { customerName: '가상고객01', quoteDate: '2026-10-05', rows: [] }, created_by: 'tester@example.com', updated_at: now },
+      { id: 2, quote_no: 'Q-2610-002', doc_type: 'quote', qtype: 'public', customer_name: '가상고객02', quote_date: '2026-10-06', grand_total: 2200000, status: '실주', data: { customerName: '가상고객02', rows: [] }, created_by: 'tester@example.com', updated_at: now }];
+    const db = new FakeDB(seed); const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page);
+    page.on('dialog', (d) => d.accept()); await fakeBackend(page, db, { extra: qTrig(db) });
+    await page.goto(url + '/index.html'); await page.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA && SVC.ST.DATA.rows.length, null, { timeout: 20000 });
+    await page.evaluate(() => SVC.switchView('quotes')); await page.waitForFunction(() => SVC.ST.RAWX.quotes && document.querySelectorAll('#dvTable tbody tr').length === 2, null, { timeout: 8000 });
+    const G = await page.evaluate(() => { const hs = [...document.querySelectorAll('#dvTable thead th')].map((x) => x.textContent.trim()); const rows = [...document.querySelectorAll('#dvTable tbody tr')].map((tr) => [...tr.children].map((td) => td.textContent.trim()));
+      return { hs, rows, badge: [...document.querySelectorAll('#dvTable tbody .ctag')].map((x) => x.className), side: !!document.querySelector('#side button[data-v="quotes"]') }; });
+    const iS = G.hs.findIndex((h) => /^상태/.test(h)), iT = G.hs.findIndex((h) => /^합계/.test(h));
+    const r1 = G.rows.find((r) => r[0] === 'Q-2610-001'), r2 = G.rows.find((r) => r[0] === 'Q-2610-002');
+    assert(G.side && r1 && r1[iT] === '1,100,000' && r1[iS] === '발송' && r2 && r2[iS] === '실주' && r2.includes('공공용') && G.badge.some((x) => /crit/.test(x)), 'grid ' + JSON.stringify(G));
+    await page.click('#dvTable tbody tr:has-text("Q-2610-002") button[data-act="edit"]'); await page.waitForTimeout(150);
+    await page.evaluate((iS) => { const tr = [...document.querySelectorAll('#dvTable tbody tr')].find((x) => x.querySelector('button.sv')); const el = tr.children[iS].querySelector('select'); el.value = '수주'; el.dispatchEvent(new Event('change', { bubbles: true })); }, iS);
+    await page.click('#dvTable button.sv'); await page.waitForTimeout(800);
+    const pw = db.writes.filter((w) => w.method === 'PATCH' && w.table === 'quotes').slice(-1)[0];
+    assert(pw && pw.body.status === '수주' && !('data' in pw.body) && db.table('quotes')[1].status === '수주', 'status ' + JSON.stringify(pw));
+    await page.click('#dvTable tbody tr:has-text("Q-2610-001") button[data-act="open"]'); await page.waitForTimeout(1500);
+    const fr = await page.evaluate(() => ({ v: SVC.ST.CUR_VIEW, src: document.getElementById('quoteFrame').getAttribute('src') }));
+    const fq = await page.frameLocator('#quoteFrame').locator('#quoteNoTxt').textContent({ timeout: 8000 });
+    assert(fr.v === 'quote' && /quote\.html\?v=.*&qid=1$/.test(fr.src) && fq === 'Q-2610-001', 'open ' + JSON.stringify({ fr, fq }));
+    await page.evaluate(() => SVC.switchView('oi')); await page.waitForTimeout(500);
+    const oiAct = await page.evaluate(() => !!document.querySelector('#dvTable tbody tr button[data-act="quoteNew"]'));
+    await page.evaluate(() => SVC.oiLinkQuote(SVC.ST.RAWX.oi.find((x) => x.id === 1))); await page.waitForSelector('#qpList .qp-row[data-qid]', { timeout: 8000 });
+    const sec = await page.evaluate(() => [...document.querySelectorAll('#qpList .qp-sec')].map((x) => x.textContent));
+    await page.click('#qpList .qp-row[data-qid="2"]'); await page.waitForTimeout(700);
+    const q2 = db.table('quotes').find((x) => x.id === 2), oi = await page.evaluate(() => SVC.ST.RAWX.oi.find((x) => x.id === 1).quote_file);
+    const cell = await page.evaluate(() => { const c = SVC.GRIDS.oi.cols.find((x) => x.k === 'quote_file'); return c.fmt('q:Q-2610-002') + ' | ' + c.href('q:Q-2610-002'); });
+    assert(oiAct && sec[0] === '포탈 DB 견적' && q2.oi_id === 1 && oi === 'q:Q-2610-002' && cell === '견적서 Q-2610-002 | quote.html?view=q%3AQ-2610-002' && !c.errs.length, 'oi ' + JSON.stringify({ oiAct, sec, q2: q2.oi_id, oi, cell, errs: c.errs }));
+    await ctx.close();
+    return 'grid 2 · 수주 PATCH · 📄 → 견적 화면 · OI 연결 q:Q-2610-002';
   });
 }
 await browser.close(); srv.close();

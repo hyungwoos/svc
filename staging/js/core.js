@@ -150,6 +150,20 @@ export function buildBaseSelect(){
 export function mkLabel(i){ var k=mk(i); return k? k.slice(2).replace('-','.') : ''; }
 export function yOf(i){ return +mk(i).slice(0,4); }
 export function monOf(i){ return +mk(i).slice(5,7); }
+/* ㊿+176 비즈포탈 차액(biz_recon) 행의 연도 · 'YYYY-MM' 열쇠 — SQL 107 의 y 칸(없으면 작성일로 추정: 서버 biz_guess_y 와 같은 규칙 — 대조한 달이 작성일의 달보다 뒤면 앞 해)
+   예전엔 «8월»만 있어 해가 바뀌면 같은 달이 섞였음 */
+export function bizMon(ym){ var m=String(ym==null? '' : ym).match(/(\d{1,2})/); return m? +m[1] : 0; }
+export function bizY(r){
+  if(r && r.y!=null && r.y!=='' && !isNaN(+r.y)) return +r.y;
+  var m=bizMon(r && r.ym), d=String((r && (r.as_of || r.created_at)) || '').slice(0,10), ok=/^\d{4}-\d{2}/.test(d), now=new Date();
+  var dy=ok? +d.slice(0,4) : now.getFullYear(), dm=ok? +d.slice(5,7) : now.getMonth()+1;
+  return m>dm? dy-1 : dy;
+}
+export function bizKey(r){ return bizY(r)+'-'+('0'+bizMon(r && r.ym)).slice(-2); }
+/** 'YYYY-MM' → «8월»(올해) · «2025년 8월»(다른 해) */
+export function bizLabel(k){ var y=+String(k).slice(0,4), m=+String(k).slice(5,7); return (y===new Date().getFullYear()? '' : y+'년 ')+m+'월'; }
+/** 그 해 그 달 비즈포탈 차액이 입력돼 있는지 */
+export function bizHas(y, m){ return ((ST.RAWX && ST.RAWX.biz) || []).some(function(r){ return bizMon(r.ym)===m && bizY(r)===y; }); }
 export function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
 
 /* ==================================================================

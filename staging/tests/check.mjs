@@ -139,6 +139,23 @@ say(/^export function tickMemo\(/m.test(jsAll) && /^export function cssvKey\(/m.
     && /'return=representation'\)\.then\(function\(res\)\{ if\(!savedRows\(res\)\)/.test(jsAll) && /^\s*verStart\(\);/m.test(jsAll) && /^export function opsItems\(/m.test(jsAll) && /rpc\/ops_status/.test(jsAll) && /^export function opsRbBind\(/m.test(jsAll)
     && (opsS === null || (/case 'gh_rollback'/.test(opsS) && /expect_head/.test(opsS) && /KEEP = \/\^\(staging\|supabase\|node_modules\|\\\.github\)\\\//.test(opsS))),
   '㊿+175 안정성: 저장 전 버전 확인(옛 탭 막음) · 표 저장 전 DB 대조(동시 수정) · 0행이면 «저장 안 됨» · 운영 상태(ops_status) · 운영 되돌리기(gh_rollback · staging/supabase/.github 제외 · 미리 본 HEAD)'); }
+// ㊿+176 정산(A-1) — 비즈포탈 차액 연도(지우기가 다른 해를 지우지 않게) · 월 마감(period_locks) · 수정 이력(doc_hist) · 리포트 발행 잠금
+{ const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
+  const cl = rd('sat/close.js'), sats = { s1: pageCode('s1.html'), kk: pageCode('kk.html'), rp: pageCode('report.html') };
+  const rawDel = (jsAll.match(/sbWrite\('DELETE','biz_recon\?ym=eq\./g) || []).length;
+  say(/^export function bizKey\(/m.test(jsAll) && /^export function bizHas\(/m.test(jsAll) && /'rpc\/biz_month_replace'/.test(jsAll) && /'rpc\/biz_month_delete'/.test(jsAll) && /'rpc\/period_unlock'/.test(jsAll) && /doc_hist\?select=/.test(jsAll)
+    && rawDel === 2 && !/r\.ym===curYm/.test(jsAll) && (jsAll.match(/bizHas\(/g) || []).length >= 4
+    && /^function clsBlockMsg\(/m.test(cl) && /rpc\/period_unlock/.test(cl) && /rpc\/report_reopen/.test(cl)
+    && /clsInit\('s1',\s*'s1_settle'/.test(sats.s1) && /clsInit\('kk',\s*'kk_settle'/.test(sats.kk) && /clsInit\(null,\s*'project_reports'/.test(sats.rp) && /function rpStateSync\(/.test(sats.rp),
+  `㊿+176 정산: 비즈포탈 차액 «연도-월» 열쇠(bizKey · bizHas) · 저장 · 삭제는 biz_month_replace/delete(SQL 107 전 대비 옛 방식 2곳만 · 지금 ${rawDel}) · 월 마감 · 마감 풀기(사유) · 이력 · 에스원 · 카카오 · 리포트(발행 잠금 · 발행 취소)`); }
+// ㊿+177 Slack 예약 발송(기본 꺼짐 · DB 예약 + 일회용 번호 · 보낼 글은 포탈 계산) · 견적을 포탈 DB 에(quotes · 번호 · 발송 뒤 잠금 · OI 연결)
+{ const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
+  const nt = rd('js/notify.js'), fnS = rd('supabase/functions/notify/index.ts'), qd = rd('sat/qdb.js'), qj = rd('sat/quote.js'), qh = rd('quote.html');
+  say(/^export var NTF_DEF=\{[^\n]*auto_on:false/m.test(nt) && /^export async function ntfSnapSave\(/m.test(nt) && /IS_STAGING \|\| !ntfAutoOk\(\) \|\| !S\.slack_on \|\| !S\.auto_on/.test(nt) && !/setInterval/.test(nt)
+    && (!fnS || (/async function autoRun\(nonce/.test(fnS) && /&used_at=is\.null&created_at=gt\./.test(fnS) && /set\.slack_on !== true \|\| set\.auto_on !== true/.test(fnS) && /MAX_AGE_H/.test(fnS) && !/Deno\.cron/.test(fnS)))
+    && /^async function qdbBeforePrint\(/m.test(qd) && /if \(\(await qdbBeforePrint\(\)\) === false\) return;/.test(qj) && /<script src="sat\/qdb\.js[^"]*"><\/script>/.test(qh) && /id="quoteNoRow"/.test(qh)
+    && /^export function quoteOpen\(/m.test(jsAll) && /quotes:\{[^\n]*\n\s*title:'견적 목록', table:'quotes'/.test(jsAll) && html.includes('data-v="quotes"'),
+  '㊿+177 Slack 예약 발송(기본 꺼짐 · 서버는 DB 예약 · 일회용 번호 · 꺼짐/오래된 글이면 안 보냄 · 보낼 글은 포탈 계산 · 스테이징은 안 씀) · 견적 DB(저장 · 발행 때 저장+발송 · 견적 번호 표시 · 견적 목록 · OI 에서 열기)'); }
 // ㊿+160 연장하면 상태 «재약정»(구분 그대로) · 계약 상세에 «계약 기간 · 연장 이력»
 say(/^export function renewStatus\(r\)/m.test(jsAll) && /var nst=renewStatus\(r\);/.test(jsAll) && /^export function ctPeriods\(c, mine\)/m.test(jsAll) && html.includes('id="dtRenew"'), '연장: 상태 «재약정»(renewStatus) · 계약 상세 연장 이력(ctPeriods · #dtRenew)');
 const idx = html + jsAll;

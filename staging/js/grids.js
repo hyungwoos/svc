@@ -336,7 +336,7 @@ export function buildGrids(){
         {k:'contract_id',l:'계약전환',ro:true,fmt:function(v){ return v? '전환됨 #'+v : '·'; },na:function(r){ return !/수주|계산서발행|종료/.test(String(r.stage||'')); }},
         {k:'quote_file',l:'견적서',ro:true,
           href:function(v){ return 'quote.html?view='+encodeURIComponent(v); },
-          fmt:function(v){ if(!v) return '·'; var L=qLabel(String(v).split('/').pop()); return '견적서 '+(L.d||L.c); },na:function(){ return true; }},
+          fmt:function(v){ if(!v) return '·'; if(/^q:/.test(String(v))) return '견적서 '+String(v).slice(2); var L=qLabel(String(v).split('/').pop()); return '견적서 '+(L.d||L.c); },na:function(){ return true; }},   /* ㊿+177 q:견적번호 = 포탈 DB 견적 */
         {k:'rival_price',l:'경쟁사가(천원)',t:'number',won:1,na:function(){ return true; }},
         {k:'next_action',l:'다음 할 일',na:function(r){ return /수주|계산서발행|종료|중지|실패/.test(String(r.stage||'')); }},
         {k:'next_date',l:'예정일',t:'date',na:function(r){ return /수주|계산서발행|종료|중지|실패/.test(String(r.stage||'')); }},
@@ -502,6 +502,25 @@ export function buildGrids(){
       custom:function(){ renderLeadSrc(); },
       rows:function(){ return []; },
       cols:[{k:'lead_src',l:'유입경로'}]
+    },
+    quotes:{   /* ㊿+177 견적을 포탈 DB 에(SQL 109) — 내용은 견적 화면에서 · 여기선 상태 · OI 연결 · 메모 */
+      title:'견적 목록', table:'quotes',
+      cap:'견적·발주 시스템에서 «💾 저장» · «PDF 발행»한 견적(포탈 DB) · 여기서는 상태(발송 · 수주 · 실주) · OI 번호 · 메모만 고침 — 내용은 행의 📄(견적 화면에서 열기) · 발송한 견적을 고치면 새 번호 · 금액은 원(VAT 포함)',
+      add:false, del:'super', pin:['quote_no','customer_name'],
+      rows:function(){ return ST.RAWX.quotes||[]; },
+      cols:[
+        {k:'quote_no',l:'번호',ro:true,fmt:function(v,r){ return v || ('발주서 #'+r.id); }},
+        {k:'quote_date',l:'견적일',ro:true},
+        {k:'customer_name',l:'고객사',ro:true},
+        {k:'qtype',l:'종류',ro:true,fmt:function(v){ return ({enterprise:'기업용', public:'공공용', po:'발주서'})[v]||v||''; }},
+        {k:'grand_total',l:'합계(원)',ro:true,num:true,fmt:function(v){ return v==null? '' : Math.round(+v).toLocaleString('ko-KR'); }},
+        {k:'status',l:'상태',t:'select',opts:['작성','발송','수주','실주'],badge:1},
+        {k:'oi_id',l:'OI 번호',t:'number'},
+        {k:'manager',l:'견적 담당',ro:true},
+        {k:'note',l:'메모'},
+        {k:'created_by',l:'작성',ro:true,fmt:function(v){ return String(v||'').split('@')[0]; }},
+        {k:'updated_at',l:'고친 시각',ro:true,fmt:function(v){ return String(v||'').replace('T',' ').slice(0,16); }}
+      ]
     },
     aiknow:{
       title:'AI 지식 — AI 에게 가르치기', table:'ai_knowledge',

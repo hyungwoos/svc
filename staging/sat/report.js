@@ -9,7 +9,7 @@ async function sbAll(q) {
 }
 async function sbWrite(method, path, body, prefer) {
     var r = await fetch(SB_URL + '/rest/v1/' + path, { method: method, headers: Object.assign(hdr(true), prefer ? { Prefer: prefer } : {}), body: body !== undefined ? JSON.stringify(body) : undefined });
-    if (!r.ok) { var t = await r.text(); if (r.status === 401) throw new Error('로그인이 만료되었습니다 — 포탈에서 다시 로그인해 주세요'); if (r.status === 403 || /policy/i.test(t)) throw new Error('쓰기 권한이 없습니다 (편집 권한 필요)'); throw new Error('저장 실패 (' + r.status + '): ' + t.slice(0, 160)); }
+    if (!r.ok) { var t = await r.text(), dm = clsErrText(t); if (r.status === 401) throw new Error('로그인이 만료되었습니다 — 포탈에서 다시 로그인해 주세요'); if (/마감|발행/.test(dm)) throw new Error(dm); if (r.status === 403 || /policy/i.test(t)) throw new Error('쓰기 권한이 없습니다 (편집 권한 필요)'); throw new Error('저장 실패 (' + r.status + '): ' + t.slice(0, 160)); }
     var tx = await r.text(); try { return tx ? JSON.parse(tx) : null; } catch (e) { return null; }
 }
 // ─────────────────────────────────────────────
@@ -286,8 +286,24 @@ function apply(p) {
     if (p.kind) $('#qKind').value = p.kind; if (p.appr) $('#qAppr').value = p.appr; if (p.coop1 != null) $('#qCoop1').checked = !!p.coop1; if (p.coop2 != null) $('#qCoop2').checked = !!p.coop2; $('#qMonth').value = p.month || ''; R.contractId = p.contract_id || null;
     calc();
 }
+/* ㊿+176 발행 잠금 · 이력(SQL 107) — 발행(인쇄)한 리포트는 DB 가 고치기 · 지우기를 막음 → 슈퍼 관리자 «발행 취소»(사유) */
+function rpStateSync() {
+    var el = $('#rpState'); if (!el) return;
+    var issued = !!R.id && R.status === 'issued';
+    $('#btnSave').disabled = issued; $('#btnSave').title = issued ? '발행한 리포트입니다 — 고치려면 슈퍼 관리자가 «발행 취소»' : '';
+    el.innerHTML = (issued ? tpl`<span class="tag issued" title="발행(인쇄)한 리포트는 고치거나 지울 수 없습니다">🔒 발행됨</span>` : '') +
+        (issued && CLS.sup ? tpl` <button class="btn line" data-click="clsReopen(${rawHtml(R.id)})">발행 취소…</button>` : '') +
+        (R.id && CLS.ok ? tpl` <button class="btn line" data-click="clsHist(${rawHtml(R.id)})">이력</button>` : '');
+}
+async function rpRefresh(m) {
+    try { R.reports = await sbGet('project_reports?select=id,contract_id,customer,kind,report_month,report_no,title,amount,status,updated_at,created_by&order=updated_at.desc&limit=400'); } catch (e) {}
+    var cur = R.id ? R.reports.filter(function (r) { return r.id === R.id; })[0] : null; R.status = cur ? cur.status : null;
+    if (R.id && cur) { var p = await loadPayload(R.id); if (p) apply(p); }
+    rpStateSync(); if ($('#ovlList').classList.contains('show')) renderList(); if (m) warn(m);
+}
 async function saveReport() {
     var s = sess(); if (!s) { alert('로그인이 필요합니다'); return; }
+    if (R.id && R.status === 'issued') { warn('발행한 리포트입니다 — 고치려면 슈퍼 관리자가 «발행 취소» 후 저장해 주세요'); return; }
     var p = collect(); if (!p.customer) { alert('고객명을 입력하세요'); return; }
     var row = { contract_id: p.contract_id || null, customer: p.customer, kind: p.kind, report_month: p.month ? p.month + '-01' : null, report_no: p.no || null, title: p.title || null, amount: n(p.amount) || null, payload: p, created_by: s.u || null };
     $('#btnSave').disabled = true;
@@ -299,7 +315,7 @@ async function saveReport() {
     } catch (e) { alert(e.message); }
     $('#btnSave').disabled = false;
 }
-function newReport() { if (!confirm('작성 중인 내용을 지우고 새로 시작할까요?')) return; R.id = null; R.contractId = null; clearDoc(true); $('#chips').querySelectorAll('.chip').forEach(function (c) { c.classList.remove('on'); }); setV('date', todayISO()); $('#btnSave').textContent = '저장'; calc(); }
+function newReport() { if (!confirm('작성 중인 내용을 지우고 새로 시작할까요?')) return; R.id = null; R.status = null; R.contractId = null; setTimeout(rpStateSync, 0); clearDoc(true); $('#chips').querySelectorAll('.chip').forEach(function (c) { c.classList.remove('on'); }); setV('date', todayISO()); $('#btnSave').textContent = '저장'; calc(); }
 function openList() { $('#ovlList').classList.add('show'); renderList(); }
 function closeOvl(id) { $('#' + id).classList.remove('show'); }
 function renderList() {
@@ -312,7 +328,7 @@ function renderList() {
     }).join('') || '<tr><td colspan="8" style="color:#888">저장된 리포트가 없습니다</td></tr>';
 }
 async function loadReport(id) {
-    try { var p = await loadPayload(id); if (!p) throw new Error('없는 리포트'); if (p.customer) { $('#qCust').value = p.customer; pickCustomer(p.customer); } apply(p); R.id = id; R.cust = p.customer; if (p.contract_id) { var ch = $('#chips .chip[data-id="' + p.contract_id + '"]'); if (ch) ch.classList.add('on'); } $('#btnSave').textContent = '저장'; closeOvl('ovlList'); } catch (e) { alert(e.message); }
+    try { var p = await loadPayload(id); if (!p) throw new Error('없는 리포트'); if (p.customer) { $('#qCust').value = p.customer; pickCustomer(p.customer); } apply(p); R.id = id; R.cust = p.customer; R.status = ((R.reports.filter(function (r) { return r.id === id; })[0]) || {}).status || null; rpStateSync(); if (p.contract_id) { var ch = $('#chips .chip[data-id="' + p.contract_id + '"]'); if (ch) ch.classList.add('on'); } $('#btnSave').textContent = '저장'; closeOvl('ovlList'); } catch (e) { alert(e.message); }
 }
 async function cloneReport(id) {
     try {
@@ -322,16 +338,20 @@ async function cloneReport(id) {
         p.month = nm; p.no = ''; p.date = todayISO(); p.cdate = todayISO(); p.taxdate = monthEnd(todayISO(), 0); p.paydate = monthEnd(todayISO(), 1);
         (p.deliv || []).forEach(function (r) { r.note = String(r.note || '').replace(/\[(\d+)(~\d+)?\/(\d+)\]/, function (_, a, b, t) { return '[' + (+a + 1) + (b ? '~' + (+b.slice(1) + 1) : '') + '/' + t + ']'; }); });
         if (/월 대금|월분/.test(p.title || '')) p.title = String(p.title).replace(/(\d+)월/, (+nm.slice(5, 7)) + '월');
-        if (p.customer) { $('#qCust').value = p.customer; pickCustomer(p.customer); } apply(p); R.id = null; R.cust = p.customer; $('#btnSave').textContent = '저장 (새 리포트)'; closeOvl('ovlList');
+        if (p.customer) { $('#qCust').value = p.customer; pickCustomer(p.customer); } apply(p); R.id = null; R.status = null; rpStateSync(); R.cust = p.customer; $('#btnSave').textContent = '저장 (새 리포트)'; closeOvl('ovlList');
         warn('이전 리포트를 ' + nm + ' 기준으로 복제했습니다. NO.·금액·비고를 확인하고 저장하세요.');
     } catch (e) { alert(e.message); }
 }
-async function delReport(id) { if (!confirm('이 리포트를 삭제할까요?')) return; try { await sbWrite('DELETE', 'project_reports?id=eq.' + id); R.reports = R.reports.filter(function (r) { return r.id !== id; }); if (R.id === id) R.id = null; renderList(); } catch (e) { alert(e.message); } }
+async function delReport(id) { var r0 = R.reports.filter(function (r) { return r.id === id; })[0]; if (r0 && r0.status === 'issued') { alert('발행한 리포트는 지울 수 없습니다 — 슈퍼 관리자가 «발행 취소» 후 지울 수 있습니다'); return; } if (!confirm('이 리포트를 삭제할까요?')) return; try { await sbWrite('DELETE', 'project_reports?id=eq.' + id); R.reports = R.reports.filter(function (r) { return r.id !== id; }); if (R.id === id) R.id = null; renderList(); } catch (e) { alert(e.message); } }
 async function printReport() {
     calc();
     var d = (getV('date') || todayISO()).replace(/-/g, '').slice(2);
     var old = document.title; document.title = d + '_' + (getV('customer') || '고객') + '_프로젝트리포트';
-    if (R.id) { try { await sbWrite('PATCH', 'project_reports?id=eq.' + R.id, { status: 'issued' }); } catch (e) {} }
+    /* ㊿+176 저장하지 않은 리포트는 먼저 저장 — 발행 기록이 남게 · 발행하면 잠김 */
+    if (!R.id) { await saveReport(); if (!R.id) return; }
+    else if (R.status !== 'issued' && $('#btnSave').textContent !== '저장됨 ✓') { if (confirm('발행하면 잠겨서 고칠 수 없습니다. 지금 화면 내용을 먼저 저장할까요?\n(취소 = 저장된 내용 그대로 발행)')) { await saveReport(); } }
+    if (R.status !== 'issued') { try { await sbWrite('PATCH', 'project_reports?id=eq.' + R.id, { status: 'issued' }); R.status = 'issued'; var lr = R.reports.filter(function (r) { return r.id === R.id; })[0]; if (lr) lr.status = 'issued'; } catch (e) { warn('발행 표시를 남기지 못했습니다 — ' + e.message); } }
+    rpStateSync();
     window.print(); setTimeout(function () { document.title = old; }, 1500);
 }
 
@@ -405,6 +425,8 @@ document.addEventListener('DOMContentLoaded', async function () {
     $('#loginOverlay').style.display = 'none';
     padRows(); setV('date', todayISO()); setAppr('bu'); calc();
     await loadAll();
+    await clsInit(null, 'project_reports', '프로젝트 리포트', rpRefresh);   /* ㊿+176 발행 잠금 · 이력 */
+    rpStateSync();
     var params = new URLSearchParams(location.search);
     if (params.get('id')) loadReport(+params.get('id'));
     else if (params.get('cust')) { $('#qCust').value = params.get('cust'); pickCustomer(params.get('cust')); }

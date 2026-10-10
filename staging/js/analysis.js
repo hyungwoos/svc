@@ -2,7 +2,7 @@
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { APP_VER, IS_QA, ST } from './state.js';
 import { Viz } from './viz.js';
-import { $, amtGuard, amtHint, baseLabel, canWrite, cssv, esc, isGN, kwToWon, lline, llineVer, mk, rawHtml, SB_KEY, SB_URL, STATE, tickMemo, tpl, won, wonFull, wonKo, wonToKw, yOf } from './core.js';
+import { $, amtGuard, amtHint, baseLabel, bizKey, bizLabel, bizY, canWrite, cssv, esc, isGN, kwToWon, lline, llineVer, mk, rawHtml, SB_KEY, SB_URL, STATE, tickMemo, tpl, won, wonFull, wonKo, wonToKw, yOf } from './core.js';
 import { dIdx, ico, idxDate, loadFromDb, onData, SB_RAW, sbHeaders, sbTry, sbWrite, toast, todayStr } from './shell.js';
 import { hbars, idxs, monthlyTotal } from './dash.js';
 import { CHURN_OPTS, codeActive, GRIDS, LEAD_OPTS, LINE_OPTS } from './grids.js';
@@ -513,20 +513,22 @@ export function renderAiKnow(){
 export function renderBizMonthly(){
   var tw=$('#dvTable').parentElement; tw.style.display='none';
   var host=bizHostEl(); host.style.display=''; host.innerHTML='';
+  if(!BIZL.at && ST.SB_TOKEN){ bizLoadLocks().then(function(){ if(ST.CUR_VIEW==='biz' && !BIZV.edit) renderBizMonthly(); }); }   /* ㊿+176 마감 · SQL 107 여부 */
   var rows=ST.RAWX.biz||[];
+  /* ㊿+176 달 = 'YYYY-MM' 열쇠(bizKey) — 예전엔 «8월»만이라 해가 바뀌면 섞였음 */
   var months=[], seen={};
-  rows.slice().sort(function(a,b){ return (b.id||0)-(a.id||0); }).forEach(function(r){
-    if(r.ym && !seen[r.ym]){ seen[r.ym]=1; months.push(r.ym); }
-  });
+  rows.forEach(function(r){ if(!r.ym) return; var k=bizKey(r); if(!seen[k]){ seen[k]=1; months.push(k); } });
+  months.sort(function(a,b){ return a<b? 1 : a>b? -1 : 0; });
   if(BIZV.edit){ renderBizEditor(host, months); return; }
   if(BIZV.ym==null || !seen[BIZV.ym]) BIZV.ym=months[0]||null;
   $('#dvCount').textContent = months.length? months.length+'개월 입력됨' : '';
+  var lk=BIZV.ym? bizLock(BIZV.ym) : null, canW=bizCanWrite();
 
   // 월 선택 + 동작 버튼
   var bar=document.createElement('div');
   bar.style.cssText='display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px';
   months.forEach(function(m){
-    var b=document.createElement('button'); b.className='pill'+(m===BIZV.ym?'':' ghost'); b.textContent=m;
+    var b=document.createElement('button'); b.className='pill'+(m===BIZV.ym?'':' ghost'); b.textContent=bizLabel(m)+(bizLock(m)? ' 🔒' : ''); if(bizLock(m)) b.title='마감됨';
     if(m===BIZV.ym){ b.style.background='var(--s1-solid,#226bc4)'; b.style.color='#fff'; b.style.borderColor='var(--s1-solid,#226bc4)'; }
     b.onclick=function(){ BIZV.ym=m; renderBizMonthly(); };
     bar.appendChild(b);
@@ -536,23 +538,30 @@ export function renderBizMonthly(){
     var bn=document.createElement('button'); bn.className='pill'; bn.textContent='＋ 새 달 입력';
     bn.onclick=function(){ if(!ST.SB_TOKEN){openOvl('ovlAuth');return;} BIZV.edit=true; BIZV.newMonth=true; renderBizMonthly(); };
     bar.appendChild(bn);
-    if(BIZV.ym){
+    if(BIZV.ym && !lk){
       var be=document.createElement('button'); be.className='pill ghost'; be.textContent='✎ 이 달 수정';
       be.onclick=function(){ if(!ST.SB_TOKEN){openOvl('ovlAuth');return;} BIZV.edit=true; BIZV.newMonth=false; renderBizMonthly(); };
       bar.appendChild(be);
       var bd=document.createElement('button'); bd.className='pill ghost'; bd.textContent='🗑 이 달 삭제'; bd.style.color='var(--critical,#d03b3b)';
       bd.onclick=async function(){
         if(!ST.SB_TOKEN){openOvl('ovlAuth');return;}
-        if(!confirm(BIZV.ym+' 입력을 전부 삭제할까요?')) return;
+        var k=BIZV.ym; if(!confirm(bizLabel(k)+'('+k+') 입력을 전부 삭제할까요?'+(BIZL.ok? '\n(지운 내용은 «이력»에서 되돌릴 수 있습니다)' : ''))) return;
         try{
-          await sbWrite('DELETE','biz_recon?ym=eq.'+encodeURIComponent(BIZV.ym));
-          logChange('delete','biz_recon',0,{ym:BIZV.ym});
-          ST.RAWX.biz=(ST.RAWX.biz||[]).filter(function(r){return r.ym!==BIZV.ym;});
+          await bizDeleteMonth(k);
+          logChange('delete','biz_recon',0,{ym:k});
+          bizReplaceLocal(k, []);
           BIZV.ym=null; renderBizMonthly();
         }catch(e){ $('#dvMsg').textContent=String(e.message||e); }
       };
       bar.appendChild(bd);
     }
+  }
+  /* ㊿+176 월 마감 · 이력 (SQL 107) */
+  if(BIZV.ym && BIZL.ok){
+    if(lk){ var ls=document.createElement('span'); ls.className='ubadge biz-lock'; ls.textContent='🔒 마감 · '+String(lk.locked_by||'').split('@')[0]+' · '+String(lk.locked_at||'').slice(0,10); ls.title=lk.note||'마감됨 — 고치려면 슈퍼 관리자가 «마감 풀기»'; bar.appendChild(ls);
+      if(ST.IS_SUPER){ var bu0=document.createElement('button'); bu0.className='pill ghost'; bu0.id='bizUnlock'; bu0.textContent='마감 풀기…'; bu0.onclick=function(){ bizUnlock(BIZV.ym); }; bar.appendChild(bu0); } }
+    else if(canW){ var bl=document.createElement('button'); bl.className='pill ghost'; bl.id='bizLockBtn'; bl.textContent='🔒 이 달 마감…'; bl.title='마감하면 이 달은 슈퍼 관리자가 풀기 전까지 고치거나 지울 수 없습니다'; bl.onclick=function(){ bizLockMonth(BIZV.ym); }; bar.appendChild(bl); }
+    var bh=document.createElement('button'); bh.className='pill ghost'; bh.id='bizHist'; bh.textContent='이력'; bh.title='이 달을 고치거나 지우기 전의 내용 — 그 판으로 되돌리기'; bh.onclick=function(){ bizHistOpen(BIZV.ym); }; bar.appendChild(bh);
   }
   /* 비즈포탈 엑셀 자동 대조 — 파일을 읽어 바로 비교 (저장하지 않음) */
   var bu=document.createElement('label'); bu.className='pill'; bu.style.cssText='cursor:pointer;display:inline-flex;align-items:center;gap:6px'; bu.title='비즈포탈에서 내려받은 매출 목록(.xlsx)을 올리면 그 달 포탈 매출과 회사 단위로 자동 대조합니다 — 파일은 저장하지 않습니다';
@@ -570,13 +579,13 @@ export function renderBizMonthly(){
     em.textContent='아직 입력된 달이 없습니다. 「＋ 새 달 입력」으로 시작하세요.';
     host.appendChild(em); return;
   }
-  var mr=rows.filter(function(r){return r.ym===BIZV.ym;});
+  var mr=rows.filter(function(r){return bizKey(r)===BIZV.ym;});
   var sums=mr.filter(function(r){return r.kind==='sum';});
   var dets=mr.filter(function(r){return r.kind==='detail';});
   var asOf=(mr[0]&&mr[0].as_of)? String(mr[0].as_of).slice(0,10):'';
 
   var head=document.createElement('p'); head.className='cap';
-  head.textContent=BIZV.ym+' 대조 결과'+(asOf? ' · 작성일 '+asOf:'');
+  head.textContent=(+BIZV.ym.slice(0,4))+'년 '+(+BIZV.ym.slice(5,7))+'월 대조 결과'+(asOf? ' · 작성일 '+asOf:'')+(lk? ' · 🔒 마감됨' : '');
   host.appendChild(head);
 
   var st=document.createElement('table'); st.className='dgrid'; st.style.maxWidth='560px';
@@ -606,11 +615,81 @@ export function renderBizMonthly(){
   }
 }
 
+/* ── ㊿+176 비즈포탈 차액: 연도 · 월 마감 · 이력 (SQL 107 — 없으면 예전 방식 그대로) ──
+   · 저장 · 삭제 = biz_month_replace · biz_month_delete 함수(지우고 넣기가 한 번에 · 바뀌기 전 행 목록이 doc_hist 에)
+   · 마감 = period_lock('biz', 'YYYY-MM') · 풀기 = 슈퍼 관리자 period_unlock(사유) · 마감된 달은 DB 가 막음 */
+export var BIZL={ok:null, locks:{}, at:0};
+export async function bizLoadLocks(force){
+  if(!force && BIZL.at && Date.now()-BIZL.at<30000) return BIZL;
+  try{ var r=await fetch(SB_URL+'/rest/v1/period_locks?select=*', {headers:sbHeaders()}); BIZL.ok=r.ok; var m={}; if(r.ok) ((await r.json())||[]).forEach(function(x){ m[x.kind+':'+x.period]=x; }); BIZL.locks=m; }
+  catch(e){ BIZL.ok=false; }
+  BIZL.at=Date.now(); return BIZL;
+}
+export function bizLock(k){ return (k && BIZL.locks['biz:'+k]) || null; }
+export function bizCanWrite(){ return !!ST.SB_TOKEN && !ST.IS_VIEWER && (ST.IS_SUPER || ST.MY_ROLE==='admin' || ST.MY_ROLE==='editor'); }
+export function bizRowsOf(k){ return (ST.RAWX.biz||[]).filter(function(r){ return bizKey(r)===k; }); }
+export function bizReplaceLocal(k, ins){ ST.RAWX.biz=(ST.RAWX.biz||[]).filter(function(r){ return bizKey(r)!==k; }).concat(ins||[]); }
+export async function bizSaveMonth(k, out, note){
+  var y=+k.slice(0,4), m=+k.slice(5,7), ym=m+'월';
+  out.forEach(function(r){ r.ym=ym; r.y=y; });
+  if(BIZL.ok===null) await bizLoadLocks();
+  if(BIZL.ok) return (await sbWrite('POST','rpc/biz_month_replace',{p_y:y, p_m:m, p_rows:out, p_note:note||null}, undefined, 'biz'))||[];
+  /* SQL 107 전 — 예전 방식(달만 · y 칸 없음) */
+  var old=out.map(function(r){ var o=Object.assign({}, r); delete o.y; return o; });
+  await sbWrite('DELETE','biz_recon?ym=eq.'+encodeURIComponent(ym));
+  return (await sbWrite('POST','biz_recon?select=*',old,'return=representation'))||[];
+}
+export async function bizDeleteMonth(k){
+  var y=+k.slice(0,4), m=+k.slice(5,7);
+  if(BIZL.ok===null) await bizLoadLocks();
+  if(BIZL.ok) return sbWrite('POST','rpc/biz_month_delete',{p_y:y, p_m:m}, undefined, 'biz');
+  return sbWrite('DELETE','biz_recon?ym=eq.'+encodeURIComponent(m+'월'));
+}
+export async function bizLockMonth(k){
+  var rs=bizRowsOf(k), sum=rs.filter(function(r){ return r.kind==='sum'; }).map(function(r){ return r.item+' '+won(r.biz)+'천원'; }).join(' · ');
+  if(!confirm(bizLabel(k)+' 비즈포탈 차액을 마감합니다\n\n'+(sum||'(요약 없음)')+'\n\n마감하면 슈퍼 관리자가 «마감 풀기» 전까지 고치거나 지울 수 없습니다. 마감할까요?')) return;
+  try{ await sbWrite('POST','rpc/period_lock',{p_kind:'biz', p_period:k, p_note:null}, undefined, 'biz'); await bizLoadLocks(true); toast('마감했습니다', bizLabel(k)+' 비즈포탈 차액'); renderBizMonthly(); }
+  catch(e){ toast('마감하지 못했습니다', String(/** @type {any} */(e).message||e).slice(0,160), 'bad'); }
+}
+export async function bizUnlock(k){
+  var why=prompt(bizLabel(k)+' 마감을 풉니다 — 사유를 적어 주세요(변경 이력에 남습니다)', '');
+  if(why==null) return; why=String(why).trim(); if(why.length<2){ toast('마감을 풀지 않았습니다','사유를 두 글자 이상 적어 주세요','info'); return; }
+  try{ await sbWrite('POST','rpc/period_unlock',{p_kind:'biz', p_period:k, p_reason:why}, undefined, 'biz'); await bizLoadLocks(true); toast('마감을 풀었습니다', bizLabel(k)+' · '+why); renderBizMonthly(); }
+  catch(e){ toast('마감을 풀지 못했습니다', String(/** @type {any} */(e).message||e).slice(0,160), 'bad'); }
+}
+export var BIZ_OP={insert:'처음 저장', replace:'고침', restore:'되돌림', delete:'삭제'};
+/** 이력 창 — 이 달을 고치거나 지우기 전의 내용 · 그 판으로 되돌리기 */
+export async function bizHistOpen(k){
+  var ov=document.getElementById('ovlBizHist');
+  if(!ov){ ov=document.createElement('div'); ov.id='ovlBizHist'; ov.className='ovl'; document.body.appendChild(ov); }
+  ov.innerHTML=tpl`<div class="modal" role="dialog" aria-modal="true" aria-labelledby="bhH" style="width:min(720px,100%)"><h3 id="bhH">${bizLabel(k)} 비즈포탈 차액 — 이력</h3><p class="cap" id="bhCap">읽는 중…</p><div id="bhBody"></div>`+
+    tpl`<div class="mact"><span class="mmsg" id="bhMsg"></span><button type="button" class="pill ghost" data-close="ovlBizHist">닫기</button></div></div>`;
+  openOvl('ovlBizHist');
+  var rows=null; try{ var r=await fetch(SB_URL+'/rest/v1/doc_hist?select=id,at,actor,op,old,new,note&kind=eq.biz_recon&ref=eq.'+encodeURIComponent(k)+'&order=at.desc&limit=30', {headers:sbHeaders()}); if(r.ok) rows=await r.json(); }catch(e){}
+  var cap=/** @type {any} */(ov.querySelector('#bhCap')), body=/** @type {any} */(ov.querySelector('#bhBody'));
+  if(rows===null){ cap.textContent='이력을 읽지 못했습니다 — SQL 107 을 실행했는지 확인해 주세요'; return; }
+  var locked=!!bizLock(k), canW=bizCanWrite();
+  cap.textContent=rows.length? '고치거나 지우기 «전»의 내용입니다. 되돌리면 지금 내용도 이력에 남습니다.'+(locked? ' (마감된 달 — 되돌리려면 먼저 마감 풀기)' : '') : '아직 고치거나 지운 기록이 없습니다.';
+  var sumOf=function(old){ var a=(old||[]).filter(function(x){ return x.kind==='sum'; }); return a.map(function(x){ return x.item+' '+won(x.biz); }).join(' · '); };
+  body.innerHTML=rows.length? tpl`<div class="tbl-wrap"><table class="rn-tbl"><thead><tr><th>언제</th><th>누가</th><th>무엇</th><th>바뀌기 전(천원)</th><th></th></tr></thead><tbody>${rawHtml(rows.map(function(h, i){
+    var n=Array.isArray(h.old)? h.old.length : 0;
+    return tpl`<tr><td class="num">${String(h.at||'').slice(0,16).replace('T',' ')}</td><td>${String(h.actor||'').split('@')[0]}</td><td>${BIZ_OP[h.op]||h.op}${rawHtml(h.note? tpl`<div class="mini">${h.note}</div>` : '')}</td>`+
+      tpl`<td class="mini">${n? n+'행 · '+sumOf(h.old) : '(없음)'}</td><td>${rawHtml(n && canW && !locked? tpl`<button type="button" class="cbtn" data-bh="${String(i)}">이 판으로 되돌리기…</button>` : '')}</td></tr>`; }).join(''))}</tbody></table></div>` : '';
+  body.querySelectorAll('[data-bh]').forEach(function(b){ /** @type {any} */(b).onclick=async function(){
+    var h=rows[+/** @type {any} */(b).dataset.bh]; if(!h) return;
+    if(!confirm(bizLabel(k)+'을 '+String(h.at||'').slice(0,16).replace('T',' ')+' '+(BIZ_OP[h.op]||h.op)+' 전의 내용('+h.old.length+'행)으로 되돌립니다.\n지금 내용은 이력에 남습니다. 되돌릴까요?')) return;
+    var msg=/** @type {any} */(ov.querySelector('#bhMsg'));
+    try{ var keep=h.old.map(function(x){ var o=Object.assign({}, x); delete o.id; delete o.created_at; delete o.updated_at; return o; });
+      var ins=await bizSaveMonth(k, keep, 'restore #'+h.id); bizReplaceLocal(k, ins); logChange('update','biz_recon',0,{ym:k, restore:h.id, rows:keep.length});
+      closeOvl('ovlBizHist'); toast('되돌렸습니다', bizLabel(k)+' · '+keep.length+'행'); BIZV.ym=k; renderBizMonthly(); }
+    catch(e){ msg.textContent=String(/** @type {any} */(e).message||e).slice(0,200); msg.className='mmsg bad'; }
+  }; });
+}
+
 /* ---- 월 목표 대비 달성률 (비즈포탈 회계매출 · 매출시트 매출 두 기준) ---- */
 export function bizYear(rows){
-  var y='';
-  (rows||[]).forEach(function(r){ if(r.as_of) y=String(r.as_of).slice(0,4); });
-  return +(y || new Date().getFullYear());
+  var k=''; (rows||[]).forEach(function(r){ if(r.ym){ var x=bizKey(r); if(x>k) k=x; } });   /* ㊿+176 가장 최근 입력 달의 해 */
+  return +(k.slice(0,4) || new Date().getFullYear());
 }
 export function bizMonthNum(ym){ var m=String(ym||'').match(/(\d+)/); return m? +m[1] : 0; }
 export function bizPick(rows, ym, re){
@@ -626,18 +705,19 @@ export function bizEntryDate(rows, ym){ var d=''; (rows||[]).forEach(function(r)
 export function renderTargetTable(host, rows){
   var year=BIZV.year||bizYear(rows);
   BIZV.year=year;
+  rows=(rows||[]).filter(function(r){ return bizY(r)===year; });   /* ㊿+176 그해 행만(예전엔 «8월»이 해마다 섞였음) */
   var tg={};
   (ST.RAWX.mtargets||[]).forEach(function(t){ if(+t.year===year) tg[+t.month]=Number(t.amount)||0; });
   var now=new Date(), curY=now.getFullYear(), curM=now.getMonth()+1;
   var isFuture=function(m){ return year>curY || (year===curY && m>curM); };
-  var latest=''; (rows||[]).forEach(function(r){ var v=String(r.as_of||r.updated_at||r.created_at||'').slice(0,10); if(v.slice(0,4)===String(year) && v>latest) latest=v; });
+  var latest=''; (rows||[]).forEach(function(r){ var v=String(r.as_of||r.updated_at||r.created_at||'').slice(0,10); if(v>latest) latest=v; });
 
   var box=document.createElement('section');
   box.style.cssText='margin-bottom:22px;padding-bottom:18px;border-bottom:1px solid var(--ring)';
 
   var hd=document.createElement('div');
   hd.style.cssText='display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px';
-  hd.innerHTML=tpl`<b style="font-size:14px">${rawHtml(year)}년 월 목표 대비 달성률</b>`+
+  hd.innerHTML=tpl`<button type="button" class="cbtn" id="bizYPrev" aria-label="앞 해">‹</button><b style="font-size:14px">${rawHtml(year)}년 월 목표 대비 달성률</b><button type="button" class="cbtn" id="bizYNext" aria-label="다음 해">›</button>`+
     tpl`<span class="ubadge sm">₩ 천원</span>`+
     tpl`<span class="cap" style="margin:0">달성률 = 입력된 달끼리 비교(입력 월 기준) · 작은 줄 = 기간 전체 목표 대비 현재 누계 · 미입력 달은 0원으로 치지 않음${rawHtml(latest? ' · 최신 반영 '+esc(latest) : '')}</span>`;
   if(!ST.IS_VIEWER){
@@ -647,6 +727,8 @@ export function renderTargetTable(host, rows){
     hd.appendChild(be);
   }
   box.appendChild(hd);
+  /** @type {any} */(hd.querySelector('#bizYPrev')).onclick=function(){ BIZV.year=year-1; renderBizMonthly(); };
+  /** @type {any} */(hd.querySelector('#bizYNext')).onclick=function(){ BIZV.year=year+1; renderBizMonthly(); };
 
   var t=document.createElement('table'); t.className='dgrid biz-tg';
   var h=tpl`<thead><tr><th>구분</th><th>입력 상태</th><th style="text-align:right">목표(천원)</th>`+
@@ -761,18 +843,19 @@ export function openTargetEditor(year){
 
 export function renderBizEditor(host, months){
   var rows=ST.RAWX.biz||[];
-  var editYm = BIZV.newMonth? '' : BIZV.ym;
+  var editYm = BIZV.newMonth? '' : BIZV.ym;   /* ㊿+176 'YYYY-MM' */
   var src = BIZV.newMonth
-    ? rows.filter(function(r){ return r.ym===months[0] && r.kind==='sum'; }).map(function(r){ return {item:r.item, biz:null}; })
-    : rows.filter(function(r){ return r.ym===editYm && r.kind==='sum'; });
+    ? rows.filter(function(r){ return bizKey(r)===months[0] && r.kind==='sum'; }).map(function(r){ return {item:r.item, biz:null}; })
+    : rows.filter(function(r){ return bizKey(r)===editYm && r.kind==='sum'; });
   if(!src.length) src=[{item:'비즈포탈 회계매출',biz:null},{item:'매출시트 매출',biz:null},{item:'차액 총계',biz:null}];
-  var dsrc = BIZV.newMonth? [] : rows.filter(function(r){ return r.ym===editYm && r.kind==='detail'; });
-  var asOf = BIZV.newMonth? todayStr() : ((rows.find(function(r){return r.ym===editYm;})||{}).as_of||'').slice(0,10);
+  var dsrc = BIZV.newMonth? [] : rows.filter(function(r){ return bizKey(r)===editYm && r.kind==='detail'; });
+  var asOf = BIZV.newMonth? todayStr() : ((rows.find(function(r){return bizKey(r)===editYm;})||{}).as_of||'').slice(0,10);
+  if(BIZV.newMonth){ var lm=new Date(); lm.setDate(1); lm.setMonth(lm.getMonth()-1); editYm=lm.getFullYear()+'-'+('0'+(lm.getMonth()+1)).slice(-2); }   /* 새 달 = 지난달(정산은 보통 지난달) */
 
   var f=document.createElement('div'); f.style.maxWidth='760px';
   f.innerHTML=
     tpl`<div class="frm" style="max-width:420px;margin-bottom:14px">`+
-      tpl`<div><label>월 *</label><input id="bzYm" placeholder="예: 8월" value="${editYm}"></div>`+
+      tpl`<div><label for="bzYm">연월 *</label><input id="bzYm" type="month" value="${editYm}"></div>`+
       tpl`<div><label>작성일</label><input id="bzAsOf" type="date" value="${asOf}"></div>`+
     tpl`</div>`+
     tpl`<div class="cap" style="margin-bottom:6px">요약 항목 — 금액은 <b>천원 단위로 입력</b> (표와 같은 단위)</div><div id="bzSums"></div>`+
@@ -811,30 +894,32 @@ export function renderBizEditor(host, months){
   $('#bzAddDet').onclick=function(){ $('#bzDets').appendChild(detRow()); };
   $('#bzCancel').onclick=function(){ BIZV.edit=false; renderBizMonthly(); };
   $('#bzSave').onclick=async function(){
-    var ym=$('#bzYm').value.trim();
-    if(!ym){ $('#bzMsg').textContent='월을 입력하세요 (예: 8월)'; return; }
+    var k=$('#bzYm').value.trim();
+    if(!/^\d{4}-\d{2}$/.test(k)){ $('#bzMsg').textContent='연월을 고르세요 (예: 2026-08)'; return; }
+    if(bizLock(k)){ $('#bzMsg').textContent=bizLabel(k)+'은 마감됐습니다 — 슈퍼 관리자가 «마감 풀기» 후 고칠 수 있습니다'; return; }
+    var ym=(+k.slice(5,7))+'월', y=+k.slice(0,4);
+    if(BIZV.newMonth && bizRowsOf(k).length && !confirm(bizLabel(k)+' 입력이 이미 있습니다. 새로 적은 내용으로 바꿀까요?')) return;
     var asof=$('#bzAsOf').value||null;
     var out=[];
     $('#bzSums').querySelectorAll('div').forEach(function(d){
       var it=d.querySelector('.bz-item').value.trim();
       var amt=kwToWon(bizNz(d.querySelector('.bz-amt').value));   /* 칸은 천원 (㊿+157) */
-      if(it) out.push({ym:ym, as_of:asof, kind:'sum', item:it, biz:amt});
+      if(it) out.push({ym:ym, y:y, as_of:asof, kind:'sum', item:it, biz:amt});
     });
     $('#bzDets').querySelectorAll('div').forEach(function(d){
       var cu=d.querySelector('.bd-cust').value.trim(); if(!cu) return;
       var bz=kwToWon(bizNz(d.querySelector('.bd-biz').value)), sh=kwToWon(bizNz(d.querySelector('.bd-sheet').value));
-      out.push({ym:ym, as_of:asof, kind:'detail', item:cu, biz:bz, sheet:sh,
+      out.push({ym:ym, y:y, as_of:asof, kind:'detail', item:cu, biz:bz, sheet:sh,
                 diff:(bz!=null&&sh!=null)? bz-sh:null, note:d.querySelector('.bd-note').value.trim()||null});
     });
     if(!out.length){ $('#bzMsg').textContent='입력된 항목이 없습니다'; return; }
     this.disabled=true; $('#bzMsg').textContent='저장 중…';
     try{
-      await sbWrite('DELETE','biz_recon?ym=eq.'+encodeURIComponent(ym));
-      var ins=await sbWrite('POST','biz_recon?select=*',out,'return=representation');
-      ST.RAWX.biz=(ST.RAWX.biz||[]).filter(function(r){return r.ym!==ym;}).concat(ins||[]);
-      logChange('update','biz_recon',0,{ym:ym, rows:out.length});
-      toast('저장되었습니다', ym+' 비즈포탈 대조 결과');
-      ST.DIRTY=true; BIZV.edit=false; BIZV.ym=ym;
+      var ins=await bizSaveMonth(k, out, null);
+      bizReplaceLocal(k, ins);
+      logChange('update','biz_recon',0,{ym:k, rows:out.length});
+      toast('저장되었습니다', bizLabel(k)+' 비즈포탈 대조 결과');
+      ST.DIRTY=true; BIZV.edit=false; BIZV.ym=k;
       renderBizMonthly();
     }catch(e){ $('#bzMsg').textContent=String(e.message||e); this.disabled=false; }
   };
@@ -1188,10 +1273,11 @@ export async function bzxSaveAlias(q){
 }
 export async function bzxSave(diffs){
   if(!ST.SB_TOKEN){ openOvl('ovlAuth'); return; }
-  var res=BZX.res, T=res.T, ym=(+mk(T).slice(5,7))+'월', y=+mk(T).slice(0,4);
+  var res=BZX.res, T=res.T, ym=(+mk(T).slice(5,7))+'월', y=+mk(T).slice(0,4), k=mk(T);
   var today=todayStr(), asof=(+today.slice(0,4)===y)? today : (y+'-'+mk(T).slice(5,7)+'-'+('0'+new Date(y,+mk(T).slice(5,7),0).getDate()).slice(-2));
-  var exists=(ST.RAWX.biz||[]).some(function(r){ return r.ym===ym; });
-  if(exists && !confirm(ym+' 대조 결과가 이미 있습니다. 이번 자동 대조 결과로 바꿀까요?')) return;
+  if(bizLock(k)){ toast('저장하지 않았습니다', bizLabel(k)+'은 마감됐습니다 — 슈퍼 관리자가 «마감 풀기» 후', 'bad'); return; }
+  var exists=bizRowsOf(k).length>0;
+  if(exists && !confirm(bizLabel(k)+' 대조 결과가 이미 있습니다. 이번 자동 대조 결과로 바꿀까요?'+(BIZL.ok? '\n(바꾸기 전 내용은 «이력»에 남습니다)' : ''))) return;
   var out=[
     {ym:ym, as_of:asof, kind:'sum', item:'비즈포탈 회계매출', biz:Math.round(res.sum.biz)},
     {ym:ym, as_of:asof, kind:'sum', item:'관리포탈 매출', biz:Math.round(res.sum.db)},
@@ -1211,13 +1297,13 @@ export async function bzxSave(diffs){
     if(!note && q.cat==='fee') note='설치비 인식 시점 차이 (비즈포탈 '+mk(T)+' · 포탈 정산일 기준)';
     out.push({ym:ym, as_of:asof, kind:'detail', item:q.name, biz:Math.round(q.bizAmt), sheet:Math.round(q.dbTot), diff:q.diff, note:note||null});
   });
+  out.forEach(function(r){ r.y=y; });
   try{
-    await sbWrite('DELETE','biz_recon?ym=eq.'+encodeURIComponent(ym));
-    var ins=await sbWrite('POST','biz_recon?select=*',out,'return=representation');
-    ST.RAWX.biz=(ST.RAWX.biz||[]).filter(function(r){return r.ym!==ym;}).concat(ins||[]);
-    logChange('update','biz_recon',0,{ym:ym, rows:out.length, from:'엑셀 자동 대조', file:BZX.file, ignored_by_rule:nIgn});
-    toast('저장되었습니다', ym+' 비즈포탈 대조 결과 · 차이 '+(out.length-3)+'곳');
-    ST.DIRTY=true; BIZV.ym=ym; BZX.res=null; BZX.rows=null; renderBizMonthly();
+    var ins=await bizSaveMonth(k, out, '엑셀 자동 대조');
+    bizReplaceLocal(k, ins);
+    logChange('update','biz_recon',0,{ym:k, rows:out.length, from:'엑셀 자동 대조', file:BZX.file, ignored_by_rule:nIgn});
+    toast('저장되었습니다', bizLabel(k)+' 비즈포탈 대조 결과 · 차이 '+(out.length-3)+'곳');
+    ST.DIRTY=true; BIZV.ym=k; BZX.res=null; BZX.rows=null; renderBizMonthly();
   }catch(e){ toast('저장 실패', String(e.message||e), 'info'); }
 }
 export async function bzxOpenFile(file){

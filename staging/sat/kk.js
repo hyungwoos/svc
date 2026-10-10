@@ -211,6 +211,7 @@ async function saveMaps(){
 async function saveSettle(){
   var s=sess(); if(!s){ alert('로그인이 필요합니다'); return; }
   var ym=$('#ym').value; if(!ym){ alert('청구월을 고르세요'); return; }
+  var bm=clsBlockMsg(ym); if(bm){ msg('mK2',bm,'bad'); return; }   /* ㊿+176 마감된 달 */
   try{
     var sum=K.rows.reduce(function(a,r){ return a+r.amt; },0);
     var row={ month:ym+'-01', use_month:($('#um').value? $('#um').value+'-01':null),
@@ -230,6 +231,7 @@ async function saveSettle(){
 }
 async function delSettle(){
   var ym=$('#ym').value; if(!ym) return;
+  if(clsBlockMsg(ym)){ msg('mK2', clsBlockMsg(ym), 'bad'); return; }
   try{
     var have=await sbGet('kk_settle?select=id,total&month=eq.'+ym+'-01');
     if(!have||!have[0]){ msg('mK2', ym+' 로 저장된 정산이 없습니다','bad'); return; }
@@ -348,14 +350,16 @@ function renderSettles(){
   var rows=(K.settles||[]).slice();
   $('#setList').innerHTML=rows.map(function(r){
     var ym=String(r.month||'').slice(0,7), um=String(r.use_month||'').slice(0,7);
-    return tpl`<div class="setmon"><span class="ym">${ym} 청구</span><span class="sum">${rawHtml(um? um+' 이용분':'')}</span></div>`+
+    return tpl`<div class="setmon"><span class="ym">${ym} 청구</span><span class="sum">${rawHtml(um? um+' 이용분':'')}</span>${rawHtml(clsMonthTag(ym))}</div>`+
       tpl`<div class="setrow"><span class="kind u">구독료</span><span class="amt">${rawHtml(fmt(r.total))}원</span>`+
       tpl`<span class="diff ${Math.abs(Number(r.total||0)-Number(r.biz_total||0))<1?'ok':'bad'}">`+ tpl`${rawHtml(Math.abs(Number(r.total||0)-Number(r.biz_total||0))<1? '대조 일치':'차액 '+fmt(Number(r.total||0)-Number(r.biz_total||0)))}</span>`+
       tpl`<span class="cnt">고객사 ${rawHtml(r.cnt||0)}곳 · 신규 ${rawHtml(r.cnt_new||0)} · 해약 ${rawHtml(r.cnt_end||0)}</span>`+
       tpl`<span class="who">${String(r.created_by||'').split('@')[0]} ${String(r.updated_at||'').slice(5,10)}${rawHtml(r.report_id? ' · 리포트 #'+r.report_id:'')}</span>`+
       tpl`<span class="acts"><button class="rowbtn" data-click="restoreSettle(${rawHtml(r.id)})">불러오기</button>`+
-      tpl`<button class="rowbtn red" data-click="delSettleId(${rawHtml(r.id)})">삭제</button></span></div>`;
+      tpl`${rawHtml(CLS.ok? tpl`<button class="rowbtn" data-click="clsHist(${rawHtml(r.id)})">이력</button>` : '')}`+
+      tpl`${rawHtml(clsLocked(ym)? '' : tpl`<button class="rowbtn red" data-click="delSettleId(${rawHtml(r.id)})">삭제</button>`)}</span></div>`;
   }).join('')||tpl`<div class="mini" style="padding:14px 4px;color:#888">${K.settleErr? '읽기 실패 — 아래 메시지를 확인하세요':'저장된 정산이 없습니다'}</div>`;
+  if(CLS.ok) $('#setList').innerHTML+=tpl`<div class="mini" style="padding:8px 4px"><span class="lnk" data-click="clsHist(null)">🕘 전체 수정 이력(지운 정산 포함)</span></div>`;
 }
 function restBar(t){ var b=$('#restBar'); if(!t){ b.classList.add('hidden'); return; } $('#restTxt').innerHTML=t; b.classList.remove('hidden'); }
 function clearRestored(){
@@ -391,6 +395,8 @@ async function restoreSettle(id){
   }catch(e){ msg('mS',e.message,'bad'); }
 }
 async function delSettleId(id){
+  var r0=(K.settles||[]).filter(function(x){ return x.id===id; })[0];
+  if(r0 && clsBlockMsg(r0.month)){ msg('mS', clsBlockMsg(r0.month), 'bad'); return; }
   if(!confirm('저장된 정산을 지울까요?')) return;
   try{ await sbWrite('DELETE','kk_settle?id=eq.'+id); K.settles=(K.settles||[]).filter(function(x){ return x.id!==id; }); renderSettles(); msg('mS','삭제했습니다','ok'); }
   catch(e){ msg('mS',e.message,'bad'); }
@@ -469,6 +475,8 @@ document.addEventListener('DOMContentLoaded', async function(){
     K.maps=r[0]; (r[1]||[]).forEach(function(c){ K.cfg[c.key]=c.val; });
   }catch(e){ msg('mK','설정을 읽지 못했습니다: '+e.message,'bad'); }
   applyCfg(); renderMaps(); loadSettles();
+  /* ㊿+176 월 마감 · 수정 이력(SQL 107) */
+  clsInit('kk', 'kk_settle', '카카오 정산', function(m){ loadSettles().then(function(){ renderSettles(); if(m) msg('mS', m, 'ok'); }); });
 });
 
 /* 버튼·입력칸이 부르는 함수 (data-click · data-change · data-input → sat/common.js) — 여기 없는 이름은 실행되지 않음 */

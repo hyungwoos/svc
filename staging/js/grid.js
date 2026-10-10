@@ -11,7 +11,7 @@ import { AK, BZX, CH_DEFS, ctOrig, DC, ensureLeadSrc, liveCalc, liveDiff, loadLi
 import { applyDense, openCust360, PR, pushRecent, renderTodo } from './tools.js';
 import { CL, renderCloud } from './cloud.js';
 import { inbLast, loadInbound, renderInbPanel, renderInbStat, renderWeekly } from './inbound.js';
-import { CHURN, CR, CS, csSetTab, ensureGroupOpen, helpBox, helpWire, initOiForm, loadRecvPresets, oiLinkQuote, oiToContract, renderChurn,
+import { CHURN, CR, CS, csSetTab, ensureGroupOpen, helpBox, helpWire, initOiForm, loadRecvPresets, oiLinkQuote, oiToContract, quoteOpen, QUOTES, quotesLoad, renderChurn,
   renderChurnRate, renderCsite, renderCustFlow, renderOiTiles, wzReset } from './sales.js';
 import { logChange, monthRows, msg, openOvl } from './edit.js';
 import { lazyGet, lazyView } from './lazy.js';
@@ -259,6 +259,7 @@ export function switchView(v){
     if(ST.DIRTY){ ST.DIRTY=false; loadFromDb().then(onData); }
     return;
   }
+  if(v==='quotes' && !ST.RAWX.quotes) quotesLoad();   /* ㊿+177 견적 목록(SQL 109) — 처음 열 때 */
   if(v==='aiknow' && !ST.RAWX.aiknow){
     sbTry('ai_knowledge?select=*&order=id').then(function(rows){ ST.RAWX.aiknow=rows||[]; if(ST.CUR_VIEW==='aiknow') renderGrid(); });
   }
@@ -538,7 +539,7 @@ export function rowMenu(anchor, items){
 /** 상태 글자 → 배지 색(글자도 항상 같이 보임 — 색만으로 구분하지 않음) */
 export function stBadge(txt){
   var s=String(txt||'');
-  if(/해지|중지|취소|실패|미대응|분실|폐기/.test(s)) return 'crit';
+  if(/해지|중지|취소|실패|실주|미대응|분실|폐기/.test(s)) return 'crit';
   if(/종료|회수완료|CN전환|이전됨|계산서발행|판매완료/.test(s)) return '';
   if(/회수예정|출하요청|배송중|계약예정|진행|접수|수리중/.test(s)) return 'warn';
   if(/신규|활성|재약정|추가|통합과금|설치완료|임대중|수주|LIVE|대응/.test(s)) return 'ok';
@@ -1346,6 +1347,7 @@ export function gridRow(r,g,editing){
       if(ST.CUR_VIEW==='contracts'){
         act.appendChild(ab('view','eye','상세 보기 — 계약 기간·연장 이력', function(){ openDetail(r); }));
       }
+      if(ST.CUR_VIEW==='quotes') act.appendChild(ab('open','doc','견적 화면에서 열기 — '+(r.quote_no||'발주서 #'+r.id), function(){ quoteOpen('qid='+r.id); }));   /* ㊿+177 */
       if(ST.IS_VIEWER) return;
       if(ST.CUR_VIEW==='oi'){
         // 수주(이후) 단계 + 아직 계약 미연결 → 계약으로 전환
@@ -1356,6 +1358,7 @@ export function gridRow(r,g,editing){
           act.appendChild(bc);
         }
         act.appendChild(ab('quote','clip', r.quote_file? '연결된 견적서 바꾸기·해제' : '견적서 연결', function(){ oiLinkQuote(r); }));
+        if(QUOTES.ok!==false && canView('quote')) act.appendChild(ab('quoteNew','plus','이 OI 로 견적 만들기 — 저장하면 이 OI 에 연결', function(){ quoteOpen('oi='+r.id); }));   /* ㊿+177 */
       }
       if(g.table==='equipment_orders' && eqWant(r).length && ['설치완료','회수예정','회수완료'].indexOf(r.status)>=0){
         act.appendChild(ab('return','undo','회수 처리 — 시리얼을 골라 일부·전부 회수 또는 회수 취소', function(){ eqRetOpen(r); }, 'ret'));

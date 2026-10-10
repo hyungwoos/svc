@@ -2728,4 +2728,23 @@ html[data-skin="gn"] #rail .gn-right .ntf-btn:hover{border-color:var(--ink-2)}
 .ops-rb-dry{margin-top:8px;padding:10px 12px;border:1px solid var(--warn-ink);border-radius:10px;font-size:13px}
 .ops-rb-dry p{margin:0 0 4px}
 .ops-rb-dry ul{margin:4px 0 8px;padding-left:18px}
+/* ==== ㊿+177 Slack 예약 발송(설정) ==== */
+.ntf-auto{border:1px solid var(--grid);border-radius:12px;padding:6px 14px 10px;margin:4px 0 0;min-width:0}
+.ntf-auto legend{padding:0 6px;margin:0}
+.ntf-auto-row{display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap;margin:4px 0 6px}
+.ntf-days{display:inline-flex;gap:4px;flex-wrap:wrap}
+.ntf-day{position:relative;display:inline-flex;margin:0}
+.ntf-day input{position:absolute;opacity:0;width:1px;height:1px;margin:0}
+.ntf-day span{display:inline-flex;align-items:center;justify-content:center;min-width:36px;height:32px;padding:0 8px;border:1px solid var(--ring);border-radius:16px;background:var(--surface);color:var(--ink);font-size:13px;cursor:pointer;user-select:none}
+.ntf-day input:checked+span{background:var(--s1-solid);border-color:var(--s1-solid);color:#fff;font-weight:700}
+.ntf-day input:focus-visible+span{outline:2px solid var(--focus,var(--s1-solid));outline-offset:2px}
+.ntf-day input:disabled+span{opacity:.5;cursor:not-allowed}
+.ntf-auto .ntf-time{margin:0;font-size:13px;color:var(--ink-2)}
+.ntf-auto select{height:32px;width:auto;min-width:90px}
+.ntf-auto .ntf-adm{display:inline-flex;align-items:center;gap:6px;margin:0;font-size:13px;color:var(--ink)}
+.ntf-auto .ntf-adm input{width:18px;height:18px;padding:0}
+.ntf-auto #nsAutoInfo{margin:2px 0 0;line-height:1.5}
+/* ==== ㊿+177 견적 고르기 창 — 포탈 DB / GitHub 구분 ==== */
+.qp-sec{padding:8px 12px 6px;font-size:12px;font-weight:700;color:var(--muted);background:var(--surface-2);border-bottom:1px solid var(--line)}
+.qp-row:focus-visible{outline:2px solid var(--s1-solid);outline-offset:-2px}
 /* ==== ㊿+166 새 디자인 end ==== */

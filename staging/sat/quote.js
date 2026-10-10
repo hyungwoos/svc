@@ -68,7 +68,9 @@ function enterQuote() {
     loadSeal();
     // 견적 데이터를 조회용으로 여는 경우(?view=)엔 종류 선택 없이 바로 진행
     const params = new URLSearchParams(window.location.search);
-    if (params.get('view')) {
+    if (params.get('qid') || /^q:/.test(params.get('view') || '')) {
+        qdbFromUrl(params);   // ㊿+177 포탈 DB 견적(sat/qdb.js)
+    } else if (params.get('view')) {
         selectQuoteType('enterprise');
     } else {
         document.getElementById('quoteTypeOverlay').style.display = 'flex';
@@ -175,6 +177,7 @@ function sanitizeFileName(str) {
 }
 async function prepareAndPrint() {
     calcAll();
+    if ((await qdbBeforePrint()) === false) return;   // ㊿+177 먼저 포탈 DB 에 저장 · «발송» (sat/qdb.js · 실패해도 발행은 계속)
     const customer = sanitizeFileName(document.getElementById('customerName').value || "고객사명");
     const qDate = sanitizeFileName(document.getElementById('quoteDate').value || "날짜미입력");
     if (isPo()) {
@@ -729,7 +732,8 @@ async function initAppAfterTypeSelected() {
     // URL에 ?view=경로 가 있으면, 그 견적을 자동으로 불러와서 읽기 전용으로 보여줍니다.
     const params = new URLSearchParams(window.location.search);
     const viewPath = params.get('view');
-    if (viewPath) {
+    if (params.get('oi')) qdbOiFromUrl();   // ㊿+177 OI 에서 «견적 만들기»
+    if (viewPath && !/^q:/.test(viewPath)) {
         try {
             const res = await workerFetch(`/load?path=${encodeURIComponent(viewPath)}`);
             if (!res.ok) {

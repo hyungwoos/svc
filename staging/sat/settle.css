@@ -57,8 +57,8 @@ tr.st-auto td{background:#fff} tr.st-map td{background:#f4fbf5} tr.st-need td{ba
 .setrow .diff.ok{color:var(--ok)} .setrow .diff.bad{color:var(--warn)}
 .setrow .cnt{flex:1;color:var(--muted);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .setrow .who{flex:0 0 auto;color:#98a2ab;font-size:11px}
-.setrow .acts{flex:0 0 auto;display:flex;gap:4px;opacity:.4}
-.setrow:hover .acts{opacity:1}
+.setrow .acts{flex:0 0 auto;display:flex;gap:4px;opacity:.72}   /* ㊿+176 .4 → .72(글자 대비 4.5 이상) · 키보드로 들어와도 또렷하게 */
+.setrow:hover .acts,.setrow:focus-within .acts{opacity:1}
 .rest{max-width:1280px;margin:0 auto 10px;background:#eef6ff;border:1px solid #cfe3fb;color:#1a56b8;border-radius:10px;padding:8px 12px;display:flex;align-items:center;gap:10px;font-size:12px}
 .rest span{flex:1}
 .ovl{position:fixed;inset:0;background:rgba(15,20,25,.38);z-index:500;display:none;align-items:flex-start;justify-content:center;padding:52px 16px 24px;overflow:auto}
@@ -82,3 +82,6 @@ select.pick{max-width:270px;font-size:11.5px}
 .kkrow td{font-size:12px}
 .kkhint{font-size:11.5px;color:var(--muted)}
 textarea.paste{width:100%;min-height:110px;border:1px solid #ccd2d8;border-radius:9px;padding:9px 11px;font-family:inherit;font-size:12px;line-height:1.5;resize:vertical}
+/* ㊿+176 월 마감 · 발행 잠금 · 이력 */
+.cls-lock{font-size:11px;color:#8a5200;background:#fff4d6;border:1px solid #e3c06b;border-radius:6px;padding:1px 6px;margin-left:6px}
+.setmon .rowbtn{margin-left:4px}

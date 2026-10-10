@@ -14,8 +14,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="SVC 포탈">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<script src="sat/common.js?v=2026-09-16%20%E3%8A%BF%2B175"></script>
-<link rel="stylesheet" href="sat/quote.css?v=2026-09-16%20%E3%8A%BF%2B175">
+<script src="sat/common.js?v=2026-09-16%20%E3%8A%BF%2B177"></script>
+<link rel="stylesheet" href="sat/quote.css?v=2026-09-16%20%E3%8A%BF%2B177">
 </head>
 <body>
 <!--
@@ -79,18 +79,33 @@
         <div id="githubListBody" style="overflow-y:auto; border:1px solid #eee; border-radius:4px; flex:1; min-height: 100px;"></div>
     </div>
 </div>
+<!-- ㊿+177 포탈 DB 견적 목록 -->
+<div id="qdbListModal" class="modal-overlay no-print" role="dialog" aria-modal="true" aria-labelledby="qdbListH">
+    <div class="modal-box qdb-box">
+        <div class="qdb-head">
+            <h3 id="qdbListH">견적 목록 <small>포탈 DB</small></h3>
+            <input type="search" id="qdbQ" placeholder="고객사 · 번호" aria-label="견적 찾기" data-change="qdbList()">
+            <button type="button" class="qdb-x" data-click="qdbListClose()" aria-label="닫기">✕</button>
+        </div>
+        <div id="qdbListBody" class="qdb-body"></div>
+        <p class="qdb-foot">상태(발송 · 수주 · 실주)는 포탈 › 영업 › 견적 목록에서 바꿉니다. 예전 GitHub 저장분은 «GitHub ▾ → 저장 내역 조회».</p>
+    </div>
+</div>
 <div id="viewModeBar" style="display:none; position:fixed; top:10px; right:10px; z-index:10000; gap:6px;">
     <button data-click="print()" style="padding:8px 14px; background:var(--genians-green); color:#fff; border:none; border-radius:5px; cursor:pointer; font-weight:bold;">인쇄</button>
     <button data-click="exitDocViewMode()" style="padding:8px 14px; background:#6c757d; color:#fff; border:none; border-radius:5px; cursor:pointer; font-weight:bold;">✎ 수정하기</button>
     <button data-click="close()" style="padding:8px 14px; background:#333; color:#fff; border:none; border-radius:5px; cursor:pointer; font-weight:bold;">✕ 닫기</button>
 </div>
 <div class="toolbar">
-    <div style="font-weight: bold; color: var(--genians-green);">Genians Pricing System v5.7 <span id="quoteTypeBadge" style="color:#888; font-weight:normal; font-size:12px;"></span></div>
+    <div style="font-weight: bold; color: var(--genians-green);">Genians Pricing System v5.7 <span id="quoteTypeBadge" style="color:#888; font-weight:normal; font-size:12px;"></span> <span id="qdbState" class="qdb-state no-print" role="status"></span></div>
     <div class="toolbar-actions">
         <button class="btn btn-add" data-click="addRow()">+ 항목 추가</button>
+        <button class="btn btn-secondary no-print" data-click="qdbSaveClick()" title="포탈 DB 에 저장 — 처음 저장할 때 견적 번호(Q-연월-순번)를 받습니다">💾 저장</button>
+        <button class="btn btn-secondary no-print" data-click="qdbList()" title="포탈 DB 에 저장된 견적 — 불러오기">📋 견적 목록</button>
         <div class="dropdown no-print">
             <button class="btn btn-secondary" data-click="toggleDropdown('fileDropdown')">파일 ▾</button>
             <div id="fileDropdown" class="dropdown-menu">
+                <button class="dropdown-item" data-click="qdbDetach(); closeAllDropdowns();">🆕 이 내용으로 새 견적 시작 (새 번호)</button>
                 <button class="dropdown-item" data-click="saveQuoteData(); closeAllDropdowns();">💾 임시저장 (JSON 다운로드)</button>
                 <label class="dropdown-item" style="cursor:pointer;">
                     📂 불러오기 (JSON 파일)
@@ -126,6 +141,10 @@
             <div style="display: flex; align-items: center;">
                 <span id="dateLabel" style="width: 60px; font-weight: bold;">견적일</span>
                 <input type="date" class="input-line" style="flex: 1; font-family: inherit;" id="quoteDate">
+            </div>
+            <div id="quoteNoRow" style="display: none; align-items: center;">
+                <span style="width: 60px; font-weight: bold;">견적번호</span>
+                <span id="quoteNoTxt" style="flex: 1; padding: 0 5px; font-weight: bold;"></span>
             </div>
         </div>
         <div class="info-right">
@@ -230,6 +249,7 @@
         </table>
     </div>
 </div>
-<script src="sat/quote.js?v=2026-09-16%20%E3%8A%BF%2B175"></script>
+<script src="sat/quote.js?v=2026-09-16%20%E3%8A%BF%2B177"></script>
+<script src="sat/qdb.js?v=2026-09-16%20%E3%8A%BF%2B177"></script>
 </body>
 </html>

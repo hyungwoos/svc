@@ -404,6 +404,7 @@ async function saveSettle(kind){
   var s=sess(); if(!s){ alert('로그인이 필요합니다'); return; }
   var ym=$('#ym').value; if(!ym){ alert('정산월을 고르세요'); return; }
   var mid=kind==='use'?'mU2':'mI2';
+  var bm=clsBlockMsg(ym); if(bm){ msg(mid,bm,'bad'); return; }   /* ㊿+176 마감된 달 */
   try{
     var row;
     if(kind==='use'){
@@ -423,7 +424,7 @@ async function saveSettle(kind){
             biz_total:(S.instBiz||[]).reduce(function(a,b){ return a+b.acc; },0),
             cnt_new:S.inst.reduce(function(a,r){ return a+r.base; },0), cnt_ext:S.inst.reduce(function(a,r){ return a+r.extra; },0),
             buy_amount:n($('#buyTotal').value),
-            payload:{ vendor:$('#vendor').value, rows:S.inst.map(function(r){ return { cno:r.cno, nm:r.nm, idate:String(r.idate||''), base:r.base, extra:r.extra, amt:r.amt, biz:r.biz?r.biz.no:null, note:r.note }; }) },
+            payload:{ vendor:$('#vendor').value, rows:S.inst.map(function(r){ return { cno:r.cno, nm:r.nm, idate:String(r.idate||''), base:r.base, extra:r.extra, amt:r.amt, biz:r.biz?r.biz.no:null, bacc:r.biz?r.biz.acc:null, note:r.note }; }) },   /* ㊿+176 bacc = 비즈포탈 금액(불러올 때 차이가 0으로 보이던 것) */
             created_by:s.u||null };
     }
     var have=await sbGet('s1_settle?select=id&month=eq.'+row.month+'&kind=eq.'+row.kind);
@@ -530,7 +531,7 @@ function renderSettles(){
   rows.forEach(function(r){ var m=String(r.month||'').slice(0,7); if(!byM[m]){ byM[m]=[]; order.push(m); } byM[m].push(r); });
   var html=order.map(function(m){
     var tot=byM[m].reduce(function(a,r){ return a+Number(r.total||0); },0);
-    return tpl`<div class="setmon"><span class="ym">${m}</span><span class="sum">합계 ${rawHtml(fmt(tot))}원</span></div>`+
+    return tpl`<div class="setmon"><span class="ym">${m}</span><span class="sum">합계 ${rawHtml(fmt(tot))}원</span>${rawHtml(clsMonthTag(m))}</div>`+
       tpl`${rawHtml(byM[m].map(function(r){
         var cnt=(r.kind==='use')
           ? '신규 '+(r.cnt_new||0)+' · 해약 '+(r.cnt_end||0)+' · 연장 '+(r.cnt_ext||0)+' · 기존 '+(r.cnt_keep||0)
@@ -543,10 +544,12 @@ function renderSettles(){
           tpl`<span class="cnt">${cnt}</span>`+
           tpl`<span class="who">${String(r.created_by||'').split('@')[0]} ${String(r.updated_at||'').slice(5,10)}${rawHtml(r.report_id? ' · 리포트 #'+r.report_id:'')}</span>`+
           tpl`<span class="acts"><button class="rowbtn" data-click="restoreSettle(${rawHtml(r.id)})">불러오기</button>`+
-          tpl`<button class="rowbtn red" data-click="delSettleId(${rawHtml(r.id)})">삭제</button></span></div>`;
+          tpl`${rawHtml(CLS.ok? tpl`<button class="rowbtn" data-click="clsHist(${rawHtml(r.id)})">이력</button>` : '')}`+
+          tpl`${rawHtml(clsLocked(m)? '' : tpl`<button class="rowbtn red" data-click="delSettleId(${rawHtml(r.id)})">삭제</button>`)}</span></div>`;
       }).join(''))}`;
   }).join('');
-  $('#setList').innerHTML=html||tpl`<div class="mini" style="padding:14px 4px;color:#888">${S.settleErr? '읽기 실패 — 아래 메시지를 확인하세요' : '저장된 정산이 없습니다'}</div>`;
+  $('#setList').innerHTML=(html||tpl`<div class="mini" style="padding:14px 4px;color:#888">${S.settleErr? '읽기 실패 — 아래 메시지를 확인하세요' : '저장된 정산이 없습니다'}</div>`)+
+    (CLS.ok? tpl`<div class="mini" style="padding:8px 4px"><span class="lnk" data-click="clsHist(null)">🕘 전체 수정 이력(지운 정산 포함)</span></div>` : '');
 }
 /* 저장된 정산을 화면으로 되살립니다 — 엑셀을 다시 올리지 않아도 그때 결과를 그대로 봅니다(읽기용) */
 /* 불러온(저장된) 정산을 화면에서 치우고 처음 상태로 */
@@ -598,7 +601,7 @@ async function restoreSettle(id){
       S.inst=(p.rows||[]).map(function(x){
         return { row:0, cno:x.cno, nm:x.nm, work:'', idate:x.idate||'', price:0, spec:'', qty:x.base||0, sensor:x.extra||0,
                  note:x.note||'', stat:'', base:Number(x.base||0), extra:Number(x.extra||0), amt:Number(x.amt||0),
-                 biz: x.biz? { no:x.biz, cust:'', acc:Number(x.amt||0) } : null, by:'map', cand:[], diff:0 };
+                 biz: x.biz? { no:x.biz, cust:'', acc:Number(x.bacc!=null? x.bacc : x.amt||0) } : null, by:'map', cand:[], diff:(x.biz && x.bacc!=null)? Number(x.amt||0)-Number(x.bacc) : 0 };
       });
       S.instBiz=S.inst.filter(function(x){ return x.biz; }).map(function(x){ return x.biz; });
       S.inst.restored=true;
@@ -616,6 +619,7 @@ async function restoreSettle(id){
 }
 async function delSettleId(id){
   var r=(S.settles||[]).filter(function(x){ return x.id===id; })[0];
+  if(r && clsBlockMsg(r.month)){ msg('mS', clsBlockMsg(r.month), 'bad'); return; }
   if(!confirm('저장된 정산을 지울까요?\n'+(r? String(r.month).slice(0,7)+' · '+(r.kind==='use'?'사용료':'설치비')+' · '+fmt(r.total)+'원' : '')+
      '\n\n화면에 올려둔 자료와 계약번호 매핑은 그대로 남습니다.')) return;
   try{
@@ -628,6 +632,7 @@ async function delSettleId(id){
 async function delSettle(kind){
   var ym=$('#ym').value, mid=kind==='use'?'mU2':'mI2';
   if(!ym){ alert('정산월을 고르세요'); return; }
+  if(clsBlockMsg(ym)){ msg(mid, clsBlockMsg(ym), 'bad'); return; }
   try{
     var have=await sbGet('s1_settle?select=id,total&month=eq.'+ym+'-01&kind=eq.'+kind);
     if(!have||!have[0]){ msg(mid, ym+' '+(kind==='use'?'사용료':'설치비')+' 로 저장된 정산이 없습니다','bad'); return; }
@@ -824,6 +829,8 @@ document.addEventListener('DOMContentLoaded', async function(){
     S.maps=r[0]; (r[1]||[]).forEach(function(c){ S.cfg[c.key]=c.val; });
   }catch(e){ msg('mU','설정을 읽지 못했습니다: '+e.message,'bad'); }
   applyCfg(); renderMaps(); loadSettles();
+  /* ㊿+176 월 마감 · 수정 이력(SQL 107) */
+  clsInit('s1', 's1_settle', '에스원 정산', function(m){ loadSettles().then(function(){ renderSettles(); if(m) msg('mS', m, 'ok'); }); });
 });
 
 /* 버튼·입력칸이 부르는 함수 (data-click · data-change · data-input → sat/common.js) — 여기 없는 이름은 실행되지 않음 */

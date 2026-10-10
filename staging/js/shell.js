@@ -2,7 +2,7 @@
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { IS_QA, ST } from './state.js';
 import { Viz } from './viz.js';
-import { $, applyPerms, canView, canWrite, clearSess, cssv, el, esc, isCC, isGN, keepLogin, LIVE2CODE, lline, loadPerms, mfaGate, mfaVerifiedOf, mfaWarnIfNeeded, mk, monOf, navText, PERF, perfDev, perfNet, perfRec, permWriteGuard, rawHtml, refreshToken, restoreSess, saveSess, SB_KEY, SB_URL, seriesColor, sessRead, sessWrite, STATE, tpl, won } from './core.js';
+import { $, applyPerms, bizHas, bizKey, canView, canWrite, clearSess, cssv, el, esc, isCC, isGN, keepLogin, LIVE2CODE, lline, loadPerms, mfaGate, mfaVerifiedOf, mfaWarnIfNeeded, mk, monOf, navText, PERF, perfDev, perfNet, perfRec, permWriteGuard, rawHtml, refreshToken, restoreSess, saveSess, SB_KEY, SB_URL, seriesColor, sessRead, sessWrite, STATE, tpl, won } from './core.js';
 import { buildControls, expN, expScan, hbars, idxs, kpiOpen, monthlyTotal, renderAll, renderInstall, renderKpis, renderMatrix, renewNeedScan } from './dash.js';
 import { ask } from './ai.js';
 import { applyCodes, GRIDS, loadCodes } from './grids.js';
@@ -149,7 +149,7 @@ export function railFlyToggle(btn, key){
 export var GN_ICO={dash:'home', weekly:'calendar', contracts:'doc', live:'target', churn:'chart', churnrate:'chart', custflow:'users', leadsrc:'arrow', dcheck:'check',
   cngen:'cloud', cnpub:'cloud', cns1:'cloud', cnlgu:'cloud', mdrgen:'shield', mdrs1:'shield', mdrlgu:'shield', chdist:'layers', cnpns:'layers',
   eqboard:'board', ordernew:'doc', orders:'box', assets:'box', mdrnew:'flask', mdrops:'flask', oinew:'target', oi:'target', inbstat:'chart', inbound:'inbox',
-  biz:'scale', targets:'target', quote:'doc', preport:'doc', s1:'scale', kk:'scale', price:'doc', cloud:'cloud', csite:'cloud', report:'doc', aiknow:'spark',
+  biz:'scale', targets:'target', quote:'doc', quotes:'doc', preport:'doc', s1:'scale', kk:'scale', price:'doc', cloud:'cloud', csite:'cloud', report:'doc', aiknow:'spark',
   log:'clock', adminx:'gear', ops:'tool', account:'user'};
 export var GN_MERGE={'g:PoC·데모':'영업', 'g:영업':'영업', 'g:인바운드':'영업', 'g:정산·목표':'정산·도구', 'g:도구':'정산·도구', 'g:관리자':'관리'};
 export var GN_BADGE={inb:null, dc:null, inbound:null};
@@ -280,7 +280,7 @@ export function gnTitleSync(v){
 }
 
 /* ㊿+168 금액 단위 안내 — 화면마다 실제 단위(가격표 = 원 · 금액 없는 화면은 숨김 · 주간보고 예상매출 = 백만원) · 누르면 용어 설명 */
-export var UNIT_NONE={ordernew:1, orders:1, assets:1, eqboard:1, inbound:1, inbstat:1, mdrnew:1, mdrops:1, log:1, account:1, adminx:1, ops:1, aiknow:1, csite:1, kk:1, s1:1, quote:1, preport:1};
+export var UNIT_NONE={quotes:1, ordernew:1, orders:1, assets:1, eqboard:1, inbound:1, inbstat:1, mdrnew:1, mdrops:1, log:1, account:1, adminx:1, ops:1, aiknow:1, csite:1, kk:1, s1:1, quote:1, preport:1};
 export function unitSync(v){
   var u=document.getElementById('unitBadge'); if(!u) return;
   if(!u.__terms){ u.__terms=1; u.setAttribute('role','button'); u.tabIndex=0; u.style.cursor='pointer';
@@ -417,7 +417,7 @@ export function renderInbox(){
   var retL=orders.filter(EQB_ONLY.ret[1]), retA=retL.filter(function(o){ return o.status==='회수예정'; }), retP=retL.filter(function(o){ return o.status!=='회수예정'; });
   /* ㊿+168 만료 = 사업 현황 타일 · 만료 예정 위젯과 같은 공통 집계(expScan — 원계약만 · 부속은 함께 만료) */
   var XS=EQ? {rows:[], amt:0, custN:0} : expScan(list, b, EN), expL=XS.rows.map(function(k){ return ST.DATA.rows[k]; }), expAmt=XS.amt;
-  var curYm=monOf(b)+'월', bizDone=EQ || (ST.RAWX.biz||[]).some(function(r){ return r.ym===curYm; });
+  var curYm=monOf(b)+'월', bizDone=EQ || bizHas(+mk(b).slice(0,4), monOf(b));   /* ㊿+176 연도까지 */
   var todayS=todayStr();
   var oiLate=EQ? [] : (ST.RAWX.oi||[]).filter(function(o){ return o.next_date && String(o.next_date).slice(0,10)<todayS && oiOpen(o); });   /* ㊿+170 진행 중 = 수주·계산서발행·종료·중지·실패 아님(OI 타일·빠른 보기와 같은 기준) */
   var inbN=EQ? 0 : (ST.INB_TODO? ST.INB_TODO.n : null);
@@ -1079,7 +1079,7 @@ export async function sbWrite(method, path, body, prefer, asView){   /* asView(�
   if(!r.ok) throw new Error('저장 실패 ('+r.status+'): '+(await r.text()).slice(0,220));
   // 저장 성공 → 이전 캐시는 옛 데이터이므로 즉시 무효화 (새로고침 시 옛 화면 방지)
   // 단, rpc/load_… 는 읽기 전용 호출이라 캐시를 지우지 않음
-  if(!/^rpc\/load_/.test(path)) cacheDrop();
+  if(!/^rpc\/load_|^notify_snapshot\b/.test(path)) cacheDrop();   /* ㊿+177 예약 발송 «보낼 글»은 업무 데이터가 아님 */
   /* ㊿+141: 저장이 됐으니 열린 창의 «입력 중» 표시를 지움 (바깥 클릭·Esc 로 닫을 때 확인을 묻지 않게) — 기록용 표는 제외 */
   if(!/^rpc\/load_/.test(path) && !OVL_SKIP_CLEAN.test(path)) try{ ovlMarkClean(); }catch(e){}
   var t=await r.text();
@@ -1137,18 +1137,13 @@ export function shapeLg(rows){
 export function shapeVs(rows){
   if(!rows||!rows.length) return null;
   // 여러 달이 들어있으면 «가장 최근 달» 만 대시보드에 보여줍니다 (과거는 정산·목표 › 비즈포탈 차액에서)
-  function mNum(r){
-    var m=String(r.ym||'').match(/(\d+)/);
-    var n=m? +m[1] : 0;
-    var y=String(r.as_of||'').slice(0,4);
-    return (y? +y*100 : 0) + n;                    // 연도+월 로 비교
-  }
-  var best=null, bestKey=-1, bestId=-1;
+  /* ㊿+176 연도+달 열쇠(bizKey — SQL 107 의 y · 없으면 작성일로 추정) */
+  var best=null, bestKey='', bestId=-1;
   rows.forEach(function(r){
-    var k=mNum(r), id=Number(r.id)||0;
+    var k=bizKey(r), id=Number(r.id)||0;
     if(k>bestKey || (k===bestKey && id>bestId)){ bestKey=k; bestId=id; best=r.ym||''; }
   });
-  var pick=rows.filter(function(r){ return (r.ym||'')===best; });
+  var pick=rows.filter(function(r){ return bizKey(r)===bestKey; });
   if(!pick.length) pick=rows;
 
   var items=[],details=[],ym=best||'',asOf='';
@@ -1158,7 +1153,7 @@ export function shapeVs(rows){
     else details.push({cust:r.item,biz:Number(r.biz)||0,sheet:Number(r.sheet)||0,diff:Number(r.diff)||0,note:r.note||''});
   });
   return {ok:true,asOf:asOf,month:ym,items:items,details:details,monthCount:(function(){
-    var seen={},n=0; rows.forEach(function(r){ if(r.ym&&!seen[r.ym]){seen[r.ym]=1;n++;} }); return n;
+    var seen={},n=0; rows.forEach(function(r){ var k=bizKey(r); if(r.ym&&!seen[k]){seen[k]=1;n++;} }); return n;
   })()};
 }
 

@@ -10,9 +10,11 @@
        + 재약정은 계약의 CSM 이름이 내 계정(담당자 연결 SQL 103)과 맞으면 나에게도
        + 장비는 «처리 담당»(work_assign · 알림함에서 지정)이 있으면 그 사람에게만 — 신청서의 «고객 담당자»(mgr_name)는 고객 쪽 사람이라 쓰지 않음
    · 읽음 표시는 계정별(notify_reads) · SQL 105 전이면 이 브라우저에만 기억
-   · Slack 은 기본 꺼짐 — 슈퍼 관리자가 켜야 «Slack 으로 보내기»가 보이고, 눌러서 미리 보고 확인할 때만 보냄(자동 발송 없음) */
-import { APP_VER, ST } from './state.js';
-import { canWrite, lline, mk, monOf, rawHtml, SB_URL, tickMemo, tpl, won } from './core.js';
+   · Slack 은 기본 꺼짐 — 슈퍼 관리자가 켜야 «Slack 으로 보내기»가 보이고, 눌러서 미리 보고 확인할 때만 보냄
+   · ㊿+177 예약 발송(선택 · 기본 꺼짐 · SQL 108): 설정에서 요일 · 시각(한국 시각)을 고르면 서버(pg_cron → notify 함수)가 그때 팀 채널로 보냄
+       보낼 글은 슈퍼 관리자가 포탈을 열 때 이 파일의 같은 계산(ntfSlackPlan)으로 만들어 notify_snapshot 에 둠(ntfSnapSave) — 서버에 계산식을 따로 두지 않음 */
+import { APP_VER, IS_STAGING, ST } from './state.js';
+import { bizHas, canWrite, lline, mk, monOf, rawHtml, SB_URL, tickMemo, tpl, won } from './core.js';
 import { expAmtOf, expEligible } from './dash.js';
 import { ico, sbHeaders, sbTry, sbWrite, toast, todayStr } from './shell.js';
 import { ctSuccessor, dcRules, openRenewList, renewScan } from './analysis.js';
@@ -22,8 +24,8 @@ import { openCust360, renderTodo } from './tools.js';
 import { placeSearchBtn } from './home.js';
 import { verNum } from './guard.js';
 
-export var NTF_DEF={renew_days:[60,30], eq_days:3, month_end_days:5, renew_emails:[], eq_emails:[], biz_emails:[], dc_emails:[], slack_on:false, team_channel:'C08RA3PPDH8'};
-export var NTF={memo:null, ops:null, opsOk:null, set:null, sqlOk:null, reads:{}, readsOk:false, asg:{}, asgOk:false, omap:null, users:null, open:false, tab:'me', loading:false, at:0, busy:false};
+export var NTF_DEF={renew_days:[60,30], eq_days:3, month_end_days:5, renew_emails:[], eq_emails:[], biz_emails:[], dc_emails:[], slack_on:false, team_channel:'C08RA3PPDH8', auto_on:false, auto_days:[1], auto_time:'09:00', auto_dm:false};
+export var NTF={memo:null, ops:null, opsOk:null, set:null, sqlOk:null, reads:{}, readsOk:false, asg:{}, asgOk:false, omap:null, users:null, open:false, tab:'me', loading:false, at:0, busy:false, snapOk:null, snapKey:'', snapAt:0, snap:null};
 export var NTF_KIND={ops:'운영 상태', renew:'재약정 만기', lapsed:'만기 미처리', eq:'장비 처리 지연', biz:'월말 마감', dc:'데이터 점검'};
 export var OPS_TBL={customers:'고객사', contracts:'계약', monthly_revenue:'월 매출', equipment_orders:'장비 신청', equipment_assets:'장비 현황', oi_deals:'OI'};
 
@@ -83,7 +85,7 @@ export function ntfItems(){
         go:function(){ var id=o.id; gridGoPre('orders', '신청 #'+id+' '+(o.customer||''), function(x){ return String(x.id)===String(id); }); }});
     });
     /* 4) 월말 마감 — 비즈포탈 차액 */
-    try{ var T2=ST.DATA.nowIdx; if(T2!=null && T2>=0){ var curYm=monOf(T2)+'월', done=(R.biz||[]).some(function(x){ return x.ym===curYm; }), left2=ntfDaysLeft(T2);
+    try{ var T2=ST.DATA.nowIdx; if(T2!=null && T2>=0){ var curYm=monOf(T2)+'월', done=bizHas(+mk(T2).slice(0,4), monOf(T2)), left2=ntfDaysLeft(T2);
       if(!done && left2!=null && left2>=0 && left2<=S.month_end_days) out.push({kind:'biz', key:'biz:'+mk(T2), sev:left2<=2? 'hi' : 'mid', order:left2, title:curYm+' 비즈포탈 차액 입력 — 마감 D-'+left2,
         detail:'정산 · 목표 달성률이 «미입력»으로 남음', to:S.biz_emails, me:ntfIsMe(S.biz_emails), go:function(){ switchView('biz'); }}); } }catch(e){}
     /* 5) 데이터 점검 «바로 고쳐야 함» (만기 지남 규칙은 2)와 겹쳐 뺌 — 홈과 같은 기준) */
@@ -166,6 +168,7 @@ export async function ntfLoad(force){
     if(hadAsg || Object.keys(g).length) try{ renderTodo(); }catch(e){}   /* 홈 «우선 업무»의 장비 담당 = 처리 담당 */
     await opsLoad();
     NTF.at=Date.now();
+    ntfSnapSave(false);   /* ㊿+177 예약 발송 «보낼 글» — 켜져 있을 때만 · 슈퍼 관리자만 · 바뀌었거나 6시간 지났을 때만 씀 */
     if(NTF.readsOk && Math.random()<0.05) fetch(SB_URL+'/rest/v1/rpc/notify_reads_trim', {method:'POST', headers:sbHeaders(true), body:'{}'}).catch(function(){});
   }catch(e){} finally{ NTF.loading=false; }
   ntfSync();
@@ -358,7 +361,8 @@ export async function ntfAdminRender(){
   host.innerHTML=tpl`${rawHtml(NTF.sqlOk===false? '<p class="cap warn">SQL 105(notify_settings · notify_reads · notify_log · work_assign)를 먼저 실행해야 저장됩니다 — 지금은 기본값으로 알림함만 동작합니다.</p>' : '')}`+
     tpl`<div class="frm ntf-frm" data-nodirty>${rawHtml(NTF_FIELDS.map(function(f){ return tpl`<div${rawHtml(/emails/.test(f[0])? ' class="full"' : '')}><label for="${f[1]}">${f[2]}</label><input id="${f[1]}" value="${ntfFormVal(f[0], S)}" autocomplete="off"${rawHtml(/emails/.test(f[0])? ' list="nsUsers"' : '')}><small class="mini">${f[3]}</small></div>`; }).join(''))}`+
     tpl`<datalist id="nsUsers">${rawHtml((users||[]).map(function(u){ return tpl`<option value="${String(u.email||'')}">`; }).join(''))}</datalist>`+
-    tpl`<div class="full ntf-sw"><label><input type="checkbox" id="nsSlack"${rawHtml(S.slack_on? ' checked' : '')}> <b>Slack 사용</b></label> <span class="mini">— 기본 꺼짐. 켜도 자동으로 보내지 않습니다. 알림함의 «Slack 으로 보내기»를 눌러 미리 보고 확인할 때만 보냅니다.</span></div></div>`+
+    tpl`<div class="full ntf-sw"><label><input type="checkbox" id="nsSlack"${rawHtml(S.slack_on? ' checked' : '')}> <b>Slack 사용</b></label> <span class="mini">— 기본 꺼짐. 알림함의 «Slack 으로 보내기»를 눌러 미리 보고 확인할 때 보냅니다. 아래 «예약 발송»을 켜지 않으면 자동으로 보내지 않습니다.</span></div>`+
+    ntfAutoHtml(S)+`</div>`+
     tpl`<div class="dbar" style="margin-top:8px;flex-wrap:wrap;gap:8px;align-items:center"><button type="button" class="pill" id="nsSave"${rawHtml(NTF.sqlOk===false? ' disabled' : '')}>저장…</button>`+
     tpl`${rawHtml(S.slack_on? '<button type="button" class="pill ghost" id="nsSlackGo">Slack 으로 보내기…</button>' : '')}<button type="button" class="pill ghost" id="nsLog">최근 발송 기록</button><span class="mini" id="nsMsg" role="status"></span></div><div id="nsLogBox"></div>`;
   var v=function(id){ return String((/** @type {any} */(host.querySelector('#'+id))||{}).value||''); };
@@ -373,24 +377,89 @@ export async function ntfAdminRender(){
     if(!(me>=1 && me<=15 && Math.round(me)===me)){ msg.textContent='월말 마감은 1~15일 전'; return; }
     var body={renew_days:days, eq_days:eq, month_end_days:me, renew_emails:emails(v('nsRenew')), eq_emails:emails(v('nsEqE')), biz_emails:emails(v('nsBiz')), dc_emails:emails(v('nsDc')),
       slack_on:!!(/** @type {any} */(host.querySelector('#nsSlack'))||{}).checked, team_channel:v('nsCh').trim()};
+    if(ntfAutoOk()){   /* ㊿+177 예약 발송(SQL 108) */
+      var ck=function(id){ return !!(/** @type {any} */(host.querySelector('#'+id))||{}).checked; };
+      var ad=[1,2,3,4,5,6,7].filter(function(d){ return ck('nsD'+d); });
+      Object.assign(body, {auto_on:ck('nsAuto'), auto_days:ad.length? ad : [1], auto_time:v('nsTime')||'09:00', auto_dm:ck('nsAutoDm')});
+      if(body.auto_on && !ad.length){ msg.textContent='예약 발송 요일을 하나 이상 고르세요'; return; }
+      if(body.auto_on && !body.slack_on){ msg.textContent='예약 발송은 «Slack 사용»을 켜야 켤 수 있습니다'; return; }
+      if(!/^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(body.auto_time)){ msg.textContent='예약 시각 형식이 아닙니다'; return; }
+    }
     if(!/^[CG][A-Z0-9]{6,20}$/.test(body.team_channel)){ msg.textContent='팀 채널 ID 형식이 아닙니다(C 로 시작하는 영문 대문자 · 숫자)'; return; }
     var bad=['renew_emails','eq_emails','biz_emails','dc_emails'].filter(function(k){ return /** @type {any} */(body)[k].length>20; }); if(bad.length){ msg.textContent='받는 사람은 칸마다 20명까지'; return; }
     var S0=ntfSet(), ch=[];
     Object.keys(body).forEach(function(k){ var a0=/** @type {any} */(S0)[k], b0=/** @type {any} */(body)[k]; var a=JSON.stringify(Array.isArray(a0)? a0.slice().sort() : a0), b=JSON.stringify(Array.isArray(b0)? b0.slice().sort() : b0); if(a!==b) ch.push(k+': '+ntfFormVal(k, S0)+' → '+ntfFormVal(k, body)); });
     if(!ch.length){ msg.textContent='바뀐 것이 없습니다'; return; }
-    if(body.slack_on && !S0.slack_on && !confirm('Slack 사용을 켭니다.\n켜도 자동으로 보내지 않고, 알림함 «Slack 으로 보내기»를 눌러 미리 보고 확인할 때만 보냅니다.\n계속할까요?')) return;
+    if(body.slack_on && !S0.slack_on && !confirm('Slack 사용을 켭니다.\n예약 발송을 켜지 않으면 자동으로 보내지 않고, 알림함 «Slack 으로 보내기»를 눌러 미리 보고 확인할 때만 보냅니다.\n계속할까요?')) return;
+    var b2=/** @type {any} */(body);
+    if(b2.auto_on && (!S0.auto_on || ntfAutoWhen(b2)!==ntfAutoWhen(S0) || b2.auto_dm!==S0.auto_dm) && !confirm('예약 발송을 '+(S0.auto_on? '바꿉니다' : '켭니다')+' — '+ntfAutoWhen(b2)+'(한국 시각) 팀 채널 '+body.team_channel+(b2.auto_dm? ' + 받는 사람 개인 DM' : '')+'\n\n그 시각에 서버가 확인 없이 자동으로 보냅니다.\n보내는 내용 = 슈퍼 관리자가 포탈을 열 때 계산해 둔 알림함(72시간이 넘은 것이면 보내지 않고 기록만).\n\n계속할까요?')) return;
     if(!confirm('알림 설정을 바꿉니다\n\n'+ch.join('\n')+'\n\n저장할까요? (변경 이력에 남습니다)')) return;
     try{ await sbWrite('PATCH','notify_settings?id=eq.1', body, undefined, 'adminx'); logChange('update','notify_settings',1,{changes:ch});
-      NTF.set=Object.assign({}, NTF.set||{}, body); ntfSync(); await ntfAdminRender(); var m2=document.getElementById('nsMsg'); if(m2) m2.textContent='저장했습니다 ✓'; toast('알림 설정을 저장했습니다', ch.length+'가지 바뀜'); }
+      NTF.set=Object.assign({}, NTF.set||{}, body); ntfSync(); if(/** @type {any} */(body).auto_on) await ntfSnapSave(true); await ntfAdminRender(); var m2=document.getElementById('nsMsg'); if(m2) m2.textContent='저장했습니다 ✓'; toast('알림 설정을 저장했습니다', ch.length+'가지 바뀜'); }
     catch(e){ msg.textContent='저장하지 못했습니다 — '+String(/** @type {any} */(e).message||e).slice(0,140); }
   };
   var sg=/** @type {any} */(host.querySelector('#nsSlackGo')); if(sg) sg.onclick=function(){ ntfSlackOpen(); };
+  ntfAutoBind(host);
   /** @type {any} */(host.querySelector('#nsLog')).onclick=async function(){
     var box=/** @type {any} */(host.querySelector('#nsLogBox')); box.innerHTML='<p class="cap">읽는 중…</p>';
     var rows=await ntfGet('notify_log?select=at,sent_by,target,n_items,ok,error,dry&order=at.desc&limit=20');
     box.innerHTML=rows===null? '<p class="cap">notify_log 표(SQL 105)가 없거나 읽을 수 없습니다</p>' : !rows.length? '<p class="cap">아직 보낸 기록이 없습니다</p>' :
       tpl`<div class="tbl-wrap" tabindex="0" style="max-height:36vh;margin-top:8px"><table class="dgrid"><thead><tr><th>일시</th><th>보낸 사람</th><th>대상</th><th class="n">항목</th><th>결과</th></tr></thead><tbody>${rawHtml(rows.map(function(r){ return tpl`<tr><td class="num">${String(r.at||'').slice(0,16).replace('T',' ')}</td><td>${r.sent_by||''}</td><td>${r.target||''}</td><td class="n">${String(r.n_items==null? '' : r.n_items)}</td><td>${r.ok? '✓' : '✗ '+(r.error||'')}${r.dry? ' (시험)' : ''}</td></tr>`; }).join(''))}</tbody></table></div>`;
   };
+}
+
+/* ── ㊿+177 예약 발송(선택 · 기본 꺼짐 · SQL 108) ── */
+export var NTF_DOW=['', '월', '화', '수', '목', '금', '토', '일'];
+/** SQL 108 이 돌았는지 — 설정 행에 auto_on 칸이 있으면 */
+export function ntfAutoOk(){ return !!NTF.set && Object.prototype.hasOwnProperty.call(NTF.set, 'auto_on'); }
+/** «매주 월 · 목 09:00» */
+export function ntfAutoWhen(S){ var d=(S.auto_days||[]).slice().sort(), all=d.length===7, wk=d.join()==='1,2,3,4,5'; return (all? '매일' : wk? '평일 매일' : '매주 '+d.map(function(x){ return NTF_DOW[x]; }).join(' · '))+' '+(S.auto_time||'09:00'); }
+/** 다음 예약 시각(한국 시각 · 화면 표시용) — 서버는 notify_auto_tick() 이 같은 규칙으로 판단 */
+export function ntfAutoNext(S, now){
+  if(!S.auto_on || !(S.auto_days||[]).length) return null;
+  var t=String(S.auto_time||'09:00'), hh=+t.slice(0,2), mm=+t.slice(3,5), k=new Date((now||Date.now())+9*36e5);   /* UTC 필드 = 한국 시각 */
+  for(var i=0;i<8;i++){ var c=new Date(Date.UTC(k.getUTCFullYear(), k.getUTCMonth(), k.getUTCDate()+i, hh, mm)), dow=c.getUTCDay()||7;
+    if(S.auto_days.indexOf(dow)>=0 && c.getTime()>k.getTime()) return {k:c, label:(c.getUTCMonth()+1)+'/'+c.getUTCDate()+'('+NTF_DOW[dow]+') '+t}; }
+  return null;
+}
+export function ntfAutoHtml(S){
+  if(!ntfAutoOk()) return tpl`<div class="full ntf-sw"><span class="mini">예약 발송(요일 · 시각을 정해 자동으로 보내기)은 SQL 108 을 실행하면 여기서 켤 수 있습니다.</span></div>`;
+  var times=[]; for(var h=6;h<=21;h++) ['00','30'].forEach(function(m){ times.push(('0'+h).slice(-2)+':'+m); });
+  if(times.indexOf(S.auto_time)<0) times.push(S.auto_time);
+  return tpl`<fieldset class="full ntf-auto" id="nsAutoBox"><legend class="ntf-sw"><label><input type="checkbox" id="nsAuto"${rawHtml(S.auto_on? ' checked' : '')}> <b>예약 발송</b></label> <span class="mini">— 기본 꺼짐. 켜면 고른 요일 · 시각(한국 시각)에 서버가 팀 채널로 자동으로 보냅니다.</span></legend>`+
+    tpl`<div class="ntf-auto-row"><div class="ntf-days" role="group" aria-label="보낼 요일">${rawHtml([1,2,3,4,5,6,7].map(function(d){ return tpl`<label class="ntf-day"><input type="checkbox" id="nsD${String(d)}"${rawHtml((S.auto_days||[]).indexOf(d)>=0? ' checked' : '')}><span>${NTF_DOW[d]}</span></label>`; }).join(''))}</div>`+
+    tpl`<label class="ntf-time" for="nsTime">시각</label><select id="nsTime">${rawHtml(times.map(function(x){ return tpl`<option${rawHtml(x===S.auto_time? ' selected' : '')}>${x}</option>`; }).join(''))}</select>`+
+    tpl`<label class="ntf-adm"><input type="checkbox" id="nsAutoDm"${rawHtml(S.auto_dm? ' checked' : '')}> 받는 사람에게 개인 DM 도</label></div>`+
+    tpl`<p class="mini" id="nsAutoInfo">${ntfAutoInfo(S)}</p></fieldset>`;
+}
+/** '2026-10-09T09:20:00Z' → «10/09 18:20»(한국 시각) */
+export function ntfKst(at){ var t=Date.parse(String(at||'')); if(isNaN(t)) return ''; var k=new Date(t+9*36e5), p=function(n){ return ('0'+n).slice(-2); }; return p(k.getUTCMonth()+1)+'/'+p(k.getUTCDate())+' '+p(k.getUTCHours())+':'+p(k.getUTCMinutes()); }
+/** 예약 칸 아래 안내 — 저장된 설정 기준 */
+export function ntfAutoInfo(S){
+  var nx=ntfAutoNext(S), sn=NTF.snap;
+  return (S.auto_on? (nx? '다음 발송: '+nx.label+' · ' : '')+ntfAutoWhen(S) : '꺼져 있음 — 켜고 «저장…»')+' · 보내는 내용 = 슈퍼 관리자가 포탈을 열 때 계산해 둔 알림함'+
+    (sn? '(마지막 계산 '+ntfKst(sn.at)+' · '+String(sn.n)+'건)' : '')+' · 72시간이 넘은 것이면 보내지 않고 기록만 · 결과는 «최근 발송 기록»(보낸 사람 «예약»)';
+}
+export function ntfAutoBind(host){
+  var sl=/** @type {any} */(host.querySelector('#nsSlack')), box=host.querySelector('#nsAutoBox'); if(!sl || !box) return;
+  var sync=function(){ box.querySelectorAll('input,select').forEach(function(x){ if(/** @type {any} */(x).id!=='nsAuto') /** @type {any} */(x).disabled=!sl.checked || !/** @type {any} */(host.querySelector('#nsAuto')).checked; });
+    /** @type {any} */(host.querySelector('#nsAuto')).disabled=!sl.checked; };
+  sl.addEventListener('change', sync); /** @type {any} */(host.querySelector('#nsAuto')).addEventListener('change', sync); sync();
+  if(ST.IS_SUPER && NTF.snapOk!==false && !NTF.snap) ntfGet('notify_snapshot?select=at,by_email,n&id=eq.1').then(function(r){ if(r && r[0]){ NTF.snap=r[0]; var i=document.getElementById('nsAutoInfo'); if(i) i.textContent=ntfAutoInfo(ntfSet()); } });
+}
+/** 예약 발송용 «보낼 글» 저장 — 슈퍼 관리자 · Slack · 예약이 켜져 있을 때만 · 스테이징은 쓰지 않음 · 바뀌었거나 6시간 지났을 때만 */
+export async function ntfSnapSave(force){
+  var S=ntfSet();
+  if(!ST.IS_SUPER || IS_STAGING || !ntfAutoOk() || !S.slack_on || !S.auto_on || NTF.snapOk===false || !ST.DATA) return false;
+  try{
+    var omap=await ntfOwnerMap(), plan=ntfSlackPlan(omap);
+    var body={id:1, ver:APP_VER, n:plan.team.n, team:{text:plan.team.text, n:plan.team.n}, dms:plan.dms.map(function(d){ return {email:d.email, text:d.text, n:d.n}; })};
+    var key=JSON.stringify([body.team, body.dms]);
+    if(!force && key===NTF.snapKey && Date.now()-NTF.snapAt<6*36e5) return false;
+    await sbWrite('POST','notify_snapshot?on_conflict=id', body, 'resolution=merge-duplicates,return=minimal', 'adminx');
+    NTF.snapKey=key; NTF.snapAt=Date.now(); NTF.snapOk=true; NTF.snap={at:new Date().toISOString(), n:body.n, by_email:ST.AUTH_USER};
+    return true;
+  }catch(e){ if(/\(404\)|PGRST205|does not exist/.test(String(/** @type {any} */(e).message||e))) NTF.snapOk=false; return false; }
 }
 
 /* ── Slack 으로 보내기 (슈퍼 관리자 · 켜져 있을 때만 · 미리 보기 → 확인 · 자동 발송 없음) ── */

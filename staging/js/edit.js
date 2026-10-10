@@ -20,7 +20,7 @@ export function closeOvl(id){ document.getElementById(id).classList.remove('on')
    · 열릴 때 role=dialog·aria-modal·제목 연결 · 초점을 창 안으로 · Tab 은 창 안에서만 돎 · 닫히면 초점을 연 버튼으로 되돌림
    init.js 끝에서 ovlInit() 이 이벤트를 등록함 */
 export var OVL_SEQ=0, OVL_STATIC=null, OVL_DOWN=null;
-export var OVL_SKIP_CLEAN=/^(change_log|client_errors|ai_feedback|ai_check_log|ai_chat_history)\b/;
+export var OVL_SKIP_CLEAN=/^(change_log|client_errors|ai_feedback|ai_check_log|ai_chat_history|notify_snapshot|notify_reads)\b/;   /* ㊿+177 알림 기록은 열린 창의 «입력 중» 표시와 무관 */
 export function ovlShown(o){ return !!(o && o.isConnected && o.classList.contains('on') && o.getClientRects().length); }
 export function ovlTop(){
   var a=Array.prototype.slice.call(document.querySelectorAll('.ovl.on')).filter(ovlShown);

@@ -2,8 +2,7 @@
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { APP_VER, ST } from './state.js';
 import { Viz } from './viz.js';
-import { $, $$, kwToWon, wonToKw, baseLabel, baseRange, buildBaseSelect, cssv, el, esc, isCC, isGN, lline, mk, mkLabel, monOf, pct, rawHtml, seriesColor, STATE, tpl, won,
-  wonFull, wrapNavIcons, yOf } from './core.js';
+import { $, $$, baseLabel, baseRange, bizHas, buildBaseSelect, cssv, el, esc, isCC, isGN, kwToWon, lline, mk, mkLabel, monOf, pct, rawHtml, seriesColor, STATE, tpl, won, wonFull, wonToKw, wrapNavIcons, yOf } from './core.js';
 import { boot, CACHE_KEY, ccAfterKpis, ccAnaCount, ccAnalysisOpen, ccHomeLayout, loadFromDb, onData, renderInbox, SB_RAW, sbWrite, themeBtnSync, toast, uiIconize } from './shell.js';
 import { abortAsk, ask, isAsking, loadAiConfig, runQuery, shortQ } from './ai.js';
 import { GRIDS } from './grids.js';
@@ -313,7 +312,7 @@ export function renderHero(list){
   var pend=(ST.RAWX.orders||[]).filter(function(o){ return ['접수','출하요청','배송중','회수예정'].indexOf(o.status)>=0; }).length;
   var XS0=expScan(list, b), expCnt=XS0.rows.length, expAmt=XS0.amt;   /* ㊿+168 공통 집계 */
   var curYm=monOf(b)+'월';
-  var bizDone=(ST.RAWX.biz||[]).some(function(r){ return r.ym===curYm; });
+  var bizDone=bizHas(+mk(b).slice(0,4), monOf(b));   /* ㊿+176 연도까지(예전엔 «8월»만 비교해 작년 8월도 입력으로 봤음) */
   var items=[];
   if(pend) items.push({t:'warn', ic:'📦', msg:tpl`처리 대기 장비 요청이 <b>${rawHtml(pend)}건</b> 있습니다.`, go:function(){ switchView('orders'); }});
   if(expCnt) items.push({t:'info', ic:'⏳', msg:tpl`${rawHtml(expN())}개월 내 만료 계약이 <b>${rawHtml(expCnt)}건</b> (${won(expAmt)}천원) 있습니다 — 재약정 타깃.`, go:function(){ goWidget('exp','계약 만료 예정'); }});
