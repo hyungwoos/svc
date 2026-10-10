@@ -7,7 +7,7 @@ import { GRIDS } from './grids.js';
 import { applyChannelMenu, ctRawOf, liveData } from './analysis.js';
 import { goInbList } from './inbound.js';
 import { applyMenuFold } from './sales.js';
-import { ctPeriods, navMenu, oiOpen, openDetail, qvCfg, renderGrid, switchView } from './grid.js';
+import { ctPeriods, custGo, navMenu, oiOpen, openDetail, qvCfg, renderGrid, switchView } from './grid.js';
 import { syncOrderAssets } from './equipment.js';
 import { closeOvl, openOvl, ovlMarkDirty } from './edit.js';
 import { homeSearchOpen, rcPush } from './home.js';
@@ -108,6 +108,13 @@ export function openCust360(name){
     var nx=tr.nextElementSibling; if(nx && nx.classList.contains('c360-rn')) nx.onclick=go;
   });
   try{ c360Enhance(nm, cts, lives, ois, inbs, asts, ords); }catch(e){ console.warn('c360', e); }
+  /* ㊿+172 이 고객으로 목록 보기 — 계약 · LIVE · OI · 인바운드 · 장비로 옮겨 다녀도 같은 고객(«고객 문맥» · 목록 위 «해제») */
+  (function(){ var cap=$('#c360Cap'); if(!cap) return; var old=document.getElementById('c360Go'); if(old) old.remove();
+    var V=[['contracts','계약',cts.length],['live','LIVE',lives.length],['oi','OI',ois.length],['inbound','인바운드',inbs.length],['orders','장비 신청',ords.length],['assets','장비 현황',asts.length]].filter(function(x){ var b=document.querySelector('#side button[data-v="'+x[0]+'"]'); return !!b && visBtn(/** @type {any} */(b)); });
+    var d=document.createElement('div'); d.id='c360Go'; d.className='c360-go'; d.setAttribute('role','group'); d.setAttribute('aria-label','이 고객으로 목록 보기');
+    d.innerHTML=tpl`<span class="mini">이 고객으로 목록 보기</span>${rawHtml(V.map(function(x){ return tpl`<button type="button" class="cbtn" data-cv="${x[0]}">${x[1]} <b class="num">${String(x[2])}</b></button>`; }).join(''))}`;
+    cap.parentElement.insertBefore(d, cap.nextSibling);
+    d.querySelectorAll('[data-cv]').forEach(function(b){ /** @type {any} */(b).onclick=function(){ closeOvl('ovlC360'); custGo(/** @type {any} */(b).dataset.cv, nm); }; }); })();
   openOvl('ovlC360');
 }
 

@@ -10,6 +10,7 @@ import { navSub, openMenuEdit } from './tools.js';
 import { UPD, updFetch, updOpenAll, updShow, updSyncSeed } from './upd.js';
 import { switchView, xlsxAoa } from './grid.js';
 import { logChange, openOvl, setAuthTab } from './edit.js';
+import { loadInbound } from './inbound.js';
 
 
 /* ===== 관리자 (super_admin 전용) — 계정·권한 관리 ===== */
@@ -651,12 +652,58 @@ export function renderAdmin(){
     $('#abSave').onclick=abSave;
   }
   try{ apBind(); }catch(e){}
+  try{ omBind(); omLoad(); }catch(e){}   /* ㊿+172 담당자 연결 */
   try{ mfBind(); mfLoad(); }catch(e){}
   try{ cdBind(); cdLoad(); }catch(e){}
   try{ updAdminLoad(); }catch(e){}
   try{ API.made=null; apiLoad(); }catch(e){}   /* ㊿+164 외부 연동 — 다시 열면 발급 직후 보이던 키 원문은 지움 */
   axLoad();
   abLoad();
+}
+/* ── ㊿+172 담당자 연결 (user_owner_map · SQL 103) — 계정 ↔ OI · 인바운드 «담당» 이름 · 슈퍼 관리자만 · 저장 전 바뀌는 내용 확인 ── */
+export var OM={rows:[], ok:null, bound:false};
+export function omOwnerNames(){ var o={}; (ST.RAWX.oi||[]).concat(ST.RAWX.inbound||[]).forEach(function(r){ String(r.owner||'').split(/[,/]/).forEach(function(x){ x=x.trim(); if(x) o[x]=1; }); }); return Object.keys(o).sort(function(a,b){ return a.localeCompare(b,'ko'); }); }
+export function omBind(){
+  if(OM.bound || !document.getElementById('omUser')) return; OM.bound=true;
+  /** @type {any} */(document.getElementById('omUser')).onchange=function(){ var e=this.value, r=OM.rows.filter(function(x){ return x.email===e; })[0]; /** @type {any} */(document.getElementById('omNames')).value=r? (r.owner_names||[]).join(', ') : ''; };
+  /** @type {any} */(document.getElementById('omSave')).onclick=omSave;
+  if(ST.RAWX.inbound===undefined) try{ loadInbound(function(){ omPaint(); }); }catch(e){}
+}
+export async function omLoad(){
+  var msg=document.getElementById('omMsg'); if(!msg) return;
+  msg.textContent='불러오는 중…';
+  var rows=await sbTry('user_owner_map?select=email,owner_names,updated_by,updated_at&order=email');
+  OM.ok=rows!==null; OM.rows=rows||[];
+  msg.textContent=OM.ok? (OM.rows.length? OM.rows.length+'개 계정 연결됨' : '연결된 계정 없음') : '표가 없습니다 — SQL 103(user_owner_map)을 먼저 실행해 주세요';
+  omPaint();
+}
+export function omPaint(){
+  var sel=/** @type {any} */(document.getElementById('omUser')), dl=document.getElementById('omNameList'), t=document.getElementById('omTable'); if(!sel || !t) return;
+  var cur=sel.value, users=(AX_USERS||[]).slice().sort(function(a,b){ return String(a.email||'').localeCompare(String(b.email||'')); });
+  sel.innerHTML=tpl`<option value="">계정 선택…</option>${rawHtml(users.map(function(u){ var r=OM.rows.filter(function(x){ return x.email===String(u.email||'').toLowerCase(); })[0]; return tpl`<option value="${String(u.email||'').toLowerCase()}">${u.email||''}${r? ' — '+(r.owner_names||[]).join(', ') : ' — 연결 없음'}</option>`; }).join(''))}`; sel.value=cur;
+  if(dl) dl.innerHTML=omOwnerNames().map(function(n){ return tpl`<option value="${n}"></option>`; }).join('');
+  var names=omOwnerNames();
+  t.innerHTML=tpl`<thead><tr><th>계정</th><th>담당 이름</th><th>담당 칸에서 찾은 행</th><th>바꾼 사람 · 시각</th></tr></thead><tbody>`+
+    tpl`${rawHtml(OM.rows.length? OM.rows.map(function(r){ var ns=r.owner_names||[], hit=((ST.RAWX.oi||[]).concat(ST.RAWX.inbound||[])).filter(function(x){ var o=String(x.owner||''); return ns.some(function(n){ return n && o.indexOf(n)>=0; }); }).length;
+      return tpl`<tr><td>${r.email}</td><td>${ns.join(', ')}</td><td class="n">${String(hit)}${rawHtml(ns.some(function(n){ return names.indexOf(n)<0 && !names.some(function(m){ return m.indexOf(n)>=0; }); })? ' <span class="ctag warn">담당 칸에 없는 이름</span>' : '')}</td><td class="mini">${r.updated_by||''} ${String(r.updated_at||'').slice(0,16).replace('T',' ')}</td></tr>`; }).join('') : '<tr><td colspan="4" class="mini">연결된 계정이 없습니다</td></tr>')}</tbody>`;
+}
+export async function omSave(){
+  var sel=/** @type {any} */(document.getElementById('omUser')), inp=/** @type {any} */(document.getElementById('omNames')), msg=document.getElementById('omMsg');
+  var email=String(sel.value||'').toLowerCase(); if(!email){ msg.textContent='계정을 고르세요'; return; }
+  if(OM.ok===false){ msg.textContent='SQL 103 이 아직 실행되지 않았습니다'; return; }
+  var names=String(inp.value||'').split(/[,\n]/).map(function(x){ return x.trim(); }).filter(Boolean).filter(function(x,i,a){ return a.indexOf(x)===i; });
+  var old=OM.rows.filter(function(x){ return x.email===email; })[0], before=old? (old.owner_names||[]).join(', ') : '(연결 없음)', after=names.length? names.join(', ') : '(연결 해제)';
+  if(before===after){ msg.textContent='바뀐 내용이 없습니다'; return; }
+  var hit=((ST.RAWX.oi||[]).concat(ST.RAWX.inbound||[])).filter(function(x){ var o=String(x.owner||''); return names.some(function(n){ return o.indexOf(n)>=0; }); }).length;
+  if(!confirm('담당자 연결을 바꿉니다\n\n계정: '+email+'\n전: '+before+'\n후: '+after+'\n\n이 이름으로 찾은 OI · 인바운드 행: '+hit+'건\n저장할까요? (변경 이력에 남습니다)')) return;
+  msg.textContent='저장 중…';
+  try{
+    if(names.length) await sbWrite('POST','user_owner_map?on_conflict=email',[{email:email, owner_names:names}],'resolution=merge-duplicates,return=minimal');
+    else await sbWrite('DELETE','user_owner_map?email=eq.'+encodeURIComponent(email));
+    toast('담당자 연결 저장', email+' → '+after, 'ok');
+    if(email===String(ST.AUTH_USER||'').toLowerCase()){ ST.OWNER_NAMES=names.length? names : null; }
+    await omLoad();
+  }catch(e){ msg.textContent='저장 실패: '+String(/** @type {any} */(e).message||e).slice(0,120); }
 }
 /* ── 메뉴 권한 (user_perms · SQL 79) — 계정마다 보기/읽기/쓰기, 슈퍼 관리자만 ── */
 export var AP={user:'', rows:{}, bound:false};

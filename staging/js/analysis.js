@@ -619,7 +619,7 @@ export function bizPick(rows, ym, re){
 }
 /* ㊿+168 정산 달성률 — 미입력과 0원을 구분
    · 달: 입력 안 한 달은 «미입력»(이미 지난 달) 또는 «—»(아직 안 온 달) · 입력된 0 은 0 · 작성일(as_of)을 «입력 상태»에
-   · 분기·상반기·누계: «입력 n/m개월» · 다 입력되면 «확정», 일부면 «잠정», 하나도 없으면 «미집계»
+   · 분기·상반기·누계: «입력 n/m개월» · 다 입력되면 «입력 완료»(㊿+172 — 실제 마감 상태가 따로 없으므로 «확정»이라 하지 않음), 일부면 «잠정», 하나도 없으면 «미집계»
      달성률 = 입력된 달끼리(입력 월 기준) · 아래 작은 줄 = 그 기간 전체 목표 대비 지금까지 누계 · 미입력 달을 0원으로 치지 않음
    · 목표·회계매출 데이터는 그대로(표시만) */
 export function bizEntryDate(rows, ym){ var d=''; (rows||[]).forEach(function(r){ if(r.ym===ym){ var v=String(r.as_of||r.updated_at||r.created_at||'').slice(0,10); if(v>d) d=v; } }); return d; }
@@ -669,7 +669,7 @@ export function renderTargetTable(host, rows){
   }
   function aggRow(label, o, cls){
     if(!o.n) return '';
-    var nIn=Math.max(o.B.n, o.S.n), st= nIn===0? '<span class="biz-na">미집계</span>' : (nIn===o.n? tpl`<span class="biz-ok">확정 · ${rawHtml(o.n)}/${rawHtml(o.n)}개월</span>` : tpl`<span class="biz-part">잠정 · ${rawHtml(o.n)}개월 중 ${rawHtml(nIn)}개월 입력</span>`);
+    var nIn=Math.max(o.B.n, o.S.n), st= nIn===0? '<span class="biz-na">미집계</span>' : (nIn===o.n? tpl`<span class="biz-ok" title="모든 달이 입력됨 — 정산 마감(확정) 표시는 따로 없습니다">입력 완료 · ${rawHtml(o.n)}/${rawHtml(o.n)}개월</span>` : tpl`<span class="biz-part">잠정 · ${rawHtml(o.n)}개월 중 ${rawHtml(nIn)}개월 입력</span>`);
     function cells(x){
       if(!x.n) return '<td style="text-align:right;color:var(--muted)">—</td><td style="text-align:right;color:var(--muted)">미집계</td>';
       var a=pctTxt(x.v, x.t), b2=pctTxt(x.v, o.T);

@@ -888,6 +888,7 @@ export function qbAutoTitle(){ if(QB.mode==='sql') return 'SQL 조회'; var S=qb
   if(by.length) t=by.join(' · ')+'별 '+t; if(G.pivot&&G.pivot.c){ var pc=qbCol(G.pivot.c); if(pc) t+=' × '+pc.l; } return t; }
 export function qbRunNow(){
   var host=$('#qbRes'); if(!host) return;
+  qbBuildSync(); if(!qbPicked()){ host.innerHTML=''; return; }
   if(QB.mode==='sql'){ qbSqlRun(); return; }
   var S=qbSources(); QB._ld=QB._ld||{};
   var pending=qbTables(QB.spec).filter(function(t){ var s=S[t]; if(!s||!s.lazy) return false; var need=(t==='inbound'? ST.RAWX.inbound===undefined : t==='cloud'? !ST.RAWX.cloud : false); if(need && !QB._ld[t]){ QB._ld[t]=1; s.lazy(function(){ QB._ld[t]=0; qbSourcesReset(); if(ST.CUR_VIEW==='report') qbRunNow(); }); } return need; });
@@ -900,6 +901,7 @@ export function qbResultDraw(){
   var host=$('#qbRes'); if(!host||!QB.res) return;
   if(QB.view!=='table' && !qbChart(QB.res)) QB.view='table';
   host.innerHTML=qbResultHtml();
+  if(QB.mode!=='sql' && QB.spec && !RPV.build){ var cd=document.createElement('div'); cd.className='qb-cond'; cd.textContent='조건 — '+qbSpecText(QB.spec)+' · 바꾸려면 «조합 바꾸기»'; host.insertBefore(cd, host.firstChild); }
   var ch=qbChart(QB.res), cb=document.getElementById('qbChart');
   if(ch && cb){ try{ var fmt=ch.money? won : function(v){ return Math.round(v).toLocaleString('ko-KR'); }; var sers=ch.series.map(function(s,i){ return {label:s.label, data:s.data, color:cssv('--s'+((i%8)+1))}; });
     if(ch.type==='lines') Viz.lines(cb,{labels:ch.labels, series:sers, fmt:fmt, fill:sers.length===1, padL:56}); else Viz.bars(cb,{labels:ch.labels, series:sers, fmt:fmt, padL:56}); }catch(e){} }
@@ -991,9 +993,16 @@ export function qbLibRefresh(){ var el=$('#qbLib'); if(!el) return; el.innerHTML
   el.querySelectorAll('[data-qdel]').forEach(function(b){ b.onclick=function(){ var L=qbSaved(), x=L.filter(function(y){ return y.id===b.dataset.qdel; })[0]; if(!x || !confirm('«'+x.name+'» 을 삭제할까요?')) return; qbSavedSet(L.filter(function(y){ return y.id!==x.id; })); if(QB.savedId===x.id) QB.savedId=null; qbLibRefresh(); }; });
   el.querySelectorAll('[data-preset]').forEach(function(c){ c.onclick=function(){ var p=QB_PRESETS.filter(function(x){ return x.id===c.dataset.preset; })[0]; if(p){ qbLoad(p.spec, p.name, null); qbLibRefresh(); } }; });
   var a2=document.getElementById('qbAuto2'); if(a2) a2.onclick=function(){ RPV.tab='auto'; renderReport(); };
-  var bt=document.getElementById('qbBuildTg'); if(bt) bt.onclick=function(){ RPV.build=!RPV.build; qbBuildSync(); qbLibRefresh(); };
+  var bt=document.getElementById('qbBuildTg'); if(bt) bt.onclick=function(){ RPV.build=!RPV.build; qbBuildSync(); qbLibRefresh(); var rh=document.getElementById('qbRes'); if(qbPicked() && rh && !rh.firstChild) qbRunNow(); };
 }
-export function qbBuildSync(){ var w=document.querySelector('#rpBody .qb-wrap'); if(w) w.classList.toggle('nobuild', !RPV.build && QB.mode!=='sql'); }
+/** ㊿+172 템플릿(또는 저장한 리포트 · 조합 · SQL)을 고르기 전에는 기본 결과를 펼치지 않음 — 고르면 조건 + 결과 */
+export function qbPicked(){ return !!(QB.title || QB.savedId || RPV.build || QB.mode==='sql'); }
+export function qbBuildSync(){
+  var w=document.querySelector('#rpBody .qb-wrap'), pk=qbPicked();
+  if(w){ w.classList.toggle('nobuild', !RPV.build && QB.mode!=='sql'); w.hidden=!pk; }
+  var h=document.getElementById('qbPickHint'); if(h) h.hidden=pk;
+  var d=document.getElementById('qbDeck2'); if(d) d.hidden=!pk && !rpbList().length;
+}
 /* PPT 덱 — 결과를 슬라이드 항목으로 (rpbMakePpt 재사용, AI 코멘트 없음) */
 export function qbDeckAdd(){
   var r=QB.res; if(!r||!r.rows.length){ toast('추가할 결과가 없습니다','', 'bad'); return; }
@@ -1253,6 +1262,7 @@ export function renderReport(){
   host.innerHTML=tpl`<div class="pr-top"><span style="font-size:18px;font-weight:600;letter-spacing:-.01em">리포트</span><span class="mini">템플릿을 고르면 바로 결과가 나옵니다</span><span class="mini">포탈 안의 표를 골라 연결(JOIN)·조건·묶기·피벗으로 조합하고 표·차트로 봅니다 — 저장해 두고 엑셀·PPT 로 내보내기</span>`+
     tpl`<button type="button" class="cbtn" id="qbAuto" style="margin-left:auto" title="예전 월간 자동 리포트(고정 양식)">월간 자동 리포트 →</button></div>`+
     tpl`<div id="qbLib"></div>`+
+    tpl`<div class="qb-pick" id="qbPickHint" role="note">위에서 리포트 템플릿을 고르면 <b>조건과 결과</b>가 여기에 나옵니다 — 직접 만들려면 «조합 바꾸기»</div>`+
     tpl`<div class="qb-wrap"><aside class="pr-card qb-panel-card"><div id="qbPanel"></div></aside><section class="pr-card qb-res-card"><div id="qbRes"></div></section></div>`+
     tpl`<div class="pr-card" id="qbDeck2" style="margin-top:14px"></div>`;
   $('#qbAuto').onclick=function(){ RPV.tab='auto'; renderReport(); };

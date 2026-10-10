@@ -35,6 +35,7 @@
  * @property {ChatTurn[]} HIST AI 대화 이력 @property {boolean} HIST_LOADED @property {number} IDLE_LAST 마지막 입력 시각 @property {boolean} IDLE_WARNED
  * @property {?Object<string, any>} RAWX 표별 원본 행 @property {string} MY_ROLE 역할 @property {boolean} IS_SUPER @property {boolean} IS_VIEWER_ROLE @property {boolean} IS_VIEWER
  * @property {boolean} IS_EQUIP 장비·PoC 제한 계정 @property {?string} EQUIP_HOME @property {?number} DASH_BASE0 @property {number} LAST_LOAD @property {?{t:number, n:?number}} INB_TODO
+ * @property {?string[]} OWNER_NAMES 계정에 연결된 담당자 이름(SQL 103 user_owner_map) · null = 연결 없음/표 없음
  */
 /** @type {AppState} */
 export var ST={
@@ -70,7 +71,8 @@ export var ST={
   EQUIP_HOME:/** @type {?string} */ (null),   // 제한 계정의 첫 화면
   DASH_BASE0:/** @type {?number} */ (null),   // 홈 «처음» 기준월 (navMenu 가 되돌림)
   LAST_LOAD:0,          // 마지막 데이터 읽기 시각(ms) — 자동 갱신 판단
-  INB_TODO:/** @type {?{t:number, n:?number}} */ (null)   // 인바운드 처리할 일 수 캐시 {t, n}
+  INB_TODO:/** @type {?{t:number, n:?number}} */ (null),   // 인바운드 처리할 일 수 캐시 {t, n}
+  OWNER_NAMES:/** @type {?string[]} */ (null)   // ㊿+172 계정 ↔ 담당자 이름(관리자 지정 · SQL 103) — 없으면 이 브라우저에서 고른 이름(임시)
 };
 
 /* 환경 — ㊿+153: 예전 boot.js(APP_VER) · init.js(IS_STAGING · IS_QA) 에서 옮김 */

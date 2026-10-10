@@ -8,7 +8,7 @@ import { activeCustomers, groupCount, hbars, monthlySeries, monthlyTotal, pinQue
 import { dcSummary, liveData, liveDelta, liveSrcLabel, renewScan } from './analysis.js';
 import { CL, clBuild, clEnsure, clFxRate, clSum } from './cloud.js';
 import { openOvl } from './edit.js';
-import { ansClear, ansStateSet, askInOvl, askInput, HOME, homeAfter, homeBeforeAsk, homeLocal, homeMetaAI, localIntent } from './home.js';
+import { aiHistory, aipOpen, aipSync, ansBlank, homePh, ansClear, ansStateSet, homeAfter, homeBeforeAsk, homeLocal, homeMetaAI, localIntent } from './home.js';
 
 
 /* ==================================================================
@@ -104,16 +104,16 @@ export function aiOn(badge){
     '\n· 금액 계산은 전부 포탈이 DB 원본으로 직접 수행합니다'+
     '\n· AI 해설: '+(AICFG.narrate?'켜짐':'꺼짐')+
     '\n· 고객명 마스킹: '+(AICFG.maskNames?'켜짐':'꺼짐');
-  $('#q').placeholder= isGN()? (window.innerWidth<520? '고객사 · 매출 · 할 일 물어보기' : '고객사 찾기, 매출 분석, 처리할 일을 물어보세요.')   /* ㊿+171 지니언스: 가운데 입력칸 하나로 검색·질문 */
+  $('#q').placeholder= isGN()? homePh()   /* ㊿+171 지니언스: 가운데 입력칸 하나로 검색·질문 */
     : '아무렇게나 물어보세요 — 예: 요즘 클라우드 좀 어때? 제일 큰 고객 누구야? 곧 재약정 챙겨야 할 데 있어?';
 }
 
 export function setAsking(on){
-  var b=$('#btnAsk'), b2=/** @type {any} */(document.getElementById('fkAsk'));   /* ㊿+171 검색·질문 창의 «질문» 버튼도 같이 */
+  var b=$('#btnAsk'), b2=/** @type {any} */(document.getElementById('aipAsk'));   /* ㊿+172 AI 패널의 «질문» 버튼도 같이(누르면 중단) */
   if(ASK_TICK){ clearInterval(ASK_TICK); ASK_TICK=null; }
   b.disabled=false;                         // 기다리는 동안에도 눌러서 «중단» 할 수 있게
   b.classList.toggle('asking', !!on); if(b2) b2.classList.toggle('asking', !!on);
-  if(!on){ b.textContent='질문'; b.title=''; if(b2){ b2.textContent='질문'; b2.title=''; } return; }
+  if(!on){ b.textContent=isGN()? 'AI 에 질문' : '질문'; b.title=''; if(b2){ b2.textContent='질문'; b2.title=''; } try{ aipSync(); }catch(e){} return; }
   ASK_T0=Date.now();
   b.textContent='생각 중… 0초'; b.title='누르면 중단합니다'; if(b2){ b2.textContent='생각 중… 0초'; b2.title='누르면 중단합니다'; }
   ASK_TICK=setInterval(function(){
@@ -147,7 +147,7 @@ export function closeAnswer(why, force){
   if(force) AI_SEQ.closed=AI_SEQ.n;
   a.classList.remove('on');
   try{ clearSay(); }catch(e){}
-  try{ ansClear(); }catch(e){}   /* ㊿+171 닫으면 이전 문답(접힌 줄)도 정리 — AI 기억(HIST)은 그대로 */
+  try{ ansBlank(); ansClear(); }catch(e){}   /* ㊿+172 = 이 대화 지우기(테스트 · 다시 읽기) — 패널 «닫기»는 대화를 지우지 않음(home.js aipClose) */
   var t=$('#ansTitle'); if(t) t.textContent='';
   var h=$('#ansHero'); if(h) h.textContent='';
   var b=$('#ansSub');  if(b) b.textContent='';
@@ -158,8 +158,7 @@ export function closeAnswer(why, force){
 export function ask(q, opt){
   q=(q||'').trim(); opt=opt||{};
   if(!q) return;               /* ㊿+171 빈 질문은 무시(예전: 답을 닫음 — Enter 가 두 번 붙으면 방금 연 답이 닫히던 원인) */
-  if(!opt.ctx && askInOvl() && HOME.ctx && HOME.ctxOn) opt.ctx=HOME.ctx;
-  try{ askInput().value=''; }catch(e){}   // 물어본 뒤에는 입력칸을 비웁니다
+  if(!opt.from){ try{ $('#q').value=''; }catch(e){} }   // 예전 경로(입력칸에서 바로 ask) — 물어본 뒤 입력칸 비움 · ㊿+172 홈/검색 창은 askFrom 이 비우고 «검색으로 바꾸기»로 되돌림
   $('#sug').classList.remove('on');
   try{ homeBeforeAsk(q, opt); }catch(e){}
   var li=''; try{ li=localIntent(q); }catch(e){}
@@ -188,7 +187,7 @@ export function ask(q, opt){
     }
   }, AI_TIMEOUT_MS+5000);
   Promise.all([loadHist(), clEnsure()]).then(function(){
-    return aiFetch({mode:'chat', question:opt.ctx? q+'\n\n'+opt.ctx.text : q, digest:buildDigest(), history:ST.HIST.slice(-6)});
+    return aiFetch({mode:'chat', question:opt.ctx? q+'\n\n'+opt.ctx.text : q, digest:buildDigest(), history:aiHistory()});
   })
     .then(function(r){
       clearTimeout(guard); if(gone()) return; setAsking(false);
@@ -216,8 +215,8 @@ export function ask(q, opt){
     })
     .catch(function(e){
       clearTimeout(guard); if(gone()) return; setAsking(false);
-      if(/^요청을 중단했습니다/.test(String(e&&e.message||''))){ try{ askInput().value=q; }catch(x){} return; }   // 사용자가 끊음 → 질문 복원 (타임아웃은 아래로)
-      if(/로그인이 만료/.test(String(e&&e.message||''))){ try{ askInput().value=q; }catch(x){} toast('로그인이 만료되었습니다','다시 로그인하면 질문이 그대로 남아 있습니다','warn'); openOvl('ovlAuth'); return; }
+      if(/^요청을 중단했습니다/.test(String(e&&e.message||''))){ try{ /** @type {any} */(document.getElementById('aipInput')).value=q; }catch(x){} return; }   // 사용자가 끊음 → 질문 복원(패널 입력칸) (타임아웃은 아래로)
+      if(/로그인이 만료/.test(String(e&&e.message||''))){ try{ /** @type {any} */(document.getElementById('aipInput')).value=q; }catch(x){} toast('로그인이 만료되었습니다','다시 로그인하면 질문이 그대로 남아 있습니다','warn'); openOvl('ovlAuth'); return; }
       localAnswer(q,'⚠ AI 호출 실패 — 이 답은 AI가 아니라 내장 규칙(간단 패턴)입니다. ('+String(e&&e.message||e).slice(0,120)+')', opt);
       aiRetryBtn(q, opt);
     });
@@ -237,13 +236,10 @@ export async function aiFeedback(verdict, q, r, say){
   }catch(e){ btns.forEach(function(b){ b.disabled=false; b.removeAttribute('aria-pressed'); }); toast('피드백 저장 실패', /ai_feedback|404|schema cache/i.test(String(e.message||e))? 'SQL 94 가 아직 실행되지 않았습니다':String(e.message||e).slice(0,120), 'warn'); }
 }
 /* 답변 패널을 열고, 화면 밖에 있으면 보이는 위치로 살짝 스크롤 */
-export function revealAnswer(){
+export function revealAnswer(){   /* ㊿+172 답은 AI 패널 — 패널을 열고 그 안에서 답 위치로(홈 배치는 그대로) */
   var a=$('#answer'); if(!a) return;
   a.classList.add('on');
-  try{
-    var r=a.getBoundingClientRect(), tb=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tbh'))||64;
-    if(r.top<tb || r.top>innerHeight-120) a.scrollIntoView({behavior:'smooth',block:'start'});
-  }catch(e){}
+  try{ aipOpen(false); var body=document.getElementById('aipBody'); if(body && a.offsetTop<body.scrollTop) body.scrollTop=a.offsetTop-8; }catch(e){}
 }
 /* AI 호출이 실패했을 때 «다시 시도» 버튼을 답변 영역에 붙입니다 */
 /* ㊿+171 실패 상태는 답 맨 위 한 줄(«AI 응답 실패» · 다시 시도) — 아래 숫자는 포탈 내장 규칙으로 계산한 것임을 분명히 */
@@ -271,7 +267,6 @@ export function cleanSay(t){
 export function clearSay(){ var e=$('#aiSay'); if(e){ e.className='ai-say'; e.innerHTML=''; } }
 export function localAnswer(q, note, opt){
   clearSay();
-  try{ askInput().value=''; }catch(e){}
   var res, p=null;
   try{ res=runQuery(q); p=Q_LAST; }   /* runQuery 가 쓴 해석 결과(이어지는 질문 상태를 두 번 바꾸지 않게 다시 해석하지 않음) */
   catch(e){ res={title:q, hero:'?', unit:'', sub:'질문을 이해하지 못했습니다', note:String(e.message||e)}; }

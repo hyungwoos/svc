@@ -208,10 +208,12 @@ for (const f of ['quote.html', 'report.html', 's1.html', 'kk.html']) {
   await S.t('❔ 이 화면 사용법 → 그 자리 검색·질문 창(보던 화면 문맥) · ? 단축키 안내 · Esc 닫기', async () => {
     await page.evaluate(() => SVC.switchView('orders')); await page.waitForTimeout(200);
     await page.click('#dvHelp'); await page.waitForTimeout(900);
-    /* ㊿+171 그 화면에서 검색·질문 창으로 묻고(목록 그대로) · 문맥(보던 화면)이 질문 옆에 */
-    const st = await page.evaluate(() => ({ v: SVC.ST.CUR_VIEW, ovl: document.getElementById('ovlFind').classList.contains('on'), inOvl: !!document.querySelector('#fkAns #answer'), on: document.getElementById('answer').classList.contains('on'), title: document.getElementById('ansQ').textContent, say: document.getElementById('aiSay').textContent }));
-    assert(st.v === 'orders' && st.ovl && st.inOvl && st.on && /화면/.test(st.title) && /mock/.test(st.say), JSON.stringify(st).slice(0, 200));
-    await page.keyboard.press('Escape'); await page.waitForTimeout(150); await page.evaluate(() => SVC.switchView('dash')); await page.waitForTimeout(200);
+    /* ㊿+172 그 화면 그대로(목록 안 바뀜) · 오른쪽 AI 패널에 답 · 문맥(보던 화면)이 질문 옆에 */
+    const st = await page.evaluate(() => ({ v: SVC.ST.CUR_VIEW, panel: !document.getElementById('aiPanel').hidden, on: document.getElementById('answer').classList.contains('on'), title: document.getElementById('ansQ').textContent, say: document.getElementById('aiSay').textContent }));
+    assert(st.v === 'orders' && st.panel && st.on && /화면/.test(st.title) && /보던 화면: 임대 장비 신청 내역/.test(st.title) && /mock/.test(st.say), JSON.stringify(st).slice(0, 200));
+    await page.keyboard.press('Escape'); await page.waitForTimeout(150);
+    assert(await page.evaluate(() => document.getElementById('aiPanel').hidden && document.getElementById('answer').classList.contains('on')), 'Esc → 패널 닫힘 · 대화 유지 아님');
+    await page.evaluate(() => { SVC.closeAnswer('', true); }); await page.evaluate(() => SVC.switchView('dash')); await page.waitForTimeout(200);
     await page.keyboard.press('Shift+?'); await page.waitForTimeout(150);
     let on = await page.evaluate(() => document.getElementById('ovlKeys').classList.contains('on')); assert(on, '? 로 단축키 창이 안 열림');
     const kbd = await page.$$eval('#ovlKeys kbd', (e) => e.length); assert(kbd >= 8, 'kbd ' + kbd);
@@ -869,7 +871,7 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
     await page.fill('#lsEmail', 'tester@example.com'); await page.fill('#lsPw', 'pw'); await page.click('#lsGo'); await page.waitForTimeout(1500);
     const r = await page.evaluate(() => ({ v: SVC.ST.CUR_VIEW, h: location.hash })); assert(r.v === 'dash' && !r.h, JSON.stringify(r)); return 'dash';
   });
-  await S.t('㊿+145 메뉴를 누르면 첫 화면(탭·검색·스크롤) · 뒤로가기는 이어서', async () => {
+  await S.t('㊿+145→172 메뉴를 다시 눌러도 보던 상태(탭 · 검색 · 스크롤) · 뒤로가기도 이어서 · 처음 상태는 «초기화»로만', async () => {
     await page.evaluate(() => SVC.navMenu('ops')); await page.waitForTimeout(500);
     await page.click('#opsTabs [data-t="log"]'); await page.waitForTimeout(500);
     assert(await page.evaluate(() => SVC.OPS.tab) === 'log', '기록 탭으로 안 바뀜');
@@ -878,15 +880,22 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
     assert(await page.evaluate(() => SVC.ST.CUR_VIEW === 'ops' && SVC.OPS.tab === 'log'), '뒤로가기가 이어서 보지 않음');
     await page.evaluate(() => document.querySelector('#side button[data-v="dash"]').click()); await page.waitForTimeout(300);
     await page.evaluate(() => document.querySelector('#side button[data-v="ops"]').click()); await page.waitForTimeout(500);
-    assert(await page.evaluate(() => SVC.OPS.tab) === 'gh', '메뉴로 들어왔는데 탭 유지: ' + await page.evaluate(() => SVC.OPS.tab));
+    assert(await page.evaluate(() => SVC.OPS.tab) === 'log', '메뉴로 다시 들어왔는데 탭이 처음으로: ' + await page.evaluate(() => SVC.OPS.tab));
+    await page.click('#btnViewReset'); await page.waitForTimeout(500);
+    assert(await page.evaluate(() => SVC.OPS.tab) === 'gh', '«초기화» 후 첫 탭 아님: ' + await page.evaluate(() => SVC.OPS.tab));
     await page.evaluate(() => document.querySelector('#side button[data-v="churn"]').click()); await page.waitForTimeout(500);
     await page.evaluate(() => { SVC.CHURN.q = 'zz'; SVC.renderChurn(); window.scrollTo(0, 900); }); await page.waitForTimeout(300);
+    const y0 = await page.evaluate(() => Math.round(scrollY));
     await page.evaluate(() => document.querySelector('#side button[data-v="dash"]').click()); await page.waitForTimeout(300);
     await page.evaluate(() => document.querySelector('#side button[data-v="churn"]').click()); await page.waitForTimeout(500);
-    const r = await page.evaluate(() => ({ q: SVC.CHURN.q, y: Math.round(scrollY) })); assert(r.q === '' && r.y === 0, JSON.stringify(r));
+    const r = await page.evaluate(() => ({ q: SVC.CHURN.q, y: Math.round(scrollY) })); assert(r.q === 'zz' && Math.abs(r.y - y0) < 30, JSON.stringify({ r, y0 }));
+    await page.click('#btnViewReset'); await page.waitForTimeout(400);
+    const r2 = await page.evaluate(() => ({ q: SVC.CHURN.q, y: Math.round(scrollY) })); assert(r2.q === '' && r2.y === 0, '초기화 ' + JSON.stringify(r2));
     await page.evaluate(() => { SVC.STATE.ind = '제조'; }); await page.evaluate(() => document.querySelector('#side button[data-v="dash"]').click()); await page.waitForTimeout(400);
-    assert(await page.evaluate(() => SVC.STATE.ind === '' && SVC.STATE.base === SVC.ST.DASH_BASE0), '홈 거르기 초기화 안 됨');
-    assert(!errs.length, errs.join(' | ')); return 'ops 탭 · 해지 검색 · 스크롤 · 홈 거르기';
+    const sum = await page.evaluate(() => document.getElementById('gnSum').textContent);
+    await page.evaluate(() => { SVC.STATE.ind = ''; SVC.renderAll(); });
+    assert(sum === await page.evaluate(() => document.getElementById('gnSum').textContent), '사업 분석 거르기가 홈 핵심 현황을 바꿈');
+    assert(!errs.length, errs.join(' | ')); return 'ops 탭 · 해지 검색 · 스크롤 유지 → 초기화';
   });
   await S.t('㊿+145 AI 점검 표 — 질문 칸이 찌그러지지 않고 표가 카드 안에', async () => {
     await page.setViewportSize({ width: 1920, height: 1000 });
@@ -923,7 +932,7 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
       if (lines >= 3 && t.length / lines < 3.2) out.push(t.slice(0, 12) + '(' + lines + '줄)'); }
     return out; });
   await S.t('㊿+146 폰 대시보드(분석 펼침) — 세로로 쌓인 글자 없음 · 장표 연도 탭에 고른 연도가 보임', async () => {
-    await page.evaluate(() => { SVC.homeModeSet('biz'); const b = document.getElementById('ccAnaBtn'); if (b && b.getAttribute('aria-expanded') !== 'true') b.click(); }); await page.waitForTimeout(1200);   /* ㊿+171 분석은 홈 «사업 분석» 안 */
+    await page.evaluate(() => { SVC.homeDetail(true); const b = document.getElementById('ccAnaBtn'); if (b && b.getAttribute('aria-expanded') !== 'true') b.click(); }); await page.waitForTimeout(1200);   /* ㊿+171 분석은 홈 «사업 분석» 안 */
     const bad = await stacked(); assert(!bad.length, bad.slice(0, 6).join(', '));
     const seg = await page.evaluate(() => { const s = document.getElementById('segMxYear'); const b = s && s.querySelector('[aria-pressed="true"]'); if (!s || !b || !s.offsetParent) return null;
       const sr = s.getBoundingClientRect(), br = b.getBoundingClientRect(); return { inView: br.left >= sr.left - 1 && br.right <= sr.right + 1, headH: Math.round(s.closest('.card-head').querySelector('h2').getBoundingClientRect().height) }; });
@@ -983,7 +992,7 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
       await page.evaluate(() => { if (!document.getElementById('noAnim')) { const st = document.createElement('style'); st.id = 'noAnim'; st.textContent = '*,*::before,*::after{animation-duration:0s!important;transition:none!important}'; document.head.appendChild(st); } });
       const bad = [];
       for (const v of ['dash', 'dashbiz', 'eqboard', 'dcheck', 'churnrate', 'ops']) {   /* ㊿+171 dash = AI 홈 · dashbiz = 홈 «사업 분석»(분석 펼침) */
-        await page.evaluate((v) => { SVC.navMenu(v === 'dashbiz' ? 'dash' : v); if (v === 'dashbiz') { SVC.homeModeSet('biz'); const b = document.getElementById('ccAnaBtn'); if (b && b.getAttribute('aria-expanded') !== 'true') b.click(); } if (v === 'ops') { SVC.OPS.tab = 'log'; SVC.renderOps(true); } }, v);
+        await page.evaluate((v) => { SVC.navMenu(v === 'dashbiz' ? 'dash' : v); if (v === 'dashbiz') { SVC.homeDetail(true); const b = document.getElementById('ccAnaBtn'); if (b && b.getAttribute('aria-expanded') !== 'true') b.click(); } if (v === 'ops') { SVC.OPS.tab = 'log'; SVC.renderOps(true); } }, v);
         await page.waitForTimeout(900);
         if (!(await page.evaluate(() => !!window.axe))) await page.evaluate(fs.readFileSync(AXE, 'utf8'));   // addScriptTag 는 CSP(인라인 금지)에 막힘
         const r = await page.evaluate(async () => { const res = await axe.run(document, { runOnly: { type: 'rule', values: ['color-contrast'] }, resultTypes: ['violations'] }); return res.violations.flatMap((x) => x.nodes.map((n) => n.target.join(' ') + ' ' + ((n.any[0] || {}).data || {}).contrastRatio)); });
@@ -1082,7 +1091,7 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
     assert(!(await page.$('#ovlUpd')), '안내 대상이 아닌데 팝업');
     return n + '개 시드 · ack ' + JSON.parse(ack.body).p_last_id;
   });
-  await S.t('㊿+149 관리자 화면 탭 4개: 한 번에 한 구역만 · 탭 전환 · 메뉴를 다시 누르면 첫 탭 · 뒤로가기는 보던 탭', async () => {
+  await S.t('㊿+149 관리자 화면 탭: 한 번에 한 구역만 · 탭 전환 · 뒤로가기 · 메뉴 다시(㊿+172)도 보던 탭 · «초기화»는 첫 탭', async () => {
     await page.evaluate(() => SVC.navMenu('adminx')); await page.waitForTimeout(700);
     const vis = () => page.evaluate(() => [...document.querySelectorAll('#viewAdmin .adm-pane')].filter((p) => p.getClientRects().length).map((p) => p.dataset.pane).join(','));
     const tabs = await page.$$eval('#admTabs button', (b) => b.map((x) => x.textContent.trim()));
@@ -1094,7 +1103,9 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
     await page.evaluate(() => SVC.navMenu('dash')); await page.waitForTimeout(300); await page.evaluate(() => SVC.goBack()); await page.waitForTimeout(500);
     assert((await page.evaluate(() => SVC.ST.CUR_VIEW)) === 'adminx' && (await vis()) === 'cfg', '뒤로가기 → 보던 탭 아님 ' + (await vis()));
     await page.evaluate(() => SVC.navMenu('adminx')); await page.waitForTimeout(400);
-    assert((await vis()) === 'acct', '메뉴 다시 누르면 첫 탭 아님 ' + (await vis()));
+    assert((await vis()) === 'cfg', '메뉴 다시 누르면 보던 탭 아님 ' + (await vis()));
+    await page.evaluate(() => SVC.viewResetHard('adminx')); await page.waitForTimeout(400);
+    assert((await vis()) === 'acct', '«초기화» 후 첫 탭 아님 ' + (await vis()));
     return tabs.join(' | ') + ' · 설정 탭 높이 ' + Math.round(h) + 'px';
   });
   await S.t('㊿+164 관리자 › 🔌 외부 연동: SQL 102 전이면 안내 · 키 발급(이름·범위 필수) → 원문 한 번만 · 복사 · 목록 · 폐기 확인 → 폐기 · 다시 열면 원문 사라짐', async () => {
@@ -1266,12 +1277,13 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
     assert(sync && js.length === n0, '두 번째 열기에 다시 받음 ' + (js.length - n0)); assert(!c.errs.length, c.errs.join(' | '));
     return 'price·report·admin·ops·account';
   });
-  await S.t('㊿+153 처음 열 때 불러오는 화면도 메뉴를 다시 누르면 «첫 화면»(코드를 받은 직후의 사본으로 되돌림)', async () => {
+  await S.t('㊿+153 처음 열 때 불러오는 화면도 «초기화»는 «첫 화면»(코드를 받은 직후의 사본으로 되돌림) · ㊿+172 메뉴 다시는 보던 그대로', async () => {
     const r = await page.evaluate(async () => {
-      SVC.navMenu('price'); const seg0 = SVC.PR.seg; SVC.PR.seg = seg0 === 'saas' ? 'onprem' : 'saas'; SVC.PR.q = 'zz'; SVC.navMenu('dash'); SVC.navMenu('price'); const back = SVC.PR.seg === seg0 && !SVC.PR.q;
-      SVC.navMenu('ops'); const t0 = SVC.OPS.tab; SVC.OPS.tab = t0 === 'gh' ? 'sql' : 'gh'; SVC.navMenu('dash'); SVC.navMenu('ops'); const opsBack = SVC.OPS.tab === t0;
-      return { back, opsBack, seg0 }; });
-    assert(r.back && r.opsBack, JSON.stringify(r)); return JSON.stringify(r);
+      SVC.navMenu('price'); const seg0 = SVC.PR.seg, seg1 = seg0 === 'saas' ? 'onprem' : 'saas'; SVC.PR.seg = seg1; SVC.PR.q = 'zz'; SVC.navMenu('dash'); SVC.navMenu('price'); const kept = SVC.PR.seg === seg1 && SVC.PR.q === 'zz';
+      SVC.viewResetHard('price'); const back = SVC.PR.seg === seg0 && !SVC.PR.q;
+      SVC.navMenu('ops'); const t0 = SVC.OPS.tab; SVC.OPS.tab = t0 === 'gh' ? 'sql' : 'gh'; SVC.navMenu('dash'); SVC.navMenu('ops'); const opsKept = SVC.OPS.tab !== t0; SVC.viewResetHard('ops'); const opsBack = SVC.OPS.tab === t0;
+      return { kept, back, opsKept, opsBack, seg0 }; });
+    assert(r.kept && r.back && r.opsKept && r.opsBack, JSON.stringify(r)); return JSON.stringify(r);
   });
   await S.t('㊿+153 코드 파일을 못 받으면 그 화면에 «오류가 발생 — 새로고침» · 오류 기록 · 다시 열면 다시 시도', async () => {
     failReport = true; const ctx2 = await browser.newContext({ viewport: { width: 1280, height: 900 }, serviceWorkers: 'block' }); const p2 = await ctx2.newPage(); const w2 = [];
@@ -1631,7 +1643,9 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
   });
   await S.t('㊿+157 설치비 칸 · 월 목표 · OI 예상단가 · 연간 목표 붙여넣기 — 전부 천원으로 입력 → DB 는 원', async () => {
     const { db, ctx, page } = await fboot(); const c = cOf(db, '가상고객_에스원')[0]; const y = +c.settle_month.slice(0, 4), m = +c.settle_month.slice(5, 7);
-    await page.evaluate(() => { SVC.navMenu('dash'); try { SVC.homeModeSet('biz'); } catch (e) { /* noop */ }   /* ㊿+171 위젯 · 장표는 홈 «사업 분석» 안 */ const w = document.querySelector('[data-w="ifee"]'); if (w) { w.classList.remove('w-off'); w.scrollIntoView(); } }); await page.waitForTimeout(500);
+    await page.evaluate(() => { SVC.navMenu('dash'); SVC.homeDetail(true); }); await page.waitForTimeout(300);   /* ㊿+172 위젯 · 장표는 홈 «사업 현황 상세 · 분석» 안(펼치면 다음 프레임에 다시 그림) */
+    await page.evaluate(() => { const b = document.getElementById('ccAnaBtn'); if (b && b.getAttribute('aria-expanded') !== 'true') b.click(); }); await page.waitForTimeout(500);
+    await page.evaluate(() => { const w = document.querySelector('[data-w="ifee"]'); if (w) { w.classList.remove('w-off'); w.scrollIntoView(); } }); await page.waitForTimeout(500);
     await page.click('td.ifc[data-y="' + y + '"][data-m="' + m + '"]'); await page.waitForTimeout(350);
     assert((await page.$eval('.ifin[data-f="c' + c.id + '"]', (e) => e.value)) === '2000', '설치비 칸(천원)');
     await page.fill('.ifin[data-f="c' + c.id + '"]', '2500'); await page.click('#ifSave'); await page.waitForTimeout(700); assert(db.ct(c.id).install_fee === 2500000, '설치비 ' + db.ct(c.id).install_fee);
@@ -1812,25 +1826,25 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
     assert(back === 'false,true', 'Esc 뒤 ' + back);
     assert(!errs.length, errs.join(' | ')); return '비고 «' + db.ct(id).note + '» · 고객 360 → 상세 ' + c3.rows.length + '줄';
   });
-  await S.t('㊿+159 홈 AI 답변: «✕ 닫기» · 다른 메뉴로 가면 닫힘(돌아와도 없음) · 생각 중엔 메뉴를 옮겨도 유지 · 생각 중 ✕ 는 멈추고 닫음', async () => {
+  await S.t('㊿+159→172 AI 대화 패널: 다른 메뉴로 갔다 와도 대화 그대로 · «패널 닫기»는 숨기기만(대화 유지) · 생각 중엔 메뉴를 옮기거나 패널을 닫아도 계속 · «대화 삭제»는 생각 중이면 멈추고 지움', async () => {
     let slow = 0;
     const extra = async (route, u) => { if (u.includes('/functions/v1/ask') && slow) { await new Promise((r) => setTimeout(r, slow)); await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, text: 'mock 늦은 답', queries: [] }) }).catch(() => {}); return true; } return false; };
     const { ctx, page, errs } = await fbootWith(null, { extra });
-    const st = () => page.evaluate(() => ({ on: document.getElementById('answer').classList.contains('on'), say: document.getElementById('aiSay').textContent, asking: SVC.isAsking(), x: !!document.getElementById('ansClose') }));
+    const st = () => page.evaluate(() => ({ on: document.getElementById('answer').classList.contains('on'), say: document.getElementById('aiSay').textContent, asking: SVC.isAsking(), panel: !document.getElementById('aiPanel').hidden }));
     await page.evaluate(() => SVC.ask('이번 달 MRR?')); await page.waitForFunction(() => /mock/.test(document.getElementById('aiSay').textContent), null, { timeout: 8000 });
-    const a = await st(); assert(a.on && a.x, '답 ' + JSON.stringify(a));
-    await page.evaluate(() => { SVC.switchView('contracts'); SVC.switchView('dash'); }); await page.waitForTimeout(150);
-    const b = await st(); assert(!b.on, '다른 메뉴 갔다 와도 남아 있음');
-    await page.evaluate(() => SVC.ask('이번 달 MRR?')); await page.waitForFunction(() => /mock/.test(document.getElementById('aiSay').textContent), null, { timeout: 8000 });
-    await page.click('#ansClose'); const c = await st(); assert(!c.on, '✕ 닫기로 안 닫힘');
+    const a = await st(); assert(a.on && a.panel, '답 ' + JSON.stringify(a));
+    await page.evaluate(() => { SVC.navMenu('contracts'); SVC.navMenu('dash'); }); await page.waitForTimeout(150);
+    const b = await st(); assert(b.on && /mock/.test(b.say), '다른 메뉴 갔다 오면 대화가 사라짐 ' + JSON.stringify(b));
+    await page.click('#aipClose'); const c = await st(); assert(c.on && !c.panel, '패널 닫기가 대화를 지움 ' + JSON.stringify(c));
     slow = 1500; await page.evaluate(() => SVC.ask('천천히')); await page.waitForTimeout(200);
-    await page.evaluate(() => { SVC.switchView('orders'); SVC.switchView('dash'); }); await page.waitForTimeout(100);
-    const d = await st(); assert(d.on && d.asking, '생각 중인데 닫힘 ' + JSON.stringify(d));
+    await page.evaluate(() => { SVC.navMenu('orders'); SVC.navMenu('dash'); SVC.aipClose(); }); await page.waitForTimeout(100);
+    const d = await st(); assert(d.on && d.asking && !d.panel, '생각 중인데 멈춤 ' + JSON.stringify(d));
     await page.waitForFunction(() => /늦은 답/.test(document.getElementById('aiSay').textContent), null, { timeout: 8000 });
-    await page.evaluate(() => SVC.ask('또 천천히')); await page.waitForTimeout(200); await page.click('#ansClose'); await page.waitForTimeout(100);
+    await page.evaluate(() => SVC.ask('또 천천히')); await page.waitForTimeout(200);
+    await page.click('#aipDel'); await page.waitForTimeout(100);   /* fbootWith 가 확인 창을 수락 */
     const e = await st(); await page.waitForTimeout(1600); const f = await st(); await ctx.close();
-    assert(!e.on && !e.asking && !f.on, '생각 중 ✕ ' + JSON.stringify({ e, f }));
-    assert(!errs.length, errs.join(' | ')); return '✕ · 메뉴 이동 · 생각 중 유지 · 멈춤';
+    assert(!e.on && !e.asking && !f.on && !/또 천천히|늦은 답/.test(f.say), '생각 중 삭제 ' + JSON.stringify({ e, f }));
+    assert(!errs.length, errs.join(' | ')); return '메뉴 이동 · 닫기 = 유지 · 삭제 = 멈춤';
   });
 }
 // ㊿+166~167: 새 디자인 «지니언스»(기본) — 정식 로고 · 상단 메뉴(묶음 + 펼침 메뉴 · ㊿+167) · 상단 화면 제목 · 홈(오늘 처리할 일 3칸 → 사업 현황) · 타원 목표 트랙 · 새 로그인 화면 · 2단계 인증 창
@@ -1871,22 +1885,25 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
     assert(d1 && d2 && d3 && bd.eq === bd.pend && bd.home === 0, JSON.stringify({ d1, d2, d3, bd }));   /* ㊿+171 홈 탭 배지 없음 — 같은 일을 홈 목록과 메뉴 배지에 두 번 강조하지 않음 */
     assert(!errs.length, errs.join(' | ')); return 'OI 로 이동 · 배지 장비 ' + bd.eq + ' · 홈 ' + bd.home;
   });
-  await S.t('㊿+171 홈: AI 질문(제목 · 입력칸 · 추천 4) → 핵심 현황 3칸 → 지금 챙길 일(3줄 이하) → 사업 분석 · 전체 할 일 · 최근 작업 / 그래프 · 목표 ARR · 타일은 «사업 분석» 안(목표 ARR 타원 트랙)', async () => {
-    await page.evaluate(() => SVC.navMenu('dash')); await page.waitForTimeout(300);
-    const r = await page.evaluate(() => { const R = (s) => document.querySelector(s).getBoundingClientRect(); const a = R('#viewDash .ask'), g = R('#gnSum'), ib = R('#ccInbox'), l = R('#gnLinks');
-      const hid = ['#ccHeroHost', '#kpis', '#ccMore', '#ccAnalysis'].map((s) => getComputedStyle(document.querySelector(s)).display).join(',');
-      return { order: a.bottom <= g.top && g.bottom <= ib.top && ib.bottom <= l.top, hid, cells: document.querySelectorAll('#gnSum .gs-c').length, rows: document.querySelectorAll('#ccInbox .hm-row').length, cnt: +document.querySelector('#ccInbox .ib-head .ctag').dataset.n, all: SVC.HOME.rows.length,
+  await S.t('㊿+172 홈 한 화면: 검색 · AI 질문(한 줄 · 추천 4) → 핵심 현황 3칸 → 바로가기 → 매출 추이 | 우선 업무 → 최근 / «사업 현황 상세 · 분석 펼치기» = 같은 화면 아래로(검색 · 핵심 현황 그대로) · 다른 메뉴 갔다 와도 펼침 유지 · 목표 ARR 타원 트랙', async () => {
+    await page.evaluate(() => { SVC.navMenu('dash'); SVC.homeDetail(false); scrollTo(0, 0); }); await page.waitForTimeout(300);
+    const r = await page.evaluate(() => { const R = (s) => document.querySelector(s).getBoundingClientRect(); const a = R('#viewDash .ask'), g = R('#gnSum'), q = R('#gnQuick'), t = R('#gnTrend'), ib = R('#ccInbox'), rc = R('#gnRecent');
+      const hid = ['#ccHeroHost', '#kpis', '#ccMore', '#ccAnalysis', '#gnBizH'].map((s) => getComputedStyle(document.querySelector(s)).display).join(',');
+      return { order: a.bottom <= g.top && g.bottom <= q.top && q.bottom <= t.top && Math.abs(t.top - ib.top) < 2 && ib.right < t.left && Math.max(t.bottom, ib.bottom) <= rc.top + 1, askH: Math.round(a.height), hid, cells: document.querySelectorAll('#gnSum .gs-c').length,
         h: document.getElementById('askH').textContent, ph: document.querySelector('#cmdBar .ph').textContent, q: document.getElementById('q').placeholder, chips: [...document.querySelectorAll('#chips .chip')].map((c) => c.textContent).join('|'), h2: document.querySelector('#ccInbox .ib-head h2').textContent }; });
-    assert(r.order && /^none,none,none,none$/.test(r.hid) && r.cells === 3 && r.rows <= 3 && r.rows >= 1 && r.cnt === r.all && /지금 챙길 일/.test(r.h2) && r.h === '오늘 어떤 업무를 도와드릴까요?' && r.ph === '검색' && /^고객사 찾기, 매출 분석, 처리할 일을 물어보세요/.test(r.q) && r.chips === '이번 달 매출 변화|재약정 대응할 고객|내가 처리할 일|고객사 현황 찾기', JSON.stringify(r));
-    await page.click('#gnLinks [data-hm="biz"]'); await page.waitForTimeout(500);
+    assert(r.order && r.askH <= 140 && /^none,none,none,none,none$/.test(r.hid) && r.cells === 3 && /우선 업무/.test(r.h2) && r.h === '검색 · AI 질문' && r.ph === '검색' && /문장으로 쓰면 AI 에 질문/.test(r.q) && r.chips === '이번 달 매출 변화|재약정 대응할 고객|내가 처리할 일|고객사 현황 찾기', JSON.stringify(r));
+    const sum0 = await page.evaluate(() => document.getElementById('gnSum').textContent);
+    await page.click('#gnDetailBtn'); await page.waitForTimeout(500);
     const b = await page.evaluate(() => { const R = (s) => document.querySelector(s).getBoundingClientRect(); const h = R('#ccHeroHost .kpi'), k = R('#kpis'); const t = document.querySelector('#ccHeroHost #goalBar .gn-trk .t1'); const bg = getComputedStyle(document.querySelector('#ccHeroHost .kpi')).backgroundImage;
-      return { mode: SVC.HOME.mode, ask: getComputedStyle(document.querySelector('#viewDash .ask')).display, sum: getComputedStyle(document.getElementById('gnSum')).display, side: Math.abs(h.top - k.top) < 2 && h.right < k.left, title: document.querySelector('#gnModeH h2').textContent,
-        light: (() => { const m = getComputedStyle(document.querySelector('#ccHeroHost .kpi')).backgroundColor.match(/\d+/g).map(Number); return !/gradient/.test(bg) && m[0] > 200 && m[1] > 200 && m[2] > 200; })(), dash: t && t.getAttribute('stroke-dasharray'), txt: (document.querySelector('#goalBar .gn-gtx') || {}).textContent || '' }; });
-    assert(b.mode === 'biz' && b.ask === 'none' && b.sum === 'none' && b.side && b.title === '사업 분석' && b.light && /^\d+(\.\d)? 100$/.test(b.dash || '') && /목표 ARR/.test(b.txt) && /현재 ARR/.test(b.txt) && /필요 12월 MRR/.test(b.txt), JSON.stringify(b));
-    await page.evaluate(() => SVC.goBack()); await page.waitForTimeout(400);
-    const back = await page.evaluate(() => ({ mode: SVC.HOME.mode, v: SVC.ST.CUR_VIEW, ask: getComputedStyle(document.querySelector('#viewDash .ask')).display }));
-    assert(back.mode === '' && back.v === 'dash' && back.ask !== 'none', '뒤로 → AI 홈 ' + JSON.stringify(back));
-    return r.rows + '줄 / 전체 ' + r.all;
+      return { ask: getComputedStyle(document.querySelector('#viewDash .ask')).display, sum: getComputedStyle(document.getElementById('gnSum')).display, below: R('#gnBizH').top >= R('#gnRecent').bottom - 1, side: Math.abs(h.top - k.top) < 2 && h.right < k.left, title: document.querySelector('#gnBizH h2').textContent, exp: document.getElementById('gnDetailBtn').getAttribute('aria-expanded'),
+        light: (() => { const m = getComputedStyle(document.querySelector('#ccHeroHost .kpi')).backgroundColor.match(/\d+/g).map(Number); return !/gradient/.test(bg) && m[0] > 200 && m[1] > 200 && m[2] > 200; })(), dash: t && t.getAttribute('stroke-dasharray'), txt: (document.querySelector('#goalBar .gn-gtx') || {}).textContent || '', sumT: document.getElementById('gnSum').textContent }; });
+    assert(b.ask !== 'none' && b.sum !== 'none' && b.below && b.side && /사업 현황 상세/.test(b.title) && b.exp === 'true' && b.light && /^\d+(\.\d)? 100$/.test(b.dash || '') && /목표 ARR/.test(b.txt) && /현재 ARR/.test(b.txt) && /필요 12월 MRR/.test(b.txt) && b.sumT === sum0, JSON.stringify(b));
+    await page.evaluate(() => SVC.navMenu('contracts')); await page.waitForTimeout(250); await page.evaluate(() => SVC.navMenu('dash')); await page.waitForTimeout(400);
+    const back = await page.evaluate(() => ({ v: SVC.ST.CUR_VIEW, det: document.getElementById('viewDash').classList.contains('hm-detail'), ask: getComputedStyle(document.querySelector('#viewDash .ask')).display }));
+    await page.click('#gnDetailBtn'); await page.waitForTimeout(200);
+    const shut = await page.evaluate(() => !document.getElementById('viewDash').classList.contains('hm-detail'));
+    assert(back.v === 'dash' && back.det && back.ask !== 'none' && shut, '돌아와도 펼침 ' + JSON.stringify(back));
+    return '질문칸 ' + r.askH + 'px · 펼침 유지';
   });
   await S.t('㊿+166 «커맨드 센터»로 바꾸면 예전 아이콘 레일(제자리 · 왼쪽) · 지니언스 표시 없음 · 인박스는 한 줄 목록 · 다시 기본으로', async () => {
     await page.evaluate(() => { localStorage.setItem('svc_look', 'cc'); SVC.applyLook(); SVC.buildRail(); SVC.renderInbox(); });
@@ -2037,7 +2054,7 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
     assert(h2.includes('자동연장') && h2.includes('해지사유') && !h2.includes('계산서발행처') && !h3.includes('과금방식') && h3.includes('계산서발행처') && h4.length === 10 && !h5.includes('과금방식') && h6.length === 27 && saved === '전체', JSON.stringify({ h2, h3, h5: h5.length, h6: h6.length, saved }));
     return '운영 10열 · 전체 27열';
   });
-  await S.t('㊿+169 목록 상태 유지: 검색·정렬·스크롤 → 다른 화면 → «뒤로» 오면 그대로 · 메뉴로 다시 들어오면 처음부터', async () => {
+  await S.t('㊿+169 목록 상태 유지: 검색·정렬·스크롤 → 다른 화면 → «뒤로» 오면 그대로 · 메뉴로 다시 들어와도(㊿+172) 그대로 · «초기화»만 처음부터', async () => {
     await page.setViewportSize({ width: 1440, height: 600 });
     await page.evaluate(() => { SVC.wvSet('contracts', '운영'); SVC.navMenu('contracts'); }); await page.waitForTimeout(250);
     await page.fill('#dvSearch', '가상'); await page.waitForTimeout(150);
@@ -2047,33 +2064,37 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
     await page.evaluate(() => SVC.switchView('oi')); await page.waitForTimeout(250);
     await page.goBack(); await page.waitForTimeout(500);
     const back = await page.evaluate(() => ({ v: SVC.ST.CUR_VIEW, q: document.getElementById('dvSearch').value, k: SVC.DV.sortK, y: Math.round(window.scrollY), first: document.querySelector('#dvTable tbody tr td').textContent }));
-    await page.evaluate(() => { SVC.navMenu('oi'); SVC.navMenu('contracts'); }); await page.waitForTimeout(200);
-    const fresh = await page.evaluate(() => ({ q: document.getElementById('dvSearch').value, k: SVC.DV.sortK }));
+    await page.evaluate(() => { SVC.navMenu('oi'); SVC.navMenu('contracts'); }); await page.waitForTimeout(400);
+    const menu = await page.evaluate(() => ({ q: document.getElementById('dvSearch').value, k: SVC.DV.sortK, y: Math.round(window.scrollY) }));
+    await page.click('#btnViewReset'); await page.waitForTimeout(250);
+    const fresh = await page.evaluate(() => ({ q: document.getElementById('dvSearch').value, k: SVC.DV.sortK, y: Math.round(window.scrollY) }));
     await page.setViewportSize({ width: 1440, height: 1000 });
-    assert(before.q === '가상' && before.k === 'mrr' && back.v === 'contracts' && back.q === '가상' && back.k === 'mrr' && Math.abs(back.y - before.y) < 30 && back.first === before.first && fresh.q === '' && fresh.k === null, JSON.stringify({ before, back, fresh }));
-    return '뒤로 = 그대로 · 메뉴 = 처음';
+    assert(before.q === '가상' && before.k === 'mrr' && back.v === 'contracts' && back.q === '가상' && back.k === 'mrr' && Math.abs(back.y - before.y) < 30 && back.first === before.first && menu.q === '가상' && menu.k === 'mrr' && Math.abs(menu.y - before.y) < 30 && fresh.q === '' && fresh.k === null && fresh.y === 0, JSON.stringify({ before, back, menu, fresh }));
+    return '뒤로 · 메뉴 = 그대로 · 초기화 = 처음';
   });
-  await S.t('㊿+169→171 홈: 핵심 현황 3칸(매출 · LIVE · 재약정 대응) · «지금 챙길 일 n가지»(대상 합계 없음) · 줄 = 업무 · 대상 · 기한 · 담당 · 버튼 1개 · 펼치면 대상/담당/기한/영향 · 전체 할 일 → 걸러진 목록(같은 건수)', async () => {
-    await page.evaluate(() => SVC.navMenu('dash')); await page.waitForTimeout(400);
+  await S.t('㊿+169→172 홈: 핵심 현황 3칸(매출 · LIVE · 재약정 대응 — 같은 재약정 기준) · «업무 n가지»(대상 합계 없음 · 단위는 줄마다) · 줄 = 업무 · 대상 수 · 기한 · 담당 · 버튼 1개 · 펼치면 대상/담당/기한/영향 · «전체 n가지 펼치기»는 같은 자리 · 버튼 → 걸러진 목록(같은 건수)', async () => {
+    await page.evaluate(() => { SVC.navMenu('dash'); SVC.HOME.allOpen = false; SVC.renderInbox(); }); await page.waitForTimeout(400);
     const r = await page.evaluate(() => { const cells = [...document.querySelectorAll('#gnSum .gs-c')].map((c) => c.dataset.k + ':' + c.querySelector('.gs-v b').textContent);
-      const RN = SVC.renewNeedScan(SVC.idxs()); const head = document.querySelector('#ccInbox .ib-head .ctag').textContent; const rows = [...document.querySelectorAll('#ccInbox .hm-row')];
+      const all = SVC.ST.DATA.rows.map((_, i) => i), RN = SVC.renewNeedScan(all, SVC.homeB()); const head = document.querySelector('#ccInbox .ib-head .ctag').textContent; const rows = [...document.querySelectorAll('#ccInbox .hm-row')];
       const shape = rows.every((x) => x.querySelector('.hm-nm') && x.querySelector('.hm-n') && x.querySelector('.hm-due') && x.querySelector('.hm-own') && x.querySelectorAll('.hm-act .cbtn').length <= 1 && x.querySelector('.hm-d').hidden);
       const btns = [...document.querySelectorAll('#ccInbox .cbtn.pri')].map((b) => b.textContent);
-      const top = document.getElementById('gnSum').getBoundingClientRect().bottom <= document.getElementById('ccInbox').getBoundingClientRect().top;
-      return { cells, rn: RN.rows.length, head, n: rows.length, all: SVC.HOME.rows.length, shape, btns, top }; });
-    assert(r.cells.length === 3 && r.cells[2] === 'rnw:' + r.rn && r.head === r.all + '가지' && !/대상 \d+건/.test(r.head) && r.n <= 3 && r.shape && r.top && !r.btns.some((b) => /처리하기|대시보드 →|OI 현황 →|^재계약 타진$/.test(b)), JSON.stringify(r));
+      const rnwRow = rows.some((x) => /재약정/.test(x.querySelector('.hm-nm').textContent));
+      return { cells, rn: RN.rows.length, head, n: rows.length, all: SVC.HOME.rows.length, shape, btns, rnwRow, more: (document.querySelector('#hmAll') || {}).textContent || '' }; });
+    assert(r.cells.length === 3 && r.cells[2] === 'rnw:' + r.rn && r.head === '업무 ' + r.all + '가지' && !/대상 \d+건/.test(r.head) && r.n >= Math.min(3, r.all) && r.n <= 5 && r.shape && !r.btns.some((b) => /처리하기|대시보드 →|OI 현황 →|^재계약 타진$/.test(b)) && (r.n === r.all || /전체 \d+가지 펼치기/.test(r.more)), JSON.stringify(r));
     await page.click('#ccInbox .hm-row .hm-nm'); await page.waitForTimeout(100);
     const meta = await page.evaluate(() => { const d = document.querySelector('#ccInbox .hm-row .hm-d'); return { open: !d.hidden, exp: document.querySelector('#ccInbox .hm-row .hm-nm').getAttribute('aria-expanded'), dt: [...d.querySelectorAll('dt')].map((x) => x.textContent).join('') }; });
     assert(meta.open && meta.exp === 'true' && meta.dt === '대상담당기한영향', '펼침 ' + JSON.stringify(meta));
     const oiN = await page.evaluate(() => { const t = SVC.todayStr(); return SVC.ST.RAWX.oi.filter((o) => o.next_date && String(o.next_date).slice(0, 10) < t && SVC.oiOpen(o)).length; });
-    await page.click('#gnLinks [data-hm="todo"]'); await page.waitForTimeout(300);
-    const todo = await page.evaluate(() => ({ rows: document.querySelectorAll('#ccInbox .hm-row').length, grp: [...document.querySelectorAll('#ccInbox .hm-grp')].map((g) => g.textContent).join('|'), all: SVC.HOME.rows.length }));
-    assert(todo.rows === todo.all && /즉시 처리|확인 필요|예정/.test(todo.grp), '전체 할 일 ' + JSON.stringify(todo));
+    const sum0 = await page.evaluate(() => Math.round(document.getElementById('gnSum').getBoundingClientRect().top + scrollY));   /* 문서 기준(클릭하며 스크롤돼도 배치 비교) */
+    if (r.n < r.all) { await page.click('#hmAll'); await page.waitForTimeout(300); }
+    const todo = await page.evaluate(() => ({ rows: document.querySelectorAll('#ccInbox .hm-row').length, all: SVC.HOME.rows.length, ask: getComputedStyle(document.querySelector('#viewDash .ask')).display, sumTop: Math.round(document.getElementById('gnSum').getBoundingClientRect().top + scrollY) }));
+    assert(todo.rows === todo.all && todo.ask !== 'none' && todo.sumTop === sum0, '전체 업무 펼침 ' + JSON.stringify(todo));
     await page.click('#ccInbox .cbtn:has-text("일정 지난 OI")'); await page.waitForTimeout(400);
     /* ㊿+170 OI 는 «빠른 보기 › 기한 초과» 칩이 눌린 채로 열림(같은 기준 oiOpen) — 칩을 다시 누르면 해제 */
     const g = await page.evaluate(() => ({ v: SVC.ST.CUR_VIEW, pre: (document.querySelector('#dvQvBar [aria-pressed="true"]') || {}).textContent || document.getElementById('dvPreBar').textContent, rows: document.querySelectorAll('#dvTable tbody tr:not(.dg-empty)').length }));
     await page.click('#dvQvBar [aria-pressed="true"]'); await page.waitForTimeout(150); const all = await page.evaluate(() => document.querySelectorAll('#dvTable tbody tr').length);
     assert(g.v === 'oi' && /기한 초과/.test(g.pre) && g.rows === oiN && all > oiN, JSON.stringify({ g, oiN, all }));
+    await page.evaluate(() => { SVC.HOME.allOpen = false; });
     return r.head + ' · 홈 ' + r.n + '줄';
   });
   await S.t('㊿+169 장비: 타일 이름에 범위(현황·대 / 신청·건) · «회수 완료 n대 / 대상 n대» · 타일 = 보드 같은 건수 · 빈 열 안 접힘 · 시리얼 칩 = 상세(바뀌지 않음) · 미등록 시리얼 표시 · 회수 처리 미리 보기(부분/전체/없음) → 저장 → 되돌리기', async () => {
@@ -2102,11 +2123,12 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
   });
   await S.t('㊿+169 공통: 글자 아이콘 → 같은 선 아이콘(도구 버튼) · 위젯은 홈에서만 · 계정 진입점 하나(오른쪽 위) · 정산·도구 묶음 정리(정산·목표 5 / 도구 5~6 — Cloud 사이트 관리는 슈퍼 관리자만) + 자주 쓰는 화면 · LIVE «제품별 합» 설명 · 장비 채널 막대 단위 «대»', async () => {
     await page.evaluate(() => SVC.navMenu('dash')); await page.waitForTimeout(250);
-    /* ㊿+171 위젯은 홈 «사업 분석»에서만(그래프 · 표가 거기 있음) */
+    /* ㊿+172 위젯은 홈 «사업 현황 상세 · 분석»을 펼쳤을 때만(그래프 · 표가 거기 있음) */
+    await page.evaluate(() => SVC.homeDetail(false)); await page.waitForTimeout(100);
     const w0 = await page.evaluate(() => getComputedStyle(document.getElementById('btnWidgets')).display === 'none');
-    await page.evaluate(() => SVC.homeModeSet('biz')); await page.waitForTimeout(200);
+    await page.evaluate(() => SVC.homeDetail(true)); await page.waitForTimeout(200);
     const w1 = w0 && await page.evaluate(() => getComputedStyle(document.getElementById('btnWidgets')).display !== 'none');
-    await page.evaluate(() => SVC.homeModeSet('')); await page.waitForTimeout(100);
+    await page.evaluate(() => SVC.homeDetail(false)); await page.waitForTimeout(100);
     await page.evaluate(() => SVC.navMenu('contracts')); await page.waitForTimeout(200);
     const r = await page.evaluate(() => ({ w2: getComputedStyle(document.getElementById('btnWidgets')).display, auth: getComputedStyle(document.getElementById('btnAuth')).display,
       tools: ['dvReload', 'dvCsv', 'dvDense', 'dvCols', 'btnEdit', 'btnReload', 'btnTheme'].map((id) => { const b = document.getElementById(id); return id + ':' + (b.querySelector('svg') ? 'svg' : '-') + ':' + (/[\u{1F300}-\u{1FAFF}☀-➿⊞↻⬇☰]/u.test(b.textContent) ? 'emoji' : 'ok'); }).join(' ') }));
@@ -2193,12 +2215,13 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
     gets.length = 0; await page.click('#inbReloadP'); await page.waitForTimeout(500); const ci = await chips();
     const btns = await page.evaluate(() => [...document.querySelectorAll('#inbHost button')].map((b) => b.textContent.trim()).join('|'));
     assert(ci.first === 1 && ci.idle === 1 && ci.open === 2 && gets.length >= 1 && /다시 조회/.test(btns) && /시트에서 가져와 반영/.test(btns), JSON.stringify({ ci, gets: gets.length, btns }));
-    await page.evaluate(() => { SVC.ST.INB_TODO = { t: Date.now(), n: 1 }; SVC.navMenu('dash'); }); await page.waitForTimeout(300);
+    await page.evaluate(() => { SVC.ST.INB_TODO = { t: Date.now(), n: 1 }; SVC.HOME.scope = 'team'; SVC.HOME.allOpen = true; SVC.navMenu('dash'); }); await page.waitForTimeout(300);   /* ㊿+172 팀 전체 · 전체 펼침에서 */
     const ib = await page.evaluate(() => [...document.querySelectorAll('#ccInbox .cbtn.pri')].map((b) => b.textContent).find((x) => /미대응/.test(x)) || '');
     await page.evaluate(() => { const b = [...document.querySelectorAll('#ccInbox .cbtn.pri')].find((x) => /미대응/.test(x.textContent)); if (b) b.click(); }); await page.waitForTimeout(400);
     const iv = await page.evaluate(() => ({ v: SVC.ST.CUR_VIEW, on: (document.querySelector('#dvQvBar [aria-pressed="true"]') || {}).dataset, rows: document.querySelectorAll('#dvTable tbody tr:not(.dg-empty)').length }));
+    await page.evaluate(() => { SVC.HOME.allOpen = false; SVC.HOME.scope = ''; });
     assert(/미대응 1건 보기/.test(ib) && iv.v === 'inbound' && iv.on && iv.on.qv === 'idle' && iv.rows === 1, JSON.stringify({ ib, iv }));
-    dialogs.length = 0; await page.evaluate(() => { SVC.wvSet('oi', '전체'); SVC.navMenu('oi'); }); await page.waitForTimeout(250);
+    dialogs.length = 0; await page.evaluate(() => { SVC.wvSet('oi', '전체'); SVC.viewResetHard('oi'); }); await page.waitForTimeout(250);   /* ㊿+172 메뉴 재진입은 보던 조건 그대로 — 처음 목록은 «초기화» */
     await page.click('#dvTable tbody tr:has-text("가상고객06") button[data-act="toContract"]'); await page.waitForTimeout(150);
     assert(dialogs.length === 1 && /같은 고객사의 유효 계약 \d+건/.test(dialogs[0]), '전환 확인 ' + dialogs[0]);
     return JSON.stringify(ci);
@@ -2231,159 +2254,204 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
   });
   await ctxM.close();
 }
-// ㊿+171 AI 중심 홈 · 검색·질문 하나로: 첫 화면(스크롤 없이 질문 칸) · 정확히 같은 것 먼저 · 추천 질문 = 포탈 계산(화면과 같은 숫자) · 이어서 묻기 · 다른 화면 문맥 · 실패 상태 · 업무 기준(회수 · OI · 데이터 점검 · 배지) · 폰 순서
+// ㊿+172 홈 · 검색 · AI 대화 · 메뉴 이동 사용성 — 실제 업무 흐름으로: 질문 없이 현황 파악 · 고객명 일부 → Enter · AI 답 → 근거 → 돌아오기 · OI 조건 유지 · 분석 필터가 홈을 안 바꿈 · 긴 답이 홈을 안 밀어냄 · 패널 닫기/새 대화/삭제 · 고객 문맥 · 내 업무/담당자 연결 · 실제 조건 전달 · 폰
 {
   const { FIX } = await import('./lib.mjs');
   const now = new Date(), dAgo = (n) => new Date(now.getTime() - n * 864e5).toISOString().slice(0, 10);
   const F = JSON.parse(JSON.stringify(FIX));
   F.orders = F.orders.map((o) => (o.id === 301 ? Object.assign({}, o, { returned_serials: 'TST0000002' }) : o));   /* 일부 회수 중 1건 */
   F.oi.push({ id: 9921, customer: '검증_OI4', stage: '진행', win_prob: 40, owner: '담당자A', deal_name: '검증 일정 지남', expect_amount: 20000000, next_date: dAgo(3), next_action: '회신', created_at: dAgo(20), updated_at: dAgo(20) });
-  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page);
-  const asks = []; let failAsk = 0;
+  const mk = (w, h, mobile) => browser.newContext({ viewport: { width: w, height: h }, serviceWorkers: 'block', isMobile: !!mobile, hasTouch: !!mobile });
+  const ctx = await mk(1440, 900); const page = await ctx.newPage(); const c = collect(page);
+  const asks = []; let failAsk = 0, longAns = 0, ownerMap = null;
+  const LONG = Array.from({ length: 60 }, (_, i) => (i + 1) + '. 긴 답변 줄 — 홈 배치가 밀리지 않아야 합니다.').join('\n');
   await mockBackend(page, { extra: async (route, u, m) => {
     if (u.includes('/rpc/load_all')) { await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(Object.assign({}, F, { roles: [{ role: 'super_admin' }] })) }); return true; }
+    if (/user_owner_map/.test(u) && m === 'GET') { const rows = ownerMap ? [{ owner_names: ownerMap }] : []; await route.fulfill({ status: 200, contentType: 'application/json', headers: { 'content-range': '0-' + Math.max(0, rows.length - 1) + '/' + rows.length, 'Access-Control-Expose-Headers': 'content-range' }, body: JSON.stringify(rows) }); return true; }
     if (u.includes('/functions/v1/ask') && m === 'POST') { let b = {}; try { b = JSON.parse(route.request().postData() || '{}'); } catch (e) { /* */ }
-      if (b.mode === 'chat') { asks.push(b); if (failAsk) { failAsk--; await route.fulfill({ status: 500, contentType: 'application/json', body: '{"error":"테스트 실패"}' }); return true; } } }
+      if (b.mode === 'chat') { asks.push(b); if (failAsk) { failAsk--; await route.fulfill({ status: 500, contentType: 'application/json', body: '{"error":"테스트 실패"}' }); return true; }
+        if (longAns) { await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, text: 'mock ' + LONG, queries: [] }) }); return true; } } }
     return false; } });
   await page.goto(url + '/index.html'); await page.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA, null, { timeout: 15000 }); await page.waitForTimeout(900);
-  await S.t('㊿+171 첫 화면: 1440×900 · 1366×768 에서 질문 칸 · 추천 질문 4개가 스크롤 없이 보임 · 홈 숫자 카드는 핵심 현황 3칸 한 번 · «계약 입력·수정»은 계약 화면에서만 · 위젯은 사업 분석에서만', async () => {
-    const out = [];
-    for (const [w, h] of [[1440, 900], [1366, 768]]) {
-      await page.setViewportSize({ width: w, height: h }); await page.evaluate(() => { SVC.navMenu('dash'); window.scrollTo(0, 0); }); await page.waitForTimeout(300);
-      const r = await page.evaluate(() => { const q = document.getElementById('q').getBoundingClientRect(), ch = document.getElementById('chips').getBoundingClientRect();
-        const vis = (el) => !!el && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
-        return { q: Math.round(q.bottom), chips: Math.round(ch.bottom), h: innerHeight, sy: scrollY, kpiVis: [...document.querySelectorAll('#viewDash .kpi')].filter(vis).length, sum: document.querySelectorAll('#gnSum .gs-c').length,
-          edit: getComputedStyle(document.getElementById('btnEdit')).display, wid: getComputedStyle(document.getElementById('btnWidgets')).display }; });
-      assert(r.q < r.h && r.chips <= r.h && r.sy === 0 && r.kpiVis === 0 && r.sum === 3 && r.edit === 'none' && r.wid === 'none', w + 'x' + h + ' ' + JSON.stringify(r)); out.push(w + ':' + r.chips + '/' + r.h);
-    }
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await page.evaluate(() => SVC.navMenu('contracts')); await page.waitForTimeout(250);
-    const e2 = await page.evaluate(() => getComputedStyle(document.getElementById('btnEdit')).display);
-    assert(e2 !== 'none', '계약 화면에 «계약 입력·수정» 없음');
-    return out.join(' · ');
+  const R = (s) => page.evaluate((s) => { const e = document.querySelector(s); if (!e) return null; const r = e.getBoundingClientRect(); return { t: Math.round(r.top + scrollY), l: Math.round(r.left), w: Math.round(r.width), b: Math.round(r.bottom) }; }, s);
+  await S.t('㊿+172 홈 진입 직후(질문 없이): 핵심 현황 3칸 · 매출 추이 그래프 · 우선 업무(기한 · 담당) · 바로가기 · 최근이 한 화면 · 검색은 오른쪽 위 · AI 호출 없음', async () => {
+    const r = await page.evaluate(() => { const vis = (s) => { const e = document.querySelector(s); return !!e && e.getClientRects().length > 0 && getComputedStyle(e).display !== 'none'; };
+      const row = document.querySelector('#ccInbox .hm-row'), t = document.getElementById('gnTrend').getBoundingClientRect(), ib = document.getElementById('ccInbox').getBoundingClientRect();
+      return { sum: [...document.querySelectorAll('#gnSum .gs-c')].map((c) => c.dataset.k).join(','), svg: !!document.querySelector('#gnTrendC svg'), trendTop: Math.round(t.top), inbTop: Math.round(ib.top), h: innerHeight,
+        row: row ? row.querySelector('.hm-nm').textContent + '|' + row.querySelector('.hm-due').textContent + '|' + row.querySelector('.hm-own').textContent : '', quick: [...document.querySelectorAll('#gnQuick button')].map((b) => b.textContent).join(','),
+        recent: vis('#gnRecent'), detail: vis('#ccHeroHost'), cmdInRail: !!document.querySelector('#rail .gn-right #cmdBar'), sumLab: document.querySelector('#gnSum [data-k="mrr"] .gs-l').textContent }; });
+    assert(r.sum === 'mrr,live,rnw' && r.svg && r.trendTop < r.h && r.inbTop < r.h && /\|/.test(r.row) && /계약/.test(r.quick) && /고객 검색/.test(r.quick) && /OI/.test(r.quick) && /장비/.test(r.quick) && /견적/.test(r.quick) && /주간회의/.test(r.quick) && r.recent && !r.detail && r.cmdInRail && /이번 달\(\d{4}-\d\d\) 매출/.test(r.sumLab) && asks.length === 0, JSON.stringify(r));
+    return r.row;
   });
-  await S.t('㊿+171 검색: 정확히 같은 고객사 · 시리얼 · 화면이 맨 위(Enter = 그것) · 고객 360 에 있는 계약 줄은 빼고 · 맨 끝 «질문» · 빠르게 치고 Enter 해도 지금 글자로', async () => {
-    await page.evaluate(() => SVC.navMenu('dash')); await page.waitForTimeout(250);
-    await page.click('#q'); await page.keyboard.type('가상고객03'); await page.waitForTimeout(250);
-    const l1 = await page.evaluate(() => { const its = [...document.querySelectorAll('#sug .sr-it')]; return { n: its.length, first: its[0] && its[0].className + ':' + its[0].querySelector('.nm').textContent, sel: its[0] && its[0].getAttribute('aria-selected'), last: its.length && its[its.length - 1].className, ct: its.filter((x) => /^계약$/.test(x.querySelector('.tp').textContent) && /가상고객03$/.test(x.querySelector('.nm').textContent)).length, exp: document.getElementById('q').getAttribute('aria-expanded') }; });
-    assert(/k-c360 ex/.test(l1.first) && /가상고객03/.test(l1.first) && l1.sel === 'true' && /k-ask/.test(l1.last) && l1.ct === 0 && l1.exp === 'true', JSON.stringify(l1));
-    await page.keyboard.press('Enter'); await page.waitForTimeout(400);
+  await S.t('㊿+172 고객명 일부 → Enter = 고른 검색 결과(고객 360) · 지금 Enter 가 할 일 표시 · 돌아와서 검색어 · 고른 줄 그대로 · 문장은 AI 질문이 먼저 · Ctrl+Enter = AI · «검색으로 바꾸기»', async () => {
+    await page.click('#q'); await page.waitForTimeout(150);
+    const empty = await page.evaluate(() => [...document.querySelectorAll('#sug .sr-g')].map((g) => g.textContent).join('|'));
+    await page.keyboard.type('가상고객0'); await page.waitForTimeout(250);
+    const a = await page.evaluate(() => ({ sel: (document.querySelector('#sug [aria-selected="true"]') || {}).className || '', nm: ((document.querySelector('#sug [aria-selected="true"] .nm') || {}).textContent) || '', foot: (document.querySelector('#sug .sr-foot') || {}).textContent || '', last: ([...document.querySelectorAll('#sug .sr-it')].pop() || {}).className || '' }));
+    assert(/자주 쓰는 화면/.test(empty) && /k-c360/.test(a.sel) && !/k-ask/.test(a.sel) && /Enter 고객 360 «가상고객/.test(a.foot) && /Ctrl\+Enter AI 에 질문/.test(a.foot) && /k-ask/.test(a.last), JSON.stringify({ empty, a }));
+    await page.keyboard.press('ArrowDown'); await page.keyboard.press('Enter'); await page.waitForTimeout(300);
     const c360 = await page.evaluate(() => ({ on: document.getElementById('ovlC360').classList.contains('on'), t: document.getElementById('c360Title').textContent }));
-    assert(c360.on && /가상고객03/.test(c360.t), '고객 360 ' + JSON.stringify(c360));
-    await page.keyboard.press('Escape'); await page.waitForTimeout(200);
-    await page.fill('#q', 'TST0000005'); await page.waitForTimeout(250); await page.keyboard.press('Enter'); await page.waitForTimeout(400);
-    const sn = await page.evaluate(() => ({ v: SVC.ST.CUR_VIEW, q: document.getElementById('dvSearch').value }));
-    assert(sn.v === 'assets' && sn.q === 'TST0000005', '시리얼 ' + JSON.stringify(sn));
-    await page.evaluate(() => SVC.navMenu('dash')); await page.waitForTimeout(250);
-    await page.fill('#q', 'OI 현황'); await page.waitForTimeout(250); await page.keyboard.press('Enter'); await page.waitForTimeout(300);
-    const mv = await page.evaluate(() => SVC.ST.CUR_VIEW); assert(mv === 'oi', '화면 이동 ' + mv);
-    await page.evaluate(() => SVC.navMenu('dash')); await page.waitForTimeout(250);
-    await page.fill('#q', '가상'); await page.waitForTimeout(250); await page.fill('#q', '이번 분기 실적 알려줘'); await page.keyboard.press('Enter'); await page.waitForTimeout(900);
-    const qa = await page.evaluate(() => ({ on: document.getElementById('answer').classList.contains('on'), q: document.getElementById('ansQ').textContent }));
-    assert(qa.on && /이번 분기 실적/.test(qa.q), '빠른 Enter ' + JSON.stringify(qa));
-    await page.evaluate(() => SVC.closeAnswer('', true));
-    assert(!c.errs.length, c.errs.join(' | ')); return l1.n + '개 · 고객 360 · 시리얼 · 화면 · 질문';
+    assert(c360.on && /가상고객02/.test(c360.t), '고객 360 ' + JSON.stringify(c360));
+    await page.keyboard.press('Escape'); await page.waitForTimeout(200); await page.click('#q'); await page.waitForTimeout(250);
+    const kept = await page.evaluate(() => ({ v: document.getElementById('q').value, nm: ((document.querySelector('#sug [aria-selected="true"] .nm') || {}).textContent) || '' }));
+    assert(kept.v === '가상고객0' && kept.nm === '가상고객02', '돌아와서 ' + JSON.stringify(kept));
+    await page.fill('#q', 'LIVE 고객 몇 곳이야?'); await page.waitForTimeout(250);
+    const qsel = await page.evaluate(() => (document.querySelector('#sug [aria-selected="true"]') || {}).className || '');
+    assert(/k-ask/.test(qsel), '문장 → AI 질문 먼저 ' + qsel);
+    asks.length = 0; await page.fill('#q', '가상고객0'); await page.waitForTimeout(200); await page.keyboard.press('Control+Enter'); await page.waitForTimeout(700);
+    const ai = await page.evaluate(() => ({ panel: !document.getElementById('aiPanel').hidden, q: document.getElementById('ansQ').textContent, inp: document.getElementById('q').value }));
+    assert(ai.panel && /가상고객0/.test(ai.q) && ai.inp === '' && asks.length === 1, 'Ctrl+Enter ' + JSON.stringify(ai));
+    await page.click('#ansToSearch'); await page.waitForTimeout(250);
+    const back = await page.evaluate(() => ({ v: document.getElementById('q').value, list: !document.getElementById('sug').hidden }));
+    assert(back.v === '가상고객0' && back.list, '검색으로 바꾸기 ' + JSON.stringify(back));
+    await page.keyboard.press('Escape'); await page.fill('#q', ''); await page.evaluate(() => { SVC.closeAnswer('', true); SVC.aipClose(); });   /* 패널이 열려 있으면 오른쪽 추천 질문 위에 겹침 — 닫고 다음 시험 */
+    assert(!c.errs.length, c.errs.join(' | ')); return a.nm + ' → Enter';
   });
-  await S.t('㊿+171 추천 질문 = 포탈 계산(AI 호출 없음 · 화면 숫자와 같음): 매출 변화 = 당월 매출 칸 · 재약정 대응 = 핵심 현황 = 목록 · 핵심 → 근거 → 원본 → 기준 · 이어서 물으면 앞 문답 접힘 · ✕ 로 정리', async () => {
-    await page.evaluate(() => { SVC.navMenu('dash'); window.scrollTo(0, 0); }); await page.waitForTimeout(250); asks.length = 0;
+  await S.t('㊿+172 AI 답 → 원본(계약 목록) → 뒤로 → 대화 · 패널 위치 그대로 · 다음 질문은 앞 답을 원래 모양(근거 표 · 버튼)으로 접어 둠 · 긴 답이어도 홈 배치 그대로', async () => {
+    await page.evaluate(() => { SVC.navMenu('dash'); scrollTo(0, 0); }); await page.waitForTimeout(250);
+    const before = { sum: await R('#gnSum'), inb: await R('#ccInbox'), tr: await R('#gnTrend') };
     await page.click('#chips .chip:has-text("이번 달 매출 변화")'); await page.waitForTimeout(300);
-    const m = await page.evaluate(() => { const N = SVC.homeNums(); const tot = document.querySelector('#ansEvLocal tr.tot');
-      return { mrr: SVC.won(N.m0), cell: document.querySelector('#gnSum [data-k="mrr"] .gs-v b').textContent, core: document.getElementById('ansLocal').textContent, tot: tot ? tot.children[1].textContent : '', dt: [...document.querySelectorAll('#ansMeta dt')].map((x) => x.textContent).join(','),
-        src: [...document.querySelectorAll('#ansSrcB button')].map((b) => b.textContent).join('|'), ev: !document.getElementById('ansEv').hidden }; });
-    assert(m.cell === m.mrr && m.core.includes(m.mrr + '천원') && m.tot === m.mrr && m.dt === '기준 기간,단위,데이터,조건' && /사업 분석/.test(m.src) && m.ev, JSON.stringify(m));
-    await page.click('#chips .chip:has-text("재약정 대응할 고객")'); await page.waitForTimeout(300);
-    const r = await page.evaluate(() => { const RN = SVC.renewNeedScan(SVC.idxs()); return { n: RN.rows.length, cell: document.querySelector('#gnSum [data-k="rnw"] .gs-v b').textContent, core: document.getElementById('ansLocal').textContent, th: document.querySelectorAll('#ansThread details.th').length, rows: document.querySelectorAll('#ansEvLocal tbody tr').length }; });
-    assert(r.cell === String(r.n) && r.core.includes('재약정 대응이 필요한 계약은 ' + r.n + '건') && r.th === 1 && r.rows === Math.min(8, r.n), JSON.stringify(r));
-    await page.click('#ansSrcB button:has-text("목록으로 보기")'); await page.waitForTimeout(300);
-    const lst = await page.evaluate(() => ({ on: document.getElementById('ovlCr').classList.contains('on'), rows: document.querySelectorAll('#crList tbody tr').length, t: document.getElementById('crTitle').textContent }));
-    assert(lst.on && lst.rows === r.n && /재약정 대응 필요/.test(lst.t), '목록 ' + JSON.stringify(lst));
-    await page.evaluate(() => SVC.closeOvl('ovlCr'));
-    assert(asks.length === 0, '추천 질문이 AI 를 불렀음 ' + asks.length);
-    await page.click('#ansClose'); await page.waitForTimeout(150);
-    const cl = await page.evaluate(() => ({ on: document.getElementById('answer').classList.contains('on'), th: document.getElementById('ansThread').innerHTML.trim() }));
-    assert(!cl.on && !cl.th, '✕ 정리 ' + JSON.stringify(cl));
-    assert(!c.errs.length, c.errs.join(' | ')); return '매출 ' + m.mrr + ' · 재약정 ' + r.n + '건';
+    longAns = 1; await page.fill('#aipInput', '왜 늘었는지 자세히 설명해줘'); await page.keyboard.press('Enter');
+    await page.waitForFunction(() => /긴 답변 줄/.test(document.getElementById('aiSay').textContent), null, { timeout: 8000 }); longAns = 0;
+    const after = { sum: await R('#gnSum'), inb: await R('#ccInbox'), tr: await R('#gnTrend') };
+    assert(JSON.stringify(before) === JSON.stringify(after), '홈 배치 ' + JSON.stringify({ before, after }));
+    const th = await page.evaluate(() => { const d = document.querySelector('#ansThread .th'); return { n: document.querySelectorAll('#ansThread .th').length, table: !!(d && d.querySelector('.ans-t tr.tot')), btn: d ? [...d.querySelectorAll('.ans-btns button')].map((b) => b.textContent).join('|') : '', ids: d ? d.querySelectorAll('[id]').length : -1 }; });
+    assert(th.n === 1 && th.table && /계약 목록/.test(th.btn) && th.ids === 0, '앞 답 ' + JSON.stringify(th));
+    await page.evaluate(() => { document.getElementById('aipBody').scrollTop = 120; });
+    await page.evaluate(() => { document.querySelector('#ansThread .th').open = true; }); await page.click('#ansThread .th .ans-btns button:has-text("계약 목록")'); await page.waitForTimeout(400);
+    const mid = await page.evaluate(() => ({ v: SVC.ST.CUR_VIEW, panel: !document.getElementById('aiPanel').hidden }));
+    await page.evaluate(() => SVC.goBack()); await page.waitForTimeout(400);
+    const ret = await page.evaluate(() => ({ v: SVC.ST.CUR_VIEW, on: document.getElementById('answer').classList.contains('on'), th: document.querySelectorAll('#ansThread .th').length, st: document.getElementById('aipBody').scrollTop, panel: !document.getElementById('aiPanel').hidden }));
+    assert(mid.v === 'contracts' && mid.panel && ret.v === 'dash' && ret.on && ret.th === 1 && ret.panel && ret.st > 0, JSON.stringify({ mid, ret }));
+    assert(!c.errs.length, c.errs.join(' | ')); return '대화 ' + (ret.th + 1) + '문답 유지';
   });
-  await S.t('㊿+171 «내가 처리할 일»: 담당자 연결 전에는 0 이 아니라 «담당자 연결 필요»(팀 전체 급한 일) · 이 브라우저에서 이름을 고르면 내 담당 OI 기한 초과 · 다음 행동 없음 → 같은 건수 목록', async () => {
-    await page.evaluate(() => { SVC.navMenu('dash'); window.scrollTo(0, 0); }); await page.waitForTimeout(250);
-    await page.click('#chips .chip:has-text("내가 처리할 일")'); await page.waitForTimeout(300);
-    const a = await page.evaluate(() => ({ st: document.getElementById('ansState').className + ':' + document.getElementById('ansState').textContent, core: document.getElementById('ansLocal').textContent, team: document.querySelectorAll('#ansEvLocal tbody tr').length }));
-    assert(/need/.test(a.st) && /담당자 연결 필요/.test(a.st) && !/0건/.test(a.core) && a.team >= 1, JSON.stringify(a));
-    await page.selectOption('#ansMe', '담당자A'); await page.click('#ansMeOk'); await page.waitForTimeout(400);
-    const b = await page.evaluate(() => { const me = (r) => String(r.owner || '').indexOf('담당자A') >= 0, t = SVC.todayStr(), oi = SVC.ST.RAWX.oi.filter((o) => me(o) && SVC.oiOpen(o));
-      return { core: document.getElementById('ansLocal').textContent, rows: [...document.querySelectorAll('#ansEvLocal tbody tr')].map((tr) => tr.children[0].textContent + ':' + tr.children[1].textContent), late: oi.filter((o) => o.next_date && String(o.next_date).slice(0, 10) < t).length, none: oi.filter((o) => !o.next_action || !o.next_date).length, st: document.getElementById('ansState').hidden }; });
-    assert(/«담당자A» 담당/.test(b.core) && b.rows.includes('OI 기한 초과:' + b.late) && b.rows.includes('OI 다음 행동 없음:' + b.none) && b.st, JSON.stringify(b));
-    await page.click('#ansEvLocal tbody tr:nth-child(2) .lnk'); await page.waitForTimeout(400);
-    const g = await page.evaluate(() => ({ v: SVC.ST.CUR_VIEW, pre: SVC.DV.pre && SVC.DV.pre.label, rows: document.querySelectorAll('#dvTable tbody tr:not(.dg-empty)').length }));
-    assert(g.v === 'oi' && /내 담당 · 다음 행동 없음/.test(g.pre) && g.rows === b.none, JSON.stringify({ g, none: b.none }));
-    const qv = await page.evaluate(() => (document.querySelector('#dvQvBar [data-qv="me"]') || {}).textContent || '');
-    assert(/내 담당 \d+/.test(qv), '빠른 보기 내 담당 ' + qv);
-    await page.evaluate(() => { const c2 = SVC.qvCfg(); c2.me = ''; SVC.qvSave(c2); SVC.navMenu('oi'); }); await page.waitForTimeout(250);
-    const qv2 = await page.evaluate(() => (document.querySelector('#dvQvBar [data-qv="me"]') || {}).textContent || '');
-    assert(/연결 필요/.test(qv2) && !/내 담당 0/.test(qv2), '이름 없을 때 빠른 보기 ' + qv2);
-    return b.rows.join(' · ');
+  await S.t('㊿+172 패널 닫기(대화 유지 · «AI 대화»로 다시) · 새 대화(지난 대화 접어 둠 · AI 에 앞 대화 안 보냄) · 대화 삭제(확인 후 전부) — 세 동작이 다름', async () => {
+    await page.click('#aipClose'); await page.waitForTimeout(150);
+    const cl = await page.evaluate(() => ({ hid: document.getElementById('aiPanel').hidden, btn: !document.getElementById('aipOpenBtn').hidden && document.getElementById('aipOpenBtn').textContent, on: document.getElementById('answer').classList.contains('on') }));
+    await page.click('#aipOpenBtn'); await page.waitForTimeout(150);
+    const re = await page.evaluate(() => !document.getElementById('aiPanel').hidden && document.getElementById('answer').classList.contains('on') && document.querySelectorAll('#ansThread .th').length === 1);
+    assert(cl.hid && /AI 대화/.test(cl.btn) && cl.on && re, '닫기 ' + JSON.stringify(cl));
+    await page.click('#aipNew'); await page.waitForTimeout(200);
+    const nw = await page.evaluate(() => ({ old: document.querySelectorAll('#aipOld .old-chat').length, oldTh: document.querySelectorAll('#aipOld .old-chat .th').length, on: document.getElementById('answer').classList.contains('on'), th: document.querySelectorAll('#ansThread .th').length }));
+    asks.length = 0; await page.fill('#aipInput', '새 질문입니다 어때?'); await page.keyboard.press('Enter'); await page.waitForTimeout(700);
+    assert(nw.old === 1 && nw.oldTh === 2 && !nw.on && nw.th === 0 && asks.length === 1 && (asks[0].history || []).length === 0, '새 대화 ' + JSON.stringify({ nw, h: (asks[0] || {}).history }));
+    let dlg = ''; page.once('dialog', (d) => { dlg = d.message(); d.accept(); }); await page.click('#aipDel'); await page.waitForTimeout(200);
+    const del = await page.evaluate(() => ({ n: document.querySelectorAll('#aipOld .old-chat, #ansThread .th').length, on: document.getElementById('answer').classList.contains('on') }));
+    assert(/모두 지울까요/.test(dlg) && del.n === 0 && !del.on, '삭제 ' + JSON.stringify(del));
+    await page.click('#aipClose'); return '닫기 · 새 대화 · 삭제';
   });
-  await S.t('㊿+171 다른 화면 검색·질문 창: 보던 화면 · 보기 · 조건이 문맥(질문 옆 · AI 질문 뒤에) · 답은 창 안 · 닫으면 목록 · 조건 그대로 · 같은 화면에서 다시 열면 이어서 · «문맥 빼기»', async () => {
-    await page.evaluate(() => { SVC.navMenu('oi'); }); await page.waitForTimeout(300); await page.evaluate(() => SVC.qvGo('oi', 'late')); await page.waitForTimeout(250); asks.length = 0;
-    await page.keyboard.press('Control+k'); await page.waitForTimeout(250);
-    const o = await page.evaluate(() => ({ on: document.getElementById('ovlFind').classList.contains('on'), ctx: document.getElementById('fkCtx').textContent, foc: document.activeElement && document.activeElement.id }));
-    assert(o.on && /OI 현황/.test(o.ctx) && /기한 초과/.test(o.ctx) && o.foc === 'fkInput', JSON.stringify(o));
-    await page.fill('#fkInput', '이 중 제일 급한 건?'); await page.keyboard.press('Enter');
-    await page.waitForFunction(() => /mock/.test(document.getElementById('aiSay').textContent), null, { timeout: 8000 });
-    const a = await page.evaluate(() => ({ inOvl: !!document.querySelector('#fkAns #answer.on'), ctx: (document.querySelector('#ansQ .ans-ctx') || {}).textContent || '', meta: document.getElementById('ansMeta').textContent }));
-    const q1 = (asks[0] || {}).question || '';
-    assert(a.inOvl && /기한 초과/.test(a.ctx) && /보던 화면: OI 현황/.test(a.meta) && /^이 중 제일 급한 건\?\n\n\(참고 — 사용자가 보던 화면: OI 현황 · 보기 «진행» · 조건 «기한 초과»\)$/.test(q1), JSON.stringify({ a, q1 }));
-    await page.keyboard.press('Escape'); await page.waitForTimeout(200);
-    const k = await page.evaluate(() => ({ v: SVC.ST.CUR_VIEW, on: document.getElementById('ovlFind').classList.contains('on'), pre: SVC.DV.pre && SVC.DV.pre.qv }));
-    assert(k.v === 'oi' && !k.on && k.pre === 'late', '닫은 뒤 ' + JSON.stringify(k));
-    await page.keyboard.press('Control+k'); await page.waitForTimeout(250);
-    const again = await page.evaluate(() => !!document.querySelector('#fkAns #answer.on'));
-    await page.click('#fkCtxX'); await page.fill('#fkInput', '그럼 전체는?'); await page.keyboard.press('Enter'); await page.waitForTimeout(800);
-    const q2 = (asks[1] || {}).question || '';
-    const th = await page.evaluate(() => document.querySelectorAll('#ansThread details.th').length);
-    assert(again && q2 === '그럼 전체는?' && th === 1 && (asks[1].history || []).some((h) => /제일 급한/.test(h.q)), JSON.stringify({ again, q2, th }));
-    await page.keyboard.press('Escape'); await page.waitForTimeout(150);
-    assert(!c.errs.length, c.errs.join(' | ')); return 'OI · 기한 초과 → 문맥 · 이어서 묻기';
+  await S.t('㊿+172 OI 조건(빠른 보기 · 검색 · 열 필터 · 스크롤) → 다른 메뉴 → OI 메뉴 다시 = 그대로 · «초기화»만 처음으로 · 다른 화면 검색 창은 실제 조건 값 · 목록 행 수를 AI 에 보내고 같은 조건 결과와 대조', async () => {
+    await page.setViewportSize({ width: 1440, height: 600 });
+    await page.evaluate(() => SVC.navMenu('oi')); await page.waitForTimeout(300); await page.evaluate(() => { SVC.qvGo('oi', 'nonext'); SVC.DV.filters = { stage: ['협상'] }; SVC.renderGrid(); }); await page.fill('#dvSearch', '가상'); await page.waitForTimeout(250);
+    await page.evaluate(() => scrollTo(0, 150)); await page.waitForTimeout(100);
+    const st = () => page.evaluate(() => ({ q: document.getElementById('dvSearch').value, pre: SVC.DV.pre && SVC.DV.pre.qv, f: JSON.stringify(SVC.DV.filters), rows: document.querySelectorAll('#dvTable tbody tr:not(.dg-empty)').length, y: Math.round(scrollY) }));
+    const a = await st(); await page.evaluate(() => SVC.navMenu('contracts')); await page.waitForTimeout(250); await page.evaluate(() => SVC.navMenu('dash')); await page.waitForTimeout(250); await page.evaluate(() => SVC.navMenu('oi')); await page.waitForTimeout(400);
+    const b = await st();
+    assert(a.q === '가상' && b.q === a.q && b.pre === 'nonext' && b.f === a.f && b.rows === a.rows && Math.abs(b.y - a.y) < 30, JSON.stringify({ a, b }));
+    asks.length = 0; await page.keyboard.press('Control+k'); await page.waitForTimeout(250);
+    const ctx1 = await page.evaluate(() => document.getElementById('fkCtx').textContent);
+    await page.fill('#fkInput', '이 목록 진행 상황 어때?'); await page.click('#fkAsk'); await page.waitForTimeout(800);
+    const q1 = (asks[0] || {}).question || '', meta = await page.evaluate(() => document.getElementById('ansMeta').textContent);
+    assert(/진행상태 = 협상/.test(ctx1) && /목록 \d+행/.test(ctx1) && q1.includes('진행상태 = 협상') && q1.includes('목록 ' + a.rows + '행') && meta.includes('화면의 같은 조건 결과 — ' + a.rows + '행') && /적용했는지는 답 내용으로 확인/.test(meta), JSON.stringify({ ctx1, q1: q1.slice(-160), meta }));
+    await page.fill('#aipInput', '이 목록 요약'); await page.keyboard.press('Enter'); await page.waitForTimeout(400);
+    const loc = await page.evaluate(() => ({ core: document.getElementById('ansLocal').textContent, meta: document.getElementById('ansMeta').textContent }));
+    assert(loc.core.includes('지금 목록 ' + a.rows + '행') && /현재 목록 기준/.test(loc.meta), '목록 요약 ' + JSON.stringify(loc));
+    await page.evaluate(() => { SVC.closeAnswer('', true); SVC.aipClose(); });
+    await page.click('#btnViewReset'); await page.waitForTimeout(300);
+    const r = await st(); assert(r.q === '' && !r.pre && r.f === '{}', '초기화 ' + JSON.stringify(r));
+    await page.setViewportSize({ width: 1440, height: 900 }); return a.rows + '행 유지 → 초기화';
   });
-  await S.t('㊿+171 AI 실패 = 답 맨 위 «AI 응답 실패» + 다시 시도(아래는 규칙형 답 — AI 답이라고 하지 않음) · 다시 시도하면 정상', async () => {
-    await page.evaluate(() => { SVC.navMenu('dash'); window.scrollTo(0, 0); }); await page.waitForTimeout(250); failAsk = 1;
-    await page.fill('#q', '올해 매출 어때?'); await page.keyboard.press('Enter'); await page.waitForTimeout(900);
-    const f = await page.evaluate(() => ({ st: document.getElementById('ansState').className, txt: document.getElementById('ansState').textContent, hid: document.getElementById('ansState').hidden, retry: !!document.getElementById('aiRetry'), hero: document.getElementById('ansHero').textContent, say: document.getElementById('aiSay').className }));
-    assert(/fail/.test(f.st) && !f.hid && /AI 응답 실패/.test(f.txt) && /규칙/.test(f.txt) && f.retry && f.hero && !/on/.test(f.say), JSON.stringify(f));
+  await S.t('㊿+172 고객 360 → «이 고객으로 목록 보기»(계약) → 메뉴로 OI · 장비 신청 = 같은 고객 · 목록 위 «고객 문맥» · 해제', async () => {
+    await page.evaluate(() => SVC.openCust360('가상고객07')); await page.waitForTimeout(300);
+    await page.click('#c360Go [data-cv="contracts"]'); await page.waitForTimeout(400);
+    const a = await page.evaluate(() => ({ v: SVC.ST.CUR_VIEW, q: document.getElementById('dvSearch').value, bar: !document.getElementById('dvCustBar').hidden }));
+    await page.evaluate(() => SVC.navMenu('oi')); await page.waitForTimeout(350);
+    const b = await page.evaluate(() => ({ v: SVC.ST.CUR_VIEW, q: document.getElementById('dvSearch').value, bar: (document.getElementById('dvCustBar') || {}).textContent || '' }));
+    await page.evaluate(() => SVC.navMenu('orders')); await page.waitForTimeout(350);
+    const o = await page.evaluate(() => document.getElementById('dvSearch').value);
+    await page.click('#dvCustX'); await page.waitForTimeout(250);
+    const x = await page.evaluate(() => ({ q: document.getElementById('dvSearch').value, c: SVC.CUSTCTX.c }));
+    assert(a.v === 'contracts' && a.q === '가상고객07' && a.bar && b.v === 'oi' && b.q === '가상고객07' && /고객 문맥 «가상고객07»/.test(b.bar) && o === '가상고객07' && x.q === '' && x.c === '', JSON.stringify({ a, b, o, x }));
+    return '계약 → OI → 장비 신청 = 가상고객07';
+  });
+  await S.t('㊿+172 사업 분석 필터(서비스 끄기 · 기준월 바꾸기)를 바꿔도 홈 핵심 현황 · 매출 추이 · 재약정 대응은 그대로(전체 사업 · 이번 달) · 상세 머리에 «이 영역의 조건» · 해제', async () => {
+    await page.evaluate(() => SVC.navMenu('dash')); await page.waitForTimeout(250);
+    const snap = () => page.evaluate(() => ({ sum: [...document.querySelectorAll('#gnSum .gs-v b')].map((b) => b.textContent).join('|'), lab: document.getElementById('gnTrendC').getAttribute('aria-label') }));
+    const a = await snap();
+    await page.evaluate(() => { SVC.homeDetail(true); const l = SVC.ST.DATA.lines[0].label; SVC.STATE.lines[l] = false; SVC.STATE.base = Math.max(0, SVC.STATE.base - 2); SVC.renderAll(); SVC.renderInbox(); }); await page.waitForTimeout(400);
+    const b = await snap(), h = await page.evaluate(() => document.getElementById('gnBizH').textContent);
+    assert(a.sum === b.sum && a.lab === b.lab && /이 영역의 조건: 서비스 1개 제외/.test(h) && /기준월/.test(h) && /핵심 현황 · 매출 추이에는 적용 안 됨/.test(h), JSON.stringify({ a, b, h }));
+    await page.click('#gnBizReset'); await page.waitForTimeout(300);
+    const h2 = await page.evaluate(() => document.getElementById('gnBizH').textContent);
+    await page.evaluate(() => SVC.homeDetail(false));
+    assert(/필터 없음/.test(h2), '해제 ' + h2); return a.sum;
+  });
+  await S.t('㊿+172 우선 업무: 담당자 연결 전 = «담당자 연결 필요»(0 아님) · 팀 전체 · 업무 n가지(대상 단위는 줄마다) / 계정 연결(SQL 103) 후 = «내 업무» 기본 · 내 OI 기한 초과 · 다음 행동 없음 · 같은 건수 목록', async () => {
+    await page.evaluate(() => SVC.navMenu('dash')); await page.waitForTimeout(250);
+    const a = await page.evaluate(() => ({ who: (document.querySelector('#ccInbox .hm-who') || {}).textContent || '', scope: (document.querySelector('#ccInbox [data-sc][aria-pressed="true"]') || {}).textContent || '', head: document.querySelector('#ccInbox .ib-head .ctag').textContent, units: [...document.querySelectorAll('#ccInbox .hm-n')].map((x) => x.textContent).join(',') }));
+    assert(/담당자 연결 필요/.test(a.who) && /0건이 아님/.test(a.who) && a.scope === '팀 전체' && /^업무 \d+가지$/.test(a.head) && /(신청|계약|OI|문의|항목) \d+건|1개월/.test(a.units), JSON.stringify(a));
+    ownerMap = ['담당자A']; await page.evaluate(() => { SVC.HOME.scope = ''; SVC.homeOwnerLoad(true); }); await page.waitForTimeout(500);
+    const b = await page.evaluate(() => ({ who: (document.querySelector('#ccInbox .hm-who') || {}).textContent || '', scope: (document.querySelector('#ccInbox [data-sc][aria-pressed="true"]') || {}).textContent || '', rows: [...document.querySelectorAll('#ccInbox .hm-row')].map((x) => x.querySelector('.hm-nm').textContent + ':' + x.querySelector('.hm-n').textContent) }));
+    const exp = await page.evaluate(() => { const t = SVC.todayStr(), oi = SVC.ST.RAWX.oi.filter((o) => String(o.owner || '').indexOf('담당자A') >= 0 && SVC.oiOpen(o)); return { late: oi.filter((o) => o.next_date && String(o.next_date).slice(0, 10) < t).length, none: oi.filter((o) => !o.next_action || !o.next_date).length }; });
+    assert(/담당자A/.test(b.who) && /계정 연결/.test(b.who) && b.scope === '내 업무' && b.rows.some((x) => x === '내 OI 기한 초과▾:OI ' + exp.late + '건'), JSON.stringify({ b, exp }));
+    await page.click('#ccInbox .hm-row:has-text("내 OI 기한 초과") .hm-act .cbtn'); await page.waitForTimeout(400);
+    const g = await page.evaluate(() => ({ v: SVC.ST.CUR_VIEW, n: document.querySelectorAll('#dvTable tbody tr:not(.dg-empty)').length, pre: (SVC.DV.pre && SVC.DV.pre.label) || '' }));
+    assert(g.v === 'oi' && g.n === exp.late && /내 담당/.test(g.pre), '목록 ' + JSON.stringify(g));
+    ownerMap = null; await page.evaluate(() => { SVC.ST.OWNER_NAMES = null; SVC.HOME.scope = ''; SVC.navMenu('dash'); });
+    return b.rows.slice(0, 3).join(' · ');
+  });
+  await S.t('㊿+172 AI 실패 = 답 맨 위 «AI 응답 실패» + 다시 시도(아래는 규칙형 답) · 다시 시도하면 정상', async () => {
+    await page.evaluate(() => { SVC.navMenu('dash'); scrollTo(0, 0); }); await page.waitForTimeout(250); failAsk = 1;
+    await page.fill('#q', '올해 매출 어때?'); await page.click('#btnAsk'); await page.waitForTimeout(900);
+    const f = await page.evaluate(() => ({ st: document.getElementById('ansState').className, txt: document.getElementById('ansState').textContent, hid: document.getElementById('ansState').hidden, retry: !!document.getElementById('aiRetry'), hero: document.getElementById('ansHero').textContent }));
+    assert(/fail/.test(f.st) && !f.hid && /AI 응답 실패/.test(f.txt) && /규칙/.test(f.txt) && f.retry && f.hero, JSON.stringify(f));
     await page.click('#aiRetry'); await page.waitForFunction(() => /mock/.test(document.getElementById('aiSay').textContent), null, { timeout: 8000 });
-    const ok = await page.evaluate(() => document.getElementById('ansState').hidden);
-    assert(ok, '다시 시도 후 실패 줄 남음');
-    await page.evaluate(() => SVC.closeAnswer('', true));
-    return '실패 → 다시 시도';
+    assert(await page.evaluate(() => document.getElementById('ansState').hidden), '다시 시도 후 실패 줄 남음');
+    await page.evaluate(() => { SVC.closeAnswer('', true); SVC.aipClose(); }); return '실패 → 다시 시도';
   });
-  await S.t('㊿+171 업무 기준: 회수 진행 = 장비 보드와 같은 범위(회수예정 · 일부 회수 중 나눔) · OI «일정 지남»과 «다음 행동 없음»을 함께(0 을 «할 일 없음»으로 안 보임) · 데이터 점검 줄은 만기 지남 규칙 빼고 · 홈 탭 배지 없음', async () => {
+  await S.t('㊿+172 업무 기준: 회수 진행 = 장비 보드 범위(회수예정 · 일부 회수 중 나눔) · 펼치면 «대상 바로 열기»(그 신청 하나) · OI 일정 지남 + 다음 행동 없음 함께 · 데이터 점검 줄은 만기 지남 규칙 빼고 · 홈 탭 배지 없음', async () => {
     await page.evaluate(() => SVC.navMenu('dash')); await page.waitForTimeout(300);
     const r = await page.evaluate(() => { const H = SVC.HOME.rows, get = (k) => H.filter((o) => o.key === k)[0] || null, O = SVC.ST.RAWX.orders, t = SVC.todayStr();
       const ret = get('ret'), oi = get('oi'), dc = get('dc'), retN = O.filter(SVC.EQB_ONLY.ret[1]).length, retA = O.filter((o) => o.status === '회수예정').length;
       const open = SVC.ST.RAWX.oi.filter(SVC.oiOpen), late = open.filter((o) => o.next_date && String(o.next_date).slice(0, 10) < t), none = open.filter((o) => !o.next_action || !o.next_date), u = new Set(late.concat(none));
       const dcN = SVC.dcRules().filter((x) => x.sev === 'crit' && x.id !== 'c_lapsed').reduce((a, x) => a + x.items.length, 0);
       const bd = document.querySelector('#rail .gn-tb[data-v="dash"] .gn-bd');
-      return { ret: ret && ret.n + ':' + ret.nm, retN, retA, oi: oi && oi.n + ':' + oi.nm, oiN: u.size, late: late.length, none: none.length, zeros: SVC.HOME.zeros.join(' · '), dc: dc ? dc.n : 0, dcN, bd: bd ? bd.hidden : true }; });
-    assert(r.ret && +r.ret.split(':')[0] === r.retN && r.ret.includes('회수예정 ' + r.retA + ' · 일부 회수 중 ' + (r.retN - r.retA)), '회수 ' + JSON.stringify(r));
-    assert(r.oi && +r.oi.split(':')[0] === r.oiN && r.oi.includes('일정 지남 ' + r.late) && r.oi.includes('다음 행동 없음 ' + r.none) && !/OI 밀린 액션 0/.test(r.zeros), 'OI ' + JSON.stringify(r));
-    assert(r.dc === r.dcN && r.bd, '점검 · 배지 ' + JSON.stringify(r));
-    await page.evaluate(() => SVC.homeModeSet('todo')); await page.waitForTimeout(200);
-    await page.click('#ccInbox .cbtn:has-text("회수 진행")'); await page.waitForTimeout(500);
-    const brd = await page.evaluate(() => ({ v: SVC.ST.CUR_VIEW, n: document.querySelectorAll('#viewEqBoard .eqb-card').length }));
-    assert(brd.v === 'eqboard' && brd.n === r.retN, '보드 ' + JSON.stringify(brd));
-    assert(!c.errs.length, c.errs.join(' | ')); return '회수 ' + r.retN + ' · OI ' + r.oiN + ' · 점검 ' + r.dc;
+      return { ret: ret && ret.n + ':' + ret.nm, retN, retA, links: ret ? ret.links.length : 0, oi: oi && oi.n + ':' + oi.nm, oiN: u.size, late: late.length, none: none.length, zeros: SVC.HOME.zeros.join(' · '), dc: dc ? dc.n : 0, dcN, bd: bd ? bd.hidden : true }; });
+    assert(r.ret && +r.ret.split(':')[0] === r.retN && r.ret.includes('회수예정 ' + r.retA + ' · 일부 회수 중 ' + (r.retN - r.retA)) && r.links === r.retN, '회수 ' + JSON.stringify(r));
+    assert(r.oi && +r.oi.split(':')[0] === r.oiN && r.oi.includes('일정 지남 ' + r.late) && r.oi.includes('다음 행동 없음 ' + r.none) && !/OI 밀린 액션 0/.test(r.zeros) && r.dc === r.dcN && r.bd, 'OI · 점검 ' + JSON.stringify(r));
+    await page.evaluate(() => { SVC.HOME.allOpen = true; SVC.homeTodo(SVC.HOME.rows, SVC.HOME.zeros, SVC.HOME.snz); });
+    await page.click('#ccInbox .hm-row:has-text("장비 회수 진행") .hm-nm'); await page.waitForTimeout(150);
+    await page.click('#ccInbox .hm-row:has-text("장비 회수 진행") .hm-links .cbtn'); await page.waitForTimeout(400);
+    const one = await page.evaluate(() => ({ v: SVC.ST.CUR_VIEW, n: document.querySelectorAll('#dvTable tbody tr:not(.dg-empty)').length, pre: SVC.DV.pre && SVC.DV.pre.label }));
+    assert(one.v === 'orders' && one.n === 1 && /^신청 #\d+/.test(one.pre), '신청 하나로 ' + JSON.stringify(one));
+    await page.evaluate(() => { SVC.HOME.allOpen = false; SVC.navMenu('dash'); });
+    assert(!c.errs.length, c.errs.join(' | ')); return '회수 ' + r.retN + ' · OI ' + r.oiN;
+  });
+  await S.t('㊿+172 리포트: 템플릿을 고르기 전에는 기본 결과를 펼치지 않음(안내 한 줄) · 고르면 «조건 — …» + 결과 · 메뉴 다시 들어와도 고른 리포트 그대로', async () => {
+    await page.evaluate(() => SVC.navMenu('report')); await page.waitForFunction(() => document.querySelector('#rpBody .qb-tc'), null, { timeout: 8000 }); await page.waitForTimeout(200);
+    const a = await page.evaluate(() => ({ hint: !document.getElementById('qbPickHint').hidden, wrap: document.querySelector('#rpBody .qb-wrap').hidden, res: document.getElementById('qbRes').children.length }));
+    await page.click('#rpBody .qb-tc[data-preset="p_oi"]'); await page.waitForTimeout(300);
+    const b = await page.evaluate(() => ({ hint: !document.getElementById('qbPickHint').hidden, wrap: document.querySelector('#rpBody .qb-wrap').hidden, cond: (document.querySelector('#qbRes .qb-cond') || {}).textContent || '', rows: SVC.QB.res && SVC.QB.res.rows.length }));
+    await page.evaluate(() => { SVC.navMenu('dash'); SVC.navMenu('report'); }); await page.waitForTimeout(300);
+    const c = await page.evaluate(() => ({ title: SVC.QB.title, wrap: document.querySelector('#rpBody .qb-wrap').hidden }));
+    assert(a.hint && a.wrap && a.res === 0 && !b.hint && !b.wrap && /^조건 — OI/.test(b.cond) && b.rows > 0 && /OI 진행상태별/.test(c.title) && !c.wrap, JSON.stringify({ a, b, c }));
+    await page.evaluate(() => SVC.viewResetHard('report')); await page.evaluate(() => SVC.navMenu('dash'));
+    return b.cond;
   });
   await ctx.close();
   /* 폰 */
-  const pc = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block', isMobile: true, hasTouch: true }); const pm = await pc.newPage(); const c2 = collect(pm);
+  const pc = await mk(390, 844, true); const pm = await pc.newPage(); const c2 = collect(pm);
   await mockBackend(pm, { extra: async (route, u) => { if (u.includes('/rpc/load_all')) { await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(Object.assign({}, F, { roles: [{ role: 'super_admin' }] })) }); return true; } return false; } });
   await pm.goto(url + '/index.html'); await pm.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA, null, { timeout: 15000 }); await pm.waitForTimeout(900);
-  await S.t('㊿+171 폰(390): 순서 AI 질문 → 핵심 현황 → 우선 업무 · 질문 칸이 첫 화면 · 옆 넘침 0 · 다른 화면 «검색» = 검색·질문 창(넘침 0)', async () => {
-    const r = await pm.evaluate(() => { const R = (s) => document.querySelector(s).getBoundingClientRect(); return { a: R('#viewDash .ask').top, g: R('#gnSum').top, i: R('#ccInbox').top, q: R('#q').bottom, h: innerHeight, over: document.documentElement.scrollWidth - innerWidth }; });
-    assert(r.a < r.g && r.g < r.i && r.q < r.h && r.over <= 1, JSON.stringify(r));
-    await pm.evaluate(() => SVC.navMenu('contracts')); await pm.waitForTimeout(300); await pm.click('#cmdBar'); await pm.waitForTimeout(300);
-    const o = await pm.evaluate(() => { const m = document.querySelector('#ovlFind .modal').getBoundingClientRect(); return { on: document.getElementById('ovlFind').classList.contains('on'), l: Math.round(m.left), r: Math.round(m.right), over: document.documentElement.scrollWidth - innerWidth }; });
-    assert(o.on && o.l >= 0 && o.r <= 390 && o.over <= 1, JSON.stringify(o));
+  await S.t('㊿+172 폰(390): AI 질문 → 핵심 현황 → 우선 업무(기한 · 담당 짧게) 순 · 검색 버튼은 위 띠 · AI 답은 전체 화면 패널 · 원본으로 가면 패널 닫히고 «AI 대화»로 다시 · 옆 넘침 0', async () => {
+    const r = await pm.evaluate(() => { const T = (s) => document.querySelector(s).getBoundingClientRect().top; const row = document.querySelector('#ccInbox .hm-row');
+      return { a: T('#viewDash .ask'), g: T('#gnSum'), i: T('#ccInbox'), own: row ? getComputedStyle(row.querySelector('.hm-own')).display : 'none', cmd: !!document.querySelector('#app .topbar > #cmdBar'), over: document.documentElement.scrollWidth - innerWidth }; });
+    assert(r.a < r.g && r.g < r.i && r.own !== 'none' && r.cmd && r.over <= 1, JSON.stringify(r));
+    await pm.click('#chips .chip:has-text("재약정 대응할 고객")'); await pm.waitForTimeout(400);
+    const p = await pm.evaluate(() => { const b = document.getElementById('aiPanel').getBoundingClientRect(); return { w: Math.round(b.width), l: Math.round(b.left) }; });
+    await pm.click('#ansSrcB button'); await pm.waitForTimeout(300);
+    const q = await pm.evaluate(() => ({ hid: document.getElementById('aiPanel').hidden, btn: !document.getElementById('aipOpenBtn').hidden }));
+    assert(p.w >= 388 && p.l <= 1 && q.hid && q.btn, JSON.stringify({ p, q }));
     assert(!c2.errs.length, c2.errs.join(' | ')); return 'AI → 현황 → 업무';
   });
   await pc.close();

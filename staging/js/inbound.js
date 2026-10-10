@@ -5,7 +5,9 @@ import { $, axTime, esc, lline, rawHtml, tpl, won } from './core.js';
 import { SB_RAW, sbTry, sbWrite, toast, todayStr } from './shell.js';
 import { idxs, MX_LIST, renderInstall, renderMatrix, statusOf } from './dash.js';
 import { DV, renderGrid, switchView, xlsxBook } from './grid.js';
-import { logChange, openOvl } from './edit.js';
+import { closeOvl, logChange, openOvl } from './edit.js';
+import { openCust360 } from './tools.js';
+import { ask } from './ai.js';
 
 
 /* ===== 인바운드 관리 — 통계 + 목록 (원본: 구글시트, 매일 아침 자동 동기화) ===== */
@@ -387,7 +389,9 @@ export function openInbDetail(r){
     tpl`</div>`+
     tpl`<div class="inb-body">${r.content||'(요청내용 없음)'}</div>`+ tpl`${rawHtml(steps.length?tpl`<div class="inb-tl">${rawHtml(steps.map(function(s){
       return tpl`<div class="st"><b>${rawHtml(s[0])}</b> ${s[1]||''}<div class="d">${s[2]||''}</div></div>`;
-    }).join(''))}`+ tpl`</div>`:'')}`+ tpl`${rawHtml(r.note?tpl`<div class="mini" style="margin-top:6px">비고: ${r.note}</div>`:'')}`;
+    }).join(''))}`+ tpl`</div>`:'')}`+ tpl`${rawHtml(r.note?tpl`<div class="mini" style="margin-top:6px">비고: ${r.note}</div>`:'')}`+
+    tpl`${rawHtml(r.org? tpl`<div class="inb-go"><button type="button" class="cbtn" id="inbD360">고객 360 — ${r.org}</button><span class="mini">원본: 인바운드 시트 ${String(r.y||'')}년 연번 ${String(r.no||'')}(수정은 시트에서)</span></div>` : '')}`;
+  var g360=document.getElementById('inbD360'); if(g360) g360.onclick=function(){ closeOvl('ovlInb'); openCust360(r.org); };   /* ㊿+172 인바운드 → 고객 360 */
   openOvl('ovlInb');
 }
 
@@ -614,6 +618,7 @@ export async function renderWeekly(atWeek){
     tpl`<span class="mini">${rawHtml(Object.keys(counts).map(function(k){return k+' '+counts[k]+'건';}).join(' · '))}</span>`+
     tpl`<button class="pill ghost" id="wkZoom" title="글자 크기 — 보통 → 크게 → 아주 크게">가<span style="font-size:15px;font-weight:800">A</span> 글자 크기</button>`+
     tpl`<button class="pill ghost" id="wkFs" title="보고 화면만 전체화면으로 — 사이드바·상단바 없이 발표 (ESC 또는 F로 종료)">⛶ 발표 모드</button>`+
+    tpl`<button class="pill ghost" id="wkAiSum" title="AI 요약은 오른쪽 AI 패널에 — 원문(이 화면)은 그대로 보면서 비교 · 결정이 필요한 것 · 미완료 액션 · 담당 · 기한">✦ AI 요약(옆 패널)</button>`+
     tpl`<button class="pill ghost" id="wkFetch">↻ 다시 가져오기</button>`+
     tpl`<button class="pill ghost" id="wkUniCopy" title="전사 «주간 업무보고» 서비스사업부 탭 양식(9열)으로 복사 — 시트의 「통합(자동)」 탭과 같은 내용 · 계약현황은 포탈 DB에서 자동 생성">📋 통합 양식 복사</button>`+
     tpl`<button class="pill ghost" id="wkUniXls" title="같은 양식을 엑셀 파일로">⬇ 통합 양식</button>`+
@@ -626,6 +631,10 @@ export async function renderWeekly(atWeek){
     tpl`<div class="ph">마무리</div><a data-go="${rawHtml(memoId)}">회의 메모</a></div>`;
 
   host.innerHTML=tpl`${rawHtml(head)}<div class="wk-wrap">${rawHtml(rail)}<div id="wkMain">${rawHtml(bodyH)}</div></div>`;
+  /* ㊿+172 주간회의 AI 요약 — 원문은 이 화면 그대로 · 요약은 오른쪽 AI 패널(요약이 원문을 가리지 않음 · 문장마다 원문 섹션 이름으로) */
+  (function(){ var sb=document.getElementById('wkAiSum'); if(!sb) return; sb.onclick=function(){
+    var main=document.getElementById('wkMain'), txt=main? String(main.innerText||'').replace(/\n{3,}/g,'\n\n').slice(0,7000) : '';
+    ask('이번 주 주간보고를 요약해줘 — 핵심 변화 · 결정이 필요한 것(담당 · 기한) · 지난주에서 넘어온 미완료 액션 순서로, 각 항목에 원문 섹션 이름을 붙여서', {from:'weekly', ctx:{v:'weekly', label:'주간회의 '+(WK.week||''), parts:['원문 '+txt.length+'자 함께 보냄'], n:null, sums:[], text:'(참고 — 사용자가 보던 주간보고 원문 '+(WK.week||'')+' 주간 · 아래 원문만 근거로, 원문에 없는 내용은 만들지 말 것)\n'+txt}}); }; })();
 
   // 상단 제목 바·주간 헤더의 실제 높이를 재서 고정 위치를 맞춤 (제목 바 밑에 숨지 않게)
   function wkMeasure(){

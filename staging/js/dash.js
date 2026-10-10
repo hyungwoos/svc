@@ -5,12 +5,12 @@ import { Viz } from './viz.js';
 import { $, $$, kwToWon, wonToKw, baseLabel, baseRange, buildBaseSelect, cssv, el, esc, isCC, isGN, lline, mk, mkLabel, monOf, pct, rawHtml, seriesColor, STATE, tpl, won,
   wonFull, wrapNavIcons, yOf } from './core.js';
 import { boot, CACHE_KEY, ccAfterKpis, ccAnaCount, ccAnalysisOpen, ccHomeLayout, loadFromDb, onData, renderInbox, SB_RAW, sbWrite, themeBtnSync, toast, uiIconize } from './shell.js';
-import { abortAsk, ask, closeAnswer, isAsking, loadAiConfig, runQuery, shortQ } from './ai.js';
+import { abortAsk, ask, isAsking, loadAiConfig, runQuery, shortQ } from './ai.js';
 import { GRIDS } from './grids.js';
 import { CH_DEFS, chOf, ctSuccessor, liveData, liveDeltaHtml, openRenewList, renderChannelView } from './analysis.js';
 import { renderTodo } from './tools.js';
 import { renderCloud } from './cloud.js';
-import { homeSetup } from './home.js';
+import { aipStale, askFrom, homeB, homeSetup } from './home.js';
 import { closeMxPop, mxKey, MXM, mxPlace, openMxMemo, renderInbStat } from './inbound.js';
 import { KX_H6, kxBase, renderChurn, renderChurnRate, renderCustFlow } from './sales.js';
 import { a11yTileRole, DV, renderGrid, switchView, xlsxAoa } from './grid.js';
@@ -179,7 +179,7 @@ export function buildControls(){
     }
   }catch(e){}
   $('#btnReload').onclick=function(){
-    closeAnswer();                       // 새로 읽은 데이터와 어긋나지 않게 이전 답변은 닫습니다
+    try{ aipStale(); }catch(e){}         // ㊿+172 대화는 지우지 않고 «이전 데이터 기준» 표시(예전: 이전 답변을 닫음)
     $('#app').classList.add('hidden'); $('#loading').classList.remove('hidden');
     $('#loading').innerHTML='<div class="spin"></div><div>다시 읽고 있습니다…</div>';
     boot(true);   // 캐시 무시하고 DB에서 새로 읽기
@@ -208,7 +208,7 @@ export function buildControls(){
         same = !!a && !!b && JSON.stringify(a)===JSON.stringify(b);
       }catch(e){}
       if(same){ REFRESHING=false; return; }
-      closeAnswer('데이터가 갱신되어 이전 답변은 닫았습니다 — 다시 물어봐 주세요');
+      try{ aipStale(); }catch(e){}   /* ㊿+172 데이터가 바뀌어도 대화는 그대로 — 패널에 «이전 데이터 기준» 한 줄 */
       if(ST.IS_EQUIP){ if(GRIDS[keep]) renderGrid(); }
       else{
         onData(nd);
@@ -235,8 +235,7 @@ export function buildControls(){
     if(document.visibilityState==='visible' && Date.now()-ST.LAST_LOAD>15*60*1000) silentRefresh('timer');
   }, 60*1000);
 
-  $('#btnAsk').onclick=function(){ if(isAsking()){ abortAsk(); return; } ask($('#q').value); };
-  var ax=document.getElementById('ansClose'); if(ax) ax.onclick=function(){ closeAnswer('', true); };   /* ㊿+159 AI 답변 ✕ 닫기 */
+  $('#btnAsk').onclick=function(){ if(isAsking()){ abortAsk(); return; } var v=/** @type {any} */($('#q')).value; if(isGN()) askFrom('home', v); else ask(v); };   /* ㊿+172 «AI 에 질문» — 답은 AI 패널 */
   var qi0=/** @type {any} */($('#q'));
   if(!isGN() && !qi0._enter){ qi0._enter=1; qi0.addEventListener('keydown',function(e){   // Enter 로 질문 (자동완성 끄면서 빠졌던 기능 복원) · ㊿+171 한 번만 연결(다시 읽을 때마다 겹쳐 붙어 답이 닫히던 것) · 지니언스는 검색·질문 목록(home.js)
     if(e.key==='Enter' && !e.isComposing){ e.preventDefault(); ask(this.value); }
@@ -1205,8 +1204,8 @@ export function kpiTable(title, cap, head, rows, xname, view){
   $('#crXls').onclick=function(){ xlsxAoa((xname||title).replace(/[\\/:*?"<>|]/g,' '), head.map(function(h){return h.l;}), rows.map(function(r){ return r.x||r.c.map(function(x){ return String(x).replace(/<[^>]+>/g,''); }); })); };
   openOvl('ovlCr');
 }
-export function kpiOpen(kind){
-  var D=KPI_D; if(!D) return;
+export function kpiOpen(kind, opt){
+  var D=KPI_D; if(!D && !(opt && opt.home)) return; D=D||{list:[], b:homeB()};
   var b=D.b, rows=[], head, tot=0;
   var base=function(r){ return [esc(r.cust), esc(lline(r.line)), esc(chOf(r)), esc(r.status||'활성')+(r.renew?tpl` <span class="ubadge sm">연장 ${rawHtml(r.renew)}회</span>`:''), mk(r.startIdx)||'', r.endIdx!=null? mk(r.endIdx):'']; };
   var H6=[{l:'고객사'},{l:'서비스'},{l:'채널'},{l:'상태'},{l:'시작월'},{l:'종료월'}];
@@ -1233,13 +1232,14 @@ export function kpiOpen(kind){
     head=[{l:'구분'}].concat(H6, [{l:'판매형태'},{l:'해지 사유'},{l:'월액(천원)',n:true}]);
     kpiTable(per+' 신규 '+D.newRows.length+'건 / 해지 '+D.churnRows.length+'건', '신규 = 원계약 시작월이 '+per+' (부속 계약·CN전환 제외) · 해지 = 상태 «해지»이고 해지월(종료월)이 '+per+' — 해지율·고객사 증감 화면과 같은 기준 · 이탈 MRR '+won(ca)+'천원 = 해지월 인식 금액 · 대시보드 필터(서비스·산업군)가 적용된 상태', head, rows, '신규해지_'+per);
   }
-  else if(kind==='expNeed'){   /* ㊿+171 재약정 대응 필요 — 홈 핵심 현황과 같은 행 */
-    var RN=renewNeedScan(D.list, b), cu1={};
+  else if(kind==='expNeed'){   /* ㊿+171 재약정 대응 필요 — 홈 핵심 현황과 같은 행 · ㊿+172 홈에서 열면 전체 사업 · 홈 기준월(사업 분석 필터와 무관) */
+    if(opt && opt.home){ b=homeB(); }
+    var RN=renewNeedScan(opt && opt.home? ST.DATA.rows.map(function(x,i){ return i; }) : D.list, b), cu1={};
     RN.rows.forEach(function(k){ var r=ST.DATA.rows[k], a=expAmtOf(k); tot+=a; cu1[r.cust]=1; rows.push({_cust:r.cust, c:base(r).concat([esc(r.saleType||''), esc(expNote(k)||'후속 계약 없음'), won(a)]), s:r.endIdx}); });
     rows.sort(function(x,y){ return x.s-y.s; });
     head=H6.concat([{l:'판매형태'},{l:'확인할 것'},{l:'종료월 월 금액(천원)',n:true}]);
     var ex=[]; if(RN.sure.length) ex.push('재약정 등록됨 '+RN.sure.length+'건'); if(RN.auto.length) ex.push('자동연장 '+RN.auto.length+'건');
-    kpiTable('재약정 대응 필요 — '+rows.length+'건 · 고객사 '+Object.keys(cu1).length+'곳 · '+won(tot)+'천원', RN.xs.EN+'개월 내 만료 원계약 '+RN.xs.rows.length+'건(종료월 '+mk(b)+' ~ '+mk(RN.xs.end)+') 중 '+(ex.length? ex.join(' · ')+' 제외' : '제외 없음')+' · 후속 계약이 «확인 필요»면 남김 · 홈 «재약정 대응 필요»와 같은 행 · 행을 누르면 계약 화면', head, rows, '재약정대응_'+mk(b));
+    kpiTable('재약정 대응 필요 — '+rows.length+'건 · 고객사 '+Object.keys(cu1).length+'곳 · '+won(tot)+'천원', RN.xs.EN+'개월 내 만료 원계약 '+RN.xs.rows.length+'건(종료월 '+mk(b)+' ~ '+mk(RN.xs.end)+') 중 '+(ex.length? ex.join(' · ')+' 제외' : '제외 없음')+' · 후속 계약이 «확인 필요»면 남김 · '+(opt && opt.home? '전체 사업 기준(홈 «재약정 대응 필요»와 같은 행)' : '사업 분석 조건 기준')+' · 행을 누르면 계약 화면', head, rows, '재약정대응_'+mk(b));
   }
   else if(kind==='exp'){
     var cu0={}; D.expRows.forEach(function(k){ var r=ST.DATA.rows[k], a=expAmtOf(k); tot+=a; cu0[r.cust]=1; rows.push({_cust:r.cust, c:base(r).concat([esc(r.saleType||''), esc(expNote(k)), won(a)]), s:r.endIdx}); });

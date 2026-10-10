@@ -83,3 +83,8 @@ var rawHtml, tpl;
 /* ㊿+156 창(.ovl.show) 바깥 클릭 · Esc 로 닫기 — 예전엔 정산(s1·kk)만 · 이제 프로젝트 리포트(저장 목록 · 관리원가)도 */
 document.addEventListener('click', function(ev){ var t=ev.target; if(t&&t.classList&&t.classList.contains('ovl')) t.classList.remove('show'); });
 document.addEventListener('keydown', function(ev){ if(ev.key==='Escape') document.querySelectorAll('.ovl.show').forEach(function(o){ o.classList.remove('show'); }); });
+/* ㊿+172 포탈 안(견적 · 프로젝트 리포트 · 정산 화면)에서 입력하다가 Ctrl+K → 포탈 검색 · AI 질문 창(쓰던 내용은 이 화면에 그대로) */
+document.addEventListener('keydown', function(ev){
+  if(!(ev.ctrlKey || ev.metaKey) || (ev.key!=='k' && ev.key!=='K') || window.parent===window) return;
+  ev.preventDefault(); try{ window.parent.postMessage({type:'svcFind'}, location.origin); }catch(e){}
+});

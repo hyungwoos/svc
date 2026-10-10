@@ -7,16 +7,16 @@ import { $, applyPerms, canView, canWrite, clearSess, cssv, el, esc, isCC, isGN,
   sessWrite, STATE, tpl, won } from './core.js';
 import { buildControls, expN, expScan, hbars, idxs, kpiOpen, monthlyTotal, renderAll, renderInstall, renderKpis, renderMatrix, renewNeedScan } from './dash.js';
 import { ask } from './ai.js';
-import { applyCodes, loadCodes } from './grids.js';
+import { applyCodes, GRIDS, loadCodes } from './grids.js';
 import { eqCanRet, eqOrderById, eqRetOpen, eqRetSet, eqScan, eqSerialsHtml, eqWant, syncOrderAssets } from './equipment.js';
 import { applyChannelMenu, chOf, ctRawOf, ctSuccessor, dcRules, ensureLeadSrc, liveData, openRenewList, renewScan } from './analysis.js';
 import { applyMenuConf, fkNorm, freqTop, menuSegments, navSub, openMenuEdit, renderTodo, subgrpSync, viewLabel } from './tools.js';
 import { loadInbound, loadMxMemos } from './inbound.js';
 import { UPD, updCheck } from './upd.js';
 import { applyMenuFold, closeDrawer, ensureGroupOpen, setupSide } from './sales.js';
-import { btnBackSync, gridGoPre, loadHide, NAV, navMenu, oiOpen, openDetail, qvCfg, qvGo, renderGrid, switchView } from './grid.js';
+import { btnBackSync, gridGoPre, loadHide, NAV, navMenu, oiOpen, openDetail, qvCfg, qvGo, renderGrid, switchView, VIEW_UI, viewResetHard } from './grid.js';
 import { closeOvl, logChange, openOvl, OVL_SKIP_CLEAN, ovlMarkClean, setupEdit, toggleAuthMenu } from './edit.js';
-import { HOME, homeAskOvl, homeOn, homeSum, homeTodo, openFindX } from './home.js';
+import { homeOn, homeRender, placeSearchBtn, srchCtx } from './home.js';
 
 
 /* ==================================================================
@@ -193,6 +193,8 @@ export function buildGnNav(rail){
   var me=String(ST.AUTH_USER||'');
   h+=tpl`<div class="gn-right">${rawHtml(adm? topBtn(adm) : '')}<button type="button" class="gn-me" data-v="account" title="내 계정 · 로그아웃" aria-label="내 계정 메뉴 (${me})"><span class="gn-av">${(me.split('@')[0]||'?').slice(0,1).toUpperCase()}</span><span class="gn-wst"><b>${me.split('@')[0]||'로그인'}</b><small>${me.indexOf('@')>0? '@'+me.split('@')[1] : ''}</small></span></button></div></div>`;
   h+=tpl`<div class="gn-menu" id="gnMenu" role="menu" hidden></div>`;
+  /* ㊿+172 오른쪽 위로 옮겨 둔 «검색» · «AI 대화» 버튼은 메뉴 줄을 다시 그리기 전에 위 띠로 꺼내 두었다가 다시 놓음(지우지 않게) */
+  (function(){ var tb0=document.querySelector('#app .topbar'); ['cmdBar','aipOpenBtn'].forEach(function(id){ var x=document.getElementById(id); if(x && tb0 && rail.contains(x)) tb0.appendChild(x); }); })();
   rail.innerHTML=h;
   /* 역할 나누기(㊿+167): 위 검색 바 = 화면 이동·검색 · 홈 질문 칸 = AI 분석 */
   /* ㊿+171 위 «검색»은 작은 버튼 + Ctrl+K · 홈 가운데 입력칸이 검색·질문 주 진입점(home.js homeSetup) */
@@ -209,6 +211,7 @@ export function buildGnNav(rail){
     document.addEventListener('click', function(e){ var r=document.getElementById('rail'); if(GN_NAV.open && r && !r.contains(e.target)) gnMenuClose(); });
     document.addEventListener('keydown', function(e){ if(e.key==='Escape' && GN_NAV.open){ var k=GN_NAV.open; gnMenuClose(); var b=document.querySelector('#rail .gn-tb[data-seg="'+k.replace(/["\\]/g,'')+'"]'); if(b) b.focus(); } });
   }
+  try{ placeSearchBtn(); }catch(e){}
   railSync(ST.CUR_VIEW);
 }
 export function gnMenuClose(){
@@ -267,6 +270,12 @@ export function gnTitleSync(v){
   if(b && v!=='dash'){ var sub=navSub(b); for(var el=b.previousElementSibling; el; el=el.previousElementSibling){ if(el.classList && el.classList.contains('grp')){ grp=el.textContent.trim(); break; } } grp=[grp, sub].filter(Boolean).join(' › '); }
   if(v==='dash'||!v){ var d=new Date(), la=document.getElementById('loadedAt'); grp=(d.getMonth()+1)+'월 '+d.getDate()+'일 ('+'일월화수목금토'.charAt(d.getDay())+')'+(la && la.textContent? ' · '+la.textContent.replace(/\d{4}-\d\d-\d\d\s*/,'') : ''); }
   t.textContent=name; s.textContent=grp;
+  /* ㊿+172 메뉴 재진입은 마지막 상태 그대로 — 처음 상태로는 여기 «초기화»(표 · 화면별 선택이 있는 화면) */
+  var rb=document.getElementById('btnViewReset'), tt=t.parentElement;
+  var can=!!v && v!=='dash' && ((GRIDS[v] && !GRIDS[v].custom) || VIEW_UI[v]);
+  if(!rb && tt){ rb=document.createElement('button'); rb.type='button'; rb.id='btnViewReset'; rb.className='cbtn vreset'; rb.textContent='초기화'; rb.title='이 화면을 처음 상태로 — 검색 · 필터 · 정렬 · 쪽 · 화면별 선택 (메뉴를 다시 눌러도 지금 상태는 그대로 남습니다)'; rb.onclick=function(){ viewResetHard(ST.CUR_VIEW); }; tt.appendChild(rb); }
+  if(rb){ rb.hidden=!(can || v==='quote'); var qt=v==='quote';   /* 견적은 메뉴 재진입에 종류 고르기 창을 다시 띄우지 않음 — 여기서 */
+    rb.textContent=qt? '견적 종류 다시 고르기' : '초기화'; rb.title=qt? '기업 · 공공 · 발주서 종류 고르기 창을 다시 엽니다' : '이 화면을 처음 상태로 — 검색 · 필터 · 정렬 · 쪽 · 화면별 선택 (메뉴를 다시 눌러도 지금 상태는 그대로 남습니다)'; }
 }
 
 /* ㊿+168 금액 단위 안내 — 화면마다 실제 단위(가격표 = 원 · 금액 없는 화면은 숨김 · 주간보고 예상매출 = 백만원) · 누르면 용어 설명 */
@@ -352,7 +361,7 @@ export function cmdAskHit(q){
   return {t:'AI', nm:'«'+q+'» 물어보기', sb:'매출·고객·계약 데이터를 기준으로 답합니다 (Enter 대신 클릭)', kai:1,
     go:function(){
       /* ㊿+171 지니언스: 다른 화면에서는 그 자리에서 검색·질문 창으로(보던 목록 · 조건 그대로 · 문맥으로 함께) */
-      if(homeOn() && !(ST.CUR_VIEW==='dash' && !HOME.mode)){ openFindX(); homeAskOvl(q); return; }
+      if(homeOn()){ ask(q, {from:'help', ctx:ST.CUR_VIEW!=='dash'? srchCtx() : null}); return; }   /* ㊿+172 그 자리에서 AI 패널로(보던 화면 그대로) */
       switchView('dash'); var qi=document.getElementById('q'); if(qi){ qi.value=q; } try{ ask(q); }catch(e){} try{ document.querySelector('.ask').scrollIntoView({block:'start',behavior:'smooth'}); }catch(e){} }};
 }
 
@@ -391,6 +400,10 @@ export function gnSumRender(rows){
     else if(k==='exp') kpiOpen('exp');
     else { box.scrollIntoView({behavior:'smooth', block:'start'}); var f=box.querySelector('.ib-lane.crit .cbtn.pri, .ib-lane .cbtn.pri'); if(f) setTimeout(function(){ f.focus(); }, 300); } }; });
 }
+/** ㊿+172 장비 할 일 → 그 신청 하나로 바로(신청 내역에서 그 행만 · 시리얼 · 회수는 그 화면에서) */
+export function eqLinks(list){ return (list||[]).slice(0,6).map(function(o){ return {l:(o.customer||'—')+' #'+o.id+(o.model? ' · '+o.model : ''), go:function(){ gridGoPre('orders', '신청 #'+o.id+' — '+(o.customer||''), function(r){ return r.id===o.id; }); }}; }); }
+/** 이번 달 남은 날(오늘 포함) — 할 일 «기한» 급한 정도 */
+export function monthLeft(){ var d=new Date(), e=new Date(d.getFullYear(), d.getMonth()+1, 0); return e.getDate()-d.getDate()+1; }
 /** 장비 보드를 «처리 대기» 또는 «회수 진행»만 보이게 — 홈 알림·요약 타일과 같은 기준 */
 export function eqbOnly(kind){ EQB.only=kind; switchView('eqboard'); }
 export function renderInbox(){
@@ -420,13 +433,14 @@ export function renderInbox(){
       s:Object.keys(byCh).map(function(c){ return c+' '+byCh[c]; }).join(' · ')+' · '+names(pendL, function(o){ return o.customer; }),
       who:names(pendL, function(o){ return o.customer; }), own:names(pendL, function(o){ return o.mgr_name || (o.requester? String(o.requester).split('@')[0] : ''); }, 2)||'',
       due:age>=3? '오늘 — '+age+'일째 대기' : '3일 안', imp:'출고 대기 '+pq+'대 · '+Object.keys(byCh).map(function(c){ return c+' '+byCh[c]; }).join(' · '),
-      nm:'장비 신청 처리 대기', cnt:pendL.length+'건', dueS:age>=3? '오늘 · '+age+'일째' : '3일 안',
+      links:eqLinks(pendL), nm:'장비 신청 처리 대기', cnt:'신청 '+pendL.length+'건', dueS:age>=3? '지남 · '+age+'일째' : '3일 안', dk:age>=3? 0 : 1,
       acts:[{l:'보류', go:function(){ ccSnooze('eq',1); }},{l:'대기 신청 '+pendL.length+'건 보기', pri:1, go:function(){ eqbOnly('pend'); }}]});
   }
   if(retL.length){
     var rA=0, rD=0; retL.forEach(function(o){ rA+=eqWant(o).length; rD+=eqRetSet(o).length; });
     add('ret', {lv:3, ic:'box', cls:'info', n:retL.length, t:tpl`회수 진행 중 <span class="num">${retL.length}건</span>${rawHtml(retP.length? ' — 회수예정 '+retA.length+' · 일부 회수 중 '+retP.length : '')}`,
-      nm:'장비 회수 진행'+(retA.length && retP.length? ' (회수예정 '+retA.length+' · 일부 회수 중 '+retP.length+')' : retP.length? ' (일부 회수 중)' : ''), cnt:retL.length+'건', dueS:'회수 일정대로',
+      links:eqLinks(retL),
+      nm:'장비 회수 진행'+(retA.length && retP.length? ' (회수예정 '+retA.length+' · 일부 회수 중 '+retP.length+')' : retP.length? ' (일부 회수 중)' : ''), cnt:'신청 '+retL.length+'건', dueS:'회수 일정대로', dk:3,
       s:retL.slice(0,3).map(function(o){ var all=eqWant(o).length, d=eqRetSet(o).length; return (o.customer||'')+' '+d+'/'+all+'대'; }).join(' · ')+(retL.length>3? ' 외 '+(retL.length-3)+'건':''),
       who:names(retL, function(o){ return o.customer; }), own:names(retL, function(o){ return o.mgr_name || (o.requester? String(o.requester).split('@')[0] : ''); }, 2)||'', due:'회수 일정대로', imp:'회수 완료 '+rD+'대 / 대상 '+rA+'대',
       acts:[{l:'회수 진행 '+retL.length+'건 보기', pri:1, go:function(){ eqbOnly('ret'); }}]});
@@ -438,14 +452,14 @@ export function renderInbox(){
     add('rnl', {lv:1, ic:'clock', cls:'crit', n:RS.lapsed.length, t:tpl`만기 지났는데 미처리 <span class="num">${RS.lapsed.length}건</span> — 이미 LIVE 에서 빠졌습니다${rawHtml(lrec? ' (최근 2개월 '+lrec+'건)':'')}`,
       s:names(RS.lapsed, function(r){ return r.cust; })+' · 월 '+won(lsum)+'천원 · 연장이면 되살리고, 끝났으면 서비스종료·해지로 정리',
       who:names(RS.lapsed, function(r){ return r.cust; }), own:'', due:'지금 — 종료월이 지남', imp:'월 '+won(lsum)+'천원 · LIVE 에서 빠짐',
-      nm:'만기 지났는데 미처리 계약', cnt:RS.lapsed.length+'건', dueS:'지금',
+      nm:'만기 지났는데 미처리 계약', cnt:'계약 '+RS.lapsed.length+'건', dueS:'지남', dk:0,
       acts:[{l:'만기 지난 '+RS.lapsed.length+'건 연장·종료 처리', pri:1, go:function(){ openRenewList('lapsed'); }}]});
   }
   if(RS && RS.due.length){
     var dsum=RS.due.reduce(function(a,r){ return a+(r.mrr||0); },0);
     add('rnd', {lv:2, ic:'clock', cls:'warn', n:RS.due.length, t:tpl`${mk(b)} 만기 <span class="num">${RS.due.length}건</span> — ${mk(b+1)} 1일 LIVE 에서 빠집니다`,
       s:names(RS.due, function(r){ return r.cust; })+' · 월 '+won(dsum)+'천원'+(RS.next.length? ' · 다음 달 만기 '+RS.next.length+'건 대기':''),
-      nm:mk(b)+' 만기 계약 처리', cnt:RS.due.length+'건', dueS:mk(b)+' 말',
+      nm:mk(b)+' 만기 계약 처리', cnt:'계약 '+RS.due.length+'건', dueS:mk(b)+' 말까지', dk:monthLeft()<=3? 1 : 2,
       who:names(RS.due, function(r){ return r.cust; }), own:'', due:mk(b)+' 말까지 ('+mk(b+1)+' 1일 LIVE 제외)', imp:'월 '+won(dsum)+'천원'+(RS.next.length? ' · 다음 달 만기 '+RS.next.length+'건 대기':''),
       acts:[{l:'보류', go:function(){ ccSnooze('rnd',3); }},{l:'이달 만기 '+RS.due.length+'건 처리', pri:1, go:function(){ openRenewList('due'); }}]});
   }
@@ -454,13 +468,13 @@ export function renderInbox(){
   if(!EQ){ var DS=null; try{ DS={crit:0, warn:0, items:{}}; dcRules().forEach(function(r){ if(!r.items.length || r.id==='c_lapsed') return; if(r.sev==='crit' || r.sev==='warn') DS[r.sev]+=r.items.length; if(r.sev==='crit') DS.items[r.title]=r.items.length; }); }catch(e){ DS=null; }
     if(DS && DS.crit){ var dcs=Object.keys(DS.items).filter(function(k){ return DS.items[k]; }).slice(0,3).map(function(k){ return k+' '+DS.items[k]; }).join(' · ');
       add('dc', {lv:1, ic:'scale', cls:'crit', n:DS.crit, t:tpl`데이터 점검 — 바로 고칠 항목 <span class="num">${rawHtml(DS.crit)}건</span>${rawHtml(DS.warn? ' · 확인 필요 '+DS.warn+'건':'')}`,
-      s:dcs, who:dcs, own:'관리자', due:'오늘', imp:'매출·LIVE·만기 숫자가 틀리게 나올 수 있음', nm:'데이터 바로 고칠 것', cnt:DS.crit+'건', dueS:'오늘',
+      s:dcs, who:dcs, own:'관리자', due:'오늘', imp:'매출·LIVE·만기 숫자가 틀리게 나올 수 있음', nm:'데이터 바로 고칠 것', cnt:'항목 '+DS.crit+'건', dueS:'오늘', dk:1,
       acts:[{l:'보류', go:function(){ ccSnooze('dc',3); }},{l:'바로 고칠 '+DS.crit+'건 보기', pri:1, go:function(){ switchView('dcheck'); }}]}); } }
   if(GNI0 && !EQ){   /* ㊿+171 지니언스: 만료 예정 전체가 아니라 «재약정 대응 필요»(자동연장 · 재약정 등록 제외) — 홈 핵심 현황과 같은 숫자라 «지금 챙길 일» 3줄에서는 빠지고 «전체 할 일»에만 */
     var RN=renewNeedScan(list, b, EN), rnL=RN.rows.map(function(k){ return ST.DATA.rows[k]; });
     if(rnL.length){ var ends2=rnL.map(function(r){ return r.endIdx; }).sort(function(x,y){ return x-y; });
       add('exp', {lv:3, ic:'clock', cls:'info', n:rnL.length, kpi:1, t:tpl`재약정 대응 필요 <span class="num">${rnL.length}건</span> · 고객사 ${rawHtml(RN.custN)}곳 — 월 <span class="num">${won(RN.amt)}</span>천원`,
-        nm:'재약정 대응', cnt:rnL.length+'건', dueS:'종료 '+mk(ends2[0])+(ends2.length>1? '~'+mk(ends2[ends2.length-1]):''),
+        nm:'재약정 대응(만료 전 연락)', cnt:'계약 '+rnL.length+'건', dueS:'종료 '+mk(ends2[0])+(ends2.length>1? '~'+mk(ends2[ends2.length-1]):''), dk:ends2[0]<=b? 2 : 3,
         who:names(rnL, function(r){ return r.cust; }), own:'', due:'종료 '+mk(ends2[0])+(ends2.length>1? '~'+mk(ends2[ends2.length-1]):''), imp:'월 '+won(RN.amt)+'천원 · '+EN+'개월 내 만료 '+XS.rows.length+'건 중 자동연장 '+RN.auto.length+' · 재약정 등록 '+RN.sure.length+' 제외',
         acts:[{l:'재약정 대응 '+rnL.length+'건 보기', pri:1, go:function(){ kpiOpen('expNeed'); }}]}); }
   }
@@ -473,13 +487,13 @@ export function renderInbox(){
   }
   if(!bizDone){
     add('biz', {lv:2, ic:'scale', cls:'', n:1, t:curYm+' 비즈포탈 차액이 아직 입력되지 않았습니다', s:'엑셀을 올리면 고객사·회계매출 기준으로 자동 대조합니다',
-      who:curYm+' 비즈포탈 차액', own:'정산 담당', due:curYm+' 마감 전', imp:'정산·목표 달성률이 «미입력»으로 남음', nm:curYm+' 비즈포탈 차액 입력', cnt:'1건', dueS:curYm+' 마감 전',
+      who:curYm+' 비즈포탈 차액', own:'정산 담당', due:curYm+' 마감 전', imp:'정산·목표 달성률이 «미입력»으로 남음', nm:curYm+' 비즈포탈 차액 입력', cnt:'1개월', dueS:curYm+' 마감 전', dk:monthLeft()<=3? 1 : 2,
       acts:[{l:'다음 주에', go:function(){ ccSnooze('biz',7); }},{l:'비즈포탈 엑셀 올리기', pri:1, go:function(){ switchView('biz'); }}]});
   }
   if(!EQ){
     if(inbN>0){
       add('inb', {lv:1, ic:'inbox', cls:'crit', n:inbN, t:tpl`인바운드 미대응 <span class="num">${rawHtml(inbN)}건</span>`, s:'진행중인데 '+qvCfg().inbIdle+'일 이상 대응 기록이 없습니다',
-      who:'올해 진행중 인바운드', own:'인바운드 담당', due:'오늘', imp:qvCfg().inbIdle+'일 넘게 대응 기록 없음 — 놓친 문의일 수 있음', nm:'인바운드 장기 미대응', cnt:inbN+'건', dueS:'오늘',
+      who:'올해 진행중 인바운드', own:'인바운드 담당', due:'오늘', imp:qvCfg().inbIdle+'일 넘게 대응 기록 없음 — 놓친 문의일 수 있음', nm:'인바운드 장기 미대응', cnt:'문의 '+inbN+'건', dk:0, dueS:'오늘',
       acts:[{l:'미대응 '+inbN+'건 보기', pri:1, go:function(){ qvGo('inbound', 'idle'); }}]}); }
     else zeros.push('인바운드 미대응 '+(inbN==null? '…':'0'));
     /* ㊿+171 OI: 일정 지남(late)과 다음 행동 없음(nonext — 다음 할 일 또는 예정일이 빈 진행 중 OI)을 한 줄로 — 일정이 없는 건을 «할 일 없음»으로 보이지 않게 · 빠른 보기와 같은 기준 */
@@ -490,7 +504,7 @@ export function renderInbox(){
       var oiActs=[]; if(oiLate.length) oiActs.push({l:'일정 지난 OI '+oiLate.length+'건 보기', pri:1, go:function(){ qvGo('oi', 'late'); }});
       if(oiNone.length) oiActs.push({l:'다음 행동 없는 OI '+oiNone.length+'건 보기', pri:!oiLate.length? 1:0, go:function(){ qvGo('oi', 'nonext'); }});
       add('oi', {lv:2, ic:'target', cls:'warn', n:oiAll.length, t:tpl`OI 다음 행동 점검 <span class="num">${oiAll.length}건</span> — ${oiParts.join(' · ')}`, s:names(oiAll, function(o){ return o.customer; }),
-      nm:'OI 다음 행동 점검 ('+oiParts.join(' · ')+')', cnt:oiAll.length+'건', dueS:oiLate.length? '예정일 지남' : '일정 없음',
+      nm:'OI 다음 행동 점검 ('+oiParts.join(' · ')+')', cnt:'OI '+oiAll.length+'건', dueS:oiLate.length? '예정일 지남' : '일정 정하기', dk:oiLate.length? 0 : 2,
       who:names(oiAll, function(o){ return o.customer; }), own:names(oiAll, function(o){ return o.owner; }, 2)||'', due:oiLate.length? '예정일 지남 (가장 오래된 '+od+')' : '다음 할 일 · 예정일을 정해야 함', imp:(oAmt? '예상 금액 '+won(oAmt)+'천원 · ' : '')+'진행 중인데 다음 일정이 없거나 지남',
       acts:oiActs}); }
     else zeros.push('OI 일정 · 다음 행동 모두 있음');
@@ -503,7 +517,7 @@ export function renderInbox(){
   function rowHtml(o,i,hid){ return tpl`<div class="ib-row" data-i="${rawHtml(i)}"${rawHtml(hid? ' hidden':'')}><span class="ib-ic ${rawHtml(o.cls)}">${rawHtml(ico(o.ic,16))}</span><div class="ib-b"><div class="ib-t">${rawHtml(o.t)}</div>${rawHtml(GNI && o.who? metaHtml(o) : tpl`<div class="ib-s" title="${o.s||''}">${o.s||''}</div>`)}</div>`+
       tpl`<div class="ib-acts">${rawHtml(o.acts.map(function(a,j){ return tpl`<button type="button" class="cbtn${a.pri?' pri':''}" data-i="${rawHtml(i)}" data-j="${rawHtml(j)}">${a.l}</button>`; }).join(''))}</div></div>`; }
   /* ㊿+171 지니언스 홈: 지금 챙길 일 3줄 · 핵심 현황 3칸(home.js) — 대상 건수를 더한 «총합»은 쓰지 않음(규칙끼리 대상이 겹칠 수 있음) */
-  if(GNI && !EQ){ try{ homeTodo(rows, zeros, snz); homeSum(); }catch(e){ console.warn('home', e); }
+  if(GNI && !EQ){ try{ homeRender(rows, zeros, snz); }catch(e){ console.warn('home', e); }
     GN_BADGE.inb=null; GN_BADGE.inbound=inbN||0; GN_BADGE.dc=(DS && DS.crit)||0; ccGreeting(rows.length); try{ railSync(ST.CUR_VIEW); }catch(e){} return; }
   var tgtN=rows.reduce(function(a,o){ return a+(+o.n||0); },0);
   var h=tpl`<div class="ib-head"><h2>${GNI? '오늘 처리할 일' : '인박스'} <span class="ctag${rows.length?' warn':' ok'}" data-n="${rawHtml(rows.length)}">${rawHtml(GNI? (rows.length? '주의 항목 '+rows.length+'종 · 대상 '+tgtN+'건' : '없음') : String(rows.length))}</span></h2><span class="mini" style="display:flex;align-items:center;gap:6px"><i style="width:7px;height:7px;border-radius:50%;background:var(--brand);display:inline-block"></i>${rawHtml(la&&la.textContent? esc(la.textContent):'')} · 자동 갱신</span></div>`;

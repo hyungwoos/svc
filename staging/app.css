@@ -2351,49 +2351,52 @@ html[data-skin="gn"] #gnSum{order:0;grid-column:1/-1;display:grid;grid-template-
 }
 /* 폰 위 띠: «＋ 등록» 하나로(계약 등록·변경도 그 안) — 한 줄 + 검색 줄 */
 @media (max-width:760px){ html[data-skin="gn"] .topbar #btnEdit{display:none!important} html[data-skin="gn"] .topbar #btnFont{padding:0 8px} }
-/* ==== ㊿+171 AI 중심 홈 · 검색·질문 하나로 ==== */
-/* ── 홈 순서: AI 질문 → 핵심 현황 → 지금 챙길 일 → 상세 진입 / 사업 분석 · 전체 할 일 · 최근 작업은 같은 홈 안 상세 ── */
-html[data-skin="gn"] #gnModeH{order:-1}
+/* ==== ㊿+171 → ㊿+172 홈 — 질문하지 않아도 현황을 보고 일을 시작하는 고정 업무 공간 ==== */
+/* 순서: 검색·AI 한 줄 → 핵심 현황 → 바로가기 → 매출 추이 + 우선 업무 → 최근 → (펼침) 사업 현황 상세 · 분석 */
 html[data-skin="gn"] #viewDash .ask{order:0}
 html[data-skin="gn"] #gnSum{order:1;grid-template-columns:repeat(3,minmax(0,1fr))}
-html[data-skin="gn"] #ccInbox{order:2}
-html[data-skin="gn"] #gnLinks{order:3}
+html[data-skin="gn"] #gnQuick{order:2}
+html[data-skin="gn"] #gnTrend{order:3;grid-column:span 7}
+html[data-skin="gn"] #ccInbox{order:3;grid-column:span 5;align-self:stretch}
 html[data-skin="gn"] #gnRecent{order:4}
-html[data-skin="gn"] #ccHeroHost,html[data-skin="gn"] #kpis{order:5}
-html[data-skin="gn"] #ccMore{order:6} html[data-skin="gn"] #ccAnalysis{order:7}
-/* 기본(AI 홈) — 숫자 카드 묶음 · 그래프 · 분석은 «사업 분석» 안으로 */
-html[data-skin="gn"] #viewDash:not([data-hm="biz"]) :is(#gnBizH,#ccHeroHost,#kpis,#ccMore,#ccAnalysis,#goalBar){display:none!important}
-html[data-skin="gn"] #viewDash:not([data-hm="recent"]) #gnRecent{display:none}
-html[data-skin="gn"] #viewDash[data-hm] :is(.ask,#gnSum,#gnLinks){display:none!important}
-html[data-skin="gn"] #viewDash:is([data-hm="biz"],[data-hm="recent"]) #ccInbox{display:none!important}
-html[data-skin="gn"] #viewDash:not([data-hm]) #gnModeH{display:none}
-html[data-skin="gn"] #viewDash :is(#noticeStack,#todoWrap,#gnBizH){display:none!important}
-html[data-skin="gn"] body:not([data-hm="biz"]) #btnWidgets{display:none!important}
+html[data-skin="gn"] #gnBizH{order:5}
+html[data-skin="gn"] #ccHeroHost,html[data-skin="gn"] #kpis{order:6}
+html[data-skin="gn"] #ccMore{order:7} html[data-skin="gn"] #ccAnalysis{order:8}
+@media (max-width:1150px){ html[data-skin="gn"] :is(#gnTrend,#ccInbox){grid-column:1/-1} html[data-skin="gn"] #ccInbox{order:2} html[data-skin="gn"] #gnQuick{order:3} }
+/* 사업 현황 상세 · 분석 — 같은 화면에서 펼침(위는 그대로) */
+html[data-skin="gn"] #viewDash:not(.hm-detail) :is(#gnBizH,#ccHeroHost,#kpis,#ccMore,#ccAnalysis){display:none!important}
+html[data-skin="gn"] #viewDash :is(#noticeStack,#todoWrap,#gnLinks,#gnModeH){display:none!important}
+html[data-skin="gn"] body:not(.hm-detail-on) #btnWidgets{display:none!important}
 html[data-skin="gn"] body:not([data-ct="1"]) .topbar #btnEdit{display:none!important}
 html[data-skin="gn"] .topbar #btnFind{display:none!important}
+html[data-skin="gn"] #gnBizH{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 12px;padding:8px 4px 0}
+html[data-skin="gn"] #gnBizH .cbtn{align-self:center}
 
-/* ── ① AI 검색·질문 ── */
+/* ── ① 한 줄 검색 · AI 질문 + 추천 질문(옆) ── */
 .ask-h{display:none}
-html[data-skin="gn"] #viewDash .ask{display:block;border:0;border-radius:0;background:transparent;box-shadow:none;padding:6px 0 0;margin:0}
-html[data-skin="gn"] #viewDash .ask .ask-h{display:block;margin:0 0 12px;font-size:22px;font-weight:800;letter-spacing:-.02em;color:var(--ink)}
-html[data-skin="gn"] #viewDash .ask .ask-row{display:flex;align-items:center;gap:10px;margin:0;padding:6px 6px 6px 18px;min-height:60px;border:1.5px solid var(--ring);border-radius:16px;background:var(--surface);box-shadow:0 6px 18px rgba(20,24,32,.06)}
+html[data-skin="gn"] #viewDash .ask{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;border:0;border-radius:0;background:transparent;box-shadow:none;padding:0;margin:0}
+html[data-skin="gn"] #viewDash .ask .ask-h{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+html[data-skin="gn"] #viewDash .ask .ask-row{flex:1 1 520px;min-width:0;display:flex;align-items:center;gap:8px;margin:0;padding:4px 4px 4px 14px;min-height:48px;border:1.5px solid var(--ring);border-radius:14px;background:var(--surface)}
 html[data-skin="gn"] #viewDash .ask .ask-row:focus-within{border-color:var(--brand);box-shadow:0 0 0 3px color-mix(in srgb,var(--brand) 18%,transparent)}
 html[data-skin="gn"] #viewDash .ask .ask-ico{display:none}
-html[data-skin="gn"] #viewDash .ask .qwrap{padding-left:30px}
-html[data-skin="gn"] #viewDash .ask .qwrap::before{width:20px;height:20px;margin-top:-10px}
-html[data-skin="gn"] #viewDash .ask #q{height:46px;font-size:15px;border:0;background:transparent;box-shadow:none;width:100%;color:var(--ink)}
+html[data-skin="gn"] #viewDash .ask .qwrap{padding-left:28px}
+html[data-skin="gn"] #viewDash .ask .qwrap::before{width:18px;height:18px;margin-top:-9px}
+html[data-skin="gn"] #viewDash .ask #q{height:38px;font-size:15px;border:0;background:transparent;box-shadow:none;width:100%;color:var(--ink)}
 html[data-skin="gn"] #viewDash .ask #q::placeholder{color:var(--muted)}
 html[data-skin="gn"] #viewDash .ask #aiBadge{display:none}
-html[data-skin="gn"] #viewDash .ask #btnAsk,html[data-skin="gn"] #fkAsk{height:46px;padding:0 22px;border-radius:12px;font-size:15px;font-weight:700;background:var(--gn-lime);border-color:var(--gn-lime);color:var(--gn-lime-ink)}
-html[data-skin="gn"] #viewDash .ask #btnAsk:hover,html[data-skin="gn"] #fkAsk:hover{background:#8DCB33}
-html[data-skin="gn"] #viewDash .ask #btnAsk.asking,html[data-skin="gn"] #fkAsk.asking{background:var(--surface);color:var(--ink-2);border-color:var(--ring)}
-html[data-skin="gn"] #viewDash .ask #chips{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 0}
-html[data-skin="gn"] #viewDash .ask #chips .chip{height:36px;padding:0 14px;border-radius:999px;font-size:14px;font-weight:600;background:var(--surface);border:1px solid var(--ring);color:var(--ink-2)}
+html[data-skin="gn"] #viewDash .ask #btnAsk,html[data-skin="gn"] #fkAsk,html[data-skin="gn"] #aipAsk{height:38px;padding:0 14px;border-radius:10px;font-size:14px;font-weight:700;background:var(--gn-lime);border-color:var(--gn-lime);color:var(--gn-lime-ink);white-space:nowrap}
+html[data-skin="gn"] #viewDash .ask #btnAsk:hover,html[data-skin="gn"] #fkAsk:hover,html[data-skin="gn"] #aipAsk:hover{background:#8DCB33}
+html[data-skin="gn"] :is(#btnAsk,#fkAsk,#aipAsk).asking{background:var(--surface)!important;color:var(--ink-2)!important;border-color:var(--ring)!important}
+html[data-skin="gn"] #viewDash .ask #chips{flex:0 1 auto;display:flex;flex-wrap:wrap;gap:6px;margin:0}
+html[data-skin="gn"] #viewDash .ask #chips .chip{height:32px;padding:0 12px;border-radius:999px;font-size:13px;font-weight:600;background:var(--surface);border:1px solid var(--ring);color:var(--ink-2)}
 html[data-skin="gn"] #viewDash .ask #chips .chip:hover{border-color:var(--brand);color:var(--ink)}
 html[data-skin="gn"] #viewDash .ask #chips .chip-more{display:none}
 
 /* 검색 결과 목록 — 홈(입력칸 아래로 펼침) · 창(바로 아래) */
-html[data-skin="gn"] #viewDash .ask .sug{top:54px;left:-30px;right:-110px;max-height:min(420px,60vh);overflow:auto;border-radius:14px;box-shadow:0 18px 40px rgba(20,24,32,.16);padding:6px}
+html[data-skin="gn"] #viewDash .ask .ask-row{position:relative}
+html[data-skin="gn"] #viewDash .ask .qwrap{position:static}
+html[data-skin="gn"] #viewDash .ask .qwrap::before{left:14px}
+html[data-skin="gn"] #viewDash .ask .sug{top:calc(100% + 6px);left:0;right:0;max-height:min(420px,60vh);overflow:auto;border-radius:14px;box-shadow:0 18px 40px rgba(20,24,32,.16);padding:6px}
 .sr-g{padding:8px 10px 4px;font-size:12px;font-weight:700;color:var(--muted)}
 .sr-it{display:grid;grid-template-columns:auto minmax(0,auto) minmax(0,1fr) auto;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;cursor:pointer;color:var(--ink-2)}
 .sr-it[aria-selected="true"],.sr-it:hover{background:var(--surface-2);color:var(--ink)}
@@ -2485,93 +2488,149 @@ html[data-skin="gn"] .answer #ansSuggest .chip{background:var(--surface);border:
 .ans-thread .th summary b{color:var(--muted);margin-right:4px}
 .ans-thread .th-a{font-size:14px;line-height:1.6;color:var(--ink-2);padding:2px 0 8px 18px}
 
-/* ── ② 핵심 현황 3칸 — 색은 경고만 ── */
-html[data-skin="gn"] .gn-sum .gs-c{padding:14px 18px}
+/* ── ② 핵심 현황 3칸 — 전체 사업 · 이번 달 고정 · 칸마다 기준 한 줄 · 색은 경고만 ── */
+html[data-skin="gn"] .gn-sum .gs-c{padding:12px 16px;gap:1px}
 html[data-skin="gn"] .gn-sum .gs-l{font-size:14px}
 html[data-skin="gn"] .gn-sum .gs-s{font-size:13px}
+html[data-skin="gn"] .gn-sum .gs-b{font-size:12px;color:var(--muted)}
 html[data-skin="gn"] .gn-sum .gs-c.warn{border-color:var(--grid)}
 html[data-skin="gn"] .gn-sum .gs-c.warn .gs-v b{color:var(--warn-ink,#875A00)}
 
-/* ── ③ 지금 챙길 일 — 한 상자 · 줄 목록 ── */
-html[data-skin="gn"] #ccInbox{padding:0;border-radius:16px}
-html[data-skin="gn"] .hm-head{display:flex;align-items:center;gap:10px;padding:14px 18px 6px}
-html[data-skin="gn"] .hm-head h2{display:flex;align-items:center;gap:8px;margin:0;font-size:18px}
+/* ── ③ 바로가기 ── */
+.gn-quick{display:flex;flex-wrap:wrap;gap:8px}
+.gn-quick button{display:inline-flex;align-items:center;gap:6px;height:38px;padding:0 14px;border:1px solid var(--grid);border-radius:10px;background:var(--surface);color:var(--ink);font:inherit;font-size:14px;font-weight:600;cursor:pointer}
+.gn-quick button svg{color:var(--ink-2)}
+.gn-quick button:hover{border-color:var(--axis)}
+.gn-quick button:focus-visible{outline:2px solid var(--s1);outline-offset:2px}
+
+/* ── ④ 매출 추이(하나) ── */
+.gn-trend{padding:14px 16px 10px;border-radius:16px;display:flex;flex-direction:column;min-width:0}
+.gn-trend:focus{outline:none}
+.gn-trend .gt-h{display:flex;align-items:baseline;gap:8px 12px;flex-wrap:wrap}
+.gn-trend h2{margin:0;font-size:15px;font-weight:800}
+.gn-trend h2 .mini{font-weight:400;margin-left:4px}
+.gn-trend .gt-d{margin-left:auto;font-size:13px;color:var(--ink-2)}
+.gn-trend .gt-d .up{color:var(--s3-ink,#0f7a52)} .gn-trend .gt-d .down{color:var(--critical,#b3261e)}
+.gn-trend .gt-c{height:190px;margin-top:6px}
+.gn-trend .gt-more{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 10px;margin-top:8px;padding:8px 2px 2px;border:0;border-top:1px solid var(--grid);background:none;color:var(--s1-ink);font:inherit;font-size:14px;font-weight:600;cursor:pointer;text-align:left}
+.gn-trend .gt-more .mini{font-weight:400;color:var(--muted)}
+.gn-trend .gt-more:focus-visible{outline:2px solid var(--s1);outline-offset:2px}
+
+/* ── ④ 우선 업무 — 내 업무 / 팀 전체 · 줄 = 업무 · 대상 / 기한 · 담당 · 버튼 ── */
+html[data-skin="gn"] #ccInbox{padding:0;border-radius:16px;display:flex;flex-direction:column;min-width:0}
+html[data-skin="gn"] .hm-head{display:flex;align-items:center;gap:8px;padding:12px 14px 6px;flex-wrap:wrap}
+html[data-skin="gn"] .hm-head h2{display:flex;align-items:center;gap:8px;margin:0;font-size:15px;font-weight:800}
 html[data-skin="gn"] .hm-head .ctag{background:var(--surface-2);color:var(--ink-2);border-radius:999px}
-.hm-all{margin-left:auto;border:0;background:none;font:inherit;font-size:14px;font-weight:600;color:var(--s1-ink);cursor:pointer;padding:4px 2px}
-.hm-all:hover{text-decoration:underline}
-.hm-cols,.hm-row{display:grid;grid-template-columns:18px minmax(0,1fr) 64px 170px 120px 210px;align-items:center;gap:6px 14px}
-.hm-cols{padding:4px 18px;font-size:12px;font-weight:600;color:var(--muted)}
-.hm-list{list-style:none;margin:0;padding:0 0 6px}
-.hm-row{padding:10px 18px;border-top:1px solid var(--grid)}
-.hm-lv i{display:block;width:9px;height:9px;border-radius:50%;background:var(--muted)}
+.hm-scope{margin-left:auto}
+.hm-scope button{height:30px;padding:0 10px;font-size:13px}
+.hm-who{padding:0 14px 6px;font-size:13px;color:var(--ink-2)}
+.hm-who .need{color:var(--warn-ink,#875A00)}
+.hm-who .cbtn{margin-left:4px}
+.hm-list{list-style:none;margin:0;padding:0}
+.hm-row{display:grid;grid-template-columns:12px minmax(0,1fr) auto;grid-template-areas:"lv nm n" ". sub act";align-items:center;gap:2px 10px;padding:8px 14px;border-top:1px solid var(--grid)}
+.hm-row .hm-lv{grid-area:lv} .hm-row .hm-nm{grid-area:nm} .hm-row .hm-n{grid-area:n;justify-self:end} .hm-row .hm-sub{grid-area:sub;min-width:0} .hm-row .hm-act{grid-area:act;justify-self:end}
+.hm-lv i{display:block;width:8px;height:8px;border-radius:50%;background:var(--muted)}
 .hm-row.lv1 .hm-lv i{background:#D6453D} .hm-row.lv2 .hm-lv i{background:#E2A013} .hm-row.lv3 .hm-lv i{background:var(--axis,#9aa0a6)}
-.hm-nm{all:unset;cursor:pointer;min-width:0;font-size:15px;font-weight:650;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:flex;align-items:center;gap:6px}
+.hm-nm{all:unset;cursor:pointer;min-width:0;font-size:14px;font-weight:650;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:flex;align-items:center;gap:6px}
 .hm-nm .chev{font-size:12px;color:var(--muted);transition:transform .15s}
 .hm-nm[aria-expanded="true"] .chev{transform:rotate(180deg)}
 .hm-nm:focus-visible{outline:2px solid var(--s1);outline-offset:2px;border-radius:4px}
-.hm-n{font-size:15px;font-weight:700;color:var(--ink)}
-.hm-due,.hm-own{font-size:14px;color:var(--ink-2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hm-n{font-size:13px;font-weight:700;color:var(--ink);white-space:nowrap}
+.hm-sub{display:flex;gap:8px;font-size:13px;color:var(--ink-2);overflow:hidden;white-space:nowrap}
+.hm-sub .hm-due,.hm-sub .hm-own{overflow:hidden;text-overflow:ellipsis}
+.hm-sub .hm-own::before{content:'· ';color:var(--muted)}
 .hm-own.none{color:var(--muted)}
 .hm-row.lv1 .hm-due{color:var(--critical,#b3261e);font-weight:600}
-.hm-act{justify-self:end}
-.hm-act .cbtn{height:34px;font-size:14px;white-space:nowrap}
+.hm-act .cbtn{height:30px;font-size:13px;white-space:nowrap}
 html[data-skin="gn"] .hm-act .cbtn.pri{background:var(--surface);border-color:var(--ring);color:var(--ink);font-weight:600}
 html[data-skin="gn"] .hm-act .cbtn.pri:hover{border-color:var(--ink-2);background:var(--surface-2)}
 .hm-d{grid-column:2/-1;padding:4px 0 2px}
 .hm-d[hidden]{display:none}
-.hm-ra{display:flex;gap:6px;margin-top:8px}
-.hm-grp{margin:0;padding:12px 18px 4px;font-size:13px;font-weight:700;color:var(--muted);border-top:1px solid var(--grid)}
-.hm-grp.lv1{color:var(--critical,#b3261e)}
-html[data-skin="gn"] #ccInbox .ib-empty{padding:16px 18px;font-size:14px}
-html[data-skin="gn"] #ccInbox .ib-foot{padding:10px 18px 14px;font-size:13px}
+.hm-ra{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.hm-all{margin:0;padding:10px 14px;border:0;border-top:1px solid var(--grid);background:none;font:inherit;font-size:14px;font-weight:600;color:var(--s1-ink);cursor:pointer;text-align:left}
+.hm-all:hover{text-decoration:underline}
+.hm-all:focus-visible{outline:2px solid var(--s1);outline-offset:-2px}
+html[data-skin="gn"] #ccInbox .ib-empty{padding:14px;font-size:14px}
+html[data-skin="gn"] #ccInbox .ib-foot{padding:8px 14px 12px;font-size:13px}
 
-/* ── ④ 상세 업무 진입 ── */
-.gn-links{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
-.gn-links button{display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:10px;align-items:center;text-align:left;padding:12px 16px;border:1px solid var(--grid);border-radius:14px;background:var(--surface);color:var(--ink);font:inherit;cursor:pointer}
-.gn-links button:hover{border-color:var(--axis)}
-.gn-links button:focus-visible{outline:2px solid var(--s1);outline-offset:2px}
-.gn-links button svg{grid-row:1/3;color:var(--ink-2)}
-.gn-links button span{font-size:15px;font-weight:700}
-.gn-links button small{font-size:13px;color:var(--muted)}
-.gn-modeh{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-.gn-modeh h2{margin:0;font-size:22px;font-weight:800;letter-spacing:-.02em}
-.gn-modeh .pill{display:inline-flex;align-items:center;gap:4px}
-.gn-recent{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
-.gn-recent .gr-col{border:1px solid var(--grid);border-radius:14px;background:var(--surface);padding:14px 16px}
-.gn-recent h3{margin:0 0 8px;font-size:15px}
-.gn-recent ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
-.gn-recent li button{all:unset;cursor:pointer;display:block;padding:6px 4px;border-radius:6px;font-size:14px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
-.gn-recent li button:hover{background:var(--surface-2)}
-.gn-recent li button:focus-visible{outline:2px solid var(--s1)}
+/* ── ⑤ 최근 본 고객 · 최근 작업 ── */
+.gn-recent{display:flex;flex-direction:column;gap:6px}
+.gn-recent .gr-l{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.gn-recent .gr-l b{font-size:13px;color:var(--muted);min-width:76px}
+.gn-recent .chip{height:30px;padding:0 10px;font-size:13px;background:var(--surface);border:1px solid var(--grid);color:var(--ink);border-radius:999px}
+.gn-recent .cap{margin:0;font-size:13px}
+
+/* ── 위쪽 «검색»(오른쪽 위) · «AI 대화» 다시 열기 ── */
+html[data-skin="gn"] #rail .gn-right .cmdbar{height:36px;margin-right:6px}
+.aip-open{display:inline-flex;align-items:center;gap:6px}
+.aip-open[hidden]{display:none!important}
+.aip-open b{min-width:20px;height:20px;border-radius:10px;background:var(--surface-2);font-size:12px;display:inline-flex;align-items:center;justify-content:center;padding:0 6px}
+.aip-open.busy{border-color:var(--brand)}
+html[data-skin="gn"] #rail .gn-right .aip-open{width:auto;height:34px;margin:0 6px 0 4px;padding:0 10px 0 12px;border:1px solid var(--ring);border-radius:17px;background:var(--surface);font-size:13px;font-weight:600;color:var(--ink)}
+html[data-skin="gn"] #rail .gn-right .aip-open:hover{border-color:var(--ink-2)}
+
+/* ── AI 패널 — 넓은 화면 오른쪽 · 좁으면 전체 · 홈 배치를 밀지 않음 ── */
+.ai-panel{position:fixed;top:var(--tbh,64px);right:0;bottom:0;width:min(500px,100vw);z-index:150;border-top:1px solid var(--ring);display:flex;flex-direction:column;background:var(--surface);border-left:1px solid var(--ring);box-shadow:-16px 0 40px rgba(20,24,32,.14)}
+.ai-panel[hidden]{display:none}
+.aip-head{display:flex;align-items:center;gap:6px;padding:12px 14px;border-bottom:1px solid var(--grid)}
+.aip-head .aip-t{margin:0 auto 0 0;font-size:15px;font-weight:800}
+.aip-head .aip-t .mini{font-weight:400;margin-left:6px}
+.aip-body{flex:1;overflow:auto;padding:12px 14px 20px;overscroll-behavior:contain}
+.aip-body:focus{outline:none}
+.aip-foot{display:flex;gap:8px;padding:10px 14px;border-top:1px solid var(--grid);background:var(--surface)}
+.aip-foot input{flex:1;min-width:0;height:40px;border-radius:10px;font-size:14px}
+.aip-stale{margin:0 0 8px;padding:8px 10px;border-radius:8px;background:var(--surface-2)}
+.aip-old:empty{display:none}
+.aip-old .old-chat{margin:0 0 10px;border:1px dashed var(--grid);border-radius:10px;padding:6px 10px}
+.aip-old .old-chat>summary{cursor:pointer;font-size:13px;color:var(--ink-2)}
+html[data-skin] .ai-panel .answer,.ai-panel .answer{margin:0;padding:0;border:0;background:none;border-radius:0}
+.ai-panel .answer.ans-old{padding:8px 0 4px}
+.ans-thread .th{border-bottom:1px solid var(--grid);padding:4px 0}
+.ans-thread .th>summary{cursor:pointer;font-size:14px;color:var(--ink-2);padding:6px 0;display:flex;gap:8px;align-items:baseline}
+.ans-thread .th>summary .q{font-weight:650;color:var(--ink)}
+.ans-thread .th[open]>summary{color:var(--ink)}
+.ans-x .cbtn{height:30px;font-size:13px}
+@media (max-width:1099px){ .ai-panel{width:100vw;border-left:0} }
+
+/* 검색 목록 아래 — 지금 Enter 가 무엇을 하는지 */
+.sr-foot{position:sticky;bottom:-6px;margin:6px -6px -6px;padding:8px 12px;border-top:1px solid var(--grid);background:var(--surface);font-size:13px;color:var(--ink-2);border-radius:0 0 14px 14px}
+.sr-foot kbd{font-size:12px}
+.sr-it .ent{visibility:hidden}
+.sr-it[aria-selected="true"] .ent{visibility:visible}
+
+/* 화면 이름 옆 «초기화» · 목록 위 «고객 문맥» */
+.gn-ttl .vreset{height:26px;font-size:12px;padding:0 9px;white-space:nowrap}
+html[data-skin="gn"] .gn-ttl:has(.vreset:not([hidden])){display:grid;grid-template-columns:minmax(0,auto) auto;column-gap:8px;align-items:center;align-content:center;max-width:360px}
+html[data-skin="gn"] .gn-ttl:has(.vreset:not([hidden])) > b{grid-column:1;grid-row:1}
+html[data-skin="gn"] .gn-ttl:has(.vreset:not([hidden])) > span{grid-column:1 / -1;grid-row:2}
+html[data-skin="gn"] .gn-ttl:has(.vreset:not([hidden])) > .vreset{grid-column:2;grid-row:1;justify-self:start}
+.gn-ttl .vreset[hidden]{display:none}
+.cust-bar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:0 0 8px}
+.cust-bar[hidden]{display:none}
 
 /* 좁은 화면 */
-@media (max-width:1100px){
-  .hm-cols{display:none}
-  .hm-row{grid-template-columns:18px minmax(0,1fr) auto;grid-template-areas:"lv nm n" ". due act" ". own act"}
-  .hm-row .hm-lv{grid-area:lv} .hm-row .hm-nm{grid-area:nm} .hm-row .hm-n{grid-area:n;justify-self:end} .hm-row .hm-due{grid-area:due} .hm-row .hm-own{grid-area:own} .hm-row .hm-act{grid-area:act;align-self:center}
-  .hm-d{grid-column:2/-1}
-}
 @media (max-width:760px){
-  html[data-skin="gn"] #viewDash .ask .ask-h{font-size:18px;margin-bottom:10px}
-  html[data-skin="gn"] #viewDash .ask .ask-row{min-height:54px;padding:4px 4px 4px 14px}
-  html[data-skin="gn"] #viewDash .ask #q{height:42px;font-size:15px}
-  html[data-skin="gn"] #viewDash .ask #btnAsk{height:42px;padding:0 14px}
-  html[data-skin="gn"] #viewDash .ask .sug{left:-30px;right:-80px}
-  html[data-skin="gn"] #gnSum{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
-  html[data-skin="gn"] .gn-sum .gs-c{padding:10px 10px}
-  html[data-skin="gn"] .gn-sum .gs-l{font-size:13px}
+  html[data-skin="gn"] #viewDash .ask .ask-row{flex-basis:100%;padding:4px 4px 4px 12px}
+  html[data-skin="gn"] #viewDash .ask #btnAsk{padding:0 10px}
+  html[data-skin="gn"] #viewDash .ask .qwrap::before{left:12px}
+  html[data-skin="gn"] #viewDash .ask #chips{flex-wrap:nowrap;overflow-x:auto;max-width:100%;padding-bottom:2px}
+  html[data-skin="gn"] #viewDash .ask #chips .chip{flex:none}
+  html[data-skin="gn"] #gnSum{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+  html[data-skin="gn"] .gn-sum .gs-c{padding:8px 8px}
+  html[data-skin="gn"] .gn-sum .gs-l{font-size:12px}
   html[data-skin="gn"] .gn-sum .gs-v b{font-size:24px}
   html[data-skin="gn"] .gn-sum .gs-s{white-space:normal;font-size:12px}
-  .hm-row{grid-template-columns:14px minmax(0,1fr) auto;grid-template-areas:"lv nm n" ". due due" ". act act";padding:10px 14px}
-  .hm-row .hm-own{display:none}
-  .hm-row .hm-act{justify-self:start}
-  html[data-skin="gn"] .hm-head{padding:12px 14px 4px}
-  .gn-links,.gn-recent{grid-template-columns:1fr}
-  .gn-links small{display:none}
+  html[data-skin="gn"] .gn-sum .gs-b{display:none}
+  .gn-quick{flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px}
+  .gn-quick button{flex:none;height:36px;padding:0 10px}
+  .gn-trend .gt-c{height:150px}
+  .gn-trend .gt-more .mini{display:none}
+  .hm-sub{flex-wrap:wrap;white-space:normal}
   .fk-modal{max-height:92vh}
   .ans-t th,.ans-t td{padding:6px 8px}
   .ans-t{font-size:13px}
-  html[data-skin="gn"] .answer{padding:14px 12px}
+  .gn-recent .gr-l{flex-wrap:nowrap;overflow-x:auto}
+  .gn-recent .chip{flex:none}
 }
 @media (max-width:440px){
   html[data-skin="gn"] #gnSum{grid-template-columns:1fr 1fr}
@@ -2579,4 +2638,28 @@ html[data-skin="gn"] #ccInbox .ib-foot{padding:10px 18px 14px;font-size:13px}
 }
 /* 빠른 보기 «내 담당» — 이름을 고르기 전에는 0 이 아니라 «연결 필요» */
 .qv-bar .chip.need b{font-weight:600;color:var(--warn-ink,#875A00)}
+/* 위 띠: 검색 버튼이 오른쪽 위로 옮겨 가면서 비는 자리 — 화면 이름 뒤를 밀어 도구 버튼은 오른쪽 */
+html[data-skin="gn"] .topbar .gn-ttl{margin-right:auto}
+html[data-skin="gn"] #rail .gn-right .cmdbar{flex:none;width:auto;max-width:none;background:var(--surface)}
+html[data-skin="gn"] #rail .gn-right .cmdbar kbd{display:inline-block}
+/* 고객 360 — 이 고객으로 목록 보기 */
+.c360-go{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:6px 0 2px}
+.c360-go .cbtn{height:30px;font-size:13px}
+/* 해지율 · 고객 증감 — «적용 기준»은 스크롤해도 위에 고정(결과와 조건을 같이 보며 비교) */
+.cr-applied{position:sticky;top:var(--tbh,64px);z-index:6;background:var(--surface);box-shadow:0 1px 0 var(--grid)}
+.inb-go{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px}
+/* ㊿+172 리포트 — 템플릿 고르기 전 안내(기본 결과 안 펼침) · 고른 뒤 조건 한 줄 */
+.qb-pick{margin:12px 0;padding:18px 16px;border:1px dashed var(--ring);border-radius:12px;color:var(--muted);font-size:14px;text-align:center}
+.qb-pick b{color:var(--ink)}
+.qb-cond{font-size:13px;color:var(--muted);margin:0 0 8px;line-height:1.5}
+/* ㊿+172 폰 위 띠: «초기화»가 들어가도 한 줄 — 등록 · 검색은 아이콘만(이름은 aria-label · title) */
+@media (max-width:520px){
+  html[data-skin="gn"] .topbar #btnNew.icb span{display:none}
+  html[data-skin="gn"] .topbar #cmdBar .ph{display:none}
+  html[data-skin="gn"] .gn-ttl .vreset{padding:0 6px}
+  html[data-skin="gn"] .gn-ttl:has(.vreset:not([hidden])){column-gap:6px}
+}
+@media (max-width:380px){ html[data-skin="gn"] .gn-ttl:has(.vreset:not([hidden])) .gn-tmark{display:none} }
+/* ㊿+172 고객 증감 «지금 보는 기준» — 결과를 내려 봐도 위에 남음(해지율 «적용 기준»과 같게) · 불투명 바탕 */
+#viewCustFlow .crnow,.crnow{position:sticky;top:var(--tbh,64px);z-index:6;background:linear-gradient(var(--brand-t,rgba(42,120,214,.08)),var(--brand-t,rgba(42,120,214,.08))),var(--plane,var(--surface));box-shadow:0 1px 0 var(--grid)}
 /* ==== ㊿+166 새 디자인 end ==== */

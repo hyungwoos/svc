@@ -8,20 +8,18 @@ import { buildControls, renderAll } from './dash.js';
 import { GRIDS } from './grids.js';
 import { eqRetOpen, eqWant, renderEqPanel, syncOrderAssets } from './equipment.js';
 import { AK, BZX, CH_DEFS, ctOrig, DC, ensureLeadSrc, liveCalc, liveDiff, loadLib, LS, LV, renderChannelView, setLiveSrc } from './analysis.js';
-import { applyDense, PR, pushRecent, renderTodo } from './tools.js';
+import { applyDense, openCust360, PR, pushRecent, renderTodo } from './tools.js';
 import { CL, renderCloud } from './cloud.js';
 import { inbLast, loadInbound, renderInbPanel, renderInbStat, renderWeekly } from './inbound.js';
 import { CHURN, CR, CS, csSetTab, ensureGroupOpen, helpBox, helpWire, initOiForm, loadRecvPresets, oiLinkQuote, oiToContract, renderChurn,
   renderChurnRate, renderCsite, renderCustFlow, renderOiTiles, wzReset } from './sales.js';
 import { logChange, monthRows, msg, openOvl } from './edit.js';
 import { lazyGet, lazyView } from './lazy.js';
-import { closeAnswer } from './ai.js';
-import { HOME, homeModeSet } from './home.js';
 
 
 /* ---- 뒤로가기 — 화면 이동을 브라우저 히스토리에 남겨 상단 ← 버튼·브라우저/폰 뒤로가기·Alt+← 가 모두 이전 화면으로 ----
    주소 해시(#oi 처럼)에 현재 화면을 적어 두므로 새로고침·링크 공유 때도 그 화면이 열립니다. */
-export var NAV={i:0, pop:false, ready:false};
+export var NAV={i:0, pop:false, ready:false, menu:false, reset:''};
 export function navValid(v){ return v==='dash' || !!document.querySelector('#side button[data-v="'+v+'"]'); }
 export function navDepth(){ try{ return (history.state && typeof history.state.i==='number')? history.state.i : 0; }catch(e){ return 0; } }
 export function navRecord(prev, v){
@@ -50,7 +48,7 @@ export var VIEW_UI={
   churnrate:{CR:['unit','base','cnd','rows','exDen','sup','from','upto','open','f','adv']}, custflow:{CR:['unit','base','cnd','rows','exDen','sup','from','upto','open','f']},
   leadsrc:{LS:['base','line','pick']}, dcheck:{DC:['open','sev']}, eqboard:{EQB:['ch','q','more','only']},
   price:{PR:['seg','ver','op','q','basis']}, cloud:{CL:['mode','sel','months','mon']}, aiknow:{AK:['log','q']},
-  biz:{BZX:['showEq','showSkip','showRuled']}, report:{RPV:['tab']}, csite:{CS:['tab']},
+  biz:{BZX:['showEq','showSkip','showRuled']}, report:{RPV:['tab','build'], QB:['title','savedId','mode','sql','spec','res','page']}, csite:{CS:['tab']},
   ops:{OPS:['tab','msg','msgCls']}, adminx:{CD:['kind','showOff'], AP:['user'], ADM:['tab']}
 };
 export var VIEW_SNAP=null;
@@ -58,7 +56,7 @@ export var VIEW_SNAP=null;
 export function viewObj(n){
   var M={LV:LV, CHURN:CHURN, CR:CR, LS:LS, DC:DC, EQB:EQB, PR:PR, CL:CL, AK:AK, BZX:BZX, CS:CS};
   if(Object.prototype.hasOwnProperty.call(M, n)) return M[n];
-  var lz=n==='RPV'? lazyGet('report') : /^(OPS|CD|AP|ADM)$/.test(n)? lazyGet('admin') : null;
+  var lz=(n==='RPV'||n==='QB')? lazyGet('report') : /^(OPS|CD|AP|ADM)$/.test(n)? lazyGet('admin') : null;
   return lz? lz[n] : null;
 }
 export function viewSnapInit(){ VIEW_SNAP={}; viewSnapAdd(); }
@@ -81,7 +79,7 @@ export function viewReset(v){
   if(v==='churnrate' || v==='custflow'){ delete CR.crCnd; delete CR.cfCnd; delete CR.cfSrc; }
   /* 화면 HTML 에 그대로 남는 입력칸(다시 그리지 않는 곳) */
   var clr={eqboard:'eqbQ', adminx:'axQ', csite:'csHistQ'}[v]; if(clr){ var q=document.getElementById(clr); if(q) q.value=''; }
-  if(v==='dash'){ dashResetIfChanged(); try{ if(HOME.mode) homeModeSet('', true); }catch(e){} }   /* ㊿+171 홈 메뉴로 들어오면 AI 홈(사업 분석 · 전체 할 일 · 최근 작업에서 나옴) */
+  if(v==='dash') dashResetIfChanged();
 }
 /* 대시보드: 위쪽 거르기(사업라인 · 기준월 · 단위 · 업종 · 파트너 · 상태 · 검색)가 처음과 다를 때만 «초기화»와 같은 동작 */
 export function dashResetIfChanged(){
@@ -92,12 +90,46 @@ export function dashResetIfChanged(){
   STATE.base=base0; var b=document.getElementById('btnReset');
   if(b && b.onclick) b.onclick.call(b); else { try{ buildControls(); renderAll(); }catch(e){} }
 }
+/* ㊿+172 메뉴를 다시 눌러도 마지막 작업 상태 그대로(검색 · 필터 · 정렬 · 쪽 · 스크롤 · 화면별 선택) — 처음 상태는 화면 이름 옆 «초기화»(viewResetHard)
+   · 고객 360 에서 넘어온 «고객 문맥»(CUSTCTX)이 있으면 고객 목록 화면에는 그 고객으로 */
+export var VSCROLL={};
+export var CUSTCTX={c:''};
+export var CUST_VIEWS={contracts:1, live:1, oi:1, inbound:1, orders:1, assets:1, mdrops:1};
 export function navMenu(v){
-  try{ viewReset(v); }catch(e){}
-  delete DVMEM[v];
+  if(CUSTCTX.c && CUST_VIEWS[v]){ custGo(v, CUSTCTX.c); return; }
+  NAV.menu=true;
   switchView(v);
+  NAV.menu=false;
+  if(!DVMEM[v] && !VSCROLL[v]) try{ window.scrollTo(0, 0); }catch(e){}
+}
+/** 화면을 처음 상태로(명시적 «초기화») — 검색 · 필터 · 정렬 · 쪽 · 화면별 선택 · 스크롤 */
+export function viewResetHard(v){
+  v=v||ST.CUR_VIEW;
+  try{ viewReset(v); }catch(e){}
+  delete DVMEM[v]; delete VSCROLL[v]; if(CUST_VIEWS[v]) CUSTCTX.c='';
+  NAV.reset=v; try{ switchView(v); } finally { NAV.reset=''; }
   try{ window.scrollTo(0, 0); }catch(e){}
   if(v==='csite') try{ csSetTab('create'); }catch(e){}
+  if(v!=='quote') toast('처음 상태로', viewLabelOf(v)+' — 검색 · 필터 · 정렬을 비웠습니다', 'info');
+}
+export function viewLabelOf(v){ var b=document.querySelector('#side button[data-v="'+v+'"]'); return b? navText(b) : v; }
+/** 고객 문맥으로 목록 열기(고객 360 → 계약 · LIVE · OI · 인바운드 · 장비) — 다른 고객 목록으로 옮겨도 같은 고객 · «해제»로 끔 */
+export function custGo(v, nm){
+  CUSTCTX.c=String(nm||'');
+  if(v==='eqboard'){ EQB.q=CUSTCTX.c; switchView('eqboard'); var qi=/** @type {any} */(document.getElementById('eqbQ')); if(qi) qi.value=CUSTCTX.c; try{ renderEqBoard(); }catch(e){} return; }
+  switchView(v);   /* 처음 상태(필터 없음)에서 고객 이름으로 — 지난 필터가 그 고객 행을 가리지 않게 */
+  var s=/** @type {any} */(document.getElementById('dvSearch')); if(s){ s.value=CUSTCTX.c; } DV.page=0; try{ renderGrid(); }catch(e){}
+}
+export function custCtxBar(){
+  var bar=document.getElementById('dvCustBar'), s=/** @type {any} */(document.getElementById('dvSearch'));
+  if(!bar && s){ bar=document.createElement('div'); bar.id='dvCustBar'; bar.className='cust-bar'; s.parentElement.parentElement.insertBefore(bar, s.parentElement); }
+  if(!bar) return;
+  var on=!!CUSTCTX.c && CUST_VIEWS[ST.CUR_VIEW] && s && s.value.trim()===CUSTCTX.c;
+  if(!on){ bar.hidden=true; bar.innerHTML=''; if(CUSTCTX.c && s && s.value.trim() && s.value.trim()!==CUSTCTX.c && CUST_VIEWS[ST.CUR_VIEW]) CUSTCTX.c=''; return; }
+  bar.hidden=false;
+  bar.innerHTML=tpl`<span class="ctag info">${rawHtml(ico('users',13))} 고객 문맥 «${CUSTCTX.c}» — 다른 고객 목록으로 옮겨도 이 고객</span><button type="button" class="cbtn" id="dvCust360">고객 360</button><button type="button" class="cbtn" id="dvCustX" aria-label="고객 문맥 해제">✕ 해제</button>`;
+  /** @type {any} */(document.getElementById('dvCust360')).onclick=function(){ openCust360(CUSTCTX.c); };
+  /** @type {any} */(document.getElementById('dvCustX')).onclick=function(){ CUSTCTX.c=''; if(s) s.value=''; DV.page=0; renderGrid(); };
 }
 
 /* Backspace = 뒤로가기 — 글자를 입력하는 칸(input·textarea·select·편집 가능 영역)에 커서가 있을 때는 그대로 글자 지우기 */
@@ -113,7 +145,10 @@ export function switchView(v){
   permEnter(v);
   try{ navRecord(ST.CUR_VIEW, v); }catch(e){}
   if(GRIDS[ST.CUR_VIEW] && ST.CUR_VIEW!==v && !GRIDS[ST.CUR_VIEW].custom){ try{ DVMEM[ST.CUR_VIEW]=dvSnap(); }catch(e){} }   /* ㊿+169 떠나는 목록의 상태 */
-  if(ST.CUR_VIEW==='dash' && v!=='dash'){ try{ closeAnswer(); }catch(e){} }   /* ㊿+159 홈을 떠나면 AI 답변 닫기 (생각 중이면 그대로) */
+  if(ST.CUR_VIEW && ST.CUR_VIEW!==v) VSCROLL[ST.CUR_VIEW]=window.scrollY||0;   /* ㊿+172 표가 아닌 화면도 스크롤 위치 */
+  var RESTORE=!!(NAV.pop || NAV.menu);
+  if(RESTORE && VSCROLL[v] && !(GRIDS[v] && !GRIDS[v].custom)){ var sy0=VSCROLL[v]; setTimeout(function(){ try{ window.scrollTo(0, sy0); }catch(e){} }, 80); }
+  /* ㊿+172 홈을 떠나도 AI 대화는 그대로(오른쪽 패널 · «AI 대화»로 다시 열기) — 예전엔 닫았음 */
   ST.CUR_VIEW=v;
   try{ document.body.dataset.view=v; document.body.dataset.ct=(/^(contracts|live|churn|renew)$/.test(v) || CH_DEFS[v])? '1':''; }catch(e){}   /* ㊿+169 화면에 맞는 도구만(위젯 = 홈) · ㊿+171 «계약 입력·수정»은 계약 관련 화면에서만(data-ct) */
   try{ pushRecent(v); }catch(e){}
@@ -210,8 +245,8 @@ export function switchView(v){
   if(quote){
     var fr=$('#quoteFrame');
     if(!fr.src){ fr.src='quote.html?v='+encodeURIComponent(APP_VER); }   // 포탈 버전을 붙여 옛 견적 화면이 캐시에서 나오는 일을 막음
-    else{
-      // 메뉴를 다시 누르면 견적 종류(기업/공공)를 다시 고를 수 있게
+    else if(NAV.reset==='quote'){
+      // ㊿+172 «초기화»를 눌렀을 때만 견적 종류(기업/공공)를 다시 고르게 — 메뉴를 다시 누르거나 검색 · AI 를 열고 돌아와도 쓰던 견적 그대로
       try{ fr.contentWindow.postMessage({type:'quoteReset'},'*'); }catch(e){}
     }
     return;
@@ -233,7 +268,7 @@ export function switchView(v){
   if(v==='inbound' && !ST.RAWX.inbound){
     loadInbound(function(){ if(ST.CUR_VIEW==='inbound') renderGrid(); });
   }
-  var mem=(NAV.pop && DVMEM[v])? DVMEM[v] : null;   /* ㊿+169 «뒤로»로 돌아오면 떠날 때 상태 그대로 · 메뉴·다른 화면에서 들어오면 처음부터 */
+  var mem=(RESTORE && DVMEM[v])? DVMEM[v] : null;   /* ㊿+169 «뒤로» · ㊿+172 메뉴 재진입도 떠날 때 상태 그대로 · 조건을 들고 들어오는 이동(홈 할 일 · 검색 결과 · 고객 360)은 처음부터 */
   if(mem){ DV.page=mem.page; DV.sortK=mem.sortK; DV.sortDir=mem.sortDir; DV.chipVal=mem.chipVal; DV.filters=mem.filters; DV.lens=mem.lens; DV.lensAll=mem.lensAll; DV.pre=mem.pre; }
   else { DV.page=0; DV.sortK=null; DV.sortDir=1; DV.chipVal=''; DV.filters={}; DV.pre=null; }
   closeColFilter();
@@ -510,6 +545,9 @@ export function stBadge(txt){
    · 기준(일수 · 내 이름)은 «기준» 버튼에서 바꾸고 내 브라우저에 저장(svc_qv_계정) · 홈 «오늘 처리할 일»도 같은 기준·같은 목록 */
 export function qvKey(){ return 'svc_qv_'+(ST.AUTH_USER||'anon'); }
 export function qvCfg(){ var d={me:'', oiIdle:30, inbFirst:3, inbIdle:90}; try{ var s=JSON.parse(localStorage.getItem(qvKey())||'{}')||{}; Object.keys(d).forEach(function(k){ if(s[k]!=null && s[k]!=='') d[k]=s[k]; }); }catch(e){} d.oiIdle=+d.oiIdle||30; d.inbFirst=+d.inbFirst||3; d.inbIdle=+d.inbIdle||90; return d; }
+/** ㊿+172 내 담당 이름 — 계정별 연결(관리자 지정 · SQL 103 user_owner_map)이 있으면 그것, 없으면 이 브라우저에서 고른 이름(임시) · 둘 다 없으면 [] («담당자 연결 필요» — 0 으로 보이지 않게) */
+export function myOwner(){ var a=ST.OWNER_NAMES; if(a && a.length) return {names:a.slice(), src:'account'}; var me=qvCfg().me; return me? {names:[me], src:'browser'} : {names:[], src:''}; }
+export function meMatch(owner){ var n=myOwner().names, o=String(owner||''); return n.some(function(x){ return !!x && o.indexOf(x)>=0; }); }
 export function qvSave(c){ try{ localStorage.setItem(qvKey(), JSON.stringify(c)); }catch(e){} }
 /** 진행 중인 OI — 수주·계산서발행·종료·중지·실패가 아닌 것 (OI 타일 · 홈 · 빠른 보기 공통) */
 export function oiOpen(r){ return !/수주|계산서|종료|중지|실패/.test(String(r && r.stage || '')); }
@@ -517,7 +555,7 @@ export function daysSince(d){ if(!d) return null; var t=new Date(String(d).slice
 export function inbIdleHit(r, C){ C=C||qvCfg(); if(String(r.y||'')!==String(new Date().getFullYear()) || r.result!=='진행중') return false; var d=daysSince(inbLast(r)); return d!=null && d>=C.inbIdle; }
 export function qvDefs(v){
   var C=qvCfg(), today=todayStr();
-  var me=['me','내 담당', C.me? '담당 «'+C.me+'»' : '«기준»에서 내 이름을 고르면 내 담당만', function(r){ return !!C.me && String(r.owner||'').indexOf(C.me)>=0; }];
+  var MO=myOwner(), me=['me','내 담당', MO.names.length? '담당 «'+MO.names.join(' / ')+'»'+(MO.src==='account'? ' — 계정 연결' : ' — 이 브라우저에서 고른 이름') : '담당자 연결 필요 — 관리자가 계정에 담당자 이름을 연결하거나 «기준»에서 임시로 고르기', function(r){ return meMatch(r.owner); }];
   if(v==='oi') return [me,
     ['today','오늘 할 일','다음 할 일 예정일이 오늘(진행 중)', function(r){ return oiOpen(r) && String(r.next_date||'').slice(0,10)===today; }],
     ['late','기한 초과','예정일이 지났는데 진행 중', function(r){ return oiOpen(r) && !!r.next_date && String(r.next_date).slice(0,10)<today; }],
@@ -539,12 +577,12 @@ export function qvBar(g, rows){
   if(!qb){ qb=document.createElement('div'); qb.id='dvQvBar'; qb.className='qv-bar'; var bar=$('#dvSearch').parentElement; bar.parentElement.insertBefore(qb, bar); }
   if(!defs || g.custom){ qb.hidden=true; qb.innerHTML=''; return; }
   qb.hidden=false; var all=g.rows();
-  var meOk=!!qvCfg().me;   /* ㊿+171 이름을 고르기 전 «내 담당»은 0 이 아니라 «연결 필요»(누르면 기준 창) */
+  var meOk=myOwner().names.length>0;   /* ㊿+171 이름을 고르기 전 «내 담당»은 0 이 아니라 «연결 필요»(누르면 기준 창) · ㊿+172 계정 연결 우선 */
   qb.innerHTML=tpl`<span class="wv-l">빠른 보기</span>${rawHtml(defs.map(function(d){ var n=all.filter(d[3]).length, on=!!(DV.pre && DV.pre.qv===d[0]), nc=d[0]==='me' && !meOk;
       return tpl`<button type="button" class="chip${n || nc? '':' zero'}${nc? ' need':''}" data-qv="${d[0]}" aria-pressed="${on?'true':'false'}" title="${nc? '담당자 연결 필요 — 눌러서 내 이름(담당자 칸 값) 고르기' : d[2]}">${d[1]} <b class="num">${nc? '연결 필요' : String(n)}</b></button>`; }).join(''))}`+
     tpl`<button type="button" class="cbtn" id="qvCfgBtn" aria-haspopup="dialog" title="빠른 보기 기준 — 내 이름 · 장기 미접촉 일수 · 첫 대응 일수">${rawHtml(ico('gear',14))} 기준</button>`;
   qb.querySelectorAll('[data-qv]').forEach(function(b){ b.onclick=function(){ var k=b.dataset.qv;
-    if(k==='me' && !qvCfg().me){ qvCfgOpen(/** @type {any} */(document.getElementById('qvCfgBtn'))); return; }
+    if(k==='me' && !meOk){ qvCfgOpen(/** @type {any} */(document.getElementById('qvCfgBtn'))); return; }
     if(DV.pre && DV.pre.qv===k){ DV.pre=null; DV.page=0; renderGrid(); } else qvGo(ST.CUR_VIEW, k); }; });
   /** @type {any} */(document.getElementById('qvCfgBtn')).onclick=function(){ qvCfgOpen(this); };
 }
@@ -556,13 +594,14 @@ export function qvCfgOpen(btn){
     tpl`<label>OI 장기 미접촉 (일)<input id="qvOi" type="number" min="1" max="365" value="${String(C.oiIdle)}"></label><label>인바운드 첫 대응 지연 (일)<input id="qvIf" type="number" min="1" max="60" value="${String(C.inbFirst)}"></label>`+
     tpl`<label>인바운드 장기 미접촉 (일)<input id="qvIi" type="number" min="7" max="365" value="${String(C.inbIdle)}"></label><div class="pa"><button type="button" class="pill ghost" id="qvX">취소</button><button type="button" class="pill pri" id="qvOk">저장</button></div>`;
   document.body.appendChild(m);
+  var MO2=myOwner(); if(MO2.src==='account'){ var sl=m.querySelector('#qvMe'); if(sl){ var lb=sl.closest('label'), dv=document.createElement('div'); dv.className='qv-acc'; dv.innerHTML=tpl`내 이름 <b>${MO2.names.join(' / ')}</b> <span class="mini">계정 연결 — 관리자 지정</span><input type="hidden" id="qvMe" value="${C.me||''}">`; if(lb) lb.replaceWith(dv); } }   /* ㊿+172 계정 연결이 있으면 브라우저 선택 대신 */
   var r=btn.getBoundingClientRect(); m.style.top=(r.bottom+6)+'px'; m.style.left=Math.max(8, Math.min(r.left, window.innerWidth-m.offsetWidth-8))+'px';
   var close=function(){ m.remove(); document.removeEventListener('keydown', key, true); btn.focus(); };
   var key=function(e){ if(e.key==='Escape'){ e.preventDefault(); e.stopPropagation(); close(); } };
   document.addEventListener('keydown', key, true);
   /** @type {any} */(m.querySelector('#qvX')).onclick=close;
   /** @type {any} */(m.querySelector('#qvOk')).onclick=function(){ var v=function(id){ return /** @type {any} */(document.getElementById(id)).value; };
-    qvSave({me:v('qvMe'), oiIdle:+v('qvOi')||30, inbFirst:+v('qvIf')||3, inbIdle:+v('qvIi')||90}); close(); DV.pre=null; renderGrid(); toast('빠른 보기 기준 저장', '이 브라우저에만 적용 · 홈 «오늘 처리할 일»도 같은 기준', 'info'); };
+    qvSave({me:v('qvMe'), oiIdle:+v('qvOi')||30, inbFirst:+v('qvIf')||3, inbIdle:+v('qvIi')||90}); close(); DV.pre=null; renderGrid(); toast('빠른 보기 기준 저장', '이 브라우저에만 적용 · 홈 «우선 업무»도 같은 기준', 'info'); };
   setTimeout(function(){ var f=/** @type {any} */(m.querySelector('select')); if(f) f.focus(); }, 0);
 }
 
@@ -1100,6 +1139,7 @@ export function renderGrid(){
   var pb=document.getElementById('dvPreBar');
   if(!pb){ pb=document.createElement('div'); pb.id='dvPreBar'; pb.className='pre-bar'; var bar4=$('#dvSearch').parentElement; bar4.parentElement.insertBefore(pb, bar4); }
   try{ qvBar(g); }catch(e){ console.warn('빠른 보기', e); }
+  try{ custCtxBar(); }catch(e){}   /* ㊿+172 고객 360 에서 넘어온 고객 문맥 */
   if(DV.pre && !isCustom && !DV.pre.qv){ pb.hidden=false; pb.innerHTML=tpl`<span class="ctag info">${rawHtml(ico('filter',13))} ${DV.pre.label}</span><button type="button" class="cbtn" id="dvPreX" aria-label="조건 해제 — ${DV.pre.label}">조건 해제</button>`;
     document.getElementById('dvPreX').onclick=function(){ DV.pre=null; DV.page=0; renderGrid(); }; }
   else { pb.hidden=true; pb.innerHTML=''; }
