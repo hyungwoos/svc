@@ -2,14 +2,15 @@
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { ST } from './state.js';
 import { $, amtWhy, lline, mk, navText, rawHtml, tpl, won, wonKo } from './core.js';
-import { buildRail, c360Enhance, cmdAskHit, cmdMenuHits, dIdx, loadFromDb, onData, renderInbox, sbTry, sbWrite, toast, todayStr, visBtn } from './shell.js';
+import { buildRail, c360Enhance, dIdx, ico, loadFromDb, onData, renderInbox, sbTry, sbWrite, toast, todayStr, visBtn } from './shell.js';
 import { GRIDS } from './grids.js';
 import { applyChannelMenu, ctRawOf, liveData } from './analysis.js';
-import { goInbList, loadInbound } from './inbound.js';
+import { goInbList } from './inbound.js';
 import { applyMenuFold } from './sales.js';
-import { ctPeriods, navMenu, openDetail, renderGrid, switchView } from './grid.js';
+import { ctPeriods, custGo, navMenu, oiOpen, openDetail, qvCfg, renderGrid, switchView } from './grid.js';
 import { syncOrderAssets } from './equipment.js';
 import { closeOvl, openOvl, ovlMarkDirty } from './edit.js';
+import { homeSearchOpen, rcPush } from './home.js';
 
 
 /* ===== 전역 검색 (Ctrl+K) ===== */
@@ -39,52 +40,8 @@ export function fkSources(){
   });
   return out;
 }
-export function openFind(){
-  if(!ST.SB_TOKEN || !ST.DATA) return;
-  if(ST.RAWX.inbound===undefined && !ST.IS_EQUIP) try{ loadInbound(function(){}); }catch(e){}
-  openOvl('ovlFind');
-  var inp=$('#fkInput'); inp.value=''; $('#fkOut').innerHTML='';
-  setTimeout(function(){ inp.focus(); },60);
-  var hits=[];
-  inp.onkeydown=function(e){                                        // 입력 전에도 ESC·Enter 동작
-    if(e.key==='Escape'){ e.preventDefault(); closeOvl('ovlFind'); }
-    if(e.key==='Enter' && hits.length){ closeOvl('ovlFind'); hits[0].go(); }
-  };
-  var ov=document.getElementById('ovlFind');
-  ov.onmousedown=function(e){ if(e.target===ov) closeOvl('ovlFind'); };   // 바깥 클릭으로 닫기
-  inp.oninput=function(){
-    var q=fkNorm(inp.value), out=$('#fkOut');
-    hits=[];
-    if(q.length<1){ out.innerHTML=''; return; }
-    // ⓞ 화면 이동 (메뉴 이름 매치)
-    try{ hits=hits.concat(cmdMenuHits(inp.value)); }catch(e){}
-    if(q.length<2){ out.innerHTML=hits.map(function(h,i){ return tpl`<div class="fk-row" data-i="${rawHtml(i)}"><span class="tp" style="background:var(--surface-2);color:var(--ink-2)">${rawHtml(h.t)}</span><span class="nm">${h.nm||''}</span><span class="sb">${h.sb||''}</span></div>`; }).join('');
-      out.querySelectorAll('.fk-row').forEach(function(row){ row.onclick=function(){ closeOvl('ovlFind'); hits[+row.dataset.i].go(); }; }); return; }
-    var src=fkSources(), seen={};
-    // ① 고객 360 후보 (고객사명 매치, 중복 제거)
-    var custs={};
-    src.forEach(function(s){ if(s.cust && fkNorm(s.cust).indexOf(q)>=0) custs[s.cust]=1; });
-    Object.keys(custs).slice(0,4).forEach(function(c){
-      hits.push({t:'고객 360', nm:c, sb:'이 고객사의 계약·OI·인바운드·PoC·장비 한눈에', go:function(){ openCust360(c); }, k360:1});
-    });
-    // ② 개별 결과
-    src.forEach(function(s){
-      if(hits.length>=32) return;
-      if(fkNorm(s.nm).indexOf(q)<0 && fkNorm(s.sb).indexOf(q)<0) return;
-      var key=s.t+'|'+s.nm+'|'+s.sb; if(seen[key]) return; seen[key]=1;
-      hits.push(s);
-    });
-    // ③ AI에게 그대로 물어보기
-    try{ var ai=cmdAskHit(inp.value); if(ai) hits.push(ai); }catch(e){}
-    out.innerHTML=hits.map(function(h,i){
-      return tpl`<div class="fk-row" data-i="${rawHtml(i)}"><span class="tp"${rawHtml(h.k360?' style="background:rgba(42,120,214,.12);color:var(--s1-ink)"':(h.kmenu?' style="background:var(--surface-2);color:var(--ink-2)"':(h.kai?' style="background:var(--brand);color:#fff"':'')))}>${rawHtml(h.t)}</span>`+
-        tpl`<span class="nm">${h.nm||''}</span><span class="sb">${h.sb||''}</span></div>`;
-    }).join('')||'<p class="cap" style="padding:8px">결과 없음</p>';
-    out.querySelectorAll('.fk-row').forEach(function(row){
-      row.onclick=function(){ closeOvl('ovlFind'); hits[+row.dataset.i].go(); };
-    });
-  };
-}
+/* ㊿+171 위쪽 «검색»(Ctrl+K) — 홈(기본)은 가운데 입력칸, 다른 화면은 검색·질문 창(home.js) · 결과 순서: 정확히 같은 고객사 · 시리얼 · 화면 → 비슷한 것 → 질문하기 */
+export function openFind(){ homeSearchOpen(); }
 
 
 /* ===== 고객 360 — 한 고객사의 모든 정보 ===== */
@@ -102,7 +59,7 @@ export function c360RenewLine(r){
   return ps.map(function(p){ return tpl`<span class="c360-rp"><b>${p.k}</b> ${p.from||'?'}~${p.to||'?'}${rawHtml(p.mrr!=null? ' · '+won(p.mrr) : '')}${rawHtml(p.qty!=null? ' · '+Number(p.qty).toLocaleString('ko-KR')+'노드' : '')}</span>`; }).join(tpl`<span class="c360-ra">→</span>`);
 }
 export function openCust360(name){
-  var nm=name;
+  var nm=name; try{ rcPush(nm); }catch(e){}   /* ㊿+171 최근 본 고객사(검색 · 최근 작업) */
   /* sub[i] — i번째 행 바로 아래에 붙일 한 줄(계약 표의 연장 이력) · ids[i] — 누르면 그 계약 상세(㊿+162) */
   function tb(cols, rows, sub, ids){
     if(!rows.length) return '<p class="cap" style="margin:2px 0 0">없음</p>';
@@ -119,9 +76,11 @@ export function openCust360(name){
   var asts=(ST.RAWX.assets||[]).filter(function(r){return c360Match(r.customer,nm);});
   var ords=(ST.RAWX.orders||[]).filter(function(r){return c360Match(r.customer,nm);});
   $('#c360Title').textContent='🏢 '+nm;
-  $('#c360Cap').textContent='계약 '+cts.length+' · LIVE '+lives.length+' · OI '+ois.length+' · 인바운드 '+inbs.length+' · MDR 운영 '+mdrs.length+' · 장비 '+(asts.length+ords.length)+
+  $('#c360Cap').textContent='계약 '+cts.length+'건 · LIVE '+lives.length+'건 · OI '+ois.length+'건 · 인바운드 '+inbs.length+'건 · MDR 운영 '+mdrs.length+'건 · 장비 현황 '+asts.length+'대(임대중 '+asts.filter(function(a){ return a.status==='임대중'; }).length+'대) · 장비 신청 '+ords.length+'건'+
     (ST.RAWX.inbound===undefined? ' · (인바운드는 메뉴를 한 번 연 뒤 집계됩니다)':'');
-  function sec(icon,label,n,html){ return tpl`<div class="c360-sec"><h4>${rawHtml(icon)} ${rawHtml(label)} <span class="ct">${rawHtml(n)}건</span></h4>${rawHtml(html)}</div>`; }
+  /* ㊿+169 섹션 머리: 이모지 대신 같은 모양 선 아이콘 · data-l = 탭 이름 */
+  var SEC_ICO={'📋':'doc','🟢':'check','🎯':'target','📥':'inbox','🛰️':'shield','🔧':'box'};
+  function sec(icon,label,n,html){ return tpl`<div class="c360-sec"><h4 data-l="${String(label).replace(/<[^>]*>.*$/,'').trim()}">${rawHtml(SEC_ICO[icon]? ico(SEC_ICO[icon],15) : icon)} ${rawHtml(label)} <span class="ct">${rawHtml(typeof n==='string'? n : n+'건')}</span></h4>${rawHtml(html)}</div>`; }   /* ㊿+168 n 이 글자면 단위 포함(장비 = 대) */
   $('#c360Body').innerHTML=
     sec('📋','계약',cts.length, tb(['서비스','채널','파트너','구분','상태','기간','연장','MRR(천원)'],
       cts.map(function(r){ return [(r.parent? '↳ ':'')+lline(r.line), r.channel, r.partner, r.ctype, r.status,
@@ -136,9 +95,12 @@ export function openCust360(name){
       inbs.map(function(r){ return [r.on_date, r.product, r.qtype, r.result, r.owner]; })))+
     sec('🛰️','MDR 운영·PoC',mdrs.length, tb(['유형','상태','라이선스','시작일','설치/계약'],
       mdrs.map(function(r){ return [r.svc_type, r.status, r.license, r.start_date, (r.agents_total||0)+'/'+(r.plan_qty||0)]; })))+
-    sec('🔧','장비',asts.length+ords.length, tb(['구분','시리얼/발주','모델','상태','일자'],
-      asts.map(function(r){ return ['자산', r.serial, r.model, r.status, r.deployed_date||r.in_date]; })
-      .concat(ords.map(function(r){ return ['발주', '#'+r.id, r.model, r.status, String(r.created_at||'').slice(0,10)]; }))));
+    /* ㊿+168 장비: 실물(시리얼 현황 · 대)과 신청(발주) 이력(건)을 나눔 — 미등록 시리얼은 «보완 필요» */
+    sec('🔧','장비',asts.filter(function(a){ return a.status==='임대중'; }).length+'대 임대중',
+      tpl`<div class="c360-sub">장비 현황(시리얼) · ${rawHtml(asts.length)}대</div>`+ tb(['시리얼','모델','상태','설치·입고일','신청'],
+        asts.map(function(r){ var ph=/^미등록-/.test(String(r.serial||'')); return [ph? '미등록 시리얼 (보완 필요)' : r.serial, r.model, r.status, r.deployed_date||r.in_date, r.order_id? '#'+r.order_id : '']; }))+
+      tpl`<div class="c360-sub">신청(발주) 이력 · ${rawHtml(ords.length)}건</div>`+ tb(['신청','모델','수량','상태','신청일','회수'],
+        ords.map(function(r){ var rs=String(r.returned_serials||'').split(/[,\s]+/).filter(Boolean).length; return ['#'+r.id, r.model, (r.qty||'')+(r.qty?'대':''), r.status, String(r.created_at||'').slice(0,10), r.status==='회수완료'? '전체 회수' : (rs? '부분 회수 '+rs+'대' : '')]; })));
   /* ㊿+162 계약 행(과 그 아래 연장 줄)을 누르면 계약 상세 — 고객 360 위에 열리고, 닫으면 고객 360 으로 돌아옴 */
   $('#c360Body').querySelectorAll('tr[data-c360ct]').forEach(function(tr){
     var go=function(){ var c=ctRawOf(Number(tr.getAttribute('data-c360ct'))); if(c) openDetail(c); else toast('계약 상세', '이 계약 원본을 아직 불러오지 못했습니다 — 잠시 뒤 다시 눌러 주세요', 'info'); };
@@ -146,6 +108,13 @@ export function openCust360(name){
     var nx=tr.nextElementSibling; if(nx && nx.classList.contains('c360-rn')) nx.onclick=go;
   });
   try{ c360Enhance(nm, cts, lives, ois, inbs, asts, ords); }catch(e){ console.warn('c360', e); }
+  /* ㊿+172 이 고객으로 목록 보기 — 계약 · LIVE · OI · 인바운드 · 장비로 옮겨 다녀도 같은 고객(«고객 문맥» · 목록 위 «해제») */
+  (function(){ var cap=$('#c360Cap'); if(!cap) return; var old=document.getElementById('c360Go'); if(old) old.remove();
+    var V=[['contracts','계약',cts.length],['live','LIVE',lives.length],['oi','OI',ois.length],['inbound','인바운드',inbs.length],['orders','장비 신청',ords.length],['assets','장비 현황',asts.length]].filter(function(x){ var b=document.querySelector('#side button[data-v="'+x[0]+'"]'); return !!b && visBtn(/** @type {any} */(b)); });
+    var d=document.createElement('div'); d.id='c360Go'; d.className='c360-go'; d.setAttribute('role','group'); d.setAttribute('aria-label','이 고객으로 목록 보기');
+    d.innerHTML=tpl`<span class="mini">이 고객으로 목록 보기</span>${rawHtml(V.map(function(x){ return tpl`<button type="button" class="cbtn" data-cv="${x[0]}">${x[1]} <b class="num">${String(x[2])}</b></button>`; }).join(''))}`;
+    cap.parentElement.insertBefore(d, cap.nextSibling);
+    d.querySelectorAll('[data-cv]').forEach(function(b){ /** @type {any} */(b).onclick=function(){ closeOvl('ovlC360'); custGo(/** @type {any} */(b).dataset.cv, nm); }; }); })();
   openOvl('ovlC360');
 }
 
@@ -347,7 +316,15 @@ export function pushRecent(v){
   try{
     var a=JSON.parse(localStorage.getItem(recentKey())||'[]').filter(function(x){return x!==v;});
     a.unshift(v); localStorage.setItem(recentKey(), JSON.stringify(a.slice(0,6)));
+    var f=JSON.parse(localStorage.getItem(freqKey())||'{}')||{}; f[v]=(f[v]||0)+1; localStorage.setItem(freqKey(), JSON.stringify(f));   /* ㊿+169 자주 쓰는 화면 */
   }catch(e){}
+}
+export function freqKey(){ return 'svc_freq_'+(ST.AUTH_USER||'anon'); }
+/** 많이 연 화면 n개 — 지금 메뉴에 보이는 것만 */
+export function freqTop(n){
+  try{ var f=JSON.parse(localStorage.getItem(freqKey())||'{}')||{};
+    return Object.keys(f).filter(function(v){ var b=document.querySelector('#side button[data-v="'+v+'"]'); return !!b && visBtn(b); }).sort(function(x,y){ return f[y]-f[x]; }).slice(0, n||5); }
+  catch(e){ return []; }
 }
 export function renderTodo(){
   var wrap=document.getElementById('todoWrap'); if(!wrap) return;
@@ -362,7 +339,7 @@ export function renderTodo(){
         var n=null;
         if(rows){ n=0; rows.forEach(function(x){
           var last=[x.on_date,x.s1d,x.s2d,x.s21d,x.s3d].filter(function(d){return d&&/^\d{4}-\d{2}-\d{2}/.test(d);}).sort().pop();
-          if(last && (t0-new Date(last).getTime())/864e5>=90) n++;   // 대시보드 기준: 3개월
+          if(last && (t0-new Date(last).getTime())/864e5>=qvCfg().inbIdle) n++;   // 대시보드 기준: 기본 90일 (㊿+170 «빠른 보기 › 기준»에서 바꿈 · 인바운드 «장기 미접촉»과 같은 기준)
         }); }
         ST.INB_TODO={t:t0, n:n};
         if(ST.CUR_VIEW==='dash') renderTodo();
@@ -371,7 +348,7 @@ export function renderTodo(){
   var inbN=ST.INB_TODO? ST.INB_TODO.n:null;
   // ② OI 밀린 액션 — 예정일이 지났는데 아직 진행 중
   var oiLate=(ST.RAWX.oi||[]).filter(function(o){
-    return o.next_date && String(o.next_date).slice(0,10)<todayS && !/수주|실패/.test(String(o.stage||''));
+    return o.next_date && String(o.next_date).slice(0,10)<todayS && oiOpen(o);
   }).length;
   // ③ 재약정 도래 — 60일(2개월) 안에 종료되는 계약
   var nowI=dIdx(todayS), renewN=0;
@@ -411,7 +388,7 @@ export function applyFs(n){
   var b=document.getElementById('btnFont');
   if(b){
     b.style.background = n>0? 'var(--brand-t,rgba(46,189,87,.13))':'';
-    b.innerHTML = tpl`가<b style="font-size:13.5px">A</b>${n===1?' 크게':n===2?' 최대':''}`;
+    b.innerHTML = tpl`가<b style="font-size:14px">A</b>${n===1?' 크게':n===2?' 최대':''}`;
   }
 }
 

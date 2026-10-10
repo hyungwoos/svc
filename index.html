@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="ko" data-theme="light" data-look="cc">
+<html lang="ko" data-theme="light" data-look="cc" data-skin="gn">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <!-- CSP (80점 프로젝트 ② 보안): GitHub Pages 는 응답 헤더를 못 넣으므로 meta 로. ㊿+136 부터 인라인 스크립트·onclick 이 없어 script-src 에 'unsafe-inline' 없음(스타일은 인라인 style 속성 때문에 유지) · ㊿+147 부터 'unsafe-eval' 도 없음(SQL 엔진 alasql 은 격리 칸 sqlbox.html 에서만 돌림) — 스크립트·연결 호스트를 목록으로 제한(XSS 시 외부 유출 차단). Worker 주소나 GAS 주소가 바뀌면 여기도 수정. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-/0Y20OLFhnzLW/2DyPNRureG0eBjkkBHTXhBf10h1pc=' blob: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' data: https://cdn.jsdelivr.net; img-src 'self' data: blob: https://amzbrdhkvzsyxjfjtugu.supabase.co; connect-src 'self' https://amzbrdhkvzsyxjfjtugu.supabase.co https://open.er-api.com https://api.frankfurter.app https://script.google.com/macros/s/AKfycbz0PDzgvgtM0ZZHEfMwEzPpgoPYidD6ElPx3oTGsgnVuveCnVA9PmYPB4WAPfr9a6DY/ https://script.googleusercontent.com https://aged-union-cdd3.choihw.workers.dev https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; worker-src 'self' blob:; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-6DeUu+vv7PFw/DeC97wpqBB5ZGjS8rZMHIfxL/rHQ4M=' blob: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' data: https://cdn.jsdelivr.net; img-src 'self' data: blob: https://amzbrdhkvzsyxjfjtugu.supabase.co; connect-src 'self' https://amzbrdhkvzsyxjfjtugu.supabase.co https://open.er-api.com https://api.frankfurter.app https://script.google.com/macros/s/AKfycbz0PDzgvgtM0ZZHEfMwEzPpgoPYidD6ElPx3oTGsgnVuveCnVA9PmYPB4WAPfr9a6DY/ https://script.googleusercontent.com https://aged-union-cdd3.choihw.workers.dev https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; worker-src 'self' blob:; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
 <title>서비스사업부 통합 관리 포탈</title>
 <!-- PWA: 홈 화면 앱 (manifest.webmanifest · sw.js · pwa-*.png · apple-touch-icon.png 를 같은 폴더에) -->
 <link rel="manifest" href="manifest.webmanifest">
@@ -15,79 +15,94 @@
 <meta name="apple-mobile-web-app-title" content="SVC 포탈">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23149e40'/%3E%3Cg fill='%23fff'%3E%3Crect x='14' y='32' width='9' height='18' rx='2'/%3E%3Crect x='27.5' y='22' width='9' height='28' rx='2'/%3E%3Crect x='41' y='14' width='9' height='36' rx='2'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Crect width=%2264%22 height=%2264%22 rx=%2214%22 fill=%22%231C1E20%22/%3E%3Cg transform=%22translate(8,13.3) scale(0.2805)%22%3E%3Cg transform=%22translate(-338.7,-184.4)%22 fill=%22%2380BF26%22%3E%3Cpath d=%22M 489.94 202.51 C 483.15 195.64 475.14 190.47 466.62 187.1 L 466.62 204.97 C 481.79 213.24 492.84 231.49 492.84 251.25 C 492.84 279 473.26 301.6 444.8 301.6 L 405.76 301.6 C 376.84 301.6 355.65 279 355.65 251.24 C 355.65 223.49 378.29 200.9 407.66 200.9 L 436.75 200.9 L 436.75 213.93 L 412.5 213.93 C 387.27 213.93 369.95 228.73 369.95 251.24 C 369.95 273.75 385.61 289.14 412.68 289.14 L 453.74 289.14 L 453.74 243.55 L 410.93 243.55 L 410.93 259.85 L 436.75 259.85 L 436.75 274.05 L 409.57 274.05 C 394.7 274.05 386.76 263.75 386.76 251.24 C 386.76 238.75 394.7 230.02 409.59 230.02 L 453.74 230.02 L 453.75 184.43 L 405.94 184.43 C 389.59 184.43 371.02 191.34 358.57 203.86 C 345.74 216.81 338.68 233.57 338.68 251.24 C 338.68 268.91 345.74 285.87 358.55 298.85 C 371.02 311.39 390.27 317.78 406.62 317.78 L 444.98 317.78 C 462.25 317.78 477.86 311.42 490.27 298.85 C 503.09 285.87 509.83 268.91 509.83 251.25 C 509.83 233.57 502.76 215.45 489.94 202.51 %22/%3E%3C/g%3E%3C/g%3E%3C/svg%3E">
 <!-- 포탈 버전 — 파일을 바꿔 올릴 때마다 아래 content 의 숫자가 +1 (화면 맨 아래 표시 · app.css / js/*.js 의 ?v= 캐시 무효화 · 배포·운영이 이 값을 읽어 비교).
      코드 파일 목록은 app-js (ES 모듈 · ㊿+153) — 파일을 더하거나 빼면 여기와 sw.js 의 SHELL 을 함께 고치고 node tests/stamp.mjs 로 아래 stamp 묶음을 다시 만들 것.
      시작점은 js/main.js 하나(나머지는 import 로 따라옴) · 리포트·관리자·가격표는 처음 열 때(js/lazy.js).
      ④ 아키텍처 2단계(㊿+136): 인라인 스크립트·onclick 을 전부 없애 CSP script-src 에서 'unsafe-inline' 제거 · 인라인은 importmap 하나뿐이고 CSP 해시로 허용. -->
-<meta name="app-ver" content="2026-09-16 ㊿+165">
-<meta name="app-js" content="js/state.js,js/viz.js,js/core.js,js/shell.js,js/dash.js,js/ai.js,js/grids.js,js/equipment.js,js/analysis.js,js/tools.js,js/cloud.js,js/price.js,js/inbound.js,js/upd.js,js/admin.js,js/sales.js,js/report.js,js/grid.js,js/edit.js,js/qadb.js,js/qadata.js,js/lazy.js,js/init.js,js/main.js">
+<meta name="app-ver" content="2026-09-16 ㊿+172">
+<meta name="app-js" content="js/state.js,js/viz.js,js/core.js,js/shell.js,js/dash.js,js/ai.js,js/home.js,js/grids.js,js/equipment.js,js/analysis.js,js/tools.js,js/cloud.js,js/price.js,js/inbound.js,js/upd.js,js/admin.js,js/sales.js,js/report.js,js/grid.js,js/edit.js,js/qadb.js,js/qadata.js,js/lazy.js,js/init.js,js/main.js">
 <!-- stamp:begin — tests/stamp.mjs 가 app-ver · app-js 로 만든 부분(손으로 고치지 말 것 · 버전을 올린 뒤 다시 실행 · tests/check.mjs 가 확인) -->
-<link rel="stylesheet" href="app.css?v=2026-09-16%20%E3%8A%BF%2B165">
-<script type="importmap">{"imports":{"./js/state.js":"./js/state.js?v=2026-09-16%20%E3%8A%BF%2B165","./js/viz.js":"./js/viz.js?v=2026-09-16%20%E3%8A%BF%2B165","./js/core.js":"./js/core.js?v=2026-09-16%20%E3%8A%BF%2B165","./js/shell.js":"./js/shell.js?v=2026-09-16%20%E3%8A%BF%2B165","./js/dash.js":"./js/dash.js?v=2026-09-16%20%E3%8A%BF%2B165","./js/ai.js":"./js/ai.js?v=2026-09-16%20%E3%8A%BF%2B165","./js/grids.js":"./js/grids.js?v=2026-09-16%20%E3%8A%BF%2B165","./js/equipment.js":"./js/equipment.js?v=2026-09-16%20%E3%8A%BF%2B165","./js/analysis.js":"./js/analysis.js?v=2026-09-16%20%E3%8A%BF%2B165","./js/tools.js":"./js/tools.js?v=2026-09-16%20%E3%8A%BF%2B165","./js/cloud.js":"./js/cloud.js?v=2026-09-16%20%E3%8A%BF%2B165","./js/price.js":"./js/price.js?v=2026-09-16%20%E3%8A%BF%2B165","./js/inbound.js":"./js/inbound.js?v=2026-09-16%20%E3%8A%BF%2B165","./js/upd.js":"./js/upd.js?v=2026-09-16%20%E3%8A%BF%2B165","./js/admin.js":"./js/admin.js?v=2026-09-16%20%E3%8A%BF%2B165","./js/sales.js":"./js/sales.js?v=2026-09-16%20%E3%8A%BF%2B165","./js/report.js":"./js/report.js?v=2026-09-16%20%E3%8A%BF%2B165","./js/grid.js":"./js/grid.js?v=2026-09-16%20%E3%8A%BF%2B165","./js/edit.js":"./js/edit.js?v=2026-09-16%20%E3%8A%BF%2B165","./js/qadb.js":"./js/qadb.js?v=2026-09-16%20%E3%8A%BF%2B165","./js/qadata.js":"./js/qadata.js?v=2026-09-16%20%E3%8A%BF%2B165","./js/lazy.js":"./js/lazy.js?v=2026-09-16%20%E3%8A%BF%2B165","./js/init.js":"./js/init.js?v=2026-09-16%20%E3%8A%BF%2B165"}}</script>
-<link rel="modulepreload" href="js/state.js?v=2026-09-16%20%E3%8A%BF%2B165">
-<link rel="modulepreload" href="js/viz.js?v=2026-09-16%20%E3%8A%BF%2B165">
-<link rel="modulepreload" href="js/core.js?v=2026-09-16%20%E3%8A%BF%2B165">
-<link rel="modulepreload" href="js/shell.js?v=2026-09-16%20%E3%8A%BF%2B165">
-<link rel="modulepreload" href="js/dash.js?v=2026-09-16%20%E3%8A%BF%2B165">
-<link rel="modulepreload" href="js/ai.js?v=2026-09-16%20%E3%8A%BF%2B165">
-<link rel="modulepreload" href="js/grids.js?v=2026-09-16%20%E3%8A%BF%2B165">
-<link rel="modulepreload" href="js/equipment.js?v=2026-09-16%20%E3%8A%BF%2B165">
-<link rel="modulepreload" href="js/analysis.js?v=2026-09-16%20%E3%8A%BF%2B165">
-<link rel="modulepreload" href="js/tools.js?v=2026-09-16%20%E3%8A%BF%2B165">
-<link rel="modulepreload" href="js/cloud.js?v=2026-09-16%20%E3%8A%BF%2B165">
-<link rel="modulepreload" href="js/inbound.js?v=2026-09-16%20%E3%8A%BF%2B165">
-<link rel="modulepreload" href="js/upd.js?v=2026-09-16%20%E3%8A%BF%2B165">
-<link rel="modulepreload" href="js/sales.js?v=2026-09-16%20%E3%8A%BF%2B165">
-<link rel="modulepreload" href="js/grid.js?v=2026-09-16%20%E3%8A%BF%2B165">
-<link rel="modulepreload" href="js/edit.js?v=2026-09-16%20%E3%8A%BF%2B165">
-<link rel="modulepreload" href="js/qadb.js?v=2026-09-16%20%E3%8A%BF%2B165">
-<link rel="modulepreload" href="js/qadata.js?v=2026-09-16%20%E3%8A%BF%2B165">
-<link rel="modulepreload" href="js/lazy.js?v=2026-09-16%20%E3%8A%BF%2B165">
-<link rel="modulepreload" href="js/init.js?v=2026-09-16%20%E3%8A%BF%2B165">
-<script type="module" src="js/main.js?v=2026-09-16%20%E3%8A%BF%2B165"></script>
+<link rel="stylesheet" href="app.css?v=2026-09-16%20%E3%8A%BF%2B172">
+<script type="importmap">{"imports":{"./js/state.js":"./js/state.js?v=2026-09-16%20%E3%8A%BF%2B172","./js/viz.js":"./js/viz.js?v=2026-09-16%20%E3%8A%BF%2B172","./js/core.js":"./js/core.js?v=2026-09-16%20%E3%8A%BF%2B172","./js/shell.js":"./js/shell.js?v=2026-09-16%20%E3%8A%BF%2B172","./js/dash.js":"./js/dash.js?v=2026-09-16%20%E3%8A%BF%2B172","./js/ai.js":"./js/ai.js?v=2026-09-16%20%E3%8A%BF%2B172","./js/home.js":"./js/home.js?v=2026-09-16%20%E3%8A%BF%2B172","./js/grids.js":"./js/grids.js?v=2026-09-16%20%E3%8A%BF%2B172","./js/equipment.js":"./js/equipment.js?v=2026-09-16%20%E3%8A%BF%2B172","./js/analysis.js":"./js/analysis.js?v=2026-09-16%20%E3%8A%BF%2B172","./js/tools.js":"./js/tools.js?v=2026-09-16%20%E3%8A%BF%2B172","./js/cloud.js":"./js/cloud.js?v=2026-09-16%20%E3%8A%BF%2B172","./js/price.js":"./js/price.js?v=2026-09-16%20%E3%8A%BF%2B172","./js/inbound.js":"./js/inbound.js?v=2026-09-16%20%E3%8A%BF%2B172","./js/upd.js":"./js/upd.js?v=2026-09-16%20%E3%8A%BF%2B172","./js/admin.js":"./js/admin.js?v=2026-09-16%20%E3%8A%BF%2B172","./js/sales.js":"./js/sales.js?v=2026-09-16%20%E3%8A%BF%2B172","./js/report.js":"./js/report.js?v=2026-09-16%20%E3%8A%BF%2B172","./js/grid.js":"./js/grid.js?v=2026-09-16%20%E3%8A%BF%2B172","./js/edit.js":"./js/edit.js?v=2026-09-16%20%E3%8A%BF%2B172","./js/qadb.js":"./js/qadb.js?v=2026-09-16%20%E3%8A%BF%2B172","./js/qadata.js":"./js/qadata.js?v=2026-09-16%20%E3%8A%BF%2B172","./js/lazy.js":"./js/lazy.js?v=2026-09-16%20%E3%8A%BF%2B172","./js/init.js":"./js/init.js?v=2026-09-16%20%E3%8A%BF%2B172"}}</script>
+<link rel="modulepreload" href="js/state.js?v=2026-09-16%20%E3%8A%BF%2B172">
+<link rel="modulepreload" href="js/viz.js?v=2026-09-16%20%E3%8A%BF%2B172">
+<link rel="modulepreload" href="js/core.js?v=2026-09-16%20%E3%8A%BF%2B172">
+<link rel="modulepreload" href="js/shell.js?v=2026-09-16%20%E3%8A%BF%2B172">
+<link rel="modulepreload" href="js/dash.js?v=2026-09-16%20%E3%8A%BF%2B172">
+<link rel="modulepreload" href="js/ai.js?v=2026-09-16%20%E3%8A%BF%2B172">
+<link rel="modulepreload" href="js/home.js?v=2026-09-16%20%E3%8A%BF%2B172">
+<link rel="modulepreload" href="js/grids.js?v=2026-09-16%20%E3%8A%BF%2B172">
+<link rel="modulepreload" href="js/equipment.js?v=2026-09-16%20%E3%8A%BF%2B172">
+<link rel="modulepreload" href="js/analysis.js?v=2026-09-16%20%E3%8A%BF%2B172">
+<link rel="modulepreload" href="js/tools.js?v=2026-09-16%20%E3%8A%BF%2B172">
+<link rel="modulepreload" href="js/cloud.js?v=2026-09-16%20%E3%8A%BF%2B172">
+<link rel="modulepreload" href="js/inbound.js?v=2026-09-16%20%E3%8A%BF%2B172">
+<link rel="modulepreload" href="js/upd.js?v=2026-09-16%20%E3%8A%BF%2B172">
+<link rel="modulepreload" href="js/sales.js?v=2026-09-16%20%E3%8A%BF%2B172">
+<link rel="modulepreload" href="js/grid.js?v=2026-09-16%20%E3%8A%BF%2B172">
+<link rel="modulepreload" href="js/edit.js?v=2026-09-16%20%E3%8A%BF%2B172">
+<link rel="modulepreload" href="js/qadb.js?v=2026-09-16%20%E3%8A%BF%2B172">
+<link rel="modulepreload" href="js/qadata.js?v=2026-09-16%20%E3%8A%BF%2B172">
+<link rel="modulepreload" href="js/lazy.js?v=2026-09-16%20%E3%8A%BF%2B172">
+<link rel="modulepreload" href="js/init.js?v=2026-09-16%20%E3%8A%BF%2B172">
+<script type="module" src="js/main.js?v=2026-09-16%20%E3%8A%BF%2B172"></script>
 <!-- stamp:end -->
 </head>
-<body>
+<body data-view="dash">
 
-<!-- 로그인 전용 화면 (비로그인 시 전체 화면) -->
-<div id="viewLogin" class="hidden" style="position:fixed;inset:0;z-index:900;background:var(--plane);display:flex;align-items:center;justify-content:center;padding:20px">
-  <div style="width:min(410px,94vw)">
-    <div style="text-align:center;margin-bottom:26px">
-      <div style="width:54px;height:54px;margin:0 auto 14px;border-radius:15px;display:flex;align-items:center;justify-content:center;font-size:26px;
-                  background:var(--brand,#149e40);box-shadow:0 8px 22px rgba(20,158,64,.30)">📊</div>
-      <div style="font-size:22px;font-weight:800;letter-spacing:-.02em">서비스사업부 통합 관리 포탈</div>
-      <div style="font-size:12.5px;color:var(--muted);margin-top:5px">매출 · 임대장비 · 견적 통합 관리</div>
+<!-- 로그인 전용 화면 (비로그인 시 전체 화면) — ㊿+166 새 디자인: 왼쪽 브랜드 무대(정식 로고 · 업무 흐름 트랙) + 오른쪽 로그인 · 폰은 위아래 -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><symbol id="gnLogo" viewBox="0 0 587.2 133.4"><g transform="translate(-338.70,-184.40)" fill="#80BF26"><path d="M 489.94 202.51 C 483.15 195.64 475.14 190.47 466.62 187.1 L 466.62 204.97 C 481.79 213.24 492.84 231.49 492.84 251.25 C 492.84 279 473.26 301.6 444.8 301.6 L 405.76 301.6 C 376.84 301.6 355.65 279 355.65 251.24 C 355.65 223.49 378.29 200.9 407.66 200.9 L 436.75 200.9 L 436.75 213.93 L 412.5 213.93 C 387.27 213.93 369.95 228.73 369.95 251.24 C 369.95 273.75 385.61 289.14 412.68 289.14 L 453.74 289.14 L 453.74 243.55 L 410.93 243.55 L 410.93 259.85 L 436.75 259.85 L 436.75 274.05 L 409.57 274.05 C 394.7 274.05 386.76 263.75 386.76 251.24 C 386.76 238.75 394.7 230.02 409.59 230.02 L 453.74 230.02 L 453.75 184.43 L 405.94 184.43 C 389.59 184.43 371.02 191.34 358.57 203.86 C 345.74 216.81 338.68 233.57 338.68 251.24 C 338.68 268.91 345.74 285.87 358.55 298.85 C 371.02 311.39 390.27 317.78 406.62 317.78 L 444.98 317.78 C 462.25 317.78 477.86 311.42 490.27 298.85 C 503.09 285.87 509.83 268.91 509.83 251.25 C 509.83 233.57 502.76 215.45 489.94 202.51 "/></g><g transform="translate(205.10,26.68) scale(1.2665) translate(-269.90,-346.20)" fill="currentColor"><path d="M 515.69 364.55 C 511.9 364.65 507.11 365.97 503.23 368.14 L 503.23 365.18 L 491.97 365.18 L 491.97 408.55 L 503.62 408.55 L 503.62 378.61 C 505.52 376.88 509.91 373.8 515.11 375.05 C 517.67 375.67 518.82 377.32 518.82 380.43 L 518.82 408.55 L 530.48 408.55 L 530.48 381.53 C 530.48 375.36 530.18 364.17 515.69 364.55 "/><path d="M 403.12 364.55 C 398.91 364.63 393.73 366.48 390.66 368.14 L 390.66 365.18 L 379.38 365.18 L 379.38 408.55 L 391.05 408.55 L 391.05 378.5 C 392.77 377.06 397.34 373.8 402.54 375.05 C 405.09 375.67 406.25 377.32 406.25 380.43 L 406.25 408.55 L 417.9 408.55 L 417.9 381.53 C 417.9 375.36 417.64 364.27 403.12 364.55 "/><path d="M 472.07 397.2 C 472.07 397.2 469.74 400.48 464.2 400.58 C 462.15 400.63 457.31 400.68 457.31 395.41 C 457.31 392.58 458.36 390.24 464.45 390.24 L 472.07 390.24 Z M 472.1 382.05 L 460.02 382.05 C 452.88 382.05 446.29 386.49 446.29 395.15 L 446.29 396.81 C 446.29 404.17 452.45 409.28 460.18 409.28 C 465.05 409.28 468.37 408 472.23 405.8 L 472.55 408.55 L 483.31 408.55 L 483.31 380.31 C 483.31 373.61 480.87 364.43 466.38 364.43 C 462.17 364.43 456.52 365.11 450.56 366.82 L 450.56 376.12 C 450.56 376.12 456.93 374.05 462.31 373.89 C 464.27 373.83 472.1 373.39 472.1 380.19 Z M 472.1 382.05 "/><path d="M 571.43 393.36 C 570.33 385.66 563.52 383.89 556.8 382.22 C 552.82 381.23 549.65 380.23 549.54 377.54 C 549.44 375.25 550.73 373.89 553.61 373.64 C 559.2 373.12 565.42 374.64 568.44 375.46 L 568.44 366.46 C 568.44 366.46 560.18 363.64 552.27 364.65 C 540.84 366.09 537.36 372.68 538.3 379.29 C 539.43 387.11 546.81 389.46 552.53 390.97 C 557.06 392.19 559.93 393.21 559.98 395.68 C 560.05 397.7 559.16 399.59 555.63 399.82 C 548.53 400.28 537.95 396.98 537.95 396.98 L 537.95 406.65 C 537.95 406.65 547.12 410.05 556.95 409.28 C 567.64 408.47 572.74 402.63 571.43 393.36 "/><path d="M 427.13 408.55 L 438.83 408.55 L 438.83 365.94 L 427.13 365.94 Z M 427.13 408.55 "/><path d="M 432.97 360.25 C 436.86 360.25 440 357.12 440 353.26 C 440 349.36 436.86 346.22 432.97 346.22 C 429.1 346.22 425.95 349.36 425.95 353.26 C 425.95 357.12 429.1 360.25 432.97 360.25 "/><path d="M 298.73 383.79 L 314.71 383.79 L 314.71 396.84 L 299.92 396.84 C 290.2 396.84 282.3 389.8 282.3 378.52 C 282.3 367.23 290.2 359.89 299.92 359.89 L 323.56 359.89 L 323.56 348.47 L 299.92 348.47 C 283.34 348.47 269.89 361.13 269.89 378.52 C 269.89 395.88 283.34 408.55 299.92 408.55 L 325.97 408.55 L 325.97 373.05 L 298.73 373.05 Z M 298.73 383.79 "/><path d="M 360.21 382.54 L 345.54 382.54 L 345.54 380.93 C 345.54 376.32 348.81 373.7 352.73 373.7 C 357.34 373.7 360.21 376.37 360.21 380.93 Z M 352.6 363.93 C 351.04 363.96 334.18 364.92 334.18 381.16 L 334.18 391 C 334.18 398.34 336.69 409.38 352.73 409.38 C 358.26 409.38 363.85 409.09 370.05 407.42 L 370.05 398.14 C 363.5 399.54 356.03 400.07 351.69 399.7 C 347.72 399.34 345.36 397.01 345.54 391.63 L 371.02 391.63 L 371.02 380.51 C 371.02 374.79 368.31 363.93 352.6 363.93 "/></g></symbol><symbol id="gnMark" viewBox="0 0 171.1 133.4"><g transform="translate(-338.70,-184.40)" fill="currentColor"><path d="M 489.94 202.51 C 483.15 195.64 475.14 190.47 466.62 187.1 L 466.62 204.97 C 481.79 213.24 492.84 231.49 492.84 251.25 C 492.84 279 473.26 301.6 444.8 301.6 L 405.76 301.6 C 376.84 301.6 355.65 279 355.65 251.24 C 355.65 223.49 378.29 200.9 407.66 200.9 L 436.75 200.9 L 436.75 213.93 L 412.5 213.93 C 387.27 213.93 369.95 228.73 369.95 251.24 C 369.95 273.75 385.61 289.14 412.68 289.14 L 453.74 289.14 L 453.74 243.55 L 410.93 243.55 L 410.93 259.85 L 436.75 259.85 L 436.75 274.05 L 409.57 274.05 C 394.7 274.05 386.76 263.75 386.76 251.24 C 386.76 238.75 394.7 230.02 409.59 230.02 L 453.74 230.02 L 453.75 184.43 L 405.94 184.43 C 389.59 184.43 371.02 191.34 358.57 203.86 C 345.74 216.81 338.68 233.57 338.68 251.24 C 338.68 268.91 345.74 285.87 358.55 298.85 C 371.02 311.39 390.27 317.78 406.62 317.78 L 444.98 317.78 C 462.25 317.78 477.86 311.42 490.27 298.85 C 503.09 285.87 509.83 268.91 509.83 251.25 C 509.83 233.57 502.76 215.45 489.94 202.51 "/></g></symbol></svg>
+<div id="viewLogin" class="hidden lg">
+  <section class="lg-stage">
+    <svg class="lg-logo" viewBox="0 0 587.2 133.4" role="img" aria-label="Genians"><use href="#gnLogo"/></svg>
+    <div class="lg-copy">
+      <p class="lg-eye">GENIANS · 서비스사업부</p>
+      <h1 class="lg-h">서비스사업부<br>통합 관리 포탈</h1>
     </div>
-    <div class="card" style="padding:26px 26px 22px;border-radius:16px;box-shadow:0 12px 34px rgba(0,0,0,.08)">
+    <div class="lg-orbit" aria-hidden="true">
+      <svg viewBox="0 0 560 300" preserveAspectRatio="xMidYMid meet">
+        <rect class="lg-trk" x="20" y="20" width="520" height="260" rx="130"/>
+        <rect class="lg-run" x="20" y="20" width="520" height="260" rx="130" pathLength="100"/>
+        <circle class="lg-dot" r="7"><animateMotion dur="14s" repeatCount="indefinite" rotate="auto" path="M150 20 H410 A130 130 0 0 1 410 280 H150 A130 130 0 0 1 150 20 Z"/></circle>
+        <svg x="215" y="100" width="130" height="101" viewBox="0 0 171.1 133.4" class="lg-mark"><use href="#gnMark"/></svg>
+      </svg>
+      <span class="lg-st" style="left:27%;top:6.7%">매출 · MRR</span>
+      <span class="lg-st" style="left:73%;top:6.7%">LIVE 고객사</span>
+      <span class="lg-st" style="left:96.4%;top:50%">만기 · 재약정</span>
+      <span class="lg-st" style="left:73%;top:93.3%">임대 장비</span>
+      <span class="lg-st" style="left:27%;top:93.3%">PoC · 영업</span>
+      <span class="lg-st" style="left:3.6%;top:50%">인바운드 · 정산</span>
+    </div>
+    <div class="lg-foot"><span id="lgDate"></span><span id="lgVer"></span></div>
+  </section>
+  <section class="lg-panel">
+    <div class="lg-card">
+      <svg class="lg-mlogo" viewBox="0 0 587.2 133.4" role="img" aria-label="Genians"><use href="#gnLogo"/></svg>
+      <h2 class="lg-t">로그인</h2>
+      <p class="lg-hint">관리자가 발급한 계정으로 들어오세요</p>
       <!-- form 으로 감싸고 name 을 붙여야 브라우저 비밀번호 관리자가 «아이디+비밀번호»를 한 쌍으로 저장·자동 완성합니다 (전에는 비밀번호만 채워지고 아이디가 비는 일이 있었음) -->
-      <form id="lsLogin" autocomplete="on" style="margin:0">
-        <label for="lsEmail" style="display:block;font-size:12px;font-weight:650;color:var(--ink-2);margin-bottom:6px">이메일</label>
-        <input id="lsEmail" name="username" type="email" autocomplete="username" placeholder="name@genians.com" spellcheck="false" autocapitalize="off"
-               style="width:100%;height:42px;padding:0 13px;border-radius:10px;border:1px solid var(--ring);background:var(--surface-2);font-size:13.5px;margin-bottom:14px">
-        <label for="lsPw" style="display:block;font-size:12px;font-weight:650;color:var(--ink-2);margin-bottom:6px">비밀번호</label>
-        <input id="lsPw" name="password" type="password" autocomplete="current-password" placeholder="••••••••"
-               style="width:100%;height:42px;padding:0 13px;border-radius:10px;border:1px solid var(--ring);background:var(--surface-2);font-size:13.5px;margin-bottom:18px">
-        <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-2);margin:-6px 0 14px;cursor:pointer;line-height:1.4"><input id="lsKeep" type="checkbox" style="width:15px;height:15px;margin:0;flex:none"><span style="white-space:nowrap;font-weight:600">로그인 유지</span><span class="mini">앱·모바일에서 닫았다 열어도 다시 로그인하지 않음</span></label>
-        <button id="lsGo" type="submit" class="btn" style="width:100%;height:44px;font-size:15px;border-radius:11px">로그인</button>
+      <form id="lsLogin" autocomplete="on">
+        <label class="lg-f" for="lsEmail"><span>이메일</span>
+          <input id="lsEmail" name="username" type="email" autocomplete="username" placeholder="name@genians.com" spellcheck="false" autocapitalize="off"></label>
+        <label class="lg-f" for="lsPw"><span>비밀번호</span>
+          <input id="lsPw" name="password" type="password" autocomplete="current-password" placeholder="••••••••"></label>
+        <label class="lg-keep"><input id="lsKeep" type="checkbox" role="switch"><span class="lg-kt"><b>로그인 유지</b><span>앱·모바일에서 닫았다 열어도 다시 로그인하지 않음</span></span></label>
+        <button id="lsGo" type="submit" class="lg-go">로그인<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg></button>
       </form>
       <div id="lsForce" style="display:none">
-        <div style="font-size:13.5px;font-weight:700;margin-bottom:4px">비밀번호 변경</div>
-        <p class="cap" style="margin:0 0 14px">최초 로그인입니다 — 본인 비밀번호로 변경해야 사용할 수 있습니다.</p>
-        <label style="display:block;font-size:12px;font-weight:650;color:var(--ink-2);margin-bottom:6px">새 비밀번호 (6자 이상)</label>
-        <input id="lsNpw1" aria-label="새 비밀번호" type="password" autocomplete="new-password"
-               style="width:100%;height:42px;padding:0 13px;border-radius:10px;border:1px solid var(--ring);background:var(--surface-2);font-size:13.5px;margin-bottom:14px">
-        <label style="display:block;font-size:12px;font-weight:650;color:var(--ink-2);margin-bottom:6px">새 비밀번호 확인</label>
-        <input id="lsNpw2" aria-label="새 비밀번호 확인" type="password" autocomplete="new-password"
-               style="width:100%;height:42px;padding:0 13px;border-radius:10px;border:1px solid var(--ring);background:var(--surface-2);font-size:13.5px;margin-bottom:18px">
-        <button id="lsPwGo" class="btn" style="width:100%;height:44px;font-size:15px;border-radius:11px">변경하고 시작하기</button>
+        <div class="lg-ft">비밀번호 변경</div>
+        <p class="lg-hint" style="margin:0 0 16px">최초 로그인입니다 — 본인 비밀번호로 변경해야 사용할 수 있습니다.</p>
+        <label class="lg-f"><span>새 비밀번호 (6자 이상)</span>
+          <input id="lsNpw1" aria-label="새 비밀번호" type="password" autocomplete="new-password"></label>
+        <label class="lg-f"><span>새 비밀번호 확인</span>
+          <input id="lsNpw2" aria-label="새 비밀번호 확인" type="password" autocomplete="new-password"></label>
+        <button id="lsPwGo" type="button" class="lg-go">변경하고 시작하기</button>
       </div>
-      <div id="lsMsg" style="font-size:12.5px;min-height:18px;margin-top:12px;text-align:center;color:var(--critical,#d03b3b)"></div>
+      <div id="lsMsg" role="status" aria-live="polite"></div>
     </div>
-    <p style="text-align:center;font-size:12px;color:var(--muted);margin-top:16px">
-      계정은 관리자가 발급합니다 · 문의: 서비스사업팀
-    </p>
-  </div>
+    <p class="lg-help">계정은 관리자가 발급합니다 · 문의: 서비스사업팀</p>
+  </section>
 </div>
 
 <div id="loading" class="loading">
@@ -96,7 +111,7 @@
 </div>
 
 <nav class="side hidden" id="side">
-  <div class="logo">서비스사업부<small>통합 관리 포탈</small></div>
+  <div class="logo"><svg class="gn-slogo" viewBox="0 0 587.2 133.4" role="img" aria-label="Genians"><use href="#gnLogo"/></svg>서비스사업부<small>통합 관리 포탈</small></div>
   <button data-v="dash" aria-current="true">🏠 홈 (대시보드)</button>
   <button data-v="weekly">📊 주간회의</button>
   <div class="grp">전체 데이터</div>
@@ -137,16 +152,16 @@
   <div class="grp">정산·목표</div>
   <button data-v="biz">⚖️ 비즈포탈 차액</button>
   <button data-v="targets">🎯 연간 목표</button>
-  <div class="grp">도구</div>
-  <button data-v="quote">📄 견적·발주 시스템</button>
-  <button data-v="preport">📑 프로젝트 리포트</button>
   <button data-v="s1">🏢 에스원 정산</button>
   <button data-v="kk">☁️ 카카오 정산</button>
-  <button data-v="price">💰 가격표</button>
   <button data-v="cloud">☁️ 클라우드 비용</button>
-  <button data-v="csite" style="display:none">🛰️ Cloud 사이트 관리</button>
+  <div class="grp">도구</div>
+  <button data-v="quote">📄 견적·발주 시스템</button>
+  <button data-v="price">💰 가격표</button>
+  <button data-v="preport">📑 프로젝트 리포트</button>
   <button data-v="report">📑 리포트</button>
   <button data-v="aiknow">🧠 AI 지식</button>
+  <button data-v="csite" style="display:none">🛰️ Cloud 사이트 관리</button>
   <div class="grp" id="grpAdmin">관리자</div>
   <button data-v="log">🕘 변경 이력</button>
   <button data-v="adminx" style="display:none">🛡️ 관리자</button>
@@ -167,17 +182,19 @@
       <h1>서비스사업부 통합 관리 포탈</h1>
       <span class="sub" id="periodLabel"></span>
     </div>
+    <div class="gn-ttl"><svg class="gn-tlogo" viewBox="0 0 587.2 133.4" role="img" aria-label="Genians"><use href="#gnLogo"/></svg><svg class="gn-tmark" viewBox="0 0 171.1 133.4" role="img" aria-label="Genians"><use href="#gnMark"/></svg><b id="gnTitle"></b><span id="gnSub"></span></div>
     <button class="cmdbar" id="cmdBar" type="button" title="검색 · 화면 이동 · AI 질문 (Ctrl+K)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/></svg><span class="ph">물어보거나 이동하세요 — «시흥도시공사 장비», «이번 달 해지», «가격표»</span><kbd>Ctrl K</kbd></button>
     <span class="ubadge" id="unitBadge"
       title="포탈에 표시되는 모든 금액은 천원 단위입니다.&#10;예) 51,104천원 = 5,110만원 (= 51,104,000원)&#10;· 금액을 넣는 칸도 천원 단위입니다 (48만원 → 480). 가격표·견적서 단가만 원 단위입니다.">₩ <b>천원</b> 단위<span class="ub-long"> 표시</span></span>
     <div class="spacer"></div>
     <span class="live"><span class="dot"></span><span id="loadedAt"></span></span>
+    <button class="pill ghost" id="btnNew" aria-haspopup="menu" aria-expanded="false" title="무엇을 등록할지 고르기 — 계약 · 영업기회 · 장비 · PoC" style="display:none">＋ 등록</button>
     <button class="pill" id="btnEdit">✏️ 입력·수정</button>
     <button class="pill ghost" id="btnAuth">로그인</button>
     <button class="pill ghost" id="btnLogout" style="display:none;border-color:rgba(208,59,59,.35);color:var(--critical,#d03b3b)">로그아웃</button>
     <button class="pill ghost" id="btnWidgets" aria-label="대시보드 위젯 표시 설정" title="대시보드 위젯 표시 설정">⊞ 위젯</button>
     <button class="pill ghost" id="btnFind" aria-label="전역 검색 (Ctrl+K)" title="전역 검색 (Ctrl+K)">⌕ 검색</button>
-    <button class="pill ghost" id="btnFont" aria-label="글자 크기 바꾸기" title="포탈 전체 글자 크기 — 보통 → 크게 → 아주 크게">가<b style="font-size:13.5px">A</b></button>
+    <button class="pill ghost" id="btnFont" aria-label="글자 크기 바꾸기" title="포탈 전체 글자 크기 — 보통 → 크게 → 아주 크게">가<b style="font-size:14px">A</b></button>
     <button class="pill ghost" id="btnTheme" aria-label="다크 모드 전환" title="다크 모드 전환">◐ 다크</button>
     <button class="pill ghost" id="btnReload" aria-label="데이터 새로고침" title="데이터 새로고침">↻ 새로고침</button>
   </div>
@@ -204,44 +221,21 @@
     <div class="todo-cards" id="todoCards"></div>
     <div class="quick-links" id="quickLinks"></div>
   </section>
-  <section class="ask">
+  <section class="ask" aria-labelledby="askH">
     <div id="ccBrief" class="cc-only"></div>
+    <h2 class="ask-h" id="askH">AI 질문</h2>
     <div class="ask-row">
       <div class="ask-ico">AI</div>
       <div class="qwrap">
         <input id="q" aria-label="AI 에게 질문" type="text" autocomplete="off"
           placeholder="말하듯이 물어보세요 — 예: 요즘 클라우드 좀 어때?  /  제일 큰 고객 누구야?  /  곧 만료되는 계약">
-        <div class="sug" id="sug"></div>
+        <div class="sug" id="sug" hidden></div>
       </div>
       <span class="ai-badge" id="aiBadge"></span>
-      <button class="btn" id="btnAsk">질문</button>
+      <button class="btn" id="btnAsk">AI 에 질문</button>
     </div>
     <div class="chips" id="chips"></div>
 
-    <div class="answer" id="answer">
-      <div class="ans-x"><button type="button" class="cbtn x-close" id="ansClose" title="AI 답변 닫기 — 다른 메뉴로 가도 닫힙니다" aria-label="AI 답변 닫기">✕ 닫기</button></div>
-      <div class="ai-say" id="aiSay"></div>
-      <div class="restate" id="ansRestate"></div>
-      <div class="ans-head">
-        <div class="ans-title" id="ansTitle"></div>
-        <div class="hero" id="ansHero"></div>
-        <div class="ans-sub" id="ansSub"></div>
-      </div>
-      <div class="ans-grid" id="ansGrid">
-        <div class="card" style="padding:12px 14px">
-          <div class="legend" id="ansLegend"></div>
-          <div class="chartbox h260" id="ansChart"></div>
-        </div>
-        <div class="card" style="padding:12px 14px">
-          <div class="cap" id="ansTableCap">상세</div>
-          <div class="tbl-wrap" tabindex="0" style="max-height:236px"><table id="ansTable"></table></div>
-        </div>
-      </div>
-      <div class="ai-comment" id="aiComment"></div>
-      <div class="ans-note" id="ansNote"></div>
-      <p class="suggest-title" id="ansSuggestTitle" style="display:none">이어서 물어보기</p>
-      <div class="chips" id="ansSuggest"></div>
-    </div>
   </section>
 
   <!-- ===================== 필터 ===================== -->
@@ -426,7 +420,7 @@
       <section class="card"><h2>월별 설치 · 회수 <span class="cap" id="eqcTrendCap">최근 12개월 · 대수</span><span class="lg"><i style="background:var(--s1)"></i>설치 <i style="background:var(--s2)"></i>회수</span></h2><div class="chartbox h200" id="eqcTrend"></div></section>
     </div>
     <div class="eqb-bar">
-      <b style="font-size:13.5px;margin-right:4px" title="카드를 옆 열로 끌면 상태가 바뀝니다 · 시리얼 칩을 누르면 일부 회수 표시">상태 보드</b>
+      <b style="font-size:14px;margin-right:4px" title="카드를 옆 열로 끌면 상태가 바뀝니다 · 시리얼 칩 = 시리얼 상세 · 회수는 카드의 «회수 처리»">상태 보드</b>
       <span class="mini" id="eqbHint" style="display:none"></span>
       <div class="eqb-chips" id="eqbChips"></div>
       <input type="search" id="eqbQ" aria-label="장비 검색" placeholder="고객·시리얼·모델 검색">
@@ -439,7 +433,7 @@
   <div id="viewQuote" class="hidden">
     <section class="card c12" style="padding:10px">
       <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px 10px">
-        <div style="font-size:13.5px;font-weight:650">📄 견적·발주 시스템 <span class="ubadge sm won">₩ 금액은 원 단위</span> <span class="mini" style="color:var(--muted);font-weight:400;margin-left:6px">기업용 견적 · 공공용 견적 · 발주서</span></div>
+        <div style="font-size:14px;font-weight:650">📄 견적·발주 시스템 <span class="ubadge sm won">₩ 금액은 원 단위</span> <span class="mini" style="color:var(--muted);font-weight:400;margin-left:6px">기업용 견적 · 공공용 견적 · 발주서</span></div>
         <a href="quote.html" target="_blank" class="pill ghost" style="text-decoration:none" data-sat="quote.html">↗ 새 창에서 열기</a>
       </div>
       <iframe id="quoteFrame" title="견적 시스템"
@@ -450,7 +444,7 @@
   <div id="viewPreport" class="hidden">
     <section class="card c12" style="padding:10px">
       <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px 10px">
-        <div style="font-size:13.5px;font-weight:650">📑 프로젝트 리포트 <span class="ubadge sm won">₩ 금액은 원 단위</span> <span class="mini" style="color:var(--muted);font-weight:400;margin-left:6px">계약을 고르면 PROJECT REPORT 양식이 자동으로 채워집니다 · 저장 · PDF 발행</span></div>
+        <div style="font-size:14px;font-weight:650">📑 프로젝트 리포트 <span class="ubadge sm won">₩ 금액은 원 단위</span> <span class="mini" style="color:var(--muted);font-weight:400;margin-left:6px">계약을 고르면 PROJECT REPORT 양식이 자동으로 채워집니다 · 저장 · PDF 발행</span></div>
         <a href="report.html" target="_blank" class="pill ghost" style="text-decoration:none" data-sat="report.html">↗ 새 창에서 열기</a>
       </div>
       <iframe id="preportFrame" title="프로젝트 리포트"
@@ -461,7 +455,7 @@
   <div id="viewS1" class="hidden">
     <section class="card c12" style="padding:10px">
       <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px 10px">
-        <div style="font-size:13.5px;font-weight:650">🏢 에스원 정산 <span class="ubadge sm won">₩ 금액은 원 단위</span> <span class="mini" style="color:var(--muted);font-weight:400;margin-left:6px">에스원 대금지급 리스트 + 비즈포탈 엑셀 → 등록번호 매칭 · 건수 · 설치비 · 프로젝트 리포트</span></div>
+        <div style="font-size:14px;font-weight:650">🏢 에스원 정산 <span class="ubadge sm won">₩ 금액은 원 단위</span> <span class="mini" style="color:var(--muted);font-weight:400;margin-left:6px">에스원 대금지급 리스트 + 비즈포탈 엑셀 → 등록번호 매칭 · 건수 · 설치비 · 프로젝트 리포트</span></div>
         <a href="s1.html" target="_blank" class="pill ghost" style="text-decoration:none" data-sat="s1.html">↗ 새 창에서 열기</a>
       </div>
       <iframe id="s1Frame" title="에스원 정산"
@@ -472,7 +466,7 @@
   <div id="viewKk" class="hidden">
     <section class="card c12" style="padding:10px">
       <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px 10px">
-        <div style="font-size:13.5px;font-weight:650">☁️ 카카오 정산 <span class="ubadge sm won">₩ 금액은 원 단위</span> <span class="mini" style="color:var(--muted);font-weight:400;margin-left:6px">정산 안내 메일(PDF) → SSL VPN 리스트 · 비즈포탈 대조 · 프로젝트 리포트</span></div>
+        <div style="font-size:14px;font-weight:650">☁️ 카카오 정산 <span class="ubadge sm won">₩ 금액은 원 단위</span> <span class="mini" style="color:var(--muted);font-weight:400;margin-left:6px">정산 안내 메일(PDF) → SSL VPN 리스트 · 비즈포탈 대조 · 프로젝트 리포트</span></div>
         <a href="kk.html" target="_blank" class="pill ghost" style="text-decoration:none" data-sat="kk.html">↗ 새 창에서 열기</a>
       </div>
       <iframe id="kkFrame" title="카카오 정산"
@@ -487,7 +481,7 @@
       <div id="odDone" style="display:none;text-align:center;padding:34px 10px 22px">
         <div style="width:66px;height:66px;margin:0 auto 16px;border-radius:50%;background:rgba(12,163,12,.12);display:flex;align-items:center;justify-content:center;font-size:30px;color:var(--good,#0ca30c)">✓</div>
         <div style="font-size:18px;font-weight:750;letter-spacing:-.01em">발주 신청이 접수되었습니다</div>
-        <p class="cap" id="odDoneSum" style="margin:10px 0 4px;font-size:12.5px"></p>
+        <p class="cap" id="odDoneSum" style="margin:10px 0 4px;font-size:13px"></p>
         <p class="cap" style="margin:0 0 22px">슬랙 <b>#service-managed</b> 채널로 자동 통보되었습니다</p>
         <div style="display:flex;gap:10px;justify-content:center">
           <button class="pill pri" id="odDoneList">📦 요청 내역 보기</button>
@@ -499,7 +493,7 @@
         <div><label for="odChannel">판매 채널 *</label><select id="odChannel"><option>에스원</option><option>LGU+</option><option>조달</option><option>일반</option><option>기타</option></select></div>
         <div><label for="odType">요청 유형 *</label><select id="odType"><option>신규발주</option><option>추가</option><option>교체(장애)</option><option>교체(증설)</option><option>철거·회수</option></select></div>
       </div>
-      <div style="font-size:11px;color:var(--muted);margin:6px 0 10px">— 신청자 정보 —</div>
+      <div style="font-size:12px;color:var(--muted);margin:6px 0 10px">— 신청자 정보 —</div>
       <div class="frm">
         <div><label for="odCustomer">고객사명 *</label><input id="odCustomer"></div>
         <div class="od-s1"><label for="odContract">계약번호</label><input id="odContract" placeholder="모르면 비워두세요 (생성 중)"></div>
@@ -514,12 +508,12 @@
         <div><label for="odModel">모델명</label><select id="odModel"><option>S100</option><option>S200</option><option>S10_R2</option><option>S20_R2</option><option>S30H_R1</option><option>ES30</option></select></div>
         <div><label for="odQty">수량</label><input id="odQty" type="number" min="1" value="1"></div>
         <div><label>단독 Pod 여부</label>
-          <label style="display:flex;align-items:center;gap:8px;height:36px;cursor:pointer;font-size:13.5px;font-weight:500">
+          <label style="display:flex;align-items:center;gap:8px;height:36px;cursor:pointer;font-size:14px;font-weight:500">
             <input id="odPod" type="checkbox" style="width:16px;height:16px;accent-color:var(--brand,#149e40)"> 단독 Pod 구성입니다
           </label>
         </div>
       </div>
-      <div style="font-size:11px;color:var(--muted);margin:14px 0 10px">— 배송 관련 정보 —</div>
+      <div style="font-size:12px;color:var(--muted);margin:14px 0 10px">— 배송 관련 정보 —</div>
       <div class="frm">
         <div class="full"><label for="odRecvPick">수령처 빠른 선택 (선택하면 아래 배송 정보가 자동 입력됩니다)</label>
           <select id="odRecvPick"><option value="">— 직접 입력 —</option></select></div>
@@ -550,7 +544,7 @@
       <div id="csDone" style="display:none;text-align:center;padding:30px 10px 20px">
         <div id="csDoneIcon" style="width:66px;height:66px;margin:0 auto 14px;border-radius:50%;background:rgba(12,163,12,.12);display:flex;align-items:center;justify-content:center;font-size:30px;color:var(--good,#0ca30c)">✓</div>
         <div id="csDoneTitle" style="font-size:18px;font-weight:750;letter-spacing:-.01em">사이트가 만들어졌습니다</div>
-        <p class="cap" id="csDoneSum" style="margin:10px 0 22px;font-size:12.5px"></p>
+        <p class="cap" id="csDoneSum" style="margin:10px 0 22px;font-size:13px"></p>
         <div style="display:flex;gap:10px;justify-content:center"><button class="pill pri" id="csDoneNew">＋ 계속 작업</button></div>
       </div>
       <div id="csFormWrap">
@@ -613,7 +607,7 @@
         </div>
       </div>
       <div style="margin-top:22px;padding-top:14px;border-top:1px solid var(--ring)">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap"><b style="font-size:13.5px">🕘 요청 이력</b><span class="mini" id="csHistCap" style="color:var(--muted)"></span><span style="flex:1"></span><input id="csHistQ" aria-label="요청 이력 검색" placeholder="사이트명·고객사 검색" style="height:30px;padding:0 10px;border:1px solid var(--ring);border-radius:8px;background:var(--surface-2);color:inherit;font:inherit;font-size:12px;width:200px"><button class="chip" id="csHistRefresh">↻ 새로 읽기</button></div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap"><b style="font-size:14px">🕘 요청 이력</b><span class="mini" id="csHistCap" style="color:var(--muted)"></span><span style="flex:1"></span><input id="csHistQ" aria-label="요청 이력 검색" placeholder="사이트명·고객사 검색" style="height:30px;padding:0 10px;border:1px solid var(--ring);border-radius:8px;background:var(--surface-2);color:inherit;font:inherit;font-size:12px;width:200px"><button class="chip" id="csHistRefresh">↻ 새로 읽기</button></div>
         <div style="overflow-x:auto"><table class="pr" id="csHist"><thead><tr><th>일시</th><th>작업</th><th>사이트명</th><th>고객사</th><th>내용</th><th>결과</th><th>메시지</th><th>요청자</th><th>API 계정</th><th>메모</th></tr></thead><tbody></tbody></table></div>
       </div>
     </section>
@@ -625,7 +619,7 @@
       <div id="mpDone" style="display:none;text-align:center;padding:34px 10px 22px">
         <div style="width:66px;height:66px;margin:0 auto 16px;border-radius:50%;background:rgba(12,163,12,.12);display:flex;align-items:center;justify-content:center;font-size:30px;color:var(--good,#0ca30c)">✓</div>
         <div style="font-size:18px;font-weight:750;letter-spacing:-.01em">POC 신청이 접수되었습니다</div>
-        <p class="cap" id="mpDoneSum" style="margin:10px 0 4px;font-size:12.5px"></p>
+        <p class="cap" id="mpDoneSum" style="margin:10px 0 4px;font-size:13px"></p>
         <p class="cap" style="margin:0 0 22px">슬랙 채널로 자동 통보되었습니다</p>
         <div style="display:flex;gap:10px;justify-content:center">
           <button class="pill pri" id="mpDoneList">📋 신청 내역 보기</button>
@@ -633,7 +627,7 @@
         </div>
       </div>
       <div id="mpFormWrap">
-      <div style="font-size:11px;color:var(--muted);margin:2px 0 10px">— 고객 정보 —</div>
+      <div style="font-size:12px;color:var(--muted);margin:2px 0 10px">— 고객 정보 —</div>
       <div class="frm">
         <div class="full"><label for="mpCompany">회사명 *</label><input id="mpCompany"></div>
         <div><label for="mpMgr">고객 담당자 이름 *</label><input id="mpMgr"></div>
@@ -641,14 +635,14 @@
         <div class="full"><label for="mpEmail">고객 담당자 이메일</label><input id="mpEmail" type="email"></div>
         <div class="full"><label for="mpDev">단말 및 서버 수량</label><input id="mpDev" placeholder="예: PC 100대 / 서버 5대"></div>
       </div>
-      <div style="font-size:11px;color:var(--muted);margin:16px 0 8px">— 적용 예정 모듈 —</div>
+      <div style="font-size:12px;color:var(--muted);margin:16px 0 8px">— 적용 예정 모듈 —</div>
       <div style="display:flex;gap:18px;flex-wrap:wrap;padding:2px 0 2px">
         <label class="mpchk"><input id="mpEdr" type="checkbox" checked> EDR+MDR</label>
         <label class="mpchk"><input id="mpAv" type="checkbox"> 안티바이러스</label>
         <label class="mpchk"><input id="mpRansom" type="checkbox"> 안티랜섬웨어</label>
         <label class="mpchk"><input id="mpMedia" type="checkbox"> 매체제어</label>
       </div>
-      <div style="font-size:11px;color:var(--muted);margin:16px 0 10px">— 운영체제별 설치 수량 —</div>
+      <div style="font-size:12px;color:var(--muted);margin:16px 0 10px">— 운영체제별 설치 수량 —</div>
       <div class="frm">
         <div><label for="mpWin">Windows</label><input id="mpWin" type="number" min="0" placeholder="0"></div>
         <div><label for="mpLinux">Linux</label><input id="mpLinux" type="number" min="0" placeholder="0"></div>
@@ -656,7 +650,7 @@
         <div><label for="mpNac">NAC 사용여부</label><select id="mpNac"><option>사용X</option><option>사용</option></select></div>
         <div class="full"><label for="mpWebui">EDR Web UI 접속 계정용 이메일 주소</label><input id="mpWebui" type="email"></div>
       </div>
-      <div style="font-size:11px;color:var(--muted);margin:16px 0 10px">— 신청 정보 —</div>
+      <div style="font-size:12px;color:var(--muted);margin:16px 0 10px">— 신청 정보 —</div>
       <div class="frm">
         <div><label for="mpSales">영업담당자</label><input id="mpSales"></div>
         <div><label for="mpSalesPh">영업담당자 연락처</label><input id="mpSalesPh" placeholder="010-0000-0000"></div>
@@ -678,7 +672,7 @@
       <div id="oiDone" style="display:none;text-align:center;padding:34px 10px 22px">
         <div style="width:66px;height:66px;margin:0 auto 16px;border-radius:50%;background:rgba(12,163,12,.12);display:flex;align-items:center;justify-content:center;font-size:30px;color:var(--good,#0ca30c)">✓</div>
         <div style="font-size:18px;font-weight:750;letter-spacing:-.01em">OI가 등록되었습니다</div>
-        <p class="cap" id="oiDoneSum" style="margin:10px 0 22px;font-size:12.5px"></p>
+        <p class="cap" id="oiDoneSum" style="margin:10px 0 22px;font-size:13px"></p>
         <div style="display:flex;gap:10px;justify-content:center">
           <button class="pill pri" id="oiDoneList">🎯 OI 현황 보기</button>
           <button class="pill ghost" id="oiDoneNew">＋ 새로 등록</button>
@@ -689,7 +683,7 @@
         <button class="pill ghost" type="button" id="oiQuoteBtn" style="white-space:nowrap">📄 견적서에서 불러오기</button>
         <span class="cap" id="oiQuoteTag" style="font-size:12px">저장된 견적서를 고르면 고객사·제품·수량·금액이 자동으로 채워집니다.</span>
       </div>
-      <div style="font-size:11px;color:var(--muted);margin:2px 0 10px">— 고객사 정보 —</div>
+      <div style="font-size:12px;color:var(--muted);margin:2px 0 10px">— 고객사 정보 —</div>
       <div class="frm">
         <div><label for="oiInd">산업군 *</label><select id="oiInd"></select></div>
         <div><label for="oiCust">고객사 *</label><input id="oiCust"></div>
@@ -700,7 +694,7 @@
         <div><label for="oiOwner">지니언스 담당자 *</label><select id="oiOwner"></select></div>
         <div><label for="oiPartner">구축 파트너</label><select id="oiPartner"></select></div>
       </div>
-      <div style="font-size:11px;color:var(--muted);margin:16px 0 10px">— 사업 관련 정보 —</div>
+      <div style="font-size:12px;color:var(--muted);margin:16px 0 10px">— 사업 관련 정보 —</div>
       <div class="frm">
         <div><label for="oiType">사업형태 *</label><select id="oiType"></select></div>
         <div><label for="oiName">사업명</label><input id="oiName" placeholder="비워두면 «고객사 + 사업형태» 로 자동 생성"></div>
@@ -712,9 +706,9 @@
         <div><label for="oiProb">수주 가능성</label><select id="oiProb"></select></div>
         <div class="full"><label for="oiStrategy">경쟁 현황 및 영업전략</label><input id="oiStrategy" placeholder="윈백 사업인 경우 기존 사용 제품의 제조사를 적어주세요"></div>
       </div>
-      <div style="font-size:11px;color:var(--muted);margin:16px 0 8px">— 제품군·수량 (해당 제품을 체크하고 수량을 넣으세요) —</div>
+      <div style="font-size:12px;color:var(--muted);margin:16px 0 8px">— 제품군·수량 (해당 제품을 체크하고 수량을 넣으세요) —</div>
       <div id="oiProducts"></div>
-      <div style="font-size:11px;color:var(--muted);margin:16px 0 10px">— 진행 관리 —</div>
+      <div style="font-size:12px;color:var(--muted);margin:16px 0 10px">— 진행 관리 —</div>
       <div class="frm">
         <div><label for="oiNext">다음 할 일</label><input id="oiNext" placeholder="예: BMT 일정 조율"></div>
         <div><label for="oiNextDate">다음 액션 예정일</label><input id="oiNextDate" type="date"></div>
@@ -749,7 +743,7 @@
     <section class="card c12" style="max-width:1000px;margin:0 auto">
       <h3 style="margin:0 0 4px;font-size:15px">🛡️ 관리자</h3>
       <p class="cap" style="margin:0 0 12px">슈퍼 관리자 전용 · 모든 변경은 즉시 적용되고 되돌리려면 다시 바꾸면 됩니다.</p>
-      <div class="mtabs adm-tabs" id="admTabs" role="tablist" aria-label="관리자 화면 구역"><button type="button" data-t="acct" aria-pressed="true">👥 계정·권한</button><button type="button" data-t="sec" aria-pressed="false">🔐 보안</button><button type="button" data-t="cfg" aria-pressed="false">⚙️ 설정</button><button type="button" data-t="bill" aria-pressed="false">💳 AI 비용</button><button type="button" data-t="api" aria-pressed="false">🔌 외부 연동</button></div>
+      <div class="mtabs adm-tabs" id="admTabs" role="group" aria-label="관리자 화면 구역"><button type="button" data-t="acct" aria-pressed="true">👥 계정·권한</button><button type="button" data-t="sec" aria-pressed="false">🔐 보안</button><button type="button" data-t="cfg" aria-pressed="false">⚙️ 설정</button><button type="button" data-t="bill" aria-pressed="false">💳 AI 비용</button><button type="button" data-t="api" aria-pressed="false">🔌 외부 연동</button></div>
       <div class="adm-pane" data-pane="acct">
       <details class="adm-new" id="axNewBox"><summary>＋ 새 계정 만들기</summary>
       <div class="frm" style="margin-top:8px">
@@ -771,7 +765,7 @@
 
       <div class="adm-h">메뉴 권한 <span class="mini">계정마다 보기 · 읽기 · 쓰기</span></div>
       <div class="dbar" style="margin-bottom:8px;flex-wrap:wrap;gap:8px;align-items:center">
-        <select id="apUser" aria-label="권한을 설정할 계정" style="height:32px;min-width:240px;padding:0 8px;border-radius:8px;border:1px solid var(--ring);background:var(--surface-2);color:var(--ink);font-family:inherit;font-size:12.5px"><option value="">계정 선택…</option></select>
+        <select id="apUser" aria-label="권한을 설정할 계정" style="height:32px;min-width:240px;padding:0 8px;border-radius:8px;border:1px solid var(--ring);background:var(--surface-2);color:var(--ink);font-family:inherit;font-size:13px"><option value="">계정 선택…</option></select>
         <span class="mini" id="apRole"></span>
         <span style="flex:1"></span>
         <button class="pill ghost" id="apAll" title="모든 메뉴 보기·읽기·쓰기">전부 허용</button>
@@ -785,6 +779,16 @@
       <p class="cap" style="margin:10px 0 0">보기 = 메뉴에 나타나고 화면을 열 수 있음 · 읽기 = 화면 안의 표·데이터 열람 · 쓰기 = 추가·수정·삭제. 쓰기는 읽기를, 읽기는 보기를 포함합니다.
         행이 없는(한 번도 저장하지 않은) 계정은 역할 기본값(admin 전부 · admin_viewer 읽기까지)으로 동작하고, 슈퍼 관리자는 제한할 수 없습니다. 바뀐 권한은 그 계정이 다음에 화면을 새로 읽을 때 적용됩니다.</p>
 
+      <div class="adm-h">담당자 연결 <span class="mini">계정 ↔ OI · 인바운드 «담당» 이름 — 홈 «우선 업무 › 내 업무» · 빠른 보기 «내 담당»에 씀 · 없으면 «담당자 연결 필요»</span></div>
+      <div class="dbar om-bar" style="margin-bottom:8px;flex-wrap:wrap;gap:8px" data-nodirty>
+        <select id="omUser" aria-label="담당자를 연결할 계정"></select>
+        <input id="omNames" list="omNameList" aria-label="담당 이름(여러 개는 쉼표)" placeholder="담당 칸 이름 — 여러 개는 쉼표 (예: 홍길동 차장, 홍길동)" style="min-width:320px">
+        <datalist id="omNameList"></datalist>
+        <button type="button" class="pill" id="omSave">저장…</button>
+        <span class="mini" id="omMsg"></span>
+      </div>
+      <div class="tbl-wrap" tabindex="0" style="max-height:40vh"><table id="omTable" class="dgrid"></table></div>
+      <p class="cap" style="margin:8px 0 0">담당 칸에 이 이름 중 하나가 들어 있으면 그 계정의 «내 담당»입니다. 저장 전에 바뀌는 내용을 확인 창으로 보여 드리고, 변경은 변경 이력에 남습니다. SQL 103 이 필요합니다.</p>
       </div>
       <div class="adm-pane" data-pane="sec" hidden>
       <div class="adm-h first">2단계 인증(MFA) 정책 <span class="mini">역할 기본 · 계정별 필수 지정 · 인증 앱 초기화</span></div>
@@ -904,11 +908,76 @@
     <div style="margin-top:12px;display:flex;justify-content:flex-end"><button type="button" class="pill ghost" data-close="ovlKeys">닫기</button></div>
   </div>
 </div>
+
+<!-- ㊿+172 AI 패널 — 넓은 화면 오른쪽 · 좁으면 전체 화면 · 닫아도 대화 유지(다시 열기) · 새 대화 / 대화 삭제는 따로 -->
+<aside class="ai-panel" id="aiPanel" aria-label="AI 대화" hidden>
+  <div class="aip-head">
+    <h2 class="aip-t">AI 대화 <span class="mini" id="aipSub"></span></h2>
+    <button type="button" class="cbtn" id="aipNew" title="지금 대화는 아래로 접어 두고(다시 펼쳐 볼 수 있음) 새로 시작 — AI 는 앞 대화를 이어 쓰지 않음">새 대화</button>
+    <button type="button" class="cbtn" id="aipDel" title="이 화면의 대화를 모두 지움(확인 후)">대화 삭제</button>
+    <button type="button" class="cbtn x-close" id="aipClose" aria-label="AI 패널 닫기" title="패널만 닫기 — 대화는 그대로(위쪽 «AI 대화»로 다시 열기)">✕ 닫기</button>
+  </div>
+  <div class="aip-body" id="aipBody" tabindex="-1">
+    <div class="aip-old" id="aipOld"></div>
+    <div class="ans-thread" id="ansThread"></div>
+    <div class="answer" id="answer" aria-live="polite">
+      <div class="ans-top">
+        <div class="ans-q" id="ansQ"></div>
+        <div class="ans-x"><button type="button" class="cbtn" id="ansToSearch" title="AI 질문이 아니라 검색이었다면 — 입력한 글을 검색 칸으로 되돌림">검색으로 바꾸기</button></div>
+      </div>
+      <div class="ans-state" id="ansState" role="status" hidden></div>
+      <section class="ans-sec ans-core" aria-label="핵심 답변">
+        <h3 class="ans-lb">핵심 답변</h3>
+        <div class="ai-say" id="aiSay"></div>
+        <div class="restate" id="ansRestate"></div>
+        <div class="ans-head">
+          <div class="ans-title" id="ansTitle"></div>
+          <div class="hero" id="ansHero"></div>
+          <div class="ans-sub" id="ansSub"></div>
+        </div>
+        <div id="ansLocal"></div>
+      </section>
+      <section class="ans-sec ans-ev" id="ansEv" aria-label="근거">
+        <h3 class="ans-lb">근거</h3>
+        <div class="ans-grid" id="ansGrid">
+          <div class="card" style="padding:12px 14px">
+            <div class="legend" id="ansLegend"></div>
+            <div class="chartbox h260" id="ansChart"></div>
+          </div>
+          <div class="card" style="padding:12px 14px">
+            <div class="cap" id="ansTableCap">상세</div>
+            <div class="tbl-wrap" tabindex="0" style="max-height:236px"><table id="ansTable"></table></div>
+          </div>
+        </div>
+        <div id="ansEvLocal" class="ans-evl"></div>
+        <div class="ai-comment" id="aiComment"></div>
+      </section>
+      <section class="ans-sec ans-src" id="ansSrc" aria-label="원본 보기" hidden>
+        <h3 class="ans-lb">원본 보기</h3>
+        <div class="ans-btns" id="ansSrcB"></div>
+      </section>
+      <section class="ans-sec ans-next" id="ansNextBox" aria-label="다음 행동" hidden title="버튼은 화면만 엽니다 — 저장 · 발송은 그 화면에서 내용을 확인한 뒤에만">
+        <h3 class="ans-lb">다음 행동</h3>
+        <div class="ans-btns" id="ansNext"></div>
+        <p class="suggest-title" id="ansSuggestTitle" style="display:none">이어서 물어보기</p>
+        <div class="chips" id="ansSuggest"></div>
+      </section>
+      <div class="ans-meta" id="ansMeta"></div>
+      <div class="ans-note" id="ansNote"></div>
+    </div>
+  </div>
+  <form class="aip-foot" id="aipForm" autocomplete="off">
+    <input id="aipInput" type="text" aria-label="이어서 질문하기" placeholder="이어서 물어보기 — 앞의 문답을 기억합니다">
+    <button type="submit" class="btn" id="aipAsk">질문</button>
+  </form>
+</aside>
+
 <div class="ovl" id="ovlFind">
-  <div class="modal" style="width:min(620px,100%)">
-    <input id="fkInput" aria-label="전체 검색" placeholder="고객사·시리얼·사업명 검색 · 화면 이름으로 이동 · 질문…  (Enter: 첫 결과 · Esc: 닫기)" autocomplete="off">
-    <div id="fkOut" style="max-height:52vh;overflow:auto;margin-top:10px"></div>
-    <p class="cap" style="margin:8px 0 0">계약 · LIVE · OI · 인바운드 · MDR 운영 · 장비를 한 번에 찾습니다 — 단축키 <b>Ctrl+K</b></p>
+  <div class="modal fk-modal" role="dialog" aria-modal="true" aria-label="검색 · 질문">
+    <div class="fk-ctx" id="fkCtx" hidden></div>
+    <div class="fk-in"><input id="fkInput" aria-label="검색 — 고객사 · 시리얼 · 화면 · 사업명" placeholder="고객사 · 시리얼 · 화면 이름으로 찾기 — 문장으로 쓰면 AI 에 질문" autocomplete="off"><button type="button" class="btn" id="fkAsk" title="입력한 글을 AI 에 질문(Ctrl+Enter)">AI 에 질문</button></div>
+    <div id="fkOut" class="fk-out" hidden></div>
+    <p class="cap fk-cap"><kbd>↑</kbd><kbd>↓</kbd> 고르기 · <kbd>Enter</kbd> 고른 항목 열기 · <kbd>Ctrl</kbd>+<kbd>Enter</kbd> AI 에 질문 · <kbd>Esc</kbd> 닫기</p>
   </div>
 </div>
 
@@ -978,7 +1047,7 @@
 <!-- 임대 장비 회수 처리 (일부 선택 가능) -->
 <div class="ovl" id="ovlEqRet">
   <div class="modal" style="width:min(620px,100%)">
-    <h3>↩ 장비 회수 처리</h3>
+    <h3>장비 회수 처리</h3>
     <p class="cap" id="erTitle" style="margin:0 0 10px"></p>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
       <button class="pill ghost" id="erAll" style="height:28px">전체 선택</button>

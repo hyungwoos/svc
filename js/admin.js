@@ -10,6 +10,7 @@ import { navSub, openMenuEdit } from './tools.js';
 import { UPD, updFetch, updOpenAll, updShow, updSyncSeed } from './upd.js';
 import { switchView, xlsxAoa } from './grid.js';
 import { logChange, openOvl, setAuthTab } from './edit.js';
+import { loadInbound } from './inbound.js';
 
 
 /* ===== 관리자 (super_admin 전용) — 계정·권한 관리 ===== */
@@ -651,12 +652,58 @@ export function renderAdmin(){
     $('#abSave').onclick=abSave;
   }
   try{ apBind(); }catch(e){}
+  try{ omBind(); omLoad(); }catch(e){}   /* ㊿+172 담당자 연결 */
   try{ mfBind(); mfLoad(); }catch(e){}
   try{ cdBind(); cdLoad(); }catch(e){}
   try{ updAdminLoad(); }catch(e){}
   try{ API.made=null; apiLoad(); }catch(e){}   /* ㊿+164 외부 연동 — 다시 열면 발급 직후 보이던 키 원문은 지움 */
   axLoad();
   abLoad();
+}
+/* ── ㊿+172 담당자 연결 (user_owner_map · SQL 103) — 계정 ↔ OI · 인바운드 «담당» 이름 · 슈퍼 관리자만 · 저장 전 바뀌는 내용 확인 ── */
+export var OM={rows:[], ok:null, bound:false};
+export function omOwnerNames(){ var o={}; (ST.RAWX.oi||[]).concat(ST.RAWX.inbound||[]).forEach(function(r){ String(r.owner||'').split(/[,/]/).forEach(function(x){ x=x.trim(); if(x) o[x]=1; }); }); return Object.keys(o).sort(function(a,b){ return a.localeCompare(b,'ko'); }); }
+export function omBind(){
+  if(OM.bound || !document.getElementById('omUser')) return; OM.bound=true;
+  /** @type {any} */(document.getElementById('omUser')).onchange=function(){ var e=this.value, r=OM.rows.filter(function(x){ return x.email===e; })[0]; /** @type {any} */(document.getElementById('omNames')).value=r? (r.owner_names||[]).join(', ') : ''; };
+  /** @type {any} */(document.getElementById('omSave')).onclick=omSave;
+  if(ST.RAWX.inbound===undefined) try{ loadInbound(function(){ omPaint(); }); }catch(e){}
+}
+export async function omLoad(){
+  var msg=document.getElementById('omMsg'); if(!msg) return;
+  msg.textContent='불러오는 중…';
+  var rows=await sbTry('user_owner_map?select=email,owner_names,updated_by,updated_at&order=email');
+  OM.ok=rows!==null; OM.rows=rows||[];
+  msg.textContent=OM.ok? (OM.rows.length? OM.rows.length+'개 계정 연결됨' : '연결된 계정 없음') : '표가 없습니다 — SQL 103(user_owner_map)을 먼저 실행해 주세요';
+  omPaint();
+}
+export function omPaint(){
+  var sel=/** @type {any} */(document.getElementById('omUser')), dl=document.getElementById('omNameList'), t=document.getElementById('omTable'); if(!sel || !t) return;
+  var cur=sel.value, users=(AX_USERS||[]).slice().sort(function(a,b){ return String(a.email||'').localeCompare(String(b.email||'')); });
+  sel.innerHTML=tpl`<option value="">계정 선택…</option>${rawHtml(users.map(function(u){ var r=OM.rows.filter(function(x){ return x.email===String(u.email||'').toLowerCase(); })[0]; return tpl`<option value="${String(u.email||'').toLowerCase()}">${u.email||''}${r? ' — '+(r.owner_names||[]).join(', ') : ' — 연결 없음'}</option>`; }).join(''))}`; sel.value=cur;
+  if(dl) dl.innerHTML=omOwnerNames().map(function(n){ return tpl`<option value="${n}"></option>`; }).join('');
+  var names=omOwnerNames();
+  t.innerHTML=tpl`<thead><tr><th>계정</th><th>담당 이름</th><th>담당 칸에서 찾은 행</th><th>바꾼 사람 · 시각</th></tr></thead><tbody>`+
+    tpl`${rawHtml(OM.rows.length? OM.rows.map(function(r){ var ns=r.owner_names||[], hit=((ST.RAWX.oi||[]).concat(ST.RAWX.inbound||[])).filter(function(x){ var o=String(x.owner||''); return ns.some(function(n){ return n && o.indexOf(n)>=0; }); }).length;
+      return tpl`<tr><td>${r.email}</td><td>${ns.join(', ')}</td><td class="n">${String(hit)}${rawHtml(ns.some(function(n){ return names.indexOf(n)<0 && !names.some(function(m){ return m.indexOf(n)>=0; }); })? ' <span class="ctag warn">담당 칸에 없는 이름</span>' : '')}</td><td class="mini">${r.updated_by||''} ${String(r.updated_at||'').slice(0,16).replace('T',' ')}</td></tr>`; }).join('') : '<tr><td colspan="4" class="mini">연결된 계정이 없습니다</td></tr>')}</tbody>`;
+}
+export async function omSave(){
+  var sel=/** @type {any} */(document.getElementById('omUser')), inp=/** @type {any} */(document.getElementById('omNames')), msg=document.getElementById('omMsg');
+  var email=String(sel.value||'').toLowerCase(); if(!email){ msg.textContent='계정을 고르세요'; return; }
+  if(OM.ok===false){ msg.textContent='SQL 103 이 아직 실행되지 않았습니다'; return; }
+  var names=String(inp.value||'').split(/[,\n]/).map(function(x){ return x.trim(); }).filter(Boolean).filter(function(x,i,a){ return a.indexOf(x)===i; });
+  var old=OM.rows.filter(function(x){ return x.email===email; })[0], before=old? (old.owner_names||[]).join(', ') : '(연결 없음)', after=names.length? names.join(', ') : '(연결 해제)';
+  if(before===after){ msg.textContent='바뀐 내용이 없습니다'; return; }
+  var hit=((ST.RAWX.oi||[]).concat(ST.RAWX.inbound||[])).filter(function(x){ var o=String(x.owner||''); return names.some(function(n){ return o.indexOf(n)>=0; }); }).length;
+  if(!confirm('담당자 연결을 바꿉니다\n\n계정: '+email+'\n전: '+before+'\n후: '+after+'\n\n이 이름으로 찾은 OI · 인바운드 행: '+hit+'건\n저장할까요? (변경 이력에 남습니다)')) return;
+  msg.textContent='저장 중…';
+  try{
+    if(names.length) await sbWrite('POST','user_owner_map?on_conflict=email',[{email:email, owner_names:names}],'resolution=merge-duplicates,return=minimal');
+    else await sbWrite('DELETE','user_owner_map?email=eq.'+encodeURIComponent(email));
+    toast('담당자 연결 저장', email+' → '+after, 'ok');
+    if(email===String(ST.AUTH_USER||'').toLowerCase()){ ST.OWNER_NAMES=names.length? names : null; }
+    await omLoad();
+  }catch(e){ msg.textContent='저장 실패: '+String(/** @type {any} */(e).message||e).slice(0,120); }
 }
 /* ── 메뉴 권한 (user_perms · SQL 79) — 계정마다 보기/읽기/쓰기, 슈퍼 관리자만 ── */
 export var AP={user:'', rows:{}, bound:false};
@@ -711,7 +758,7 @@ export function apPaint(){
   var menus=apMenus(), grp='';
   var h='<thead><tr><th>메뉴</th><th style="width:90px;text-align:center">보기</th><th style="width:90px;text-align:center">읽기</th><th style="width:90px;text-align:center">쓰기</th><th></th></tr></thead><tbody>';
   menus.forEach(function(m){
-    if(m.grp!==grp){ grp=m.grp; h+=tpl`<tr><td colspan="5" style="background:var(--surface-2);font-size:11px;font-weight:650;color:var(--ink-2);padding:6px 10px">${grp||'기타'}</td></tr>`; }
+    if(m.grp!==grp){ grp=m.grp; h+=tpl`<tr><td colspan="5" style="background:var(--surface-2);font-size:12px;font-weight:650;color:var(--ink-2);padding:6px 10px">${grp||'기타'}</td></tr>`; }
     var p=AP.rows[m.v]||{v:true,r:true,w:false};
     var na=limited && !limited[m.v];             // 제한 역할(poc·장비)은 역할에 없는 메뉴 자체가 없음
     var dis=isSuper||na;
@@ -774,9 +821,9 @@ export async function abLoad(){
   var credit=bill? Number(bill.credit_usd)||0 : 0;
   var remain=credit? Math.round((credit-r.total_usd)*100)/100 : null;
   function box(l,v,s,warn){
-    return tpl`<div class="kpi${warn?'':''}" style="padding:11px 14px"><div style="font-size:11px;color:var(--muted);font-weight:650">${rawHtml(l)}</div>`+
+    return tpl`<div class="kpi${warn?'':''}" style="padding:11px 14px"><div style="font-size:12px;color:var(--muted);font-weight:650">${rawHtml(l)}</div>`+
       tpl`<div style="font-size:18px;font-weight:800;margin-top:2px${warn?';color:var(--critical)':''}">${rawHtml(v)}</div>`+
-      tpl`<div style="font-size:11px;color:var(--muted)">${rawHtml(s)}</div></div>`;
+      tpl`<div style="font-size:12px;color:var(--muted)">${rawHtml(s)}</div></div>`;
   }
   var usd=function(v){ return (v!=null && isFinite(Number(v)))? '$'+Number(v).toLocaleString('en-US') : '—'; };   /* ㊿+151: 값 없으면 $NaN 대신 — (스테이징 QA 가 잡음) */
   kpi.innerHTML=
@@ -792,7 +839,7 @@ export async function abLoad(){
     tpl`${rawHtml(r.daily.map(function(d){
       return tpl`<div title="${rawHtml(d.d)} · $${rawHtml(d.usd)}" style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:2px">`+
         tpl`<div style="width:100%;border-radius:3px 3px 0 0;background:var(--brand);height:${Math.max(2,Math.round(d.usd/mx*40))}px"></div>`+
-        tpl`<span style="font-size:11px;color:var(--muted)">${rawHtml(d.d.slice(8))}</span></div>`;
+        tpl`<span style="font-size:12px;color:var(--muted)">${rawHtml(d.d.slice(8))}</span></div>`;
     }).join(''))}`+ tpl`</div>` : '';
 }
 export async function abSave(){
@@ -1108,8 +1155,8 @@ export async function renderAccount(){
     if(s0 && s0.e) sessTxt='로그인 유지 켜짐 · 현재 토큰 만료 '+new Date(s0.e*1000).toLocaleString('ko-KR')+' (자동 갱신)';
   }catch(e){}
   function row(k,v){ return tpl`<div style="display:flex;gap:14px;padding:9px 2px;border-bottom:1px solid var(--ring)">`+
-    tpl`<span style="width:110px;color:var(--muted);font-size:12.5px;flex-shrink:0">${rawHtml(k)}</span>`+
-    tpl`<span style="font-size:13.5px">${rawHtml(v)}</span></div>`; }
+    tpl`<span style="width:110px;color:var(--muted);font-size:13px;flex-shrink:0">${rawHtml(k)}</span>`+
+    tpl`<span style="font-size:14px">${rawHtml(v)}</span></div>`; }
   box.innerHTML=
     row('이메일', esc(ST.AUTH_USER||''))+
     row('권한', tpl`<b>${ri[0]}</b>${rawHtml(role? tpl` <span class="mini">(${role})</span>`:'')}`)+
@@ -1128,22 +1175,22 @@ export async function renderAccount(){
   box.appendChild(act);
   /* 보안 — 2단계 인증(인증 앱) · 계정 단위, 본인이 켬 */
   var sec=document.createElement('div'); sec.style.cssText='margin-top:22px';
-  sec.innerHTML=tpl`<div style="font-size:13.5px;font-weight:650;margin-bottom:4px">보안</div>${rawHtml(row('🔐 2단계 인증', '<div id="accMfa"></div>'))}`;
+  sec.innerHTML=tpl`<div style="font-size:14px;font-weight:650;margin-bottom:4px">보안</div>${rawHtml(row('🔐 2단계 인증', '<div id="accMfa"></div>'))}`;
   box.appendChild(sec); mfaCardRender(sec.querySelector('#accMfa'));
   /* 설정 — 이 브라우저에만 저장 (localStorage) */
   var set=document.createElement('div'); set.style.cssText='margin-top:22px';
   var curIdle=idleMin(), look0=curLook();
-  set.innerHTML=tpl`<div style="font-size:13.5px;font-weight:650;margin-bottom:4px">설정 <span class="mini" style="font-weight:400">— 이 브라우저에만 저장됩니다</span></div>`+
+  set.innerHTML=tpl`<div style="font-size:14px;font-weight:650;margin-bottom:4px">설정 <span class="mini" style="font-weight:400">— 이 브라우저에만 저장됩니다</span></div>`+
     tpl`${rawHtml(row('자동 로그아웃', tpl`<select id="accIdle" aria-label="자동 로그아웃" style="height:30px;min-width:200px">${rawHtml(IDLE_OPTS.map(function(m){
         return tpl`<option value="${rawHtml(m)}"${m===curIdle?' selected':''}>${idleLabel(m)}${m? ' 동안 활동 없으면':''}</option>`; }).join(''))}`+ tpl`</select>`+
       tpl`<div class="mini" style="margin-top:5px;line-height:1.6">마우스·키보드·스크롤 입력이 정한 시간 동안 없으면 이 탭에서 자동으로 로그아웃합니다. 끝나기 1분 전에 알림이 뜹니다.</div>`))}`+
     tpl`${rawHtml(row('화면 디자인', tpl`<select id="accLook" aria-label="화면 디자인" style="height:30px;min-width:200px">${rawHtml(Object.keys(LOOKS).map(function(k){ return tpl`<option value="${rawHtml(k)}"${k===look0?' selected':''}>${LOOKS[k]}</option>`; }).join(''))}</select>`+
-      tpl`<div class="mini" style="margin-top:5px;line-height:1.6">커맨드 센터: 아이콘 레일 + 상단 커맨드 바(검색·이동·AI) + 인박스 홈 + 장비 운영 보드 + 고객 360 패널 · 심플: 평면 디자인에 기존 사이드바 · 클래식: 이전 디자인. 바꾸면 화면을 다시 읽습니다.</div>`))}`;
+      tpl`<div class="mini" style="margin-top:5px;line-height:1.6">지니언스: 정식 로고 · 브랜드 색 · 글자 메뉴(그룹 접기) — 기능은 커맨드 센터와 같음 · 커맨드 센터: 아이콘 레일 + 상단 커맨드 바(검색·이동·AI) + 인박스 홈 + 장비 운영 보드 + 고객 360 패널 · 심플: 평면 디자인에 기존 사이드바 · 클래식: 이전 디자인. 바꾸면 화면을 다시 읽습니다.</div>`))}`;
   var prow=document.createElement('div'); prow.innerHTML=row('📱 앱으로 설치', tpl`<div id="accPwa">${rawHtml(pwaHintHtml())}</div>`);
   set.appendChild(prow.firstChild);
   var meb=document.getElementById('btnMenuEdit');
   if(meb && meb.style.display!=='none'){
-    var mrow=document.createElement('div'); mrow.innerHTML=row('메뉴 편집', '<button type="button" class="pill" id="accMenuEdit">⚙ 메뉴 순서·숨김 편집</button><div class="mini" style="margin-top:5px">사이드바(심플·클래식)와 아이콘 레일(커맨드 센터)에 함께 적용됩니다 · 이 브라우저에만 저장</div>');
+    var mrow=document.createElement('div'); mrow.innerHTML=row('메뉴 편집', '<button type="button" class="pill" id="accMenuEdit">⚙ 메뉴 순서·숨김 편집</button><div class="mini" style="margin-top:5px">사이드바(지니언스·심플·클래식)와 아이콘 레일(커맨드 센터)에 함께 적용됩니다 · 이 브라우저에만 저장</div>');
     set.appendChild(mrow.firstChild);
   }
   box.appendChild(set);

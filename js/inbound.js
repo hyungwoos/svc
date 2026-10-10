@@ -5,7 +5,9 @@ import { $, axTime, esc, lline, rawHtml, tpl, won } from './core.js';
 import { SB_RAW, sbTry, sbWrite, toast, todayStr } from './shell.js';
 import { idxs, MX_LIST, renderInstall, renderMatrix, statusOf } from './dash.js';
 import { DV, renderGrid, switchView, xlsxBook } from './grid.js';
-import { logChange, openOvl } from './edit.js';
+import { closeOvl, logChange, openOvl } from './edit.js';
+import { openCust360 } from './tools.js';
+import { ask } from './ai.js';
 
 
 /* ===== 인바운드 관리 — 통계 + 목록 (원본: 구글시트, 매일 아침 자동 동기화) ===== */
@@ -222,14 +224,18 @@ export function inbLogTable(){
 export function inbSyncPanel(){
   return tpl`<div class="card" style="padding:10px 14px;margin-bottom:10px">`+
     tpl`<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">`+
-      tpl`<b style="font-size:13.5px">시트 → 포탈 가져오기</b>${rawHtml(inbSyncBadge())}`+
-      tpl`<span style="flex:1"></span>`+ tpl`${rawHtml(ST.IS_VIEWER? '' : '<button class="pill" id="inbFetchP">↻ 지금 시트에서 가져오기</button>')}`+
+      tpl`<b style="font-size:14px">원본(구글시트) → 포탈</b>${rawHtml(inbSyncBadge())}`+
+      tpl`<span class="mini" style="color:var(--muted)">· 포탈 목록 읽은 시각 ${rawHtml(ST.RAWX._inbAt? esc(new Date(ST.RAWX._inbAt).toTimeString().slice(0,5)) : '—')}</span>`+
+      tpl`<span style="flex:1"></span>`+
+      tpl`<button class="pill ghost" id="inbReloadP" title="포탈 DB 에 이미 들어온 인바운드를 다시 읽기만 합니다 (시트·DB 를 바꾸지 않음)">다시 조회</button>`+
+      tpl`${rawHtml(ST.IS_VIEWER? '' : '<button class="pill" id="inbFetchP" title="구글시트 원본을 지금 가져와 포탈 DB 에 반영합니다 (매일 아침 7시 자동과 같은 작업 · 최대 1분)">시트에서 가져와 반영…</button>')}`+
       tpl`<button class="pill ghost" id="inbLogTg">🕘 가져온 기록${rawHtml(ST.RAWX.inbLog&&ST.RAWX.inbLog.length? ' ('+ST.RAWX.inbLog.length+')':'')}</button>`+
     tpl`</div>`+
     tpl`<div id="inbLogBox" style="display:${INB_LOG_OPEN?'':'none'}">${rawHtml(inbLogTable())}</div></div>`;
 }
 export function inbWirePanel(host){
-  var b=host.querySelector('#inbFetchP'); if(b) b.onclick=inbRefetch;
+  var b=host.querySelector('#inbFetchP'); if(b) b.onclick=function(){ if(confirm('구글시트 원본을 지금 가져와 포탈 DB 에 반영할까요?\n(매일 아침 7시 자동 가져오기와 같은 작업 · 시트에서 지운 행은 포탈에서도 바뀔 수 있음)')) inbRefetch(); };
+  var rl=host.querySelector('#inbReloadP'); if(rl) rl.onclick=function(){ rl.disabled=true; ST.RAWX.inbLog=undefined; loadInbLog(function(){ loadInbound(function(){ toast('다시 조회', '포탈 DB 의 인바운드 '+(ST.RAWX.inbound||[]).length+'건을 다시 읽었습니다(시트는 그대로)', 'info'); if(ST.CUR_VIEW==='inbstat') renderInbStat(); else if(ST.CUR_VIEW==='inbound') renderGrid(); }); }); };
   var t=host.querySelector('#inbLogTg'); if(t) t.onclick=function(){
     INB_LOG_OPEN=!INB_LOG_OPEN;
     var box=host.querySelector('#inbLogBox'); if(box) box.style.display=INB_LOG_OPEN?'':'none';
@@ -317,7 +323,7 @@ export function renderInbStat(){
     tpl`<div class="inb-kpi"><div class="l">유입 건수</div><div class="v">${rawHtml(R.length.toLocaleString())}건</div><div class="s">${rawHtml(ST.INB_Y==='all'?'25년~현재 누적':ST.INB_Y+'년')}</div></div>`+
     tpl`<div class="inb-kpi"><div class="l">진행중</div><div class="v">${rawHtml(prog)}건</div><div class="s">방문미팅·데모·이관 포함</div></div>`+
     tpl`<div class="inb-kpi"><div class="l">수주</div><div class="v">${wonL.length}건</div><div class="s">전환율 ${rawHtml(conv)}%</div></div>`+
-    tpl`<div class="inb-kpi"><div class="l">수주액</div><div class="v">${won(amt)}<small style="font-size:11px;font-weight:600"> 천원</small></div><div class="s">단위: 천원</div></div>`+
+    tpl`<div class="inb-kpi"><div class="l">수주액</div><div class="v">${won(amt)}<small style="font-size:12px;font-weight:600"> 천원</small></div><div class="s">단위: 천원</div></div>`+
     tpl`<div class="inb-kpi warn"><div class="l">3개월+ 무응답</div><div class="v">${stale.length}건</div><div class="s">진행중인데 대응 기록이 오래됨</div></div></div>`+
     tpl`<div class="inb-2">`+
     tpl`<div class="inb-card"><h3>월별 유입 추이 <small><span style="color:var(--brand)">■</span> ${rawHtml(curY)}년 · <span style="color:var(--muted)">■</span> ${rawHtml(prvY)}년</small></h3><div class="inb-bars">${rawHtml(bars)}</div></div>`+
@@ -383,7 +389,9 @@ export function openInbDetail(r){
     tpl`</div>`+
     tpl`<div class="inb-body">${r.content||'(요청내용 없음)'}</div>`+ tpl`${rawHtml(steps.length?tpl`<div class="inb-tl">${rawHtml(steps.map(function(s){
       return tpl`<div class="st"><b>${rawHtml(s[0])}</b> ${s[1]||''}<div class="d">${s[2]||''}</div></div>`;
-    }).join(''))}`+ tpl`</div>`:'')}`+ tpl`${rawHtml(r.note?tpl`<div class="mini" style="margin-top:6px">비고: ${r.note}</div>`:'')}`;
+    }).join(''))}`+ tpl`</div>`:'')}`+ tpl`${rawHtml(r.note?tpl`<div class="mini" style="margin-top:6px">비고: ${r.note}</div>`:'')}`+
+    tpl`${rawHtml(r.org? tpl`<div class="inb-go"><button type="button" class="cbtn" id="inbD360">고객 360 — ${r.org}</button><span class="mini">원본: 인바운드 시트 ${String(r.y||'')}년 연번 ${String(r.no||'')}(수정은 시트에서)</span></div>` : '')}`;
+  var g360=document.getElementById('inbD360'); if(g360) g360.onclick=function(){ closeOvl('ovlInb'); openCust360(r.org); };   /* ㊿+172 인바운드 → 고객 360 */
   openOvl('ovlInb');
 }
 
@@ -590,7 +598,7 @@ export async function renderWeekly(atWeek){
   if(d.prev_memo) memoInner+=tpl`<div class="ai-comment on" style="margin:0 0 8px"><b>지난주 액션</b><div class="wk-body" style="margin-top:4px">${d.prev_memo}</div></div>`;
   var wkCanMemo=!ST.IS_EQUIP && !ST.IS_VIEWER;   // 메모 저장은 admin 이상만
   memoInner+=tpl`<textarea id="wkMemo"${wkCanMemo?'':' disabled'} style="width:100%;min-height:76px;border:1px solid var(--ring);border-radius:10px;`+
-    tpl`background:var(--surface-2);color:var(--ink);padding:10px;font-family:inherit;font-size:12.5px" `+
+    tpl`background:var(--surface-2);color:var(--ink);padding:10px;font-family:inherit;font-size:13px" `+
     tpl`placeholder="회의에서 정한 것을 적어두면 다음 주 이 화면에 「지난주 액션」으로 표시됩니다">${(meta&&meta.memo)||''}</textarea>`+
     tpl`<div style="display:flex;gap:8px;margin-top:8px;align-items:center"><span class="mini" id="wkMemoMsg"></span>`+
     tpl`<span style="flex:1"></span>${rawHtml(wkCanMemo?'<button class="pill" id="wkMemoSave">메모 저장</button>':'<span class="mini">메모 저장은 관리자만</span>')}</div>`;
@@ -610,6 +618,7 @@ export async function renderWeekly(atWeek){
     tpl`<span class="mini">${rawHtml(Object.keys(counts).map(function(k){return k+' '+counts[k]+'건';}).join(' · '))}</span>`+
     tpl`<button class="pill ghost" id="wkZoom" title="글자 크기 — 보통 → 크게 → 아주 크게">가<span style="font-size:15px;font-weight:800">A</span> 글자 크기</button>`+
     tpl`<button class="pill ghost" id="wkFs" title="보고 화면만 전체화면으로 — 사이드바·상단바 없이 발표 (ESC 또는 F로 종료)">⛶ 발표 모드</button>`+
+    tpl`<button class="pill ghost" id="wkAiSum" title="AI 요약은 오른쪽 AI 패널에 — 원문(이 화면)은 그대로 보면서 비교 · 결정이 필요한 것 · 미완료 액션 · 담당 · 기한">✦ AI 요약(옆 패널)</button>`+
     tpl`<button class="pill ghost" id="wkFetch">↻ 다시 가져오기</button>`+
     tpl`<button class="pill ghost" id="wkUniCopy" title="전사 «주간 업무보고» 서비스사업부 탭 양식(9열)으로 복사 — 시트의 「통합(자동)」 탭과 같은 내용 · 계약현황은 포탈 DB에서 자동 생성">📋 통합 양식 복사</button>`+
     tpl`<button class="pill ghost" id="wkUniXls" title="같은 양식을 엑셀 파일로">⬇ 통합 양식</button>`+
@@ -622,6 +631,10 @@ export async function renderWeekly(atWeek){
     tpl`<div class="ph">마무리</div><a data-go="${rawHtml(memoId)}">회의 메모</a></div>`;
 
   host.innerHTML=tpl`${rawHtml(head)}<div class="wk-wrap">${rawHtml(rail)}<div id="wkMain">${rawHtml(bodyH)}</div></div>`;
+  /* ㊿+172 주간회의 AI 요약 — 원문은 이 화면 그대로 · 요약은 오른쪽 AI 패널(요약이 원문을 가리지 않음 · 문장마다 원문 섹션 이름으로) */
+  (function(){ var sb=document.getElementById('wkAiSum'); if(!sb) return; sb.onclick=function(){
+    var main=document.getElementById('wkMain'), txt=main? String(main.innerText||'').replace(/\n{3,}/g,'\n\n').slice(0,7000) : '';
+    ask('이번 주 주간보고를 요약해줘 — 핵심 변화 · 결정이 필요한 것(담당 · 기한) · 지난주에서 넘어온 미완료 액션 순서로, 각 항목에 원문 섹션 이름을 붙여서', {from:'weekly', ctx:{v:'weekly', label:'주간회의 '+(WK.week||''), parts:['원문 '+txt.length+'자 함께 보냄'], n:null, sums:[], text:'(참고 — 사용자가 보던 주간보고 원문 '+(WK.week||'')+' 주간 · 아래 원문만 근거로, 원문에 없는 내용은 만들지 말 것)\n'+txt}}); }; })();
 
   // 상단 제목 바·주간 헤더의 실제 높이를 재서 고정 위치를 맞춤 (제목 바 밑에 숨지 않게)
   function wkMeasure(){

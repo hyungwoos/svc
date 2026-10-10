@@ -4,10 +4,10 @@
    ★ 새 즉시 실행 코드(이벤트 등록·초기화)는 start() 끝(boot() 앞)에 추가하세요. 선언만 있는 함수는 해당 도메인 파일에. */
 import { APP_VER, IS_QA, IS_STAGING, ST } from './state.js';
 import { applyLook, idleCheck, idleTouch, logClientError, PWA, pwaHintSync, rawHtml, refreshToken, sessRead, tpl } from './core.js';
-import { boot, eqRefresh, railFlyClose, screenLogin, screenPw, toast, todayStr } from './shell.js';
+import { boot, railFlyClose, screenLogin, screenPw, toast } from './shell.js';
 import { measureTopbar, onResize, RESIZE_HOOKS } from './dash.js';
 import { buildGrids, GRIDS } from './grids.js';
-import { EQOPEN, eqOrderById, EQP, eqRetApply, eqRetSet, eqWant } from './equipment.js';
+import { EQOPEN, eqSnDetail } from './equipment.js';
 import { applyFs, openFind } from './tools.js';
 import { wkFsSync, wkNext, wkPrev, wkToggleFs } from './inbound.js';
 import { askScreenHelp, btnBackSync, comboPlace, goBack, gridActPad, LENS_DEFS, LENS_DESC, NAV, navValid, switchView, viewSnapAdd, viewSnapInit } from './grid.js';
@@ -18,6 +18,12 @@ import { lazyHook } from './lazy.js';
 export function start(){
 
   /* [core.js 99행] */
+  /* ㊿+172 포탈 안 화면(견적 · 프로젝트 리포트 · 정산 iframe)에서 Ctrl+K — 같은 출처만 */
+  window.addEventListener('message', function(ev){
+    if(!ev || ev.origin!==location.origin || !ev.data || ev.data.type!=='svcFind') return;
+    var ok=['quoteFrame','preportFrame','s1Frame','kkFrame'].some(function(id){ var f=/** @type {any} */(document.getElementById(id)); return !!f && f.contentWindow===ev.source; });
+    if(ok) try{ openFind(); }catch(e){}
+  });
   window.addEventListener('message', function(ev){
     if(!ev || !ev.data || ev.data.type!=='openReport' || !ev.data.id) return;
     var pf=document.getElementById('preportFrame');
@@ -108,26 +114,11 @@ export function start(){
       var open=f.style.display!=='none'; f.style.display=open? 'none':'block'; more.textContent=open? ((more.closest('.eqb-card')? '+':'외 ')+more.dataset.n+(more.closest('.eqb-card')? ' ▾':'대 ▾')) : '접기 ▴';
       if(more.dataset.oid) EQOPEN[more.dataset.oid]=!open; return; }
     var chip=t.closest('.eqsn.act');
-    if(chip){ e.stopPropagation(); var oid=chip.dataset.oid, U=chip.dataset.sn, r=eqOrderById(oid); if(!r) return;
-      var saved=(r.status==='회수완료')||eqRetSet(r).indexOf(U)>=0; var p=EQP[oid]=EQP[oid]||{};
-      var cur=(U in p)? p[U] : saved; p[U]=!cur; if(p[U]===saved) delete p[U];
-      EQOPEN[oid]=true; eqRefresh(); return; }
-    var all=t.closest('.eqbar-all');
-    if(all){ e.stopPropagation(); var bar=all.closest('.eqbar'), oid2=bar.dataset.oid, r2=eqOrderById(oid2); if(!r2) return;
-      var p2=EQP[oid2]={}; eqWant(r2).forEach(function(sn){ p2[sn.toUpperCase()]=true; }); EQOPEN[oid2]=true; eqRefresh(); return; }
-    var cancel=t.closest('.eqbar-cancel');
-    if(cancel){ e.stopPropagation(); var oid3=cancel.closest('.eqbar').dataset.oid; delete EQP[oid3]; delete EQP['_d'+oid3]; eqRefresh(); return; }
-    var save=t.closest('.eqbar-save');
-    if(save){ e.stopPropagation(); var bar4=save.closest('.eqbar'), oid4=bar4.dataset.oid, r4=eqOrderById(oid4); if(!r4) return;
-      var dI=bar4.querySelector('.eqbar-date'), date=(dI&&dI.value)||todayStr(); var p4=EQP[oid4]||{};
-      var checked=eqWant(r4).filter(function(sn){ var U=sn.toUpperCase(); var saved=(r4.status==='회수완료')||eqRetSet(r4).indexOf(U)>=0; return (U in p4)? p4[U] : saved; });
-      save.disabled=true; save.textContent='저장 중…';
-      eqRetApply(r4, checked, date, '').then(function(){ delete EQP[oid4]; delete EQP['_d'+oid4]; }).catch(function(err){ toast('회수 처리 실패', String(err.message||err).slice(0,80), 'bad'); }).then(function(){ ST.DIRTY=true; eqRefresh(); });
-      return; }
+    if(chip){ e.stopPropagation(); eqSnDetail(chip); return; }   /* ㊿+169 칩 = 시리얼 상세 (회수는 «회수 처리» 버튼으로) */
   });
+  document.addEventListener('keydown', function(e){ var t=e.target; if((e.key==='Enter'||e.key===' ') && t && t.classList && t.classList.contains('eqsn') && t.classList.contains('act')){ e.preventDefault(); eqSnDetail(t); } });
 
-  /* [equipment.js 5204행] */
-  document.addEventListener('change', function(e){ var d=e.target; if(d && d.classList && d.classList.contains('eqbar-date')){ var oid=d.closest('.eqbar').dataset.oid; EQP['_d'+oid]=d.value; } });
+  /* [equipment.js 5204행] ㊿+169 칩으로 회수 표시하던 막대(회수일 칸)는 없앰 */
 
 
   /* [tools.js 7264행] */

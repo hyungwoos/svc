@@ -3,24 +3,23 @@
 import { APP_VER, ST } from './state.js';
 import { Viz } from './viz.js';
 import { $, amtGuard, amtHint, canView, cssv, esc, kwToWon, lline, mk, navText, permEnter, rawHtml, STATE, tpl, won, wonFull, wonKo, wonToKw } from './core.js';
-import { cmdAskHit, dIdx, EQB, EQUIP_VIEWS, idxDate, loadFromDb, onData, railSync, renderEqBoard, sbTry, sbWrite, toast, todayStr } from './shell.js';
+import { cmdAskHit, dIdx, EQB, EQUIP_VIEWS, ico, idxDate, loadFromDb, onData, railSync, renderEqBoard, sbTry, sbWrite, toast, todayStr } from './shell.js';
 import { buildControls, renderAll } from './dash.js';
 import { GRIDS } from './grids.js';
 import { eqRetOpen, eqWant, renderEqPanel, syncOrderAssets } from './equipment.js';
 import { AK, BZX, CH_DEFS, ctOrig, DC, ensureLeadSrc, liveCalc, liveDiff, loadLib, LS, LV, renderChannelView, setLiveSrc } from './analysis.js';
-import { applyDense, PR, pushRecent, renderTodo } from './tools.js';
+import { applyDense, openCust360, PR, pushRecent, renderTodo } from './tools.js';
 import { CL, renderCloud } from './cloud.js';
-import { loadInbound, renderInbPanel, renderInbStat, renderWeekly } from './inbound.js';
+import { inbLast, loadInbound, renderInbPanel, renderInbStat, renderWeekly } from './inbound.js';
 import { CHURN, CR, CS, csSetTab, ensureGroupOpen, helpBox, helpWire, initOiForm, loadRecvPresets, oiLinkQuote, oiToContract, renderChurn,
-  renderChurnRate, renderCsite, renderCustFlow, renderOiTiles } from './sales.js';
+  renderChurnRate, renderCsite, renderCustFlow, renderOiTiles, wzReset } from './sales.js';
 import { logChange, monthRows, msg, openOvl } from './edit.js';
 import { lazyGet, lazyView } from './lazy.js';
-import { closeAnswer } from './ai.js';
 
 
 /* ---- 뒤로가기 — 화면 이동을 브라우저 히스토리에 남겨 상단 ← 버튼·브라우저/폰 뒤로가기·Alt+← 가 모두 이전 화면으로 ----
    주소 해시(#oi 처럼)에 현재 화면을 적어 두므로 새로고침·링크 공유 때도 그 화면이 열립니다. */
-export var NAV={i:0, pop:false, ready:false};
+export var NAV={i:0, pop:false, ready:false, menu:false, reset:''};
 export function navValid(v){ return v==='dash' || !!document.querySelector('#side button[data-v="'+v+'"]'); }
 export function navDepth(){ try{ return (history.state && typeof history.state.i==='number')? history.state.i : 0; }catch(e){ return 0; } }
 export function navRecord(prev, v){
@@ -46,10 +45,10 @@ export function goBack(){
    · 화면에 새 상태를 더하면 VIEW_UI 에 «화면: {객체: [키…]}» 한 줄 */
 export var VIEW_UI={
   live:{LV:['T','diff']}, churn:{CHURN:['f','t','q','fil','sk','sd','inclRenew']},
-  churnrate:{CR:['unit','base','cnd','rows','exDen','sup','from','upto','open','f']}, custflow:{CR:['unit','base','cnd','rows','exDen','sup','from','upto','open','f']},
-  leadsrc:{LS:['base','line','pick']}, dcheck:{DC:['open','sev']}, eqboard:{EQB:['ch','q','more']},
+  churnrate:{CR:['unit','base','cnd','rows','exDen','sup','from','upto','open','f','adv']}, custflow:{CR:['unit','base','cnd','rows','exDen','sup','from','upto','open','f']},
+  leadsrc:{LS:['base','line','pick']}, dcheck:{DC:['open','sev']}, eqboard:{EQB:['ch','q','more','only']},
   price:{PR:['seg','ver','op','q','basis']}, cloud:{CL:['mode','sel','months','mon']}, aiknow:{AK:['log','q']},
-  biz:{BZX:['showEq','showSkip','showRuled']}, report:{RPV:['tab']}, csite:{CS:['tab']},
+  biz:{BZX:['showEq','showSkip','showRuled']}, report:{RPV:['tab','build'], QB:['title','savedId','mode','sql','spec','res','page']}, csite:{CS:['tab']},
   ops:{OPS:['tab','msg','msgCls']}, adminx:{CD:['kind','showOff'], AP:['user'], ADM:['tab']}
 };
 export var VIEW_SNAP=null;
@@ -57,7 +56,7 @@ export var VIEW_SNAP=null;
 export function viewObj(n){
   var M={LV:LV, CHURN:CHURN, CR:CR, LS:LS, DC:DC, EQB:EQB, PR:PR, CL:CL, AK:AK, BZX:BZX, CS:CS};
   if(Object.prototype.hasOwnProperty.call(M, n)) return M[n];
-  var lz=n==='RPV'? lazyGet('report') : /^(OPS|CD|AP|ADM)$/.test(n)? lazyGet('admin') : null;
+  var lz=(n==='RPV'||n==='QB')? lazyGet('report') : /^(OPS|CD|AP|ADM)$/.test(n)? lazyGet('admin') : null;
   return lz? lz[n] : null;
 }
 export function viewSnapInit(){ VIEW_SNAP={}; viewSnapAdd(); }
@@ -91,11 +90,46 @@ export function dashResetIfChanged(){
   STATE.base=base0; var b=document.getElementById('btnReset');
   if(b && b.onclick) b.onclick.call(b); else { try{ buildControls(); renderAll(); }catch(e){} }
 }
+/* ㊿+172 메뉴를 다시 눌러도 마지막 작업 상태 그대로(검색 · 필터 · 정렬 · 쪽 · 스크롤 · 화면별 선택) — 처음 상태는 화면 이름 옆 «초기화»(viewResetHard)
+   · 고객 360 에서 넘어온 «고객 문맥»(CUSTCTX)이 있으면 고객 목록 화면에는 그 고객으로 */
+export var VSCROLL={};
+export var CUSTCTX={c:''};
+export var CUST_VIEWS={contracts:1, live:1, oi:1, inbound:1, orders:1, assets:1, mdrops:1};
 export function navMenu(v){
-  try{ viewReset(v); }catch(e){}
+  if(CUSTCTX.c && CUST_VIEWS[v]){ custGo(v, CUSTCTX.c); return; }
+  NAV.menu=true;
   switchView(v);
+  NAV.menu=false;
+  if(!DVMEM[v] && !VSCROLL[v]) try{ window.scrollTo(0, 0); }catch(e){}
+}
+/** 화면을 처음 상태로(명시적 «초기화») — 검색 · 필터 · 정렬 · 쪽 · 화면별 선택 · 스크롤 */
+export function viewResetHard(v){
+  v=v||ST.CUR_VIEW;
+  try{ viewReset(v); }catch(e){}
+  delete DVMEM[v]; delete VSCROLL[v]; if(CUST_VIEWS[v]) CUSTCTX.c='';
+  NAV.reset=v; try{ switchView(v); } finally { NAV.reset=''; }
   try{ window.scrollTo(0, 0); }catch(e){}
   if(v==='csite') try{ csSetTab('create'); }catch(e){}
+  if(v!=='quote') toast('처음 상태로', viewLabelOf(v)+' — 검색 · 필터 · 정렬을 비웠습니다', 'info');
+}
+export function viewLabelOf(v){ var b=document.querySelector('#side button[data-v="'+v+'"]'); return b? navText(b) : v; }
+/** 고객 문맥으로 목록 열기(고객 360 → 계약 · LIVE · OI · 인바운드 · 장비) — 다른 고객 목록으로 옮겨도 같은 고객 · «해제»로 끔 */
+export function custGo(v, nm){
+  CUSTCTX.c=String(nm||'');
+  if(v==='eqboard'){ EQB.q=CUSTCTX.c; switchView('eqboard'); var qi=/** @type {any} */(document.getElementById('eqbQ')); if(qi) qi.value=CUSTCTX.c; try{ renderEqBoard(); }catch(e){} return; }
+  switchView(v);   /* 처음 상태(필터 없음)에서 고객 이름으로 — 지난 필터가 그 고객 행을 가리지 않게 */
+  var s=/** @type {any} */(document.getElementById('dvSearch')); if(s){ s.value=CUSTCTX.c; } DV.page=0; try{ renderGrid(); }catch(e){}
+}
+export function custCtxBar(){
+  var bar=document.getElementById('dvCustBar'), s=/** @type {any} */(document.getElementById('dvSearch'));
+  if(!bar && s){ bar=document.createElement('div'); bar.id='dvCustBar'; bar.className='cust-bar'; s.parentElement.parentElement.insertBefore(bar, s.parentElement); }
+  if(!bar) return;
+  var on=!!CUSTCTX.c && CUST_VIEWS[ST.CUR_VIEW] && s && s.value.trim()===CUSTCTX.c;
+  if(!on){ bar.hidden=true; bar.innerHTML=''; if(CUSTCTX.c && s && s.value.trim() && s.value.trim()!==CUSTCTX.c && CUST_VIEWS[ST.CUR_VIEW]) CUSTCTX.c=''; return; }
+  bar.hidden=false;
+  bar.innerHTML=tpl`<span class="ctag info">${rawHtml(ico('users',13))} 고객 문맥 «${CUSTCTX.c}» — 다른 고객 목록으로 옮겨도 이 고객</span><button type="button" class="cbtn" id="dvCust360">고객 360</button><button type="button" class="cbtn" id="dvCustX" aria-label="고객 문맥 해제">✕ 해제</button>`;
+  /** @type {any} */(document.getElementById('dvCust360')).onclick=function(){ openCust360(CUSTCTX.c); };
+  /** @type {any} */(document.getElementById('dvCustX')).onclick=function(){ CUSTCTX.c=''; if(s) s.value=''; DV.page=0; renderGrid(); };
 }
 
 /* Backspace = 뒤로가기 — 글자를 입력하는 칸(input·textarea·select·편집 가능 영역)에 커서가 있을 때는 그대로 글자 지우기 */
@@ -110,8 +144,13 @@ export function switchView(v){
   if(!canView(v)){ toast('권한 없음','이 메뉴는 보기 권한이 없습니다 — 슈퍼 관리자에게 요청하세요','info'); v='dash'; }
   permEnter(v);
   try{ navRecord(ST.CUR_VIEW, v); }catch(e){}
-  if(ST.CUR_VIEW==='dash' && v!=='dash'){ try{ closeAnswer(); }catch(e){} }   /* ㊿+159 홈을 떠나면 AI 답변 닫기 (생각 중이면 그대로) */
+  if(GRIDS[ST.CUR_VIEW] && ST.CUR_VIEW!==v && !GRIDS[ST.CUR_VIEW].custom){ try{ DVMEM[ST.CUR_VIEW]=dvSnap(); }catch(e){} }   /* ㊿+169 떠나는 목록의 상태 */
+  if(ST.CUR_VIEW && ST.CUR_VIEW!==v) VSCROLL[ST.CUR_VIEW]=window.scrollY||0;   /* ㊿+172 표가 아닌 화면도 스크롤 위치 */
+  var RESTORE=!!(NAV.pop || NAV.menu);
+  if(RESTORE && VSCROLL[v] && !(GRIDS[v] && !GRIDS[v].custom)){ var sy0=VSCROLL[v]; setTimeout(function(){ try{ window.scrollTo(0, sy0); }catch(e){} }, 80); }
+  /* ㊿+172 홈을 떠나도 AI 대화는 그대로(오른쪽 패널 · «AI 대화»로 다시 열기) — 예전엔 닫았음 */
   ST.CUR_VIEW=v;
+  try{ document.body.dataset.view=v; document.body.dataset.ct=(/^(contracts|live|churn|renew)$/.test(v) || CH_DEFS[v])? '1':''; }catch(e){}   /* ㊿+169 화면에 맞는 도구만(위젯 = 홈) · ㊿+171 «계약 입력·수정»은 계약 관련 화면에서만(data-ct) */
   try{ pushRecent(v); }catch(e){}
   $('#side').querySelectorAll('button').forEach(function(b){
     b.setAttribute('aria-current', b.dataset.v===v?'true':'false');
@@ -161,6 +200,7 @@ export function switchView(v){
   if(chv){ renderChannelView(v); return; }
   if(acct){ lazyView('admin','viewAccount','renderAccount'); return; }
   if(onew){
+    try{ wzReset('od'); }catch(e){}
     msg('odMsg','');
     $('#odFormWrap').style.display='';
     $('#odDone').style.display='none';
@@ -169,6 +209,7 @@ export function switchView(v){
     return;
   }
   if(oinew){
+    try{ wzReset('oi'); }catch(e){}
     msg('oiMsg','');
     $('#oiFormWrap').style.display='';
     $('#oiDone').style.display='none';
@@ -177,6 +218,7 @@ export function switchView(v){
     return;
   }
   if(mnew){
+    try{ wzReset('mp'); }catch(e){}
     msg('mpMsg','');
     $('#mpFormWrap').style.display='';
     $('#mpDone').style.display='none';
@@ -203,8 +245,8 @@ export function switchView(v){
   if(quote){
     var fr=$('#quoteFrame');
     if(!fr.src){ fr.src='quote.html?v='+encodeURIComponent(APP_VER); }   // 포탈 버전을 붙여 옛 견적 화면이 캐시에서 나오는 일을 막음
-    else{
-      // 메뉴를 다시 누르면 견적 종류(기업/공공)를 다시 고를 수 있게
+    else if(NAV.reset==='quote'){
+      // ㊿+172 «초기화»를 눌렀을 때만 견적 종류(기업/공공)를 다시 고르게 — 메뉴를 다시 누르거나 검색 · AI 를 열고 돌아와도 쓰던 견적 그대로
       try{ fr.contentWindow.postMessage({type:'quoteReset'},'*'); }catch(e){}
     }
     return;
@@ -226,7 +268,10 @@ export function switchView(v){
   if(v==='inbound' && !ST.RAWX.inbound){
     loadInbound(function(){ if(ST.CUR_VIEW==='inbound') renderGrid(); });
   }
-  DV.page=0; DV.sortK=null; DV.sortDir=1; DV.chipVal=''; DV.filters={}; closeColFilter();
+  var mem=(RESTORE && DVMEM[v])? DVMEM[v] : null;   /* ㊿+169 «뒤로» · ㊿+172 메뉴 재진입도 떠날 때 상태 그대로 · 조건을 들고 들어오는 이동(홈 할 일 · 검색 결과 · 고객 360)은 처음부터 */
+  if(mem){ DV.page=mem.page; DV.sortK=mem.sortK; DV.sortDir=mem.sortDir; DV.chipVal=mem.chipVal; DV.filters=mem.filters; DV.lens=mem.lens; DV.lensAll=mem.lensAll; DV.pre=mem.pre; }
+  else { DV.page=0; DV.sortK=null; DV.sortDir=1; DV.chipVal=''; DV.filters={}; DV.pre=null; }
+  closeColFilter();
   var g=GRIDS[v];
   renderOiTiles(v==='oi');
   /* 금액 열(won:1)이 있는 표는 제목 옆에 «천원 단위» 배지를 붙입니다 */
@@ -235,9 +280,10 @@ export function switchView(v){
   dvCapRender(v, g.cap + (hasWon? ' · 금액은 보기·입력 모두 천원 단위':'') + (ST.IS_VIEWER? ' · 조회 전용 계정입니다':''));
   $('#dvAdd').style.display=(g.add && !ST.IS_VIEWER)?'':'none';
   $('#dvPaste').style.display=(g.add && !ST.IS_VIEWER)?'':'none';
-  $('#dvSearch').value='';
+  $('#dvSearch').value=mem? mem.q : '';
   renderGrid();
   applyDense();
+  if(mem) setTimeout(function(){ try{ window.scrollTo(0, mem.sy); var tw=$('#dvTable').parentElement; if(tw) tw.scrollLeft=mem.sx; }catch(e){} }, 0);
 }
 
 export function fmtCell(c,v,r){
@@ -426,6 +472,140 @@ export function readRowInputs(tr,g){
 
 export var DV={page:0, per:100, sortK:null, sortDir:1, filters:{}};
 
+/* ===== ㊿+169 업무 보기 — 계약·OI 표를 «하는 일»별 열 묶음으로 (사용자: 표 기본 보기 재설계 · 운영/갱신/정산/전체 · 개인 저장)
+   · 보기마다 보일 열·순서가 다름 — 열 설정에서 바꾸면 그 보기에만 내 브라우저에 저장(HIDE['contracts@운영']) · «전체»는 예전 열 설정(HIDE['contracts']) 그대로
+   · 고른 보기도 기억(svc_wv_계정) · 검색은 숨긴 열까지 전부 봄(예전과 같음) */
+export var WORKV={
+  contracts:{def:'운영', views:[
+    ['운영','지금 계약 — 상태 · 서비스 · 채널 · 노드 · 금액 · 기간', ['_custName','status','line','channel','partner','qty','mrr','start_month','end_month','csm']],
+    ['갱신','만기·연장·해지 — 종료월 · 자동연장 · 연장 회차 · 해지 사유', ['_custName','status','line','contract_type','start_month','end_month','auto_renew','renew_count','mrr','churn_reason','churn_month']],
+    ['정산','계산서·과금 — 발행처 · 과금방식 · 설치비 · 정산일 · 에스원 계약번호', ['_custName','status','line','channel','biller','billing','mrr','install_fee','settle_month','s1_no']],
+    ['전체','모든 열 — 예전 열 설정 그대로', null]]},
+  oi:{def:'진행', views:[
+    ['진행','진행 관리 — 단계 · 가능성 · 담당 · 계약 예상 · 다음 할 일', ['customer','stage','deal_name','win_prob','owner','expect_month','expect_amount','next_action','next_date']],
+    ['전체','모든 열 — 예전 열 설정 그대로', null]]}
+};
+export function wvKey(){ return 'svc_wv_'+(ST.AUTH_USER||'anon'); }
+export function wvAll(){ try{ return JSON.parse(localStorage.getItem(wvKey())||'{}')||{}; }catch(e){ return {}; } }
+export function wvCur(v){ v=v||ST.CUR_VIEW; var d=WORKV[v]; if(!d) return null; var k=wvAll()[v]||d.def; return d.views.filter(function(x){ return x[0]===k; })[0]||d.views[0]; }
+export function wvSet(v, k){ var a=wvAll(); a[v]=k; try{ localStorage.setItem(wvKey(), JSON.stringify(a)); }catch(e){} }
+export function hideView(){ var w=wvCur(); return ST.CUR_VIEW+(w && w[2]? '@'+w[0] : ''); }
+/** 지금 보기에서 숨긴 열 — 업무 보기는 사용자가 바꾼 적 없으면 그 보기의 열만 보임 */
+export function hidCur(g){
+  var hv=hideView(), w=wvCur();
+  if(w && w[2] && !HIDE[hv]) return g.cols.filter(function(c){ return w[2].indexOf(c.k)<0; }).map(function(c){ return c.k; });
+  return (HIDE[hv]||[]).slice();
+}
+/** 고정 열(이름 · 상태) — 가로로 밀어도 왼쪽에 남음 */
+export function pinCls(g, c){ var i=(g.pin||[]).indexOf(c.k); return i<0? '' : 'pin pin'+(i+1); }
+export function pinSync(t){
+  var p1=t.querySelector('thead th.pin1'); t.style.setProperty('--pin1w', (p1? p1.offsetWidth : 0)+'px');
+}
+/* ===== ㊿+169 목록 상태 기억 — 상세·다른 화면에 갔다가 «뒤로»(← · 브라우저 · Alt+←)로 오면 검색·필터·정렬·쪽·스크롤 그대로 ===== */
+export var DVMEM={};
+export function dvSnap(){
+  var w=document.getElementById('dvTable'), wrap=w? w.parentElement : null;
+  return {page:DV.page, sortK:DV.sortK, sortDir:DV.sortDir, chipVal:DV.chipVal, filters:JSON.parse(JSON.stringify(DV.filters||{})), lens:DV.lens, lensAll:DV.lensAll, pre:DV.pre||null,
+    q:($('#dvSearch')||{}).value||'', sy:window.scrollY||0, sx:wrap? wrap.scrollLeft : 0};
+}
+/* ===== ㊿+169 홈 알림 → «그 조건으로 걸러진» 목록 (DV.pre — 이름이 붙은 조건 · ✕ 로 해제) ===== */
+export function gridGoPre(view, label, fn){
+  switchView(view); DV.pre={label:label, fn:fn}; DV.page=0; renderGrid();
+}
+/** 행 «더보기» 메뉴 — 삭제처럼 드물고 되돌리기 어려운 동작은 여기로 (권한 검사는 부르는 쪽 그대로) */
+export function rowMenu(anchor, items){
+  var old=document.getElementById('rowMenu'); if(old){ var same=old._a===anchor; old._close(); if(same) return; }
+  var m=/** @type {any} */(document.createElement('div')); m.id='rowMenu'; m.className='rmenu'; m.setAttribute('role','menu'); m._a=anchor;
+  items.forEach(function(it){ var b=document.createElement('button'); b.type='button'; b.setAttribute('role','menuitem'); b.className=it.danger? 'dz':''; b.innerHTML=(it.ic? ico(it.ic,15):'')+tpl`<span>${it.l}</span>`; if(it.tip) b.title=it.tip;
+    b.onclick=function(e){ e.stopPropagation(); close(); it.go(); }; m.appendChild(b); });
+  document.body.appendChild(m);
+  var r=anchor.getBoundingClientRect(); m.style.top=Math.max(8, Math.min(r.bottom+4, window.innerHeight-m.offsetHeight-8))+'px'; m.style.left=Math.max(8, r.right-m.offsetWidth)+'px';
+  anchor.setAttribute('aria-expanded','true');
+  function close(){ m.remove(); anchor.setAttribute('aria-expanded','false'); document.removeEventListener('click', out, true); document.removeEventListener('keydown', key, true); }
+  m._close=close;
+  function out(e){ if(!m.contains(e.target) && e.target!==anchor && !anchor.contains(e.target)) close(); }
+  function key(e){ var bs=[].slice.call(m.querySelectorAll('button')), i=bs.indexOf(/** @type {any} */(document.activeElement));
+    if(e.key==='Escape'){ e.preventDefault(); e.stopPropagation(); close(); anchor.focus(); }
+    else if(e.key==='ArrowDown'){ e.preventDefault(); bs[(i+1)%bs.length].focus(); }
+    else if(e.key==='ArrowUp'){ e.preventDefault(); bs[(i-1+bs.length)%bs.length].focus(); }
+    else if(e.key==='Tab'){ close(); } }
+  setTimeout(function(){ document.addEventListener('click', out, true); document.addEventListener('keydown', key, true); var f=m.querySelector('button'); if(f) f.focus(); }, 0);
+}
+/** 상태 글자 → 배지 색(글자도 항상 같이 보임 — 색만으로 구분하지 않음) */
+export function stBadge(txt){
+  var s=String(txt||'');
+  if(/해지|중지|취소|실패|미대응|분실|폐기/.test(s)) return 'crit';
+  if(/종료|회수완료|CN전환|이전됨|계산서발행|판매완료/.test(s)) return '';
+  if(/회수예정|출하요청|배송중|계약예정|진행|접수|수리중/.test(s)) return 'warn';
+  if(/신규|활성|재약정|추가|통합과금|설치완료|임대중|수주|LIVE|대응/.test(s)) return 'ok';
+  return 'info';
+}
+
+/* ===== ㊿+170 영업·인바운드 빠른 보기 — 내 담당 · 오늘 할 일 · 기한 초과 · 다음 행동 없음 · 장기 미접촉 / 첫 대응 지연
+   · 기준(일수 · 내 이름)은 «기준» 버튼에서 바꾸고 내 브라우저에 저장(svc_qv_계정) · 홈 «오늘 처리할 일»도 같은 기준·같은 목록 */
+export function qvKey(){ return 'svc_qv_'+(ST.AUTH_USER||'anon'); }
+export function qvCfg(){ var d={me:'', oiIdle:30, inbFirst:3, inbIdle:90}; try{ var s=JSON.parse(localStorage.getItem(qvKey())||'{}')||{}; Object.keys(d).forEach(function(k){ if(s[k]!=null && s[k]!=='') d[k]=s[k]; }); }catch(e){} d.oiIdle=+d.oiIdle||30; d.inbFirst=+d.inbFirst||3; d.inbIdle=+d.inbIdle||90; return d; }
+/** ㊿+172 내 담당 이름 — 계정별 연결(관리자 지정 · SQL 103 user_owner_map)이 있으면 그것, 없으면 이 브라우저에서 고른 이름(임시) · 둘 다 없으면 [] («담당자 연결 필요» — 0 으로 보이지 않게) */
+export function myOwner(){ var a=ST.OWNER_NAMES; if(a && a.length) return {names:a.slice(), src:'account'}; var me=qvCfg().me; return me? {names:[me], src:'browser'} : {names:[], src:''}; }
+export function meMatch(owner){ var n=myOwner().names, o=String(owner||''); return n.some(function(x){ return !!x && o.indexOf(x)>=0; }); }
+export function qvSave(c){ try{ localStorage.setItem(qvKey(), JSON.stringify(c)); }catch(e){} }
+/** 진행 중인 OI — 수주·계산서발행·종료·중지·실패가 아닌 것 (OI 타일 · 홈 · 빠른 보기 공통) */
+export function oiOpen(r){ return !/수주|계산서|종료|중지|실패/.test(String(r && r.stage || '')); }
+export function daysSince(d){ if(!d) return null; var t=new Date(String(d).slice(0,10)).getTime(); return isNaN(t)? null : Math.floor((Date.now()-t)/864e5); }
+export function inbIdleHit(r, C){ C=C||qvCfg(); if(String(r.y||'')!==String(new Date().getFullYear()) || r.result!=='진행중') return false; var d=daysSince(inbLast(r)); return d!=null && d>=C.inbIdle; }
+export function qvDefs(v){
+  var C=qvCfg(), today=todayStr();
+  var MO=myOwner(), me=['me','내 담당', MO.names.length? '담당 «'+MO.names.join(' / ')+'»'+(MO.src==='account'? ' — 계정 연결' : ' — 이 브라우저에서 고른 이름') : '담당자 연결 필요 — 관리자가 계정에 담당자 이름을 연결하거나 «기준»에서 임시로 고르기', function(r){ return meMatch(r.owner); }];
+  if(v==='oi') return [me,
+    ['today','오늘 할 일','다음 할 일 예정일이 오늘(진행 중)', function(r){ return oiOpen(r) && String(r.next_date||'').slice(0,10)===today; }],
+    ['late','기한 초과','예정일이 지났는데 진행 중', function(r){ return oiOpen(r) && !!r.next_date && String(r.next_date).slice(0,10)<today; }],
+    ['nonext','다음 행동 없음','진행 중인데 다음 할 일 또는 예정일이 비어 있음', function(r){ return oiOpen(r) && (!r.next_action || !r.next_date); }],
+    ['idle','장기 미접촉', C.oiIdle+'일 넘게 수정 없음(진행 중)', function(r){ var d=daysSince(r.updated_at||r.created_at); return oiOpen(r) && d!=null && d>=C.oiIdle; }]];
+  if(v==='inbound') return [me,
+    ['first','첫 대응 지연','접수 '+C.inbFirst+'일이 지났는데 1차 대응 기록 없음(진행중)', function(r){ var d=daysSince(r.on_date); return r.result==='진행중' && !r.s1d && d!=null && d>=C.inbFirst; }],
+    ['idle','장기 미접촉','올해 진행중인데 마지막 대응이 '+C.inbIdle+'일 이상 — 홈 «인바운드 미대응»과 같은 기준', function(r){ return inbIdleHit(r, C); }],
+    ['open','진행중 전체','결과가 «진행중»', function(r){ return r.result==='진행중'; }]];
+  return null;
+}
+export function qvGo(view, key){
+  switchView(view);
+  var d=(qvDefs(view)||[]).filter(function(x){ return x[0]===key; })[0];
+  if(d){ DV.pre={label:d[1]+' — '+d[2], fn:d[3], qv:key}; DV.page=0; renderGrid(); }
+}
+export function qvBar(g, rows){
+  var qb=document.getElementById('dvQvBar'), defs=qvDefs(ST.CUR_VIEW);
+  if(!qb){ qb=document.createElement('div'); qb.id='dvQvBar'; qb.className='qv-bar'; var bar=$('#dvSearch').parentElement; bar.parentElement.insertBefore(qb, bar); }
+  if(!defs || g.custom){ qb.hidden=true; qb.innerHTML=''; return; }
+  qb.hidden=false; var all=g.rows();
+  var meOk=myOwner().names.length>0;   /* ㊿+171 이름을 고르기 전 «내 담당»은 0 이 아니라 «연결 필요»(누르면 기준 창) · ㊿+172 계정 연결 우선 */
+  qb.innerHTML=tpl`<span class="wv-l">빠른 보기</span>${rawHtml(defs.map(function(d){ var n=all.filter(d[3]).length, on=!!(DV.pre && DV.pre.qv===d[0]), nc=d[0]==='me' && !meOk;
+      return tpl`<button type="button" class="chip${n || nc? '':' zero'}${nc? ' need':''}" data-qv="${d[0]}" aria-pressed="${on?'true':'false'}" title="${nc? '담당자 연결 필요 — 눌러서 내 이름(담당자 칸 값) 고르기' : d[2]}">${d[1]} <b class="num">${nc? '연결 필요' : String(n)}</b></button>`; }).join(''))}`+
+    tpl`<button type="button" class="cbtn" id="qvCfgBtn" aria-haspopup="dialog" title="빠른 보기 기준 — 내 이름 · 장기 미접촉 일수 · 첫 대응 일수">${rawHtml(ico('gear',14))} 기준</button>`;
+  qb.querySelectorAll('[data-qv]').forEach(function(b){ b.onclick=function(){ var k=b.dataset.qv;
+    if(k==='me' && !meOk){ qvCfgOpen(/** @type {any} */(document.getElementById('qvCfgBtn'))); return; }
+    if(DV.pre && DV.pre.qv===k){ DV.pre=null; DV.page=0; renderGrid(); } else qvGo(ST.CUR_VIEW, k); }; });
+  /** @type {any} */(document.getElementById('qvCfgBtn')).onclick=function(){ qvCfgOpen(this); };
+}
+export function qvCfgOpen(btn){
+  var old=document.getElementById('qvCfg'); if(old){ old.remove(); return; }
+  var C=qvCfg(), owners={}; (ST.RAWX.oi||[]).concat(ST.RAWX.inbound||[]).forEach(function(r){ String(r.owner||'').split(/[,/]/).forEach(function(o){ o=o.trim(); if(o) owners[o]=1; }); });
+  var m=document.createElement('div'); m.id='qvCfg'; m.className='rmenu qv-cfg'; m.setAttribute('role','dialog'); m.setAttribute('aria-label','빠른 보기 기준');
+  m.innerHTML=tpl`<b>빠른 보기 기준</b><label>내 이름(담당자 칸 값)<select id="qvMe"><option value="">— 고르기 —</option>${rawHtml(Object.keys(owners).sort(function(a,b){ return a.localeCompare(b,'ko'); }).map(function(o){ return tpl`<option${rawHtml(o===C.me?' selected':'')}>${o}</option>`; }).join(''))}</select></label>`+
+    tpl`<label>OI 장기 미접촉 (일)<input id="qvOi" type="number" min="1" max="365" value="${String(C.oiIdle)}"></label><label>인바운드 첫 대응 지연 (일)<input id="qvIf" type="number" min="1" max="60" value="${String(C.inbFirst)}"></label>`+
+    tpl`<label>인바운드 장기 미접촉 (일)<input id="qvIi" type="number" min="7" max="365" value="${String(C.inbIdle)}"></label><div class="pa"><button type="button" class="pill ghost" id="qvX">취소</button><button type="button" class="pill pri" id="qvOk">저장</button></div>`;
+  document.body.appendChild(m);
+  var MO2=myOwner(); if(MO2.src==='account'){ var sl=m.querySelector('#qvMe'); if(sl){ var lb=sl.closest('label'), dv=document.createElement('div'); dv.className='qv-acc'; dv.innerHTML=tpl`내 이름 <b>${MO2.names.join(' / ')}</b> <span class="mini">계정 연결 — 관리자 지정</span><input type="hidden" id="qvMe" value="${C.me||''}">`; if(lb) lb.replaceWith(dv); } }   /* ㊿+172 계정 연결이 있으면 브라우저 선택 대신 */
+  var r=btn.getBoundingClientRect(); m.style.top=(r.bottom+6)+'px'; m.style.left=Math.max(8, Math.min(r.left, window.innerWidth-m.offsetWidth-8))+'px';
+  var close=function(){ m.remove(); document.removeEventListener('keydown', key, true); btn.focus(); };
+  var key=function(e){ if(e.key==='Escape'){ e.preventDefault(); e.stopPropagation(); close(); } };
+  document.addEventListener('keydown', key, true);
+  /** @type {any} */(m.querySelector('#qvX')).onclick=close;
+  /** @type {any} */(m.querySelector('#qvOk')).onclick=function(){ var v=function(id){ return /** @type {any} */(document.getElementById(id)).value; };
+    qvSave({me:v('qvMe'), oiIdle:+v('qvOi')||30, inbFirst:+v('qvIf')||3, inbIdle:+v('qvIi')||90}); close(); DV.pre=null; renderGrid(); toast('빠른 보기 기준 저장', '이 브라우저에만 적용 · 홈 «우선 업무»도 같은 기준', 'info'); };
+  setTimeout(function(){ var f=/** @type {any} */(m.querySelector('select')); if(f) f.focus(); }, 0);
+}
+
+
 /* ===== 열 보이기/숨기기 (화면마다 따로 기억) =====
    계약처럼 열이 많은 표에서 지금 보고 싶은 열만 남깁니다. 숨겨도 값은 그대로 있고 검색·엑셀 내려받기에만 빠집니다. */
 export var HIDE={};
@@ -434,16 +614,20 @@ export function loadHide(){ try{ HIDE=JSON.parse(localStorage.getItem(hideKey())
 export function saveHide(){ try{ localStorage.setItem(hideKey(), JSON.stringify(HIDE)); }catch(e){} }
 export function hiddenSet(view){ return (HIDE[view]||[]); }
 export function visCols(g){
-  var h=hiddenSet(ST.CUR_VIEW);
-  if(!h.length) return g.cols;
+  var h=hidCur(g), w=wvCur();
   var out=g.cols.filter(function(c){ return h.indexOf(c.k)<0; });
-  return out.length? out : g.cols;      /* 전부 숨기면 아무것도 안 보이니 원래대로 */
+  if(!out.length) out=g.cols.slice();      /* 전부 숨기면 아무것도 안 보이니 원래대로 */
+  if(w && w[2]){ var ord=w[2]; out=out.map(function(c,i){ return [c,i]; }).sort(function(a,b){ var ia=ord.indexOf(a[0].k), ib=ord.indexOf(b[0].k); return (ia<0? 100+a[1]:ia)-(ib<0? 100+b[1]:ib); }).map(function(x){ return x[0]; }); }
+  /* ㊿+169 이름·상태 열은 맨 앞(고정) */
+  var pins=(g.pin||[]).map(function(k){ return out.filter(function(c){ return c.k===k; })[0]; }).filter(Boolean);
+  if(pins.length) out=pins.concat(out.filter(function(c){ return pins.indexOf(c)<0; }));
+  return out;
 }
 export function openColPick(btn){
   var g=GRIDS[ST.CUR_VIEW]; if(!g||g.custom) return;
   closeColFilter();
   var old=document.getElementById('colPick'); if(old) old.remove();
-  var h=hiddenSet(ST.CUR_VIEW).slice();
+  var h=hidCur(g), WV=wvCur(), hv=hideView();
   var box=document.createElement('div'); box.id='colPick'; box.className='colmenu';
   box.style.cssText='position:absolute;z-index:80;background:var(--surface);border:1px solid var(--ring);border-radius:12px;'+
     'box-shadow:0 10px 30px rgba(0,0,0,.18);padding:10px;min-width:250px;max-height:60vh;overflow:auto;font-size:12px';
@@ -454,23 +638,25 @@ export function openColPick(btn){
   head.style.cssText='display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap';
   head.innerHTML=tpl`<b style="font-size:12px">보일 열 고르기</b><span class="mini" style="color:var(--muted)">${g.cols.length-h.length}/${g.cols.length}</span>`;
   var all=document.createElement('button'); all.className='chip'; all.textContent='전체 보기';
-  all.onclick=function(){ HIDE[ST.CUR_VIEW]=[]; saveHide(); box.remove(); renderGrid(); };
+  all.onclick=function(){ HIDE[hv]=[]; saveHide(); box.remove(); renderGrid(); };
   head.appendChild(all);
+  if(WV && WV[2]){ var rv=document.createElement('button'); rv.className='chip'; rv.textContent='«'+WV[0]+'» 기본 열로'; rv.title='이 보기에서 바꾼 열 설정을 지우고 기본 열 묶음으로';
+    rv.onclick=function(){ delete HIDE[hv]; saveHide(); box.remove(); renderGrid(); }; head.appendChild(rv); }
   /* ㊿+142: 끌어서 바꾼 열 너비가 있으면 한 번에 원래대로 */
   if(Object.keys(colwGet(ST.CUR_VIEW)).length){ var rw=document.createElement('button'); rw.className='chip'; rw.textContent='열 너비 원래대로'; rw.title='머리 칸 경계를 끌어 바꾼 너비를 모두 지웁니다';
     rw.onclick=function(){ box.remove(); colwReset(ST.CUR_VIEW); }; head.appendChild(rw); }
   box.appendChild(head);
-  var tip=document.createElement('div'); tip.className='mini'; tip.style.cssText='color:var(--muted);margin:-2px 0 6px'; tip.textContent='열 너비는 머리 칸 오른쪽 경계를 끌어서 바꿉니다';
+  var tip=document.createElement('div'); tip.className='mini'; tip.style.cssText='color:var(--muted);margin:-2px 0 6px'; tip.textContent=(WV? '«'+WV[0]+'» 보기의 열 — 이 보기에만 저장 · ':'')+'열 너비는 머리 칸 오른쪽 경계를 끌어서 바꿉니다';
   box.appendChild(tip);
   g.cols.forEach(function(c){
     var lb=document.createElement('label');
     lb.style.cssText='display:flex;gap:7px;align-items:center;padding:4px 2px;cursor:pointer';
     var cb=document.createElement('input'); cb.type='checkbox'; cb.checked=h.indexOf(c.k)<0; cb.style.width='auto';
     cb.onchange=function(){
-      var cur=hiddenSet(ST.CUR_VIEW).slice();
+      var cur=hidCur(g);
       var i=cur.indexOf(c.k);
       if(cb.checked){ if(i>=0) cur.splice(i,1); } else if(i<0) cur.push(c.k);
-      HIDE[ST.CUR_VIEW]=cur; saveHide(); renderGrid();
+      HIDE[hv]=cur; saveHide(); renderGrid();
       head.querySelector('.mini').textContent=(g.cols.length-cur.length)+'/'+g.cols.length;
     };
     lb.appendChild(cb); lb.appendChild(document.createTextNode(c.l));
@@ -497,7 +683,7 @@ export function cellText(c,v,r){
   return t;
 }
 export function filterCount(){ var n=0; for(var k in DV.filters){ if(DV.filters[k]&&DV.filters[k].length) n++; } return n; }
-export function clearFilters(){ DV.filters={}; DV.lens=''; DV.page=0; renderGrid(); }
+export function clearFilters(){ DV.filters={}; DV.lens=''; DV.pre=null; DV.page=0; renderGrid(); }
 /* skipK 열의 필터만 빼고 나머지 조건을 통과하는지 */
 export function passFilters(r,g,skipK){
   for(var k in DV.filters){
@@ -516,6 +702,7 @@ export function baseRows(g,skipK){
   var toks=q? q.split(/\s+/).filter(Boolean):[];
   return g.rows().filter(function(r){
     if(g.chipsField && DV.chipVal && String(r[g.chipsField]||'')!==DV.chipVal) return false;
+    if(DV.pre && !DV.pre.fn(r)) return false;
     if(!passFilters(r,g,skipK)) return false;
     if(!toks.length) return true;
     var hay='';
@@ -647,6 +834,7 @@ export function gridFilteredSorted(g){
   var rows=g.rows().filter(function(r){
     if(g._lens && !g._lens[r.id]) return false;                                   // 관점 필터(계약 메뉴)
     if(g.chipsField && DV.chipVal && String(r[g.chipsField]||'')!==DV.chipVal) return false;
+    if(DV.pre && !DV.pre.fn(r)) return false;                                     // ㊿+169 홈 알림에서 온 조건
     if(!passFilters(r,g,null)) return false;
     if(!toks.length) return true;
     // 열 안의 공백만 무시하고, 열 사이에는 경계 문자를 둬서
@@ -911,7 +1099,9 @@ export function renderGrid(){
       var btn=document.createElement('button');
       btn.className='pill'+(DV.chipVal===v||(!DV.chipVal&&!v)?'':' ghost');
       if(DV.chipVal===v||(!DV.chipVal&&!v)){ btn.style.background='var(--brand-solid,#107b32)'; btn.style.borderColor='var(--brand-solid,#107b32)'; btn.style.color='#fff'; }
-      btn.textContent=op;
+      var cn=v? g.rows().filter(function(x){ return String(x[g.chipsField]||'')===v; }) : g.rows();   /* ㊿+170 칩마다 건수(OI = 단계별 요약 · 금액은 툴팁) */
+      btn.innerHTML=tpl`${op} <span class="num">${String(cn.length)}</span>`;
+      if(ST.CUR_VIEW==='oi'){ var am=cn.reduce(function(a,x){ return a+(+x.expect_amount||0); },0); btn.title=op+' '+cn.length+'건 · 예상 '+won(am)+'천원'; }
       btn.onclick=function(){ DV.chipVal=v; DV.page=0; renderGrid(); };
       cb.appendChild(btn);
     });
@@ -937,9 +1127,25 @@ export function renderGrid(){
     g._lens=(DV.lens && LS[DV.lens])? LS[DV.lens].ids : null;
   } else if(ST.CUR_VIEW==='live'){ lb.style.display='flex'; renderLiveBar(lb); g._lens=null; }
   else { lb.style.display='none'; g._lens=null; }
+  /* ㊿+169 업무 보기(운영 · 갱신 · 정산 · 전체) — 계약 · OI */
+  var wb=document.getElementById('dvWvBar');
+  if(!wb){ wb=document.createElement('div'); wb.id='dvWvBar'; wb.className='wv-bar'; cb.parentElement.insertBefore(wb, cb); }
+  var WD=!isCustom && WORKV[ST.CUR_VIEW], WC=WD? wvCur() : null;
+  if(WD){ wb.hidden=false;
+    wb.innerHTML=tpl`<span class="wv-l" id="wvLbl">보기</span><div class="seg" role="group" aria-labelledby="wvLbl">${rawHtml(WD.views.map(function(x){ return tpl`<button type="button" data-wv="${x[0]}" aria-pressed="${x===WC?'true':'false'}" title="${x[1]}">${x[0]}</button>`; }).join(''))}</div><span class="mini wv-d">${WC[1]} · 보기마다 열 구성이 내 브라우저에 저장됩니다</span>`;
+    wb.querySelectorAll('[data-wv]').forEach(function(b){ b.onclick=function(){ wvSet(ST.CUR_VIEW, b.dataset.wv); DV.page=0; renderGrid(); }; });
+  } else { wb.hidden=true; wb.innerHTML=''; }
+  /* ㊿+169 홈 알림에서 넘어온 조건 — 이름표 + ✕ */
+  var pb=document.getElementById('dvPreBar');
+  if(!pb){ pb=document.createElement('div'); pb.id='dvPreBar'; pb.className='pre-bar'; var bar4=$('#dvSearch').parentElement; bar4.parentElement.insertBefore(pb, bar4); }
+  try{ qvBar(g); }catch(e){ console.warn('빠른 보기', e); }
+  try{ custCtxBar(); }catch(e){}   /* ㊿+172 고객 360 에서 넘어온 고객 문맥 */
+  if(DV.pre && !isCustom && !DV.pre.qv){ pb.hidden=false; pb.innerHTML=tpl`<span class="ctag info">${rawHtml(ico('filter',13))} ${DV.pre.label}</span><button type="button" class="cbtn" id="dvPreX" aria-label="조건 해제 — ${DV.pre.label}">조건 해제</button>`;
+    document.getElementById('dvPreX').onclick=function(){ DV.pre=null; DV.page=0; renderGrid(); }; }
+  else { pb.hidden=true; pb.innerHTML=''; }
   ['dvSearch','dvCsv','dvCols'].forEach(function(id){ $('#'+id).style.display=isCustom?'none':''; });
-  var nHid=hiddenSet(ST.CUR_VIEW).filter(function(k){ return g.cols.some(function(c){ return c.k===k; }); }).length;
-  var cbtn2=$('#dvCols'); if(cbtn2 && !isCustom){ cbtn2.textContent=nHid? ('🧱 열 '+(g.cols.length-nHid)+'/'+g.cols.length) : '🧱 열';
+  var nHid=isCustom? 0 : hidCur(g).filter(function(k){ return g.cols.some(function(c){ return c.k===k; }); }).length;
+  var cbtn2=$('#dvCols'); if(cbtn2 && !isCustom){ cbtn2.innerHTML=ico('cols',15)+tpl`<span>${nHid? '열 '+(g.cols.length-nHid)+'/'+g.cols.length : '열'}</span>`; cbtn2.classList.add('icb');
     cbtn2.style.borderColor=nHid?'var(--s1)':''; cbtn2.style.color=nHid?'var(--s1)':''; }
   var nf=filterCount();
   var fc=$('#dvFclr');
@@ -948,7 +1154,7 @@ export function renderGrid(){
   $('#dvPager').style.display=isCustom?'none':'';
   try{ renderEqPanel(); }catch(e){}
   try{ renderInbPanel(); }catch(e){}
-  if(isCustom){ g.custom(); return; }
+  if(isCustom){ var dc0=document.getElementById('dvCount'); if(dc0){ dc0.textContent=''; dc0.title=''; } g.custom(); return; }   /* ㊿+170 이전 표의 «n행» 글자가 남지 않게 */
   var bh=document.getElementById('bizHost'); if(bh) bh.style.display='none';
   $('#dvTable').parentElement.style.display='';
   var rows=gridFilteredSorted(g);
@@ -960,13 +1166,16 @@ export function renderGrid(){
   var pageRows=rows.slice(start,start+DV.per);
 
   $('#dvCount').textContent=rows.length.toLocaleString('ko-KR')+'행 · '+
-    (rows.length? (start+1)+'–'+(start+pageRows.length) : '0');
+    (rows.length? (start+1)+'–'+(start+pageRows.length) : '0')+' · — 미입력 · 빈칸 해당 없음';
+  $('#dvCount').title='— = 값이 비어 있음(입력 필요할 수 있음) · 빈칸 = 이 계약/행에는 해당하지 않는 칸';
 
   var t=$('#dvTable'); t.innerHTML='';
   var thead=document.createElement('thead');
   var tr0=document.createElement('tr');
   visCols(g).forEach(function(c){
     var th=document.createElement('th');
+    var pc=pinCls(g,c); if(pc) th.className=pc;
+    if(DV.sortK===c.k) th.setAttribute('aria-sort', DV.sortDir>0? 'ascending':'descending');
     var arrow = DV.sortK===c.k ? (DV.sortDir>0?' ▲':' ▼') : '';
     var on=!!(DV.filters[c.k] && DV.filters[c.k].length);
     var wrap=document.createElement('div'); wrap.className='thw';
@@ -980,7 +1189,7 @@ export function renderGrid(){
     };
     var fb=document.createElement('button');
     fb.type='button'; fb.className='fbtn'+(on?' on':'');
-    fb.textContent='▼';
+    fb.textContent='▼'; fb.setAttribute('aria-label', c.l+' 열 값으로 거르기'+(on? ' (적용 중)':''));
     fb.title=on? ('필터 적용 중 ('+DV.filters[c.k].length+'개 값) — 클릭해서 바꾸기') : '값 골라 보기';
     fb.onclick=function(ev){ ev.stopPropagation(); openColFilter(fb,g,c); };
     wrap.appendChild(lab); wrap.appendChild(fb);
@@ -1000,16 +1209,17 @@ export function renderGrid(){
   pageRows.forEach(function(r){ tb.appendChild(gridRow(r,g,false)); });
   if(!pageRows.length){   /* 빈 상태 (⑤ UX): 왜 비었는지 + 한 번에 되돌리는 버튼 */
     var q=($('#dvSearch').value||'').trim(), nfl=filterCount(), hasLens=!!DV.lens, hasChip=!!DV.chipVal;
-    var why=q? '검색어 «'+esc(q)+'»' : (nfl? '열 필터 '+nfl+'개' : hasLens? '관점 필터' : hasChip? '«'+esc(DV.chipVal)+'» 탭' : '');
+    var why=q? '검색어 «'+esc(q)+'»' : (nfl? '열 필터 '+nfl+'개' : hasLens? '관점 필터' : hasChip? '«'+esc(DV.chipVal)+'» 탭' : DV.pre? '조건 «'+esc(DV.pre.label)+'»' : '');
     var tr=document.createElement('tr'); tr.className='dg-empty';
-    tr.innerHTML=tpl`<td colspan="${rawHtml(g.cols.length+2)}" style="text-align:left;padding:34px 12px;color:var(--muted)"><div style="position:sticky;left:12px;width:min(520px,calc(100vw - 160px));text-align:center">`+ tpl`${rawHtml(why? tpl`<div style="font-size:13.5px">${rawHtml(why)}에 맞는 행이 없습니다</div><div style="margin-top:10px;display:flex;gap:6px;justify-content:center;flex-wrap:wrap">`+ tpl`${rawHtml(q? '<button type="button" class="cbtn" data-dge="q">검색어 지우기</button>':'')}${rawHtml((nfl||hasLens)? '<button type="button" class="cbtn" data-dge="f">필터 지우기</button>':'')}${rawHtml(hasChip? '<button type="button" class="cbtn" data-dge="c">전체 탭으로</button>':'')}</div>`
-          : tpl`<div style="font-size:13.5px">아직 데이터가 없습니다</div>${rawHtml(g.add&&!ST.IS_VIEWER? '<div class="mini" style="margin-top:6px">위의 «＋ 행 추가» 로 첫 행을 넣을 수 있습니다</div>':'')}`)}`+ tpl`</div></td>`;
+    tr.innerHTML=tpl`<td colspan="${rawHtml(g.cols.length+2)}" style="text-align:left;padding:34px 12px;color:var(--muted)"><div style="position:sticky;left:12px;width:min(520px,calc(100vw - 160px));text-align:center">`+ tpl`${rawHtml(why? tpl`<div style="font-size:14px">${rawHtml(why)}에 맞는 행이 없습니다</div><div style="margin-top:10px;display:flex;gap:6px;justify-content:center;flex-wrap:wrap">`+ tpl`${rawHtml(q? '<button type="button" class="cbtn" data-dge="q">검색어 지우기</button>':'')}${rawHtml((nfl||hasLens)? '<button type="button" class="cbtn" data-dge="f">필터 지우기</button>':'')}${rawHtml(hasChip? '<button type="button" class="cbtn" data-dge="c">전체 탭으로</button>':'')}</div>`
+          : tpl`<div style="font-size:14px">아직 데이터가 없습니다</div>${rawHtml(g.add&&!ST.IS_VIEWER? '<div class="mini" style="margin-top:6px">위의 «＋ 행 추가» 로 첫 행을 넣을 수 있습니다</div>':'')}`)}`+ tpl`</div></td>`;
     tb.appendChild(tr);
-    tr.querySelectorAll('[data-dge]').forEach(function(b){ b.onclick=function(){ var k=b.dataset.dge; if(k==='q'){ $('#dvSearch').value=''; } if(k==='f'){ DV.filters={}; DV.lens=''; } if(k==='c'){ DV.chipVal=''; } DV.page=0; renderGrid(); }; });
+    tr.querySelectorAll('[data-dge]').forEach(function(b){ b.onclick=function(){ var k=b.dataset.dge; if(k==='q'){ $('#dvSearch').value=''; } if(k==='f'){ DV.filters={}; DV.lens=''; DV.pre=null; } if(k==='c'){ DV.chipVal=''; } DV.page=0; renderGrid(); }; });
   }
   t.appendChild(tb);
   colwApply(t, ST.CUR_VIEW);   /* ㊿+142: 사용자가 정한 열 너비 */
   gridActPad();
+  pinSync(t);
 
   /* 페이저 */
   var pg=$('#dvPager'); pg.innerHTML='';
@@ -1084,13 +1294,21 @@ export function gridRow(r,g,editing){
   var tr=document.createElement('tr');
   function view(){
     tr.innerHTML=visCols(g).map(function(c){
-      var n=c.t==='number'?' class="n"':'';
+      var cl=[]; if(c.t==='number') cl.push('n'); var pc=pinCls(g,c); if(pc) cl.push(pc);
       var txt=fmtCell(c,r[c.k],r);
+      /* ㊿+169 빈 칸 구분: «—» = 미입력(값이 있어야 할 수 있음) · 빈칸 = 해당 없음(c.na · 예/아니오 칸의 «아니오») */
+      if(!c.html && (txt==null || txt==='' || txt==='·')){
+        var na=c.t==='bool'; try{ if(c.na && c.na(r)) na=true; }catch(e){}
+        cl.push(na? 'na':'nil');
+        return na? tpl`<td class="${rawHtml(cl.join(' '))}" title="해당 없음"><span class="sr">해당 없음</span></td>` : tpl`<td class="${rawHtml(cl.join(' '))}" title="미입력">—</td>`;
+      }
+      var n=cl.length? tpl` class="${rawHtml(cl.join(' '))}"` : '';
       if(c.href && r[c.k]){
         return tpl`<td${rawHtml(n)}><a href="${c.href(r[c.k],r)}" target="_blank" `+
                tpl`style="color:var(--s1-ink);text-decoration:none">${txt}</a></td>`;
       }
       if(c.html) return tpl`<td${rawHtml(n)} style="white-space:normal">${rawHtml(txt)}</td>`;   /* fmt 가 안전한 HTML 을 만든 열 (시리얼 묶음 등) */
+      if(c.badge) return tpl`<td${rawHtml(n)}><span class="ctag ${rawHtml(stBadge(txt))}">${txt}</span></td>`;   /* ㊿+169 상태 = 글자 + 배지 */
       return tpl`<td${rawHtml(n)}>${txt}</td>`;
     }).join('')+(g.ro?'':'<td class="act"></td>');
     if(g.rowClick){ tr.style.cursor='pointer'; tr.onclick=function(e){
@@ -1099,45 +1317,38 @@ export function gridRow(r,g,editing){
     }; }
     if(!g.ro){
       var act=tr.lastChild;
+      /* ㊿+169 동작 버튼 = 같은 모양 아이콘 + 이름(aria-label · 툴팁) · 삭제는 «더보기» 안으로 */
+      var ab=function(kind, ic, label, fn, cls){ var b=document.createElement('button'); b.type='button'; b.className='ab'+(cls? ' '+cls:''); b.dataset.act=kind; b.innerHTML=ico(ic,15); b.setAttribute('aria-label', label); b.title=label; b.onclick=fn; return b; };
       if(ST.CUR_VIEW==='contracts'){
-        var bv=document.createElement('button'); bv.textContent='👁'; bv.title='상세 보기';
-        bv.onclick=function(){ openDetail(r); };
-        act.appendChild(bv);
+        act.appendChild(ab('view','eye','상세 보기 — 계약 기간·연장 이력', function(){ openDetail(r); }));
       }
       if(ST.IS_VIEWER) return;
       if(ST.CUR_VIEW==='oi'){
         // 수주(이후) 단계 + 아직 계약 미연결 → 계약으로 전환
         if(['수주','계산서발행','종료'].indexOf(r.stage)>=0 && !r.contract_id){
-          var bc=document.createElement('button'); bc.textContent='→계약'; bc.title='이 수주 건을 신규 계약으로 전환';
+          var bc=document.createElement('button'); bc.type='button'; bc.textContent='계약 전환'; bc.dataset.act='toContract'; bc.title='이 수주 건을 신규 계약으로 전환'; bc.setAttribute('aria-label','이 수주 건을 신규 계약으로 전환');
           bc.style.color='var(--good,#0ca30c)';
           bc.onclick=function(){ oiToContract(r); };
           act.appendChild(bc);
         }
-        var bq=document.createElement('button'); bq.textContent='📎';
-        bq.title=r.quote_file? '연결된 견적서 바꾸기/해제' : '견적서 연결';
-        bq.onclick=function(){ oiLinkQuote(r); };
-        act.appendChild(bq);
+        act.appendChild(ab('quote','clip', r.quote_file? '연결된 견적서 바꾸기·해제' : '견적서 연결', function(){ oiLinkQuote(r); }));
       }
       if(g.table==='equipment_orders' && eqWant(r).length && ['설치완료','회수예정','회수완료'].indexOf(r.status)>=0){
-        var br=document.createElement('button'); br.textContent='↩'; br.title='회수 처리 — 시리얼을 골라 일부만 회수할 수 있습니다';
-        br.style.color='var(--s2,#d95926)';
-        br.onclick=function(){ eqRetOpen(r); };
-        act.appendChild(br);
+        act.appendChild(ab('return','undo','회수 처리 — 시리얼을 골라 일부·전부 회수 또는 회수 취소', function(){ eqRetOpen(r); }, 'ret'));
       }
       if(g.table==='equipment_assets' && r.order_id!=null){
         /* 현황은 신청 내역에서 만들어지는 저장소 — 신청에 붙은 장비는 여기서 고치지 않고 신청 내역(↩ 회수 처리 · ✎)에서 고칩니다 */
-        var lk=document.createElement('button'); lk.textContent='🔒'; lk.title='신청 #'+r.order_id+' 에서 만들어진 장비 — 수정·회수는 «임대 장비 신청 내역» 에서 (↩ 회수 처리)';
-        lk.style.opacity='.6'; lk.onclick=function(){ toast('신청 내역에서 수정', '이 장비는 신청 #'+r.order_id+' 에 붙어 있습니다. 임대 장비 신청 내역에서 ✎ 또는 ↩ 회수 처리로 고치면 현황이 따라옵니다', 'info'); };
+        var lk=ab('locked','lock','신청 #'+r.order_id+' 에서 만들어진 장비 — 수정·회수는 «임대 장비 신청 내역»에서(회수 처리)', function(){}, 'lk');
+        lk.onclick=function(){ toast('신청 내역에서 수정', '이 장비는 신청 #'+r.order_id+' 에 붙어 있습니다. 임대 장비 신청 내역에서 «수정» 또는 «회수 처리»로 고치면 현황이 따라옵니다', 'info'); };
         act.appendChild(lk);
         return;
       }
-      var be=document.createElement('button'); be.textContent='✎';
-      be.onclick=function(){ edit(); };
-      act.appendChild(be);
+      act.appendChild(ab('edit','edit','이 행 수정', function(){ edit(); }));
       var canDel = g.del===true || (g.del==='super' && ST.IS_SUPER);
       if(canDel){
-        var bd=document.createElement('button'); bd.textContent='🗑'; bd.className='dl';
-        bd.onclick=function(){
+        var bm=ab('more','more','더보기 — 삭제', function(){ rowMenu(bm, [{l:'삭제…', ic:'trash', danger:1, tip:'확인 후 삭제 — 되돌릴 수 없습니다', go:doDel}]); });
+        bm.setAttribute('aria-haspopup','menu'); bm.setAttribute('aria-expanded','false');
+        var doDel=function(){
           if(!ST.SB_TOKEN){ openOvl('ovlAuth'); return; }
           var warn='이 행을 삭제할까요?\n'+g.cols.slice(0,2).map(function(c){return r[c.k];}).join(' · ');
           if(g.table==='contracts') warn='계약을 삭제할까요?\n'+ (r._custName||'') +' · '+lline(r.line||'')+
@@ -1150,13 +1361,14 @@ export function gridRow(r,g,editing){
             ST.DIRTY=true; try{ railSync(ST.CUR_VIEW); }catch(e){} renderGrid();
           }).catch(function(e){ $('#dvMsg').textContent=String(e.message||e); });
         };
-        act.appendChild(bd);
+        act.appendChild(bm);
       }
     }
   }
   function edit(){
     tr.innerHTML=tpl`${rawHtml(visCols(g).map(function(c){
-      return tpl`<td>${rawHtml(c.ro? (c.html? fmtCell(c,r[c.k],r) : esc(fmtCell(c,r[c.k],r))) : editCell(c,r[c.k]))}</td>`;
+      var pc=pinCls(g,c);
+      return tpl`<td${rawHtml(pc? ' class="'+pc+'"':'')}>${rawHtml(c.ro? (c.html? fmtCell(c,r[c.k],r) : esc(fmtCell(c,r[c.k],r))) : editCell(c,r[c.k]))}</td>`;
     }).join(''))}`+ tpl`<td class="act"></td>`;
     wireRowInputs(tr,g);
     var act=tr.lastChild;

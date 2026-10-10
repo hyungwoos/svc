@@ -183,7 +183,7 @@ export function renderCloud(){
       tpl`<h3 id="clChartT">월별 비용 추이</h3><div class="cl-legend" id="clLegend"></div><div id="clChart" class="chartbox h260"></div></div>`+
     tpl`${rawHtml(det('mdr','MDR 서비스 인프라 월별 비용 <span class="mini">EDR(KR) + awstac</span>', '<div id="clMdr"></div>'))}`+
     tpl`${rawHtml(det('acct','계정 개요 · 통합청구 연결 계정 <span class="mini" id="clAcctCap"></span>', '<div id="clAcct" style="display:none"></div><div id="clLinked" style="display:none;margin-top:12px"></div>'))}`+
-    tpl`${rawHtml(det('tbl','서비스 × 월 비용 내역', '<h3 id="clTableT" style="margin:0 0 8px;font-size:13.5px">서비스 × 월 비용 내역</h3><div class="tbl-wrap" tabindex="0" style="max-height:none"><table class="pr" id="clTable"></table></div><p class="cap" id="clNote" style="margin-top:8px"></p>'))}`+
+    tpl`${rawHtml(det('tbl','서비스 × 월 비용 내역', '<h3 id="clTableT" style="margin:0 0 8px;font-size:14px">서비스 × 월 비용 내역</h3><div class="tbl-wrap" tabindex="0" style="max-height:none"><table class="pr" id="clTable"></table></div><p class="cap" id="clNote" style="margin-top:8px"></p>'))}`+
     tpl`${rawHtml(det('inv',tpl`인보이스 등록 내역 <span class="mini">${B.inv.length}건 · PDF 는 읽은 뒤 보관하지 않고 파일명만</span>`, '<div id="clInv"></div>'))}`;
   clSummary(B); clMdr(B); clChips(B); clChart(B); clAcctOverview(B); clLinked(B); clTable(B); clInvList(B, canEdit);
   host.querySelectorAll('details.cl-det').forEach(function(d){
@@ -352,7 +352,7 @@ export function clInvList(B, canEdit){
       h+=tpl`<tr><td>${rawHtml(m)}</td><td><span style="display:inline-block;width:8px;height:8px;background:${rawHtml(a.color||'#999')};margin-right:6px;border-radius:2px"></span>${a.label}${rawHtml(i.vendor? tpl` <span class="cap">· ${i.vendor}</span>`:'')}</td>`+
         tpl`<td class="n">${rawHtml(i.total_usd!=null? clU(i.total_usd):'–')}</td><td class="n">${rawHtml(i.fx_rate!=null? Number(i.fx_rate).toLocaleString('ko-KR'):'–')}</td><td class="n">${rawHtml(i.supply_krw!=null? clW(i.supply_krw):'–')}</td><td class="n">${rawHtml(i.total_krw!=null? clW(i.total_krw):'–')}</td>`+
         tpl`<td class="cap">${rawHtml(i.file_name? '📄 '+esc(i.file_name) : esc(i.source||''))}</td>`+
-        tpl`<td class="cap">${(i.uploaded_by||'').split('@')[0]} · ${rawHtml(String(i.uploaded_at||'').slice(0,10))}</td>`+ tpl`${rawHtml(canEdit? tpl`<td><button class="pill ghost" data-del="${rawHtml(i.id)}" style="height:24px;padding:0 8px;font-size:11px;color:var(--critical)">삭제</button></td>`:'')}</tr>`; }); });
+        tpl`<td class="cap">${(i.uploaded_by||'').split('@')[0]} · ${rawHtml(String(i.uploaded_at||'').slice(0,10))}</td>`+ tpl`${rawHtml(canEdit? tpl`<td><button class="pill ghost" data-del="${rawHtml(i.id)}" style="height:24px;padding:0 8px;font-size:12px;color:var(--critical)">삭제</button></td>`:'')}</tr>`; }); });
     h+='</tbody></table></div>';
   }
   p.innerHTML=h;
@@ -486,7 +486,7 @@ export function clRenderPreview(){
   var accOpts=((ST.RAWX.cloud&&ST.RAWX.cloud.acc)||[]).filter(function(a){ return a.vendor!=='NCP'; });
   var h='', ready=0;
   CL.parsed.forEach(function(it,ix){
-    h+=tpl`<div class="cl-prev" data-ix="${rawHtml(ix)}"><h4>📄 ${it.name} <button class="pill ghost" data-rm="${rawHtml(ix)}" style="height:22px;padding:0 8px;font-size:11px;margin-left:auto">제거</button></h4>`;
+    h+=tpl`<div class="cl-prev" data-ix="${rawHtml(ix)}"><h4>📄 ${it.name} <button class="pill ghost" data-rm="${rawHtml(ix)}" style="height:22px;padding:0 8px;font-size:12px;margin-left:auto">제거</button></h4>`;
     if(it.error){ h+=tpl`<span class="st bad">읽기 실패</span> <span class="cap">${it.error}</span></div>`; return; }
     var p=it.parsed;
     h+=tpl`<div class="cap" style="margin-bottom:6px">사용기간 <b>${p.ym||'?'}</b> · 청구일 ${p.billDate||'?'} · 환율 ${rawHtml(p.fx||'?')} · 전체합계 ${rawHtml(p.totalUsd!=null? clU(p.totalUsd):'?')} · 공급가액 ${rawHtml(p.supplyKrw!=null? clW(p.supplyKrw):'?')} · VAT 포함 ${rawHtml(p.totalKrw!=null? clW(p.totalKrw):'?')}${rawHtml(p.vendor? ' · '+esc(p.vendor):'')}</div>`;

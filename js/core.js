@@ -167,8 +167,8 @@ export function pwaInstall(){ if(!PWA.deferred) return false; var ev=PWA.deferre
 export function pwaHintHtml(){
   if(pwaStandalone()) return '<span style="color:var(--brand);font-weight:650">지금 앱으로 실행 중입니다 ✓</span><div class="mini" style="margin-top:5px;line-height:1.6">홈 화면 아이콘으로 열린 상태입니다. 새 버전은 다음 실행 때 자동으로 반영됩니다.</div>';
   if(PWA.deferred) return '<button type="button" class="pill pri" id="accPwaGo">📱 홈 화면에 설치</button><div class="mini" style="margin-top:5px;line-height:1.6">설치하면 주소창 없이 전체 화면 앱처럼 열립니다. 스토어 등록·다운로드 없음, 새 버전은 자동 반영.</div>';
-  if(pwaIsIOS()) return '<div style="font-size:13.5px;line-height:1.7">Safari 하단 <b>공유</b> 버튼 <span style="display:inline-block;border:1px solid var(--ring);border-radius:5px;padding:0 5px;font-size:11px">⎋</span> → <b>«홈 화면에 추가»</b> → 추가</div><div class="mini" style="margin-top:5px;line-height:1.6">아이폰·아이패드는 Safari 에서만 설치됩니다(Chrome 앱에서는 안 됨). 설치 후 홈 화면의 «SVC 포탈» 아이콘으로 열면 전체 화면 앱처럼 동작합니다.</div>';
-  return '<div style="font-size:13.5px;line-height:1.7">Chrome 주소창 오른쪽의 <b>설치</b> 아이콘, 또는 메뉴(⋮) › <b>«앱 설치»</b> / «홈 화면에 추가»</div><div class="mini" style="margin-top:5px;line-height:1.6">안드로이드·PC Chrome·Edge 에서 됩니다. 설치하면 주소창 없이 전체 화면으로 열리고 새 버전은 자동 반영됩니다.</div>';
+  if(pwaIsIOS()) return '<div style="font-size:14px;line-height:1.7">Safari 하단 <b>공유</b> 버튼 <span style="display:inline-block;border:1px solid var(--ring);border-radius:5px;padding:0 5px;font-size:12px">⎋</span> → <b>«홈 화면에 추가»</b> → 추가</div><div class="mini" style="margin-top:5px;line-height:1.6">아이폰·아이패드는 Safari 에서만 설치됩니다(Chrome 앱에서는 안 됨). 설치 후 홈 화면의 «SVC 포탈» 아이콘으로 열면 전체 화면 앱처럼 동작합니다.</div>';
+  return '<div style="font-size:14px;line-height:1.7">Chrome 주소창 오른쪽의 <b>설치</b> 아이콘, 또는 메뉴(⋮) › <b>«앱 설치»</b> / «홈 화면에 추가»</div><div class="mini" style="margin-top:5px;line-height:1.6">안드로이드·PC Chrome·Edge 에서 됩니다. 설치하면 주소창 없이 전체 화면으로 열리고 새 버전은 자동 반영됩니다.</div>';
 }
 export function pwaHintSync(){ var h=document.getElementById('accPwa'); if(!h) return; h.innerHTML=pwaHintHtml(); var b=document.getElementById('accPwaGo'); if(b) b.onclick=function(){ pwaInstall(); }; }
 
@@ -351,16 +351,43 @@ export function mfaWarnIfNeeded(){
   var d=mfaDaysLeft(st);
   toast('2단계 인증 등록이 필요합니다', (/role/.test(st.source||'')? '관리자 계정 기본 정책' : '관리자 지정')+' — '+st.deadline+' 까지('+(d>0? d+'일 남음':'오늘')+') 내 계정 › 보안에서 켜 주세요. 지나면 등록 전까지 포탈을 쓸 수 없습니다.', 'warn');
 }
+/* ㊿+167 2단계 인증 창 새 디자인 — 6칸 숫자 상자(진짜 입력칸 하나를 투명하게 겹침 · 붙여넣기·자동 완성 그대로) · 30초 코드 주기 링 · 틀리면 흔들림 */
+export function otpCellsHtml(id, label){
+  return tpl`<div class="otp" data-otp="${id}"><input id="${id}" class="otp-in" inputmode="numeric" autocomplete="one-time-code" maxlength="6" aria-label="${label}" spellcheck="false">`+
+    tpl`<div class="otp-cells" aria-hidden="true">${rawHtml('<span></span>'.repeat(6))}</div></div>`;
+}
+export function otpBind(inp){
+  var box=inp && inp.parentElement; if(!box) return;
+  var cells=[].slice.call(box.querySelectorAll('.otp-cells span'));
+  function paint(){ var v=(inp.value||'').replace(/\D/g,'').slice(0,6), foc=document.activeElement===inp;
+    cells.forEach(function(c,i){ c.textContent=v.charAt(i)||''; c.classList.toggle('on', foc && (i===v.length || (v.length===6 && i===5))); c.classList.toggle('fill', i<v.length); }); }
+  inp.addEventListener('input', paint); inp.addEventListener('focus', paint); inp.addEventListener('blur', paint); inp.addEventListener('keyup', paint);
+  box.addEventListener('click', function(){ inp.focus(); });
+  paint(); return paint;
+}
+export function otpShake(inp){ var box=inp && inp.parentElement; if(!box) return; box.classList.remove('bad'); void box.offsetWidth; box.classList.add('bad'); }
+/* 코드가 바뀌기까지 남은 초 (인증 앱 30초 주기) — 링과 글자 */
+export function mfaRingHtml(){
+  return tpl`<div class="mfa-ring" aria-hidden="true"><svg viewBox="0 0 96 96"><circle class="r0" cx="48" cy="48" r="44"/><circle class="r1" cx="48" cy="48" r="44" pathLength="100"/></svg>`+
+    tpl`<svg class="mfa-mark" viewBox="0 0 171.1 133.4"><use href="#gnMark"/></svg></div>`;
+}
+export function mfaRingRun(ov){
+  var r=ov.querySelector('.mfa-ring .r1'), tx=ov.querySelector('.mfa-sec'); if(!r) return;
+  function tick(){ if(!document.body.contains(ov)){ clearInterval(iv); return; }
+    var s=30-((Date.now()/1000)%30); r.setAttribute('stroke-dasharray', (s/30*100).toFixed(2)+' 100'); r.classList.toggle('low', s<6);
+    if(tx) tx.textContent='인증 앱 코드가 바뀌기까지 '+Math.ceil(s)+'초'; }
+  var iv=setInterval(tick, 250); tick();
+}
 /* 필수 지정 + 기한 지남: 등록 창을 띄우고 끝나야 들어감 (취소 = 로그아웃) */
 export function mfaForceEnroll(tok, email, st){
   return new Promise(function(resolve){
     var old=document.getElementById('ovlMfa'); if(old) old.remove();
     var ov=document.createElement('div'); ov.id='ovlMfa'; ov.className='ovl on'; ov.style.cssText='z-index:100000;align-items:center';
-    ov.innerHTML=tpl`<div class="modal" style="width:min(560px,100%);padding:22px" role="dialog" aria-modal="true" aria-labelledby="mfaTitle">`+
-      tpl`<h3 id="mfaTitle" style="margin:0 0 6px;font-size:18px">🔐 2단계 인증 등록이 필요합니다</h3>`+
-      tpl`<p class="cap" style="margin:0 0 14px">관리자가 <b>${email||''}</b> 계정에 2단계 인증을 필수로 지정했습니다${rawHtml(st&&st.deadline? ' (기한 '+esc(st.deadline)+' 지남)':'')}. 인증 앱을 등록해야 포탈을 쓸 수 있습니다 — 1분이면 끝납니다.</p>`+
+    ov.classList.add('mfa-ovl');
+    ov.innerHTML=tpl`<div class="modal mfa-card wide" role="dialog" aria-modal="true" aria-labelledby="mfaTitle"><div class="mfa-top"><span class="mfa-shield">${rawHtml('<svg viewBox="0 0 171.1 133.4" aria-hidden="true"><use href="#gnMark"/></svg>')}</span>`+
+      tpl`<div><h3 id="mfaTitle" class="mfa-h">2단계 인증 등록이 필요합니다</h3><p class="mfa-p">관리자가 <b>${email||''}</b> 계정에 2단계 인증을 필수로 지정했습니다${rawHtml(st&&st.deadline? ' (기한 '+esc(st.deadline)+' 지남)':'')}. 인증 앱을 등록해야 포탈을 쓸 수 있어요 — 1분이면 끝납니다.</p></div></div>`+
       tpl`<div id="mfaForceHost"></div>`+
-      tpl`<div style="margin-top:12px;display:flex;justify-content:flex-end"><button type="button" class="pill ghost" id="mfaForceCancel">나중에 (로그아웃)</button></div></div>`;
+      tpl`<div class="mfa-foot"><span>폰을 바꾸거나 잃어버리면 슈퍼 관리자에게 해제를 요청하세요</span><button type="button" class="pill ghost" id="mfaForceCancel">나중에 (로그아웃)</button></div></div>`;
     document.body.appendChild(ov);
     ov.querySelector('#mfaForceCancel').onclick=function(){ ov.remove(); resolve(false); };
     mfaEnrollFlow([], ov.querySelector('#mfaForceHost'), {tok:tok, email:email, onDone:function(ok){ if(ok){ ov.remove(); resolve(true); } }});
@@ -375,15 +402,18 @@ export function mfaPrompt(factor, tok, email){
   return new Promise(function(resolve){
     var old=document.getElementById('ovlMfa'); if(old) old.remove();
     var ov=document.createElement('div'); ov.id='ovlMfa'; ov.className='ovl on'; ov.style.cssText='z-index:100000;align-items:center';
-    ov.innerHTML=tpl`<div class="modal" style="width:min(400px,100%);padding:22px" role="dialog" aria-modal="true" aria-labelledby="mfaTitle">`+
-      tpl`<h3 id="mfaTitle" style="margin:0 0 6px;font-size:18px">🔐 2단계 인증</h3>`+
-      tpl`<p class="cap" style="margin:0 0 14px">${email||ST.AUTH_USER||''} 계정은 인증 앱이 등록돼 있습니다. 앱(Google Authenticator · Microsoft Authenticator 등)에 표시된 <b>6자리 코드</b>를 입력하세요.</p>`+
-      tpl`<input id="mfaCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" aria-label="인증 코드 6자리" style="width:100%;height:52px;font-size:26px;letter-spacing:.35em;text-align:center;border-radius:10px;border:1px solid var(--ring);background:var(--surface-2)">`+
-      tpl`<div class="mmsg" id="mfaMsg" style="min-height:18px;margin-top:8px"></div>`+
-      tpl`<div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end"><button type="button" class="pill ghost" id="mfaCancel">취소</button><button type="button" class="pill" id="mfaGo">확인</button></div></div>`;
+    ov.classList.add('mfa-ovl');
+    ov.innerHTML=tpl`<div class="modal mfa-card" role="dialog" aria-modal="true" aria-labelledby="mfaTitle">${rawHtml(mfaRingHtml())}`+
+      tpl`<h3 id="mfaTitle" class="mfa-h c">2단계 인증</h3><div class="mfa-who">${email||ST.AUTH_USER||''}</div>`+
+      tpl`<p class="mfa-p c">인증 앱(Google · Microsoft Authenticator 등)에 보이는 <b>6자리 코드</b>를 입력하세요</p>`+
+      tpl`${rawHtml(otpCellsHtml('mfaCode','인증 코드 6자리'))}<div class="mfa-sec"></div>`+
+      tpl`<div class="mmsg mfa-msg" id="mfaMsg" role="status" aria-live="polite"></div>`+
+      tpl`<div class="mfa-btns"><button type="button" class="pill ghost" id="mfaCancel">취소</button><button type="button" class="pill mfa-go" id="mfaGo">확인</button></div>`+
+      tpl`<div class="mfa-note">폰을 바꾸거나 잃어버렸다면 슈퍼 관리자에게 해제를 요청하세요</div></div>`;
     document.body.appendChild(ov);
     var inp=ov.querySelector('#mfaCode'), msgEl=ov.querySelector('#mfaMsg'), go=ov.querySelector('#mfaGo'), ch=null, busy=false, fails=0;
-    function say(t,bad){ msgEl.textContent=t||''; msgEl.style.color=bad? 'var(--critical,#d03b3b)':'var(--muted)'; }
+    var repaint=otpBind(inp); mfaRingRun(ov);
+    function say(t,bad){ msgEl.textContent=t||''; msgEl.style.color=bad? 'var(--critical,#d03b3b)':'var(--muted)'; if(bad) otpShake(inp); }
     function done(ok){ ov.remove(); resolve(ok); }
     async function challenge(){ try{ ch=await authApi('POST','factors/'+factor.id+'/challenge',{},tok); }catch(e){ ch=null; say('인증 요청을 만들지 못했습니다: '+e.message, true); } }
     async function submit(){
@@ -397,7 +427,7 @@ export function mfaPrompt(factor, tok, email){
       }catch(e){
         fails++; ch=null;   // 틀리거나 만료됐으면 다음엔 새 challenge
         say(fails>=5? '여러 번 틀렸습니다 — 인증 앱의 시간 설정을 확인하세요 ('+e.message+')' : '코드가 맞지 않습니다 — 다시 입력하세요', true);
-        inp.value=''; inp.focus();
+        inp.value=''; inp.focus(); if(repaint) repaint();
       }
       busy=false; go.disabled=false;
     }
@@ -446,16 +476,19 @@ export async function mfaEnrollFlow(existing, host, opts){
     var name='SVC 포탈 '+new Date().toISOString().slice(0,10);
     var f=await authApi('POST','factors',{factor_type:'totp', friendly_name:name, issuer:'SVC 포탈'},tok);
     var totp=f.totp||{};
-    host.innerHTML=tpl`<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">`+ tpl`${rawHtml(totp.qr_code? tpl`<img src="${mfaQrSrc(totp.qr_code)}" alt="인증 앱 등록 QR" style="width:168px;height:168px;background:#fff;border:1px solid var(--ring);border-radius:8px;padding:6px;flex:none">`:'')}`+
-      tpl`<div style="flex:1;min-width:220px"><ol class="mini" style="margin:0 0 8px 16px;padding:0;line-height:1.8"><li>인증 앱에서 «계정 추가 → QR 스캔»</li><li>스캔이 안 되면 키를 직접 입력: <code style="user-select:all;word-break:break-all">${totp.secret||''}</code></li><li>앱에 뜬 6자리 코드를 아래에 입력</li></ol>`+
-      tpl`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><input id="mfaEnCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" aria-label="인증 코드" style="width:140px;height:40px;font-size:22px;letter-spacing:.3em;text-align:center"><button type="button" class="pill" id="mfaEnGo">확인하고 켜기</button><button type="button" class="pill ghost" id="mfaEnCancel">취소</button></div>`+
-      tpl`<div class="mmsg" id="mfaEnMsg" style="min-height:18px;margin-top:6px"></div></div></div>`;
-    var inp=host.querySelector('#mfaEnCode'), m=host.querySelector('#mfaEnMsg');
+    host.innerHTML=tpl`<div class="mfa-en">${rawHtml(totp.qr_code? tpl`<div class="mfa-qr"><img src="${mfaQrSrc(totp.qr_code)}" alt="인증 앱 등록 QR"><i></i><i></i><i></i><i></i></div>`:'')}`+
+      tpl`<ol class="mfa-steps"><li><b>인증 앱 열기</b><span>Google · Microsoft Authenticator, 1Password 등 → «계정 추가»</span></li>`+
+      tpl`<li><b>QR 스캔</b><span>안 되면 키를 직접 입력</span><span class="mfa-key"><code>${totp.secret||''}</code><button type="button" class="cbtn" id="mfaEnCopy">복사</button></span></li>`+
+      tpl`<li><b>앱에 뜬 6자리 코드 입력</b>${rawHtml(otpCellsHtml('mfaEnCode','인증 코드'))}`+
+      tpl`<div class="mfa-btns l"><button type="button" class="pill mfa-go" id="mfaEnGo">확인하고 켜기</button><button type="button" class="pill ghost" id="mfaEnCancel">취소</button></div>`+
+      tpl`<div class="mmsg mfa-msg" id="mfaEnMsg" role="status" aria-live="polite"></div></li></ol></div>`;
+    var inp=host.querySelector('#mfaEnCode'), m=host.querySelector('#mfaEnMsg'), repaint=otpBind(inp);
+    var cp=host.querySelector('#mfaEnCopy'); if(cp) cp.onclick=function(){ try{ navigator.clipboard.writeText(String(totp.secret||'')).then(function(){ cp.textContent='복사됨'; }, function(){ cp.textContent='직접 선택'; }); }catch(e){ cp.textContent='직접 선택'; } };
     host.querySelector('#mfaEnCancel').onclick=async function(){ try{ await authApi('DELETE','factors/'+f.id,null,tok); }catch(e){} back(false); };
     if(opts.onDone) host.querySelector('#mfaEnCancel').style.display='none';   // 강제 등록 창은 바깥의 «나중에(로그아웃)» 만
     async function go(){
-      var code=(inp.value||'').replace(/\D/g,''); if(code.length!==6){ m.textContent='6자리 숫자를 입력하세요'; return; }
-      m.textContent='확인 중…';
+      var code=(inp.value||'').replace(/\D/g,''); if(code.length!==6){ m.textContent='6자리 숫자를 입력하세요'; m.style.color='var(--critical,#d03b3b)'; otpShake(inp); return; }
+      m.textContent='확인 중…'; m.style.color='';
       try{
         var ch=await authApi('POST','factors/'+f.id+'/challenge',{},tok);
         var s=await authApi('POST','factors/'+f.id+'/verify',{challenge_id:ch.id, code:code},tok);
@@ -463,7 +496,7 @@ export async function mfaEnrollFlow(existing, host, opts){
         logChange('mfa_on','auth',who,{factor:name, forced:!!opts.onDone});
         toast('2단계 인증 켜짐', '다음 로그인부터 인증 앱 코드가 필요합니다', 'ok');
         back(true);
-      }catch(e){ m.textContent='코드가 맞지 않습니다 — 앱의 코드를 다시 확인하세요 ('+e.message+')'; inp.value=''; inp.focus(); }
+      }catch(e){ m.textContent='코드가 맞지 않습니다 — 앱의 코드를 다시 확인하세요 ('+e.message+')'; m.style.color='var(--critical,#d03b3b)'; inp.value=''; otpShake(inp); if(repaint) repaint(); inp.focus(); }
     }
     host.querySelector('#mfaEnGo').onclick=go; inp.onkeydown=function(e){ if(e.key==='Enter'){ e.preventDefault(); go(); } };
     setTimeout(function(){ inp.focus(); },60);
@@ -514,17 +547,21 @@ export function idleCheck(){
    · cc      : 아이콘 레일 + 커맨드 바 + 인박스 홈 + 장비 보드 + 고객 360 패널 (v5 CSS · html[data-look="cc"])
    · simple  : 평면 디자인, 기존 사이드바 (v4 CSS · html:not([data-look="classic"]))
    · classic : 이전 디자인 그대로                                                                 */
-export var LOOKS={cc:'커맨드 센터 (기본)', simple:'심플', classic:'클래식 (이전 디자인)'};
-export function curLook(){ var v=null; try{ v=localStorage.getItem('svc_look'); }catch(e){} return LOOKS[v]? v : 'cc'; }
+/* ㊿+166 «지니언스»(gn) = 새 기본 — 구조는 커맨드 센터 그대로(data-look="cc") + 정식 로고·브랜드 색·글자 메뉴(data-skin="gn")
+   · isCC() 는 gn 에서도 참(인박스·히어로·고객 360 패널 등 커맨드 센터 기능을 그대로 씀) · gn 만 다른 곳은 isGN() */
+export var LOOKS={gn:'지니언스 (기본)', cc:'커맨드 센터', simple:'심플', classic:'클래식 (이전 디자인)'};
+export function curLook(){ var v=null; try{ v=localStorage.getItem('svc_look'); }catch(e){} return LOOKS[v]? v : 'gn'; }
 export function isCC(){ return document.documentElement.getAttribute('data-look')==='cc'; }
+export function isGN(){ return document.documentElement.getAttribute('data-skin')==='gn'; }
 export function applyLook(){
-  var v=curLook();
-  if(v==='simple') document.documentElement.removeAttribute('data-look');
-  else document.documentElement.setAttribute('data-look', v);
+  var v=curLook(), h=document.documentElement;
+  if(v==='simple') h.removeAttribute('data-look');
+  else h.setAttribute('data-look', v==='gn'? 'cc' : v);
+  if(v==='gn') h.setAttribute('data-skin','gn'); else h.removeAttribute('data-skin');
 }
 export function setLook(v){
-  if(!LOOKS[v]) v='cc';
-  try{ if(v==='cc') localStorage.removeItem('svc_look'); else localStorage.setItem('svc_look',v); }catch(e){}
+  if(!LOOKS[v]) v='gn';
+  try{ if(v==='gn') localStorage.removeItem('svc_look'); else localStorage.setItem('svc_look',v); }catch(e){}
   applyLook();
   /* 레일·인박스 등 구조가 달라지므로 다시 읽는 편이 안전합니다 */
   setTimeout(function(){ location.reload(); }, 350);

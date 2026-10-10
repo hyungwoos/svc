@@ -142,6 +142,7 @@ export var OI_PARTNERS=['다원티에스','글로웰시스템','에티버스','�
  * @property {function(): any[]} rows 그릴 행 @property {GridCol[]} cols 열 @property {function(any): void} [rowClick] 행 누름
  * @property {function(): void} [custom] 표 대신 그리는 화면(데이터 점검 등) @property {string} [chipsField] 위쪽 칩으로 거를 열 @property {any} [chipsOpts] 칩 값 목록
  * @property {?Object<string, any>} [_lens] 관점 필터(계약 메뉴)로 남길 행 id — grid.js 가 그릴 때 붙임
+ * @property {string[]} [pin] 가로로 밀어도 왼쪽에 고정할 열(이름 · 상태)
  */
 /** 표 열 하나
  * @typedef {Object} GridCol
@@ -149,6 +150,7 @@ export var OI_PARTNERS=['다원티에스','글로웰시스템','에티버스','�
  * @property {any} [opts] 고를 값(배열 또는 함수) @property {string} [tbl] 다른 표에 저장 @property {string} [ref] 그 표의 연결 키 @property {string} [src] 그 표의 열
  * @property {function(any, any=): any} [fmt] 셀 표시 @property {boolean|number} [won] 원 단위 @property {boolean|number} [req] 필수 @property {boolean|number} [num] 숫자
  * @property {any} [href] 링크 @property {boolean|number} [html] fmt 결과가 HTML @property {boolean|number} [raw] 원본 그대로
+ * @property {boolean|number} [badge] 상태 배지로 표시 @property {function(any): boolean} [na] 비어 있을 때 해당 없음(빈칸)인지 — 아니면 미입력(—)
  */
 /** @type {?Object<string, GridDef>} */
 export var GRIDS=null;
@@ -156,8 +158,8 @@ export function buildGrids(){
   GRIDS={
     contracts:{
       title:'계약 관리', table:'contracts',
-      cap:'행 클릭 = 고객 360 · ✎ 수정 · 금액은 ✏️ 입력·수정 사용 · 삭제는 슈퍼 관리자만',
-      add:false, del:'super',
+      cap:'행 클릭 = 고객 360 · 연필 = 이 행 수정 · 금액 변경은 위 «입력·수정» · 삭제는 «더보기»(슈퍼 관리자만)',
+      add:false, del:'super', pin:['_custName','status'],
       rowClick:function(r){ openCust360(String(r._custName||'').replace(/^↳ /,'')); },
       rows:function(){
         var cmap={}; (ST.RAWX.customers||[]).forEach(function(x){ cmap[x.id]=x; });
@@ -187,30 +189,30 @@ export function buildGrids(){
         {k:'_sector',l:'업종',t:'list',opts:function(){ return SECTOR_OPTS; },tbl:'customers',ref:'customer_id',src:'sector',
          fmt:function(v,r0){ return (r0&&r0._sector)||'·'; }},
         {k:'line',l:'서비스',t:'select',opts:LINE_OPTS,fmt:function(v,r0){ return llineVer(v, r0&&r0.version); }},   /* Cloud NAC 5.0 / 6.0 을 구분해 표시·필터 */
-        {k:'version',l:'Ver.',t:'select',opts:VER_OPTS,fmt:function(v){ return v||'·'; }},                             /* V6.0 · V5.0 · ZTNA (Cloud NAC 계약) */
+        {k:'version',l:'Ver.',t:'select',opts:VER_OPTS,fmt:function(v){ return v||'·'; },na:function(r){ return !/^(Cloud|S1)$/.test(String(r.line||'')); }},                             /* V6.0 · V5.0 · ZTNA (Cloud NAC 계약) */
         {k:'channel',l:'판매 채널',t:'select',opts:CH_OPTS},
         {k:'lead_src',l:'유입경로',t:'select',opts:LEAD_OPTS,fmt:function(v){ return v||'·'; }},   /* 직접영업/파트너영업/인바운드/프로모션/기타 (SQL 80) */
         {k:'partner',l:'파트너',t:'list',opts:PTN_OPTS},           /* 목록에서 고르거나 직접 입력 */
         {k:'biller',l:'계산서발행처'},
-        {k:'combine',l:'모듈',t:'select',opts:COMBINE_OPTS},
+        {k:'combine',l:'모듈',t:'select',opts:COMBINE_OPTS,na:function(r){ return !/^(Cloud|S1)$/.test(String(r.line||'')); }},
         {k:'contract_type',l:'구분',t:'select',opts:CTYPE_OPTS},
-        {k:'status',l:'상태',t:'select',opts:CSTATUS_OPTS},
-        {k:'live_override',l:'LIVE 예외',t:'select',opts:LIVEOV_OPTS,fmt:function(v){ return v? (v==='포함'? '포함(고정)':'제외(고정)') : '·'; }},   /* 규칙보다 우선 — 비우면 규칙대로 (64단계) */
-        {k:'live_override_note',l:'LIVE 예외 사유'},
-        {k:'auto_renew',l:'자동연장',t:'bool',fmt:function(v){ return v? '✅ 매월':'·'; }},   /* 월 단위 자동연장 — 만기 목록·슬랙 알림에서 제외 (SQL 84 · ㊿+127) */
-        {k:'renew_count',l:'연장',ro:true,fmt:renewLabel},                /* 연장 회차 — «갱신» 탭으로 올라감 */
-        {k:'churn_reason',l:'해지사유',t:'list',opts:CHURN_OPTS},
+        {k:'status',l:'상태',t:'select',opts:CSTATUS_OPTS,badge:1},
+        {k:'live_override',l:'LIVE 예외',t:'select',opts:LIVEOV_OPTS,fmt:function(v){ return v? (v==='포함'? '포함(고정)':'제외(고정)') : '·'; },na:function(){ return true; }},   /* 규칙보다 우선 — 비우면 규칙대로 (64단계) */
+        {k:'live_override_note',l:'LIVE 예외 사유',na:function(r){ return !r.live_override; }},
+        {k:'auto_renew',l:'자동연장',t:'bool',fmt:function(v){ return v? '매월 자동연장':'·'; }},   /* 월 단위 자동연장 — 만기 목록·슬랙 알림에서 제외 (SQL 84 · ㊿+127) */
+        {k:'renew_count',l:'연장',ro:true,fmt:renewLabel,na:function(){ return true; }},                /* 연장 회차 — «갱신» 탭으로 올라감 */
+        {k:'churn_reason',l:'해지사유',t:'list',opts:CHURN_OPTS,na:function(r){ return !/해지|종료|CN전환/.test(String(r.status||'')); }},
         {k:'start_month',l:'시작월',t:'month'},
         {k:'end_month',l:'종료월',t:'month'},
-        {k:'churn_month',l:'해지월',t:'month',fmt:function(v,r0){ return v? String(v).slice(0,7) : (/해지|종료/.test(String(r0&&r0.status||''))&&r0.end_month? String(r0.end_month).slice(0,7)+' (종료월)' : '·'); }},
-        {k:'s1_no',l:'에스원 계약번호',t:'list',opts:function(){ return s1NoOpts(); }},
+        {k:'churn_month',l:'해지월',t:'month',fmt:function(v,r0){ return v? String(v).slice(0,7) : (/해지|종료/.test(String(r0&&r0.status||''))&&r0.end_month? String(r0.end_month).slice(0,7)+' (종료월)' : '·'); },na:function(){ return true; }},
+        {k:'s1_no',l:'에스원 계약번호',t:'list',opts:function(){ return s1NoOpts(); },na:function(r){ return r.channel!=='에스원' && !/^(S1|MDR_S1)$/.test(String(r.line||'')); }},
         {k:'mrr',l:'MRR(천원)',t:'number',won:1},
         {k:'qty',l:'노드수',t:'number',fmt:function(v){ return v? Number(v).toLocaleString('ko-KR') : '·'; }},   /* 매출시트 «노드수» — LIVE 노드 합계의 근거 */
-        {k:'csm',l:'CSM(사이트명)'},                              /* 영문 사이트명 (site name) */
+        {k:'csm',l:'CSM(사이트명)',na:function(r){ return !/^(Cloud|S1)$/.test(String(r.line||'')); }},                              /* 영문 사이트명 (site name) */
         {k:'billing',l:'과금방식',t:'list',opts:BILLING_OPTS},     /* 목록에서 고르거나 직접 입력 */
-        {k:'install_fee',l:'설치비(천원)',t:'number',won:1},        /* 1회성 · 주로 에스원(S1) 계약 */
-        {k:'settle_month',l:'대금정산일',t:'month'},                /* 설치비를 인식하는 달 */
-        {k:'note',l:'비고',t:'list',opts:CNOTE_OPTS}
+        {k:'install_fee',l:'설치비(천원)',t:'number',won:1,na:function(r){ return r.channel!=='에스원'; }},        /* 1회성 · 주로 에스원(S1) 계약 */
+        {k:'settle_month',l:'대금정산일',t:'month',na:function(r){ return !r.install_fee; }},                /* 설치비를 인식하는 달 */
+        {k:'note',l:'비고',t:'list',opts:CNOTE_OPTS,na:function(){ return true; }}
       ]
     },
     live:(function(){
@@ -311,12 +313,12 @@ export function buildGrids(){
     oi:{
       title:'OI 현황 (영업기회)', table:'oi_deals',
       chipsField:'stage', chipsOpts:OI_STAGE,
-      cap:'행 클릭 = 고객 360 · 진행 상태 관리 · 신규 등록은 영업 › OI 등록', add:false, del:true,
+      cap:'행 클릭 = 고객 360 · 진행 상태 관리 · 신규 등록은 영업 › OI 등록 · 삭제는 «더보기»', add:false, del:true, pin:['customer','stage'],
       rowClick:function(r){ openCust360(r.customer); },
       rows:function(){ return ST.RAWX.oi||[]; },
       cols:[
         {k:'created_at',l:'등록일',ro:true,fmt:function(v){return String(v||'').slice(0,10);}},
-        {k:'stage',l:'진행상태',t:'select',opts:OI_STAGE},
+        {k:'stage',l:'진행상태',t:'select',opts:OI_STAGE,badge:1},
         {k:'win_prob',l:'수주가능성',t:'select',num:true,opts:OI_PROB.map(function(x){return String(x[0]);}),
           fmt:function(v){ return (v==null?0:v)+'%'; }},
         {k:'customer',l:'고객사',req:true},
@@ -331,17 +333,17 @@ export function buildGrids(){
           catch(e){ return '·'; } }},
         {k:'expect_month',l:'계약예상',t:'month'},
         {k:'expect_amount',l:'예상단가(천원)',t:'number',won:1},
-        {k:'contract_id',l:'계약전환',ro:true,fmt:function(v){ return v? '✅ #'+v : '·'; }},
+        {k:'contract_id',l:'계약전환',ro:true,fmt:function(v){ return v? '전환됨 #'+v : '·'; },na:function(r){ return !/수주|계산서발행|종료/.test(String(r.stage||'')); }},
         {k:'quote_file',l:'견적서',ro:true,
           href:function(v){ return 'quote.html?view='+encodeURIComponent(v); },
-          fmt:function(v){ if(!v) return '·'; var L=qLabel(String(v).split('/').pop()); return '📄 '+(L.d||L.c); }},
-        {k:'rival_price',l:'경쟁사가(천원)',t:'number',won:1},
-        {k:'next_action',l:'다음 할 일'},
-        {k:'next_date',l:'예정일',t:'date'},
+          fmt:function(v){ if(!v) return '·'; var L=qLabel(String(v).split('/').pop()); return '견적서 '+(L.d||L.c); },na:function(){ return true; }},
+        {k:'rival_price',l:'경쟁사가(천원)',t:'number',won:1,na:function(){ return true; }},
+        {k:'next_action',l:'다음 할 일',na:function(r){ return /수주|계산서발행|종료|중지|실패/.test(String(r.stage||'')); }},
+        {k:'next_date',l:'예정일',t:'date',na:function(r){ return /수주|계산서발행|종료|중지|실패/.test(String(r.stage||'')); }},
         {k:'cust_name',l:'고객 담당자'},
         {k:'cust_phone',l:'연락처'},
-        {k:'lost_reason',l:'실패사유'},
-        {k:'note',l:'비고'}
+        {k:'lost_reason',l:'실패사유',na:function(r){ return !/실패|중지/.test(String(r.stage||'')); }},
+        {k:'note',l:'비고',na:function(){ return true; }}
       ]
     },
     mdrops:{
@@ -385,8 +387,8 @@ export function buildGrids(){
     },
     orders:{
       title:'임대 장비 신청 내역', table:'equipment_orders',
-      chipsField:'channel', chipsOpts:ORD_CH_OPTS,
-      cap:'저장할 때마다 장비 현황에 자동 반영됩니다 — 접수·출하요청·배송중은 재고, 설치완료·회수예정은 임대중, 회수완료는 회수완료 (취소는 현황에서 내림) · 시리얼 칩을 눌러 회수 표시 → «회수 처리 저장» (일부·전부 모두, ↩ 버튼은 체크 목록 방식) · 시리얼을 비워두면 «미등록-신청번호» 로 수량만큼 임시 등록 · 신규 신청은 장비 › 임대 장비 신청', add:true, del:true,
+      chipsField:'channel', chipsOpts:ORD_CH_OPTS, pin:['customer','status'],
+      cap:'저장할 때마다 장비 현황에 자동 반영됩니다 — 접수·출하요청·배송중은 재고, 설치완료·회수예정은 임대중, 회수완료는 회수완료 (취소는 현황에서 내림) · 시리얼 칩 = 시리얼 상세 · 회수는 행의 «회수 처리»(일부·전부·취소 미리 보기 → 저장 → 되돌리기) · 시리얼을 비워두면 «미등록 시리얼»로 수량만큼 임시 등록 · 신규 신청은 장비 › 임대 장비 신청 · 삭제는 «더보기»', add:true, del:true,
       rows:function(){ return ST.RAWX.orders||[]; },
       cols:[
         {k:'created_at',l:'신청일',ro:true,fmt:function(v){return String(v||'').slice(0,10);}},
@@ -400,11 +402,11 @@ export function buildGrids(){
         {k:'nodes',l:'노드',t:'number'},
         {k:'model',l:'모델',t:'select',opts:MODEL_OPTS},   /* 장비 현황의 모델 목록과 동일 — code_lists model (SQL 93) */
         {k:'qty',l:'수량',t:'number'},
-        {k:'standalone_pod',l:'단독Pod',t:'bool',fmt:function(v){return v?'✅ 단독':'·';}},
+        {k:'standalone_pod',l:'단독Pod',t:'bool',fmt:function(v){return v?'단독':'·';}},
         {k:'recv_name',l:'수령인'},
         {k:'ship_date',l:'수령희망',t:'date'},
-        {k:'status',l:'상태',t:'select',opts:ORD_STATUS_OPTS},
-        {k:'returned_date',l:'회수일',t:'date',fmt:function(v,r){
+        {k:'status',l:'상태',t:'select',opts:ORD_STATUS_OPTS,badge:1},
+        {k:'returned_date',l:'회수일',t:'date',na:function(r){ return !/회수/.test(String(r.status||'')); },fmt:function(v,r){
           if(v) return String(v).slice(0,10);
           return (r&&r.status==='회수완료')? '· ⚠ 미입력' : '·';     /* 회수완료인데 날짜가 없으면 표시 */
         }},
@@ -413,15 +415,15 @@ export function buildGrids(){
           if(!all.length) return v? String(v) : '·';
           if(r.status==='회수완료') return all.length+'/'+all.length+' 회수';
           return ret.length? (ret.length+'/'+all.length+' 일부 회수') : '·';
-        }},
+        },na:function(r){ return !/회수/.test(String(r.status||'')) && !eqRetSet(r).length; }},
         {k:'serials',l:'시리얼',html:true,raw:true,fmt:function(v,r){ return eqSerialsHtml(r||{}); }},
-        {k:'request_note',l:'요청사항'}
+        {k:'request_note',l:'요청사항',na:function(){ return true; }}
       ]
     },
     assets:{
       title:'임대 장비 현황 (시리얼 단위)', table:'equipment_assets',
-      chipsField:'channel', chipsOpts:ORD_CH_OPTS,
-      cap:'신청 내역에서 자동으로 만들어지는 시리얼 단위 저장소입니다 — 신청에 붙은 장비(🔒)는 «임대 장비 신청 내역» 에서 ✎ 수정·↩ 회수 처리하면 따라옵니다 · 여기서는 신청과 무관한 재고·데모·판매 장비만 직접 등록·수정', add:true, del:true,
+      chipsField:'channel', chipsOpts:ORD_CH_OPTS, pin:['serial','status'],
+      cap:'신청 내역에서 자동으로 만들어지는 시리얼 단위 저장소입니다 — 신청에 붙은 장비(자물쇠)는 «임대 장비 신청 내역»에서 수정·회수 처리하면 따라옵니다 · 여기서는 신청과 무관한 재고·데모·판매 장비만 직접 등록·수정', add:true, del:true,
       rows:function(){
         var om={}; (ST.RAWX.orders||[]).forEach(function(o){ om[String(o.id)]=o; });
         var out=(ST.RAWX.assets||[]).slice();
@@ -434,14 +436,14 @@ export function buildGrids(){
         {k:'serial',l:'시리얼',req:true},
         {k:'model',l:'모델',t:'select',opts:MODEL_OPTS},
         {k:'usage',l:'구분',t:'select',opts:['임대','데모','대여','판매','하자보수']},
-        {k:'status',l:'상태',t:'select',opts:['재고','임대중','회수완료','판매완료','수리중','분실','폐기']},
+        {k:'status',l:'상태',t:'select',opts:['재고','임대중','회수완료','판매완료','수리중','분실','폐기'],badge:1},
         {k:'_ostat',l:'신청상태',ro:true,fmt:function(v,r){ return (r&&r.order_id==null)? '· 신청 없음' : (v||'· 신청 삭제됨'); }},
         {k:'customer',l:'고객사'},
         {k:'channel',l:'채널',t:'select',opts:ORD_CH_OPTS},
         {k:'partner',l:'파트너'},
         {k:'in_date',l:'입고일',t:'date'},
         {k:'deployed_date',l:'출고일',t:'date'},
-        {k:'returned_date',l:'회수일',t:'date',fmt:function(v,r){
+        {k:'returned_date',l:'회수일',t:'date',na:function(r){ return r.status!=='회수완료'; },fmt:function(v,r){
           if(!v) return '·';
           /* 임대중인데 회수일이 남아 있으면 이전 임대의 값이 남은 것 — 사람 확인 필요 */
           return String(v).slice(0,10)+((r&&r.status==='임대중')? ' ⚠':'');

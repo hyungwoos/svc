@@ -2,14 +2,15 @@
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { APP_VER, ST } from './state.js';
 import { Viz } from './viz.js';
-import { $, $$, kwToWon, wonToKw, baseLabel, baseRange, buildBaseSelect, cssv, el, esc, isCC, lline, mk, mkLabel, monOf, pct, rawHtml, seriesColor, STATE, tpl, won,
+import { $, $$, kwToWon, wonToKw, baseLabel, baseRange, buildBaseSelect, cssv, el, esc, isCC, isGN, lline, mk, mkLabel, monOf, pct, rawHtml, seriesColor, STATE, tpl, won,
   wonFull, wrapNavIcons, yOf } from './core.js';
-import { boot, CACHE_KEY, ccAfterKpis, ccAnaCount, ccAnalysisOpen, ccHomeLayout, loadFromDb, onData, renderInbox, SB_RAW, sbWrite, toast } from './shell.js';
-import { abortAsk, ask, closeAnswer, isAsking, loadAiConfig, runQuery, shortQ } from './ai.js';
+import { boot, CACHE_KEY, ccAfterKpis, ccAnaCount, ccAnalysisOpen, ccHomeLayout, loadFromDb, onData, renderInbox, SB_RAW, sbWrite, themeBtnSync, toast, uiIconize } from './shell.js';
+import { abortAsk, ask, isAsking, loadAiConfig, runQuery, shortQ } from './ai.js';
 import { GRIDS } from './grids.js';
-import { CH_DEFS, chOf, liveData, liveDeltaHtml, openRenewList, renderChannelView } from './analysis.js';
+import { CH_DEFS, chOf, ctSuccessor, liveData, liveDeltaHtml, openRenewList, renderChannelView } from './analysis.js';
 import { renderTodo } from './tools.js';
 import { renderCloud } from './cloud.js';
+import { aipStale, askFrom, homeB, homeSetup } from './home.js';
 import { closeMxPop, mxKey, MXM, mxPlace, openMxMemo, renderInbStat } from './inbound.js';
 import { KX_H6, kxBase, renderChurn, renderChurnRate, renderCustFlow } from './sales.js';
 import { a11yTileRole, DV, renderGrid, switchView, xlsxAoa } from './grid.js';
@@ -161,11 +162,11 @@ export function buildControls(){
     };
   });
 
-  try{ wrapNavIcons(); ccHomeLayout(); }catch(e){}
+  try{ wrapNavIcons(); ccHomeLayout(); uiIconize(); }catch(e){}
   $('#btnTheme').onclick=function(){
     var l = document.documentElement.getAttribute('data-theme')==='light';
     document.documentElement.setAttribute('data-theme', l?'dark':'light');
-    this.textContent = l? '◐ 라이트' : '◐ 다크';
+    themeBtnSync();
     try{ localStorage.setItem('svc_theme', l?'dark':'light'); }catch(e){}
     renderAll();
   };
@@ -174,11 +175,11 @@ export function buildControls(){
     var th=localStorage.getItem('svc_theme');
     if(th==='dark'){
       document.documentElement.setAttribute('data-theme','dark');
-      $('#btnTheme').textContent='◐ 라이트';
+      themeBtnSync();
     }
   }catch(e){}
   $('#btnReload').onclick=function(){
-    closeAnswer();                       // 새로 읽은 데이터와 어긋나지 않게 이전 답변은 닫습니다
+    try{ aipStale(); }catch(e){}         // ㊿+172 대화는 지우지 않고 «이전 데이터 기준» 표시(예전: 이전 답변을 닫음)
     $('#app').classList.add('hidden'); $('#loading').classList.remove('hidden');
     $('#loading').innerHTML='<div class="spin"></div><div>다시 읽고 있습니다…</div>';
     boot(true);   // 캐시 무시하고 DB에서 새로 읽기
@@ -207,7 +208,7 @@ export function buildControls(){
         same = !!a && !!b && JSON.stringify(a)===JSON.stringify(b);
       }catch(e){}
       if(same){ REFRESHING=false; return; }
-      closeAnswer('데이터가 갱신되어 이전 답변은 닫았습니다 — 다시 물어봐 주세요');
+      try{ aipStale(); }catch(e){}   /* ㊿+172 데이터가 바뀌어도 대화는 그대로 — 패널에 «이전 데이터 기준» 한 줄 */
       if(ST.IS_EQUIP){ if(GRIDS[keep]) renderGrid(); }
       else{
         onData(nd);
@@ -234,11 +235,11 @@ export function buildControls(){
     if(document.visibilityState==='visible' && Date.now()-ST.LAST_LOAD>15*60*1000) silentRefresh('timer');
   }, 60*1000);
 
-  $('#btnAsk').onclick=function(){ if(isAsking()){ abortAsk(); return; } ask($('#q').value); };
-  var ax=document.getElementById('ansClose'); if(ax) ax.onclick=function(){ closeAnswer('', true); };   /* ㊿+159 AI 답변 ✕ 닫기 */
-  $('#q').addEventListener('keydown',function(e){   // Enter 로 질문 (자동완성 끄면서 빠졌던 기능 복원)
+  $('#btnAsk').onclick=function(){ if(isAsking()){ abortAsk(); return; } var v=/** @type {any} */($('#q')).value; if(isGN()) askFrom('home', v); else ask(v); };   /* ㊿+172 «AI 에 질문» — 답은 AI 패널 */
+  var qi0=/** @type {any} */($('#q'));
+  if(!isGN() && !qi0._enter){ qi0._enter=1; qi0.addEventListener('keydown',function(e){   // Enter 로 질문 (자동완성 끄면서 빠졌던 기능 복원) · ㊿+171 한 번만 연결(다시 읽을 때마다 겹쳐 붙어 답이 닫히던 것) · 지니언스는 검색·질문 목록(home.js)
     if(e.key==='Enter' && !e.isComposing){ e.preventDefault(); ask(this.value); }
-  });
+  }); }
   // setupSuggest();   // 질문창 자동완성 드롭다운 — 사용자 요청으로 끔 (아래 칩 예시는 유지)
 
   var samples=['이번 달 매출','이번 분기 실적','올해 매출 어때?','분기별 비교','연도별 매출',
@@ -248,6 +249,7 @@ export function buildControls(){
   samples.forEach(function(s){ var c=el('button','chip',s); c.onclick=function(){ $('#q').value=s; ask(s); }; cb.appendChild(c); });
   if(isCC()){ var mb=el('button','chip chip-more', cb.classList.contains('all')? '접기 ▴':'예시 더 보기 ▾'); mb.type='button';
     mb.onclick=function(){ var all=cb.classList.toggle('all'); mb.textContent= all? '접기 ▴':'예시 더 보기 ▾'; }; cb.appendChild(mb); }
+  try{ homeSetup(); }catch(e){ console.warn('home', e); }   /* ㊿+171 지니언스 홈: 질문 제목 · 추천 질문 4개 · 검색·질문 목록 */
 
   if(!CTRL_RZ){ CTRL_RZ=true; onResize(function(){ if(ST.DATA) renderAll(); }); }
   loadAiConfig();
@@ -299,11 +301,7 @@ export function renderHero(list){
   var b=STATE.base;
   // 할 일 알림 배너 (클릭 → 해당 화면)
   var pend=(ST.RAWX.orders||[]).filter(function(o){ return ['접수','출하요청','배송중','회수예정'].indexOf(o.status)>=0; }).length;
-  var expCnt=0, expAmt=0;
-  list.forEach(function(k){
-    var e=ST.DATA.rows[k].endIdx;
-    if(e!=null && e>=b && e<=b+expN()-1 && !/해지|종료|CN전환/.test(String(ST.DATA.rows[k].status||''))){ expCnt++; expAmt+=ST.MAT[k][Math.min(e,ST.M-1)]||ST.DATA.rows[k].mrr||0; }
-  });
+  var XS0=expScan(list, b), expCnt=XS0.rows.length, expAmt=XS0.amt;   /* ㊿+168 공통 집계 */
   var curYm=monOf(b)+'월';
   var bizDone=(ST.RAWX.biz||[]).some(function(r){ return r.ym===curYm; });
   var items=[];
@@ -354,7 +352,7 @@ export function renderQWidgets(){
     var sec=document.createElement('section');
     sec.className='card c6'; sec.dataset.w=w.id;
     sec.innerHTML=tpl`<div class="qw-head"><div class="t">`+
-      tpl`<h2 style="font-size:13.5px">📌 ${shortQ((res&&res.title)||w.q)}</h2>`+
+      tpl`<h2 style="font-size:14px">📌 ${shortQ((res&&res.title)||w.q)}</h2>`+
       tpl`<p class="cap" style="margin:2px 0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${w.q}">${shortQ(w.q)}</p></div>`+
       tpl`<button class="qw-btn" data-a="rf" title="새로고침">↻</button>`+
       tpl`<button class="qw-btn" data-a="rm" title="위젯 제거">✕</button></div>`+ tpl`${rawHtml((res&&res.hero)? tpl`<div class="qw-hero">${res.hero}<small> ${res.unit||''}</small></div>`:'')}`+ tpl`${rawHtml((res&&res.sub)? tpl`<p class="cap" style="margin:-4px 0 8px">${res.sub}</p>`:'')}`+
@@ -521,14 +519,14 @@ export function toggleWidgetPanel(){
   p=document.createElement('div'); p.id='widgetPanel';
   p.style.cssText='position:fixed;top:56px;right:18px;z-index:1300;width:238px;background:var(--surface);'+
     'border:1px solid var(--ring);border-radius:14px;box-shadow:0 14px 40px rgba(0,0,0,.16);padding:14px 16px';
-  var h='<div style="font-size:12.5px;font-weight:700;margin-bottom:10px">⊞ 대시보드 위젯</div>';
+  var h='<div style="font-size:13px;font-weight:700;margin-bottom:10px">⊞ 대시보드 위젯</div>';
   WIDGET_DEFS.forEach(function(d){
-    h+=tpl`<label style="display:flex;gap:8px;align-items:center;padding:4px 0;font-size:12.5px;cursor:pointer">`+
+    h+=tpl`<label style="display:flex;gap:8px;align-items:center;padding:4px 0;font-size:13px;cursor:pointer">`+
        tpl`<input type="checkbox" data-wk="${rawHtml(d[0])}" ${widgetOn(d[0],off)?'checked':''} style="width:15px;height:15px"> ${d[1]}</label>`;
   });
   var qws=qwList();
   if(qws.length){
-    h+='<div style="font-size:11px;color:var(--muted);letter-spacing:.08em;margin:10px 0 4px">고정한 질문</div>';
+    h+='<div style="font-size:12px;color:var(--muted);letter-spacing:.08em;margin:10px 0 4px">고정한 질문</div>';
     qws.forEach(function(w){
       h+=tpl`<div style="display:flex;gap:6px;align-items:center;padding:3px 0;font-size:12px">`+
          tpl`<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📌 ${w.q}</span>`+
@@ -740,7 +738,7 @@ export function openIfeeDetail(td, Y, M, det, adj){
       tpl`<td><input class="ifin" data-f="x${rawHtml(i)}_note" type="text" value="${note}" placeholder="비고(선택)"`+
         tpl` style="width:100%;min-width:110px;font-size:12px;padding:3px 5px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)"></td>`+
       tpl`<td class="n">${rawHtml(amtIn(amt,'x'+i+'_amt'))}</td>`+
-      tpl`<td><button class="ifdel" data-x="${rawHtml(i)}" title="이 줄 지우기" style="border:none;background:none;cursor:pointer;color:var(--critical,#d03b3b);font-size:13.5px">✕</button></td></tr>`;
+      tpl`<td><button class="ifdel" data-x="${rawHtml(i)}" title="이 줄 지우기" style="border:none;background:none;cursor:pointer;color:var(--critical,#d03b3b);font-size:14px">✕</button></td></tr>`;
   }
   ex.forEach(function(e,i){ h+=exRow(e,i); });
   if(ed) h+='<tr id="ifAddRow"><td colspan="5" style="padding:4px 6px"><button class="pill ghost" id="ifAdd" style="font-size:12px;padding:4px 10px">＋ 설치·철거비 추가</button></td></tr>';
@@ -798,7 +796,7 @@ export function ifeeWire(box, Y, M, rows, ex, td){
         tpl`${rawHtml(IFEE_KINDS.map(function(k){ return tpl`<option>${rawHtml(k)}</option>`; }).join(''))}</select></td>`+
       tpl`<td><input class="ifin" data-f="x${rawHtml(nextX)}_note" type="text" placeholder="비고(선택)" style="width:100%;min-width:110px;font-size:12px;padding:3px 5px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)"></td>`+
       tpl`<td class="n"><input class="ifin" data-f="x${rawHtml(nextX)}_amt" type="number" step="any" placeholder="천원" style="width:104px;text-align:right;font-size:12px;padding:3px 5px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)"></td>`+
-      tpl`<td><button class="ifdel" data-x="${rawHtml(nextX)}" title="이 줄 지우기" style="border:none;background:none;cursor:pointer;color:var(--critical,#d03b3b);font-size:13.5px">✕</button></td>`;
+      tpl`<td><button class="ifdel" data-x="${rawHtml(nextX)}" title="이 줄 지우기" style="border:none;background:none;cursor:pointer;color:var(--critical,#d03b3b);font-size:14px">✕</button></td>`;
     var anchor=box.querySelector('#ifAddRow');
     anchor.parentNode.insertBefore(tr, anchor);
     wireRow(tr); nextX++;
@@ -994,7 +992,7 @@ export function renderVs(){
     (vs.monthCount>1? ' · 최근 달만 표시 (전체는 정산·목표 › 비즈포탈 차액)':'');
   var sm=$('#vsSummary'); sm.innerHTML='';
   vs.items.forEach(function(x){
-    var row=el('div'); row.style.cssText='display:flex;justify-content:space-between;gap:12px;padding:3px 2px;font-size:13.5px';
+    var row=el('div'); row.style.cssText='display:flex;justify-content:space-between;gap:12px;padding:3px 2px;font-size:14px';
     var k=el('span','',x.k); k.style.color='var(--mut)';
     var v=el('b','',won(x.v)+'천원');
     if(/차액/.test(x.k)) v.style.color = x.v>=0? 'var(--up,#199e70)':'var(--dn,#d95926)';
@@ -1029,9 +1027,19 @@ export function renderGoal(list){
   var needMrr = tg.amount / 12;                              // 달성에 필요한 12월 MRR
 
   box.style.display='';
+  /* ㊿+166 지니언스: 로고 모양 타원 트랙(현재 ARR · 연한 줄 = 12월 계약분) + 같은 숫자 4줄 */
+  if(isGN()){
+    var trk=function(cls, p){ return tpl`<rect class="${rawHtml(cls)}" x="6" y="6" width="120" height="66" rx="33" pathLength="100" stroke-dasharray="${rawHtml(Math.max(0,Math.min(100,p)).toFixed(1))} 100"/>`; };
+    box.innerHTML=tpl`<div class="gn-goal"><svg class="gn-trk" viewBox="0 0 132 78" role="img" aria-label="${rawHtml(yr)}년 목표 ARR 대비 현재 ${rawHtml(p1.toFixed(1))}%">`+
+      tpl`<rect class="t0" x="6" y="6" width="120" height="66" rx="33"/>${rawHtml(decArr>curArr? trk('t2', p2) : '')}${rawHtml(trk(p1>=100?'t1 done':'t1', p1))}`+
+      tpl`<text x="66" y="47" text-anchor="middle">${rawHtml(p1>=99.95? '100' : p1.toFixed(1))}%</text></svg>`+
+      tpl`<div class="gn-gtx"><b>🎯 ${rawHtml(yr)}년 목표 ARR ${won(tg.amount)}천원</b><span>현재 ARR <b>${won(curArr)}천원</b> (${rawHtml(p1.toFixed(1))}%)</span>`+
+      tpl`${rawHtml(decArr? tpl`<span>12월 계약분 기준 ${won(decArr)}천원 (${rawHtml(p2.toFixed(1))}%)</span>` : '')}<span>필요 12월 MRR <b>${won(needMrr)}천원</b></span></div></div>`;
+    return;
+  }
   box.innerHTML=
     tpl`<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:9px">`+
-      tpl`<div style="font-size:12.5px;font-weight:650">🎯 ${rawHtml(yr)}년 목표 ARR ${won(tg.amount)}천원`+
+      tpl`<div style="font-size:13px;font-weight:650">🎯 ${rawHtml(yr)}년 목표 ARR ${won(tg.amount)}천원`+
         tpl`<span style="font-weight:500;color:var(--muted)"> · 필요 12월 MRR ${won(needMrr)}천원</span></div>`+
       tpl`<div style="font-size:12px;color:var(--ink-2)">현재 ARR <b style="color:var(--ink)">${won(curArr)}천원 (${p1.toFixed(1)}%)</b>`+ tpl`${rawHtml(decArr? ' · 12월 계약분 기준 '+won(decArr)+'천원 ('+p2.toFixed(1)+'%)':'')}</div></div>`+
     tpl`<div style="position:relative;height:14px;border-radius:7px;background:var(--surface-2);overflow:hidden">`+
@@ -1061,9 +1069,8 @@ export function renderKpis(list){
     var st=String(r.status||'');
     if(st!=='통합과금' && r.startIdx!=null && r.startIdx>=0 && r.startIdx>=f0 && r.startIdx<=b) newRows.push(k);
     if(st==='해지' && !(r.line==='S1' && String(r.saleType||'')==='CND')){ var x=r.endIdx!=null? r.endIdx : r._l; if(x!=null && x>=f0 && x<=b){ churnRows.push(k); churnAmt+=(ST.MAT[k][x]||ST.MAT[k][Math.max(x-1,0)]||r.mrr||0); } }
-    var e=r.endIdx, EN=expN();
-    if(e!=null && e>=b && e<=b+EN-1 && !/해지|종료|CN전환/.test(st)){ expRows.push(k); expAmt+=ST.MAT[k][Math.min(e,ST.M-1)]||r.mrr||0; }
   });
+  var XS=expScan(list, b); expRows=XS.rows; expAmt=XS.amt;   /* ㊿+168 만료 = 공통 집계(홈 할 일 · 만료 예정 위젯 · 목록과 같은 행) */
   var newCnt=newRows.length, churnCnt=churnRows.length, expCnt=expRows.length;
   var uq2=function(ks){ var u={}; ks.forEach(function(k){ u[ST.DATA.rows[k].cust]=1; }); return Object.keys(u).length; };
   var newCu=uq2(newRows), churnCu=uq2(churnRows);
@@ -1100,7 +1107,7 @@ export function renderKpis(list){
         var isDb=(lv.src==='db'), other='';
         if(isDb && ST.DATA.live && ST.DATA.live.ok){ var su={}; selOf(ST.DATA.live.rows).forEach(function(x){ su[x.cust]=1; }); var sn=Object.keys(su).length; other=' · 시트 명단 '+sn+(sn!==nCust? ' ('+(nCust-sn>0?'+':'')+(nCust-sn)+')':' ✓'); }
         return { k:'LIVE 고객사'+(isDb? ' ('+mk(b)+')':''), v:nCust.toLocaleString('ko-KR'), u:'곳',
-                 d:'제품별 합 '+prodSum.toLocaleString('ko-KR')+(!isDb && prodSum>nCust? ' (복수 제품 '+(prodSum-nCust)+'곳)':'')+
+                 d:'제품별 합 '+prodSum.toLocaleString('ko-KR')+(prodSum>nCust? ' — 두 제품 이상 쓰는 '+(prodSum-nCust)+'곳을 제품마다 셈' : ' — 회사 수와 같음(겹침 없음)')+   /* ㊿+169 고객 수(곳) ≠ 제품별 합 이유를 글로 */
                    (nRow>prodSum? ' · 사이트 '+nRow+'건':'')+other, open:'live',
                  extra:(isDb && !STATE.ind && Object.keys(STATE.lines).every(function(k){ return STATE.lines[k]; }))? liveDeltaHtml(b) : '',   /* 전월 대비 분해 (신규·복귀 / 만기 미처리·해지·종료) + «확인중» — 표시용 (㊿+127) */
                  tip:(isDb? '계약 기준 자동 판정 — 원계약이 '+mk(b)+'에 유효한 회사(시작월 ≤ 기준월, 종료 전 · 해지는 해지월부터 제외 · 통합과금/추가/H/W 제외 · CN전환 포함) · 곳 = 회사 단위 · 제품별 합 = 매출시트 LIVE 산정 방식(제품마다 1곳'+(prodSum>nCust? ' · 두 제품 이상 쓰는 '+(prodSum-nCust)+'곳이 겹침':'')+') · «시트 명단» 은 예전 LIVE 고객사 탭 사본 — 차이는 LIVE 화면 «시트와 다른 곳»에서 항목별로'
@@ -1112,7 +1119,7 @@ export function renderKpis(list){
       d:'고객사 '+newCu+' / '+churnCu+'곳 · 이탈 MRR '+won(churnAmt)+'천원',
       cls: churnCnt>newCnt? 'down':'up', open:'nc', tip:'신규 = 원계약 시작월이 '+(STATE.unit==='month'? mk(b) : mk(f0)+'~'+mk(b))+' · 해지 = 상태 «해지» 해지월이 그 기간 (부속 계약·CND 제외 · 해지 분석·해지율 화면과 같은 기준) — 누르면 명단' },
     (function(){ var EN=expN(), eEnd=Math.min(b+EN-1,ST.M-1);
-      var seg=tpl`<div class="expseg" style="display:flex;gap:3px;align-items:center;margin-top:8px;flex-wrap:wrap" title="만료 기간을 바꿉니다 (이 브라우저에 기억 · 아래 «만료 예정» 위젯도 같이 바뀜)"><span class="mini" style="color:var(--muted);margin-right:2px">기간</span>${rawHtml([1,2,3,6,12].map(function(n){ return tpl`<button type="button" data-expn="${rawHtml(n)}" aria-pressed="${n===EN}" style="font:inherit;font-size:11px;line-height:1;padding:4px 7px;border-radius:6px;border:1px solid var(--ring);cursor:pointer;background:${n===EN?'var(--s1-solid,#226bc4)':'var(--surface-2)'};color:${n===EN?'#fff':'var(--ink-2)'}">${rawHtml(n)}개월</button>`; }).join(''))}</div>`;
+      var seg=tpl`<div class="expseg" style="display:flex;gap:3px;align-items:center;margin-top:8px;flex-wrap:wrap" title="만료 기간을 바꿉니다 (이 브라우저에 기억 · 아래 «만료 예정» 위젯도 같이 바뀜)"><span class="mini" style="color:var(--muted);margin-right:2px">기간</span>${rawHtml([1,2,3,6,12].map(function(n){ return tpl`<button type="button" data-expn="${rawHtml(n)}" aria-pressed="${n===EN}" style="font:inherit;font-size:12px;line-height:1;padding:4px 7px;border-radius:6px;border:1px solid var(--ring);cursor:pointer;background:${n===EN?'var(--s1-solid,#226bc4)':'var(--surface-2)'};color:${n===EN?'#fff':'var(--ink-2)'}">${rawHtml(n)}개월</button>`; }).join(''))}</div>`;
       return { k:EN+'개월 내 만료', v:won(expAmt), u:'천원', d: expCnt+'건 · 재약정 타깃 · '+mk(b)+'~'+mk(eEnd), cls: expCnt? 'down':'', open:'exp', extra:seg,
                tip:'종료월이 '+mk(b)+'~'+mk(eEnd)+'인 원계약(해지·종료 상태 제외) — 숫자를 누르면 명단 · 아래 버튼으로 기간 변경' }; })()
   ];
@@ -1144,6 +1151,43 @@ export function renderKpis(list){
 /* ── 대시보드 타일 상세 ── 타일을 누르면 그 숫자를 만든 행을 그대로 보여줍니다 */
 export var KPI_D=null;
 /* 만료 예정 타일의 기간(개월) — 타일 안의 1·2·3·6 버튼으로 바꾸며 이 브라우저에 기억 */
+/* ㊿+168 «N개월 내 만료» 공통 집계 — KPI 타일 · 만료 예정 위젯 · 홈 할 일 · (예전) 알림 배너가 모두 이것 하나를 씀
+   · 대상: 원계약만(부속 계약 · 고객 수 제외 행 · H/W 제외 — 부속은 원계약과 함께 만료) · 상태 해지·중지·서비스 종료·CN전환 제외
+   · 종료월이 기준월 ~ 기준월+N-1 · 금액 = 종료월에 인식된 월 금액(없으면 계약 MRR) · 대시보드 필터(서비스·산업군 등)가 걸린 목록(idxs)
+   · 자동연장·후속 계약(재약정 등록) 여부는 빼지 않고 목록의 «비고»에 표시 — 계산식은 그대로, 근거만 보여 줌
+   · 다른 지표: «이달 만기 처리»(renewScan)는 LIVE 판정용 — 자동연장·LIVE 제외 지정 계약은 빼고 대시보드 필터와 무관(만기 처리 창 안내문) */
+export function expAmtOf(k){ var r=ST.DATA.rows[k]; return ST.MAT[k][Math.min(r.endIdx,ST.M-1)]||r.mrr||0; }
+export function expEligible(r){
+  if(!r || r.parent || r.noCount || String(r.saleType||'')==='H/W') return false;
+  return !/해지|중지|종료|CN전환/.test(statusOf(r)+' '+String(r.status||''));
+}
+export function expScan(list, b, EN){
+  list=list||idxs(); if(b==null) b=STATE.base; EN=EN||expN();
+  var rows=[], amt=0, cu={};
+  list.forEach(function(k){ var r=ST.DATA.rows[k]; if(!expEligible(r)) return; var e=r.endIdx;
+    if(e==null || e<b || e>b+EN-1) return; rows.push(k); amt+=expAmtOf(k); cu[r.cust]=1; });
+  rows.sort(function(a,c){ return ST.DATA.rows[a].endIdx-ST.DATA.rows[c].endIdx || expAmtOf(c)-expAmtOf(a); });
+  return {rows:rows, amt:amt, custN:Object.keys(cu).length, b:b, EN:EN, end:Math.min(b+EN-1, ST.M-1)};
+}
+/* 만료 목록 «비고» — 자동연장 · 후속 계약(재약정 등록됨 / 확인 필요) · 함께 끝나는 부속 계약 수 */
+export function expNote(k){
+  var r=ST.DATA.rows[k], out=[];
+  if(r.autoRenew) out.push('자동연장');
+  /** @type {any} */ var s=null; try{ s=ctSuccessor(r); }catch(e){}
+  if(s) out.push(s.sure? '재약정 등록됨 '+mk(s.row.startIdx)+'~' : '후속 계약 확인 필요');
+  var kids=ST.DATA.rows.filter(function(x){ return x.parent && x.parent===r._id && x.endIdx===r.endIdx; }).length;
+  if(kids) out.push('부속 '+kids+'건 함께 만료');
+  return out.join(' · ');
+}
+/* ㊿+171 «재약정 대응 필요» = N개월 내 만료 원계약(expScan) 중 자동연장 · 후속 계약이 확실히 등록된 것을 뺀 행
+   · 홈 핵심 현황 · AI 추천 질문 «재약정 대응할 고객» · 목록(kpiOpen expNeed)이 모두 이것 하나 · 후속 계약이 «확인 필요»(확실하지 않음)이면 대응 필요에 남김
+   · 고객 360 «다음 행동 제안»도 같은 ctSuccessor · 자동연장(autoRenew) 기준 */
+export function renewNeedScan(list, b, EN){
+  var XS=expScan(list, b, EN), need=[], sure=[], auto=[], amt=0, cu={};
+  XS.rows.forEach(function(k){ var r=ST.DATA.rows[k]; /** @type {any} */ var s=null; try{ s=ctSuccessor(r); }catch(e){}
+    if(r.autoRenew) auto.push(k); else if(s && s.sure) sure.push(k); else { need.push(k); amt+=expAmtOf(k); cu[r.cust]=1; } });
+  return {xs:XS, rows:need, sure:sure, auto:auto, amt:amt, custN:Object.keys(cu).length};
+}
 export function expN(){ var n=3; try{ n=+localStorage.getItem('svc_exp_n')||3; }catch(e){} return [1,2,3,6,12].indexOf(n)>=0? n : 3; }
 export function setExpN(n){
   try{ localStorage.setItem('svc_exp_n',String(n)); }catch(e){}
@@ -1160,8 +1204,8 @@ export function kpiTable(title, cap, head, rows, xname, view){
   $('#crXls').onclick=function(){ xlsxAoa((xname||title).replace(/[\\/:*?"<>|]/g,' '), head.map(function(h){return h.l;}), rows.map(function(r){ return r.x||r.c.map(function(x){ return String(x).replace(/<[^>]+>/g,''); }); })); };
   openOvl('ovlCr');
 }
-export function kpiOpen(kind){
-  var D=KPI_D; if(!D) return;
+export function kpiOpen(kind, opt){
+  var D=KPI_D; if(!D && !(opt && opt.home)) return; D=D||{list:[], b:homeB()};
   var b=D.b, rows=[], head, tot=0;
   var base=function(r){ return [esc(r.cust), esc(lline(r.line)), esc(chOf(r)), esc(r.status||'활성')+(r.renew?tpl` <span class="ubadge sm">연장 ${rawHtml(r.renew)}회</span>`:''), mk(r.startIdx)||'', r.endIdx!=null? mk(r.endIdx):'']; };
   var H6=[{l:'고객사'},{l:'서비스'},{l:'채널'},{l:'상태'},{l:'시작월'},{l:'종료월'}];
@@ -1188,12 +1232,21 @@ export function kpiOpen(kind){
     head=[{l:'구분'}].concat(H6, [{l:'판매형태'},{l:'해지 사유'},{l:'월액(천원)',n:true}]);
     kpiTable(per+' 신규 '+D.newRows.length+'건 / 해지 '+D.churnRows.length+'건', '신규 = 원계약 시작월이 '+per+' (부속 계약·CN전환 제외) · 해지 = 상태 «해지»이고 해지월(종료월)이 '+per+' — 해지율·고객사 증감 화면과 같은 기준 · 이탈 MRR '+won(ca)+'천원 = 해지월 인식 금액 · 대시보드 필터(서비스·산업군)가 적용된 상태', head, rows, '신규해지_'+per);
   }
-  else if(kind==='exp'){
-    D.expRows.forEach(function(k){ var r=ST.DATA.rows[k], a=ST.MAT[k][Math.min(r.endIdx,ST.M-1)]||r.mrr||0; tot+=a; rows.push({_cust:r.cust, c:base(r).concat([esc(r.saleType||''), r.parent?'부속':'', won(a)]), s:r.endIdx}); });
+  else if(kind==='expNeed'){   /* ㊿+171 재약정 대응 필요 — 홈 핵심 현황과 같은 행 · ㊿+172 홈에서 열면 전체 사업 · 홈 기준월(사업 분석 필터와 무관) */
+    if(opt && opt.home){ b=homeB(); }
+    var RN=renewNeedScan(opt && opt.home? ST.DATA.rows.map(function(x,i){ return i; }) : D.list, b), cu1={};
+    RN.rows.forEach(function(k){ var r=ST.DATA.rows[k], a=expAmtOf(k); tot+=a; cu1[r.cust]=1; rows.push({_cust:r.cust, c:base(r).concat([esc(r.saleType||''), esc(expNote(k)||'후속 계약 없음'), won(a)]), s:r.endIdx}); });
     rows.sort(function(x,y){ return x.s-y.s; });
-    head=H6.concat([{l:'판매형태'},{l:'구분'},{l:'월액(천원)',n:true}]);
+    head=H6.concat([{l:'판매형태'},{l:'확인할 것'},{l:'종료월 월 금액(천원)',n:true}]);
+    var ex=[]; if(RN.sure.length) ex.push('재약정 등록됨 '+RN.sure.length+'건'); if(RN.auto.length) ex.push('자동연장 '+RN.auto.length+'건');
+    kpiTable('재약정 대응 필요 — '+rows.length+'건 · 고객사 '+Object.keys(cu1).length+'곳 · '+won(tot)+'천원', RN.xs.EN+'개월 내 만료 원계약 '+RN.xs.rows.length+'건(종료월 '+mk(b)+' ~ '+mk(RN.xs.end)+') 중 '+(ex.length? ex.join(' · ')+' 제외' : '제외 없음')+' · 후속 계약이 «확인 필요»면 남김 · '+(opt && opt.home? '전체 사업 기준(홈 «재약정 대응 필요»와 같은 행)' : '사업 분석 조건 기준')+' · 행을 누르면 계약 화면', head, rows, '재약정대응_'+mk(b));
+  }
+  else if(kind==='exp'){
+    var cu0={}; D.expRows.forEach(function(k){ var r=ST.DATA.rows[k], a=expAmtOf(k); tot+=a; cu0[r.cust]=1; rows.push({_cust:r.cust, c:base(r).concat([esc(r.saleType||''), esc(expNote(k)), won(a)]), s:r.endIdx}); });
+    rows.sort(function(x,y){ return x.s-y.s; });
+    head=H6.concat([{l:'판매형태'},{l:'비고'},{l:'종료월 월 금액(천원)',n:true}]);
     var EN2=expN();
-    kpiTable(EN2+'개월 내 만료 — '+rows.length+'건 · '+won(tot)+'천원', '종료월이 '+mk(b)+' ~ '+mk(Math.min(b+EN2-1,ST.M-1))+' 인 계약 (해지·서비스종료 상태 제외 · 원계약 기준) · 연장을 등록하면 여기서 빠집니다 · 기간은 타일의 1·2·3·6·12 버튼으로 · 행을 누르면 계약 화면', head, rows, '만료예정_'+EN2+'개월_'+mk(b));
+    kpiTable(EN2+'개월 내 만료 — 원계약 '+rows.length+'건 · 고객사 '+Object.keys(cu0).length+'곳 · '+won(tot)+'천원', '종료월이 '+mk(b)+' ~ '+mk(Math.min(b+EN2-1,ST.M-1))+' 인 원계약 (부속 계약·H/W·해지·중지·서비스 종료 제외 — 부속은 «비고»에 함께 만료로 표시) · 금액 = 종료월 인식 금액 · 홈 «오늘 처리할 일»·만료 예정 위젯과 같은 행 · 연장을 등록하면 빠집니다 · 행을 누르면 계약 화면', head, rows, '만료예정_'+EN2+'개월_'+mk(b));
   }
 }
 export function deltaHtml(a,b,label){
@@ -1324,7 +1377,7 @@ export function hbars(sel, arr, total, isCount){
     var tr=el('div','tr'); var fl=el('div','fl');
     fl.style.width=Math.max(1.5,Math.abs(x.v)/mx*100)+'%'; fl.style.background=x.c;
     tr.appendChild(fl);
-    var vv=el('div','vv', isCount? x.v+'건' : won(x.v));
+    var vv=el('div','vv', isCount? x.v+(typeof isCount==='string'? isCount : '건') : won(x.v));   /* ㊿+169 단위를 넘겨받음(장비 = 대) */
     if(!isCount && total) vv.title=wonFull(x.v)+' · '+(x.v/total*100).toFixed(1)+'%';
     row.appendChild(nm); row.appendChild(tr); row.appendChild(vv);
     box.appendChild(row);
@@ -1411,27 +1464,20 @@ export function renderNcWidget(list){
 export function renderExpiring(list){
   list=list||idxs();
   var b=STATE.base, mm=STATE.expM;
-  var rows=list.filter(function(k){
-    var r=ST.DATA.rows[k];
-    if(r.parent || r.noCount || String(r.saleType||'')==='H/W') return false;               // 대시보드 «N개월 내 만료» 타일과 같은 기준 (부속·고객수 제외 행·H/W 제외)
-    if(/해지|종료|CN전환/.test(statusOf(r)+' '+String(r.status||''))) return false;
-    return r.endIdx!=null && r.endIdx>=b && r.endIdx<=b+mm-1;
-  }).sort(function(a,b2){ return ST.DATA.rows[a].endIdx-ST.DATA.rows[b2].endIdx || (ST.MAT[b2][Math.min(ST.DATA.rows[b2].endIdx,ST.M-1)]-ST.MAT[a][Math.min(ST.DATA.rows[a].endIdx,ST.M-1)]); });
-
-  var amt=rows.reduce(function(s,k){ var r=ST.DATA.rows[k]; return s+(ST.MAT[k][Math.min(r.endIdx,ST.M-1)]||r.mrr||0); },0);
-  $('#capExp').textContent = mk(b)+' 이후 '+mm+'개월 내 만료 '+rows.length+'건 · 해당 MRR 합계 '+won(amt)+'천원 · 원계약 기준(부속 계약은 원계약과 함께 만료) · 위 타일과 같은 수';
+  var XS=expScan(list, b, mm), rows=XS.rows, amt=XS.amt;   /* ㊿+168 공통 집계 — 타일 · 홈 할 일과 같은 행 */
+  $('#capExp').textContent = mk(b)+' ~ '+mk(XS.end)+' 만료 원계약 '+rows.length+'건 · 고객사 '+XS.custN+'곳 · 종료월 월 금액 합계 '+won(amt)+'천원 · 부속 계약은 원계약과 함께 만료(«비고») · 홈 «사업 현황» 타일 · «오늘 처리할 일»과 같은 수';
 
   var t=$('#tExp');
   t.innerHTML=tpl`<thead><tr><th>만료월</th><th>남은 개월</th><th>서비스</th><th>산업군</th><th>고객사</th><th>파트너</th>`+
-    tpl`<th>계약구분</th><th>상태</th><th class="n">월 MRR(천원)</th><th class="n">총 계약액(천원)</th></tr></thead><tbody>`+ tpl`${rawHtml(rows.length? rows.map(function(k){
+    tpl`<th>계약구분</th><th>상태</th><th class="n">종료월 월 금액(천원)</th><th class="n">총 계약액(천원)</th><th>비고</th></tr></thead><tbody>`+ tpl`${rawHtml(rows.length? rows.map(function(k){
       var r=ST.DATA.rows[k]; var left=r.endIdx-b;
       var mrr=ST.MAT[k][Math.min(r.endIdx,ST.M-1)]||r.mrr||0;
       var cls = left<=1? 'b-churn' : left<=3? 'b-warn' : 'b-end';
       return tpl`<tr><td>${mk(r.endIdx)}</td><td><span class="badge ${rawHtml(cls)}">${rawHtml(left)}개월</span></td>`+
         tpl`<td>${lline(r.line)}</td><td>${r.ind}</td><td><b>${r.cust}</b></td><td>${r.partner}</td>`+
         tpl`<td>${r.ctype||'-'}</td><td>${rawHtml(statusBadge(r))}</td>`+
-        tpl`<td class="n">${won(mrr)}</td><td class="n">${won(r.total)}</td></tr>`;
-    }).join('') : '<tr><td colspan="10" class="mini" style="padding:16px">해당 기간에 만료되는 계약이 없습니다.</td></tr>')}`+ tpl`</tbody>`;
+        tpl`<td class="n">${won(mrr)}</td><td class="n">${won(r.total)}</td><td class="mini">${expNote(k)}</td></tr>`;
+    }).join('') : '<tr><td colspan="11" class="mini" style="padding:16px">해당 기간에 만료되는 계약이 없습니다.</td></tr>')}`+ tpl`</tbody>`;
 }
 export function statusBadge(r){
   var s=statusOf(r);
