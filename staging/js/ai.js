@@ -8,6 +8,7 @@ import { activeCustomers, groupCount, hbars, monthlySeries, monthlyTotal, pinQue
 import { dcSummary, liveData, liveDelta, liveSrcLabel, renewScan } from './analysis.js';
 import { CL, clBuild, clEnsure, clFxRate, clSum } from './cloud.js';
 import { openOvl } from './edit.js';
+import { ansClear, ansStateSet, askInOvl, askInput, HOME, homeAfter, homeBeforeAsk, homeLocal, homeMetaAI, localIntent } from './home.js';
 
 
 /* ==================================================================
@@ -103,21 +104,21 @@ export function aiOn(badge){
     '\n· 금액 계산은 전부 포탈이 DB 원본으로 직접 수행합니다'+
     '\n· AI 해설: '+(AICFG.narrate?'켜짐':'꺼짐')+
     '\n· 고객명 마스킹: '+(AICFG.maskNames?'켜짐':'꺼짐');
-  $('#q').placeholder= isGN()? 'AI 분석 — 매출·고객·계약 데이터로 답합니다 (예: 요즘 클라우드 어때? · 곧 재약정할 곳은?)'   /* ㊿+167 지니언스: 위 검색 바(이동·검색)와 역할을 나눔 */
+  $('#q').placeholder= isGN()? (window.innerWidth<520? '고객사 · 매출 · 할 일 물어보기' : '고객사 찾기, 매출 분석, 처리할 일을 물어보세요.')   /* ㊿+171 지니언스: 가운데 입력칸 하나로 검색·질문 */
     : '아무렇게나 물어보세요 — 예: 요즘 클라우드 좀 어때? 제일 큰 고객 누구야? 곧 재약정 챙겨야 할 데 있어?';
 }
 
 export function setAsking(on){
-  var b=$('#btnAsk');
+  var b=$('#btnAsk'), b2=/** @type {any} */(document.getElementById('fkAsk'));   /* ㊿+171 검색·질문 창의 «질문» 버튼도 같이 */
   if(ASK_TICK){ clearInterval(ASK_TICK); ASK_TICK=null; }
   b.disabled=false;                         // 기다리는 동안에도 눌러서 «중단» 할 수 있게
-  b.classList.toggle('asking', !!on);
-  if(!on){ b.textContent='질문'; b.title=''; return; }
+  b.classList.toggle('asking', !!on); if(b2) b2.classList.toggle('asking', !!on);
+  if(!on){ b.textContent='질문'; b.title=''; if(b2){ b2.textContent='질문'; b2.title=''; } return; }
   ASK_T0=Date.now();
-  b.textContent='생각 중… 0초'; b.title='누르면 중단합니다';
+  b.textContent='생각 중… 0초'; b.title='누르면 중단합니다'; if(b2){ b2.textContent='생각 중… 0초'; b2.title='누르면 중단합니다'; }
   ASK_TICK=setInterval(function(){
     var s=Math.round((Date.now()-ASK_T0)/1000);
-    b.textContent='생각 중… '+s+'초'+(s>=8? ' · 중단':'');
+    b.textContent='생각 중… '+s+'초'+(s>=8? ' · 중단':''); if(b2) b2.textContent=b.textContent;
     if(s>=25 && !b._slowTold){ b._slowTold=1; toast('AI 가 오래 걸리고 있습니다','DB 를 여러 번 조회하는 질문이면 1분 가까이 걸릴 수 있어요. 버튼을 누르면 중단합니다','info'); }
   },1000);
   b._slowTold=0;
@@ -146,26 +147,32 @@ export function closeAnswer(why, force){
   if(force) AI_SEQ.closed=AI_SEQ.n;
   a.classList.remove('on');
   try{ clearSay(); }catch(e){}
+  try{ ansClear(); }catch(e){}   /* ㊿+171 닫으면 이전 문답(접힌 줄)도 정리 — AI 기억(HIST)은 그대로 */
   var t=$('#ansTitle'); if(t) t.textContent='';
   var h=$('#ansHero'); if(h) h.textContent='';
   var b=$('#ansSub');  if(b) b.textContent='';
   var g=document.getElementById('ansGrid'); if(g) g.style.display='none';
   if(why) toast('AI 답변을 닫았습니다', why, 'info');
 }
-export function ask(q){
-  q=(q||'').trim();
-  if(!q){ $('#answer').classList.remove('on'); return; }
-  $('#q').value='';            // 물어본 뒤에는 입력칸을 비웁니다
+/** opt.ctx — ㊿+171 검색·질문 창에서 물을 때 보던 화면 · 조건(home.js srchCtx) — AI 에는 질문 뒤에 붙여 보내고, 화면에는 질문 옆 문맥으로 */
+export function ask(q, opt){
+  q=(q||'').trim(); opt=opt||{};
+  if(!q) return;               /* ㊿+171 빈 질문은 무시(예전: 답을 닫음 — Enter 가 두 번 붙으면 방금 연 답이 닫히던 원인) */
+  if(!opt.ctx && askInOvl() && HOME.ctx && HOME.ctxOn) opt.ctx=HOME.ctx;
+  try{ askInput().value=''; }catch(e){}   // 물어본 뒤에는 입력칸을 비웁니다
   $('#sug').classList.remove('on');
-  if(!AICFG.enabled){ localAnswer(q); return; }
+  try{ homeBeforeAsk(q, opt); }catch(e){}
+  var li=''; try{ li=localIntent(q); }catch(e){}
+  if(li){ try{ homeLocal(q, li, opt); return; }catch(e){ console.warn('local', e); } }   /* 추천 질문 4개 — 포탈이 직접 계산 */
+  if(!AICFG.enabled){ localAnswer(q, '', opt); return; }
 
   setAsking(true);
   var mySeq=++AI_SEQ.n, gone=function(){ return AI_SEQ.closed>=mySeq; };   /* ✕ 로 닫았으면 늦게 온 답·오류는 조용히 버림 */
   // 답변 자리를 먼저 열고 "생각 중" 표시
   $('#answer').classList.add('on');
   $('#ansRestate').className='restate';
-  $('#ansTitle').textContent=shortQ(q);
-  $('#ansHero').textContent=''; $('#ansSub').textContent='';
+  $('#ansTitle').textContent='';   /* 질문은 답 맨 위(#ansQ)에 */
+  $('#ansHero').textContent=''; $('#ansSub').textContent=''; $('#ansNote').textContent='';
   $('#aiComment').className='ai-comment';
   var say=$('#aiSay');
   say.className='ai-say on loading';
@@ -177,15 +184,15 @@ export function ask(q){
     if(gone()) return;
     if(isAsking()){
       setAsking(false);
-      localAnswer(q,'⚠ AI가 응답하지 않아 내장 규칙으로 답했습니다 — 잠시 후 다시 물어봐 주세요.');
+      localAnswer(q,'⚠ AI가 응답하지 않아 내장 규칙으로 답했습니다 — 잠시 후 다시 물어봐 주세요.', opt); aiRetryBtn(q, opt);
     }
   }, AI_TIMEOUT_MS+5000);
   Promise.all([loadHist(), clEnsure()]).then(function(){
-    return aiFetch({mode:'chat', question:q, digest:buildDigest(), history:ST.HIST.slice(-6)});
+    return aiFetch({mode:'chat', question:opt.ctx? q+'\n\n'+opt.ctx.text : q, digest:buildDigest(), history:ST.HIST.slice(-6)});
   })
     .then(function(r){
       clearTimeout(guard); if(gone()) return; setAsking(false);
-      if(!r || !r.ok || !r.text){ localAnswer(q,'⚠ AI가 답하지 못해 내장 규칙(간단 패턴)으로 답했습니다 — AI 답변이 아닙니다. '+String((r&&r.error)||'').slice(0,100)); return; }
+      if(!r || !r.ok || !r.text){ localAnswer(q,'⚠ AI가 답하지 못해 내장 규칙(간단 패턴)으로 답했습니다 — AI 답변이 아닙니다. '+String((r&&r.error)||'').slice(0,100), opt); aiRetryBtn(q, opt); return; }
       revealAnswer();
       say.className='ai-say on';
       say.innerHTML=tpl`<span class="lb">AI</span>${cleanSay(r.text)}`+
@@ -197,20 +204,22 @@ export function ask(q){
       ST.HIST.push({q:q, a:r.text}); if(ST.HIST.length>10) ST.HIST.shift();
       saveHistTurn(q, r.text);                  // 계정별 누적 기억 (세션 무관)
       // 표·그래프가 도움이 되는 질문이면 포탈이 직접 계산해서 아래에 붙입니다
+      var pp=null;
       if(r.view && r.view.intent){
         try{
-          var pp=planToP(r.view), res=computeFromP(pp);
+          pp=planToP(r.view); var res=computeFromP(pp);
           res.restate=''; res.suggestions=[];
           renderAnswerBody(res);
-        }catch(e){ /* 계산 실패해도 대화 답변은 그대로 둡니다 */ }
+        }catch(e){ pp=null; /* 계산 실패해도 대화 답변은 그대로 둡니다 */ }
       }
+      try{ homeMetaAI(q, r, pp, opt); homeAfter(cleanSay(r.text)); }catch(e){}
     })
     .catch(function(e){
       clearTimeout(guard); if(gone()) return; setAsking(false);
-      if(/^요청을 중단했습니다/.test(String(e&&e.message||''))){ $('#q').value=q; return; }   // 사용자가 끊음 → 질문 복원 (타임아웃은 아래로)
-      if(/로그인이 만료/.test(String(e&&e.message||''))){ $('#q').value=q; toast('로그인이 만료되었습니다','다시 로그인하면 질문이 그대로 남아 있습니다','warn'); openOvl('ovlAuth'); return; }
-      localAnswer(q,'⚠ AI 호출 실패 — 이 답은 AI가 아니라 내장 규칙(간단 패턴)입니다. ('+String(e&&e.message||e).slice(0,120)+')');
-      aiRetryBtn(q);
+      if(/^요청을 중단했습니다/.test(String(e&&e.message||''))){ try{ askInput().value=q; }catch(x){} return; }   // 사용자가 끊음 → 질문 복원 (타임아웃은 아래로)
+      if(/로그인이 만료/.test(String(e&&e.message||''))){ try{ askInput().value=q; }catch(x){} toast('로그인이 만료되었습니다','다시 로그인하면 질문이 그대로 남아 있습니다','warn'); openOvl('ovlAuth'); return; }
+      localAnswer(q,'⚠ AI 호출 실패 — 이 답은 AI가 아니라 내장 규칙(간단 패턴)입니다. ('+String(e&&e.message||e).slice(0,120)+')', opt);
+      aiRetryBtn(q, opt);
     });
 }
 
@@ -237,13 +246,12 @@ export function revealAnswer(){
   }catch(e){}
 }
 /* AI 호출이 실패했을 때 «다시 시도» 버튼을 답변 영역에 붙입니다 */
-export function aiRetryBtn(q){
-  var say=$('#aiSay'); if(!say) return;
-  say.className='ai-say on';
-  say.innerHTML=tpl`<span class="lb">AI</span>AI가 답하지 못했습니다. `+
-    tpl`<button class="pill" id="aiRetry" style="height:26px;padding:0 10px;font-size:12px;margin-left:6px">↻ 다시 시도</button>`;
+/* ㊿+171 실패 상태는 답 맨 위 한 줄(«AI 응답 실패» · 다시 시도) — 아래 숫자는 포탈 내장 규칙으로 계산한 것임을 분명히 */
+export function aiRetryBtn(q, opt){
+  var say=$('#aiSay'); if(say){ say.className='ai-say'; say.innerHTML=''; }
+  try{ ansStateSet('fail', tpl`<b>AI 응답 실패</b> — 아래는 AI 가 아니라 포탈 내장 규칙으로 계산한 답입니다 <button type="button" class="cbtn" id="aiRetry">↻ 다시 시도</button>`); }catch(e){}
   var b=document.getElementById('aiRetry');
-  if(b) b.onclick=function(){ ask(q); };
+  if(b) b.onclick=function(){ ask(q, opt); };
 }
 
 /* 답변에 JSON/코드펜스가 섞여 오면 사람이 읽을 문장만 남깁니다 */
@@ -261,14 +269,15 @@ export function cleanSay(t){
   return t;
 }
 export function clearSay(){ var e=$('#aiSay'); if(e){ e.className='ai-say'; e.innerHTML=''; } }
-export function localAnswer(q, note){
+export function localAnswer(q, note, opt){
   clearSay();
-  $('#q').value='';
-  var res;
-  try{ res=runQuery(q); }
+  try{ askInput().value=''; }catch(e){}
+  var res, p=null;
+  try{ res=runQuery(q); p=Q_LAST; }   /* runQuery 가 쓴 해석 결과(이어지는 질문 상태를 두 번 바꾸지 않게 다시 해석하지 않음) */
   catch(e){ res={title:q, hero:'?', unit:'', sub:'질문을 이해하지 못했습니다', note:String(e.message||e)}; }
   if(note) res.note = note + (res.note? ' · '+res.note : '');
   showAnswer(q,res);
+  try{ homeMetaAI(q, null, p, opt); if(String(res.hero)==='?') ansStateSet('need', '<b>질문을 이해하지 못했습니다</b> — 기간 · 서비스 · 고객사를 넣어 다시 물어보세요'); homeAfter([res.title, res.hero, res.unit, res.sub].filter(Boolean).join(' ')); }catch(e){}
 }
 
 export function onPlan(q, r){
@@ -1454,7 +1463,7 @@ export function showAnswer(q,res){
     ph.textContent='📌 위젯으로 고정'; ph.style.cssText='margin-top:10px';
     var hd0=document.querySelector('#answer .ans-head'); if(hd0) hd0.appendChild(ph);
   }
-  ph.onclick=function(){ pinQuery(q); };
+  ph.hidden=false; ph.onclick=function(){ pinQuery(q); };
   var rs=$('#ansRestate');
   if(res.restate){ rs.className='restate on'; rs.innerHTML=tpl`이렇게 이해했어요 — <b>${res.restate}</b>`; }
   else rs.className='restate';

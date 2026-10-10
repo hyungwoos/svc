@@ -2,14 +2,15 @@
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { ST } from './state.js';
 import { $, amtWhy, lline, mk, navText, rawHtml, tpl, won, wonKo } from './core.js';
-import { buildRail, c360Enhance, cmdAskHit, cmdMenuHits, dIdx, ico, loadFromDb, onData, renderInbox, sbTry, sbWrite, toast, todayStr, visBtn } from './shell.js';
+import { buildRail, c360Enhance, dIdx, ico, loadFromDb, onData, renderInbox, sbTry, sbWrite, toast, todayStr, visBtn } from './shell.js';
 import { GRIDS } from './grids.js';
 import { applyChannelMenu, ctRawOf, liveData } from './analysis.js';
-import { goInbList, loadInbound } from './inbound.js';
+import { goInbList } from './inbound.js';
 import { applyMenuFold } from './sales.js';
 import { ctPeriods, navMenu, oiOpen, openDetail, qvCfg, renderGrid, switchView } from './grid.js';
 import { syncOrderAssets } from './equipment.js';
 import { closeOvl, openOvl, ovlMarkDirty } from './edit.js';
+import { homeSearchOpen, rcPush } from './home.js';
 
 
 /* ===== 전역 검색 (Ctrl+K) ===== */
@@ -39,52 +40,8 @@ export function fkSources(){
   });
   return out;
 }
-export function openFind(){
-  if(!ST.SB_TOKEN || !ST.DATA) return;
-  if(ST.RAWX.inbound===undefined && !ST.IS_EQUIP) try{ loadInbound(function(){}); }catch(e){}
-  openOvl('ovlFind');
-  var inp=$('#fkInput'); inp.value=''; $('#fkOut').innerHTML='';
-  setTimeout(function(){ inp.focus(); },60);
-  var hits=[];
-  inp.onkeydown=function(e){                                        // 입력 전에도 ESC·Enter 동작
-    if(e.key==='Escape'){ e.preventDefault(); closeOvl('ovlFind'); }
-    if(e.key==='Enter' && hits.length){ closeOvl('ovlFind'); hits[0].go(); }
-  };
-  var ov=document.getElementById('ovlFind');
-  ov.onmousedown=function(e){ if(e.target===ov) closeOvl('ovlFind'); };   // 바깥 클릭으로 닫기
-  inp.oninput=function(){
-    var q=fkNorm(inp.value), out=$('#fkOut');
-    hits=[];
-    if(q.length<1){ out.innerHTML=''; return; }
-    // ⓞ 화면 이동 (메뉴 이름 매치)
-    try{ hits=hits.concat(cmdMenuHits(inp.value)); }catch(e){}
-    if(q.length<2){ out.innerHTML=hits.map(function(h,i){ return tpl`<div class="fk-row" data-i="${rawHtml(i)}"><span class="tp" style="background:var(--surface-2);color:var(--ink-2)">${rawHtml(h.t)}</span><span class="nm">${h.nm||''}</span><span class="sb">${h.sb||''}</span></div>`; }).join('');
-      out.querySelectorAll('.fk-row').forEach(function(row){ row.onclick=function(){ closeOvl('ovlFind'); hits[+row.dataset.i].go(); }; }); return; }
-    var src=fkSources(), seen={};
-    // ① 고객 360 후보 (고객사명 매치, 중복 제거)
-    var custs={};
-    src.forEach(function(s){ if(s.cust && fkNorm(s.cust).indexOf(q)>=0) custs[s.cust]=1; });
-    Object.keys(custs).slice(0,4).forEach(function(c){
-      hits.push({t:'고객 360', nm:c, sb:'이 고객사의 계약·OI·인바운드·PoC·장비 한눈에', go:function(){ openCust360(c); }, k360:1});
-    });
-    // ② 개별 결과
-    src.forEach(function(s){
-      if(hits.length>=32) return;
-      if(fkNorm(s.nm).indexOf(q)<0 && fkNorm(s.sb).indexOf(q)<0) return;
-      var key=s.t+'|'+s.nm+'|'+s.sb; if(seen[key]) return; seen[key]=1;
-      hits.push(s);
-    });
-    // ③ AI에게 그대로 물어보기
-    try{ var ai=cmdAskHit(inp.value); if(ai) hits.push(ai); }catch(e){}
-    out.innerHTML=hits.map(function(h,i){
-      return tpl`<div class="fk-row" data-i="${rawHtml(i)}"><span class="tp"${rawHtml(h.k360?' style="background:rgba(42,120,214,.12);color:var(--s1-ink)"':(h.kmenu?' style="background:var(--surface-2);color:var(--ink-2)"':(h.kai?' style="background:var(--brand);color:#fff"':'')))}>${rawHtml(h.t)}</span>`+
-        tpl`<span class="nm">${h.nm||''}</span><span class="sb">${h.sb||''}</span></div>`;
-    }).join('')||'<p class="cap" style="padding:8px">결과 없음</p>';
-    out.querySelectorAll('.fk-row').forEach(function(row){
-      row.onclick=function(){ closeOvl('ovlFind'); hits[+row.dataset.i].go(); };
-    });
-  };
-}
+/* ㊿+171 위쪽 «검색»(Ctrl+K) — 홈(기본)은 가운데 입력칸, 다른 화면은 검색·질문 창(home.js) · 결과 순서: 정확히 같은 고객사 · 시리얼 · 화면 → 비슷한 것 → 질문하기 */
+export function openFind(){ homeSearchOpen(); }
 
 
 /* ===== 고객 360 — 한 고객사의 모든 정보 ===== */
@@ -102,7 +59,7 @@ export function c360RenewLine(r){
   return ps.map(function(p){ return tpl`<span class="c360-rp"><b>${p.k}</b> ${p.from||'?'}~${p.to||'?'}${rawHtml(p.mrr!=null? ' · '+won(p.mrr) : '')}${rawHtml(p.qty!=null? ' · '+Number(p.qty).toLocaleString('ko-KR')+'노드' : '')}</span>`; }).join(tpl`<span class="c360-ra">→</span>`);
 }
 export function openCust360(name){
-  var nm=name;
+  var nm=name; try{ rcPush(nm); }catch(e){}   /* ㊿+171 최근 본 고객사(검색 · 최근 작업) */
   /* sub[i] — i번째 행 바로 아래에 붙일 한 줄(계약 표의 연장 이력) · ids[i] — 누르면 그 계약 상세(㊿+162) */
   function tb(cols, rows, sub, ids){
     if(!rows.length) return '<p class="cap" style="margin:2px 0 0">없음</p>';

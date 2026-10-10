@@ -13,6 +13,7 @@ import { wkFsSync, wkNext, wkPrev, wkToggleFs } from './inbound.js';
 import { askScreenHelp, btnBackSync, comboPlace, goBack, gridActPad, LENS_DEFS, LENS_DESC, NAV, navValid, switchView, viewSnapAdd, viewSnapInit } from './grid.js';
 import { closeOvl, fillSectorSel, ovlDismiss, ovlInit, ovlTop, renameShowPreview, syncCustMeta } from './edit.js';
 import { lazyHook } from './lazy.js';
+import { homeModeSet } from './home.js';
 
 /* 시작 순서 — main.js 가 모든 모듈을 읽은 뒤 한 번 부름. 아래 문장들은 예전 고전 스크립트 때의 «파일을 읽을 때 실행» 순서 그대로 */
 export function start(){
@@ -165,6 +166,7 @@ export function start(){
     var v=(e.state && e.state.v) || (location.hash||'').replace('#','') || 'dash';
     if(!navValid(v)) v='dash';
     NAV.pop=true; try{ switchView(v); }catch(x){} NAV.pop=false;
+    if(v==='dash') try{ homeModeSet((e.state && e.state.hm)||'', true); }catch(x){}   /* ㊿+171 홈 안 상세(사업 분석 · 전체 할 일 · 최근 작업)도 뒤로가기로 */
     btnBackSync();
   });
 

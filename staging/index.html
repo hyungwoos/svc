@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <!-- CSP (80점 프로젝트 ② 보안): GitHub Pages 는 응답 헤더를 못 넣으므로 meta 로. ㊿+136 부터 인라인 스크립트·onclick 이 없어 script-src 에 'unsafe-inline' 없음(스타일은 인라인 style 속성 때문에 유지) · ㊿+147 부터 'unsafe-eval' 도 없음(SQL 엔진 alasql 은 격리 칸 sqlbox.html 에서만 돌림) — 스크립트·연결 호스트를 목록으로 제한(XSS 시 외부 유출 차단). Worker 주소나 GAS 주소가 바뀌면 여기도 수정. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-XWHRW3g/Ci5F29Ym99D247Jxclr7HuKbnj4/F5M0L50=' blob: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' data: https://cdn.jsdelivr.net; img-src 'self' data: blob: https://amzbrdhkvzsyxjfjtugu.supabase.co; connect-src 'self' https://amzbrdhkvzsyxjfjtugu.supabase.co https://open.er-api.com https://api.frankfurter.app https://script.google.com/macros/s/AKfycbz0PDzgvgtM0ZZHEfMwEzPpgoPYidD6ElPx3oTGsgnVuveCnVA9PmYPB4WAPfr9a6DY/ https://script.googleusercontent.com https://aged-union-cdd3.choihw.workers.dev https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; worker-src 'self' blob:; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-iPZR2bcq9dZrGAQHverVPNHXC6V+7FvkaL88yY9EYkY=' blob: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' data: https://cdn.jsdelivr.net; img-src 'self' data: blob: https://amzbrdhkvzsyxjfjtugu.supabase.co; connect-src 'self' https://amzbrdhkvzsyxjfjtugu.supabase.co https://open.er-api.com https://api.frankfurter.app https://script.google.com/macros/s/AKfycbz0PDzgvgtM0ZZHEfMwEzPpgoPYidD6ElPx3oTGsgnVuveCnVA9PmYPB4WAPfr9a6DY/ https://script.googleusercontent.com https://aged-union-cdd3.choihw.workers.dev https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; worker-src 'self' blob:; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
 <title>서비스사업부 통합 관리 포탈</title>
 <!-- PWA: 홈 화면 앱 (manifest.webmanifest · sw.js · pwa-*.png · apple-touch-icon.png 를 같은 폴더에) -->
 <link rel="manifest" href="manifest.webmanifest">
@@ -20,32 +20,33 @@
      코드 파일 목록은 app-js (ES 모듈 · ㊿+153) — 파일을 더하거나 빼면 여기와 sw.js 의 SHELL 을 함께 고치고 node tests/stamp.mjs 로 아래 stamp 묶음을 다시 만들 것.
      시작점은 js/main.js 하나(나머지는 import 로 따라옴) · 리포트·관리자·가격표는 처음 열 때(js/lazy.js).
      ④ 아키텍처 2단계(㊿+136): 인라인 스크립트·onclick 을 전부 없애 CSP script-src 에서 'unsafe-inline' 제거 · 인라인은 importmap 하나뿐이고 CSP 해시로 허용. -->
-<meta name="app-ver" content="2026-09-16 ㊿+170">
-<meta name="app-js" content="js/state.js,js/viz.js,js/core.js,js/shell.js,js/dash.js,js/ai.js,js/grids.js,js/equipment.js,js/analysis.js,js/tools.js,js/cloud.js,js/price.js,js/inbound.js,js/upd.js,js/admin.js,js/sales.js,js/report.js,js/grid.js,js/edit.js,js/qadb.js,js/qadata.js,js/lazy.js,js/init.js,js/main.js">
+<meta name="app-ver" content="2026-09-16 ㊿+171">
+<meta name="app-js" content="js/state.js,js/viz.js,js/core.js,js/shell.js,js/dash.js,js/ai.js,js/home.js,js/grids.js,js/equipment.js,js/analysis.js,js/tools.js,js/cloud.js,js/price.js,js/inbound.js,js/upd.js,js/admin.js,js/sales.js,js/report.js,js/grid.js,js/edit.js,js/qadb.js,js/qadata.js,js/lazy.js,js/init.js,js/main.js">
 <!-- stamp:begin — tests/stamp.mjs 가 app-ver · app-js 로 만든 부분(손으로 고치지 말 것 · 버전을 올린 뒤 다시 실행 · tests/check.mjs 가 확인) -->
-<link rel="stylesheet" href="app.css?v=2026-09-16%20%E3%8A%BF%2B170">
-<script type="importmap">{"imports":{"./js/state.js":"./js/state.js?v=2026-09-16%20%E3%8A%BF%2B170","./js/viz.js":"./js/viz.js?v=2026-09-16%20%E3%8A%BF%2B170","./js/core.js":"./js/core.js?v=2026-09-16%20%E3%8A%BF%2B170","./js/shell.js":"./js/shell.js?v=2026-09-16%20%E3%8A%BF%2B170","./js/dash.js":"./js/dash.js?v=2026-09-16%20%E3%8A%BF%2B170","./js/ai.js":"./js/ai.js?v=2026-09-16%20%E3%8A%BF%2B170","./js/grids.js":"./js/grids.js?v=2026-09-16%20%E3%8A%BF%2B170","./js/equipment.js":"./js/equipment.js?v=2026-09-16%20%E3%8A%BF%2B170","./js/analysis.js":"./js/analysis.js?v=2026-09-16%20%E3%8A%BF%2B170","./js/tools.js":"./js/tools.js?v=2026-09-16%20%E3%8A%BF%2B170","./js/cloud.js":"./js/cloud.js?v=2026-09-16%20%E3%8A%BF%2B170","./js/price.js":"./js/price.js?v=2026-09-16%20%E3%8A%BF%2B170","./js/inbound.js":"./js/inbound.js?v=2026-09-16%20%E3%8A%BF%2B170","./js/upd.js":"./js/upd.js?v=2026-09-16%20%E3%8A%BF%2B170","./js/admin.js":"./js/admin.js?v=2026-09-16%20%E3%8A%BF%2B170","./js/sales.js":"./js/sales.js?v=2026-09-16%20%E3%8A%BF%2B170","./js/report.js":"./js/report.js?v=2026-09-16%20%E3%8A%BF%2B170","./js/grid.js":"./js/grid.js?v=2026-09-16%20%E3%8A%BF%2B170","./js/edit.js":"./js/edit.js?v=2026-09-16%20%E3%8A%BF%2B170","./js/qadb.js":"./js/qadb.js?v=2026-09-16%20%E3%8A%BF%2B170","./js/qadata.js":"./js/qadata.js?v=2026-09-16%20%E3%8A%BF%2B170","./js/lazy.js":"./js/lazy.js?v=2026-09-16%20%E3%8A%BF%2B170","./js/init.js":"./js/init.js?v=2026-09-16%20%E3%8A%BF%2B170"}}</script>
-<link rel="modulepreload" href="js/state.js?v=2026-09-16%20%E3%8A%BF%2B170">
-<link rel="modulepreload" href="js/viz.js?v=2026-09-16%20%E3%8A%BF%2B170">
-<link rel="modulepreload" href="js/core.js?v=2026-09-16%20%E3%8A%BF%2B170">
-<link rel="modulepreload" href="js/shell.js?v=2026-09-16%20%E3%8A%BF%2B170">
-<link rel="modulepreload" href="js/dash.js?v=2026-09-16%20%E3%8A%BF%2B170">
-<link rel="modulepreload" href="js/ai.js?v=2026-09-16%20%E3%8A%BF%2B170">
-<link rel="modulepreload" href="js/grids.js?v=2026-09-16%20%E3%8A%BF%2B170">
-<link rel="modulepreload" href="js/equipment.js?v=2026-09-16%20%E3%8A%BF%2B170">
-<link rel="modulepreload" href="js/analysis.js?v=2026-09-16%20%E3%8A%BF%2B170">
-<link rel="modulepreload" href="js/tools.js?v=2026-09-16%20%E3%8A%BF%2B170">
-<link rel="modulepreload" href="js/cloud.js?v=2026-09-16%20%E3%8A%BF%2B170">
-<link rel="modulepreload" href="js/inbound.js?v=2026-09-16%20%E3%8A%BF%2B170">
-<link rel="modulepreload" href="js/upd.js?v=2026-09-16%20%E3%8A%BF%2B170">
-<link rel="modulepreload" href="js/sales.js?v=2026-09-16%20%E3%8A%BF%2B170">
-<link rel="modulepreload" href="js/grid.js?v=2026-09-16%20%E3%8A%BF%2B170">
-<link rel="modulepreload" href="js/edit.js?v=2026-09-16%20%E3%8A%BF%2B170">
-<link rel="modulepreload" href="js/qadb.js?v=2026-09-16%20%E3%8A%BF%2B170">
-<link rel="modulepreload" href="js/qadata.js?v=2026-09-16%20%E3%8A%BF%2B170">
-<link rel="modulepreload" href="js/lazy.js?v=2026-09-16%20%E3%8A%BF%2B170">
-<link rel="modulepreload" href="js/init.js?v=2026-09-16%20%E3%8A%BF%2B170">
-<script type="module" src="js/main.js?v=2026-09-16%20%E3%8A%BF%2B170"></script>
+<link rel="stylesheet" href="app.css?v=2026-09-16%20%E3%8A%BF%2B171">
+<script type="importmap">{"imports":{"./js/state.js":"./js/state.js?v=2026-09-16%20%E3%8A%BF%2B171","./js/viz.js":"./js/viz.js?v=2026-09-16%20%E3%8A%BF%2B171","./js/core.js":"./js/core.js?v=2026-09-16%20%E3%8A%BF%2B171","./js/shell.js":"./js/shell.js?v=2026-09-16%20%E3%8A%BF%2B171","./js/dash.js":"./js/dash.js?v=2026-09-16%20%E3%8A%BF%2B171","./js/ai.js":"./js/ai.js?v=2026-09-16%20%E3%8A%BF%2B171","./js/home.js":"./js/home.js?v=2026-09-16%20%E3%8A%BF%2B171","./js/grids.js":"./js/grids.js?v=2026-09-16%20%E3%8A%BF%2B171","./js/equipment.js":"./js/equipment.js?v=2026-09-16%20%E3%8A%BF%2B171","./js/analysis.js":"./js/analysis.js?v=2026-09-16%20%E3%8A%BF%2B171","./js/tools.js":"./js/tools.js?v=2026-09-16%20%E3%8A%BF%2B171","./js/cloud.js":"./js/cloud.js?v=2026-09-16%20%E3%8A%BF%2B171","./js/price.js":"./js/price.js?v=2026-09-16%20%E3%8A%BF%2B171","./js/inbound.js":"./js/inbound.js?v=2026-09-16%20%E3%8A%BF%2B171","./js/upd.js":"./js/upd.js?v=2026-09-16%20%E3%8A%BF%2B171","./js/admin.js":"./js/admin.js?v=2026-09-16%20%E3%8A%BF%2B171","./js/sales.js":"./js/sales.js?v=2026-09-16%20%E3%8A%BF%2B171","./js/report.js":"./js/report.js?v=2026-09-16%20%E3%8A%BF%2B171","./js/grid.js":"./js/grid.js?v=2026-09-16%20%E3%8A%BF%2B171","./js/edit.js":"./js/edit.js?v=2026-09-16%20%E3%8A%BF%2B171","./js/qadb.js":"./js/qadb.js?v=2026-09-16%20%E3%8A%BF%2B171","./js/qadata.js":"./js/qadata.js?v=2026-09-16%20%E3%8A%BF%2B171","./js/lazy.js":"./js/lazy.js?v=2026-09-16%20%E3%8A%BF%2B171","./js/init.js":"./js/init.js?v=2026-09-16%20%E3%8A%BF%2B171"}}</script>
+<link rel="modulepreload" href="js/state.js?v=2026-09-16%20%E3%8A%BF%2B171">
+<link rel="modulepreload" href="js/viz.js?v=2026-09-16%20%E3%8A%BF%2B171">
+<link rel="modulepreload" href="js/core.js?v=2026-09-16%20%E3%8A%BF%2B171">
+<link rel="modulepreload" href="js/shell.js?v=2026-09-16%20%E3%8A%BF%2B171">
+<link rel="modulepreload" href="js/dash.js?v=2026-09-16%20%E3%8A%BF%2B171">
+<link rel="modulepreload" href="js/ai.js?v=2026-09-16%20%E3%8A%BF%2B171">
+<link rel="modulepreload" href="js/home.js?v=2026-09-16%20%E3%8A%BF%2B171">
+<link rel="modulepreload" href="js/grids.js?v=2026-09-16%20%E3%8A%BF%2B171">
+<link rel="modulepreload" href="js/equipment.js?v=2026-09-16%20%E3%8A%BF%2B171">
+<link rel="modulepreload" href="js/analysis.js?v=2026-09-16%20%E3%8A%BF%2B171">
+<link rel="modulepreload" href="js/tools.js?v=2026-09-16%20%E3%8A%BF%2B171">
+<link rel="modulepreload" href="js/cloud.js?v=2026-09-16%20%E3%8A%BF%2B171">
+<link rel="modulepreload" href="js/inbound.js?v=2026-09-16%20%E3%8A%BF%2B171">
+<link rel="modulepreload" href="js/upd.js?v=2026-09-16%20%E3%8A%BF%2B171">
+<link rel="modulepreload" href="js/sales.js?v=2026-09-16%20%E3%8A%BF%2B171">
+<link rel="modulepreload" href="js/grid.js?v=2026-09-16%20%E3%8A%BF%2B171">
+<link rel="modulepreload" href="js/edit.js?v=2026-09-16%20%E3%8A%BF%2B171">
+<link rel="modulepreload" href="js/qadb.js?v=2026-09-16%20%E3%8A%BF%2B171">
+<link rel="modulepreload" href="js/qadata.js?v=2026-09-16%20%E3%8A%BF%2B171">
+<link rel="modulepreload" href="js/lazy.js?v=2026-09-16%20%E3%8A%BF%2B171">
+<link rel="modulepreload" href="js/init.js?v=2026-09-16%20%E3%8A%BF%2B171">
+<script type="module" src="js/main.js?v=2026-09-16%20%E3%8A%BF%2B171"></script>
 <!-- stamp:end -->
 </head>
 <body data-view="dash">
@@ -220,43 +221,66 @@
     <div class="todo-cards" id="todoCards"></div>
     <div class="quick-links" id="quickLinks"></div>
   </section>
-  <section class="ask">
+  <section class="ask" aria-labelledby="askH">
     <div id="ccBrief" class="cc-only"></div>
+    <h2 class="ask-h" id="askH">AI 질문</h2>
     <div class="ask-row">
       <div class="ask-ico">AI</div>
       <div class="qwrap">
         <input id="q" aria-label="AI 에게 질문" type="text" autocomplete="off"
           placeholder="말하듯이 물어보세요 — 예: 요즘 클라우드 좀 어때?  /  제일 큰 고객 누구야?  /  곧 만료되는 계약">
-        <div class="sug" id="sug"></div>
+        <div class="sug" id="sug" hidden></div>
       </div>
       <span class="ai-badge" id="aiBadge"></span>
       <button class="btn" id="btnAsk">질문</button>
     </div>
     <div class="chips" id="chips"></div>
 
-    <div class="answer" id="answer">
-      <div class="ans-x"><button type="button" class="cbtn x-close" id="ansClose" title="AI 답변 닫기 — 다른 메뉴로 가도 닫힙니다" aria-label="AI 답변 닫기">✕ 닫기</button></div>
-      <div class="ai-say" id="aiSay"></div>
-      <div class="restate" id="ansRestate"></div>
-      <div class="ans-head">
-        <div class="ans-title" id="ansTitle"></div>
-        <div class="hero" id="ansHero"></div>
-        <div class="ans-sub" id="ansSub"></div>
+    <div class="answer" id="answer" aria-live="polite">
+      <div class="ans-thread" id="ansThread"></div>
+      <div class="ans-top">
+        <div class="ans-q" id="ansQ"></div>
+        <div class="ans-x"><button type="button" class="cbtn x-close" id="ansClose" title="답 닫기 — 이전 문답도 함께 정리합니다 · 다른 메뉴로 가도 닫힙니다" aria-label="AI 답변 닫기">✕ 닫기</button></div>
       </div>
-      <div class="ans-grid" id="ansGrid">
-        <div class="card" style="padding:12px 14px">
-          <div class="legend" id="ansLegend"></div>
-          <div class="chartbox h260" id="ansChart"></div>
+      <div class="ans-state" id="ansState" role="status" hidden></div>
+      <section class="ans-sec ans-core" aria-label="핵심 답변">
+        <h3 class="ans-lb">핵심 답변</h3>
+        <div class="ai-say" id="aiSay"></div>
+        <div class="restate" id="ansRestate"></div>
+        <div class="ans-head">
+          <div class="ans-title" id="ansTitle"></div>
+          <div class="hero" id="ansHero"></div>
+          <div class="ans-sub" id="ansSub"></div>
         </div>
-        <div class="card" style="padding:12px 14px">
-          <div class="cap" id="ansTableCap">상세</div>
-          <div class="tbl-wrap" tabindex="0" style="max-height:236px"><table id="ansTable"></table></div>
+        <div id="ansLocal"></div>
+      </section>
+      <section class="ans-sec ans-ev" id="ansEv" aria-label="근거">
+        <h3 class="ans-lb">근거</h3>
+        <div class="ans-grid" id="ansGrid">
+          <div class="card" style="padding:12px 14px">
+            <div class="legend" id="ansLegend"></div>
+            <div class="chartbox h260" id="ansChart"></div>
+          </div>
+          <div class="card" style="padding:12px 14px">
+            <div class="cap" id="ansTableCap">상세</div>
+            <div class="tbl-wrap" tabindex="0" style="max-height:236px"><table id="ansTable"></table></div>
+          </div>
         </div>
-      </div>
-      <div class="ai-comment" id="aiComment"></div>
+        <div id="ansEvLocal"></div>
+        <div class="ai-comment" id="aiComment"></div>
+      </section>
+      <section class="ans-sec ans-src" id="ansSrc" aria-label="원본 보기" hidden>
+        <h3 class="ans-lb">원본 보기</h3>
+        <div class="ans-btns" id="ansSrcB"></div>
+      </section>
+      <section class="ans-sec ans-next" id="ansNextBox" aria-label="다음 행동" hidden title="버튼은 화면만 엽니다 — 저장 · 발송은 그 화면에서 내용을 확인한 뒤에만">
+        <h3 class="ans-lb">다음 행동</h3>
+        <div class="ans-btns" id="ansNext"></div>
+        <p class="suggest-title" id="ansSuggestTitle" style="display:none">이어서 물어보기</p>
+        <div class="chips" id="ansSuggest"></div>
+      </section>
+      <div class="ans-meta" id="ansMeta"></div>
       <div class="ans-note" id="ansNote"></div>
-      <p class="suggest-title" id="ansSuggestTitle" style="display:none">이어서 물어보기</p>
-      <div class="chips" id="ansSuggest"></div>
     </div>
   </section>
 
@@ -921,10 +945,12 @@
   </div>
 </div>
 <div class="ovl" id="ovlFind">
-  <div class="modal" style="width:min(620px,100%)">
-    <input id="fkInput" aria-label="전체 검색" placeholder="고객사·시리얼·사업명 검색 · 화면 이름으로 이동 · 질문…  (Enter: 첫 결과 · Esc: 닫기)" autocomplete="off">
-    <div id="fkOut" style="max-height:52vh;overflow:auto;margin-top:10px"></div>
-    <p class="cap" style="margin:8px 0 0">계약 · LIVE · OI · 인바운드 · MDR 운영 · 장비를 한 번에 찾습니다 — 단축키 <b>Ctrl+K</b></p>
+  <div class="modal fk-modal" role="dialog" aria-modal="true" aria-label="검색 · 질문">
+    <div class="fk-ctx" id="fkCtx" hidden></div>
+    <div class="fk-in"><input id="fkInput" aria-label="검색하거나 질문하기" placeholder="고객사 찾기, 매출 분석, 처리할 일을 물어보세요." autocomplete="off"><button type="button" class="btn" id="fkAsk">질문</button></div>
+    <div id="fkOut" class="fk-out" hidden></div>
+    <div id="fkAns" class="fk-ans"></div>
+    <p class="cap fk-cap"><kbd>↑</kbd><kbd>↓</kbd> 고르기 · <kbd>Enter</kbd> 열기 · 질문 · <kbd>Esc</kbd> 닫기 — 보던 화면 · 조건은 그대로</p>
   </div>
 </div>
 

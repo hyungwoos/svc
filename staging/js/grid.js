@@ -16,6 +16,7 @@ import { CHURN, CR, CS, csSetTab, ensureGroupOpen, helpBox, helpWire, initOiForm
 import { logChange, monthRows, msg, openOvl } from './edit.js';
 import { lazyGet, lazyView } from './lazy.js';
 import { closeAnswer } from './ai.js';
+import { HOME, homeModeSet } from './home.js';
 
 
 /* ---- 뒤로가기 — 화면 이동을 브라우저 히스토리에 남겨 상단 ← 버튼·브라우저/폰 뒤로가기·Alt+← 가 모두 이전 화면으로 ----
@@ -80,7 +81,7 @@ export function viewReset(v){
   if(v==='churnrate' || v==='custflow'){ delete CR.crCnd; delete CR.cfCnd; delete CR.cfSrc; }
   /* 화면 HTML 에 그대로 남는 입력칸(다시 그리지 않는 곳) */
   var clr={eqboard:'eqbQ', adminx:'axQ', csite:'csHistQ'}[v]; if(clr){ var q=document.getElementById(clr); if(q) q.value=''; }
-  if(v==='dash') dashResetIfChanged();
+  if(v==='dash'){ dashResetIfChanged(); try{ if(HOME.mode) homeModeSet('', true); }catch(e){} }   /* ㊿+171 홈 메뉴로 들어오면 AI 홈(사업 분석 · 전체 할 일 · 최근 작업에서 나옴) */
 }
 /* 대시보드: 위쪽 거르기(사업라인 · 기준월 · 단위 · 업종 · 파트너 · 상태 · 검색)가 처음과 다를 때만 «초기화»와 같은 동작 */
 export function dashResetIfChanged(){
@@ -114,7 +115,7 @@ export function switchView(v){
   if(GRIDS[ST.CUR_VIEW] && ST.CUR_VIEW!==v && !GRIDS[ST.CUR_VIEW].custom){ try{ DVMEM[ST.CUR_VIEW]=dvSnap(); }catch(e){} }   /* ㊿+169 떠나는 목록의 상태 */
   if(ST.CUR_VIEW==='dash' && v!=='dash'){ try{ closeAnswer(); }catch(e){} }   /* ㊿+159 홈을 떠나면 AI 답변 닫기 (생각 중이면 그대로) */
   ST.CUR_VIEW=v;
-  try{ document.body.dataset.view=v; }catch(e){}   /* ㊿+169 화면에 맞는 도구만(위젯 = 홈) */
+  try{ document.body.dataset.view=v; document.body.dataset.ct=(/^(contracts|live|churn|renew)$/.test(v) || CH_DEFS[v])? '1':''; }catch(e){}   /* ㊿+169 화면에 맞는 도구만(위젯 = 홈) · ㊿+171 «계약 입력·수정»은 계약 관련 화면에서만(data-ct) */
   try{ pushRecent(v); }catch(e){}
   $('#side').querySelectorAll('button').forEach(function(b){
     b.setAttribute('aria-current', b.dataset.v===v?'true':'false');
@@ -538,8 +539,9 @@ export function qvBar(g, rows){
   if(!qb){ qb=document.createElement('div'); qb.id='dvQvBar'; qb.className='qv-bar'; var bar=$('#dvSearch').parentElement; bar.parentElement.insertBefore(qb, bar); }
   if(!defs || g.custom){ qb.hidden=true; qb.innerHTML=''; return; }
   qb.hidden=false; var all=g.rows();
-  qb.innerHTML=tpl`<span class="wv-l">빠른 보기</span>${rawHtml(defs.map(function(d){ var n=all.filter(d[3]).length, on=!!(DV.pre && DV.pre.qv===d[0]);
-      return tpl`<button type="button" class="chip${n? '':' zero'}" data-qv="${d[0]}" aria-pressed="${on?'true':'false'}" title="${d[2]}">${d[1]} <b class="num">${String(n)}</b></button>`; }).join(''))}`+
+  var meOk=!!qvCfg().me;   /* ㊿+171 이름을 고르기 전 «내 담당»은 0 이 아니라 «연결 필요»(누르면 기준 창) */
+  qb.innerHTML=tpl`<span class="wv-l">빠른 보기</span>${rawHtml(defs.map(function(d){ var n=all.filter(d[3]).length, on=!!(DV.pre && DV.pre.qv===d[0]), nc=d[0]==='me' && !meOk;
+      return tpl`<button type="button" class="chip${n || nc? '':' zero'}${nc? ' need':''}" data-qv="${d[0]}" aria-pressed="${on?'true':'false'}" title="${nc? '담당자 연결 필요 — 눌러서 내 이름(담당자 칸 값) 고르기' : d[2]}">${d[1]} <b class="num">${nc? '연결 필요' : String(n)}</b></button>`; }).join(''))}`+
     tpl`<button type="button" class="cbtn" id="qvCfgBtn" aria-haspopup="dialog" title="빠른 보기 기준 — 내 이름 · 장기 미접촉 일수 · 첫 대응 일수">${rawHtml(ico('gear',14))} 기준</button>`;
   qb.querySelectorAll('[data-qv]').forEach(function(b){ b.onclick=function(){ var k=b.dataset.qv;
     if(k==='me' && !qvCfg().me){ qvCfgOpen(/** @type {any} */(document.getElementById('qvCfgBtn'))); return; }
