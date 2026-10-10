@@ -20,10 +20,12 @@ import { gridGoPre, meMatch, switchView } from './grid.js';
 import { closeOvl, logChange, openOvl } from './edit.js';
 import { openCust360, renderTodo } from './tools.js';
 import { placeSearchBtn } from './home.js';
+import { verNum } from './guard.js';
 
 export var NTF_DEF={renew_days:[60,30], eq_days:3, month_end_days:5, renew_emails:[], eq_emails:[], biz_emails:[], dc_emails:[], slack_on:false, team_channel:'C08RA3PPDH8'};
-export var NTF={memo:null, set:null, sqlOk:null, reads:{}, readsOk:false, asg:{}, asgOk:false, omap:null, users:null, open:false, tab:'me', loading:false, at:0, busy:false};
-export var NTF_KIND={renew:'재약정 만기', lapsed:'만기 미처리', eq:'장비 처리 지연', biz:'월말 마감', dc:'데이터 점검'};
+export var NTF={memo:null, ops:null, opsOk:null, set:null, sqlOk:null, reads:{}, readsOk:false, asg:{}, asgOk:false, omap:null, users:null, open:false, tab:'me', loading:false, at:0, busy:false};
+export var NTF_KIND={ops:'운영 상태', renew:'재약정 만기', lapsed:'만기 미처리', eq:'장비 처리 지연', biz:'월말 마감', dc:'데이터 점검'};
+export var OPS_TBL={customers:'고객사', contracts:'계약', monthly_revenue:'월 매출', equipment_orders:'장비 신청', equipment_assets:'장비 현황', oi_deals:'OI'};
 
 /** 설정(없으면 기본값) */
 export function ntfSet(){ return Object.assign({}, NTF_DEF, NTF.set||{}); }
@@ -50,7 +52,7 @@ export function ntfItems(){
   if(!ST.DATA || !ST.DATA.rows || ST.IS_EQUIP) return [];
   var S=ntfSet(), rows=ST.DATA.rows, R=ST.RAWX||{};
   /* 같은 데이터 · 설정 · 담당 · 날짜면 지난 결과(데이터 점검 규칙까지 도는 계산이라 종 숫자를 다시 그릴 때마다 하지 않음) — 데이터를 새로 읽으면 ST.DATA · ST.RAWX 가 새 객체 */
-  var sig=(R.orders||[]).map(function(o){ return o.id+':'+o.status; }).join(','), deps=[ST.DATA, R, rows.length, sig, NTF.set, NTF.asg, ST.AUTH_USER, ST.OWNER_NAMES, todayStr()];
+  var sig=(R.orders||[]).map(function(o){ return o.id+':'+o.status; }).join(','), deps=[ST.DATA, R, rows.length, sig, NTF.set, NTF.asg, NTF.ops, ST.AUTH_USER, ST.OWNER_NAMES, todayStr()];
   if(NTF.memo && NTF.memo.deps.length===deps.length && NTF.memo.deps.every(function(d, i){ return d===deps[i]; })) return NTF.memo.v;
   var v=tickMemo('ntfItems', deps, function(){
     var out=[], days=(S.renew_days||[60,30]).slice().sort(function(a,b){ return a-b; }), maxD=days[days.length-1];
@@ -88,12 +90,56 @@ export function ntfItems(){
     try{ var crit=dcRules().filter(function(x){ return x.sev==='crit' && x.id!=='c_lapsed' && x.items.length; }), n=crit.reduce(function(a,x){ return a+x.items.length; }, 0);
       if(n) out.push({kind:'dc', key:'dc:'+mk(ST.DATA.nowIdx)+':'+n, sev:'hi', order:0, title:'데이터 바로 고칠 것 '+n+'건', detail:crit.map(function(x){ return x.title+' '+x.items.length; }).slice(0,3).join(' · '),
         to:S.dc_emails, me:ntfIsMe(S.dc_emails), go:function(){ switchView('dcheck'); }}); }catch(e){}
-    var KO={lapsed:0, dc:1, biz:2, renew:3, eq:4};
+    /* 6) ㊿+175 운영 상태(슈퍼 관리자 · SQL 106 ops_status) — 야간 백업 · 자동 작업 · AI 점검 · 브라우저 오류 · 옛 버전 · 백업 대비 행 수 */
+    if(ST.IS_SUPER && NTF.ops) try{ opsItems(NTF.ops).forEach(function(x){ out.push(x); }); }catch(e){}
+    var KO={ops:0, lapsed:1, dc:2, biz:3, renew:4, eq:5};
     out.sort(function(a,b){ return (a.sev==='hi'?0:1)-(b.sev==='hi'?0:1) || KO[a.kind]-KO[b.kind] || a.order-b.order; });
     return out;
   });
   NTF.memo={deps:deps, v:v};
   return v;
+}
+/** 운영 상태 → 알림 항목(슈퍼 관리자만 · Slack 보내기에는 넣지 않음) */
+export function opsItems(o){
+  var out=[], now=Date.now(), go=function(){ ntfGoOps(); };
+  var add=function(key, sev, title, detail){ out.push({kind:'ops', key:'ops:'+key, sev:sev, order:0, title:title, detail:detail, to:[], me:true, ops:true, go:go}); };
+  var sn=o.snap||{};
+  if(sn.schema===false) add('snap:none', 'mid', '야간 백업 표(snap)가 없습니다', 'SQL 86 과 자동 작업(pg_cron)이 켜져 있는지 확인 — 배포·운영 › 기록 › 시스템 점검');
+  else if(sn.schema && !sn.last_day) add('snap:empty', 'hi', '야간 백업이 한 번도 없습니다', '자동 작업 svc-snap-nightly 를 확인하세요');
+  else if(sn.last_day){
+    var d=String(sn.last_day), at=Date.UTC(+d.slice(0,4), +d.slice(4,6)-1, +d.slice(6,8), 18, 10), h=Math.round((now-at)/36e5);
+    if(h>30) add('snap:late:'+d, 'hi', '야간 백업이 '+h+'시간째 없습니다', '마지막 백업 '+d.slice(0,4)+'-'+d.slice(4,6)+'-'+d.slice(6,8)+' · 자동 작업(svc-snap-nightly)을 확인하세요');
+    var lr=o.live_rows||{}, sr=sn.rows||{};
+    Object.keys(OPS_TBL).forEach(function(t){ var a=+sr[t], b=+lr[t]; if(!(a>0) || isNaN(b) || b>=a) return; var drop=a-b;
+      if(drop>=Math.max(3, Math.ceil(a*0.02))) add('drop:'+t+':'+d+':'+b, 'mid', OPS_TBL[t]+' 행이 마지막 백업보다 '+drop+'건 적습니다', a.toLocaleString('ko-KR')+' → '+b.toLocaleString('ko-KR')+' — 지운 것이 맞는지 확인(되살리기는 배포·운영 › SQL 에서 백업 표로)'); });
+  }
+  (Array.isArray(o.cron)? o.cron : []).forEach(function(j){
+    if(j.active===false || !j.last_status || /succeeded|running|starting/.test(String(j.last_status))) return;
+    add('cron:'+j.name+':'+String(j.last_start||'').slice(0,16), 'hi', '자동 작업 실패 — '+j.name, String(j.last_start||'').slice(0,16).replace('T',' ')+' · '+String(j.last_msg||j.last_status).slice(0,120));
+  });
+  var ac=(o.aicheck||{}).last_cron;
+  if(ac && ac.run_at){ var ah=Math.round((now-new Date(ac.run_at).getTime())/36e5);
+    if(ah>36) add('ai:late:'+String(ac.run_at).slice(0,10), 'mid', '야간 AI 점검이 '+ah+'시간째 없습니다', '마지막 '+String(ac.run_at).slice(0,16).replace('T',' ')+' · 자동 작업(aicheck)을 확인하세요');
+    else if(ac.total && ac.pass/ac.total<0.7) add('ai:fail:'+String(ac.run_at).slice(0,16), 'mid', '야간 AI 점검 통과 '+ac.pass+'/'+ac.total, 'AI 답이 포탈 숫자와 다릅니다 — 배포·운영 › 기록 › AI 점검'); }
+  var er=o.errors;
+  if(er && +er.n24>=5){ var bk=+er.n24>=50? 50 : +er.n24>=20? 20 : 5, top=(er.top||[])[0];
+    add('err:'+todayStr()+':'+bk, +er.n24>=20? 'hi' : 'mid', '브라우저 오류 '+er.n24+'건(24시간 · '+(er.users24||0)+'명)', top? '가장 많은 것: '+String(top.msg||'').slice(0,90)+' ('+top.cnt+'건)' : '배포·운영 › 기록 › 브라우저 오류'); }
+  var me=verNum(APP_VER), old=(o.vers||[]).filter(function(v){ var n=verNum(v.ver); return n!=null && me!=null && n<me; });
+  if(old.length){ var users=old.reduce(function(a, v){ return a+(+v.users||0); }, 0);
+    add('old:'+todayStr()+':'+old.map(function(v){ return verNum(v.ver); }).join(','), 'mid', '옛 버전 탭으로 쓰는 사람 '+users+'명(24시간)', old.map(function(v){ return '㊿+'+verNum(v.ver)+' '+v.users+'명'; }).join(' · ')+' — 새로고침(Ctrl+Shift+R) 안내'); }
+  return out;
+}
+export function ntfGoOps(){
+  switchView('ops');
+  var n=0, go=function(){ var t=/** @type {any} */(document.querySelector('#opsTabs [data-t="log"]')); if(!t){ if(++n<40) setTimeout(go, 50); return; } t.click(); };
+  setTimeout(go, 0);
+}
+/** ㊿+175 운영 상태 읽기(슈퍼 관리자 · SQL 106 전이면 null) */
+export async function opsLoad(){
+  if(!ST.IS_SUPER || !ST.SB_TOKEN) return null;
+  try{ var r=await fetch(SB_URL+'/rest/v1/rpc/ops_status', {method:'POST', headers:sbHeaders(true), body:'{}'}); NTF.opsOk=r.ok; if(!r.ok) return (NTF.ops=null); var j=await r.json(); NTF.ops=(j && typeof j==='object')? j : null; }
+  catch(e){ NTF.ops=null; }
+  return NTF.ops;
 }
 export function ntfRead(k){ return !!NTF.reads[k]; }
 export function ntfUnread(){ return ntfItems().filter(function(x){ return x.me && !ntfRead(x.key); }).length; }
@@ -118,6 +164,7 @@ export async function ntfLoad(force){
     var as=NTF.sqlOk? await ntfGet('work_assign?select=kind,ref,assignee,assigned_by,assigned_at&kind=eq.eq&limit=1000') : null;
     var g={}; (as||[]).forEach(function(x){ g[String(x.ref)]=x; }); var hadAsg=Object.keys(NTF.asg).length>0; NTF.asg=g; NTF.asgOk=as!==null;
     if(hadAsg || Object.keys(g).length) try{ renderTodo(); }catch(e){}   /* 홈 «우선 업무»의 장비 담당 = 처리 담당 */
+    await opsLoad();
     NTF.at=Date.now();
     if(NTF.readsOk && Math.random()<0.05) fetch(SB_URL+'/rest/v1/rpc/notify_reads_trim', {method:'POST', headers:sbHeaders(true), body:'{}'}).catch(function(){});
   }catch(e){} finally{ NTF.loading=false; }
@@ -369,6 +416,7 @@ export function ntfTargets(x, omap){
 }
 export function ntfSlackPlan(omap){
   var all=ntfItems(), S=ntfSet(), day=todayStr(), per={};
+  all=all.filter(function(x){ return x.kind!=='ops'; });   /* 운영 상태는 관리자 화면 안에서만(Slack 에 안 보냄) */
   all.forEach(function(x){ ntfTargets(x, omap).forEach(function(e){ (per[e]=per[e]||[]).push(x); }); });
   var dms=Object.keys(per).sort().slice(0, 30).map(function(e){ return {email:e, n:per[e].length, text:ntfSlackText(per[e], '🔔 '+ntfWho(e)+' 님 포탈 알림 '+day+' — '+per[e].length+'건')}; });
   return {team:{channel:S.team_channel, n:all.length, text:ntfSlackText(all, '🔔 포탈 알림 '+day+' — '+all.length+'건')}, dms:dms, more:Math.max(0, Object.keys(per).length-30)};

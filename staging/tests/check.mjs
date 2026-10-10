@@ -132,6 +132,13 @@ say(/^export function tickMemo\(/m.test(jsAll) && /^export function cssvKey\(/m.
     && /^export function ntfItems\(/m.test(nt) && /tickMemo\('ntfItems'/.test(nt) && /expEligible\(r\)/.test(nt) && /'work_assign\?on_conflict=kind,ref'/.test(nt) && html.includes('id="ntfAdmin"')
     && (fnS === null || (/set\.slack_on !== true/.test(fnS) && /자동 발송은 받지 않습니다/.test(fnS) && /rpc\/is_super_admin/.test(fnS) && /team_channel\)/.test(fnS) && !/Deno\.cron/.test(fnS))),
   '㊿+174 알림함: Slack 기본 꺼짐 · 보내기는 미리 보기 → 확인 뒤 한 곳(ntfCall) · 타이머 발송 없음 · notify 함수는 사용자(슈퍼 관리자)만 · 서비스 키 거절 · slack_on 다시 확인 · 처리 담당은 work_assign(신청서 안 바꿈)'); }
+// ㊿+175 운영 · 안정성 — 옛 탭 막기(저장 경로에 버전 확인) · 동시 수정 대조 · 저장 0행 확인 · 운영 상태 · 운영 되돌리기
+{ const gd = fs.existsSync(path.join(ROOT, 'js', 'guard.js')) ? fs.readFileSync(path.join(ROOT, 'js', 'guard.js'), 'utf8') : '';
+  const opsP = path.join(ROOT, 'supabase', 'functions', 'ops', 'index.ts'), opsS = fs.existsSync(opsP) ? fs.readFileSync(opsP, 'utf8') : null;
+  say(/^export async function verBeforeWrite\(/m.test(gd) && /^export async function rowGuard\(/m.test(gd) && /cache:'no-store'/.test(gd) && /await verBeforeWrite\(method, path\);/.test(jsAll) && /rowGuard\(g\.table, r, body, g\.cols\)/.test(jsAll)
+    && /'return=representation'\)\.then\(function\(res\)\{ if\(!savedRows\(res\)\)/.test(jsAll) && /^\s*verStart\(\);/m.test(jsAll) && /^export function opsItems\(/m.test(jsAll) && /rpc\/ops_status/.test(jsAll) && /^export function opsRbBind\(/m.test(jsAll)
+    && (opsS === null || (/case 'gh_rollback'/.test(opsS) && /expect_head/.test(opsS) && /KEEP = \/\^\(staging\|supabase\|node_modules\|\\\.github\)\\\//.test(opsS))),
+  '㊿+175 안정성: 저장 전 버전 확인(옛 탭 막음) · 표 저장 전 DB 대조(동시 수정) · 0행이면 «저장 안 됨» · 운영 상태(ops_status) · 운영 되돌리기(gh_rollback · staging/supabase/.github 제외 · 미리 본 HEAD)'); }
 // ㊿+160 연장하면 상태 «재약정»(구분 그대로) · 계약 상세에 «계약 기간 · 연장 이력»
 say(/^export function renewStatus\(r\)/m.test(jsAll) && /var nst=renewStatus\(r\);/.test(jsAll) && /^export function ctPeriods\(c, mine\)/m.test(jsAll) && html.includes('id="dtRenew"'), '연장: 상태 «재약정»(renewStatus) · 계약 상세 연장 이력(ctPeriods · #dtRenew)');
 const idx = html + jsAll;

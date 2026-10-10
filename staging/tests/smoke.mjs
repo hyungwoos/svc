@@ -2695,6 +2695,152 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
     return out.map((x) => x.slice(0, 40)).join(' · ');
   });
 }
+// ㊿+175 운영 · 안정성 — 옛 탭 막기 · 동시 수정 · 저장 확인 · 다시 시도 · 운영 상태(알림함) · 운영 되돌리기 (가짜 DB · 모의 응답 · 외부 발송 0)
+{
+  const verRoute = async (page, st) => page.route(/index\.html\?vw=/, async (r) => { const res = await r.fetch(); let t = await res.text(); if (st.ver) t = t.replace(/name="app-ver" content="[^"]+"/, 'name="app-ver" content="' + st.ver + '"'); await r.fulfill({ status: 200, contentType: 'text/html', body: t }); });
+  await S.t('㊿+175 옛 탭 막기: 서버에 새 버전 → 화면 아래 띠 · 업무 저장은 막음(요청 0) · 기록(change_log)은 통과 · 같아지면 띠 사라짐 · 서버가 더 옛것(되돌림)이면 1분 넘게 계속될 때만 · 저장 직전에도 확인', async () => {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page);
+    const writes = [], st = { ver: null };
+    await mockBackend(page, { onWrite: (w) => writes.push(w.m + ' ' + w.url.replace(/^https:\/\/[^/]+\/rest\/v1\//, '').split('?')[0]) }); await verRoute(page, st);
+    await page.goto(url + '/index.html'); await page.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA, null, { timeout: 15000 }); await page.waitForTimeout(300);
+    const a0 = await page.evaluate(async () => { await SVC.verCheck(); return { stale: SVC.VW.stale, bar: !!document.getElementById('verBar'), latest: SVC.VW.latest === SVC.APP_VER }; });
+    st.ver = '2026-09-16 ㊿+999';
+    const a1 = await page.evaluate(async () => { await SVC.verCheck(); const b = document.getElementById('verBar'); return { stale: SVC.VW.stale, bar: b && b.textContent, role: b && b.getAttribute('role') }; });
+    writes.length = 0;
+    const a2 = await page.evaluate(async () => { let e1 = null; try { await SVC.sbWrite('PATCH', 'contracts?id=eq.1', { note: 'x' }); } catch (e) { e1 = { m: e.message, st: !!e.stale }; }
+      let ok2 = true; try { await SVC.sbWrite('POST', 'change_log', { actor: 't', action: 'x' }); } catch (e) { ok2 = String(e.message); } return { e1, ok2 }; });
+    await page.waitForTimeout(200); const w2 = writes.slice();
+    st.ver = null; const a3 = await page.evaluate(async () => { await SVC.verCheck(); return { stale: SVC.VW.stale, bar: !!document.getElementById('verBar') }; });
+    st.ver = '2026-09-16 ㊿+1'; const a4 = await page.evaluate(async () => { await SVC.verCheck(); const s1 = SVC.VW.stale; SVC.VW.older = Date.now() - 61000; SVC.verJudge(); return { s1, s2: SVC.VW.stale, bar: document.getElementById('verBar') && document.getElementById('verBar').textContent }; });
+    st.ver = null; await page.evaluate(async () => { await SVC.verCheck(); });
+    st.ver = '2026-09-16 ㊿+998'; writes.length = 0;
+    const a5 = await page.evaluate(async () => { SVC.VW.at = 0; let m = null; try { await SVC.sbWrite('PATCH', 'oi_deals?id=eq.1', { stage: 'x' }); } catch (e) { m = e.message; } return { m, stale: SVC.VW.stale }; });
+    await page.waitForTimeout(200);
+    assert(!a0.stale && !a0.bar && a0.latest, 'same ' + JSON.stringify(a0));
+    assert(a1.stale && /새 버전\(㊿\+999\)/.test(a1.bar) && /이 탭은 ㊿\+175/.test(a1.bar) && a1.role === 'status', 'newer ' + JSON.stringify(a1));
+    assert(a2.e1 && a2.e1.st && /저장하지 않았습니다/.test(a2.e1.m) && a2.ok2 === true && !w2.some((x) => /contracts/.test(x)) && w2.some((x) => /^POST change_log/.test(x)), 'block ' + JSON.stringify({ a2, w2 }));
+    assert(!a3.stale && !a3.bar && a4.s1 === false && a4.s2 === true && /운영 버전이 ㊿\+1/.test(a4.bar || ''), 'older ' + JSON.stringify({ a3, a4 }));
+    assert(a5.stale && /새 버전\(㊿\+998\)/.test(a5.m || '') && !writes.some((x) => /oi_deals/.test(x)) && !c.errs.length, 'before-write ' + JSON.stringify({ a5, writes, errs: c.errs }));
+    await ctx.close();
+    return '새 버전 → 띠 · 막음 / 같음 → 풀림 / 옛것 → 1분 뒤 / 저장 직전 확인';
+  });
+
+  const mkF = async (opt) => {
+    const db = new FakeDB(seedData()); const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, serviceWorkers: 'block' }); const page = await ctx.newPage();
+    const errs = []; page.on('pageerror', (e) => errs.push(String(e).slice(0, 200))); page.on('dialog', (d) => d.accept());
+    const st = { patch: [], abort: false, empty: false };
+    await fakeBackend(page, db, { extra: async (route, u, m) => {
+      if (/\/rest\/v1\/contracts\?id=eq\./.test(u) && m === 'PATCH') { st.patch.push(route.request().postData()); if (st.abort) { await route.abort('failed'); return true; } if (st.empty) { await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }); return true; } }
+      return false; } });
+    await page.goto(url + '/index.html'); await page.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA && SVC.ST.DATA.rows.length, null, { timeout: 20000 }); await page.waitForTimeout(400);
+    const cu = db.t.customers.find((x) => x.name === '가상고객01'); const ct = db.t.contracts.find((x) => x.customer_id === cu.id);
+    return { db, ctx, page, errs, st, ct };
+  };
+  const openRow = async (page) => { await page.evaluate(() => { SVC.wvSet('contracts', '전체'); SVC.switchView('contracts'); }); await page.fill('#dvSearch', '가상고객01'); await page.waitForTimeout(350);
+    await page.click('#dvTable tbody tr:has-text("가상고객01") button[data-act="edit"]'); await page.waitForTimeout(150); };
+  const setCell = (page, head, v) => page.evaluate(([h, v]) => { const tr = [...document.querySelectorAll('#dvTable tbody tr')].find((x) => x.querySelector('button.sv')); const hs = [...document.querySelectorAll('#dvTable thead th')].map((x) => x.textContent.trim());
+    const el = tr.children[hs.findIndex((x) => x.startsWith(h))].querySelector('input,select'); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); }, [head, v]);
+  const msg = (page) => page.$eval('#dvMsg', (e) => e.textContent);
+
+  await S.t('㊿+175 동시 수정: 남이 바꾼 칸 중 내가 안 바꾼 칸은 그대로(저장에서 뺌 · 알림) / 둘 다 바꾼 칸은 창(내가 본 값 · 지금 값 · 내 값) → «내 값으로 저장» = 내 값 · «취소하고 새로 읽기» = 남의 값 + 다시 읽음', async () => {
+    const A = await mkF(); await openRow(A.page); await setCell(A.page, '비고', '내 메모'); A.ct.csm = '다른CSM';
+    await A.page.click('#dvTable button.sv'); await A.page.waitForTimeout(1500);
+    const pa = JSON.parse(A.st.patch[0] || '{}'), ta = await A.page.$$eval('.toast', (t) => t.map((x) => x.textContent).join(' / '));
+    assert(A.ct.note === '내 메모' && A.ct.csm === '다른CSM' && !('csm' in pa) && pa.note === '내 메모' && /그대로 두었습니다.*CSM/.test(ta) && /저장됨/.test(await msg(A.page)) && !A.errs.length, 'kept ' + JSON.stringify({ note: A.ct.note, csm: A.ct.csm, pa: Object.keys(pa).length, ta, errs: A.errs }));
+    await A.ctx.close();
+    const out = [];
+    for (const mine of [true, false]) {
+      const B = await mkF(); await openRow(B.page); await setCell(B.page, '비고', '내 값'); B.ct.note = '남의 값';
+      const l0 = await B.page.evaluate(() => SVC.ST.LAST_LOAD);
+      await B.page.click('#dvTable button.sv'); await B.page.waitForTimeout(800);
+      const dlg = await B.page.evaluate(() => { const o = document.getElementById('ovlConflict'); return o && o.classList.contains('on') ? { rows: [...o.querySelectorAll('tbody tr')].map((r) => [...r.children].map((x) => x.textContent).join('|')), h: o.querySelector('h3').textContent, focus: document.activeElement && document.activeElement.id } : null; });
+      await B.page.click(mine ? '#cfMine' : '#cfCancel'); await B.page.waitForTimeout(1500);
+      const reloaded = (await B.page.evaluate(() => SVC.ST.LAST_LOAD)) !== l0, m = await msg(B.page);
+      out.push({ mine, note: B.ct.note, reloaded });
+      assert(dlg && /먼저 고쳤습니다/.test(dlg.h) && dlg.rows.length === 1 && dlg.rows[0] === '비고|(비어 있음)|남의 값|내 값' && dlg.focus === 'cfCancel', 'dlg ' + JSON.stringify(dlg));
+      if (mine) assert(B.ct.note === '내 값' && /저장됨/.test(m) && !reloaded, 'mine ' + JSON.stringify({ note: B.ct.note, m }));
+      else assert(B.ct.note === '남의 값' && reloaded && /저장하지 않았습니다/.test(m) && B.st.patch.length === 0, 'cancel ' + JSON.stringify({ note: B.ct.note, m, reloaded, p: B.st.patch.length }));
+      assert(!B.errs.length, B.errs.join('|'));
+      await B.ctx.close();
+    }
+    return 'CSM 은 남의 값 · 비고 충돌 → 내 값 / 취소';
+  });
+
+  await S.t('㊿+175 저장 확인 · 다시 시도: 반영 0행(권한 · 지워짐)이면 «저장되지 않았습니다»(예전엔 저장됨으로 보였음) · 연결이 끊기면 빨간 알림 «다시 시도» → 누르면 저장 · 행이 지워졌으면 저장 안 함', async () => {
+    const A = await mkF(); await openRow(A.page); await setCell(A.page, '비고', '시험1'); A.st.empty = true;
+    await A.page.click('#dvTable button.sv'); await A.page.waitForTimeout(1200); const m1 = await msg(A.page);
+    A.st.empty = false; A.st.abort = true; await A.page.click('#dvTable button.sv'); await A.page.waitForTimeout(1200);
+    const t2 = await A.page.$$eval('.toast.bad', (x) => x.map((y) => y.textContent).join(' / ')); const retry = await A.page.$('.toast.bad .tact');
+    A.st.abort = false; if (retry) await retry.click(); await A.page.waitForTimeout(1500); const m3 = await msg(A.page);
+    assert(/저장되지 않았습니다/.test(m1) && /연결이 끊겼습니다/.test(t2) && retry && A.ct.note === '시험1' && /저장됨/.test(m3) && !A.errs.length, JSON.stringify({ m1, t2, retry: !!retry, note: A.ct.note, m3, errs: A.errs }));
+    await A.ctx.close();
+    const B = await mkF(); await openRow(B.page); await setCell(B.page, '비고', '지워진 행'); B.db.t.contracts.splice(B.db.t.contracts.indexOf(B.ct), 1);
+    await B.page.click('#dvTable button.sv'); await B.page.waitForTimeout(1000); const m4 = await msg(B.page);
+    assert(/지워졌거나 볼 권한이 없습니다/.test(m4) && B.st.patch.length === 0, JSON.stringify({ m4, p: B.st.patch.length }));
+    await B.ctx.close();
+    return '0행 → 안 됨 · 끊김 → 다시 시도 → 저장 · 지워진 행 → 안 함';
+  });
+
+  const OPS_ST = (now) => { const ymd = new Date(now - 3 * 864e5).toISOString().slice(0, 10).replace(/-/g, '');
+    return { v: 1, at: new Date(now).toISOString(), snap: { schema: true, last_day: ymd, days: [ymd], rows: { contracts: 100, customers: 40, monthly_revenue: 5000 } }, live_rows: { contracts: 90, customers: 40, monthly_revenue: 4990 },
+      cron: [{ name: 'svc-snap-nightly', active: true, last_status: 'succeeded', last_start: new Date(now - 26 * 36e5).toISOString() }, { name: 'aicheck-nightly', active: true, last_status: 'failed', last_start: new Date(now - 20 * 36e5).toISOString(), last_msg: 'ERROR: boom' }],
+      aicheck: { last_cron: { run_at: new Date(now - 50 * 36e5).toISOString(), source: 'cron', pass: 15, total: 15 } }, errors: { n24: 23, n7: 30, users24: 3, top: [{ msg: 'TypeError: x is null', cnt: 20, users: 3 }] },
+      vers: [{ ver: '2026-09-16 ㊿+175', users: 4 }, { ver: '2026-09-16 ㊿+173', users: 2 }] }; };
+  await S.t('㊿+175 운영 상태(SQL 106 ops_status · 슈퍼 관리자만): 야간 백업 30시간 넘게 없음 · 자동 작업 실패 · 계약 행 수 급감 · 야간 AI 점검 오래됨 · 브라우저 오류 23건 · 옛 버전 2명 → 알림함 «운영 상태» · Slack 보내기에서는 빠짐 · 시스템 점검에도 / 관리자 아님 = 부르지 않음', async () => {
+    const run = async (role, sqlOk) => {
+      const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page); let called = 0;
+      await mockBackend(page, { role, extra: async (route, u, m) => {
+        if (u.includes('/rpc/load_all')) { await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(Object.assign({}, (await import('./lib.mjs')).FIX, { roles: [{ role }] })) }); return true; }
+        if (u.includes('/rpc/ops_status')) { called++; if (!sqlOk) { await route.fulfill({ status: 404, contentType: 'application/json', body: '{"code":"PGRST202"}' }); return true; } await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(OPS_ST(Date.now())) }); return true; }
+        if (/\/rest\/v1\/notify_settings/.test(u) && m === 'GET') { await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([{ id: 1, renew_days: [60, 30], eq_days: 3, month_end_days: 5, renew_emails: [], eq_emails: [], biz_emails: [], dc_emails: [], slack_on: true, team_channel: 'C0TEST1234' }]) }); return true; }
+        return false; } });
+      await page.goto(url + '/index.html'); await page.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA && SVC.NTF.at > 0, null, { timeout: 15000 }); await page.waitForTimeout(400);
+      const r = await page.evaluate(() => { const it = SVC.ntfItems().filter((x) => x.kind === 'ops'); return { n: it.length, me: it.every((x) => x.me), titles: it.map((x) => x.title), slack: SVC.ntfSlackPlan([]).team.text.includes('운영 상태') || /백업/.test(SVC.ntfSlackPlan([]).team.text) }; });
+      return { ctx, page, c, r, called: () => called };
+    };
+    const S1 = await run('super_admin', true);
+    const t = S1.r.titles.join(' / ');
+    await S1.page.click('#ntfBtn'); await S1.page.waitForTimeout(250);
+    const pane = await S1.page.evaluate(() => [...document.querySelectorAll('#ntfPanel .ntf-g')].map((x) => x.textContent));
+    await S1.page.click('#ntfPanel [data-go="0"]'); await S1.page.waitForFunction(() => SVC.ST.CUR_VIEW === 'ops' && document.querySelector('#opsTabs'), null, { timeout: 8000 }); await S1.page.waitForTimeout(300);
+    const ops = await S1.page.evaluate(() => ({ v: SVC.ST.CUR_VIEW, tab: (document.querySelector('#opsTabs [aria-pressed="true"], #opsTabs .on') || {}).textContent || '' }));
+    await S1.page.route(/github\.io|githubusercontent/, (r) => r.fulfill({ status: 200, contentType: 'text/html', body: '<meta name="app-ver" content="2026-09-16 ㊿+175">' }));
+    await S1.page.evaluate(() => { SVC.opsHealth(); }); await S1.page.waitForFunction(() => SVC.OPS.health && !SVC.OPS.health.running, null, { timeout: 20000 });
+    const hl = await S1.page.evaluate(() => (SVC.OPS.health && SVC.OPS.health.rows || []).filter((x) => /운영 상태/.test(x.name)).map((x) => (x.ok ? 'ok ' : 'bad ') + x.info).join(''));
+    assert(S1.r.n === 6 && S1.r.me && /야간 백업이 \d+시간째 없습니다/.test(t) && /자동 작업 실패 — aicheck-nightly/.test(t) && /계약 행이 마지막 백업보다 10건 적습니다/.test(t) && !/월 매출 행/.test(t) && /야간 AI 점검이 5\d시간째/.test(t) && /브라우저 오류 23건/.test(t) && /옛 버전 탭으로 쓰는 사람 2명/.test(t) && !S1.r.slack, 'items ' + JSON.stringify(S1.r));
+    assert(pane[0] === '운영 상태' && ops.v === 'ops' && /^bad /.test(hl) && /야간 백업/.test(hl) && !S1.c.errs.length, JSON.stringify({ pane, ops, hl, errs: S1.c.errs }));
+    await S1.ctx.close();
+    const S2 = await run('admin', true); const S3 = await run('super_admin', false);
+    assert(S2.r.n === 0 && S2.called() === 0 && S3.r.n === 0 && S3.called() >= 1 && !S2.c.errs.length && !S3.c.errs.length, JSON.stringify({ s2: S2.r, s2c: S2.called(), s3: S3.r }));
+    await S2.ctx.close(); await S3.ctx.close();
+    return t.slice(0, 110);
+  });
+
+  await S.t('㊿+175 운영 되돌리기(ops v1.6): 운영 버전 이력(운영 index.html 커밋) → 기본 = 바로 전 · 지금 운영은 고를 수 없음 → 미리 보기(dry · 파일 목록 · 버전) → 확인 창 → 미리 본 HEAD 와 함께 커밋 요청 · 취소면 요청 없음', async () => {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page);
+    const calls = []; let accept = false; page.on('dialog', async (d) => { calls.push('dialog:' + d.message().split('\n').slice(0, 3).join(' ')); if (accept) await d.accept(); else await d.dismiss(); });
+    await mockBackend(page, { extra: async (route, u) => { if (!u.includes('/functions/v1/ops')) return false; const b = JSON.parse(route.request().postData() || '{}'); calls.push(b.action + (b.dry ? ':dry' : '') + (b.to ? ':' + b.to.slice(0, 4) : '') + (b.expect_head ? ':head=' + b.expect_head : ''));
+      const out = b.action === 'status' ? { ok: true, pin_set: true, github: { repo: 'x/svc', branch: 'main', token_set: true }, recent: [] }
+        : b.action === 'gh_history' ? { ok: true, commits: [{ sha: 'c'.repeat(40), short: 'ccccccc', date: '2026-10-10T05:00:00Z', message: '스테이징 → 운영 승격 (36개 파일)' }, { sha: 'b'.repeat(40), short: 'bbbbbbb', date: '2026-10-09T05:00:00Z', message: '스테이징 → 운영 승격 (30개 파일)' }, { sha: 'a'.repeat(40), short: 'aaaaaaa', date: '2026-10-08T05:00:00Z', message: '스테이징 → 운영 승격 (12개 파일)' }] }
+        : b.action === 'gh_rollback' && b.dry ? { ok: true, dry: true, to: 'b'.repeat(40), to_short: 'bbbbbbb', to_ver: '2026-09-16 ㊿+174', to_date: '2026-10-09T05:00:00Z', head: 'h'.repeat(40), head_ver: '2026-09-16 ㊿+175', changed: ['index.html', 'js/grid.js', 'tests/smoke.mjs'], added: [], removed: ['js/guard.js'] }
+        : b.action === 'gh_rollback' ? { ok: true, commit: 'd'.repeat(40), note: 'Actions(테스트) 통과 뒤 1~2분이면 운영에 반영' } : { ok: true };
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(out) }); return true; } });
+    await page.goto(url + '/index.html'); await page.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA, null, { timeout: 15000 }); await page.waitForTimeout(300);
+    await page.evaluate(() => SVC.switchView('ops')); await page.waitForFunction(() => SVC.OPS && document.getElementById('opsRbLoad'), null, { timeout: 8000 });
+    await page.evaluate(() => { SVC.OPS.pin = '1234'; }); await page.click('#opsRbLoad'); await page.waitForTimeout(400);
+    const L = await page.evaluate(() => [...document.querySelectorAll('input[name="opsRb"]')].map((x) => (x.checked ? '*' : '') + (x.disabled ? 'x' : '') + x.value));
+    await page.click('#opsRbDry'); await page.waitForTimeout(400);
+    const dry = await page.evaluate(() => { const d = document.querySelector('.ops-rb-dry'); return d && d.textContent; });
+    await page.click('#opsRbGo'); await page.waitForTimeout(300); const n1 = calls.filter((x) => /^gh_rollback:(?!dry)/.test(x)).length;
+    accept = true; await page.click('#opsRbGo'); await page.waitForTimeout(500);
+    const msg = await page.$eval('#opsMsg', (e) => e.textContent), last = calls.filter((x) => /^gh_rollback/.test(x));
+    assert(JSON.stringify(L) === JSON.stringify(['x0', '*1', '2']), 'list ' + JSON.stringify(L));
+    assert(/㊿\+175.*→.*㊿\+174/.test(dry || '') && /바뀜 3/.test(dry) && /지움 1/.test(dry) && /js\/guard\.js/.test(dry), 'dry ' + dry);
+    assert(n1 === 0 && last.length === 2 && last[0] === 'gh_rollback:dry:bbbb' && last[1] === 'gh_rollback:bbbb:head=' + 'h'.repeat(40) && calls.some((x) => /^dialog:운영 포탈을 되돌립니다/.test(x)) && /되돌리기 커밋 완료/.test(msg) && !c.errs.length, JSON.stringify({ n1, last, msg, calls: calls.slice(-6), errs: c.errs }));
+    await ctx.close();
+    return '이력 3 → 미리 보기 ㊿+175 → ㊿+174 · 취소 0 · 확인 1';
+  });
+}
 await browser.close(); srv.close();
 const ok = S.report();
 fs.writeFileSync(path.join(OUT, 'smoke.json'), JSON.stringify(S.results, null, 1));

@@ -1,7 +1,7 @@
 // ============================================================================
-//  Supabase Edge Function: ops  (v1.5.1 · 2026-10-08 · 함수 배포 진입점은 파일 이름만(경로 겹침 고침) · v1.5 2026-10-07 · 커밋 빠르게: 바뀌지 않은 파일은 건너뛰고(내용 SHA 비교) 바뀐 파일은 6개씩 동시에 올림 · v1.4 2026-10-03 · APP_VER 를 <meta name="app-ver"> 에서도 읽음(㊿+136) · v1.3 gh_copy 하위 폴더 · v1.2 gh_delete · v1.1 gh_copy)
+//  Supabase Edge Function: ops  (v1.6 · 2026-10-10 · gh_rollback 운영 되돌리기(미리 보기 → 커밋 하나) · v1.5.1 2026-10-08 · 함수 배포 진입점은 파일 이름만(경로 겹침 고침) · v1.5 2026-10-07 · 커밋 빠르게: 바뀌지 않은 파일은 건너뛰고(내용 SHA 비교) 바뀐 파일은 6개씩 동시에 올림 · v1.4 2026-10-03 · APP_VER 를 <meta name="app-ver"> 에서도 읽음(㊿+136) · v1.3 gh_copy 하위 폴더 · v1.2 gh_delete · v1.1 gh_copy)
 //   포탈 «관리자 › 배포·운영» 화면 뒤의 단일 중계 함수 — 포탈(공개 HTML)에는 어떤 토큰도 두지 않고 전부 여기 Secrets 에만.
-//     · GitHub   : 저장소 파일 목록/내용 · 여러 파일을 커밋 하나로(Git Data API: blob → tree → commit → ref) · 파일 이력 · 이전 버전 복원
+//     · GitHub   : 저장소 파일 목록/내용 · 여러 파일을 커밋 하나로(Git Data API: blob → tree → commit → ref) · 파일 이력 · 이전 버전 복원 · 운영 전체 되돌리기(v1.6)
 //     · Supabase : SQL 실행(Management API /database/query · 읽기 전용 토글) · Edge Function 목록/코드 조회/배포/Verify JWT · Secrets 이름 조회/설정/삭제
 //     · 기록     : 모든 동작을 ops_log(SQL 85)에 · 선택: 슬랙 채널에 한 줄 알림
 //   인증(모두 충족): ① 사용자 JWT ② 이메일이 OPS_OWNER 목록에 있음(이 기능은 지정한 사람만) ③ user_roles = super_admin ④ 작업 PIN == OPS_PIN(status 제외)
@@ -273,6 +273,49 @@ Deno.serve(async (req: Request) => {
         const c = await ghCommitFiles([{ path, content_b64 }], message, actor);
         summary = message; detail = { sha: c.sha, from: ref }; notify = `↩️ GitHub 되돌리기 — ${path} ← ${ref.slice(0, 7)}\n${c.url}`;
         out = { commit: c.sha, url: c.url, app_ver: blob.encoding === 'base64' ? appVer(b64dec(String(blob.content))) : null }; break;
+      }
+      case 'gh_rollback': {
+        /* v1.6 운영 되돌리기(㊿+175) — 운영(루트)의 포탈 파일 · 테스트를 지정한 이전 커밋 때 상태로 «커밋 하나»에 되돌림.
+           범위 = 승격(gh_copy staging → 루트)이 바꾸는 것과 같음: 루트의 사이트 파일(html · js · mjs · css · json …) — staging/ · supabase/ · .github/ 는 그대로
+           (테스트 tests/*.mjs 도 함께 되돌려야 CI 가 그 버전 코드로 통과 → Pages 반영). blob 은 sha 재사용(업로드 없음)
+           dry:true = 바뀔 파일 · 버전만 돌려줌 → 사람이 확인 → expect_head(미리 볼 때의 HEAD)와 함께 다시 부르면 커밋(그 사이 저장소가 바뀌면 거절) */
+        const to = String(body.to || '').trim(); target = to.slice(0, 12);
+        if (!/^[0-9a-f]{7,40}$/i.test(to)) throw new Error('되돌릴 커밋(sha)이 필요합니다');
+        const SITE_FILE = /\.(html?|js|mjs|css|json|webmanifest|png|jpe?g|svg|ico|txt|xml)$/i;
+        const KEEP = /^(staging|supabase|node_modules|\.github)\//;
+        const inScope = (p: string) => !KEEP.test(p) && SITE_FILE.test(p) && !/^\.|\/\./.test(p);
+        const ref = await gh(`/repos/${GH_REPO}/git/ref/heads/${encodeURIComponent(GH_BRANCH)}`); const headSha = ref.object.sha as string;
+        if (body.expect_head && String(body.expect_head) !== headSha) throw new Error('미리 본 뒤에 저장소가 바뀌었습니다 — 미리 보기를 다시 해 주세요');
+        const head = await gh(`/repos/${GH_REPO}/git/commits/${headSha}`);
+        const toC = await gh(`/repos/${GH_REPO}/commits/${encodeURIComponent(to)}`); const toSha = String(toC.sha || '');
+        if (!/^[0-9a-f]{40}$/i.test(toSha)) throw new Error('그 커밋을 찾지 못했습니다: ' + to);
+        if (toSha === headSha) throw new Error('지금 HEAD 와 같은 커밋입니다');
+        const cmp = await gh(`/repos/${GH_REPO}/compare/${toSha}...${headSha}`);
+        if (cmp.status !== 'ahead') throw new Error('지금 브랜치의 지난 기록에 있는 커밋만 고를 수 있습니다 (' + cmp.status + ')');
+        const [tTo, tHead] = await Promise.all([ghTree(String(toC.commit?.tree?.sha || toSha)), ghTree(head.tree.sha as string)]);
+        const A = new Map(tTo.filter((e) => e.type === 'blob' && inScope(e.path)).map((e) => [e.path, e]));
+        const B = new Map(tHead.filter((e) => e.type === 'blob' && inScope(e.path)).map((e) => [e.path, e]));
+        const changed: GhTreeEntry[] = [], added: GhTreeEntry[] = [], removed: string[] = [];
+        for (const [p, e] of A) { const h = B.get(p); if (!h) added.push(e); else if (h.sha !== e.sha) changed.push(e); }
+        for (const p of B.keys()) if (!A.has(p)) removed.push(p);
+        if (!changed.length && !added.length && !removed.length) throw new Error('운영 파일이 이미 그 커밋 때와 같습니다');
+        if (!A.has('index.html')) throw new Error('그 커밋에는 운영 index.html 이 없습니다 — 고를 수 없는 커밋입니다');
+        if (changed.length + added.length + removed.length > 400) throw new Error('바뀌는 파일이 너무 많습니다 (400개 넘음)');
+        const verAt = async (m: Map<string, GhTreeEntry>) => { const e = m.get('index.html'); try { return e ? appVer(await ghBlobText(e.sha)) : null; } catch { return null; } };
+        const [toVer, headVer] = await Promise.all([verAt(A), verAt(B)]);
+        const info = { to: toSha, to_short: toSha.slice(0, 7), to_ver: toVer, to_date: toC.commit?.author?.date || null, to_message: String(toC.commit?.message || '').split('\n')[0].slice(0, 140),
+          head: headSha, head_ver: headVer, changed: changed.map((e) => e.path), added: added.map((e) => e.path), removed };
+        if (body.dry) { out = { dry: true, ...info }; summary = `미리 보기 ${headVer || ''} → ${toVer || toSha.slice(0, 7)} · ${changed.length + added.length + removed.length}개`; break; }
+        const entries = [...changed, ...added].map((e) => ({ path: e.path, mode: e.mode || '100644', type: 'blob', sha: e.sha }))
+          .concat(removed.map((p) => ({ path: p, mode: '100644', type: 'blob', sha: null as unknown as string })));
+        const newTree = await gh(`/repos/${GH_REPO}/git/trees`, { method: 'POST', body: JSON.stringify({ base_tree: head.tree.sha, tree: entries }) });
+        const message = `운영 되돌리기 → ${toVer || toSha.slice(0, 7)} (지금 ${headVer || '?'} · 커밋 ${toSha.slice(0, 7)} 때 상태 · 포탈)`.slice(0, 500);
+        const commit = await gh(`/repos/${GH_REPO}/git/commits`, { method: 'POST', body: JSON.stringify({ message, tree: newTree.sha, parents: [headSha], author: { name: 'SVC 포탈', email: actor, date: new Date().toISOString() } }) });
+        await gh(`/repos/${GH_REPO}/git/refs/heads/${encodeURIComponent(GH_BRANCH)}`, { method: 'PATCH', body: JSON.stringify({ sha: commit.sha, force: false }) });
+        summary = message; detail = { sha: commit.sha, ...info };
+        notify = `↩️ 운영 되돌리기 ${headVer || ''} → ${toVer || toSha.slice(0, 7)} — ${entries.length}개 파일\nhttps://github.com/${GH_REPO}/commit/${commit.sha}`;
+        out = { commit: commit.sha, url: `https://github.com/${GH_REPO}/commit/${commit.sha}`, files: entries.length, ...info,
+          note: 'Actions(테스트) 통과 뒤 1~2분이면 운영에 반영 · 스테이징(staging/)은 그대로 — 고친 뒤 다시 승격하면 됩니다' }; break;
       }
       /* ── Supabase: SQL ── */
       case 'sql_run': {

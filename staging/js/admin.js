@@ -10,7 +10,7 @@ import { UPD, updFetch, updOpenAll, updShow, updSyncSeed } from './upd.js';
 import { switchView, viewLabelOf, xlsxAoa } from './grid.js';
 import { logChange, openOvl, setAuthTab } from './edit.js';
 import { loadInbound } from './inbound.js';
-import { ntfAdminRender } from './notify.js';
+import { NTF, ntfAdminRender, opsItems, opsLoad } from './notify.js';
 
 
 /* ===== 관리자 (super_admin 전용) — 계정·권한 관리 ===== */
@@ -167,6 +167,7 @@ export function opsGhHtml(){
     h+=tpl`<p class="mini" style="margin:6px 0 0">커밋 하나로 묶여 올라가고, 테스트가 통과하면 GitHub Pages 에 반영(보통 2~3분). ${stg? '스테이징에서 확인한 뒤 «스테이징 → 운영 승격»으로 같은 파일을 운영에 올립니다.':'index.html 은 올린 뒤 이 화면을 새로고침하면 새 버전으로 바뀝니다.'} 저장소 파일(.github · supabase · cloudflare · tests/fn · README · package.json · .gitignore)은 대상과 상관없이 루트로 갑니다.</p>`;
   }
   h+=tpl`<div class="ops-h" style="margin-top:14px">스테이징 ↔ 운영</div><div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="cbtn" id="opsSync" title="운영에 있는 포탈 파일 전부를 staging/ 로 복사(재업로드 없이 같은 내용) — 스테이징을 운영과 똑같이 맞출 때">운영 → 스테이징 동기화</button><button type="button" class="cbtn" id="opsQa" title="스테이징 포탈을 창 안에서 열어 메뉴 전부를 자동으로 눌러 봅니다 — JS 오류·빈 화면·깨진 값·넘침·핵심 숫자 비교 (약 30초)">🧪 스테이징 QA</button>${rawHtml(qaBadgeHtml())}<button type="button" class="cbtn pri" id="opsPromote" title="staging/ 에 있는 파일을 운영(루트)으로 복사 — 스테이징에서 확인이 끝났을 때">스테이징 → 운영 승격</button><a class="cbtn" href="${stagingUrl()}" target="_blank" rel="noopener">스테이징 열기 ↗</a></div>`;
+  h+=opsRbHtml();   /* ㊿+175 운영 되돌리기 */
   h+='</div>';
   h+=tpl`<div><div class="ops-h">② 저장소 · 이전 버전</div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px"><button type="button" class="pill ghost" id="opsGhList">저장소 파일 보기</button><button type="button" class="pill ghost" id="opsGhHist" data-p="index.html">index.html 이력</button><a class="pill ghost" href="https://github.com/${(OPS.st&&OPS.st.github&&OPS.st.github.repo)||'hyungwoos/svc'}/actions" target="_blank" rel="noopener" title="테스트·배포 진행 상황">Actions ↗</a></div>`;
   h+=tpl`<div style="display:flex;gap:6px;flex-wrap:wrap;margin:-2px 0 8px"><button type="button" class="pill ghost" id="opsRepoCheck" title="안 쓰는 파일 · 스테이징에만 있는 저장소 파일 · 루트에 없는 테스트/함수 · 배포 설정(deploy.yml) 상태를 확인">🧹 저장소 점검</button><a class="pill ghost" target="_blank" rel="noopener" href="https://github.com/${opsRepoName()}/settings/pages" title="Source 가 «GitHub Actions» 여야 테스트를 통과한 버전만 배포됩니다">Pages 설정 ↗</a></div>`;
@@ -303,6 +304,7 @@ export function opsGhBind(host){
   var go=host.querySelector('#opsCommit'); if(go) go.onclick=opsCommit;
   var rc=host.querySelector('#opsRepoCheck'); if(rc) rc.onclick=opsRepoCheck;
   var rcl=host.querySelector('#opsRepoClean'); if(rcl) rcl.onclick=opsRepoClean;
+  opsRbBind(host);
   host.querySelectorAll('[data-wfcopy]').forEach(function(b){ b.onclick=function(){ var f=OPS.files[+b.dataset.wfcopy]; if(!f) return;
     var done=function(){ toast('복사했습니다','GitHub 편집 화면에서 전체 선택(Ctrl+A) 후 붙여 넣고 «Commit changes»'); };
     try{ navigator.clipboard.writeText(f.content||'').then(done, function(){ prompt('아래 내용을 복사하세요 (Ctrl+C)', f.content||''); }); }catch(e){ prompt('아래 내용을 복사하세요 (Ctrl+C)', f.content||''); } }; });
@@ -313,6 +315,42 @@ export function opsGhBind(host){
     opsSetMsg('복원 중…'); b.disabled=true;
     try{ var r=await opsCall('gh_restore',{path:p, ref:sha}); opsSetMsg('복원 커밋 완료 — '+r.commit.slice(0,7)+(r.app_ver? ' · '+r.app_ver:'')+' · Pages 반영 1~2분','ok'); toast('GitHub 복원 완료', p+' ← '+sha.slice(0,7)); OPS.hist=null; renderOps(true); }
     catch(e){ opsSetMsg(String(e.message||e),'bad'); b.disabled=false; } }; });
+}
+/* ── ㊿+175 운영 되돌리기 (ops v1.6 gh_rollback) — 승격 뒤 문제가 생기면 운영(루트)의 포탈 파일 · 테스트를 이전 운영 버전으로 «커밋 하나»에
+   · 버전 목록 = 운영 index.html 을 바꾼 커밋(승격 · 되돌리기) · 기본 선택 = 바로 전 것 · 미리 보기(dry: 바뀜 · 되살림 · 지움 · 버전) → 확인 → 커밋(미리 본 HEAD 그대로일 때만)
+   · 스테이징(staging/) · 함수 소스 · .github 는 그대로 — 고친 뒤 다시 승격 */
+export var OPS_RB={list:null, sel:1, dry:null, busy:false};
+export function opsRbHtml(){
+  var R=OPS_RB, h=tpl`<div class="ops-h" style="margin-top:14px">문제가 생기면 — 운영 되돌리기</div>`;
+  h+=tpl`<p class="mini" style="margin:0 0 6px">승격한 뒤 운영에서 문제가 생기면 운영 포탈을 이전 운영 버전으로 되돌립니다(커밋 하나 · 테스트 통과 뒤 1~2분). 스테이징은 그대로 두니 고친 뒤 다시 승격하면 됩니다. 데이터(DB)는 되돌리지 않습니다.</p>`;
+  if(!R.list) return h+tpl`<div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="cbtn" id="opsRbLoad">운영 버전 이력 보기…</button></div>`;
+  h+=tpl`<div class="ops-rb" role="radiogroup" aria-label="되돌릴 운영 버전">${rawHtml(R.list.map(function(c, i){ var cur=i===0;
+    return tpl`<label class="ops-rb-it${cur? ' cur' : ''}"><input type="radio" name="opsRb" value="${String(i)}"${rawHtml(i===R.sel? ' checked' : '')}${rawHtml(cur? ' disabled' : '')}> <span class="num">${String(c.date||'').slice(0,16).replace('T',' ')}</span> <code>${c.short||String(c.sha||'').slice(0,7)}</code> ${c.message||''}${cur? ' — 지금 운영' : ''}</label>`; }).join(''))}</div>`;
+  h+=tpl`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><button type="button" class="cbtn" id="opsRbDry"${rawHtml(R.busy? ' disabled' : '')}>미리 보기</button><button type="button" class="cbtn" id="opsRbX">닫기</button></div>`;
+  var D=R.dry;
+  if(D){ var n=D.changed.length+D.added.length+D.removed.length, list=function(a, lab){ return a.length? tpl`<li><b>${lab} ${String(a.length)}</b> — ${a.slice(0,12).join(', ')}${a.length>12? ' 외 '+(a.length-12)+'개' : ''}</li>` : ''; };
+    h+=tpl`<div class="ops-rb-dry"><p><b>${D.head_ver||'?'}</b> → <b>${D.to_ver||D.to_short}</b> (커밋 ${D.to_short} · ${String(D.to_date||'').slice(0,16).replace('T',' ')}) · 파일 ${String(n)}개</p>`+
+      tpl`<ul class="mini">${rawHtml(list(D.changed,'바뀜')+list(D.added,'되살림')+list(D.removed,'지움'))}</ul>`+
+      tpl`<button type="button" class="pill" id="opsRbGo"${rawHtml(R.busy? ' disabled' : '')}>운영을 ${D.to_ver? D.to_ver.replace(/^\S+\s+/,'') : D.to_short}(으)로 되돌리기…</button></div>`; }
+  return h;
+}
+export function opsRbBind(host){
+  var ld=host.querySelector('#opsRbLoad'); if(ld) ld.onclick=async function(){ if(!opsNeedPin()) return; opsSetMsg('운영 버전 이력 읽는 중…');
+    try{ var r=await opsCall('gh_history',{path:'index.html', n:8}); OPS_RB.list=(r.commits||[]); OPS_RB.sel=OPS_RB.list.length>1? 1 : 0; OPS_RB.dry=null; opsSetMsg(OPS_RB.list.length+'개 버전','ok'); renderOps(true); }
+    catch(e){ opsSetMsg(String(/** @type {any} */(e).message||e),'bad'); } };
+  host.querySelectorAll('input[name="opsRb"]').forEach(function(x){ /** @type {any} */(x).onchange=function(){ OPS_RB.sel=+/** @type {any} */(x).value; OPS_RB.dry=null; renderOps(true); }; });
+  var xb=host.querySelector('#opsRbX'); if(xb) xb.onclick=function(){ OPS_RB.list=null; OPS_RB.dry=null; renderOps(true); };
+  var dr=host.querySelector('#opsRbDry'); if(dr) dr.onclick=async function(){ if(!opsNeedPin()) return; var c=OPS_RB.list[OPS_RB.sel]; if(!c || OPS_RB.sel===0){ opsSetMsg('되돌릴 이전 버전을 고르세요','bad'); return; }
+    OPS_RB.busy=true; opsSetMsg('미리 보는 중…'); renderOps(true);
+    try{ OPS_RB.dry=await opsCall('gh_rollback',{to:c.sha, dry:true}); opsSetMsg('미리 보기 — 아래 내용을 확인하고 «되돌리기»','ok'); }
+    catch(e){ OPS_RB.dry=null; opsSetMsg(String(/** @type {any} */(e).message||e),'bad'); }
+    OPS_RB.busy=false; renderOps(true); };
+  var go=host.querySelector('#opsRbGo'); if(go) go.onclick=async function(){ var D=OPS_RB.dry; if(!D || !opsNeedPin()) return;
+    if(!confirm('운영 포탈을 되돌립니다\n\n지금 '+(D.head_ver||'?')+' → '+(D.to_ver||D.to_short)+'\n파일 '+(D.changed.length+D.added.length+D.removed.length)+'개 · 커밋 하나 · 테스트 통과 뒤 1~2분이면 반영\n\n스테이징 · DB 데이터는 그대로입니다. 되돌릴까요?')) return;
+    OPS_RB.busy=true; opsSetMsg('되돌리는 중…'); renderOps(true);
+    try{ var r=await opsCall('gh_rollback',{to:D.to, expect_head:D.head}); opsSetMsg('되돌리기 커밋 완료 — '+String(r.commit).slice(0,7)+' · '+(r.note||''),'ok'); toast('운영 되돌리기 커밋', (D.head_ver||'')+' → '+(D.to_ver||D.to_short)); OPS_RB.list=null; OPS_RB.dry=null; }
+    catch(e){ opsSetMsg(String(/** @type {any} */(e).message||e),'bad'); }
+    OPS_RB.busy=false; renderOps(true); };
 }
 /* 끌어다 놓은 항목에 폴더가 있으면 안을 걸어 상대 경로를 유지 (tests/smoke.mjs 처럼) */
 export function opsDropItems(dt){
@@ -395,6 +433,10 @@ export async function opsHealth(){
   await step('remind (dry)', async function(){ var r=await fetch(SB_URL+'/functions/v1/remind?dry=1', {method:'POST', headers:{'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+ST.SB_TOKEN}, body:JSON.stringify({month:idxDate(STATE.base)})}); var j=await r.json(); if(!j.ok) throw new Error(j.error||('HTTP '+r.status)); return '이달 '+(j.counts&&j.counts.due)+' · 다음 달 '+(j.counts&&j.counts.next)+' · 미처리 '+(j.counts&&j.counts.lapsed); });
   await step('ops (status)', async function(){ var r=await opsCall('status'); return (r.github&&r.github.token_set? 'GitHub ✓':'GitHub ✗')+' · '+(r.mgmt_token_set? 'Supabase ✓':'Supabase ✗')+' · '+(r.log_ok? '기록 ✓':'기록 ✗'); });
   if(OPS.pin) await step('운영 DB (select 1 · 읽기 전용)', async function(){ var r=await opsCall('sql_run',{sql:'select 1 as ok, now() as at', read_only:true}); return Array.isArray(r.rows)&&r.rows[0]? String(r.rows[0].at||'').slice(0,19) : 'ok'; });
+  await step('운영 상태 (야간 백업 · 자동 작업 · AI 점검 · SQL 106)', async function(){ var o=await opsLoad(); if(!o) throw new Error(NTF.opsOk===false? 'ops_status 없음 — SQL 106 을 실행하세요' : '읽지 못함');
+    var its=opsItems(o), sn=o.snap||{}, base=(sn.last_day? '마지막 백업 '+sn.last_day : '백업 없음')+' · 자동 작업 '+(Array.isArray(o.cron)? o.cron.length+'개' : '확인 못 함(pg_cron 없음)');
+    if(its.some(function(x){ return x.sev==='hi'; })) throw new Error(base+' · '+its.map(function(x){ return x.title; }).join(' / '));
+    return base+(its.length? ' · 확인: '+its.map(function(x){ return x.title; }).join(' / ') : ' · 이상 없음'); });
   await step('서비스 워커', async function(){ if(!('serviceWorker' in navigator)) return '미지원'; var reg=await navigator.serviceWorker.getRegistration(); return reg? (reg.active? '활성':'등록됨') : '없음 (file:// 또는 미등록)'; });
   OPS.health={running:false, rows:out, at:new Date()}; renderOps(true);
 }

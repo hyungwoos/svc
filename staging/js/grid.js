@@ -15,6 +15,7 @@ import { CHURN, CR, CS, csSetTab, ensureGroupOpen, helpBox, helpWire, initOiForm
   renderChurnRate, renderCsite, renderCustFlow, renderOiTiles, wzReset } from './sales.js';
 import { logChange, monthRows, msg, openOvl } from './edit.js';
 import { lazyGet, lazyView } from './lazy.js';
+import { isNetErr, netToast, rowGuard, savedRows, saveFailMsg } from './guard.js';
 
 
 /* ---- 뒤로가기 — 화면 이동을 브라우저 히스토리에 남겨 상단 ← 버튼·브라우저/폰 뒤로가기·Alt+← 가 모두 이전 화면으로 ----
@@ -1425,6 +1426,16 @@ export function gridRow(r,g,editing){
           body.returned_date=todayStr();               /* 회수완료로 바꾸는 날 = 회수일 (나중에 회수일 칸에서 수정 가능) */
           toast('회수일 자동 입력', body.returned_date+' — 다른 날이면 회수일 칸을 고쳐 저장하세요', 'info');
         }
+        /* ㊿+175 저장 직전에 DB 의 지금 값과 대조(rowGuard) — 남이 먼저 고친 칸이 있으면 알려 주고, 확인되면 저장 */
+        $('#dvMsg').textContent='저장 중…';
+        rowGuard(g.table, r, body, g.cols).then(function(gd){
+          if(gd.gone){ $('#dvMsg').textContent='그 행이 지워졌거나 볼 권한이 없습니다 — 새로 읽어 확인해 주세요'; toast('저장하지 않았습니다', '그 행이 지워졌거나 볼 권한이 없습니다', 'bad'); return; }
+          if(gd.cancel){ $('#dvMsg').textContent='저장하지 않았습니다 — 최신 데이터를 다시 읽었습니다'; toast('저장하지 않았습니다', '다른 사람이 고친 값을 다시 읽었습니다', 'info');
+            loadFromDb().then(function(nd){ onData(nd); if(GRIDS[ST.CUR_VIEW]) renderGrid(); }).catch(function(){}); return; }
+          if(gd.kept && gd.kept.length) toast('다른 사람이 바꾼 칸은 그대로 두었습니다', gd.kept.map(function(k){ var c=g.cols.filter(function(x){ return x.k===k; })[0]; return c? c.l : k; }).join(', '), 'info');
+          doSave();
+        }).catch(function(e){ $('#dvMsg').textContent=String(e.message||e); if(isNetErr(e)) netToast(e, function(){ bs.click(); }); });
+        function doSave(){
         var sideJobs=side.map(function(x){
           var o={}; o[x.col]=x.val;
           return sbWrite('PATCH',x.tbl+'?id=eq.'+x.id,o).then(function(){
@@ -1437,7 +1448,7 @@ export function gridRow(r,g,editing){
           });
         });
         Promise.all(sideJobs).then(function(){
-        return (Object.keys(body).length? sbWrite('PATCH',g.table+'?id=eq.'+r.id,body) : Promise.resolve()); }).then(function(){
+        return (Object.keys(body).length? sbWrite('PATCH',g.table+'?id=eq.'+r.id,body,'return=representation').then(function(res){ if(!savedRows(res)) throw new Error(saveFailMsg()); }) : Promise.resolve()); }).then(function(){
           Object.keys(body).forEach(function(k){ r[k]=body[k]; });
           if(Object.keys(body).length) logChange('update',g.table,r.id,body);
           ST.DIRTY=true; $('#dvMsg').textContent='저장됨 ✅';
@@ -1452,7 +1463,8 @@ export function gridRow(r,g,editing){
                    ST.DIRTY=true; if(ST.CUR_VIEW==='orders'||ST.CUR_VIEW==='assets') renderGrid(); }
           });
           view();
-        }).catch(function(e){ $('#dvMsg').textContent=String(e.message||e); });
+        }).catch(function(e){ $('#dvMsg').textContent=String(e.message||e); if(isNetErr(e)) netToast(e, function(){ bs.click(); }); else if(/** @type {any} */(e).stale) toast('저장하지 않았습니다', '새 버전이 올라왔습니다 — 화면 아래 «지금 새로고침»', 'bad'); });
+        }
       }catch(e){ $('#dvMsg').textContent=String(e.message||e); }
     };
     var bc=document.createElement('button'); bc.textContent='취소';

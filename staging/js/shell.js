@@ -16,6 +16,7 @@ import { btnBackSync, gridGoPre, loadHide, NAV, navMenu, oiOpen, openDetail, qvC
 import { closeOvl, logChange, openOvl, OVL_SKIP_CLEAN, ovlMarkClean, setupEdit, toggleAuthMenu } from './edit.js';
 import { homeOn, homeRender, placeSearchBtn, srchCtx } from './home.js';
 import { NTF, ntfAfterData, ntfWho } from './notify.js';
+import { verBeforeWrite } from './guard.js';
 
 
 /* ==================================================================
@@ -1063,15 +1064,17 @@ export async function sbAll(q){
 export async function sbWrite(method, path, body, prefer, asView){   /* asView(㊿+148): 다른 화면에서 저장할 때 그 표의 화면 권한으로 검사 — 예: 데이터 점검 수정 창 → 'contracts' */
   if(!ST.SB_TOKEN) throw new Error('로그인이 필요합니다.');
   permWriteGuard(method, path, asView);
-  var r=await fetch(SB_URL+'/rest/v1/'+path,{
-    method:method, headers:Object.assign(sbHeaders(true), prefer?{Prefer:prefer}:{}),
-    body: body!==undefined? JSON.stringify(body): undefined
-  });
+  await verBeforeWrite(method, path);   /* ㊿+175 옛 탭(새 버전이 올라온 뒤의 탭)이면 저장 막음 */
+  /* ㊿+175 연결이 끊기거나 60초 넘게 답이 없으면 알아보기 쉬운 오류(net · timeout) — 부르는 쪽이 «다시 시도»를 붙일 수 있음 */
+  var send=async function(){
+    var ctl=new AbortController(), tm=setTimeout(function(){ try{ ctl.abort(); }catch(e){} }, 60000);
+    try{ return await fetch(SB_URL+'/rest/v1/'+path,{ method:method, headers:Object.assign(sbHeaders(true), prefer?{Prefer:prefer}:{}), body: body!==undefined? JSON.stringify(body): undefined, signal:ctl.signal }); }
+    catch(e){ var to=/** @type {any} */(e) && /** @type {any} */(e).name==='AbortError'; var ne=/** @type {any} */(new Error(to? '서버 응답이 60초 넘게 없습니다 — 저장됐는지 새로 읽어 확인한 뒤 다시 시도해 주세요' : '서버에 연결하지 못했습니다 — 인터넷 연결을 확인하고 다시 시도해 주세요')); ne.net=true; ne.timeout=to; throw ne; }
+    finally{ clearTimeout(tm); }
+  };
+  var r=await send();
   if(r.status===401 && await refreshToken()){   // 토큰 만료 → 연장 후 1회 재시도
-    r=await fetch(SB_URL+'/rest/v1/'+path,{
-      method:method, headers:Object.assign(sbHeaders(true), prefer?{Prefer:prefer}:{}),
-      body: body!==undefined? JSON.stringify(body): undefined
-    });
+    r=await send();
   }
   if(!r.ok) throw new Error('저장 실패 ('+r.status+'): '+(await r.text()).slice(0,220));
   // 저장 성공 → 이전 캐시는 옛 데이터이므로 즉시 무효화 (새로고침 시 옛 화면 방지)

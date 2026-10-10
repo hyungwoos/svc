@@ -2704,4 +2704,28 @@ html[data-skin="gn"] #rail .gn-right .ntf-btn:hover{border-color:var(--ink-2)}
 .ntf-it .ntf-rd[aria-pressed="true"]::before{content:'✓ '}
 .ntf-frm .ntf-sw label{display:inline-flex;align-items:center;gap:8px;margin:0;font-size:14px;color:var(--ink)}
 .ntf-frm .ntf-sw input[type=checkbox]{width:18px;height:18px;padding:0}
+/* ==== ㊿+175 운영 · 안정성 ==== */
+/* 옛 탭 띠 — 아래 가운데에 늘 떠 있음(메뉴 · 창을 가리지 않게) */
+.ver-bar{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:260;display:flex;align-items:center;gap:12px;max-width:min(760px,calc(100vw - 24px));padding:10px 12px 10px 16px;border-radius:12px;background:var(--warn-bg,#fff4d6);color:var(--ink);border:1px solid var(--warn-ink);box-shadow:0 10px 30px rgba(0,0,0,.22);font-size:14px;line-height:1.45}
+.ver-bar b{color:var(--warn-ink)}
+.ver-bar .pill{flex:none}
+:root[data-theme="dark"] .ver-bar{background:#3a2e10}
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]) .ver-bar{background:#3a2e10} }
+@media (max-width:520px){ .ver-bar{flex-direction:column;align-items:stretch;bottom:10px} }
+/* 동시 수정 창 */
+.cf-tbl th[scope=row]{text-align:left;white-space:nowrap}
+.cf-tbl td.now{font-weight:700;color:var(--warn-ink)}
+.cf-tbl td.mine{font-weight:700}
+.cf-tbl td{overflow-wrap:anywhere}
+#verBar #verReload{background:var(--warn-ink);border-color:var(--warn-ink);color:#fff}
+:root[data-theme="dark"] #verBar #verReload{color:#1a1300}
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]) #verBar #verReload{color:#1a1300} }
+/* 운영 되돌리기 */
+.ops-rb{display:flex;flex-direction:column;gap:4px;max-height:240px;overflow:auto;border:1px solid var(--grid);border-radius:10px;padding:6px 10px}
+.ops-rb-it{display:flex;gap:6px;align-items:baseline;flex-wrap:wrap;font-size:13px;line-height:1.5;cursor:pointer}
+.ops-rb-it.cur{color:var(--muted);cursor:default}
+.ops-rb-it code{font-size:12px}
+.ops-rb-dry{margin-top:8px;padding:10px 12px;border:1px solid var(--warn-ink);border-radius:10px;font-size:13px}
+.ops-rb-dry p{margin:0 0 4px}
+.ops-rb-dry ul{margin:4px 0 8px;padding-left:18px}
 /* ==== ㊿+166 새 디자인 end ==== */

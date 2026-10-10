@@ -12,6 +12,14 @@ const TREE = [
   { path: 'supabase/functions/ops/index.ts', type: 'blob', sha: 'b7', size: 10, mode: '100644' }, { path: 'staging/index.html', type: 'blob', sha: 'b8', size: 60, mode: '100644' },
   { path: 'staging/js/app.js', type: 'blob', sha: 'b9', size: 10, mode: '100644' }, { path: '도장.jpg', type: 'blob', sha: 'b10', size: 10, mode: '100644' }, { path: 'staging/도장.jpg', type: 'blob', sha: 'b11', size: 10, mode: '100644' },
 ];
+/* 옛 커밋 트리 — index.html · app.css 내용이 다름 · js/app.js 같음 · js/old.js 는 옛날에만(되살림) · sw.js 는 지금만(지움) · tests/smoke.mjs 다름(함께 되돌림) · staging/ · supabase/ · .github 는 달라도 손대지 않음 */
+const OLD_TREE = [
+  { path: 'index.html', type: 'blob', sha: 'o1', size: 60, mode: '100644' }, { path: 'app.css', type: 'blob', sha: 'o3', size: 10, mode: '100644' },
+  { path: 'js/app.js', type: 'blob', sha: 'b4', size: 10, mode: '100644' }, { path: 'js/old.js', type: 'blob', sha: 'o12', size: 10, mode: '100644' },
+  { path: 'tests/smoke.mjs', type: 'blob', sha: 'o5', size: 10, mode: '100644' }, { path: '.github/workflows/deploy.yml', type: 'blob', sha: 'o6', size: 10, mode: '100644' },
+  { path: 'supabase/functions/ops/index.ts', type: 'blob', sha: 'o7', size: 10, mode: '100644' }, { path: 'staging/index.html', type: 'blob', sha: 'o8', size: 60, mode: '100644' },
+  { path: '도장.jpg', type: 'blob', sha: 'b10', size: 10, mode: '100644' },
+];
 const b64 = (s: string) => { const u = new TextEncoder().encode(s); let bin = ''; u.forEach((c) => bin += String.fromCharCode(c)); return btoa(bin); };
 const treePosts: string[][] = [];
 let blobInFlight = 0, blobMax = 0, blobPosts = 0;
@@ -26,6 +34,11 @@ installFetch(async (url, method, body, init) => {
     return J(logRows.slice(-30));
   }
   if (url.includes('api.github.com')) {
+    /* v1.6 gh_rollback — 옛 커밋(OLD) 의 트리 · 비교 · 커밋 정보 */
+    if (url.includes('/git/trees/oldtree')) return J({ tree: OLD_TREE });
+    if (/\/commits\/(aaaa1111|ffff9999)$/.test(url)) { const z = url.endsWith('ffff9999'); return J({ sha: (z ? 'f' : 'a').repeat(40), commit: { tree: { sha: 'oldtree' }, message: '스테이징 → 운영 승격 (3개 파일)\n상세', author: { date: '2026-10-09T01:00:00Z' } } }); }
+    if (url.includes('/compare/')) return J({ status: url.includes('/compare/' + 'f'.repeat(40)) ? 'diverged' : 'ahead' });
+    if (url.includes('/git/blobs/o1')) return J({ encoding: 'base64', content: b64('<html><meta name="app-ver" content="2026-09-16 ㊿+136"></html>') });
     if (url.includes('/git/trees/') && method === 'GET') return J({ tree: TREE });
     if (url.includes('/git/trees') && method === 'POST') { treePosts.push(JSON.parse(body!).tree.map((e: any) => e.path + '←' + e.sha)); return J({ sha: 'newtree' }, 201); }
     if (url.includes('/git/blobs/b1')) return J({ encoding: 'base64', content: b64('<html><meta name="app-ver" content="2026-09-16 ㊿+137"></html>') });
@@ -97,6 +110,18 @@ console.log('ops 함수');
 ok(lastDeployMeta && lastDeployMeta.entrypoint_path === 'index.ts', 'fn_deploy: 진입점은 파일 이름만(예전 file:///… 경로가 겹치지 않음)', lastDeployMeta && lastDeployMeta.entrypoint_path);
 { const r = await call(P({ action: 'secrets_list' })); ok(r.j.ok && JSON.stringify(r.j).includes('SLACK_BOT_TOKEN') && !JSON.stringify(r.j).includes('"value"'), 'secrets_list: 이름만(값 없음)'); }
 { const r = await call(P({ action: 'secrets_set', name: 'SUPABASE_X', value: 'v' })); ok(!r.j.ok, 'secrets_set: SUPABASE_ 접두 거부', r.j.error); }
+// v1.6 운영 되돌리기 — 미리 보기(dry)는 커밋 없음 · 범위(루트 사이트 파일 + tests) · 버전 · 커밋 하나 · HEAD 바뀌면 거절 · 지난 기록이 아닌 커밋 거절
+{ const n0 = treePosts.length; const r = await call(P({ action: 'gh_rollback', to: 'aaaa1111', dry: true }));
+  ok(r.j.ok && r.j.dry && treePosts.length === n0 && r.j.to_ver === '2026-09-16 ㊿+136' && r.j.head_ver === '2026-09-16 ㊿+137', 'gh_rollback dry: 커밋 없이 버전(지금 → 되돌릴 것)', { to_ver: r.j.to_ver, head_ver: r.j.head_ver });
+  ok(JSON.stringify(r.j.changed) === JSON.stringify(['index.html', 'app.css', 'tests/smoke.mjs']) && JSON.stringify(r.j.added) === JSON.stringify(['js/old.js']) && r.j.removed.includes('sw.js') && r.j.removed.every((p: string) => !/^(staging|supabase|\.github)\//.test(p)) && !r.j.changed.includes('도장.jpg'),
+    'gh_rollback dry: 바뀜 · 되살림 · 지움 — staging/ · supabase/ · .github · 도장.jpg(같음) 는 범위 밖', { c: r.j.changed, a: r.j.added, d: r.j.removed }); }
+{ const r = await call(P({ action: 'gh_rollback', to: 'aaaa1111', expect_head: 'otherhead' })); ok(!r.j.ok && /미리 본 뒤에/.test(r.j.error), 'gh_rollback: 미리 본 HEAD 와 다르면 거절', r.j.error); }
+{ const r = await call(P({ action: 'gh_rollback', to: 'ffff9999' })); ok(!r.j.ok && /지난 기록/.test(r.j.error), 'gh_rollback: 지금 브랜치의 지난 커밋이 아니면 거절', r.j.error); }
+{ const r = await call(P({ action: 'gh_rollback', to: 'not-a-sha' })); ok(!r.j.ok && /sha/.test(r.j.error), 'gh_rollback: sha 형식 아님 → 거절'); }
+{ const n0 = treePosts.length; const r = await call(P({ action: 'gh_rollback', to: 'aaaa1111', expect_head: 'headsha' })); const t = treePosts[n0] || [];
+  ok(r.j.ok && r.j.commit === 'c0ffee1234567' && treePosts.length === n0 + 1 && t.includes('index.html←o1') && t.includes('js/old.js←o12') && t.includes('sw.js←null') && t.includes('tests/smoke.mjs←o5') && !t.some((x) => /^(staging|supabase|\.github)\//.test(x)),
+    'gh_rollback: 커밋 하나(blob sha 재사용 · 지운 파일 sha null) · staging/ 그대로', t);
+  ok(logRows.some((l) => l.action === 'gh_rollback' && /운영 되돌리기 → 2026-09-16 ㊿\+136/.test(String(l.summary))), 'gh_rollback: ops_log 에 «운영 되돌리기 → 버전»'); }
 // 거부 경로
 role = 'admin'; { const r = await call(P({ action: 'gh_list' })); ok(r.status === 403 && /슈퍼/.test(r.j.error), 'admin 역할 → 403', r.j.error); } role = 'super_admin';
 email = 'stranger@example.com'; { const r = await call(P({ action: 'gh_list' })); ok(r.status === 403 && /지정된 계정/.test(r.j.error), 'OWNER 아님 → 403 + denied 로그', r.j.error); ok(logRows.some((l) => l.action === 'denied' && l.actor === 'stranger@example.com'), 'denied 가 ops_log 에 기록'); } email = OWNER;

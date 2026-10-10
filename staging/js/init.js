@@ -13,6 +13,7 @@ import { wkFsSync, wkNext, wkPrev, wkToggleFs } from './inbound.js';
 import { askScreenHelp, btnBackSync, comboPlace, goBack, gridActPad, LENS_DEFS, LENS_DESC, NAV, navValid, switchView, viewSnapAdd, viewSnapInit } from './grid.js';
 import { closeOvl, fillSectorSel, ovlDismiss, ovlInit, ovlTop, renameShowPreview, syncCustMeta } from './edit.js';
 import { lazyHook } from './lazy.js';
+import { verStart } from './guard.js';
 
 /* 시작 순서 — main.js 가 모든 모듈을 읽은 뒤 한 번 부름. 아래 문장들은 예전 고전 스크립트 때의 «파일을 읽을 때 실행» 순서 그대로 */
 export function start(){
@@ -42,6 +43,8 @@ export function start(){
   /* ㊿+173 실사용 속도 기록은 창을 숨기거나 닫을 때 한 번에 */
   window.addEventListener('pagehide', function(){ perfFlush(true); });
   document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='hidden') perfFlush(true); });
+  /* ㊿+175 옛 탭 막기 — 서버에 새 버전이 올라오면 위쪽 띠 + 저장 막음(guard.js) */
+  verStart();
 
   /* [core.js 134행] */
   if('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !IS_QA){

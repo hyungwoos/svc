@@ -13,6 +13,7 @@ import * as m_dash from './dash.js';
 import * as m_ai from './ai.js';
 import * as m_home from './home.js';
 import * as m_notify from './notify.js';
+import * as m_guard from './guard.js';
 import * as m_grids from './grids.js';
 import * as m_equipment from './equipment.js';
 import * as m_analysis from './analysis.js';
@@ -35,7 +36,7 @@ function expose(ns){
     Object.defineProperty(SVC, k, {get:function(){ return ns[k]; }, enumerable:true, configurable:true});
   });
 }
-[m_state, m_viz, m_core, m_shell, m_dash, m_ai, m_home, m_notify, m_grids, m_equipment, m_analysis, m_tools, m_cloud, m_inbound, m_upd, m_sales, m_grid, m_edit, m_lazy, m_qadb, m_qadata].forEach(expose);
+[m_state, m_viz, m_core, m_shell, m_dash, m_ai, m_home, m_notify, m_guard, m_grids, m_equipment, m_analysis, m_tools, m_cloud, m_inbound, m_upd, m_sales, m_grid, m_edit, m_lazy, m_qadb, m_qadata].forEach(expose);
 m_lazy.lazyHook(function(name, ns){ expose(ns); });
 Object.defineProperty(window, 'SVC', {value:SVC, enumerable:false, configurable:false, writable:false});
 if(m_state.IS_QA_DATA) m_qadata.qaDataInstall();   /* ㊿+157 ?qa=data — 시작 전에 가짜 DB 로 바꿔 끼움(운영 DB 에 닿지 않음) */
