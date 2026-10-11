@@ -194,6 +194,13 @@ say(/^export function tickMemo\(/m.test(jsAll) && /^export function cssvKey\(/m.
     && /fetchT\(SB_URL\+'\/functions\/v1\/notify'/.test(jsAll) && /fetchT\(SB_URL\+'\/functions\/v1\/cloudsite'/.test(jsAll) && /^export async function opsIntegrations\(\)/m.test(ad) && /id="opsInteg"/.test(ad)
     && fnOk && /blk\(\) \{ this\.bi\+\+;/.test(lb) && /SMOKE_SHARDS/.test(sm) && fs.existsSync(path.join(ROOT, 'tests', 'unit.mjs')),
   '㊿+182 연동: 호출 시간 제한(fetchT · 쓰기는 다시 안 보냄) · 연동 상태(토큰 만료 · 봇 권한 · 마지막 실행) · ops v1.7 · notify v1.2(429 · 대상마다 기록 · health) · remind v1.4 · 병렬 smoke · 단위 시험'); }
+// ㊿+183 숫자 차이 근거 · 계약 요약 + 다음 처리 · 폰 카드 우선 칸
+{ const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
+  const an = rd('js/analysis.js'), gr = rd('js/grid.js'), gd = rd('js/grids.js'), sa = rd('js/sales.js'), sh = rd('js/shell.js'), da = rd('js/dash.js');
+  say(/^export function diffOpen\(o\)/m.test(an) && /^export function liveMultiOpen\(T, rows\)/m.test(an) && /^export function liveDeltaOpen\(T\)/m.test(an) && /^export function renewOpenFor\(r, T\)/m.test(an)
+    && /data-diff="multi"/.test(da) && /id="lvMulti"/.test(gr) && /^export function crDupOpen\(/m.test(sa) && /^export function dtSummary\(c\)/m.test(gr) && /button\.c360-do/.test(sh)
+    && /mob:\['line','end_month','mrr','partner'\]/.test(gd) && /DVC\.ord=ord;/.test(gr) && /sbAll\('customers\?select=\*&order=id'\)/.test(sh) && /ST\.LOAD_PATH='slow'/.test(sh),
+  '㊿+183 숫자 차이 근거(diffOpen · 두 제품 이상 · 변동 · 시트 차이 · 해지율 중복) · 계약 요약 + 다음 처리(dtSummary · renewOpenFor · 고객 360 만기 처리) · 폰 카드 우선 칸(mob)'); }
 // ㊿+160 연장하면 상태 «재약정»(구분 그대로) · 계약 상세에 «계약 기간 · 연장 이력»
 say(/^export function renewStatus\(r\)/m.test(jsAll) && /var nst=renewStatus\(r\);/.test(jsAll) && /^export function ctPeriods\(c, mine\)/m.test(jsAll) && html.includes('id="dtRenew"'), '연장: 상태 «재약정»(renewStatus) · 계약 상세 연장 이력(ctPeriods · #dtRenew)');
 const idx = html + jsAll;

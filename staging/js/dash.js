@@ -6,7 +6,7 @@ import { $, $$, baseLabel, baseRange, bizHas, buildBaseSelect, cssv, el, esc, is
 import { boot, CACHE_KEY, ccAfterKpis, ccAnaCount, ccAnalysisOpen, ccHomeLayout, loadFromDb, onData, renderInbox, SB_RAW, sbWrite, themeBtnSync, toast, uiIconize } from './shell.js';
 import { abortAsk, ask, isAsking, loadAiConfig, runQuery, shortQ } from './ai.js';
 import { GRIDS } from './grids.js';
-import { CH_DEFS, chOf, ctSuccessor, liveData, liveDeltaHtml, openRenewList, renderChannelView } from './analysis.js';
+import { CH_DEFS, chOf, ctSuccessor, liveData, liveDeltaHtml, liveDeltaOpen, liveMultiOpen, liveSheetDiffOpen, openRenewList, renderChannelView } from './analysis.js';
 import { renderTodo } from './tools.js';
 import { renderCloud } from './cloud.js';
 import { aipStale, askFrom, homeB, homeDetailOpen, homeOn, homeSetup } from './home.js';
@@ -1114,12 +1114,14 @@ export function renderKpis(list, dataOnly){
         var sel = selOf(lv.rows);
         var uq={}, perLine={}; sel.forEach(function(x){ uq[x.cust]=1; (perLine[x.line]=perLine[x.line]||{})[x.cust]=1; });
         var nCust=Object.keys(uq).length, nRow=sel.length, prodSum=Object.keys(perLine).reduce(function(a,l){ return a+Object.keys(perLine[l]).length; },0);
-        var isDb=(lv.src==='db'), other='';
-        if(isDb && ST.DATA.live && ST.DATA.live.ok){ var su={}; selOf(ST.DATA.live.rows).forEach(function(x){ su[x.cust]=1; }); var sn=Object.keys(su).length; other=' · 시트 명단 '+sn+(sn!==nCust? ' ('+(nCust-sn>0?'+':'')+(nCust-sn)+')':' ✓'); }
+        var isDb=(lv.src==='db'), other='', nMulti=Object.keys(uq).filter(function(c){ var k=0; Object.keys(perLine).forEach(function(l){ if(perLine[l][c]) k++; }); return k>1; }).length;
+        var keep=function(x){ return selOf([x]).length>0; };   /* ㊿+183 차이 근거도 같은 거르기 */
+        if(isDb && ST.DATA.live && ST.DATA.live.ok){ var su={}; selOf(ST.DATA.live.rows).forEach(function(x){ su[x.cust]=1; }); var sn=Object.keys(su).length; other=' · 시트 명단 '+sn+(sn!==nCust? ' ('+(nCust-sn>0?'+':'')+(nCust-sn)+') '+tpl`<button type="button" class="lnk" data-diff="sheet" title="계약 기준과 시트 명단이 다른 곳">차이 보기</button>`:' ✓'); }
         return { k:'LIVE 고객사'+(isDb? ' ('+mk(b)+')':''), v:nCust.toLocaleString('ko-KR'), u:'곳',
-                 d:'제품별 합 '+prodSum.toLocaleString('ko-KR')+(prodSum>nCust? ' — 두 제품 이상 쓰는 '+(prodSum-nCust)+'곳을 제품마다 셈' : ' — 회사 수와 같음(겹침 없음)')+   /* ㊿+169 고객 수(곳) ≠ 제품별 합 이유를 글로 */
+                 d:'제품별 합 '+prodSum.toLocaleString('ko-KR')+(prodSum>nCust? ' — '+tpl`<button type="button" class="lnk" data-diff="multi" title="제품을 두 개 이상 써서 제품마다 1곳씩 세는 고객사">두 제품 이상 ${String(nMulti)}곳</button>` : ' — 회사 수와 같음(겹침 없음)')+   /* ㊿+169 고객 수(곳) ≠ 제품별 합 · ㊿+183 이유 글 대신 그 고객사 목록 */
                    (nRow>prodSum? ' · 사이트 '+nRow+'건':'')+other, open:'live',
-                 extra:(isDb && !STATE.ind && Object.keys(STATE.lines).every(function(k){ return STATE.lines[k]; }))? liveDeltaHtml(b) : '',   /* 전월 대비 분해 (신규·복귀 / 만기 미처리·해지·종료) + «확인중» — 표시용 (㊿+127) */
+                 extra:(isDb && !STATE.ind && Object.keys(STATE.lines).every(function(k){ return STATE.lines[k]; }))? liveDeltaHtml(b) : '',
+                 diff:{multi:function(){ liveMultiOpen(b, sel); }, sheet:function(){ liveSheetDiffOpen(b, keep); }, delta:function(){ liveDeltaOpen(b); }},   /* 전월 대비 분해 (신규·복귀 / 만기 미처리·해지·종료) + «확인중» — 표시용 (㊿+127) */
                  tip:(isDb? '계약 기준 자동 판정 — 원계약이 '+mk(b)+'에 유효한 회사(시작월 ≤ 기준월, 종료 전 · 해지는 해지월부터 제외 · 통합과금/추가/H/W 제외 · CN전환 포함) · 곳 = 회사 단위 · 제품별 합 = 매출시트 LIVE 산정 방식(제품마다 1곳'+(prodSum>nCust? ' · 두 제품 이상 쓰는 '+(prodSum-nCust)+'곳이 겹침':'')+') · «시트 명단» 은 예전 LIVE 고객사 탭 사본 — 차이는 LIVE 화면 «시트와 다른 곳»에서 항목별로'
                             : 'LIVE 명단 시트 기준 — 곳 = 회사 단위 · 제품별 합 = 매출시트 LIVE 고객사 산정 방식(제품마다 1곳)')+' — 누르면 LIVE 고객사 화면' };
       }
@@ -1153,6 +1155,7 @@ export function renderKpis(list, dataOnly){
     /* 타일 안의 기간 버튼(만료 예정) — 타일 클릭(명단 열기)과 분리 */
     c.querySelectorAll('button[data-expn]').forEach(function(bt){ bt.onclick=function(ev){ ev.stopPropagation(); setExpN(+bt.dataset.expn); }; });
     c.querySelectorAll('button[data-renew]').forEach(function(bt){ bt.onclick=function(ev){ ev.stopPropagation(); openRenewList(bt.dataset.renew); }; });   /* LIVE 타일 «확인중 N건 →» */
+    c.querySelectorAll('button[data-diff]').forEach(function(bt){ bt.onclick=function(ev){ ev.stopPropagation(); var f=t.diff && t.diff[/** @type {any} */(bt).dataset.diff]; if(f) f(); }; });   /* ㊿+183 차이 근거 목록 */
     a11yTileRole(c);   /* ㊿+141: 안에 버튼이 있는 타일은 role=group (버튼 속 버튼 금지 · 키보드 Enter 는 그대로) */
     box.appendChild(c);
   });

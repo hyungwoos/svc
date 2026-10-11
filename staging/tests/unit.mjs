@@ -127,6 +127,13 @@ test('데이터 점검: 비슷한 고객사 이름(㊿+179)', () => {
   assert.ok(!ids.includes('3-4'), '4글자 이름은 한 글자 차이로 안 묶음'); assert.ok(!ids.includes('5-6'), '숫자만 다른 것은 뺌');
 });
 
+test('만기 처리 목록 자리(renewKindOf · ㊿+183) — 만기 처리 창과 같은 기준', () => {
+  const r = (o) => Object.assign({ cust: 'A', line: 'Cloud', status: '신규', endRaw: 70, startRaw: 58 }, o);
+  assert.equal(ana.renewKindOf(r({ endRaw: 69 }), 70), 'lapsed'); assert.equal(ana.renewKindOf(r({ endRaw: 70 }), 70), 'due'); assert.equal(ana.renewKindOf(r({ endRaw: 71 }), 70), 'next');
+  assert.equal(ana.renewKindOf(r({ endRaw: 72 }), 70), null); assert.equal(ana.renewKindOf(r({ endRaw: 45 }), 70), null);   // 24개월 넘게 지난 것은 목록 밖
+  assert.equal(ana.renewKindOf(r({ endRaw: 70, autoRenew: true }), 70), null); assert.equal(ana.renewKindOf(r({ endRaw: 70, status: '해지' }), 70), null);
+  assert.equal(ana.renewKindOf(r({ endRaw: 70, parent: 5 }), 70), null); assert.equal(ana.renewKindOf(r({ endRaw: 70, liveOv: '제외' }), 70), null);
+});
 test('대시보드 합계(행 × 월 금액)', () => {
   ST.M = 3; ST.MAT = [[100, 200, 0], [50, 0, 0], [0, 300, 400]];
   ST.DATA = /** @type {any} */ ({ rows: [{ cust: 'A', line: 'Cloud', csm: 'x' }, { cust: 'A', line: 'MDR', csm: 'y' }, { cust: 'B', line: 'Cloud', csm: '' }], lines: [{ label: 'Cloud' }, { label: 'MDR' }], monthKeys: ['2026-08', '2026-09', '2026-10'] });

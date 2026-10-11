@@ -5,7 +5,7 @@ import { $, amtHint, canView, canWrite, doLogout, esc, fetchT, kwToWon, lline, m
 import { dIdx, EQB, loadFromDb, onData, railSync, renderEqBoard, SB_RAW, sbHeaders, sbTry, sbWrite, toast, todayStr } from './shell.js';
 import { kpiTable, toggleWidgetPanel } from './dash.js';
 import { OI_IND, OI_OWNERS, OI_PARTNERS, OI_PROB, OI_PRODUCTS, OI_TYPE } from './grids.js';
-import { CH_DEFS, chOf } from './analysis.js';
+import { CH_DEFS, chOf, diffOpen } from './analysis.js';
 import { applyDense, denseKey, openFind, openPaste } from './tools.js';
 import { loadInbound } from './inbound.js';
 import { syncOrderAssets } from './equipment.js';
@@ -1058,7 +1058,7 @@ export function renderChurnRate(){
         return tpl`<td class="n">${rawHtml(crLink(lost,p.s,p.e,x,'lost',o[1]+' · '+p.l+' 해지'))} / ${rawHtml(crLink(base,p.s-1,p.s-1,x,'base',o[1]+' · '+p.l+' 시작 활성','color:var(--ink-2)'))}<div class="mini" style="font-weight:700">${rawHtml(crRate(nl,nb))}</div></td>`;
       }).join(''))}`;
       var tB=crN(crActive(p.s-1,crMatch)), tL=crN(crLost(p.s,p.e,crMatch)), dB=sB-tB, dL=sL-tL;
-      h+=tpl`<td class="n" style="color:var(--muted)">${rawHtml(sL)} / ${rawHtml(sB)}${rawHtml(dB||dL? tpl` <span title="${rawHtml(gg[0])} 칸 합계와 전체 표 차이 = 두 개 이상 ${rawHtml(gg[0])}을 함께 쓰는 고객사 (전체 표에서는 1곳)">→ <b style="color:var(--ink-2)">${rawHtml(tL)} / ${rawHtml(tB)}</b> <span class="mini">(중복 ${rawHtml(dB? dB+'곳':'')}${rawHtml(dL? (dB?' · ':'')+'해지 '+dL:'')})</span></span>`:' <span class="mini">= 전체</span>')}</td></tr>`;
+      h+=tpl`<td class="n" style="color:var(--muted)">${rawHtml(sL)} / ${rawHtml(sB)}${rawHtml(dB||dL? tpl` <span title="${rawHtml(gg[0])} 칸 합계와 전체 표 차이 = 두 개 이상 ${rawHtml(gg[0])}을 함께 쓰는 고객사 (전체 표에서는 1곳)">→ <b style="color:var(--ink-2)">${rawHtml(tL)} / ${rawHtml(tB)}</b> ${rawHtml(CR.rows? tpl`<span class="mini">(중복 ${rawHtml(dB? dB+'곳':'')}${rawHtml(dL? (dB?' · ':'')+'해지 '+dL:'')})</span>` : tpl`<button type="button" class="lnk mini" data-crdup="${g.k}" data-s="${String(p.s)}" data-e="${String(p.e)}" data-l="${gg[0]+' · '+p.l}" title="두 칸 이상에 함께 잡힌 고객사 목록">중복 ${rawHtml(dB? dB+'곳':'')}${rawHtml(dL? (dB?' · ':'')+'해지 '+dL:'')}</button>`)}</span>`:' <span class="mini">= 전체</span>')}</td></tr>`;   /* ㊿+183 이유 글 대신 그 고객사 목록 */
     });
     h+='</tbody></table></div></div>';
   });
@@ -1076,6 +1076,19 @@ export function renderChurnRate(){
   var det=$('#crMore'); if(det) det.ontoggle=function(){ CR.open=det.open; };
   var adv=/** @type {any} */($('#crAdv')); if(adv) adv.ontoggle=function(){ CR.adv=adv.open; };
   host.querySelectorAll('a.crk').forEach(function(a){ a.onclick=function(ev){ ev.preventDefault(); crOpen(a.dataset); }; });
+  host.querySelectorAll('button[data-crdup]').forEach(function(b){ /** @type {any} */(b).onclick=function(){ var d=/** @type {any} */(b).dataset; crDupOpen(d.crdup, +d.s, +d.e, d.l); }; });
+}
+/** ㊿+183 제품별 · 사업영역별 칸 합계 > 전체 표 — 두 칸 이상에 함께 잡힌 고객사(전체 표에서는 1곳) · 계산은 표와 같은 crActive/crLost */
+export function crDupOpen(gk, s, e, label){
+  var G=CR_G||(CR_G=crFilterGroups()), g=G.filter(function(x){ return x.k===gk; })[0]; if(!g) return;
+  var cols=g.opts.filter(function(o){ var sel=CR.f[g.k]||[]; return !sel.length || sel.indexOf(o[0])>=0; });
+  var dup=function(fn){ var m={}; cols.forEach(function(o){ var mm=function(r){ return crMatch(r) && (g.test? g.test(r,[o[0]]) : g.get(r)===o[0]); };
+      fn(mm).forEach(function(r){ var x=m[r.cust]=m[r.cust]||[]; if(x.indexOf(o[1])<0) x.push(o[1]); }); });
+    return Object.keys(m).filter(function(c){ return m[c].length>1; }).sort(function(a,b){ return a.localeCompare(b,'ko'); }).map(function(c){ return {cust:c, sub:m[c].length+'칸 · '+m[c].join(' · ')}; }); };
+  var base=dup(function(mm){ return crActive(s-1,mm); }), lost=dup(function(mm){ return crLost(s,e,mm); });
+  diffOpen({title:label+' — 칸 합계와 전체 표 차이', xlsx:'해지율_중복',
+    intro:'칸마다 그 '+g.l+'을 쓰는 고객사를 1곳씩 세므로, 두 칸 이상에 걸친 고객사는 칸 합계에 여러 번 들어가고 전체 표(회사 단위)에는 1곳입니다. 해지율 계산은 그대로입니다.',
+    groups:[{label:'시작 활성('+mk(s-1)+')에서 두 칸 이상', rows:base}, {label:'해지('+mk(s)+'~'+mk(e)+')에서 두 칸 이상', rows:lost}]});
 }
 /* 셀 내역 팝업 */
 export var CR_LAST=[];

@@ -2867,4 +2867,43 @@ html[data-skin="gn"] #rail .gn-right .ntf-btn:hover{border-color:var(--ink-2)}
 .integ-tbl tr.integ-warn td:first-child{box-shadow:inset 3px 0 0 var(--warning)}
 .integ-tbl .mini{margin-top:2px}
 @media (max-width:760px){ .integ-tbl .integ-n{width:auto} .integ-tbl tr{display:block;padding:6px 0} .integ-tbl td{display:block;border:0} }
+/* ==== ㊿+183 차이 근거 · 계약 요약 · 폰 우선 칸 ==== */
+/* 차이 근거 창(diffOpen) */
+.df-m .df-b{display:grid;gap:14px;max-height:min(60vh,560px);overflow:auto;padding-right:4px}
+.df-g h4{margin:0 0 4px;font-size:14px;display:flex;align-items:center;gap:8px}
+.df-s{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:6px;font-weight:700;background:var(--surface-2)}
+.df-s.up{color:var(--ok)} .df-s.down{color:var(--critical)}
+.df-why{margin:0 0 6px;color:var(--muted)}
+.df-l{list-style:none;margin:0;padding:0;display:grid}
+.df-l li{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px;padding:4px 0;border-bottom:1px solid var(--ring)}
+.df-c{border:0;background:none;padding:0;font:inherit;font-weight:600;color:var(--s1-ink);cursor:pointer;min-height:24px;text-align:left}
+.df-c:hover{text-decoration:underline}
+.df-sub{font-size:12px;color:var(--muted)}
+.kpi .d .lnk,.lnk.mini{font:inherit;font-size:12px;background:none;border:0;padding:0;color:var(--s1-ink);cursor:pointer;text-decoration:underline;text-underline-offset:2px;min-height:24px}
+.lnk.mini{font-size:12px}
+/* 계약 상세 요약 · 다음 처리 */
+.dt-sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin:10px 0 0}
+.dt-sum>div{border:1px solid var(--ring);border-radius:10px;padding:8px 10px;background:var(--surface-2);min-width:0}
+.dt-sum .l{font-size:12px;color:var(--muted)}
+.dt-sum .v{font-size:15px;font-weight:650;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.dt-sum .s{font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.dt-sum .warn{border-color:var(--warning)} .dt-sum .warn .v{color:var(--warn-ink)}
+.dt-sum .bad{border-color:var(--critical)} .dt-sum .bad .v{color:var(--critical)}
+.dt-act{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 0;align-items:center}
+.dt-act .mini{color:var(--muted)}
+/* 고객 360 «지금 계약» 처리 칸 */
+.c360-summ .c360-do{min-height:28px;padding:0 10px;white-space:nowrap}
+/* 폰 카드 — 화면별 우선 칸 순서(mob) · 머리(고정 열이 없는 표) */
+@media (max-width:760px){
+  #dvTable.cards td.cx{order:50}
+  #dvTable.cards td.act,#dvTable.cards td.cxt{order:99}
+  #dvTable.cards td.mh1{order:-2;flex:1 1 auto;font-weight:650;font-size:15px;color:var(--ink)}
+  #dvTable.cards td.mh2{order:-1;flex:0 0 auto}
+  #dvTable.cards td.mh1::before,#dvTable.cards td.mh2::before{content:none}
+}
+@media (max-width:760px){
+  #dvTable.cards td.mo1{order:1} #dvTable.cards td.mo2{order:2} #dvTable.cards td.mo3{order:3} #dvTable.cards td.mo4{order:4} #dvTable.cards td.mo5{order:5}
+}
+/* 스테이징 QA(㊿+182) 📱 관리자 가로 넘침 — 표 머리글의 화면 읽기용 글(.sr · position:absolute)이 스크롤 칸(.tbl-wrap)을 벗어나 문서 폭을 늘렸음 → 왼쪽에 붙임(안 보이는 글 · 읽기 그대로) */
+.sr{left:0}
 /* ==== ㊿+166 새 디자인 end ==== */

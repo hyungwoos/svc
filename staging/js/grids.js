@@ -143,6 +143,7 @@ export var OI_PARTNERS=['다원티에스','글로웰시스템','에티버스','�
  * @property {function(): void} [custom] 표 대신 그리는 화면(데이터 점검 등) @property {string} [chipsField] 위쪽 칩으로 거를 열 @property {any} [chipsOpts] 칩 값 목록
  * @property {?Object<string, any>} [_lens] 관점 필터(계약 메뉴)로 남길 행 id — grid.js 가 그릴 때 붙임
  * @property {string[]} [pin] 가로로 밀어도 왼쪽에 고정할 열(이름 · 상태)
+ * @property {string[]} [mob] 폰 카드에서 먼저 보일 칸(현장에서 필요한 순서) — pin 다음, 모두 5칸 · 없으면 표 열 순서
  */
 /** 표 열 하나
  * @typedef {Object} GridCol
@@ -159,7 +160,7 @@ export function buildGrids(){
     contracts:{
       title:'계약 관리', table:'contracts',
       cap:'행 클릭 = 고객 360 · 연필 = 이 행 수정 · 금액 변경은 위 «입력·수정» · 삭제는 «더보기»(슈퍼 관리자만)',
-      add:false, del:'super', pin:['_custName','status'],
+      add:false, del:'super', pin:['_custName','status'], mob:['line','end_month','mrr','partner'],   /* 폰: 서비스 · 만료 · 금액 · 파트너 */
       rowClick:function(r){ openCust360(String(r._custName||'').replace(/^↳ /,'')); },
       rows:function(){
         var cmap={}; (ST.RAWX.customers||[]).forEach(function(x){ cmap[x.id]=x; });
@@ -245,7 +246,7 @@ export function buildGrids(){
         {k:'ov',l:'예외',fmt:function(v,r){ return v? (v+(r&&r.ovNote? ' — '+r.ovNote:'')) : '·'; }}
       ];
       var g=/** @type {GridDef} */ ({
-        title:'LIVE 고객사',
+        title:'LIVE 고객사', mob:['cust','name','line','end','end_month','nodes','partner'],   /* 폰: 고객사 · 서비스 · 종료월 · 노드(계약 기준 / 시트 명단 칸 이름이 달라 둘 다) */
         rowClick:function(r){ openCust360(r.name||r.cust); },
         rows:function(){
           if(ST.LIVE_SRC==='sheet') return (ST.RAWX.live||[]).slice().sort(function(a,b){
@@ -313,7 +314,7 @@ export function buildGrids(){
     oi:{
       title:'OI 현황 (영업기회)', table:'oi_deals',
       chipsField:'stage', chipsOpts:OI_STAGE,
-      cap:'행 클릭 = 고객 360 · 진행 상태 관리 · 신규 등록은 영업 › OI 등록 · 삭제는 «더보기»', add:false, del:true, pin:['customer','stage'],
+      cap:'행 클릭 = 고객 360 · 진행 상태 관리 · 신규 등록은 영업 › OI 등록 · 삭제는 «더보기»', add:false, del:true, pin:['customer','stage'], mob:['deal_name','next_action','next_date'],   /* 폰: 사업명 · 다음 할 일 · 예정일 */
       rowClick:function(r){ openCust360(r.customer); },
       rows:function(){ return ST.RAWX.oi||[]; },
       cols:[
@@ -347,7 +348,7 @@ export function buildGrids(){
       ]
     },
     mdrops:{
-      title:'MDR 운영·신청 현황', table:'mdr_ops',
+      title:'MDR 운영·신청 현황', table:'mdr_ops', mob:['customer','status','svc_type','_fill','sales_name'],
       chipsField:'status', chipsOpts:['신청','대기','진행중','데모','구독','종료'],
       cap:'행 클릭 = 고객 360 · PoC 신청부터 운영까지 — 신청 → 진행중 → 데모 → 구독 · 설치율 = 설치 ÷ 계약 수량', add:true, del:true,
       rowClick:function(r){ if(!ST.IS_EQUIP) openCust360(r.customer); },
@@ -387,7 +388,7 @@ export function buildGrids(){
     },
     orders:{
       title:'임대 장비 신청 내역', table:'equipment_orders',
-      chipsField:'channel', chipsOpts:ORD_CH_OPTS, pin:['customer','status'],
+      chipsField:'channel', chipsOpts:ORD_CH_OPTS, pin:['customer','status'], mob:['install_date','model','qty'],   /* 폰: 설치희망 · 모델 · 수량 */
       cap:'저장할 때마다 장비 현황에 자동 반영됩니다 — 접수·출하요청·배송중은 재고, 설치완료·회수예정은 임대중, 회수완료는 회수완료 (취소는 현황에서 내림) · 시리얼 칩 = 시리얼 상세 · 회수는 행의 «회수 처리»(일부·전부·취소 미리 보기 → 저장 → 되돌리기) · 시리얼을 비워두면 «미등록 시리얼»로 수량만큼 임시 등록 · 신규 신청은 장비 › 임대 장비 신청 · 삭제는 «더보기»', add:true, del:true,
       rows:function(){ return ST.RAWX.orders||[]; },
       cols:[
@@ -422,7 +423,7 @@ export function buildGrids(){
     },
     assets:{
       title:'임대 장비 현황 (시리얼 단위)', table:'equipment_assets',
-      chipsField:'channel', chipsOpts:ORD_CH_OPTS, pin:['serial','status'],
+      chipsField:'channel', chipsOpts:ORD_CH_OPTS, pin:['serial','status'], mob:['customer','model','deployed_date'],
       cap:'신청 내역에서 자동으로 만들어지는 시리얼 단위 저장소입니다 — 신청에 붙은 장비(자물쇠)는 «임대 장비 신청 내역»에서 수정·회수 처리하면 따라옵니다 · 여기서는 신청과 무관한 재고·데모·판매 장비만 직접 등록·수정', add:true, del:true,
       rows:function(){
         var om={}; (ST.RAWX.orders||[]).forEach(function(o){ om[String(o.id)]=o; });
@@ -453,7 +454,7 @@ export function buildGrids(){
       ]
     },
     inbound:{
-      title:'인바운드 목록', table:'inbound_leads',
+      title:'인바운드 목록', table:'inbound_leads', mob:['org','result','_days','owner','product'],   /* 폰: 기관 · 상태 · 경과일 · 담당 · 문의 제품 */
       cap:'원본은 구글시트 — 수정은 시트에서, 포탈은 매일 아침 7시 자동으로 가져옵니다 (위에서 지금 가져오기·가져온 기록) · 행을 누르면 상세 보기',
       add:false, del:false, ro:true,
       rowClick:function(r){ openInbDetail(r); },
@@ -506,7 +507,7 @@ export function buildGrids(){
     quotes:{   /* ㊿+177 견적을 포탈 DB 에(SQL 109) — 내용은 견적 화면에서 · 여기선 상태 · OI 연결 · 메모 */
       title:'견적 목록', table:'quotes',
       cap:'견적·발주 시스템에서 «💾 저장» · «PDF 발행»한 견적(포탈 DB) · 여기서는 상태(발송 · 수주 · 실주) · OI 번호 · 메모만 고침 — 내용은 행의 📄(견적 화면에서 열기) · 발송한 견적을 고치면 새 번호 · 금액은 원(VAT 포함)',
-      add:false, del:'super', pin:['quote_no','customer_name'],
+      add:false, del:'super', pin:['quote_no','customer_name'], mob:['grand_total','status','quote_date'],
       rows:function(){ return ST.RAWX.quotes||[]; },
       cols:[
         {k:'quote_no',l:'번호',ro:true,fmt:function(v,r){ return v || ('발주서 #'+r.id); }},

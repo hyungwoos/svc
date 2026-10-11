@@ -3657,7 +3657,7 @@ if (S.blk()) {
     assert(R.slack[1] === 'warn' && /users:read\.email/.test(R.slack[2]) && /Reinstall/.test(R.slack[2]) && R.notify[1] === 'ok' && /예약 켜짐/.test(R.notify[2]) && /1곳 보냄/.test(R.notify[2]), 'slack ' + JSON.stringify([R.slack, R.notify]));
     assert(R.remind[1] === 'ok' && /2026-10/.test(R.remind[2]) && /자동/.test(R.remind[2]) && R.aicheck[1] === 'warn' && /하루 넘게/.test(R.aicheck[2]) && R.export[1] === 'info', 'remind ' + JSON.stringify([R.remind, R.aicheck, R.export]));
     assert(R.worker[1] === 'warn' && /ACCESS_PASSWORD/.test(R.worker[2]) && R.cs[1] === 'ok' && /API 계정 1개/.test(R.cs[2]) && !/api@example\.com/.test(R.cs[2]) && R.fx[1] === 'ok' && /1400/.test(R.fx[2]), 'worker ' + JSON.stringify([R.worker, R.cs, R.fx]));
-    const rq = reqs.slice().sort().join(' '), w0 = writes.filter((w) => !/client_perf|client_errors/.test(w.url));
+    const rq = reqs.slice().sort().join(' '), w0 = writes.filter((w) => !/client_perf|client_errors|notify_snapshot|upd_notes|dc_daily/.test(w.url));   /* 화면을 연 사람(슈퍼 관리자)의 자동 저장(예약 발송용 알림함 계산 · 안내 · 점검 추이)은 연동 확인과 무관 */
     assert(rq === 'cloudsite:creds notify:health ops:status:deep worker:whoami' && !w0.length, '읽기만? ' + JSON.stringify({ rq, w0: w0.map((w) => w.m + ' ' + w.url.slice(-50)) }));
     old = true; await page.click('#opsInteg'); await page.waitForFunction(() => SVC.INTEG.at && !SVC.INTEG.running && document.querySelector('#opsBody tr[data-integ="gh"]'), null, { timeout: 8000 });
     const o = await page.evaluate(() => Object.fromEntries([...document.querySelectorAll('#opsBody tr[data-integ]')].map((tr) => [tr.dataset.integ, tr.className.replace('integ-', '') + ' ' + tr.innerText.replace(/\s+/g, ' ')])));
@@ -3669,6 +3669,101 @@ if (S.blk()) {
     assert(ov <= 0 && closed && !c.errs.length, JSON.stringify({ ov, closed, errs: c.errs }));
     await ctx.close();
     return sev;
+  });
+}
+// ㊿+183 숫자 차이 근거(설명 글 대신 그 고객사 목록) · 계약 요약 + 다음 처리 · 폰 카드 우선 칸 — 가짜 DB · 저장 없음
+if (S.blk()) {
+  /* 가상고객10 에 MDR 계약을 하나 더 — 두 제품 이상 쓰는 곳(회사 수 ≠ 제품별 합)을 만듦 */
+  const seed183 = () => { const sd = seedData(); const cu = sd.customers.find((c) => c.name === '가상고객10'); const base = sd.contracts.find((c) => c.customer_id === cu.id && !c.parent_contract_id);
+    sd.contracts.push(Object.assign({}, base, { id: 9901, line: 'MDR', version: null, mrr: 100000, qty: 30 }));
+    sd.monthly_revenue.filter((m) => m.contract_id === base.id).forEach((m) => sd.monthly_revenue.push({ contract_id: 9901, month: m.month, amount: 100000 }));
+    sd.equipment_orders.forEach((o) => { o.mgr_name = '고객쪽담당'; if (!o.requester) o.requester = 'tester@example.com'; }); return sd; };   /* 장비 카드 «담당»이 고객 담당자로 나오지 않는지 */
+  const mk183 = async (o) => { o = Object.assign({ w: 1440, h: 1000, mobile: false }, o || {});
+    const db = new FakeDB(seed183()); const ctx = await browser.newContext({ viewport: { width: o.w, height: o.h }, serviceWorkers: 'block', isMobile: o.mobile, hasTouch: o.mobile }); const page = await ctx.newPage(); const c = collect(page);
+    const writes = []; page.on('request', (rq) => { if (/PATCH|POST|DELETE/.test(rq.method()) && /rest\/v1\/(?!rpc\/|client_|change_log|notify_snapshot|dc_daily|upd_notes)/.test(rq.url())) writes.push(rq.method() + ' ' + rq.url().split('/rest/v1/')[1]); });
+    page.on('dialog', (d) => d.dismiss()); await fakeBackend(page, db, {}); await page.goto(url + '/index.html');
+    await page.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA && SVC.ST.DATA.rows.length, null, { timeout: 20000 }); await page.waitForTimeout(400); return { db, ctx, page, c, writes }; };
+  const dlg = (page) => page.evaluate(() => { const o = document.getElementById('ovlDiff'); return o && o.classList.contains('on') ? { t: o.querySelector('h3').textContent, gs: [...o.querySelectorAll('.df-g')].map((g) => g.querySelector('h4').textContent.replace(/\s+/g, ' ').trim() + ' :: ' + [...g.querySelectorAll('li')].map((li) => li.textContent.replace(/\s+/g, ' ').trim()).join(' / ')) } : null; });
+  await S.t('㊿+183 숫자 차이 근거: LIVE 회사 수 ≠ 제품별 합 → «두 제품 이상 n곳» = 그 고객사와 제품 · 전월 대비 «변동 n곳» = 사유별 고객사 · LIVE 화면 같은 버튼 · 시트 명단 차이 · 해지율 «중복» = 두 칸 이상 고객사 · 고객사 누르면 고객 360 · 저장 0', async () => {
+    const A = await mk183();
+    await A.page.evaluate(() => { if (SVC.homeDetail) SVC.homeDetail(true); }); await A.page.waitForTimeout(600);
+    const tile = await A.page.evaluate(() => { const k = [...document.querySelectorAll('#kpis .kpi')].find((x) => /LIVE/.test(x.textContent)); return k ? k.querySelector('.d').textContent.replace(/\s+/g, ' ') : ''; });
+    await A.page.click('#kpis button[data-diff="multi"]'); await A.page.waitForTimeout(250); const m1 = await dlg(A.page);
+    await A.page.click('#ovlDiff .df-c'); await A.page.waitForTimeout(500);
+    const c360 = await A.page.evaluate(() => ({ diffOn: document.getElementById('ovlDiff').classList.contains('on'), c360: document.getElementById('ovlC360').classList.contains('on') && document.getElementById('c360Title').textContent }));
+    await A.page.keyboard.press('Escape'); await A.page.waitForTimeout(200);
+    await A.page.click('#kpis button[data-diff="delta"]'); await A.page.waitForTimeout(250); const d1 = await dlg(A.page); await A.page.keyboard.press('Escape'); await A.page.waitForTimeout(150);
+    await A.page.evaluate(() => SVC.switchView('live')); await A.page.waitForTimeout(500);
+    const lb = await A.page.evaluate(() => [document.getElementById('lvMulti'), document.getElementById('lvDelta')].map((b) => b && b.textContent));
+    await A.page.click('#lvMulti'); await A.page.waitForTimeout(250); const m2 = await dlg(A.page); await A.page.keyboard.press('Escape'); await A.page.waitForTimeout(150);
+    const sh = await A.page.evaluate(() => { const T = SVC.STATE.base, d = SVC.liveDiff(T); SVC.liveSheetDiffOpen(T); const o = document.getElementById('ovlDiff'); return { n: d.onlyDb.length + d.onlySheet.length, li: o.querySelectorAll('.df-l li').length, empty: !!o.querySelector('.ib-empty') }; });
+    await A.page.keyboard.press('Escape'); await A.page.waitForTimeout(150);
+    await A.page.evaluate(() => SVC.switchView('churnrate')); await A.page.waitForTimeout(700);
+    await A.page.click('button[data-crdup]'); await A.page.waitForTimeout(250); const cr = await dlg(A.page);
+    assert(/두 제품 이상 1곳/.test(tile) && m1 && /22곳 vs 제품별 합 23/.test(m1.t) && /가상고객10\s*2개 · Cloud NAC · MDR/.test(m1.gs.join()) && c360.c360 && /가상고객10/.test(c360.c360) && !c360.diffOn, 'multi ' + JSON.stringify({ tile, m1, c360 }));
+    assert(d1 && /만기 미처리 1곳 :: 가상고객_만기지남\s*Cloud NAC ~\d{4}-\d\d · 상태/.test(d1.gs.join()) && /두 제품 이상 1곳/.test(lb[0]) && /변동 1곳/.test(lb[1]) && m2 && m2.t === m1.t, 'delta/live ' + JSON.stringify({ d1, lb, m2 }));
+    assert(sh.li === sh.n && (sh.n > 0 || sh.empty) && cr && /시작 활성\(\d{4}-\d\d\)에서 두 칸 이상 1곳 :: 가상고객10\s*2칸 · Cloud NAC · MDR/.test(cr.gs.join()), 'sheet/cr ' + JSON.stringify({ sh, cr }));
+    assert(!A.writes.length && !A.c.errs.length, 'writes/errs ' + JSON.stringify({ w: A.writes, e: A.c.errs }));
+    await A.ctx.close();
+    return 'multi 1곳 · 변동 1곳 · 시트 ' + sh.n + '줄 · 해지율 중복 1곳';
+  });
+  await S.t('㊿+183 계약 요약 + 다음 처리: 계약 상세 맨 위 금액 · 만료(지남/남음) · 갱신 · 영업 경로 / 만기 지난 계약 → «만기 지난 계약 처리» = 만기 처리 창 그 줄 강조 + 연장 버튼에 초점 / 먼 만기 계약엔 처리 버튼 없음 / 고객 360 «지금 계약»에 만기 지남 줄 + «만기 처리» / 저장 0', async () => {
+    const A = await mk183();
+    const ids = await A.page.evaluate(() => { const T = SVC.STATE.base; const lap = SVC.ST.DATA.rows.find((x) => SVC.renewKindOf(x, T) === 'lapsed'); const far = SVC.ST.DATA.rows.find((x) => !x.parent && x.endRaw != null && x.endRaw > T + 6 && !/해지|종료/.test(x.status || '')); return { lap: lap && lap._id, lapC: lap && lap.cust, far: far && far._id }; });
+    await A.page.evaluate((id) => SVC.openDetail(SVC.ctRawOf(id)), ids.lap); await A.page.waitForTimeout(300);
+    const s1 = await A.page.evaluate(() => ({ t: document.getElementById('dtSum').innerText.replace(/\s+/g, ' '), b: [...document.querySelectorAll('#dtSum button[data-dt]')].map((b) => b.dataset.dt) }));
+    await A.page.click('#dtSum button[data-dt="renew"]'); await A.page.waitForTimeout(400);
+    const r1 = await A.page.evaluate(() => ({ det: document.getElementById('ovlDetail').classList.contains('on'), rn: document.getElementById('ovlRenew').classList.contains('on'), tab: (document.querySelector('#rnTabs button[aria-pressed="true"]') || {}).textContent, on: [...document.querySelectorAll('#rnList tr.rn-on')].map((t) => t.dataset.id), act: document.activeElement && document.activeElement.textContent }));
+    await A.page.keyboard.press('Escape'); await A.page.waitForTimeout(150);
+    await A.page.evaluate((id) => SVC.openDetail(SVC.ctRawOf(id)), ids.far); await A.page.waitForTimeout(300);
+    const s2 = await A.page.evaluate(() => ({ t: document.getElementById('dtSum').innerText.replace(/\s+/g, ' '), b: [...document.querySelectorAll('#dtSum button[data-dt]')].map((b) => b.dataset.dt) }));
+    await A.page.keyboard.press('Escape'); await A.page.waitForTimeout(150);
+    await A.page.evaluate((n) => SVC.openCust360(n), ids.lapC); await A.page.waitForTimeout(500);
+    const c1 = await A.page.evaluate(() => ({ nx: document.querySelector('#c360Body .c360-next').textContent.replace(/\s+/g, ' '), h: document.querySelector('#c360Body .c360-summ h4').textContent, row: [...document.querySelectorAll('#c360Body tr[data-c360sum]')].map((t) => t.textContent.replace(/\s+/g, ' ')).join(' / ') }));
+    await A.page.click('#c360Body button.c360-do'); await A.page.waitForTimeout(400);
+    const r2 = await A.page.evaluate(() => ({ c360: document.getElementById('ovlC360').classList.contains('on'), rn: document.getElementById('ovlRenew').classList.contains('on'), det: document.getElementById('ovlDetail').classList.contains('on'), on: [...document.querySelectorAll('#rnList tr.rn-on')].map((t) => t.dataset.id) }));
+    assert(/\d{4}-\d\d 금액/.test(s1.t) && /1개월 지남 · 처리 안 됨/.test(s1.t) && /후속 계약 없음/.test(s1.t) && /영업 경로/.test(s1.t) && s1.b.join() === 'renew,c360,edit', 's1 ' + JSON.stringify(s1));
+    assert(!r1.det && r1.rn && /만기 지남/.test(r1.tab) && r1.on.join() === String(ids.lap) && r1.act === '연장', 'r1 ' + JSON.stringify(r1));
+    assert(/개월 남음/.test(s2.t) && !s2.b.includes('renew') && s2.b.includes('c360'), 's2 ' + JSON.stringify(s2));
+    assert(/처리 안 된 계약 1건/.test(c1.nx) && /만기 처리 \(Cloud NAC ~\d{4}-\d\d\)/.test(c1.nx) && /만기 지남 1건/.test(c1.h) && /만기 지남.*만기 처리/.test(c1.row) && !r2.c360 && r2.rn && !r2.det && r2.on.join() === String(ids.lap), 'c360 ' + JSON.stringify({ c1, r2 }));
+    await A.page.keyboard.press('Escape'); await A.page.evaluate(() => SVC.switchView('eqboard')); await A.page.waitForTimeout(500);
+    const eq = await A.page.evaluate(() => [...document.querySelectorAll('#viewEqBoard .eqb-card')].map((c) => { const o = SVC.ST.RAWX.orders.find((x) => String(x.id) === c.dataset.oid) || {}; const a = SVC.NTF.asg && SVC.NTF.asg[String(o.id)]; return { who: c.querySelector('.ft .mini').textContent, want: a ? SVC.ntfWho(a.assignee) : String(o.requester || '').split('@')[0], mgr: o.mgr_name || '' }; }));
+    assert(eq.length && eq.every((x) => x.who === x.want), '장비 카드 담당 = 처리 담당 → 신청한 사람(고객 담당자 아님) ' + JSON.stringify(eq.slice(0, 4)));
+    assert(!A.writes.length && !A.c.errs.length, 'writes/errs ' + JSON.stringify({ w: A.writes, e: A.c.errs }));
+    await A.ctx.close();
+    return '요약 4칸 · 버튼 ' + s1.b.join('/') + ' · 먼 만기 ' + s2.b.join('/') + ' · 장비 카드 담당 ' + eq.length + '장';
+  });
+  await S.t('㊿+183 스테이징 QA 실패 2건 고침: ① load_all 이 실패해 표별로 받아도 업종(sector) · 동명 · 추정분류까지 같은 숫자(buildDigest 업종별) · 받은 길(LOAD_PATH · 이유) / ② 관리자 표(계정 · 2단계 인증 · 코드 · 안내 받는 사람) 390px(데스크톱 창) 가로 넘침 0', async () => {
+    const dg = (page) => page.evaluate(() => ({ p: SVC.ST.LOAD_PATH, why: SVC.ST.LOAD_WHY, u: JSON.stringify(SVC.buildDigest().업종별) }));
+    const A = await mk183(); const fast = await dg(A.page); await A.ctx.close();
+    const db = new FakeDB(seed183()); const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page);
+    await fakeBackend(page, db, { extra: async (route, u) => { if (/rpc\/load_all/.test(u)) { await route.fulfill({ status: 500, contentType: 'application/json', body: '{"message":"canceling statement due to statement timeout"}' }); return true; } return false; } });
+    await page.goto(url + '/index.html'); await page.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA && SVC.ST.DATA.rows.length, null, { timeout: 20000 }); await page.waitForTimeout(400);
+    const slow = await dg(page); await ctx.close();
+    assert(fast.p === 'fast' && slow.p === 'slow' && /load_all 500/.test(slow.why) && fast.u === slow.u && !/"미분류_고객사수":[1-9]\d{1,}/.test(slow.u), JSON.stringify({ fast, slow, errs: c.errs }));
+    const W = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' }); const wp = await W.newPage();   /* 데스크톱 브라우저 창을 390 으로(QA 미리보기와 같음 — isMobile 아님) */
+    const users = Array.from({ length: 4 }, (_, i) => ({ email: 'user' + i + '.longname@example.com', role: i ? 'editor' : 'super_admin', last_sign_in: new Date().toISOString(), created_at: new Date(Date.now() - 400 * 864e5).toISOString() }));
+    const JJ = (route, o) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'content-range': '0-0/' + o.length, 'Access-Control-Expose-Headers': 'content-range' }, body: JSON.stringify(o) });
+    await fakeBackend(wp, new FakeDB(seedData()), { extra: async (route, u) => { if (/rpc\/admin_list_users/.test(u)) { await JJ(route, users); return true; } if (/rpc\/mfa_admin_list/.test(u)) { await JJ(route, users.map((x) => ({ email: x.email, role: x.role, enrolled: false }))); return true; } return false; } });
+    await wp.goto(url + '/index.html'); await wp.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA && SVC.ST.DATA.rows.length, null, { timeout: 20000 });
+    await wp.evaluate(async () => { await SVC.lazyLoad('admin'); SVC.switchView('adminx'); }); await wp.waitForTimeout(800);
+    const ov = {}; for (const t of ['acct', 'sec', 'cfg']) { await wp.evaluate((t) => SVC.admTab(t), t); await wp.waitForTimeout(400); ov[t] = await wp.evaluate(() => document.documentElement.scrollWidth - innerWidth); }
+    await W.close();
+    assert(ov.acct <= 0 && ov.sec <= 0 && ov.cfg <= 0, '넘침 ' + JSON.stringify(ov));
+    return 'fast = slow 업종별 · 이유 «' + slow.why.slice(0, 30) + '» · 관리자 넘침 0';
+  });
+  await S.t('㊿+183 폰 카드 우선 칸: 계약 = 고객사 · 상태 · 서비스 · 종료월 · MRR(업종 · Ver. 는 «더 보기») / OI = 사업명 · 다음 할 일 · 예정일 / 장비 신청 = 설치희망 · 모델 · 수량 — 보이는 순서도 그대로 · PC 표 열 순서는 그대로', async () => {
+    const A = await mk183({ w: 390, h: 844, mobile: true });
+    const vis = (v) => A.page.evaluate(async (v) => { SVC.switchView(v); await new Promise((r) => setTimeout(r, 500)); const tr = document.querySelector('#dvTable.cards tbody tr'); if (!tr) return 'no card';
+      return [...tr.querySelectorAll('td')].filter((td) => getComputedStyle(td).display !== 'none' && td.dataset.l).sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top || a.getBoundingClientRect().left - b.getBoundingClientRect().left).map((td) => td.dataset.l).join(','); }, v);
+    const ct = await vis('contracts'), oi = await vis('oi'), od = await vis('orders');
+    await A.ctx.close();
+    const P = await mk183();
+    const head = await P.page.evaluate(async () => { SVC.switchView('contracts'); await new Promise((r) => setTimeout(r, 400)); return (document.getElementById('dvTable').classList.contains('cards') ? 'cards!' : '') + [...document.querySelectorAll('#dvTable thead th:not(.act)')].slice(0, 5).map((t) => t.textContent.replace(/[▼\s]+/g, '')).join(','); });
+    await P.ctx.close();
+    assert(ct === '고객사,상태,서비스,종료월,MRR(천원)' && oi === '고객사,진행상태,사업명,다음 할 일,예정일' && od === '고객사,상태,설치희망,모델,수량', JSON.stringify({ ct, oi, od }));
+    assert(/^고객사,상태,서비스,판매채널,파트너$/.test(head), 'PC head(표 열 순서 그대로) ' + head);
+    return ct + ' / ' + oi + ' / ' + od;
   });
 }
 await browser.close(); srv.close();

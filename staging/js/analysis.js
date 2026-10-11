@@ -2002,14 +2002,80 @@ export function liveDeltaHtml(b){
   var plus=[n.신규? '신규 '+n.신규:'', n.복귀? '복귀 '+n.복귀:''].filter(Boolean).join(' · ');
   var minus=[n.만기? '만기 미처리 '+n.만기:'', n.해지? '해지 '+n.해지:'', n.종료? '종료 '+n.종료:'', n.예외? '예외 제외 '+n.예외:''].filter(Boolean).join(' · ');
   return tpl`<div class="lv-delta" title="LIVE 고객사 수의 전월 대비 변화를 사유별로 나눈 것 — 숫자는 회사 단위 · 만기 미처리 = 종료월이 지났는데 연장·해지·종료 처리가 없어 빠진 곳">`+
-    tpl`전월 ${rawHtml(dd.prevN)} → ${rawHtml(dd.curN)} <b class="${dn>0?'up':dn<0?'down':''}">(${dn>0?'+':''}${rawHtml(dn)})</b>`+ tpl`${rawHtml(dd.added.length? tpl` · <span class="up">+${dd.added.length}</span><span class="why">${plus}</span>`:'')}`+ tpl`${rawHtml(dd.removed.length? tpl` · <span class="down">−${dd.removed.length}</span><span class="why">${minus}</span>`:'')}`+ tpl`${rawHtml(dd.checking? tpl` · <button type="button" class="lnk" data-renew="checking" title="종료월이 최근 2개월 안에 지났는데 연장·해지 처리가 없는 계약 — LIVE 에 넣지 않고 표시만 합니다. 연장을 등록하면 되돌아옵니다">확인중 ${rawHtml(dd.checking)}건 →</button>`:'')}`+
+    tpl`전월 ${rawHtml(dd.prevN)} → ${rawHtml(dd.curN)} <b class="${dn>0?'up':dn<0?'down':''}">(${dn>0?'+':''}${rawHtml(dn)})</b>`+ tpl`${rawHtml(dd.added.length? tpl` · <span class="up">+${dd.added.length}</span><span class="why">${plus}</span>`:'')}`+ tpl`${rawHtml(dd.removed.length? tpl` · <span class="down">−${dd.removed.length}</span><span class="why">${minus}</span>`:'')}`+ tpl`${rawHtml(dd.added.length||dd.removed.length? tpl` · <button type="button" class="lnk" data-diff="delta" title="늘어난 곳 · 빠진 곳을 고객사 이름으로 봅니다">변동 ${rawHtml(dd.added.length+dd.removed.length)}곳 보기</button>`:'')}`+ tpl`${rawHtml(dd.checking? tpl` · <button type="button" class="lnk" data-renew="checking" title="종료월이 최근 2개월 안에 지났는데 연장·해지 처리가 없는 계약 — LIVE 에 넣지 않고 표시만 합니다. 연장을 등록하면 되돌아옵니다">확인중 ${rawHtml(dd.checking)}건 →</button>`:'')}`+
     tpl`</div>`;
 }
+/* ── ㊿+183 차이 근거 — 두 숫자가 다를 때 설명 글 대신 «실제로 다른 곳» 목록 (계산식은 그대로 · 보여 주기만)
+   o={title, intro, groups:[{label, sign:'+'|'−'|'', why, rows:[{cust, sub}]}], xlsx:파일 이름} · 고객사를 누르면 고객 360 */
+export var DF={o:null};
+export function diffOpen(o){
+  DF.o=o;
+  var ov=document.getElementById('ovlDiff');
+  if(!ov){ ov=document.createElement('div'); ov.className='ovl'; ov.id='ovlDiff'; document.body.appendChild(ov); }
+  var gs=(o.groups||[]).filter(function(g){ return g.rows && g.rows.length; }), n=gs.reduce(function(a,g){ return a+g.rows.length; },0), MAX=300;
+  var body=gs.length? gs.map(function(g, gi){
+    return tpl`<section class="df-g" aria-labelledby="dfG${String(gi)}"><h4 id="dfG${String(gi)}">${rawHtml(g.sign? tpl`<span class="df-s ${g.sign==='+'?'up':g.sign==='−'?'down':''}">${g.sign}</span>`:'')}${g.label} <b class="num">${String(g.rows.length)}곳</b></h4>`+
+      tpl`${rawHtml(g.why? tpl`<p class="mini df-why">${g.why}</p>`:'')}<ul class="df-l">${rawHtml(g.rows.slice(0,MAX).map(function(r){ return tpl`<li><button type="button" class="df-c" data-c="${r.cust}" title="고객 360">${r.cust}</button>${rawHtml(r.sub? tpl`<span class="df-sub">${r.sub}</span>`:'')}</li>`; }).join(''))}</ul>`+
+      tpl`${rawHtml(g.rows.length>MAX? tpl`<p class="mini">처음 ${String(MAX)}곳만 보입니다 — 전체는 «엑셀로 받기»</p>`:'')}</section>`; }).join('')
+    : tpl`<div class="ib-empty"><span class="ib-ic ok">${rawHtml(ico('check',16))}</span>다른 곳이 없습니다 — 두 숫자가 같습니다.</div>`;
+  ov.innerHTML=tpl`<div class="modal df-m" role="dialog" aria-modal="true" aria-labelledby="dfT" style="width:min(720px,100%)">`+
+    tpl`<h3 id="dfT">${o.title}</h3>${rawHtml(o.intro? tpl`<p class="cap">${o.intro}</p>`:'')}<div class="df-b">${rawHtml(body)}</div>`+
+    tpl`<div class="mact"><span class="mini" style="margin-right:auto">고객사를 누르면 고객 360 · 계산식은 바꾸지 않고 근거만 보여 줍니다</span>${rawHtml(n? '<button type="button" class="pill ghost" id="dfX">엑셀로 받기</button>':'')}<button type="button" class="pill" data-close="ovlDiff">닫기</button></div></div>`;
+  ov.querySelectorAll('.df-c').forEach(function(b){ /** @type {any} */(b).onclick=function(){ closeOvl('ovlDiff'); openCust360(/** @type {any} */(b).dataset.c); }; });
+  var x=ov.querySelector('#dfX'); if(x) /** @type {any} */(x).onclick=function(){ var out=[]; gs.forEach(function(g){ g.rows.forEach(function(r){ out.push([(g.sign||'')+' '+g.label, r.cust, String(r.sub||'').replace(/<[^>]+>/g,'')]); }); });
+    xlsxAoa((o.xlsx||'차이')+'_'+todayStr(), ['구분','고객사','내용'], out); };
+  openOvl('ovlDiff');
+  var f=ov.querySelector('.df-c, [data-close]'); if(f) try{ /** @type {any} */(f).focus(); }catch(e){}
+}
+/** LIVE 회사 수 vs 제품별 합 — 두 제품 이상 쓰는 곳(제품마다 1곳씩 세어 합이 커짐) · rows 를 주면 그 목록(대시보드 거르기 적용)으로 */
+export function liveMultiOpen(T, rows){
+  var lv=rows? {rows:rows} : liveData(T); if(!lv || !lv.rows) return;
+  var by={}; lv.rows.forEach(function(x){ var o=by[x.cust]=by[x.cust]||{}; o[x.line]=1; });
+  var cs=Object.keys(by), ps=cs.reduce(function(a,c){ return a+Object.keys(by[c]).length; },0);
+  var multi=cs.filter(function(c){ return Object.keys(by[c]).length>1; }).sort(function(a,b){ return Object.keys(by[b]).length-Object.keys(by[a]).length || a.localeCompare(b,'ko'); });
+  diffOpen({title:'LIVE 고객사 '+cs.length+'곳 vs 제품별 합 '+ps, xlsx:'LIVE_두제품이상',
+    intro:'회사는 1곳으로, 제품별 합은 제품마다 1곳씩 셉니다. 아래 '+multi.length+'곳이 제품을 두 개 이상 써서 차이 '+(ps-cs.length)+'이 납니다(세 제품이면 2만큼).',
+    groups:[{label:'두 제품 이상 쓰는 곳', rows:multi.map(function(c){ var ls=Object.keys(by[c]); return {cust:c, sub:ls.length+'개 · '+ls.map(lline).join(' · ')}; })}]});
+}
+/** 계약 기준 LIVE vs 시트 명단 — 제품 단위로 다른 줄(LIVE 화면 «시트와 다른 곳»과 같은 계산) · keep 으로 대시보드 거르기 */
+export function liveSheetDiffOpen(T, keep){
+  var d=liveDiff(T), k=keep||function(){ return true; };
+  var a=d.onlyDb.filter(k), b=d.onlySheet.filter(k);
+  diffOpen({title:'계약 기준 LIVE vs 시트 명단', xlsx:'LIVE_시트차이',
+    intro:mk(T)+' 계약 기준 '+d.db.uniq+'곳 · 시트 명단 '+d.sheetN+'곳 — 이름은 띄어쓰기 · (주) · 괄호 · 별칭을 무시하고 맞췄습니다. 아래 줄이 없어지면 두 숫자가 같아집니다.',
+    groups:[{label:'계약으로는 LIVE 인데 시트 명단에 없음', sign:'+', why:'시트 LIVE 탭에 추가하면 같아집니다', rows:a.map(function(x){ return {cust:x.cust, sub:lline(x.line)+(x.basis? ' · '+x.basis:'')}; })},
+            {label:'시트 명단에는 있는데 계약으로는 LIVE 아님', sign:'−', why:'계약을 등록 · 연장하거나, 끝난 곳이면 시트에서 뺍니다', rows:b.map(function(x){ return {cust:x.cust, sub:lline(x.line)+' · '+x.why}; })}]});
+}
+/** LIVE 전월 대비 변화 — 늘어난 곳 · 빠진 곳을 사유별로(liveDelta 와 같은 계산) */
+export function liveDeltaOpen(T){
+  var dd=liveDelta(T); if(!dd) return;
+  var byCust={}; ST.DATA.rows.forEach(function(r){ if(liveRoot(r)) (byCust[r.cust]=byCust[r.cust]||[]).push(r); });
+  var subAdd=function(c){ var rs=(byCust[c]||[]).filter(function(r){ return liveActiveAt(r,T); }); return rs.map(function(r){ return lline(r.line)+' '+(r.startRaw!=null? mk(r.startRaw):'?')+'~'+(r.endRaw!=null? mk(r.endRaw):''); }).join(' · '); };
+  var subRm=function(c){ var rs=(byCust[c]||[]).filter(function(r){ return liveActiveAt(r,T-1); }); return rs.map(function(r){ return lline(r.line)+' ~'+(r.endRaw!=null? mk(r.endRaw):'?')+(r.status? ' · 상태 '+r.status:''); }).join(' · '); };
+  var g=function(arr, kind, sign, label, why){ return {label:label, sign:sign, why:why, rows:arr.filter(function(x){ return x.kind===kind; }).map(function(x){ return {cust:x.cust, sub:(sign==='+'? subAdd : subRm)(x.cust)}; })}; };
+  diffOpen({title:'LIVE 고객사 '+mk(T-1)+' '+dd.prevN+'곳 → '+mk(T)+' '+dd.curN+'곳', xlsx:'LIVE_전월대비',
+    intro:'회사 단위로 늘어난 곳 '+dd.added.length+' · 빠진 곳 '+dd.removed.length+' (차이 '+(dd.curN-dd.prevN>0?'+':'')+(dd.curN-dd.prevN)+'). 만기 미처리 = 종료월이 지났는데 연장 · 해지 · 종료 처리가 없어 빠진 곳.',
+    groups:[g(dd.added,'신규','+','신규 — 첫 계약 시작'), g(dd.added,'복귀','+','복귀 — 다시 계약'),
+            g(dd.removed,'만기','−','만기 미처리','연장이면 «만기 처리»에서 연장을 등록하면 되돌아옵니다'), g(dd.removed,'해지','−','해지'), g(dd.removed,'종료','−','서비스 종료'), g(dd.removed,'예외','−','LIVE 예외로 제외')]});
+}
+/** 계약 하나가 지금 «만기 처리» 목록 어디에 있는지 — 'lapsed' | 'due' | 'next' | null (renewScan 과 같은 기준) */
+export function renewKindOf(r, T){
+  if(T==null) T=(STATE&&STATE.base!=null)? STATE.base : ST.DATA.nowIdx;
+  if(!r || !renewEligible(r)) return null; var e=r.endRaw;
+  return e<T? (e>=T-24? 'lapsed' : null) : e===T? 'due' : e===T+1? 'next' : null;
+}
+/** 만기 처리 창을 그 계약 줄에 맞춰 엶(줄 강조 · 연장 · 종료 · 해지 · 자동연장 버튼이 바로 보임) */
+export function renewOpenFor(r, T){
+  if(T==null) T=STATE.base; var k=renewKindOf(r, T); if(!k) return false;
+  openRenewList(k, T); RN.focus=r._id; renderRenewList();
+  setTimeout(function(){ var tr=document.querySelector('#rnList tr[data-id="'+r._id+'"]'); if(tr){ try{ tr.scrollIntoView({block:'center'}); }catch(e){} var b=tr.querySelector('.rn-acts .cbtn'); if(b) try{ /** @type {any} */(b).focus(); }catch(e){} } }, 30);
+  return true;
+}
 /* ── 만기 처리 창 ── */
-export var RN={kind:'due', T:null, open:null, act:'', busy:false};
+export var RN={kind:'due', T:null, open:null, act:'', busy:false, focus:null};
 export function openRenewList(kind, T){
   if(!ST.DATA || !ST.DATA.rows) return;
-  RN.kind=(kind==='checking')? 'lapsed' : (kind||'due'); RN.T=(T!=null? T : STATE.base); RN.open=null; RN.act='';
+  RN.kind=(kind==='checking')? 'lapsed' : (kind||'due'); RN.T=(T!=null? T : STATE.base); RN.open=null; RN.act=''; RN.focus=null;
   var m=$('#rnMsg'); if(m){ m.textContent=''; m.className='mmsg'; }
   renderRenewList(); openOvl('ovlRenew');
 }
@@ -2050,13 +2116,13 @@ export function renderRenewList(){
   $('#rnCap').textContent=caps[RN.kind]+' 월 단위 자동연장 계약은 «자동연장»을 켜면 이 목록과 슬랙 알림에서 빠집니다.'+(W? '' : ' (계약 쓰기 권한이 없어 열람만 됩니다)');
   $('#rnTabs').innerHTML=[['lapsed','만기 지남 · 미처리',S.lapsed.length],['due',mk(T)+' 만기',S.due.length],['next',mk(T+1)+' 만기',S.next.length]].map(function(t){
     return tpl`<button type="button" data-k="${rawHtml(t[0])}" aria-pressed="${RN.kind===t[0]}">${t[1]} <b class="num">${rawHtml(t[2])}</b></button>`; }).join('');
-  $('#rnTabs').querySelectorAll('button').forEach(function(b){ b.onclick=function(){ RN.kind=b.dataset.k; RN.open=null; RN.act=''; renderRenewList(); }; });
+  $('#rnTabs').querySelectorAll('button').forEach(function(b){ b.onclick=function(){ RN.kind=b.dataset.k; RN.open=null; RN.act=''; RN.focus=null; renderRenewList(); }; });
   if(!rows.length){ box.innerHTML=tpl`<div class="ib-empty"><span class="ib-ic ok">${rawHtml(ico('check',16))}</span>처리할 계약이 없습니다.</div>`; }
   else {
     var h=tpl`<table class="rn-tbl"><thead><tr><th>고객사</th><th>서비스</th><th>채널 · 파트너</th><th>기간</th><th class="n">약정</th><th class="n">MRR(천원)</th><th>상태</th>${rawHtml(W? '<th>처리</th>':'')}</tr></thead><tbody>`;
     rows.forEach(function(r){
       var id=r._id, open=(RN.open===id);
-      h+=tpl`<tr data-id="${rawHtml(id)}"${rawHtml(open?' class="rn-on"':'')}><td><a class="rn-cust" data-c="${r.cust}" title="고객 360">${r.cust}</a>${rawHtml(r.s1no? tpl` <span class="mini">${r.s1no}</span>`:'')}</td>`+
+      h+=tpl`<tr data-id="${rawHtml(id)}"${rawHtml(open||RN.focus===id?' class="rn-on"':'')}><td><a class="rn-cust" data-c="${r.cust}" title="고객 360">${r.cust}</a>${rawHtml(r.s1no? tpl` <span class="mini">${r.s1no}</span>`:'')}</td>`+
          tpl`<td>${llineVer(r.line,r.ver)}</td><td>${chOf(r)}${rawHtml(r.ptn&&r.ptn!=='직접(계산서)'? ' · '+esc(r.ptn):'')}</td>`+
          tpl`<td>${r.startRaw!=null? mk(r.startRaw):'?'} ~ <b>${mk(r.endRaw)}</b></td><td class="n">${rawHtml(r.term? r.term+'개월':'·')}</td><td class="n">${won(r.mrr)}</td>`+
          tpl`<td>${r.status||''}${rawHtml(r.renew? tpl` <span class="ubadge sm">연장 ${rawHtml(r.renew)}회</span>`:'')}</td>`;

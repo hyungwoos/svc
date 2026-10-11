@@ -2,18 +2,18 @@
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { APP_VER, ST } from './state.js';
 import { Viz } from './viz.js';
-import { $, amtGuard, amtHint, canView, cssv, esc, kwToWon, lline, mk, navText, perfNav, permEnter, rawHtml, STATE, tpl, won, wonFull, wonKo, wonToKw } from './core.js';
-import { cmdAskHit, dIdx, EQB, EQUIP_VIEWS, ico, idxDate, loadFromDb, onData, railSync, renderEqBoard, sbTry, sbWrite, toast, todayStr } from './shell.js';
+import { $, amtGuard, amtHint, canView, canWrite, cssv, esc, kwToWon, lline, mk, navText, perfNav, permEnter, rawHtml, STATE, tpl, won, wonFull, wonKo, wonToKw } from './core.js';
+import { cmdAskHit, dIdx, EQB, EQUIP_VIEWS, gridGo, ico, idxDate, loadFromDb, onData, railSync, renderEqBoard, sbTry, sbWrite, toast, todayStr } from './shell.js';
 import { buildControls, DASH_DIRTY, dashDetailShown, renderAll } from './dash.js';
 import { GRIDS } from './grids.js';
 import { eqRetOpen, eqWant, renderEqPanel, syncOrderAssets } from './equipment.js';
-import { AK, BZX, CH_DEFS, ctOrig, DC, ensureLeadSrc, liveCalc, liveDiff, loadLib, LS, LV, renderChannelView, setLiveSrc } from './analysis.js';
+import { AK, BZX, CH_DEFS, ctOrig, ctRawOf, ctSuccessor, DC, ensureLeadSrc, liveCalc, liveDelta, liveDeltaOpen, liveDiff, liveMultiOpen, loadLib, LS, LV, renderChannelView, renewKindOf, renewOpenFor, setLiveSrc } from './analysis.js';
 import { applyDense, openCust360, PR, pushRecent, renderTodo } from './tools.js';
 import { CL, renderCloud } from './cloud.js';
 import { inbLast, loadInbound, renderInbPanel, renderInbStat, renderWeekly } from './inbound.js';
 import { CHURN, CR, CS, csSetTab, ensureGroupOpen, helpBox, helpWire, initOiForm, loadRecvPresets, oiLinkQuote, oiToContract, quoteOpen, QUOTES, quotesLoad, renderChurn,
   renderChurnRate, renderCsite, renderCustFlow, renderOiTiles, wzReset } from './sales.js';
-import { logChange, monthRows, msg, openOvl } from './edit.js';
+import { closeOvl, logChange, monthRows, msg, openOvl } from './edit.js';
 import { lazyGet, lazyView } from './lazy.js';
 import { isNetErr, netToast, rowGuard, savedRows, saveFailMsg } from './guard.js';
 
@@ -993,6 +993,11 @@ export function renderLiveBar(lb){
     var opts=''; for(var i=ST.DATA.nowIdx+3;i>=Math.max(0,ST.DATA.nowIdx-36);i--){ opts+=tpl`<option value="${rawHtml(i)}"${i===T?' selected':''}>${mk(i)}${i===ST.DATA.nowIdx?' (이번 달)':''}</option>`; }
     h+=tpl`<label class="mini" style="display:flex;align-items:center;gap:6px">기준월 <select id="lvMonth" style="font:inherit;padding:4px 6px;border:1px solid var(--ring);border-radius:8px;background:var(--surface-2);color:inherit">${rawHtml(opts)}</select></label>`;
     h+=tpl`<span class="mini"><b>${mk(T)}</b> LIVE <b>${rawHtml(lv.uniq)}곳</b>(회사) · 제품별 합 <b>${rawHtml(lv.count)}</b> — ${rawHtml(lineTxt)}${rawHtml(sh? ' · 시트 명단 '+sh.uniq+'곳 / '+sh.count+'건':'')}</span>`;
+    /* ㊿+183 숫자 차이의 근거 — 회사 수 ≠ 제품별 합(두 제품 이상) · 전월 대비 변동을 고객사 목록으로 */
+    var mby={}; lv.rows.forEach(function(x){ (mby[x.cust]=mby[x.cust]||{})[x.line]=1; });
+    var nMul=Object.keys(mby).filter(function(c){ return Object.keys(mby[c]).length>1; }).length, dd=null; try{ dd=liveDelta(T); }catch(e){}
+    if(nMul) h+=tpl`<button type="button" class="chip" id="lvMulti" title="제품을 두 개 이상 써서 제품마다 1곳씩 세는 고객사 — 회사 수와 제품별 합이 다른 이유">두 제품 이상 ${String(nMul)}곳</button>`;
+    if(dd && (dd.added.length||dd.removed.length)) h+=tpl`<button type="button" class="chip" id="lvDelta" title="전월(${mk(T-1)})보다 늘어난 곳 · 빠진 곳을 사유별로">전월 대비 ${dd.curN-dd.prevN>0?'+':''}${String(dd.curN-dd.prevN)} · 변동 ${String(dd.added.length+dd.removed.length)}곳</button>`;
     if(sh){ var df=liveDiff(T); var nd=df.onlyDb.length+df.onlySheet.length;
       h+=tpl`<button class="chip" id="lvDiffBtn" aria-pressed="${rawHtml(LV.diff)}" title="계약 기준과 시트 명단이 다른 곳만 보기">${rawHtml(nd? '⚠ 시트와 다른 곳 '+nd:'✓ 시트 명단과 일치')}</button>`; }
   } else {
@@ -1023,6 +1028,8 @@ export function renderLiveBar(lb){
   lb.querySelectorAll('button[data-lsrc]').forEach(function(b){ b.onclick=function(){ setLiveSrc(b.dataset.lsrc); DV.page=0; DV.filters={}; DV.sortK=null; switchView('live'); }; });
   var ms=lb.querySelector('#lvMonth'); if(ms) ms.onchange=function(){ LV.T=+ms.value; DV.page=0; renderGrid(); };
   var db=lb.querySelector('#lvDiffBtn'); if(db) db.onclick=function(){ LV.diff=!LV.diff; renderGrid(); };
+  var mb=lb.querySelector('#lvMulti'); if(mb) /** @type {any} */(mb).onclick=function(){ liveMultiOpen(T); };
+  var vb=lb.querySelector('#lvDelta'); if(vb) /** @type {any} */(vb).onclick=function(){ liveDeltaOpen(T); };
   helpWire(lb);
 }
 /* 표 설명(cap) — 길면(120자 초과 · ㊿+181 폰은 40자) 첫 문장만 보이고 «도움말 ▾» 로 펼침 · 펼침 상태는 화면별로 기억 (⑤ UX 2단계 · ㊿+139) */
@@ -1108,14 +1115,16 @@ export function colwStart(ev, th, t, v){
 export function colwReset(v, k){ var m=colwGet(v); if(k) delete m[k]; else m={}; colwPut(v,m); renderGrid(); }
 /* ===== ㊿+181 폰 목록 = 카드 — 760px 이하에서 표 대신 카드(행마다 주요 칸 + 상태 · «＋ n칸» 으로 나머지) · «표로 보기»로 바꿀 수 있음(이 브라우저에 기억)
    · 같은 표(tr · td)를 CSS 로 카드처럼 그림 → 행 클릭 · 수정(칸이 위아래로 · 칸 이름 붙음) · 삭제 · 저장 동작은 그대로 · 머리글은 숨기고 위에 «정렬 · 거르기» */
-export var DVC={key:'svc_dvcards', on:false, mq:null, main:{}};
+export var DVC={key:'svc_dvcards', on:false, mq:null, main:{}, ord:[]};
 export function dvNarrow(){ try{ return window.matchMedia('(max-width:760px)').matches; }catch(e){ return false; } }
 export function dvCardsOn(){ if(!dvNarrow()) return false; try{ return localStorage.getItem(DVC.key)!=='0'; }catch(e){ return true; } }
 /** 카드에 늘 보이는 칸 — 고정 열(고객사 · 상태 등) 먼저, 그다음 보이는 열 순서로 모두 5칸 */
 export function dvMainKeys(g){
-  var vc=visCols(g), out={}, n=0;
-  (g.pin||[]).forEach(function(k){ if(n<5 && vc.some(function(c){ return c.k===k; })){ out[k]=1; n++; } });
-  vc.forEach(function(c){ if(n<5 && !out[c.k]){ out[c.k]=1; n++; } });
+  /* 고정 열(pin) → ㊿+183 화면별 우선 칸(mob) → 표 열 순서 · 모두 5칸 · 순서는 DVC.ord(폰 카드에서 그 순서로 보임) */
+  var vc=visCols(g), out={}, n=0, ord=[];
+  var add=function(k){ if(n<5 && !out[k] && vc.some(function(c){ return c.k===k; })){ out[k]=1; n++; ord.push(k); } };
+  (g.pin||[]).forEach(add); (g.mob||[]).forEach(add); vc.forEach(function(c){ add(c.k); });
+  DVC.ord=ord;
   return out;
 }
 export function dvCardBar(g, on){
@@ -1320,11 +1329,47 @@ export function ctPeriods(c, mine){
   });
   return out;
 }
+/* ㊿+183 계약 요약 · 다음 처리 — 찾은 계약의 금액 · 만료 · 갱신 상태 · 영업 경로를 맨 위에, 지금 할 수 있는 처리(기존 기능)를 바로 옆에
+   · 계산은 기존 그대로(MAT · renewScan · ctSuccessor) · 버튼은 권한이 있는 것만 · 계약 표에는 «담당자» 칸이 없어 채널 · 파트너를 보여 줌 */
+export function dtSummary(c){
+  var host=document.getElementById('dtSum');
+  if(!host){ var meta=document.getElementById('dtMeta'); if(!meta) return; host=document.createElement('div'); host.id='dtSum'; meta.insertAdjacentElement('afterend', host); }
+  var r=((ST.DATA&&ST.DATA.rows)||[]).filter(function(x){ return x._id===c.id; })[0];
+  if(!r){ host.innerHTML=''; return; }
+  var b=STATE.base, k=ST.DATA.rows.indexOf(r), amt=k>=0? (ST.MAT[k][b]||0) : 0, e=r.endRaw, st=String(r.status||''), nm=r.cust;
+  var ended=/해지|중지|종료|CN전환/.test(st), kind=renewKindOf(r, b), succ=null; try{ succ=(!ended && !r.parent)? ctSuccessor(r) : null; }catch(x){ succ=null; }
+  var ex, exC='';
+  if(e==null) ex=['종료월 없음', r.autoRenew? '매월 자동연장' : '기간 미정'];
+  else if(ended) ex=[mk(e), st];
+  else { var d=e-b; if(d<0){ ex=[mk(e), (-d)+'개월 지남'+(kind==='lapsed'? ' · 처리 안 됨':'')]; exC='bad'; } else if(d===0){ ex=[mk(e), '이달 만기']; exC='warn'; } else { ex=[mk(e), d+'개월 남음']; if(d<=3) exC='warn'; } }
+  var rn=ended? ['끝난 계약', st+(r.churn? ' · '+r.churn : '')] : r.autoRenew? ['자동연장', '매월 자동으로 이어짐'] : (succ && succ.sure)? ['재약정 등록됨', mk(succ.row.startIdx)+'~ 다음 계약'] :
+    succ? ['후속 계약 확인', mk(succ.row.startIdx)+'~ 같은 갱신인지 확인'] : r.parent? ['추가 계약', '원계약과 함께 만료'] : ['후속 계약 없음', r.renew? '연장 '+r.renew+'회' : '최초 계약'];
+  var cell=function(l, v, s, cls){ return tpl`<div class="${cls||''}"><div class="l">${l}</div><div class="v">${v}</div>${rawHtml(s? tpl`<div class="s">${s}</div>` : '')}</div>`; };
+  var acts=[];
+  if(kind) acts.push(['renew', {lapsed:'만기 지난 계약 처리', due:'이달 만기 처리', next:'다음 달 만기 처리'}[kind]+' — 연장 · 종료 · 해지', 1]);
+  if(!ended && !kind && e!=null && e>=b && e-b<=3 && !r.autoRenew && !r.parent && !(succ && succ.sure) && canView('oinew')) acts.push(['oi', '재계약 OI 만들기', 1]);
+  if(succ) acts.push(['succ', '후속 계약 보기 ('+mk(succ.row.startIdx)+'~)', 0]);
+  acts.push(['c360', '고객 360', 0]);
+  if(canWrite('contracts')) acts.push(['edit', '계약 표에서 수정', 0]);
+  host.innerHTML=tpl`<div class="dt-sum" role="group" aria-label="계약 요약">`+
+    cell(mk(b)+' 금액', won(amt)+'천원', '계약 월 금액 '+won(r.mrr||0)+'천원')+ cell('만료', ex[0], ex[1], exC)+ cell('갱신', rn[0], rn[1], exC==='bad' && !ended? 'bad' : '')+
+    cell('영업 경로', r.ptn||'직접', (r.channel||'일반')+(r.qty? ' · '+Number(r.qty).toLocaleString('ko-KR')+'노드' : ''))+ tpl`</div>`+
+    tpl`<div class="dt-act">${rawHtml(acts.map(function(a){ return tpl`<button type="button" class="${a[2]? 'pill pri' : 'cbtn'}" data-dt="${a[0]}">${a[1]}</button>`; }).join(''))}</div>`;
+  var go={
+    renew:function(){ closeOvl('ovlDetail'); renewOpenFor(r, b); },
+    oi:function(){ closeOvl('ovlDetail'); switchView('oinew'); setTimeout(function(){ var ci=/** @type {any} */(document.getElementById('oiCust')); if(ci) ci.value=nm; }, 80); },
+    succ:function(){ var s=succ && ctRawOf(succ.row._id); if(s) openDetail(s); },
+    c360:function(){ closeOvl('ovlDetail'); openCust360(nm); },
+    edit:function(){ closeOvl('ovlDetail'); gridGo('contracts', nm); }
+  };
+  host.querySelectorAll('button[data-dt]').forEach(function(bt){ /** @type {any} */(bt).onclick=function(){ go[/** @type {any} */(bt).dataset.dt](); }; });
+}
 export function openDetail(c){
   var cu=(ST.RAWX.customers||[]).filter(function(x){return x.id===c.customer_id;})[0]||{};
   $('#dtTitle').textContent=cu.name||'?';
   $('#dtMeta').textContent=[c.line, c.partner, c.biller, (c.start_month||'').slice(0,7)+'~'+((c.end_month||'').slice(0,7)||'?'),
     (c.contract_type? '구분 '+c.contract_type : ''), '상태 '+(c.status||'활성'), (c.renew_count? '연장 '+c.renew_count+'회':''), (c.qty? Number(c.qty).toLocaleString('ko-KR')+'노드':''), c.churn_reason||''].filter(Boolean).join(' · ');
+  try{ dtSummary(c); }catch(e){ console.warn('dtSummary', e); }   /* ㊿+183 */
   openOvl('ovlDetail');
   // 월별 금액 차트
   var mine=(ST.RAWX.mrs||[]).filter(function(x){return x.contract_id===c.id;});
@@ -1358,6 +1403,7 @@ export function gridRow(r,g,editing){
     tr.innerHTML=visCols(g).map(function(c){
       var cl=[]; if(c.t==='number') cl.push('n'); var pc=pinCls(g,c); if(pc) cl.push(pc);
       if(DVC.on && !DVC.main[c.k]){ cl.push('cx'); nCx++; }   /* ㊿+181 카드: 주요 칸 밖은 «＋ n칸»으로 */
+      else if(DVC.on && !pc){ var oi=DVC.ord.indexOf(c.k); cl.push(!(g.pin&&g.pin.length) && oi<2? 'mh'+(oi+1) : 'mo'+Math.max(1,oi)); }   /* ㊿+183 우선 칸 순서 · 고정 열 없는 표는 앞 두 칸이 카드 머리 */
       var dl=tpl` data-l="${c.l}"`;
       var txt=fmtCell(c,r[c.k],r);
       /* ㊿+169 빈 칸 구분: «—» = 미입력(값이 있어야 할 수 있음) · 빈칸 = 해당 없음(c.na · 예/아니오 칸의 «아니오») */

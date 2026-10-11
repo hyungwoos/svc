@@ -1660,6 +1660,7 @@ export function qaKpi(w){
     (function walk(o,p,d){ if(d>2 || !o) return; Object.keys(o).forEach(function(k){ if(/시간|시각|time|ms$|생성|갱신|오늘|기준일|설명|읽는법|주의/i.test(k)) return; var v=o[k], q=p? p+'.'+k : k;
       if(typeof v==='number' && isFinite(v)) out[q]=v; else if(Array.isArray(v)) out[q+'(개수)']=v.length; else if(v && typeof v==='object') walk(v,q,d+1); }); })(D,'',0);
     out['계약 행 수']=((qaApi(w).ST&&qaApi(w).ST.DATA&&qaApi(w).ST.DATA.rows)||[]).length; out['월 수']=(qaApi(w).ST&&qaApi(w).ST.M)||0;
+    try{ var S0=qaApi(w).ST||{}; Object.defineProperty(out, '_path', {value:(S0.LOAD_PATH||'?')+(S0.LOAD_WHY? ' ('+S0.LOAD_WHY+')' : ''), enumerable:false}); }catch(e){}   /* ㊿+183 데이터 받은 길 — 비교 대상 아님(diag 에만) */
   }catch(e){ out._err=String(e.message||e); }
   return out;
 }
@@ -1802,7 +1803,7 @@ export async function qaRun(){
   try{ var a=qaKpi(window), b=qaKpi(w);
     if(a._err || b._err){ sK.st='warn'; sK.detail='비교 못 함 — '+(a._err? '이 화면: '+a._err : '')+(b._err? ' 스테이징: '+b._err : ''); }
     else { var df=qaKpiDiff(a, b); var n=Object.keys(a).length;
-      if(df.diffs.length){ sK.st='fail'; sK.detail=df.diffs.length+'개 다름 — '+df.diffs.slice(0,5).join(' · ')+(df.diffs.length>5? ' 외 '+(df.diffs.length-5):''); sK.diag=['기준(이 화면) → 스테이징, buildDigest() 숫자:'].concat(df.diffs.slice(0,40).map(function(x){ return '  - '+x; })); }
+      if(df.diffs.length){ sK.st='fail'; sK.detail=df.diffs.length+'개 다름 — '+df.diffs.slice(0,5).join(' · ')+(df.diffs.length>5? ' 외 '+(df.diffs.length-5):''); sK.diag=['기준(이 화면) → 스테이징, buildDigest() 숫자:'].concat(df.diffs.slice(0,40).map(function(x){ return '  - '+x; })).concat(['데이터 받은 길 — 이 화면: '+(/** @type {any} */(a)._path||'?')+' · 스테이징: '+(/** @type {any} */(b)._path||'?')+' (fast = load_all 한 번 · slow = 표별)']); }
       else { sK.st='ok'; sK.detail=n+'개 숫자 일치'+(df.onlyB? ' · 스테이징에 새 항목 '+df.onlyB:'')+(df.onlyA? ' · 없어진 항목 '+df.onlyA:''); } }
   }catch(e){ sK.st='warn'; sK.detail=qaText(e.message||e, 100); }
   sK.ms=Date.now()-tk; qaPaint();

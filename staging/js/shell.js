@@ -7,7 +7,7 @@ import { buildControls, expN, expScan, hbars, idxs, kpiOpen, monthlyTotal, rende
 import { ask } from './ai.js';
 import { applyCodes, GRIDS, loadCodes } from './grids.js';
 import { eqCanRet, eqOrderById, eqRetOpen, eqRetSet, eqScan, eqSerialsHtml, eqWant, syncOrderAssets } from './equipment.js';
-import { applyChannelMenu, chOf, ctRawOf, ctSuccessor, dcRules, ensureLeadSrc, liveData, openRenewList, renewScan } from './analysis.js';
+import { applyChannelMenu, chOf, ctRawOf, ctSuccessor, dcRules, ensureLeadSrc, liveData, openRenewList, renewKindOf, renewOpenFor, renewScan } from './analysis.js';
 import { applyMenuConf, fkNorm, freqTop, menuSegments, navSub, openMenuEdit, renderTodo, subgrpSync, viewLabel } from './tools.js';
 import { loadInbound, loadMxMemos } from './inbound.js';
 import { UPD, updCheck } from './upd.js';
@@ -856,8 +856,10 @@ export function eqbCard(o, canEdit, todayS){
     prog=tpl`<div style="display:flex;align-items:center;gap:8px"><div class="eqb-prog" style="flex:1;margin:0">${rawHtml(all.map(function(sn){ return tpl`<i class="${ret.indexOf(sn.toUpperCase())>=0?'on':''}"></i>`; }).join(''))}</div><span class="num" style="font-size:12px;font-weight:600">${ret.length}/${all.length}</span></div>`;
   }
   var idx=EQB_COLS.map(function(c){ return c[0]; }).indexOf(o.status), nextSt=idx>=0 && idx<EQB_COLS.length-1? EQB_COLS[idx+1][0] : null;
-  var who=o.mgr_name? o.mgr_name : (o.requester? String(o.requester).split('@')[0] : '');
-  var ft=tpl`<div class="ft"><span class="mini" title="담당 ${who}">${who}</span><span class="acts">`+
+  /* ㊿+183 카드의 «담당» = 처리 담당(work_assign) → 없으면 신청한 사람 (홈 · 알림함과 같은 기준 · ㊿+174). 예전엔 신청서의 고객 담당자(mgr_name · 고객 쪽 사람)가 나왔음 */
+  var asg=NTF.asg && NTF.asg[String(o.id)], who=asg? ntfWho(asg.assignee) : (o.requester? String(o.requester).split('@')[0] : '');
+  var whoT=(asg? '처리 담당 ' : '신청 ')+who+(o.mgr_name? ' · 고객 담당자 '+o.mgr_name : '');
+  var ft=tpl`<div class="ft"><span class="mini" title="${whoT}">${who}</span><span class="acts">`+
     tpl`<button type="button" class="cbtn ab" data-open="${rawHtml(o.id)}" title="신청 내역에서 열기·수정" aria-label="신청 #${rawHtml(o.id)} 신청 내역에서 열기·수정">${rawHtml(ico('edit',14))}</button>`+
     tpl`${rawHtml(canEdit && eqCanRet(o) && all.length? tpl`<button type="button" class="cbtn" data-ret="${rawHtml(o.id)}" title="시리얼을 골라 일부·전부 회수 또는 회수 취소">${done? '회수 취소…' : '회수 처리'}</button>`:'')}`+
     tpl`${rawHtml(canEdit && nextSt && nextSt!=='회수완료'? tpl`<button type="button" class="cbtn nx${['출하요청','배송중','설치완료'].indexOf(nextSt)>=0?' pri':''}" data-oid="${rawHtml(o.id)}" data-next="${nextSt}" title="${nextSt} 로 이동">${nextSt} →</button>`:'')}</span></div>`;
@@ -974,6 +976,10 @@ export function c360Enhance(nm, cts, lives, ois, inbs, asts, ords){
       acts.push(['재계약 OI 만들기', function(){ closeOvl('ovlC360'); switchView('oinew'); setTimeout(function(){ var c=document.getElementById('oiCust'); if(c){ c.value=nm; } },80); }]); }
     if(EQ.lent) tips.push(tpl`임대 장비 ${rawHtml(EQ.lent)}대는 재약정하면 그대로 씁니다 — 종료가 확정될 때만 회수 신청을 하세요.`);
   }
+  /* ㊿+183 만기가 지났는데 연장 · 종료 · 해지 처리가 없는 계약 — 제안 맨 앞 + «만기 처리» */
+  var lapR=cts.filter(function(r){ return renewKindOf(r, b)==='lapsed'; });
+  if(lapR.length){ tips.unshift(tpl`<b>만기가 지났는데 처리 안 된 계약 ${String(lapR.length)}건</b> — ${rawHtml(lapR.slice(0,3).map(function(r){ return esc(lline(r.line))+' ~'+mk(r.endRaw); }).join(' · '))} · 이미 LIVE 에서 빠져 있습니다. 연장 · 서비스종료 · 해지 중 하나로 정리하세요.`);
+    acts.unshift(['만기 처리 ('+lline(lapR[0].line)+' ~'+mk(lapR[0].endRaw)+')', function(){ closeOvl('ovlC360'); renewOpenFor(lapR[0], b); }]); }
   if(EQ.retPend) tips.push(tpl`회수 예정 장비 ${rawHtml(EQ.retPend)}대(신청 ${rawHtml(EQ.retOrd.map(function(o){ return '#'+o.id; }).join(', '))}) — 장비 대시보드에서 회수 처리.`);
   if(EQ.partial.length) tips.push(tpl`부분 회수된 신청 ${rawHtml(EQ.partial.length)}건 — 남은 장비를 계속 쓸지 확인하세요.`);
   if(EQ.open.length) tips.push(tpl`처리 대기 장비 신청 ${rawHtml(EQ.open.length)}건(${rawHtml(EQ.open.map(function(o){ return o.status; }).join('·'))}).`);
@@ -987,11 +993,12 @@ export function c360Enhance(nm, cts, lives, ois, inbs, asts, ords){
   /* 요약 탭(기본): 지금 유효한 계약 + 시작 예정 + 장비 네 칸 · 상세는 기존 탭 */
   var valid=cts.filter(function(r){ return r.startIdx!=null && r.startIdx<=b && (r.endIdx==null || r.endIdx>=b) && !/해지|중지/.test(String(r.status||'')); });
   var upc=cts.filter(function(r){ return r.startIdx!=null && r.startIdx>b; });
+  var lap=cts.filter(function(r){ return renewKindOf(r, b)==='lapsed'; });   /* ㊿+183 만기가 지났는데 처리 안 된 계약도 «지금 계약»에 — 바로 «만기 처리» */
   function line(r, tag){ var k=ST.DATA.rows.indexOf(r), a=k>=0? (ST.MAT[k][b]||0) : 0; var s=succ.get(r);
-    return tpl`<tr data-c360sum="${rawHtml(r._id)}" tabindex="0" title="계약 상세"><td><span class="ctag ${rawHtml(tag==='유효'?'ok':'info')}">${rawHtml(r.parent? '추가 계약' : tag)}</span></td><td>${lline(r.line)}<span class="st">${r.status||r.ctype||''}</span></td><td>${mk(r.startIdx)} ~ ${r.endIdx!=null? mk(r.endIdx):'—'}</td>`+
-      tpl`<td class="n">${tag==='유효'? won(a) : '—'}</td><td class="n">${won(r.mrr||0)}</td><td class="mini">${rawHtml(r.autoRenew? '자동연장' : (s? (s.sure? '재약정 등록됨' : '후속 계약 확인 필요') : ''))}</td></tr>`; }
-  var summ=tpl`<div class="c360-summ"><h4>지금 계약 <span class="ct">유효 ${rawHtml(valid.length)}건${rawHtml(upc.length? ' · 시작 예정 '+upc.length+'건':'')} · 금액 단위 천원</span></h4>`+
-    tpl`${rawHtml(valid.length||upc.length? tpl`<div class="c360-summ-w"><table><thead><tr><th>구분</th><th>서비스 · 계약 상태</th><th>기간</th><th class="n" title="기준월(${mk(b)})에 인식되는 금액">${mk(b)} 인식</th><th class="n" title="계약서 기준 월 금액">월 금액</th><th>갱신</th></tr></thead><tbody>${rawHtml(valid.map(function(r){ return line(r,'유효'); }).concat(upc.map(function(r){ return line(r,'시작 예정'); })).join(''))}</tbody></table></div>` : '<p class="cap" style="margin:2px 0 0">기준월에 유효한 계약이 없습니다 — «계약» 탭에서 이력을 확인하세요.</p>')}`+
+    return tpl`<tr data-c360sum="${rawHtml(r._id)}" tabindex="0" title="계약 상세"><td><span class="ctag ${rawHtml(tag==='유효'?'ok':tag==='만기 지남'?'warn':'info')}">${rawHtml(r.parent? '추가 계약' : tag)}</span></td><td>${lline(r.line)}<span class="st">${r.status||r.ctype||''}</span></td><td>${mk(r.startIdx)} ~ ${r.endIdx!=null? mk(r.endIdx):'—'}</td>`+
+      tpl`<td class="n">${tag==='유효'? won(a) : '—'}</td><td class="n">${won(r.mrr||0)}</td><td class="mini">${rawHtml(r.autoRenew? '자동연장' : (s? (s.sure? '재약정 등록됨' : '후속 계약 확인 필요') : ''))}${rawHtml(renewKindOf(r, b)? tpl` <button type="button" class="cbtn c360-do" data-do="${String(r._id)}" title="만기 처리 창에서 연장 · 종료 · 해지">만기 처리</button>` : '')}</td></tr>`; }   /* ㊿+183 다음 처리를 그 줄에서 바로(갱신 칸 안 — 좁은 창에서도 보이게) */
+  var summ=tpl`<div class="c360-summ"><h4>지금 계약 <span class="ct">유효 ${rawHtml(valid.length)}건${rawHtml(upc.length? ' · 시작 예정 '+upc.length+'건':'')}${rawHtml(lap.length? ' · 만기 지남 '+lap.length+'건':'')} · 금액 단위 천원</span></h4>`+
+    tpl`${rawHtml(valid.length||upc.length||lap.length? tpl`<div class="c360-summ-w"><table><thead><tr><th>구분</th><th>서비스 · 계약 상태</th><th>기간</th><th class="n" title="기준월(${mk(b)})에 인식되는 금액">${mk(b)} 인식</th><th class="n" title="계약서 기준 월 금액">월 금액</th><th>갱신 · 처리</th></tr></thead><tbody>${rawHtml(valid.map(function(r){ return line(r,'유효'); }).concat(upc.map(function(r){ return line(r,'시작 예정'); })).concat(lap.map(function(r){ return line(r,'만기 지남'); })).join(''))}</tbody></table></div>` : '<p class="cap" style="margin:2px 0 0">기준월에 유효한 계약이 없습니다 — «계약» 탭에서 이력을 확인하세요.</p>')}`+
     tpl`<h4 style="margin-top:14px">장비 <span class="ct">상세는 «장비» 탭</span></h4><div class="c360-eq4"><div><b class="num">${rawHtml(EQ.lent)}</b><span>현재 임대중 (대)</span></div><div><b class="num">${rawHtml(EQ.retPend)}</b><span>회수 예정 (대)</span></div><div><b class="num">${rawHtml(EQ.retDone)}</b><span>회수 완료 (대)</span></div><div><b class="num">${rawHtml(EQ.ordN)}</b><span>신청(발주) 이력 (건)</span></div></div></div>`;
   /* 섹션 탭 */
   var secs=[].slice.call(body.querySelectorAll('.c360-sec'));
@@ -1000,7 +1007,8 @@ export function c360Enhance(nm, cts, lives, ois, inbs, asts, ords){
   body.insertBefore(head, body.firstChild);
   var sv=document.createElement('div'); sv.className='c360-summary-pane'; sv.innerHTML=summ; head.appendChild(sv);
   head.querySelectorAll('[data-a]').forEach(function(bt){ bt.onclick=function(){ acts[+bt.dataset.a][1](); }; });
-  sv.querySelectorAll('tr[data-c360sum]').forEach(function(tr){ var go=function(){ var c=ctRawOf(Number(tr.getAttribute('data-c360sum'))); if(c) openDetail(c); }; tr.onclick=go; tr.onkeydown=function(e){ if(e.key==='Enter'){ e.preventDefault(); go(); } }; });
+  sv.querySelectorAll('button.c360-do').forEach(function(bt){ /** @type {any} */(bt).onclick=function(ev){ ev.stopPropagation(); var id=Number(/** @type {any} */(bt).dataset.do), r=cts.filter(function(x){ return x._id===id; })[0]; if(r){ closeOvl('ovlC360'); renewOpenFor(r, b); } }; });
+  sv.querySelectorAll('tr[data-c360sum]').forEach(function(tr){ var go=function(){ var c=ctRawOf(Number(tr.getAttribute('data-c360sum'))); if(c) openDetail(c); }; tr.onclick=go; tr.onkeydown=function(e){ if(e.key==='Enter' && e.target===tr){ e.preventDefault(); go(); } }; });
   function show(t){ sv.style.display= t===-2? '' : 'none'; secs.forEach(function(sc,i){ sc.style.display=(t===-1||t===i)? '':'none'; }); }
   head.querySelectorAll('[role="tab"]').forEach(function(bt){ bt.onclick=function(){
     head.querySelectorAll('[role="tab"]').forEach(function(x){ x.setAttribute('aria-selected', x===bt? 'true':'false'); });
@@ -1214,13 +1222,15 @@ export async function loadFromDb(){
         j.iextra || []           /* 설치비 추가 항목 — 화면을 먼저 그리고 뒤에서 채웁니다 */
       ];
       cacheWriteLater(res0);   /* ㊿+145: 큰 JSON 저장은 화면을 그린 뒤로 */
-      var built=buildFromRes(res0);
+      var built=buildFromRes(res0); ST.LOAD_PATH='fast'; ST.LOAD_WHY='';
       if(!j.s1map || !j.iextra) loadExtrasLater(!j.s1map, !j.iextra);   // 첫 화면을 붙잡지 않도록 뒤에서 병렬로
       return built;
     }
-  }catch(e){ /* 함수 미설치 등 → 아래 기존 방식으로 */ }
+    ST.LOAD_WHY='load_all 응답에 customers 없음';
+  }catch(e){ ST.LOAD_WHY=String(/** @type {any} */(e) && /** @type {any} */(e).message || e).slice(0,200); }   /* 함수 미설치 · 시간 초과 등 → 아래 표별 방식으로 */
+  ST.LOAD_PATH='slow'; try{ console.warn('[데이터] load_all 대신 표별로 읽음 —', ST.LOAD_WHY); }catch(e){}
   var res=await Promise.all([
-    sbAll('customers?select=id,name,industry&order=id'),
+    sbAll('customers?select=*&order=id'),   /* ㊿+183 업종(sector) · 동명 · 별칭까지 — 예전엔 id,name,industry 만 받아 load_all 이 실패한 창에서 «업종별» 숫자가 달라졌음(스테이징 QA) */
     sbAll('contracts?select=*&order=id'),
     sbAll('monthly_revenue?select=contract_id,month,amount&order=contract_id,month'),
     sbTry('live_customers?select=*&order=id'),
@@ -1259,7 +1269,7 @@ export function loadFromCache(){
     var c=JSON.parse(sessionStorage.getItem(CACHE_KEY)||'null');
     if(c && c.res && c.res[0] && c.res[0].length){
       if(Date.now()-(c.t||0) > 10*60*1000) return null;   // 10분 넘은 캐시는 쓰지 않음
-      var bc=buildFromRes(c.res); try{ bc._fromCache=true; }catch(e){} return bc;
+      var bc=buildFromRes(c.res); try{ bc._fromCache=true; }catch(e){} ST.LOAD_PATH='cache'; return bc;
     }
   }catch(e){}
   return null;
