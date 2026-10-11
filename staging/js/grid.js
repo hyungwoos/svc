@@ -7,7 +7,7 @@ import { cmdAskHit, dIdx, EQB, EQUIP_VIEWS, gridGo, ico, idxDate, loadFromDb, on
 import { buildControls, DASH_DIRTY, dashDetailShown, renderAll } from './dash.js';
 import { GRIDS } from './grids.js';
 import { eqRetOpen, eqWant, renderEqPanel, syncOrderAssets } from './equipment.js';
-import { AK, BZX, CH_DEFS, ctOrig, ctRawOf, ctSuccessor, DC, ensureLeadSrc, liveCalc, liveDelta, liveDeltaOpen, liveDiff, liveMultiOpen, loadLib, LS, LV, renderChannelView, renewKindOf, renewOpenFor, setLiveSrc } from './analysis.js';
+import { AK, areaPick, BZX, CH_DEFS, ctOrig, ctRawOf, ctSuccessor, DC, ensureLeadSrc, liveCalc, liveDelta, liveDeltaOpen, liveDiff, liveMultiOpen, loadLib, LS, LV, renderChannelView, renewKindOf, renewOpenFor, setLiveSrc } from './analysis.js';
 import { applyDense, openCust360, PR, pushRecent, renderTodo } from './tools.js';
 import { CL, renderCloud } from './cloud.js';
 import { inbLast, loadInbound, renderInbPanel, renderInbStat, renderWeekly } from './inbound.js';
@@ -21,7 +21,7 @@ import { isNetErr, netToast, rowGuard, savedRows, saveFailMsg } from './guard.js
 /* ---- 뒤로가기 — 화면 이동을 브라우저 히스토리에 남겨 상단 ← 버튼·브라우저/폰 뒤로가기·Alt+← 가 모두 이전 화면으로 ----
    주소 해시(#oi 처럼)에 현재 화면을 적어 두므로 새로고침·링크 공유 때도 그 화면이 열립니다. */
 export var NAV={i:0, pop:false, ready:false, menu:false, reset:''};
-export function navValid(v){ return v==='dash' || !!document.querySelector('#side button[data-v="'+v+'"]'); }
+export function navValid(v){ return v==='dash' || v==='area' || !!document.querySelector('#side button[data-v="'+v+'"]'); }
 export function navDepth(){ try{ return (history.state && typeof history.state.i==='number')? history.state.i : 0; }catch(e){ return 0; } }
 export function navRecord(prev, v){
   if(NAV.pop || prev===v) return;
@@ -97,6 +97,7 @@ export var VSCROLL={};
 export var CUSTCTX={c:''};
 export var CUST_VIEWS={contracts:1, live:1, oi:1, inbound:1, orders:1, assets:1, mdrops:1};
 export function navMenu(v){
+  if(v==='area'){ v=areaPick(); if(!v){ toast('사업 영역', '계약이 있는 사업 영역이 없습니다', 'info'); return; } }   /* ㊿+187 상단 «사업 영역» 버튼 → 마지막(또는 첫) 영역 */
   try{ perfNav(v); }catch(e){}   /* ㊿+173 실사용 속도 */
   if(CUSTCTX.c && CUST_VIEWS[v]){ custGo(v, CUSTCTX.c); return; }
   NAV.menu=true;
@@ -138,6 +139,7 @@ export function custCtxBar(){
 
 export function switchView(v){
   if(v==='mdrpoc') v='mdrops';                       // 통합 전 이름 호환
+  if(v==='area'){ v=areaPick()||'dash'; }            // ㊿+187 사업 영역 한 화면(주소 #area 로 와도)
   if((v==='ordernew'||v==='mdrnew'||v==='oinew'||v==='csite'||v==='preport'||v==='s1'||v==='kk') && !ST.SB_TOKEN){ openOvl('ovlAuth'); return; }
   if(ST.IS_EQUIP && !EQUIP_VIEWS[v]) v=ST.EQUIP_HOME||'orders';   // 제한 계정은 허용된 화면만
   if(v==='log' && !ST.IS_SUPER) v='dash';                             // 변경 이력은 슈퍼 관리자만
@@ -274,7 +276,7 @@ export function switchView(v){
   }
   var mem=(RESTORE && DVMEM[v])? DVMEM[v] : null;   /* ㊿+169 «뒤로» · ㊿+172 메뉴 재진입도 떠날 때 상태 그대로 · 조건을 들고 들어오는 이동(홈 할 일 · 검색 결과 · 고객 360)은 처음부터 */
   if(mem){ DV.page=mem.page; DV.sortK=mem.sortK; DV.sortDir=mem.sortDir; DV.chipVal=mem.chipVal; DV.filters=mem.filters; DV.lens=mem.lens; DV.lensAll=mem.lensAll; DV.pre=mem.pre; }
-  else { DV.page=0; DV.sortK=null; DV.sortDir=1; DV.chipVal=''; DV.filters={}; DV.pre=null; }
+  else { DV.page=0; DV.sortK=null; DV.sortDir=1; DV.chipVal=''; DV.filters={}; DV.pre=null; DV.lens=''; }   /* ㊿+187 관점(계약 전용)도 비움 — 다른 화면 칩에 남지 않게 */
   closeColFilter();
   var g=GRIDS[v];
   renderOiTiles(v==='oi');
@@ -618,6 +620,8 @@ export function qvGo(view, key){
 export function qvBar(g, rows){
   var qb=document.getElementById('dvQvBar'), defs=qvDefs(ST.CUR_VIEW);
   if(!qb){ qb=document.createElement('div'); qb.id='dvQvBar'; qb.className='qv-bar'; var bar=$('#dvSearch').parentElement; bar.parentElement.insertBefore(qb, bar); }
+  var qhost=(isGN() && document.getElementById('dvQoiHost'))||qb;   /* ㊿+187 «견적만 있음 → OI»는 필터가 아니라 할 일 — 한 줄 도구줄에 */
+  if(qhost!==qb) qhost.innerHTML='';
   if(!defs || g.custom){ qb.hidden=true; qb.innerHTML=''; return; }
   qb.hidden=false; var all=g.rows();
   var qOk=ST.CUR_VIEW!=='oi' || oiQuotesReady('qv', function(){ if(ST.CUR_VIEW==='oi') renderGrid(); });   /* ㊿+184 «내 OI» · «견적 전»은 견적 목록을 받은 뒤 셈(그 전엔 «…») */
@@ -625,7 +629,7 @@ export function qvBar(g, rows){
       return tpl`<button type="button" class="chip${n || wq? '':' zero'}" data-qv="${d[0]}" aria-pressed="${on?'true':'false'}" title="${d[2]}">${d[1]} <b class="num">${wq? '…' : String(n)}</b></button>`; }).join(''))}`+
     tpl`<button type="button" class="cbtn" id="qvCfgBtn" aria-haspopup="dialog" title="빠른 보기 기준 — 장기 미접촉 일수 · 첫 대응 일수">${rawHtml(ico('gear',14))} 기준</button>`;
   var nq=(ST.CUR_VIEW==='oi' && qOk && canWrite('oi'))? (ST.RAWX.quotes||[]).filter(qoiCand).length : 0;   /* ㊿+184 견적만 있고 OI 없음 → 미리 보기 후 OI 등록(10%) · 연결 */
-  if(nq) qb.insertAdjacentHTML('beforeend', tpl`<button type="button" class="cbtn qoi-btn" id="qoiBtn" aria-haspopup="dialog" title="견적서는 있는데 OI 가 없는 견적 — 미리 보고 OI 에 넣기(진행 중 OI 가 있으면 연결 · 없으면 가능성 10%로 등록)">견적만 있음 <b class="num">${String(nq)}</b>건 → OI</button>`);
+  if(nq) qhost.insertAdjacentHTML('beforeend', tpl`<button type="button" class="cbtn qoi-btn" id="qoiBtn" aria-haspopup="dialog" title="견적서는 있는데 OI 가 없는 견적 — 미리 보고 OI 에 넣기(진행 중 OI 가 있으면 연결 · 없으면 가능성 10%로 등록)">견적만 있음 <b class="num">${String(nq)}</b>건 → OI</button>`);
   var qbtn=document.getElementById('qoiBtn'); if(qbtn) qbtn.onclick=function(){ qoiOpen(); };
   qb.querySelectorAll('[data-qv]').forEach(function(b){ b.onclick=function(){ var k=b.dataset.qv;
     if(DV.pre && DV.pre.qv===k){ DV.pre=null; DV.page=0; renderGrid(); } else qvGo(ST.CUR_VIEW, k); }; });
@@ -647,6 +651,152 @@ export function qvCfgOpen(btn){
   /** @type {any} */(m.querySelector('#qvOk')).onclick=function(){ var v=function(id){ return /** @type {any} */(document.getElementById(id)).value; };
     qvSave({me:C.me, oiIdle:+v('qvOi')||30, inbFirst:+v('qvIf')||3, inbIdle:+v('qvIi')||90}); close(); DV.pre=null; renderGrid(); toast('빠른 보기 기준 저장', '이 브라우저에만 적용 · 홈 «우선 업무»도 같은 기준', 'info'); };
   setTimeout(function(){ var f=/** @type {any} */(m.querySelector('input')); if(f) f.focus(); }, 0);
+}
+
+/* ===== ㊿+187 표 위 필터 한 줄(지니언스 디자인 · 고급 SaaS 기준 — 제3자 점검 «모든 화면» 항목 11) =====
+   · 예전엔 보기 · 상태 · 빠른 보기 · 관점 · 조건 · 도구 줄이 3~5줄로 쌓였음 → 한 줄: [보기 탭] [검색] [필터 ▾ n] [저장된 보기 ▾] [견적만 있음 → OI] … [n행] [엑셀] [AI 도움말] [열] [⋯]
+   · «필터» 팝오버(#dvFilterPop) 안에 상태 · 빠른 보기 · 관점 — 예전 줄 요소(#dvChipBar · #dvQvBar · #dvLensBar)를 그대로 옮겨 둠(id · 버튼 · 건수 · 동작 · 시험 선택자 그대로) · 아래 «지금 조건 n행»
+   · 걸린 조건은 표 바로 위 칩 줄(#dvChips) — 칩마다 ✕ · 둘 이상이면 «모두 해제»(#dvFclr) · 홈 알림 조건(DV.pre) · 고객 문맥(#dvCustBar)도 같은 줄
+   · 저장된 보기(#dvSavedBtn): 지금 조건(보기 · 상태 · 빠른 보기 · 관점 · 열 필터 · 검색어)에 이름을 붙여 내 브라우저에 저장(svc_fviews_계정) · 한 번에 다시 적용 · 화면마다 따로
+   · ⋯(#dvMoreBtn): 다시 읽기 · 붙여넣기 입력 · 밀도 — 드물게 쓰는 도구(요소를 옮겨 둠 — id · 동작 그대로)
+   · 클래식 디자인은 예전 줄 그대로(fbarOn 이 false) · LIVE 화면의 기준 줄(#dvLensBar 를 다시 씀)은 팝오버에 넣지 않고 줄 위에 둠 */
+export var FBAR={view:'', close:null};
+export function fbarOn(){ return isGN() && !!document.getElementById('dvSearch'); }
+export function fbarEnsure(){
+  if(!fbarOn()) return null;
+  var s=$('#dvSearch'), bar=s.parentElement, card=bar.parentElement;
+  if(document.getElementById('dvFilterBtn')) return bar;
+  bar.classList.add('fbar');
+  var fb=document.createElement('button'); fb.type='button'; fb.id='dvFilterBtn'; fb.className='cbtn fb-btn icb'; fb.setAttribute('aria-haspopup','dialog'); fb.setAttribute('aria-expanded','false'); fb.setAttribute('aria-controls','dvFilterPop'); fb.title='필터 — 상태 · 빠른 보기 · 관점';
+  fb.innerHTML=ico('filter',15)+tpl`<span>필터</span><b class="num fb-n" hidden></b>`;
+  var sv=document.createElement('button'); sv.type='button'; sv.id='dvSavedBtn'; sv.className='cbtn fb-btn icb'; sv.setAttribute('aria-haspopup','dialog'); sv.setAttribute('aria-expanded','false'); sv.title='저장된 보기 — 지금 조건에 이름을 붙여 두고 한 번에 다시 적용(내 브라우저에만)';
+  sv.innerHTML=ico('star',15)+tpl`<span>저장된 보기</span><b class="num fb-n" hidden></b>`;
+  var qh=document.createElement('span'); qh.id='dvQoiHost'; qh.className='fb-qoi';
+  s.insertAdjacentElement('afterend', fb); fb.insertAdjacentElement('afterend', sv); sv.insertAdjacentElement('afterend', qh);
+  var wb=document.getElementById('dvWvBar'); if(wb) bar.insertBefore(wb, s);   /* 보기 탭은 줄 맨 앞 */
+  var pop=document.createElement('div'); pop.id='dvFilterPop'; pop.className='fb-pop'; pop.setAttribute('role','dialog'); pop.setAttribute('aria-label','필터'); pop.hidden=true;
+  pop.innerHTML=tpl`<div class="fb-sec" data-sec="chip" hidden><div class="fb-st">구분</div></div><div class="fb-sec" data-sec="qv" hidden><div class="fb-st">빠른 보기</div></div><div class="fb-sec" data-sec="lens" hidden><div class="fb-st">관점</div></div>`+
+    tpl`<div class="fb-ft"><span class="mini" id="dvFbCount"></span><span class="spacer"></span><button type="button" class="cbtn" id="dvFbClear">모두 해제</button><button type="button" class="cbtn pri" id="dvFbDone">닫기</button></div>`;
+  card.insertBefore(pop, bar.nextSibling);
+  var ch=document.createElement('div'); ch.id='dvChips'; ch.className='dv-chips'; ch.setAttribute('aria-label','걸린 조건'); ch.hidden=true;
+  card.insertBefore(ch, pop.nextSibling);
+  var mb=document.createElement('button'); mb.type='button'; mb.id='dvMoreBtn'; mb.className='cbtn icb fb-more'; mb.setAttribute('aria-haspopup','menu'); mb.setAttribute('aria-expanded','false'); mb.setAttribute('aria-controls','dvMoreMenu'); mb.setAttribute('aria-label','표 도구 더보기 — 다시 읽기 · 붙여넣기 입력 · 밀도'); mb.title='더보기 — 다시 읽기 · 붙여넣기 입력 · 밀도'; mb.innerHTML=ico('more',15);
+  var mm=document.createElement('div'); mm.id='dvMoreMenu'; mm.className='more-menu fb-menu'; mm.setAttribute('role','menu'); mm.hidden=true;
+  ['dvReload','dvPaste','dvDense'].forEach(function(id){ var x=document.getElementById(id); if(x){ x.classList.add('mm-it'); x.setAttribute('role','menuitem'); mm.appendChild(x); } });
+  ['dvCount','dvCsv','dvHelp','dvCols'].forEach(function(id){ var x=document.getElementById(id); if(x) bar.appendChild(x); });   /* 오른쪽 끝 순서: n행 · 엑셀 · AI 도움말 · 열 · ⋯ */
+  bar.appendChild(mb); bar.appendChild(mm);
+  var fc=document.getElementById('dvFclr'); if(fc){ fc.classList.add('fb-clr'); ch.appendChild(fc); fc.onclick=fbarClearAll; }   /* «필터 해제»는 칩 줄 끝 «모두 해제»(검색어까지) */
+  fbarWire(fb, pop, sv, mb, mm);
+  return bar;
+}
+export function fbarClearAll(){ var s=/** @type {any} */($('#dvSearch')); if(s) s.value=''; clearFilters(); }   /* 모두 해제 = 상태 · 빠른 보기 · 관점 · 열 필터 · 검색어(고객 문맥은 따로 ✕) */
+export function fbarPlace(pop, fb){ var r=fb.getBoundingClientRect(), w=pop.offsetWidth; pop.style.top=(r.bottom+6)+'px'; pop.style.left=Math.max(8, Math.min(r.left, window.innerWidth-w-8))+'px'; pop.style.maxHeight=Math.max(200, window.innerHeight-r.bottom-16)+'px'; }
+export function fbarWire(fb, pop, sv, mb, mm){
+  function popClose(back){ if(pop.hidden) return; pop.hidden=true; fb.setAttribute('aria-expanded','false'); if(back) try{ fb.focus(); }catch(e){} }
+  function popOpen(){ menuClose(); pop.hidden=false; fb.setAttribute('aria-expanded','true'); fbarPlace(pop, fb); var f=/** @type {any} */(pop.querySelector('.fb-sec:not([hidden]) button:not([disabled])')); if(f) try{ f.focus(); }catch(e){} }
+  function menuClose(back){ if(mm.hidden) return; mm.hidden=true; mb.setAttribute('aria-expanded','false'); if(back) try{ mb.focus(); }catch(e){} }
+  function menuOpen(){ popClose(); mm.hidden=false; mb.setAttribute('aria-expanded','true'); var r=mb.getBoundingClientRect(); mm.style.top=(r.bottom+6)+'px'; mm.style.right=Math.max(8, window.innerWidth-r.right)+'px'; mm.style.left='auto';
+    var f=[].slice.call(mm.querySelectorAll('button')).filter(function(b){ return b.style.display!=='none' && !b.hidden; })[0]; if(f) try{ f.focus(); }catch(e){} }
+  fb.onclick=function(e){ e.stopPropagation(); if(pop.hidden) popOpen(); else popClose(); };
+  mb.onclick=function(e){ e.stopPropagation(); if(mm.hidden) menuOpen(); else menuClose(); };
+  mm.addEventListener('click', function(e){ var it=/** @type {any} */(e.target).closest('.mm-it'); if(it) setTimeout(function(){ menuClose(true); }, 0); });
+  /** @type {any} */(pop.querySelector('#dvFbDone')).onclick=function(){ popClose(true); };
+  /** @type {any} */(pop.querySelector('#dvFbClear')).onclick=fbarClearAll;
+  sv.onclick=function(e){ e.stopPropagation(); popClose(); menuClose(); fvMenuOpen(sv); };
+  document.addEventListener('click', function(e){ var t=/** @type {any} */(e.target); if(!t || !t.closest) return;
+    var path=(e.composedPath && e.composedPath())||[];   /* 팝오버 안 칩을 누르면 표가 다시 그려져 그 칩이 사라짐 — 눌린 경로로 판단 */
+    var inPop=path.indexOf(pop)>=0 || pop.contains(t), inFb=path.indexOf(fb)>=0 || fb.contains(t);
+    if(!pop.hidden && !inPop && !inFb && !t.closest('.rmenu,.ovl,.colf')) popClose();
+    if(!mm.hidden && path.indexOf(mm)<0 && !mm.contains(t) && path.indexOf(mb)<0 && !mb.contains(t)) menuClose(); });
+  document.addEventListener('keydown', function(e){ if(e.key!=='Escape') return;
+    if(!pop.hidden){ if(document.getElementById('qvCfg') || document.getElementById('fvMenu')) return; e.stopPropagation(); popClose(true); }
+    else if(!mm.hidden){ e.stopPropagation(); menuClose(true); } }, true);
+  window.addEventListener('resize', function(){ if(!pop.hidden) fbarPlace(pop, fb); });
+  FBAR.close=function(){ popClose(); menuClose(); };
+}
+/** 매 렌더 — 팝오버 안 구역 보이기 · 버튼 배지 · 칩 줄 · 보기 탭 설명 */
+export function fbarSync(g, isCustom){
+  var bar=fbarEnsure(); if(!bar) return;
+  if(FBAR.view!==ST.CUR_VIEW){ FBAR.view=ST.CUR_VIEW; if(FBAR.close) FBAR.close(); }
+  var pop=document.getElementById('dvFilterPop'), fb=document.getElementById('dvFilterBtn'), sv=document.getElementById('dvSavedBtn'), ch=document.getElementById('dvChips');
+  var secs={chip:document.getElementById('dvChipBar'), qv:document.getElementById('dvQvBar'), lens:document.getElementById('dvLensBar')};
+  Object.keys(secs).forEach(function(k){ var el=secs[k], sec=pop.querySelector('[data-sec="'+k+'"]'); if(!el || !sec) return;
+    if(k==='lens' && ST.CUR_VIEW==='live'){ if(el.nextSibling!==bar) bar.parentElement.insertBefore(el, bar); sec.hidden=true; return; }   /* LIVE 기준 줄은 필터가 아님 */
+    if(el.parentElement!==sec) sec.appendChild(el);
+    sec.hidden=isCustom || (el.id==='dvQvBar'? el.hidden : el.style.display==='none'); });
+  var cs=pop.querySelector('[data-sec="chip"] .fb-st'); if(cs && g.chipsField){ var cc=(g.cols||[]).filter(function(c){ return c.k===g.chipsField; })[0]; cs.textContent=cc? cc.l : '구분'; }
+  var pb=document.getElementById('dvPreBar'); if(pb){ pb.hidden=true; pb.innerHTML=''; }   /* 홈 알림 조건은 칩으로 */
+  var cust=document.getElementById('dvCustBar'); if(cust && cust.parentElement!==ch) ch.insertBefore(cust, ch.firstChild);
+  var wb=document.getElementById('dvWvBar'), sg=wb? wb.querySelector('.seg') : null, WC=wvCur(); if(wb && wb.parentElement!==bar) bar.insertBefore(wb, $('#dvSearch'));   /* 첫 렌더 땐 틀이 먼저 생겨 보기 줄이 밖에 있음 */
+  if(sg && WC) sg.title=WC[1]+' · 보기마다 열 구성이 내 브라우저에 저장됩니다';
+  var n=fbarChips(g, isCustom);
+  var hasSec=!!pop.querySelector('.fb-sec:not([hidden])');
+  fb.hidden=isCustom || !hasSec; if(fb.hidden && !pop.hidden && FBAR.close) FBAR.close();
+  var fn=fb.querySelector('.fb-n'); fn.hidden=!n; fn.textContent=String(n||''); fb.classList.toggle('on', !!n); fb.setAttribute('aria-label', '필터'+(n? ' — 걸린 조건 '+n+'개' : ''));
+  sv.hidden=!!isCustom; var sn=sv.querySelector('.fb-n'), nsv=isCustom? 0 : fvList(ST.CUR_VIEW).length; sn.hidden=!nsv; sn.textContent=String(nsv||'');
+}
+/** 걸린 조건 칩(✕) — 상태 · 빠른 보기 · 홈 알림 조건 · 관점 · 열 필터 */
+export function fbarChips(g, isCustom){
+  var ch=document.getElementById('dvChips'); if(!ch) return 0;
+  ch.querySelectorAll('.dvc').forEach(function(x){ x.remove(); });
+  /** @type {{l:string, v:string, t?:string, x:function():void}[]} */ var items=[]; var fc=document.getElementById('dvFclr'), cust=document.getElementById('dvCustBar');
+  if(!isCustom){
+    if(g.chipsField && DV.chipVal){ var cl=((g.cols||[]).filter(function(c){ return c.k===g.chipsField; })[0]||{}).l||'구분'; items.push({l:cl, v:DV.chipVal, x:function(){ DV.chipVal=''; }}); }
+    if(DV.pre){ if(DV.pre.qv){ var d=(qvDefs(ST.CUR_VIEW)||[]).filter(function(x){ return x[0]===DV.pre.qv; })[0]; items.push({l:'빠른 보기', v:String(d? d[1] : DV.pre.qv), t:String(d? d[2] : ''), x:function(){ DV.pre=null; }}); }
+      else items.push({l:'조건', v:DV.pre.label, x:function(){ DV.pre=null; }}); }
+    if(DV.lens){ var ld=LENS_DEFS.filter(function(x){ return x[0]===DV.lens; })[0]; items.push({l:'관점', v:ld? ld[1] : DV.lens, t:ld? ld[2] : '', x:function(){ DV.lens=''; }}); }
+    Object.keys(DV.filters||{}).forEach(function(k){ var sel=DV.filters[k]; if(!sel || !sel.length) return; var col=(g.cols||[]).filter(function(c){ return c.k===k; })[0]; if(!col) return;
+      items.push({l:col.l, v:sel.slice(0,2).join(', ')+(sel.length>2? ' 외 '+(sel.length-2) : ''), t:sel.join(', '), x:function(){ delete DV.filters[k]; }}); });
+  }
+  var frag=document.createDocumentFragment();
+  items.forEach(function(it){ var c=document.createElement('span'); c.className='dvc ctag info'; if(it.t) c.title=it.t; c.innerHTML=tpl`<span class="dvc-l">${it.l}:</span><b>${it.v}</b>`;
+    var x=document.createElement('button'); x.type='button'; x.className='dvc-x'; x.setAttribute('aria-label','조건 해제 — '+it.l+' '+it.v); x.textContent='✕'; x.onclick=function(){ it.x(); DV.page=0; renderGrid(); }; c.appendChild(x); frag.appendChild(c); });
+  if(fc) ch.insertBefore(frag, fc); else ch.appendChild(frag);
+  var nq=(($('#dvSearch')||{}).value||'').trim()? 1 : 0;
+  if(fc){ fc.style.display=(items.length+nq)>=2 && items.length? '' : 'none'; fc.textContent='모두 해제'; fc.title='걸린 조건과 검색어를 모두 지웁니다'; }
+  ch.hidden=!(items.length || (cust && !cust.hidden));
+  return items.length;
+}
+/* 저장된 보기 — 화면마다 [{n:이름, s:{wv, chip, qv, lens, filters, q}, t}] · 내 브라우저(svc_fviews_계정) */
+export function fvKey(){ return 'svc_fviews_'+(ST.AUTH_USER||'anon'); }
+export function fvAll(){ try{ return JSON.parse(localStorage.getItem(fvKey())||'{}')||{}; }catch(e){ return {}; } }
+export function fvList(v){ var a=fvAll()[v||ST.CUR_VIEW]; return Array.isArray(a)? a : []; }
+export function fvPut(v, list){ var a=fvAll(); a[v]=list; try{ localStorage.setItem(fvKey(), JSON.stringify(a)); }catch(e){} }
+export function fvState(){ var w=wvCur(); return {wv:w? w[0] : '', chip:DV.chipVal||'', qv:(DV.pre && DV.pre.qv)||'', lens:DV.lens||'', filters:JSON.parse(JSON.stringify(DV.filters||{})), q:(($('#dvSearch')||{}).value||'').trim()}; }
+export function fvActive(s){ s=s||fvState(); return !!(s.chip || s.qv || s.lens || s.q || Object.keys(s.filters||{}).some(function(k){ return s.filters[k] && s.filters[k].length; })); }
+export function fvDesc(s, v){ v=v||ST.CUR_VIEW; var g=/** @type {any} */(GRIDS[v]||{}), p=[];
+  if(s.wv) p.push('보기 '+s.wv); if(s.chip) p.push(s.chip);
+  if(s.qv){ var d=(qvDefs(v)||[]).filter(function(x){ return x[0]===s.qv; })[0]; p.push(String(d? d[1] : s.qv)); }
+  if(s.lens){ var ld=LENS_DEFS.filter(function(x){ return x[0]===s.lens; })[0]; p.push(ld? ld[1] : s.lens); }
+  Object.keys(s.filters||{}).forEach(function(k){ var sel=s.filters[k]; if(!sel || !sel.length) return; var c=(g.cols||[]).filter(function(c){ return c.k===k; })[0]; p.push((c? c.l : k)+' '+sel.length+'개'); });
+  if(s.q) p.push('«'+s.q+'»'); return p.join(' · '); }
+export function fvSave(name){ name=String(name||'').trim(); if(!name) return false; var v=ST.CUR_VIEW, list=fvList(v).filter(function(x){ return x.n!==name; }); list.unshift({n:name, s:fvState(), t:Date.now()}); fvPut(v, list.slice(0,20)); return true; }
+export function fvDel(name){ var v=ST.CUR_VIEW; fvPut(v, fvList(v).filter(function(x){ return x.n!==name; })); }
+export function fvApply(it){ var s=(it && it.s)||{}, v=ST.CUR_VIEW;
+  if(s.wv && WORKV[v]) wvSet(v, s.wv);
+  DV.chipVal=s.chip||''; DV.lens=s.lens||''; DV.filters=JSON.parse(JSON.stringify(s.filters||{})); DV.pre=null;
+  if(s.qv){ var d=(qvDefs(v)||[]).filter(function(x){ return x[0]===s.qv; })[0]; if(d) DV.pre={label:d[1]+' — '+d[2], fn:d[3], qv:s.qv}; }
+  var si=/** @type {any} */($('#dvSearch')); if(si) si.value=s.q||''; DV.page=0; renderGrid(); }
+export function fvMenuOpen(btn){
+  var old=document.getElementById('fvMenu'); if(old){ old.remove(); btn.setAttribute('aria-expanded','false'); return; }
+  var v=ST.CUR_VIEW, list=fvList(v), cur=fvState(), act=fvActive(cur);
+  var m=document.createElement('div'); m.id='fvMenu'; m.className='rmenu fv-menu'; m.setAttribute('role','dialog'); m.setAttribute('aria-label','저장된 보기');
+  m.innerHTML=tpl`<div class="fv-h"><b>저장된 보기</b><span class="mini">${viewLabelOf(v)} · 내 브라우저에만</span></div>`+
+    (list.length? tpl`<div class="fv-l">${rawHtml(list.map(function(it, i){ var ds=fvDesc(it.s||{}, v)||'조건 없음'; return tpl`<div class="fv-it"><button type="button" class="fv-go" data-i="${String(i)}" title="${ds}"><b>${it.n}</b><span class="mini">${ds}</span></button><button type="button" class="fv-x" data-i="${String(i)}" aria-label="삭제 — ${it.n}">✕</button></div>`; }).join(''))}</div>`
+      : tpl`<p class="mini fv-empty">아직 없음 — 조건을 걸고 아래에서 이름을 붙여 저장하세요</p>`)+
+    tpl`<div class="fv-new"><div class="mini fv-cur">${act? '지금 조건: '+fvDesc(cur, v) : '지금 걸린 조건이 없습니다 — 보기 · 필터 · 검색어를 먼저'}</div><div class="fv-row"><input id="fvName" type="text" maxlength="30" placeholder="이름 (예: 내 갱신 대상)" aria-label="저장할 보기 이름"${rawHtml(act? '' : ' disabled')}><button type="button" class="cbtn pri" id="fvSave"${rawHtml(act? '' : ' disabled')}>지금 조건 저장</button></div></div>`;
+  document.body.appendChild(m); btn.setAttribute('aria-expanded','true');
+  var r=btn.getBoundingClientRect(); m.style.top=(r.bottom+6)+'px'; m.style.left=Math.max(8, Math.min(r.left, window.innerWidth-m.offsetWidth-8))+'px';
+  var close=function(back){ m.remove(); btn.setAttribute('aria-expanded','false'); document.removeEventListener('keydown', key, true); document.removeEventListener('click', out, true); if(back) try{ btn.focus(); }catch(e){} };
+  var key=function(e){ if(e.key==='Escape'){ e.preventDefault(); e.stopPropagation(); close(true); } };
+  var out=function(e){ if(!m.contains(e.target) && !btn.contains(e.target)) close(); };
+  document.addEventListener('keydown', key, true); setTimeout(function(){ document.addEventListener('click', out, true); }, 0);
+  m.querySelectorAll('.fv-go').forEach(function(b){ /** @type {any} */(b).onclick=function(){ var it=list[+/** @type {any} */(b).dataset.i]; close(true); if(it){ fvApply(it); toast('저장된 보기', it.n+' — '+(fvDesc(it.s||{}, v)||'조건 없음'), 'info'); } }; });
+  m.querySelectorAll('.fv-x').forEach(function(b){ /** @type {any} */(b).onclick=function(e){ e.stopPropagation(); var it=list[+/** @type {any} */(b).dataset.i]; if(!it) return; fvDel(it.n); close(); fvMenuOpen(btn); renderGrid(); toast('저장된 보기 삭제', it.n, 'info'); }; });
+  var sb=/** @type {any} */(m.querySelector('#fvSave')), ni=/** @type {any} */(m.querySelector('#fvName'));
+  if(sb) sb.onclick=function(){ var nm=(ni.value||'').trim(); if(!nm){ ni.focus(); return; } fvSave(nm); close(true); renderGrid(); toast('저장된 보기', '«'+nm+'» 저장 — '+fvDesc(cur, v), 'ok'); };
+  if(ni) ni.onkeydown=function(e){ if(e.key==='Enter'){ e.preventDefault(); sb.click(); } };
+  setTimeout(function(){ var f=(act && ni)? ni : m.querySelector('button'); if(f) try{ f.focus(); }catch(e){} }, 0);
 }
 
 
@@ -727,7 +877,7 @@ export function cellText(c,v,r){
   return t;
 }
 export function filterCount(){ var n=0; for(var k in DV.filters){ if(DV.filters[k]&&DV.filters[k].length) n++; } return n; }
-export function clearFilters(){ DV.filters={}; DV.lens=''; DV.pre=null; DV.page=0; renderGrid(); }
+export function clearFilters(){ DV.filters={}; DV.lens=''; DV.pre=null; DV.chipVal=''; DV.page=0; renderGrid(); }   /* ㊿+187 칩(상태)도 함께 */
 /* skipK 열의 필터만 빼고 나머지 조건을 통과하는지 */
 export function passFilters(r,g,skipK){
   for(var k in DV.filters){
@@ -1186,6 +1336,7 @@ export function dvCardBar(g, on){
 export function renderGrid(){
   var g=GRIDS[ST.CUR_VIEW]; if(!g) return;
   var isCustom=!!g.custom;
+  try{ fbarEnsure(); }catch(e){}   /* ㊿+187 한 줄 도구줄 틀(지니언스) — 아래 빠른 보기가 «견적만 있음 → OI» 자리를 찾을 수 있게 먼저 */
   // 채널 칩 필터
   var cb=document.getElementById('dvChipBar');
   if(!cb){
@@ -1252,6 +1403,7 @@ export function renderGrid(){
   var fc=$('#dvFclr');
   fc.style.display=(isCustom||!nf)?'none':'';
   fc.textContent='✕ 필터 해제 ('+nf+')';
+  try{ fbarSync(g, isCustom); }catch(e){ console.warn('필터 줄', e); }   /* ㊿+187 지니언스: 줄 하나 + 팝오버 + 칩 */
   $('#dvPager').style.display=isCustom?'none':'';
   try{ renderEqPanel(); }catch(e){}
   try{ renderInbPanel(); }catch(e){}
@@ -1266,9 +1418,9 @@ export function renderGrid(){
   var start=DV.page*DV.per;
   var pageRows=rows.slice(start,start+DV.per);
 
-  $('#dvCount').textContent=rows.length.toLocaleString('ko-KR')+'행 · '+
-    (rows.length? (start+1)+'–'+(start+pageRows.length) : '0')+' · — 미입력 · 빈칸 해당 없음';
+  $('#dvCount').innerHTML=tpl`${rows.length.toLocaleString('ko-KR')}행 · ${rows.length? (start+1)+'–'+(start+pageRows.length) : '0'}<span class="dv-lgd"> · — 미입력 · 빈칸 해당 없음</span>`;   /* ㊿+187 범례는 넓은 화면에서만(툴팁엔 늘) */
   $('#dvCount').title='— = 값이 비어 있음(입력 필요할 수 있음) · 빈칸 = 이 계약/행에는 해당하지 않는 칸';
+  var fbc=document.getElementById('dvFbCount'); if(fbc) fbc.textContent='지금 조건 '+rows.length.toLocaleString('ko-KR')+'행';   /* ㊿+187 필터 팝오버 아래 */
 
   var t=$('#dvTable'); t.innerHTML='';
   DVC.on=dvCardsOn(); DVC.main=dvMainKeys(g); t.classList.toggle('cards', DVC.on); dvCardBar(g, DVC.on);   /* ㊿+181 폰 카드 */

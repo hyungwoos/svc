@@ -7,7 +7,7 @@ import { buildControls, expN, expScan, hbars, idxs, kpiOpen, monthlyTotal, rende
 import { ask } from './ai.js';
 import { applyCodes, GRIDS, loadCodes } from './grids.js';
 import { eqCanRet, eqOrderById, eqRetOpen, eqRetSet, eqScan, eqSerialsHtml, eqWant, syncOrderAssets } from './equipment.js';
-import { applyChannelMenu, chOf, ctRawOf, ctSuccessor, dcRules, ensureLeadSrc, liveData, openRenewList, renewKindOf, renewOpenFor, renewScan } from './analysis.js';
+import { applyChannelMenu, CH_DEFS, chOf, ctRawOf, ctSuccessor, dcRules, ensureLeadSrc, liveData, openRenewList, renewKindOf, renewOpenFor, renewScan } from './analysis.js';
 import { applyMenuConf, fkNorm, freqTop, menuSegments, navSub, openMenuEdit, renderTodo, subgrpSync, viewLabel } from './tools.js';
 import { loadInbound, loadMxMemos } from './inbound.js';
 import { UPD, updCheck } from './upd.js';
@@ -173,6 +173,7 @@ export function buildGnNav(rail){
         cur.items.push({v:el.dataset.v, t:navText(el)});
       });
       cols=cols.filter(function(c){ return c.items.length; });
+      if(s.key==='g:사업 영역' && isGN()){ tops.push({v:'area', t:s.label}); return; }   /* ㊿+187 사업 영역은 펼침 없이 한 화면(영역 선택 띠) */
       var mk2=GN_MERGE[s.key]? 'm:'+GN_MERGE[s.key] : s.key, lab=GN_MERGE[s.key]||s.label;
       if(!menus[mk2]){ menus[mk2]={key:mk2, label:lab, cols:[]}; if(!seen[mk2]){ seen[mk2]=1; tops.push({seg:mk2}); } }
       if(GN_MERGE[s.key] && cols.length===1) cols[0].t=s.label;
@@ -254,7 +255,7 @@ export function gnNavSync(rail, v){
   var bdOf=gnBadges();
   function setBd(b, n, hot){ var s=b.querySelector('.gn-bd'); if(!s) return; s.hidden=!n; s.textContent=n>99?'99+':String(n||''); s.classList.toggle('hot', !!hot); }
   rail.querySelectorAll('.gn-tb').forEach(function(b){
-    if(b.dataset.v){ b.setAttribute('aria-current', b.dataset.v===v? 'true':'false'); if(b.dataset.v==='dash') setBd(b, GN_BADGE.inb, GN_BADGE.inb>0); return; }
+    if(b.dataset.v){ b.setAttribute('aria-current', (b.dataset.v===v || (b.dataset.v==='area' && !!CH_DEFS[v]))? 'true':'false'); if(b.dataset.v==='dash') setBd(b, GN_BADGE.inb, GN_BADGE.inb>0); return; }
     var d=GN_NAV.menus[b.dataset.seg]; if(!d) return;
     var vs=[]; d.cols.forEach(function(c){ c.items.forEach(function(it){ vs.push(it.v); }); });
     b.setAttribute('aria-current', vs.indexOf(v)>=0? 'true':'false');
@@ -269,7 +270,8 @@ export function gnTitleSync(v){
   var b=[].slice.call(document.querySelectorAll('#side button[data-v]')).filter(function(x){ return x.dataset.v===(v||'dash'); })[0];
   var name= v==='dash'||!v? '홈' : (b? navText(b) : '');
   var grp='';
-  if(b && v!=='dash'){ var sub=navSub(b); for(var el=b.previousElementSibling; el; el=el.previousElementSibling){ if(el.classList && el.classList.contains('grp')){ grp=el.textContent.trim(); break; } } grp=[grp, sub].filter(Boolean).join(' › '); }
+  if(b && v!=='dash'){ var sub=navSub(b); for(var el=b.previousElementSibling; el; el=el.previousElementSibling){ if(el.classList && el.classList.contains('grp')){ grp=el.textContent.trim(); break; } } grp=[grp, sub].filter(Boolean).join(' › ');
+    if(CH_DEFS[v] && isGN()){ name='사업 영역'; grp=[sub, navText(b)].filter(Boolean).join(' › '); } }   /* ㊿+187 한 화면: 제목 «사업 영역» · 부제 «Cloud NAC › 일반 판매» */
   if(v==='dash'||!v){ var d=new Date(), la=document.getElementById('loadedAt'); grp=(d.getMonth()+1)+'월 '+d.getDate()+'일 ('+'일월화수목금토'.charAt(d.getDay())+')'+(la && la.textContent? ' · '+la.textContent.replace(/\d{4}-\d\d-\d\d\s*/,'') : ''); }
   t.textContent=name; s.textContent=grp;
   /* ㊿+172 메뉴 재진입은 마지막 상태 그대로 — 처음 상태로는 여기 «초기화»(표 · 화면별 선택이 있는 화면) */

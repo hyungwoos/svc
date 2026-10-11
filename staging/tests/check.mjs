@@ -219,6 +219,13 @@ say(/^export function tickMemo\(/m.test(jsAll) && /^export function cssvKey\(/m.
   say(/^export function vtDupSync\(v\)/m.test(sh) && /^export function deEmoji\(root\)/m.test(sh) && /^export function moreMenuSetup\(\)/m.test(sh) && /\['btnViewReset','btnReload','btnFont','btnTheme'\]/.test(sh) && /try\{ vtDupSync\(v\);/.test(sh)
     && /data-dge="cta"/.test(gr) && /emptyCta:\{l:'견적 만들기', v:'quote'/.test(rd('js/grids.js')) && !/원본: Supabase DB/.test(da) && /\.vt-dup \.vt-txt\{position:absolute/.test(css) && /td\.act \.ab\{opacity:0/.test(css) && !/43_inbound\.sql 실행과 Apps Script 코드 교체·배포가 필요합니다\.<\/p>/.test(rd('js/inbound.js')),
   '㊿+186 전역 정리(제목 한 번 · 이모지 제거 · «더보기» 메뉴 · 행 버튼 올렸을 때 · 빈 화면 버튼 · 푸터 · 설정 안내는 관리자만)'); }
+// ㊿+187 표 위 필터 한 줄(fbarSync · #dvFilterPop · #dvChips · 저장된 보기 fv*) · 사업 영역 한 화면(renderAreaSel · areaPick · 상단 «사업 영역» 버튼)
+{ const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
+  const sh = rd('js/shell.js'), gr = rd('js/grid.js'), an = rd('js/analysis.js'), css = rd('app.css');
+  say(/^export function fbarSync\(g, isCustom\)/m.test(gr) && /^export function fbarChips\(g, isCustom\)/m.test(gr) && /^export function fvMenuOpen\(btn\)/m.test(gr) && /id='dvFilterPop'/.test(gr) && /id='dvChips'/.test(gr) && /\['dvReload','dvPaste','dvDense'\]/.test(gr) && /try\{ fbarSync\(g, isCustom\); \}/.test(gr)
+    && /DV\.chipVal=''; DV\.page=0; renderGrid\(\); \}/.test(gr) && /^export function renderAreaSel\(key\)/m.test(an) && /^export function areaPick\(\)/m.test(an) && /tops\.push\(\{v:'area', t:s\.label\}\)/.test(sh) && /b\.dataset\.v==='area' && !!CH_DEFS\[v\]/.test(sh) && /if\(v==='area'\)\{ v=areaPick\(\);/.test(gr)
+    && /\.fb-pop\{position:fixed/.test(css) && /\.area-sel\{display:flex/.test(css),
+  '㊿+187 표 위 필터 한 줄(fbarSync · 필터 팝오버 · 조건 칩 · 저장된 보기 · ⋯ 도구) · 사업 영역 한 화면(renderAreaSel · areaPick · 상단 버튼 하나)'); }
 // ㊿+160 연장하면 상태 «재약정»(구분 그대로) · 계약 상세에 «계약 기간 · 연장 이력»
 say(/^export function renewStatus\(r\)/m.test(jsAll) && /var nst=renewStatus\(r\);/.test(jsAll) && /^export function ctPeriods\(c, mine\)/m.test(jsAll) && html.includes('id="dtRenew"'), '연장: 상태 «재약정»(renewStatus) · 계약 상세 연장 이력(ctPeriods · #dtRenew)');
 const idx = html + jsAll;

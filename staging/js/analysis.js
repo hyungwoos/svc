@@ -2,12 +2,12 @@
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { APP_VER, IS_QA, IS_STAGING, ST } from './state.js';
 import { Viz } from './viz.js';
-import { $, amtGuard, amtHint, baseLabel, bizKey, bizLabel, bizY, canWrite, cssv, esc, fetchT, isGN, kwToWon, lline, llineVer, mk, rawHtml, SB_KEY, SB_URL, STATE, tickMemo, tpl, won, wonFull, wonKo, wonToKw, yOf } from './core.js';
+import { $, amtGuard, amtHint, baseLabel, bizKey, bizLabel, bizY, canWrite, cssv, navText, esc, fetchT, isGN, kwToWon, lline, llineVer, mk, rawHtml, SB_KEY, SB_URL, STATE, tickMemo, tpl, won, wonFull, wonKo, wonToKw, yOf } from './core.js';
 import { dIdx, ico, idxDate, loadFromDb, onData, SB_RAW, sbHeaders, sbTry, sbWrite, toast, todayStr } from './shell.js';
 import { hbars, idxs, monthlyTotal } from './dash.js';
 import { CHURN_OPTS, codeActive, GRIDS, LEAD_OPTS, LINE_OPTS } from './grids.js';
 import { bizHostEl, bizNz, BIZV, eqIsPh, eqScan, eqSerials, syncOrderAssets } from './equipment.js';
-import { c360Match, fkNorm, openCust360, subgrpSync } from './tools.js';
+import { c360Match, fkNorm, navSub, openCust360, subgrpSync } from './tools.js';
 import { helpBox, helpWire, kxCustMrr, kxLive, kxMrr, kxWire, QUOTES, quotesLoad } from './sales.js';
 import { BLANK_LABEL, ctRevPlan, DV, editCell, oiOpen, openFilterPanel, readRowInputs, renderGrid, switchView, wireRowInputs, xlsxAoa } from './grid.js';
 import { closeOvl, logChange, monthRows, openOvl, ymFromInput } from './edit.js';
@@ -2408,9 +2408,33 @@ export function liveChannel(x){
   var pick=best||bestChild;
   return pick? chOf(pick) : '일반';
 }
+/* ===== ㊿+187 사업 영역 한 화면(지니언스 디자인) — 상단 메뉴 «사업 영역» 버튼 하나 → 영역 선택 띠(제품 소제목 × 채널 · 당월 MRR · LIVE 곳) + 아래에 고른 영역의 기존 화면
+   · 화면 id 는 예전 그대로(cngen · cnpub …) — 주소(#cnpub) · 최근 작업 · 홈 바로가기 · 권한(메뉴 권한 표) · 메뉴 편집 숨김 · 계약 없는 영역 숨김이 그대로 듣음
+   · 띠의 묶음과 순서는 메뉴(#side 의 소제목 · 버튼 순서)에서 가져옴 — 메뉴 편집으로 바꾸면 띠도 같이 · 클래식 디자인은 예전처럼 메뉴 9개 */
+export var AREA={key:''};
+export function areaKeys(){ return [].slice.call(document.querySelectorAll('#side button[data-v]')).filter(function(b){ return CH_DEFS[b.dataset.v] && !b.classList.contains('mhide') && !b.classList.contains('pdeny') && b.style.display!=='none'; }).map(function(b){ return b.dataset.v; }); }
+export function areaPick(){ var ks=areaKeys(); if(AREA.key && ks.indexOf(AREA.key)>=0) return AREA.key; try{ var s=localStorage.getItem('svc_area_'+(ST.AUTH_USER||'anon')); if(s && ks.indexOf(s)>=0) return s; }catch(e){} return ks[0]||''; }
+export function areaStat(k){ var def=CH_DEFS[k], list=[], b=STATE.base; ST.DATA.rows.forEach(function(r,i){ if(def[3](r)) list.push(i); });
+  var lv=liveForArea(k), n=lv? liveN(lv) : null; if(n==null){ var c={}; list.forEach(function(i){ if(ST.MAT[i][b]>0) c[ST.DATA.rows[i].cust]=1; }); n=Object.keys(c).length; }
+  return {mrr:monthlyTotal(list, b), n:n}; }
+export function renderAreaSel(key){
+  var view=document.getElementById('viewChannel'), body=document.getElementById('chBody'); if(!view || !body) return;
+  var sel=document.getElementById('areaSel');
+  if(!isGN()){ if(sel) sel.remove(); return; }
+  if(!sel){ sel=document.createElement('div'); sel.id='areaSel'; sel.className='area-sel'; sel.setAttribute('role','tablist'); sel.setAttribute('aria-label','사업 영역 고르기'); view.insertBefore(sel, body); }
+  var groups=[], gi={};
+  [].slice.call(document.querySelectorAll('#side button[data-v]')).forEach(function(b){ var k=b.dataset.v; if(!CH_DEFS[k] || b.classList.contains('mhide') || b.classList.contains('pdeny') || b.style.display==='none') return;
+    var g=navSub(b)||'기타'; if(gi[g]==null){ gi[g]=groups.length; groups.push({t:g, items:[]}); } groups[gi[g]].items.push({k:k, t:navText(b)}); });
+  sel.innerHTML=groups.map(function(g){ return tpl`<div class="area-g"><span class="area-gl">${g.t}</span>${rawHtml(g.items.map(function(it){ var s=areaStat(it.k), on=it.k===key;
+    return tpl`<button type="button" role="tab" data-area="${it.k}" aria-selected="${on?'true':'false'}" title="${CH_DEFS[it.k][2]}"><b>${it.t}</b><small>${won(s.mrr)}천원 · ${String(s.n)}곳</small></button>`; }).join(''))}</div>`; }).join('');
+  sel.querySelectorAll('[data-area]').forEach(function(b){ /** @type {any} */(b).onclick=function(){ var k=/** @type {any} */(b).dataset.area; if(k===key) return; switchView(k); try{ window.scrollTo(0, 0); }catch(e){} };
+    /** @type {any} */(b).onkeydown=function(e){ if(e.key!=='ArrowRight' && e.key!=='ArrowLeft') return; e.preventDefault(); var all=[].slice.call(sel.querySelectorAll('[data-area]')), i=all.indexOf(b), j=(i+(e.key==='ArrowRight'?1:-1)+all.length)%all.length; var k2=/** @type {any} */(all[j]).dataset.area; all[j].click(); var nb=/** @type {any} */(sel.querySelector('[data-area="'+k2+'"]')); if(nb) nb.focus(); }; });
+}
 export function renderChannelView(key){
   var def=CH_DEFS[key], ch=def[1], match=def[3];
   var host=$('#chBody');
+  AREA.key=key; try{ localStorage.setItem('svc_area_'+(ST.AUTH_USER||'anon'), key); }catch(e){}
+  try{ renderAreaSel(key); }catch(e){ console.warn('사업 영역 띠', e); }
   var list=[]; ST.DATA.rows.forEach(function(r,k){ if(match(r)) list.push(k); });
   var b=STATE.base;
   var mrr=monthlyTotal(list,b);
@@ -2426,8 +2450,9 @@ export function renderChannelView(key){
     (ST.RAWX.assets||[]).forEach(function(a){ if(a.channel===ch && a.status==='임대중') rentEq++; });
   }
   function tile(k2,v2,u2,d2,kx){ return tpl`<div class="kpi"${rawHtml(kx?' data-kx="'+kx+'"':'')}><div class="k">${rawHtml(k2)}</div><div class="v">${rawHtml(v2)}<small>${rawHtml(u2)}</small></div><div class="d">${rawHtml(d2||'')}</div></div>`; }
-  var h=tpl`<div style="display:flex;align-items:baseline;gap:12px;margin:2px 2px 14px">`+
-    tpl`<span style="font-size:18px;font-weight:800">${rawHtml(isGN()? def[0].replace(/^[^\w가-힣]+\s*/,'') : def[0])} 사업 영역</span>`+
+  var h=isGN()? tpl`<div class="area-cap"><b>${def[0].replace(/^[^\w가-힣]+\s*/,'')}</b><span class="mini">${def[2]} · ${baseLabel()} 기준</span></div>`   /* ㊿+187 이름은 띠에서 골랐으니 작게 · 단위는 상단 배지 하나 */
+    : tpl`<div style="display:flex;align-items:baseline;gap:12px;margin:2px 2px 14px">`+
+    tpl`<span style="font-size:18px;font-weight:800">${def[0]} 사업 영역</span>`+
     tpl`<span class="ubadge sm">₩ 금액 단위 = 천원</span>`+
     tpl`<span class="mini">${def[2]} · ${baseLabel()} 기준</span></div>`;
   h+=tpl`<div class="kpis" style="margin-bottom:16px">`+

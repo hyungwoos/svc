@@ -775,7 +775,7 @@ if (S.blk()) {
     assert(!errs.length, errs.join(' | ')); return Math.round(w0) + '→' + st.m[k] + '→' + Math.round(w3);
   });
   await S.t('메뉴: «사업 영역» 한 그룹(소제목 Cloud NAC·MDR·기타) · 레일 아이콘 1개 · Ctrl+K 에 소제목 붙음', async () => {
-    const r = await page.evaluate(() => ({ g: [...document.querySelectorAll('#side .grp')].map((g) => g.textContent.trim()).filter((t) => /사업 영역/.test(t)), sub: [...document.querySelectorAll('#side .subgrp')].map((s) => s.dataset.sub), rail: document.querySelectorAll('#rail [data-seg^="g:사업 영역"]').length }));
+    const r = await page.evaluate(() => ({ g: [...document.querySelectorAll('#side .grp')].map((g) => g.textContent.trim()).filter((t) => /사업 영역/.test(t)), sub: [...document.querySelectorAll('#side .subgrp')].map((s) => s.dataset.sub), rail: document.querySelectorAll('#rail [data-seg^="g:사업 영역"], #rail [data-v="area"]').length }));   /* ㊿+187 지니언스는 버튼 하나(area) */
     assert(r.g.length === 1 && r.g[0] === '사업 영역' && r.sub.join('|') === 'Cloud NAC|MDR|기타 (유통)' && r.rail === 1, JSON.stringify(r));
     const nm = await page.evaluate(() => SVC.cmdMenuHits('일반 판매').map((h) => h.nm)); assert(nm.every((x) => /·/.test(x)), JSON.stringify(nm));
     return JSON.stringify(nm);
@@ -1885,16 +1885,16 @@ if (S.blk()) {
         left: Math.round(rail.getBoundingClientRect().left), w: Math.round(rail.getBoundingClientRect().width), W: document.documentElement.clientWidth, pad: getComputedStyle(document.body).paddingLeft,
         home: (rail.querySelector('.gn-tb[aria-current="true"]') || {}).dataset.v, ttl: document.getElementById('gnTitle').textContent }; });
     assert(r.skin === 'gn' && r.look === 'cc' && r.cc && r.gn && r.cur === 'gn' && /^gn,cc,simple,classic$/.test(r.keys), JSON.stringify(r));
-    assert(r.inTop && r.logo && /^dash\|weekly\|g:전체 데이터\|g:사업 영역\|g:장비\|m:영업\|m:정산·도구$/.test(r.tabs) && r.right === 'm:관리' && r.left === 0 && r.w === r.W && r.pad === '0px' && r.home === 'dash' && r.ttl === '홈', JSON.stringify(r));
+    assert(r.inTop && r.logo && /^dash\|weekly\|g:전체 데이터\|area\|g:장비\|m:영업\|m:정산·도구$/.test(r.tabs)   /* ㊿+187 사업 영역은 펼침 없는 버튼 하나(area) */ && r.right === 'm:관리' && r.left === 0 && r.w === r.W && r.pad === '0px' && r.home === 'dash' && r.ttl === '홈', JSON.stringify(r));
     return r.tabs.split('|').length + '개 묶음 + 관리';
   });
   await S.t('㊿+167 상단 메뉴: 묶음 누르면 펼침(소제목·그룹마다 칸) · 항목 누르면 이동·닫힘 · 지금 화면 묶음 표시 · 다른 묶음에 마우스 → 옮겨 감 · Esc·바깥 클릭 닫힘 · ↓ 첫 항목 · 배지 합계', async () => {
     const seg = (k) => '#rail .gn-tb[data-seg="' + k + '"]';
-    await page.click(seg('g:사업 영역')); await page.waitForTimeout(150);
-    const a = await page.evaluate(() => { const m = document.getElementById('gnMenu'); return { open: !m.hidden, exp: document.querySelector('#rail .gn-tb[data-seg="g:사업 영역"]').getAttribute('aria-expanded'), cols: [...m.querySelectorAll('.gn-st')].map((x) => x.textContent).join('|'), n: m.querySelectorAll('.gn-mi').length, inView: m.getBoundingClientRect().right <= document.documentElement.clientWidth }; });
-    assert(a.open && a.exp === 'true' && /Cloud NAC/.test(a.cols) && /MDR/.test(a.cols) && a.n >= 3 && a.inView, '사업 영역 ' + JSON.stringify(a));
+    await page.click(seg('g:장비')); await page.waitForTimeout(150);   /* ㊿+187 사업 영역 묶음은 펼침이 없어져 장비 묶음으로 */
+    const a = await page.evaluate(() => { const m = document.getElementById('gnMenu'); return { open: !m.hidden, exp: document.querySelector('#rail .gn-tb[data-seg="g:장비"]').getAttribute('aria-expanded'), cols: [...m.querySelectorAll('.gn-st')].map((x) => x.textContent).join('|'), n: m.querySelectorAll('.gn-mi').length, inView: m.getBoundingClientRect().right <= document.documentElement.clientWidth }; });
+    assert(a.open && a.exp === 'true' && /장비/.test(a.cols) && a.n >= 3 && a.inView, '장비 묶음 ' + JSON.stringify(a));
     await page.hover(seg('m:영업')); await page.waitForTimeout(120);
-    const b = await page.evaluate(() => ({ cols: [...document.querySelectorAll('#gnMenu .gn-st')].map((x) => x.textContent).join('|'), e1: document.querySelector('#rail .gn-tb[data-seg="g:사업 영역"]').getAttribute('aria-expanded') }));
+    const b = await page.evaluate(() => ({ cols: [...document.querySelectorAll('#gnMenu .gn-st')].map((x) => x.textContent).join('|'), e1: document.querySelector('#rail .gn-tb[data-seg="g:장비"]').getAttribute('aria-expanded') }));
     assert(/PoC·데모/.test(b.cols) && /영업/.test(b.cols) && /인바운드/.test(b.cols) && b.e1 === 'false', '영업 묶음 ' + JSON.stringify(b));
     await page.click('#gnMenu .gn-mi[data-v="oi"]'); await page.waitForTimeout(300);
     const c = await page.evaluate(() => ({ v: SVC.ST.CUR_VIEW, open: !document.getElementById('gnMenu').hidden, cur: (document.querySelector('#rail .gn-tb[aria-current="true"]') || {}).dataset.seg, ttl: document.getElementById('gnTitle').textContent }));
@@ -2118,7 +2118,7 @@ if (S.blk()) {
     await page.click('#ccInbox .cbtn:has-text("일정 지난 OI")'); await page.waitForTimeout(400);
     /* ㊿+170 OI 는 «빠른 보기 › 기한 초과» 칩이 눌린 채로 열림(같은 기준 oiOpen) — 칩을 다시 누르면 해제 */
     const g = await page.evaluate(() => ({ v: SVC.ST.CUR_VIEW, pre: (document.querySelector('#dvQvBar [aria-pressed="true"]') || {}).textContent || document.getElementById('dvPreBar').textContent, rows: document.querySelectorAll('#dvTable tbody tr:not(.dg-empty)').length }));
-    await page.click('#dvQvBar [aria-pressed="true"]'); await page.waitForTimeout(150); const all = await page.evaluate(() => document.querySelectorAll('#dvTable tbody tr').length);
+    await page.click('#dvFilterBtn'); await page.waitForTimeout(120); await page.click('#dvQvBar [aria-pressed="true"]'); await page.waitForTimeout(150);   /* ㊿+187 빠른 보기는 «필터» 안 */ const all = await page.evaluate(() => document.querySelectorAll('#dvTable tbody tr').length);
     assert(g.v === 'oi' && /기한 초과/.test(g.pre) && g.rows === oiN && all > oiN, JSON.stringify({ g, oiN, all }));
     await page.evaluate(() => { SVC.HOME.allOpen = false; });
     return r.head + ' · 홈 ' + r.n + '줄';
@@ -2233,7 +2233,7 @@ if (S.blk()) {
   await S.t('㊿+170 영업·인바운드 빠른 보기: 건수 = 거른 목록 · «기준»에서 일수 저장 · ㊿+184 «내 OI» = 내가 작성한 견적서가 붙은 OI(이름 고르기 없음) · «견적 전» · 견적 담당 칸 · 인바운드엔 «내 담당» 없음 · 홈에 인바운드 할 일 없음 · OI 담당 = 견적 작성자 · «다시 조회»는 시트를 안 건드림 · OI → 계약 전환 때 같은 고객사 유효 계약 알림', async () => {
     await page.evaluate(() => SVC.navMenu('oi')); await page.waitForTimeout(300);
     const chips = async () => page.evaluate(() => Object.fromEntries([...document.querySelectorAll('#dvQvBar [data-qv]')].map((b) => [b.dataset.qv, +b.querySelector('b').textContent])));
-    const c1 = await chips(); await page.click('#dvQvBar [data-qv="late"]'); await page.waitForTimeout(150);
+    const c1 = await chips(); await page.click('#dvFilterBtn'); await page.waitForTimeout(120); await page.click('#dvQvBar [data-qv="late"]'); await page.waitForTimeout(150);   /* ㊿+187 빠른 보기는 «필터» 안 */
     const lateRows = await page.evaluate(() => document.querySelectorAll('#dvTable tbody tr:not(.dg-empty)').length);
     await page.click('#qvCfgBtn'); await page.waitForTimeout(100); const noMe = await page.evaluate(() => !document.getElementById('qvMe') && /견적서/.test(document.getElementById('qvCfg').textContent)); await page.fill('#qvOi', '20'); await page.click('#qvOk'); await page.waitForTimeout(150);
     const c2 = await chips(); await page.click('#dvQvBar [data-qv="me"]'); await page.waitForTimeout(150);
@@ -2908,7 +2908,7 @@ if (S.blk()) {
     const pills = () => page.evaluate(() => [...document.querySelectorAll('#bizHost .pill, .biz-host .pill')].map((b) => b.textContent.trim()).filter((t) => /월/.test(t) && !/입력|수정|삭제|마감|대조/.test(t)));
     const p0 = await pills(), has = await page.evaluate((cy) => [SVC.bizHas(cy - 1, 8), SVC.bizHas(cy - 2, 8), SVC.bizHas(cy, 8), SVC.bizHas(cy - 1, 12)], CY);
     assert(JSON.stringify(p0) === JSON.stringify([(CY - 1) + '년 12월', (CY - 1) + '년 8월', (CY - 2) + '년 8월']) && has.join() === 'true,true,false,true', 'pills ' + JSON.stringify({ p0, has }));
-    await page.click('text=' + (CY - 1) + '년 8월'); await page.click('text=✎ 이 달 수정'); await page.waitForTimeout(200);
+    await page.click('text=' + (CY - 1) + '년 8월'); await page.click('text=이 달 수정'); await page.waitForTimeout(200);   /* ㊿+186 지니언스는 버튼 앞 그림 글자를 뗌 */
     const ym0 = await page.$eval('#bzYm', (e) => e.value); await page.fill('#bzSums .bz-amt >> nth=0', '65000'); await page.click('#bzSave'); await page.waitForTimeout(700);
     const rows = db.table('biz_recon'), o2 = rows.filter((r) => r.y === CY - 2).map((r) => r.id).join(), n1 = rows.filter((r) => r.y === CY - 1 && r.ym === '8월'), h1 = db.table('doc_hist').slice(-1)[0];
     assert(ym0 === K(CY - 1, 8) && log[0] === 'replace ' + K(CY - 1, 8) + ' ' && o2 === '9001,9002' && n1.length === 2 && n1.some((r) => r.biz === 65000000) && h1 && h1.op === 'replace' && h1.old.length === 2 && !db.writes.some((w) => w.method === 'DELETE' && w.table === 'biz_recon'), 'save ' + JSON.stringify({ ym0, log, o2, n1, h1 }));
@@ -3640,7 +3640,7 @@ if (S.blk()) {
   });
   await S.t('㊿+182 연동 상태(배포·운영 › 기록): GitHub 토큰 만료 임박 · 관리 토큰 · Slack 봇(빠진 DM 권한) · 예약 발송 · 만기 알림 · AI 야간 점검(오래됨) · 내보내기 · 견적 서버(옛 비밀번호 기한) · Cloud 사이트 API · 환율 — 읽기만 · 고칠 곳 / 옛 ops · notify 면 «올리면 확인»', async () => {
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page);
-    const ymd = (d) => new Date(Date.now() + d * 864e5 + 9 * 36e5).toISOString().slice(0, 10), ago = (d) => new Date(Date.now() - d * 864e5).toISOString();
+    const ymd = (d) => { const t = new Date(Date.now() + d * 864e5); return t.getFullYear() + '-' + ('0' + (t.getMonth() + 1)).slice(-2) + '-' + ('0' + t.getDate()).slice(-2); }, ago =   /* 브라우저(todayStr)와 같은 지역 시각 — UTC 15시 이후엔 +9h 로 하루 어긋나 «21일 남음»이 되던 것 */ (d) => new Date(Date.now() - d * 864e5).toISOString();
     let old = false; const reqs = [], writes = [];
     const J = (route, o) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'content-range': '0-' + Math.max(0, (o.length || 1) - 1) + '/' + (o.length || 1), 'Access-Control-Expose-Headers': 'content-range' }, body: JSON.stringify(o) });
     await mockBackend(page, { onWrite: (w) => writes.push(w), extra: async (route, u, m) => {
@@ -4023,6 +4023,112 @@ if (S.blk()) {
       && row.op0 === '0' && row2.op1 === '1' && row2.other === '0' && cap.more && cap.head.length < 70 && cap.help === 'AI 도움말' && cap.unitChipVis === false && cap.badge && cta === '견적 만들기' && v2 === 'quote' && mob.rows === 1 && mob.n <= 8 && mob.ab === '1' && !/sql/i.test(pv) && /관리자가 가격표를 등록하면/.test(pv),
       JSON.stringify({ emo, dyn, mm, mo, th, esc, row, row2, cap, cta, v2, mob, pv: pv.slice(0, 80) }));
     return '이모지 0 · 더보기 4 · 폰 상단 ' + mob.n + '개 한 줄 · 빈 화면 → ' + v2;
+  });
+}
+// ㊿+187 표 위 필터 한 줄(보기 탭 · 검색 · «필터» 팝오버 · 조건 칩 · 저장된 보기 · ⋯ 도구) · 사업 영역 한 화면(상단 버튼 하나 · 영역 선택 띠) — 가짜 DB
+if (S.blk()) {
+  const mk187 = async (o) => { o = Object.assign({ role: 'super_admin', email: 'tester@example.com', w: 1440, h: 1000, mobile: false, look: '' }, o || {});
+    const db = new FakeDB(seedData()); const ctx = await browser.newContext({ viewport: { width: o.w, height: o.h }, serviceWorkers: 'block', isMobile: o.mobile, hasTouch: o.mobile }); const page = await ctx.newPage(); const c = collect(page);
+    page.on('dialog', (d) => d.dismiss()); if (o.look) await page.addInitScript((l) => { try { localStorage.setItem('svc_look', l); } catch (e) { } }, o.look);
+    await fakeBackend(page, db, { role: o.role, email: o.email }); await page.goto(url + '/index.html');
+    await page.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA && SVC.ST.DATA.rows.length, null, { timeout: 20000 }); await page.waitForTimeout(600); return { db, ctx, page, c }; };
+  await S.t('㊿+187 표 위 한 줄: 보기 탭 + 검색 + «필터»(상태 · 빠른 보기 · 관점 — 예전 줄 요소 그대로 안에) + 저장된 보기 + ⋯(다시 읽기 · 붙여넣기 · 밀도) · 걸린 조건은 칩(✕ · 모두 해제) · 팝오버는 칩을 눌러도 열린 채 · Esc 초점 복귀 · 저장된 보기 저장 → 적용 → 삭제 · OI 는 상태 + 빠른 보기 · LIVE 기준 줄은 밖 · 점검 화면은 버튼 없음 · 폰 한 줄씩 · 클래식은 예전 그대로', async () => {
+    const A = await mk187(), P = A.page;
+    await P.evaluate(() => SVC.navMenu('contracts')); await P.waitForTimeout(400);
+    const vis = (e) => { const r = e.getBoundingClientRect(); return r.width > 1 && r.height > 1; };
+    const a = await P.evaluate(() => { const bar = document.querySelector('#viewData .dbar'), pop = document.getElementById('dvFilterPop'); const v = (e) => { const r = e.getBoundingClientRect(); return r.width > 1 && r.height > 1; };
+      return { h: Math.round(bar.getBoundingClientRect().height), one: bar.classList.contains('fbar'), order: [...bar.children].filter((e) => v(e)).map((e) => e.id).join('|'), wvIn: document.getElementById('dvWvBar').parentElement === bar, lensIn: document.getElementById('dvLensBar').closest('#dvFilterPop [data-sec="lens"]') !== null, chipIn: document.getElementById('dvChipBar').closest('#dvFilterPop') !== null, qvIn: document.getElementById('dvQvBar').closest('#dvFilterPop') !== null,
+        popHid: pop.hidden, chipsHid: document.getElementById('dvChips').hidden, fbVis: v(document.getElementById('dvFilterBtn')), moreIn: ['dvReload', 'dvPaste', 'dvDense'].every((id) => document.getElementById(id).closest('#dvMoreMenu')), pre: document.getElementById('dvPreBar').hidden, wvDesc: v(document.querySelector('#dvWvBar .wv-d')), segT: document.querySelector('#dvWvBar .seg').title }; });
+    assert(a.h <= 40 && a.one && /^dvWvBar\|dvSearch\|dvFilterBtn\|dvSavedBtn\|dvCount\|dvCsv\|dvHelp\|dvCols\|dvMoreBtn$/.test(a.order) && a.wvIn && a.lensIn && a.chipIn && a.qvIn && a.popHid && a.chipsHid && a.fbVis && a.moreIn && a.pre && !a.wvDesc && /보기마다 열 구성/.test(a.segT), JSON.stringify(a));
+    await P.click('#dvFilterBtn'); await P.waitForTimeout(150);
+    const b = await P.evaluate(() => ({ open: !document.getElementById('dvFilterPop').hidden, exp: document.getElementById('dvFilterBtn').getAttribute('aria-expanded'), secs: [...document.querySelectorAll('#dvFilterPop .fb-sec')].map((s) => s.dataset.sec + ':' + (s.hidden ? 0 : 1)).join(' '), cnt: document.getElementById('dvFbCount').textContent, foc: document.activeElement && document.activeElement.closest('#dvFilterPop') !== null }));
+    await P.click('#dvLensBar .chip:has-text("부속 계약")'); await P.waitForTimeout(300);
+    const c = await P.evaluate(() => ({ lens: SVC.DV.lens, open: !document.getElementById('dvFilterPop').hidden, chips: [...document.querySelectorAll('#dvChips .dvc')].map((x) => x.textContent.replace('✕', '').trim()).join('|'), clr: getComputedStyle(document.getElementById('dvFclr')).display, badge: document.querySelector('#dvFilterBtn .fb-n').textContent, on: document.getElementById('dvFilterBtn').classList.contains('on'), cnt: document.getElementById('dvFbCount').textContent, rows: document.querySelectorAll('#dvTable tbody tr:not(.dg-empty)').length, lbl: document.getElementById('dvFilterBtn').getAttribute('aria-label') }));
+    await P.keyboard.press('Escape'); await P.waitForTimeout(120);
+    const d = await P.evaluate(() => ({ open: !document.getElementById('dvFilterPop').hidden, foc: document.activeElement && document.activeElement.id }));
+    await P.evaluate(() => { SVC.DV.filters = { status: ['신규'] }; SVC.renderGrid(); }); await P.waitForTimeout(200);
+    const e = await P.evaluate(() => ({ chips: [...document.querySelectorAll('#dvChips .dvc')].map((x) => x.textContent.replace('✕', '').trim()).join('|'), clr: getComputedStyle(document.getElementById('dvFclr')).display, clrT: document.getElementById('dvFclr').textContent, badge: document.querySelector('#dvFilterBtn .fb-n').textContent }));
+    await P.click('#dvChips .dvc:has-text("상태:") .dvc-x'); await P.waitForTimeout(200);
+    const f = await P.evaluate(() => ({ lens: SVC.DV.lens, f: JSON.stringify(SVC.DV.filters), chips: document.querySelectorAll('#dvChips .dvc').length }));
+    await P.evaluate(() => { SVC.DV.lens = 'kids'; SVC.DV.chipVal = ''; SVC.renderGrid(); }); await P.fill('#dvSearch', '가상'); await P.waitForTimeout(250);
+    await P.click('#dvSavedBtn'); await P.waitForTimeout(150);
+    const g = await P.evaluate(() => ({ menu: !!document.getElementById('fvMenu'), empty: /아직 없음/.test(document.getElementById('fvMenu').textContent), cur: document.querySelector('#fvMenu .fv-cur').textContent, foc: document.activeElement && document.activeElement.id }));
+    await P.fill('#fvName', '내 부속 계약'); await P.keyboard.press('Enter'); await P.waitForTimeout(250);
+    const h = await P.evaluate(() => ({ n: SVC.fvList('contracts').length, s: SVC.fvList('contracts')[0].s, badge: document.querySelector('#dvSavedBtn .fb-n').textContent, menu: !!document.getElementById('fvMenu'), foc: document.activeElement && document.activeElement.id }));
+    const i0 = await P.evaluate(() => getComputedStyle(document.getElementById('dvFclr')).display);   /* 칩 1 + 검색어 → «모두 해제» 보임(검색어까지 지움) */
+    await P.click('#dvFclr'); await P.waitForTimeout(250);
+    const i = await P.evaluate(() => ({ lens: SVC.DV.lens, chips: document.getElementById('dvChips').hidden, q: document.getElementById('dvSearch').value, clr0: 'x' }));
+    await P.click('#dvSavedBtn'); await P.waitForTimeout(150); await P.click('#fvMenu .fv-go'); await P.waitForTimeout(300);
+    const j = await P.evaluate(() => ({ lens: SVC.DV.lens, q: document.getElementById('dvSearch').value, wv: SVC.wvCur('contracts')[0], chips: [...document.querySelectorAll('#dvChips .dvc')].map((x) => x.textContent.replace('✕', '').trim()).join('|'), toast: (document.querySelector('#toasts .toast') || {}).textContent || '' }));
+    await P.click('#dvSavedBtn'); await P.waitForTimeout(150); await P.click('#fvMenu .fv-x'); await P.waitForTimeout(250);
+    const k = await P.evaluate(() => ({ n: SVC.fvList('contracts').length, badgeHid: document.querySelector('#dvSavedBtn .fb-n').hidden, menu: !!document.getElementById('fvMenu') }));
+    await P.keyboard.press('Escape'); await P.waitForTimeout(100);
+    await P.click('#dvMoreBtn'); await P.waitForTimeout(150);
+    const l = await P.evaluate(() => { const v = (e) => { const r = e.getBoundingClientRect(); return r.width > 1 && r.height > 1; }; return { open: !document.getElementById('dvMoreMenu').hidden, items: [...document.querySelectorAll('#dvMoreMenu .mm-it')].map((b) => b.id + ':' + (v(b) ? 1 : 0)).join(' '), foc: document.activeElement && document.activeElement.id, txt: document.getElementById('dvDense').textContent.trim() }; });
+    await P.keyboard.press('Escape'); await P.waitForTimeout(120);
+    const m = await P.evaluate(() => ({ open: !document.getElementById('dvMoreMenu').hidden, foc: document.activeElement && document.activeElement.id }));
+    await P.click('#dvFilterBtn'); await P.waitForTimeout(100); await P.evaluate(() => SVC.navMenu('oi')); await P.waitForTimeout(500);
+    const n = await P.evaluate(() => ({ open: !document.getElementById('dvFilterPop').hidden, secs: [...document.querySelectorAll('#dvFilterPop .fb-sec')].map((s) => s.dataset.sec + ':' + (s.hidden ? 0 : 1)).join(' '), st: document.querySelector('#dvFilterPop [data-sec="chip"] .fb-st').textContent, lens: SVC.DV.lens, qoiIn: !!document.querySelector('#dvFilterPop #qoiBtn'), chips: document.getElementById('dvChips').hidden }));
+    await P.click('#dvFilterBtn'); await P.waitForTimeout(100); await P.click('#dvQvBar [data-qv="nonext"]'); await P.waitForTimeout(250); await P.click('#dvChipBar .pill:has-text("등록")'); await P.waitForTimeout(250);
+    const o = await P.evaluate(() => ({ open: !document.getElementById('dvFilterPop').hidden, pre: SVC.DV.pre && SVC.DV.pre.qv, chip: SVC.DV.chipVal, chips: [...document.querySelectorAll('#dvChips .dvc')].map((x) => x.textContent.replace('✕', '').trim()).join('|'), badge: document.querySelector('#dvFilterBtn .fb-n').textContent }));
+    await P.click('#dvFbClear'); await P.waitForTimeout(250);
+    const p2 = await P.evaluate(() => ({ pre: SVC.DV.pre, chip: SVC.DV.chipVal, chips: document.getElementById('dvChips').hidden, open: !document.getElementById('dvFilterPop').hidden }));
+    await P.click('#dvFbDone'); await P.evaluate(() => SVC.navMenu('live')); await P.waitForTimeout(500);
+    const q = await P.evaluate(() => { const lb = document.getElementById('dvLensBar'), bar = document.querySelector('#viewData .dbar'); return { out: lb.nextElementSibling === bar && !lb.closest('#dvFilterPop'), vis: getComputedStyle(lb).display, fb: document.getElementById('dvFilterBtn').hidden, src: !!lb.querySelector('[data-lsrc]') }; });
+    await P.evaluate(() => SVC.navMenu('dcheck')); await P.waitForTimeout(400);
+    const r = await P.evaluate(() => ({ fb: document.getElementById('dvFilterBtn').hidden, sv: document.getElementById('dvSavedBtn').hidden, more: getComputedStyle(document.getElementById('dvMoreBtn')).display !== 'none', chips: document.getElementById('dvChips').hidden }));
+    await A.ctx.close();
+    const M = await mk187({ w: 390, h: 844, mobile: true }), Q = M.page; await Q.evaluate(() => SVC.navMenu('contracts')); await Q.waitForTimeout(500);
+    const mob = await Q.evaluate(() => { const bar = document.querySelector('#viewData .dbar'), W = document.documentElement.clientWidth; const w = (id) => Math.round(document.getElementById(id).getBoundingClientRect().width); const sp = (id) => getComputedStyle(document.querySelector('#' + id + ' span')).display;
+      return { h: Math.round(bar.getBoundingClientRect().height), seg: Math.round(document.querySelector('#dvWvBar .seg').getBoundingClientRect().width), bar: Math.round(bar.getBoundingClientRect().width), icon: [sp('dvSavedBtn'), sp('dvCsv'), sp('dvCols')].join(','), lgd: getComputedStyle(document.querySelector('#dvCount .dv-lgd')).display, ov: document.documentElement.scrollWidth <= W, rows: [...bar.children].filter((e) => e.getBoundingClientRect().height > 1).map((e) => Math.round(e.getBoundingClientRect().top)).filter((t, i, a) => a.indexOf(t) === i).length, w: w('dvSavedBtn') }; });
+    await Q.click('#dvFilterBtn'); await Q.waitForTimeout(200);
+    const mob2 = await Q.evaluate(() => { const r = document.getElementById('dvFilterPop').getBoundingClientRect(); return { l: Math.round(r.left), rt: Math.round(document.documentElement.clientWidth - r.right), open: !document.getElementById('dvFilterPop').hidden }; });
+    await M.ctx.close();
+    const C = await mk187({ look: 'classic' }); await C.page.evaluate(() => SVC.navMenu('contracts')); await C.page.waitForTimeout(400);
+    const cl = await C.page.evaluate(() => ({ gn: SVC.isGN(), fb: !!document.getElementById('dvFilterBtn'), lensBefore: document.getElementById('dvLensBar').parentElement === document.querySelector('#viewData .dbar').parentElement && !document.getElementById('dvFilterPop'), fclr: document.getElementById('dvFclr').parentElement.classList.contains('dbar'), reload: document.getElementById('dvReload').parentElement.classList.contains('dbar') })); await C.ctx.close();
+    assert(b.open && b.exp === 'true' && b.secs === 'chip:0 qv:0 lens:1' && /지금 조건 \d+행/.test(b.cnt) && b.foc, '팝오버 ' + JSON.stringify(b));
+    assert(c.lens === 'kids' && c.open && c.chips === '관점:부속 계약 있는 고객사' && c.clr === 'none' && c.badge === '1' && c.on && c.cnt === '지금 조건 ' + c.rows + '행' && /걸린 조건 1개/.test(c.lbl) && !d.open && d.foc === 'dvFilterBtn', '관점 칩 ' + JSON.stringify({ c, d }));
+    assert(e.chips === '관점:부속 계약 있는 고객사|상태:신규' && e.clr !== 'none' && e.clrT === '모두 해제' && e.badge === '2' && f.lens === 'kids' && f.f === '{}' && f.chips === 1, '열 필터 칩 ' + JSON.stringify({ e, f }));
+    assert(g.menu && g.empty && /보기 운영 · 부속 계약 있는 고객사 · «가상»/.test(g.cur) && g.foc === 'fvName' && h.n === 1 && h.s.lens === 'kids' && h.s.q === '가상' && h.s.wv === '운영' && h.badge === '1' && !h.menu && h.foc === 'dvSavedBtn', '저장 ' + JSON.stringify({ g, h }));
+    assert(i0 !== 'none' && i.lens === '' && i.chips && i.q === '' && j.lens === 'kids' && j.q === '가상' && j.wv === '운영' && j.chips === '관점:부속 계약 있는 고객사' && /내 부속 계약/.test(j.toast) && k.n === 0 && k.badgeHid && k.menu, '적용 · 삭제 ' + JSON.stringify({ i, j, k }));
+    assert(l.open && /dvReload:1/.test(l.items) && /dvDense:1/.test(l.items) && l.foc === 'dvReload' && l.txt === '밀도' && !m.open && m.foc === 'dvMoreBtn', '⋯ ' + JSON.stringify({ l, m }));
+    assert(!n.open && n.secs === 'chip:1 qv:1 lens:0' && n.st === '진행상태' && n.lens === '' && !n.qoiIn && n.chips && o.open && o.pre === 'nonext' && o.chip === '등록' && o.chips === '진행상태:등록|빠른 보기:다음 행동 없음' && o.badge === '2' && !p2.pre && p2.chip === '' && p2.chips && p2.open, 'OI ' + JSON.stringify({ n, o, p2 }));
+    assert(q.out && q.vis === 'flex' && q.fb && q.src && r.fb && r.sv && r.more && r.chips, 'LIVE · 점검 ' + JSON.stringify({ q, r }));
+    assert(mob.h <= 150 && mob.seg >= mob.bar - 2 && mob.icon === 'none,none,none' && mob.lgd === 'none' && mob.ov && mob.rows <= 4 && mob.w <= 40 && mob2.open && mob2.l === 8 && mob2.rt === 8, '폰 ' + JSON.stringify({ mob, mob2 }));
+    assert(!cl.gn && !cl.fb && cl.lensBefore && cl.fclr && cl.reload && !A.c.errs.filter((e) => !/serviceWorker/.test(e)).length, '클래식 ' + JSON.stringify({ cl, errs: A.c.errs }));
+    return '한 줄 ' + a.h + 'px · 팝오버 · 칩 · 저장된 보기 · ⋯ · 폰 ' + mob.rows + '줄';
+  });
+  await S.t('㊿+187 사업 영역 한 화면: 상단 «사업 영역» 버튼 하나(펼침 없음) → 마지막(처음엔 첫) 영역 · 영역 선택 띠 = 메뉴 소제목 × 계약 있는 채널(당월 MRR · LIVE 곳 = KPI 타일과 같음) · 고르면 아래 화면 · 주소 #키 · 제목 «사업 영역» · 부제 «Cloud NAC › 일반 판매» · ← → 키 · 권한 없는 영역 빠짐 · 폰 2열 · 클래식은 메뉴 9개 그대로', async () => {
+    const A = await mk187(), P = A.page;
+    const tabs = await P.evaluate(() => [...document.querySelectorAll('#rail .gn-tabs .gn-tb')].map((b) => b.dataset.v || b.dataset.seg).join('|'));
+    await P.click('#rail .gn-tb[data-v="area"]'); await P.waitForTimeout(500);
+    const a = await P.evaluate(() => ({ v: SVC.ST.CUR_VIEW, cur: (document.querySelector('#rail .gn-tb[aria-current="true"]') || {}).dataset.v, ttl: document.getElementById('gnTitle').textContent, sub: document.getElementById('gnSub').textContent, hash: location.hash, menu: document.getElementById('gnMenu').hidden,
+      keys: [...document.querySelectorAll('#areaSel [data-area]')].map((b) => b.dataset.area + (b.getAttribute('aria-selected') === 'true' ? '*' : '')).join(' '), groups: [...document.querySelectorAll('#areaSel .area-gl')].map((x) => x.textContent).join('|'), stat: document.querySelector('#areaSel [data-area="cngen"] small').textContent,
+      kpi: [...document.querySelectorAll('#chBody .kpi')].slice(0, 2).map((k) => k.querySelector('.v').textContent.replace(/\s/g, '')).join(' '), cap: document.querySelector('#chBody .area-cap').textContent, big: !!document.querySelector('#chBody .ubadge'), firstH: (document.querySelector('#viewChannel h2,#viewChannel h3') || {}).textContent, role: document.getElementById('areaSel').getAttribute('role') }));
+    await P.click('#areaSel [data-area="mdrgen"]'); await P.waitForTimeout(500);
+    const b = await P.evaluate(() => ({ v: SVC.ST.CUR_VIEW, sel: (document.querySelector('#areaSel [aria-selected="true"]') || {}).dataset.area, sub: document.getElementById('gnSub').textContent, hash: location.hash, cur: (document.querySelector('#rail .gn-tb[aria-current="true"]') || {}).dataset.v, cap: document.querySelector('#chBody .area-cap').textContent, y: Math.round(window.scrollY) }));
+    await P.evaluate(() => SVC.navMenu('dash')); await P.waitForTimeout(300); await P.click('#rail .gn-tb[data-v="area"]'); await P.waitForTimeout(400);
+    const c = await P.evaluate(() => ({ v: SVC.ST.CUR_VIEW, mem: localStorage.getItem('svc_area_tester@example.com') }));
+    await P.focus('#areaSel [aria-selected="true"]'); await P.keyboard.press('ArrowLeft'); await P.waitForTimeout(400);
+    const d = await P.evaluate(() => ({ v: SVC.ST.CUR_VIEW, foc: document.activeElement && document.activeElement.dataset.area }));
+    await P.evaluate(() => { SVC.switchView('cnpub'); }); await P.waitForTimeout(400);
+    const e = await P.evaluate(() => ({ v: SVC.ST.CUR_VIEW, sel: (document.querySelector('#areaSel [aria-selected="true"]') || {}).dataset.area, sub: document.getElementById('gnSub').textContent }));
+    await P.evaluate(() => { SVC.ST.IS_SUPER = false; SVC.ST.PERMS = { cnpub: { v: false, r: false, w: false } }; SVC.applyPerms(); SVC.switchView('cngen'); }); await P.waitForTimeout(400);   /* 슈퍼 관리자는 권한 표를 안 타므로 잠깐 내림 */
+    const f = await P.evaluate(() => ({ keys: [...document.querySelectorAll('#areaSel [data-area]')].map((b) => b.dataset.area).join(' '), tabs: [...document.querySelectorAll('#rail .gn-tabs .gn-tb')].map((b) => b.dataset.v || b.dataset.seg).join('|') }));
+    await P.evaluate(() => { SVC.ST.IS_SUPER = true; SVC.ST.PERMS = null; SVC.applyPerms(); });
+    await A.ctx.close();
+    const M = await mk187({ w: 390, h: 844, mobile: true }), Q = M.page; await Q.evaluate(() => SVC.navMenu('area')); await Q.waitForTimeout(500);
+    const m = await Q.evaluate(() => { const bs = [...document.querySelectorAll('#areaSel [data-area]')]; const W = document.documentElement.clientWidth; return { v: SVC.ST.CUR_VIEW, n: bs.length, w: Math.round(bs[0].getBoundingClientRect().width), W, ov: document.documentElement.scrollWidth <= W, two: Math.round(bs[0].getBoundingClientRect().top) === Math.round(bs[1].getBoundingClientRect().top) && Math.round(bs[0].getBoundingClientRect().top) !== Math.round(bs[2].getBoundingClientRect().top) }; }); await M.ctx.close();
+    const C = await mk187({ look: 'classic' }); await C.page.evaluate(() => SVC.switchView('cngen')); await C.page.waitForTimeout(400);
+    const cl = await C.page.evaluate(() => ({ gn: SVC.isGN(), sel: !!document.getElementById('areaSel'), side: [...document.querySelectorAll('#side button[data-v]')].filter((b) => /^(cngen|cnpub|cns1|cnlgu|mdrgen)$/.test(b.dataset.v) && b.style.display !== 'none').length, big: /일반 판매 사업 영역/.test(document.getElementById('chBody').textContent) })); await C.ctx.close();
+    assert(/\|area\|/.test(tabs) && !/사업 영역/.test(tabs) && a.v === 'cngen' && a.cur === 'area' && a.ttl === '사업 영역' && a.sub === 'Cloud NAC › 일반 판매' && a.hash === '#cngen' && a.menu && a.keys === 'cngen* cnpub cns1 cnlgu mdrgen' && a.groups === 'Cloud NAC|MDR' && a.role === 'tablist' && !a.big && /월별 매출 추이/.test(a.firstH), '진입 ' + JSON.stringify(a));
+    const mrr = (a.kpi.split(' ')[0] || '').replace(/천원.*/, ''), live = (a.kpi.split(' ')[1] || '').replace(/곳.*/, '');
+    assert(a.stat === mrr + '천원 · ' + live + '곳' && /Cloud NAC · 일반 판매/.test(a.cap) && /2026-\d\d 기준/.test(a.cap), '띠 숫자 = KPI ' + JSON.stringify({ stat: a.stat, kpi: a.kpi, cap: a.cap }));
+    assert(b.v === 'mdrgen' && b.sel === 'mdrgen' && b.sub === 'MDR › 일반 판매' && b.hash === '#mdrgen' && b.cur === 'area' && /MDR · 일반 판매/.test(b.cap) && b.y === 0 && c.v === 'mdrgen' && c.mem === 'mdrgen' && d.v === 'cnlgu' && d.foc === 'cnlgu' && e.v === 'cnpub' && e.sel === 'cnpub' && e.sub === 'Cloud NAC › 조달 판매', '고르기 ' + JSON.stringify({ b, c, d, e }));
+    assert(f.keys === 'cngen cns1 cnlgu mdrgen' && /\|area\|/.test(f.tabs), '권한 ' + JSON.stringify(f));
+    assert(m.v === 'cngen' && m.n === 5 && m.w < m.W / 2 && m.w > m.W / 3 && m.ov && m.two, '폰 ' + JSON.stringify(m));
+    assert(!cl.gn && !cl.sel && cl.side === 5 && cl.big && !A.c.errs.filter((e) => !/serviceWorker/.test(e)).length, '클래식 ' + JSON.stringify({ cl, errs: A.c.errs }));
+    return '영역 ' + a.keys.split(' ').length + '개 띠 · ' + a.groups;
   });
 }
 await browser.close(); srv.close();
