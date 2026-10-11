@@ -2935,4 +2935,27 @@ html[data-skin="gn"] #rail .gn-right .ntf-btn:hover{border-color:var(--ink-2)}
 .qoi-t td,.qoi-t th{white-space:nowrap}
 .qoi-t tr.qoi-off td{color:var(--muted)}
 .qoi-t td:last-child{white-space:normal;min-width:180px}
+/* ==== ㊿+185 우선 업무 줄 담당 지정 · 개선 요청 ==== */
+button.hm-own.hm-asg{appearance:none;background:transparent;border:1px dashed var(--ring);border-radius:999px;padding:0 8px;margin:-1px 0;font:inherit;font-size:13px;line-height:20px;color:var(--ink-2);cursor:pointer;display:inline-flex;align-items:center;gap:4px;min-height:24px}
+button.hm-own.hm-asg::before{content:none}
+button.hm-own.hm-asg.none{color:var(--warn-ink,#875A00);border-color:var(--warn-ink,#875A00)}
+button.hm-own.hm-asg:hover{background:var(--surface-2,var(--surface));border-style:solid}
+button.hm-own.hm-asg:focus-visible{outline:2px solid var(--s1);outline-offset:1px}
+.hm-asg .hm-pen{font-size:12px;opacity:.75}
+/* 줄 제목 버튼도 24px 이상(아래 담당 버튼과 겹치지 않게 · 접근성 target-size) */
+.hm-nm{min-height:24px}
+/* 개선 요청 */
+.fb-list{margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
+.fb-list:empty{display:none}
+.fb-t{margin:0 0 8px;font-size:14px;display:flex;align-items:center;gap:8px}
+.fb-ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;max-height:42vh;overflow:auto}
+.fb-it{border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--surface)}
+.fb-it.done .fb-c{color:var(--ink-2)}
+.fb-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px}
+.fb-h b{font-size:13px}
+.fb-a{margin-left:auto;display:flex;gap:4px}
+.fb-c{margin-top:6px;font-size:14px;line-height:1.55;white-space:pre-wrap;word-break:break-word}
+.fb-n{margin-top:4px;color:var(--ink-2)}
+#fbText{width:100%;font:inherit;font-size:14px;line-height:1.5;padding:9px 11px;border:1px solid var(--ring);border-radius:9px;background:var(--surface);color:var(--ink);resize:vertical;min-height:110px}
+.fb-empty{margin:0}
 /* ==== ㊿+166 새 디자인 end ==== */

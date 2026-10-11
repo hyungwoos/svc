@@ -21,6 +21,7 @@ import { c360Match, fkNorm, fkSources, freqTop, navSub, openCust360, recentKey, 
 import { loadInbound } from './inbound.js';
 import { closeOvl, openOvl } from './edit.js';
 import { Viz } from './viz.js';
+import { ntfAreaOpen, ntfCanAssignArea } from './notify.js';
 
 /** 홈 상태 @type {any} */
 export var HOME={rows:[], zeros:[], snz:0, cur:null, nTurn:0, ctx:null, ctxOn:true, open:{}, bound:0, scope:'', allOpen:false, newChat:false, hist:[], srch:{home:{q:'', i:-1}, ovl:{q:'', i:-1}}, ownerTry:0, rz:0};
@@ -54,7 +55,8 @@ export function placeSearchBtn(){
   if(!cmd || !tb) return;
   var wide=isGN() && !!right && window.innerWidth>760;
   var nb=document.getElementById('ntfBtn');   /* ㊿+174 알림 종 — 검색 · AI 대화 바로 뒤 */
-  function bell(){ var ref=op||cmd; if(nb && ref.parentElement && (nb.parentElement!==ref.parentElement || nb.previousElementSibling!==ref)) ref.parentElement.insertBefore(nb, ref.nextSibling); }
+  var fb=document.getElementById('fbBtn');   /* ㊿+185 개선 요청 — 종 다음 */
+  function bell(){ var ref=op||cmd; if(nb && ref.parentElement && (nb.parentElement!==ref.parentElement || nb.previousElementSibling!==ref)) ref.parentElement.insertBefore(nb, ref.nextSibling); var r2=nb||ref; if(fb && r2.parentElement && (fb.parentElement!==r2.parentElement || fb.previousElementSibling!==r2)) r2.parentElement.insertBefore(fb, r2.nextSibling); }
   function toTop(){ var ub=document.getElementById('unitBadge'); if(cmd.parentElement!==tb) tb.insertBefore(cmd, ub||null); if(op && op.parentElement!==tb) tb.insertBefore(op, cmd.nextSibling); bell(); }
   if(wide){ if(cmd.parentElement!==right) right.insertBefore(cmd, right.firstChild); if(op && op.parentElement!==right) right.insertBefore(op, cmd.nextSibling); bell();
     /* 위 메뉴 묶음이 잘리면(좁은 노트북 폭) 검색 · AI 대화는 아래 띠로 — 메뉴가 먼저 */
@@ -585,7 +587,7 @@ export function homeTodo(rows, zeros, snz){
   var more=ord.length-show.length;
   var seg=tpl`<div class="seg hm-scope" role="group" aria-label="우선 업무 범위"><button type="button" data-sc="me" aria-pressed="${scope==='me'?'true':'false'}">내 업무</button><button type="button" data-sc="team" aria-pressed="${scope==='team'?'true':'false'}">팀 전체</button></div>`;
   var h=tpl`<div class="ib-head hm-head"><h2>우선 업무 <span class="ctag" data-n="${String(ord.length)}" title="업무 종류 수 — 대상 건수는 줄마다(신청 · 계약 · OI · 문의 단위가 달라 더하지 않음)">업무 ${String(ord.length)}가지</span></h2>${rawHtml(seg)}</div>`;
-  if(scope==='me') h+=tpl`<p class="hm-basis mini">내 업무 = 내가 작성한 견적서가 붙은 OI · 나에게 맡겨진(또는 내가 신청한) 장비 신청</p>`;   /* ㊿+184 «담당자 연결» 없이 견적 작성자로 */
+  if(scope==='me') h+=tpl`<p class="hm-basis mini">내 업무 = 내가 작성한 견적서가 붙은 OI · 나에게 맡겨진(또는 내가 신청한) 장비 신청 · 담당으로 지정된 줄</p>`;   /* ㊿+184 «담당자 연결» 없이 견적 작성자로 */
   if(!show.length) h+=tpl`<div class="ib-empty"><span class="ib-ic ok">${rawHtml(ico('check',16))}</span>${scope==='me'? '내 OI · 내 장비 신청으로 지금 챙길 일이 없습니다 — 팀 전체를 보세요' : '지금 챙길 일이 없습니다'}</div>`;
   else {
     var LV={1:'즉시',2:'확인',3:'예정'};
@@ -596,7 +598,7 @@ export function homeTodo(rows, zeros, snz){
         tpl`<span class="hm-lv" title="${LV[lv]}"><i></i><span class="sr">${LV[lv]}</span></span>`+
         tpl`<button type="button" class="hm-nm" aria-expanded="${open?'true':'false'}" aria-controls="hmD_${key}" title="눌러서 대상 · 담당 · 기한 · 영향">${o.nm||String(o.t).replace(/<[^>]+>/g,'')}<span class="chev" aria-hidden="true">▾</span></button>`+
         tpl`<span class="hm-n num">${o.cnt||''}</span>`+
-        tpl`<span class="hm-sub"><span class="hm-due">${o.dueS||o.due||''}</span><span class="hm-own${o.own?'':' none'}">${o.own || '담당 미지정'}</span></span>`+
+        tpl`<span class="hm-sub"><span class="hm-due">${o.dueS||o.due||''}</span>${rawHtml(o.asg && ntfCanAssignArea()? tpl`<button type="button" class="hm-own hm-asg${o.own?'':' none'}" data-asg="${o.asg}" title="${o.own? '담당 바꾸기 — '+o.own : '담당 지정 — 포탈 계정 중에서'}">${o.own || '담당 지정'}<span class="hm-pen" aria-hidden="true">✎</span></button>` : tpl`<span class="hm-own${o.own?'':' none'}">${o.own || '담당 미지정'}</span>`)}</span>`+
         tpl`<span class="hm-act">${rawHtml(pri? tpl`<button type="button" class="cbtn pri" data-a="${String((o.acts||[]).indexOf(pri))}">${pri.l}</button>` : '')}</span>`+
         tpl`<div class="hm-d" id="hmD_${key}"${rawHtml(open? '' : ' hidden')}><dl class="ib-meta">${rawHtml([['대상',o.who],['담당',o.own||'담당 미지정'],['기한',o.due],['영향',o.imp]].filter(function(m){ return m[1]; }).map(function(m){ return tpl`<div><dt>${m[0]}</dt><dd>${m[1]}</dd></div>`; }).join(''))}</dl>`+
         tpl`${rawHtml((o.links||[]).length? tpl`<div class="hm-ra hm-links"><span class="mini">대상 바로 열기</span>${rawHtml(o.links.map(function(l2, li){ return tpl`<button type="button" class="cbtn" data-l="${String(li)}">${l2.l}</button>`; }).join(''))}</div>` : '')}`+
@@ -611,6 +613,7 @@ export function homeTodo(rows, zeros, snz){
   box.querySelectorAll('.hm-row').forEach(function(li){ var o=byKey[/** @type {any} */(li).dataset.key]; if(!o) return;
     li.querySelectorAll('.cbtn[data-a]').forEach(function(bt){ /** @type {any} */(bt).onclick=function(e){ e.stopPropagation(); o.acts[+/** @type {any} */(bt).dataset.a].go(); }; });
     li.querySelectorAll('.cbtn[data-l]').forEach(function(bt){ /** @type {any} */(bt).onclick=function(e){ e.stopPropagation(); o.links[+/** @type {any} */(bt).dataset.l].go(); }; });
+    var ab=li.querySelector('.hm-asg'); if(ab) /** @type {any} */(ab).onclick=function(e){ e.stopPropagation(); ntfAreaOpen(/** @type {any} */(ab).dataset.asg); };   /* ㊿+185 줄 담당 지정 */
     var nb=li.querySelector('.hm-nm'); if(nb) /** @type {any} */(nb).onclick=function(){ var d=li.querySelector('.hm-d'), on=/** @type {any} */(d).hidden; /** @type {any} */(d).hidden=!on; nb.setAttribute('aria-expanded', on? 'true':'false'); HOME.open[o.key]=on; }; });
   box.querySelectorAll('[data-sc]').forEach(function(b){ /** @type {any} */(b).onclick=function(){ HOME.scope=/** @type {any} */(b).dataset.sc; homeTodo(HOME.rows, HOME.zeros, HOME.snz); var nb=box.querySelector('[data-sc="'+HOME.scope+'"]'); if(nb) /** @type {any} */(nb).focus(); }; });
   var al=document.getElementById('hmAll'); if(al) al.onclick=function(){ HOME.allOpen=!HOME.allOpen; homeTodo(HOME.rows, HOME.zeros, HOME.snz); var nb=document.getElementById('hmAll'); if(nb) nb.focus(); };

@@ -6,6 +6,7 @@ import { afterLoad, idxDate, loadFromDb, onData, onErr, SB_RAW, sbWrite, showAut
 import { s1NoInfo, s1NoOpts } from './grids.js';
 import { chOf, doChurn, doRenew, liveCalc, nmKeys, renewMates, renewMatesHtml, renewOpts, renewQty0, renewUndoFlow, renewUndoPlan, renewWire } from './analysis.js';
 import { switchView } from './grid.js';
+import { fbOpen } from './notify.js';
 
 
 /* ==================================================================
@@ -237,6 +238,7 @@ export function toggleAuthMenu(anchor){
   var bs='display:block;width:100%;text-align:left;border:0;background:transparent;padding:9px 11px;border-radius:8px;font:inherit;font-size:14px;cursor:pointer;color:var(--ink)';
   m.innerHTML=tpl`<div style="padding:7px 11px 5px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--line);margin-bottom:4px">${ST.AUTH_USER||''}</div>`+
     tpl`<button data-a="acct" style="${rawHtml(bs)}">내 계정 · 설정</button>`+
+    tpl`<button data-a="fb" style="${rawHtml(bs)}">개선 요청 보내기</button>`+
     tpl`<button data-a="out" style="${rawHtml(bs)};color:var(--critical,#d03b3b)">로그아웃</button>`;
   document.body.appendChild(m);
   m.querySelectorAll('button').forEach(function(b){
@@ -244,6 +246,7 @@ export function toggleAuthMenu(anchor){
     b.onmouseleave=function(){ b.style.background='transparent'; };
   });
   m.querySelector('[data-a="acct"]').onclick=function(){ m.remove(); switchView('account'); };
+  m.querySelector('[data-a="fb"]').onclick=function(){ m.remove(); fbOpen(); };   /* ㊿+185 */
   m.querySelector('[data-a="out"]').onclick=function(){ m.remove(); doLogout(); };
   setTimeout(function(){
     document.addEventListener('click', function h(e){
