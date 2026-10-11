@@ -64,6 +64,8 @@ jobs:
           run_t supabase/functions/remind/index.ts   tests/fn/remind.test.ts
           run_t supabase/functions/aicheck/index.ts  tests/fn/aicheck.test.ts
           run_t cloudflare/quote-worker/worker.js    tests/fn/quote-worker.test.ts
+          run_t supabase/functions/notify/index.ts   tests/fn/notify.test.ts
+          run_t supabase/functions/export/index.ts   tests/fn/export.test.ts
   deploy:
     needs: [test, functions]
     runs-on: ubuntu-24.04
