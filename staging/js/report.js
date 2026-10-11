@@ -2,7 +2,8 @@
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { APP_VER, ST } from './state.js';
 import { Viz } from './viz.js';
-import { $, cssv, esc, LINE_LABEL, lline, llineVer, mk, pct, rawHtml, SB_URL, tpl, won } from './core.js';
+import { $, cssv, esc, LINE_LABEL, lline, llineVer, mk, pct, rawHtml, SB_URL, STATE, tpl, won } from './core.js';
+import { AICFG, aiFetch } from './ai.js';
 import { dIdx, RPB, rpbBadge, rpbKey, rpbList, SB_RAW, sbHeaders, thisMonthStr, toast, todayStr } from './shell.js';
 import { expAmtOf, expEligible, idxs } from './dash.js';
 import { GRIDS } from './grids.js';
@@ -772,7 +773,7 @@ export function qbChart(res){
 }
 
 /* ---- 데이터 조합 화면 (리포트 메뉴) ---- */
-export var QB={spec:null, res:null, view:'table', title:'', page:300, savedId:null, deckOpen:false, mode:'ui', sql:''};
+export var QB={spec:null, res:null, view:'table', title:'', page:300, savedId:null, deckOpen:false, mode:'ui', sql:'', ai:false, aiQ:'', aiNote:''};   /* ㊿+184 ai = 글로 만든 결과(SQL 은 «조회식 보기»에서만) */
 export function qbKey(){ return 'svc_qb_'+(ST.AUTH_USER||'anon'); }
 export function qbSaved(){ try{ return JSON.parse(localStorage.getItem(qbKey())||'[]')||[]; }catch(e){ return []; } }
 export function qbSavedSet(L){ try{ localStorage.setItem(qbKey(), JSON.stringify(L)); }catch(e){ toast('저장 실패','브라우저 저장 공간이 부족합니다','bad'); } }
@@ -902,6 +903,7 @@ export function qbResultDraw(){
   if(QB.view!=='table' && !qbChart(QB.res)) QB.view='table';
   host.innerHTML=qbResultHtml();
   if(QB.mode!=='sql' && QB.spec && !RPV.build){ var cd=document.createElement('div'); cd.className='qb-cond'; cd.textContent='조건 — '+qbSpecText(QB.spec)+' · 바꾸려면 «조합 바꾸기»'; host.insertBefore(cd, host.firstChild); }
+  if(QB.ai && QB.aiNote){ var an=document.createElement('div'); an.className='qb-cond rp-note'; an.textContent='계산 기준 — '+QB.aiNote; host.insertBefore(an, host.firstChild); }   /* ㊿+184 글로 만든 결과: AI 가 밝힌 기준(무엇을 · 뺀 것 · 단위) */
   var ch=qbChart(QB.res), cb=document.getElementById('qbChart');
   if(ch && cb){ try{ var fmt=ch.money? won : function(v){ return Math.round(v).toLocaleString('ko-KR'); }; var sers=ch.series.map(function(s,i){ return {label:s.label, data:s.data, color:cssv('--s'+((i%8)+1))}; });
     if(ch.type==='lines') Viz.lines(cb,{labels:ch.labels, series:sers, fmt:fmt, fill:sers.length===1, padL:56}); else Viz.bars(cb,{labels:ch.labels, series:sers, fmt:fmt, padL:56}); }catch(e){} }
@@ -945,7 +947,7 @@ export function qbBindPanel(){
   });
   p.addEventListener('input', function(e){ var el=e.target, k=el.dataset.qb; if(!k) return; var row=rowOf(el), L=row? listFor(row.kind) : null; if(row && L && L[row.i] && (k==='v'||k==='v2'||k==='alias')){ L[row.i][k]=el.value; qbRun_(); } if(k==='limit'){ QB.spec.limit=Math.max(0, parseInt(el.value,10)||0); qbRun_(); } });
   p.addEventListener('click', function(e){
-    var mb=e.target.closest('[data-qbmode]'); if(mb){ var m=mb.dataset.qbmode; if(m!==QB.mode){ QB.mode=m; QB.page=300; if(m==='sql' && !String(QB.sql||'').trim()) QB.sql=qbSpecToSql(QB.spec); qbPanelRefresh(); qbRunNow(); } return; }
+    var mb=e.target.closest('[data-qbmode]'); if(mb){ var m=mb.dataset.qbmode; if(m!==QB.mode){ QB.ai=false; QB.mode=m; QB.page=300; if(m==='sql' && !String(QB.sql||'').trim()) QB.sql=qbSpecToSql(QB.spec); qbPanelRefresh(); qbRunNow(); } return; }
     var el=e.target.closest('[data-qb]'); if(!el) return; var k=el.dataset.qb, sp=QB.spec;
     if(k==='del'){ var row=rowOf(el), L=row? listFor(row.kind) : null; if(L){ L.splice(row.i,1); qbPanelRefresh(); qbRun_(); } return; }
     if(k==='jdel'){ var ji=+el.closest('.qb-join').dataset.i, t=sp.joins[ji].t; sp.joins.splice(ji,1);
@@ -964,8 +966,8 @@ export function qbBindPanel(){
   });
 }
 /* 저장·불러오기 */
-export function qbLoadSql(sql, name, id){ QB.mode='sql'; QB.sql=sql||''; QB.title=name||''; QB.savedId=id||null; QB.page=300; QB.chartM=null; QB.chartX=null; qbPanelRefresh(); qbSqlRun(); qbLibRefresh(); }
-export function qbLoad(spec, name, id){ QB.mode='ui'; QB.chartM=null; QB.chartX=null; QB.spec=JSON.parse(JSON.stringify(spec)); QB.spec.group=QB.spec.group||{by:[],aggs:[],pivot:null}; QB.spec.joins=QB.spec.joins||[]; QB.spec.filters=QB.spec.filters||[]; QB.spec.sel=QB.spec.sel||[]; QB.spec.post=QB.spec.post||[]; QB.spec.sort=QB.spec.sort||[]; QB.title=name||''; QB.savedId=id||null; QB.page=300; QB.view= (QB.spec.group.by.length||QB.spec.group.pivot)? 'both':'table'; qbPanelRefresh(); qbRunNow(); qbLibRefresh(); }
+export function qbLoadSql(sql, name, id){ QB.ai=false; QB.mode='sql'; QB.sql=sql||''; QB.title=name||''; QB.savedId=id||null; QB.page=300; QB.chartM=null; QB.chartX=null; qbPanelRefresh(); qbSqlRun(); qbLibRefresh(); }
+export function qbLoad(spec, name, id){ QB.ai=false; QB.mode='ui'; QB.chartM=null; QB.chartX=null; QB.spec=JSON.parse(JSON.stringify(spec)); QB.spec.group=QB.spec.group||{by:[],aggs:[],pivot:null}; QB.spec.joins=QB.spec.joins||[]; QB.spec.filters=QB.spec.filters||[]; QB.spec.sel=QB.spec.sel||[]; QB.spec.post=QB.spec.post||[]; QB.spec.sort=QB.spec.sort||[]; QB.title=name||''; QB.savedId=id||null; QB.page=300; QB.view= (QB.spec.group.by.length||QB.spec.group.pivot)? 'both':'table'; qbPanelRefresh(); qbRunNow(); qbLibRefresh(); }
 /* ── ㊿+179 리포트 저장을 DB 에(report_queries · SQL 111) — «내 리포트»(다른 PC 에서도) + «팀 공유» · SQL 111 전이면 예전처럼 이 브라우저(localStorage)
    · 공유 = 조합(표 · 조건 · 묶기)만 — 결과 숫자는 보는 사람의 데이터 · 권한으로 다시 계산 · 남의 공유 리포트를 고쳐 저장하면 내 것으로 새로 */
 export var RQ={ok:null, rows:[], at:0, loading:false};
@@ -1056,12 +1058,12 @@ export function qbLibHtml(){
     if(!L.length) h+=tpl`<span class="mini">없음 — 결과 위 «저장»으로 보관하면 여기에 생깁니다</span>`;
     h+=L.map(function(x){ return qbChip(x, {del:true}); }).join('');
   }
-  h+=tpl`<span style="flex:1"></span><button type="button" class="cbtn${rawHtml(RPV.build?' pri':'')}" id="qbBuildTg" aria-expanded="${RPV.build?'true':'false'}" aria-controls="qbPanel">${RPV.build? '조합 닫기' : '조합 바꾸기 — 표·조건·묶기'}</button></div>`;
+  h+=tpl`<span style="flex:1"></span><button type="button" class="cbtn${rawHtml(RPV.build?' pri':'')}" id="qbBuildTg" aria-expanded="${RPV.build?'true':'false'}" aria-controls="qbPanel">${RPV.build? '고급 닫기' : (QB.ai? '고급 — 조회식(SQL) 보기 · 고치기' : '고급 — 직접 조합(표·조건·묶기) · SQL')}</button></div>`;
   if(RQ.ok) h+=tpl`<div class="qb-lib qb-team"><span class="mini" style="font-weight:600">팀 공유</span>${rawHtml(team.length? team.map(function(x){ return qbChip(x, {who:x.owner.split('@')[0], del:!!ST.IS_SUPER}); }).join('') : tpl`<span class="mini">아직 없음 — 내 리포트의 «공유»를 누르면 모두의 이 목록에 보입니다(결과는 보는 사람의 데이터로 계산)</span>`)}</div>`;
   return h;
 }
 export function qbLibRefresh(){ var el=$('#qbLib'); if(!el) return; el.innerHTML=qbLibHtml();
-  el.querySelectorAll('[data-load]').forEach(function(c){ c.onclick=function(){ qbOpenSaved(qbFind(c.dataset.load)); }; });
+  el.querySelectorAll('[data-load]').forEach(function(c){ c.onclick=function(){ qbOpenSaved(qbFind(c.dataset.load)); rpResScroll(); }; });
   el.querySelectorAll('[data-qdel]').forEach(function(b){ b.onclick=async function(){ var x=qbFind(b.dataset.qdel); if(!x || !confirm('«'+x.name+'» 을 삭제할까요?'+(x.shared? '\n\n팀과 공유 중인 리포트입니다 — 다른 사람 목록에서도 사라집니다.' : ''))) return;
     if(x.dbId){ try{ var res=await fetch(SB_URL+'/rest/v1/report_queries?id=eq.'+x.dbId, {method:'DELETE', headers:Object.assign(sbHeaders(true), {Prefer:'return=representation'})}); var got=res.ok? await res.json() : null; if(!got || !got.length) throw new Error(res.ok? '지운 줄이 없습니다(권한)' : 'HTTP '+res.status); await rqLoad(true); }catch(e){ toast('삭제 실패', String(/** @type {any} */(e).message||e).slice(0,140), 'bad'); return; } }
     else qbSavedSet(qbSaved().filter(function(y){ return y.id!==x.id; }));
@@ -1072,7 +1074,7 @@ export function qbLibRefresh(){ var el=$('#qbLib'); if(!el) return; el.innerHTML
     catch(e){ toast('공유 바꾸기 실패', String(/** @type {any} */(e).message||e).slice(0,140), 'bad'); }
     qbLibRefresh(); }; });
   var mg=document.getElementById('qbMig'); if(mg) mg.onclick=function(){ qbMigrate(); };
-  el.querySelectorAll('[data-preset]').forEach(function(c){ c.onclick=function(){ var p=QB_PRESETS.filter(function(x){ return x.id===c.dataset.preset; })[0]; if(p){ qbLoad(p.spec, p.name, null); qbLibRefresh(); } }; });
+  el.querySelectorAll('[data-preset]').forEach(function(c){ c.onclick=function(){ var p=QB_PRESETS.filter(function(x){ return x.id===c.dataset.preset; })[0]; if(p){ qbLoad(p.spec, p.name, null); qbLibRefresh(); rpResScroll(); } }; });
   var a2=document.getElementById('qbAuto2'); if(a2) a2.onclick=function(){ RPV.tab='auto'; renderReport(); };
   var bt=document.getElementById('qbBuildTg'); if(bt) bt.onclick=function(){ RPV.build=!RPV.build; qbBuildSync(); qbLibRefresh(); var rh=document.getElementById('qbRes'); if(qbPicked() && rh && !rh.firstChild) qbRunNow(); };
 }
@@ -1080,7 +1082,7 @@ export function qbLibRefresh(){ var el=$('#qbLib'); if(!el) return; el.innerHTML
 export function qbPicked(){ return !!(QB.title || QB.savedId || RPV.build || QB.mode==='sql'); }
 export function qbBuildSync(){
   var w=document.querySelector('#rpBody .qb-wrap'), pk=qbPicked();
-  if(w){ w.classList.toggle('nobuild', !RPV.build && QB.mode!=='sql'); w.hidden=!pk; }
+  if(w){ w.classList.toggle('nobuild', !RPV.build && (QB.mode!=='sql' || QB.ai)); w.hidden=!pk; }
   var h=document.getElementById('qbPickHint'); if(h) h.hidden=pk;
   var d=document.getElementById('qbDeck2'); if(d) d.hidden=!pk && !rpbList().length;
 }
@@ -1091,7 +1093,7 @@ export function qbDeckAdd(){
   var head=r.cols.map(function(c){ return c.l; }), rows=r.rows.slice(0,300).map(function(row){ return row.map(function(v,ci){ return qbFmtCell(v, r.cols[ci]); }); });
   if(r.sums) rows.push(r.cols.map(function(c,ci){ return ci===0? '합계' : (r.sums[ci]==null? '' : qbFmtCell(r.sums[ci], c)); }));
   var isSql=QB.mode==='sql';
-  var it={t: (ch && QB.view!=='table')? 'chart':'table', title:title, sub:r.total.toLocaleString()+'행 · '+(isSql? 'SQL 조회' : qbSpecText(QB.spec)), from:'report', note:'', noteSrc:'user', spec: isSql? null : JSON.parse(JSON.stringify(QB.spec)), sql: isSql? QB.sql : null, chartX:QB.chartX||null, chartM:QB.chartM||null,
+  var it={t: (ch && QB.view!=='table')? 'chart':'table', title:title, sub:r.total.toLocaleString()+'행 · '+(QB.ai? (QB.aiNote||QB.aiQ||'글로 만든 리포트') : isSql? 'SQL 조회' : qbSpecText(QB.spec)), from:'report', note:'', noteSrc:'user', spec: isSql? null : JSON.parse(JSON.stringify(QB.spec)), sql: isSql? QB.sql : null, chartX:QB.chartX||null, chartM:QB.chartM||null,
     table:{head:head, rows:rows, total:r.total}, chart: (ch && QB.view!=='table')? {type:ch.type, labels:ch.labels, series:ch.series, money:ch.money} : null};
   it.id='r'+Date.now().toString(36)+Math.random().toString(36).slice(2,5); it.at=new Date().toISOString(); L.push(it); rpbSave();
   QB.deckOpen=true; qbDeckRefresh(); toast('PPT 슬라이드에 추가했습니다 ('+L.length+')', title, 'ok');
@@ -1188,19 +1190,19 @@ export function qbSqlRefs(sql){ var S=qbSources(), out=[]; Object.keys(S).forEac
 export async function qbSqlRun(){
   var host=$('#qbRes'), errBox=$('#qbSqlErr'); if(!host) return;
   var sql=QB.sql||''; var body=qbSqlStrip(sql);
-  function fail(msg){ if(errBox){ errBox.textContent=msg; errBox.style.display=''; } }
+  function fail(msg){ if(errBox){ errBox.textContent=msg; errBox.style.display=''; } return {ok:false, error:msg}; }   /* ㊿+184 결과를 돌려줌(글로 만드는 리포트가 오류면 한 번 고쳐 다시) */
   if(errBox){ errBox.style.display='none'; errBox.textContent=''; }
-  if(!body){ host.innerHTML='<div class="cap" style="padding:30px;text-align:center">왼쪽에 SQL 을 쓰고 실행하세요 — 예시를 골라 시작할 수 있습니다</div>'; return; }
-  if(!/^(select|with)\b/i.test(body)){ fail('SELECT 또는 WITH 로 시작하는 조회만 실행할 수 있습니다 (INSERT·UPDATE·DELETE·DROP 은 막혀 있습니다).'); return; }
-  if(/;\s*\S/.test(body.replace(/;\s*$/,''))){ fail('한 번에 하나의 SELECT 만 실행합니다.'); return; }
+  if(!body){ host.innerHTML='<div class="cap" style="padding:30px;text-align:center">왼쪽에 SQL 을 쓰고 실행하세요 — 예시를 골라 시작할 수 있습니다</div>'; return {ok:false, error:'SQL 이 비어 있습니다'}; }
+  if(!/^(select|with)\b/i.test(body)) return fail('SELECT 또는 WITH 로 시작하는 조회만 실행할 수 있습니다 (INSERT·UPDATE·DELETE·DROP 은 막혀 있습니다).');
+  if(/;\s*\S/.test(body.replace(/;\s*$/,''))) return fail('한 번에 하나의 SELECT 만 실행합니다.');
   /* 지연 로드 표 */
   var S=qbSources(), refs=qbSqlRefs(body); QB._ld=QB._ld||{};
   var pending=refs.filter(function(t){ var s=S[t]; if(!s.lazy) return false; var need=(t==='inbound'? ST.RAWX.inbound===undefined : t==='cloud'? !ST.RAWX.cloud : false); if(need && !QB._ld[t]){ QB._ld[t]=1; s.lazy(function(){ QB._ld[t]=0; qbSourcesReset(); if(ST.CUR_VIEW==='report' && QB.mode==='sql') qbSqlRun(); }); } return need; });
-  if(pending.length){ host.innerHTML=tpl`<div class="cap" style="padding:30px;text-align:center">${rawHtml(pending.map(function(t){ return S[t].label; }).join(', '))} 데이터를 불러오는 중…</div>`; return; }
+  if(pending.length){ host.innerHTML=tpl`<div class="cap" style="padding:30px;text-align:center">${rawHtml(pending.map(function(t){ return S[t].label; }).join(', '))} 데이터를 불러오는 중…</div>`; return {ok:true, pending:true}; }
   host.innerHTML='<div class="cap" style="padding:30px;text-align:center">실행 중…</div>';
   var t0=Date.now(), data;
   try{ data=await sqlboxRun(qbSqlTables(), qbSqlKo(body.replace(/;\s*$/,''))); }
-  catch(e){ var m=String(e.message||e); m=m.replace(/^Parse error on line (\d+):\n?/,'문법 오류 ($1번째 줄): ').replace(/Expecting[\s\S]*$/,'').replace(/Table does not exist: (\w+)/,'표가 없습니다: $1 (표 이름은 아래 «표·열» 참고)').replace(/Column not found/,'열을 찾을 수 없습니다'); fail(m.trim()); host.innerHTML=''; QB.res=null; return; }
+  catch(e){ var m=String(e.message||e); m=m.replace(/^Parse error on line (\d+):\n?/,'문법 오류 ($1번째 줄): ').replace(/Expecting[\s\S]*$/,'').replace(/Table does not exist: (\w+)/,'표가 없습니다: $1 (표 이름은 아래 «표·열» 참고)').replace(/Column not found/,'열을 찾을 수 없습니다'); host.innerHTML=''; QB.res=null; return fail(m.trim()); }
   if(!Array.isArray(data)) data=[{결과:data}];
   if(data.length && Array.isArray(data[0])) data=data[data.length-1];      // 여러 문장이면 마지막
   /* 결과 → 공용 표 모양 */
@@ -1209,12 +1211,13 @@ export async function qbSqlRun(){
   var cols=keys.map(function(k){ var vals=data.slice(0,500).map(function(r){ return r[k]; }).filter(function(v){ return v!=null && v!==''; });
     var isNum=vals.length && vals.every(function(v){ return typeof v==='number' && isFinite(v); }), isBool=vals.length && vals.every(function(v){ return typeof v==='boolean'; });
     var isMonth=!isNum && vals.length && vals.every(function(v){ return /^\d{4}-\d{2}$/.test(String(v)); });
-    return {id:k, l:k, t: isNum? 'num' : isBool? 'bool' : 'text', noSum: isNum && (/(^|_)(id|no)$|번호|_id$|^id$/i.test(k)), sqlMonth:isMonth}; });
+    return {id:k, l:k, t: isNum? 'num' : isBool? 'bool' : isMonth? 'month' : 'text', noSum: isNum && (/(^|_)(id|no)$|번호|_id$|^id$/i.test(k)), sqlMonth:isMonth}; });
   var rows=data.map(function(r){ return keys.map(function(k){ var v=r[k]; if(v!=null && typeof v==='object'){ try{ v=JSON.stringify(v); }catch(e){ v=String(v); } } return v; }); });
   var sums=null; if(rows.length>1){ sums=cols.map(function(c,ci){ if(c.t!=='num'||c.noSum) return null; var s=0,n=0; rows.forEach(function(r){ if(r[ci]!=null){ s+=Number(r[ci])||0; n++; } }); return n? s:null; }); if(!sums.some(function(v){ return v!=null; })) sums=null; }
   QB.res={cols:cols, rows:rows, total:rows.length, baseN:rows.length, joinedN:rows.length, filteredN:rows.length, sums:sums, warn:[], ms:Date.now()-t0, grouped:false, pivot:false, sql:true};
   if(QB.view!=='table' && !qbChart(QB.res)) QB.view='table';
   qbResultDraw();
+  return {ok:true, n:rows.length};
 }
 /* 표·열 목록 (클릭하면 커서 위치에 삽입) */
 export function qbSchemaHtml(){
@@ -1334,6 +1337,105 @@ export function qbAutoView(){
   var back=document.createElement('div'); back.className='pr-top'; back.innerHTML='<button type="button" class="cbtn" id="qbBack">← 데이터 조합으로</button><span class="mini">월간 자동 리포트 (고정 양식)</span>'; h2.insertBefore(back, h2.firstChild);
   $('#qbBack').onclick=function(){ RPV.tab='build'; renderReport(); };
 }
+/* ===== ㊿+184 글로 만드는 리포트 — 글 → AI(ask v3.5 · report) → 조회식(SELECT) → 이 브라우저 안(격리 칸 sqlbox)에서 계산 → 표 · 차트 → «＋ PPT 슬라이드에 추가» → PPT
+   · AI 에는 표 이름 · 열 이름 · 분류 값(25가지 이하인 열만 · 이름 · 메모 · 연락처 열 제외)만 보냄 — 고객 행 데이터는 안 보냄
+   · 실행 오류면 오류를 붙여 한 번 고쳐 받음 · «결과 고치기»는 앞 조회식을 바탕으로 · 템플릿 · 저장한 리포트 · 직접 조합(고급)은 그대로 */
+export var RPA={busy:false, last:/** @type {any} */(null), err:'', clarify:'', seq:0};
+export var RPA_EX=['서비스별 최근 12개월 월 매출 추이','업종별 LIVE 고객사 수 상위 10','3개월 안에 만료되는 계약과 월 금액','OI 진행 단계별 건수와 예상 금액','판매 채널별 올해 신규 계약 수','산업군별 월 매출(이번 달)'];
+export var RPA_NOEX=/name|cust|customer|org|serial|note|memo|phone|mail|contact|deal|alias|_key|csm|s1_no|addr|requester|owner|reason|item|product|content|title|request|sales_name/i;
+/** AI 에 보낼 표 설명 — {t, label, rows, lazy?, cols:[{k, l, t, won?, ex?}]} */
+export function rpaSchema(){
+  var S=qbSources(), out=[];
+  Object.keys(S).filter(function(k){ return k[0]!=='_'; }).forEach(function(t){
+    var s=S[t], wait=t==='inbound'? ST.RAWX.inbound===undefined : t==='cloud'? !ST.RAWX.cloud : false, rows=null;
+    try{ rows=wait? null : s.rows(); }catch(e){ rows=null; }
+    var cols=s.cols.map(function(c){ var o={k:c.k, l:c.l, t:c.t}; if(c.won) o.won=1;
+      if(c.t==='text' && rows && rows.length && !RPA_NOEX.test(c.k)){ var u={}, n=0;
+        for(var i=0;i<rows.length && n<=25;i++){ var v=qbRaw(rows[i], c); if(v==null || v==='') continue; v=String(v).slice(0,40); if(u[v]==null){ u[v]=0; n++; } u[v]++; }
+        var ks=Object.keys(u); if(ks.length && ks.length<=25) o.ex=ks.sort(function(a,b){ return u[b]-u[a]; }).slice(0,12); }
+      return o; });
+    if(t!=='mrs' && t!=='cloud') cols.push({k:'_key', l:'회사명 매칭 키(다른 표와 이을 때)', t:'text'});
+    var x={t:t, label:s.label, rows:rows? rows.length : null, cols:cols}; if(wait) x.lazy=1; out.push(x);
+  });
+  return out;
+}
+/** 조회식이 쓰는 늦게 읽는 표(인바운드 · 클라우드)를 먼저 받음 — 최대 20초 */
+export function rpaLazy(sql){
+  var S=qbSources(), need=qbSqlRefs(sql).filter(function(t){ var s=S[t]; return s && s.lazy && (t==='inbound'? ST.RAWX.inbound===undefined : t==='cloud'? !ST.RAWX.cloud : false); });
+  return Promise.all(need.map(function(t){ return new Promise(function(res){ var tm=setTimeout(res, 20000); S[t].lazy(function(){ clearTimeout(tm); res(null); }); }); })).then(function(){ if(need.length) qbSourcesReset(); });
+}
+export function rpaVerOld(v){ var m=/^v?(\d+)\.(\d+)/.exec(String(v||'')); return !!m && (+m[1]<3 || (+m[1]===3 && +m[2]<5)); }
+/** 글 → 표 · 차트 (fix = 앞 결과 고치기) */
+export async function rpaAsk(q, fix){
+  q=String(q||'').trim(); var ta=/** @type {any} */(document.getElementById('rpQ'));
+  if(!q){ RPA.err='보고 싶은 내용을 글로 적어 주세요'; rpaPaint(); if(ta) ta.focus(); return; }
+  if(RPA.busy) return;
+  if(!AICFG.enabled){ RPA.err='AI 연결이 없어 글로 만들 수 없습니다 — 아래 템플릿 · 저장한 리포트 · 고급(직접 조합)을 쓰세요'; rpaPaint(); return; }
+  if(rpaVerOld(AICFG.ver)){ RPA.err='AI 중계 함수(ask)가 '+AICFG.ver+' 입니다 — v3.5 로 올리면 글로 만들 수 있습니다(배포·운영 › Edge Function › ask)'; rpaPaint(); return; }
+  var prev=fix && RPA.last && RPA.last.sql? {question:RPA.last.question, sql:RPA.last.sql, title:RPA.last.title} : null;
+  var my=++RPA.seq, base=''; try{ base=mk(STATE.base); }catch(e){}
+  RPA.busy=true; RPA.err=''; RPA.clarify=''; rpaPaint();
+  var schema=rpaSchema(), j=null;
+  function done(err){ if(my!==RPA.seq) return; RPA.busy=false; if(err) RPA.err=err; rpaPaint(); }
+  try{ j=await aiFetch({mode:'report', question:q, schema:schema, prev:prev, baseMonth:base}, 90000); }
+  catch(e){ done('AI 응답 실패 — '+String(/** @type {any} */(e).message||e).slice(0,140)); return; }
+  if(my!==RPA.seq) return;
+  if(!j || !j.report){ done(j && j.plan? 'AI 중계 함수(ask)가 예전 버전입니다 — v3.5 로 올리면 글로 만들 수 있습니다' : ((j && j.error) || '응답 형식이 아닙니다')); return; }
+  var R=j.report;
+  if(!R.sql){ RPA.clarify=R.clarify || '무엇을 셀지 조금 더 적어 주세요(기간 · 기준 · 묶을 항목)'; done(''); return; }
+  var r=await rpaRun(q, R, fix);
+  if(!r.ok && my===RPA.seq){   /* 실행 오류 — 오류를 붙여 한 번 고쳐 받음 */
+    try{ var j2=await aiFetch({mode:'report', question:q, schema:schema, prev:{question:q, sql:R.sql, title:R.title}, error:r.error, baseMonth:base}, 90000);
+      if(my===RPA.seq && j2 && j2.report && j2.report.sql){ R=j2.report; r=await rpaRun(q, R, fix); } }catch(e){ /* 처음 오류를 보여 줌 */ }
+  }
+  if(my!==RPA.seq) return;
+  done(r.ok? '' : '계산하지 못했습니다 — '+String(r.error||'').slice(0,160)+' · 요청을 조금 바꿔 다시 써 보세요');
+}
+/** AI 조회식을 결과 칸에서 실행 — 표 · 차트(제안한 가로축 · 값) */
+export async function rpaRun(q, R, fix){
+  await rpaLazy(R.sql);
+  QB.ai=true; QB.aiQ=fix && RPA.last? RPA.last.question+' → '+q : q; QB.aiNote=String(R.note||''); QB.mode='sql'; QB.sql=R.sql; QB.title=R.title||q; QB.savedId=null; QB.page=300; QB.chartM=null; QB.chartX=null; QB.view=R.chart==='none'? 'table' : 'both'; RPV.build=false;
+  qbBuildSync(); qbPanelRefresh(); qbLibRefresh();
+  var r=await qbSqlRun();
+  if(!r || !r.ok) return r || {ok:false, error:'결과 없음'};
+  var cols=(QB.res && QB.res.cols)||[], has=function(k){ return cols.some(function(c){ return c.id===k; }); };
+  if(R.x && has(R.x)) QB.chartX=R.x;
+  var ys=(R.y||[]).filter(has); if(ys.length===1) QB.chartM=ys[0];
+  if(QB.view!=='table') qbResultDraw();
+  RPA.last={question:QB.aiQ, sql:R.sql, title:QB.title, note:QB.aiNote, n:r.n};
+  return r;
+}
+export function rpaHtml(){
+  return tpl`<label class="rp-ask-l" for="rpQ">무엇을 보고 싶으세요? <span class="mini">글로 쓰면 표 · 차트를 만듭니다 → «＋ PPT 슬라이드에 추가» → PPT 내보내기</span></label>`+
+    tpl`<div class="rp-ask-row"><textarea id="rpQ" rows="2" placeholder="예) 서비스별 최근 12개월 월 매출 추이 · 업종별 LIVE 고객사 수 상위 10" aria-describedby="rpSt"></textarea><div class="rp-ask-b" id="rpBtns"></div></div>`+
+    tpl`<div class="rp-ex" role="group" aria-label="예시 요청"><span class="mini">예시</span>${rawHtml(RPA_EX.map(function(x, i){ return tpl`<button type="button" class="chip" data-rpex="${String(i)}">${x}</button>`; }).join(''))}</div>`+
+    tpl`<div class="rp-st" id="rpSt" role="status" aria-live="polite"></div>`;
+}
+export function rpaPaint(){
+  var b=document.getElementById('rpBtns'), st=document.getElementById('rpSt'), ta=/** @type {any} */(document.getElementById('rpQ')); if(!b || !st) return;
+  var has=!!(RPA.last && RPA.last.sql && QB.ai);
+  b.innerHTML=has? tpl`<button type="button" class="pill pri" id="rpFix"${rawHtml(RPA.busy?' disabled':'')} title="바로 앞 결과를 바탕으로 — 예) 상위 10개만 · 금액 큰 순 · 올해만">결과 고치기</button><button type="button" class="pill ghost" id="rpNew"${rawHtml(RPA.busy?' disabled':'')}>새로 만들기</button>`
+    : tpl`<button type="button" class="pill pri" id="rpGo"${rawHtml(RPA.busy?' disabled':'')}>표 · 차트 만들기</button>`;
+  if(ta) ta.placeholder=has? '고칠 내용 — 예) 상위 10개만 · 금액 큰 순 · 올해만 · 막대 차트로' : '예) 서비스별 최근 12개월 월 매출 추이 · 업종별 LIVE 고객사 수 상위 10';
+  st.className='rp-st'+(RPA.err? ' bad' : RPA.clarify? ' ask' : '');
+  st.innerHTML=RPA.busy? tpl`<span class="spin" aria-hidden="true"></span> 만드는 중… AI 가 조회식을 쓰고, 계산은 이 브라우저 안에서 합니다`
+    : RPA.err? tpl`⚠ ${RPA.err}`
+    : RPA.clarify? tpl`<b>확인이 필요합니다</b> — ${RPA.clarify}`
+    : has? tpl`✓ <b>${RPA.last.title}</b> ${String(RPA.last.n||0)}행 — 아래 결과에서 «＋ PPT 슬라이드에 추가» · 고칠 점은 위에 적고 «결과 고치기»` : '';
+  var go=function(fix){ var v=ta? ta.value : ''; rpaAsk(v, fix).then(function(){ var t2=/** @type {any} */(document.getElementById('rpQ')); if(t2 && !RPA.err && !RPA.clarify) t2.value=''; }); };
+  var g=document.getElementById('rpGo'); if(g) g.onclick=function(){ go(false); };
+  var f=document.getElementById('rpFix'); if(f) f.onclick=function(){ go(true); };
+  var n=document.getElementById('rpNew'); if(n) n.onclick=function(){ go(false); };
+}
+/** ㊿+184 템플릿 · 저장한 리포트를 고르면 결과 칸으로(목록이 결과 아래에 있어서) */
+export function rpResScroll(){ setTimeout(function(){ var rc=document.querySelector('#rpBody .qb-res-card'); if(!rc) return; var t=rc.getBoundingClientRect().top; if(t<0 || t>window.innerHeight*0.6) try{ rc.scrollIntoView({behavior:'smooth', block:'start'}); }catch(e){} }, 60); }
+export function rpaBind(){
+  var host=document.getElementById('rpAsk'); if(!host) return;
+  var ta=/** @type {any} */(document.getElementById('rpQ'));
+  if(ta) ta.onkeydown=function(e){ if(e.key==='Enter' && !e.shiftKey && !e.isComposing && e.keyCode!==229){ e.preventDefault(); var has=!!(RPA.last && RPA.last.sql && QB.ai); var v=ta.value; rpaAsk(v, has).then(function(){ if(!RPA.err && !RPA.clarify) ta.value=''; }); } };
+  host.querySelectorAll('[data-rpex]').forEach(function(c){ /** @type {any} */(c).onclick=function(){ var v=RPA_EX[+/** @type {any} */(c).dataset.rpex]; if(ta) ta.value=v; rpaAsk(v, false).then(function(){ if(ta && !RPA.err && !RPA.clarify) ta.value=''; }); }; });
+  rpaPaint();
+}
 export function renderReport(){
   var host=$('#rpBody'); if(!host) return;
   if(!ST.DATA||!ST.DATA.rows){ host.innerHTML='<div class="cap" style="padding:40px;text-align:center">데이터를 불러오는 중…</div>'; return; }
@@ -1341,13 +1443,15 @@ export function renderReport(){
   if(!QB.spec) QB.spec=qbNewSpec('contracts');
   rqLoad().then(function(){ if(ST.CUR_VIEW==='report' && RPV.tab!=='auto') qbLibRefresh(); }).catch(function(){});   /* ㊿+179 내 리포트 · 팀 공유(DB) — 1분에 한 번 */
   if(host.querySelector('#qbPanel')){ qbPanelRefresh(); qbRunNow(); qbLibRefresh(); qbDeckRefresh(); qbBuildSync(); return; }
-  host.innerHTML=tpl`<div class="pr-top"><span style="font-size:18px;font-weight:600;letter-spacing:-.01em">리포트</span><span class="mini">템플릿을 고르면 바로 결과가 나옵니다</span><span class="mini">포탈 안의 표를 골라 연결(JOIN)·조건·묶기·피벗으로 조합하고 표·차트로 봅니다 — 저장해 두고 엑셀·PPT 로 내보내기</span>`+
+  host.innerHTML=tpl`<div class="pr-top"><span style="font-size:18px;font-weight:600;letter-spacing:-.01em">리포트</span>`+
     tpl`<button type="button" class="cbtn" id="qbAuto" style="margin-left:auto" title="예전 월간 자동 리포트(고정 양식)">월간 자동 리포트 →</button></div>`+
-    tpl`<div id="qbLib"></div>`+
-    tpl`<div class="qb-pick" id="qbPickHint" role="note">위에서 리포트 템플릿을 고르면 <b>조건과 결과</b>가 여기에 나옵니다 — 직접 만들려면 «조합 바꾸기»</div>`+
+    tpl`<section class="pr-card rp-ask" id="rpAsk">${rawHtml(rpaHtml())}</section>`+   /* ㊿+184 글로 만들기가 맨 위 */
+    tpl`<div class="qb-pick" id="qbPickHint" role="note">위에 글로 쓰거나 아래 템플릿 · 저장한 리포트를 고르면 <b>표 · 차트</b>가 여기에 나옵니다</div>`+
     tpl`<div class="qb-wrap"><aside class="pr-card qb-panel-card"><div id="qbPanel"></div></aside><section class="pr-card qb-res-card"><div id="qbRes"></div></section></div>`+
-    tpl`<div class="pr-card" id="qbDeck2" style="margin-top:14px"></div>`;
+    tpl`<div class="pr-card" id="qbDeck2" style="margin-top:14px"></div>`+
+    tpl`<h3 class="rp-lib-h">템플릿 · 저장한 리포트</h3><div id="qbLib"></div>`;   /* ㊿+184 순서: 글로 만들기 → 결과 → 슬라이드 → 템플릿 · 저장한 리포트 */
   $('#qbAuto').onclick=function(){ RPV.tab='auto'; renderReport(); };
+  rpaBind();
   qbPanelRefresh(); qbBindPanel(); qbLibRefresh(); qbDeckRefresh(); qbRunNow(); qbBuildSync();
 }
 

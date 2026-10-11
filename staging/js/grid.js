@@ -11,7 +11,7 @@ import { AK, BZX, CH_DEFS, ctOrig, ctRawOf, ctSuccessor, DC, ensureLeadSrc, live
 import { applyDense, openCust360, PR, pushRecent, renderTodo } from './tools.js';
 import { CL, renderCloud } from './cloud.js';
 import { inbLast, loadInbound, renderInbPanel, renderInbStat, renderWeekly } from './inbound.js';
-import { CHURN, CR, CS, csSetTab, ensureGroupOpen, helpBox, helpWire, initOiForm, loadRecvPresets, oiLinkQuote, oiToContract, quoteOpen, QUOTES, quotesLoad, renderChurn,
+import { CHURN, CR, CS, csSetTab, ensureGroupOpen, helpBox, helpWire, initOiForm, loadRecvPresets, oiLinkQuote, oiToContract, QMGR_MAP, qoiCand, qoiOpen, quoteOpen, QUOTES, quotesLoad, renderChurn,
   renderChurnRate, renderCsite, renderCustFlow, renderOiTiles, wzReset } from './sales.js';
 import { closeOvl, logChange, monthRows, msg, openOvl } from './edit.js';
 import { lazyGet, lazyView } from './lazy.js';
@@ -487,7 +487,7 @@ export var WORKV={
     ['정산','계산서·과금 — 발행처 · 과금방식 · 설치비 · 정산일 · 에스원 계약번호', ['_custName','status','line','channel','biller','billing','mrr','install_fee','settle_month','s1_no']],
     ['전체','모든 열 — 예전 열 설정 그대로', null]]},
   oi:{def:'진행', views:[
-    ['진행','진행 관리 — 단계 · 가능성 · 담당 · 계약 예상 · 다음 할 일', ['customer','stage','deal_name','win_prob','owner','expect_month','expect_amount','next_action','next_date']],
+    ['진행','진행 관리 — 단계 · 가능성 · 견적 담당 · 계약 예상 · 다음 할 일', ['customer','stage','deal_name','win_prob','_qown','expect_month','expect_amount','next_action','next_date']],   /* ㊿+184 담당 = 붙은 견적서의 작성자(OI 시트 담당 칸은 «전체»에) */
     ['전체','모든 열 — 예전 열 설정 그대로', null]]}
 };
 export function wvKey(){ return 'svc_wv_'+(ST.AUTH_USER||'anon'); }
@@ -550,7 +550,7 @@ export function stBadge(txt){
    · 기준(일수 · 내 이름)은 «기준» 버튼에서 바꾸고 내 브라우저에 저장(svc_qv_계정) · 홈 «오늘 처리할 일»도 같은 기준·같은 목록 */
 export function qvKey(){ return 'svc_qv_'+(ST.AUTH_USER||'anon'); }
 export function qvCfg(){ var d={me:'', oiIdle:30, inbFirst:3, inbIdle:90}; try{ var s=JSON.parse(localStorage.getItem(qvKey())||'{}')||{}; Object.keys(d).forEach(function(k){ if(s[k]!=null && s[k]!=='') d[k]=s[k]; }); }catch(e){} d.oiIdle=+d.oiIdle||30; d.inbFirst=+d.inbFirst||3; d.inbIdle=+d.inbIdle||90; return d; }
-/** ㊿+172 내 담당 이름 — 계정별 연결(관리자 지정 · SQL 103 user_owner_map)이 있으면 그것, 없으면 이 브라우저에서 고른 이름(임시) · 둘 다 없으면 [] («담당자 연결 필요» — 0 으로 보이지 않게) */
+/** ㊿+172 계정 ↔ 담당 이름(SQL 103 user_owner_map · 예전에 고른 이름) — ㊿+184 부터 홈 · 빠른 보기는 안 씀(OI 담당 = 견적 작성자) · 재약정 알림의 계약 CSM 확인에만 */
 export function myOwner(){ var a=ST.OWNER_NAMES; if(a && a.length) return {names:a.slice(), src:'account'}; var me=qvCfg().me; return me? {names:[me], src:'browser'} : {names:[], src:''}; }
 export function meMatch(owner){ var n=myOwner().names, o=String(owner||''); return n.some(function(x){ return !!x && o.indexOf(x)>=0; }); }
 export function qvSave(c){ try{ localStorage.setItem(qvKey(), JSON.stringify(c)); }catch(e){} }
@@ -558,17 +558,55 @@ export function qvSave(c){ try{ localStorage.setItem(qvKey(), JSON.stringify(c))
 export function oiOpen(r){ return !/수주|계산서|종료|중지|실패/.test(String(r && r.stage || '')); }
 export function daysSince(d){ if(!d) return null; var t=new Date(String(d).slice(0,10)).getTime(); return isNaN(t)? null : Math.floor((Date.now()-t)/864e5); }
 export function inbIdleHit(r, C){ C=C||qvCfg(); if(String(r.y||'')!==String(new Date().getFullYear()) || r.result!=='진행중') return false; var d=daysSince(inbLast(r)); return d!=null && d>=C.inbIdle; }
+/* ===== ㊿+184 OI 담당 = 그 OI 에 붙은 견적서의 작성자(견적 «담당자» 칸의 이메일 → 없으면 저장한 계정)
+   · OI 시트 «담당» 칸은 안 씀 · 견적이 없으면 «견적 전» · 견적 목록(SQL 109)은 필요할 때 한 번 불러옴 · 인바운드는 회사 일(취합 · 알림 · 통계)이라 «내 담당» 없음 */
+export var OIQ={src:/** @type {any} */(null), by:/** @type {Object<string,any>} */({}), no:/** @type {Object<string,any>} */({}), wait:/** @type {?Object<string,function>} */(null)};
+/** 로그인 계정의 앞부분(choihw@… → choihw) — 견적 작성자와 맞춰 봄 */
+export function meLoc(){ return String(ST.AUTH_USER||'').toLowerCase().split('@')[0]; }
+/** 견적 작성자 {loc, name} — 견적 «담당자» 칸(이메일 / 연락처) → 없으면 저장한 계정 */
+export function quoteWho(q){
+  var s=String(q && q.manager || ''), m=/[\w.+-]+@[\w-]+(?:\.[\w-]+)*/.exec(s), em=String(m? m[0] : (q && q.created_by) || '').toLowerCase(), loc=em.indexOf('@')>0? em.split('@')[0] : '';
+  return {loc:loc, name:loc? (QMGR_MAP[loc] || loc) : ''};
+}
+export function meName(){ var l=meLoc(); return QMGR_MAP[l] || l; }
+function oiqT(q){ return String(q.updated_at||q.quote_date||q.created_at||''); }
+/** OI 에 붙은 견적(가장 최근 · 발주서 제외) — 견적의 OI 번호 → 없으면 OI 의 «q:견적번호» */
+export function oiQuote(r){
+  if(!r) return null;
+  var qs=ST.RAWX.quotes;
+  if(OIQ.src!==qs){ OIQ.src=qs; OIQ.by={}; OIQ.no={};
+    (qs||[]).forEach(function(q){ if(q.doc_type && q.doc_type!=='quote') return; if(q.quote_no) OIQ.no[q.quote_no]=q; if(q.oi_id==null) return; var k=String(q.oi_id), o=OIQ.by[k]; if(!o || oiqT(q)>oiqT(o)) OIQ.by[k]=q; }); }
+  var hit=r.id!=null? OIQ.by[String(r.id)] : null; if(hit) return hit;
+  var f=String(r.quote_file||''); return /^q:/.test(f)? (OIQ.no[f.slice(2)]||null) : null;
+}
+/** OI 담당 {loc, name, src} — src 'quote' 견적 작성자 · 'file' 예전 파일 견적(작성자 기록이 없어 OI 등록 때 견적에서 옮긴 이름) · '' 견적 전 */
+export function oiOwnerOf(r){
+  var q=oiQuote(r); if(q){ var w=quoteWho(q); return {loc:w.loc, name:w.name||'작성자 모름', src:'quote'}; }
+  if(r && r.quote_file){ var o=String(r.owner||''), k=Object.keys(QMGR_MAP).filter(function(x){ var n=String(QMGR_MAP[x]).split(' ')[0]; return !!n && o.indexOf(n)>=0; })[0];
+    return {loc:k||'', name:k? QMGR_MAP[k] : '작성자 모름', src:'file'}; }
+  return {loc:'', name:'견적 전', src:''};
+}
+export function oiMine(r){ var me=meLoc(); return !!me && oiOwnerOf(r).loc===me; }
+export function oiNoQuote(r){ return oiOwnerOf(r).src===''; }
+/** 견적 목록이 있어야 «내 OI»를 셈 — 없으면 한 번 불러오고(같은 요청 한 번) 다 되면 cb(key 마다 하나) · 불러오는 중이면 false */
+export function oiQuotesReady(key, cb){
+  if(ST.RAWX.quotes) return true;
+  if(!OIQ.wait){ var w=OIQ.wait={}; quotesLoad().catch(function(){}).then(function(){ OIQ.wait=null; Object.keys(w).forEach(function(k){ try{ w[k](); }catch(e){ console.warn('oi quotes', e); } }); }); }
+  if(key && cb) OIQ.wait[key]=cb;
+  return false;
+}
 export function qvDefs(v){
   var C=qvCfg(), today=todayStr();
-  var MO=myOwner(), me=['me','내 담당', MO.names.length? '담당 «'+MO.names.join(' / ')+'»'+(MO.src==='account'? ' — 계정 연결' : ' — 이 브라우저에서 고른 이름') : '담당자 연결 필요 — 관리자가 계정에 담당자 이름을 연결하거나 «기준»에서 임시로 고르기', function(r){ return meMatch(r.owner); }];
+  var me=['me','내 OI','진행 중인 OI 중 내가 작성한 견적서가 붙은 것(견적 «담당자» 기준 · OI 시트 담당 칸은 안 씀)', function(r){ return oiOpen(r) && oiMine(r); }];
   if(v==='oi') return [me,
     ['today','오늘 할 일','다음 할 일 예정일이 오늘(진행 중)', function(r){ return oiOpen(r) && String(r.next_date||'').slice(0,10)===today; }],
     ['late','기한 초과','예정일이 지났는데 진행 중', function(r){ return oiOpen(r) && !!r.next_date && String(r.next_date).slice(0,10)<today; }],
     ['nonext','다음 행동 없음','진행 중인데 다음 할 일 또는 예정일이 비어 있음', function(r){ return oiOpen(r) && (!r.next_action || !r.next_date); }],
-    ['idle','장기 미접촉', C.oiIdle+'일 넘게 수정 없음(진행 중)', function(r){ var d=daysSince(r.updated_at||r.created_at); return oiOpen(r) && d!=null && d>=C.oiIdle; }]];
-  if(v==='inbound') return [me,
+    ['idle','장기 미접촉', C.oiIdle+'일 넘게 수정 없음(진행 중)', function(r){ var d=daysSince(r.updated_at||r.created_at); return oiOpen(r) && d!=null && d>=C.oiIdle; }],
+    ['noq','견적 전','진행 중인데 견적서가 아직 안 붙은 OI — 담당(견적 작성자)이 정해지지 않음', function(r){ return oiOpen(r) && oiNoQuote(r); }]];
+  if(v==='inbound') return [
     ['first','첫 대응 지연','접수 '+C.inbFirst+'일이 지났는데 1차 대응 기록 없음(진행중)', function(r){ var d=daysSince(r.on_date); return r.result==='진행중' && !r.s1d && d!=null && d>=C.inbFirst; }],
-    ['idle','장기 미접촉','올해 진행중인데 마지막 대응이 '+C.inbIdle+'일 이상 — 홈 «인바운드 미대응»과 같은 기준', function(r){ return inbIdleHit(r, C); }],
+    ['idle','장기 미접촉','올해 진행중인데 마지막 대응이 '+C.inbIdle+'일 이상', function(r){ return inbIdleHit(r, C); }],
     ['open','진행중 전체','결과가 «진행중»', function(r){ return r.result==='진행중'; }]];
   return null;
 }
@@ -582,32 +620,33 @@ export function qvBar(g, rows){
   if(!qb){ qb=document.createElement('div'); qb.id='dvQvBar'; qb.className='qv-bar'; var bar=$('#dvSearch').parentElement; bar.parentElement.insertBefore(qb, bar); }
   if(!defs || g.custom){ qb.hidden=true; qb.innerHTML=''; return; }
   qb.hidden=false; var all=g.rows();
-  var meOk=myOwner().names.length>0;   /* ㊿+171 이름을 고르기 전 «내 담당»은 0 이 아니라 «연결 필요»(누르면 기준 창) · ㊿+172 계정 연결 우선 */
-  qb.innerHTML=tpl`<span class="wv-l">빠른 보기</span>${rawHtml(defs.map(function(d){ var n=all.filter(d[3]).length, on=!!(DV.pre && DV.pre.qv===d[0]), nc=d[0]==='me' && !meOk;
-      return tpl`<button type="button" class="chip${n || nc? '':' zero'}${nc? ' need':''}" data-qv="${d[0]}" aria-pressed="${on?'true':'false'}" title="${nc? '담당자 연결 필요 — 눌러서 내 이름(담당자 칸 값) 고르기' : d[2]}">${d[1]} <b class="num">${nc? '연결 필요' : String(n)}</b></button>`; }).join(''))}`+
-    tpl`<button type="button" class="cbtn" id="qvCfgBtn" aria-haspopup="dialog" title="빠른 보기 기준 — 내 이름 · 장기 미접촉 일수 · 첫 대응 일수">${rawHtml(ico('gear',14))} 기준</button>`;
+  var qOk=ST.CUR_VIEW!=='oi' || oiQuotesReady('qv', function(){ if(ST.CUR_VIEW==='oi') renderGrid(); });   /* ㊿+184 «내 OI» · «견적 전»은 견적 목록을 받은 뒤 셈(그 전엔 «…») */
+  qb.innerHTML=tpl`<span class="wv-l">빠른 보기</span>${rawHtml(defs.map(function(d){ var wq=!qOk && (d[0]==='me' || d[0]==='noq'), n=wq? 0 : all.filter(d[3]).length, on=!!(DV.pre && DV.pre.qv===d[0]);
+      return tpl`<button type="button" class="chip${n || wq? '':' zero'}" data-qv="${d[0]}" aria-pressed="${on?'true':'false'}" title="${d[2]}">${d[1]} <b class="num">${wq? '…' : String(n)}</b></button>`; }).join(''))}`+
+    tpl`<button type="button" class="cbtn" id="qvCfgBtn" aria-haspopup="dialog" title="빠른 보기 기준 — 장기 미접촉 일수 · 첫 대응 일수">${rawHtml(ico('gear',14))} 기준</button>`;
+  var nq=(ST.CUR_VIEW==='oi' && qOk && canWrite('oi'))? (ST.RAWX.quotes||[]).filter(qoiCand).length : 0;   /* ㊿+184 견적만 있고 OI 없음 → 미리 보기 후 OI 등록(10%) · 연결 */
+  if(nq) qb.insertAdjacentHTML('beforeend', tpl`<button type="button" class="cbtn qoi-btn" id="qoiBtn" aria-haspopup="dialog" title="견적서는 있는데 OI 가 없는 견적 — 미리 보고 OI 에 넣기(진행 중 OI 가 있으면 연결 · 없으면 가능성 10%로 등록)">견적만 있음 <b class="num">${String(nq)}</b>건 → OI</button>`);
+  var qbtn=document.getElementById('qoiBtn'); if(qbtn) qbtn.onclick=function(){ qoiOpen(); };
   qb.querySelectorAll('[data-qv]').forEach(function(b){ b.onclick=function(){ var k=b.dataset.qv;
-    if(k==='me' && !meOk){ qvCfgOpen(/** @type {any} */(document.getElementById('qvCfgBtn'))); return; }
     if(DV.pre && DV.pre.qv===k){ DV.pre=null; DV.page=0; renderGrid(); } else qvGo(ST.CUR_VIEW, k); }; });
   /** @type {any} */(document.getElementById('qvCfgBtn')).onclick=function(){ qvCfgOpen(this); };
 }
 export function qvCfgOpen(btn){
   var old=document.getElementById('qvCfg'); if(old){ old.remove(); return; }
-  var C=qvCfg(), owners={}; (ST.RAWX.oi||[]).concat(ST.RAWX.inbound||[]).forEach(function(r){ String(r.owner||'').split(/[,/]/).forEach(function(o){ o=o.trim(); if(o) owners[o]=1; }); });
+  var C=qvCfg();
   var m=document.createElement('div'); m.id='qvCfg'; m.className='rmenu qv-cfg'; m.setAttribute('role','dialog'); m.setAttribute('aria-label','빠른 보기 기준');
-  m.innerHTML=tpl`<b>빠른 보기 기준</b><label>내 이름(담당자 칸 값)<select id="qvMe"><option value="">— 고르기 —</option>${rawHtml(Object.keys(owners).sort(function(a,b){ return a.localeCompare(b,'ko'); }).map(function(o){ return tpl`<option${rawHtml(o===C.me?' selected':'')}>${o}</option>`; }).join(''))}</select></label>`+
+  m.innerHTML=tpl`<b>빠른 보기 기준</b><p class="mini qv-who">내 OI = 내가 작성한 견적서가 붙은 OI(따로 고를 것 없음)</p>`+
     tpl`<label>OI 장기 미접촉 (일)<input id="qvOi" type="number" min="1" max="365" value="${String(C.oiIdle)}"></label><label>인바운드 첫 대응 지연 (일)<input id="qvIf" type="number" min="1" max="60" value="${String(C.inbFirst)}"></label>`+
     tpl`<label>인바운드 장기 미접촉 (일)<input id="qvIi" type="number" min="7" max="365" value="${String(C.inbIdle)}"></label><div class="pa"><button type="button" class="pill ghost" id="qvX">취소</button><button type="button" class="pill pri" id="qvOk">저장</button></div>`;
   document.body.appendChild(m);
-  var MO2=myOwner(); if(MO2.src==='account'){ var sl=m.querySelector('#qvMe'); if(sl){ var lb=sl.closest('label'), dv=document.createElement('div'); dv.className='qv-acc'; dv.innerHTML=tpl`내 이름 <b>${MO2.names.join(' / ')}</b> <span class="mini">계정 연결 — 관리자 지정</span><input type="hidden" id="qvMe" value="${C.me||''}">`; if(lb) lb.replaceWith(dv); } }   /* ㊿+172 계정 연결이 있으면 브라우저 선택 대신 */
   var r=btn.getBoundingClientRect(); m.style.top=(r.bottom+6)+'px'; m.style.left=Math.max(8, Math.min(r.left, window.innerWidth-m.offsetWidth-8))+'px';
   var close=function(){ m.remove(); document.removeEventListener('keydown', key, true); btn.focus(); };
   var key=function(e){ if(e.key==='Escape'){ e.preventDefault(); e.stopPropagation(); close(); } };
   document.addEventListener('keydown', key, true);
   /** @type {any} */(m.querySelector('#qvX')).onclick=close;
   /** @type {any} */(m.querySelector('#qvOk')).onclick=function(){ var v=function(id){ return /** @type {any} */(document.getElementById(id)).value; };
-    qvSave({me:v('qvMe'), oiIdle:+v('qvOi')||30, inbFirst:+v('qvIf')||3, inbIdle:+v('qvIi')||90}); close(); DV.pre=null; renderGrid(); toast('빠른 보기 기준 저장', '이 브라우저에만 적용 · 홈 «우선 업무»도 같은 기준', 'info'); };
-  setTimeout(function(){ var f=/** @type {any} */(m.querySelector('select')); if(f) f.focus(); }, 0);
+    qvSave({me:C.me, oiIdle:+v('qvOi')||30, inbFirst:+v('qvIf')||3, inbIdle:+v('qvIi')||90}); close(); DV.pre=null; renderGrid(); toast('빠른 보기 기준 저장', '이 브라우저에만 적용 · 홈 «우선 업무»도 같은 기준', 'info'); };
+  setTimeout(function(){ var f=/** @type {any} */(m.querySelector('input')); if(f) f.focus(); }, 0);
 }
 
 

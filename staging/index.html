@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <!-- CSP (80점 프로젝트 ② 보안): GitHub Pages 는 응답 헤더를 못 넣으므로 meta 로. ㊿+136 부터 인라인 스크립트·onclick 이 없어 script-src 에 'unsafe-inline' 없음(스타일은 인라인 style 속성 때문에 유지) · ㊿+147 부터 'unsafe-eval' 도 없음(SQL 엔진 alasql 은 격리 칸 sqlbox.html 에서만 돌림) — 스크립트·연결 호스트를 목록으로 제한(XSS 시 외부 유출 차단). Worker 주소나 GAS 주소가 바뀌면 여기도 수정. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-AE3JUwuhqX9oUWVSfCUAhgK6JHMeb4vJb0PQ/HU6E0g=' blob: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' data: https://cdn.jsdelivr.net; img-src 'self' data: blob: https://amzbrdhkvzsyxjfjtugu.supabase.co; connect-src 'self' https://amzbrdhkvzsyxjfjtugu.supabase.co https://open.er-api.com https://api.frankfurter.app https://script.google.com/macros/s/AKfycbz0PDzgvgtM0ZZHEfMwEzPpgoPYidD6ElPx3oTGsgnVuveCnVA9PmYPB4WAPfr9a6DY/ https://script.googleusercontent.com https://aged-union-cdd3.choihw.workers.dev https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; worker-src 'self' blob:; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-YJ9RBPfzdiSHiYP07n0I3cHTO6ip0878wjNfvhZ2zTU=' blob: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' data: https://cdn.jsdelivr.net; img-src 'self' data: blob: https://amzbrdhkvzsyxjfjtugu.supabase.co; connect-src 'self' https://amzbrdhkvzsyxjfjtugu.supabase.co https://open.er-api.com https://api.frankfurter.app https://script.google.com/macros/s/AKfycbz0PDzgvgtM0ZZHEfMwEzPpgoPYidD6ElPx3oTGsgnVuveCnVA9PmYPB4WAPfr9a6DY/ https://script.googleusercontent.com https://aged-union-cdd3.choihw.workers.dev https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; worker-src 'self' blob:; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
 <title>서비스사업부 통합 관리 포탈</title>
 <!-- PWA: 홈 화면 앱 (manifest.webmanifest · sw.js · pwa-*.png · apple-touch-icon.png 를 같은 폴더에) -->
 <link rel="manifest" href="manifest.webmanifest">
@@ -20,35 +20,35 @@
      코드 파일 목록은 app-js (ES 모듈 · ㊿+153) — 파일을 더하거나 빼면 여기와 sw.js 의 SHELL 을 함께 고치고 node tests/stamp.mjs 로 아래 stamp 묶음을 다시 만들 것.
      시작점은 js/main.js 하나(나머지는 import 로 따라옴) · 리포트·관리자·가격표는 처음 열 때(js/lazy.js).
      ④ 아키텍처 2단계(㊿+136): 인라인 스크립트·onclick 을 전부 없애 CSP script-src 에서 'unsafe-inline' 제거 · 인라인은 importmap 하나뿐이고 CSP 해시로 허용. -->
-<meta name="app-ver" content="2026-09-16 ㊿+183">
+<meta name="app-ver" content="2026-09-16 ㊿+184">
 <meta name="app-js" content="js/state.js,js/viz.js,js/core.js,js/shell.js,js/dash.js,js/ai.js,js/home.js,js/notify.js,js/guard.js,js/grids.js,js/equipment.js,js/analysis.js,js/tools.js,js/cloud.js,js/price.js,js/inbound.js,js/upd.js,js/admin.js,js/sales.js,js/report.js,js/grid.js,js/edit.js,js/qadb.js,js/qadata.js,js/lazy.js,js/init.js,js/main.js">
 <!-- stamp:begin — tests/stamp.mjs 가 app-ver · app-js 로 만든 부분(손으로 고치지 말 것 · 버전을 올린 뒤 다시 실행 · tests/check.mjs 가 확인) -->
-<link rel="stylesheet" href="app.css?v=2026-09-16%20%E3%8A%BF%2B183">
-<script type="importmap">{"imports":{"./js/state.js":"./js/state.js?v=2026-09-16%20%E3%8A%BF%2B183","./js/viz.js":"./js/viz.js?v=2026-09-16%20%E3%8A%BF%2B183","./js/core.js":"./js/core.js?v=2026-09-16%20%E3%8A%BF%2B183","./js/shell.js":"./js/shell.js?v=2026-09-16%20%E3%8A%BF%2B183","./js/dash.js":"./js/dash.js?v=2026-09-16%20%E3%8A%BF%2B183","./js/ai.js":"./js/ai.js?v=2026-09-16%20%E3%8A%BF%2B183","./js/home.js":"./js/home.js?v=2026-09-16%20%E3%8A%BF%2B183","./js/notify.js":"./js/notify.js?v=2026-09-16%20%E3%8A%BF%2B183","./js/guard.js":"./js/guard.js?v=2026-09-16%20%E3%8A%BF%2B183","./js/grids.js":"./js/grids.js?v=2026-09-16%20%E3%8A%BF%2B183","./js/equipment.js":"./js/equipment.js?v=2026-09-16%20%E3%8A%BF%2B183","./js/analysis.js":"./js/analysis.js?v=2026-09-16%20%E3%8A%BF%2B183","./js/tools.js":"./js/tools.js?v=2026-09-16%20%E3%8A%BF%2B183","./js/cloud.js":"./js/cloud.js?v=2026-09-16%20%E3%8A%BF%2B183","./js/price.js":"./js/price.js?v=2026-09-16%20%E3%8A%BF%2B183","./js/inbound.js":"./js/inbound.js?v=2026-09-16%20%E3%8A%BF%2B183","./js/upd.js":"./js/upd.js?v=2026-09-16%20%E3%8A%BF%2B183","./js/admin.js":"./js/admin.js?v=2026-09-16%20%E3%8A%BF%2B183","./js/sales.js":"./js/sales.js?v=2026-09-16%20%E3%8A%BF%2B183","./js/report.js":"./js/report.js?v=2026-09-16%20%E3%8A%BF%2B183","./js/grid.js":"./js/grid.js?v=2026-09-16%20%E3%8A%BF%2B183","./js/edit.js":"./js/edit.js?v=2026-09-16%20%E3%8A%BF%2B183","./js/qadb.js":"./js/qadb.js?v=2026-09-16%20%E3%8A%BF%2B183","./js/qadata.js":"./js/qadata.js?v=2026-09-16%20%E3%8A%BF%2B183","./js/lazy.js":"./js/lazy.js?v=2026-09-16%20%E3%8A%BF%2B183","./js/init.js":"./js/init.js?v=2026-09-16%20%E3%8A%BF%2B183"}}</script>
-<link rel="modulepreload" href="js/state.js?v=2026-09-16%20%E3%8A%BF%2B183">
-<link rel="modulepreload" href="js/viz.js?v=2026-09-16%20%E3%8A%BF%2B183">
-<link rel="modulepreload" href="js/core.js?v=2026-09-16%20%E3%8A%BF%2B183">
-<link rel="modulepreload" href="js/shell.js?v=2026-09-16%20%E3%8A%BF%2B183">
-<link rel="modulepreload" href="js/dash.js?v=2026-09-16%20%E3%8A%BF%2B183">
-<link rel="modulepreload" href="js/ai.js?v=2026-09-16%20%E3%8A%BF%2B183">
-<link rel="modulepreload" href="js/home.js?v=2026-09-16%20%E3%8A%BF%2B183">
-<link rel="modulepreload" href="js/notify.js?v=2026-09-16%20%E3%8A%BF%2B183">
-<link rel="modulepreload" href="js/guard.js?v=2026-09-16%20%E3%8A%BF%2B183">
-<link rel="modulepreload" href="js/grids.js?v=2026-09-16%20%E3%8A%BF%2B183">
-<link rel="modulepreload" href="js/equipment.js?v=2026-09-16%20%E3%8A%BF%2B183">
-<link rel="modulepreload" href="js/analysis.js?v=2026-09-16%20%E3%8A%BF%2B183">
-<link rel="modulepreload" href="js/tools.js?v=2026-09-16%20%E3%8A%BF%2B183">
-<link rel="modulepreload" href="js/cloud.js?v=2026-09-16%20%E3%8A%BF%2B183">
-<link rel="modulepreload" href="js/inbound.js?v=2026-09-16%20%E3%8A%BF%2B183">
-<link rel="modulepreload" href="js/upd.js?v=2026-09-16%20%E3%8A%BF%2B183">
-<link rel="modulepreload" href="js/sales.js?v=2026-09-16%20%E3%8A%BF%2B183">
-<link rel="modulepreload" href="js/grid.js?v=2026-09-16%20%E3%8A%BF%2B183">
-<link rel="modulepreload" href="js/edit.js?v=2026-09-16%20%E3%8A%BF%2B183">
-<link rel="modulepreload" href="js/qadb.js?v=2026-09-16%20%E3%8A%BF%2B183">
-<link rel="modulepreload" href="js/qadata.js?v=2026-09-16%20%E3%8A%BF%2B183">
-<link rel="modulepreload" href="js/lazy.js?v=2026-09-16%20%E3%8A%BF%2B183">
-<link rel="modulepreload" href="js/init.js?v=2026-09-16%20%E3%8A%BF%2B183">
-<script type="module" src="js/main.js?v=2026-09-16%20%E3%8A%BF%2B183"></script>
+<link rel="stylesheet" href="app.css?v=2026-09-16%20%E3%8A%BF%2B184">
+<script type="importmap">{"imports":{"./js/state.js":"./js/state.js?v=2026-09-16%20%E3%8A%BF%2B184","./js/viz.js":"./js/viz.js?v=2026-09-16%20%E3%8A%BF%2B184","./js/core.js":"./js/core.js?v=2026-09-16%20%E3%8A%BF%2B184","./js/shell.js":"./js/shell.js?v=2026-09-16%20%E3%8A%BF%2B184","./js/dash.js":"./js/dash.js?v=2026-09-16%20%E3%8A%BF%2B184","./js/ai.js":"./js/ai.js?v=2026-09-16%20%E3%8A%BF%2B184","./js/home.js":"./js/home.js?v=2026-09-16%20%E3%8A%BF%2B184","./js/notify.js":"./js/notify.js?v=2026-09-16%20%E3%8A%BF%2B184","./js/guard.js":"./js/guard.js?v=2026-09-16%20%E3%8A%BF%2B184","./js/grids.js":"./js/grids.js?v=2026-09-16%20%E3%8A%BF%2B184","./js/equipment.js":"./js/equipment.js?v=2026-09-16%20%E3%8A%BF%2B184","./js/analysis.js":"./js/analysis.js?v=2026-09-16%20%E3%8A%BF%2B184","./js/tools.js":"./js/tools.js?v=2026-09-16%20%E3%8A%BF%2B184","./js/cloud.js":"./js/cloud.js?v=2026-09-16%20%E3%8A%BF%2B184","./js/price.js":"./js/price.js?v=2026-09-16%20%E3%8A%BF%2B184","./js/inbound.js":"./js/inbound.js?v=2026-09-16%20%E3%8A%BF%2B184","./js/upd.js":"./js/upd.js?v=2026-09-16%20%E3%8A%BF%2B184","./js/admin.js":"./js/admin.js?v=2026-09-16%20%E3%8A%BF%2B184","./js/sales.js":"./js/sales.js?v=2026-09-16%20%E3%8A%BF%2B184","./js/report.js":"./js/report.js?v=2026-09-16%20%E3%8A%BF%2B184","./js/grid.js":"./js/grid.js?v=2026-09-16%20%E3%8A%BF%2B184","./js/edit.js":"./js/edit.js?v=2026-09-16%20%E3%8A%BF%2B184","./js/qadb.js":"./js/qadb.js?v=2026-09-16%20%E3%8A%BF%2B184","./js/qadata.js":"./js/qadata.js?v=2026-09-16%20%E3%8A%BF%2B184","./js/lazy.js":"./js/lazy.js?v=2026-09-16%20%E3%8A%BF%2B184","./js/init.js":"./js/init.js?v=2026-09-16%20%E3%8A%BF%2B184"}}</script>
+<link rel="modulepreload" href="js/state.js?v=2026-09-16%20%E3%8A%BF%2B184">
+<link rel="modulepreload" href="js/viz.js?v=2026-09-16%20%E3%8A%BF%2B184">
+<link rel="modulepreload" href="js/core.js?v=2026-09-16%20%E3%8A%BF%2B184">
+<link rel="modulepreload" href="js/shell.js?v=2026-09-16%20%E3%8A%BF%2B184">
+<link rel="modulepreload" href="js/dash.js?v=2026-09-16%20%E3%8A%BF%2B184">
+<link rel="modulepreload" href="js/ai.js?v=2026-09-16%20%E3%8A%BF%2B184">
+<link rel="modulepreload" href="js/home.js?v=2026-09-16%20%E3%8A%BF%2B184">
+<link rel="modulepreload" href="js/notify.js?v=2026-09-16%20%E3%8A%BF%2B184">
+<link rel="modulepreload" href="js/guard.js?v=2026-09-16%20%E3%8A%BF%2B184">
+<link rel="modulepreload" href="js/grids.js?v=2026-09-16%20%E3%8A%BF%2B184">
+<link rel="modulepreload" href="js/equipment.js?v=2026-09-16%20%E3%8A%BF%2B184">
+<link rel="modulepreload" href="js/analysis.js?v=2026-09-16%20%E3%8A%BF%2B184">
+<link rel="modulepreload" href="js/tools.js?v=2026-09-16%20%E3%8A%BF%2B184">
+<link rel="modulepreload" href="js/cloud.js?v=2026-09-16%20%E3%8A%BF%2B184">
+<link rel="modulepreload" href="js/inbound.js?v=2026-09-16%20%E3%8A%BF%2B184">
+<link rel="modulepreload" href="js/upd.js?v=2026-09-16%20%E3%8A%BF%2B184">
+<link rel="modulepreload" href="js/sales.js?v=2026-09-16%20%E3%8A%BF%2B184">
+<link rel="modulepreload" href="js/grid.js?v=2026-09-16%20%E3%8A%BF%2B184">
+<link rel="modulepreload" href="js/edit.js?v=2026-09-16%20%E3%8A%BF%2B184">
+<link rel="modulepreload" href="js/qadb.js?v=2026-09-16%20%E3%8A%BF%2B184">
+<link rel="modulepreload" href="js/qadata.js?v=2026-09-16%20%E3%8A%BF%2B184">
+<link rel="modulepreload" href="js/lazy.js?v=2026-09-16%20%E3%8A%BF%2B184">
+<link rel="modulepreload" href="js/init.js?v=2026-09-16%20%E3%8A%BF%2B184">
+<script type="module" src="js/main.js?v=2026-09-16%20%E3%8A%BF%2B184"></script>
 <!-- stamp:end -->
 </head>
 <body data-view="dash">
@@ -783,16 +783,6 @@
       <p class="cap" style="margin:10px 0 0">보기 = 메뉴에 나타나고 화면을 열 수 있음 · 읽기 = 화면 안의 표·데이터 열람 · 쓰기 = 추가·수정·삭제. 쓰기는 읽기를, 읽기는 보기를 포함합니다.
         행이 없는(한 번도 저장하지 않은) 계정은 역할 기본값(admin 전부 · admin_viewer 읽기까지)으로 동작하고, 슈퍼 관리자는 제한할 수 없습니다. 바뀐 권한은 그 계정이 다음에 화면을 새로 읽을 때 적용됩니다.</p>
 
-      <div class="adm-h">담당자 연결 <span class="mini">계정 ↔ OI · 인바운드 «담당» 이름 — 홈 «우선 업무 › 내 업무» · 빠른 보기 «내 담당»에 씀 · 없으면 «담당자 연결 필요»</span></div>
-      <div class="dbar om-bar" style="margin-bottom:8px;flex-wrap:wrap;gap:8px" data-nodirty>
-        <select id="omUser" aria-label="담당자를 연결할 계정"></select>
-        <input id="omNames" list="omNameList" aria-label="담당 이름(여러 개는 쉼표)" placeholder="담당 칸 이름 — 여러 개는 쉼표 (예: 홍길동 차장, 홍길동)" style="min-width:320px">
-        <datalist id="omNameList"></datalist>
-        <button type="button" class="pill" id="omSave">저장…</button>
-        <span class="mini" id="omMsg"></span>
-      </div>
-      <div class="tbl-wrap" tabindex="0" style="max-height:40vh"><table id="omTable" class="dgrid"></table></div>
-      <p class="cap" style="margin:8px 0 0">담당 칸에 이 이름 중 하나가 들어 있으면 그 계정의 «내 담당»입니다. 저장 전에 바뀌는 내용을 확인 창으로 보여 드리고, 변경은 변경 이력에 남습니다. SQL 103 이 필요합니다.</p>
       </div>
       <div class="adm-pane" data-pane="sec" hidden>
       <div class="adm-h first">보안 점검 <span class="mini">조회만 — DB 보안 설정 · 계정 · API 키 · 이 브라우저 (SQL 112)</span></div>

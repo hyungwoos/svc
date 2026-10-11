@@ -2,12 +2,12 @@
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { ST } from './state.js';
 import { $, amtWhy, isCC, lline, mk, navText, rawHtml, tpl, won, wonKo } from './core.js';
-import { buildRail, c360Enhance, dIdx, ico, loadFromDb, onData, renderInbox, sbTry, sbWrite, toast, todayStr, visBtn } from './shell.js';
+import { buildRail, c360Enhance, dIdx, ico, loadFromDb, onData, renderInbox, sbWrite, toast, todayStr, visBtn } from './shell.js';
 import { GRIDS } from './grids.js';
 import { applyChannelMenu, ctRawOf, liveData } from './analysis.js';
 import { goInbList } from './inbound.js';
 import { applyMenuFold } from './sales.js';
-import { ctPeriods, custGo, navMenu, oiOpen, openDetail, qvCfg, renderGrid, switchView } from './grid.js';
+import { ctPeriods, custGo, navMenu, oiMine, oiOpen, oiQuotesReady, openDetail, renderGrid, switchView } from './grid.js';
 import { syncOrderAssets } from './equipment.js';
 import { closeOvl, logChange, openOvl, ovlMarkDirty } from './edit.js';
 import { homeSearchOpen, rcPush } from './home.js';
@@ -376,23 +376,10 @@ export function renderTodo(){
   if(!ST.SB_TOKEN || !ST.DATA || ST.IS_EQUIP){ wrap.style.display='none'; return; }
   wrap.style.display='';
   var today=new Date(), t0=today.getTime(), todayS=todayStr(today);
-  // ① 인바운드 장기 미대응 — 10분 캐시, 필요한 열만 가볍게 조회
-  if(!ST.INB_TODO || t0-ST.INB_TODO.t>10*60*1000){
-    ST.INB_TODO={t:t0, n:ST.INB_TODO? ST.INB_TODO.n:null};
-    sbTry('inbound_leads?y=eq.'+today.getFullYear()+'&result=eq.'+encodeURIComponent('진행중')+'&select=on_date,s1d,s2d,s21d,s3d')
-      .then(function(rows){
-        var n=null;
-        if(rows){ n=0; rows.forEach(function(x){
-          var last=[x.on_date,x.s1d,x.s2d,x.s21d,x.s3d].filter(function(d){return d&&/^\d{4}-\d{2}-\d{2}/.test(d);}).sort().pop();
-          if(last && (t0-new Date(last).getTime())/864e5>=qvCfg().inbIdle) n++;   // 대시보드 기준: 기본 90일 (㊿+170 «빠른 보기 › 기준»에서 바꿈 · 인바운드 «장기 미접촉»과 같은 기준)
-        }); }
-        ST.INB_TODO={t:t0, n:n};
-        if(ST.CUR_VIEW==='dash') renderTodo();
-      });
-  }
+  /* ㊿+184 인바운드는 회사 일(자동 취합 · Slack 알림 · 통계) — 할 일 카드에서 뺌 · 첫 칸은 «내 OI»(내가 작성한 견적서가 붙은 진행 중 OI) */
   /* ㊿+173 성능: 커맨드 센터 · 지니언스 화면에는 이 카드 줄이 없음(#todoWrap 숨김) — 홈 목록(renderInbox)만 */
   if(isCC()){ try{ renderInbox(); }catch(e){} return; }
-  var inbN=ST.INB_TODO? ST.INB_TODO.n:null;
+  var qOk=oiQuotesReady('todo', function(){ if(ST.CUR_VIEW==='dash') renderTodo(); }), myOi=qOk? (ST.RAWX.oi||[]).filter(function(o){ return oiOpen(o) && oiMine(o); }).length : null;
   // ② OI 밀린 액션 — 예정일이 지났는데 아직 진행 중
   var oiLate=(ST.RAWX.oi||[]).filter(function(o){
     return o.next_date && String(o.next_date).slice(0,10)<todayS && oiOpen(o);
@@ -411,7 +398,7 @@ export function renderTodo(){
       tpl`<div class="v">${rawHtml(val)}</div><div class="s">${rawHtml(sub)}</div></div>`;
   }
   document.getElementById('todoCards').innerHTML=
-    card(inbN>0?'crit':'ok','📥','인바운드 미대응', inbN==null?'…':inbN+'건', inbN>0?'진행중인데 3개월+ 대응 없음':'밀린 건 없음','inbstat')+
+    card(myOi? 'warn':'ok','🎯','내 OI', myOi==null?'…':myOi+'건', '내가 작성한 견적서가 붙은 진행 중 OI','oi')+
     card(oiLate>0?'warn':'ok','🎯','OI 밀린 액션', oiLate+'건', oiLate>0?'다음 할 일 예정일 지남':'예정일 지난 건 없음','oi')+
     card(renewN>0?'warn':'ok','📋','재약정 도래', renewN+'건','60일 안에 계약 종료','contracts')+
     card('','📊','주간회의', wkTxt,'매주 월요일 · 일요일 저녁 자동 취합','weekly');

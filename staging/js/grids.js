@@ -8,6 +8,7 @@ import { liveCalc, LV, renderAiKnow, renderBizMonthly, renderDataCheck, renderLe
 import { openCust360 } from './tools.js';
 import { openInbDetail } from './inbound.js';
 import { qLabel } from './sales.js';
+import { oiOwnerOf } from './grid.js';
 import { SECTOR_OPTS } from './edit.js';
 
 
@@ -327,6 +328,7 @@ export function buildGrids(){
         {k:'deal_type',l:'사업형태',t:'select',opts:OI_TYPE},
         {k:'industry',l:'산업군',t:'select',opts:OI_IND},
         {k:'owner',l:'담당자'},
+        {k:'_qown',l:'견적 담당',ro:true,fmt:function(v,r0){ return ST.RAWX.quotes? oiOwnerOf(r0).name : '…'; }},   /* ㊿+184 내 OI 기준 = 붙은 견적서의 작성자 · 없으면 «견적 전» */
         {k:'partner',l:'구축파트너'},
         {k:'products',l:'제품군',ro:true,fmt:function(v){ return (v&&v.length)? v.join(', ') : '·'; }},
         {k:'items',l:'수량',ro:true,fmt:function(v){

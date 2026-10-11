@@ -5,7 +5,7 @@ import { $, amtHint, canView, canWrite, doLogout, esc, fetchT, kwToWon, lline, m
 import { dIdx, EQB, loadFromDb, onData, railSync, renderEqBoard, SB_RAW, sbHeaders, sbTry, sbWrite, toast, todayStr } from './shell.js';
 import { kpiTable, toggleWidgetPanel } from './dash.js';
 import { OI_IND, OI_OWNERS, OI_PARTNERS, OI_PROB, OI_PRODUCTS, OI_TYPE } from './grids.js';
-import { CH_DEFS, chOf, diffOpen } from './analysis.js';
+import { CH_DEFS, chOf, diffOpen, nmKeys } from './analysis.js';
 import { applyDense, denseKey, openFind, openPaste } from './tools.js';
 import { loadInbound } from './inbound.js';
 import { syncOrderAssets } from './equipment.js';
@@ -335,6 +335,125 @@ export async function quotesLoad(){
   catch(e){ ST.RAWX.quotes=[]; }
   QUOTES.at=Date.now();
   if(ST.CUR_VIEW==='quotes'){ renderGrid(); if(QUOTES.ok===false) toast('견적 목록이 비어 있습니다','SQL 109(견적 DB)를 실행하면 견적 화면의 «💾 저장» · «PDF 발행»이 여기에 쌓입니다','info'); }
+}
+/* ── ㊿+184 견적 → OI 자동 등록(가능성 10%) — 견적은 있는데 OI 현황에 없으면
+   · 붙일 곳: ① 같은 견적 줄기(발송 뒤 고쳐서 새 번호 · parent_id)의 OI ② 같은 고객사의 진행 중 OI(가장 최근 수정) → 그 OI 에 견적 연결 ③ 둘 다 없으면 OI 를 «등록 · 10%»로 새로 만들고 연결
+   · 견적 화면(포탈 안)에서 💾 저장 · PDF 발행 때 바로(위성 → 포탈 postMessage «quoteSaved») · 예전 견적은 OI 화면 «견적만 있음 n건» → 미리 보기 → 고른 것만 한 번에
+   · 발주서 · 실주 · 고객사 없는 견적은 빼고 · OI 쓰기 권한이 있을 때만 · 같은 견적은 동시에 한 번만 · 새 OI 칸은 OI 등록 폼 «견적서 불러오기»와 같은 규칙 */
+export var QOI={busy:/** @type {Object<string,number>} */({}), sel:/** @type {Object<string,boolean>} */({}), rows:/** @type {any[]} */([]), run:false};
+export function qoiSameCust(a, b){ var ka=nmKeys(a||''), kb=nmKeys(b||''); return ka.some(function(k){ return kb.indexOf(k)>=0; }); }
+/** 견적 q 를 붙일 OI — {kind:'chain'|'cust'|'new', oi} · quotes = 같은 줄기를 찾을 견적 목록 */
+export function qoiMatch(q, oiList, quotes){
+  var byId={}; (quotes||[]).forEach(function(x){ byId[x.id]=x; });
+  for(var p=q.parent_id, n=0; p!=null && n<20; n++){ var pq=byId[p]; if(!pq) break;
+    if(pq.oi_id!=null){ var po=(oiList||[]).filter(function(o){ return o.id===pq.oi_id; })[0]; if(po) return {kind:'chain', oi:po}; }
+    p=pq.parent_id; }
+  var same=(oiList||[]).filter(function(o){ return oiOpen(o) && qoiSameCust(o.customer, q.customer_name); })
+    .sort(function(a,b){ return String(b.updated_at||b.created_at||'').localeCompare(String(a.updated_at||a.created_at||'')); });
+  return same.length? {kind:'cust', oi:same[0]} : {kind:'new', oi:null};
+}
+/** 견적 → 새 OI 한 줄(단계 «등록» · 가능성 10% · 제품 · 수량 · 금액(VAT 별도) · 담당 = 견적 담당자) */
+export function qoiRow(q){
+  var d=q.data||{}, prods=[], items=[], pub=false;
+  (d.rows||[]).forEach(function(r){ var raw=(r.prod==='direct')? String(r.prodCustom||'').trim() : String(r.prod||'').trim(); if(!raw) return; if(/\(공공\)/.test(raw)) pub=true;
+    var nm=QPROD_MAP[raw]||raw, qty=qNum(r.qty)||null, it=items.filter(function(x){ return x.product===nm; })[0];
+    if(it){ if(qty) it.qty=(it.qty||0)+qty; } else { items.push({product:nm, qty:qty}); prods.push(nm); } });
+  var mgr=''; Object.keys(QMGR_MAP).forEach(function(k){ if(String(q.manager||d.manager||'').indexOf(k)>=0) mgr=QMGR_MAP[k]; });
+  var cu=(ST.RAWX.customers||[]).filter(function(c){ return qoiSameCust(c.name, q.customer_name); })[0], ind=pub? '공공' : (cu && OI_IND.indexOf(cu.industry)>=0? cu.industry : '기업');
+  var supply=qNum(q.supply_total!=null? q.supply_total : d.supplyTotal); if(!supply) supply=Math.round(qNum(q.grand_total!=null? q.grand_total : d.grandTotal)/1.1);
+  var no=q.quote_no||('#'+q.id);
+  return {requester:ST.AUTH_USER||null, industry:ind, customer:String(q.customer_name||'').trim(), cust_name:String(d.contactPerson||'').trim()||null, owner:mgr||null,
+    deal_type:OI_TYPE[0], deal_name:(prods.length? prods.join(' · ') : '견적')+' ('+no+')', products:prods, items:items, stage:'등록', win_prob:10, expect_amount:supply||null,
+    note:'견적 '+no+' 에서 자동 등록(가능성 10%)'+(q.quote_date? ' · 견적일 '+q.quote_date : ''), quote_file:'q:'+no, quote_date:q.quote_date||null, quote_total:qNum(q.grand_total)||null};
+}
+/** 붙일 대상인 견적 — 견적서(발주서 아님) · OI 없음 · 실주 아님 · 고객사 있음 */
+export function qoiCand(q){ return !!q && q.oi_id==null && (!q.doc_type || q.doc_type==='quote') && q.status!=='실주' && !!String(q.customer_name||'').trim(); }
+/** 견적 하나를 OI 에(새로 만들거나 연결) — 반환 {kind, oi} | null(대상 아님 · 처리 중) */
+export async function qoiApply(q, quotes){
+  if(!qoiCand(q) || QOI.busy[q.id]) return null;
+  QOI.busy[q.id]=1;
+  try{
+    var m=qoiMatch(q, ST.RAWX.oi||[], quotes||ST.RAWX.quotes||[]), oi=m.oi, no=q.quote_no||('#'+q.id);
+    if(m.kind==='new'){
+      var out=await sbWrite('POST','oi_deals?select=*',[qoiRow(q)],'return=representation'); oi=out && out[0];
+      if(!oi) throw new Error('OI 가 만들어지지 않았습니다 — OI 쓰기 권한을 확인해 주세요');
+      ST.RAWX.oi=ST.RAWX.oi||[]; ST.RAWX.oi.unshift(oi);
+      try{ logChange('insert','oi_deals',oi.id,{customer:oi.customer, deal:oi.deal_name, from:'견적 '+no+' 자동(10%)'}); }catch(e){}
+    }
+    await sbWrite('PATCH','quotes?id=eq.'+q.id, {oi_id:oi.id}, 'return=minimal');   /* OI 의 «견적서» 칸은 DB(SQL 109 트리거)가 맞춤 — 화면은 아래에서 같게 */
+    q.oi_id=oi.id; if(m.kind!=='new'){ oi.quote_file='q:'+no; oi.quote_date=q.quote_date||oi.quote_date; oi.quote_total=qNum(q.grand_total)||oi.quote_total;
+      try{ logChange('update','oi_deals',oi.id,{quote:'q:'+no+' 자동 연결'}); }catch(e){} }
+    return {kind:m.kind, oi:oi};
+  } finally { delete QOI.busy[q.id]; }
+}
+/** 견적 화면(포탈 안)에서 저장했을 때 — OI 가 없으면 바로 연결 · 등록하고 견적 화면에 OI 번호를 돌려줌(다음 저장에 그대로) */
+export async function qoiOnSaved(id, src){
+  if(!canWrite('oi') || !id) return null;
+  try{
+    var r=await fetchT(SB_URL+'/rest/v1/quotes?select='+QUOTE_COLS+',data&id=eq.'+(+id), {headers:sbHeaders()}, 30000, '견적 DB');
+    var q=r.ok? ((await r.json())||[])[0] : null; if(!qoiCand(q)) return null;
+    if(q.parent_id!=null && !ST.RAWX.quotes) await quotesLoad();
+    var res=await qoiApply(q, ST.RAWX.quotes||[]); if(!res) return null;
+    ST.RAWX.quotes=null;   /* 홈 «내 OI» · 빠른 보기가 다시 읽음 */
+    toast(res.kind==='new'? 'OI 자동 등록 — 가능성 10%' : 'OI 에 견적 연결', (res.oi.customer||'')+' · OI #'+res.oi.id+(res.kind==='cust'? ' (같은 고객사 진행 중 OI)' : res.kind==='chain'? ' (원래 견적의 OI)' : ' · '+(q.quote_no||'')), 'ok');
+    try{ if(src) src.postMessage({type:'quoteOi', id:q.id, oi:res.oi.id, name:res.oi.customer||''}, location.origin); }catch(e){}
+    if(ST.CUR_VIEW==='oi') renderGrid();
+    return res;
+  }catch(e){ toast('OI 자동 등록 실패', String(/** @type {any} */(e).message||e).slice(0,140)+' — 영업 › OI 등록에서 직접 해 주세요', 'bad'); return null; }
+}
+/** 미리 보기 계획 — 고른 견적을 오래된 것부터: 앞에서 새로 만들 OI 도 뒤 견적의 «같은 고객사 OI»로 셈 */
+export function qoiPlan(cands, sel){
+  var oiL=(ST.RAWX.oi||[]).slice(), qs=(ST.RAWX.quotes||[]).map(function(x){ return Object.assign({}, x); }), byId={}, now=new Date().toISOString();
+  qs.forEach(function(x){ byId[x.id]=x; });
+  return cands.slice().sort(function(a,b){ return a.id-b.id; }).map(function(q){
+    if(!sel[q.id]) return {q:q, kind:'skip', oi:null};
+    var m=qoiMatch(byId[q.id]||q, oiL, qs);
+    if(m.kind==='new'){ m.oi={id:'새 OI', customer:q.customer_name, stage:'등록', updated_at:now, _new:1}; oiL.unshift(m.oi); }
+    if(byId[q.id]) byId[q.id].oi_id=m.oi.id;
+    return {q:q, kind:m.kind, oi:m.oi};
+  });
+}
+/** OI 화면 «견적만 있음 n건» — 미리 보기 → 고른 것만 등록 · 연결(6개월 지난 견적은 기본으로 안 고름) */
+export function qoiOpen(){
+  var cands=(ST.RAWX.quotes||[]).filter(qoiCand); QOI.rows=cands; QOI.sel={};
+  var lim=new Date(); lim.setMonth(lim.getMonth()-6); var limS=todayStr(lim);
+  cands.forEach(function(q){ QOI.sel[q.id]=String(q.quote_date||q.created_at||'').slice(0,10)>=limS; });
+  var ov=document.getElementById('ovlQoi');
+  if(!ov){ ov=document.createElement('div'); ov.className='ovl'; ov.id='ovlQoi'; document.body.appendChild(ov); }
+  qoiPaint(); openOvl('ovlQoi');
+  var f=ov.querySelector('input,button'); if(f) try{ /** @type {any} */(f).focus(); }catch(e){}
+}
+export function qoiPaint(){
+  var ov=document.getElementById('ovlQoi'); if(!ov) return;
+  var plan=qoiPlan(QOI.rows, QOI.sel), nNew=plan.filter(function(p){ return p.kind==='new'; }).length, nLink=plan.filter(function(p){ return p.kind==='cust' || p.kind==='chain'; }).length;
+  var rows=plan.map(function(p){ var q=p.q, on=p.kind!=='skip';
+    var what=!on? '—' : p.kind==='new'? '새 OI · 등록 · 10%' : p.oi._new? '위에서 새로 만드는 OI 에 연결' : 'OI #'+p.oi.id+' 에 연결'+(p.kind==='chain'? ' (원래 견적의 OI)' : ' (진행 중 · '+String(p.oi.stage||'')+')');
+    return tpl`<tr${rawHtml(on? '' : ' class="qoi-off"')}><td><input type="checkbox" data-qid="${String(q.id)}"${rawHtml(on?' checked':'')} aria-label="${(q.quote_no||'#'+q.id)+' '+q.customer_name}"></td><td>${q.quote_no||'#'+q.id}</td><td>${q.customer_name}</td><td>${String(q.quote_date||'').slice(0,10)}</td><td class="n">${rawHtml(won(qNum(q.grand_total)))}</td><td>${String(q.status||'')}</td><td>${what}</td></tr>`; }).join('');
+  ov.innerHTML=tpl`<div class="modal qoi-m" role="dialog" aria-modal="true" aria-labelledby="qoiT" style="width:min(820px,100%)">`+
+    tpl`<h3 id="qoiT">견적만 있고 OI 가 없는 견적 ${String(QOI.rows.length)}건</h3>`+
+    tpl`<p class="cap">고른 견적을 OI 에 넣습니다 — 같은 고객사에 진행 중 OI 가 있으면 그 OI 에 견적을 연결하고, 없으면 OI 를 «등록 · 가능성 10%»로 새로 만듭니다. 6개월 지난 견적은 기본으로 고르지 않았습니다(실주 · 발주서는 목록에 없음).</p>`+
+    tpl`<div class="tbl-wrap" tabindex="0" role="region" aria-label="견적 목록" style="max-height:52vh"><table class="pr qoi-t"><thead><tr><th><span class="sr">고르기</span></th><th>견적</th><th>고객사</th><th>견적일</th><th class="n">합계(천원)</th><th>상태</th><th>처리</th></tr></thead><tbody>${rawHtml(rows)}</tbody></table></div>`+
+    tpl`<div class="mact"><span class="mini" id="qoiMsg" role="status" style="margin-right:auto">새 OI ${String(nNew)}건 · 기존 OI 연결 ${String(nLink)}건</span><button type="button" class="pill ghost" data-close="ovlQoi">닫기</button><button type="button" class="pill pri" id="qoiGo"${rawHtml(nNew+nLink && !QOI.run? '' : ' disabled')}>고른 ${String(nNew+nLink)}건 넣기</button></div></div>`;
+  ov.querySelectorAll('input[data-qid]').forEach(function(cb){ /** @type {any} */(cb).onchange=function(){ QOI.sel[+/** @type {any} */(cb).dataset.qid]=/** @type {any} */(cb).checked; var id=/** @type {any} */(cb).dataset.qid; qoiPaint(); var nb=ov.querySelector('input[data-qid="'+id+'"]'); if(nb) /** @type {any} */(nb).focus(); }; });
+  var go=document.getElementById('qoiGo'); if(go) go.onclick=function(){ qoiRun(nNew, nLink); };
+}
+export async function qoiRun(nNew, nLink){
+  if(QOI.run) return;
+  if(!confirm('견적 '+(nNew+nLink)+'건을 OI 에 넣습니다\n\n새 OI(등록 · 가능성 10%): '+nNew+'건\n기존 진행 중 OI 에 연결: '+nLink+'건\n\n진행할까요? (변경 이력에 남습니다)')) return;
+  QOI.run=true; var ids=QOI.rows.filter(function(q){ return QOI.sel[q.id]; }).map(function(q){ return q.id; }).sort(function(a,b){ return a-b; }), msgEl=document.getElementById('qoiMsg'), done={new:0, link:0, fail:0}, last='';
+  var go=/** @type {any} */(document.getElementById('qoiGo')); if(go) go.disabled=true;
+  try{
+    var r=await fetchT(SB_URL+'/rest/v1/quotes?select='+QUOTE_COLS+',data&id=in.('+ids.join(',')+')', {headers:sbHeaders()}, 60000, '견적 DB');
+    var full=r.ok? ((await r.json())||[]) : [], byId={}; full.forEach(function(x){ byId[x.id]=x; });
+    for(var i=0;i<ids.length;i++){ var q=byId[ids[i]]; if(msgEl) msgEl.textContent='넣는 중… '+(i+1)+' / '+ids.length;
+      var lq=(ST.RAWX.quotes||[]).filter(function(x){ return x.id===ids[i]; })[0];
+      try{ var res=q? await qoiApply(q, ST.RAWX.quotes||[]) : null; if(res){ if(res.kind==='new') done.new++; else done.link++; if(lq) lq.oi_id=res.oi.id; } }
+      catch(e){ done.fail++; last=String(/** @type {any} */(e).message||e).slice(0,120); }
+    }
+  } catch(e){ last=String(/** @type {any} */(e).message||e).slice(0,120); done.fail=ids.length; }
+  QOI.run=false; closeOvl('ovlQoi');
+  toast('견적 → OI 완료', '새 OI '+done.new+'건(10%) · 연결 '+done.link+'건'+(done.fail? ' · 실패 '+done.fail+'건 — '+last : ''), done.fail? 'bad' : 'ok');
+  ST.RAWX.quotes=null; if(ST.CUR_VIEW==='oi') renderGrid();
 }
 /** 견적 화면(포탈 안)을 DB 견적(qid=번호) 또는 OI 연결(oi=번호)로 열기 */
 export function quoteOpen(q){

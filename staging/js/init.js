@@ -10,6 +10,7 @@ import { buildGrids, GRIDS } from './grids.js';
 import { EQOPEN, eqSnDetail } from './equipment.js';
 import { applyFs, openFind } from './tools.js';
 import { wkFsSync, wkNext, wkPrev, wkToggleFs } from './inbound.js';
+import { qoiOnSaved } from './sales.js';
 import { askScreenHelp, btnBackSync, comboPlace, goBack, gridActPad, LENS_DEFS, LENS_DESC, NAV, navValid, switchView, viewSnapAdd, viewSnapInit } from './grid.js';
 import { closeOvl, fillSectorSel, ovlDismiss, ovlInit, ovlTop, renameShowPreview, syncCustMeta } from './edit.js';
 import { lazyHook } from './lazy.js';
@@ -27,6 +28,12 @@ export function start(){
     if(!ev || ev.origin!==location.origin || !ev.data || ev.data.type!=='svcFind') return;
     var ok=['quoteFrame','preportFrame','s1Frame','kkFrame'].some(function(id){ var f=/** @type {any} */(document.getElementById(id)); return !!f && f.contentWindow===ev.source; });
     if(ok) try{ openFind(); }catch(e){}
+  });
+  /* ㊿+184 견적 화면(포탈 안)에서 저장 → OI 가 없으면 바로 연결 · 등록(가능성 10%) — 같은 출처 · 견적 칸에서 온 것만 */
+  window.addEventListener('message', function(ev){
+    if(!ev || ev.origin!==location.origin || !ev.data || ev.data.type!=='quoteSaved') return;
+    var f=/** @type {any} */(document.getElementById('quoteFrame')); if(!f || f.contentWindow!==ev.source) return;
+    qoiOnSaved(+ev.data.id, ev.source);
   });
   window.addEventListener('message', function(ev){
     if(!ev || !ev.data || ev.data.type!=='openReport' || !ev.data.id) return;
