@@ -643,7 +643,7 @@ export async function mfaCardRender(host){
   } else {
     host.innerHTML=tpl`${rawHtml(polHtml)}<div><b>꺼짐</b> <span class="mini">· 비밀번호만으로 로그인</span></div>`+
       tpl`<div class="mini" style="margin:5px 0 8px;line-height:1.6">인증 앱(Google Authenticator · Microsoft Authenticator · 1Password 등)을 등록하면 비밀번호가 새어도 코드 없이는 들어올 수 없습니다. 이 계정에만 적용되며 다른 사용자는 영향이 없습니다.</div>`+
-      tpl`<button type="button" class="pill" id="mfaOn">🔐 2단계 인증 켜기</button>`;
+      tpl`<button type="button" class="pill" id="mfaOn">2단계 인증 켜기</button>`;
     host.querySelector('#mfaOn').onclick=function(){ mfaEnrollFlow(fs, host); };
   }
 }

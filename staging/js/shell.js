@@ -69,7 +69,7 @@ export var ICO={
 };
 /* ㊿+169 아이콘 한 가지 모양 — 위쪽·표 도구 버튼의 이모지/기호(✏️ ⊞ ↻ ⬇ 🧱 ☰ ❔ 📋)를 같은 선 아이콘 + 글자로 (id·이름표는 그대로) */
 export var UI_ICO={btnEdit:['edit','계약 입력·수정'], btnNew:['plus','등록'], btnWidgets:['board','위젯'], btnReload:['reload','새로고침'], btnFind:['spark','검색'],
-  dvAdd:['plus','행 추가'], dvPaste:['doc','붙여넣기 입력'], dvReload:['reload','다시 읽기'], dvCsv:['down','엑셀'], dvDense:['menu','밀도'], dvHelp:['spark','']};
+  dvAdd:['plus','행 추가'], dvPaste:['doc','붙여넣기 입력'], dvReload:['reload','다시 읽기'], dvCsv:['down','엑셀'], dvDense:['menu','밀도'], dvHelp:['spark','AI 도움말']};
 export function icoLbl(name, label){ return ico(name,15)+(label? tpl`<span>${label}</span>` : ''); }
 export function uiIconize(){
   Object.keys(UI_ICO).forEach(function(id){ var b=document.getElementById(id); if(b && !b.querySelector('svg')){ b.innerHTML=icoLbl(UI_ICO[id][0], UI_ICO[id][1]); b.classList.add('icb'); } });
@@ -278,6 +278,65 @@ export function gnTitleSync(v){
   if(!rb && tt){ rb=document.createElement('button'); rb.type='button'; rb.id='btnViewReset'; rb.className='cbtn vreset'; rb.textContent='초기화'; rb.title='이 화면을 처음 상태로 — 검색 · 필터 · 정렬 · 쪽 · 화면별 선택 (메뉴를 다시 눌러도 지금 상태는 그대로 남습니다)'; rb.onclick=function(){ viewResetHard(ST.CUR_VIEW); }; tt.appendChild(rb); }
   if(rb){ rb.hidden=!(can || v==='quote'); var qt=v==='quote';   /* 견적은 메뉴 재진입에 종류 고르기 창을 다시 띄우지 않음 — 여기서 */
     rb.textContent=qt? '견적 종류 다시 고르기' : '초기화'; rb.title=qt? '기업 · 공공 · 발주서 종류 고르기 창을 다시 엽니다' : '이 화면을 처음 상태로 — 검색 · 필터 · 정렬 · 쪽 · 화면별 선택 (메뉴를 다시 눌러도 지금 상태는 그대로 남습니다)'; }
+  try{ vtDupSync(v); setTimeout(function(){ vtDupSync(v); }, 80); }catch(e){}   /* ㊿+186 화면 안 제목이 상단 제목과 같으면 숨김(늦게 그려지는 화면은 한 번 더) */
+}
+
+/* ===== ㊿+186 전역 정리(고급 SaaS 기준) — 제목 한 번 · 이모지 → 아이콘 체계 · 상단 «더보기» 메뉴 · 행 버튼은 올렸을 때 =====
+   · vtDupSync: 상단 제목(gnTitle)과 같은 화면 안 첫 제목(«계약 관리» · «📉 해지 분석» …)은 화면 읽기용으로만 남기고 숨김(.vt-dup · 칩 · 작은 설명은 그대로)
+   · deEmoji: 지니언스 디자인에서는 제목 · 버튼 · 탭 앞의 그림 글자(이모지)를 뗌(메뉴는 navText 가 이미 뗌) — 글자만 바꾸고 id · 동작은 그대로 · MutationObserver 로 다시 그린 화면도
+   · moreMenu: 글자 크기 · 다크 · 새로고침 · 초기화 는 매 화면 상단에서 «⋯ 더보기» 안으로(원래 버튼 요소를 옮겨 둠 — id · 동작 · 단축키 그대로) */
+export var VT_DUP_FORCE={ordernew:1, mdrnew:1};
+export function vtNorm(s){ return String(s||'').replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}]/gu,'').replace(/[\s·—–\-()（）:：,.]/g,'').toLowerCase(); }
+export function vtDupSync(v){
+  var host=document.querySelector('#app [id^="view"]:not(.hidden)'), t=document.getElementById('gnTitle'); if(!host || !t) return;
+  host.querySelectorAll('.vt-dup').forEach(function(h){ h.classList.remove('vt-dup'); });
+  if(!isGN() || !v || v==='dash') return;
+  var name=vtNorm(t.textContent); if(name.length<2) return;
+  var hs=[].slice.call(host.querySelectorAll('h1,h2,h3')).filter(function(h){ var r=h.getBoundingClientRect(); return r.width>0 && r.height>0; }), h=hs[0]; if(!h) return;
+  var own=''; [].forEach.call(h.childNodes, function(n){ if(n.nodeType===3) own+=n.textContent; }); own=vtNorm(own);
+  if(!(own && (own===name || own.indexOf(name)===0 || name.indexOf(own)===0 || own.indexOf(name)>=0 || VT_DUP_FORCE[v]))) return;
+  if(!h.querySelector('.vt-txt')){ var sp=document.createElement('span'); sp.className='vt-txt'; [].slice.call(h.childNodes).forEach(function(n){ if(n.nodeType===3) sp.appendChild(n); }); h.insertBefore(sp, h.firstChild); }
+  h.classList.add('vt-dup');
+}
+export var EMO_RE=/^[\s ]*(?:[\u{1F000}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}][\u{FE0F}\u{200D}\u{1F3FB}-\u{1F3FF}]*)+[\s ]*/u;
+export var EMO_KEEP=/^[\s ]*[✓✔✕✖⚠☰✖]/;   /* ✓ ✔ ✕ ✖ ⚠ ☰ 는 뜻이 있는 기호 — 둠 */
+export function deEmoji(root){
+  if(!isGN() || !root || !root.querySelectorAll) return;
+  var els=root.querySelectorAll('h1,h2,h3,h4,button,summary,.chip,dt,label,.adm-tab,.pill'), n=0;
+  for(var i=0;i<els.length;i++){ var el=els[i], tn=el.firstChild;
+    while(tn && tn.nodeType!==3 && tn.nodeType!==1) tn=tn.nextSibling;
+    if(!tn || tn.nodeType!==3) continue;
+    var txt=tn.textContent; if(!EMO_RE.test(txt) || EMO_KEEP.test(txt)) continue;
+    tn.textContent=txt.replace(EMO_RE,''); n++; }
+  return n;
+}
+export var DEEMO={on:false, t:null, q:/** @type {any[]} */([])};
+export function deEmojiStart(){
+  if(DEEMO.on || typeof MutationObserver==='undefined') return; DEEMO.on=true;
+  var app=document.getElementById('app')||document.body;
+  deEmoji(app);
+  var mo=new MutationObserver(function(recs){ if(!isGN()) return; var seen=DEEMO.q; recs.forEach(function(r){ r.addedNodes && [].forEach.call(r.addedNodes, function(nd){ if(nd.nodeType===3) nd=nd.parentElement; if(nd && nd.nodeType===1 && seen.indexOf(nd)<0) seen.push(nd); }); });
+    if(!seen.length) return; clearTimeout(DEEMO.t); DEEMO.t=setTimeout(function(){ var list=DEEMO.q; DEEMO.q=[]; list.forEach(function(nd){ try{ if(nd.isConnected){ deEmoji(nd); if(nd.matches && nd.matches('h1,h2,h3,h4,button,summary,.chip,dt,label,.adm-tab,.pill')){ var tn=nd.firstChild; if(tn && tn.nodeType===3 && EMO_RE.test(tn.textContent) && !EMO_KEEP.test(tn.textContent)) tn.textContent=tn.textContent.replace(EMO_RE,''); } } }catch(e){} }); }, 30); });
+  mo.observe(app, {childList:true, subtree:true});
+  document.querySelectorAll('.ovl, #ntfPanel, #aiPanel').forEach(function(o){ try{ mo.observe(o, {childList:true, subtree:true}); }catch(e){} });
+  var bodyMo=new MutationObserver(function(recs){ recs.forEach(function(r){ r.addedNodes && [].forEach.call(r.addedNodes, function(nd){ if(nd.nodeType===1 && nd.parentElement===document.body){ try{ mo.observe(nd, {childList:true, subtree:true}); deEmoji(nd); }catch(e){} } }); }); });
+  bodyMo.observe(document.body, {childList:true});
+}
+/** «⋯ 더보기» — 상단 오른쪽 보조 기능(초기화 · 새로고침 · 글자 크기 · 다크)을 한 메뉴로 */
+export function moreMenuSetup(){
+  if(!isGN()) return;
+  var tb=document.querySelector('#app .topbar'); if(!tb || document.getElementById('btnMore')) return;
+  var b=document.createElement('button'); b.type='button'; b.id='btnMore'; b.className='pill ghost icb'; b.setAttribute('aria-haspopup','menu'); b.setAttribute('aria-expanded','false'); b.setAttribute('aria-label','더보기 — 초기화 · 새로고침 · 글자 크기 · 다크 모드'); b.title='더보기 — 초기화 · 새로고침 · 글자 크기 · 다크 모드';
+  b.innerHTML=icoLbl('more','');
+  var m=document.createElement('div'); m.id='moreMenu'; m.className='more-menu'; m.setAttribute('role','menu'); m.hidden=true;
+  ['btnViewReset','btnReload','btnFont','btnTheme'].forEach(function(id){ var x=document.getElementById(id); if(!x) return; x.classList.add('mm-it'); x.setAttribute('role','menuitem'); m.appendChild(x); });
+  tb.appendChild(b); tb.appendChild(m);
+  function close(back){ m.hidden=true; b.setAttribute('aria-expanded','false'); if(back) try{ b.focus(); }catch(e){} }
+  function open(){ m.hidden=false; b.setAttribute('aria-expanded','true'); var r=b.getBoundingClientRect(); m.style.top=(r.bottom+6)+'px'; m.style.right=Math.max(8, window.innerWidth-r.right)+'px'; var f=m.querySelector('button:not([hidden])'); if(f) try{ f.focus(); }catch(e){} }
+  b.onclick=function(e){ e.stopPropagation(); if(m.hidden) open(); else close(); };
+  m.addEventListener('click', function(e){ var it=e.target.closest('.mm-it'); if(it && it.id!=='btnFont') setTimeout(function(){ close(true); }, 0); });
+  document.addEventListener('click', function(e){ if(!m.hidden && !m.contains(e.target) && e.target!==b) close(); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape' && !m.hidden){ e.stopPropagation(); close(true); } }, true);
 }
 
 /* ㊿+168 금액 단위 안내 — 화면마다 실제 단위(가격표 = 원 · 금액 없는 화면은 숨김 · 주간보고 예상매출 = 백만원) · 누르면 용어 설명 */

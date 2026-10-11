@@ -2958,4 +2958,49 @@ button.hm-own.hm-asg:focus-visible{outline:2px solid var(--s1);outline-offset:1p
 .fb-n{margin-top:4px;color:var(--ink-2)}
 #fbText{width:100%;font:inherit;font-size:14px;line-height:1.5;padding:9px 11px;border:1px solid var(--ring);border-radius:9px;background:var(--surface);color:var(--ink);resize:vertical;min-height:110px}
 .fb-empty{margin:0}
+/* ==== ㊿+186 전역 정리 — 제목 한 번 · 단위 한 번 · 더보기 메뉴 · 행 버튼은 올렸을 때 · 빈 화면 버튼 ==== */
+/* 화면 안 첫 제목이 상단 제목과 같으면 글자만 숨김(화면 읽기엔 남김) · 그 옆 단위 칩도 숨김(상단 ₩ 배지가 있음) */
+/* 폰은 상단 제목 줄이 없어 화면 안 제목을 그대로 둠 */
+@media (min-width:761px){
+  html[data-skin="gn"] .vt-dup .vt-txt{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  html[data-skin="gn"] .vt-dup .ubadge{display:none}
+  html[data-skin="gn"] h2#dvTitle.vt-dup{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);margin:0}
+  html[data-skin="gn"] #viewData .card-head .t:has(> #dvTitle.vt-dup){margin-top:0}
+  html[data-skin="gn"] #viewData .card-head .t:has(> #dvTitle.vt-dup) #dvCap{margin-top:0}
+  html[data-skin="gn"] .vt-dup small{display:block;margin:0;font-weight:400}
+}
+@media (max-width:760px){ html[data-skin="gn"] .vt-dup .ubadge{display:none} }
+/* «⋯ 더보기» 메뉴 — 초기화 · 새로고침 · 글자 크기 · 다크 */
+html[data-skin="gn"] #btnMore{padding:0 9px;min-width:34px}
+.more-menu{position:fixed;z-index:1200;min-width:200px;padding:6px;background:var(--surface);border:1px solid var(--ring);border-radius:12px;box-shadow:0 14px 34px -14px rgba(0,0,0,.32);display:flex;flex-direction:column;gap:2px}
+.more-menu[hidden]{display:none}
+html[data-skin="gn"] .topbar .more-menu .mm-it,html[data-skin="gn"] .topbar .more-menu .mm-it.pill,html[data-skin="gn"] .topbar .more-menu .mm-it.cbtn,html[data-skin="gn"] .topbar .more-menu .mm-it.icb{display:flex;align-items:center;gap:9px;width:100%;min-width:0;justify-content:flex-start;height:38px;min-height:38px;margin:0;padding:0 11px;border:0;border-radius:8px;background:transparent;color:var(--ink);font:inherit;font-size:14px;font-weight:500;text-align:left;box-shadow:none}
+html[data-skin="gn"] .topbar .more-menu .mm-it span{display:inline}
+html[data-skin="gn"] .topbar .more-menu .mm-it:hover,html[data-skin="gn"] .topbar .more-menu .mm-it:focus-visible{background:var(--surface-2,var(--plane))}
+html[data-skin="gn"] .topbar .more-menu .mm-it[hidden]{display:none}
+html[data-skin="gn"] .topbar .more-menu .mm-it svg{flex:0 0 auto}
+/* 표 행의 동작 버튼(👁 ✎ ⋯)은 마우스를 올리거나 키보드로 들어갔을 때만 — 터치 화면은 늘 보임 */
+@media (hover:hover) and (pointer:fine){
+  html[data-skin="gn"] .dgrid tbody tr td.act .ab{opacity:0;transition:opacity .12s}
+  html[data-skin="gn"] .dgrid tbody tr:hover td.act .ab,html[data-skin="gn"] .dgrid tbody tr:focus-within td.act .ab,html[data-skin="gn"] .dgrid tbody tr td.act .ab:focus-visible,html[data-skin="gn"] .dgrid tbody tr td.act .ab[aria-expanded="true"]{opacity:1}
+}
+/* 빈 화면 할 일 버튼 */
+.dg-empty .dg-cta{display:inline-flex}
+/* 푸터는 한 줄 · 작게 */
+html[data-skin="gn"] .foot{font-size:12px;color:var(--muted)}
+/* AI 도움말 버튼에 글자가 생김 — 아이콘만 쓰던 고정 폭 해제 */
+html[data-skin="gn"] #dvHelp.icb{width:auto;padding:0 10px;justify-content:flex-start}
+@media (min-width:761px){
+  html[data-skin="gn"] .vt-dup{flex:1 1 auto;text-align:left;min-width:0}
+  html[data-skin="gn"] .vt-dup small{display:block;margin:0;font-weight:400;color:var(--ink-2);font-size:13px}
+}
+@media (max-width:760px){ html[data-skin="gn"] #dvHelp.icb span{display:none} html[data-skin="gn"] #dvHelp.icb{width:34px;padding:0;justify-content:center} }
+#btnFont .fs-ico{font-size:13px;font-weight:700;letter-spacing:-.02em}
+/* 메뉴 안에서는 좁은 창에서도 글자를 보임(좁은 창의 아이콘만 규칙보다 뒤에 · 같은 세기) */
+html[data-skin="gn"] .topbar .more-menu :is(#btnWidgets,#btnReload,#btnTheme,#btnFont,#btnViewReset).icb span{display:inline}
+html[data-skin="gn"] .topbar .more-menu :is(#btnWidgets,#btnReload,#btnTheme,#btnFont,#btnViewReset).icb{width:100%;padding:0 11px;justify-content:flex-start}
+@media (max-width:760px){ .more-menu #btnTheme,.more-menu #btnReload{font-size:14px;min-width:0} }
+@media (max-width:760px){ .more-menu #btnTheme::before,.more-menu #btnReload::before{content:none} }
+@media (max-width:760px){ .more-menu .mm-it{display:flex;gap:9px} .more-menu .mm-it svg{margin-right:0} }
+html[data-skin="gn"] .topbar .more-menu .mm-it{gap:9px}
 /* ==== ㊿+166 새 디자인 end ==== */

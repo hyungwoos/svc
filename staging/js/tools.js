@@ -422,7 +422,7 @@ export function applyFs(n){
   var b=document.getElementById('btnFont');
   if(b){
     b.style.background = n>0? 'var(--brand-t,rgba(46,189,87,.13))':'';
-    b.innerHTML = tpl`가<b style="font-size:14px">A</b>${n===1?' 크게':n===2?' 최대':''}`;
+    b.innerHTML = tpl`<b class="fs-ico" aria-hidden="true">가A</b><span>글자 크기${n===1?' · 크게':n===2?' · 최대':' · 보통'}</span>`;
   }
 }
 

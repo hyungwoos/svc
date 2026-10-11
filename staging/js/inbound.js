@@ -261,7 +261,7 @@ export function renderInbStat(){
   if(!ALL.length){
     host.innerHTML=tpl`<section class="card c12" style="max-width:640px;margin:0 auto;text-align:center;padding:40px">`+
       tpl`<h3 style="margin:0 0 8px">📥 인바운드 관리</h3>`+
-      tpl`<p class="cap">아직 데이터가 없습니다 — 43_inbound.sql 실행과 Apps Script 코드 교체·배포가 필요합니다.</p>`+
+      tpl`<p class="cap">아직 인바운드 데이터가 없습니다.${rawHtml(ST.IS_SUPER? ' <span class="mini">(관리자: 43_inbound.sql 실행과 Apps Script 배포가 필요합니다)</span>' : ' 회사 인바운드 시트에서 자동으로 가져옵니다.')}</p>`+
       tpl`<button class="pill" id="inbFetch0">↻ 지금 시트에서 가져오기</button></section>`;
     var b0=document.getElementById('inbFetch0'); if(b0) b0.onclick=inbRefetch;
     return;

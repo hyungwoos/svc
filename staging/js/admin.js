@@ -1405,22 +1405,22 @@ export async function renderAccount(){
     row('로그인 세션', tpl`<span style="color:var(--ink-2)">${sessTxt}</span>`);
   var act=document.createElement('div');
   act.style.cssText='display:flex;gap:10px;margin-top:18px';
-  var bp=document.createElement('button'); bp.className='pill'; bp.textContent='🔑 비밀번호 변경';
+  var bp=document.createElement('button'); bp.className='pill'; bp.textContent='비밀번호 변경';
   bp.onclick=function(){ openOvl('ovlAuth'); setAuthTab('pw'); };
   var bo=document.createElement('button'); bo.className='pill ghost'; bo.textContent='로그아웃';
   bo.style.cssText='border-color:var(--critical,#d03b3b);color:var(--critical,#d03b3b)';
   bo.onclick=doLogout;
-  var bu=document.createElement('button'); bu.className='pill ghost'; bu.textContent='📢 업데이트 내역'; bu.onclick=updOpenAll;   /* ㊿+148 */
+  var bu=document.createElement('button'); bu.className='pill ghost'; bu.textContent='업데이트 내역'; bu.onclick=updOpenAll;   /* ㊿+148 */
   var ba=document.createElement('button'); ba.className='pill ghost'; ba.id='accOutAll'; ba.textContent='모든 기기에서 로그아웃'; ba.onclick=function(){ logoutAll(); };   /* ㊿+180 */
   act.appendChild(bp); act.appendChild(bu); act.appendChild(ba); act.appendChild(bo);
   act.style.flexWrap='wrap';
   box.appendChild(act);
   /* 보안 — 2단계 인증(인증 앱) · 계정 단위, 본인이 켬 */
   var sec=document.createElement('div'); sec.style.cssText='margin-top:22px';
-  sec.innerHTML=tpl`<div style="font-size:14px;font-weight:650;margin-bottom:4px">보안</div>${rawHtml(row('🔐 2단계 인증', '<div id="accMfa"></div>'))}`;
+  sec.innerHTML=tpl`<div style="font-size:14px;font-weight:650;margin-bottom:4px">보안</div>${rawHtml(row('2단계 인증', '<div id="accMfa"></div>'))}`;
   box.appendChild(sec); mfaCardRender(sec.querySelector('#accMfa'));
   /* ㊿+180 최근 로그인(login_log · SQL 112) — 모르는 기기가 있으면 «모든 기기에서 로그아웃» 뒤 비밀번호 변경 */
-  var lg=document.createElement('div'); lg.innerHTML=row('🕘 최근 로그인', '<div id="accLogins" class="mini">불러오는 중…</div>'); sec.appendChild(lg.firstChild);
+  var lg=document.createElement('div'); lg.innerHTML=row('최근 로그인', '<div id="accLogins" class="mini">불러오는 중…</div>'); sec.appendChild(lg.firstChild);
   accLoginsLoad();
   /* 설정 — 이 브라우저에만 저장 (localStorage) */
   var set=document.createElement('div'); set.style.cssText='margin-top:22px';
@@ -1431,7 +1431,7 @@ export async function renderAccount(){
       tpl`<div class="mini" style="margin-top:5px;line-height:1.6">마우스·키보드·스크롤 입력이 정한 시간 동안 없으면 이 탭에서 자동으로 로그아웃합니다. 끝나기 1분 전에 알림이 뜹니다.</div>`))}`+
     tpl`${rawHtml(row('화면 디자인', tpl`<select id="accLook" aria-label="화면 디자인" style="height:30px;min-width:200px">${rawHtml(Object.keys(LOOKS).map(function(k){ return tpl`<option value="${rawHtml(k)}"${k===look0?' selected':''}>${LOOKS[k]}</option>`; }).join(''))}</select>`+
       tpl`<div class="mini" style="margin-top:5px;line-height:1.6">지니언스: 정식 로고 · 브랜드 색 · 글자 메뉴(그룹 접기) — 기능은 커맨드 센터와 같음 · 커맨드 센터: 아이콘 레일 + 상단 커맨드 바(검색·이동·AI) + 인박스 홈 + 장비 운영 보드 + 고객 360 패널 · 심플: 평면 디자인에 기존 사이드바 · 클래식: 이전 디자인. 바꾸면 화면을 다시 읽습니다.</div>`))}`;
-  var prow=document.createElement('div'); prow.innerHTML=row('📱 앱으로 설치', tpl`<div id="accPwa">${rawHtml(pwaHintHtml())}</div>`);
+  var prow=document.createElement('div'); prow.innerHTML=row('앱으로 설치', tpl`<div id="accPwa">${rawHtml(pwaHintHtml())}</div>`);
   set.appendChild(prow.firstChild);
   var meb=document.getElementById('btnMenuEdit');
   if(meb && meb.style.display!=='none'){

@@ -2,7 +2,7 @@
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { APP_VER, ST } from './state.js';
 import { Viz } from './viz.js';
-import { $, amtGuard, amtHint, canView, canWrite, cssv, esc, kwToWon, lline, mk, navText, perfNav, permEnter, rawHtml, STATE, tpl, won, wonFull, wonKo, wonToKw } from './core.js';
+import { $, amtGuard, amtHint, canView, canWrite, cssv, esc, isGN, kwToWon, lline, mk, navText, perfNav, permEnter, rawHtml, STATE, tpl, won, wonFull, wonKo, wonToKw } from './core.js';
 import { cmdAskHit, dIdx, EQB, EQUIP_VIEWS, gridGo, ico, idxDate, loadFromDb, onData, railSync, renderEqBoard, sbTry, sbWrite, toast, todayStr } from './shell.js';
 import { buildControls, DASH_DIRTY, dashDetailShown, renderAll } from './dash.js';
 import { GRIDS } from './grids.js';
@@ -281,7 +281,7 @@ export function switchView(v){
   /* 금액 열(won:1)이 있는 표는 제목 옆에 «천원 단위» 배지를 붙입니다 */
   var hasWon=(g.cols||[]).some(function(c){ return c.won; });
   $('#dvTitle').innerHTML=esc(g.title)+(hasWon? ' <span class="ubadge sm">₩ 금액 단위 = 천원</span>':'');
-  dvCapRender(v, g.cap + (hasWon? ' · 금액은 보기·입력 모두 천원 단위':'') + (ST.IS_VIEWER? ' · 조회 전용 계정입니다':''));
+  dvCapRender(v, g.cap + (hasWon && !isGN()? ' · 금액은 보기·입력 모두 천원 단위':'') + (ST.IS_VIEWER? ' · 조회 전용 계정입니다':''));   /* ㊿+186 지니언스: 단위는 상단 ₩ 배지 한 번 */
   $('#dvAdd').style.display=(g.add && !ST.IS_VIEWER)?'':'none';
   $('#dvPaste').style.display=(g.add && !ST.IS_VIEWER)?'':'none';
   $('#dvSearch').value=mem? mem.q : '';
@@ -1075,7 +1075,7 @@ export function renderLiveBar(lb){
 export function dvCapRender(v, text){
   var el=$('#dvCap'); if(!el) return; text=String(text||'');
   var key='svc_capopen_'+v, open=false; try{ open=localStorage.getItem(key)==='1'; }catch(e){}
-  if(text.length<=(dvNarrow()? 40 : 120)){ el.textContent=text; return; }
+  if(text.length<=(dvNarrow()? 40 : (isGN()? 60 : 120))){ el.textContent=text; return; }   /* ㊿+186 지니언스: 첫 문장만 · 나머지는 «도움말 ▾» */
   var nw=dvNarrow(), cut=text.search(/ — | · /); var head=(cut>(nw? 8 : 20) && (!nw || cut<=40))? text.slice(0,cut) : text.slice(0, nw? 34 : 90)+'…';
   el.innerHTML=tpl`<span class="cap-head">${open? text : head}</span> <button type="button" class="cap-more" aria-expanded="${rawHtml(open)}" aria-controls="dvCap">${open? '접기 ▴':'도움말 ▾'}</button>`;
   el.querySelector('.cap-more').onclick=function(){ try{ localStorage.setItem(key, open? '0':'1'); }catch(e){} dvCapRender(v, text); };
@@ -1322,9 +1322,10 @@ export function renderGrid(){
     var why=q? '검색어 «'+esc(q)+'»' : (nfl? '열 필터 '+nfl+'개' : hasLens? '관점 필터' : hasChip? '«'+esc(DV.chipVal)+'» 탭' : DV.pre? '조건 «'+esc(DV.pre.label)+'»' : '');
     var tr=document.createElement('tr'); tr.className='dg-empty';
     tr.innerHTML=tpl`<td colspan="${rawHtml(g.cols.length+2)}" style="text-align:left;padding:34px 12px;color:var(--muted)"><div style="position:sticky;left:12px;width:min(520px,calc(100vw - 160px));text-align:center">`+ tpl`${rawHtml(why? tpl`<div style="font-size:14px">${rawHtml(why)}에 맞는 행이 없습니다</div><div style="margin-top:10px;display:flex;gap:6px;justify-content:center;flex-wrap:wrap">`+ tpl`${rawHtml(q? '<button type="button" class="cbtn" data-dge="q">검색어 지우기</button>':'')}${rawHtml((nfl||hasLens)? '<button type="button" class="cbtn" data-dge="f">필터 지우기</button>':'')}${rawHtml(hasChip? '<button type="button" class="cbtn" data-dge="c">전체 탭으로</button>':'')}</div>`
-          : tpl`<div style="font-size:14px">아직 데이터가 없습니다</div>${rawHtml(g.add&&!ST.IS_VIEWER? '<div class="mini" style="margin-top:6px">위의 «＋ 행 추가» 로 첫 행을 넣을 수 있습니다</div>':'')}`)}`+ tpl`</div></td>`;
+          : tpl`<div style="font-size:14px">아직 데이터가 없습니다</div>${rawHtml(g.emptyCta && !ST.IS_VIEWER && canView(g.emptyCta.v)? tpl`<div class="mini" style="margin-top:6px">${g.emptyCta.s||''}</div><button type="button" class="pill pri dg-cta" data-dge="cta" style="margin-top:10px">${g.emptyCta.l}</button>` : g.add&&!ST.IS_VIEWER? '<div class="mini" style="margin-top:6px">위의 «＋ 행 추가» 로 첫 행을 넣을 수 있습니다</div>':'')}`)}`+ tpl`</div></td>`;   /* ㊿+186 빈 화면에 할 일 버튼 */
     tb.appendChild(tr);
-    tr.querySelectorAll('[data-dge]').forEach(function(b){ b.onclick=function(){ var k=b.dataset.dge; if(k==='q'){ $('#dvSearch').value=''; } if(k==='f'){ DV.filters={}; DV.lens=''; DV.pre=null; } if(k==='c'){ DV.chipVal=''; } DV.page=0; renderGrid(); }; });
+    var cta=tr.querySelector('[data-dge="cta"]'); if(cta) cta.onclick=function(){ navMenu(g.emptyCta.v); };
+    tr.querySelectorAll('[data-dge]:not([data-dge="cta"])').forEach(function(b){ b.onclick=function(){ var k=b.dataset.dge; if(k==='q'){ $('#dvSearch').value=''; } if(k==='f'){ DV.filters={}; DV.lens=''; DV.pre=null; } if(k==='c'){ DV.chipVal=''; } DV.page=0; renderGrid(); }; });
   }
   t.appendChild(tb);
   colwApply(t, ST.CUR_VIEW);   /* ㊿+142: 사용자가 정한 열 너비 */

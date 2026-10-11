@@ -154,7 +154,7 @@ say(/^export function tickMemo\(/m.test(jsAll) && /^export function cssvKey\(/m.
   say(/^export var NTF_DEF=\{[^\n]*auto_on:false/m.test(nt) && /^export async function ntfSnapSave\(/m.test(nt) && /IS_STAGING \|\| !ntfAutoOk\(\) \|\| !S\.slack_on \|\| !S\.auto_on/.test(nt) && !/setInterval/.test(nt)
     && (!fnS || (/async function autoRun\(nonce/.test(fnS) && /&used_at=is\.null&created_at=gt\./.test(fnS) && /set\.slack_on !== true \|\| set\.auto_on !== true/.test(fnS) && /MAX_AGE_H/.test(fnS) && !/Deno\.cron/.test(fnS)))
     && /^async function qdbBeforePrint\(/m.test(qd) && /if \(\(await qdbBeforePrint\(\)\) === false\) return;/.test(qj) && /<script src="sat\/qdb\.js[^"]*"><\/script>/.test(qh) && /id="quoteNoRow"/.test(qh)
-    && /^export function quoteOpen\(/m.test(jsAll) && /quotes:\{[^\n]*\n\s*title:'견적 목록', table:'quotes'/.test(jsAll) && html.includes('data-v="quotes"'),
+    && /^export function quoteOpen\(/m.test(jsAll) && /quotes:\{[^\n]*\n\s*(emptyCta:\{[^}]*\}, )?title:'견적 목록', table:'quotes'/.test(jsAll) && html.includes('data-v="quotes"'),
   '㊿+177 Slack 예약 발송(기본 꺼짐 · 서버는 DB 예약 · 일회용 번호 · 꺼짐/오래된 글이면 안 보냄 · 보낼 글은 포탈 계산 · 스테이징은 안 씀) · 견적 DB(저장 · 발행 때 저장+발송 · 견적 번호 표시 · 견적 목록 · OI 에서 열기)'); }
 // ㊿+178 AI 품질 — 근거 표시 · 👎 신고 전체 · 지식 제안/반영 · 숫자 기준(이번 달 · 진행 중 OI) · 채점(건수 단위 · 금액 ±)
 { const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
@@ -213,6 +213,12 @@ say(/^export function tickMemo\(/m.test(jsAll) && /^export function cssvKey\(/m.
   say(/^export var AREA_DEFS=/m.test(nt) && /^export async function ntfAreaOpen\(key\)/m.test(nt) && /^export async function ntfAccounts\(\)/m.test(nt) && /rpc\/portal_accounts/.test(nt) && /kind=in\.\(eq,area\)/.test(nt)
     && /^export function fbOpen\(opt\)/m.test(nt) && /portal_feedback/.test(nt) && /class="hm-own hm-asg/.test(hm) && /asg:'rnl', me:areaMe\('rnl'\)/.test(sh) && /data-a="fb"/.test(ed) && /bulb:'<path/.test(sh),
   '㊿+185 우선 업무 줄 담당(AREA_DEFS · ntfAreaOpen · 포탈 계정 portal_accounts · work_assign area) · 개선 요청(fbOpen · portal_feedback · 위 띠 💡 · 계정 메뉴)'); }
+// ㊿+186 전역 정리 — 제목 한 번(vtDupSync) · 이모지 제거(deEmoji) · 더보기 메뉴(moreMenuSetup) · 빈 화면 버튼(emptyCta) · 푸터
+{ const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
+  const sh = rd('js/shell.js'), gr = rd('js/grid.js'), da = rd('js/dash.js'), css = rd('app.css');
+  say(/^export function vtDupSync\(v\)/m.test(sh) && /^export function deEmoji\(root\)/m.test(sh) && /^export function moreMenuSetup\(\)/m.test(sh) && /\['btnViewReset','btnReload','btnFont','btnTheme'\]/.test(sh) && /try\{ vtDupSync\(v\);/.test(sh)
+    && /data-dge="cta"/.test(gr) && /emptyCta:\{l:'견적 만들기', v:'quote'/.test(rd('js/grids.js')) && !/원본: Supabase DB/.test(da) && /\.vt-dup \.vt-txt\{position:absolute/.test(css) && /td\.act \.ab\{opacity:0/.test(css) && !/43_inbound\.sql 실행과 Apps Script 코드 교체·배포가 필요합니다\.<\/p>/.test(rd('js/inbound.js')),
+  '㊿+186 전역 정리(제목 한 번 · 이모지 제거 · «더보기» 메뉴 · 행 버튼 올렸을 때 · 빈 화면 버튼 · 푸터 · 설정 안내는 관리자만)'); }
 // ㊿+160 연장하면 상태 «재약정»(구분 그대로) · 계약 상세에 «계약 기간 · 연장 이력»
 say(/^export function renewStatus\(r\)/m.test(jsAll) && /var nst=renewStatus\(r\);/.test(jsAll) && /^export function ctPeriods\(c, mine\)/m.test(jsAll) && html.includes('id="dtRenew"'), '연장: 상태 «재약정»(renewStatus) · 계약 상세 연장 이력(ctPeriods · #dtRenew)');
 const idx = html + jsAll;

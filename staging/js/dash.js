@@ -3,7 +3,7 @@
 import { APP_VER, ST } from './state.js';
 import { Viz } from './viz.js';
 import { $, $$, baseLabel, baseRange, bizHas, buildBaseSelect, cssv, el, esc, isCC, isGN, kwToWon, lline, mk, mkLabel, monOf, pct, rawHtml, seriesColor, STATE, tpl, won, wonFull, wonToKw, wrapNavIcons, yOf } from './core.js';
-import { boot, CACHE_KEY, ccAfterKpis, ccAnaCount, ccAnalysisOpen, ccHomeLayout, loadFromDb, onData, renderInbox, SB_RAW, sbWrite, themeBtnSync, toast, uiIconize } from './shell.js';
+import { boot, CACHE_KEY, ccAfterKpis, ccAnaCount, ccAnalysisOpen, ccHomeLayout, loadFromDb, onData, deEmojiStart, moreMenuSetup, renderInbox, SB_RAW, sbWrite, themeBtnSync, toast, uiIconize } from './shell.js';
 import { abortAsk, ask, isAsking, loadAiConfig, runQuery, shortQ } from './ai.js';
 import { GRIDS } from './grids.js';
 import { CH_DEFS, chOf, ctSuccessor, liveData, liveDeltaHtml, liveDeltaOpen, liveMultiOpen, liveSheetDiffOpen, openRenewList, renderChannelView } from './analysis.js';
@@ -162,6 +162,7 @@ export function buildControls(){
   });
 
   try{ wrapNavIcons(); ccHomeLayout(); uiIconize(); }catch(e){}
+  try{ moreMenuSetup(); deEmojiStart(); }catch(e){}   /* ㊿+186 */
   $('#btnTheme').onclick=function(){
     var l = document.documentElement.getAttribute('data-theme')==='light';
     document.documentElement.setAttribute('data-theme', l?'dark':'light');
@@ -256,7 +257,7 @@ export function buildControls(){
   (function(){ var nP=ST.DATA.rows.filter(function(r){return !r.parent;}).length, nC=ST.DATA.rows.length-nP;
     $('#periodLabel').textContent = ST.DATA.monthKeys[0]+' ~ '+ST.DATA.monthKeys[ST.M-1]+' · 계약 '+nP.toLocaleString('ko-KR')+'건'+(nC? ' (+부속 '+nC+')':''); })();
   $('#loadedAt').textContent = '읽은 시각 '+ST.DATA.generatedAt;
-  $('#foot').innerHTML = tpl`원본: Supabase DB · <b>금액 단위: 천원</b> (입력도 천원 · 가격표·견적 단가만 원) · 모든 수정은 변경 이력에 기록됩니다 · 포탈 버전 ${rawHtml(APP_VER)}`+ tpl`${rawHtml(ST.DATA.warnings&&ST.DATA.warnings.length? tpl`<br>⚠️ ${rawHtml(ST.DATA.warnings.join(' / '))}` : '')}`;
+  $('#foot').innerHTML = tpl`포탈 ${rawHtml(APP_VER)} · 금액 단위 천원(가격표 · 견적 단가만 원) · 모든 수정은 변경 이력에 남습니다`+ tpl`${rawHtml(ST.DATA.warnings&&ST.DATA.warnings.length? tpl`<br>⚠️ ${rawHtml(ST.DATA.warnings.join(' / '))}` : '')}`;
 }
 export function uniq(f){
   var s={}; ST.DATA.rows.forEach(function(r){ var v=f(r); if(v) s[v]=1; });

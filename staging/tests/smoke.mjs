@@ -228,7 +228,7 @@ if (S.blk()) {
     assert(b.len > a.len + 40 && /접기/.test(b.btn) && b.saved === '1', JSON.stringify(b));
     await page.evaluate(() => { SVC.switchView('assets'); SVC.switchView('orders'); }); await page.waitForTimeout(300);
     const c = await page.evaluate(() => /접기/.test(document.querySelector('#dvCap .cap-more').textContent)); assert(c, '펼침 상태 기억 안 됨');
-    const d = await page.evaluate(() => { SVC.switchView('contracts'); return document.querySelector('#dvCap .cap-more'); }); assert(!d, '짧은 cap 에 버튼이 생김');
+    const d = await page.evaluate(() => { SVC.switchView('biz'); return document.querySelector('#dvCap .cap-more'); }); assert(!d, '짧은 cap 에 버튼이 생김');   /* ㊿+186 지니언스는 60자부터 접음 — 비즈포탈(28자)로 */
     return a.len + '→' + b.len;
   });
   await S.t('❔ 이 화면 사용법 → 그 자리 검색·질문 창(보던 화면 문맥) · ? 단축키 안내 · Esc 닫기', async () => {
@@ -673,14 +673,14 @@ if (S.blk()) {
   });
   await S.t('창 초점: 열리면 창 안으로 · Tab 은 창 안에서만 · 닫히면 연 버튼으로 · role=dialog 자동', async () => {
     await page.evaluate(() => SVC.switchView('dash')); await page.waitForTimeout(200);
-    await page.focus('#btnTheme'); await page.keyboard.press('Shift+?'); await page.waitForTimeout(200);
+    await page.focus('#btnMore'); await page.keyboard.press('Shift+?'); await page.waitForTimeout(200);   /* ㊿+186 다크 버튼은 «더보기» 메뉴 안 — 보이는 버튼에서 */
     const a = await page.evaluate(() => { const o = document.getElementById('ovlKeys'); return { inside: o.contains(document.activeElement) }; }); assert(a.inside, '초점이 창 밖');
     let out = 0; for (let i = 0; i < 12; i++) { await page.keyboard.press('Tab'); if (!(await page.evaluate(() => document.getElementById('ovlKeys').contains(document.activeElement)))) out++; }
     await page.keyboard.press('Shift+Tab'); await page.keyboard.press('Shift+Tab');
     if (!(await page.evaluate(() => document.getElementById('ovlKeys').contains(document.activeElement)))) out++;
     assert(out === 0, 'Tab 이 창 밖으로 ' + out + '회');
     await page.keyboard.press('Escape'); await page.waitForTimeout(150);
-    const back = await page.evaluate(() => document.activeElement && document.activeElement.id); assert(back === 'btnTheme', '닫힌 뒤 초점 ' + back);
+    const back = await page.evaluate(() => document.activeElement && document.activeElement.id); assert(back === 'btnMore', '닫힌 뒤 초점 ' + back);
     await page.evaluate(() => SVC.openRenewList('due')); await page.waitForTimeout(300);
     const d = await page.evaluate(() => { const m = document.querySelector('#ovlRenew .modal'); return { role: m.getAttribute('role'), modal: m.getAttribute('aria-modal'), lb: m.getAttribute('aria-labelledby'), inside: document.getElementById('ovlRenew').contains(document.activeElement) }; });
     assert(d.role === 'dialog' && d.modal === 'true' && d.lb === 'rnTitle' && d.inside, JSON.stringify(d));
@@ -907,7 +907,7 @@ if (S.blk()) {
     await page.evaluate(() => document.querySelector('#side button[data-v="dash"]').click()); await page.waitForTimeout(300);
     await page.evaluate(() => document.querySelector('#side button[data-v="ops"]').click()); await page.waitForTimeout(500);
     assert(await page.evaluate(() => SVC.OPS.tab) === 'log', '메뉴로 다시 들어왔는데 탭이 처음으로: ' + await page.evaluate(() => SVC.OPS.tab));
-    await page.click('#btnViewReset'); await page.waitForTimeout(500);
+    await page.click('#btnMore'); await page.click('#btnViewReset'); await page.waitForTimeout(500);
     assert(await page.evaluate(() => SVC.OPS.tab) === 'gh', '«초기화» 후 첫 탭 아님: ' + await page.evaluate(() => SVC.OPS.tab));
     await page.evaluate(() => document.querySelector('#side button[data-v="churn"]').click()); await page.waitForTimeout(500);
     await page.evaluate(() => { SVC.CHURN.q = 'zz'; SVC.renderChurn(); window.scrollTo(0, 900); }); await page.waitForTimeout(300);
@@ -915,7 +915,7 @@ if (S.blk()) {
     await page.evaluate(() => document.querySelector('#side button[data-v="dash"]').click()); await page.waitForTimeout(300);
     await page.evaluate(() => document.querySelector('#side button[data-v="churn"]').click()); await page.waitForTimeout(500);
     const r = await page.evaluate(() => ({ q: SVC.CHURN.q, y: Math.round(scrollY) })); assert(r.q === 'zz' && Math.abs(r.y - y0) < 30, JSON.stringify({ r, y0 }));
-    await page.click('#btnViewReset'); await page.waitForTimeout(400);
+    await page.click('#btnMore'); await page.click('#btnViewReset'); await page.waitForTimeout(400);
     const r2 = await page.evaluate(() => ({ q: SVC.CHURN.q, y: Math.round(scrollY) })); assert(r2.q === '' && r2.y === 0, '초기화 ' + JSON.stringify(r2));
     await page.evaluate(() => { SVC.STATE.ind = '제조'; }); await page.evaluate(() => document.querySelector('#side button[data-v="dash"]').click()); await page.waitForTimeout(400);
     const sum = await page.evaluate(() => document.getElementById('gnSum').textContent);
@@ -2085,14 +2085,14 @@ if (S.blk()) {
     await page.evaluate(() => { SVC.wvSet('contracts', '운영'); SVC.navMenu('contracts'); }); await page.waitForTimeout(250);
     await page.fill('#dvSearch', '가상'); await page.waitForTimeout(150);
     await page.click('#dvTable thead th[data-k="mrr"] .thw > span'); await page.waitForTimeout(150);
-    await page.evaluate(() => window.scrollTo(0, 400)); await page.waitForTimeout(100);
+    await page.evaluate(() => window.scrollTo(0, 200)); await page.waitForTimeout(100);   /* ㊿+186 문서 끝이 아닌 자리로(끝이면 행이 늦게 그려질 때 잘림) */
     const before = await page.evaluate(() => ({ q: document.getElementById('dvSearch').value, k: SVC.DV.sortK, y: Math.round(window.scrollY), first: document.querySelector('#dvTable tbody tr td').textContent }));
     await page.evaluate(() => SVC.switchView('oi')); await page.waitForTimeout(250);
     await page.goBack(); await page.waitForTimeout(500);
     const back = await page.evaluate(() => ({ v: SVC.ST.CUR_VIEW, q: document.getElementById('dvSearch').value, k: SVC.DV.sortK, y: Math.round(window.scrollY), first: document.querySelector('#dvTable tbody tr td').textContent }));
     await page.evaluate(() => { SVC.navMenu('oi'); SVC.navMenu('contracts'); }); await page.waitForTimeout(400);
     const menu = await page.evaluate(() => ({ q: document.getElementById('dvSearch').value, k: SVC.DV.sortK, y: Math.round(window.scrollY) }));
-    await page.click('#btnViewReset'); await page.waitForTimeout(250);
+    await page.click('#btnMore'); await page.click('#btnViewReset'); await page.waitForTimeout(250);
     const fresh = await page.evaluate(() => ({ q: document.getElementById('dvSearch').value, k: SVC.DV.sortK, y: Math.round(window.scrollY) }));
     await page.setViewportSize({ width: 1440, height: 1000 });
     assert(before.q === '가상' && before.k === 'mrr' && back.v === 'contracts' && back.q === '가상' && back.k === 'mrr' && Math.abs(back.y - before.y) < 30 && back.first === before.first && menu.q === '가상' && menu.k === 'mrr' && Math.abs(menu.y - before.y) < 30 && fresh.q === '' && fresh.k === null && fresh.y === 0, JSON.stringify({ before, back, menu, fresh }));
@@ -2386,7 +2386,7 @@ if (S.blk()) {
     const loc = await page.evaluate(() => ({ core: document.getElementById('ansLocal').textContent, meta: document.getElementById('ansMeta').textContent }));
     assert(loc.core.includes('지금 목록 ' + a.rows + '행') && /현재 목록 기준/.test(loc.meta), '목록 요약 ' + JSON.stringify(loc));
     await page.evaluate(() => { SVC.closeAnswer('', true); SVC.aipClose(); });
-    await page.click('#btnViewReset'); await page.waitForTimeout(300);
+    await page.click('#btnMore'); await page.click('#btnViewReset'); await page.waitForTimeout(300);
     const r = await st(); assert(r.q === '' && !r.pre && r.f === '{}', '초기화 ' + JSON.stringify(r));
     await page.setViewportSize({ width: 1440, height: 900 }); return a.rows + '행 유지 → 초기화';
   });
@@ -3365,7 +3365,7 @@ if (S.blk()) {
     A.dlg.length = 0; await A.page.click('#qbSave'); await A.page.waitForTimeout(600);
     const p1 = A.db.writes.filter((w) => w.method === 'POST' && w.table === 'report_queries'), nid = p1.length && p1[0].body.id;
     assert(/팀 리포트/.test(L0.team) && /other/.test(L0.team) && !/남의 비공개/.test(L0.team) && /이 브라우저에만 1개/.test(L0.mine) && /로컬 리포트/.test(L0.mine) && L0.mig
-      && /바뀐 열/.test(t1.toast) && /contracts\.없는열/.test(t1.toast) && t1.save === '💾 내 것으로 저장' && t1.id === 'db5'
+      && /바뀐 열/.test(t1.toast) && /contracts\.없는열/.test(t1.toast) && /내 것으로 저장/.test(t1.save) && t1.id === 'db5'
       && A.dlg.some((x) => /내 것으로 새로 저장/.test(x)) && p1.length === 1 && p1[0].body.name === '팀 리포트 (사본)' && p1[0].body.spec.spec.base === 'contracts' && !A.db.writes.some((w) => w.method === 'PATCH' && w.table === 'report_queries'), 'load/save ' + JSON.stringify({ L0, t1, dlg: A.dlg, p1 }));
     await A.page.waitForSelector('#qbLib [data-qshare="db' + nid + '"]', { timeout: 4000 }); await A.page.click('#qbLib [data-qshare="db' + nid + '"]'); await A.page.waitForTimeout(600);
     const sh = A.db.table('report_queries').find((x) => x.id === nid), pr = await A.page.$eval('#qbLib [data-qshare="db' + nid + '"]', (e) => e.getAttribute('aria-pressed'));
@@ -3967,6 +3967,62 @@ if (S.blk()) {
     const no = await N.page.$eval('#fbMsg', (e) => e.textContent); await N.ctx.close();
     assert(/SQL 113/.test(no) && !A.c.errs.filter((e) => !/serviceWorker/.test(e)).length, no + ' ' + A.c.errs.join('|'));
     return '보냄 2 · 내 것만 2 · 관리자 3건 → 처리 1 · 메모';
+  });
+}
+// ㊿+186 전역 정리 — 제목 한 번 · 단위 한 번 · 이모지 → 아이콘 체계 · «더보기» 메뉴 · 행 버튼은 올렸을 때 · 빈 화면 버튼 · 푸터 · 설명 접기 — 가짜 DB
+if (S.blk()) {
+  const mk186 = async (o) => { o = Object.assign({ role: 'super_admin', email: 'tester@example.com', w: 1440, h: 1000, mobile: false }, o || {});
+    const db = new FakeDB(seedData()); const ctx = await browser.newContext({ viewport: { width: o.w, height: o.h }, serviceWorkers: 'block', isMobile: o.mobile, hasTouch: o.mobile }); const page = await ctx.newPage(); const c = collect(page);
+    page.on('dialog', (d) => d.dismiss()); await fakeBackend(page, db, { role: o.role, email: o.email }); await page.goto(url + '/index.html');
+    await page.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA && SVC.ST.DATA.rows.length, null, { timeout: 20000 }); await page.waitForTimeout(600); return { db, ctx, page, c }; };
+  const EMO = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/u;
+  await S.t('㊿+186 제목 한 번(PC): 표 · 분석 · 입력 화면의 카드 제목이 상단 제목과 같으면 화면 읽기용으로만(.vt-dup) · 단위 칩 숨김(상단 ₩ 배지만) · 작은 설명은 남음 · 다른 제목(월별 매출 추이)은 그대로 / 폰은 카드 제목 보임', async () => {
+    const A = await mk186(), P = A.page;
+    const out = {};
+    for (const v of ['contracts', 'churn', 'churnrate', 'ordernew', 'account', 'cngen']) { await P.evaluate(async (v) => { try { await SVC.lazyLoad(v); } catch (e) { } SVC.navMenu(v); }, v); await P.waitForTimeout(350);
+      out[v] = await P.evaluate(() => { const host = document.querySelector('#app [id^="view"]:not(.hidden)'); const h = host.querySelector('.vt-dup'); const vis = (e) => { const r = e.getBoundingClientRect(); return r.width > 1 && r.height > 1; };
+        const txt = h && h.querySelector('.vt-txt'); return { dup: !!h, tag: h && h.tagName, txtVis: txt ? vis(txt) : (h ? vis(h) : null), chip: h && h.querySelector('.ubadge') ? vis(h.querySelector('.ubadge')) : null, small: h && h.querySelector('small') ? vis(h.querySelector('small')) : null, firstH: (host.querySelector('h2,h3') || {}).textContent }; }); }
+    const foot = await P.$eval('#foot', (e) => e.textContent);
+    await A.ctx.close();
+    const M = await mk186({ w: 390, h: 844, mobile: true }); await M.page.evaluate(() => SVC.navMenu('contracts')); await M.page.waitForTimeout(400);
+    const m = await M.page.evaluate(() => { const h = document.getElementById('dvTitle'); const r = h.getBoundingClientRect(); return { dup: h.classList.contains('vt-dup'), vis: r.height > 10, txt: h.textContent.trim() }; }); await M.ctx.close();
+    assert(out.contracts.dup && out.contracts.tag === 'H2' && out.contracts.txtVis === false && out.churn.dup && out.churn.txtVis === false && out.churn.chip === false && out.churn.small === true && out.churnrate.dup && out.ordernew.dup && out.account.dup && !out.cngen.dup && /월별 매출 추이/.test(out.cngen.firstH)
+      && !/Supabase/.test(foot) && /포탈 2026/.test(foot) && m.dup && m.vis && /^계약 관리/.test(m.txt) && !A.c.errs.filter((e) => !/serviceWorker/.test(e)).length, JSON.stringify({ out, foot, m, errs: A.c.errs }));
+    return Object.keys(out).filter((k) => out[k].dup).join(',') + ' · 폰 보임';
+  });
+  await S.t('㊿+186 이모지 → 없음(제목 · 버튼 · 탭 · 다시 그린 화면도) · «더보기» 메뉴에 초기화 · 새로고침 · 글자 크기 · 다크(동작 그대로) · 폰 상단 한 줄 · 행 동작 버튼은 올렸을 때만(PC) · 빈 화면 «견적 만들기» · 설명은 첫 문장 + 도움말 · AI 도움말 글자', async () => {
+    const A = await mk186(), P = A.page;
+    const emo = {}; for (const v of ['adminx', 'account', 'ordernew', 'churn', 'weekly', 'report']) { await P.evaluate(async (v) => { try { await SVC.lazyLoad(v); } catch (e) { } SVC.navMenu(v); }, v); await P.waitForTimeout(350);
+      emo[v] = await P.evaluate((src) => { const E = new RegExp(src, 'u'); const host = document.querySelector('#app [id^="view"]:not(.hidden)'); return [...host.querySelectorAll('h1,h2,h3,h4,button,.adm-tab,.pill,summary')].filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && E.test(String(e.textContent || '').trim().slice(0, 2)); }).map((e) => e.textContent.trim().slice(0, 14)); }, EMO.source); }
+    await P.evaluate(() => SVC.navMenu('adminx')); await P.waitForTimeout(200);
+    const dyn = await P.evaluate(() => { const b = document.createElement('button'); b.className = 'pill'; b.textContent = '🧪 동적 버튼'; document.querySelector('#app [id^="view"]:not(.hidden)').appendChild(b); return new Promise((r) => setTimeout(() => r(b.textContent), 120)); });
+    const mm = await P.evaluate(() => { const m = document.getElementById('moreMenu'), b = document.getElementById('btnMore'); return { hid: m.hidden, items: [...m.querySelectorAll('.mm-it')].map((x) => x.id).join(','), inTop: !!b.closest('.topbar'), themeVis: document.getElementById('btnTheme').getBoundingClientRect().height > 0, reset: document.getElementById('btnViewReset').hidden }; });
+    await P.click('#btnMore'); await P.waitForTimeout(100);
+    const mo = await P.evaluate(() => ({ hid: document.getElementById('moreMenu').hidden, exp: document.getElementById('btnMore').getAttribute('aria-expanded'), themeVis: document.getElementById('btnTheme').getBoundingClientRect().height > 0, focusIn: document.getElementById('moreMenu').contains(document.activeElement) }));
+    await P.click('#btnTheme'); await P.waitForTimeout(150);
+    const th = await P.evaluate(() => ({ theme: document.documentElement.getAttribute('data-theme'), hid: document.getElementById('moreMenu').hidden }));
+    const afterClick = await P.evaluate(() => document.activeElement && document.activeElement.id);
+    await P.click('#btnMore'); await P.click('#btnTheme'); await P.waitForTimeout(100); await P.click('#btnMore'); await P.waitForTimeout(60); await P.keyboard.press('Escape'); await P.waitForTimeout(100);
+    const esc = await P.evaluate(() => ({ hid: document.getElementById('moreMenu').hidden, theme: document.documentElement.getAttribute('data-theme'), act: document.activeElement && document.activeElement.id })); esc.afterClick = afterClick;
+    await P.evaluate(() => SVC.navMenu('contracts')); await P.waitForTimeout(400);
+    const row = await P.evaluate(() => { const b = document.querySelector('#dvTable tbody tr td.act .ab'); return { op0: getComputedStyle(b).opacity }; });
+    await P.hover('#dvTable tbody tr:first-child td:first-child'); await P.waitForTimeout(250);
+    const row2 = await P.evaluate(() => ({ op1: getComputedStyle(document.querySelector('#dvTable tbody tr:first-child td.act .ab')).opacity, other: getComputedStyle(document.querySelector('#dvTable tbody tr:nth-child(3) td.act .ab')).opacity }));
+    const cap = await P.evaluate(() => ({ head: (document.querySelector('#dvCap .cap-head') || document.getElementById('dvCap')).textContent, more: !!document.querySelector('#dvCap .cap-more'), help: document.getElementById('dvHelp').textContent.trim(), unitChipVis: document.querySelector('#dvTitle .ubadge') ? document.querySelector('#dvTitle .ubadge').getBoundingClientRect().height > 0 : null, badge: !document.getElementById('unitBadge').hidden }));
+    await P.evaluate(() => SVC.navMenu('quotes')); await P.waitForTimeout(500);
+    const cta = await P.evaluate(() => { const b = document.querySelector('#dvTable .dg-empty .dg-cta'); return b ? b.textContent : null; });
+    await P.click('#dvTable .dg-empty .dg-cta'); await P.waitForTimeout(300); const v2 = await P.evaluate(() => SVC.ST.CUR_VIEW);
+    await A.ctx.close();
+    const M = await mk186({ w: 390, h: 844, mobile: true }), Q = M.page; await Q.evaluate(() => SVC.navMenu('contracts')); await Q.waitForTimeout(400);
+    const mob = await Q.evaluate(() => { const tb = document.querySelector('#app .topbar'); const vis = [...tb.querySelectorAll('button,a,span.ubadge')].filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && !e.closest('#moreMenu'); }); const tops = [...new Set(vis.map((e) => Math.round(e.getBoundingClientRect().top / 10)))]; return { n: vis.length, rows: tops.length, ab: getComputedStyle(document.querySelector('#dvTable .ab') || document.body).opacity }; });
+    await M.ctx.close();
+    const V = await mk186({ role: 'viewer', email: 'v@example.com' }); await V.page.evaluate(async () => { await SVC.lazyLoad('price'); SVC.navMenu('price'); }); await V.page.waitForTimeout(600);
+    const pv = await V.page.evaluate(() => document.getElementById('viewPrice').textContent); await V.ctx.close();
+    const emoAll = Object.values(emo).flat();
+    assert(emoAll.length === 0 && dyn === '동적 버튼' && mm.hid && mm.items === 'btnViewReset,btnReload,btnFont,btnTheme' && mm.inTop && !mm.themeVis && !mo.hid && mo.exp === 'true' && mo.themeVis && mo.focusIn && th.theme === 'dark' && th.hid && esc.afterClick === 'btnMore' && esc.hid && esc.theme === 'light' && esc.act === 'btnMore'
+      && row.op0 === '0' && row2.op1 === '1' && row2.other === '0' && cap.more && cap.head.length < 70 && cap.help === 'AI 도움말' && cap.unitChipVis === false && cap.badge && cta === '견적 만들기' && v2 === 'quote' && mob.rows === 1 && mob.n <= 8 && mob.ab === '1' && !/sql/i.test(pv) && /관리자가 가격표를 등록하면/.test(pv),
+      JSON.stringify({ emo, dyn, mm, mo, th, esc, row, row2, cap, cta, v2, mob, pv: pv.slice(0, 80) }));
+    return '이모지 0 · 더보기 4 · 폰 상단 ' + mob.n + '개 한 줄 · 빈 화면 → ' + v2;
   });
 }
 await browser.close(); srv.close();
