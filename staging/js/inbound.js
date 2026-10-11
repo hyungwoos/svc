@@ -1,7 +1,7 @@
 /* ===== inbound.js — 인바운드 관리 · 장표 메모 · 주간회의 =====
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { ST } from './state.js';
-import { $, axTime, esc, lline, rawHtml, tpl, won } from './core.js';
+import { $, axTime, esc, fetchT, lline, rawHtml, tpl, won } from './core.js';
 import { SB_RAW, sbTry, sbWrite, toast, todayStr } from './shell.js';
 import { idxs, MX_LIST, renderInstall, renderMatrix, statusOf } from './dash.js';
 import { DV, renderGrid, switchView, xlsxBook } from './grid.js';
@@ -362,11 +362,12 @@ export function inbRefetch(){
     loadInbLog(function(){ loadInbound(function(){
       if(ST.CUR_VIEW==='inbstat') renderInbStat(); else if(ST.CUR_VIEW==='inbound') renderGrid(); }); });
   }
-  fetch(WEEKLY_GAS+'?action=inbound_fetch').then(function(r){return r.json();}).then(function(j){
+  fetchT(WEEKLY_GAS+'?action=inbound_fetch', {}, 180000, '시트 가져오기(GAS)').then(function(r){return r.json();})   /* ㊿+182 시간 제한 */.then(function(j){
     if(j&&j.ok) toast('가져오기 완료', j.msg || inbCounts(j.counts) || '');
     else toast('가져오기 실패', (j&&j.error)||'', 'bad');
     done();
-  }).catch(function(){
+  }).catch(function(e){
+    if(e && e.timeout){ toast('가져오기 응답 없음', String(e.message||e)+' (시트에서 이미 가져왔을 수 있어 다시 실행하지 않음)', 'bad'); done(); return; }   /* ㊿+182 시간 초과는 새 탭으로 다시 실행하지 않음(두 번 가져오기 방지) */
     window.open(WEEKLY_GAS+'?action=inbound_fetch','_blank');   // CORS 차단 등 — 새 탭에서 실행
     setTimeout(done, 5000);
   });
@@ -734,13 +735,14 @@ export function wkPrev(){
 export async function wkRefetch(){
   toast('주간보고 취합','시트에서 가져오는 중… (수십 초 걸릴 수 있습니다)','info');
   try{
-    var r=await fetch(WEEKLY_GAS+'?action=weekly_fetch');
+    var r=await fetchT(WEEKLY_GAS+'?action=weekly_fetch', {}, 180000, '주간보고 취합(GAS)');
     var j=await r.json();
     if(!j.ok) throw new Error(j.error||'실패');
     toast('취합 완료', j.msg||('사업팀·MSS팀 갱신'));
   }catch(e){
+    if(/** @type {any} */(e) && /** @type {any} */(e).timeout){ toast('주간보고 취합 응답 없음', String(/** @type {any} */(e).message||e)+' — 잠시 뒤 주간 보고를 다시 열어 확인하세요', 'bad'); }
     // CORS 차단 등 — 새 탭에서 실행 (결과 JSON 표시)
-    window.open(WEEKLY_GAS+'?action=weekly_fetch','_blank');
+    else window.open(WEEKLY_GAS+'?action=weekly_fetch','_blank');
   }
   WK_CACHE={};   // 새로 취합했으니 캐시 비움
   setTimeout(function(){ renderWeekly(); }, 1500);

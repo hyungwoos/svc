@@ -14,7 +14,7 @@
    · ㊿+177 예약 발송(선택 · 기본 꺼짐 · SQL 108): 설정에서 요일 · 시각(한국 시각)을 고르면 서버(pg_cron → notify 함수)가 그때 팀 채널로 보냄
        보낼 글은 슈퍼 관리자가 포탈을 열 때 이 파일의 같은 계산(ntfSlackPlan)으로 만들어 notify_snapshot 에 둠(ntfSnapSave) — 서버에 계산식을 따로 두지 않음 */
 import { APP_VER, IS_STAGING, ST } from './state.js';
-import { bizHas, canWrite, lline, mk, monOf, rawHtml, SB_URL, tickMemo, tpl, won } from './core.js';
+import { bizHas, canWrite, fetchT, lline, mk, monOf, rawHtml, SB_URL, tickMemo, tpl, won } from './core.js';
 import { expAmtOf, expEligible } from './dash.js';
 import { ico, sbHeaders, sbTry, sbWrite, toast, todayStr } from './shell.js';
 import { ctSuccessor, dcAckLoad, dcDailySave, dcRules, openRenewList, renewScan } from './analysis.js';
@@ -491,7 +491,7 @@ export function ntfSlackPlan(omap){
   return {team:{channel:S.team_channel, n:all.length, text:ntfSlackText(all, '🔔 포탈 알림 '+day+' — '+all.length+'건')}, dms:dms, more:Math.max(0, Object.keys(per).length-30)};
 }
 export async function ntfCall(body){
-  var r=await fetch(SB_URL+'/functions/v1/notify', {method:'POST', headers:sbHeaders(true), body:JSON.stringify(body)});
+  var r=await fetchT(SB_URL+'/functions/v1/notify', {method:'POST', headers:sbHeaders(true), body:JSON.stringify(body)}, 60000, 'notify 함수', !!(body && (body.dry || body.mode==='health' || body.mode==='preview')));   /* ㊿+182 시간 제한 — 보내기는 다시 보내지 않음 */
   /** @type {any} */ var j=null; try{ j=await r.json(); }catch(e){}
   if(!r.ok || !j) throw new Error((j && j.error) || ('notify 함수 응답 '+r.status+(r.status===404? ' — Edge Function «notify» 를 먼저 배포하세요(README)' : '')));
   return j;

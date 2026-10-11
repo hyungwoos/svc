@@ -24,6 +24,7 @@ const b64 = (s: string) => { const u = new TextEncoder().encode(s); let bin = ''
 const treePosts: string[][] = [];
 let blobInFlight = 0, blobMax = 0, blobPosts = 0;
 let lastDeployMeta: any = null;
+let ghBad = false, slackDone = 0;
 
 installFetch(async (url, method, body, init) => {
   if (url.includes('/auth/v1/user')) return J({ id: 'u1', email });
@@ -34,6 +35,7 @@ installFetch(async (url, method, body, init) => {
     return J(logRows.slice(-30));
   }
   if (url.includes('api.github.com')) {
+    if (/\/repos\/hyungwoos\/svc$/.test(url)) return ghBad ? J({ message: 'Bad credentials' }, 401) : new Response(JSON.stringify({ full_name: 'hyungwoos/svc' }), { status: 200, headers: { 'content-type': 'application/json', 'github-authentication-token-expiration': '2026-11-01 09:00:00 +0900' } });   // ㊿+182 연동 상태
     /* v1.6 gh_rollback — 옛 커밋(OLD) 의 트리 · 비교 · 커밋 정보 */
     if (url.includes('/git/trees/oldtree')) return J({ tree: OLD_TREE });
     if (/\/commits\/(aaaa1111|ffff9999)$/.test(url)) { const z = url.endsWith('ffff9999'); return J({ sha: (z ? 'f' : 'a').repeat(40), commit: { tree: { sha: 'oldtree' }, message: '스테이징 → 운영 승격 (3개 파일)\n상세', author: { date: '2026-10-09T01:00:00Z' } } }); }
@@ -60,7 +62,10 @@ installFetch(async (url, method, body, init) => {
     if (url.endsWith('/secrets') && method === 'GET') return J([{ name: 'SLACK_BOT_TOKEN', value: 'x' }]);
     return J({ message: 'not mocked ' + url }, 404);
   }
-  if (url.includes('slack.com')) return J({ ok: true, ts: '1' });
+  if (url.includes('slack.com/api/auth.test')) return new Response(JSON.stringify({ ok: true, team: '가상팀', user: 'svc-bot' }), { status: 200, headers: { 'content-type': 'application/json', 'x-oauth-scopes': 'chat:write,users:read.email' } });
+  if (url.includes('slack.com')) { await new Promise((r) => setTimeout(r, 150)); slackDone++; return J({ ok: true, ts: '1' }); }   // ㊿+182 늦게 답해도 응답 전에 끝나야 함(기다림)
+  if (url.includes('/rest/v1/remind_log')) return J([{ sent_at: '2026-09-25T00:00:00Z', period: '2026-10', kind: 'monthly', ok: true, error: null, dry: false, sent_by: 'cron' }]);
+  if (url.includes('/rest/v1/api_access_log')) return J([], 404);
   return undefined;
 });
 Deno.env.set('SUPABASE_URL', 'https://mockref.supabase.co'); Deno.env.set('SUPABASE_ANON_KEY', 'anon'); Deno.env.set('SUPABASE_SERVICE_ROLE_KEY', 'svc');
@@ -72,12 +77,20 @@ const P = (o: Record<string, unknown>) => Object.assign({ pin: '7391' }, o);
 console.log('ops 함수');
 { const r = await call({ action: 'status' }, { token: null }); ok(r.status === 401, '토큰 없음 → 401', r.status); }
 { const r = await call({ action: 'status' }); ok(r.status === 200 && r.j.ok && r.j.pin_set && r.j.github?.token_set && r.j.mgmt_token_set, 'status: PIN 없이 설정 상태', r.j && { pin_set: r.j.pin_set, gh: r.j.github?.repo }); }
+{ const r = await call({ action: 'status' }); ok(r.j.ok && r.j.integrations === undefined, 'status: deep 없으면 연동 확인 안 함(외부 호출 없음)'); }
+{ const n0 = calls.length; const r = await call({ action: 'status', deep: true }); const I = r.j.integrations || {};
+  ok(r.j.ok && I.github?.ok && I.github.expires === '2026-11-01 09:00:00 +0900' && I.mgmt?.ok && I.slack?.ok && I.slack.team === '가상팀' && I.slack.scopes.includes('users:read.email'), 'status deep: GitHub 토큰 유효 · 만료일 · 관리 토큰 · Slack 봇 · 권한', I);
+  ok(Array.isArray(I.remind) && I.remind[0].period === '2026-10' && I.export === null, 'status deep: 만기 알림 마지막(remind_log) · 내보내기 표 없음 = null', { r: I.remind, e: I.export });
+  ok(!JSON.stringify(r.j).includes('ghp_test') && !JSON.stringify(r.j).includes('sbp_test') && !JSON.stringify(r.j).includes('xoxb'), 'status deep: 토큰 값은 돌려주지 않음');
+  ok(calls.slice(n0).every((c) => c.method === 'GET' || /auth\.test|user_roles|auth\/v1/.test(c.url)), 'status deep: 읽기만(쓰기 호출 없음)', calls.slice(n0).map((c) => c.method + ' ' + c.url.slice(8, 60))); }
+ghBad = true; { const r = await call({ action: 'status', deep: true }); ok(r.j.ok && r.j.integrations.github.ok === false && /만료/.test(r.j.integrations.github.error), 'status deep: 토큰 틀림/만료 → 안내', r.j.integrations.github); } ghBad = false;
 { const r = await call({ action: 'gh_list' }); ok(r.status === 403 && /PIN/.test(r.j.error), 'PIN 없음 → 403', r.j?.error); }
 { const r = await call(P({ action: 'gh_list' })); ok(r.j.ok && Array.isArray(r.j.tree ?? r.j.files ?? r.j.items) || (r.j.ok && JSON.stringify(r.j).includes('index.html')), 'gh_list: 트리', Object.keys(r.j)); }
 { const r = await call(P({ action: 'gh_get', path: 'index.html' })); ok(r.j.ok && r.j.app_ver === '2026-09-16 ㊿+137', 'gh_get: meta app-ver 인식', r.j.app_ver); }
 { const r = await call(P({ action: 'gh_get', path: 'staging/index.html' })); ok(r.j.ok && r.j.app_ver === '2026-09-16 ㊿+129', 'gh_get: 옛 var APP_VER 도 인식', r.j.app_ver); }
 { treePosts.length = 0; const r = await call(P({ action: 'gh_put', files: [{ path: 'index.html', content: '<html>x</html>' }, { path: 'js/app.js', content: 'var a=1;' }], message: 'test' }));
-  ok(r.j.ok && r.j.commit === 'c0ffee1234567' && treePosts.length === 1 && treePosts[0].length === 2, 'gh_put: 파일 2개 → 커밋 1개', treePosts[0]); }
+  ok(r.j.ok && r.j.commit === 'c0ffee1234567' && treePosts.length === 1 && treePosts[0].length === 2, 'gh_put: 파일 2개 → 커밋 1개', treePosts[0]);
+  ok(slackDone >= 1, '슬랙 알림(OPS_SLACK_CHANNEL)을 응답 전에 끝냄(기다림 · 150ms 늦은 Slack)', slackDone); }
 // v1.5 커밋 빠르게 — 내용이 같은 파일은 건너뜀(git blob SHA 비교) · 바뀐 파일은 동시에 업로드 · 전부 같으면 커밋 안 함
 { const mod = await import('../../supabase/functions/ops/index.ts');
   const sha = await mod.gitBlobSha(b64('hello\n')); ok(sha === 'ce013625030ba8dba906f756967f9e9ca394464a', 'gitBlobSha = git hash-object 와 같음', sha);

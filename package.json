@@ -1,12 +1,13 @@
 {
   "name": "svc-portal",
   "private": true,
-  "description": "Genians 서비스사업부 통합 관리 포탈 — 정적 포탈 + 테스트 (실행: npm run check · npm run lint · npm test)",
+  "description": "Genians 서비스사업부 통합 관리 포탈 — 정적 포탈 + 테스트 (실행: npm run check · npm run lint · npm run test:unit · npm test · npm run test:fn)",
   "type": "module",
   "scripts": {
     "check": "node tests/check.mjs",
     "test": "node tests/smoke.mjs",
-    "test:fn": "deno check supabase/functions/*/index.ts && deno run -A tests/fn/ops.test.ts && deno run -A tests/fn/remind.test.ts && deno run -A tests/fn/aicheck.test.ts && deno run -A tests/fn/quote-worker.test.ts",
+    "test:unit": "node --test tests/unit.mjs",
+    "test:fn": "deno check supabase/functions/*/index.ts && deno run -A tests/fn/ops.test.ts && deno run -A tests/fn/remind.test.ts && deno run -A tests/fn/aicheck.test.ts && deno run -A tests/fn/notify.test.ts && deno run -A tests/fn/export.test.ts && deno run -A tests/fn/quote-worker.test.ts",
     "test:install": "npx playwright install --with-deps chromium",
     "lint": "node tests/lint.mjs",
     "typecheck": "node tests/typecheck.mjs"

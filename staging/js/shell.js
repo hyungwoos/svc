@@ -2,7 +2,7 @@
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { IS_QA, ST } from './state.js';
 import { Viz } from './viz.js';
-import { $, applyPerms, bizHas, bizKey, canView, canWrite, clearSess, cssv, el, esc, isCC, isGN, keepLogin, lfFail, lfMsg, lfOk, lfWait, LIVE2CODE, lline, loadPerms, loginRecord, mfaGate, mfaVerifiedOf, mfaWarnIfNeeded, mk, monOf, navText, PERF, perfDev, perfNet, perfRec, permWriteGuard, pwRule, rawHtml, refreshToken, restoreSess, saveSess, SB_KEY, SB_URL, seriesColor, sessIdleOver, sessRead, sessTooOld, sessWrite, STATE, tpl, won } from './core.js';
+import { $, applyPerms, bizHas, bizKey, canView, canWrite, clearSess, cssv, el, esc, fetchT, isCC, isGN, keepLogin, lfFail, lfMsg, lfOk, lfWait, LIVE2CODE, lline, loadPerms, loginRecord, mfaGate, mfaVerifiedOf, mfaWarnIfNeeded, mk, monOf, navText, PERF, perfDev, perfNet, perfRec, permWriteGuard, pwRule, rawHtml, refreshToken, restoreSess, saveSess, SB_KEY, SB_URL, seriesColor, sessIdleOver, sessRead, sessTooOld, sessWrite, STATE, tpl, won } from './core.js';
 import { buildControls, expN, expScan, hbars, idxs, kpiOpen, monthlyTotal, renderAll, renderInstall, renderKpis, renderMatrix, renewNeedScan } from './dash.js';
 import { ask } from './ai.js';
 import { applyCodes, GRIDS, loadCodes } from './grids.js';
@@ -1041,14 +1041,14 @@ export function sbHeaders(json){
   return h;
 }
 export async function sbGet(q){
-  var r=await fetch(SB_URL+'/rest/v1/'+q,{headers:sbHeaders()});
+  var r=await fetchT(SB_URL+'/rest/v1/'+q,{headers:sbHeaders()}, 60000, 'DB');   /* ㊿+182 시간 제한 */
   if(!r.ok) throw new Error('DB 읽기 실패 ('+r.status+'): '+(await r.text()).slice(0,180));
   return r.json();
 }
 export async function sbAll(q){
   // 1000행 페이지네이션 — count 먼저 얻고 병렬로
-  var h=await fetch(SB_URL+'/rest/v1/'+q+(q.indexOf('?')>=0?'&':'?')+'limit=1',
-    {headers:Object.assign(sbHeaders(),{Prefer:'count=exact'})});
+  var h=await fetchT(SB_URL+'/rest/v1/'+q+(q.indexOf('?')>=0?'&':'?')+'limit=1',
+    {headers:Object.assign(sbHeaders(),{Prefer:'count=exact'})}, 60000, 'DB');
   /* ㊿+141: 서버 오류(5xx)를 «0행»으로 넘기면 데이터가 다 사라진 것처럼 보임 → 오류로 올림.
      401/403/404(권한·표 없음)는 예전처럼 빈 목록 — 장비 전용 계정 판별·선택 표(sbTry)가 그 동작에 기대고 있음 */
   if(h.status>=500) throw new Error('DB 읽기 실패 ('+h.status+') — '+q.split('?')[0]);
@@ -1159,8 +1159,8 @@ export function shapeVs(rows){
 
 export var CACHE_KEY='svc_cache_v1';
 export async function sbRpc(name){
-  var r=await fetch(SB_URL+'/rest/v1/rpc/'+name,{
-    method:'POST', headers:sbHeaders(true), body:'{}'});
+  var r=await fetchT(SB_URL+'/rest/v1/rpc/'+name,{
+    method:'POST', headers:sbHeaders(true), body:'{}'}, 90000, 'DB', true);
   if(!r.ok) throw new Error('rpc '+name+' '+r.status);
   return r.json();
 }
@@ -1173,7 +1173,7 @@ export function prefetchData(){
     var s=sessRead(); if(!s || !s.a || s.p===false || sessTooOld(s) || sessIdleOver()) return;   /* ㊿+180 30일 지났거나 자동 로그아웃 시간이 지난 로그인은 미리 받지 않음(곧 로그인 화면) */
     if(Math.floor(Date.now()/1000) >= (s.e||0)-120) return;   // 곧 만료 → 연장 뒤 새 토큰으로 받음
     PREFETCH.tok=s.a; PREFETCH.at=Date.now();
-    PREFETCH.p=fetch(SB_URL+'/rest/v1/rpc/load_all', {method:'POST', headers:{apikey:SB_KEY, Authorization:'Bearer '+s.a, 'Content-Type':'application/json'}, body:'{}'})
+    PREFETCH.p=fetchT(SB_URL+'/rest/v1/rpc/load_all', {method:'POST', headers:{apikey:SB_KEY, Authorization:'Bearer '+s.a, 'Content-Type':'application/json'}, body:'{}'}, 90000, 'DB', true)
       .then(function(r){ return r.ok? r.json() : null; }).catch(function(){ return null; });
   }catch(e){ PREFETCH.p=null; }
 }

@@ -2,6 +2,9 @@
 // 실행: node tests/smoke.mjs      (Playwright chromium 필요: npx playwright install --with-deps chromium)
 // 환경: SMOKE_DIR=서빙할 폴더(기본 저장소 루트) · SMOKE_SHOT=1 이면 실패 화면을 tests/out/ 에 저장
 import fs from 'node:fs';
+import os from 'node:os';
+import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import http from 'node:http';
 import path from 'node:path';
 import { chromium } from 'playwright';
@@ -10,6 +13,28 @@ import { FakeDB, fakeBackend, seedData, nowIdx, idxYm } from './fakedb.mjs';
 
 const DIR = process.env.SMOKE_DIR || ROOT;
 const OUT = path.join(ROOT, 'tests', 'out'); fs.mkdirSync(OUT, { recursive: true });
+/* ㊿+182 병렬 — 따로 정하지 않으면 3개 프로세스가 동시에 돌고, 맨 위 블록({ … })마다 먼저 잡은 프로세스가 맡음(작업 큐 · mkdir 잠금)
+   · SMOKE_SHARDS=1 이면 예전처럼 하나로 · SMOKE_ONLY(이름 거르기)도 하나로 · 결과는 합쳐서 tests/out/smoke.json */
+if (!process.env.SMOKE_CLAIM && !process.env.SMOKE_ONLY && process.env.SMOKE_SHARDS !== '1') {
+  const N = Math.max(1, Math.min(6, Number(process.env.SMOKE_SHARDS) || 3)), t0 = Date.now();
+  const claim = fs.mkdtempSync(path.join(os.tmpdir(), 'smoke-claim-'));
+  const rs = await Promise.all(Array.from({ length: N }, (_, i) => new Promise((res) => {
+    const out = []; const p = spawn(process.execPath, [fileURLToPath(import.meta.url)], { env: { ...process.env, SMOKE_CLAIM: claim, SMOKE_PART: String(i) }, stdio: ['ignore', 'pipe', 'pipe'] });
+    p.stdout.on('data', (d) => out.push(d)); p.stderr.on('data', (d) => out.push(d));
+    p.on('close', (code) => res({ i, code, text: Buffer.concat(out).toString() }));
+  })));
+  let all = [];
+  for (const r of rs) {
+    console.log(`── 묶음 ${r.i + 1}/${N} (종료 ${r.code}) ──\n` + r.text.split('\n').filter((l) => !/^smoke: |^::error/.test(l)).join('\n').trim());
+    try { all = all.concat(JSON.parse(fs.readFileSync(path.join(OUT, 'smoke-' + r.i + '.json'), 'utf8'))); }
+    catch (e) { all.push({ label: '묶음 ' + (r.i + 1) + ' 결과 없음(프로세스가 중간에 멈춤 · 종료 ' + r.code + ')', ok: false, error: r.text.slice(-400) }); }
+  }
+  const S0 = new Suite('smoke'); S0.results = all; const ok0 = S0.report();
+  console.log(`(병렬 ${N} · ${Math.round((Date.now() - t0) / 1000)}초 · 블록 ${fs.readdirSync(claim).length}개)`);
+  try { fs.rmSync(claim, { recursive: true, force: true }); } catch { /* noop */ }
+  fs.writeFileSync(path.join(OUT, 'smoke.json'), JSON.stringify(all, null, 1));
+  process.exit(ok0 ? 0 : 1);
+}
 const { srv, url } = await serve(DIR);
 const browser = await chromium.launch();
 const S = new Suite('smoke');
@@ -28,7 +53,7 @@ async function open(opts = {}) {
 async function shot(page, name) { try { await page.screenshot({ path: path.join(OUT, name + '.png') }); } catch { /* noop */ } }
 
 // 1) 기본 로드
-{
+if (S.blk()) {
   const { ctx, page, errs, csp } = await open();
   await S.t('로그인 상태로 열림 · 오류 없음', async () => { assert(await page.evaluate(() => !document.getElementById('app').classList.contains('hidden') && !!SVC.ST.DATA), '#app 숨김 또는 DATA 없음'); assert(!errs.length, 'pageerror: ' + errs.join(' | ')); return await page.evaluate(() => SVC.APP_VER); });
   await S.t('홈: KPI 타일·인박스', async () => { const k = await page.$$eval('#kpis .kpi, #ccHeroHost .kpi', (e) => e.length); const ib = await page.$$eval('#ccInbox .ib-row, #ccInbox .ib-empty', (e) => e.length); assert(k >= 4, 'kpi ' + k); assert(ib >= 1, 'inbox ' + ib); return { kpi: k, inbox: ib }; });
@@ -65,7 +90,7 @@ async function shot(page, name) { try { await page.screenshot({ path: path.join(
   await ctx.close();
 }
 // 2) 저장 동작 — 계약 연장이 올바른 요청(PATCH + DELETE + POST 12행 + change_log)을 보내는지
-{
+if (S.blk()) {
   const writes = [];
   const { ctx, page, errs } = await open({ onWrite: (w) => writes.push(w) });
   await S.t('만기 처리 › 연장 저장 요청 모양', async () => {
@@ -81,7 +106,7 @@ async function shot(page, name) { try { await page.screenshot({ path: path.join(
   await ctx.close();
 }
 // 3) 권한 — admin_viewer 는 쓰기 차단 · 배포·운영 메뉴 숨김
-{
+if (S.blk()) {
   const { ctx, page } = await open({ role: 'admin_viewer', email: 'viewer@example.com' });
   await S.t('admin_viewer: 쓰기 차단 · ops 메뉴 숨김', async () => {
     const r = await page.evaluate(async () => { let blocked = false; try { await SVC.sbWrite('PATCH', 'contracts?id=eq.1', { note: 'x' }); } catch (e) { blocked = /권한/.test(String(e.message || e)); } return { blocked, opsMenu: document.querySelector('#side button[data-v="ops"]').style.display !== 'none', isViewer: !!SVC.ST.IS_VIEWER_ROLE }; });
@@ -90,7 +115,7 @@ async function shot(page, name) { try { await page.screenshot({ path: path.join(
   await ctx.close();
 }
 // 4) 위성 페이지 — 세션 인식 · 오류 없음
-for (const f of ['quote.html', 'report.html', 's1.html', 'kk.html']) {
+if (S.blk()) for (const f of ['quote.html', 'report.html', 's1.html', 'kk.html']) {
   if (!fs.existsSync(path.join(DIR, f))) { console.log('  · ' + f + ' 없음(건너뜀)'); continue; }
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } }); const page = await ctx.newPage(); const c = collect(page);
   await mockBackend(page); await page.goto(url + '/' + f); await page.waitForTimeout(1500);
@@ -98,14 +123,14 @@ for (const f of ['quote.html', 'report.html', 's1.html', 'kk.html']) {
   await ctx.close();
 }
 // 5) 모바일 폭
-{
+if (S.blk()) {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 820 }, isMobile: true }); const page = await ctx.newPage(); const c = collect(page);
   await mockBackend(page); await page.goto(url + '/index.html'); await page.waitForTimeout(2200);
   await S.t('모바일 390px: 하단 탭 · 오류 없음 · 가로 스크롤 없음', async () => { assert(!c.errs.length, c.errs.join(' | ')); const tabs = await page.$$eval('#mtabs button', (b) => b.length).catch(() => 0); assert(tabs >= 3, 'mtabs ' + tabs); const over = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth); assert(over <= 2, '가로 넘침 ' + over + 'px'); return { tabs, over }; });
   await ctx.close();
 }
 // 6) 배포·운영 — 대상(운영/스테이징) · 폴더 경로 유지 · 동기화/승격 · 시스템 점검 (ops 함수는 가짜)
-{
+if (S.blk()) {
   const opsCalls = [];
   const seal = { exists: false, puts: [] };
   const opsWrites = [];
@@ -182,7 +207,7 @@ for (const f of ['quote.html', 'report.html', 's1.html', 'kk.html']) {
   await ctx.close();
 }
 // ⑤ UX 2단계 · ⑥ AI 2단계 (㊿+139): 동작 열 여백 · 설명 접기 · ❔ 화면 도움말 · ? 단축키 · aria-label · 👍/👎 피드백
-{
+if (S.blk()) {
   const writes = [];
   const { ctx, page, errs } = await open({ onWrite: (w) => writes.push(w) });
   await S.t('표 동작 열: 가로로 넘칠 때만 마지막 데이터 열에 여백(act-pad)', async () => {
@@ -250,7 +275,7 @@ for (const f of ['quote.html', 'report.html', 's1.html', 'kk.html']) {
   await ctx.close();
 }
 // 7) 브라우저 오류 수집 — 화면 JS 오류가 client_errors 로 1번만 기록되는지
-{
+if (S.blk()) {
   const writes = [];
   const { ctx, page } = await open({ onWrite: (w) => writes.push(w) });
   await S.t('JS 오류 → client_errors 기록(중복 1회)', async () => {
@@ -262,7 +287,7 @@ for (const f of ['quote.html', 'report.html', 's1.html', 'kk.html']) {
   await ctx.close();
 }
 // 8) 스테이징 경로 — staging/ 사본이 있으면 띠가 보이는지
-if (fs.existsSync(path.join(DIR, 'staging', 'index.html'))) {
+if (S.blk() && fs.existsSync(path.join(DIR, 'staging', 'index.html'))) {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 } }); const page = await ctx.newPage(); const c = collect(page);
   await mockBackend(page); await page.goto(url + '/staging/index.html'); await page.waitForTimeout(2200);
   await S.t('스테이징: STAGING 띠 · 배포 기본 대상 스테이징', async () => { assert(!c.errs.length, c.errs.join(' | ')); assert(await page.$('#stagingBar'), '띠 없음'); /* ㊿+153: staging/ 은 다음 버전일 수 있음 — 모듈 전환 뒤 포탈 이름은 window.SVC 에(예전 버전은 window 에 바로) */
@@ -272,7 +297,7 @@ if (fs.existsSync(path.join(DIR, 'staging', 'index.html'))) {
   await ctx.close();
 } else console.log('  · staging/ 없음(건너뜀)');
 // 9) 2단계 인증(MFA) — 등록된 계정: 저장된 aal1 세션 → 코드 창 → aal2 세션 교체 · 취소 · 로그인 화면 흐름 · 내 계정 카드(끄기·켜기)
-{
+if (S.blk()) {
   const authCalls = []; let factors = [{ id: 'f1', factor_type: 'totp', status: 'verified', friendly_name: 'SVC 포탈 2026-10-03', created_at: '2026-10-03T00:00:00Z' }];
   let policy = { required: false, deadline: null };   // SQL 89 mfa_policy 흉내
   const today = new Date().toISOString().slice(0, 10); const adminCalls = [];
@@ -433,7 +458,7 @@ if (fs.existsSync(path.join(DIR, 'staging', 'index.html'))) {
   }
 }
 // 10) 견적서 직인 — quote.html 이 비공개 Storage 에서 로그인 토큰으로 받아 <img> 에 넣는지 · 없으면 숨김
-if (fs.existsSync(path.join(DIR, 'quote.html'))) {
+if (S.blk() && fs.existsSync(path.join(DIR, 'quote.html'))) {
   for (const has of [true, false]) {
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } }); const page = await ctx.newPage(); const c = collect(page); const got = [];
     await mockBackend(page, { extra: async (route, u, m) => { if (!u.includes('/storage/v1/object/authenticated/private/seal.jpg')) return false; got.push(route.request().headers()['authorization'] || ''); if (has) await route.fulfill({ status: 200, contentType: 'image/png', body: PNG1 }); else await route.fulfill({ status: 400, contentType: 'application/json', body: '{"message":"Object not found"}' }); return true; } });
@@ -448,7 +473,7 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
   }
 }
 // 코드 목록 (code_lists · SQL 93 · ㊿+137): 표 → *_OPTS 갱신 · 관리자 › 코드 관리 · 데이터 점검 병합·mrr 채우기
-{
+if (S.blk()) {
   const CODE_ROWS = [
     { kind: 'channel', value: '일반', label: null, sort: 1, active: true }, { kind: 'channel', value: '조달', label: null, sort: 2, active: true }, { kind: 'channel', value: '에스원', label: null, sort: 3, active: true },
     { kind: 'channel', value: 'LGU+', label: null, sort: 4, active: true }, { kind: 'channel', value: '유통', label: null, sort: 5, active: true }, { kind: 'channel', value: '테스트채널', label: null, sort: 6, active: true, note: 'smoke' },
@@ -536,7 +561,7 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
   await ctx.close();
 }
 // 견적 Worker v2 (2026-10-04): 비밀번호 대신 포탈 로그인 토큰(Bearer) · 401 → 토큰 갱신 후 재시도 · 옛 비밀번호 정리 · 목록 이스케이프
-{
+if (S.blk()) {
   const wk = []; let w401 = 0, refreshed = 0;
   const workerRoute = async (route) => {
     const rq = route.request(), u = rq.url(), hd = rq.headers();
@@ -601,7 +626,7 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
   }
 }
 // ㊿+141 UX: 창 바깥 클릭으로 닫기 · 입력 중 확인 · 초점 들어가기/가두기/되돌리기 · 배포·운영 기록 넘침 · 서버 오류 표시 · 접근성 이름
-{
+if (S.blk()) {
   const files = Array.from({ length: 22 }, (_, i) => 'staging/js/file' + i + '.js').join(', ');
   const recent = Array.from({ length: 8 }, (_, i) => ({ at: '2026-10-04T05:1' + i + ':00', actor: 'tester@example.com', action: i % 2 ? 'gh_put' : 'sql_run', target: i % 2 ? 'staging/.gitignore, staging/app.css, ' + files : '59개 문장', summary: '포탈 ㊿+141 · ' + files, ok: i !== 3, error: i === 3 ? 'GitHub 422 ' + files : null, ms: 900 }));
   const { ctx, page, errs } = await open({ extra: async (route, u) => { if (u.includes('/functions/v1/ops')) { await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, log_ok: true, github: { repo: 'x/y', branch: 'main', token_set: true }, recent }) }); return true; } return false; } });
@@ -690,7 +715,7 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
   await ctx.close();
 }
 // ㊿+141: 서버 오류(5xx)는 «데이터 없음»이 아니라 오류로 보임 · 캐시로 그린 뒤 최신 로드 실패는 알림
-{
+if (S.blk()) {
   const { ctx, page } = await open({ extra: async (route, u) => { if (u.includes('/rpc/load_all') || /\/rest\/v1\/(customers|contracts|monthly_revenue)\b/.test(u)) { await route.fulfill({ status: 503, contentType: 'application/json', body: '{"message":"down"}' }); return true; } return false; } });
   await S.t('DB 5xx → «데이터를 불러오지 못했습니다» (빈 화면으로 넘기지 않음)', async () => {
     const t = await page.evaluate(() => ({ load: (document.getElementById('loading') || {}).textContent || '', data: !!SVC.ST.DATA }));
@@ -698,7 +723,7 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
   });
   await ctx.close();
 }
-{
+if (S.blk()) {
   let fail = false;
   const { ctx, page } = await open({ extra: async (route, u) => { if (fail && (u.includes('/rpc/load_all') || /\/rest\/v1\/(customers|contracts|monthly_revenue)\b/.test(u))) { await route.fulfill({ status: 502, contentType: 'application/json', body: '{}' }); return true; } return false; } });
   await S.t('캐시로 그린 뒤 최신 데이터 실패 → 경고 토스트', async () => {
@@ -711,7 +736,7 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
   await ctx.close();
 }
 // ㊿+142 디자인 정리: 글자 크기 7단계 · 버튼 4종 · 표 열 너비 조절 · 메뉴 «사업 영역» 한 그룹
-{
+if (S.blk()) {
   const { ctx, page, errs } = await open();
   await S.t('글자 크기: 화면 글자는 6단계(보조 12·13 · 본문 14·15 · 제목 18·22) + 큰 숫자(≥24)만 · 12px 미만 0 (㊿+169)', async () => {
     const STEP = [12, 13, 14, 15, 18, 22]; const bad = {}; let small = 0;
@@ -757,7 +782,7 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
   });
   await ctx.close();
 }
-{
+if (S.blk()) {
   const { ctx, page, errs } = await open();
   await S.t('메뉴 편집 예전 설정(옛 «사업 영역 · MDR» 숨김·순서) → 새 그룹으로 옮김', async () => {
     await page.evaluate(() => { localStorage.setItem(SVC.menuConfKey(), JSON.stringify({ order: ['g:장비', 'g:사업 영역 · MDR', 'g:전체 데이터', 'g:사업 영역 · Cloud NAC'], hidden: { 'g:사업 영역 · MDR': 1 } })); SVC.applyMenuConf(); SVC.buildRail(); });
@@ -769,7 +794,7 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
   await ctx.close();
 }
 // ㊿+143 배포 안전장치: 파일 자리 자동 · 저장소 파일은 루트 · 워크플로는 커밋에서 빼고 안내 · 커밋 전 경고 · 저장소 점검/정리
-{
+if (S.blk()) {
   const calls = []; const dialogs = []; let dismissNext = false;
   const OLD_WF = "name: test-and-deploy\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-node@v4\n        with: { node-version: 20 }\n";
   const { ctx, page, errs } = await open({ extra: async (route, u) => {
@@ -845,7 +870,7 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
   await ctx.close();
 }
 // ㊿+145: 로그아웃 → 서버 왕복 없이 로그인 화면 · 로그인 → 항상 대시보드 · 메뉴는 첫 화면 · 뒤로가기는 이어서 · AI 점검 표 · 사본 쓰기 취소 · 폭 감시 1개
-{
+if (S.blk()) {
   let sbN = 0; let counting = false;
   const { ctx, page, errs } = await open({ noSession: true, extra: async (route, u) => { if (counting) sbN++;
     if (u.includes('grant_type=password')) { await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ access_token: 'tok', refresh_token: 'r1', expires_in: 3600, token_type: 'bearer', user: { id: 'u1', email: 'tester@example.com', user_metadata: { pw_changed: true } } }) }); return true; }
@@ -923,7 +948,7 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
   await ctx.close();
 }
 // ㊿+146: 폰 — 글자가 한 글자씩 세로로 쌓이는 곳 0 (대시보드 분석 펼침 · 데이터 점검 · 관리자 · 유입경로) · 장표 연도 탭은 고른 연도가 보임
-{
+if (S.blk()) {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }); const page = await ctx.newPage(); const c = collect(page);
   await mockBackend(page, {}); await page.goto(url + '/index.html'); await page.waitForTimeout(2200);
   const stacked = () => page.evaluate(() => { const out = []; const w = document.createTreeWalker(document.getElementById('app'), NodeFilter.SHOW_TEXT); let n;
@@ -949,7 +974,7 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
   await ctx.close();
 }
 // ㊿+147: 100점 1차 — SQL 엔진 격리(unsafe-eval 없음) · AI 점검 만원 표기 · 색 대비 0(라이트·다크) · 관리자 MFA 역할 기본 · 칩 글자색
-{
+if (S.blk()) {
   const ALA = path.join(ROOT, 'node_modules', 'alasql', 'dist', 'alasql.min.js');
   const AXE = path.join(ROOT, 'node_modules', 'axe-core', 'axe.min.js');
   const roleCalls = []; let roleRows = [{ role: 'super_admin', required: true, grace_days: 14, since: '2026-10-05', deadline: '2026-10-19' }, { role: 'admin', required: true, grace_days: 14, since: '2026-10-05', deadline: '2026-10-19' }];
@@ -1006,7 +1031,7 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
   await ctx.close();
 }
 // ㊿+148 데이터 점검 수정 창 · 업데이트 안내 팝업
-{
+if (S.blk()) {
   const { FIX } = await import('./lib.mjs');
   const writes = [], dialogs = []; let fixed = null, pending = { notify: false }, notesDb = [], notifyDb = [], ackDb = [], apiKeysDb = null, apiLogDb = [];
   const J = (route, o, st = 200) => route.fulfill({ status: st, contentType: 'application/json', body: JSON.stringify(o) });
@@ -1158,7 +1183,7 @@ if (fs.existsSync(path.join(DIR, 'quote.html'))) {
   });
   await ctx.close();
 }
-{ // 권한: 계약 쓰기 없음(admin_viewer) → 수정 창은 보기만
+if (S.blk()) { // 권한: 계약 쓰기 없음(admin_viewer) → 수정 창은 보기만
   const { ctx, page, errs } = await open({ role: 'admin_viewer' });
   await S.t('㊿+148 수정 창 권한: 쓰기 없는 계정은 칸 비활성 · 저장 버튼 없음', async () => {
     await page.evaluate(() => { SVC.switchView('dcheck'); }); await page.waitForTimeout(300);
@@ -1172,7 +1197,7 @@ const PB_AT = ['1~49', '50~99', '100~299', '300~499', '500~999', '1000~2999', '3
 const pbSv = (name, base) => ({ name, icon: '🛡️', sub: '24시간 365일 관제 · Cloud Insights E 에 추가', tiers: PB_AT, cons: PB_AT.map((_, i) => base - i * 5000), minD: PB_AT.map((_, i) => Math.round((base - i * 5000) * .75)), dist: PB_AT.map((_, i) => Math.round((base - i * 5000) * .4)), minP: PB_AT.map((_, i) => Math.round((base - i * 5000) * .9)), ptn: PB_AT.map((_, i) => Math.round((base - i * 5000) * .48)) });
 const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insights E · Add-on 24×7 · MDR 통합)', applied: '2026-09-21', note: '', data: { supply_rate: { cnac: 0.5 }, cnac: { rows: PB_NT.map((t, i) => [t, 16000 - i * 900, 7200 - i * 400, 5500 - i * 300, 4800 - i * 280]) }, ztna: { rows: PB_NT.map((t, i) => [t, 13300 - i * 800, 6000 - i * 350, 4500 - i * 280, 4000 - i * 250]) }, services: [pbSv('Cloud Insights E', 86900), pbSv('MDR Add-on 24×7', 43300), pbSv('Genian MDR 통합', 130200), pbSv('AV Service', 74400)], addons: [] } }];
 // ㊿+152 가격표(실제 모양 데이터)가 1280px·폰에서 페이지를 옆으로 밀지 않음 — fixture 에 가격표가 없어 그동안 빈 화면만 검사됐음
-{
+if (S.blk()) {
   for (const [W, H, mob] of [[1280, 800, false], [390, 844, true]]) {
     const ctx = await browser.newContext({ viewport: { width: W, height: H }, isMobile: mob, hasTouch: mob }); const page = await ctx.newPage(); const c = collect(page);
     await mockBackend(page, { extra: async (route, u) => { if (!/\/rest\/v1\/price_books/.test(u)) return false; await route.fulfill({ status: 200, contentType: 'application/json', headers: { 'content-range': '0-0/1', 'Access-Control-Expose-Headers': 'content-range' }, body: JSON.stringify(PRICE_BOOK) }); return true; } });
@@ -1186,7 +1211,7 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
   }
 }
 // ㊿+151 스테이징 QA — 같은 파일을 /staging/ 경로로도 서빙(route) · 서비스 워커는 막음(route 를 가로채므로)
-{
+if (S.blk()) {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page);
   const writes = [], dialogs = []; let breakDcheck = false, breakCss = false;
   await mockBackend(page, { onWrite: (w) => writes.push(w), extra: async (route, u) => { if (/\/rest\/v1\/price_books/.test(u)) { await route.fulfill({ status: 200, contentType: 'application/json', headers: { 'content-range': '0-0/1', 'Access-Control-Expose-Headers': 'content-range' }, body: JSON.stringify(PRICE_BOOK) }); return true; } if (!u.includes('/functions/v1/ops')) return false; const b = JSON.parse(route.request().postData() || '{}'); const out = b.action === 'status' ? { ok: true, pin_set: true, github: { repo: 'x/svc', branch: 'main', token_set: true }, recent: [] } : b.action === 'gh_copy' ? { ok: true, commit: 'c0ffee1', copied: 3 } : { ok: true }; await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(out) }); return true; } });
@@ -1247,7 +1272,7 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
   await ctx.close();
 }
 // ㊿+153: ES 모듈 — 시작점 main.js 하나 · importmap 의 ?v= · 리포트·관리자·가격표는 처음 열 때 · window.SVC · 서비스 워커 오프라인
-{
+if (S.blk()) {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page);
   const js = []; let failReport = false; const writes = [];
   page.on('request', (r) => { const u = r.url(); if (/\/js\/[\w-]+\.js/.test(u)) js.push(u.replace(/^.*\/svc\//, '')); });
@@ -1299,7 +1324,7 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
   });
   await ctx.close();
 }
-{
+if (S.blk()) {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } }); const page = await ctx.newPage(); const c = collect(page);
   await mockBackend(page); await page.goto(url + '/index.html');
   await S.t('㊿+153 서비스 워커: 코드 파일 전부 미리 저장 → 오프라인에서 다시 열어도 뜸 · 처음 열 때 받는 화면(리포트)도', async () => {
@@ -1318,7 +1343,7 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
   await ctx.close();
 }
 // ㊿+154: 위성 페이지 — 코드는 sat/*.js · 인라인 onclick → data-click 등(sat/common.js 위임) · CSP 'unsafe-inline' 없음 · 버튼이 그대로 동작
-{
+if (S.blk()) {
   const satOpen = async (f, w = 1280) => {
     const ctx = await browser.newContext({ viewport: { width: w, height: 900 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page);
     page.on('dialog', (d) => d.dismiss().catch(() => {}));
@@ -1400,7 +1425,7 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
   });
 }
 // ㊿+155: 화면 HTML 은 tpl`` (특수문자 자동 처리) · 타입 검사로 찾은 고객 360 «기간» 빈칸 수정
-{
+if (S.blk()) {
   const { ctx, page } = await open();
   await S.t('㊿+155 tpl``: ${값} 은 자동 esc · rawHtml(…) 만 그대로 · null/undefined 는 빈칸 · 숫자 그대로 · 위성 페이지 tpl 도 같은 규칙', async () => {
     const r = await page.evaluate(() => { const t = SVC.tpl, R = SVC.rawHtml; const x = '<img src=x onerror=alert(1)> & "q"';
@@ -1419,7 +1444,7 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
   await ctx.close();
 }
 // ㊿+156: 버튼으로 펼친 목록·결과·미리보기는 «✕ 닫기»(core.js closeBtn · .x-close) 로 닫힘
-{
+if (S.blk()) {
   const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
   const { ctx, page, errs } = await open({ extra: async (route, u) => {
     if (/\/storage\/v1\/object\/authenticated\//.test(u)) { await route.fulfill({ status: 200, contentType: 'image/png', body: PNG }); return true; }
@@ -1483,7 +1508,7 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
 }
 // ㊿+157: 금액 입력은 전부 천원(표시와 같은 단위) · 저장은 원 · 이상한 금액 확인 · 계약 표 ✎ 의 MRR·기간·상태 → 월 매출도 맞춤
 //   «저장하면 실제로 바뀌는» 가짜 DB(tests/fakedb.mjs)로 사람처럼 입력 → 저장 → DB 값(원) · 다시 읽은 화면 · 합계 · LIVE 를 대조 (2026-10 월 4.8억 입력 사고 재현 포함)
-{
+if (S.blk()) {
   const T = nowIdx(), YM = (i) => idxYm(i).slice(0, 7), ix = (s) => (+s.slice(0, 4) - 2020) * 12 + (+s.slice(5, 7) - 6);
   async function fboot() {
     const db = new FakeDB(seedData()); const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' }); const page = await ctx.newPage();
@@ -1849,7 +1874,7 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
   });
 }
 // ㊿+166~167: 새 디자인 «지니언스»(기본) — 정식 로고 · 상단 메뉴(묶음 + 펼침 메뉴 · ㊿+167) · 상단 화면 제목 · 홈(오늘 처리할 일 3칸 → 사업 현황) · 타원 목표 트랙 · 새 로그인 화면 · 2단계 인증 창
-{
+if (S.blk()) {
   const { ctx, page, errs } = await open();
   await page.evaluate(() => SVC.ST.RAWX.targets = [{ year: 2026, amount: 2000000000 }]); await page.evaluate(() => { SVC.renderAll(); SVC.switchView('dash'); }); await page.waitForTimeout(400);
   await S.t('㊿+166 지니언스 기본: data-skin=gn + data-look=cc(커맨드 센터 기능 그대로) · ㊿+167 상단 메뉴 = 정식 로고 + 묶음 버튼(상단바 첫 줄) · 화면 디자인 목록 맨 앞', async () => {
@@ -1942,7 +1967,7 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
 }
 // ㊿+168 1차: 집계 기준(만료 = 공통 집계) · 사업 영역 기준월 보기 · 고객 360 후속 계약/OI/장비 구분 · 정산 미입력·0원 · 화면별 단위
 //   오늘 날짜 기준 상대 월로 만든 검증 사례(가상 «검증_» 고객)를 픽스처에 덧붙여 가짜 DB 로 읽음 — 운영 데이터와 무관
-{
+if (S.blk()) {
   const { FIX } = await import('./lib.mjs');
   const now = new Date(), T0 = now.getFullYear() * 12 + now.getMonth();
   const ym = (o) => { const x = T0 + o; return Math.floor(x / 12) + '-' + String(x % 12 + 1).padStart(2, '0'); };
@@ -2018,7 +2043,7 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
 }
 // ㊿+169 2차: 계약·OI 표 기본 보기(업무 보기 · 고정 열 · 상태 배지 · 미입력/해당 없음 · 아이콘 버튼 이름 · 삭제는 더보기) · 목록 상태 유지 · 홈 밀도 · 장비 상태·수량·조작 · 공통 디자인
 //   가짜 DB(FIX + 가상 «검증_» 행) — 운영 데이터와 무관 · 쓰기는 가짜 응답
-{
+if (S.blk()) {
   const { FIX } = await import('./lib.mjs');
   const now = new Date(), d10 = new Date(now.getTime() - 10 * 864e5).toISOString().slice(0, 10);
   const F = JSON.parse(JSON.stringify(FIX));
@@ -2156,7 +2181,7 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
   await ctx.close();
 }
 // ㊿+170 3차: 입력 단계(필수·형식 즉시 확인 · 중복 의심 · 확인 단계 + 알림 안내 · 두 번 저장 방지 · 실패 시 값 유지) · «＋ 등록» · 영업/인바운드 빠른 보기 · 전환 중복 확인 · 리포트 템플릿 · 해지율 적용 기준 · 데이터 점검 · 폰 위 띠
-{
+if (S.blk()) {
   const { FIX } = await import('./lib.mjs');
   const now = new Date(), dAgo = (n) => new Date(now.getTime() - n * 864e5).toISOString().slice(0, 10), yr = now.getFullYear();
   const F = JSON.parse(JSON.stringify(FIX));
@@ -2256,7 +2281,7 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
   await ctxM.close();
 }
 // ㊿+172 홈 · 검색 · AI 대화 · 메뉴 이동 사용성 — 실제 업무 흐름으로: 질문 없이 현황 파악 · 고객명 일부 → Enter · AI 답 → 근거 → 돌아오기 · OI 조건 유지 · 분석 필터가 홈을 안 바꿈 · 긴 답이 홈을 안 밀어냄 · 패널 닫기/새 대화/삭제 · 고객 문맥 · 내 업무/담당자 연결 · 실제 조건 전달 · 폰
-{
+if (S.blk()) {
   const { FIX } = await import('./lib.mjs');
   const now = new Date(), dAgo = (n) => new Date(now.getTime() - n * 864e5).toISOString().slice(0, 10);
   const F = JSON.parse(JSON.stringify(FIX));
@@ -2458,7 +2483,7 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
   await pc.close();
 }
 // ㊿+173 성능 — 같은 숫자로 더 빨리: 계산 사본(tickMemo) · CSS 변수 사본 · 숨은 상세는 펼칠 때 · 목록 처음 30행 → 나머지 · 장비 보드 열마다 8장 → 나머지 · 로그인 확인과 데이터 요청 동시 · 실사용 속도 기록(client_perf)
-{
+if (S.blk()) {
   const { FIX } = await import('./lib.mjs');
   const F = JSON.parse(JSON.stringify(FIX));
   const baseC = F.contracts.slice(), baseM = F.mrsegs.slice(), baseO = F.orders.slice();
@@ -2553,7 +2578,7 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
   await ctx.close();
 }
 // ㊿+174 알림함 · 처리 담당 · Slack(기본 꺼짐 — 눌러서 확인할 때만) — 가상 데이터 · 모의 응답 · 외부 발송 0
-{
+if (S.blk()) {
   const { FIX } = await import('./lib.mjs');
   const mkCtx = async (opt) => {
     opt = Object.assign({ role: 'super_admin', set: null, sqlOk: true, w: 1440, asg: [] }, opt || {});
@@ -2697,7 +2722,7 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
   });
 }
 // ㊿+175 운영 · 안정성 — 옛 탭 막기 · 동시 수정 · 저장 확인 · 다시 시도 · 운영 상태(알림함) · 운영 되돌리기 (가짜 DB · 모의 응답 · 외부 발송 0)
-{
+if (S.blk()) {
   const CUR = /<meta name="app-ver" content="([^"]+)">/.exec(fs.readFileSync(path.join(DIR, 'index.html'), 'utf8'))[1], CURN = CUR.split(' ')[1];   /* 지금 버전(㊿+n) — 버전을 올려도 시험은 그대로 */
   const verRoute = async (page, st) => page.route(/index\.html\?vw=/, async (r) => { const res = await r.fetch(); let t = await res.text(); if (st.ver) t = t.replace(/name="app-ver" content="[^"]+"/, 'name="app-ver" content="' + st.ver + '"'); await r.fulfill({ status: 200, contentType: 'text/html', body: t }); });
   await S.t('㊿+175 옛 탭 막기: 서버에 새 버전 → 화면 아래 띠 · 업무 저장은 막음(요청 0) · 기록(change_log)은 통과 · 같아지면 띠 사라짐 · 서버가 더 옛것(되돌림)이면 1분 넘게 계속될 때만 · 저장 직전에도 확인', async () => {
@@ -2844,7 +2869,7 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
   });
 }
 // ㊿+176 정산(A-1) — 비즈포탈 차액 연도 · 월 마감 · 수정 이력 · 에스원/카카오 정산 마감 · 리포트 발행 잠금 (가짜 DB · SQL 107 함수는 시험용 흉내 · 외부 발송 0)
-{
+if (S.blk()) {
   const CY = new Date().getFullYear(), K = (y, m) => y + '-' + String(m).padStart(2, '0');
   const fakeClose = (db, log) => {   /* SQL 107 함수 흉내 — 마감 확인 · 지우고 넣기 한 번에 · 바뀌기 전 내용을 doc_hist 에 */
     const locked = (kind, k) => db.table('period_locks').some((x) => x.kind === kind && x.period === k);
@@ -2958,7 +2983,7 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
   });
 }
 // ㊿+177 Slack 예약 발송(설정 · 보낼 글 저장) · 견적을 포탈 DB 에(견적 화면 저장 · 번호 · 발행 = 발송 · 발송 뒤 새 번호 · 목록 · OI 연결) — 가짜 DB · 외부 발송 0
-{
+if (S.blk()) {
   const { FIX } = await import('./lib.mjs');
   const SET7 = { id: 1, renew_days: [60, 30], eq_days: 3, month_end_days: 5, renew_emails: ['tester@example.com'], eq_emails: [], biz_emails: [], dc_emails: [], slack_on: true, team_channel: 'C0TEST1234', auto_on: false, auto_days: [1], auto_time: '09:00', auto_dm: false };
   const mk7 = async (o) => {
@@ -3111,7 +3136,7 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
   });
 }
 // ㊿+178 AI 품질 — 답 근거 · 👎 신고 전체(SQL 110 전 대비) · 지식 제안 → 반영 · 신고 «지식으로…» · 같은 숫자(이번 달 · 진행 중 OI) · 채점 규칙
-{
+if (S.blk()) {
   const { FIX } = await import('./lib.mjs');
   const mk8 = async (o) => {
     o = Object.assign({ role: 'super_admin', know: [], fb: [], fb400: false }, o || {});
@@ -3200,7 +3225,7 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
   });
 }
 // ㊿+179 데이터(B-2) — 붙여넣기(머리글 · 검사 · 같은 행 · 중간 실패) · 내보내기(원 · 수식 막기) · 비즈포탈 숫자 · 데이터 점검(정상 표시 · 추이 · 새 규칙) · 리포트 DB 저장 · 팀 공유
-{
+if (S.blk()) {
   const ago = (d) => new Date(Date.now() - d * 864e5).toISOString();
   const dayAgo = (d) => { const x = new Date(Date.now() - d * 864e5); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); };
   const mk9 = async (seed, o) => {
@@ -3348,7 +3373,7 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
   });
 }
 // ㊿+180 보안 · 계정 — 로그인 실패 대기 · 비밀번호 규칙 · 첫 변경 우회 막기 · 로그인 기록 · 30일 · 자동 로그아웃(닫아 둔 시간) · 서버 로그아웃 · 모든 기기 · 계정 목록 · 초기화 창 · 보안 점검 · iframe 막기
-{
+if (S.blk()) {
   const J9 = (route, body, status) => route.fulfill({ status: status || 200, contentType: 'application/json', headers: { 'content-range': '*/0', 'Access-Control-Expose-Headers': 'content-range' }, body: typeof body === 'string' ? body : JSON.stringify(body) });
   const mkA = async (o) => {
     o = Object.assign({ init: null, role: 'super_admin', handle: null, noSession: true }, o || {});
@@ -3485,7 +3510,7 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
   });
 }
 // ㊿+181 화면 · 모바일 — 폰 목록 카드 · 누르는 영역 · 접근성 · 폰 입력(숫자 키패드 · 16px · 저장 버튼 고정 · 비어 있는 필수 칸으로)
-{
+if (S.blk()) {
   const mkM = async (o) => {
     o = Object.assign({ w: 390, h: 844, mobile: true, init: null }, o || {});
     const db = new FakeDB(seedData()); const ctx = await browser.newContext({ viewport: { width: o.w, height: o.h }, serviceWorkers: 'block', isMobile: o.mobile, hasTouch: o.mobile }); const page = await ctx.newPage(); const c = collect(page);
@@ -3564,7 +3589,89 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
     return 'hit ' + h + '/' + d + '/' + fb + ' · 스크롤 ' + ch.n;
   });
 }
+// ㊿+182 연동 — 호출 시간 제한(답 없는 서버 · 함수 · Worker · GAS) · 연동 상태(토큰 만료 · 봇 권한 · 마지막 실행) — 전부 모의 응답 · 외부 발송 0
+if (S.blk()) {
+  await S.t('㊿+182 연동 호출 시간 제한: 답 없는 함수 · DB · Worker · GAS → «N초 넘게 답이 없습니다» · 보내기 · 사이트 만들기는 «처리됐는지 확인» + 다시 보내지 않음 · 읽기는 «잠시 뒤» · GAS 는 새 탭으로 다시 실행 안 함 · 부른 쪽 멈춤은 그대로', async () => {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page);
+    const hits = {}; const hang = (k) => { hits[k] = (hits[k] || 0) + 1; };   /* 답하지 않음 = 서버가 멈춘 것 */
+    await mockBackend(page, { extra: async (route, u) => {
+      const k = u.includes('/functions/v1/notify') ? 'notify' : u.includes('/functions/v1/cloudsite') ? 'cs' : u.includes('/rest/v1/hang_tbl') ? 'db' : u.includes('/functions/v1/remind') ? 'remind' : null;
+      if (!k) return false; hang(k); return true; } });
+    await page.route(/workers\.dev/, () => hang('worker')); await page.route(/script\.google\.com/, () => hang('gas'));
+    await page.goto(url + '/index.html'); await page.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA, null, { timeout: 15000 }); await page.waitForTimeout(300);
+    const r = await page.evaluate(async () => {
+      SVC.FETCH_T.scale = 0.005;   // 60초 → 0.3초 (화면 글은 원래 초로)
+      const out = {}; let opened = 0; window.open = () => { opened++; return null; };
+      const t = async (k, fn) => { const t0 = performance.now(); try { await fn(); out[k] = 'no error'; } catch (e) { out[k] = { m: String(e.message), to: !!e.timeout, name: e.name, ms: Math.round(performance.now() - t0) }; } };
+      await t('notify', () => SVC.ntfCall({ team: { channel: 'C0TEST1234', text: 'x', n: 1 } }));
+      await t('nDry', () => SVC.ntfCall({ team: { channel: 'C0TEST1234', text: 'x', n: 1 }, dry: true }));
+      await t('csNew', () => SVC.csFn({ action: 'create', sitename: 'mock' }));
+      await t('csRead', () => SVC.csFn({ action: 'creds' }));
+      await t('db', () => SVC.sbGet('hang_tbl?select=id'));
+      await t('worker', () => SVC.qFetch('/list', { method: 'GET' }));
+      const ac = new AbortController(); setTimeout(() => ac.abort(), 60);
+      await t('stop', () => SVC.fetchT(SVC.SB_URL + '/rest/v1/hang_tbl?x=1', { signal: ac.signal }, 60000, 'DB'));
+      await SVC.wkRefetch(); await new Promise((ok) => setTimeout(ok, 100));
+      const toast = [...document.querySelectorAll('.toast, #toast, .toast-wrap *')].map((x) => x.textContent).join(' | ');
+      SVC.FETCH_T.scale = 1;
+      return { out, opened, toast: toast.slice(0, 400) };
+    });
+    const O = r.out;
+    assert(/^notify 함수 응답이 60초 넘게 없습니다 — 처리됐는지 확인한 뒤 다시 시도/.test(O.notify.m) && O.notify.to && O.notify.ms < 3000, 'notify ' + JSON.stringify(O.notify));
+    assert(/잠시 뒤 다시/.test(O.nDry.m), 'dry ' + JSON.stringify(O.nDry));
+    assert(/^cloudsite 함수 응답이 90초 넘게 없습니다 — 처리됐는지 확인/.test(O.csNew.m) && /잠시 뒤 다시/.test(O.csRead.m), 'cs ' + JSON.stringify([O.csNew, O.csRead]));
+    assert(/^DB 응답이 60초 넘게 없습니다 — 잠시 뒤 다시/.test(O.db.m) && /^견적 저장 서버 응답이 60초 넘게 없습니다/.test(O.worker.m), 'db/worker ' + JSON.stringify([O.db, O.worker]));
+    assert(O.stop.name === 'AbortError' && !O.stop.to && !/초 넘게/.test(O.stop.m), 'stop ' + JSON.stringify(O.stop));
+    assert(hits.notify === 2 && hits.cs === 2 && hits.db === 2 && hits.worker === 1 && hits.gas === 1, '다시 보냄? ' + JSON.stringify(hits));   // db 2 = 시간 초과 1 + 부른 쪽 멈춤 1
+    assert(r.opened === 0 && /주간보고 취합 응답 없음/.test(r.toast), 'GAS ' + JSON.stringify({ opened: r.opened, toast: r.toast }));
+    assert(!c.errs.length, 'errs ' + c.errs.join(' | '));
+    await ctx.close();
+    return 'notify · cloudsite · DB · Worker · GAS 시간 초과 · 다시 보냄 0';
+  });
+  await S.t('㊿+182 연동 상태(배포·운영 › 기록): GitHub 토큰 만료 임박 · 관리 토큰 · Slack 봇(빠진 DM 권한) · 예약 발송 · 만기 알림 · AI 야간 점검(오래됨) · 내보내기 · 견적 서버(옛 비밀번호 기한) · Cloud 사이트 API · 환율 — 읽기만 · 고칠 곳 / 옛 ops · notify 면 «올리면 확인»', async () => {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page);
+    const ymd = (d) => new Date(Date.now() + d * 864e5 + 9 * 36e5).toISOString().slice(0, 10), ago = (d) => new Date(Date.now() - d * 864e5).toISOString();
+    let old = false; const reqs = [], writes = [];
+    const J = (route, o) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'content-range': '0-' + Math.max(0, (o.length || 1) - 1) + '/' + (o.length || 1), 'Access-Control-Expose-Headers': 'content-range' }, body: JSON.stringify(o) });
+    await mockBackend(page, { onWrite: (w) => writes.push(w), extra: async (route, u, m) => {
+      if (/functions\/v1\/(ops|notify|cloudsite)/.test(u)) { const b = JSON.parse(route.request().postData() || '{}'); reqs.push(u.split('/v1/')[1].split('?')[0] + ':' + (b.action || b.mode || (b.dry ? 'dry' : 'send')) + (b.deep ? ':deep' : ''));
+        if (u.includes('/ops')) return J(route, { ok: true, pin_set: true, github: { repo: 'x/svc', branch: 'main', token_set: true }, mgmt_token_set: true, log_ok: true, recent: [],
+          integrations: old || !b.deep ? undefined : { github: { ok: true, set: true, repo: 'x/svc', branch: 'main', expires: ymd(20) + ' 09:00:00 +0900' }, mgmt: { ok: true, set: true }, slack: { ok: true, set: true, team: '가상팀', bot: 'svc-bot', scopes: ['chat:write'] },
+            remind: [{ sent_at: ago(1), period: '2026-11', kind: 'monthly', ok: true, dry: true, sent_by: 'tester@example.com' }, { sent_at: ago(10), period: '2026-10', kind: 'monthly', ok: true, dry: false, sent_by: 'cron' }], export: null } }).then(() => true);
+        if (u.includes('/notify')) return (old ? J(route, { ok: true, text: 'mock' }) : J(route, { ok: true, health: { set: true, ok: true, team: '가상팀', bot: 'svc-bot', scopes: ['chat:write'], missing: ['users:read.email', 'im:write'] } })).then(() => true);
+        return J(route, { ok: true, creds: [{ id: 1, label: '가상계정', apiemail: 'api@example.com' }] }).then(() => true); }
+      if (m === 'GET' && u.includes('/rest/v1/notify_settings')) return J(route, [{ slack_on: true, auto_on: true, auto_dm: false }]).then(() => true);
+      if (m === 'GET' && u.includes('/rest/v1/notify_auto_run')) return J(route, [{ slot: '2026-10-12 09:00', used_at: ago(1), result: '1곳 보냄' }]).then(() => true);
+      if (m === 'GET' && u.includes('/rest/v1/notify_log')) return J(route, [{ at: ago(1), target: 'team:C0TEST1234', ok: true, sent_by: '예약' }]).then(() => true);
+      if (m === 'GET' && u.includes('/rest/v1/ai_check_log') && u.includes('source=eq.cron')) return J(route, [{ run_at: ago(3), pass: 12, total: 12 }]).then(() => true);
+      return false; } });
+    await page.route(/workers\.dev\/whoami/, (route) => { reqs.push('worker:whoami'); return J(route, { ok: true, email: 'tester@example.com', role: 'super_admin', read: true, write: true, delete: true, legacy_until: ymd(7), ver: 'v2' }); });
+    await page.goto(url + '/index.html'); await page.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA, null, { timeout: 15000 }); await page.waitForTimeout(300);
+    await page.evaluate(async () => { await SVC.lazyLoad('admin'); SVC.OPS.tab = 'log'; SVC.switchView('ops'); }); await page.waitForSelector('#opsInteg', { timeout: 8000 });
+    const before = await page.evaluate(() => document.querySelector('#opsBody').innerText.includes('읽기만'));
+    reqs.length = 0; writes.length = 0; await page.click('#opsInteg'); await page.waitForFunction(() => SVC.INTEG.at && !SVC.INTEG.running, null, { timeout: 8000 });
+    const rows = await page.evaluate(() => [...document.querySelectorAll('#opsBody tr[data-integ]')].map((tr) => [tr.dataset.integ, tr.className.replace('integ-', ''), tr.innerText.replace(/\s+/g, ' ')]));
+    const R = Object.fromEntries(rows.map((x) => [x[0], x])), sev = rows.map((x) => x[0] + ':' + x[1]).join(' ');
+    assert(before && rows.length === 10, 'rows ' + JSON.stringify(rows));
+    assert(R.gh[1] === 'warn' && /\(20일 남음\)/.test(R.gh[2]) && /GITHUB_TOKEN/.test(R.gh[2]) && R.mgmt[1] === 'ok', 'gh ' + JSON.stringify([R.gh, R.mgmt]));
+    assert(R.slack[1] === 'warn' && /users:read\.email/.test(R.slack[2]) && /Reinstall/.test(R.slack[2]) && R.notify[1] === 'ok' && /예약 켜짐/.test(R.notify[2]) && /1곳 보냄/.test(R.notify[2]), 'slack ' + JSON.stringify([R.slack, R.notify]));
+    assert(R.remind[1] === 'ok' && /2026-10/.test(R.remind[2]) && /자동/.test(R.remind[2]) && R.aicheck[1] === 'warn' && /하루 넘게/.test(R.aicheck[2]) && R.export[1] === 'info', 'remind ' + JSON.stringify([R.remind, R.aicheck, R.export]));
+    assert(R.worker[1] === 'warn' && /ACCESS_PASSWORD/.test(R.worker[2]) && R.cs[1] === 'ok' && /API 계정 1개/.test(R.cs[2]) && !/api@example\.com/.test(R.cs[2]) && R.fx[1] === 'ok' && /1400/.test(R.fx[2]), 'worker ' + JSON.stringify([R.worker, R.cs, R.fx]));
+    const rq = reqs.slice().sort().join(' '), w0 = writes.filter((w) => !/client_perf|client_errors/.test(w.url));
+    assert(rq === 'cloudsite:creds notify:health ops:status:deep worker:whoami' && !w0.length, '읽기만? ' + JSON.stringify({ rq, w0: w0.map((w) => w.m + ' ' + w.url.slice(-50)) }));
+    old = true; await page.click('#opsInteg'); await page.waitForFunction(() => SVC.INTEG.at && !SVC.INTEG.running && document.querySelector('#opsBody tr[data-integ="gh"]'), null, { timeout: 8000 });
+    const o = await page.evaluate(() => Object.fromEntries([...document.querySelectorAll('#opsBody tr[data-integ]')].map((tr) => [tr.dataset.integ, tr.className.replace('integ-', '') + ' ' + tr.innerText.replace(/\s+/g, ' ')])));
+    assert(/^warn .*v1\.7/.test(o.gh) && /^warn .*v1\.2/.test(o.slack) && /v1\.7/.test(o.remind) && !o.export, 'old ' + JSON.stringify(o));
+    await page.setViewportSize({ width: 390, height: 844 }); await page.waitForTimeout(200);
+    const ov = await page.evaluate(() => document.scrollingElement.scrollWidth - innerWidth);
+    await page.click('#opsBody [data-ops-close="integ"]'); await page.waitForTimeout(150);
+    const closed = await page.evaluate(() => !document.querySelector('#opsBody tr[data-integ]') && SVC.INTEG.rows === null);
+    assert(ov <= 0 && closed && !c.errs.length, JSON.stringify({ ov, closed, errs: c.errs }));
+    await ctx.close();
+    return sev;
+  });
+}
 await browser.close(); srv.close();
 const ok = S.report();
-fs.writeFileSync(path.join(OUT, 'smoke.json'), JSON.stringify(S.results, null, 1));
+fs.writeFileSync(path.join(OUT, process.env.SMOKE_PART != null ? 'smoke-' + process.env.SMOKE_PART + '.json' : 'smoke.json'), JSON.stringify(S.results, null, 1));
 process.exit(ok ? 0 : 1);

@@ -948,7 +948,7 @@ export var LENS_DEFS=[
 export var LENS_DESC={}; 
 export function lensSets(){
   var cts=ST.RAWX.contracts||[], cus={}; (ST.RAWX.customers||[]).forEach(function(c){ cus[c.id]=c; });
-  var nowYm=(ST.DATA&&ST.DATA.nowIdx>=0? mk(ST.DATA.nowIdx) : new Date().toISOString().slice(0,7))+'-01';
+  var nowYm=(ST.DATA&&ST.DATA.nowIdx>=0? mk(ST.DATA.nowIdx) : todayStr().slice(0,7))+'-01';
   var byId={}; cts.forEach(function(c){ byId[c.id]=c; });
   var kids={}; cts.forEach(function(c){ if(c.parent_contract_id) (kids[c.parent_contract_id]=kids[c.parent_contract_id]||[]).push(c.id); });
   var root=function(c){ return c.parent_contract_id? (byId[c.parent_contract_id]||c) : c; };

@@ -2,7 +2,7 @@
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { APP_VER, IS_QA, IS_STAGING, ST } from './state.js';
 import { Viz } from './viz.js';
-import { $, amtGuard, amtHint, baseLabel, bizKey, bizLabel, bizY, canWrite, cssv, esc, isGN, kwToWon, lline, llineVer, mk, rawHtml, SB_KEY, SB_URL, STATE, tickMemo, tpl, won, wonFull, wonKo, wonToKw, yOf } from './core.js';
+import { $, amtGuard, amtHint, baseLabel, bizKey, bizLabel, bizY, canWrite, cssv, esc, fetchT, isGN, kwToWon, lline, llineVer, mk, rawHtml, SB_KEY, SB_URL, STATE, tickMemo, tpl, won, wonFull, wonKo, wonToKw, yOf } from './core.js';
 import { dIdx, ico, idxDate, loadFromDb, onData, SB_RAW, sbHeaders, sbTry, sbWrite, toast, todayStr } from './shell.js';
 import { hbars, idxs, monthlyTotal } from './dash.js';
 import { CHURN_OPTS, codeActive, GRIDS, LEAD_OPTS, LINE_OPTS } from './grids.js';
@@ -287,7 +287,7 @@ export function renderDataCheck(){
   var oka=/** @type {any} */(host.querySelector('.dc-okall')); if(oka) oka.ontoggle=function(){ DC.okOpen=oka.open; };
   dcLogOnce(cnt, rules);
   dcDailySave();   // ㊿+179 하루 건수(한 시간에 한 번 · 쓰는 사람만)
-  host.querySelector('#dcXlsx').onclick=function(){ var out=[]; rules.forEach(function(r){ r.items.forEach(function(it){ out.push([DC_SEV[r.sev][1], r.title, it.label, it.sub||'', r.go]); }); (r.acked||[]).forEach(function(it){ var a=it.ack||{}; out.push(['정상으로 표시', r.title, it.label, (it.sub||'')+' — «'+(a.note||'')+'» '+String(a.by_email||'')+' '+String(a.at||'').slice(0,10), r.go]); }); }); if(!out.length){ toast('내보낼 항목이 없습니다','전부 이상 없음'); return; } xlsxAoa('데이터점검_'+new Date().toISOString().slice(0,10), ['심각도','규칙','항목','내용','고치는 화면'], out); };
+  host.querySelector('#dcXlsx').onclick=function(){ var out=[]; rules.forEach(function(r){ r.items.forEach(function(it){ out.push([DC_SEV[r.sev][1], r.title, it.label, it.sub||'', r.go]); }); (r.acked||[]).forEach(function(it){ var a=it.ack||{}; out.push(['정상으로 표시', r.title, it.label, (it.sub||'')+' — «'+(a.note||'')+'» '+String(a.by_email||'')+' '+String(a.at||'').slice(0,10), r.go]); }); }); if(!out.length){ toast('내보낼 항목이 없습니다','전부 이상 없음'); return; } xlsxAoa('데이터점검_'+todayStr(), ['심각도','규칙','항목','내용','고치는 화면'], out); };
 }
 /** ㊿+179 데이터 점검 화면의 비동기 읽기 — 정상 표시(5분) · 추이(10분) · 견적 목록(없을 때 한 번) */
 export function dcAsync(){
@@ -2313,19 +2313,19 @@ export async function renewSlack(scope){
     var url=SB_URL+'/functions/v1/remind', hdr={'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+ST.SB_TOKEN};
     var body={month:idxDate(RN.T), kind:'monthly'}; if(tabOnly) body.only=RN.kind;
     if(/^https:/.test(location.protocol+'//')) body.portal_url=location.origin+location.pathname;   /* 슬랙 메시지의 «포탈 홈 › 만기 처리» 링크 = 지금 열려 있는 이 포탈 주소 (함수 Secrets PORTAL_URL 보다 우선) */
-    var pv=await fetch(url+'?dry=1',{method:'POST',headers:hdr,body:JSON.stringify(body)}).then(function(r){ return r.json(); });
+    var pv=await fetchT(url+'?dry=1',{method:'POST',headers:hdr,body:JSON.stringify(body)}, 60000, 'remind 함수', true).then(function(r){ return r.json(); });
     if(!pv || !pv.ok) throw new Error((pv&&pv.error)||'미리보기 실패 — remind 함수가 배포됐는지 확인');
     var c=pv.counts||{};
     var lines=tabOnly? ['«'+tabName+'» 탭만 — '+(pv.total!=null? pv.total : (c[RN.kind]||0))+'건'] : ['세 구역 전부 — 이달 만기 '+(c.due||0)+'건 · 다음 달 만기 '+(c.next||0)+'건 · 미처리 '+(c.lapsed||0)+'건'];
     if(tabOnly && pv.kinds && pv.kinds.length!==1) lines.push('⚠ 배포된 remind 함수가 구역 선택(only)을 모르는 옛 버전이라 세 구역이 전부 갑니다 — v1.2 로 올려 주세요');
     if(!confirm('슬랙 팀 채널('+(pv.channel||'')+')로 보냅니다.\n\n'+(pv.text||'')+'\n'+lines.join('\n')+'\n\n보낼까요?')) throw new Error('취소했습니다.');
-    var rr=await fetch(url,{method:'POST',headers:hdr,body:JSON.stringify(body)}).then(function(r){ return r.json(); });
+    var rr=await fetchT(url,{method:'POST',headers:hdr,body:JSON.stringify(body)}, 60000, 'remind 함수').then(function(r){ return r.json(); });   /* ㊿+182 시간 제한 · 다시 보내지 않음(중복 발송 방지) */
     if(!rr || !rr.ok) throw new Error((rr&&rr.error)||'발송 실패');
     toast('슬랙 발송 완료 📣', String(rr.text||'').slice(0,90));
     if(m){ m.textContent='슬랙 발송 완료 — '+(rr.text||''); m.className='mmsg ok'; }
   }catch(e){
     var em=String(e.message||e);
-    if(/Failed to fetch|NetworkError|Load failed|network/i.test(em))   /* 브라우저가 응답을 못 받음 = 함수가 없거나 게이트웨이가 CORS 없이 거절 */
+    if(/** @type {any} */(e).net || /Failed to fetch|NetworkError|Load failed/i.test(em))   /* 브라우저가 응답을 못 받음 = 함수가 없거나 게이트웨이가 CORS 없이 거절 */
       em='remind 함수에 연결하지 못했습니다 (Failed to fetch) — ① Edge Functions 에 이름이 정확히 «remind» 인 함수가 배포돼 있는지 ② 그 함수 설정에서 «Verify JWT» 를 껐는지(ask 와 같게 — 함수가 로그인 토큰을 직접 검사합니다) 확인하세요. 방금 배포했으면 30초쯤 뒤 다시 눌러 보세요.';
     if(m){ m.textContent=em; m.className='mmsg bad'; }
   }

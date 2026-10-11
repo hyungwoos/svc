@@ -1,5 +1,5 @@
 // ============================================================================
-//  Supabase Edge Function: ops  (v1.6 · 2026-10-10 · gh_rollback 운영 되돌리기(미리 보기 → 커밋 하나) · v1.5.1 2026-10-08 · 함수 배포 진입점은 파일 이름만(경로 겹침 고침) · v1.5 2026-10-07 · 커밋 빠르게: 바뀌지 않은 파일은 건너뛰고(내용 SHA 비교) 바뀐 파일은 6개씩 동시에 올림 · v1.4 2026-10-03 · APP_VER 를 <meta name="app-ver"> 에서도 읽음(㊿+136) · v1.3 gh_copy 하위 폴더 · v1.2 gh_delete · v1.1 gh_copy)
+//  Supabase Edge Function: ops  (v1.7 · 2026-10-11 · ㊿+182 status {deep:true} = 연동 상태(GitHub 토큰 유효 · 만료일 · Supabase 관리 토큰 · Slack 봇 · 만기 알림 · 내보내기 API 마지막 기록) · 슬랙 알림을 기다린 뒤 응답 · v1.6 2026-10-10 · gh_rollback 운영 되돌리기(미리 보기 → 커밋 하나) · v1.5.1 2026-10-08 · 함수 배포 진입점은 파일 이름만(경로 겹침 고침) · v1.5 2026-10-07 · 커밋 빠르게: 바뀌지 않은 파일은 건너뛰고(내용 SHA 비교) 바뀐 파일은 6개씩 동시에 올림 · v1.4 2026-10-03 · APP_VER 를 <meta name="app-ver"> 에서도 읽음(㊿+136) · v1.3 gh_copy 하위 폴더 · v1.2 gh_delete · v1.1 gh_copy)
 //   포탈 «관리자 › 배포·운영» 화면 뒤의 단일 중계 함수 — 포탈(공개 HTML)에는 어떤 토큰도 두지 않고 전부 여기 Secrets 에만.
 //     · GitHub   : 저장소 파일 목록/내용 · 여러 파일을 커밋 하나로(Git Data API: blob → tree → commit → ref) · 파일 이력 · 이전 버전 복원 · 운영 전체 되돌리기(v1.6)
 //     · Supabase : SQL 실행(Management API /database/query · 읽기 전용 토글) · Edge Function 목록/코드 조회/배포/Verify JWT · Secrets 이름 조회/설정/삭제
@@ -130,6 +130,44 @@ async function mgmt(path: string, init: RequestInit = {}, ms = 60000): Promise<{
   const text = await r.text(); let j: any = null; try { j = JSON.parse(text); } catch { /* not json */ }
   return { status: r.status, json: j, text, headers: r.headers };
 }
+// ── ㊿+182 연동 상태(status {deep:true}) — 읽기만 · 토큰 값은 돌려주지 않음(유효 · 만료일 · 권한 이름만) ──
+async function ghCheck() {
+  if (!GH_TOKEN) return { ok: false, set: false, error: 'GITHUB_TOKEN 이 없습니다' };
+  const r = await fetchT(`https://api.github.com/repos/${GH_REPO}`, { headers: ghHdr() }, 8000).catch(() => null);
+  if (!r) return { ok: false, set: true, error: 'GitHub 응답이 8초 넘게 없음' };
+  const expires = r.headers.get('github-authentication-token-expiration') || null;   // fine-grained · 기한 있는 classic 토큰만 보냄
+  await r.body?.cancel().catch(() => null);
+  if (!r.ok) return { ok: false, set: true, status: r.status, expires, error: r.status === 401 ? '토큰이 틀리거나 만료됨 — 새 토큰을 Secrets GITHUB_TOKEN 에' : r.status === 404 || r.status === 403 ? '저장소를 볼 수 없음 — 토큰의 저장소 · Contents 권한 확인' : 'HTTP ' + r.status };
+  return { ok: true, set: true, status: r.status, expires, repo: GH_REPO, branch: GH_BRANCH };
+}
+async function mgmtCheck() {
+  if (!MGMT_TOKEN) return { ok: false, set: false, error: 'MGMT_ACCESS_TOKEN 이 없습니다(SQL 실행 · 함수 배포에 필요)' };
+  const r = await fetchT(`${MGMT}/v1/projects/${PROJECT_REF}/functions`, { headers: { Authorization: 'Bearer ' + MGMT_TOKEN } }, 8000).catch(() => null);
+  if (!r) return { ok: false, set: true, error: 'Supabase 관리 API 응답이 8초 넘게 없음' };
+  await r.body?.cancel().catch(() => null);
+  return r.ok ? { ok: true, set: true, status: r.status } : { ok: false, set: true, status: r.status, error: r.status === 401 ? '토큰이 틀리거나 만료됨' : r.status === 403 ? '이 프로젝트 권한 없음' : 'HTTP ' + r.status };
+}
+async function slackCheck() {
+  if (!SLACK_TOKEN) return { ok: false, set: false, error: 'SLACK_BOT_TOKEN 이 없습니다' };
+  const r = await fetchT('https://slack.com/api/auth.test', { method: 'POST', headers: { Authorization: 'Bearer ' + SLACK_TOKEN } }, 8000).catch(() => null);
+  if (!r) return { ok: false, set: true, error: 'Slack 응답이 8초 넘게 없음' };
+  const scopes = String(r.headers.get('x-oauth-scopes') || '').split(',').map((s) => s.trim()).filter(Boolean);
+  const j = await r.json().catch(() => null) as Record<string, unknown> | null;
+  if (!j || !j.ok) return { ok: false, set: true, error: String((j && j.error) || 'http_' + r.status) + (j && (j.error === 'invalid_auth' || j.error === 'token_revoked') ? ' — 봇 토큰이 바뀌었거나 앱이 지워짐' : '') };
+  return { ok: true, set: true, team: j.team || null, bot: j.user || null, scopes, ops_channel: !!OPS_SLACK };
+}
+async function lastRows(path: string) {
+  if (!SB_SVC) return null;
+  const r = await fetchT(SB_URL + '/rest/v1/' + path, { headers: svcHdr() }, 6000).catch(() => null);
+  if (!r || !r.ok) { await r?.body?.cancel().catch(() => null); return null; }   // 표가 없음(SQL 84 · 102 전) = null
+  return await r.json().catch(() => null);
+}
+async function integrations() {
+  const [github, mgmtApi, slack, remind, exportApi] = await Promise.all([ghCheck(), mgmtCheck(), slackCheck(),
+    lastRows('remind_log?select=sent_at,period,kind,ok,error,dry,sent_by&order=sent_at.desc&limit=5'),
+    lastRows('api_access_log?select=at,key_name,resource,status&order=at.desc&limit=1')]);
+  return { at: new Date().toISOString(), github, mgmt: mgmtApi, slack, remind, export: exportApi };
+}
 function mgmtErr(r: { status: number; json: any; text: string }, what: string): never {
   const m = (r.json && (r.json.message || r.json.error || r.json.msg)) || r.text.slice(0, 300);
   throw new Error(`${what} 실패 (${r.status}): ${m}${r.status === 401 ? ' — MGMT_ACCESS_TOKEN 확인' : r.status === 403 ? ' — 토큰 권한(scope) 부족' : ''}`);
@@ -161,7 +199,7 @@ Deno.serve(async (req: Request) => {
   if (action === 'status') {
     return json({ ok: true, actor, project_ref: PROJECT_REF, pin_set: !!OPS_PIN, owner_ok: true,
       github: { repo: GH_REPO, branch: GH_BRANCH, token_set: !!GH_TOKEN }, mgmt_token_set: !!MGMT_TOKEN, log_ok: !!SB_SVC,
-      slack: !!(SLACK_TOKEN && OPS_SLACK), recent: await recentLogs(30) });
+      slack: !!(SLACK_TOKEN && OPS_SLACK), recent: await recentLogs(30), integrations: body.deep === true ? await integrations() : undefined });
   }
 
   // ── ④ PIN ──
@@ -419,7 +457,7 @@ Deno.serve(async (req: Request) => {
     }
     const ms = Date.now() - t0;
     await logOp({ actor, action, target, summary, ok: true, ms, detail });
-    if (notify) slackNote(notify + `\n_${actor} · 포탈 배포·운영_`);
+    if (notify) await slackNote(notify + `\n_${actor} · 포탈 배포·운영_`);   // ㊿+182 기다림 — 응답 뒤에 남은 호출은 함수가 끝나며 끊길 수 있음
     return json({ ok: true, action, ms, ...out });
   } catch (e) {
     const msg = String((e as Error).message || e);

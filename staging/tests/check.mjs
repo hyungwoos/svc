@@ -185,6 +185,15 @@ say(/^export function tickMemo\(/m.test(jsAll) && /^export function cssvKey\(/m.
     && /#dvTable\.cards thead\{display:none\}/.test(css) && /\{font-size:16px!important\}/.test(css) && /id="nMrr"[^>]*inputmode="decimal"/.test(html) && /id="odPhone"[^>]*type="tel"/.test(html) && /id="dvCardBar"/.test(html)
     && /^export function formFocusBad\(from\)/m.test(ed) && /if\(cls==='bad'\) try\{ formFocusBad\(e\); \}/.test(ed),
   '㊿+181 폰: 목록 카드(같은 표 · 칸 이름 · 주요 5칸 · 정렬/거르기 · 표로 보기) · 수정 중 표시(tr.editing) · 숫자/전화 키패드 · 터치 입력 16px · 필수 칸으로 이동 · 빈 머리글 이름'); }
+// ㊿+182 연동 · 코드 품질: 호출 시간 제한(fetchT) · 연동 상태 · 함수 v1.7/v1.2/v1.4(속도 제한 · 기록) · 병렬 smoke · 단위 시험
+{ const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
+  const co = rd('js/core.js'), ad = rd('js/admin.js'), sm = rd('tests/smoke.mjs'), lb = rd('tests/lib.mjs');
+  const fnOk = !fs.existsSync(path.join(ROOT, 'tests', 'fn')) || (/integrations: body\.deep === true/.test(rd('supabase/functions/ops/index.ts')) && /r\.status === 429 && i < RETRY_429/.test(rd('supabase/functions/notify/index.ts')) && /body\.mode === 'health'/.test(rd('supabase/functions/notify/index.ts'))
+    && /await fetchT\(SB_URL \+ '\/rest\/v1\/remind_log'/.test(rd('supabase/functions/remind/index.ts')));
+  say(/^export async function fetchT\(url, opts, ms, what, rd\)/m.test(co) && /x\.timeout=to; x\.net=!to;/.test(co) && /fetchT\(SB_URL\+'\/rest\/v1\/'\+q,\{headers:sbHeaders\(\)\}, 60000, 'DB'\)/.test(jsAll)
+    && /fetchT\(SB_URL\+'\/functions\/v1\/notify'/.test(jsAll) && /fetchT\(SB_URL\+'\/functions\/v1\/cloudsite'/.test(jsAll) && /^export async function opsIntegrations\(\)/m.test(ad) && /id="opsInteg"/.test(ad)
+    && fnOk && /blk\(\) \{ this\.bi\+\+;/.test(lb) && /SMOKE_SHARDS/.test(sm) && fs.existsSync(path.join(ROOT, 'tests', 'unit.mjs')),
+  '㊿+182 연동: 호출 시간 제한(fetchT · 쓰기는 다시 안 보냄) · 연동 상태(토큰 만료 · 봇 권한 · 마지막 실행) · ops v1.7 · notify v1.2(429 · 대상마다 기록 · health) · remind v1.4 · 병렬 smoke · 단위 시험'); }
 // ㊿+160 연장하면 상태 «재약정»(구분 그대로) · 계약 상세에 «계약 기간 · 연장 이력»
 say(/^export function renewStatus\(r\)/m.test(jsAll) && /var nst=renewStatus\(r\);/.test(jsAll) && /^export function ctPeriods\(c, mine\)/m.test(jsAll) && html.includes('id="dtRenew"'), '연장: 상태 «재약정»(renewStatus) · 계약 상세 연장 이력(ctPeriods · #dtRenew)');
 const idx = html + jsAll;
@@ -319,6 +328,17 @@ say(/\^ai_feedback\\b\|\^ai_check_log\\b/.test(jsAll), 'permWriteGuard 예외에
     if (HAS_FN) say(fs.existsSync(path.join(ROOT, 'tests', 'fn', 'quote-worker.test.ts')), 'tests/fn/quote-worker.test.ts 존재'); }
 }
 for (const d of ['', 'staging']) { const p = path.join(ROOT, d, '도장.jpg'); if (fs.existsSync(p)) console.log(`  ⚠ ${d ? d + '/' : ''}도장.jpg 가 저장소에 있음 — 배포·운영 › GitHub › 보안 자산에서 Storage 로 올리고 삭제하세요 (SQL 87)`); }
+/* ㊿+182 날짜는 한국 기준 — new Date().toISOString().slice(0,10) 은 UTC 라 아침 9시 전엔 «어제» (todayStr() 를 쓸 것 · 위성 페이지는 localYmd) */
+{ const utc = [];
+  for (const f of [...fs.readdirSync(path.join(ROOT, 'js')).map((x) => 'js/' + x), ...(fs.existsSync(path.join(ROOT, 'sat')) ? fs.readdirSync(path.join(ROOT, 'sat')).map((x) => 'sat/' + x) : [])].filter((x) => x.endsWith('.js'))) {
+    fs.readFileSync(path.join(ROOT, f), 'utf8').split('\n').forEach((l, i) => { if (/new Date\(\)\.toISOString\(\)\.slice\(0,\s*(7|10)\)|Date\.now\(\)\+9\*3600e3\)\.toISOString\(\)\.slice/.test(l)) utc.push(f + ':' + (i + 1)); }); }
+  say(!utc.length, '오늘 날짜는 한국 기준(todayStr) — UTC 날짜(toISOString().slice(0,10)) 없음' + (utc.length ? ' — ' + utc.slice(0, 6).join(', ') : '')); }
+/* ㊿+182 단위 시험(tests/unit.mjs · 순수 함수 · 1초) */
+if (fs.existsSync(path.join(ROOT, 'tests', 'unit.mjs'))) {
+  const r = spawnSync(process.execPath, ['--test', '--test-reporter=tap', path.join(ROOT, 'tests', 'unit.mjs')], { encoding: 'utf8', cwd: ROOT, timeout: 60000 });
+  const n = /# pass (\d+)/.exec(r.stdout || '') ? +/# pass (\d+)/.exec(r.stdout)[1] : null;
+  say(r.status === 0, '단위 시험(tests/unit.mjs)' + (r.status === 0 ? '' : ' 실패 — ' + ((r.stdout || '') + (r.stderr || '')).split('\n').filter((l) => /not ok|Error|expected|actual|✖/.test(l)).slice(0, 8).join(' | ')) + (n != null ? ' · ' + n + '개' : ''));
+}
 fs.rmSync(tmp, { recursive: true, force: true });
 console.log(fail ? `\n정적 검사 실패 ${fail}건` : '\n정적 검사 통과');
 process.exit(fail ? 1 : 0);

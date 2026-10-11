@@ -1,5 +1,5 @@
 // ============================================================================
-//  Supabase Edge Function: remind  (v1.3 · 2026-10-02)
+//  Supabase Edge Function: remind  (v1.4 · 2026-10-11 · ㊿+182 Slack 속도 제한(429)이면 Retry-After 만큼 기다렸다 다시(최대 2번) · 기록(remind_log)을 남긴 뒤 응답 — v1.3 2026-10-02)
 //   계약 만기 알림 — 매월 말(25일) 슬랙 팀 채널에 «다음 달 갱신 처리 대상» 을 한 번에 보냄
 //     · 이번 달 만기(다음 달 1일 LIVE 에서 빠짐) · 다음 달 만기 · 만기 지났는데 미처리
 //     · 데이터는 DB 함수 renew_watch() (SQL 84) — 포탈 LIVE 규칙과 같은 기준
@@ -136,18 +136,21 @@ Deno.serve(async (req: Request) => {
     if (!SLACK_TOKEN) { ok = false; error = 'SLACK_BOT_TOKEN 이 설정되지 않았습니다 (Edge Functions › Secrets)'; }
     else {
       try {
-        const sr = await fetchT('https://slack.com/api/chat.postMessage', {
+        const post = () => fetchT('https://slack.com/api/chat.postMessage', {
           method: 'POST', headers: { Authorization: 'Bearer ' + SLACK_TOKEN, 'Content-Type': 'application/json; charset=utf-8' },
           body: JSON.stringify({ channel: SLACK_CHANNEL, text: msg.text, blocks: msg.blocks, unfurl_links: false }),
         }, 15000);
-        slack = await sr.json();
+        let sr = await post();
+        /* ㊿+182 속도 제한(429) = Slack 이 받지 않은 것 → 기다렸다 다시(두 번 가지 않음) · 시간 초과는 다시 보내지 않음(보내졌을 수 있음) */
+        for (let i = 0; sr.status === 429 && i < 2; i++) { const ra = Number(sr.headers.get('Retry-After')); await sr.body?.cancel().catch(() => null); await new Promise((ok) => setTimeout(ok, Math.min(isFinite(ra) && ra >= 0 ? ra : 1, 10) * 1000)); sr = await post(); }
+        slack = await sr.json().catch(() => ({ ok: false, error: sr.status === 429 ? 'ratelimited' : 'http_' + sr.status }));
         if (!slack || !slack.ok) { ok = false; error = 'slack: ' + String((slack && slack.error) || sr.status) + (slack && slack.error === 'not_in_channel' ? ' — 봇을 채널에 초대하세요 (/invite @봇이름)' : ''); }
       } catch (e) { ok = false; error = 'slack: ' + String((e as Error).message); }
     }
   }
   // ── 기록 (표가 없어도 실패하지 않음) ──
   if (svcKey) {
-    fetchT(SB_URL + '/rest/v1/remind_log', { method: 'POST', headers: { ...hdr, Prefer: 'return=minimal' },
+    await fetchT(SB_URL + '/rest/v1/remind_log', { method: 'POST', headers: { ...hdr, Prefer: 'return=minimal' },
       body: JSON.stringify({ period: nextM.slice(0, 7), kind: kinds.length === ALL_KINDS.length ? 'monthly' : kinds.join('+'), channel: SLACK_CHANNEL, n_lapsed: msg.lapsed.length, n_due: msg.due.length, n_next: msg.next.length, ok, error: error || null, dry, sent_by: sentBy }) }, 5000).catch(() => null);
   }
   return json({ ok, error: error || undefined, dry, period: nextM.slice(0, 7), kinds, total: msg.total, portal_url: portalUrl || undefined, counts: { due: msg.due.length, next: msg.next.length, lapsed: msg.lapsed.length }, text: msg.text,

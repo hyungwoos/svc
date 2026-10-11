@@ -5,6 +5,7 @@
 import { installFetch, loadFn, call, ok, report, J } from './_mock.ts';
 
 let superAdmin = true, slackOn = true, scopeMiss = false, notIn = false, autoOn = true, autoDm = false;
+let rate429 = 0, logsAtDm = -1, authBad = false;   // ㊿+182 속도 제한 횟수 · DM 보낼 때 이미 남은 기록 수 · 봇 토큰 틀림
 const SET = () => ({ slack_on: slackOn, auto_on: autoOn, auto_dm: autoDm, team_channel: 'C0TEST1234', renew_emails: ['a@example.com'], eq_emails: ['b@example.com'], biz_emails: [], dc_emails: [] });
 const N1 = '11111111-2222-4333-8444-555555555555', N2 = '21111111-2222-4333-8444-555555555555', N3 = '31111111-2222-4333-8444-555555555555', N4 = '41111111-2222-4333-8444-555555555555';
 const runs: any[] = [N1, N2, N3, N4].map((n, i) => ({ id: i + 1, slot: '2026-10-12 09:0' + i, nonce: n, created_at: new Date(Date.now() - (i === 2 ? 20 : 1) * 60000).toISOString(), used_at: null, result: null }));
@@ -28,6 +29,9 @@ installFetch((url, method, body, init) => {
     const m = url.split('/api/')[1].split('?')[0]; slack.push({ m, body: body ? JSON.parse(body) : url });
     if (m === 'users.lookupByEmail') return J(scopeMiss ? { ok: false, error: 'missing_scope' } : /zz%40/.test(url) ? { ok: false, error: 'users_not_found' } : { ok: true, user: { id: 'U' + url.length } });
     if (m === 'conversations.open') return J({ ok: true, channel: { id: 'D123' } });
+    if (m === 'auth.test') return authBad ? J({ ok: false, error: 'invalid_auth' }) : new Response(JSON.stringify({ ok: true, team: '가상팀', user: 'svc-bot' }), { status: 200, headers: { 'content-type': 'application/json', 'x-oauth-scopes': 'chat:write,channels:read' } });
+    if (m === 'chat.postMessage' && rate429 > 0) { rate429--; return new Response(JSON.stringify({ ok: false, error: 'ratelimited' }), { status: 429, headers: { 'content-type': 'application/json', 'Retry-After': '0' } }); }
+    if (m === 'chat.postMessage' && body && JSON.parse(body).channel === 'D123' && logsAtDm < 0) logsAtDm = logs.length;
     if (m === 'chat.postMessage') return J(notIn ? { ok: false, error: 'not_in_channel' } : { ok: true, ts: '1.2' });
   }
   return undefined;
@@ -61,6 +65,19 @@ scopeMiss = true; { const r = await call({ team: TEAM, dms: [{ email: 'b@example
   ok(r.status === 200 && !r.j.ok && r.j.results[0].ok && !r.j.results[1].ok && /users:read\.email/.test(r.j.hint || ''), 'DM 권한 없음 → 팀은 보내고 DM 실패 + 권한 안내', r.j); } scopeMiss = false;
 notIn = true; { const r = await call({ team: TEAM }); ok(!r.j.ok && /invite/.test(r.j.results[0].error), 'not_in_channel → 초대 안내', r.j.results[0]); } notIn = false;
 { const r = await call({ dms: [{ email: 'a@example.com', text: 'x' }, { email: 'a@example.com', text: 'y' }] }); ok(r.status === 400, '같은 계정 두 번 → 400'); }
+console.log('연결 확인 · 속도 제한 · 바로 기록 (㊿+182)');
+{ slack.length = 0; logs.length = 0; const r = await call({ mode: 'health' });
+  ok(r.status === 200 && r.j.health?.ok && r.j.health.team === '가상팀' && r.j.health.missing.join() === 'users:read.email,im:write' && /users:read\.email/.test(r.j.health.hint || ''), 'health: 봇 · 팀 · 빠진 권한(DM 용) 안내', r.j?.health);
+  ok(slack.every((s) => s.m === 'auth.test') && logs.length === 0, 'health: 보내지 않음 · 기록 없음', slack.map((s) => s.m)); }
+superAdmin = false; { slack.length = 0; const r = await call({ mode: 'health' }); ok(r.status === 403 && slack.length === 0, 'health: 슈퍼 관리자만', r.j?.error); } superAdmin = true;
+slackOn = false; { const r = await call({ mode: 'health' }); ok(r.status === 200 && r.j.health?.ok, 'health: Slack 꺼져 있어도 확인은 됨', r.j?.health?.ok); } slackOn = true;
+authBad = true; { const r = await call({ mode: 'health' }); ok(r.j?.health && !r.j.health.ok && /SLACK_BOT_TOKEN/.test(r.j.health.error), 'health: 토큰 틀림 → 안내', r.j?.health); } authBad = false;
+rate429 = 1; { slack.length = 0; const r = await call({ team: TEAM }); const posts = slack.filter((s) => s.m === 'chat.postMessage');
+  ok(r.j.ok && posts.length === 2, '429(Retry-After) → 기다렸다 다시 → 보냄(한 번만 도착)', { n: posts.length, r: r.j.results }); } rate429 = 0;
+rate429 = 5; { slack.length = 0; const r = await call({ team: TEAM }); const posts = slack.filter((s) => s.m === 'chat.postMessage');
+  ok(!r.j.ok && posts.length === 3 && /속도 제한/.test(r.j.results[0].error), '429 가 계속 → 2번 다시 해 보고 «속도 제한» 실패', { n: posts.length, e: r.j.results[0].error }); } rate429 = 0;
+{ logs.length = 0; logsAtDm = -1; const r = await call({ team: TEAM, dms: [{ email: 'a@example.com', text: 'a', n: 1 }] });
+  ok(r.j.ok && logsAtDm === 1 && logs.length === 2 && logs.every((x) => x.dry === false), '기록은 대상마다 바로(팀 기록이 DM 보내기 전에 남음)', { logsAtDm, n: logs.length }); }
 console.log('예약 발송 (㊿+177)');
 { slack.length = 0; const r = await call({ auto: 'not-a-uuid' }, { token: null }); ok(r.status === 403 && slack.length === 0, '번호 형식 아님 → 403', r.j?.error); }
 { slack.length = 0; const r = await call({ auto: '99999999-2222-4333-8444-555555555555' }, { token: null }); ok(r.status === 403 && slack.length === 0, '없는 번호 → 403 · 안 보냄', r.j?.error); }

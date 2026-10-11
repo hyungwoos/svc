@@ -1,7 +1,7 @@
 /* ===== admin.js — 관리자(계정·권한·MFA 정책) · 배포·운영 · AI 점검 · 내 계정 · 수령처 =====
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { APP_VER, IS_STAGING, ST } from './state.js';
-import { $, applyPerms, axTime, closeBtn, curLook, doLogout, esc, IDLE_KEY, IDLE_OPTS, idleLabel, idleMin, idleTouch, keepLogin, loadPerms, logoutAll, LOOKS, mfaCardRender, navText, PERF, PERM_EXEMPT, pwaHintHtml, pwaInstall, pwaStandalone, pwGen, pwRule, rawHtml, SB_KEY, SB_URL, SESS_MAX_DAYS, sessRead, setLook, STATE, tpl } from './core.js';
+import { $, applyPerms, axTime, closeBtn, curLook, doLogout, esc, fetchT, IDLE_KEY, IDLE_OPTS, idleLabel, idleMin, idleTouch, keepLogin, loadPerms, logoutAll, LOOKS, mfaCardRender, navText, PERF, PERM_EXEMPT, pwaHintHtml, pwaInstall, pwaStandalone, pwGen, pwRule, rawHtml, SB_KEY, SB_URL, SESS_MAX_DAYS, sessRead, setLook, STATE, tpl } from './core.js';
 import { cacheDrop, idxDate, ROLE_VIEWS, sbHeaders, sbTry, sbWrite, thisMonthStr, toast, todayStr } from './shell.js';
 import { aiFetch, buildDigest } from './ai.js';
 import { applyCodes, CODE_KIND, CODE_KIND_LABEL, CODE_KIND_NOTE } from './grids.js';
@@ -10,7 +10,9 @@ import { UPD, updFetch, updOpenAll, updShow, updSyncSeed } from './upd.js';
 import { switchView, viewLabelOf, xlsxAoa } from './grid.js';
 import { closeOvl, logChange, openOvl, setAuthTab } from './edit.js';
 import { loadInbound } from './inbound.js';
-import { NTF, ntfAdminRender, opsItems, opsLoad } from './notify.js';
+import { csFn, qFetch } from './sales.js';
+import { clFetchFx } from './cloud.js';
+import { NTF, ntfAdminRender, ntfCall, opsItems, opsLoad } from './notify.js';
 
 
 /* ===== 관리자 (super_admin 전용) — 계정·권한 관리 ===== */
@@ -21,11 +23,11 @@ export var AX_ROLE_KO={super_admin:'슈퍼 관리자',admin:'관리자 (조회+�
 export var AX_USERS=[];
 export function axMsg(t,bad){ var e=$('#axMsg'); e.textContent=t||''; e.style.color=bad?'var(--critical)':'var(--ink-2)'; }
 export async function adminFetch(payload){
-  var r=await fetch(SB_URL+'/functions/v1/admin',{
+  var r=await fetchT(SB_URL+'/functions/v1/admin',{
     method:'POST',
     headers:{'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+(ST.SB_TOKEN||'')},
     body:JSON.stringify(payload)
-  });
+  }, 30000, 'admin 함수', payload && /^(list|get)/.test(String(payload.action||'')));
   var j=null; try{ j=await r.json(); }catch(e){}
   if(!r.ok || !j || !j.ok) throw new Error((j&&j.error)||('HTTP '+r.status));
   cacheDrop();   // 권한 변경 등도 캐시 무효화
@@ -94,8 +96,9 @@ export function opsUrl(){ return SB_URL+'/functions/v1/ops'; }
 export async function opsCall(action, body){
   var o=Object.assign({action:action}, body||{}); if(action!=='status') o.pin=OPS.pin;
   var r;
-  try{ r=await fetch(opsUrl(), {method:'POST', headers:{'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+ST.SB_TOKEN}, body:JSON.stringify(o)}); }
-  catch(e){ throw new Error('ops 함수에 연결하지 못했습니다 — Edge Functions 에 «ops» 가 배포돼 있고 Verify JWT 가 꺼져 있는지 확인하세요'); }
+  var rd=/^(status|integrations|gh_list|gh_history|gh_get|fn_list|fn_get)$/.test(action) || !!(body && (body.dry || (action==='sql_run' && body.read_only)));
+  try{ r=await fetchT(opsUrl(), {method:'POST', headers:{'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+ST.SB_TOKEN}, body:JSON.stringify(o)}, action==='status'? 20000 : 120000, 'ops 함수', rd); }   /* ㊿+182 시간 제한 — 커밋 · 배포 · SQL 은 다시 보내지 않음 */
+  catch(e){ if(/** @type {any} */(e).timeout) throw e; throw new Error('ops 함수에 연결하지 못했습니다 — Edge Functions 에 «ops» 가 배포돼 있고 Verify JWT 가 꺼져 있는지 확인하세요'); }
   var j=null; try{ j=await r.json(); }catch(e){}
   if(!j) throw new Error('ops 함수 응답을 읽지 못했습니다 ('+r.status+')');
   if(!j.ok) throw new Error(j.error||('실패 ('+r.status+')'));
@@ -120,6 +123,7 @@ export function opsClose(k){
   else if(k==='sqlRes') OPS.sqlRes=null;
   else if(k==='health'){ if(OPS.health&&OPS.health.running) return; OPS.health=null; }
   else if(k==='errs') OPS.errs=null;
+  else if(k==='integ'){ if(INTEG.running) return; INTEG.rows=null; INTEG.at=null; }   /* ㊿+182 연동 상태 */
   else if(k==='aic'){ if(OPS.aic&&OPS.aic.running) return; OPS.aic=null; }
   else return;
   OPS.msg=''; OPS.msgCls=''; renderOps(true);
@@ -427,10 +431,10 @@ export async function opsHealth(){
   var out=[], t=function(){ return Date.now(); };
   async function step(name, fn){ var t0=t(); try{ var r=await fn(); out.push({name:name, ok:true, ms:t()-t0, info:r||''}); }catch(e){ out.push({name:name, ok:false, ms:t()-t0, info:String(e.message||e).slice(0,140)}); } }
   OPS.health={running:true, rows:out}; renderOps(true);
-  await step('GitHub Pages 최신 index.html', async function(){ var r=await fetch(prodUrl()+'?nocache='+Date.now(), {cache:'no-store'}); if(!r.ok) throw new Error('HTTP '+r.status); var m=opsVerOf(await r.text()); if(!m) throw new Error('APP_VER 없음'); return m+(m===APP_VER? ' (지금과 같음)':' ← 지금 실행 중 '+APP_VER+(IS_STAGING? ' (스테이징)':' — 새로고침 필요')); });
-  await step('Supabase REST (load_all)', async function(){ var r=await fetch(SB_URL+'/rest/v1/rpc/load_all', {method:'POST', headers:{'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+ST.SB_TOKEN}, body:'{}'}); if(!r.ok) throw new Error('HTTP '+r.status); return 'HTTP 200'; });
+  await step('GitHub Pages 최신 index.html', async function(){ var r=await fetchT(prodUrl()+'?nocache='+Date.now(), {cache:'no-store'}, 15000, 'GitHub Pages'); if(!r.ok) throw new Error('HTTP '+r.status); var m=opsVerOf(await r.text()); if(!m) throw new Error('APP_VER 없음'); return m+(m===APP_VER? ' (지금과 같음)':' ← 지금 실행 중 '+APP_VER+(IS_STAGING? ' (스테이징)':' — 새로고침 필요')); });
+  await step('Supabase REST (load_all)', async function(){ var r=await fetchT(SB_URL+'/rest/v1/rpc/load_all', {method:'POST', headers:{'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+ST.SB_TOKEN}, body:'{}'}, 30000, 'DB', true); if(!r.ok) throw new Error('HTTP '+r.status); return 'HTTP 200'; });
   await step('AI (ask ping)', async function(){ var r=await aiFetch({mode:'ping'}, 12000); if(!r || r.ok===false) throw new Error((r&&r.error)||'응답 없음'); return (r.model||'ok'); });
-  await step('remind (dry)', async function(){ var r=await fetch(SB_URL+'/functions/v1/remind?dry=1', {method:'POST', headers:{'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+ST.SB_TOKEN}, body:JSON.stringify({month:idxDate(STATE.base)})}); var j=await r.json(); if(!j.ok) throw new Error(j.error||('HTTP '+r.status)); return '이달 '+(j.counts&&j.counts.due)+' · 다음 달 '+(j.counts&&j.counts.next)+' · 미처리 '+(j.counts&&j.counts.lapsed); });
+  await step('remind (dry)', async function(){ var r=await fetchT(SB_URL+'/functions/v1/remind?dry=1', {method:'POST', headers:{'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+ST.SB_TOKEN}, body:JSON.stringify({month:idxDate(STATE.base)})}, 20000, 'remind 함수', true); var j=await r.json(); if(!j.ok) throw new Error(j.error||('HTTP '+r.status)); return '이달 '+(j.counts&&j.counts.due)+' · 다음 달 '+(j.counts&&j.counts.next)+' · 미처리 '+(j.counts&&j.counts.lapsed); });
   await step('ops (status)', async function(){ var r=await opsCall('status'); return (r.github&&r.github.token_set? 'GitHub ✓':'GitHub ✗')+' · '+(r.mgmt_token_set? 'Supabase ✓':'Supabase ✗')+' · '+(r.log_ok? '기록 ✓':'기록 ✗'); });
   if(OPS.pin) await step('운영 DB (select 1 · 읽기 전용)', async function(){ var r=await opsCall('sql_run',{sql:'select 1 as ok, now() as at', read_only:true}); return Array.isArray(r.rows)&&r.rows[0]? String(r.rows[0].at||'').slice(0,19) : 'ok'; });
   await step('운영 상태 (야간 백업 · 자동 작업 · AI 점검 · SQL 106)', async function(){ var o=await opsLoad(); if(!o) throw new Error(NTF.opsOk===false? 'ops_status 없음 — SQL 106 을 실행하세요' : '읽지 못함');
@@ -733,11 +737,120 @@ export function aiCheckBind(host){
   var b=host.querySelector('#opsAiCheck'); if(b) b.onclick=aiCheckRun;
   var x=host.querySelector('#opsAiXlsx'); if(x) x.onclick=function(){ var A=OPS.aic; if(!A) return; xlsxAoa('AI점검_'+String(A.at||'').slice(0,10), ['#','질문','기대','결과','시간(s)','모델','도구','답'], A.rows.map(function(r,i){ return [i+1, r.q, r.l, r.st, r.ms? +(r.ms/1000).toFixed(1):'', r.model||'', r.tools||0, r.text||'']; })); };
 }
+/* ── ㊿+182 연동 상태 — 바깥 서비스 연결 · 토큰 만료 · 자동 작업 마지막 실행을 한 곳에 (배포·운영 › 기록)
+   · 읽기만(보내기 · 저장 · 커밋 없음) · 토큰 값은 화면에 오지 않음(유효 · 만료일 · 권한 이름만) · 줄마다 «고칠 곳»
+   · ops v1.7(status deep: GitHub · 관리 토큰 · Slack · remind_log · api_access_log) · notify v1.2(health) — 옛 함수면 그 줄에 «올리면 확인» 안내 */
+export var INTEG={running:false, at:null, rows:null};
+/** 'YYYY-MM-DD…' 까지 남은 날(한국 날짜 기준 · 지났으면 음수) */
+export function integDays(d){ var m=/^(\d{4}-\d{2}-\d{2})/.exec(String(d||'')); if(!m) return null; return Math.round((new Date(m[1]+'T00:00:00').getTime()-new Date(todayStr()+'T00:00:00').getTime())/864e5); }
+/** ISO 시각 → 한국 'MM-DD HH:mm' (며칠 전) */
+export function integAgo(iso){ if(!iso) return ''; var t=new Date(iso); if(isNaN(t.getTime())) return String(iso); var d=Math.floor((Date.now()-t.getTime())/864e5);
+  return todayStr(t).slice(5)+' '+('0'+t.getHours()).slice(-2)+':'+('0'+t.getMinutes()).slice(-2)+(d>=1? ' ('+d+'일 전)' : ''); }
+export async function opsIntegrations(){
+  if(INTEG.running) return;
+  INTEG.running=true; INTEG.rows=[]; renderOps(true);
+  var R={}, put=function(k, sev, name, info, fix){ R[k]={sev:sev, name:name, info:info, fix:fix||''}; };
+  var st=null; try{ st=await opsCall('status', {deep:true}); }catch(e){ st={ok:false, error:String(/** @type {any} */(e).message||e)}; }
+  var I=(st && st.ok && st.integrations)||null, OLD='ops 함수를 v1.7 로 올리면(배포·운영 › Edge Function › ops) 확인합니다';
+  var SECRETS='배포·운영 › Edge Function › Secrets';
+  if(!st || !st.ok) put('gh','bad','GitHub 토큰 (배포 · 저장소)', 'ops 함수 오류 — '+((st&&st.error)||''), 'Edge Functions 에 ops 배포 · Verify JWT 끔 · OPS_OWNER');
+  else if(!I) put('gh','warn','GitHub 토큰 (배포 · 저장소)', st.github&&st.github.token_set? '설정됨 — 유효 · 만료일은 아직 모름' : 'GITHUB_TOKEN 없음', OLD);
+  else { var g=I.github||{}, dl=integDays(g.expires);
+    if(!g.ok) put('gh','bad','GitHub 토큰 (배포 · 저장소)', g.error||'확인 실패', 'GitHub › Settings › Developer settings › Fine-grained tokens → 새 토큰(svc 저장소 · Contents 읽기/쓰기) → '+SECRETS+' GITHUB_TOKEN');
+    else put('gh', dl==null? 'ok' : dl<0? 'bad' : dl<=30? 'warn' : 'ok', 'GitHub 토큰 (배포 · 저장소)',
+      (dl!=null && dl<0? '' : '유효 · ')+(g.repo||'')+(g.branch? ' ('+g.branch+')':'')+' · '+(dl==null? '만료일 없음' : '만료 '+String(g.expires).slice(0,10)+(dl<0? ' — 이미 지남' : ' ('+dl+'일 남음)')),
+      dl!=null && dl<=30? '만료 전에 새 토큰을 만들어 '+SECRETS+' GITHUB_TOKEN 에 (만료되면 배포 · 승격 · 되돌리기가 멈춤)' : ''); }
+  if(I){ var mg=I.mgmt||{};
+    put('mgmt', mg.ok? 'ok' : 'bad', 'Supabase 관리 토큰 (SQL 실행 · 함수 배포)', mg.ok? '유효' : (mg.error||'확인 실패'), mg.ok? '' : 'Supabase › Account › Access Tokens → 새 sbp_ 토큰 → '+SECRETS+' MGMT_ACCESS_TOKEN'); }
+  else if(st && st.ok) put('mgmt', st.mgmt_token_set? 'info' : 'warn', 'Supabase 관리 토큰 (SQL 실행 · 함수 배포)', st.mgmt_token_set? '설정됨 — 유효한지는 아직 모름' : 'MGMT_ACCESS_TOKEN 없음', OLD);
+  var jobs=[
+    /* Slack 봇 — notify v1.2 health(받는 함수까지 확인) · 옛 notify 면 ops 쪽 확인으로 */
+    (async function(){
+      var h=null, herr=''; try{ var j=await ntfCall({mode:'health'}); h=j && j.health; }catch(e){ herr=String(/** @type {any} */(e).message||e); }
+      var sl=h || (I && I.slack) || null, name='Slack 봇 (알림함 · 만기 · 배포 알림)';
+      if(!sl){ put('slack','warn',name, herr? 'notify 함수 — '+herr : '확인 못 함', 'notify 함수를 v1.2 로 올리면 확인합니다'); return; }
+      if(!sl.ok){ put('slack', sl.set===false? 'info' : 'bad', name, sl.error||'확인 실패', 'api.slack.com › 내 앱 › OAuth & Permissions 의 Bot Token(xoxb-) → '+SECRETS+' SLACK_BOT_TOKEN'); return; }
+      var miss=h? (h.missing||[]) : [];
+      put('slack', miss.length? 'warn' : 'ok', name, '연결됨 · '+(sl.team||'')+' · 봇 '+(sl.bot||'')+(miss.length? ' · 권한 없음: '+miss.join(', ')+'(개인 메시지)' : ''),
+        miss.length? 'Slack 앱 › OAuth & Permissions 에 '+miss.join(' · ')+' 더하고 «Reinstall» (팀 채널은 지금도 됨)' : (h? '' : 'notify 함수를 v1.2 로 올리면 개인 메시지 권한까지 확인'));
+    })(),
+    /* Slack 예약 발송 · 마지막 실제 발송 (SQL 105 · 108) */
+    (async function(){
+      var set=await sbTry('notify_settings?select=slack_on,auto_on,auto_dm&id=eq.1'), run=await sbTry('notify_auto_run?select=slot,used_at,result&order=id.desc&limit=1'),
+          last=await sbTry('notify_log?select=at,target,ok,error,sent_by&dry=eq.false&order=at.desc&limit=1');
+      var s0=set&&set[0], r0=run&&run[0], l0=last&&last[0], name='Slack 보내기 · 예약 발송';
+      var lastTxt=l0? '마지막 발송 '+integAgo(l0.at)+' '+(l0.ok? '✓' : '✗ '+(l0.error||''))+(l0.sent_by==='예약'? ' (예약)' : '') : '보낸 기록 없음';
+      if(!s0){ put('notify','info',name,'설정 표 없음(SQL 105)', ''); return; }
+      if(!s0.slack_on){ put('notify','info',name,'Slack 꺼짐 · '+lastTxt, '관리자 › 설정 › 알림 · Slack'); return; }
+      if(!s0.auto_on){ put('notify', l0 && !l0.ok? 'warn' : 'ok', name,'예약 꺼짐(직접 보내기만) · '+lastTxt, ''); return; }
+      var bad=r0 && /실패|못|없음|놓침|pg_net/.test(String(r0.result||''));
+      put('notify', bad || (l0 && !l0.ok)? 'warn' : 'ok', name, '예약 켜짐'+(s0.auto_dm? '(개인 메시지 포함)' : '')+(r0? ' · 마지막 예약 '+String(r0.slot||'')+' → '+(r0.result||(r0.used_at? '보내는 중' : '아직')) : ' · 아직 예약 실행 없음')+' · '+lastTxt,
+        bad? '관리자 › 설정 › 알림 · Slack «예약 발송» 안내 · notify 함수 Verify JWT 끔 · pg_net' : '');
+    })(),
+    /* AI 야간 점검(aicheck · SQL 94) */
+    (async function(){
+      var a=await sbTry('ai_check_log?select=run_at,pass,total&source=eq.cron&order=run_at.desc&limit=1'), a0=a&&a[0], name='AI 야간 점검 (aicheck)';
+      if(a===null){ put('aicheck','info',name,'기록 표 없음(SQL 94)',''); return; }
+      if(!a0){ put('aicheck','info',name,'야간 자동 점검 기록 없음','선택: Supabase › Cron 에 aicheck 등록(README)'); return; }
+      var hrs=(Date.now()-new Date(a0.run_at).getTime())/36e5;
+      put('aicheck', hrs>36? 'warn' : (a0.total && a0.pass<a0.total? 'warn' : 'ok'), name, '마지막 '+integAgo(a0.run_at)+' · '+a0.pass+'/'+a0.total+' 통과', hrs>36? '하루 넘게 안 돌았음 — Supabase › Cron 의 aicheck 작업 · AICHECK_KEY 확인' : (a0.pass<a0.total? '기록 탭 «AI 점검 추이»에서 실패 질문 확인' : ''));
+    })(),
+    /* 견적 저장 서버(Cloudflare Worker) — whoami · 옛 팀 비밀번호 종료일 */
+    (async function(){
+      var name='견적 저장 서버 (Cloudflare Worker)';
+      try{ var res=await qFetch('/whoami', {method:'GET'}); var j=null; try{ j=await res.json(); }catch(e){}
+        if(!res.ok || !j || !j.ok){ put('worker','bad',name,'HTTP '+res.status+((j&&j.error)? ' — '+j.error : ''), 'Cloudflare › Workers › quote-worker · 견적 화면 «GitHub ▾ → 설정» 주소'); return; }
+        var lu=j.legacy_until? String(j.legacy_until) : '', base='연결됨 · '+(j.role||'')+' · 쓰기 '+(j.write? '가능' : '불가')+(j.ver? ' · '+j.ver : '');
+        if(lu && todayStr()<=lu) put('worker','warn',name, base+' · 옛 팀 비밀번호(ACCESS_PASSWORD) 아직 받음 — '+lu+' 뒤 자동 종료', '모두 포탈 로그인으로 쓰고 있으면 지금 Cloudflare › Worker › Settings › Variables 에서 ACCESS_PASSWORD 지우기');
+        else put('worker', lu? 'info' : 'ok', name, base+(lu? ' · 옛 팀 비밀번호 방식 종료됨('+lu+')' : ''), lu? 'Cloudflare › Worker › Settings › Variables 의 ACCESS_PASSWORD 는 지워도 됨' : '');
+      }catch(e){ put('worker','bad',name,String(/** @type {any} */(e).message||e),'견적 화면 «GitHub ▾ → 설정»의 저장 서버 주소 · Cloudflare Worker 상태'); }
+    })(),
+    /* Cloud 사이트 API(my.genians · cloudsite 함수) — API 계정 수만 */
+    (async function(){
+      var name='Cloud 사이트 API (cloudsite)';
+      try{ var j=await csFn({action:'creds'}); if(!j.ok){ put('cs','bad',name,j.error||'실패','Edge Functions 의 cloudsite 함수 · Secrets'); return; }
+        var n=(j.creds||[]).length; put('cs', n? 'ok' : 'warn', name, '연결됨 · API 계정 '+n+'개', n? '' : '고객 › Cloud 사이트 › «계정·API Key 관리»에서 추가');
+      }catch(e){ put('cs','bad',name,String(/** @type {any} */(e).message||e),'Edge Functions 에 cloudsite 배포 · Verify JWT'); }
+    })(),
+    /* 환율(클라우드 비용 화면) */
+    (async function(){
+      var name='환율 (클라우드 비용)';
+      try{ var fx=await clFetchFx(false); put('fx', fx.live? 'ok' : 'warn', name, (fx.live? '' : '외부 환율을 못 받음 — ')+fx.rate+'원/USD · '+fx.src+(fx.when? ' · '+String(fx.when).slice(0,25) : ''), fx.live? '' : '잠시 뒤 다시 · 회사 망에서 open.er-api.com · api.frankfurter.app 이 막혔는지'); }
+      catch(e){ put('fx','warn',name,String(/** @type {any} */(e).message||e),''); }
+    })()
+  ];
+  await Promise.all(jobs.map(function(p){ return p.catch(function(){}); }));
+  /* ops 가 읽은 서비스 키 전용 기록(remind_log · api_access_log) */
+  if(I){
+    var rl=I.remind, rr=Array.isArray(rl)? rl.filter(function(x){ return !x.dry; })[0] : null, nm='만기 알림 (remind · 월말)';
+    if(!Array.isArray(rl)) put('remind','info',nm,'기록 표 없음(SQL 84)','');
+    else if(!rr) put('remind','info',nm,'보낸 기록 없음'+(rl.length? ' (미리 보기만 '+rl.length+'번)' : ''),'월말 자동 발송: Supabase › Cron 에 remind 등록(README)');
+    else { var age=(Date.now()-new Date(rr.sent_at).getTime())/864e5;
+      put('remind', !rr.ok? 'bad' : age>40? 'warn' : 'ok', nm, '마지막 '+integAgo(rr.sent_at)+' · '+(rr.period||'')+(rr.kind && rr.kind!=='monthly'? ' '+String(rr.kind).split('+').map(function(k){ return ({lapsed:'미처리', due:'이달 만기', next:'다음 달 만기'})[k]||k; }).join('·') : ' 전체')+' · '+(rr.sent_by==='cron'? '자동' : (rr.sent_by||''))+' '+(rr.ok? '✓' : '✗ '+(rr.error||'')),
+        !rr.ok? (/not_in_channel/.test(String(rr.error))? '봇을 채널에 초대(/invite)' : 'remind 함수 Secrets(SLACK_BOT_TOKEN · SLACK_CHANNEL)') : age>40? '한 달 넘게 안 보냄 — Supabase › Cron 의 remind 작업 확인' : ''); }
+    var ex=I.export, e0=Array.isArray(ex)? ex[0] : null, en='데이터 내보내기 API (export)';
+    if(!Array.isArray(ex)) put('export','info',en,'기록 표 없음(SQL 102) — 내보내기 API 를 안 쓰면 그대로','');
+    else if(!e0) put('export','info',en,'아직 호출 없음','');
+    else put('export', e0.status>=400? 'warn' : 'ok', en, '마지막 호출 '+integAgo(e0.at)+' · '+(e0.key_name||'')+' · '+(e0.resource||'')+' · HTTP '+e0.status, e0.status>=400? '관리자 › 🔐 보안 › API 키' : '');
+  } else if(st && st.ok){ put('remind','info','만기 알림 (remind · 월말)','마지막 발송은 아직 모름',OLD); }
+  var ORDER=['gh','mgmt','slack','notify','remind','aicheck','export','worker','cs','fx'];
+  INTEG.rows=ORDER.filter(function(k){ return R[k]; }).map(function(k){ return Object.assign({k:k}, R[k]); });
+  INTEG.running=false; INTEG.at=new Date(); renderOps(true);
+}
+export function integHtml(){
+  var X=INTEG, ic={ok:'<span class="up">✓</span>', warn:'<span class="integ-w">⚠</span>', bad:'<span class="integ-b">✗</span>', info:'<span class="mini">·</span>'};
+  var n=X.rows? X.rows.filter(function(r){ return r.sev==='bad'; }).length : 0, w=X.rows? X.rows.filter(function(r){ return r.sev==='warn'; }).length : 0;
+  var h=tpl`<div class="ops-h" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">연동 상태 <button type="button" class="cbtn" id="opsInteg"${X.running? ' disabled':''}>${X.running? '확인 중…' : '연동 확인'}</button>${rawHtml(X.at? tpl`<span class="mini">${X.at.toLocaleTimeString('ko-KR')}${n||w? ' · 확인 필요 '+(n+w)+'개' : ' · 모두 정상'}</span>` : '')}${X.rows&&!X.running? closeBtn({'data-ops-close':'integ'},'연동 상태 닫기') : ''}</div>`;
+  if(!X.rows) return h+tpl`<p class="mini" style="margin:0 0 14px">GitHub · Supabase 관리 토큰(유효 · 만료일) · Slack 봇 · 예약 발송 · 만기 알림 · AI 야간 점검 · 내보내기 API · 견적 저장 서버 · Cloud 사이트 API · 환율 — 읽기만(보내기 · 저장 없음)</p>`;
+  if(X.running && !X.rows.length) return h+tpl`<p class="mini" style="margin:0 0 14px">확인하는 중…</p>`;
+  return h+tpl`<table class="rn-tbl integ-tbl" style="margin-bottom:14px"><tbody>${rawHtml(X.rows.map(function(r){ return tpl`<tr class="integ-${r.sev}" data-integ="${r.k}"><td class="integ-n">${r.name}</td><td>${rawHtml(ic[r.sev]||'')} ${r.info}${rawHtml(r.fix? tpl`<div class="mini">고칠 곳: ${r.fix}</div>` : '')}</td></tr>`; }).join(''))}</tbody></table>`;
+}
 export function opsLogHtml(){
   var st=OPS.st, L=(st&&st.ok&&st.recent)||[], H=OPS.health, E=OPS.errs;
   var h=tpl`<div class="ops-h" style="display:flex;align-items:center;gap:10px">시스템 점검 <button type="button" class="cbtn" id="opsHealth"${H&&H.running? ' disabled':''}>${H&&H.running? '점검 중…':'지금 점검'}</button>${rawHtml(H&&H.at? tpl`<span class="mini">${H.at.toLocaleTimeString('ko-KR')}</span>`:'')}${H&&!H.running&&H.rows.length? closeBtn({'data-ops-close':'health'},'점검 결과 닫기'):''}</div>`;
   if(H && H.rows.length) h+=tpl`<table class="rn-tbl" style="margin-bottom:14px"><tbody>${rawHtml(H.rows.map(function(r){ return tpl`<tr><td style="width:240px">${r.name}</td><td>${rawHtml(r.ok? '<span class="up">✓</span>':'<span style="color:var(--critical)">✗</span>')} ${r.info}</td><td class="n mini">${rawHtml(r.ms)}ms</td></tr>`; }).join(''))}</tbody></table>`;
   else h+='<p class="mini" style="margin:0 0 14px">Pages 최신 버전 · Supabase REST · AI · remind · ops · (PIN 있으면) 운영 DB · 서비스 워커를 순서대로 확인합니다.</p>';
+  h+=integHtml();
   h+=tpl`<div class="ops-h" style="display:flex;align-items:center;gap:10px">브라우저 오류 (사용자 화면에서 난 JS 오류 · 최근 30건) <button type="button" class="cbtn" id="opsErrs">불러오기</button>${E!=null? closeBtn({'data-ops-close':'errs'},'오류 목록 닫기'):''}</div>`;
   if(E===null) h+='<p class="mini" style="margin:0 0 14px">«불러오기»를 누르면 client_errors 표(SQL 86)를 읽습니다.</p>';
   else if(!E.length) h+='<p class="mini" style="margin:0 0 14px">기록된 오류가 없습니다 ✓</p>';
@@ -764,6 +877,7 @@ export function opsTgtHtml(t){
 export function opsLogBind(host){
   aiCheckBind(host);
   var hb=host.querySelector('#opsHealth'); if(hb) hb.onclick=opsHealth;
+  var ib=host.querySelector('#opsInteg'); if(ib) ib.onclick=opsIntegrations;
   var eb=host.querySelector('#opsErrs'); if(eb) eb.onclick=opsLoadErrors;
   var pb=host.querySelector('#opsPerf'); if(pb) pb.onclick=opsLoadPerf;
 }
@@ -1012,7 +1126,7 @@ export function mfPaint(){
     var tr=document.createElement('tr'); var me=(r.email||'').toLowerCase()===(ST.AUTH_USER||'').toLowerCase();
     /* ㊿+147 SQL 95: 실제 적용 = 계정 지정 OR 역할 기본 (eff_* 가 없으면 SQL 95 전 — 계정 지정만) */
     var effReq=(r.eff_required!=null)? r.eff_required : r.required, effDl=(r.eff_required!=null)? r.eff_deadline : r.deadline, byRole=/role/.test(r.source||'');
-    var due=effReq && !r.enrolled && (!effDl || effDl<=new Date().toISOString().slice(0,10));
+    var due=effReq && !r.enrolled && (!effDl || effDl<=todayStr());   /* ㊿+182 한국 날짜(예전 UTC — 아침 9시 전엔 어제) */
     tr.innerHTML=tpl`<td>${r.email||''}${rawHtml(me? ' <span class="mini">(나)</span>':'')}</td>`+
       tpl`<td class="mini">${AX_ROLE_KO[r.role]||r.role||'권한 없음'}</td>`+
       tpl`<td>${rawHtml(r.enrolled? tpl`<span style="color:var(--brand)">✓ 등록</span> <span class="mini">${String(r.factor_at||'').slice(0,10)}</span>` : (effReq? tpl`<span style="color:${due? 'var(--critical)':'var(--warn-ink)'}">${rawHtml(due? '미등록 · 차단 중':'미등록 · 유예 '+esc(effDl||''))}</span>${rawHtml(byRole? ' <span class="ctag" title="역할 기본 정책(SQL 95)으로 필수">역할 기본</span>':'')}` : '<span class="mini">미등록</span>'))}</td>`+
@@ -1027,7 +1141,7 @@ export function mfPaint(){
   t.querySelectorAll('[data-mf-save]').forEach(function(b){ b.onclick=function(){ mfSave(b.dataset.mfSave); }; });
   t.querySelectorAll('[data-mf-reset]').forEach(function(b){ b.onclick=function(){ mfReset(b.dataset.mfReset); }; });
 }
-export function mfPlus(days){ var d=new Date(); d.setDate(d.getDate()+days); return d.toISOString().slice(0,10); }
+export function mfPlus(days){ var d=new Date(); d.setDate(d.getDate()+days); return todayStr(d); }
 export async function mfSave(email){
   var t=$('#mfTable'); var q=function(sel){ return t.querySelector('['+sel+'="'+CSS.escape(email)+'"]'); };
   var req=q('data-mf-req').checked, dl=q('data-mf-dl').value||null, note=q('data-mf-note').value.trim()||null;
@@ -1481,7 +1595,7 @@ export function updAdminPaint(){
   host.innerHTML=h;
   host.querySelector('#updReload').onclick=updAdminLoad;
   host.querySelector('#updPreview').onclick=function(){ updShow(act, {mode:'preview'}); };
-  host.querySelector('#updNew').onclick=function(){ UPD.edit={id:null, ver:'', title:'', body:'- ', published_on:new Date(Date.now()+9*3600e3).toISOString().slice(0,10)}; updEditPaint(); };
+  host.querySelector('#updNew').onclick=function(){ UPD.edit={id:null, ver:'', title:'', body:'- ', published_on:todayStr()}; updEditPaint(); };
   host.querySelectorAll('[data-updn]').forEach(function(c){ c.onchange=function(){ updNotifySet(c.dataset.updn, c.checked); }; });
   host.querySelectorAll('[data-updreset]').forEach(function(b){ b.onclick=function(){ updAckReset(b.dataset.updreset); }; });
   host.querySelectorAll('[data-upded]').forEach(function(b){ b.onclick=function(){ var r=UPD.rows.filter(function(x){ return String(x.id)===b.dataset.upded; })[0]; if(r){ UPD.edit=Object.assign({}, r); updEditPaint(); } }; });

@@ -12,7 +12,11 @@ function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){ retu
 function n(v){ var x=parseFloat(String(v==null?'':v).replace(/[^\d.\-]/g,'')); return isNaN(x)?0:x; }
 function todayISO(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 async function aiFetch(payload){
-  var r=await fetch(SB_URL+'/functions/v1/ask',{method:'POST',headers:hdr(true),body:JSON.stringify(payload)});
+  /* ㊿+182 시간 제한 — AI 가 2분 넘게 답이 없으면 끊고 안내(예전엔 «생각 중»이 끝없이 돌았음) */
+  var ctl=new AbortController(), tm=setTimeout(function(){ try{ ctl.abort(); }catch(e){} }, 120000), r;
+  try{ r=await fetch(SB_URL+'/functions/v1/ask',{method:'POST',headers:hdr(true),body:JSON.stringify(payload),signal:ctl.signal}); }
+  catch(e){ throw new Error(e && e.name==='AbortError'? 'AI 응답이 120초 넘게 없습니다 — 잠시 뒤 다시 시도해 주세요' : 'AI 에 연결하지 못했습니다(네트워크)'); }
+  finally{ clearTimeout(tm); }
   var j=null; try{ j=await r.json(); }catch(e){}
   if(!r.ok) throw new Error((j&&j.error)||('HTTP '+r.status));
   return j;

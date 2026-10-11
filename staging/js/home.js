@@ -11,7 +11,7 @@
    · 답의 버튼은 화면만 엶 — 저장 · 발송은 그 화면에서 확인한 뒤에만 */
 import { ST } from './state.js';
 import { cssv, esc, isGN, lline, mk, navText, rawHtml, STATE, tpl, won, wonFull } from './core.js';
-import { ccPref, ccPrefSet, ccUnsnooze, ico, sbTry, toast, visBtn } from './shell.js';
+import { ccPref, ccPrefSet, ccUnsnooze, ico, sbTry, toast, todayStr, visBtn } from './shell.js';
 import { DASH_DIRTY, expNote, kpiOpen, monthlyTotal, onResize, renderAll, renewNeedScan } from './dash.js';
 import { abortAsk, ask, isAsking } from './ai.js';
 import { liveData, openRenewList } from './analysis.js';
@@ -746,7 +746,7 @@ export function liList(opt){
 }
 /** «내가 처리할 일» — 계정 ↔ 담당자 이름 연결이 있어야 셈(없으면 0 이 아니라 «담당자 연결 필요») */
 export function liMine(){
-  var C=qvCfg(), MO=myOwner(), meta={period:'오늘 '+new Date().toISOString().slice(0,10)+' 기준', unit:'건', cond:''};
+  var C=qvCfg(), MO=myOwner(), meta={period:'오늘 '+todayStr()+' 기준', unit:'건', cond:''};
   var team=(HOME.rows||[]).slice().sort(function(a,c){ return dueK(a)-dueK(c) || (a.lv||2)-(c.lv||2); }).slice(0,5);
   if(!MO.names.length){
     var owners={}; (ST.RAWX.oi||[]).concat(ST.RAWX.inbound||[]).forEach(function(r){ String(r.owner||'').split(/[,/]/).forEach(function(o){ o=o.trim(); if(o) owners[o]=1; }); });

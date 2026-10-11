@@ -7,7 +7,7 @@ const ROWS = [
   { kind: 'next', contract_id: 2, customer: '가상고객02', line: 'S1', channel: '에스원', partner: null, csm: null, s1_no: 'N0000001', start_month: '2023-12-01', end_month: '2026-11-01', term_months: 36, mrr: 100000, renew_count: 1, status: '신규', note: null },
   { kind: 'lapsed', contract_id: 3, customer: '가상고객03', line: 'Cloud', channel: '일반', partner: '직접(계산서)', csm: null, s1_no: null, start_month: '2024-09-01', end_month: '2026-08-01', term_months: 24, mrr: 150000, renew_count: 0, status: '신규', note: null },
 ];
-let role = 'super_admin', slackFail = false;
+let role = 'super_admin', slackFail = false, rate429 = 0, logSlow = false;   // ㊿+182 속도 제한 횟수 · 기록이 늦게 끝남
 const logs: any[] = [], slack: any[] = [];
 installFetch((url, method, body, init) => {
   const auth = String((init?.headers as Record<string, string>)?.Authorization || (init?.headers as Record<string, string>)?.authorization || '');
@@ -15,7 +15,8 @@ installFetch((url, method, body, init) => {
   if (url.includes('/auth/v1/user')) return /Bearer sb_secret_/.test(auth) ? J({ msg: 'invalid JWT' }, 401) : J({ id: 'u1', email: 'tester@example.com' });   // 실제 GoTrue 는 비밀 키를 사용자 토큰으로 받지 않음
   if (url.includes('/rest/v1/user_roles')) return J([{ role }]);
   if (url.includes('/rpc/renew_watch')) return J(ROWS);
-  if (url.includes('/rest/v1/remind_log')) { logs.push(JSON.parse(body || '{}')); return new Response('', { status: 201 }); }
+  if (url.includes('/rest/v1/remind_log')) { const b = JSON.parse(body || '{}'); if (logSlow) return new Promise((res) => setTimeout(() => { logs.push(b); res(new Response('', { status: 201 })); }, 150)); logs.push(b); return new Response('', { status: 201 }); }
+  if (url.includes('slack.com') && rate429 > 0) { rate429--; slack.push(JSON.parse(body || '{}')); return new Response(JSON.stringify({ ok: false, error: 'ratelimited' }), { status: 429, headers: { 'Retry-After': '0' } }); }
   if (url.includes('slack.com')) { slack.push(JSON.parse(body || '{}')); return J(slackFail ? { ok: false, error: 'not_in_channel' } : { ok: true, ts: '1.2' }); }
   return undefined;
 });
@@ -42,4 +43,8 @@ role = 'admin'; { const r = await call({ dry: true }); ok(r.status === 403, 'adm
 { const r = await call({ dry: true }, { token: 'sb_secret_wrong' }); ok(r.status === 401, '잘못된 sb_secret_ → 서비스 키 아님 → 사용자 토큰 검사 → 401', r.status); }
 { slackFail = true; logs.length = 0; const r = await call({ month: '2026-10-01' }); ok(!r.j.ok && /not_in_channel|초대/.test(String(r.j.error)), 'not_in_channel → 봇 초대 안내', r.j.error); ok(logs.length === 1 && logs[0].ok === false, '실패도 remind_log 에 기록'); slackFail = false; }
 ok(!calls.some((c) => c.body && /xoxb-test/.test(c.body) && !c.url.includes('slack.com')), '슬랙 토큰이 슬랙 외 요청 본문에 새지 않음');
+console.log('㊿+182 속도 제한 · 기록');
+rate429 = 1; { slack.length = 0; logs.length = 0; const r = await call({ month: '2026-10-01' }); ok(r.j.ok && slack.length === 2 && logs[0]?.ok === true, '429(Retry-After) → 기다렸다 다시 → 보냄', { n: slack.length, ok: r.j.ok }); } rate429 = 0;
+rate429 = 5; { slack.length = 0; logs.length = 0; const r = await call({ month: '2026-10-01' }); ok(!r.j.ok && slack.length === 3 && /ratelimited/.test(r.j.error) && logs[0]?.ok === false, '429 계속 → 2번 다시 · 실패 기록', { n: slack.length, e: r.j.error }); } rate429 = 0;
+logSlow = true; { logs.length = 0; const r = await call({ month: '2026-10-01' }); ok(r.j.ok && logs.length === 1, 'remind_log 기록을 남긴 뒤 응답(150ms 늦은 기록)', logs.length); } logSlow = false;
 report('remind');

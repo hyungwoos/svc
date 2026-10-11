@@ -1,7 +1,7 @@
 /* ===== core.js — 공통 유틸 · 데이터 로드 · Supabase · PWA · 메뉴 권한 · 세션 · 2단계 인증 · 자동 로그아웃 · 화면 디자인 =====
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { APP_VER, IS_QA, IS_STAGING, ST } from './state.js';
-import { buildMtabs, buildRail, cacheDrop, dIdx, sbTry, toast } from './shell.js';
+import { buildMtabs, buildRail, cacheDrop, dIdx, sbTry, toast, todayStr } from './shell.js';
 import { subgrpSync } from './tools.js';
 import { logChange } from './edit.js';
 /* ==================================================================
@@ -176,6 +176,26 @@ export function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
 /* APP_VER 는 js/state.js 가 index.html <meta name="app-ver"> 에서 읽습니다 (app.css/js 의 ?v= 캐시 무효화 — tests/stamp.mjs · 배포·운영 버전 비교가 그 값을 씀) */
 export var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 export var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
+/* ── ㊿+182 연동 호출 시간 제한 — 서버 · 함수 · Worker · GAS 가 답을 안 주면 «불러오는 중»이 끝없이 돌던 것.
+   · ms 넘게 답이 없으면 끊고 알아보기 쉬운 오류(e.timeout=true) · 연결 자체가 안 되면 e.net=true
+   · 쓰기(POST · PATCH · DELETE · 함수 실행)는 자동으로 다시 보내지 않음 — 서버에서는 처리됐을 수 있으니 «확인한 뒤 다시» 안내(중복 발송 · 중복 저장 방지)
+   · FETCH_T.scale = 시험에서 시간을 줄이는 배율(화면 동작은 그대로) */
+export var FETCH_T={scale:1};
+/** @param {string} url @param {RequestInit} [opts] @param {number} [ms] @param {string} [what] 오류 글의 이름 @param {boolean} [rd] POST 지만 읽기(rpc 조회 · 미리 보기) */
+export async function fetchT(url, opts, ms, what, rd){
+  opts=opts||{}; ms=Math.max(1, (ms||30000)*(FETCH_T.scale||1));
+  var ctl=new AbortController(), up=opts.signal, tm=setTimeout(function(){ try{ ctl.abort(); }catch(e){} }, ms);
+  if(up){ if(up.aborted) ctl.abort(); else up.addEventListener('abort', function(){ try{ ctl.abort(); }catch(e){} }); }
+  var wr=!rd && !!opts.method && !/^(GET|HEAD)$/i.test(opts.method), sec=Math.max(1, Math.round((ms/(FETCH_T.scale||1))/1000));
+  try{ return await fetch(url, Object.assign({}, opts, {signal:ctl.signal})); }
+  catch(e){
+    if(up && up.aborted) throw e;   /* 부른 쪽이 스스로 멈춘 것(예: AI 답 멈춤) */
+    var to=/** @type {any} */(e) && /** @type {any} */(e).name==='AbortError';
+    var x=/** @type {any} */(new Error((what||'서버')+(to? ' 응답이 '+sec+'초 넘게 없습니다' : '에 연결하지 못했습니다(네트워크)')+(wr? ' — 처리됐는지 확인한 뒤 다시 시도해 주세요' : ' — 잠시 뒤 다시 시도해 주세요')));
+    x.timeout=to; x.net=!to; throw x;
+  }
+  finally{ clearTimeout(tm); }
+}
 
 /* ---- PWA (홈 화면 앱) — 서비스 워커 등록 · 설치 안내 ---- */
 /* ── 스테이징 띠 · 브라우저 오류 수집 (㊿+129) ──
@@ -480,8 +500,8 @@ export var MFA_ST=null;   // 본인 정책(rpc mfa_status · SQL 89) — {requir
 export async function mfaPolicy(tok){
   try{ var r=await fetch(SB_URL+'/rest/v1/rpc/mfa_status',{method:'POST', headers:authHdr(tok), body:'{}'}); if(!r.ok) return null; return await r.json(); }catch(e){ return null; }
 }
-export function mfaDue(st){ return !!(st && st.required && !st.enrolled && (!st.deadline || (st.today||new Date().toISOString().slice(0,10))>=st.deadline)); }
-export function mfaDaysLeft(st){ if(!st||!st.deadline) return 0; var a=new Date(st.deadline+'T00:00:00'), b=new Date((st.today||new Date().toISOString().slice(0,10))+'T00:00:00'); return Math.round((a.getTime()-b.getTime())/86400000); }
+export function mfaDue(st){ return !!(st && st.required && !st.enrolled && (!st.deadline || (st.today||todayStr())>=st.deadline)); }
+export function mfaDaysLeft(st){ if(!st||!st.deadline) return 0; var a=new Date(st.deadline+'T00:00:00'), b=new Date((st.today||todayStr())+'T00:00:00'); return Math.round((a.getTime()-b.getTime())/86400000); }
 export async function mfaGate(tok, email, factorsHint, opt){
   if(sessAal(tok)==='aal2') return true;
   /* ㊿+145 빠른 길: 로그인 응답에 «확인된 인증 앱»이 없거나(대부분의 계정) 지난번 확인 결과가 «없음»이면
@@ -644,7 +664,7 @@ export async function mfaEnrollFlow(existing, host, opts){
   try{
     if(!existing){ try{ existing=await mfaFactors(tok); }catch(e){ existing=[]; } }
     for(var i=0;i<(existing||[]).length;i++) if(existing[i].status!=='verified'){ try{ await authApi('DELETE','factors/'+existing[i].id,null,tok); }catch(e){} }   // 끝내지 않은 등록은 지우고 새로
-    var name='SVC 포탈 '+new Date().toISOString().slice(0,10);
+    var name='SVC 포탈 '+todayStr();
     var f=await authApi('POST','factors',{factor_type:'totp', friendly_name:name, issuer:'SVC 포탈'},tok);
     var totp=f.totp||{};
     host.innerHTML=tpl`<div class="mfa-en">${rawHtml(totp.qr_code? tpl`<div class="mfa-qr"><img src="${mfaQrSrc(totp.qr_code)}" alt="인증 앱 등록 QR"><i></i><i></i><i></i><i></i></div>`:'')}`+

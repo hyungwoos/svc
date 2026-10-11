@@ -1,5 +1,7 @@
 // ============================================================================
-//  Supabase Edge Function: notify  (v1.1 · 2026-10-10 · ㊿+177 — v1.0 ㊿+174)
+//  Supabase Edge Function: notify  (v1.2 · 2026-10-11 · ㊿+182 — v1.1 ㊿+177 · v1.0 ㊿+174)
+//   v1.2: Slack 속도 제한(429)이면 Retry-After 만큼 기다렸다 다시(최대 2번 · 10초까지 — 429 는 «안 보내짐»이라 다시 보내도 중복 없음)
+//         · 보낸 기록을 대상마다 바로 남김(중간에 끊겨도 어디까지 보냈는지 남음 · 다시 보낼 때 중복 확인용) · { mode:'health' } = 봇 연결 · 권한 확인(보내지 않음)
 //   포탈 알림함 → Slack — 팀 채널에 요약 1번 + 받는 사람에게 개인 메시지(DM)
 //   두 가지로만 불림:
 //    ① 직접 보내기: 포탈에서 슈퍼 관리자가 «Slack 으로 보내기» → 미리 보기 → 확인 (사용자 로그인 토큰 · 슈퍼 관리자만)
@@ -11,7 +13,7 @@
 //   메시지 글은 포탈이 만듦(알림함과 같은 계산) — 이 함수는 권한 · 켜짐 · 대상 · 길이만 검사하고 그대로 보냄
 //     · 팀 채널은 notify_settings.team_channel 과 같아야 함 · DM 대상은 설정의 받는 사람 · 담당자 연결(user_owner_map) · 처리 담당(work_assign) 계정만
 //     · @channel · @here · @everyone 같은 전체 호출은 지움 · 글 3,000자 · DM 30명까지
-//   body: { team: {channel, text, n} | null, dms: [{email, text, n}], dry?: true } | { auto: '<uuid>' }   → { ok, results:[{target, ok, error?}], hint? }
+//   body: { team: {channel, text, n} | null, dms: [{email, text, n}], dry?: true } | { auto: '<uuid>' } | { mode: 'health' }   → { ok, results:[{target, ok, error?}], hint? }
 //   Secrets: SLACK_BOT_TOKEN(remind 와 같은 봇 · chat:write — DM 은 users:read.email · im:write 권한을 더하고 앱 다시 설치) · 새 Secret 없음
 //   ★ 배포: 이름 notify · «Verify JWT» 끔(remind · ask 와 같게 — 켜져 있으면 CORS 없이 401 → 포탈에서 «Failed to fetch» · 예약 호출도 막힘). 이 함수가 직접 확인합니다.
 //   기록: notify_log(대상마다 한 줄 · 서비스 키로 씀 · 예약은 sent_by '예약') — 업무 내용(메시지 글)은 저장하지 않음
@@ -43,11 +45,16 @@ export function clean(t: unknown): string {
 const rest = (path: string, key: string, init: RequestInit = {}) =>
   fetchT(SB_URL + '/rest/v1/' + path, { ...init, headers: { apikey: key === SB_SVC ? SB_SVC : SB_ANON, Authorization: 'Bearer ' + key, 'Content-Type': 'application/json', ...(init.headers || {}) } }, 8000);
 
+const RETRY_429 = 2, RETRY_MAX_S = 10;
 async function slackApi(method: string, body: Record<string, unknown> | null, query = ''): Promise<Record<string, unknown>> {
-  const r = await fetchT('https://slack.com/api/' + method + query, body
-    ? { method: 'POST', headers: { Authorization: 'Bearer ' + SLACK_TOKEN, 'Content-Type': 'application/json; charset=utf-8' }, body: JSON.stringify(body) }
-    : { method: 'GET', headers: { Authorization: 'Bearer ' + SLACK_TOKEN } });
-  try { return await r.json(); } catch { return { ok: false, error: 'http_' + r.status }; }
+  for (let i = 0; ; i++) {
+    const r = await fetchT('https://slack.com/api/' + method + query, body
+      ? { method: 'POST', headers: { Authorization: 'Bearer ' + SLACK_TOKEN, 'Content-Type': 'application/json; charset=utf-8' }, body: JSON.stringify(body) }
+      : { method: 'GET', headers: { Authorization: 'Bearer ' + SLACK_TOKEN } });
+    /* ㊿+182 속도 제한 — Slack 이 받지 않은 것(429)이라 기다렸다 다시 보내도 두 번 가지 않음. 시간 초과(응답 없음)는 다시 보내지 않음(보내졌을 수 있음) */
+    if (r.status === 429 && i < RETRY_429) { const ra = Number(r.headers.get('Retry-After')); await r.body?.cancel().catch(() => null); await new Promise((ok) => setTimeout(ok, Math.min(isFinite(ra) && ra >= 0 ? ra : 1, RETRY_MAX_S) * 1000)); continue; }
+    try { return await r.json(); } catch { return { ok: false, error: r.status === 429 ? 'ratelimited' : 'http_' + r.status }; }
+  }
 }
 function why(e: unknown): string {
   const s = String(e || '');
@@ -56,6 +63,7 @@ function why(e: unknown): string {
   if (s === 'users_not_found') return 'users_not_found — Slack 에 이 이메일의 사람이 없음';
   if (s === 'missing_scope') return 'missing_scope — Slack 앱 권한 부족';
   if (s === 'invalid_auth' || s === 'not_authed') return s + ' — SLACK_BOT_TOKEN 확인';
+  if (s === 'ratelimited') return 'ratelimited — Slack 속도 제한(잠시 뒤 다시)';
   return s.slice(0, 120);
 }
 
@@ -69,9 +77,10 @@ async function allowList(set: Record<string, unknown>): Promise<Set<string>> {
   }
   return allow;
 }
-/** 팀 채널 1번 + DM 들 — 차례대로(Slack 속도 제한) */
-async function sendAll(team: Item | null, dms: Item[], dry: boolean): Promise<{ results: Result[]; scopeMiss: boolean }> {
-  const results: Result[] = []; let scopeMiss = false;
+/** 팀 채널 1번 + DM 들 — 차례대로(Slack 속도 제한) · ㊿+182 실제로 보낼 때는 대상마다 바로 기록(sentBy) */
+async function sendAll(team: Item | null, dms: Item[], dry: boolean, sentBy = ''): Promise<{ results: Result[]; scopeMiss: boolean }> {
+  const out: Result[] = [], pend: Promise<unknown>[] = []; let scopeMiss = false;
+  const results = { push: (r: Result) => { out.push(r); if (!dry && sentBy) pend.push(logRows([r], sentBy, false)); } };
   if (team) {
     const tgt = 'team:' + team.channel;
     if (dry) results.push({ target: tgt, ok: true, n: Number(team.n) || 0 });
@@ -94,7 +103,8 @@ async function sendAll(team: Item | null, dms: Item[], dry: boolean): Promise<{ 
       results.push({ target: tgt, ok: !!pm.ok, error: pm.ok ? undefined : why(pm.error), n: Number(d.n) || 0 });
     } catch (err) { results.push({ target: tgt, ok: false, error: why((err as Error).message), n: Number(d.n) || 0 }); }
   }
-  return { results, scopeMiss };
+  await Promise.all(pend);
+  return { results: out, scopeMiss };
 }
 
 async function logRows(results: Result[], sentBy: string, dry: boolean) {
@@ -135,8 +145,7 @@ async function autoRun(nonce: string): Promise<Response> {
       .slice(0, MAX_DM).map((d) => ({ email: String(d.email).toLowerCase(), text: head + '\n' + String(d.text), n: Number(d.n) || 0 }));
   }
   if (!SLACK_TOKEN) return skip('SLACK_BOT_TOKEN 이 설정되지 않음 (Edge Functions › Secrets)', 500);
-  const { results, scopeMiss } = await sendAll(team, dms, false);
-  await logRows(results, '예약', false);
+  const { results, scopeMiss } = await sendAll(team, dms, false, '예약');   // 기록은 대상마다 sendAll 안에서
   const bad = results.filter((r) => !r.ok);
   await fin(`${results.length - bad.length}곳 보냄` + (bad.length ? ` · ${bad.length}곳 실패: ` + bad.slice(0, 3).map((r) => r.target + ' ' + (r.error || '')).join(' · ') : '') + ` · 글 ${Math.round(age)}시간 전 계산`);
   return json({ ok: !bad.length, auto: true, results, hint: scopeMiss ? HINT : undefined });
@@ -164,6 +173,18 @@ Deno.serve(async (req: Request) => {
   const sa = await rest('rpc/is_super_admin', token, { method: 'POST', body: '{}' }).catch(() => null);
   const isSuper = sa && sa.ok ? (await sa.json().catch(() => false)) === true : false;
   if (!isSuper) return json({ ok: false, error: 'Slack 보내기는 슈퍼 관리자만 할 수 있습니다' }, 403);
+
+  // ── ㊿+182 연결 확인(보내지 않음) — 봇 토큰 · 팀 · 권한(팀 채널 chat:write · DM users:read.email + im:write) ──
+  if (body.mode === 'health') {
+    if (!SLACK_TOKEN) return json({ ok: true, health: { set: false, ok: false, error: 'SLACK_BOT_TOKEN 이 없습니다 (Edge Functions › Secrets)' } });
+    const r = await fetchT('https://slack.com/api/auth.test', { method: 'POST', headers: { Authorization: 'Bearer ' + SLACK_TOKEN } }, 8000).catch(() => null);
+    if (!r) return json({ ok: true, health: { set: true, ok: false, error: 'Slack 응답이 8초 넘게 없음' } });
+    const scopes = String(r.headers.get('x-oauth-scopes') || '').split(',').map((s) => s.trim()).filter(Boolean);
+    const j = await r.json().catch(() => null) as Record<string, unknown> | null;
+    if (!j || !j.ok) return json({ ok: true, health: { set: true, ok: false, error: why((j && j.error) || 'http_' + r.status) } });
+    const need = ['chat:write', 'users:read.email', 'im:write'], missing = scopes.length ? need.filter((s) => !scopes.includes(s)) : [];
+    return json({ ok: true, health: { set: true, ok: true, team: j.team || null, bot: j.user || null, scopes, missing, hint: missing.some((s) => s !== 'chat:write') ? HINT : undefined } });
+  }
 
   // ── 켜짐 · 설정 다시 확인 (포탈 화면을 믿지 않음) ──
   const sr = await rest('notify_settings?select=slack_on,team_channel,renew_emails,eq_emails,biz_emails,dc_emails&id=eq.1', token).catch(() => null);
@@ -195,10 +216,10 @@ Deno.serve(async (req: Request) => {
   if (!dry && !SLACK_TOKEN) return json({ ok: false, error: 'SLACK_BOT_TOKEN 이 설정되지 않았습니다 (Edge Functions › Secrets)' }, 500);
 
   // ── 보내기 (차례대로 — Slack 속도 제한) ──
-  const { results, scopeMiss } = await sendAll(team, dms, dry);
+  const { results, scopeMiss } = await sendAll(team, dms, dry, sentBy);
 
-  // ── 기록 (대상마다 한 줄 · 메시지 글은 저장 안 함 · 표가 없어도 실패하지 않음) ──
-  await logRows(results, sentBy, dry);
+  // ── 기록 (대상마다 한 줄 · 메시지 글은 저장 안 함 · 표가 없어도 실패하지 않음) — 실제 발송은 sendAll 이 대상마다 바로 · 미리 보기(dry)는 여기서 한 번에 ──
+  if (dry) await logRows(results, sentBy, dry);
   const hint = scopeMiss ? HINT : undefined;
   return json({ ok: results.every((r) => r.ok), dry, results, hint });
 });

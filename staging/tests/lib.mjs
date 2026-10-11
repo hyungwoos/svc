@@ -56,7 +56,9 @@ export function collect(page) {
 }
 
 export class Suite {
-  constructor(name) { this.name = name; this.results = []; }
+  constructor(name) { this.name = name; this.results = []; this.bi = 0; }
+  /** ㊿+182 맨 위 블록 하나 — 병렬(SMOKE_CLAIM) 이면 먼저 잡은 프로세스만 실행(mkdir 은 한 곳만 성공) · 아니면 늘 실행 */
+  blk() { this.bi++; const d = process.env.SMOKE_CLAIM; if (!d) return true; try { fs.mkdirSync(path.join(d, 'b' + this.bi)); return true; } catch (e) { return false; } }
   async t(label, fn) {
     if (process.env.SMOKE_ONLY && !label.includes(process.env.SMOKE_ONLY)) return;   // 개발용: 이름에 이 글자가 든 시험만 (CI 는 안 씀)
     const t0 = Date.now();

@@ -1,7 +1,7 @@
 /* ===== sales.js — Cloud 사이트 · OI · 견적→OI · 수주→계약 · 사이드바 접기 · 해지 분석 =====
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { APP_VER, ST } from './state.js';
-import { $, amtHint, canView, canWrite, doLogout, esc, kwToWon, lline, mk, rawHtml, refreshToken, SB_KEY, SB_URL, tickMemo, tpl, won, wonToKw } from './core.js';
+import { $, amtHint, canView, canWrite, doLogout, esc, fetchT, kwToWon, lline, mk, rawHtml, refreshToken, SB_KEY, SB_URL, tickMemo, tpl, won, wonToKw } from './core.js';
 import { dIdx, EQB, loadFromDb, onData, railSync, renderEqBoard, SB_RAW, sbHeaders, sbTry, sbWrite, toast, todayStr } from './shell.js';
 import { kpiTable, toggleWidgetPanel } from './dash.js';
 import { OI_IND, OI_OWNERS, OI_PARTNERS, OI_PROB, OI_PRODUCTS, OI_TYPE } from './grids.js';
@@ -17,7 +17,7 @@ import { closeOvl, FORM_FN, logChange, msg, openOvl } from './edit.js';
 /* ================= Cloud 사이트 생성·수정 (my.genians.co.kr cloudsite / cloudsite-update · Edge Function cloudsite 경유) ================= */
 export var CS={wired:false, hist:undefined, creds:undefined, tab:'create'};
 export async function csFn(payload){
-  var r=await fetch(SB_URL+'/functions/v1/cloudsite',{ method:'POST', headers:{'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+(ST.SB_TOKEN||'')}, body:JSON.stringify(payload) });
+  var r=await fetchT(SB_URL+'/functions/v1/cloudsite',{ method:'POST', headers:{'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+(ST.SB_TOKEN||'')}, body:JSON.stringify(payload) }, 90000, 'cloudsite 함수', !/^(create|update)$/.test(String(payload&&payload.action||'')));   /* ㊿+182 시간 제한 — 사이트 만들기 · 바꾸기는 다시 보내지 않음 */
   var j=null; try{ j=await r.json(); }catch(e){}
   if(!j || !('ok' in j)) throw new Error('HTTP '+r.status+(r.status===404? ' — Edge Function «cloudsite» 가 아직 배포되지 않았습니다':''));
   return j;
@@ -331,7 +331,7 @@ export var OI_QUOTE=null;   // {file, date, total, qid?}
 export var QUOTES={ok:null, at:0};
 export var QUOTE_COLS='id,quote_no,doc_type,qtype,customer_name,customer_id,oi_id,quote_date,manager,supply_total,grand_total,status,parent_id,note,created_by,created_at,updated_at,sent_at,won_at,lost_at';
 export async function quotesLoad(){
-  try{ var r=await fetch(SB_URL+'/rest/v1/quotes?select='+QUOTE_COLS+'&order=id.desc&limit=2000', {headers:sbHeaders()}); QUOTES.ok=r.ok; ST.RAWX.quotes=r.ok? ((await r.json())||[]) : []; }
+  try{ var r=await fetchT(SB_URL+'/rest/v1/quotes?select='+QUOTE_COLS+'&order=id.desc&limit=2000', {headers:sbHeaders()}, 30000, '견적 DB'); QUOTES.ok=r.ok; ST.RAWX.quotes=r.ok? ((await r.json())||[]) : []; }
   catch(e){ ST.RAWX.quotes=[]; }
   QUOTES.at=Date.now();
   if(ST.CUR_VIEW==='quotes'){ renderGrid(); if(QUOTES.ok===false) toast('견적 목록이 비어 있습니다','SQL 109(견적 DB)를 실행하면 견적 화면의 «💾 저장» · «PDF 발행»이 여기에 쌓입니다','info'); }
@@ -357,7 +357,7 @@ export function qCfg(){
 export async function qFetch(path, opts){
   opts=opts||{}; var cfg=qCfg();
   if(!ST.SB_TOKEN) throw new Error('포탈 로그인이 필요합니다');
-  var go=function(){ return fetch(cfg.base+path, Object.assign({}, opts, {headers:Object.assign({}, opts.headers||{}, {Authorization:'Bearer '+ST.SB_TOKEN})})); };
+  var go=function(){ return fetchT(cfg.base+path, Object.assign({}, opts, {headers:Object.assign({}, opts.headers||{}, {Authorization:'Bearer '+ST.SB_TOKEN})}), 60000, '견적 저장 서버'); };
   var res=await go();
   if(res.status===401 && await refreshToken()) res=await go();
   return res;
