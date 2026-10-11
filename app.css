@@ -2523,9 +2523,6 @@ html[data-skin="gn"] .hm-head h2{display:flex;align-items:center;gap:8px;margin:
 html[data-skin="gn"] .hm-head .ctag{background:var(--surface-2);color:var(--ink-2);border-radius:999px}
 .hm-scope{margin-left:auto}
 .hm-scope button{height:30px;padding:0 10px;font-size:13px}
-.hm-who{padding:0 14px 6px;font-size:13px;color:var(--ink-2)}
-.hm-who .need{color:var(--warn-ink,#875A00)}
-.hm-who .cbtn{margin-left:4px}
 .hm-list{list-style:none;margin:0;padding:0}
 .hm-row{display:grid;grid-template-columns:12px minmax(0,1fr) auto;grid-template-areas:"lv nm n" ". sub act";align-items:center;gap:2px 10px;padding:8px 14px;border-top:1px solid var(--grid)}
 .hm-row .hm-lv{grid-area:lv} .hm-row .hm-nm{grid-area:nm} .hm-row .hm-n{grid-area:n;justify-self:end} .hm-row .hm-sub{grid-area:sub;min-width:0} .hm-row .hm-act{grid-area:act;justify-self:end}
@@ -2637,7 +2634,6 @@ html[data-skin="gn"] .gn-ttl:has(.vreset:not([hidden])) > .vreset{grid-column:2;
   html[data-skin="gn"] #gnSum .gs-c[data-k="rnw"]{grid-column:1/-1}
 }
 /* 빠른 보기 «내 담당» — 이름을 고르기 전에는 0 이 아니라 «연결 필요» */
-.qv-bar .chip.need b{font-weight:600;color:var(--warn-ink,#875A00)}
 /* 위 띠: 검색 버튼이 오른쪽 위로 옮겨 가면서 비는 자리 — 화면 이름 뒤를 밀어 도구 버튼은 오른쪽 */
 html[data-skin="gn"] .topbar .gn-ttl{margin-right:auto}
 html[data-skin="gn"] #rail .gn-right .cmdbar{flex:none;width:auto;max-width:none;background:var(--surface)}
@@ -2906,4 +2902,37 @@ html[data-skin="gn"] #rail .gn-right .ntf-btn:hover{border-color:var(--ink-2)}
 }
 /* 스테이징 QA(㊿+182) 📱 관리자 가로 넘침 — 표 머리글의 화면 읽기용 글(.sr · position:absolute)이 스크롤 칸(.tbl-wrap)을 벗어나 문서 폭을 늘렸음 → 왼쪽에 붙임(안 보이는 글 · 읽기 그대로) */
 .sr{left:0}
+/* ==== ㊿+184 OI = 견적 작성자 기준 · 글로 만드는 리포트 ==== */
+.hm-basis{margin:0;padding:0 14px 6px;color:var(--ink-2)}
+.qv-cfg .qv-who{margin:2px 0 8px;color:var(--ink-2)}
+/* 리포트 «무엇을 보고 싶으세요?» — 글 → 표 · 차트 → 슬라이드 → PPT */
+.rp-ask{margin:0 0 12px;padding:16px 16px 14px}
+.rp-ask-l{display:block;font-size:15px;font-weight:600;color:var(--ink);margin-bottom:8px}
+.rp-ask-l .mini{font-weight:400;margin-left:6px}
+.rp-ask-row{display:flex;gap:8px;align-items:stretch}
+.rp-ask-row textarea{flex:1 1 auto;min-width:0;min-height:58px;resize:vertical;font:inherit;font-size:15px;line-height:1.5;padding:10px 12px;border:1px solid var(--ring);border-radius:10px;background:var(--surface);color:var(--ink)}
+.rp-ask-row textarea:focus-visible{outline:2px solid var(--s1);outline-offset:1px}
+.rp-ask-b{display:flex;flex-direction:column;gap:6px;justify-content:flex-start}
+.rp-ask-b .pill{white-space:nowrap}
+.rp-ex{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:10px}
+.rp-ex .mini{margin-right:2px;flex:0 0 auto;white-space:nowrap}
+.rp-st{margin-top:10px;font-size:13px;line-height:1.55;color:var(--ink-2)}
+.rp-st:empty{display:none}
+.rp-st .spin{display:inline-block;width:14px;height:14px;border-width:2px;vertical-align:-2px;margin-right:6px}
+.rp-st.bad{color:var(--warn-ink,#875A00)}
+.rp-st.ask{color:var(--ink)}
+.rp-lib-h{margin:18px 2px 8px;font-size:14px;font-weight:600;color:var(--ink-2)}
+.qb-cond.rp-note{color:var(--ink-2)}
+@media (max-width:640px){
+  .rp-ask-row{flex-direction:column}
+  .rp-ask-b{flex-direction:row}
+  .rp-ask-l .mini{display:block;margin:4px 0 0}
+  .rp-ex{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
+  .rp-ex .chip{flex:0 0 auto}
+}
+/* 견적만 있고 OI 없음 → OI (미리 보기) */
+.qv-bar .qoi-btn{margin-left:4px}
+.qoi-t td,.qoi-t th{white-space:nowrap}
+.qoi-t tr.qoi-off td{color:var(--muted)}
+.qoi-t td:last-child{white-space:normal;min-width:180px}
 /* ==== ㊿+166 새 디자인 end ==== */

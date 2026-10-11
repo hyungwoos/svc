@@ -134,6 +134,52 @@ test('만기 처리 목록 자리(renewKindOf · ㊿+183) — 만기 처리 창�
   assert.equal(ana.renewKindOf(r({ endRaw: 70, autoRenew: true }), 70), null); assert.equal(ana.renewKindOf(r({ endRaw: 70, status: '해지' }), 70), null);
   assert.equal(ana.renewKindOf(r({ endRaw: 70, parent: 5 }), 70), null); assert.equal(ana.renewKindOf(r({ endRaw: 70, liveOv: '제외' }), 70), null);
 });
+test('OI 담당 = 붙은 견적서의 작성자(㊿+184) — 견적 «담당자» 칸 이메일 → 없으면 저장한 계정 · 발주서 제외 · 가장 최근 견적 · 견적 없으면 «견적 전»', async () => {
+  const sales = await import('../js/sales.js');
+  const RAWX0 = ST.RAWX; ST.RAWX = /** @type {any} */ ({}); ST.AUTH_USER = 'tester@example.com';
+  ST.RAWX.quotes = [
+    { id: 1, doc_type: 'quote', oi_id: 10, manager: 'tester@example.com / 010-0000-0000', created_by: 'other@example.com', updated_at: '2026-09-01' },
+    { id: 2, doc_type: 'quote', oi_id: 11, manager: '', created_by: 'tester@example.com', updated_at: '2026-09-01' },
+    { id: 3, doc_type: 'quote', oi_id: 12, manager: 'other@example.com / 010', created_by: 'tester@example.com', updated_at: '2026-09-01' },
+    { id: 4, doc_type: 'quote', oi_id: 12, manager: 'tester@example.com', created_by: 'x@example.com', updated_at: '2026-10-01' },   // 같은 OI 의 더 최근 견적
+    { id: 5, doc_type: 'po', oi_id: 13, manager: 'tester@example.com', created_by: 'tester@example.com', updated_at: '2026-10-01' },   // 발주서는 담당 기준 아님
+    { id: 6, doc_type: 'quote', quote_no: 'Q-9', oi_id: null, manager: 'tester@example.com', updated_at: '2026-10-01' }];
+  assert.equal(grid.oiOwnerOf({ id: 10 }).loc, 'tester'); assert.ok(grid.oiMine({ id: 10 }));
+  assert.equal(grid.oiOwnerOf({ id: 11 }).loc, 'tester');
+  assert.equal(grid.oiOwnerOf({ id: 12 }).loc, 'tester');
+  assert.equal(grid.oiOwnerOf({ id: 13 }).src, ''); assert.ok(grid.oiNoQuote({ id: 13 }));
+  assert.equal(grid.oiOwnerOf({ id: 14, quote_file: 'q:Q-9' }).loc, 'tester');   // OI 의 «q:견적번호»로도
+  const k = Object.keys(sales.QMGR_MAP)[0];   // 예전 파일 견적 — OI 등록 때 견적에서 옮긴 담당 이름(이름은 코드의 목록에서 읽음)
+  assert.equal(grid.oiOwnerOf({ id: 15, quote_file: 'old.json', owner: sales.QMGR_MAP[k] }).loc, k);
+  assert.equal(grid.oiOwnerOf({ id: 16, quote_file: 'old.json', owner: '다른사람' }).name, '작성자 모름');
+  assert.ok(!grid.oiMine({ id: 16 }));
+  ST.RAWX = RAWX0; ST.AUTH_USER = null;
+});
+test('견적 → OI 자동 등록(㊿+184): 붙일 곳 = 같은 견적 줄기의 OI → 같은 고객사 진행 중 OI(최근) → 없으면 새 OI(등록 · 10%) · 대상 = 견적서 · OI 없음 · 실주 아님', async () => {
+  const sales = await import('../js/sales.js');
+  const RAWX0 = ST.RAWX; ST.RAWX = /** @type {any} */ ({ customers: [{ id: 1, name: '(주)가상고객A', industry: '금융' }] }); ST.AUTH_USER = 'tester@example.com';
+  const oi = [{ id: 1, customer: '가상고객A', stage: '진행', updated_at: '2026-09-01' }, { id: 2, customer: '가상고객A', stage: '등록', updated_at: '2026-10-01' }, { id: 3, customer: '가상고객B', stage: '수주', updated_at: '2026-10-02' }, { id: 4, customer: '가상고객C', stage: '실패' }];
+  const qs = [{ id: 10, customer_name: '가상고객D', oi_id: 4 }, { id: 11, customer_name: '가상고객D', parent_id: 10, oi_id: null }];
+  assert.deepEqual([sales.qoiMatch({ id: 20, customer_name: '가상고객 A' }, oi, []).kind, sales.qoiMatch({ id: 20, customer_name: '가상고객 A' }, oi, []).oi.id], ['cust', 2]);   // 같은 고객사(㈜ · 띄어쓰기 무시) · 최근 수정
+  assert.equal(sales.qoiMatch({ id: 21, customer_name: '가상고객B' }, oi, []).kind, 'new');   // 수주 끝난 OI 는 진행 중 아님
+  assert.deepEqual([sales.qoiMatch(qs[1], oi, qs).kind, sales.qoiMatch(qs[1], oi, qs).oi.id], ['chain', 4]);   // 고쳐서 새 번호 → 원래 견적의 OI
+  assert.ok(sales.qoiCand({ id: 1, customer_name: 'X', doc_type: 'quote', status: '발송', oi_id: null }));
+  assert.ok(!sales.qoiCand({ id: 1, customer_name: 'X', doc_type: 'po', oi_id: null })); assert.ok(!sales.qoiCand({ id: 1, customer_name: 'X', status: '실주', oi_id: null }));
+  assert.ok(!sales.qoiCand({ id: 1, customer_name: 'X', oi_id: 3 })); assert.ok(!sales.qoiCand({ id: 1, customer_name: ' ', oi_id: null }));
+  const row = sales.qoiRow({ id: 30, quote_no: 'Q-2610-007', customer_name: '가상고객A', quote_date: '2026-10-05', supply_total: 1000000, grand_total: 1100000, manager: 'tester@example.com',
+    data: { contactPerson: '가상 담당', rows: [{ prod: 'Cloud NAC V6.0', qty: '50' }, { prod: 'Cloud NAC V5.0', qty: '10' }, { prod: 'direct', prodCustom: '가상 제품', qty: '' }] } });
+  assert.equal(row.stage, '등록'); assert.equal(row.win_prob, 10); assert.equal(row.industry, '금융'); assert.equal(row.expect_amount, 1000000); assert.equal(row.quote_file, 'q:Q-2610-007');
+  assert.deepEqual(row.products, ['Cloud NAC', '가상 제품']); assert.deepEqual(row.items, [{ product: 'Cloud NAC', qty: 60 }, { product: '가상 제품', qty: null }]);
+  assert.equal(row.deal_name, 'Cloud NAC · 가상 제품 (Q-2610-007)'); assert.equal(row.cust_name, '가상 담당'); assert.match(row.note, /자동 등록\(가능성 10%\)/);
+  assert.equal(sales.qoiRow({ id: 31, customer_name: '가상고객Z', grand_total: 1100000, data: { rows: [{ prod: '가상(공공)', qty: 1 }] } }).industry, '공공');   // 공공 제품 → 공공 · 공급가가 없으면 합계 ÷ 1.1
+  assert.equal(sales.qoiRow({ id: 31, customer_name: '가상고객Z', grand_total: 1100000, data: {} }).expect_amount, 1000000);
+  ST.RAWX = RAWX0; ST.AUTH_USER = null;
+});
+test('리포트 «글로 만들기»는 ask v3.5 부터(rpaVerOld · ㊿+184)', async () => {
+  const rp = await import('../js/report.js');
+  assert.equal(rp.rpaVerOld('v3.4'), true); assert.equal(rp.rpaVerOld('v2.9'), true);
+  assert.equal(rp.rpaVerOld('v3.5'), false); assert.equal(rp.rpaVerOld('v3.10'), false); assert.equal(rp.rpaVerOld('v4.0'), false); assert.equal(rp.rpaVerOld(''), false);
+});
 test('대시보드 합계(행 × 월 금액)', () => {
   ST.M = 3; ST.MAT = [[100, 200, 0], [50, 0, 0], [0, 300, 400]];
   ST.DATA = /** @type {any} */ ({ rows: [{ cust: 'A', line: 'Cloud', csm: 'x' }, { cust: 'A', line: 'MDR', csm: 'y' }, { cust: 'B', line: 'Cloud', csm: '' }], lines: [{ label: 'Cloud' }, { label: 'MDR' }], monthKeys: ['2026-08', '2026-09', '2026-10'] });

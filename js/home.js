@@ -15,7 +15,7 @@ import { ccPref, ccPrefSet, ccUnsnooze, ico, sbTry, toast, todayStr, visBtn } fr
 import { DASH_DIRTY, expNote, kpiOpen, monthlyTotal, onResize, renderAll, renewNeedScan } from './dash.js';
 import { abortAsk, ask, isAsking } from './ai.js';
 import { liveData, openRenewList } from './analysis.js';
-import { dashResetIfChanged, DV, gridFilteredSorted, gridGoPre, meMatch, myOwner, navMenu, oiOpen, qvCfg, qvDefs, qvSave, switchView, wvCur } from './grid.js';
+import { dashResetIfChanged, DV, gridFilteredSorted, gridGoPre, meLoc, meName, navMenu, oiMine, oiNoQuote, oiOpen, oiQuotesReady, qvDefs, qvGo, switchView, wvCur } from './grid.js';
 import { GRIDS } from './grids.js';
 import { c360Match, fkNorm, fkSources, freqTop, navSub, openCust360, recentKey, viewLabel } from './tools.js';
 import { loadInbound } from './inbound.js';
@@ -555,29 +555,28 @@ export function homeBiz(){ if(ST.CUR_VIEW!=='dash') switchView('dash'); homeDeta
    ------------------------------------------------------------------ */
 /** 줄의 급한 정도 — 0 지남/오늘 · 1 사흘 안 · 2 이번 달 · 3 예정 */
 export function dueK(o){ if(o.dk!=null) return o.dk; return o.lv===1? 0 : o.lv===2? 2 : 3; }
-/** 내 업무 줄 — 담당 칸이 있는 OI · 인바운드를 내 이름(계정 연결 · 없으면 이 브라우저 임시)으로 · 빠른 보기와 같은 기준 */
+/** 내 업무 줄 — ㊿+184 내 OI = 내가 작성한 견적서가 붙은 진행 중 OI(빠른 보기 «내 OI»와 같은 기준) · 인바운드는 회사 일이라 빠짐
+   · 견적 목록을 불러오는 중이면 null(팀 전체로 보이다가 다 되면 다시 그림) */
 export function myRows(){
-  var MO=myOwner(); if(!MO.names.length) return null;
-  var out=[], dO={}, dI={}; (qvDefs('oi')||[]).forEach(function(d){ dO[d[0]]=d; }); (qvDefs('inbound')||[]).forEach(function(d){ dI[d[0]]=d; });
-  var who=MO.names.join(' / '), oi=(ST.RAWX.oi||[]).filter(function(r){ return meMatch(r.owner) && oiOpen(r); });
-  function row(key, view, d, base, nm, unit, dk, lv){ if(!d) return; var hit=base.filter(d[3]); if(!hit.length) return;
-    out.push({key:key, lv:lv, dk:dk, nm:nm, cnt:unit+' '+hit.length+'건', dueS:dk===0? '지남 · 오늘' : dk===1? '오늘' : '정하기', own:who, mine:1,
-      who:hit.slice(0,3).map(function(r){ return r.customer||r.org||''; }).join(', ')+(hit.length>3? ' 외 '+(hit.length-3)+'건':''), due:d[2], imp:'내 담당 '+unit+' '+hit.length+'건',
-      acts:[{l:'목록 보기', pri:1, go:function(){ gridGoPre(view, '내 담당 · '+d[1]+' — '+d[2], function(r){ return meMatch(r.owner) && d[3](r); }); }}]}); }
-  row('my-oi-late','oi', dO.late, oi, '내 OI 기한 초과', 'OI', 0, 1);
-  row('my-oi-today','oi', dO.today, oi, '오늘 할 내 OI', 'OI', 1, 1);
-  row('my-oi-none','oi', dO.nonext, oi, '다음 행동 없는 내 OI', 'OI', 2, 2);
-  if(ST.RAWX.inbound!==undefined){ var inb=(ST.RAWX.inbound||[]).filter(function(r){ return meMatch(r.owner); });
-    row('my-inb-first','inbound', dI.first, inb, '내 인바운드 첫 대응 지연', '문의', 0, 1);
-    row('my-inb-idle','inbound', dI.idle, inb, '내 인바운드 장기 미접촉', '문의', 2, 2); }
+  if(!meLoc()) return null;
+  if(!oiQuotesReady('home', function(){ if(ST.CUR_VIEW==='dash' || !ST.CUR_VIEW) try{ homeTodo(HOME.rows, HOME.zeros, HOME.snz); }catch(e){} })) return null;
+  var out=[], dO={}; (qvDefs('oi')||[]).forEach(function(d){ dO[d[0]]=d; });
+  var who=meName(), oi=(ST.RAWX.oi||[]).filter(function(r){ return oiOpen(r) && oiMine(r); });
+  function row(key, d, nm, dk, lv){ if(!d) return; var hit=oi.filter(d[3]); if(!hit.length) return;
+    out.push({key:key, lv:lv, dk:dk, nm:nm, cnt:'OI '+hit.length+'건', dueS:dk===0? '지남 · 오늘' : dk===1? '오늘' : '정하기', own:who, mine:1,
+      who:hit.slice(0,3).map(function(r){ return r.customer||''; }).join(', ')+(hit.length>3? ' 외 '+(hit.length-3)+'건':''), due:d[2], imp:'내 견적이 붙은 OI '+hit.length+'건',
+      acts:[{l:'목록 보기', pri:1, go:function(){ gridGoPre('oi', '내 OI · '+d[1]+' — '+d[2], function(r){ return oiMine(r) && d[3](r); }); }}]}); }
+  row('my-oi-late', dO.late, '내 OI 기한 초과', 0, 1);
+  row('my-oi-today', dO.today, '오늘 할 내 OI', 1, 1);
+  row('my-oi-none', dO.nonext, '다음 행동 없는 내 OI', 2, 2);
   return out;
 }
 export function homeTodo(rows, zeros, snz){
   HOME.rows=rows; HOME.zeros=zeros||[]; HOME.snz=snz||0;
   var box=document.getElementById('ccInbox'); if(!box) return;
-  var MO=myOwner(), mine=myRows(), scope=HOME.scope || (mine && mine.length? 'me' : 'team');
-  if(scope==='me' && !mine) scope='team';
-  var base=scope==='me'? (mine||[]).concat(rows.filter(function(o){ return o.own && meMatch(o.own); })) : rows;
+  var mine=myRows(), meAll=mine? mine.concat(rows.filter(function(o){ return o.me; }).map(function(o){ return Object.assign({}, o, o.me, {mine:1}); })) : null, scope=HOME.scope || (meAll && meAll.length? 'me' : 'team');
+  if(scope==='me' && !meAll) scope='team';
+  var base=scope==='me'? meAll||[] : rows;
   var ord=base.map(function(o,i){ return [o,i]; }).sort(function(a,c){ return dueK(a[0])-dueK(c[0]) || (a[0].lv||2)-(c[0].lv||2) || a[1]-c[1]; });
   /* 처음 보이는 줄: 지났거나 사흘 안(기한 기준) 전부 — 최대 5 · 적으면 다음 급한 것으로 3개까지 */
   var urgent=ord.filter(function(x){ return dueK(x[0])<=1; }), show=urgent.slice(0,5);
@@ -586,8 +585,8 @@ export function homeTodo(rows, zeros, snz){
   var more=ord.length-show.length;
   var seg=tpl`<div class="seg hm-scope" role="group" aria-label="우선 업무 범위"><button type="button" data-sc="me" aria-pressed="${scope==='me'?'true':'false'}">내 업무</button><button type="button" data-sc="team" aria-pressed="${scope==='team'?'true':'false'}">팀 전체</button></div>`;
   var h=tpl`<div class="ib-head hm-head"><h2>우선 업무 <span class="ctag" data-n="${String(ord.length)}" title="업무 종류 수 — 대상 건수는 줄마다(신청 · 계약 · OI · 문의 단위가 달라 더하지 않음)">업무 ${String(ord.length)}가지</span></h2>${rawHtml(seg)}</div>`;
-  if(scope==='me' || !MO.names.length) h+=tpl`<div class="hm-who">${rawHtml(MO.names.length? tpl`내 이름 <b>${MO.names.join(' / ')}</b> <span class="mini">${MO.src==='account'? '계정 연결(관리자 지정)' : '이 브라우저에서 고른 이름(임시)'}</span>` : tpl`<b class="need">담당자 연결 필요</b> <span class="mini">계정에 담당자 이름이 연결되지 않아 내 업무를 고를 수 없습니다(0건이 아님) — 관리자 › 담당자 연결 · 아래는 팀 전체</span> <button type="button" class="cbtn" id="hmPickMe">임시로 내 이름 고르기</button>`)}</div>`;
-  if(!show.length) h+=tpl`<div class="ib-empty"><span class="ib-ic ok">${rawHtml(ico('check',16))}</span>${scope==='me'? '내 담당으로 지금 챙길 일이 없습니다 — 팀 전체를 보세요' : '지금 챙길 일이 없습니다'}</div>`;
+  if(scope==='me') h+=tpl`<p class="hm-basis mini">내 업무 = 내가 작성한 견적서가 붙은 OI · 나에게 맡겨진(또는 내가 신청한) 장비 신청</p>`;   /* ㊿+184 «담당자 연결» 없이 견적 작성자로 */
+  if(!show.length) h+=tpl`<div class="ib-empty"><span class="ib-ic ok">${rawHtml(ico('check',16))}</span>${scope==='me'? '내 OI · 내 장비 신청으로 지금 챙길 일이 없습니다 — 팀 전체를 보세요' : '지금 챙길 일이 없습니다'}</div>`;
   else {
     var LV={1:'즉시',2:'확인',3:'예정'};
     h+='<ul class="hm-list">';
@@ -616,7 +615,6 @@ export function homeTodo(rows, zeros, snz){
   box.querySelectorAll('[data-sc]').forEach(function(b){ /** @type {any} */(b).onclick=function(){ HOME.scope=/** @type {any} */(b).dataset.sc; homeTodo(HOME.rows, HOME.zeros, HOME.snz); var nb=box.querySelector('[data-sc="'+HOME.scope+'"]'); if(nb) /** @type {any} */(nb).focus(); }; });
   var al=document.getElementById('hmAll'); if(al) al.onclick=function(){ HOME.allOpen=!HOME.allOpen; homeTodo(HOME.rows, HOME.zeros, HOME.snz); var nb=document.getElementById('hmAll'); if(nb) nb.focus(); };
   var un=document.getElementById('ibUnsnz'); if(un) un.onclick=function(e){ e.preventDefault(); ccUnsnooze(); };
-  var pm=document.getElementById('hmPickMe'); if(pm) pm.onclick=function(){ ask('내가 처리할 일', {from:'home'}); };
 }
 /** 홈 전체 그리기(renderInbox 가 부름) */
 export function homeRender(rows, zeros, snz){
@@ -744,34 +742,23 @@ export function liList(opt){
   return {core:core, table:trs.length? {cols:['구분','행'], n:[1], rows:trs, cap:'보던 목록과 같은 행(검색 · 필터 · 보기 · 조건 그대로)'} : null,
     meta:{period:'지금', unit:'행 · 천원', cond:'현재 목록 기준 — '+C.label+(C.parts.length? ' · '+C.parts.join(' · ') : ''), cmp:'화면 «'+rows.length+'행»과 같은 계산'}};
 }
-/** «내가 처리할 일» — 계정 ↔ 담당자 이름 연결이 있어야 셈(없으면 0 이 아니라 «담당자 연결 필요») */
+/** «내가 처리할 일» — ㊿+184 내 OI = 내가 작성한 견적서가 붙은 진행 중 OI · 인바운드는 회사 일(취합 · 알림 · 통계)이라 빠짐 */
 export function liMine(){
-  var C=qvCfg(), MO=myOwner(), meta={period:'오늘 '+todayStr()+' 기준', unit:'건', cond:''};
+  var meta={period:'오늘 '+todayStr()+' 기준', unit:'건', cond:''};
   var team=(HOME.rows||[]).slice().sort(function(a,c){ return dueK(a)-dueK(c) || (a.lv||2)-(c.lv||2); }).slice(0,5);
-  if(!MO.names.length){
-    var owners={}; (ST.RAWX.oi||[]).concat(ST.RAWX.inbound||[]).forEach(function(r){ String(r.owner||'').split(/[,/]/).forEach(function(o){ o=o.trim(); if(o) owners[o]=1; }); });
-    var opts=Object.keys(owners).sort(function(a,c){ return a.localeCompare(c,'ko'); });
-    meta.cond='계정 '+(ST.AUTH_USER||'')+' — 담당자 이름 연결 없음';
-    return {state:'need', stTitle:'담당자 연결 필요', stMsg:'이 계정에 OI · 인바운드 «담당» 이름이 연결되지 않아 내 일을 고를 수 없습니다(0건이 아닙니다) — 관리자 › 담당자 연결',
-      core:'계정에 담당자 이름이 연결되면 내 담당 OI · 인바운드만 골라 보여 드립니다. 지금은 팀 전체에서 급한 일을 보여 드립니다.',
-      extra:opts.length? tpl`<div class="ans-pick" data-nodirty><label for="ansMe">관리자 연결 전 — 임시로 이 브라우저에서 내 이름 고르기</label><select id="ansMe"><option value="">— 고르기 —</option>${rawHtml(opts.map(function(o){ return tpl`<option>${o}</option>`; }).join(''))}</select><button type="button" class="cbtn" id="ansMeOk">이 브라우저에 저장</button></div>` : '',
-      bind:function(){ var ok=document.getElementById('ansMeOk'); if(ok) ok.onclick=function(){ var s=/** @type {any} */(document.getElementById('ansMe')); if(!s || !s.value) return; var c=qvCfg(); c.me=s.value; qvSave(c); toast('내 이름 저장(임시)','«'+s.value+'» — 이 브라우저에만 · 관리자가 계정에 연결하면 그것을 씀','info'); HOME.scope=''; try{ homeTodo(HOME.rows, HOME.zeros, HOME.snz); }catch(e){} ask('내가 처리할 일', {from:'panel'}); }; },
-      table:team.length? {cols:['팀 전체 — 우선 업무','대상','담당'], rows:team.map(function(o){ return {c:[o.nm||'', o.cnt||'', o.own||'담당 미지정']}; }), go:team.map(function(o){ var pa=(o.acts||[]).filter(function(x){ return x.pri; })[0]; return pa? pa.go : null; })} : null,
-      src:[{l:'홈 우선 업무', go:function(){ if(ST.CUR_VIEW!=='dash') switchView('dash'); var b=document.getElementById('ccInbox'); if(b) try{ b.scrollIntoView({behavior:'smooth', block:'center'}); }catch(e){} }}], meta:meta};
-  }
-  var oi=ST.RAWX.oi||[], inbL=ST.RAWX.inbound;
-  var dO=qvDefs('oi')||[], dI=qvDefs('inbound')||[], fO={}, fI={}; dO.forEach(function(d){ fO[d[0]]=d; }); dI.forEach(function(d){ fI[d[0]]=d; });
-  var oiOpenMine=oi.filter(function(r){ return meMatch(r.owner) && oiOpen(r); });
+  var teamTbl=team.length? {cols:['팀 전체 — 우선 업무','대상','담당'], rows:team.map(function(o){ return {c:[o.nm||'', o.cnt||'', o.own||'담당 미지정']}; }), go:team.map(function(o){ var pa=(o.acts||[]).filter(function(x){ return x.pri; })[0]; return pa? pa.go : null; })} : null;
+  if(!oiQuotesReady('limine', function(){ if(HOME.cur && /내가?처리할일|내할일/.test(String(HOME.cur.q).replace(/\s+/g,''))) ask(HOME.cur.q, {from:'panel'}); }))
+    return {core:'견적 목록을 불러오는 중입니다 — 내 OI(내가 작성한 견적서가 붙은 OI)는 잠시 뒤 다시 보여 드립니다.', table:teamTbl, meta:meta};
+  var oi=ST.RAWX.oi||[], dO={}; (qvDefs('oi')||[]).forEach(function(d){ dO[d[0]]=d; });
+  var mine=oi.filter(function(r){ return oiOpen(r) && oiMine(r); }), noQ=oi.filter(function(r){ return oiOpen(r) && oiNoQuote(r); }).length;
   var rows=[], go=[];
-  function add(view, d, base, lab){ if(!d) return 0; var n=base.filter(d[3]).length; rows.push({c:[lab, String(n)]}); go.push(function(){ gridGoPre(view, '내 담당 · '+d[1]+' — '+d[2], function(r){ return meMatch(r.owner) && d[3](r); }); }); return n; }
-  var nLate=add('oi', fO.late, oiOpenMine, 'OI 기한 초과'), nNone=add('oi', fO.nonext, oiOpenMine, 'OI 다음 행동 없음'), nToday=add('oi', fO.today, oiOpenMine, 'OI 오늘 할 일');
-  var inbTxt='';
-  if(inbL===undefined){ inbTxt=' · 인바운드는 불러오는 중'; try{ loadInbound(function(){ if(HOME.cur && /내가?처리할일|내할일/.test(String(HOME.cur.q).replace(/\s+/g,''))) ask(HOME.cur.q, {from:'panel'}); }); }catch(e){} }
-  else { var inbMine=(inbL||[]).filter(function(r){ return meMatch(r.owner); }); add('inbound', fI.first, inbMine, '인바운드 첫 대응 지연'); add('inbound', fI.idle, inbMine, '인바운드 장기 미접촉'); }
-  meta.cond='담당 칸에 «'+MO.names.join(' / ')+'» 포함('+(MO.src==='account'? '계정 연결' : '이 브라우저에서 고른 이름')+') · OI 진행 중 · 첫 대응 '+C.inbFirst+'일 · 장기 미접촉 '+C.inbIdle+'일 · 계약 · 장비 신청은 담당 칸이 없어 빠짐';
-  var core=tpl`<b>«${MO.names.join(' / ')}» 담당</b> — 진행 중 OI ${String(oiOpenMine.length)}건 중 기한 초과 ${String(nLate)} · 다음 행동 없음 ${String(nNone)} · 오늘 할 일 ${String(nToday)}${inbTxt}.`;
-  return {core:core, table:{cols:['내 담당','건수'], n:[1], rows:rows, go:go, cap:'항목을 누르면 그 조건의 목록'},
-    src:[{l:'OI 현황 — 내 담당', go:function(){ gridGoPre('oi', '내 담당 — 담당 «'+MO.names.join(' / ')+'»', function(r){ return meMatch(r.owner); }); }}],
-    next:MO.src==='browser'? [{l:'임시 이름 지우기', stay:1, go:function(){ var c=qvCfg(); c.me=''; qvSave(c); ask('내가 처리할 일', {from:'panel'}); }}] : [],
-    meta:meta};
+  function add(d, lab){ if(!d) return 0; var n=mine.filter(d[3]).length; rows.push({c:[lab, String(n)]}); go.push(function(){ gridGoPre('oi', '내 OI · '+d[1]+' — '+d[2], function(r){ return oiMine(r) && d[3](r); }); }); return n; }
+  var nLate=add(dO.late, 'OI 기한 초과'), nNone=add(dO.nonext, 'OI 다음 행동 없음'), nToday=add(dO.today, 'OI 오늘 할 일'); add(dO.idle, 'OI 장기 미접촉');
+  if(noQ){ rows.push({c:['견적 전 OI(팀 전체 — 담당 미정)', String(noQ)]}); go.push(function(){ qvGo('oi', 'noq'); }); }
+  meta.cond='OI 진행 중 · 내가 작성한 견적서(견적 «담당자» '+meName()+')가 붙은 OI · OI 시트 담당 칸은 안 씀 · 인바운드는 회사 일이라 빠짐';
+  if(!mine.length) return {core:tpl`<b>내 OI 없음</b> — 내가 작성한 견적서가 붙은 진행 중 OI가 없습니다${rawHtml(noQ? ' · 견적 전 OI '+noQ+'건(팀 전체)' : '')}. 아래는 팀 전체에서 급한 일입니다.`,
+    table:teamTbl, src:[{l:'OI 현황 — 견적 전', go:function(){ qvGo('oi', 'noq'); }}], meta:meta};
+  var core=tpl`<b>내 OI ${String(mine.length)}건</b>(진행 중) — 기한 초과 ${String(nLate)} · 다음 행동 없음 ${String(nNone)} · 오늘 할 일 ${String(nToday)}${rawHtml(noQ? ' · 팀 전체 견적 전 '+noQ+'건' : '')}.`;
+  return {core:core, table:{cols:['내 OI','건수'], n:[1], rows:rows, go:go, cap:'항목을 누르면 그 조건의 목록'},
+    src:[{l:'OI 현황 — 내 OI', go:function(){ qvGo('oi', 'me'); }}], meta:meta};
 }

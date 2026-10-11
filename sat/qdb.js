@@ -29,7 +29,7 @@ function qdbRow() {
     var d = collectQuoteData(), po = isPo();
     return { doc_type: po ? 'po' : 'quote', qtype: po ? 'po' : (window.currentQuoteType === 'public' ? 'public' : 'enterprise'),
         customer_name: String(d.customerName || '').trim(), quote_date: d.quoteDate || null, manager: d.manager || null,
-        supply_total: qdbNum(d.supplyTotal), grand_total: qdbNum(d.grandTotal), data: d, oi_id: QDB.oi || null };
+        supply_total: qdbNum(d.supplyTotal), grand_total: qdbNum(d.grandTotal), data: d, oi_id: QDB.oi || undefined };   // ㊿+184 OI 를 모르면 보내지 않음(다른 곳에서 붙인 연결을 지우지 않게)
 }
 /** 저장된 뒤 화면을 고쳤는지 비교용(저장 시각은 빼고) */
 function qdbSig() { var d = collectQuoteData(); delete d.savedAt; return JSON.stringify(d) + '|' + (QDB.oi || ''); }
@@ -57,13 +57,15 @@ async function qdbSave(quiet) {
     QDB.busy = true;
     try {
         var r;
-        if (QDB.id && !sent) r = await qdbFetch('quotes?id=eq.' + QDB.id + '&select=id,quote_no,status', { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(row) });
-        else { if (sent) row.parent_id = QDB.id; r = await qdbFetch('quotes?select=id,quote_no,status', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(row) }); }
+        if (QDB.id && !sent) r = await qdbFetch('quotes?id=eq.' + QDB.id + '&select=id,quote_no,status,oi_id', { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(row) });
+        else { if (sent) row.parent_id = QDB.id; r = await qdbFetch('quotes?select=id,quote_no,status,oi_id', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(row) }); }
         if (!r.ok) throw new Error(await qdbErr(r));
         var x = ((await r.json()) || [])[0];
         if (!x) throw new Error('저장되지 않았습니다 — 권한(견적·발주 시스템 «쓰기»)을 확인하거나 목록을 다시 열어 주세요');
-        QDB.ok = true; QDB.id = x.id; QDB.no = x.quote_no; QDB.status = x.status; QDB.saved = qdbSig();
+        QDB.ok = true; QDB.id = x.id; QDB.no = x.quote_no; QDB.status = x.status; if (x.oi_id) QDB.oi = x.oi_id; QDB.saved = qdbSig();
         qdbShow();
+        /* ㊿+184 포탈 안에서 저장했는데 OI 가 없으면 → 포탈이 같은 고객사 진행 중 OI 에 연결하거나 OI 를 가능성 10%로 등록(«quoteOi» 로 번호를 돌려줌) */
+        if (!x.oi_id && row.doc_type === 'quote' && window.parent !== window) { try { window.parent.postMessage({ type: 'quoteSaved', id: x.id }, location.origin); } catch (e) { } }
         if (!quiet) qdbToast((x.quote_no || '발주서 #' + x.id) + ' 저장했습니다' + (sent ? ' (새 번호)' : ''));
         return x;
     } catch (e) { if (!quiet) alert('저장하지 못했습니다 — ' + e.message); else throw e; return null; }
@@ -84,6 +86,15 @@ async function qdbBeforePrint() {
     } catch (e) { if (QDB.ok !== false) alert('⚠ 포탈 DB 에 저장하지 못했지만 발행은 계속합니다.\n' + e.message); }
     return true;
 }
+/* ㊿+184 포탈이 OI 에 연결(또는 자동 등록)했다고 알려 줌 — 다음 저장 · 새 번호에도 그 OI 그대로 */
+window.addEventListener('message', function (ev) {
+    if (!ev || ev.origin !== location.origin || ev.source !== window.parent || !ev.data || ev.data.type !== 'quoteOi') return;
+    if (!QDB.id || +ev.data.id !== QDB.id) return;
+    var clean = qdbSig() === QDB.saved;
+    QDB.oi = +ev.data.oi || null; QDB.oiName = String(ev.data.name || '');
+    if (clean) QDB.saved = qdbSig();
+    qdbShow();
+});
 function qdbToast(t) {
     var el = document.getElementById('qdbToast');
     if (!el) { el = document.createElement('div'); el.id = 'qdbToast'; el.className = 'qdb-toast no-print'; el.setAttribute('role', 'status'); document.body.appendChild(el); }

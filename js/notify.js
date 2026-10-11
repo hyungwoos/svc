@@ -345,7 +345,7 @@ export async function ntfOwnerMap(){
   return NTF.omap;
 }
 export var NTF_FIELDS=[
-  ['renew_days','nsDays','재약정 만료 며칠 전','쉼표로 · 단계마다 한 번(예: 60, 30) — 계약 CSM 이 담당자 연결된 계정이면 그 사람에게도'],
+  ['renew_days','nsDays','재약정 만료 며칠 전','쉼표로 · 단계마다 한 번(예: 60, 30)'],
   ['eq_days','nsEq','장비 처리 지연(일)','접수 뒤 이 날수가 지나도 접수 · 출하요청 · 배송중'],
   ['month_end_days','nsMe','월말 마감 며칠 전','그달 비즈포탈 차액이 없을 때'],
   ['renew_emails','nsRenew','재약정 · 만기 미처리 받는 사람','계정 이메일 · 쉼표로'],

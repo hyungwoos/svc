@@ -12,7 +12,7 @@ import { applyMenuConf, fkNorm, freqTop, menuSegments, navSub, openMenuEdit, ren
 import { loadInbound, loadMxMemos } from './inbound.js';
 import { UPD, updCheck } from './upd.js';
 import { applyMenuFold, closeDrawer, ensureGroupOpen, setupSide } from './sales.js';
-import { btnBackSync, gridGoPre, loadHide, NAV, navMenu, oiOpen, openDetail, qvCfg, qvGo, renderGrid, switchView, VIEW_UI, viewResetHard } from './grid.js';
+import { btnBackSync, gridGoPre, loadHide, meLoc, NAV, navMenu, oiOpen, oiOwnerOf, oiQuotesReady, openDetail, qvGo, renderGrid, switchView, VIEW_UI, viewResetHard } from './grid.js';
 import { closeOvl, logChange, openOvl, OVL_SKIP_CLEAN, ovlMarkClean, setupEdit, toggleAuthMenu } from './edit.js';
 import { homeOn, homeRender, placeSearchBtn, srchCtx } from './home.js';
 import { NTF, ntfAfterData, ntfWho } from './notify.js';
@@ -407,6 +407,8 @@ export function eqLinks(list){ return (list||[]).slice(0,6).map(function(o){ ret
 export function monthLeft(){ var d=new Date(), e=new Date(d.getFullYear(), d.getMonth()+1, 0); return e.getDate()-d.getDate()+1; }
 /** 장비 보드를 «처리 대기» 또는 «회수 진행»만 보이게 — 홈 알림·요약 타일과 같은 기준 */
 export function eqbOnly(kind){ EQB.only=kind; switchView('eqboard'); }
+/** ㊿+184 OI 담당 글 — 견적 작성자별 건수(«작성자 3 · 견적 전 1») · 견적이 없는 OI 는 «견적 전» */
+export function oiOwnTxt(arr){ var c={}; arr.forEach(function(o){ var n=oiOwnerOf(o).name; c[n]=(c[n]||0)+1; }); return Object.keys(c).sort(function(x,y){ return (x==='견적 전'? 1:0)-(y==='견적 전'? 1:0) || c[y]-c[x]; }).map(function(k){ return k+' '+c[k]; }).join(' · '); }
 export function renderInbox(){
   if(!isCC()) return;
   var box=document.getElementById('ccInbox'); if(!box || !ST.DATA || !ST.SB_TOKEN){ if(box) box.innerHTML=''; return; }
@@ -420,19 +422,20 @@ export function renderInbox(){
   var curYm=monOf(b)+'월', bizDone=EQ || bizHas(+mk(b).slice(0,4), monOf(b));   /* ㊿+176 연도까지 */
   var todayS=todayStr();
   var oiLate=EQ? [] : (ST.RAWX.oi||[]).filter(function(o){ return o.next_date && String(o.next_date).slice(0,10)<todayS && oiOpen(o); });   /* ㊿+170 진행 중 = 수주·계산서발행·종료·중지·실패 아님(OI 타일·빠른 보기와 같은 기준) */
-  var inbN=EQ? 0 : (ST.INB_TODO? ST.INB_TODO.n : null);
   var dow=new Date().getDay(), toMon=(8-dow)%7, wkTxt= dow===1? '오늘':'D-'+(toMon===0?7:toMon);
   var rows=[], zeros=[], snz=0;
   function add(key, o){ if(ccSnoozed(key)){ snz++; return; } o.key=key; rows.push(o); }
   /* ㊿+174 장비 «담당» = 알림함에서 정한 처리 담당(work_assign) → 없으면 신청한 사람. 신청서의 mgr_name 은 «고객 담당자»(고객 쪽 사람)라 쓰지 않음 */
   function eqOwn(o){ var a=NTF.asg[String(o.id)]; return a? ntfWho(a.assignee) : (o.requester? String(o.requester).split('@')[0] : ''); }
+  var meL=meLoc(); function eqMe(o){ var a=NTF.asg[String(o.id)]; return !!meL && String(a? a.assignee : o.requester||'').toLowerCase().split('@')[0]===meL; }   /* ㊿+184 홈 «내 업무» — 나에게 맡겨진(없으면 내가 신청한) 장비 신청 */
   function names(arr, f, n){ var u={}; arr.forEach(function(x){ var v=f(x); if(v) u[v]=1; }); var ks=Object.keys(u); return ks.slice(0,n||3).join(', ')+(ks.length>(n||3)? ' 외 '+(ks.length-(n||3))+'곳':''); }
   if(pendL.length){
     var oldest=pendL.map(function(o){ return String(o.created_at||'').slice(0,10); }).filter(Boolean).sort()[0];
     var age=oldest? Math.floor((new Date(todayS).getTime()-new Date(oldest).getTime())/864e5) : 0;
     var byCh={}; pendL.forEach(function(o){ byCh[o.channel||'기타']=(byCh[o.channel||'기타']||0)+1; });
     var pq=pendL.reduce(function(a,o){ return a+(+o.qty||eqWant(o).length||1); },0);
-    add('eq', {lv:age>=3?1:2, ic:'box', cls:'warn', n:pendL.length, t:tpl`처리 대기 장비 신청 <span class="num">${pendL.length}건</span>${rawHtml(age>=1? ' — 가장 오래된 건 '+age+'일 경과':'')}`,
+    var pendMe=pendL.filter(eqMe);
+    add('eq', {lv:age>=3?1:2, ic:'box', cls:'warn', n:pendL.length, me:pendMe.length? {key:'my-eq', nm:'내 장비 신청 처리 대기', cnt:'신청 '+pendMe.length+'건', who:names(pendMe, function(o){ return o.customer; }), own:names(pendMe, eqOwn, 2)||'', links:eqLinks(pendMe)} : null, t:tpl`처리 대기 장비 신청 <span class="num">${pendL.length}건</span>${rawHtml(age>=1? ' — 가장 오래된 건 '+age+'일 경과':'')}`,
       s:Object.keys(byCh).map(function(c){ return c+' '+byCh[c]; }).join(' · ')+' · '+names(pendL, function(o){ return o.customer; }),
       who:names(pendL, function(o){ return o.customer; }), own:names(pendL, eqOwn, 2)||'',
       due:age>=3? '오늘 — '+age+'일째 대기' : '3일 안', imp:'출고 대기 '+pq+'대 · '+Object.keys(byCh).map(function(c){ return c+' '+byCh[c]; }).join(' · '),
@@ -494,11 +497,8 @@ export function renderInbox(){
       acts:[{l:'다음 주에', go:function(){ ccSnooze('biz',7); }},{l:'비즈포탈 엑셀 올리기', pri:1, go:function(){ switchView('biz'); }}]});
   }
   if(!EQ){
-    if(inbN>0){
-      add('inb', {lv:1, ic:'inbox', cls:'crit', n:inbN, t:tpl`인바운드 미대응 <span class="num">${rawHtml(inbN)}건</span>`, s:'진행중인데 '+qvCfg().inbIdle+'일 이상 대응 기록이 없습니다',
-      who:'올해 진행중 인바운드', own:'인바운드 담당', due:'오늘', imp:qvCfg().inbIdle+'일 넘게 대응 기록 없음 — 놓친 문의일 수 있음', nm:'인바운드 장기 미대응', cnt:'문의 '+inbN+'건', dk:0, dueS:'오늘',
-      acts:[{l:'미대응 '+inbN+'건 보기', pri:1, go:function(){ qvGo('inbound', 'idle'); }}]}); }
-    else zeros.push('인바운드 미대응 '+(inbN==null? '…':'0'));
+    /* ㊿+184 인바운드는 회사 일(자동 취합 · Slack 알림 · 통계) — 할 일 목록에서 뺌 · OI 담당 = 붙은 견적서의 작성자(OI 시트 담당 칸은 안 씀) */
+    var qOk=oiQuotesReady('inbox', function(){ try{ renderInbox(); }catch(e){} });
     /* ㊿+171 OI: 일정 지남(late)과 다음 행동 없음(nonext — 다음 할 일 또는 예정일이 빈 진행 중 OI)을 한 줄로 — 일정이 없는 건을 «할 일 없음»으로 보이지 않게 · 빠른 보기와 같은 기준 */
     var oiNone=EQ? [] : (ST.RAWX.oi||[]).filter(function(o){ return oiOpen(o) && (!o.next_action || !o.next_date); }), oiU={};
     oiLate.concat(oiNone).forEach(function(o){ oiU[o.id!=null? o.id : (o.customer+'|'+o.deal_name)]=o; }); var oiAll=Object.keys(oiU).map(function(k){ return oiU[k]; });
@@ -508,7 +508,7 @@ export function renderInbox(){
       if(oiNone.length) oiActs.push({l:'다음 행동 없는 OI '+oiNone.length+'건 보기', pri:!oiLate.length? 1:0, go:function(){ qvGo('oi', 'nonext'); }});
       add('oi', {lv:2, ic:'target', cls:'warn', n:oiAll.length, t:tpl`OI 다음 행동 점검 <span class="num">${oiAll.length}건</span> — ${oiParts.join(' · ')}`, s:names(oiAll, function(o){ return o.customer; }),
       nm:'OI 다음 행동 점검 ('+oiParts.join(' · ')+')', cnt:'OI '+oiAll.length+'건', dueS:oiLate.length? '예정일 지남' : '일정 정하기', dk:oiLate.length? 0 : 2,
-      who:names(oiAll, function(o){ return o.customer; }), own:names(oiAll, function(o){ return o.owner; }, 2)||'', due:oiLate.length? '예정일 지남 (가장 오래된 '+od+')' : '다음 할 일 · 예정일을 정해야 함', imp:(oAmt? '예상 금액 '+won(oAmt)+'천원 · ' : '')+'진행 중인데 다음 일정이 없거나 지남',
+      who:names(oiAll, function(o){ return o.customer; }), own:qOk? oiOwnTxt(oiAll) : '견적 작성자 확인 중…', due:oiLate.length? '예정일 지남 (가장 오래된 '+od+')' : '다음 할 일 · 예정일을 정해야 함', imp:(oAmt? '예상 금액 '+won(oAmt)+'천원 · ' : '')+'진행 중인데 다음 일정이 없거나 지남',
       acts:oiActs}); }
     else zeros.push('OI 일정 · 다음 행동 모두 있음');
   }
@@ -521,7 +521,7 @@ export function renderInbox(){
       tpl`<div class="ib-acts">${rawHtml(o.acts.map(function(a,j){ return tpl`<button type="button" class="cbtn${a.pri?' pri':''}" data-i="${rawHtml(i)}" data-j="${rawHtml(j)}">${a.l}</button>`; }).join(''))}</div></div>`; }
   /* ㊿+171 지니언스 홈: 지금 챙길 일 3줄 · 핵심 현황 3칸(home.js) — 대상 건수를 더한 «총합»은 쓰지 않음(규칙끼리 대상이 겹칠 수 있음) */
   if(GNI && !EQ){ try{ homeRender(rows, zeros, snz); }catch(e){ console.warn('home', e); }
-    GN_BADGE.inb=null; GN_BADGE.inbound=inbN||0; GN_BADGE.dc=(DS && DS.crit)||0; ccGreeting(rows.length); try{ railSync(ST.CUR_VIEW); }catch(e){} return; }
+    GN_BADGE.inb=null; GN_BADGE.inbound=0; GN_BADGE.dc=(DS && DS.crit)||0; ccGreeting(rows.length); try{ railSync(ST.CUR_VIEW); }catch(e){} return; }
   var tgtN=rows.reduce(function(a,o){ return a+(+o.n||0); },0);
   var h=tpl`<div class="ib-head"><h2>${GNI? '오늘 처리할 일' : '인박스'} <span class="ctag${rows.length?' warn':' ok'}" data-n="${rawHtml(rows.length)}">${rawHtml(GNI? (rows.length? '주의 항목 '+rows.length+'종 · 대상 '+tgtN+'건' : '없음') : String(rows.length))}</span></h2><span class="mini" style="display:flex;align-items:center;gap:6px"><i style="width:7px;height:7px;border-radius:50%;background:var(--brand);display:inline-block"></i>${rawHtml(la&&la.textContent? esc(la.textContent):'')} · 자동 갱신</span></div>`;
   if(!rows.length) h+=tpl`<div class="ib-empty"><span class="ib-ic ok">${rawHtml(ico('check',16))}</span>처리할 알림이 없습니다. 모든 항목이 정리되어 있어요.</div>`;
@@ -543,7 +543,7 @@ export function renderInbox(){
   try{ gnSumRender(rows); }catch(e){}
   var un=document.getElementById('ibUnsnz'); if(un) un.onclick=ccUnsnooze;
   ccGreeting(rows.length);
-  GN_BADGE.inb=rows.filter(function(o){ return o.lv===1; }).length; GN_BADGE.inbound=inbN||0; GN_BADGE.dc=(!EQ && DS && DS.crit)||0;   /* ㊿+167 지니언스 상단 메뉴 배지 — 홈 = «즉시 처리» 건수 */
+  GN_BADGE.inb=rows.filter(function(o){ return o.lv===1; }).length; GN_BADGE.inbound=0; GN_BADGE.dc=(!EQ && DS && DS.crit)||0;   /* ㊿+167 지니언스 상단 메뉴 배지 — 홈 = «즉시 처리» 건수 */
   try{ railSync(ST.CUR_VIEW); }catch(e){}
 }
 

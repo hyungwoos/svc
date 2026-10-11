@@ -25,7 +25,7 @@ export var LINE_ALIAS=[
   [/\bpns\b|피엔에스|알림서비스|푸시/i,'PNS'],
   [/\bs1\b|에스원|세콤/i,'S1']
 ];
-export var AICFG = {enabled:false, narrate:true, maskNames:true, model:''};
+export var AICFG = {enabled:false, narrate:true, maskNames:true, model:'', ver:''};   // ver = ask 함수 버전(ping · ㊿+184 리포트 «글로 만들기»는 v3.5 부터)
 /* 계정별 대화 기억 — DB(ai_chat_history)에서 최근 문답을 불러옵니다 (최초 1회) */
 export function loadHist(){
   if(ST.HIST_LOADED || !ST.SB_TOKEN) return Promise.resolve();
@@ -88,7 +88,7 @@ export function loadAiConfig(){
   }
   badge.className='ai-badge'; badge.textContent='AI 확인 중…';
   // 가벼운 호출로 중계 함수(ask) 연결 여부만 확인합니다
-  aiFetch({mode:'ping'}).then(function(){ aiOn(badge); })
+  aiFetch({mode:'ping'}).then(function(j){ AICFG.ver=String((j && j.version)||''); aiOn(badge); })
     .catch(function(e){
       var m=String(e.message||e);
       if(/질문이 비어/.test(m)){ aiOn(badge); return; }   // 함수는 살아있음 = 연결 OK
