@@ -2,15 +2,14 @@
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { APP_VER, ST } from './state.js';
 import { Viz } from './viz.js';
-import { $, $$, kwToWon, wonToKw, baseLabel, baseRange, buildBaseSelect, cssv, el, esc, isCC, isGN, lline, mk, mkLabel, monOf, pct, rawHtml, seriesColor, STATE, tpl, won,
-  wonFull, wrapNavIcons, yOf } from './core.js';
+import { $, $$, baseLabel, baseRange, bizHas, buildBaseSelect, cssv, el, esc, isCC, isGN, kwToWon, lline, mk, mkLabel, monOf, pct, rawHtml, seriesColor, STATE, tpl, won, wonFull, wonToKw, wrapNavIcons, yOf } from './core.js';
 import { boot, CACHE_KEY, ccAfterKpis, ccAnaCount, ccAnalysisOpen, ccHomeLayout, loadFromDb, onData, renderInbox, SB_RAW, sbWrite, themeBtnSync, toast, uiIconize } from './shell.js';
 import { abortAsk, ask, isAsking, loadAiConfig, runQuery, shortQ } from './ai.js';
 import { GRIDS } from './grids.js';
-import { CH_DEFS, chOf, ctSuccessor, liveData, liveDeltaHtml, openRenewList, renderChannelView } from './analysis.js';
+import { CH_DEFS, chOf, ctSuccessor, liveData, liveDeltaHtml, liveDeltaOpen, liveMultiOpen, liveSheetDiffOpen, openRenewList, renderChannelView } from './analysis.js';
 import { renderTodo } from './tools.js';
 import { renderCloud } from './cloud.js';
-import { aipStale, askFrom, homeB, homeSetup } from './home.js';
+import { aipStale, askFrom, homeB, homeDetailOpen, homeOn, homeSetup } from './home.js';
 import { closeMxPop, mxKey, MXM, mxPlace, openMxMemo, renderInbStat } from './inbound.js';
 import { KX_H6, kxBase, renderChurn, renderChurnRate, renderCustFlow } from './sales.js';
 import { a11yTileRole, DV, renderGrid, switchView, xlsxAoa } from './grid.js';
@@ -273,9 +272,19 @@ export function fillSelect(sel, arr){
 /* ==================================================================
    4. 렌더
    ================================================================== */
+/* ㊿+173 성능: 보이지 않는 대시보드 차트 · 표는 그리지 않고 «다시 그릴 것» 표시만 — 홈(지니언스)에서 «사업 현황 상세 · 분석»을 펼치거나
+   홈으로 돌아올 때 그림(homeDetail · switchView). 숫자 계산(KPI_D 등 다른 곳이 쓰는 값)은 그대로 */
+export var DASH_DIRTY={v:false};
+export function dashDetailShown(){
+  if(ST.CUR_VIEW && ST.CUR_VIEW!=='dash') return false;
+  if(isGN() && homeOn()) return !!homeDetailOpen();   /* 지니언스 홈: «사업 현황 상세 · 분석»을 펼쳐 둔 때만(이 브라우저 기억) */
+  return true;
+}
 export function renderAll(){
   var list=idxs();
   $('#filterCount').textContent = list.length.toLocaleString('ko-KR')+'건 선택됨';
+  if(!dashDetailShown()){ DASH_DIRTY.v=true; renderKpis(list, true); renderHero(list); return; }
+  DASH_DIRTY.v=false;
   renderKpis(list);
   renderGoal(list);
   renderTrend(list);
@@ -303,7 +312,7 @@ export function renderHero(list){
   var pend=(ST.RAWX.orders||[]).filter(function(o){ return ['접수','출하요청','배송중','회수예정'].indexOf(o.status)>=0; }).length;
   var XS0=expScan(list, b), expCnt=XS0.rows.length, expAmt=XS0.amt;   /* ㊿+168 공통 집계 */
   var curYm=monOf(b)+'월';
-  var bizDone=(ST.RAWX.biz||[]).some(function(r){ return r.ym===curYm; });
+  var bizDone=bizHas(+mk(b).slice(0,4), monOf(b));   /* ㊿+176 연도까지(예전엔 «8월»만 비교해 작년 8월도 입력으로 봤음) */
   var items=[];
   if(pend) items.push({t:'warn', ic:'📦', msg:tpl`처리 대기 장비 요청이 <b>${rawHtml(pend)}건</b> 있습니다.`, go:function(){ switchView('orders'); }});
   if(expCnt) items.push({t:'info', ic:'⏳', msg:tpl`${rawHtml(expN())}개월 내 만료 계약이 <b>${rawHtml(expCnt)}건</b> (${won(expAmt)}천원) 있습니다 — 재약정 타깃.`, go:function(){ goWidget('exp','계약 만료 예정'); }});
@@ -713,7 +722,7 @@ export function openIfeeDetail(td, Y, M, det, adj){
   var ed=ifeeCanEdit();
   /* 금액은 «천원 단위»로 입력합니다 (㊿+157 — 표와 같은 단위 · 저장은 원) */
   function amtIn(v, key){
-    return tpl`<input class="ifin" data-f="${rawHtml(key)}" type="number" step="any" value="${v===''||v==null?'':wonToKw(v)}" placeholder="천원" `+
+    return tpl`<input class="ifin" data-f="${rawHtml(key)}" type="number" inputmode="decimal" step="any" value="${v===''||v==null?'':wonToKw(v)}" placeholder="천원" `+
            tpl`style="width:104px;text-align:right;font-size:12px;padding:3px 5px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)">`;
   }
   var h=tpl`<div class="mxdet"><table><thead><tr><th style="min-width:150px">고객사</th><th>구분·서비스</th><th>근거</th><th class="n">설치비(천원)</th>${rawHtml(ed?'<th></th>':'')}</tr></thead><tbody>`;
@@ -795,7 +804,7 @@ export function ifeeWire(box, Y, M, rows, ex, td){
       tpl`<td><select class="ifin" aria-label="항목 종류" data-f="x${rawHtml(nextX)}_kind" style="font-size:12px;padding:3px 4px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)">`+
         tpl`${rawHtml(IFEE_KINDS.map(function(k){ return tpl`<option>${rawHtml(k)}</option>`; }).join(''))}</select></td>`+
       tpl`<td><input class="ifin" data-f="x${rawHtml(nextX)}_note" type="text" placeholder="비고(선택)" style="width:100%;min-width:110px;font-size:12px;padding:3px 5px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)"></td>`+
-      tpl`<td class="n"><input class="ifin" data-f="x${rawHtml(nextX)}_amt" type="number" step="any" placeholder="천원" style="width:104px;text-align:right;font-size:12px;padding:3px 5px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)"></td>`+
+      tpl`<td class="n"><input class="ifin" data-f="x${rawHtml(nextX)}_amt" type="number" inputmode="decimal" step="any" placeholder="천원" style="width:104px;text-align:right;font-size:12px;padding:3px 5px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)"></td>`+
       tpl`<td><button class="ifdel" data-x="${rawHtml(nextX)}" title="이 줄 지우기" style="border:none;background:none;cursor:pointer;color:var(--critical,#d03b3b);font-size:14px">✕</button></td>`;
     var anchor=box.querySelector('#ifAddRow');
     anchor.parentNode.insertBefore(tr, anchor);
@@ -1049,7 +1058,7 @@ export function renderGoal(list){
     tpl`</div>`;
 }
 
-export function renderKpis(list){
+export function renderKpis(list, dataOnly){
   list=list||idxs();
   var b=STATE.base;
   var br=baseRange(), f0=br[0];
@@ -1086,6 +1095,7 @@ export function renderKpis(list){
   var ser=monthlySeries(list);
   var series24=ser.slice(Math.max(0,b-23), b+1);
   KPI_D={list:list, b:b, f0:f0, newRows:newRows, churnRows:churnRows, expRows:expRows, mrr:mrr, prevY:prevY, prevM:prevM, perSum:perSum, perPy:perPy, span:span};
+  if(dataOnly) return;   /* ㊿+173 숫자만(타일 · 작은 그래프는 보일 때 그림) */
 
   var tiles=[
     { k:'당월 MRR ('+mk(b)+')', v:won(mrr), u:'천원', d: prevM? deltaHtml(mrr,prevM,'전월'):'', spark:series24, open:'mrr', tip:'기준월에 인식된 월 금액 합계 (계약별 월 매출표 · 부속 계약 포함) — 누르면 고객사별 내역' },
@@ -1104,12 +1114,14 @@ export function renderKpis(list){
         var sel = selOf(lv.rows);
         var uq={}, perLine={}; sel.forEach(function(x){ uq[x.cust]=1; (perLine[x.line]=perLine[x.line]||{})[x.cust]=1; });
         var nCust=Object.keys(uq).length, nRow=sel.length, prodSum=Object.keys(perLine).reduce(function(a,l){ return a+Object.keys(perLine[l]).length; },0);
-        var isDb=(lv.src==='db'), other='';
-        if(isDb && ST.DATA.live && ST.DATA.live.ok){ var su={}; selOf(ST.DATA.live.rows).forEach(function(x){ su[x.cust]=1; }); var sn=Object.keys(su).length; other=' · 시트 명단 '+sn+(sn!==nCust? ' ('+(nCust-sn>0?'+':'')+(nCust-sn)+')':' ✓'); }
+        var isDb=(lv.src==='db'), other='', nMulti=Object.keys(uq).filter(function(c){ var k=0; Object.keys(perLine).forEach(function(l){ if(perLine[l][c]) k++; }); return k>1; }).length;
+        var keep=function(x){ return selOf([x]).length>0; };   /* ㊿+183 차이 근거도 같은 거르기 */
+        if(isDb && ST.DATA.live && ST.DATA.live.ok){ var su={}; selOf(ST.DATA.live.rows).forEach(function(x){ su[x.cust]=1; }); var sn=Object.keys(su).length; other=' · 시트 명단 '+sn+(sn!==nCust? ' ('+(nCust-sn>0?'+':'')+(nCust-sn)+') '+tpl`<button type="button" class="lnk" data-diff="sheet" title="계약 기준과 시트 명단이 다른 곳">차이 보기</button>`:' ✓'); }
         return { k:'LIVE 고객사'+(isDb? ' ('+mk(b)+')':''), v:nCust.toLocaleString('ko-KR'), u:'곳',
-                 d:'제품별 합 '+prodSum.toLocaleString('ko-KR')+(prodSum>nCust? ' — 두 제품 이상 쓰는 '+(prodSum-nCust)+'곳을 제품마다 셈' : ' — 회사 수와 같음(겹침 없음)')+   /* ㊿+169 고객 수(곳) ≠ 제품별 합 이유를 글로 */
+                 d:'제품별 합 '+prodSum.toLocaleString('ko-KR')+(prodSum>nCust? ' — '+tpl`<button type="button" class="lnk" data-diff="multi" title="제품을 두 개 이상 써서 제품마다 1곳씩 세는 고객사">두 제품 이상 ${String(nMulti)}곳</button>` : ' — 회사 수와 같음(겹침 없음)')+   /* ㊿+169 고객 수(곳) ≠ 제품별 합 · ㊿+183 이유 글 대신 그 고객사 목록 */
                    (nRow>prodSum? ' · 사이트 '+nRow+'건':'')+other, open:'live',
-                 extra:(isDb && !STATE.ind && Object.keys(STATE.lines).every(function(k){ return STATE.lines[k]; }))? liveDeltaHtml(b) : '',   /* 전월 대비 분해 (신규·복귀 / 만기 미처리·해지·종료) + «확인중» — 표시용 (㊿+127) */
+                 extra:(isDb && !STATE.ind && Object.keys(STATE.lines).every(function(k){ return STATE.lines[k]; }))? liveDeltaHtml(b) : '',
+                 diff:{multi:function(){ liveMultiOpen(b, sel); }, sheet:function(){ liveSheetDiffOpen(b, keep); }, delta:function(){ liveDeltaOpen(b); }},   /* 전월 대비 분해 (신규·복귀 / 만기 미처리·해지·종료) + «확인중» — 표시용 (㊿+127) */
                  tip:(isDb? '계약 기준 자동 판정 — 원계약이 '+mk(b)+'에 유효한 회사(시작월 ≤ 기준월, 종료 전 · 해지는 해지월부터 제외 · 통합과금/추가/H/W 제외 · CN전환 포함) · 곳 = 회사 단위 · 제품별 합 = 매출시트 LIVE 산정 방식(제품마다 1곳'+(prodSum>nCust? ' · 두 제품 이상 쓰는 '+(prodSum-nCust)+'곳이 겹침':'')+') · «시트 명단» 은 예전 LIVE 고객사 탭 사본 — 차이는 LIVE 화면 «시트와 다른 곳»에서 항목별로'
                             : 'LIVE 명단 시트 기준 — 곳 = 회사 단위 · 제품별 합 = 매출시트 LIVE 고객사 산정 방식(제품마다 1곳)')+' — 누르면 LIVE 고객사 화면' };
       }
@@ -1143,6 +1155,7 @@ export function renderKpis(list){
     /* 타일 안의 기간 버튼(만료 예정) — 타일 클릭(명단 열기)과 분리 */
     c.querySelectorAll('button[data-expn]').forEach(function(bt){ bt.onclick=function(ev){ ev.stopPropagation(); setExpN(+bt.dataset.expn); }; });
     c.querySelectorAll('button[data-renew]').forEach(function(bt){ bt.onclick=function(ev){ ev.stopPropagation(); openRenewList(bt.dataset.renew); }; });   /* LIVE 타일 «확인중 N건 →» */
+    c.querySelectorAll('button[data-diff]').forEach(function(bt){ bt.onclick=function(ev){ ev.stopPropagation(); var f=t.diff && t.diff[/** @type {any} */(bt).dataset.diff]; if(f) f(); }; });   /* ㊿+183 차이 근거 목록 */
     a11yTileRole(c);   /* ㊿+141: 안에 버튼이 있는 타일은 role=group (버튼 속 버튼 금지 · 키보드 Enter 는 그대로) */
     box.appendChild(c);
   });

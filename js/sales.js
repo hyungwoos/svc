@@ -1,11 +1,11 @@
 /* ===== sales.js — Cloud 사이트 · OI · 견적→OI · 수주→계약 · 사이드바 접기 · 해지 분석 =====
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
-import { ST } from './state.js';
-import { $, amtHint, canView, canWrite, doLogout, esc, kwToWon, lline, mk, rawHtml, refreshToken, SB_KEY, SB_URL, tpl, won, wonToKw } from './core.js';
-import { dIdx, EQB, loadFromDb, onData, railSync, renderEqBoard, SB_RAW, sbTry, sbWrite, toast, todayStr } from './shell.js';
+import { APP_VER, ST } from './state.js';
+import { $, amtHint, canView, canWrite, doLogout, esc, fetchT, kwToWon, lline, mk, rawHtml, refreshToken, SB_KEY, SB_URL, tickMemo, tpl, won, wonToKw } from './core.js';
+import { dIdx, EQB, loadFromDb, onData, railSync, renderEqBoard, SB_RAW, sbHeaders, sbTry, sbWrite, toast, todayStr } from './shell.js';
 import { kpiTable, toggleWidgetPanel } from './dash.js';
 import { OI_IND, OI_OWNERS, OI_PARTNERS, OI_PROB, OI_PRODUCTS, OI_TYPE } from './grids.js';
-import { CH_DEFS, chOf } from './analysis.js';
+import { CH_DEFS, chOf, diffOpen } from './analysis.js';
 import { applyDense, denseKey, openFind, openPaste } from './tools.js';
 import { loadInbound } from './inbound.js';
 import { syncOrderAssets } from './equipment.js';
@@ -17,7 +17,7 @@ import { closeOvl, FORM_FN, logChange, msg, openOvl } from './edit.js';
 /* ================= Cloud 사이트 생성·수정 (my.genians.co.kr cloudsite / cloudsite-update · Edge Function cloudsite 경유) ================= */
 export var CS={wired:false, hist:undefined, creds:undefined, tab:'create'};
 export async function csFn(payload){
-  var r=await fetch(SB_URL+'/functions/v1/cloudsite',{ method:'POST', headers:{'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+(ST.SB_TOKEN||'')}, body:JSON.stringify(payload) });
+  var r=await fetchT(SB_URL+'/functions/v1/cloudsite',{ method:'POST', headers:{'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+(ST.SB_TOKEN||'')}, body:JSON.stringify(payload) }, 90000, 'cloudsite 함수', !/^(create|update)$/.test(String(payload&&payload.action||'')));   /* ㊿+182 시간 제한 — 사이트 만들기 · 바꾸기는 다시 보내지 않음 */
   var j=null; try{ j=await r.json(); }catch(e){}
   if(!j || !('ok' in j)) throw new Error('HTTP '+r.status+(r.status===404? ' — Edge Function «cloudsite» 가 아직 배포되지 않았습니다':''));
   return j;
@@ -284,12 +284,12 @@ export function initOiForm(){
     var h=OI_PRODUCTS.map(function(name){
       return tpl`<div class="oi-prow">`+
         tpl`<label class="mpchk" style="min-width:190px"><input type="checkbox" data-oip="${name}"> ${name}</label>`+
-        tpl`<input class="oi-qty" type="number" min="1" placeholder="수량" disabled></div>`;
+        tpl`<input class="oi-qty" type="number" inputmode="numeric" min="1" placeholder="수량" disabled></div>`;
     }).join('');
     h+=tpl`<div class="oi-prow">`+
        tpl`<label class="mpchk" style="min-width:190px"><input type="checkbox" data-oip="__etc"> 직접 입력</label>`+
        tpl`<input class="oi-etc" placeholder="제품명" disabled style="flex:1;max-width:220px">`+
-       tpl`<input class="oi-qty" type="number" min="1" placeholder="수량" disabled></div>`;
+       tpl`<input class="oi-qty" type="number" inputmode="numeric" min="1" placeholder="수량" disabled></div>`;
     h+=tpl`<div style="margin-top:8px"><button class="pill ghost" type="button" id="oiEtcAdd" `+
        tpl`style="height:28px;padding:0 12px;font-size:12px">＋ 직접 입력 항목 추가</button></div>`;
     pb.innerHTML=h;
@@ -325,7 +325,27 @@ export var QPROD_MAP={
   'Cloud NAC V5.0':'Cloud NAC'
 };
 export var QMGR_MAP={'kholong':'송기영 부장','choihw':'최형우 차장'};
-export var OI_QUOTE=null;   // {file, date, total}
+export var OI_QUOTE=null;   // {file, date, total, qid?}
+
+/* ── ㊿+177 견적을 포탈 DB 에(quotes · SQL 109) — 목록(영업 › 견적 목록) · 견적 화면 열기 · OI 연결 ── */
+export var QUOTES={ok:null, at:0};
+export var QUOTE_COLS='id,quote_no,doc_type,qtype,customer_name,customer_id,oi_id,quote_date,manager,supply_total,grand_total,status,parent_id,note,created_by,created_at,updated_at,sent_at,won_at,lost_at';
+export async function quotesLoad(){
+  try{ var r=await fetchT(SB_URL+'/rest/v1/quotes?select='+QUOTE_COLS+'&order=id.desc&limit=2000', {headers:sbHeaders()}, 30000, '견적 DB'); QUOTES.ok=r.ok; ST.RAWX.quotes=r.ok? ((await r.json())||[]) : []; }
+  catch(e){ ST.RAWX.quotes=[]; }
+  QUOTES.at=Date.now();
+  if(ST.CUR_VIEW==='quotes'){ renderGrid(); if(QUOTES.ok===false) toast('견적 목록이 비어 있습니다','SQL 109(견적 DB)를 실행하면 견적 화면의 «💾 저장» · «PDF 발행»이 여기에 쌓입니다','info'); }
+}
+/** 견적 화면(포탈 안)을 DB 견적(qid=번호) 또는 OI 연결(oi=번호)로 열기 */
+export function quoteOpen(q){
+  var fr=/** @type {any} */($('#quoteFrame')), w=null; try{ w=fr.getAttribute('src')? fr.contentWindow : null; }catch(e){ w=null; }
+  var m=/^qid=(\d+)$/.exec(q);
+  if(m && w && typeof w.qdbOpen==='function' && w.__quoteInit){ switchView('quote'); w.qdbOpen(+m[1], false); return; }   /* 이미 열린 견적 화면 — 저장 안 한 내용은 거기서 확인 */
+  if(w && w.__quoteInit){ var dirty=false; try{ dirty=w.QDB && w.QDB.id? w.qdbSig()!==w.QDB.saved : !!String((w.document.getElementById('customerName')||{}).value||'').trim(); }catch(e){}
+    if(dirty && !confirm('견적 화면에 저장하지 않은 내용이 있습니다. 새로 열까요?')) return; }
+  fr.src='quote.html?v='+encodeURIComponent(APP_VER)+'&'+q;
+  switchView('quote');
+}
 
 export function qCfg(){
   var o={};
@@ -337,7 +357,7 @@ export function qCfg(){
 export async function qFetch(path, opts){
   opts=opts||{}; var cfg=qCfg();
   if(!ST.SB_TOKEN) throw new Error('포탈 로그인이 필요합니다');
-  var go=function(){ return fetch(cfg.base+path, Object.assign({}, opts, {headers:Object.assign({}, opts.headers||{}, {Authorization:'Bearer '+ST.SB_TOKEN})})); };
+  var go=function(){ return fetchT(cfg.base+path, Object.assign({}, opts, {headers:Object.assign({}, opts.headers||{}, {Authorization:'Bearer '+ST.SB_TOKEN})}), 60000, '견적 저장 서버'); };
   var res=await go();
   if(res.status===401 && await refreshToken()) res=await go();
   return res;
@@ -359,6 +379,14 @@ export function openQuotePick(target){
   ul.onclick=function(){
     var r=QP_TARGET.row;
     if(!confirm(r.customer+' OI의 견적서 연결을 해제할까요?\n(견적서 파일 자체는 지워지지 않습니다)')) return;
+    if(/^q:/.test(String(r.quote_file||''))){   /* ㊿+177 포탈 DB 견적 — 견적의 OI 번호를 비우면 OI 칸은 DB 가 맞춤(이 OI 의 다른 견적이 있으면 그것으로) */
+      sbWrite('PATCH','quotes?quote_no=eq.'+encodeURIComponent(String(r.quote_file).slice(2))+'&oi_id=eq.'+r.id,{oi_id:null},'return=minimal')
+        .then(function(){ return sbTry('oi_deals?select=quote_file,quote_date,quote_total&id=eq.'+r.id); })
+        .then(function(x){ var o=(x||[])[0]||{quote_file:null,quote_date:null,quote_total:null}; r.quote_file=o.quote_file; r.quote_date=o.quote_date; r.quote_total=o.quote_total; ST.RAWX.quotes=null;
+          toast('견적서 연결 해제', r.customer+(o.quote_file? ' — 이 OI 의 다른 견적('+String(o.quote_file).slice(2)+')으로' : ''),'info'); closeOvl('ovlQuote'); renderGrid(); })
+        .catch(function(e){ msg('qpMsg',String(e.message||e),'bad'); });
+      return;
+    }
     sbWrite('PATCH','oi_deals?id=eq.'+r.id,{quote_file:null,quote_date:null,quote_total:null,updated_at:new Date().toISOString()})
       .then(function(){
         r.quote_file=null; r.quote_date=null; r.quote_total=null;
@@ -378,6 +406,14 @@ export function oiLinkQuote(r){
 }
 export async function qpLoadList(){
   $('#qpList').innerHTML='<div class="cap" style="padding:16px;text-align:center">불러오는 중…</div>';
+  /* ㊿+177 포탈 DB 견적(SQL 109)을 먼저 — 고르면 견적 번호(q:Q-…)로 연결 */
+  var dbRows=null;
+  if(QUOTES.ok!==false){ try{ var rq=await fetch(SB_URL+'/rest/v1/quotes?select=id,quote_no,customer_name,quote_date,grand_total,status,oi_id&doc_type=eq.quote&order=id.desc&limit=40', {headers:sbHeaders()}); if(rq.ok) dbRows=await rq.json(); else if(rq.status===404) QUOTES.ok=false; }catch(e){} }
+  var dbHtml=(dbRows && dbRows.length)? tpl`<div class="qp-sec">포탈 DB 견적</div>${rawHtml(dbRows.map(function(x){
+      return tpl`<div class="qp-row" data-qid="${String(x.id)}"><div style="min-width:0"><div style="font-weight:650;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${x.quote_no||''} · ${x.customer_name}</div>`+
+        tpl`<div class="cap" style="font-size:12px">${String(x.quote_date||'')} · ${Math.round(+x.grand_total||0).toLocaleString('ko-KR')}원 · ${x.status}${x.oi_id? ' · OI #'+x.oi_id+' 연결됨' : ''}</div></div>`+
+        tpl`<button class="pill ghost" type="button" style="height:28px;padding:0 12px;font-size:12px;flex:0 0 auto">고르기</button></div>`; }).join(''))}<div class="qp-sec">GitHub 저장 견적(예전)</div>` : '';
+  var bindDb=function(){ $('#qpList').querySelectorAll('.qp-row[data-qid]').forEach(function(r){ /** @type {any} */(r).onclick=function(){ qpPickDb(+/** @type {any} */(r).dataset.qid); }; }); };   /* 키보드는 안의 «고르기» 단추(누르면 이 행으로 올라옴) */
   try{
     var res=await qFetch('/list');
     if(!res.ok){ var e=await res.json().catch(function(){return {};});
@@ -385,21 +421,42 @@ export async function qpLoadList(){
     var out=await res.json();
     var files=(out.files||[]).filter(function(f){ return /\.json$/i.test(f.name||''); });
     files.sort(function(a,b){ return String(b.name).localeCompare(String(a.name)); });
-    if(!files.length){ $('#qpList').innerHTML='<div class="cap" style="padding:16px;text-align:center">저장된 견적서가 없습니다.</div>'; return; }
-    $('#qpList').innerHTML=files.slice(0,80).map(function(f){
+    if(!files.length){ $('#qpList').innerHTML=dbHtml+tpl`<div class="cap" style="padding:16px;text-align:center">저장된 견적서가 없습니다.</div>`; bindDb(); return; }
+    $('#qpList').innerHTML=dbHtml+files.slice(0,80).map(function(f){
       var L=qLabel(f.name);
       return tpl`<div class="qp-row" data-path="${f.path||f.name}" data-name="${f.name}">`+
         tpl`<div style="min-width:0"><div style="font-weight:650;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${L.c}</div>`+
         tpl`<div class="cap" style="font-size:12px">${L.d||''}</div></div>`+
         tpl`<button class="pill ghost" type="button" style="height:28px;padding:0 12px;font-size:12px;flex:0 0 auto">불러오기</button></div>`;
     }).join('');
-    $('#qpList').querySelectorAll('.qp-row').forEach(function(r){
+    $('#qpList').querySelectorAll('.qp-row[data-path]').forEach(function(r){
       r.onclick=function(){ qpPick(r.dataset.path, r.dataset.name); };
     });
+    bindDb();
     if(files.length>80) msg('qpMsg','최근 80건만 표시했습니다');
   }catch(err){
-    $('#qpList').innerHTML=tpl`<div class="cap" style="padding:16px;text-align:center;color:var(--critical)">목록 조회 실패: ${String(err.message||err)}</div>`;
+    $('#qpList').innerHTML=dbHtml+tpl`<div class="cap" style="padding:16px;text-align:center;color:var(--critical)">${dbHtml? 'GitHub 저장 견적' : '목록'} 조회 실패: ${String(err.message||err)}</div>`; bindDb();
   }
+}
+/** ㊿+177 포탈 DB 견적 고르기 — 기존 OI 에 연결(견적의 OI 번호를 바꾸면 OI 칸은 DB 가 맞춤) · 또는 OI 등록 폼 채우기 */
+export async function qpPickDb(id){
+  msg('qpMsg','견적을 읽는 중…');
+  try{
+    var r=await fetch(SB_URL+'/rest/v1/quotes?select=id,quote_no,data,quote_date,grand_total,oi_id&id=eq.'+id, {headers:sbHeaders()});
+    var x=r.ok? ((await r.json())||[])[0] : null; if(!x) throw new Error('견적이 없거나 볼 권한이 없습니다');
+    var ref='q:'+(x.quote_no||'#'+x.id);
+    if(QP_TARGET && QP_TARGET.row){
+      var o=QP_TARGET.row;
+      if(x.oi_id && x.oi_id!==o.id && !confirm((x.quote_no||'')+' 은(는) 지금 OI #'+x.oi_id+' 에 연결돼 있습니다. 이 OI(#'+o.id+')로 옮길까요?')){ msg('qpMsg',''); return; }
+      await sbWrite('PATCH','quotes?id=eq.'+x.id, {oi_id:o.id}, 'return=minimal');
+      o.quote_file=ref; o.quote_date=x.quote_date; o.quote_total=x.grand_total; ST.RAWX.quotes=null;
+      if(x.oi_id && x.oi_id!==o.id){ var o2=(ST.RAWX.oi||[]).filter(function(y){ return y.id===x.oi_id; })[0]; if(o2 && o2.quote_file===ref){ o2.quote_file=null; o2.quote_date=null; o2.quote_total=null; } }
+      closeOvl('ovlQuote'); toast('견적서 연결됨', (o.customer||'')+' ← '+(x.quote_no||'')); renderGrid(); return;
+    }
+    oiApplyQuote(Object.assign({}, x.data||{}), ref, x.quote_no||ref);
+    if(OI_QUOTE) OI_QUOTE.qid=x.id;
+    closeOvl('ovlQuote'); toast('견적서 불러옴', x.quote_no||'');
+  }catch(e){ msg('qpMsg','불러오기 실패: '+String(/** @type {any} */(e).message||e),'bad'); }
 }
 export async function qpPick(path, name){
   msg('qpMsg','견적서를 읽는 중…');
@@ -433,7 +490,7 @@ export function oiAddEtcRow(prodName, qty){
   row.className='oi-prow'; row.dataset.extra='1';
   row.innerHTML=tpl`<label class="mpchk" style="min-width:190px"><input type="checkbox" data-oip="__etc"> 직접 입력</label>`+
     tpl`<input class="oi-etc" placeholder="제품명" disabled style="flex:1;max-width:220px">`+
-    tpl`<input class="oi-qty" type="number" min="1" placeholder="수량" disabled>`+
+    tpl`<input class="oi-qty" type="number" inputmode="numeric" min="1" placeholder="수량" disabled>`+
     tpl`<button class="pill ghost" type="button" style="height:26px;padding:0 9px;font-size:12px" title="행 삭제">✕</button>`;
   var cb=row.querySelector('input[data-oip]');
   cb.onchange=function(){
@@ -562,6 +619,7 @@ export async function submitOi(){
     };
     var out=await sbWrite('POST','oi_deals?select=*',[row],'return=representation');
     ST.RAWX.oi=ST.RAWX.oi||[]; ST.RAWX.oi.unshift(out[0]);
+    if(OI_QUOTE && OI_QUOTE.qid && out[0]) sbWrite('PATCH','quotes?id=eq.'+OI_QUOTE.qid, {oi_id:out[0].id}, 'return=minimal').then(function(){ ST.RAWX.quotes=null; }).catch(function(){});   /* ㊿+177 견적 쪽에도 OI 번호 */
     logChange('insert','oi_deals',out[0].id,{customer:cust,deal:name});
     msg('oiMsg','');
     $('#oiDoneSum').textContent=[cust, name, row.deal_type,
@@ -867,10 +925,15 @@ export function crEligible(r){
   return true;
 }
 export function crIsSup(r){ return /지원/.test(String(r.saleType||'')); }
+/* ㊿+173 성능: 해지율 · 고객 증감은 기간마다 같은 «대상 계약»(규칙 + 필터)을 처음부터 다시 걸렀음 — 같은 계산 묶음 안에서는 한 번만(행 순서 · 행 번호 그대로) */
+export function crPool(match){
+  var rows=ST.DATA.rows;
+  return tickMemo('crPool', [rows, rows.length, match, CR.base, CR.sup, CR.cnd, JSON.stringify(CR.f||{}), CR_G], function(){
+    var out=[]; rows.forEach(function(r, i){ if(crEligible(r) && match(r)) out.push(i); }); return out; });
+}
 export function crActive(t, match){
-  var out=[];
-  ST.DATA.rows.forEach(function(r,i){
-    if(!crEligible(r) || !match(r)) return;
+  var out=[], rows=ST.DATA.rows;
+  crPool(match).forEach(function(i){ var r=rows[i];
     if(CR.base==='rev'){ if(ST.MAT[i][t]>0) out.push(r); return; }
     if(CR.base==='sheet'){                                                                                          // 매출시트 LIVE 규칙: 상태 글자 기준 (신규·재약정·CN전환 = LIVE, 서비스종료·추가 = 아님, 해지는 해지월 전까지) · 날짜 없는 행도 포함
       var st0=String(r.status||''); if(st0==='추가' || /종료/.test(st0)) return;
@@ -887,9 +950,8 @@ export function crActive(t, match){
   return out;
 }
 export function crLost(s,e,match){
-  var out=[];
-  ST.DATA.rows.forEach(function(r){
-    if(!crEligible(r) || !match(r)) return;
+  var out=[], rows=ST.DATA.rows;
+  crPool(match).forEach(function(i){ var r=rows[i];
     if(String(r.status||'')!=='해지') return;
     if(r.line==='S1' && String(r.saleType||'')==='CND') return;          // CND(DeviceKeeper) 해지는 매출시트 규칙대로 해지 집계에서 항상 제외
     var x=r.endIdx!=null? r.endIdx : r._l; if(x==null) return;
@@ -964,7 +1026,7 @@ export function renderChurnRate(){
   var m=crMatch, baseLab={valid:'계약 유효 고객사',rev:'과금 고객사',cum:'누적고객(신규 − 해지)'}[CR.base];
   h+=tpl`<div class="pr-card" style="margin-bottom:12px"><h3>${crSummary()} — ${CR.unit==='year'?'연도별':CR.unit==='half'?'반기별':'분기별'} 해지율`+
      tpl` <span class="ubadge sm">분모 = 기간 시작 전 달 ${rawHtml(baseLab)}</span><small>${CR.rows?'계약 행 단위':'고객사 단위'} · 지원사업 ${rawHtml({all:'포함',ex:'제외',only:'만'}[CR.sup])} · CND ${CR.cnd?'포함':'제외'} · 지원 제외율 = 그 외 해지 ÷ ${CR.exDen==='all'?'전체 활성':'지원 제외 활성'}</small></h3>`+
-     tpl`<div style="overflow-x:auto"><table class="pr"><thead><tr><th>기간</th><th class="n" title="기간 시작 직전 달 기준 — 연도면 전년 12월">시작 활성<br><span class="mini">(직전 달)</span></th><th class="n">└ 지원사업</th><th class="n" title="기간 마지막 달 기준">기간 말 활성</th><th class="n">해지</th><th class="n">└ 지원사업</th><th class="n">└ 그 외</th><th class="n">해지율 (지원 포함)</th><th class="n">해지율 (지원 제외)</th><th class="n">해지 MRR(천원)</th></tr></thead><tbody>`;
+     tpl`<div style="overflow-x:auto" tabindex="0" role="region" aria-label="표 — 옆으로 스크롤"><table class="pr"><thead><tr><th>기간</th><th class="n" title="기간 시작 직전 달 기준 — 연도면 전년 12월">시작 활성<br><span class="mini">(직전 달)</span></th><th class="n">└ 지원사업</th><th class="n" title="기간 마지막 달 기준">기간 말 활성</th><th class="n">해지</th><th class="n">└ 지원사업</th><th class="n">└ 그 외</th><th class="n">해지율 (지원 포함)</th><th class="n">해지율 (지원 제외)</th><th class="n">해지 MRR(천원)</th></tr></thead><tbody>`;
   var tot={lost:[],sup:[],org:[],amt:0};
   P.forEach(function(p){
     var base=crActive(p.s-1,m), baseSup=base.filter(crIsSup), lost=crLost(p.s,p.e,m), sup=lost.filter(crIsSup), org=lost.filter(function(r){return !crIsSup(r);});
@@ -984,7 +1046,7 @@ export function renderChurnRate(){
   [['제품별','line'],['사업영역별','area']].forEach(function(gg){
     var g=G.filter(function(x){return x.k===gg[1];})[0]; if(!g) return;
     var cols=g.opts.filter(function(o){ var sel=CR.f[g.k]||[]; return !sel.length || sel.indexOf(o[0])>=0; });
-    h+=tpl`<div class="pr-card" style="margin-bottom:12px"><h3>${rawHtml(gg[0])} 해지율 <small>칸 = 해지 / 기간 시작 활성 · 해지율(지원 포함) · 다른 필터는 그대로 적용 · 맨 오른쪽 = 칸 합계와 전체 표(회사 단위) 대조</small></h3><div style="overflow-x:auto"><table class="pr"><thead><tr><th>기간</th>`+
+    h+=tpl`<div class="pr-card" style="margin-bottom:12px"><h3>${rawHtml(gg[0])} 해지율 <small>칸 = 해지 / 기간 시작 활성 · 해지율(지원 포함) · 다른 필터는 그대로 적용 · 맨 오른쪽 = 칸 합계와 전체 표(회사 단위) 대조</small></h3><div style="overflow-x:auto" tabindex="0" role="region" aria-label="표 — 옆으로 스크롤"><table class="pr"><thead><tr><th>기간</th>`+
        tpl`${rawHtml(cols.map(function(o){ return tpl`<th class="n">${o[1]}</th>`; }).join(''))}<th class="n" title="칸을 그대로 더한 값 / 전체 표 값 — 두 제품(영역)을 함께 쓰는 고객사는 칸마다 1곳씩 잡히지만 전체 표에서는 회사 단위로 1곳이라 그만큼 차이가 납니다">합계 → 전체(회사 단위)</th></tr></thead><tbody>`;
     P.forEach(function(p){
       var sB=0, sL=0;
@@ -996,7 +1058,7 @@ export function renderChurnRate(){
         return tpl`<td class="n">${rawHtml(crLink(lost,p.s,p.e,x,'lost',o[1]+' · '+p.l+' 해지'))} / ${rawHtml(crLink(base,p.s-1,p.s-1,x,'base',o[1]+' · '+p.l+' 시작 활성','color:var(--ink-2)'))}<div class="mini" style="font-weight:700">${rawHtml(crRate(nl,nb))}</div></td>`;
       }).join(''))}`;
       var tB=crN(crActive(p.s-1,crMatch)), tL=crN(crLost(p.s,p.e,crMatch)), dB=sB-tB, dL=sL-tL;
-      h+=tpl`<td class="n" style="color:var(--muted)">${rawHtml(sL)} / ${rawHtml(sB)}${rawHtml(dB||dL? tpl` <span title="${rawHtml(gg[0])} 칸 합계와 전체 표 차이 = 두 개 이상 ${rawHtml(gg[0])}을 함께 쓰는 고객사 (전체 표에서는 1곳)">→ <b style="color:var(--ink-2)">${rawHtml(tL)} / ${rawHtml(tB)}</b> <span class="mini">(중복 ${rawHtml(dB? dB+'곳':'')}${rawHtml(dL? (dB?' · ':'')+'해지 '+dL:'')})</span></span>`:' <span class="mini">= 전체</span>')}</td></tr>`;
+      h+=tpl`<td class="n" style="color:var(--muted)">${rawHtml(sL)} / ${rawHtml(sB)}${rawHtml(dB||dL? tpl` <span title="${rawHtml(gg[0])} 칸 합계와 전체 표 차이 = 두 개 이상 ${rawHtml(gg[0])}을 함께 쓰는 고객사 (전체 표에서는 1곳)">→ <b style="color:var(--ink-2)">${rawHtml(tL)} / ${rawHtml(tB)}</b> ${rawHtml(CR.rows? tpl`<span class="mini">(중복 ${rawHtml(dB? dB+'곳':'')}${rawHtml(dL? (dB?' · ':'')+'해지 '+dL:'')})</span>` : tpl`<button type="button" class="lnk mini" data-crdup="${g.k}" data-s="${String(p.s)}" data-e="${String(p.e)}" data-l="${gg[0]+' · '+p.l}" title="두 칸 이상에 함께 잡힌 고객사 목록">중복 ${rawHtml(dB? dB+'곳':'')}${rawHtml(dL? (dB?' · ':'')+'해지 '+dL:'')}</button>`)}</span>`:' <span class="mini">= 전체</span>')}</td></tr>`;   /* ㊿+183 이유 글 대신 그 고객사 목록 */
     });
     h+='</tbody></table></div></div>';
   });
@@ -1014,6 +1076,19 @@ export function renderChurnRate(){
   var det=$('#crMore'); if(det) det.ontoggle=function(){ CR.open=det.open; };
   var adv=/** @type {any} */($('#crAdv')); if(adv) adv.ontoggle=function(){ CR.adv=adv.open; };
   host.querySelectorAll('a.crk').forEach(function(a){ a.onclick=function(ev){ ev.preventDefault(); crOpen(a.dataset); }; });
+  host.querySelectorAll('button[data-crdup]').forEach(function(b){ /** @type {any} */(b).onclick=function(){ var d=/** @type {any} */(b).dataset; crDupOpen(d.crdup, +d.s, +d.e, d.l); }; });
+}
+/** ㊿+183 제품별 · 사업영역별 칸 합계 > 전체 표 — 두 칸 이상에 함께 잡힌 고객사(전체 표에서는 1곳) · 계산은 표와 같은 crActive/crLost */
+export function crDupOpen(gk, s, e, label){
+  var G=CR_G||(CR_G=crFilterGroups()), g=G.filter(function(x){ return x.k===gk; })[0]; if(!g) return;
+  var cols=g.opts.filter(function(o){ var sel=CR.f[g.k]||[]; return !sel.length || sel.indexOf(o[0])>=0; });
+  var dup=function(fn){ var m={}; cols.forEach(function(o){ var mm=function(r){ return crMatch(r) && (g.test? g.test(r,[o[0]]) : g.get(r)===o[0]); };
+      fn(mm).forEach(function(r){ var x=m[r.cust]=m[r.cust]||[]; if(x.indexOf(o[1])<0) x.push(o[1]); }); });
+    return Object.keys(m).filter(function(c){ return m[c].length>1; }).sort(function(a,b){ return a.localeCompare(b,'ko'); }).map(function(c){ return {cust:c, sub:m[c].length+'칸 · '+m[c].join(' · ')}; }); };
+  var base=dup(function(mm){ return crActive(s-1,mm); }), lost=dup(function(mm){ return crLost(s,e,mm); });
+  diffOpen({title:label+' — 칸 합계와 전체 표 차이', xlsx:'해지율_중복',
+    intro:'칸마다 그 '+g.l+'을 쓰는 고객사를 1곳씩 세므로, 두 칸 이상에 걸친 고객사는 칸 합계에 여러 번 들어가고 전체 표(회사 단위)에는 1곳입니다. 해지율 계산은 그대로입니다.',
+    groups:[{label:'시작 활성('+mk(s-1)+')에서 두 칸 이상', rows:base}, {label:'해지('+mk(s)+'~'+mk(e)+')에서 두 칸 이상', rows:lost}]});
 }
 /* 셀 내역 팝업 */
 export var CR_LAST=[];
@@ -1054,9 +1129,9 @@ export function crOpen(d){
    신규 = 그 기간에 첫 계약을 시작한 고객사 · 해지 = 상태 «해지» 종료월이 그 기간인 고객사
    기타 조정 = 기말 − (기초 + 신규 − 해지): 약정 만기 뒤 재약정 없이 끝난 고객, 데이터 보정 등 */
 export function crNew(s,e,match){
-  var first={};
-  ST.DATA.rows.forEach(function(r){
-    if(!crEligible(r) || !match(r) || r.startIdx==null) return;
+  var first={}, rows=ST.DATA.rows;
+  crPool(match).forEach(function(i){ var r=rows[i];
+    if(r.startIdx==null) return;
     var k=r.cust; if(!first[k] || r.startIdx<first[k].startIdx) first[k]=r;
   });
   return Object.keys(first).map(function(k){ return first[k]; }).filter(function(r){ return r.startIdx>=s && r.startIdx<=e; });
@@ -1118,7 +1193,7 @@ export function renderCustFlow(){
   /* ① 롤포워드 (2020년부터) */
   var from0=CR.from; CR.from=2020; P=crPeriods(); CR.from=from0;
   h+=tpl`<div class="pr-card" style="margin-bottom:12px"><h3>${crSummary()} — 고객사 증감<small>고객사 단위 · 계약 유효 기준(해지 고객사는 해지월 말에 빠짐) · 지원사업 ${rawHtml({all:'포함',ex:'제외',only:'만'}[CR.sup])} · CND ${CR.cnd?'포함':'제외'}</small></h3>`+
-     tpl`<div style="overflow-x:auto"><table class="pr"><thead><tr><th>기간</th><th class="n">기초</th><th class="n" title="그 기간에 첫 계약을 시작한 고객사">+ 신규</th><th class="n" title="예전에 끊겼다가 다시 계약한 고객사 (첫 계약이 아님)">+ 복귀</th><th class="n" title="상태 «해지» · 해지월이 그 기간 (해지율 화면과 같은 수) · 괄호 = 그중 다른 서비스 계약·재계약이 남아 고객사로는 유지된 곳">− 해지 <span class="mini">(잔존)</span></th><th class="n" title="해지가 아닌데 기간 말에 유효 계약이 없는 고객사: 약정 만기 후 미연장 · 서비스종료 · CN전환 등">− 종료(해지 외)</th><th class="n">기말</th><th class="n">순증</th><th class="n">증가율</th></tr></thead><tbody>`;
+     tpl`<div style="overflow-x:auto" tabindex="0" role="region" aria-label="표 — 옆으로 스크롤"><table class="pr"><thead><tr><th>기간</th><th class="n">기초</th><th class="n" title="그 기간에 첫 계약을 시작한 고객사">+ 신규</th><th class="n" title="예전에 끊겼다가 다시 계약한 고객사 (첫 계약이 아님)">+ 복귀</th><th class="n" title="상태 «해지» · 해지월이 그 기간 (해지율 화면과 같은 수) · 괄호 = 그중 다른 서비스 계약·재계약이 남아 고객사로는 유지된 곳">− 해지 <span class="mini">(잔존)</span></th><th class="n" title="해지가 아닌데 기간 말에 유효 계약이 없는 고객사: 약정 만기 후 미연장 · 서비스종료 · CN전환 등">− 종료(해지 외)</th><th class="n">기말</th><th class="n">순증</th><th class="n">증가율</th></tr></thead><tbody>`;
   var sumN=0,sumR=0,sumL=0,sumK=0,sumX=0;
   P.forEach(function(p){
     var b0=crActive(p.s-1,m), nw=crNew(p.s,p.e,m), rt=crRet(p.s,p.e,m), lo=crLost(p.s,p.e,m), kp=crLostKeep(p.s,p.e,m), xd=crEnded(p.s,p.e,m), e1=crActive(p.e,m);
@@ -1190,7 +1265,7 @@ export function renderCustFlow(){
     if(used['']) cols.push(['','(미지정)']);
     h+=tpl`<div class="pr-card" style="margin-bottom:12px"><h3>유입 경로 — 신규 고객사<small>그 기간에 첫 계약을 시작한 고객사를 첫 계약의 ${g.l}로 나눔 · 칸을 누르면 명단</small></h3>`+
        tpl`<div class="crrow" style="margin:6px 0 8px">${rawHtml(crSeg('기준','cfSrc',DIMS,CR.cfSrc))}</div>`+
-       tpl`<div style="overflow-x:auto"><table class="pr"><thead><tr><th>기간</th>${rawHtml(cols.map(function(o){ return tpl`<th class="n">${o[1]}</th>`; }).join(''))}<th class="n" style="border-left:1px solid var(--ring)">신규 합계</th></tr></thead><tbody>`;
+       tpl`<div style="overflow-x:auto" tabindex="0" role="region" aria-label="표 — 옆으로 스크롤"><table class="pr"><thead><tr><th>기간</th>${rawHtml(cols.map(function(o){ return tpl`<th class="n">${o[1]}</th>`; }).join(''))}<th class="n" style="border-left:1px solid var(--ring)">신규 합계</th></tr></thead><tbody>`;
     per.forEach(function(x){
       var byV={}; x.nw.forEach(function(r){ var v=val(r); (byV[v]=byV[v]||[]).push(r); });
       var tot=crN(x.nw);
@@ -1206,7 +1281,7 @@ export function renderCustFlow(){
   /* ② 제품별 기말 고객사 */
   if(lineG){
     var cols=lineG.opts.filter(function(o){ var sel=CR.f.line||[]; return !sel.length || sel.indexOf(o[0])>=0; });
-    h+=tpl`<div class="pr-card" style="margin-bottom:12px"><h3>제품별 기말 고객사 <small>칸 = 기말 고객사 (순증) · 한 고객이 두 제품을 쓰면 제품마다 1곳 — 전체는 회사 단위라 제품 합보다 작을 수 있음</small></h3><div style="overflow-x:auto"><table class="pr"><thead><tr><th>기간</th>${rawHtml(cols.map(function(o){return tpl`<th class="n">${o[1]}</th>`;}).join(''))}<th class="n">전체(중복 제거)</th></tr></thead><tbody>`;
+    h+=tpl`<div class="pr-card" style="margin-bottom:12px"><h3>제품별 기말 고객사 <small>칸 = 기말 고객사 (순증) · 한 고객이 두 제품을 쓰면 제품마다 1곳 — 전체는 회사 단위라 제품 합보다 작을 수 있음</small></h3><div style="overflow-x:auto" tabindex="0" role="region" aria-label="표 — 옆으로 스크롤"><table class="pr"><thead><tr><th>기간</th>${rawHtml(cols.map(function(o){return tpl`<th class="n">${o[1]}</th>`;}).join(''))}<th class="n">전체(중복 제거)</th></tr></thead><tbody>`;
     P.forEach(function(p){
       h+=tpl`<tr><td><b>${p.l}</b></td>${rawHtml(cols.map(function(o){
         var mm=function(r){ return crMatch(r) && r.line===o[0]; };
@@ -1377,7 +1452,7 @@ export function renderChurn(){
       tpl`<button class="chip" data-ln="" aria-pressed="${!lSel.length}">전체 ${rawHtml(lTot)}</button>`+
       tpl`${rawHtml(lKeys.map(function(k2){ return tpl`<button class="chip" data-ln="${k2}" aria-pressed="${lSel.indexOf(k2)>=0}">${k2} ${rawHtml(byL[k2].n)}</button>`; }).join(''))}`+
       tpl`<span class="mini" style="align-self:center;color:var(--muted)">여러 개 선택 가능 · 다시 누르면 해제${rawHtml(lSel.length>1? ' · 선택 '+lSel.length+'개 합산은 아래 리스트·사유 표에 반영':'')}</span></div>`+
-    tpl`<div style="overflow-x:auto"><table class="pr" id="chLine"><thead><tr><th>제품</th><th class="n">해지 건수</th><th class="n">비중</th><th class="n">고객사</th><th class="n">지원사업</th><th class="n">시작 활성</th><th class="n">해지율</th><th class="n">월액 합(천원)</th><th class="n">연환산(천원)</th><th>주요 사유</th></tr></thead><tbody>`+ tpl`${rawHtml(lKeys.map(function(k2){
+    tpl`<div style="overflow-x:auto" tabindex="0" role="region" aria-label="표 — 옆으로 스크롤"><table class="pr" id="chLine"><thead><tr><th>제품</th><th class="n">해지 건수</th><th class="n">비중</th><th class="n">고객사</th><th class="n">지원사업</th><th class="n">시작 활성</th><th class="n">해지율</th><th class="n">월액 합(천원)</th><th class="n">연환산(천원)</th><th>주요 사유</th></tr></thead><tbody>`+ tpl`${rawHtml(lKeys.map(function(k2){
       var o=byL[k2], on=(lSel.indexOf(k2)>=0), cu=Object.keys(o.cu).length, base=lineBase(k2, CHURN.f-1);
       var top=Object.keys(o.rs).sort(function(a,b2){ return o.rs[b2]-o.rs[a]; }).slice(0,3).map(function(r2){ return r2+' '+o.rs[r2]; }).join(' · ');
       return tpl`<tr data-ln="${k2}" style="cursor:pointer${on?';background:var(--brand-t);font-weight:700':''}"><td>${k2}${on?' ✓':''}</td><td class="n">${rawHtml(o.n)}</td><td class="n">${lTot?Math.round(o.n/lTot*100):0}%</td><td class="n">${rawHtml(cu)}</td><td class="n">${rawHtml(o.sup||'–')}</td>`+
@@ -1391,13 +1466,13 @@ export function renderChurn(){
   if(lKeys.length>1){
     var rsAll={}; inRL.forEach(function(x){ rsAll[x.reason]=(rsAll[x.reason]||0)+1; });
     var rsKeys=Object.keys(rsAll).sort(function(a,b2){ return rsAll[b2]-rsAll[a]; });
-    h+=tpl`<details style="margin-top:10px"><summary style="cursor:pointer;color:var(--s1-ink);font-size:13px">사유 × 제품 표 펼치기</summary><div style="overflow-x:auto;margin-top:6px"><table class="pr"><thead><tr><th>해지 사유</th>${rawHtml(lKeys.map(function(k2){ return tpl`<th class="n">${k2}</th>`; }).join(''))}<th class="n">합계</th></tr></thead><tbody>`+
+    h+=tpl`<details style="margin-top:10px"><summary style="cursor:pointer;color:var(--s1-ink);font-size:13px">사유 × 제품 표 펼치기</summary><div style="overflow-x:auto;margin-top:6px" tabindex="0" role="region" aria-label="표 — 옆으로 스크롤"><table class="pr"><thead><tr><th>해지 사유</th>${rawHtml(lKeys.map(function(k2){ return tpl`<th class="n">${k2}</th>`; }).join(''))}<th class="n">합계</th></tr></thead><tbody>`+
       tpl`${rawHtml(rsKeys.map(function(r2){ return tpl`<tr><td>${r2}</td>${rawHtml(lKeys.map(function(k2){ var v=byL[k2].rs[r2]||0; return tpl`<td class="n"${rawHtml(v?'':' style="color:var(--muted)"')}>${rawHtml(v||'–')}</td>`; }).join(''))}<td class="n"><b>${rawHtml(rsAll[r2])}</b></td></tr>`; }).join(''))}`+
       tpl`</tbody></table></div></details>`;
   }
   h+='</div>';
   h+=tpl`<div class="pr-card" style="margin-bottom:14px"><h3>사유별 집계 <small>행을 클릭하면 아래 리스트가 그 사유로 좁혀집니다</small></h3>`+
-    tpl`<div style="overflow-x:auto"><table class="pr" id="chAgg"><thead><tr><th>해지 사유</th><th class="n">건수</th><th class="n">비중</th><th class="n">월액 합(천원)</th><th class="n">연환산(천원)</th></tr></thead><tbody>`+ tpl`${rawHtml(keys.map(function(k2){
+    tpl`<div style="overflow-x:auto" tabindex="0" role="region" aria-label="표 — 옆으로 스크롤"><table class="pr" id="chAgg"><thead><tr><th>해지 사유</th><th class="n">건수</th><th class="n">비중</th><th class="n">월액 합(천원)</th><th class="n">연환산(천원)</th></tr></thead><tbody>`+ tpl`${rawHtml(keys.map(function(k2){
       var o=by[k2], on=!!(CHURN.fil.reason && CHURN.fil.reason.length===1 && CHURN.fil.reason[0]===k2);
       return tpl`<tr data-rs="${k2}" style="cursor:pointer${on?';background:var(--brand-t);font-weight:700':''}">`+
         tpl`<td>${k2}${on?' ✓':''}</td><td class="n">${rawHtml(o.n)}</td><td class="n">${totN?Math.round(o.n/totN*100):0}%</td>`+
@@ -1414,7 +1489,7 @@ export function renderChurn(){
       tpl`<span class="mini" id="chXmsg"></span>`+
       tpl`<span class="spacer"></span><span class="mini">열 제목의 ▼ 로 값 골라 보기 · ${list.length}건 / 기간 내 ${inR0.length}건</span>`+
     tpl`</div>`+
-    tpl`<div style="overflow-x:auto"><table class="pr" id="chList"><thead><tr>`+
+    tpl`<div style="overflow-x:auto" tabindex="0" role="region" aria-label="표 — 옆으로 스크롤"><table class="pr" id="chList"><thead><tr>`+
     tpl`${rawHtml(cols.map(function(c){
       var on=!!(CHURN.fil[c[0]] && CHURN.fil[c[0]].length);
       return tpl`<th${rawHtml(c[2]?' class="n"':'')}><div class="thw">`+

@@ -3,7 +3,7 @@
    원래 app.js 에 있던 순서 그대로 아래 start() 안에 모았습니다 — main.js 가 모든 파일을 읽은 뒤 start() 를 한 번 부릅니다. 각 문장 위 주석 [파일 N행] 은 원래 위치.
    ★ 새 즉시 실행 코드(이벤트 등록·초기화)는 start() 끝(boot() 앞)에 추가하세요. 선언만 있는 함수는 해당 도메인 파일에. */
 import { APP_VER, IS_QA, IS_STAGING, ST } from './state.js';
-import { applyLook, idleCheck, idleTouch, logClientError, PWA, pwaHintSync, rawHtml, refreshToken, sessRead, tpl } from './core.js';
+import { applyLook, idleCheck, idleTouch, logClientError, perfFlush, PWA, pwaHintSync, rawHtml, refreshToken, sessRead, tpl } from './core.js';
 import { boot, railFlyClose, screenLogin, screenPw, toast } from './shell.js';
 import { measureTopbar, onResize, RESIZE_HOOKS } from './dash.js';
 import { buildGrids, GRIDS } from './grids.js';
@@ -13,9 +13,13 @@ import { wkFsSync, wkNext, wkPrev, wkToggleFs } from './inbound.js';
 import { askScreenHelp, btnBackSync, comboPlace, goBack, gridActPad, LENS_DEFS, LENS_DESC, NAV, navValid, switchView, viewSnapAdd, viewSnapInit } from './grid.js';
 import { closeOvl, fillSectorSel, ovlDismiss, ovlInit, ovlTop, renameShowPreview, syncCustMeta } from './edit.js';
 import { lazyHook } from './lazy.js';
+import { verStart } from './guard.js';
 
 /* 시작 순서 — main.js 가 모든 모듈을 읽은 뒤 한 번 부름. 아래 문장들은 예전 고전 스크립트 때의 «파일을 읽을 때 실행» 순서 그대로 */
 export function start(){
+  /* ㊿+180 다른 사이트가 포탈을 iframe 으로 끼워 넣어 클릭을 가로채지 못하게 — 같은 출처(포탈 안 위성 화면 · 스테이징 QA)만 허용
+     GitHub Pages 는 frame-ancestors 헤더를 보낼 수 없어 여기서 막음 */
+  if(!frameOk()){ frameBlock(); return; }
 
   /* [core.js 99행] */
   /* ㊿+172 포탈 안 화면(견적 · 프로젝트 리포트 · 정산 iframe)에서 Ctrl+K — 같은 출처만 */
@@ -39,6 +43,11 @@ export function start(){
 
   /* [core.js 130행] */
   window.addEventListener('unhandledrejection', function(e){ var r=e.reason; logClientError((r&&r.message)||String(r), '', null, null, r&&r.stack); });
+  /* ㊿+173 실사용 속도 기록은 창을 숨기거나 닫을 때 한 번에 */
+  window.addEventListener('pagehide', function(){ perfFlush(true); });
+  document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='hidden') perfFlush(true); });
+  /* ㊿+175 옛 탭 막기 — 서버에 새 버전이 올라오면 위쪽 띠 + 저장 막음(guard.js) */
+  verStart();
 
   /* [core.js 134행] */
   if('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !IS_QA){
@@ -237,4 +246,9 @@ export function start(){
 
   /* [edit.js 15194행] */
   boot();
+}
+/** 최상위 창이거나 같은 출처의 부모 안 — 다른 출처면 부모 위치를 읽을 때 오류 */
+export function frameOk(){ try{ return window.top===window.self || window.top.location.origin===location.origin; }catch(e){ return false; } }
+export function frameBlock(){
+  try{ document.body.innerHTML=tpl`<p style="font:15px/1.6 sans-serif;padding:32px">보안을 위해 이 포탈은 다른 사이트 안에서 열 수 없습니다. <a href="${location.href}" target="_top" rel="noopener">포탈을 새 창으로 열기</a></p>`; }catch(e){}
 }

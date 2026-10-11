@@ -2,19 +2,20 @@
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { APP_VER, ST } from './state.js';
 import { Viz } from './viz.js';
-import { $, amtGuard, amtHint, canView, cssv, esc, kwToWon, lline, mk, navText, permEnter, rawHtml, STATE, tpl, won, wonFull, wonKo, wonToKw } from './core.js';
-import { cmdAskHit, dIdx, EQB, EQUIP_VIEWS, ico, idxDate, loadFromDb, onData, railSync, renderEqBoard, sbTry, sbWrite, toast, todayStr } from './shell.js';
-import { buildControls, renderAll } from './dash.js';
+import { $, amtGuard, amtHint, canView, canWrite, cssv, esc, kwToWon, lline, mk, navText, perfNav, permEnter, rawHtml, STATE, tpl, won, wonFull, wonKo, wonToKw } from './core.js';
+import { cmdAskHit, dIdx, EQB, EQUIP_VIEWS, gridGo, ico, idxDate, loadFromDb, onData, railSync, renderEqBoard, sbTry, sbWrite, toast, todayStr } from './shell.js';
+import { buildControls, DASH_DIRTY, dashDetailShown, renderAll } from './dash.js';
 import { GRIDS } from './grids.js';
 import { eqRetOpen, eqWant, renderEqPanel, syncOrderAssets } from './equipment.js';
-import { AK, BZX, CH_DEFS, ctOrig, DC, ensureLeadSrc, liveCalc, liveDiff, loadLib, LS, LV, renderChannelView, setLiveSrc } from './analysis.js';
+import { AK, BZX, CH_DEFS, ctOrig, ctRawOf, ctSuccessor, DC, ensureLeadSrc, liveCalc, liveDelta, liveDeltaOpen, liveDiff, liveMultiOpen, loadLib, LS, LV, renderChannelView, renewKindOf, renewOpenFor, setLiveSrc } from './analysis.js';
 import { applyDense, openCust360, PR, pushRecent, renderTodo } from './tools.js';
 import { CL, renderCloud } from './cloud.js';
 import { inbLast, loadInbound, renderInbPanel, renderInbStat, renderWeekly } from './inbound.js';
-import { CHURN, CR, CS, csSetTab, ensureGroupOpen, helpBox, helpWire, initOiForm, loadRecvPresets, oiLinkQuote, oiToContract, renderChurn,
+import { CHURN, CR, CS, csSetTab, ensureGroupOpen, helpBox, helpWire, initOiForm, loadRecvPresets, oiLinkQuote, oiToContract, quoteOpen, QUOTES, quotesLoad, renderChurn,
   renderChurnRate, renderCsite, renderCustFlow, renderOiTiles, wzReset } from './sales.js';
-import { logChange, monthRows, msg, openOvl } from './edit.js';
+import { closeOvl, logChange, monthRows, msg, openOvl } from './edit.js';
 import { lazyGet, lazyView } from './lazy.js';
+import { isNetErr, netToast, rowGuard, savedRows, saveFailMsg } from './guard.js';
 
 
 /* ---- 뒤로가기 — 화면 이동을 브라우저 히스토리에 남겨 상단 ← 버튼·브라우저/폰 뒤로가기·Alt+← 가 모두 이전 화면으로 ----
@@ -96,6 +97,7 @@ export var VSCROLL={};
 export var CUSTCTX={c:''};
 export var CUST_VIEWS={contracts:1, live:1, oi:1, inbound:1, orders:1, assets:1, mdrops:1};
 export function navMenu(v){
+  try{ perfNav(v); }catch(e){}   /* ㊿+173 실사용 속도 */
   if(CUSTCTX.c && CUST_VIEWS[v]){ custGo(v, CUSTCTX.c); return; }
   NAV.menu=true;
   switchView(v);
@@ -253,9 +255,11 @@ export function switchView(v){
   }
   if(dash){
     try{ renderTodo(); }catch(e){}
+    if(DASH_DIRTY.v && dashDetailShown()) try{ renderAll(); }catch(e){}   /* ㊿+173 다른 화면에 있는 동안 미뤄 둔 차트 · 표 */
     if(ST.DIRTY){ ST.DIRTY=false; loadFromDb().then(onData); }
     return;
   }
+  if(v==='quotes' && !ST.RAWX.quotes) quotesLoad();   /* ㊿+177 견적 목록(SQL 109) — 처음 열 때 */
   if(v==='aiknow' && !ST.RAWX.aiknow){
     sbTry('ai_knowledge?select=*&order=id').then(function(rows){ ST.RAWX.aiknow=rows||[]; if(ST.CUR_VIEW==='aiknow') renderGrid(); });
   }
@@ -281,6 +285,7 @@ export function switchView(v){
   $('#dvAdd').style.display=(g.add && !ST.IS_VIEWER)?'':'none';
   $('#dvPaste').style.display=(g.add && !ST.IS_VIEWER)?'':'none';
   $('#dvSearch').value=mem? mem.q : '';
+  if(mem && mem.sy>0) DV.full=true;   /* ㊿+173 스크롤 위치로 돌아갈 때는 행을 한 번에(아래쪽 위치가 잘리지 않게) */
   renderGrid();
   applyDense();
   if(mem) setTimeout(function(){ try{ window.scrollTo(0, mem.sy); var tw=$('#dvTable').parentElement; if(tw) tw.scrollLeft=mem.sx; }catch(e){} }, 0);
@@ -320,8 +325,8 @@ export function editCell(c,v){
   var isWon=(c.won && c.t==='number');
   var val=v==null?'':(c.t==='month'?String(v).slice(0,7):c.t==='date'?String(v).slice(0,10):isWon? wonToKw(v):v);
   /* 금액 열은 «천원 단위» — 칸 아래 실시간 환산(amtHint · wireRowInputs) · data-prev = 지금 값(원, 이상 금액 확인용) */
-  if(isWon) return tpl`<input type="number" step="any" data-k="${rawHtml(c.k)}" data-won="1" data-prev="${v==null?'':String(v)}" value="${String(val)}" placeholder="천원" title="천원 단위로 입력하세요 (48만원 → 480)">`;
-  return tpl`<input type="${rawHtml(ty)}" data-k="${rawHtml(c.k)}" value="${String(val)}">`;
+  if(isWon) return tpl`<input type="number" step="any" inputmode="decimal" data-k="${rawHtml(c.k)}" data-won="1" data-prev="${v==null?'':String(v)}" value="${String(val)}" placeholder="천원" title="천원 단위로 입력하세요 (48만원 → 480)">`;
+  return tpl`<input type="${rawHtml(ty)}"${rawHtml(ty==='number'? ' inputmode="decimal"' : '')} data-k="${rawHtml(c.k)}" value="${String(val)}">`;   /* ㊿+181 폰 숫자 키패드 */
 }
 /* 편집 행의 입력칸 보조 동작
    · 날짜 칸: 값이 있으면 옆에 ✕(비우기) — 브라우저 날짜 입력은 지우는 법이 잘 안 보입니다
@@ -470,7 +475,7 @@ export function readRowInputs(tr,g){
   return body;
 }
 
-export var DV={page:0, per:100, sortK:null, sortDir:1, filters:{}};
+export var DV={page:0, per:100, sortK:null, sortDir:1, filters:{}, full:false};
 
 /* ===== ㊿+169 업무 보기 — 계약·OI 표를 «하는 일»별 열 묶음으로 (사용자: 표 기본 보기 재설계 · 운영/갱신/정산/전체 · 개인 저장)
    · 보기마다 보일 열·순서가 다름 — 열 설정에서 바꾸면 그 보기에만 내 브라우저에 저장(HIDE['contracts@운영']) · «전체»는 예전 열 설정(HIDE['contracts']) 그대로
@@ -534,7 +539,7 @@ export function rowMenu(anchor, items){
 /** 상태 글자 → 배지 색(글자도 항상 같이 보임 — 색만으로 구분하지 않음) */
 export function stBadge(txt){
   var s=String(txt||'');
-  if(/해지|중지|취소|실패|미대응|분실|폐기/.test(s)) return 'crit';
+  if(/해지|중지|취소|실패|실주|미대응|분실|폐기/.test(s)) return 'crit';
   if(/종료|회수완료|CN전환|이전됨|계산서발행|판매완료/.test(s)) return '';
   if(/회수예정|출하요청|배송중|계약예정|진행|접수|수리중/.test(s)) return 'warn';
   if(/신규|활성|재약정|추가|통합과금|설치완료|임대중|수주|LIVE|대응/.test(s)) return 'ok';
@@ -863,11 +868,15 @@ export function gridFilteredSorted(g){
 }
 
 export function loadXlsxLib(){ return loadLib('xlsx'); }
+/** ㊿+179 수식 주입 막기 — =·+·-·@ 로 시작하는 글자 칸은 엑셀이 수식으로 실행하므로 앞에 ' (숫자 · «-5» 같은 수는 그대로) */
+export function xlsxSafe(v){ if(typeof v!=='string' || !v) return v; return /^[=+\-@\t\r]/.test(v) && !/^[+\-]?\d[\d,]*(\.\d+)?%?$/.test(v)? "'"+v : v; }
+/** ㊿+179 금액 열 머리글 — 엑셀에는 원 단위 그대로(화면은 천원) */
+export function xlsxHead(c){ var l=String(c.l||''); return c.won? (/\(천원\)/.test(l)? l.replace(/\(천원\)/,'(원)') : l+' (원)') : l; }
 export async function xlsxBook(name, sheets){                       // sheets: [{name, head, rows}]
   await loadXlsxLib();
   var wb=XLSX.utils.book_new();
   sheets.forEach(function(sh,si){
-    var ws=XLSX.utils.aoa_to_sheet([sh.head].concat(sh.rows));
+    var ws=XLSX.utils.aoa_to_sheet([sh.head.map(xlsxSafe)].concat(sh.rows.map(function(r){ return r.map(xlsxSafe); })));
     ws['!cols']=sh.widths? sh.widths.map(function(w){ return {wch:w}; }) : sh.head.map(function(h2,i){
       var w=String(h2).length+2;
       sh.rows.slice(0,80).forEach(function(r){ var L=String(r[i]==null?'':r[i]).length+2; if(L>w) w=L; });
@@ -882,12 +891,12 @@ export async function exportXlsx(){
   var g=GRIDS[ST.CUR_VIEW]; if(!g) return;
   var rows=gridFilteredSorted(g);
   var VC=visCols(g);                                            /* 숨긴 열은 엑셀에도 빼고 내려받습니다 */
-  var head=VC.map(function(c){return c.l;});
+  var head=VC.map(xlsxHead);
   var aoa=rows.map(function(r){ return VC.map(function(c){
     var v=r[c.k];
     if(c.t==='month'&&v) return String(v).slice(0,7);
     if(c.t==='bool') return v?'Y':'';
-    if(c.won) return Math.round(Number(v||0)/1000);            // 천원 단위
+    if(c.won) return v==null || v===''? '' : Math.round(Number(v));   // ㊿+179 원 단위 그대로(예전엔 천원으로 반올림해 끝 세 자리가 사라짐)
     if(typeof v==='number') return v;
     if(c.raw) return v==null?'':String(v);                       /* 시리얼처럼 화면은 요약, 엑셀은 원본 */
     if(c.fmt){ try{ var fv=c.fmt(v,r); if(fv!=null) return String(fv).replace(/<[^>]*>/g,''); }catch(e){} }
@@ -900,15 +909,17 @@ export function exportCsv(){
   var g=GRIDS[ST.CUR_VIEW]; if(!g) return;
   var rows=gridFilteredSorted(g);
   var VC=visCols(g);
-  var head=VC.map(function(c){return c.l;});
-  function cell(v){ v=(v==null?'':String(v)); return /[",\n]/.test(v)? '"'+v.replace(/"/g,'""')+'"' : v; }
+  var head=VC.map(xlsxHead);
+  function cell(v){ v=xlsxSafe(v==null?'':String(v)); return /[",\n]/.test(v)? '"'+v.replace(/"/g,'""')+'"' : v; }
   var csv='\ufeff'+head.join(',')+'\n'+rows.map(function(r){
     return VC.map(function(c){
       var v=r[c.k];
       if(c.t==='month'&&v) v=String(v).slice(0,7);
       if(c.t==='bool') v=v?'Y':'';
-      else if(c.won) v=Math.round(Number(v||0)/1000);          // 천원 단위 (열 이름에 (천원) 표기)
-      else if(c.fmt) v=c.fmt(r[c.k],r);
+      else if(c.won) v=v==null || v===''? '' : Math.round(Number(v));   // ㊿+179 원 단위(엑셀과 같게)
+      else if(typeof v==='number'){}
+      else if(c.raw) v=v==null? '' : String(v);
+      else if(c.fmt){ try{ var fv=c.fmt(r[c.k],r); v=fv==null? v : String(fv).replace(/<[^>]*>/g,''); }catch(e){} }   /* 엑셀과 같은 규칙(HTML 떼기 · raw) */
       return cell(v);
     }).join(',');
   }).join('\n');
@@ -937,7 +948,7 @@ export var LENS_DEFS=[
 export var LENS_DESC={}; 
 export function lensSets(){
   var cts=ST.RAWX.contracts||[], cus={}; (ST.RAWX.customers||[]).forEach(function(c){ cus[c.id]=c; });
-  var nowYm=(ST.DATA&&ST.DATA.nowIdx>=0? mk(ST.DATA.nowIdx) : new Date().toISOString().slice(0,7))+'-01';
+  var nowYm=(ST.DATA&&ST.DATA.nowIdx>=0? mk(ST.DATA.nowIdx) : todayStr().slice(0,7))+'-01';
   var byId={}; cts.forEach(function(c){ byId[c.id]=c; });
   var kids={}; cts.forEach(function(c){ if(c.parent_contract_id) (kids[c.parent_contract_id]=kids[c.parent_contract_id]||[]).push(c.id); });
   var root=function(c){ return c.parent_contract_id? (byId[c.parent_contract_id]||c) : c; };
@@ -982,6 +993,11 @@ export function renderLiveBar(lb){
     var opts=''; for(var i=ST.DATA.nowIdx+3;i>=Math.max(0,ST.DATA.nowIdx-36);i--){ opts+=tpl`<option value="${rawHtml(i)}"${i===T?' selected':''}>${mk(i)}${i===ST.DATA.nowIdx?' (이번 달)':''}</option>`; }
     h+=tpl`<label class="mini" style="display:flex;align-items:center;gap:6px">기준월 <select id="lvMonth" style="font:inherit;padding:4px 6px;border:1px solid var(--ring);border-radius:8px;background:var(--surface-2);color:inherit">${rawHtml(opts)}</select></label>`;
     h+=tpl`<span class="mini"><b>${mk(T)}</b> LIVE <b>${rawHtml(lv.uniq)}곳</b>(회사) · 제품별 합 <b>${rawHtml(lv.count)}</b> — ${rawHtml(lineTxt)}${rawHtml(sh? ' · 시트 명단 '+sh.uniq+'곳 / '+sh.count+'건':'')}</span>`;
+    /* ㊿+183 숫자 차이의 근거 — 회사 수 ≠ 제품별 합(두 제품 이상) · 전월 대비 변동을 고객사 목록으로 */
+    var mby={}; lv.rows.forEach(function(x){ (mby[x.cust]=mby[x.cust]||{})[x.line]=1; });
+    var nMul=Object.keys(mby).filter(function(c){ return Object.keys(mby[c]).length>1; }).length, dd=null; try{ dd=liveDelta(T); }catch(e){}
+    if(nMul) h+=tpl`<button type="button" class="chip" id="lvMulti" title="제품을 두 개 이상 써서 제품마다 1곳씩 세는 고객사 — 회사 수와 제품별 합이 다른 이유">두 제품 이상 ${String(nMul)}곳</button>`;
+    if(dd && (dd.added.length||dd.removed.length)) h+=tpl`<button type="button" class="chip" id="lvDelta" title="전월(${mk(T-1)})보다 늘어난 곳 · 빠진 곳을 사유별로">전월 대비 ${dd.curN-dd.prevN>0?'+':''}${String(dd.curN-dd.prevN)} · 변동 ${String(dd.added.length+dd.removed.length)}곳</button>`;
     if(sh){ var df=liveDiff(T); var nd=df.onlyDb.length+df.onlySheet.length;
       h+=tpl`<button class="chip" id="lvDiffBtn" aria-pressed="${rawHtml(LV.diff)}" title="계약 기준과 시트 명단이 다른 곳만 보기">${rawHtml(nd? '⚠ 시트와 다른 곳 '+nd:'✓ 시트 명단과 일치')}</button>`; }
   } else {
@@ -1012,14 +1028,16 @@ export function renderLiveBar(lb){
   lb.querySelectorAll('button[data-lsrc]').forEach(function(b){ b.onclick=function(){ setLiveSrc(b.dataset.lsrc); DV.page=0; DV.filters={}; DV.sortK=null; switchView('live'); }; });
   var ms=lb.querySelector('#lvMonth'); if(ms) ms.onchange=function(){ LV.T=+ms.value; DV.page=0; renderGrid(); };
   var db=lb.querySelector('#lvDiffBtn'); if(db) db.onclick=function(){ LV.diff=!LV.diff; renderGrid(); };
+  var mb=lb.querySelector('#lvMulti'); if(mb) /** @type {any} */(mb).onclick=function(){ liveMultiOpen(T); };
+  var vb=lb.querySelector('#lvDelta'); if(vb) /** @type {any} */(vb).onclick=function(){ liveDeltaOpen(T); };
   helpWire(lb);
 }
-/* 표 설명(cap) — 길면(120자 초과) 첫 문장만 보이고 «도움말 ▾» 로 펼침 · 펼침 상태는 화면별로 기억 (⑤ UX 2단계 · ㊿+139) */
+/* 표 설명(cap) — 길면(120자 초과 · ㊿+181 폰은 40자) 첫 문장만 보이고 «도움말 ▾» 로 펼침 · 펼침 상태는 화면별로 기억 (⑤ UX 2단계 · ㊿+139) */
 export function dvCapRender(v, text){
   var el=$('#dvCap'); if(!el) return; text=String(text||'');
   var key='svc_capopen_'+v, open=false; try{ open=localStorage.getItem(key)==='1'; }catch(e){}
-  if(text.length<=120){ el.textContent=text; return; }
-  var cut=text.search(/ — | · /); var head=cut>20? text.slice(0,cut) : text.slice(0,90)+'…';
+  if(text.length<=(dvNarrow()? 40 : 120)){ el.textContent=text; return; }
+  var nw=dvNarrow(), cut=text.search(/ — | · /); var head=(cut>(nw? 8 : 20) && (!nw || cut<=40))? text.slice(0,cut) : text.slice(0, nw? 34 : 90)+'…';
   el.innerHTML=tpl`<span class="cap-head">${open? text : head}</span> <button type="button" class="cap-more" aria-expanded="${rawHtml(open)}" aria-controls="dvCap">${open? '접기 ▴':'도움말 ▾'}</button>`;
   el.querySelector('.cap-more').onclick=function(){ try{ localStorage.setItem(key, open? '0':'1'); }catch(e){} dvCapRender(v, text); };
 }
@@ -1038,6 +1056,19 @@ export function gridActPad(){
   var over=wrap.scrollWidth>wrap.clientWidth+2;
   if(over) t.style.setProperty('--actw', th.offsetWidth+'px');
   t.classList.toggle('act-pad', over);
+}
+/* ㊿+173 성능: 표를 새로 그린 직후 폭을 읽으면 큰 표 전체 배치를 그 자리에서 한 번 더 계산 — 배치가 끝난 뒤(ResizeObserver)에 읽고 고침.
+   읽기(넘침 · 동작 열 폭 · 고정 열 폭)를 먼저 모두 하고 쓰기는 그다음 */
+export var GLAY={ro:null};
+export var GRID_GEN={n:0};
+/** 지금 쪽의 행을 모두 그린 상태로(이어 붙이기를 기다리는 중이면 바로) — 시험 · 인쇄 등 */
+export function gridFlush(){ if(GRID_GEN.n && ST.CUR_VIEW && GRIDS[ST.CUR_VIEW] && !GRIDS[ST.CUR_VIEW].custom){ DV.full=true; renderGrid(); } }
+export function gridLayoutLater(){
+  var t=$('#dvTable'); if(!t) return;
+  var run=function(){ var t2=$('#dvTable'); if(!t2) return; var p1=t2.querySelector('thead th.pin1'), w1=p1? p1.offsetWidth : 0; gridActPad(); t2.style.setProperty('--pin1w', w1+'px'); };
+  if(typeof ResizeObserver==='undefined'){ run(); return; }
+  if(!GLAY.ro) GLAY.ro=new ResizeObserver(function(ents){ var e=ents[0]; if(!e || !e.contentRect.width) return; GLAY.ro.disconnect(); try{ run(); }catch(err){} });
+  GLAY.ro.disconnect(); GLAY.ro.observe(t);
 }
 /* ❔ 이 화면 사용법 — 포탈 AI(팀 지식 SQL 91 포함)에게 현재 화면 사용법을 묻고 홈 답변 칸으로 이동 */
 export function askScreenHelp(){
@@ -1082,6 +1113,37 @@ export function colwStart(ev, th, t, v){
   h.addEventListener('pointermove',mv); h.addEventListener('pointerup',up); h.addEventListener('pointercancel',up);
 }
 export function colwReset(v, k){ var m=colwGet(v); if(k) delete m[k]; else m={}; colwPut(v,m); renderGrid(); }
+/* ===== ㊿+181 폰 목록 = 카드 — 760px 이하에서 표 대신 카드(행마다 주요 칸 + 상태 · «＋ n칸» 으로 나머지) · «표로 보기»로 바꿀 수 있음(이 브라우저에 기억)
+   · 같은 표(tr · td)를 CSS 로 카드처럼 그림 → 행 클릭 · 수정(칸이 위아래로 · 칸 이름 붙음) · 삭제 · 저장 동작은 그대로 · 머리글은 숨기고 위에 «정렬 · 거르기» */
+export var DVC={key:'svc_dvcards', on:false, mq:null, main:{}, ord:[]};
+export function dvNarrow(){ try{ return window.matchMedia('(max-width:760px)').matches; }catch(e){ return false; } }
+export function dvCardsOn(){ if(!dvNarrow()) return false; try{ return localStorage.getItem(DVC.key)!=='0'; }catch(e){ return true; } }
+/** 카드에 늘 보이는 칸 — 고정 열(고객사 · 상태 등) 먼저, 그다음 보이는 열 순서로 모두 5칸 */
+export function dvMainKeys(g){
+  /* 고정 열(pin) → ㊿+183 화면별 우선 칸(mob) → 표 열 순서 · 모두 5칸 · 순서는 DVC.ord(폰 카드에서 그 순서로 보임) */
+  var vc=visCols(g), out={}, n=0, ord=[];
+  var add=function(k){ if(n<5 && !out[k] && vc.some(function(c){ return c.k===k; })){ out[k]=1; n++; ord.push(k); } };
+  (g.pin||[]).forEach(add); (g.mob||[]).forEach(add); vc.forEach(function(c){ add(c.k); });
+  DVC.ord=ord;
+  return out;
+}
+export function dvCardBar(g, on){
+  var bar=document.getElementById('dvCardBar'); if(!bar) return;
+  if(!DVC.mq){ try{ DVC.mq=window.matchMedia('(max-width:760px)'); var re=function(){ var g2=GRIDS[ST.CUR_VIEW]; if(g2 && !g2.custom && !document.getElementById('viewData').classList.contains('hidden')) renderGrid(); };
+    if(DVC.mq.addEventListener) DVC.mq.addEventListener('change', re); else DVC.mq.addListener(re); }catch(e){} }
+  if(!dvNarrow() || !g || g.custom){ bar.hidden=true; bar.innerHTML=''; return; }
+  bar.hidden=false;
+  var vc=visCols(g), cur=DV.sortK? DV.sortK+'|'+DV.sortDir : '';
+  var tg=tpl`<button type="button" class="pill ghost dvc-tg" id="dvCardTg" title="${on? '모든 목록을 표로 — 이 브라우저에 기억' : '모든 목록을 카드로 — 이 브라우저에 기억'}">${on? '표로 보기' : '카드로 보기'}</button>`;
+  if(!on){ bar.innerHTML=tg; }
+  else bar.innerHTML=tpl`<label class="dvc-l"><span>정렬</span><select id="dvSortSel">${rawHtml(tpl`<option value=""${rawHtml(cur? '':' selected')}>기본 순서</option>`+vc.map(function(c){
+      return tpl`<option value="${c.k}|1"${rawHtml(cur===c.k+'|1'? ' selected':'')}>${c.l} ↑</option><option value="${c.k}|-1"${rawHtml(cur===c.k+'|-1'? ' selected':'')}>${c.l} ↓</option>`; }).join(''))}</select></label>`+
+    tpl`<label class="dvc-l"><span>거르기</span><select id="dvFiltSel"><option value="">열 고르기…</option>${rawHtml(vc.map(function(c){ var on2=!!(DV.filters[c.k] && DV.filters[c.k].length);
+      return tpl`<option value="${c.k}">${c.l}${on2? ' ● '+DV.filters[c.k].length+'개' : ''}</option>`; }).join(''))}</select></label>`+tg;
+  var b=/** @type {any} */(document.getElementById('dvCardTg')); b.onclick=function(){ try{ localStorage.setItem(DVC.key, on? '0':'1'); }catch(e){} DV.page=0; renderGrid(); var t2=document.getElementById('dvCardTg'); if(t2) t2.focus(); };
+  var ss=/** @type {any} */(document.getElementById('dvSortSel')); if(ss) ss.onchange=function(){ var p=String(ss.value||'').split('|'); if(!p[0]){ DV.sortK=null; DV.sortDir=1; } else { DV.sortK=p[0]; DV.sortDir=+p[1]||1; } DV.page=0; renderGrid(); var s2=document.getElementById('dvSortSel'); if(s2) s2.focus(); };
+  var fs=/** @type {any} */(document.getElementById('dvFiltSel')); if(fs) fs.onchange=function(){ var c=vc.filter(function(x){ return x.k===fs.value; })[0]; if(c) openColFilter(fs, g, c); fs.value=''; };
+}
 export function renderGrid(){
   var g=GRIDS[ST.CUR_VIEW]; if(!g) return;
   var isCustom=!!g.custom;
@@ -1170,6 +1232,7 @@ export function renderGrid(){
   $('#dvCount').title='— = 값이 비어 있음(입력 필요할 수 있음) · 빈칸 = 이 계약/행에는 해당하지 않는 칸';
 
   var t=$('#dvTable'); t.innerHTML='';
+  DVC.on=dvCardsOn(); DVC.main=dvMainKeys(g); t.classList.toggle('cards', DVC.on); dvCardBar(g, DVC.on);   /* ㊿+181 폰 카드 */
   var thead=document.createElement('thead');
   var tr0=document.createElement('tr');
   visCols(g).forEach(function(c){
@@ -1201,12 +1264,20 @@ export function renderGrid(){
     th.appendChild(rs);
     tr0.appendChild(th);
   });
-  if(!g.ro){ var th2=document.createElement('th'); th2.style.width='110px'; th2.className='act'; tr0.appendChild(th2); }
+  if(!g.ro){ var th2=document.createElement('th'); th2.style.width='110px'; th2.className='act'; th2.innerHTML='<span class="sr">동작</span>'; tr0.appendChild(th2); }   /* ㊿+181 빈 머리글에 이름(화면 읽기) */
   thead.appendChild(tr0);
   t.appendChild(thead);
 
   var tb=document.createElement('tbody');
-  pageRows.forEach(function(r){ tb.appendChild(gridRow(r,g,false)); });
+  /* ㊿+173 성능: 쪽당 100행 중 처음 30행을 먼저 그려 화면을 바로 보여 주고, 나머지는 첫 그리기 직후에 이어 붙임(같은 행 · 같은 순서).
+     저장해 둔 스크롤 위치로 돌아가는 경우(DV.full)와 40행 이하는 한 번에 */
+  var FIRST=(DV.full || pageRows.length<=40)? pageRows.length : 30, GEN=++GRID_GEN.n;
+  pageRows.slice(0, FIRST).forEach(function(r){ tb.appendChild(gridRow(r,g,false)); });
+  if(FIRST<pageRows.length){ var rest=pageRows.slice(FIRST);
+    var more=function(){ if(GEN!==GRID_GEN.n || !tb.isConnected) return; var fr=document.createDocumentFragment(); rest.forEach(function(r){ fr.appendChild(gridRow(r,g,false)); }); tb.appendChild(fr); gridLayoutLater(); };
+    var later=function(){ try{ if(window.requestIdleCallback) window.requestIdleCallback(more, {timeout:180}); else setTimeout(more, 30); }catch(e){ setTimeout(more, 30); } };   /* 첫 그리기가 끝나고 한가할 때(늦어도 0.2초) */
+    if(typeof requestAnimationFrame!=='undefined') requestAnimationFrame(later); else later(); }
+  DV.full=false;
   if(!pageRows.length){   /* 빈 상태 (⑤ UX): 왜 비었는지 + 한 번에 되돌리는 버튼 */
     var q=($('#dvSearch').value||'').trim(), nfl=filterCount(), hasLens=!!DV.lens, hasChip=!!DV.chipVal;
     var why=q? '검색어 «'+esc(q)+'»' : (nfl? '열 필터 '+nfl+'개' : hasLens? '관점 필터' : hasChip? '«'+esc(DV.chipVal)+'» 탭' : DV.pre? '조건 «'+esc(DV.pre.label)+'»' : '');
@@ -1218,8 +1289,7 @@ export function renderGrid(){
   }
   t.appendChild(tb);
   colwApply(t, ST.CUR_VIEW);   /* ㊿+142: 사용자가 정한 열 너비 */
-  gridActPad();
-  pinSync(t);
+  gridLayoutLater();   /* ㊿+173 동작 열 여백 · 고정 열 폭은 배치가 끝난 뒤 */
 
   /* 페이저 */
   var pg=$('#dvPager'); pg.innerHTML='';
@@ -1259,11 +1329,47 @@ export function ctPeriods(c, mine){
   });
   return out;
 }
+/* ㊿+183 계약 요약 · 다음 처리 — 찾은 계약의 금액 · 만료 · 갱신 상태 · 영업 경로를 맨 위에, 지금 할 수 있는 처리(기존 기능)를 바로 옆에
+   · 계산은 기존 그대로(MAT · renewScan · ctSuccessor) · 버튼은 권한이 있는 것만 · 계약 표에는 «담당자» 칸이 없어 채널 · 파트너를 보여 줌 */
+export function dtSummary(c){
+  var host=document.getElementById('dtSum');
+  if(!host){ var meta=document.getElementById('dtMeta'); if(!meta) return; host=document.createElement('div'); host.id='dtSum'; meta.insertAdjacentElement('afterend', host); }
+  var r=((ST.DATA&&ST.DATA.rows)||[]).filter(function(x){ return x._id===c.id; })[0];
+  if(!r){ host.innerHTML=''; return; }
+  var b=STATE.base, k=ST.DATA.rows.indexOf(r), amt=k>=0? (ST.MAT[k][b]||0) : 0, e=r.endRaw, st=String(r.status||''), nm=r.cust;
+  var ended=/해지|중지|종료|CN전환/.test(st), kind=renewKindOf(r, b), succ=null; try{ succ=(!ended && !r.parent)? ctSuccessor(r) : null; }catch(x){ succ=null; }
+  var ex, exC='';
+  if(e==null) ex=['종료월 없음', r.autoRenew? '매월 자동연장' : '기간 미정'];
+  else if(ended) ex=[mk(e), st];
+  else { var d=e-b; if(d<0){ ex=[mk(e), (-d)+'개월 지남'+(kind==='lapsed'? ' · 처리 안 됨':'')]; exC='bad'; } else if(d===0){ ex=[mk(e), '이달 만기']; exC='warn'; } else { ex=[mk(e), d+'개월 남음']; if(d<=3) exC='warn'; } }
+  var rn=ended? ['끝난 계약', st+(r.churn? ' · '+r.churn : '')] : r.autoRenew? ['자동연장', '매월 자동으로 이어짐'] : (succ && succ.sure)? ['재약정 등록됨', mk(succ.row.startIdx)+'~ 다음 계약'] :
+    succ? ['후속 계약 확인', mk(succ.row.startIdx)+'~ 같은 갱신인지 확인'] : r.parent? ['추가 계약', '원계약과 함께 만료'] : ['후속 계약 없음', r.renew? '연장 '+r.renew+'회' : '최초 계약'];
+  var cell=function(l, v, s, cls){ return tpl`<div class="${cls||''}"><div class="l">${l}</div><div class="v">${v}</div>${rawHtml(s? tpl`<div class="s">${s}</div>` : '')}</div>`; };
+  var acts=[];
+  if(kind) acts.push(['renew', {lapsed:'만기 지난 계약 처리', due:'이달 만기 처리', next:'다음 달 만기 처리'}[kind]+' — 연장 · 종료 · 해지', 1]);
+  if(!ended && !kind && e!=null && e>=b && e-b<=3 && !r.autoRenew && !r.parent && !(succ && succ.sure) && canView('oinew')) acts.push(['oi', '재계약 OI 만들기', 1]);
+  if(succ) acts.push(['succ', '후속 계약 보기 ('+mk(succ.row.startIdx)+'~)', 0]);
+  acts.push(['c360', '고객 360', 0]);
+  if(canWrite('contracts')) acts.push(['edit', '계약 표에서 수정', 0]);
+  host.innerHTML=tpl`<div class="dt-sum" role="group" aria-label="계약 요약">`+
+    cell(mk(b)+' 금액', won(amt)+'천원', '계약 월 금액 '+won(r.mrr||0)+'천원')+ cell('만료', ex[0], ex[1], exC)+ cell('갱신', rn[0], rn[1], exC==='bad' && !ended? 'bad' : '')+
+    cell('영업 경로', r.ptn||'직접', (r.channel||'일반')+(r.qty? ' · '+Number(r.qty).toLocaleString('ko-KR')+'노드' : ''))+ tpl`</div>`+
+    tpl`<div class="dt-act">${rawHtml(acts.map(function(a){ return tpl`<button type="button" class="${a[2]? 'pill pri' : 'cbtn'}" data-dt="${a[0]}">${a[1]}</button>`; }).join(''))}</div>`;
+  var go={
+    renew:function(){ closeOvl('ovlDetail'); renewOpenFor(r, b); },
+    oi:function(){ closeOvl('ovlDetail'); switchView('oinew'); setTimeout(function(){ var ci=/** @type {any} */(document.getElementById('oiCust')); if(ci) ci.value=nm; }, 80); },
+    succ:function(){ var s=succ && ctRawOf(succ.row._id); if(s) openDetail(s); },
+    c360:function(){ closeOvl('ovlDetail'); openCust360(nm); },
+    edit:function(){ closeOvl('ovlDetail'); gridGo('contracts', nm); }
+  };
+  host.querySelectorAll('button[data-dt]').forEach(function(bt){ /** @type {any} */(bt).onclick=function(){ go[/** @type {any} */(bt).dataset.dt](); }; });
+}
 export function openDetail(c){
   var cu=(ST.RAWX.customers||[]).filter(function(x){return x.id===c.customer_id;})[0]||{};
   $('#dtTitle').textContent=cu.name||'?';
   $('#dtMeta').textContent=[c.line, c.partner, c.biller, (c.start_month||'').slice(0,7)+'~'+((c.end_month||'').slice(0,7)||'?'),
     (c.contract_type? '구분 '+c.contract_type : ''), '상태 '+(c.status||'활성'), (c.renew_count? '연장 '+c.renew_count+'회':''), (c.qty? Number(c.qty).toLocaleString('ko-KR')+'노드':''), c.churn_reason||''].filter(Boolean).join(' · ');
+  try{ dtSummary(c); }catch(e){ console.warn('dtSummary', e); }   /* ㊿+183 */
   openOvl('ovlDetail');
   // 월별 금액 차트
   var mine=(ST.RAWX.mrs||[]).filter(function(x){return x.contract_id===c.id;});
@@ -1293,16 +1399,20 @@ export function openDetail(c){
 export function gridRow(r,g,editing){
   var tr=document.createElement('tr');
   function view(){
+    var nCx=0; tr.classList.remove('editing', 'cx-open');
     tr.innerHTML=visCols(g).map(function(c){
       var cl=[]; if(c.t==='number') cl.push('n'); var pc=pinCls(g,c); if(pc) cl.push(pc);
+      if(DVC.on && !DVC.main[c.k]){ cl.push('cx'); nCx++; }   /* ㊿+181 카드: 주요 칸 밖은 «＋ n칸»으로 */
+      else if(DVC.on && !pc){ var oi=DVC.ord.indexOf(c.k); cl.push(!(g.pin&&g.pin.length) && oi<2? 'mh'+(oi+1) : 'mo'+Math.max(1,oi)); }   /* ㊿+183 우선 칸 순서 · 고정 열 없는 표는 앞 두 칸이 카드 머리 */
+      var dl=tpl` data-l="${c.l}"`;
       var txt=fmtCell(c,r[c.k],r);
       /* ㊿+169 빈 칸 구분: «—» = 미입력(값이 있어야 할 수 있음) · 빈칸 = 해당 없음(c.na · 예/아니오 칸의 «아니오») */
       if(!c.html && (txt==null || txt==='' || txt==='·')){
         var na=c.t==='bool'; try{ if(c.na && c.na(r)) na=true; }catch(e){}
-        cl.push(na? 'na':'nil');
-        return na? tpl`<td class="${rawHtml(cl.join(' '))}" title="해당 없음"><span class="sr">해당 없음</span></td>` : tpl`<td class="${rawHtml(cl.join(' '))}" title="미입력">—</td>`;
+        cl.push(na? 'na':'nil'); if(na && cl.indexOf('cx')>=0) nCx--;
+        return na? tpl`<td class="${rawHtml(cl.join(' '))}"${rawHtml(dl)} title="해당 없음"><span class="sr">해당 없음</span></td>` : tpl`<td class="${rawHtml(cl.join(' '))}"${rawHtml(dl)} title="미입력">—</td>`;
       }
-      var n=cl.length? tpl` class="${rawHtml(cl.join(' '))}"` : '';
+      var n=(cl.length? tpl` class="${rawHtml(cl.join(' '))}"` : '')+dl;
       if(c.href && r[c.k]){
         return tpl`<td${rawHtml(n)}><a href="${c.href(r[c.k],r)}" target="_blank" `+
                tpl`style="color:var(--s1-ink);text-decoration:none">${txt}</a></td>`;
@@ -1311,6 +1421,11 @@ export function gridRow(r,g,editing){
       if(c.badge) return tpl`<td${rawHtml(n)}><span class="ctag ${rawHtml(stBadge(txt))}">${txt}</span></td>`;   /* ㊿+169 상태 = 글자 + 배지 */
       return tpl`<td${rawHtml(n)}>${txt}</td>`;
     }).join('')+(g.ro?'':'<td class="act"></td>');
+    if(DVC.on && nCx>0){   /* ㊿+181 카드: 나머지 칸 펼치기 */
+      var xt=document.createElement('td'); xt.className='cxt'; var xb=document.createElement('button'); xb.type='button'; xb.className='cxb'; xb.setAttribute('aria-expanded','false'); xb.textContent='＋ '+nCx+'칸 더 보기';
+      xb.onclick=function(ev){ ev.stopPropagation(); var op=tr.classList.toggle('cx-open'); xb.setAttribute('aria-expanded', op? 'true':'false'); xb.textContent=op? '− 접기' : '＋ '+nCx+'칸 더 보기'; };
+      xt.appendChild(xb); if(g.ro) tr.appendChild(xt); else tr.insertBefore(xt, tr.lastChild);
+    }
     if(g.rowClick){ tr.style.cursor='pointer'; tr.onclick=function(e){
       if(e.target.closest('button')||e.target.closest('input')||e.target.closest('select')||e.target.closest('a')) return;
       g.rowClick(r);
@@ -1322,6 +1437,7 @@ export function gridRow(r,g,editing){
       if(ST.CUR_VIEW==='contracts'){
         act.appendChild(ab('view','eye','상세 보기 — 계약 기간·연장 이력', function(){ openDetail(r); }));
       }
+      if(ST.CUR_VIEW==='quotes') act.appendChild(ab('open','doc','견적 화면에서 열기 — '+(r.quote_no||'발주서 #'+r.id), function(){ quoteOpen('qid='+r.id); }));   /* ㊿+177 */
       if(ST.IS_VIEWER) return;
       if(ST.CUR_VIEW==='oi'){
         // 수주(이후) 단계 + 아직 계약 미연결 → 계약으로 전환
@@ -1332,6 +1448,7 @@ export function gridRow(r,g,editing){
           act.appendChild(bc);
         }
         act.appendChild(ab('quote','clip', r.quote_file? '연결된 견적서 바꾸기·해제' : '견적서 연결', function(){ oiLinkQuote(r); }));
+        if(QUOTES.ok!==false && canView('quote')) act.appendChild(ab('quoteNew','plus','이 OI 로 견적 만들기 — 저장하면 이 OI 에 연결', function(){ quoteOpen('oi='+r.id); }));   /* ㊿+177 */
       }
       if(g.table==='equipment_orders' && eqWant(r).length && ['설치완료','회수예정','회수완료'].indexOf(r.status)>=0){
         act.appendChild(ab('return','undo','회수 처리 — 시리얼을 골라 일부·전부 회수 또는 회수 취소', function(){ eqRetOpen(r); }, 'ret'));
@@ -1366,9 +1483,10 @@ export function gridRow(r,g,editing){
     }
   }
   function edit(){
+    tr.classList.add('editing');
     tr.innerHTML=tpl`${rawHtml(visCols(g).map(function(c){
       var pc=pinCls(g,c);
-      return tpl`<td${rawHtml(pc? ' class="'+pc+'"':'')}>${rawHtml(c.ro? (c.html? fmtCell(c,r[c.k],r) : esc(fmtCell(c,r[c.k],r))) : editCell(c,r[c.k]))}</td>`;
+      return tpl`<td${rawHtml(pc? ' class="'+pc+'"':'')} data-l="${c.l}">${rawHtml(c.ro? (c.html? fmtCell(c,r[c.k],r) : esc(fmtCell(c,r[c.k],r))) : editCell(c,r[c.k]))}</td>`;
     }).join(''))}`+ tpl`<td class="act"></td>`;
     wireRowInputs(tr,g);
     var act=tr.lastChild;
@@ -1402,6 +1520,16 @@ export function gridRow(r,g,editing){
           body.returned_date=todayStr();               /* 회수완료로 바꾸는 날 = 회수일 (나중에 회수일 칸에서 수정 가능) */
           toast('회수일 자동 입력', body.returned_date+' — 다른 날이면 회수일 칸을 고쳐 저장하세요', 'info');
         }
+        /* ㊿+175 저장 직전에 DB 의 지금 값과 대조(rowGuard) — 남이 먼저 고친 칸이 있으면 알려 주고, 확인되면 저장 */
+        $('#dvMsg').textContent='저장 중…';
+        rowGuard(g.table, r, body, g.cols).then(function(gd){
+          if(gd.gone){ $('#dvMsg').textContent='그 행이 지워졌거나 볼 권한이 없습니다 — 새로 읽어 확인해 주세요'; toast('저장하지 않았습니다', '그 행이 지워졌거나 볼 권한이 없습니다', 'bad'); return; }
+          if(gd.cancel){ $('#dvMsg').textContent='저장하지 않았습니다 — 최신 데이터를 다시 읽었습니다'; toast('저장하지 않았습니다', '다른 사람이 고친 값을 다시 읽었습니다', 'info');
+            loadFromDb().then(function(nd){ onData(nd); if(GRIDS[ST.CUR_VIEW]) renderGrid(); }).catch(function(){}); return; }
+          if(gd.kept && gd.kept.length) toast('다른 사람이 바꾼 칸은 그대로 두었습니다', gd.kept.map(function(k){ var c=g.cols.filter(function(x){ return x.k===k; })[0]; return c? c.l : k; }).join(', '), 'info');
+          doSave();
+        }).catch(function(e){ $('#dvMsg').textContent=String(e.message||e); if(isNetErr(e)) netToast(e, function(){ bs.click(); }); });
+        function doSave(){
         var sideJobs=side.map(function(x){
           var o={}; o[x.col]=x.val;
           return sbWrite('PATCH',x.tbl+'?id=eq.'+x.id,o).then(function(){
@@ -1414,7 +1542,7 @@ export function gridRow(r,g,editing){
           });
         });
         Promise.all(sideJobs).then(function(){
-        return (Object.keys(body).length? sbWrite('PATCH',g.table+'?id=eq.'+r.id,body) : Promise.resolve()); }).then(function(){
+        return (Object.keys(body).length? sbWrite('PATCH',g.table+'?id=eq.'+r.id,body,'return=representation').then(function(res){ if(!savedRows(res)) throw new Error(saveFailMsg()); }) : Promise.resolve()); }).then(function(){
           Object.keys(body).forEach(function(k){ r[k]=body[k]; });
           if(Object.keys(body).length) logChange('update',g.table,r.id,body);
           ST.DIRTY=true; $('#dvMsg').textContent='저장됨 ✅';
@@ -1429,7 +1557,8 @@ export function gridRow(r,g,editing){
                    ST.DIRTY=true; if(ST.CUR_VIEW==='orders'||ST.CUR_VIEW==='assets') renderGrid(); }
           });
           view();
-        }).catch(function(e){ $('#dvMsg').textContent=String(e.message||e); });
+        }).catch(function(e){ $('#dvMsg').textContent=String(e.message||e); if(isNetErr(e)) netToast(e, function(){ bs.click(); }); else if(/** @type {any} */(e).stale) toast('저장하지 않았습니다', '새 버전이 올라왔습니다 — 화면 아래 «지금 새로고침»', 'bad'); });
+        }
       }catch(e){ $('#dvMsg').textContent=String(e.message||e); }
     };
     var bc=document.createElement('button'); bc.textContent='취소';

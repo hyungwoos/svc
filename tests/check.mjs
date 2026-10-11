@@ -123,6 +123,84 @@ say(/^export var WORKV=/m.test(jsAll) && /^export function hidCur\(/m.test(jsAll
 say(/^export var WZ_DEF=/m.test(jsAll) && /^export function wzCheck\(/m.test(jsAll) && /^export function wzDup\(/m.test(jsAll) && /^export function openNewMenu\(/m.test(jsAll) && /^export function qvDefs\(/m.test(jsAll) && /^export function oiOpen\(/m.test(jsAll) && /^export function crApplied\(/m.test(jsAll) && /^export var DC_IMPACT=/m.test(jsAll) && /^export function previewDlg\(/m.test(jsAll) && /^export function qbAdvHtml\(/m.test(jsAll) && /_expRoot/.test(jsAll) && html.includes('id="btnNew"') && !/data-qbmode="ui" aria-pressed/.test(jsAll), '3차 업무 UX(㊿+170 · 입력 단계·즉시 확인·중복 의심·확인 단계 · ＋등록 · 영업/인바운드 빠른 보기·기준 · OI 진행 공통 기준 · 리포트 템플릿·SQL 고급 분석 · 해지율 적용 기준 · 데이터 점검 영향/대상/해결 · 일괄 수정 미리 보기)');
 say(/^export function homeSetup\(/m.test(jsAll) && /^export function srchHits\(/m.test(jsAll) && /^export function looksQuestion\(/m.test(jsAll) && /^export function localIntent\(/m.test(jsAll) && /^export function renewNeedScan\(/m.test(jsAll) && /^export function homeRender\(/m.test(jsAll) && /^export function srchCtx\(/m.test(jsAll) && /^export function homeB\(/m.test(jsAll) && /^export function myOwner\(/m.test(jsAll) && /^export function viewResetHard\(/m.test(jsAll) && /^export function custGo\(/m.test(jsAll) && /^export function turnSnap\(/m.test(jsAll) && html.includes('id="ansThread"') && html.includes('id="fkCtx"') && html.includes('id="omUser"') && /#viewDash:not\(\.hm-detail\)/.test(fs.readFileSync(path.join(ROOT, 'app.css'), 'utf8')) && /retL=orders\.filter\(EQB_ONLY\.ret\[1\]\)/.test(jsAll) && /r\.id==='c_lapsed'/.test(jsAll) && !/biz-ok">확정/.test(jsAll) && /^export function qbPicked\(/m.test(jsAll) && /NAV\.reset==='quote'/.test(jsAll) && /svcFind/.test(fs.readFileSync(path.join(ROOT, 'sat', 'common.js'), 'utf8')) && /role="listbox" id="\$\{box\.id\}_lb"/.test(jsAll), '㊿+171~172 홈 업무 공간: 검색(결과 먼저 · AI 는 따로) · 핵심 현황(전체 사업 · 이번 달 고정) · 바로가기 · 매출 추이 + 우선 업무(내 업무/팀) · 최근 · 상세 펼침 · AI 패널(원래 답 보존) · 메뉴 재진입 상태 유지 · 초기화 · 고객 문맥 · 담당자 연결(SQL 103) · 비즈포탈 «입력 완료» · 리포트 템플릿 먼저 · 견적 쓰던 내용 유지(위성 화면 Ctrl+K)');
 say(fs.existsSync(path.join(ROOT, 'supabase/functions/export/index.ts')) && fs.existsSync(path.join(ROOT, 'tests/fn/export.test.ts')), 'export 함수 소스 · 테스트 있음');
+// ㊿+173 성능 — 계산 사본 · CSS 변수 사본 · 숨은 상세 미룸 · 목록/보드 먼저 일부 · 데이터 동시 요청 · 실사용 속도 기록
+say(/^export function tickMemo\(/m.test(jsAll) && /^export function cssvKey\(/m.test(jsAll) && /tickMemo\('eqOwn'/.test(jsAll) && /tickMemo\('ctByStart'/.test(jsAll) && /tickMemo\('crPool'/.test(jsAll) && /^export function dashDetailShown\(/m.test(jsAll) && /^export function gridLayoutLater\(/m.test(jsAll) && /GRID_GEN/.test(jsAll) && /^export function eqbBind\(/m.test(jsAll) && /^export function prefetchData\(/m.test(jsAll) && /^export function perfRec\(/m.test(jsAll) && /rest\/v1\/client_perf/.test(jsAll) && /afterLayout: afterLayout/.test(jsAll), '㊿+173 성능: tickMemo(장비 주인 · 후속 계약 · 해지율 대상) · CSS 변수 사본 · 접힌 상세 그리기 미룸 · 표 폭 읽기는 배치 뒤 · 목록 30행 먼저 · 보드 8장 먼저(위임 동작) · 데이터 동시 요청 · client_perf');
+// ㊿+174 알림함 · 처리 담당 · Slack(기본 꺼짐 · 눌러서 확인할 때만) — 자동 발송 경로가 생기지 않게
+{ const nt = fs.existsSync(path.join(ROOT, 'js', 'notify.js')) ? fs.readFileSync(path.join(ROOT, 'js', 'notify.js'), 'utf8') : '';
+  const fnP = path.join(ROOT, 'supabase', 'functions', 'notify', 'index.ts'), fnS = fs.existsSync(fnP) ? fs.readFileSync(fnP, 'utf8') : null;
+  say(/^export var NTF_DEF=\{[^\n]*slack_on:false/m.test(nt) && (nt.match(/ntfCall\(/g) || []).length === 2 && /if\(!confirm\('Slack 으로 보냅니다[^\n]*\n[\s\S]{0,300}?await ntfCall\(/.test(nt) && !/setInterval/.test(nt) && !/sbWrite\([^)]*equipment_orders/.test(nt)
+    && /^export function ntfItems\(/m.test(nt) && /tickMemo\('ntfItems'/.test(nt) && /expEligible\(r\)/.test(nt) && /'work_assign\?on_conflict=kind,ref'/.test(nt) && html.includes('id="ntfAdmin"')
+    && (fnS === null || (/set\.slack_on !== true/.test(fnS) && /자동 발송은 받지 않습니다/.test(fnS) && /rpc\/is_super_admin/.test(fnS) && /team_channel\)/.test(fnS) && !/Deno\.cron/.test(fnS))),
+  '㊿+174 알림함: Slack 기본 꺼짐 · 보내기는 미리 보기 → 확인 뒤 한 곳(ntfCall) · 타이머 발송 없음 · notify 함수는 사용자(슈퍼 관리자)만 · 서비스 키 거절 · slack_on 다시 확인 · 처리 담당은 work_assign(신청서 안 바꿈)'); }
+// ㊿+175 운영 · 안정성 — 옛 탭 막기(저장 경로에 버전 확인) · 동시 수정 대조 · 저장 0행 확인 · 운영 상태 · 운영 되돌리기
+{ const gd = fs.existsSync(path.join(ROOT, 'js', 'guard.js')) ? fs.readFileSync(path.join(ROOT, 'js', 'guard.js'), 'utf8') : '';
+  const opsP = path.join(ROOT, 'supabase', 'functions', 'ops', 'index.ts'), opsS = fs.existsSync(opsP) ? fs.readFileSync(opsP, 'utf8') : null;
+  say(/^export async function verBeforeWrite\(/m.test(gd) && /^export async function rowGuard\(/m.test(gd) && /cache:'no-store'/.test(gd) && /await verBeforeWrite\(method, path\);/.test(jsAll) && /rowGuard\(g\.table, r, body, g\.cols\)/.test(jsAll)
+    && /'return=representation'\)\.then\(function\(res\)\{ if\(!savedRows\(res\)\)/.test(jsAll) && /^\s*verStart\(\);/m.test(jsAll) && /^export function opsItems\(/m.test(jsAll) && /rpc\/ops_status/.test(jsAll) && /^export function opsRbBind\(/m.test(jsAll)
+    && (opsS === null || (/case 'gh_rollback'/.test(opsS) && /expect_head/.test(opsS) && /KEEP = \/\^\(staging\|supabase\|node_modules\|\\\.github\)\\\//.test(opsS))),
+  '㊿+175 안정성: 저장 전 버전 확인(옛 탭 막음) · 표 저장 전 DB 대조(동시 수정) · 0행이면 «저장 안 됨» · 운영 상태(ops_status) · 운영 되돌리기(gh_rollback · staging/supabase/.github 제외 · 미리 본 HEAD)'); }
+// ㊿+176 정산(A-1) — 비즈포탈 차액 연도(지우기가 다른 해를 지우지 않게) · 월 마감(period_locks) · 수정 이력(doc_hist) · 리포트 발행 잠금
+{ const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
+  const cl = rd('sat/close.js'), sats = { s1: pageCode('s1.html'), kk: pageCode('kk.html'), rp: pageCode('report.html') };
+  const rawDel = (jsAll.match(/sbWrite\('DELETE','biz_recon\?ym=eq\./g) || []).length;
+  say(/^export function bizKey\(/m.test(jsAll) && /^export function bizHas\(/m.test(jsAll) && /'rpc\/biz_month_replace'/.test(jsAll) && /'rpc\/biz_month_delete'/.test(jsAll) && /'rpc\/period_unlock'/.test(jsAll) && /doc_hist\?select=/.test(jsAll)
+    && rawDel === 2 && !/r\.ym===curYm/.test(jsAll) && (jsAll.match(/bizHas\(/g) || []).length >= 4
+    && /^function clsBlockMsg\(/m.test(cl) && /rpc\/period_unlock/.test(cl) && /rpc\/report_reopen/.test(cl)
+    && /clsInit\('s1',\s*'s1_settle'/.test(sats.s1) && /clsInit\('kk',\s*'kk_settle'/.test(sats.kk) && /clsInit\(null,\s*'project_reports'/.test(sats.rp) && /function rpStateSync\(/.test(sats.rp),
+  `㊿+176 정산: 비즈포탈 차액 «연도-월» 열쇠(bizKey · bizHas) · 저장 · 삭제는 biz_month_replace/delete(SQL 107 전 대비 옛 방식 2곳만 · 지금 ${rawDel}) · 월 마감 · 마감 풀기(사유) · 이력 · 에스원 · 카카오 · 리포트(발행 잠금 · 발행 취소)`); }
+// ㊿+177 Slack 예약 발송(기본 꺼짐 · DB 예약 + 일회용 번호 · 보낼 글은 포탈 계산) · 견적을 포탈 DB 에(quotes · 번호 · 발송 뒤 잠금 · OI 연결)
+{ const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
+  const nt = rd('js/notify.js'), fnS = rd('supabase/functions/notify/index.ts'), qd = rd('sat/qdb.js'), qj = rd('sat/quote.js'), qh = rd('quote.html');
+  say(/^export var NTF_DEF=\{[^\n]*auto_on:false/m.test(nt) && /^export async function ntfSnapSave\(/m.test(nt) && /IS_STAGING \|\| !ntfAutoOk\(\) \|\| !S\.slack_on \|\| !S\.auto_on/.test(nt) && !/setInterval/.test(nt)
+    && (!fnS || (/async function autoRun\(nonce/.test(fnS) && /&used_at=is\.null&created_at=gt\./.test(fnS) && /set\.slack_on !== true \|\| set\.auto_on !== true/.test(fnS) && /MAX_AGE_H/.test(fnS) && !/Deno\.cron/.test(fnS)))
+    && /^async function qdbBeforePrint\(/m.test(qd) && /if \(\(await qdbBeforePrint\(\)\) === false\) return;/.test(qj) && /<script src="sat\/qdb\.js[^"]*"><\/script>/.test(qh) && /id="quoteNoRow"/.test(qh)
+    && /^export function quoteOpen\(/m.test(jsAll) && /quotes:\{[^\n]*\n\s*title:'견적 목록', table:'quotes'/.test(jsAll) && html.includes('data-v="quotes"'),
+  '㊿+177 Slack 예약 발송(기본 꺼짐 · 서버는 DB 예약 · 일회용 번호 · 꺼짐/오래된 글이면 안 보냄 · 보낼 글은 포탈 계산 · 스테이징은 안 씀) · 견적 DB(저장 · 발행 때 저장+발송 · 견적 번호 표시 · 견적 목록 · OI 에서 열기)'); }
+// ㊿+178 AI 품질 — 근거 표시 · 👎 신고 전체 · 지식 제안/반영 · 숫자 기준(이번 달 · 진행 중 OI) · 채점(건수 단위 · 금액 ±)
+{ const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
+  const ai = rd('js/ai.js'), ac = rd('supabase/functions/aicheck/index.ts');
+  say(/^export function aiSrcHtml\(/m.test(ai) && /var b=homeB\(\), all=/.test(ai) && /var open=o\.filter\(oiOpen\);/.test(ai) && !/고객명 마스킹/.test(ai) && /queries:aiQBrief\(/.test(ai)
+    && /filter\(oiOpen\)/.test(rd('js/report.js')) && /^export function aiHasCount\(a, n\)\{\n/m.test(jsAll) && /^export function aiNear\(/m.test(jsAll) && /data-aiq="know"/.test(jsAll) && /data-ak="ok"/.test(jsAll)
+    && (!ac || (/export function near\(/.test(ac) && /check: \(E, a\) => near\(a, E\.month_revenue, 0\.01\)/.test(ac) && !/t\.includes\(String\(v\)\)/.test(ac))),
+  '㊿+178 AI: 답 근거(조회 · 행 수) · 👎 에 답 전체 · 조회 · 화면 조건 · 지식 제안 → 슈퍼 관리자 반영 · 이번 달 = homeB · 진행 중 OI = oiOpen(AI · 리포트) · 채점 = 단위 붙은 건수 · 금액 ±1% (포탈 15문 · aicheck v1.6)'); }
+// ㊿+179 데이터(B-2): 내보내기 원 단위 · 수식 막기 · 붙여넣기 머리글 · 검사 · 중복 · 데이터 점검 정상 표시 · 추이 · 새 규칙 · 리포트 DB 저장 · 팀 공유
+{ const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
+  const gr = rd('js/grid.js'), tl = rd('js/tools.js'), an = rd('js/analysis.js'), rp = rd('js/report.js'), nt = rd('js/notify.js');
+  say(/^export function xlsxSafe\(v\)/m.test(gr) && /^export function xlsxHead\(c\)/m.test(gr) && /^export function pasteParse\(text, cols\)/m.test(tl) && /^export function pasteDups\(rows, cols, existing\)/m.test(tl) && /if\(P\.errs\.length\)\{/.test(tl)
+    && /^export function bzxNum\(v\)/m.test(an) && /^export function dcAckKey\(it\)/m.test(an) && /DC_NOACK=\{c_nocust:1, c_parent:1, c_dates:1, c_lapsed:1, eq_serial_dup:1, c_renew_sync:1\}/.test(an) && /if\(IS_STAGING \|\| IS_QA \|\| DCD\.ok===false/.test(an)
+    && /rule\('cu_similar'/.test(an) && /rule\('oi_dup'/.test(an) && /rule\('q_stale'/.test(an) && /rule\('cu_sector'/.test(an) && /dcAckLoad\(\)\.then/.test(nt)
+    && /^export async function rqLoad\(force\)/m.test(rp) && /^export function qbMissing\(spec\)/m.test(rp) && /data-qshare=/.test(rp),
+  '㊿+179 데이터: 엑셀 · CSV 원 단위 · 수식 막기(xlsxSafe) · 붙여넣기 머리글 · 검사 · 중복(pasteParse · pasteDups) · 비즈포탈 숫자(bzxNum) · 데이터 점검 정상 표시(구조 문제는 불가) · 추이(스테이징 안 씀) · 새 규칙 4 · 리포트 DB 저장 · 팀 공유 · 없어진 열 경고'); }
+// ㊿+180 보안 · 계정: 서버 로그아웃 · 모든 기기 · 30일 재로그인 · 토큰 갱신이 «첫 비밀번호 변경»을 풀지 않음 · 비밀번호 규칙 · 연속 실패 대기 · 로그인 기록 · iframe 막기 · 보안 점검
+{ const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
+  const co = rd('js/core.js'), sh = rd('js/shell.js'), ed = rd('js/edit.js'), ad = rd('js/admin.js'), it = rd('js/init.js'), sc = rd('sat/common.js');
+  say(/^export function authLogout\(scope, tok\)/m.test(co) && /\/auth\/v1\/logout\?scope=/.test(co) && /^export async function logoutAll\(/m.test(co) && /^export function sessTooOld\(s\)/m.test(co) && /saveSess\(j,s\.u,sessPKeep\(j, s\)\)/.test(co) && /saveSess\(j, s\.u, sessPKeep\(j, s\)\)/.test(co) && !/saveSess\(j, ?s\.u, ?true\)/.test(co)
+    && /^export function pwRule\(p, email, old\)/m.test(co) && /^export function lfFail\(email\)/m.test(co) && /var bad=pwRule\(p1/.test(sh) && /lfWait\(em\)/.test(sh) && /loginRecord\('password'\)/.test(sh) && /loginRecord\('password'\)/.test(ed) && /id="apPwCur"/.test(html)
+    && /if\(!frameOk\(\)\)\{ frameBlock\(\); return; \}/.test(it) && /window\.top\.location\.origin===location\.origin/.test(sc) && /^export async function secRun\(/m.test(ad) && /^export function axResetPw\(em\)/m.test(ad) && !/prompt\(em\+' 의 새 비밀번호/.test(ad),
+  '㊿+180 보안 · 계정: 서버 로그아웃 · 모든 기기 · 30일 재로그인 · 갱신이 첫 비밀번호 변경을 풀지 않음 · 비밀번호 10자 영문+숫자 · 지금 비밀번호 확인 · 연속 실패 대기 · 로그인 기록 · iframe 막기(포탈 · 위성) · 보안 점검 · 초기화 창'); }
+// ㊿+181 화면 · 모바일: 폰 목록 카드(같은 표를 CSS 로 · 칸 이름 data-l · 주요 5칸 · 정렬/거르기 · 표로 보기) · 숫자/전화 키패드 · 터치 16px · 저장 줄 고정 · 필수 칸으로 · 빈 머리글 이름
+{ const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
+  const gr = rd('js/grid.js'), ed = rd('js/edit.js'), css = rd('app.css');
+  say(/^export function dvCardsOn\(\)/m.test(gr) && /^export function dvMainKeys\(g\)/m.test(gr) && /t\.classList\.toggle\('cards', DVC\.on\)/.test(gr) && /data-l="\$\{c\.l\}"/.test(gr) && /tr\.classList\.add\('editing'\)/.test(gr) && /<span class="sr">동작<\/span>/.test(gr)
+    && /#dvTable\.cards thead\{display:none\}/.test(css) && /\{font-size:16px!important\}/.test(css) && /id="nMrr"[^>]*inputmode="decimal"/.test(html) && /id="odPhone"[^>]*type="tel"/.test(html) && /id="dvCardBar"/.test(html)
+    && /^export function formFocusBad\(from\)/m.test(ed) && /if\(cls==='bad'\) try\{ formFocusBad\(e\); \}/.test(ed),
+  '㊿+181 폰: 목록 카드(같은 표 · 칸 이름 · 주요 5칸 · 정렬/거르기 · 표로 보기) · 수정 중 표시(tr.editing) · 숫자/전화 키패드 · 터치 입력 16px · 필수 칸으로 이동 · 빈 머리글 이름'); }
+// ㊿+182 연동 · 코드 품질: 호출 시간 제한(fetchT) · 연동 상태 · 함수 v1.7/v1.2/v1.4(속도 제한 · 기록) · 병렬 smoke · 단위 시험
+{ const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
+  const co = rd('js/core.js'), ad = rd('js/admin.js'), sm = rd('tests/smoke.mjs'), lb = rd('tests/lib.mjs');
+  const fnOk = !fs.existsSync(path.join(ROOT, 'tests', 'fn')) || (/integrations: body\.deep === true/.test(rd('supabase/functions/ops/index.ts')) && /r\.status === 429 && i < RETRY_429/.test(rd('supabase/functions/notify/index.ts')) && /body\.mode === 'health'/.test(rd('supabase/functions/notify/index.ts'))
+    && /await fetchT\(SB_URL \+ '\/rest\/v1\/remind_log'/.test(rd('supabase/functions/remind/index.ts')));
+  say(/^export async function fetchT\(url, opts, ms, what, rd\)/m.test(co) && /x\.timeout=to; x\.net=!to;/.test(co) && /fetchT\(SB_URL\+'\/rest\/v1\/'\+q,\{headers:sbHeaders\(\)\}, 60000, 'DB'\)/.test(jsAll)
+    && /fetchT\(SB_URL\+'\/functions\/v1\/notify'/.test(jsAll) && /fetchT\(SB_URL\+'\/functions\/v1\/cloudsite'/.test(jsAll) && /^export async function opsIntegrations\(\)/m.test(ad) && /id="opsInteg"/.test(ad)
+    && fnOk && /blk\(\) \{ this\.bi\+\+;/.test(lb) && /SMOKE_SHARDS/.test(sm) && fs.existsSync(path.join(ROOT, 'tests', 'unit.mjs')),
+  '㊿+182 연동: 호출 시간 제한(fetchT · 쓰기는 다시 안 보냄) · 연동 상태(토큰 만료 · 봇 권한 · 마지막 실행) · ops v1.7 · notify v1.2(429 · 대상마다 기록 · health) · remind v1.4 · 병렬 smoke · 단위 시험'); }
+// ㊿+183 숫자 차이 근거 · 계약 요약 + 다음 처리 · 폰 카드 우선 칸
+{ const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
+  const an = rd('js/analysis.js'), gr = rd('js/grid.js'), gd = rd('js/grids.js'), sa = rd('js/sales.js'), sh = rd('js/shell.js'), da = rd('js/dash.js');
+  say(/^export function diffOpen\(o\)/m.test(an) && /^export function liveMultiOpen\(T, rows\)/m.test(an) && /^export function liveDeltaOpen\(T\)/m.test(an) && /^export function renewOpenFor\(r, T\)/m.test(an)
+    && /data-diff="multi"/.test(da) && /id="lvMulti"/.test(gr) && /^export function crDupOpen\(/m.test(sa) && /^export function dtSummary\(c\)/m.test(gr) && /button\.c360-do/.test(sh)
+    && /mob:\['line','end_month','mrr','partner'\]/.test(gd) && /DVC\.ord=ord;/.test(gr) && /sbAll\('customers\?select=\*&order=id'\)/.test(sh) && /ST\.LOAD_PATH='slow'/.test(sh),
+  '㊿+183 숫자 차이 근거(diffOpen · 두 제품 이상 · 변동 · 시트 차이 · 해지율 중복) · 계약 요약 + 다음 처리(dtSummary · renewOpenFor · 고객 360 만기 처리) · 폰 카드 우선 칸(mob)'); }
 // ㊿+160 연장하면 상태 «재약정»(구분 그대로) · 계약 상세에 «계약 기간 · 연장 이력»
 say(/^export function renewStatus\(r\)/m.test(jsAll) && /var nst=renewStatus\(r\);/.test(jsAll) && /^export function ctPeriods\(c, mine\)/m.test(jsAll) && html.includes('id="dtRenew"'), '연장: 상태 «재약정»(renewStatus) · 계약 상세 연장 이력(ctPeriods · #dtRenew)');
 const idx = html + jsAll;
@@ -189,7 +267,7 @@ if (HAS_FN) {
   const used = ((/name="app-js" content="([^"]+)"/.exec(html) || [])[1] || '').split(',').map((x) => x.trim()).filter((x) => x && !/viz\.js$/.test(x) && fs.existsSync(path.join(ROOT, x)));
   const src = [['app.css', fs.readFileSync(path.join(ROOT, 'app.css'), 'utf8')], ['index.html', html]].concat(used.map((f) => [f, fs.readFileSync(path.join(ROOT, f), 'utf8')]));
   if (fs.existsSync(path.join(ROOT, 'js', 'app.js')) && !used.includes('js/app.js')) warn('js/app.js 는 ㊿+136 부터 안 쓰는 옛 파일 — 지워도 됨(공개 사이트에 그대로 올라가 있음)');
-  for (const [f, t] of src) t.split('\n').forEach((ln, i) => { if (/data-zoom|:fullscreen|#viewLogin input\{height:42px;font-size:16px|^\.otp-in\{/.test(ln)) return;   /* .otp-in = 2단계 인증 숫자 칸(투명 · iOS 확대 방지 16px · ㊿+167) */ for (const m of ln.matchAll(/font-size:\s*([0-9.]+)px/g)) { if (+m[1] < 24 && !STEP.has(m[1])) off.push(f + ':' + (i + 1) + ' ' + m[1] + 'px'); } });
+  for (const [f, t] of src) t.split('\n').forEach((ln, i) => { if (/data-zoom|:fullscreen|#viewLogin input\{height:42px;font-size:16px|^\.otp-in\{|^\s*input:not\(\[type=checkbox\]\)[^{]*\{font-size:16px!important\}$/.test(ln)) return;   /* ㊿+181 터치 화면 입력칸 16px = iOS 확대 방지 */   /* .otp-in = 2단계 인증 숫자 칸(투명 · iOS 확대 방지 16px · ㊿+167) */ for (const m of ln.matchAll(/font-size:\s*([0-9.]+)px/g)) { if (+m[1] < 24 && !STEP.has(m[1])) off.push(f + ':' + (i + 1) + ' ' + m[1] + 'px'); } });
   say(!off.length, '글자 크기 6단계(본문 14·15 · 보조 12·13 · 제목 18·22 + 큰 숫자) 밖 값 없음 — ㊿+169 본문 14px↑·보조 12px↑' + (off.length ? ' — ' + off.slice(0, 6).join(', ') : ''));
   say(/function colwApply\(/.test(jsAll) && /colwApply\(t, ST\.CUR_VIEW\)/.test(jsAll) && /\.dgrid\.colw-fixed\{table-layout:fixed\}/.test(fs.readFileSync(path.join(ROOT, 'app.css'), 'utf8')), '표 열 너비 조절(colw) 연결');
   say(/class="subgrp" data-sub="Cloud NAC"/.test(html) && (html.match(/class="grp"[^>]*>사업 영역</g) || []).length === 1 && /function menuConfMigrate\(/.test(jsAll), '메뉴: «사업 영역» 한 그룹 + 소제목 · 예전 메뉴 편집 설정 옮김');
@@ -257,6 +335,17 @@ say(/\^ai_feedback\\b\|\^ai_check_log\\b/.test(jsAll), 'permWriteGuard 예외에
     if (HAS_FN) say(fs.existsSync(path.join(ROOT, 'tests', 'fn', 'quote-worker.test.ts')), 'tests/fn/quote-worker.test.ts 존재'); }
 }
 for (const d of ['', 'staging']) { const p = path.join(ROOT, d, '도장.jpg'); if (fs.existsSync(p)) console.log(`  ⚠ ${d ? d + '/' : ''}도장.jpg 가 저장소에 있음 — 배포·운영 › GitHub › 보안 자산에서 Storage 로 올리고 삭제하세요 (SQL 87)`); }
+/* ㊿+182 날짜는 한국 기준 — new Date().toISOString().slice(0,10) 은 UTC 라 아침 9시 전엔 «어제» (todayStr() 를 쓸 것 · 위성 페이지는 localYmd) */
+{ const utc = [];
+  for (const f of [...fs.readdirSync(path.join(ROOT, 'js')).map((x) => 'js/' + x), ...(fs.existsSync(path.join(ROOT, 'sat')) ? fs.readdirSync(path.join(ROOT, 'sat')).map((x) => 'sat/' + x) : [])].filter((x) => x.endsWith('.js'))) {
+    fs.readFileSync(path.join(ROOT, f), 'utf8').split('\n').forEach((l, i) => { if (/new Date\(\)\.toISOString\(\)\.slice\(0,\s*(7|10)\)|Date\.now\(\)\+9\*3600e3\)\.toISOString\(\)\.slice/.test(l)) utc.push(f + ':' + (i + 1)); }); }
+  say(!utc.length, '오늘 날짜는 한국 기준(todayStr) — UTC 날짜(toISOString().slice(0,10)) 없음' + (utc.length ? ' — ' + utc.slice(0, 6).join(', ') : '')); }
+/* ㊿+182 단위 시험(tests/unit.mjs · 순수 함수 · 1초) */
+if (fs.existsSync(path.join(ROOT, 'tests', 'unit.mjs'))) {
+  const r = spawnSync(process.execPath, ['--test', '--test-reporter=tap', path.join(ROOT, 'tests', 'unit.mjs')], { encoding: 'utf8', cwd: ROOT, timeout: 60000 });
+  const n = /# pass (\d+)/.exec(r.stdout || '') ? +/# pass (\d+)/.exec(r.stdout)[1] : null;
+  say(r.status === 0, '단위 시험(tests/unit.mjs)' + (r.status === 0 ? '' : ' 실패 — ' + ((r.stdout || '') + (r.stderr || '')).split('\n').filter((l) => /not ok|Error|expected|actual|✖/.test(l)).slice(0, 8).join(' | ')) + (n != null ? ' · ' + n + '개' : ''));
+}
 fs.rmSync(tmp, { recursive: true, force: true });
 console.log(fail ? `\n정적 검사 실패 ${fail}건` : '\n정적 검사 통과');
 process.exit(fail ? 1 : 0);

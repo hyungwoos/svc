@@ -1,7 +1,7 @@
 /* ===== core.js — 공통 유틸 · 데이터 로드 · Supabase · PWA · 메뉴 권한 · 세션 · 2단계 인증 · 자동 로그아웃 · 화면 디자인 =====
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { APP_VER, IS_QA, IS_STAGING, ST } from './state.js';
-import { buildMtabs, buildRail, cacheDrop, dIdx, sbTry, toast } from './shell.js';
+import { buildMtabs, buildRail, cacheDrop, dIdx, sbTry, toast, todayStr } from './shell.js';
 import { subgrpSync } from './tools.js';
 import { logChange } from './edit.js';
 /* ==================================================================
@@ -13,7 +13,32 @@ export var STATE = { lines:{}, base:0, unit:'month', ind:'', partner:'', status:
 
 export function $(s){ return document.querySelector(s); }
 export function $$(s){ return Array.prototype.slice.call(document.querySelectorAll(s)); }
-export function cssv(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+/* ㊿+173 성능: CSS 변수 값 사본 — getComputedStyle 은 바로 앞에서 화면을 바꿨으면 문서 전체 스타일을 다시 계산하게 해 차트마다 수십~수백 ms.
+   열쇠 = <html> 의 속성 전부(테마 · 디자인 · 글자 크기 style · class) + 밝게/어둡게 설정 — 속성 읽기는 스타일 계산을 일으키지 않음 · 바뀌면 그 자리에서 비움
+   빈 값(스타일 시트 읽기 전)은 담지 않음 */
+export var CSSV={m:new Map(), k:'', mq:null};
+export function cssvKey(){
+  var h=document.documentElement, a=h.attributes, k='';
+  for(var i=0;i<a.length;i++) k+=a[i].name+'='+a[i].value+';';
+  if(CSSV.mq===null){ try{ CSSV.mq=window.matchMedia('(prefers-color-scheme: dark)'); }catch(e){ CSSV.mq=false; } }
+  return k+(CSSV.mq && CSSV.mq.matches? 'D' : 'L')+document.styleSheets.length;
+}
+export function cssv(n){
+  var k=cssvKey(); if(k!==CSSV.k){ CSSV.m.clear(); CSSV.k=k; }
+  var v=CSSV.m.get(n); if(v!==undefined) return v;
+  v=getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  if(v) CSSV.m.set(n, v);
+  return v;
+}
+/** ㊿+173 성능: 한 번의 계산 묶음(같은 동기 실행) 안에서만 쓰는 사본 — 다음 마이크로태스크에서 비움.
+    deps(배열 · 참조 비교)가 바뀌면 그 자리에서 다시 만듦 — 데이터를 새로 읽거나 행이 늘고 줄면 같은 묶음 안에서도 새로 */
+export var TICK={m:null};
+export function tickMemo(key, deps, build){
+  if(!TICK.m){ TICK.m=new Map(); Promise.resolve().then(function(){ TICK.m=null; }); }
+  var c=TICK.m.get(key);
+  if(c && c.d.length===deps.length && c.d.every(function(x, i){ return x===deps[i]; })) return c.v;
+  var v=build(); TICK.m.set(key, {d:deps.slice(), v:v}); return v;
+}
 export function el(t,c,x){ var e=document.createElement(t); if(c)e.className=c; if(x!=null)e.textContent=x; return e; }
 
 /* 포탈 전체 금액 표시 단위 = 천원 (원 단위 이하는 표시하지 않음)
@@ -125,6 +150,20 @@ export function buildBaseSelect(){
 export function mkLabel(i){ var k=mk(i); return k? k.slice(2).replace('-','.') : ''; }
 export function yOf(i){ return +mk(i).slice(0,4); }
 export function monOf(i){ return +mk(i).slice(5,7); }
+/* ㊿+176 비즈포탈 차액(biz_recon) 행의 연도 · 'YYYY-MM' 열쇠 — SQL 107 의 y 칸(없으면 작성일로 추정: 서버 biz_guess_y 와 같은 규칙 — 대조한 달이 작성일의 달보다 뒤면 앞 해)
+   예전엔 «8월»만 있어 해가 바뀌면 같은 달이 섞였음 */
+export function bizMon(ym){ var m=String(ym==null? '' : ym).match(/(\d{1,2})/); return m? +m[1] : 0; }
+export function bizY(r){
+  if(r && r.y!=null && r.y!=='' && !isNaN(+r.y)) return +r.y;
+  var m=bizMon(r && r.ym), d=String((r && (r.as_of || r.created_at)) || '').slice(0,10), ok=/^\d{4}-\d{2}/.test(d), now=new Date();
+  var dy=ok? +d.slice(0,4) : now.getFullYear(), dm=ok? +d.slice(5,7) : now.getMonth()+1;
+  return m>dm? dy-1 : dy;
+}
+export function bizKey(r){ return bizY(r)+'-'+('0'+bizMon(r && r.ym)).slice(-2); }
+/** 'YYYY-MM' → «8월»(올해) · «2025년 8월»(다른 해) */
+export function bizLabel(k){ var y=+String(k).slice(0,4), m=+String(k).slice(5,7); return (y===new Date().getFullYear()? '' : y+'년 ')+m+'월'; }
+/** 그 해 그 달 비즈포탈 차액이 입력돼 있는지 */
+export function bizHas(y, m){ return ((ST.RAWX && ST.RAWX.biz) || []).some(function(r){ return bizMon(r.ym)===m && bizY(r)===y; }); }
 export function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
 
 /* ==================================================================
@@ -137,6 +176,26 @@ export function seriesColor(n){ return cssv('--s'+((n-1)%8+1)); }
 /* APP_VER 는 js/state.js 가 index.html <meta name="app-ver"> 에서 읽습니다 (app.css/js 의 ?v= 캐시 무효화 — tests/stamp.mjs · 배포·운영 버전 비교가 그 값을 씀) */
 export var SB_URL='https://amzbrdhkvzsyxjfjtugu.supabase.co';
 export var SB_KEY='sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF';
+/* ── ㊿+182 연동 호출 시간 제한 — 서버 · 함수 · Worker · GAS 가 답을 안 주면 «불러오는 중»이 끝없이 돌던 것.
+   · ms 넘게 답이 없으면 끊고 알아보기 쉬운 오류(e.timeout=true) · 연결 자체가 안 되면 e.net=true
+   · 쓰기(POST · PATCH · DELETE · 함수 실행)는 자동으로 다시 보내지 않음 — 서버에서는 처리됐을 수 있으니 «확인한 뒤 다시» 안내(중복 발송 · 중복 저장 방지)
+   · FETCH_T.scale = 시험에서 시간을 줄이는 배율(화면 동작은 그대로) */
+export var FETCH_T={scale:1};
+/** @param {string} url @param {RequestInit} [opts] @param {number} [ms] @param {string} [what] 오류 글의 이름 @param {boolean} [rd] POST 지만 읽기(rpc 조회 · 미리 보기) */
+export async function fetchT(url, opts, ms, what, rd){
+  opts=opts||{}; ms=Math.max(1, (ms||30000)*(FETCH_T.scale||1));
+  var ctl=new AbortController(), up=opts.signal, tm=setTimeout(function(){ try{ ctl.abort(); }catch(e){} }, ms);
+  if(up){ if(up.aborted) ctl.abort(); else up.addEventListener('abort', function(){ try{ ctl.abort(); }catch(e){} }); }
+  var wr=!rd && !!opts.method && !/^(GET|HEAD)$/i.test(opts.method), sec=Math.max(1, Math.round((ms/(FETCH_T.scale||1))/1000));
+  try{ return await fetch(url, Object.assign({}, opts, {signal:ctl.signal})); }
+  catch(e){
+    if(up && up.aborted) throw e;   /* 부른 쪽이 스스로 멈춘 것(예: AI 답 멈춤) */
+    var to=/** @type {any} */(e) && /** @type {any} */(e).name==='AbortError';
+    var x=/** @type {any} */(new Error((what||'서버')+(to? ' 응답이 '+sec+'초 넘게 없습니다' : '에 연결하지 못했습니다(네트워크)')+(wr? ' — 처리됐는지 확인한 뒤 다시 시도해 주세요' : ' — 잠시 뒤 다시 시도해 주세요')));
+    x.timeout=to; x.net=!to; throw x;
+  }
+  finally{ clearTimeout(tm); }
+}
 
 /* ---- PWA (홈 화면 앱) — 서비스 워커 등록 · 설치 안내 ---- */
 /* ── 스테이징 띠 · 브라우저 오류 수집 (㊿+129) ──
@@ -156,6 +215,43 @@ export function logClientError(msg, src, line, col, stack){
   }catch(e){}
 }
 
+
+/* ── ㊿+173 실사용 속도 기록 (client_perf · SQL 104) ──
+   · 첫 화면(로그인 상태로 열기 → 홈 숫자가 그려질 때까지) · 메뉴 이동(누른 뒤 화면이 그려질 때까지) 시간만 — 고객 · 계약 내용은 담지 않음
+   · 세션당 최대 30건 · 30초마다 또는 창을 닫을 때 한 번에 보냄 · 표가 없으면(SQL 104 전) 조용히 그만둠
+   · 관리자 › 배포·운영 › 기록 «포탈 속도(실사용)»에서 화면별 중앙값 · 느린 쪽(90%) */
+export var PERF={q:[], n:0, max:30, off:false, t:null, boot:null, ld:null, last:{}};
+export function perfNet(name){
+  try{ var es=performance.getEntriesByType('resource').filter(function(e){ return e.name.indexOf(name)>=0; }); var e=es[es.length-1]; return e? Math.round(e.duration) : null; }catch(e){ return null; }
+}
+export function perfDev(){
+  var n=/** @type {any} */(navigator), c=n.connection||{};
+  return {cpu:n.hardwareConcurrency||null, mem:n.deviceMemory||null, net:c.effectiveType||null, w:window.innerWidth};
+}
+export function perfRec(kind, view, ms, extra){
+  try{
+    if(PERF.off || IS_QA || !(ms>=0) || PERF.n>=PERF.max) return;
+    PERF.n++; var r=Object.assign({kind:kind, view:view||'', ms:Math.round(ms), ver:APP_VER}, extra||{});
+    PERF.last[kind+':'+(view||'')]=r; PERF.q.push(r);
+    if(!PERF.t) PERF.t=setTimeout(perfFlush, 30000);
+    if(PERF.q.length>=10) perfFlush();
+  }catch(e){}
+}
+export function perfFlush(keep){
+  try{
+    if(PERF.t){ clearTimeout(PERF.t); PERF.t=null; }
+    if(!PERF.q.length || PERF.off || !ST.SB_TOKEN || !ST.AUTH_USER) return;
+    var rows=PERF.q.splice(0).map(function(r){ return {email:ST.AUTH_USER, ver:r.ver, kind:r.kind, view:r.view, ms:r.ms, net_ms:r.net_ms==null? null : r.net_ms, rows:r.rows==null? null : r.rows, detail:r.detail||null}; });
+    fetch(SB_URL+'/rest/v1/client_perf', {method:'POST', keepalive:!!keep, headers:{'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+ST.SB_TOKEN, Prefer:'return=minimal'}, body:JSON.stringify(rows)})
+      .then(function(res){ if([400,401,403,404].indexOf(res.status)>=0) PERF.off=true; }).catch(function(){});   /* 표가 없거나(SQL 104 전) 권한이 없으면 이 세션은 그만 */
+  }catch(e){}
+}
+/** 메뉴 이동 시간 — 누른 뒤 두 번째 그리기(화면이 실제로 바뀐 뒤)까지 */
+export function perfNav(v){
+  if(PERF.off || IS_QA || typeof requestAnimationFrame==='undefined') return;
+  var t0=performance.now();
+  requestAnimationFrame(function(){ requestAnimationFrame(function(){ perfRec('nav', v, performance.now()-t0); }); });
+}
 
 export var PWA={deferred:null};
 export function pwaStandalone(){ try{ return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone===true; }catch(e){ return false; } }
@@ -239,20 +335,33 @@ export function sessWrite(o){
   try{ sessionStorage.setItem(SESS_KEY, j); }catch(e){}
   try{ if(keepLogin()) localStorage.setItem(SESS_KEY, j); else localStorage.removeItem(SESS_KEY); }catch(e){}
 }
-export function saveSess(j,email,pOverride){
+export function saveSess(j,email,pOverride,fresh){
   var s0=null; try{ s0=sessRead(); }catch(e){}
   sessWrite({
     a:j.access_token, r:j.refresh_token||null,
     e:Math.floor(Date.now()/1000)+(j.expires_in||3600), u:email,
     p:(pOverride!==undefined)? pOverride : !!(j.user&&j.user.user_metadata&&j.user.user_metadata.pw_changed),
-    m:(s0 && s0.u===email && s0.m) || ''   /* ㊿+145: 'none' = 지난번 확인 때 인증 앱 없음·필수 지정 기한 전 → 다음 시작 때 확인을 기다리지 않음 */
+    m:(s0 && s0.u===email && s0.m) || '',   /* ㊿+145: 'none' = 지난번 확인 때 인증 앱 없음·필수 지정 기한 전 → 다음 시작 때 확인을 기다리지 않음 */
+    l:(!fresh && s0 && s0.u===email && s0.l) || Date.now()   /* ㊿+180 마지막으로 비밀번호를 넣은 시각 — 로그인 유지여도 30일 지나면 다시 로그인 */
   });
+  if(fresh){ try{ localStorage.removeItem(IDLE_LAST_KEY); }catch(e){} }   /* 새로 로그인 — 예전 탭의 마지막 활동 시각으로 바로 끊기지 않게 */
 }
+/** ㊿+180 토큰 갱신 때 «첫 로그인 비밀번호 변경 전» 표시를 지우지 않음(예전엔 갱신하면 true 로 바뀌어 새로고침으로 변경을 건너뛸 수 있었음) */
+export function sessPKeep(j, s){ var md=j && j.user && j.user.user_metadata; return (md && md.pw_changed)? true : (s && s.p===false? false : true); }
+export var SESS_MAX_DAYS=30;
+export function sessTooOld(s){ return !!(s && s.l && Date.now()-s.l > SESS_MAX_DAYS*864e5); }
+/** 자동 로그아웃을 켰고, 마지막 활동(다른 탭 · 닫기 전 포함)에서 그 시간이 지남 */
+export function sessIdleOver(){ var im=idleMin(), il=0; try{ il=+(localStorage.getItem(IDLE_LAST_KEY)||0); }catch(e){} return !!(im && il && Date.now()-il > im*60000); }
 export function sessMark(m){ try{ var s=sessRead(); if(s){ s.m=m||''; sessWrite(s); } }catch(e){} }
 export function clearSess(){ try{ sessionStorage.removeItem(SESS_KEY); }catch(e){} try{ localStorage.removeItem(SESS_KEY); }catch(e){} }
 export async function restoreSess(){
   var s=sessRead();
   if(!s || !s.a || s.p===false) return false;      // 비밀번호 미변경 계정은 다시 로그인
+  /* ㊿+180 로그인 유지여도 마지막 비밀번호 입력 30일 뒤에는 다시 로그인 · 예전 세션(시각 없음)은 지금부터 셈
+     자동 로그아웃을 켠 사람은 앱 · 탭을 닫아 둔 시간도 셈(예전엔 다시 열면 그대로 들어감) */
+  if(!s.l){ s.l=Date.now(); sessWrite(s); }
+  if(sessTooOld(s)){ sessEnd('로그인한 지 '+SESS_MAX_DAYS+'일이 지나 보안을 위해 다시 로그인해 주세요.', s.a); return false; }
+  if(sessIdleOver()){ sessEnd(idleLabel(idleMin())+' 동안 활동이 없어 자동 로그아웃되었습니다. 다시 로그인하세요.', s.a); return false; }
   if(Math.floor(Date.now()/1000) < (s.e||0)-120){ ST.SB_TOKEN=s.a; ST.AUTH_USER=s.u; }
   else {
     if(!s.r){ clearSess(); return false; }
@@ -262,7 +371,7 @@ export async function restoreSess(){
         body:JSON.stringify({refresh_token:s.r})});
       var j=await r.json();
       if(!r.ok||!j.access_token){ clearSess(); return false; }
-      ST.SB_TOKEN=j.access_token; ST.AUTH_USER=s.u; saveSess(j,s.u,true);
+      ST.SB_TOKEN=j.access_token; ST.AUTH_USER=s.u; saveSess(j,s.u,sessPKeep(j, s));
     }catch(e){ clearSess(); return false; }
   }
   // 인증 앱이 등록된 계정인데 저장된 세션이 aal1(코드 미확인)이면 코드부터 — 취소하면 로그인 화면으로
@@ -280,17 +389,93 @@ export async function refreshToken(){
       body:JSON.stringify({refresh_token:s.r})});
     var j=await r.json();
     if(!r.ok || !j.access_token) return false;
-    ST.SB_TOKEN=j.access_token; saveSess(j, s.u, true);
+    ST.SB_TOKEN=j.access_token; saveSess(j, s.u, sessPKeep(j, s));
     return true;
   }catch(e){ return false; }
 }
 
 
-export function doLogout(){
-  if(!confirm('로그아웃할까요?')) return;
-  clearSess(); cacheDrop();
-  ST.SB_TOKEN=null; ST.AUTH_USER=null; reloadHome();
+/* ㊿+180 로그아웃 — «로그인 유지»로 이 기기(디스크)에 저장해 둔 로그인은 서버에서도 끊음(예전엔 브라우저 저장만 지움) · 권한 · 코드 · 데이터 사본도 지움
+   · 유지하지 않은 탭은 토큰이 그 탭(sessionStorage)에만 있어 지우면 끝 — 예전처럼 서버 호출 없음(운영 시험 «로그아웃 뒤 서버 호출 0번»과 같음)
+   · 다른 기기까지 끊으려면 «모든 기기에서 로그아웃»(global) */
+export function authLogout(scope, tok){
+  tok=tok||ST.SB_TOKEN; if(!tok) return Promise.resolve(false);
+  var ctl=null; try{ ctl=new AbortController(); setTimeout(function(){ try{ ctl.abort(); }catch(e){} }, 3000); }catch(e){}
+  return fetch(SB_URL+'/auth/v1/logout?scope='+(scope||'local'), {method:'POST', headers:authHdr(tok), keepalive:true, signal:ctl? ctl.signal : undefined})
+    .then(function(r){ return r.ok || r.status===204; }).catch(function(){ return false; });
 }
+export function sessWipe(){
+  clearSess(); cacheDrop();
+  ['svc_perms','svc_codes'].forEach(function(k){ try{ sessionStorage.removeItem(k); }catch(e){} });
+  try{ localStorage.removeItem(IDLE_LAST_KEY); }catch(e){}
+  ST.SB_TOKEN=null; ST.AUTH_USER=null; ST.PERMS=null;
+}
+export function sessKept(){ try{ return !!localStorage.getItem(SESS_KEY); }catch(e){ return false; } }
+/** 시간 초과 등으로 끝냄 — 서버 로그아웃은 기다리지 않음(keepalive) · 로그인 화면에 이유 */
+export function sessEnd(msg, tok){
+  if(sessKept()) authLogout('local', tok);
+  sessWipe();
+  try{ if(msg) sessionStorage.setItem('svc_idle_msg', msg); }catch(e){}
+}
+export async function doLogout(){
+  if(!confirm('로그아웃할까요?')) return;
+  if(sessKept()) await authLogout('local');
+  sessWipe(); reloadHome();
+}
+/** ㊿+180 모든 기기에서 로그아웃 — 이 계정의 모든 로그인(다른 PC · 폰 · 앱)을 끊음 · 다른 기기는 다음 토큰 갱신(최대 1시간) 때 로그인 화면 */
+export async function logoutAll(){
+  if(!confirm('모든 기기에서 로그아웃합니다.\n\n다른 PC · 폰 · 앱의 로그인도 끊깁니다(그 기기는 늦어도 1시간 안에 로그인 화면). 모르는 기기가 보이면 이것을 누른 뒤 비밀번호를 바꾸세요.\n\n계속할까요?')) return false;
+  await loginRecord('logout_all');
+  var ok=await authLogout('global');
+  if(!ok){ toast('모든 기기 로그아웃 실패', '인증 서버에 닿지 못했습니다 — 잠시 뒤 다시 해 주세요', 'bad'); return false; }
+  sessWipe();
+  try{ sessionStorage.setItem('svc_idle_msg', '모든 기기에서 로그아웃했습니다. 다시 로그인하세요.'); }catch(e){}
+  reloadHome(); return true;
+}
+/* ── ㊿+180 로그인 기록(login_log · SQL 112) — 비밀번호로 들어올 때 한 줄 · 기기는 «Windows · Chrome» 정도만(원문 UA 저장 안 함) ── */
+export function devLabel(ua){
+  ua=String(ua||navigator.userAgent||'');
+  var os=/iPhone|iPad|iPod/.test(ua)? 'iOS' : /Android/.test(ua)? 'Android' : /Windows/.test(ua)? 'Windows' : /Mac OS X|Macintosh/.test(ua)? 'macOS' : /CrOS/.test(ua)? 'ChromeOS' : /Linux/.test(ua)? 'Linux' : '기타';
+  var br=/Whale\//.test(ua)? 'Whale' : /SamsungBrowser\//.test(ua)? 'Samsung' : /Edg\//.test(ua)? 'Edge' : /OPR\//.test(ua)? 'Opera' : /Firefox\//.test(ua)? 'Firefox' : /(Chrome|CriOS)\//.test(ua)? 'Chrome' : /Safari\//.test(ua)? 'Safari' : '브라우저';
+  return os+' · '+br;
+}
+export async function loginRecord(kind, tok){
+  tok=tok||ST.SB_TOKEN; if(!tok) return false;
+  try{ var r=await fetch(SB_URL+'/rest/v1/login_log', {method:'POST', headers:Object.assign(authHdr(tok), {Prefer:'return=minimal'}), body:JSON.stringify({email:String(ST.AUTH_USER||'').toLowerCase(), kind:kind||'password', aal:sessAal(tok), device:devLabel(), keep:keepLogin(), pwa:pwaStandalone()})}); return r.ok; }
+  catch(e){ return false; }
+}
+/* ── ㊿+180 비밀번호 규칙 · 연속 실패 대기(이 브라우저 기준 · 서버 쪽 제한은 Supabase 가 따로) ── */
+export var PW_MIN=10;
+/** 새 비밀번호 검사 — 문제가 없으면 '' */
+export function pwRule(p, email, old){
+  p=String(p||''); var id=String(email||'').split('@')[0].toLowerCase();
+  if(p.length<PW_MIN) return PW_MIN+'자 이상으로 입력하세요';
+  if(!/[A-Za-z]/.test(p) || !/\d/.test(p)) return '영문과 숫자를 함께 넣어 주세요';
+  if(/^(.)\1+$/.test(p.replace(/\d/g,'')) && /^(.)\1+$/.test(p.replace(/[A-Za-z]/g,''))) return '같은 글자만 반복하지 마세요';
+  if(id.length>=4 && p.toLowerCase().indexOf(id)>=0) return '이메일 아이디가 들어가지 않게 해 주세요';
+  if(/^(password|qwer|asdf|genians|1q2w3e)/i.test(p)) return '흔한 비밀번호로 시작하지 않게 해 주세요';
+  if(old && p===old) return '지금 비밀번호와 다르게 해 주세요';
+  return '';
+}
+export function pwGen(n){
+  var A='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz', D='23456789', all=A+D, out='', u=new Uint32Array(n||14);
+  try{ crypto.getRandomValues(u); }catch(e){ for(var k=0;k<u.length;k++) u[k]=Math.floor(Math.random()*4294967295); }
+  for(var i=0;i<u.length;i++) out+=all[u[i]%all.length];
+  if(!/\d/.test(out)) out=out.slice(0,-1)+D[u[0]%D.length];
+  if(!/[A-Za-z]/.test(out)) out=A[u[1]%A.length]+out.slice(1);
+  return out;
+}
+export var LF_KEY='svc_lf', LF_MAX=5;
+export function lfAll(){ try{ return JSON.parse(localStorage.getItem(LF_KEY)||'{}')||{}; }catch(e){ return {}; } }
+/** 남은 대기(초) — 0 이면 바로 시도 가능 */
+export function lfWait(email){ var o=lfAll()[String(email||'').toLowerCase()]; return o && o.until>Date.now()? Math.ceil((o.until-Date.now())/1000) : 0; }
+export function lfFail(email){
+  var all=lfAll(), k=String(email||'').toLowerCase(), o=all[k]||{n:0, until:0}; o.n++;
+  if(o.n>=LF_MAX) o.until=Date.now()+Math.min(15*60, 30*Math.pow(2, o.n-LF_MAX))*1000;
+  all[k]=o; try{ localStorage.setItem(LF_KEY, JSON.stringify(all)); }catch(e){} return o;
+}
+export function lfOk(email){ var all=lfAll(); delete all[String(email||'').toLowerCase()]; try{ localStorage.setItem(LF_KEY, JSON.stringify(all)); }catch(e){} }
+export function lfMsg(sec){ return '연속으로 '+LF_MAX+'번 넘게 틀려 잠시 막았습니다 — '+(sec>=60? Math.ceil(sec/60)+'분' : sec+'초')+' 뒤에 다시 시도하세요(비밀번호가 기억나지 않으면 관리자에게 초기화를 요청)'; }
 /* ㊿+145: 로그아웃 뒤에는 «이전 메뉴»가 아니라 처음(대시보드)부터 — 주소의 #메뉴 · ?v= 를 떼고 다시 엽니다 */
 export function reloadHome(){ try{ location.replace(location.pathname); }catch(e){ location.reload(); } }
 
@@ -315,8 +500,8 @@ export var MFA_ST=null;   // 본인 정책(rpc mfa_status · SQL 89) — {requir
 export async function mfaPolicy(tok){
   try{ var r=await fetch(SB_URL+'/rest/v1/rpc/mfa_status',{method:'POST', headers:authHdr(tok), body:'{}'}); if(!r.ok) return null; return await r.json(); }catch(e){ return null; }
 }
-export function mfaDue(st){ return !!(st && st.required && !st.enrolled && (!st.deadline || (st.today||new Date().toISOString().slice(0,10))>=st.deadline)); }
-export function mfaDaysLeft(st){ if(!st||!st.deadline) return 0; var a=new Date(st.deadline+'T00:00:00'), b=new Date((st.today||new Date().toISOString().slice(0,10))+'T00:00:00'); return Math.round((a.getTime()-b.getTime())/86400000); }
+export function mfaDue(st){ return !!(st && st.required && !st.enrolled && (!st.deadline || (st.today||todayStr())>=st.deadline)); }
+export function mfaDaysLeft(st){ if(!st||!st.deadline) return 0; var a=new Date(st.deadline+'T00:00:00'), b=new Date((st.today||todayStr())+'T00:00:00'); return Math.round((a.getTime()-b.getTime())/86400000); }
 export async function mfaGate(tok, email, factorsHint, opt){
   if(sessAal(tok)==='aal2') return true;
   /* ㊿+145 빠른 길: 로그인 응답에 «확인된 인증 앱»이 없거나(대부분의 계정) 지난번 확인 결과가 «없음»이면
@@ -426,8 +611,14 @@ export function mfaPrompt(factor, tok, email){
         mfaApplySession(s, email); done(true); return;
       }catch(e){
         fails++; ch=null;   // 틀리거나 만료됐으면 다음엔 새 challenge
-        say(fails>=5? '여러 번 틀렸습니다 — 인증 앱의 시간 설정을 확인하세요 ('+e.message+')' : '코드가 맞지 않습니다 — 다시 입력하세요', true);
-        inp.value=''; inp.focus(); if(repaint) repaint();
+        inp.value=''; if(repaint) repaint();
+        if(fails>=5 && fails%5===0){   /* ㊿+180 5번 틀릴 때마다 30초 기다림(이 창 기준 · 서버 제한은 Supabase) */
+          var w=30; inp.disabled=true; say('여러 번 틀렸습니다 — '+w+'초 뒤에 다시 입력하세요 · 인증 앱의 시간(자동 설정)을 확인하세요', true);
+          var tm=setInterval(function(){ w--; if(w>0){ msgEl.textContent='여러 번 틀렸습니다 — '+w+'초 뒤에 다시 입력하세요 · 인증 앱의 시간(자동 설정)을 확인하세요'; return; } clearInterval(tm); inp.disabled=false; busy=false; go.disabled=false; say(''); inp.focus(); }, 1000);
+          return;
+        }
+        say(fails>=3? '코드가 맞지 않습니다 — 인증 앱의 시간 설정을 확인하세요 ('+e.message+')' : '코드가 맞지 않습니다 — 다시 입력하세요', true);
+        inp.focus();
       }
       busy=false; go.disabled=false;
     }
@@ -473,7 +664,7 @@ export async function mfaEnrollFlow(existing, host, opts){
   try{
     if(!existing){ try{ existing=await mfaFactors(tok); }catch(e){ existing=[]; } }
     for(var i=0;i<(existing||[]).length;i++) if(existing[i].status!=='verified'){ try{ await authApi('DELETE','factors/'+existing[i].id,null,tok); }catch(e){} }   // 끝내지 않은 등록은 지우고 새로
-    var name='SVC 포탈 '+new Date().toISOString().slice(0,10);
+    var name='SVC 포탈 '+todayStr();
     var f=await authApi('POST','factors',{factor_type:'totp', friendly_name:name, issuer:'SVC 포탈'},tok);
     var totp=f.totp||{};
     host.innerHTML=tpl`<div class="mfa-en">${rawHtml(totp.qr_code? tpl`<div class="mfa-qr"><img src="${mfaQrSrc(totp.qr_code)}" alt="인증 앱 등록 QR"><i></i><i></i><i></i><i></i></div>`:'')}`+
@@ -525,15 +716,19 @@ export var IDLE_KEY='svc_idle_min';   // ㊿+153: init.js 에서 옮김
 export var IDLE_OPTS=[0,15,30,60,120,240,480];
 export function idleMin(){ var v=0; try{ v=parseInt(localStorage.getItem(IDLE_KEY),10)||0; }catch(e){} return v>0? v:0; }
 export function idleLabel(m){ return !m? '끄기 (로그인 유지)' : (m>=60? (m/60)+'시간' : m+'분'); }
-export function idleTouch(){ ST.IDLE_LAST=Date.now(); ST.IDLE_WARNED=false; }
+export var IDLE_LAST_KEY='svc_idle_last';   /* ㊿+180 마지막 활동 시각(탭 · 앱을 닫아 둔 시간도 세려고) — 자동 로그아웃을 켰을 때만 씀 */
+export function idleTouch(){ ST.IDLE_LAST=Date.now(); ST.IDLE_WARNED=false;
+  if(idleMin() && (!ST.IDLE_SAVED || ST.IDLE_LAST-ST.IDLE_SAVED>15000)){ ST.IDLE_SAVED=ST.IDLE_LAST; try{ localStorage.setItem(IDLE_LAST_KEY, String(ST.IDLE_LAST)); }catch(e){} } }
 
 export function idleLogout(m){
-  clearSess(); cacheDrop();
-  try{ sessionStorage.setItem('svc_idle_msg', idleLabel(m)+' 동안 활동이 없어 자동 로그아웃되었습니다. 다시 로그인하세요.'); }catch(e){}
-  ST.SB_TOKEN=null; ST.AUTH_USER=null; reloadHome();
+  sessEnd(idleLabel(m)+' 동안 활동이 없어 자동 로그아웃되었습니다. 다시 로그인하세요.');
+  reloadHome();
 }
 export function idleCheck(){
+  if(ST.SB_TOKEN && sessTooOld(sessRead())){ sessEnd('로그인한 지 '+SESS_MAX_DAYS+'일이 지나 보안을 위해 다시 로그인해 주세요.'); reloadHome(); return; }   /* ㊿+180 */
   var m=idleMin(); if(!m || !ST.SB_TOKEN) return;
+  /* ㊿+180 다른 탭에서 쓰고 있으면 이 탭도 활동 중으로 — 로그아웃이 서버 로그인까지 끊으므로(로그인 유지) 한 탭만 쉬었다고 다른 탭이 끊기면 안 됨 */
+  try{ var il=+(localStorage.getItem(IDLE_LAST_KEY)||0); if(il>ST.IDLE_LAST){ ST.IDLE_LAST=il; ST.IDLE_WARNED=false; } }catch(e){}
   var idle=Date.now()-ST.IDLE_LAST, lim=m*60000;
   if(idle>=lim){ idleLogout(m); return; }
   if(!ST.IDLE_WARNED && lim-idle<=60000){

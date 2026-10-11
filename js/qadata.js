@@ -10,6 +10,7 @@ import { qaDb, qaSeed, qaNow, qaYm, qaIdx } from './qadb.js';
 import { loadFromDb, onData, ccAnalysisOpen } from './shell.js';
 import { dcFixOpen, dcRules, liveCalc, openRenewList, openTargetEditor } from './analysis.js';
 import { navMenu, switchView, wvSet } from './grid.js';
+import { homeDetail, homeDetailOpen } from './home.js';
 import { GRIDS } from './grids.js';
 import { openPaste, pasteCols } from './tools.js';
 
@@ -153,9 +154,11 @@ function qaScenarios(){
     {id:'kw', label:'설치비 칸 · 월 목표 · OI 예상단가 · 붙여넣기(원 시트 → 확인 창) — 천원 입력', run:async function(h, db){
       h.dlg(function(m){ return !/이상해 보이는/.test(m); });
       var c=db.byCust('가상고객_에스원')[0], y=+c.settle_month.slice(0,4), mo=+c.settle_month.slice(5,7);
-      navMenu('dash'); try{ ccAnalysisOpen(true, true); }catch(e){} var w=document.querySelector('[data-w="ifee"]'); if(w) w.classList.remove('w-off'); await h.sleep(300);
+      var hd0=homeDetailOpen(); navMenu('dash'); try{ homeDetail(true); }catch(e){} try{ ccAnalysisOpen(true, true); }catch(e){} await h.sleep(300);   /* ㊿+173 접힌 상세는 그리지 않음 — 펼친 뒤(끝나면 원래대로) */
+      var w=document.querySelector('[data-w="ifee"]'); if(w) w.classList.remove('w-off'); await h.sleep(300);
       h.click('td.ifc[data-y="'+y+'"][data-m="'+mo+'"]'); await h.sleep(250); h.ok(h.must('.ifin[data-f="c'+c.id+'"]').value==='2000', '설치비 칸이 천원이 아님');
       h.fill('.ifin[data-f="c'+c.id+'"]', '2500'); h.click('#ifSave'); await h.until(function(){ return db.ct(c.id).install_fee===2500000; }, 6000, '설치비 저장');
+      if(!hd0) try{ homeDetail(false); }catch(e){}
       var yr=new Date().getFullYear(); openTargetEditor(yr); await h.sleep(200); h.ok(h.must('#ovlTarget input[data-m="1"]').value==='90000', '월 목표 칸이 천원이 아님');
       h.fill('#ovlTarget input[data-m="1"]', '95000'); h.click('#tgSave'); await h.until(function(){ var t=db.t.monthly_targets.filter(function(x){ return x.year===yr && x.month===1; })[0]; return t && t.amount===95000000; }, 6000, '월 목표 저장');
       navMenu('oinew'); await h.sleep(200); h.fill('#oiCust', '가상고객_OI2'); h.fill('#oiAmt', '12000'); h.click('#oiGo');

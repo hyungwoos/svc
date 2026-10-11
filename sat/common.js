@@ -7,6 +7,9 @@
        인자 = 숫자 · '문자' · "문자" · true · false · null · [숫자, …] · event · this · this.속성(.속성…) · this.메서드('문자')  예: this.value · this.closest('tr')
    · 고전 스크립트(전역 SAT 하나) — <head> 에서 페이지 스크립트(sat/<페이지>.js)보다 먼저 */
 (function(){ if('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) addEventListener('load', function(){ navigator.serviceWorker.register('sw.js').catch(function(){}); }); })();
+/* ㊿+180 다른 사이트의 iframe 안이면 화면을 비움(클릭 가로채기 막기) — 포탈(같은 출처) 안에서는 그대로 */
+(function(){ var ok=true; try{ ok=window.top===window.self || window.top.location.origin===location.origin; }catch(e){ ok=false; }
+  if(!ok) document.addEventListener('DOMContentLoaded', function(){ document.body.textContent='보안을 위해 이 화면은 다른 사이트 안에서 열 수 없습니다.'; }); })();
 
 var SAT=(function(){
   var ACTS={ print:function(){ window.print(); }, close:function(){ window.close(); }, reload:function(){ location.reload(); } };

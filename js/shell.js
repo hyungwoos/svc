@@ -2,14 +2,12 @@
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { IS_QA, ST } from './state.js';
 import { Viz } from './viz.js';
-import { $, applyPerms, canView, canWrite, clearSess, cssv, el, esc, isCC, isGN, keepLogin, LIVE2CODE, lline, loadPerms, mfaGate, mfaVerifiedOf,
-  mfaWarnIfNeeded, mk, monOf, navText, permWriteGuard, rawHtml, refreshToken, restoreSess, saveSess, SB_KEY, SB_URL, seriesColor, sessRead,
-  sessWrite, STATE, tpl, won } from './core.js';
+import { $, applyPerms, bizHas, bizKey, canView, canWrite, clearSess, cssv, el, esc, fetchT, isCC, isGN, keepLogin, lfFail, lfMsg, lfOk, lfWait, LIVE2CODE, lline, loadPerms, loginRecord, mfaGate, mfaVerifiedOf, mfaWarnIfNeeded, mk, monOf, navText, PERF, perfDev, perfNet, perfRec, permWriteGuard, pwRule, rawHtml, refreshToken, restoreSess, saveSess, SB_KEY, SB_URL, seriesColor, sessIdleOver, sessRead, sessTooOld, sessWrite, STATE, tpl, won } from './core.js';
 import { buildControls, expN, expScan, hbars, idxs, kpiOpen, monthlyTotal, renderAll, renderInstall, renderKpis, renderMatrix, renewNeedScan } from './dash.js';
 import { ask } from './ai.js';
 import { applyCodes, GRIDS, loadCodes } from './grids.js';
 import { eqCanRet, eqOrderById, eqRetOpen, eqRetSet, eqScan, eqSerialsHtml, eqWant, syncOrderAssets } from './equipment.js';
-import { applyChannelMenu, chOf, ctRawOf, ctSuccessor, dcRules, ensureLeadSrc, liveData, openRenewList, renewScan } from './analysis.js';
+import { applyChannelMenu, chOf, ctRawOf, ctSuccessor, dcRules, ensureLeadSrc, liveData, openRenewList, renewKindOf, renewOpenFor, renewScan } from './analysis.js';
 import { applyMenuConf, fkNorm, freqTop, menuSegments, navSub, openMenuEdit, renderTodo, subgrpSync, viewLabel } from './tools.js';
 import { loadInbound, loadMxMemos } from './inbound.js';
 import { UPD, updCheck } from './upd.js';
@@ -17,6 +15,8 @@ import { applyMenuFold, closeDrawer, ensureGroupOpen, setupSide } from './sales.
 import { btnBackSync, gridGoPre, loadHide, NAV, navMenu, oiOpen, openDetail, qvCfg, qvGo, renderGrid, switchView, VIEW_UI, viewResetHard } from './grid.js';
 import { closeOvl, logChange, openOvl, OVL_SKIP_CLEAN, ovlMarkClean, setupEdit, toggleAuthMenu } from './edit.js';
 import { homeOn, homeRender, placeSearchBtn, srchCtx } from './home.js';
+import { NTF, ntfAfterData, ntfWho } from './notify.js';
+import { verBeforeWrite } from './guard.js';
 
 
 /* ==================================================================
@@ -41,6 +41,7 @@ export var ICO={
   user:'<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
   spark:'<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/>',
   clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  bell:'<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/>',
   check:'<path d="M5 12l5 5L20 7"/>',
   menu:'<path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/>',
   board:'<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="9.5" y="4" width="5" height="10" rx="1"/><rect x="16" y="4" width="5" height="13" rx="1"/>',
@@ -148,7 +149,7 @@ export function railFlyToggle(btn, key){
 export var GN_ICO={dash:'home', weekly:'calendar', contracts:'doc', live:'target', churn:'chart', churnrate:'chart', custflow:'users', leadsrc:'arrow', dcheck:'check',
   cngen:'cloud', cnpub:'cloud', cns1:'cloud', cnlgu:'cloud', mdrgen:'shield', mdrs1:'shield', mdrlgu:'shield', chdist:'layers', cnpns:'layers',
   eqboard:'board', ordernew:'doc', orders:'box', assets:'box', mdrnew:'flask', mdrops:'flask', oinew:'target', oi:'target', inbstat:'chart', inbound:'inbox',
-  biz:'scale', targets:'target', quote:'doc', preport:'doc', s1:'scale', kk:'scale', price:'doc', cloud:'cloud', csite:'cloud', report:'doc', aiknow:'spark',
+  biz:'scale', targets:'target', quote:'doc', quotes:'doc', preport:'doc', s1:'scale', kk:'scale', price:'doc', cloud:'cloud', csite:'cloud', report:'doc', aiknow:'spark',
   log:'clock', adminx:'gear', ops:'tool', account:'user'};
 export var GN_MERGE={'g:PoC·데모':'영업', 'g:영업':'영업', 'g:인바운드':'영업', 'g:정산·목표':'정산·도구', 'g:도구':'정산·도구', 'g:관리자':'관리'};
 export var GN_BADGE={inb:null, dc:null, inbound:null};
@@ -279,7 +280,7 @@ export function gnTitleSync(v){
 }
 
 /* ㊿+168 금액 단위 안내 — 화면마다 실제 단위(가격표 = 원 · 금액 없는 화면은 숨김 · 주간보고 예상매출 = 백만원) · 누르면 용어 설명 */
-export var UNIT_NONE={ordernew:1, orders:1, assets:1, eqboard:1, inbound:1, inbstat:1, mdrnew:1, mdrops:1, log:1, account:1, adminx:1, ops:1, aiknow:1, csite:1, kk:1, s1:1, quote:1, preport:1};
+export var UNIT_NONE={quotes:1, ordernew:1, orders:1, assets:1, eqboard:1, inbound:1, inbstat:1, mdrnew:1, mdrops:1, log:1, account:1, adminx:1, ops:1, aiknow:1, csite:1, kk:1, s1:1, quote:1, preport:1};
 export function unitSync(v){
   var u=document.getElementById('unitBadge'); if(!u) return;
   if(!u.__terms){ u.__terms=1; u.setAttribute('role','button'); u.tabIndex=0; u.style.cursor='pointer';
@@ -416,13 +417,15 @@ export function renderInbox(){
   var retL=orders.filter(EQB_ONLY.ret[1]), retA=retL.filter(function(o){ return o.status==='회수예정'; }), retP=retL.filter(function(o){ return o.status!=='회수예정'; });
   /* ㊿+168 만료 = 사업 현황 타일 · 만료 예정 위젯과 같은 공통 집계(expScan — 원계약만 · 부속은 함께 만료) */
   var XS=EQ? {rows:[], amt:0, custN:0} : expScan(list, b, EN), expL=XS.rows.map(function(k){ return ST.DATA.rows[k]; }), expAmt=XS.amt;
-  var curYm=monOf(b)+'월', bizDone=EQ || (ST.RAWX.biz||[]).some(function(r){ return r.ym===curYm; });
+  var curYm=monOf(b)+'월', bizDone=EQ || bizHas(+mk(b).slice(0,4), monOf(b));   /* ㊿+176 연도까지 */
   var todayS=todayStr();
   var oiLate=EQ? [] : (ST.RAWX.oi||[]).filter(function(o){ return o.next_date && String(o.next_date).slice(0,10)<todayS && oiOpen(o); });   /* ㊿+170 진행 중 = 수주·계산서발행·종료·중지·실패 아님(OI 타일·빠른 보기와 같은 기준) */
   var inbN=EQ? 0 : (ST.INB_TODO? ST.INB_TODO.n : null);
   var dow=new Date().getDay(), toMon=(8-dow)%7, wkTxt= dow===1? '오늘':'D-'+(toMon===0?7:toMon);
   var rows=[], zeros=[], snz=0;
   function add(key, o){ if(ccSnoozed(key)){ snz++; return; } o.key=key; rows.push(o); }
+  /* ㊿+174 장비 «담당» = 알림함에서 정한 처리 담당(work_assign) → 없으면 신청한 사람. 신청서의 mgr_name 은 «고객 담당자»(고객 쪽 사람)라 쓰지 않음 */
+  function eqOwn(o){ var a=NTF.asg[String(o.id)]; return a? ntfWho(a.assignee) : (o.requester? String(o.requester).split('@')[0] : ''); }
   function names(arr, f, n){ var u={}; arr.forEach(function(x){ var v=f(x); if(v) u[v]=1; }); var ks=Object.keys(u); return ks.slice(0,n||3).join(', ')+(ks.length>(n||3)? ' 외 '+(ks.length-(n||3))+'곳':''); }
   if(pendL.length){
     var oldest=pendL.map(function(o){ return String(o.created_at||'').slice(0,10); }).filter(Boolean).sort()[0];
@@ -431,7 +434,7 @@ export function renderInbox(){
     var pq=pendL.reduce(function(a,o){ return a+(+o.qty||eqWant(o).length||1); },0);
     add('eq', {lv:age>=3?1:2, ic:'box', cls:'warn', n:pendL.length, t:tpl`처리 대기 장비 신청 <span class="num">${pendL.length}건</span>${rawHtml(age>=1? ' — 가장 오래된 건 '+age+'일 경과':'')}`,
       s:Object.keys(byCh).map(function(c){ return c+' '+byCh[c]; }).join(' · ')+' · '+names(pendL, function(o){ return o.customer; }),
-      who:names(pendL, function(o){ return o.customer; }), own:names(pendL, function(o){ return o.mgr_name || (o.requester? String(o.requester).split('@')[0] : ''); }, 2)||'',
+      who:names(pendL, function(o){ return o.customer; }), own:names(pendL, eqOwn, 2)||'',
       due:age>=3? '오늘 — '+age+'일째 대기' : '3일 안', imp:'출고 대기 '+pq+'대 · '+Object.keys(byCh).map(function(c){ return c+' '+byCh[c]; }).join(' · '),
       links:eqLinks(pendL), nm:'장비 신청 처리 대기', cnt:'신청 '+pendL.length+'건', dueS:age>=3? '지남 · '+age+'일째' : '3일 안', dk:age>=3? 0 : 1,
       acts:[{l:'보류', go:function(){ ccSnooze('eq',1); }},{l:'대기 신청 '+pendL.length+'건 보기', pri:1, go:function(){ eqbOnly('pend'); }}]});
@@ -442,7 +445,7 @@ export function renderInbox(){
       links:eqLinks(retL),
       nm:'장비 회수 진행'+(retA.length && retP.length? ' (회수예정 '+retA.length+' · 일부 회수 중 '+retP.length+')' : retP.length? ' (일부 회수 중)' : ''), cnt:'신청 '+retL.length+'건', dueS:'회수 일정대로', dk:3,
       s:retL.slice(0,3).map(function(o){ var all=eqWant(o).length, d=eqRetSet(o).length; return (o.customer||'')+' '+d+'/'+all+'대'; }).join(' · ')+(retL.length>3? ' 외 '+(retL.length-3)+'건':''),
-      who:names(retL, function(o){ return o.customer; }), own:names(retL, function(o){ return o.mgr_name || (o.requester? String(o.requester).split('@')[0] : ''); }, 2)||'', due:'회수 일정대로', imp:'회수 완료 '+rD+'대 / 대상 '+rA+'대',
+      who:names(retL, function(o){ return o.customer; }), own:names(retL, eqOwn, 2)||'', due:'회수 일정대로', imp:'회수 완료 '+rD+'대 / 대상 '+rA+'대',
       acts:[{l:'회수 진행 '+retL.length+'건 보기', pri:1, go:function(){ eqbOnly('ret'); }}]});
   }
   /* 만기 관리 (㊿+127): 종료월이 지났는데 미처리 → 이미 LIVE 에서 빠짐 · 이달 만기 → 다음 달 1일에 빠짐. 각 행 원클릭 처리 창으로 */
@@ -765,8 +768,8 @@ export function renderEqDash(){
       if(['설치완료','회수예정','회수완료'].indexOf(o.status)>=0){ var i1=months.indexOf(String(o.install_date||'').slice(0,7)); if(i1>=0) inst[i1]+=q; }
       if(o.status==='회수완료'){ var i2=months.indexOf(String(o.returned_date||'').slice(0,7)); if(i2>=0) rets[i2]+=q; }
     });
-    Viz.bars(document.getElementById('eqcTrend'),{labels:months.map(function(m){ return m.slice(2).replace('-','.'); }), fmt:function(v){ return Math.round(v); }, tipFmt:cnt, maxBar:16, padL:34,
-      series:[{label:'설치', data:inst, color:cssv('--s1')},{label:'회수', data:rets, color:cssv('--s2')}]});
+    (function(){ var eh=document.getElementById('eqcTrend'); Viz.afterLayout(eh, function(){ Viz.bars(eh,{labels:months.map(function(m){ return m.slice(2).replace('-','.'); }), fmt:function(v){ return Math.round(v); }, tipFmt:cnt, maxBar:16, padL:34,
+      series:[{label:'설치', data:inst, color:cssv('--s1')},{label:'회수', data:rets, color:cssv('--s2')}]}); }); })();   /* ㊿+173 배치가 끝난 뒤 */
   }catch(e){ console.warn('eq dash charts', e); }
 }
 export function renderEqBoard(){
@@ -798,7 +801,7 @@ export function renderEqBoard(){
   var cancel=rows.filter(function(o){ return o.status==='취소'; }).length;
   document.getElementById('eqbCount').textContent=(rows.length-cancel)+'건'+(cancel? ' · 취소 '+cancel+'건은 보드에 안 보임':'');
   var canEdit=!ST.IS_VIEWER && !!ST.SB_TOKEN, todayS=todayStr();
-  var h='', tracks=[];
+  var h='', tracks=[], REST={};   /* ㊿+173 성능: 열마다 처음 8장만 먼저 그리고 나머지(최대 30장까지 · 더 보기 규칙 그대로)는 첫 그리기 직후 */
   EQB_COLS.forEach(function(col, ci){
     var st=col[0], list=rows.filter(function(o){ return o.status===st; }), older=0;
     if(st==='회수완료'){ var cut=new Date(); cut.setDate(cut.getDate()-90); var cutS=todayStr(cut);
@@ -809,7 +812,9 @@ export function renderEqBoard(){
     h+=tpl`<section class="eqb-col${st==='회수예정'?' warm':''}${list.length? '':' none'}" data-st="${st}" aria-label="${st} ${rawHtml(list.length)}건">`+
       tpl`<div class="eqb-ch" title="${col[2]}"><i style="background:${rawHtml(col[1])}"></i>${st} <span class="n">${list.length}</span>${rawHtml(st==='회수완료'? '<span class="to">최근 90일</span>':'')}</div>`;
     if(!list.length) h+=tpl`<div class="eqb-empty">없음${rawHtml(st==='회수완료'&&older? ' · 90일 이전 '+older+'건은 신청 내역에서':'')}${rawHtml(canEdit? '<br><span class="mini">끌어서 옮길 수 있음</span>':'')}</div>`;
-    list.slice(0,lim).forEach(function(o){ h+=eqbCard(o, canEdit, todayS); });
+    var shown=list.slice(0,lim);
+    shown.slice(0,8).forEach(function(o){ h+=eqbCard(o, canEdit, todayS); });
+    if(shown.length>8){ REST[st]=shown.slice(8); h+=tpl`<i class="eqb-mk" data-mk="${st}" hidden></i>`; }
     if(list.length>lim) h+=tpl`<button type="button" class="eqb-more" data-more="${st}">외 ${list.length-lim}건 더 보기</button>`;
     if(st==='접수' && canEdit) h+='<button type="button" class="eqb-more" data-new="1">＋ 새 신청</button>';
     if(st==='회수완료' && older && list.length) h+=tpl`<div class="eqb-empty">90일 이전 ${rawHtml(older)}건은 신청 내역(목록)에서</div>`;
@@ -817,12 +822,27 @@ export function renderEqBoard(){
   });
   wrap.innerHTML=h;
   wrap.style.gridTemplateColumns = '';   // ㊿+169 열 너비는 CSS(넓으면 6열 · 좁으면 3열 · 폰 1열) — 빈 열도 같은 폭
-  wrap.querySelectorAll('[data-more]').forEach(function(bt){ bt.onclick=function(){ EQB.more[bt.dataset.more]=1; renderEqBoard(); }; });
-  wrap.querySelectorAll('[data-new]').forEach(function(bt){ bt.onclick=function(){ switchView('ordernew'); }; });
-  wrap.querySelectorAll('[data-next]').forEach(function(bt){ bt.onclick=function(e){ e.stopPropagation(); var r=eqOrderById(bt.dataset.oid); if(r) eqSetStatus(r, bt.dataset.next); }; });
-  wrap.querySelectorAll('[data-open]').forEach(function(bt){ bt.onclick=function(e){ e.stopPropagation(); var r=eqOrderById(bt.dataset.open); if(!r) return; gridGoPre('orders', '신청 #'+r.id+' '+(r.customer||''), function(x){ return String(x.id)===String(r.id); }); }; });
-  wrap.querySelectorAll('[data-ret]').forEach(function(bt){ bt.onclick=function(e){ e.stopPropagation(); var r=eqOrderById(bt.dataset.ret); if(r) eqRetOpen(r); }; });
-  if(canEdit) eqbDnD(wrap);
+  wrap._canEdit=canEdit; eqbBind(wrap);
+  var gen=wrap._gen=(wrap._gen||0)+1;
+  if(Object.keys(REST).length){ var more=function(){ if(wrap._gen!==gen || !wrap.isConnected) return;
+      Object.keys(REST).forEach(function(st){ var mk=wrap.querySelector('.eqb-mk[data-mk="'+st.replace(/["\\]/g,'')+'"]'); if(!mk) return; mk.insertAdjacentHTML('beforebegin', REST[st].map(function(o){ return eqbCard(o, canEdit, todayS); }).join('')); mk.remove(); }); };
+    var later=function(){ try{ if(window.requestIdleCallback) window.requestIdleCallback(more, {timeout:180}); else setTimeout(more, 30); }catch(e){ setTimeout(more, 30); } };
+    if(typeof requestAnimationFrame!=='undefined') requestAnimationFrame(later); else later(); }
+}
+/* ㊿+173 보드 동작은 보드 틀(wrap)에 한 번만 — 나중에 붙는 카드도 같은 동작(누르기 · 끌어 옮기기) */
+export function eqbBind(wrap){
+  if(wrap._eqbBound) return; wrap._eqbBound=1;
+  wrap.addEventListener('click', function(e){
+    var t=/** @type {any} */(e.target), bt=t && t.closest && t.closest('[data-more],[data-new],[data-next],[data-open],[data-ret]'); if(!bt || !wrap.contains(bt)) return;
+    var d=bt.dataset, r;
+    if(d.more!=null){ EQB.more[d.more]=1; renderEqBoard(); return; }
+    if(d.new!=null){ switchView('ordernew'); return; }
+    e.stopPropagation();
+    if(d.next!=null){ r=eqOrderById(d.oid); if(r) eqSetStatus(r, d.next); return; }
+    if(d.open!=null){ r=eqOrderById(d.open); if(!r) return; gridGoPre('orders', '신청 #'+r.id+' '+(r.customer||''), function(x){ return String(x.id)===String(r.id); }); return; }
+    if(d.ret!=null){ r=eqOrderById(d.ret); if(r) eqRetOpen(r); }
+  });
+  eqbDnD(wrap);
 }
 export function eqbCard(o, canEdit, todayS){
   var all=eqWant(o), ret=eqRetSet(o), done=o.status==='회수완료';
@@ -836,8 +856,10 @@ export function eqbCard(o, canEdit, todayS){
     prog=tpl`<div style="display:flex;align-items:center;gap:8px"><div class="eqb-prog" style="flex:1;margin:0">${rawHtml(all.map(function(sn){ return tpl`<i class="${ret.indexOf(sn.toUpperCase())>=0?'on':''}"></i>`; }).join(''))}</div><span class="num" style="font-size:12px;font-weight:600">${ret.length}/${all.length}</span></div>`;
   }
   var idx=EQB_COLS.map(function(c){ return c[0]; }).indexOf(o.status), nextSt=idx>=0 && idx<EQB_COLS.length-1? EQB_COLS[idx+1][0] : null;
-  var who=o.mgr_name? o.mgr_name : (o.requester? String(o.requester).split('@')[0] : '');
-  var ft=tpl`<div class="ft"><span class="mini" title="담당 ${who}">${who}</span><span class="acts">`+
+  /* ㊿+183 카드의 «담당» = 처리 담당(work_assign) → 없으면 신청한 사람 (홈 · 알림함과 같은 기준 · ㊿+174). 예전엔 신청서의 고객 담당자(mgr_name · 고객 쪽 사람)가 나왔음 */
+  var asg=NTF.asg && NTF.asg[String(o.id)], who=asg? ntfWho(asg.assignee) : (o.requester? String(o.requester).split('@')[0] : '');
+  var whoT=(asg? '처리 담당 ' : '신청 ')+who+(o.mgr_name? ' · 고객 담당자 '+o.mgr_name : '');
+  var ft=tpl`<div class="ft"><span class="mini" title="${whoT}">${who}</span><span class="acts">`+
     tpl`<button type="button" class="cbtn ab" data-open="${rawHtml(o.id)}" title="신청 내역에서 열기·수정" aria-label="신청 #${rawHtml(o.id)} 신청 내역에서 열기·수정">${rawHtml(ico('edit',14))}</button>`+
     tpl`${rawHtml(canEdit && eqCanRet(o) && all.length? tpl`<button type="button" class="cbtn" data-ret="${rawHtml(o.id)}" title="시리얼을 골라 일부·전부 회수 또는 회수 취소">${done? '회수 취소…' : '회수 처리'}</button>`:'')}`+
     tpl`${rawHtml(canEdit && nextSt && nextSt!=='회수완료'? tpl`<button type="button" class="cbtn nx${['출하요청','배송중','설치완료'].indexOf(nextSt)>=0?' pri':''}" data-oid="${rawHtml(o.id)}" data-next="${nextSt}" title="${nextSt} 로 이동">${nextSt} →</button>`:'')}</span></div>`;
@@ -847,17 +869,16 @@ export function eqbCard(o, canEdit, todayS){
     tpl`<div class="mt"><span class="chn">${o.channel||'기타'}</span> · ${rawHtml(meta.filter(Boolean).join(' · '))}</div>${rawHtml(prog)}`+
     tpl`<div class="sn">${rawHtml(eqSerialsHtml(o,{full:true, max:4}))}</div>${rawHtml(ft)}</article>`;
 }
-export function eqbDnD(wrap){
+export function eqbDnD(wrap){   /* ㊿+173 보드 틀에 한 번(eqbBind) — 카드 · 열은 다시 그려도 그대로 동작 · 쓰기 권한이 없으면(wrap._canEdit) 아무것도 안 함 */
   var dragging=null;
-  wrap.querySelectorAll('.eqb-card').forEach(function(c){
-    c.addEventListener('dragstart', function(e){ if(e.target.closest && e.target.closest('.eqsn,.eqbar,button,input')) { e.preventDefault(); return; } dragging=c.dataset.oid; c.classList.add('drag'); try{ e.dataTransfer.setData('text/plain', dragging); e.dataTransfer.effectAllowed='move'; }catch(x){} });
-    c.addEventListener('dragend', function(){ c.classList.remove('drag'); wrap.querySelectorAll('.eqb-col.over').forEach(function(x){ x.classList.remove('over'); }); });
-  });
-  wrap.querySelectorAll('.eqb-col').forEach(function(col){
-    col.addEventListener('dragover', function(e){ if(!dragging) return; e.preventDefault(); col.classList.add('over'); });
-    col.addEventListener('dragleave', function(){ col.classList.remove('over'); });
-    col.addEventListener('drop', function(e){ e.preventDefault(); col.classList.remove('over'); var r=eqOrderById(dragging); dragging=null; if(!r) return; eqSetStatus(r, col.dataset.st); });
-  });
+  var cardOf=function(e){ var t=/** @type {any} */(e.target); return t && t.closest? t.closest('.eqb-card') : null; };
+  var colOf=function(e){ var t=/** @type {any} */(e.target); return t && t.closest? t.closest('.eqb-col') : null; };
+  wrap.addEventListener('dragstart', function(e){ var c=cardOf(e); if(!c || !wrap._canEdit) return;
+    if(e.target.closest && e.target.closest('.eqsn,.eqbar,button,input')) { e.preventDefault(); return; } dragging=c.dataset.oid; c.classList.add('drag'); try{ e.dataTransfer.setData('text/plain', dragging); e.dataTransfer.effectAllowed='move'; }catch(x){} });
+  wrap.addEventListener('dragend', function(e){ var c=cardOf(e); if(c) c.classList.remove('drag'); wrap.querySelectorAll('.eqb-col.over').forEach(function(x){ x.classList.remove('over'); }); });
+  wrap.addEventListener('dragover', function(e){ var col=colOf(e); if(!col || !dragging) return; e.preventDefault(); col.classList.add('over'); });
+  wrap.addEventListener('dragleave', function(e){ var col=colOf(e); if(col) col.classList.remove('over'); });
+  wrap.addEventListener('drop', function(e){ var col=colOf(e); if(!col) return; e.preventDefault(); col.classList.remove('over'); var r=eqOrderById(dragging); dragging=null; if(!r || !wrap._canEdit) return; eqSetStatus(r, col.dataset.st); });
 }
 /* 상태 변경 — 신청 내역 표에서 상태 칸을 고쳐 저장하는 것과 같은 결과 (회수일 자동 · 현황 동기화 · 변경 이력) */
 export async function eqSetStatus(r, st){
@@ -955,6 +976,10 @@ export function c360Enhance(nm, cts, lives, ois, inbs, asts, ords){
       acts.push(['재계약 OI 만들기', function(){ closeOvl('ovlC360'); switchView('oinew'); setTimeout(function(){ var c=document.getElementById('oiCust'); if(c){ c.value=nm; } },80); }]); }
     if(EQ.lent) tips.push(tpl`임대 장비 ${rawHtml(EQ.lent)}대는 재약정하면 그대로 씁니다 — 종료가 확정될 때만 회수 신청을 하세요.`);
   }
+  /* ㊿+183 만기가 지났는데 연장 · 종료 · 해지 처리가 없는 계약 — 제안 맨 앞 + «만기 처리» */
+  var lapR=cts.filter(function(r){ return renewKindOf(r, b)==='lapsed'; });
+  if(lapR.length){ tips.unshift(tpl`<b>만기가 지났는데 처리 안 된 계약 ${String(lapR.length)}건</b> — ${rawHtml(lapR.slice(0,3).map(function(r){ return esc(lline(r.line))+' ~'+mk(r.endRaw); }).join(' · '))} · 이미 LIVE 에서 빠져 있습니다. 연장 · 서비스종료 · 해지 중 하나로 정리하세요.`);
+    acts.unshift(['만기 처리 ('+lline(lapR[0].line)+' ~'+mk(lapR[0].endRaw)+')', function(){ closeOvl('ovlC360'); renewOpenFor(lapR[0], b); }]); }
   if(EQ.retPend) tips.push(tpl`회수 예정 장비 ${rawHtml(EQ.retPend)}대(신청 ${rawHtml(EQ.retOrd.map(function(o){ return '#'+o.id; }).join(', '))}) — 장비 대시보드에서 회수 처리.`);
   if(EQ.partial.length) tips.push(tpl`부분 회수된 신청 ${rawHtml(EQ.partial.length)}건 — 남은 장비를 계속 쓸지 확인하세요.`);
   if(EQ.open.length) tips.push(tpl`처리 대기 장비 신청 ${rawHtml(EQ.open.length)}건(${rawHtml(EQ.open.map(function(o){ return o.status; }).join('·'))}).`);
@@ -968,11 +993,12 @@ export function c360Enhance(nm, cts, lives, ois, inbs, asts, ords){
   /* 요약 탭(기본): 지금 유효한 계약 + 시작 예정 + 장비 네 칸 · 상세는 기존 탭 */
   var valid=cts.filter(function(r){ return r.startIdx!=null && r.startIdx<=b && (r.endIdx==null || r.endIdx>=b) && !/해지|중지/.test(String(r.status||'')); });
   var upc=cts.filter(function(r){ return r.startIdx!=null && r.startIdx>b; });
+  var lap=cts.filter(function(r){ return renewKindOf(r, b)==='lapsed'; });   /* ㊿+183 만기가 지났는데 처리 안 된 계약도 «지금 계약»에 — 바로 «만기 처리» */
   function line(r, tag){ var k=ST.DATA.rows.indexOf(r), a=k>=0? (ST.MAT[k][b]||0) : 0; var s=succ.get(r);
-    return tpl`<tr data-c360sum="${rawHtml(r._id)}" tabindex="0" title="계약 상세"><td><span class="ctag ${rawHtml(tag==='유효'?'ok':'info')}">${rawHtml(r.parent? '추가 계약' : tag)}</span></td><td>${lline(r.line)}<span class="st">${r.status||r.ctype||''}</span></td><td>${mk(r.startIdx)} ~ ${r.endIdx!=null? mk(r.endIdx):'—'}</td>`+
-      tpl`<td class="n">${tag==='유효'? won(a) : '—'}</td><td class="n">${won(r.mrr||0)}</td><td class="mini">${rawHtml(r.autoRenew? '자동연장' : (s? (s.sure? '재약정 등록됨' : '후속 계약 확인 필요') : ''))}</td></tr>`; }
-  var summ=tpl`<div class="c360-summ"><h4>지금 계약 <span class="ct">유효 ${rawHtml(valid.length)}건${rawHtml(upc.length? ' · 시작 예정 '+upc.length+'건':'')} · 금액 단위 천원</span></h4>`+
-    tpl`${rawHtml(valid.length||upc.length? tpl`<div class="c360-summ-w"><table><thead><tr><th>구분</th><th>서비스 · 계약 상태</th><th>기간</th><th class="n" title="기준월(${mk(b)})에 인식되는 금액">${mk(b)} 인식</th><th class="n" title="계약서 기준 월 금액">월 금액</th><th>갱신</th></tr></thead><tbody>${rawHtml(valid.map(function(r){ return line(r,'유효'); }).concat(upc.map(function(r){ return line(r,'시작 예정'); })).join(''))}</tbody></table></div>` : '<p class="cap" style="margin:2px 0 0">기준월에 유효한 계약이 없습니다 — «계약» 탭에서 이력을 확인하세요.</p>')}`+
+    return tpl`<tr data-c360sum="${rawHtml(r._id)}" tabindex="0" title="계약 상세"><td><span class="ctag ${rawHtml(tag==='유효'?'ok':tag==='만기 지남'?'warn':'info')}">${rawHtml(r.parent? '추가 계약' : tag)}</span></td><td>${lline(r.line)}<span class="st">${r.status||r.ctype||''}</span></td><td>${mk(r.startIdx)} ~ ${r.endIdx!=null? mk(r.endIdx):'—'}</td>`+
+      tpl`<td class="n">${tag==='유효'? won(a) : '—'}</td><td class="n">${won(r.mrr||0)}</td><td class="mini">${rawHtml(r.autoRenew? '자동연장' : (s? (s.sure? '재약정 등록됨' : '후속 계약 확인 필요') : ''))}${rawHtml(renewKindOf(r, b)? tpl` <button type="button" class="cbtn c360-do" data-do="${String(r._id)}" title="만기 처리 창에서 연장 · 종료 · 해지">만기 처리</button>` : '')}</td></tr>`; }   /* ㊿+183 다음 처리를 그 줄에서 바로(갱신 칸 안 — 좁은 창에서도 보이게) */
+  var summ=tpl`<div class="c360-summ"><h4>지금 계약 <span class="ct">유효 ${rawHtml(valid.length)}건${rawHtml(upc.length? ' · 시작 예정 '+upc.length+'건':'')}${rawHtml(lap.length? ' · 만기 지남 '+lap.length+'건':'')} · 금액 단위 천원</span></h4>`+
+    tpl`${rawHtml(valid.length||upc.length||lap.length? tpl`<div class="c360-summ-w"><table><thead><tr><th>구분</th><th>서비스 · 계약 상태</th><th>기간</th><th class="n" title="기준월(${mk(b)})에 인식되는 금액">${mk(b)} 인식</th><th class="n" title="계약서 기준 월 금액">월 금액</th><th>갱신 · 처리</th></tr></thead><tbody>${rawHtml(valid.map(function(r){ return line(r,'유효'); }).concat(upc.map(function(r){ return line(r,'시작 예정'); })).concat(lap.map(function(r){ return line(r,'만기 지남'); })).join(''))}</tbody></table></div>` : '<p class="cap" style="margin:2px 0 0">기준월에 유효한 계약이 없습니다 — «계약» 탭에서 이력을 확인하세요.</p>')}`+
     tpl`<h4 style="margin-top:14px">장비 <span class="ct">상세는 «장비» 탭</span></h4><div class="c360-eq4"><div><b class="num">${rawHtml(EQ.lent)}</b><span>현재 임대중 (대)</span></div><div><b class="num">${rawHtml(EQ.retPend)}</b><span>회수 예정 (대)</span></div><div><b class="num">${rawHtml(EQ.retDone)}</b><span>회수 완료 (대)</span></div><div><b class="num">${rawHtml(EQ.ordN)}</b><span>신청(발주) 이력 (건)</span></div></div></div>`;
   /* 섹션 탭 */
   var secs=[].slice.call(body.querySelectorAll('.c360-sec'));
@@ -981,7 +1007,8 @@ export function c360Enhance(nm, cts, lives, ois, inbs, asts, ords){
   body.insertBefore(head, body.firstChild);
   var sv=document.createElement('div'); sv.className='c360-summary-pane'; sv.innerHTML=summ; head.appendChild(sv);
   head.querySelectorAll('[data-a]').forEach(function(bt){ bt.onclick=function(){ acts[+bt.dataset.a][1](); }; });
-  sv.querySelectorAll('tr[data-c360sum]').forEach(function(tr){ var go=function(){ var c=ctRawOf(Number(tr.getAttribute('data-c360sum'))); if(c) openDetail(c); }; tr.onclick=go; tr.onkeydown=function(e){ if(e.key==='Enter'){ e.preventDefault(); go(); } }; });
+  sv.querySelectorAll('button.c360-do').forEach(function(bt){ /** @type {any} */(bt).onclick=function(ev){ ev.stopPropagation(); var id=Number(/** @type {any} */(bt).dataset.do), r=cts.filter(function(x){ return x._id===id; })[0]; if(r){ closeOvl('ovlC360'); renewOpenFor(r, b); } }; });
+  sv.querySelectorAll('tr[data-c360sum]').forEach(function(tr){ var go=function(){ var c=ctRawOf(Number(tr.getAttribute('data-c360sum'))); if(c) openDetail(c); }; tr.onclick=go; tr.onkeydown=function(e){ if(e.key==='Enter' && e.target===tr){ e.preventDefault(); go(); } }; });
   function show(t){ sv.style.display= t===-2? '' : 'none'; secs.forEach(function(sc,i){ sc.style.display=(t===-1||t===i)? '':'none'; }); }
   head.querySelectorAll('[role="tab"]').forEach(function(bt){ bt.onclick=function(){
     head.querySelectorAll('[role="tab"]').forEach(function(x){ x.setAttribute('aria-selected', x===bt? 'true':'false'); });
@@ -1022,14 +1049,14 @@ export function sbHeaders(json){
   return h;
 }
 export async function sbGet(q){
-  var r=await fetch(SB_URL+'/rest/v1/'+q,{headers:sbHeaders()});
+  var r=await fetchT(SB_URL+'/rest/v1/'+q,{headers:sbHeaders()}, 60000, 'DB');   /* ㊿+182 시간 제한 */
   if(!r.ok) throw new Error('DB 읽기 실패 ('+r.status+'): '+(await r.text()).slice(0,180));
   return r.json();
 }
 export async function sbAll(q){
   // 1000행 페이지네이션 — count 먼저 얻고 병렬로
-  var h=await fetch(SB_URL+'/rest/v1/'+q+(q.indexOf('?')>=0?'&':'?')+'limit=1',
-    {headers:Object.assign(sbHeaders(),{Prefer:'count=exact'})});
+  var h=await fetchT(SB_URL+'/rest/v1/'+q+(q.indexOf('?')>=0?'&':'?')+'limit=1',
+    {headers:Object.assign(sbHeaders(),{Prefer:'count=exact'})}, 60000, 'DB');
   /* ㊿+141: 서버 오류(5xx)를 «0행»으로 넘기면 데이터가 다 사라진 것처럼 보임 → 오류로 올림.
      401/403/404(권한·표 없음)는 예전처럼 빈 목록 — 장비 전용 계정 판별·선택 표(sbTry)가 그 동작에 기대고 있음 */
   if(h.status>=500) throw new Error('DB 읽기 실패 ('+h.status+') — '+q.split('?')[0]);
@@ -1045,20 +1072,22 @@ export async function sbAll(q){
 export async function sbWrite(method, path, body, prefer, asView){   /* asView(㊿+148): 다른 화면에서 저장할 때 그 표의 화면 권한으로 검사 — 예: 데이터 점검 수정 창 → 'contracts' */
   if(!ST.SB_TOKEN) throw new Error('로그인이 필요합니다.');
   permWriteGuard(method, path, asView);
-  var r=await fetch(SB_URL+'/rest/v1/'+path,{
-    method:method, headers:Object.assign(sbHeaders(true), prefer?{Prefer:prefer}:{}),
-    body: body!==undefined? JSON.stringify(body): undefined
-  });
+  await verBeforeWrite(method, path);   /* ㊿+175 옛 탭(새 버전이 올라온 뒤의 탭)이면 저장 막음 */
+  /* ㊿+175 연결이 끊기거나 60초 넘게 답이 없으면 알아보기 쉬운 오류(net · timeout) — 부르는 쪽이 «다시 시도»를 붙일 수 있음 */
+  var send=async function(){
+    var ctl=new AbortController(), tm=setTimeout(function(){ try{ ctl.abort(); }catch(e){} }, 60000);
+    try{ return await fetch(SB_URL+'/rest/v1/'+path,{ method:method, headers:Object.assign(sbHeaders(true), prefer?{Prefer:prefer}:{}), body: body!==undefined? JSON.stringify(body): undefined, signal:ctl.signal }); }
+    catch(e){ var to=/** @type {any} */(e) && /** @type {any} */(e).name==='AbortError'; var ne=/** @type {any} */(new Error(to? '서버 응답이 60초 넘게 없습니다 — 저장됐는지 새로 읽어 확인한 뒤 다시 시도해 주세요' : '서버에 연결하지 못했습니다 — 인터넷 연결을 확인하고 다시 시도해 주세요')); ne.net=true; ne.timeout=to; throw ne; }
+    finally{ clearTimeout(tm); }
+  };
+  var r=await send();
   if(r.status===401 && await refreshToken()){   // 토큰 만료 → 연장 후 1회 재시도
-    r=await fetch(SB_URL+'/rest/v1/'+path,{
-      method:method, headers:Object.assign(sbHeaders(true), prefer?{Prefer:prefer}:{}),
-      body: body!==undefined? JSON.stringify(body): undefined
-    });
+    r=await send();
   }
   if(!r.ok) throw new Error('저장 실패 ('+r.status+'): '+(await r.text()).slice(0,220));
   // 저장 성공 → 이전 캐시는 옛 데이터이므로 즉시 무효화 (새로고침 시 옛 화면 방지)
   // 단, rpc/load_… 는 읽기 전용 호출이라 캐시를 지우지 않음
-  if(!/^rpc\/load_/.test(path)) cacheDrop();
+  if(!/^rpc\/load_|^notify_snapshot\b/.test(path)) cacheDrop();   /* ㊿+177 예약 발송 «보낼 글»은 업무 데이터가 아님 */
   /* ㊿+141: 저장이 됐으니 열린 창의 «입력 중» 표시를 지움 (바깥 클릭·Esc 로 닫을 때 확인을 묻지 않게) — 기록용 표는 제외 */
   if(!/^rpc\/load_/.test(path) && !OVL_SKIP_CLEAN.test(path)) try{ ovlMarkClean(); }catch(e){}
   var t=await r.text();
@@ -1116,18 +1145,13 @@ export function shapeLg(rows){
 export function shapeVs(rows){
   if(!rows||!rows.length) return null;
   // 여러 달이 들어있으면 «가장 최근 달» 만 대시보드에 보여줍니다 (과거는 정산·목표 › 비즈포탈 차액에서)
-  function mNum(r){
-    var m=String(r.ym||'').match(/(\d+)/);
-    var n=m? +m[1] : 0;
-    var y=String(r.as_of||'').slice(0,4);
-    return (y? +y*100 : 0) + n;                    // 연도+월 로 비교
-  }
-  var best=null, bestKey=-1, bestId=-1;
+  /* ㊿+176 연도+달 열쇠(bizKey — SQL 107 의 y · 없으면 작성일로 추정) */
+  var best=null, bestKey='', bestId=-1;
   rows.forEach(function(r){
-    var k=mNum(r), id=Number(r.id)||0;
+    var k=bizKey(r), id=Number(r.id)||0;
     if(k>bestKey || (k===bestKey && id>bestId)){ bestKey=k; bestId=id; best=r.ym||''; }
   });
-  var pick=rows.filter(function(r){ return (r.ym||'')===best; });
+  var pick=rows.filter(function(r){ return bizKey(r)===bestKey; });
   if(!pick.length) pick=rows;
 
   var items=[],details=[],ym=best||'',asOf='';
@@ -1137,23 +1161,43 @@ export function shapeVs(rows){
     else details.push({cust:r.item,biz:Number(r.biz)||0,sheet:Number(r.sheet)||0,diff:Number(r.diff)||0,note:r.note||''});
   });
   return {ok:true,asOf:asOf,month:ym,items:items,details:details,monthCount:(function(){
-    var seen={},n=0; rows.forEach(function(r){ if(r.ym&&!seen[r.ym]){seen[r.ym]=1;n++;} }); return n;
+    var seen={},n=0; rows.forEach(function(r){ var k=bizKey(r); if(r.ym&&!seen[k]){seen[k]=1;n++;} }); return n;
   })()};
 }
 
 export var CACHE_KEY='svc_cache_v1';
 export async function sbRpc(name){
-  var r=await fetch(SB_URL+'/rest/v1/rpc/'+name,{
-    method:'POST', headers:sbHeaders(true), body:'{}'});
+  var r=await fetchT(SB_URL+'/rest/v1/rpc/'+name,{
+    method:'POST', headers:sbHeaders(true), body:'{}'}, 90000, 'DB', true);
   if(!r.ok) throw new Error('rpc '+name+' '+r.status);
   return r.json();
 }
+/* ㊿+173 성능: 저장된 로그인(만료 전)이 있으면 로그인 확인(사용자 · 2단계 인증 상태)을 기다리지 않고 데이터 요청부터 시작 —
+   쓰는 건 확인이 끝난 뒤 같은 토큰일 때만(2단계 인증 뒤에는 토큰이 바뀌어 새로 받음 · 권한은 DB RLS 가 그대로 판단) */
+export var PREFETCH={tok:'', p:null, at:0};
+export function prefetchData(){
+  try{
+    if(IS_QA) return;
+    var s=sessRead(); if(!s || !s.a || s.p===false || sessTooOld(s) || sessIdleOver()) return;   /* ㊿+180 30일 지났거나 자동 로그아웃 시간이 지난 로그인은 미리 받지 않음(곧 로그인 화면) */
+    if(Math.floor(Date.now()/1000) >= (s.e||0)-120) return;   // 곧 만료 → 연장 뒤 새 토큰으로 받음
+    PREFETCH.tok=s.a; PREFETCH.at=Date.now();
+    PREFETCH.p=fetchT(SB_URL+'/rest/v1/rpc/load_all', {method:'POST', headers:{apikey:SB_KEY, Authorization:'Bearer '+s.a, 'Content-Type':'application/json'}, body:'{}'}, 90000, 'DB', true)
+      .then(function(r){ return r.ok? r.json() : null; }).catch(function(){ return null; });
+  }catch(e){ PREFETCH.p=null; }
+}
+export function prefetchTake(){
+  var p=PREFETCH.p, ok=!!p && PREFETCH.tok===ST.SB_TOKEN && Date.now()-PREFETCH.at<60000;
+  PREFETCH.p=null; PREFETCH.tok='';
+  return ok? p : null;
+}
 export async function loadFromDb(){
+  if(PERF.boot) PERF.ld=performance.now();   /* ㊿+173 다시 읽기 시간 */
   var permP=loadPerms();   // 메뉴 권한은 데이터와 병렬로 (표가 없거나 행이 없으면 null = 역할 기본)
   var codeP=loadCodes();   // 코드 목록(code_lists · SQL 93)도 병렬로 — 표가 없으면 상수 그대로 (㊿+137)
   // 1) 고속 경로: load_all() 함수로 한 번에 (10_fast_load.sql 적용 시)
   try{
-    var j=await sbRpc('load_all');
+    var pf=prefetchTake(), j=pf? await pf : null;
+    if(!j || !j.customers) j=await sbRpc('load_all');
     try{ await permP; }catch(e){} try{ await codeP; }catch(e){}
     if(j && j.customers){
       var mrsRows;
@@ -1178,13 +1222,15 @@ export async function loadFromDb(){
         j.iextra || []           /* 설치비 추가 항목 — 화면을 먼저 그리고 뒤에서 채웁니다 */
       ];
       cacheWriteLater(res0);   /* ㊿+145: 큰 JSON 저장은 화면을 그린 뒤로 */
-      var built=buildFromRes(res0);
+      var built=buildFromRes(res0); ST.LOAD_PATH='fast'; ST.LOAD_WHY='';
       if(!j.s1map || !j.iextra) loadExtrasLater(!j.s1map, !j.iextra);   // 첫 화면을 붙잡지 않도록 뒤에서 병렬로
       return built;
     }
-  }catch(e){ /* 함수 미설치 등 → 아래 기존 방식으로 */ }
+    ST.LOAD_WHY='load_all 응답에 customers 없음';
+  }catch(e){ ST.LOAD_WHY=String(/** @type {any} */(e) && /** @type {any} */(e).message || e).slice(0,200); }   /* 함수 미설치 · 시간 초과 등 → 아래 표별 방식으로 */
+  ST.LOAD_PATH='slow'; try{ console.warn('[데이터] load_all 대신 표별로 읽음 —', ST.LOAD_WHY); }catch(e){}
   var res=await Promise.all([
-    sbAll('customers?select=id,name,industry&order=id'),
+    sbAll('customers?select=*&order=id'),   /* ㊿+183 업종(sector) · 동명 · 별칭까지 — 예전엔 id,name,industry 만 받아 load_all 이 실패한 창에서 «업종별» 숫자가 달라졌음(스테이징 QA) */
     sbAll('contracts?select=*&order=id'),
     sbAll('monthly_revenue?select=contract_id,month,amount&order=contract_id,month'),
     sbTry('live_customers?select=*&order=id'),
@@ -1212,6 +1258,8 @@ export var CACHE_GEN=0;
 export function cacheDrop(){ CACHE_GEN++; try{ sessionStorage.removeItem(CACHE_KEY); }catch(e){} }   /* 예약된 사본 쓰기까지 취소 (로그아웃 뒤 이전 사용자 데이터가 남지 않게) */
 export function cacheWriteLater(res){
   var g=++CACHE_GEN, t0=Date.now(); if(IS_QA) return;
+  /* ㊿+173 성능: 사본이 너무 크면(대략 4MB 넘음 — 브라우저 한도 근처) 만들지 않음 — 만드는 데만 화면이 0.3초 이상 멈추고 한도를 넘으면 어차피 저장 안 됨 */
+  try{ var est=0; (res||[]).forEach(function(a, i){ if(Array.isArray(a)) est+=a.length*(i===2? 55 : 380); }); if(est>4e6){ cacheDrop(); return; } }catch(e){}   /* [2] = 월별 매출 행(작음) */
   var run=function(){ if(g!==CACHE_GEN || !ST.SB_TOKEN) return; try{ sessionStorage.setItem(CACHE_KEY, JSON.stringify({t:t0, res:res})); }catch(e){} };
   try{ if(window.requestIdleCallback) requestIdleCallback(run, {timeout:3000}); else setTimeout(run, 400); }catch(e){ setTimeout(run, 400); }
 }
@@ -1221,7 +1269,7 @@ export function loadFromCache(){
     var c=JSON.parse(sessionStorage.getItem(CACHE_KEY)||'null');
     if(c && c.res && c.res[0] && c.res[0].length){
       if(Date.now()-(c.t||0) > 10*60*1000) return null;   // 10분 넘은 캐시는 쓰지 않음
-      return buildFromRes(c.res);
+      var bc=buildFromRes(c.res); try{ bc._fromCache=true; }catch(e){} ST.LOAD_PATH='cache'; return bc;
     }
   }catch(e){}
   return null;
@@ -1364,6 +1412,7 @@ export function enterEquipMode(d){
   switchView(EQUIP_VIEWS[ST.CUR_VIEW]? ST.CUR_VIEW : ST.EQUIP_HOME);
 }
 export function boot(skipCache){
+  if(!skipCache) prefetchData();   /* ㊿+173 로그인 확인과 동시에 데이터 요청 */
   if(!SHELL_ONCE.edit){ SHELL_ONCE.edit=1; setupEdit(); setupSide(); }
   restoreSess().then(function(ok){
     /* ㊿+145: 로그인 안 된 상태 → 서버에 묻지 않고 바로 로그인 화면 (예전엔 익명으로 load_all 을 한 번 불러 «빈 결과»를 확인한 뒤에야 보여 줌 — 로그아웃이 느렸던 이유) */
@@ -1433,19 +1482,22 @@ export function enterAfterLogin(){
 export async function screenLogin(){
   var em=$('#lsEmail').value.trim(), pw=$('#lsPw').value, m=$('#lsMsg');
   if(!em||!pw){ m.textContent='이메일과 비밀번호를 입력하세요'; return; }
+  var wt=lfWait(em); if(wt){ m.style.color='var(--critical,#d03b3b)'; m.textContent=lfMsg(wt); return; }   /* ㊿+180 연속 실패 대기 */
   m.style.color='var(--muted)'; m.textContent='확인 중…';
   try{
     var r=await fetch(SB_URL+'/auth/v1/token?grant_type=password',{
       method:'POST', headers:{apikey:SB_KEY,'Content-Type':'application/json'},
       body:JSON.stringify({email:em, password:pw})});
     var j=await r.json();
-    if(!r.ok||!j.access_token) throw new Error(j.error_description||j.msg||'이메일 또는 비밀번호가 올바르지 않습니다');
+    if(!r.ok||!j.access_token){ if(r.status===400 || r.status===401){ var lf=lfFail(em); if(lf.until>Date.now()) throw new Error(lfMsg(lfWait(em))); } throw new Error(j.error_description||j.msg||'이메일 또는 비밀번호가 올바르지 않습니다'); }
+    lfOk(em);
     ST.SB_TOKEN=j.access_token; ST.AUTH_USER=em;
     try{ var kc=$('#lsKeep'); if(kc) localStorage.setItem('svc_keep', kc.checked? '1':'0'); }catch(x){}
-    saveSess(j, em);
+    saveSess(j, em, undefined, true);
     try{ localStorage.setItem('svc_last_email', em); }catch(x){}
     var vf0=mfaVerifiedOf(j.user&&j.user.factors);   /* ㊿+145: 확인된 인증 앱이 없으면 빠른 길(확인은 데이터 읽기와 병렬) */
     if(!(await mfaGate(j.access_token, em, j.user&&j.user.factors, {fast:!vf0.length}))){ clearSess(); ST.SB_TOKEN=null; ST.AUTH_USER=null; m.style.color='var(--muted)'; m.textContent='2단계 인증을 취소해 로그인하지 않았습니다'; return; }
+    loginRecord('password');   /* ㊿+180 로그인 기록(SQL 112 전이면 조용히 건너뜀) */
     showAuthUi();
     var changed=j.user && j.user.user_metadata && j.user.user_metadata.pw_changed;
     if(!changed){
@@ -1459,7 +1511,7 @@ export async function screenLogin(){
 }
 export async function screenPw(){
   var p1=$('#lsNpw1').value, p2=$('#lsNpw2').value, m=$('#lsMsg');
-  if(p1.length<6){ m.style.color='var(--critical,#d03b3b)'; m.textContent='6자 이상으로 입력하세요'; return; }
+  var bad=pwRule(p1, ST.AUTH_USER, $('#lsPw').value); if(bad){ m.style.color='var(--critical,#d03b3b)'; m.textContent=bad; return; }   /* ㊿+180 10자 · 영문 + 숫자 */
   if(p1!==p2){ m.style.color='var(--critical,#d03b3b)'; m.textContent='비밀번호 확인이 일치하지 않습니다'; return; }
   m.style.color='var(--muted)'; m.textContent='변경 중…';
   try{
@@ -1538,7 +1590,15 @@ export function onData(d){
   $('#app').classList.remove('hidden');
   // 레이아웃이 확정된 다음에 그려야 차트 폭이 정확합니다
   /* ㊿+145: 첫 화면(차트·숫자)을 먼저 그리고, 할 일 카드·폭 감시는 화면이 뜬 다음 차례로 (로그인 직후 체감 속도) */
-  requestAnimationFrame(function(){ renderAll(); setTimeout(function(){ watchWidth(); try{ renderTodo(); }catch(e){} }, 0); });
+  requestAnimationFrame(function(){ renderAll(); setTimeout(function(){ watchWidth(); try{ renderTodo(); }catch(e){} }, 0); perfAfterData(d); ntfAfterData(); });
+}
+/* ㊿+173 실사용 속도: 처음 열 때(페이지를 연 순간부터 홈이 그려질 때까지) · 다시 읽기(요청부터 그려질 때까지) */
+export function perfAfterData(d){
+  try{
+    var now=performance.now(), rows=(d && d.rows)? d.rows.length : null;
+    if(!PERF.boot){ PERF.boot=now; perfRec('boot', ST.CUR_VIEW||'dash', now, {net_ms:perfNet('/rpc/load_all'), rows:rows, detail:Object.assign(perfDev(), {cache:!!(d && d._fromCache)})}); return; }
+    if(PERF.ld!=null){ var t=PERF.ld; PERF.ld=null; perfRec('reload', ST.CUR_VIEW||'', now-t, {net_ms:perfNet('/rpc/load_all'), rows:rows}); }
+  }catch(e){}
 }
 
 /* 카드 폭이 바뀌면 (창 크기, 사이드바, 인쇄) 다시 그립니다 */

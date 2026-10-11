@@ -102,7 +102,7 @@ tr:hover .rowact { display: flex; }
 .pan .st.bad { color: #c0392b; }
 .pan .st.ok { color: #1e8e3e; }
 .tag { display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 999px; background: #eef3f8; color: #345; margin-right: 4px; }
-.tag.issued { background: #e3f6e6; color: #1e8e3e; }
+.tag.issued { background: #e3f6e6; color: #17692e; }   /* ㊿+176 글자 대비 4.5 이상 */
 #loginOverlay { position: fixed; inset: 0; background: #f9f9f7; z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; }
 @media print {
     /* 여백은 인쇄 대화상자 설정과 무관하게 문서 안쪽 padding 으로 확보 (여백 «없음»으로 저장해도 같은 결과) */
@@ -133,3 +133,6 @@ tr:hover .rowact { display: flex; }
     select.sel-plain { background: transparent !important; }
     textarea[data-k=remarks] { min-height: 40px; }
 }
+/* ㊿+176 월 마감 · 발행 잠금 · 이력 */
+.rp-state{display:inline-flex;gap:6px;align-items:center}
+.rp-state .tag.issued{font-size:12px}

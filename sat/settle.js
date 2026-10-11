@@ -2,8 +2,9 @@
    · 두 페이지에 똑같이 들어 있던 함수(쓰기 · 숫자 표시 · 엑셀 읽기 · 정산서 인쇄 창 · 파일 끌어 놓기 · 창 닫기 …)를 한 곳으로 — sat/db.js 다음에 */
 async function sbWrite(m,p,b,pref){
   var r=await fetch(SB_URL+'/rest/v1/'+p,{method:m,headers:Object.assign(hdr(true),pref?{Prefer:pref}:{}),body:b!==undefined?JSON.stringify(b):undefined});
-  if(!r.ok){ var t=await r.text();
+  if(!r.ok){ var t=await r.text(), dm=clsErrText(t);
     if(r.status===401) throw new Error('로그인이 만료되었습니다 — 포탈에서 다시 로그인해 주세요');
+    if(/마감|발행/.test(dm)) throw new Error(dm);   /* ㊿+176 월 마감 · 발행 잠금(SQL 107) — DB 가 막은 이유 그대로 */
     if(r.status===403||/policy/i.test(t)) throw new Error('쓰기 권한이 없습니다 (편집 권한 필요)');
     throw new Error('저장 실패 ('+r.status+'): '+t.slice(0,150)); }
   var tx=await r.text(); try{ return tx?JSON.parse(tx):null; }catch(e){ return null; }
@@ -83,7 +84,7 @@ function toggleMore(btn){
       if(m.contains(ev.target)||ev.target===btn) return; m.classList.remove('on'); document.removeEventListener('click',off); }); },0); }
 }
 function closeOvl(id){ var e=$('#'+id); if(e) e.classList.remove('show'); }
-function openSettles(){ $('#ovlSet').classList.add('show'); msg('mS',''); loadSettles().then(renderSettles); renderSettles(); }
+function openSettles(){ $('#ovlSet').classList.add('show'); msg('mS',''); Promise.all([loadSettles(), typeof clsLoad==='function'? clsLoad() : null]).then(renderSettles); renderSettles(); }   /* ㊿+176 마감 상태도 다시 읽음 */
 function bindDrop(dropId,inputId,handler){
   var d=$('#'+dropId), inp=$('#'+inputId);
   inp.addEventListener('change',function(){ if(inp.files&&inp.files[0]) handler(inp.files[0],d); });

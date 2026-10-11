@@ -58,7 +58,11 @@ async function qToken() {
 async function workerFetch(path, opts) {
     opts = opts || {};
     if (!workerConfig.baseUrl) throw new Error('저장 서버 주소가 없습니다 — "GitHub ▾ → 설정"에서 확인해주세요');
-    var go = async function () { var t = await qToken(); return fetch(workerConfig.baseUrl + path, Object.assign({}, opts, { headers: Object.assign({}, opts.headers || {}, { Authorization: 'Bearer ' + t }) })); };
+    /* ㊿+182 시간 제한 60초 — 저장 서버가 답이 없으면 끊고 안내(저장은 자동으로 다시 보내지 않음 · 목록에서 저장됐는지 확인) */
+    var go = async function () { var t = await qToken(), ctl = new AbortController(), tm = setTimeout(function () { try { ctl.abort(); } catch (e) { /* noop */ } }, 60000);
+        try { return await fetch(workerConfig.baseUrl + path, Object.assign({}, opts, { signal: ctl.signal, headers: Object.assign({}, opts.headers || {}, { Authorization: 'Bearer ' + t }) })); }
+        catch (e) { if (e && e.name === 'AbortError') throw new Error('저장 서버 응답이 60초 넘게 없습니다' + (opts.method && opts.method !== 'GET' ? ' — 저장됐는지 목록에서 확인한 뒤 다시 시도해 주세요' : ' — 잠시 뒤 다시 시도해 주세요')); throw e; }
+        finally { clearTimeout(tm); } };
     var res = await go();
     if (res.status === 401 && await qRefresh()) res = await go();
     return res;
@@ -68,7 +72,9 @@ function enterQuote() {
     loadSeal();
     // 견적 데이터를 조회용으로 여는 경우(?view=)엔 종류 선택 없이 바로 진행
     const params = new URLSearchParams(window.location.search);
-    if (params.get('view')) {
+    if (params.get('qid') || /^q:/.test(params.get('view') || '')) {
+        qdbFromUrl(params);   // ㊿+177 포탈 DB 견적(sat/qdb.js)
+    } else if (params.get('view')) {
         selectQuoteType('enterprise');
     } else {
         document.getElementById('quoteTypeOverlay').style.display = 'flex';
@@ -175,6 +181,7 @@ function sanitizeFileName(str) {
 }
 async function prepareAndPrint() {
     calcAll();
+    if ((await qdbBeforePrint()) === false) return;   // ㊿+177 먼저 포탈 DB 에 저장 · «발송» (sat/qdb.js · 실패해도 발행은 계속)
     const customer = sanitizeFileName(document.getElementById('customerName').value || "고객사명");
     const qDate = sanitizeFileName(document.getElementById('quoteDate').value || "날짜미입력");
     if (isPo()) {
@@ -611,7 +618,9 @@ const PO_REMARKS    = [["발 주 번 호:",""],["발  주  자:",""],["결 제 �
 const PO_MANAGERS = [{ name: "김민정 대리", contact: "kmj915@genians.com / 010-2985-8915" }];   // 발주서에서만 목록에 추가되는 담당자 (견적서 목록에는 없음)
 function remarkInputs() { return Array.from(document.querySelectorAll('.remarks-section tr')).slice(0, 3).map(tr => Array.from(tr.querySelectorAll('input'))); }
 function setRemarks(pairs) { const rows = remarkInputs(); pairs.forEach((p, i) => { const r = rows[Math.floor(i / 2)]; if (!r) return; const off = (i % 2) * 2; r[off].value = p[0]; r[off + 1].value = p[1]; }); }
-function poNoFor(dateStr) { const d = (dateStr || new Date().toISOString().slice(0, 10)); return 'PO-' + d.slice(2, 4) + d.slice(5, 7) + d.slice(8, 10) + '-001'; }
+/** ㊿+182 오늘(이 컴퓨터 날짜 · 한국) — toISOString 은 UTC 라 아침 9시 전엔 어제가 됨 */
+function localYmd() { const d = new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+function poNoFor(dateStr) { const d = (dateStr || localYmd()); return 'PO-' + d.slice(2, 4) + d.slice(5, 7) + d.slice(8, 10) + '-001'; }
 function applyDocMode(type) {
     const po = (type === 'po');
     document.getElementById('docTitle').innerText = po ? '발 주 서' : '견 적 서';
@@ -729,7 +738,8 @@ async function initAppAfterTypeSelected() {
     // URL에 ?view=경로 가 있으면, 그 견적을 자동으로 불러와서 읽기 전용으로 보여줍니다.
     const params = new URLSearchParams(window.location.search);
     const viewPath = params.get('view');
-    if (viewPath) {
+    if (params.get('oi')) qdbOiFromUrl();   // ㊿+177 OI 에서 «견적 만들기»
+    if (viewPath && !/^q:/.test(viewPath)) {
         try {
             const res = await workerFetch(`/load?path=${encodeURIComponent(viewPath)}`);
             if (!res.ok) {
@@ -1217,7 +1227,7 @@ async function silentSaveToGithub() {
     }
     const data = collectQuoteData();
     const customer = sanitizeFileName(data.customerName || '고객사미입력');
-    const dateStr = (data.quoteDate || new Date().toISOString().slice(0, 10)).replace(/-/g, '');
+    const dateStr = (data.quoteDate || localYmd()).replace(/-/g, '');
     const timeStamp = Date.now();
     const fileName = isPo() ? `${dateStr}_${customer}_발주서_${timeStamp}.json` : `${dateStr}_${customer}_${timeStamp}.json`;
     try {
