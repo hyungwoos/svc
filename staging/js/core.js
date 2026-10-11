@@ -315,20 +315,33 @@ export function sessWrite(o){
   try{ sessionStorage.setItem(SESS_KEY, j); }catch(e){}
   try{ if(keepLogin()) localStorage.setItem(SESS_KEY, j); else localStorage.removeItem(SESS_KEY); }catch(e){}
 }
-export function saveSess(j,email,pOverride){
+export function saveSess(j,email,pOverride,fresh){
   var s0=null; try{ s0=sessRead(); }catch(e){}
   sessWrite({
     a:j.access_token, r:j.refresh_token||null,
     e:Math.floor(Date.now()/1000)+(j.expires_in||3600), u:email,
     p:(pOverride!==undefined)? pOverride : !!(j.user&&j.user.user_metadata&&j.user.user_metadata.pw_changed),
-    m:(s0 && s0.u===email && s0.m) || ''   /* ㊿+145: 'none' = 지난번 확인 때 인증 앱 없음·필수 지정 기한 전 → 다음 시작 때 확인을 기다리지 않음 */
+    m:(s0 && s0.u===email && s0.m) || '',   /* ㊿+145: 'none' = 지난번 확인 때 인증 앱 없음·필수 지정 기한 전 → 다음 시작 때 확인을 기다리지 않음 */
+    l:(!fresh && s0 && s0.u===email && s0.l) || Date.now()   /* ㊿+180 마지막으로 비밀번호를 넣은 시각 — 로그인 유지여도 30일 지나면 다시 로그인 */
   });
+  if(fresh){ try{ localStorage.removeItem(IDLE_LAST_KEY); }catch(e){} }   /* 새로 로그인 — 예전 탭의 마지막 활동 시각으로 바로 끊기지 않게 */
 }
+/** ㊿+180 토큰 갱신 때 «첫 로그인 비밀번호 변경 전» 표시를 지우지 않음(예전엔 갱신하면 true 로 바뀌어 새로고침으로 변경을 건너뛸 수 있었음) */
+export function sessPKeep(j, s){ var md=j && j.user && j.user.user_metadata; return (md && md.pw_changed)? true : (s && s.p===false? false : true); }
+export var SESS_MAX_DAYS=30;
+export function sessTooOld(s){ return !!(s && s.l && Date.now()-s.l > SESS_MAX_DAYS*864e5); }
+/** 자동 로그아웃을 켰고, 마지막 활동(다른 탭 · 닫기 전 포함)에서 그 시간이 지남 */
+export function sessIdleOver(){ var im=idleMin(), il=0; try{ il=+(localStorage.getItem(IDLE_LAST_KEY)||0); }catch(e){} return !!(im && il && Date.now()-il > im*60000); }
 export function sessMark(m){ try{ var s=sessRead(); if(s){ s.m=m||''; sessWrite(s); } }catch(e){} }
 export function clearSess(){ try{ sessionStorage.removeItem(SESS_KEY); }catch(e){} try{ localStorage.removeItem(SESS_KEY); }catch(e){} }
 export async function restoreSess(){
   var s=sessRead();
   if(!s || !s.a || s.p===false) return false;      // 비밀번호 미변경 계정은 다시 로그인
+  /* ㊿+180 로그인 유지여도 마지막 비밀번호 입력 30일 뒤에는 다시 로그인 · 예전 세션(시각 없음)은 지금부터 셈
+     자동 로그아웃을 켠 사람은 앱 · 탭을 닫아 둔 시간도 셈(예전엔 다시 열면 그대로 들어감) */
+  if(!s.l){ s.l=Date.now(); sessWrite(s); }
+  if(sessTooOld(s)){ sessEnd('로그인한 지 '+SESS_MAX_DAYS+'일이 지나 보안을 위해 다시 로그인해 주세요.', s.a); return false; }
+  if(sessIdleOver()){ sessEnd(idleLabel(idleMin())+' 동안 활동이 없어 자동 로그아웃되었습니다. 다시 로그인하세요.', s.a); return false; }
   if(Math.floor(Date.now()/1000) < (s.e||0)-120){ ST.SB_TOKEN=s.a; ST.AUTH_USER=s.u; }
   else {
     if(!s.r){ clearSess(); return false; }
@@ -338,7 +351,7 @@ export async function restoreSess(){
         body:JSON.stringify({refresh_token:s.r})});
       var j=await r.json();
       if(!r.ok||!j.access_token){ clearSess(); return false; }
-      ST.SB_TOKEN=j.access_token; ST.AUTH_USER=s.u; saveSess(j,s.u,true);
+      ST.SB_TOKEN=j.access_token; ST.AUTH_USER=s.u; saveSess(j,s.u,sessPKeep(j, s));
     }catch(e){ clearSess(); return false; }
   }
   // 인증 앱이 등록된 계정인데 저장된 세션이 aal1(코드 미확인)이면 코드부터 — 취소하면 로그인 화면으로
@@ -356,17 +369,93 @@ export async function refreshToken(){
       body:JSON.stringify({refresh_token:s.r})});
     var j=await r.json();
     if(!r.ok || !j.access_token) return false;
-    ST.SB_TOKEN=j.access_token; saveSess(j, s.u, true);
+    ST.SB_TOKEN=j.access_token; saveSess(j, s.u, sessPKeep(j, s));
     return true;
   }catch(e){ return false; }
 }
 
 
-export function doLogout(){
-  if(!confirm('로그아웃할까요?')) return;
-  clearSess(); cacheDrop();
-  ST.SB_TOKEN=null; ST.AUTH_USER=null; reloadHome();
+/* ㊿+180 로그아웃 — «로그인 유지»로 이 기기(디스크)에 저장해 둔 로그인은 서버에서도 끊음(예전엔 브라우저 저장만 지움) · 권한 · 코드 · 데이터 사본도 지움
+   · 유지하지 않은 탭은 토큰이 그 탭(sessionStorage)에만 있어 지우면 끝 — 예전처럼 서버 호출 없음(운영 시험 «로그아웃 뒤 서버 호출 0번»과 같음)
+   · 다른 기기까지 끊으려면 «모든 기기에서 로그아웃»(global) */
+export function authLogout(scope, tok){
+  tok=tok||ST.SB_TOKEN; if(!tok) return Promise.resolve(false);
+  var ctl=null; try{ ctl=new AbortController(); setTimeout(function(){ try{ ctl.abort(); }catch(e){} }, 3000); }catch(e){}
+  return fetch(SB_URL+'/auth/v1/logout?scope='+(scope||'local'), {method:'POST', headers:authHdr(tok), keepalive:true, signal:ctl? ctl.signal : undefined})
+    .then(function(r){ return r.ok || r.status===204; }).catch(function(){ return false; });
 }
+export function sessWipe(){
+  clearSess(); cacheDrop();
+  ['svc_perms','svc_codes'].forEach(function(k){ try{ sessionStorage.removeItem(k); }catch(e){} });
+  try{ localStorage.removeItem(IDLE_LAST_KEY); }catch(e){}
+  ST.SB_TOKEN=null; ST.AUTH_USER=null; ST.PERMS=null;
+}
+export function sessKept(){ try{ return !!localStorage.getItem(SESS_KEY); }catch(e){ return false; } }
+/** 시간 초과 등으로 끝냄 — 서버 로그아웃은 기다리지 않음(keepalive) · 로그인 화면에 이유 */
+export function sessEnd(msg, tok){
+  if(sessKept()) authLogout('local', tok);
+  sessWipe();
+  try{ if(msg) sessionStorage.setItem('svc_idle_msg', msg); }catch(e){}
+}
+export async function doLogout(){
+  if(!confirm('로그아웃할까요?')) return;
+  if(sessKept()) await authLogout('local');
+  sessWipe(); reloadHome();
+}
+/** ㊿+180 모든 기기에서 로그아웃 — 이 계정의 모든 로그인(다른 PC · 폰 · 앱)을 끊음 · 다른 기기는 다음 토큰 갱신(최대 1시간) 때 로그인 화면 */
+export async function logoutAll(){
+  if(!confirm('모든 기기에서 로그아웃합니다.\n\n다른 PC · 폰 · 앱의 로그인도 끊깁니다(그 기기는 늦어도 1시간 안에 로그인 화면). 모르는 기기가 보이면 이것을 누른 뒤 비밀번호를 바꾸세요.\n\n계속할까요?')) return false;
+  await loginRecord('logout_all');
+  var ok=await authLogout('global');
+  if(!ok){ toast('모든 기기 로그아웃 실패', '인증 서버에 닿지 못했습니다 — 잠시 뒤 다시 해 주세요', 'bad'); return false; }
+  sessWipe();
+  try{ sessionStorage.setItem('svc_idle_msg', '모든 기기에서 로그아웃했습니다. 다시 로그인하세요.'); }catch(e){}
+  reloadHome(); return true;
+}
+/* ── ㊿+180 로그인 기록(login_log · SQL 112) — 비밀번호로 들어올 때 한 줄 · 기기는 «Windows · Chrome» 정도만(원문 UA 저장 안 함) ── */
+export function devLabel(ua){
+  ua=String(ua||navigator.userAgent||'');
+  var os=/iPhone|iPad|iPod/.test(ua)? 'iOS' : /Android/.test(ua)? 'Android' : /Windows/.test(ua)? 'Windows' : /Mac OS X|Macintosh/.test(ua)? 'macOS' : /CrOS/.test(ua)? 'ChromeOS' : /Linux/.test(ua)? 'Linux' : '기타';
+  var br=/Whale\//.test(ua)? 'Whale' : /SamsungBrowser\//.test(ua)? 'Samsung' : /Edg\//.test(ua)? 'Edge' : /OPR\//.test(ua)? 'Opera' : /Firefox\//.test(ua)? 'Firefox' : /(Chrome|CriOS)\//.test(ua)? 'Chrome' : /Safari\//.test(ua)? 'Safari' : '브라우저';
+  return os+' · '+br;
+}
+export async function loginRecord(kind, tok){
+  tok=tok||ST.SB_TOKEN; if(!tok) return false;
+  try{ var r=await fetch(SB_URL+'/rest/v1/login_log', {method:'POST', headers:Object.assign(authHdr(tok), {Prefer:'return=minimal'}), body:JSON.stringify({email:String(ST.AUTH_USER||'').toLowerCase(), kind:kind||'password', aal:sessAal(tok), device:devLabel(), keep:keepLogin(), pwa:pwaStandalone()})}); return r.ok; }
+  catch(e){ return false; }
+}
+/* ── ㊿+180 비밀번호 규칙 · 연속 실패 대기(이 브라우저 기준 · 서버 쪽 제한은 Supabase 가 따로) ── */
+export var PW_MIN=10;
+/** 새 비밀번호 검사 — 문제가 없으면 '' */
+export function pwRule(p, email, old){
+  p=String(p||''); var id=String(email||'').split('@')[0].toLowerCase();
+  if(p.length<PW_MIN) return PW_MIN+'자 이상으로 입력하세요';
+  if(!/[A-Za-z]/.test(p) || !/\d/.test(p)) return '영문과 숫자를 함께 넣어 주세요';
+  if(/^(.)\1+$/.test(p.replace(/\d/g,'')) && /^(.)\1+$/.test(p.replace(/[A-Za-z]/g,''))) return '같은 글자만 반복하지 마세요';
+  if(id.length>=4 && p.toLowerCase().indexOf(id)>=0) return '이메일 아이디가 들어가지 않게 해 주세요';
+  if(/^(password|qwer|asdf|genians|1q2w3e)/i.test(p)) return '흔한 비밀번호로 시작하지 않게 해 주세요';
+  if(old && p===old) return '지금 비밀번호와 다르게 해 주세요';
+  return '';
+}
+export function pwGen(n){
+  var A='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz', D='23456789', all=A+D, out='', u=new Uint32Array(n||14);
+  try{ crypto.getRandomValues(u); }catch(e){ for(var k=0;k<u.length;k++) u[k]=Math.floor(Math.random()*4294967295); }
+  for(var i=0;i<u.length;i++) out+=all[u[i]%all.length];
+  if(!/\d/.test(out)) out=out.slice(0,-1)+D[u[0]%D.length];
+  if(!/[A-Za-z]/.test(out)) out=A[u[1]%A.length]+out.slice(1);
+  return out;
+}
+export var LF_KEY='svc_lf', LF_MAX=5;
+export function lfAll(){ try{ return JSON.parse(localStorage.getItem(LF_KEY)||'{}')||{}; }catch(e){ return {}; } }
+/** 남은 대기(초) — 0 이면 바로 시도 가능 */
+export function lfWait(email){ var o=lfAll()[String(email||'').toLowerCase()]; return o && o.until>Date.now()? Math.ceil((o.until-Date.now())/1000) : 0; }
+export function lfFail(email){
+  var all=lfAll(), k=String(email||'').toLowerCase(), o=all[k]||{n:0, until:0}; o.n++;
+  if(o.n>=LF_MAX) o.until=Date.now()+Math.min(15*60, 30*Math.pow(2, o.n-LF_MAX))*1000;
+  all[k]=o; try{ localStorage.setItem(LF_KEY, JSON.stringify(all)); }catch(e){} return o;
+}
+export function lfOk(email){ var all=lfAll(); delete all[String(email||'').toLowerCase()]; try{ localStorage.setItem(LF_KEY, JSON.stringify(all)); }catch(e){} }
+export function lfMsg(sec){ return '연속으로 '+LF_MAX+'번 넘게 틀려 잠시 막았습니다 — '+(sec>=60? Math.ceil(sec/60)+'분' : sec+'초')+' 뒤에 다시 시도하세요(비밀번호가 기억나지 않으면 관리자에게 초기화를 요청)'; }
 /* ㊿+145: 로그아웃 뒤에는 «이전 메뉴»가 아니라 처음(대시보드)부터 — 주소의 #메뉴 · ?v= 를 떼고 다시 엽니다 */
 export function reloadHome(){ try{ location.replace(location.pathname); }catch(e){ location.reload(); } }
 
@@ -502,8 +591,14 @@ export function mfaPrompt(factor, tok, email){
         mfaApplySession(s, email); done(true); return;
       }catch(e){
         fails++; ch=null;   // 틀리거나 만료됐으면 다음엔 새 challenge
-        say(fails>=5? '여러 번 틀렸습니다 — 인증 앱의 시간 설정을 확인하세요 ('+e.message+')' : '코드가 맞지 않습니다 — 다시 입력하세요', true);
-        inp.value=''; inp.focus(); if(repaint) repaint();
+        inp.value=''; if(repaint) repaint();
+        if(fails>=5 && fails%5===0){   /* ㊿+180 5번 틀릴 때마다 30초 기다림(이 창 기준 · 서버 제한은 Supabase) */
+          var w=30; inp.disabled=true; say('여러 번 틀렸습니다 — '+w+'초 뒤에 다시 입력하세요 · 인증 앱의 시간(자동 설정)을 확인하세요', true);
+          var tm=setInterval(function(){ w--; if(w>0){ msgEl.textContent='여러 번 틀렸습니다 — '+w+'초 뒤에 다시 입력하세요 · 인증 앱의 시간(자동 설정)을 확인하세요'; return; } clearInterval(tm); inp.disabled=false; busy=false; go.disabled=false; say(''); inp.focus(); }, 1000);
+          return;
+        }
+        say(fails>=3? '코드가 맞지 않습니다 — 인증 앱의 시간 설정을 확인하세요 ('+e.message+')' : '코드가 맞지 않습니다 — 다시 입력하세요', true);
+        inp.focus();
       }
       busy=false; go.disabled=false;
     }
@@ -601,15 +696,19 @@ export var IDLE_KEY='svc_idle_min';   // ㊿+153: init.js 에서 옮김
 export var IDLE_OPTS=[0,15,30,60,120,240,480];
 export function idleMin(){ var v=0; try{ v=parseInt(localStorage.getItem(IDLE_KEY),10)||0; }catch(e){} return v>0? v:0; }
 export function idleLabel(m){ return !m? '끄기 (로그인 유지)' : (m>=60? (m/60)+'시간' : m+'분'); }
-export function idleTouch(){ ST.IDLE_LAST=Date.now(); ST.IDLE_WARNED=false; }
+export var IDLE_LAST_KEY='svc_idle_last';   /* ㊿+180 마지막 활동 시각(탭 · 앱을 닫아 둔 시간도 세려고) — 자동 로그아웃을 켰을 때만 씀 */
+export function idleTouch(){ ST.IDLE_LAST=Date.now(); ST.IDLE_WARNED=false;
+  if(idleMin() && (!ST.IDLE_SAVED || ST.IDLE_LAST-ST.IDLE_SAVED>15000)){ ST.IDLE_SAVED=ST.IDLE_LAST; try{ localStorage.setItem(IDLE_LAST_KEY, String(ST.IDLE_LAST)); }catch(e){} } }
 
 export function idleLogout(m){
-  clearSess(); cacheDrop();
-  try{ sessionStorage.setItem('svc_idle_msg', idleLabel(m)+' 동안 활동이 없어 자동 로그아웃되었습니다. 다시 로그인하세요.'); }catch(e){}
-  ST.SB_TOKEN=null; ST.AUTH_USER=null; reloadHome();
+  sessEnd(idleLabel(m)+' 동안 활동이 없어 자동 로그아웃되었습니다. 다시 로그인하세요.');
+  reloadHome();
 }
 export function idleCheck(){
+  if(ST.SB_TOKEN && sessTooOld(sessRead())){ sessEnd('로그인한 지 '+SESS_MAX_DAYS+'일이 지나 보안을 위해 다시 로그인해 주세요.'); reloadHome(); return; }   /* ㊿+180 */
   var m=idleMin(); if(!m || !ST.SB_TOKEN) return;
+  /* ㊿+180 다른 탭에서 쓰고 있으면 이 탭도 활동 중으로 — 로그아웃이 서버 로그인까지 끊으므로(로그인 유지) 한 탭만 쉬었다고 다른 탭이 끊기면 안 됨 */
+  try{ var il=+(localStorage.getItem(IDLE_LAST_KEY)||0); if(il>ST.IDLE_LAST){ ST.IDLE_LAST=il; ST.IDLE_WARNED=false; } }catch(e){}
   var idle=Date.now()-ST.IDLE_LAST, lim=m*60000;
   if(idle>=lim){ idleLogout(m); return; }
   if(!ST.IDLE_WARNED && lim-idle<=60000){

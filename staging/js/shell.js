@@ -2,7 +2,7 @@
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { IS_QA, ST } from './state.js';
 import { Viz } from './viz.js';
-import { $, applyPerms, bizHas, bizKey, canView, canWrite, clearSess, cssv, el, esc, isCC, isGN, keepLogin, LIVE2CODE, lline, loadPerms, mfaGate, mfaVerifiedOf, mfaWarnIfNeeded, mk, monOf, navText, PERF, perfDev, perfNet, perfRec, permWriteGuard, rawHtml, refreshToken, restoreSess, saveSess, SB_KEY, SB_URL, seriesColor, sessRead, sessWrite, STATE, tpl, won } from './core.js';
+import { $, applyPerms, bizHas, bizKey, canView, canWrite, clearSess, cssv, el, esc, isCC, isGN, keepLogin, lfFail, lfMsg, lfOk, lfWait, LIVE2CODE, lline, loadPerms, loginRecord, mfaGate, mfaVerifiedOf, mfaWarnIfNeeded, mk, monOf, navText, PERF, perfDev, perfNet, perfRec, permWriteGuard, pwRule, rawHtml, refreshToken, restoreSess, saveSess, SB_KEY, SB_URL, seriesColor, sessIdleOver, sessRead, sessTooOld, sessWrite, STATE, tpl, won } from './core.js';
 import { buildControls, expN, expScan, hbars, idxs, kpiOpen, monthlyTotal, renderAll, renderInstall, renderKpis, renderMatrix, renewNeedScan } from './dash.js';
 import { ask } from './ai.js';
 import { applyCodes, GRIDS, loadCodes } from './grids.js';
@@ -1170,7 +1170,7 @@ export var PREFETCH={tok:'', p:null, at:0};
 export function prefetchData(){
   try{
     if(IS_QA) return;
-    var s=sessRead(); if(!s || !s.a || s.p===false) return;
+    var s=sessRead(); if(!s || !s.a || s.p===false || sessTooOld(s) || sessIdleOver()) return;   /* ㊿+180 30일 지났거나 자동 로그아웃 시간이 지난 로그인은 미리 받지 않음(곧 로그인 화면) */
     if(Math.floor(Date.now()/1000) >= (s.e||0)-120) return;   // 곧 만료 → 연장 뒤 새 토큰으로 받음
     PREFETCH.tok=s.a; PREFETCH.at=Date.now();
     PREFETCH.p=fetch(SB_URL+'/rest/v1/rpc/load_all', {method:'POST', headers:{apikey:SB_KEY, Authorization:'Bearer '+s.a, 'Content-Type':'application/json'}, body:'{}'})
@@ -1472,19 +1472,22 @@ export function enterAfterLogin(){
 export async function screenLogin(){
   var em=$('#lsEmail').value.trim(), pw=$('#lsPw').value, m=$('#lsMsg');
   if(!em||!pw){ m.textContent='이메일과 비밀번호를 입력하세요'; return; }
+  var wt=lfWait(em); if(wt){ m.style.color='var(--critical,#d03b3b)'; m.textContent=lfMsg(wt); return; }   /* ㊿+180 연속 실패 대기 */
   m.style.color='var(--muted)'; m.textContent='확인 중…';
   try{
     var r=await fetch(SB_URL+'/auth/v1/token?grant_type=password',{
       method:'POST', headers:{apikey:SB_KEY,'Content-Type':'application/json'},
       body:JSON.stringify({email:em, password:pw})});
     var j=await r.json();
-    if(!r.ok||!j.access_token) throw new Error(j.error_description||j.msg||'이메일 또는 비밀번호가 올바르지 않습니다');
+    if(!r.ok||!j.access_token){ if(r.status===400 || r.status===401){ var lf=lfFail(em); if(lf.until>Date.now()) throw new Error(lfMsg(lfWait(em))); } throw new Error(j.error_description||j.msg||'이메일 또는 비밀번호가 올바르지 않습니다'); }
+    lfOk(em);
     ST.SB_TOKEN=j.access_token; ST.AUTH_USER=em;
     try{ var kc=$('#lsKeep'); if(kc) localStorage.setItem('svc_keep', kc.checked? '1':'0'); }catch(x){}
-    saveSess(j, em);
+    saveSess(j, em, undefined, true);
     try{ localStorage.setItem('svc_last_email', em); }catch(x){}
     var vf0=mfaVerifiedOf(j.user&&j.user.factors);   /* ㊿+145: 확인된 인증 앱이 없으면 빠른 길(확인은 데이터 읽기와 병렬) */
     if(!(await mfaGate(j.access_token, em, j.user&&j.user.factors, {fast:!vf0.length}))){ clearSess(); ST.SB_TOKEN=null; ST.AUTH_USER=null; m.style.color='var(--muted)'; m.textContent='2단계 인증을 취소해 로그인하지 않았습니다'; return; }
+    loginRecord('password');   /* ㊿+180 로그인 기록(SQL 112 전이면 조용히 건너뜀) */
     showAuthUi();
     var changed=j.user && j.user.user_metadata && j.user.user_metadata.pw_changed;
     if(!changed){
@@ -1498,7 +1501,7 @@ export async function screenLogin(){
 }
 export async function screenPw(){
   var p1=$('#lsNpw1').value, p2=$('#lsNpw2').value, m=$('#lsMsg');
-  if(p1.length<6){ m.style.color='var(--critical,#d03b3b)'; m.textContent='6자 이상으로 입력하세요'; return; }
+  var bad=pwRule(p1, ST.AUTH_USER, $('#lsPw').value); if(bad){ m.style.color='var(--critical,#d03b3b)'; m.textContent=bad; return; }   /* ㊿+180 10자 · 영문 + 숫자 */
   if(p1!==p2){ m.style.color='var(--critical,#d03b3b)'; m.textContent='비밀번호 확인이 일치하지 않습니다'; return; }
   m.style.color='var(--muted)'; m.textContent='변경 중…';
   try{

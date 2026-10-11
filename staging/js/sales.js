@@ -284,12 +284,12 @@ export function initOiForm(){
     var h=OI_PRODUCTS.map(function(name){
       return tpl`<div class="oi-prow">`+
         tpl`<label class="mpchk" style="min-width:190px"><input type="checkbox" data-oip="${name}"> ${name}</label>`+
-        tpl`<input class="oi-qty" type="number" min="1" placeholder="수량" disabled></div>`;
+        tpl`<input class="oi-qty" type="number" inputmode="numeric" min="1" placeholder="수량" disabled></div>`;
     }).join('');
     h+=tpl`<div class="oi-prow">`+
        tpl`<label class="mpchk" style="min-width:190px"><input type="checkbox" data-oip="__etc"> 직접 입력</label>`+
        tpl`<input class="oi-etc" placeholder="제품명" disabled style="flex:1;max-width:220px">`+
-       tpl`<input class="oi-qty" type="number" min="1" placeholder="수량" disabled></div>`;
+       tpl`<input class="oi-qty" type="number" inputmode="numeric" min="1" placeholder="수량" disabled></div>`;
     h+=tpl`<div style="margin-top:8px"><button class="pill ghost" type="button" id="oiEtcAdd" `+
        tpl`style="height:28px;padding:0 12px;font-size:12px">＋ 직접 입력 항목 추가</button></div>`;
     pb.innerHTML=h;
@@ -490,7 +490,7 @@ export function oiAddEtcRow(prodName, qty){
   row.className='oi-prow'; row.dataset.extra='1';
   row.innerHTML=tpl`<label class="mpchk" style="min-width:190px"><input type="checkbox" data-oip="__etc"> 직접 입력</label>`+
     tpl`<input class="oi-etc" placeholder="제품명" disabled style="flex:1;max-width:220px">`+
-    tpl`<input class="oi-qty" type="number" min="1" placeholder="수량" disabled>`+
+    tpl`<input class="oi-qty" type="number" inputmode="numeric" min="1" placeholder="수량" disabled>`+
     tpl`<button class="pill ghost" type="button" style="height:26px;padding:0 9px;font-size:12px" title="행 삭제">✕</button>`;
   var cb=row.querySelector('input[data-oip]');
   cb.onchange=function(){
@@ -1026,7 +1026,7 @@ export function renderChurnRate(){
   var m=crMatch, baseLab={valid:'계약 유효 고객사',rev:'과금 고객사',cum:'누적고객(신규 − 해지)'}[CR.base];
   h+=tpl`<div class="pr-card" style="margin-bottom:12px"><h3>${crSummary()} — ${CR.unit==='year'?'연도별':CR.unit==='half'?'반기별':'분기별'} 해지율`+
      tpl` <span class="ubadge sm">분모 = 기간 시작 전 달 ${rawHtml(baseLab)}</span><small>${CR.rows?'계약 행 단위':'고객사 단위'} · 지원사업 ${rawHtml({all:'포함',ex:'제외',only:'만'}[CR.sup])} · CND ${CR.cnd?'포함':'제외'} · 지원 제외율 = 그 외 해지 ÷ ${CR.exDen==='all'?'전체 활성':'지원 제외 활성'}</small></h3>`+
-     tpl`<div style="overflow-x:auto"><table class="pr"><thead><tr><th>기간</th><th class="n" title="기간 시작 직전 달 기준 — 연도면 전년 12월">시작 활성<br><span class="mini">(직전 달)</span></th><th class="n">└ 지원사업</th><th class="n" title="기간 마지막 달 기준">기간 말 활성</th><th class="n">해지</th><th class="n">└ 지원사업</th><th class="n">└ 그 외</th><th class="n">해지율 (지원 포함)</th><th class="n">해지율 (지원 제외)</th><th class="n">해지 MRR(천원)</th></tr></thead><tbody>`;
+     tpl`<div style="overflow-x:auto" tabindex="0" role="region" aria-label="표 — 옆으로 스크롤"><table class="pr"><thead><tr><th>기간</th><th class="n" title="기간 시작 직전 달 기준 — 연도면 전년 12월">시작 활성<br><span class="mini">(직전 달)</span></th><th class="n">└ 지원사업</th><th class="n" title="기간 마지막 달 기준">기간 말 활성</th><th class="n">해지</th><th class="n">└ 지원사업</th><th class="n">└ 그 외</th><th class="n">해지율 (지원 포함)</th><th class="n">해지율 (지원 제외)</th><th class="n">해지 MRR(천원)</th></tr></thead><tbody>`;
   var tot={lost:[],sup:[],org:[],amt:0};
   P.forEach(function(p){
     var base=crActive(p.s-1,m), baseSup=base.filter(crIsSup), lost=crLost(p.s,p.e,m), sup=lost.filter(crIsSup), org=lost.filter(function(r){return !crIsSup(r);});
@@ -1046,7 +1046,7 @@ export function renderChurnRate(){
   [['제품별','line'],['사업영역별','area']].forEach(function(gg){
     var g=G.filter(function(x){return x.k===gg[1];})[0]; if(!g) return;
     var cols=g.opts.filter(function(o){ var sel=CR.f[g.k]||[]; return !sel.length || sel.indexOf(o[0])>=0; });
-    h+=tpl`<div class="pr-card" style="margin-bottom:12px"><h3>${rawHtml(gg[0])} 해지율 <small>칸 = 해지 / 기간 시작 활성 · 해지율(지원 포함) · 다른 필터는 그대로 적용 · 맨 오른쪽 = 칸 합계와 전체 표(회사 단위) 대조</small></h3><div style="overflow-x:auto"><table class="pr"><thead><tr><th>기간</th>`+
+    h+=tpl`<div class="pr-card" style="margin-bottom:12px"><h3>${rawHtml(gg[0])} 해지율 <small>칸 = 해지 / 기간 시작 활성 · 해지율(지원 포함) · 다른 필터는 그대로 적용 · 맨 오른쪽 = 칸 합계와 전체 표(회사 단위) 대조</small></h3><div style="overflow-x:auto" tabindex="0" role="region" aria-label="표 — 옆으로 스크롤"><table class="pr"><thead><tr><th>기간</th>`+
        tpl`${rawHtml(cols.map(function(o){ return tpl`<th class="n">${o[1]}</th>`; }).join(''))}<th class="n" title="칸을 그대로 더한 값 / 전체 표 값 — 두 제품(영역)을 함께 쓰는 고객사는 칸마다 1곳씩 잡히지만 전체 표에서는 회사 단위로 1곳이라 그만큼 차이가 납니다">합계 → 전체(회사 단위)</th></tr></thead><tbody>`;
     P.forEach(function(p){
       var sB=0, sL=0;
@@ -1180,7 +1180,7 @@ export function renderCustFlow(){
   /* ① 롤포워드 (2020년부터) */
   var from0=CR.from; CR.from=2020; P=crPeriods(); CR.from=from0;
   h+=tpl`<div class="pr-card" style="margin-bottom:12px"><h3>${crSummary()} — 고객사 증감<small>고객사 단위 · 계약 유효 기준(해지 고객사는 해지월 말에 빠짐) · 지원사업 ${rawHtml({all:'포함',ex:'제외',only:'만'}[CR.sup])} · CND ${CR.cnd?'포함':'제외'}</small></h3>`+
-     tpl`<div style="overflow-x:auto"><table class="pr"><thead><tr><th>기간</th><th class="n">기초</th><th class="n" title="그 기간에 첫 계약을 시작한 고객사">+ 신규</th><th class="n" title="예전에 끊겼다가 다시 계약한 고객사 (첫 계약이 아님)">+ 복귀</th><th class="n" title="상태 «해지» · 해지월이 그 기간 (해지율 화면과 같은 수) · 괄호 = 그중 다른 서비스 계약·재계약이 남아 고객사로는 유지된 곳">− 해지 <span class="mini">(잔존)</span></th><th class="n" title="해지가 아닌데 기간 말에 유효 계약이 없는 고객사: 약정 만기 후 미연장 · 서비스종료 · CN전환 등">− 종료(해지 외)</th><th class="n">기말</th><th class="n">순증</th><th class="n">증가율</th></tr></thead><tbody>`;
+     tpl`<div style="overflow-x:auto" tabindex="0" role="region" aria-label="표 — 옆으로 스크롤"><table class="pr"><thead><tr><th>기간</th><th class="n">기초</th><th class="n" title="그 기간에 첫 계약을 시작한 고객사">+ 신규</th><th class="n" title="예전에 끊겼다가 다시 계약한 고객사 (첫 계약이 아님)">+ 복귀</th><th class="n" title="상태 «해지» · 해지월이 그 기간 (해지율 화면과 같은 수) · 괄호 = 그중 다른 서비스 계약·재계약이 남아 고객사로는 유지된 곳">− 해지 <span class="mini">(잔존)</span></th><th class="n" title="해지가 아닌데 기간 말에 유효 계약이 없는 고객사: 약정 만기 후 미연장 · 서비스종료 · CN전환 등">− 종료(해지 외)</th><th class="n">기말</th><th class="n">순증</th><th class="n">증가율</th></tr></thead><tbody>`;
   var sumN=0,sumR=0,sumL=0,sumK=0,sumX=0;
   P.forEach(function(p){
     var b0=crActive(p.s-1,m), nw=crNew(p.s,p.e,m), rt=crRet(p.s,p.e,m), lo=crLost(p.s,p.e,m), kp=crLostKeep(p.s,p.e,m), xd=crEnded(p.s,p.e,m), e1=crActive(p.e,m);
@@ -1252,7 +1252,7 @@ export function renderCustFlow(){
     if(used['']) cols.push(['','(미지정)']);
     h+=tpl`<div class="pr-card" style="margin-bottom:12px"><h3>유입 경로 — 신규 고객사<small>그 기간에 첫 계약을 시작한 고객사를 첫 계약의 ${g.l}로 나눔 · 칸을 누르면 명단</small></h3>`+
        tpl`<div class="crrow" style="margin:6px 0 8px">${rawHtml(crSeg('기준','cfSrc',DIMS,CR.cfSrc))}</div>`+
-       tpl`<div style="overflow-x:auto"><table class="pr"><thead><tr><th>기간</th>${rawHtml(cols.map(function(o){ return tpl`<th class="n">${o[1]}</th>`; }).join(''))}<th class="n" style="border-left:1px solid var(--ring)">신규 합계</th></tr></thead><tbody>`;
+       tpl`<div style="overflow-x:auto" tabindex="0" role="region" aria-label="표 — 옆으로 스크롤"><table class="pr"><thead><tr><th>기간</th>${rawHtml(cols.map(function(o){ return tpl`<th class="n">${o[1]}</th>`; }).join(''))}<th class="n" style="border-left:1px solid var(--ring)">신규 합계</th></tr></thead><tbody>`;
     per.forEach(function(x){
       var byV={}; x.nw.forEach(function(r){ var v=val(r); (byV[v]=byV[v]||[]).push(r); });
       var tot=crN(x.nw);
@@ -1268,7 +1268,7 @@ export function renderCustFlow(){
   /* ② 제품별 기말 고객사 */
   if(lineG){
     var cols=lineG.opts.filter(function(o){ var sel=CR.f.line||[]; return !sel.length || sel.indexOf(o[0])>=0; });
-    h+=tpl`<div class="pr-card" style="margin-bottom:12px"><h3>제품별 기말 고객사 <small>칸 = 기말 고객사 (순증) · 한 고객이 두 제품을 쓰면 제품마다 1곳 — 전체는 회사 단위라 제품 합보다 작을 수 있음</small></h3><div style="overflow-x:auto"><table class="pr"><thead><tr><th>기간</th>${rawHtml(cols.map(function(o){return tpl`<th class="n">${o[1]}</th>`;}).join(''))}<th class="n">전체(중복 제거)</th></tr></thead><tbody>`;
+    h+=tpl`<div class="pr-card" style="margin-bottom:12px"><h3>제품별 기말 고객사 <small>칸 = 기말 고객사 (순증) · 한 고객이 두 제품을 쓰면 제품마다 1곳 — 전체는 회사 단위라 제품 합보다 작을 수 있음</small></h3><div style="overflow-x:auto" tabindex="0" role="region" aria-label="표 — 옆으로 스크롤"><table class="pr"><thead><tr><th>기간</th>${rawHtml(cols.map(function(o){return tpl`<th class="n">${o[1]}</th>`;}).join(''))}<th class="n">전체(중복 제거)</th></tr></thead><tbody>`;
     P.forEach(function(p){
       h+=tpl`<tr><td><b>${p.l}</b></td>${rawHtml(cols.map(function(o){
         var mm=function(r){ return crMatch(r) && r.line===o[0]; };
@@ -1439,7 +1439,7 @@ export function renderChurn(){
       tpl`<button class="chip" data-ln="" aria-pressed="${!lSel.length}">전체 ${rawHtml(lTot)}</button>`+
       tpl`${rawHtml(lKeys.map(function(k2){ return tpl`<button class="chip" data-ln="${k2}" aria-pressed="${lSel.indexOf(k2)>=0}">${k2} ${rawHtml(byL[k2].n)}</button>`; }).join(''))}`+
       tpl`<span class="mini" style="align-self:center;color:var(--muted)">여러 개 선택 가능 · 다시 누르면 해제${rawHtml(lSel.length>1? ' · 선택 '+lSel.length+'개 합산은 아래 리스트·사유 표에 반영':'')}</span></div>`+
-    tpl`<div style="overflow-x:auto"><table class="pr" id="chLine"><thead><tr><th>제품</th><th class="n">해지 건수</th><th class="n">비중</th><th class="n">고객사</th><th class="n">지원사업</th><th class="n">시작 활성</th><th class="n">해지율</th><th class="n">월액 합(천원)</th><th class="n">연환산(천원)</th><th>주요 사유</th></tr></thead><tbody>`+ tpl`${rawHtml(lKeys.map(function(k2){
+    tpl`<div style="overflow-x:auto" tabindex="0" role="region" aria-label="표 — 옆으로 스크롤"><table class="pr" id="chLine"><thead><tr><th>제품</th><th class="n">해지 건수</th><th class="n">비중</th><th class="n">고객사</th><th class="n">지원사업</th><th class="n">시작 활성</th><th class="n">해지율</th><th class="n">월액 합(천원)</th><th class="n">연환산(천원)</th><th>주요 사유</th></tr></thead><tbody>`+ tpl`${rawHtml(lKeys.map(function(k2){
       var o=byL[k2], on=(lSel.indexOf(k2)>=0), cu=Object.keys(o.cu).length, base=lineBase(k2, CHURN.f-1);
       var top=Object.keys(o.rs).sort(function(a,b2){ return o.rs[b2]-o.rs[a]; }).slice(0,3).map(function(r2){ return r2+' '+o.rs[r2]; }).join(' · ');
       return tpl`<tr data-ln="${k2}" style="cursor:pointer${on?';background:var(--brand-t);font-weight:700':''}"><td>${k2}${on?' ✓':''}</td><td class="n">${rawHtml(o.n)}</td><td class="n">${lTot?Math.round(o.n/lTot*100):0}%</td><td class="n">${rawHtml(cu)}</td><td class="n">${rawHtml(o.sup||'–')}</td>`+
@@ -1453,13 +1453,13 @@ export function renderChurn(){
   if(lKeys.length>1){
     var rsAll={}; inRL.forEach(function(x){ rsAll[x.reason]=(rsAll[x.reason]||0)+1; });
     var rsKeys=Object.keys(rsAll).sort(function(a,b2){ return rsAll[b2]-rsAll[a]; });
-    h+=tpl`<details style="margin-top:10px"><summary style="cursor:pointer;color:var(--s1-ink);font-size:13px">사유 × 제품 표 펼치기</summary><div style="overflow-x:auto;margin-top:6px"><table class="pr"><thead><tr><th>해지 사유</th>${rawHtml(lKeys.map(function(k2){ return tpl`<th class="n">${k2}</th>`; }).join(''))}<th class="n">합계</th></tr></thead><tbody>`+
+    h+=tpl`<details style="margin-top:10px"><summary style="cursor:pointer;color:var(--s1-ink);font-size:13px">사유 × 제품 표 펼치기</summary><div style="overflow-x:auto;margin-top:6px" tabindex="0" role="region" aria-label="표 — 옆으로 스크롤"><table class="pr"><thead><tr><th>해지 사유</th>${rawHtml(lKeys.map(function(k2){ return tpl`<th class="n">${k2}</th>`; }).join(''))}<th class="n">합계</th></tr></thead><tbody>`+
       tpl`${rawHtml(rsKeys.map(function(r2){ return tpl`<tr><td>${r2}</td>${rawHtml(lKeys.map(function(k2){ var v=byL[k2].rs[r2]||0; return tpl`<td class="n"${rawHtml(v?'':' style="color:var(--muted)"')}>${rawHtml(v||'–')}</td>`; }).join(''))}<td class="n"><b>${rawHtml(rsAll[r2])}</b></td></tr>`; }).join(''))}`+
       tpl`</tbody></table></div></details>`;
   }
   h+='</div>';
   h+=tpl`<div class="pr-card" style="margin-bottom:14px"><h3>사유별 집계 <small>행을 클릭하면 아래 리스트가 그 사유로 좁혀집니다</small></h3>`+
-    tpl`<div style="overflow-x:auto"><table class="pr" id="chAgg"><thead><tr><th>해지 사유</th><th class="n">건수</th><th class="n">비중</th><th class="n">월액 합(천원)</th><th class="n">연환산(천원)</th></tr></thead><tbody>`+ tpl`${rawHtml(keys.map(function(k2){
+    tpl`<div style="overflow-x:auto" tabindex="0" role="region" aria-label="표 — 옆으로 스크롤"><table class="pr" id="chAgg"><thead><tr><th>해지 사유</th><th class="n">건수</th><th class="n">비중</th><th class="n">월액 합(천원)</th><th class="n">연환산(천원)</th></tr></thead><tbody>`+ tpl`${rawHtml(keys.map(function(k2){
       var o=by[k2], on=!!(CHURN.fil.reason && CHURN.fil.reason.length===1 && CHURN.fil.reason[0]===k2);
       return tpl`<tr data-rs="${k2}" style="cursor:pointer${on?';background:var(--brand-t);font-weight:700':''}">`+
         tpl`<td>${k2}${on?' ✓':''}</td><td class="n">${rawHtml(o.n)}</td><td class="n">${totN?Math.round(o.n/totN*100):0}%</td>`+
@@ -1476,7 +1476,7 @@ export function renderChurn(){
       tpl`<span class="mini" id="chXmsg"></span>`+
       tpl`<span class="spacer"></span><span class="mini">열 제목의 ▼ 로 값 골라 보기 · ${list.length}건 / 기간 내 ${inR0.length}건</span>`+
     tpl`</div>`+
-    tpl`<div style="overflow-x:auto"><table class="pr" id="chList"><thead><tr>`+
+    tpl`<div style="overflow-x:auto" tabindex="0" role="region" aria-label="표 — 옆으로 스크롤"><table class="pr" id="chList"><thead><tr>`+
     tpl`${rawHtml(cols.map(function(c){
       var on=!!(CHURN.fil[c[0]] && CHURN.fil[c[0]].length);
       return tpl`<th${rawHtml(c[2]?' class="n"':'')}><div class="thw">`+

@@ -722,7 +722,7 @@ export function openIfeeDetail(td, Y, M, det, adj){
   var ed=ifeeCanEdit();
   /* 금액은 «천원 단위»로 입력합니다 (㊿+157 — 표와 같은 단위 · 저장은 원) */
   function amtIn(v, key){
-    return tpl`<input class="ifin" data-f="${rawHtml(key)}" type="number" step="any" value="${v===''||v==null?'':wonToKw(v)}" placeholder="천원" `+
+    return tpl`<input class="ifin" data-f="${rawHtml(key)}" type="number" inputmode="decimal" step="any" value="${v===''||v==null?'':wonToKw(v)}" placeholder="천원" `+
            tpl`style="width:104px;text-align:right;font-size:12px;padding:3px 5px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)">`;
   }
   var h=tpl`<div class="mxdet"><table><thead><tr><th style="min-width:150px">고객사</th><th>구분·서비스</th><th>근거</th><th class="n">설치비(천원)</th>${rawHtml(ed?'<th></th>':'')}</tr></thead><tbody>`;
@@ -804,7 +804,7 @@ export function ifeeWire(box, Y, M, rows, ex, td){
       tpl`<td><select class="ifin" aria-label="항목 종류" data-f="x${rawHtml(nextX)}_kind" style="font-size:12px;padding:3px 4px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)">`+
         tpl`${rawHtml(IFEE_KINDS.map(function(k){ return tpl`<option>${rawHtml(k)}</option>`; }).join(''))}</select></td>`+
       tpl`<td><input class="ifin" data-f="x${rawHtml(nextX)}_note" type="text" placeholder="비고(선택)" style="width:100%;min-width:110px;font-size:12px;padding:3px 5px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)"></td>`+
-      tpl`<td class="n"><input class="ifin" data-f="x${rawHtml(nextX)}_amt" type="number" step="any" placeholder="천원" style="width:104px;text-align:right;font-size:12px;padding:3px 5px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)"></td>`+
+      tpl`<td class="n"><input class="ifin" data-f="x${rawHtml(nextX)}_amt" type="number" inputmode="decimal" step="any" placeholder="천원" style="width:104px;text-align:right;font-size:12px;padding:3px 5px;border:1px solid var(--ring);border-radius:6px;background:var(--surface)"></td>`+
       tpl`<td><button class="ifdel" data-x="${rawHtml(nextX)}" title="이 줄 지우기" style="border:none;background:none;cursor:pointer;color:var(--critical,#d03b3b);font-size:14px">✕</button></td>`;
     var anchor=box.querySelector('#ifAddRow');
     anchor.parentNode.insertBefore(tr, anchor);

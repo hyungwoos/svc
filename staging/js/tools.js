@@ -9,7 +9,7 @@ import { goInbList } from './inbound.js';
 import { applyMenuFold } from './sales.js';
 import { ctPeriods, custGo, navMenu, oiOpen, openDetail, qvCfg, renderGrid, switchView } from './grid.js';
 import { syncOrderAssets } from './equipment.js';
-import { closeOvl, openOvl, ovlMarkDirty } from './edit.js';
+import { closeOvl, logChange, openOvl, ovlMarkDirty } from './edit.js';
 import { homeSearchOpen, rcPush } from './home.js';
 
 
@@ -129,53 +129,96 @@ export function applyDense(){
   if(b) b.style.background = on? 'var(--brand-t,rgba(46,189,87,.13))':'';
 }
 
-/* ===== 엑셀 붙여넣기 대량 입력 ===== */
+/* ===== 엑셀 붙여넣기 대량 입력 =====
+   ㊿+179 · 첫 줄이 열 이름(머리글)이면 순서와 상관없이 이름으로 맞춤(모르는 열은 건너뜀)
+          · 넣기 전에 검사: 필수 칸 빈 행 · 목록에 없는 값(선택 칸) · 날짜/숫자 형식 → 고칠 때까지 저장 안 함
+          · 이미 표에 똑같은 행이 있거나 붙여넣은 것끼리 같은 행이면 «빼고 넣기»
+          · 100행씩 넣다가 실패하면 «앞의 n행은 들어갔고 m행부터 실패» + 변경 이력 */
 export function pasteCols(g){ return g.cols.filter(function(c){ return !c.ro && c.k[0]!=='_'; }); }
+export function pasteNorm(t){ return String(t==null? '' : t).replace(/\(천원\)|\(원\)|\s|\*/g,'').toLowerCase(); }
+/** 붙여넣은 글 → {rows, map(머리글로 맞춘 열 · 없으면 null), skipped(모르는 머리글), errs[], cols} */
+export function pasteParse(text, cols){
+  var lines=String(text||'').split(/\r?\n/).filter(function(l){ return l.trim(); });
+  var map=null, skipped=[], errs=[];
+  if(lines.length){
+    var raw=lines[0].split('\t'), hd=raw.map(pasteNorm), hit=0, m=hd.map(function(h){ var c=cols.filter(function(c0){ return pasteNorm(c0.l)===h || c0.k.toLowerCase()===h; })[0]; if(c) hit++; return c||null; });
+    if(hit>=Math.min(2, cols.length)){ map=m; lines=lines.slice(1); hd.forEach(function(h, i){ if(!m[i] && h) skipped.push(String(raw[i]).trim()); }); }
+  }
+  var rows=lines.map(function(l, li){
+    var cells=l.split('\t'), row={};
+    (map? map : cols).forEach(function(c, i){
+      if(!c) return;
+      var v=(cells[i]||'').trim(), at=(li+1)+'행 '+c.l.replace(/\(천원\)/,'');
+      if(v===''){ row[c.k]=null; return; }
+      if(c.t==='number'){ var n=parseFloat(v.replace(/[^\d.\-]/g,'')); if(isNaN(n)) errs.push(at+': 숫자가 아님(«'+v.slice(0,20)+'»)'); row[c.k]=isNaN(n)?null:(c.won? Math.round(n*1000) : n); }   /* 금액 열은 천원으로 붙여넣기 → 원 (㊿+157) */
+      else if(c.t==='month'){ var mm=v.match(/(\d{4})[.\-\/년\s]*(\d{1,2})/); if(!mm || +mm[2]<1 || +mm[2]>12) errs.push(at+': 연월 형식이 아님(«'+v.slice(0,20)+'»)'); row[c.k]=mm? mm[1]+'-'+('0'+mm[2]).slice(-2)+'-01':null; }
+      else if(c.t==='date'){ var dd=v.match(/(\d{4})[.\-\/년\s]*(\d{1,2})[.\-\/월\s]*(\d{1,2})/); if(!dd) errs.push(at+': 날짜 형식이 아님(«'+v.slice(0,20)+'»)'); row[c.k]=dd? dd[1]+'-'+('0'+dd[2]).slice(-2)+'-'+('0'+dd[3]).slice(-2) : null; }
+      else if(c.t==='bool'){ row[c.k]=/^(o|y|true|1|예|중복)$/i.test(v); }
+      else { if(c.t==='select' && Array.isArray(c.opts) && c.opts.length && c.opts.map(String).indexOf(v)<0) errs.push(at+': 목록에 없는 값 «'+v.slice(0,20)+'» (목록: '+c.opts.slice(0,6).join(', ')+(c.opts.length>6? '…' : '')+')'); row[c.k]=v; }
+    });
+    cols.forEach(function(c){ if(c.req && (row[c.k]==null || row[c.k]==='')) errs.push((li+1)+'행 '+c.l+': 꼭 넣어야 하는 칸이 비어 있음'); });
+    return row;
+  });
+  return {rows:rows, map:map, skipped:skipped, errs:errs, cols:cols};
+}
+/** 같은 행 — 붙여넣은 열 값이 모두 같은 기존 행 · 붙여넣은 것끼리 같은 행 */
+export function pasteDups(rows, cols, existing){
+  var keyOf=function(r){ return cols.map(function(c){ var v=r[c.k]; if(v==null || v==='') return ''; if(c.t==='month' || c.t==='date') return String(v).slice(0, c.t==='month'? 7 : 10); return String(v).trim(); }).join('\u0001'); };
+  var have={}; (existing||[]).forEach(function(r){ have[keyOf(r)]=1; });
+  var seen={}, dupOld=[], dupNew=[];
+  rows.forEach(function(r, i){ var k=keyOf(r); if(!k.replace(/\u0001/g,'')) return; if(have[k]) dupOld.push(i); else if(seen[k]) dupNew.push(i); seen[k]=1; });
+  return {old:dupOld, inner:dupNew};
+}
 export function openPaste(){
   var g=GRIDS[ST.CUR_VIEW]; if(!g||!g.add) return;
   var cols=pasteCols(g);
   $('#pasteCols').innerHTML=tpl`열 순서: ${rawHtml(cols.map(function(c){return tpl`<b>${c.l}</b>`;}).join(' → '))}`+ tpl`${rawHtml(cols.some(function(c){ return c.won; })? ' <span class="mini"><b>금액은 천원</b>(표와 같은 단위)</span>' : '')}`+
-    tpl` <span class="mini">(엑셀에서 이 순서로 열을 맞춰 복사하세요 · 빈 칸은 비워둬도 됩니다)</span>`;
+    tpl` <span class="mini">(이 순서로 복사하거나, 첫 줄에 열 이름(머리글)을 함께 복사하면 순서와 상관없이 이름으로 맞춥니다)</span>`;
   $('#pasteTa').value=''; $('#pastePrev').textContent=''; $('#pasteMsg').textContent='';
-  function parse(){
-    var lines=$('#pasteTa').value.split(/\r?\n/).filter(function(l){return l.trim();});
-    return lines.map(function(l){
-      var cells=l.split('\t'), row={};
-      cols.forEach(function(c,i){
-        var v=(cells[i]||'').trim();
-        if(v===''){ row[c.k]=null; return; }
-        if(c.t==='number'){ var n=parseFloat(v.replace(/[^\d.\-]/g,'')); row[c.k]=isNaN(n)?null:(c.won? Math.round(n*1000) : n); }   /* 금액 열은 천원으로 붙여넣기 → 원 (㊿+157) */
-        else if(c.t==='month'){ var m=v.match(/(\d{4})[.\-\/년\s]*(\d{1,2})/); row[c.k]=m? m[1]+'-'+('0'+m[2]).slice(-2)+'-01':null; }
-        else if(c.t==='bool'){ row[c.k]=/^(o|y|true|1|예|중복)$/i.test(v); }
-        else row[c.k]=v;
-      });
-      return row;
-    });
-  }
+  var parse=function(){ return pasteParse($('#pasteTa').value, cols); };
   $('#pasteTa').oninput=function(){
-    var rows=parse();
-    /* ㊿+157 첫 행을 «열 이름: 값»으로 · 금액은 읽기 쉬운 금액(= 48만원)으로 보여 줌 */
-    $('#pastePrev').textContent=rows.length? rows.length+'행 인식됨 — 첫 행: '+cols.map(function(c){ var v=rows[0][c.k]; return v==null? '' : c.l.replace(/\(천원\)/,'')+' '+(c.won? wonKo(v) : String(v)); }).filter(Boolean).join(' · ').slice(0,220):'';
+    var P=parse(), rows=P.rows;
+    /* ㊿+157 첫 행을 «열 이름: 값»으로 · 금액은 읽기 쉬운 금액(= 48만원)으로 보여 줌 · ㊿+179 머리글 · 검사 결과 */
+    var t=rows.length? rows.length+'행 인식됨'+(P.map? ' (머리글로 맞춤'+(P.skipped.length? ' · 모르는 열 건너뜀: '+P.skipped.slice(0,4).join(', ') : '')+')' : '')+' — 첫 행: '+cols.map(function(c){ var v=rows[0][c.k]; return v==null? '' : c.l.replace(/\(천원\)/,'')+' '+(c.won? wonKo(v) : String(v)); }).filter(Boolean).join(' · ').slice(0,220):'';
+    if(P.errs.length) t+='\n⚠ 고칠 것 '+P.errs.length+'개: '+P.errs.slice(0,3).join(' · ')+(P.errs.length>3? ' …' : '');
+    $('#pastePrev').textContent=t;
   };
   $('#pasteGo').onclick=async function(){
-    var rows=parse();
+    var P=parse(), rows=P.rows;
     if(!rows.length){ $('#pasteMsg').textContent='붙여넣은 내용이 없습니다'; return; }
+    if(P.errs.length){ $('#pasteMsg').textContent='고칠 것 '+P.errs.length+'개 — '+P.errs.slice(0,2).join(' · ')+(P.errs.length>2? ' …(위 미리 보기)' : ''); $('#pasteMsg').className='mmsg bad'; return; }
     /* ㊿+157 금액이 이상한 행(1만원 미만 · 월 금액 1억↑ · 1,000억↑)이 있으면 먼저 보여 주고 묻기 — 원으로 된 시트를 그대로 붙이면 1000배가 됨 */
     var odd=[]; rows.forEach(function(r, i){ cols.forEach(function(c){ if(!c.won || !r[c.k]) return; var why=amtWhy(r[c.k], 0, /^(mrr|monthly_fee)$/.test(c.k)) || (Math.abs(r[c.k])>=1e11? '1,000억원 이상입니다':''); if(why) odd.push((i+1)+'행 '+c.l.replace(/\(천원\)/,'')+' '+wonKo(r[c.k])+' — '+why); }); });
     if(odd.length && !confirm('금액이 이상해 보이는 칸이 '+odd.length+'개 있습니다 (금액은 «천원» 단위로 붙여넣기):\n\n'+odd.slice(0,5).join('\n')+(odd.length>5? '\n… 외 '+(odd.length-5)+'개':'')+'\n\n그래도 추가할까요?')) return;
+    var used=P.map? cols.filter(function(c){ return P.map.indexOf(c)>=0; }) : cols;   /* 머리글로 맞췄으면 붙여넣은 열만 비교 */
+    var D=pasteDups(rows, used, (g.rows && g.rows())||[]), drop=D.old.concat(D.inner);
+    if(drop.length){
+      if(!confirm('이미 표에 똑같은 행 '+D.old.length+'개'+(D.inner.length? ' · 붙여넣은 것끼리 같은 행 '+D.inner.length+'개' : '')+'가 있습니다 ('+drop.slice(0,6).map(function(i){ return (i+1)+'행'; }).join(', ')+(drop.length>6? '…' : '')+').\n\n[확인] 이 행들은 빼고 나머지 '+(rows.length-drop.length)+'행만 넣기\n[취소] 그만두기')) return;
+      rows=rows.filter(function(r, i){ return drop.indexOf(i)<0; });
+      if(!rows.length){ $('#pasteMsg').textContent='넣을 새 행이 없습니다(모두 이미 있음)'; return; }
+    }
     if(!confirm(rows.length+'행을 「'+g.title+'」에 추가할까요?')) return;
-    $('#pasteMsg').textContent='저장 중…';
+    $('#pasteMsg').textContent='저장 중…'; $('#pasteMsg').className='mmsg';
+    var done=0;
     try{
       for(var i=0;i<rows.length;i+=100){
         if(g.table==='equipment_orders'){   /* ㊿+157 붙여넣은 신청도 장비 현황에 바로 반영 */
           var got=await sbWrite('POST', g.table+'?select=*', rows.slice(i,i+100), 'return=representation');
           for(var j=0;j<(got||[]).length;j++){ try{ ST.RAWX.orders=(ST.RAWX.orders||[]).concat([got[j]]); await syncOrderAssets(got[j], null, true); }catch(e){} }
         } else await sbWrite('POST', g.table, rows.slice(i,i+100));
+        done=Math.min(rows.length, i+100);
       }
+      try{ logChange('insert', g.table, null, {rows:done, from:'붙여넣기'+(drop.length? ' · 같은 행 '+drop.length+'개 뺌' : '')}); }catch(e){}
       closeOvl('ovlPaste');
-      toast('붙여넣기 입력', rows.length+'행 추가됨 — '+g.title);
+      toast('붙여넣기 입력', rows.length+'행 추가됨 — '+g.title+(drop.length? ' (같은 행 '+drop.length+'개는 뺌)' : ''));
       loadFromDb().then(function(nd){ onData(nd); if(GRIDS[ST.CUR_VIEW]) renderGrid(); });
-    }catch(e){ $('#pasteMsg').textContent=String(e.message||e).slice(0,140); }
+    }catch(e){
+      /* ㊿+179 중간 실패 — 이미 들어간 행을 알려 주고(다시 붙이면 «같은 행»으로 빠짐) 표를 새로 읽음 */
+      if(done) try{ logChange('insert', g.table, null, {rows:done, from:'붙여넣기(중간 실패)'}); }catch(x){}
+      $('#pasteMsg').textContent=(done? '앞의 '+done+'행은 들어갔고, '+(done+1)+'행부터 실패 — ' : '저장 실패 — ')+String(/** @type {any} */(e).message||e).slice(0,140)+(done? ' (같은 내용을 다시 붙여넣으면 들어간 행은 «같은 행»으로 빠집니다)' : '');
+      $('#pasteMsg').className='mmsg bad';
+      if(done) loadFromDb().then(function(nd){ onData(nd); if(GRIDS[ST.CUR_VIEW]) renderGrid(); });
+    }
   };
   openOvl('ovlPaste');
 }

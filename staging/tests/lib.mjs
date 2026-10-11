@@ -27,7 +27,7 @@ export function serve(dir = ROOT, base = '/svc') {
 
 /** Supabase · CDN 가짜 응답. role: super_admin | admin | admin_viewer ... · onWrite: 쓰기 요청 기록 콜백 */
 /** token: 주입할 access token(기본 'tok' · JWT 모양이면 aal 검사에 쓰임) · noSession: 세션 없이 시작(로그인 화면 테스트) */
-export async function mockBackend(page, { role = 'super_admin', email = 'tester@example.com', onWrite = null, extra = null, token = 'tok', noSession = false } = {}) {
+export async function mockBackend(page, { role = 'super_admin', email = 'tester@example.com', onWrite = null, extra = null, token = 'tok', noSession = false, keepStore = false } = {}) {
   const data = JSON.stringify(Object.assign({}, FIX, { roles: [{ role }] }));
   await page.route('**/*supabase.co/**', async (route) => {
     const u = route.request().url(), m = route.request().method();
@@ -41,10 +41,10 @@ export async function mockBackend(page, { role = 'super_admin', email = 'tester@
   });
   await page.route(/cdn\.jsdelivr\.net|cdnjs\.cloudflare\.com|unpkg\.com/, (r) => r.fulfill({ status: 200, contentType: 'application/javascript', body: '' }));
   await page.route(/open\.er-api\.com|api\.exchangerate|api\.frankfurter/, (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"rates":{"KRW":1400}}' }));
-  await page.addInitScript(({ email, token, noSession }) => {
-    try { localStorage.clear(); sessionStorage.clear(); } catch (e) { /* noop */ }
+  await page.addInitScript(({ email, token, noSession, keepStore }) => {
+    try { if (!keepStore) { localStorage.clear(); sessionStorage.clear(); } } catch (e) { /* noop */ }   /* keepStore(㊿+180): 새로고침 · 포탈 안 빈 iframe 에서 저장소를 지우지 않음(로그인 유지 · 로그아웃 시험) */
     try { if (!noSession) sessionStorage.setItem('svc_sess', JSON.stringify({ a: token, r: null, e: Math.floor(Date.now() / 1000) + 3600, u: email, p: true })); } catch (e) { /* 격리 칸(sandbox · 출처 없음)에선 저장소가 없음 — 무시 */ }
-  }, { email, token, noSession });
+  }, { email, token, noSession, keepStore });
 }
 
 /** 페이지 오류·콘솔 오류 수집 */

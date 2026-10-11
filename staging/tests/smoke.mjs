@@ -2,6 +2,7 @@
 // 실행: node tests/smoke.mjs      (Playwright chromium 필요: npx playwright install --with-deps chromium)
 // 환경: SMOKE_DIR=서빙할 폴더(기본 저장소 루트) · SMOKE_SHOT=1 이면 실패 화면을 tests/out/ 에 저장
 import fs from 'node:fs';
+import http from 'node:http';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { ROOT, serve, mockBackend, collect, Suite, assert } from './lib.mjs';
@@ -2031,7 +2032,7 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
   await page.goto(url + '/index.html'); await page.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA, null, { timeout: 15000 }); await page.waitForTimeout(600);
   await S.t('㊿+169 계약 표: 기본 «운영» 보기(고객사·상태 맨 앞 고정) · 갱신/정산/전체 · 고른 보기·보기별 열 설정 기억 · 상태 = 글자+배지 · «—» 미입력 / 빈칸 해당 없음 · 아이콘 버튼 이름 · 삭제는 «더보기»', async () => {
     await page.evaluate(() => SVC.navMenu('contracts')); await page.waitForTimeout(300);
-    const hs = () => page.evaluate(() => [...document.querySelectorAll('#dvTable thead th')].map((h) => h.textContent.replace(/[▼▲]/g, '').trim()).filter(Boolean));
+    const hs = () => page.evaluate(() => [...document.querySelectorAll('#dvTable thead th:not(.act)')].map((h) => h.textContent.replace(/[▼▲]/g, '').trim()).filter(Boolean));   /* ㊿+181 동작 열 머리글은 화면 읽기용 이름만 */
     const a = await page.evaluate(() => { const t = document.getElementById('dvTable'), p1 = t.querySelector('tbody td.pin1'), p2 = t.querySelector('tbody td.pin2');
       return { wv: [...document.querySelectorAll('#dvWvBar [data-wv]')].map((b) => b.textContent + (b.getAttribute('aria-pressed') === 'true' ? '*' : '')).join('|'), sticky: p1 && getComputedStyle(p1).position, p2l: p2 && p2.getBoundingClientRect().left - p1.getBoundingClientRect().right,
         badge: !!t.querySelector('tbody td.pin2 .ctag'), nil: !!t.querySelector('td.nil[title="미입력"]'), na: !!t.querySelector('td.na[title="해당 없음"]'),
@@ -3196,6 +3197,371 @@ const PRICE_BOOK = [{ id: 1, seg: 'saas', label: '2026-09 MDR 3종 (Cloud Insigh
     assert(/aiq-new/.test(t.rows[0]) && /이번 달 MRR/.test(t.rows[0]) && t.det && pre === 'S1 제외해야 함' && kp && kp.content === 'S1 제외해야 함' && kp.from_feedback === 11 && fp && fp.status === '처리' && fp.knowledge_id === 77 && !A.c.errs.length, JSON.stringify({ t, pre, kp, fp, errs: A.c.errs }));
     await A.ctx.close();
     return '지식 #77 · 신고 처리';
+  });
+}
+// ㊿+179 데이터(B-2) — 붙여넣기(머리글 · 검사 · 같은 행 · 중간 실패) · 내보내기(원 · 수식 막기) · 비즈포탈 숫자 · 데이터 점검(정상 표시 · 추이 · 새 규칙) · 리포트 DB 저장 · 팀 공유
+{
+  const ago = (d) => new Date(Date.now() - d * 864e5).toISOString();
+  const dayAgo = (d) => { const x = new Date(Date.now() - d * 864e5); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); };
+  const mk9 = async (seed, o) => {
+    o = Object.assign({ role: 'super_admin', init: null, extra: null }, o || {});
+    const db = new FakeDB(seed); const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block', acceptDownloads: true }); const page = await ctx.newPage(); const c = collect(page);
+    const dlg = []; page.on('dialog', (d) => { dlg.push(d.message()); d.type() === 'prompt' ? d.accept(d.defaultValue()) : d.accept(); });
+    await fakeBackend(page, db, { role: o.role, extra: o.extra });
+    if (o.init) await page.addInitScript(o.init);
+    await page.goto(url + '/index.html'); await page.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA && SVC.ST.DATA.rows.length, null, { timeout: 20000 }); await page.waitForTimeout(400);
+    return { db, ctx, page, c, dlg };
+  };
+  const LG0 = { id: 1, customer: '가상고객01', partner: '파트너A', product: 'NAC', nodes: 100, start_month: '2026-01-01', end_month: '2026-12-01', months: 12, monthly_fee: 1200000 };
+  const HEAD = '고객사\t구축파트너\t제품\t노드\t시작월\t종료월\t개월\t월액(천원)';
+  await S.t('㊿+179 붙여넣기: 머리글로 열 맞춤(모르는 열 건너뜀) · 검사(숫자 · 연월 · 필수) → 막음 · 이미 있는 행 · 붙여넣은 것끼리 같은 행 빼고 넣기 · 100행씩 넣다 중간 실패 → «앞의 100행은 들어갔고» · 다시 붙이면 들어간 행은 빠짐', async () => {
+    const seed = seedData(); seed.lg_sales = [LG0];
+    const A = await mk9(seed);
+    const u = await A.page.evaluate(() => { const cols = SVC.pasteCols(SVC.GRIDS.lg);
+      const P = SVC.pasteParse('월액(천원)\t고객사\t메모\t노드\n1,200\t가상고객01\tx\t100\nabc\t\t\t1.5', cols);
+      const M = SVC.pasteParse('고객사\t시작월\n가상고객01\t2026.3\n가상고객02\t2026-13', cols), N = SVC.pasteParse('가상고객03\t파트너\tNAC\t10', cols);
+      const D = SVC.pasteDups([{ customer: 'a', nodes: 1 }, { customer: 'b', nodes: 2 }, { customer: 'b', nodes: 2 }], cols.filter((x) => /customer|nodes/.test(x.k)), [{ customer: 'a', nodes: 1, partner: 'z' }]);
+      return { map: !!P.map, skipped: P.skipped, r0: P.rows[0], errs: P.errs, mrow: M.rows[0].start_month, merr: M.errs, nmap: N.map, n0: N.rows[0].customer + '/' + N.rows[0].nodes, D }; });
+    assert(u.map && u.skipped.join() === '메모' && u.r0.monthly_fee === 1200000 && u.r0.customer === '가상고객01' && u.r0.nodes === 100 && u.errs.some((e) => /2행 월액: 숫자가 아님/.test(e)) && u.errs.some((e) => /2행 고객사: 꼭 넣어야/.test(e))
+      && u.mrow === '2026-03-01' && u.merr.some((e) => /2행 시작월: 연월 형식이 아님/.test(e)) && u.nmap === null && u.n0 === '가상고객03/10' && u.D.old.join() === '0' && u.D.inner.join() === '2', 'unit ' + JSON.stringify(u));
+    await A.page.evaluate(() => SVC.switchView('lg')); await A.page.waitForTimeout(300); await A.page.evaluate(() => SVC.openPaste());
+    await A.page.fill('#pasteTa', HEAD + '\n가상고객04\t\t\tabc\t2026-01\t\t\t'); await A.page.click('#pasteGo'); await A.page.waitForTimeout(200);
+    const m1 = await A.page.$eval('#pasteMsg', (e) => e.textContent), pv = await A.page.$eval('#pastePrev', (e) => e.textContent);
+    assert(/고칠 것 1개/.test(m1) && /머리글로 맞춤/.test(pv) && !A.db.writes.some((w) => w.table === 'lg_sales'), 'errs ' + m1 + ' | ' + pv);
+    await A.page.fill('#pasteTa', HEAD + '\n가상고객01\t파트너A\tNAC\t100\t2026-01\t2026-12\t12\t1,200\n가상고객02\t파트너B\tNAC\t50\t2026-02\t2027-01\t12\t800\n가상고객02\t파트너B\tNAC\t50\t2026-02\t2027-01\t12\t800');
+    A.dlg.length = 0; await A.page.click('#pasteGo'); await A.page.waitForTimeout(900);
+    const p1 = A.db.writes.filter((w) => w.method === 'POST' && w.table === 'lg_sales');
+    assert(A.dlg.some((x) => /이미 표에 똑같은 행 1개 · 붙여넣은 것끼리 같은 행 1개/.test(x)) && p1.length === 1 && p1[0].body.customer === '가상고객02' && p1[0].body.monthly_fee === 800000, 'dups ' + JSON.stringify({ dlg: A.dlg, p1 }));
+    await A.page.waitForFunction(() => (SVC.ST.RAWX.lg || []).length === 2, null, { timeout: 5000 });
+    const rows = Array.from({ length: 150 }, (_, i) => '가상고객P' + String(i + 1).padStart(3, '0') + '\t파트너C\tNAC\t10\t2026-03\t2027-02\t12\t100').join('\n');
+    A.db.fail = (m, name, body) => m === 'POST' && name === 'lg_sales' && Array.isArray(body) && body.length === 50;
+    await A.page.evaluate(() => SVC.openPaste()); await A.page.fill('#pasteTa', HEAD + '\n' + rows); A.dlg.length = 0; await A.page.click('#pasteGo'); await A.page.waitForTimeout(1200);
+    const m2 = await A.page.$eval('#pasteMsg', (e) => e.textContent), n2 = A.db.table('lg_sales').length;
+    const cl = A.db.writes.filter((w) => w.table === 'change_log' && w.body && w.body.detail && /중간 실패/.test(w.body.detail.from || ''));
+    assert(/앞의 100행은 들어갔고, 101행부터 실패/.test(m2) && n2 === 102 && cl.length === 1 && cl[0].body.detail.rows === 100, 'partial ' + JSON.stringify({ m2, n2, cl: cl.length }));
+    await A.page.waitForFunction(() => (SVC.ST.RAWX.lg || []).length === 102, null, { timeout: 5000 });
+    A.db.fail = null; A.dlg.length = 0; await A.page.click('#pasteGo'); await A.page.waitForTimeout(1200);
+    const p3 = A.db.writes.filter((w) => w.method === 'POST' && w.table === 'lg_sales').slice(-1)[0];
+    assert(A.dlg.some((x) => /이미 표에 똑같은 행 100개/.test(x)) && A.dlg.some((x) => /^50행을/.test(x)) && A.db.table('lg_sales').length === 152 && p3.body.customer === '가상고객P150' && !A.c.errs.length, 'retry ' + JSON.stringify({ dlg: A.dlg, n: A.db.table('lg_sales').length, errs: A.c.errs }));
+    await A.ctx.close();
+    return '머리글 · 검사 · 같은 행 2 · 중간 실패 100/150 → 다시 50';
+  });
+  await S.t('㊿+179 내보내기 · 가져오기 숫자: CSV 금액 = 원 그대로(1,234,567원 → 1234567 · 머리글 «월액(원)») · = + - @ 로 시작하는 글자는 앞에 \' (숫자 -5 · +82 는 그대로) / 비즈포탈 «1,234,000» · «₩ 2,000» · «(1,000)» 글자 금액', async () => {
+    const seed = seedData(); seed.lg_sales = [Object.assign({}, LG0, { customer: '=HYPERLINK("http://x")', partner: '-5', product: '@SUM(A1)', monthly_fee: 1234567 })];
+    const A = await mk9(seed);
+    const u = await A.page.evaluate(() => ({ s: [SVC.xlsxSafe('=1+2'), SVC.xlsxSafe('+82-10'), SVC.xlsxSafe('-5'), SVC.xlsxSafe('+82'), SVC.xlsxSafe('@x'), SVC.xlsxSafe('\tx'), SVC.xlsxSafe(-5), SVC.xlsxSafe('가나')],
+      h: [SVC.xlsxHead({ l: 'MRR(천원)', won: 1 }), SVC.xlsxHead({ l: '금액', won: 1 }), SVC.xlsxHead({ l: '노드' })],
+      n: [SVC.bzxNum('1,234,000'), SVC.bzxNum('₩ 2,000'), SVC.bzxNum('(1,000)'), SVC.bzxNum(-3.5), SVC.bzxNum(''), SVC.bzxNum('abc'), SVC.bzxNum('-1,500')],
+      rows: SVC.bzxRowsFromAoa([['비즈포탈 매출'], ['등록번호', '고객사', '매출액', '회계매출', '진행상태'], [1, '가상고객01', '1,100,000', '1,000,000', '완료'], [2, '가상고객02', 500, '(200)', '완료'], [3, null, 1, 1, '']]).map((r) => r.cust + ':' + r.sales + ':' + r.acc),
+      bad: (() => { try { SVC.bzxRowsFromAoa([['a', 'b']]); return 'no'; } catch (e) { return /고객사/.test(e.message) ? 'ok' : e.message; } })() }));
+    assert(JSON.stringify(u.s) === JSON.stringify(["'=1+2", "'+82-10", '-5', '+82', "'@x", "'\tx", -5, '가나']) && u.h.join('|') === 'MRR(원)|금액 (원)|노드'
+      && u.n.join() === '1234000,2000,-1000,-3.5,0,0,-1500' && u.rows.join() === '가상고객01:1100000:1000000,가상고객02:500:-200' && u.bad === 'ok', 'unit ' + JSON.stringify(u));
+    await A.page.evaluate(() => SVC.switchView('lg')); await A.page.waitForTimeout(400);
+    const [dl] = await Promise.all([A.page.waitForEvent('download', { timeout: 8000 }), A.page.evaluate(() => SVC.exportCsv())]);
+    const csv = fs.readFileSync(await dl.path(), 'utf8'), lines = csv.replace(/^﻿/, '').split('\n');
+    assert(/월액\(원\)/.test(lines[0]) && !/천원/.test(lines[0]) && /1234567/.test(lines[1]) && lines[1].includes('"\'=HYPERLINK(""http://x"")"') && lines[1].includes(',-5,') && lines[1].includes("'@SUM(A1)") && !A.c.errs.length, 'csv ' + lines.slice(0, 2).join(' / '));
+    await A.ctx.close();
+    return 'csv 원 · 수식 막기 · bzx 글자 숫자';
+  });
+  await S.t('㊿+179 데이터 점검 «정상…»: 이유 없으면 막음 → 예시 넣기 → dc_ack POST · 건수에서 빠지고 카드 아래 «정상으로 표시한 1건» · 되돌리기(DELETE) → 다시 나타남 / 구조 문제(고객사 없음 등)는 표시 불가 · 내용이 바뀌면 열쇠가 바뀜 / 하루 건수(dc_daily) 기록 · 추이(7일 전 비교) / 조회 전용 · SQL 111 전(404)이면 버튼 없음', async () => {
+    const seed = seedData(); seed.dc_daily = [{ day: dayAgo(8), crit: 9, warn: 9, info: 9, acked: 0 }, { day: dayAgo(1), crit: 1, warn: 1, info: 1, acked: 0 }];
+    const A = await mk9(seed);
+    await A.page.evaluate(() => SVC.switchView('dcheck')); await A.page.waitForSelector('#bizHost .dc-trend', { timeout: 8000 });
+    const before = await A.page.evaluate(() => { const r = SVC.dcRules().find((x) => x.id === 'cu_similar'); return { n: r.items.length, labels: r.items.map((x) => x.label) }; });
+    const d0 = A.db.table('dc_daily').find((x) => x.day === (new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0') + '-' + String(new Date().getDate()).padStart(2, '0')));
+    const tr = await A.page.$eval('#bizHost .dc-trend', (e) => e.textContent + '|' + !!e.querySelector('svg polyline'));
+    assert(before.n === 2 && d0 && typeof d0.crit === 'number' && d0.ver && /7일 전\(/.test(tr) && /true$/.test(tr), 'pre ' + JSON.stringify({ before, d0, tr }));
+    await A.page.click('#bizHost [data-dc="cu_similar"]'); await A.page.waitForSelector('#bizHost [data-dcack^="cu_similar:"]', { timeout: 4000 });
+    const noAck = await A.page.evaluate(() => [SVC.dcAckable({ id: 'c_nocust' }), SVC.dcAckable({ id: 'c_amt_odd' }), SVC.dcAckable({ id: 'eq_serial_dup' }), SVC.dcAckable({ id: 'c_live_zero' }),
+      SVC.dcAckKey({ key: 5, label: 'a', sub: 'x' }) !== SVC.dcAckKey({ key: 5, label: 'a', sub: 'y' }), SVC.dcAckKey({ key: 5, label: 'a', sub: 'x', ackSig: 'S' }) === SVC.dcAckKey({ key: 5, label: 'a', sub: 'y', ackSig: 'S' })]);
+    await A.page.click('#bizHost [data-dcack="cu_similar:0"]'); await A.page.waitForSelector('#ovlDcAck.on', { timeout: 3000 }); await A.page.waitForTimeout(100);
+    const foc = await A.page.evaluate(() => document.activeElement && document.activeElement.id);
+    await A.page.click('#dcaOk'); const m0 = await A.page.$eval('#dcaM', (e) => e.textContent);
+    await A.page.click('#dcaHB'); await A.page.click('#dcaOk'); await A.page.waitForTimeout(700);
+    const ack = A.db.table('dc_ack')[0];
+    const after = await A.page.evaluate(() => { const r = SVC.dcRules().find((x) => x.id === 'cu_similar'); return { n: r.items.length, acked: r.acked.length, sum: document.querySelector('#bizHost .dc-acked summary') && document.querySelector('#bizHost .dc-acked summary').textContent, head: document.querySelector('#bizHost .dbar .mini').textContent }; });
+    const d1 = A.db.writes.filter((w) => w.table === 'dc_daily').slice(-1)[0];
+    assert(noAck.join() === 'false,true,false,true,true,true' && foc === 'dcaN' && /2자 이상/.test(m0) && ack && ack.rule === 'cu_similar' && ack.note === '다른 회사입니다' && /\|/.test(ack.key)
+      && after.n === 1 && after.acked === 1 && after.sum === '정상으로 표시한 1건' && /정상으로 표시 1건/.test(after.head) && d1 && d1.body.acked === 1, 'ack ' + JSON.stringify({ noAck, foc, m0, ack, after, d1: d1 && d1.body }));
+    await A.page.click('#bizHost .dc-acked summary'); await A.page.click('#bizHost [data-dcunack="cu_similar:0"]'); await A.page.waitForTimeout(700);
+    const back = await A.page.evaluate(() => SVC.dcRules().find((x) => x.id === 'cu_similar').items.length);
+    assert(back === 2 && !A.db.table('dc_ack').length && A.db.writes.some((w) => w.method === 'DELETE' && w.table === 'dc_ack') && !A.c.errs.length, 'unack ' + JSON.stringify({ back, errs: A.c.errs }));
+    await A.ctx.close();
+    const V = await mk9(seedData(), { role: 'viewer' }); await V.page.evaluate(() => SVC.switchView('dcheck')); await V.page.waitForTimeout(600);
+    await V.page.click('#bizHost [data-dc="cu_similar"]'); await V.page.waitForTimeout(200);
+    const v = { btn: await V.page.$$eval('#bizHost [data-dcack]', (e) => e.length), daily: V.db.writes.filter((w) => w.table === 'dc_daily').length }; await V.ctx.close();
+    const N = await mk9(seedData(), { extra: async (route, u) => { if (/\/rest\/v1\/dc_(ack|daily)/.test(u)) { await route.fulfill({ status: 404, contentType: 'application/json', body: '{"code":"PGRST205","message":"Could not find the table"}' }); return true; } return false; } });
+    await N.page.evaluate(() => SVC.switchView('dcheck')); await N.page.waitForTimeout(700); await N.page.click('#bizHost [data-dc="cu_similar"]'); await N.page.waitForTimeout(200);
+    const nb = { btn: await N.page.$$eval('#bizHost [data-dcack]', (e) => e.length), trend: !!(await N.page.$('#bizHost .dc-trend')), rules: await N.page.$$eval('#bizHost .dc-rule', (e) => e.length), errs: N.c.errs.length }; await N.ctx.close();
+    assert(v.btn === 0 && v.daily === 0 && nb.btn === 0 && !nb.trend && nb.rules >= 22 && !nb.errs, 'viewer/404 ' + JSON.stringify({ v, nb }));
+    return '표시 · 되돌리기 · 추이 · 조회 전용 · 404';
+  });
+  await S.t('㊿+179 데이터 점검 새 규칙: 비슷한 이름(별칭 겹침 · 셋째 글자부터 한 글자 · 앞부분 같음 — 앞 두 글자 · 숫자만 다른 것은 뺌) · LIVE 고객사 업종 없음 · 같은 고객(이름 정규화) · 같은 사업명 진행 중 OI 2건 · 발송 뒤 30일 넘은 견적', async () => {
+    const seed = seedData();
+    seed.customers.push({ id: 901, name: '가상고객한국전력공사', sector: '공공' }, { id: 902, name: '가상고객한국전력공상', sector: '공공' }, { id: 903, name: '강남구청가상기관', sector: '공공' }, { id: 904, name: '강북구청가상기관', sector: '공공' },
+      { id: 905, name: '가상알파상사', aliases: ['가상베타상사'], sector: '제조' }, { id: 906, name: '가상베타상사', sector: '제조' }, { id: 907, name: '가상고객7공장', sector: '제조' }, { id: 908, name: '가상고객8공장', sector: '제조' });
+    const live = seed.contracts.find((c) => c.customer_id === seed.customers.find((x) => x.name === '가상고객01').id);
+    seed.customers.find((x) => x.name === '가상고객01').sector = null;
+    seed.oi_deals = (seed.oi_deals || []).concat([{ id: 801, customer: '가상고객02', deal_name: 'NAC 증설', stage: '진행', owner: '담당A', created_at: ago(10) }, { id: 802, customer: '(주)가상고객02', deal_name: 'NAC증설', stage: '등록', owner: '담당B', created_at: ago(3) },
+      { id: 803, customer: '가상고객02', deal_name: 'NAC 증설', stage: '수주', created_at: ago(30) }]);
+    seed.quotes = [{ id: 1, quote_no: 'Q-2608-001', doc_type: 'quote', customer_name: '가상고객03', quote_date: dayAgo(41), grand_total: 1100000, status: '발송', sent_at: ago(40) },
+      { id: 2, quote_no: 'Q-2610-002', doc_type: 'quote', customer_name: '가상고객04', quote_date: dayAgo(5), grand_total: 500000, status: '발송', sent_at: ago(5) }, { id: 3, quote_no: 'Q-2607-003', doc_type: 'quote', customer_name: '가상고객05', grand_total: 1, status: '수주', sent_at: ago(60) }];
+    const A = await mk9(seed);
+    await A.page.evaluate(() => SVC.switchView('dcheck')); await A.page.waitForFunction(() => SVC.ST.RAWX.quotes && SVC.ST.RAWX.quotes.length === 3, null, { timeout: 8000 }); await A.page.waitForTimeout(300);
+    const r = await A.page.evaluate(() => { const R = {}; SVC.dcRules().forEach((x) => { if (/^(cu_similar|cu_sector|oi_dup|q_stale)$/.test(x.id)) R[x.id] = { sev: x.sev, items: x.items.map((i) => i.label + ' ‖ ' + i.sub) }; }); return R; });
+    const sim = r.cu_similar.items.join(' / ');
+    const cards = await A.page.$$eval('#bizHost .dc-rule [data-dc]', (e) => e.map((x) => x.dataset.dc).filter((x) => /^(cu_similar|cu_sector|oi_dup|q_stale)$/.test(x)));
+    assert(live && /가상고객한국전력공사 ≈ 가상고객한국전력공상 ‖ 이름 한 글자 차이/.test(sim) && /가상알파상사 ≈ 가상베타상사 ‖ «가상알파상사»의 별칭이/.test(sim) && /가상고객_에스원 ≈ 가상고객_에스원일할 ‖ 앞부분이 같음\(\+2글자\)/.test(sim)
+      && !/강남구청/.test(sim) && !/7공장/.test(sim) && r.cu_sector.items.some((x) => /^가상고객01 ‖ LIVE 계약 \d+건/.test(x)) && r.cu_sector.items.length === 1
+      && r.oi_dup.sev === 'warn' && r.oi_dup.items.length === 1 && /× 2 ‖ #801 진행 · 담당A .* \/ #802 등록 · 담당B/.test(r.oi_dup.items[0]) && r.q_stale.items.length === 1 && /^Q-2608-001 · 가상고객03 ‖ 발송 .* · 40일 · 합계/.test(r.q_stale.items[0])
+      && cards.length === 4 && !A.c.errs.length, JSON.stringify({ r, cards, errs: A.c.errs }));
+    await A.ctx.close();
+    return Object.keys(r).map((k) => k + ' ' + r[k].items.length).join(' · ');
+  });
+  await S.t('㊿+179 리포트 저장 DB · 팀 공유: 다른 사람 공유 리포트 → «팀 공유»(비공개는 안 보임) · 불러오면 없어진 열 경고 · 저장 = «내 것으로 저장»(새 POST) · «공유» 켜기(PATCH) · 이 브라우저 것 «DB 로 옮기기» · 삭제 / SQL 111 전(404)이면 예전처럼 이 브라우저', async () => {
+    const seed = seedData(), now = new Date().toISOString(), sp = (f) => ({ spec: { base: 'contracts', joins: [], filters: f || [], sel: ['contracts.id', 'contracts._custName'], group: { by: [], aggs: [], pivot: null }, post: [], sort: [], limit: 0 } });
+    seed.report_queries = [{ id: 5, name: '팀 리포트', spec: sp([{ c: 'contracts.없는열', op: 'eq', v: 'x' }]), owner: 'other@example.com', shared: true, updated_at: now }, { id: 6, name: '남의 비공개', spec: sp(), owner: 'other@example.com', shared: false, updated_at: now }];
+    const init = () => { try { if (!sessionStorage.getItem('qbInit')) { sessionStorage.setItem('qbInit', '1'); localStorage.setItem('svc_qb_tester@example.com', JSON.stringify([{ id: 'qlocal1', name: '로컬 리포트', spec: { base: 'customers', joins: [], filters: [], sel: ['customers.name'], group: { by: [], aggs: [], pivot: null }, post: [], sort: [], limit: 0 }, sql: null }])); } } catch (e) { /* */ } };
+    const A = await mk9(seed, { init });
+    await A.page.evaluate(async () => { await SVC.lazyLoad('report'); SVC.switchView('report'); }); await A.page.waitForSelector('#qbLib .qb-team', { timeout: 8000 });
+    const L0 = await A.page.evaluate(() => ({ team: document.querySelector('#qbLib .qb-team').textContent, mine: document.querySelector('#qbLib .qb-lib').textContent, mig: !!document.getElementById('qbMig') }));
+    await A.page.click('#qbLib [data-load="db5"]'); await A.page.waitForTimeout(500);
+    const t1 = await A.page.evaluate(() => ({ toast: [...document.querySelectorAll('.toast')].map((x) => x.textContent).join(' | '), save: document.getElementById('qbSave') && document.getElementById('qbSave').textContent, id: SVC.QB.savedId }));
+    A.dlg.length = 0; await A.page.click('#qbSave'); await A.page.waitForTimeout(600);
+    const p1 = A.db.writes.filter((w) => w.method === 'POST' && w.table === 'report_queries'), nid = p1.length && p1[0].body.id;
+    assert(/팀 리포트/.test(L0.team) && /other/.test(L0.team) && !/남의 비공개/.test(L0.team) && /이 브라우저에만 1개/.test(L0.mine) && /로컬 리포트/.test(L0.mine) && L0.mig
+      && /바뀐 열/.test(t1.toast) && /contracts\.없는열/.test(t1.toast) && t1.save === '💾 내 것으로 저장' && t1.id === 'db5'
+      && A.dlg.some((x) => /내 것으로 새로 저장/.test(x)) && p1.length === 1 && p1[0].body.name === '팀 리포트 (사본)' && p1[0].body.spec.spec.base === 'contracts' && !A.db.writes.some((w) => w.method === 'PATCH' && w.table === 'report_queries'), 'load/save ' + JSON.stringify({ L0, t1, dlg: A.dlg, p1 }));
+    await A.page.waitForSelector('#qbLib [data-qshare="db' + nid + '"]', { timeout: 4000 }); await A.page.click('#qbLib [data-qshare="db' + nid + '"]'); await A.page.waitForTimeout(600);
+    const sh = A.db.table('report_queries').find((x) => x.id === nid), pr = await A.page.$eval('#qbLib [data-qshare="db' + nid + '"]', (e) => e.getAttribute('aria-pressed'));
+    await A.page.click('#qbMig'); await A.page.waitForTimeout(900);
+    const mg = { local: await A.page.evaluate(() => SVC.qbSaved().length), rows: A.db.table('report_queries').map((x) => x.name), mig: !!(await A.page.$('#qbMig')) };
+    await A.page.click('#qbLib [data-qdel="db' + nid + '"]'); await A.page.waitForTimeout(600);
+    assert(sh && sh.shared === true && pr === 'true' && mg.local === 0 && mg.rows.includes('로컬 리포트') && !mg.mig && !A.db.table('report_queries').some((x) => x.id === nid) && A.dlg.some((x) => /팀과 공유 중인 리포트/.test(x)) && !A.c.errs.length, 'share/mig/del ' + JSON.stringify({ sh, pr, mg, dlg: A.dlg, errs: A.c.errs }));
+    await A.ctx.close();
+    const B = await mk9(seedData(), { extra: async (route, u) => { if (/\/rest\/v1\/report_queries/.test(u)) { await route.fulfill({ status: 404, contentType: 'application/json', body: '{"code":"PGRST205"}' }); return true; } return false; } });
+    await B.page.evaluate(async () => { await SVC.lazyLoad('report'); SVC.switchView('report'); }); await B.page.waitForSelector('#qbLib .qb-lib', { timeout: 8000 }); await B.page.waitForTimeout(300);
+    await B.page.click('#qbLib [data-preset="p_cust"]'); await B.page.waitForTimeout(400); await B.page.click('#qbSave'); await B.page.waitForTimeout(400);
+    const b = { local: await B.page.evaluate(() => SVC.qbSaved().map((x) => x.name)), team: !!(await B.page.$('#qbLib .qb-team')), lib: await B.page.$eval('#qbLib', (e) => e.textContent) }; await B.ctx.close();
+    assert(b.local.length === 1 && !b.team && /내가 저장한 리포트/.test(b.lib), '404 ' + JSON.stringify(b));
+    return '팀 공유 · 사본 저장 · 공유 · 옮기기 · 삭제 · 404 = 이 브라우저';
+  });
+}
+// ㊿+180 보안 · 계정 — 로그인 실패 대기 · 비밀번호 규칙 · 첫 변경 우회 막기 · 로그인 기록 · 30일 · 자동 로그아웃(닫아 둔 시간) · 서버 로그아웃 · 모든 기기 · 계정 목록 · 초기화 창 · 보안 점검 · iframe 막기
+{
+  const J9 = (route, body, status) => route.fulfill({ status: status || 200, contentType: 'application/json', headers: { 'content-range': '*/0', 'Access-Control-Expose-Headers': 'content-range' }, body: typeof body === 'string' ? body : JSON.stringify(body) });
+  const mkA = async (o) => {
+    o = Object.assign({ init: null, role: 'super_admin', handle: null, noSession: true }, o || {});
+    const st = { auth: [], recs: [], writes: [], fn: [], loads: 0, dialogs: [] };
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 } }); const page = await ctx.newPage(); const c = collect(page);
+    page.on('dialog', (d) => { st.dialogs.push(d.message()); d.accept(); });
+    await mockBackend(page, { role: o.role, noSession: o.noSession, keepStore: !!o.init, onWrite: (x) => st.writes.push(x), extra: async (route, u, m) => {
+      if (/\/auth\/v1\/logout/.test(u)) { st.auth.push('logout:' + (/scope=(\w+)/.exec(u) || [])[1]); await route.fulfill({ status: 204, body: '' }); return true; }
+      if (/\/rest\/v1\/login_log/.test(u) && m === 'POST') { st.recs.push(JSON.parse(route.request().postData() || '{}')); await route.fulfill({ status: 201, body: '' }); return true; }
+      if (/\/rpc\/load_all/.test(u)) st.loads++;
+      if (/\/functions\/v1\/admin/.test(u)) { st.fn.push(JSON.parse(route.request().postData() || '{}')); await J9(route, { ok: true, msg: '완료' }); return true; }
+      if (o.handle) return o.handle(route, u, m, st);
+      return false; } });
+    if (o.init) await page.addInitScript(o.init[0], o.init[1]);
+    await page.goto(url + '/index.html'); await page.waitForTimeout(1800);
+    return { ctx, page, c, st };
+  };
+  const kept = ([l, extra]) => { if (document.cookie.indexOf('k180=1') >= 0) return; document.cookie = 'k180=1; path=/';   /* 처음 한 번만(새로고침 뒤에는 넣지 않음) */ const s = { a: 'tok', r: 'r1', e: Math.floor(Date.now() / 1000) + 3600, u: 'tester@example.com', p: true, m: 'none' }; if (l !== null) s.l = l;
+    localStorage.setItem('svc_keep', '1'); localStorage.setItem('svc_sess', JSON.stringify(s)); Object.keys(extra || {}).forEach((k) => localStorage.setItem(k, extra[k])); };
+  await S.t('㊿+180 로그인 · 비밀번호: 5번 틀리면 대기(서버에 묻지 않고 막음) · 풀리면 들어감 · 로그인 기록(기기 · 유지 여부) / 첫 로그인 변경 규칙(10자 · 영문+숫자 · 아이디 · 지금과 같음) · 그사이 토큰 갱신이 «변경 전»을 지우지 않음 / 규칙 · 자동 만들기 · 기기 이름', async () => {
+    let pw = 0; const puts = [];
+    const A = await mkA({ handle: async (route, u, m) => {
+      if (u.includes('grant_type=password')) { pw++; const b = JSON.parse(route.request().postData() || '{}');
+        if (b.password === 'Start0001x') { await J9(route, { access_token: 'tok', refresh_token: 'r1', expires_in: 3600, token_type: 'bearer', user: { id: 'u1', email: 'tester@example.com', user_metadata: {}, factors: [] } }); return true; }
+        await J9(route, { error: 'invalid_grant', error_description: 'Invalid login credentials' }, 400); return true; }
+      if (u.includes('grant_type=refresh_token')) { await J9(route, { access_token: 'tok2', refresh_token: 'r2', expires_in: 3600, user: { id: 'u1', email: 'tester@example.com', user_metadata: {} } }); return true; }
+      if (/\/auth\/v1\/user/.test(u) && m === 'PUT') { puts.push(JSON.parse(route.request().postData() || '{}')); await J9(route, { id: 'u1', email: 'tester@example.com', user_metadata: { pw_changed: true } }); return true; }
+      return false; } });
+    await A.page.waitForSelector('#viewLogin:not(.hidden)', { timeout: 8000 }); await A.page.fill('#lsEmail', 'tester@example.com');
+    for (let i = 0; i < 5; i++) { await A.page.fill('#lsPw', 'wrong' + i); await A.page.click('#lsGo'); await A.page.waitForTimeout(250); }
+    const m5 = await A.page.$eval('#lsMsg', (e) => e.textContent), n5 = pw;
+    await A.page.fill('#lsPw', 'Start0001x'); await A.page.click('#lsGo'); await A.page.waitForTimeout(250);
+    const m6 = await A.page.$eval('#lsMsg', (e) => e.textContent), n6 = pw;
+    assert(n5 === 5 && /잠시 막았습니다/.test(m5) && n6 === 5 && /초 뒤에 다시 시도/.test(m6), 'lock ' + JSON.stringify({ n5, m5, n6, m6 }));
+    await A.page.evaluate(() => SVC.lfOk('tester@example.com')); await A.page.click('#lsGo');
+    await A.page.waitForFunction(() => getComputedStyle(document.getElementById('lsForce')).display !== 'none', null, { timeout: 5000 }); await A.page.waitForTimeout(300);
+    const pk = await A.page.evaluate(async () => { await SVC.refreshToken(); const s = JSON.parse(sessionStorage.getItem('svc_sess')); return { a: s.a, p: s.p, l: typeof s.l, lf: localStorage.getItem('svc_lf') }; });
+    const tries = [];
+    for (const p of ['short1', 'abcdefghijk', 'tester12345', 'Start0001x']) { await A.page.fill('#lsNpw1', p); await A.page.fill('#lsNpw2', p); await A.page.click('#lsPwGo'); await A.page.waitForTimeout(150); tries.push(await A.page.$eval('#lsMsg', (e) => e.textContent)); }
+    await A.page.fill('#lsNpw1', 'Blue7harbor92'); await A.page.fill('#lsNpw2', 'Blue7harbor92'); await A.page.click('#lsPwGo'); await A.page.waitForTimeout(1500);
+    const fin = await A.page.evaluate(() => ({ dash: SVC.ST.CUR_VIEW === 'dash' && document.getElementById('viewLogin').classList.contains('hidden'), p: JSON.parse(sessionStorage.getItem('svc_sess')).p }));
+    assert(pk.a === 'tok2' && pk.p === false && pk.l === 'number' && pk.lf === '{}' && /10자 이상/.test(tries[0]) && /영문과 숫자/.test(tries[1]) && /아이디/.test(tries[2]) && /지금 비밀번호와 다르게/.test(tries[3])
+      && puts.length === 1 && puts[0].password === 'Blue7harbor92' && puts[0].data.pw_changed === true && fin.dash && fin.p === true, 'force ' + JSON.stringify({ pk, tries, puts, fin }));
+    const r = A.st.recs[0];
+    assert(A.st.recs.length === 1 && r.kind === 'password' && r.email === 'tester@example.com' && /^Linux · Chrome$/.test(r.device) && r.keep === false && r.pwa === false && r.aal === 'aal1', 'rec ' + JSON.stringify(A.st.recs));
+    const u = await A.page.evaluate(() => ({ rule: [SVC.pwRule('Ab1', 'a@b.c'), SVC.pwRule('Abcdefgh12', 'kim@x.com'), SVC.pwRule('kimchul1234', 'kimchul@x.com'), SVC.pwRule('Password123', 'a@x.com'), SVC.pwRule('Abcdefgh12', 'a@x.com', 'Abcdefgh12')].map((x) => !!x),
+      gen: Array.from({ length: 30 }, () => SVC.pwGen(14)).every((p) => p.length === 14 && !SVC.pwRule(p, 'tester@example.com')),
+      dev: [SVC.devLabel('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'), SVC.devLabel('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36 Edg/120.0'), SVC.devLabel('Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/24.0 Chrome/117.0 Mobile Safari/537.36'), SVC.devLabel('Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Whale/3.24 Safari/537.36')],
+      keep: [SVC.sessPKeep({ user: { user_metadata: {} } }, { p: false }), SVC.sessPKeep({ user: { user_metadata: { pw_changed: true } } }, { p: false }), SVC.sessPKeep({}, { p: true })] }));
+    assert(u.rule.join() === 'true,false,true,true,true' && u.gen && u.dev.join('|') === 'iOS · Safari|Windows · Edge|Android · Samsung|macOS · Whale' && u.keep.join() === 'false,true,true' && !A.c.errs.length, 'unit ' + JSON.stringify({ u, errs: A.c.errs }));
+    await A.ctx.close();
+    return '대기 5회 · 규칙 4 · 갱신 p=false 유지 · 기록 1';
+  });
+  await S.t('㊿+180 세션: 로그인 유지 30일 지나면 로그인 화면(데이터 미리 받기 없음 · 서버 logout · 안내) · 예전 세션(시각 없음)은 지금부터 · 자동 로그아웃 켠 사람은 닫아 둔 시간도 셈 · 유지 세션 로그아웃 = 서버 logout(local) · 모든 기기 = 기록 + logout(global) · 내 계정 최근 로그인', async () => {
+    const A = await mkA({ init: [kept, [Date.now() - 31 * 864e5, {}]] });
+    const a = await A.page.evaluate(() => ({ login: !document.getElementById('viewLogin').classList.contains('hidden'), msg: document.getElementById('lsMsg').textContent, sess: !!localStorage.getItem('svc_sess') }));
+    assert(a.login && /30일이 지나/.test(a.msg) && !a.sess && A.st.loads === 0 && A.st.auth.join() === 'logout:local', '30d ' + JSON.stringify({ a, loads: A.st.loads, auth: A.st.auth }));
+    await A.ctx.close();
+    const B = await mkA({ init: [kept, [null, {}]] });
+    const b = await B.page.evaluate(() => ({ dash: !!SVC.ST.DATA && document.getElementById('viewLogin').classList.contains('hidden'), l: JSON.parse(localStorage.getItem('svc_sess')).l }));
+    const tabs = await B.page.evaluate(() => { localStorage.setItem('svc_idle_min', '15'); SVC.ST.IDLE_LAST = Date.now() - 20 * 60000; localStorage.setItem('svc_idle_last', String(Date.now() - 5000)); SVC.idleCheck(); const ok = !!SVC.ST.SB_TOKEN; localStorage.removeItem('svc_idle_min'); return ok; });   /* 다른 탭에서 쓰는 중이면 이 탭도 안 끊김 */
+    assert(b.dash && b.l > Date.now() - 60000 && tabs && !B.st.auth.length, 'legacy ' + JSON.stringify({ b, tabs, auth: B.st.auth }));
+    await B.page.evaluate(() => { setTimeout(() => SVC.doLogout(), 0); }); await B.page.waitForTimeout(1500);
+    assert(B.st.auth.join() === 'logout:local' && await B.page.evaluate(() => !document.getElementById('viewLogin').classList.contains('hidden')), 'logout ' + JSON.stringify(B.st.auth));
+    await B.ctx.close();
+    const C = await mkA({ init: [kept, [Date.now() - 864e5, { svc_idle_min: '15', svc_idle_last: String(Date.now() - 20 * 60000) }]] });
+    const cc = await C.page.evaluate(() => ({ login: !document.getElementById('viewLogin').classList.contains('hidden'), msg: document.getElementById('lsMsg').textContent }));
+    assert(cc.login && /15분 동안 활동이 없어/.test(cc.msg) && C.st.loads === 0, 'idle ' + JSON.stringify({ cc, loads: C.st.loads }));
+    await C.ctx.close();
+    const lg = [{ at: new Date().toISOString(), kind: 'password', aal: 'aal2', device: 'Windows · Chrome', keep: true, pwa: false }, { at: new Date(Date.now() - 864e5).toISOString(), kind: 'password', aal: 'aal1', device: 'iOS · Safari', keep: true, pwa: true }];
+    const D = await mkA({ init: [kept, [Date.now() - 864e5, {}]], handle: async (route, u, m) => { if (/\/rest\/v1\/login_log/.test(u) && m === 'GET') { await J9(route, lg); return true; } return false; } });
+    await D.page.evaluate(() => SVC.switchView('account')); await D.page.waitForSelector('#accLogins table', { timeout: 6000 });
+    const d = await D.page.evaluate(() => ({ rows: [...document.querySelectorAll('#accLogins tbody tr')].map((r) => r.textContent), sess: [...document.querySelectorAll('#accBody div')].map((x) => x.textContent).find((t) => /^로그인 세션/.test(t)) || '', btn: !!document.getElementById('accOutAll'), tip: document.querySelector('#accBody p.cap:last-of-type').textContent }));
+    await D.page.click('#accOutAll'); await D.page.waitForTimeout(1500);
+    const d2 = await D.page.evaluate(() => ({ login: !document.getElementById('viewLogin').classList.contains('hidden'), msg: document.getElementById('lsMsg').textContent }));
+    assert(d.rows.length === 2 && /Windows · Chrome/.test(d.rows[0]) && /비밀번호 \+ 인증 앱/.test(d.rows[0]) && /iOS · Safari 앱/.test(d.rows[1]) && /이 기기에 로그인 유지 · .* 로그인 — .*까지/.test(d.sess) && d.btn && /슈퍼 관리자가 관리자/.test(d.tip)
+      && D.st.recs.length === 1 && D.st.recs[0].kind === 'logout_all' && D.st.auth.join() === 'logout:global' && d2.login && /모든 기기에서 로그아웃했습니다/.test(d2.msg) && D.st.dialogs.some((x) => /모든 기기에서 로그아웃합니다/.test(x)) && !D.c.errs.length, 'all ' + JSON.stringify({ d, d2, recs: D.st.recs, auth: D.st.auth, errs: D.c.errs }));
+    await D.ctx.close();
+    return '30일 · 예전 세션 · 닫아 둔 시간 · local · global · 최근 로그인 2';
+  });
+  const users = () => { const n = Date.now(); return [{ email: 'tester@example.com', role: 'super_admin', last_sign_in: new Date(n).toISOString(), created_at: new Date(n - 400 * 864e5).toISOString() }, { email: 'boss@example.com', role: 'super_admin', last_sign_in: new Date(n - 864e5).toISOString(), created_at: new Date(n - 400 * 864e5).toISOString() },
+    { email: 'staff@example.com', role: 'admin', last_sign_in: new Date(n - 100 * 864e5).toISOString(), created_at: new Date(n - 400 * 864e5).toISOString() }, { email: 'new@example.com', role: 'viewer', last_sign_in: null, created_at: new Date(n - 30 * 864e5).toISOString() }]; };
+  const admH = (aud) => async (route, u) => {
+    if (/\/rpc\/admin_list_users/.test(u)) { await J9(route, users()); return true; }
+    if (/\/rpc\/mfa_admin_list/.test(u)) { await J9(route, [{ email: 'tester@example.com', role: 'super_admin', enrolled: true }, { email: 'boss@example.com', role: 'super_admin', enrolled: true }, { email: 'staff@example.com', role: 'admin', enrolled: false, required: false }, { email: 'new@example.com', role: 'viewer', enrolled: false }]); return true; }
+    if (/\/rpc\/sec_audit/.test(u)) { if (aud === 404) await J9(route, { code: 'PGRST202', message: 'Could not find the function public.sec_audit without parameters in the schema cache' }, 404); else await J9(route, aud); return true; }
+    return false; };
+  await S.t('㊿+180 관리자 계정: 2단계 인증 칸(관리자 미등록 강조) · 90일 넘게 안 씀 / 한 번도 안 씀 · 요약(관리자 n · 인증 앱 n) / 비밀번호 초기화 창(가려진 칸 · 규칙 · 자동 만들기 · 이력에 비밀번호 없음) / 새 계정 초기 비밀번호 규칙 · 자동 만들기 · 이력', async () => {
+    const A = await mkA({ noSession: false, handle: admH({}) });
+    await A.page.evaluate(() => SVC.switchView('adminx')); await A.page.waitForFunction(() => document.querySelectorAll('#axTable tbody tr').length === 4, null, { timeout: 8000 });
+    const t = await A.page.evaluate(() => ({ head: [...document.querySelectorAll('#axTable thead th')].map((x) => x.textContent), rows: [...document.querySelectorAll('#axTable tbody tr')].map((r) => r.textContent), msg: document.getElementById('axMsg').textContent,
+      warn: [...document.querySelectorAll('#axTable tbody tr')].find((r) => /staff/.test(r.textContent)).children[2].innerHTML }));
+    const row = (e) => t.rows.find((x) => x.indexOf(e) === 0) || '';
+    assert(t.head.includes('2단계 인증') && /✓ 켬/.test(row('boss')) && /안 켬/.test(row('staff')) && /warn-ink/.test(t.warn) && /오래 안 씀/.test(row('staff')) && /한 번도 안 씀/.test(row('new')) && !/안 씀/.test(row('boss')) && /4개 계정 · 관리자 3\(인증 앱 2\) · 90일 넘게 안 씀 2/.test(t.msg), 'list ' + JSON.stringify(t));
+    await A.page.click('#axTable tbody tr:has-text("staff@example.com") button:has-text("비번 초기화")'); await A.page.waitForSelector('#ovlAxPw.on', { timeout: 3000 }); await A.page.waitForTimeout(80);
+    const m0 = await A.page.evaluate(() => ({ foc: document.activeElement && document.activeElement.id, type: document.getElementById('axpPw').type }));
+    await A.page.fill('#axpPw', 'short'); await A.page.click('#axpGo'); const e1 = await A.page.$eval('#axpM', (e) => e.textContent);
+    await A.page.click('#axpGen'); const gen = await A.page.evaluate(() => ({ v: document.getElementById('axpPw').value, type: document.getElementById('axpPw').type }));
+    await A.page.click('#axpGo'); await A.page.waitForTimeout(500);
+    const rp = A.st.fn.find((x) => x.action === 'reset_password'), cl = A.st.writes.filter((w) => /change_log/.test(w.url)).map((w) => JSON.parse(w.body));
+    const clr = cl.find((x) => x.action === 'pw_reset');
+    assert(m0.foc === 'axpPw' && m0.type === 'password' && /10자/.test(e1) && gen.v.length === 14 && gen.type === 'text' && rp && rp.email === 'staff@example.com' && rp.password === gen.v && clr && clr.target_id === 'staff@example.com' && JSON.stringify(clr).indexOf(gen.v) < 0 && !(await A.page.$('#ovlAxPw.on')), 'reset ' + JSON.stringify({ m0, e1, gen, rp, clr }));
+    await A.page.evaluate(() => { document.getElementById('axNewBox').open = true; }); await A.page.fill('#axEmail', 'n2@example.com'); await A.page.fill('#axPw', 'abc'); await A.page.click('#axCreate'); await A.page.waitForTimeout(150);
+    const e2 = await A.page.$eval('#axMsg', (e) => e.textContent), pwType = await A.page.$eval('#axPw', (e) => e.type);
+    await A.page.click('#axPwGen'); await A.page.click('#axCreate'); await A.page.waitForTimeout(600);
+    const cu = A.st.fn.find((x) => x.action === 'create_user'), cl2 = A.st.writes.filter((w) => /change_log/.test(w.url)).map((w) => JSON.parse(w.body)).find((x) => x.action === 'user_create');
+    assert(/초기 비밀번호: 10자/.test(e2) && pwType === 'password' && cu && cu.email === 'n2@example.com' && cu.password.length === 14 && cl2 && cl2.target_id === 'n2@example.com' && !A.c.errs.length, 'create ' + JSON.stringify({ e2, pwType, cu, cl2, errs: A.c.errs }));
+    await A.ctx.close();
+    return '목록 · 초기화 · 생성';
+  });
+  await S.t('㊿+180 보안 점검(관리자 › 보안): sec_audit → 🔴 RLS 꺼진 표(펼침) · 🟠 열린 쓰기 정책 · 공개 버킷 · 인증 앱 없는 관리자 · ✅ 없는 항목 · 이 브라우저(CSP) / SQL 112 전이면 안내 / 다른 사이트 iframe 안에서는 포탈 · 위성 화면을 비움', async () => {
+    const aud = { no_rls: ['tmp_bak'], open_write: [{ t: 'client_errors', p: 'ins', cmd: 'INSERT', roles: 'authenticated' }], anon_definer: [], public_buckets: ['logo'], admins_no_mfa: ['staff@example.com'], api_no_expiry: [], stale: [{ email: 'old@example.com', last: null }], no_role: [], api_unused: [], users: 5, mfa_on: 2, auth_definer_n: 12 };
+    const A = await mkA({ noSession: false, handle: admH(aud) });
+    await A.page.evaluate(() => SVC.switchView('adminx')); await A.page.waitForTimeout(300); await A.page.click('#admTabs [data-t="sec"]'); await A.page.click('#secRun'); await A.page.waitForSelector('#secOut .sec-it', { timeout: 5000 });
+    const r = await A.page.evaluate(() => ({ msg: document.getElementById('secMsg').textContent, it: [...document.querySelectorAll('#secOut .sec-it')].map((x) => x.dataset.sev + '|' + x.querySelector('b').textContent + '|' + (x.querySelector('details') ? (x.querySelector('details').open ? 'open:' : 'shut:') + x.querySelector('details').textContent : '')) }));
+    const f = (t) => r.it.find((x) => x.indexOf(t) >= 0) || '';
+    assert(/^crit\|RLS\(행 보안\)가 꺼진 표\|open:.*tmp_bak/.test(r.it[0]) && /^warn\|조건 없이/.test(f('조건 없이')) && /client_errors · ins \(INSERT · authenticated\)/.test(f('조건 없이')) && /^warn\|공개 Storage/.test(f('공개 Storage')) && /^warn\|2단계 인증을 안 켠 관리자\|shut:.*staff/.test(f('안 켠 관리자'))
+      && /^ok\|비로그인도/.test(f('비로그인도')) && /^ok\|콘텐츠 보안 정책/.test(f('콘텐츠 보안')) && /^info\|90일/.test(f('90일')) && /🔴 1 · 🟠 3 · 🔵 2/.test(r.msg) && /계정 5\(인증 앱 2\)/.test(r.msg) && /12개/.test(r.msg), 'audit ' + JSON.stringify(r));
+    await A.ctx.close();
+    const B = await mkA({ noSession: false, handle: admH(404) });
+    await B.page.evaluate(() => SVC.switchView('adminx')); await B.page.waitForTimeout(300); await B.page.click('#admTabs [data-t="sec"]'); await B.page.click('#secRun'); await B.page.waitForTimeout(500);
+    const b = await B.page.$eval('#secMsg', (e) => e.textContent); await B.ctx.close();
+    assert(/SQL 112/.test(b), '404 ' + b);
+    const other = http.createServer((q, rs) => { rs.writeHead(200, { 'Content-Type': 'text/html' }); rs.end('<!doctype html><title>x</title><iframe src="' + url + '/index.html" width="800" height="400"></iframe><iframe src="' + url + '/quote.html" width="800" height="400"></iframe>'); });
+    await new Promise((res) => other.listen(0, '127.0.0.1', res));   /* 다른 출처(포트가 다름) */
+    const ctx = await browser.newContext({ viewport: { width: 1200, height: 800 } }); const page = await ctx.newPage();
+    await mockBackend(page, {});
+    await page.goto('http://127.0.0.1:' + other.address().port + '/'); await page.waitForTimeout(2500);
+    const fr = page.frames().filter((x) => x !== page.mainFrame()), txt = [];
+    for (const x of fr) { try { txt.push(await x.evaluate(() => document.body.textContent.trim().slice(0, 80))); } catch (e) { txt.push('ERR ' + e.message.slice(0, 60)); } }
+    await ctx.close(); other.close();
+    assert(txt.length === 2 && txt.every((x) => /다른 사이트 안에서 열 수 없습니다/.test(x)), 'frame ' + JSON.stringify(txt));
+    return r.it.length + '항목 · 404 · iframe 2';
+  });
+}
+// ㊿+181 화면 · 모바일 — 폰 목록 카드 · 누르는 영역 · 접근성 · 폰 입력(숫자 키패드 · 16px · 저장 버튼 고정 · 비어 있는 필수 칸으로)
+{
+  const mkM = async (o) => {
+    o = Object.assign({ w: 390, h: 844, mobile: true, init: null }, o || {});
+    const db = new FakeDB(seedData()); const ctx = await browser.newContext({ viewport: { width: o.w, height: o.h }, serviceWorkers: 'block', isMobile: o.mobile, hasTouch: o.mobile }); const page = await ctx.newPage(); const c = collect(page);
+    page.on('dialog', (d) => d.accept()); await fakeBackend(page, db, {});
+    if (o.init) await page.addInitScript(o.init);
+    await page.goto(url + '/index.html'); await page.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA && SVC.ST.DATA.rows.length, null, { timeout: 20000 }); await page.waitForTimeout(400);
+    return { db, ctx, page, c };
+  };
+  await S.t('㊿+181 폰 목록 = 카드: 머리글 숨김 · 고객사 + 상태가 위 · 칸 이름 붙음 · 주요 5칸 밖은 «＋ n칸 더 보기» / ✎ 수정 = 칸이 위아래(이름 붙음) · 저장 PATCH · 수정 중 표시(tr.editing) / 위 «정렬 · 거르기» / «표로 보기» 기억 · PC 는 늘 표', async () => {
+    const A = await mkM();
+    await A.page.evaluate(() => SVC.switchView('contracts')); await A.page.waitForSelector('#dvTable.cards tbody tr', { timeout: 6000 });
+    const a = await A.page.evaluate(() => { const t = document.getElementById('dvTable'), tr = t.querySelector('tbody tr'), pin1 = tr.querySelector('td.pin1'), pin2 = tr.querySelector('td.pin2'), cx = [...tr.querySelectorAll('td.cx')];
+      const vis = (e) => getComputedStyle(e).display !== 'none';
+      return { thead: getComputedStyle(t.querySelector('thead')).display, pin1: pin1 && pin1.textContent.trim(), p1top: pin1 && pin2 && Math.abs(pin1.getBoundingClientRect().top - pin2.getBoundingClientRect().top) < 12, lab: [...tr.querySelectorAll('td[data-l]')].filter(vis).slice(2, 4).map((x) => getComputedStyle(x, '::before').content),
+        cxHidden: cx.length > 0 && cx.every((x) => !vis(x)), more: (tr.querySelector('.cxb') || {}).textContent, bar: !document.getElementById('dvCardBar').hidden && !!document.getElementById('dvSortSel'), sticky: getComputedStyle(pin1).position, wrapMax: getComputedStyle(t.parentElement).maxHeight }; });
+    await A.page.evaluate(() => document.querySelector('#dvTable tbody tr .cxb').click());
+    const b = await A.page.evaluate(() => { const tr = document.querySelector('#dvTable tbody tr'); return { open: tr.classList.contains('cx-open'), shown: [...tr.querySelectorAll('td.cx:not(.na)')].every((x) => getComputedStyle(x).display !== 'none'), aria: tr.querySelector('.cxb').getAttribute('aria-expanded') }; });
+    assert(a.thead === 'none' && a.pin1 && a.p1top && a.lab.every((x) => /^".+"$/.test(x)) && a.cxHidden && /^＋ \d+칸 더 보기$/.test(a.more) && a.bar && a.sticky === 'static' && a.wrapMax === 'none' && b.open && b.shown && b.aria === 'true', 'card ' + JSON.stringify({ a, b }));
+    const id = await A.page.evaluate(() => { const tr = [...document.querySelectorAll('#dvTable tbody tr')].find((x) => x.querySelector('button[data-act="edit"]')); tr.querySelector('button[data-act="edit"]').click(); return 1; });
+    await A.page.waitForSelector('#dvTable tr.editing', { timeout: 3000 });
+    const e = await A.page.evaluate(() => { const tr = document.querySelector('#dvTable tr.editing'), inp = tr.querySelector('input[data-k="csm"]') || tr.querySelector('input[type="text"][data-k]');
+      const td = inp.closest('td'); return { k: inp.dataset.k, lab: getComputedStyle(td, '::before').content, w: Math.round(inp.getBoundingClientRect().width), fs: getComputedStyle(inp).fontSize, nIn: tr.querySelectorAll('[data-k]').length, mrr: (tr.querySelector('input[data-won]') || {}).inputMode }; });
+    await A.page.fill('#dvTable tr.editing input[data-k="' + e.k + '"]', 'cardsite1'); await A.page.click('#dvTable tr.editing button.sv'); await A.page.waitForTimeout(900);
+    const pw = A.db.writes.filter((w) => w.method === 'PATCH' && w.table === 'contracts').slice(-1)[0];
+    assert(e.lab.length > 2 && e.w > 150 && e.fs === '16px' && e.nIn > 5 && e.mrr === 'decimal' && pw && pw.body[e.k] === 'cardsite1' && !(await A.page.$('#dvTable tr.editing')), 'edit ' + JSON.stringify({ e, pw }));
+    await A.page.selectOption('#dvSortSel', { index: 2 }); await A.page.waitForTimeout(300);
+    const so = await A.page.evaluate(() => ({ k: SVC.DV.sortK, d: SVC.DV.sortDir, sel: document.getElementById('dvSortSel').value }));
+    await A.page.selectOption('#dvFiltSel', { index: 2 }); await A.page.waitForTimeout(300);
+    const fo = await A.page.evaluate(() => !!document.querySelector('.colf'));
+    await A.page.keyboard.press('Escape'); await A.page.evaluate(() => { const f = document.querySelector('.colf'); if (f) f.remove(); });
+    await A.page.click('#dvCardTg'); await A.page.waitForTimeout(300);
+    const tb = await A.page.evaluate(() => ({ cards: document.getElementById('dvTable').classList.contains('cards'), thead: getComputedStyle(document.querySelector('#dvTable thead')).display, pref: localStorage.getItem('svc_dvcards'), btn: document.getElementById('dvCardTg').textContent, cxt: !!document.querySelector('#dvTable td.cxt') }));
+    assert(so.k && so.d === -1 && so.sel === so.k + '|-1' && fo && !tb.cards && tb.thead !== 'none' && tb.pref === '0' && tb.btn === '카드로 보기' && !tb.cxt && !A.c.errs.length, 'bar ' + JSON.stringify({ so, fo, tb, errs: A.c.errs }));
+    await A.ctx.close();
+    const P = await mkM({ w: 1440, h: 900, mobile: false });
+    await P.page.evaluate(() => SVC.switchView('contracts')); await P.page.waitForTimeout(500);
+    const p = await P.page.evaluate(() => ({ cards: document.getElementById('dvTable').classList.contains('cards'), bar: document.getElementById('dvCardBar').hidden, sr: (document.querySelector('#dvTable thead th.act .sr') || {}).textContent, dl: !!document.querySelector('#dvTable td[data-l]') }));
+    await P.ctx.close();
+    assert(!p.cards && p.bar && p.sr === '동작' && p.dl, 'pc ' + JSON.stringify(p));
+    return '카드 · 수정 · 정렬/거르기 · 표로 · PC 표';
+  });
+  await S.t('㊿+181 폰 입력: 금액 · 수량 칸 숫자 키패드(inputmode) · 전화 칸 tel · 터치 화면 입력칸 16px(iOS 확대 없음) / 입력·수정 창 «저장» → 비어 있는 필수 칸 빨간 테두리 + 그 칸으로 · 고치면 사라짐 · 저장 줄 화면 아래 고정 / OI 등록 «다음» 줄 고정', async () => {
+    const A = await mkM();
+    const at = await A.page.evaluate(() => ({ nMrr: document.getElementById('nMrr').inputMode, odQty: document.getElementById('odQty').inputMode, oiAmt: document.getElementById('oiAmt').inputMode, tel: ['odPhone', 'oiCPhone', 'mpPhone'].map((i) => document.getElementById(i).type + '/' + document.getElementById(i).inputMode).join(',') }));
+    await A.page.evaluate(() => document.getElementById('btnEdit').click()); await A.page.waitForSelector('#ovlEdit.on', { timeout: 3000 });
+    await A.page.evaluate(() => document.getElementById('eGo').click()); await A.page.waitForTimeout(400);
+    const r = await A.page.evaluate(() => ({ act: document.activeElement && document.activeElement.id, bad: [...document.querySelectorAll('#ovlEdit .f-bad')].map((x) => x.id), inv: document.getElementById('nCust').getAttribute('aria-invalid'), fs: getComputedStyle(document.getElementById('nCust')).fontSize,
+      mact: getComputedStyle(document.querySelector('#ovlEdit .modal > .mact')).position, inView: (() => { const m = document.querySelector('#ovlEdit .modal > .mact').getBoundingClientRect(); return m.bottom <= innerHeight + 1 && m.top > 0; })() }));
+    await A.page.fill('#nCust', '가상고객01'); const after = await A.page.evaluate(() => ({ cls: document.getElementById('nCust').classList.contains('f-bad'), inv: document.getElementById('nCust').getAttribute('aria-invalid'), left: [...document.querySelectorAll('#ovlEdit .f-bad')].length }));
+    assert(at.nMrr === 'decimal' && at.odQty === 'numeric' && at.oiAmt === 'decimal' && at.tel === 'tel/tel,tel/tel,tel/tel' && r.act === 'nCust' && r.bad.join() === 'nCust,nStart,nEnd,nMrr' && r.inv === 'true' && r.fs === '16px' && r.mact === 'sticky' && r.inView
+      && !after.cls && after.inv === null && after.left === 3, 'entry ' + JSON.stringify({ at, r, after }));
+    await A.page.evaluate(() => { document.getElementById('ovlEdit').classList.remove('on'); SVC.switchView('oinew'); window.scrollTo(0, 0); }); await A.page.waitForTimeout(400);
+    const w = await A.page.evaluate(() => { const n = document.querySelector('#viewOiNew .wz-nav'), r0 = n.getBoundingClientRect(), tab = document.getElementById('mtabs').getBoundingClientRect(); return { pos: getComputedStyle(n).position, bottom: Math.round(r0.bottom), tabTop: Math.round(tab.top), vis: r0.top < innerHeight && r0.bottom <= tab.top + 2 }; });
+    assert(w.pos === 'sticky' && w.vis && !A.c.errs.length, 'wz ' + JSON.stringify({ w, errs: A.c.errs }));
+    await A.ctx.close();
+    return 'inputmode · tel · 16px · 필수 칸 4 · 고정 줄';
+  });
+  await S.t('㊿+181 누르는 영역 · 접근성: 홈 할 일 이름 · 데이터 점검 «기술 상세» · 표 ▼ 거르기 = 터치 32px 이상 · 해지 화면 표 스크롤 영역 키보드(tabindex) · 관리자 표 빈 머리글 이름 · 표 수정 중이면 새 버전 새로고침 전에 확인', async () => {
+    const A = await mkM();
+    const h = await A.page.evaluate(() => { const nm = document.querySelector('.hm-nm'); const af = nm ? getComputedStyle(nm, '::after') : null; return nm ? Math.min(parseFloat(af.width), parseFloat(af.height)) : -1; });
+    await A.page.evaluate(() => SVC.switchView('dcheck')); await A.page.waitForTimeout(500);
+    const d = await A.page.evaluate(() => { const s = document.querySelector('.dc-tech>summary'); return s ? Math.round(s.getBoundingClientRect().height) : -1; });
+    await A.page.evaluate(() => SVC.switchView('churn')); await A.page.waitForTimeout(800);
+    const ch = await A.page.evaluate(() => { const w = [...document.querySelectorAll('#viewChurn div[style*="overflow-x:auto"]')]; return { n: w.length, tab: w.every((x) => x.tabIndex === 0 && x.getAttribute('role') === 'region') }; });
+    await A.ctx.close();
+    const P = await mkM({ w: 1440, h: 900, mobile: false });
+    await P.page.evaluate(() => SVC.switchView('adminx')); await P.page.waitForTimeout(800);
+    const ad = await P.page.evaluate(() => [...document.querySelectorAll('#viewAdmin th.act')].map((x) => x.textContent.trim()));
+    await P.page.evaluate(() => SVC.switchView('contracts')); await P.page.waitForTimeout(400);
+    const fb = await P.page.evaluate(() => { const b = document.querySelector('#dvTable thead .fbtn'), af = getComputedStyle(b, '::after'); return Math.min(parseFloat(af.width), parseFloat(af.height)); });
+    let asked = 0; P.page.removeAllListeners('dialog'); P.page.on('dialog', (dg) => { asked++; dg.dismiss(); });
+    await P.page.evaluate(() => { const b = document.querySelector('#dvTable tbody tr button[data-act="edit"]'); b.click(); }); await P.page.waitForTimeout(200);
+    const ed = await P.page.evaluate(() => !!document.querySelector('#dvTable tr.editing')); await P.page.evaluate(() => SVC.verReload()); await P.page.waitForTimeout(200);
+    await P.ctx.close();
+    assert(h >= 32 && d >= 32 && ch.n >= 1 && ch.tab && ad.length >= 2 && ad.every((x) => x === '동작') && fb >= 24 && ed && asked === 1, JSON.stringify({ h, d, ch, ad, fb, ed, asked }));
+    return 'hit ' + h + '/' + d + '/' + fb + ' · 스크롤 ' + ch.n;
   });
 }
 await browser.close(); srv.close();

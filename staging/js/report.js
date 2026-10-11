@@ -2,8 +2,8 @@
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { APP_VER, ST } from './state.js';
 import { Viz } from './viz.js';
-import { $, cssv, esc, LINE_LABEL, lline, llineVer, mk, pct, rawHtml, tpl, won } from './core.js';
-import { dIdx, RPB, rpbBadge, rpbKey, rpbList, SB_RAW, thisMonthStr, toast, todayStr } from './shell.js';
+import { $, cssv, esc, LINE_LABEL, lline, llineVer, mk, pct, rawHtml, SB_URL, tpl, won } from './core.js';
+import { dIdx, RPB, rpbBadge, rpbKey, rpbList, SB_RAW, sbHeaders, thisMonthStr, toast, todayStr } from './shell.js';
 import { expAmtOf, expEligible, idxs } from './dash.js';
 import { GRIDS } from './grids.js';
 import { eqRetSet } from './equipment.js';
@@ -860,7 +860,7 @@ export function qbPanelHtml(){
   h+=tpl`<section class="qb-sec"><div class="qb-h"><span class="qb-n">${grouped?5:6}</span>결과 조건 · 정렬 · 상위</div>`;
   h+=tpl`<div class="qb-sub">결과 조건 (집계 값에도)</div>${rawHtml((spec.post||[]).map(function(f,i){ return qbFilterRow(f,i,spec,'post'); }).join(''))}<button type="button" class="cbtn qb-add" data-qb="padd">＋ 결과 조건</button>`;
   h+=tpl`<div class="qb-sub">정렬</div>${rawHtml((spec.sort||[]).map(function(s,i){ return tpl`<div class="qb-row" data-i="${rawHtml(i)}" data-kind="sort">${rawHtml(qbSel('c', qbOutColOpts(QB.res&&QB.res.cols, s.c), s.c))}<select data-qb="dir" aria-label="정렬 방향" class="qb-sel qb-dir"><option value="asc"${s.dir!=='desc'?' selected':''}>오름차순 ↑</option><option value="desc"${s.dir==='desc'?' selected':''}>내림차순 ↓</option></select><button type="button" class="cbtn qb-x" data-qb="del">×</button></div>`; }).join(''))}<button type="button" class="cbtn qb-add" data-qb="sadd">＋ 정렬</button>`;
-  h+=tpl`<div class="qb-sub">상위 N행만 <input data-qb="limit" class="qb-in" type="number" min="0" style="width:80px" value="${rawHtml(spec.limit||'')}" placeholder="전체"></div></section>`;
+  h+=tpl`<div class="qb-sub">상위 N행만 <input data-qb="limit" class="qb-in" type="number" inputmode="numeric" min="0" style="width:80px" value="${rawHtml(spec.limit||'')}" placeholder="전체"></div></section>`;
   h+=qbAdvHtml();
   return h;
 }
@@ -870,7 +870,7 @@ export function qbResultHtml(){
   var h=tpl`<div class="qb-res-h"><input id="qbTitle" class="qb-title" value="${QB.title||qbAutoTitle()}" placeholder="결과 제목">`+
     tpl`<span class="mini qb-meta">${rawHtml(r.total.toLocaleString())}행${rawHtml(r.rows.length<r.total? ' (상위 '+r.rows.length.toLocaleString()+')':'')}${rawHtml(r.sql? ' · SQL' : ' · 기준 '+r.baseN.toLocaleString()+(r.joinedN!==r.baseN? ' → 연결 후 '+r.joinedN.toLocaleString():'')+(r.filteredN!==r.joinedN? ' → 조건 후 '+r.filteredN.toLocaleString():''))} · ${rawHtml(r.ms)}ms</span></div>`+
     tpl`<div class="qb-res-t"><div class="eqb-seg"><button type="button" data-qbv="table" aria-pressed="${QB.view==='table'}">표</button><button type="button" data-qbv="chart" aria-pressed="${QB.view==='chart'}">차트</button><button type="button" data-qbv="both" aria-pressed="${QB.view==='both'}">둘 다</button></div>`+ tpl`${rawHtml(ch && QB.view!=='table' && ch.xs && ch.xs.length>1? tpl`<label class="mini qb-chk">가로축 <select id="qbChartX" class="qb-sel">${rawHtml(ch.xs.map(function(x){ return tpl`<option value="${rawHtml(x.c.id)}"${ch.xi===x.c.id?' selected':''}>${x.c.l}</option>`; }).join(''))}</select></label>` : '')}`+ tpl`${rawHtml(ch && QB.view!=='table' && ch.all.length>1? tpl`<label class="mini qb-chk">값 <select id="qbChartM" class="qb-sel" title="차트에 그릴 값"><option value="auto"${ch.picked==='auto'?' selected':''}>자동</option><option value="all"${ch.picked==='all'?' selected':''}>모든 값</option>${rawHtml(ch.all.map(function(m){ return tpl`<option value="${rawHtml(m.c.id)}"${ch.picked===m.c.id?' selected':''}>${m.c.l}</option>`; }).join(''))}</select></label>` : '')}`+
-    tpl`<span style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="cbtn" id="qbSave" title="이 조합을 저장해 두고 다음에 바로 불러옵니다">${QB.savedId? '💾 저장(덮어쓰기)':'💾 저장'}</button><button type="button" class="cbtn" id="qbXlsx">⬇ 엑셀</button><button type="button" class="cbtn pri" id="qbDeck">＋ PPT 슬라이드에 추가</button></span></div>`;
+    tpl`<span style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="cbtn" id="qbSave" title="이 조합을 저장해 두고 다음에 바로 불러옵니다">${qbSaveLabel()}</button><button type="button" class="cbtn" id="qbXlsx">⬇ 엑셀</button><button type="button" class="cbtn pri" id="qbDeck">＋ PPT 슬라이드에 추가</button></span></div>`;
   if(r.warn&&r.warn.length) h+=tpl`<div class="qb-warn">${rawHtml(r.warn.map(function(w){ return '⚠ '+esc(w); }).join('<br>'))}</div>`;
   if((QB.view==='chart'||QB.view==='both') && ch) h+=tpl`<div class="legend" id="qbLegend">${rawHtml(ch.series.map(function(sr,i){ return tpl`<span class="li"><span class="sw" style="background:${rawHtml(cssv('--s'+((i%8)+1)))}"></span>${sr.label}</span>`; }).join(''))}${rawHtml(ch.money? '<span class="mini" style="margin-left:auto">단위: 천원</span>':'')}</div><div class="chartbox h260" id="qbChart"></div><div class="mini">${ch.xLabel||''}별 ${ch.series.map(function(x){ return x.label; }).join(' · ')}${rawHtml(ch.merged? ' — 같은 '+esc(ch.xLabel)+' 행은 '+(ch.count?'건수로 셈':'합산')+'':'')}${ch.truncated? ' · 상위 40개만':''}</div>`;
   if(QB.view!=='chart'){
@@ -966,31 +966,112 @@ export function qbBindPanel(){
 /* 저장·불러오기 */
 export function qbLoadSql(sql, name, id){ QB.mode='sql'; QB.sql=sql||''; QB.title=name||''; QB.savedId=id||null; QB.page=300; QB.chartM=null; QB.chartX=null; qbPanelRefresh(); qbSqlRun(); qbLibRefresh(); }
 export function qbLoad(spec, name, id){ QB.mode='ui'; QB.chartM=null; QB.chartX=null; QB.spec=JSON.parse(JSON.stringify(spec)); QB.spec.group=QB.spec.group||{by:[],aggs:[],pivot:null}; QB.spec.joins=QB.spec.joins||[]; QB.spec.filters=QB.spec.filters||[]; QB.spec.sel=QB.spec.sel||[]; QB.spec.post=QB.spec.post||[]; QB.spec.sort=QB.spec.sort||[]; QB.title=name||''; QB.savedId=id||null; QB.page=300; QB.view= (QB.spec.group.by.length||QB.spec.group.pivot)? 'both':'table'; qbPanelRefresh(); qbRunNow(); qbLibRefresh(); }
-export function qbSaveCur(){
+/* ── ㊿+179 리포트 저장을 DB 에(report_queries · SQL 111) — «내 리포트»(다른 PC 에서도) + «팀 공유» · SQL 111 전이면 예전처럼 이 브라우저(localStorage)
+   · 공유 = 조합(표 · 조건 · 묶기)만 — 결과 숫자는 보는 사람의 데이터 · 권한으로 다시 계산 · 남의 공유 리포트를 고쳐 저장하면 내 것으로 새로 */
+export var RQ={ok:null, rows:[], at:0, loading:false};
+export async function rqLoad(force){
+  if(!ST.SB_TOKEN || RQ.loading || (RQ.ok===false && !force) || (!force && RQ.at && Date.now()-RQ.at<60*1000)) return RQ;
+  RQ.loading=true;
+  try{ var r=await fetch(SB_URL+'/rest/v1/report_queries?select=id,name,spec,owner,shared,updated_at&order=updated_at.desc&limit=500', {headers:sbHeaders()});
+    if(r.ok){ RQ.ok=true; RQ.rows=(await r.json())||[]; } else if(r.status===404) RQ.ok=false; }
+  catch(e){}
+  RQ.loading=false; RQ.at=Date.now(); return RQ;
+}
+export function rqItem(x){ var p=x.spec||{}; return {id:'db'+x.id, dbId:x.id, name:x.name, spec:p.sql!=null? null : (p.spec||null), sql:p.sql!=null? p.sql : null, shared:!!x.shared, owner:String(x.owner||''), mine:String(x.owner||'').toLowerCase()===String(ST.AUTH_USER||'').toLowerCase(), at:x.updated_at}; }
+/** 저장 버튼 글자 — 내 것(덮어쓰기) · 다른 사람의 공유 리포트(내 것으로 새로) · 새로 */
+export function qbSaveLabel(){ var c=QB.savedId? qbFind(QB.savedId) : null; return !c? '💾 저장' : (!c.dbId || c.mine)? '💾 저장(덮어쓰기)' : '💾 내 것으로 저장'; }
+export function qbFind(id){ return (RQ.ok? RQ.rows.map(rqItem) : []).concat(qbSaved()).filter(function(x){ return x.id===id; })[0]||null; }
+/** 저장한 조합이 가리키는 표 · 열 중 지금 없는 것(열 이름이 바뀌었거나 없어짐) — 그 조건 · 열은 빠진 채 실행됨 */
+export function qbMissing(spec){
+  if(!spec) return [];
+  var S=qbSources(), miss=[], refs=[];
+  if(!S[spec.base]) return ['기준 표 «'+String(spec.base||'?')+'»'];
+  (spec.joins||[]).forEach(function(j){ if(!S[j.t]) miss.push('표 «'+j.t+'»'); (j.on||[]).forEach(function(r){ refs.push(r); }); (j.where||[]).forEach(function(f){ refs.push(f.c); }); });
+  (spec.filters||[]).forEach(function(f){ refs.push(f.c); }); (spec.sel||[]).forEach(function(c){ refs.push(c); });
+  var G=spec.group||{}; (G.by||[]).forEach(function(b){ refs.push(b.c); }); (G.aggs||[]).forEach(function(a){ if(a.c) refs.push(a.c); }); if(G.pivot && G.pivot.c) refs.push(G.pivot.c);
+  (spec.sort||[]).forEach(function(x){ refs.push(x.c); });
+  refs.forEach(function(r){ r=String(r||''); if(r.indexOf('.')>0 && !qbCol(r) && miss.indexOf(r)<0) miss.push(r); });
+  return miss;
+}
+export function qbOpenSaved(x){
+  if(!x) return; if(x.sql!=null) { qbLoadSql(x.sql, x.name, x.id); return; }
+  var miss=qbMissing(x.spec); qbLoad(x.spec, x.name, x.id);
+  if(miss.length) toast('저장한 뒤 바뀐 열이 있습니다', miss.length+'개 — '+miss.slice(0,3).join(', ')+(miss.length>3? ' …' : '')+' · 그 조건 · 열은 빼고 실행했습니다 — 조합을 고쳐 다시 저장하세요', 'warn');
+}
+export async function qbSaveCur(){
   var L=qbSaved(), name=(QB.title||qbAutoTitle()).trim();
-  var cur=QB.savedId? L.filter(function(x){ return x.id===QB.savedId; })[0] : null;
-  var nm=prompt(cur? '이름 (덮어쓰기)':'저장할 이름', cur? cur.name : name); if(nm==null) return; nm=nm.trim()||name;
+  var cur=QB.savedId? qbFind(QB.savedId) : null, own=!!cur && (!cur.dbId || cur.mine);
+  var nm=prompt(own? '이름 (덮어쓰기)' : (cur? '저장할 이름 — 다른 사람의 공유 리포트라 내 것으로 새로 저장' : '저장할 이름'), cur? (own? cur.name : cur.name+' (사본)') : name); if(nm==null) return; nm=nm.trim()||name;
   var payload= QB.mode==='sql'? {sql:QB.sql||'', spec:null} : {spec:JSON.parse(JSON.stringify(QB.spec)), sql:null};
-  if(cur){ cur.name=nm; cur.spec=payload.spec; cur.sql=payload.sql; cur.at=new Date().toISOString(); }
-  else { var id='q'+Date.now().toString(36); L.push({id:id, name:nm, spec:payload.spec, sql:payload.sql, at:new Date().toISOString()}); QB.savedId=id; }
-  QB.title=nm; qbSavedSet(L); qbLibRefresh(); var ti=$('#qbTitle'); if(ti) ti.value=nm; var sv=$('#qbSave'); if(sv) sv.textContent='💾 저장(덮어쓰기)'; toast('저장했습니다', nm, 'ok');
+  if(RQ.ok && !(cur && !cur.dbId)){   /* DB — 이 브라우저에만 있는 항목을 덮어쓸 때는 예전처럼(«DB 로 옮기기»로 한 번에) */
+    try{
+      var body={name:nm, spec:payload.sql!=null? {sql:payload.sql} : {spec:payload.spec}}; if(!(own && cur)) body.owner=String(ST.AUTH_USER||'').toLowerCase();   /* 주인은 DB 트리거가 로그인한 사람으로 정함(여기 값은 참고) */
+      var res=(own && cur)? await fetch(SB_URL+'/rest/v1/report_queries?id=eq.'+cur.dbId, {method:'PATCH', headers:Object.assign(sbHeaders(true), {Prefer:'return=representation'}), body:JSON.stringify(body)})
+                          : await fetch(SB_URL+'/rest/v1/report_queries', {method:'POST', headers:Object.assign(sbHeaders(true), {Prefer:'return=representation'}), body:JSON.stringify(body)});
+      var txt=res.ok? '' : await res.text(), got=res.ok? await res.json() : null;
+      if(!res.ok || !got || !got.length) throw new Error(res.ok? '저장된 줄이 없습니다(권한)' : 'HTTP '+res.status+' '+txt.slice(0,100));
+      QB.savedId='db'+got[0].id; await rqLoad(true);
+    }catch(e){ toast('저장 실패', String(/** @type {any} */(e).message||e).slice(0,160), 'bad'); return; }
+  } else {
+    if(cur && !cur.dbId){ var lc=L.filter(function(x){ return x.id===cur.id; })[0]; if(lc){ lc.name=nm; lc.spec=payload.spec; lc.sql=payload.sql; lc.at=new Date().toISOString(); } }
+    else { var id='q'+Date.now().toString(36); L.push({id:id, name:nm, spec:payload.spec, sql:payload.sql, at:new Date().toISOString()}); QB.savedId=id; }
+    qbSavedSet(L);
+  }
+  QB.title=nm; qbLibRefresh(); var ti=$('#qbTitle'); if(ti) ti.value=nm; var sv=$('#qbSave'); if(sv) sv.textContent=qbSaveLabel(); toast('저장했습니다', nm+(RQ.ok && String(QB.savedId).indexOf('db')===0? ' — 내 리포트(DB)' : ''), 'ok');
+}
+/** 이 브라우저에만 있던 저장 리포트를 DB(내 리포트)로 — 옮긴 것만 브라우저에서 지움 */
+export async function qbMigrate(){
+  var L=qbSaved(); if(!L.length || !RQ.ok) return;
+  if(!confirm('이 브라우저에만 저장된 리포트 '+L.length+'개를 «내 리포트»(DB)로 옮길까요?\n\n옮기면 다른 PC 에서도 보이고, 원하면 팀과 공유할 수 있습니다. (공유는 따로 켜야 합니다)')) return;
+  var moved={}, bad=0;
+  for(var i=0;i<L.length;i++){ var x=L[i];
+    try{ var res=await fetch(SB_URL+'/rest/v1/report_queries', {method:'POST', headers:Object.assign(sbHeaders(true), {Prefer:'return=representation'}), body:JSON.stringify({name:String(x.name||'이름 없음').slice(0,120), owner:String(ST.AUTH_USER||'').toLowerCase(), spec:x.sql!=null? {sql:x.sql} : {spec:x.spec||{}}})});
+      var got=res.ok? await res.json() : null; if(got && got.length){ moved[x.id]='db'+got[0].id; } else bad++; }catch(e){ bad++; } }
+  qbSavedSet(L.filter(function(x){ return !moved[x.id]; }));
+  if(QB.savedId && moved[QB.savedId]) QB.savedId=moved[QB.savedId];
+  await rqLoad(true); qbLibRefresh();
+  toast(bad? '일부만 옮겼습니다' : '옮겼습니다', Object.keys(moved).length+'개 → 내 리포트'+(bad? ' · '+bad+'개는 실패(브라우저에 그대로)' : ''), bad? 'warn' : 'ok');
 }
 /* ㊿+170 템플릿 먼저 — 자주 쓰는 리포트(카드)를 고르면 바로 결과 · 조건을 바꾸려면 «조합 바꾸기» · SQL 은 조합 화면 맨 아래 «고급 분석» */
 export var QB_TPL_SUB={p_cust:'고객사마다 계약 수 · MRR · 임대중 장비', p_line_month:'최근 12개월 · 서비스별 월 매출', p_ch_month:'채널 × 설치 월 · 장비 대수', p_expire:'만료 예정 원계약 + 산업군 · 장비',
   p_ind_live:'산업군별 LIVE 고객 · 노드', p_return:'회수예정 신청의 장비 목록', p_oi:'OI 진행상태별 건수 · 예상 금액', p_cloud:'클라우드 계정 × 월 비용'};
+export function qbChip(x, o){
+  var on=x.id===QB.savedId;
+  return tpl`<span class="qb-chip${rawHtml(on?' on':'')}${rawHtml(x.shared?' shared':'')}"><button type="button" class="qb-cl" data-load="${x.id}"${rawHtml(on?' aria-current="true"':'')}>${rawHtml(x.sql!=null? '<code>SQL</code> ':'')}${x.name}${rawHtml(o.who? tpl`<span class="qb-who"> · ${o.who}</span>` : '')}</button>`+
+    tpl`${rawHtml(o.share? tpl`<button type="button" class="qb-sh" data-qshare="${x.id}" aria-pressed="${x.shared?'true':'false'}" aria-label="${x.name} 팀 공유" title="${x.shared? '팀 공유 중 — 누르면 끔' : '팀과 공유 — 다른 사람의 «팀 공유» 목록에 보임'}">${x.shared? '공유 중' : '공유'}</button>` : '')}`+
+    tpl`${rawHtml(o.del? tpl`<button type="button" data-qdel="${x.id}" title="삭제" aria-label="${x.name} 삭제">×</button>` : '')}</span>`;
+}
 export function qbLibHtml(){
   var L=qbSaved(), h=tpl`<div class="qb-tpl" role="group" aria-label="리포트 템플릿">${rawHtml(QB_PRESETS.map(function(p){ var on=(QB.title===p.name && !QB.savedId);
       return tpl`<button type="button" class="qb-tc${rawHtml(on?' on':'')}" data-preset="${rawHtml(p.id)}"${rawHtml(on?' aria-current="true"':'')}><b>${p.name}</b><span>${QB_TPL_SUB[p.id]||''}</span></button>`; }).join(''))}`+
     tpl`<button type="button" class="qb-tc auto" id="qbAuto2"><b>월간 자동 리포트</b><span>고정 양식 · 매출·고객·장비·인바운드 한 번에</span></button></div>`;
-  h+='<div class="qb-lib"><span class="mini" style="font-weight:600">내가 저장한 리포트</span>';
-  if(!L.length) h+='<span class="mini">없음 — 결과 위 «저장»으로 보관하면 여기에 생깁니다</span>';
-  L.forEach(function(x){ h+=tpl`<span class="qb-chip${x.id===QB.savedId?' on':''}" data-load="${rawHtml(x.id)}">${rawHtml(x.sql? '<code>SQL</code> ':'')}${x.name}<button type="button" data-qdel="${rawHtml(x.id)}" title="삭제" aria-label="${x.name} 삭제">×</button></span>`; });
+  if(RQ.ok){
+    var all=RQ.rows.map(rqItem), mine=all.filter(function(x){ return x.mine; }), team=all.filter(function(x){ return !x.mine && x.shared; });
+    h+=tpl`<div class="qb-lib"><span class="mini" style="font-weight:600">내 리포트</span>`;
+    if(!mine.length) h+=tpl`<span class="mini">없음 — 결과 위 «저장»으로 보관하면 여기에 생깁니다(다른 PC 에서도)</span>`;
+    h+=mine.map(function(x){ return qbChip(x, {share:true, del:true}); }).join('');
+    if(L.length) h+=tpl`<span class="qb-lib-sep"></span><span class="mini">이 브라우저에만 ${String(L.length)}개</span>`+L.map(function(x){ return qbChip(x, {del:true}); }).join('')+tpl`<button type="button" class="cbtn" id="qbMig">DB 로 옮기기</button>`;
+  } else {
+    h+=tpl`<div class="qb-lib"><span class="mini" style="font-weight:600">내가 저장한 리포트</span>`;
+    if(!L.length) h+=tpl`<span class="mini">없음 — 결과 위 «저장»으로 보관하면 여기에 생깁니다</span>`;
+    h+=L.map(function(x){ return qbChip(x, {del:true}); }).join('');
+  }
   h+=tpl`<span style="flex:1"></span><button type="button" class="cbtn${rawHtml(RPV.build?' pri':'')}" id="qbBuildTg" aria-expanded="${RPV.build?'true':'false'}" aria-controls="qbPanel">${RPV.build? '조합 닫기' : '조합 바꾸기 — 표·조건·묶기'}</button></div>`;
+  if(RQ.ok) h+=tpl`<div class="qb-lib qb-team"><span class="mini" style="font-weight:600">팀 공유</span>${rawHtml(team.length? team.map(function(x){ return qbChip(x, {who:x.owner.split('@')[0], del:!!ST.IS_SUPER}); }).join('') : tpl`<span class="mini">아직 없음 — 내 리포트의 «공유»를 누르면 모두의 이 목록에 보입니다(결과는 보는 사람의 데이터로 계산)</span>`)}</div>`;
   return h;
 }
 export function qbLibRefresh(){ var el=$('#qbLib'); if(!el) return; el.innerHTML=qbLibHtml();
-  el.querySelectorAll('[data-load]').forEach(function(c){ c.onclick=function(e){ if(e.target.closest('[data-qdel]')) return; var x=qbSaved().filter(function(y){ return y.id===c.dataset.load; })[0]; if(!x) return; if(x.sql) qbLoadSql(x.sql, x.name, x.id); else qbLoad(x.spec, x.name, x.id); }; });
-  el.querySelectorAll('[data-qdel]').forEach(function(b){ b.onclick=function(){ var L=qbSaved(), x=L.filter(function(y){ return y.id===b.dataset.qdel; })[0]; if(!x || !confirm('«'+x.name+'» 을 삭제할까요?')) return; qbSavedSet(L.filter(function(y){ return y.id!==x.id; })); if(QB.savedId===x.id) QB.savedId=null; qbLibRefresh(); }; });
+  el.querySelectorAll('[data-load]').forEach(function(c){ c.onclick=function(){ qbOpenSaved(qbFind(c.dataset.load)); }; });
+  el.querySelectorAll('[data-qdel]').forEach(function(b){ b.onclick=async function(){ var x=qbFind(b.dataset.qdel); if(!x || !confirm('«'+x.name+'» 을 삭제할까요?'+(x.shared? '\n\n팀과 공유 중인 리포트입니다 — 다른 사람 목록에서도 사라집니다.' : ''))) return;
+    if(x.dbId){ try{ var res=await fetch(SB_URL+'/rest/v1/report_queries?id=eq.'+x.dbId, {method:'DELETE', headers:Object.assign(sbHeaders(true), {Prefer:'return=representation'})}); var got=res.ok? await res.json() : null; if(!got || !got.length) throw new Error(res.ok? '지운 줄이 없습니다(권한)' : 'HTTP '+res.status); await rqLoad(true); }catch(e){ toast('삭제 실패', String(/** @type {any} */(e).message||e).slice(0,140), 'bad'); return; } }
+    else qbSavedSet(qbSaved().filter(function(y){ return y.id!==x.id; }));
+    if(QB.savedId===x.id) QB.savedId=null; qbLibRefresh(); }; });
+  el.querySelectorAll('[data-qshare]').forEach(function(b){ b.onclick=async function(){ var x=qbFind(b.dataset.qshare); if(!x || !x.dbId) return; b.disabled=true;
+    try{ var res=await fetch(SB_URL+'/rest/v1/report_queries?id=eq.'+x.dbId, {method:'PATCH', headers:Object.assign(sbHeaders(true), {Prefer:'return=representation'}), body:JSON.stringify({shared:!x.shared})}); var got=res.ok? await res.json() : null; if(!got || !got.length) throw new Error(res.ok? '바뀐 줄이 없습니다(권한)' : 'HTTP '+res.status);
+      await rqLoad(true); toast(x.shared? '공유를 껐습니다' : '팀과 공유했습니다', x.name+(x.shared? '' : ' — 다른 사람의 «팀 공유» 목록에 보입니다'), 'ok'); }
+    catch(e){ toast('공유 바꾸기 실패', String(/** @type {any} */(e).message||e).slice(0,140), 'bad'); }
+    qbLibRefresh(); }; });
+  var mg=document.getElementById('qbMig'); if(mg) mg.onclick=function(){ qbMigrate(); };
   el.querySelectorAll('[data-preset]').forEach(function(c){ c.onclick=function(){ var p=QB_PRESETS.filter(function(x){ return x.id===c.dataset.preset; })[0]; if(p){ qbLoad(p.spec, p.name, null); qbLibRefresh(); } }; });
   var a2=document.getElementById('qbAuto2'); if(a2) a2.onclick=function(){ RPV.tab='auto'; renderReport(); };
   var bt=document.getElementById('qbBuildTg'); if(bt) bt.onclick=function(){ RPV.build=!RPV.build; qbBuildSync(); qbLibRefresh(); var rh=document.getElementById('qbRes'); if(qbPicked() && rh && !rh.firstChild) qbRunNow(); };
@@ -1258,6 +1339,7 @@ export function renderReport(){
   if(!ST.DATA||!ST.DATA.rows){ host.innerHTML='<div class="cap" style="padding:40px;text-align:center">데이터를 불러오는 중…</div>'; return; }
   if(RPV.tab==='auto'){ qbAutoView(); return; }
   if(!QB.spec) QB.spec=qbNewSpec('contracts');
+  rqLoad().then(function(){ if(ST.CUR_VIEW==='report' && RPV.tab!=='auto') qbLibRefresh(); }).catch(function(){});   /* ㊿+179 내 리포트 · 팀 공유(DB) — 1분에 한 번 */
   if(host.querySelector('#qbPanel')){ qbPanelRefresh(); qbRunNow(); qbLibRefresh(); qbDeckRefresh(); qbBuildSync(); return; }
   host.innerHTML=tpl`<div class="pr-top"><span style="font-size:18px;font-weight:600;letter-spacing:-.01em">리포트</span><span class="mini">템플릿을 고르면 바로 결과가 나옵니다</span><span class="mini">포탈 안의 표를 골라 연결(JOIN)·조건·묶기·피벗으로 조합하고 표·차트로 봅니다 — 저장해 두고 엑셀·PPT 로 내보내기</span>`+
     tpl`<button type="button" class="cbtn" id="qbAuto" style="margin-left:auto" title="예전 월간 자동 리포트(고정 양식)">월간 자동 리포트 →</button></div>`+

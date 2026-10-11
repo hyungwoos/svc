@@ -17,7 +17,7 @@ import { APP_VER, IS_STAGING, ST } from './state.js';
 import { bizHas, canWrite, lline, mk, monOf, rawHtml, SB_URL, tickMemo, tpl, won } from './core.js';
 import { expAmtOf, expEligible } from './dash.js';
 import { ico, sbHeaders, sbTry, sbWrite, toast, todayStr } from './shell.js';
-import { ctSuccessor, dcRules, openRenewList, renewScan } from './analysis.js';
+import { ctSuccessor, dcAckLoad, dcDailySave, dcRules, openRenewList, renewScan } from './analysis.js';
 import { gridGoPre, meMatch, switchView } from './grid.js';
 import { closeOvl, logChange, openOvl } from './edit.js';
 import { openCust360, renderTodo } from './tools.js';
@@ -525,4 +525,6 @@ export async function ntfSlackOpen(){
   openOvl('ovlNtfSlack');
 }
 /** 데이터를 새로 읽은 뒤(shell.js) — 종 숫자만 다시 · 설정 · 읽음은 5분에 한 번 */
-export function ntfAfterData(){ try{ ntfSync(); ntfLoad(); }catch(e){} }
+export function ntfAfterData(){ try{ ntfSync(); ntfLoad(); }catch(e){}
+  /* ㊿+179 데이터 점검 «정상으로 표시»를 읽은 뒤 종 숫자 다시(표시한 항목은 빠짐) · 하루 건수 기록(한 시간에 한 번 · 쓰는 사람만) */
+  try{ dcAckLoad().then(function(d){ if(d && d.map && Object.keys(d.map).length) ntfSync(); return dcDailySave(); }).catch(function(){}); }catch(e){} }

@@ -163,6 +163,28 @@ say(/^export function tickMemo\(/m.test(jsAll) && /^export function cssvKey\(/m.
     && /filter\(oiOpen\)/.test(rd('js/report.js')) && /^export function aiHasCount\(a, n\)\{\n/m.test(jsAll) && /^export function aiNear\(/m.test(jsAll) && /data-aiq="know"/.test(jsAll) && /data-ak="ok"/.test(jsAll)
     && (!ac || (/export function near\(/.test(ac) && /check: \(E, a\) => near\(a, E\.month_revenue, 0\.01\)/.test(ac) && !/t\.includes\(String\(v\)\)/.test(ac))),
   '㊿+178 AI: 답 근거(조회 · 행 수) · 👎 에 답 전체 · 조회 · 화면 조건 · 지식 제안 → 슈퍼 관리자 반영 · 이번 달 = homeB · 진행 중 OI = oiOpen(AI · 리포트) · 채점 = 단위 붙은 건수 · 금액 ±1% (포탈 15문 · aicheck v1.6)'); }
+// ㊿+179 데이터(B-2): 내보내기 원 단위 · 수식 막기 · 붙여넣기 머리글 · 검사 · 중복 · 데이터 점검 정상 표시 · 추이 · 새 규칙 · 리포트 DB 저장 · 팀 공유
+{ const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
+  const gr = rd('js/grid.js'), tl = rd('js/tools.js'), an = rd('js/analysis.js'), rp = rd('js/report.js'), nt = rd('js/notify.js');
+  say(/^export function xlsxSafe\(v\)/m.test(gr) && /^export function xlsxHead\(c\)/m.test(gr) && /^export function pasteParse\(text, cols\)/m.test(tl) && /^export function pasteDups\(rows, cols, existing\)/m.test(tl) && /if\(P\.errs\.length\)\{/.test(tl)
+    && /^export function bzxNum\(v\)/m.test(an) && /^export function dcAckKey\(it\)/m.test(an) && /DC_NOACK=\{c_nocust:1, c_parent:1, c_dates:1, c_lapsed:1, eq_serial_dup:1, c_renew_sync:1\}/.test(an) && /if\(IS_STAGING \|\| IS_QA \|\| DCD\.ok===false/.test(an)
+    && /rule\('cu_similar'/.test(an) && /rule\('oi_dup'/.test(an) && /rule\('q_stale'/.test(an) && /rule\('cu_sector'/.test(an) && /dcAckLoad\(\)\.then/.test(nt)
+    && /^export async function rqLoad\(force\)/m.test(rp) && /^export function qbMissing\(spec\)/m.test(rp) && /data-qshare=/.test(rp),
+  '㊿+179 데이터: 엑셀 · CSV 원 단위 · 수식 막기(xlsxSafe) · 붙여넣기 머리글 · 검사 · 중복(pasteParse · pasteDups) · 비즈포탈 숫자(bzxNum) · 데이터 점검 정상 표시(구조 문제는 불가) · 추이(스테이징 안 씀) · 새 규칙 4 · 리포트 DB 저장 · 팀 공유 · 없어진 열 경고'); }
+// ㊿+180 보안 · 계정: 서버 로그아웃 · 모든 기기 · 30일 재로그인 · 토큰 갱신이 «첫 비밀번호 변경»을 풀지 않음 · 비밀번호 규칙 · 연속 실패 대기 · 로그인 기록 · iframe 막기 · 보안 점검
+{ const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
+  const co = rd('js/core.js'), sh = rd('js/shell.js'), ed = rd('js/edit.js'), ad = rd('js/admin.js'), it = rd('js/init.js'), sc = rd('sat/common.js');
+  say(/^export function authLogout\(scope, tok\)/m.test(co) && /\/auth\/v1\/logout\?scope=/.test(co) && /^export async function logoutAll\(/m.test(co) && /^export function sessTooOld\(s\)/m.test(co) && /saveSess\(j,s\.u,sessPKeep\(j, s\)\)/.test(co) && /saveSess\(j, s\.u, sessPKeep\(j, s\)\)/.test(co) && !/saveSess\(j, ?s\.u, ?true\)/.test(co)
+    && /^export function pwRule\(p, email, old\)/m.test(co) && /^export function lfFail\(email\)/m.test(co) && /var bad=pwRule\(p1/.test(sh) && /lfWait\(em\)/.test(sh) && /loginRecord\('password'\)/.test(sh) && /loginRecord\('password'\)/.test(ed) && /id="apPwCur"/.test(html)
+    && /if\(!frameOk\(\)\)\{ frameBlock\(\); return; \}/.test(it) && /window\.top\.location\.origin===location\.origin/.test(sc) && /^export async function secRun\(/m.test(ad) && /^export function axResetPw\(em\)/m.test(ad) && !/prompt\(em\+' 의 새 비밀번호/.test(ad),
+  '㊿+180 보안 · 계정: 서버 로그아웃 · 모든 기기 · 30일 재로그인 · 갱신이 첫 비밀번호 변경을 풀지 않음 · 비밀번호 10자 영문+숫자 · 지금 비밀번호 확인 · 연속 실패 대기 · 로그인 기록 · iframe 막기(포탈 · 위성) · 보안 점검 · 초기화 창'); }
+// ㊿+181 화면 · 모바일: 폰 목록 카드(같은 표를 CSS 로 · 칸 이름 data-l · 주요 5칸 · 정렬/거르기 · 표로 보기) · 숫자/전화 키패드 · 터치 16px · 저장 줄 고정 · 필수 칸으로 · 빈 머리글 이름
+{ const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
+  const gr = rd('js/grid.js'), ed = rd('js/edit.js'), css = rd('app.css');
+  say(/^export function dvCardsOn\(\)/m.test(gr) && /^export function dvMainKeys\(g\)/m.test(gr) && /t\.classList\.toggle\('cards', DVC\.on\)/.test(gr) && /data-l="\$\{c\.l\}"/.test(gr) && /tr\.classList\.add\('editing'\)/.test(gr) && /<span class="sr">동작<\/span>/.test(gr)
+    && /#dvTable\.cards thead\{display:none\}/.test(css) && /\{font-size:16px!important\}/.test(css) && /id="nMrr"[^>]*inputmode="decimal"/.test(html) && /id="odPhone"[^>]*type="tel"/.test(html) && /id="dvCardBar"/.test(html)
+    && /^export function formFocusBad\(from\)/m.test(ed) && /if\(cls==='bad'\) try\{ formFocusBad\(e\); \}/.test(ed),
+  '㊿+181 폰: 목록 카드(같은 표 · 칸 이름 · 주요 5칸 · 정렬/거르기 · 표로 보기) · 수정 중 표시(tr.editing) · 숫자/전화 키패드 · 터치 입력 16px · 필수 칸으로 이동 · 빈 머리글 이름'); }
 // ㊿+160 연장하면 상태 «재약정»(구분 그대로) · 계약 상세에 «계약 기간 · 연장 이력»
 say(/^export function renewStatus\(r\)/m.test(jsAll) && /var nst=renewStatus\(r\);/.test(jsAll) && /^export function ctPeriods\(c, mine\)/m.test(jsAll) && html.includes('id="dtRenew"'), '연장: 상태 «재약정»(renewStatus) · 계약 상세 연장 이력(ctPeriods · #dtRenew)');
 const idx = html + jsAll;
@@ -229,7 +251,7 @@ if (HAS_FN) {
   const used = ((/name="app-js" content="([^"]+)"/.exec(html) || [])[1] || '').split(',').map((x) => x.trim()).filter((x) => x && !/viz\.js$/.test(x) && fs.existsSync(path.join(ROOT, x)));
   const src = [['app.css', fs.readFileSync(path.join(ROOT, 'app.css'), 'utf8')], ['index.html', html]].concat(used.map((f) => [f, fs.readFileSync(path.join(ROOT, f), 'utf8')]));
   if (fs.existsSync(path.join(ROOT, 'js', 'app.js')) && !used.includes('js/app.js')) warn('js/app.js 는 ㊿+136 부터 안 쓰는 옛 파일 — 지워도 됨(공개 사이트에 그대로 올라가 있음)');
-  for (const [f, t] of src) t.split('\n').forEach((ln, i) => { if (/data-zoom|:fullscreen|#viewLogin input\{height:42px;font-size:16px|^\.otp-in\{/.test(ln)) return;   /* .otp-in = 2단계 인증 숫자 칸(투명 · iOS 확대 방지 16px · ㊿+167) */ for (const m of ln.matchAll(/font-size:\s*([0-9.]+)px/g)) { if (+m[1] < 24 && !STEP.has(m[1])) off.push(f + ':' + (i + 1) + ' ' + m[1] + 'px'); } });
+  for (const [f, t] of src) t.split('\n').forEach((ln, i) => { if (/data-zoom|:fullscreen|#viewLogin input\{height:42px;font-size:16px|^\.otp-in\{|^\s*input:not\(\[type=checkbox\]\)[^{]*\{font-size:16px!important\}$/.test(ln)) return;   /* ㊿+181 터치 화면 입력칸 16px = iOS 확대 방지 */   /* .otp-in = 2단계 인증 숫자 칸(투명 · iOS 확대 방지 16px · ㊿+167) */ for (const m of ln.matchAll(/font-size:\s*([0-9.]+)px/g)) { if (+m[1] < 24 && !STEP.has(m[1])) off.push(f + ':' + (i + 1) + ' ' + m[1] + 'px'); } });
   say(!off.length, '글자 크기 6단계(본문 14·15 · 보조 12·13 · 제목 18·22 + 큰 숫자) 밖 값 없음 — ㊿+169 본문 14px↑·보조 12px↑' + (off.length ? ' — ' + off.slice(0, 6).join(', ') : ''));
   say(/function colwApply\(/.test(jsAll) && /colwApply\(t, ST\.CUR_VIEW\)/.test(jsAll) && /\.dgrid\.colw-fixed\{table-layout:fixed\}/.test(fs.readFileSync(path.join(ROOT, 'app.css'), 'utf8')), '표 열 너비 조절(colw) 연결');
   say(/class="subgrp" data-sub="Cloud NAC"/.test(html) && (html.match(/class="grp"[^>]*>사업 영역</g) || []).length === 1 && /function menuConfMigrate\(/.test(jsAll), '메뉴: «사업 영역» 한 그룹 + 소제목 · 예전 메뉴 편집 설정 옮김');

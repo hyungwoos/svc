@@ -325,8 +325,8 @@ export function editCell(c,v){
   var isWon=(c.won && c.t==='number');
   var val=v==null?'':(c.t==='month'?String(v).slice(0,7):c.t==='date'?String(v).slice(0,10):isWon? wonToKw(v):v);
   /* 금액 열은 «천원 단위» — 칸 아래 실시간 환산(amtHint · wireRowInputs) · data-prev = 지금 값(원, 이상 금액 확인용) */
-  if(isWon) return tpl`<input type="number" step="any" data-k="${rawHtml(c.k)}" data-won="1" data-prev="${v==null?'':String(v)}" value="${String(val)}" placeholder="천원" title="천원 단위로 입력하세요 (48만원 → 480)">`;
-  return tpl`<input type="${rawHtml(ty)}" data-k="${rawHtml(c.k)}" value="${String(val)}">`;
+  if(isWon) return tpl`<input type="number" step="any" inputmode="decimal" data-k="${rawHtml(c.k)}" data-won="1" data-prev="${v==null?'':String(v)}" value="${String(val)}" placeholder="천원" title="천원 단위로 입력하세요 (48만원 → 480)">`;
+  return tpl`<input type="${rawHtml(ty)}"${rawHtml(ty==='number'? ' inputmode="decimal"' : '')} data-k="${rawHtml(c.k)}" value="${String(val)}">`;   /* ㊿+181 폰 숫자 키패드 */
 }
 /* 편집 행의 입력칸 보조 동작
    · 날짜 칸: 값이 있으면 옆에 ✕(비우기) — 브라우저 날짜 입력은 지우는 법이 잘 안 보입니다
@@ -868,11 +868,15 @@ export function gridFilteredSorted(g){
 }
 
 export function loadXlsxLib(){ return loadLib('xlsx'); }
+/** ㊿+179 수식 주입 막기 — =·+·-·@ 로 시작하는 글자 칸은 엑셀이 수식으로 실행하므로 앞에 ' (숫자 · «-5» 같은 수는 그대로) */
+export function xlsxSafe(v){ if(typeof v!=='string' || !v) return v; return /^[=+\-@\t\r]/.test(v) && !/^[+\-]?\d[\d,]*(\.\d+)?%?$/.test(v)? "'"+v : v; }
+/** ㊿+179 금액 열 머리글 — 엑셀에는 원 단위 그대로(화면은 천원) */
+export function xlsxHead(c){ var l=String(c.l||''); return c.won? (/\(천원\)/.test(l)? l.replace(/\(천원\)/,'(원)') : l+' (원)') : l; }
 export async function xlsxBook(name, sheets){                       // sheets: [{name, head, rows}]
   await loadXlsxLib();
   var wb=XLSX.utils.book_new();
   sheets.forEach(function(sh,si){
-    var ws=XLSX.utils.aoa_to_sheet([sh.head].concat(sh.rows));
+    var ws=XLSX.utils.aoa_to_sheet([sh.head.map(xlsxSafe)].concat(sh.rows.map(function(r){ return r.map(xlsxSafe); })));
     ws['!cols']=sh.widths? sh.widths.map(function(w){ return {wch:w}; }) : sh.head.map(function(h2,i){
       var w=String(h2).length+2;
       sh.rows.slice(0,80).forEach(function(r){ var L=String(r[i]==null?'':r[i]).length+2; if(L>w) w=L; });
@@ -887,12 +891,12 @@ export async function exportXlsx(){
   var g=GRIDS[ST.CUR_VIEW]; if(!g) return;
   var rows=gridFilteredSorted(g);
   var VC=visCols(g);                                            /* 숨긴 열은 엑셀에도 빼고 내려받습니다 */
-  var head=VC.map(function(c){return c.l;});
+  var head=VC.map(xlsxHead);
   var aoa=rows.map(function(r){ return VC.map(function(c){
     var v=r[c.k];
     if(c.t==='month'&&v) return String(v).slice(0,7);
     if(c.t==='bool') return v?'Y':'';
-    if(c.won) return Math.round(Number(v||0)/1000);            // 천원 단위
+    if(c.won) return v==null || v===''? '' : Math.round(Number(v));   // ㊿+179 원 단위 그대로(예전엔 천원으로 반올림해 끝 세 자리가 사라짐)
     if(typeof v==='number') return v;
     if(c.raw) return v==null?'':String(v);                       /* 시리얼처럼 화면은 요약, 엑셀은 원본 */
     if(c.fmt){ try{ var fv=c.fmt(v,r); if(fv!=null) return String(fv).replace(/<[^>]*>/g,''); }catch(e){} }
@@ -905,15 +909,17 @@ export function exportCsv(){
   var g=GRIDS[ST.CUR_VIEW]; if(!g) return;
   var rows=gridFilteredSorted(g);
   var VC=visCols(g);
-  var head=VC.map(function(c){return c.l;});
-  function cell(v){ v=(v==null?'':String(v)); return /[",\n]/.test(v)? '"'+v.replace(/"/g,'""')+'"' : v; }
+  var head=VC.map(xlsxHead);
+  function cell(v){ v=xlsxSafe(v==null?'':String(v)); return /[",\n]/.test(v)? '"'+v.replace(/"/g,'""')+'"' : v; }
   var csv='\ufeff'+head.join(',')+'\n'+rows.map(function(r){
     return VC.map(function(c){
       var v=r[c.k];
       if(c.t==='month'&&v) v=String(v).slice(0,7);
       if(c.t==='bool') v=v?'Y':'';
-      else if(c.won) v=Math.round(Number(v||0)/1000);          // 천원 단위 (열 이름에 (천원) 표기)
-      else if(c.fmt) v=c.fmt(r[c.k],r);
+      else if(c.won) v=v==null || v===''? '' : Math.round(Number(v));   // ㊿+179 원 단위(엑셀과 같게)
+      else if(typeof v==='number'){}
+      else if(c.raw) v=v==null? '' : String(v);
+      else if(c.fmt){ try{ var fv=c.fmt(r[c.k],r); v=fv==null? v : String(fv).replace(/<[^>]*>/g,''); }catch(e){} }   /* 엑셀과 같은 규칙(HTML 떼기 · raw) */
       return cell(v);
     }).join(',');
   }).join('\n');
@@ -1019,12 +1025,12 @@ export function renderLiveBar(lb){
   var db=lb.querySelector('#lvDiffBtn'); if(db) db.onclick=function(){ LV.diff=!LV.diff; renderGrid(); };
   helpWire(lb);
 }
-/* 표 설명(cap) — 길면(120자 초과) 첫 문장만 보이고 «도움말 ▾» 로 펼침 · 펼침 상태는 화면별로 기억 (⑤ UX 2단계 · ㊿+139) */
+/* 표 설명(cap) — 길면(120자 초과 · ㊿+181 폰은 40자) 첫 문장만 보이고 «도움말 ▾» 로 펼침 · 펼침 상태는 화면별로 기억 (⑤ UX 2단계 · ㊿+139) */
 export function dvCapRender(v, text){
   var el=$('#dvCap'); if(!el) return; text=String(text||'');
   var key='svc_capopen_'+v, open=false; try{ open=localStorage.getItem(key)==='1'; }catch(e){}
-  if(text.length<=120){ el.textContent=text; return; }
-  var cut=text.search(/ — | · /); var head=cut>20? text.slice(0,cut) : text.slice(0,90)+'…';
+  if(text.length<=(dvNarrow()? 40 : 120)){ el.textContent=text; return; }
+  var nw=dvNarrow(), cut=text.search(/ — | · /); var head=(cut>(nw? 8 : 20) && (!nw || cut<=40))? text.slice(0,cut) : text.slice(0, nw? 34 : 90)+'…';
   el.innerHTML=tpl`<span class="cap-head">${open? text : head}</span> <button type="button" class="cap-more" aria-expanded="${rawHtml(open)}" aria-controls="dvCap">${open? '접기 ▴':'도움말 ▾'}</button>`;
   el.querySelector('.cap-more').onclick=function(){ try{ localStorage.setItem(key, open? '0':'1'); }catch(e){} dvCapRender(v, text); };
 }
@@ -1100,6 +1106,35 @@ export function colwStart(ev, th, t, v){
   h.addEventListener('pointermove',mv); h.addEventListener('pointerup',up); h.addEventListener('pointercancel',up);
 }
 export function colwReset(v, k){ var m=colwGet(v); if(k) delete m[k]; else m={}; colwPut(v,m); renderGrid(); }
+/* ===== ㊿+181 폰 목록 = 카드 — 760px 이하에서 표 대신 카드(행마다 주요 칸 + 상태 · «＋ n칸» 으로 나머지) · «표로 보기»로 바꿀 수 있음(이 브라우저에 기억)
+   · 같은 표(tr · td)를 CSS 로 카드처럼 그림 → 행 클릭 · 수정(칸이 위아래로 · 칸 이름 붙음) · 삭제 · 저장 동작은 그대로 · 머리글은 숨기고 위에 «정렬 · 거르기» */
+export var DVC={key:'svc_dvcards', on:false, mq:null, main:{}};
+export function dvNarrow(){ try{ return window.matchMedia('(max-width:760px)').matches; }catch(e){ return false; } }
+export function dvCardsOn(){ if(!dvNarrow()) return false; try{ return localStorage.getItem(DVC.key)!=='0'; }catch(e){ return true; } }
+/** 카드에 늘 보이는 칸 — 고정 열(고객사 · 상태 등) 먼저, 그다음 보이는 열 순서로 모두 5칸 */
+export function dvMainKeys(g){
+  var vc=visCols(g), out={}, n=0;
+  (g.pin||[]).forEach(function(k){ if(n<5 && vc.some(function(c){ return c.k===k; })){ out[k]=1; n++; } });
+  vc.forEach(function(c){ if(n<5 && !out[c.k]){ out[c.k]=1; n++; } });
+  return out;
+}
+export function dvCardBar(g, on){
+  var bar=document.getElementById('dvCardBar'); if(!bar) return;
+  if(!DVC.mq){ try{ DVC.mq=window.matchMedia('(max-width:760px)'); var re=function(){ var g2=GRIDS[ST.CUR_VIEW]; if(g2 && !g2.custom && !document.getElementById('viewData').classList.contains('hidden')) renderGrid(); };
+    if(DVC.mq.addEventListener) DVC.mq.addEventListener('change', re); else DVC.mq.addListener(re); }catch(e){} }
+  if(!dvNarrow() || !g || g.custom){ bar.hidden=true; bar.innerHTML=''; return; }
+  bar.hidden=false;
+  var vc=visCols(g), cur=DV.sortK? DV.sortK+'|'+DV.sortDir : '';
+  var tg=tpl`<button type="button" class="pill ghost dvc-tg" id="dvCardTg" title="${on? '모든 목록을 표로 — 이 브라우저에 기억' : '모든 목록을 카드로 — 이 브라우저에 기억'}">${on? '표로 보기' : '카드로 보기'}</button>`;
+  if(!on){ bar.innerHTML=tg; }
+  else bar.innerHTML=tpl`<label class="dvc-l"><span>정렬</span><select id="dvSortSel">${rawHtml(tpl`<option value=""${rawHtml(cur? '':' selected')}>기본 순서</option>`+vc.map(function(c){
+      return tpl`<option value="${c.k}|1"${rawHtml(cur===c.k+'|1'? ' selected':'')}>${c.l} ↑</option><option value="${c.k}|-1"${rawHtml(cur===c.k+'|-1'? ' selected':'')}>${c.l} ↓</option>`; }).join(''))}</select></label>`+
+    tpl`<label class="dvc-l"><span>거르기</span><select id="dvFiltSel"><option value="">열 고르기…</option>${rawHtml(vc.map(function(c){ var on2=!!(DV.filters[c.k] && DV.filters[c.k].length);
+      return tpl`<option value="${c.k}">${c.l}${on2? ' ● '+DV.filters[c.k].length+'개' : ''}</option>`; }).join(''))}</select></label>`+tg;
+  var b=/** @type {any} */(document.getElementById('dvCardTg')); b.onclick=function(){ try{ localStorage.setItem(DVC.key, on? '0':'1'); }catch(e){} DV.page=0; renderGrid(); var t2=document.getElementById('dvCardTg'); if(t2) t2.focus(); };
+  var ss=/** @type {any} */(document.getElementById('dvSortSel')); if(ss) ss.onchange=function(){ var p=String(ss.value||'').split('|'); if(!p[0]){ DV.sortK=null; DV.sortDir=1; } else { DV.sortK=p[0]; DV.sortDir=+p[1]||1; } DV.page=0; renderGrid(); var s2=document.getElementById('dvSortSel'); if(s2) s2.focus(); };
+  var fs=/** @type {any} */(document.getElementById('dvFiltSel')); if(fs) fs.onchange=function(){ var c=vc.filter(function(x){ return x.k===fs.value; })[0]; if(c) openColFilter(fs, g, c); fs.value=''; };
+}
 export function renderGrid(){
   var g=GRIDS[ST.CUR_VIEW]; if(!g) return;
   var isCustom=!!g.custom;
@@ -1188,6 +1223,7 @@ export function renderGrid(){
   $('#dvCount').title='— = 값이 비어 있음(입력 필요할 수 있음) · 빈칸 = 이 계약/행에는 해당하지 않는 칸';
 
   var t=$('#dvTable'); t.innerHTML='';
+  DVC.on=dvCardsOn(); DVC.main=dvMainKeys(g); t.classList.toggle('cards', DVC.on); dvCardBar(g, DVC.on);   /* ㊿+181 폰 카드 */
   var thead=document.createElement('thead');
   var tr0=document.createElement('tr');
   visCols(g).forEach(function(c){
@@ -1219,7 +1255,7 @@ export function renderGrid(){
     th.appendChild(rs);
     tr0.appendChild(th);
   });
-  if(!g.ro){ var th2=document.createElement('th'); th2.style.width='110px'; th2.className='act'; tr0.appendChild(th2); }
+  if(!g.ro){ var th2=document.createElement('th'); th2.style.width='110px'; th2.className='act'; th2.innerHTML='<span class="sr">동작</span>'; tr0.appendChild(th2); }   /* ㊿+181 빈 머리글에 이름(화면 읽기) */
   thead.appendChild(tr0);
   t.appendChild(thead);
 
@@ -1318,16 +1354,19 @@ export function openDetail(c){
 export function gridRow(r,g,editing){
   var tr=document.createElement('tr');
   function view(){
+    var nCx=0; tr.classList.remove('editing', 'cx-open');
     tr.innerHTML=visCols(g).map(function(c){
       var cl=[]; if(c.t==='number') cl.push('n'); var pc=pinCls(g,c); if(pc) cl.push(pc);
+      if(DVC.on && !DVC.main[c.k]){ cl.push('cx'); nCx++; }   /* ㊿+181 카드: 주요 칸 밖은 «＋ n칸»으로 */
+      var dl=tpl` data-l="${c.l}"`;
       var txt=fmtCell(c,r[c.k],r);
       /* ㊿+169 빈 칸 구분: «—» = 미입력(값이 있어야 할 수 있음) · 빈칸 = 해당 없음(c.na · 예/아니오 칸의 «아니오») */
       if(!c.html && (txt==null || txt==='' || txt==='·')){
         var na=c.t==='bool'; try{ if(c.na && c.na(r)) na=true; }catch(e){}
-        cl.push(na? 'na':'nil');
-        return na? tpl`<td class="${rawHtml(cl.join(' '))}" title="해당 없음"><span class="sr">해당 없음</span></td>` : tpl`<td class="${rawHtml(cl.join(' '))}" title="미입력">—</td>`;
+        cl.push(na? 'na':'nil'); if(na && cl.indexOf('cx')>=0) nCx--;
+        return na? tpl`<td class="${rawHtml(cl.join(' '))}"${rawHtml(dl)} title="해당 없음"><span class="sr">해당 없음</span></td>` : tpl`<td class="${rawHtml(cl.join(' '))}"${rawHtml(dl)} title="미입력">—</td>`;
       }
-      var n=cl.length? tpl` class="${rawHtml(cl.join(' '))}"` : '';
+      var n=(cl.length? tpl` class="${rawHtml(cl.join(' '))}"` : '')+dl;
       if(c.href && r[c.k]){
         return tpl`<td${rawHtml(n)}><a href="${c.href(r[c.k],r)}" target="_blank" `+
                tpl`style="color:var(--s1-ink);text-decoration:none">${txt}</a></td>`;
@@ -1336,6 +1375,11 @@ export function gridRow(r,g,editing){
       if(c.badge) return tpl`<td${rawHtml(n)}><span class="ctag ${rawHtml(stBadge(txt))}">${txt}</span></td>`;   /* ㊿+169 상태 = 글자 + 배지 */
       return tpl`<td${rawHtml(n)}>${txt}</td>`;
     }).join('')+(g.ro?'':'<td class="act"></td>');
+    if(DVC.on && nCx>0){   /* ㊿+181 카드: 나머지 칸 펼치기 */
+      var xt=document.createElement('td'); xt.className='cxt'; var xb=document.createElement('button'); xb.type='button'; xb.className='cxb'; xb.setAttribute('aria-expanded','false'); xb.textContent='＋ '+nCx+'칸 더 보기';
+      xb.onclick=function(ev){ ev.stopPropagation(); var op=tr.classList.toggle('cx-open'); xb.setAttribute('aria-expanded', op? 'true':'false'); xb.textContent=op? '− 접기' : '＋ '+nCx+'칸 더 보기'; };
+      xt.appendChild(xb); if(g.ro) tr.appendChild(xt); else tr.insertBefore(xt, tr.lastChild);
+    }
     if(g.rowClick){ tr.style.cursor='pointer'; tr.onclick=function(e){
       if(e.target.closest('button')||e.target.closest('input')||e.target.closest('select')||e.target.closest('a')) return;
       g.rowClick(r);
@@ -1393,9 +1437,10 @@ export function gridRow(r,g,editing){
     }
   }
   function edit(){
+    tr.classList.add('editing');
     tr.innerHTML=tpl`${rawHtml(visCols(g).map(function(c){
       var pc=pinCls(g,c);
-      return tpl`<td${rawHtml(pc? ' class="'+pc+'"':'')}>${rawHtml(c.ro? (c.html? fmtCell(c,r[c.k],r) : esc(fmtCell(c,r[c.k],r))) : editCell(c,r[c.k]))}</td>`;
+      return tpl`<td${rawHtml(pc? ' class="'+pc+'"':'')} data-l="${c.l}">${rawHtml(c.ro? (c.html? fmtCell(c,r[c.k],r) : esc(fmtCell(c,r[c.k],r))) : editCell(c,r[c.k]))}</td>`;
     }).join(''))}`+ tpl`<td class="act"></td>`;
     wireRowInputs(tr,g);
     var act=tr.lastChild;

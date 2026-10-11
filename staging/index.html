@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <!-- CSP (80점 프로젝트 ② 보안): GitHub Pages 는 응답 헤더를 못 넣으므로 meta 로. ㊿+136 부터 인라인 스크립트·onclick 이 없어 script-src 에 'unsafe-inline' 없음(스타일은 인라인 style 속성 때문에 유지) · ㊿+147 부터 'unsafe-eval' 도 없음(SQL 엔진 alasql 은 격리 칸 sqlbox.html 에서만 돌림) — 스크립트·연결 호스트를 목록으로 제한(XSS 시 외부 유출 차단). Worker 주소나 GAS 주소가 바뀌면 여기도 수정. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-tBAcF1QVdAPVbLRy7IDZdDv+YQn8qTxLTkty3MJlD1Q=' blob: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' data: https://cdn.jsdelivr.net; img-src 'self' data: blob: https://amzbrdhkvzsyxjfjtugu.supabase.co; connect-src 'self' https://amzbrdhkvzsyxjfjtugu.supabase.co https://open.er-api.com https://api.frankfurter.app https://script.google.com/macros/s/AKfycbz0PDzgvgtM0ZZHEfMwEzPpgoPYidD6ElPx3oTGsgnVuveCnVA9PmYPB4WAPfr9a6DY/ https://script.googleusercontent.com https://aged-union-cdd3.choihw.workers.dev https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; worker-src 'self' blob:; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-U6n+VUo2UlnsRNQ7DhF0rREKx4jnzQ4z3zT8plBdTaI=' blob: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' data: https://cdn.jsdelivr.net; img-src 'self' data: blob: https://amzbrdhkvzsyxjfjtugu.supabase.co; connect-src 'self' https://amzbrdhkvzsyxjfjtugu.supabase.co https://open.er-api.com https://api.frankfurter.app https://script.google.com/macros/s/AKfycbz0PDzgvgtM0ZZHEfMwEzPpgoPYidD6ElPx3oTGsgnVuveCnVA9PmYPB4WAPfr9a6DY/ https://script.googleusercontent.com https://aged-union-cdd3.choihw.workers.dev https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; worker-src 'self' blob:; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
 <title>서비스사업부 통합 관리 포탈</title>
 <!-- PWA: 홈 화면 앱 (manifest.webmanifest · sw.js · pwa-*.png · apple-touch-icon.png 를 같은 폴더에) -->
 <link rel="manifest" href="manifest.webmanifest">
@@ -20,35 +20,35 @@
      코드 파일 목록은 app-js (ES 모듈 · ㊿+153) — 파일을 더하거나 빼면 여기와 sw.js 의 SHELL 을 함께 고치고 node tests/stamp.mjs 로 아래 stamp 묶음을 다시 만들 것.
      시작점은 js/main.js 하나(나머지는 import 로 따라옴) · 리포트·관리자·가격표는 처음 열 때(js/lazy.js).
      ④ 아키텍처 2단계(㊿+136): 인라인 스크립트·onclick 을 전부 없애 CSP script-src 에서 'unsafe-inline' 제거 · 인라인은 importmap 하나뿐이고 CSP 해시로 허용. -->
-<meta name="app-ver" content="2026-09-16 ㊿+178">
+<meta name="app-ver" content="2026-09-16 ㊿+181">
 <meta name="app-js" content="js/state.js,js/viz.js,js/core.js,js/shell.js,js/dash.js,js/ai.js,js/home.js,js/notify.js,js/guard.js,js/grids.js,js/equipment.js,js/analysis.js,js/tools.js,js/cloud.js,js/price.js,js/inbound.js,js/upd.js,js/admin.js,js/sales.js,js/report.js,js/grid.js,js/edit.js,js/qadb.js,js/qadata.js,js/lazy.js,js/init.js,js/main.js">
 <!-- stamp:begin — tests/stamp.mjs 가 app-ver · app-js 로 만든 부분(손으로 고치지 말 것 · 버전을 올린 뒤 다시 실행 · tests/check.mjs 가 확인) -->
-<link rel="stylesheet" href="app.css?v=2026-09-16%20%E3%8A%BF%2B178">
-<script type="importmap">{"imports":{"./js/state.js":"./js/state.js?v=2026-09-16%20%E3%8A%BF%2B178","./js/viz.js":"./js/viz.js?v=2026-09-16%20%E3%8A%BF%2B178","./js/core.js":"./js/core.js?v=2026-09-16%20%E3%8A%BF%2B178","./js/shell.js":"./js/shell.js?v=2026-09-16%20%E3%8A%BF%2B178","./js/dash.js":"./js/dash.js?v=2026-09-16%20%E3%8A%BF%2B178","./js/ai.js":"./js/ai.js?v=2026-09-16%20%E3%8A%BF%2B178","./js/home.js":"./js/home.js?v=2026-09-16%20%E3%8A%BF%2B178","./js/notify.js":"./js/notify.js?v=2026-09-16%20%E3%8A%BF%2B178","./js/guard.js":"./js/guard.js?v=2026-09-16%20%E3%8A%BF%2B178","./js/grids.js":"./js/grids.js?v=2026-09-16%20%E3%8A%BF%2B178","./js/equipment.js":"./js/equipment.js?v=2026-09-16%20%E3%8A%BF%2B178","./js/analysis.js":"./js/analysis.js?v=2026-09-16%20%E3%8A%BF%2B178","./js/tools.js":"./js/tools.js?v=2026-09-16%20%E3%8A%BF%2B178","./js/cloud.js":"./js/cloud.js?v=2026-09-16%20%E3%8A%BF%2B178","./js/price.js":"./js/price.js?v=2026-09-16%20%E3%8A%BF%2B178","./js/inbound.js":"./js/inbound.js?v=2026-09-16%20%E3%8A%BF%2B178","./js/upd.js":"./js/upd.js?v=2026-09-16%20%E3%8A%BF%2B178","./js/admin.js":"./js/admin.js?v=2026-09-16%20%E3%8A%BF%2B178","./js/sales.js":"./js/sales.js?v=2026-09-16%20%E3%8A%BF%2B178","./js/report.js":"./js/report.js?v=2026-09-16%20%E3%8A%BF%2B178","./js/grid.js":"./js/grid.js?v=2026-09-16%20%E3%8A%BF%2B178","./js/edit.js":"./js/edit.js?v=2026-09-16%20%E3%8A%BF%2B178","./js/qadb.js":"./js/qadb.js?v=2026-09-16%20%E3%8A%BF%2B178","./js/qadata.js":"./js/qadata.js?v=2026-09-16%20%E3%8A%BF%2B178","./js/lazy.js":"./js/lazy.js?v=2026-09-16%20%E3%8A%BF%2B178","./js/init.js":"./js/init.js?v=2026-09-16%20%E3%8A%BF%2B178"}}</script>
-<link rel="modulepreload" href="js/state.js?v=2026-09-16%20%E3%8A%BF%2B178">
-<link rel="modulepreload" href="js/viz.js?v=2026-09-16%20%E3%8A%BF%2B178">
-<link rel="modulepreload" href="js/core.js?v=2026-09-16%20%E3%8A%BF%2B178">
-<link rel="modulepreload" href="js/shell.js?v=2026-09-16%20%E3%8A%BF%2B178">
-<link rel="modulepreload" href="js/dash.js?v=2026-09-16%20%E3%8A%BF%2B178">
-<link rel="modulepreload" href="js/ai.js?v=2026-09-16%20%E3%8A%BF%2B178">
-<link rel="modulepreload" href="js/home.js?v=2026-09-16%20%E3%8A%BF%2B178">
-<link rel="modulepreload" href="js/notify.js?v=2026-09-16%20%E3%8A%BF%2B178">
-<link rel="modulepreload" href="js/guard.js?v=2026-09-16%20%E3%8A%BF%2B178">
-<link rel="modulepreload" href="js/grids.js?v=2026-09-16%20%E3%8A%BF%2B178">
-<link rel="modulepreload" href="js/equipment.js?v=2026-09-16%20%E3%8A%BF%2B178">
-<link rel="modulepreload" href="js/analysis.js?v=2026-09-16%20%E3%8A%BF%2B178">
-<link rel="modulepreload" href="js/tools.js?v=2026-09-16%20%E3%8A%BF%2B178">
-<link rel="modulepreload" href="js/cloud.js?v=2026-09-16%20%E3%8A%BF%2B178">
-<link rel="modulepreload" href="js/inbound.js?v=2026-09-16%20%E3%8A%BF%2B178">
-<link rel="modulepreload" href="js/upd.js?v=2026-09-16%20%E3%8A%BF%2B178">
-<link rel="modulepreload" href="js/sales.js?v=2026-09-16%20%E3%8A%BF%2B178">
-<link rel="modulepreload" href="js/grid.js?v=2026-09-16%20%E3%8A%BF%2B178">
-<link rel="modulepreload" href="js/edit.js?v=2026-09-16%20%E3%8A%BF%2B178">
-<link rel="modulepreload" href="js/qadb.js?v=2026-09-16%20%E3%8A%BF%2B178">
-<link rel="modulepreload" href="js/qadata.js?v=2026-09-16%20%E3%8A%BF%2B178">
-<link rel="modulepreload" href="js/lazy.js?v=2026-09-16%20%E3%8A%BF%2B178">
-<link rel="modulepreload" href="js/init.js?v=2026-09-16%20%E3%8A%BF%2B178">
-<script type="module" src="js/main.js?v=2026-09-16%20%E3%8A%BF%2B178"></script>
+<link rel="stylesheet" href="app.css?v=2026-09-16%20%E3%8A%BF%2B181">
+<script type="importmap">{"imports":{"./js/state.js":"./js/state.js?v=2026-09-16%20%E3%8A%BF%2B181","./js/viz.js":"./js/viz.js?v=2026-09-16%20%E3%8A%BF%2B181","./js/core.js":"./js/core.js?v=2026-09-16%20%E3%8A%BF%2B181","./js/shell.js":"./js/shell.js?v=2026-09-16%20%E3%8A%BF%2B181","./js/dash.js":"./js/dash.js?v=2026-09-16%20%E3%8A%BF%2B181","./js/ai.js":"./js/ai.js?v=2026-09-16%20%E3%8A%BF%2B181","./js/home.js":"./js/home.js?v=2026-09-16%20%E3%8A%BF%2B181","./js/notify.js":"./js/notify.js?v=2026-09-16%20%E3%8A%BF%2B181","./js/guard.js":"./js/guard.js?v=2026-09-16%20%E3%8A%BF%2B181","./js/grids.js":"./js/grids.js?v=2026-09-16%20%E3%8A%BF%2B181","./js/equipment.js":"./js/equipment.js?v=2026-09-16%20%E3%8A%BF%2B181","./js/analysis.js":"./js/analysis.js?v=2026-09-16%20%E3%8A%BF%2B181","./js/tools.js":"./js/tools.js?v=2026-09-16%20%E3%8A%BF%2B181","./js/cloud.js":"./js/cloud.js?v=2026-09-16%20%E3%8A%BF%2B181","./js/price.js":"./js/price.js?v=2026-09-16%20%E3%8A%BF%2B181","./js/inbound.js":"./js/inbound.js?v=2026-09-16%20%E3%8A%BF%2B181","./js/upd.js":"./js/upd.js?v=2026-09-16%20%E3%8A%BF%2B181","./js/admin.js":"./js/admin.js?v=2026-09-16%20%E3%8A%BF%2B181","./js/sales.js":"./js/sales.js?v=2026-09-16%20%E3%8A%BF%2B181","./js/report.js":"./js/report.js?v=2026-09-16%20%E3%8A%BF%2B181","./js/grid.js":"./js/grid.js?v=2026-09-16%20%E3%8A%BF%2B181","./js/edit.js":"./js/edit.js?v=2026-09-16%20%E3%8A%BF%2B181","./js/qadb.js":"./js/qadb.js?v=2026-09-16%20%E3%8A%BF%2B181","./js/qadata.js":"./js/qadata.js?v=2026-09-16%20%E3%8A%BF%2B181","./js/lazy.js":"./js/lazy.js?v=2026-09-16%20%E3%8A%BF%2B181","./js/init.js":"./js/init.js?v=2026-09-16%20%E3%8A%BF%2B181"}}</script>
+<link rel="modulepreload" href="js/state.js?v=2026-09-16%20%E3%8A%BF%2B181">
+<link rel="modulepreload" href="js/viz.js?v=2026-09-16%20%E3%8A%BF%2B181">
+<link rel="modulepreload" href="js/core.js?v=2026-09-16%20%E3%8A%BF%2B181">
+<link rel="modulepreload" href="js/shell.js?v=2026-09-16%20%E3%8A%BF%2B181">
+<link rel="modulepreload" href="js/dash.js?v=2026-09-16%20%E3%8A%BF%2B181">
+<link rel="modulepreload" href="js/ai.js?v=2026-09-16%20%E3%8A%BF%2B181">
+<link rel="modulepreload" href="js/home.js?v=2026-09-16%20%E3%8A%BF%2B181">
+<link rel="modulepreload" href="js/notify.js?v=2026-09-16%20%E3%8A%BF%2B181">
+<link rel="modulepreload" href="js/guard.js?v=2026-09-16%20%E3%8A%BF%2B181">
+<link rel="modulepreload" href="js/grids.js?v=2026-09-16%20%E3%8A%BF%2B181">
+<link rel="modulepreload" href="js/equipment.js?v=2026-09-16%20%E3%8A%BF%2B181">
+<link rel="modulepreload" href="js/analysis.js?v=2026-09-16%20%E3%8A%BF%2B181">
+<link rel="modulepreload" href="js/tools.js?v=2026-09-16%20%E3%8A%BF%2B181">
+<link rel="modulepreload" href="js/cloud.js?v=2026-09-16%20%E3%8A%BF%2B181">
+<link rel="modulepreload" href="js/inbound.js?v=2026-09-16%20%E3%8A%BF%2B181">
+<link rel="modulepreload" href="js/upd.js?v=2026-09-16%20%E3%8A%BF%2B181">
+<link rel="modulepreload" href="js/sales.js?v=2026-09-16%20%E3%8A%BF%2B181">
+<link rel="modulepreload" href="js/grid.js?v=2026-09-16%20%E3%8A%BF%2B181">
+<link rel="modulepreload" href="js/edit.js?v=2026-09-16%20%E3%8A%BF%2B181">
+<link rel="modulepreload" href="js/qadb.js?v=2026-09-16%20%E3%8A%BF%2B181">
+<link rel="modulepreload" href="js/qadata.js?v=2026-09-16%20%E3%8A%BF%2B181">
+<link rel="modulepreload" href="js/lazy.js?v=2026-09-16%20%E3%8A%BF%2B181">
+<link rel="modulepreload" href="js/init.js?v=2026-09-16%20%E3%8A%BF%2B181">
+<script type="module" src="js/main.js?v=2026-09-16%20%E3%8A%BF%2B181"></script>
 <!-- stamp:end -->
 </head>
 <body data-view="dash">
@@ -95,7 +95,7 @@
       <div id="lsForce" style="display:none">
         <div class="lg-ft">비밀번호 변경</div>
         <p class="lg-hint" style="margin:0 0 16px">최초 로그인입니다 — 본인 비밀번호로 변경해야 사용할 수 있습니다.</p>
-        <label class="lg-f"><span>새 비밀번호 (6자 이상)</span>
+        <label class="lg-f"><span>새 비밀번호 (10자 이상 · 영문 + 숫자)</span>
           <input id="lsNpw1" aria-label="새 비밀번호" type="password" autocomplete="new-password"></label>
         <label class="lg-f"><span>새 비밀번호 확인</span>
           <input id="lsNpw2" aria-label="새 비밀번호 확인" type="password" autocomplete="new-password"></label>
@@ -403,6 +403,7 @@
         <span class="spacer"></span>
         <span class="mini" id="dvCount"></span>
       </div>
+      <div id="dvCardBar" class="dv-cardbar" hidden></div>
       <div class="tbl-wrap" tabindex="0" style="max-height:70vh"><table id="dvTable" class="dgrid"></table></div>
       <div id="dvPager" style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:12px"></div>
     </section>
@@ -501,15 +502,15 @@
         <div><label for="odCustomer">고객사명 *</label><input id="odCustomer"></div>
         <div class="od-s1"><label for="odContract">계약번호</label><input id="odContract" placeholder="모르면 비워두세요 (생성 중)"></div>
         <div><label for="odMgr">고객 담당자 *</label><input id="odMgr"></div>
-        <div><label for="odPhone">담당자 연락처</label><input id="odPhone" placeholder="010-0000-0000"></div>
+        <div><label for="odPhone">담당자 연락처</label><input id="odPhone" placeholder="010-0000-0000" type="tel" inputmode="tel" autocomplete="tel"></div>
         <div class="od-s1"><label for="odAdmin">관리자 계정 (이메일)</label><input id="odAdmin"></div>
         <div class="od-s1"><label for="odInstall">설치 희망일</label><input id="odInstall" type="date"></div>
         <div class="full"><label for="odAddr">고객사 주소</label><input id="odAddr"></div>
         <div class="od-s1"><label for="odEdition">서비스 에디션</label><select id="odEdition"><option>Enterprise Edition</option><option>Basic Edition</option></select></div>
         <div class="od-s1"><label for="odFeat">요청 서비스 기능</label><input id="odFeat" value="IP관리, 단말 무결성 검증"></div>
-        <div><label for="odNodes">노드수</label><input id="odNodes" type="number" min="0"></div>
+        <div><label for="odNodes">노드수</label><input id="odNodes" type="number" min="0" inputmode="numeric"></div>
         <div><label for="odModel">모델명</label><select id="odModel"><option>S100</option><option>S200</option><option>S10_R2</option><option>S20_R2</option><option>S30H_R1</option><option>ES30</option></select></div>
-        <div><label for="odQty">수량</label><input id="odQty" type="number" min="1" value="1"></div>
+        <div><label for="odQty">수량</label><input id="odQty" type="number" min="1" value="1" inputmode="numeric"></div>
         <div><label>단독 Pod 여부</label>
           <label style="display:flex;align-items:center;gap:8px;height:36px;cursor:pointer;font-size:14px;font-weight:500">
             <input id="odPod" type="checkbox" style="width:16px;height:16px;accent-color:var(--brand,#149e40)"> 단독 Pod 구성입니다
@@ -522,7 +523,7 @@
           <select id="odRecvPick"><option value="">— 직접 입력 —</option></select></div>
         <div class="full"><label for="odRecvAddr">수령 주소</label><input id="odRecvAddr"></div>
         <div><label for="odRecvName">수령인 성명</label><input id="odRecvName"></div>
-        <div><label for="odRecvPhone">수령인 연락처</label><input id="odRecvPhone"></div>
+        <div><label for="odRecvPhone">수령인 연락처</label><input id="odRecvPhone" type="tel" inputmode="tel" autocomplete="tel"></div>
         <div><label for="odShip">수령 희망일</label><input id="odShip" type="date"></div>
         <div><label for="odNote">요청사항</label><input id="odNote" placeholder="예: GNOS 사용 가능, 퀵 발송 필요"></div>
         <div class="full"><label for="odSerials">장비 시리얼 (알고 있으면 입력 · 콤마 구분)</label><input id="odSerials" placeholder="비워두면 «미등록» 으로 현황에 임시 등록되고, 나중에 신청 내역에서 채워 넣으면 자동으로 바뀝니다"></div>
@@ -562,7 +563,7 @@
             <div class="frm">
               <div><label for="csProd">제품 <small style="color:var(--muted)">product</small></label><select id="csProd"><option value="ztna">Cloud ZTNA (ztna)</option><option value="__etc">직접 입력…</option></select><input id="csProdEtc" aria-label="제품 코드 직접 입력" placeholder="제품 코드" style="display:none;margin-top:6px" autocapitalize="off"></div>
               <div><label for="csEd">에디션 <small style="color:var(--muted)">edition</small></label><select id="csEd"><option value="ent">Enterprise (ent)</option><option value="__etc">직접 입력…</option></select><input id="csEdEtc" aria-label="에디션 코드 직접 입력" placeholder="에디션 코드 (예: bas)" style="display:none;margin-top:6px" autocapitalize="off"></div>
-              <div><label for="csDev">노드 수 <small style="color:var(--muted)">numberofdevices · 라이선스 단말 수</small></label><input id="csDev" type="number" min="1" max="100000" step="1" placeholder="예: 100"></div>
+              <div><label for="csDev">노드 수 <small style="color:var(--muted)">numberofdevices · 라이선스 단말 수</small></label><input id="csDev" type="number" min="1" max="100000" step="1" placeholder="예: 100" inputmode="numeric"></div>
               <div><label for="csLang">화면 언어 <small style="color:var(--muted)">language</small></label><select id="csLang"><option value="ko">한국어 (ko)</option><option value="en">English (en)</option><option value="ja">日本語 (ja)</option><option value="zh">中文 (zh)</option></select></div>
               <div><label for="csBranch">배포 브랜치 <small style="color:var(--muted)">branch · 어떤 버전 계열로 만들지</small></label><select id="csBranch"><option value="candidate">candidate — RC (기본)</option><option value="release">release — R (정식 릴리스)</option><option value="beta">beta — 베타</option><option value="current">current — 최신 개발</option></select></div>
               <div class="full"><label for="csMemo">메모 <small style="color:var(--muted)">(선택 · 용도·담당 — 이력에 남음)</small></label><input id="csMemo" placeholder="예: OO사 PoC 2주 · 담당 홍길동"></div>
@@ -579,9 +580,9 @@
           </div>
           <div class="cs-sec"><h4><span class="no">2</span>무엇을 바꿀까요</h4>
             <div class="frm">
-              <div><label for="cuNodes">라이선스 노드 수 <small style="color:var(--muted)">nodes</small></label><input id="cuNodes" type="number" min="1" max="100000" step="1" placeholder="예: 500"></div>
+              <div><label for="cuNodes">라이선스 노드 수 <small style="color:var(--muted)">nodes</small></label><input id="cuNodes" type="number" min="1" max="100000" step="1" placeholder="예: 500" inputmode="numeric"></div>
               <div><label for="cuExp">만료일 <small style="color:var(--muted)">expiredate</small></label><input id="cuExp" type="date"></div>
-              <div><label for="cuSra">SRA <small style="color:var(--muted)">sra · API 항목 그대로 · 모르면 비움</small></label><input id="cuSra" type="number" min="0" step="1" placeholder="예: 10"></div>
+              <div><label for="cuSra">SRA <small style="color:var(--muted)">sra · API 항목 그대로 · 모르면 비움</small></label><input id="cuSra" type="number" min="0" step="1" placeholder="예: 10" inputmode="numeric"></div>
               <div><label>&nbsp;</label><label class="mpchk" style="width:100%;height:36px;justify-content:center;margin:0;box-sizing:border-box"><input type="checkbox" id="cuMail" style="width:16px;height:16px;margin:0;padding:0"> 고객에게 안내 메일 발송 (send_mail)</label></div>
               <div class="full"><label for="cuMemo">메모 <small style="color:var(--muted)">(선택 · 이력에 남음)</small></label><input id="cuMemo" placeholder="예: 재약정 3년 · 노드 300→500"></div>
             </div>
@@ -634,7 +635,7 @@
       <div class="frm">
         <div class="full"><label for="mpCompany">회사명 *</label><input id="mpCompany"></div>
         <div><label for="mpMgr">고객 담당자 이름 *</label><input id="mpMgr"></div>
-        <div><label for="mpPhone">고객 연락처</label><input id="mpPhone" placeholder="010-0000-0000"></div>
+        <div><label for="mpPhone">고객 연락처</label><input id="mpPhone" placeholder="010-0000-0000" type="tel" inputmode="tel" autocomplete="tel"></div>
         <div class="full"><label for="mpEmail">고객 담당자 이메일</label><input id="mpEmail" type="email"></div>
         <div class="full"><label for="mpDev">단말 및 서버 수량</label><input id="mpDev" placeholder="예: PC 100대 / 서버 5대"></div>
       </div>
@@ -647,16 +648,16 @@
       </div>
       <div style="font-size:12px;color:var(--muted);margin:16px 0 10px">— 운영체제별 설치 수량 —</div>
       <div class="frm">
-        <div><label for="mpWin">Windows</label><input id="mpWin" type="number" min="0" placeholder="0"></div>
-        <div><label for="mpLinux">Linux</label><input id="mpLinux" type="number" min="0" placeholder="0"></div>
-        <div><label for="mpMac">MacOS</label><input id="mpMac" type="number" min="0" placeholder="0"></div>
+        <div><label for="mpWin">Windows</label><input id="mpWin" type="number" min="0" placeholder="0" inputmode="numeric"></div>
+        <div><label for="mpLinux">Linux</label><input id="mpLinux" type="number" min="0" placeholder="0" inputmode="numeric"></div>
+        <div><label for="mpMac">MacOS</label><input id="mpMac" type="number" min="0" placeholder="0" inputmode="numeric"></div>
         <div><label for="mpNac">NAC 사용여부</label><select id="mpNac"><option>사용X</option><option>사용</option></select></div>
         <div class="full"><label for="mpWebui">EDR Web UI 접속 계정용 이메일 주소</label><input id="mpWebui" type="email"></div>
       </div>
       <div style="font-size:12px;color:var(--muted);margin:16px 0 10px">— 신청 정보 —</div>
       <div class="frm">
         <div><label for="mpSales">영업담당자</label><input id="mpSales"></div>
-        <div><label for="mpSalesPh">영업담당자 연락처</label><input id="mpSalesPh" placeholder="010-0000-0000"></div>
+        <div><label for="mpSalesPh">영업담당자 연락처</label><input id="mpSalesPh" placeholder="010-0000-0000" type="tel" inputmode="tel" autocomplete="tel"></div>
         <div><label for="mpDate">신청일자</label><input id="mpDate" type="date"></div>
         <div class="full"><label for="mpNote">요청사항 / 비고</label><input id="mpNote" placeholder="예: 특정 기간 희망, 사전 협의 사항"></div>
       </div>
@@ -693,7 +694,7 @@
         <div><label for="oiCDept">고객 담당자 부서</label><input id="oiCDept"></div>
         <div><label for="oiCName">고객 담당자 이름</label><input id="oiCName"></div>
         <div><label for="oiCEmail">고객 담당자 이메일</label><input id="oiCEmail" type="email"></div>
-        <div><label for="oiCPhone">고객 담당자 연락처</label><input id="oiCPhone" placeholder="010-0000-0000"></div>
+        <div><label for="oiCPhone">고객 담당자 연락처</label><input id="oiCPhone" placeholder="010-0000-0000" type="tel" inputmode="tel" autocomplete="tel"></div>
         <div><label for="oiOwner">지니언스 담당자 *</label><select id="oiOwner"></select></div>
         <div><label for="oiPartner">구축 파트너</label><select id="oiPartner"></select></div>
       </div>
@@ -702,10 +703,10 @@
         <div><label for="oiType">사업형태 *</label><select id="oiType"></select></div>
         <div><label for="oiName">사업명</label><input id="oiName" placeholder="비워두면 «고객사 + 사업형태» 로 자동 생성"></div>
         <div><label for="oiRoute">매출경로</label><input id="oiRoute" placeholder="예: 파트너 경유, 직판"></div>
-        <div><label for="oiFree">무상 유지관리 기간 (개월)</label><input id="oiFree" type="number" min="0"></div>
+        <div><label for="oiFree">무상 유지관리 기간 (개월)</label><input id="oiFree" type="number" min="0" inputmode="numeric"></div>
         <div><label for="oiMonth">계약 예상 시기</label><input id="oiMonth" type="month"></div>
-        <div><label for="oiAmt">계약 예상단가 (천원 · VAT 별도)</label><input id="oiAmt" type="number" min="0" step="any" placeholder="예: 12000 (= 1,200만원)"></div>
-        <div><label for="oiRival">경쟁사 제안가 (천원)</label><input id="oiRival" type="number" min="0" step="any" placeholder="천원"></div>
+        <div><label for="oiAmt">계약 예상단가 (천원 · VAT 별도)</label><input id="oiAmt" type="number" min="0" step="any" placeholder="예: 12000 (= 1,200만원)" inputmode="decimal"></div>
+        <div><label for="oiRival">경쟁사 제안가 (천원)</label><input id="oiRival" type="number" min="0" step="any" placeholder="천원" inputmode="decimal"></div>
         <div><label for="oiProb">수주 가능성</label><select id="oiProb"></select></div>
         <div class="full"><label for="oiStrategy">경쟁 현황 및 영업전략</label><input id="oiStrategy" placeholder="윈백 사업인 경우 기존 사용 제품의 제조사를 적어주세요"></div>
       </div>
@@ -751,7 +752,7 @@
       <details class="adm-new" id="axNewBox"><summary>＋ 새 계정 만들기</summary>
       <div class="frm" style="margin-top:8px">
         <div><label for="axEmail">이메일 *</label><input id="axEmail" type="email" placeholder="user@genians.com"></div>
-        <div><label for="axPw">초기 비밀번호 * (6자 이상)</label><input id="axPw" placeholder="본인이 로그인 후 변경"></div>
+        <div><label for="axPw">초기 비밀번호 * (10자 이상 · 영문 + 숫자)</label><div style="display:flex;gap:6px"><input id="axPw" type="password" autocomplete="new-password" placeholder="본인이 로그인 후 변경" style="flex:1;min-width:0"><button type="button" class="pill ghost" id="axPwGen" title="안전한 비밀번호를 만들어 넣고 보여 줍니다">자동 만들기</button></div></div>
         <div><label for="axRole">권한</label><select id="axRole"></select></div>
         <div style="display:flex;align-items:flex-end"><button class="pill" id="axCreate" style="height:36px">＋ 계정 생성</button></div>
       </div>
@@ -794,7 +795,13 @@
       <p class="cap" style="margin:8px 0 0">담당 칸에 이 이름 중 하나가 들어 있으면 그 계정의 «내 담당»입니다. 저장 전에 바뀌는 내용을 확인 창으로 보여 드리고, 변경은 변경 이력에 남습니다. SQL 103 이 필요합니다.</p>
       </div>
       <div class="adm-pane" data-pane="sec" hidden>
-      <div class="adm-h first">2단계 인증(MFA) 정책 <span class="mini">역할 기본 · 계정별 필수 지정 · 인증 앱 초기화</span></div>
+      <div class="adm-h first">보안 점검 <span class="mini">조회만 — DB 보안 설정 · 계정 · API 키 · 이 브라우저 (SQL 112)</span></div>
+      <div class="dbar" style="margin-bottom:8px;flex-wrap:wrap;gap:8px;align-items:center">
+        <button type="button" class="pill" id="secRun">🔎 점검 실행</button>
+        <span class="mini" id="secMsg" role="status"></span>
+      </div>
+      <div id="secOut" class="sec-out"></div>
+      <div class="adm-h">2단계 인증(MFA) 정책 <span class="mini">역할 기본 · 계정별 필수 지정 · 인증 앱 초기화</span></div>
       <div class="dbar" style="margin-bottom:8px;flex-wrap:wrap;gap:8px;align-items:center">
         <button class="pill ghost" id="mfReload">↻ 다시 읽기</button>
         <button class="pill ghost" id="mfAll" title="등록 안 된 모든 계정을 필수로 지정하고 기한을 7일 뒤로">전체 필수 (7일 유예)</button>
@@ -835,7 +842,7 @@
       <div id="axBillKpi" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px"></div>
       <div id="axBillBars" style="margin-bottom:10px"></div>
       <div class="frm" style="grid-template-columns:1fr 1fr 1fr 1fr">
-        <div><label for="abCredit">충전 금액 (USD)</label><input id="abCredit" type="number" step="0.01" placeholder="예: 50"></div>
+        <div><label for="abCredit">충전 금액 (USD)</label><input id="abCredit" type="number" step="0.01" placeholder="예: 50" inputmode="decimal"></div>
         <div><label for="abDate">충전일</label><input id="abDate" type="date"></div>
         <div style="display:flex;align-items:flex-end"><button class="pill" id="abSave" style="height:36px">저장 후 다시 계산</button></div>
         <div style="display:flex;align-items:flex-end"><span class="mini" id="abMsg"></span></div>
@@ -1115,9 +1122,10 @@
     </div>
 
     <div id="auTabPw" style="display:none">
-      <p class="cap">관리자에게 받은 계정으로 먼저 로그인한 뒤, 여기서 본인 비밀번호로 바꾸세요.</p>
+      <p class="cap">관리자에게 받은 계정으로 먼저 로그인한 뒤, 여기서 본인 비밀번호로 바꾸세요. 새 비밀번호는 10자 이상 · 영문과 숫자를 함께.</p>
       <div class="frm">
-        <div><label for="apPw">새 비밀번호 (6자 이상)</label><input id="apPw" type="password" autocomplete="new-password"></div>
+        <div class="full" id="apCurRow" style="display:none"><label for="apPwCur">지금 비밀번호</label><input id="apPwCur" type="password" autocomplete="current-password"></div>
+        <div><label for="apPw">새 비밀번호 (10자 이상 · 영문 + 숫자)</label><input id="apPw" type="password" autocomplete="new-password"></div>
         <div><label for="apPw2">새 비밀번호 확인</label><input id="apPw2" type="password" autocomplete="new-password"></div>
       </div>
     </div>
@@ -1193,8 +1201,8 @@
         <div><label for="nType">계약 구분</label><select id="nType"><option>신규</option><option>재약정</option><option>추가</option></select></div>
         <div><label for="nStart">시작월 *</label><input id="nStart" type="month"></div>
         <div><label for="nEnd">종료월 *</label><input id="nEnd" type="month"></div>
-        <div><label for="nMrr">월 금액(MRR, 천원) *</label><input id="nMrr" type="number" min="0" step="any" placeholder="예: 480 (= 48만원)"></div>
-        <div><label for="nQty">수량(노드 등)</label><input id="nQty" type="number" min="0"></div>
+        <div><label for="nMrr">월 금액(MRR, 천원) *</label><input id="nMrr" type="number" min="0" step="any" placeholder="예: 480 (= 48만원)" inputmode="decimal"></div>
+        <div><label for="nQty">수량(노드 등)</label><input id="nQty" type="number" min="0" inputmode="numeric"></div>
         <div><label for="nCsm">CSM (영문 사이트명)</label><input id="nCsm" placeholder="예: kumhotire" autocapitalize="off" spellcheck="false"></div>
         <div><label for="nS1No">에스원 계약번호 <small style="color:var(--muted)">(N… · 에스원 정산·장비 신청에서 자동완성)</small></label>
           <input id="nS1No" list="dlS1No" placeholder="예: N6213654" autocapitalize="off" spellcheck="false"><datalist id="dlS1No"></datalist></div>
@@ -1207,7 +1215,7 @@
           <option value="">— 선택 —</option><option>월납입</option><option>일시납</option><option>분기납</option><option>반년납</option><option>연납</option>
           <option value="__etc">직접 입력…</option>
         </select><input id="nBillingEtc" aria-label="과금방식 직접 입력" placeholder="과금방식 직접 입력" style="display:none;margin-top:6px"></div>
-        <div id="nFeeWrap"><label for="nFee">설치비 (천원) <small style="color:var(--muted)">— 1회성 · 주로 에스원 계약</small></label><input id="nFee" type="number" min="0" step="any" placeholder="예: 100 (= 10만원)"></div>
+        <div id="nFeeWrap"><label for="nFee">설치비 (천원) <small style="color:var(--muted)">— 1회성 · 주로 에스원 계약</small></label><input id="nFee" type="number" min="0" step="any" placeholder="예: 100 (= 10만원)" inputmode="decimal"></div>
         <div id="nSettleWrap"><label for="nSettle">대금정산일 <small style="color:var(--muted)">(설치비를 인식하는 달 · 비우면 시작월+1)</small></label><input id="nSettle" type="month"></div>
         <div class="full"><label for="nNote">비고</label><input id="nNote"></div>
         <div class="full cap" id="nLivePrev" style="display:none"></div>
@@ -1220,10 +1228,10 @@
           <div class="pick" id="aPick"></div></div>
         <div class="full" id="aSel" style="display:none"></div>
         <div><label for="aKind">추가 종류 *</label><select id="aKind"><option>라이선스 추가</option><option>임대 센서 추가</option><option>노드 추가</option><option>기타 추가</option></select></div>
-        <div><label for="aQty">추가 수량 <small style="color:var(--muted)">(노드/대)</small></label><input id="aQty" type="number" min="0" step="1"></div>
+        <div><label for="aQty">추가 수량 <small style="color:var(--muted)">(노드/대)</small></label><input id="aQty" type="number" min="0" step="1" inputmode="numeric"></div>
         <div><label for="aStart">시작월 *</label><input id="aStart" type="month"></div>
         <div><label for="aEnd">종료월 <small style="color:var(--muted)">(비우면 원계약 만기와 같게)</small></label><input id="aEnd" type="month"></div>
-        <div><label for="aMrr">월 금액(천원) *</label><input id="aMrr" type="number" min="0" step="any" placeholder="천원"></div>
+        <div><label for="aMrr">월 금액(천원) *</label><input id="aMrr" type="number" min="0" step="any" placeholder="천원" inputmode="decimal"></div>
         <div><label for="aSerial">장비 시리얼 <small style="color:var(--muted)">(센서 추가일 때 · 선택)</small></label><input id="aSerial" placeholder="예: GN-2026-0123"></div>
         <div class="full"><label for="aNote">비고</label><input id="aNote"></div>
         <div class="full cap">추가 구매는 원계약에 매달린 <b>부속 계약</b>으로 저장됩니다 — 고객사·서비스·채널·파트너는 원계약을 그대로 따르고, 고객사 수·LIVE·계약 수·해지에는 세지 않으며 MRR에만 더해집니다.</div>
@@ -1245,8 +1253,8 @@
         <div class="full"><label for="rFind">계약 찾기 (고객사명 입력)</label><input id="rFind" placeholder="고객사명 두 글자 이상">
           <div class="pick" id="rPick"></div></div>
         <div><label for="rEnd">새 종료월 *</label><input id="rEnd" type="month"></div>
-        <div><label for="rMrr">연장 구간 월 금액(천원) — 비우면 기존 MRR</label><input id="rMrr" type="number" min="0" step="any" placeholder="천원"></div>
-        <div><label for="rQty">노드수 — 비우면 그대로</label><input id="rQty" type="number" min="0" step="1" placeholder="그대로"></div>
+        <div><label for="rMrr">연장 구간 월 금액(천원) — 비우면 기존 MRR</label><input id="rMrr" type="number" min="0" step="any" placeholder="천원" inputmode="decimal"></div>
+        <div><label for="rQty">노드수 — 비우면 그대로</label><input id="rQty" type="number" min="0" step="1" placeholder="그대로" inputmode="numeric"></div>
         <div class="full"><label for="rNote">연장 메모 <small style="color:var(--muted)">(선택 · 계약 관리 «비고»에 덧붙임)</small></label><input id="rNote" placeholder="예: 3년 재약정 · 단가 조정"></div>
         <div class="full" id="rMates" style="display:none"></div>
         <div class="full cap" id="rPrev" aria-live="polite"></div>
@@ -1262,7 +1270,7 @@
         <div class="full" id="fCur" style="display:none"></div>
         <div><label for="fFrom">적용 시작월 *</label><input id="fFrom" type="month"></div>
         <div><label for="fTo">적용 종료월 <small style="color:var(--muted)">(비우면 계약 끝까지)</small></label><input id="fTo" type="month"></div>
-        <div><label for="fMrr">새 월 금액(천원) *</label><input id="fMrr" type="number" min="0" step="any" placeholder="천원"></div>
+        <div><label for="fMrr">새 월 금액(천원) *</label><input id="fMrr" type="number" min="0" step="any" placeholder="천원" inputmode="decimal"></div>
         <div><label>&nbsp;</label><p class="cap" style="margin:6px 0 0">한 달만 고치려면 시작월·종료월을 같은 달로. 그 구간만 바뀌고 앞뒤 달은 그대로입니다.</p></div>
       </div>
     </div>

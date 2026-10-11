@@ -133,10 +133,10 @@ export function prCalcHtml(){
   h+=tpl`<div class="pr-sec"><div class="pr-sech"><span class="no">1</span><b>빠른 견적</b><span class="mini">단가표 그대로 계산 · 할인은 별도 협의 · 실제 견적은 견적·발주 시스템에서</span></div>`+
     tpl`<div class="pr-two">`+
     tpl`<div class="pr-card"><h3>Cloud NAC <small>기본 구독 · ZTNA 사용 시 PA Agent 추가</small></h3>`+
-      tpl`<div class="row">노드 <input type="number" id="pnQty" value="300" min="1" style="width:90px">`+
+      tpl`<div class="row">노드 <input type="number" inputmode="numeric" id="pnQty" value="300" min="1" style="width:90px">`+
       tpl`<select id="pnTerm" aria-label="약정 기간"><option value="0">무약정</option><option value="1" selected>1년 약정</option><option value="2">2년</option><option value="3">3년</option></select>`+
       tpl`<label class="svc"><input type="checkbox" id="pnZ">+ ZTNA (PA Agent)</label>`+
-      tpl`<span id="pnZW" style="display:none">동시접속 <input type="number" id="pnZQ" value="100" min="1" style="width:80px"></span></div>`+
+      tpl`<span id="pnZW" style="display:none">동시접속 <input type="number" inputmode="numeric" id="pnZQ" value="100" min="1" style="width:80px"></span></div>`+
       tpl`<div class="pr-out"><div class="pr-ob"><div class="l">Cloud NAC 월</div><div class="v" id="pvMon">—</div></div>`+
       tpl`<div class="pr-ob"><div class="l">ZTNA PA 월</div><div class="v" id="pvZ">—</div></div>`+
       tpl`<div class="pr-ob fin"><div class="l">월 합계 · 연간</div><div class="v" id="pvTot">—</div></div></div>`+
@@ -151,7 +151,7 @@ export function prCalcHtml(){
         return ORDER.filter(function(k){ return have[k]; }).map(function(k){
           return tpl`<label class="svc"><input type="checkbox" data-prs="${rawHtml(k)}"${k===def?' checked':''}>${LAB[k]||have[k].name}</label>`; }).join('');
       })())}`+
-      tpl` Agent <input type="number" id="pmQty" value="100" min="1" style="width:90px">`+
+      tpl` Agent <input type="number" inputmode="numeric" id="pmQty" value="100" min="1" style="width:90px">`+
       tpl`<select id="pmWho" aria-label="견적 대상"><option value="dist">총판가 기준</option><option value="ptn">파트너가 기준</option></select></div>`+
       tpl`<div class="pr-out"><div class="pr-ob"><div class="l">소비자가 합계(연)</div><div class="v" id="pmCons">—</div></div>`+
       tpl`<div class="pr-ob fin"><div class="l">공급가 합계(연)</div><div class="v" id="pmSup">—</div></div>`+
@@ -163,8 +163,8 @@ export function prCalcHtml(){
     tpl`<div class="pr-card">`+
     tpl`<div class="pr-ctl">`+
       tpl`<span class="pr-f"><span class="l">제품</span><span class="eqb-seg"><button type="button" data-tcop="nac" id="tpNac">NAC</button><button type="button" data-tcop="ztna" id="tpZtna">ZTNA</button></span></span>`+
-      tpl`<span class="pr-f"><span class="l">노드</span><input type="number" id="ptQty" value="500" min="1" style="${rawHtml(inSt)};width:96px"></span>`+
-      tpl`<span class="pr-f" id="ptZW" style="display:none"><span class="l">동시접속 Agent</span><input type="number" id="ptZQ" value="100" min="1" style="${rawHtml(inSt)};width:90px"></span>`+
+      tpl`<span class="pr-f"><span class="l">노드</span><input type="number" inputmode="numeric" id="ptQty" value="500" min="1" style="${rawHtml(inSt)};width:96px"></span>`+
+      tpl`<span class="pr-f" id="ptZW" style="display:none"><span class="l">동시접속 Agent</span><input type="number" inputmode="numeric" id="ptZQ" value="100" min="1" style="${rawHtml(inSt)};width:90px"></span>`+
       tpl`<span class="pr-f"><span class="l">검토 기간</span><select id="ptY" aria-label="검토 기간" style="${rawHtml(inSt)}">${rawHtml(yOpt)}</select></span>`+
       tpl`<span class="pr-f"><span class="l">구축형 할인</span><span class="eqb-seg">`+
         tpl`<button type="button" data-tcod="60" id="td60" title="SR파트너가 영업하는 일반 채널 딜의 통상 엔드가 — SR 마진 10%p 포함">60% SR채널</button>`+
@@ -351,7 +351,7 @@ export function prBindSaas(){
     $('#ptSsL').innerHTML=PR.tcoSS.map(function(r,i){
       return tpl`<span style="display:inline-flex;gap:4px;align-items:center">`+
         tpl`<select aria-label="구독형 단가" data-ssp="${rawHtml(i)}" style="${rawHtml(sSt)}">${rawHtml(SEN_P.map(function(pv2){ return tpl`<option value="${rawHtml(pv2)}"${r.p===pv2?' selected':''}>${pv2/10000}만원</option>`; }).join(''))}</select>`+
-        tpl`<input type="number" data-ssq="${rawHtml(i)}" value="${rawHtml(+r.q||0)}" min="0" style="${rawHtml(sSt)};width:52px">대`+ tpl`${rawHtml(PR.tcoSS.length>1?tpl`<button data-ssx="${rawHtml(i)}" class="pill" style="height:24px;padding:0 7px">×</button>`:'')}</span>`;
+        tpl`<input type="number" inputmode="numeric" data-ssq="${rawHtml(i)}" value="${rawHtml(+r.q||0)}" min="0" style="${rawHtml(sSt)};width:52px">대`+ tpl`${rawHtml(PR.tcoSS.length>1?tpl`<button data-ssx="${rawHtml(i)}" class="pill" style="height:24px;padding:0 7px">×</button>`:'')}</span>`;
     }).join('');
     var rows=tcoSenRowsO();
     var names=rows.map(function(x){ return String(x[1]); });
@@ -359,7 +359,7 @@ export function prBindSaas(){
     $('#ptOsL').innerHTML=PR.tcoOS.map(function(r,i){
       return tpl`<span style="display:inline-flex;gap:4px;align-items:center">`+
         tpl`<select aria-label="구축형 유지보수 비율" data-osm="${rawHtml(i)}" style="${rawHtml(sSt)}">${rawHtml(rows.map(function(x){ return tpl`<option value="${String(x[1])}"${String(x[1])===r.m?' selected':''}>${String(x[1])} · ${String(x[0])} · ${prWon(x[2])}원</option>`; }).join(''))}</select>`+
-        tpl`<input type="number" data-osq="${rawHtml(i)}" value="${rawHtml(+r.q||0)}" min="0" style="${rawHtml(sSt)};width:52px">대`+ tpl`${rawHtml(PR.tcoOS.length>1?tpl`<button data-osx="${rawHtml(i)}" class="pill" style="height:24px;padding:0 7px">×</button>`:'')}</span>`;
+        tpl`<input type="number" inputmode="numeric" data-osq="${rawHtml(i)}" value="${rawHtml(+r.q||0)}" min="0" style="${rawHtml(sSt)};width:52px">대`+ tpl`${rawHtml(PR.tcoOS.length>1?tpl`<button data-osx="${rawHtml(i)}" class="pill" style="height:24px;padding:0 7px">×</button>`:'')}</span>`;
     }).join('');
     document.querySelectorAll('[data-ssp]').forEach(function(e){ e.onchange=function(){ PR.tcoSS[+e.dataset.ssp].p=+e.value; tco(); }; });
     document.querySelectorAll('[data-ssq]').forEach(function(e){ e.oninput=e.onchange=function(){ PR.tcoSS[+e.dataset.ssq].q=Math.max(0,+e.value||0); tco(); }; });

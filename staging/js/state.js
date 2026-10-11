@@ -32,7 +32,7 @@
  * @property {?string} SB_TOKEN 로그인 토큰 @property {?string} AUTH_USER 로그인 이메일 @property {?Object<string, ViewPerm>} PERMS 메뉴 권한
  * @property {?Object<string, CodeItem[]>} CODES 코드 목록 @property {string} CUR_VIEW 지금 화면 @property {boolean} DIRTY 저장 뒤 다시 읽기 필요
  * @property {string} LIVE_SRC LIVE 판정 기준 db|sheet @property {string} INB_Y 인바운드 연도 @property {any} TCOQ TCO 비교 견적 @property {any} OI_CONVERT 전환 중인 OI 행
- * @property {ChatTurn[]} HIST AI 대화 이력 @property {boolean} HIST_LOADED @property {number} IDLE_LAST 마지막 입력 시각 @property {boolean} IDLE_WARNED
+ * @property {ChatTurn[]} HIST AI 대화 이력 @property {boolean} HIST_LOADED @property {number} IDLE_LAST 마지막 입력 시각 @property {number} [IDLE_SAVED] 마지막 활동을 localStorage 에 쓴 시각(㊿+180) @property {boolean} IDLE_WARNED
  * @property {?Object<string, any>} RAWX 표별 원본 행 @property {string} MY_ROLE 역할 @property {boolean} IS_SUPER @property {boolean} IS_VIEWER_ROLE @property {boolean} IS_VIEWER
  * @property {boolean} IS_EQUIP 장비·PoC 제한 계정 @property {?string} EQUIP_HOME @property {?number} DASH_BASE0 @property {number} LAST_LOAD @property {?{t:number, n:?number}} INB_TODO
  * @property {?string[]} OWNER_NAMES 계정에 연결된 담당자 이름(SQL 103 user_owner_map) · null = 연결 없음/표 없음

@@ -1,7 +1,7 @@
 /* ===== edit.js — 입력·수정(Supabase 쓰기) · 로그인 모달 · 계약 검색 · 저장 동작 · 사명 변경 · boot =====
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { ST } from './state.js';
-import { $, amtGuard, amtHint, clearSess, doLogout, el, esc, kwToWon, lline, mfaGate, mfaVerifiedOf, mk, rawHtml, saveSess, SB_KEY, SB_URL, sessRead, sessWrite, tpl, won, wonToKw } from './core.js';
+import { $, amtGuard, amtHint, authLogout, clearSess, doLogout, el, esc, kwToWon, lfFail, lfMsg, lfOk, lfWait, lline, loginRecord, mfaGate, mfaVerifiedOf, mk, pwRule, rawHtml, saveSess, SB_KEY, SB_URL, sessRead, sessWrite, tpl, won, wonToKw } from './core.js';
 import { afterLoad, idxDate, loadFromDb, onData, onErr, SB_RAW, sbWrite, showAuthUi, showLoading, toast } from './shell.js';
 import { s1NoInfo, s1NoOpts } from './grids.js';
 import { chOf, doChurn, doRenew, liveCalc, nmKeys, renewMates, renewMatesHtml, renewOpts, renewQty0, renewUndoFlow, renewUndoPlan, renewWire } from './analysis.js';
@@ -117,23 +117,42 @@ export function ovlInit(){
   document.addEventListener('input', late, true); document.addEventListener('change', late, true);
   document.addEventListener('keydown', ovlTrapTab);
 }
-export function msg(id,t,cls){ var e=$('#'+id); e.textContent=t||''; e.className='mmsg'+(cls?' '+cls:''); }
+export function msg(id,t,cls){ var e=$('#'+id); e.textContent=t||''; e.className='mmsg'+(cls?' '+cls:''); if(cls==='bad') try{ formFocusBad(e); }catch(x){} }
+/** ㊿+181 저장이 막히면 — 같은 창(지금 보이는 탭)에서 «*» 필수 칸이 비어 있으면 빨간 테두리 + 그 칸으로 이동(폰에서 위로 스크롤해 찾지 않게) · 고치면 표시가 사라짐 */
+export function formFocusBad(from){
+  var box=from && from.closest('.modal, .wz-step, section, .card'); if(!box) return null;
+  var bad=[];
+  box.querySelectorAll('label[for]').forEach(function(l){
+    if(!/\s\*(\s|$)/.test(l.textContent||'')) return;
+    var el=/** @type {any} */(document.getElementById(l.htmlFor)); if(!el || el.disabled || !el.offsetParent || !('value' in el)) return;
+    if(String(el.value||'').trim()) return;
+    bad.push(el);
+  });
+  bad.forEach(function(el){ el.classList.add('f-bad'); el.setAttribute('aria-invalid','true');
+    var off=function(){ if(String(el.value||'').trim()){ el.classList.remove('f-bad'); el.removeAttribute('aria-invalid'); el.removeEventListener('input', off); el.removeEventListener('change', off); } };
+    el.addEventListener('input', off); el.addEventListener('change', off); });
+  if(bad[0]){ try{ bad[0].scrollIntoView({block:'center'}); }catch(e){} try{ bad[0].focus({preventScroll:true}); }catch(e){ bad[0].focus(); } }
+  return bad[0]||null;
+}
 
 /* ---- 로그인 / 가입 / 비밀번호 변경 ---- */
 export var AU_TAB='login';
 
 export async function doLogin(){
+  var em0=$('#auEmail').value.trim(), wt=lfWait(em0); if(wt) return msg('auMsg', lfMsg(wt), 'bad');   /* ㊿+180 연속 실패 대기 */
   msg('auMsg','확인 중…');
   try{
     var r=await fetch(SB_URL+'/auth/v1/token?grant_type=password',{
       method:'POST', headers:{apikey:SB_KEY,'Content-Type':'application/json'},
-      body:JSON.stringify({email:$('#auEmail').value.trim(), password:$('#auPw').value})
+      body:JSON.stringify({email:em0, password:$('#auPw').value})
     });
     var j=await r.json();
-    if(!r.ok||!j.access_token) throw new Error(j.error_description||j.msg||'이메일 또는 비밀번호가 올바르지 않습니다');
-    ST.SB_TOKEN=j.access_token; ST.AUTH_USER=($('#auEmail').value.trim());
-    saveSess(j, ST.AUTH_USER);
+    if(!r.ok||!j.access_token){ if(r.status===400 || r.status===401){ var lf=lfFail(em0); if(lf.until>Date.now()) throw new Error(lfMsg(lfWait(em0))); } throw new Error(j.error_description||j.msg||'이메일 또는 비밀번호가 올바르지 않습니다'); }
+    lfOk(em0);
+    ST.SB_TOKEN=j.access_token; ST.AUTH_USER=em0;
+    saveSess(j, ST.AUTH_USER, undefined, true);
     if(!(await mfaGate(j.access_token, ST.AUTH_USER, j.user&&j.user.factors, {fast:!mfaVerifiedOf(j.user&&j.user.factors).length}))){ clearSess(); ST.SB_TOKEN=null; ST.AUTH_USER=null; msg('auMsg','2단계 인증을 취소해 로그인하지 않았습니다'); return; }
+    loginRecord('password');
     showAuthUi();
     msg('auMsg','');
 
@@ -160,20 +179,31 @@ export var FORCE_PW=false;
 
 export async function doPwChange(){
   if(!ST.SB_TOKEN) return msg('auMsg','먼저 「로그인」 탭에서 로그인하세요','bad');
-  var p1=$('#apPw').value, p2=$('#apPw2').value;
-  if(p1.length<6) return msg('auMsg','6자 이상으로 입력하세요','bad');
+  var p1=$('#apPw').value, p2=$('#apPw2').value, cur=(/** @type {any} */($('#apPwCur'))||{}).value||'';
+  if(!FORCE_PW && !cur) return msg('auMsg','지금 비밀번호를 입력하세요','bad');
+  var bad=pwRule(p1, ST.AUTH_USER, FORCE_PW? $('#auPw').value : cur); if(bad) return msg('auMsg', bad, 'bad');   /* ㊿+180 10자 · 영문 + 숫자 */
   if(p1!==p2) return msg('auMsg','비밀번호 확인이 일치하지 않습니다','bad');
-  msg('auMsg','변경 중…');
   try{
+    /* ㊿+180 스스로 바꿀 때는 지금 비밀번호를 먼저 확인(자리를 비운 사이 다른 사람이 바꾸지 못하게) — 확인용으로 받은 로그인은 바로 끊음 */
+    if(!FORCE_PW){
+      var wt=lfWait(ST.AUTH_USER); if(wt) return msg('auMsg', lfMsg(wt), 'bad');
+      msg('auMsg','지금 비밀번호 확인 중…');
+      var vr=await fetch(SB_URL+'/auth/v1/token?grant_type=password',{method:'POST', headers:{apikey:SB_KEY,'Content-Type':'application/json'}, body:JSON.stringify({email:ST.AUTH_USER, password:cur})});
+      var vj=null; try{ vj=await vr.json(); }catch(x){ vj={}; }
+      if(!vr.ok || !vj.access_token){ if(vr.status===400 || vr.status===401) lfFail(ST.AUTH_USER); return msg('auMsg', vr.status===400 || vr.status===401? '지금 비밀번호가 맞지 않습니다' : '확인하지 못했습니다 — '+(vj.error_description||vj.msg||vr.status),'bad'); }
+      lfOk(ST.AUTH_USER); authLogout('local', vj.access_token);
+    }
+    msg('auMsg','변경 중…');
     var r=await fetch(SB_URL+'/auth/v1/user',{
       method:'PUT', headers:{apikey:SB_KEY,'Content-Type':'application/json',Authorization:'Bearer '+ST.SB_TOKEN},
       body:JSON.stringify({password:p1, data:{pw_changed:true}})
     });
     var j=await r.json();
     if(!r.ok) throw new Error(j.error_description||j.msg||'변경 실패');
-    $('#apPw').value=$('#apPw2').value='';
-    try{ var s0=sessRead(); if(s0){ s0.p=true; sessWrite(s0); } }catch(e){}
-    msg('auMsg','비밀번호를 변경했습니다 ✅','ok');
+    $('#apPw').value=$('#apPw2').value=''; if($('#apPwCur')) /** @type {any} */($('#apPwCur')).value='';
+    try{ var s0=sessRead(); if(s0){ s0.p=true; s0.l=Date.now(); sessWrite(s0); } }catch(e){}
+    try{ logChange('pw_change','auth',String(ST.AUTH_USER||'').toLowerCase(), {self:true}); }catch(e){}
+    msg('auMsg','비밀번호를 변경했습니다 ✅ — 다른 기기의 로그인도 끊으려면 내 계정 › «모든 기기에서 로그아웃»','ok');
     if(FORCE_PW){
       FORCE_PW=false;
       $('#auTabs').style.display='';
@@ -190,6 +220,7 @@ export function setAuthTab(t){
   });
   $('#auTabLogin').style.display = t==='login'?'':'none';
   $('#auTabPw').style.display = t==='pw'?'':'none';
+  var cr=document.getElementById('apCurRow'); if(cr) cr.style.display=(t==='pw' && !FORCE_PW)? '' : 'none';   /* ㊿+180 스스로 바꿀 때만 «지금 비밀번호» */
   $('#auGo').textContent = t==='login'?'로그인':'변경';
   msg('auMsg','');
 }

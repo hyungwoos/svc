@@ -2762,4 +2762,100 @@ html[data-skin="gn"] #rail .gn-right .ntf-btn:hover{border-color:var(--ink-2)}
 .aiq-qs{margin:4px 0;padding-left:18px;font-size:12px}
 .aiq-fb tr.aiq-new td:first-child{box-shadow:inset 3px 0 0 var(--warn-ink)}
 .ak-props{border-color:var(--warn-ink)}
+/* ==== ㊿+179 데이터 점검 추이 · 정상 표시 · 붙여넣기 미리 보기 · 리포트 팀 공유 ==== */
+.dc-trend{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:10px 14px;margin-bottom:14px;color:var(--ink-2)}
+.dc-trend svg{color:var(--s1-solid);flex:0 0 auto}
+.dc-trend .mini{flex:1 1 260px;min-width:0}
+.dc-ackb{padding:1px 8px!important;font-size:12px!important;margin-left:4px}
+.dc-acked{margin:8px 0 0 26px;font-size:13px}
+.dc-acked>summary{cursor:pointer;color:var(--muted);font-weight:600;min-height:28px;display:flex;align-items:center}
+.dc-acked>summary:focus-visible{outline:2px solid var(--s1-solid);outline-offset:2px;border-radius:4px}
+.dc-acked table{width:100%;margin-top:4px}
+.dc-acked td{vertical-align:top;overflow-wrap:anywhere}
+.dc-acked .pill{padding:1px 8px;font-size:12px}
+.dc-ackhint{margin:6px 0 2px}
+.dc-ackhint .pill{padding:2px 10px;font-size:12px}
+.qb-chip .qb-cl{color:inherit;font:inherit;font-size:12px;padding:0;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-height:24px}
+.qb-chip .qb-cl:focus-visible,.qb-chip .qb-sh:focus-visible{outline:2px solid var(--s1-solid);outline-offset:2px;border-radius:4px}
+.qb-chip .qb-who{color:var(--muted);font-weight:400}
+.qb-chip .qb-sh{font-size:12px;padding:1px 6px;border:1px solid var(--ring);border-radius:10px;color:var(--ink-2)}
+.qb-chip .qb-sh[aria-pressed="true"]{background:var(--s1-solid);border-color:var(--s1-solid);color:#fff}
+.qb-chip.shared{border-style:solid;border-color:var(--brand)}
+.qb-team{margin-top:-6px}
+.dc-rule .rn-tbl td{white-space:normal;overflow-wrap:anywhere}
+.qb-chip button[data-qdel]{min-width:24px;min-height:24px;display:inline-flex;align-items:center;justify-content:center}
+/* ==== ㊿+180 보안 · 계정 — 보안 점검 · 최근 로그인 ==== */
+.sec-out{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}
+.sec-it{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--surface)}
+.sec-it[data-sev="crit"]{border-color:var(--critical-solid)}
+.sec-it[data-sev="warn"]{box-shadow:inset 3px 0 0 var(--warn-ink)}
+.sec-it[data-sev="ok"]{opacity:.85}
+.sec-h{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.sec-h b{font-size:14px}
+.sec-why{margin-top:4px;line-height:1.55;color:var(--ink-2)}
+.sec-list{margin-top:6px;font-size:13px}
+.sec-list>summary{cursor:pointer;color:var(--ink-2);font-weight:600;min-height:28px;display:flex;align-items:center}
+.sec-list>summary:focus-visible{outline:2px solid var(--s1-solid);outline-offset:2px;border-radius:4px}
+.sec-list ul{margin:4px 0 0;padding-left:20px;max-height:220px;overflow:auto;overflow-wrap:anywhere}
+.acc-logins{max-width:560px}
+.acc-logins td{white-space:normal}
+.ax-stale{display:inline-block;margin-left:4px;padding:0 6px;border:1px solid var(--warn-ink);border-radius:8px;color:var(--ink-2);font-size:12px;white-space:nowrap}
+/* ==== ㊿+181 화면 · 모바일 — 폰 카드 목록 · 누르는 영역 · 폰 입력 ==== */
+.dv-cardbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 10px}
+.dv-cardbar[hidden]{display:none}
+.dvc-l{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);flex:1 1 140px;min-width:0}
+.dvc-l select{flex:1;min-width:0;height:36px;border:1px solid var(--ring);border-radius:8px;background:var(--surface-2);color:var(--ink);padding:0 8px}
+.dvc-tg{height:36px}
+@media (max-width:760px){
+  #dvTable.cards{display:block;border:0;background:transparent;min-width:0!important;width:100%!important;font-size:14px}
+  #dvTable.cards thead{display:none}
+  #dvTable.cards tbody{display:flex;flex-direction:column;gap:10px}
+  #dvTable.cards tr{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+  #dvTable.cards tr:hover td{background:transparent}
+  #dvTable.cards td{display:flex;align-items:baseline;gap:8px;flex:1 1 100%;padding:3px 0!important;border:0!important;max-width:none!important;white-space:normal!important;overflow:visible!important;text-overflow:clip!important;position:static!important;box-shadow:none!important;background:transparent!important;min-width:0;width:auto!important;overflow-wrap:anywhere;text-align:left!important}
+  #dvTable.cards td::before{content:attr(data-l);flex:0 0 96px;color:var(--muted);font-size:12px;font-weight:400;line-height:1.7;white-space:normal}
+  #dvTable.cards td.pin1{order:-2;flex:1 1 auto;font-weight:650;font-size:15px;color:var(--ink)}
+  #dvTable.cards td.pin2{order:-1;flex:0 0 auto}
+  #dvTable.cards td.pin1::before,#dvTable.cards td.pin2::before{content:none}
+  #dvTable.cards td.na,#dvTable.cards td.cx{display:none}
+  #dvTable.cards tr.cx-open td.cx{display:flex}
+  #dvTable.cards tr.cx-open td.cx.na{display:none}
+  #dvTable.cards td.act,#dvTable.cards td.cxt{flex:1 1 auto;align-items:center;justify-content:flex-end;border-top:1px solid var(--line)!important;margin-top:6px;padding-top:8px!important}
+  #dvTable.cards td.cxt{justify-content:flex-start}
+  #dvTable.cards td.act::before,#dvTable.cards td.cxt::before,#dvTable.cards tr.dg-empty td::before{content:none}
+  #dvTable.cards td.act .ab{min-width:36px;min-height:36px}
+  #dvTable.cards .cxb{border:0;background:transparent;color:var(--s1-ink);font:inherit;font-size:13px;font-weight:600;min-height:36px;padding:0 4px;cursor:pointer}
+  #dvTable.cards tr.dg-empty td>div{position:static!important;width:auto!important}
+  #dvTable.cards tr.editing td{align-items:center}
+  #dvTable.cards tr.editing td>input,#dvTable.cards tr.editing td>select,#dvTable.cards tr.editing td>.cbo{flex:1;min-width:0;width:auto!important}
+  #dvTable.cards tr.editing td.act button{min-height:38px;padding:0 16px}
+  .tbl-wrap:has(> #dvTable.cards){max-height:none!important;overflow:visible!important;border:0!important;background:transparent!important;box-shadow:none!important}
+  /* 목록 위쪽을 짧게 — 보기 설명은 숨기고(툴팁 · 도움말) 관점 칩은 한 줄 가로 스크롤 */
+  #dvWvBar .wv-d{display:none}
+  #dvLensBar{flex-wrap:nowrap!important;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+  #dvLensBar::-webkit-scrollbar{display:none}
+  #dvLensBar>*{flex:0 0 auto}
+}
+/* 누르는 영역 — 보이는 모양은 그대로, 영역만 24px(터치 32px) 이상 · ㊿+141 방식 확장 */
+.hm-nm,.dc-tech>summary,.dc-acked>summary,#dvLensBar>button.mini,.pr a.crk,.eqb-card .sn .eqsn.act{position:relative}
+.hm-nm::after,.dc-tech>summary::after,#dvLensBar>button.mini::after,.pr a.crk::after,.eqb-card .sn .eqsn.act::after{content:'';position:absolute;left:50%;top:50%;width:max(100%,24px);height:max(100%,24px);transform:translate(-50%,-50%)}
+@media (pointer:coarse){
+  .hm-nm::after,.dc-tech>summary::after,#dvLensBar>button.mini::after,.pr a.crk::after,.cap-more::after,.dgrid thead th .fbtn::after{width:max(100%,32px);height:max(100%,32px)}
+  .dc-tech>summary{min-height:32px;display:flex;align-items:center}
+  /* 폰에서 입력칸을 누르면 화면이 확대되지 않게(iOS 는 16px 미만이면 확대) */
+  input:not([type=checkbox]):not([type=radio]):not([type=range]),select,textarea{font-size:16px!important}
+}
+/* 폰 입력 — 저장 · 다음 버튼을 화면 아래에 붙임(긴 입력에서 찾지 않게) */
+@media (max-width:760px){
+  html[data-look="cc"] :is(#viewOrderNew,#viewMdrNew,#viewOiNew) .wz-nav{position:sticky;bottom:calc(66px + env(safe-area-inset-bottom));z-index:5;background:var(--surface);margin:12px -14px -14px;padding:10px 14px;border-top:1px solid var(--line);box-shadow:0 -8px 16px -12px rgba(0,0,0,.25)}
+  .ovl .modal>.mact{position:sticky;bottom:-16px;z-index:5;background:var(--surface);margin:14px -14px -16px;padding:10px 14px 12px;border-top:1px solid var(--line)}
+}
+.f-bad{outline:2px solid var(--critical-solid);outline-offset:1px}
+/* 접근성 — 다크에서 분기 줄(회색 바탕) 위 «파트너» 글자 대비 */
+:root[data-theme="dark"] .biz-tg tr.biz-q .biz-part{color:#8cbcf5}
+/* 누르는 영역 — 장비 보드 시리얼 칩 · 해지 화면 숫자 링크 · 해지율 «업종 · 파트너…» 펼침 */
+#viewEqBoard .eqsn.act{display:inline-flex;align-items:center;min-height:24px}
+[data-kxs]{display:inline-block;min-width:24px;min-height:24px;line-height:24px;text-align:center}
+#crMore>summary,#crAdv>summary{min-height:24px;display:flex;align-items:center}
+@media (pointer:coarse){ #crMore>summary,#crAdv>summary{min-height:32px} }
 /* ==== ㊿+166 새 디자인 end ==== */

@@ -1,7 +1,7 @@
 /* ===== admin.js — 관리자(계정·권한·MFA 정책) · 배포·운영 · AI 점검 · 내 계정 · 수령처 =====
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { APP_VER, IS_STAGING, ST } from './state.js';
-import { $, applyPerms, axTime, closeBtn, curLook, doLogout, esc, IDLE_KEY, IDLE_OPTS, idleLabel, idleMin, idleTouch, loadPerms, LOOKS, mfaCardRender, navText, PERF, PERM_EXEMPT, pwaHintHtml, pwaInstall, rawHtml, SB_KEY, SB_URL, sessRead, setLook, STATE, tpl } from './core.js';
+import { $, applyPerms, axTime, closeBtn, curLook, doLogout, esc, IDLE_KEY, IDLE_OPTS, idleLabel, idleMin, idleTouch, keepLogin, loadPerms, logoutAll, LOOKS, mfaCardRender, navText, PERF, PERM_EXEMPT, pwaHintHtml, pwaInstall, pwaStandalone, pwGen, pwRule, rawHtml, SB_KEY, SB_URL, SESS_MAX_DAYS, sessRead, setLook, STATE, tpl } from './core.js';
 import { cacheDrop, idxDate, ROLE_VIEWS, sbHeaders, sbTry, sbWrite, thisMonthStr, toast, todayStr } from './shell.js';
 import { aiFetch, buildDigest } from './ai.js';
 import { applyCodes, CODE_KIND, CODE_KIND_LABEL, CODE_KIND_NOTE } from './grids.js';
@@ -790,6 +790,8 @@ export function renderAdmin(){
     $('#axReload').onclick=axLoad;
     $('#axQ').oninput=axPaint;
     $('#axCreate').onclick=axCreate;
+    var pg=$('#axPwGen'); if(pg) pg.onclick=function(){ var i=/** @type {any} */($('#axPw')); i.value=pwGen(14); i.type='text'; axMsg('초기 비밀번호를 만들었습니다 — 본인에게 1:1 메신저로 전달하세요'); };   /* ㊿+180 */
+    var sr=$('#secRun'); if(sr) sr.onclick=secRun;   /* ㊿+180 보안 점검 */
     $('#abSave').onclick=abSave;
   }
   try{ apBind(); }catch(e){}
@@ -1004,7 +1006,7 @@ export async function mfLoad(){
 }
 export function mfPaint(){
   var t=$('#mfTable'); if(!t||!MF.rows) return;
-  t.innerHTML='<thead><tr><th>이메일</th><th>권한</th><th>인증 앱</th><th style="width:60px">필수</th><th style="width:150px">기한</th><th>메모</th><th class="act" style="width:220px"></th></tr></thead>';
+  t.innerHTML='<thead><tr><th>이메일</th><th>권한</th><th>인증 앱</th><th style="width:60px">필수</th><th style="width:150px">기한</th><th>메모</th><th class="act" style="width:220px"><span class="sr">동작</span></th></tr></thead>';
   var tb=document.createElement('tbody');
   MF.rows.forEach(function(r){
     var tr=document.createElement('tr'); var me=(r.email||'').toLowerCase()===(ST.AUTH_USER||'').toLowerCase();
@@ -1014,9 +1016,9 @@ export function mfPaint(){
     tr.innerHTML=tpl`<td>${r.email||''}${rawHtml(me? ' <span class="mini">(나)</span>':'')}</td>`+
       tpl`<td class="mini">${AX_ROLE_KO[r.role]||r.role||'권한 없음'}</td>`+
       tpl`<td>${rawHtml(r.enrolled? tpl`<span style="color:var(--brand)">✓ 등록</span> <span class="mini">${String(r.factor_at||'').slice(0,10)}</span>` : (effReq? tpl`<span style="color:${due? 'var(--critical)':'var(--warn-ink)'}">${rawHtml(due? '미등록 · 차단 중':'미등록 · 유예 '+esc(effDl||''))}</span>${rawHtml(byRole? ' <span class="ctag" title="역할 기본 정책(SQL 95)으로 필수">역할 기본</span>':'')}` : '<span class="mini">미등록</span>'))}</td>`+
-      tpl`<td><input type="checkbox" data-mf-req="${r.email}"${r.required?' checked':''}></td>`+
-      tpl`<td><input type="date" data-mf-dl="${r.email}" value="${r.deadline||''}"${r.required?'':' disabled'} style="height:30px;width:140px"></td>`+
-      tpl`<td><input data-mf-note="${r.email}" value="${r.note||''}" placeholder="메모" style="height:30px;width:100%;min-width:90px"></td>`+
+      tpl`<td><input type="checkbox" data-mf-req="${r.email}" aria-label="${r.email} 2단계 인증 필수"${r.required?' checked':''}></td>`+   /* ㊿+180 칸 이름(화면 읽기) */
+      tpl`<td><input type="date" data-mf-dl="${r.email}" aria-label="${r.email} 등록 기한" value="${r.deadline||''}"${r.required?'':' disabled'} style="height:30px;width:140px"></td>`+
+      tpl`<td><input data-mf-note="${r.email}" aria-label="${r.email} 메모" value="${r.note||''}" placeholder="메모" style="height:30px;width:100%;min-width:90px"></td>`+
       tpl`<td class="act"><button type="button" class="cbtn pri" data-mf-save="${r.email}">저장</button>${rawHtml(r.enrolled? tpl` <button type="button" class="cbtn" data-mf-reset="${r.email}" title="폰 분실 등 — 이 계정의 인증 앱 등록을 지웁니다">인증 앱 초기화</button>`:'')}</td>`;
     tb.appendChild(tr);
   });
@@ -1060,7 +1062,7 @@ export async function mfRoleLoad(){
       var r=rows.filter(function(x){ return x.role===role; })[0]||{role:role, required:false, grace_days:14};
       var st=r.required? (r.deadline<=today? tpl`<span style="color:var(--critical)">기한 지남 (${r.deadline})</span>` : tpl`<span style="color:var(--warn-ink)">유예 중 · ${r.deadline}까지</span>`) : '<span class="mini">선택</span>';
       return tpl`<label class="mf-role-it"><input type="checkbox" data-mfr="${rawHtml(role)}"${r.required?' checked':''}> ${AX_ROLE_KO[role]||role}`+
-        tpl` · 유예 <input type="number" min="0" max="180" step="1" data-mfr-g="${rawHtml(role)}" value="${rawHtml(r.grace_days!=null? r.grace_days:14)}" aria-label="${AX_ROLE_KO[role]||role} 유예 일수" style="width:56px;height:28px"> 일 ${rawHtml(st)}</label>`; }).join(''))}`+
+        tpl` · 유예 <input type="number" inputmode="numeric" min="0" max="180" step="1" data-mfr-g="${rawHtml(role)}" value="${rawHtml(r.grace_days!=null? r.grace_days:14)}" aria-label="${AX_ROLE_KO[role]||role} 유예 일수" style="width:56px;height:28px"> 일 ${rawHtml(st)}</label>`; }).join(''))}`+
     tpl`<button type="button" class="cbtn pri" id="mfRoleSave">역할 기본 저장</button></div>`;
   $('#mfRoleSave').onclick=mfRoleSave;
 }
@@ -1098,7 +1100,7 @@ export function cdPaint(){
   var t=$('#cdTable'); if(!t||!CD.rows) return;
   var list=CD.rows.filter(function(r){ return r.kind===CD.kind && (CD.showOff || r.active!==false); }).sort(function(a,b){ return (a.sort||0)-(b.sort||0) || String(a.value).localeCompare(String(b.value)); });
   var note=CODE_KIND_NOTE[CD.kind]; var cap=$('#cdCap'); if(cap){ var w=cap.querySelector('.cd-warn'); if(w) w.remove(); if(note){ var sp=document.createElement('div'); sp.className='cd-warn'; sp.style.cssText='margin-top:6px;color:var(--warn-ink)'; sp.textContent='⚠ '+note; cap.appendChild(sp); } }
-  t.innerHTML='<thead><tr><th style="width:40px">순서</th><th>값</th><th>표시 이름</th><th>메모</th><th style="width:70px">상태</th><th class="mini">수정</th><th class="act" style="width:170px"></th></tr></thead>';
+  t.innerHTML='<thead><tr><th style="width:40px">순서</th><th>값</th><th>표시 이름</th><th>메모</th><th style="width:70px">상태</th><th class="mini">수정</th><th class="act" style="width:170px"><span class="sr">동작</span></th></tr></thead>';
   var tb=document.createElement('tbody');
   if(!list.length){ var tr0=document.createElement('tr'); tr0.innerHTML=tpl`<td colspan="7" class="mini" style="padding:14px">값이 없습니다 — 아래에서 추가하세요${CD.showOff? '':' (숨긴 값은 «숨긴 값도 보기»)'}</td>`; tb.appendChild(tr0); }
   list.forEach(function(r,i){
@@ -1167,11 +1169,17 @@ export async function cdAdd(){
     toast('코드 추가', CODE_KIND_LABEL[CD.kind]+' «'+v+'»'); await cdLoad();
   }catch(e){ cdMsg(String(e.message||e).slice(0,140), true); }
 }
+export var AX_MFA=null;   /* ㊿+180 이메일 → {enrolled, required} (mfa_admin_list · SQL 89) */
+export var AX_STALE_DAYS=90;
+export function axStale(u){ var t=Date.parse(String(u.last_sign_in||'')); return !isFinite(t)? (Date.now()-Date.parse(String(u.created_at||''))>14*864e5? 'never' : '') : (Date.now()-t>AX_STALE_DAYS*864e5? 'old' : ''); }
 export async function axLoad(){
   axMsg('불러오는 중…');
   try{
-    AX_USERS=await sbWrite('POST','rpc/admin_list_users',{})||[];
-    axMsg(AX_USERS.length+'개 계정');
+    var both=await Promise.all([sbWrite('POST','rpc/admin_list_users',{}), sbWrite('POST','rpc/mfa_admin_list',{}).catch(function(){ return null; })]);
+    AX_USERS=both[0]||[];
+    AX_MFA=null; if(both[1]){ AX_MFA={}; both[1].forEach(function(r){ AX_MFA[String(r.email||'').toLowerCase()]={enrolled:!!r.enrolled, required:!!((r.eff_required!=null)? r.eff_required : r.required)}; }); }
+    var adm=AX_USERS.filter(function(u){ return /^(super_admin|admin)$/.test(String(u.role||'')); }), mf=function(u){ return AX_MFA && AX_MFA[String(u.email||'').toLowerCase()]; };
+    axMsg(AX_USERS.length+'개 계정 · 관리자 '+adm.length+(AX_MFA? '(인증 앱 '+adm.filter(function(u){ var m=mf(u); return m && m.enrolled; }).length+')' : '')+' · '+AX_STALE_DAYS+'일 넘게 안 씀 '+AX_USERS.filter(function(u){ return axStale(u); }).length);
     axPaint();
     try{ apFillUsers(); }catch(e){}
   }catch(e){ axMsg(String(e.message||e).slice(0,120),1); $('#axTable').innerHTML=''; }
@@ -1180,7 +1188,7 @@ export function axPaint(){
   var q=($('#axQ').value||'').trim().toLowerCase();
   var rows=AX_USERS.filter(function(u){ return !q || String(u.email||'').toLowerCase().indexOf(q)>=0; });
   var t=$('#axTable');
-  t.innerHTML='<thead><tr><th>이메일</th><th>권한</th><th>마지막 로그인</th><th>생성일</th><th class="act" style="width:170px"></th></tr></thead>';
+  t.innerHTML='<thead><tr><th>이메일</th><th>권한</th><th>2단계 인증</th><th>마지막 로그인</th><th>생성일</th><th class="act" style="width:170px"><span class="sr">동작</span></th></tr></thead>';
   var tb=document.createElement('tbody');
   rows.forEach(function(u){
     var tr=document.createElement('tr');
@@ -1192,7 +1200,8 @@ export function axPaint(){
       tpl`</select>`;
     tr.innerHTML=tpl`<td>${u.email||''}${rawHtml(me?' <span class="mini">(나)</span>':'')}</td>`+
       tpl`<td>${rawHtml(sel)}</td>`+
-      tpl`<td class="mini">${axTime(u.last_sign_in)}</td>`+
+      tpl`<td class="mini">${rawHtml(axMfaCell(u))}</td>`+
+      tpl`<td class="mini">${axTime(u.last_sign_in)}${rawHtml(axStale(u)? tpl` <span class="ax-stale" title="${AX_STALE_DAYS}일 넘게 로그인하지 않음 — 안 쓰는 계정이면 권한을 없애거나 삭제">${axStale(u)==='never'? '한 번도 안 씀' : '오래 안 씀'}</span>` : '')}</td>`+
       tpl`<td class="mini">${axTime(u.created_at).slice(0,10)}</td>`+
       tpl`<td class="act"></td>`;
     var act=tr.lastChild;
@@ -1232,33 +1241,53 @@ export function axPaint(){
     };
   });
 }
+export function axMfaCell(u){
+  var m=AX_MFA && AX_MFA[String(u.email||'').toLowerCase()]; if(!AX_MFA) return '<span class="mini">—</span>';
+  if(m && m.enrolled) return '<span style="color:var(--brand)">✓ 켬</span>';
+  var adm=/^(super_admin|admin)$/.test(String(u.role||''));
+  return tpl`<span${rawHtml(adm? ' style="color:var(--warn-ink)"' : '')}>${m && m.required? '필수 · 미등록' : '안 켬'}</span>`;
+}
 export async function axCreate(){
   var em=$('#axEmail').value.trim().toLowerCase(), pw=$('#axPw').value, role=$('#axRole').value;
-  if(!em || pw.length<6){ axMsg('이메일과 6자 이상 비밀번호를 입력하세요',1); return; }
+  if(!em){ axMsg('이메일을 입력하세요',1); return; }
+  var bad=pwRule(pw, em); if(bad){ axMsg('초기 비밀번호: '+bad+' — «자동 만들기»를 써도 됩니다',1); return; }   /* ㊿+180 */
   var btn=$('#axCreate'); btn.disabled=true; axMsg('계정 생성 중…');
   try{
     var out=await adminFetch({action:'create_user', email:em, password:pw, role:role||''});
+    try{ logChange('user_create','auth',em,{role:role||null}); }catch(x){}
     toast('계정 생성', out.msg,'info');
-    $('#axEmail').value=''; $('#axPw').value='';
+    $('#axEmail').value=''; $('#axPw').value=''; /** @type {any} */($('#axPw')).type='password';
     await axLoad();
   }catch(e){ axMsg(String(e.message||e).slice(0,140),1); }
   btn.disabled=false;
 }
-export async function axResetPw(em){
-  var pw=prompt(em+' 의 새 비밀번호 (6자 이상):');
-  if(pw==null) return;
-  if(String(pw).length<6){ axMsg('6자 이상이어야 합니다',1); return; }
-  axMsg('변경 중…');
-  try{
-    var out=await adminFetch({action:'reset_password', email:em, password:pw});
-    axMsg(out.msg); toast('비밀번호 초기화', em,'info');
-  }catch(e){ axMsg(String(e.message||e).slice(0,140),1); }
+/** ㊿+180 비밀번호 초기화 창 — 예전 prompt()는 입력이 화면에 그대로 보였음 · 가려진 칸 + 보기 · 자동 만들기 · 복사 */
+export function axResetPw(em){
+  var ov=document.getElementById('ovlAxPw');
+  if(!ov){ ov=document.createElement('div'); ov.className='ovl'; ov.id='ovlAxPw'; ov.innerHTML='<div class="modal" style="width:min(460px,100%)" role="dialog" aria-modal="true" aria-labelledby="axpT"><h3 id="axpT">비밀번호 초기화</h3><p class="cap" id="axpI"></p><label class="mini" for="axpPw">새 비밀번호 (10자 이상 · 영문 + 숫자)</label><div style="display:flex;gap:6px;margin-top:4px"><input id="axpPw" type="password" autocomplete="new-password" style="flex:1;min-width:0"><button type="button" class="pill ghost" id="axpShow" aria-pressed="false">보기</button></div><div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap"><button type="button" class="pill ghost" id="axpGen">자동 만들기</button><button type="button" class="pill ghost" id="axpCopy">복사</button></div><p class="mini" style="margin-top:10px">본인에게는 1:1 메신저로만 알려 주세요(단체방 · 메일 본문 금지). 로그인한 뒤 내 계정 › 비밀번호 변경에서 본인 비밀번호로 바꾸라고 안내하세요.</p><div class="mact"><span class="mmsg" id="axpM" role="status"></span><button type="button" class="pill ghost" data-close="ovlAxPw">취소</button><button type="button" class="pill pri" id="axpGo">초기화</button></div></div>'; document.body.appendChild(ov); }
+  var inp=/** @type {any} */(document.getElementById('axpPw')), msg=/** @type {any} */(document.getElementById('axpM')), go=/** @type {any} */(document.getElementById('axpGo')), sh=/** @type {any} */(document.getElementById('axpShow'));
+  /** @type {any} */(document.getElementById('axpI')).textContent=em+' 의 비밀번호를 새로 정합니다. 그 계정의 지금 비밀번호는 바로 못 쓰게 됩니다.';
+  inp.value=''; inp.type='password'; sh.setAttribute('aria-pressed','false'); sh.textContent='보기'; msg.textContent=''; msg.className='mmsg'; go.disabled=false;
+  sh.onclick=function(){ var on=inp.type==='password'; inp.type=on? 'text' : 'password'; sh.setAttribute('aria-pressed', on? 'true':'false'); sh.textContent=on? '가리기' : '보기'; };
+  /** @type {any} */(document.getElementById('axpGen')).onclick=function(){ inp.value=pwGen(14); inp.type='text'; sh.setAttribute('aria-pressed','true'); sh.textContent='가리기'; msg.textContent='만들었습니다 — 복사해서 본인에게 1:1 로 전달하세요'; msg.className='mmsg'; };
+  /** @type {any} */(document.getElementById('axpCopy')).onclick=function(){ if(!inp.value) return; try{ navigator.clipboard.writeText(inp.value).then(function(){ msg.textContent='복사했습니다'; }, function(){ msg.textContent='복사하지 못했습니다 — 직접 선택해 복사하세요'; }); }catch(e){ msg.textContent='복사하지 못했습니다'; } };
+  go.onclick=async function(){
+    var pw=String(inp.value||''), bad=pwRule(pw, em); if(bad){ msg.textContent=bad; msg.className='mmsg bad'; inp.focus(); return; }
+    go.disabled=true; msg.textContent='변경 중…'; msg.className='mmsg';
+    try{
+      var out=await adminFetch({action:'reset_password', email:em, password:pw});
+      try{ logChange('pw_reset','auth',String(em).toLowerCase(),{by:'super_admin'}); }catch(x){}
+      closeOvl('ovlAxPw'); axMsg(out.msg); toast('비밀번호 초기화', em,'info');
+    }catch(e){ msg.textContent=String(/** @type {any} */(e).message||e).slice(0,140); msg.className='mmsg bad'; go.disabled=false; }
+  };
+  openOvl('ovlAxPw'); setTimeout(function(){ try{ inp.focus(); }catch(e){} }, 30);
 }
 export async function axDelete(em){
   if(!confirm(em+' 계정을 삭제할까요?\n로그인이 즉시 막히고 되돌릴 수 없습니다.')) return;
   axMsg('삭제 중…');
   try{
     var out=await adminFetch({action:'delete_user', email:em});
+    try{ logChange('user_delete','auth',String(em).toLowerCase(),null); }catch(x){}
     axMsg(out.msg); toast('계정 삭제', em,'info');
     await axLoad();
   }catch(e){ axMsg(String(e.message||e).slice(0,140),1); }
@@ -1291,10 +1320,12 @@ export async function renderAccount(){
     if(rr && rr.length) role=rr[0].role;
   }catch(e){}
   var ri=ROLE_INFO[role]||['기본 (역할 미지정)','역할이 지정되지 않아 기본 권한으로 동작합니다. 관리자에게 문의하세요.'];
-  var sessTxt='로그인 유지 켜짐 · 만료 시 자동 갱신';
+  /* ㊿+180 사실대로 — 예전엔 늘 «로그인 유지 켜짐» */
+  var sessTxt=keepLogin()? '이 기기에 로그인 유지' : '이 탭(앱)을 닫으면 로그아웃';
   try{
     var s0=sessRead();
-    if(s0 && s0.e) sessTxt='로그인 유지 켜짐 · 현재 토큰 만료 '+new Date(s0.e*1000).toLocaleString('ko-KR')+' (자동 갱신)';
+    if(s0 && s0.l) sessTxt+=' · '+new Date(s0.l).toLocaleDateString('ko-KR')+' 로그인 — '+new Date(s0.l+SESS_MAX_DAYS*864e5).toLocaleDateString('ko-KR')+'까지(그 뒤 다시 로그인)';
+    if(idleMin()) sessTxt+=' · 자동 로그아웃 '+idleLabel(idleMin());
   }catch(e){}
   function row(k,v){ return tpl`<div style="display:flex;gap:14px;padding:9px 2px;border-bottom:1px solid var(--ring)">`+
     tpl`<span style="width:110px;color:var(--muted);font-size:13px;flex-shrink:0">${rawHtml(k)}</span>`+
@@ -1312,13 +1343,17 @@ export async function renderAccount(){
   bo.style.cssText='border-color:var(--critical,#d03b3b);color:var(--critical,#d03b3b)';
   bo.onclick=doLogout;
   var bu=document.createElement('button'); bu.className='pill ghost'; bu.textContent='📢 업데이트 내역'; bu.onclick=updOpenAll;   /* ㊿+148 */
-  act.appendChild(bp); act.appendChild(bu); act.appendChild(bo);
+  var ba=document.createElement('button'); ba.className='pill ghost'; ba.id='accOutAll'; ba.textContent='모든 기기에서 로그아웃'; ba.onclick=function(){ logoutAll(); };   /* ㊿+180 */
+  act.appendChild(bp); act.appendChild(bu); act.appendChild(ba); act.appendChild(bo);
   act.style.flexWrap='wrap';
   box.appendChild(act);
   /* 보안 — 2단계 인증(인증 앱) · 계정 단위, 본인이 켬 */
   var sec=document.createElement('div'); sec.style.cssText='margin-top:22px';
   sec.innerHTML=tpl`<div style="font-size:14px;font-weight:650;margin-bottom:4px">보안</div>${rawHtml(row('🔐 2단계 인증', '<div id="accMfa"></div>'))}`;
   box.appendChild(sec); mfaCardRender(sec.querySelector('#accMfa'));
+  /* ㊿+180 최근 로그인(login_log · SQL 112) — 모르는 기기가 있으면 «모든 기기에서 로그아웃» 뒤 비밀번호 변경 */
+  var lg=document.createElement('div'); lg.innerHTML=row('🕘 최근 로그인', '<div id="accLogins" class="mini">불러오는 중…</div>'); sec.appendChild(lg.firstChild);
+  accLoginsLoad();
   /* 설정 — 이 브라우저에만 저장 (localStorage) */
   var set=document.createElement('div'); set.style.cssText='margin-top:22px';
   var curIdle=idleMin(), look0=curLook();
@@ -1349,10 +1384,59 @@ export async function renderAccount(){
     setLook(this.value);
   };
   var tip=document.createElement('p'); tip.className='cap'; tip.style.marginTop='14px';
-  tip.textContent='계정 발급·권한 변경은 관리자가 Supabase 콘솔에서 처리합니다.';
+  tip.textContent='계정 발급 · 권한 변경 · 비밀번호 초기화는 슈퍼 관리자가 관리자 › 계정·권한에서 합니다.';
   box.appendChild(tip);
 }
 
+/** ㊿+180 내 최근 로그인 10건 — 표 없으면(SQL 112 전) 줄을 숨김 */
+export async function accLoginsLoad(){
+  var el=document.getElementById('accLogins'); if(!el) return;
+  try{
+    var r=await fetch(SB_URL+'/rest/v1/login_log?select=at,kind,aal,device,keep,pwa&email=eq.'+encodeURIComponent(String(ST.AUTH_USER||'').toLowerCase())+'&order=at.desc&limit=10', {headers:sbHeaders()});
+    if(!r.ok){ var rw=el.closest('div[style]'); if(r.status===404 && rw) rw.remove(); else el.textContent='읽지 못했습니다'; return; }
+    var rows=(await r.json())||[];
+    if(!rows.length){ el.textContent='아직 기록이 없습니다 — 다음 로그인부터 남습니다'; return; }
+    el.classList.remove('mini');
+    el.innerHTML=tpl`<table class="rn-tbl acc-logins"><thead><tr><th>시각</th><th>기기</th><th>방법</th></tr></thead><tbody>${rawHtml(rows.map(function(x){
+      return tpl`<tr><td>${new Date(x.at).toLocaleString('ko-KR', {month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit'})}</td><td>${x.device||'—'}${rawHtml(x.pwa? ' <span class="mini">앱</span>' : '')}</td><td class="mini">${x.kind==='logout_all'? '모든 기기 로그아웃' : (x.aal==='aal2'? '비밀번호 + 인증 앱' : '비밀번호')}${x.keep && x.kind!=='logout_all'? ' · 유지' : ''}</td></tr>`; }).join(''))}</tbody></table>`+
+      tpl`<div class="mini" style="margin-top:6px">모르는 기기 · 시각이 있으면 «모든 기기에서 로그아웃»을 누르고 비밀번호를 바꾸세요.</div>`;
+  }catch(e){ el.textContent='읽지 못했습니다'; }
+}
+/* ── ㊿+180 관리자 › 보안 › 보안 점검 — sec_audit()(SQL 112 · 슈퍼 관리자 · 조회만) + 이 브라우저 ── */
+export var SEC={res:null, at:0};
+export var SEC_SEV={crit:['🔴','바로 고칠 것'], warn:['🟠','확인할 것'], info:['🔵','참고'], ok:['✅','이상 없음']};
+/** 점검 결과 → 항목 [{sev, title, why, list[]}] (화면 · 시험에서 같이 씀) */
+export function secItems(a){
+  a=a||{}; var out=[], L=function(x){ return Array.isArray(x)? x : []; };
+  var add=function(sev, title, why, list, okText){ list=L(list); out.push({sev:list.length? sev : 'ok', title:title, why:list.length? why : (okText||why), list:list}); };
+  add('crit', 'RLS(행 보안)가 꺼진 표', '로그인만 하면(또는 공개 키로) 이 표 전체를 읽고 고칠 수 있습니다 — Supabase › Table editor › 표 › RLS 켜기 + 정책. 백업용 임시 표(_bak)면 지우세요.', a.no_rls, '모든 표에 RLS 가 켜져 있습니다');
+  add('warn', '조건 없이(true) 쓰기를 허용하는 정책', '로그인한 누구나(조회 전용 계정 포함) 이 표에 넣거나 고칠 수 있습니다 — 오류 기록처럼 일부러 연 것이면 그대로, 아니면 정책을 역할 검사로 바꾸세요.', L(a.open_write).map(function(x){ return x.t+' · '+x.p+' ('+x.cmd+(x.roles? ' · '+x.roles : '')+')'; }), '없습니다');
+  add('warn', '비로그인도 부를 수 있는 SECURITY DEFINER 함수', '공개 키만으로 호출됩니다 — 함수 안에서 로그인 · 역할을 검사하는지 확인하고, 아니면 «revoke execute … from anon, public».', a.anon_definer, '없습니다');
+  add('warn', '공개 Storage 버킷', '주소만 알면 누구나 파일을 받습니다 — 직인 · 계약서 같은 파일은 비공개 버킷에.', a.public_buckets, '없습니다(직인은 비공개 버킷)');
+  add('warn', '2단계 인증을 안 켠 관리자', '관리자 계정은 비밀번호만 새도 전체 데이터가 열립니다 — 아래 «2단계 인증 정책»에서 계정별로 필수 지정(결정: 계정별 지정 유지).', a.admins_no_mfa, '관리자 모두 인증 앱 사용');
+  add('warn', '기한 없는 API 키', '외부 연동 키가 새면 끝없이 쓰입니다 — 외부 연동 탭에서 기한을 두고 새로 발급.', a.api_no_expiry, '없습니다');
+  add('info', '90일 넘게 안 쓴 계정', '퇴사 · 이동한 사람의 계정일 수 있습니다 — 안 쓰면 권한을 없애거나 삭제.', L(a.stale).map(function(x){ return x.email+' · '+(x.last? '마지막 '+String(x.last).slice(0,10) : '로그인한 적 없음'); }), '없습니다');
+  add('info', '역할이 없는 계정', '로그인은 되지만 제한 화면만 보입니다 — 필요 없으면 삭제.', a.no_role, '없습니다');
+  add('info', '오래 안 쓴 API 키', '90일 넘게 호출이 없습니다 — 안 쓰면 폐기.', a.api_unused, '없습니다');
+  /* 이 브라우저 */
+  var csp=!!document.querySelector('meta[http-equiv="Content-Security-Policy"]');
+  out.push({sev:csp? 'ok' : 'crit', title:'콘텐츠 보안 정책(CSP)', why:csp? '켜져 있음 — 허용한 곳의 스크립트만 실행' : '없음 — index.html 의 CSP meta 가 빠졌습니다', list:[], local:true});
+  out.push({sev:'info', title:'이 브라우저', why:(keepLogin()? '로그인 유지(최대 '+SESS_MAX_DAYS+'일)' : '탭을 닫으면 로그아웃')+' · 자동 로그아웃 '+(idleMin()? idleLabel(idleMin()) : '끔')+(pwaStandalone()? ' · 앱으로 실행' : '')+' · 다른 사이트 안(iframe)에서는 열리지 않음', list:[], local:true});
+  return out;
+}
+export async function secRun(){
+  var m=$('#secMsg'), host=$('#secOut'); if(!host) return;
+  m.textContent='점검 중…';
+  try{ SEC.res=await sbWrite('POST','rpc/sec_audit',{}); SEC.at=Date.now(); }
+  catch(e){ var t=String(/** @type {any} */(e).message||e); m.textContent=/sec_audit|404|schema cache|Could not find/i.test(t)? 'SQL 112 를 먼저 실행해 주세요(배포·운영 › SQL)' : t.slice(0,140); SEC.res=null; host.innerHTML=''; return; }
+  var it=secItems(SEC.res), n={crit:0, warn:0, info:0, ok:0}; it.forEach(function(x){ n[x.sev]++; });
+  m.textContent=new Date(SEC.at).toLocaleTimeString('ko-KR')+' 점검 · 🔴 '+n.crit+' · 🟠 '+n.warn+' · 🔵 '+n.info+' · ✅ '+n.ok+(SEC.res.users!=null? ' · 계정 '+SEC.res.users+'(인증 앱 '+(SEC.res.mfa_on||0)+')' : '')+(SEC.res.auth_definer_n!=null? ' · 로그인 사용자가 부를 수 있는 SECURITY DEFINER 함수 '+SEC.res.auth_definer_n+'개' : '');
+  var ord={crit:0, warn:1, info:2, ok:3};
+  host.innerHTML=it.slice().sort(function(a, b){ return ord[a.sev]-ord[b.sev]; }).map(function(x){
+    return tpl`<div class="sec-it" data-sev="${rawHtml(x.sev)}"><div class="sec-h"><span aria-hidden="true">${rawHtml(SEC_SEV[x.sev][0])}</span><b>${x.title}</b><span class="mini">${SEC_SEV[x.sev][1]}${x.list.length? ' · '+x.list.length+'건' : ''}</span></div>`+
+      tpl`<div class="mini sec-why">${x.why}</div>${rawHtml(x.list.length? tpl`<details class="sec-list"${rawHtml(x.sev==='crit'? ' open' : '')}><summary>${String(x.list.length)}건 보기</summary><ul>${rawHtml(x.list.slice(0,100).map(function(v){ return tpl`<li>${String(v)}</li>`; }).join(''))}</ul></details>` : '')}</div>`; }).join('')+
+    tpl`<p class="cap" style="margin-top:8px">점검은 읽기만 합니다 — 고치는 것은 사람이(Supabase 설정 · 위 정책 · 외부 연동 탭). 비밀번호 길이 · 로그인 시도 제한 같은 서버 규칙은 Supabase › Authentication 설정에서 정합니다.</p>`;
+}
 /* ── 관리자 › 업데이트 안내 ── */
 export function updMsg(t, bad){ var e=document.getElementById('updMsg'); if(e){ e.textContent=t||''; e.style.color=bad? 'var(--critical)':'var(--muted)'; } }
 export async function updAdminLoad(){
@@ -1382,14 +1466,14 @@ export function updAdminPaint(){
   Object.keys(nmap).forEach(function(e){ if(!emails.some(function(u){ return String(u.email).toLowerCase()===e; })) emails.push({email:nmap[e].email, role:''}); });
   emails.sort(function(a,b){ var x=Number(!!(nmap[String(b.email).toLowerCase()]||{}).enabled) - Number(!!(nmap[String(a.email).toLowerCase()]||{}).enabled); return x || String(a.email).localeCompare(String(b.email)); });
   var h=tpl`<div class="dbar" style="margin-bottom:8px;flex-wrap:wrap;gap:8px;align-items:center"><button type="button" class="pill ghost" id="updReload">↻ 다시 읽기</button><button type="button" class="pill ghost" id="updPreview">👁 팝업 미리보기</button><button type="button" class="pill ghost" id="updNew">＋ 새 안내</button><span class="mini" id="updMsg">게시 ${act.length}건 · 안내 받는 계정 ${(UPD.notify||[]).filter(function(x){ return x.enabled; }).length}명</span></div>`;
-  h+=tpl`<div class="tbl-wrap" tabindex="0" style="max-height:40vh"><table class="dgrid" id="updUsers"><thead><tr><th>계정</th><th>권한</th><th>안내 받기</th><th>안 읽은 안내</th><th>마지막 확인</th><th class="act"></th></tr></thead><tbody>`+
+  h+=tpl`<div class="tbl-wrap" tabindex="0" style="max-height:40vh"><table class="dgrid" id="updUsers"><thead><tr><th>계정</th><th>권한</th><th>안내 받기</th><th>안 읽은 안내</th><th>마지막 확인</th><th class="act"><span class="sr">동작</span></th></tr></thead><tbody>`+
     tpl`${rawHtml(emails.map(function(u){ var k=String(u.email).toLowerCase(), on=!!(nmap[k]&&nmap[k].enabled), a=amap[k], last=a? +a.last_id : 0, unread=act.filter(function(r){ return r.id>last; }).length;
       return tpl`<tr><td>${u.email}</td><td class="mini">${u.role||''}</td><td><label class="mini" style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" data-updn="${u.email}"${on?' checked':''}> 받기</label></td>`+
         tpl`<td>${rawHtml(on? (unread? tpl`<span class="ctag warn">${rawHtml(unread)}건</span>`:'<span class="ctag ok">다 봄</span>') : '<span class="mini">—</span>')}</td>`+
         tpl`<td class="mini">${rawHtml(a? esc(String(a.acked_at||'').replace('T',' ').slice(0,16)) : '아직 없음')}</td>`+
         tpl`<td class="act">${rawHtml(a? tpl`<button type="button" class="pill ghost" data-updreset="${u.email}" title="확인 기록을 지워 다음 로그인 때 전체 안내를 다시 보여 줌">처음부터 다시</button>`:'')}</td></tr>`; }).join(''))}`+ tpl`</tbody></table></div>`;
   h+='<p class="cap" style="margin:6px 0 14px">«받기»를 켠 계정은 로그인할 때 아직 확인하지 않은 안내를 팝업으로 봅니다(처음이면 지금까지 전체). «모두 확인했습니다»에 체크하고 확인하면 다음 안내 전까지 다시 뜨지 않습니다.</p>';
-  h+=tpl`<div class="tbl-wrap" tabindex="0" style="max-height:40vh"><table class="dgrid" id="updNotes"><thead><tr><th>날짜</th><th>버전</th><th>제목</th><th class="n">항목</th><th>상태</th><th class="act"></th></tr></thead><tbody>`+
+  h+=tpl`<div class="tbl-wrap" tabindex="0" style="max-height:40vh"><table class="dgrid" id="updNotes"><thead><tr><th>날짜</th><th>버전</th><th>제목</th><th class="n">항목</th><th>상태</th><th class="act"><span class="sr">동작</span></th></tr></thead><tbody>`+
     tpl`${rawHtml(UPD.rows.map(function(r){ var n=String(r.body||'').split(/\n/).filter(function(x){ return /^\s*[-•·]/.test(x); }).length;
       return tpl`<tr${rawHtml(r.active? '':' class="row-dim"')}><td class="mini">${String(r.published_on||'').slice(0,10)}</td><td class="mini">${r.ver||''}</td><td>${r.title||''}</td><td class="n">${rawHtml(n)}</td><td>${rawHtml(r.active? '<span class="ctag ok">게시</span>':'<span class="ctag">숨김</span>')}</td>`+
         tpl`<td class="act"><button type="button" class="pill ghost" data-upded="${rawHtml(r.id)}">수정</button><button type="button" class="pill ghost" data-updtg="${rawHtml(r.id)}">${r.active? '숨기기':'게시'}</button></td></tr>`; }).join(''))}`+ tpl`</tbody></table></div>`;
