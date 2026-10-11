@@ -207,6 +207,12 @@ say(/^export function tickMemo\(/m.test(jsAll) && /^export function cssvKey\(/m.
   say(/^export function oiOwnerOf\(r\)/m.test(gr) && /^export function oiQuotesReady\(key, cb\)/m.test(gr) && /\['noq','견적 전'/.test(gr) && !/id="qvMe"/.test(gr) && /return oiOpen\(r\) && oiMine\(r\);/.test(hm + gr)
     && !/add\('inb',/.test(sh) && !/id="omUser"/.test(ix) && !/hm-who/.test(hm) && /^export async function rpaAsk\(q, fix\)/m.test(rp) && /mode:'report'/.test(rp) && /id="rpAsk"/.test(rp) && /return \{ok:true, n:rows\.length\};/.test(rp) && /^export async function qoiOnSaved\(id, src\)/m.test(rd('js/sales.js')) && /win_prob:10/.test(rd('js/sales.js')) && /type: 'quoteSaved'/.test(rd('sat/qdb.js')) && /data\.type!=='quoteSaved'/.test(rd('js/init.js')),
   '㊿+184 내 OI = 견적 작성자(oiOwnerOf · 견적 전 · 이름 고르기 · 담당자 연결 없음) · 인바운드는 홈 할 일 아님 · 견적 → OI 자동 등록(10% · 진행 중 OI 면 연결 · 예전 견적은 미리 보기) · 글로 만드는 리포트(rpaAsk → ask report → 격리 칸 계산)'); }
+// ㊿+185 우선 업무 줄 담당(work_assign area · 포탈 계정 목록) · 개선 요청(portal_feedback)
+{ const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
+  const nt = rd('js/notify.js'), hm = rd('js/home.js'), sh = rd('js/shell.js'), ed = rd('js/edit.js');
+  say(/^export var AREA_DEFS=/m.test(nt) && /^export async function ntfAreaOpen\(key\)/m.test(nt) && /^export async function ntfAccounts\(\)/m.test(nt) && /rpc\/portal_accounts/.test(nt) && /kind=in\.\(eq,area\)/.test(nt)
+    && /^export function fbOpen\(opt\)/m.test(nt) && /portal_feedback/.test(nt) && /class="hm-own hm-asg/.test(hm) && /asg:'rnl', me:areaMe\('rnl'\)/.test(sh) && /data-a="fb"/.test(ed) && /bulb:'<path/.test(sh),
+  '㊿+185 우선 업무 줄 담당(AREA_DEFS · ntfAreaOpen · 포탈 계정 portal_accounts · work_assign area) · 개선 요청(fbOpen · portal_feedback · 위 띠 💡 · 계정 메뉴)'); }
 // ㊿+160 연장하면 상태 «재약정»(구분 그대로) · 계약 상세에 «계약 기간 · 연장 이력»
 say(/^export function renewStatus\(r\)/m.test(jsAll) && /var nst=renewStatus\(r\);/.test(jsAll) && /^export function ctPeriods\(c, mine\)/m.test(jsAll) && html.includes('id="dtRenew"'), '연장: 상태 «재약정»(renewStatus) · 계약 상세 연장 이력(ctPeriods · #dtRenew)');
 const idx = html + jsAll;

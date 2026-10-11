@@ -15,7 +15,7 @@ import { applyMenuFold, closeDrawer, ensureGroupOpen, setupSide } from './sales.
 import { btnBackSync, gridGoPre, loadHide, meLoc, NAV, navMenu, oiOpen, oiOwnerOf, oiQuotesReady, openDetail, qvGo, renderGrid, switchView, VIEW_UI, viewResetHard } from './grid.js';
 import { closeOvl, logChange, openOvl, OVL_SKIP_CLEAN, ovlMarkClean, setupEdit, toggleAuthMenu } from './edit.js';
 import { homeOn, homeRender, placeSearchBtn, srchCtx } from './home.js';
-import { NTF, ntfAfterData, ntfWho } from './notify.js';
+import { NTF, ntfAfterData, ntfAreaMe, ntfAreaOf, ntfName, ntfWho } from './notify.js';
 import { verBeforeWrite } from './guard.js';
 
 
@@ -25,6 +25,7 @@ import { verBeforeWrite } from './guard.js';
 /* 이 창에서 한 번만 하는 일 표시 (㊿+154: 예전 window.__ccInbLoad · __editInit · __pwaStart) */
 export var SHELL_ONCE={inb:0, edit:0, pwa:0, gnm:0};
 export var ICO={
+  bulb:'<path d="M9 18h6"/><path d="M10 21h4"/><path d="M8.5 14.5A6 6 0 1 1 15.5 14.5c-.6.5-1 1.3-1 2H9.5c0-.7-.4-1.5-1-2z"/>',
   home:'<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>',
   chart:'<path d="M4 19h16"/><path d="M6 16V9"/><path d="M11 16V5"/><path d="M16 16v-6"/>',
   cloud:'<path d="M7 18a4 4 0 0 1-.6-7.95A6 6 0 0 1 18 9a4.5 4.5 0 0 1-.5 9z"/>',
@@ -427,6 +428,9 @@ export function renderInbox(){
   function add(key, o){ if(ccSnoozed(key)){ snz++; return; } o.key=key; rows.push(o); }
   /* ㊿+174 장비 «담당» = 알림함에서 정한 처리 담당(work_assign) → 없으면 신청한 사람. 신청서의 mgr_name 은 «고객 담당자»(고객 쪽 사람)라 쓰지 않음 */
   function eqOwn(o){ var a=NTF.asg[String(o.id)]; return a? ntfWho(a.assignee) : (o.requester? String(o.requester).split('@')[0] : ''); }
+  /* ㊿+185 줄 담당(work_assign area) — 지정돼 있으면 담당 칸에 그 사람 · 나면 «내 업무»에 */
+  function areaOwn(key, dflt){ var e=ntfAreaOf(key); return e? ntfName(e) : (dflt||''); }
+  function areaMe(key){ return ntfAreaMe(key)? {} : null; }
   var meL=meLoc(); function eqMe(o){ var a=NTF.asg[String(o.id)]; return !!meL && String(a? a.assignee : o.requester||'').toLowerCase().split('@')[0]===meL; }   /* ㊿+184 홈 «내 업무» — 나에게 맡겨진(없으면 내가 신청한) 장비 신청 */
   function names(arr, f, n){ var u={}; arr.forEach(function(x){ var v=f(x); if(v) u[v]=1; }); var ks=Object.keys(u); return ks.slice(0,n||3).join(', ')+(ks.length>(n||3)? ' 외 '+(ks.length-(n||3))+'곳':''); }
   if(pendL.length){
@@ -457,7 +461,7 @@ export function renderInbox(){
     var lsum=RS.lapsed.reduce(function(a,r){ return a+(r.mrr||0); },0), lrec=RS.checking.length;
     add('rnl', {lv:1, ic:'clock', cls:'crit', n:RS.lapsed.length, t:tpl`만기 지났는데 미처리 <span class="num">${RS.lapsed.length}건</span> — 이미 LIVE 에서 빠졌습니다${rawHtml(lrec? ' (최근 2개월 '+lrec+'건)':'')}`,
       s:names(RS.lapsed, function(r){ return r.cust; })+' · 월 '+won(lsum)+'천원 · 연장이면 되살리고, 끝났으면 서비스종료·해지로 정리',
-      who:names(RS.lapsed, function(r){ return r.cust; }), own:'', due:'지금 — 종료월이 지남', imp:'월 '+won(lsum)+'천원 · LIVE 에서 빠짐',
+      who:names(RS.lapsed, function(r){ return r.cust; }), own:areaOwn('rnl'), asg:'rnl', me:areaMe('rnl'), due:'지금 — 종료월이 지남', imp:'월 '+won(lsum)+'천원 · LIVE 에서 빠짐',
       nm:'만기 지났는데 미처리 계약', cnt:'계약 '+RS.lapsed.length+'건', dueS:'지남', dk:0,
       acts:[{l:'만기 지난 '+RS.lapsed.length+'건 연장·종료 처리', pri:1, go:function(){ openRenewList('lapsed'); }}]});
   }
@@ -466,7 +470,7 @@ export function renderInbox(){
     add('rnd', {lv:2, ic:'clock', cls:'warn', n:RS.due.length, t:tpl`${mk(b)} 만기 <span class="num">${RS.due.length}건</span> — ${mk(b+1)} 1일 LIVE 에서 빠집니다`,
       s:names(RS.due, function(r){ return r.cust; })+' · 월 '+won(dsum)+'천원'+(RS.next.length? ' · 다음 달 만기 '+RS.next.length+'건 대기':''),
       nm:mk(b)+' 만기 계약 처리', cnt:'계약 '+RS.due.length+'건', dueS:mk(b)+' 말까지', dk:monthLeft()<=3? 1 : 2,
-      who:names(RS.due, function(r){ return r.cust; }), own:'', due:mk(b)+' 말까지 ('+mk(b+1)+' 1일 LIVE 제외)', imp:'월 '+won(dsum)+'천원'+(RS.next.length? ' · 다음 달 만기 '+RS.next.length+'건 대기':''),
+      who:names(RS.due, function(r){ return r.cust; }), own:areaOwn('rnd'), asg:'rnd', me:areaMe('rnd'), due:mk(b)+' 말까지 ('+mk(b+1)+' 1일 LIVE 제외)', imp:'월 '+won(dsum)+'천원'+(RS.next.length? ' · 다음 달 만기 '+RS.next.length+'건 대기':''),
       acts:[{l:'보류', go:function(){ ccSnooze('rnd',3); }},{l:'이달 만기 '+RS.due.length+'건 처리', pri:1, go:function(){ openRenewList('due'); }}]});
   }
   /* 데이터 점검 (㊿+133): 바로 고쳐야 할 항목이 있으면 한 줄 */
@@ -474,26 +478,26 @@ export function renderInbox(){
   if(!EQ){ var DS=null; try{ DS={crit:0, warn:0, items:{}}; dcRules().forEach(function(r){ if(!r.items.length || r.id==='c_lapsed') return; if(r.sev==='crit' || r.sev==='warn') DS[r.sev]+=r.items.length; if(r.sev==='crit') DS.items[r.title]=r.items.length; }); }catch(e){ DS=null; }
     if(DS && DS.crit){ var dcs=Object.keys(DS.items).filter(function(k){ return DS.items[k]; }).slice(0,3).map(function(k){ return k+' '+DS.items[k]; }).join(' · ');
       add('dc', {lv:1, ic:'scale', cls:'crit', n:DS.crit, t:tpl`데이터 점검 — 바로 고칠 항목 <span class="num">${rawHtml(DS.crit)}건</span>${rawHtml(DS.warn? ' · 확인 필요 '+DS.warn+'건':'')}`,
-      s:dcs, who:dcs, own:'관리자', due:'오늘', imp:'매출·LIVE·만기 숫자가 틀리게 나올 수 있음', nm:'데이터 바로 고칠 것', cnt:'항목 '+DS.crit+'건', dueS:'오늘', dk:1,
+      s:dcs, who:dcs, own:areaOwn('dc', '관리자'), asg:'dc', me:areaMe('dc'), due:'오늘', imp:'매출·LIVE·만기 숫자가 틀리게 나올 수 있음', nm:'데이터 바로 고칠 것', cnt:'항목 '+DS.crit+'건', dueS:'오늘', dk:1,
       acts:[{l:'보류', go:function(){ ccSnooze('dc',3); }},{l:'바로 고칠 '+DS.crit+'건 보기', pri:1, go:function(){ switchView('dcheck'); }}]}); } }
   if(GNI0 && !EQ){   /* ㊿+171 지니언스: 만료 예정 전체가 아니라 «재약정 대응 필요»(자동연장 · 재약정 등록 제외) — 홈 핵심 현황과 같은 숫자라 «지금 챙길 일» 3줄에서는 빠지고 «전체 할 일»에만 */
     var RN=renewNeedScan(list, b, EN), rnL=RN.rows.map(function(k){ return ST.DATA.rows[k]; });
     if(rnL.length){ var ends2=rnL.map(function(r){ return r.endIdx; }).sort(function(x,y){ return x-y; });
       add('exp', {lv:3, ic:'clock', cls:'info', n:rnL.length, kpi:1, t:tpl`재약정 대응 필요 <span class="num">${rnL.length}건</span> · 고객사 ${rawHtml(RN.custN)}곳 — 월 <span class="num">${won(RN.amt)}</span>천원`,
         nm:'재약정 대응(만료 전 연락)', cnt:'계약 '+rnL.length+'건', dueS:'종료 '+mk(ends2[0])+(ends2.length>1? '~'+mk(ends2[ends2.length-1]):''), dk:ends2[0]<=b? 2 : 3,
-        who:names(rnL, function(r){ return r.cust; }), own:'', due:'종료 '+mk(ends2[0])+(ends2.length>1? '~'+mk(ends2[ends2.length-1]):''), imp:'월 '+won(RN.amt)+'천원 · '+EN+'개월 내 만료 '+XS.rows.length+'건 중 자동연장 '+RN.auto.length+' · 재약정 등록 '+RN.sure.length+' 제외',
+        who:names(rnL, function(r){ return r.cust; }), own:areaOwn('exp'), asg:'exp', me:areaMe('exp'), due:'종료 '+mk(ends2[0])+(ends2.length>1? '~'+mk(ends2[ends2.length-1]):''), imp:'월 '+won(RN.amt)+'천원 · '+EN+'개월 내 만료 '+XS.rows.length+'건 중 자동연장 '+RN.auto.length+' · 재약정 등록 '+RN.sure.length+' 제외',
         acts:[{l:'재약정 대응 '+rnL.length+'건 보기', pri:1, go:function(){ kpiOpen('expNeed'); }}]}); }
   }
   else if(expL.length && !(RS && EN===1 && RS.due.length)){
     var ends=expL.map(function(r){ return r.endIdx; }).sort(function(x,y){ return x-y; });
     add('exp', {lv:3, ic:'clock', cls:'info', n:expL.length, t:tpl`${rawHtml(EN)}개월 내 만료 원계약 <span class="num">${expL.length}건</span> · 고객사 ${rawHtml(XS.custN)}곳 — 월 <span class="num">${won(expAmt)}</span>천원`,
       s:names(expL, function(r){ return r.cust; })+' · 종료 '+mk(ends[0])+(ends.length>1? '~'+mk(ends[ends.length-1]):'')+' · 재약정 타깃',
-      who:names(expL, function(r){ return r.cust; }), own:'', due:'종료 '+mk(ends[0])+(ends.length>1? '~'+mk(ends[ends.length-1]):''), imp:'월 '+won(expAmt)+'천원 · 재약정 대상',
+      who:names(expL, function(r){ return r.cust; }), own:areaOwn('exp'), asg:'exp', me:areaMe('exp'), due:'종료 '+mk(ends[0])+(ends.length>1? '~'+mk(ends[ends.length-1]):''), imp:'월 '+won(expAmt)+'천원 · 재약정 대상',
       acts:[{l:'만료 원계약 '+expL.length+'건 보기', pri:1, go:function(){ kpiOpen('exp'); }}]});
   }
   if(!bizDone){
     add('biz', {lv:2, ic:'scale', cls:'', n:1, t:curYm+' 비즈포탈 차액이 아직 입력되지 않았습니다', s:'엑셀을 올리면 고객사·회계매출 기준으로 자동 대조합니다',
-      who:curYm+' 비즈포탈 차액', own:'정산 담당', due:curYm+' 마감 전', imp:'정산·목표 달성률이 «미입력»으로 남음', nm:curYm+' 비즈포탈 차액 입력', cnt:'1개월', dueS:curYm+' 마감 전', dk:monthLeft()<=3? 1 : 2,
+      who:curYm+' 비즈포탈 차액', own:areaOwn('biz', '정산 담당'), asg:'biz', me:areaMe('biz'), due:curYm+' 마감 전', imp:'정산·목표 달성률이 «미입력»으로 남음', nm:curYm+' 비즈포탈 차액 입력', cnt:'1개월', dueS:curYm+' 마감 전', dk:monthLeft()<=3? 1 : 2,
       acts:[{l:'다음 주에', go:function(){ ccSnooze('biz',7); }},{l:'비즈포탈 엑셀 올리기', pri:1, go:function(){ switchView('biz'); }}]});
   }
   if(!EQ){

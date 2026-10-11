@@ -14,18 +14,19 @@
    · ㊿+177 예약 발송(선택 · 기본 꺼짐 · SQL 108): 설정에서 요일 · 시각(한국 시각)을 고르면 서버(pg_cron → notify 함수)가 그때 팀 채널로 보냄
        보낼 글은 슈퍼 관리자가 포탈을 열 때 이 파일의 같은 계산(ntfSlackPlan)으로 만들어 notify_snapshot 에 둠(ntfSnapSave) — 서버에 계산식을 따로 두지 않음 */
 import { APP_VER, IS_STAGING, ST } from './state.js';
-import { bizHas, canWrite, fetchT, lline, mk, monOf, rawHtml, SB_URL, tickMemo, tpl, won } from './core.js';
+import { bizHas, canWrite, esc, fetchT, lline, mk, monOf, navText, rawHtml, SB_URL, tickMemo, tpl, won } from './core.js';
 import { expAmtOf, expEligible } from './dash.js';
-import { ico, sbHeaders, sbTry, sbWrite, toast, todayStr } from './shell.js';
+import { ico, sbHeaders, sbTry, sbWrite, toast, todayStr, visBtn } from './shell.js';
 import { ctSuccessor, dcAckLoad, dcDailySave, dcRules, openRenewList, renewScan } from './analysis.js';
 import { gridGoPre, meMatch, switchView } from './grid.js';
 import { closeOvl, logChange, openOvl } from './edit.js';
-import { openCust360, renderTodo } from './tools.js';
+import { menuSegments, openCust360, renderTodo } from './tools.js';
 import { placeSearchBtn } from './home.js';
 import { verNum } from './guard.js';
+import { QMGR_MAP } from './sales.js';
 
 export var NTF_DEF={renew_days:[60,30], eq_days:3, month_end_days:5, renew_emails:[], eq_emails:[], biz_emails:[], dc_emails:[], slack_on:false, team_channel:'C08RA3PPDH8', auto_on:false, auto_days:[1], auto_time:'09:00', auto_dm:false};
-export var NTF={memo:null, ops:null, opsOk:null, set:null, sqlOk:null, reads:{}, readsOk:false, asg:{}, asgOk:false, omap:null, users:null, open:false, tab:'me', loading:false, at:0, busy:false, snapOk:null, snapKey:'', snapAt:0, snap:null};
+export var NTF={memo:null, ops:null, opsOk:null, set:null, sqlOk:null, reads:{}, readsOk:false, asg:{}, asgOk:false, area:/** @type {Object<string,any>} */({}), accounts:/** @type {?any[]} */(null), omap:null, users:null, open:false, tab:'me', loading:false, at:0, busy:false, snapOk:null, snapKey:'', snapAt:0, snap:null};
 export var NTF_KIND={ops:'운영 상태', renew:'재약정 만기', lapsed:'만기 미처리', eq:'장비 처리 지연', biz:'월말 마감', dc:'데이터 점검'};
 export var OPS_TBL={customers:'고객사', contracts:'계약', monthly_revenue:'월 매출', equipment_orders:'장비 신청', equipment_assets:'장비 현황', oi_deals:'OI'};
 
@@ -54,7 +55,7 @@ export function ntfItems(){
   if(!ST.DATA || !ST.DATA.rows || ST.IS_EQUIP) return [];
   var S=ntfSet(), rows=ST.DATA.rows, R=ST.RAWX||{};
   /* 같은 데이터 · 설정 · 담당 · 날짜면 지난 결과(데이터 점검 규칙까지 도는 계산이라 종 숫자를 다시 그릴 때마다 하지 않음) — 데이터를 새로 읽으면 ST.DATA · ST.RAWX 가 새 객체 */
-  var sig=(R.orders||[]).map(function(o){ return o.id+':'+o.status; }).join(','), deps=[ST.DATA, R, rows.length, sig, NTF.set, NTF.asg, NTF.ops, ST.AUTH_USER, ST.OWNER_NAMES, todayStr()];
+  var sig=(R.orders||[]).map(function(o){ return o.id+':'+o.status; }).join(','), deps=[ST.DATA, R, rows.length, sig, NTF.set, NTF.asg, NTF.area, NTF.ops, ST.AUTH_USER, ST.OWNER_NAMES, FB.newN, FB.ok, todayStr()];
   if(NTF.memo && NTF.memo.deps.length===deps.length && NTF.memo.deps.every(function(d, i){ return d===deps[i]; })) return NTF.memo.v;
   var v=tickMemo('ntfItems', deps, function(){
     var out=[], days=(S.renew_days||[60,30]).slice().sort(function(a,b){ return a-b; }), maxD=days[days.length-1];
@@ -66,12 +67,12 @@ export function ntfItems(){
       var stage=days.filter(function(d){ return left<=d; })[0], amt=0; try{ amt=expAmtOf(k); }catch(e){ amt=r.mrr||0; }
       out.push({kind:'renew', key:'renew:'+r._id+':'+stage, sev:stage<=30? 'hi' : 'mid', order:left,
         title:r.cust+' · '+lline(r.line)+' 만료 D-'+left, detail:mk(r.endIdx)+' 말 종료 · 월 '+won(amt)+'천원'+(r.renew? ' · 연장 '+r.renew+'회' : '')+(sc && !sc.sure? ' · 후속 계약 확인 필요' : ''),
-        to:S.renew_emails, who:String(r.csm||'').trim(), me:ntfIsMe(S.renew_emails) || (!!String(r.csm||'').trim() && meMatch(r.csm)), stage:stage, id:r._id,
+        to:S.renew_emails.concat(ntfAreaTo('exp')), who:String(r.csm||'').trim(), me:ntfIsMe(S.renew_emails) || ntfAreaMe('exp') || (!!String(r.csm||'').trim() && meMatch(r.csm)), stage:stage, id:r._id,
         go:function(){ openCust360(r.cust); }});
     });
     /* 2) 만기 미처리(이미 종료월이 지남) — 건수 한 줄 */
     try{ var T=(ST.DATA.nowIdx>=0)? ST.DATA.nowIdx : null; var RS=T!=null? renewScan(T) : null;
-      if(RS && RS.lapsed.length){ var to2=S.renew_emails.concat(S.dc_emails);
+      if(RS && RS.lapsed.length){ var to2=S.renew_emails.concat(S.dc_emails, ntfAreaTo('rnl'));
         out.push({kind:'lapsed', key:'lapsed:'+mk(T)+':'+RS.lapsed.length, sev:'hi', order:-1, title:'만기 지났는데 미처리 '+RS.lapsed.length+'건',
           detail:'이미 LIVE 에서 빠짐 — 연장 · 서비스종료 · 해지 중 하나로 정리', to:to2, me:ntfIsMe(to2), go:function(){ openRenewList('lapsed'); }}); } }catch(e){}
     /* 3) 장비 신청 처리 지연 — 상태마다 한 번 */
@@ -87,14 +88,16 @@ export function ntfItems(){
     /* 4) 월말 마감 — 비즈포탈 차액 */
     try{ var T2=ST.DATA.nowIdx; if(T2!=null && T2>=0){ var curYm=monOf(T2)+'월', done=bizHas(+mk(T2).slice(0,4), monOf(T2)), left2=ntfDaysLeft(T2);
       if(!done && left2!=null && left2>=0 && left2<=S.month_end_days) out.push({kind:'biz', key:'biz:'+mk(T2), sev:left2<=2? 'hi' : 'mid', order:left2, title:curYm+' 비즈포탈 차액 입력 — 마감 D-'+left2,
-        detail:'정산 · 목표 달성률이 «미입력»으로 남음', to:S.biz_emails, me:ntfIsMe(S.biz_emails), go:function(){ switchView('biz'); }}); } }catch(e){}
+        detail:'정산 · 목표 달성률이 «미입력»으로 남음', to:S.biz_emails.concat(ntfAreaTo('biz')), me:ntfIsMe(S.biz_emails) || ntfAreaMe('biz'), go:function(){ switchView('biz'); }}); } }catch(e){}
     /* 5) 데이터 점검 «바로 고쳐야 함» (만기 지남 규칙은 2)와 겹쳐 뺌 — 홈과 같은 기준) */
     try{ var crit=dcRules().filter(function(x){ return x.sev==='crit' && x.id!=='c_lapsed' && x.items.length; }), n=crit.reduce(function(a,x){ return a+x.items.length; }, 0);
       if(n) out.push({kind:'dc', key:'dc:'+mk(ST.DATA.nowIdx)+':'+n, sev:'hi', order:0, title:'데이터 바로 고칠 것 '+n+'건', detail:crit.map(function(x){ return x.title+' '+x.items.length; }).slice(0,3).join(' · '),
-        to:S.dc_emails, me:ntfIsMe(S.dc_emails), go:function(){ switchView('dcheck'); }}); }catch(e){}
+        to:S.dc_emails.concat(ntfAreaTo('dc')), me:ntfIsMe(S.dc_emails) || ntfAreaMe('dc'), go:function(){ switchView('dcheck'); }}); }catch(e){}
     /* 6) ㊿+175 운영 상태(슈퍼 관리자 · SQL 106 ops_status) — 야간 백업 · 자동 작업 · AI 점검 · 브라우저 오류 · 옛 버전 · 백업 대비 행 수 */
     if(ST.IS_SUPER && NTF.ops) try{ opsItems(NTF.ops).forEach(function(x){ out.push(x); }); }catch(e){}
-    var KO={ops:0, lapsed:1, dc:2, biz:3, renew:4, eq:5};
+    /* 7) ㊿+185 개선 요청(슈퍼 관리자) — 새 요청 건수 */
+    if(ST.IS_SUPER && FB.ok && FB.newN) out.push({kind:'fb', key:'fb:'+FB.newN+':'+(FB.rows[0]? FB.rows[0].id : 0), sev:'mid', order:0, title:'개선 요청 새 '+FB.newN+'건', detail:FB.rows.filter(function(x){ return x.status==='new'; }).slice(0,2).map(function(x){ return (x.menu||'포탈 전체')+' — '+String(x.content||'').slice(0,40); }).join(' · '), to:[], me:true, go:function(){ fbOpen({list:true}); }});   /* ㊿+185 */
+    var KO={ops:0, lapsed:1, dc:2, biz:3, renew:4, eq:5, fb:6};
     out.sort(function(a,b){ return (a.sev==='hi'?0:1)-(b.sev==='hi'?0:1) || KO[a.kind]-KO[b.kind] || a.order-b.order; });
     return out;
   });
@@ -163,10 +166,11 @@ export async function ntfLoad(force){
     var m={}; if(rd){ NTF.readsOk=true; rd.forEach(function(x){ m[x.key]=x.read_at||1; }); }
     else { NTF.readsOk=false; try{ (JSON.parse(localStorage.getItem(ntfLsKey())||'[]')||[]).forEach(function(k){ m[k]=1; }); }catch(e){} }
     NTF.reads=m;
-    var as=NTF.sqlOk? await ntfGet('work_assign?select=kind,ref,assignee,assigned_by,assigned_at&kind=eq.eq&limit=1000') : null;
-    var g={}; (as||[]).forEach(function(x){ g[String(x.ref)]=x; }); var hadAsg=Object.keys(NTF.asg).length>0; NTF.asg=g; NTF.asgOk=as!==null;
-    if(hadAsg || Object.keys(g).length) try{ renderTodo(); }catch(e){}   /* 홈 «우선 업무»의 장비 담당 = 처리 담당 */
+    var as=NTF.sqlOk? await ntfGet('work_assign?select=kind,ref,assignee,assigned_by,assigned_at&kind=in.(eq,area)&limit=1000') : null;   /* ㊿+185 area = 홈 우선 업무 줄(만기 · 재약정 · 비즈포탈 · 데이터 점검)의 담당 */
+    var g={}, ar={}; (as||[]).forEach(function(x){ if(x.kind==='area') ar[String(x.ref)]=x; else g[String(x.ref)]=x; }); var hadAsg=Object.keys(NTF.asg).length+Object.keys(NTF.area).length>0; NTF.asg=g; NTF.area=ar; NTF.asgOk=as!==null;
+    if(hadAsg || Object.keys(g).length || Object.keys(ar).length) try{ renderTodo(); }catch(e){}   /* 홈 «우선 업무»의 장비 담당 = 처리 담당 · 줄 담당 */
     await opsLoad();
+    if(ST.IS_SUPER) try{ await fbLoad(true); }catch(e){}   /* ㊿+185 개선 요청 새 건수(알림함) */
     NTF.at=Date.now();
     ntfSnapSave(false);   /* ㊿+177 예약 발송 «보낼 글» — 켜져 있을 때만 · 슈퍼 관리자만 · 바뀌었거나 6시간 지났을 때만 씀 */
     if(NTF.readsOk && Math.random()<0.05) fetch(SB_URL+'/rest/v1/rpc/notify_reads_trim', {method:'POST', headers:sbHeaders(true), body:'{}'}).catch(function(){});
@@ -195,6 +199,7 @@ export function ntfBtn(){
   return b;
 }
 export function ntfSync(){
+  try{ fbSync(); }catch(e){}
   var b=ntfBtn(); if(!b) return;
   var show=!!ST.SB_TOKEN && !!ST.DATA && !ST.IS_EQUIP;
   var wasHid=b.hidden; b.hidden=!show; if(!show) return;
@@ -294,6 +299,7 @@ export function ntfAssignOpen(x){
   var o=(ST.RAWX.orders||[]).filter(function(r){ return String(r.id)===String(x.id); })[0]; if(!o) return;
   if(!ntfCanAssign()){ toast('지정할 수 없습니다', NTF.asgOk? '임대 장비 신청 «쓰기» 권한이 필요합니다' : 'SQL 105(work_assign 표)를 먼저 실행해 주세요', 'info'); return; }
   var cur=x.asg||'', cands=ntfCands(), me=ntfMe();
+  ntfAccounts().then(function(a){ var dl=document.getElementById('naList'); if(!dl || !a.length) return; var u={}; cands.concat(a.map(function(z){ return z.email; })).forEach(function(e){ u[e]=1; }); dl.innerHTML=Object.keys(u).sort().map(function(e){ return tpl`<option value="${e}">${e===me? '나' : ntfName(e)}</option>`; }).join(''); });   /* ㊿+185 포탈 계정 전체 */
   var m=ntfDlg('ovlNtfAsg', 480);
   m.innerHTML=tpl`<h3 id="ovlNtfAsgH">처리 담당 지정 — 신청 #${String(o.id)}</h3>`+
     tpl`<p class="cap">${o.customer||'(고객사 없음)'} · ${o.model||'모델 미정'} ×${String(o.qty||1)} · ${o.status||''} — 신청서의 «고객 담당자»(${o.mgr_name||'없음'})는 그대로 두고, 우리 쪽에서 처리할 사람만 정합니다. 그 사람의 알림함 «나에게»로 갑니다.</p>`+
@@ -319,6 +325,124 @@ export function ntfAssignOpen(x){
   var c=m.querySelector('#naClear'); if(c) c.onclick=function(){ save(''); };
   var mb=m.querySelector('#naMe'); if(mb) mb.onclick=function(){ inp.value=me; save(me); };
   openOvl('ovlNtfAsg'); setTimeout(function(){ try{ inp.focus(); }catch(e){} }, 30);
+}
+
+/* ── ㊿+185 홈 «우선 업무» 줄 담당 — work_assign(kind 'area' · SQL 113) · 담당은 포탈 계정(portal_accounts RPC)에서 고름
+   · 줄: 만기 지난 계약(rnl) · 이달 만기(rnd) · 재약정 대응(exp) · 비즈포탈 차액(biz) · 데이터 점검(dc) — 장비는 신청마다(eq) · OI 는 견적 작성자
+   · 정하기: super_admin · admin · editor 역할(DB work_assign_can 과 같은 기준) · 지정되면 그 사람의 «내 업무» · 알림함 «나에게» · Slack 개인 알림 대상 ── */
+export var AREA_DEFS={rnl:'만기 지난 계약 처리', rnd:'이달 만기 계약 처리', exp:'재약정 대응(만료 전 연락)', biz:'비즈포탈 차액 입력', dc:'데이터 점검 — 바로 고칠 것'};
+export function ntfAreaOf(key){ var a=NTF.area[key]; return a? String(a.assignee||'').toLowerCase() : ''; }
+export function ntfAreaMe(key){ var e=ntfAreaOf(key); return !!e && e===ntfMe(); }
+export function ntfAreaTo(key){ var e=ntfAreaOf(key); return e? [e] : []; }
+export function ntfCanAssignArea(){ return !!ST.SB_TOKEN && NTF.asgOk && (ST.IS_SUPER || ST.MY_ROLE==='admin' || ST.MY_ROLE==='editor'); }
+/** 계정 이메일 → 보이는 이름(견적 담당자 목록에 있으면 그 이름 · 없으면 @ 앞) */
+export function ntfName(e){ var l=String(e||'').toLowerCase().split('@')[0]; return QMGR_MAP[l] || l; }
+/** 포탈 계정 목록 [{email, role}] — SQL 113 portal_accounts(로그인한 사람 누구나) · 한 번 받아 둠 · 없으면 [] */
+export async function ntfAccounts(){
+  if(NTF.accounts) return NTF.accounts;
+  var rows=null; try{ var r=await fetchT(SB_URL+'/rest/v1/rpc/portal_accounts', {method:'POST', headers:sbHeaders(true), body:'{}'}, 15000, '계정 목록', true); rows=r.ok? await r.json() : null; }catch(e){ rows=null; }
+  NTF.accounts=Array.isArray(rows)? rows.filter(function(x){ return x && /^[^@\s]+@[^@\s]+$/.test(String(x.email||'')); }).map(function(x){ return {email:String(x.email).toLowerCase(), role:String(x.role||'')}; }).sort(function(a,b){ return a.email.localeCompare(b.email); }) : [];
+  return NTF.accounts;
+}
+export async function ntfAreaOpen(key){
+  var label=AREA_DEFS[key]; if(!label) return;
+  if(!ntfCanAssignArea()){ toast('지정할 수 없습니다', NTF.asgOk? 'admin · editor 역할이 필요합니다' : 'SQL 113(줄 담당)을 먼저 실행해 주세요', 'info'); return; }
+  var cur=ntfAreaOf(key), me=ntfMe(), m=ntfDlg('ovlNtfArea', 460);
+  m.innerHTML=tpl`<h3 id="ovlNtfAreaH">담당 지정 — ${label}</h3><p class="cap">포탈 계정 중에서 고릅니다. 지정하면 그 사람의 홈 «내 업무» · 알림함 «나에게» · Slack 개인 알림에 들어갑니다.</p>`+
+    tpl`<div class="frm"><div class="full"><label for="arSel">담당</label><select id="arSel"><option value="">불러오는 중…</option></select></div></div>`+
+    tpl`<div class="mact"><span class="mmsg" id="arMsg" role="status"></span>${rawHtml(cur? '<button type="button" class="pill ghost" id="arClear">담당 해제…</button>' : '')}${rawHtml(cur!==me? '<button type="button" class="pill ghost" id="arMe">나로 지정</button>' : '')}<button type="button" class="pill ghost" data-close="ovlNtfArea">닫기</button><button type="button" class="pill" id="arSave">저장…</button></div>`;
+  var msg=m.querySelector('#arMsg'), sel=/** @type {any} */(m.querySelector('#arSel'));
+  openOvl('ovlNtfArea');
+  var acc=await ntfAccounts(), u={}; acc.forEach(function(a){ u[a.email]=a.role; }); if(me) u[me]=u[me]||''; if(cur) u[cur]=u[cur]||'';
+  var ks=Object.keys(u).sort(function(a,b){ return (a===me? 0:1)-(b===me? 0:1) || a.localeCompare(b); });
+  sel.innerHTML=tpl`<option value="">— 고르기 —</option>${rawHtml(ks.map(function(e){ return tpl`<option value="${e}"${rawHtml(e===cur? ' selected':'')}>${ntfName(e)}${e===me? ' (나)' : ''} · ${e}${u[e]? ' · '+u[e] : ''}</option>`; }).join(''))}`;
+  if(!acc.length){ msg.textContent='계정 목록을 받지 못했습니다(SQL 113 portal_accounts) — 나로 지정만 할 수 있습니다'; msg.className='mmsg'; }
+  var save=async function(em){
+    em=String(em||'').trim().toLowerCase();
+    if(em===cur){ msg.textContent='바뀐 것이 없습니다'; msg.className='mmsg'; return; }
+    if(!confirm(label+' — 담당\n전: '+(cur? ntfName(cur)+' ('+cur+')' : '(없음)')+'\n후: '+(em? ntfName(em)+' ('+em+')' : '(없음)')+'\n\n저장할까요? (변경 이력에 남습니다)')) return;
+    try{
+      if(em) await sbWrite('POST', 'work_assign?on_conflict=kind,ref', [{kind:'area', ref:key, assignee:em}], 'resolution=merge-duplicates,return=minimal');
+      else await sbWrite('DELETE', 'work_assign?kind=eq.area&ref=eq.'+encodeURIComponent(key));
+      var ar=Object.assign({}, NTF.area); if(em) ar[key]={kind:'area', ref:key, assignee:em, assigned_by:me, assigned_at:new Date().toISOString()}; else delete ar[key]; NTF.area=ar;
+      logChange(em? 'update' : 'delete', 'work_assign', key, {kind:'area', label:label, assignee:{from:cur||null, to:em||null}, _via:'홈 우선 업무 담당'});
+      closeOvl('ovlNtfArea'); toast(em? '담당을 정했습니다' : '담당을 해제했습니다', label+(em? ' → '+ntfName(em) : ''), 'ok'); ntfSync(); try{ renderTodo(); }catch(e){}
+    }catch(e){ msg.textContent='저장하지 못했습니다 — '+String(/** @type {any} */(e).message||e).slice(0,140); msg.className='mmsg bad'; }
+  };
+  /** @type {any} */(m.querySelector('#arSave')).onclick=function(){ var v=String(sel.value||''); if(!v){ msg.textContent='담당을 고르거나 «담당 해제»를 누르세요'; msg.className='mmsg bad'; return; } save(v); };
+  var c=m.querySelector('#arClear'); if(c) /** @type {any} */(c).onclick=function(){ save(''); };
+  var mb=m.querySelector('#arMe'); if(mb) /** @type {any} */(mb).onclick=function(){ sel.value=me; save(me); };
+  setTimeout(function(){ try{ sel.focus(); }catch(e){} }, 30);
+}
+
+/* ── ㊿+185 개선 요청 — 로그인한 사람 누구나 «포탈 전체» 또는 «특정 화면»을 골라 양식 없이 적어 보냄(portal_feedback · SQL 113)
+   · 진입: 위 띠 💡 버튼 · 계정 메뉴 «개선 요청 보내기» · 슈퍼 관리자는 같은 창에서 받은 요청을 보고 «처리함» · 메모 · 알림함 «개선 요청 새 n건»
+   · 보낸 사람은 자기 것만 봄 · 처리 표시 · 삭제는 슈퍼 관리자만(DB RLS) ── */
+export var FB={ok:null, newN:0, rows:/** @type {any[]} */([]), loaded:false, busy:false};
+export function fbBtn(){
+  var b=document.getElementById('fbBtn');
+  if(!b){ b=document.createElement('button'); b.type='button'; b.id='fbBtn'; b.className='pill ghost ntf-btn fb-btn'; b.hidden=true;
+    b.setAttribute('aria-haspopup','dialog'); b.innerHTML=tpl`${rawHtml(ico('bulb',16))}<span class="sr">개선 요청</span>`; b.title='개선 요청 — 불편한 점 · 틀린 숫자 · 있으면 좋을 기능을 적어 보냅니다';
+    b.setAttribute('aria-label','개선 요청 보내기'); b.onclick=function(e){ e.stopPropagation(); fbOpen(); };
+    var tb=document.querySelector('#app .topbar'); if(tb) tb.appendChild(b); }
+  return b;
+}
+export function fbSync(){ var b=fbBtn(); var show=!!ST.SB_TOKEN && !!ST.DATA; var was=b.hidden; b.hidden=!show; if(was!==b.hidden) try{ placeSearchBtn(); }catch(e){} }
+/** 화면 목록 [{v, label}] — 메뉴에 보이는 화면만(권한 · 숨김 반영) · 그룹 이름을 앞에 */
+export function fbViews(){
+  var out=[]; try{ menuSegments().forEach(function(s){
+    if(s.grp){ (s.buttons||[]).forEach(function(b){ if(visBtn(b)) out.push({v:b.dataset.v, label:s.label+' › '+navText(b)}); }); }
+    else if(s.btn && visBtn(s.btn)) out.push({v:s.btn.dataset.v, label:navText(s.btn)}); }); }catch(e){}
+  return out;
+}
+export async function fbLoad(force){
+  if(!ST.SB_TOKEN) return;
+  if(FB.loaded && !force) return;
+  var rows=await ntfGet('portal_feedback?select=id,view,menu,content,status,note,created_by,created_at,done_by,done_at&order=id.desc&limit=300'+(ST.IS_SUPER? '' : '&created_by=eq.'+encodeURIComponent(ntfMe())));   /* 내 것만(DB RLS 도 같은 기준) */
+  FB.ok=rows!==null; FB.rows=rows||[]; FB.loaded=true; FB.newN=FB.rows.filter(function(x){ return x.status==='new'; }).length;
+}
+export function fbOpen(opt){
+  opt=opt||{};
+  if(!ST.SB_TOKEN){ toast('로그인이 필요합니다','', 'info'); return; }
+  var m=ntfDlg('ovlFb', 620), views=fbViews(), cur=ST.CUR_VIEW && ST.CUR_VIEW!=='dash'? ST.CUR_VIEW : '';
+  var curOk=views.some(function(x){ return x.v===cur; });
+  m.innerHTML=tpl`<h3 id="ovlFbH">${rawHtml(ico('bulb',18))} 개선 요청</h3><p class="cap">불편한 점 · 틀린 숫자 · 있으면 좋을 기능을 양식 없이 적어 주세요. 특정 화면 이야기면 그 화면을 고르면 됩니다. 보낸 글은 관리자가 확인합니다.</p>`+
+    tpl`<div class="frm"><div class="full"><label for="fbMenu">어느 화면?</label><select id="fbMenu"><option value="">포탈 전체 — 특정 화면 아님</option>${rawHtml(views.map(function(x){ return tpl`<option value="${x.v}"${rawHtml(x.v===cur && curOk? ' selected':'')}>${x.label}</option>`; }).join(''))}</select></div>`+
+    tpl`<div class="full"><label for="fbText">내용</label><textarea id="fbText" rows="5" maxlength="4000" placeholder="예) 계약 상세에서 종료월이 안 보여요 · OI 목록에 견적 금액도 같이 나오면 좋겠어요 · 홈 숫자가 시트와 달라요"></textarea></div></div>`+
+    tpl`<div class="mact"><span class="mmsg" id="fbMsg" role="status"></span><button type="button" class="pill ghost" data-close="ovlFb">닫기</button><button type="button" class="pill pri" id="fbSend">보내기</button></div>`+
+    tpl`<div id="fbList" class="fb-list"></div>`;
+  var msg=m.querySelector('#fbMsg'), ta=/** @type {any} */(m.querySelector('#fbText')), sel=/** @type {any} */(m.querySelector('#fbMenu'));
+  /** @type {any} */(m.querySelector('#fbSend')).onclick=async function(){
+    var text=String(ta.value||'').trim(); if(!text){ msg.textContent='내용을 적어 주세요'; msg.className='mmsg bad'; ta.focus(); return; }
+    if(FB.busy) return; FB.busy=true; msg.textContent='보내는 중…'; msg.className='mmsg';
+    var v=String(sel.value||''), lab=v? (views.filter(function(x){ return x.v===v; })[0]||{}).label||v : '';
+    try{
+      await sbWrite('POST','portal_feedback',[{view:v||null, menu:lab||null, content:text, status:'new', created_by:ntfMe()||null, page:{ver:APP_VER, hash:String(location.hash||''), w:window.innerWidth}}],'return=minimal');   /* created_by 는 DB 트리거가 로그인 계정으로 다시 씀 */
+      FB.loaded=false; closeOvl('ovlFb'); toast('개선 요청을 보냈습니다', (lab? lab+' · ' : '')+text.slice(0,40)+(text.length>40? '…':''), 'ok');
+      if(ST.IS_SUPER){ await fbLoad(true); ntfSync(); }
+    }catch(e){ var em=String(/** @type {any} */(e).message||e); msg.textContent=/PGRST205|does not exist|404/.test(em)? 'SQL 113(portal_feedback)을 먼저 실행해야 보낼 수 있습니다' : '보내지 못했습니다 — '+em.slice(0,140); msg.className='mmsg bad'; }
+    FB.busy=false;
+  };
+  openOvl('ovlFb'); setTimeout(function(){ try{ (opt.list? m.querySelector('#fbList') : ta).focus(); }catch(e){} }, 30);
+  fbLoad(!!opt.reload).then(function(){ fbListPaint(); if(opt.list){ var l=m.querySelector('#fbList'); if(l) try{ l.scrollIntoView({block:'start'}); }catch(e){} } });
+}
+/** 받은 요청(슈퍼 관리자: 전부 · 그 밖: 내가 보낸 것) — «처리함» 토글 · 메모 */
+export function fbListPaint(){
+  var host=document.getElementById('fbList'); if(!host) return;
+  if(FB.ok===false){ host.innerHTML=''; return; }
+  var rows=FB.rows, me=ntfMe();
+  if(!rows.length){ host.innerHTML=tpl`<p class="mini fb-empty">${ST.IS_SUPER? '아직 받은 요청이 없습니다' : '내가 보낸 요청이 아직 없습니다'}</p>`; return; }
+  var open=rows.filter(function(x){ return x.status!=='done'; }), done=rows.filter(function(x){ return x.status==='done'; });
+  function row(x){ var who=String(x.created_by||'').split('@')[0];
+    return tpl`<li class="fb-it${rawHtml(x.status==='done'? ' done':'')}" data-id="${String(x.id)}"><div class="fb-h"><b>${x.menu||'포탈 전체'}</b><span class="mini">${ntfName(x.created_by)||who} · ${String(x.created_at||'').slice(0,10)}${rawHtml(x.status==='done'? ' · 처리함'+(x.done_by? ' ('+esc(ntfName(x.done_by))+')' : '') : '')}</span>`+
+      tpl`${rawHtml(ST.IS_SUPER? tpl`<span class="fb-a"><button type="button" class="cbtn" data-fbdone="${String(x.id)}">${x.status==='done'? '다시 열기' : '처리함'}</button><button type="button" class="cbtn" data-fbnote="${String(x.id)}" title="관리자 메모">메모</button></span>` : '')}</div>`+
+      tpl`<div class="fb-c">${x.content}</div>${rawHtml(x.note? tpl`<div class="fb-n mini">메모: ${x.note}</div>` : '')}</li>`; }
+  host.innerHTML=tpl`<h4 class="fb-t">${ST.IS_SUPER? '받은 요청' : '내가 보낸 요청'} <span class="ctag">${String(open.length)}건 열림${rawHtml(done.length? ' · '+done.length+'건 처리' : '')}</span></h4><ul class="fb-ul">${rawHtml(open.concat(done).slice(0,100).map(row).join(''))}</ul>`;
+  host.querySelectorAll('[data-fbdone]').forEach(function(b){ /** @type {any} */(b).onclick=async function(){ var id=+/** @type {any} */(b).dataset.fbdone, x=rows.filter(function(y){ return y.id===id; })[0]; if(!x) return; var to=x.status==='done'? 'new' : 'done';
+    try{ await sbWrite('PATCH','portal_feedback?id=eq.'+id, to==='done'? {status:'done', done_by:me, done_at:new Date().toISOString()} : {status:'new', done_by:null, done_at:null}, 'return=minimal'); x.status=to; if(to==='done'){ x.done_by=me; } FB.newN=rows.filter(function(y){ return y.status==='new'; }).length; fbListPaint(); ntfSync(); }
+    catch(e){ toast('저장 실패', String(/** @type {any} */(e).message||e).slice(0,120), 'bad'); } }; });
+  host.querySelectorAll('[data-fbnote]').forEach(function(b){ /** @type {any} */(b).onclick=async function(){ var id=+/** @type {any} */(b).dataset.fbnote, x=rows.filter(function(y){ return y.id===id; })[0]; if(!x) return; var n=prompt('관리자 메모 (요청한 사람에게도 보입니다)', x.note||''); if(n==null) return;
+    try{ await sbWrite('PATCH','portal_feedback?id=eq.'+id, {note:n.trim()||null}, 'return=minimal'); x.note=n.trim()||null; fbListPaint(); }catch(e){ toast('저장 실패', String(/** @type {any} */(e).message||e).slice(0,120), 'bad'); } }; });
 }
 
 /* ── 관리자 › 설정 › 알림 · Slack (슈퍼 관리자) ── */
