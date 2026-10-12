@@ -85,3 +85,13 @@ textarea.paste{width:100%;min-height:110px;border:1px solid #ccd2d8;border-radiu
 /* ㊿+176 월 마감 · 발행 잠금 · 이력 */
 .cls-lock{font-size:11px;color:#8a5200;background:#fff4d6;border:1px solid #e3c06b;border-radius:6px;padding:1px 6px;margin-left:6px}
 .setmon .rowbtn{margin-left:4px}
+
+/* ㊿+188 포탈(지니언스) 안에 들어갔을 때(html[data-embed="gn"] · sat/common.js) — 포탈과 같은 초록 · 진한 선택 탭 · 모서리 · 여백(바깥 카드가 이미 여백을 줌) */
+html[data-embed="gn"]{--gg:#3F7A0C;--bd:rgba(28,30,32,.12);--bg:#fff}
+html[data-embed="gn"] body{padding:4px 2px 12px}
+html[data-embed="gn"] .card{border-radius:14px}
+html[data-embed="gn"] .tab{border-radius:8px;font-size:13px;padding:8px 14px}
+html[data-embed="gn"] .tab.on{background:#1C1E20;border-color:#1C1E20}
+html[data-embed="gn"] .btn{border-radius:8px}
+html[data-embed="gn"] .btn.green{background:#1C1E20}
+html[data-embed="gn"] input[type=month],html[data-embed="gn"] input[type=text],html[data-embed="gn"] input[type=number],html[data-embed="gn"] select{border-radius:8px}

@@ -103,19 +103,19 @@ export function looksQuestion(v){
   if(/[?？]$/.test(v)) return true;
   return /\s/.test(v) && /(알려|보여|어때|얼마|몇\s?(곳|건|개|명)|누구|무엇|뭐야|왜|어떻게|할까|해줘|해 줘|정리|요약|비교|추이|변화|늘었|줄었|있어|없어|인가|일까|이야)/.test(v);
 }
-/** 검색 결과 — [{t, nm, sb, go, exact, k}] · 순서: 정확히 같은 것 → 고객 360 → 화면 → 개별 기록 → (맨 끝) AI 에 질문 */
+/** 검색 결과 — [{t, nm, sb, go, exact, k}] · 순서: 정확히 같은 것 → 고객 한눈에 → 화면 → 개별 기록 → (맨 끝) AI 에 질문 */
 export function srchHits(q){
   var qn=fkNorm(q), hits=[]; if(!qn) return hits;
   var menus=srchMenus(q), src=fkSources(), cust={}, exact=[], recs=[], seen={};
   src.forEach(function(s){ if(s.cust && fkNorm(s.cust).indexOf(qn)>=0){ var c=cust[s.cust]=cust[s.cust]||{n:0, ex:fkNorm(s.cust)===qn}; c.n++; } });
-  Object.keys(cust).forEach(function(c){ if(cust[c].ex) exact.push({t:'고객 360', nm:c, sb:'계약 · LIVE · OI · 장비 한눈에', go:function(){ openCust360(c); }, exact:true, k:'c360'}); });
+  Object.keys(cust).forEach(function(c){ if(cust[c].ex) exact.push({t:'고객 한눈에', nm:c, sb:'계약 · LIVE · OI · 장비 한눈에', go:function(){ openCust360(c); }, exact:true, k:'c360'}); });
   src.forEach(function(s){ if(s.t==='장비' && fkNorm(s.nm)===qn) exact.push({t:'장비 시리얼', nm:s.nm, sb:s.sb, go:s.go, exact:true, k:'sn'}); });
   menus.filter(function(m){ return m.exact; }).forEach(function(m){ exact.push(m); });
   hits=hits.concat(exact);
   /* 정확히 같은 것 다음: 이름이 그 글자로 «시작»하는 고객 → 시작하는 화면 → 중간에 들어 있는 고객 → 나머지 화면 (예: «OI» = OI 현황 화면이 «검증_OI» 고객보다 먼저) */
   var cp=function(c){ return fkNorm(c).indexOf(qn)===0; };
   var cs=Object.keys(cust).filter(function(c){ return !cust[c].ex; }).sort(function(a,b){ return fkNorm(a).indexOf(qn)-fkNorm(b).indexOf(qn) || a.length-b.length; }).slice(0,4);
-  var cH=function(c){ return {t:'고객 360', nm:c, sb:'계약 · LIVE · OI · 장비 한눈에', go:function(){ openCust360(c); }, k:'c360'}; };
+  var cH=function(c){ return {t:'고객 한눈에', nm:c, sb:'계약 · LIVE · OI · 장비 한눈에', go:function(){ openCust360(c); }, k:'c360'}; };
   var ms=menus.filter(function(m){ return !m.exact; }).slice(0,3);
   cs.filter(cp).forEach(function(c){ hits.push(cH(c)); });
   ms.filter(function(m){ return m.pre; }).forEach(function(m){ hits.push(m); });
@@ -124,7 +124,7 @@ export function srchHits(q){
   var shown={}; hits.forEach(function(h){ if(h.k==='c360') shown[h.nm]=1; });
   if(qn.length>=2) src.forEach(function(s){
     if(recs.length>=5) return;
-    if(s.cust && shown[s.cust] && (s.t==='계약' || s.t==='LIVE' || s.t==='임대신청')) return;   /* 고객 360 에 있는 고객사의 계약 · LIVE 줄은 빼고 */
+    if(s.cust && shown[s.cust] && (s.t==='계약' || s.t==='LIVE' || s.t==='임대신청')) return;   /* 고객 한눈에 에 있는 고객사의 계약 · LIVE 줄은 빼고 */
     if(fkNorm(s.nm).indexOf(qn)<0 && fkNorm(s.sb).indexOf(qn)<0) return;
     if(s.t==='장비' && fkNorm(s.nm)===qn) return;
     var key=s.t+'|'+s.nm+'|'+s.sb; if(seen[key]) return; seen[key]=1; recs.push({t:s.t, nm:s.nm, sb:s.sb, go:s.go, k:'rec'});
@@ -137,21 +137,21 @@ export function srchHits(q){
 export function srchEmpty(){
   var out=[], seen={};
   if(HOME.custHint){
-    rcCusts().slice(0,4).forEach(function(c){ if(seen['c'+c]) return; seen['c'+c]=1; out.push({t:'최근 본 고객', nm:c, sb:'고객 360', go:function(){ openCust360(c); }, k:'c360', grp:'고객사 — 이름 일부를 적고 Enter'}); });
-    topCusts(6).forEach(function(c){ if(seen['c'+c.c] || out.length>=7) return; seen['c'+c.c]=1; out.push({t:'월 매출 상위', nm:c.c, sb:won(c.v)+'천원 · 고객 360', go:function(){ openCust360(c.c); }, k:'c360', grp:'고객사 — 이름 일부를 적고 Enter'}); });
+    rcCusts().slice(0,4).forEach(function(c){ if(seen['c'+c]) return; seen['c'+c]=1; out.push({t:'최근 본 고객', nm:c, sb:'고객 한눈에', go:function(){ openCust360(c); }, k:'c360', grp:'고객사 — 이름 일부를 적고 Enter'}); });
+    topCusts(6).forEach(function(c){ if(seen['c'+c.c] || out.length>=7) return; seen['c'+c.c]=1; out.push({t:'월 매출 상위', nm:c.c, sb:won(c.v)+'천원 · 고객 한눈에', go:function(){ openCust360(c.c); }, k:'c360', grp:'고객사 — 이름 일부를 적고 Enter'}); });
     return out;
   }
   var rc=rcCusts().slice(0,4);
-  rc.forEach(function(c){ out.push({t:'고객 360', nm:c, sb:'최근 본 고객', go:function(){ openCust360(c); }, k:'c360', grp:'최근 본 고객'}); });
+  rc.forEach(function(c){ out.push({t:'고객 한눈에', nm:c, sb:'최근 본 고객', go:function(){ openCust360(c); }, k:'c360', grp:'최근 본 고객'}); });
   /* 처음 쓰는 브라우저(최근 기록 없음)에도 같은 모양 — 월 매출 상위 고객 · 기본 바로가기 화면 */
-  if(!rc.length) topCusts(3).forEach(function(c){ out.push({t:'고객 360', nm:c.c, sb:'월 매출 상위 · '+won(c.v)+'천원', go:function(){ openCust360(c.c); }, k:'c360', grp:'주요 고객 — 이름 일부를 적고 Enter'}); });
+  if(!rc.length) topCusts(3).forEach(function(c){ out.push({t:'고객 한눈에', nm:c.c, sb:'월 매출 상위 · '+won(c.v)+'천원', go:function(){ openCust360(c.c); }, k:'c360', grp:'주요 고객 — 이름 일부를 적고 Enter'}); });
   var rec=[]; try{ rec=JSON.parse(localStorage.getItem(recentKey())||'[]')||[]; }catch(e){}
   var vs=[]; freqTop(5).concat(rec).concat(HOME_QUICK.map(function(x){ return x[0]; })).forEach(function(v){ if(vs.indexOf(v)<0 && v!==ST.CUR_VIEW && v.charAt(0)!=='@' && document.querySelector('#side button[data-v="'+v+'"]') && visBtn(/** @type {any} */(document.querySelector('#side button[data-v="'+v+'"]')))) vs.push(v); });
   vs.slice(0,5).forEach(function(v){ out.push({t:'화면', nm:viewLabel(v), sb:'자주 · 최근 연 화면', go:function(){ navMenu(v); }, k:'menu', grp:'자주 쓰는 화면'}); });
   (ST.HIST||[]).slice().reverse().forEach(function(h){ var t=String(h.q||'').split('\n')[0]; if(!t || seen['q'+t] || out.filter(function(x){ return x.k==='ask'; }).length>=3) return; seen['q'+t]=1; out.push({t:'AI 질문', nm:t, sb:'다시 물어보기', k:'ask', grp:'최근 질문'}); });
   return out;
 }
-/** 최근 연 고객 360 (이 브라우저 · 계정별) */
+/** 최근 연 고객 한눈에 (이 브라우저 · 계정별) */
 export function rcKey(){ return 'svc_rc360_'+(ST.AUTH_USER||'anon'); }
 export function rcCusts(){ try{ return JSON.parse(localStorage.getItem(rcKey())||'[]')||[]; }catch(e){ return []; } }
 export function rcPush(c){ if(!c) return; try{ var a=rcCusts().filter(function(x){ return x!==c; }); a.unshift(c); localStorage.setItem(rcKey(), JSON.stringify(a.slice(0,8))); }catch(e){} }
@@ -441,7 +441,7 @@ export function ansStateSet(kind, html){
 /** AI · 규칙형 답의 원본 보기 · 기준 (ai.js 가 부름) — p: 규칙형 해석 결과(있으면) · 보던 화면 조건은 «참고로 보냄»(적용 여부는 AI 답으로 확인) + 화면의 같은 조건 결과(행 수 · 합계)를 대조용으로 */
 export function homeMetaAI(q, r, p, opt){
   var C=opt && opt.ctx, src=[], custs=p && (p.custs && p.custs.length? p.custs : (p.cust? [p.cust] : [])) || [];
-  custs.slice(0,2).forEach(function(c){ src.push({l:'고객 360 — '+c, go:function(){ openCust360(c); }}); });
+  custs.slice(0,2).forEach(function(c){ src.push({l:'고객 한눈에 — '+c, go:function(){ openCust360(c); }}); });
   if(p) src.push({l:'계약 목록에서 확인', go:function(){ switchView('contracts'); var s=/** @type {any} */(document.getElementById('dvSearch')); if(s && custs.length===1){ s.value=custs[0]; try{ s.dispatchEvent(new Event('input')); }catch(e){} } }});
   if(C && C.v && C.v!=='dash' && ST.CUR_VIEW!==C.v) src.push({l:'보던 화면으로 — '+C.label, go:function(){ navMenu(C.v); }});
   ansBtns(document.getElementById('ansSrcB'), src);
@@ -503,7 +503,7 @@ export var HOME_QUICK=[['contracts','계약','doc'],['@cust','고객 검색','se
 export function homeQuick(){
   var host=homeHost('gnQuick', 'gn-quick', 'nav'); if(!host) return; host.setAttribute('aria-label','바로가기');
   var its=HOME_QUICK.filter(function(x){ if(x[0]==='@cust') return true; var b=document.querySelector('#side button[data-v="'+x[0]+'"]'); return !!b && visBtn(/** @type {any} */(b)); });
-  host.innerHTML=its.map(function(x){ var full=x[0]==='@cust'? '고객사 이름으로 고객 360 찾기' : (function(){ var b=document.querySelector('#side button[data-v="'+x[0]+'"]'); return b? navText(b) : x[1]; })();
+  host.innerHTML=its.map(function(x){ var full=x[0]==='@cust'? '고객사 이름으로 고객 한눈에 찾기' : (function(){ var b=document.querySelector('#side button[data-v="'+x[0]+'"]'); return b? navText(b) : x[1]; })();
     return tpl`<button type="button" data-q="${x[0]}" title="${full}${x[0]==='@cust'? '' : ' — 마지막 작업 상태로'}">${rawHtml(ico(x[2],16))}<span>${x[1]}</span></button>`; }).join('');
   host.querySelectorAll('button').forEach(function(b){ /** @type {any} */(b).onclick=function(){ var v=/** @type {any} */(b).dataset.q; if(v==='@cust') homeFindCust(); else navMenu(v); }; });
 }
@@ -544,7 +544,7 @@ export function homeRecentRow(){
   var host=homeHost('gnRecent', 'gn-recent', 'section'); if(!host) return; host.setAttribute('aria-label','최근 본 고객 · 최근 작업');
   var cs=rcCusts().slice(0,6), rec=[]; try{ rec=JSON.parse(localStorage.getItem(recentKey())||'[]')||[]; }catch(e){}
   rec=rec.filter(function(v){ return !!document.querySelector('#side button[data-v="'+v+'"]'); }).slice(0,6);
-  host.innerHTML=tpl`<div class="gr-l"><b>최근 본 고객</b>${rawHtml(cs.length? cs.map(function(c){ return tpl`<button type="button" class="chip" data-c="${c}">${c}</button>`; }).join('') : '<span class="cap">고객 360 을 열면 여기에 남습니다</span>')}</div>`+
+  host.innerHTML=tpl`<div class="gr-l"><b>최근 본 고객</b>${rawHtml(cs.length? cs.map(function(c){ return tpl`<button type="button" class="chip" data-c="${c}">${c}</button>`; }).join('') : '<span class="cap">고객 한눈에 을 열면 여기에 남습니다</span>')}</div>`+
     tpl`<div class="gr-l"><b>최근 작업</b>${rawHtml(rec.length? rec.map(function(v){ return tpl`<button type="button" class="chip" data-go="${v}">${viewLabel(v)}</button>`; }).join('') : '<span class="cap">메뉴를 열면 여기에 남습니다(다시 열면 마지막 상태)</span>')}</div>`;
   host.querySelectorAll('[data-c]').forEach(function(b){ /** @type {any} */(b).onclick=function(){ openCust360(/** @type {any} */(b).dataset.c); }; });
   host.querySelectorAll('[data-go]').forEach(function(b){ /** @type {any} */(b).onclick=function(){ navMenu(/** @type {any} */(b).dataset.go); }; });
@@ -707,7 +707,7 @@ export function liMrr(){
   rows.push({c:['합계', won(N.m0), won(N.m1), sgn(d)], tot:1});
   return {core:core, extra:ex, table:{cols:['서비스', mk(b), mk(b-1), '증감'], n:[1,2,3], rows:rows, cap:'서비스별 월 인식 매출(천원)'},
     src:[{l:'홈 매출 추이', stay:0, go:function(){ if(ST.CUR_VIEW!=='dash') switchView('dash'); var t=document.getElementById('gnTrend'); if(t) try{ t.scrollIntoView({behavior:'smooth', block:'center'}); }catch(e){} }}, {l:'사업 현황 상세(월별 장표)', go:function(){ homeBiz(); }}, {l:'계약 목록', go:function(){ navMenu('contracts'); }}],
-    next:up.concat(dn).slice(0,2).map(function(x){ return {l:'고객 360 — '+x.c, go:function(){ openCust360(x.c); }}; }),
+    next:up.concat(dn).slice(0,2).map(function(x){ return {l:'고객 한눈에 — '+x.c, go:function(){ openCust360(x.c); }}; }),
     follow:['최근 6개월 추이 보여줘','제일 큰 고객 누구야?'], meta:meta};
 }
 /** «재약정 대응할 고객» — 홈 «재약정 대응 필요»와 같은 행 */
@@ -724,9 +724,9 @@ export function liRenew(){
     return {c:[r.cust, lline(r.line), mk(r.endIdx), won(ST.MAT[k][Math.min(r.endIdx, ST.M-1)]||r.mrr||0), nt.join(' · ')||'후속 계약 없음']}; });
   var go=RN.rows.slice(0,8).map(function(k){ var c=ST.DATA.rows[k].cust; return function(){ openCust360(c); }; });
   var first=RN.rows.length? ST.DATA.rows[RN.rows[0]].cust : '';
-  var next=[]; if(first) next.push({l:'고객 360 — '+first, go:function(){ openCust360(first); }});
+  var next=[]; if(first) next.push({l:'고객 한눈에 — '+first, go:function(){ openCust360(first); }});
   next.push({l:'만기 처리 창 열기', go:function(){ openRenewList('due'); }});
-  return {core:core, table:{cols:['고객사','서비스','종료월','월 금액','확인할 것'], n:[3], rows:rows, go:go, cap:RN.rows.length>8? '종료가 가까운 8건 — 전체 '+RN.rows.length+'건은 «목록으로 보기»' : '고객사를 누르면 고객 360'},
+  return {core:core, table:{cols:['고객사','서비스','종료월','월 금액','확인할 것'], n:[3], rows:rows, go:go, cap:RN.rows.length>8? '종료가 가까운 8건 — 전체 '+RN.rows.length+'건은 «목록으로 보기»' : '고객사를 누르면 고객 한눈에'},
     src:[{l:'목록으로 보기 ('+RN.rows.length+'건)', pri:1, go:function(){ kpiOpen('expNeed', {home:1}); }}], next:next, meta:meta};
 }
 /** «이 목록 요약» — 보던 표의 실제 조건으로 포탈이 계산(현재 목록 기준이라고 말할 수 있는 유일한 답) */

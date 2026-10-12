@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <!-- CSP (80점 프로젝트 ② 보안): GitHub Pages 는 응답 헤더를 못 넣으므로 meta 로. ㊿+136 부터 인라인 스크립트·onclick 이 없어 script-src 에 'unsafe-inline' 없음(스타일은 인라인 style 속성 때문에 유지) · ㊿+147 부터 'unsafe-eval' 도 없음(SQL 엔진 alasql 은 격리 칸 sqlbox.html 에서만 돌림) — 스크립트·연결 호스트를 목록으로 제한(XSS 시 외부 유출 차단). Worker 주소나 GAS 주소가 바뀌면 여기도 수정. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-ZOOInNKG1dA8rWKcemiyGmy8aQkI/8rEI86h5ttOTNw=' blob: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' data: https://cdn.jsdelivr.net; img-src 'self' data: blob: https://amzbrdhkvzsyxjfjtugu.supabase.co; connect-src 'self' https://amzbrdhkvzsyxjfjtugu.supabase.co https://open.er-api.com https://api.frankfurter.app https://script.google.com/macros/s/AKfycbz0PDzgvgtM0ZZHEfMwEzPpgoPYidD6ElPx3oTGsgnVuveCnVA9PmYPB4WAPfr9a6DY/ https://script.googleusercontent.com https://aged-union-cdd3.choihw.workers.dev https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; worker-src 'self' blob:; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-U/jc/wl0JtAbAHOo5VQUKvdoQrubH1alsmuq/s8ZBJA=' blob: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' data: https://cdn.jsdelivr.net; img-src 'self' data: blob: https://amzbrdhkvzsyxjfjtugu.supabase.co; connect-src 'self' https://amzbrdhkvzsyxjfjtugu.supabase.co https://open.er-api.com https://api.frankfurter.app https://script.google.com/macros/s/AKfycbz0PDzgvgtM0ZZHEfMwEzPpgoPYidD6ElPx3oTGsgnVuveCnVA9PmYPB4WAPfr9a6DY/ https://script.googleusercontent.com https://aged-union-cdd3.choihw.workers.dev https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; worker-src 'self' blob:; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
 <title>서비스사업부 통합 관리 포탈</title>
 <!-- PWA: 홈 화면 앱 (manifest.webmanifest · sw.js · pwa-*.png · apple-touch-icon.png 를 같은 폴더에) -->
 <link rel="manifest" href="manifest.webmanifest">
@@ -20,35 +20,35 @@
      코드 파일 목록은 app-js (ES 모듈 · ㊿+153) — 파일을 더하거나 빼면 여기와 sw.js 의 SHELL 을 함께 고치고 node tests/stamp.mjs 로 아래 stamp 묶음을 다시 만들 것.
      시작점은 js/main.js 하나(나머지는 import 로 따라옴) · 리포트·관리자·가격표는 처음 열 때(js/lazy.js).
      ④ 아키텍처 2단계(㊿+136): 인라인 스크립트·onclick 을 전부 없애 CSP script-src 에서 'unsafe-inline' 제거 · 인라인은 importmap 하나뿐이고 CSP 해시로 허용. -->
-<meta name="app-ver" content="2026-09-16 ㊿+185">
+<meta name="app-ver" content="2026-09-16 ㊿+189">
 <meta name="app-js" content="js/state.js,js/viz.js,js/core.js,js/shell.js,js/dash.js,js/ai.js,js/home.js,js/notify.js,js/guard.js,js/grids.js,js/equipment.js,js/analysis.js,js/tools.js,js/cloud.js,js/price.js,js/inbound.js,js/upd.js,js/admin.js,js/sales.js,js/report.js,js/grid.js,js/edit.js,js/qadb.js,js/qadata.js,js/lazy.js,js/init.js,js/main.js">
 <!-- stamp:begin — tests/stamp.mjs 가 app-ver · app-js 로 만든 부분(손으로 고치지 말 것 · 버전을 올린 뒤 다시 실행 · tests/check.mjs 가 확인) -->
-<link rel="stylesheet" href="app.css?v=2026-09-16%20%E3%8A%BF%2B185">
-<script type="importmap">{"imports":{"./js/state.js":"./js/state.js?v=2026-09-16%20%E3%8A%BF%2B185","./js/viz.js":"./js/viz.js?v=2026-09-16%20%E3%8A%BF%2B185","./js/core.js":"./js/core.js?v=2026-09-16%20%E3%8A%BF%2B185","./js/shell.js":"./js/shell.js?v=2026-09-16%20%E3%8A%BF%2B185","./js/dash.js":"./js/dash.js?v=2026-09-16%20%E3%8A%BF%2B185","./js/ai.js":"./js/ai.js?v=2026-09-16%20%E3%8A%BF%2B185","./js/home.js":"./js/home.js?v=2026-09-16%20%E3%8A%BF%2B185","./js/notify.js":"./js/notify.js?v=2026-09-16%20%E3%8A%BF%2B185","./js/guard.js":"./js/guard.js?v=2026-09-16%20%E3%8A%BF%2B185","./js/grids.js":"./js/grids.js?v=2026-09-16%20%E3%8A%BF%2B185","./js/equipment.js":"./js/equipment.js?v=2026-09-16%20%E3%8A%BF%2B185","./js/analysis.js":"./js/analysis.js?v=2026-09-16%20%E3%8A%BF%2B185","./js/tools.js":"./js/tools.js?v=2026-09-16%20%E3%8A%BF%2B185","./js/cloud.js":"./js/cloud.js?v=2026-09-16%20%E3%8A%BF%2B185","./js/price.js":"./js/price.js?v=2026-09-16%20%E3%8A%BF%2B185","./js/inbound.js":"./js/inbound.js?v=2026-09-16%20%E3%8A%BF%2B185","./js/upd.js":"./js/upd.js?v=2026-09-16%20%E3%8A%BF%2B185","./js/admin.js":"./js/admin.js?v=2026-09-16%20%E3%8A%BF%2B185","./js/sales.js":"./js/sales.js?v=2026-09-16%20%E3%8A%BF%2B185","./js/report.js":"./js/report.js?v=2026-09-16%20%E3%8A%BF%2B185","./js/grid.js":"./js/grid.js?v=2026-09-16%20%E3%8A%BF%2B185","./js/edit.js":"./js/edit.js?v=2026-09-16%20%E3%8A%BF%2B185","./js/qadb.js":"./js/qadb.js?v=2026-09-16%20%E3%8A%BF%2B185","./js/qadata.js":"./js/qadata.js?v=2026-09-16%20%E3%8A%BF%2B185","./js/lazy.js":"./js/lazy.js?v=2026-09-16%20%E3%8A%BF%2B185","./js/init.js":"./js/init.js?v=2026-09-16%20%E3%8A%BF%2B185"}}</script>
-<link rel="modulepreload" href="js/state.js?v=2026-09-16%20%E3%8A%BF%2B185">
-<link rel="modulepreload" href="js/viz.js?v=2026-09-16%20%E3%8A%BF%2B185">
-<link rel="modulepreload" href="js/core.js?v=2026-09-16%20%E3%8A%BF%2B185">
-<link rel="modulepreload" href="js/shell.js?v=2026-09-16%20%E3%8A%BF%2B185">
-<link rel="modulepreload" href="js/dash.js?v=2026-09-16%20%E3%8A%BF%2B185">
-<link rel="modulepreload" href="js/ai.js?v=2026-09-16%20%E3%8A%BF%2B185">
-<link rel="modulepreload" href="js/home.js?v=2026-09-16%20%E3%8A%BF%2B185">
-<link rel="modulepreload" href="js/notify.js?v=2026-09-16%20%E3%8A%BF%2B185">
-<link rel="modulepreload" href="js/guard.js?v=2026-09-16%20%E3%8A%BF%2B185">
-<link rel="modulepreload" href="js/grids.js?v=2026-09-16%20%E3%8A%BF%2B185">
-<link rel="modulepreload" href="js/equipment.js?v=2026-09-16%20%E3%8A%BF%2B185">
-<link rel="modulepreload" href="js/analysis.js?v=2026-09-16%20%E3%8A%BF%2B185">
-<link rel="modulepreload" href="js/tools.js?v=2026-09-16%20%E3%8A%BF%2B185">
-<link rel="modulepreload" href="js/cloud.js?v=2026-09-16%20%E3%8A%BF%2B185">
-<link rel="modulepreload" href="js/inbound.js?v=2026-09-16%20%E3%8A%BF%2B185">
-<link rel="modulepreload" href="js/upd.js?v=2026-09-16%20%E3%8A%BF%2B185">
-<link rel="modulepreload" href="js/sales.js?v=2026-09-16%20%E3%8A%BF%2B185">
-<link rel="modulepreload" href="js/grid.js?v=2026-09-16%20%E3%8A%BF%2B185">
-<link rel="modulepreload" href="js/edit.js?v=2026-09-16%20%E3%8A%BF%2B185">
-<link rel="modulepreload" href="js/qadb.js?v=2026-09-16%20%E3%8A%BF%2B185">
-<link rel="modulepreload" href="js/qadata.js?v=2026-09-16%20%E3%8A%BF%2B185">
-<link rel="modulepreload" href="js/lazy.js?v=2026-09-16%20%E3%8A%BF%2B185">
-<link rel="modulepreload" href="js/init.js?v=2026-09-16%20%E3%8A%BF%2B185">
-<script type="module" src="js/main.js?v=2026-09-16%20%E3%8A%BF%2B185"></script>
+<link rel="stylesheet" href="app.css?v=2026-09-16%20%E3%8A%BF%2B189">
+<script type="importmap">{"imports":{"./js/state.js":"./js/state.js?v=2026-09-16%20%E3%8A%BF%2B189","./js/viz.js":"./js/viz.js?v=2026-09-16%20%E3%8A%BF%2B189","./js/core.js":"./js/core.js?v=2026-09-16%20%E3%8A%BF%2B189","./js/shell.js":"./js/shell.js?v=2026-09-16%20%E3%8A%BF%2B189","./js/dash.js":"./js/dash.js?v=2026-09-16%20%E3%8A%BF%2B189","./js/ai.js":"./js/ai.js?v=2026-09-16%20%E3%8A%BF%2B189","./js/home.js":"./js/home.js?v=2026-09-16%20%E3%8A%BF%2B189","./js/notify.js":"./js/notify.js?v=2026-09-16%20%E3%8A%BF%2B189","./js/guard.js":"./js/guard.js?v=2026-09-16%20%E3%8A%BF%2B189","./js/grids.js":"./js/grids.js?v=2026-09-16%20%E3%8A%BF%2B189","./js/equipment.js":"./js/equipment.js?v=2026-09-16%20%E3%8A%BF%2B189","./js/analysis.js":"./js/analysis.js?v=2026-09-16%20%E3%8A%BF%2B189","./js/tools.js":"./js/tools.js?v=2026-09-16%20%E3%8A%BF%2B189","./js/cloud.js":"./js/cloud.js?v=2026-09-16%20%E3%8A%BF%2B189","./js/price.js":"./js/price.js?v=2026-09-16%20%E3%8A%BF%2B189","./js/inbound.js":"./js/inbound.js?v=2026-09-16%20%E3%8A%BF%2B189","./js/upd.js":"./js/upd.js?v=2026-09-16%20%E3%8A%BF%2B189","./js/admin.js":"./js/admin.js?v=2026-09-16%20%E3%8A%BF%2B189","./js/sales.js":"./js/sales.js?v=2026-09-16%20%E3%8A%BF%2B189","./js/report.js":"./js/report.js?v=2026-09-16%20%E3%8A%BF%2B189","./js/grid.js":"./js/grid.js?v=2026-09-16%20%E3%8A%BF%2B189","./js/edit.js":"./js/edit.js?v=2026-09-16%20%E3%8A%BF%2B189","./js/qadb.js":"./js/qadb.js?v=2026-09-16%20%E3%8A%BF%2B189","./js/qadata.js":"./js/qadata.js?v=2026-09-16%20%E3%8A%BF%2B189","./js/lazy.js":"./js/lazy.js?v=2026-09-16%20%E3%8A%BF%2B189","./js/init.js":"./js/init.js?v=2026-09-16%20%E3%8A%BF%2B189"}}</script>
+<link rel="modulepreload" href="js/state.js?v=2026-09-16%20%E3%8A%BF%2B189">
+<link rel="modulepreload" href="js/viz.js?v=2026-09-16%20%E3%8A%BF%2B189">
+<link rel="modulepreload" href="js/core.js?v=2026-09-16%20%E3%8A%BF%2B189">
+<link rel="modulepreload" href="js/shell.js?v=2026-09-16%20%E3%8A%BF%2B189">
+<link rel="modulepreload" href="js/dash.js?v=2026-09-16%20%E3%8A%BF%2B189">
+<link rel="modulepreload" href="js/ai.js?v=2026-09-16%20%E3%8A%BF%2B189">
+<link rel="modulepreload" href="js/home.js?v=2026-09-16%20%E3%8A%BF%2B189">
+<link rel="modulepreload" href="js/notify.js?v=2026-09-16%20%E3%8A%BF%2B189">
+<link rel="modulepreload" href="js/guard.js?v=2026-09-16%20%E3%8A%BF%2B189">
+<link rel="modulepreload" href="js/grids.js?v=2026-09-16%20%E3%8A%BF%2B189">
+<link rel="modulepreload" href="js/equipment.js?v=2026-09-16%20%E3%8A%BF%2B189">
+<link rel="modulepreload" href="js/analysis.js?v=2026-09-16%20%E3%8A%BF%2B189">
+<link rel="modulepreload" href="js/tools.js?v=2026-09-16%20%E3%8A%BF%2B189">
+<link rel="modulepreload" href="js/cloud.js?v=2026-09-16%20%E3%8A%BF%2B189">
+<link rel="modulepreload" href="js/inbound.js?v=2026-09-16%20%E3%8A%BF%2B189">
+<link rel="modulepreload" href="js/upd.js?v=2026-09-16%20%E3%8A%BF%2B189">
+<link rel="modulepreload" href="js/sales.js?v=2026-09-16%20%E3%8A%BF%2B189">
+<link rel="modulepreload" href="js/grid.js?v=2026-09-16%20%E3%8A%BF%2B189">
+<link rel="modulepreload" href="js/edit.js?v=2026-09-16%20%E3%8A%BF%2B189">
+<link rel="modulepreload" href="js/qadb.js?v=2026-09-16%20%E3%8A%BF%2B189">
+<link rel="modulepreload" href="js/qadata.js?v=2026-09-16%20%E3%8A%BF%2B189">
+<link rel="modulepreload" href="js/lazy.js?v=2026-09-16%20%E3%8A%BF%2B189">
+<link rel="modulepreload" href="js/init.js?v=2026-09-16%20%E3%8A%BF%2B189">
+<script type="module" src="js/main.js?v=2026-09-16%20%E3%8A%BF%2B189"></script>
 <!-- stamp:end -->
 </head>
 <body data-view="dash">
@@ -195,7 +195,7 @@
     <button class="pill" id="btnEdit">✏️ 입력·수정</button>
     <button class="pill ghost" id="btnAuth">로그인</button>
     <button class="pill ghost" id="btnLogout" style="display:none;border-color:rgba(208,59,59,.35);color:var(--critical,#d03b3b)">로그아웃</button>
-    <button class="pill ghost" id="btnWidgets" aria-label="대시보드 위젯 표시 설정" title="대시보드 위젯 표시 설정">⊞ 위젯</button>
+    <button class="pill ghost" id="btnWidgets" aria-label="홈 카드 표시 설정" title="홈 카드 표시 설정">⊞ 홈 카드</button>
     <button class="pill ghost" id="btnFind" aria-label="전역 검색 (Ctrl+K)" title="전역 검색 (Ctrl+K)">⌕ 검색</button>
     <button class="pill ghost" id="btnFont" aria-label="글자 크기 바꾸기" title="포탈 전체 글자 크기 — 보통 → 크게 → 아주 크게">가<b style="font-size:14px">A</b></button>
     <button class="pill ghost" id="btnTheme" aria-label="다크 모드 전환" title="다크 모드 전환">◐ 다크</button>
@@ -215,7 +215,7 @@
     <div id="ccHome" class="cc-only">
       <div id="ccHi"></div>
       <div id="ccRow">
-        <section class="card" id="ccInbox" aria-label="인박스"></section>
+        <section class="card" id="ccInbox" aria-label="우선 업무"></section>
         <div id="ccHeroHost"></div>
       </div>
     </div>
@@ -436,8 +436,8 @@
 
   <div id="viewQuote" class="hidden">
     <section class="card c12" style="padding:10px">
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px 10px">
-        <div style="font-size:14px;font-weight:650">📄 견적·발주 시스템 <span class="ubadge sm won">₩ 금액은 원 단위</span> <span class="mini" style="color:var(--muted);font-weight:400;margin-left:6px">기업용 견적 · 공공용 견적 · 발주서</span></div>
+      <div class="sat-head" style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px 10px">
+        <div style="font-size:14px;font-weight:650"><span class="sat-ttl">📄 견적·발주 시스템</span> <span class="ubadge sm won">₩ 금액은 원 단위</span> <span class="mini" style="color:var(--muted);font-weight:400;margin-left:6px">기업용 견적 · 공공용 견적 · 발주서</span></div>
         <a href="quote.html" target="_blank" class="pill ghost" style="text-decoration:none" data-sat="quote.html">↗ 새 창에서 열기</a>
       </div>
       <iframe id="quoteFrame" title="견적 시스템"
@@ -447,8 +447,8 @@
 
   <div id="viewPreport" class="hidden">
     <section class="card c12" style="padding:10px">
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px 10px">
-        <div style="font-size:14px;font-weight:650">📑 프로젝트 리포트 <span class="ubadge sm won">₩ 금액은 원 단위</span> <span class="mini" style="color:var(--muted);font-weight:400;margin-left:6px">계약을 고르면 PROJECT REPORT 양식이 자동으로 채워집니다 · 저장 · PDF 발행</span></div>
+      <div class="sat-head" style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px 10px">
+        <div style="font-size:14px;font-weight:650"><span class="sat-ttl">📑 프로젝트 리포트</span> <span class="ubadge sm won">₩ 금액은 원 단위</span> <span class="mini" style="color:var(--muted);font-weight:400;margin-left:6px">계약을 고르면 PROJECT REPORT 양식이 자동으로 채워집니다 · 저장 · PDF 발행</span></div>
         <a href="report.html" target="_blank" class="pill ghost" style="text-decoration:none" data-sat="report.html">↗ 새 창에서 열기</a>
       </div>
       <iframe id="preportFrame" title="프로젝트 리포트"
@@ -458,8 +458,8 @@
 
   <div id="viewS1" class="hidden">
     <section class="card c12" style="padding:10px">
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px 10px">
-        <div style="font-size:14px;font-weight:650">🏢 에스원 정산 <span class="ubadge sm won">₩ 금액은 원 단위</span> <span class="mini" style="color:var(--muted);font-weight:400;margin-left:6px">에스원 대금지급 리스트 + 비즈포탈 엑셀 → 등록번호 매칭 · 건수 · 설치비 · 프로젝트 리포트</span></div>
+      <div class="sat-head" style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px 10px">
+        <div style="font-size:14px;font-weight:650"><span class="sat-ttl">🏢 에스원 정산</span> <span class="ubadge sm won">₩ 금액은 원 단위</span> <span class="mini" style="color:var(--muted);font-weight:400;margin-left:6px">에스원 대금지급 리스트 + 비즈포탈 엑셀 → 등록번호 매칭 · 건수 · 설치비 · 프로젝트 리포트</span></div>
         <a href="s1.html" target="_blank" class="pill ghost" style="text-decoration:none" data-sat="s1.html">↗ 새 창에서 열기</a>
       </div>
       <iframe id="s1Frame" title="에스원 정산"
@@ -469,8 +469,8 @@
 
   <div id="viewKk" class="hidden">
     <section class="card c12" style="padding:10px">
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px 10px">
-        <div style="font-size:14px;font-weight:650">☁️ 카카오 정산 <span class="ubadge sm won">₩ 금액은 원 단위</span> <span class="mini" style="color:var(--muted);font-weight:400;margin-left:6px">정산 안내 메일(PDF) → SSL VPN 리스트 · 비즈포탈 대조 · 프로젝트 리포트</span></div>
+      <div class="sat-head" style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px 10px">
+        <div style="font-size:14px;font-weight:650"><span class="sat-ttl">☁️ 카카오 정산</span> <span class="ubadge sm won">₩ 금액은 원 단위</span> <span class="mini" style="color:var(--muted);font-weight:400;margin-left:6px">정산 안내 메일(PDF) → SSL VPN 리스트 · 비즈포탈 대조 · 프로젝트 리포트</span></div>
         <a href="kk.html" target="_blank" class="pill ghost" style="text-decoration:none" data-sat="kk.html">↗ 새 창에서 열기</a>
       </div>
       <iframe id="kkFrame" title="카카오 정산"
@@ -984,10 +984,10 @@
   </div>
 </div>
 
-<!-- 고객 360 -->
+<!-- 고객 한눈에 -->
 <div class="ovl" id="ovlC360">
   <div class="modal" style="width:min(980px,100%)">
-    <h3 id="c360Title">고객 360</h3>
+    <h3 id="c360Title">고객 한눈에</h3>
     <p class="cap" id="c360Cap" style="margin:0 0 12px"></p>
     <div id="c360Body" style="max-height:64vh;overflow:auto"></div>
     <div class="mact"><span class="mmsg"></span><button class="pill ghost" data-close="ovlC360">닫기</button></div>
@@ -1137,6 +1137,7 @@
   <div class="modal" style="width:min(760px,100%)">
     <h3 id="dtTitle">계약 상세</h3>
     <p class="cap" id="dtMeta"></p>
+    <div class="mini" id="dtChartCap" style="color:var(--ink-2);margin:10px 0 4px"></div>
     <div class="chartbox h200" id="dtChart"></div>
     <div id="dtRenew"></div>
     <div style="font-size:12px;color:var(--ink-2);opacity:.8;margin:14px 0 6px">변경 이력</div>

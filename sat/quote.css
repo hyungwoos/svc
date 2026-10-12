@@ -170,3 +170,7 @@ body.pdf-capturing .main-table td:first-child .print-text {
 .qdb-toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(20px); background: #222; color: #fff; padding: 10px 16px; border-radius: 10px; font-size: 13px; opacity: 0; transition: opacity .2s, transform .2s; z-index: 10001; pointer-events: none; }
 .qdb-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 @media print { .qdb-state, .qdb-toast, #qdbListModal { display: none !important; } }
+
+/* ㊿+188 포탈(지니언스) 안에 들어갔을 때(html[data-embed="gn"] · sat/common.js) — 포탈과 같은 초록 · 여백 */
+html[data-embed="gn"]{--genians-green:#3F7A0C}
+html[data-embed="gn"] body{padding:6px 2px 12px;background:#fff}

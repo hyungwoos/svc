@@ -56,7 +56,7 @@ export function renderPrice(){
   var book=prCur(segBook);
   if(!book){
     host.innerHTML=tpl`<section class="card c12" style="max-width:640px;margin:0 auto;text-align:center;padding:40px">`+
-      tpl`<h3 style="margin:0 0 8px">💰 제품 가격표</h3><p class="cap">등록된 가격표가 없습니다 — 44_price.sql 실행이 필요합니다.</p></section>`;
+      tpl`<h3 style="margin:0 0 8px">💰 제품 가격표</h3><p class="cap">등록된 가격표가 없습니다.${rawHtml(ST.IS_SUPER? ' <span class="mini">(관리자: 44_price.sql 실행이 필요합니다)</span>' : ' 관리자가 가격표를 등록하면 여기에 보입니다.')}</p></section>`;
     return;
   }
   var vers=prBooks(segBook), isCalc=PR.seg==='calc';

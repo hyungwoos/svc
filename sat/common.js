@@ -10,6 +10,8 @@
 /* ㊿+180 다른 사이트의 iframe 안이면 화면을 비움(클릭 가로채기 막기) — 포탈(같은 출처) 안에서는 그대로 */
 (function(){ var ok=true; try{ ok=window.top===window.self || window.top.location.origin===location.origin; }catch(e){ ok=false; }
   if(!ok) document.addEventListener('DOMContentLoaded', function(){ document.body.textContent='보안을 위해 이 화면은 다른 사이트 안에서 열 수 없습니다.'; }); })();
+/* ㊿+188 포탈(지니언스 디자인) 안 iframe 으로 열렸으면(…?embed=gn) 포탈과 같은 색 · 여백 — 각 위성 CSS 의 html[data-embed="gn"] 규칙 · 새 창에서는 예전 그대로 */
+(function(){ try{ if(/[?&]embed=gn(&|$)/.test(location.search)) document.documentElement.setAttribute('data-embed','gn'); }catch(e){} })();
 
 var SAT=(function(){
   var ACTS={ print:function(){ window.print(); }, close:function(){ window.close(); }, reload:function(){ location.reload(); } };

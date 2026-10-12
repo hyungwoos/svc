@@ -1,7 +1,7 @@
-/* ===== tools.js — 전역 검색 · 고객 360 · 표 밀도 · 엑셀 붙여넣기 · 메뉴 편집 · 글자 크기 =====
+/* ===== tools.js — 전역 검색 · 고객 한눈에 · 표 밀도 · 엑셀 붙여넣기 · 메뉴 편집 · 글자 크기 =====
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { ST } from './state.js';
-import { $, amtWhy, isCC, lline, mk, navText, rawHtml, tpl, won, wonKo } from './core.js';
+import { $, amtWhy, isCC, isGN, lline, mk, navText, rawHtml, tpl, won, wonKo } from './core.js';
 import { buildRail, c360Enhance, dIdx, ico, loadFromDb, onData, renderInbox, sbWrite, toast, todayStr, visBtn } from './shell.js';
 import { GRIDS } from './grids.js';
 import { applyChannelMenu, ctRawOf, liveData } from './analysis.js';
@@ -46,13 +46,13 @@ export function fkSources(){
 export function openFind(){ homeSearchOpen(); }
 
 
-/* ===== 고객 360 — 한 고객사의 모든 정보 ===== */
+/* ===== 고객 한눈에 — 한 고객사의 모든 정보 ===== */
 export function c360Match(a,b){
   var x=fkNorm(a), y=fkNorm(b);
   if(!x||!y) return false;
   return x.indexOf(y)>=0 || y.indexOf(x)>=0;
 }
-/* ㊿+161 고객 360 계약 표의 연장 — 연장한 계약 바로 아래 한 줄: 최초 → 연장 n회 (기간 · 월 금액(천원) · 노드) · 계약 상세(ctPeriods)와 같은 값 */
+/* ㊿+161 고객 한눈에 계약 표의 연장 — 연장한 계약 바로 아래 한 줄: 최초 → 연장 n회 (기간 · 월 금액(천원) · 노드) · 계약 상세(ctPeriods)와 같은 값 */
 export function c360RenewLine(r){
   if(!r || !(r.renew>0 || (r.renewHist||[]).length)) return '';
   var raw=ctRawOf(r._id) || {start_month:(r.startIdx!=null? mk(r.startIdx)+'-01' : null), contract_type:r.ctype, renew_history:r.renewHist, qty:r.qty};
@@ -78,8 +78,10 @@ export function openCust360(name){
   var asts=(ST.RAWX.assets||[]).filter(function(r){return c360Match(r.customer,nm);});
   var ords=(ST.RAWX.orders||[]).filter(function(r){return c360Match(r.customer,nm);});
   $('#c360Title').textContent='🏢 '+nm;
-  $('#c360Cap').textContent='계약 '+cts.length+'건 · LIVE '+lives.length+'건 · OI '+ois.length+'건 · 인바운드 '+inbs.length+'건 · MDR 운영 '+mdrs.length+'건 · 장비 현황 '+asts.length+'대(임대중 '+asts.filter(function(a){ return a.status==='임대중'; }).length+'대) · 장비 신청 '+ords.length+'건'+
-    (ST.RAWX.inbound===undefined? ' · (인바운드는 메뉴를 한 번 연 뒤 집계됩니다)':'');
+  /* ㊿+188 지니언스: 건수는 아래 탭에 한 번만(요약 문장 · 목록 버튼의 숫자 반복을 뺌) — 인바운드 안내만 남김 */
+  $('#c360Cap').textContent=isGN()? (ST.RAWX.inbound===undefined? '인바운드는 메뉴를 한 번 연 뒤 집계됩니다' : '') : '계약 '+cts.length+'건 · LIVE '+lives.length+'건 · OI '+ois.length+'건 · 인바운드 '+inbs.length+'건 · MDR 운영 '+mdrs.length+'건 · 장비 현황 '+asts.length+'대(임대중 '+asts.filter(function(a){ return a.status==='임대중'; }).length+'대) · 장비 신청 '+ords.length+'건'+
+    (!isGN() && ST.RAWX.inbound===undefined? ' · (인바운드는 메뉴를 한 번 연 뒤 집계됩니다)':'');
+  $('#c360Cap').hidden=!$('#c360Cap').textContent;
   /* ㊿+169 섹션 머리: 이모지 대신 같은 모양 선 아이콘 · data-l = 탭 이름 */
   var SEC_ICO={'📋':'doc','🟢':'check','🎯':'target','📥':'inbox','🛰️':'shield','🔧':'box'};
   function sec(icon,label,n,html){ return tpl`<div class="c360-sec"><h4 data-l="${String(label).replace(/<[^>]*>.*$/,'').trim()}">${rawHtml(SEC_ICO[icon]? ico(SEC_ICO[icon],15) : icon)} ${rawHtml(label)} <span class="ct">${rawHtml(typeof n==='string'? n : n+'건')}</span></h4>${rawHtml(html)}</div>`; }   /* ㊿+168 n 이 글자면 단위 포함(장비 = 대) */
@@ -103,21 +105,49 @@ export function openCust360(name){
         asts.map(function(r){ var ph=/^미등록-/.test(String(r.serial||'')); return [ph? '미등록 시리얼 (보완 필요)' : r.serial, r.model, r.status, r.deployed_date||r.in_date, r.order_id? '#'+r.order_id : '']; }))+
       tpl`<div class="c360-sub">신청(발주) 이력 · ${rawHtml(ords.length)}건</div>`+ tb(['신청','모델','수량','상태','신청일','회수'],
         ords.map(function(r){ var rs=String(r.returned_serials||'').split(/[,\s]+/).filter(Boolean).length; return ['#'+r.id, r.model, (r.qty||'')+(r.qty?'대':''), r.status, String(r.created_at||'').slice(0,10), r.status==='회수완료'? '전체 회수' : (rs? '부분 회수 '+rs+'대' : '')]; })));
-  /* ㊿+162 계약 행(과 그 아래 연장 줄)을 누르면 계약 상세 — 고객 360 위에 열리고, 닫으면 고객 360 으로 돌아옴 */
+  /* ㊿+162 계약 행(과 그 아래 연장 줄)을 누르면 계약 상세 — 고객 한눈에 위에 열리고, 닫으면 고객 한눈에 으로 돌아옴 */
   $('#c360Body').querySelectorAll('tr[data-c360ct]').forEach(function(tr){
     var go=function(){ var c=ctRawOf(Number(tr.getAttribute('data-c360ct'))); if(c) openDetail(c); else toast('계약 상세', '이 계약 원본을 아직 불러오지 못했습니다 — 잠시 뒤 다시 눌러 주세요', 'info'); };
     tr.onclick=go; tr.onkeydown=function(e){ if(e.key==='Enter'){ e.preventDefault(); go(); } };
     var nx=tr.nextElementSibling; if(nx && nx.classList.contains('c360-rn')) nx.onclick=go;
   });
   try{ c360Enhance(nm, cts, lives, ois, inbs, asts, ords); }catch(e){ console.warn('c360', e); }
-  /* ㊿+172 이 고객으로 목록 보기 — 계약 · LIVE · OI · 인바운드 · 장비로 옮겨 다녀도 같은 고객(«고객 문맥» · 목록 위 «해제») */
+  /* ㊿+172 이 고객으로 목록 보기 — 계약 · LIVE · OI · 인바운드 · 장비로 옮겨 다녀도 같은 고객(«고객 고정» · 목록 위 «해제») */
   (function(){ var cap=$('#c360Cap'); if(!cap) return; var old=document.getElementById('c360Go'); if(old) old.remove();
     var V=[['contracts','계약',cts.length],['live','LIVE',lives.length],['oi','OI',ois.length],['inbound','인바운드',inbs.length],['orders','장비 신청',ords.length],['assets','장비 현황',asts.length]].filter(function(x){ var b=document.querySelector('#side button[data-v="'+x[0]+'"]'); return !!b && visBtn(/** @type {any} */(b)); });
     var d=document.createElement('div'); d.id='c360Go'; d.className='c360-go'; d.setAttribute('role','group'); d.setAttribute('aria-label','이 고객으로 목록 보기');
-    d.innerHTML=tpl`<span class="mini">이 고객으로 목록 보기</span>${rawHtml(V.map(function(x){ return tpl`<button type="button" class="cbtn" data-cv="${x[0]}">${x[1]} <b class="num">${String(x[2])}</b></button>`; }).join(''))}`;
+    d.innerHTML=tpl`<span class="mini">이 고객으로 목록 보기</span>${rawHtml(V.map(function(x){ return tpl`<button type="button" class="cbtn" data-cv="${x[0]}" title="${x[1]} ${String(x[2])}건 — 목록 화면으로">${x[1]}${rawHtml(isGN()? '' : tpl` <b class="num">${String(x[2])}</b>`)}</button>`; }).join(''))}`;
     cap.parentElement.insertBefore(d, cap.nextSibling);
     d.querySelectorAll('[data-cv]').forEach(function(b){ /** @type {any} */(b).onclick=function(){ closeOvl('ovlC360'); custGo(/** @type {any} */(b).dataset.cv, nm); }; }); })();
   openOvl('ovlC360');
+}
+
+/* ===== ㊿+188 분석 표의 «0 인 기간» 접기(지니언스) — 해지율 · 고객사 증감 · 유입경로처럼 연도/분기 행이 쌓이는 표에서
+   숫자가 전부 0 · – 인 행(예: 계약이 없던 해 · 필터로 비는 분기)은 접고 «0 인 기간 n개 보기» 한 줄로. 합계 · 누계 줄은 그대로. 계산은 건드리지 않음(그려진 표만) ===== */
+export var ZR={open:{}};
+export function zeroRowText(td){ return String(td.textContent||'').replace(/[\s,]/g,''); }
+export function zeroRowIs(tr){
+  var tds=[].slice.call(tr.children); if(tds.length<3) return false;
+  var first=zeroRowText(tds[0]); if(/합계|누계|전체|계$/.test(first)) return false;
+  if(tr.classList.contains('zr-tg') || tr.querySelector('th')) return false;
+  var n=0;
+  for(var i=1;i<tds.length;i++){ var t=zeroRowText(tds[i]); if(t==='') continue; n++;
+    if(!/^[+\-–−]?0(\.0+)?%?$|^[–\-·]$|^\(0\)$|^0\/0$/.test(t)) return false; }
+  return n>0;
+}
+export function foldZeroRows(root, key, word){
+  if(!isGN() || !root) return 0; var total=0; word=word||'기간';
+  [].slice.call(root.querySelectorAll('table')).forEach(function(tb, ti){
+    var body=tb.tBodies[0]; if(!body) return; var rows=[].slice.call(body.rows).filter(zeroRowIs); if(!rows.length) return;
+    var k=(key||'t')+':'+ti, open=!!ZR.open[k]; total+=rows.length;
+    rows.forEach(function(r){ r.classList.add('zr-row'); r.hidden=!open; });
+    var tg=document.createElement('tr'); tg.className='zr-tg'; var td=document.createElement('td'); td.colSpan=rows[0].children.length;
+    var b=document.createElement('button'); b.type='button'; b.className='zr-btn'; b.setAttribute('aria-expanded', open? 'true':'false');
+    b.textContent=(open? '0 인 '+word+' 접기' : '0 인 '+word+' '+rows.length+'개 보기'); b.title='숫자가 모두 0 인 '+word+' — 계약이 없거나 지금 조건에서 비는 줄';
+    b.onclick=function(){ open=!open; ZR.open[k]=open; rows.forEach(function(r){ r.hidden=!open; }); b.textContent=open? '0 인 '+word+' 접기' : '0 인 '+word+' '+rows.length+'개 보기'; b.setAttribute('aria-expanded', open? 'true':'false'); };
+    td.appendChild(b); tg.appendChild(td); body.insertBefore(tg, rows[0]);
+  });
+  return total;
 }
 
 /* ===== 표 밀도 (보통/컴팩트) ===== */
@@ -422,7 +452,7 @@ export function applyFs(n){
   var b=document.getElementById('btnFont');
   if(b){
     b.style.background = n>0? 'var(--brand-t,rgba(46,189,87,.13))':'';
-    b.innerHTML = tpl`가<b style="font-size:14px">A</b>${n===1?' 크게':n===2?' 최대':''}`;
+    b.innerHTML = tpl`<b class="fs-ico" aria-hidden="true">가A</b><span>글자 크기${n===1?' · 크게':n===2?' · 최대':' · 보통'}</span>`;
   }
 }
 

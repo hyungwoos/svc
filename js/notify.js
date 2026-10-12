@@ -1,7 +1,7 @@
 /* ===== notify.js — 알림함 · Slack 보내기(기본 꺼짐) (㊿+174 · SQL 105) =====
    ES 모듈 — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에
    · 알림 항목은 포탈이 화면과 같은 계산으로 만듦(홈 «우선 업무» · 데이터 점검 · 만기 처리와 같은 기준) — 서버가 따로 계산하지 않아 숫자가 어긋나지 않음
-       재약정 만기  = 홈 «재약정 대응 필요»와 같은 행(expEligible · 자동연장 · 후속 계약 확실 제외) · 종료월 말일까지 남은 날이 기준(60 · 30일) 이하 — 단계마다 한 번 · 열기 = 고객 360
+       재약정 만기  = 홈 «재약정 대응 필요»와 같은 행(expEligible · 자동연장 · 후속 계약 확실 제외) · 종료월 말일까지 남은 날이 기준(60 · 30일) 이하 — 단계마다 한 번 · 열기 = 고객 한눈에
        만기 미처리  = 만기 처리 «미처리»(renewScan.lapsed) 건수
        장비 지연    = 접수 · 출하요청 · 배송중인 신청이 접수 뒤 n일(기본 3) 지남 — 상태가 바뀌면 새 알림
        월말 마감    = 말일까지 n일(기본 5) 이하인데 그달 비즈포탈 차액이 없음
@@ -14,7 +14,7 @@
    · ㊿+177 예약 발송(선택 · 기본 꺼짐 · SQL 108): 설정에서 요일 · 시각(한국 시각)을 고르면 서버(pg_cron → notify 함수)가 그때 팀 채널로 보냄
        보낼 글은 슈퍼 관리자가 포탈을 열 때 이 파일의 같은 계산(ntfSlackPlan)으로 만들어 notify_snapshot 에 둠(ntfSnapSave) — 서버에 계산식을 따로 두지 않음 */
 import { APP_VER, IS_STAGING, ST } from './state.js';
-import { bizHas, canWrite, esc, fetchT, lline, mk, monOf, navText, rawHtml, SB_URL, tickMemo, tpl, won } from './core.js';
+import { b64urlJson, bizHas, canWrite, esc, fetchT, lline, mk, monOf, navText, rawHtml, SB_KEY, SB_URL, tickMemo, tpl, won } from './core.js';
 import { expAmtOf, expEligible } from './dash.js';
 import { ico, sbHeaders, sbTry, sbWrite, toast, todayStr, visBtn } from './shell.js';
 import { ctSuccessor, dcAckLoad, dcDailySave, dcRules, openRenewList, renewScan } from './analysis.js';
@@ -167,6 +167,7 @@ export async function ntfLoad(force){
     else { NTF.readsOk=false; try{ (JSON.parse(localStorage.getItem(ntfLsKey())||'[]')||[]).forEach(function(k){ m[k]=1; }); }catch(e){} }
     NTF.reads=m;
     var as=NTF.sqlOk? await ntfGet('work_assign?select=kind,ref,assignee,assigned_by,assigned_at&kind=in.(eq,area)&limit=1000') : null;   /* ㊿+185 area = 홈 우선 업무 줄(만기 · 재약정 · 비즈포탈 · 데이터 점검)의 담당 */
+    if(!NTF.accounts && NTF.sqlOk) ntfAccounts().then(function(a){ if(a && a.some(function(x){ return x.name; })){ try{ renderTodo(); }catch(e){} try{ ntfSync(); }catch(e){} } });   /* ㊿+189 표시 이름을 받아 담당 칸을 이름으로 */
     var g={}, ar={}; (as||[]).forEach(function(x){ if(x.kind==='area') ar[String(x.ref)]=x; else g[String(x.ref)]=x; }); var hadAsg=Object.keys(NTF.asg).length+Object.keys(NTF.area).length>0; NTF.asg=g; NTF.area=ar; NTF.asgOk=as!==null;
     if(hadAsg || Object.keys(g).length || Object.keys(ar).length) try{ renderTodo(); }catch(e){}   /* 홈 «우선 업무»의 장비 담당 = 처리 담당 · 줄 담당 */
     await opsLoad();
@@ -336,12 +337,39 @@ export function ntfAreaMe(key){ var e=ntfAreaOf(key); return !!e && e===ntfMe();
 export function ntfAreaTo(key){ var e=ntfAreaOf(key); return e? [e] : []; }
 export function ntfCanAssignArea(){ return !!ST.SB_TOKEN && NTF.asgOk && (ST.IS_SUPER || ST.MY_ROLE==='admin' || ST.MY_ROLE==='editor'); }
 /** 계정 이메일 → 보이는 이름(견적 담당자 목록에 있으면 그 이름 · 없으면 @ 앞) */
-export function ntfName(e){ var l=String(e||'').toLowerCase().split('@')[0]; return QMGR_MAP[l] || l; }
+/* ㊿+189 표시 이름 — portal_profiles(SQL 114)의 «이름 직급»(예: 홍길동 대리) → 없으면 견적 담당 표 → 없으면 계정 id(이메일 앞부분). 이름은 DB 에만(코드엔 없음) */
+export function ntfProf(e){ var em=String(e||'').toLowerCase(); if(!em || !NTF.accounts) return null; for(var i=0;i<NTF.accounts.length;i++){ if(NTF.accounts[i].email===em) return NTF.accounts[i]; } return null; }
+export function ntfDisp(p){ if(!p || !p.name) return ''; return p.name+(p.title? ' '+p.title : ''); }
+export function ntfName(e){ var l=String(e||'').toLowerCase().split('@')[0]; return ntfDisp(ntfProf(e)) || QMGR_MAP[l] || l; }
+/** 표시 이름 고치기 — 본인(내 계정) 또는 슈퍼 관리자(관리자 › 계정) · portal_profiles 에 upsert · 캐시 · 홈 · 알림함 바로 반영 */
+export function profEdit(email, opt){
+  opt=opt||{}; var em=String(email||'').toLowerCase(); if(!em) return;
+  var me=ntfMe(), own=em===me; if(!own && !ST.IS_SUPER){ toast('고칠 수 없습니다', '본인 이름은 «내 계정»에서, 다른 사람은 슈퍼 관리자가', 'info'); return; }
+  var p=ntfProf(em)||{}, m=ntfDlg('ovlProf', 440);
+  m.innerHTML=tpl`<h3 id="ovlProfH">표시 이름${own? '' : ' — '+em}</h3><p class="cap">홈 «우선 업무» 담당 · 알림함 · 담당 지정 · 개선 요청에 계정 id 대신 이 이름으로 보입니다(예: 홍길동 대리).</p>`+
+    tpl`<div class="frm"><div><label for="pfName">이름</label><input id="pfName" type="text" maxlength="30" value="${p.name||''}" placeholder="예: 홍길동" autocomplete="off"></div><div><label for="pfTitle">직급</label><input id="pfTitle" type="text" maxlength="20" list="pfTitles" value="${p.title||''}" placeholder="예: 대리" autocomplete="off"><datalist id="pfTitles">${rawHtml(['사원','주임','대리','과장','차장','부장','이사','상무','전무','대표'].map(function(t){ return tpl`<option value="${t}">`; }).join(''))}</datalist></div></div>`+
+    tpl`<div class="mact"><span class="mmsg" id="pfMsg" role="status"></span><button type="button" class="pill ghost" data-close="ovlProf">닫기</button><button type="button" class="pill pri" id="pfSave">저장</button></div>`;
+  var msg=m.querySelector('#pfMsg'), ni=/** @type {any} */(m.querySelector('#pfName')), ti=/** @type {any} */(m.querySelector('#pfTitle'));
+  /** @type {any} */(m.querySelector('#pfSave')).onclick=async function(){
+    var name=String(ni.value||'').trim(), title=String(ti.value||'').trim();
+    if(!name){ msg.textContent='이름을 적어 주세요'; msg.className='mmsg bad'; ni.focus(); return; }
+    msg.textContent='저장 중…'; msg.className='mmsg';
+    try{
+      await sbWrite('POST', 'portal_profiles?on_conflict=email', [{email:em, name:name, title:title||null}], 'resolution=merge-duplicates,return=minimal');
+      var a=ntfProf(em); if(a){ a.name=name; a.title=title||''; } else if(NTF.accounts) NTF.accounts.push({email:em, role:'', name:name, title:title||''});
+      logChange('update', 'portal_profiles', em, {name:name, title:title||null, _via:own? '내 계정 · 표시 이름' : '관리자 › 계정 · 표시 이름'});
+      closeOvl('ovlProf'); toast('표시 이름 저장', ntfDisp({name:name, title:title}), 'ok');
+      try{ renderTodo(); }catch(e){} try{ ntfSync(); }catch(e){} if(opt.after) try{ opt.after(); }catch(e){}
+    }catch(e){ var s=String(/** @type {any} */(e).message||e); msg.textContent=/PGRST205|does not exist|404/.test(s)? 'SQL 114(portal_profiles)를 먼저 실행해야 저장할 수 있습니다' : '저장하지 못했습니다 — '+s.slice(0,140); msg.className='mmsg bad'; }
+  };
+  ni.onkeydown=ti.onkeydown=function(e){ if(e.key==='Enter'){ e.preventDefault(); /** @type {any} */(m.querySelector('#pfSave')).click(); } };
+  openOvl('ovlProf'); setTimeout(function(){ try{ ni.focus(); }catch(e){} }, 30);
+}
 /** 포탈 계정 목록 [{email, role}] — SQL 113 portal_accounts(로그인한 사람 누구나) · 한 번 받아 둠 · 없으면 [] */
 export async function ntfAccounts(){
   if(NTF.accounts) return NTF.accounts;
   var rows=null; try{ var r=await fetchT(SB_URL+'/rest/v1/rpc/portal_accounts', {method:'POST', headers:sbHeaders(true), body:'{}'}, 15000, '계정 목록', true); rows=r.ok? await r.json() : null; }catch(e){ rows=null; }
-  NTF.accounts=Array.isArray(rows)? rows.filter(function(x){ return x && /^[^@\s]+@[^@\s]+$/.test(String(x.email||'')); }).map(function(x){ return {email:String(x.email).toLowerCase(), role:String(x.role||'')}; }).sort(function(a,b){ return a.email.localeCompare(b.email); }) : [];
+  NTF.accounts=Array.isArray(rows)? rows.filter(function(x){ return x && /^[^@\s]+@[^@\s]+$/.test(String(x.email||'')); }).map(function(x){ return {email:String(x.email).toLowerCase(), role:String(x.role||''), name:String(x.name||''), title:String(x.title||'')}; })   /* ㊿+189 name · title(SQL 114) — 113 이면 빈 값 */.sort(function(a,b){ return a.email.localeCompare(b.email); }) : [];
   return NTF.accounts;
 }
 export async function ntfAreaOpen(key){
@@ -378,7 +406,58 @@ export async function ntfAreaOpen(key){
 /* ── ㊿+185 개선 요청 — 로그인한 사람 누구나 «포탈 전체» 또는 «특정 화면»을 골라 양식 없이 적어 보냄(portal_feedback · SQL 113)
    · 진입: 위 띠 💡 버튼 · 계정 메뉴 «개선 요청 보내기» · 슈퍼 관리자는 같은 창에서 받은 요청을 보고 «처리함» · 메모 · 알림함 «개선 요청 새 n건»
    · 보낸 사람은 자기 것만 봄 · 처리 표시 · 삭제는 슈퍼 관리자만(DB RLS) ── */
-export var FB={ok:null, newN:0, rows:/** @type {any[]} */([]), loaded:false, busy:false};
+export var FB={ok:null, newN:0, rows:/** @type {any[]} */([]), loaded:false, busy:false, filesOk:null, att:/** @type {any[]} */([])};
+/* ㊿+189 개선 요청 첨부 — 캡처(Ctrl+V · 끌어다 놓기) · 파일(이미지 · PDF · 엑셀 · 문서) 5MB · 5개 → Storage 버킷 feedback/<uid>/… (SQL 114) · 행의 files 에 [{path,name,size,type}] */
+export var FB_MAX=5, FB_MAXB=5*1024*1024, FB_EXT=/\.(png|jpe?g|gif|webp|pdf|txt|csv|xlsx?|docx?|pptx?)$/i;
+export function fbUid(){ try{ return String(b64urlJson(String(ST.SB_TOKEN||'').split('.')[1]).sub||'me'); }catch(e){ return 'me'; } }
+export function fbSize(n){ n=+n||0; return n>=1048576? (n/1048576).toFixed(1)+'MB' : n>=1024? Math.round(n/1024)+'KB' : n+'B'; }
+export function fbIsImg(t, n){ return /^image\//.test(String(t||'')) || /\.(png|jpe?g|gif|webp)$/i.test(String(n||'')); }
+export function fbAttAdd(files, msg){
+  var added=0, why='';
+  [].slice.call(files||[]).forEach(function(f){
+    if(!f) return;
+    if(FB.att.length>=FB_MAX){ why='첨부는 '+FB_MAX+'개까지'; return; }
+    var nm=String(f.name||''); if(!nm || /^(image|blob)\.(png|jpe?g|gif|webp)$/i.test(nm)) nm='캡처_'+(FB.att.length+1)+'.'+((String(f.type||'').split('/')[1]||'png').replace('jpeg','jpg'));
+    if(!(/^image\//.test(f.type) || FB_EXT.test(nm))){ why='이미지 · PDF · 텍스트 · 엑셀 · 문서 파일만'; return; }
+    if(f.size>FB_MAXB){ why=nm+' — 5MB 를 넘습니다'; return; }
+    FB.att.push({file:f, name:nm, url:fbIsImg(f.type, nm)? URL.createObjectURL(f) : ''}); added++;
+  });
+  fbPrevPaint();
+  if(msg){ msg.textContent=why? why : (added? '첨부 '+FB.att.length+'개' : ''); msg.className='mmsg'+(why? ' bad' : ''); }
+  return added;
+}
+export function fbAttClear(){ FB.att.forEach(function(a){ if(a.url) try{ URL.revokeObjectURL(a.url); }catch(e){} }); FB.att=[]; }
+export function fbPrevPaint(){
+  var host=document.getElementById('fbPrev'); if(!host) return;
+  host.innerHTML=FB.att.map(function(a, i){ return tpl`<div class="fb-pv"${rawHtml(a.url? ' data-img="1"' : '')}>${rawHtml(a.url? tpl`<img src="${a.url}" alt="${a.name}">` : tpl`<span class="fb-pv-f">${rawHtml(ico('doc',16))}</span>`)}<span class="fb-pv-n" title="${a.name}">${a.name}</span><span class="mini">${fbSize(a.file.size)}</span><button type="button" class="fb-pv-x" data-fbx="${String(i)}" aria-label="첨부 빼기 — ${a.name}">✕</button></div>`; }).join('');
+  host.hidden=!FB.att.length;
+  host.querySelectorAll('[data-fbx]').forEach(function(b){ /** @type {any} */(b).onclick=function(){ var i=+/** @type {any} */(b).dataset.fbx, a=FB.att[i]; if(a && a.url) try{ URL.revokeObjectURL(a.url); }catch(e){} FB.att.splice(i,1); fbPrevPaint(); }; });
+}
+/** 첨부를 Storage 에 올림 → [{path,name,size,type}] · 실패하면 예외(어느 파일인지) */
+export async function fbUpload(){
+  var out=[], uid=fbUid(), base=Date.now();
+  for(var i=0;i<FB.att.length;i++){
+    var a=FB.att[i], ext=(a.name.match(/\.([a-z0-9]+)$/i)||[])[1]||'bin', path=uid+'/'+base+'_'+(i+1)+'.'+ext.toLowerCase();
+    var r=await fetch(SB_URL+'/storage/v1/object/feedback/'+path, {method:'POST', headers:{apikey:SB_KEY, Authorization:'Bearer '+ST.SB_TOKEN, 'Content-Type':a.file.type||'application/octet-stream', 'x-upsert':'false'}, body:a.file});
+    if(!r.ok){ var t=''; try{ t=(await r.json()).message||''; }catch(e){} throw new Error(r.status===404||/Bucket not found/i.test(t)? 'SQL 114(feedback 버킷)를 먼저 실행해야 첨부를 올릴 수 있습니다' : (r.status===403||/policy|row-level/i.test(t)? '첨부 올리기 권한 없음 — SQL 114 정책 확인' : '첨부 «'+a.name+'» 올리기 실패 ('+r.status+(t? ' '+t.slice(0,80) : '')+')')); }
+    out.push({path:path, name:a.name, size:a.file.size, type:a.file.type||''});
+  }
+  return out;
+}
+/** 첨부 열기 — 이미지는 그 자리에 미리 보기(토글) · 그 밖은 내려받기 (비공개 버킷이라 로그인 토큰으로 받음) */
+export async function fbFileOpen(f, li, btn){
+  var box=li.querySelector('.fb-fprev'); if(!box){ box=document.createElement('div'); box.className='fb-fprev'; li.appendChild(box); }
+  var old=box.querySelector('[data-path="'+f.path+'"]'); if(old){ old.remove(); if(btn) btn.setAttribute('aria-expanded','false'); return; }
+  if(btn){ btn.disabled=true; btn.classList.add('busy'); }
+  try{
+    var r=await fetch(SB_URL+'/storage/v1/object/authenticated/feedback/'+f.path, {headers:{apikey:SB_KEY, Authorization:'Bearer '+ST.SB_TOKEN}});
+    if(!r.ok) throw new Error(r.status===404? '파일이 없습니다(지워졌을 수 있음)' : r.status===403? '볼 수 있는 권한이 없습니다' : '받지 못했습니다 ('+r.status+')');
+    var b=await r.blob(), u=URL.createObjectURL(b);
+    if(fbIsImg(f.type||b.type, f.name)){ var w=document.createElement('div'); w.className='fb-fimg'; w.dataset.path=f.path; w.innerHTML=tpl`<a href="${u}" target="_blank" rel="noopener" title="새 탭에서 크게"><img src="${u}" alt="${f.name}"></a>`; box.appendChild(w); if(btn) btn.setAttribute('aria-expanded','true'); }
+    else { var a=document.createElement('a'); a.href=u; a.download=f.name||'file'; document.body.appendChild(a); a.click(); setTimeout(function(){ a.remove(); URL.revokeObjectURL(u); }, 2000); }
+  }catch(e){ toast('첨부', String(/** @type {any} */(e).message||e), 'bad'); }
+  if(btn){ btn.disabled=false; btn.classList.remove('busy'); }
+}
 export function fbBtn(){
   var b=document.getElementById('fbBtn');
   if(!b){ b=document.createElement('button'); b.type='button'; b.id='fbBtn'; b.className='pill ghost ntf-btn fb-btn'; b.hidden=true;
@@ -398,7 +477,10 @@ export function fbViews(){
 export async function fbLoad(force){
   if(!ST.SB_TOKEN) return;
   if(FB.loaded && !force) return;
-  var rows=await ntfGet('portal_feedback?select=id,view,menu,content,status,note,created_by,created_at,done_by,done_at&order=id.desc&limit=300'+(ST.IS_SUPER? '' : '&created_by=eq.'+encodeURIComponent(ntfMe())));   /* 내 것만(DB RLS 도 같은 기준) */
+  var mine=(ST.IS_SUPER? '' : '&created_by=eq.'+encodeURIComponent(ntfMe()));   /* 내 것만(DB RLS 도 같은 기준) */
+  var rows=await ntfGet('portal_feedback?select=id,view,menu,content,status,note,created_by,created_at,done_by,done_at,files&order=id.desc&limit=300'+mine);
+  if(rows===null){ rows=await ntfGet('portal_feedback?select=id,view,menu,content,status,note,created_by,created_at,done_by,done_at&order=id.desc&limit=300'+mine); FB.filesOk=rows===null? null : false; }   /* ㊿+189 SQL 114 전(files 열 없음)이면 첨부 없이 */
+  else FB.filesOk=true;
   FB.ok=rows!==null; FB.rows=rows||[]; FB.loaded=true; FB.newN=FB.rows.filter(function(x){ return x.status==='new'; }).length;
 }
 export function fbOpen(opt){
@@ -408,19 +490,27 @@ export function fbOpen(opt){
   var curOk=views.some(function(x){ return x.v===cur; });
   m.innerHTML=tpl`<h3 id="ovlFbH">${rawHtml(ico('bulb',18))} 개선 요청</h3><p class="cap">불편한 점 · 틀린 숫자 · 있으면 좋을 기능을 양식 없이 적어 주세요. 특정 화면 이야기면 그 화면을 고르면 됩니다. 보낸 글은 관리자가 확인합니다.</p>`+
     tpl`<div class="frm"><div class="full"><label for="fbMenu">어느 화면?</label><select id="fbMenu"><option value="">포탈 전체 — 특정 화면 아님</option>${rawHtml(views.map(function(x){ return tpl`<option value="${x.v}"${rawHtml(x.v===cur && curOk? ' selected':'')}>${x.label}</option>`; }).join(''))}</select></div>`+
-    tpl`<div class="full"><label for="fbText">내용</label><textarea id="fbText" rows="5" maxlength="4000" placeholder="예) 계약 상세에서 종료월이 안 보여요 · OI 목록에 견적 금액도 같이 나오면 좋겠어요 · 홈 숫자가 시트와 달라요"></textarea></div></div>`+
+    tpl`<div class="full"><label for="fbText">내용</label><textarea id="fbText" rows="5" maxlength="4000" placeholder="예) 계약 상세에서 종료월이 안 보여요 · OI 목록에 견적 금액도 같이 나오면 좋겠어요 · 홈 숫자가 시트와 달라요"></textarea></div>`+
+    tpl`<div class="full fb-att"><div class="fb-att-bar"><label class="cbtn fb-att-btn" for="fbFile">${rawHtml(ico('doc',15))} 캡처 · 파일 붙이기</label><input id="fbFile" type="file" multiple accept="image/*,.pdf,.txt,.csv,.xls,.xlsx,.doc,.docx,.ppt,.pptx" class="fb-file"><span class="mini">이미지 · PDF · 엑셀 · 문서 — 5MB · 5개까지 · 캡처는 글 칸에 Ctrl+V 또는 끌어다 놓기</span></div><div id="fbPrev" class="fb-prev" hidden></div></div></div>`+
     tpl`<div class="mact"><span class="mmsg" id="fbMsg" role="status"></span><button type="button" class="pill ghost" data-close="ovlFb">닫기</button><button type="button" class="pill pri" id="fbSend">보내기</button></div>`+
     tpl`<div id="fbList" class="fb-list"></div>`;
   var msg=m.querySelector('#fbMsg'), ta=/** @type {any} */(m.querySelector('#fbText')), sel=/** @type {any} */(m.querySelector('#fbMenu'));
+  /* ㊿+189 첨부 — 파일 고르기 · 글 칸에 Ctrl+V(캡처) · 창에 끌어다 놓기 */
+  fbAttClear(); var fi=/** @type {any} */(m.querySelector('#fbFile')); fi.onchange=function(){ fbAttAdd(fi.files, msg); fi.value=''; };
+  ta.addEventListener('paste', function(e){ var cd=e.clipboardData; var fs=cd && cd.files? [].slice.call(cd.files) : []; if(fs.length){ e.preventDefault(); fbAttAdd(fs, msg); } });
+  m.addEventListener('dragover', function(e){ e.preventDefault(); m.classList.add('fb-drop'); }); m.addEventListener('dragleave', function(){ m.classList.remove('fb-drop'); });
+  m.addEventListener('drop', function(e){ e.preventDefault(); m.classList.remove('fb-drop'); var dt=e.dataTransfer; if(dt && dt.files && dt.files.length) fbAttAdd(dt.files, msg); });
   /** @type {any} */(m.querySelector('#fbSend')).onclick=async function(){
     var text=String(ta.value||'').trim(); if(!text){ msg.textContent='내용을 적어 주세요'; msg.className='mmsg bad'; ta.focus(); return; }
-    if(FB.busy) return; FB.busy=true; msg.textContent='보내는 중…'; msg.className='mmsg';
+    if(FB.busy) return; FB.busy=true; msg.textContent=FB.att.length? '첨부 올리는 중…' : '보내는 중…'; msg.className='mmsg';
     var v=String(sel.value||''), lab=v? (views.filter(function(x){ return x.v===v; })[0]||{}).label||v : '';
     try{
-      await sbWrite('POST','portal_feedback',[{view:v||null, menu:lab||null, content:text, status:'new', created_by:ntfMe()||null, page:{ver:APP_VER, hash:String(location.hash||''), w:window.innerWidth}}],'return=minimal');   /* created_by 는 DB 트리거가 로그인 계정으로 다시 씀 */
+      var files=FB.att.length? await fbUpload() : null; if(files) msg.textContent='보내는 중…';
+      var row={view:v||null, menu:lab||null, content:text, status:'new', created_by:ntfMe()||null, page:{ver:APP_VER, hash:String(location.hash||''), w:window.innerWidth}}; if(files) /** @type {any} */(row).files=files;
+      await sbWrite('POST','portal_feedback',[row],'return=minimal'); fbAttClear();   /* created_by 는 DB 트리거가 로그인 계정으로 다시 씀 */
       FB.loaded=false; closeOvl('ovlFb'); toast('개선 요청을 보냈습니다', (lab? lab+' · ' : '')+text.slice(0,40)+(text.length>40? '…':''), 'ok');
       if(ST.IS_SUPER){ await fbLoad(true); ntfSync(); }
-    }catch(e){ var em=String(/** @type {any} */(e).message||e); msg.textContent=/PGRST205|does not exist|404/.test(em)? 'SQL 113(portal_feedback)을 먼저 실행해야 보낼 수 있습니다' : '보내지 못했습니다 — '+em.slice(0,140); msg.className='mmsg bad'; }
+    }catch(e){ var em=String(/** @type {any} */(e).message||e); msg.textContent=/SQL 114/.test(em)? em : /files/.test(em) && /column|schema cache/i.test(em)? 'SQL 114(첨부 열)를 먼저 실행해야 첨부를 보낼 수 있습니다 — 첨부를 빼면 보낼 수 있습니다' : /PGRST205|does not exist|404/.test(em)? 'SQL 113(portal_feedback)을 먼저 실행해야 보낼 수 있습니다' : '보내지 못했습니다 — '+em.slice(0,140); msg.className='mmsg bad'; }
     FB.busy=false;
   };
   openOvl('ovlFb'); setTimeout(function(){ try{ (opt.list? m.querySelector('#fbList') : ta).focus(); }catch(e){} }, 30);
@@ -436,8 +526,9 @@ export function fbListPaint(){
   function row(x){ var who=String(x.created_by||'').split('@')[0];
     return tpl`<li class="fb-it${rawHtml(x.status==='done'? ' done':'')}" data-id="${String(x.id)}"><div class="fb-h"><b>${x.menu||'포탈 전체'}</b><span class="mini">${ntfName(x.created_by)||who} · ${String(x.created_at||'').slice(0,10)}${rawHtml(x.status==='done'? ' · 처리함'+(x.done_by? ' ('+esc(ntfName(x.done_by))+')' : '') : '')}</span>`+
       tpl`${rawHtml(ST.IS_SUPER? tpl`<span class="fb-a"><button type="button" class="cbtn" data-fbdone="${String(x.id)}">${x.status==='done'? '다시 열기' : '처리함'}</button><button type="button" class="cbtn" data-fbnote="${String(x.id)}" title="관리자 메모">메모</button></span>` : '')}</div>`+
-      tpl`<div class="fb-c">${x.content}</div>${rawHtml(x.note? tpl`<div class="fb-n mini">메모: ${x.note}</div>` : '')}</li>`; }
+      tpl`<div class="fb-c">${x.content}</div>${rawHtml(x.note? tpl`<div class="fb-n mini">메모: ${x.note}</div>` : '')}${rawHtml(Array.isArray(x.files) && x.files.length? tpl`<div class="fb-fs">${rawHtml(x.files.map(function(f, i){ return tpl`<button type="button" class="fb-f${rawHtml(fbIsImg(f.type, f.name)? ' img' : '')}" data-fbf="${String(x.id)}:${String(i)}" aria-expanded="false" title="${fbIsImg(f.type, f.name)? '미리 보기' : '내려받기'}">${rawHtml(ico(fbIsImg(f.type, f.name)? 'board' : 'doc', 14))}<span>${f.name||'파일'}</span><span class="mini">${fbSize(f.size)}</span></button>`; }).join(''))}</div>` : '')}</li>`; }   /* ㊿+189 첨부 */
   host.innerHTML=tpl`<h4 class="fb-t">${ST.IS_SUPER? '받은 요청' : '내가 보낸 요청'} <span class="ctag">${String(open.length)}건 열림${rawHtml(done.length? ' · '+done.length+'건 처리' : '')}</span></h4><ul class="fb-ul">${rawHtml(open.concat(done).slice(0,100).map(row).join(''))}</ul>`;
+  host.querySelectorAll('[data-fbf]').forEach(function(b){ /** @type {any} */(b).onclick=function(){ var p=String(/** @type {any} */(b).dataset.fbf).split(':'), x=rows.filter(function(y){ return String(y.id)===p[0]; })[0], f=x && x.files && x.files[+p[1]]; if(f) fbFileOpen(f, b.closest('li'), b); }; });
   host.querySelectorAll('[data-fbdone]').forEach(function(b){ /** @type {any} */(b).onclick=async function(){ var id=+/** @type {any} */(b).dataset.fbdone, x=rows.filter(function(y){ return y.id===id; })[0]; if(!x) return; var to=x.status==='done'? 'new' : 'done';
     try{ await sbWrite('PATCH','portal_feedback?id=eq.'+id, to==='done'? {status:'done', done_by:me, done_at:new Date().toISOString()} : {status:'new', done_by:null, done_at:null}, 'return=minimal'); x.status=to; if(to==='done'){ x.done_by=me; } FB.newN=rows.filter(function(y){ return y.status==='new'; }).length; fbListPaint(); ntfSync(); }
     catch(e){ toast('저장 실패', String(/** @type {any} */(e).message||e).slice(0,120), 'bad'); } }; });

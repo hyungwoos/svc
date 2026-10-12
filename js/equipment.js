@@ -1,7 +1,7 @@
 /* ===== equipment.js — 임대 장비: 신청 ↔ 현황 대조 · 원복 · 대조 패널 · 비즈포탈 월 입력 =====
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { APP_VER, ST } from './state.js';
-import { $, closeBtn, esc, rawHtml, tickMemo, TICK, tpl } from './core.js';
+import { $, closeBtn, esc, isGN, rawHtml, tickMemo, TICK, tpl } from './core.js';
 import { eqRefresh, sbGet, sbTry, sbWrite, toast, todayStr } from './shell.js';
 import { gridGoPre, renderGrid } from './grid.js';
 import { closeOvl, logChange, openOvl } from './edit.js';
@@ -257,6 +257,7 @@ export function eqFieldDiff(o,a){
 
 /* ---- 원복(되돌리기) — 일괄 작업 직전 현황을 통째로 찍어둡니다 ---- */
 export var EQ_UNDO=null, EQ_ERR='', EQ_DIAG='';
+export var EQ_CHK={open:null};   /* ㊿+188 대조 카드 펼침 — null = 자동(알릴 게 있으면) · true/false = 사용자가 정함 */
 export function eqRow(a){ var o={}; EQ_COLS.forEach(function(k){ o[k]=(a[k]===undefined? null : a[k]); }); return o; }
 export function eqSnap(label){
   EQ_UNDO={ at:new Date().toISOString(), label:label,
@@ -434,15 +435,25 @@ export function renderEqPanel(){
   }
   var host=eqHostEl(), s=eqScan(), bad=s.gap.length>0, u=eqUndoGet();
   host.style.display='';
-  var h=tpl`<div class="card" style="padding:11px 14px;margin-bottom:10px;border-left:4px solid `+ tpl`${bad?'var(--warning,#fab219)':'var(--good,#0ca30c)'}">`+
-    tpl`<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">`+
-      tpl`<b style="font-size:14px">신청 ↔ 현황 대조</b>`+
-      tpl`<span class="mini" style="color:var(--ink-2)">신청 ${s.orders.length}건 · 현황 반영 ${rawHtml(s.ok)}건 · `+
+  /* ㊿+188 지니언스: 다 맞으면 한 줄(✓ 일치 · 건수 · 진단)로 접고, 맞지 않음 · 이전됨 · 임시 시리얼 · 고아 자산 · 오류 · 진단 결과가 있을 때만 펼침(사용자가 연 상태는 기억) — 클래식은 예전 카드 */
+  var gn=isGN(), must=!!(bad || EQ_ERR || EQ_DIAG), info=!!(s.moved.length || s.ph.length || s.orphan.length);
+  var needOpen=EQ_CHK.open==null? (must || info) : (EQ_CHK.open || must);   /* 처음엔 알릴 게 있으면 펼침 · 사용자가 접었으면 맞지 않음 · 오류 · 진단 결과가 있을 때만 다시 펼침 */
+  var btns=tpl`${rawHtml(ST.IS_VIEWER? '' : tpl`<button class="pill" id="eqFixAll"${rawHtml(bad?'':' disabled style="opacity:.45"')}>신청 내역 기준으로 현황 맞추기</button>`)}`+ tpl`${rawHtml(ST.IS_VIEWER||!u? '' : tpl`<button class="pill ghost" id="eqUndo" title="${u.label||''}">↩ 원복 (${rawHtml(String(u.at||'').replace('T',' ').slice(5,16))})</button>`)}`+ tpl`${rawHtml(ST.IS_VIEWER? '' : '<button class="pill ghost" id="eqDiag" title="동기화가 안 될 때 원인을 찾아봅니다">🩺 진단</button>')}`;
+  var stat=tpl`<span class="mini" style="color:var(--ink-2)">신청 ${s.orders.length}건 · 현황 반영 ${rawHtml(s.ok)}건 · `+
         tpl`<b style="color:${bad?'var(--critical,#d03b3b)':'inherit'}">맞지 않음 ${s.gap.length}건</b>`+
-        tpl` · 취소 ${s.cancel.length}건${rawHtml(s.moved.length? ' · 이전됨 '+s.moved.length+'건':'')}</span>`+ tpl`${rawHtml(ST.IS_VIEWER? '' : tpl`<button class="pill" id="eqFixAll"${rawHtml(bad?'':' disabled style="opacity:.45"')}>신청 내역 기준으로 현황 맞추기</button>`)}`+ tpl`${rawHtml(ST.IS_VIEWER||!u? '' : tpl`<button class="pill ghost" id="eqUndo" title="${u.label||''}">↩ 원복 (${rawHtml(String(u.at||'').replace('T',' ').slice(5,16))})</button>`)}`+ tpl`${rawHtml(ST.IS_VIEWER? '' : '<button class="pill ghost" id="eqDiag" title="동기화가 안 될 때 원인을 찾아봅니다">🩺 진단</button>')}`+
+        tpl` · 취소 ${s.cancel.length}건${rawHtml(s.moved.length? ' · 이전됨 '+s.moved.length+'건':'')}</span>`;
+  var h;
+  if(gn){
+    h=tpl`<details class="card eq-chk${bad?' bad':' ok'}" id="eqChk"${rawHtml(needOpen? ' open':'')}><summary><b>${bad? '⚠ 신청 ↔ 현황 맞지 않음 '+s.gap.length+'건' : '✓ 신청 ↔ 현황 일치'}</b> ${rawHtml(stat)}<span class="mini eq-chk-more">자세히</span></summary><div class="eq-chk-body"><div class="eq-chk-act">${rawHtml(btns)}<span class="mini" id="eqMsg" style="color:var(--muted)"></span></div>`+   /* 버튼은 요약 줄이 아니라 본문 첫 줄(요약 안 버튼은 접근성 위반) */
+      tpl`<div class="mini" style="margin-top:4px;color:var(--muted)">기준은 «임대 장비 신청 내역» 입니다 — 취소를 뺀 모든 신청이 현황에 «수량»대씩 있어야 하고, 상태·고객사·모델·채널은 신청 내역 값으로 맞춥니다 (출고 전이면 재고)`+ tpl`${u? ' · 마지막 일괄 작업은 «↩ 원복» 으로 되돌릴 수 있습니다':''}</div>`;
+  } else {
+    h=tpl`<div class="card" style="padding:11px 14px;margin-bottom:10px;border-left:4px solid `+ tpl`${bad?'var(--warning,#fab219)':'var(--good,#0ca30c)'}">`+
+    tpl`<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">`+
+      tpl`<b style="font-size:14px">신청 ↔ 현황 대조</b>`+stat+btns+
       tpl`<span class="mini" id="eqMsg" style="color:var(--muted)"></span>`+
     tpl`</div>`+
     tpl`<div class="mini" style="margin-top:4px;color:var(--muted)">기준은 «임대 장비 신청 내역» 입니다 — 취소를 뺀 모든 신청이 현황에 «수량»대씩 있어야 하고, 상태·고객사·모델·채널은 신청 내역 값으로 맞춥니다 (출고 전이면 재고)`+ tpl`${u? ' · 마지막 일괄 작업은 «↩ 원복» 으로 되돌릴 수 있습니다':''}</div>`;
+  }
   if(bad){
     h+=tpl`<div class="mini" style="margin-top:8px;color:var(--ink-2);line-height:1.7">`+
       tpl`${rawHtml(s.gap.slice(0,20).map(function(x){
@@ -470,8 +481,9 @@ export function renderEqPanel(){
   }
   h+=tpl`<div class="mini" id="eqDiagOut" style="margin-top:8px;padding:8px 10px;border-radius:8px;background:var(--bg-2,#f6f7f9);`+
      tpl`line-height:1.75;word-break:break-all;display:${EQ_DIAG?'':'none'}"><div style="float:right;margin:0 0 4px 8px">${closeBtn({id:'eqDiagClose'},'진단 결과 닫기')}</div><div id="eqDiagBody">${rawHtml(EQ_DIAG||'')}</div></div>`;
-  h+='</div>';
+  h+=gn? '</div></details>' : '</div>';
   host.innerHTML=h;
+  var dt=/** @type {any} */(document.getElementById('eqChk')); if(dt){ dt.ontoggle=function(){ EQ_CHK.open=dt.open; }; }
   var b=document.getElementById('eqFixAll'); if(b) b.onclick=eqFixAll;
   var b2=document.getElementById('eqOrphan'); if(b2) b2.onclick=eqOrphanFix;
   var b3=document.getElementById('eqUndo');   if(b3) b3.onclick=eqUndoRun;

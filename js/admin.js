@@ -11,7 +11,7 @@ import { switchView, viewLabelOf, xlsxAoa } from './grid.js';
 import { closeOvl, logChange, openOvl, setAuthTab } from './edit.js';
 import { csFn, qFetch } from './sales.js';
 import { clFetchFx } from './cloud.js';
-import { NTF, ntfAdminRender, ntfCall, opsItems, opsLoad } from './notify.js';
+import { NTF, ntfAccounts, ntfAdminRender, ntfCall, ntfDisp, ntfProf, opsItems, opsLoad, profEdit } from './notify.js';
 
 
 /* ===== 관리자 (super_admin 전용) — 계정·권한 관리 ===== */
@@ -1245,6 +1245,7 @@ export async function axLoad(){
   try{
     var both=await Promise.all([sbWrite('POST','rpc/admin_list_users',{}), sbWrite('POST','rpc/mfa_admin_list',{}).catch(function(){ return null; })]);
     AX_USERS=both[0]||[];
+    try{ await ntfAccounts(); }catch(e){}   /* ㊿+189 표시 이름 열 */
     AX_MFA=null; if(both[1]){ AX_MFA={}; both[1].forEach(function(r){ AX_MFA[String(r.email||'').toLowerCase()]={enrolled:!!r.enrolled, required:!!((r.eff_required!=null)? r.eff_required : r.required)}; }); }
     var adm=AX_USERS.filter(function(u){ return /^(super_admin|admin)$/.test(String(u.role||'')); }), mf=function(u){ return AX_MFA && AX_MFA[String(u.email||'').toLowerCase()]; };
     axMsg(AX_USERS.length+'개 계정 · 관리자 '+adm.length+(AX_MFA? '(인증 앱 '+adm.filter(function(u){ var m=mf(u); return m && m.enrolled; }).length+')' : '')+' · '+AX_STALE_DAYS+'일 넘게 안 씀 '+AX_USERS.filter(function(u){ return axStale(u); }).length);
@@ -1256,7 +1257,7 @@ export function axPaint(){
   var q=($('#axQ').value||'').trim().toLowerCase();
   var rows=AX_USERS.filter(function(u){ return !q || String(u.email||'').toLowerCase().indexOf(q)>=0; });
   var t=$('#axTable');
-  t.innerHTML='<thead><tr><th>이메일</th><th>권한</th><th>2단계 인증</th><th>마지막 로그인</th><th>생성일</th><th class="act" style="width:170px"><span class="sr">동작</span></th></tr></thead>';
+  t.innerHTML='<thead><tr><th>이메일</th><th>표시 이름</th><th>권한</th><th>2단계 인증</th><th>마지막 로그인</th><th>생성일</th><th class="act" style="width:170px"><span class="sr">동작</span></th></tr></thead>';   /* ㊿+189 표시 이름 */
   var tb=document.createElement('tbody');
   rows.forEach(function(u){
     var tr=document.createElement('tr');
@@ -1266,7 +1267,9 @@ export function axPaint(){
       tpl`<option value="">— 권한 없음 —</option>`+
       tpl`${rawHtml(AX_ROLES.map(function(r){ return tpl`<option value="${rawHtml(r)}"${u.role===r?' selected':''}>${rawHtml(r)}</option>`; }).join(''))}`+
       tpl`</select>`;
+    var pf=ntfProf(u.email||'');
     tr.innerHTML=tpl`<td>${u.email||''}${rawHtml(me?' <span class="mini">(나)</span>':'')}</td>`+
+      tpl`<td class="ax-prof">${rawHtml(ntfDisp(pf)? tpl`<span>${ntfDisp(pf)}</span>` : '<span class="mini" style="color:var(--muted)">—</span>')} <button type="button" class="cbtn ax-pf" data-axpf="${u.email||''}" title="표시 이름 · 직급(담당 · 알림에 이 이름으로)">${rawHtml(ntfDisp(pf)? '✎' : '이름 적기')}</button></td>`+
       tpl`<td>${rawHtml(sel)}</td>`+
       tpl`<td class="mini">${rawHtml(axMfaCell(u))}</td>`+
       tpl`<td class="mini">${axTime(u.last_sign_in)}${rawHtml(axStale(u)? tpl` <span class="ax-stale" title="${AX_STALE_DAYS}일 넘게 로그인하지 않음 — 안 쓰는 계정이면 권한을 없애거나 삭제">${axStale(u)==='never'? '한 번도 안 씀' : '오래 안 씀'}</span>` : '')}</td>`+
@@ -1284,6 +1287,7 @@ export function axPaint(){
     tb.appendChild(tr);
   });
   t.appendChild(tb);
+  t.querySelectorAll('button[data-axpf]').forEach(function(b){ /** @type {any} */(b).onclick=function(){ profEdit(/** @type {any} */(b).dataset.axpf, {after:function(){ axPaint(); }}); }; });   /* ㊿+189 */
   t.querySelectorAll('select[data-ax]').forEach(function(sel){
     sel.onchange=function(){
       var em=this.dataset.ax, v=this.value, that=this;
@@ -1398,29 +1402,32 @@ export async function renderAccount(){
   function row(k,v){ return tpl`<div style="display:flex;gap:14px;padding:9px 2px;border-bottom:1px solid var(--ring)">`+
     tpl`<span style="width:110px;color:var(--muted);font-size:13px;flex-shrink:0">${rawHtml(k)}</span>`+
     tpl`<span style="font-size:14px">${rawHtml(v)}</span></div>`; }
+  var prof=null; try{ await ntfAccounts(); prof=ntfProf(ST.AUTH_USER||''); }catch(e){}   /* ㊿+189 표시 이름 */
   box.innerHTML=
     row('이메일', esc(ST.AUTH_USER||''))+
+    row('표시 이름', tpl`<span id="accProf">${rawHtml(ntfDisp(prof)? tpl`<b>${ntfDisp(prof)}</b>` : tpl`<span style="color:var(--muted)">아직 없음 — 담당 · 알림에 계정 id(${(ST.AUTH_USER||'').split('@')[0]})로 보입니다</span>`)}</span> <button type="button" class="cbtn" id="accProfEdit" style="margin-left:8px">${rawHtml(ntfDisp(prof)? '고치기' : '이름 · 직급 적기')}</button>`)+
     row('권한', tpl`<b>${ri[0]}</b>${rawHtml(role? tpl` <span class="mini">(${role})</span>`:'')}`)+
     row('권한 설명', tpl`<span style="color:var(--ink-2)">${ri[1]}</span>`)+
     row('로그인 세션', tpl`<span style="color:var(--ink-2)">${sessTxt}</span>`);
+  var pe=/** @type {any} */(box.querySelector('#accProfEdit')); if(pe) pe.onclick=function(){ profEdit(ST.AUTH_USER||'', {after:function(){ renderAccount(); }}); };
   var act=document.createElement('div');
   act.style.cssText='display:flex;gap:10px;margin-top:18px';
-  var bp=document.createElement('button'); bp.className='pill'; bp.textContent='🔑 비밀번호 변경';
+  var bp=document.createElement('button'); bp.className='pill'; bp.textContent='비밀번호 변경';
   bp.onclick=function(){ openOvl('ovlAuth'); setAuthTab('pw'); };
   var bo=document.createElement('button'); bo.className='pill ghost'; bo.textContent='로그아웃';
   bo.style.cssText='border-color:var(--critical,#d03b3b);color:var(--critical,#d03b3b)';
   bo.onclick=doLogout;
-  var bu=document.createElement('button'); bu.className='pill ghost'; bu.textContent='📢 업데이트 내역'; bu.onclick=updOpenAll;   /* ㊿+148 */
+  var bu=document.createElement('button'); bu.className='pill ghost'; bu.textContent='업데이트 내역'; bu.onclick=updOpenAll;   /* ㊿+148 */
   var ba=document.createElement('button'); ba.className='pill ghost'; ba.id='accOutAll'; ba.textContent='모든 기기에서 로그아웃'; ba.onclick=function(){ logoutAll(); };   /* ㊿+180 */
   act.appendChild(bp); act.appendChild(bu); act.appendChild(ba); act.appendChild(bo);
   act.style.flexWrap='wrap';
   box.appendChild(act);
   /* 보안 — 2단계 인증(인증 앱) · 계정 단위, 본인이 켬 */
   var sec=document.createElement('div'); sec.style.cssText='margin-top:22px';
-  sec.innerHTML=tpl`<div style="font-size:14px;font-weight:650;margin-bottom:4px">보안</div>${rawHtml(row('🔐 2단계 인증', '<div id="accMfa"></div>'))}`;
+  sec.innerHTML=tpl`<div style="font-size:14px;font-weight:650;margin-bottom:4px">보안</div>${rawHtml(row('2단계 인증', '<div id="accMfa"></div>'))}`;
   box.appendChild(sec); mfaCardRender(sec.querySelector('#accMfa'));
   /* ㊿+180 최근 로그인(login_log · SQL 112) — 모르는 기기가 있으면 «모든 기기에서 로그아웃» 뒤 비밀번호 변경 */
-  var lg=document.createElement('div'); lg.innerHTML=row('🕘 최근 로그인', '<div id="accLogins" class="mini">불러오는 중…</div>'); sec.appendChild(lg.firstChild);
+  var lg=document.createElement('div'); lg.innerHTML=row('최근 로그인', '<div id="accLogins" class="mini">불러오는 중…</div>'); sec.appendChild(lg.firstChild);
   accLoginsLoad();
   /* 설정 — 이 브라우저에만 저장 (localStorage) */
   var set=document.createElement('div'); set.style.cssText='margin-top:22px';
@@ -1430,8 +1437,8 @@ export async function renderAccount(){
         return tpl`<option value="${rawHtml(m)}"${m===curIdle?' selected':''}>${idleLabel(m)}${m? ' 동안 활동 없으면':''}</option>`; }).join(''))}`+ tpl`</select>`+
       tpl`<div class="mini" style="margin-top:5px;line-height:1.6">마우스·키보드·스크롤 입력이 정한 시간 동안 없으면 이 탭에서 자동으로 로그아웃합니다. 끝나기 1분 전에 알림이 뜹니다.</div>`))}`+
     tpl`${rawHtml(row('화면 디자인', tpl`<select id="accLook" aria-label="화면 디자인" style="height:30px;min-width:200px">${rawHtml(Object.keys(LOOKS).map(function(k){ return tpl`<option value="${rawHtml(k)}"${k===look0?' selected':''}>${LOOKS[k]}</option>`; }).join(''))}</select>`+
-      tpl`<div class="mini" style="margin-top:5px;line-height:1.6">지니언스: 정식 로고 · 브랜드 색 · 글자 메뉴(그룹 접기) — 기능은 커맨드 센터와 같음 · 커맨드 센터: 아이콘 레일 + 상단 커맨드 바(검색·이동·AI) + 인박스 홈 + 장비 운영 보드 + 고객 360 패널 · 심플: 평면 디자인에 기존 사이드바 · 클래식: 이전 디자인. 바꾸면 화면을 다시 읽습니다.</div>`))}`;
-  var prow=document.createElement('div'); prow.innerHTML=row('📱 앱으로 설치', tpl`<div id="accPwa">${rawHtml(pwaHintHtml())}</div>`);
+      tpl`<div class="mini" style="margin-top:5px;line-height:1.6">지니언스: 정식 로고 · 브랜드 색 · 글자 메뉴(그룹 접기) — 기능은 커맨드 센터와 같음 · 커맨드 센터: 아이콘 레일 + 상단 커맨드 바(검색·이동·AI) + 인박스 홈 + 장비 운영 보드 + 고객 한눈에 패널 · 심플: 평면 디자인에 기존 사이드바 · 클래식: 이전 디자인. 바꾸면 화면을 다시 읽습니다.</div>`))}`;
+  var prow=document.createElement('div'); prow.innerHTML=row('앱으로 설치', tpl`<div id="accPwa">${rawHtml(pwaHintHtml())}</div>`);
   set.appendChild(prow.firstChild);
   var meb=document.getElementById('btnMenuEdit');
   if(meb && meb.style.display!=='none'){

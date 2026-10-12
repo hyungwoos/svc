@@ -2958,4 +2958,236 @@ button.hm-own.hm-asg:focus-visible{outline:2px solid var(--s1);outline-offset:1p
 .fb-n{margin-top:4px;color:var(--ink-2)}
 #fbText{width:100%;font:inherit;font-size:14px;line-height:1.5;padding:9px 11px;border:1px solid var(--ring);border-radius:9px;background:var(--surface);color:var(--ink);resize:vertical;min-height:110px}
 .fb-empty{margin:0}
+/* ==== ㊿+186 전역 정리 — 제목 한 번 · 단위 한 번 · 더보기 메뉴 · 행 버튼은 올렸을 때 · 빈 화면 버튼 ==== */
+/* 화면 안 첫 제목이 상단 제목과 같으면 글자만 숨김(화면 읽기엔 남김) · 그 옆 단위 칩도 숨김(상단 ₩ 배지가 있음) */
+/* 폰은 상단 제목 줄이 없어 화면 안 제목을 그대로 둠 */
+@media (min-width:761px){
+  html[data-skin="gn"] .vt-dup .vt-txt{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  html[data-skin="gn"] .vt-dup .ubadge{display:none}
+  html[data-skin="gn"] h2#dvTitle.vt-dup{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);margin:0}
+  html[data-skin="gn"] #viewData .card-head .t:has(> #dvTitle.vt-dup){margin-top:0}
+  html[data-skin="gn"] #viewData .card-head .t:has(> #dvTitle.vt-dup) #dvCap{margin-top:0}
+  html[data-skin="gn"] .vt-dup small{display:block;margin:0;font-weight:400}
+}
+@media (max-width:760px){ html[data-skin="gn"] .vt-dup .ubadge{display:none} }
+/* «⋯ 더보기» 메뉴 — 초기화 · 새로고침 · 글자 크기 · 다크 */
+html[data-skin="gn"] #btnMore{padding:0 9px;min-width:34px}
+.more-menu{position:fixed;z-index:1200;min-width:200px;padding:6px;background:var(--surface);border:1px solid var(--ring);border-radius:12px;box-shadow:0 14px 34px -14px rgba(0,0,0,.32);display:flex;flex-direction:column;gap:2px}
+.more-menu[hidden]{display:none}
+html[data-skin="gn"] .topbar .more-menu .mm-it,html[data-skin="gn"] .topbar .more-menu .mm-it.pill,html[data-skin="gn"] .topbar .more-menu .mm-it.cbtn,html[data-skin="gn"] .topbar .more-menu .mm-it.icb{display:flex;align-items:center;gap:9px;width:100%;min-width:0;justify-content:flex-start;height:38px;min-height:38px;margin:0;padding:0 11px;border:0;border-radius:8px;background:transparent;color:var(--ink);font:inherit;font-size:14px;font-weight:500;text-align:left;box-shadow:none}
+html[data-skin="gn"] .topbar .more-menu .mm-it span{display:inline}
+html[data-skin="gn"] .topbar .more-menu .mm-it:hover,html[data-skin="gn"] .topbar .more-menu .mm-it:focus-visible{background:var(--surface-2,var(--plane))}
+html[data-skin="gn"] .topbar .more-menu .mm-it[hidden]{display:none}
+html[data-skin="gn"] .topbar .more-menu .mm-it svg{flex:0 0 auto}
+/* 표 행의 동작 버튼(👁 ✎ ⋯)은 마우스를 올리거나 키보드로 들어갔을 때만 — 터치 화면은 늘 보임 */
+@media (hover:hover) and (pointer:fine){
+  html[data-skin="gn"] .dgrid tbody tr td.act .ab{opacity:0;transition:opacity .12s}
+  html[data-skin="gn"] .dgrid tbody tr:hover td.act .ab,html[data-skin="gn"] .dgrid tbody tr:focus-within td.act .ab,html[data-skin="gn"] .dgrid tbody tr td.act .ab:focus-visible,html[data-skin="gn"] .dgrid tbody tr td.act .ab[aria-expanded="true"]{opacity:1}
+}
+/* 빈 화면 할 일 버튼 */
+.dg-empty .dg-cta{display:inline-flex}
+/* 푸터는 한 줄 · 작게 */
+html[data-skin="gn"] .foot{font-size:12px;color:var(--muted)}
+/* AI 도움말 버튼에 글자가 생김 — 아이콘만 쓰던 고정 폭 해제 */
+html[data-skin="gn"] #dvHelp.icb{width:auto;padding:0 10px;justify-content:flex-start}
+@media (min-width:761px){
+  html[data-skin="gn"] .vt-dup{flex:1 1 auto;text-align:left;min-width:0}
+  html[data-skin="gn"] .vt-dup small{display:block;margin:0;font-weight:400;color:var(--ink-2);font-size:13px}
+}
+@media (max-width:760px){ html[data-skin="gn"] #dvHelp.icb span{display:none} html[data-skin="gn"] #dvHelp.icb{width:34px;padding:0;justify-content:center} }
+#btnFont .fs-ico{font-size:13px;font-weight:700;letter-spacing:-.02em}
+/* 메뉴 안에서는 좁은 창에서도 글자를 보임(좁은 창의 아이콘만 규칙보다 뒤에 · 같은 세기) */
+html[data-skin="gn"] .topbar .more-menu :is(#btnWidgets,#btnReload,#btnTheme,#btnFont,#btnViewReset).icb span{display:inline}
+html[data-skin="gn"] .topbar .more-menu :is(#btnWidgets,#btnReload,#btnTheme,#btnFont,#btnViewReset).icb{width:100%;padding:0 11px;justify-content:flex-start}
+@media (max-width:760px){ .more-menu #btnTheme,.more-menu #btnReload{font-size:14px;min-width:0} }
+@media (max-width:760px){ .more-menu #btnTheme::before,.more-menu #btnReload::before{content:none} }
+@media (max-width:760px){ .more-menu .mm-it{display:flex;gap:9px} .more-menu .mm-it svg{margin-right:0} }
+html[data-skin="gn"] .topbar .more-menu .mm-it{gap:9px}
+/* ==== ㊿+187 표 위 필터 한 줄(지니언스) — 보기 탭 · 검색 · «필터» 팝오버 · 걸린 조건 칩 · 저장된 보기 · ⋯ 도구 ==== */
+html[data-skin="gn"] #viewData .dbar.fbar{gap:8px;margin-bottom:10px;align-items:center}
+html[data-skin="gn"] .fbar #dvWvBar{margin:0;gap:0}
+html[data-skin="gn"] .fbar #dvWvBar .wv-l,html[data-skin="gn"] .fbar #dvWvBar .wv-d{display:none}
+html[data-skin="gn"] .fbar #dvWvBar .seg button{height:32px;padding:0 13px;font-size:13px}
+html[data-skin="gn"] .fbar #dvSearch{min-width:200px;flex:0 1 300px;height:32px}
+html[data-skin="gn"] .fbar :is(.fb-btn,#dvCsv,#dvCols,#dvHelp,#dvAdd,#dvMoreBtn){height:32px}
+html[data-skin="gn"] .fb-btn[hidden]{display:none}
+html[data-skin="gn"] .fb-btn .fb-n{margin-left:1px;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:var(--brand-solid);color:#fff;font-size:12px;font-weight:700;display:inline-flex;align-items:center;justify-content:center}
+html[data-skin="gn"] .fb-btn .fb-n[hidden]{display:none}
+html[data-skin="gn"] .fb-btn.on{border-color:var(--brand-solid);color:var(--brand-ink)}
+html[data-skin="gn"] .fb-btn[aria-expanded="true"]{background:var(--surface-2);border-color:var(--axis)}
+html[data-skin="gn"] .fbar #dvMoreBtn{width:32px;padding:0;justify-content:center}
+html[data-skin="gn"] .fbar .fb-qoi:empty{display:none}
+html[data-skin="gn"] .fbar .fb-qoi .qoi-btn{margin:0;height:32px}
+html[data-skin="gn"] .fb-menu{min-width:190px}
+html[data-skin="gn"] .fb-menu .mm-it{display:flex;align-items:center;gap:9px;width:100%;height:36px;padding:0 11px;border:0;background:transparent;color:var(--ink);font:inherit;font-size:14px;border-radius:8px;cursor:pointer;justify-content:flex-start;text-align:left}
+html[data-skin="gn"] .fb-menu .mm-it span{display:inline}
+html[data-skin="gn"] .fb-menu .mm-it:hover,html[data-skin="gn"] .fb-menu .mm-it:focus-visible{background:var(--surface-2)}
+/* «필터» 팝오버 */
+.fb-pop{position:fixed;z-index:1250;width:min(620px,calc(100vw - 16px));overflow:auto;background:var(--surface);border:1px solid var(--ring);border-radius:14px;box-shadow:0 18px 44px -16px rgba(0,0,0,.35);padding:2px 14px 10px}
+.fb-pop[hidden]{display:none}
+.fb-sec{padding:10px 0;border-bottom:1px solid var(--grid)}
+.fb-sec[hidden]{display:none}
+.fb-st{font-size:12px;font-weight:700;color:var(--muted);margin-bottom:7px}
+.fb-pop :is(#dvChipBar,#dvQvBar,#dvLensBar){margin-bottom:0!important}
+.fb-pop #dvQvBar .wv-l,.fb-pop #dvLensBar > span.mini:first-child{display:none}
+.fb-ft{display:flex;align-items:center;gap:8px;padding-top:10px}
+.fb-ft .spacer{flex:1}
+/* 걸린 조건 칩 줄 */
+.dv-chips{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:-2px 0 10px}
+.dv-chips[hidden]{display:none}
+.dvc{height:26px;padding:0 3px 0 9px;gap:5px;border-radius:999px;font-weight:600}
+.dvc .dvc-l{color:var(--ink-2);font-weight:500}
+.dvc-x{border:0;background:transparent;color:inherit;width:20px;height:20px;border-radius:999px;cursor:pointer;font:inherit;font-size:12px;display:inline-flex;align-items:center;justify-content:center;padding:0}
+.dvc-x:hover,.dvc-x:focus-visible{background:rgba(0,0,0,.09)}
+.dv-chips #dvCustBar{margin:0}
+.dv-chips #dvFclr.fb-clr{height:26px;padding:0 9px;border-color:transparent;color:var(--critical);background:transparent}
+.dv-chips #dvFclr.fb-clr:hover{background:rgba(208,59,59,.08)}
+/* 저장된 보기 */
+.fv-menu{min-width:320px;max-width:min(440px,calc(100vw - 16px));padding:10px 12px}
+.fv-h{display:flex;align-items:baseline;gap:8px;margin-bottom:8px}
+.fv-h b{font-size:14px}
+.fv-l{display:flex;flex-direction:column;gap:2px;max-height:40vh;overflow:auto}
+.fv-it{display:flex;align-items:center;gap:4px}
+.rmenu .fv-go{flex:1;flex-direction:column;align-items:flex-start;gap:2px;padding:7px 9px}
+.rmenu .fv-go b{font-size:14px}
+.rmenu .fv-x{width:28px;padding:0;justify-content:center;color:var(--muted);flex:none}
+.fv-empty{margin:4px 0 2px;color:var(--muted)}
+.fv-new{border-top:1px solid var(--grid);margin-top:8px;padding-top:8px}
+.fv-cur{color:var(--ink-2)}
+.fv-row{display:flex;gap:6px;margin-top:6px}
+.fv-row input{flex:1;min-width:0;height:32px;border:1px solid var(--ring);border-radius:8px;padding:0 9px;font:inherit;background:var(--surface-2);color:var(--ink)}
+.fv-row input:disabled{opacity:.55}
+.rmenu .fv-row .cbtn{width:auto;flex:none;display:inline-flex;padding:0 10px;font-size:12px}
+.rmenu .fv-row .cbtn:disabled{opacity:.5;cursor:default}
+@media (max-width:760px){
+  html[data-skin="gn"] .fbar #dvWvBar{flex:1 1 100%}
+  html[data-skin="gn"] .fbar #dvWvBar .seg{display:flex;width:100%}
+  html[data-skin="gn"] .fbar #dvWvBar .seg button{flex:1;padding:0 6px}
+  html[data-skin="gn"] .fbar #dvSearch{flex:1 1 100%}
+  .fb-pop{left:8px!important;right:8px;width:auto}
+  .fv-menu{left:8px!important;right:8px;max-width:none}
+}
+@media (max-width:1200px){ html[data-skin="gn"] .fbar #dvCount .dv-lgd{display:none} }
+@media (max-width:760px){
+  html[data-skin="gn"] .fbar :is(#dvSavedBtn,#dvCsv,#dvCols).icb span{display:none}
+  html[data-skin="gn"] .fbar :is(#dvSavedBtn,#dvCsv,#dvCols).icb{width:34px;padding:0;justify-content:center}
+  html[data-skin="gn"] .fbar #dvSavedBtn .fb-n{position:absolute;top:-6px;right:-6px;margin:0}
+  html[data-skin="gn"] .fbar #dvSavedBtn{position:relative}
+  html[data-skin="gn"] .fbar #dvCount{flex:1 1 100%;order:9;text-align:right;font-size:12px;margin-top:-2px}
+  html[data-skin="gn"] .fbar .spacer{display:none}
+}
+/* ==== ㊿+187 사업 영역 한 화면 — 영역 선택 띠 ==== */
+html[data-skin="gn"] .area-sel{display:flex;gap:10px 22px;flex-wrap:wrap;align-items:flex-start;margin:0 0 14px;padding:10px 12px;background:var(--surface);border:1px solid var(--grid);border-radius:14px}
+html[data-skin="gn"] .area-g{display:flex;align-items:stretch;gap:6px;flex-wrap:wrap}
+html[data-skin="gn"] .area-gl{align-self:center;font-size:12px;font-weight:700;color:var(--muted);margin-right:2px;white-space:nowrap}
+html[data-skin="gn"] .area-sel button{display:flex;flex-direction:column;align-items:flex-start;gap:1px;min-width:118px;padding:6px 11px;border:1px solid var(--grid);border-radius:10px;background:var(--surface);color:var(--ink);font:inherit;cursor:pointer;text-align:left;line-height:1.3}
+html[data-skin="gn"] .area-sel button b{font-size:13px;font-weight:600}
+html[data-skin="gn"] .area-sel button small{font-size:12px;color:var(--muted);white-space:nowrap}
+html[data-skin="gn"] .area-sel button:hover{border-color:var(--axis);background:var(--surface-2)}
+html[data-skin="gn"] .area-sel button[aria-selected="true"]{border-color:var(--brand-solid);background:var(--brand-t);color:var(--brand-ink)}
+html[data-skin="gn"] .area-sel button[aria-selected="true"] small{color:inherit}
+html[data-skin="gn"] .area-sel button:focus-visible{outline:2px solid var(--s1);outline-offset:1px}
+html[data-skin="gn"] .area-cap{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:0 2px 12px}
+html[data-skin="gn"] .area-cap b{font-size:15px}
+html[data-skin="gn"] .area-cap .mini{color:var(--ink-2)}
+@media (max-width:760px){
+  html[data-skin="gn"] .area-sel{gap:10px;padding:10px}
+  html[data-skin="gn"] .area-g{width:100%}
+  html[data-skin="gn"] .area-gl{width:100%}
+  html[data-skin="gn"] .area-sel button{flex:1 1 calc(50% - 6px);min-width:0}
+}
+/* 다크: 표 안 «갱신 상태» 같은 주의 칩 글자 대비 4.47 → 4.5 이상 (사업 영역 계약 목록에서 걸림) */
+html:not([data-theme="light"]) .ctag.warn{color:#d99000}
+html[data-theme="dark"] .ctag.warn{color:#d99000}
+/* ==== ㊿+188 화면별 정리(지니언스) — 분석 표 0 행 접기 · 필터 접기 · 대조 카드 한 줄 · 입력 창 고정 푸터 · 상세 창 · 작은 표 · 위성 · 단위 칩 · 폰 도구줄 ==== */
+/* 분석 표: 0 인 기간 접기 */
+.zr-tg td{padding:4px 8px!important;background:var(--surface-2)}
+.zr-btn{border:0;background:transparent;color:var(--s1-ink);font:inherit;font-size:12px;font-weight:600;cursor:pointer;padding:2px 4px;border-radius:6px}
+.zr-btn:hover,.zr-btn:focus-visible{background:var(--surface);outline:1px solid var(--ring)}
+.zr-row[hidden]{display:none}
+/* 해지율 · 고객사 증감: 제품 · 사업영역 … 칩 줄은 «필터 ▾» 로 접음 */
+.cr-flt{margin-top:4px}
+:is(.cr-flt,html[data-skin="gn"] .cr-adv)>summary{cursor:pointer;font-size:13px;font-weight:600;color:var(--ink-2);padding:6px 0;list-style:none;display:flex;align-items:center;gap:8px;flex-wrap:nowrap;min-width:0}
+:is(.cr-flt,html[data-skin="gn"] .cr-adv)>summary>*{min-width:0}
+:is(.cr-flt,html[data-skin="gn"] .cr-adv)>summary::-webkit-details-marker{display:none}
+:is(.cr-flt,html[data-skin="gn"] .cr-adv)>summary::before{content:'';width:7px;height:7px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(-45deg);margin:0 2px 0 2px;transition:transform .15s;flex:none}
+:is(.cr-flt,html[data-skin="gn"] .cr-adv)[open]>summary::before{transform:rotate(45deg)}
+.cr-flt .cr-flt-sel{color:var(--brand-ink);font-weight:600}
+.cr-flt[open]>summary{margin-bottom:4px}
+/* 유입경로: 0 인 경로 한 줄 */
+.ls-zero{margin:-6px 0 14px;color:var(--muted)}
+/* 장비 신청 · 현황: 신청 ↔ 현황 대조 카드 — 다 맞으면 한 줄 */
+details.eq-chk{padding:0;margin-bottom:10px;border-left:4px solid var(--good,#0ca30c)}
+details.eq-chk.bad{border-left-color:var(--warning,#fab219)}
+details.eq-chk>summary{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:9px 14px;cursor:pointer;list-style:none;font-size:13px}
+details.eq-chk>summary::-webkit-details-marker{display:none}
+details.eq-chk>summary>b{font-size:14px}
+details.eq-chk>summary .eq-chk-more{margin-left:auto;color:var(--muted);font-size:12px}
+details.eq-chk[open]>summary .eq-chk-more{display:none}
+details.eq-chk .eq-chk-body{padding:0 14px 11px}
+details.eq-chk.ok #eqFixAll{display:none}
+/* 입력 · 상세 창: 저장 줄을 창 아래에 붙임(PC 도 — 긴 입력에서 찾지 않게) */
+@media (min-width:761px){
+  html[data-skin="gn"] .ovl .modal>.mact{position:sticky;bottom:-18px;z-index:5;background:var(--surface);margin:16px -20px -18px;padding:10px 20px 12px;border-top:1px solid var(--grid)}
+  html[data-skin="gn"] #ovlC360 .modal>.mact{margin:12px -22px -20px;padding:12px 22px 14px}
+}
+/* 계약 상세: 변동 없는 금액은 한 줄 · 빈 이력 */
+.dt-flat{margin:0;padding:10px 12px;background:var(--surface-2);border-radius:10px}
+.dt-nolog{padding:8px 4px!important}
+/* 작은 표(몇 줄짜리): 검색 · 엑셀 · 열 숨김 */
+html[data-skin="gn"] .fbar.fb-small :is(#dvSearch,#dvCsv,#dvCols){display:none!important}
+/* 단위 «천원» 칩은 상단 ₩ 배지가 있는 PC 에선 숨김(단위 한 번) · 폰은 상단 배지가 없어 그대로 */
+@media (min-width:761px){ html[data-skin="gn"] .ukw{display:none} }
+/* 위성(견적 · 리포트 · 정산) 카드: 제목 글자는 상단과 겹쳐 숨기고 단위 배지 · 새 창 버튼만 · iframe 은 카드에 붙임 */
+html[data-skin="gn"] .sat-head .sat-ttl{display:none}
+html[data-skin="gn"] .sat-head{padding:2px 6px 8px!important}
+html[data-skin="gn"] :is(#viewQuote,#viewPreport,#viewS1,#viewKk) .card{padding:8px!important}
+html[data-skin="gn"] :is(#viewQuote,#viewPreport,#viewS1,#viewKk) iframe{border-radius:14px!important;background:var(--surface)!important}
+/* 폰: 카드 줄을 도구줄에 합침 — 정렬 select 는 줄에 · 거르기는 필터 안 · 표 보기는 ⋯ */
+@media (max-width:760px){
+  html[data-skin="gn"] .fbar .dvc-l{display:flex;align-items:center;gap:4px;height:32px;margin:0}
+  html[data-skin="gn"] .fbar .dvc-l>span{font-size:12px;color:var(--muted)}
+  html[data-skin="gn"] .fbar .dvc-l select{height:32px;max-width:150px;font-size:13px}
+  html[data-skin="gn"] .fb-pop .dvc-l{display:flex;align-items:center;gap:6px}
+  html[data-skin="gn"] .fb-pop .dvc-l>span{display:none}
+  html[data-skin="gn"] .fb-pop .dvc-l select{height:34px;flex:1;font-size:14px}
+  html[data-skin="gn"] #dvCardBar.fb-merged{display:none}
+  html[data-skin="gn"] .fb-menu :is(#dvCsv,#dvHelp,#dvCols).icb span{display:inline}
+  html[data-skin="gn"] .fb-menu :is(#dvCsv,#dvHelp,#dvCols,#dvCardTg){display:flex;align-items:center;gap:9px;width:100%;padding:0 11px;justify-content:flex-start;height:36px;border:0;background:transparent;font-size:14px;border-radius:8px}
+  html[data-skin="gn"] .fb-menu :is(#dvCsv,#dvHelp,#dvCols,#dvCardTg):hover{background:var(--surface-2)}
+}
+@media (max-width:760px){ .fb-pop #dvLensBar{flex-wrap:wrap!important;overflow:visible;padding-bottom:0} }
+.c360-eq4[hidden]{display:none}
+details.eq-chk .eq-chk-act{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+details.eq-chk .eq-chk-act:empty{display:none}
+/* ==== ㊿+189 개선 요청 첨부 · 표시 이름 ==== */
+.fb-att{margin-top:-4px}
+.fb-att-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.fb-att-bar .mini{color:var(--muted)}
+.fb-file{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;clip:rect(0 0 0 0)}
+.fb-att-btn{cursor:pointer}
+.fb-att-btn:focus-within{outline:2px solid var(--s1);outline-offset:1px}
+.fb-prev{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.fb-prev[hidden]{display:none}
+.fb-pv{position:relative;display:flex;flex-direction:column;gap:2px;width:112px;padding:6px;border:1px solid var(--ring);border-radius:10px;background:var(--surface-2);font-size:12px}
+.fb-pv img{width:100%;height:68px;object-fit:cover;border-radius:6px;background:#fff}
+.fb-pv .fb-pv-f{display:flex;align-items:center;justify-content:center;height:68px;color:var(--muted);background:var(--surface);border-radius:6px}
+.fb-pv .fb-pv-n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.fb-pv .mini{color:var(--muted)}
+.fb-pv-x{position:absolute;top:2px;right:2px;width:22px;height:22px;border:0;border-radius:999px;background:rgba(0,0,0,.55);color:#fff;font-size:12px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0}
+.fb-pv-x:hover,.fb-pv-x:focus-visible{background:rgba(0,0,0,.8)}
+.modal.fb-drop{outline:2px dashed var(--brand);outline-offset:-6px}
+.fb-fs{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.fb-f{display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 9px;border:1px solid var(--ring);border-radius:999px;background:var(--surface);color:var(--ink);font:inherit;font-size:12px;cursor:pointer;max-width:100%}
+.fb-f>span:first-of-type{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px}
+.fb-f .mini{color:var(--muted)}
+.fb-f:hover{border-color:var(--axis);background:var(--surface-2)}
+.fb-f[aria-expanded="true"]{border-color:var(--brand-solid);color:var(--brand-ink)}
+.fb-f.busy{opacity:.6}
+.fb-fprev{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.fb-fprev:empty{display:none}
+.fb-fimg img{max-width:100%;max-height:320px;border:1px solid var(--ring);border-radius:10px;background:#fff}
+.ax-prof{white-space:nowrap}
+.ax-prof .ax-pf{height:24px;padding:0 7px;margin-left:4px;font-size:12px}
+@media (max-width:760px){ .fb-pv{width:calc(50% - 4px)} .fb-f>span:first-of-type{max-width:140px} }
 /* ==== ㊿+166 새 디자인 end ==== */

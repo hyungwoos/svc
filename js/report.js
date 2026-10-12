@@ -1532,7 +1532,7 @@ export function renderReportAuto(){
   h+=tpl`<div class="pr-card" style="margin-bottom:14px"><h3>📨 <span contenteditable spellcheck="false">인바운드</span> <small>${d.inb.length}건${ST.RAWX.inbound?'':' · 불러오는 중…'}</small>${rawHtml(rpCopyBtn('rpTblInb'))}${rawHtml(inc('inb'))}</h3>`+
     tpl`${rawHtml(tbl('rpTblInb',[['상태'],['건수',1]], Object.keys(inbBy).sort(function(a,b){return inbBy[b]-inbBy[a];}).map(function(k){ return [k,{t:inbBy[k],n:1}]; }),'해당 월 인바운드가 없습니다'))}`+
     tpl`<p class="pr-note" id="rpInbX" contenteditable spellcheck="false" style="margin-top:6px">${rawHtml(inbNote)}</p></div>`;
-  h+=tpl`<div class="pr-card" style="margin-bottom:14px"><h3>🎯 <span contenteditable spellcheck="false">OI 파이프라인</span> <span class="ubadge sm">₩ 천원</span><small>현재 시점 스냅샷</small>${rawHtml(rpCopyBtn('rpK2'))}${rawHtml(inc('oi'))}</h3><div class="pr-out" id="rpK2" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">`+
+  h+=tpl`<div class="pr-card" style="margin-bottom:14px"><h3>🎯 <span contenteditable spellcheck="false">OI 진행 현황</span> <span class="ubadge sm">₩ 천원</span><small>지금 기준</small>${rawHtml(rpCopyBtn('rpK2'))}${rawHtml(inc('oi'))}</h3><div class="pr-out" id="rpK2" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">`+
     tpl`${rawHtml(kpi('진행 중 OI', d.oiOpen.length+'건','등록+진행 단계','rp_oi'))}`+
     tpl`${rawHtml(kpi('예상 금액 합',won(d.oiSum)+'천원','전부 수주 가정 · VAT별도','rp_oi'))}`+
     tpl`${rawHtml(kpi('기대 수주액',won(d.oiW)+'천원','수주가능성 가중','rp_oi'))}`+
@@ -1545,7 +1545,7 @@ export function renderReportAuto(){
       rp_mrr:function(){ kxMrr(all, j, mk(j)+' 월 매출(MRR)', '커스텀 리포트 요약'); },
       rp_cust:function(){ kxCustMrr(all, j, mk(j)+' 활성 고객사', '커스텀 리포트 요약 · 매출 발생 기준'); },
       rp_nc:function(){ var el2=document.getElementById('rpTblNew'); if(el2) el2.scrollIntoView({behavior:'smooth',block:'start'}); },
-      rp_oi:function(){ kxOi(d.oiOpen, '진행 중 OI '+d.oiOpen.length+'건', '커스텀 리포트 · 현재 시점 스냅샷'); },
+      rp_oi:function(){ kxOi(d.oiOpen, '진행 중 OI '+d.oiOpen.length+'건', '내 리포트 · 지금 기준'); },
       an_cap:function(){ var c=rpAnCap(j); kxSimple('월별 신규 등록 (최근 '+c.n+'개월)', '신규 고객사 = 그 달 시작한 계약의 고객사 수 · 계약 = 시작 계약 건수', ['월',{l:'신규 고객사',n:true},{l:'신규 계약',n:true}], c.series.slice().reverse().map(function(x){ return [x.ym, x.cust, x.ct]; })); },
       an_cust:function(){ kxCustMrr(all, j, mk(j)+' 활성 고객사 · 고객사별 월 매출', '커스텀 리포트 분석'); },
       an_mrr:function(){ kxMrr(all, j, mk(j)+' 월 매출 합', '커스텀 리포트 분석'); },
@@ -1796,7 +1796,7 @@ export async function rpMakePpt(){
       var kk=rpKpiData('rpK2');
       if(kk.length){
         var s7=p.addSlide({masterName:'M'});
-        slTitle(s7,'OI 파이프라인 (현재 시점)');
+        slTitle(s7,'OI 진행 현황 (지금 기준)');
         kk.forEach(function(k,i){
           var x=0.5+(i%3)*4.28, y=1.6;
           s7.addShape('roundRect',{x:x,y:y,w:4.05,h:2.45,fill:{color:'F7FAF2'},line:{color:THD,width:1},rectRadius:0.07});

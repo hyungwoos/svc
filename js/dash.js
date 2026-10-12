@@ -3,7 +3,7 @@
 import { APP_VER, ST } from './state.js';
 import { Viz } from './viz.js';
 import { $, $$, baseLabel, baseRange, bizHas, buildBaseSelect, cssv, el, esc, isCC, isGN, kwToWon, lline, mk, mkLabel, monOf, pct, rawHtml, seriesColor, STATE, tpl, won, wonFull, wonToKw, wrapNavIcons, yOf } from './core.js';
-import { boot, CACHE_KEY, ccAfterKpis, ccAnaCount, ccAnalysisOpen, ccHomeLayout, loadFromDb, onData, renderInbox, SB_RAW, sbWrite, themeBtnSync, toast, uiIconize } from './shell.js';
+import { boot, CACHE_KEY, ccAfterKpis, ccAnaCount, ccAnalysisOpen, ccHomeLayout, loadFromDb, onData, deEmojiStart, moreMenuSetup, renderInbox, SB_RAW, sbWrite, themeBtnSync, toast, uiIconize } from './shell.js';
 import { abortAsk, ask, isAsking, loadAiConfig, runQuery, shortQ } from './ai.js';
 import { GRIDS } from './grids.js';
 import { CH_DEFS, chOf, ctSuccessor, liveData, liveDeltaHtml, liveDeltaOpen, liveMultiOpen, liveSheetDiffOpen, openRenewList, renderChannelView } from './analysis.js';
@@ -162,6 +162,7 @@ export function buildControls(){
   });
 
   try{ wrapNavIcons(); ccHomeLayout(); uiIconize(); }catch(e){}
+  try{ moreMenuSetup(); deEmojiStart(); }catch(e){}   /* ㊿+186 */
   $('#btnTheme').onclick=function(){
     var l = document.documentElement.getAttribute('data-theme')==='light';
     document.documentElement.setAttribute('data-theme', l?'dark':'light');
@@ -256,7 +257,7 @@ export function buildControls(){
   (function(){ var nP=ST.DATA.rows.filter(function(r){return !r.parent;}).length, nC=ST.DATA.rows.length-nP;
     $('#periodLabel').textContent = ST.DATA.monthKeys[0]+' ~ '+ST.DATA.monthKeys[ST.M-1]+' · 계약 '+nP.toLocaleString('ko-KR')+'건'+(nC? ' (+부속 '+nC+')':''); })();
   $('#loadedAt').textContent = '읽은 시각 '+ST.DATA.generatedAt;
-  $('#foot').innerHTML = tpl`원본: Supabase DB · <b>금액 단위: 천원</b> (입력도 천원 · 가격표·견적 단가만 원) · 모든 수정은 변경 이력에 기록됩니다 · 포탈 버전 ${rawHtml(APP_VER)}`+ tpl`${rawHtml(ST.DATA.warnings&&ST.DATA.warnings.length? tpl`<br>⚠️ ${rawHtml(ST.DATA.warnings.join(' / '))}` : '')}`;
+  $('#foot').innerHTML = tpl`포탈 ${rawHtml(APP_VER)} · 금액 단위 천원(가격표 · 견적 단가만 원) · 모든 수정은 변경 이력에 남습니다`+ tpl`${rawHtml(ST.DATA.warnings&&ST.DATA.warnings.length? tpl`<br>⚠️ ${rawHtml(ST.DATA.warnings.join(' / '))}` : '')}`;
 }
 export function uniq(f){
   var s={}; ST.DATA.rows.forEach(function(r){ var v=f(r); if(v) s[v]=1; });
@@ -346,12 +347,12 @@ export function pinQuery(q){
   l.push({id:'q'+Date.now().toString(36), q:q});
   qwSave(l);
   renderQWidgets(); applyWidgetOrder(); initWidgetDnD();
-  toast('대시보드 위젯으로 고정했습니다', q);
+  toast('홈 카드로 고정했습니다', q);
 }
 export function removeQWidget(id){
   qwSave(qwList().filter(function(w){ return w.id!==id; }));
   var el0=document.querySelector('[data-w="'+id+'"]'); if(el0) el0.remove();
-  toast('위젯을 제거했습니다','','info');
+  toast('홈 카드를 뺐습니다','','info');
 }
 export function renderQWidgets(){
   var grid=document.querySelector('#viewDash .grid'); if(!grid) return;
@@ -364,7 +365,7 @@ export function renderQWidgets(){
       tpl`<h2 style="font-size:14px">📌 ${shortQ((res&&res.title)||w.q)}</h2>`+
       tpl`<p class="cap" style="margin:2px 0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${w.q}">${shortQ(w.q)}</p></div>`+
       tpl`<button class="qw-btn" data-a="rf" title="새로고침">↻</button>`+
-      tpl`<button class="qw-btn" data-a="rm" title="위젯 제거">✕</button></div>`+ tpl`${rawHtml((res&&res.hero)? tpl`<div class="qw-hero">${res.hero}<small> ${res.unit||''}</small></div>`:'')}`+ tpl`${rawHtml((res&&res.sub)? tpl`<p class="cap" style="margin:-4px 0 8px">${res.sub}</p>`:'')}`+
+      tpl`<button class="qw-btn" data-a="rm" title="홈 카드 빼기">✕</button></div>`+ tpl`${rawHtml((res&&res.hero)? tpl`<div class="qw-hero">${res.hero}<small> ${res.unit||''}</small></div>`:'')}`+ tpl`${rawHtml((res&&res.sub)? tpl`<p class="cap" style="margin:-4px 0 8px">${res.sub}</p>`:'')}`+
       tpl`<div id="qwc_${rawHtml(w.id)}" style="min-height:60px"></div>`;
     grid.appendChild(sec);
     var host=document.getElementById('qwc_'+w.id);
@@ -390,7 +391,7 @@ export function renderQWidgets(){
       host.innerHTML='<p class="cap" style="padding-top:14px">표시할 데이터가 없습니다</p>';
     }
     sec.querySelector('[data-a="rm"]').onclick=function(){ removeQWidget(w.id); };
-    sec.querySelector('[data-a="rf"]').onclick=function(){ renderQWidgets(); applyWidgetOrder(); initWidgetDnD(); toast('위젯을 갱신했습니다','','info'); };
+    sec.querySelector('[data-a="rf"]').onclick=function(){ renderQWidgets(); applyWidgetOrder(); initWidgetDnD(); toast('홈 카드를 갱신했습니다','','info'); };
   });
 }
 
@@ -433,7 +434,7 @@ export function saveWidgetOrder(){
   var keys=[].map.call(grid.querySelectorAll(':scope > [data-w]'),function(s){ return s.dataset.w; });
   var o=widgetPrefs(); o.__order=keys;
   try{ localStorage.setItem(widgetKey(), JSON.stringify(o)); }catch(e){}
-  toast('위젯 배치를 저장했습니다','','info');
+  toast('홈 카드 배치를 저장했습니다','','info');
 }
 /* sticky 상단바의 실제 높이를 --tbh 에 기록 — 카드 스크롤 여백 계산에 씁니다.
    상단바는 좁은 화면에서 두 줄로 접히므로 값이 고정이 아닙니다. */
@@ -457,12 +458,12 @@ export function goWidget(k, label){
   if(ST.CUR_VIEW!=='dash'){ switchView('dash'); }
   try{ if(isCC()) ccAnalysisOpen(true, true); }catch(e){}
   var el0=widgetEl(k);
-  if(!el0){ toast('이동할 위젯을 찾지 못했습니다', label||k, 'info'); return; }
+  if(!el0){ toast('옮길 홈 카드를 찾지 못했습니다', label||k, 'info'); return; }
   if(el0.classList.contains('w-off')){
     var o=widgetPrefs(); o[k]=true;
     try{ localStorage.setItem(widgetKey(), JSON.stringify(o)); }catch(e){}
     applyWidgets();
-    toast('«'+(label||k)+'» 위젯을 다시 켰습니다','숨겨져 있어서 켜고 이동합니다','info');
+    toast('«'+(label||k)+'» 홈 카드를 다시 켰습니다','숨겨져 있어서 켜고 이동합니다','info');
   }
   measureTopbar();
   requestAnimationFrame(function(){
@@ -485,8 +486,8 @@ export function applyWidgetOrder(){
 
 /* ---- 대시보드 위젯 커스터마이징 (사용자별, 이 브라우저에 저장) ---- */
 export var WIDGET_DEFS=[
-  ['hero','히어로 요약'],
-  ['kpi','KPI 카드'], ['goal','연간 목표 진행'], ['mx','월별 종합 장표'],
+  ['hero','위쪽 요약'],
+  ['kpi','핵심 숫자'], ['goal','연간 목표 진행'], ['mx','월별 종합 장표'],
   ['trend','MRR 추이'], ['year','연도별 매출'], ['line','서비스별 MRR'],
   ['ifee','설치비 현황'],
   ['ptn','파트너 실적'], ['ind','산업군'], ['nc','신규·해지 고객수 추이'],
@@ -528,7 +529,7 @@ export function toggleWidgetPanel(){
   p=document.createElement('div'); p.id='widgetPanel';
   p.style.cssText='position:fixed;top:56px;right:18px;z-index:1300;width:238px;background:var(--surface);'+
     'border:1px solid var(--ring);border-radius:14px;box-shadow:0 14px 40px rgba(0,0,0,.16);padding:14px 16px';
-  var h='<div style="font-size:13px;font-weight:700;margin-bottom:10px">⊞ 대시보드 위젯</div>';
+  var h='<div style="font-size:13px;font-weight:700;margin-bottom:10px">홈 카드 고르기</div>';
   WIDGET_DEFS.forEach(function(d){
     h+=tpl`<label style="display:flex;gap:8px;align-items:center;padding:4px 0;font-size:13px;cursor:pointer">`+
        tpl`<input type="checkbox" data-wk="${rawHtml(d[0])}" ${widgetOn(d[0],off)?'checked':''} style="width:15px;height:15px"> ${d[1]}</label>`;
@@ -1194,7 +1195,7 @@ export function expNote(k){
 }
 /* ㊿+171 «재약정 대응 필요» = N개월 내 만료 원계약(expScan) 중 자동연장 · 후속 계약이 확실히 등록된 것을 뺀 행
    · 홈 핵심 현황 · AI 추천 질문 «재약정 대응할 고객» · 목록(kpiOpen expNeed)이 모두 이것 하나 · 후속 계약이 «확인 필요»(확실하지 않음)이면 대응 필요에 남김
-   · 고객 360 «다음 행동 제안»도 같은 ctSuccessor · 자동연장(autoRenew) 기준 */
+   · 고객 한눈에 «다음 행동 제안»도 같은 ctSuccessor · 자동연장(autoRenew) 기준 */
 export function renewNeedScan(list, b, EN){
   var XS=expScan(list, b, EN), need=[], sure=[], auto=[], amt=0, cu={};
   XS.rows.forEach(function(k){ var r=ST.DATA.rows[k]; /** @type {any} */ var s=null; try{ s=ctSuccessor(r); }catch(e){}

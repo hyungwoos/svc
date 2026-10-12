@@ -228,7 +228,7 @@ if (S.blk()) {
     assert(b.len > a.len + 40 && /접기/.test(b.btn) && b.saved === '1', JSON.stringify(b));
     await page.evaluate(() => { SVC.switchView('assets'); SVC.switchView('orders'); }); await page.waitForTimeout(300);
     const c = await page.evaluate(() => /접기/.test(document.querySelector('#dvCap .cap-more').textContent)); assert(c, '펼침 상태 기억 안 됨');
-    const d = await page.evaluate(() => { SVC.switchView('contracts'); return document.querySelector('#dvCap .cap-more'); }); assert(!d, '짧은 cap 에 버튼이 생김');
+    const d = await page.evaluate(() => { SVC.switchView('biz'); return document.querySelector('#dvCap .cap-more'); }); assert(!d, '짧은 cap 에 버튼이 생김');   /* ㊿+186 지니언스는 60자부터 접음 — 비즈포탈(28자)로 */
     return a.len + '→' + b.len;
   });
   await S.t('❔ 이 화면 사용법 → 그 자리 검색·질문 창(보던 화면 문맥) · ? 단축키 안내 · Esc 닫기', async () => {
@@ -673,14 +673,14 @@ if (S.blk()) {
   });
   await S.t('창 초점: 열리면 창 안으로 · Tab 은 창 안에서만 · 닫히면 연 버튼으로 · role=dialog 자동', async () => {
     await page.evaluate(() => SVC.switchView('dash')); await page.waitForTimeout(200);
-    await page.focus('#btnTheme'); await page.keyboard.press('Shift+?'); await page.waitForTimeout(200);
+    await page.focus('#btnMore'); await page.keyboard.press('Shift+?'); await page.waitForTimeout(200);   /* ㊿+186 다크 버튼은 «더보기» 메뉴 안 — 보이는 버튼에서 */
     const a = await page.evaluate(() => { const o = document.getElementById('ovlKeys'); return { inside: o.contains(document.activeElement) }; }); assert(a.inside, '초점이 창 밖');
     let out = 0; for (let i = 0; i < 12; i++) { await page.keyboard.press('Tab'); if (!(await page.evaluate(() => document.getElementById('ovlKeys').contains(document.activeElement)))) out++; }
     await page.keyboard.press('Shift+Tab'); await page.keyboard.press('Shift+Tab');
     if (!(await page.evaluate(() => document.getElementById('ovlKeys').contains(document.activeElement)))) out++;
     assert(out === 0, 'Tab 이 창 밖으로 ' + out + '회');
     await page.keyboard.press('Escape'); await page.waitForTimeout(150);
-    const back = await page.evaluate(() => document.activeElement && document.activeElement.id); assert(back === 'btnTheme', '닫힌 뒤 초점 ' + back);
+    const back = await page.evaluate(() => document.activeElement && document.activeElement.id); assert(back === 'btnMore', '닫힌 뒤 초점 ' + back);
     await page.evaluate(() => SVC.openRenewList('due')); await page.waitForTimeout(300);
     const d = await page.evaluate(() => { const m = document.querySelector('#ovlRenew .modal'); return { role: m.getAttribute('role'), modal: m.getAttribute('aria-modal'), lb: m.getAttribute('aria-labelledby'), inside: document.getElementById('ovlRenew').contains(document.activeElement) }; });
     assert(d.role === 'dialog' && d.modal === 'true' && d.lb === 'rnTitle' && d.inside, JSON.stringify(d));
@@ -775,7 +775,7 @@ if (S.blk()) {
     assert(!errs.length, errs.join(' | ')); return Math.round(w0) + '→' + st.m[k] + '→' + Math.round(w3);
   });
   await S.t('메뉴: «사업 영역» 한 그룹(소제목 Cloud NAC·MDR·기타) · 레일 아이콘 1개 · Ctrl+K 에 소제목 붙음', async () => {
-    const r = await page.evaluate(() => ({ g: [...document.querySelectorAll('#side .grp')].map((g) => g.textContent.trim()).filter((t) => /사업 영역/.test(t)), sub: [...document.querySelectorAll('#side .subgrp')].map((s) => s.dataset.sub), rail: document.querySelectorAll('#rail [data-seg^="g:사업 영역"]').length }));
+    const r = await page.evaluate(() => ({ g: [...document.querySelectorAll('#side .grp')].map((g) => g.textContent.trim()).filter((t) => /사업 영역/.test(t)), sub: [...document.querySelectorAll('#side .subgrp')].map((s) => s.dataset.sub), rail: document.querySelectorAll('#rail [data-seg^="g:사업 영역"], #rail [data-v="area"]').length }));   /* ㊿+187 지니언스는 버튼 하나(area) */
     assert(r.g.length === 1 && r.g[0] === '사업 영역' && r.sub.join('|') === 'Cloud NAC|MDR|기타 (유통)' && r.rail === 1, JSON.stringify(r));
     const nm = await page.evaluate(() => SVC.cmdMenuHits('일반 판매').map((h) => h.nm)); assert(nm.every((x) => /·/.test(x)), JSON.stringify(nm));
     return JSON.stringify(nm);
@@ -907,7 +907,7 @@ if (S.blk()) {
     await page.evaluate(() => document.querySelector('#side button[data-v="dash"]').click()); await page.waitForTimeout(300);
     await page.evaluate(() => document.querySelector('#side button[data-v="ops"]').click()); await page.waitForTimeout(500);
     assert(await page.evaluate(() => SVC.OPS.tab) === 'log', '메뉴로 다시 들어왔는데 탭이 처음으로: ' + await page.evaluate(() => SVC.OPS.tab));
-    await page.click('#btnViewReset'); await page.waitForTimeout(500);
+    await page.click('#btnMore'); await page.click('#btnViewReset'); await page.waitForTimeout(500);
     assert(await page.evaluate(() => SVC.OPS.tab) === 'gh', '«초기화» 후 첫 탭 아님: ' + await page.evaluate(() => SVC.OPS.tab));
     await page.evaluate(() => document.querySelector('#side button[data-v="churn"]').click()); await page.waitForTimeout(500);
     await page.evaluate(() => { SVC.CHURN.q = 'zz'; SVC.renderChurn(); window.scrollTo(0, 900); }); await page.waitForTimeout(300);
@@ -915,7 +915,7 @@ if (S.blk()) {
     await page.evaluate(() => document.querySelector('#side button[data-v="dash"]').click()); await page.waitForTimeout(300);
     await page.evaluate(() => document.querySelector('#side button[data-v="churn"]').click()); await page.waitForTimeout(500);
     const r = await page.evaluate(() => ({ q: SVC.CHURN.q, y: Math.round(scrollY) })); assert(r.q === 'zz' && Math.abs(r.y - y0) < 30, JSON.stringify({ r, y0 }));
-    await page.click('#btnViewReset'); await page.waitForTimeout(400);
+    await page.click('#btnMore'); await page.click('#btnViewReset'); await page.waitForTimeout(400);
     const r2 = await page.evaluate(() => ({ q: SVC.CHURN.q, y: Math.round(scrollY) })); assert(r2.q === '' && r2.y === 0, '초기화 ' + JSON.stringify(r2));
     await page.evaluate(() => { SVC.STATE.ind = '제조'; }); await page.evaluate(() => document.querySelector('#side button[data-v="dash"]').click()); await page.waitForTimeout(400);
     const sum = await page.evaluate(() => document.getElementById('gnSum').textContent);
@@ -1424,7 +1424,7 @@ if (S.blk()) {
     await page.goto(url + '/orders.html'); await page.waitForURL(/index\.html\?v=ordernew/, { timeout: 5000 }); const u = page.url(); await ctx.close(); return u.replace(/^.*\/svc\//, '');
   });
 }
-// ㊿+155: 화면 HTML 은 tpl`` (특수문자 자동 처리) · 타입 검사로 찾은 고객 360 «기간» 빈칸 수정
+// ㊿+155: 화면 HTML 은 tpl`` (특수문자 자동 처리) · 타입 검사로 찾은 고객 한눈에 «기간» 빈칸 수정
 if (S.blk()) {
   const { ctx, page } = await open();
   await S.t('㊿+155 tpl``: ${값} 은 자동 esc · rawHtml(…) 만 그대로 · null/undefined 는 빈칸 · 숫자 그대로 · 위성 페이지 tpl 도 같은 규칙', async () => {
@@ -1436,7 +1436,7 @@ if (S.blk()) {
     const sat = await p2.evaluate(() => tpl`<b>${'<x>'}</b>${rawHtml('<i>y</i>')}`); await ctx2.close();
     assert(sat === '<b>&lt;x&gt;</b><i>y</i>', 'sat ' + sat); return r.a.slice(0, 60);
   });
-  await S.t('㊿+155 고객 360 «계약» 표의 기간이 채워짐 (예전엔 없는 키 r.start·r.end 를 읽어 늘 « ~ » — 타입 검사가 찾음)', async () => {
+  await S.t('㊿+155 고객 한눈에 «계약» 표의 기간이 채워짐 (예전엔 없는 키 r.start·r.end 를 읽어 늘 « ~ » — 타입 검사가 찾음)', async () => {
     await page.evaluate(() => SVC.openCust360(SVC.ST.DATA.rows[0].cust)); await page.waitForTimeout(400);
     const per = await page.evaluate(() => [...document.querySelectorAll('#c360Body .c360-sec')][0].querySelectorAll('tbody tr td:nth-child(6)')[0].textContent);
     assert(/^\d{4}-\d{2} ~ \d{4}-\d{2}$/.test(per), '기간 «' + per + '»'); return per;
@@ -1885,16 +1885,16 @@ if (S.blk()) {
         left: Math.round(rail.getBoundingClientRect().left), w: Math.round(rail.getBoundingClientRect().width), W: document.documentElement.clientWidth, pad: getComputedStyle(document.body).paddingLeft,
         home: (rail.querySelector('.gn-tb[aria-current="true"]') || {}).dataset.v, ttl: document.getElementById('gnTitle').textContent }; });
     assert(r.skin === 'gn' && r.look === 'cc' && r.cc && r.gn && r.cur === 'gn' && /^gn,cc,simple,classic$/.test(r.keys), JSON.stringify(r));
-    assert(r.inTop && r.logo && /^dash\|weekly\|g:전체 데이터\|g:사업 영역\|g:장비\|m:영업\|m:정산·도구$/.test(r.tabs) && r.right === 'm:관리' && r.left === 0 && r.w === r.W && r.pad === '0px' && r.home === 'dash' && r.ttl === '홈', JSON.stringify(r));
+    assert(r.inTop && r.logo && /^dash\|weekly\|g:전체 데이터\|area\|g:장비\|m:영업\|m:정산·도구$/.test(r.tabs)   /* ㊿+187 사업 영역은 펼침 없는 버튼 하나(area) */ && r.right === 'm:관리' && r.left === 0 && r.w === r.W && r.pad === '0px' && r.home === 'dash' && r.ttl === '홈', JSON.stringify(r));
     return r.tabs.split('|').length + '개 묶음 + 관리';
   });
   await S.t('㊿+167 상단 메뉴: 묶음 누르면 펼침(소제목·그룹마다 칸) · 항목 누르면 이동·닫힘 · 지금 화면 묶음 표시 · 다른 묶음에 마우스 → 옮겨 감 · Esc·바깥 클릭 닫힘 · ↓ 첫 항목 · 배지 합계', async () => {
     const seg = (k) => '#rail .gn-tb[data-seg="' + k + '"]';
-    await page.click(seg('g:사업 영역')); await page.waitForTimeout(150);
-    const a = await page.evaluate(() => { const m = document.getElementById('gnMenu'); return { open: !m.hidden, exp: document.querySelector('#rail .gn-tb[data-seg="g:사업 영역"]').getAttribute('aria-expanded'), cols: [...m.querySelectorAll('.gn-st')].map((x) => x.textContent).join('|'), n: m.querySelectorAll('.gn-mi').length, inView: m.getBoundingClientRect().right <= document.documentElement.clientWidth }; });
-    assert(a.open && a.exp === 'true' && /Cloud NAC/.test(a.cols) && /MDR/.test(a.cols) && a.n >= 3 && a.inView, '사업 영역 ' + JSON.stringify(a));
+    await page.click(seg('g:장비')); await page.waitForTimeout(150);   /* ㊿+187 사업 영역 묶음은 펼침이 없어져 장비 묶음으로 */
+    const a = await page.evaluate(() => { const m = document.getElementById('gnMenu'); return { open: !m.hidden, exp: document.querySelector('#rail .gn-tb[data-seg="g:장비"]').getAttribute('aria-expanded'), cols: [...m.querySelectorAll('.gn-st')].map((x) => x.textContent).join('|'), n: m.querySelectorAll('.gn-mi').length, inView: m.getBoundingClientRect().right <= document.documentElement.clientWidth }; });
+    assert(a.open && a.exp === 'true' && /장비/.test(a.cols) && a.n >= 3 && a.inView, '장비 묶음 ' + JSON.stringify(a));
     await page.hover(seg('m:영업')); await page.waitForTimeout(120);
-    const b = await page.evaluate(() => ({ cols: [...document.querySelectorAll('#gnMenu .gn-st')].map((x) => x.textContent).join('|'), e1: document.querySelector('#rail .gn-tb[data-seg="g:사업 영역"]').getAttribute('aria-expanded') }));
+    const b = await page.evaluate(() => ({ cols: [...document.querySelectorAll('#gnMenu .gn-st')].map((x) => x.textContent).join('|'), e1: document.querySelector('#rail .gn-tb[data-seg="g:장비"]').getAttribute('aria-expanded') }));
     assert(/PoC·데모/.test(b.cols) && /영업/.test(b.cols) && /인바운드/.test(b.cols) && b.e1 === 'false', '영업 묶음 ' + JSON.stringify(b));
     await page.click('#gnMenu .gn-mi[data-v="oi"]'); await page.waitForTimeout(300);
     const c = await page.evaluate(() => ({ v: SVC.ST.CUR_VIEW, open: !document.getElementById('gnMenu').hidden, cur: (document.querySelector('#rail .gn-tb[aria-current="true"]') || {}).dataset.seg, ttl: document.getElementById('gnTitle').textContent }));
@@ -2085,14 +2085,14 @@ if (S.blk()) {
     await page.evaluate(() => { SVC.wvSet('contracts', '운영'); SVC.navMenu('contracts'); }); await page.waitForTimeout(250);
     await page.fill('#dvSearch', '가상'); await page.waitForTimeout(150);
     await page.click('#dvTable thead th[data-k="mrr"] .thw > span'); await page.waitForTimeout(150);
-    await page.evaluate(() => window.scrollTo(0, 400)); await page.waitForTimeout(100);
+    await page.evaluate(() => window.scrollTo(0, 200)); await page.waitForTimeout(100);   /* ㊿+186 문서 끝이 아닌 자리로(끝이면 행이 늦게 그려질 때 잘림) */
     const before = await page.evaluate(() => ({ q: document.getElementById('dvSearch').value, k: SVC.DV.sortK, y: Math.round(window.scrollY), first: document.querySelector('#dvTable tbody tr td').textContent }));
     await page.evaluate(() => SVC.switchView('oi')); await page.waitForTimeout(250);
     await page.goBack(); await page.waitForTimeout(500);
     const back = await page.evaluate(() => ({ v: SVC.ST.CUR_VIEW, q: document.getElementById('dvSearch').value, k: SVC.DV.sortK, y: Math.round(window.scrollY), first: document.querySelector('#dvTable tbody tr td').textContent }));
     await page.evaluate(() => { SVC.navMenu('oi'); SVC.navMenu('contracts'); }); await page.waitForTimeout(400);
     const menu = await page.evaluate(() => ({ q: document.getElementById('dvSearch').value, k: SVC.DV.sortK, y: Math.round(window.scrollY) }));
-    await page.click('#btnViewReset'); await page.waitForTimeout(250);
+    await page.click('#btnMore'); await page.click('#btnViewReset'); await page.waitForTimeout(250);
     const fresh = await page.evaluate(() => ({ q: document.getElementById('dvSearch').value, k: SVC.DV.sortK, y: Math.round(window.scrollY) }));
     await page.setViewportSize({ width: 1440, height: 1000 });
     assert(before.q === '가상' && before.k === 'mrr' && back.v === 'contracts' && back.q === '가상' && back.k === 'mrr' && Math.abs(back.y - before.y) < 30 && back.first === before.first && menu.q === '가상' && menu.k === 'mrr' && Math.abs(menu.y - before.y) < 30 && fresh.q === '' && fresh.k === null && fresh.y === 0, JSON.stringify({ before, back, menu, fresh }));
@@ -2118,7 +2118,7 @@ if (S.blk()) {
     await page.click('#ccInbox .cbtn:has-text("일정 지난 OI")'); await page.waitForTimeout(400);
     /* ㊿+170 OI 는 «빠른 보기 › 기한 초과» 칩이 눌린 채로 열림(같은 기준 oiOpen) — 칩을 다시 누르면 해제 */
     const g = await page.evaluate(() => ({ v: SVC.ST.CUR_VIEW, pre: (document.querySelector('#dvQvBar [aria-pressed="true"]') || {}).textContent || document.getElementById('dvPreBar').textContent, rows: document.querySelectorAll('#dvTable tbody tr:not(.dg-empty)').length }));
-    await page.click('#dvQvBar [aria-pressed="true"]'); await page.waitForTimeout(150); const all = await page.evaluate(() => document.querySelectorAll('#dvTable tbody tr').length);
+    await page.click('#dvFilterBtn'); await page.waitForTimeout(120); await page.click('#dvQvBar [aria-pressed="true"]'); await page.waitForTimeout(150);   /* ㊿+187 빠른 보기는 «필터» 안 */ const all = await page.evaluate(() => document.querySelectorAll('#dvTable tbody tr').length);
     assert(g.v === 'oi' && /기한 초과/.test(g.pre) && g.rows === oiN && all > oiN, JSON.stringify({ g, oiN, all }));
     await page.evaluate(() => { SVC.HOME.allOpen = false; });
     return r.head + ' · 홈 ' + r.n + '줄';
@@ -2233,7 +2233,7 @@ if (S.blk()) {
   await S.t('㊿+170 영업·인바운드 빠른 보기: 건수 = 거른 목록 · «기준»에서 일수 저장 · ㊿+184 «내 OI» = 내가 작성한 견적서가 붙은 OI(이름 고르기 없음) · «견적 전» · 견적 담당 칸 · 인바운드엔 «내 담당» 없음 · 홈에 인바운드 할 일 없음 · OI 담당 = 견적 작성자 · «다시 조회»는 시트를 안 건드림 · OI → 계약 전환 때 같은 고객사 유효 계약 알림', async () => {
     await page.evaluate(() => SVC.navMenu('oi')); await page.waitForTimeout(300);
     const chips = async () => page.evaluate(() => Object.fromEntries([...document.querySelectorAll('#dvQvBar [data-qv]')].map((b) => [b.dataset.qv, +b.querySelector('b').textContent])));
-    const c1 = await chips(); await page.click('#dvQvBar [data-qv="late"]'); await page.waitForTimeout(150);
+    const c1 = await chips(); await page.click('#dvFilterBtn'); await page.waitForTimeout(120); await page.click('#dvQvBar [data-qv="late"]'); await page.waitForTimeout(150);   /* ㊿+187 빠른 보기는 «필터» 안 */
     const lateRows = await page.evaluate(() => document.querySelectorAll('#dvTable tbody tr:not(.dg-empty)').length);
     await page.click('#qvCfgBtn'); await page.waitForTimeout(100); const noMe = await page.evaluate(() => !document.getElementById('qvMe') && /견적서/.test(document.getElementById('qvCfg').textContent)); await page.fill('#qvOi', '20'); await page.click('#qvOk'); await page.waitForTimeout(150);
     const c2 = await chips(); await page.click('#dvQvBar [data-qv="me"]'); await page.waitForTimeout(150);
@@ -2317,7 +2317,7 @@ if (S.blk()) {
     const empty = await page.evaluate(() => [...document.querySelectorAll('#sug .sr-g')].map((g) => g.textContent).join('|'));
     await page.keyboard.type('가상고객0'); await page.waitForTimeout(250);
     const a = await page.evaluate(() => ({ sel: (document.querySelector('#sug [aria-selected="true"]') || {}).className || '', nm: ((document.querySelector('#sug [aria-selected="true"] .nm') || {}).textContent) || '', foot: (document.querySelector('#sug .sr-foot') || {}).textContent || '', last: ([...document.querySelectorAll('#sug .sr-it')].pop() || {}).className || '' }));
-    assert(/자주 쓰는 화면/.test(empty) && /k-c360/.test(a.sel) && !/k-ask/.test(a.sel) && /Enter 고객 360 «가상고객/.test(a.foot) && /Ctrl\+Enter AI 에 질문/.test(a.foot) && /k-ask/.test(a.last), JSON.stringify({ empty, a }));
+    assert(/자주 쓰는 화면/.test(empty) && /k-c360/.test(a.sel) && !/k-ask/.test(a.sel) && /Enter 고객 한눈에 «가상고객/.test(a.foot) && /Ctrl\+Enter AI 에 질문/.test(a.foot) && /k-ask/.test(a.last), JSON.stringify({ empty, a }));
     await page.keyboard.press('ArrowDown'); await page.keyboard.press('Enter'); await page.waitForTimeout(300);
     const c360 = await page.evaluate(() => ({ on: document.getElementById('ovlC360').classList.contains('on'), t: document.getElementById('c360Title').textContent }));
     assert(c360.on && /가상고객02/.test(c360.t), '고객 360 ' + JSON.stringify(c360));
@@ -2386,7 +2386,7 @@ if (S.blk()) {
     const loc = await page.evaluate(() => ({ core: document.getElementById('ansLocal').textContent, meta: document.getElementById('ansMeta').textContent }));
     assert(loc.core.includes('지금 목록 ' + a.rows + '행') && /현재 목록 기준/.test(loc.meta), '목록 요약 ' + JSON.stringify(loc));
     await page.evaluate(() => { SVC.closeAnswer('', true); SVC.aipClose(); });
-    await page.click('#btnViewReset'); await page.waitForTimeout(300);
+    await page.click('#btnMore'); await page.click('#btnViewReset'); await page.waitForTimeout(300);
     const r = await st(); assert(r.q === '' && !r.pre && r.f === '{}', '초기화 ' + JSON.stringify(r));
     await page.setViewportSize({ width: 1440, height: 900 }); return a.rows + '행 유지 → 초기화';
   });
@@ -2400,7 +2400,7 @@ if (S.blk()) {
     const o = await page.evaluate(() => document.getElementById('dvSearch').value);
     await page.click('#dvCustX'); await page.waitForTimeout(250);
     const x = await page.evaluate(() => ({ q: document.getElementById('dvSearch').value, c: SVC.CUSTCTX.c }));
-    assert(a.v === 'contracts' && a.q === '가상고객07' && a.bar && b.v === 'oi' && b.q === '가상고객07' && /고객 문맥 «가상고객07»/.test(b.bar) && o === '가상고객07' && x.q === '' && x.c === '', JSON.stringify({ a, b, o, x }));
+    assert(a.v === 'contracts' && a.q === '가상고객07' && a.bar && b.v === 'oi' && b.q === '가상고객07' && /고객 고정 «가상고객07»/.test(b.bar) && o === '가상고객07' && x.q === '' && x.c === '', JSON.stringify({ a, b, o, x }));
     return '계약 → OI → 장비 신청 = 가상고객07';
   });
   await S.t('㊿+172 사업 분석 필터(서비스 끄기 · 기준월 바꾸기)를 바꿔도 홈 핵심 현황 · 매출 추이 · 재약정 대응은 그대로(전체 사업 · 이번 달) · 상세 머리에 «이 영역의 조건» · 해제', async () => {
@@ -2908,11 +2908,11 @@ if (S.blk()) {
     const pills = () => page.evaluate(() => [...document.querySelectorAll('#bizHost .pill, .biz-host .pill')].map((b) => b.textContent.trim()).filter((t) => /월/.test(t) && !/입력|수정|삭제|마감|대조/.test(t)));
     const p0 = await pills(), has = await page.evaluate((cy) => [SVC.bizHas(cy - 1, 8), SVC.bizHas(cy - 2, 8), SVC.bizHas(cy, 8), SVC.bizHas(cy - 1, 12)], CY);
     assert(JSON.stringify(p0) === JSON.stringify([(CY - 1) + '년 12월', (CY - 1) + '년 8월', (CY - 2) + '년 8월']) && has.join() === 'true,true,false,true', 'pills ' + JSON.stringify({ p0, has }));
-    await page.click('text=' + (CY - 1) + '년 8월'); await page.click('text=✎ 이 달 수정'); await page.waitForTimeout(200);
+    await page.click('text=' + (CY - 1) + '년 8월'); await page.click('text=이 달 수정'); await page.waitForTimeout(200);   /* ㊿+186 지니언스는 버튼 앞 그림 글자를 뗌 */
     const ym0 = await page.$eval('#bzYm', (e) => e.value); await page.fill('#bzSums .bz-amt >> nth=0', '65000'); await page.click('#bzSave'); await page.waitForTimeout(700);
     const rows = db.table('biz_recon'), o2 = rows.filter((r) => r.y === CY - 2).map((r) => r.id).join(), n1 = rows.filter((r) => r.y === CY - 1 && r.ym === '8월'), h1 = db.table('doc_hist').slice(-1)[0];
     assert(ym0 === K(CY - 1, 8) && log[0] === 'replace ' + K(CY - 1, 8) + ' ' && o2 === '9001,9002' && n1.length === 2 && n1.some((r) => r.biz === 65000000) && h1 && h1.op === 'replace' && h1.old.length === 2 && !db.writes.some((w) => w.method === 'DELETE' && w.table === 'biz_recon'), 'save ' + JSON.stringify({ ym0, log, o2, n1, h1 }));
-    const p1 = await pills(); await page.click('text=' + (CY - 2) + '년 8월'); await page.click('text=🗑 이 달 삭제'); await page.waitForTimeout(600);
+    const p1 = await pills(); await page.click('text=' + (CY - 2) + '년 8월'); await page.click('text=이 달 삭제'); await page.waitForTimeout(600);
     const left = db.table('biz_recon').map((r) => r.y + ':' + r.ym).sort().join(), p2 = await pills();
     assert(log[1] === 'delete ' + K(CY - 2, 8) && !/9001|9002/.test(db.table('biz_recon').map((r) => r.id).join()) && left.includes((CY - 1) + ':8월') && JSON.stringify(p2) === JSON.stringify([(CY - 1) + '년 12월', (CY - 1) + '년 8월']) && p1.length === 3, 'delete ' + JSON.stringify({ log, left, p2 }));
     assert(!c.errs.length, c.errs.join('|')); await ctx.close();
@@ -3365,7 +3365,7 @@ if (S.blk()) {
     A.dlg.length = 0; await A.page.click('#qbSave'); await A.page.waitForTimeout(600);
     const p1 = A.db.writes.filter((w) => w.method === 'POST' && w.table === 'report_queries'), nid = p1.length && p1[0].body.id;
     assert(/팀 리포트/.test(L0.team) && /other/.test(L0.team) && !/남의 비공개/.test(L0.team) && /이 브라우저에만 1개/.test(L0.mine) && /로컬 리포트/.test(L0.mine) && L0.mig
-      && /바뀐 열/.test(t1.toast) && /contracts\.없는열/.test(t1.toast) && t1.save === '💾 내 것으로 저장' && t1.id === 'db5'
+      && /바뀐 열/.test(t1.toast) && /contracts\.없는열/.test(t1.toast) && /내 것으로 저장/.test(t1.save) && t1.id === 'db5'
       && A.dlg.some((x) => /내 것으로 새로 저장/.test(x)) && p1.length === 1 && p1[0].body.name === '팀 리포트 (사본)' && p1[0].body.spec.spec.base === 'contracts' && !A.db.writes.some((w) => w.method === 'PATCH' && w.table === 'report_queries'), 'load/save ' + JSON.stringify({ L0, t1, dlg: A.dlg, p1 }));
     await A.page.waitForSelector('#qbLib [data-qshare="db' + nid + '"]', { timeout: 4000 }); await A.page.click('#qbLib [data-qshare="db' + nid + '"]'); await A.page.waitForTimeout(600);
     const sh = A.db.table('report_queries').find((x) => x.id === nid), pr = await A.page.$eval('#qbLib [data-qshare="db' + nid + '"]', (e) => e.getAttribute('aria-pressed'));
@@ -3475,7 +3475,7 @@ if (S.blk()) {
     const A = await mkA({ noSession: false, handle: admH({}) });
     await A.page.evaluate(() => SVC.switchView('adminx')); await A.page.waitForFunction(() => document.querySelectorAll('#axTable tbody tr').length === 4, null, { timeout: 8000 });
     const t = await A.page.evaluate(() => ({ head: [...document.querySelectorAll('#axTable thead th')].map((x) => x.textContent), rows: [...document.querySelectorAll('#axTable tbody tr')].map((r) => r.textContent), msg: document.getElementById('axMsg').textContent,
-      warn: [...document.querySelectorAll('#axTable tbody tr')].find((r) => /staff/.test(r.textContent)).children[2].innerHTML }));
+      warn: [...document.querySelectorAll('#axTable tbody tr')].find((r) => /staff/.test(r.textContent)).children[3].innerHTML }));   /* ㊿+189 «표시 이름» 열이 끼어 2단계 인증은 4번째 칸 */
     const row = (e) => t.rows.find((x) => x.indexOf(e) === 0) || '';
     assert(t.head.includes('2단계 인증') && /✓ 켬/.test(row('boss')) && /안 켬/.test(row('staff')) && /warn-ink/.test(t.warn) && /오래 안 씀/.test(row('staff')) && /한 번도 안 씀/.test(row('new')) && !/안 씀/.test(row('boss')) && /4개 계정 · 관리자 3\(인증 앱 2\) · 90일 넘게 안 씀 2/.test(t.msg), 'list ' + JSON.stringify(t));
     await A.page.click('#axTable tbody tr:has-text("staff@example.com") button:has-text("비번 초기화")'); await A.page.waitForSelector('#ovlAxPw.on', { timeout: 3000 }); await A.page.waitForTimeout(80);
@@ -3535,7 +3535,7 @@ if (S.blk()) {
     const a = await A.page.evaluate(() => { const t = document.getElementById('dvTable'), tr = t.querySelector('tbody tr'), pin1 = tr.querySelector('td.pin1'), pin2 = tr.querySelector('td.pin2'), cx = [...tr.querySelectorAll('td.cx')];
       const vis = (e) => getComputedStyle(e).display !== 'none';
       return { thead: getComputedStyle(t.querySelector('thead')).display, pin1: pin1 && pin1.textContent.trim(), p1top: pin1 && pin2 && Math.abs(pin1.getBoundingClientRect().top - pin2.getBoundingClientRect().top) < 12, lab: [...tr.querySelectorAll('td[data-l]')].filter(vis).slice(2, 4).map((x) => getComputedStyle(x, '::before').content),
-        cxHidden: cx.length > 0 && cx.every((x) => !vis(x)), more: (tr.querySelector('.cxb') || {}).textContent, bar: !document.getElementById('dvCardBar').hidden && !!document.getElementById('dvSortSel'), sticky: getComputedStyle(pin1).position, wrapMax: getComputedStyle(t.parentElement).maxHeight }; });
+        cxHidden: cx.length > 0 && cx.every((x) => !vis(x)), more: (tr.querySelector('.cxb') || {}).textContent, bar: !!document.getElementById('dvSortSel') && document.getElementById('dvSortSel').closest('.dbar, #dvCardBar') !== null, sticky: getComputedStyle(pin1).position, wrapMax: getComputedStyle(t.parentElement).maxHeight }; });
     await A.page.evaluate(() => document.querySelector('#dvTable tbody tr .cxb').click());
     const b = await A.page.evaluate(() => { const tr = document.querySelector('#dvTable tbody tr'); return { open: tr.classList.contains('cx-open'), shown: [...tr.querySelectorAll('td.cx:not(.na)')].every((x) => getComputedStyle(x).display !== 'none'), aria: tr.querySelector('.cxb').getAttribute('aria-expanded') }; });
     assert(a.thead === 'none' && a.pin1 && a.p1top && a.lab.every((x) => /^".+"$/.test(x)) && a.cxHidden && /^＋ \d+칸 더 보기$/.test(a.more) && a.bar && a.sticky === 'static' && a.wrapMax === 'none' && b.open && b.shown && b.aria === 'true', 'card ' + JSON.stringify({ a, b }));
@@ -3548,10 +3548,11 @@ if (S.blk()) {
     assert(e.lab.length > 2 && e.w > 150 && e.fs === '16px' && e.nIn > 5 && e.mrr === 'decimal' && pw && pw.body[e.k] === 'cardsite1' && !(await A.page.$('#dvTable tr.editing')), 'edit ' + JSON.stringify({ e, pw }));
     await A.page.selectOption('#dvSortSel', { index: 2 }); await A.page.waitForTimeout(300);
     const so = await A.page.evaluate(() => ({ k: SVC.DV.sortK, d: SVC.DV.sortDir, sel: document.getElementById('dvSortSel').value }));
+    await A.page.click('#dvFilterBtn'); await A.page.waitForTimeout(150);   /* ㊿+188 폰: «거르기»는 «필터» 안 · «표로 보기»는 ⋯ 안 */
     await A.page.selectOption('#dvFiltSel', { index: 2 }); await A.page.waitForTimeout(300);
     const fo = await A.page.evaluate(() => !!document.querySelector('.colf'));
-    await A.page.keyboard.press('Escape'); await A.page.evaluate(() => { const f = document.querySelector('.colf'); if (f) f.remove(); });
-    await A.page.click('#dvCardTg'); await A.page.waitForTimeout(300);
+    await A.page.keyboard.press('Escape'); await A.page.evaluate(() => { const f = document.querySelector('.colf'); if (f) f.remove(); }); await A.page.keyboard.press('Escape'); await A.page.waitForTimeout(100);
+    await A.page.click('#dvMoreBtn'); await A.page.waitForTimeout(150); await A.page.click('#dvCardTg'); await A.page.waitForTimeout(300);
     const tb = await A.page.evaluate(() => ({ cards: document.getElementById('dvTable').classList.contains('cards'), thead: getComputedStyle(document.querySelector('#dvTable thead')).display, pref: localStorage.getItem('svc_dvcards'), btn: document.getElementById('dvCardTg').textContent, cxt: !!document.querySelector('#dvTable td.cxt') }));
     assert(so.k && so.d === -1 && so.sel === so.k + '|-1' && fo && !tb.cards && tb.thead !== 'none' && tb.pref === '0' && tb.btn === '카드로 보기' && !tb.cxt && !A.c.errs.length, 'bar ' + JSON.stringify({ so, fo, tb, errs: A.c.errs }));
     await A.ctx.close();
@@ -3640,7 +3641,7 @@ if (S.blk()) {
   });
   await S.t('㊿+182 연동 상태(배포·운영 › 기록): GitHub 토큰 만료 임박 · 관리 토큰 · Slack 봇(빠진 DM 권한) · 예약 발송 · 만기 알림 · AI 야간 점검(오래됨) · 내보내기 · 견적 서버(옛 비밀번호 기한) · Cloud 사이트 API · 환율 — 읽기만 · 고칠 곳 / 옛 ops · notify 면 «올리면 확인»', async () => {
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page);
-    const ymd = (d) => new Date(Date.now() + d * 864e5 + 9 * 36e5).toISOString().slice(0, 10), ago = (d) => new Date(Date.now() - d * 864e5).toISOString();
+    const ymd = (d) => { const t = new Date(Date.now() + d * 864e5); return t.getFullYear() + '-' + ('0' + (t.getMonth() + 1)).slice(-2) + '-' + ('0' + t.getDate()).slice(-2); }, ago =   /* 브라우저(todayStr)와 같은 지역 시각 — UTC 15시 이후엔 +9h 로 하루 어긋나 «21일 남음»이 되던 것 */ (d) => new Date(Date.now() - d * 864e5).toISOString();
     let old = false; const reqs = [], writes = [];
     const J = (route, o) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'content-range': '0-' + Math.max(0, (o.length || 1) - 1) + '/' + (o.length || 1), 'Access-Control-Expose-Headers': 'content-range' }, body: JSON.stringify(o) });
     await mockBackend(page, { onWrite: (w) => writes.push(w), extra: async (route, u, m) => {
@@ -3717,7 +3718,7 @@ if (S.blk()) {
     await A.ctx.close();
     return 'multi 1곳 · 변동 1곳 · 시트 ' + sh.n + '줄 · 해지율 중복 1곳';
   });
-  await S.t('㊿+183 계약 요약 + 다음 처리: 계약 상세 맨 위 금액 · 만료(지남/남음) · 갱신 · 영업 경로 / 만기 지난 계약 → «만기 지난 계약 처리» = 만기 처리 창 그 줄 강조 + 연장 버튼에 초점 / 먼 만기 계약엔 처리 버튼 없음 / 고객 360 «지금 계약»에 만기 지남 줄 + «만기 처리» / 저장 0', async () => {
+  await S.t('㊿+183 계약 요약 + 다음 처리: 계약 상세 맨 위 금액 · 만료(지남/남음) · 갱신 · 영업 경로 / 만기 지난 계약 → «만기 지난 계약 처리» = 만기 처리 창 그 줄 강조 + 연장 버튼에 초점 / 먼 만기 계약엔 처리 버튼 없음 / 고객 한눈에 «지금 계약»에 만기 지남 줄 + «만기 처리» / 저장 0', async () => {
     const A = await mk183();
     const ids = await A.page.evaluate(() => { const T = SVC.STATE.base; const lap = SVC.ST.DATA.rows.find((x) => SVC.renewKindOf(x, T) === 'lapsed'); const far = SVC.ST.DATA.rows.find((x) => !x.parent && x.endRaw != null && x.endRaw > T + 6 && !/해지|종료/.test(x.status || '')); return { lap: lap && lap._id, lapC: lap && lap.cust, far: far && far._id }; });
     await A.page.evaluate((id) => SVC.openDetail(SVC.ctRawOf(id)), ids.lap); await A.page.waitForTimeout(300);
@@ -3967,6 +3968,353 @@ if (S.blk()) {
     const no = await N.page.$eval('#fbMsg', (e) => e.textContent); await N.ctx.close();
     assert(/SQL 113/.test(no) && !A.c.errs.filter((e) => !/serviceWorker/.test(e)).length, no + ' ' + A.c.errs.join('|'));
     return '보냄 2 · 내 것만 2 · 관리자 3건 → 처리 1 · 메모';
+  });
+}
+// ㊿+186 전역 정리 — 제목 한 번 · 단위 한 번 · 이모지 → 아이콘 체계 · «더보기» 메뉴 · 행 버튼은 올렸을 때 · 빈 화면 버튼 · 푸터 · 설명 접기 — 가짜 DB
+if (S.blk()) {
+  const mk186 = async (o) => { o = Object.assign({ role: 'super_admin', email: 'tester@example.com', w: 1440, h: 1000, mobile: false }, o || {});
+    const db = new FakeDB(seedData()); const ctx = await browser.newContext({ viewport: { width: o.w, height: o.h }, serviceWorkers: 'block', isMobile: o.mobile, hasTouch: o.mobile }); const page = await ctx.newPage(); const c = collect(page);
+    page.on('dialog', (d) => d.dismiss()); await fakeBackend(page, db, { role: o.role, email: o.email }); await page.goto(url + '/index.html');
+    await page.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA && SVC.ST.DATA.rows.length, null, { timeout: 20000 }); await page.waitForTimeout(600); return { db, ctx, page, c }; };
+  const EMO = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/u;
+  await S.t('㊿+186 제목 한 번(PC): 표 · 분석 · 입력 화면의 카드 제목이 상단 제목과 같으면 화면 읽기용으로만(.vt-dup) · 단위 칩 숨김(상단 ₩ 배지만) · 작은 설명은 남음 · 다른 제목(월별 매출 추이)은 그대로 / 폰은 카드 제목 보임', async () => {
+    const A = await mk186(), P = A.page;
+    const out = {};
+    for (const v of ['contracts', 'churn', 'churnrate', 'ordernew', 'account', 'cngen']) { await P.evaluate(async (v) => { try { await SVC.lazyLoad(v); } catch (e) { } SVC.navMenu(v); }, v); await P.waitForTimeout(350);
+      out[v] = await P.evaluate(() => { const host = document.querySelector('#app [id^="view"]:not(.hidden)'); const h = host.querySelector('.vt-dup'); const vis = (e) => { const r = e.getBoundingClientRect(); return r.width > 1 && r.height > 1; };
+        const txt = h && h.querySelector('.vt-txt'); return { dup: !!h, tag: h && h.tagName, txtVis: txt ? vis(txt) : (h ? vis(h) : null), chip: h && h.querySelector('.ubadge') ? vis(h.querySelector('.ubadge')) : null, small: h && h.querySelector('small') ? vis(h.querySelector('small')) : null, firstH: (host.querySelector('h2,h3') || {}).textContent }; }); }
+    const foot = await P.$eval('#foot', (e) => e.textContent);
+    await A.ctx.close();
+    const M = await mk186({ w: 390, h: 844, mobile: true }); await M.page.evaluate(() => SVC.navMenu('contracts')); await M.page.waitForTimeout(400);
+    const m = await M.page.evaluate(() => { const h = document.getElementById('dvTitle'); const r = h.getBoundingClientRect(); return { dup: h.classList.contains('vt-dup'), vis: r.height > 10, txt: h.textContent.trim() }; }); await M.ctx.close();
+    assert(out.contracts.dup && out.contracts.tag === 'H2' && out.contracts.txtVis === false && out.churn.dup && out.churn.txtVis === false && out.churn.chip === false && out.churn.small === true && out.churnrate.dup && out.ordernew.dup && out.account.dup && !out.cngen.dup && /월별 매출 추이/.test(out.cngen.firstH)
+      && !/Supabase/.test(foot) && /포탈 2026/.test(foot) && m.dup && m.vis && /^계약 관리/.test(m.txt) && !A.c.errs.filter((e) => !/serviceWorker/.test(e)).length, JSON.stringify({ out, foot, m, errs: A.c.errs }));
+    return Object.keys(out).filter((k) => out[k].dup).join(',') + ' · 폰 보임';
+  });
+  await S.t('㊿+186 이모지 → 없음(제목 · 버튼 · 탭 · 다시 그린 화면도) · «더보기» 메뉴에 초기화 · 새로고침 · 글자 크기 · 다크(동작 그대로) · 폰 상단 한 줄 · 행 동작 버튼은 올렸을 때만(PC) · 빈 화면 «견적 만들기» · 설명은 첫 문장 + 도움말 · AI 도움말 글자', async () => {
+    const A = await mk186(), P = A.page;
+    const emo = {}; for (const v of ['adminx', 'account', 'ordernew', 'churn', 'weekly', 'report']) { await P.evaluate(async (v) => { try { await SVC.lazyLoad(v); } catch (e) { } SVC.navMenu(v); }, v); await P.waitForTimeout(350);
+      emo[v] = await P.evaluate((src) => { const E = new RegExp(src, 'u'); const host = document.querySelector('#app [id^="view"]:not(.hidden)'); return [...host.querySelectorAll('h1,h2,h3,h4,button,.adm-tab,.pill,summary')].filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && E.test(String(e.textContent || '').trim().slice(0, 2)); }).map((e) => e.textContent.trim().slice(0, 14)); }, EMO.source); }
+    await P.evaluate(() => SVC.navMenu('adminx')); await P.waitForTimeout(200);
+    const dyn = await P.evaluate(() => { const b = document.createElement('button'); b.className = 'pill'; b.textContent = '🧪 동적 버튼'; document.querySelector('#app [id^="view"]:not(.hidden)').appendChild(b); return new Promise((r) => setTimeout(() => r(b.textContent), 120)); });
+    const mm = await P.evaluate(() => { const m = document.getElementById('moreMenu'), b = document.getElementById('btnMore'); return { hid: m.hidden, items: [...m.querySelectorAll('.mm-it')].map((x) => x.id).join(','), inTop: !!b.closest('.topbar'), themeVis: document.getElementById('btnTheme').getBoundingClientRect().height > 0, reset: document.getElementById('btnViewReset').hidden }; });
+    await P.click('#btnMore'); await P.waitForTimeout(100);
+    const mo = await P.evaluate(() => ({ hid: document.getElementById('moreMenu').hidden, exp: document.getElementById('btnMore').getAttribute('aria-expanded'), themeVis: document.getElementById('btnTheme').getBoundingClientRect().height > 0, focusIn: document.getElementById('moreMenu').contains(document.activeElement) }));
+    await P.click('#btnTheme'); await P.waitForTimeout(150);
+    const th = await P.evaluate(() => ({ theme: document.documentElement.getAttribute('data-theme'), hid: document.getElementById('moreMenu').hidden }));
+    const afterClick = await P.evaluate(() => document.activeElement && document.activeElement.id);
+    await P.click('#btnMore'); await P.click('#btnTheme'); await P.waitForTimeout(100); await P.click('#btnMore'); await P.waitForTimeout(60); await P.keyboard.press('Escape'); await P.waitForTimeout(100);
+    const esc = await P.evaluate(() => ({ hid: document.getElementById('moreMenu').hidden, theme: document.documentElement.getAttribute('data-theme'), act: document.activeElement && document.activeElement.id })); esc.afterClick = afterClick;
+    await P.evaluate(() => SVC.navMenu('contracts')); await P.waitForTimeout(400);
+    const row = await P.evaluate(() => { const b = document.querySelector('#dvTable tbody tr td.act .ab'); return { op0: getComputedStyle(b).opacity }; });
+    await P.hover('#dvTable tbody tr:first-child td:first-child'); await P.waitForTimeout(250);
+    const row2 = await P.evaluate(() => ({ op1: getComputedStyle(document.querySelector('#dvTable tbody tr:first-child td.act .ab')).opacity, other: getComputedStyle(document.querySelector('#dvTable tbody tr:nth-child(3) td.act .ab')).opacity }));
+    const cap = await P.evaluate(() => ({ head: (document.querySelector('#dvCap .cap-head') || document.getElementById('dvCap')).textContent, more: !!document.querySelector('#dvCap .cap-more'), help: document.getElementById('dvHelp').textContent.trim(), unitChipVis: document.querySelector('#dvTitle .ubadge') ? document.querySelector('#dvTitle .ubadge').getBoundingClientRect().height > 0 : null, badge: !document.getElementById('unitBadge').hidden }));
+    await P.evaluate(() => SVC.navMenu('quotes')); await P.waitForTimeout(500);
+    const cta = await P.evaluate(() => { const b = document.querySelector('#dvTable .dg-empty .dg-cta'); return b ? b.textContent : null; });
+    await P.click('#dvTable .dg-empty .dg-cta'); await P.waitForTimeout(300); const v2 = await P.evaluate(() => SVC.ST.CUR_VIEW);
+    await A.ctx.close();
+    const M = await mk186({ w: 390, h: 844, mobile: true }), Q = M.page; await Q.evaluate(() => SVC.navMenu('contracts')); await Q.waitForTimeout(400);
+    const mob = await Q.evaluate(() => { const tb = document.querySelector('#app .topbar'); const vis = [...tb.querySelectorAll('button,a,span.ubadge')].filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && !e.closest('#moreMenu'); }); const tops = [...new Set(vis.map((e) => Math.round(e.getBoundingClientRect().top / 10)))]; return { n: vis.length, rows: tops.length, ab: getComputedStyle(document.querySelector('#dvTable .ab') || document.body).opacity }; });
+    await M.ctx.close();
+    const V = await mk186({ role: 'viewer', email: 'v@example.com' }); await V.page.evaluate(async () => { await SVC.lazyLoad('price'); SVC.navMenu('price'); }); await V.page.waitForTimeout(600);
+    const pv = await V.page.evaluate(() => document.getElementById('viewPrice').textContent); await V.ctx.close();
+    const emoAll = Object.values(emo).flat();
+    assert(emoAll.length === 0 && dyn === '동적 버튼' && mm.hid && mm.items === 'btnViewReset,btnReload,btnFont,btnTheme' && mm.inTop && !mm.themeVis && !mo.hid && mo.exp === 'true' && mo.themeVis && mo.focusIn && th.theme === 'dark' && th.hid && esc.afterClick === 'btnMore' && esc.hid && esc.theme === 'light' && esc.act === 'btnMore'
+      && row.op0 === '0' && row2.op1 === '1' && row2.other === '0' && cap.more && cap.head.length < 70 && cap.help === 'AI 도움말' && cap.unitChipVis === false && cap.badge && cta === '견적 만들기' && v2 === 'quote' && mob.rows === 1 && mob.n <= 8 && mob.ab === '1' && !/sql/i.test(pv) && /관리자가 가격표를 등록하면/.test(pv),
+      JSON.stringify({ emo, dyn, mm, mo, th, esc, row, row2, cap, cta, v2, mob, pv: pv.slice(0, 80) }));
+    return '이모지 0 · 더보기 4 · 폰 상단 ' + mob.n + '개 한 줄 · 빈 화면 → ' + v2;
+  });
+}
+// ㊿+187 표 위 필터 한 줄(보기 탭 · 검색 · «필터» 팝오버 · 조건 칩 · 저장된 보기 · ⋯ 도구) · 사업 영역 한 화면(상단 버튼 하나 · 영역 선택 띠) — 가짜 DB
+if (S.blk()) {
+  const mk187 = async (o) => { o = Object.assign({ role: 'super_admin', email: 'tester@example.com', w: 1440, h: 1000, mobile: false, look: '' }, o || {});
+    const db = new FakeDB(seedData()); const ctx = await browser.newContext({ viewport: { width: o.w, height: o.h }, serviceWorkers: 'block', isMobile: o.mobile, hasTouch: o.mobile }); const page = await ctx.newPage(); const c = collect(page);
+    page.on('dialog', (d) => d.dismiss()); if (o.look) await page.addInitScript((l) => { try { localStorage.setItem('svc_look', l); } catch (e) { } }, o.look);
+    await fakeBackend(page, db, { role: o.role, email: o.email }); await page.goto(url + '/index.html');
+    await page.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA && SVC.ST.DATA.rows.length, null, { timeout: 20000 }); await page.waitForTimeout(600); return { db, ctx, page, c }; };
+  await S.t('㊿+187 표 위 한 줄: 보기 탭 + 검색 + «필터»(상태 · 빠른 보기 · 관점 — 예전 줄 요소 그대로 안에) + 저장된 보기 + ⋯(다시 읽기 · 붙여넣기 · 밀도) · 걸린 조건은 칩(✕ · 모두 해제) · 팝오버는 칩을 눌러도 열린 채 · Esc 초점 복귀 · 저장된 보기 저장 → 적용 → 삭제 · OI 는 상태 + 빠른 보기 · LIVE 기준 줄은 밖 · 점검 화면은 버튼 없음 · 폰 한 줄씩 · 클래식은 예전 그대로', async () => {
+    const A = await mk187(), P = A.page;
+    await P.evaluate(() => SVC.navMenu('contracts')); await P.waitForTimeout(400);
+    const vis = (e) => { const r = e.getBoundingClientRect(); return r.width > 1 && r.height > 1; };
+    const a = await P.evaluate(() => { const bar = document.querySelector('#viewData .dbar'), pop = document.getElementById('dvFilterPop'); const v = (e) => { const r = e.getBoundingClientRect(); return r.width > 1 && r.height > 1; };
+      return { h: Math.round(bar.getBoundingClientRect().height), one: bar.classList.contains('fbar'), order: [...bar.children].filter((e) => v(e)).map((e) => e.id).join('|'), wvIn: document.getElementById('dvWvBar').parentElement === bar, lensIn: document.getElementById('dvLensBar').closest('#dvFilterPop [data-sec="lens"]') !== null, chipIn: document.getElementById('dvChipBar').closest('#dvFilterPop') !== null, qvIn: document.getElementById('dvQvBar').closest('#dvFilterPop') !== null,
+        popHid: pop.hidden, chipsHid: document.getElementById('dvChips').hidden, fbVis: v(document.getElementById('dvFilterBtn')), moreIn: ['dvReload', 'dvPaste', 'dvDense'].every((id) => document.getElementById(id).closest('#dvMoreMenu')), pre: document.getElementById('dvPreBar').hidden, wvDesc: v(document.querySelector('#dvWvBar .wv-d')), segT: document.querySelector('#dvWvBar .seg').title }; });
+    assert(a.h <= 40 && a.one && /^dvWvBar\|dvSearch\|dvFilterBtn\|dvSavedBtn\|dvCount\|dvCsv\|dvHelp\|dvCols\|dvMoreBtn$/.test(a.order) && a.wvIn && a.lensIn && a.chipIn && a.qvIn && a.popHid && a.chipsHid && a.fbVis && a.moreIn && a.pre && !a.wvDesc && /보기마다 열 구성/.test(a.segT), JSON.stringify(a));
+    await P.click('#dvFilterBtn'); await P.waitForTimeout(150);
+    const b = await P.evaluate(() => ({ open: !document.getElementById('dvFilterPop').hidden, exp: document.getElementById('dvFilterBtn').getAttribute('aria-expanded'), secs: [...document.querySelectorAll('#dvFilterPop .fb-sec')].map((s) => s.dataset.sec + ':' + (s.hidden ? 0 : 1)).join(' '), cnt: document.getElementById('dvFbCount').textContent, foc: document.activeElement && document.activeElement.closest('#dvFilterPop') !== null }));
+    await P.click('#dvLensBar .chip:has-text("부속 계약")'); await P.waitForTimeout(300);
+    const c = await P.evaluate(() => ({ lens: SVC.DV.lens, open: !document.getElementById('dvFilterPop').hidden, chips: [...document.querySelectorAll('#dvChips .dvc')].map((x) => x.textContent.replace('✕', '').trim()).join('|'), clr: getComputedStyle(document.getElementById('dvFclr')).display, badge: document.querySelector('#dvFilterBtn .fb-n').textContent, on: document.getElementById('dvFilterBtn').classList.contains('on'), cnt: document.getElementById('dvFbCount').textContent, rows: document.querySelectorAll('#dvTable tbody tr:not(.dg-empty)').length, lbl: document.getElementById('dvFilterBtn').getAttribute('aria-label') }));
+    await P.keyboard.press('Escape'); await P.waitForTimeout(120);
+    const d = await P.evaluate(() => ({ open: !document.getElementById('dvFilterPop').hidden, foc: document.activeElement && document.activeElement.id }));
+    await P.evaluate(() => { SVC.DV.filters = { status: ['신규'] }; SVC.renderGrid(); }); await P.waitForTimeout(200);
+    const e = await P.evaluate(() => ({ chips: [...document.querySelectorAll('#dvChips .dvc')].map((x) => x.textContent.replace('✕', '').trim()).join('|'), clr: getComputedStyle(document.getElementById('dvFclr')).display, clrT: document.getElementById('dvFclr').textContent, badge: document.querySelector('#dvFilterBtn .fb-n').textContent }));
+    await P.click('#dvChips .dvc:has-text("상태:") .dvc-x'); await P.waitForTimeout(200);
+    const f = await P.evaluate(() => ({ lens: SVC.DV.lens, f: JSON.stringify(SVC.DV.filters), chips: document.querySelectorAll('#dvChips .dvc').length }));
+    await P.evaluate(() => { SVC.DV.lens = 'kids'; SVC.DV.chipVal = ''; SVC.renderGrid(); }); await P.fill('#dvSearch', '가상'); await P.waitForTimeout(250);
+    await P.click('#dvSavedBtn'); await P.waitForTimeout(150);
+    const g = await P.evaluate(() => ({ menu: !!document.getElementById('fvMenu'), empty: /아직 없음/.test(document.getElementById('fvMenu').textContent), cur: document.querySelector('#fvMenu .fv-cur').textContent, foc: document.activeElement && document.activeElement.id }));
+    await P.fill('#fvName', '내 부속 계약'); await P.keyboard.press('Enter'); await P.waitForTimeout(250);
+    const h = await P.evaluate(() => ({ n: SVC.fvList('contracts').length, s: SVC.fvList('contracts')[0].s, badge: document.querySelector('#dvSavedBtn .fb-n').textContent, menu: !!document.getElementById('fvMenu'), foc: document.activeElement && document.activeElement.id }));
+    const i0 = await P.evaluate(() => getComputedStyle(document.getElementById('dvFclr')).display);   /* 칩 1 + 검색어 → «모두 해제» 보임(검색어까지 지움) */
+    await P.click('#dvFclr'); await P.waitForTimeout(250);
+    const i = await P.evaluate(() => ({ lens: SVC.DV.lens, chips: document.getElementById('dvChips').hidden, q: document.getElementById('dvSearch').value, clr0: 'x' }));
+    await P.click('#dvSavedBtn'); await P.waitForTimeout(150); await P.click('#fvMenu .fv-go'); await P.waitForTimeout(300);
+    const j = await P.evaluate(() => ({ lens: SVC.DV.lens, q: document.getElementById('dvSearch').value, wv: SVC.wvCur('contracts')[0], chips: [...document.querySelectorAll('#dvChips .dvc')].map((x) => x.textContent.replace('✕', '').trim()).join('|'), toast: (document.querySelector('#toasts .toast') || {}).textContent || '' }));
+    await P.click('#dvSavedBtn'); await P.waitForTimeout(150); await P.click('#fvMenu .fv-x'); await P.waitForTimeout(250);
+    const k = await P.evaluate(() => ({ n: SVC.fvList('contracts').length, badgeHid: document.querySelector('#dvSavedBtn .fb-n').hidden, menu: !!document.getElementById('fvMenu') }));
+    await P.keyboard.press('Escape'); await P.waitForTimeout(100);
+    await P.click('#dvMoreBtn'); await P.waitForTimeout(150);
+    const l = await P.evaluate(() => { const v = (e) => { const r = e.getBoundingClientRect(); return r.width > 1 && r.height > 1; }; return { open: !document.getElementById('dvMoreMenu').hidden, items: [...document.querySelectorAll('#dvMoreMenu .mm-it')].map((b) => b.id + ':' + (v(b) ? 1 : 0)).join(' '), foc: document.activeElement && document.activeElement.id, txt: document.getElementById('dvDense').textContent.trim() }; });
+    await P.keyboard.press('Escape'); await P.waitForTimeout(120);
+    const m = await P.evaluate(() => ({ open: !document.getElementById('dvMoreMenu').hidden, foc: document.activeElement && document.activeElement.id }));
+    await P.click('#dvFilterBtn'); await P.waitForTimeout(100); await P.evaluate(() => SVC.navMenu('oi')); await P.waitForTimeout(500);
+    const n = await P.evaluate(() => ({ open: !document.getElementById('dvFilterPop').hidden, secs: [...document.querySelectorAll('#dvFilterPop .fb-sec')].map((s) => s.dataset.sec + ':' + (s.hidden ? 0 : 1)).join(' '), st: document.querySelector('#dvFilterPop [data-sec="chip"] .fb-st').textContent, lens: SVC.DV.lens, qoiIn: !!document.querySelector('#dvFilterPop #qoiBtn'), chips: document.getElementById('dvChips').hidden }));
+    await P.click('#dvFilterBtn'); await P.waitForTimeout(100); await P.click('#dvQvBar [data-qv="nonext"]'); await P.waitForTimeout(250); await P.click('#dvChipBar .pill:has-text("등록")'); await P.waitForTimeout(250);
+    const o = await P.evaluate(() => ({ open: !document.getElementById('dvFilterPop').hidden, pre: SVC.DV.pre && SVC.DV.pre.qv, chip: SVC.DV.chipVal, chips: [...document.querySelectorAll('#dvChips .dvc')].map((x) => x.textContent.replace('✕', '').trim()).join('|'), badge: document.querySelector('#dvFilterBtn .fb-n').textContent }));
+    await P.click('#dvFbClear'); await P.waitForTimeout(250);
+    const p2 = await P.evaluate(() => ({ pre: SVC.DV.pre, chip: SVC.DV.chipVal, chips: document.getElementById('dvChips').hidden, open: !document.getElementById('dvFilterPop').hidden }));
+    await P.click('#dvFbDone'); await P.evaluate(() => SVC.navMenu('live')); await P.waitForTimeout(500);
+    const q = await P.evaluate(() => { const lb = document.getElementById('dvLensBar'), bar = document.querySelector('#viewData .dbar'); return { out: lb.nextElementSibling === bar && !lb.closest('#dvFilterPop'), vis: getComputedStyle(lb).display, fb: document.getElementById('dvFilterBtn').hidden, src: !!lb.querySelector('[data-lsrc]') }; });
+    await P.evaluate(() => SVC.navMenu('dcheck')); await P.waitForTimeout(400);
+    const r = await P.evaluate(() => ({ fb: document.getElementById('dvFilterBtn').hidden, sv: document.getElementById('dvSavedBtn').hidden, more: getComputedStyle(document.getElementById('dvMoreBtn')).display !== 'none', chips: document.getElementById('dvChips').hidden }));
+    await A.ctx.close();
+    const M = await mk187({ w: 390, h: 844, mobile: true }), Q = M.page; await Q.evaluate(() => SVC.navMenu('contracts')); await Q.waitForTimeout(500);
+    const mob = await Q.evaluate(() => { const bar = document.querySelector('#viewData .dbar'), W = document.documentElement.clientWidth; const w = (id) => Math.round(document.getElementById(id).getBoundingClientRect().width); const sp = (id) => getComputedStyle(document.querySelector('#' + id + ' span')).display;
+      return { h: Math.round(bar.getBoundingClientRect().height), seg: Math.round(document.querySelector('#dvWvBar .seg').getBoundingClientRect().width), bar: Math.round(bar.getBoundingClientRect().width), icon: [sp('dvSavedBtn')].join(',') + (document.querySelector('#dvMoreMenu #dvCsv') && document.querySelector('#dvMoreMenu #dvCols') ? ',menu' : ',bar'), lgd: getComputedStyle(document.querySelector('#dvCount .dv-lgd')).display, ov: document.documentElement.scrollWidth <= W, rows: [...bar.children].filter((e) => e.getBoundingClientRect().height > 1).map((e) => Math.round(e.getBoundingClientRect().top)).filter((t, i, a) => a.indexOf(t) === i).length, w: w('dvSavedBtn') }; });
+    await Q.click('#dvFilterBtn'); await Q.waitForTimeout(200);
+    const mob2 = await Q.evaluate(() => { const r = document.getElementById('dvFilterPop').getBoundingClientRect(); return { l: Math.round(r.left), rt: Math.round(document.documentElement.clientWidth - r.right), open: !document.getElementById('dvFilterPop').hidden }; });
+    await M.ctx.close();
+    const C = await mk187({ look: 'classic' }); await C.page.evaluate(() => SVC.navMenu('contracts')); await C.page.waitForTimeout(400);
+    const cl = await C.page.evaluate(() => ({ gn: SVC.isGN(), fb: !!document.getElementById('dvFilterBtn'), lensBefore: document.getElementById('dvLensBar').parentElement === document.querySelector('#viewData .dbar').parentElement && !document.getElementById('dvFilterPop'), fclr: document.getElementById('dvFclr').parentElement.classList.contains('dbar'), reload: document.getElementById('dvReload').parentElement.classList.contains('dbar') })); await C.ctx.close();
+    assert(b.open && b.exp === 'true' && b.secs === 'chip:0 qv:0 lens:1 colf:0' && /지금 조건 \d+행/.test(b.cnt) && b.foc, '팝오버 ' + JSON.stringify(b));   /* ㊿+188 폰용 «열로 거르기» 구역(PC 는 숨김) */
+    assert(c.lens === 'kids' && c.open && c.chips === '관점:부속 계약 있는 고객사' && c.clr === 'none' && c.badge === '1' && c.on && c.cnt === '지금 조건 ' + c.rows + '행' && /걸린 조건 1개/.test(c.lbl) && !d.open && d.foc === 'dvFilterBtn', '관점 칩 ' + JSON.stringify({ c, d }));
+    assert(e.chips === '관점:부속 계약 있는 고객사|상태:신규' && e.clr !== 'none' && e.clrT === '모두 해제' && e.badge === '2' && f.lens === 'kids' && f.f === '{}' && f.chips === 1, '열 필터 칩 ' + JSON.stringify({ e, f }));
+    assert(g.menu && g.empty && /보기 운영 · 부속 계약 있는 고객사 · «가상»/.test(g.cur) && g.foc === 'fvName' && h.n === 1 && h.s.lens === 'kids' && h.s.q === '가상' && h.s.wv === '운영' && h.badge === '1' && !h.menu && h.foc === 'dvSavedBtn', '저장 ' + JSON.stringify({ g, h }));
+    assert(i0 !== 'none' && i.lens === '' && i.chips && i.q === '' && j.lens === 'kids' && j.q === '가상' && j.wv === '운영' && j.chips === '관점:부속 계약 있는 고객사' && /내 부속 계약/.test(j.toast) && k.n === 0 && k.badgeHid && k.menu, '적용 · 삭제 ' + JSON.stringify({ i, j, k }));
+    assert(l.open && /dvReload:1/.test(l.items) && /dvDense:1/.test(l.items) && l.foc === 'dvReload' && l.txt === '밀도' && !m.open && m.foc === 'dvMoreBtn', '⋯ ' + JSON.stringify({ l, m }));
+    assert(!n.open && n.secs === 'chip:1 qv:1 lens:0 colf:0' && n.st === '진행상태' && n.lens === '' && !n.qoiIn && n.chips && o.open && o.pre === 'nonext' && o.chip === '등록' && o.chips === '진행상태:등록|빠른 보기:다음 행동 없음' && o.badge === '2' && !p2.pre && p2.chip === '' && p2.chips && p2.open, 'OI ' + JSON.stringify({ n, o, p2 }));
+    assert(q.out && q.vis === 'flex' && q.fb && q.src && r.fb && r.sv && r.more && r.chips, 'LIVE · 점검 ' + JSON.stringify({ q, r }));
+    assert(mob.h <= 150 && mob.seg >= mob.bar - 2 && mob.icon === 'none,menu' && mob.lgd === 'none' && mob.ov && mob.rows <= 4 && mob.w <= 40 && mob2.open && mob2.l === 8 && mob2.rt === 8, '폰 ' + JSON.stringify({ mob, mob2 }));
+    assert(!cl.gn && !cl.fb && cl.lensBefore && cl.fclr && cl.reload && !A.c.errs.filter((e) => !/serviceWorker/.test(e)).length, '클래식 ' + JSON.stringify({ cl, errs: A.c.errs }));
+    return '한 줄 ' + a.h + 'px · 팝오버 · 칩 · 저장된 보기 · ⋯ · 폰 ' + mob.rows + '줄';
+  });
+  await S.t('㊿+187 사업 영역 한 화면: 상단 «사업 영역» 버튼 하나(펼침 없음) → 마지막(처음엔 첫) 영역 · 영역 선택 띠 = 메뉴 소제목 × 계약 있는 채널(당월 MRR · LIVE 곳 = KPI 타일과 같음) · 고르면 아래 화면 · 주소 #키 · 제목 «사업 영역» · 부제 «Cloud NAC › 일반 판매» · ← → 키 · 권한 없는 영역 빠짐 · 폰 2열 · 클래식은 메뉴 9개 그대로', async () => {
+    const A = await mk187(), P = A.page;
+    const tabs = await P.evaluate(() => [...document.querySelectorAll('#rail .gn-tabs .gn-tb')].map((b) => b.dataset.v || b.dataset.seg).join('|'));
+    await P.click('#rail .gn-tb[data-v="area"]'); await P.waitForTimeout(500);
+    const a = await P.evaluate(() => ({ v: SVC.ST.CUR_VIEW, cur: (document.querySelector('#rail .gn-tb[aria-current="true"]') || {}).dataset.v, ttl: document.getElementById('gnTitle').textContent, sub: document.getElementById('gnSub').textContent, hash: location.hash, menu: document.getElementById('gnMenu').hidden,
+      keys: [...document.querySelectorAll('#areaSel [data-area]')].map((b) => b.dataset.area + (b.getAttribute('aria-selected') === 'true' ? '*' : '')).join(' '), groups: [...document.querySelectorAll('#areaSel .area-gl')].map((x) => x.textContent).join('|'), stat: document.querySelector('#areaSel [data-area="cngen"] small').textContent,
+      kpi: [...document.querySelectorAll('#chBody .kpi')].slice(0, 2).map((k) => k.querySelector('.v').textContent.replace(/\s/g, '')).join(' '), cap: document.querySelector('#chBody .area-cap').textContent, big: !!document.querySelector('#chBody .ubadge'), firstH: (document.querySelector('#viewChannel h2,#viewChannel h3') || {}).textContent, role: document.getElementById('areaSel').getAttribute('role') }));
+    await P.click('#areaSel [data-area="mdrgen"]'); await P.waitForTimeout(500);
+    const b = await P.evaluate(() => ({ v: SVC.ST.CUR_VIEW, sel: (document.querySelector('#areaSel [aria-selected="true"]') || {}).dataset.area, sub: document.getElementById('gnSub').textContent, hash: location.hash, cur: (document.querySelector('#rail .gn-tb[aria-current="true"]') || {}).dataset.v, cap: document.querySelector('#chBody .area-cap').textContent, y: Math.round(window.scrollY) }));
+    await P.evaluate(() => SVC.navMenu('dash')); await P.waitForTimeout(300); await P.click('#rail .gn-tb[data-v="area"]'); await P.waitForTimeout(400);
+    const c = await P.evaluate(() => ({ v: SVC.ST.CUR_VIEW, mem: localStorage.getItem('svc_area_tester@example.com') }));
+    await P.focus('#areaSel [aria-selected="true"]'); await P.keyboard.press('ArrowLeft'); await P.waitForTimeout(400);
+    const d = await P.evaluate(() => ({ v: SVC.ST.CUR_VIEW, foc: document.activeElement && document.activeElement.dataset.area }));
+    await P.evaluate(() => { SVC.switchView('cnpub'); }); await P.waitForTimeout(400);
+    const e = await P.evaluate(() => ({ v: SVC.ST.CUR_VIEW, sel: (document.querySelector('#areaSel [aria-selected="true"]') || {}).dataset.area, sub: document.getElementById('gnSub').textContent }));
+    await P.evaluate(() => { SVC.ST.IS_SUPER = false; SVC.ST.PERMS = { cnpub: { v: false, r: false, w: false } }; SVC.applyPerms(); SVC.switchView('cngen'); }); await P.waitForTimeout(400);   /* 슈퍼 관리자는 권한 표를 안 타므로 잠깐 내림 */
+    const f = await P.evaluate(() => ({ keys: [...document.querySelectorAll('#areaSel [data-area]')].map((b) => b.dataset.area).join(' '), tabs: [...document.querySelectorAll('#rail .gn-tabs .gn-tb')].map((b) => b.dataset.v || b.dataset.seg).join('|') }));
+    await P.evaluate(() => { SVC.ST.IS_SUPER = true; SVC.ST.PERMS = null; SVC.applyPerms(); });
+    await A.ctx.close();
+    const M = await mk187({ w: 390, h: 844, mobile: true }), Q = M.page; await Q.evaluate(() => SVC.navMenu('area')); await Q.waitForTimeout(500);
+    const m = await Q.evaluate(() => { const bs = [...document.querySelectorAll('#areaSel [data-area]')]; const W = document.documentElement.clientWidth; return { v: SVC.ST.CUR_VIEW, n: bs.length, w: Math.round(bs[0].getBoundingClientRect().width), W, ov: document.documentElement.scrollWidth <= W, two: Math.round(bs[0].getBoundingClientRect().top) === Math.round(bs[1].getBoundingClientRect().top) && Math.round(bs[0].getBoundingClientRect().top) !== Math.round(bs[2].getBoundingClientRect().top) }; }); await M.ctx.close();
+    const C = await mk187({ look: 'classic' }); await C.page.evaluate(() => SVC.switchView('cngen')); await C.page.waitForTimeout(400);
+    const cl = await C.page.evaluate(() => ({ gn: SVC.isGN(), sel: !!document.getElementById('areaSel'), side: [...document.querySelectorAll('#side button[data-v]')].filter((b) => /^(cngen|cnpub|cns1|cnlgu|mdrgen)$/.test(b.dataset.v) && b.style.display !== 'none').length, big: /일반 판매 사업 영역/.test(document.getElementById('chBody').textContent) })); await C.ctx.close();
+    assert(/\|area\|/.test(tabs) && !/사업 영역/.test(tabs) && a.v === 'cngen' && a.cur === 'area' && a.ttl === '사업 영역' && a.sub === 'Cloud NAC › 일반 판매' && a.hash === '#cngen' && a.menu && a.keys === 'cngen* cnpub cns1 cnlgu mdrgen' && a.groups === 'Cloud NAC|MDR' && a.role === 'tablist' && !a.big && /월별 매출 추이/.test(a.firstH), '진입 ' + JSON.stringify(a));
+    const mrr = (a.kpi.split(' ')[0] || '').replace(/천원.*/, ''), live = (a.kpi.split(' ')[1] || '').replace(/곳.*/, '');
+    assert(a.stat === mrr + '천원 · ' + live + '곳' && /Cloud NAC · 일반 판매/.test(a.cap) && /2026-\d\d 기준/.test(a.cap), '띠 숫자 = KPI ' + JSON.stringify({ stat: a.stat, kpi: a.kpi, cap: a.cap }));
+    assert(b.v === 'mdrgen' && b.sel === 'mdrgen' && b.sub === 'MDR › 일반 판매' && b.hash === '#mdrgen' && b.cur === 'area' && /MDR · 일반 판매/.test(b.cap) && b.y === 0 && c.v === 'mdrgen' && c.mem === 'mdrgen' && d.v === 'cnlgu' && d.foc === 'cnlgu' && e.v === 'cnpub' && e.sel === 'cnpub' && e.sub === 'Cloud NAC › 조달 판매', '고르기 ' + JSON.stringify({ b, c, d, e }));
+    assert(f.keys === 'cngen cns1 cnlgu mdrgen' && /\|area\|/.test(f.tabs), '권한 ' + JSON.stringify(f));
+    assert(m.v === 'cngen' && m.n === 5 && m.w < m.W / 2 && m.w > m.W / 3 && m.ov && m.two, '폰 ' + JSON.stringify(m));
+    assert(!cl.gn && !cl.sel && cl.side === 5 && cl.big && !A.c.errs.filter((e) => !/serviceWorker/.test(e)).length, '클래식 ' + JSON.stringify({ cl, errs: A.c.errs }));
+    return '영역 ' + a.keys.split(' ').length + '개 띠 · ' + a.groups;
+  });
+}
+// ㊿+188 화면별 정리 — 0 인 기간 접기 · 필터 접기 · 유입경로 0 경로 · 대조 한 줄 · 눈금 · 이력 읽기 · 상세 창 · 고객 360 · 위성 · 폰 도구줄 — 가짜 DB
+if (S.blk()) {
+  const mk188 = async (o) => { o = Object.assign({ role: 'super_admin', email: 'tester@example.com', w: 1440, h: 1000, mobile: false, look: '', seed: null }, o || {});
+    const db = new FakeDB(seedData()); if (o.seed) o.seed(db); const ctx = await browser.newContext({ viewport: { width: o.w, height: o.h }, serviceWorkers: 'block', isMobile: o.mobile, hasTouch: o.mobile }); const page = await ctx.newPage(); const c = collect(page);
+    page.on('dialog', (d) => d.dismiss()); if (o.look) await page.addInitScript((l) => { try { localStorage.setItem('svc_look', l); } catch (e) { } }, o.look);
+    await fakeBackend(page, db, { role: o.role, email: o.email }); await page.goto(url + '/index.html');
+    await page.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA && SVC.ST.DATA.rows.length, null, { timeout: 20000 }); await page.waitForTimeout(600); return { db, ctx, page, c }; };
+  const go = async (P, v) => { await P.evaluate(async (v) => { try { await SVC.lazyLoad(v); } catch (e) { } SVC.navMenu(v); }, v); await P.waitForTimeout(500); };
+  await S.t('㊿+188 분석 · 장비 · 창: 해지율 · 증감 «0 인 기간 n개 보기»(합계 줄은 그대로 · 펼침 기억) · 필터 칩 줄은 «필터 ▾»(고르면 펼침) · 유입경로 0 경로는 한 줄 + «모두 보기» · 장비 차트 눈금 중복 없음 · 대조 카드 한 줄(진단 버튼은 접힘 안 건드림 · 접은 상태 기억) · 작은 표(연간 목표) 검색 · 엑셀 · 열 숨김 · 이력 «내용» 읽히는 글 · 계약 상세 그래프 기간 · 합계 · 변동 없으면 한 줄 · 빈 이력 한 줄 · 입력 창 저장 줄 고정 · 고객 360 건수 한 번 · 장비 0 이면 한 줄 · 위성 embed=gn · 단위 칩 PC 숨김 · 클래식 그대로', async () => {
+    const A = await mk188(), P = A.page;
+    await go(P, 'churnrate');
+    const a = await P.evaluate(() => { const tg = document.querySelector('#crBody .zr-tg'), rows = [...document.querySelectorAll('#crBody .zr-row')]; const tb = tg && tg.closest('table'); const last = tb && [...tb.tBodies[0].rows].slice(-1)[0];
+      return { tg: !!tg, n: rows.length, hid: rows.every((r) => r.hidden), txt: tg && tg.textContent.trim(), zero: rows.every((r) => [...r.children].slice(1).every((td) => /^[\s0.,%–\-−+]*$/.test(td.textContent))), sum: last && last.textContent.trim().slice(0, 2), sumZr: last && last.classList.contains('zr-row'), flt: document.getElementById('crFlt').open, fsum: document.querySelector('#crFlt>summary').textContent.trim(), adv: document.getElementById('crAdv').open }; });
+    await P.click('#crBody .zr-tg .zr-btn'); await P.waitForTimeout(100);
+    const b = await P.evaluate(() => ({ shown: [...document.querySelectorAll('#crBody .zr-row')].every((r) => !r.hidden), txt: document.querySelector('#crBody .zr-tg').textContent.trim(), exp: document.querySelector('#crBody .zr-btn').getAttribute('aria-expanded') }));
+    await P.click('#crFlt>summary'); await P.waitForTimeout(100); await P.click('#crBody button.chip[data-fg="line"]'); await P.waitForTimeout(500);
+    const c2 = await P.evaluate(() => ({ flt: document.getElementById('crFlt').open, sel: (document.querySelector('#crFlt .cr-flt-sel') || {}).textContent, kept: document.querySelector('#crBody .zr-tg') ? document.querySelector('#crBody .zr-tg').textContent.trim() : '(없음)', chip: document.querySelector('#crBody button.chip[data-fg="line"]').getAttribute('aria-pressed') }));
+    await P.click('#crBody button.chip[data-fg="line"]'); await P.waitForTimeout(400);
+    const c3 = await P.evaluate(() => { SVC.navMenu('custflow'); return document.getElementById('cfFlt').open; });   /* 연 상태는 해지율 · 증감이 같이 기억(필터도 같이 씀) */
+    await P.evaluate(() => { SVC.CR.flt = false; }); await go(P, 'custflow');
+    const d = await P.evaluate(() => ({ tg: document.querySelectorAll('#cfBody .zr-tg').length, flt: document.getElementById('cfFlt').open, first: (document.querySelector('#cfBody .zr-tg') || {}).textContent }));
+    await go(P, 'leadsrc');
+    const e = await P.evaluate(() => ({ tiles: document.querySelectorAll('.ls-tile').length, zero: (document.querySelector('.ls-zero') || {}).textContent, tg: (document.querySelector('#bizHost .zr-tg') || {}).textContent }));
+    await P.click('#lsAllTiles'); await P.waitForTimeout(400);
+    const f = await P.evaluate(() => ({ tiles: document.querySelectorAll('.ls-tile').length, btn: (document.getElementById('lsAllTiles') || {}).textContent }));
+    await P.click('#lsAllTiles'); await P.waitForTimeout(300);
+    await go(P, 'eqboard');
+    const g = await P.evaluate(() => { const t = [...document.querySelectorAll('#eqcTrend svg text')].map((x) => x.textContent).filter((x) => /^[\d,]+$/.test(x)); return { ticks: t.join(','), uniq: new Set(t).size === t.length && t.length >= 2 }; });
+    await go(P, 'orders');
+    const h = await P.evaluate(() => { const d = document.getElementById('eqChk'); return { det: !!d && d.tagName === 'DETAILS', open: d.open, sum: d.querySelector('summary').textContent.replace(/\s+/g, ' ').trim(), ok: d.classList.contains('ok'), fixVis: getComputedStyle(document.getElementById('eqFixAll')).display, diagIn: !!d.querySelector('.eq-chk-act #eqDiag') && !d.querySelector('summary button'), body: d.querySelector('.eq-chk-body').textContent.includes('기준은') }; });
+    await P.click('#eqChk summary'); await P.waitForTimeout(150);
+    const h2 = await P.evaluate(() => ({ open: document.getElementById('eqChk').open, mem: SVC.EQ_CHK.open }));
+    await P.evaluate(() => SVC.renderGrid()); await P.waitForTimeout(300);
+    const h3 = await P.evaluate(() => ({ open: document.getElementById('eqChk').open }));
+    await P.click('#eqChk summary'); await P.waitForTimeout(150); await P.click('#eqDiag'); await P.waitForTimeout(900);   /* 버튼은 펼친 본문 첫 줄에 */
+    const h4 = await P.evaluate(() => ({ open: document.getElementById('eqChk').open, diag: getComputedStyle(document.getElementById('eqDiagOut')).display !== 'none' }));
+    await P.click('#eqDiagClose'); await P.waitForTimeout(150);
+    await go(P, 'targets');
+    const i = await P.evaluate(() => ({ small: document.querySelector('#viewData .dbar').classList.contains('fb-small'), q: getComputedStyle(document.getElementById('dvSearch')).display, csv: getComputedStyle(document.getElementById('dvCsv')).display, add: getComputedStyle(document.getElementById('dvAdd')).display }));
+    const j = await P.evaluate(() => ({ t1: SVC.logDetailText({ mrr: 480, status: '해지', _via: '계약 표 ✎' }, 'contracts'), t2: SVC.logDetailText({ kind: 'eq', assignee: { from: null, to: 'a@example.com' } }, 'work_assign'), t3: SVC.logDetailText('그냥 글', 'x'), t4: SVC.logDetailText({ 맞춤: [1, 2, 3], ok: true }, 'monthly_revenue') }));
+    await go(P, 'contracts');
+    const k = await P.evaluate(() => { const flat = SVC.ST.RAWX.contracts.find((c) => { const m = SVC.ST.RAWX.mrs.filter((x) => x.contract_id === c.id); return m.length >= 2 && m.every((x) => Number(x.amount) === Number(m[0].amount)); }); SVC.openDetail(flat); return !!flat; });
+    await P.waitForTimeout(500);
+    const l = await P.evaluate(() => ({ cap: document.getElementById('dtChartCap').textContent, flat: (document.querySelector('#dtChart .dt-flat') || {}).textContent, h200: document.getElementById('dtChart').classList.contains('h200'), log: document.getElementById('dtLog').textContent.trim(), thead: !!document.querySelector('#dtLog thead'), nolog: !!document.querySelector('#dtLog .dt-nolog'), mact: getComputedStyle(document.querySelector('#ovlDetail .modal>.mact')).position }));
+    await P.keyboard.press('Escape'); await P.waitForTimeout(200);
+    const m0 = await P.evaluate(() => { const v = SVC.ST.RAWX.contracts.find((c) => { const m = SVC.ST.RAWX.mrs.filter((x) => x.contract_id === c.id); return m.length >= 2 && m.some((x) => Number(x.amount) !== Number(m[0].amount)); }); if (!v) return false; SVC.openDetail(v); return true; });
+    await P.waitForTimeout(500);
+    const m = await P.evaluate(() => ({ svg: !!document.querySelector('#dtChart svg'), h200: document.getElementById('dtChart').classList.contains('h200'), cap: /합계/.test(document.getElementById('dtChartCap').textContent) }));
+    await P.keyboard.press('Escape'); await P.waitForTimeout(200);
+    await P.click('#btnEdit'); await P.waitForTimeout(400);
+    const n = await P.evaluate(() => ({ mact: getComputedStyle(document.querySelector('#ovlEdit .modal>.mact')).position, bt: getComputedStyle(document.querySelector('#ovlEdit .modal>.mact')).borderTopWidth }));
+    await P.keyboard.press('Escape'); await P.waitForTimeout(200);
+    await P.evaluate(() => SVC.openCust360('가상고객07')); await P.waitForTimeout(500);
+    const o = await P.evaluate(() => ({ cap: document.getElementById('c360Cap').textContent, go: [...document.querySelectorAll('#c360Go [data-cv]')].map((b) => b.textContent.trim()).join('|'), goNum: !!document.querySelector('#c360Go .num'), tabs: [...document.querySelectorAll('.c360-tabs [role="tab"]')].map((b) => b.textContent.trim()).slice(0, 3).join('|'), eq4: getComputedStyle(document.querySelector('.c360-eq4')).display, eqLine: ([...document.querySelectorAll('.c360-summ h4:not([hidden])')].filter((h) => /장비/.test(h.textContent)).map((h) => h.querySelector('.ct').textContent)[0] || ''), eqH4: [...document.querySelectorAll('.c360-summ h4')].filter((h) => /장비/.test(h.textContent) && !h.hidden).length }));
+    await P.keyboard.press('Escape'); await P.waitForTimeout(200);
+    await P.evaluate(() => SVC.switchView('s1')); await P.waitForFunction(() => { const f = document.getElementById('s1Frame'); try { return f.contentDocument && f.contentDocument.readyState === 'complete' && f.contentDocument.documentElement.getAttribute('data-embed'); } catch (e) { return false; } }, null, { timeout: 8000 });
+    const p = await P.evaluate(() => { const f = document.getElementById('s1Frame'), d = f.contentDocument; return { src: /embed=gn/.test(f.src), emb: d.documentElement.getAttribute('data-embed'), gg: getComputedStyle(d.documentElement).getPropertyValue('--gg').trim(), tab: getComputedStyle(d.querySelector('.tab.on')).backgroundColor, ttl: getComputedStyle(document.querySelector('#viewS1 .sat-ttl')).display, badge: getComputedStyle(document.querySelector('#viewS1 .sat-head .ubadge')).display, newWin: document.querySelector('#viewS1 a[data-sat]').getAttribute('href') }; });
+    const q = await P.evaluate(() => { SVC.navMenu('dash'); SVC.homeDetail(true); return [...document.querySelectorAll('#viewDash .ukw')].filter((x) => getComputedStyle(x).display !== 'none').length; }); await P.evaluate(() => SVC.homeDetail(false));
+    await A.ctx.close();
+    const C = await mk188({ look: 'classic' }), Q = C.page; await go(Q, 'churnrate');
+    const cl = { zr: await Q.evaluate(() => document.querySelectorAll('.zr-tg').length), flt: await Q.evaluate(() => !!document.getElementById('crFlt')) };
+    await go(Q, 'orders'); cl.eq = await Q.evaluate(() => ({ det: !!document.getElementById('eqChk'), old: /신청 ↔ 현황 대조/.test(document.getElementById('eqHost').textContent) }));
+    await Q.evaluate(() => SVC.openCust360('가상고객07')); await Q.waitForTimeout(400); cl.cap = await Q.evaluate(() => document.getElementById('c360Cap').textContent); await C.ctx.close();
+    assert(a.tg && a.n >= 1 && a.hid && /^0 인 기간 \d+개 보기$/.test(a.txt) && a.zero && a.sum === '누계' && !a.sumZr && !a.flt && /\(전체\)/.test(a.fsum) && !a.adv && b.shown && b.txt === '0 인 기간 접기' && b.exp === 'true', '해지율 0행 ' + JSON.stringify({ a, b }));
+    assert(c2.flt && c2.sel && c2.chip === 'true' && c2.kept === '0 인 기간 접기' && c3 && d.tg >= 1 && !d.flt && /0 인 기간/.test(d.first), '필터 접기 · 증감 ' + JSON.stringify({ c2, c3, d }));
+    assert(e.tiles === 1 && /모두 0 인 경로 5개/.test(e.zero) && /직접영업/.test(e.zero) && /0 인 경로 \d+개 보기/.test(e.tg) && f.tiles === 6 && f.btn === '0 인 경로 접기', '유입경로 ' + JSON.stringify({ e, f }));
+    assert(g.uniq && h.det && h.open && /✓ 신청 ↔ 현황 일치/.test(h.sum) && /신청 2건/.test(h.sum) && h.ok && h.fixVis === 'none' && h.diagIn && h.body && !h2.open && h2.mem === false && !h3.open && h4.open && h4.diag, '장비 ' + JSON.stringify({ g, h, h2, h3, h4 }));
+    assert(i.small && i.q === 'none' && i.csv === 'none' && i.add !== 'none' && j.t1 === 'MRR(천원): 480 · 상태: 해지 (계약 표 ✎)' && j.t2 === 'kind: eq · assignee: (비움) → a@example.com' && j.t3 === '그냥 글' && j.t4 === '맞춤: 3개 · ok: 예', '작은 표 · 이력 ' + JSON.stringify({ i, j }));
+    assert(k && /월 인식 금액\(천원\) · \d{4}-\d\d ~ \d{4}-\d\d · \d+개월 · 합계 [\d,]+천원/.test(l.cap) && /매달 [\d,]+천원 — 기간 내 변동 없음/.test(l.flat) && !l.h200 && l.nolog && !l.thead && /기록이 없습니다/.test(l.log) && l.mact === 'sticky' && m0 && m.svg && m.h200 && m.cap && n.mact === 'sticky' && n.bt === '1px', '상세 · 입력 창 ' + JSON.stringify({ k, l, m0, m, n }));
+    assert(o.cap === '인바운드는 메뉴를 한 번 연 뒤 집계됩니다' && o.go === '계약|LIVE|OI|인바운드|장비 신청|장비 현황' && !o.goNum && /^요약\|계약\s?\d+\|LIVE\s?\d+$/.test(o.tabs) && o.eq4 === 'none' && /이력 없음/.test(o.eqLine) && o.eqH4 === 1, '고객 360 ' + JSON.stringify(o));
+    assert(p.src && p.emb === 'gn' && p.gg === '#3F7A0C' && p.tab === 'rgb(28, 30, 32)' && p.ttl === 'none' && p.badge !== 'none' && !/embed/.test(p.newWin) && q === 0, '위성 · 단위 ' + JSON.stringify({ p, q }));
+    assert(cl.zr === 0 && !cl.flt && !cl.eq.det && cl.eq.old && /계약 \d+건 · LIVE/.test(cl.cap) && !A.c.errs.filter((e) => !/serviceWorker/.test(e)).length, '클래식 ' + JSON.stringify({ cl, errs: A.c.errs }));
+    return '0행 ' + a.n + ' · 경로 5 · 눈금 ' + g.ticks + ' · 대조 한 줄 · 이력 글';
+  });
+  await S.t('㊿+188 폰(390): 표 도구줄 4줄 이하 — 정렬은 줄에 · «거르기»는 «필터» 안(관점 칩 줄바꿈) · 엑셀 · AI 도움말 · 열 · «표로 보기»는 «⋯» 안(글자 보임) · 카드 줄 숨김 · 단위 칩은 보임 · 해지율 접기 머리 한 줄 · 가로 넘침 0', async () => {
+    const M = await mk188({ w: 390, h: 844, mobile: true }), Q = M.page; await go(Q, 'contracts');
+    const a = await Q.evaluate(() => { const bar = document.querySelector('#viewData .dbar'); const v = (e) => { const r = e.getBoundingClientRect(); return r.width > 1 && r.height > 1; };
+      return { rows: [...bar.children].filter(v).map((e) => Math.round(e.getBoundingClientRect().top)).filter((t, i, a) => a.indexOf(t) === i).length, sortIn: !!bar.querySelector('#dvSortSel'), filtIn: !!document.querySelector('#dvFilterPop [data-sec="colf"] #dvFiltSel'), tgIn: !!document.querySelector('#dvMoreMenu #dvCardTg'), csvIn: !!document.querySelector('#dvMoreMenu #dvCsv'), cb: getComputedStyle(document.getElementById('dvCardBar')).display, ov: document.documentElement.scrollWidth <= document.documentElement.clientWidth, dup: document.querySelectorAll('#dvSortSel').length }; });
+    await Q.click('#dvFilterBtn'); await Q.waitForTimeout(200);
+    const b = await Q.evaluate(() => { const lb = document.getElementById('dvLensBar'), pop = document.getElementById('dvFilterPop'); return { wrap: getComputedStyle(lb).flexWrap, fits: lb.scrollWidth <= pop.clientWidth + 2, colf: !document.querySelector('[data-sec="colf"]').hidden }; });
+    await Q.selectOption('#dvFiltSel', { index: 1 }); await Q.waitForTimeout(300);
+    const b2 = await Q.evaluate(() => !!document.querySelector('.colf')); await Q.keyboard.press('Escape'); await Q.evaluate(() => { const f = document.querySelector('.colf'); if (f) f.remove(); }); await Q.keyboard.press('Escape'); await Q.waitForTimeout(100);
+    await Q.click('#dvMoreBtn'); await Q.waitForTimeout(200);
+    const c = await Q.evaluate(() => { const v = (e) => { const r = e.getBoundingClientRect(); return r.width > 1 && r.height > 1; }; return { items: [...document.querySelectorAll('#dvMoreMenu .mm-it')].map((x) => x.id + ':' + (v(x) ? 1 : 0)).join(' '), lbl: [...document.querySelectorAll('#dvMoreMenu :is(#dvCsv,#dvHelp,#dvCols) span')].every((s) => getComputedStyle(s).display !== 'none'), tg: document.getElementById('dvCardTg').textContent }; });
+    await Q.click('#dvCardTg'); await Q.waitForTimeout(400);
+    const d = await Q.evaluate(() => ({ cards: document.getElementById('dvTable').classList.contains('cards'), sortIn: !!document.querySelector('.dbar #dvSortSel'), tg: document.getElementById('dvCardTg').textContent, dup: document.querySelectorAll('#dvCardTg').length }));
+    await Q.click('#dvMoreBtn'); await Q.waitForTimeout(150); await Q.click('#dvCardTg'); await Q.waitForTimeout(400);
+    await go(Q, 'churnrate');
+    const e = await Q.evaluate(() => ({ h: Math.round(document.querySelector('#crAdv>summary').getBoundingClientRect().height), h2: Math.round(document.querySelector('#crFlt>summary').getBoundingClientRect().height), ov: document.documentElement.scrollWidth <= document.documentElement.clientWidth }));
+    const f = await Q.evaluate(() => { SVC.navMenu('dash'); SVC.homeDetail(true); return [...document.querySelectorAll('#viewDash .ukw')].filter((x) => getComputedStyle(x).display !== 'none').length; });
+    await M.ctx.close();
+    assert(a.rows <= 4 && a.sortIn && a.filtIn && a.tgIn && a.csvIn && a.cb === 'none' && a.ov && a.dup === 1 && b.wrap === 'wrap' && b.fits && b.colf && b2, '폰 도구줄 ' + JSON.stringify({ a, b, b2 }));
+    assert(/dvCsv:1/.test(c.items) && /dvCardTg:1/.test(c.items) && c.lbl && c.tg === '표로 보기' && !d.cards && !d.sortIn && d.tg === '카드로 보기' && d.dup === 1 && e.h <= 48 && e.h2 <= 48 && e.ov && f > 0 && !M.c.errs.filter((x) => !/serviceWorker/.test(x)).length, '⋯ · 표 보기 ' + JSON.stringify({ c, d, e, f, errs: M.c.errs }));
+    return '도구줄 ' + a.rows + '줄 · 거르기 → 필터 · 표 보기 → ⋯';
+  });
+}
+// ㊿+189 개선 요청 첨부(캡처 · 파일 → Storage feedback) · 표시 이름(portal_profiles → 담당 · 알림 · 내 계정 · 관리자 계정) · 용어(고객 한눈에 · 홈 카드) — 가짜 DB
+if (S.blk()) {
+  const PNG1 = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+  const mk189 = async (o) => { o = Object.assign({ role: 'super_admin', email: 'tester@example.com', w: 1440, h: 1000, mobile: false, names: true }, o || {});
+    const db = new FakeDB(seedData()); const st = { puts: [], gets: [] };
+    db.rpc.portal_accounts = () => [{ email: 'tester@example.com', role: 'super_admin', name: o.names ? '홍길동' : '', title: o.names ? '차장' : '' }, { email: 'other@example.com', role: 'editor', name: o.names ? '김철수' : '', title: o.names ? '대리' : '' }, { email: 'viewer@example.com', role: 'viewer', name: '', title: '' }];
+    db.rpc.admin_list_users = () => [{ email: 'tester@example.com', role: 'super_admin', created_at: '2026-01-01T00:00:00Z', last_sign_in: '2026-10-11T00:00:00Z' }, { email: 'other@example.com', role: 'editor', created_at: '2026-01-01T00:00:00Z', last_sign_in: '2026-10-10T00:00:00Z' }, { email: 'viewer@example.com', role: 'viewer', created_at: '2026-01-01T00:00:00Z', last_sign_in: null }];
+    const ctx = await browser.newContext({ viewport: { width: o.w, height: o.h }, serviceWorkers: 'block', isMobile: o.mobile, hasTouch: o.mobile }); const page = await ctx.newPage(); const c = collect(page);
+    const dlg = []; page.on('dialog', (d) => { dlg.push(d.message().split('\n')[0]); d.accept(); });
+    await fakeBackend(page, db, { role: o.role, email: o.email, extra: async (route, u, m) => {
+      if (!u.includes('/storage/v1/object/')) return false;
+      if (m === 'POST') { st.puts.push({ path: u.split('/storage/v1/object/')[1], type: route.request().headers()['content-type'], auth: route.request().headers()['authorization'], len: (route.request().postDataBuffer() || Buffer.alloc(0)).length }); await route.fulfill({ status: 200, contentType: 'application/json', body: '{"Key":"ok"}' }); return true; }
+      st.gets.push(u.split('/storage/v1/object/')[1]); await route.fulfill({ status: 200, contentType: /\.png$/.test(u) ? 'image/png' : 'application/pdf', body: PNG1 }); return true; } });
+    await page.goto(url + '/index.html'); await page.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA && SVC.ST.DATA.rows.length, null, { timeout: 20000 }); await page.waitForTimeout(600); return { db, ctx, page, c, dlg, st }; };
+  await S.t('㊿+189 개선 요청 첨부: «캡처 · 파일 붙이기»(png · pdf) + 글 칸 Ctrl+V 캡처 → 미리 보기 3개(✕ 로 빼기) · 큰 파일 · 이상한 종류 막기 · 보내기 = Storage feedback/<uid>/… 올린 뒤 portal_feedback.files 저장 · 받은 요청에 첨부 칩 → 이미지는 그 자리 미리 보기(토글) · PDF 는 내려받기 · SQL 114 전(files 열 없음)엔 첨부 없이 목록', async () => {
+    const A = await mk189(), P = A.page;
+    await P.evaluate(() => SVC.navMenu('contracts')); await P.waitForTimeout(300);
+    await P.click('#fbBtn'); await P.waitForSelector('#fbText', { timeout: 4000 });
+    const a0 = await P.evaluate(() => ({ file: !!document.getElementById('fbFile'), multi: document.getElementById('fbFile').multiple, prev: document.getElementById('fbPrev').hidden, lbl: document.querySelector('label[for="fbFile"]').textContent.trim() }));
+    await P.setInputFiles('#fbFile', [{ name: 'shot.png', mimeType: 'image/png', buffer: PNG1 }, { name: '견적.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 test') }]); await P.waitForTimeout(200);
+    await P.evaluate((b64) => { const bin = atob(b64), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i); const f = new File([u8], 'image.png', { type: 'image/png' }); const dt = new DataTransfer(); dt.items.add(f); const ev = new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }); document.getElementById('fbText').dispatchEvent(ev); }, PNG1.toString('base64')); await P.waitForTimeout(200);
+    const a = await P.evaluate(() => ({ n: SVC.FB.att.length, names: SVC.FB.att.map((x) => x.name).join('|'), imgs: document.querySelectorAll('#fbPrev .fb-pv img').length, docs: document.querySelectorAll('#fbPrev .fb-pv-f').length, vis: !document.getElementById('fbPrev').hidden, msg: document.getElementById('fbMsg').textContent }));
+    await P.setInputFiles('#fbFile', [{ name: 'virus.exe', mimeType: 'application/octet-stream', buffer: Buffer.from('x') }]); await P.waitForTimeout(150);
+    const bad1 = await P.$eval('#fbMsg', (e) => e.textContent);
+    await P.setInputFiles('#fbFile', [{ name: 'big.png', mimeType: 'image/png', buffer: Buffer.alloc(5 * 1024 * 1024 + 10) }]); await P.waitForTimeout(300);
+    const bad2 = await P.evaluate(() => ({ msg: document.getElementById('fbMsg').textContent, n: SVC.FB.att.length }));
+    await P.click('#fbPrev [data-fbx="2"]'); await P.waitForTimeout(150);
+    const b = await P.evaluate(() => ({ n: SVC.FB.att.length, names: SVC.FB.att.map((x) => x.name).join('|') }));
+    await P.fill('#fbText', '계약 상세 캡처 첨부합니다'); await P.click('#fbSend'); await P.waitForTimeout(800);
+    const row = A.db.table('portal_feedback')[0];
+    const c2 = { puts: A.st.puts, row: row && { files: row.files, content: row.content }, att: await P.evaluate(() => SVC.FB.att.length), on: await P.evaluate(() => document.getElementById('ovlFb').classList.contains('on')) };
+    await P.click('#fbBtn'); await P.waitForSelector('#fbList .fb-it', { timeout: 5000 });
+    const d = await P.evaluate(() => ({ chips: [...document.querySelectorAll('#fbList .fb-f')].map((b) => b.textContent.replace(/\s+/g, ' ').trim() + (b.classList.contains('img') ? '[img]' : '')).join('|'), who: document.querySelector('#fbList .fb-h .mini').textContent }));
+    await P.click('#fbList .fb-f.img'); await P.waitForSelector('#fbList .fb-fimg img', { timeout: 5000 });
+    const e = await P.evaluate(() => ({ img: !!document.querySelector('#fbList .fb-fimg img'), exp: document.querySelector('#fbList .fb-f.img').getAttribute('aria-expanded'), gets: 0 }));
+    await P.click('#fbList .fb-f.img'); await P.waitForTimeout(150);
+    const e2 = await P.evaluate(() => ({ img: !!document.querySelector('#fbList .fb-fimg img'), exp: document.querySelector('#fbList .fb-f.img').getAttribute('aria-expanded') }));
+    const dl = P.waitForEvent('download', { timeout: 5000 }).catch(() => null); await P.click('#fbList .fb-f:not(.img)'); const dlr = await dl;
+    await P.keyboard.press('Escape'); await A.ctx.close();
+    /* SQL 114 전: files 열이 없어 select 가 400 → 첨부 없이 다시 받음 */
+    const N = await mk189(); await N.page.route(/\/rest\/v1\/portal_feedback\?select=[^&]*files/, (r) => r.fulfill({ status: 400, contentType: 'application/json', body: '{"code":"42703","message":"column portal_feedback.files does not exist"}' }));
+    await N.page.evaluate(() => { SVC.FB.loaded = false; });   /* 시작할 때 이미 받았으니 다시 받게 */
+    await N.page.click('#fbBtn'); await N.page.waitForSelector('#fbText', { timeout: 4000 }); await N.page.waitForTimeout(500);
+    const n = await N.page.evaluate(() => ({ ok: SVC.FB.ok, filesOk: SVC.FB.filesOk, empty: /아직 받은 요청이 없습니다/.test(document.getElementById('fbList').textContent) })); await N.ctx.close();
+    assert(a0.file && a0.multi && a0.prev && /캡처 · 파일 붙이기/.test(a0.lbl) && a.n === 3 && a.names === 'shot.png|견적.pdf|캡처_3.png' && a.imgs === 2 && a.docs === 1 && a.vis && /첨부 3개/.test(a.msg), '첨부 ' + JSON.stringify({ a0, a }));
+    assert(/이미지 · PDF/.test(bad1) && /5MB/.test(bad2.msg) && bad2.n === 3 && b.n === 2 && b.names === 'shot.png|견적.pdf', '막기 · 빼기 ' + JSON.stringify({ bad1, bad2, b }));
+    assert(c2.puts.length === 2 && /^feedback\/me\/\d+_1\.png$/.test(c2.puts[0].path) && /^feedback\/me\/\d+_2\.pdf$/.test(c2.puts[1].path) && c2.puts.every((p) => /^Bearer /.test(p.auth) && p.len > 5) && c2.puts[0].type === 'image/png' && c2.puts[1].type === 'application/pdf' && c2.row && Array.isArray(c2.row.files) && c2.row.files.length === 2 && c2.row.files[0].name === 'shot.png' && c2.row.files[1].name === '견적.pdf' && c2.row.files.every((f) => /^me\//.test(f.path) && f.size > 0) && c2.att === 0 && !c2.on, '올리기 · 저장 ' + JSON.stringify(c2));
+    assert(/shot\.png.*\[img\]/.test(d.chips) && /견적\.pdf/.test(d.chips) && !/견적\.pdf[^|]*\[img\]/.test(d.chips) && /홍길동 차장/.test(d.who) && e.img && e.exp === 'true' && !e2.img && e2.exp === 'false' && A.st.gets.length >= 1 && /^authenticated\/feedback\/me\//.test(A.st.gets[0]), '목록 · 미리 보기 ' + JSON.stringify({ d, e, e2, gets: A.st.gets, dl: !!dlr }));
+    assert(n.ok === true && n.filesOk === false && n.empty && !A.c.errs.filter((x) => !/serviceWorker/.test(x)).length, 'SQL 114 전 ' + JSON.stringify({ n, errs: A.c.errs }));
+    return '첨부 3 → 2 올림 · 미리 보기 · 114 전 안전';
+  });
+  await S.t('㊿+189 표시 이름: portal_accounts 의 이름 · 직급 → 담당 지정 목록 «김철수 대리 · 이메일» · 홈 우선 업무 줄에 «김철수 대리» · 개선 요청 보낸 사람 · 내 계정 «표시 이름» 고치기 → portal_profiles upsert(본인) · 관리자 › 계정 표 «표시 이름» 열 + ✎(남의 것) · 이름 없으면 계정 id · 용어: «고객 한눈에» · «홈 카드»', async () => {
+    const A = await mk189(), P = A.page;
+    await P.evaluate(() => { SVC.HOME.scope = 'team'; SVC.HOME.allOpen = true; SVC.navMenu('dash'); }); await P.waitForTimeout(500);
+    const key = await P.evaluate(() => [...document.querySelectorAll('#ccInbox .hm-row')].map((r) => r.dataset.key).find((k) => /^(rnl|rnd|exp)$/.test(k)));
+    await P.click('#ccInbox .hm-row[data-key="' + key + '"] .hm-asg'); await P.waitForFunction(() => document.querySelector('#arSel option[value="other@example.com"]'), null, { timeout: 5000 });
+    const opts = await P.evaluate(() => [...document.querySelectorAll('#arSel option')].map((o) => o.value + '|' + o.textContent));
+    await P.selectOption('#arSel', 'other@example.com'); await P.click('#arSave'); await P.waitForTimeout(500);
+    const a = await P.evaluate((key) => ({ own: document.querySelector('#ccInbox .hm-row[data-key="' + key + '"] .hm-asg').textContent.replace(/✎/, '').trim(), nm: SVC.ntfName('other@example.com'), raw: SVC.ntfName('viewer@example.com'), dlg: 0 }), key);
+    await P.evaluate(async () => { await SVC.lazyLoad('admin'); SVC.navMenu('account'); }); await P.waitForTimeout(600);
+    const b = await P.evaluate(() => ({ prof: document.getElementById('accProf').textContent.trim(), btn: document.getElementById('accProfEdit').textContent.trim() }));
+    await P.click('#accProfEdit'); await P.waitForSelector('#pfName', { timeout: 4000 }); await P.waitForTimeout(120);
+    const b1 = await P.evaluate(() => ({ name: document.getElementById('pfName').value, title: document.getElementById('pfTitle').value, h: document.getElementById('ovlProfH').textContent }));
+    await P.fill('#pfName', '홍길동'); await P.fill('#pfTitle', '부장'); const w0 = A.db.writes.length; await P.click('#pfSave'); await P.waitForTimeout(600);
+    const pw = A.db.writes.slice(w0).find((w) => w.table === 'portal_profiles'), lg = A.db.writes.slice(w0).find((w) => w.table === 'change_log'), pb = pw && (Array.isArray(pw.body) ? pw.body[0] : pw.body);
+    const c = await P.evaluate(() => ({ prof: document.getElementById('accProf').textContent.trim(), nm: SVC.ntfName('tester@example.com'), on: document.getElementById('ovlProf').classList.contains('on') }));
+    await P.evaluate(async () => { await SVC.lazyLoad('admin'); SVC.navMenu('adminx'); }); await P.waitForTimeout(500);
+    await P.evaluate(() => SVC.admTab('acct')); await P.waitForTimeout(300);
+    await P.waitForFunction(() => document.querySelector('#axTable tbody tr'), null, { timeout: 6000 });
+    const d = await P.evaluate(() => ({ head: [...document.querySelectorAll('#axTable thead th')].map((x) => x.textContent.trim()).slice(0, 3).join('|'), cells: [...document.querySelectorAll('#axTable .ax-prof')].map((td) => td.textContent.replace(/\s+/g, ' ').trim()).join('|') }));
+    const ob = await P.$('#axTable button[data-axpf="other@example.com"]');
+    if (ob) { await ob.click(); await P.waitForSelector('#pfName', { timeout: 4000 }); await P.waitForTimeout(120); }
+    const e = ob ? await P.evaluate(() => ({ h: document.getElementById('ovlProfH').textContent, name: document.getElementById('pfName').value })) : null;
+    if (ob) { await P.fill('#pfTitle', '과장'); await P.click('#pfSave'); await P.waitForTimeout(500); }
+    const e2 = ob ? await P.evaluate(() => ({ nm: SVC.ntfName('other@example.com'), cell: [...document.querySelectorAll('#axTable .ax-prof')].map((td) => td.textContent.replace(/\s+/g, ' ').trim()).join('|') })) : null;
+    const f = await P.evaluate(() => ({ t360: [...document.querySelectorAll('#viewData, #ovlDetail, #ovlC360')].map((x) => x.textContent).join(' ').indexOf('고객 360'), wid: document.getElementById('btnWidgets').textContent.trim(), src: [...document.querySelectorAll('script')].length }));
+    await A.ctx.close();
+    const V = await mk189({ role: 'viewer', email: 'viewer@example.com', names: false }); await V.page.evaluate(async () => { await SVC.lazyLoad('admin'); SVC.navMenu('account'); }); await V.page.waitForTimeout(600);
+    const v = await V.page.evaluate(() => ({ prof: document.getElementById('accProf').textContent.trim(), nm: SVC.ntfName('other@example.com') }));
+    await V.page.click('#accProfEdit'); await V.page.waitForSelector('#pfName', { timeout: 4000 }); await V.page.waitForTimeout(120); await V.page.fill('#pfName', '박보기'); const vw0 = V.db.writes.length; await V.page.click('#pfSave'); await V.page.waitForTimeout(500);
+    const vpw0 = V.db.writes.slice(vw0).find((w) => w.table === 'portal_profiles'), vpw = vpw0 && { body: [Array.isArray(vpw0.body) ? vpw0.body[0] : vpw0.body] }; const vmsg = await V.page.evaluate(() => (document.getElementById('pfMsg') || {}).textContent || '');
+    await V.ctx.close();
+    assert(opts.some((o) => /^other@example\.com\|김철수 대리 · other@example\.com · editor$/.test(o)) && a.own === '김철수 대리' && a.nm === '김철수 대리' && a.raw === 'viewer', '담당 이름 ' + JSON.stringify({ opts, a }));
+    assert(/홍길동 차장/.test(b.prof) && b.btn === '고치기' && b1.name === '홍길동' && b1.title === '차장' && !/—/.test(b1.h) && pw && /^(POST|UPSERT)$/.test(pw.method) && pb.email === 'tester@example.com' && pb.name === '홍길동' && pb.title === '부장' && lg && /portal_profiles/.test(JSON.stringify(lg.body)) && /홍길동 부장/.test(c.prof) && c.nm === '홍길동 부장' && !c.on, '내 계정 ' + JSON.stringify({ b, b1, pw: pw && pw.body, c }));
+    assert(/이메일\|표시 이름\|권한/.test(d.head) && /홍길동 부장/.test(d.cells) && /김철수 대리/.test(d.cells) && (!ob || (/other@example\.com/.test(e.h) && e.name === '김철수' && e2.nm === '김철수 과장' && /김철수 과장/.test(e2.cell))), '관리자 계정 ' + JSON.stringify({ d, e, e2 }));
+    assert(f.t360 < 0 && f.wid === '홈 카드' && /아직 없음/.test(v.prof) && v.nm === 'other' && vpw && vpw.body[0].name === '박보기' && !/못했습니다/.test(vmsg) && !A.c.errs.filter((x) => !/serviceWorker/.test(x)).length, '용어 · viewer ' + JSON.stringify({ f, v, vpw: vpw && vpw.body, vmsg, errs: A.c.errs }));
+    return '김철수 대리 · 내 계정 저장 · 관리자 ✎ · 용어';
   });
 }
 await browser.close(); srv.close();

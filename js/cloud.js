@@ -160,7 +160,7 @@ export function renderCloud(){
   var B=clBuild(); CL.B=B;
   if(!B.months.length){
     host.innerHTML=tpl`<section class="card c12" style="max-width:640px;margin:0 auto;text-align:center;padding:40px">`+
-      tpl`<h3 style="margin:0 0 8px">☁️ 클라우드 비용</h3><p class="cap">데이터가 없습니다 — 54_cloud_cost.sql 실행이 필요합니다.</p></section>`;
+      tpl`<h3 style="margin:0 0 8px">☁️ 클라우드 비용</h3><p class="cap">아직 클라우드 비용 데이터가 없습니다.${rawHtml(ST.IS_SUPER? ' <span class="mini">(관리자: 54_cloud_cost.sql 실행 뒤 인보이스를 올리면 쌓입니다)</span>' : ' 관리자가 인보이스를 올리면 여기에 보입니다.')}</p></section>`;
     return;
   }
   if(!CL.sel) CL.sel={}; if(!Object.keys(CL.sel).length) B.awsKeys.forEach(function(k){ CL.sel[k]=1; });
