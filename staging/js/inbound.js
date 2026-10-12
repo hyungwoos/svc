@@ -232,9 +232,11 @@ export function inbSyncPanel(){
       tpl`${rawHtml(ST.IS_VIEWER? '' : '<button class="pill" id="inbFetchP" title="구글시트 원본을 지금 가져와 포탈 DB 에 반영합니다 (매일 아침 7시 자동과 같은 작업 · 최대 1분)">시트에서 가져와 반영…</button>')}`+
       tpl`<button class="pill ghost" id="inbLogTg">🕘 가져온 기록${rawHtml(ST.RAWX.inbLog&&ST.RAWX.inbLog.length? ' ('+ST.RAWX.inbLog.length+')':'')}</button>`+
     tpl`</div>`+
-    tpl`<div id="inbLogBox" style="display:${INB_LOG_OPEN?'':'none'}">${rawHtml(inbLogTable())}</div></div>`;
+    tpl`<div id="inbLogBox" style="display:${INB_LOG_OPEN?'':'none'}">${rawHtml(inbLogTable())}</div></div>`+
+    tpl`${rawHtml(ST.IS_EQUIP? '' : iaCard())}`;   /* ㊿+193 자동 회신 카드 */
 }
 export function inbWirePanel(host){
+  iaWire(host);
   var b=host.querySelector('#inbFetchP'); if(b) b.onclick=function(){ if(confirm('구글시트 원본을 지금 가져와 포탈 DB 에 반영할까요?\n(매일 아침 7시 자동 가져오기와 같은 작업 · 시트에서 지운 행은 포탈에서도 바뀔 수 있음)')) inbRefetch(); };
   var rl=host.querySelector('#inbReloadP'); if(rl) rl.onclick=function(){ rl.disabled=true; ST.RAWX.inbLog=undefined; loadInbLog(function(){ loadInbound(function(){ toast('다시 조회', '포탈 DB 의 인바운드 '+(ST.RAWX.inbound||[]).length+'건을 다시 읽었습니다(시트는 그대로)', 'info'); if(ST.CUR_VIEW==='inbstat') renderInbStat(); else if(ST.CUR_VIEW==='inbound') renderGrid(); }); }); };
   var t=host.querySelector('#inbLogTg'); if(t) t.onclick=function(){
@@ -250,6 +252,7 @@ export function renderInbPanel(){
   if(!host){ var tw=$('#dvTable').parentElement; host=document.createElement('div'); host.id='inbHost'; tw.parentElement.insertBefore(host,tw); }
   host.style.display=''; host.innerHTML=inbSyncPanel(); inbWirePanel(host);
   if(ST.RAWX.inbLog===undefined) loadInbLog(function(){ if(ST.CUR_VIEW==='inbound') renderInbPanel(); });
+  if(IA.cfg===undefined) iaLoad(function(){ if(ST.CUR_VIEW==='inbound'){ renderInbPanel(); renderGrid(); } });   /* ㊿+193 */
 }
 export function renderInbStat(){
   var host=$('#inbBody');
@@ -352,6 +355,7 @@ export function renderInbStat(){
   });
   inbWirePanel(host);
   if(ST.RAWX.inbLog===undefined) loadInbLog(function(){ if(ST.CUR_VIEW==='inbstat') renderInbStat(); });
+  if(IA.cfg===undefined) iaLoad(function(){ if(ST.CUR_VIEW==='inbstat') renderInbStat(); });   /* ㊿+193 */
   var bl=document.getElementById('inbGoList'); if(bl) bl.onclick=function(){ goInbList(); };
 }
 export function inbRefetch(){
@@ -387,7 +391,7 @@ export function openInbDetail(r){
     tpl`<div><b>부서</b>${r.dept||'-'}</div>`+
     tpl`<div><b>기 고객</b>${r.existing||'-'}</div>`+
     tpl`<div><b>이메일</b>${r.email||'-'}</div>`+
-    tpl`<div><b>연락처</b>${r.phone||'-'}</div>`+ tpl`${rawHtml(r.biz_no?tpl`<div><b>영업현황 번호</b>${r.biz_no}</div>`:'')}`+ tpl`${rawHtml(r.amount?tpl`<div><b>수주액</b>${won(r.amount)}천원</div>`:'')}`+
+    tpl`<div><b>연락처</b>${r.phone||'-'}</div>`+ tpl`${rawHtml(iaFor(r)? tpl`<div><b>자동 회신</b>${rawHtml(iaBadge(r))}${rawHtml(iaFor(r).reason? tpl` <span class="mini">${iaFor(r).reason}</span>`:'')}</div>` : '')}`+ tpl`${rawHtml(r.biz_no?tpl`<div><b>영업현황 번호</b>${r.biz_no}</div>`:'')}`+ tpl`${rawHtml(r.amount?tpl`<div><b>수주액</b>${won(r.amount)}천원</div>`:'')}`+
     tpl`</div>`+
     tpl`<div class="inb-body">${r.content||'(요청내용 없음)'}</div>`+ tpl`${rawHtml(steps.length?tpl`<div class="inb-tl">${rawHtml(steps.map(function(s){
       return tpl`<div class="st"><b>${rawHtml(s[0])}</b> ${s[1]||''}<div class="d">${s[2]||''}</div></div>`;
@@ -747,4 +751,116 @@ export async function wkRefetch(){
   }
   WK_CACHE={};   // 새로 취합했으니 캐시 비움
   setTimeout(function(){ renderWeekly(); }, 1500);
+}
+/* ═══ ㊿+193 인바운드 자동 회신 — 설정(inbound_auto) · 기록(inbound_auto_log) · SQL 117 ═══
+   Apps Script(Code.gs 자동 회신 구역 v2)가 5분마다 sales@ 의 HubSpot 알림 메일을 읽어 접수 확인 메일을 보내고 시트에 등록하는데,
+   켜고 끄기 · 문구 · 규칙은 이 포탈의 inbound_auto 한 줄에서 읽고, 처리한 메일마다 inbound_auto_log 에 한 줄 남김 */
+export var IA={cfg:undefined, log:undefined, ok:null, at:0, open:false, map:null, busy:false};
+export var IA_MODE={off:'끔', draft:'초안만(임시보관함)', send:'실제 발송'};
+export var IA_ACT={sent:'보냄', draft:'초안', skip_replied:'건너뜀 · 사람이 답함', skip_dupe:'건너뜀 · 최근 회신', skip_rule:'건너뜀 · 규칙', skip_old:'건너뜀 · 오래된 메일', skip_off:'건너뜀 · 끔', hold:'확인 필요', error:'오류'};
+export function iaKstDate(v){ try{ return new Date(v).toLocaleDateString('sv-SE', {timeZone:'Asia/Seoul'}); }catch(e){ return String(v||'').slice(0,10); } }
+export function iaKey(email, date){ return String(email||'').trim().toLowerCase()+'|'+String(date||'').slice(0,10); }
+export function iaLoad(cb){
+  Promise.all([sbTry('inbound_auto?select=*&id=eq.1'), sbTry('inbound_auto_log?select=*&order=at.desc&limit=200')]).then(function(res){
+    var c=res[0], l=res[1];
+    IA.ok=!!(c && c.length); IA.cfg=IA.ok? c[0] : null; IA.log=l||[]; IA.at=Date.now();
+    var m={}; IA.log.slice().reverse().forEach(function(x){ if(!x.email) return; var k=iaKey(x.email, x.mail_at? iaKstDate(x.mail_at) : iaKstDate(x.at)); if(!m[k] || x.action==='sent' || x.action==='draft') m[k]=x; });
+    IA.map=m; if(cb) cb();
+  });
+}
+/** 인바운드 줄(이메일 · 접수일) → 자동 회신 기록 */
+export function iaFor(r){ if(!IA.map || !r) return null; return IA.map[iaKey(r.email, r.on_date)] || null; }
+export function iaActText(x){ if(!x) return ''; var t=IA_ACT[x.action]||x.action; var hm=''; try{ hm=new Date(x.at).toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit', hour12:false, timeZone:'Asia/Seoul'}); }catch(e){} return t+(x.action==='sent'||x.action==='draft'? ' '+hm : ''); }
+export function iaBadge(r){ var x=iaFor(r); if(!x) return ''; var cls=x.action==='sent'? 'ok' : (x.action==='hold'||x.action==='error')? 'warn' : ''; return tpl`<span class="ctag ia-tag ${rawHtml(cls)}" title="${x.reason||''}${x.registered? ' · 시트 연번 '+String(x.sheet_no||'')+' 등록':''}">${iaActText(x)}</span>`; }
+export function iaToday(){ var d=iaKstDate(new Date()), c={sent:0, draft:0, hold:0, skipped:0}; (IA.log||[]).forEach(function(x){ if(iaKstDate(x.at)!==d) return; if(x.action==='sent') c.sent++; else if(x.action==='draft') c.draft++; else if(x.action==='hold'||x.action==='error') c.hold++; else c.skipped++; }); return c; }
+export function iaCard(){
+  if(IA.cfg===undefined) return tpl`<div class="card ia-card" style="padding:10px 14px;margin-bottom:10px"><b style="font-size:14px">✉ 자동 회신</b> <span class="mini">읽는 중…</span></div>`;
+  if(!IA.ok) return tpl`<div class="card ia-card" style="padding:10px 14px;margin-bottom:10px"><b style="font-size:14px">✉ 자동 회신</b> <span class="mini" style="color:var(--muted)">— 홈페이지 문의 접수 확인 메일을 자동으로 보내는 기능. Supabase 에서 <b>SQL 117</b> 을 실행하고 Code.gs 자동 회신 구역을 v2 로 바꾸면 여기서 켜고 끄고 문구를 고칠 수 있습니다(그 전엔 스크립트의 예비값으로 돕니다).</span></div>`;
+  var c=IA.cfg, run=c.last_run||null, t=iaToday(), mode=c.mode||'draft';
+  var modeCls=mode==='send'? 'ok' : mode==='off'? 'warn' : '';
+  var alive=c.last_run_at? (Date.now()-new Date(c.last_run_at).getTime())<20*60*1000 : false;
+  var h=tpl`<div class="card ia-card" style="padding:10px 14px;margin-bottom:10px"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">`+
+    tpl`<b style="font-size:14px">✉ 자동 회신</b><span class="ctag ${rawHtml(modeCls)}" id="iaModeTag">${IA_MODE[mode]||mode}</span>`+
+    tpl`<span class="mini" title="${rawHtml(c.last_run_at? esc(axTime(c.last_run_at)) : '')}">${rawHtml(c.last_run_at? '· 마지막 실행 '+esc(inbAgo(c.last_run_at))+(alive? '' : tpl` <span style="color:var(--critical)">(5분 트리거가 안 도는 듯 — setupAutoReply 확인)</span>`) : tpl`· <span style="color:var(--critical)">아직 실행 기록 없음 — Code.gs 에서 setupAutoReply() 를 한 번 실행했는지 확인</span>`)}</span>`+
+    tpl`<span class="mini">· 오늘 보냄 ${String(t.sent)} · 초안 ${String(t.draft)} · 건너뜀 ${String(t.skipped)}${rawHtml(t.hold? tpl` · <b style="color:var(--critical)">확인 필요 ${String(t.hold)}</b>`:'')}</span>`+
+    tpl`<span style="flex:1"></span>`+
+    tpl`${rawHtml(ST.IS_SUPER? tpl`<button class="pill ghost" id="iaEdit">설정 · 문구 ✎</button><button class="pill" id="iaRun" title="5분 트리거를 기다리지 않고 지금 한 번 돌립니다(스크립트 실행 · 최대 1분)">지금 실행</button>` : '')}`+
+    tpl`<button class="pill ghost" id="iaLogTg">🕘 기록${rawHtml(IA.log&&IA.log.length? ' ('+IA.log.length+')':'')}</button>`+
+    tpl`</div>`;
+  h+=tpl`<div class="mini" style="margin-top:4px;color:var(--muted)">참조 ${c.cc||'(없음)'} · 보내는 이름 ${c.sender_name||''} · 같은 주소엔 ${String(c.dedupe_days)}일 안 재회신 안 함 · 받은 지 ${String(c.max_age_hours)}시간 넘은 메일엔 안 보냄${rawHtml((c.skip_qtypes||[]).length? ' · 제외 종류 '+esc((c.skip_qtypes||[]).join(', ')):'')}${rawHtml((c.skip_domains||[]).length? ' · 제외 도메인 '+esc((c.skip_domains||[]).join(', ')):'')} · 시트 등록 ${c.register_on? '켜짐':'꺼짐'}${rawHtml(run && run.src && !/^포탈/.test(String(run.src))? tpl` · <span style="color:var(--critical)">스크립트가 포탈 설정 대신 «${String(run.src)}»으로 돌고 있음</span>`:'')}</div>`;
+  h+=tpl`<div id="iaLogBox" style="display:${IA.open?'':'none'}">${rawHtml(iaLogTable())}</div></div>`;
+  return h;
+}
+export function iaLogTable(){
+  var L=IA.log||[];
+  if(!L.length) return '<div class="mini" style="color:var(--muted);padding:6px 0">아직 기록이 없습니다 — 다음 HubSpot 문의 메일부터 여기에 남습니다</div>';
+  return tpl`<table class="mini ia-log" style="width:100%;border-collapse:collapse;margin-top:6px"><thead><tr style="color:var(--muted);text-align:left"><th style="padding:4px 8px">시각</th><th style="padding:4px 8px">처리</th><th style="padding:4px 8px">회사 · 요청자</th><th style="padding:4px 8px">제품 · 종류</th><th style="padding:4px 8px">받는 주소</th><th style="padding:4px 8px">시트</th></tr></thead><tbody>`+
+    tpl`${rawHtml(L.slice(0,60).map(function(x){ var cls=x.action==='sent'? 'ok' : (x.action==='hold'||x.action==='error')? 'warn' : '';
+      return tpl`<tr style="border-top:1px solid var(--line,#eee)"><td style="padding:4px 8px;white-space:nowrap">${axTime(x.at)}</td><td style="padding:4px 8px"><span class="ctag ia-tag ${rawHtml(cls)}" title="${x.reason||''}">${IA_ACT[x.action]||x.action}</span>${rawHtml(x.reason && /hold|error|skip/.test(x.action)? tpl`<div class="mini" style="color:var(--muted)">${x.reason}</div>`:'')}</td><td style="padding:4px 8px">${x.org||'—'}${rawHtml(x.requester? ' · '+esc(x.requester):'')}</td><td style="padding:4px 8px">${x.product||''}${rawHtml(x.qtype? ' · '+esc(x.qtype):'')}</td><td style="padding:4px 8px">${x.email||''}</td><td style="padding:4px 8px">${rawHtml(x.registered? '연번 '+esc(String(x.sheet_no||''))+' ✓' : '')}</td></tr>`; }).join(''))}</tbody></table>`;
+}
+/** 설정 · 실행 뒤 다시 그리기 — 목록 화면이면 카드 + 표, 통계 화면이면 통계 */
+export function iaRefresh(){ if(ST.CUR_VIEW==='inbstat') renderInbStat(); else { renderInbPanel(); if(ST.CUR_VIEW==='inbound') renderGrid(); } }
+export function iaWire(host){
+  var e=host.querySelector('#iaEdit'); if(e) e.onclick=iaEdit;
+  var r=host.querySelector('#iaRun'); if(r) r.onclick=iaRun;
+  var t=host.querySelector('#iaLogTg'); if(t) t.onclick=function(){ IA.open=!IA.open; var box=host.querySelector('#iaLogBox'); if(box) box.style.display=IA.open?'':'none'; };
+}
+/** «지금 실행» — Apps Script 웹앱 action=inbound_autoreply (가져오기 버튼과 같은 방식 · 5분에 1회) */
+export function iaRun(){
+  if(!ST.IS_SUPER || IA.busy) return;
+  if(!confirm('인바운드 자동 회신을 지금 한 번 돌립니다.\n지금 모드: '+(IA_MODE[(IA.cfg||{}).mode]||'')+'\n\n«실제 발송» 모드면 새 문의자에게 메일이 실제로 나갑니다. 계속할까요?')) return;
+  IA.busy=true; var b=document.getElementById('iaRun'); if(b) b.disabled=true;
+  var done=function(){ IA.busy=false; iaLoad(iaRefresh); };
+  fetchT(WEEKLY_GAS+'?action=inbound_autoreply', {}, 120000, '자동 회신(GAS)').then(function(r){ return r.json(); }).then(function(j){
+    if(j && j.ok){ var c=j.counts||{}; toast('자동 회신 실행', j.msg || ('처리 '+(c.done||0)+'건 · 보냄 '+(c.sent||0)+' · 초안 '+(c.draft||0)+' · 건너뜀 '+(c.skipped||0)+' · 확인 필요 '+(c.hold||0))); }
+    else toast('자동 회신 실행 실패', (j&&j.error)||'스크립트의 doGet 에 inbound_autoreply 가 없으면 Code.gs 를 새 버전으로 배포해 주세요', 'bad');
+    done();
+  }).catch(function(e){ if(e && e.timeout){ toast('응답 없음', String(e.message||e), 'bad'); done(); return; } window.open(WEEKLY_GAS+'?action=inbound_autoreply','_blank'); setTimeout(done, 5000); });
+}
+/** 설정 · 문구 창 — inbound_auto 한 줄 PATCH (슈퍼 관리자 · SQL 117 정책) */
+export function iaEdit(){
+  if(!ST.IS_SUPER || !IA.cfg){ toast('슈퍼 관리자만 고칠 수 있습니다', '', 'info'); return; }
+  var c=IA.cfg, id='ovlIa', ov=document.getElementById(id);
+  if(!ov){ ov=document.createElement('div'); ov.id=id; ov.className='ovl'; document.body.appendChild(ov); }
+  ov.innerHTML=tpl`<div class="modal ia-m" role="dialog" aria-modal="true" aria-labelledby="ovlIaH" style="width:min(720px,100%)">`+
+    tpl`<h3 id="ovlIaH">✉ 인바운드 자동 회신 — 설정 · 문구</h3><p class="cap">홈페이지(HubSpot) 제품 문의가 sales@ 로 오면 Apps Script 가 5분 안에 이 문구로 접수 확인 메일을 보냅니다. 저장하면 다음 실행부터 바로 적용(스크립트 수정 불필요). 자리표시: <code>{담당자}</code> <code>{회사}</code> <code>{제품}</code> <code>{문의종류}</code> — 빈 값이면 그 부분은 자연스럽게 빠집니다.</p>`+
+    tpl`<div class="frm ia-grid">`+
+    tpl`<div class="fld"><label for="iaMode">모드</label><select id="iaMode"><option value="off"${c.mode==='off'? ' selected':''}>끔 — 회신하지 않음(시트 등록은 아래 설정대로)</option><option value="draft"${c.mode==='draft'? ' selected':''}>초안만 — 임시보관함에 만들고 사람이 보냄</option><option value="send"${c.mode==='send'? ' selected':''}>실제 발송 — 문의자에게 바로 보냄</option></select></div>`+
+    tpl`<div class="fld"><label for="iaSender">보내는 이름</label><input id="iaSender" maxlength="60" value="${c.sender_name||''}"></div>`+
+    tpl`<div class="fld"><label for="iaCc">참조(CC)</label><input id="iaCc" maxlength="120" value="${c.cc||''}" placeholder="sales@genians.com"></div>`+
+    tpl`<div class="fld"><label for="iaDedupe">같은 주소 재회신 안 함(일)</label><input id="iaDedupe" type="number" min="0" max="60" value="${String(c.dedupe_days==null? 3 : c.dedupe_days)}"></div>`+
+    tpl`<div class="fld"><label for="iaAge">받은 지 n시간 넘은 메일엔 안 보냄</label><input id="iaAge" type="number" min="1" max="720" value="${String(c.max_age_hours==null? 48 : c.max_age_hours)}"></div>`+
+    tpl`<div class="fld"><label for="iaSkipQ">보내지 않을 문의 종류(쉼표)</label><input id="iaSkipQ" value="${(c.skip_qtypes||[]).join(', ')}" placeholder="예: 파트너 문의, 채용 문의"></div>`+
+    tpl`<div class="fld"><label for="iaSkipD">보내지 않을 도메인(쉼표)</label><input id="iaSkipD" value="${(c.skip_domains||[]).join(', ')}" placeholder="예: partner.co.kr"></div>`+
+    tpl`<div class="fld"><label>시트 · 슬랙</label><div class="ia-chk"><label><input type="checkbox" id="iaReg"${c.register_on!==false? ' checked':''}> 인바운드 시트에 자동 등록</label><label><input type="checkbox" id="iaSlack"${c.slack_on? ' checked':''}> 등록 때 슬랙 알림</label></div></div>`+
+    tpl`<div class="fld full"><label for="iaSubject">제목</label><input id="iaSubject" maxlength="200" value="${c.subject||''}"></div>`+
+    tpl`<div class="fld full"><label for="iaBody">본문</label><textarea id="iaBody" rows="9" maxlength="4000">${c.body||''}</textarea></div>`+
+    tpl`<div class="fld full"><label for="iaSign">서명</label><textarea id="iaSign" rows="4" maxlength="1000">${c.signature||''}</textarea></div>`+
+    tpl`</div><details class="ia-pv"><summary class="mini">미리 보기(예: 가상기관 · 홍길동 · Genian NAC · 견적 문의)</summary><pre id="iaPv" class="mini"></pre></details>`+
+    tpl`<div class="mact"><span class="mmsg" id="iaMsg"></span><button type="button" class="pill ghost" id="iaCancel">닫기</button><button type="button" class="pill" id="iaSave">저장</button></div></div>`;
+  openOvl(id);
+  var m=/** @type {any} */(ov.firstElementChild);
+  var pv=function(){ var f={requester:'홍길동', org:'가상기관', product:'Genian NAC', qtype:'견적 문의'}; var fill=function(s){ return String(s||'').replace(/\{담당자\}/g,f.requester).replace(/\{회사\}/g,f.org).replace(/\{제품\}/g,f.product).replace(/\{문의종류\}/g,f.qtype); };
+    m.querySelector('#iaPv').textContent='제목: '+fill(m.querySelector('#iaSubject').value)+'\n\n'+fill(m.querySelector('#iaBody').value).trim()+'\n\n'+String(m.querySelector('#iaSign').value||'').trim(); };
+  ['iaSubject','iaBody','iaSign'].forEach(function(i){ m.querySelector('#'+i).addEventListener('input', pv); }); pv();
+  m.querySelector('#iaCancel').onclick=function(){ closeOvl(id); };
+  m.querySelector('#iaSave').onclick=async function(){
+    var msg=m.querySelector('#iaMsg'), v=function(i){ return /** @type {any} */(m.querySelector('#'+i)).value; };
+    var list=function(s){ return String(s||'').split(/[,\n]/).map(function(x){ return x.trim(); }).filter(Boolean); };
+    var body={mode:v('iaMode'), sender_name:v('iaSender').trim()||'지니언스 서비스사업부', cc:v('iaCc').trim(), dedupe_days:Math.max(0, Math.min(60, +v('iaDedupe')||0)), max_age_hours:Math.max(1, Math.min(720, +v('iaAge')||48)),
+      skip_qtypes:list(v('iaSkipQ')), skip_domains:list(v('iaSkipD')).map(function(d){ return d.toLowerCase().replace(/^@/,''); }), register_on:/** @type {any} */(m.querySelector('#iaReg')).checked, slack_on:/** @type {any} */(m.querySelector('#iaSlack')).checked,
+      subject:v('iaSubject').trim(), body:v('iaBody'), signature:v('iaSign')};
+    if(!body.subject || !body.body.trim()){ msg.textContent='제목과 본문은 비울 수 없습니다'; msg.className='mmsg bad'; return; }
+    if(body.cc && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(body.cc)){ msg.textContent='참조 주소가 이메일 형식이 아닙니다'; msg.className='mmsg bad'; return; }
+    if(body.mode==='send' && c.mode!=='send' && !confirm('«실제 발송»으로 바꿉니다. 저장 뒤 5분 안에 들어오는 새 문의부터 문의자에게 메일이 실제로 나갑니다.\n(이미 받은 지 '+body.max_age_hours+'시간 넘은 메일엔 보내지 않음)\n\n계속할까요?')) return;
+    msg.textContent='저장 중…'; msg.className='mmsg';
+    try{
+      await sbWrite('PATCH', 'inbound_auto?id=eq.1', body, 'return=minimal', 'inbound');
+      var ch={}; Object.keys(body).forEach(function(k){ if(JSON.stringify(body[k])!==JSON.stringify(c[k])) ch[k]={from:c[k]==null? null : c[k], to:body[k]}; });
+      logChange('update', 'inbound_auto', 1, Object.assign({_via:'인바운드 › 자동 회신 설정'}, ch));
+      closeOvl(id); toast('자동 회신 설정 저장', IA_MODE[body.mode]+(ch.body||ch.subject||ch.signature? ' · 문구 바뀜':''), 'ok');
+      iaLoad(iaRefresh);
+    }catch(e){ var s=String(/** @type {any} */(e).message||e); msg.textContent=/PGRST|42501|policy|permission|does not exist/i.test(s)? 'SQL 117 을 먼저 실행해야 저장할 수 있습니다 — '+s.slice(0,100) : '저장하지 못했습니다 — '+s.slice(0,140); msg.className='mmsg bad'; }
+  };
+  setTimeout(function(){ try{ m.querySelector('#iaMode').focus(); }catch(e){} }, 60);
 }

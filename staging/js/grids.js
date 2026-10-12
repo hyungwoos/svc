@@ -6,7 +6,7 @@ import { sbTry } from './shell.js';
 import { eqRetSet, eqSerialsHtml, eqWant } from './equipment.js';
 import { liveCalc, LV, renderAiKnow, renderBizMonthly, renderDataCheck, renderLeadSrc } from './analysis.js';
 import { openCust360 } from './tools.js';
-import { openInbDetail } from './inbound.js';
+import { IA, iaBadge, iaFor, openInbDetail } from './inbound.js';
 import { qLabel } from './sales.js';
 import { logDetailText, oiOwnerOf } from './grid.js';
 import { SECTOR_OPTS } from './edit.js';
@@ -470,6 +470,7 @@ export function buildGrids(){
             r._last=last||'';
             r._days=last? Math.floor((Date.now()-new Date(last).getTime())/864e5) : null;
           }
+          r._auto=IA.map? ((iaFor(r)||{}).action||'') : '';   /* ㊿+193 정렬 · 검색용 */
         });
         out.sort(function(a,b){
           var n=String(b.on_date||'').localeCompare(String(a.on_date||''));
@@ -484,6 +485,7 @@ export function buildGrids(){
         {k:'org',l:'기관(고객)명',ro:true},
         {k:'product',l:'문의 제품',ro:true},
         {k:'qtype',l:'유형',ro:true},
+        {k:'_auto',l:'자동 회신',ro:true,html:1,fmt:function(v,r){ return IA.map? (iaBadge(r)||'·') : '·'; }},   /* ㊿+193 inbound_auto_log 배지(이메일 · 접수일로 맞춤) */
         {k:'owner',l:'담당',ro:true},
         {k:'_last',l:'최근 대응일',ro:true},
         {k:'_days',l:'경과일',t:'number',ro:true,fmt:function(v,r){

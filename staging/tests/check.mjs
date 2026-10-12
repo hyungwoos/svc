@@ -265,6 +265,14 @@ say(/^export function tickMemo\(/m.test(jsAll) && /^export function cssvKey\(/m.
     && /^export var PERM_OPTIN=\{csite:1\};/m.test(co) && !/PERM_EXEMPT=\{[^}]*csite/.test(co) && /PERM_OPTIN\[v\]\? \{v:false, r:false, w:false\}/.test(co) && /apDefault\(role, v\)/.test(ad)
     && /rpc\/site_watch/.test(rm) && /function buildSites\(/.test(rm) && /only\.includes\('sites'\)/.test(rm) && /kind: 'sites'/.test(rm) && /\.sw-tiles\{/.test(css),
   '㊿+192 Cloud 사이트 → 계약 전환 점검(site_watch · 홈 줄 · 알림 · 점검 탭 · 용도/기한 · 계약 입력 · EDR · 메뉴 권한 · remind v1.5)'); }
+// ㊿+193 인바운드 자동 회신(IA · inbound_auto · inbound_auto_log · 카드 · 설정 창 · 지금 실행 · 목록 열 · 상세 줄)
+{ const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
+  const ib = rd('js/inbound.js'), gr = rd('js/grids.js'), css = rd('app.css');
+  say(/^export var IA=\{cfg:undefined, log:undefined, ok:null, at:0, open:false, map:null, busy:false\};/m.test(ib) && /^export function iaLoad\(cb\)/m.test(ib) && /inbound_auto\?select=\*&id=eq\.1/.test(ib) && /inbound_auto_log\?select=\*&order=at\.desc&limit=200/.test(ib)
+    && /^export function iaCard\(\)/m.test(ib) && /^export function iaEdit\(\)/m.test(ib) && /^export function iaRun\(\)/m.test(ib) && /\?action=inbound_autoreply/.test(ib) && /sbWrite\('PATCH', 'inbound_auto\?id=eq\.1', body, 'return=minimal', 'inbound'\)/.test(ib)
+    && /logChange\('update', 'inbound_auto', 1/.test(ib) && /ST\.IS_EQUIP\? '' : iaCard\(\)/.test(ib) && /^  iaWire\(host\);/m.test(ib) && /<b>자동 회신<\/b>/.test(ib) && /timeZone:'Asia\/Seoul'/.test(ib)
+    && /\{k:'_auto',l:'자동 회신',ro:true,html:1/.test(gr) && /r\._auto=IA\.map\?/.test(gr) && /\.ia-card \.ia-tag\{/.test(css),
+  '㊿+193 인바운드 자동 회신(IA · inbound_auto · 카드 · 설정 창 · 지금 실행 · 목록 «자동 회신» 열 · 상세 줄)'); }
 // ㊿+160 연장하면 상태 «재약정»(구분 그대로) · 계약 상세에 «계약 기간 · 연장 이력»
 say(/^export function renewStatus\(r\)/m.test(jsAll) && /var nst=renewStatus\(r\);/.test(jsAll) && /^export function ctPeriods\(c, mine\)/m.test(jsAll) && html.includes('id="dtRenew"'), '연장: 상태 «재약정»(renewStatus) · 계약 상세 연장 이력(ctPeriods · #dtRenew)');
 const idx = html + jsAll;

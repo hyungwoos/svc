@@ -3205,4 +3205,18 @@ details.eq-chk .eq-chk-act:empty{display:none}
 #ovlSw .frm{margin-bottom:10px}
 #ovlSw .frm label{display:block;font-size:12px;color:var(--muted);margin-bottom:3px}
 #ovlSw .frm select,#ovlSw .frm input{width:100%}
+/* ==== ㊿+193 인바운드 자동 회신 ==== */
+.ia-card .ia-tag{height:18px;font-size:12px;padding:0 6px}
+.ia-log td{vertical-align:top}
+#ovlIa .ia-grid{margin-bottom:6px}
+#ovlIa .fld label{display:block;font-size:12px;color:var(--muted);margin-bottom:3px}
+#ovlIa .fld select,#ovlIa .fld input,#ovlIa .fld textarea{width:100%;height:36px;padding:0 10px;border-radius:9px;border:1px solid var(--ring);box-sizing:border-box;font:inherit;background:var(--surface)}
+#ovlIa .fld textarea{height:auto;min-height:72px;padding:8px 10px;line-height:1.5;resize:vertical}
+#ovlIa .fld input:focus,#ovlIa .fld select:focus,#ovlIa .fld textarea:focus{border-color:var(--s1)}
+#ovlIa .ia-chk{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;min-height:36px}
+#ovlIa .ia-chk label{display:inline-flex;align-items:center;gap:6px;margin:0;color:var(--ink);font-size:13px}
+#ovlIa .ia-chk input[type=checkbox]{width:16px;height:16px;padding:0;margin:0;accent-color:var(--brand)}
+#ovlIa .ia-pv{margin:4px 0 8px}
+#ovlIa .ia-pv>summary{cursor:pointer;color:var(--muted)}
+#ovlIa .ia-pv pre{white-space:pre-wrap;background:var(--surface-2);border-radius:8px;padding:8px 10px;margin:6px 0 0;max-height:260px;overflow:auto;font:inherit;font-size:13px}
 /* ==== ㊿+166 새 디자인 end ==== */
