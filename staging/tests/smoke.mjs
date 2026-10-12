@@ -1424,7 +1424,7 @@ if (S.blk()) {
     await page.goto(url + '/orders.html'); await page.waitForURL(/index\.html\?v=ordernew/, { timeout: 5000 }); const u = page.url(); await ctx.close(); return u.replace(/^.*\/svc\//, '');
   });
 }
-// ㊿+155: 화면 HTML 은 tpl`` (특수문자 자동 처리) · 타입 검사로 찾은 고객 360 «기간» 빈칸 수정
+// ㊿+155: 화면 HTML 은 tpl`` (특수문자 자동 처리) · 타입 검사로 찾은 고객 한눈에 «기간» 빈칸 수정
 if (S.blk()) {
   const { ctx, page } = await open();
   await S.t('㊿+155 tpl``: ${값} 은 자동 esc · rawHtml(…) 만 그대로 · null/undefined 는 빈칸 · 숫자 그대로 · 위성 페이지 tpl 도 같은 규칙', async () => {
@@ -1436,7 +1436,7 @@ if (S.blk()) {
     const sat = await p2.evaluate(() => tpl`<b>${'<x>'}</b>${rawHtml('<i>y</i>')}`); await ctx2.close();
     assert(sat === '<b>&lt;x&gt;</b><i>y</i>', 'sat ' + sat); return r.a.slice(0, 60);
   });
-  await S.t('㊿+155 고객 360 «계약» 표의 기간이 채워짐 (예전엔 없는 키 r.start·r.end 를 읽어 늘 « ~ » — 타입 검사가 찾음)', async () => {
+  await S.t('㊿+155 고객 한눈에 «계약» 표의 기간이 채워짐 (예전엔 없는 키 r.start·r.end 를 읽어 늘 « ~ » — 타입 검사가 찾음)', async () => {
     await page.evaluate(() => SVC.openCust360(SVC.ST.DATA.rows[0].cust)); await page.waitForTimeout(400);
     const per = await page.evaluate(() => [...document.querySelectorAll('#c360Body .c360-sec')][0].querySelectorAll('tbody tr td:nth-child(6)')[0].textContent);
     assert(/^\d{4}-\d{2} ~ \d{4}-\d{2}$/.test(per), '기간 «' + per + '»'); return per;
@@ -2317,7 +2317,7 @@ if (S.blk()) {
     const empty = await page.evaluate(() => [...document.querySelectorAll('#sug .sr-g')].map((g) => g.textContent).join('|'));
     await page.keyboard.type('가상고객0'); await page.waitForTimeout(250);
     const a = await page.evaluate(() => ({ sel: (document.querySelector('#sug [aria-selected="true"]') || {}).className || '', nm: ((document.querySelector('#sug [aria-selected="true"] .nm') || {}).textContent) || '', foot: (document.querySelector('#sug .sr-foot') || {}).textContent || '', last: ([...document.querySelectorAll('#sug .sr-it')].pop() || {}).className || '' }));
-    assert(/자주 쓰는 화면/.test(empty) && /k-c360/.test(a.sel) && !/k-ask/.test(a.sel) && /Enter 고객 360 «가상고객/.test(a.foot) && /Ctrl\+Enter AI 에 질문/.test(a.foot) && /k-ask/.test(a.last), JSON.stringify({ empty, a }));
+    assert(/자주 쓰는 화면/.test(empty) && /k-c360/.test(a.sel) && !/k-ask/.test(a.sel) && /Enter 고객 한눈에 «가상고객/.test(a.foot) && /Ctrl\+Enter AI 에 질문/.test(a.foot) && /k-ask/.test(a.last), JSON.stringify({ empty, a }));
     await page.keyboard.press('ArrowDown'); await page.keyboard.press('Enter'); await page.waitForTimeout(300);
     const c360 = await page.evaluate(() => ({ on: document.getElementById('ovlC360').classList.contains('on'), t: document.getElementById('c360Title').textContent }));
     assert(c360.on && /가상고객02/.test(c360.t), '고객 360 ' + JSON.stringify(c360));
@@ -2400,7 +2400,7 @@ if (S.blk()) {
     const o = await page.evaluate(() => document.getElementById('dvSearch').value);
     await page.click('#dvCustX'); await page.waitForTimeout(250);
     const x = await page.evaluate(() => ({ q: document.getElementById('dvSearch').value, c: SVC.CUSTCTX.c }));
-    assert(a.v === 'contracts' && a.q === '가상고객07' && a.bar && b.v === 'oi' && b.q === '가상고객07' && /고객 문맥 «가상고객07»/.test(b.bar) && o === '가상고객07' && x.q === '' && x.c === '', JSON.stringify({ a, b, o, x }));
+    assert(a.v === 'contracts' && a.q === '가상고객07' && a.bar && b.v === 'oi' && b.q === '가상고객07' && /고객 고정 «가상고객07»/.test(b.bar) && o === '가상고객07' && x.q === '' && x.c === '', JSON.stringify({ a, b, o, x }));
     return '계약 → OI → 장비 신청 = 가상고객07';
   });
   await S.t('㊿+172 사업 분석 필터(서비스 끄기 · 기준월 바꾸기)를 바꿔도 홈 핵심 현황 · 매출 추이 · 재약정 대응은 그대로(전체 사업 · 이번 달) · 상세 머리에 «이 영역의 조건» · 해제', async () => {
@@ -3475,7 +3475,7 @@ if (S.blk()) {
     const A = await mkA({ noSession: false, handle: admH({}) });
     await A.page.evaluate(() => SVC.switchView('adminx')); await A.page.waitForFunction(() => document.querySelectorAll('#axTable tbody tr').length === 4, null, { timeout: 8000 });
     const t = await A.page.evaluate(() => ({ head: [...document.querySelectorAll('#axTable thead th')].map((x) => x.textContent), rows: [...document.querySelectorAll('#axTable tbody tr')].map((r) => r.textContent), msg: document.getElementById('axMsg').textContent,
-      warn: [...document.querySelectorAll('#axTable tbody tr')].find((r) => /staff/.test(r.textContent)).children[2].innerHTML }));
+      warn: [...document.querySelectorAll('#axTable tbody tr')].find((r) => /staff/.test(r.textContent)).children[3].innerHTML }));   /* ㊿+189 «표시 이름» 열이 끼어 2단계 인증은 4번째 칸 */
     const row = (e) => t.rows.find((x) => x.indexOf(e) === 0) || '';
     assert(t.head.includes('2단계 인증') && /✓ 켬/.test(row('boss')) && /안 켬/.test(row('staff')) && /warn-ink/.test(t.warn) && /오래 안 씀/.test(row('staff')) && /한 번도 안 씀/.test(row('new')) && !/안 씀/.test(row('boss')) && /4개 계정 · 관리자 3\(인증 앱 2\) · 90일 넘게 안 씀 2/.test(t.msg), 'list ' + JSON.stringify(t));
     await A.page.click('#axTable tbody tr:has-text("staff@example.com") button:has-text("비번 초기화")'); await A.page.waitForSelector('#ovlAxPw.on', { timeout: 3000 }); await A.page.waitForTimeout(80);
@@ -3718,7 +3718,7 @@ if (S.blk()) {
     await A.ctx.close();
     return 'multi 1곳 · 변동 1곳 · 시트 ' + sh.n + '줄 · 해지율 중복 1곳';
   });
-  await S.t('㊿+183 계약 요약 + 다음 처리: 계약 상세 맨 위 금액 · 만료(지남/남음) · 갱신 · 영업 경로 / 만기 지난 계약 → «만기 지난 계약 처리» = 만기 처리 창 그 줄 강조 + 연장 버튼에 초점 / 먼 만기 계약엔 처리 버튼 없음 / 고객 360 «지금 계약»에 만기 지남 줄 + «만기 처리» / 저장 0', async () => {
+  await S.t('㊿+183 계약 요약 + 다음 처리: 계약 상세 맨 위 금액 · 만료(지남/남음) · 갱신 · 영업 경로 / 만기 지난 계약 → «만기 지난 계약 처리» = 만기 처리 창 그 줄 강조 + 연장 버튼에 초점 / 먼 만기 계약엔 처리 버튼 없음 / 고객 한눈에 «지금 계약»에 만기 지남 줄 + «만기 처리» / 저장 0', async () => {
     const A = await mk183();
     const ids = await A.page.evaluate(() => { const T = SVC.STATE.base; const lap = SVC.ST.DATA.rows.find((x) => SVC.renewKindOf(x, T) === 'lapsed'); const far = SVC.ST.DATA.rows.find((x) => !x.parent && x.endRaw != null && x.endRaw > T + 6 && !/해지|종료/.test(x.status || '')); return { lap: lap && lap._id, lapC: lap && lap.cust, far: far && far._id }; });
     await A.page.evaluate((id) => SVC.openDetail(SVC.ctRawOf(id)), ids.lap); await A.page.waitForTimeout(300);
@@ -4226,6 +4226,95 @@ if (S.blk()) {
     assert(a.rows <= 4 && a.sortIn && a.filtIn && a.tgIn && a.csvIn && a.cb === 'none' && a.ov && a.dup === 1 && b.wrap === 'wrap' && b.fits && b.colf && b2, '폰 도구줄 ' + JSON.stringify({ a, b, b2 }));
     assert(/dvCsv:1/.test(c.items) && /dvCardTg:1/.test(c.items) && c.lbl && c.tg === '표로 보기' && !d.cards && !d.sortIn && d.tg === '카드로 보기' && d.dup === 1 && e.h <= 48 && e.h2 <= 48 && e.ov && f > 0 && !M.c.errs.filter((x) => !/serviceWorker/.test(x)).length, '⋯ · 표 보기 ' + JSON.stringify({ c, d, e, f, errs: M.c.errs }));
     return '도구줄 ' + a.rows + '줄 · 거르기 → 필터 · 표 보기 → ⋯';
+  });
+}
+// ㊿+189 개선 요청 첨부(캡처 · 파일 → Storage feedback) · 표시 이름(portal_profiles → 담당 · 알림 · 내 계정 · 관리자 계정) · 용어(고객 한눈에 · 홈 카드) — 가짜 DB
+if (S.blk()) {
+  const PNG1 = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+  const mk189 = async (o) => { o = Object.assign({ role: 'super_admin', email: 'tester@example.com', w: 1440, h: 1000, mobile: false, names: true }, o || {});
+    const db = new FakeDB(seedData()); const st = { puts: [], gets: [] };
+    db.rpc.portal_accounts = () => [{ email: 'tester@example.com', role: 'super_admin', name: o.names ? '홍길동' : '', title: o.names ? '차장' : '' }, { email: 'other@example.com', role: 'editor', name: o.names ? '김철수' : '', title: o.names ? '대리' : '' }, { email: 'viewer@example.com', role: 'viewer', name: '', title: '' }];
+    db.rpc.admin_list_users = () => [{ email: 'tester@example.com', role: 'super_admin', created_at: '2026-01-01T00:00:00Z', last_sign_in: '2026-10-11T00:00:00Z' }, { email: 'other@example.com', role: 'editor', created_at: '2026-01-01T00:00:00Z', last_sign_in: '2026-10-10T00:00:00Z' }, { email: 'viewer@example.com', role: 'viewer', created_at: '2026-01-01T00:00:00Z', last_sign_in: null }];
+    const ctx = await browser.newContext({ viewport: { width: o.w, height: o.h }, serviceWorkers: 'block', isMobile: o.mobile, hasTouch: o.mobile }); const page = await ctx.newPage(); const c = collect(page);
+    const dlg = []; page.on('dialog', (d) => { dlg.push(d.message().split('\n')[0]); d.accept(); });
+    await fakeBackend(page, db, { role: o.role, email: o.email, extra: async (route, u, m) => {
+      if (!u.includes('/storage/v1/object/')) return false;
+      if (m === 'POST') { st.puts.push({ path: u.split('/storage/v1/object/')[1], type: route.request().headers()['content-type'], auth: route.request().headers()['authorization'], len: (route.request().postDataBuffer() || Buffer.alloc(0)).length }); await route.fulfill({ status: 200, contentType: 'application/json', body: '{"Key":"ok"}' }); return true; }
+      st.gets.push(u.split('/storage/v1/object/')[1]); await route.fulfill({ status: 200, contentType: /\.png$/.test(u) ? 'image/png' : 'application/pdf', body: PNG1 }); return true; } });
+    await page.goto(url + '/index.html'); await page.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA && SVC.ST.DATA.rows.length, null, { timeout: 20000 }); await page.waitForTimeout(600); return { db, ctx, page, c, dlg, st }; };
+  await S.t('㊿+189 개선 요청 첨부: «캡처 · 파일 붙이기»(png · pdf) + 글 칸 Ctrl+V 캡처 → 미리 보기 3개(✕ 로 빼기) · 큰 파일 · 이상한 종류 막기 · 보내기 = Storage feedback/<uid>/… 올린 뒤 portal_feedback.files 저장 · 받은 요청에 첨부 칩 → 이미지는 그 자리 미리 보기(토글) · PDF 는 내려받기 · SQL 114 전(files 열 없음)엔 첨부 없이 목록', async () => {
+    const A = await mk189(), P = A.page;
+    await P.evaluate(() => SVC.navMenu('contracts')); await P.waitForTimeout(300);
+    await P.click('#fbBtn'); await P.waitForSelector('#fbText', { timeout: 4000 });
+    const a0 = await P.evaluate(() => ({ file: !!document.getElementById('fbFile'), multi: document.getElementById('fbFile').multiple, prev: document.getElementById('fbPrev').hidden, lbl: document.querySelector('label[for="fbFile"]').textContent.trim() }));
+    await P.setInputFiles('#fbFile', [{ name: 'shot.png', mimeType: 'image/png', buffer: PNG1 }, { name: '견적.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 test') }]); await P.waitForTimeout(200);
+    await P.evaluate((b64) => { const bin = atob(b64), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i); const f = new File([u8], 'image.png', { type: 'image/png' }); const dt = new DataTransfer(); dt.items.add(f); const ev = new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }); document.getElementById('fbText').dispatchEvent(ev); }, PNG1.toString('base64')); await P.waitForTimeout(200);
+    const a = await P.evaluate(() => ({ n: SVC.FB.att.length, names: SVC.FB.att.map((x) => x.name).join('|'), imgs: document.querySelectorAll('#fbPrev .fb-pv img').length, docs: document.querySelectorAll('#fbPrev .fb-pv-f').length, vis: !document.getElementById('fbPrev').hidden, msg: document.getElementById('fbMsg').textContent }));
+    await P.setInputFiles('#fbFile', [{ name: 'virus.exe', mimeType: 'application/octet-stream', buffer: Buffer.from('x') }]); await P.waitForTimeout(150);
+    const bad1 = await P.$eval('#fbMsg', (e) => e.textContent);
+    await P.setInputFiles('#fbFile', [{ name: 'big.png', mimeType: 'image/png', buffer: Buffer.alloc(5 * 1024 * 1024 + 10) }]); await P.waitForTimeout(300);
+    const bad2 = await P.evaluate(() => ({ msg: document.getElementById('fbMsg').textContent, n: SVC.FB.att.length }));
+    await P.click('#fbPrev [data-fbx="2"]'); await P.waitForTimeout(150);
+    const b = await P.evaluate(() => ({ n: SVC.FB.att.length, names: SVC.FB.att.map((x) => x.name).join('|') }));
+    await P.fill('#fbText', '계약 상세 캡처 첨부합니다'); await P.click('#fbSend'); await P.waitForTimeout(800);
+    const row = A.db.table('portal_feedback')[0];
+    const c2 = { puts: A.st.puts, row: row && { files: row.files, content: row.content }, att: await P.evaluate(() => SVC.FB.att.length), on: await P.evaluate(() => document.getElementById('ovlFb').classList.contains('on')) };
+    await P.click('#fbBtn'); await P.waitForSelector('#fbList .fb-it', { timeout: 5000 });
+    const d = await P.evaluate(() => ({ chips: [...document.querySelectorAll('#fbList .fb-f')].map((b) => b.textContent.replace(/\s+/g, ' ').trim() + (b.classList.contains('img') ? '[img]' : '')).join('|'), who: document.querySelector('#fbList .fb-h .mini').textContent }));
+    await P.click('#fbList .fb-f.img'); await P.waitForSelector('#fbList .fb-fimg img', { timeout: 5000 });
+    const e = await P.evaluate(() => ({ img: !!document.querySelector('#fbList .fb-fimg img'), exp: document.querySelector('#fbList .fb-f.img').getAttribute('aria-expanded'), gets: 0 }));
+    await P.click('#fbList .fb-f.img'); await P.waitForTimeout(150);
+    const e2 = await P.evaluate(() => ({ img: !!document.querySelector('#fbList .fb-fimg img'), exp: document.querySelector('#fbList .fb-f.img').getAttribute('aria-expanded') }));
+    const dl = P.waitForEvent('download', { timeout: 5000 }).catch(() => null); await P.click('#fbList .fb-f:not(.img)'); const dlr = await dl;
+    await P.keyboard.press('Escape'); await A.ctx.close();
+    /* SQL 114 전: files 열이 없어 select 가 400 → 첨부 없이 다시 받음 */
+    const N = await mk189(); await N.page.route(/\/rest\/v1\/portal_feedback\?select=[^&]*files/, (r) => r.fulfill({ status: 400, contentType: 'application/json', body: '{"code":"42703","message":"column portal_feedback.files does not exist"}' }));
+    await N.page.evaluate(() => { SVC.FB.loaded = false; });   /* 시작할 때 이미 받았으니 다시 받게 */
+    await N.page.click('#fbBtn'); await N.page.waitForSelector('#fbText', { timeout: 4000 }); await N.page.waitForTimeout(500);
+    const n = await N.page.evaluate(() => ({ ok: SVC.FB.ok, filesOk: SVC.FB.filesOk, empty: /아직 받은 요청이 없습니다/.test(document.getElementById('fbList').textContent) })); await N.ctx.close();
+    assert(a0.file && a0.multi && a0.prev && /캡처 · 파일 붙이기/.test(a0.lbl) && a.n === 3 && a.names === 'shot.png|견적.pdf|캡처_3.png' && a.imgs === 2 && a.docs === 1 && a.vis && /첨부 3개/.test(a.msg), '첨부 ' + JSON.stringify({ a0, a }));
+    assert(/이미지 · PDF/.test(bad1) && /5MB/.test(bad2.msg) && bad2.n === 3 && b.n === 2 && b.names === 'shot.png|견적.pdf', '막기 · 빼기 ' + JSON.stringify({ bad1, bad2, b }));
+    assert(c2.puts.length === 2 && /^feedback\/me\/\d+_1\.png$/.test(c2.puts[0].path) && /^feedback\/me\/\d+_2\.pdf$/.test(c2.puts[1].path) && c2.puts.every((p) => /^Bearer /.test(p.auth) && p.len > 5) && c2.puts[0].type === 'image/png' && c2.puts[1].type === 'application/pdf' && c2.row && Array.isArray(c2.row.files) && c2.row.files.length === 2 && c2.row.files[0].name === 'shot.png' && c2.row.files[1].name === '견적.pdf' && c2.row.files.every((f) => /^me\//.test(f.path) && f.size > 0) && c2.att === 0 && !c2.on, '올리기 · 저장 ' + JSON.stringify(c2));
+    assert(/shot\.png.*\[img\]/.test(d.chips) && /견적\.pdf/.test(d.chips) && !/견적\.pdf[^|]*\[img\]/.test(d.chips) && /홍길동 차장/.test(d.who) && e.img && e.exp === 'true' && !e2.img && e2.exp === 'false' && A.st.gets.length >= 1 && /^authenticated\/feedback\/me\//.test(A.st.gets[0]), '목록 · 미리 보기 ' + JSON.stringify({ d, e, e2, gets: A.st.gets, dl: !!dlr }));
+    assert(n.ok === true && n.filesOk === false && n.empty && !A.c.errs.filter((x) => !/serviceWorker/.test(x)).length, 'SQL 114 전 ' + JSON.stringify({ n, errs: A.c.errs }));
+    return '첨부 3 → 2 올림 · 미리 보기 · 114 전 안전';
+  });
+  await S.t('㊿+189 표시 이름: portal_accounts 의 이름 · 직급 → 담당 지정 목록 «김철수 대리 · 이메일» · 홈 우선 업무 줄에 «김철수 대리» · 개선 요청 보낸 사람 · 내 계정 «표시 이름» 고치기 → portal_profiles upsert(본인) · 관리자 › 계정 표 «표시 이름» 열 + ✎(남의 것) · 이름 없으면 계정 id · 용어: «고객 한눈에» · «홈 카드»', async () => {
+    const A = await mk189(), P = A.page;
+    await P.evaluate(() => { SVC.HOME.scope = 'team'; SVC.HOME.allOpen = true; SVC.navMenu('dash'); }); await P.waitForTimeout(500);
+    const key = await P.evaluate(() => [...document.querySelectorAll('#ccInbox .hm-row')].map((r) => r.dataset.key).find((k) => /^(rnl|rnd|exp)$/.test(k)));
+    await P.click('#ccInbox .hm-row[data-key="' + key + '"] .hm-asg'); await P.waitForFunction(() => document.querySelector('#arSel option[value="other@example.com"]'), null, { timeout: 5000 });
+    const opts = await P.evaluate(() => [...document.querySelectorAll('#arSel option')].map((o) => o.value + '|' + o.textContent));
+    await P.selectOption('#arSel', 'other@example.com'); await P.click('#arSave'); await P.waitForTimeout(500);
+    const a = await P.evaluate((key) => ({ own: document.querySelector('#ccInbox .hm-row[data-key="' + key + '"] .hm-asg').textContent.replace(/✎/, '').trim(), nm: SVC.ntfName('other@example.com'), raw: SVC.ntfName('viewer@example.com'), dlg: 0 }), key);
+    await P.evaluate(async () => { await SVC.lazyLoad('admin'); SVC.navMenu('account'); }); await P.waitForTimeout(600);
+    const b = await P.evaluate(() => ({ prof: document.getElementById('accProf').textContent.trim(), btn: document.getElementById('accProfEdit').textContent.trim() }));
+    await P.click('#accProfEdit'); await P.waitForSelector('#pfName', { timeout: 4000 }); await P.waitForTimeout(120);
+    const b1 = await P.evaluate(() => ({ name: document.getElementById('pfName').value, title: document.getElementById('pfTitle').value, h: document.getElementById('ovlProfH').textContent }));
+    await P.fill('#pfName', '홍길동'); await P.fill('#pfTitle', '부장'); const w0 = A.db.writes.length; await P.click('#pfSave'); await P.waitForTimeout(600);
+    const pw = A.db.writes.slice(w0).find((w) => w.table === 'portal_profiles'), lg = A.db.writes.slice(w0).find((w) => w.table === 'change_log'), pb = pw && (Array.isArray(pw.body) ? pw.body[0] : pw.body);
+    const c = await P.evaluate(() => ({ prof: document.getElementById('accProf').textContent.trim(), nm: SVC.ntfName('tester@example.com'), on: document.getElementById('ovlProf').classList.contains('on') }));
+    await P.evaluate(async () => { await SVC.lazyLoad('admin'); SVC.navMenu('adminx'); }); await P.waitForTimeout(500);
+    await P.evaluate(() => SVC.admTab('acct')); await P.waitForTimeout(300);
+    await P.waitForFunction(() => document.querySelector('#axTable tbody tr'), null, { timeout: 6000 });
+    const d = await P.evaluate(() => ({ head: [...document.querySelectorAll('#axTable thead th')].map((x) => x.textContent.trim()).slice(0, 3).join('|'), cells: [...document.querySelectorAll('#axTable .ax-prof')].map((td) => td.textContent.replace(/\s+/g, ' ').trim()).join('|') }));
+    const ob = await P.$('#axTable button[data-axpf="other@example.com"]');
+    if (ob) { await ob.click(); await P.waitForSelector('#pfName', { timeout: 4000 }); await P.waitForTimeout(120); }
+    const e = ob ? await P.evaluate(() => ({ h: document.getElementById('ovlProfH').textContent, name: document.getElementById('pfName').value })) : null;
+    if (ob) { await P.fill('#pfTitle', '과장'); await P.click('#pfSave'); await P.waitForTimeout(500); }
+    const e2 = ob ? await P.evaluate(() => ({ nm: SVC.ntfName('other@example.com'), cell: [...document.querySelectorAll('#axTable .ax-prof')].map((td) => td.textContent.replace(/\s+/g, ' ').trim()).join('|') })) : null;
+    const f = await P.evaluate(() => ({ t360: [...document.querySelectorAll('#viewData, #ovlDetail, #ovlC360')].map((x) => x.textContent).join(' ').indexOf('고객 360'), wid: document.getElementById('btnWidgets').textContent.trim(), src: [...document.querySelectorAll('script')].length }));
+    await A.ctx.close();
+    const V = await mk189({ role: 'viewer', email: 'viewer@example.com', names: false }); await V.page.evaluate(async () => { await SVC.lazyLoad('admin'); SVC.navMenu('account'); }); await V.page.waitForTimeout(600);
+    const v = await V.page.evaluate(() => ({ prof: document.getElementById('accProf').textContent.trim(), nm: SVC.ntfName('other@example.com') }));
+    await V.page.click('#accProfEdit'); await V.page.waitForSelector('#pfName', { timeout: 4000 }); await V.page.waitForTimeout(120); await V.page.fill('#pfName', '박보기'); const vw0 = V.db.writes.length; await V.page.click('#pfSave'); await V.page.waitForTimeout(500);
+    const vpw0 = V.db.writes.slice(vw0).find((w) => w.table === 'portal_profiles'), vpw = vpw0 && { body: [Array.isArray(vpw0.body) ? vpw0.body[0] : vpw0.body] }; const vmsg = await V.page.evaluate(() => (document.getElementById('pfMsg') || {}).textContent || '');
+    await V.ctx.close();
+    assert(opts.some((o) => /^other@example\.com\|김철수 대리 · other@example\.com · editor$/.test(o)) && a.own === '김철수 대리' && a.nm === '김철수 대리' && a.raw === 'viewer', '담당 이름 ' + JSON.stringify({ opts, a }));
+    assert(/홍길동 차장/.test(b.prof) && b.btn === '고치기' && b1.name === '홍길동' && b1.title === '차장' && !/—/.test(b1.h) && pw && /^(POST|UPSERT)$/.test(pw.method) && pb.email === 'tester@example.com' && pb.name === '홍길동' && pb.title === '부장' && lg && /portal_profiles/.test(JSON.stringify(lg.body)) && /홍길동 부장/.test(c.prof) && c.nm === '홍길동 부장' && !c.on, '내 계정 ' + JSON.stringify({ b, b1, pw: pw && pw.body, c }));
+    assert(/이메일\|표시 이름\|권한/.test(d.head) && /홍길동 부장/.test(d.cells) && /김철수 대리/.test(d.cells) && (!ob || (/other@example\.com/.test(e.h) && e.name === '김철수' && e2.nm === '김철수 과장' && /김철수 과장/.test(e2.cell))), '관리자 계정 ' + JSON.stringify({ d, e, e2 }));
+    assert(f.t360 < 0 && f.wid === '홈 카드' && /아직 없음/.test(v.prof) && v.nm === 'other' && vpw && vpw.body[0].name === '박보기' && !/못했습니다/.test(vmsg) && !A.c.errs.filter((x) => !/serviceWorker/.test(x)).length, '용어 · viewer ' + JSON.stringify({ f, v, vpw: vpw && vpw.body, vmsg, errs: A.c.errs }));
+    return '김철수 대리 · 내 계정 저장 · 관리자 ✎ · 용어';
   });
 }
 await browser.close(); srv.close();

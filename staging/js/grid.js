@@ -92,7 +92,7 @@ export function dashResetIfChanged(){
   if(b && b.onclick) b.onclick.call(b); else { try{ buildControls(); renderAll(); }catch(e){} }
 }
 /* ㊿+172 메뉴를 다시 눌러도 마지막 작업 상태 그대로(검색 · 필터 · 정렬 · 쪽 · 스크롤 · 화면별 선택) — 처음 상태는 화면 이름 옆 «초기화»(viewResetHard)
-   · 고객 360 에서 넘어온 «고객 문맥»(CUSTCTX)이 있으면 고객 목록 화면에는 그 고객으로 */
+   · 고객 한눈에 에서 넘어온 «고객 고정»(CUSTCTX)이 있으면 고객 목록 화면에는 그 고객으로 */
 export var VSCROLL={};
 export var CUSTCTX={c:''};
 export var CUST_VIEWS={contracts:1, live:1, oi:1, inbound:1, orders:1, assets:1, mdrops:1};
@@ -116,7 +116,7 @@ export function viewResetHard(v){
   if(v!=='quote') toast('처음 상태로', viewLabelOf(v)+' — 검색 · 필터 · 정렬을 비웠습니다', 'info');
 }
 export function viewLabelOf(v){ var b=document.querySelector('#side button[data-v="'+v+'"]'); return b? navText(b) : v; }
-/** 고객 문맥으로 목록 열기(고객 360 → 계약 · LIVE · OI · 인바운드 · 장비) — 다른 고객 목록으로 옮겨도 같은 고객 · «해제»로 끔 */
+/** 고객 고정으로 목록 열기(고객 한눈에 → 계약 · LIVE · OI · 인바운드 · 장비) — 다른 고객 목록으로 옮겨도 같은 고객 · «해제»로 끔 */
 export function custGo(v, nm){
   CUSTCTX.c=String(nm||'');
   if(v==='eqboard'){ EQB.q=CUSTCTX.c; switchView('eqboard'); var qi=/** @type {any} */(document.getElementById('eqbQ')); if(qi) qi.value=CUSTCTX.c; try{ renderEqBoard(); }catch(e){} return; }
@@ -130,7 +130,7 @@ export function custCtxBar(){
   var on=!!CUSTCTX.c && CUST_VIEWS[ST.CUR_VIEW] && s && s.value.trim()===CUSTCTX.c;
   if(!on){ bar.hidden=true; bar.innerHTML=''; if(CUSTCTX.c && s && s.value.trim() && s.value.trim()!==CUSTCTX.c && CUST_VIEWS[ST.CUR_VIEW]) CUSTCTX.c=''; return; }
   bar.hidden=false;
-  bar.innerHTML=tpl`<span class="ctag info">${rawHtml(ico('users',13))} 고객 문맥 «${CUSTCTX.c}» — 다른 고객 목록으로 옮겨도 이 고객</span><button type="button" class="cbtn" id="dvCust360">고객 360</button><button type="button" class="cbtn" id="dvCustX" aria-label="고객 문맥 해제">✕ 해제</button>`;
+  bar.innerHTML=tpl`<span class="ctag info">${rawHtml(ico('users',13))} 고객 고정 «${CUSTCTX.c}» — 다른 고객 목록으로 옮겨도 이 고객</span><button type="button" class="cbtn" id="dvCust360">고객 한눈에</button><button type="button" class="cbtn" id="dvCustX" aria-label="고객 고정 해제">✕ 해제</button>`;
   /** @type {any} */(document.getElementById('dvCust360')).onclick=function(){ openCust360(CUSTCTX.c); };
   /** @type {any} */(document.getElementById('dvCustX')).onclick=function(){ CUSTCTX.c=''; if(s) s.value=''; DV.page=0; renderGrid(); };
 }
@@ -276,7 +276,7 @@ export function switchView(v){
   if(v==='inbound' && !ST.RAWX.inbound){
     loadInbound(function(){ if(ST.CUR_VIEW==='inbound') renderGrid(); });
   }
-  var mem=(RESTORE && DVMEM[v])? DVMEM[v] : null;   /* ㊿+169 «뒤로» · ㊿+172 메뉴 재진입도 떠날 때 상태 그대로 · 조건을 들고 들어오는 이동(홈 할 일 · 검색 결과 · 고객 360)은 처음부터 */
+  var mem=(RESTORE && DVMEM[v])? DVMEM[v] : null;   /* ㊿+169 «뒤로» · ㊿+172 메뉴 재진입도 떠날 때 상태 그대로 · 조건을 들고 들어오는 이동(홈 할 일 · 검색 결과 · 고객 한눈에)은 처음부터 */
   if(mem){ DV.page=mem.page; DV.sortK=mem.sortK; DV.sortDir=mem.sortDir; DV.chipVal=mem.chipVal; DV.filters=mem.filters; DV.lens=mem.lens; DV.lensAll=mem.lensAll; DV.pre=mem.pre; }
   else { DV.page=0; DV.sortK=null; DV.sortDir=1; DV.chipVal=''; DV.filters={}; DV.pre=null; DV.lens=''; }   /* ㊿+187 관점(계약 전용)도 비움 — 다른 화면 칩에 남지 않게 */
   closeColFilter();
@@ -658,7 +658,7 @@ export function qvCfgOpen(btn){
 /* ===== ㊿+187 표 위 필터 한 줄(지니언스 디자인 · 고급 SaaS 기준 — 제3자 점검 «모든 화면» 항목 11) =====
    · 예전엔 보기 · 상태 · 빠른 보기 · 관점 · 조건 · 도구 줄이 3~5줄로 쌓였음 → 한 줄: [보기 탭] [검색] [필터 ▾ n] [저장된 보기 ▾] [견적만 있음 → OI] … [n행] [엑셀] [AI 도움말] [열] [⋯]
    · «필터» 팝오버(#dvFilterPop) 안에 상태 · 빠른 보기 · 관점 — 예전 줄 요소(#dvChipBar · #dvQvBar · #dvLensBar)를 그대로 옮겨 둠(id · 버튼 · 건수 · 동작 · 시험 선택자 그대로) · 아래 «지금 조건 n행»
-   · 걸린 조건은 표 바로 위 칩 줄(#dvChips) — 칩마다 ✕ · 둘 이상이면 «모두 해제»(#dvFclr) · 홈 알림 조건(DV.pre) · 고객 문맥(#dvCustBar)도 같은 줄
+   · 걸린 조건은 표 바로 위 칩 줄(#dvChips) — 칩마다 ✕ · 둘 이상이면 «모두 해제»(#dvFclr) · 홈 알림 조건(DV.pre) · 고객 고정(#dvCustBar)도 같은 줄
    · 저장된 보기(#dvSavedBtn): 지금 조건(보기 · 상태 · 빠른 보기 · 관점 · 열 필터 · 검색어)에 이름을 붙여 내 브라우저에 저장(svc_fviews_계정) · 한 번에 다시 적용 · 화면마다 따로
    · ⋯(#dvMoreBtn): 다시 읽기 · 붙여넣기 입력 · 밀도 — 드물게 쓰는 도구(요소를 옮겨 둠 — id · 동작 그대로)
    · 클래식 디자인은 예전 줄 그대로(fbarOn 이 false) · LIVE 화면의 기준 줄(#dvLensBar 를 다시 씀)은 팝오버에 넣지 않고 줄 위에 둠 */
@@ -691,7 +691,7 @@ export function fbarEnsure(){
   fbarWire(fb, pop, sv, mb, mm);
   return bar;
 }
-export function fbarClearAll(){ var s=/** @type {any} */($('#dvSearch')); if(s) s.value=''; clearFilters(); }   /* 모두 해제 = 상태 · 빠른 보기 · 관점 · 열 필터 · 검색어(고객 문맥은 따로 ✕) */
+export function fbarClearAll(){ var s=/** @type {any} */($('#dvSearch')); if(s) s.value=''; clearFilters(); }   /* 모두 해제 = 상태 · 빠른 보기 · 관점 · 열 필터 · 검색어(고객 고정은 따로 ✕) */
 export function fbarPlace(pop, fb){ var r=fb.getBoundingClientRect(), w=pop.offsetWidth; pop.style.top=(r.bottom+6)+'px'; pop.style.left=Math.max(8, Math.min(r.left, window.innerWidth-w-8))+'px'; pop.style.maxHeight=Math.max(200, window.innerHeight-r.bottom-16)+'px'; }
 export function fbarWire(fb, pop, sv, mb, mm){
   function popClose(back){ if(pop.hidden) return; pop.hidden=true; fb.setAttribute('aria-expanded','false'); if(back) try{ fb.focus(); }catch(e){} }
@@ -1416,7 +1416,7 @@ export function renderGrid(){
   var pb=document.getElementById('dvPreBar');
   if(!pb){ pb=document.createElement('div'); pb.id='dvPreBar'; pb.className='pre-bar'; var bar4=$('#dvSearch').parentElement; bar4.parentElement.insertBefore(pb, bar4); }
   try{ qvBar(g); }catch(e){ console.warn('빠른 보기', e); }
-  try{ custCtxBar(); }catch(e){}   /* ㊿+172 고객 360 에서 넘어온 고객 문맥 */
+  try{ custCtxBar(); }catch(e){}   /* ㊿+172 고객 한눈에 에서 넘어온 고객 고정 */
   if(DV.pre && !isCustom && !DV.pre.qv){ pb.hidden=false; pb.innerHTML=tpl`<span class="ctag info">${rawHtml(ico('filter',13))} ${DV.pre.label}</span><button type="button" class="cbtn" id="dvPreX" aria-label="조건 해제 — ${DV.pre.label}">조건 해제</button>`;
     document.getElementById('dvPreX').onclick=function(){ DV.pre=null; DV.page=0; renderGrid(); }; }
   else { pb.hidden=true; pb.innerHTML=''; }
@@ -1567,7 +1567,7 @@ export function dtSummary(c){
   if(kind) acts.push(['renew', {lapsed:'만기 지난 계약 처리', due:'이달 만기 처리', next:'다음 달 만기 처리'}[kind]+' — 연장 · 종료 · 해지', 1]);
   if(!ended && !kind && e!=null && e>=b && e-b<=3 && !r.autoRenew && !r.parent && !(succ && succ.sure) && canView('oinew')) acts.push(['oi', '재계약 OI 만들기', 1]);
   if(succ) acts.push(['succ', '후속 계약 보기 ('+mk(succ.row.startIdx)+'~)', 0]);
-  acts.push(['c360', '고객 360', 0]);
+  acts.push(['c360', '고객 한눈에', 0]);
   if(canWrite('contracts')) acts.push(['edit', '계약 표에서 수정', 0]);
   host.innerHTML=tpl`<div class="dt-sum" role="group" aria-label="계약 요약">`+
     cell(mk(b)+' 금액', won(amt)+'천원', '계약 월 금액 '+won(r.mrr||0)+'천원')+ cell('만료', ex[0], ex[1], exC)+ cell('갱신', rn[0], rn[1], exC==='bad' && !ended? 'bad' : '')+

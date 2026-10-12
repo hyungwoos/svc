@@ -234,6 +234,12 @@ say(/^export function tickMemo\(/m.test(jsAll) && /^export function cssvKey\(/m.
     && /^export function fbarPhoneSync\(g\)/m.test(gr) && /^export function satEmbed\(\)/m.test(gr) && /embed=gn/.test(rd('sat/common.js')) && /html\[data-embed="gn"\]/.test(rd('sat/settle.css')) && /class="sat-head"/.test(ix) && /var eqZero=isGN\(\)/.test(sh)
     && /\.zr-btn\{/.test(css) && /details\.eq-chk>summary\{/.test(css) && /\.ovl \.modal>\.mact\{position:sticky;bottom:-18px/.test(css) && /html\[data-skin="gn"\] \.ukw\{display:none\}/.test(css),
   '㊿+188 화면별 정리(0 행 접기 · 필터 접기 · 대조 한 줄 · 눈금 · 이력 읽기 · 상세 창 · 고객 360 · 위성 embed · 폰 도구줄)'); }
+// ㊿+189 개선 요청 첨부(fbAttAdd · fbUpload · Storage feedback) · 표시 이름(portal_profiles · ntfProf · profEdit · 내 계정 · 관리자 계정)
+{ const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
+  const nt = rd('js/notify.js'), ad = rd('js/admin.js'), co = rd('js/core.js'), css = rd('app.css');
+  say(/^export function fbAttAdd\(files, msg\)/m.test(nt) && /^export async function fbUpload\(\)/m.test(nt) && /storage\/v1\/object\/feedback\//.test(nt) && /storage\/v1\/object\/authenticated\/feedback\//.test(nt) && /id="fbFile"/.test(nt) && /addEventListener\('paste'/.test(nt) && /done_at,files&order/.test(nt)
+    && /^export function ntfProf\(e\)/m.test(nt) && /^export function profEdit\(email, opt\)/m.test(nt) && /portal_profiles\?on_conflict=email/.test(nt) && /return ntfDisp\(ntfProf\(e\)\) \|\| QMGR_MAP\[l\] \|\| l;/.test(nt) && /id="accProfEdit"/.test(ad) && /data-axpf=/.test(ad) && /\^portal_feedback\\b\|\^portal_profiles\\b/.test(co) && /\.fb-pv\{/.test(css),
+  '㊿+189 개선 요청 첨부(fbAttAdd · fbUpload · 붙여넣기 · 버킷 feedback) · 표시 이름(ntfProf · profEdit · portal_profiles · 내 계정 · 관리자 계정 · 쓰기 관문 예외)'); }
 // ㊿+160 연장하면 상태 «재약정»(구분 그대로) · 계약 상세에 «계약 기간 · 연장 이력»
 say(/^export function renewStatus\(r\)/m.test(jsAll) && /var nst=renewStatus\(r\);/.test(jsAll) && /^export function ctPeriods\(c, mine\)/m.test(jsAll) && html.includes('id="dtRenew"'), '연장: 상태 «재약정»(renewStatus) · 계약 상세 연장 이력(ctPeriods · #dtRenew)');
 const idx = html + jsAll;

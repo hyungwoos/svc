@@ -161,7 +161,7 @@ export function buildGrids(){
   GRIDS={
     contracts:{
       title:'계약 관리', table:'contracts',
-      cap:'행 클릭 = 고객 360 · 연필 = 이 행 수정 · 금액 변경은 위 «입력·수정» · 삭제는 «더보기»(슈퍼 관리자만)',
+      cap:'행 클릭 = 고객 한눈에 · 연필 = 이 행 수정 · 금액 변경은 위 «입력·수정» · 삭제는 «더보기»(슈퍼 관리자만)',
       add:false, del:'super', pin:['_custName','status'], mob:['line','end_month','mrr','partner'],   /* 폰: 서비스 · 만료 · 금액 · 파트너 */
       rowClick:function(r){ openCust360(String(r._custName||'').replace(/^↳ /,'')); },
       rows:function(){
@@ -264,8 +264,8 @@ export function buildGrids(){
       Object.defineProperty(g,'add',{get:function(){ return ST.LIVE_SRC==='sheet'; }});
       Object.defineProperty(g,'del',{get:function(){ return ST.LIVE_SRC==='sheet'; }});
       Object.defineProperty(g,'cap',{get:function(){ return ST.LIVE_SRC==='sheet'
-        ? '예전 LIVE 고객사 탭을 옮겨 둔 명단(직접 편집) — 대조용 · 행 클릭 = 고객 360'
-        : '계약을 등록하면 자동으로 따라오는 명단 — 따로 등록하지 않습니다 · 새 고객은 입력·수정 › 계약에서 신규 계약, 빠질 때는 해지 처리 · 행 클릭 = 고객 360'; }});
+        ? '예전 LIVE 고객사 탭을 옮겨 둔 명단(직접 편집) — 대조용 · 행 클릭 = 고객 한눈에'
+        : '계약을 등록하면 자동으로 따라오는 명단 — 따로 등록하지 않습니다 · 새 고객은 입력·수정 › 계약에서 신규 계약, 빠질 때는 해지 처리 · 행 클릭 = 고객 한눈에'; }});
       return g;
     })(),
     lg:{
@@ -316,7 +316,7 @@ export function buildGrids(){
     oi:{
       emptyCta:{l:'OI 등록', v:'oinew', s:'영업기회를 등록하면 여기에 쌓입니다'}, title:'OI 현황 (영업기회)', table:'oi_deals',
       chipsField:'stage', chipsOpts:OI_STAGE,
-      cap:'행 클릭 = 고객 360 · 진행 상태 관리 · 신규 등록은 영업 › OI 등록 · 삭제는 «더보기»', add:false, del:true, pin:['customer','stage'], mob:['deal_name','next_action','next_date'],   /* 폰: 사업명 · 다음 할 일 · 예정일 */
+      cap:'행 클릭 = 고객 한눈에 · 진행 상태 관리 · 신규 등록은 영업 › OI 등록 · 삭제는 «더보기»', add:false, del:true, pin:['customer','stage'], mob:['deal_name','next_action','next_date'],   /* 폰: 사업명 · 다음 할 일 · 예정일 */
       rowClick:function(r){ openCust360(r.customer); },
       rows:function(){ return ST.RAWX.oi||[]; },
       cols:[
@@ -353,7 +353,7 @@ export function buildGrids(){
     mdrops:{
       emptyCta:{l:'PoC 신청', v:'mdrnew', s:'PoC 를 신청하면 여기에 쌓입니다'}, title:'MDR 운영·신청 현황', table:'mdr_ops', mob:['customer','status','svc_type','_fill','sales_name'],
       chipsField:'status', chipsOpts:['신청','대기','진행중','데모','구독','종료'],
-      cap:'행 클릭 = 고객 360 · PoC 신청부터 운영까지 — 신청 → 진행중 → 데모 → 구독 · 설치율 = 설치 ÷ 계약 수량', add:true, del:true,
+      cap:'행 클릭 = 고객 한눈에 · PoC 신청부터 운영까지 — 신청 → 진행중 → 데모 → 구독 · 설치율 = 설치 ÷ 계약 수량', add:true, del:true,
       rowClick:function(r){ if(!ST.IS_EQUIP) openCust360(r.customer); },
       rows:function(){ return (ST.RAWX.mdrops||[]).slice().sort(function(a,b){
         var n=String(b.start_date||'').localeCompare(String(a.start_date||''));

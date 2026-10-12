@@ -313,7 +313,7 @@ export function permEnter(v){
 /* 쓰기 호출 공통 관문 — 현재 화면에 쓰기 권한이 없으면 저장 자체를 막음 (변경 이력·읽기용 RPC 는 예외) */
 export function permWriteGuard(method, path, asView){
   if(!/^(POST|PATCH|PUT|DELETE)$/i.test(method)) return;
-  if(/^change_log\b|^ai_chat_history\b|^ai_feedback\b|^ai_check_log\b|^rpc\/(load_|admin_|ai_)|^user_perms\b|^ai_billing\b|^recv_presets\b/.test(path)) return;   // 이력·개인 기록·관리자 RPC 는 화면 권한과 무관
+  if(/^change_log\b|^ai_chat_history\b|^ai_feedback\b|^ai_check_log\b|^rpc\/(load_|admin_|ai_)|^user_perms\b|^ai_billing\b|^recv_presets\b|^portal_feedback\b|^portal_profiles\b/.test(path)) return;   // 이력·개인 기록·관리자 RPC · 개선 요청 · 표시 이름(㊿+189 — DB RLS 가 경계)은 화면 권한과 무관
   if(ST.IS_SUPER) return;
   var pv=asView||ST.CUR_VIEW;
   if(!canWrite(pv)){ var b=document.querySelector('#side button[data-v="'+pv+'"]'); var nm=b? navText(b) : pv; throw new Error('쓰기 권한이 없습니다 — 「'+nm+'」 화면은 읽기만 허용돼 있습니다. 슈퍼 관리자에게 «쓰기» 권한을 요청하세요.'); }
@@ -739,11 +739,11 @@ export function idleCheck(){
 
 
 /* ---- 화면 디자인: 커맨드 센터(기본, cc) / 심플(simple) / 클래식(classic) — 이 브라우저에만 저장 ----
-   · cc      : 아이콘 레일 + 커맨드 바 + 인박스 홈 + 장비 보드 + 고객 360 패널 (v5 CSS · html[data-look="cc"])
+   · cc      : 아이콘 레일 + 커맨드 바 + 인박스 홈 + 장비 보드 + 고객 한눈에 패널 (v5 CSS · html[data-look="cc"])
    · simple  : 평면 디자인, 기존 사이드바 (v4 CSS · html:not([data-look="classic"]))
    · classic : 이전 디자인 그대로                                                                 */
 /* ㊿+166 «지니언스»(gn) = 새 기본 — 구조는 커맨드 센터 그대로(data-look="cc") + 정식 로고·브랜드 색·글자 메뉴(data-skin="gn")
-   · isCC() 는 gn 에서도 참(인박스·히어로·고객 360 패널 등 커맨드 센터 기능을 그대로 씀) · gn 만 다른 곳은 isGN() */
+   · isCC() 는 gn 에서도 참(인박스·히어로·고객 한눈에 패널 등 커맨드 센터 기능을 그대로 씀) · gn 만 다른 곳은 isGN() */
 export var LOOKS={gn:'지니언스 (기본)', cc:'커맨드 센터', simple:'심플', classic:'클래식 (이전 디자인)'};
 export function curLook(){ var v=null; try{ v=localStorage.getItem('svc_look'); }catch(e){} return LOOKS[v]? v : 'gn'; }
 export function isCC(){ return document.documentElement.getAttribute('data-look')==='cc'; }

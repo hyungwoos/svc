@@ -3160,4 +3160,34 @@ html[data-skin="gn"] :is(#viewQuote,#viewPreport,#viewS1,#viewKk) iframe{border-
 .c360-eq4[hidden]{display:none}
 details.eq-chk .eq-chk-act{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}
 details.eq-chk .eq-chk-act:empty{display:none}
+/* ==== ㊿+189 개선 요청 첨부 · 표시 이름 ==== */
+.fb-att{margin-top:-4px}
+.fb-att-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.fb-att-bar .mini{color:var(--muted)}
+.fb-file{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;clip:rect(0 0 0 0)}
+.fb-att-btn{cursor:pointer}
+.fb-att-btn:focus-within{outline:2px solid var(--s1);outline-offset:1px}
+.fb-prev{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.fb-prev[hidden]{display:none}
+.fb-pv{position:relative;display:flex;flex-direction:column;gap:2px;width:112px;padding:6px;border:1px solid var(--ring);border-radius:10px;background:var(--surface-2);font-size:12px}
+.fb-pv img{width:100%;height:68px;object-fit:cover;border-radius:6px;background:#fff}
+.fb-pv .fb-pv-f{display:flex;align-items:center;justify-content:center;height:68px;color:var(--muted);background:var(--surface);border-radius:6px}
+.fb-pv .fb-pv-n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.fb-pv .mini{color:var(--muted)}
+.fb-pv-x{position:absolute;top:2px;right:2px;width:22px;height:22px;border:0;border-radius:999px;background:rgba(0,0,0,.55);color:#fff;font-size:12px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0}
+.fb-pv-x:hover,.fb-pv-x:focus-visible{background:rgba(0,0,0,.8)}
+.modal.fb-drop{outline:2px dashed var(--brand);outline-offset:-6px}
+.fb-fs{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.fb-f{display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 9px;border:1px solid var(--ring);border-radius:999px;background:var(--surface);color:var(--ink);font:inherit;font-size:12px;cursor:pointer;max-width:100%}
+.fb-f>span:first-of-type{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px}
+.fb-f .mini{color:var(--muted)}
+.fb-f:hover{border-color:var(--axis);background:var(--surface-2)}
+.fb-f[aria-expanded="true"]{border-color:var(--brand-solid);color:var(--brand-ink)}
+.fb-f.busy{opacity:.6}
+.fb-fprev{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.fb-fprev:empty{display:none}
+.fb-fimg img{max-width:100%;max-height:320px;border:1px solid var(--ring);border-radius:10px;background:#fff}
+.ax-prof{white-space:nowrap}
+.ax-prof .ax-pf{height:24px;padding:0 7px;margin-left:4px;font-size:12px}
+@media (max-width:760px){ .fb-pv{width:calc(50% - 4px)} .fb-f>span:first-of-type{max-width:140px} }
 /* ==== ㊿+166 새 디자인 end ==== */

@@ -1479,7 +1479,7 @@ export function showAnswer(q,res){
   var ph=document.getElementById('ansPin');
   if(!ph){
     ph=document.createElement('button'); ph.id='ansPin'; ph.className='pill';
-    ph.textContent='📌 위젯으로 고정'; ph.style.cssText='margin-top:10px';
+    ph.textContent='📌 홈 카드로 고정'; ph.style.cssText='margin-top:10px';
     var hd0=document.querySelector('#answer .ans-head'); if(hd0) hd0.appendChild(ph);
   }
   ph.hidden=false; ph.onclick=function(){ pinQuery(q); };

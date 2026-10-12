@@ -391,8 +391,8 @@ export function openInbDetail(r){
     tpl`<div class="inb-body">${r.content||'(요청내용 없음)'}</div>`+ tpl`${rawHtml(steps.length?tpl`<div class="inb-tl">${rawHtml(steps.map(function(s){
       return tpl`<div class="st"><b>${rawHtml(s[0])}</b> ${s[1]||''}<div class="d">${s[2]||''}</div></div>`;
     }).join(''))}`+ tpl`</div>`:'')}`+ tpl`${rawHtml(r.note?tpl`<div class="mini" style="margin-top:6px">비고: ${r.note}</div>`:'')}`+
-    tpl`${rawHtml(r.org? tpl`<div class="inb-go"><button type="button" class="cbtn" id="inbD360">고객 360 — ${r.org}</button><span class="mini">원본: 인바운드 시트 ${String(r.y||'')}년 연번 ${String(r.no||'')}(수정은 시트에서)</span></div>` : '')}`;
-  var g360=document.getElementById('inbD360'); if(g360) g360.onclick=function(){ closeOvl('ovlInb'); openCust360(r.org); };   /* ㊿+172 인바운드 → 고객 360 */
+    tpl`${rawHtml(r.org? tpl`<div class="inb-go"><button type="button" class="cbtn" id="inbD360">고객 한눈에 — ${r.org}</button><span class="mini">원본: 인바운드 시트 ${String(r.y||'')}년 연번 ${String(r.no||'')}(수정은 시트에서)</span></div>` : '')}`;
+  var g360=document.getElementById('inbD360'); if(g360) g360.onclick=function(){ closeOvl('ovlInb'); openCust360(r.org); };   /* ㊿+172 인바운드 → 고객 한눈에 */
   openOvl('ovlInb');
 }
 

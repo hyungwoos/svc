@@ -1,4 +1,4 @@
-/* ===== shell.js — 커맨드 센터(레일·커맨드 바·인박스·홈 위계) · 데이터 빌드(buildFromRes) · 고객 360 보강 · 토스트 · 제한 역할 · 로그인 화면 =====
+/* ===== shell.js — 커맨드 센터(레일·커맨드 바·인박스·홈 위계) · 데이터 빌드(buildFromRes) · 고객 한눈에 보강 · 토스트 · 제한 역할 · 로그인 화면 =====
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { IS_QA, ST } from './state.js';
 import { Viz } from './viz.js';
@@ -20,7 +20,7 @@ import { verBeforeWrite } from './guard.js';
 
 
 /* ==================================================================
-   커맨드 센터 (v5) — 아이콘 레일 · 커맨드 바 · 인박스 홈 · 운영 보드 · 고객 360 패널 · 모바일 탭
+   커맨드 센터 (v5) — 아이콘 레일 · 커맨드 바 · 인박스 홈 · 운영 보드 · 고객 한눈에 패널 · 모바일 탭
    ================================================================== */
 /* 이 창에서 한 번만 하는 일 표시 (㊿+154: 예전 window.__ccInbLoad · __editInit · __pwaStart) */
 export var SHELL_ONCE={inb:0, edit:0, pwa:0, gnm:0};
@@ -68,7 +68,7 @@ export var ICO={
   back:'<path d="M15 18l-6-6 6-6"/>'
 };
 /* ㊿+169 아이콘 한 가지 모양 — 위쪽·표 도구 버튼의 이모지/기호(✏️ ⊞ ↻ ⬇ 🧱 ☰ ❔ 📋)를 같은 선 아이콘 + 글자로 (id·이름표는 그대로) */
-export var UI_ICO={btnEdit:['edit','계약 입력·수정'], btnNew:['plus','등록'], btnWidgets:['board','위젯'], btnReload:['reload','새로고침'], btnFind:['spark','검색'],
+export var UI_ICO={btnEdit:['edit','계약 입력·수정'], btnNew:['plus','등록'], btnWidgets:['board','홈 카드'], btnReload:['reload','새로고침'], btnFind:['spark','검색'],
   dvAdd:['plus','행 추가'], dvPaste:['doc','붙여넣기 입력'], dvReload:['reload','다시 읽기'], dvCsv:['down','엑셀'], dvDense:['menu','밀도'], dvHelp:['spark','AI 도움말']};
 export function icoLbl(name, label){ return ico(name,15)+(label? tpl`<span>${label}</span>` : ''); }
 export function uiIconize(){
@@ -357,7 +357,7 @@ export function openTerms(){
   var old=document.getElementById('ovlTerms'); if(old){ old.remove(); }
   var ov=document.createElement('div'); ov.id='ovlTerms'; ov.className='ovl on';
   var D=[['금액 단위','포탈 금액은 천원 단위입니다 — 입력도 천원(480 → 480,000원), 저장은 원. 가격표·견적서는 원 단위(VAT별도), 주간보고 «예상매출»은 백만원.'],
-    ['계약 MRR','계약서의 월 금액(계약 1건). 계약 목록 · 고객 360의 «계약 월 금액».'],
+    ['계약 MRR','계약서의 월 금액(계약 1건). 계약 목록 · 고객 한눈에의 «계약 월 금액».'],
     ['당월 인식 매출 (홈의 «당월 MRR»)','기준월에 월 매출표에 잡힌 금액의 합 — 부속 계약 포함, 시작·종료·해지 월을 반영. 사업 영역의 «고객 합계 · 당월 매출»도 같은 값.'],
     ['연환산 ARR','당월 인식 매출 × 12. 목표 ARR 진행은 12월 계약분(12월 MRR × 12)도 함께 표시.'],
     ['비즈포탈 회계매출','회계 시스템에 잡힌 매출(세금계산서 기준). 포탈 매출과의 차이는 정산 › 비즈포탈 차액에서 고객사별로 대조.'],
@@ -654,7 +654,7 @@ export function ccAfterKpis(box, list, b){
     try{ more.appendChild(ccTileChannel(list,b)); }catch(e){}
     if(!ST.IS_EQUIP){ try{ more.appendChild(ccTilePipe()); }catch(e){} }
     try{ more.appendChild(ccTileWeekly()); }catch(e){}
-    var mc=document.getElementById('ccMoreCnt'); if(mc) mc.textContent=more.children.length+'개 — 채널별 MRR · 파이프라인 · 주간회의'; }
+    var mc=document.getElementById('ccMoreCnt'); if(mc) mc.textContent=more.children.length+'개 — 채널별 MRR · 진행 현황 · 주간회의'; }
   try{ ccBrief(list,b); }catch(e){}
   try{ ccAnaCount(); }catch(e){}
   /* ㊿+167 지니언스: «오늘 처리할 일»(인박스) 아래 «사업 현황» 제목 — 숫자 카드 묶음과 할 일을 나눔 */
@@ -739,7 +739,7 @@ export function ccTilePipe(){
   var inb=ST.RAWX.inbound===undefined? null : (ST.RAWX.inbound||[]).filter(function(r){ return String(r.on_date||'').slice(0,10)>=wkS; }).length;
   if(ST.RAWX.inbound===undefined && !SHELL_ONCE.inb){ SHELL_ONCE.inb=1; try{ loadInbound(function(){ if(ST.CUR_VIEW==='dash') try{ renderKpis(); }catch(e){} }); }catch(e){} }
   var c=el('div','kpi');
-  c.innerHTML=tpl`<div class="k">이번 주 파이프라인 <span class="ctag info">인바운드 자동 07:00</span></div>`+
+  c.innerHTML=tpl`<div class="k">이번 주 진행 현황 <span class="ctag info">인바운드 자동 07:00</span></div>`+
     tpl`<div class="tri" style="grid-template-columns:repeat(2,minmax(0,1fr))"><div><b class="num">${rawHtml(inb==null?'…':inb)}</b><span>최근 7일 인바운드</span></div><div><b class="num">${open.length}</b><span>진행 중 OI</span></div></div>`+
     tpl`<div style="display:flex;flex-direction:column;gap:3px;font-size:13px;margin-top:8px">${rawHtml(Object.keys(st).slice(0,3).map(function(k){ return tpl`<div class="mrow"><span>${k} 단계</span><span class="num">${rawHtml(st[k])}</span></div>`; }).join(''))}`+
     tpl`<div class="mrow"><span>이달 계약예상</span><span class="num" style="font-weight:600">${due.length}</span></div></div>`;
@@ -981,7 +981,7 @@ export async function eqSetBack(r, prev, st){
   }catch(e){ toast('되돌리기 실패', String(e.message||e).slice(0,100), 'bad'); renderEqBoard(); }
 }
 
-/* ---- 고객 360 — 요약 4칸 · 다음 액션 제안 · 섹션 탭 (모달 본문 위에 덧붙임) ----
+/* ---- 고객 한눈에 — 요약 4칸 · 다음 액션 제안 · 섹션 탭 (모달 본문 위에 덧붙임) ----
    ㊿+168: 제안 전에 후속 계약(ctSuccessor) · 진행 중 OI 를 먼저 확인 — 재약정이 등록돼 있으면 «재약정 등록됨 → 후속 계약 보기»,
    같은 갱신 OI 가 있으면 그 OI 로, 관계가 불확실하면 «후속 계약 확인 필요» (자동 확정 안 함) · 계약 만료만으로 장비 회수를 권하지 않음
    장비 숫자는 «현재 임대중(시리얼 현황) · 회수 예정(회수예정 신청 중 아직 안 돌아온 대수) · 회수 완료 · 신청 이력(건)» 으로 나눔 */
