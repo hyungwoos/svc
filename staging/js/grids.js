@@ -10,6 +10,7 @@ import { openInbDetail } from './inbound.js';
 import { qLabel } from './sales.js';
 import { logDetailText, oiOwnerOf } from './grid.js';
 import { SECTOR_OPTS } from './edit.js';
+import { ntfName } from './notify.js';
 
 
 /* ==================================================================
@@ -522,7 +523,7 @@ export function buildGrids(){
         {k:'oi_id',l:'OI 번호',t:'number'},
         {k:'manager',l:'견적 담당',ro:true},
         {k:'note',l:'메모'},
-        {k:'created_by',l:'작성',ro:true,fmt:function(v){ return String(v||'').split('@')[0]; }},
+        {k:'created_by',l:'작성',ro:true,fmt:function(v){ return ntfName(v); }},   /* ㊿+190 이름 직급 */
         {k:'updated_at',l:'고친 시각',ro:true,fmt:function(v){ return String(v||'').replace('T',' ').slice(0,16); }}
       ]
     },
@@ -539,7 +540,7 @@ export function buildGrids(){
       rows:function(){ return ST.RAWX.log||[]; },
       cols:[
         {k:'at',l:'시각',ro:true,fmt:function(v){return String(v||'').replace('T',' ').slice(0,16);}},
-        {k:'actor',l:'누가',ro:true},
+        {k:'actor',l:'누가',ro:true,fmt:function(v){ return ntfName(v); }},   /* ㊿+190 이름 직급 */
         {k:'action',l:'동작',ro:true},
         {k:'target',l:'대상',ro:true},
         {k:'target_id',l:'ID',ro:true},

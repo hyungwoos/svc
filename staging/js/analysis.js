@@ -11,6 +11,7 @@ import { c360Match, fkNorm, foldZeroRows, navSub, openCust360, subgrpSync } from
 import { helpBox, helpWire, kxCustMrr, kxLive, kxMrr, kxWire, QUOTES, quotesLoad } from './sales.js';
 import { BLANK_LABEL, ctRevPlan, DV, editCell, oiOpen, openFilterPanel, readRowInputs, renderGrid, switchView, wireRowInputs, xlsxAoa } from './grid.js';
 import { closeOvl, logChange, monthRows, openOvl, ymFromInput } from './edit.js';
+import { ntfName } from './notify.js';
 
 /* ===== AI 지식 — 사람이 AI 에게 가르치는 사실·규칙·용어 (ai_knowledge · active 인 행은 매 질문의 시스템 프롬프트에 들어감) ===== */
 /* ===== 데이터 점검 (80점 프로젝트 ③ 데이터 정합성 · ㊿+133) — 메모리 데이터(DATA/RAWX)로 규칙을 돌려 어긋난 행 + 바로가기 =====
@@ -270,7 +271,7 @@ export function renderDataCheck(){
       tpl`${rawHtml(ok? (imp? tpl`<div class="mini dc-ok">${imp} — 지금은 이상 없음</div>` : '') : tpl`<dl class="dc-dl">${rawHtml(imp? tpl`<div><dt>업무 영향</dt><dd>${imp}</dd></div>` : '')}<div><dt>대상</dt><dd>${String(r.items.length)}건 — ${r.items.slice(0,3).map(function(it){ return it.label; }).join(' · ')}${r.items.length>3? ' 외 '+(r.items.length-3)+'건' : ''}</dd></div>`+
         tpl`<div><dt>해결 행동</dt><dd>${r.go? r.go+'에서 고치기' : '항목별로 확인'}${r.items.some(function(it){ return it.fix; })? ' · 항목을 누르면 바로 수정 창' : ''}${rawHtml(r.act? tpl` <button type="button" class="pill ghost dc-bulk" data-dcact="${rawHtml(r.id)}">${r.act.label.replace(/^[⚡↩]\s*/,'')} — 미리 보기</button>` : '')}</dd></div></dl>`)}`+
       tpl`${rawHtml(ADM? tpl`<details class="dc-tech"><summary>기술 상세 (관리자)</summary><div class="mini">${r.why}</div></details>` : '')}`+ tpl`${rawHtml(open&&!ok&&r.items.some(function(it){ return it.fix; })? '<div class="mini" style="margin:8px 0 0 26px">항목을 누르면 수정 창이 열립니다 — 저장하면 다음 항목으로 넘어갑니다</div>':'')}`+ tpl`${rawHtml(open&&!ok? tpl`<table class="rn-tbl" style="margin:8px 0 0 26px;width:calc(100% - 26px)"><tbody>${rawHtml(r.items.slice(0,60).map(function(it,i){ return tpl`<tr><td><a href="#" data-dcgo="${rawHtml(r.id)}:${rawHtml(i)}">${it.label}</a></td><td class="mini">${it.sub||''}${rawHtml(it.act? tpl` <button type="button" class="pill ghost" style="padding:1px 8px;font-size:12px" data-dcitem="${rawHtml(r.id)}:${rawHtml(i)}">${it.act.label}</button>`:'')}${rawHtml(canAck && dcAckable(r)? tpl` <button type="button" class="pill ghost dc-ackb" data-dcack="${rawHtml(r.id)}:${rawHtml(i)}" aria-label="${it.label} — 정상으로 표시">정상…</button>`:'')}</td></tr>`; }).join(''))}${rawHtml(r.items.length>60? tpl`<tr><td colspan="2" class="mini">… 외 ${r.items.length-60}건 (엑셀로 전체)</td></tr>`:'')}</tbody></table>`:'')}`+
-      tpl`${rawHtml((r.acked&&r.acked.length)? tpl`<details class="dc-acked"><summary>정상으로 표시한 ${String(r.acked.length)}건</summary><table class="rn-tbl"><tbody>${rawHtml(r.acked.slice(0,100).map(function(it,i){ var a=it.ack||{}; return tpl`<tr><td>${it.label}<div class="mini">${it.sub||''}</div></td><td class="mini">«${a.note||''}» · ${String(a.by_email||'').split('@')[0]} · ${String(a.at||'').slice(0,10)}${rawHtml(canAck? tpl` <button type="button" class="pill ghost" data-dcunack="${rawHtml(r.id)}:${rawHtml(i)}" aria-label="${it.label} — 정상 표시 되돌리기">되돌리기</button>`:'')}</td></tr>`; }).join(''))}</tbody></table></details>` : '')}`+
+      tpl`${rawHtml((r.acked&&r.acked.length)? tpl`<details class="dc-acked"><summary>정상으로 표시한 ${String(r.acked.length)}건</summary><table class="rn-tbl"><tbody>${rawHtml(r.acked.slice(0,100).map(function(it,i){ var a=it.ack||{}; return tpl`<tr><td>${it.label}<div class="mini">${it.sub||''}</div></td><td class="mini">«${a.note||''}» · ${ntfName(a.by_email)} · ${String(a.at||'').slice(0,10)}${rawHtml(canAck? tpl` <button type="button" class="pill ghost" data-dcunack="${rawHtml(r.id)}:${rawHtml(i)}" aria-label="${it.label} — 정상 표시 되돌리기">되돌리기</button>`:'')}</td></tr>`; }).join(''))}</tbody></table></details>` : '')}`+
       tpl`</div>`; };
   h+=list.filter(function(r){ return r.items.length; }).map(cardOf).join('');
   if(nOk) h+=tpl`<details class="dc-okall"${rawHtml(DC.okOpen?' open':'')}><summary>이상 없는 규칙 ${String(nOk)}개</summary>${rawHtml(list.filter(function(r){ return !r.items.length; }).map(cardOf).join(''))}</details>`;
@@ -652,7 +653,7 @@ export function renderAiKnow(){
   if(props.length){   /* ㊿+178 제안 — 슈퍼 관리자 «반영» · «거절» / 제안한 사람은 지우기 */
     h+=tpl`<div class="pr-card ak-props" style="margin-bottom:14px;max-width:920px"><div style="font-size:14px;font-weight:650;margin-bottom:8px">제안 ${String(props.length)}개 <span class="mini">— ${isSup? '«반영»하면 다음 질문부터 AI 가 씁니다' : '슈퍼 관리자가 반영하면 AI 에 들어갑니다'}</span></div>`+
       tpl`<div class="qb-deck-list">${rawHtml(props.map(function(x){ return tpl`<div class="qb-deck-it" data-id="${rawHtml(x.id)}"><span class="ctag">${x.topic||''}</span><span style="flex:1;min-width:240px;font-size:14px;line-height:1.55;white-space:pre-wrap">${x.content||''}</span>`+
-        tpl`<span class="mini">${String(x.proposed_by||x.created_by||'').split('@')[0]} · ${String(x.created_at||'').slice(0,10)}${x.from_feedback? ' · 👎 #'+x.from_feedback : ''}</span>`+
+        tpl`<span class="mini">${ntfName(x.proposed_by||x.created_by)} · ${String(x.created_at||'').slice(0,10)}${x.from_feedback? ' · 👎 #'+x.from_feedback : ''}</span>`+
         tpl`<span style="display:flex;gap:4px">${rawHtml(isSup? tpl`<button type="button" class="cbtn pri" data-ak="ok">반영</button><button type="button" class="cbtn" data-ak="no">거절</button>` : '')}${rawHtml(isSup || mine(x)? '<button type="button" class="cbtn" data-ak="del" style="color:var(--critical)" aria-label="제안 지우기">×</button>' : '')}</span></div>`; }).join(''))}</div></div>`;
   }
   if(AK.log && L.length){
@@ -661,7 +662,7 @@ export function renderAiKnow(){
     h+=tpl`<div class="pr-card" style="max-width:920px"><div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap"><div style="font-size:14px;font-weight:650">가르친 기록</div><span class="mini">${M.length}개 · 최근 것부터 · «적용» 을 끄면 AI 가 쓰지 않습니다(기록은 남음)</span>`+
       tpl`<input id="akQ" class="qb-in" placeholder="찾기" value="${AK.q||''}" style="width:160px;height:28px;margin-left:auto"></div>`+
       tpl`<div class="qb-deck-list">${rawHtml(M.filter(function(x){ return !v2 || x.status!=='제안'; }).map(function(x){ return tpl`<div class="qb-deck-it" data-id="${rawHtml(x.id)}" style="${x.active===false?'opacity:.55':''}"><span class="ctag">${x.topic||''}</span>${rawHtml(v2 && x.status==='거절'? '<span class="ctag crit">거절</span>' : '')}<span style="flex:1;min-width:240px;font-size:14px;line-height:1.55;white-space:pre-wrap">${x.content||''}</span>`+
-      tpl`<span class="mini">${String(x.created_by||'').split('@')[0]} · ${String(x.created_at||'').slice(0,10)}</span>`+
+      tpl`<span class="mini">${ntfName(x.created_by)} · ${String(x.created_at||'').slice(0,10)}</span>`+
       tpl`<span style="display:flex;gap:4px;align-items:center"><label class="mini qb-chk"><input type="checkbox" data-ak="active"${x.active===false?'':' checked'}${canAct && (!v2 || x.status==='반영')?'':' disabled'}> 적용</label><button type="button" class="cbtn" data-ak="del" style="color:var(--critical)" aria-label="지우기"${canAct?'':' disabled'}>×</button></span></div>`; }).join(''))}`+ tpl`${rawHtml(M.length? '' : '<div class="cap" style="padding:16px;text-align:center">찾는 내용이 없습니다</div>')}</div></div>`;
   }
   host.innerHTML=h;
@@ -729,7 +730,7 @@ export function renderBizMonthly(){
   }
   /* ㊿+176 월 마감 · 이력 (SQL 107) */
   if(BIZV.ym && BIZL.ok){
-    if(lk){ var ls=document.createElement('span'); ls.className='ubadge biz-lock'; ls.textContent='🔒 마감 · '+String(lk.locked_by||'').split('@')[0]+' · '+String(lk.locked_at||'').slice(0,10); ls.title=lk.note||'마감됨 — 고치려면 슈퍼 관리자가 «마감 풀기»'; bar.appendChild(ls);
+    if(lk){ var ls=document.createElement('span'); ls.className='ubadge biz-lock'; ls.textContent='🔒 마감 · '+ntfName(lk.locked_by)+' · '+String(lk.locked_at||'').slice(0,10); ls.title=lk.note||'마감됨 — 고치려면 슈퍼 관리자가 «마감 풀기»'; bar.appendChild(ls);
       if(ST.IS_SUPER){ var bu0=document.createElement('button'); bu0.className='pill ghost'; bu0.id='bizUnlock'; bu0.textContent='마감 풀기…'; bu0.onclick=function(){ bizUnlock(BIZV.ym); }; bar.appendChild(bu0); } }
     else if(canW){ var bl=document.createElement('button'); bl.className='pill ghost'; bl.id='bizLockBtn'; bl.textContent='🔒 이 달 마감…'; bl.title='마감하면 이 달은 슈퍼 관리자가 풀기 전까지 고치거나 지울 수 없습니다'; bl.onclick=function(){ bizLockMonth(BIZV.ym); }; bar.appendChild(bl); }
     var bh=document.createElement('button'); bh.className='pill ghost'; bh.id='bizHist'; bh.textContent='이력'; bh.title='이 달을 고치거나 지우기 전의 내용 — 그 판으로 되돌리기'; bh.onclick=function(){ bizHistOpen(BIZV.ym); }; bar.appendChild(bh);
@@ -844,7 +845,7 @@ export async function bizHistOpen(k){
   var sumOf=function(old){ var a=(old||[]).filter(function(x){ return x.kind==='sum'; }); return a.map(function(x){ return x.item+' '+won(x.biz); }).join(' · '); };
   body.innerHTML=rows.length? tpl`<div class="tbl-wrap" tabindex="0"><table class="rn-tbl"><thead><tr><th>언제</th><th>누가</th><th>무엇</th><th>바뀌기 전(천원)</th><th></th></tr></thead><tbody>${rawHtml(rows.map(function(h, i){
     var n=Array.isArray(h.old)? h.old.length : 0;
-    return tpl`<tr><td class="num">${String(h.at||'').slice(0,16).replace('T',' ')}</td><td>${String(h.actor||'').split('@')[0]}</td><td>${BIZ_OP[h.op]||h.op}${rawHtml(h.note? tpl`<div class="mini">${h.note}</div>` : '')}</td>`+
+    return tpl`<tr><td class="num">${String(h.at||'').slice(0,16).replace('T',' ')}</td><td>${ntfName(h.actor)}</td><td>${BIZ_OP[h.op]||h.op}${rawHtml(h.note? tpl`<div class="mini">${h.note}</div>` : '')}</td>`+
       tpl`<td class="mini">${n? n+'행 · '+sumOf(h.old) : '(없음)'}</td><td>${rawHtml(n && canW && !locked? tpl`<button type="button" class="cbtn" data-bh="${String(i)}">이 판으로 되돌리기…</button>` : '')}</td></tr>`; }).join(''))}</tbody></table></div>` : '';
   body.querySelectorAll('[data-bh]').forEach(function(b){ /** @type {any} */(b).onclick=async function(){
     var h=rows[+/** @type {any} */(b).dataset.bh]; if(!h) return;

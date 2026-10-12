@@ -13,6 +13,7 @@ import { APP_VER, IS_QA } from './state.js';
 import { rawHtml, SB_URL, tpl, won } from './core.js';
 import { sbHeaders, toast } from './shell.js';
 import { closeOvl, openOvl } from './edit.js';
+import { ntfName } from './notify.js';
 
 export var VW={latest:null, at:0, stale:false, older:0, busy:null, fails:0, started:false};
 /** 옛 탭이어도 막지 않는 쓰기 — 기록 · 개인 표 · 읽기 RPC */
@@ -141,7 +142,7 @@ export function conflictAsk(r, body, cur, clash, kept, who, cols){
     if(!ov){ ov=document.createElement('div'); ov.id='ovlConflict'; ov.className='ovl'; document.body.appendChild(ov); }
     var lab=function(k){ var c=cols.filter(function(x){ return x.k===k; })[0]; return c? String(c.l||k).replace(/\(천원\)/,'') : k; };
     var col=function(k){ return cols.filter(function(x){ return x.k===k; })[0]; };
-    var whoTxt=who? (String(who.actor||'').split('@')[0]+' · '+String(who.at||'').slice(0,16).replace('T',' ')) : '기록 없음(포탈 밖에서 바뀌었을 수 있음)';
+    var whoTxt=who? (ntfName(who.actor)+' · '+String(who.at||'').slice(0,16).replace('T',' ')) : '기록 없음(포탈 밖에서 바뀌었을 수 있음)';
     ov.innerHTML=tpl`<div class="modal cf-m" role="dialog" aria-modal="true" aria-labelledby="cfH" style="width:min(640px,100%)"><h3 id="cfH">다른 사람이 먼저 고쳤습니다</h3>`+
       tpl`<p class="cap">이 행을 연 뒤에 같은 칸이 바뀌었습니다 — 마지막 변경: ${whoTxt}. 어느 값으로 할지 골라 주세요.</p>`+
       tpl`<div class="tbl-wrap"><table class="rn-tbl cf-tbl"><thead><tr><th>칸</th><th>내가 본 값</th><th>지금 값(다른 사람)</th><th>내가 넣을 값</th></tr></thead><tbody>${rawHtml(clash.map(function(k){ var c=col(k);

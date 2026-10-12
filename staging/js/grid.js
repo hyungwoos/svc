@@ -16,6 +16,7 @@ import { CHURN, CR, CS, csSetTab, ensureGroupOpen, helpBox, helpWire, initOiForm
 import { closeOvl, logChange, monthRows, msg, openOvl } from './edit.js';
 import { lazyGet, lazyView } from './lazy.js';
 import { isNetErr, netToast, rowGuard, savedRows, saveFailMsg } from './guard.js';
+import { ntfName } from './notify.js';
 
 
 /* ---- 뒤로가기 — 화면 이동을 브라우저 히스토리에 남겨 상단 ← 버튼·브라우저/폰 뒤로가기·Alt+← 가 모두 이전 화면으로 ----
@@ -1542,7 +1543,7 @@ export function ctPeriods(c, mine){
   var out=[{k:'최초', from:s0, to:end0, mrr:(e0.prev_mrr!=null? Number(e0.prev_mrr) : amtAt(s0)), qty:(e0.prev_qty!=null? e0.prev_qty : null), info:(ctOrig(c)? '구분 '+ctOrig(c) : '')}];   /* ㊿+163 연장으로 «재약정»이 돼도 최초 줄은 처음 구분 */
   h.forEach(function(e, i){
     var last=out[out.length-1], from=ym(e.from) || (last.to? ymAdd(last.to, 1) : ''), to=ym(e.to || e.new_end);
-    var mg=e.merged, info=[String(e.at||'').slice(0,10), e.by||'', /migration|sheet-sync/i.test(String(e.by||''))? '시트 이관' : '',
+    var mg=e.merged, info=[String(e.at||'').slice(0,10), ntfName(e.by), /migration|sheet-sync/i.test(String(e.by||''))? '시트 이관' : '',
       Array.isArray(mg)? '추가 '+mg.length+'건 통합' : (mg? '재약정 행 #'+mg+' 합침' : ''), e.note||''].filter(Boolean).join(' · ');
     out.push({k:'연장 '+(e.no||e.renew_no||i+1)+'회', from:from, to:to, mrr:(e.mrr!=null? Number(e.mrr) : amtAt(from)), qty:(e.qty!=null? e.qty : (i===h.length-1 && c.qty? c.qty : null)), info:info});
   });
@@ -1613,7 +1614,7 @@ export function openDetail(c){
   sbTry('change_log?select=*&target_id=eq.'+c.id+'&order=id.desc&limit=50').then(function(rows){
     rows=rows||[];
     t.innerHTML=tpl`<thead><tr><th>시각</th><th>누가</th><th>동작</th><th>내용</th></tr></thead><tbody>`+ tpl`${rawHtml(rows.length? rows.map(function(x){
-        return tpl`<tr><td>${rawHtml(String(x.at||'').replace('T',' ').slice(0,16))}</td><td>${x.actor||''}`+
+        return tpl`<tr><td>${rawHtml(String(x.at||'').replace('T',' ').slice(0,16))}</td><td title="${x.actor||''}">${ntfName(x.actor)}`+
           tpl`</td><td>${x.action||''}</td><td class="mini" title="${x.detail? JSON.stringify(x.detail).slice(0,400) : ''}">${logDetailText(x.detail, x.target, 140)}</td></tr>`;   /* ㊿+188 읽히는 글(원문은 툴팁) */
       }).join('') : '')}`+ tpl`</tbody>`;
     if(!rows.length) t.innerHTML='<tbody><tr><td class="mini dt-nolog">웹에서 수정한 기록이 없습니다 (최초 이관 데이터)</td></tr></tbody>';   /* ㊿+188 빈 이력은 머리줄 없이 한 줄 */

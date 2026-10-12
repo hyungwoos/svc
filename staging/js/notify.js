@@ -16,7 +16,7 @@
 import { APP_VER, IS_STAGING, ST } from './state.js';
 import { b64urlJson, bizHas, canWrite, esc, fetchT, lline, mk, monOf, navText, rawHtml, SB_KEY, SB_URL, tickMemo, tpl, won } from './core.js';
 import { expAmtOf, expEligible } from './dash.js';
-import { ico, sbHeaders, sbTry, sbWrite, toast, todayStr, visBtn } from './shell.js';
+import { gnMeSync, ico, sbHeaders, sbTry, sbWrite, toast, todayStr, visBtn } from './shell.js';
 import { ctSuccessor, dcAckLoad, dcDailySave, dcRules, openRenewList, renewScan } from './analysis.js';
 import { gridGoPre, meMatch, switchView } from './grid.js';
 import { closeOvl, logChange, openOvl } from './edit.js';
@@ -26,7 +26,7 @@ import { verNum } from './guard.js';
 import { QMGR_MAP } from './sales.js';
 
 export var NTF_DEF={renew_days:[60,30], eq_days:3, month_end_days:5, renew_emails:[], eq_emails:[], biz_emails:[], dc_emails:[], slack_on:false, team_channel:'C08RA3PPDH8', auto_on:false, auto_days:[1], auto_time:'09:00', auto_dm:false};
-export var NTF={memo:null, ops:null, opsOk:null, set:null, sqlOk:null, reads:{}, readsOk:false, asg:{}, asgOk:false, area:/** @type {Object<string,any>} */({}), accounts:/** @type {?any[]} */(null), omap:null, users:null, open:false, tab:'me', loading:false, at:0, busy:false, snapOk:null, snapKey:'', snapAt:0, snap:null};
+export var NTF={memo:null, ops:null, opsOk:null, set:null, sqlOk:null, reads:{}, readsOk:false, asg:{}, asgOk:false, area:/** @type {Object<string,any>} */({}), accounts:/** @type {?any[]} */(null), names:/** @type {?Object<string,{name:string,title:string}>} */(null), omap:null, users:null, open:false, tab:'me', loading:false, at:0, busy:false, snapOk:null, snapKey:'', snapAt:0, snap:null};
 export var NTF_KIND={ops:'운영 상태', renew:'재약정 만기', lapsed:'만기 미처리', eq:'장비 처리 지연', biz:'월말 마감', dc:'데이터 점검'};
 export var OPS_TBL={customers:'고객사', contracts:'계약', monthly_revenue:'월 매출', equipment_orders:'장비 신청', equipment_assets:'장비 현황', oi_deals:'OI'};
 
@@ -81,7 +81,7 @@ export function ntfItems(){
       var age=ntfDaysSince(o.created_at); if(age==null || age<S.eq_days) return;
       var a=NTF.asg[String(o.id)], asg=a? String(a.assignee||'').toLowerCase() : '';
       out.push({kind:'eq', key:'eq:'+o.id+':'+o.status, sev:age>=S.eq_days*2? 'hi' : 'mid', order:-age,
-        title:(o.customer||'(고객사 없음)')+' · '+(o.model||'모델 미정')+' ×'+(o.qty||1)+' · '+o.status+' '+age+'일째', detail:'신청 #'+o.id+' · 처리 담당 '+(asg? ntfWho(asg) : '미지정'),
+        title:(o.customer||'(고객사 없음)')+' · '+(o.model||'모델 미정')+' ×'+(o.qty||1)+' · '+o.status+' '+age+'일째', detail:'신청 #'+o.id+' · 처리 담당 '+(asg? ntfName(asg) : '미지정'),
         to:asg? [asg] : S.eq_emails, me:asg? asg===ntfMe() : ntfIsMe(S.eq_emails), asg:asg, id:o.id,
         go:function(){ var id=o.id; gridGoPre('orders', '신청 #'+id+' '+(o.customer||''), function(x){ return String(x.id)===String(id); }); }});
     });
@@ -167,7 +167,7 @@ export async function ntfLoad(force){
     else { NTF.readsOk=false; try{ (JSON.parse(localStorage.getItem(ntfLsKey())||'[]')||[]).forEach(function(k){ m[k]=1; }); }catch(e){} }
     NTF.reads=m;
     var as=NTF.sqlOk? await ntfGet('work_assign?select=kind,ref,assignee,assigned_by,assigned_at&kind=in.(eq,area)&limit=1000') : null;   /* ㊿+185 area = 홈 우선 업무 줄(만기 · 재약정 · 비즈포탈 · 데이터 점검)의 담당 */
-    if(!NTF.accounts && NTF.sqlOk) ntfAccounts().then(function(a){ if(a && a.some(function(x){ return x.name; })){ try{ renderTodo(); }catch(e){} try{ ntfSync(); }catch(e){} } });   /* ㊿+189 표시 이름을 받아 담당 칸을 이름으로 */
+    if(!NTF.accounts && NTF.sqlOk) ntfAccounts().then(function(a){ if(a && a.some(function(x){ return x.name; })){ try{ renderTodo(); }catch(e){} try{ ntfSync(); }catch(e){} try{ gnMeSync(); }catch(e){} } });   /* ㊿+189 표시 이름을 받아 담당 칸을 이름으로 */
     var g={}, ar={}; (as||[]).forEach(function(x){ if(x.kind==='area') ar[String(x.ref)]=x; else g[String(x.ref)]=x; }); var hadAsg=Object.keys(NTF.asg).length+Object.keys(NTF.area).length>0; NTF.asg=g; NTF.area=ar; NTF.asgOk=as!==null;
     if(hadAsg || Object.keys(g).length || Object.keys(ar).length) try{ renderTodo(); }catch(e){}   /* 홈 «우선 업무»의 장비 담당 = 처리 담당 · 줄 담당 */
     await opsLoad();
@@ -319,7 +319,7 @@ export function ntfAssignOpen(x){
       else await sbWrite('DELETE', 'work_assign?kind=eq.eq&ref=eq.'+encodeURIComponent(String(o.id)), undefined, undefined, ntfAsgView());
       var g=Object.assign({}, NTF.asg); if(em) g[String(o.id)]={kind:'eq', ref:String(o.id), assignee:em, assigned_by:me, assigned_at:new Date().toISOString()}; else delete g[String(o.id)]; NTF.asg=g;
       logChange(em? 'update' : 'delete', 'work_assign', o.id, {kind:'eq', assignee:{from:cur||null, to:em||null}, customer:o.customer||null, _via:'알림함 처리 담당'});
-      closeOvl('ovlNtfAsg'); toast(em? '처리 담당을 정했습니다' : '처리 담당을 해제했습니다', '신청 #'+o.id+(em? ' → '+ntfWho(em) : '')); ntfSync(); try{ renderTodo(); }catch(e){}
+      closeOvl('ovlNtfAsg'); toast(em? '처리 담당을 정했습니다' : '처리 담당을 해제했습니다', '신청 #'+o.id+(em? ' → '+ntfName(em) : '')); ntfSync(); try{ renderTodo(); }catch(e){}
     }catch(e){ msg.textContent='저장하지 못했습니다 — '+String(/** @type {any} */(e).message||e).slice(0,140); msg.className='mmsg bad'; }
   };
   m.querySelector('#naSave').onclick=function(){ var v=String(inp.value||'').trim(); if(!v){ msg.textContent='이메일을 넣거나 «담당 해제»를 누르세요'; msg.className='mmsg bad'; return; } save(v); };
@@ -338,7 +338,14 @@ export function ntfAreaTo(key){ var e=ntfAreaOf(key); return e? [e] : []; }
 export function ntfCanAssignArea(){ return !!ST.SB_TOKEN && NTF.asgOk && (ST.IS_SUPER || ST.MY_ROLE==='admin' || ST.MY_ROLE==='editor'); }
 /** 계정 이메일 → 보이는 이름(견적 담당자 목록에 있으면 그 이름 · 없으면 @ 앞) */
 /* ㊿+189 표시 이름 — portal_profiles(SQL 114)의 «이름 직급»(예: 홍길동 대리) → 없으면 견적 담당 표 → 없으면 계정 id(이메일 앞부분). 이름은 DB 에만(코드엔 없음) */
-export function ntfProf(e){ var em=String(e||'').toLowerCase(); if(!em || !NTF.accounts) return null; for(var i=0;i<NTF.accounts.length;i++){ if(NTF.accounts[i].email===em) return NTF.accounts[i]; } return null; }
+/* ㊿+190 이름 캐시 — 계정 목록(portal_accounts)이 오기 전에 그린 표 · 상단 버튼도 이름으로 · 내 브라우저에만(이메일 → 이름 · 직급) · 목록이 오면 그걸로 갈아 끼움 */
+var NAMES_LS='svc_names';
+function namesCache(){ if(NTF.names) return NTF.names; var m=/** @type {Object<string,{name:string,title:string}>} */({}); try{ m=JSON.parse(localStorage.getItem(NAMES_LS)||'{}')||{}; }catch(e){ m={}; } if(!m || typeof m!=='object') m={}; NTF.names=m; return m; }
+function namesStore(acc){ var m=/** @type {Object<string,{name:string,title:string}>} */({}); (acc||[]).forEach(function(a){ if(a && a.name) m[a.email]={name:String(a.name), title:String(a.title||'')}; }); NTF.names=m; try{ localStorage.setItem(NAMES_LS, JSON.stringify(m)); }catch(e){} }
+/** 이메일 또는 계정 id(«@» 없음) → 계정(이름 · 직급) — 목록이 아직 없으면 캐시 */
+export function ntfProf(e){ var em=String(e||'').toLowerCase().trim(); if(!em) return null; var bare=em.indexOf('@')<0;
+  if(NTF.accounts && NTF.accounts.length){ for(var i=0;i<NTF.accounts.length;i++){ var a=NTF.accounts[i]; if(a.email===em || (bare && a.email.split('@')[0]===em)) return a; } return null; }
+  var c=namesCache(), ks=Object.keys(c); for(var j=0;j<ks.length;j++){ if(ks[j]===em || (bare && ks[j].split('@')[0]===em)) return {email:ks[j], role:'', name:c[ks[j]].name, title:c[ks[j]].title}; } return null; }
 export function ntfDisp(p){ if(!p || !p.name) return ''; return p.name+(p.title? ' '+p.title : ''); }
 export function ntfName(e){ var l=String(e||'').toLowerCase().split('@')[0]; return ntfDisp(ntfProf(e)) || QMGR_MAP[l] || l; }
 /** 표시 이름 고치기 — 본인(내 계정) 또는 슈퍼 관리자(관리자 › 계정) · portal_profiles 에 upsert · 캐시 · 홈 · 알림함 바로 반영 */
@@ -356,7 +363,9 @@ export function profEdit(email, opt){
     msg.textContent='저장 중…'; msg.className='mmsg';
     try{
       await sbWrite('POST', 'portal_profiles?on_conflict=email', [{email:em, name:name, title:title||null}], 'resolution=merge-duplicates,return=minimal');
-      var a=ntfProf(em); if(a){ a.name=name; a.title=title||''; } else if(NTF.accounts) NTF.accounts.push({email:em, role:'', name:name, title:title||''});
+      var a=NTF.accounts && NTF.accounts.length? ntfProf(em) : null; if(a){ a.name=name; a.title=title||''; } else if(NTF.accounts) NTF.accounts.push({email:em, role:'', name:name, title:title||''});
+      var nc=namesCache(); nc[em]={name:name, title:title||''}; try{ localStorage.setItem(NAMES_LS, JSON.stringify(nc)); }catch(e){}   /* ㊿+190 이름 캐시 */
+      try{ gnMeSync(); }catch(e){}
       logChange('update', 'portal_profiles', em, {name:name, title:title||null, _via:own? '내 계정 · 표시 이름' : '관리자 › 계정 · 표시 이름'});
       closeOvl('ovlProf'); toast('표시 이름 저장', ntfDisp({name:name, title:title}), 'ok');
       try{ renderTodo(); }catch(e){} try{ ntfSync(); }catch(e){} if(opt.after) try{ opt.after(); }catch(e){}
@@ -370,6 +379,7 @@ export async function ntfAccounts(){
   if(NTF.accounts) return NTF.accounts;
   var rows=null; try{ var r=await fetchT(SB_URL+'/rest/v1/rpc/portal_accounts', {method:'POST', headers:sbHeaders(true), body:'{}'}, 15000, '계정 목록', true); rows=r.ok? await r.json() : null; }catch(e){ rows=null; }
   NTF.accounts=Array.isArray(rows)? rows.filter(function(x){ return x && /^[^@\s]+@[^@\s]+$/.test(String(x.email||'')); }).map(function(x){ return {email:String(x.email).toLowerCase(), role:String(x.role||''), name:String(x.name||''), title:String(x.title||'')}; })   /* ㊿+189 name · title(SQL 114) — 113 이면 빈 값 */.sort(function(a,b){ return a.email.localeCompare(b.email); }) : [];
+  if(Array.isArray(rows)) namesStore(NTF.accounts);   /* ㊿+190 이름 캐시(목록을 못 받은 때는 예전 캐시 그대로) */
   return NTF.accounts;
 }
 export async function ntfAreaOpen(key){
@@ -702,7 +712,7 @@ export function ntfSlackPlan(omap){
   var all=ntfItems(), S=ntfSet(), day=todayStr(), per={};
   all=all.filter(function(x){ return x.kind!=='ops'; });   /* 운영 상태는 관리자 화면 안에서만(Slack 에 안 보냄) */
   all.forEach(function(x){ ntfTargets(x, omap).forEach(function(e){ (per[e]=per[e]||[]).push(x); }); });
-  var dms=Object.keys(per).sort().slice(0, 30).map(function(e){ return {email:e, n:per[e].length, text:ntfSlackText(per[e], '🔔 '+ntfWho(e)+' 님 포탈 알림 '+day+' — '+per[e].length+'건')}; });
+  var dms=Object.keys(per).sort().slice(0, 30).map(function(e){ return {email:e, n:per[e].length, text:ntfSlackText(per[e], '🔔 '+ntfName(e)+' 님 포탈 알림 '+day+' — '+per[e].length+'건')}; });
   return {team:{channel:S.team_channel, n:all.length, text:ntfSlackText(all, '🔔 포탈 알림 '+day+' — '+all.length+'건')}, dms:dms, more:Math.max(0, Object.keys(per).length-30)};
 }
 export async function ntfCall(body){

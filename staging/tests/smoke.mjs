@@ -4318,6 +4318,60 @@ if (S.blk()) {
     return '김철수 대리 · 내 계정 저장 · 관리자 ✎ · 용어';
   });
 }
+// ㊿+190 사람은 어디서나 «이름 직급»(홈 장비 줄 · 상단 내 계정 · 변경 이력 «누가» · 장비 카드 · 이름 캐시) · 에스원 «묶음» 표시(첫 줄에만 회계매출 · 차액 · 저장분 다시 열 때 회계매출 중복 없음) — 가짜 DB
+if (S.blk()) {
+  await S.t('㊿+190 이름 어디서나: 장비 신청자(requester) = 홈 «우선 업무» 장비 줄 담당 «김철수 대리» · 장비 카드 «김철수 대리» · 상단 내 계정 버튼 «홍길동 차장»(아래 작은 글씨 계정 id) · 변경 이력 표 «누가» 열 이름 · 계정 id 만으로도(ntfName("other")) · 이름 캐시(localStorage svc_names → 계정 목록이 없어도 이름)', async () => {
+    const sd = seedData(); sd.equipment_orders.forEach((o) => { o.requester = 'other@example.com'; }); sd.change_log = [{ id: 9001, at: new Date().toISOString(), actor: 'other@example.com', action: 'update', target: 'contracts', ref: '1', detail: { mrr: { from: 1, to: 2 } } }];
+    const db = new FakeDB(sd);
+    db.rpc.portal_accounts = () => [{ email: 'tester@example.com', role: 'super_admin', name: '홍길동', title: '차장' }, { email: 'other@example.com', role: 'editor', name: '김철수', title: '대리' }, { email: 'viewer@example.com', role: 'viewer', name: '', title: '' }];
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' }); const P = await ctx.newPage(); const c = collect(P);
+    await fakeBackend(P, db, { role: 'super_admin', email: 'tester@example.com' });
+    await P.goto(url + '/index.html'); await P.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA && SVC.ST.DATA.rows.length, null, { timeout: 20000 });
+    await P.waitForFunction(() => SVC.NTF.accounts && SVC.NTF.accounts.length, null, { timeout: 8000 }); await P.waitForTimeout(500);
+    await P.evaluate(() => { SVC.HOME.scope = 'team'; SVC.HOME.allOpen = true; SVC.navMenu('dash'); }); await P.waitForTimeout(600);
+    const a = await P.evaluate(() => { const r = document.querySelector('#ccInbox .hm-row[data-key="eq"]'); const me = document.querySelector('#rail .gn-me');
+      return { eq: r ? (r.querySelector('.hm-own') || {}).textContent : null, meB: me && me.querySelector('.gn-wst b').textContent, meS: me && me.querySelector('.gn-wst small').textContent, av: me && me.querySelector('.gn-av').textContent,
+        bare: SVC.ntfName('other'), full: SVC.ntfName('other@example.com'), none: SVC.ntfName('viewer@example.com'), cache: JSON.parse(localStorage.getItem('svc_names') || '{}') }; });
+    await P.evaluate(() => SVC.navMenu('eqboard')); await P.waitForTimeout(600);
+    const b = await P.evaluate(() => [...document.querySelectorAll('#viewEqBoard .eqb-card .ft .mini')].map((x) => x.textContent.trim()));
+    await P.evaluate(() => SVC.navMenu('log')); await P.waitForTimeout(700);
+    const d = await P.evaluate(() => { const hs = [...document.querySelectorAll('#dvTable thead th')].map((x) => x.textContent.trim()); const i = hs.findIndex((h) => /누가/.test(h)); const tr = document.querySelector('#dvTable tbody tr');
+      return { i, cell: tr && i >= 0 ? tr.children[i].textContent.trim() : null }; });
+    const e = await P.evaluate(() => { const acc = SVC.NTF.accounts; SVC.NTF.accounts = null; SVC.NTF.names = null; const r = { cached: SVC.ntfName('other@example.com'), bare: SVC.ntfName('other'), none: SVC.ntfName('viewer@example.com') }; SVC.NTF.accounts = acc; return r; });
+    await ctx.close();
+    assert(a.eq && /김철수 대리/.test(a.eq) && !/other/.test(a.eq) && a.meB === '홍길동 차장' && a.meS === 'tester' && a.av === '홍' && a.bare === '김철수 대리' && a.full === '김철수 대리' && a.none === 'viewer' && a.cache['other@example.com'] && a.cache['other@example.com'].name === '김철수' && !a.cache['viewer@example.com'], '홈 · 상단 ' + JSON.stringify(a));
+    assert(b.length && b.every((x) => /김철수 대리/.test(x)) && !b.some((x) => /other/.test(x)), '장비 카드 ' + JSON.stringify(b));
+    assert(d.i >= 0 && d.cell === '김철수 대리', '변경 이력 ' + JSON.stringify(d));
+    assert(e.cached === '김철수 대리' && e.bare === '김철수 대리' && e.none === 'viewer' && !c.errs.filter((x) => !/serviceWorker/.test(x)).length, '캐시 ' + JSON.stringify({ e, errs: c.errs }));
+    return '홈 · 카드 · 상단 · 이력 · 캐시';
+  });
+
+  await S.t('㊿+190 에스원 «묶음»: 한 등록번호(125507)에 계약 2건 → 대조 표는 첫 줄에 회계매출 73,000 «묶음 2건 · 에스원 합 146,000» · 차액 −73,000, 둘째 줄은 «↑ 묶음» · 타일 비즈포탈 회계매출은 73,000 한 번(저장분 다시 열 때 두 번 더하지 않음) · 차액 = 청구 − 비즈포탈 · 대조표(인쇄)도 같은 규칙 · 묶음 아닌 줄은 그대로', async () => {
+    const now = new Date().toISOString(), m = (new Date().getFullYear() - 1) + '-09';
+    const nac = [{ cno: 'N0000001', nm: '가상기관A센터NAC', amt: 73000, biz: 125507, biz_cust: '가상기관A (에스원)', acc: 73000, diff: -73000, by: 'pick', kind: 'keep' },
+      { cno: 'N0000002', nm: '가상기관B NAC', amt: 139000, biz: 100001, biz_cust: '가상기관B', acc: 139000, diff: 0, by: 'name', kind: 'keep' },
+      { cno: 'N0000003', nm: '가상기관A빌딩NAC', amt: 73000, biz: 125507, biz_cust: '가상기관A (에스원)', acc: 73000, diff: -73000, by: 'pick', kind: 'new' }];
+    const db = new FakeDB(Object.assign(seedData(), { s1_settle: [{ id: 1, month: m + '-01', kind: 'use', total: 285000, biz_total: 212000, cnt_new: 1, cnt_end: 0, cnt_ext: 0, cnt_keep: 2, created_by: 'tester@example.com', updated_at: now, payload: { nac, dk_total: 0, dk_count: 0, biz_settle: [] } }] }));
+    db.rpc.is_super_admin = () => true;
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page);
+    await fakeBackend(page, db); await page.goto(url + '/s1.html'); await page.waitForFunction(() => window.CLS && CLS.ok === true, null, { timeout: 10000 });
+    await page.evaluate(async () => { await restoreSettle(1); }); await page.waitForTimeout(500);
+    const T = await page.evaluate(() => { const rows = [...document.querySelectorAll('#tUse tbody tr')].map((tr) => ({ cno: tr.children[2].textContent, acc: tr.children[7].textContent.replace(/\s+/g, ' ').trim(), diff: tr.children[8].textContent.trim(), tags: tr.children[0].textContent.replace(/\s+/g, ' ').trim(), cls: tr.className }));
+      const tiles = [...document.querySelectorAll('#uTiles .tile')].map((t) => t.querySelector('.t').textContent + '=' + t.querySelector('.v').textContent.replace(/\s+/g, ' ').trim());
+      return { rows, tiles, cnt: document.getElementById('uCnt').textContent }; });
+    await page.evaluate(() => { window.open = function () { const f = document.createElement('iframe'); document.body.appendChild(f); const w = f.contentWindow; w.print = function () {}; window.__pw = w; return w; }; printUse(); }); await page.waitForTimeout(600);
+    const PR = await page.evaluate(() => { const d = window.__pw.document; const rows = [...d.querySelectorAll('table tbody tr')].filter((tr) => !tr.classList.contains('ft')).map((tr) => [...tr.children].map((td) => td.textContent.trim()));
+      return { rows, note: (d.body.textContent.match(/묶음\(한 등록번호에[^\n]*/) || [''])[0].slice(0, 60), sum: [...d.querySelectorAll('.sum')].map((s) => s.textContent.replace(/\s+/g, ' ').trim()) }; });
+    await ctx.close();
+    const r1 = T.rows.find((r) => r.cno === 'N0000001'), r2 = T.rows.find((r) => r.cno === 'N0000002'), r3 = T.rows.find((r) => r.cno === 'N0000003');
+    assert(r1 && r2 && r3 && /^73,000\s?묶음 2건 · 에스원 합 146,000$/.test(r1.acc) && r1.diff === '-73,000' && /묶음/.test(r1.tags) && r1.cls === 'st-diff' && r3.acc === '↑ 묶음' && r3.diff === '↑ 묶음' && /묶음/.test(r3.tags) && r3.cls === 'st-diff' && r2.acc === '139,000' && r2.diff === '0' && !/묶음/.test(r2.tags), '표 ' + JSON.stringify(T.rows));
+    assert(T.tiles.some((t) => /^비즈포탈 회계매출=212,000/.test(t)) && T.tiles.some((t) => /^에스원 청구 총액=285,000$/.test(t)) && T.tiles.some((t) => /^차액=73,000$/.test(t)), '타일 ' + JSON.stringify(T.tiles));
+    const p1 = PR.rows.find((r) => r[2] === 'N0000001'), p3 = PR.rows.find((r) => r[2] === 'N0000003'), p2 = PR.rows.find((r) => r[2] === 'N0000002');
+    assert(p1 && p3 && p2 && p1[5] === '73,000 (묶음 2건 · 합 146,000)' && p1[6] === '-73,000' && p3[5] === '↑ 묶음' && p3[6] === '↑ 묶음' && p2[5] === '139,000' && p2[6] === '' && /묶음\(한 등록번호에/.test(PR.note) && PR.sum.some((s) => /비즈포탈 회계매출.*212,000/.test(s)) && PR.sum.some((s) => /^차액.*73,000/.test(s)), '인쇄 ' + JSON.stringify(PR));
+    assert(!c.errs.filter((x) => !/serviceWorker/.test(x)).length, c.errs.join('|'));
+    return '첫 줄 73,000 · ↑ 묶음 · 타일 212,000 · 인쇄';
+  });
+}
 await browser.close(); srv.close();
 const ok = S.report();
 fs.writeFileSync(path.join(OUT, process.env.SMOKE_PART != null ? 'smoke-' + process.env.SMOKE_PART + '.json' : 'smoke.json'), JSON.stringify(S.results, null, 1));

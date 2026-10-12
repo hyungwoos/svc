@@ -15,7 +15,7 @@ import { applyMenuFold, closeDrawer, ensureGroupOpen, setupSide } from './sales.
 import { btnBackSync, gridGoPre, loadHide, meLoc, NAV, navMenu, oiOpen, oiOwnerOf, oiQuotesReady, openDetail, qvGo, renderGrid, switchView, VIEW_UI, viewResetHard } from './grid.js';
 import { closeOvl, logChange, openOvl, OVL_SKIP_CLEAN, ovlMarkClean, setupEdit, toggleAuthMenu } from './edit.js';
 import { homeOn, homeRender, placeSearchBtn, srchCtx } from './home.js';
-import { NTF, ntfAfterData, ntfAreaMe, ntfAreaOf, ntfName, ntfWho } from './notify.js';
+import { NTF, ntfAfterData, ntfAreaMe, ntfAreaOf, ntfDisp, ntfName, ntfProf } from './notify.js';
 import { verBeforeWrite } from './guard.js';
 
 
@@ -194,7 +194,8 @@ export function buildGnNav(rail){
   var h=tpl`<div class="gn-bar"><a class="gn-logo" data-v="dash" href="#" aria-label="Genians — 홈"><svg class="gn-lw" viewBox="0 0 587.2 133.4" aria-hidden="true"><use href="#gnLogo"/></svg><svg class="gn-lm" viewBox="0 0 171.1 133.4" aria-hidden="true"><use href="#gnMark"/></svg></a>`;
   h+=tpl`<nav class="gn-tabs" aria-label="주 메뉴">${rawHtml(topBtn({v:'dash', t:'홈'}))}${rawHtml(tops.filter(function(o){ return o!==adm; }).map(topBtn).join(''))}</nav>`;
   var me=String(ST.AUTH_USER||'');
-  h+=tpl`<div class="gn-right">${rawHtml(adm? topBtn(adm) : '')}<button type="button" class="gn-me" data-v="account" title="내 계정 · 로그아웃" aria-label="내 계정 메뉴 (${me})"><span class="gn-av">${(me.split('@')[0]||'?').slice(0,1).toUpperCase()}</span><span class="gn-wst"><b>${me.split('@')[0]||'로그인'}</b><small>${me.indexOf('@')>0? '@'+me.split('@')[1] : ''}</small></span></button></div></div>`;
+  var meNm=''; try{ meNm=ntfDisp(ntfProf(me)); }catch(e){}   /* ㊿+190 이름이 있으면 «이름 직급» 굵게 · 아래엔 계정 id */
+  h+=tpl`<div class="gn-right">${rawHtml(adm? topBtn(adm) : '')}<button type="button" class="gn-me" data-v="account" title="내 계정 · 로그아웃" aria-label="내 계정 메뉴 (${me})"><span class="gn-av">${(meNm || me.split('@')[0] || '?').slice(0,1).toUpperCase()}</span><span class="gn-wst"><b>${meNm || me.split('@')[0] || '로그인'}</b><small>${meNm? (me.split('@')[0]||'') : (me.indexOf('@')>0? '@'+me.split('@')[1] : '')}</small></span></button></div></div>`;
   h+=tpl`<div class="gn-menu" id="gnMenu" role="menu" hidden></div>`;
   /* ㊿+172 오른쪽 위로 옮겨 둔 «검색» · «AI 대화» 버튼은 메뉴 줄을 다시 그리기 전에 위 띠로 꺼내 두었다가 다시 놓음(지우지 않게) */
   (function(){ var tb0=document.querySelector('#app .topbar'); ['cmdBar','aipOpenBtn'].forEach(function(id){ var x=document.getElementById(id); if(x && tb0 && rail.contains(x)) tb0.appendChild(x); }); })();
@@ -250,6 +251,12 @@ export function gnMenuOpen(btn){
 export function gnBadges(){
   var pend=(ST.RAWX.orders||[]).filter(function(o){ return ['접수','출하요청','배송중'].indexOf(o.status)>=0; }).length;
   return {dcheck:GN_BADGE.dc||0, inbound:GN_BADGE.inbound||0, eqboard:pend};
+}
+/** ㊿+190 상단 «내 계정» 버튼을 이름으로 — 계정 목록(이름)이 뒤늦게 오거나 «표시 이름»을 고친 뒤 */
+export function gnMeSync(){
+  var b=document.querySelector('#rail .gn-me'); if(!b) return; var me=String(ST.AUTH_USER||''), nm=''; try{ nm=ntfDisp(ntfProf(me)); }catch(e){}
+  var bb=b.querySelector('.gn-wst b'), sm=b.querySelector('.gn-wst small'), av=b.querySelector('.gn-av'); if(!bb) return;
+  bb.textContent=nm || me.split('@')[0] || '로그인'; if(sm) sm.textContent=nm? (me.split('@')[0]||'') : (me.indexOf('@')>0? '@'+me.split('@')[1] : ''); if(av) av.textContent=(nm || me.split('@')[0] || '?').slice(0,1).toUpperCase();
 }
 export function gnNavSync(rail, v){
   var bdOf=gnBadges();
@@ -494,7 +501,7 @@ export function renderInbox(){
   var rows=[], zeros=[], snz=0;
   function add(key, o){ if(ccSnoozed(key)){ snz++; return; } o.key=key; rows.push(o); }
   /* ㊿+174 장비 «담당» = 알림함에서 정한 처리 담당(work_assign) → 없으면 신청한 사람. 신청서의 mgr_name 은 «고객 담당자»(고객 쪽 사람)라 쓰지 않음 */
-  function eqOwn(o){ var a=NTF.asg[String(o.id)]; return a? ntfWho(a.assignee) : (o.requester? String(o.requester).split('@')[0] : ''); }
+  function eqOwn(o){ var a=NTF.asg[String(o.id)]; return a? ntfName(a.assignee) : (o.requester? ntfName(o.requester) : ''); }   /* ㊿+190 신청한 사람도 «이름 직급» */
   /* ㊿+185 줄 담당(work_assign area) — 지정돼 있으면 담당 칸에 그 사람 · 나면 «내 업무»에 */
   function areaOwn(key, dflt){ var e=ntfAreaOf(key); return e? ntfName(e) : (dflt||''); }
   function areaMe(key){ return ntfAreaMe(key)? {} : null; }
@@ -928,7 +935,7 @@ export function eqbCard(o, canEdit, todayS){
   }
   var idx=EQB_COLS.map(function(c){ return c[0]; }).indexOf(o.status), nextSt=idx>=0 && idx<EQB_COLS.length-1? EQB_COLS[idx+1][0] : null;
   /* ㊿+183 카드의 «담당» = 처리 담당(work_assign) → 없으면 신청한 사람 (홈 · 알림함과 같은 기준 · ㊿+174). 예전엔 신청서의 고객 담당자(mgr_name · 고객 쪽 사람)가 나왔음 */
-  var asg=NTF.asg && NTF.asg[String(o.id)], who=asg? ntfWho(asg.assignee) : (o.requester? String(o.requester).split('@')[0] : '');
+  var asg=NTF.asg && NTF.asg[String(o.id)], who=asg? ntfName(asg.assignee) : (o.requester? ntfName(o.requester) : '');   /* ㊿+190 이름 직급 */
   var whoT=(asg? '처리 담당 ' : '신청 ')+who+(o.mgr_name? ' · 고객 담당자 '+o.mgr_name : '');
   var ft=tpl`<div class="ft"><span class="mini" title="${whoT}">${who}</span><span class="acts">`+
     tpl`<button type="button" class="cbtn ab" data-open="${rawHtml(o.id)}" title="신청 내역에서 열기·수정" aria-label="신청 #${rawHtml(o.id)} 신청 내역에서 열기·수정">${rawHtml(ico('edit',14))}</button>`+
