@@ -26,7 +26,7 @@
 const DEFAULTS = {
   SUPABASE_URL: 'https://amzbrdhkvzsyxjfjtugu.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_s_BGJf84vUQoASbT8F0H4g_L2MBOGZF',   // 공개(publishable) 키 — 포탈 HTML 에도 있는 값
-  ALLOWED_ORIGINS: 'https://hyungwoos.github.io',
+  ALLOWED_ORIGINS: 'https://hyungwoos.github.io,https://svc.genians.co.kr',   /* ㊿+192 포탈 커스텀 주소(svc.genians.co.kr)도 — 주소를 바꾼 뒤 견적 «GitHub 저장 내역»이 «Failed to fetch»(CORS 403)였음 · Worker 변수 ALLOWED_ORIGINS 가 있으면 그 값이 우선 */
   LEGACY_UNTIL: '2026-10-18',
   QUOTE_READ_ROLES: 'super_admin,admin,admin_viewer',
   QUOTE_WRITE_ROLES: 'super_admin,admin,admin_viewer',   // 견적서 PDF 발행 때 자동 저장되므로 조회 전용 관리자도 기본 허용 — 막으려면 변수로 'super_admin,admin'

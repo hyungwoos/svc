@@ -249,6 +249,22 @@ say(/^export function tickMemo\(/m.test(jsAll) && /^export function cssvKey\(/m.
     && /ntfName\(h\.actor\)/.test(an) && /ntfName\(lk\.locked_by\)/.test(an) && /ntfName\(a\.by_email\)/.test(an) && /ntfName\(i\.uploaded_by\)/.test(rd('js/cloud.js')) && /ntfName\(who\.actor\)/.test(rd('js/guard.js')) && /who:ntfName\(x\.owner\)/.test(rd('js/report.js'))
     && /ntfName\(x\.handled_by\)/.test(rd('js/admin.js')) && /ntfName\(r\.requester\)/.test(rd('js/inbound.js')) && /ntfName\(r\.requester\)/.test(rd('js/tools.js')) && /ntfName\(h\.by\)/.test(rd('js/edit.js')),
   '㊿+190 사람은 어디서나 «이름 직급»(ntfName · gnMeSync · 이름 캐시 · 표 열 · 이력 · 알림)'); }
+// ㊿+191 에스원 대조표 DK 건별 · 비즈포탈에만 · 차액 맞춰 보기 · 저장 payload(dk · biz_only · svc) / 카카오 회계매출 한 번(bizSumOnce) · 회계매출 · 차액 열 / 인쇄 공통(bundleMark · sec/sub 줄 · 짝수 줄 노란 · table-layout:fixed)
+{ const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
+  const s1 = rd('sat/s1.js'), kk = rd('sat/kk.js'), st = rd('sat/settle.js');
+  say(/^function bundleMark\(rows\)/m.test(st) && /^function bizSumOnce\(rows\)/m.test(st) && !/^function bundleMark/m.test(s1) && /r\.__sec/.test(st) && /tbody tr\.hl td,tbody tr\.hl:nth-child\(even\) td/.test(st) && /table-layout:fixed/.test(st) && /overflow-wrap:anywhere/.test(st)
+    && /^function useFlags\(g, ym\)/m.test(s1) && /^function bizOnlyRows\(\)/m.test(s1) && /^function dkRowOut\(g\)/m.test(s1) && /dk:\(S\.use\.dk\|\|\[\]\)\.map\(dkRowOut\)/.test(s1) && /biz_only:bizOnlyRows\(\)/.test(s1) && /저장분에 건별 목록이 없음/.test(s1) && /차액 맞춰 보기/.test(s1) && /S\.use\.etc=G\.filter/.test(s1) && /svc:\(g\.lines\|\|\[\]\)\.map/.test(s1)
+    && /var bizSum=bizSumOnce\(K\.rows\);/.test(kk) && /biz_total:bizSumOnce\(K\.rows\)/.test(kk) && /\{k:'acc',l:'회계매출',n:true,w:'12%',wrap:true\},\{k:'diff',l:'차액'/.test(kk) && !/\{k:'prod',l:'제공서비스'\}/.test(kk),
+  '㊿+191 에스원 대조표(DK 건별 · 비즈포탈만 · 맞춰 보기 · 저장분) · 카카오(회계매출 한 번 · 열) · 인쇄 공통(묶음 · 구역 줄 · 노란 · 표 너비)'); }
+// ㊿+192 Cloud 사이트 → 계약 전환 점검(site_watch · SW · 홈 줄 · 알림 kind site · 점검 탭 · 용도/기한 · 계약 입력 채우기 · EDR · 메뉴 권한 opt-in · remind v1.5 sites)
+{ const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
+  const sa = rd('js/sales.js'), nt = rd('js/notify.js'), sh = rd('js/shell.js'), co = rd('js/core.js'), ad = rd('js/admin.js'), ix = rd('index.html'), rm = rd('supabase/functions/remind/index.ts'), css = rd('app.css');
+  say(/^export var SW=\{rows:null, ok:null, at:0, loading:null\};/m.test(sa) && /^export function swLoad\(force\)/m.test(sa) && /rpc\/site_watch/.test(sa) && /^export function swRender\(load\)/m.test(sa) && /^export function swLinkContract\(id\)/m.test(sa) && /^export function swEdit\(id\)/m.test(sa) && /^export async function swSlack\(\)/m.test(sa) && /^export async function swAfterCreate\(sitename, purpose, due\)/m.test(sa)
+    && /edr:'Cloud EDR'/.test(sa) && /id="csPaneWatch"/.test(ix) && /id="swHost"/.test(ix) && /id="csPurpose"/.test(ix) && /id="csDue"/.test(ix) && /<option value="edr">Cloud EDR \(edr\)<\/option>/.test(ix) && /data-t="watch"/.test(ix)
+    && /kind:'site', key:'site:'/.test(nt) && /swLoad\(false\)\.then/.test(nt) && /add\('site', \{lv:swHi\? 1 : 2/.test(sh) && /\(ST\.IS_SUPER \|\| canView\('csite'\)\)\? '':'none'/.test(sh)
+    && /^export var PERM_OPTIN=\{csite:1\};/m.test(co) && !/PERM_EXEMPT=\{[^}]*csite/.test(co) && /PERM_OPTIN\[v\]\? \{v:false, r:false, w:false\}/.test(co) && /apDefault\(role, v\)/.test(ad)
+    && /rpc\/site_watch/.test(rm) && /function buildSites\(/.test(rm) && /only\.includes\('sites'\)/.test(rm) && /kind: 'sites'/.test(rm) && /\.sw-tiles\{/.test(css),
+  '㊿+192 Cloud 사이트 → 계약 전환 점검(site_watch · 홈 줄 · 알림 · 점검 탭 · 용도/기한 · 계약 입력 · EDR · 메뉴 권한 · remind v1.5)'); }
 // ㊿+160 연장하면 상태 «재약정»(구분 그대로) · 계약 상세에 «계약 기간 · 연장 이력»
 say(/^export function renewStatus\(r\)/m.test(jsAll) && /var nst=renewStatus\(r\);/.test(jsAll) && /^export function ctPeriods\(c, mine\)/m.test(jsAll) && html.includes('id="dtRenew"'), '연장: 상태 «재약정»(renewStatus) · 계약 상세 연장 이력(ctPeriods · #dtRenew)');
 const idx = html + jsAll;

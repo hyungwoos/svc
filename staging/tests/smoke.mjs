@@ -4372,6 +4372,162 @@ if (S.blk()) {
     return '첫 줄 73,000 · ↑ 묶음 · 타일 212,000 · 인쇄';
   });
 }
+// ㊿+191 에스원 대조표: 디바이스키퍼 건별 · 비즈포탈에만 있는 건 · 차액 맞춰 보기 · 저장분(dk · biz_only) / 카카오: 같은 등록번호 한 번만 · 회계매출 · 차액 열 / 인쇄 공통: 짝수 줄 노란 표시 · 표 너비 — 가짜 DB
+if (S.blk()) {
+  const now191 = new Date().toISOString(), m191 = (new Date().getFullYear() - 1) + '-09';
+  const openPrint = async (page, fn) => { await page.evaluate(() => { window.open = function () { const f = document.createElement('iframe'); document.body.appendChild(f); const w = f.contentWindow; w.print = function () {}; window.__pw = w; return w; }; }); await page.evaluate(fn); await page.waitForTimeout(500); };
+  await S.t('㊿+191 에스원 대조표: 클라우드NAC 구역 → 소계(회계매출 212,000 · 차액 −244,000) → 디바이스키퍼 2건 전부(등록번호 없이 · 구분) → 소계 130,000 ↔ 대금 정산 120,000(−10,000 · 노란) → 비즈포탈에만 있는 건 2건(139,000 · 73,000 · 노란) → 총계 586,000 · 544,000 · −42,000 · 차액 맞춰 보기 줄 · 타일(비즈포탈만 포함 544,000 · 차액 42,000) · 예전 저장분은 «합계만» 한 줄 · 짝수 줄 노란 배경 · 표가 종이 안', async () => {
+    const nac = [{ cno: 'N0000001', nm: '가상기관A센터NAC', amt: 73000, svc: '클라우드NAC BASIC 50', biz: 125507, biz_cust: '가상기관A (에스원)', acc: 73000, diff: -73000, by: 'pick', kind: 'keep' },
+      { cno: 'N0000002', nm: '가상기관B NAC', amt: 139000, svc: '클라우드NAC BASIC 100', biz: 100001, biz_cust: '가상기관B', acc: 139000, diff: 0, by: 'name', kind: 'keep' },
+      { cno: 'N0000003', nm: '가상기관A빌딩NAC', amt: 73000, svc: '클라우드NAC BASIC 50', biz: 125507, biz_cust: '가상기관A (에스원)', acc: 73000, diff: -73000, by: 'pick', kind: 'new' },
+      { cno: 'N0000004', nm: '가상기관C NAC', amt: 171000, svc: '클라우드NAC Enterprise 100', biz: null, biz_cust: null, acc: null, diff: 0, by: null, kind: 'end' }];
+    const dk = [{ cno: 'D0000001', nm: '가상기관D', amt: 50000, svc: '디바이스키퍼 BASIC', kind: 'keep' }, { cno: 'D0000002', nm: '가상기관E', amt: 80000, svc: '디바이스키퍼 PRO + 디바이스키퍼 센서', kind: 'new' }];
+    const biz_only = [{ no: 130001, cust: '가상기관F', proj: '[에스원] 가상기관F S1 Cloud NAC', acc: 139000 }, { no: 130002, cust: '가상기관G', proj: '[에스원] 가상기관G S1 Cloud NAC 연장', acc: 73000 }];
+    const S0 = (id, payload) => ({ id, month: m191 + '-01', kind: 'use', total: 586000, biz_total: 544000, cnt_new: 1, cnt_end: 1, cnt_ext: 0, cnt_keep: 2, created_by: 'tester@example.com', updated_at: now191, payload });
+    const db = new FakeDB(Object.assign(seedData(), { s1_settle: [S0(1, { nac, dk_total: 130000, dk_count: 2, dk, biz_only, biz_settle: [{ no: 140001, proj: '[에스원] 디바이스키퍼 대금 정산', acc: 120000 }] }), S0(2, { nac, dk_total: 130000, dk_count: 2, biz_settle: [] })] }));
+    db.rpc.is_super_admin = () => true;
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page);
+    await fakeBackend(page, db); await page.goto(url + '/s1.html'); await page.waitForFunction(() => window.CLS && CLS.ok === true, null, { timeout: 10000 });
+    await page.evaluate(async () => { await restoreSettle(1); }); await page.waitForTimeout(400);
+    const tiles = await page.evaluate(() => [...document.querySelectorAll('#uTiles .tile')].map((t) => t.querySelector('.t').textContent + '=' + t.querySelector('.v').textContent.replace(/\s+/g, ' ').trim()));
+    await openPrint(page, () => printUse());
+    const P = await page.evaluate(() => { const d = window.__pw.document; const trs = [...d.querySelectorAll('table tbody tr')];
+      const rows = trs.map((tr) => ({ cls: tr.className, c: [...tr.children].map((td) => td.textContent.replace(/\s+/g, ' ').trim()), bg: getComputedStyle(tr.children[0]).backgroundColor }));
+      const tb = d.querySelector('table').getBoundingClientRect(), pg = d.querySelector('.page').getBoundingClientRect();
+      return { rows, note: d.querySelector('.note').textContent, fit: tb.right <= pg.right + 1 && tb.left >= pg.left - 1, sums: [...d.querySelectorAll('.sum')].map((s) => s.textContent.replace(/\s+/g, ' ').trim()) }; });
+    await page.evaluate(async () => { await restoreSettle(2); }); await page.waitForTimeout(400); await openPrint(page, () => printUse());
+    const P2 = await page.evaluate(() => { const d = window.__pw.document; return [...d.querySelectorAll('table tbody tr')].map((tr) => [...tr.children].map((td) => td.textContent.trim()).join('|')); });
+    await ctx.close();
+    const secs = P.rows.filter((r) => r.cls === 'sec').map((r) => r.c[0]), find = (cno) => P.rows.find((r) => r.c[2] === cno), sub = (nm) => P.rows.find((r) => /sub/.test(r.cls) && r.c[1] === nm);
+    const nacSub = sub('클라우드NAC 합계'), dkSub = sub('디바이스키퍼 합계'), d1 = find('D0000001'), d2 = find('D0000002'), f = P.rows.find((r) => r.c[0] === '130001'), g = P.rows.find((r) => r.c[0] === '130002'), ft = P.rows.find((r) => r.cls === 'ft');
+    assert(secs.length === 3 && /^클라우드NAC 4건/.test(secs[0]) && /^디바이스키퍼\(임대 포함\) 2건 — 비즈포탈엔 «대금 정산» 1건/.test(secs[1]) && /^비즈포탈\(사용료\)에만 있고 에스원 계약이 안 붙은 건 2건 — 합계 212,000원/.test(secs[2]), '구역 ' + JSON.stringify(secs));
+    assert(nacSub && nacSub.c[4] === '456,000' && nacSub.c[5] === '212,000' && nacSub.c[6] === '-244,000', 'NAC 소계 ' + JSON.stringify(nacSub));
+    assert(d1 && d1.c[0] === '' && d1.c[1] === '가상기관D' && d1.c[3] === '디바이스키퍼 BASIC' && d1.c[4] === '50,000' && d1.c[5] === '' && d1.c[7] === '기존' && !/hl/.test(d1.cls) && d2 && d2.c[7] === '신규' && d2.c[4] === '80,000', 'DK 줄 ' + JSON.stringify([d1, d2]));
+    assert(dkSub && dkSub.c[4] === '130,000' && dkSub.c[5] === '120,000 (대금 정산 1건)' && dkSub.c[6] === '-10,000' && /hl/.test(dkSub.cls), 'DK 소계 ' + JSON.stringify(dkSub));
+    assert(f && f.c[1] === '가상기관F' && f.c[4] === '' && f.c[5] === '139,000' && f.c[6] === '139,000' && f.c[7] === '비즈포탈' && /hl/.test(f.cls) && g && g.c[5] === '73,000' && /hl/.test(g.cls), '비즈포탈만 ' + JSON.stringify([f, g]));
+    assert(ft && ft.c[4] === '586,000' && ft.c[5] === '544,000' && ft.c[6] === '-42,000' && /계약별 -244,000 \+ 디바이스키퍼 -10,000 \+ 비즈포탈에만 있는 건 212,000 = -42,000/.test(P.note) && /요약의 차액\(청구 − 비즈포탈\) 42,000/.test(P.note), '총계 · 맞춰 보기 ' + JSON.stringify({ ft, note: P.note }));
+    const r1 = find('N0000001'), evenHl = P.rows.filter((r, i) => /hl/.test(r.cls) && (i + 1) % 2 === 0);
+    assert(r1 && r1.c[3] === '클라우드NAC BASIC 50' && r1.c[5] === '73,000 (묶음 2건 · 합 146,000)' && evenHl.length && evenHl.every((r) => r.bg === 'rgb(255, 248, 225)' || r.bg === 'rgb(255, 243, 196)') && P.fit, '서비스 · 짝수 줄 노란 · 너비 ' + JSON.stringify({ r1, evenHl: evenHl.map((r) => r.bg), fit: P.fit }));
+    assert(tiles.some((t) => /^비즈포탈 회계매출=544,000 5건/.test(t)) && tiles.some((t) => /^차액=42,000$/.test(t)) && P.sums.some((s) => /비즈포탈 회계매출\s?544,000원/.test(s)) && P.sums.some((s) => /^차액\s?42,000원/.test(s)), '타일 ' + JSON.stringify({ tiles, sums: P.sums }));
+    assert(P2.some((r) => /^\|\(저장분에 건별 목록이 없음 — 합계만\)\|\|\|130,000\|/.test(r)) && !P2.some((r) => /D0000001/.test(r)) && !c.errs.filter((x) => !/serviceWorker/.test(x)).length, '예전 저장분 ' + JSON.stringify({ P2: P2.filter((r) => /합계만|디바이스키퍼/.test(r)), errs: c.errs }));
+    return 'NAC 소계 · DK 2건 · 비즈포탈만 2건 · 총계 −42,000 · 맞춰 보기';
+  });
+
+  await S.t('㊿+191 카카오: 같은 등록번호(200001)를 두 줄에 골라도 회계매출은 한 번(타일 210,000 · 차액 210,000) · 화면 둘째 줄 «↑ 묶음» · 저장 biz_total 한 번 · PDF 에 회계매출 · 차액 열(−100,000 묶음 · −10,000 · 미매칭 빈 칸) · 합계 줄 · 노란 = 미매칭 + 금액 다름 · 표가 종이 안 · 제공서비스는 머리글에', async () => {
+    const rows = [{ code: 'K001', project: 'P1', qty: 1, unit: 100000, amt: 100000, cust: '가상기관H', start: '2026-01', end: '2026-12', termNo: 3, termTotal: 12, note: '첫 줄 메모\n둘째 줄', biz: 200001, acc: 100000 },
+      { code: 'K002', project: 'P2', qty: 2, unit: 50000, amt: 100000, cust: '가상기관I', start: '2026-03', end: '2027-02', termNo: 1, termTotal: 12, note: '', biz: null, acc: null },
+      { code: 'K003', project: 'P3', qty: 1, unit: 120000, amt: 120000, cust: '가상기관J 아주아주아주아주아주 긴 고객사 이름 주식회사', start: '2025-09', end: '2026-08', termNo: 12, termTotal: 12, note: '마지막 회차 · 연장 여부 확인', biz: 200003, acc: 110000 },
+      { code: 'K004', project: 'P4', qty: 1, unit: 100000, amt: 100000, cust: '가상기관H', start: '2026-01', end: '2026-12', termNo: 3, termTotal: 12, note: '', biz: 200001, acc: 100000 }];
+    const db = new FakeDB(Object.assign(seedData(), { kk_settle: [{ id: 1, month: m191 + '-01', use_month: m191 + '-01', kind: 'kk', total: 420000, biz_total: 310000, cnt_new: 1, cnt_end: 0, created_by: 'tester@example.com', updated_at: now191, payload: { rows } }] }));
+    db.rpc.is_super_admin = () => true;
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page);
+    page.on('dialog', (d) => d.accept());
+    await fakeBackend(page, db); await page.goto(url + '/kk.html'); await page.waitForFunction(() => window.CLS && CLS.ok === true, null, { timeout: 10000 });
+    await page.evaluate(async () => { await restoreSettle(1); }); await page.waitForTimeout(400);
+    const A = await page.evaluate(() => ({ tiles: [...document.querySelectorAll('#kTiles .tile')].map((t) => t.querySelector('.t').textContent + '=' + t.querySelector('.v').textContent.replace(/\s+/g, ' ').trim()),
+      acc: [...document.querySelectorAll('#tK tbody tr')].map((tr) => tr.children[9].textContent.replace(/\s+/g, ' ').trim()), tags: [...document.querySelectorAll('#tK tbody tr')].map((tr) => tr.children[0].textContent.replace(/\s+/g, ' ').trim()) }));
+    const w0 = db.writes.length; await page.evaluate(async () => { await saveSettle(); }).catch(() => {}); await page.waitForTimeout(400);
+    const sv = db.writes.slice(w0).find((w) => w.table === 'kk_settle' && /^(POST|PATCH|UPSERT)$/.test(w.method)), sb = sv && (Array.isArray(sv.body) ? sv.body[0] : sv.body);
+    await openPrint(page, () => printList());
+    const P = await page.evaluate(() => { const d = window.__pw.document; const trs = [...d.querySelectorAll('table tbody tr')];
+      return { head: [...d.querySelectorAll('thead th')].map((x) => x.textContent.trim()), rows: trs.map((tr) => ({ cls: tr.className, c: [...tr.children].map((td) => td.textContent.replace(/\s+/g, ' ').trim()) })), sub: d.querySelector('.hd .sub').textContent,
+        fit: (function () { const tb = d.querySelector('table').getBoundingClientRect(), pg = d.querySelector('.page').getBoundingClientRect(); return tb.right <= pg.right + 1; })(), sums: [...d.querySelectorAll('.sum')].map((s) => s.textContent.replace(/\s+/g, ' ').trim()), note: d.querySelector('.note').textContent }; });
+    await ctx.close();
+    assert(A.tiles.some((t) => /^비즈포탈 회계매출=210,000원$/.test(t)) && A.tiles.some((t) => /^차액=210,000$/.test(t)) && /^100,000\s?묶음 2건 · 청구 합 200,000$/.test(A.acc[0]) && A.acc[3] === '↑ 묶음' && A.acc[1] === '' && /묶음/.test(A.tags[0]) && /묶음/.test(A.tags[3]) && !/묶음/.test(A.tags[2]), '화면 ' + JSON.stringify(A));
+    assert(!sb || sb.biz_total === 210000, '저장 biz_total ' + JSON.stringify(sb && { biz_total: sb.biz_total, total: sb.total }));
+    const H = P.rows.find((r) => r.c[0] === '200001' && r.c[6] === '-100,000'), H2 = P.rows.find((r) => r.c[0] === '200001' && r.c[5] === '↑ 묶음'), I = P.rows.find((r) => r.c[1] === '가상기관I'), J = P.rows.find((r) => r.c[0] === '200003'), ft = P.rows.find((r) => r.cls === 'ft');
+    assert(P.head.join('|') === '등록번호|서비스제공처(고객사명)|수량|단가|금액|회계매출|차액|회차|계약기간|비고' && /제공서비스 SSL PNS/.test(P.sub), '머리 ' + JSON.stringify({ head: P.head, sub: P.sub }));
+    assert(H && /^100,000 \(묶음 2건 · 청구 합 200,000\)$/.test(H.c[5]) && /hl/.test(H.cls) && H2 && H2.c[6] === '↑ 묶음' && /hl/.test(H2.cls) && I && I.c[5] === '' && I.c[6] === '' && /hl/.test(I.cls) && J && J.c[5] === '110,000' && J.c[6] === '-10,000' && /hl/.test(J.cls) && J.c[7] === '12/12' && J.c[8] === '2025-09 ~ 2026-08', '줄 ' + JSON.stringify([H, H2, I, J]));
+    assert(ft && ft.c[4] === '420,000' && ft.c[5] === '210,000' && ft.c[6] === '-210,000' && P.sums.some((s) => /비즈포탈 회계매출\s?210,000원/.test(s)) && P.sums.some((s) => /^차액\s?210,000원/.test(s)) && /등록번호 없음 1건 · 금액 다름 3건/.test(P.note) && P.fit && !c.errs.filter((x) => !/serviceWorker/.test(x)).length, '합계 · 안내 · 너비 ' + JSON.stringify({ ft, sums: P.sums, note: P.note, fit: P.fit, errs: c.errs }));
+    return '한 번 210,000 · ↑ 묶음 · 회계매출/차액 열 · 종이 안';
+  });
+}
+// ㊿+192 Cloud 사이트 → 계약 전환 점검 — site_watch(SQL 115) · 홈 줄 · 알림함 · 사이트 관리 «계약 전환 점검» 탭 · 용도·기한 저장 · 계약 입력 채우기 · 만들 때 용도 PATCH · EDR · 메뉴 권한(기본 숨김 · 보기 받으면 점검만) — 가짜 DB
+if (S.blk()) {
+  const SW192 = [
+    { id: 1, sitename: 'vsite-a', product: 'ztna', edition: 'ent', devices: 100, customer: '가상기관A', requested_by: 'other@example.com', created_at: '2026-07-01T00:00:00Z', purpose: 'paid', due_date: '2026-09-30', site_status: null, status_note: null, contract_id: null, contract_cust: null, contract_status: null, contract_start: null, days: 103, state: 'overdue' },
+    { id: 2, sitename: 'vsite-b', product: 'edr', edition: 'ent', devices: 50, customer: '가상기관B', requested_by: 'tester@example.com', created_at: '2026-09-20T00:00:00Z', purpose: null, due_date: null, site_status: null, status_note: null, contract_id: null, contract_cust: null, contract_status: null, contract_start: null, days: 22, state: 'waiting' },
+    { id: 3, sitename: 'vsite-c', product: 'ztna', edition: 'ent', devices: 30, customer: '가상기관C', requested_by: 'other@example.com', created_at: '2026-08-01T00:00:00Z', purpose: 'poc', due_date: '2026-10-01', site_status: null, status_note: null, contract_id: null, contract_cust: null, contract_status: null, contract_start: null, days: 72, state: 'poc_over' },
+    { id: 4, sitename: 'vsite-d', product: 'ztna', edition: 'ent', devices: 10, customer: '가상기관D', requested_by: 'other@example.com', created_at: '2026-09-01T00:00:00Z', purpose: 'poc', due_date: '2026-12-01', site_status: null, status_note: null, contract_id: null, contract_cust: null, contract_status: null, contract_start: null, days: 41, state: 'poc' },
+    { id: 5, sitename: 'vsite-e', product: 'ztna', edition: 'ent', devices: 200, customer: '가상기관E', requested_by: 'other@example.com', created_at: '2026-05-01T00:00:00Z', purpose: 'paid', due_date: null, site_status: null, status_note: null, contract_id: 77, contract_cust: '가상기관E', contract_status: '신규', contract_start: '2026-06-01', days: 164, state: 'linked' },
+    { id: 7, sitename: 'vsite-g', product: 'ztna', edition: 'ent', devices: 20, customer: '가상기관G', requested_by: 'other@example.com', created_at: '2026-02-01T00:00:00Z', purpose: 'paid', due_date: null, site_status: 'exempt', status_note: '재무 승인 무상', contract_id: null, contract_cust: null, contract_status: null, contract_start: null, days: 253, state: 'exempt' }];
+  const mk192 = async (o) => { o = Object.assign({ role: 'super_admin', email: 'tester@example.com', sites: true, cloud: [] }, o || {});
+    const db = new FakeDB(Object.assign(seedData(), { cloud_sites: o.cloud }));
+    if (o.sites) db.rpc.site_watch = () => SW192; else db.rpc.site_watch = () => { throw new Error('PGRST202 Could not find the function'); };
+    db.rpc.portal_accounts = () => [{ email: 'tester@example.com', role: o.role, name: '홍길동', title: '차장' }, { email: 'other@example.com', role: 'admin', name: '김철수', title: '대리' }];
+    const fn = [];
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page);
+    const dlg = []; page.on('dialog', (d) => { dlg.push(d.type() + ':' + d.message().split('\n')[0]); d.accept(); });
+    await fakeBackend(page, db, { role: o.role, email: o.email, extra: async (route, u, m) => {
+      if (!/\/functions\/v1\/(cloudsite|remind)/.test(u)) return false;
+      const body = JSON.parse(route.request().postData() || '{}'); fn.push({ u: u.split('/functions/v1/')[1], body });
+      if (/cloudsite/.test(u)) { if (o.onCreate) o.onCreate(db, body); await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, message: '만들었습니다(가짜)' }) }); return true; }
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, dry: /dry=1/.test(u), text: '🛰️ 계약 없이 쓰는 Cloud 사이트 3개', channel: 'C_TEST', sites: { ok: true, total: 3, counts: {} }, kinds: [] }) }); return true; } });
+    await page.goto(url + '/index.html'); await page.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA && SVC.ST.DATA.rows.length, null, { timeout: 20000 });
+    await page.waitForFunction(() => SVC.SW && SVC.SW.ok !== null, null, { timeout: 8000 }).catch(() => null); await page.waitForTimeout(500);
+    return { db, ctx, page, c, dlg, fn }; };
+  await S.t('㊿+192 계약 없이 쓰는 사이트: 홈 «우선 업무» 줄(3개 · 지남 2 · 가장 오래된 103일 · 담당 = 만든 사람 이름 · 내 업무엔 내가 만든 것만) · 알림함 kind site 3개(발주일·PoC 종료 지남 hi · 대기 mid · 받는 사람 = 만든 사람) · 사이트 관리 › 계약 전환 점검 탭(타일 · 표 3줄 · 그 밖 3개) · 탭 배지 «3개 확인» · «계약 입력» → 계약 입력창에 고객사 · Cloud · CSM 채움 · «용도 · 기한 ✎» 저장 → cloud_sites PATCH(purpose · due_date · site_status · status_note) + 변경 이력 · 무상 승인은 사유 필수 · «슬랙으로 지금 보내기» = remind only:sites(dry → 확인 → 발송)', async () => {
+    const A = await mk192({ cloud: SW192.map((s) => ({ id: s.id, action: 'create', sitename: s.sitename, product: s.product, edition: s.edition, devices: s.devices, customer: s.customer, result: true, hidden: false, requested_by: s.requested_by, created_at: s.created_at, purpose: s.purpose, due_date: s.due_date, site_status: s.site_status, status_note: s.status_note })) }), P = A.page;
+    await P.evaluate(() => { SVC.HOME.scope = 'team'; SVC.HOME.allOpen = true; SVC.navMenu('dash'); }); await P.waitForTimeout(500);
+    const h = await P.evaluate(() => { const r = document.querySelector('#ccInbox .hm-row[data-key="site"]'); return { txt: r ? r.textContent.replace(/\s+/g, ' ') : '', own: r ? (r.querySelector('.hm-own') || {}).textContent : '' }; });
+    await P.evaluate(() => { SVC.HOME.scope = 'me'; SVC.renderTodo(); }); await P.waitForTimeout(300);
+    const hm = await P.evaluate(() => [...document.querySelectorAll('#ccInbox .hm-row')].map((r) => r.textContent.replace(/\s+/g, ' ')).filter((t) => /사이트/.test(t)).join(' | '));
+    await P.evaluate(() => { SVC.HOME.scope = 'team'; });
+    const n = await P.evaluate(() => SVC.ntfItems().filter((x) => x.kind === 'site').map((x) => ({ t: x.title, sev: x.sev, to: x.to.join(','), me: x.me })));
+    await P.evaluate(() => { SVC.navMenu('csite'); SVC.csSetTab('watch'); }); await P.waitForTimeout(600);
+    const w = await P.evaluate(() => ({ tiles: [...document.querySelectorAll('#swHost .sw-tiles .tile')].map((t) => t.querySelector('.t').textContent + '=' + t.querySelector('.v').textContent).join('|'), rows: [...document.querySelectorAll('#swHost table')[0].querySelectorAll('tbody tr')].map((tr) => tr.children[0].querySelector('b').textContent + ':' + tr.querySelector('.ctag').textContent), rest: document.querySelector('#swHost .sw-rest summary').textContent, badge: document.getElementById('csWatchN').textContent, pane: getComputedStyle(document.getElementById('csPaneWatch')).display, run: getComputedStyle(document.getElementById('csSecRun')).display }));
+    await P.click('#swHost button[data-swlink="2"]'); await P.waitForTimeout(500);
+    const f = await P.evaluate(() => ({ on: document.getElementById('ovlEdit').classList.contains('on'), cust: document.getElementById('nCust').value, line: document.getElementById('nLine').value, csm: document.getElementById('nCsm').value }));
+    await P.evaluate(() => SVC.closeOvl('ovlEdit')); await P.evaluate(() => { SVC.navMenu('csite'); SVC.csSetTab('watch'); }); await P.waitForTimeout(400);
+    await P.click('#swHost button[data-swedit="1"]'); await P.waitForSelector('#ovlSw.on #swPurpose', { timeout: 4000 }); await P.waitForTimeout(120);
+    const e0 = await P.evaluate(() => ({ purpose: document.getElementById('swPurpose').value, due: document.getElementById('swDue').value, lbl: document.getElementById('swDueL').textContent, h: document.getElementById('ovlSwH').textContent }));
+    await P.selectOption('#swStatus', 'exempt'); await P.click('#swSave'); await P.waitForTimeout(300);
+    const e1 = await P.evaluate(() => ({ msg: document.getElementById('swEMsg').textContent, on: document.getElementById('ovlSw').classList.contains('on') }));
+    await P.selectOption('#swPurpose', 'poc'); const e2 = await P.evaluate(() => document.getElementById('swDueL').textContent);
+    await P.fill('#swDue', '2026-11-30'); await P.selectOption('#swStatus', 'open'); await P.fill('#swNote', '고객 PoC 연장'); const w0 = A.db.writes.length; await P.click('#swSave'); await P.waitForTimeout(600);
+    const pw = A.db.writes.slice(w0).find((x) => x.table === 'cloud_sites' && x.method === 'PATCH'), lg = A.db.writes.slice(w0).find((x) => x.table === 'change_log');
+    const e3 = await P.evaluate(() => ({ on: document.getElementById('ovlSw').classList.contains('on') }));
+    await P.click('#swSlack'); await P.waitForTimeout(600);
+    const sl = A.fn.filter((x) => /remind/.test(x.u)), sm = await P.evaluate(() => document.getElementById('swMsg').textContent);
+    await A.ctx.close();
+    assert(/계약 없이 쓰는 Cloud 사이트/.test(h.txt) && /사이트 3개/.test(h.txt) && /지남/.test(h.txt) && /vsite-a, vsite-b, vsite-c/.test(h.txt) && /김철수 대리/.test(h.own) && /홍길동 차장/.test(h.own) && /내가 만든 사이트 — 계약 없음/.test(hm) && /vsite-b/.test(hm) && !/vsite-a/.test(hm), '홈 줄 ' + JSON.stringify({ h, hm }));
+    assert(n.length === 3 && n[0].t === 'vsite-a 사이트 — 발주일 지남 (103일째)' && n[0].sev === 'hi' && n[0].to === 'other@example.com' && !n[0].me && n.find((x) => /vsite-b/.test(x.t)).sev === 'mid' && n.find((x) => /vsite-b/.test(x.t)).me === true && n.find((x) => /vsite-c/.test(x.t)).sev === 'hi', '알림함 ' + JSON.stringify(n));
+    assert(w.tiles === '발주일 지남=1|계약 대기=1|PoC 종료 지남=1|계약 끝남=0|PoC 진행=1|내부·데모=0|계약 연결=1|사이트 종료=1' && w.rows.join('|') === 'vsite-a:발주일 지남|vsite-b:계약 대기|vsite-c:PoC 종료 지남' && /그 밖의 사이트 3개/.test(w.rest) && w.badge === '3개 확인' && w.pane !== 'none' && w.run === 'none', '점검 탭 ' + JSON.stringify(w));
+    assert(f.on && f.cust === '가상기관B' && f.line === 'Cloud' && f.csm === 'vsite-b', '계약 입력 채우기 ' + JSON.stringify(f));
+    assert(e0.purpose === 'paid' && e0.due === '2026-09-30' && /예상 발주일/.test(e0.lbl) && /vsite-a/.test(e0.h) && /사유를 적어야/.test(e1.msg) && e1.on && /PoC 종료일/.test(e2), '용도 창 ' + JSON.stringify({ e0, e1, e2 }));
+    assert(pw && pw.body.purpose === 'poc' && pw.body.due_date === '2026-11-30' && pw.body.site_status === null && pw.body.status_note === '고객 PoC 연장' && lg && /cloud_sites/.test(JSON.stringify(lg.body)) && !e3.on, '저장 ' + JSON.stringify({ pw: pw && pw.body, lg: !!lg, e3 }));
+    assert(sl.length === 2 && /dry=1/.test(sl[0].u) && sl[0].body.only === 'sites' && !/dry=1/.test(sl[1].u) && A.dlg.some((d) => /^confirm:슬랙 팀 채널\(C_TEST\)/.test(d)) && /슬랙 발송 완료/.test(sm) && !A.c.errs.filter((x) => !/serviceWorker/.test(x)).length, '슬랙 ' + JSON.stringify({ sl, sm, dlg: A.dlg, errs: A.c.errs }));
+    return '홈 3개 · 알림 3 · 탭 · 계약 입력 · PATCH · 슬랙';
+  });
+  await S.t('㊿+192 사이트 만들기: 제품에 Cloud EDR(edr) · 용도 · 예상 발주일 칸(PoC 면 «PoC 종료일» · 내부면 기한 없음) · 요약에 용도 · 만든 뒤 cloud_sites 그 행에 purpose · due_date PATCH(함수 요청 본문엔 안 섞임) · SQL 115 전(site_watch 없음) = 홈 줄 · 알림 없음 · 점검 탭 안내 · 메뉴 권한: csite 는 기본 숨김(행 없으면 안 보임) · 보기 받으면 메뉴 · 점검 탭만(만들기 · 수정 카드 없음)', async () => {
+    const A = await mk192({ sites: false, onCreate: (db, body) => { db.table('cloud_sites').push({ id: 50, action: 'create', sitename: body.sitename, product: body.product, edition: body.edition, devices: 100, customer: body.customer, result: true, hidden: false, requested_by: 'tester@example.com', created_at: '2026-10-12T00:00:00Z' }); } }), P = A.page;
+    await P.evaluate(() => { SVC.HOME.scope = 'team'; SVC.HOME.allOpen = true; SVC.navMenu('dash'); }); await P.waitForTimeout(400);
+    const h0 = await P.evaluate(() => ({ row: !!document.querySelector('#ccInbox .hm-row[data-key="site"]'), ntf: SVC.ntfItems().filter((x) => x.kind === 'site').length, ok: SVC.SW.ok }));
+    await P.evaluate(() => { SVC.navMenu('csite'); SVC.csSetTab('watch'); }); await P.waitForTimeout(500);
+    const w0 = await P.evaluate(() => document.getElementById('swHost').textContent);
+    await P.evaluate(() => SVC.csSetTab('create')); await P.waitForTimeout(200);
+    const opts = await P.evaluate(() => [...document.querySelectorAll('#csProd option')].map((o) => o.value + '=' + o.textContent).join('|'));
+    await P.selectOption('#csProd', 'edr'); await P.selectOption('#csPurpose', 'poc'); const l1 = await P.evaluate(() => document.getElementById('csDueL').textContent);
+    await P.selectOption('#csPurpose', 'internal'); const l2 = await P.evaluate(() => document.getElementById('csDueL').textContent);
+    await P.selectOption('#csPurpose', 'paid'); await P.fill('#csDue', '2026-12-15'); await P.fill('#csName', 'newsite-x'); await P.fill('#csCust', '가상기관X'); await P.fill('#csDev', '100');
+    await P.evaluate(() => { SVC.CS.creds = [{ id: 1, label: '가짜 계정', apiemail: 'api@example.com' }]; const s = document.getElementById('csCred'); s.innerHTML = '<option value="1">가짜 계정 — api@example.com</option>'; s.value = '1'; SVC.csPreview(); });
+    const pv = await P.evaluate(() => document.getElementById('csSum').textContent.replace(/\s+/g, ' '));
+    const wr0 = A.db.writes.length; await P.click('#csGo'); await P.waitForTimeout(900);
+    const call = A.fn.find((x) => /cloudsite/.test(x.u) && x.body.action === 'create'), pw = A.db.writes.slice(wr0).find((x) => x.table === 'cloud_sites' && x.method === 'PATCH');
+    const done = await P.evaluate(() => document.getElementById('csDoneTitle').textContent);
+    /* 메뉴 권한 — csite 는 기본 숨김 · 보기 받으면 메뉴 + 점검만 */
+    const pm = await P.evaluate(() => { SVC.ST.IS_SUPER = false; SVC.ST.PERMS = {}; SVC.applyPerms(); const b = document.querySelector('#side button[data-v="csite"]'); const none = SVC.canView('csite');
+      SVC.ST.PERMS = { csite: { v: true, r: true, w: false } }; SVC.applyPerms(); const some = SVC.canView('csite'); SVC.navMenu('csite'); SVC.renderCsite();
+      const r = { none, some, deny: b.classList.contains('pdeny'), cards: [...document.querySelectorAll('#csTabs button')].filter((x) => getComputedStyle(x).display !== 'none').map((x) => x.dataset.t).join(','), tab: SVC.CS.tab, badge: document.getElementById('csWhoBadge').textContent };
+      SVC.ST.IS_SUPER = true; SVC.ST.PERMS = null; SVC.applyPerms(); return r; });
+    await A.ctx.close();
+    assert(!h0.row && h0.ntf === 0 && h0.ok === false && /SQL 115/.test(w0), 'SQL 115 전 ' + JSON.stringify({ h0, w0: w0.slice(0, 80) }));
+    assert(/edr=Cloud EDR \(edr\)/.test(opts) && /PoC 종료일/.test(l1) && /기한 없음/.test(l2) && /용도: 유상 — 발주 예정 · 예상 발주일 2026-12-15/.test(pv) && /Cloud EDR/.test(pv), '만들기 폼 ' + JSON.stringify({ opts, l1, l2, pv: pv.slice(0, 200) }));
+    assert(call && call.body.product === 'edr' && !('purpose' in call.body) && !('due_date' in call.body) && /만들어졌습니다/.test(done) && pw && pw.body.purpose === 'paid' && pw.body.due_date === '2026-12-15' && pw.id === 50, '만든 뒤 PATCH ' + JSON.stringify({ call: call && call.body, pw, done }));
+    assert(pm.none === false && pm.some === true && !pm.deny && pm.cards === 'watch' && pm.tab === 'watch' && /점검만/.test(pm.badge), '메뉴 권한 ' + JSON.stringify(pm));
+    return 'EDR · 용도 · PATCH · 권한';
+  });
+}
 await browser.close(); srv.close();
 const ok = S.report();
 fs.writeFileSync(path.join(OUT, process.env.SMOKE_PART != null ? 'smoke-' + process.env.SMOKE_PART + '.json' : 'smoke.json'), JSON.stringify(S.results, null, 1));

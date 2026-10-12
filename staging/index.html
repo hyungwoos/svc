@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <!-- CSP (80점 프로젝트 ② 보안): GitHub Pages 는 응답 헤더를 못 넣으므로 meta 로. ㊿+136 부터 인라인 스크립트·onclick 이 없어 script-src 에 'unsafe-inline' 없음(스타일은 인라인 style 속성 때문에 유지) · ㊿+147 부터 'unsafe-eval' 도 없음(SQL 엔진 alasql 은 격리 칸 sqlbox.html 에서만 돌림) — 스크립트·연결 호스트를 목록으로 제한(XSS 시 외부 유출 차단). Worker 주소나 GAS 주소가 바뀌면 여기도 수정. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-OBIULrX5xTeXkzNxioQuZoR4sL+1v5EZ4l+uELA1CAs=' blob: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' data: https://cdn.jsdelivr.net; img-src 'self' data: blob: https://amzbrdhkvzsyxjfjtugu.supabase.co; connect-src 'self' https://amzbrdhkvzsyxjfjtugu.supabase.co https://open.er-api.com https://api.frankfurter.app https://script.google.com/macros/s/AKfycbz0PDzgvgtM0ZZHEfMwEzPpgoPYidD6ElPx3oTGsgnVuveCnVA9PmYPB4WAPfr9a6DY/ https://script.googleusercontent.com https://aged-union-cdd3.choihw.workers.dev https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; worker-src 'self' blob:; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-Wvb8l+YKRdDSnXJ9mYeUjezW5XUb/9Y6Wdflv8uy9M4=' blob: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' data: https://cdn.jsdelivr.net; img-src 'self' data: blob: https://amzbrdhkvzsyxjfjtugu.supabase.co; connect-src 'self' https://amzbrdhkvzsyxjfjtugu.supabase.co https://open.er-api.com https://api.frankfurter.app https://script.google.com/macros/s/AKfycbz0PDzgvgtM0ZZHEfMwEzPpgoPYidD6ElPx3oTGsgnVuveCnVA9PmYPB4WAPfr9a6DY/ https://script.googleusercontent.com https://aged-union-cdd3.choihw.workers.dev https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; worker-src 'self' blob:; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
 <title>서비스사업부 통합 관리 포탈</title>
 <!-- PWA: 홈 화면 앱 (manifest.webmanifest · sw.js · pwa-*.png · apple-touch-icon.png 를 같은 폴더에) -->
 <link rel="manifest" href="manifest.webmanifest">
@@ -20,35 +20,35 @@
      코드 파일 목록은 app-js (ES 모듈 · ㊿+153) — 파일을 더하거나 빼면 여기와 sw.js 의 SHELL 을 함께 고치고 node tests/stamp.mjs 로 아래 stamp 묶음을 다시 만들 것.
      시작점은 js/main.js 하나(나머지는 import 로 따라옴) · 리포트·관리자·가격표는 처음 열 때(js/lazy.js).
      ④ 아키텍처 2단계(㊿+136): 인라인 스크립트·onclick 을 전부 없애 CSP script-src 에서 'unsafe-inline' 제거 · 인라인은 importmap 하나뿐이고 CSP 해시로 허용. -->
-<meta name="app-ver" content="2026-09-16 ㊿+190">
+<meta name="app-ver" content="2026-09-16 ㊿+192">
 <meta name="app-js" content="js/state.js,js/viz.js,js/core.js,js/shell.js,js/dash.js,js/ai.js,js/home.js,js/notify.js,js/guard.js,js/grids.js,js/equipment.js,js/analysis.js,js/tools.js,js/cloud.js,js/price.js,js/inbound.js,js/upd.js,js/admin.js,js/sales.js,js/report.js,js/grid.js,js/edit.js,js/qadb.js,js/qadata.js,js/lazy.js,js/init.js,js/main.js">
 <!-- stamp:begin — tests/stamp.mjs 가 app-ver · app-js 로 만든 부분(손으로 고치지 말 것 · 버전을 올린 뒤 다시 실행 · tests/check.mjs 가 확인) -->
-<link rel="stylesheet" href="app.css?v=2026-09-16%20%E3%8A%BF%2B190">
-<script type="importmap">{"imports":{"./js/state.js":"./js/state.js?v=2026-09-16%20%E3%8A%BF%2B190","./js/viz.js":"./js/viz.js?v=2026-09-16%20%E3%8A%BF%2B190","./js/core.js":"./js/core.js?v=2026-09-16%20%E3%8A%BF%2B190","./js/shell.js":"./js/shell.js?v=2026-09-16%20%E3%8A%BF%2B190","./js/dash.js":"./js/dash.js?v=2026-09-16%20%E3%8A%BF%2B190","./js/ai.js":"./js/ai.js?v=2026-09-16%20%E3%8A%BF%2B190","./js/home.js":"./js/home.js?v=2026-09-16%20%E3%8A%BF%2B190","./js/notify.js":"./js/notify.js?v=2026-09-16%20%E3%8A%BF%2B190","./js/guard.js":"./js/guard.js?v=2026-09-16%20%E3%8A%BF%2B190","./js/grids.js":"./js/grids.js?v=2026-09-16%20%E3%8A%BF%2B190","./js/equipment.js":"./js/equipment.js?v=2026-09-16%20%E3%8A%BF%2B190","./js/analysis.js":"./js/analysis.js?v=2026-09-16%20%E3%8A%BF%2B190","./js/tools.js":"./js/tools.js?v=2026-09-16%20%E3%8A%BF%2B190","./js/cloud.js":"./js/cloud.js?v=2026-09-16%20%E3%8A%BF%2B190","./js/price.js":"./js/price.js?v=2026-09-16%20%E3%8A%BF%2B190","./js/inbound.js":"./js/inbound.js?v=2026-09-16%20%E3%8A%BF%2B190","./js/upd.js":"./js/upd.js?v=2026-09-16%20%E3%8A%BF%2B190","./js/admin.js":"./js/admin.js?v=2026-09-16%20%E3%8A%BF%2B190","./js/sales.js":"./js/sales.js?v=2026-09-16%20%E3%8A%BF%2B190","./js/report.js":"./js/report.js?v=2026-09-16%20%E3%8A%BF%2B190","./js/grid.js":"./js/grid.js?v=2026-09-16%20%E3%8A%BF%2B190","./js/edit.js":"./js/edit.js?v=2026-09-16%20%E3%8A%BF%2B190","./js/qadb.js":"./js/qadb.js?v=2026-09-16%20%E3%8A%BF%2B190","./js/qadata.js":"./js/qadata.js?v=2026-09-16%20%E3%8A%BF%2B190","./js/lazy.js":"./js/lazy.js?v=2026-09-16%20%E3%8A%BF%2B190","./js/init.js":"./js/init.js?v=2026-09-16%20%E3%8A%BF%2B190"}}</script>
-<link rel="modulepreload" href="js/state.js?v=2026-09-16%20%E3%8A%BF%2B190">
-<link rel="modulepreload" href="js/viz.js?v=2026-09-16%20%E3%8A%BF%2B190">
-<link rel="modulepreload" href="js/core.js?v=2026-09-16%20%E3%8A%BF%2B190">
-<link rel="modulepreload" href="js/shell.js?v=2026-09-16%20%E3%8A%BF%2B190">
-<link rel="modulepreload" href="js/dash.js?v=2026-09-16%20%E3%8A%BF%2B190">
-<link rel="modulepreload" href="js/ai.js?v=2026-09-16%20%E3%8A%BF%2B190">
-<link rel="modulepreload" href="js/home.js?v=2026-09-16%20%E3%8A%BF%2B190">
-<link rel="modulepreload" href="js/notify.js?v=2026-09-16%20%E3%8A%BF%2B190">
-<link rel="modulepreload" href="js/guard.js?v=2026-09-16%20%E3%8A%BF%2B190">
-<link rel="modulepreload" href="js/grids.js?v=2026-09-16%20%E3%8A%BF%2B190">
-<link rel="modulepreload" href="js/equipment.js?v=2026-09-16%20%E3%8A%BF%2B190">
-<link rel="modulepreload" href="js/analysis.js?v=2026-09-16%20%E3%8A%BF%2B190">
-<link rel="modulepreload" href="js/tools.js?v=2026-09-16%20%E3%8A%BF%2B190">
-<link rel="modulepreload" href="js/cloud.js?v=2026-09-16%20%E3%8A%BF%2B190">
-<link rel="modulepreload" href="js/inbound.js?v=2026-09-16%20%E3%8A%BF%2B190">
-<link rel="modulepreload" href="js/upd.js?v=2026-09-16%20%E3%8A%BF%2B190">
-<link rel="modulepreload" href="js/sales.js?v=2026-09-16%20%E3%8A%BF%2B190">
-<link rel="modulepreload" href="js/grid.js?v=2026-09-16%20%E3%8A%BF%2B190">
-<link rel="modulepreload" href="js/edit.js?v=2026-09-16%20%E3%8A%BF%2B190">
-<link rel="modulepreload" href="js/qadb.js?v=2026-09-16%20%E3%8A%BF%2B190">
-<link rel="modulepreload" href="js/qadata.js?v=2026-09-16%20%E3%8A%BF%2B190">
-<link rel="modulepreload" href="js/lazy.js?v=2026-09-16%20%E3%8A%BF%2B190">
-<link rel="modulepreload" href="js/init.js?v=2026-09-16%20%E3%8A%BF%2B190">
-<script type="module" src="js/main.js?v=2026-09-16%20%E3%8A%BF%2B190"></script>
+<link rel="stylesheet" href="app.css?v=2026-09-16%20%E3%8A%BF%2B192">
+<script type="importmap">{"imports":{"./js/state.js":"./js/state.js?v=2026-09-16%20%E3%8A%BF%2B192","./js/viz.js":"./js/viz.js?v=2026-09-16%20%E3%8A%BF%2B192","./js/core.js":"./js/core.js?v=2026-09-16%20%E3%8A%BF%2B192","./js/shell.js":"./js/shell.js?v=2026-09-16%20%E3%8A%BF%2B192","./js/dash.js":"./js/dash.js?v=2026-09-16%20%E3%8A%BF%2B192","./js/ai.js":"./js/ai.js?v=2026-09-16%20%E3%8A%BF%2B192","./js/home.js":"./js/home.js?v=2026-09-16%20%E3%8A%BF%2B192","./js/notify.js":"./js/notify.js?v=2026-09-16%20%E3%8A%BF%2B192","./js/guard.js":"./js/guard.js?v=2026-09-16%20%E3%8A%BF%2B192","./js/grids.js":"./js/grids.js?v=2026-09-16%20%E3%8A%BF%2B192","./js/equipment.js":"./js/equipment.js?v=2026-09-16%20%E3%8A%BF%2B192","./js/analysis.js":"./js/analysis.js?v=2026-09-16%20%E3%8A%BF%2B192","./js/tools.js":"./js/tools.js?v=2026-09-16%20%E3%8A%BF%2B192","./js/cloud.js":"./js/cloud.js?v=2026-09-16%20%E3%8A%BF%2B192","./js/price.js":"./js/price.js?v=2026-09-16%20%E3%8A%BF%2B192","./js/inbound.js":"./js/inbound.js?v=2026-09-16%20%E3%8A%BF%2B192","./js/upd.js":"./js/upd.js?v=2026-09-16%20%E3%8A%BF%2B192","./js/admin.js":"./js/admin.js?v=2026-09-16%20%E3%8A%BF%2B192","./js/sales.js":"./js/sales.js?v=2026-09-16%20%E3%8A%BF%2B192","./js/report.js":"./js/report.js?v=2026-09-16%20%E3%8A%BF%2B192","./js/grid.js":"./js/grid.js?v=2026-09-16%20%E3%8A%BF%2B192","./js/edit.js":"./js/edit.js?v=2026-09-16%20%E3%8A%BF%2B192","./js/qadb.js":"./js/qadb.js?v=2026-09-16%20%E3%8A%BF%2B192","./js/qadata.js":"./js/qadata.js?v=2026-09-16%20%E3%8A%BF%2B192","./js/lazy.js":"./js/lazy.js?v=2026-09-16%20%E3%8A%BF%2B192","./js/init.js":"./js/init.js?v=2026-09-16%20%E3%8A%BF%2B192"}}</script>
+<link rel="modulepreload" href="js/state.js?v=2026-09-16%20%E3%8A%BF%2B192">
+<link rel="modulepreload" href="js/viz.js?v=2026-09-16%20%E3%8A%BF%2B192">
+<link rel="modulepreload" href="js/core.js?v=2026-09-16%20%E3%8A%BF%2B192">
+<link rel="modulepreload" href="js/shell.js?v=2026-09-16%20%E3%8A%BF%2B192">
+<link rel="modulepreload" href="js/dash.js?v=2026-09-16%20%E3%8A%BF%2B192">
+<link rel="modulepreload" href="js/ai.js?v=2026-09-16%20%E3%8A%BF%2B192">
+<link rel="modulepreload" href="js/home.js?v=2026-09-16%20%E3%8A%BF%2B192">
+<link rel="modulepreload" href="js/notify.js?v=2026-09-16%20%E3%8A%BF%2B192">
+<link rel="modulepreload" href="js/guard.js?v=2026-09-16%20%E3%8A%BF%2B192">
+<link rel="modulepreload" href="js/grids.js?v=2026-09-16%20%E3%8A%BF%2B192">
+<link rel="modulepreload" href="js/equipment.js?v=2026-09-16%20%E3%8A%BF%2B192">
+<link rel="modulepreload" href="js/analysis.js?v=2026-09-16%20%E3%8A%BF%2B192">
+<link rel="modulepreload" href="js/tools.js?v=2026-09-16%20%E3%8A%BF%2B192">
+<link rel="modulepreload" href="js/cloud.js?v=2026-09-16%20%E3%8A%BF%2B192">
+<link rel="modulepreload" href="js/inbound.js?v=2026-09-16%20%E3%8A%BF%2B192">
+<link rel="modulepreload" href="js/upd.js?v=2026-09-16%20%E3%8A%BF%2B192">
+<link rel="modulepreload" href="js/sales.js?v=2026-09-16%20%E3%8A%BF%2B192">
+<link rel="modulepreload" href="js/grid.js?v=2026-09-16%20%E3%8A%BF%2B192">
+<link rel="modulepreload" href="js/edit.js?v=2026-09-16%20%E3%8A%BF%2B192">
+<link rel="modulepreload" href="js/qadb.js?v=2026-09-16%20%E3%8A%BF%2B192">
+<link rel="modulepreload" href="js/qadata.js?v=2026-09-16%20%E3%8A%BF%2B192">
+<link rel="modulepreload" href="js/lazy.js?v=2026-09-16%20%E3%8A%BF%2B192">
+<link rel="modulepreload" href="js/init.js?v=2026-09-16%20%E3%8A%BF%2B192">
+<script type="module" src="js/main.js?v=2026-09-16%20%E3%8A%BF%2B192"></script>
 <!-- stamp:end -->
 </head>
 <body data-view="dash">
@@ -538,12 +538,13 @@
 
   <div id="viewCsite" class="hidden">
     <section class="card c12" style="max-width:960px;margin:0 auto">
-      <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><h3 style="margin:0;font-size:15px">🛰️ Cloud 사이트 관리</h3><span class="ubadge sm">슈퍼 관리자 전용</span></div>
+      <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px"><h3 style="margin:0;font-size:15px">🛰️ Cloud 사이트 관리</h3><span class="ubadge sm" id="csWhoBadge">슈퍼 관리자 전용</span></div>
       <p class="cap" style="margin:0 0 14px">my.genians.co.kr 에 사이트를 만들거나(체험판) 기존 사이트의 노드 수·만료일을 바꿉니다. 아래 카드에서 할 일을 고르고 → 칸을 채우면 → 맨 아래 요약을 확인하고 실행합니다. API 키는 서버에만 있어 화면·저장소에 나오지 않습니다.</p>
       <div class="cs-acts" id="csTabs">
         <button class="cs-act" data-t="create" aria-pressed="true"><div class="ic">➕</div><div class="t">새 사이트 만들기</div><div class="d">고객 데모·PoC용 Cloud 사이트를 새로 만듭니다 (cloudsite)</div></button>
         <button class="cs-act" data-t="update"><div class="ic">✏️</div><div class="t">기존 사이트 수정</div><div class="d">라이선스 노드 수·만료일을 바꿉니다 (cloudsite-update)</div></button>
         <button class="cs-act" data-t="creds" id="csTabCreds" style="display:none"><div class="ic">🔑</div><div class="t">API 계정 관리</div><div class="d">my.genians API 키를 계정별로 등록·삭제</div></button>
+        <button class="cs-act" data-t="watch" id="csTabWatch"><div class="ic">✓</div><div class="t">계약 전환 점검</div><div class="d">만든 사이트마다 계약이 붙었는지 · 발주일 지남 · PoC 종료 <span id="csWatchN" class="ctag warn" style="display:none"></span></div></button>
       </div>
       <div id="csDone" style="display:none;text-align:center;padding:30px 10px 20px">
         <div id="csDoneIcon" style="width:66px;height:66px;margin:0 auto 14px;border-radius:50%;background:rgba(12,163,12,.12);display:flex;align-items:center;justify-content:center;font-size:30px;color:var(--good,#0ca30c)">✓</div>
@@ -561,11 +562,13 @@
           </div>
           <div class="cs-sec"><h4><span class="no">2</span>어떤 사이트로 만들까요</h4>
             <div class="frm">
-              <div><label for="csProd">제품 <small style="color:var(--muted)">product</small></label><select id="csProd"><option value="ztna">Cloud ZTNA (ztna)</option><option value="__etc">직접 입력…</option></select><input id="csProdEtc" aria-label="제품 코드 직접 입력" placeholder="제품 코드" style="display:none;margin-top:6px" autocapitalize="off"></div>
+              <div><label for="csProd">제품 <small style="color:var(--muted)">product</small></label><select id="csProd"><option value="ztna">Cloud ZTNA (ztna)</option><option value="edr">Cloud EDR (edr)</option><option value="__etc">직접 입력…</option></select><input id="csProdEtc" aria-label="제품 코드 직접 입력" placeholder="제품 코드" style="display:none;margin-top:6px" autocapitalize="off"></div>
               <div><label for="csEd">에디션 <small style="color:var(--muted)">edition</small></label><select id="csEd"><option value="ent">Enterprise (ent)</option><option value="__etc">직접 입력…</option></select><input id="csEdEtc" aria-label="에디션 코드 직접 입력" placeholder="에디션 코드 (예: bas)" style="display:none;margin-top:6px" autocapitalize="off"></div>
               <div><label for="csDev">노드 수 <small style="color:var(--muted)">numberofdevices · 라이선스 단말 수</small></label><input id="csDev" type="number" min="1" max="100000" step="1" placeholder="예: 100" inputmode="numeric"></div>
               <div><label for="csLang">화면 언어 <small style="color:var(--muted)">language</small></label><select id="csLang"><option value="ko">한국어 (ko)</option><option value="en">English (en)</option><option value="ja">日本語 (ja)</option><option value="zh">中文 (zh)</option></select></div>
               <div><label for="csBranch">배포 브랜치 <small style="color:var(--muted)">branch · 어떤 버전 계열로 만들지</small></label><select id="csBranch"><option value="candidate">candidate — RC (기본)</option><option value="release">release — R (정식 릴리스)</option><option value="beta">beta — 베타</option><option value="current">current — 최신 개발</option></select></div>
+              <div><label for="csPurpose">용도 <small style="color:var(--muted)">계약 전환 점검의 기준</small></label><select id="csPurpose"><option value="paid">유상 — 발주 예정</option><option value="poc">PoC — 종료일 있음</option><option value="internal">내부·데모 — 무상</option></select></div>
+              <div><label for="csDue" id="csDueL">예상 발주일 <small style="color:var(--muted)">지나면 알림이 세짐</small></label><input id="csDue" type="date"></div>
               <div class="full"><label for="csMemo">메모 <small style="color:var(--muted)">(선택 · 용도·담당 — 이력에 남음)</small></label><input id="csMemo" placeholder="예: OO사 PoC 2주 · 담당 홍길동"></div>
             </div>
           </div>
@@ -601,6 +604,11 @@
             <div style="overflow-x:auto"><table class="pr" id="ccList"><thead><tr><th>라벨</th><th>API 이메일</th><th>등록</th><th></th></tr></thead><tbody></tbody></table></div>
           </div>
         </div>
+        <div id="csPaneWatch" style="display:none">
+          <div class="cs-sec"><h4><span class="no">✓</span>계약 전환 점검 <small>— 만든 사이트마다 계약이 붙었는지 · 발주서 없이 무상으로 쓰이는 일을 막기 위한 점검(월말 슬랙과 같은 기준)</small></h4>
+            <div id="swHost"></div>
+          </div>
+        </div>
         <div class="cs-sec" id="csSecRun"><h4><span class="no">3</span>확인하고 실행 <small>— 실제 사이트가 바뀌는 작업이라 한 번 더 묻습니다</small></h4>
           <div class="frm"><div class="full"><label for="csCred">어느 API 계정으로 부를까요 <small style="color:var(--muted)">(등록된 my.genians 계정)</small></label><select id="csCred"><option value="">불러오는 중…</option></select></div></div>
           <div class="cs-sum" id="csSum"></div>
@@ -610,7 +618,7 @@
           </div>
         </div>
       </div>
-      <div style="margin-top:22px;padding-top:14px;border-top:1px solid var(--ring)">
+      <div style="margin-top:22px;padding-top:14px;border-top:1px solid var(--ring)" id="csHistWrap">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap"><b style="font-size:14px">🕘 요청 이력</b><span class="mini" id="csHistCap" style="color:var(--muted)"></span><span style="flex:1"></span><input id="csHistQ" aria-label="요청 이력 검색" placeholder="사이트명·고객사 검색" style="height:30px;padding:0 10px;border:1px solid var(--ring);border-radius:8px;background:var(--surface-2);color:inherit;font:inherit;font-size:12px;width:200px"><button class="chip" id="csHistRefresh">↻ 새로 읽기</button></div>
         <div style="overflow-x:auto"><table class="pr" id="csHist"><thead><tr><th>일시</th><th>작업</th><th>사이트명</th><th>고객사</th><th>내용</th><th>결과</th><th>메시지</th><th>요청자</th><th>API 계정</th><th>메모</th></tr></thead><tbody></tbody></table></div>
       </div>

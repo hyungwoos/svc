@@ -6,7 +6,8 @@ import { dIdx, EQB, loadFromDb, onData, railSync, renderEqBoard, SB_RAW, sbHeade
 import { kpiTable, toggleWidgetPanel } from './dash.js';
 import { OI_IND, OI_OWNERS, OI_PARTNERS, OI_PROB, OI_PRODUCTS, OI_TYPE } from './grids.js';
 import { CH_DEFS, chOf, diffOpen, nmKeys } from './analysis.js';
-import { applyDense, denseKey, foldZeroRows, openFind, openPaste } from './tools.js';
+import { applyDense, denseKey, foldZeroRows, openFind, openPaste, renderTodo } from './tools.js';
+import { ntfDlg, ntfName, ntfSync } from './notify.js';
 import { loadInbound } from './inbound.js';
 import { syncOrderAssets } from './equipment.js';
 import { a11yTileRole, BLANK_LABEL, clearFilters, closeColFilter, DV, exportXlsx, gridAddRow, navMenu, oiOpen, openColPick, openFilterPanel, renderGrid, rowMenu,
@@ -92,7 +93,7 @@ export function csDupOf(name){
   if(h) return {kind:'hist', txt:'이 포탈에서 '+String(h.created_at).slice(0,10)+'에 이미 만든 사이트'+(h.customer? ' — '+h.customer:'')};
   return null;
 }
-export var CS_PROD={ztna:'Cloud ZTNA'}, CS_ED={ent:'Enterprise', bas:'Basic', basic:'Basic', std:'Standard'}, CS_LANG={ko:'한국어',en:'English',ja:'日本語',zh:'中文'}, CS_BR={candidate:'RC(candidate)', release:'R 정식(release)', beta:'베타(beta)', current:'최신 개발(current)'};
+export var CS_PROD={ztna:'Cloud ZTNA', edr:'Cloud EDR'},   /* ㊿+192 EDR */ CS_ED={ent:'Enterprise', bas:'Basic', basic:'Basic', std:'Standard'}, CS_LANG={ko:'한국어',en:'English',ja:'日本語',zh:'中文'}, CS_BR={candidate:'RC(candidate)', release:'R 정식(release)', beta:'베타(beta)', current:'최신 개발(current)'};
 export function csPreview(){
   var b=csBody(), ok=/^[a-z0-9][a-z0-9-]{1,62}$/.test(b.sitename||'');
   if(CS.tab==='create') $('#csNameHint').style.color=(!b.sitename||ok)? 'var(--muted)' : 'var(--critical)';
@@ -114,6 +115,7 @@ export function csPreview(){
     html=tpl`${rawHtml(($('#csCust').value||'').trim()? tpl`<b>${$('#csCust').value.trim()}</b> 고객사의 `:'')}<b>${b.sitename||'(사이트명)'}</b> 사이트를 <b>${CS_PROD[b.product]||b.product} ${CS_ED[b.edition]||b.edition}</b> 에디션, ${CS_LANG[b.language]||b.language} 화면, <b>${CS_BR[b.branch]||b.branch}</b> 브랜치, <b>${rawHtml(b.numberofdevices? Number(b.numberofdevices).toLocaleString('ko-KR')+'노드':'(노드 수)')}</b>로 새로 만듭니다.`+ tpl`${rawHtml(dup? tpl`<div class="mini" style="color:var(--critical);margin-top:4px">⚠ ${dup.txt} — 기존 사이트라면 «기존 사이트 수정»을, 새 사이트라면 다른 이름을 쓰세요</div>`:'')}`;
   }
   html+=tpl`<div class="mini" style="margin-top:4px;color:var(--muted)">API 계정: ${rawHtml(cred? esc(cred.label+' — '+cred.apiemail) : '<span style="color:var(--critical)">선택 필요</span>')}</div>`;
+  if(CS.tab==='create'){ var pu=$('#csPurpose'), du=$('#csDue'); if(pu) html+=tpl`<div class="mini" style="margin-top:2px;color:var(--muted)">용도: ${SW_PURPOSE[pu.value]||pu.value}${rawHtml(pu.value!=='internal'? (du && du.value? ' · '+(pu.value==='poc'? 'PoC 종료일 ':'예상 발주일 ')+esc(du.value) : ' · <span style="color:var(--warn-ink,#b45309)">기한 없음 — 적어 두면 점검이 정확해집니다</span>') : '')}</div>`; }   /* ㊿+192 */
   if(miss.length) html=tpl`<div style="color:var(--critical);font-weight:650;margin-bottom:4px">아직 비어 있음: ${rawHtml(miss.join(' · '))}</div>${rawHtml(html)}`;
   html+=tpl`<details><summary>실제로 보내는 요청 보기 (API 형식)</summary><pre>POST my.genians.co.kr/genians/api/v1/${CS.tab==='update'?'cloudsite-update':'cloudsite'}\n${JSON.stringify(Object.assign({apikey:'(서버 보관)', apiemail:cred? cred.apiemail : '(계정 선택)'}, show), null, 1)}</pre></details>`;
   box.className='cs-sum'+(miss.length?' bad':''); box.innerHTML=html;
@@ -124,7 +126,9 @@ export function csSetTab(t){
   CS.tab=t;
   $('#csTabs').querySelectorAll('button').forEach(function(b){ b.setAttribute('aria-pressed', b.dataset.t===t? 'true':'false'); });
   $('#csPaneCreate').style.display=t==='create'?'':'none'; $('#csPaneUpdate').style.display=t==='update'?'':'none'; $('#csPaneCreds').style.display=t==='creds'?'':'none';
-  $('#csSecRun').style.display=t==='creds'?'none':'';
+  var pw=$('#csPaneWatch'); if(pw) pw.style.display=t==='watch'?'':'none';   /* ㊿+192 계약 전환 점검 */
+  $('#csSecRun').style.display=(t==='creds' || t==='watch')?'none':'';
+  if(t==='watch') swRender(true);
   $('#csGo').textContent=t==='update'? '✏️ 사이트 수정 실행' : '➕ 사이트 만들기';
   msg('csMsg',''); csPreview();
   if(t==='creds') csRenderCreds();
@@ -150,10 +154,16 @@ export function renderCsite(){
   msg('csMsg',''); msg('ccMsg','');
   $('#csFormWrap').style.display=''; $('#csDone').style.display='none';
   $('#csTabCreds').style.display=ST.IS_SUPER? '':'none';
+  /* ㊿+192 메뉴 권한으로 들어온 계정(슈퍼 아님)은 «계약 전환 점검»만 — 사이트 만들기 · 수정은 함수(cloudsite) 규칙대로 슈퍼 관리자만 */
+  $('#csTabs').querySelectorAll('button[data-t="create"],button[data-t="update"]').forEach(function(b){ b.style.display=ST.IS_SUPER? '':'none'; });
+  var hw=document.getElementById('csHistWrap'); if(hw) hw.style.display=(ST.IS_SUPER || canView('csite'))? '':'none';
+  if(!ST.IS_SUPER) CS.tab='watch';
+  var wb=document.getElementById('csWhoBadge'); if(wb) wb.textContent=ST.IS_SUPER? '슈퍼 관리자 · 메뉴 권한을 받은 계정은 점검만' : '점검만 — 사이트 만들기 · 수정은 슈퍼 관리자';
   csFillSiteList();
   if(!CS.wired){
     CS.wired=true;
-    ['csName','csDev','csProd','csProdEtc','csEd','csEdEtc','csLang','csBranch','csCred','cuName','cuNodes','cuSra','cuExp','cuMail'].forEach(function(i){ var e=$('#'+i); e.addEventListener('input',csPreview); e.addEventListener('change',csPreview); });
+    var pu=$('#csPurpose'); if(pu) pu.addEventListener('change', function(){ var l=$('#csDueL'); if(l) l.innerHTML=pu.value==='poc'? tpl`PoC 종료일 <small style="color:var(--muted)">지나면 «전환하거나 정리» 알림</small>` : pu.value==='internal'? tpl`(기한 없음) <small style="color:var(--muted)">내부·데모는 점검에서 건수만</small>` : tpl`예상 발주일 <small style="color:var(--muted)">지나면 알림이 세짐</small>`; });
+    ['csName','csDev','csProd','csProdEtc','csEd','csEdEtc','csLang','csBranch','csCred','cuName','cuNodes','cuSra','cuExp','cuMail','csPurpose','csDue'].forEach(function(i){ var e=$('#'+i); if(!e) return; e.addEventListener('input',csPreview); e.addEventListener('change',csPreview); });
     $('#csProd').addEventListener('change',function(){ $('#csProdEtc').style.display=this.value==='__etc'?'':'none'; });
     $('#csEd').addEventListener('change',function(){ $('#csEdEtc').style.display=this.value==='__etc'?'':'none'; });
     $('#csTabs').querySelectorAll('button').forEach(function(b){ b.onclick=function(){ csSetTab(b.dataset.t); }; });
@@ -162,12 +172,13 @@ export function renderCsite(){
     $('#cuName').addEventListener('change',function(){ cuSyncCust(); csPreview(); });
     $('#csGo').onclick=csSubmit;
     $('#ccAdd').onclick=csAddCred;
-    $('#csDoneNew').onclick=function(){ ['csName','csDev','csMemo','csCust','csProdEtc','csEdEtc','cuName','cuNodes','cuSra','cuExp','cuCust','cuMemo'].forEach(function(i){ $('#'+i).value=''; }); $('#cuMail').checked=false; $('#csProd').value='ztna'; $('#csEd').value='ent'; $('#csLang').value='ko'; $('#csBranch').value='candidate'; renderCsite(); };
+    $('#csDoneNew').onclick=function(){ ['csName','csDev','csMemo','csCust','csProdEtc','csEdEtc','cuName','cuNodes','cuSra','cuExp','cuCust','cuMemo','csDue'].forEach(function(i){ var e=$('#'+i); if(e) e.value=''; }); var pu1=$('#csPurpose'); if(pu1){ pu1.value='paid'; pu1.dispatchEvent(new Event('change')); } $('#cuMail').checked=false; $('#csProd').value='ztna'; $('#csEd').value='ent'; $('#csLang').value='ko'; $('#csBranch').value='candidate'; renderCsite(); };
     $('#csHistRefresh').onclick=function(){ CS.hist=undefined; csHist(); };
     $('#csHistQ').addEventListener('input',function(){ csHist(); });
     $('#csCust').addEventListener('input',csPreview);
   }
-  csSetTab(CS.tab||'create'); csLoadCreds(); csHist();
+  csSetTab(CS.tab||'create'); if(ST.IS_SUPER) csLoadCreds(); csHist();
+  swLoad(false).then(function(){ var n=swAlerts().length, b=document.getElementById('csWatchN'); if(b){ b.textContent=n? n+'개 확인':''; b.style.display=n? '':'none'; } });
   setTimeout(function(){ var f=CS.tab==='update'? '#cuName' : '#csCust'; if(!$(f).value) $(f).focus(); },50);
 }
 export async function csHist(){
@@ -237,6 +248,7 @@ export async function csSubmit(){
       $('#csDoneTitle').textContent=up? '사이트 정보가 수정되었습니다' : '사이트가 만들어졌습니다'; $('#csDoneSum').textContent=sum+' · '+(j.message||'');
       toast(up? 'Cloud 사이트 수정':'Cloud 사이트 생성', b.sitename+' — '+(j.message||'완료'));
       try{ logChange('insert','cloud_sites',0,{action:b.action, sitename:b.sitename, customer:cust}); }catch(e){}
+      if(!up){ var pu0=$('#csPurpose'), du0=$('#csDue'); try{ await swAfterCreate(b.sitename, pu0? pu0.value : 'paid', du0 && pu0 && pu0.value!=='internal'? du0.value : ''); }catch(e){} }   /* ㊿+192 용도 · 기한을 그 행에 */
     } else {
       $('#csDoneIcon').style.background='rgba(208,59,59,.12)'; $('#csDoneIcon').style.color='var(--critical)'; $('#csDoneIcon').textContent='!';
       var er=String(j.error||'알 수 없는 오류');
@@ -1975,4 +1987,118 @@ export function openNewMenu(btn){
     {l:'계약 변경 — 갱신·추가·해지·금액', ic:'edit', go:function(){ $('#btnEdit').click(); var t=/** @type {any} */(document.querySelector('#eTabs button[data-t="renew"]')); if(t) t.click(); }});
   [['oinew','영업기회(OI) 등록','target'],['ordernew','장비 신청','box'],['mdrnew','PoC 신청','shield']].forEach(function(x){ if(canView(x[0])) it.push({l:x[1], ic:x[2], go:function(){ navMenu(x[0]); }}); });
   if(it.length) rowMenu(btn, it);
+}
+
+/* ═══ ㊿+192 Cloud 사이트 → 계약 전환 점검 (SQL 115 site_watch) ═══
+   정책서버(사이트)를 만들어 주고 발주 없이 쓰는 일이 없게: 사이트마다 용도(유상 · PoC · 내부) · 기한을 적고, 계약(CSM 사이트명)이 붙었는지를 홈 · 알림함 · 이 화면 · 월말 슬랙(remind)이 같은 함수로 봄 */
+export var SW={rows:null, ok:null, at:0, loading:null};
+export var SW_STATE={overdue:'발주일 지남', waiting:'계약 대기', poc_over:'PoC 종료 지남', ended:'계약 끝남', poc:'PoC 진행', internal:'내부·데모', linked:'계약 연결', closed:'사이트 종료', exempt:'무상 승인'};
+export var SW_ALERT=['overdue','waiting','poc_over','ended'];
+export var SW_PURPOSE={paid:'유상 — 발주 예정', poc:'PoC — 종료일 있음', internal:'내부·데모 — 무상'};
+export function swLoad(force){
+  if(!ST.SB_TOKEN) return Promise.resolve(null);
+  if(SW.loading) return SW.loading;
+  if(!force && SW.rows && Date.now()-SW.at<10*60*1000) return Promise.resolve(SW.rows);
+  SW.loading=fetchT(SB_URL+'/rest/v1/rpc/site_watch', {method:'POST', headers:sbHeaders(true), body:'{}'}, 15000, '사이트 점검', true)
+    .then(function(r){ return r.ok? r.json() : null; }).catch(function(){ return null; })
+    .then(function(rows){ SW.loading=null; SW.at=Date.now(); SW.ok=Array.isArray(rows); SW.rows=Array.isArray(rows)? rows : (SW.rows||[]); return SW.rows; });
+  return SW.loading;
+}
+export function swAlerts(){ return (SW.rows||[]).filter(function(r){ return SW_ALERT.indexOf(r.state)>=0; }); }
+export function swProd(r){ return CS_PROD[String(r.product||'').toLowerCase()] || r.product || ''; }
+/** 홈 우선 업무 · 알림함 한 줄용 요약 */
+export function swSummary(){
+  var a=swAlerts(), by={}; a.forEach(function(r){ by[r.state]=(by[r.state]||0)+1; });
+  var oldest=a.slice().sort(function(x,y){ return (y.days||0)-(x.days||0); })[0];
+  return {n:a.length, by:by, oldest:oldest||null, ok:SW.ok};
+}
+function swDue(r){ return r.purpose==='poc'? (r.due_date? 'PoC 종료 '+r.due_date : 'PoC 종료일 미정') : (r.due_date? '예상 발주 '+r.due_date : '발주일 미정'); }
+export function swRender(load){
+  var host=document.getElementById('swHost'); if(!host) return;
+  if(load && (!SW.rows || !SW.ok)){ host.innerHTML=tpl`<p class="mini">불러오는 중…</p>`; swLoad(true).then(function(){ swRender(false); }); return; }
+  if(SW.ok===false){ host.innerHTML=tpl`<p class="mini" style="color:var(--critical)">site_watch 를 부르지 못했습니다 — SQL 115 를 먼저 실행해 주세요(그 전엔 이 점검 · 홈 줄 · 월말 슬랙이 비어 있음)</p>`; return; }
+  var rows=SW.rows||[], a=swAlerts(), rest=rows.filter(function(r){ return SW_ALERT.indexOf(r.state)<0; }), by={}; rows.forEach(function(r){ by[r.state]=(by[r.state]||0)+1; });
+  var tile=function(k, n, cls){ return tpl`<div class="tile ${rawHtml(cls||'')}"><div class="t">${SW_STATE[k]}</div><div class="v">${String(n||0)}</div></div>`; };
+  var h=tpl`<div class="tiles sw-tiles">${rawHtml(['overdue','waiting','poc_over','ended'].map(function(k){ return tile(k, by[k], by[k]? 'bad':'ok'); }).join(''))}${rawHtml(['poc','internal','linked','closed'].map(function(k){ return tile(k, (by[k]||0)+(k==='closed'? (by.exempt||0):0)); }).join(''))}</div>`;
+  h+=tpl`<p class="cap" style="margin:8px 0 10px">계약 연결 = 계약 관리 표의 <b>CSM(사이트명)</b> 칸이 이 사이트명과 같은 계약이 있음. 사이트를 만들 때 적은 용도 · 기한으로 «발주일 지남 · PoC 종료 지남»을 가립니다. 월말 슬랙(remind)도 같은 기준.</p>`;
+  var row=function(r, alert){
+    var st=SW_STATE[r.state]||r.state, who=ntfName(r.requested_by);
+    var acts=alert? tpl`<button type="button" class="cbtn" data-swlink="${String(r.id)}" title="계약 입력창을 이 사이트(고객사 · CSM)로 채워서 엽니다">계약 입력</button> <button type="button" class="cbtn" data-swedit="${String(r.id)}">용도 · 기한 ✎</button>`
+      : tpl`<button type="button" class="cbtn" data-swedit="${String(r.id)}">✎</button>`;
+    return tpl`<tr class="${rawHtml(alert? 'sw-alert':'')}"><td><b>${r.sitename}</b><div class="mini">${swProd(r)}${r.edition? '/'+r.edition:''}${r.devices? ' · '+r.devices+'노드':''}</div></td><td>${r.customer||'—'}${rawHtml(r.contract_id? tpl`<div class="mini">계약 #${String(r.contract_id)} ${r.contract_status||''}${r.contract_cust && r.contract_cust!==r.customer? ' · '+r.contract_cust:''}</div>`:'')}</td>`+
+      tpl`<td><span class="ctag ${rawHtml(alert? 'warn':'')}">${st}</span><div class="mini">${SW_PURPOSE[r.purpose]? SW_PURPOSE[r.purpose].split(' — ')[0] : '용도 미지정'} · ${swDue(r)}</div>${rawHtml(r.status_note? tpl`<div class="mini">${r.status_note}</div>`:'')}</td>`+
+      tpl`<td class="n">${String(r.days||0)}일</td><td class="mini">${who}<div>${String(r.created_at||'').slice(0,10)}</div></td><td class="nw">${rawHtml(acts)}</td></tr>`;
+  };
+  h+=tpl`<div class="scroll"><table class="rn-tbl sw-tbl"><thead><tr><th>사이트</th><th>고객사 · 계약</th><th>상태 · 용도 · 기한</th><th class="n">경과</th><th>만든 사람</th><th></th></tr></thead><tbody>`+
+    tpl`${rawHtml(a.length? a.map(function(r){ return row(r, true); }).join('') : tpl`<tr><td colspan="6" class="mini">계약 없이 쓰는 사이트가 없습니다 ✅</td></tr>`)}</tbody></table></div>`;
+  h+=tpl`<details class="sw-rest" style="margin-top:10px"><summary class="mini">그 밖의 사이트 ${String(rest.length)}개 — PoC 진행 · 내부 · 계약 연결 · 종료 · 무상 승인</summary><div class="scroll"><table class="rn-tbl sw-tbl"><tbody>${rawHtml(rest.map(function(r){ return row(r, false); }).join(''))}</tbody></table></div></details>`;
+  h+=tpl`<div class="mact" style="margin-top:12px"><button type="button" class="pill ghost" id="swRefresh">다시 읽기</button>${rawHtml(ST.IS_SUPER? tpl`<button type="button" class="pill" id="swSlack" title="월말 크론과 같은 메시지를 지금 팀 채널로">슬랙으로 지금 보내기</button>`:'')}<span class="mmsg" id="swMsg"></span></div>`;
+  host.innerHTML=h;
+  host.querySelectorAll('button[data-swlink]').forEach(function(b){ b.onclick=function(){ swLinkContract(+b.dataset.swlink); }; });
+  host.querySelectorAll('button[data-swedit]').forEach(function(b){ b.onclick=function(){ swEdit(+b.dataset.swedit); }; });
+  var rf=document.getElementById('swRefresh'); if(rf) rf.onclick=function(){ swLoad(true).then(function(){ swRender(false); try{ renderTodo(); }catch(e){} }); };
+  var sl=document.getElementById('swSlack'); if(sl) sl.onclick=swSlack;
+}
+/** 계약 입력창을 이 사이트로 채워서 열기 — 고객사 · 서비스 Cloud · CSM(사이트명) */
+export function swLinkContract(id){
+  var r=(SW.rows||[]).filter(function(x){ return x.id===id; })[0]; if(!r) return;
+  if(!canWrite('contracts')){ toast('계약 쓰기 권한이 없습니다', '계약 관리 화면 쓰기 권한이 있어야 입력할 수 있습니다', 'info'); return; }
+  $('#btnEdit').click(); var t=/** @type {any} */(document.querySelector('#eTabs button[data-t="new"]')); if(t) t.click();
+  if(r.customer) $('#nCust').value=r.customer;
+  var nl=$('#nLine'); if(nl){ nl.value='Cloud'; nl.dispatchEvent(new Event('change')); }
+  var cs=$('#nCsm'); if(cs) cs.value=r.sitename;
+  toast('계약 입력창', r.sitename+' — 고객사 · CSM 사이트명을 채웠습니다. 금액 · 기간을 적고 저장하면 «계약 연결»로 바뀝니다');
+}
+/** 용도 · 기한 · 상태 고치기 — cloud_sites 의 purpose · due_date · site_status · status_note (슈퍼 관리자 · SQL 115 정책) */
+export function swEdit(id){
+  var r=(SW.rows||[]).filter(function(x){ return x.id===id; })[0]; if(!r) return;
+  if(!ST.IS_SUPER){ toast('슈퍼 관리자만 고칠 수 있습니다', '', 'info'); return; }
+  var m=ntfDlg('ovlSw', 460);
+  m.innerHTML=tpl`<h3 id="ovlSwH">${r.sitename} — 용도 · 기한 · 상태</h3><p class="cap">${r.customer||'(고객사 없음)'} · ${swProd(r)} · 만든 날 ${String(r.created_at||'').slice(0,10)} · 지금 «${SW_STATE[r.state]||r.state}»</p>`+
+    tpl`<div class="frm"><label for="swPurpose">용도</label><select id="swPurpose">${rawHtml(Object.keys(SW_PURPOSE).map(function(k){ return tpl`<option value="${k}"${(r.purpose||'paid')===k? ' selected':''}>${SW_PURPOSE[k]}</option>`; }).join(''))}</select></div>`+
+    tpl`<div class="frm"><label for="swDue" id="swDueL">${r.purpose==='poc'? 'PoC 종료일' : '예상 발주일'}</label><input id="swDue" type="date" value="${r.due_date||''}"></div>`+
+    tpl`<div class="frm"><label for="swStatus">상태</label><select id="swStatus"><option value="open"${!r.site_status||r.site_status==='open'? ' selected':''}>점검 대상(계약이 붙을 때까지)</option><option value="closed"${r.site_status==='closed'? ' selected':''}>사이트 종료 · 삭제됨 — 더 안 봄</option><option value="exempt"${r.site_status==='exempt'? ' selected':''}>무상 승인 — 사유 필수</option></select></div>`+
+    tpl`<div class="frm"><label for="swNote">사유 · 메모</label><input id="swNote" maxlength="200" value="${r.status_note||''}" placeholder="예: 재무 승인 무상 제공(승인일) · 고객 요청으로 삭제"></div>`+
+    tpl`<div class="mact"><span class="mmsg" id="swEMsg"></span><button type="button" class="pill ghost" id="swCancel">닫기</button><button type="button" class="pill" id="swSave">저장</button></div>`;
+  openOvl('ovlSw');
+  var pu=/** @type {any} */(m.querySelector('#swPurpose')); pu.onchange=function(){ m.querySelector('#swDueL').textContent=pu.value==='poc'? 'PoC 종료일' : '예상 발주일'; };
+  m.querySelector('#swCancel').onclick=function(){ closeOvl('ovlSw'); };
+  m.querySelector('#swSave').onclick=async function(){
+    var em=m.querySelector('#swEMsg'), purpose=pu.value, due=/** @type {any} */(m.querySelector('#swDue')).value||null, st=/** @type {any} */(m.querySelector('#swStatus')).value, note=(/** @type {any} */(m.querySelector('#swNote')).value||'').trim();
+    if(st==='exempt' && !note){ em.textContent='무상 승인은 사유를 적어야 합니다'; em.className='mmsg bad'; return; }
+    em.textContent='저장 중…'; em.className='mmsg';
+    try{
+      await sbWrite('PATCH', 'cloud_sites?id=eq.'+id, {purpose:purpose, due_date:due, site_status:st==='open'? null : st, status_note:note||null}, 'return=minimal', 'csite');
+      logChange('update', 'cloud_sites', id, {sitename:r.sitename, purpose:{from:r.purpose||null, to:purpose}, due_date:{from:r.due_date||null, to:due}, site_status:{from:r.site_status||null, to:st==='open'? null : st}, note:note||null, _via:'계약 전환 점검'});
+      closeOvl('ovlSw'); toast('저장', r.sitename+' — '+SW_PURPOSE[purpose].split(' — ')[0]+(due? ' · '+due:'')+(st!=='open'? ' · '+(st==='closed'? '사이트 종료':'무상 승인'):''), 'ok');
+      await swLoad(true); swRender(false); try{ renderTodo(); }catch(e){} try{ ntfSync(); }catch(e){}
+    }catch(e){ var s=String(/** @type {any} */(e).message||e); em.textContent=/PGRST204|column|does not exist|42501|permission|policy/i.test(s)? 'SQL 115 를 먼저 실행해야 저장할 수 있습니다 — '+s.slice(0,100) : '저장하지 못했습니다 — '+s.slice(0,140); em.className='mmsg bad'; }
+  };
+  setTimeout(function(){ try{ pu.focus(); }catch(e){} }, 60);
+}
+/** 월말 크론과 같은 «사이트 점검» 메시지를 지금 팀 채널로(remind · only:'sites') */
+export async function swSlack(){
+  if(!ST.IS_SUPER){ toast('슬랙 발송은 슈퍼 관리자만 할 수 있습니다',''); return; }
+  var m=document.getElementById('swMsg'), b=/** @type {any} */(document.getElementById('swSlack')); if(b) b.disabled=true; if(m){ m.textContent='미리보기 만드는 중…'; m.className='mmsg'; }
+  try{
+    var url=SB_URL+'/functions/v1/remind', hdr={'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+ST.SB_TOKEN};
+    var body={only:'sites'}; if(/^https:/.test(location.protocol+'//')) body.portal_url=location.origin+location.pathname;
+    var pv=await fetchT(url+'?dry=1',{method:'POST',headers:hdr,body:JSON.stringify(body)}, 60000, 'remind 함수', true).then(function(r){ return r.json(); });
+    if(!pv || !pv.ok) throw new Error((pv&&pv.error)||'미리보기 실패 — remind 함수 v1.5 가 배포됐는지 확인');
+    if(!pv.sites) throw new Error('배포된 remind 함수가 사이트 점검을 모르는 옛 버전입니다 — v1.5 로 올려 주세요');
+    if(!confirm('슬랙 팀 채널('+(pv.channel||'')+')로 보냅니다.\n\n'+(pv.text||'')+'\n\n보낼까요?')) throw new Error('취소했습니다.');
+    var rr=await fetchT(url,{method:'POST',headers:hdr,body:JSON.stringify(body)}, 60000, 'remind 함수').then(function(r){ return r.json(); });
+    if(!rr || !rr.ok) throw new Error((rr&&rr.error)||'발송 실패');
+    toast('슬랙 발송 완료 📣', String(rr.text||'').slice(0,90)); if(m){ m.textContent='슬랙 발송 완료 — '+(rr.text||''); m.className='mmsg ok'; }
+  }catch(e){ if(m){ m.textContent=String(/** @type {any} */(e).message||e); m.className='mmsg bad'; } }
+  if(b) b.disabled=false;
+}
+/** 사이트를 만든 직후: 용도 · 기한을 그 행에 적음(함수(서버 키)가 넣은 행을 사이트명으로 찾아 PATCH · SQL 115 전이면 조용히 건너뜀) */
+export async function swAfterCreate(sitename, purpose, due){
+  try{
+    var rows=await sbTry('cloud_sites?select=id&action=eq.create&sitename=eq.'+encodeURIComponent(sitename)+'&order=id.desc&limit=1');
+    var id=rows && rows[0] && rows[0].id; if(!id) return false;
+    await sbWrite('PATCH', 'cloud_sites?id=eq.'+id, {purpose:purpose||'paid', due_date:due||null}, 'return=minimal', 'csite');
+    SW.rows=null; return true;
+  }catch(e){ return false; }
 }

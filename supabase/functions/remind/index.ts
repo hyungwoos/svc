@@ -1,5 +1,6 @@
 // ============================================================================
-//  Supabase Edge Function: remind  (v1.4 · 2026-10-11 · ㊿+182 Slack 속도 제한(429)이면 Retry-After 만큼 기다렸다 다시(최대 2번) · 기록(remind_log)을 남긴 뒤 응답 — v1.3 2026-10-02)
+//  Supabase Edge Function: remind  (v1.5 · 2026-10-12 · ㊿+192 «사이트 → 계약 전환 점검» 메시지(SQL 115 site_watch) — 월말 크론이면 갱신 메시지 다음에 따로 한 번 · body.only:'sites' 면 그것만 · SQL 115 전이면 건너뜀(응답에 이유)
+//   v1.4 · 2026-10-11 · ㊿+182 Slack 속도 제한(429)이면 Retry-After 만큼 기다렸다 다시(최대 2번) · 기록(remind_log)을 남긴 뒤 응답 — v1.3 2026-10-02)
 //   계약 만기 알림 — 매월 말(25일) 슬랙 팀 채널에 «다음 달 갱신 처리 대상» 을 한 번에 보냄
 //     · 이번 달 만기(다음 달 1일 LIVE 에서 빠짐) · 다음 달 만기 · 만기 지났는데 미처리
 //     · 데이터는 DB 함수 renew_watch() (SQL 84) — 포탈 LIVE 규칙과 같은 기준
@@ -66,10 +67,44 @@ function section(title: string, rows: Row[], max = 25): unknown[] {
 }
 type Kind = 'due' | 'next' | 'lapsed';
 const ALL_KINDS: Kind[] = ['due', 'next', 'lapsed'];
+function onlyList(v: unknown): string[] { const arr = Array.isArray(v) ? v : (typeof v === 'string' ? v.split(/[,+\s]+/) : []); return arr.map(String).filter(Boolean); }
 function pickKinds(v: unknown): Kind[] {
-  const arr = Array.isArray(v) ? v : (typeof v === 'string' ? v.split(/[,+\s]+/) : []);
-  const ks = arr.map(String).filter((k): k is Kind => (ALL_KINDS as string[]).includes(k));
+  const ks = onlyList(v).filter((k): k is Kind => (ALL_KINDS as string[]).includes(k));
   return ks.length ? Array.from(new Set(ks)) : ALL_KINDS;
+}
+// ㊿+192 사이트 → 계약 전환 점검 (SQL 115 site_watch) — 정책서버를 만들어 주고 발주 없이 쓰는 일이 없게, 월말에 채널로 한 번
+type SiteRow = { id: number; sitename: string; product: string | null; edition: string | null; devices: number | null; customer: string | null; requested_by: string | null; created_at: string;
+  purpose: string | null; due_date: string | null; site_status: string | null; status_note: string | null; contract_id: number | null; contract_cust: string | null; contract_status: string | null; days: number; state: string };
+const PROD: Record<string, string> = { ztna: 'Cloud ZTNA', edr: 'Cloud EDR', nac: 'Cloud NAC' };
+function siteLine(r: SiteRow, who: (e: string | null) => string): string {
+  const bits = [r.customer || '(고객사 없음)', (PROD[String(r.product || '').toLowerCase()] || r.product || '') + (r.edition ? '/' + r.edition : ''), r.devices ? r.devices + '노드' : '', who(r.requested_by), '경과 ' + r.days + '일'];
+  if (r.purpose === 'poc') bits.push('PoC 종료일 ' + (r.due_date || '미정')); else if (r.due_date) bits.push('예상 발주일 ' + r.due_date);
+  if (r.state === 'ended') bits.push('계약 ' + (r.contract_status || '종료') + (r.contract_cust ? ' · ' + r.contract_cust : ''));
+  return `• *${r.sitename}* — ${bits.filter(Boolean).join(' · ')}`;
+}
+function siteSection(title: string, rows: SiteRow[], who: (e: string | null) => string, max = 25): unknown[] {
+  if (!rows.length) return [];
+  const body = rows.slice(0, max).map((r) => siteLine(r, who)).join('\n') + (rows.length > max ? `\n… 외 ${rows.length - max}건` : '');
+  return [{ type: 'section', text: { type: 'mrkdwn', text: `*${title}* — ${rows.length}건` } }, { type: 'section', text: { type: 'mrkdwn', text: body.slice(0, 2900) } }];
+}
+function buildSites(rows: SiteRow[], who: (e: string | null) => string, portalUrl = PORTAL_URL) {
+  const by = (s: string) => rows.filter((r) => r.state === s);
+  const overdue = by('overdue'), waiting = by('waiting'), pocOver = by('poc_over'), ended = by('ended');
+  const alert = overdue.length + waiting.length + pocOver.length + ended.length;
+  const oldest = [...overdue, ...waiting].sort((a, b) => b.days - a.days)[0];
+  const head = alert ? `🛰️ 계약 없이 쓰는 Cloud 사이트 ${alert}개${oldest ? ` — 가장 오래된 건 ${oldest.days}일` : ''}` : '🛰️ Cloud 사이트 → 계약 전환 점검 — 계약 없이 쓰는 사이트 없음 ✅';
+  const blocks: unknown[] = [
+    { type: 'header', text: { type: 'plain_text', text: head.slice(0, 150) } },
+    { type: 'context', elements: [{ type: 'mrkdwn', text: `${SLACK_MENTION ? SLACK_MENTION + ' ' : ''}포탈에서 만든 정책서버(사이트)마다 계약(CSM 사이트명)이 붙었는지 — 발주서 없이 무상 사용되는 일을 막기 위한 월말 점검 · 처리는 ${portalUrl ? `<${portalUrl}#csite|포탈 › Cloud 사이트 관리 › 계약 전환 점검>` : '포탈 › Cloud 사이트 관리 › 계약 전환 점검'}` }] },
+  ];
+  blocks.push(...siteSection('🔴 예상 발주일이 지났는데 계약 없음', overdue, who));
+  blocks.push(...siteSection('🟠 계약 대기 (오래된 순)', [...waiting].sort((a, b) => b.days - a.days), who));
+  blocks.push(...siteSection('🟡 PoC 종료일이 지남 — 전환하거나 사이트를 정리', pocOver, who));
+  blocks.push(...siteSection('⚫ 계약은 끝났는데 사이트가 남아 있음', ended, who));
+  const tail = [`PoC 진행 ${by('poc').length}`, `내부·데모 ${by('internal').length}`, `계약 연결 ${by('linked').length}`, `종료·무상 승인 ${by('closed').length + by('exempt').length}`].join(' · ');
+  blocks.push({ type: 'context', elements: [{ type: 'mrkdwn', text: `그 밖에 — ${tail} · 사이트를 만들 때 용도(유상 · PoC · 내부)와 예상 발주일을 적어 두면 이 점검이 정확해집니다` }] });
+  const text = `${head} — 발주일 지남 ${overdue.length} · 계약 대기 ${waiting.length} · PoC 종료 ${pocOver.length} · 계약 끝남 ${ended.length}`;
+  return { blocks, text, total: alert, counts: { overdue: overdue.length, waiting: waiting.length, poc_over: pocOver.length, ended: ended.length, poc: by('poc').length, internal: by('internal').length, linked: by('linked').length, closed: by('closed').length + by('exempt').length } };
 }
 function buildMessage(rows: Row[], thisM: string, nextM: string, kinds: Kind[] = ALL_KINDS, portalUrl = PORTAL_URL) {
   const due = rows.filter((r) => r.kind === 'due'), next = rows.filter((r) => r.kind === 'next'), lapsed = rows.filter((r) => r.kind === 'lapsed');
@@ -123,36 +158,70 @@ Deno.serve(async (req: Request) => {
   const nextM = (() => { const [y, m] = thisM.split('-').map(Number); const t = y * 12 + (m - 1) + 1; return `${Math.floor(t / 12)}-${String((t % 12) + 1).padStart(2, '0')}-01`; })();
   const svcKey = SB_SVC || (svc && /^sb_secret_/.test(token) ? token : '');
   const hdr = { apikey: svcKey || SB_ANON, Authorization: 'Bearer ' + (svcKey || token), 'Content-Type': 'application/json' };
-  const r = await fetchT(SB_URL + '/rest/v1/rpc/renew_watch', { method: 'POST', headers: hdr, body: JSON.stringify({ p_month: thisM }) }, 15000);
-  if (!r.ok) return json({ ok: false, error: 'renew_watch 실패 (' + r.status + '): ' + (await r.text()).slice(0, 200) + ' — SQL 84 를 실행했는지 확인' }, 500);
-  const rows = (await r.json()) as Row[];
+  const only = onlyList(body.only);
+  const wantRenew = !only.length || only.some((k) => (ALL_KINDS as string[]).includes(k));
+  const wantSites = !only.length || only.includes('sites');   /* ㊿+192 월말 전체 실행이면 갱신 메시지 다음에 «사이트 점검»도 · only:'sites' 면 그것만 */
   const kinds = pickKinds(body.only);
   const portalUrl = (typeof body.portal_url === 'string' && /^https:\/\/[^\s<>|"']{8,200}$/.test(body.portal_url)) ? body.portal_url : PORTAL_URL;
-  const msg = buildMessage(rows, thisM, nextM, kinds, portalUrl);
 
-  // ── 슬랙 ──
-  let slack: Record<string, unknown> | null = null, ok = true, error = '';
-  if (!dry) {
-    if (!SLACK_TOKEN) { ok = false; error = 'SLACK_BOT_TOKEN 이 설정되지 않았습니다 (Edge Functions › Secrets)'; }
-    else {
-      try {
-        const post = () => fetchT('https://slack.com/api/chat.postMessage', {
-          method: 'POST', headers: { Authorization: 'Bearer ' + SLACK_TOKEN, 'Content-Type': 'application/json; charset=utf-8' },
-          body: JSON.stringify({ channel: SLACK_CHANNEL, text: msg.text, blocks: msg.blocks, unfurl_links: false }),
-        }, 15000);
-        let sr = await post();
-        /* ㊿+182 속도 제한(429) = Slack 이 받지 않은 것 → 기다렸다 다시(두 번 가지 않음) · 시간 초과는 다시 보내지 않음(보내졌을 수 있음) */
-        for (let i = 0; sr.status === 429 && i < 2; i++) { const ra = Number(sr.headers.get('Retry-After')); await sr.body?.cancel().catch(() => null); await new Promise((ok) => setTimeout(ok, Math.min(isFinite(ra) && ra >= 0 ? ra : 1, 10) * 1000)); sr = await post(); }
-        slack = await sr.json().catch(() => ({ ok: false, error: sr.status === 429 ? 'ratelimited' : 'http_' + sr.status }));
-        if (!slack || !slack.ok) { ok = false; error = 'slack: ' + String((slack && slack.error) || sr.status) + (slack && slack.error === 'not_in_channel' ? ' — 봇을 채널에 초대하세요 (/invite @봇이름)' : ''); }
-      } catch (e) { ok = false; error = 'slack: ' + String((e as Error).message); }
+  // ── 슬랙 보내기(공통) — 429 면 Retry-After 만큼 기다렸다 다시(두 번까지) · 시간 초과는 다시 보내지 않음 ──
+  async function postSlack(text: string, blocks: unknown[]): Promise<{ ok: boolean; error: string; ts?: string }> {
+    if (!SLACK_TOKEN) return { ok: false, error: 'SLACK_BOT_TOKEN 이 설정되지 않았습니다 (Edge Functions › Secrets)' };
+    try {
+      const post = () => fetchT('https://slack.com/api/chat.postMessage', {
+        method: 'POST', headers: { Authorization: 'Bearer ' + SLACK_TOKEN, 'Content-Type': 'application/json; charset=utf-8' },
+        body: JSON.stringify({ channel: SLACK_CHANNEL, text, blocks, unfurl_links: false }),
+      }, 15000);
+      let sr = await post();
+      for (let i = 0; sr.status === 429 && i < 2; i++) { const ra = Number(sr.headers.get('Retry-After')); await sr.body?.cancel().catch(() => null); await new Promise((ok) => setTimeout(ok, Math.min(isFinite(ra) && ra >= 0 ? ra * 1000 : 2000, 10000))); sr = await post(); }
+      const j = await sr.json().catch(() => ({ ok: false, error: sr.status === 429 ? 'ratelimited' : 'http_' + sr.status }));
+      if (!j || !j.ok) return { ok: false, error: 'slack: ' + String((j && j.error) || sr.status) + (j && j.error === 'not_in_channel' ? ' — 봇을 채널에 초대하세요 (/invite @봇이름)' : '') };
+      return { ok: true, error: '', ts: j.ts ? String(j.ts) : undefined };
+    } catch (e) { return { ok: false, error: 'slack: ' + String((e as Error).message) }; }
+  }
+
+  // ── ① 갱신 처리 대상 ──
+  let msg: ReturnType<typeof buildMessage> | null = null, ok = true, error = '', slackTs: string | undefined;
+  if (wantRenew) {
+    const r = await fetchT(SB_URL + '/rest/v1/rpc/renew_watch', { method: 'POST', headers: hdr, body: JSON.stringify({ p_month: thisM }) }, 15000);
+    if (!r.ok) return json({ ok: false, error: 'renew_watch 실패 (' + r.status + '): ' + (await r.text()).slice(0, 200) + ' — SQL 84 를 실행했는지 확인' }, 500);
+    const rows = (await r.json()) as Row[];
+    msg = buildMessage(rows, thisM, nextM, kinds, portalUrl);
+    if (!dry) { const sres = await postSlack(msg.text, msg.blocks); ok = sres.ok; error = sres.error; slackTs = sres.ts; }
+    // ── 기록 (표가 없어도 실패하지 않음) ──
+    if (svcKey) {
+      await fetchT(SB_URL + '/rest/v1/remind_log', { method: 'POST', headers: { ...hdr, Prefer: 'return=minimal' },
+        body: JSON.stringify({ period: nextM.slice(0, 7), kind: kinds.length === ALL_KINDS.length ? 'monthly' : kinds.join('+'), channel: SLACK_CHANNEL, n_lapsed: msg.lapsed.length, n_due: msg.due.length, n_next: msg.next.length, ok, error: error || null, dry, sent_by: sentBy }) }, 8000).catch(() => null);
     }
   }
-  // ── 기록 (표가 없어도 실패하지 않음) ──
-  if (svcKey) {
-    await fetchT(SB_URL + '/rest/v1/remind_log', { method: 'POST', headers: { ...hdr, Prefer: 'return=minimal' },
-      body: JSON.stringify({ period: nextM.slice(0, 7), kind: kinds.length === ALL_KINDS.length ? 'monthly' : kinds.join('+'), channel: SLACK_CHANNEL, n_lapsed: msg.lapsed.length, n_due: msg.due.length, n_next: msg.next.length, ok, error: error || null, dry, sent_by: sentBy }) }, 5000).catch(() => null);
+
+  // ── ② 사이트 → 계약 전환 점검 (㊿+192 · SQL 115) ──
+  let sites: Record<string, unknown> | undefined;
+  if (wantSites) {
+    const sr = await fetchT(SB_URL + '/rest/v1/rpc/site_watch', { method: 'POST', headers: hdr, body: '{}' }, 15000).catch(() => null);
+    if (!sr || !sr.ok) {
+      const why = sr ? 'site_watch 실패 (' + sr.status + ') — SQL 115 를 실행했는지 확인' : 'site_watch 호출 실패';
+      sites = { ok: false, skipped: true, error: why };
+      if (only.includes('sites')) return json({ ok: false, error: why, dry }, 500);
+    } else {
+      const srows = (await sr.json()) as SiteRow[];
+      const names: Record<string, string> = {};
+      if (svcKey) { const pr = await fetchT(SB_URL + '/rest/v1/portal_profiles?select=email,name,title', { headers: hdr }, 8000).catch(() => null);
+        if (pr && pr.ok) for (const p of (await pr.json()) as { email: string; name: string | null; title: string | null }[]) if (p.name) names[String(p.email).toLowerCase()] = p.name + (p.title ? ' ' + p.title : ''); }
+      const who = (e: string | null) => { const em = String(e || '').toLowerCase(); return em ? (names[em] || em.split('@')[0]) : ''; };
+      const sm = buildSites(srows, who, portalUrl);
+      let sok = true, serr = '', sts: string | undefined;
+      if (!dry) { const res = await postSlack(sm.text, sm.blocks); sok = res.ok; serr = res.error; sts = res.ts; }
+      if (svcKey) {
+        await fetchT(SB_URL + '/rest/v1/remind_log', { method: 'POST', headers: { ...hdr, Prefer: 'return=minimal' },
+          body: JSON.stringify({ period: thisM.slice(0, 7), kind: 'sites', channel: SLACK_CHANNEL, n_lapsed: sm.counts.overdue + sm.counts.poc_over + sm.counts.ended, n_due: sm.counts.waiting, n_next: 0, ok: sok, error: serr || null, dry, sent_by: sentBy }) }, 8000).catch(() => null);
+      }
+      sites = { ok: sok, error: serr || undefined, total: sm.total, counts: sm.counts, text: sm.text, preview: dry ? sm.blocks : undefined, slack_ts: sts };
+      if (!wantRenew) { ok = sok; error = serr; }
+      else if (!sok) { ok = false; error = (error ? error + ' / ' : '') + '사이트 점검: ' + serr; }
+    }
   }
-  return json({ ok, error: error || undefined, dry, period: nextM.slice(0, 7), kinds, total: msg.total, portal_url: portalUrl || undefined, counts: { due: msg.due.length, next: msg.next.length, lapsed: msg.lapsed.length }, text: msg.text,
-    preview: dry ? msg.blocks : undefined, slack_ts: slack && slack.ts ? slack.ts : undefined, channel: SLACK_CHANNEL });
+  return json({ ok, error: error || undefined, dry, period: nextM.slice(0, 7), kinds: wantRenew ? kinds : [], only: only.length ? only : undefined, total: msg ? msg.total : (sites && typeof sites.total === 'number' ? sites.total : 0), portal_url: portalUrl || undefined,
+    counts: msg ? { due: msg.due.length, next: msg.next.length, lapsed: msg.lapsed.length } : undefined, text: msg ? msg.text : (sites && sites.text) || '',
+    preview: dry && msg ? msg.blocks : undefined, slack_ts: slackTs, channel: SLACK_CHANNEL, sites });
 });
