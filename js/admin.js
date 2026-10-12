@@ -1,7 +1,7 @@
 /* ===== admin.js — 관리자(계정·권한·MFA 정책) · 배포·운영 · AI 점검 · 내 계정 · 수령처 =====
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { APP_VER, IS_STAGING, ST } from './state.js';
-import { $, applyPerms, axTime, closeBtn, curLook, doLogout, esc, fetchT, IDLE_KEY, IDLE_OPTS, idleLabel, idleMin, idleTouch, keepLogin, loadPerms, logoutAll, LOOKS, mfaCardRender, navText, PERF, PERM_EXEMPT, pwaHintHtml, pwaInstall, pwaStandalone, pwGen, pwRule, rawHtml, SB_KEY, SB_URL, SESS_MAX_DAYS, sessRead, setLook, STATE, tpl } from './core.js';
+import { $, applyPerms, axTime, closeBtn, curLook, doLogout, esc, fetchT, IDLE_KEY, IDLE_OPTS, idleLabel, idleMin, idleTouch, keepLogin, loadPerms, logoutAll, LOOKS, mfaCardRender, navText, PERF, PERM_EXEMPT, PERM_OPTIN, pwaHintHtml, pwaInstall, pwaStandalone, pwGen, pwRule, rawHtml, SB_KEY, SB_URL, SESS_MAX_DAYS, sessRead, setLook, STATE, tpl } from './core.js';
 import { cacheDrop, idxDate, ROLE_VIEWS, sbHeaders, sbTry, sbWrite, thisMonthStr, toast, todayStr } from './shell.js';
 import { aiFetch, buildDigest } from './ai.js';
 import { applyCodes, CODE_KIND, CODE_KIND_LABEL, CODE_KIND_NOTE } from './grids.js';
@@ -930,7 +930,7 @@ export function apMenus(){
   return out;
 }
 export function apRoleOf(email){ var u=(AX_USERS||[]).filter(function(x){ return String(x.email||'').toLowerCase()===String(email||'').toLowerCase(); })[0]; return u? (u.role||'') : ''; }
-export function apDefault(role){ return (role==='admin_viewer'||role==='viewer')? {v:true,r:true,w:false} : {v:true,r:true,w:true}; }
+export function apDefault(role, v){ if(v && PERM_OPTIN[v]) return {v:false,r:false,w:false}; return (role==='admin_viewer'||role==='viewer')? {v:true,r:true,w:false} : {v:true,r:true,w:true}; }   /* ㊿+192 기본 숨김 메뉴(csite) */
 export function apFillUsers(){
   var sel=$('#apUser'), cp=$('#apCopy'); if(!sel) return;
   var cur=sel.value;
@@ -952,7 +952,7 @@ export async function apLoadUser(email){
   $('#apMsg').textContent='불러오는 중…';
   try{
     var got=await apFetch(email);
-    apMenus().forEach(function(m){ AP.rows[m.v]=got.map[m.v]? got.map[m.v] : {v:d.v, r:d.r, w:d.w}; });
+    apMenus().forEach(function(m){ var dm=apDefault(role, m.v); AP.rows[m.v]=got.map[m.v]? got.map[m.v] : {v:dm.v, r:dm.r, w:dm.w}; });
     $('#apMsg').textContent=got.n? got.n+'개 메뉴 지정됨' : '지정 없음 — 역할 기본값 표시';
   }catch(e){ $('#apMsg').textContent='읽기 실패: '+String(e.message||e).slice(0,100); apMenus().forEach(function(m){ AP.rows[m.v]={v:d.v,r:d.r,w:d.w}; }); }
   apPaint();
@@ -977,7 +977,7 @@ export function apPaint(){
     function cb(k,on,disabled){ return tpl`<td style="text-align:center"><input type="checkbox" data-ap="${rawHtml(k)}" data-v="${m.v}"${on?' checked':''}${disabled?' disabled':''} style="width:16px;height:16px"></td>`; }
     h+=tpl`<tr${rawHtml(na?' class="row-dim"':'')}><td>${m.label}</td>`+
       tpl`${rawHtml(cb('v', isSuper||(!na&&p.v), dis))}${rawHtml(cb('r', isSuper||(!na&&p.r), dis))}${rawHtml(cb('w', isSuper||(!na&&p.w), dis||roleRO))}`+
-      tpl`<td class="mini">${rawHtml(isSuper? '슈퍼 관리자 — 제한 불가' : na? '역할('+esc(AX_ROLE_KO[role]||role)+')에 없는 메뉴' : roleRO&&p.r? '조회 전용 역할 — 쓰기 불가' : (!p.v? '숨김' : !p.r? '메뉴만 보임' : !p.w? '읽기만' : ''))}</td></tr>`;
+      tpl`<td class="mini">${rawHtml(isSuper? '슈퍼 관리자 — 제한 불가' : na? '역할('+esc(AX_ROLE_KO[role]||role)+')에 없는 메뉴' : roleRO&&p.r? '조회 전용 역할 — 쓰기 불가' : (!p.v? (PERM_OPTIN[m.v]? '기본 숨김 — 지정한 계정만' : '숨김') : !p.r? '메뉴만 보임' : !p.w? '읽기만' : (PERM_OPTIN[m.v]? '보기 · 점검 가능(사이트 만들기는 슈퍼 관리자만)' : '')))}</td></tr>`;
   });
   h+='</tbody>';
   t.innerHTML=h;
@@ -1012,7 +1012,7 @@ export function apBind(){
   $('#apNone').onclick=function(){ apPreset('none'); };
   $('#apSave').onclick=apSave;
   $('#apCopy').onchange=async function(){ var src=String(this.value||''); this.value=''; if(!src||!AP.user) return; if(src.toLowerCase()===String(AP.user).toLowerCase()) return;
-    try{ var got=await apFetch(src); var d=apDefault(apRoleOf(src)); apMenus().forEach(function(m){ AP.rows[m.v]=got.map[m.v]? got.map[m.v] : {v:d.v,r:d.r,w:d.w}; }); apPaint(); $('#apMsg').textContent=src+' 설정을 가져왔습니다 — 저장을 눌러야 반영'; }
+    try{ var got=await apFetch(src); var sr=apRoleOf(src); apMenus().forEach(function(m){ var dm=apDefault(sr, m.v); AP.rows[m.v]=got.map[m.v]? got.map[m.v] : {v:dm.v,r:dm.r,w:dm.w}; }); apPaint(); $('#apMsg').textContent=src+' 설정을 가져왔습니다 — 저장을 눌러야 반영'; }
     catch(e){ toast('복사 실패', String(e.message||e).slice(0,100), 'bad'); } };
 }
 

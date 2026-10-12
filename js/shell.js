@@ -11,7 +11,7 @@ import { applyChannelMenu, CH_DEFS, chOf, ctRawOf, ctSuccessor, dcRules, ensureL
 import { applyMenuConf, fkNorm, freqTop, menuSegments, navSub, openMenuEdit, renderTodo, subgrpSync, viewLabel } from './tools.js';
 import { loadInbound, loadMxMemos } from './inbound.js';
 import { UPD, updCheck } from './upd.js';
-import { applyMenuFold, closeDrawer, ensureGroupOpen, setupSide } from './sales.js';
+import { applyMenuFold, closeDrawer, csSetTab, ensureGroupOpen, setupSide, SW, swAlerts, swSummary } from './sales.js';
 import { btnBackSync, gridGoPre, loadHide, meLoc, NAV, navMenu, oiOpen, oiOwnerOf, oiQuotesReady, openDetail, qvGo, renderGrid, switchView, VIEW_UI, viewResetHard } from './grid.js';
 import { closeOvl, logChange, openOvl, OVL_SKIP_CLEAN, ovlMarkClean, setupEdit, toggleAuthMenu } from './edit.js';
 import { homeOn, homeRender, placeSearchBtn, srchCtx } from './home.js';
@@ -539,6 +539,17 @@ export function renderInbox(){
       nm:'만기 지났는데 미처리 계약', cnt:'계약 '+RS.lapsed.length+'건', dueS:'지남', dk:0,
       acts:[{l:'만기 지난 '+RS.lapsed.length+'건 연장·종료 처리', pri:1, go:function(){ openRenewList('lapsed'); }}]});
   }
+  /* ㊿+192 계약 없이 쓰는 Cloud 사이트(SQL 115 site_watch) — 정책서버를 만들어 주고 발주 없이 쓰는 일이 없게 · 사이트 메뉴가 보이는 사람에게 */
+  if(SW.ok && (ST.IS_SUPER || canView('csite'))){ var swA=swAlerts(); if(swA.length){
+    var swS=swSummary(), swHi=swA.filter(function(s){ return s.state==='overdue' || s.state==='poc_over'; }).length, swMine=swA.filter(function(s){ return String(s.requested_by||'').toLowerCase()===String(ST.AUTH_USER||'').toLowerCase(); });
+    var swWho=names(swA, function(s){ return s.sitename; }), swOwn=names(swA, function(s){ return ntfName(s.requested_by); }, 2);
+    add('site', {lv:swHi? 1 : 2, ic:'cloud', cls:swHi? 'crit' : 'warn', n:swA.length, me:swMine.length? {key:'my-site', nm:'내가 만든 사이트 — 계약 없음', cnt:'사이트 '+swMine.length+'개', who:names(swMine, function(s){ return s.sitename; }), own:ntfName(ST.AUTH_USER), links:swMine.slice(0,6).map(function(s){ return {l:s.sitename+' · '+(s.customer||'—')+' · '+(s.days||0)+'일째', go:function(){ switchView('csite'); try{ csSetTab('watch'); }catch(e){} }}; })} : null,
+      t:tpl`계약 없이 쓰는 Cloud 사이트 <span class="num">${swA.length}개</span>${rawHtml(swHi? ' — 발주일 · PoC 종료일 지남 '+swHi+'개':'')}${rawHtml(swS.oldest? ' (가장 오래된 건 '+swS.oldest.days+'일)':'')}`,
+      s:swWho+' · 사이트를 만든 뒤 계약(CSM 사이트명)이 안 붙음 — 발주서 없이 무상 사용되지 않게 계약으로 전환하거나 PoC · 종료로 정리',
+      who:swWho, own:swOwn, due:swHi? '지금 — 기한이 지남' : '예상 발주일 · PoC 종료일까지', imp:'발주 없는 무상 사용 위험 · 월말 슬랙 점검에 올라감',
+      nm:'계약 없이 쓰는 Cloud 사이트', cnt:'사이트 '+swA.length+'개', dueS:swHi? '지남' : '', dk:0,
+      acts:[{l:'사이트 '+swA.length+'개 계약 전환 점검', pri:1, go:function(){ switchView('csite'); try{ csSetTab('watch'); }catch(e){} }}]});
+  } }
   if(RS && RS.due.length){
     var dsum=RS.due.reduce(function(a,r){ return a+(r.mrr||0); },0);
     add('rnd', {lv:2, ic:'clock', cls:'warn', n:RS.due.length, t:tpl`${mk(b)} 만기 <span class="num">${RS.due.length}건</span> — ${mk(b+1)} 1일 LIVE 에서 빠집니다`,
@@ -1374,7 +1385,7 @@ export function buildFromRes(res){
   var lbtn=document.querySelector('.side button[data-v="log"]');
   if(lbtn) lbtn.style.display = ST.IS_SUPER? '':'none';   // 변경 이력은 슈퍼 관리자만
   var cbtn=document.querySelector('.side button[data-v="csite"]');
-  if(cbtn) cbtn.style.display = ST.IS_SUPER? '':'none';   // Cloud 사이트 생성·수정은 슈퍼 관리자만 (Edge Function 도 같은 규칙)
+  if(cbtn) cbtn.style.display = (ST.IS_SUPER || canView('csite'))? '':'none';   // ㊿+192 메뉴 권한에서 «보기»를 준 계정도(계약 전환 점검) · 사이트 생성·수정은 슈퍼 관리자만 (Edge Function 도 같은 규칙)
   var ggrp=document.getElementById('grpAdmin');
   if(ggrp) ggrp.style.display = ST.IS_SUPER? '':'none';   // 「관리자」 그룹 헤더도 슈퍼만
   var mbtn=document.getElementById('btnMenuEdit');

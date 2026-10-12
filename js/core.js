@@ -271,7 +271,8 @@ export function pwaHintSync(){ var h=document.getElementById('accPwa'); if(!h) r
 /* ---- 계정별 메뉴 권한 (user_perms · SQL 79) — 슈퍼 관리자가 관리자 › 메뉴 권한에서 지정 ----
    보기(v): 메뉴 표시·화면 열기 · 읽기(r): 화면 안 데이터 열람 · 쓰기(w): 추가·수정·삭제.
    행이 없는 메뉴는 역할 기본(admin 전부 · admin_viewer 보기+읽기). super_admin 은 항상 전부. 홈·내 계정은 항상 보임. */
-export var PERM_EXEMPT={dash:1, account:1, adminx:1, log:1, csite:1, ops:1};   // 역할로만 다루는 화면
+export var PERM_EXEMPT={dash:1, account:1, adminx:1, log:1, ops:1};   // 역할로만 다루는 화면
+export var PERM_OPTIN={csite:1};   /* ㊿+192 기본 숨김 — 메뉴 권한에서 «보기»를 준 계정만(슈퍼 관리자는 항상). 사이트 만들기 · 수정은 함수(cloudsite) 규칙대로 슈퍼 관리자만 · 계약 전환 점검은 보기 권한으로 */
 export async function loadPerms(){
   if(!ST.SB_TOKEN || !ST.AUTH_USER){ ST.PERMS=null; return null; }
   try{
@@ -285,7 +286,7 @@ export function permOf(v){
   var roleW=!ST.IS_VIEWER_ROLE;
   if(ST.IS_SUPER || PERM_EXEMPT[v] || !v) return {v:true, r:true, w:roleW};
   var p=ST.PERMS && ST.PERMS[v];
-  if(!p) return {v:true, r:true, w:roleW};
+  if(!p) return PERM_OPTIN[v]? {v:false, r:false, w:false} : {v:true, r:true, w:roleW};
   return {v:!!p.v, r:!!(p.v&&p.r), w:!!(p.v&&p.r&&p.w&&roleW)};
 }
 export function canView(v){ return permOf(v).v; }

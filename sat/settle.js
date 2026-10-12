@@ -13,6 +13,14 @@ function fmt(v){ v=Math.round(v||0); return v?v.toLocaleString('ko-KR'):'0'; }
 function readFile(f){ return new Promise(function(ok,ng){ var r=new FileReader(); r.onload=function(){ ok(new Uint8Array(r.result)); }; r.onerror=function(){ ng(new Error('파일을 읽지 못했습니다')); }; r.readAsArrayBuffer(f); }); }
 function grams(s){ var g={}; for(var i=0;i<s.length-1;i++) g[s.substr(i,2)]=1; if(s.length===1) g[s]=1; return g; }
 function tile(t,v,cls){ return tpl`<div class="tile ${rawHtml(cls||'')}"><div class="t">${t}</div><div class="v">${rawHtml(v)}</div></div>`; }
+/* ㊿+190·191 «묶음»(한 등록번호에 계약 여러 건): 회계매출 · 차액은 묶음의 첫 줄에만 쓰고 나머지 줄은 «↑ 묶음» — 에스원 · 카카오 공통(계산은 각자 그대로) */
+function bundleMark(rows){
+  var cnt={}, seen={}; rows.forEach(function(g){ if(g.biz) cnt[g.biz.no]=(cnt[g.biz.no]||0)+1; });
+  return function(g){ if(!g.biz || cnt[g.biz.no]<2) return {many:false, first:true, n:1};
+    var first=!seen[g.biz.no]; seen[g.biz.no]=1; return {many:true, first:first, n:cnt[g.biz.no]}; };
+}
+/* 등록번호 하나는 한 번만 더함(같은 등록번호를 두 줄에 골라도 회계매출이 두 번 들어가지 않게) */
+function bizSumOnce(rows){ var seen={}, s=0; rows.forEach(function(r){ if(r.biz && !seen[r.biz.no]){ seen[r.biz.no]=1; s+=Number(r.biz.acc||0); } }); return s; }
 function printDoc(o){
   var base=location.href.replace(/[^\/]*$/,'');
   var w=window.open('', '_blank');
@@ -20,7 +28,9 @@ function printDoc(o){
   function cell(v,i){ var c=o.cols[i]||{}; var t=(v==null?'':String(v));
     return tpl`<td class="${c.n?'n':''}${c.mini?' mini':''}${c.wrap?' wrap':''}">${rawHtml(t.replace(/&/g,'&amp;').replace(/</g,'&lt;'))}</td>`; }
   var rows=(o.rows||[]).map(function(r,ri){
-    return tpl`<tr${rawHtml(r.__hl?' class="hl"':'')}>${rawHtml(o.cols.map(function(c,i){ return cell(r[c.k],i); }).join(''))}</tr>`;
+    if(r.__sec) return tpl`<tr class="sec"><td colspan="${rawHtml(o.cols.length)}">${r.__sec}</td></tr>`;   /* ㊿+191 구역 머리줄(한 칸) */
+    var cls=(r.__hl?'hl':'')+(r.__sub?' sub':'');
+    return tpl`<tr${rawHtml(cls.trim()? ' class="'+cls.trim()+'"':'')}>${rawHtml(o.cols.map(function(c,i){ return cell(r[c.k],i); }).join(''))}</tr>`;
   }).join('');
   var sums=(o.summary||[]).map(function(s){
     return tpl`<div class="sum${s.bad?' bad':''}${s.ok?' ok':''}"><span>${rawHtml(s.k)}</span><b>${rawHtml(s.v)}</b></div>`; }).join('');
@@ -39,19 +49,23 @@ function printDoc(o){
     tpl`.sum span{display:block;font-size:10.5px;color:#6b7176;margin-bottom:2px}`+
     tpl`.sum b{font-size:14px;font-variant-numeric:tabular-nums}`+
     tpl`.sum.ok b{color:#1e8e3e} .sum.bad b{color:#c0392b}`+
-    tpl`table{width:100%;border-collapse:collapse;font-size:10.5px}`+
+    tpl`table{width:100%;border-collapse:collapse;font-size:10.5px;table-layout:fixed}`+   /* ㊿+191 칸 너비를 지킴(긴 이름이 표를 종이 밖으로 밀던 것) · 긴 글은 wrap 칸에서 줄바꿈 */
     tpl`th{background:#1fb53a;color:#fff;font-weight:600;padding:6px 6px;text-align:left;border:1px solid #1fb53a;white-space:nowrap}`+
     tpl`td{padding:5px 6px;border:1px solid #e3e6e8;vertical-align:middle}`+
     tpl`td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}`+
     tpl`td.mini{font-size:9.5px;color:#6b7176}`+
     tpl`tbody tr:nth-child(even) td{background:#fafbfc}`+
-    tpl`tr.hl td{background:#fff8e1}`+
+    tpl`tbody tr.hl td,tbody tr.hl:nth-child(even) td{background:#fff8e1}`+   /* ㊿+191 짝수 줄에서도 노란 표시(줄무늬가 덮던 것) */
+    tpl`tbody tr.sec td{background:#e9f3dc;color:#2f5d10;font-weight:700;font-size:10.5px;padding:5px 7px;border-top:2px solid #c9dfb3;white-space:normal}`+
+    tpl`tbody tr.sub td{background:#f3f5f7;font-weight:700;border-top:1.5px solid #c8ccd0}`+
+    tpl`tbody tr.sub.hl td{background:#fff3c4}`+
+    tpl`tr.sec{page-break-after:avoid;break-after:avoid}`+
     tpl`tbody tr.ft td{background:#eef3f8!important;font-weight:700;border-top:2px solid #b8cce4}`+
     tpl`tbody tr.ft:last-child td{background:#e3ecf6!important;border-bottom:2px solid #b8cce4}`+
     tpl`tr.ft,tr.hl{page-break-inside:avoid;break-inside:avoid}`+
     tpl`thead{display:table-header-group}`+
     tpl`.note{margin-top:10px;font-size:10.5px;color:#4a5055;line-height:1.6;white-space:pre-line}`+
-    tpl`td.wrap{white-space:normal;word-break:keep-all}`+
+    tpl`td.wrap{white-space:normal;word-break:keep-all;overflow-wrap:anywhere}`+
     tpl`td:not(.wrap){white-space:nowrap;overflow:hidden;text-overflow:ellipsis}`+
     tpl`.ft2{margin-top:auto;padding-top:12px;display:flex;justify-content:space-between;font-size:9.5px;color:#8b9298}`+
     tpl`.bar{position:fixed;top:0;left:0;right:0;background:#22262a;color:#fff;padding:9px 14px;display:flex;gap:10px;align-items:center;font-size:12px;z-index:9}`+

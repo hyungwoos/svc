@@ -23,7 +23,7 @@ import { closeOvl, logChange, openOvl } from './edit.js';
 import { menuSegments, openCust360, renderTodo } from './tools.js';
 import { placeSearchBtn } from './home.js';
 import { verNum } from './guard.js';
-import { QMGR_MAP } from './sales.js';
+import { CS_PROD, csSetTab, QMGR_MAP, SW, SW_STATE, swAlerts, swLoad } from './sales.js';
 
 export var NTF_DEF={renew_days:[60,30], eq_days:3, month_end_days:5, renew_emails:[], eq_emails:[], biz_emails:[], dc_emails:[], slack_on:false, team_channel:'C08RA3PPDH8', auto_on:false, auto_days:[1], auto_time:'09:00', auto_dm:false};
 export var NTF={memo:null, ops:null, opsOk:null, set:null, sqlOk:null, reads:{}, readsOk:false, asg:{}, asgOk:false, area:/** @type {Object<string,any>} */({}), accounts:/** @type {?any[]} */(null), names:/** @type {?Object<string,{name:string,title:string}>} */(null), omap:null, users:null, open:false, tab:'me', loading:false, at:0, busy:false, snapOk:null, snapKey:'', snapAt:0, snap:null};
@@ -55,7 +55,7 @@ export function ntfItems(){
   if(!ST.DATA || !ST.DATA.rows || ST.IS_EQUIP) return [];
   var S=ntfSet(), rows=ST.DATA.rows, R=ST.RAWX||{};
   /* 같은 데이터 · 설정 · 담당 · 날짜면 지난 결과(데이터 점검 규칙까지 도는 계산이라 종 숫자를 다시 그릴 때마다 하지 않음) — 데이터를 새로 읽으면 ST.DATA · ST.RAWX 가 새 객체 */
-  var sig=(R.orders||[]).map(function(o){ return o.id+':'+o.status; }).join(','), deps=[ST.DATA, R, rows.length, sig, NTF.set, NTF.asg, NTF.area, NTF.ops, ST.AUTH_USER, ST.OWNER_NAMES, FB.newN, FB.ok, todayStr()];
+  var sig=(R.orders||[]).map(function(o){ return o.id+':'+o.status; }).join(','), deps=[ST.DATA, R, rows.length, sig, NTF.set, NTF.asg, NTF.area, NTF.ops, ST.AUTH_USER, ST.OWNER_NAMES, FB.newN, FB.ok, SW.rows, SW.ok, todayStr()];
   if(NTF.memo && NTF.memo.deps.length===deps.length && NTF.memo.deps.every(function(d, i){ return d===deps[i]; })) return NTF.memo.v;
   var v=tickMemo('ntfItems', deps, function(){
     var out=[], days=(S.renew_days||[60,30]).slice().sort(function(a,b){ return a-b; }), maxD=days[days.length-1];
@@ -97,7 +97,14 @@ export function ntfItems(){
     if(ST.IS_SUPER && NTF.ops) try{ opsItems(NTF.ops).forEach(function(x){ out.push(x); }); }catch(e){}
     /* 7) ㊿+185 개선 요청(슈퍼 관리자) — 새 요청 건수 */
     if(ST.IS_SUPER && FB.ok && FB.newN) out.push({kind:'fb', key:'fb:'+FB.newN+':'+(FB.rows[0]? FB.rows[0].id : 0), sev:'mid', order:0, title:'개선 요청 새 '+FB.newN+'건', detail:FB.rows.filter(function(x){ return x.status==='new'; }).slice(0,2).map(function(x){ return (x.menu||'포탈 전체')+' — '+String(x.content||'').slice(0,40); }).join(' · '), to:[], me:true, go:function(){ fbOpen({list:true}); }});   /* ㊿+185 */
-    var KO={ops:0, lapsed:1, dc:2, biz:3, renew:4, eq:5, fb:6};
+    /* 8) ㊿+192 계약 없이 쓰는 Cloud 사이트(SQL 115 site_watch) — 사이트마다 한 번 · 만든 사람에게(+ 사이트 메뉴 담당 없음) · 발주일 · PoC 종료일이 지나면 hi */
+    if(SW.ok) swAlerts().forEach(function(s){
+      var st=SW_STATE[s.state]||s.state, who=String(s.requested_by||'').toLowerCase(), hi=s.state==='overdue' || s.state==='poc_over' || (s.state==='waiting' && (s.days||0)>=60);
+      out.push({kind:'site', key:'site:'+s.id+':'+s.state+':'+(s.state==='waiting'? Math.floor((s.days||0)/30) : 0), sev:hi? 'hi' : 'mid', order:-(s.days||0),
+        title:s.sitename+' 사이트 — '+st+' ('+(s.days||0)+'일째)', detail:(s.customer||'(고객사 없음)')+' · '+(CS_PROD[String(s.product||'').toLowerCase()]||s.product||'')+(s.purpose==='poc'? ' · PoC 종료일 '+(s.due_date||'미정') : (s.due_date? ' · 예상 발주일 '+s.due_date : ''))+' · 계약(CSM 사이트명)이 붙으면 사라짐',
+        to:who? [who] : [], me:!!who && who===ntfMe(), id:s.id, go:function(){ switchView('csite'); try{ csSetTab('watch'); }catch(e){} }});
+    });
+    var KO={ops:0, lapsed:1, dc:2, biz:3, renew:4, eq:5, site:6, fb:7};
     out.sort(function(a,b){ return (a.sev==='hi'?0:1)-(b.sev==='hi'?0:1) || KO[a.kind]-KO[b.kind] || a.order-b.order; });
     return out;
   });
@@ -167,7 +174,8 @@ export async function ntfLoad(force){
     else { NTF.readsOk=false; try{ (JSON.parse(localStorage.getItem(ntfLsKey())||'[]')||[]).forEach(function(k){ m[k]=1; }); }catch(e){} }
     NTF.reads=m;
     var as=NTF.sqlOk? await ntfGet('work_assign?select=kind,ref,assignee,assigned_by,assigned_at&kind=in.(eq,area)&limit=1000') : null;   /* ㊿+185 area = 홈 우선 업무 줄(만기 · 재약정 · 비즈포탈 · 데이터 점검)의 담당 */
-    if(!NTF.accounts && NTF.sqlOk) ntfAccounts().then(function(a){ if(a && a.some(function(x){ return x.name; })){ try{ renderTodo(); }catch(e){} try{ ntfSync(); }catch(e){} try{ gnMeSync(); }catch(e){} } });   /* ㊿+189 표시 이름을 받아 담당 칸을 이름으로 */
+    if(!NTF.accounts && NTF.sqlOk) ntfAccounts().then(function(a){ if(a && a.some(function(x){ return x.name; })){ try{ renderTodo(); }catch(e){} try{ ntfSync(); }catch(e){} try{ gnMeSync(); }catch(e){} } });
+    if(!ST.IS_EQUIP) swLoad(false).then(function(rows){ if(rows && rows.length){ try{ renderTodo(); }catch(e){} try{ ntfSync(); }catch(e){} } });   /* ㊿+192 계약 없이 쓰는 사이트 → 홈 줄 · 알림함 */   /* ㊿+189 표시 이름을 받아 담당 칸을 이름으로 */
     var g={}, ar={}; (as||[]).forEach(function(x){ if(x.kind==='area') ar[String(x.ref)]=x; else g[String(x.ref)]=x; }); var hadAsg=Object.keys(NTF.asg).length+Object.keys(NTF.area).length>0; NTF.asg=g; NTF.area=ar; NTF.asgOk=as!==null;
     if(hadAsg || Object.keys(g).length || Object.keys(ar).length) try{ renderTodo(); }catch(e){}   /* 홈 «우선 업무»의 장비 담당 = 처리 담당 · 줄 담당 */
     await opsLoad();

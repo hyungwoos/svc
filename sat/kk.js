@@ -145,7 +145,7 @@ async function onBiz(f,d){
 function renderRun(){
   if(!K.rows) return;
   var sum=K.rows.reduce(function(a,r){ return a+r.amt; },0);
-  var bizSum=K.rows.reduce(function(a,r){ return a+(r.biz? r.biz.acc:0); },0);
+  var bizSum=bizSumOnce(K.rows);   /* ㊿+191 같은 등록번호를 두 줄에 골라도 한 번만 */
   var need=K.rows.filter(function(r){ return !r.mapped; }).length;
   var needBiz=K.rows.filter(function(r){ return !r.biz; }).length;
   $('#kTiles').innerHTML=
@@ -160,10 +160,14 @@ function renderRun(){
   if($('#cEnd').value==='') $('#cEnd').value=0;
   $('#kCnt').textContent=K.rows.length+'건 · 이용월 '+($('#um').value||'-')+' · 청구월 '+($('#ym').value||'-');
   var tb=$('#tK tbody'); tb.innerHTML='';
+  var bm=bundleMark(K.rows), gsum={}; K.rows.forEach(function(r){ if(r.biz) gsum[r.biz.no]=(gsum[r.biz.no]||0)+r.amt; });
   K.rows.forEach(function(r,i){
+    var bd=bm(r), rest=bd.many && !bd.first;
+    var accCell=!r.biz? '' : (rest? tpl`<span class="mini" style="color:#999">↑ 묶음</span>` : tpl`${rawHtml(fmt(r.biz.acc))}${rawHtml(bd.many? tpl`<div class="mini">묶음 ${rawHtml(bd.n)}건 · 청구 합 ${rawHtml(fmt(gsum[r.biz.no]))}</div>` : '')}`);
     var st=!r.mapped? 'need' : (!r.biz? 'need':'auto');
     var tag=r.mapped? '<span class="tag map">매핑</span>' : '<span class="tag need">고객사 확인</span>';
     if(r.isNew) tag+=' <span class="tag new">신규</span>';
+    if(bd.many) tag+=tpl` <span class="tag" title="등록번호 ${rawHtml(r.biz.no)} 하나에 ${rawHtml(bd.n)}건 — 회계매출은 첫 줄에 한 번">묶음</span>`;
     var cust=r.mapped? esc(r.cust)
       : tpl`<input type="text" value="${r.cust}" placeholder="고객사 입력" style="width:150px" data-change="setCust(${rawHtml(i)},this.value)">`;
     var pick=tpl`<select class="pick" data-change="pickBiz(${rawHtml(i)},this.value)"><option value="">— 선택 —</option>`+
@@ -173,7 +177,7 @@ function renderRun(){
       tpl`<td class="n">${rawHtml(r.qty)}</td><td class="n">${rawHtml(fmt(r.unit))}</td><td class="n">${rawHtml(fmt(r.amt))}</td>`+
       tpl`<td class="mini">${rawHtml(r.termNo||1)}/${rawHtml(r.termTotal||1)}</td>`+
       tpl`<td class="mini">${r.start||''}${rawHtml(r.end? ' ~ '+esc(r.end):'')}</td>`+
-      tpl`<td>${rawHtml(pick)}</td><td class="n">${rawHtml(r.biz? fmt(r.biz.acc):'')}</td>`+
+      tpl`<td>${rawHtml(pick)}</td><td class="n">${rawHtml(accCell)}</td>`+
       tpl`<td><input type="text" value="${r.note||''}" placeholder="비고" style="width:140px" data-change="setNote(${rawHtml(i)},this.value)"></td>`;
     tb.appendChild(tr);
   });
@@ -215,7 +219,7 @@ async function saveSettle(){
   try{
     var sum=K.rows.reduce(function(a,r){ return a+r.amt; },0);
     var row={ month:ym+'-01', use_month:($('#um').value? $('#um').value+'-01':null),
-      total:sum, biz_total:K.rows.reduce(function(a,r){ return a+(r.biz?r.biz.acc:0); },0),
+      total:sum, biz_total:bizSumOnce(K.rows),
       cnt:K.rows.length, cnt_new:n($('#cNew').value), cnt_end:n($('#cEnd').value),
       payload:{ rows:K.rows.map(function(r){ return { code:r.code, cust:r.cust, project:r.project, qty:r.qty, unit:r.unit, amt:r.amt,
                 termNo:r.termNo, termTotal:r.termTotal, start:r.start, end:r.end, note:r.note, biz:r.biz? r.biz.no:null, acc:r.biz? r.biz.acc:null }; }) },
@@ -310,22 +314,27 @@ function printList(){
   var ym=$('#ym').value||'', um=$('#um').value||'';
   var M=+ym.slice(5,7), UM=um? +um.slice(5,7):'';
   var sum=K.rows.reduce(function(a,r){ return a+r.amt; },0);
-  var bizSum=K.rows.reduce(function(a,r){ return a+(r.biz? r.biz.acc:0); },0);
+  var bizSum=bizSumOnce(K.rows);   /* ㊿+191 등록번호 하나는 한 번만 */
+  var bm=bundleMark(K.rows), gsum={}; K.rows.forEach(function(r){ if(r.biz) gsum[r.biz.no]=(gsum[r.biz.no]||0)+r.amt; });
+  var nOff=K.rows.filter(function(r){ return r.biz && Math.abs(r.biz.acc-gsum[r.biz.no])>=1; }).length;
   printDoc({
     title:'카카오엔터프라이즈 구독료 리스트 — '+ym.slice(0,4)+'년 '+M+'월 청구',
-    sub:(um? um.slice(0,4)+'년 '+UM+'월 이용분 · ':'')+'카카오클라우드 마켓플레이스 SSL VPN · 단위: 원(VAT 별도)',
+    sub:(um? um.slice(0,4)+'년 '+UM+'월 이용분 · ':'')+'카카오클라우드 마켓플레이스 SSL VPN · 제공서비스 '+((K.cfg.basic&&K.cfg.basic.product)||'SSL PNS')+' · 단위: 원(VAT 별도)',   /* ㊿+191 제공서비스는 전부 같아 머리글에 한 번(표 칸 하나 줄임) */
     summary:[{k:'고객사',v:K.rows.length+'곳'},{k:'청구 합계',v:fmt(sum)+'원'},
              {k:'비즈포탈 회계매출',v:fmt(bizSum)+'원'},
              {k:'차액',v:fmt(sum-bizSum)+'원', ok:Math.abs(sum-bizSum)<1, bad:Math.abs(sum-bizSum)>=1},
              {k:'신규 / 해약',v:($('#cNew').value||0)+' / '+($('#cEnd').value||0)}],
-    cols:[{k:'no',l:'Bizportal 등록번호',w:'15%'},{k:'cust',l:'서비스제공처(고객사명)',w:'20%'},{k:'prod',l:'제공서비스'},
-          {k:'qty',l:'수량',n:true,w:'7%'},{k:'unit',l:'단가',n:true,w:'10%'},{k:'amt',l:'금액',n:true,w:'11%'},
-          {k:'term',l:'회차',w:'7%'},{k:'period',l:'계약기간',mini:true,w:'16%'},{k:'note',l:'비고',mini:true,wrap:true}],
-    rows:K.rows.map(function(r){ return { no:r.biz? r.biz.no:'', cust:r.cust, prod:r.product, qty:r.qty,
-      unit:fmt(r.unit), amt:fmt(r.amt), term:(r.termNo||1)+'/'+(r.termTotal||1),
-      period:(r.start||'')+(r.end? ' ~ '+r.end:''), note:String(r.note||'').replace(/\s*\n\s*/g,' '), __hl:!r.biz }; }),
-    foot:[{ cust:'합계', amt:fmt(sum), qty:K.rows.length+'건' }],
-    note:'· 연한 노란 줄은 비즈포탈 등록번호가 아직 연결되지 않은 건입니다.\n· 계산서 발행일: 매월 '+((K.cfg.basic&&K.cfg.basic.invoice_day)||15)+'일 · 수금: '+((K.cfg.basic&&K.cfg.basic.pay_term)||'익월 말 결제')
+    cols:[{k:'no',l:'등록번호',w:'8%'},{k:'cust',l:'서비스제공처(고객사명)',w:'16%',wrap:true},
+          {k:'qty',l:'수량',n:true,w:'5%'},{k:'unit',l:'단가',n:true,w:'8%'},{k:'amt',l:'금액',n:true,w:'9%'},
+          {k:'acc',l:'회계매출',n:true,w:'12%',wrap:true},{k:'diff',l:'차액',n:true,w:'8%'},
+          {k:'term',l:'회차',w:'6%'},{k:'period',l:'계약기간',mini:true,w:'15%'},{k:'note',l:'비고',mini:true,wrap:true,w:'13%'}],
+    rows:K.rows.map(function(r){ var bd=bm(r), rest=bd.many && !bd.first, d=r.biz? r.biz.acc-gsum[r.biz.no] : 0;   /* ㊿+191 회계매출 · 차액(= 회계매출 − 청구 · 묶음은 첫 줄에 한 번) */
+      return { no:r.biz? r.biz.no:'', cust:r.cust, qty:r.qty,
+      unit:fmt(r.unit), amt:fmt(r.amt), acc:!r.biz? '' : (rest? '↑ 묶음' : fmt(r.biz.acc)+(bd.many? ' (묶음 '+bd.n+'건 · 청구 합 '+fmt(gsum[r.biz.no])+')' : '')),
+      diff:!r.biz? '' : (rest? '↑ 묶음' : (Math.abs(d)>=1? fmt(d) : '')), term:(r.termNo||1)+'/'+(r.termTotal||1),
+      period:(r.start||'')+(r.end? ' ~ '+r.end:''), note:String(r.note||'').replace(/\s*\n\s*/g,' '), __hl:!r.biz || Math.abs(d)>=1 }; }),
+    foot:[{ cust:'합계', amt:fmt(sum), acc:fmt(bizSum), diff:Math.abs(bizSum-sum)>=1? fmt(bizSum-sum):'', qty:K.rows.length+'건' }],
+    note:'· 연한 노란 줄은 비즈포탈 등록번호가 아직 연결되지 않았거나 회계매출이 청구와 다른 건입니다(등록번호 없음 '+K.rows.filter(function(r){ return !r.biz; }).length+'건 · 금액 다름 '+nOff+'건). 표의 «차액»은 회계매출 − 청구, 위 요약의 «차액»은 청구 − 비즈포탈(부호 반대).\n· 묶음(한 등록번호에 여러 건)은 첫 줄에 회계매출 · 차액(= 회계매출 − 묶음 청구 합)을 쓰고 나머지 줄은 «↑ 묶음»입니다.\n· 계산서 발행일: 매월 '+((K.cfg.basic&&K.cfg.basic.invoice_day)||15)+'일 · 수금: '+((K.cfg.basic&&K.cfg.basic.pay_term)||'익월 말 결제')
   });
 }
 

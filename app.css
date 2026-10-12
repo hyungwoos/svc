@@ -3190,4 +3190,19 @@ details.eq-chk .eq-chk-act:empty{display:none}
 .ax-prof{white-space:nowrap}
 .ax-prof .ax-pf{height:24px;padding:0 7px;margin-left:4px;font-size:12px}
 @media (max-width:760px){ .fb-pv{width:calc(50% - 4px)} .fb-f>span:first-of-type{max-width:140px} }
+/* ==== ㊿+192 Cloud 사이트 → 계약 전환 점검 ==== */
+.sw-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:8px;margin:4px 0 6px}
+.sw-tiles .tile{border:1px solid var(--grid);border-radius:10px;padding:8px 10px;background:var(--surface-2)}
+.sw-tiles .tile .t{font-size:12px;color:var(--muted);margin-bottom:2px}
+.sw-tiles .tile .v{font-size:18px;font-weight:750;font-variant-numeric:tabular-nums}
+.sw-tiles .tile.bad .v{color:var(--critical)}
+.sw-tiles .tile.ok .v{color:var(--muted)}
+.sw-tbl td,.sw-tbl th{padding:7px 8px;vertical-align:top}
+.sw-tbl tr.sw-alert td:first-child{box-shadow:inset 3px 0 0 var(--warning,#fab219)}
+.sw-tbl td.nw{white-space:nowrap}
+.sw-tbl .cbtn{margin:1px 2px 1px 0}
+.sw-rest>summary{cursor:pointer;padding:4px 0}
+#ovlSw .frm{margin-bottom:10px}
+#ovlSw .frm label{display:block;font-size:12px;color:var(--muted);margin-bottom:3px}
+#ovlSw .frm select,#ovlSw .frm input{width:100%}
 /* ==== ㊿+166 새 디자인 end ==== */
