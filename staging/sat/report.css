@@ -136,3 +136,7 @@ tr:hover .rowact { display: flex; }
 /* ㊿+176 월 마감 · 발행 잠금 · 이력 */
 .rp-state{display:inline-flex;gap:6px;align-items:center}
 .rp-state .tag.issued{font-size:12px}
+
+/* ㊿+188 포탈(지니언스) 안에 들어갔을 때(html[data-embed="gn"] · sat/common.js) — 포탈과 같은 초록 · 여백 */
+html[data-embed="gn"]{--genians-green:#3F7A0C}
+html[data-embed="gn"] body{padding:6px 2px 12px;background:#fff}

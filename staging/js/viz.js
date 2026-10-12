@@ -44,10 +44,13 @@ export var Viz = (function () {
     var ticks = 4, step = niceNum((max - min) / ticks) || 1;
     var lo = Math.floor(min / step) * step, hi = Math.ceil(max / step) * step;
     if (hi === lo) hi = lo + step;
-    var g = s('g', {});
+    var g = s('g', {}), lastTxt = null;
     for (var v = lo; v <= hi + 1e-9; v += step) {
       var y = f.pad.t + f.ih - ((v - lo) / (hi - lo)) * f.ih;
       var isZero = Math.abs(v) < 1e-9;
+      var txt = fmt(v);
+      if (txt === lastTxt && !isZero) continue;   /* ㊿+188 건수 차트(최대 2~3)에서 0 · 1 · 1 · 2 · 2 처럼 같은 눈금이 두 번 찍히던 것 — 같은 글자면 눈금을 건너뜀 */
+      lastTxt = txt;
       g.appendChild(s('line', {
         x1: f.pad.l, x2: f.pad.l + f.iw, y1: y, y2: y,
         stroke: isZero ? cv('--axis') : cv('--grid'), 'stroke-width': 1, 'shape-rendering': 'crispEdges'
@@ -55,7 +58,7 @@ export var Viz = (function () {
       var t = s('text', { x: f.pad.l - 8, y: y + 3.5, 'text-anchor': 'end', fill: cv('--muted') });
       t.style.font = '10.5px system-ui,sans-serif';
       t.style.fontVariantNumeric = 'tabular-nums';
-      t.textContent = fmt(v);
+      t.textContent = txt;
       g.appendChild(t);
     }
     f.root.appendChild(g);

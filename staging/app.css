@@ -3099,4 +3099,65 @@ html[data-skin="gn"] .area-cap .mini{color:var(--ink-2)}
 /* 다크: 표 안 «갱신 상태» 같은 주의 칩 글자 대비 4.47 → 4.5 이상 (사업 영역 계약 목록에서 걸림) */
 html:not([data-theme="light"]) .ctag.warn{color:#d99000}
 html[data-theme="dark"] .ctag.warn{color:#d99000}
+/* ==== ㊿+188 화면별 정리(지니언스) — 분석 표 0 행 접기 · 필터 접기 · 대조 카드 한 줄 · 입력 창 고정 푸터 · 상세 창 · 작은 표 · 위성 · 단위 칩 · 폰 도구줄 ==== */
+/* 분석 표: 0 인 기간 접기 */
+.zr-tg td{padding:4px 8px!important;background:var(--surface-2)}
+.zr-btn{border:0;background:transparent;color:var(--s1-ink);font:inherit;font-size:12px;font-weight:600;cursor:pointer;padding:2px 4px;border-radius:6px}
+.zr-btn:hover,.zr-btn:focus-visible{background:var(--surface);outline:1px solid var(--ring)}
+.zr-row[hidden]{display:none}
+/* 해지율 · 고객사 증감: 제품 · 사업영역 … 칩 줄은 «필터 ▾» 로 접음 */
+.cr-flt{margin-top:4px}
+:is(.cr-flt,html[data-skin="gn"] .cr-adv)>summary{cursor:pointer;font-size:13px;font-weight:600;color:var(--ink-2);padding:6px 0;list-style:none;display:flex;align-items:center;gap:8px;flex-wrap:nowrap;min-width:0}
+:is(.cr-flt,html[data-skin="gn"] .cr-adv)>summary>*{min-width:0}
+:is(.cr-flt,html[data-skin="gn"] .cr-adv)>summary::-webkit-details-marker{display:none}
+:is(.cr-flt,html[data-skin="gn"] .cr-adv)>summary::before{content:'';width:7px;height:7px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(-45deg);margin:0 2px 0 2px;transition:transform .15s;flex:none}
+:is(.cr-flt,html[data-skin="gn"] .cr-adv)[open]>summary::before{transform:rotate(45deg)}
+.cr-flt .cr-flt-sel{color:var(--brand-ink);font-weight:600}
+.cr-flt[open]>summary{margin-bottom:4px}
+/* 유입경로: 0 인 경로 한 줄 */
+.ls-zero{margin:-6px 0 14px;color:var(--muted)}
+/* 장비 신청 · 현황: 신청 ↔ 현황 대조 카드 — 다 맞으면 한 줄 */
+details.eq-chk{padding:0;margin-bottom:10px;border-left:4px solid var(--good,#0ca30c)}
+details.eq-chk.bad{border-left-color:var(--warning,#fab219)}
+details.eq-chk>summary{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:9px 14px;cursor:pointer;list-style:none;font-size:13px}
+details.eq-chk>summary::-webkit-details-marker{display:none}
+details.eq-chk>summary>b{font-size:14px}
+details.eq-chk>summary .eq-chk-more{margin-left:auto;color:var(--muted);font-size:12px}
+details.eq-chk[open]>summary .eq-chk-more{display:none}
+details.eq-chk .eq-chk-body{padding:0 14px 11px}
+details.eq-chk.ok #eqFixAll{display:none}
+/* 입력 · 상세 창: 저장 줄을 창 아래에 붙임(PC 도 — 긴 입력에서 찾지 않게) */
+@media (min-width:761px){
+  html[data-skin="gn"] .ovl .modal>.mact{position:sticky;bottom:-18px;z-index:5;background:var(--surface);margin:16px -20px -18px;padding:10px 20px 12px;border-top:1px solid var(--grid)}
+  html[data-skin="gn"] #ovlC360 .modal>.mact{margin:12px -22px -20px;padding:12px 22px 14px}
+}
+/* 계약 상세: 변동 없는 금액은 한 줄 · 빈 이력 */
+.dt-flat{margin:0;padding:10px 12px;background:var(--surface-2);border-radius:10px}
+.dt-nolog{padding:8px 4px!important}
+/* 작은 표(몇 줄짜리): 검색 · 엑셀 · 열 숨김 */
+html[data-skin="gn"] .fbar.fb-small :is(#dvSearch,#dvCsv,#dvCols){display:none!important}
+/* 단위 «천원» 칩은 상단 ₩ 배지가 있는 PC 에선 숨김(단위 한 번) · 폰은 상단 배지가 없어 그대로 */
+@media (min-width:761px){ html[data-skin="gn"] .ukw{display:none} }
+/* 위성(견적 · 리포트 · 정산) 카드: 제목 글자는 상단과 겹쳐 숨기고 단위 배지 · 새 창 버튼만 · iframe 은 카드에 붙임 */
+html[data-skin="gn"] .sat-head .sat-ttl{display:none}
+html[data-skin="gn"] .sat-head{padding:2px 6px 8px!important}
+html[data-skin="gn"] :is(#viewQuote,#viewPreport,#viewS1,#viewKk) .card{padding:8px!important}
+html[data-skin="gn"] :is(#viewQuote,#viewPreport,#viewS1,#viewKk) iframe{border-radius:14px!important;background:var(--surface)!important}
+/* 폰: 카드 줄을 도구줄에 합침 — 정렬 select 는 줄에 · 거르기는 필터 안 · 표 보기는 ⋯ */
+@media (max-width:760px){
+  html[data-skin="gn"] .fbar .dvc-l{display:flex;align-items:center;gap:4px;height:32px;margin:0}
+  html[data-skin="gn"] .fbar .dvc-l>span{font-size:12px;color:var(--muted)}
+  html[data-skin="gn"] .fbar .dvc-l select{height:32px;max-width:150px;font-size:13px}
+  html[data-skin="gn"] .fb-pop .dvc-l{display:flex;align-items:center;gap:6px}
+  html[data-skin="gn"] .fb-pop .dvc-l>span{display:none}
+  html[data-skin="gn"] .fb-pop .dvc-l select{height:34px;flex:1;font-size:14px}
+  html[data-skin="gn"] #dvCardBar.fb-merged{display:none}
+  html[data-skin="gn"] .fb-menu :is(#dvCsv,#dvHelp,#dvCols).icb span{display:inline}
+  html[data-skin="gn"] .fb-menu :is(#dvCsv,#dvHelp,#dvCols,#dvCardTg){display:flex;align-items:center;gap:9px;width:100%;padding:0 11px;justify-content:flex-start;height:36px;border:0;background:transparent;font-size:14px;border-radius:8px}
+  html[data-skin="gn"] .fb-menu :is(#dvCsv,#dvHelp,#dvCols,#dvCardTg):hover{background:var(--surface-2)}
+}
+@media (max-width:760px){ .fb-pop #dvLensBar{flex-wrap:wrap!important;overflow:visible;padding-bottom:0} }
+.c360-eq4[hidden]{display:none}
+details.eq-chk .eq-chk-act{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+details.eq-chk .eq-chk-act:empty{display:none}
 /* ==== ㊿+166 새 디자인 end ==== */

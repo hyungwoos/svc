@@ -2912,7 +2912,7 @@ if (S.blk()) {
     const ym0 = await page.$eval('#bzYm', (e) => e.value); await page.fill('#bzSums .bz-amt >> nth=0', '65000'); await page.click('#bzSave'); await page.waitForTimeout(700);
     const rows = db.table('biz_recon'), o2 = rows.filter((r) => r.y === CY - 2).map((r) => r.id).join(), n1 = rows.filter((r) => r.y === CY - 1 && r.ym === '8월'), h1 = db.table('doc_hist').slice(-1)[0];
     assert(ym0 === K(CY - 1, 8) && log[0] === 'replace ' + K(CY - 1, 8) + ' ' && o2 === '9001,9002' && n1.length === 2 && n1.some((r) => r.biz === 65000000) && h1 && h1.op === 'replace' && h1.old.length === 2 && !db.writes.some((w) => w.method === 'DELETE' && w.table === 'biz_recon'), 'save ' + JSON.stringify({ ym0, log, o2, n1, h1 }));
-    const p1 = await pills(); await page.click('text=' + (CY - 2) + '년 8월'); await page.click('text=🗑 이 달 삭제'); await page.waitForTimeout(600);
+    const p1 = await pills(); await page.click('text=' + (CY - 2) + '년 8월'); await page.click('text=이 달 삭제'); await page.waitForTimeout(600);
     const left = db.table('biz_recon').map((r) => r.y + ':' + r.ym).sort().join(), p2 = await pills();
     assert(log[1] === 'delete ' + K(CY - 2, 8) && !/9001|9002/.test(db.table('biz_recon').map((r) => r.id).join()) && left.includes((CY - 1) + ':8월') && JSON.stringify(p2) === JSON.stringify([(CY - 1) + '년 12월', (CY - 1) + '년 8월']) && p1.length === 3, 'delete ' + JSON.stringify({ log, left, p2 }));
     assert(!c.errs.length, c.errs.join('|')); await ctx.close();
@@ -3535,7 +3535,7 @@ if (S.blk()) {
     const a = await A.page.evaluate(() => { const t = document.getElementById('dvTable'), tr = t.querySelector('tbody tr'), pin1 = tr.querySelector('td.pin1'), pin2 = tr.querySelector('td.pin2'), cx = [...tr.querySelectorAll('td.cx')];
       const vis = (e) => getComputedStyle(e).display !== 'none';
       return { thead: getComputedStyle(t.querySelector('thead')).display, pin1: pin1 && pin1.textContent.trim(), p1top: pin1 && pin2 && Math.abs(pin1.getBoundingClientRect().top - pin2.getBoundingClientRect().top) < 12, lab: [...tr.querySelectorAll('td[data-l]')].filter(vis).slice(2, 4).map((x) => getComputedStyle(x, '::before').content),
-        cxHidden: cx.length > 0 && cx.every((x) => !vis(x)), more: (tr.querySelector('.cxb') || {}).textContent, bar: !document.getElementById('dvCardBar').hidden && !!document.getElementById('dvSortSel'), sticky: getComputedStyle(pin1).position, wrapMax: getComputedStyle(t.parentElement).maxHeight }; });
+        cxHidden: cx.length > 0 && cx.every((x) => !vis(x)), more: (tr.querySelector('.cxb') || {}).textContent, bar: !!document.getElementById('dvSortSel') && document.getElementById('dvSortSel').closest('.dbar, #dvCardBar') !== null, sticky: getComputedStyle(pin1).position, wrapMax: getComputedStyle(t.parentElement).maxHeight }; });
     await A.page.evaluate(() => document.querySelector('#dvTable tbody tr .cxb').click());
     const b = await A.page.evaluate(() => { const tr = document.querySelector('#dvTable tbody tr'); return { open: tr.classList.contains('cx-open'), shown: [...tr.querySelectorAll('td.cx:not(.na)')].every((x) => getComputedStyle(x).display !== 'none'), aria: tr.querySelector('.cxb').getAttribute('aria-expanded') }; });
     assert(a.thead === 'none' && a.pin1 && a.p1top && a.lab.every((x) => /^".+"$/.test(x)) && a.cxHidden && /^＋ \d+칸 더 보기$/.test(a.more) && a.bar && a.sticky === 'static' && a.wrapMax === 'none' && b.open && b.shown && b.aria === 'true', 'card ' + JSON.stringify({ a, b }));
@@ -3548,10 +3548,11 @@ if (S.blk()) {
     assert(e.lab.length > 2 && e.w > 150 && e.fs === '16px' && e.nIn > 5 && e.mrr === 'decimal' && pw && pw.body[e.k] === 'cardsite1' && !(await A.page.$('#dvTable tr.editing')), 'edit ' + JSON.stringify({ e, pw }));
     await A.page.selectOption('#dvSortSel', { index: 2 }); await A.page.waitForTimeout(300);
     const so = await A.page.evaluate(() => ({ k: SVC.DV.sortK, d: SVC.DV.sortDir, sel: document.getElementById('dvSortSel').value }));
+    await A.page.click('#dvFilterBtn'); await A.page.waitForTimeout(150);   /* ㊿+188 폰: «거르기»는 «필터» 안 · «표로 보기»는 ⋯ 안 */
     await A.page.selectOption('#dvFiltSel', { index: 2 }); await A.page.waitForTimeout(300);
     const fo = await A.page.evaluate(() => !!document.querySelector('.colf'));
-    await A.page.keyboard.press('Escape'); await A.page.evaluate(() => { const f = document.querySelector('.colf'); if (f) f.remove(); });
-    await A.page.click('#dvCardTg'); await A.page.waitForTimeout(300);
+    await A.page.keyboard.press('Escape'); await A.page.evaluate(() => { const f = document.querySelector('.colf'); if (f) f.remove(); }); await A.page.keyboard.press('Escape'); await A.page.waitForTimeout(100);
+    await A.page.click('#dvMoreBtn'); await A.page.waitForTimeout(150); await A.page.click('#dvCardTg'); await A.page.waitForTimeout(300);
     const tb = await A.page.evaluate(() => ({ cards: document.getElementById('dvTable').classList.contains('cards'), thead: getComputedStyle(document.querySelector('#dvTable thead')).display, pref: localStorage.getItem('svc_dvcards'), btn: document.getElementById('dvCardTg').textContent, cxt: !!document.querySelector('#dvTable td.cxt') }));
     assert(so.k && so.d === -1 && so.sel === so.k + '|-1' && fo && !tb.cards && tb.thead !== 'none' && tb.pref === '0' && tb.btn === '카드로 보기' && !tb.cxt && !A.c.errs.length, 'bar ' + JSON.stringify({ so, fo, tb, errs: A.c.errs }));
     await A.ctx.close();
@@ -4080,21 +4081,21 @@ if (S.blk()) {
     await A.ctx.close();
     const M = await mk187({ w: 390, h: 844, mobile: true }), Q = M.page; await Q.evaluate(() => SVC.navMenu('contracts')); await Q.waitForTimeout(500);
     const mob = await Q.evaluate(() => { const bar = document.querySelector('#viewData .dbar'), W = document.documentElement.clientWidth; const w = (id) => Math.round(document.getElementById(id).getBoundingClientRect().width); const sp = (id) => getComputedStyle(document.querySelector('#' + id + ' span')).display;
-      return { h: Math.round(bar.getBoundingClientRect().height), seg: Math.round(document.querySelector('#dvWvBar .seg').getBoundingClientRect().width), bar: Math.round(bar.getBoundingClientRect().width), icon: [sp('dvSavedBtn'), sp('dvCsv'), sp('dvCols')].join(','), lgd: getComputedStyle(document.querySelector('#dvCount .dv-lgd')).display, ov: document.documentElement.scrollWidth <= W, rows: [...bar.children].filter((e) => e.getBoundingClientRect().height > 1).map((e) => Math.round(e.getBoundingClientRect().top)).filter((t, i, a) => a.indexOf(t) === i).length, w: w('dvSavedBtn') }; });
+      return { h: Math.round(bar.getBoundingClientRect().height), seg: Math.round(document.querySelector('#dvWvBar .seg').getBoundingClientRect().width), bar: Math.round(bar.getBoundingClientRect().width), icon: [sp('dvSavedBtn')].join(',') + (document.querySelector('#dvMoreMenu #dvCsv') && document.querySelector('#dvMoreMenu #dvCols') ? ',menu' : ',bar'), lgd: getComputedStyle(document.querySelector('#dvCount .dv-lgd')).display, ov: document.documentElement.scrollWidth <= W, rows: [...bar.children].filter((e) => e.getBoundingClientRect().height > 1).map((e) => Math.round(e.getBoundingClientRect().top)).filter((t, i, a) => a.indexOf(t) === i).length, w: w('dvSavedBtn') }; });
     await Q.click('#dvFilterBtn'); await Q.waitForTimeout(200);
     const mob2 = await Q.evaluate(() => { const r = document.getElementById('dvFilterPop').getBoundingClientRect(); return { l: Math.round(r.left), rt: Math.round(document.documentElement.clientWidth - r.right), open: !document.getElementById('dvFilterPop').hidden }; });
     await M.ctx.close();
     const C = await mk187({ look: 'classic' }); await C.page.evaluate(() => SVC.navMenu('contracts')); await C.page.waitForTimeout(400);
     const cl = await C.page.evaluate(() => ({ gn: SVC.isGN(), fb: !!document.getElementById('dvFilterBtn'), lensBefore: document.getElementById('dvLensBar').parentElement === document.querySelector('#viewData .dbar').parentElement && !document.getElementById('dvFilterPop'), fclr: document.getElementById('dvFclr').parentElement.classList.contains('dbar'), reload: document.getElementById('dvReload').parentElement.classList.contains('dbar') })); await C.ctx.close();
-    assert(b.open && b.exp === 'true' && b.secs === 'chip:0 qv:0 lens:1' && /지금 조건 \d+행/.test(b.cnt) && b.foc, '팝오버 ' + JSON.stringify(b));
+    assert(b.open && b.exp === 'true' && b.secs === 'chip:0 qv:0 lens:1 colf:0' && /지금 조건 \d+행/.test(b.cnt) && b.foc, '팝오버 ' + JSON.stringify(b));   /* ㊿+188 폰용 «열로 거르기» 구역(PC 는 숨김) */
     assert(c.lens === 'kids' && c.open && c.chips === '관점:부속 계약 있는 고객사' && c.clr === 'none' && c.badge === '1' && c.on && c.cnt === '지금 조건 ' + c.rows + '행' && /걸린 조건 1개/.test(c.lbl) && !d.open && d.foc === 'dvFilterBtn', '관점 칩 ' + JSON.stringify({ c, d }));
     assert(e.chips === '관점:부속 계약 있는 고객사|상태:신규' && e.clr !== 'none' && e.clrT === '모두 해제' && e.badge === '2' && f.lens === 'kids' && f.f === '{}' && f.chips === 1, '열 필터 칩 ' + JSON.stringify({ e, f }));
     assert(g.menu && g.empty && /보기 운영 · 부속 계약 있는 고객사 · «가상»/.test(g.cur) && g.foc === 'fvName' && h.n === 1 && h.s.lens === 'kids' && h.s.q === '가상' && h.s.wv === '운영' && h.badge === '1' && !h.menu && h.foc === 'dvSavedBtn', '저장 ' + JSON.stringify({ g, h }));
     assert(i0 !== 'none' && i.lens === '' && i.chips && i.q === '' && j.lens === 'kids' && j.q === '가상' && j.wv === '운영' && j.chips === '관점:부속 계약 있는 고객사' && /내 부속 계약/.test(j.toast) && k.n === 0 && k.badgeHid && k.menu, '적용 · 삭제 ' + JSON.stringify({ i, j, k }));
     assert(l.open && /dvReload:1/.test(l.items) && /dvDense:1/.test(l.items) && l.foc === 'dvReload' && l.txt === '밀도' && !m.open && m.foc === 'dvMoreBtn', '⋯ ' + JSON.stringify({ l, m }));
-    assert(!n.open && n.secs === 'chip:1 qv:1 lens:0' && n.st === '진행상태' && n.lens === '' && !n.qoiIn && n.chips && o.open && o.pre === 'nonext' && o.chip === '등록' && o.chips === '진행상태:등록|빠른 보기:다음 행동 없음' && o.badge === '2' && !p2.pre && p2.chip === '' && p2.chips && p2.open, 'OI ' + JSON.stringify({ n, o, p2 }));
+    assert(!n.open && n.secs === 'chip:1 qv:1 lens:0 colf:0' && n.st === '진행상태' && n.lens === '' && !n.qoiIn && n.chips && o.open && o.pre === 'nonext' && o.chip === '등록' && o.chips === '진행상태:등록|빠른 보기:다음 행동 없음' && o.badge === '2' && !p2.pre && p2.chip === '' && p2.chips && p2.open, 'OI ' + JSON.stringify({ n, o, p2 }));
     assert(q.out && q.vis === 'flex' && q.fb && q.src && r.fb && r.sv && r.more && r.chips, 'LIVE · 점검 ' + JSON.stringify({ q, r }));
-    assert(mob.h <= 150 && mob.seg >= mob.bar - 2 && mob.icon === 'none,none,none' && mob.lgd === 'none' && mob.ov && mob.rows <= 4 && mob.w <= 40 && mob2.open && mob2.l === 8 && mob2.rt === 8, '폰 ' + JSON.stringify({ mob, mob2 }));
+    assert(mob.h <= 150 && mob.seg >= mob.bar - 2 && mob.icon === 'none,menu' && mob.lgd === 'none' && mob.ov && mob.rows <= 4 && mob.w <= 40 && mob2.open && mob2.l === 8 && mob2.rt === 8, '폰 ' + JSON.stringify({ mob, mob2 }));
     assert(!cl.gn && !cl.fb && cl.lensBefore && cl.fclr && cl.reload && !A.c.errs.filter((e) => !/serviceWorker/.test(e)).length, '클래식 ' + JSON.stringify({ cl, errs: A.c.errs }));
     return '한 줄 ' + a.h + 'px · 팝오버 · 칩 · 저장된 보기 · ⋯ · 폰 ' + mob.rows + '줄';
   });
@@ -4129,6 +4130,102 @@ if (S.blk()) {
     assert(m.v === 'cngen' && m.n === 5 && m.w < m.W / 2 && m.w > m.W / 3 && m.ov && m.two, '폰 ' + JSON.stringify(m));
     assert(!cl.gn && !cl.sel && cl.side === 5 && cl.big && !A.c.errs.filter((e) => !/serviceWorker/.test(e)).length, '클래식 ' + JSON.stringify({ cl, errs: A.c.errs }));
     return '영역 ' + a.keys.split(' ').length + '개 띠 · ' + a.groups;
+  });
+}
+// ㊿+188 화면별 정리 — 0 인 기간 접기 · 필터 접기 · 유입경로 0 경로 · 대조 한 줄 · 눈금 · 이력 읽기 · 상세 창 · 고객 360 · 위성 · 폰 도구줄 — 가짜 DB
+if (S.blk()) {
+  const mk188 = async (o) => { o = Object.assign({ role: 'super_admin', email: 'tester@example.com', w: 1440, h: 1000, mobile: false, look: '', seed: null }, o || {});
+    const db = new FakeDB(seedData()); if (o.seed) o.seed(db); const ctx = await browser.newContext({ viewport: { width: o.w, height: o.h }, serviceWorkers: 'block', isMobile: o.mobile, hasTouch: o.mobile }); const page = await ctx.newPage(); const c = collect(page);
+    page.on('dialog', (d) => d.dismiss()); if (o.look) await page.addInitScript((l) => { try { localStorage.setItem('svc_look', l); } catch (e) { } }, o.look);
+    await fakeBackend(page, db, { role: o.role, email: o.email }); await page.goto(url + '/index.html');
+    await page.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA && SVC.ST.DATA.rows.length, null, { timeout: 20000 }); await page.waitForTimeout(600); return { db, ctx, page, c }; };
+  const go = async (P, v) => { await P.evaluate(async (v) => { try { await SVC.lazyLoad(v); } catch (e) { } SVC.navMenu(v); }, v); await P.waitForTimeout(500); };
+  await S.t('㊿+188 분석 · 장비 · 창: 해지율 · 증감 «0 인 기간 n개 보기»(합계 줄은 그대로 · 펼침 기억) · 필터 칩 줄은 «필터 ▾»(고르면 펼침) · 유입경로 0 경로는 한 줄 + «모두 보기» · 장비 차트 눈금 중복 없음 · 대조 카드 한 줄(진단 버튼은 접힘 안 건드림 · 접은 상태 기억) · 작은 표(연간 목표) 검색 · 엑셀 · 열 숨김 · 이력 «내용» 읽히는 글 · 계약 상세 그래프 기간 · 합계 · 변동 없으면 한 줄 · 빈 이력 한 줄 · 입력 창 저장 줄 고정 · 고객 360 건수 한 번 · 장비 0 이면 한 줄 · 위성 embed=gn · 단위 칩 PC 숨김 · 클래식 그대로', async () => {
+    const A = await mk188(), P = A.page;
+    await go(P, 'churnrate');
+    const a = await P.evaluate(() => { const tg = document.querySelector('#crBody .zr-tg'), rows = [...document.querySelectorAll('#crBody .zr-row')]; const tb = tg && tg.closest('table'); const last = tb && [...tb.tBodies[0].rows].slice(-1)[0];
+      return { tg: !!tg, n: rows.length, hid: rows.every((r) => r.hidden), txt: tg && tg.textContent.trim(), zero: rows.every((r) => [...r.children].slice(1).every((td) => /^[\s0.,%–\-−+]*$/.test(td.textContent))), sum: last && last.textContent.trim().slice(0, 2), sumZr: last && last.classList.contains('zr-row'), flt: document.getElementById('crFlt').open, fsum: document.querySelector('#crFlt>summary').textContent.trim(), adv: document.getElementById('crAdv').open }; });
+    await P.click('#crBody .zr-tg .zr-btn'); await P.waitForTimeout(100);
+    const b = await P.evaluate(() => ({ shown: [...document.querySelectorAll('#crBody .zr-row')].every((r) => !r.hidden), txt: document.querySelector('#crBody .zr-tg').textContent.trim(), exp: document.querySelector('#crBody .zr-btn').getAttribute('aria-expanded') }));
+    await P.click('#crFlt>summary'); await P.waitForTimeout(100); await P.click('#crBody button.chip[data-fg="line"]'); await P.waitForTimeout(500);
+    const c2 = await P.evaluate(() => ({ flt: document.getElementById('crFlt').open, sel: (document.querySelector('#crFlt .cr-flt-sel') || {}).textContent, kept: document.querySelector('#crBody .zr-tg') ? document.querySelector('#crBody .zr-tg').textContent.trim() : '(없음)', chip: document.querySelector('#crBody button.chip[data-fg="line"]').getAttribute('aria-pressed') }));
+    await P.click('#crBody button.chip[data-fg="line"]'); await P.waitForTimeout(400);
+    const c3 = await P.evaluate(() => { SVC.navMenu('custflow'); return document.getElementById('cfFlt').open; });   /* 연 상태는 해지율 · 증감이 같이 기억(필터도 같이 씀) */
+    await P.evaluate(() => { SVC.CR.flt = false; }); await go(P, 'custflow');
+    const d = await P.evaluate(() => ({ tg: document.querySelectorAll('#cfBody .zr-tg').length, flt: document.getElementById('cfFlt').open, first: (document.querySelector('#cfBody .zr-tg') || {}).textContent }));
+    await go(P, 'leadsrc');
+    const e = await P.evaluate(() => ({ tiles: document.querySelectorAll('.ls-tile').length, zero: (document.querySelector('.ls-zero') || {}).textContent, tg: (document.querySelector('#bizHost .zr-tg') || {}).textContent }));
+    await P.click('#lsAllTiles'); await P.waitForTimeout(400);
+    const f = await P.evaluate(() => ({ tiles: document.querySelectorAll('.ls-tile').length, btn: (document.getElementById('lsAllTiles') || {}).textContent }));
+    await P.click('#lsAllTiles'); await P.waitForTimeout(300);
+    await go(P, 'eqboard');
+    const g = await P.evaluate(() => { const t = [...document.querySelectorAll('#eqcTrend svg text')].map((x) => x.textContent).filter((x) => /^[\d,]+$/.test(x)); return { ticks: t.join(','), uniq: new Set(t).size === t.length && t.length >= 2 }; });
+    await go(P, 'orders');
+    const h = await P.evaluate(() => { const d = document.getElementById('eqChk'); return { det: !!d && d.tagName === 'DETAILS', open: d.open, sum: d.querySelector('summary').textContent.replace(/\s+/g, ' ').trim(), ok: d.classList.contains('ok'), fixVis: getComputedStyle(document.getElementById('eqFixAll')).display, diagIn: !!d.querySelector('.eq-chk-act #eqDiag') && !d.querySelector('summary button'), body: d.querySelector('.eq-chk-body').textContent.includes('기준은') }; });
+    await P.click('#eqChk summary'); await P.waitForTimeout(150);
+    const h2 = await P.evaluate(() => ({ open: document.getElementById('eqChk').open, mem: SVC.EQ_CHK.open }));
+    await P.evaluate(() => SVC.renderGrid()); await P.waitForTimeout(300);
+    const h3 = await P.evaluate(() => ({ open: document.getElementById('eqChk').open }));
+    await P.click('#eqChk summary'); await P.waitForTimeout(150); await P.click('#eqDiag'); await P.waitForTimeout(900);   /* 버튼은 펼친 본문 첫 줄에 */
+    const h4 = await P.evaluate(() => ({ open: document.getElementById('eqChk').open, diag: getComputedStyle(document.getElementById('eqDiagOut')).display !== 'none' }));
+    await P.click('#eqDiagClose'); await P.waitForTimeout(150);
+    await go(P, 'targets');
+    const i = await P.evaluate(() => ({ small: document.querySelector('#viewData .dbar').classList.contains('fb-small'), q: getComputedStyle(document.getElementById('dvSearch')).display, csv: getComputedStyle(document.getElementById('dvCsv')).display, add: getComputedStyle(document.getElementById('dvAdd')).display }));
+    const j = await P.evaluate(() => ({ t1: SVC.logDetailText({ mrr: 480, status: '해지', _via: '계약 표 ✎' }, 'contracts'), t2: SVC.logDetailText({ kind: 'eq', assignee: { from: null, to: 'a@example.com' } }, 'work_assign'), t3: SVC.logDetailText('그냥 글', 'x'), t4: SVC.logDetailText({ 맞춤: [1, 2, 3], ok: true }, 'monthly_revenue') }));
+    await go(P, 'contracts');
+    const k = await P.evaluate(() => { const flat = SVC.ST.RAWX.contracts.find((c) => { const m = SVC.ST.RAWX.mrs.filter((x) => x.contract_id === c.id); return m.length >= 2 && m.every((x) => Number(x.amount) === Number(m[0].amount)); }); SVC.openDetail(flat); return !!flat; });
+    await P.waitForTimeout(500);
+    const l = await P.evaluate(() => ({ cap: document.getElementById('dtChartCap').textContent, flat: (document.querySelector('#dtChart .dt-flat') || {}).textContent, h200: document.getElementById('dtChart').classList.contains('h200'), log: document.getElementById('dtLog').textContent.trim(), thead: !!document.querySelector('#dtLog thead'), nolog: !!document.querySelector('#dtLog .dt-nolog'), mact: getComputedStyle(document.querySelector('#ovlDetail .modal>.mact')).position }));
+    await P.keyboard.press('Escape'); await P.waitForTimeout(200);
+    const m0 = await P.evaluate(() => { const v = SVC.ST.RAWX.contracts.find((c) => { const m = SVC.ST.RAWX.mrs.filter((x) => x.contract_id === c.id); return m.length >= 2 && m.some((x) => Number(x.amount) !== Number(m[0].amount)); }); if (!v) return false; SVC.openDetail(v); return true; });
+    await P.waitForTimeout(500);
+    const m = await P.evaluate(() => ({ svg: !!document.querySelector('#dtChart svg'), h200: document.getElementById('dtChart').classList.contains('h200'), cap: /합계/.test(document.getElementById('dtChartCap').textContent) }));
+    await P.keyboard.press('Escape'); await P.waitForTimeout(200);
+    await P.click('#btnEdit'); await P.waitForTimeout(400);
+    const n = await P.evaluate(() => ({ mact: getComputedStyle(document.querySelector('#ovlEdit .modal>.mact')).position, bt: getComputedStyle(document.querySelector('#ovlEdit .modal>.mact')).borderTopWidth }));
+    await P.keyboard.press('Escape'); await P.waitForTimeout(200);
+    await P.evaluate(() => SVC.openCust360('가상고객07')); await P.waitForTimeout(500);
+    const o = await P.evaluate(() => ({ cap: document.getElementById('c360Cap').textContent, go: [...document.querySelectorAll('#c360Go [data-cv]')].map((b) => b.textContent.trim()).join('|'), goNum: !!document.querySelector('#c360Go .num'), tabs: [...document.querySelectorAll('.c360-tabs [role="tab"]')].map((b) => b.textContent.trim()).slice(0, 3).join('|'), eq4: getComputedStyle(document.querySelector('.c360-eq4')).display, eqLine: ([...document.querySelectorAll('.c360-summ h4:not([hidden])')].filter((h) => /장비/.test(h.textContent)).map((h) => h.querySelector('.ct').textContent)[0] || ''), eqH4: [...document.querySelectorAll('.c360-summ h4')].filter((h) => /장비/.test(h.textContent) && !h.hidden).length }));
+    await P.keyboard.press('Escape'); await P.waitForTimeout(200);
+    await P.evaluate(() => SVC.switchView('s1')); await P.waitForFunction(() => { const f = document.getElementById('s1Frame'); try { return f.contentDocument && f.contentDocument.readyState === 'complete' && f.contentDocument.documentElement.getAttribute('data-embed'); } catch (e) { return false; } }, null, { timeout: 8000 });
+    const p = await P.evaluate(() => { const f = document.getElementById('s1Frame'), d = f.contentDocument; return { src: /embed=gn/.test(f.src), emb: d.documentElement.getAttribute('data-embed'), gg: getComputedStyle(d.documentElement).getPropertyValue('--gg').trim(), tab: getComputedStyle(d.querySelector('.tab.on')).backgroundColor, ttl: getComputedStyle(document.querySelector('#viewS1 .sat-ttl')).display, badge: getComputedStyle(document.querySelector('#viewS1 .sat-head .ubadge')).display, newWin: document.querySelector('#viewS1 a[data-sat]').getAttribute('href') }; });
+    const q = await P.evaluate(() => { SVC.navMenu('dash'); SVC.homeDetail(true); return [...document.querySelectorAll('#viewDash .ukw')].filter((x) => getComputedStyle(x).display !== 'none').length; }); await P.evaluate(() => SVC.homeDetail(false));
+    await A.ctx.close();
+    const C = await mk188({ look: 'classic' }), Q = C.page; await go(Q, 'churnrate');
+    const cl = { zr: await Q.evaluate(() => document.querySelectorAll('.zr-tg').length), flt: await Q.evaluate(() => !!document.getElementById('crFlt')) };
+    await go(Q, 'orders'); cl.eq = await Q.evaluate(() => ({ det: !!document.getElementById('eqChk'), old: /신청 ↔ 현황 대조/.test(document.getElementById('eqHost').textContent) }));
+    await Q.evaluate(() => SVC.openCust360('가상고객07')); await Q.waitForTimeout(400); cl.cap = await Q.evaluate(() => document.getElementById('c360Cap').textContent); await C.ctx.close();
+    assert(a.tg && a.n >= 1 && a.hid && /^0 인 기간 \d+개 보기$/.test(a.txt) && a.zero && a.sum === '누계' && !a.sumZr && !a.flt && /\(전체\)/.test(a.fsum) && !a.adv && b.shown && b.txt === '0 인 기간 접기' && b.exp === 'true', '해지율 0행 ' + JSON.stringify({ a, b }));
+    assert(c2.flt && c2.sel && c2.chip === 'true' && c2.kept === '0 인 기간 접기' && c3 && d.tg >= 1 && !d.flt && /0 인 기간/.test(d.first), '필터 접기 · 증감 ' + JSON.stringify({ c2, c3, d }));
+    assert(e.tiles === 1 && /모두 0 인 경로 5개/.test(e.zero) && /직접영업/.test(e.zero) && /0 인 경로 \d+개 보기/.test(e.tg) && f.tiles === 6 && f.btn === '0 인 경로 접기', '유입경로 ' + JSON.stringify({ e, f }));
+    assert(g.uniq && h.det && h.open && /✓ 신청 ↔ 현황 일치/.test(h.sum) && /신청 2건/.test(h.sum) && h.ok && h.fixVis === 'none' && h.diagIn && h.body && !h2.open && h2.mem === false && !h3.open && h4.open && h4.diag, '장비 ' + JSON.stringify({ g, h, h2, h3, h4 }));
+    assert(i.small && i.q === 'none' && i.csv === 'none' && i.add !== 'none' && j.t1 === 'MRR(천원): 480 · 상태: 해지 (계약 표 ✎)' && j.t2 === 'kind: eq · assignee: (비움) → a@example.com' && j.t3 === '그냥 글' && j.t4 === '맞춤: 3개 · ok: 예', '작은 표 · 이력 ' + JSON.stringify({ i, j }));
+    assert(k && /월 인식 금액\(천원\) · \d{4}-\d\d ~ \d{4}-\d\d · \d+개월 · 합계 [\d,]+천원/.test(l.cap) && /매달 [\d,]+천원 — 기간 내 변동 없음/.test(l.flat) && !l.h200 && l.nolog && !l.thead && /기록이 없습니다/.test(l.log) && l.mact === 'sticky' && m0 && m.svg && m.h200 && m.cap && n.mact === 'sticky' && n.bt === '1px', '상세 · 입력 창 ' + JSON.stringify({ k, l, m0, m, n }));
+    assert(o.cap === '인바운드는 메뉴를 한 번 연 뒤 집계됩니다' && o.go === '계약|LIVE|OI|인바운드|장비 신청|장비 현황' && !o.goNum && /^요약\|계약\s?\d+\|LIVE\s?\d+$/.test(o.tabs) && o.eq4 === 'none' && /이력 없음/.test(o.eqLine) && o.eqH4 === 1, '고객 360 ' + JSON.stringify(o));
+    assert(p.src && p.emb === 'gn' && p.gg === '#3F7A0C' && p.tab === 'rgb(28, 30, 32)' && p.ttl === 'none' && p.badge !== 'none' && !/embed/.test(p.newWin) && q === 0, '위성 · 단위 ' + JSON.stringify({ p, q }));
+    assert(cl.zr === 0 && !cl.flt && !cl.eq.det && cl.eq.old && /계약 \d+건 · LIVE/.test(cl.cap) && !A.c.errs.filter((e) => !/serviceWorker/.test(e)).length, '클래식 ' + JSON.stringify({ cl, errs: A.c.errs }));
+    return '0행 ' + a.n + ' · 경로 5 · 눈금 ' + g.ticks + ' · 대조 한 줄 · 이력 글';
+  });
+  await S.t('㊿+188 폰(390): 표 도구줄 4줄 이하 — 정렬은 줄에 · «거르기»는 «필터» 안(관점 칩 줄바꿈) · 엑셀 · AI 도움말 · 열 · «표로 보기»는 «⋯» 안(글자 보임) · 카드 줄 숨김 · 단위 칩은 보임 · 해지율 접기 머리 한 줄 · 가로 넘침 0', async () => {
+    const M = await mk188({ w: 390, h: 844, mobile: true }), Q = M.page; await go(Q, 'contracts');
+    const a = await Q.evaluate(() => { const bar = document.querySelector('#viewData .dbar'); const v = (e) => { const r = e.getBoundingClientRect(); return r.width > 1 && r.height > 1; };
+      return { rows: [...bar.children].filter(v).map((e) => Math.round(e.getBoundingClientRect().top)).filter((t, i, a) => a.indexOf(t) === i).length, sortIn: !!bar.querySelector('#dvSortSel'), filtIn: !!document.querySelector('#dvFilterPop [data-sec="colf"] #dvFiltSel'), tgIn: !!document.querySelector('#dvMoreMenu #dvCardTg'), csvIn: !!document.querySelector('#dvMoreMenu #dvCsv'), cb: getComputedStyle(document.getElementById('dvCardBar')).display, ov: document.documentElement.scrollWidth <= document.documentElement.clientWidth, dup: document.querySelectorAll('#dvSortSel').length }; });
+    await Q.click('#dvFilterBtn'); await Q.waitForTimeout(200);
+    const b = await Q.evaluate(() => { const lb = document.getElementById('dvLensBar'), pop = document.getElementById('dvFilterPop'); return { wrap: getComputedStyle(lb).flexWrap, fits: lb.scrollWidth <= pop.clientWidth + 2, colf: !document.querySelector('[data-sec="colf"]').hidden }; });
+    await Q.selectOption('#dvFiltSel', { index: 1 }); await Q.waitForTimeout(300);
+    const b2 = await Q.evaluate(() => !!document.querySelector('.colf')); await Q.keyboard.press('Escape'); await Q.evaluate(() => { const f = document.querySelector('.colf'); if (f) f.remove(); }); await Q.keyboard.press('Escape'); await Q.waitForTimeout(100);
+    await Q.click('#dvMoreBtn'); await Q.waitForTimeout(200);
+    const c = await Q.evaluate(() => { const v = (e) => { const r = e.getBoundingClientRect(); return r.width > 1 && r.height > 1; }; return { items: [...document.querySelectorAll('#dvMoreMenu .mm-it')].map((x) => x.id + ':' + (v(x) ? 1 : 0)).join(' '), lbl: [...document.querySelectorAll('#dvMoreMenu :is(#dvCsv,#dvHelp,#dvCols) span')].every((s) => getComputedStyle(s).display !== 'none'), tg: document.getElementById('dvCardTg').textContent }; });
+    await Q.click('#dvCardTg'); await Q.waitForTimeout(400);
+    const d = await Q.evaluate(() => ({ cards: document.getElementById('dvTable').classList.contains('cards'), sortIn: !!document.querySelector('.dbar #dvSortSel'), tg: document.getElementById('dvCardTg').textContent, dup: document.querySelectorAll('#dvCardTg').length }));
+    await Q.click('#dvMoreBtn'); await Q.waitForTimeout(150); await Q.click('#dvCardTg'); await Q.waitForTimeout(400);
+    await go(Q, 'churnrate');
+    const e = await Q.evaluate(() => ({ h: Math.round(document.querySelector('#crAdv>summary').getBoundingClientRect().height), h2: Math.round(document.querySelector('#crFlt>summary').getBoundingClientRect().height), ov: document.documentElement.scrollWidth <= document.documentElement.clientWidth }));
+    const f = await Q.evaluate(() => { SVC.navMenu('dash'); SVC.homeDetail(true); return [...document.querySelectorAll('#viewDash .ukw')].filter((x) => getComputedStyle(x).display !== 'none').length; });
+    await M.ctx.close();
+    assert(a.rows <= 4 && a.sortIn && a.filtIn && a.tgIn && a.csvIn && a.cb === 'none' && a.ov && a.dup === 1 && b.wrap === 'wrap' && b.fits && b.colf && b2, '폰 도구줄 ' + JSON.stringify({ a, b, b2 }));
+    assert(/dvCsv:1/.test(c.items) && /dvCardTg:1/.test(c.items) && c.lbl && c.tg === '표로 보기' && !d.cards && !d.sortIn && d.tg === '카드로 보기' && d.dup === 1 && e.h <= 48 && e.h2 <= 48 && e.ov && f > 0 && !M.c.errs.filter((x) => !/serviceWorker/.test(x)).length, '⋯ · 표 보기 ' + JSON.stringify({ c, d, e, f, errs: M.c.errs }));
+    return '도구줄 ' + a.rows + '줄 · 거르기 → 필터 · 표 보기 → ⋯';
   });
 }
 await browser.close(); srv.close();

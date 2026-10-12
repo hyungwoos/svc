@@ -137,6 +137,8 @@ export function custCtxBar(){
 
 /* Backspace = 뒤로가기 — 글자를 입력하는 칸(input·textarea·select·편집 가능 영역)에 커서가 있을 때는 그대로 글자 지우기 */
 
+/** ㊿+188 위성(견적 · 리포트 · 정산)을 지니언스 포탈 안에 넣을 때 — 위성이 포탈과 같은 색 · 여백으로 그리도록(sat/common.js 가 data-embed=gn) · 새 창으로 열 때는 안 붙임 */
+export function satEmbed(){ return isGN()? '&embed=gn' : ''; }
 export function switchView(v){
   if(v==='mdrpoc') v='mdrops';                       // 통합 전 이름 호환
   if(v==='area'){ v=areaPick()||'dash'; }            // ㊿+187 사업 영역 한 화면(주소 #area 로 와도)
@@ -233,22 +235,22 @@ export function switchView(v){
   }
   if(kkv){
     var kf=$('#kkFrame');
-    if(!kf.src){ kf.src='kk.html?v='+encodeURIComponent(APP_VER); }
+    if(!kf.src){ kf.src='kk.html?v='+encodeURIComponent(APP_VER)+satEmbed(); }
     return;
   }
   if(s1v){
     var sf=$('#s1Frame');
-    if(!sf.src){ sf.src='s1.html?v='+encodeURIComponent(APP_VER); }
+    if(!sf.src){ sf.src='s1.html?v='+encodeURIComponent(APP_VER)+satEmbed(); }
     return;
   }
   if(preport){
     var pf=$('#preportFrame');
-    if(!pf.src){ pf.src='report.html?v='+encodeURIComponent(APP_VER); }
+    if(!pf.src){ pf.src='report.html?v='+encodeURIComponent(APP_VER)+satEmbed(); }
     return;
   }
   if(quote){
     var fr=$('#quoteFrame');
-    if(!fr.src){ fr.src='quote.html?v='+encodeURIComponent(APP_VER); }   // 포탈 버전을 붙여 옛 견적 화면이 캐시에서 나오는 일을 막음
+    if(!fr.src){ fr.src='quote.html?v='+encodeURIComponent(APP_VER)+satEmbed(); }   // 포탈 버전을 붙여 옛 견적 화면이 캐시에서 나오는 일을 막음
     else if(NAV.reset==='quote'){
       // ㊿+172 «초기화»를 눌렀을 때만 견적 종류(기업/공공)를 다시 고르게 — 메뉴를 다시 누르거나 검색 · AI 를 열고 돌아와도 쓰던 견적 그대로
       try{ fr.contentWindow.postMessage({type:'quoteReset'},'*'); }catch(e){}
@@ -730,10 +732,32 @@ export function fbarSync(g, isCustom){
   var wb=document.getElementById('dvWvBar'), sg=wb? wb.querySelector('.seg') : null, WC=wvCur(); if(wb && wb.parentElement!==bar) bar.insertBefore(wb, $('#dvSearch'));   /* 첫 렌더 땐 틀이 먼저 생겨 보기 줄이 밖에 있음 */
   if(sg && WC) sg.title=WC[1]+' · 보기마다 열 구성이 내 브라우저에 저장됩니다';
   var n=fbarChips(g, isCustom);
+  var small=!isCustom && (g.rows()||[]).length<=5 && (g.cols||[]).length<=6 && !n && !(($('#dvSearch')||{}).value||'').trim();   /* ㊿+188 작은 표(연간 목표 같은 몇 줄짜리)는 검색 · 엑셀 · 열 버튼을 숨김 */
+  bar.classList.toggle('fb-small', small);
   var hasSec=!!pop.querySelector('.fb-sec:not([hidden])');
   fb.hidden=isCustom || !hasSec; if(fb.hidden && !pop.hidden && FBAR.close) FBAR.close();
   var fn=fb.querySelector('.fb-n'); fn.hidden=!n; fn.textContent=String(n||''); fb.classList.toggle('on', !!n); fb.setAttribute('aria-label', '필터'+(n? ' — 걸린 조건 '+n+'개' : ''));
   sv.hidden=!!isCustom; var sn=sv.querySelector('.fb-n'), nsv=isCustom? 0 : fvList(ST.CUR_VIEW).length; sn.hidden=!nsv; sn.textContent=String(nsv||'');
+}
+/** ㊿+188 폰(≤760px · 지니언스): 엑셀 · AI 도움말 · 열 은 ⋯ 안으로, 카드 줄의 정렬은 도구줄에 · «거르기»(열 고르기)는 «필터» 안 · «표로 보기»는 ⋯ 안 — PC 로 돌아오면 제자리 */
+export function fbarPhoneSync(g){
+  if(!fbarOn()) return;
+  var bar=$('#dvSearch').parentElement, mm=document.getElementById('dvMoreMenu'), mb=document.getElementById('dvMoreBtn'), pop=document.getElementById('dvFilterPop'), cb=document.getElementById('dvCardBar');
+  if(!mm || !mb || !pop) return;
+  var narrow=dvNarrow() && !(g && g.custom);
+  ['dvCsv','dvHelp','dvCols'].forEach(function(id){ var x=document.getElementById(id); if(!x) return;
+    if(narrow){ if(x.parentElement!==mm){ x.classList.add('mm-it'); x.setAttribute('role','menuitem'); mm.appendChild(x); } }
+    else if(x.parentElement!==bar){ x.classList.remove('mm-it'); x.removeAttribute('role'); bar.insertBefore(x, mb); } });
+  var sec=pop.querySelector('[data-sec="colf"]');
+  if(!sec){ sec=document.createElement('div'); sec.className='fb-sec'; sec.dataset.sec='colf'; sec.hidden=true; sec.innerHTML=tpl`<div class="fb-st">열로 거르기</div>`; pop.insertBefore(sec, pop.querySelector('.fb-ft')); }
+  sec.hidden=true;
+  if(!narrow || !cb || cb.hidden){ if(cb && !narrow) cb.classList.remove('fb-merged'); return; }
+  var ss=document.getElementById('dvSortSel'), fs=document.getElementById('dvFiltSel'), tg=document.getElementById('dvCardTg');
+  if(ss && ss.parentElement){ var sl=ss.parentElement; sl.classList.add('fb-moved'); var sv=document.getElementById('dvSavedBtn'); bar.insertBefore(sl, sv? sv.nextSibling : mb); }
+  if(fs && fs.parentElement){ var fl=fs.parentElement; fl.classList.add('fb-moved'); sec.appendChild(fl); sec.hidden=false; }
+  if(tg){ tg.classList.add('fb-moved','mm-it'); tg.setAttribute('role','menuitem'); mm.appendChild(tg); }
+  cb.classList.add('fb-merged'); cb.hidden=true;
+  var fb=document.getElementById('dvFilterBtn'); if(fb && fb.hidden && !sec.hidden) fb.hidden=false;   /* 거르기만 있어도 «필터» 버튼은 보임 */
 }
 /** 걸린 조건 칩(✕) — 상태 · 빠른 보기 · 홈 알림 조건 · 관점 · 열 필터 */
 export function fbarChips(g, isCustom){
@@ -1318,6 +1342,7 @@ export function dvMainKeys(g){
 }
 export function dvCardBar(g, on){
   var bar=document.getElementById('dvCardBar'); if(!bar) return;
+  document.querySelectorAll('.fb-moved').forEach(function(x){ x.remove(); });   /* ㊿+188 지난 렌더에서 도구줄 · 필터 · ⋯ 로 옮겨 둔 카드 줄 요소를 먼저 치움(같은 id 가 둘이면 동작 연결이 옛 것에 붙음) */
   if(!DVC.mq){ try{ DVC.mq=window.matchMedia('(max-width:760px)'); var re=function(){ var g2=GRIDS[ST.CUR_VIEW]; if(g2 && !g2.custom && !document.getElementById('viewData').classList.contains('hidden')) renderGrid(); };
     if(DVC.mq.addEventListener) DVC.mq.addEventListener('change', re); else DVC.mq.addListener(re); }catch(e){} }
   if(!dvNarrow() || !g || g.custom){ bar.hidden=true; bar.innerHTML=''; return; }
@@ -1325,9 +1350,9 @@ export function dvCardBar(g, on){
   var vc=visCols(g), cur=DV.sortK? DV.sortK+'|'+DV.sortDir : '';
   var tg=tpl`<button type="button" class="pill ghost dvc-tg" id="dvCardTg" title="${on? '모든 목록을 표로 — 이 브라우저에 기억' : '모든 목록을 카드로 — 이 브라우저에 기억'}">${on? '표로 보기' : '카드로 보기'}</button>`;
   if(!on){ bar.innerHTML=tg; }
-  else bar.innerHTML=tpl`<label class="dvc-l"><span>정렬</span><select id="dvSortSel">${rawHtml(tpl`<option value=""${rawHtml(cur? '':' selected')}>기본 순서</option>`+vc.map(function(c){
+  else bar.innerHTML=tpl`<label class="dvc-l"><span>정렬</span><select id="dvSortSel" aria-label="정렬">${rawHtml(tpl`<option value=""${rawHtml(cur? '':' selected')}>기본 순서</option>`+vc.map(function(c){
       return tpl`<option value="${c.k}|1"${rawHtml(cur===c.k+'|1'? ' selected':'')}>${c.l} ↑</option><option value="${c.k}|-1"${rawHtml(cur===c.k+'|-1'? ' selected':'')}>${c.l} ↓</option>`; }).join(''))}</select></label>`+
-    tpl`<label class="dvc-l"><span>거르기</span><select id="dvFiltSel"><option value="">열 고르기…</option>${rawHtml(vc.map(function(c){ var on2=!!(DV.filters[c.k] && DV.filters[c.k].length);
+    tpl`<label class="dvc-l"><span>거르기</span><select id="dvFiltSel" aria-label="열로 거르기 — 열 고르기"><option value="">열 고르기…</option>${rawHtml(vc.map(function(c){ var on2=!!(DV.filters[c.k] && DV.filters[c.k].length);
       return tpl`<option value="${c.k}">${c.l}${on2? ' ● '+DV.filters[c.k].length+'개' : ''}</option>`; }).join(''))}</select></label>`+tg;
   var b=/** @type {any} */(document.getElementById('dvCardTg')); b.onclick=function(){ try{ localStorage.setItem(DVC.key, on? '0':'1'); }catch(e){} DV.page=0; renderGrid(); var t2=document.getElementById('dvCardTg'); if(t2) t2.focus(); };
   var ss=/** @type {any} */(document.getElementById('dvSortSel')); if(ss) ss.onchange=function(){ var p=String(ss.value||'').split('|'); if(!p[0]){ DV.sortK=null; DV.sortDir=1; } else { DV.sortK=p[0]; DV.sortDir=+p[1]||1; } DV.page=0; renderGrid(); var s2=document.getElementById('dvSortSel'); if(s2) s2.focus(); };
@@ -1424,6 +1449,7 @@ export function renderGrid(){
 
   var t=$('#dvTable'); t.innerHTML='';
   DVC.on=dvCardsOn(); DVC.main=dvMainKeys(g); t.classList.toggle('cards', DVC.on); dvCardBar(g, DVC.on);   /* ㊿+181 폰 카드 */
+  try{ fbarPhoneSync(g); }catch(e){ console.warn('폰 도구줄', e); }   /* ㊿+188 폰: 카드 줄(정렬 · 거르기 · 표 보기)을 한 줄 도구줄 · 필터 · ⋯ 에 합침 */
   var thead=document.createElement('thead');
   var tr0=document.createElement('tr');
   visCols(g).forEach(function(c){
@@ -1566,7 +1592,11 @@ export function openDetail(c){
   // 월별 금액 차트
   var mine=(ST.RAWX.mrs||[]).filter(function(x){return x.contract_id===c.id;});
   var host=$('#dtChart'); host.innerHTML='';
-  if(mine.length>=2){
+  var cap=document.getElementById('dtChartCap'); var vals=mine.map(function(x){ return Number(x.amount)||0; }), flat=mine.length>=2 && vals.every(function(x){ return x===vals[0]; });
+  if(cap) cap.textContent=mine.length? '월 인식 금액(천원) · '+String(mine[0].month).slice(0,7)+' ~ '+String(mine[mine.length-1].month).slice(0,7)+' · '+mine.length+'개월 · 합계 '+won(vals.reduce(function(a,b){ return a+b; },0))+'천원' : '';   /* ㊿+188 차트에 이름 · 기간 · 합계 */
+  host.classList.toggle('h200', !flat);
+  if(flat){ host.innerHTML=tpl`<p class="cap dt-flat">매달 ${won(vals[0])}천원 — 기간 내 변동 없음</p>`; }   /* ㊿+188 금액이 같은 기간은 평평한 그래프 대신 한 줄 */
+  else if(mine.length>=2){
     Viz.lines(host,{labels:mine.map(function(x){return String(x.month).slice(2,7).replace('-','.');}),
       series:[{label:'월 금액',data:mine.map(function(x){return Number(x.amount);}),color:cssv('--s1')}],
       fmt:won, tipFmt:wonFull, fill:true});
@@ -1583,9 +1613,24 @@ export function openDetail(c){
     rows=rows||[];
     t.innerHTML=tpl`<thead><tr><th>시각</th><th>누가</th><th>동작</th><th>내용</th></tr></thead><tbody>`+ tpl`${rawHtml(rows.length? rows.map(function(x){
         return tpl`<tr><td>${rawHtml(String(x.at||'').replace('T',' ').slice(0,16))}</td><td>${x.actor||''}`+
-          tpl`</td><td>${x.action||''}</td><td class="mini">${x.detail?JSON.stringify(x.detail).slice(0,90):''}</td></tr>`;
-      }).join('') : '<tr><td colspan="4" class="mini">웹에서 수정한 기록이 없습니다 (최초 이관 데이터)</td></tr>')}`+ tpl`</tbody>`;
+          tpl`</td><td>${x.action||''}</td><td class="mini" title="${x.detail? JSON.stringify(x.detail).slice(0,400) : ''}">${logDetailText(x.detail, x.target, 140)}</td></tr>`;   /* ㊿+188 읽히는 글(원문은 툴팁) */
+      }).join('') : '')}`+ tpl`</tbody>`;
+    if(!rows.length) t.innerHTML='<tbody><tr><td class="mini dt-nolog">웹에서 수정한 기록이 없습니다 (최초 이관 데이터)</td></tr></tbody>';   /* ㊿+188 빈 이력은 머리줄 없이 한 줄 */
   });
+}
+
+/* ㊿+188 변경 이력 «내용» — JSON 대신 읽히는 글: 열 이름(그 표의 열 라벨) · 값 · «전 → 후»(assignee 같은 {from,to}) · _via 는 (경로) · 깊은 값은 짧게 */
+export function logDetailText(v, target, max){
+  if(v==null || v==='') return '';
+  if(typeof v==='string') return v.length>(max||120)? v.slice(0,(max||120))+'…' : v;
+  var labs={}; try{ Object.keys(GRIDS).forEach(function(k){ var g=GRIDS[k]; if(g && g.table===target && g.cols) g.cols.forEach(function(c){ if(!labs[c.k]) labs[c.k]=c.l; }); }); }catch(e){}
+  function one(x){ if(x==null || x==='') return '(비움)'; if(x===true) return '예'; if(x===false) return '아니오';
+    if(Array.isArray(x)) return x.length+'개'; if(typeof x==='object'){ if('from' in x || 'to' in x) return one(x.from)+' → '+one(x.to); var ks=Object.keys(x); return ks.slice(0,3).map(function(k){ return k+' '+one(x[k]); }).join(', ')+(ks.length>3? ' …':''); }
+    var s=String(x); return s.length>40? s.slice(0,40)+'…' : s; }
+  var parts=[], via='';
+  Object.keys(v).forEach(function(k){ if(k==='_via'){ via=String(v[k]||''); return; } parts.push((labs[k]||k.replace(/_/g,' '))+': '+one(v[k])); });
+  var out=parts.join(' · ')+(via? (parts.length? ' (' : '(')+via+')' : '');
+  return out.length>(max||120)? out.slice(0,(max||120))+'…' : out;
 }
 
 export function gridRow(r,g,editing){

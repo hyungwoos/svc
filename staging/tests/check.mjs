@@ -226,6 +226,14 @@ say(/^export function tickMemo\(/m.test(jsAll) && /^export function cssvKey\(/m.
     && /DV\.chipVal=''; DV\.page=0; renderGrid\(\); \}/.test(gr) && /^export function renderAreaSel\(key\)/m.test(an) && /^export function areaPick\(\)/m.test(an) && /tops\.push\(\{v:'area', t:s\.label\}\)/.test(sh) && /b\.dataset\.v==='area' && !!CH_DEFS\[v\]/.test(sh) && /if\(v==='area'\)\{ v=areaPick\(\);/.test(gr)
     && /\.fb-pop\{position:fixed/.test(css) && /\.area-sel\{display:flex/.test(css),
   '㊿+187 표 위 필터 한 줄(fbarSync · 필터 팝오버 · 조건 칩 · 저장된 보기 · ⋯ 도구) · 사업 영역 한 화면(renderAreaSel · areaPick · 상단 버튼 하나)'); }
+// ㊿+188 화면별 정리 — 0 행 접기(foldZeroRows) · 필터 접기(crFltOpen) · 유입경로 0 경로 · 대조 카드(details#eqChk) · 눈금 중복 · 이력 읽기(logDetailText) · 상세 창 · 고객 360 · 위성 embed · 폰 도구줄(fbarPhoneSync)
+{ const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
+  const to = rd('js/tools.js'), sa = rd('js/sales.js'), an = rd('js/analysis.js'), eq = rd('js/equipment.js'), gr = rd('js/grid.js'), vz = rd('js/viz.js'), sh = rd('js/shell.js'), css = rd('app.css'), ix = rd('index.html');
+  say(/^export function foldZeroRows\(root, key, word\)/m.test(to) && /foldZeroRows\(host, 'cr'\)/.test(sa) && /foldZeroRows\(host, 'cf'\)/.test(sa) && /foldZeroRows\(host, 'ls', '경로'\)/.test(an) && /^export function crFltOpen\(id, G\)/m.test(sa) && /zeroSrc=isGN\(\)/.test(an)
+    && /id="eqChk"/.test(eq) && /EQ_CHK=\{open:null\}/.test(eq) && /if \(txt === lastTxt && !isZero\) continue;/.test(vz) && /^export function logDetailText\(v, target, max\)/m.test(gr) && /logDetailText\(v, r&&r\.target, 160\)/.test(rd('js/grids.js')) && /id="dtChartCap"/.test(ix) && /dt-flat/.test(gr)
+    && /^export function fbarPhoneSync\(g\)/m.test(gr) && /^export function satEmbed\(\)/m.test(gr) && /embed=gn/.test(rd('sat/common.js')) && /html\[data-embed="gn"\]/.test(rd('sat/settle.css')) && /class="sat-head"/.test(ix) && /var eqZero=isGN\(\)/.test(sh)
+    && /\.zr-btn\{/.test(css) && /details\.eq-chk>summary\{/.test(css) && /\.ovl \.modal>\.mact\{position:sticky;bottom:-18px/.test(css) && /html\[data-skin="gn"\] \.ukw\{display:none\}/.test(css),
+  '㊿+188 화면별 정리(0 행 접기 · 필터 접기 · 대조 한 줄 · 눈금 · 이력 읽기 · 상세 창 · 고객 360 · 위성 embed · 폰 도구줄)'); }
 // ㊿+160 연장하면 상태 «재약정»(구분 그대로) · 계약 상세에 «계약 기간 · 연장 이력»
 say(/^export function renewStatus\(r\)/m.test(jsAll) && /var nst=renewStatus\(r\);/.test(jsAll) && /^export function ctPeriods\(c, mine\)/m.test(jsAll) && html.includes('id="dtRenew"'), '연장: 상태 «재약정»(renewStatus) · 계약 상세 연장 이력(ctPeriods · #dtRenew)');
 const idx = html + jsAll;

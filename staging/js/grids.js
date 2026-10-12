@@ -8,7 +8,7 @@ import { liveCalc, LV, renderAiKnow, renderBizMonthly, renderDataCheck, renderLe
 import { openCust360 } from './tools.js';
 import { openInbDetail } from './inbound.js';
 import { qLabel } from './sales.js';
-import { oiOwnerOf } from './grid.js';
+import { logDetailText, oiOwnerOf } from './grid.js';
 import { SECTOR_OPTS } from './edit.js';
 
 
@@ -543,7 +543,7 @@ export function buildGrids(){
         {k:'action',l:'동작',ro:true},
         {k:'target',l:'대상',ro:true},
         {k:'target_id',l:'ID',ro:true},
-        {k:'detail',l:'내용',ro:true,fmt:function(v){return v? JSON.stringify(v).slice(0,80):'';}}
+        {k:'detail',l:'내용',ro:true,fmt:function(v,r){return logDetailText(v, r&&r.target, 160);}}   /* ㊿+188 JSON 대신 읽히는 글 */
       ]
     }
   };

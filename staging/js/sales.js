@@ -1,12 +1,12 @@
 /* ===== sales.js — Cloud 사이트 · OI · 견적→OI · 수주→계약 · 사이드바 접기 · 해지 분석 =====
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { APP_VER, ST } from './state.js';
-import { $, amtHint, canView, canWrite, doLogout, esc, fetchT, kwToWon, lline, mk, rawHtml, refreshToken, SB_KEY, SB_URL, tickMemo, tpl, won, wonToKw } from './core.js';
+import { $, amtHint, canView, canWrite, doLogout, esc, fetchT, isGN, kwToWon, lline, mk, rawHtml, refreshToken, SB_KEY, SB_URL, tickMemo, tpl, won, wonToKw } from './core.js';
 import { dIdx, EQB, loadFromDb, onData, railSync, renderEqBoard, SB_RAW, sbHeaders, sbTry, sbWrite, toast, todayStr } from './shell.js';
 import { kpiTable, toggleWidgetPanel } from './dash.js';
 import { OI_IND, OI_OWNERS, OI_PARTNERS, OI_PROB, OI_PRODUCTS, OI_TYPE } from './grids.js';
 import { CH_DEFS, chOf, diffOpen, nmKeys } from './analysis.js';
-import { applyDense, denseKey, openFind, openPaste } from './tools.js';
+import { applyDense, denseKey, foldZeroRows, openFind, openPaste } from './tools.js';
 import { loadInbound } from './inbound.js';
 import { syncOrderAssets } from './equipment.js';
 import { a11yTileRole, BLANK_LABEL, clearFilters, closeColFilter, DV, exportXlsx, gridAddRow, navMenu, oiOpen, openColPick, openFilterPanel, renderGrid, rowMenu,
@@ -990,7 +990,7 @@ export function churnRows(){
    · 해지 = 상태 «해지» 인 원계약(부속 제외) · 해지월 = 종료월(시트 해지년월) · 지원사업 = 판매형태에 «지원»
    · 분모 = 기간 시작 직전 달의 활성 고객사 — «계약 유효»(기본) / «과금»(그 달 인식 금액) / «누적고객»(통계 탭: 신규 누계 − 해지 누계)
    숫자를 누르면 그 칸의 계약 내역이 뜹니다. */
-export var CR={unit:'year', base:'valid', cnd:true, rows:false, exDen:'org', sup:'all', from:2021, upto:null, open:false,
+export var CR={unit:'year', base:'valid', cnd:true, rows:false, exDen:'org', sup:'all', from:2021, upto:null, open:false, flt:false,
         f:{line:[], area:[], sale:[], ind:[], sector:[], ch:[], ptn:[], billing:[], svc:[]}};
 export var CR_PRESET={
   portal:{base:'valid', cnd:true, rows:false, exDen:'org', sup:'all', f:{line:[],area:[],sale:[],ind:[],sector:[],ch:[],ptn:[],billing:[],svc:[]}},
@@ -1092,6 +1092,15 @@ export function crChips(g){
   return tpl`<div class="crchips"><span class="crlab">${rawHtml(g.l)}${rawHtml(sel.length?tpl` <b>${sel.length}</b>`:'')}</span>`+
     tpl`${rawHtml(g.opts.map(function(o){ var on=sel.indexOf(o[0])>=0; return tpl`<button class="chip" data-fg="${rawHtml(g.k)}" data-fv="${o[0]}" aria-pressed="${rawHtml(on)}">${o[1]}</button>`; }).join(''))}`+ tpl`${rawHtml(sel.length? tpl`<button class="chip clr" data-fclr="${rawHtml(g.k)}" title="이 조건 지우기">✕</button>`:'')}</div>`;
 }
+/* ㊿+188 지니언스: 제품 · 사업영역 · 판매형태 · 판매 채널 칩 줄은 «필터 ▾»로 접음(고른 게 있으면 펼침 · 연 상태 기억) — 클래식은 예전처럼 늘 펼침 */
+export function crFltOpen(id, G){
+  if(!isGN()) return '';
+  var sel=[]; (G||[]).forEach(function(g){ var s=CR.f[g.k]||[]; if(s.length){ var lab={}; g.opts.forEach(function(o){ lab[o[0]]=o[1]; }); sel.push(g.l+' '+s.map(function(v){ return lab[v]||v; }).join('·')); } });
+  var open=!!(sel.length || CR.flt);
+  return tpl`<details class="cr-flt" id="${rawHtml(id)}"${rawHtml(open? ' open':'')}><summary>필터 — 제품 · 사업영역 · 판매형태 · 판매 채널 ${rawHtml(sel.length? tpl`<b class="cr-flt-sel">${sel.join(' / ')}</b>` : '<span class="mini">(전체)</span>')}</summary>`;
+}
+export function crFltClose(){ return isGN()? '</details>' : ''; }
+export function crFltWire(host){ var d=/** @type {any} */(host.querySelector('.cr-flt')); if(d) d.ontoggle=function(){ CR.flt=d.open; }; }
 export function crSummary(){
   var G=CR_G||(CR_G=crFilterGroups()), parts=[];
   G.forEach(function(g){ var sel=CR.f[g.k]||[]; if(!sel.length) return; var lab={}; g.opts.forEach(function(o){lab[o[0]]=o[1];}); parts.push(g.l+': '+sel.map(function(v){return lab[v]||v;}).join('·')); });
@@ -1138,9 +1147,9 @@ export function renderChurnRate(){
        tpl`${rawHtml(crSeg('CND 전환 고객','cnd',[['in','포함 (기본)','DeviceKeeper→S1 Basic 전환 고객을 LIVE 고객으로 셉니다 · 해지 집계는 어차피 CND를 빼므로 분모에만 영향'],['ex','제외','매출시트 통계 탭이 CND를 통째로 빼고 계산한 것과 맞출 때만']],CR.cnd?'in':'ex'))}`+
        tpl`${rawHtml(crSeg('지원 제외율 분모','exDen',[['org','지원 제외 활성'],['all','전체 활성','통계 탭 장표 방식']],CR.exDen))}`+
      tpl`</div></details>`+
-     tpl`<div class="crrow crfilters">${rawHtml(G.filter(function(g){return !g.more;}).map(crChips).join(''))}`+
+     tpl`${rawHtml(crFltOpen('crFlt', G))}<div class="crrow crfilters">${rawHtml(G.filter(function(g){return !g.more;}).map(crChips).join(''))}`+
        tpl`<details${CR.open?' open':''} id="crMore"><summary>업종 · 파트너 · 과금방식 · S1 서비스 종류 ${rawHtml(G.filter(function(g){return g.more&&(CR.f[g.k]||[]).length;}).length? '<b>선택됨</b>':'')}</summary>${rawHtml(G.filter(function(g){return g.more;}).map(crChips).join(''))}</details>`+
-     tpl`</div></div>`;
+     tpl`</div>${rawHtml(crFltClose())}</div>`;
   /* ① 상세표 */
   var m=crMatch, baseLab={valid:'계약 유효 고객사',rev:'과금 고객사',cum:'누적고객(신규 − 해지)'}[CR.base];
   h+=tpl`<div class="pr-card" style="margin-bottom:12px"><h3>${crSummary()} — ${CR.unit==='year'?'연도별':CR.unit==='half'?'반기별':'분기별'} 해지율`+
@@ -1181,7 +1190,7 @@ export function renderChurnRate(){
     });
     h+='</tbody></table></div></div>';
   });
-  host.innerHTML=h; helpWire(host);
+  host.innerHTML=h; helpWire(host); crFltWire(host); try{ foldZeroRows(host, 'cr'); }catch(e){}   /* ㊿+188 */
   host.querySelectorAll('button[data-preset]').forEach(function(b){ b.onclick=function(){ var p=CR_PRESET[b.dataset.preset]; CR.base=p.base; CR.cnd=CR.crCnd=p.cnd; CR.rows=p.rows; CR.exDen=p.exDen; CR.sup=p.sup; CR.f=JSON.parse(JSON.stringify(p.f)); renderChurnRate(); }; });
   host.querySelectorAll('.crseg button[data-g]').forEach(function(b){ b.onclick=function(){
     var g=b.dataset.g, v=b.dataset.v;
@@ -1303,7 +1312,7 @@ export function renderCustFlow(){
      tpl`${rawHtml(crSeg('지원사업','sup',[['all','포함','지원사업(정부 지원) 고객을 포함해 셉니다'],['ex','제외','지원사업 고객을 빼고 셉니다'],['only','지원사업만','지원사업 고객만 봅니다']],CR.sup))}`+
      tpl`${rawHtml(crSeg('CND 전환 고객','cnd',[['in','포함 (기본)','DeviceKeeper→S1 Basic 전환 고객(통합 과금)은 LIVE 고객이므로 항상 포함이 기본'],['ex','제외','매출시트 통계 탭과 맞출 때만']],CR.cnd?'in':'ex'))}`+
      tpl`<div class="crseg"><span>기준월</span><select id="cfUpto" title="이 달까지의 데이터로 계산합니다 (기본 = 최신 달)">${rawHtml((function(){ var o=''; for(var j=maxAll;j>=Math.max(0,maxAll-35);j--) o+=tpl`<option value="${rawHtml(j)}"${j===crMaxJ()?' selected':''}>${mk(j)}</option>`; return o; })())}</select></div>`+
-     tpl`</div><div class="crrow crfilters">${rawHtml(G.filter(function(g){return !g.more;}).map(crChips).join(''))}</div></div>`;
+     tpl`</div>${rawHtml(crFltOpen('cfFlt', G))}<div class="crrow crfilters">${rawHtml(G.filter(function(g){return !g.more;}).map(crChips).join(''))}</div>${rawHtml(crFltClose())}</div>`;
   /* 지금 보고 있는 기준을 말로 풀어 보여줌 */
   (function(){ var cndN=0; if(CR.cnd){ var u={}; ST.DATA.rows.forEach(function(r){ if(!r.parent && r.line==='S1' && String(r.saleType||'')==='CND' && r.startIdx!=null && r.startIdx>=0) u[r.cust]=1; }); cndN=Object.keys(u).length; }
      var fsel=[]; G.forEach(function(g){ var sel=CR.f[g.k]||[]; if(sel.length) fsel.push(g.l+' '+sel.map(function(v){ var o=g.opts.filter(function(x){return x[0]===v;})[0]; return o? o[1]:v; }).join('·')); });
@@ -1413,7 +1422,7 @@ export function renderCustFlow(){
   }
   host.innerHTML=h;
   host.querySelectorAll('button[data-cfp]').forEach(function(b){ b.onclick=function(){ CR.cfCnd=(b.dataset.cfp==='live'); CR.sup='all'; renderCustFlow(); }; });
-  helpWire(host);
+  helpWire(host); crFltWire(host); try{ foldZeroRows(host, 'cf'); }catch(e){}   /* ㊿+188 */
   host.querySelectorAll('.crseg button[data-g]').forEach(function(b){ b.onclick=function(){ var g=b.dataset.g, v=b.dataset.v;
     if(g==='unit') CR.unit=v; else if(g==='cnd') CR.cfCnd=(v==='in'); else if(g==='sup') CR.sup=v; else if(g==='cfSrc') CR.cfSrc=v; renderCustFlow(); }; });
   host.querySelectorAll('button.chip[data-fg]').forEach(function(b){ b.onclick=function(){ var k=b.dataset.fg, v=b.dataset.fv, sel=CR.f[k]=CR.f[k]||[]; var i=sel.indexOf(v); if(i>=0) sel.splice(i,1); else sel.push(v); renderCustFlow(); }; });

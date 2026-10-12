@@ -7,7 +7,7 @@ import { dIdx, ico, idxDate, loadFromDb, onData, SB_RAW, sbHeaders, sbTry, sbWri
 import { hbars, idxs, monthlyTotal } from './dash.js';
 import { CHURN_OPTS, codeActive, GRIDS, LEAD_OPTS, LINE_OPTS } from './grids.js';
 import { bizHostEl, bizNz, BIZV, eqIsPh, eqScan, eqSerials, syncOrderAssets } from './equipment.js';
-import { c360Match, fkNorm, navSub, openCust360, subgrpSync } from './tools.js';
+import { c360Match, fkNorm, foldZeroRows, navSub, openCust360, subgrpSync } from './tools.js';
 import { helpBox, helpWire, kxCustMrr, kxLive, kxMrr, kxWire, QUOTES, quotesLoad } from './sales.js';
 import { BLANK_LABEL, ctRevPlan, DV, editCell, oiOpen, openFilterPanel, readRowInputs, renderGrid, switchView, wireRowInputs, xlsxAoa } from './grid.js';
 import { closeOvl, logChange, monthRows, openOvl, ymFromInput } from './edit.js';
@@ -585,14 +585,18 @@ export function renderLeadSrc(){
     tpl`<label class="mini">서비스 <select id="lsLine" class="qb-in" style="height:30px;width:auto"><option value="">전체</option>${rawHtml(LINE_OPTS.map(function(l){ return tpl`<option value="${rawHtml(l)}"${LS.line===l?' selected':''}>${lline(l)}</option>`; }).join(''))}</select></label>`+
     tpl`<span class="mini">기준월 MRR 합계 <b>${won(total)}천원</b> · ${rawHtml(y0)}년 누적 <b>${won(totYtd)}천원</b> · 단위 천원</span>`+ tpl`${rawHtml(unassigned.n? tpl`<span class="ctag warn" style="margin-left:auto" title="유입경로가 비어 있는 계약">미지정 ${rawHtml(unassigned.n)}건 · ${won(unassigned.mrr)}천원</span><button type="button" class="cbtn" id="lsFix" style="height:26px;font-size:12px">계약 관리에서 지정 →</button>`:'')}`+
     tpl`</div>`;
-  /* 타일 */
-  h+=tpl`<div class="kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:14px">${rawHtml(order.map(function(src){
+  /* 타일 — ㊿+188 지니언스: 이 달 · 올해 · 신규가 전부 0 인 경로는 타일 대신 아래 한 줄(«모두 보기»로 펼침) */
+  var zeroSrc=isGN() && !LS.allTiles? order.filter(function(src){ var a=agg[src]; return !a.mrr && !a.n && !a.ytd && !a.newN && src!==LS.pick; }) : [];
+  var tileSrc=order.filter(function(src){ return zeroSrc.indexOf(src)<0; });
+  h+=tpl`<div class="kpis" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;margin-bottom:14px">${rawHtml(tileSrc.map(function(src){
     var a=agg[src], sh=total? a.mrr/total*100 : 0, col=cssv(LEAD_COLOR[src]||'--muted');
     return tpl`<div class="kpi ls-tile" data-src="${src}" style="padding:12px 14px;cursor:pointer${rawHtml(LS.pick===src?';outline:2px solid '+col:'')}" title="누르면 이 유입경로의 계약 목록">`+
       tpl`<div class="k" style="display:flex;align-items:center;gap:6px"><i style="width:9px;height:9px;border-radius:50%;background:${rawHtml(col)};display:inline-block"></i>${src}</div>`+
       tpl`<div style="font-size:22px;font-weight:800;margin-top:2px">${won(a.mrr)} <small style="font-size:12px;font-weight:500;color:var(--muted);white-space:nowrap">천원 · ${sh.toFixed(1)}%</small></div>`+
       tpl`<div class="mini" style="margin-top:4px">계약 ${rawHtml(a.n)}건 · 고객사 ${Object.keys(a.custs).length}곳${rawHtml(a.newN? ' · 올해 신규 '+a.newN+'건':'')}</div>`+
       tpl`<div class="mini">${rawHtml(y0)}년 누적 ${won(a.ytd)}천원</div></div>`; }).join(''))}`+ tpl`</div>`;
+  if(zeroSrc.length) h+=tpl`<p class="mini ls-zero">${mk(b)} 매출 · ${rawHtml(y0)}년 누적 · 올해 신규가 모두 0 인 경로 ${rawHtml(zeroSrc.length)}개 — ${zeroSrc.join(' · ')} <button type="button" class="zr-btn" id="lsAllTiles">모두 보기</button></p>`;
+  else if(isGN() && LS.allTiles) h+=tpl`<p class="mini ls-zero"><button type="button" class="zr-btn" id="lsAllTiles">0 인 경로 접기</button></p>`;
   /* 차트 2개 */
   h+=tpl`<div class="ls-2col">`+
     tpl`<div class="pr-card"><div style="font-size:14px;font-weight:650;margin-bottom:8px">유입경로별 MRR <span class="mini">${mk(b)}</span></div><div id="lsBars"></div></div>`+
@@ -622,6 +626,8 @@ export function renderLeadSrc(){
   $('#lsLine').onchange=function(){ LS.line=this.value; renderLeadSrc(); };
   var fx=$('#lsFix'); if(fx) fx.onclick=function(){ switchView('contracts'); setTimeout(function(){ try{ var sr=$('#dvSearch'); if(sr){ sr.value=''; } DV.filters={}; DV.filters.lead_src=[BLANK_LABEL]; DV.page=0; renderGrid(); }catch(e){} }, 80); };
   host.querySelectorAll('.ls-tile').forEach(function(t){ t.onclick=function(){ LS.pick=(LS.pick===t.dataset.src)? '' : t.dataset.src; renderLeadSrc(); }; });
+  var lat=$('#lsAllTiles'); if(lat) lat.onclick=function(){ LS.allTiles=!LS.allTiles; renderLeadSrc(); };
+  try{ foldZeroRows(host, 'ls', '경로'); }catch(e){}   /* ㊿+188 유입경로 × 서비스 표의 0 행 */
   var px=$('#lsPickX'); if(px) px.onclick=function(){ LS.pick=''; renderLeadSrc(); };
 }
 export var AK={log:false, q:''};   // AI 지식 화면 상태 — 기록은 기본 숨김(사용자: «학습에 업데이트만 하고 기록은 따로»)
