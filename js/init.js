@@ -15,6 +15,7 @@ import { askScreenHelp, btnBackSync, comboPlace, goBack, gridActPad, LENS_DEFS, 
 import { closeOvl, fillSectorSel, ovlDismiss, ovlInit, ovlTop, renameShowPreview, syncCustMeta } from './edit.js';
 import { lazyHook } from './lazy.js';
 import { verStart } from './guard.js';
+import { Viz } from './viz.js';
 
 /* 시작 순서 — main.js 가 모든 모듈을 읽은 뒤 한 번 부름. 아래 문장들은 예전 고전 스크립트 때의 «파일을 읽을 때 실행» 순서 그대로 */
 export function start(){
@@ -117,6 +118,7 @@ export function start(){
     t=setTimeout(function(){
       try{ measureTopbar(); }catch(e){}          // 상단바가 두 줄로 접히면 높이가 바뀝니다
       RESIZE_HOOKS.forEach(function(f){ try{f();}catch(e){} });
+      try{ Viz.redrawAll(); }catch(e){}            /* ㊿+193 차트를 지금 폭으로 */
     },160); }); })();
 
   /* 표 정의 — ㊿+153: grids.js 의 buildGrids() 로 (OI_PROB.map 같은 호출이 있어 시작할 때 만듦) */

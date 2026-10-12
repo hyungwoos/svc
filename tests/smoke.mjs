@@ -4528,6 +4528,90 @@ if (S.blk()) {
     return 'EDR · 용도 · PATCH · 권한';
   });
 }
+// ㊿+193 인바운드 자동 회신 — inbound_auto(SQL 117) 설정 카드 · 설정 창(PATCH + 변경 이력 · 실제 발송 확인 · 검사) · «지금 실행»(GAS action=inbound_autoreply) · 기록 표 · 목록 «자동 회신» 열 · 상세 줄 · SQL 117 전 안내 · 관리자(비슈퍼)는 보기만 — 가짜 DB
+if (S.blk()) {
+  const kst = (d) => d.toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' });
+  const todayK = kst(new Date()), yest = kst(new Date(Date.now() - 864e5));
+  const atK = (day, hm) => new Date(day + 'T' + hm + ':00+09:00').toISOString();
+  const CFG = { id: 1, mode: 'draft', register_on: true, slack_on: false, cc: 'sales@example.com', sender_name: '가상 서비스사업부', subject: '[가상] {제품} 문의 접수 확인 안내', body: '{담당자} 님, {제품} ({문의종류}) 문의를 접수했습니다.', signature: '가상 서명', dedupe_days: 3, max_age_hours: 48, skip_qtypes: ['채용 문의'], skip_domains: [], last_run_at: new Date(Date.now() - 2 * 60000).toISOString(), last_run: { done: 2, sent: 0, draft: 1, skipped: 1, hold: 0, mode: 'draft', src: '포탈' }, updated_by: 'tester@example.com', updated_at: new Date().toISOString() };
+  const LOG = [{ id: 1, at: atK(todayK, '16:09'), mail_at: atK(todayK, '16:05'), email: 'hong@example.com', org: '가상기관A', requester: '홍길동', product: 'Genian NAC', qtype: '견적 문의', action: 'draft', reason: null, registered: true, sheet_no: 101, subject: '[가상] Genian NAC 문의 접수 확인 안내', src: '포탈' },
+    { id: 2, at: atK(todayK, '16:10'), mail_at: atK(todayK, '16:06'), email: 'kim@example.com', org: '가상기관B', requester: '김철수', product: 'Genian NAC', qtype: '채용 문의', action: 'skip_rule', reason: '제외 종류: 채용 문의', registered: false, sheet_no: null, subject: null, src: '포탈' },
+    { id: 3, at: atK(yest, '09:00'), mail_at: atK(yest, '08:55'), email: 'park@example.com', org: '가상기관C', requester: null, product: null, qtype: null, action: 'hold', reason: '본문에서 제품을 못 읽음', registered: false, sheet_no: null, subject: null, src: '포탈' }];
+  const yr = new Date().getFullYear();
+  const INB = [{ id: 1, no: 101, y: yr, on_date: todayK, org: '가상기관A', owner: '담당자A', result: '진행중', product: 'Genian NAC', qtype: '견적 문의', email: 'Hong@Example.com', requester: '홍길동' },
+    { id: 2, no: 102, y: yr, on_date: todayK, org: '가상기관B', owner: '담당자A', result: '진행중', product: 'Genian NAC', qtype: '채용 문의', email: 'kim@example.com' },
+    { id: 3, no: 103, y: yr, on_date: yest, org: '가상기관C', owner: '담당자B', result: '진행중', email: 'park@example.com' },
+    { id: 4, no: 104, y: yr, on_date: yest, org: '가상기관D', owner: '담당자B', result: '완료', email: 'lee@example.com' }];
+  const mk193 = async (o) => { o = Object.assign({ role: 'super_admin', sql: true }, o || {});
+    const db = new FakeDB(Object.assign(seedData(), { inbound_leads: INB.map((r) => Object.assign({}, r)), inbound_auto: o.sql ? [Object.assign({}, CFG)] : [], inbound_auto_log: o.sql ? LOG.map((r) => Object.assign({}, r)) : [] }));
+    const gas = [];
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page);
+    const dlg = []; page.on('dialog', (d) => { dlg.push(d.type() + ':' + d.message().split('\n')[0]); d.accept(); });
+    await page.route(/script\.google\.com/, async (route) => { gas.push(route.request().url()); await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, counts: { done: 1, sent: 1, draft: 0, skipped: 0, hold: 0, registered: 1, mode: 'send', src: '포탈' } }) }); });
+    await fakeBackend(page, db, { role: o.role });
+    await page.goto(url + '/index.html'); await page.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA && SVC.ST.DATA.rows.length, null, { timeout: 20000 });
+    await page.evaluate(() => SVC.navMenu('inbound')); await page.waitForFunction(() => SVC.IA && SVC.IA.cfg !== undefined && SVC.ST.RAWX.inbound && SVC.ST.RAWX.inbound.length, null, { timeout: 8000 }); await page.waitForTimeout(500);
+    return { db, ctx, page, c, dlg, gas }; };
+  await S.t('㊿+193 자동 회신 카드: 모드 «초안만» · 마지막 실행 2분 전 · 오늘 초안 1 · 건너뜀 1 · 설정 요약(참조 · 3일 · 48시간 · 제외 종류) · 기록 토글(3줄 · 시트 연번 101 ✓) · 목록 «자동 회신» 열(초안 16:09 · 건너뜀 · 규칙 · 확인 필요 · 없는 줄은 ·) — 이메일 대소문자 무시 · 상세 창에 «자동 회신» 줄 · 설정 창: 미리 보기에 홍길동 · 가상기관 · 제목 비우면 저장 안 됨 · «실제 발송»으로 바꾸면 확인 → inbound_auto PATCH(mode send · 바뀐 칸만 이력) · 카드 «실제 발송» · «지금 실행» → 확인 → GAS action=inbound_autoreply 1번 · 결과 토스트', async () => {
+    const A = await mk193();
+    const card = await A.page.evaluate(() => { const k = document.querySelector('#inbHost .ia-card'); return { txt: k.textContent.replace(/\s+/g, ' '), mode: document.getElementById('iaModeTag').textContent, btns: [...k.querySelectorAll('button')].map((b) => b.textContent.trim()).join('|'), logVis: getComputedStyle(document.getElementById('iaLogBox')).display }; });
+    assert(card.mode === '초안만(임시보관함)' && /마지막 실행 방금/.test(card.txt) && /오늘 보냄 0 · 초안 1 · 건너뜀 1/.test(card.txt) && /참조 sales@example\.com/.test(card.txt) && /3일 안 재회신 안 함/.test(card.txt) && /48시간/.test(card.txt) && /제외 종류 채용 문의/.test(card.txt) && /시트 등록 켜짐/.test(card.txt) && !/SQL 117/.test(card.txt) && /설정 · 문구 ✎\|지금 실행\|(🕘 )?기록 \(3\)/.test(card.btns) && card.logVis === 'none', JSON.stringify(card));
+    await A.page.click('#iaLogTg'); await A.page.waitForTimeout(100);
+    const lg = await A.page.evaluate(() => ({ vis: getComputedStyle(document.getElementById('iaLogBox')).display, rows: [...document.querySelectorAll('#iaLogBox tbody tr')].map((tr) => tr.textContent.replace(/\s+/g, ' ').trim()) }));
+    assert(lg.vis !== 'none' && lg.rows.length === 3 && /초안.*가상기관A · 홍길동.*Genian NAC · 견적 문의.*hong@example\.com.*연번 101 ✓/.test(lg.rows[1]) && /건너뜀 · 규칙.*제외 종류: 채용 문의/.test(lg.rows[0]) && /확인 필요.*본문에서 제품을 못 읽음/.test(lg.rows[2]), JSON.stringify(lg));
+    const grid = await A.page.evaluate(() => { const hd = [...document.querySelectorAll('#dvTable thead th')].map((x) => x.textContent.trim().replace(/[▲▼]$/, '')); const i = hd.indexOf('자동 회신'); const cell = (org) => { const tr = [...document.querySelectorAll('#dvTable tbody tr')].find((t) => t.textContent.includes(org)); return tr ? tr.children[i].textContent.trim() + '|' + (tr.children[i].querySelector('.ia-tag') || {}).className : null; };
+      return { i, after: hd[i - 1], a: cell('가상기관A'), b: cell('가상기관B'), c: cell('가상기관C'), d: cell('가상기관D') }; });
+    assert(grid.i > 0 && grid.after === '유형' && grid.a === '초안 16:09|ctag ia-tag ' && /^건너뜀 · 규칙\|ctag ia-tag $/.test(grid.b) && /^확인 필요\|ctag ia-tag warn$/.test(grid.c) && /^·\|undefined$/.test(grid.d), JSON.stringify(grid));
+    await A.page.click('#dvTable tbody tr:has-text("가상기관A")'); await A.page.waitForTimeout(200);
+    const det = await A.page.evaluate(() => { const m = document.querySelector('.inb-meta'); const d = m && [...m.children].find((x) => /^자동 회신/.test(x.textContent)); return d ? d.textContent.replace(/\s+/g, ' ') : null; });
+    assert(det && /초안 16:09/.test(det), 'detail ' + det);
+    await A.page.evaluate(() => { const o = document.querySelector('.ovl.on'); if (o) SVC.closeOvl(o.id); }); await A.page.waitForTimeout(100);
+    await A.page.click('#iaEdit'); await A.page.waitForTimeout(200);
+    const ed = await A.page.evaluate(() => ({ on: document.getElementById('ovlIa').classList.contains('on'), mode: document.getElementById('iaMode').value, pv: document.getElementById('iaPv').textContent, cc: document.getElementById('iaCc').value, skipQ: document.getElementById('iaSkipQ').value, reg: document.getElementById('iaReg').checked }));
+    assert(ed.on && ed.mode === 'draft' && /제목: \[가상\] Genian NAC 문의 접수 확인 안내/.test(ed.pv) && /홍길동 님, Genian NAC \(견적 문의\)/.test(ed.pv) && /가상 서명/.test(ed.pv) && ed.cc === 'sales@example.com' && ed.skipQ === '채용 문의' && ed.reg === true, JSON.stringify(ed));
+    await A.page.fill('#iaSubject', ''); await A.page.click('#iaSave'); await A.page.waitForTimeout(100);
+    const v1 = await A.page.evaluate(() => document.getElementById('iaMsg').textContent);
+    await A.page.fill('#iaSubject', '[가상] {제품} 문의 접수 확인'); await A.page.fill('#iaCc', 'not-mail'); await A.page.click('#iaSave'); await A.page.waitForTimeout(100);
+    const v2 = await A.page.evaluate(() => document.getElementById('iaMsg').textContent);
+    await A.page.fill('#iaCc', 'sales@example.com'); await A.page.selectOption('#iaMode', 'send'); A.dlg.length = 0; A.db.writes.length = 0; await A.page.click('#iaSave'); await A.page.waitForTimeout(500);
+    const sv = await A.page.evaluate(() => ({ on: document.getElementById('ovlIa').classList.contains('on'), mode: document.getElementById('iaModeTag').textContent, writes: 0 }));
+    const w = A.db.writes.map((x) => x.method + ' ' + x.table + ' ' + JSON.stringify(x.body).slice(0, 160));
+    const patch = A.db.writes.find((x) => x.method === 'PATCH' && x.table === 'inbound_auto'), log = A.db.writes.find((x) => x.method === 'POST' && x.table === 'change_log');
+    assert(/제목과 본문/.test(v1) && /참조 주소/.test(v2) && A.dlg.length === 1 && /실제 발송»으로 바꿉니다/.test(A.dlg[0]) && !sv.on && sv.mode === '실제 발송' && patch && patch.body.mode === 'send' && patch.body.subject === '[가상] {제품} 문의 접수 확인' && patch.body.register_on === true && patch.body.skip_qtypes.join() === '채용 문의'
+      && log && log.body.target === 'inbound_auto' && log.body.detail.mode.to === 'send' && log.body.detail.subject && !log.body.detail.cc && !log.body.detail.body && A.db.t.inbound_auto[0].mode === 'send', JSON.stringify({ v1, v2, dlg: A.dlg, sv, w }));
+    A.dlg.length = 0; A.gas.length = 0; await A.page.click('#iaRun'); await A.page.waitForTimeout(900);
+    const run = await A.page.evaluate(() => ({ toast: [...document.querySelectorAll('#toasts .toast')].map((t) => t.textContent.replace(/\s+/g, ' ')).join(' / ') }));
+    assert(A.dlg.length === 1 && /지금 한 번 돌립니다/.test(A.dlg[0]) && A.gas.length === 1 && /action=inbound_autoreply/.test(A.gas[0]) && /처리 1건 · 보냄 1/.test(run.toast), JSON.stringify({ dlg: A.dlg, gas: A.gas, run }));
+    await A.ctx.close();
+    return '카드 · 기록 3 · 열 · 상세 · 설정 PATCH · 이력 · 지금 실행 1';
+  });
+  await S.t('㊿+193 SQL 117 전(inbound_auto 없음): 카드에 SQL 117 안내 · 설정 · 실행 버튼 없음 · 목록 열은 «·» / 관리자(비슈퍼): 카드는 보이되 설정 · 지금 실행 없음 · 기록은 봄 · 자동 회신 열은 그대로', async () => {
+    const A = await mk193({ sql: false });
+    const a = await A.page.evaluate(() => { const k = document.querySelector('#inbHost .ia-card'); const hd = [...document.querySelectorAll('#dvTable thead th')].map((x) => x.textContent.trim().replace(/[▲▼]$/, '')); const i = hd.indexOf('자동 회신'); const tr = [...document.querySelectorAll('#dvTable tbody tr')].find((t) => t.textContent.includes('가상기관A'));
+      return { ok: SVC.IA.ok, txt: k.textContent.replace(/\s+/g, ' '), btns: k.querySelectorAll('button').length, cell: tr ? tr.children[i].textContent.trim() : null }; });
+    assert(a.ok === false && /SQL 117/.test(a.txt) && a.btns === 0 && a.cell === '·', JSON.stringify(a));
+    await A.ctx.close();
+    const B = await mk193({ role: 'admin' });
+    const b = await B.page.evaluate(() => { const k = document.querySelector('#inbHost .ia-card'); const hd = [...document.querySelectorAll('#dvTable thead th')].map((x) => x.textContent.trim().replace(/[▲▼]$/, '')); const i = hd.indexOf('자동 회신'); const tr = [...document.querySelectorAll('#dvTable tbody tr')].find((t) => t.textContent.includes('가상기관A'));
+      return { ok: SVC.IA.ok, mode: document.getElementById('iaModeTag').textContent, btns: [...k.querySelectorAll('button')].map((x) => x.textContent.trim()).join('|'), cell: tr ? tr.children[i].textContent.trim() : null }; });
+    assert(b.ok === true && b.mode === '초안만(임시보관함)' && /^(🕘 )?기록 \(3\)$/.test(b.btns) && b.cell === '초안 16:09', JSON.stringify(b));
+    await B.ctx.close();
+    return 'SQL 117 전 안내 · admin 보기만';
+  });  await S.t('㊿+193 장비 대시보드 차트: 넓은 창(1280)에서 그린 뒤 폰 폭(390)으로 줄이면 차트를 다시 그려 옆으로 안 넘침(스테이징 QA 📱 eqboard «841px 넘침») · 다시 그리기 전에도 CSS(minmax 0 · svg max-width)로 문서 폭 ≤ 화면', async () => {
+    const db = new FakeDB(seedData());
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page);
+    await fakeBackend(page, db); await page.goto(url + '/index.html'); await page.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA && SVC.ST.DATA.rows.length, null, { timeout: 20000 });
+    await page.evaluate(() => SVC.navMenu('eqboard')); await page.waitForFunction(() => document.querySelector('#eqcTrend svg'), null, { timeout: 8000 }); await page.waitForTimeout(300);
+    const w0 = await page.evaluate(() => +document.querySelector('#eqcTrend svg').getAttribute('width'));
+    await page.setViewportSize({ width: 390, height: 844 }); await page.waitForTimeout(80);   /* 160ms 디바운스 전 — CSS 만으로 */
+    const css = await page.evaluate(() => ({ doc: document.documentElement.scrollWidth, svg: document.querySelector('#eqcTrend svg').getBoundingClientRect().width }));
+    await page.waitForTimeout(600);
+    const after = await page.evaluate(() => ({ doc: document.documentElement.scrollWidth, w: +document.querySelector('#eqcTrend svg').getAttribute('width'), right: Math.round(document.querySelector('#eqbCharts section.card').getBoundingClientRect().right) }));
+    assert(w0 > 600 && css.doc <= 390 && css.svg <= 390 && after.doc <= 390 && after.w < 390 && after.right <= 390, JSON.stringify({ w0, css, after }));
+    assert(!c.errs.length, '페이지 오류 ' + c.errs.join(' | ')); await ctx.close();
+    return '1280 → 390 · svg ' + w0 + ' → ' + after.w + ' · 문서 폭 ' + after.doc;
+  });
+}
 await browser.close(); srv.close();
 const ok = S.report();
 fs.writeFileSync(path.join(OUT, process.env.SMOKE_PART != null ? 'smoke-' + process.env.SMOKE_PART + '.json' : 'smoke.json'), JSON.stringify(S.results, null, 1));
