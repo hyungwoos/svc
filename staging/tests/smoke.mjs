@@ -4597,6 +4597,19 @@ if (S.blk()) {
     assert(b.ok === true && b.mode === '초안만(임시보관함)' && /^(🕘 )?기록 \(3\)$/.test(b.btns) && b.cell === '초안 16:09', JSON.stringify(b));
     await B.ctx.close();
     return 'SQL 117 전 안내 · admin 보기만';
+  });  await S.t('㊿+193 장비 대시보드 차트: 넓은 창(1280)에서 그린 뒤 폰 폭(390)으로 줄이면 차트를 다시 그려 옆으로 안 넘침(스테이징 QA 📱 eqboard «841px 넘침») · 다시 그리기 전에도 CSS(minmax 0 · svg max-width)로 문서 폭 ≤ 화면', async () => {
+    const db = new FakeDB(seedData());
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page);
+    await fakeBackend(page, db); await page.goto(url + '/index.html'); await page.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA && SVC.ST.DATA.rows.length, null, { timeout: 20000 });
+    await page.evaluate(() => SVC.navMenu('eqboard')); await page.waitForFunction(() => document.querySelector('#eqcTrend svg'), null, { timeout: 8000 }); await page.waitForTimeout(300);
+    const w0 = await page.evaluate(() => +document.querySelector('#eqcTrend svg').getAttribute('width'));
+    await page.setViewportSize({ width: 390, height: 844 }); await page.waitForTimeout(80);   /* 160ms 디바운스 전 — CSS 만으로 */
+    const css = await page.evaluate(() => ({ doc: document.documentElement.scrollWidth, svg: document.querySelector('#eqcTrend svg').getBoundingClientRect().width }));
+    await page.waitForTimeout(600);
+    const after = await page.evaluate(() => ({ doc: document.documentElement.scrollWidth, w: +document.querySelector('#eqcTrend svg').getAttribute('width'), right: Math.round(document.querySelector('#eqbCharts section.card').getBoundingClientRect().right) }));
+    assert(w0 > 600 && css.doc <= 390 && css.svg <= 390 && after.doc <= 390 && after.w < 390 && after.right <= 390, JSON.stringify({ w0, css, after }));
+    assert(!c.errs.length, '페이지 오류 ' + c.errs.join(' | ')); await ctx.close();
+    return '1280 → 390 · svg ' + w0 + ' → ' + after.w + ' · 문서 폭 ' + after.doc;
   });
 }
 await browser.close(); srv.close();

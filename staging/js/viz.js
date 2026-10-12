@@ -37,6 +37,7 @@ export var Viz = (function () {
     var tip = document.createElement('div');
     tip.className = 'viz-tip';
     host.appendChild(tip);
+    host.__vizW = W;   /* ㊿+193 그린 폭 — 창 크기가 바뀌면 redrawAll 이 비교 */
     return { root: root, W: W, H: H, pad: pad, iw: iw, ih: ih, tip: tip };
   }
 
@@ -226,8 +227,18 @@ export var Viz = (function () {
     var ro = new ResizeObserver(function (ents) { var w = ents[0] && ents[0].contentRect.width; if (!w) return; ro.disconnect(); host._vzRO = null; try { fn(); } catch (e) { /* 그리기 실패는 차트 칸만 비움 */ } });
     host._vzRO = ro; ro.observe(host);
   }
+  /* ㊿+193 창 폭이 바뀌면(폰 회전 · 창 줄임 · QA 미리보기) 그려 둔 차트를 지금 폭으로 다시 그림 — svg 는 그릴 때의 폭(width 속성)으로 고정되어 좁아진 화면을 옆으로 밀어내던 것 */
+  function redrawAll() {
+    var hosts = [];
+    document.querySelectorAll('svg[role="img"]').forEach(function (sv) { var h = sv.parentNode; if (h && h.__viz && hosts.indexOf(h) < 0) hosts.push(h); });
+    hosts.forEach(function (h) {
+      var w = h.clientWidth || 0; if (!w || Math.abs(w - (h.__vizW || 0)) < 2) return;
+      try { (h.__viz.type === 'bars' ? bars : lines)(h, h.__viz.cfg); } catch (e) { /* 다시 그리기 실패는 그대로 둠 */ }
+    });
+  }
   return {
     afterLayout: afterLayout,
+    redrawAll: redrawAll,
     lines: lines,
     bars: bars,
     area: function (h, c) { c.stacked = true; c.fill = true; lines(h, c); },

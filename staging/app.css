@@ -3219,4 +3219,9 @@ details.eq-chk .eq-chk-act:empty{display:none}
 #ovlIa .ia-pv{margin:4px 0 8px}
 #ovlIa .ia-pv>summary{cursor:pointer;color:var(--muted)}
 #ovlIa .ia-pv pre{white-space:pre-wrap;background:var(--surface-2);border-radius:8px;padding:8px 10px;margin:6px 0 0;max-height:260px;overflow:auto;font:inherit;font-size:13px}
+/* ㊿+193 임대 장비 대시보드 차트가 좁은 화면을 옆으로 밀지 않게 — 칸은 내용보다 좁아질 수 있게(minmax 0) · svg 는 칸 폭까지만 */
+.eqb-charts{grid-template-columns:minmax(0,1fr) minmax(0,1.7fr)}
+@media (max-width:1300px){ .eqb-charts{grid-template-columns:minmax(0,1fr)} }
+.eqb-charts .card{min-width:0}
+.eqb-charts .card svg[role="img"]{max-width:100%;height:auto}
 /* ==== ㊿+166 새 디자인 end ==== */
