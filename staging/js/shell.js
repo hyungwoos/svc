@@ -291,14 +291,20 @@ export var VT_DUP_FORCE={ordernew:1, mdrnew:1};
 export function vtNorm(s){ return String(s||'').replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}]/gu,'').replace(/[\s·—–\-()（）:：,.]/g,'').toLowerCase(); }
 export function vtDupSync(v){
   var host=document.querySelector('#app [id^="view"]:not(.hidden)'), t=document.getElementById('gnTitle'); if(!host || !t) return;
-  host.querySelectorAll('.vt-dup').forEach(function(h){ h.classList.remove('vt-dup'); });
-  if(!isGN() || !v || v==='dash') return;
-  var name=vtNorm(t.textContent); if(name.length<2) return;
-  var hs=[].slice.call(host.querySelectorAll('h1,h2,h3')).filter(function(h){ var r=h.getBoundingClientRect(); return r.width>0 && r.height>0; }), h=hs[0]; if(!h) return;
-  var own=''; [].forEach.call(h.childNodes, function(n){ if(n.nodeType===3) own+=n.textContent; }); own=vtNorm(own);
-  if(!(own && (own===name || own.indexOf(name)===0 || name.indexOf(own)===0 || own.indexOf(name)>=0 || VT_DUP_FORCE[v]))) return;
-  if(!h.querySelector('.vt-txt')){ var sp=document.createElement('span'); sp.className='vt-txt'; [].slice.call(h.childNodes).forEach(function(n){ if(n.nodeType===3) sp.appendChild(n); }); h.insertBefore(sp, h.firstChild); }
-  h.classList.add('vt-dup');
+  /* ㊿+189 두 번 불러도 같은 결과(멱등) — 예전엔 한 번 감싼 제목(.vt-txt)은 own 글자가 비어 두 번째 호출에서 도로 보였고(레일 배지 갱신 때마다 railSync → 제목이 깜빡 · 문서 높이 40px 오르내림 → 돌아온 스크롤 위치가 어긋남 · CI ㊿+173 실패) */
+  var hide=null;
+  if(isGN() && v && v!=='dash'){
+    var name=vtNorm(t.textContent);
+    if(name.length>=2){
+      var hs=[].slice.call(host.querySelectorAll('h1,h2,h3')).filter(function(h){ var r=h.getBoundingClientRect(); return r.width>0 && r.height>0; }), h=hs[0];
+      if(h){ var sp0=h.querySelector('.vt-txt'), own=''; if(sp0) own=sp0.textContent; else [].forEach.call(h.childNodes, function(n){ if(n.nodeType===3) own+=n.textContent; }); own=vtNorm(own);
+        if(own && (own===name || own.indexOf(name)===0 || name.indexOf(own)===0 || own.indexOf(name)>=0 || VT_DUP_FORCE[v])) hide=h; }
+    }
+  }
+  host.querySelectorAll('.vt-dup').forEach(function(h){ if(h!==hide) h.classList.remove('vt-dup'); });
+  if(!hide) return;
+  if(!hide.querySelector('.vt-txt')){ var sp=document.createElement('span'); sp.className='vt-txt'; [].slice.call(hide.childNodes).forEach(function(n){ if(n.nodeType===3) sp.appendChild(n); }); hide.insertBefore(sp, hide.firstChild); }
+  hide.classList.add('vt-dup');
 }
 export var EMO_RE=/^[\s ]*(?:[\u{1F000}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}][\u{FE0F}\u{200D}\u{1F3FB}-\u{1F3FF}]*)+[\s ]*/u;
 export var EMO_KEEP=/^[\s ]*[✓✔✕✖⚠☰✖]/;   /* ✓ ✔ ✕ ✖ ⚠ ☰ 는 뜻이 있는 기호 — 둠 */

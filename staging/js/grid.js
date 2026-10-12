@@ -3,7 +3,7 @@
 import { APP_VER, ST } from './state.js';
 import { Viz } from './viz.js';
 import { $, amtGuard, amtHint, canView, canWrite, cssv, esc, isGN, kwToWon, lline, mk, navText, perfNav, permEnter, rawHtml, STATE, tpl, won, wonFull, wonKo, wonToKw } from './core.js';
-import { cmdAskHit, dIdx, EQB, EQUIP_VIEWS, gridGo, ico, idxDate, loadFromDb, onData, railSync, renderEqBoard, sbTry, sbWrite, toast, todayStr } from './shell.js';
+import { cmdAskHit, dIdx, EQB, EQUIP_VIEWS, gridGo, ico, idxDate, loadFromDb, onData, railSync, renderEqBoard, sbTry, sbWrite, toast, todayStr, vtDupSync } from './shell.js';
 import { buildControls, DASH_DIRTY, dashDetailShown, renderAll } from './dash.js';
 import { GRIDS } from './grids.js';
 import { eqRetOpen, eqWant, renderEqPanel, syncOrderAssets } from './equipment.js';
@@ -285,6 +285,7 @@ export function switchView(v){
   /* 금액 열(won:1)이 있는 표는 제목 옆에 «천원 단위» 배지를 붙입니다 */
   var hasWon=(g.cols||[]).some(function(c){ return c.won; });
   $('#dvTitle').innerHTML=esc(g.title)+(hasWon? ' <span class="ubadge sm">₩ 금액 단위 = 천원</span>':'');
+  try{ vtDupSync(v); }catch(e){}   /* ㊿+189 제목을 넣은 바로 그때 겹침 판정 — 80ms 뒤에 숨기면 문서 높이가 바뀌어 돌아온 스크롤 위치가 어긋남(CI ㊿+173) */
   dvCapRender(v, g.cap + (hasWon && !isGN()? ' · 금액은 보기·입력 모두 천원 단위':'') + (ST.IS_VIEWER? ' · 조회 전용 계정입니다':''));   /* ㊿+186 지니언스: 단위는 상단 ₩ 배지 한 번 */
   $('#dvAdd').style.display=(g.add && !ST.IS_VIEWER)?'':'none';
   $('#dvPaste').style.display=(g.add && !ST.IS_VIEWER)?'':'none';

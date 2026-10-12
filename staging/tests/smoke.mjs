@@ -2539,7 +2539,7 @@ if (S.blk()) {
     await page.evaluate(() => window.scrollTo(0, 1500)); await page.waitForTimeout(100); const y0 = await page.evaluate(() => Math.round(scrollY));
     const back = await page.evaluate(() => { SVC.navMenu('oi'); SVC.navMenu('contracts'); return document.querySelectorAll('#dvTable tbody tr').length; });
     await page.waitForTimeout(300); const y1 = await page.evaluate(() => Math.round(scrollY));
-    assert(first === 30 && full.n === full.want && full.n === 100 && want === 100 && back === 100 && Math.abs(y1 - y0) < 30, JSON.stringify({ first, full: { n: full.n, want: full.want }, back, y0, y1 }));
+    assert(first === 30 && full.n === full.want && full.n === 100 && want === 100 && back === 100 && Math.abs(y1 - y0) < 5, JSON.stringify({ first, full: { n: full.n, want: full.want }, back, y0, y1 }));   /* ㊿+189 제목 숨김이 늦게 일어나 문서 높이가 바뀌던 것 고침 — 같은 자리여야 함(CI 글꼴에선 40px 차이로 실패했었음) */
     return '30 → ' + full.n + '행 · 돌아오면 ' + back + '행 한 번에';
   });
   await S.t('㊿+173 장비 보드: 열마다 처음 8장 → 곧 나머지(더 보기 규칙 그대로) · 나중에 붙은 카드의 버튼도 동작(신청 내역에서 열기)', async () => {
@@ -3984,11 +3984,12 @@ if (S.blk()) {
       out[v] = await P.evaluate(() => { const host = document.querySelector('#app [id^="view"]:not(.hidden)'); const h = host.querySelector('.vt-dup'); const vis = (e) => { const r = e.getBoundingClientRect(); return r.width > 1 && r.height > 1; };
         const txt = h && h.querySelector('.vt-txt'); return { dup: !!h, tag: h && h.tagName, txtVis: txt ? vis(txt) : (h ? vis(h) : null), chip: h && h.querySelector('.ubadge') ? vis(h.querySelector('.ubadge')) : null, small: h && h.querySelector('small') ? vis(h.querySelector('small')) : null, firstH: (host.querySelector('h2,h3') || {}).textContent }; }); }
     const foot = await P.$eval('#foot', (e) => e.textContent);
+    const idem = await P.evaluate(() => { SVC.navMenu('contracts'); const h = document.getElementById('dvTitle'); const a = h.classList.contains('vt-dup'); SVC.vtDupSync('contracts'); SVC.vtDupSync('contracts'); SVC.railSync('contracts'); return { a, b: h.classList.contains('vt-dup'), txt: h.querySelector('.vt-txt') && h.querySelector('.vt-txt').textContent.trim() }; });   /* ㊿+189 두 번 불러도 그대로 숨김 */
     await A.ctx.close();
     const M = await mk186({ w: 390, h: 844, mobile: true }); await M.page.evaluate(() => SVC.navMenu('contracts')); await M.page.waitForTimeout(400);
     const m = await M.page.evaluate(() => { const h = document.getElementById('dvTitle'); const r = h.getBoundingClientRect(); return { dup: h.classList.contains('vt-dup'), vis: r.height > 10, txt: h.textContent.trim() }; }); await M.ctx.close();
     assert(out.contracts.dup && out.contracts.tag === 'H2' && out.contracts.txtVis === false && out.churn.dup && out.churn.txtVis === false && out.churn.chip === false && out.churn.small === true && out.churnrate.dup && out.ordernew.dup && out.account.dup && !out.cngen.dup && /월별 매출 추이/.test(out.cngen.firstH)
-      && !/Supabase/.test(foot) && /포탈 2026/.test(foot) && m.dup && m.vis && /^계약 관리/.test(m.txt) && !A.c.errs.filter((e) => !/serviceWorker/.test(e)).length, JSON.stringify({ out, foot, m, errs: A.c.errs }));
+      && !/Supabase/.test(foot) && /포탈 2026/.test(foot) && idem.a && idem.b && /^계약 관리/.test(idem.txt) && m.dup && m.vis && /^계약 관리/.test(m.txt) && !A.c.errs.filter((e) => !/serviceWorker/.test(e)).length, JSON.stringify({ out, foot, idem, m, errs: A.c.errs }));
     return Object.keys(out).filter((k) => out[k].dup).join(',') + ' · 폰 보임';
   });
   await S.t('㊿+186 이모지 → 없음(제목 · 버튼 · 탭 · 다시 그린 화면도) · «더보기» 메뉴에 초기화 · 새로고침 · 글자 크기 · 다크(동작 그대로) · 폰 상단 한 줄 · 행 동작 버튼은 올렸을 때만(PC) · 빈 화면 «견적 만들기» · 설명은 첫 문장 + 도움말 · AI 도움말 글자', async () => {
