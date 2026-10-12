@@ -6,7 +6,7 @@ import { afterLoad, idxDate, loadFromDb, onData, onErr, SB_RAW, sbWrite, showAut
 import { s1NoInfo, s1NoOpts } from './grids.js';
 import { chOf, doChurn, doRenew, liveCalc, nmKeys, renewMates, renewMatesHtml, renewOpts, renewQty0, renewUndoFlow, renewUndoPlan, renewWire } from './analysis.js';
 import { switchView } from './grid.js';
-import { fbOpen } from './notify.js';
+import { fbOpen, ntfName } from './notify.js';
 
 
 /* ==================================================================
@@ -329,7 +329,7 @@ export function showRenewPick(r){
       var h=(r.renewHist||[])[(r.renewHist||[]).length-1]||{}, plan=renewUndoPlan(r);
       ub.style.display='';
       ub.innerHTML=tpl`<label>연장 기록</label><div class="cap">이 계약은 <b>연장 ${rawHtml(r.renew)}회</b> · 마지막 연장 ${String(h.from||'').slice(0,7)}~${String(h.to||'').slice(0,7)} 월 ${won(h.mrr||0)}천원`+
-        tpl`${rawHtml(h.at? ' ('+esc(String(h.at).slice(0,10))+(h.by? ' · '+esc(h.by):'')+')' : '')}<br>`+
+        tpl`${rawHtml(h.at? ' ('+esc(String(h.at).slice(0,10))+(h.by? ' · '+esc(ntfName(h.by)):'')+')' : '')}<br>`+
         tpl`${rawHtml(plan.bad? tpl`<span class="mini">${plan.bad}</span>` : tpl`잘못 연장했거나 두 번 들어갔으면 <button type="button" class="pill ghost" id="rUndoGo">↩ 마지막 연장 되돌리기</button> <span class="mini">— 연장 전 종료월·MRR·노드수로 돌아가고 그 전 달 월 매출은 그대로</span>`)}</div>`;
       var ug=$('#rUndoGo'); if(ug) ug.onclick=async function(){
         ug.disabled=true;

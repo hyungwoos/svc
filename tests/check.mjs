@@ -240,6 +240,15 @@ say(/^export function tickMemo\(/m.test(jsAll) && /^export function cssvKey\(/m.
   say(/^export function fbAttAdd\(files, msg\)/m.test(nt) && /^export async function fbUpload\(\)/m.test(nt) && /storage\/v1\/object\/feedback\//.test(nt) && /storage\/v1\/object\/authenticated\/feedback\//.test(nt) && /id="fbFile"/.test(nt) && /addEventListener\('paste'/.test(nt) && /done_at,files&order/.test(nt)
     && /^export function ntfProf\(e\)/m.test(nt) && /^export function profEdit\(email, opt\)/m.test(nt) && /portal_profiles\?on_conflict=email/.test(nt) && /return ntfDisp\(ntfProf\(e\)\) \|\| QMGR_MAP\[l\] \|\| l;/.test(nt) && /id="accProfEdit"/.test(ad) && /data-axpf=/.test(ad) && /\^portal_feedback\\b\|\^portal_profiles\\b/.test(co) && /\.fb-pv\{/.test(css),
   '㊿+189 개선 요청 첨부(fbAttAdd · fbUpload · 붙여넣기 · 버킷 feedback) · 표시 이름(ntfProf · profEdit · portal_profiles · 내 계정 · 관리자 계정 · 쓰기 관문 예외)'); }
+// ㊿+190 사람은 어디서나 «이름 직급»(ntfName) — 홈 장비 줄 · 상단 내 계정(gnMeSync) · 표 작성/누가 열 · 이력 · 제안 · 마감 · 공유 · 첨부 · 알림 · 이름 캐시
+{ const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
+  const nt = rd('js/notify.js'), sh = rd('js/shell.js'), gs = rd('js/grids.js'), gr = rd('js/grid.js'), an = rd('js/analysis.js');
+  say(/^export function gnMeSync\(\)/m.test(sh) && /return a\? ntfName\(a\.assignee\) : \(o\.requester\? ntfName\(o\.requester\) : ''\);/.test(sh) && /var meNm=''; try\{ meNm=ntfDisp\(ntfProf\(me\)\); \}catch\(e\)\{\}/.test(sh)
+    && /function namesCache\(\)/.test(nt) && /function namesStore\(acc\)/.test(nt) && /NAMES_LS='svc_names'/.test(nt) && /\(bare && a\.email\.split\('@'\)\[0\]===em\)/.test(nt) && /try\{ gnMeSync\(\); \}catch\(e\)\{\}/.test(nt) && !/ntfWho\(asg\)|ntfWho\(em\)|ntfWho\(e\)\+/.test(nt)
+    && /k:'created_by',l:'작성',ro:true,fmt:function\(v\)\{ return ntfName\(v\); \}/.test(gs) && /k:'actor',l:'누가',ro:true,fmt:function\(v\)\{ return ntfName\(v\); \}/.test(gs) && /\$\{ntfName\(x\.actor\)\}/.test(gr) && /ntfName\(e\.by\)/.test(gr)
+    && /ntfName\(h\.actor\)/.test(an) && /ntfName\(lk\.locked_by\)/.test(an) && /ntfName\(a\.by_email\)/.test(an) && /ntfName\(i\.uploaded_by\)/.test(rd('js/cloud.js')) && /ntfName\(who\.actor\)/.test(rd('js/guard.js')) && /who:ntfName\(x\.owner\)/.test(rd('js/report.js'))
+    && /ntfName\(x\.handled_by\)/.test(rd('js/admin.js')) && /ntfName\(r\.requester\)/.test(rd('js/inbound.js')) && /ntfName\(r\.requester\)/.test(rd('js/tools.js')) && /ntfName\(h\.by\)/.test(rd('js/edit.js')),
+  '㊿+190 사람은 어디서나 «이름 직급»(ntfName · gnMeSync · 이름 캐시 · 표 열 · 이력 · 알림)'); }
 // ㊿+160 연장하면 상태 «재약정»(구분 그대로) · 계약 상세에 «계약 기간 · 연장 이력»
 say(/^export function renewStatus\(r\)/m.test(jsAll) && /var nst=renewStatus\(r\);/.test(jsAll) && /^export function ctPeriods\(c, mine\)/m.test(jsAll) && html.includes('id="dtRenew"'), '연장: 상태 «재약정»(renewStatus) · 계약 상세 연장 이력(ctPeriods · #dtRenew)');
 const idx = html + jsAll;

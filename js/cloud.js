@@ -6,6 +6,7 @@ import { $, cssv, esc, rawHtml, tpl } from './core.js';
 import { sbTry, sbWrite, toast } from './shell.js';
 import { loadLib, loadWorkerBlob, PDFJS_WORKER } from './analysis.js';
 import { logChange, ovlMarkDirty } from './edit.js';
+import { ntfName } from './notify.js';
 
 /* ==================================================================
    도구 › 클라우드 비용
@@ -352,7 +353,7 @@ export function clInvList(B, canEdit){
       h+=tpl`<tr><td>${rawHtml(m)}</td><td><span style="display:inline-block;width:8px;height:8px;background:${rawHtml(a.color||'#999')};margin-right:6px;border-radius:2px"></span>${a.label}${rawHtml(i.vendor? tpl` <span class="cap">· ${i.vendor}</span>`:'')}</td>`+
         tpl`<td class="n">${rawHtml(i.total_usd!=null? clU(i.total_usd):'–')}</td><td class="n">${rawHtml(i.fx_rate!=null? Number(i.fx_rate).toLocaleString('ko-KR'):'–')}</td><td class="n">${rawHtml(i.supply_krw!=null? clW(i.supply_krw):'–')}</td><td class="n">${rawHtml(i.total_krw!=null? clW(i.total_krw):'–')}</td>`+
         tpl`<td class="cap">${rawHtml(i.file_name? '📄 '+esc(i.file_name) : esc(i.source||''))}</td>`+
-        tpl`<td class="cap">${(i.uploaded_by||'').split('@')[0]} · ${rawHtml(String(i.uploaded_at||'').slice(0,10))}</td>`+ tpl`${rawHtml(canEdit? tpl`<td><button class="pill ghost" data-del="${rawHtml(i.id)}" style="height:24px;padding:0 8px;font-size:12px;color:var(--critical)">삭제</button></td>`:'')}</tr>`; }); });
+        tpl`<td class="cap">${ntfName(i.uploaded_by)} · ${rawHtml(String(i.uploaded_at||'').slice(0,10))}</td>`+ tpl`${rawHtml(canEdit? tpl`<td><button class="pill ghost" data-del="${rawHtml(i.id)}" style="height:24px;padding:0 8px;font-size:12px;color:var(--critical)">삭제</button></td>`:'')}</tr>`; }); });
     h+='</tbody></table></div>';
   }
   p.innerHTML=h;

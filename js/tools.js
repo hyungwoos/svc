@@ -11,6 +11,7 @@ import { ctPeriods, custGo, navMenu, oiMine, oiOpen, oiQuotesReady, openDetail, 
 import { syncOrderAssets } from './equipment.js';
 import { closeOvl, logChange, openOvl, ovlMarkDirty } from './edit.js';
 import { homeSearchOpen, rcPush } from './home.js';
+import { ntfName } from './notify.js';
 
 
 /* ===== 전역 검색 (Ctrl+K) ===== */
@@ -26,19 +27,19 @@ export function fkSources(){
     out.push({t:'LIVE', nm:r.cust, sb:(r.prod||'')+' · '+(r.nodes||'')+'노드'+(r.basis? ' · '+r.basis:''), go:function(){ switchView('live'); $('#dvSearch').value=r.cust; renderGrid(); }, cust:r.cust});
   }); })();
   (ST.RAWX.oi||[]).forEach(function(r){
-    out.push({t:'OI', nm:r.customer, sb:(r.deal_name||'')+' · '+(r.stage||'')+' · '+(r.owner||'')+' '+(r.requester||''), go:function(){ switchView('oi'); $('#dvSearch').value=r.customer; renderGrid(); }, cust:r.customer});
+    out.push({t:'OI', nm:r.customer, sb:(r.deal_name||'')+' · '+(r.stage||'')+' · '+(r.owner||'')+' '+ntfName(r.requester), go:function(){ switchView('oi'); $('#dvSearch').value=r.customer; renderGrid(); }, cust:r.customer});
   });
   (ST.RAWX.inbound||[]).forEach(function(r){
-    out.push({t:'인바운드', nm:r.org, sb:(r.on_date||'')+' · '+(r.product||'')+' · '+(r.result||'')+' · '+(r.owner||'')+' '+(r.requester||''), go:function(){ goInbList(); $('#dvSearch').value=r.org; renderGrid(); }, cust:r.org});
+    out.push({t:'인바운드', nm:r.org, sb:(r.on_date||'')+' · '+(r.product||'')+' · '+(r.result||'')+' · '+(r.owner||'')+' '+ntfName(r.requester), go:function(){ goInbList(); $('#dvSearch').value=r.org; renderGrid(); }, cust:r.org});
   });
   (ST.RAWX.mdrops||[]).forEach(function(r){
-    out.push({t:'MDR', nm:r.customer, sb:(r.svc_type||'')+' · '+(r.status||'')+' · '+(r.sales_name||'')+' '+(r.requester||'')+' '+(r.mgr_name||''), go:function(){ switchView('mdrops'); $('#dvSearch').value=r.customer; renderGrid(); }, cust:r.customer});
+    out.push({t:'MDR', nm:r.customer, sb:(r.svc_type||'')+' · '+(r.status||'')+' · '+(r.sales_name||'')+' '+ntfName(r.requester)+' '+(r.mgr_name||''), go:function(){ switchView('mdrops'); $('#dvSearch').value=r.customer; renderGrid(); }, cust:r.customer});
   });
   (ST.RAWX.assets||[]).forEach(function(r){
     out.push({t:'장비', nm:r.serial, sb:(r.model||'')+' · '+(r.status||'')+' · '+(r.customer||''), go:function(){ switchView('assets'); $('#dvSearch').value=r.serial; renderGrid(); }});
   });
   (ST.RAWX.orders||[]).forEach(function(r){
-    out.push({t:'임대신청', nm:r.customer||'-', sb:(r.status||'')+' · '+(r.requester||'')+' '+(r.mgr_name||''), go:function(){ switchView('orders'); $('#dvSearch').value=r.customer||''; renderGrid(); }, cust:r.customer});
+    out.push({t:'임대신청', nm:r.customer||'-', sb:(r.status||'')+' · '+ntfName(r.requester)+' '+(r.mgr_name||''), go:function(){ switchView('orders'); $('#dvSearch').value=r.customer||''; renderGrid(); }, cust:r.customer});
   });
   return out;
 }

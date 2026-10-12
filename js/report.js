@@ -13,6 +13,7 @@ import { clFxRate, loadCloud } from './cloud.js';
 import { loadInbound } from './inbound.js';
 import { churnRows, kxChurn, kxCustMrr, kxMrr, kxOi, kxSimple, kxWire } from './sales.js';
 import { oiOpen, xlsxAoa } from './grid.js';
+import { ntfName } from './notify.js';
 
 
 /* ===== 리포트 — 커스텀 리포트 빌더 (모든 값 클릭 수정 · 행 추가 · 자유 슬라이드 → PPT) ===== */
@@ -1059,7 +1060,7 @@ export function qbLibHtml(){
     h+=L.map(function(x){ return qbChip(x, {del:true}); }).join('');
   }
   h+=tpl`<span style="flex:1"></span><button type="button" class="cbtn${rawHtml(RPV.build?' pri':'')}" id="qbBuildTg" aria-expanded="${RPV.build?'true':'false'}" aria-controls="qbPanel">${RPV.build? '고급 닫기' : (QB.ai? '고급 — 조회식(SQL) 보기 · 고치기' : '고급 — 직접 조합(표·조건·묶기) · SQL')}</button></div>`;
-  if(RQ.ok) h+=tpl`<div class="qb-lib qb-team"><span class="mini" style="font-weight:600">팀 공유</span>${rawHtml(team.length? team.map(function(x){ return qbChip(x, {who:x.owner.split('@')[0], del:!!ST.IS_SUPER}); }).join('') : tpl`<span class="mini">아직 없음 — 내 리포트의 «공유»를 누르면 모두의 이 목록에 보입니다(결과는 보는 사람의 데이터로 계산)</span>`)}</div>`;
+  if(RQ.ok) h+=tpl`<div class="qb-lib qb-team"><span class="mini" style="font-weight:600">팀 공유</span>${rawHtml(team.length? team.map(function(x){ return qbChip(x, {who:ntfName(x.owner), del:!!ST.IS_SUPER}); }).join('') : tpl`<span class="mini">아직 없음 — 내 리포트의 «공유»를 누르면 모두의 이 목록에 보입니다(결과는 보는 사람의 데이터로 계산)</span>`)}</div>`;
   return h;
 }
 export function qbLibRefresh(){ var el=$('#qbLib'); if(!el) return; el.innerHTML=qbLibHtml();

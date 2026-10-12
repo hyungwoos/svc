@@ -15,7 +15,7 @@ import { applyMenuFold, closeDrawer, ensureGroupOpen, setupSide } from './sales.
 import { btnBackSync, gridGoPre, loadHide, meLoc, NAV, navMenu, oiOpen, oiOwnerOf, oiQuotesReady, openDetail, qvGo, renderGrid, switchView, VIEW_UI, viewResetHard } from './grid.js';
 import { closeOvl, logChange, openOvl, OVL_SKIP_CLEAN, ovlMarkClean, setupEdit, toggleAuthMenu } from './edit.js';
 import { homeOn, homeRender, placeSearchBtn, srchCtx } from './home.js';
-import { NTF, ntfAfterData, ntfAreaMe, ntfAreaOf, ntfName, ntfWho } from './notify.js';
+import { NTF, ntfAfterData, ntfAreaMe, ntfAreaOf, ntfDisp, ntfName, ntfProf } from './notify.js';
 import { verBeforeWrite } from './guard.js';
 
 
@@ -194,7 +194,8 @@ export function buildGnNav(rail){
   var h=tpl`<div class="gn-bar"><a class="gn-logo" data-v="dash" href="#" aria-label="Genians — 홈"><svg class="gn-lw" viewBox="0 0 587.2 133.4" aria-hidden="true"><use href="#gnLogo"/></svg><svg class="gn-lm" viewBox="0 0 171.1 133.4" aria-hidden="true"><use href="#gnMark"/></svg></a>`;
   h+=tpl`<nav class="gn-tabs" aria-label="주 메뉴">${rawHtml(topBtn({v:'dash', t:'홈'}))}${rawHtml(tops.filter(function(o){ return o!==adm; }).map(topBtn).join(''))}</nav>`;
   var me=String(ST.AUTH_USER||'');
-  h+=tpl`<div class="gn-right">${rawHtml(adm? topBtn(adm) : '')}<button type="button" class="gn-me" data-v="account" title="내 계정 · 로그아웃" aria-label="내 계정 메뉴 (${me})"><span class="gn-av">${(me.split('@')[0]||'?').slice(0,1).toUpperCase()}</span><span class="gn-wst"><b>${me.split('@')[0]||'로그인'}</b><small>${me.indexOf('@')>0? '@'+me.split('@')[1] : ''}</small></span></button></div></div>`;
+  var meNm=''; try{ meNm=ntfDisp(ntfProf(me)); }catch(e){}   /* ㊿+190 이름이 있으면 «이름 직급» 굵게 · 아래엔 계정 id */
+  h+=tpl`<div class="gn-right">${rawHtml(adm? topBtn(adm) : '')}<button type="button" class="gn-me" data-v="account" title="내 계정 · 로그아웃" aria-label="내 계정 메뉴 (${me})"><span class="gn-av">${(meNm || me.split('@')[0] || '?').slice(0,1).toUpperCase()}</span><span class="gn-wst"><b>${meNm || me.split('@')[0] || '로그인'}</b><small>${meNm? (me.split('@')[0]||'') : (me.indexOf('@')>0? '@'+me.split('@')[1] : '')}</small></span></button></div></div>`;
   h+=tpl`<div class="gn-menu" id="gnMenu" role="menu" hidden></div>`;
   /* ㊿+172 오른쪽 위로 옮겨 둔 «검색» · «AI 대화» 버튼은 메뉴 줄을 다시 그리기 전에 위 띠로 꺼내 두었다가 다시 놓음(지우지 않게) */
   (function(){ var tb0=document.querySelector('#app .topbar'); ['cmdBar','aipOpenBtn'].forEach(function(id){ var x=document.getElementById(id); if(x && tb0 && rail.contains(x)) tb0.appendChild(x); }); })();
@@ -251,6 +252,12 @@ export function gnBadges(){
   var pend=(ST.RAWX.orders||[]).filter(function(o){ return ['접수','출하요청','배송중'].indexOf(o.status)>=0; }).length;
   return {dcheck:GN_BADGE.dc||0, inbound:GN_BADGE.inbound||0, eqboard:pend};
 }
+/** ㊿+190 상단 «내 계정» 버튼을 이름으로 — 계정 목록(이름)이 뒤늦게 오거나 «표시 이름»을 고친 뒤 */
+export function gnMeSync(){
+  var b=document.querySelector('#rail .gn-me'); if(!b) return; var me=String(ST.AUTH_USER||''), nm=''; try{ nm=ntfDisp(ntfProf(me)); }catch(e){}
+  var bb=b.querySelector('.gn-wst b'), sm=b.querySelector('.gn-wst small'), av=b.querySelector('.gn-av'); if(!bb) return;
+  bb.textContent=nm || me.split('@')[0] || '로그인'; if(sm) sm.textContent=nm? (me.split('@')[0]||'') : (me.indexOf('@')>0? '@'+me.split('@')[1] : ''); if(av) av.textContent=(nm || me.split('@')[0] || '?').slice(0,1).toUpperCase();
+}
 export function gnNavSync(rail, v){
   var bdOf=gnBadges();
   function setBd(b, n, hot){ var s=b.querySelector('.gn-bd'); if(!s) return; s.hidden=!n; s.textContent=n>99?'99+':String(n||''); s.classList.toggle('hot', !!hot); }
@@ -291,14 +298,20 @@ export var VT_DUP_FORCE={ordernew:1, mdrnew:1};
 export function vtNorm(s){ return String(s||'').replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}]/gu,'').replace(/[\s·—–\-()（）:：,.]/g,'').toLowerCase(); }
 export function vtDupSync(v){
   var host=document.querySelector('#app [id^="view"]:not(.hidden)'), t=document.getElementById('gnTitle'); if(!host || !t) return;
-  host.querySelectorAll('.vt-dup').forEach(function(h){ h.classList.remove('vt-dup'); });
-  if(!isGN() || !v || v==='dash') return;
-  var name=vtNorm(t.textContent); if(name.length<2) return;
-  var hs=[].slice.call(host.querySelectorAll('h1,h2,h3')).filter(function(h){ var r=h.getBoundingClientRect(); return r.width>0 && r.height>0; }), h=hs[0]; if(!h) return;
-  var own=''; [].forEach.call(h.childNodes, function(n){ if(n.nodeType===3) own+=n.textContent; }); own=vtNorm(own);
-  if(!(own && (own===name || own.indexOf(name)===0 || name.indexOf(own)===0 || own.indexOf(name)>=0 || VT_DUP_FORCE[v]))) return;
-  if(!h.querySelector('.vt-txt')){ var sp=document.createElement('span'); sp.className='vt-txt'; [].slice.call(h.childNodes).forEach(function(n){ if(n.nodeType===3) sp.appendChild(n); }); h.insertBefore(sp, h.firstChild); }
-  h.classList.add('vt-dup');
+  /* ㊿+189 두 번 불러도 같은 결과(멱등) — 예전엔 한 번 감싼 제목(.vt-txt)은 own 글자가 비어 두 번째 호출에서 도로 보였고(레일 배지 갱신 때마다 railSync → 제목이 깜빡 · 문서 높이 40px 오르내림 → 돌아온 스크롤 위치가 어긋남 · CI ㊿+173 실패) */
+  var hide=null;
+  if(isGN() && v && v!=='dash'){
+    var name=vtNorm(t.textContent);
+    if(name.length>=2){
+      var hs=[].slice.call(host.querySelectorAll('h1,h2,h3')).filter(function(h){ var r=h.getBoundingClientRect(); return r.width>0 && r.height>0; }), h=hs[0];
+      if(h){ var sp0=h.querySelector('.vt-txt'), own=''; if(sp0) own=sp0.textContent; else [].forEach.call(h.childNodes, function(n){ if(n.nodeType===3) own+=n.textContent; }); own=vtNorm(own);
+        if(own && (own===name || own.indexOf(name)===0 || name.indexOf(own)===0 || own.indexOf(name)>=0 || VT_DUP_FORCE[v])) hide=h; }
+    }
+  }
+  host.querySelectorAll('.vt-dup').forEach(function(h){ if(h!==hide) h.classList.remove('vt-dup'); });
+  if(!hide) return;
+  if(!hide.querySelector('.vt-txt')){ var sp=document.createElement('span'); sp.className='vt-txt'; [].slice.call(hide.childNodes).forEach(function(n){ if(n.nodeType===3) sp.appendChild(n); }); hide.insertBefore(sp, hide.firstChild); }
+  hide.classList.add('vt-dup');
 }
 export var EMO_RE=/^[\s ]*(?:[\u{1F000}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}][\u{FE0F}\u{200D}\u{1F3FB}-\u{1F3FF}]*)+[\s ]*/u;
 export var EMO_KEEP=/^[\s ]*[✓✔✕✖⚠☰✖]/;   /* ✓ ✔ ✕ ✖ ⚠ ☰ 는 뜻이 있는 기호 — 둠 */
@@ -488,7 +501,7 @@ export function renderInbox(){
   var rows=[], zeros=[], snz=0;
   function add(key, o){ if(ccSnoozed(key)){ snz++; return; } o.key=key; rows.push(o); }
   /* ㊿+174 장비 «담당» = 알림함에서 정한 처리 담당(work_assign) → 없으면 신청한 사람. 신청서의 mgr_name 은 «고객 담당자»(고객 쪽 사람)라 쓰지 않음 */
-  function eqOwn(o){ var a=NTF.asg[String(o.id)]; return a? ntfWho(a.assignee) : (o.requester? String(o.requester).split('@')[0] : ''); }
+  function eqOwn(o){ var a=NTF.asg[String(o.id)]; return a? ntfName(a.assignee) : (o.requester? ntfName(o.requester) : ''); }   /* ㊿+190 신청한 사람도 «이름 직급» */
   /* ㊿+185 줄 담당(work_assign area) — 지정돼 있으면 담당 칸에 그 사람 · 나면 «내 업무»에 */
   function areaOwn(key, dflt){ var e=ntfAreaOf(key); return e? ntfName(e) : (dflt||''); }
   function areaMe(key){ return ntfAreaMe(key)? {} : null; }
@@ -922,7 +935,7 @@ export function eqbCard(o, canEdit, todayS){
   }
   var idx=EQB_COLS.map(function(c){ return c[0]; }).indexOf(o.status), nextSt=idx>=0 && idx<EQB_COLS.length-1? EQB_COLS[idx+1][0] : null;
   /* ㊿+183 카드의 «담당» = 처리 담당(work_assign) → 없으면 신청한 사람 (홈 · 알림함과 같은 기준 · ㊿+174). 예전엔 신청서의 고객 담당자(mgr_name · 고객 쪽 사람)가 나왔음 */
-  var asg=NTF.asg && NTF.asg[String(o.id)], who=asg? ntfWho(asg.assignee) : (o.requester? String(o.requester).split('@')[0] : '');
+  var asg=NTF.asg && NTF.asg[String(o.id)], who=asg? ntfName(asg.assignee) : (o.requester? ntfName(o.requester) : '');   /* ㊿+190 이름 직급 */
   var whoT=(asg? '처리 담당 ' : '신청 ')+who+(o.mgr_name? ' · 고객 담당자 '+o.mgr_name : '');
   var ft=tpl`<div class="ft"><span class="mini" title="${whoT}">${who}</span><span class="acts">`+
     tpl`<button type="button" class="cbtn ab" data-open="${rawHtml(o.id)}" title="신청 내역에서 열기·수정" aria-label="신청 #${rawHtml(o.id)} 신청 내역에서 열기·수정">${rawHtml(ico('edit',14))}</button>`+

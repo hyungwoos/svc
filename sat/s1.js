@@ -256,24 +256,34 @@ function renderUse(){
   });
   $('#uCnt').textContent=list.length+' / '+nac.length+'건';
   var tb=$('#tUse tbody'); tb.innerHTML='';
+  var bm=bundleMark(list);
   list.forEach(function(g){
-    var i=nac.indexOf(g);
+    var i=nac.indexOf(g), bd=bm(g);
     var st=!g.biz?'need':(Math.abs(g.diff)>=1?'diff':(g.by==='map'?'map':'auto'));
     var tags=(g.isNew?'<span class="tag new">신규</span> ':'')+(g.isEnd?'<span class="tag end">해약</span> ':'')+(g.isExt?'<span class="tag ext">연장</span> ':'');
     var by={map:'<span class="tag map">저장된 매핑</span>',name:'<span class="tag">이름 일치</span>',amt:'<span class="tag amt">금액 일치</span>',pick:'<span class="tag map">직접 선택</span>'}[g.by]||'<span class="tag need">확인 필요</span>';
     var many=g.biz && nac.filter(function(x){ return x.biz&&x.biz.no===g.biz.no; }).length>1;
-    if(many) by+=' <span class="tag">묶음</span>';
+    if(many) by+=tpl` <span class="tag" title="등록번호 ${rawHtml(g.biz.no)} 하나에 계약 ${rawHtml(bd.n)}건 — 회계매출 · 차액은 묶음의 첫 줄에">묶음</span>`;
+    var rest=many && !bd.first, upTag=tpl`<span class="mini" style="color:#999">↑ 묶음</span>`;
+    var accCell=!g.biz? '' : (rest? upTag : tpl`${rawHtml(fmt(g.biz.acc))}${rawHtml(many? tpl`<div class="mini">묶음 ${rawHtml(bd.n)}건 · 에스원 합 ${rawHtml(fmt(g.groupSum))}</div>` : '')}`);
+    var diffCell=!g.biz? '' : (rest? upTag : (g.diff? fmt(g.diff) : '0'));
     var pick=tpl`<select class="pick" data-i="${rawHtml(i)}" data-change="pickBiz(this)"><option value="">— 선택 —</option>`+
       tpl`${rawHtml(g.cand.map(function(c){ return tpl`<option value="${rawHtml(c.b.no)}"${g.biz&&g.biz.no===c.b.no?' selected':''}>${c.b.no+' · '+(c.b.cust||c.b.name)+' · '+fmt(c.b.acc)}</option>`; }).join(''))}`+ tpl`${rawHtml(g.biz && !g.cand.some(function(c){ return c.b.no===g.biz.no; })?tpl`<option value="${rawHtml(g.biz.no)}" selected>${g.biz.no+' · '+g.biz.cust}</option>`:'')}</select>`;
     var tr=document.createElement('tr'); tr.className='st-'+st;
     tr.innerHTML=tpl`<td>${rawHtml(tags)}${rawHtml(by)}</td><td>${g.nm}</td><td>${g.cno||''}</td>`+
       tpl`<td class="mini">${g.lines.map(function(l){ return l.svc; }).join(' + ')}</td>`+
       tpl`<td class="n">${rawHtml(fmt(g.amt))}</td><td>${rawHtml(pick)}</td><td>${g.biz?g.biz.cust:''}</td>`+
-      tpl`<td class="n">${rawHtml(g.biz?fmt(g.biz.acc):'')}</td>`+
-      tpl`<td class="n" style="color:${g.biz&&Math.abs(g.diff)>=1?'var(--warn)':'#999'}">${rawHtml(g.biz?(g.diff?fmt(g.diff):'0'):'')}</td>`;
+      tpl`<td class="n">${rawHtml(accCell)}</td>`+
+      tpl`<td class="n" style="color:${g.biz&&Math.abs(g.diff)>=1?'var(--warn)':'#999'}">${rawHtml(diffCell)}</td>`;
     tb.appendChild(tr);
   });
   $('#uRes').classList.remove('hidden');
+}
+/* ㊿+190 «묶음»(한 등록번호에 계약 여러 건): 회계매출 · 차액은 묶음의 첫 줄에만 쓰고 나머지 줄은 «↑ 묶음» — 두 줄에 같은 값을 적어 «73,000 = 73,000 인데 −73,000?» 으로 보이던 것. 계산(g.diff = 회계매출 − 묶음 합)은 그대로 */
+function bundleMark(rows){
+  var cnt={}, seen={}; rows.forEach(function(g){ if(g.biz) cnt[g.biz.no]=(cnt[g.biz.no]||0)+1; });
+  return function(g){ if(!g.biz || cnt[g.biz.no]<2) return {many:false, first:true, n:1};
+    var first=!seen[g.biz.no]; seen[g.biz.no]=1; return {many:true, first:first, n:cnt[g.biz.no]}; };
 }
 function pickBiz(sel){
   var g=S.use.nac[+sel.dataset.i]; var no=+sel.value;
@@ -370,10 +380,12 @@ async function dlUseXlsx(){
   var ym=$('#ym').value||'';
   var aoa=[['에스원 사용료 정산 대조 — '+ym],[],
     ['비즈포탈 등록번호','계약번호','에스원 고객(서비스제공처)','제공서비스','에스원 금액','비즈포탈 고객사','회계매출','차액','구분','매칭 방법']];
+  var bm=bundleMark(S.use.nac);
   S.use.nac.forEach(function(g){
+    var bd=bm(g), rest=bd.many && !bd.first;   /* ㊿+190 묶음은 첫 줄에만 회계매출 · 차액(열 합계가 맞게) */
     aoa.push([ g.biz?g.biz.no:'', g.cno||'', g.nm, g.lines.map(function(l){ return l.svc; }).join(' + '), g.amt,
-               g.biz?g.biz.cust:'', g.biz?g.biz.acc:'', g.biz?g.diff:'',
-               g.isNew?'신규':(g.isEnd?'해약':(g.isExt?'연장':'기존')), g.by||'미매칭' ]);
+               g.biz?g.biz.cust:'', g.biz&&!rest?g.biz.acc:'', g.biz&&!rest?g.diff:'',
+               g.isNew?'신규':(g.isEnd?'해약':(g.isExt?'연장':'기존')), (g.by||'미매칭')+(bd.many? ' · 묶음 '+bd.n+'건'+(rest? '(↑ 첫 줄에 회계매출 · 차액)' : '') : '') ]);
   });
   var dkSum=(S.use.dk||[]).reduce(function(a,g){ return a+g.amt; },0);
   aoa.push([]); aoa.push(['디바이스키퍼(임대 포함) 합계','','','',dkSum,'',(S.use.bizSettle||[]).reduce(function(a,b){ return a+b.acc; },0)]);
@@ -460,14 +472,14 @@ function printUse(){
     cols:[{k:'no',l:'등록번호',w:'10%'},{k:'nm',l:'에스원 고객(서비스제공처)',w:'25%'},{k:'cno',l:'계약번호',mini:true,w:'11%'},
           {k:'svc',l:'서비스',mini:true},{k:'amt',l:'에스원 금액',n:true,w:'12%'},{k:'acc',l:'회계매출',n:true,w:'12%'},
           {k:'diff',l:'차액',n:true,w:'9%'},{k:'kind',l:'구분',w:'8%'}],
-    rows:S.use.nac.map(function(g){ return { no:g.biz? g.biz.no:'', nm:g.nm, cno:g.cno||'',
-      svc:g.lines.map(function(l){ return l.svc; }).join(' + '), amt:fmt(g.amt), acc:g.biz? fmt(g.biz.acc):'',
-      diff:g.biz&&Math.abs(g.diff)>=1? fmt(g.diff):'', kind:g.isNew?'신규':(g.isEnd?'해약':(g.isExt?'연장':'기존')),
-      __hl:!g.biz||Math.abs(g.diff||0)>=1 }; }),
+    rows:(function(){ var bm=bundleMark(S.use.nac); return S.use.nac.map(function(g){ var bd=bm(g), rest=bd.many && !bd.first; return { no:g.biz? g.biz.no:'', nm:g.nm, cno:g.cno||'',
+      svc:g.lines.map(function(l){ return l.svc; }).join(' + '), amt:fmt(g.amt), acc:!g.biz? '' : (rest? '↑ 묶음' : fmt(g.biz.acc)+(bd.many? ' (묶음 '+bd.n+'건 · 합 '+fmt(g.groupSum)+')' : '')),
+      diff:!g.biz? '' : (rest? '↑ 묶음' : (Math.abs(g.diff)>=1? fmt(g.diff) : '')), kind:g.isNew?'신규':(g.isEnd?'해약':(g.isExt?'연장':'기존')),
+      __hl:!g.biz||Math.abs(g.diff||0)>=1 }; }); })(),
     foot:[{ nm:'클라우드NAC 합계', amt:fmt(nacSum) },
           { nm:'디바이스키퍼(임대 포함) 합계 — 비즈포탈 «대금 정산» 1건', amt:fmt(dkSum) },
           { nm:'총계', amt:fmt(nacSum+dkSum) }],
-    note:'· 연한 노란 줄은 등록번호가 없거나 금액이 다른 건입니다.\n· 건수 — 신규 '+$('#cNew').value+' · 해약 '+$('#cEnd').value+' · 연장 '+$('#cExt').value+' · 기존 '+$('#cKeep').value
+    note:'· 연한 노란 줄은 등록번호가 없거나 금액이 다른 건입니다.\n· 묶음(한 등록번호에 계약 여러 건)은 첫 줄에 회계매출 · 차액(= 회계매출 − 묶음 합)을 쓰고 나머지 줄은 «↑ 묶음»입니다.\n· 건수 — 신규 '+$('#cNew').value+' · 해약 '+$('#cEnd').value+' · 연장 '+$('#cExt').value+' · 기존 '+$('#cKeep').value
   });
 }
 /* 에스원 — 설치비 내역서 한 장 출력 */
@@ -586,8 +598,9 @@ async function restoreSettle(id){
                  by:x.by||null, diff:Number(x.diff||0), groupSum:Number(x.acc||0),
                  isNew:x.kind==='new', isEnd:x.kind==='end', isExt:x.kind==='ext' };
       });
+      var gsum={}; nac.forEach(function(g){ if(g.biz) gsum[g.biz.no]=(gsum[g.biz.no]||0)+g.amt; }); nac.forEach(function(g){ g.groupSum=g.biz? gsum[g.biz.no] : 0; });   /* ㊿+190 묶음 합(저장분에는 없음) */
       S.use={ groups:nac, lines:[], nac:nac, dk:[{amt:Number(p.dk_total||0), lines:[]}],
-              bizUse:nac.filter(function(g){ return g.biz; }).map(function(g){ return g.biz; }),
+              bizUse:(function(){ var seen={}; return nac.filter(function(g){ return g.biz && !seen[g.biz.no] && (seen[g.biz.no]=1); }).map(function(g){ return g.biz; }); })(),   /* ㊿+190 묶음은 등록번호 하나로(저장분을 다시 열 때 회계매출이 두 번 더해지던 것) */
               bizSettle:(p.biz_settle||[]).map(function(b){ return {no:b.no, proj:b.proj, acc:Number(b.acc||0), cust:'', kind:'settle'}; }),
               restored:true };
       S.settle.use=r.id;

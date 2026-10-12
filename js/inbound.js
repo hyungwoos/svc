@@ -8,6 +8,7 @@ import { DV, renderGrid, switchView, xlsxBook } from './grid.js';
 import { closeOvl, logChange, openOvl } from './edit.js';
 import { openCust360 } from './tools.js';
 import { ask } from './ai.js';
+import { ntfName } from './notify.js';
 
 
 /* ===== 인바운드 관리 — 통계 + 목록 (원본: 구글시트, 매일 아침 자동 동기화) ===== */
@@ -382,7 +383,7 @@ export function openInbDetail(r){
     tpl`<div><b>문의 제품</b>${r.product||'-'} <span class="mini">(${r.ptype||''})</span></div>`+
     tpl`<div><b>지니 담당</b>${r.owner||'-'}</div>`+
     tpl`<div><b>노드수</b>${r.nodes||'-'}</div>`+
-    tpl`<div><b>요청자</b>${r.requester||'-'}</div>`+
+    tpl`<div><b>요청자</b>${r.requester? ntfName(r.requester) : '-'}</div>`+
     tpl`<div><b>부서</b>${r.dept||'-'}</div>`+
     tpl`<div><b>기 고객</b>${r.existing||'-'}</div>`+
     tpl`<div><b>이메일</b>${r.email||'-'}</div>`+

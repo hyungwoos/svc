@@ -3,7 +3,7 @@
 import { APP_VER, ST } from './state.js';
 import { Viz } from './viz.js';
 import { $, amtGuard, amtHint, canView, canWrite, cssv, esc, isGN, kwToWon, lline, mk, navText, perfNav, permEnter, rawHtml, STATE, tpl, won, wonFull, wonKo, wonToKw } from './core.js';
-import { cmdAskHit, dIdx, EQB, EQUIP_VIEWS, gridGo, ico, idxDate, loadFromDb, onData, railSync, renderEqBoard, sbTry, sbWrite, toast, todayStr } from './shell.js';
+import { cmdAskHit, dIdx, EQB, EQUIP_VIEWS, gridGo, ico, idxDate, loadFromDb, onData, railSync, renderEqBoard, sbTry, sbWrite, toast, todayStr, vtDupSync } from './shell.js';
 import { buildControls, DASH_DIRTY, dashDetailShown, renderAll } from './dash.js';
 import { GRIDS } from './grids.js';
 import { eqRetOpen, eqWant, renderEqPanel, syncOrderAssets } from './equipment.js';
@@ -16,6 +16,7 @@ import { CHURN, CR, CS, csSetTab, ensureGroupOpen, helpBox, helpWire, initOiForm
 import { closeOvl, logChange, monthRows, msg, openOvl } from './edit.js';
 import { lazyGet, lazyView } from './lazy.js';
 import { isNetErr, netToast, rowGuard, savedRows, saveFailMsg } from './guard.js';
+import { ntfName } from './notify.js';
 
 
 /* ---- 뒤로가기 — 화면 이동을 브라우저 히스토리에 남겨 상단 ← 버튼·브라우저/폰 뒤로가기·Alt+← 가 모두 이전 화면으로 ----
@@ -285,6 +286,7 @@ export function switchView(v){
   /* 금액 열(won:1)이 있는 표는 제목 옆에 «천원 단위» 배지를 붙입니다 */
   var hasWon=(g.cols||[]).some(function(c){ return c.won; });
   $('#dvTitle').innerHTML=esc(g.title)+(hasWon? ' <span class="ubadge sm">₩ 금액 단위 = 천원</span>':'');
+  try{ vtDupSync(v); }catch(e){}   /* ㊿+189 제목을 넣은 바로 그때 겹침 판정 — 80ms 뒤에 숨기면 문서 높이가 바뀌어 돌아온 스크롤 위치가 어긋남(CI ㊿+173) */
   dvCapRender(v, g.cap + (hasWon && !isGN()? ' · 금액은 보기·입력 모두 천원 단위':'') + (ST.IS_VIEWER? ' · 조회 전용 계정입니다':''));   /* ㊿+186 지니언스: 단위는 상단 ₩ 배지 한 번 */
   $('#dvAdd').style.display=(g.add && !ST.IS_VIEWER)?'':'none';
   $('#dvPaste').style.display=(g.add && !ST.IS_VIEWER)?'':'none';
@@ -1541,7 +1543,7 @@ export function ctPeriods(c, mine){
   var out=[{k:'최초', from:s0, to:end0, mrr:(e0.prev_mrr!=null? Number(e0.prev_mrr) : amtAt(s0)), qty:(e0.prev_qty!=null? e0.prev_qty : null), info:(ctOrig(c)? '구분 '+ctOrig(c) : '')}];   /* ㊿+163 연장으로 «재약정»이 돼도 최초 줄은 처음 구분 */
   h.forEach(function(e, i){
     var last=out[out.length-1], from=ym(e.from) || (last.to? ymAdd(last.to, 1) : ''), to=ym(e.to || e.new_end);
-    var mg=e.merged, info=[String(e.at||'').slice(0,10), e.by||'', /migration|sheet-sync/i.test(String(e.by||''))? '시트 이관' : '',
+    var mg=e.merged, info=[String(e.at||'').slice(0,10), ntfName(e.by), /migration|sheet-sync/i.test(String(e.by||''))? '시트 이관' : '',
       Array.isArray(mg)? '추가 '+mg.length+'건 통합' : (mg? '재약정 행 #'+mg+' 합침' : ''), e.note||''].filter(Boolean).join(' · ');
     out.push({k:'연장 '+(e.no||e.renew_no||i+1)+'회', from:from, to:to, mrr:(e.mrr!=null? Number(e.mrr) : amtAt(from)), qty:(e.qty!=null? e.qty : (i===h.length-1 && c.qty? c.qty : null)), info:info});
   });
@@ -1612,7 +1614,7 @@ export function openDetail(c){
   sbTry('change_log?select=*&target_id=eq.'+c.id+'&order=id.desc&limit=50').then(function(rows){
     rows=rows||[];
     t.innerHTML=tpl`<thead><tr><th>시각</th><th>누가</th><th>동작</th><th>내용</th></tr></thead><tbody>`+ tpl`${rawHtml(rows.length? rows.map(function(x){
-        return tpl`<tr><td>${rawHtml(String(x.at||'').replace('T',' ').slice(0,16))}</td><td>${x.actor||''}`+
+        return tpl`<tr><td>${rawHtml(String(x.at||'').replace('T',' ').slice(0,16))}</td><td title="${x.actor||''}">${ntfName(x.actor)}`+
           tpl`</td><td>${x.action||''}</td><td class="mini" title="${x.detail? JSON.stringify(x.detail).slice(0,400) : ''}">${logDetailText(x.detail, x.target, 140)}</td></tr>`;   /* ㊿+188 읽히는 글(원문은 툴팁) */
       }).join('') : '')}`+ tpl`</tbody>`;
     if(!rows.length) t.innerHTML='<tbody><tr><td class="mini dt-nolog">웹에서 수정한 기록이 없습니다 (최초 이관 데이터)</td></tr></tbody>';   /* ㊿+188 빈 이력은 머리줄 없이 한 줄 */
