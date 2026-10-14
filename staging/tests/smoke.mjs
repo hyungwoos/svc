@@ -9,7 +9,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { ROOT, serve, mockBackend, collect, Suite, assert } from './lib.mjs';
-import { FakeDB, fakeBackend, seedData, nowIdx, idxYm } from './fakedb.mjs';
+import { FakeDB, fakeBackend, seedData, nowIdx, idxYm, fbActRpc } from './fakedb.mjs';
 
 const DIR = process.env.SMOKE_DIR || ROOT;
 const OUT = path.join(ROOT, 'tests', 'out'); fs.mkdirSync(OUT, { recursive: true });
@@ -1161,6 +1161,33 @@ if (S.blk()) {
     assert(!(await page.$('#apiKeyText')) && !(await page.evaluate(() => SVC.API.made)), '관리자 화면을 다시 열어도 원문이 남음');
     assert(!errs.length, errs.join(' | ')); return '발급 2 · 폐기 1 · 원문 한 번만';
   });
+  // ㊿+200 외부 연동 «쉽게» — 3단계 · 자료 카드 · 칸 설명 · 주소 만들기 · 엑셀 · 구글 시트 · Power BI · 프로그램 따라 하기 · 키 안 들어감 · 폰 넘침 0
+  await S.t('㊿+200 외부 연동 안내: 3단계 · 자료 카드 7개 → 칸(뜻 · 가짜 예시) · 이 자료를 볼 수 있는 키 · 주소 만들기(기간 · 상태 · 형식 → 주소 바로 바뀜 · 복사) · 따라 하기 탭(엑셀 헤더 X-API-Key · 구글 시트 Apps Script + 스크립트 속성 · Power BI · Python/curl) · 키 원문 없음 · 폰 넘침 0', async () => {
+    apiKeysDb = [{ id: 7, name: '가상 회계 ERP', prefix: 'svc_7777777', scopes: ['contracts', 'revenue'], names: true, note: null, expires_at: null, active: true, revoked_at: null, last_used_at: null, calls_7d: 0, errors_7d: 0 }]; apiLogDb = [];
+    await page.evaluate(() => { SVC.navMenu('adminx'); }); await page.waitForTimeout(400); await page.click('#admTabs [data-t="api"]'); await page.evaluate(() => SVC.apiLoad()); await page.waitForSelector('#apiGuide .api-ds', { timeout: 5000 });
+    await page.evaluate(() => { window.__cp = []; try { Object.defineProperty(navigator, 'clipboard', { value: { writeText: (t) => { window.__cp.push(t); return Promise.resolve(); } }, configurable: true }); } catch (e) { /* noop */ } });
+    const g = () => page.evaluate(() => ({ flow: document.querySelectorAll('#apiBox .api-flow li').length, cards: [...document.querySelectorAll('#apiGuide .api-ds')].map((b) => b.querySelector('b').textContent + (b.classList.contains('on') ? '*' : '')), keys: (document.querySelector('#apiGuide .api-dh .ctag') || {}).textContent, url: document.getElementById('apiUrl').textContent,
+      fields: [...document.querySelectorAll('#apiGuide .api-f tbody tr')].map((r) => r.cells[0].textContent), how: (document.querySelector('#apiGuide .api-howb') || {}).textContent, opts: [...document.querySelectorAll('#apiGuide [data-apio]')].map((e) => e.dataset.apio) }));
+    const a = await g();
+    await page.click('#apiGuide [data-apids="revenue"]'); const b = await g();
+    await page.fill('#apiGuide [data-apio="from"]', '2026-01'); await page.dispatchEvent('#apiGuide [data-apio="from"]', 'change'); await page.fill('#apiGuide [data-apio="to"]', '2026-06'); await page.dispatchEvent('#apiGuide [data-apio="to"]', 'change');
+    const c = await g();
+    await page.click('#apiGuide [data-apihow="sheet"]'); const sh = await g();
+    await page.selectOption('#apiGuide [data-apio="fmt"]', 'json'); await page.click('#apiGuide [data-apihow="code"]'); const cd = await g();
+    await page.click('#apiGuide [data-apicp="apiUrl"]'); await page.waitForTimeout(100); const cp = await page.evaluate(() => window.__cp.slice());
+    await page.click('#apiGuide [data-apids="poc"]'); await page.selectOption('#apiGuide [data-apio="st"]', '신청,대기,진행중,데모'); await page.click('#apiGuide [data-apihow="pbi"]'); const pc = await g();
+    await page.click('#apiGuide [data-apids="customers"]'); const cu = await g();
+    await page.setViewportSize({ width: 390, height: 844 }); await page.waitForTimeout(300);
+    const ov = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth); const ovw = await page.evaluate(() => { const W = window.innerWidth, out = []; const inScroll = (e) => { for (let p = e.parentElement; p; p = p.parentElement) { const o = getComputedStyle(p).overflowX; if (o === 'auto' || o === 'scroll' || o === 'hidden') return true; } return false; }; document.querySelectorAll('body *').forEach((e) => { const b = e.getBoundingClientRect(); if (b.right > W + 1 && b.width > 0 && !inScroll(e)) out.push(e.tagName + '.' + String(e.className).slice(0, 24) + '#' + e.id + ':' + Math.round(b.left) + '-' + Math.round(b.right)); }); return out.slice(0, 8); }); await page.setViewportSize({ width: 1280, height: 900 });
+    const txt = await page.$eval('#apiBox', (e) => e.textContent);
+    const got = { a, b: b.url, c: c.url, sh: sh.how.slice(0, 400), cd: cd.how.slice(0, 300), cp, pc: { url: pc.url, keys: pc.keys, how: pc.how.slice(0, 120) }, cu: { url: cu.url, opts: cu.opts }, ov };
+    assert(a.flow === 3 && a.cards.length === 7 && a.cards[0] === '계약*' && /가상 회계 ERP/.test(a.keys) && a.fields.includes('mrr') && a.fields.includes('csm') && /\/functions\/v1\/export\/contracts\?limit=5000&format=csv$/.test(a.url) && /X-API-Key/.test(a.how) && /데이터 가져오기/.test(a.how) && /회사 밖으로 보내지/.test(a.how), '처음 ' + JSON.stringify(got));
+    assert(/\/export\/revenue\?from=\d{4}-\d\d&to=\d{4}-\d\d&limit=5000&format=csv$/.test(b.url) && /\/export\/revenue\?from=2026-01&to=2026-06&limit=5000&format=csv$/.test(c.url) && /function 가져오기_월매출/.test(sh.how) && /SVC_API_KEY/.test(sh.how) && /format=csv/.test(sh.how) && /트리거/.test(sh.how)
+      && /requests\.get\('[^']*\/export\/revenue\?from=2026-01&to=2026-06&limit=5000'/.test(cd.how) && !/format=csv/.test(cd.url) && cp.length === 1 && cp[0] === cd.url, '월 매출 · 시트 · 코드 · 복사 ' + JSON.stringify(got));
+    assert(/\/export\/poc\?status=%EC%8B%A0%EC%B2%AD,%EB%8C%80%EA%B8%B0,%EC%A7%84%ED%96%89%EC%A4%91,%EB%8D%B0%EB%AA%A8&limit=5000&format=csv$/.test(pc.url) && /고른 키가 아직 없습니다/.test(pc.keys) && /Power BI/.test(pc.how) && /\/export\/customers\?limit=5000&format=csv$/.test(cu.url) && cu.opts.join() === 'fmt,limit'
+      && ov <= 1 && !/svc_7777777\d/.test(txt) && !errs.length, 'PoC · 고객사 · 폰 ' + JSON.stringify({ ov, ovw, errs, key: /svc_7777777\d/.test(txt), pc: got.pc.url, cu: got.cu }));
+    return '7 자료 · 주소 · 4 방법 · 복사 · 폰 넘침 0';
+  });
   await S.t('㊿+148 관리자 › 업데이트 안내: 계정 «받기» upsert · 처음부터 다시 DELETE · 새 안내 POST · 내 계정 › 업데이트 내역', async () => {
     notifyDb = [{ email: 'sales@example.com', enabled: true }]; ackDb = [{ email: 'sales@example.com', last_id: notesDb.length - 1, acked_at: '2026-10-05T01:00:00Z' }];
     await page.evaluate(async () => { await SVC.lazyLoad('admin'); SVC.switchView('adminx'); SVC.admTab('cfg'); });
@@ -2001,10 +2028,10 @@ if (S.blk()) {
       const kids = xs.rows.filter((k) => S.ST.DATA.rows[k].parent).length;
       return { n: xs.rows.length, amt: S.won(xs.amt), cust: xs.custN, tile: tile.querySelector('.v').textContent + ' ' + tile.querySelector('.d').textContent, ib, cap, rows: rows.length, title, notes, kids, need: RN.rows.length, sure: RN.sure.length, auto: RN.auto.length, needAmt: S.won(RN.amt), needRows, needTitle }; });
     const has = (s) => s.includes(r.n + '건') && s.includes(r.amt);
-    assert(r.kids === 0 && has(r.tile) && has(r.cap) && r.rows === r.n && has(r.title) && r.title.includes('고객사 ' + r.cust + '곳'), JSON.stringify(r));
+    assert(r.kids === 0 && has(r.tile) && has(r.cap) && r.rows === r.n && has(r.title) && r.title.includes('고객사 ' + r.cust + '개사'), JSON.stringify(r));
     assert(r.need + r.sure + r.auto === r.n && r.sure >= 1 && r.ib.includes(r.need + '건') && r.ib.includes('만료 ' + r.n + '건') && r.ib.includes(r.needAmt) && r.needRows === r.need && r.needTitle.includes(r.need + '건') && r.needTitle.includes(r.needAmt), '재약정 대응 ' + JSON.stringify(r));
     assert(/부속 1건 함께 만료/.test(r.notes) && /재약정 등록됨/.test(r.notes) && /후속 계약 확인 필요/.test(r.notes), '비고 ' + r.notes);
-    return r.n + '건 · ' + r.amt + '천원 · ' + r.cust + '곳';
+    return r.n + '건 · ' + r.amt + '천원 · ' + r.cust + '개사';
   });
   await S.t('㊿+168 사업 영역(조달): 기본 «현재 유효» — 기준월 유효 계약의 고객 합계(=당월 MRR) · 현행 기간 · 갱신 상태(재약정 등록됨) · 종료된 추가 계약이 대표로 안 나옴 · «시작 예정» · «전체 이력» 기준월 상태', async () => {
     await page.evaluate(() => { localStorage.removeItem('svc_chv_mode'); SVC.switchView('cnpub'); }); await page.waitForTimeout(500);
@@ -2033,11 +2060,11 @@ if (S.blk()) {
     assert(q3 && /잠정 · 3개월 중 2개월 입력/.test(q3[1]) && /^92\.5%/.test(q3[4]) && /기간 목표 대비 61\.7%/.test(q3[4]) && q4 && q4[1] === '미집계' && q4[4] === '미집계' && m8 && m8[5] === '0' && m8[6] === '0.0%' && m9 && m9[1] === '미입력' && m9[3] === '—', JSON.stringify({ q3, q4, m8, m9 }));
     return q3[4];
   });
-  await S.t('㊿+168 단위: 상단 단위 안내가 화면마다(홈 천원 · 가격표 원·VAT별도 · 장비 신청 내역 숨김 · 주간회의 백만원 안내) · 누르면 용어 설명(MRR·당월 인식·ARR·회계매출·곳/건/대)', async () => {
+  await S.t('㊿+168 단위: 상단 단위 안내가 화면마다(홈 천원 · 가격표 원·VAT별도 · 장비 신청 내역 숨김 · 주간회의 백만원 안내) · 누르면 용어 설명(MRR·당월 인식·ARR·회계매출·개사/건/대)', async () => {
     const u = {}; for (const v of ['dash', 'price', 'orders', 'weekly']) { await page.evaluate((v) => SVC.switchView(v), v); await page.waitForTimeout(200); u[v] = await page.evaluate(() => { const b = document.getElementById('unitBadge'); return b.hidden ? '숨김' : b.textContent; }); }
     await page.evaluate(() => SVC.switchView('dash')); await page.click('#unitBadge'); await page.waitForTimeout(100);
     const terms = await page.evaluate(() => [...document.querySelectorAll('#ovlTerms dt')].map((x) => x.textContent).join('|')); await page.keyboard.press('Escape');
-    assert(/천원/.test(u.dash) && /원 단위/.test(u.price) && /VAT/.test(u.price) && u.orders === '숨김' && /백만원/.test(u.weekly) && /계약 MRR/.test(terms) && /당월 인식/.test(terms) && /ARR/.test(terms) && /회계매출/.test(terms) && /곳 · 건 · 대/.test(terms), JSON.stringify({ u, terms }));
+    assert(/천원/.test(u.dash) && /원 단위/.test(u.price) && /VAT/.test(u.price) && u.orders === '숨김' && /백만원/.test(u.weekly) && /계약 MRR/.test(terms) && /당월 인식/.test(terms) && /ARR/.test(terms) && /회계매출/.test(terms) && /개사 · 건 · 대/.test(terms), JSON.stringify({ u, terms }));
     assert(!c.errs.length, c.errs.join(' | ')); return JSON.stringify(u);
   });
   await ctx.close();
@@ -3741,12 +3768,12 @@ if (S.blk()) {
     await A.page.keyboard.press('Escape'); await A.page.waitForTimeout(150);
     await A.page.evaluate(() => SVC.switchView('churnrate')); await A.page.waitForTimeout(700);
     await A.page.click('button[data-crdup]'); await A.page.waitForTimeout(250); const cr = await dlg(A.page);
-    assert(/두 제품 이상 1곳/.test(tile) && m1 && /22곳 vs 제품별 합 23/.test(m1.t) && /가상고객10\s*2개 · Cloud NAC · MDR/.test(m1.gs.join()) && c360.c360 && /가상고객10/.test(c360.c360) && !c360.diffOn, 'multi ' + JSON.stringify({ tile, m1, c360 }));
-    assert(d1 && /만기 미처리 1곳 :: 가상고객_만기지남\s*Cloud NAC ~\d{4}-\d\d · 상태/.test(d1.gs.join()) && /두 제품 이상 1곳/.test(lb[0]) && /변동 1곳/.test(lb[1]) && m2 && m2.t === m1.t, 'delta/live ' + JSON.stringify({ d1, lb, m2 }));
-    assert(sh.li === sh.n && (sh.n > 0 || sh.empty) && cr && /시작 활성\(\d{4}-\d\d\)에서 두 칸 이상 1곳 :: 가상고객10\s*2칸 · Cloud NAC · MDR/.test(cr.gs.join()), 'sheet/cr ' + JSON.stringify({ sh, cr }));
+    assert(/두 제품 이상 1개사/.test(tile) && m1 && /22개사 vs 제품별 합 23/.test(m1.t) && /가상고객10\s*2개 · Cloud NAC · MDR/.test(m1.gs.join()) && c360.c360 && /가상고객10/.test(c360.c360) && !c360.diffOn, 'multi ' + JSON.stringify({ tile, m1, c360 }));
+    assert(d1 && /만기 미처리 1개사 :: 가상고객_만기지남\s*Cloud NAC ~\d{4}-\d\d · 상태/.test(d1.gs.join()) && /두 제품 이상 1개사/.test(lb[0]) && /변동 1개사/.test(lb[1]) && m2 && m2.t === m1.t, 'delta/live ' + JSON.stringify({ d1, lb, m2 }));
+    assert(sh.li === sh.n && (sh.n > 0 || sh.empty) && cr && /시작 활성\(\d{4}-\d\d\)에서 두 칸 이상 1개사 :: 가상고객10\s*2칸 · Cloud NAC · MDR/.test(cr.gs.join()), 'sheet/cr ' + JSON.stringify({ sh, cr }));
     assert(!A.writes.length && !A.c.errs.length, 'writes/errs ' + JSON.stringify({ w: A.writes, e: A.c.errs }));
     await A.ctx.close();
-    return 'multi 1곳 · 변동 1곳 · 시트 ' + sh.n + '줄 · 해지율 중복 1곳';
+    return 'multi 1개사 · 변동 1개사 · 시트 ' + sh.n + '줄 · 해지율 중복 1개사';
   });
   await S.t('㊿+183 계약 요약 + 다음 처리: 계약 상세 맨 위 금액 · 만료(지남/남음) · 갱신 · 영업 경로 / 만기 지난 계약 → «만기 지난 계약 처리» = 만기 처리 창 그 줄 강조 + 연장 버튼에 초점 / 먼 만기 계약엔 처리 버튼 없음 / 고객 한눈에 «지금 계약»에 만기 지남 줄 + «만기 처리» / 저장 0', async () => {
     const A = await mk183();
@@ -3976,12 +4003,13 @@ if (S.blk()) {
     const f1 = await P.evaluate(() => document.getElementById('fbMenu').value);
     await P.fill('#fbText', '홈 숫자가 시트와 달라요'); await P.click('#fbSend'); await P.waitForTimeout(500);
     E.db.table('portal_feedback').push({ id: 99, view: null, menu: null, content: '남의 요청', status: 'new', created_by: 'someone@example.com', created_at: '2026-10-01' });
-    await P.click('#fbBtn'); await P.waitForSelector('#fbList .fb-it', { timeout: 4000 });
+    await P.click('#fbBtn'); await P.click('#ovlFb [data-fbtab="mine"]'); await P.waitForSelector('#fbList .fb-it', { timeout: 4000 });   /* ㊿+200 탭 «내 요청» */
     const mine = await P.evaluate(() => ({ n: document.querySelectorAll('#fbList .fb-it').length, t: document.querySelector('#fbList .fb-t').textContent, act: document.querySelectorAll('#fbList [data-fbdone]').length }));
     await P.keyboard.press('Escape'); await E.ctx.close();
     assert(!top.hid && top.inRight && /개선 요청/.test(top.label) && f0.sel === 'contracts' && /계약/.test(f0.lab) && /포탈 전체/.test(f0.all) && f0.n > 5 && /내용을 적어/.test(empty) && r1 && r1.view === 'contracts' && /계약/.test(r1.menu) && r1.content === '계약 상세에서 종료월이 안 보여요' && r1.page && /㊿/.test(r1.page.ver) && f1 === '' && E.db.table('portal_feedback').length === 3 && mine.n === 2 && /내가 보낸 요청/.test(mine.t) && mine.act === 0, JSON.stringify({ top, f0, empty, r1, f1, mine }));
     const rows = E.db.table('portal_feedback').map((x) => Object.assign({}, x));
     const A = await mk185({ seed: (db) => { rows.forEach((r) => db.table('portal_feedback').push(r)); } }), Q = A.page;
+    await Q.route(/\/rest\/v1\/portal_feedback\?select=[^&]*assignee/, (r) => r.fulfill({ status: 400, contentType: 'application/json', body: '{"code":"42703","message":"column portal_feedback.assignee does not exist"}' }));   /* ㊿+200 SQL 120 전(예전 «처리함 · 메모») */
     await Q.evaluate(() => SVC.ntfLoad(true)); await Q.waitForFunction(() => SVC.FB.loaded && SVC.FB.newN === 3, null, { timeout: 6000 });
     const it = await Q.evaluate(() => SVC.ntfItems().filter((x) => x.kind === 'fb').map((x) => x.title + ' / ' + x.detail));
     await Q.evaluate(() => SVC.ntfItems().find((x) => x.kind === 'fb').go()); await Q.waitForSelector('#fbList [data-fbdone]', { timeout: 4000 });
@@ -4155,8 +4183,8 @@ if (S.blk()) {
     const C = await mk187({ look: 'classic' }); await C.page.evaluate(() => SVC.switchView('cngen')); await C.page.waitForTimeout(400);
     const cl = await C.page.evaluate(() => ({ gn: SVC.isGN(), sel: !!document.getElementById('areaSel'), side: [...document.querySelectorAll('#side button[data-v]')].filter((b) => /^(cngen|cnpub|cns1|cnlgu|mdrgen)$/.test(b.dataset.v) && b.style.display !== 'none').length, big: /일반 판매 사업 영역/.test(document.getElementById('chBody').textContent) })); await C.ctx.close();
     assert(/\|area\|/.test(tabs) && !/사업 영역/.test(tabs) && a.v === 'cngen' && a.cur === 'area' && a.ttl === '사업 영역' && a.sub === 'Cloud NAC › 일반 판매' && a.hash === '#cngen' && a.menu && a.keys === 'cngen* cnpub cns1 cnlgu mdrgen' && a.groups === 'Cloud NAC|MDR' && a.role === 'tablist' && !a.big && /월별 매출 추이/.test(a.firstH), '진입 ' + JSON.stringify(a));
-    const mrr = (a.kpi.split(' ')[0] || '').replace(/천원.*/, ''), live = (a.kpi.split(' ')[1] || '').replace(/곳.*/, '');
-    assert(a.stat === mrr + '천원 · ' + live + '곳' && /Cloud NAC · 일반 판매/.test(a.cap) && /2026-\d\d 기준/.test(a.cap), '띠 숫자 = KPI ' + JSON.stringify({ stat: a.stat, kpi: a.kpi, cap: a.cap }));
+    const mrr = (a.kpi.split(' ')[0] || '').replace(/천원.*/, ''), live = (a.kpi.split(' ')[1] || '').replace(/개사.*/, '');
+    assert(a.stat === mrr + '천원 · ' + live + '개사' && /Cloud NAC · 일반 판매/.test(a.cap) && /2026-\d\d 기준/.test(a.cap), '띠 숫자 = KPI ' + JSON.stringify({ stat: a.stat, kpi: a.kpi, cap: a.cap }));
     assert(b.v === 'mdrgen' && b.sel === 'mdrgen' && b.sub === 'MDR › 일반 판매' && b.hash === '#mdrgen' && b.cur === 'area' && /MDR · 일반 판매/.test(b.cap) && b.y === 0 && c.v === 'mdrgen' && c.mem === 'mdrgen' && d.v === 'cnlgu' && d.foc === 'cnlgu' && e.v === 'cnpub' && e.sel === 'cnpub' && e.sub === 'Cloud NAC › 조달 판매', '고르기 ' + JSON.stringify({ b, c, d, e }));
     assert(f.keys === 'cngen cns1 cnlgu mdrgen' && /\|area\|/.test(f.tabs), '권한 ' + JSON.stringify(f));
     assert(m.v === 'cngen' && m.n === 5 && m.w < m.W / 2 && m.w > m.W / 3 && m.ov && m.two, '폰 ' + JSON.stringify(m));
@@ -4291,7 +4319,7 @@ if (S.blk()) {
     await P.fill('#fbText', '계약 상세 캡처 첨부합니다'); await P.click('#fbSend'); await P.waitForTimeout(800);
     const row = A.db.table('portal_feedback')[0];
     const c2 = { puts: A.st.puts, row: row && { files: row.files, content: row.content }, att: await P.evaluate(() => SVC.FB.att.length), on: await P.evaluate(() => document.getElementById('ovlFb').classList.contains('on')) };
-    await P.click('#fbBtn'); await P.waitForSelector('#fbList .fb-it', { timeout: 5000 });
+    await P.click('#fbBtn'); await P.click('#ovlFb [data-fbtab="inbox"]'); await P.waitForSelector('#fbList .fb-it', { timeout: 5000 });   /* ㊿+200 탭 «받은 요청» */
     const d = await P.evaluate(() => ({ chips: [...document.querySelectorAll('#fbList .fb-f')].map((b) => b.textContent.replace(/\s+/g, ' ').trim() + (b.classList.contains('img') ? '[img]' : '')).join('|'), who: document.querySelector('#fbList .fb-h .mini').textContent }));
     await P.click('#fbList .fb-f.img'); await P.waitForSelector('#fbList .fb-fimg img', { timeout: 5000 });
     const e = await P.evaluate(() => ({ img: !!document.querySelector('#fbList .fb-fimg img'), exp: document.querySelector('#fbList .fb-f.img').getAttribute('aria-expanded'), gets: 0 }));
@@ -4302,7 +4330,7 @@ if (S.blk()) {
     /* SQL 114 전: files 열이 없어 select 가 400 → 첨부 없이 다시 받음 */
     const N = await mk189(); await N.page.route(/\/rest\/v1\/portal_feedback\?select=[^&]*files/, (r) => r.fulfill({ status: 400, contentType: 'application/json', body: '{"code":"42703","message":"column portal_feedback.files does not exist"}' }));
     await N.page.evaluate(() => { SVC.FB.loaded = false; });   /* 시작할 때 이미 받았으니 다시 받게 */
-    await N.page.click('#fbBtn'); await N.page.waitForSelector('#fbText', { timeout: 4000 }); await N.page.waitForTimeout(500);
+    await N.page.click('#fbBtn'); await N.page.waitForSelector('#fbText', { timeout: 4000 }); await N.page.click('#ovlFb [data-fbtab="inbox"]'); await N.page.waitForTimeout(500);
     const n = await N.page.evaluate(() => ({ ok: SVC.FB.ok, filesOk: SVC.FB.filesOk, empty: /아직 받은 요청이 없습니다/.test(document.getElementById('fbList').textContent) })); await N.ctx.close();
     assert(a0.file && a0.multi && a0.prev && /캡처 · 파일 붙이기/.test(a0.lbl) && a.n === 3 && a.names === 'shot.png|견적.pdf|캡처_3.png' && a.imgs === 2 && a.docs === 1 && a.vis && /첨부 3개/.test(a.msg), '첨부 ' + JSON.stringify({ a0, a }));
     assert(/이미지 · PDF/.test(bad1) && /5MB/.test(bad2.msg) && bad2.n === 3 && b.n === 2 && b.names === 'shot.png|견적.pdf', '막기 · 빼기 ' + JSON.stringify({ bad1, bad2, b }));
@@ -4856,6 +4884,67 @@ if (S.blk()) {
       && hits === 1 && /seg=eq\.saas/.test(qa) && /order=applied\.desc,id\.desc/.test(qa) && /limit=1/.test(qa)
       && bn === '7,200' && bz === '13,300' && bm === '130,200' && /내장 값\(2026-09 MDR 3종 · 2026-09-21 판\)/.test(bst.t) && /warn/.test(bst.cls) && !errsA.length && !errsB.length, JSON.stringify(got));
     return 'NAC 1년 9,000 · 3년 6,000 · ZTNA 2년 5,000 · GIES 88,000 · RW 내장 43,500 · 새 품목 4 · 3,500개 안내 · 저장 단가 16,000 유지 · 실패 → 내장 7,200';
+  });
+}
+// ㊿+200 개선 요청 — 요청 ↔ 처리가 서로 보이게(SQL 120 흉내 fbActRpc) · 가짜 DB 하나를 처리자 · 요청자 두 창이 같이 씀
+if (S.blk()) {
+  await S.t('㊿+200 개선 요청: 처리자 «받은 요청» → 내가 맡기(확인 중 · 담당 이름) → 완료 처리(처리 내용 없으면 막음) / 요청자 알림함 «완료 — 처리 홍길동 차장» · «내 요청» 진행 줄 · 대화 → 열면 알림 사라짐 → 다시 요청(이유) → 처리자 알림 «다시 요청» → 완료 → 요청자 «확인했어요» → 처리자에게 «완료 · 확인함» / Slack 은 본인 DM 에만 · 팀 채널엔 안 감 / 탭 · 키보드', async () => {
+    const db = new FakeDB(seedData()), t0 = new Date(Date.now() - 864e5).toISOString();
+    db.rpc.portal_accounts = () => [{ email: 'tester@example.com', role: 'super_admin', name: '홍길동', title: '차장' }, { email: 'other@example.com', role: 'editor', name: '김철수', title: '대리' }];
+    db.table('portal_feedback').push({ id: 1, view: 'orders', menu: '장비 › 임대 장비 신청 내역', content: '출고일을 수령희망일로 바꿔 주세요', status: 'new', created_by: 'other@example.com', created_at: t0, last_by: 'other@example.com', last_at: t0, req_seen_at: t0, reopen_n: 0 });
+    const mk = async (email, role) => {
+      const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page); page.on('dialog', (d) => d.accept());
+      const act = fbActRpc(email, role === 'super_admin'), calls = [];
+      await fakeBackend(page, db, { role, email, extra: async (route, u) => { if (!/\/rest\/v1\/rpc\/feedback_act/.test(u)) return false; const b = JSON.parse(route.request().postData() || '{}'); calls.push(b.p_act); let st = 200, body;
+        try { body = JSON.stringify(act(b, db)); } catch (e) { st = 400; body = JSON.stringify({ code: 'P0001', message: String(e.message) }); } await route.fulfill({ status: st, contentType: 'application/json', body }); return true; } });
+      await page.goto(url + '/index.html'); await page.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA && SVC.ST.DATA.rows.length && SVC.FB.loaded, null, { timeout: 20000 }); await page.waitForTimeout(500);
+      return { ctx, page, c, calls };
+    };
+    const card = (P) => P.evaluate(() => { const li = document.querySelector('#fbList .fb-it[data-id="1"]'); if (!li) return null; return { st: (li.querySelector('.fb-st') || {}).textContent, steps: [...li.querySelectorAll('.fb-steps li')].map((x) => (x.classList.contains('on') ? '●' : '○') + x.textContent), acts: [...li.querySelectorAll('[data-fbact]')].map((b) => b.textContent), th: [...li.querySelectorAll('.fb-m')].map((m) => m.textContent.replace(/\s+/g, ' ').trim()) }; });
+    const fbIt = (P) => P.evaluate(() => SVC.ntfItems().filter((x) => x.kind === 'fb').map((x) => ({ t: x.title, d: x.detail, to: x.to, me: x.me, dm: !!x.dmOnly })));
+    /* 1) 처리자 */
+    const A = await mk('tester@example.com', 'super_admin'), P = A.page;
+    const it0 = await fbIt(P);
+    await P.evaluate(() => SVC.ntfItems().find((x) => x.kind === 'fb').go()); await P.waitForSelector('#fbList .fb-it[data-id="1"]', { timeout: 5000 });
+    const tabs = await P.evaluate(() => ({ sel: document.querySelector('#ovlFb [aria-selected="true"]').dataset.fbtab, n: document.querySelectorAll('#ovlFb [role="tab"]').length, paneNew: document.getElementById('fbPaneNew').hidden }));
+    const c0 = await card(P);
+    await P.click('#fbList .fb-it[data-id="1"] [data-fbact="assign"]'); await P.waitForFunction(() => (document.querySelector('#fbList .fb-it[data-id="1"] .fb-st') || {}).textContent === '확인 중', null, { timeout: 5000 });
+    const c1 = await card(P), r1 = Object.assign({}, db.table('portal_feedback')[0]);
+    await P.click('#fbList .fb-it[data-id="1"] [data-fbact="done"]'); await P.waitForSelector('#fbCmp-1'); await P.click('#fbList .fb-it[data-id="1"] .fb-cmp [data-go]');
+    const e0 = await P.$eval('#fbList .fb-it[data-id="1"] .fb-cmp .mmsg', (e) => e.textContent);
+    await P.fill('#fbCmp-1', '㊿+194 에 반영 — 출고일 = 수령희망일 › 신청일'); await P.click('#fbList .fb-it[data-id="1"] .fb-cmp [data-go]');
+    await P.waitForFunction(() => (document.querySelector('#fbList .fb-it[data-id="1"] .fb-st') || {}).textContent === '완료', null, { timeout: 5000 });
+    const c2 = await card(P), r2 = Object.assign({}, db.table('portal_feedback')[0]);
+    await P.evaluate(() => SVC.fbLoad(true)); const plan = await P.evaluate(() => { const p = SVC.ntfSlackPlan([]); return { team: p.team.text, dms: p.dms.map((d) => d.email + ':' + d.text) }; });
+    /* 2) 요청자 */
+    const B = await mk('other@example.com', 'editor'), Q = B.page;
+    const itB = await fbIt(Q);
+    await Q.evaluate(() => SVC.ntfItems().find((x) => x.kind === 'fb').go()); await Q.waitForSelector('#fbList .fb-it[data-id="1"]', { timeout: 5000 }); await Q.waitForTimeout(300);
+    const tabB = await Q.evaluate(() => ({ sel: document.querySelector('#ovlFb [aria-selected="true"]').dataset.fbtab, n: document.querySelectorAll('#ovlFb [role="tab"]').length }));
+    const cB = await card(Q), seen = !!db.table('portal_feedback')[0].req_seen_at && db.table('portal_feedback')[0].req_seen_at >= r2.last_at, itB2 = await fbIt(Q);
+    await Q.click('#fbList .fb-it[data-id="1"] [data-fbact="reopen"]'); await Q.waitForSelector('#fbCmp-1'); await Q.fill('#fbCmp-1', '합계가 아직 안 맞아요'); await Q.click('#fbList .fb-it[data-id="1"] .fb-cmp [data-go]');
+    await Q.waitForFunction(() => (document.querySelector('#fbList .fb-it[data-id="1"] .fb-st') || {}).textContent === '확인 중', null, { timeout: 5000 });
+    const r3 = Object.assign({}, db.table('portal_feedback')[0]);
+    /* 3) 처리자 — 다시 요청 알림 → 완료 */
+    await P.evaluate(() => SVC.fbLoad(true)); const itA2 = await fbIt(P);
+    await P.evaluate(() => SVC.fbOpen({ tab: 'inbox', id: 1 })); await P.waitForSelector('#fbList .fb-it[data-id="1"] [data-fbact="done"]', { timeout: 5000 });
+    await P.click('#fbList .fb-it[data-id="1"] [data-fbact="done"]'); await P.fill('#fbCmp-1', '합계 고침'); await P.click('#fbList .fb-it[data-id="1"] .fb-cmp [data-go]');
+    await P.waitForFunction(() => (document.querySelector('#fbList .fb-it[data-id="1"] .fb-st') || {}).textContent === '완료', null, { timeout: 5000 });
+    /* 4) 요청자 확인 → 처리자에게 «확인함» */
+    await Q.evaluate(() => SVC.fbOpen({ tab: 'mine', id: 1 })); await Q.waitForSelector('#fbList .fb-it[data-id="1"] [data-fbact="confirm"]', { timeout: 5000 });
+    await Q.click('#fbList .fb-it[data-id="1"] [data-fbact="confirm"]'); await Q.waitForFunction(() => /확인함/.test((document.querySelector('#fbList .fb-it[data-id="1"] .fb-st') || {}).textContent), null, { timeout: 5000 });
+    const cB2 = await card(Q);
+    await P.evaluate(() => SVC.fbOpen({ tab: 'inbox', id: 1 })); await P.waitForFunction(() => /확인함/.test((document.querySelector('#fbList .fb-it[data-id="1"] .fb-st') || {}).textContent), null, { timeout: 5000 });
+    const cA3 = await card(P);
+    await P.focus('#ovlFb [data-fbtab="inbox"]'); const kb = await P.evaluate(() => document.activeElement.getAttribute('role'));
+    const errs = A.c.errs.concat(B.c.errs); await A.ctx.close(); await B.ctx.close();
+    const got = { it0, tabs, c0, c1, r1: { st: r1.status, asg: r1.assignee }, e0, c2, r2: { st: r2.status, by: r2.done_by }, plan, itB, tabB, cB, seen, itB2, r3: { st: r3.status, n: r3.reopen_n }, itA2, cB2, cA3, kb, calls: B.calls, errs };
+    assert(it0.length === 1 && /개선 요청 새 1건/.test(it0[0].t) && /김철수 대리/.test(it0[0].d) && tabs.sel === 'inbox' && tabs.n === 3 && tabs.paneNew && c0.st === '접수' && c0.acts.join() === '내가 맡기,답변' && /●요청김철수 대리/.test(c0.steps[0]) && /○확인 중담당 전/.test(c0.steps[1]), '처리자 처음 ' + JSON.stringify(got));
+    assert(c1.st === '확인 중' && /●확인 중담당 홍길동 차장/.test(c1.steps[1]) && c1.acts.join() === '완료 처리,답변' && r1.status === 'doing' && r1.assignee === 'tester@example.com' && /내용을 적어/.test(e0) && c2.st === '완료' && /●완료홍길동 차장/.test(c2.steps[2]) && /○요청자 확인확인 전/.test(c2.steps[3]) && c2.th.some((m) => /완료 · 처리 내용.*㊿\+194 에 반영/.test(m)) && r2.status === 'done' && r2.done_by === 'tester@example.com', '맡기 · 완료 ' + JSON.stringify(got));
+    assert(!/개선 요청/.test(plan.team) && plan.dms.some((d) => /^other@example\.com:[\s\S]*개선 요청[\s\S]*완료/.test(d)), 'Slack 은 본인 DM 에만 ' + JSON.stringify(plan.dms));
+    assert(itB.length === 1 && /개선 요청 완료 — 장비 › 임대 장비 신청 내역/.test(itB[0].t) && /처리 홍길동 차장/.test(itB[0].d) && itB[0].me && tabB.sel === 'mine' && tabB.n === 2 && cB.st === '완료' && cB.acts.join() === '확인했어요,다시 요청,덧붙이기' && cB.th.length === 2 && seen && itB2.length === 0 && B.calls.includes('seen'), '요청자 알림 · 봄 ' + JSON.stringify(got));
+    assert(r3.status === 'doing' && r3.reopen_n === 1 && itA2.some((x) => /김철수 대리 다시 요청/.test(x.t) && x.me && x.to.join() === 'tester@example.com') && /완료 · 확인함/.test(cB2.st) && /●요청자 확인/.test(cB2.steps[3]) && /완료 · 확인함/.test(cA3.st) && cA3.th.some((m) => /확인했어요/.test(m)) && cA3.th.some((m) => /다시 요청.*합계가 아직 안 맞아요/.test(m)) && kb === 'tab' && !errs.length, '다시 요청 · 확인 ' + JSON.stringify({ r3: got.r3, itA2, b2: cB2.st, a3: cA3.st, a3th: cA3.th, kb, errs }));
+    return '맡기 → 완료 → 요청자 알림 · 봄 → 다시 요청 → 처리자 알림 → 완료 → 확인함 · DM 만';
   });
 }
 await browser.close(); srv.close();

@@ -300,9 +300,9 @@ export function rpAnHtml(j, inc, tbl){
   /* ③ 유입 경로 */
   if(RP_AN.src){
     var sc=rpAnSrc(j);
-    var inner3=obox(kpi('활성 고객사', sc.custN+'곳', mk(j)+' 매출 발생 기준','an_cust')+
+    var inner3=obox(kpi('활성 고객사', sc.custN+'개사', mk(j)+' 매출 발생 기준','an_cust')+
       kpi('월 매출 합', won(sc.mrr)+'천원','','an_mrr')+
-      kpi('최대 경로', (sc.ch[0]? sc.ch[0].name+' '+sc.ch[0].n+'곳':'—'),
+      kpi('최대 경로', (sc.ch[0]? sc.ch[0].name+' '+sc.ch[0].n+'개사':'—'),
           sc.ch[0]&&sc.custN? '전체의 '+Math.round(sc.ch[0].n/sc.custN*100)+'%':''));
     inner3+=tpl`<div class="pr-note" style="margin:2px 0 6px"><b>채널별</b></div>`+
       tpl`${rawHtml(tbl('rpTblSrc',[['채널'],['고객사',1],['비중',1],['월 매출',1]],
@@ -341,7 +341,7 @@ export function rpAnHtml(j, inc, tbl){
     var inner5=obox(kpi('12개월 평균 해지율', (Math.round(cr.avg*100)/100)+'%', '월 기초 고객사 대비','an_lost')+
       kpi('추세', (dv>0?'▲ ':(dv<0?'▼ ':''))+(Math.round(Math.abs(dv)*100)/100)+'%p',
           '전반 6개월 '+(Math.round(cr.h1*100)/100)+'% → 후반 '+(Math.round(cr.h2*100)/100)+'%','an_lost')+
-      kpi('이탈 고객사', cr.totLost+'곳', '재약정 '+cr.renewN+'건은 제외','an_lost')+
+      kpi('이탈 고객사', cr.totLost+'개사', '재약정 '+cr.renewN+'건은 제외','an_lost')+
       kpi('이탈 월 매출', won(cr.totAmt)+'천원', '연환산 '+won(cr.totAmt*12)+'천원','an_lost'));
     inner5+=tbl('rpTblChr',[['월'],['기초 고객사',1],['이탈',1],['해지율',1],['이탈 월 매출',1]],
       cr.series.slice().reverse().map(function(x){
@@ -1509,7 +1509,7 @@ export function renderReportAuto(){
     tpl`${rawHtml(kpi('ARR 환산',won(d.tot*12)+'천원','','rp_mrr'))}`+
     tpl`${rawHtml(kpi('월 목표 달성률', d.mtg? Math.round(d.tot/d.mtg*100)+'%':'목표 없음', d.mtg?('목표 '+won(d.mtg)+'천원'):''))}`+
     tpl`${rawHtml(kpi('연 누계', won(d.ytd)+'천원', d.ytg?('연 목표 '+won(d.ytg)+'천원 의 '+Math.round(d.ytd/d.ytg*100)+'%'):''))}`+
-    tpl`${rawHtml(kpi('활성 고객사', d.actCnt+'곳','매출 발생 기준','rp_cust'))}`+
+    tpl`${rawHtml(kpi('활성 고객사', d.actCnt+'개사','매출 발생 기준','rp_cust'))}`+
     tpl`${rawHtml(kpi('신규 / 해지', d.newCt.length+'건 / '+d.endCt.length+'건','아래 «신규 계약»·«해지·종료» 표 참조','rp_nc'))}`+
     tpl`</div></div>`;
   var tr=''; var mx=Math.max.apply(null,d.trend.map(function(x){return x[1];}).concat([1]));

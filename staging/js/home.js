@@ -492,7 +492,7 @@ export function homeSum(){
   host.setAttribute('aria-labelledby','gnSumH');
   host.innerHTML=tpl`<h2 class="sr" id="gnSumH">핵심 현황 — 전체 사업 · ${mk(b)}</h2>`+
     cell('mrr','', homeMonthName(b)+' 매출', won(N.m0), '천원', N.d==null? '전월 자료 없음' : '전월 대비 '+(N.d>=0?'+':'')+N.d.toFixed(1)+'%', '전체 사업 · 월 인식 매출', '모든 계약의 '+mk(b)+' 인식 매출(천원) — 사업 분석의 필터와 무관 · 누르면 매출 추이')+
-    cell('live','', 'LIVE 고객', N.liveOk? String(N.nC) : '—', N.liveOk? '곳' : '', N.liveOk? (N.ps>N.nC? '제품별 합 '+N.ps+' — 두 제품 이상 '+(N.ps-N.nC)+'곳' : '제품별 합 '+N.ps) : '불러오는 중', mk(b)+' 유효 원계약 · 회사 수', '회사 수 기준(제품별 합은 제품마다 1곳) — 누르면 LIVE 고객사 목록')+
+    cell('live','', 'LIVE 고객', N.liveOk? String(N.nC) : '—', N.liveOk? '개사' : '', N.liveOk? (N.ps>N.nC? '제품별 합 '+N.ps+' — 두 제품 이상 '+(N.ps-N.nC)+'개사' : '제품별 합 '+N.ps) : '불러오는 중', mk(b)+' 유효 원계약 · 회사 수', '회사 수 기준(제품별 합은 제품마다 1개사) — 누르면 LIVE 고객사 목록')+
     cell('rnw', RN.rows.length? 'warn':'', '재약정 대응 필요', String(RN.rows.length), '건', RN.xs.EN+'개월 내 만료 '+RN.xs.rows.length+'건 중 · 월 '+won(RN.amt)+'천원', '원계약 · 자동연장 · 재약정 등록 제외', '자동연장 · 후속 계약(재약정 등록)이 확실한 계약을 뺀 만료 원계약 — 누르면 같은 목록');
   host.querySelectorAll('.gs-c').forEach(function(c){ /** @type {any} */(c).onclick=function(){ var k=/** @type {any} */(c).dataset.k;
     if(k==='mrr'){ var t=document.getElementById('gnTrend'); if(t) try{ t.scrollIntoView({behavior:'smooth', block:'center'}); /** @type {any} */(t).focus({preventScroll:true}); }catch(e){} }
@@ -716,7 +716,7 @@ export function liRenew(){
   var meta={period:'종료월 '+mk(b)+' ~ '+mk(end)+' ('+XS.EN+'개월)', unit:'천원(종료월 월 금액)', cond:'전체 사업 · 원계약만(부속 · H/W · 해지 · 중지 제외) · 자동연장 · 재약정 등록 제외'};
   var exc=[]; if(RN.sure.length) exc.push('재약정 등록됨 '+RN.sure.length+'건'); if(RN.auto.length) exc.push('자동연장 '+RN.auto.length+'건');
   if(!XS.rows.length) return {core:tpl`앞으로 ${String(XS.EN)}개월(${mk(b)}~${mk(end)}) 안에 끝나는 원계약이 없습니다.`, meta:meta, src:[{l:'만료 기간 바꾸기(사업 현황 상세 «N개월 내 만료»)', go:function(){ homeBiz(); }}]};
-  var core=tpl`앞으로 ${String(XS.EN)}개월(${mk(b)}~${mk(end)}) 안에 끝나는 원계약 ${String(XS.rows.length)}건 중 <b>재약정 대응이 필요한 계약은 ${String(RN.rows.length)}건</b>(고객사 ${String(RN.custN)}곳 · 월 ${won(RN.amt)}천원)입니다.${exc.length? ' '+exc.join(' · ')+'은 뺐습니다.' : ''}`;
+  var core=tpl`앞으로 ${String(XS.EN)}개월(${mk(b)}~${mk(end)}) 안에 끝나는 원계약 ${String(XS.rows.length)}건 중 <b>재약정 대응이 필요한 계약은 ${String(RN.rows.length)}건</b>(고객사 ${String(RN.custN)}개사 · 월 ${won(RN.amt)}천원)입니다.${exc.length? ' '+exc.join(' · ')+'은 뺐습니다.' : ''}`;
   var ois=ST.RAWX.oi||[];
   var rows=RN.rows.slice(0,8).map(function(k){ var r=ST.DATA.rows[k];
     var oiN=ois.filter(function(o){ return oiOpen(o) && c360Match(o.customer, r.cust); }).length;
@@ -739,7 +739,7 @@ export function liList(opt){
   var cu={}; if(cuK) rows.forEach(function(r){ var k=r[cuK]||'—'; cu[k]=(cu[k]||0)+1; });
   var top=Object.keys(cu).sort(function(a,b){ return cu[b]-cu[a]; }).slice(0,5);
   var stK=['stage','status','result'].filter(function(k){ return g.cols.some(function(c){ return c.k===k; }); })[0], st={}; if(stK) rows.forEach(function(r){ var k=r[stK]||'—'; st[k]=(st[k]||0)+1; });
-  var core=tpl`<b>${C.label} — 지금 목록 ${String(rows.length)}행</b>${rawHtml(sums.length? ' · '+sums.map(function(s){ return esc(s.l)+' 합계 '+won(s.v)+'천원'; }).join(' · ') : '')}${rawHtml(cuK? ' · 고객사 '+Object.keys(cu).length+'곳' : '')}.`;
+  var core=tpl`<b>${C.label} — 지금 목록 ${String(rows.length)}행</b>${rawHtml(sums.length? ' · '+sums.map(function(s){ return esc(s.l)+' 합계 '+won(s.v)+'천원'; }).join(' · ') : '')}${rawHtml(cuK? ' · 고객사 '+Object.keys(cu).length+'개사' : '')}.`;
   var trs=[]; if(stK) Object.keys(st).sort(function(a,b){ return st[b]-st[a]; }).forEach(function(k){ trs.push({c:[(g.cols.filter(function(c){ return c.k===stK; })[0]||{l:''}).l+' '+k, String(st[k])]}); });
   top.forEach(function(k){ trs.push({c:['고객사 '+k, String(cu[k])]}); });
   return {core:core, table:trs.length? {cols:['구분','행'], n:[1], rows:trs, cap:'보던 목록과 같은 행(검색 · 필터 · 보기 · 조건 그대로)'} : null,

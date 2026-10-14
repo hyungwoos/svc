@@ -3254,4 +3254,93 @@ button.emo-ico svg{display:block;flex:none}
 .ai-fb button.emo-ico{width:30px;padding:0}
 .ax-prof .cbtn.emo-ico{width:28px;height:26px;padding:0;margin-left:4px}
 .dgrid .act button.emo-ico{width:28px;min-width:28px;padding:0}
+/* ㊿+200 개선 요청 — 탭 · 단계 배지 · 진행 줄 · 대화 · 카드 안 글 칸 */
+#ovlFb .fb-tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:4px 0 12px}
+#ovlFb .fb-tabs [role="tab"]{appearance:none;border:0;background:none;font:inherit;font-size:14px;font-weight:600;color:var(--ink-2);padding:8px 12px;min-height:40px;border-bottom:2px solid transparent;margin-bottom:-1px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+#ovlFb .fb-tabs [role="tab"][aria-selected="true"]{color:var(--ink);border-bottom-color:var(--brand-solid)}
+#ovlFb .fb-tabs [role="tab"]:focus-visible{outline:2px solid var(--s1);outline-offset:-2px}
+#ovlFb .fb-cnt{font-size:12px;font-weight:600;color:var(--ink-2);background:var(--surface-2);border-radius:999px;padding:0 7px;line-height:20px}
+#ovlFb .fb-cnt:empty{display:none}
+#ovlFb .fb-t{flex-wrap:wrap;row-gap:4px}
+#ovlFb .fb-tt{white-space:nowrap}
+#ovlFb #fbPaneList .fb-list{margin-top:0;border-top:0;padding-top:0}
+#ovlFb #fbPaneList .fb-ul{max-height:58vh}
+.fb-sum{color:var(--ink-2);font-weight:400}
+.fb-old{margin:0 0 8px;color:var(--warn-ink)}
+.fb-st{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:999px;font-size:12px;font-weight:700;border:1px solid var(--ring);background:var(--surface-2);color:var(--ink-2)}
+.fb-st.st-doing{border-color:var(--s1);color:var(--s1-ink);background:color-mix(in srgb, var(--s1) 10%, transparent)}
+.fb-st.st-done{border-color:var(--brand-solid);color:var(--brand-ink);background:var(--brand-t)}
+.fb-st.st-done.conf{background:var(--brand-solid);color:#fff}
+.fb-it.st-new{border-left:3px solid var(--axis)}
+.fb-it.st-doing{border-left:3px solid var(--s1)}
+.fb-it.st-done{border-left:3px solid var(--brand-solid)}
+.fb-it.focus{box-shadow:0 0 0 2px var(--brand-t)}
+.fb-a .cbtn.pri{background:var(--brand-solid);border-color:var(--brand-solid);color:#fff;font-weight:700}
+.fb-steps{list-style:none;margin:8px 0 2px;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;counter-reset:fbs}
+.fb-steps li{position:relative;padding:5px 8px 5px 24px;border-radius:8px;background:var(--surface-2);font-size:12px;line-height:16px;color:var(--muted);min-width:0}
+.fb-steps li::before{content:'';position:absolute;left:5px;top:6px;width:14px;height:14px;box-sizing:border-box;border-radius:999px;border:1px solid var(--ring);font-size:12px;line-height:12px;text-align:center;background:var(--surface)}
+.fb-steps li.on{color:var(--ink)}
+.fb-steps li.on::before{content:'✓';background:var(--brand-solid);border-color:var(--brand-solid);color:#fff}
+.fb-steps li.cur{background:color-mix(in srgb, var(--s1) 9%, var(--surface-2));box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--s1) 45%, transparent)}
+.fb-steps .k{display:block;font-weight:700}
+.fb-steps .v{display:block;word-break:keep-all;overflow-wrap:anywhere}
+.fb-th{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.fb-m{max-width:88%;padding:6px 10px;border-radius:10px;font-size:13px;line-height:1.5;border:1px solid var(--line)}
+.fb-m.req{align-self:flex-start;background:var(--surface-2)}
+.fb-m.adm{align-self:flex-end;background:color-mix(in srgb, var(--s1) 7%, var(--surface))}
+.fb-m.k-done{border-color:var(--brand-solid);background:var(--brand-t)}
+.fb-m.k-reopen{border-color:var(--s2)}
+.fb-mh{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px}
+.fb-mk{color:var(--ink-2)}
+.fb-mh .mini{color:var(--muted)}
+.fb-mb{white-space:pre-wrap;word-break:break-word;margin-top:2px}
+.fb-cmp{margin-top:8px;padding:8px;border:1px solid var(--ring);border-radius:10px;background:var(--surface-2)}
+.fb-cmp[hidden]{display:none}
+.fb-cmp label{display:block;font-size:12px;font-weight:700;margin-bottom:4px}
+.fb-cmp textarea{width:100%;box-sizing:border-box;border:1px solid var(--ring);border-radius:8px;padding:8px;font:inherit;font-size:13px;background:var(--surface);color:var(--ink);resize:vertical}
+.fb-cmp-a{display:flex;align-items:center;gap:6px;justify-content:flex-end;margin-top:6px}
+.fb-cmp-a .mmsg{margin-right:auto}
+.fb-cmp-a .cbtn.pri{background:var(--brand-solid);border-color:var(--brand-solid);color:#fff;font-weight:700}
+@media (max-width:760px){ .fb-steps{grid-template-columns:repeat(2,minmax(0,1fr))} .fb-m{max-width:100%} #ovlFb .fb-tabs [role="tab"]{padding:8px 8px} }
+/* ㊿+200 외부 연동 «쉽게» — 3단계 · 자료 카드 · 칸 · 주소 만들기 · 따라 하기 */
+.api-flow{list-style:none;margin:0 0 10px;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.api-flow li{border:1px solid var(--ring);border-radius:10px;padding:10px 12px;background:var(--surface);display:flex;flex-direction:column;gap:4px;font-size:13px;line-height:1.5}
+.api-flow li b{font-size:14px;color:var(--brand-ink)}
+.api-flow li span{color:var(--ink-2)}
+.api-dsg{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin:0 0 10px}
+.api-ds{appearance:none;text-align:left;border:1px solid var(--ring);border-radius:10px;padding:10px 12px;background:var(--surface);color:var(--ink);font:inherit;cursor:pointer;display:flex;flex-direction:column;gap:4px;min-height:44px}
+.api-ds b{font-size:14px}
+.api-ds span{font-size:12px;line-height:1.45;color:var(--ink-2)}
+.api-ds:hover{border-color:var(--axis)}
+.api-ds.on{border-color:var(--brand-solid);box-shadow:inset 0 0 0 1px var(--brand-solid);background:var(--brand-t)}
+.api-ds:focus-visible{outline:2px solid var(--s1);outline-offset:1px}
+.api-detail{border:1px solid var(--ring);border-radius:12px;padding:12px 14px;margin:0 0 14px;background:var(--surface)}
+.api-dh{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.api-dh>b{font-size:15px}
+.api-sec{margin-top:12px}
+.api-st{font-size:13px;font-weight:700;margin-bottom:6px;color:var(--ink)}
+.api-f{max-height:280px}
+.api-f code{font-size:12px}
+.api-opts{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end}
+.api-o{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--ink-2)}
+.api-o input,.api-o select{height:34px;padding:0 8px;border:1px solid var(--ring);border-radius:8px;background:var(--surface-2);color:var(--ink);font:inherit;font-size:13px}
+.api-cp{display:flex;align-items:flex-start;gap:6px;margin-top:6px}
+.api-cp code,.api-cp pre{flex:1;min-width:0}
+.api-cp>code{display:block;font-family:ui-monospace,monospace;font-size:12px;background:var(--surface-2);border-radius:8px;padding:8px 10px;word-break:break-all}
+.api-cp>pre.api-code{margin:0}
+.api-cp .cbtn.pri{background:var(--brand-solid);border-color:var(--brand-solid);color:#fff;font-weight:700}
+.api-url>code{font-size:13px;border:1px dashed var(--brand-solid)}
+.api-how{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:8px}
+.api-how [role="tab"]{appearance:none;border:0;background:none;font:inherit;font-size:13px;font-weight:600;color:var(--ink-2);padding:6px 12px;min-height:36px;border-bottom:2px solid transparent;margin-bottom:-1px;cursor:pointer}
+.api-how [role="tab"][aria-selected="true"]{color:var(--ink);border-bottom-color:var(--brand-solid)}
+.api-steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px;font-size:13px;line-height:1.55}
+.api-steps code{font-size:12px;background:var(--surface-2);border-radius:4px;padding:1px 5px}
+.api-kv{display:grid;grid-template-columns:auto 1fr auto 1fr;gap:4px 8px;align-items:center;margin-top:6px;font-size:12px;color:var(--ink-2);max-width:560px}
+.api-kv code{background:var(--surface-2);border-radius:6px;padding:4px 8px;color:var(--ink)}
+.api-note{margin:8px 0 0;font-size:12px;color:var(--warn-ink)}
+.api-faq{margin-top:12px;border-top:1px solid var(--line);padding-top:8px}
+.api-faq summary{cursor:pointer;font-size:13px}
+.api-faq ul{margin:6px 0 0;padding-left:18px;line-height:1.75}
+@media (max-width:760px){ .api-flow{grid-template-columns:1fr} .api-kv{grid-template-columns:auto 1fr} .api-cp{flex-direction:column} .api-cp .cbtn{align-self:flex-end} }
+.api-dh .ctag{white-space:normal;height:auto;min-height:22px;line-height:1.45;padding:2px 8px;max-width:100%}
 /* ==== ㊿+166 새 디자인 end ==== */

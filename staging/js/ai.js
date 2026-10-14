@@ -1256,7 +1256,7 @@ export function computeFromP(p){
       title: scope+' · '+want+' 계약',
       hero: sel.length.toLocaleString('ko-KR'), unit:'건',
       sub: (want==='해지'?'이탈 MRR ':'해당 MRR ')+won(lostMrr)+'천원 · 고객 '+
-           Object.keys(sel.reduce(function(a,k){a[ST.DATA.rows[k].cust]=1;return a;},{})).length+'곳',
+           Object.keys(sel.reduce(function(a,k){a[ST.DATA.rows[k].cust]=1;return a;},{})).length+'개사',
       chart:{type:'bar', labels:mlab, series:[{label:want+' 건수', data:mlab.map(function(x){return byMonth[x];}),
              color: want==='해지'? cssv('--critical'):cssv('--s1')}], money:false},
       table:{cols:[gbLabel(gb),'건수'], rows:grp.map(function(g){return [g.name, g.v+'건'];})},
@@ -1300,9 +1300,9 @@ export function computeFromP(p){
     var sc0=[]; if(p.lines&&p.lines.length) sc0.push(p.lines.join('+')); if(p.ind) sc0.push(p.ind);
     return {
       title:(sc0.length? sc0.join(' · ')+' · ':'')+'LIVE 고객사 · '+liveSrcLabel(),
-      hero: Object.keys(uq).length.toLocaleString('ko-KR'), unit:'곳',
+      hero: Object.keys(uq).length.toLocaleString('ko-KR'), unit:'개사',
       sub: '서비스 기준 '+lvSel.length.toLocaleString('ko-KR')+'건 (한 고객사가 여러 서비스를 쓰면 서비스마다 1건)'+
-           (Object.keys(uqND).length!==Object.keys(uq).length? ' · 중복표시 제외 '+Object.keys(uqND).length+'곳':'')+
+           (Object.keys(uqND).length!==Object.keys(uq).length? ' · 중복표시 제외 '+Object.keys(uqND).length+'개사':'')+
            (nodes? ' · 노드 '+nodes.toLocaleString('ko-KR')+'개':''),
       chart:{type:'bar', labels:arr0.map(function(x){return lline(x[0]);}),
              series:[{label:useInd?'산업군':'제품군', data:arr0.map(function(x){return x[1];}), color:cssv('--s1')}], money:false},
@@ -1322,7 +1322,7 @@ export function computeFromP(p){
     for(var j3=Math.max(0,jj-23);j3<=jj;j3++){ trend.push(activeCustomers(list,j3)); tl.push(mkLabel(j3)); }
     return {
       title: scope+' · '+mk(jj)+' 기준 활성 고객사',
-      hero: cnt.toLocaleString('ko-KR'), unit:'곳',
+      hero: cnt.toLocaleString('ko-KR'), unit:'개사',
       sub: '해당 월 MRR '+won(monthlyTotal(list,jj))+'천원',
       chart:{type:'line', labels:tl, series:[{label:'활성 고객사', data:trend, color:cssv('--s1')}], money:false},
       table:{cols:['고객사','월 MRR'], rows:top.map(function(t){return [t.name, won(t.v)+'천원'];})},

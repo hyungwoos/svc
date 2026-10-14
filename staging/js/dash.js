@@ -1118,18 +1118,18 @@ export function renderKpis(list, dataOnly){
         var isDb=(lv.src==='db'), other='', nMulti=Object.keys(uq).filter(function(c){ var k=0; Object.keys(perLine).forEach(function(l){ if(perLine[l][c]) k++; }); return k>1; }).length;
         var keep=function(x){ return selOf([x]).length>0; };   /* ㊿+183 차이 근거도 같은 거르기 */
         if(isDb && ST.DATA.live && ST.DATA.live.ok){ var su={}; selOf(ST.DATA.live.rows).forEach(function(x){ su[x.cust]=1; }); var sn=Object.keys(su).length; other=' · 시트 명단 '+sn+(sn!==nCust? ' ('+(nCust-sn>0?'+':'')+(nCust-sn)+') '+tpl`<button type="button" class="lnk" data-diff="sheet" title="계약 기준과 시트 명단이 다른 곳">차이 보기</button>`:' ✓'); }
-        return { k:'LIVE 고객사'+(isDb? ' ('+mk(b)+')':''), v:nCust.toLocaleString('ko-KR'), u:'곳',
-                 d:'제품별 합 '+prodSum.toLocaleString('ko-KR')+(prodSum>nCust? ' — '+tpl`<button type="button" class="lnk" data-diff="multi" title="제품을 두 개 이상 써서 제품마다 1곳씩 세는 고객사">두 제품 이상 ${String(nMulti)}곳</button>` : ' — 회사 수와 같음(겹침 없음)')+   /* ㊿+169 고객 수(곳) ≠ 제품별 합 · ㊿+183 이유 글 대신 그 고객사 목록 */
+        return { k:'LIVE 고객사'+(isDb? ' ('+mk(b)+')':''), v:nCust.toLocaleString('ko-KR'), u:'개사',
+                 d:'제품별 합 '+prodSum.toLocaleString('ko-KR')+(prodSum>nCust? ' — '+tpl`<button type="button" class="lnk" data-diff="multi" title="제품을 두 개 이상 써서 제품마다 1개사씩 세는 고객사">두 제품 이상 ${String(nMulti)}개사</button>` : ' — 회사 수와 같음(겹침 없음)')+   /* ㊿+169 고객 수(곳) ≠ 제품별 합 · ㊿+183 이유 글 대신 그 고객사 목록 */
                    (nRow>prodSum? ' · 사이트 '+nRow+'건':'')+other, open:'live',
                  extra:(isDb && !STATE.ind && Object.keys(STATE.lines).every(function(k){ return STATE.lines[k]; }))? liveDeltaHtml(b) : '',
                  diff:{multi:function(){ liveMultiOpen(b, sel); }, sheet:function(){ liveSheetDiffOpen(b, keep); }, delta:function(){ liveDeltaOpen(b); }},   /* 전월 대비 분해 (신규·복귀 / 만기 미처리·해지·종료) + «확인중» — 표시용 (㊿+127) */
-                 tip:(isDb? '계약 기준 자동 판정 — 원계약이 '+mk(b)+'에 유효한 회사(시작월 ≤ 기준월, 종료 전 · 해지는 해지월부터 제외 · 통합과금/추가/H/W 제외 · CN전환 포함) · 곳 = 회사 단위 · 제품별 합 = 매출시트 LIVE 산정 방식(제품마다 1곳'+(prodSum>nCust? ' · 두 제품 이상 쓰는 '+(prodSum-nCust)+'곳이 겹침':'')+') · «시트 명단» 은 예전 LIVE 고객사 탭 사본 — 차이는 LIVE 화면 «시트와 다른 곳»에서 항목별로'
-                            : 'LIVE 명단 시트 기준 — 곳 = 회사 단위 · 제품별 합 = 매출시트 LIVE 고객사 산정 방식(제품마다 1곳)')+' — 누르면 LIVE 고객사 화면' };
+                 tip:(isDb? '계약 기준 자동 판정 — 원계약이 '+mk(b)+'에 유효한 회사(시작월 ≤ 기준월, 종료 전 · 해지는 해지월부터 제외 · 통합과금/추가/H/W 제외 · CN전환 포함) · 개사 = 회사 단위 · 제품별 합 = 매출시트 LIVE 산정 방식(제품마다 1개사'+(prodSum>nCust? ' · 두 제품 이상 쓰는 '+(prodSum-nCust)+'개사가 겹침':'')+') · «시트 명단» 은 예전 LIVE 고객사 탭 사본 — 차이는 LIVE 화면 «시트와 다른 곳»에서 항목별로'
+                            : 'LIVE 명단 시트 기준 — 개사 = 회사 단위 · 제품별 합 = 매출시트 LIVE 고객사 산정 방식(제품마다 1개사)')+' — 누르면 LIVE 고객사 화면' };
       }
-      return { k:'활성 고객사', v:cust.toLocaleString('ko-KR'), u:'곳', d: custPrevY? deltaHtml(cust,custPrevY,'전년'):'', open:'live' };
+      return { k:'활성 고객사', v:cust.toLocaleString('ko-KR'), u:'개사', d: custPrevY? deltaHtml(cust,custPrevY,'전년'):'', open:'live' };
     })(),
     { k:(STATE.unit==='month'?'당월':'기간 내')+' 신규 / 해지', v:newCnt+' / '+churnCnt, u:'건',
-      d:'고객사 '+newCu+' / '+churnCu+'곳 · 이탈 MRR '+won(churnAmt)+'천원',
+      d:'고객사 '+newCu+' / '+churnCu+'개사 · 이탈 MRR '+won(churnAmt)+'천원',
       cls: churnCnt>newCnt? 'down':'up', open:'nc', tip:'신규 = 원계약 시작월이 '+(STATE.unit==='month'? mk(b) : mk(f0)+'~'+mk(b))+' · 해지 = 상태 «해지» 해지월이 그 기간 (부속 계약·CND 제외 · 해지 분석·해지율 화면과 같은 기준) — 누르면 명단' },
     (function(){ var EN=expN(), eEnd=Math.min(b+EN-1,ST.M-1);
       var seg=tpl`<div class="expseg" style="display:flex;gap:3px;align-items:center;margin-top:8px;flex-wrap:wrap" title="만료 기간을 바꿉니다 (이 브라우저에 기억 · 아래 «만료 예정» 위젯도 같이 바뀜)"><span class="mini" style="color:var(--muted);margin-right:2px">기간</span>${rawHtml([1,2,3,6,12].map(function(n){ return tpl`<button type="button" data-expn="${rawHtml(n)}" aria-pressed="${n===EN}" style="font:inherit;font-size:12px;line-height:1;padding:4px 7px;border-radius:6px;border:1px solid var(--ring);cursor:pointer;background:${n===EN?'var(--s1-solid,#226bc4)':'var(--surface-2)'};color:${n===EN?'#fff':'var(--ink-2)'}">${rawHtml(n)}개월</button>`; }).join(''))}</div>`;
@@ -1237,7 +1237,7 @@ export function kpiOpen(kind, opt){
       rows.push({_cust:c, c:[esc(c), esc(lline(o.r.line)), kind2, won(o.p), won(o.a), (o.a-o.p>0?'+':'')+won(o.a-o.p)], s:o.a-o.p}); });
     rows.sort(function(x,y){ return y.s-x.s; });
     head=[{l:'고객사'},{l:'서비스'},{l:'구분'},{l:mk(pb)+'(천원)',n:true},{l:mk(b)+'(천원)',n:true},{l:'증감(천원)',n:true}];
-    kpiTable('전년 동월 대비 — '+mk(pb)+' '+won(tp)+' → '+mk(b)+' '+won(ta)+'천원 ('+(ta-tp>0?'+':'')+won(ta-tp)+')', '고객사 '+rows.length+'곳 · 신규 = 전년엔 없던 곳 · 이탈 = 올해 금액 0 · 증액/감액 = 같은 고객의 금액 변화 · 합계 차이가 타일의 % 입니다', head, rows, '전년동월대비_'+mk(b));
+    kpiTable('전년 동월 대비 — '+mk(pb)+' '+won(tp)+' → '+mk(b)+' '+won(ta)+'천원 ('+(ta-tp>0?'+':'')+won(ta-tp)+')', '고객사 '+rows.length+'개사 · 신규 = 전년엔 없던 곳 · 이탈 = 올해 금액 0 · 증액/감액 = 같은 고객의 금액 변화 · 합계 차이가 타일의 % 입니다', head, rows, '전년동월대비_'+mk(b));
   }
   else if(kind==='nc'){
     var per=(STATE.unit==='month'? mk(b) : mk(D.f0)+'~'+mk(b));
@@ -1253,14 +1253,14 @@ export function kpiOpen(kind, opt){
     rows.sort(function(x,y){ return x.s-y.s; });
     head=H6.concat([{l:'판매형태'},{l:'확인할 것'},{l:'종료월 월 금액(천원)',n:true}]);
     var ex=[]; if(RN.sure.length) ex.push('재약정 등록됨 '+RN.sure.length+'건'); if(RN.auto.length) ex.push('자동연장 '+RN.auto.length+'건');
-    kpiTable('재약정 대응 필요 — '+rows.length+'건 · 고객사 '+Object.keys(cu1).length+'곳 · '+won(tot)+'천원', RN.xs.EN+'개월 내 만료 원계약 '+RN.xs.rows.length+'건(종료월 '+mk(b)+' ~ '+mk(RN.xs.end)+') 중 '+(ex.length? ex.join(' · ')+' 제외' : '제외 없음')+' · 후속 계약이 «확인 필요»면 남김 · '+(opt && opt.home? '전체 사업 기준(홈 «재약정 대응 필요»와 같은 행)' : '사업 분석 조건 기준')+' · 행을 누르면 계약 화면', head, rows, '재약정대응_'+mk(b));
+    kpiTable('재약정 대응 필요 — '+rows.length+'건 · 고객사 '+Object.keys(cu1).length+'개사 · '+won(tot)+'천원', RN.xs.EN+'개월 내 만료 원계약 '+RN.xs.rows.length+'건(종료월 '+mk(b)+' ~ '+mk(RN.xs.end)+') 중 '+(ex.length? ex.join(' · ')+' 제외' : '제외 없음')+' · 후속 계약이 «확인 필요»면 남김 · '+(opt && opt.home? '전체 사업 기준(홈 «재약정 대응 필요»와 같은 행)' : '사업 분석 조건 기준')+' · 행을 누르면 계약 화면', head, rows, '재약정대응_'+mk(b));
   }
   else if(kind==='exp'){
     var cu0={}; D.expRows.forEach(function(k){ var r=ST.DATA.rows[k], a=expAmtOf(k); tot+=a; cu0[r.cust]=1; rows.push({_cust:r.cust, c:base(r).concat([esc(r.saleType||''), esc(expNote(k)), won(a)]), s:r.endIdx}); });
     rows.sort(function(x,y){ return x.s-y.s; });
     head=H6.concat([{l:'판매형태'},{l:'비고'},{l:'종료월 월 금액(천원)',n:true}]);
     var EN2=expN();
-    kpiTable(EN2+'개월 내 만료 — 원계약 '+rows.length+'건 · 고객사 '+Object.keys(cu0).length+'곳 · '+won(tot)+'천원', '종료월이 '+mk(b)+' ~ '+mk(Math.min(b+EN2-1,ST.M-1))+' 인 원계약 (부속 계약·H/W·해지·중지·서비스 종료 제외 — 부속은 «비고»에 함께 만료로 표시) · 금액 = 종료월 인식 금액 · 홈 «오늘 처리할 일»·만료 예정 위젯과 같은 행 · 연장을 등록하면 빠집니다 · 행을 누르면 계약 화면', head, rows, '만료예정_'+EN2+'개월_'+mk(b));
+    kpiTable(EN2+'개월 내 만료 — 원계약 '+rows.length+'건 · 고객사 '+Object.keys(cu0).length+'개사 · '+won(tot)+'천원', '종료월이 '+mk(b)+' ~ '+mk(Math.min(b+EN2-1,ST.M-1))+' 인 원계약 (부속 계약·H/W·해지·중지·서비스 종료 제외 — 부속은 «비고»에 함께 만료로 표시) · 금액 = 종료월 인식 금액 · 홈 «오늘 처리할 일»·만료 예정 위젯과 같은 행 · 연장을 등록하면 빠집니다 · 행을 누르면 계약 화면', head, rows, '만료예정_'+EN2+'개월_'+mk(b));
   }
 }
 export function deltaHtml(a,b,label){
@@ -1467,7 +1467,7 @@ export function renderNcWidget(list){
           rows.push({_cust:r.cust, c:[isL?'<b style="color:var(--critical)">해지</b>':'<b style="color:var(--ok,#2e7d32)">신규</b>'].concat(kxBase(r), [esc(r.saleType||''), isL? esc(r.churn||''):'', won(a)]), s:(isL? x : r.startIdx), o:isL?1:0}); }); });
       if(!rows.length){ toast('해당 건이 없습니다',''); return; }
       rows.sort(function(x,y){ return x.o-y.o || x.s-y.s || x._cust.localeCompare(y._cust,'ko'); });
-      var ttl= kind==='net'? lab+' 순증 '+(nN-nL>0?'+':'')+(nN-nL)+' = 신규 '+nN+' − 해지 '+nL : lab+' '+(lb? lline(lb)+' ':'')+(kind==='lost'?'해지':'신규')+' '+(kind==='lost'?nL:nN)+'곳 ('+rows.length+'건)';
+      var ttl= kind==='net'? lab+' 순증 '+(nN-nL>0?'+':'')+(nN-nL)+' = 신규 '+nN+' − 해지 '+nL : lab+' '+(lb? lline(lb)+' ':'')+(kind==='lost'?'해지':'신규')+' '+(kind==='lost'?nL:nN)+'개사 ('+rows.length+'건)';
       kpiTable(ttl, '신규 = 원계약 시작월 기준(부속·CN전환 제외) · 해지 = 상태 «해지» 원계약 해지월 기준(CND 제외) · 월액 = 신규는 계약 MRR, 해지는 직전 월 매출 · 대시보드 필터 적용 · 행을 누르면 계약 화면',
         [{l:'구분'}].concat(KX_H6, [{l:'판매형태'},{l:'해지 사유'},{l:'월액(천원)',n:true}]), rows, (kind==='net'?'순증_':kind==='lost'?'해지_':'신규_')+lab);
     };
@@ -1479,7 +1479,7 @@ export function renderExpiring(list){
   list=list||idxs();
   var b=STATE.base, mm=STATE.expM;
   var XS=expScan(list, b, mm), rows=XS.rows, amt=XS.amt;   /* ㊿+168 공통 집계 — 타일 · 홈 할 일과 같은 행 */
-  $('#capExp').textContent = mk(b)+' ~ '+mk(XS.end)+' 만료 원계약 '+rows.length+'건 · 고객사 '+XS.custN+'곳 · 종료월 월 금액 합계 '+won(amt)+'천원 · 부속 계약은 원계약과 함께 만료(«비고») · 홈 «사업 현황» 타일 · «오늘 처리할 일»과 같은 수';
+  $('#capExp').textContent = mk(b)+' ~ '+mk(XS.end)+' 만료 원계약 '+rows.length+'건 · 고객사 '+XS.custN+'개사 · 종료월 월 금액 합계 '+won(amt)+'천원 · 부속 계약은 원계약과 함께 만료(«비고») · 홈 «사업 현황» 타일 · «오늘 처리할 일»과 같은 수';
 
   var t=$('#tExp');
   t.innerHTML=tpl`<thead><tr><th>만료월</th><th>남은 개월</th><th>서비스</th><th>산업군</th><th>고객사</th><th>파트너</th>`+

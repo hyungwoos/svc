@@ -149,7 +149,7 @@ function renderRun(){
   var need=K.rows.filter(function(r){ return !r.mapped; }).length;
   var needBiz=K.rows.filter(function(r){ return !r.biz; }).length;
   $('#kTiles').innerHTML=
-    tile('고객사', K.rows.length+'곳')+
+    tile('고객사', K.rows.length+'개사')+
     tile('청구 합계', fmt(sum)+'원')+
     tile('안내 합계', fmt(K.total||sum)+'원', Math.abs((K.total||sum)-sum)<1?'ok':'bad')+
     tile('비즈포탈 회계매출', fmt(bizSum)+'원')+
@@ -320,7 +320,7 @@ function printList(){
   printDoc({
     title:'카카오엔터프라이즈 구독료 리스트 — '+ym.slice(0,4)+'년 '+M+'월 청구',
     sub:(um? um.slice(0,4)+'년 '+UM+'월 이용분 · ':'')+'카카오클라우드 마켓플레이스 SSL VPN · 제공서비스 '+((K.cfg.basic&&K.cfg.basic.product)||'SSL PNS')+' · 단위: 원(VAT 별도)',   /* ㊿+191 제공서비스는 전부 같아 머리글에 한 번(표 칸 하나 줄임) */
-    summary:[{k:'고객사',v:K.rows.length+'곳'},{k:'청구 합계',v:fmt(sum)+'원'},
+    summary:[{k:'고객사',v:K.rows.length+'개사'},{k:'청구 합계',v:fmt(sum)+'원'},
              {k:'비즈포탈 회계매출',v:fmt(bizSum)+'원'},
              {k:'차액',v:fmt(sum-bizSum)+'원', ok:Math.abs(sum-bizSum)<1, bad:Math.abs(sum-bizSum)>=1},
              {k:'신규 / 해약',v:($('#cNew').value||0)+' / '+($('#cEnd').value||0)}],
@@ -362,7 +362,7 @@ function renderSettles(){
     return tpl`<div class="setmon"><span class="ym">${ym} 청구</span><span class="sum">${rawHtml(um? um+' 이용분':'')}</span>${rawHtml(clsMonthTag(ym))}</div>`+
       tpl`<div class="setrow"><span class="kind u">구독료</span><span class="amt">${rawHtml(fmt(r.total))}원</span>`+
       tpl`<span class="diff ${Math.abs(Number(r.total||0)-Number(r.biz_total||0))<1?'ok':'bad'}">`+ tpl`${rawHtml(Math.abs(Number(r.total||0)-Number(r.biz_total||0))<1? '대조 일치':'차액 '+fmt(Number(r.total||0)-Number(r.biz_total||0)))}</span>`+
-      tpl`<span class="cnt">고객사 ${rawHtml(r.cnt||0)}곳 · 신규 ${rawHtml(r.cnt_new||0)} · 해약 ${rawHtml(r.cnt_end||0)}</span>`+
+      tpl`<span class="cnt">고객사 ${rawHtml(r.cnt||0)}개사 · 신규 ${rawHtml(r.cnt_new||0)} · 해약 ${rawHtml(r.cnt_end||0)}</span>`+
       tpl`<span class="who">${String(r.created_by||'').split('@')[0]} ${String(r.updated_at||'').slice(5,10)}${rawHtml(r.report_id? ' · 리포트 #'+r.report_id:'')}</span>`+
       tpl`<span class="acts"><button class="rowbtn" data-click="restoreSettle(${rawHtml(r.id)})">불러오기</button>`+
       tpl`${rawHtml(CLS.ok? tpl`<button class="rowbtn" data-click="clsHist(${rawHtml(r.id)})">이력</button>` : '')}`+

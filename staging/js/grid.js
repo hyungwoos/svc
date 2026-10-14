@@ -1212,16 +1212,16 @@ export function renderLiveBar(lb){
   if(isDb){
     var opts=''; for(var i=ST.DATA.nowIdx+3;i>=Math.max(0,ST.DATA.nowIdx-36);i--){ opts+=tpl`<option value="${rawHtml(i)}"${i===T?' selected':''}>${mk(i)}${i===ST.DATA.nowIdx?' (이번 달)':''}</option>`; }
     h+=tpl`<label class="mini" style="display:flex;align-items:center;gap:6px">기준월 <select id="lvMonth" style="font:inherit;padding:4px 6px;border:1px solid var(--ring);border-radius:8px;background:var(--surface-2);color:inherit">${rawHtml(opts)}</select></label>`;
-    h+=tpl`<span class="mini"><b>${mk(T)}</b> LIVE <b>${rawHtml(lv.uniq)}곳</b>(회사) · 제품별 합 <b>${rawHtml(lv.count)}</b> — ${rawHtml(lineTxt)}${rawHtml(sh? ' · 시트 명단 '+sh.uniq+'곳 / '+sh.count+'건':'')}</span>`;
+    h+=tpl`<span class="mini"><b>${mk(T)}</b> LIVE <b>${rawHtml(lv.uniq)}개사</b>(회사) · 제품별 합 <b>${rawHtml(lv.count)}</b> — ${rawHtml(lineTxt)}${rawHtml(sh? ' · 시트 명단 '+sh.uniq+'개사 / '+sh.count+'건':'')}</span>`;
     /* ㊿+183 숫자 차이의 근거 — 회사 수 ≠ 제품별 합(두 제품 이상) · 전월 대비 변동을 고객사 목록으로 */
     var mby={}; lv.rows.forEach(function(x){ (mby[x.cust]=mby[x.cust]||{})[x.line]=1; });
     var nMul=Object.keys(mby).filter(function(c){ return Object.keys(mby[c]).length>1; }).length, dd=null; try{ dd=liveDelta(T); }catch(e){}
-    if(nMul) h+=tpl`<button type="button" class="chip" id="lvMulti" title="제품을 두 개 이상 써서 제품마다 1곳씩 세는 고객사 — 회사 수와 제품별 합이 다른 이유">두 제품 이상 ${String(nMul)}곳</button>`;
-    if(dd && (dd.added.length||dd.removed.length)) h+=tpl`<button type="button" class="chip" id="lvDelta" title="전월(${mk(T-1)})보다 늘어난 곳 · 빠진 곳을 사유별로">전월 대비 ${dd.curN-dd.prevN>0?'+':''}${String(dd.curN-dd.prevN)} · 변동 ${String(dd.added.length+dd.removed.length)}곳</button>`;
+    if(nMul) h+=tpl`<button type="button" class="chip" id="lvMulti" title="제품을 두 개 이상 써서 제품마다 1개사씩 세는 고객사 — 회사 수와 제품별 합이 다른 이유">두 제품 이상 ${String(nMul)}개사</button>`;
+    if(dd && (dd.added.length||dd.removed.length)) h+=tpl`<button type="button" class="chip" id="lvDelta" title="전월(${mk(T-1)})보다 늘어난 곳 · 빠진 곳을 사유별로">전월 대비 ${dd.curN-dd.prevN>0?'+':''}${String(dd.curN-dd.prevN)} · 변동 ${String(dd.added.length+dd.removed.length)}개사</button>`;
     if(sh){ var df=liveDiff(T); var nd=df.onlyDb.length+df.onlySheet.length;
       h+=tpl`<button class="chip" id="lvDiffBtn" aria-pressed="${rawHtml(LV.diff)}" title="계약 기준과 시트 명단이 다른 곳만 보기">${rawHtml(nd? '⚠ 시트와 다른 곳 '+nd:'✓ 시트 명단과 일치')}</button>`; }
   } else {
-    h+=tpl`<span class="mini">시트 명단 <b>${rawHtml(sh?sh.uniq:0)}곳</b> / ${rawHtml(sh?sh.count:0)}건 · 계약 기준 ${mk(T)} ${rawHtml(lv.uniq)}곳</span>`;
+    h+=tpl`<span class="mini">시트 명단 <b>${rawHtml(sh?sh.uniq:0)}개사</b> / ${rawHtml(sh?sh.count:0)}건 · 계약 기준 ${mk(T)} ${rawHtml(lv.uniq)}개사</span>`;
   }
   h+=tpl`<span class="mini" style="color:var(--muted)">${isDb? '따로 등록하지 않습니다 — 계약이 등록·해지되면 자동으로 바뀝니다':'이 명단은 직접 고쳐야 하며 대시보드에는 쓰이지 않습니다'}</span></div>`;
   if(isDb && sh && LV.diff){
@@ -1229,7 +1229,7 @@ export function renderLiveBar(lb){
     function rowsOf(arr, kind){ if(!arr.length) return '<tr><td colspan="4" class="mini" style="color:var(--muted)">없음</td></tr>';
       return arr.map(function(x){ return tpl`<tr><td>${x.cust}</td><td>${lline(x.line)}</td><td>${kind==='db'? (x.basis||'') : x.why}</td><td>${kind==='db'? '시트 LIVE 탭에 추가하면 같아짐' : (/계약 없음/.test(x.why)? '계약을 등록하거나 사명을 맞춤(사명 변경 기능)' : /계약 예정/.test(x.why)? '시작하면 계약 화면에서 시작월 입력' : /no_count/.test(x.why)? '매출만 세는 행 — 시트에서도 «중복»으로 빼는 행이라 정상' : /예외 제외/.test(x.why)? '계약의 LIVE 예외 «제외» 지정 — 의도한 것' : /해지|종료/.test(x.why)? '시트 명단에서 빼야 함' : /만기/.test(x.why)? '재약정이면 연장 등록, 끝났으면 해지 처리' : '계약 화면 확인')}</td></tr>`; }).join(''); }
     h+=tpl`<div style="flex-basis:100%;margin-top:6px;padding:10px 12px;border:1px solid var(--ring);border-radius:10px;background:var(--surface-2,rgba(0,0,0,.02))">`+
-      tpl`<div class="mini" style="margin-bottom:6px"><b>계약 기준 ${mk(T)}</b> ${rawHtml(d.db.uniq)}곳 vs <b>시트 명단</b> ${rawHtml(d.sheetN)}곳 — 이름은 띄어쓰기·(주)·괄호·별칭을 무시하고 맞춰 봤습니다. 아래 항목이 0이 되면 두 숫자가 같아집니다.</div>`+
+      tpl`<div class="mini" style="margin-bottom:6px"><b>계약 기준 ${mk(T)}</b> ${rawHtml(d.db.uniq)}개사 vs <b>시트 명단</b> ${rawHtml(d.sheetN)}개사 — 이름은 띄어쓰기·(주)·괄호·별칭을 무시하고 맞춰 봤습니다. 아래 항목이 0이 되면 두 숫자가 같아집니다.</div>`+
       tpl`<div style="overflow-x:auto"><table class="pr"><thead><tr><th>고객사</th><th>서비스</th><th>왜 다른가</th><th>어떻게 맞추나</th></tr></thead><tbody>`+
       tpl`<tr><td colspan="4" style="background:var(--surface)"><b>계약으로는 LIVE 인데 시트 명단에 없음 — ${d.onlyDb.length}</b></td></tr>${rawHtml(rowsOf(d.onlyDb,'db'))}`+
       tpl`<tr><td colspan="4" style="background:var(--surface)"><b>시트 명단에는 있는데 계약으로는 LIVE 아님 — ${d.onlySheet.length}</b></td></tr>${rawHtml(rowsOf(d.onlySheet,'sheet'))}`+
@@ -1397,8 +1397,8 @@ export function renderGrid(){
   if(ST.CUR_VIEW==='contracts' && !isCustom){
     lb.style.display='flex'; lb.innerHTML='<span class="mini" style="color:var(--muted);margin-right:2px">관점</span>';
     var LS=lensSets();
-    var zero=LENS_DEFS.filter(function(d){ return !LS[d[0]].n; }).length;   /* ⑤ UX: 0곳인 관점은 접어 둠 (칩 10개가 늘어서 있던 것) */
-    [['','전체','모든 계약']].concat(LENS_DEFS.map(function(d){ return [d[0], d[1]+' '+LS[d[0]].n+'곳', d[2]+' · 계약 '+LS[d[0]].nRows+'건']; })).forEach(function(op){
+    var zero=LENS_DEFS.filter(function(d){ return !LS[d[0]].n; }).length;   /* ⑤ UX: 0개사인 관점은 접어 둠 (칩 10개가 늘어서 있던 것) */
+    [['','전체','모든 계약']].concat(LENS_DEFS.map(function(d){ return [d[0], d[1]+' '+LS[d[0]].n+'개사', d[2]+' · 계약 '+LS[d[0]].nRows+'건']; })).forEach(function(op){
       var v=op[0], on=(DV.lens||'')===v;
       if(v && !LS[v].n && !DV.lensAll) return;
       var btn=document.createElement('button'); btn.className='chip'; btn.setAttribute('aria-pressed', on?'true':'false'); btn.textContent=op[1]; btn.title=op[2];

@@ -1207,7 +1207,7 @@ export function renderChurnRate(){
      ['포탈 기준 / 매출시트 기준','오른쪽 위 버튼. 매출시트 통계 탭과 같은 숫자를 보려면 «매출시트 기준»(누적고객 · CND 포함 · 계약 행 단위 · Cloud NAC+에스원)을 누르세요.'],
      ['지원사업 제외율','판매형태 «정부 지원» 고객을 빼고 계산한 해지율. 바우처 만기 해지를 걷어낸 «순수 이탈률»입니다.'],
      ['CND 전환 고객','CND = Cloud NAC DeviceKeeper. 예전에 에스원으로 납품하던 제품인데 단종되어 전부 S1 Cloud NAC Basic으로 교체됐고, 과금은 에스원에 한 건으로 묶어 받습니다(«에스원 통합과금» 행). 이 고객들은 <b>LIVE 고객으로 항상 포함</b>합니다(기본). 다만 옛 DeviceKeeper 계약의 해지는 매출시트 규칙대로 해지 건수에 넣지 않습니다. «제외»는 매출시트 통계 탭이 CND를 통째로 빼고 계산한 값과 맞출 때만 쓰세요.'],
-     ['분모가 작을 때','시작 활성이 20곳 미만(PNS·DRM·초기 MDR)이면 한 곳 차이가 10%p 이상 움직입니다. 그런 칸은 비율보다 «7곳 중 2곳»처럼 건수로 읽어 주세요.']
+     ['분모가 작을 때','시작 활성이 20개사 미만(PNS·DRM·초기 MDR)이면 1개사 차이가 10%p 이상 움직입니다. 그런 칸은 비율보다 «7개사 중 2개사»처럼 건수로 읽어 주세요.']
    ],'모든 숫자는 «계약» 메뉴의 데이터로 계산하며, 파란 숫자를 누르면 그 칸을 만든 계약 명단이 열립니다. 제품별·사업영역별 표의 오른쪽 «합계 → 전체» 열은 두 제품을 함께 쓰는 고객사 때문에 생기는 차이를 보여줍니다.');
   /* 계산 규칙 — ㊿+170 기본(기간 · 기준월)만 펼치고, 분모·단위·CND·지원사업은 «고급 설정»에 접어 둠 · 맨 위에 «적용 기준» 한 줄 */
   h+=tpl`<div class="cr-applied" role="note"><b>적용 기준</b> ${rawHtml(crApplied(isPortal, isSheet))}</div>`;
@@ -1251,7 +1251,7 @@ export function renderChurnRate(){
     var g=G.filter(function(x){return x.k===gg[1];})[0]; if(!g) return;
     var cols=g.opts.filter(function(o){ var sel=CR.f[g.k]||[]; return !sel.length || sel.indexOf(o[0])>=0; });
     h+=tpl`<div class="pr-card" style="margin-bottom:12px"><h3>${rawHtml(gg[0])} 해지율 <small>칸 = 해지 / 기간 시작 활성 · 해지율(지원 포함) · 다른 필터는 그대로 적용 · 맨 오른쪽 = 칸 합계와 전체 표(회사 단위) 대조</small></h3><div style="overflow-x:auto" tabindex="0" role="region" aria-label="표 — 옆으로 스크롤"><table class="pr"><thead><tr><th>기간</th>`+
-       tpl`${rawHtml(cols.map(function(o){ return tpl`<th class="n">${o[1]}</th>`; }).join(''))}<th class="n" title="칸을 그대로 더한 값 / 전체 표 값 — 두 제품(영역)을 함께 쓰는 고객사는 칸마다 1곳씩 잡히지만 전체 표에서는 회사 단위로 1곳이라 그만큼 차이가 납니다">합계 → 전체(회사 단위)</th></tr></thead><tbody>`;
+       tpl`${rawHtml(cols.map(function(o){ return tpl`<th class="n">${o[1]}</th>`; }).join(''))}<th class="n" title="칸을 그대로 더한 값 / 전체 표 값 — 두 제품(영역)을 함께 쓰는 고객사는 칸마다 1개사씩 잡히지만 전체 표에서는 회사 단위로 1개사라 그만큼 차이가 납니다">합계 → 전체(회사 단위)</th></tr></thead><tbody>`;
     P.forEach(function(p){
       var sB=0, sL=0;
       h+=tpl`<tr><td><b>${p.l}</b></td>${rawHtml(cols.map(function(o){
@@ -1262,7 +1262,7 @@ export function renderChurnRate(){
         return tpl`<td class="n">${rawHtml(crLink(lost,p.s,p.e,x,'lost',o[1]+' · '+p.l+' 해지'))} / ${rawHtml(crLink(base,p.s-1,p.s-1,x,'base',o[1]+' · '+p.l+' 시작 활성','color:var(--ink-2)'))}<div class="mini" style="font-weight:700">${rawHtml(crRate(nl,nb))}</div></td>`;
       }).join(''))}`;
       var tB=crN(crActive(p.s-1,crMatch)), tL=crN(crLost(p.s,p.e,crMatch)), dB=sB-tB, dL=sL-tL;
-      h+=tpl`<td class="n" style="color:var(--muted)">${rawHtml(sL)} / ${rawHtml(sB)}${rawHtml(dB||dL? tpl` <span title="${rawHtml(gg[0])} 칸 합계와 전체 표 차이 = 두 개 이상 ${rawHtml(gg[0])}을 함께 쓰는 고객사 (전체 표에서는 1곳)">→ <b style="color:var(--ink-2)">${rawHtml(tL)} / ${rawHtml(tB)}</b> ${rawHtml(CR.rows? tpl`<span class="mini">(중복 ${rawHtml(dB? dB+'곳':'')}${rawHtml(dL? (dB?' · ':'')+'해지 '+dL:'')})</span>` : tpl`<button type="button" class="lnk mini" data-crdup="${g.k}" data-s="${String(p.s)}" data-e="${String(p.e)}" data-l="${gg[0]+' · '+p.l}" title="두 칸 이상에 함께 잡힌 고객사 목록">중복 ${rawHtml(dB? dB+'곳':'')}${rawHtml(dL? (dB?' · ':'')+'해지 '+dL:'')}</button>`)}</span>`:' <span class="mini">= 전체</span>')}</td></tr>`;   /* ㊿+183 이유 글 대신 그 고객사 목록 */
+      h+=tpl`<td class="n" style="color:var(--muted)">${rawHtml(sL)} / ${rawHtml(sB)}${rawHtml(dB||dL? tpl` <span title="${rawHtml(gg[0])} 칸 합계와 전체 표 차이 = 두 개 이상 ${rawHtml(gg[0])}을 함께 쓰는 고객사 (전체 표에서는 1개사)">→ <b style="color:var(--ink-2)">${rawHtml(tL)} / ${rawHtml(tB)}</b> ${rawHtml(CR.rows? tpl`<span class="mini">(중복 ${rawHtml(dB? dB+'개사':'')}${rawHtml(dL? (dB?' · ':'')+'해지 '+dL:'')})</span>` : tpl`<button type="button" class="lnk mini" data-crdup="${g.k}" data-s="${String(p.s)}" data-e="${String(p.e)}" data-l="${gg[0]+' · '+p.l}" title="두 칸 이상에 함께 잡힌 고객사 목록">중복 ${rawHtml(dB? dB+'개사':'')}${rawHtml(dL? (dB?' · ':'')+'해지 '+dL:'')}</button>`)}</span>`:' <span class="mini">= 전체</span>')}</td></tr>`;   /* ㊿+183 이유 글 대신 그 고객사 목록 */
     });
     h+='</tbody></table></div></div>';
   });
@@ -1282,7 +1282,7 @@ export function renderChurnRate(){
   host.querySelectorAll('a.crk').forEach(function(a){ a.onclick=function(ev){ ev.preventDefault(); crOpen(a.dataset); }; });
   host.querySelectorAll('button[data-crdup]').forEach(function(b){ /** @type {any} */(b).onclick=function(){ var d=/** @type {any} */(b).dataset; crDupOpen(d.crdup, +d.s, +d.e, d.l); }; });
 }
-/** ㊿+183 제품별 · 사업영역별 칸 합계 > 전체 표 — 두 칸 이상에 함께 잡힌 고객사(전체 표에서는 1곳) · 계산은 표와 같은 crActive/crLost */
+/** ㊿+183 제품별 · 사업영역별 칸 합계 > 전체 표 — 두 칸 이상에 함께 잡힌 고객사(전체 표에서는 1개사) · 계산은 표와 같은 crActive/crLost */
 export function crDupOpen(gk, s, e, label){
   var G=CR_G||(CR_G=crFilterGroups()), g=G.filter(function(x){ return x.k===gk; })[0]; if(!g) return;
   var cols=g.opts.filter(function(o){ var sel=CR.f[g.k]||[]; return !sel.length || sel.indexOf(o[0])>=0; });
@@ -1291,7 +1291,7 @@ export function crDupOpen(gk, s, e, label){
     return Object.keys(m).filter(function(c){ return m[c].length>1; }).sort(function(a,b){ return a.localeCompare(b,'ko'); }).map(function(c){ return {cust:c, sub:m[c].length+'칸 · '+m[c].join(' · ')}; }); };
   var base=dup(function(mm){ return crActive(s-1,mm); }), lost=dup(function(mm){ return crLost(s,e,mm); });
   diffOpen({title:label+' — 칸 합계와 전체 표 차이', xlsx:'해지율_중복',
-    intro:'칸마다 그 '+g.l+'을 쓰는 고객사를 1곳씩 세므로, 두 칸 이상에 걸친 고객사는 칸 합계에 여러 번 들어가고 전체 표(회사 단위)에는 1곳입니다. 해지율 계산은 그대로입니다.',
+    intro:'칸마다 그 '+g.l+'을 쓰는 고객사를 1개사씩 세므로, 두 칸 이상에 걸친 고객사는 칸 합계에 여러 번 들어가고 전체 표(회사 단위)에는 1개사입니다. 해지율 계산은 그대로입니다.',
     groups:[{label:'시작 활성('+mk(s-1)+')에서 두 칸 이상', rows:base}, {label:'해지('+mk(s)+'~'+mk(e)+')에서 두 칸 이상', rows:lost}]});
 }
 /* 셀 내역 팝업 */
@@ -1315,7 +1315,7 @@ export function crOpen(d){
     return {cust:r.cust, line:lline(r.line), ch:chOf(r), sale:r.saleType||'', ind:r.ind||'', sector:r.sector||'', st:r.status||'', start:mk(r.startIdx)||'', end:en!=null?mk(en):'', reason:r.churn||'', note:r.note||'', amt:amt, renew:r.renew||0}; });
   $('#crTitle').textContent=d.l;
   var u={}; CR_LAST.forEach(function(x){u[x.cust]=1;});
-  $('#crCap').textContent=crSummary()+' · 계약 '+CR_LAST.length+'건 · 고객사 '+Object.keys(u).length+'곳 · 행을 누르면 계약 화면에서 그 고객사를 찾습니다';
+  $('#crCap').textContent=crSummary()+' · 계약 '+CR_LAST.length+'건 · 고객사 '+Object.keys(u).length+'개사 · 행을 누르면 계약 화면에서 그 고객사를 찾습니다';
   $('#crList').innerHTML=tpl`<table class="pr"><thead><tr><th>고객사</th><th>서비스</th><th>채널</th><th>판매형태</th><th>산업군</th><th>업종</th><th>상태</th><th>시작월</th><th>${isLost?'해지월':'종료월'}</th>${rawHtml(isLost?'<th>사유</th>':'')}<th>비고</th><th class="n">${isLost?'해지 직전 월액(천원)':'월액(천원)'}</th></tr></thead><tbody>`+
     tpl`${rawHtml(CR_LAST.map(function(x,i){ return tpl`<tr data-i="${rawHtml(i)}" style="cursor:pointer"><td>${x.cust}${rawHtml(x.renew?tpl` <span class="ubadge sm">연장 ${rawHtml(x.renew)}회</span>`:'')}</td><td>${x.line}</td><td>${x.ch}</td><td>${x.sale}</td><td>${x.ind}</td><td>${x.sector}</td><td>${x.st}</td><td>${x.start}</td><td>${x.end}</td>${rawHtml(isLost?tpl`<td>${x.reason}</td>`:'')}<td>${x.note}</td><td class="n">${won(x.amt)}</td></tr>`; }).join(''))}</tbody></table>`;
   $('#crList').querySelectorAll('tr[data-i]').forEach(function(tr){ tr.onclick=function(){ var x=CR_LAST[+tr.dataset.i]; closeOvl('ovlCr'); switchView('contracts'); $('#dvSearch').value=x.cust; renderGrid(); }; });
@@ -1373,7 +1373,7 @@ export function renderCustFlow(){
   var h=tpl`<div class="pr-top"><div><h2 style="margin:0;font-size:18px">👥 고객사 증감</h2><p class="cap" style="margin:2px 0 0">우리 고객사가 언제 몇 곳 들어오고 나갔는지 — 기간별 증감, 어디서 들어왔는지(유입 경로), 제품별 고객사 수. 파란 숫자를 누르면 그 명단이 열립니다</p></div>`+
      tpl`<span class="spacer"></span><div class="seg" title="자주 쓰는 기준을 한 번에 맞춥니다"><button data-cfp="live" aria-pressed="${rawHtml(isLive)}" title="LIVE 고객사 메뉴·대시보드와 같은 범위 — 에스원 CND 사이트 포함">LIVE 기준</button><button data-cfp="sheet" aria-pressed="${rawHtml(isSheet)}" title="매출시트 해지 통계와 같은 범위 — 에스원 CND 사이트 제외">매출시트 기준</button></div></div>`;
   h+=helpBox('custflow','이 화면 읽는 법 (처음 보시는 분께)',[
-     ['고객사 1곳','회사 하나를 1곳으로 셉니다. 한 회사가 Cloud NAC와 MDR을 같이 써도 1곳이고, 계약이 여러 건이어도 1곳입니다. 부속 계약(라이선스·센서 추가)은 세지 않습니다.'],
+     ['고객사 1개사','회사 하나를 1개사로 셉니다. 한 회사가 Cloud NAC와 MDR을 같이 써도 1개사이고, 계약이 여러 건이어도 1개사입니다. 부속 계약(라이선스·센서 추가)은 세지 않습니다.'],
      ['기초 · 기말','기간 시작 직전 달 말 / 기간 마지막 달 말에 유효한 계약이 있는 고객사 수. 해지한 고객사는 해지월(마지막 매출월) 말에 빠집니다.'],
      ['신규','그 기간에 <b>회사의 첫 계약</b>을 시작한 고객사. 기존 고객이 다른 제품을 추가한 건 신규가 아닙니다(그건 제품별 표에서 보입니다).'],
      ['복귀','예전에 끊겼다가 다시 계약한 고객사. 첫 계약이 아니라서 신규에 안 잡히고 따로 보여줍니다.'],
@@ -1392,7 +1392,7 @@ export function renderCustFlow(){
   /* 지금 보고 있는 기준을 말로 풀어 보여줌 */
   (function(){ var cndN=0; if(CR.cnd){ var u={}; ST.DATA.rows.forEach(function(r){ if(!r.parent && r.line==='S1' && String(r.saleType||'')==='CND' && r.startIdx!=null && r.startIdx>=0) u[r.cust]=1; }); cndN=Object.keys(u).length; }
      var fsel=[]; G.forEach(function(g){ var sel=CR.f[g.k]||[]; if(sel.length) fsel.push(g.l+' '+sel.map(function(v){ var o=g.opts.filter(function(x){return x[0]===v;})[0]; return o? o[1]:v; }).join('·')); });
-     h+=tpl`<div class="crnow">지금 보는 기준 — <b>${rawHtml({year:'연도별',half:'반기별',quarter:'분기별'}[CR.unit])}</b> · <b>${mk(crMaxJ())}</b>까지 · 회사 단위 · CND 전환 고객 <b>${rawHtml(CR.cnd? '포함 (LIVE 기준'+(cndN? ' · '+cndN+'곳':'')+')':'제외 (매출시트 기준)')}</b> · 지원사업 <b>${rawHtml({all:'포함',ex:'제외',only:'만'}[CR.sup])}</b>${rawHtml(fsel.length? tpl` · 필터: <b>${fsel.join(' / ')}</b>`:'')}`+
+     h+=tpl`<div class="crnow">지금 보는 기준 — <b>${rawHtml({year:'연도별',half:'반기별',quarter:'분기별'}[CR.unit])}</b> · <b>${mk(crMaxJ())}</b>까지 · 회사 단위 · CND 전환 고객 <b>${rawHtml(CR.cnd? '포함 (LIVE 기준'+(cndN? ' · '+cndN+'개사':'')+')':'제외 (매출시트 기준)')}</b> · 지원사업 <b>${rawHtml({all:'포함',ex:'제외',only:'만'}[CR.sup])}</b>${rawHtml(fsel.length? tpl` · 필터: <b>${fsel.join(' / ')}</b>`:'')}`+
        tpl`<span class="mini" style="color:var(--ink-2)"> — ${CR.cnd? '매출시트 통계나 해지율 화면(CND 제외)과 비교하려면 «매출시트 기준»을 누르세요':'LIVE 고객사 메뉴·대시보드와 비교하려면 «LIVE 기준»을 누르세요'}</span></div>`; })();
   /* ① 롤포워드 (2020년부터) */
   var from0=CR.from; CR.from=2020; P=crPeriods(); CR.from=from0;
@@ -1443,7 +1443,7 @@ export function renderCustFlow(){
       if(r.startIdx!=null && r.startIdx>=maxAll-3) cats.recent.push(r.cust+' ('+lline(r.line)+' '+mk(r.startIdx)+'~)'); else cats.other.push(r.cust+' ('+lline(r.line)+' '+String(r.status||'')+' '+mk(r.startIdx)+'~'+(r.endIdx!=null?mk(r.endIdx):'')+')'); });
     function det(label,arr,sign,hint){ if(!arr.length) return ''; return tpl`<tr><td>${rawHtml(sign)}</td><td>${rawHtml(label)}${rawHtml(hint?tpl` <span class="mini" style="color:var(--muted)">${rawHtml(hint)}</span>`:'')}</td><td class="n"><b>${arr.length}</b></td><td><details><summary style="cursor:pointer;color:var(--s1-ink)">명단</summary><div class="mini" style="margin-top:4px;line-height:1.6">${arr.join(' · ')}</div></details></td></tr>`; }
     var plus=cats.cnd.length+cats.expired.length+cats.ended.length+cats.none.length+cats.nostart.length+cats.bad.length, minus=cats.recent.length+cats.other.length;
-    h+=tpl`<div style="margin-top:14px;padding-top:10px;border-top:1px dashed var(--ring)"><b>${mk(maxAll)} 기말 ${rawHtml(nowN)}곳 vs LIVE 메뉴 ${rawHtml(ln)}곳</b> <span class="mini" style="color:var(--muted)">(${rawHtml(nowN)} + ${rawHtml(plus)} − ${rawHtml(minus)} = ${nowN+plus-minus}${rawHtml(nowN+plus-minus===ln?' ✓':' · 나머지 '+Math.abs(ln-(nowN+plus-minus))+'곳은 사명 표기가 달라 양쪽 매칭이 어긋난 것')}) — 기말은 계약 데이터에서, LIVE 메뉴는 LIVE 명단 시트에서 나오므로 아래 항목만큼 차이가 납니다. 항목이 0이 되면 두 숫자가 같아집니다.</span>`+
+    h+=tpl`<div style="margin-top:14px;padding-top:10px;border-top:1px dashed var(--ring)"><b>${mk(maxAll)} 기말 ${rawHtml(nowN)}개사 vs LIVE 메뉴 ${rawHtml(ln)}개사</b> <span class="mini" style="color:var(--muted)">(${rawHtml(nowN)} + ${rawHtml(plus)} − ${rawHtml(minus)} = ${nowN+plus-minus}${rawHtml(nowN+plus-minus===ln?' ✓':' · 나머지 '+Math.abs(ln-(nowN+plus-minus))+'개사는 사명 표기가 달라 양쪽 매칭이 어긋난 것')}) — 기말은 계약 데이터에서, LIVE 메뉴는 LIVE 명단 시트에서 나오므로 아래 항목만큼 차이가 납니다. 항목이 0이 되면 두 숫자가 같아집니다.</span>`+
        tpl`<table class="pr" style="margin-top:6px"><thead><tr><th></th><th>왜 다른가</th><th class="n">곳</th><th>확인</th></tr></thead><tbody>`+
        tpl`${rawHtml(det('LIVE 명단에 있는데 계약이 없음', cats.none, '+', '계약 미등록 또는 사명이 달라 못 찾음'))}`+
        tpl`${rawHtml(det('CND(DeviceKeeper→S1 Basic) 전환 고객', cats.cnd, '+', 'CND 제외 옵션이라 빠짐 — «LIVE 기준»으로 바꾸면 사라짐'))}`+
@@ -1480,12 +1480,12 @@ export function renderCustFlow(){
     var allNw=[]; per.forEach(function(x){ allNw=allNw.concat(x.nw); }); var byAll={}; allNw.forEach(function(r){ var v=val(r); (byAll[v]=byAll[v]||[]).push(r); });
     h+=tpl`<tr style="background:var(--surface-2,rgba(0,0,0,.03));font-weight:700"><td>합계</td>${rawHtml(cols.map(function(o){ var n=crN(byAll[o[0]]||[]); return tpl`<td class="n">${rawHtml(n||'–')} <span class="mini" style="color:var(--muted)">${allNw.length? Math.round(n/allNw.length*100):0}%</span></td>`; }).join(''))}<td class="n" style="border-left:1px solid var(--ring)">${rawHtml(crN(allNw))}</td></tr>`;
     var cndIn=0; allNw.forEach(function(r){ if(r.line==='S1' && String(r.saleType||'')==='CND') cndIn++; });
-    h+=tpl`</tbody></table></div><p class="pr-note" style="margin:8px 0 0">신규 = 회사의 첫 원계약(부속 계약 제외) · 두 제품을 같은 달에 시작하면 먼저 등록된 계약 기준 · 판매 채널·파트너가 비어 있으면 (미지정) · 위의 지원사업·CND 옵션과 필터가 그대로 적용됩니다`+ tpl`${rawHtml(CR.cnd? (cndIn? tpl` · <b>이 표에는 CND(DeviceKeeper→S1 Basic) 전환 고객 ${rawHtml(cndIn)}곳이 들어 있습니다</b> — 매출시트 통계와 맞추려면 위에서 «매출시트 기준»을 누르세요`:'') : ' · <b>CND 전환 고객은 제외된 상태</b>입니다 — LIVE 고객사 수와 맞추려면 «LIVE 기준»을 누르세요')}</p></div>`;
+    h+=tpl`</tbody></table></div><p class="pr-note" style="margin:8px 0 0">신규 = 회사의 첫 원계약(부속 계약 제외) · 두 제품을 같은 달에 시작하면 먼저 등록된 계약 기준 · 판매 채널·파트너가 비어 있으면 (미지정) · 위의 지원사업·CND 옵션과 필터가 그대로 적용됩니다`+ tpl`${rawHtml(CR.cnd? (cndIn? tpl` · <b>이 표에는 CND(DeviceKeeper→S1 Basic) 전환 고객 ${rawHtml(cndIn)}개사가 들어 있습니다</b> — 매출시트 통계와 맞추려면 위에서 «매출시트 기준»을 누르세요`:'') : ' · <b>CND 전환 고객은 제외된 상태</b>입니다 — LIVE 고객사 수와 맞추려면 «LIVE 기준»을 누르세요')}</p></div>`;
   })();
   /* ② 제품별 기말 고객사 */
   if(lineG){
     var cols=lineG.opts.filter(function(o){ var sel=CR.f.line||[]; return !sel.length || sel.indexOf(o[0])>=0; });
-    h+=tpl`<div class="pr-card" style="margin-bottom:12px"><h3>제품별 기말 고객사 <small>칸 = 기말 고객사 (순증) · 한 고객이 두 제품을 쓰면 제품마다 1곳 — 전체는 회사 단위라 제품 합보다 작을 수 있음</small></h3><div style="overflow-x:auto" tabindex="0" role="region" aria-label="표 — 옆으로 스크롤"><table class="pr"><thead><tr><th>기간</th>${rawHtml(cols.map(function(o){return tpl`<th class="n">${o[1]}</th>`;}).join(''))}<th class="n">전체(중복 제거)</th></tr></thead><tbody>`;
+    h+=tpl`<div class="pr-card" style="margin-bottom:12px"><h3>제품별 기말 고객사 <small>칸 = 기말 고객사 (순증) · 한 고객이 두 제품을 쓰면 제품마다 1개사 — 전체는 회사 단위라 제품 합보다 작을 수 있음</small></h3><div style="overflow-x:auto" tabindex="0" role="region" aria-label="표 — 옆으로 스크롤"><table class="pr"><thead><tr><th>기간</th>${rawHtml(cols.map(function(o){return tpl`<th class="n">${o[1]}</th>`;}).join(''))}<th class="n">전체(중복 제거)</th></tr></thead><tbody>`;
     P.forEach(function(p){
       h+=tpl`<tr><td><b>${p.l}</b></td>${rawHtml(cols.map(function(o){
         var mm=function(r){ return crMatch(r) && r.line===o[0]; };
@@ -1542,14 +1542,14 @@ export function kxCustMrr(list, j, title, cap){
   var m={}; list.forEach(function(k){ var r=ST.DATA.rows[k], a=ST.MAT[k][j]||0; if(!a) return; var o=(m[r.cust]=m[r.cust]||{a:0,n:0,ln:{},ch:chOf(r)}); o.a+=a; o.n++; o.ln[lline(r.line)]=1; });
   var rows=Object.keys(m).map(function(c){ var o=m[c]; return {_cust:c, c:[esc(c), esc(Object.keys(o.ln).join(' + ')), esc(o.ch), o.n, won(o.a)], s:o.a}; }).sort(function(x,y){ return y.s-x.s; });
   var tot=rows.reduce(function(a,x){ return a+x.s; },0);
-  kpiTable(title+' — '+rows.length+'곳 · '+won(tot)+'천원', (cap||'')+' · '+mk(j)+' 인식 금액이 있는 고객사(계약 여러 건은 합산) · 행을 누르면 계약 화면', [{l:'고객사'},{l:'서비스'},{l:'채널'},{l:'계약 수',n:true},{l:'월 금액(천원)',n:true}], rows, title);
+  kpiTable(title+' — '+rows.length+'개사 · '+won(tot)+'천원', (cap||'')+' · '+mk(j)+' 인식 금액이 있는 고객사(계약 여러 건은 합산) · 행을 누르면 계약 화면', [{l:'고객사'},{l:'서비스'},{l:'채널'},{l:'계약 수',n:true},{l:'월 금액(천원)',n:true}], rows, title);
 }
 /* 해지 분석 행(churnRows 결과) 목록 */
 export function kxChurn(items, title, cap, byAmt){
   var rows=items.slice().sort(function(a,b){ return byAmt? (b.amt-a.amt) : (b.e-a.e || b.amt-a.amt); }).map(function(x){
     return {_cust:x.cust, c:[esc(x.cust), esc(x.line), esc(x.channel), esc(x.ctype), x.ym, esc(x.reason), esc(x.note), x.sup?'지원사업':'일반', won(x.amt)]}; });
   var tot=items.reduce(function(a,x){ return a+x.amt; },0), cu={}; items.forEach(function(x){ cu[x.cust]=1; });
-  kpiTable(title, (cap||'')+' · '+items.length+'건 · 고객사 '+Object.keys(cu).length+'곳 · 직전 월액 합 '+won(tot)+'천원 (연환산 '+won(tot*12)+'천원) · 행을 누르면 계약 화면',
+  kpiTable(title, (cap||'')+' · '+items.length+'건 · 고객사 '+Object.keys(cu).length+'개사 · 직전 월액 합 '+won(tot)+'천원 (연환산 '+won(tot*12)+'천원) · 행을 누르면 계약 화면',
     [{l:'고객사'},{l:'서비스'},{l:'채널'},{l:'구분'},{l:'해지월'},{l:'사유'},{l:'비고'},{l:'지원'},{l:'직전 월액(천원)',n:true}], rows, title);
 }
 /* LIVE 명단 행 목록 */
@@ -1557,7 +1557,7 @@ export function kxLive(lv, title, cap){
   var rows=lv.slice().sort(function(a,b){ return String(a.cust).localeCompare(String(b.cust),'ko'); }).map(function(x){
     return {_cust:x.cust, c:[esc(x.cust), esc(lline(x.line)), esc(x.prod||''), esc(x.ind||''), x.nodes!=null? Number(x.nodes).toLocaleString('ko-KR'):'', esc(String(x.start||'').slice(0,7)), esc(String(x.end||'').slice(0,7)), (x.dup?'중복표시':'')]}; });
   var u={}; lv.forEach(function(x){ u[x.cust]=1; });
-  kpiTable(title, (cap||'')+' · '+lv.length+'건 · 고객사 '+Object.keys(u).length+'곳 · LIVE 명단 시트 기준 · 행을 누르면 LIVE 화면', [{l:'고객사'},{l:'서비스'},{l:'제품'},{l:'산업군'},{l:'노드',n:true},{l:'시작'},{l:'종료'},{l:''}], rows, title, 'live');
+  kpiTable(title, (cap||'')+' · '+lv.length+'건 · 고객사 '+Object.keys(u).length+'개사 · LIVE 명단 시트 기준 · 행을 누르면 LIVE 화면', [{l:'고객사'},{l:'서비스'},{l:'제품'},{l:'산업군'},{l:'노드',n:true},{l:'시작'},{l:'종료'},{l:''}], rows, title, 'live');
 }
 /* OI 건 목록 */
 export function kxOi(items, title, cap){
@@ -1639,7 +1639,7 @@ export function renderChurn(){
   h+=tpl`<div class="pr-card" style="margin-bottom:14px"><h3>${mk(CHURN.f)} ~ ${mk(CHURN.t)} 요약 <span class="ubadge sm">₩ 천원</span></h3>`+
     tpl`<div class="pr-out" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">`+
     tpl`${rawHtml(kpi('해지', totN+'건', tpl`지원사업 <a href="#" data-kxs="sup" style="font-weight:700">${rawHtml(supN)}건</a> · 그 외 <a href="#" data-kxs="org" style="font-weight:700">${totN-supN}건</a>`,'ch_all'))}`+
-    tpl`${rawHtml(kpi('고객사', Object.keys(custN).length+'곳','','ch_cust'))}`+
+    tpl`${rawHtml(kpi('고객사', Object.keys(custN).length+'개사','','ch_cust'))}`+
     tpl`${rawHtml(kpi('이탈 월액 합',won(totA)+'천원','해지 직전 월 매출 기준','ch_amt'))}`+
     tpl`${rawHtml(kpi('연환산 손실',won(totA*12)+'천원','ARR 감소분','ch_amt'))}`+
     tpl`</div></div>`;
@@ -1728,7 +1728,7 @@ export function renderChurn(){
   (function(){ var per=mk(CHURN.f)+'~'+mk(CHURN.t), capC='해지 분석 '+per+' · 현재 검색·열 필터 적용';
     kxWire(host, {
       ch_all:function(){ kxChurn(inR, per+' 해지 '+inR.length+'건', capC, false); },
-      ch_cust:function(){ var seen={}, one=inR.filter(function(x){ if(seen[x.cust]) return false; seen[x.cust]=1; return true; }); kxChurn(one, per+' 해지 고객사 '+one.length+'곳', capC+' · 고객사마다 1행', false); },
+      ch_cust:function(){ var seen={}, one=inR.filter(function(x){ if(seen[x.cust]) return false; seen[x.cust]=1; return true; }); kxChurn(one, per+' 해지 고객사 '+one.length+'개사', capC+' · 고객사마다 1행', false); },
       ch_amt:function(){ kxChurn(inR, per+' 이탈 월액 — 금액순', capC+' · 해지 직전 월 매출 기준', true); }
     });
     host.querySelectorAll('a[data-kxs]').forEach(function(a){ a.onclick=function(ev){ ev.preventDefault(); ev.stopPropagation(); var sup=a.dataset.kxs==='sup'; var sub=inR.filter(function(x){ return !!x.sup===sup; }); kxChurn(sub, per+' 해지 — '+(sup?'지원사업':'지원사업 외')+' '+sub.length+'건', capC, false); }; });
