@@ -176,8 +176,8 @@ export async function ntfLoad(force){
     var as=NTF.sqlOk? await ntfGet('work_assign?select=kind,ref,assignee,assigned_by,assigned_at&kind=in.(eq,area)&limit=1000') : null;   /* ㊿+185 area = 홈 우선 업무 줄(만기 · 재약정 · 비즈포탈 · 데이터 점검)의 담당 */
     if(!NTF.accounts && NTF.sqlOk) ntfAccounts().then(function(a){ if(a && a.some(function(x){ return x.name; })){ try{ renderTodo(); }catch(e){} try{ ntfSync(); }catch(e){} try{ gnMeSync(); }catch(e){} } });
     if(!ST.IS_EQUIP) swLoad(false).then(function(rows){ if(rows && rows.length){ try{ renderTodo(); }catch(e){} try{ ntfSync(); }catch(e){} } });   /* ㊿+192 계약 없이 쓰는 사이트 → 홈 줄 · 알림함 */   /* ㊿+189 표시 이름을 받아 담당 칸을 이름으로 */
-    var g={}, ar={}; (as||[]).forEach(function(x){ if(x.kind==='area') ar[String(x.ref)]=x; else g[String(x.ref)]=x; }); var hadAsg=Object.keys(NTF.asg).length+Object.keys(NTF.area).length>0; NTF.asg=g; NTF.area=ar; NTF.asgOk=as!==null;
-    if(hadAsg || Object.keys(g).length || Object.keys(ar).length) try{ renderTodo(); }catch(e){}   /* 홈 «우선 업무»의 장비 담당 = 처리 담당 · 줄 담당 */
+    var g={}, ar={}; (as||[]).forEach(function(x){ if(x.kind==='area') ar[String(x.ref)]=x; else g[String(x.ref)]=x; }); var hadAsg=Object.keys(NTF.asg).length+Object.keys(NTF.area).length>0, wasOk=!!NTF.asgOk; NTF.asg=g; NTF.area=ar; NTF.asgOk=as!==null;
+    if(hadAsg || Object.keys(g).length || Object.keys(ar).length || (NTF.asgOk && !wasOk)) try{ renderTodo(); }catch(e){}   /* ㊿+195 담당 표를 처음 읽었으면(비어 있어도) 홈을 다시 그려 «담당 지정» 버튼이 보이게 — 예전엔 먼저 그린 홈에 버튼이 안 나올 때가 있었음 */   /* 홈 «우선 업무»의 장비 담당 = 처리 담당 · 줄 담당 */
     await opsLoad();
     if(ST.IS_SUPER) try{ await fbLoad(true); }catch(e){}   /* ㊿+185 개선 요청 새 건수(알림함) */
     NTF.at=Date.now();

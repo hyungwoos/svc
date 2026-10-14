@@ -49,6 +49,8 @@ export function aiEndpoint(){ return SB_URL + '/functions/v1/ask'; }
    타임아웃을 걸어 반드시 끝나게 하고, 끝나지 않으면 내장 규칙으로 답합니다. */
 export var AI_TIMEOUT_MS = 90000;   // 중계 함수(ask v3.2)의 총 예산 78초 + 여유 — 함수가 예산 안에 반드시 답을 돌려주므로 여기까지 오는 일은 드묾
 export var AI_PING_MS    = 12000;      // 연결 확인은 짧게
+/** ㊿+194 공급자 표시 이름 — ask v3.6 은 'OpenRouter', v3.5 의 ping 은 'openrouter' */
+export function aiProvName(p){ var v=String(p||''); return /^openrouter$/i.test(v)? 'OpenRouter' : /^anthropic$/i.test(v)? 'Anthropic' : v; }
 export async function aiFetch(payload, ms){
   ms = ms || (payload && payload.mode==='ping' ? AI_PING_MS : AI_TIMEOUT_MS);
   var ctl = (typeof AbortController!=='undefined') ? new AbortController() : null;
@@ -198,7 +200,7 @@ export function ask(q, opt){
       say.className='ai-say on';
       say.innerHTML=tpl`<span class="lb">AI</span>${cleanSay(r.text)}`+
         tpl`<div style="font-size:12px;color:var(--muted);margin-top:6px">`+
-        tpl`${String(r.model||'').replace(/^claude-/,'')}`+ tpl`${rawHtml(r.queries&&r.queries.length? tpl` · DB 조회 ${r.queries.length}회 <span title="${r.queries.map(function(q){ return q.tool+' '+((q.ms||0)/1000).toFixed(1)+'s'+(q.error?' ✗':''); }).join(' · ')}">(${aiToolBrief(r.queries)})</span>`:'')}`+ tpl`${rawHtml(r.llm&&r.llm.length? ' · 모델 '+r.llm.length+'회 '+(r.llm.reduce(function(a,x){ return a+(x.ms||0); },0)/1000).toFixed(1)+'s':'')}`+ tpl`${rawHtml(r.cut? tpl` · <span style="color:var(--warn-ink)">${r.degraded? '답 미완성: '+r.cut : '도구 중단: '+r.cut}</span>`:'')}`+ tpl`${rawHtml(r.tried&&r.tried.length? tpl` · <span style="color:var(--warn-ink)">폴백: ${r.tried.join(' / ')}</span>`:'')}`+ tpl`${rawHtml(r._ms? ' · '+(r._ms/1000).toFixed(1)+'초':'')}`+
+        tpl`${String(r.model||'').replace(/^claude-/,'')}`+ tpl`${rawHtml(r.provider? tpl` · <span class="ai-prov" title="AI 를 부른 경로(ask 함수 v3.6+)">${aiProvName(r.provider)}</span>` : '')}`+ tpl`${rawHtml(r.queries&&r.queries.length? tpl` · DB 조회 ${r.queries.length}회 <span title="${r.queries.map(function(q){ return q.tool+' '+((q.ms||0)/1000).toFixed(1)+'s'+(q.error?' ✗':''); }).join(' · ')}">(${aiToolBrief(r.queries)})</span>`:'')}`+ tpl`${rawHtml(r.llm&&r.llm.length? ' · 모델 '+r.llm.length+'회 '+(r.llm.reduce(function(a,x){ return a+(x.ms||0); },0)/1000).toFixed(1)+'s':'')}`+ tpl`${rawHtml(r.cut? tpl` · <span style="color:var(--warn-ink)">${r.degraded? '답 미완성: '+r.cut : '도구 중단: '+r.cut}</span>`:'')}`+ tpl`${rawHtml(r.tried&&r.tried.length? tpl` · <span style="color:var(--warn-ink)">폴백: ${r.tried.join(' / ')}</span>`:'')}`+ tpl`${rawHtml(r._ms? ' · '+(r._ms/1000).toFixed(1)+'초':'')}`+
         tpl` · ${rawHtml(new Date().toTimeString().slice(0,5))} 답함${rawHtml(ST.LAST_LOAD? ' · 화면 요약은 '+esc(new Date(ST.LAST_LOAD).toTimeString().slice(0,5))+' 에 읽은 데이터' : '')}`+
         tpl`<span class="ai-fb" role="group" aria-label="이 답변 평가"><button type="button" data-fb="up" aria-label="도움이 됐어요" title="도움이 됐어요">👍</button><button type="button" data-fb="down" aria-label="틀렸거나 부족해요" title="틀렸거나 부족해요 — 무엇이 틀렸는지 적으면 AI 지식 보강에 씁니다">👎</button></span></div>`+aiSrcHtml(r.queries);
       r._ctx=(opt.ctx && opt.ctx.text) || null;

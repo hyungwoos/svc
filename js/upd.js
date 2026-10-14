@@ -303,6 +303,31 @@ export var UPD_SEED=[
     '- 스크립트가 처리한 메일마다 기록이 남아 인바운드 목록에 «자동 회신» 열(보냄 16:09 · 초안 · 건너뜀 · 확인 필요)로 보이고, 카드에서 마지막 실행 · 오늘 건수 · 전체 기록을 봅니다. «지금 실행»으로 5분을 기다리지 않고 돌릴 수 있습니다.',
     '- 임대 장비 대시보드 차트가 창을 좁히거나 폰으로 볼 때 화면 밖으로 넘치던 것을 고쳤습니다(창 폭이 바뀌면 차트를 다시 그림).',
   ].join('\n')}
+  ,{ver:'㊿+194', date:'2026-10-14', title:'AI 는 OpenRouter 로 · AI 비용 탭 정리 · 장비 현황 회수일 · 출고일 기준', body:[
+    '- (관리자) «AI 비용» 탭을 뺐습니다 — AI 는 OpenRouter 로 옮겼고 Anthropic 결제는 해지합니다. AI 답 밑에 어느 경로로 답했는지(OpenRouter)가 함께 보입니다.',
+    '- 임대 장비 현황의 «출고일»이 설치희망일이 아니라 수령희망일(없으면 신청일)로 들어갑니다. 한 번 정해진 출고일은 신청을 고쳐도 바뀌지 않습니다.',
+    '- 회수일이 없는 회수완료 신청을 맞출 때 «오늘»을 회수일로 넣지 않습니다(비워 두고 ⚠ 미입력 표시). 신청은 회수 전인데 현황에 회수일이 남은 장비는 «신청 내역 기준으로 현황 맞추기»에서 바로잡습니다.',
+    '- Cloud 사이트 수정이 «권한 없음»으로 실패하면 이유와 할 일(권한 위임 · 만든 API 계정으로)을 함께 보여 줍니다. 이력의 요청자는 이름으로 보입니다.',
+  ].join('\n')}
+  ,{ver:'㊿+195', date:'2026-10-14', title:'Cloud 사이트 요청 이력을 한 화면에 · 메시지는 펼쳐 보기', body:[
+    '- Cloud 사이트 관리의 요청 이력이 가로 스크롤 없이 한 화면에 들어옵니다. 실패 줄은 결과 칸에 «권한 없음 · 키 오류 · 변경 없음»처럼 짧게만 보이고, 메시지 원문 · 할 일 · API 계정 · 메모는 «메시지 ▾»를 눌러 펼쳐 봅니다(«메시지 모두 보기»로 한 번에).',
+    '- 이력의 일시가 한국 시각으로 보입니다(예전엔 9시간 이르게 보였음). API 계정 목록을 못 불러오면 «계정이 없습니다» 대신 «불러오지 못했습니다 · 다시 시도»가 나옵니다.',
+  ].join('\n')}
+  ,{ver:'㊿+196', date:'2026-10-14', title:'에스원 정산 — 리스트 지급금액 = 비즈포탈 회계매출(설치비 · 철거비 제외) · 메뉴 재진입 때 검색 · 필터 비움', body:[
+    '- 에스원 사용료 정산의 «에스원 청구 총액»이 리스트 머리의 «지급금액»과 같은 값이 됩니다. EDR · MDR 같은 기타 서비스도 합계에 들어가고 비즈포탈과 건별로 맞춥니다(예전엔 «분류되지 않음»으로 빠졌음).',
+    '- 비즈포탈의 «철거비»는 설치비처럼 일회성으로 보고 사용료 대조 · 회계매출 합계에서 뺍니다(따로 보여 줌). 그래서 두 합계가 같으면 차액 0 입니다. 일할 소수점 때문에 1원 미만으로 다른 줄은 0 으로 봅니다.',
+    '- 목록(계약 · OI · 장비 등)에서 검색하거나 필터를 건 뒤 다른 메뉴에 갔다가 메뉴로 다시 들어오면 검색어 · 필터는 비워집니다(정렬은 그대로). «←» 뒤로가기로 돌아오면 보던 조건 그대로입니다.',
+  ].join('\n')}
+  ,{ver:'㊿+197', date:'2026-10-14', title:'Cloud 사이트 API 키를 암호화 보관 · 키 교체', body:[
+    '- (슈퍼 관리자) Cloud 사이트 관리 › API 계정 관리에 «키 교체»가 생겼습니다. CSM(my.genians)에서 키를 재발급하면 같은 계정(라벨 · 이메일 · 이력 그대로)으로 키만 바꿉니다. 키는 서버의 암호화 보관함에만 남고 화면 · 기록에는 나오지 않습니다.',
+    '- 계정을 삭제하면 서버에 보관한 키도 함께 지웁니다.',
+  ].join('\n')}
+  ,{ver:'㊿+198', date:'2026-10-14', title:'견적서 단가 = 가격표', body:[
+    '- 견적 시스템의 소비자 단가가 포탈 «가격표»의 SaaS 최신 판을 따릅니다. 가격표에 새 판을 올리면 견적서도 그 단가로 계산합니다(화면 위에 «단가: 가격표 … 기준» 표시 · 인쇄에는 안 나옴).',
+    '- Cloud NAC · ZTNA PA 는 약정 기간별 단가(무약정 · 1년 · 2년 · 3년)를 가격표대로 씁니다. ZTNA PA 단가도 가격표 기준으로 바뀌었습니다.',
+    '- 품목 추가: MDR Add-on 24×7 · Genian MDR 통합 · 로그 장기 저장(500GB · 1TB · 10TB) · Slack 1일 보고 추가 관리자 계정.',
+    '- 이미 저장한 견적은 저장할 때의 단가 그대로 열립니다.',
+  ].join('\n')}
 ];
 export async function updFetch(path, opt){   /* 캐시를 건드리지 않는 직접 호출 — 401 이면 토큰 갱신 뒤 1회 재시도 */
   if(!ST.SB_TOKEN) throw new Error('로그인이 필요합니다');
@@ -348,8 +373,9 @@ export function updShow(notes, opt){
 }
 /* 슈퍼 관리자가 열 때 — DB 에 없는 ver 만 넣기(오래된 것부터 → id 가 날짜 순) */
 export async function updSyncSeed(){
-  if(!ST.IS_SUPER || IS_QA) return 0;
+  if(!ST.IS_SUPER || IS_QA || !ST.SB_TOKEN) return 0;
   var have=await updFetch('upd_notes?select=ver');
+  if(!ST.SB_TOKEN) return 0;
   var set={}; (have||[]).forEach(function(r){ if(r.ver) set[r.ver]=1; });
   var add=UPD_SEED.filter(function(s){ return !set[s.ver]; }).map(function(s){ return {ver:s.ver, title:s.title, body:s.body, published_on:s.date, created_by:'포탈 '+(APP_VER||'')+' (자동)'}; });
   if(add.length) await updFetch('upd_notes', {method:'POST', body:JSON.stringify(add), headers:Object.assign(sbHeaders(true), {Prefer:'return=minimal'})});
@@ -359,6 +385,7 @@ export async function updSyncSeed(){
 export async function updCheck(){
   if(UPD.checked || !ST.SB_TOKEN || IS_QA) return; UPD.checked=true;
   try{ await updSyncSeed(); }catch(e){ /* 표 없음(SQL 96 전) 등 — 조용히 */ }
+  if(!ST.SB_TOKEN) return;   /* ㊿+195 그 사이 로그아웃했으면 부르지 않음(로그아웃 뒤 서버 호출 0) */
   try{
     var r=await updRpc('upd_pending', {});
     if(r && r.notify && Array.isArray(r.notes) && r.notes.length) updShow(r.notes, {mode:'ack', first:!r.last_id});

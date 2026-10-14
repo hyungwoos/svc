@@ -102,7 +102,13 @@ function parseS1Use(cells){
     if(line.edate) cur.edate=line.edate;
     if(line.fill==='FFFF00') cur.fill='FFFF00';
   }
-  return { groups:groups, lines:lines, cols:C, head:h.row };
+  /* ㊿+196 리스트 머리의 «지급금액»(에스원이 낸 합계) — 포탈 합계와 맞는지 보여줌 */
+  var headTotal=null;
+  for(var hr=0;hr<h.row && headTotal==null;hr++){ var hrow=cells[hr]||[];
+    for(var hc=0;hc<hrow.length;hc++){ if(hrow[hc] && /지급\s*금액/.test(String(hrow[hc].v||''))){
+      for(var hk=hc+1;hk<hrow.length;hk++){ var hv=hrow[hk]&&hrow[hk].v; if(typeof hv==='number' && hv>0){ headTotal=hv; break; } if(hv!=null && hv!=='' && isFinite(Number(String(hv).replace(/[,\s원]/g,''))) && Number(String(hv).replace(/[,\s원]/g,''))>0){ headTotal=Number(String(hv).replace(/[,\s원]/g,'')); break; } }
+      break; } } }
+  return { groups:groups, lines:lines, cols:C, head:h.row, headTotal:headTotal };
 }
 
 /* ② 비즈포탈 영업현황 엑셀 */
@@ -119,7 +125,7 @@ function parseBiz(cells){
     var proj=String(g(C.proj)||'');
     rows.push({ no:Math.round(n(no)), proj:proj, cust:String(g(C.cust)||''), stage:String(g(C.stage)||''),
                 acc:n(g(C.acc)), sales:n(g(C.sales)), ch:String(g(C.ch)||''),
-                kind: /설치비/.test(proj)?'install' : (/정산/.test(proj)?'settle':'use'),
+                kind: /설치비/.test(proj)?'install' : (/철거비|회수비/.test(proj)?'once' : (/정산/.test(proj)?'settle':'use')),   /* ㊿+196 철거비 = 일회성(설치비처럼 사용료 대조에서 뺌) */
                 name: (proj.match(/^\[[^\]]*\]\s*(.+?)\s+S1\s+Cloud/i)||[])[1] || (proj.match(/^(.+?)\s+Cloud\s*NAC/i)||[])[1] || '' });
   }
   return rows;
@@ -186,7 +192,19 @@ function matchUse(){
   nac.forEach(function(g){ g.groupSum=g.biz?sums[g.biz.no]:0; g.diff=g.biz?(g.biz.acc-sums[g.biz.no]):0; });
   S.use.nac=nac;
   S.use.dk=G.filter(function(g){ return g.prod==='dk'; });
-  S.use.etc=G.filter(function(g){ return g.prod==='etc'; });   /* ㊿+191 분류 안 된 서비스 — 합계엔 안 들어감(예전부터) · 대조표에 «확인 필요»로 보임 */
+  /* ㊿+196 기타 서비스(EDR · MDR 등) — 에스원 리스트 «지급금액»에 들어 있으므로 합계에 넣고 비즈포탈 사용료와도 맞춤(예전엔 «분류되지 않음»으로 합계에서 빠져 차액이 남았음) */
+  var etc=G.filter(function(g){ return g.prod==='etc'; });
+  etc.forEach(function(g){
+    g.biz=null; g.by=null;
+    var nm2=String(g.nm||'').replace(/mdr|edr/ig,' ');
+    var m=g.cno&&mapByCno[g.cno];
+    if(m&&m.biz_no){ var b=biz.find(function(x){ return x.no===m.biz_no && !used[x.no]; }); if(b){ g.biz=b; g.by='map'; used[b.no]=1; } }
+    if(!g.biz){ var c=biz.filter(function(b){ return !used[b.no] && (nameHit(b.cust,nm2) || (b.name&&nameHit(b.name,nm2))); }); if(c.length>1) c=c.filter(function(b){ return Math.abs(b.acc-g.amt)<1; }); if(c.length===1){ g.biz=c[0]; g.by='name'; used[c[0].no]=1; } }
+    if(!g.biz && g.amt){ var c2=biz.filter(function(b){ return !used[b.no] && Math.abs(b.acc-g.amt)<1; }); if(c2.length===1){ g.biz=c2[0]; g.by='amt'; used[c2[0].no]=1; } }
+    g.diff=g.biz? g.biz.acc-g.amt : 0;
+  });
+  S.use.etc=etc;
+  S.use.bizOnce=S.biz.filter(function(b){ return b.kind==='once'; });
   S.use.bizUse=biz;
   S.use.bizSettle=S.biz.filter(function(b){ return b.kind==='settle'; });
   countUse();
@@ -200,7 +218,7 @@ function useFlags(g, ym){
 }
 /* ㊿+191 대조표 보조 — 비즈포탈(사용료)에만 있고 에스원 계약이 안 붙은 건 · 디바이스키퍼 ↔ 비즈포탈 «대금 정산» */
 function bizOnlyRows(){
-  var used={}; (S.use.nac||[]).forEach(function(g){ if(g.biz) used[g.biz.no]=1; });
+  var used={}; (S.use.nac||[]).concat(S.use.etc||[]).forEach(function(g){ if(g.biz) used[g.biz.no]=1; });   /* ㊿+196 기타 서비스에 붙은 건도 */
   return (S.use.bizUse||[]).filter(function(b){ return !used[b.no]; });
 }
 function kindOf(g){ return g.isNew?'신규':(g.isEnd?'해약':(g.isExt?'연장':'기존')); }
@@ -242,24 +260,38 @@ function matchInst(){
 /* ─────────────────────────────────────────────────────────────
    화면
    ───────────────────────────────────────────────────────────── */
+/* ㊿+196 합계 한곳 — 에스원 리스트 금액(클라우드NAC + 디바이스키퍼 + 기타 서비스 · 일할 소수점은 끝에서 반올림 = 리스트 머리 «지급금액»)
+   ↔ 비즈포탈 회계매출(사용료 + 대금 정산 · 설치비 · 철거비 같은 일회성은 뺌). 둘이 같아야 정상(사용자 기준) */
+function useTot(){
+  var U=S.use||{}, sum=function(a,f){ return (a||[]).reduce(function(s,x){ return s+f(x); },0); }, amt=function(g){ return Number(g.amt)||0; }, acc=function(b){ return Number(b.acc)||0; };
+  var t={ nac:sum(U.nac,amt), dk:sum(U.dk,amt), etc:sum(U.etc,amt), bizUse:sum(U.bizUse,acc), bizSet:sum(U.bizSettle,acc), once:U.bizOnce||[], head:U.headTotal==null? null : Number(U.headTotal) };
+  /* 청구 총액 = 리스트 머리 «지급금액»(에스원이 낸 값 · 일할 소수점 처리도 그쪽 기준) — 없으면 금액 합을 반올림. 머리 값과 금액 합이 1원 넘게 다르면 줄을 덜 읽은 것(경고) */
+  t.raw=t.nac+t.dk+t.etc; t.headOff=t.head!=null && Math.abs(t.head-t.raw)>=1; t.s1=(t.head!=null && !t.headOff)? t.head : Math.round(t.raw);
+  t.round=t.s1-t.raw; t.biz=t.bizUse+t.bizSet; t.diff=t.s1-t.biz; t.onceSum=sum(t.once,acc);
+  t.nInst=(S.biz||[]).filter(function(b){ return b.kind==='install'; }).length;
+  return t;
+}
 function renderUse(){
   if(!S.use||!S.use.nac) return;
-  var nac=S.use.nac, dk=S.use.dk||[];
-  var nacSum=nac.reduce(function(a,g){ return a+g.amt; },0);
-  var dkSum=dk.reduce(function(a,g){ return a+g.amt; },0);
-  var bizUse=(S.use.bizUse||[]).reduce(function(a,b){ return a+b.acc; },0);
-  var bizSet=(S.use.bizSettle||[]).reduce(function(a,b){ return a+b.acc; },0);
-  var need=nac.filter(function(g){ return !g.biz; }).length;
-  var diffs=nac.filter(function(g){ return g.biz && Math.abs(g.diff)>=1; }).length;
-  var fee=Math.round((nacSum+dkSum)*n(S.cfg.fee&&S.cfg.fee.rate||5)/100);
+  var nac=S.use.nac, dk=S.use.dk||[], etc=S.use.etc||[], T=useTot();
+  var nacSum=T.nac, dkSum=T.dk;
+  var need=nac.filter(function(g){ return !g.biz; }).length+etc.filter(function(g){ return !g.biz; }).length;
+  var diffs=nac.concat(etc).filter(function(g){ return g.biz && Math.abs(g.diff)>=1; }).length;
+  var fee=Math.round((nacSum+dkSum)*n(S.cfg.fee&&S.cfg.fee.rate||5)/100);   /* 수수료 기준은 그대로(클라우드NAC + 디바이스키퍼) */
+  var headOk=T.head==null? null : !T.headOff;
   $('#uTiles').innerHTML=
     tile('클라우드NAC', tpl`${rawHtml(fmt(nacSum))} <span class="mini">${nac.length}건</span>`)+
     tile('디바이스키퍼(임대 포함)', tpl`${rawHtml(fmt(dkSum))} <span class="mini">${dk.length}건</span>`)+
-    tile('에스원 청구 총액', fmt(nacSum+dkSum))+
-    tile('비즈포탈 회계매출', tpl`${rawHtml(fmt(bizUse+bizSet))} <span class="mini">${rawHtml((S.use.bizUse||[]).length+(S.use.bizSettle||[]).length)}건</span>`)+
-    tile('차액', fmt((nacSum+dkSum)-(bizUse+bizSet)), Math.abs((nacSum+dkSum)-(bizUse+bizSet))<1?'ok':'bad')+
+    (etc.length? tile('기타 서비스(EDR·MDR 등)', tpl`${rawHtml(fmt(T.etc))} <span class="mini">${etc.length}건</span>`) : '')+
+    tile('에스원 청구 총액', tpl`${rawHtml(fmt(T.s1))}${rawHtml(headOk==null? '' : headOk? '<div class="mini" style="color:var(--ok,#0a7a2f)">= 리스트 «지급금액» ✓</div>' : tpl`<div class="mini" style="color:var(--warn)">리스트 «지급금액» ${rawHtml(fmt(T.head))} ≠ 금액 합 ${rawHtml(fmt(T.raw))} — 덜 읽은 줄 확인</div>`)}`, headOk===false? 'bad' : '')+
+    tile('비즈포탈 회계매출', tpl`${rawHtml(fmt(T.biz))} <span class="mini">${rawHtml((S.use.bizUse||[]).length+(S.use.bizSettle||[]).length)}건</span>${rawHtml(T.nInst||T.once.length? tpl`<div class="mini">설치비 ${rawHtml(T.nInst)} · 철거비 ${rawHtml(T.once.length)}건 뺌</div>` : '')}`)+
+    tile('차액', fmt(T.diff), Math.abs(T.diff)<1?'ok':'bad')+
     tile('미매칭 / 금액 차이', need+' / '+diffs, (need+diffs)?'bad':'ok')+
     tile('파트너 수수료 '+(S.cfg.fee&&S.cfg.fee.rate||5)+'%', fmt(fee));
+  /* ㊿+196 표 위 한 줄 — 기타 서비스(EDR·MDR) 대조 · 일회성(철거비) */
+  var ex=document.getElementById('uExtra'); if(!ex){ ex=document.createElement('div'); ex.id='uExtra'; ex.className='mini'; ex.style.cssText='margin:6px 0 2px;line-height:1.7'; var ut=$('#uTiles'); ut.parentNode.insertBefore(ex, ut.nextSibling); }
+  ex.innerHTML=(etc.length? tpl`<div>기타 서비스 ${rawHtml(etc.length)}건(청구 총액에 들어감): ${rawHtml(etc.map(function(g){ return tpl`<b>${g.nm}</b> ${rawHtml(fmt(g.amt))}`+(g.biz? tpl` ↔ ${g.biz.no+' · '+g.biz.cust} ${rawHtml(fmt(g.biz.acc))}${rawHtml(Math.abs(g.diff)>=1? tpl` <span style="color:var(--warn)">(차액 ${rawHtml(fmt(g.diff))})</span>`:'')}` : ' <span style="color:var(--warn)">— 비즈포탈 등록번호 없음</span>'); }).join(' · '))}</div>` : '')+
+    (T.once.length? tpl`<div>일회성(철거비) ${rawHtml(T.once.length)}건 · ${rawHtml(fmt(T.onceSum))}원 — 비즈포탈엔 있지만 에스원 대금지급 리스트(월 사용료)엔 없어서 대조에서 뺌(설치비와 같이): ${rawHtml(T.once.map(function(b){ return tpl`${b.no+' '+(b.cust||'')} ${rawHtml(fmt(b.acc))}`; }).join(' · '))}</div>` : '');
   var q=($('#q').value||'').trim().toLowerCase(), only=$('#onlyTodo').checked;
   var list=nac.filter(function(g){
     if(only && g.biz && Math.abs(g.diff)<1) return false;
@@ -278,7 +310,7 @@ function renderUse(){
     if(many) by+=tpl` <span class="tag" title="등록번호 ${rawHtml(g.biz.no)} 하나에 계약 ${rawHtml(bd.n)}건 — 회계매출 · 차액은 묶음의 첫 줄에">묶음</span>`;
     var rest=many && !bd.first, upTag=tpl`<span class="mini" style="color:#999">↑ 묶음</span>`;
     var accCell=!g.biz? '' : (rest? upTag : tpl`${rawHtml(fmt(g.biz.acc))}${rawHtml(many? tpl`<div class="mini">묶음 ${rawHtml(bd.n)}건 · 에스원 합 ${rawHtml(fmt(g.groupSum))}</div>` : '')}`);
-    var diffCell=!g.biz? '' : (rest? upTag : (g.diff? fmt(g.diff) : '0'));
+    var diffCell=!g.biz? '' : (rest? upTag : (Math.abs(g.diff)>=1? fmt(g.diff) : (g.diff? tpl`<span title="일할 소수점 반올림 ${rawHtml((Math.round(g.diff*100)/100).toString())}원">0</span>` : '0')));   /* ㊿+196 1원 미만(일할 소수점)은 0 */
     var pick=tpl`<select class="pick" data-i="${rawHtml(i)}" data-change="pickBiz(this)"><option value="">— 선택 —</option>`+
       tpl`${rawHtml(g.cand.map(function(c){ return tpl`<option value="${rawHtml(c.b.no)}"${g.biz&&g.biz.no===c.b.no?' selected':''}>${c.b.no+' · '+(c.b.cust||c.b.name)+' · '+fmt(c.b.acc)}</option>`; }).join(''))}`+ tpl`${rawHtml(g.biz && !g.cand.some(function(c){ return c.b.no===g.biz.no; })?tpl`<option value="${rawHtml(g.biz.no)}" selected>${g.biz.no+' · '+g.biz.cust}</option>`:'')}</select>`;
     var tr=document.createElement('tr'); tr.className='st-'+st;
@@ -398,10 +430,16 @@ async function dlUseXlsx(){
   aoa.push([]); aoa.push(['디바이스키퍼(임대 포함) — 건별(비즈포탈엔 «대금 정산»으로만 들어가 건별 등록번호 없음)']);   /* ㊿+191 */
   (S.use.dk||[]).forEach(function(g){ if(!g.nm) return; aoa.push([ '', g.cno||'', g.nm, (g.lines||[]).map(function(l){ return l.svc; }).join(' + '), g.amt, '', '', '', kindOf(g), '디바이스키퍼' ]); });
   aoa.push(['디바이스키퍼(임대 포함) 합계','','','',dkSum,'대금 정산 '+(S.use.bizSettle||[]).length+'건',settleSum,settleSum-dkSum]);
+  var etcX=S.use.etc||[], T=useTot();
+  if(etcX.length){ aoa.push([]); aoa.push(['기타 서비스(EDR·MDR 등) — 청구 총액에 들어감']);   /* ㊿+196 */
+    etcX.forEach(function(g){ aoa.push([ g.biz?g.biz.no:'', g.cno||'', g.nm, (g.lines||[]).map(function(l){ return l.svc; }).join(' + '), g.amt, g.biz?g.biz.cust:'', g.biz?g.biz.acc:'', g.biz?g.diff:'', '기타', g.by||'미매칭' ]); }); }
   var bizOnly=bizOnlyRows();
   if(bizOnly.length){ aoa.push([]); aoa.push(['비즈포탈(사용료)에만 있고 에스원 계약이 안 붙은 건 '+bizOnly.length+'건']);
     bizOnly.forEach(function(b){ aoa.push([ b.no, '', b.cust||'', b.proj||'', '', b.cust||'', b.acc, b.acc, '비즈포탈만', '미매칭' ]); }); }
-  aoa.push([]); aoa.push(['총계','','','',S.use.nac.reduce(function(a,g){ return a+g.amt; },0)+dkSum]);
+  if(T.once.length){ aoa.push([]); aoa.push(['일회성(철거비) — 대조 · 합계에서 뺌(설치비와 같이)']);   /* ㊿+196 */
+    T.once.forEach(function(b){ aoa.push([ b.no, '', b.cust||'', b.proj||'', '', b.cust||'', b.acc, '', '일회성', '대조 제외' ]); }); }
+  aoa.push([]); aoa.push(['총계(에스원 청구 · 비즈포탈 회계매출 · 차액)','','','',T.s1,'',T.biz,T.biz-T.s1]);
+  if(T.head!=null) aoa.push(['에스원 리스트 «지급금액»(청구 총액 기준)','','','',T.head,'',T.headOff? '금액 합 '+Math.round(T.raw)+' 과 다름 — 확인' : '금액 합(일할 소수점) '+Math.round(T.raw*100)/100]);
   aoa.push([]); aoa.push(['신규',$('#cNew').value,'해약',$('#cEnd').value,'연장',$('#cExt').value,'기존',$('#cKeep').value]);
   var wb=XLSX.utils.book_new(); var ws=XLSX.utils.aoa_to_sheet(aoa);
   ws['!cols']=[{wch:14},{wch:12},{wch:32},{wch:30},{wch:12},{wch:22},{wch:12},{wch:10},{wch:8},{wch:12}];
@@ -432,16 +470,15 @@ async function saveSettle(kind){
   try{
     var row;
     if(kind==='use'){
-      var nacSum=S.use.nac.reduce(function(a,g){ return a+g.amt; },0);
-      var dkSum=(S.use.dk||[]).reduce(function(a,g){ return a+g.amt; },0);
-      var bizSum=(S.use.bizUse||[]).reduce(function(a,b){ return a+b.acc; },0)+(S.use.bizSettle||[]).reduce(function(a,b){ return a+b.acc; },0);
+      var T=useTot(), nacSum=T.nac, dkSum=T.dk, bizSum=T.biz;
       var rate=n(S.cfg.fee&&S.cfg.fee.rate||5);
-      row={ month:ym+'-01', kind:'use', total:nacSum+dkSum, biz_total:bizSum,
+      row={ month:ym+'-01', kind:'use', total:T.s1, biz_total:bizSum,   /* ㊿+196 total = 에스원 리스트 금액(기타 서비스 포함 · 반올림) — 리스트 머리 «지급금액»과 같은 값 */
             cnt_new:n($('#cNew').value), cnt_end:n($('#cEnd').value), cnt_ext:n($('#cExt').value), cnt_keep:n($('#cKeep').value),
             fee_rate:rate, fee_amount:Math.round((nacSum+dkSum)*rate/100),
             payload:{ nac:S.use.nac.map(useRowOut), dk_total:dkSum, dk_count:(S.use.dk||[]).length,
                       dk:(S.use.dk||[]).map(dkRowOut), biz_only:bizOnlyRows().map(function(b){ return {no:b.no, cust:b.cust, proj:b.proj, acc:b.acc}; }),   /* ㊿+191 대조표에 건별 · 비즈포탈만 */
-                      biz_settle:(S.use.bizSettle||[]).map(function(b){ return {no:b.no,proj:b.proj,acc:b.acc}; }) },
+                      biz_settle:(S.use.bizSettle||[]).map(function(b){ return {no:b.no,proj:b.proj,acc:b.acc}; }),
+                      etc:(S.use.etc||[]).map(useRowOut), once:T.once.map(function(b){ return {no:b.no, cust:b.cust, proj:b.proj, acc:b.acc}; }), head_total:T.head },   /* ㊿+196 */
             created_by:s.u||null };
     }else{
       var sum=S.inst.reduce(function(a,r){ return a+r.amt; },0);
@@ -469,23 +506,24 @@ async function saveSettle(kind){
 function printUse(){
   if(!S.use||!S.use.nac){ msg('mU2','먼저 파일을 올려주세요','bad'); return; }
   var ym=$('#ym').value||'';
-  var nacSum=S.use.nac.reduce(function(a,g){ return a+g.amt; },0);
-  var dkSum=(S.use.dk||[]).reduce(function(a,g){ return a+g.amt; },0);
-  var bizSum=(S.use.bizUse||[]).reduce(function(a,b){ return a+b.acc; },0)+(S.use.bizSettle||[]).reduce(function(a,b){ return a+b.acc; },0);
+  var T=useTot(), nacSum=T.nac, dkSum=T.dk, bizSum=T.biz;
   var rate=n(S.cfg.fee&&S.cfg.fee.rate||5);
-  /* ㊿+191 줄 단위로 맞아떨어지게: 계약별(묶음 한 번) · 디바이스키퍼 ↔ 대금 정산 · 비즈포탈에만 있는 건 */
+  /* ㊿+191 줄 단위로 맞아떨어지게: 계약별(묶음 한 번) · 디바이스키퍼 ↔ 대금 정산 · ㊿+196 기타 서비스(EDR·MDR) · 비즈포탈에만 있는 건 · (따로) 일회성 철거비 */
   var dkRows=(S.use.dk||[]).filter(function(g){ return g.lines && g.lines.length && g.nm; }), etcRows=S.use.etc||[], settle=S.use.bizSettle||[], bizOnly=bizOnlyRows();
   var settleSum=settle.reduce(function(a,b){ return a+b.acc; },0), bizOnlySum=bizOnly.reduce(function(a,b){ return a+b.acc; },0);
   var seenAcc={}, nacAcc=0; S.use.nac.forEach(function(g){ if(g.biz && !seenAcc[g.biz.no]){ seenAcc[g.biz.no]=1; nacAcc+=g.biz.acc; } });
+  var etcAcc=0; etcRows.forEach(function(g){ if(g.biz) etcAcc+=g.biz.acc; });
+  var d1=function(v){ return Math.abs(v)>=1? fmt(v) : ''; };
   printDoc({
     title:'에스원 사용료 정산 대조표 — '+ym,
-    sub:'클라우드NAC 건별 + 디바이스키퍼 · 비즈포탈 영업현황 대조 · 단위: 원(VAT 별도)',
+    sub:'클라우드NAC 건별 + 디바이스키퍼 + 기타 서비스 · 비즈포탈 영업현황(설치비 · 철거비 제외) 대조 · 단위: 원(VAT 별도)',
     summary:[{k:'클라우드NAC',v:fmt(nacSum)+'원 ('+S.use.nac.length+'건)'},
-             {k:'디바이스키퍼',v:fmt(dkSum)+'원'},
-             {k:'청구 총액',v:fmt(nacSum+dkSum)+'원'},
-             {k:'비즈포탈 회계매출',v:fmt(bizSum)+'원'},
-             {k:'차액',v:fmt((nacSum+dkSum)-bizSum)+'원', ok:Math.abs((nacSum+dkSum)-bizSum)<1, bad:Math.abs((nacSum+dkSum)-bizSum)>=1},
-             {k:'파트너 수수료 '+rate+'%',v:fmt((nacSum+dkSum)*rate/100)+'원'}],
+             {k:'디바이스키퍼',v:fmt(dkSum)+'원'}]
+      .concat(etcRows.length? [{k:'기타 서비스(EDR·MDR)',v:fmt(T.etc)+'원 ('+etcRows.length+'건)'}] : [])
+      .concat([{k:'청구 총액',v:fmt(T.s1)+'원'+(T.head==null? ' (금액 합)' : !T.headOff? ' (= 리스트 지급금액)' : ' (리스트 지급금액 '+fmt(T.head)+'원 ≠ 금액 합 — 확인)'), bad:T.headOff},
+             {k:'비즈포탈 회계매출',v:fmt(bizSum)+'원'+(T.nInst||T.once.length? ' (설치비 '+T.nInst+' · 철거비 '+T.once.length+'건 제외)' : '')},
+             {k:'차액',v:fmt(T.diff)+'원', ok:Math.abs(T.diff)<1, bad:Math.abs(T.diff)>=1},
+             {k:'파트너 수수료 '+rate+'%',v:fmt((nacSum+dkSum)*rate/100)+'원'}]),
     cols:[{k:'no',l:'등록번호',w:'8%'},{k:'nm',l:'에스원 고객(서비스제공처)',w:'24%',wrap:true},{k:'cno',l:'계약번호',mini:true,w:'10%'},
           {k:'svc',l:'서비스',mini:true,wrap:true},{k:'amt',l:'에스원 금액',n:true,w:'11%'},{k:'acc',l:'회계매출',n:true,w:'14%',wrap:true},
           {k:'diff',l:'차액',n:true,w:'9%'},{k:'kind',l:'구분',w:'9%'}],
@@ -493,22 +531,27 @@ function printUse(){
       rows.push({ __sec:'클라우드NAC '+S.use.nac.length+'건 — 계약별 비즈포탈 대조' });
       S.use.nac.forEach(function(g){ var bd=bm(g), rest=bd.many && !bd.first; rows.push({ no:g.biz? g.biz.no:'', nm:g.nm, cno:g.cno||'',
         svc:g.lines.map(function(l){ return l.svc; }).join(' + '), amt:fmt(g.amt), acc:!g.biz? '' : (rest? '↑ 묶음' : fmt(g.biz.acc)+(bd.many? ' (묶음 '+bd.n+'건 · 합 '+fmt(g.groupSum)+')' : '')),
-        diff:!g.biz? '' : (rest? '↑ 묶음' : (Math.abs(g.diff)>=1? fmt(g.diff) : '')), kind:kindOf(g),
+        diff:!g.biz? '' : (rest? '↑ 묶음' : d1(g.diff)), kind:kindOf(g),
         __hl:!g.biz||Math.abs(g.diff||0)>=1 }); });
-      rows.push({ nm:'클라우드NAC 합계', amt:fmt(nacSum), acc:fmt(nacAcc), diff:Math.abs(nacAcc-nacSum)>=1? fmt(nacAcc-nacSum):'', __sub:true });
+      rows.push({ nm:'클라우드NAC 합계', amt:fmt(nacSum), acc:fmt(nacAcc), diff:d1(nacAcc-nacSum), __sub:true });
       /* ㊿+191 디바이스키퍼 — 건별 전부(비즈포탈 등록번호가 없어도 · 비즈포탈엔 «대금 정산» 한 줄이라 건별 대조는 없음) */
       rows.push({ __sec:'디바이스키퍼(임대 포함) '+dkRows.length+'건 — 비즈포탈엔 «대금 정산» '+settle.length+'건으로 들어감(건별 등록번호 없음)' });
       if(!dkRows.length && dkSum) rows.push({ nm:'(저장분에 건별 목록이 없음 — 합계만)', amt:fmt(dkSum), kind:'디바이스키퍼' });
       dkRows.forEach(function(g){ rows.push({ no:'', nm:g.nm, cno:g.cno||'', svc:g.lines.map(function(l){ return l.svc; }).join(' + '), amt:fmt(g.amt), acc:'', diff:'', kind:kindOf(g) }); });
-      rows.push({ nm:'디바이스키퍼 합계', amt:fmt(dkSum), acc:fmt(settleSum)+(settle.length? ' (대금 정산 '+settle.length+'건)':''), diff:Math.abs(settleSum-dkSum)>=1? fmt(settleSum-dkSum):'', __sub:true, __hl:Math.abs(settleSum-dkSum)>=1 });
-      if(etcRows.length){ rows.push({ __sec:'분류되지 않은 서비스 '+etcRows.length+'건 — 클라우드NAC · 디바이스키퍼 어느 쪽도 아니어서 합계에 들어가지 않음(확인 필요)' });
-        etcRows.forEach(function(g){ rows.push({ no:'', nm:g.nm, cno:g.cno||'', svc:g.lines.map(function(l){ return l.svc; }).join(' + '), amt:fmt(g.amt), kind:'제외', __hl:true }); }); }
+      rows.push({ nm:'디바이스키퍼 합계', amt:fmt(dkSum), acc:fmt(settleSum)+(settle.length? ' (대금 정산 '+settle.length+'건)':''), diff:d1(settleSum-dkSum), __sub:true, __hl:Math.abs(settleSum-dkSum)>=1 });
+      /* ㊿+196 기타 서비스(EDR·MDR 등) — 청구 총액에 들어가고 비즈포탈과 건별 대조 */
+      if(etcRows.length){ rows.push({ __sec:'기타 서비스(EDR·MDR 등) '+etcRows.length+'건 — 청구 총액에 들어감 · 비즈포탈 사용료와 건별 대조' });
+        etcRows.forEach(function(g){ rows.push({ no:g.biz? g.biz.no:'', nm:g.nm, cno:g.cno||'', svc:g.lines.map(function(l){ return l.svc; }).join(' + '), amt:fmt(g.amt), acc:g.biz? fmt(g.biz.acc):'', diff:g.biz? d1(g.diff):'', kind:'기타', __hl:!g.biz||Math.abs(g.diff||0)>=1 }); });
+        rows.push({ nm:'기타 서비스 합계', amt:fmt(T.etc), acc:fmt(etcAcc), diff:d1(etcAcc-T.etc), __sub:true }); }
       /* ㊿+191 비즈포탈에만 있는 건 — 총 차액에 들어가는데 표엔 안 보이던 것 */
       rows.push({ __sec:'비즈포탈(사용료)에만 있고 에스원 계약이 안 붙은 건 '+bizOnly.length+'건 — 합계 '+fmt(bizOnlySum)+'원(비즈포탈 회계매출에 들어감)' });
       bizOnly.forEach(function(b){ rows.push({ no:b.no, nm:b.cust||'', cno:'', svc:b.proj||'', amt:'', acc:fmt(b.acc), diff:fmt(b.acc), kind:'비즈포탈', __hl:true }); });
+      /* ㊿+196 일회성(철거비) — 대조에서 뺀 것(설치비는 «설치비» 탭) */
+      if(T.once.length){ rows.push({ __sec:'일회성(철거비) '+T.once.length+'건 · '+fmt(T.onceSum)+'원 — 에스원 대금지급 리스트(월 사용료)엔 없어 대조 · 합계에서 뺌(설치비와 같이)' });
+        T.once.forEach(function(b){ rows.push({ no:b.no, nm:b.cust||'', cno:'', svc:b.proj||'', amt:'', acc:'('+fmt(b.acc)+')', diff:'', kind:'일회성' }); }); }
       return rows; })(),
-    foot:[{ nm:'총계(청구 · 회계매출 · 차액)', amt:fmt(nacSum+dkSum), acc:fmt(bizSum), diff:Math.abs(bizSum-(nacSum+dkSum))>=1? fmt(bizSum-(nacSum+dkSum)):'' }],
-    note:'· 차액 맞춰 보기(표의 차액 = 회계매출 − 에스원): 계약별 '+fmt(nacAcc-nacSum)+' + 디바이스키퍼 '+fmt(settleSum-dkSum)+' + 비즈포탈에만 있는 건 '+fmt(bizOnlySum)+' = '+fmt(bizSum-(nacSum+dkSum))+' → 위 요약의 차액(청구 − 비즈포탈) '+fmt((nacSum+dkSum)-bizSum)+'(부호 반대).\n· 연한 노란 줄은 등록번호가 없거나 금액이 다른 건 · 비즈포탈에만 있는 건입니다.\n· 묶음(한 등록번호에 계약 여러 건)은 첫 줄에 회계매출 · 차액(= 회계매출 − 묶음 합)을 쓰고 나머지 줄은 «↑ 묶음»입니다.\n· 건수(클라우드NAC) — 신규 '+$('#cNew').value+' · 해약 '+$('#cEnd').value+' · 연장 '+$('#cExt').value+' · 기존 '+$('#cKeep').value
+    foot:[{ nm:'총계(청구 · 회계매출 · 차액)', amt:fmt(T.s1), acc:fmt(bizSum), diff:d1(bizSum-T.s1) }],
+    note:'· 차액 맞춰 보기(표의 차액 = 회계매출 − 에스원): 계약별 '+fmt(nacAcc-nacSum)+' + 디바이스키퍼 '+fmt(settleSum-dkSum)+(etcRows.length? ' + 기타 서비스 '+fmt(etcAcc-T.etc) : '')+' + 비즈포탈에만 있는 건 '+fmt(bizOnlySum)+(Math.abs(T.round)>=0.005? ' − 일할 소수점(리스트 합 '+(Math.round(T.raw*100)/100).toLocaleString('ko-KR')+' → 청구 '+fmt(T.s1)+') '+(Math.round(T.round*100)/100) : '')+' = '+fmt(bizSum-T.s1)+' → 위 요약의 차액(청구 − 비즈포탈) '+fmt(T.diff)+'(부호 반대).\n· 에스원 청구 총액 = 리스트 머리 «지급금액»(일할 소수점 처리는 에스원 기준 · 머리 값이 없으면 금액 합 반올림) · 비즈포탈 회계매출 = 사용료 + 대금 정산(설치비 · 철거비 제외). 둘이 같으면 정상입니다.\n· 연한 노란 줄은 등록번호가 없거나 금액이 다른 건 · 비즈포탈에만 있는 건입니다. 1원 미만(일할 소수점) 차이는 0 으로 봅니다.\n· 묶음(한 등록번호에 계약 여러 건)은 첫 줄에 회계매출 · 차액(= 회계매출 − 묶음 합)을 쓰고 나머지 줄은 «↑ 묶음»입니다.\n· 건수(클라우드NAC) — 신규 '+$('#cNew').value+' · 해약 '+$('#cEnd').value+' · 연장 '+$('#cExt').value+' · 기존 '+$('#cKeep').value
   });
 }
 /* 에스원 — 설치비 내역서 한 장 출력 */
@@ -630,8 +673,10 @@ async function restoreSettle(id){
       var gsum={}; nac.forEach(function(g){ if(g.biz) gsum[g.biz.no]=(gsum[g.biz.no]||0)+g.amt; }); nac.forEach(function(g){ g.groupSum=g.biz? gsum[g.biz.no] : 0; });   /* ㊿+190 묶음 합(저장분에는 없음) */
       var dkR=Array.isArray(p.dk)? p.dk.map(function(x){ return { row:0, cno:x.cno, nm:x.nm, prod:'dk', amt:Number(x.amt||0), lines:[{svc:x.svc||''}], isNew:x.kind==='new', isEnd:x.kind==='end', isExt:x.kind==='ext' }; }) : [{amt:Number(p.dk_total||0), lines:[]}];   /* ㊿+191 건별(새 저장분) · 예전 저장분은 합계만 */
       var bizOnlyR=(p.biz_only||[]).map(function(b){ return { no:b.no, cust:b.cust||'', proj:b.proj||'', acc:Number(b.acc||0), kind:'use' }; });
-      S.use={ groups:nac, lines:[], nac:nac, dk:dkR,
-              bizUse:(function(){ var seen={}; return nac.filter(function(g){ return g.biz && !seen[g.biz.no] && (seen[g.biz.no]=1); }).map(function(g){ return g.biz; }).concat(bizOnlyR); })(),   /* ㊿+190 묶음은 등록번호 하나로 · ㊿+191 비즈포탈에만 있는 건도(새로 대조할 때와 같은 합계) */
+      var etcR=(p.etc||[]).map(function(x){ return { row:0, cno:x.cno, nm:x.nm, prod:'etc', amt:Number(x.amt||0), lines:[{svc:x.svc||''}], cand:[], biz:x.biz? { no:x.biz, cust:x.biz_cust||'', acc:Number(x.acc||0), proj:'' } : null, by:x.by||null, diff:Number(x.diff||0) }; });   /* ㊿+196 */
+      S.use={ groups:nac.concat(etcR), lines:[], nac:nac, dk:dkR, etc:etcR, headTotal:p.head_total==null? null : Number(p.head_total),
+              bizOnce:(p.once||[]).map(function(b){ return { no:b.no, cust:b.cust||'', proj:b.proj||'', acc:Number(b.acc||0), kind:'once' }; }),
+              bizUse:(function(){ var seen={}; return nac.concat(etcR).filter(function(g){ return g.biz && !seen[g.biz.no] && (seen[g.biz.no]=1); }).map(function(g){ return g.biz; }).concat(bizOnlyR); })(),   /* ㊿+190 묶음은 등록번호 하나로 · ㊿+191 비즈포탈에만 있는 건도 · ㊿+196 기타 서비스에 붙은 것도(새로 대조할 때와 같은 합계) */
               bizSettle:(p.biz_settle||[]).map(function(b){ return {no:b.no, proj:b.proj, acc:Number(b.acc||0), cust:'', kind:'settle'}; }),
               restored:true };
       S.settle.use=r.id;
@@ -704,9 +749,7 @@ async function makeReport(kind){
   try{
     var p, title, amount, nos;
     if(kind==='use'){
-      var nacSum=S.use.nac.reduce(function(a,g){ return a+g.amt; },0);
-      var dkSum=(S.use.dk||[]).reduce(function(a,g){ return a+g.amt; },0);
-      amount=nacSum+dkSum;
+      amount=useTot().s1;   /* ㊿+196 에스원 리스트 금액(기타 서비스 포함) */
       var settleNo=(S.use.bizSettle||[])[0];
       nos=(settleNo?settleNo.no:'')+' 외 신규 '+$('#cNew').value+'건, 해지 '+$('#cEnd').value+'건 \n기존 '+$('#cKeep').value+'건';
       title='클라우드 NAC '+M+'월 대금';
@@ -824,6 +867,7 @@ async function onBiz(f,d){
     markDrop(d,f);
     msg('mU','비즈포탈 '+S.biz.length+'건(사용료 '+S.biz.filter(function(b){return b.kind==='use';}).length+
         ' · 설치비 '+S.biz.filter(function(b){return b.kind==='install';}).length+
+        ' · 철거비 '+S.biz.filter(function(b){return b.kind==='once';}).length+
         ' · 정산 '+S.biz.filter(function(b){return b.kind==='settle';}).length+')을 읽었습니다.','ok');
     if(S.use){ matchUse(); renderUse(); }
     if(S.inst){ matchInst(); renderInst(); }

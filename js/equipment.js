@@ -246,12 +246,22 @@ export async function eqRetSave(){
   btn.disabled=false;
 }
 /* 현황 한 행이 신청과 다른 점 */
+/** ㊿+194 현황 «출고일» — 수령희망일(ship_date) › 신청일(created_at · 한국 날짜) › 오늘 */
+export function eqShipDate(r, todayS){
+  var s=String((r&&r.ship_date)||'').slice(0,10);
+  if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  var c=r&&r.created_at; if(c){ try{ var d=new Date(c); if(!isNaN(d.getTime())) return d.toLocaleDateString('sv-SE', {timeZone:'Asia/Seoul'}); }catch(e){} var c10=String(c).slice(0,10); if(/^\d{4}-\d{2}-\d{2}$/.test(c10)) return c10; }
+  return todayS||null;
+}
 export function eqFieldDiff(o,a){
   var d=[], stA=eqSerialStatus(o, a.serial);
   if(String(a.status||'')!==String(stA||'')) d.push('상태');
   if(String(a.customer||'')!==String(o.customer||'')) d.push('고객사');
   if(o.model   && String(a.model||'')  !==String(o.model))   d.push('모델');
   if(o.channel && String(a.channel||'')!==String(o.channel)) d.push('채널');
+  /* ㊿+194 신청 기준으로 아직 회수 전(임대중 · 재고)인데 현황에 회수일이 남아 있으면 어긋남 — 회계팀이 현황의 회수일로 «회수 장비»를 세므로
+     (맞추기 = syncOrderAssets 가 회수 전 시리얼의 회수일을 비움 · 회수완료인데 날짜가 없는 쪽은 날짜를 지어내지 않도록 여기서 잡지 않음) */
+  if(stA && stA!=='회수완료' && a.returned_date) d.push('회수일');
   return d;
 }
 
@@ -343,8 +353,10 @@ export async function syncOrderAssets(r, st, quiet){
     if(want.length){
       var isPh=!real.length;
       var gone=(stA!=='재고');                                   // 재고(출고 전)는 출고일을 넣지 않습니다
-      var dep=gone? (r.install_date || String(r.created_at||'').slice(0,10) || todayS) : null;
-      var rd=(stA==='회수완료')? (String(r.returned_date||'').slice(0,10) || todayS) : null;   /* 신청의 회수일이 기준 · 없으면 오늘 */
+      /* ㊿+194 출고일 = 수령희망일 › 신청일(한국 날짜) — 예전엔 설치희망일이라 «그달 출고» 집계가 설치 일정에 끌려갔음(회계 요청) */
+      var dep=gone? eqShipDate(r, todayS) : null;
+      /* ㊿+194 회수일은 지어내지 않음 — 신청에 회수일이 없으면 비워 둠(현황에 «⚠ 미입력»). 예전엔 «오늘»을 넣어 일괄 맞추기를 한 달(2026-09)로 회수일이 몰렸음 */
+      var rd=(stA==='회수완료')? (String(r.returned_date||'').slice(0,10) || null) : null;
       var mk=function(sn){
         var o={ serial:sn, model:r.model||null, usage:'임대', status:stA,
                 customer:(r.customer||null),                   /* 회수완료도 고객사를 남깁니다 — 현황에서 고객사로 찾아야 하니까 */
@@ -358,9 +370,11 @@ export async function syncOrderAssets(r, st, quiet){
       var retSet=(stA==='임대중')? eqRetSet(r) : [];
       var mkFor=function(sn){
         var o=mk(sn), U=sn.toUpperCase(), a=cur[U];
-        if(retSet.indexOf(U)>=0){ o.status='회수완료'; o.returned_date=(r._retDates&&r._retDates[U]) || (a&&a.returned_date? String(a.returned_date).slice(0,10):null) || (r.returned_date? String(r.returned_date).slice(0,10):null) || todayS; }
+        /* ㊿+194 출고일은 한 번 정해지면 그대로(이관한 실제 출고일 · 이미 나간 날을 신청을 고칠 때마다 덮지 않음) — 재고로 돌아가면 비움 */
+        if(o.deployed_date && a && a.deployed_date && a.status!=='재고') o.deployed_date=String(a.deployed_date).slice(0,10);
+        if(retSet.indexOf(U)>=0){ o.status='회수완료'; o.returned_date=(r._retDates&&r._retDates[U]) || (a&&a.returned_date? String(a.returned_date).slice(0,10):null) || (r.returned_date? String(r.returned_date).slice(0,10):null) || null; }
         else if(stA==='회수완료'){   /* 전부 회수: 이번에 처리한 시리얼은 이번 날짜, 예전에 먼저 회수된 시리얼은 그때 날짜를 지킵니다 */
-          o.returned_date=(r._retDates&&r._retDates[U]) || (a&&a.returned_date? String(a.returned_date).slice(0,10):null) || (r.returned_date? String(r.returned_date).slice(0,10):null) || todayS; }
+          o.returned_date=(r._retDates&&r._retDates[U]) || (a&&a.returned_date? String(a.returned_date).slice(0,10):null) || (r.returned_date? String(r.returned_date).slice(0,10):null) || null; }
         return o;
       };
       var ins=[], upd=[];
@@ -498,6 +512,7 @@ export async function eqFixAll(){
     '· 현황에 없는 장비 → 신청 내역대로 새로 등록 (시리얼이 비어 있으면 «미등록-신청번호-번호» 로 임시 등록)\n'+
     '· 접수·출하요청·배송중 신청 → 재고 로 등록 / 설치완료·회수예정 → 임대중 / 회수완료 → 회수완료\n'+
     '· 상태·고객사·모델·채널이 다른 장비 → 신청 내역 값으로 덮어쓰기\n'+
+    '· 신청은 회수 전(임대중·재고)인데 현황에 회수일이 남은 장비 → 회수일 비움\n'+
     '· 취소된 신청인데 현황에 남아 있던 장비 → 재고로 되돌림\n'+
     '· 신청에 없는데 붙어 있던 장비 → 연결 해제 후 재고\n\n'+
     '실행 직전 현황을 찍어두므로 «↩ 원복» 버튼으로 되돌릴 수 있습니다.')) return;

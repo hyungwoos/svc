@@ -2,8 +2,8 @@
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { APP_VER, IS_STAGING, ST } from './state.js';
 import { $, applyPerms, axTime, closeBtn, curLook, doLogout, esc, fetchT, IDLE_KEY, IDLE_OPTS, idleLabel, idleMin, idleTouch, keepLogin, loadPerms, logoutAll, LOOKS, mfaCardRender, navText, PERF, PERM_EXEMPT, PERM_OPTIN, pwaHintHtml, pwaInstall, pwaStandalone, pwGen, pwRule, rawHtml, SB_KEY, SB_URL, SESS_MAX_DAYS, sessRead, setLook, STATE, tpl } from './core.js';
-import { cacheDrop, idxDate, ROLE_VIEWS, sbHeaders, sbTry, sbWrite, thisMonthStr, toast, todayStr } from './shell.js';
-import { aiFetch, buildDigest } from './ai.js';
+import { cacheDrop, idxDate, ROLE_VIEWS, sbHeaders, sbTry, sbWrite, toast, todayStr } from './shell.js';
+import { aiFetch, aiProvName, buildDigest } from './ai.js';
 import { applyCodes, CODE_KIND, CODE_KIND_LABEL, CODE_KIND_NOTE } from './grids.js';
 import { navSub, openMenuEdit } from './tools.js';
 import { UPD, updFetch, updOpenAll, updShow, updSyncSeed } from './upd.js';
@@ -432,7 +432,7 @@ export async function opsHealth(){
   OPS.health={running:true, rows:out}; renderOps(true);
   await step('GitHub Pages 최신 index.html', async function(){ var r=await fetchT(prodUrl()+'?nocache='+Date.now(), {cache:'no-store'}, 15000, 'GitHub Pages'); if(!r.ok) throw new Error('HTTP '+r.status); var m=opsVerOf(await r.text()); if(!m) throw new Error('APP_VER 없음'); return m+(m===APP_VER? ' (지금과 같음)':' ← 지금 실행 중 '+APP_VER+(IS_STAGING? ' (스테이징)':' — 새로고침 필요')); });
   await step('Supabase REST (load_all)', async function(){ var r=await fetchT(SB_URL+'/rest/v1/rpc/load_all', {method:'POST', headers:{'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+ST.SB_TOKEN}, body:'{}'}, 30000, 'DB', true); if(!r.ok) throw new Error('HTTP '+r.status); return 'HTTP 200'; });
-  await step('AI (ask ping)', async function(){ var r=await aiFetch({mode:'ping'}, 12000); if(!r || r.ok===false) throw new Error((r&&r.error)||'응답 없음'); return (r.model||'ok'); });
+  await step('AI (ask ping)', async function(){ var r=await aiFetch({mode:'ping'}, 12000); if(!r || r.ok===false) throw new Error((r&&r.error)||'응답 없음'); return (r.model||'ok')+(r.provider? ' · '+aiProvName(r.provider) : '')+(r.version? ' · ask '+r.version : ''); });   /* ㊿+194 공급자 · 함수 버전 */
   await step('remind (dry)', async function(){ var r=await fetchT(SB_URL+'/functions/v1/remind?dry=1', {method:'POST', headers:{'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+ST.SB_TOKEN}, body:JSON.stringify({month:idxDate(STATE.base)})}, 20000, 'remind 함수', true); var j=await r.json(); if(!j.ok) throw new Error(j.error||('HTTP '+r.status)); return '이달 '+(j.counts&&j.counts.due)+' · 다음 달 '+(j.counts&&j.counts.next)+' · 미처리 '+(j.counts&&j.counts.lapsed); });
   await step('ops (status)', async function(){ var r=await opsCall('status'); return (r.github&&r.github.token_set? 'GitHub ✓':'GitHub ✗')+' · '+(r.mgmt_token_set? 'Supabase ✓':'Supabase ✗')+' · '+(r.log_ok? '기록 ✓':'기록 ✗'); });
   if(OPS.pin) await step('운영 DB (select 1 · 읽기 전용)', async function(){ var r=await opsCall('sql_run',{sql:'select 1 as ok, now() as at', read_only:true}); return Array.isArray(r.rows)&&r.rows[0]? String(r.rows[0].at||'').slice(0,19) : 'ok'; });
@@ -881,7 +881,7 @@ export function opsLogBind(host){
   var pb=host.querySelector('#opsPerf'); if(pb) pb.onclick=opsLoadPerf;
 }
 
-/* ㊿+149 관리자 화면 탭 4개 (사용자: «너무 지저분 · 스크롤 많고 난잡») — 계정·권한 / 보안 / 설정(코드 관리·업데이트 안내) / AI 비용
+/* ㊿+149 관리자 화면 탭 (사용자: «너무 지저분 · 스크롤 많고 난잡») — 계정·권한 / 보안 / 설정(코드 관리·업데이트 안내) / 외부 연동 (㊿+194 AI 비용 탭은 뺌)
    · 메뉴를 누르면 첫 탭(viewReset · VIEW_UI.adminx.ADM) · 뒤로가기는 보던 탭 · 데이터는 예전처럼 한 번에 읽고 보이는 탭만 바꿈 */
 export var ADM={tab:'acct'};
 export function admTab(t){
@@ -905,7 +905,6 @@ export function renderAdmin(){
     $('#axCreate').onclick=axCreate;
     var pg=$('#axPwGen'); if(pg) pg.onclick=function(){ var i=/** @type {any} */($('#axPw')); i.value=pwGen(14); i.type='text'; axMsg('초기 비밀번호를 만들었습니다 — 본인에게 1:1 메신저로 전달하세요'); };   /* ㊿+180 */
     var sr=$('#secRun'); if(sr) sr.onclick=secRun;   /* ㊿+180 보안 점검 */
-    $('#abSave').onclick=abSave;
   }
   try{ apBind(); }catch(e){}
   try{ ntfAdminRender(); }catch(e){}   /* ㊿+174 알림 · Slack(기본 꺼짐) */
@@ -914,7 +913,6 @@ export function renderAdmin(){
   try{ updAdminLoad(); }catch(e){}
   try{ API.made=null; apiLoad(); }catch(e){}   /* ㊿+164 외부 연동 — 다시 열면 발급 직후 보이던 키 원문은 지움 */
   axLoad();
-  abLoad();
 }
 /* ── ㊿+172 «담당자 연결» 화면은 ㊿+184 에 뺌 — 홈 · 빠른 보기의 «내 OI» = 붙은 견적서의 작성자(grid.js oiOwnerOf) · 표(user_owner_map)와 값은 그대로(재약정 알림의 계약 CSM 확인에만) ── */
 /* ── 메뉴 권한 (user_perms · SQL 79) — 계정마다 보기/읽기/쓰기, 슈퍼 관리자만 ── */
@@ -1016,54 +1014,7 @@ export function apBind(){
     catch(e){ toast('복사 실패', String(e.message||e).slice(0,100), 'bad'); } };
 }
 
-/* ── AI 사용 비용 (Anthropic Cost API + 충전액 기준 잔여 추정) ── */
-export async function abLoad(){
-  var kpi=$('#axBillKpi'), bars=$('#axBillBars');
-  kpi.innerHTML='<div class="cap">AI 사용 비용을 불러오는 중…</div>'; bars.innerHTML='';
-  var bill=null;
-  try{ var rows=await sbTry('ai_billing?select=*'); bill=(rows&&rows[0])||null; }catch(e){}
-  if(bill){
-    if(!$('#abCredit').value && bill.credit_usd) $('#abCredit').value=bill.credit_usd;
-    if(!$('#abDate').value && bill.baseline) $('#abDate').value=String(bill.baseline).slice(0,10);
-  }
-  var from=(bill&&bill.baseline)? String(bill.baseline).slice(0,10) : todayStr(new Date(Date.now()-29*864e5));
-  var r;
-  try{ r=await adminFetch({action:'ai_cost', from:from}); }
-  catch(e){ kpi.innerHTML=tpl`<div class="cap">⚠ ${String(e.message||e)}</div>`; return; }
-  var credit=bill? Number(bill.credit_usd)||0 : 0;
-  var remain=credit? Math.round((credit-r.total_usd)*100)/100 : null;
-  function box(l,v,s,warn){
-    return tpl`<div class="kpi${warn?'':''}" style="padding:11px 14px"><div style="font-size:12px;color:var(--muted);font-weight:650">${rawHtml(l)}</div>`+
-      tpl`<div style="font-size:18px;font-weight:800;margin-top:2px${warn?';color:var(--critical)':''}">${rawHtml(v)}</div>`+
-      tpl`<div style="font-size:12px;color:var(--muted)">${rawHtml(s)}</div></div>`;
-  }
-  var usd=function(v){ return (v!=null && isFinite(Number(v)))? '$'+Number(v).toLocaleString('en-US') : '—'; };   /* ㊿+151: 값 없으면 $NaN 대신 — (스테이징 QA 가 잡음) */
-  kpi.innerHTML=
-    box('잔여 크레딧 (추정)', remain==null?'충전액 미입력':'$'+remain.toLocaleString('en-US'),
-        remain==null?'아래에 충전액·충전일을 입력하세요':'충전액 $'+credit+' − 사용 $'+r.total_usd, remain!=null&&remain<5)+
-    box('이번 달 사용액', usd(r.month_usd), thisMonthStr()+' 실측 (Cost API)')+
-    box('기준일 이후 사용액', usd(r.total_usd), (r.from||'—')+' 부터 누적')+
-    (r.partial? tpl`<div class="cap" style="grid-column:1/-1;color:var(--warn-ink)">⚠ 일부 기간만 집계됐습니다 — ${String(r.partial)}</div>`:'');
-  var mx=0.01; (r.daily||[]).forEach(function(d){ mx=Math.max(mx,d.usd); });
-  bars.innerHTML=(r.daily&&r.daily.length)?
-    tpl`<div class="mini" style="margin-bottom:4px">최근 14일 일별 사용액</div>`+
-    tpl`<div style="display:flex;align-items:flex-end;gap:3px;height:52px">`+
-    tpl`${rawHtml(r.daily.map(function(d){
-      return tpl`<div title="${rawHtml(d.d)} · $${rawHtml(d.usd)}" style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:2px">`+
-        tpl`<div style="width:100%;border-radius:3px 3px 0 0;background:var(--brand);height:${Math.max(2,Math.round(d.usd/mx*40))}px"></div>`+
-        tpl`<span style="font-size:12px;color:var(--muted)">${rawHtml(d.d.slice(8))}</span></div>`;
-    }).join(''))}`+ tpl`</div>` : '';
-}
-export async function abSave(){
-  var c=+$('#abCredit').value||0, d=$('#abDate').value, m=$('#abMsg');
-  if(!d){ m.textContent='충전일을 입력하세요'; return; }
-  m.textContent='저장 중…';
-  try{
-    await sbWrite('PATCH','ai_billing?id=eq.1',{credit_usd:c, baseline:d, updated_at:new Date().toISOString()});
-    m.textContent='저장됨';
-    abLoad();
-  }catch(e){ m.textContent=String(e.message||e).slice(0,80); }
-}
+/* ㊿+194 «AI 비용» 탭(Anthropic Cost API · 충전액 기준 잔여 추정 · 잔여 계산 · 충전액 저장)은 뺌 — AI 는 OpenRouter 로 옮겼고 Anthropic 결제는 해지(표 ai_billing 은 그대로 둠) */
 /* ── 2단계 인증 정책 (mfa_policy · SQL 89) — 슈퍼 관리자가 계정별 필수·기한 지정, 인증 앱 초기화 ── */
 export var MF={rows:null, bound:false};
 export function mfMsg(t,bad){ var e=$('#mfMsg'); if(e){ e.textContent=t||''; e.style.color=bad? 'var(--critical)':''; } }
@@ -1749,7 +1700,7 @@ export async function qaRun(){
       try{ qaApi(w).navMenu(m.v); }catch(e){ res.push({m:'이동 오류: '+qaText(e.message||e, 100), w:false, d:['navMenu(\''+m.v+'\') 에서 예외: '+String(e.message||e), 'stack: '+String(e.stack||'').split('\n').slice(0,4).join(' ⏎ ')]}); }
       if(m.v==='dash'){ try{ var ab=w.document.getElementById('ccAnaBtn'); if(ab && ab.getAttribute('aria-expanded')!=='true') ab.click(); }catch(e){} }
       await qaRaf(w); await qaSleep(250);
-      if(m.v==='adminx' && await qaWait(function(){ return !!qaApi(w).admTab; }, 6000, 100)){   /* ㊿+153: 관리자 코드는 처음 열 때 받음 — 받을 때까지 */ var tabs=['acct','sec','cfg','bill','api']; for(var i=0;i<tabs.length;i++){ if(!alive()) return; qaApi(w).admTab(tabs[i]); await qaRaf(w); pre(tabs[i], await qaInspect(w, m.v)); } qaApi(w).admTab('acct'); }
+      if(m.v==='adminx' && await qaWait(function(){ return !!qaApi(w).admTab; }, 6000, 100)){   /* ㊿+153: 관리자 코드는 처음 열 때 받음 — 받을 때까지 */ var tabs=['acct','sec','cfg','api']; for(var i=0;i<tabs.length;i++){ if(!alive()) return; qaApi(w).admTab(tabs[i]); await qaRaf(w); pre(tabs[i], await qaInspect(w, m.v)); } qaApi(w).admTab('acct'); }
       else pre('', await qaInspect(w, m.v));
       QA.errs.slice(e0).forEach(function(x){ res.push({m:'JS 오류: '+qaText(x.m, 110), w:false, d:['오류: '+x.m+(x.at? ' @ '+x.at:''), x.st? 'stack: '+x.st : ''].filter(Boolean)}); });
     }catch(e){ res.push({m:'검사 오류: '+qaText(e.message||e, 100), w:true, d:[String(e.stack||e).slice(0,300)]}); }

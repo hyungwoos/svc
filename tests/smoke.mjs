@@ -1117,11 +1117,11 @@ if (S.blk()) {
     assert(!(await page.$('#ovlUpd')), '안내 대상이 아닌데 팝업');
     return n + '개 시드 · ack ' + JSON.parse(ack.body).p_last_id;
   });
-  await S.t('㊿+149 관리자 화면 탭: 한 번에 한 구역만 · 탭 전환 · 뒤로가기 · 메뉴 다시(㊿+172)도 보던 탭 · «초기화»는 첫 탭', async () => {
+  await S.t('㊿+149 관리자 화면 탭(㊿+194 4개 · AI 비용 없음): 한 번에 한 구역만 · 탭 전환 · 뒤로가기 · 메뉴 다시(㊿+172)도 보던 탭 · «초기화»는 첫 탭', async () => {
     await page.evaluate(() => SVC.navMenu('adminx')); await page.waitForTimeout(700);
     const vis = () => page.evaluate(() => [...document.querySelectorAll('#viewAdmin .adm-pane')].filter((p) => p.getClientRects().length).map((p) => p.dataset.pane).join(','));
     const tabs = await page.$$eval('#admTabs button', (b) => b.map((x) => x.textContent.trim()));
-    assert(tabs.length === 5 && (await vis()) === 'acct', JSON.stringify({ tabs, vis: await vis() }));
+    assert(tabs.length === 4 && !tabs.some((t) => /AI 비용/.test(t)) && (await vis()) === 'acct' && !(await page.$('#axBillKpi')), JSON.stringify({ tabs, vis: await vis() }));   /* ㊿+194 «AI 비용» 탭 뺌 → 4개 */
     assert(await page.evaluate(() => { const d = document.getElementById('axNewBox'); return d && !d.open && !!document.getElementById('axTable') && document.getElementById('axTable').getClientRects().length > 0; }), '새 계정 접힘·계정 표 보임 아님');
     await page.click('#admTabs [data-t="cfg"]'); await page.waitForTimeout(200);
     assert((await vis()) === 'cfg' && (await page.$eval('#admTabs [data-t="cfg"]', (b) => b.getAttribute('aria-pressed'))) === 'true', 'cfg 전환 ' + (await vis()));
@@ -1857,7 +1857,8 @@ if (S.blk()) {
     const extra = async (route, u) => { if (u.includes('/functions/v1/ask') && slow) { await new Promise((r) => setTimeout(r, slow)); await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, text: 'mock 늦은 답', queries: [] }) }).catch(() => {}); return true; } return false; };
     const { ctx, page, errs } = await fbootWith(null, { extra });
     const st = () => page.evaluate(() => ({ on: document.getElementById('answer').classList.contains('on'), say: document.getElementById('aiSay').textContent, asking: SVC.isAsking(), panel: !document.getElementById('aiPanel').hidden }));
-    await page.evaluate(() => SVC.ask('이번 달 MRR?')); await page.waitForFunction(() => /mock/.test(document.getElementById('aiSay').textContent), null, { timeout: 8000 });
+    await page.waitForFunction(() => SVC.AICFG && SVC.AICFG.enabled, null, { timeout: 15000 }).catch(() => null);   /* ㊿+195 AI 가 켜진 뒤 질문(병렬 부하) */
+    await page.evaluate(() => SVC.ask('이번 달 MRR?')); await page.waitForFunction(() => /mock/.test(document.getElementById('aiSay').textContent), null, { timeout: 15000 });
     const a = await st(); assert(a.on && a.panel, '답 ' + JSON.stringify(a));
     await page.evaluate(() => { SVC.navMenu('contracts'); SVC.navMenu('dash'); }); await page.waitForTimeout(150);
     const b = await st(); assert(b.on && /mock/.test(b.say), '다른 메뉴 갔다 오면 대화가 사라짐 ' + JSON.stringify(b));
@@ -2080,7 +2081,7 @@ if (S.blk()) {
     assert(h2.includes('자동연장') && h2.includes('해지사유') && !h2.includes('계산서발행처') && !h3.includes('과금방식') && h3.includes('계산서발행처') && h4.length === 10 && !h5.includes('과금방식') && h6.length === 27 && saved === '전체', JSON.stringify({ h2, h3, h5: h5.length, h6: h6.length, saved }));
     return '운영 10열 · 전체 27열';
   });
-  await S.t('㊿+169 목록 상태 유지: 검색·정렬·스크롤 → 다른 화면 → «뒤로» 오면 그대로 · 메뉴로 다시 들어와도(㊿+172) 그대로 · «초기화»만 처음부터', async () => {
+  await S.t('㊿+169 목록 상태 유지: 검색·정렬·스크롤 → 다른 화면 → «뒤로» 오면 그대로 · ㊿+196 메뉴로 다시 들어오면 검색은 비우고 정렬은 그대로(위에서부터) · «초기화»만 전부 처음부터', async () => {
     await page.setViewportSize({ width: 1440, height: 600 });
     await page.evaluate(() => { SVC.wvSet('contracts', '운영'); SVC.navMenu('contracts'); }); await page.waitForTimeout(250);
     await page.fill('#dvSearch', '가상'); await page.waitForTimeout(150);
@@ -2095,8 +2096,8 @@ if (S.blk()) {
     await page.click('#btnMore'); await page.click('#btnViewReset'); await page.waitForTimeout(250);
     const fresh = await page.evaluate(() => ({ q: document.getElementById('dvSearch').value, k: SVC.DV.sortK, y: Math.round(window.scrollY) }));
     await page.setViewportSize({ width: 1440, height: 1000 });
-    assert(before.q === '가상' && before.k === 'mrr' && back.v === 'contracts' && back.q === '가상' && back.k === 'mrr' && Math.abs(back.y - before.y) < 30 && back.first === before.first && menu.q === '가상' && menu.k === 'mrr' && Math.abs(menu.y - before.y) < 30 && fresh.q === '' && fresh.k === null && fresh.y === 0, JSON.stringify({ before, back, menu, fresh }));
-    return '뒤로 · 메뉴 = 그대로 · 초기화 = 처음';
+    assert(before.q === '가상' && before.k === 'mrr' && back.v === 'contracts' && back.q === '가상' && back.k === 'mrr' && Math.abs(back.y - before.y) < 30 && back.first === before.first && menu.q === '' && menu.k === 'mrr' && menu.y === 0 && fresh.q === '' && fresh.k === null && fresh.y === 0, JSON.stringify({ before, back, menu, fresh }));
+    return '뒤로 = 그대로 · 메뉴 = 검색 비움 · 정렬 그대로 · 초기화 = 처음';
   });
   await S.t('㊿+169→172 홈: 핵심 현황 3칸(매출 · LIVE · 재약정 대응 — 같은 재약정 기준) · «업무 n가지»(대상 합계 없음 · 단위는 줄마다) · 줄 = 업무 · 대상 수 · 기한 · 담당 · 버튼 1개 · 펼치면 대상/담당/기한/영향 · «전체 n가지 펼치기»는 같은 자리 · 버튼 → 걸러진 목록(같은 건수)', async () => {
     await page.evaluate(() => { SVC.navMenu('dash'); SVC.HOME.allOpen = false; SVC.renderInbox(); }); await page.waitForTimeout(400);
@@ -2369,14 +2370,18 @@ if (S.blk()) {
     assert(/모두 지울까요/.test(dlg) && del.n === 0 && !del.on, '삭제 ' + JSON.stringify(del));
     await page.click('#aipClose'); return '닫기 · 새 대화 · 삭제';
   });
-  await S.t('㊿+172 OI 조건(빠른 보기 · 검색 · 열 필터 · 스크롤) → 다른 메뉴 → OI 메뉴 다시 = 그대로 · «초기화»만 처음으로 · 다른 화면 검색 창은 실제 조건 값 · 목록 행 수를 AI 에 보내고 같은 조건 결과와 대조', async () => {
+  await S.t('㊿+172→196 OI 조건(빠른 보기 · 검색 · 열 필터 · 스크롤) → 다른 메뉴 → «뒤로»(←) = 그대로 · ㊿+196 메뉴로 다시 들어오면 검색 · 필터는 비움(정렬은 그대로) · «초기화»만 처음으로 · 다른 화면 검색 창은 실제 조건 값 · 목록 행 수를 AI 에 보내고 같은 조건 결과와 대조', async () => {
     await page.setViewportSize({ width: 1440, height: 600 });
     await page.evaluate(() => SVC.navMenu('oi')); await page.waitForTimeout(300); await page.evaluate(() => { SVC.qvGo('oi', 'nonext'); SVC.DV.filters = { stage: ['협상'] }; SVC.renderGrid(); }); await page.fill('#dvSearch', '가상'); await page.waitForTimeout(250);
     await page.evaluate(() => scrollTo(0, 150)); await page.waitForTimeout(100);
     const st = () => page.evaluate(() => ({ q: document.getElementById('dvSearch').value, pre: SVC.DV.pre && SVC.DV.pre.qv, f: JSON.stringify(SVC.DV.filters), rows: document.querySelectorAll('#dvTable tbody tr:not(.dg-empty)').length, y: Math.round(scrollY) }));
-    const a = await st(); await page.evaluate(() => SVC.navMenu('contracts')); await page.waitForTimeout(250); await page.evaluate(() => SVC.navMenu('dash')); await page.waitForTimeout(250); await page.evaluate(() => SVC.navMenu('oi')); await page.waitForTimeout(400);
+    const a = await st(); await page.evaluate(() => SVC.navMenu('contracts')); await page.waitForTimeout(250); await page.evaluate(() => SVC.goBack()); await page.waitForTimeout(400);
     const b = await st();
-    assert(a.q === '가상' && b.q === a.q && b.pre === 'nonext' && b.f === a.f && b.rows === a.rows && Math.abs(b.y - a.y) < 30, JSON.stringify({ a, b }));
+    assert(a.q === '가상' && b.q === a.q && b.pre === 'nonext' && b.f === a.f && b.rows === a.rows && Math.abs(b.y - a.y) < 30, '뒤로 ' + JSON.stringify({ a, b }));
+    await page.evaluate(() => { SVC.DV.sortK = 'customer'; SVC.DV.sortDir = -1; }); await page.evaluate(() => SVC.navMenu('dash')); await page.waitForTimeout(250); await page.evaluate(() => SVC.navMenu('oi')); await page.waitForTimeout(400);
+    const c0 = await st(), srt = await page.evaluate(() => SVC.DV.sortK + '/' + SVC.DV.sortDir);
+    assert(c0.q === '' && !c0.pre && c0.f === '{}' && c0.y === 0 && srt === 'customer/-1', '메뉴 다시 ' + JSON.stringify({ c0, srt }));
+    await page.evaluate(() => { SVC.DV.sortK = null; SVC.DV.sortDir = 1; SVC.qvGo('oi', 'nonext'); SVC.DV.filters = { stage: ['협상'] }; SVC.renderGrid(); }); await page.fill('#dvSearch', '가상'); await page.waitForTimeout(250);   /* 아래 AI 단계는 같은 조건으로 */
     asks.length = 0; await page.keyboard.press('Control+k'); await page.waitForTimeout(250);
     const ctx1 = await page.evaluate(() => document.getElementById('fkCtx').textContent);
     await page.fill('#fkInput', '이 목록 진행 상황 어때?'); await page.click('#fkAsk'); await page.waitForTimeout(800);
@@ -2529,7 +2534,7 @@ if (S.blk()) {
     assert(a.dirty && a.kd && b.kpiTiles > 0 && !b.dirty && a.sum === b.sum && ov > 0, JSON.stringify({ a: Object.assign({}, a, { sum: 0 }), b: Object.assign({}, b, { sum: 0 }), ov }));
     return '접힘: 그리기 미룸 · 펼침: 타일 ' + b.kpiTiles;
   });
-  await S.t('㊿+173 목록: 처음 30행 먼저 → 곧 나머지(쪽당 100행 그대로 · 같은 순서) · 다른 메뉴 갔다 와서 스크롤 위치로 돌아갈 때는 한 번에 · 정렬 · 검색해도 같은 행', async () => {
+  await S.t('㊿+173 목록: 처음 30행 먼저 → 곧 나머지(쪽당 100행 그대로 · 같은 순서) · 다른 메뉴 갔다가 «뒤로»(㊿+196 — 메뉴로 다시 들어오면 위에서부터)로 스크롤 위치로 돌아갈 때는 한 번에 · 정렬 · 검색해도 같은 행', async () => {
     await page.evaluate(() => { SVC.viewResetHard('contracts'); }); await page.waitForTimeout(0);
     const first = await page.evaluate(() => { SVC.navMenu('dash'); SVC.navMenu('contracts'); return document.querySelectorAll('#dvTable tbody tr').length; });
     await page.waitForTimeout(500);
@@ -2537,7 +2542,8 @@ if (S.blk()) {
     const flush = await page.evaluate(() => { SVC.gridFlush(); return { n: document.querySelectorAll('#dvTable tbody tr').length, txt: [...document.querySelectorAll('#dvTable tbody tr')].map((t) => t.textContent).join('|') }; });   /* 한 번에 그린 것과 같은 행 · 같은 순서 */
     full.want = flush.n; const want = flush.txt === full.txt ? 100 : -1;
     await page.evaluate(() => window.scrollTo(0, 1500)); await page.waitForTimeout(100); const y0 = await page.evaluate(() => Math.round(scrollY));
-    const back = await page.evaluate(() => { SVC.navMenu('oi'); SVC.navMenu('contracts'); return document.querySelectorAll('#dvTable tbody tr').length; });
+    await page.evaluate(() => SVC.navMenu('oi')); await page.evaluate(() => SVC.goBack()); await page.waitForFunction(() => SVC.ST.CUR_VIEW === 'contracts', null, { timeout: 5000 });
+    const back = await page.evaluate(() => document.querySelectorAll('#dvTable tbody tr').length);
     await page.waitForTimeout(300); const y1 = await page.evaluate(() => Math.round(scrollY));
     assert(first === 30 && full.n === full.want && full.n === 100 && want === 100 && back === 100 && Math.abs(y1 - y0) < 5, JSON.stringify({ first, full: { n: full.n, want: full.want }, back, y0, y1 }));   /* ㊿+189 제목 숨김이 늦게 일어나 문서 높이가 바뀌던 것 고침 — 같은 자리여야 함(CI 글꼴에선 40px 차이로 실패했었음) */
     return '30 → ' + full.n + '행 · 돌아오면 ' + back + '행 한 번에';
@@ -2701,12 +2707,13 @@ if (S.blk()) {
   await S.t('㊿+174 SQL 105 전(표 없음 · 404): 기본 기준으로 알림함 동작 · 읽음은 이 브라우저에만(DB 쓰기 0) · 담당 지정 · Slack · 설정 저장 버튼 꺼짐 / 조회 전용 계정: 담당 지정 · 설정 · Slack 없음', async () => {
     const pre = await mkCtx({ sqlOk: false });
     const a = await pre.page.evaluate(() => { SVC.ntfOpen(); return { n: SVC.ntfItems().length, foot: document.querySelector('#ntfPanel .ntf-f').textContent, asg: !!document.querySelector('#ntfPanel [data-asg]'), slack: !!document.getElementById('ntfSlack'), tab: SVC.NTF.tab }; });
+    await pre.page.waitForFunction(() => SVC.UPD && SVC.UPD.checked, null, { timeout: 8000 }).catch(() => null); await pre.page.waitForTimeout(600);   /* ㊿+195 첫 화면 1.5초 뒤의 업데이트 안내(upd_notes 넣기)가 끝난 뒤에 «쓰기 0»을 셈 */
     const w0 = pre.st.writes.length; await pre.page.evaluate(() => SVC.ntfMark(SVC.ntfItems().map((x) => x.key), true)); await pre.page.waitForTimeout(300);
     const ls = await pre.page.evaluate(() => { try { return JSON.parse(localStorage.getItem('svc_ntf_read_tester@example.com') || '[]').length; } catch (e) { return -1; } });
     const w1 = pre.st.writes.filter((x) => /notify_/.test(x.url)).length, wM = pre.st.writes.length;
     await pre.page.evaluate(() => SVC.ntfGoSettings()); await pre.page.waitForTimeout(800);
     const dis = await pre.page.evaluate(() => document.getElementById('nsSave') && document.getElementById('nsSave').disabled);
-    assert(a.n > 0 && /SQL 105 전/.test(a.foot) && !a.asg && !a.slack && a.tab === 'team' && ls === a.n && w1 === 0 && wM === w0 && dis === true && !pre.c.errs.length, JSON.stringify({ a, ls, w1, dis, errs: pre.c.errs }));
+    assert(a.n > 0 && /SQL 105 전/.test(a.foot) && !a.asg && !a.slack && a.tab === 'team' && ls === a.n && w1 === 0 && wM === w0 && dis === true && !pre.c.errs.length, JSON.stringify({ a, ls, w1, dis, errs: pre.c.errs, extra: pre.st.writes.slice(w0, wM).map((x) => (x.m || x.method || '') + ' ' + String(x.url || '').replace(/^.*\/rest\/v1\//, '').slice(0, 80)) }));
     await pre.ctx.close();
     const v = await mkCtx({ role: 'admin_viewer', set: SET });
     const b = await v.page.evaluate(() => { SVC.ntfOpen(); return { items: document.querySelectorAll('#ntfPanel .ntf-it').length, asg: !!document.querySelector('#ntfPanel [data-asg]'), set: !!document.getElementById('ntfSet'), slack: !!document.getElementById('ntfSlack'), can: SVC.ntfCanAssign() }; });
@@ -3908,6 +3915,7 @@ if (S.blk()) {
   await S.t('㊿+185 우선 업무 줄 담당: «담당 지정» 버튼(만기 · 재약정 · 비즈포탈 · 데이터 점검 줄) → 포탈 계정 목록(portal_accounts)에서 고름 → work_assign kind=area 저장 · 확인 창 전/후 · 변경 이력 · 줄에 이름 · 나로 지정하면 «내 업무»에 · 알림함 «나에게» · 다른 창(viewer)은 버튼 없음', async () => {
     const A = await mk185(), P = A.page;
     await P.evaluate(() => { SVC.HOME.scope = 'team'; SVC.HOME.allOpen = true; SVC.navMenu('dash'); }); await P.waitForTimeout(400);
+    await P.waitForFunction(() => document.querySelector('#ccInbox .hm-row .hm-asg'), null, { timeout: 10000 }).catch(() => null);   /* ㊿+195 계정 목록 · 담당 표를 읽은 뒤(병렬 부하에서 400ms 로는 모자랐음) */
     const a = await P.evaluate(() => [...document.querySelectorAll('#ccInbox .hm-row')].map((r) => r.dataset.key + ':' + (r.querySelector('.hm-asg') ? 'btn=' + r.querySelector('.hm-asg').textContent.replace(/✎/, '').trim() : (r.querySelector('.hm-own') || {}).textContent)));
     const keys = a.map((x) => x.split(':')[0]);
     assert(a.some((x) => /^(rnl|rnd|exp):btn=담당 지정$/.test(x)) && a.some((x) => /^biz:btn=정산 담당$/.test(x)) && !a.some((x) => /^(eq|ret|oi):btn=/.test(x)), JSON.stringify(a));
@@ -4610,6 +4618,221 @@ if (S.blk()) {
     assert(w0 > 600 && css.doc <= 390 && css.svg <= 390 && after.doc <= 390 && after.w < 390 && after.right <= 390, JSON.stringify({ w0, css, after }));
     assert(!c.errs.length, '페이지 오류 ' + c.errs.join(' | ')); await ctx.close();
     return '1280 → 390 · svg ' + w0 + ' → ' + after.w + ' · 문서 폭 ' + after.doc;
+  });
+}
+// ㊿+194 AI 공급자 표시 · 장비 현황(출고일 = 수령희망›신청일 · 회수일 지어내지 않음 · 회수일 어긋남) · Cloud 사이트 권한 오류 안내 — 가짜 DB
+if (S.blk()) {
+  const mk194 = async (o) => { o = Object.assign({ role: 'super_admin', prov: 'OpenRouter' }, o || {});
+    const seed = seedData();
+    if (o.eq) { seed.equipment_orders = seed.equipment_orders.concat(o.eq.orders); seed.equipment_assets = seed.equipment_assets.concat(o.eq.assets); }
+    if (o.cloud) seed.cloud_sites = o.cloud;
+    const db = new FakeDB(seed);
+    db.rpc.portal_accounts = () => [{ email: 'tester@example.com', role: o.role, name: '홍길동', title: '차장' }, { email: 'other@example.com', role: 'admin', name: '김철수', title: '대리' }];
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page);
+    const dlg = []; page.on('dialog', (d) => { dlg.push(d.message().split('\n')[0]); d.accept(); });
+    await fakeBackend(page, db, { role: o.role, extra: async (route, u) => {
+      if (!/\/functions\/v1\/ask/.test(u)) return false;
+      const b = JSON.parse(route.request().postData() || '{}');
+      const body = b.mode === 'ping' ? { ok: true, version: o.prov ? 'v3.6' : 'v3.5', model: 'claude-sonnet-5.5', provider: o.prov ? o.prov : undefined }
+        : { ok: true, text: '가상 답 — LIVE 29곳', model: 'claude-sonnet-5.5', provider: o.prov || undefined, queries: [] };
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) }); return true; } });
+    await page.goto(url + '/index.html'); await page.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA && SVC.ST.DATA.rows.length, null, { timeout: 20000 }); await page.waitForTimeout(400);
+    if (o.ai) await page.waitForFunction(() => SVC.AICFG && SVC.AICFG.enabled, null, { timeout: 15000 });   /* ping 이 끝나 AI 가 켜진 뒤에 질문(부하 큰 병렬 실행에서 내장 규칙으로 빠지지 않게) */
+    return { db, ctx, page, c, dlg }; };
+  await S.t('㊿+194 AI 답 밑에 공급자(«sonnet-5.5 · OpenRouter») · 예전 함수(공급자 없음)면 표시 없음 · aiProvName(openrouter → OpenRouter)', async () => {
+    const A = await mk194({ ai: true });
+    await A.page.evaluate(() => SVC.ask('LIVE 고객사 몇 곳이야?')); await A.page.waitForFunction(() => /가상 답/.test((document.getElementById('aiSay') || {}).textContent || ''), null, { timeout: 15000 });
+    const a = await A.page.evaluate(() => ({ t: document.getElementById('aiSay').textContent.replace(/\s+/g, ' '), prov: (document.querySelector('#aiSay .ai-prov') || {}).textContent || '', n: SVC.aiProvName('openrouter') + '|' + SVC.aiProvName('OpenRouter') + '|' + SVC.aiProvName('') }));
+    await A.ctx.close();
+    const B = await mk194({ prov: '', ai: true });
+    await B.page.evaluate(() => SVC.ask('LIVE 고객사 몇 곳이야?')); await B.page.waitForFunction(() => /가상 답/.test((document.getElementById('aiSay') || {}).textContent || ''), null, { timeout: 8000 });
+    const b = await B.page.evaluate(() => ({ prov: !!document.querySelector('#aiSay .ai-prov'), t: document.getElementById('aiSay').textContent }));
+    await B.ctx.close();
+    assert(/sonnet-5\.5 · OpenRouter/.test(a.t) && a.prov === 'OpenRouter' && a.n === 'OpenRouter|OpenRouter|' && !b.prov && !/OpenRouter/.test(b.t) && !A.c.errs.length, JSON.stringify({ a, b, errs: A.c.errs }));
+    return a.prov;
+  });
+  await S.t('㊿+194 장비 현황 맞추기: 신청은 임대중인데 현황에 회수일이 남은 장비 = «회수일» 어긋남 → 맞추면 비움 · 회수완료 신청에 회수일이 없으면 «오늘»을 넣지 않음 · 출고일 = 수령희망일 › 신청일(한국 날짜) · 이미 있는 출고일은 그대로', async () => {
+    const eq = { orders: [
+      { id: 900, channel: '일반', order_type: '신규발주', customer: '가상고객_장비A', model: 'S100', qty: 2, serials: 'EQ94A, EQ94B', status: '설치완료', install_date: '2026-03-20', ship_date: '2026-03-12', created_at: '2026-03-01T16:30:00Z', returned_date: null, returned_serials: null },
+      { id: 901, channel: '일반', order_type: '신규발주', customer: '가상고객_장비B', model: 'S100', qty: 1, serials: 'EQ94C', status: '회수완료', install_date: '2026-02-20', ship_date: null, created_at: '2026-02-01T16:30:00Z', returned_date: null, returned_serials: null },
+      { id: 902, channel: '일반', order_type: '신규발주', customer: '가상고객_장비C', model: 'S100', qty: 1, serials: 'EQ94D', status: '설치완료', install_date: '2026-06-25', ship_date: '2026-05-07', created_at: '2026-05-01T00:00:00Z', returned_date: null, returned_serials: null }],
+      assets: [
+      { id: 9401, serial: 'EQ94A', model: 'S100', usage: '임대', status: '임대중', customer: '가상고객_장비A', channel: '일반', order_id: 900, deployed_date: '2026-03-20', returned_date: '2026-09-01', note: null },
+      { id: 9402, serial: 'EQ94B', model: 'S100', usage: '임대', status: '임대중', customer: '가상고객_장비A', channel: '일반', order_id: 900, deployed_date: '2026-03-20', returned_date: null, note: null },
+      { id: 9403, serial: 'EQ94C', model: 'S100', usage: '임대', status: '임대중', customer: '가상고객_장비B', channel: '일반', order_id: 901, deployed_date: null, returned_date: null, note: null }] };
+    const A = await mk194({ eq });
+    await A.page.evaluate(() => SVC.navMenu('orders')); await A.page.waitForTimeout(500);
+    const g = await A.page.evaluate(() => { const s = SVC.eqScan(); return s.gap.map((x) => x.o.id + ':' + x.why).join(' | '); });
+    await A.page.evaluate(() => { const d = document.getElementById('eqChk'); if (d) d.open = true; }); await A.page.waitForTimeout(100);
+    await A.page.click('#eqFixAll'); await A.page.waitForTimeout(1500);
+    const T = (sn) => A.db.table('equipment_assets').find((x) => x.serial === sn) || {};
+    const r = { a: T('EQ94A'), b: T('EQ94B'), c: T('EQ94C'), d: T('EQ94D') };
+    const pick = (x) => [x.status, x.deployed_date, x.returned_date].join('/');
+    const out = { g, a: pick(r.a), b: pick(r.b), c: pick(r.c), d: pick(r.d), dlg: A.dlg };
+    await A.ctx.close();
+    assert(/900:현황 값이 신청과 다름 — 회수일/.test(g) && /901:/.test(g) && /902:/.test(g)
+      && out.a === '임대중/2026-03-20/' && out.b === '임대중/2026-03-20/' && out.c === '회수완료/2026-02-02/' && out.d === '임대중/2026-05-07/'
+      && out.dlg.some((m) => /현황 \d+건을 맞출까요/.test(m)), JSON.stringify(out));
+    return out.a + ' · ' + out.c + ' · ' + out.d;
+  });
+  await S.t('㊿+194 · ㊿+195 Cloud 사이트 요청 이력: 한 화면(1280 · 가로 넘침 0 · 칸 7개) · 실패 줄은 결과에 «권한 없음»만 · 메시지 · 할 일(권한 위임) · API 계정 · 메모는 «메시지 ▾»로 펼침 · «메시지 모두 보기»(브라우저에 기억) · 요청자 이름 · 일시는 한국 시각 · csErrHint/csErrShort 분류 / API 계정 목록을 못 불러오면 «불러오지 못했습니다 · 다시 시도»(예전엔 «계정이 없습니다»)', async () => {
+    const cloud = [
+      { id: 1, action: 'update', sitename: 'vsite-perm', customer: '가상기관P', devices: 100, result: false, message: 'You do not have permission to update this site.', requested_by: 'other@example.com', cred_label: '가상 계정 A', memo: '가상 메모', created_at: '2026-10-12T15:22:00Z', extra: { expiredate: '2027-10-01' } },
+      { id: 2, action: 'update', sitename: 'vsite-ok', customer: '가상기관Q', devices: 500, result: true, message: 'Site update successful.', requested_by: 'tester@example.com', cred_label: '가상 계정 B', created_at: '2026-10-12T02:00:00Z', extra: { expiredate: '2027-10-31' } }];
+    const A = await mk194({ cloud });
+    await A.page.setViewportSize({ width: 1280, height: 900 });
+    await A.page.waitForFunction(() => SVC.ntfName('other@example.com') === '김철수 대리', null, { timeout: 10000 }).catch(() => null);   /* 계정 이름을 읽은 뒤 */
+    await A.page.evaluate(() => { SVC.navMenu('csite'); SVC.csSetTab('update'); }); await A.page.waitForFunction(() => document.querySelectorAll('#csHist tbody tr').length >= 2, null, { timeout: 8000 }); await A.page.waitForTimeout(300);
+    const rowsOf = () => A.page.evaluate(() => [...document.querySelectorAll('#csHist tbody tr')].map((tr) => ({ det: tr.classList.contains('cs-det'), t: tr.textContent.replace(/\s+/g, ' ').trim() })));
+    const r0 = await rowsOf();
+    const m0 = await A.page.evaluate(() => ({ doc: document.documentElement.scrollWidth, th: document.querySelectorAll('#csHist thead th').length, tbl: Math.round(document.getElementById('csHist').getBoundingClientRect().right), wrap: Math.round(document.getElementById('csHistWrap').getBoundingClientRect().right) }));
+    await A.page.click('#csHist [data-cshist="1"]'); await A.page.waitForTimeout(150);
+    const r1 = await rowsOf();
+    await A.page.check('#csHistMsg'); await A.page.waitForTimeout(150);
+    const r2 = await rowsOf(); const ls = await A.page.evaluate(() => localStorage.getItem('svc_cs_histmsg'));
+    const k = await A.page.evaluate(() => [SVC.csErrShort('You do not have permission to update this site.'), SVC.csErrShort('Invalid apikey'), SVC.csErrShort('변경 사항이 없습니다'), SVC.csErrShort(''), SVC.csErrHint('Site update successful.')].join('|'));
+    /* API 계정 목록 — cloudsite 함수가 creds 에서 실패하면 */
+    await A.page.route('**/functions/v1/cloudsite', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: false, error: '가상 실패(시험)' }) }));
+    await A.page.evaluate(async () => { SVC.CS.creds = undefined; SVC.csSetTab('creds'); await SVC.csLoadCreds(true); SVC.csRenderCreds(); }); await A.page.waitForTimeout(200);
+    const cr = await A.page.evaluate(() => ({ t: document.querySelector('#ccList tbody').textContent.replace(/\s+/g, ' '), retry: !!document.getElementById('ccRetry') }));
+    await A.ctx.close();
+    const perm0 = r0.find((x) => /vsite-perm/.test(x.t)) || {}, det1 = r1.filter((x) => x.det), det2 = r2.filter((x) => x.det);
+    assert(m0.doc <= 1280 && m0.th === 7 && m0.tbl <= m0.wrap + 1 && r0.length === 2 && !r0.some((x) => x.det) && /실패\s?권한 없음/.test(perm0.t) && !/permission/.test(perm0.t) && /김철수 대리/.test(perm0.t) && /10-13 00:22/.test(perm0.t)
+      && det1.length === 1 && /You do not have permission/.test(det1[0].t) && /권한 위임/.test(det1[0].t) && /가상 계정 A/.test(det1[0].t) && /가상 메모/.test(det1[0].t) && /other@example\.com/.test(det1[0].t)
+      && det2.length === 2 && ls === '1' && k === '권한 없음|키 오류|변경 없음||'
+      && /불러오지 못했습니다/.test(cr.t) && /가상 실패\(시험\)/.test(cr.t) && /서버에 그대로/.test(cr.t) && cr.retry, JSON.stringify({ m0, r0, r1, r2, ls, k, cr }));
+    return '칸 ' + m0.th + ' · 문서 폭 ' + m0.doc + ' · 펼침 1 → 모두 2 · 목록 실패 표시';
+  });
+}
+// ㊿+196 에스원 사용료 정산 — 청구 총액 = 리스트 «지급금액» · 기타 서비스(EDR·MDR)도 합계 · 매칭 · 비즈포탈 회계매출은 설치비 · 철거비 빼고 → 둘이 같으면 차액 0 — 가짜 시트(셀 배열)
+if (S.blk()) {
+  await S.t('㊿+196 에스원 정산: 리스트 머리 «지급금액»(10,301) = 청구 총액(소수점 일할 1,300.8 은 에스원 기준) · 기타 서비스(가상의원MDR)는 합계에 들어가고 비즈포탈과 이름으로 매칭 · 비즈포탈 «철거비»는 일회성(설치비처럼 대조 · 합계에서 뺌) → 회계매출 10,301 · 차액 0 · 대조표(기타 · 일회성 구역 · 총계) · 엑셀 행 · 저장 → 다시 불러와도 같은 합계 / 머리 값과 금액 합이 다르면 경고하고 금액 합으로', async () => {
+    const db = new FakeDB(seedData()); db.rpc.is_super_admin = () => true;
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page);
+    await fakeBackend(page, db); await page.goto(url + '/s1.html'); await page.waitForFunction(() => window.CLS && CLS.ok === true, null, { timeout: 10000 });
+    const run = async (head) => page.evaluate((head) => {
+      const C = (a) => a.map((v) => (v === null ? null : { v }));
+      const H = ['사업팀', '개시사업장', '계약번호', '서비스제공처', '제공서비스', '수량', '단가', '외주비용', '계약일자', '기산일자', '사용일수', '해약일자', '현재상태'];
+      const s1 = [C(['□ 지급건 : ', 4, '건']), C(['□ 지급금액 : ', head, '원']), C(H),
+        C(['가상팀', '가상지사', 'N9000001', '가상기관A클라우드NAC', '클라우드NAC BASIC 50', 1, 7000, 7000, '2025.01.01', '2025.01.01', 30, null, '개시']),
+        C(['가상팀', '가상지사', 'N9000002', '가상기관B디바이스키퍼', '디바이스키퍼 50', 1, 2000, 2000, '2025.01.01', '2025.01.01', 30, null, '개시']),
+        C(['가상팀', '가상지사', 'N9000003', '가상의원MDR', '지니언스EDR_EDR+MDR', 1, 1000.4, 1000.4, '2026.09.30', null, 1, null, '개시']),
+        C(['가상팀', '가상지사', null, '가상의원MDR', '지니언스EDR_안티바이러스', 1, 300.4, 300.4, '2026.09.30', null, 1, null, '개시'])];
+      const BH = ['등록번호', '매출종류', '프로젝트명', '산업군', '고객사', '영업채널', '진행상태', '회계매출'];
+      const biz = [C(BH), C([1001, '제품판매', '[1/36] 가상기관A S1 Cloud NAC 신규 도입', '기업', '가상기관A (에스원)', '(주)에스원', '계산서발행', 7000]),
+        C([1002, '제품판매', '[에스원] 디바이스키퍼 대금 정산', '기업', '에스원', '(주)에스원', '계산서발행', 2000]),
+        C([1003, '제품판매', '[1/36] 가상의원 MDR 신규 도입', '기업', '가상의원 (에스원)', '(주)에스원', '계산서발행', 1301]),
+        C([1004, '제품판매', '가상기관C Cloud NAC 설치비', '기업', '가상기관C (에스원)', '(주)에스원', '계산서발행', 100000]),
+        C([1005, '제품판매', '가상기관D Cloud NAC 철거비', '기업', '가상기관D (에스원)', '(주)에스원', '계산서발행', 100000])];
+      document.getElementById('ym').value = '2026-09'; S.maps = [];
+      S.use = parseS1Use(s1); S.biz = parseBiz(biz); matchUse(); renderUse();
+      const T = useTot(), etc = S.use.etc[0];
+      return { T: { s1: T.s1, biz: T.biz, diff: T.diff, head: T.head, headOff: T.headOff, etc: Math.round(T.etc * 10) / 10, once: T.once.length, nInst: T.nInst },
+        kinds: S.biz.map((b) => b.no + ':' + b.kind).join(','), etc: etc && (etc.nm + '→' + (etc.biz && etc.biz.no) + '/' + etc.by), only: bizOnlyRows().map((b) => b.no).join(','),
+        tiles: [...document.querySelectorAll('#uTiles .tile')].map((t) => t.querySelector('.t').textContent + '=' + t.querySelector('.v').textContent.replace(/\s+/g, ' ').trim()),
+        extra: (document.getElementById('uExtra') || {}).textContent || '' };
+    }, head);
+    const a = await run(10301);
+    await page.evaluate(() => { window.open = function () { const f = document.createElement('iframe'); document.body.appendChild(f); const w = f.contentWindow; w.print = function () {}; window.__pw = w; return w; }; });
+    await page.evaluate(() => printUse()); await page.waitForTimeout(400);
+    const P = await page.evaluate(() => { const d = window.__pw.document; return { secs: [...d.querySelectorAll('tr.sec')].map((x) => x.textContent.replace(/\s+/g, ' ').trim()), foot: [...d.querySelectorAll('tfoot tr, tr.foot')].map((x) => x.textContent.replace(/\s+/g, ' ').trim()).join(' | '), note: d.querySelector('.note').textContent, sums: [...d.querySelectorAll('.sum')].map((x) => x.textContent.replace(/\s+/g, ' ').trim()) }; });
+    await page.evaluate(async () => { await saveSettle('use'); }); await page.waitForTimeout(500);
+    const saved = db.table('s1_settle').find((x) => x.kind === 'use') || {};
+    await page.evaluate(async (id) => { await restoreSettle(id); }, saved.id); await page.waitForTimeout(400);
+    const R = await page.evaluate(() => { const T = useTot(); return { s1: T.s1, biz: T.biz, diff: T.diff, once: T.once.length, etc: (S.use.etc || []).length, tiles: [...document.querySelectorAll('#uTiles .tile')].map((t) => t.querySelector('.t').textContent).join('|') }; });
+    const b = await run(9999);
+    await ctx.close();
+    const out = { a, P, saved: { total: saved.total, biz_total: saved.biz_total, etc: (saved.payload || {}).etc && saved.payload.etc.length, once: (saved.payload || {}).once && saved.payload.once.length, head: (saved.payload || {}).head_total }, R, b: { T: b.T, tiles: b.tiles.filter((x) => /청구/.test(x)) } };
+    assert(a.T.s1 === 10301 && a.T.biz === 10301 && a.T.diff === 0 && a.T.head === 10301 && !a.T.headOff && a.T.etc === 1300.8 && a.T.once === 1 && a.T.nInst === 1
+      && a.kinds === '1001:use,1002:settle,1003:use,1004:install,1005:once' && a.etc === '가상의원MDR→1003/name' && a.only === ''
+      && a.tiles.some((x) => /^기타 서비스\(EDR·MDR 등\)=1,301 1건$/.test(x)) && a.tiles.some((x) => /^에스원 청구 총액=10,301\s?= 리스트 «지급금액» ✓$/.test(x)) && a.tiles.some((x) => /^비즈포탈 회계매출=10,301 3건\s?설치비 1 · 철거비 1건 뺌$/.test(x)) && a.tiles.some((x) => /^차액=0$/.test(x))
+      && /일회성\(철거비\) 1건/.test(a.extra) && /가상의원MDR/.test(a.extra)
+      && P.secs.some((x) => /^기타 서비스\(EDR·MDR 등\) 1건/.test(x)) && P.secs.some((x) => /^일회성\(철거비\) 1건 · 100,000원/.test(x)) && /요약의 차액\(청구 − 비즈포탈\) 0/.test(P.note) && /리스트 머리 «지급금액»/.test(P.note) && P.sums.some((x) => /청구 총액\s?10,301원 \(= 리스트 지급금액\)/.test(x))
+      && out.saved.total === 10301 && out.saved.biz_total === 10301 && out.saved.etc === 1 && out.saved.once === 1 && out.saved.head === 10301
+      && R.s1 === 10301 && R.biz === 10301 && R.diff === 0 && R.once === 1 && R.etc === 1 && /기타 서비스/.test(R.tiles)
+      && b.T.headOff === true && b.T.s1 === 10301 && b.tiles.some((x) => /9,999 ≠ 금액 합/.test(x)) && !c.errs.length, JSON.stringify(out));
+    return '청구 10,301 = 회계매출 10,301 · 차액 0 · 저장 · 다시 불러오기 같음';
+  });
+}
+// ㊿+197 API 계정 «키 교체» — 같은 계정으로 새 키만(cloudsite v2 cred_rekey) · 입력은 비밀번호 칸 · 확인 창 · 화면 · 변경 이력에 키 없음 · 예전 함수면 안내 — 가짜 함수
+if (S.blk()) {
+  await S.t('㊿+197 API 계정: 계정 탭을 연 채로 들어와도 목록이 온 뒤 보임(«계정이 다 없어졌다»의 원인) · 키 교체: «키 교체» → 비밀번호 칸 · 짧은 키는 막음 · 저장 → 확인 창 → cloudsite {action:cred_rekey, id, apikey} 1번 · 칸 비움 · 변경 이력(키 없음) · Esc 로 취소 / cloudsite 가 예전 버전(알 수 없는 action)이면 «v2 를 배포한 뒤» 안내', async () => {
+    const db = new FakeDB(seedData()); const fn = []; let v1 = false;
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page);
+    const dlg = []; page.on('dialog', (d) => { dlg.push(d.message().split('\n')[0]); d.accept(); });
+    await fakeBackend(page, db, { extra: async (route, u) => {
+      if (!/\/functions\/v1\/cloudsite/.test(u)) return false;
+      const b = JSON.parse(route.request().postData() || '{}'); fn.push(b);
+      const out = b.action === 'creds' ? { ok: true, creds: [{ id: 1, label: '가상 계정 A', apiemail: 'a@example.com', created_at: '2026-10-01' }, { id: 0, label: '기본 계정 (Secrets)', apiemail: 's@example.com' }] }
+        : b.action === 'cred_rekey' ? (v1 ? { ok: false, error: '알 수 없는 action: cred_rekey' } : { ok: true, cred: { id: 1, label: '가상 계정 A', apiemail: 'a@example.com' } }) : { ok: true };
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(out) }); return true; } });
+    await page.goto(url + '/index.html'); await page.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA && SVC.ST.DATA.rows.length, null, { timeout: 20000 });
+    await page.evaluate(() => { SVC.CS.tab = 'creds'; SVC.navMenu('csite'); });   /* 계정 탭을 연 채로 들어옴 — 목록이 온 뒤 다시 그려져야(㊿+197 고침) */
+    const loading = await page.evaluate(() => document.querySelector('#ccList tbody').textContent.trim());
+    await page.waitForFunction(() => document.querySelector('#ccList .cc-rekey'), null, { timeout: 8000 });
+    const btns = await page.evaluate(() => [...document.querySelectorAll('#ccList tbody tr')].map((tr) => [...tr.querySelectorAll('button')].map((b) => b.textContent.trim()).join('+')));
+    await page.click('#ccList .cc-rekey'); await page.waitForTimeout(100);
+    const inp = await page.evaluate(() => { const i = document.querySelector('#ccList .cc-rk-in'); return i ? { type: i.type, focus: document.activeElement === i, ac: i.autocomplete } : null; });
+    await page.fill('#ccList .cc-rk-in', 'short'); await page.click('#ccList .cc-rk-go'); await page.waitForTimeout(100);
+    const m0 = await page.evaluate(() => document.getElementById('ccMsg').textContent);
+    await page.fill('#ccList .cc-rk-in', 'NEW-FAKE-KEY-12345'); fn.length = 0; db.writes.length = 0; await page.click('#ccList .cc-rk-go'); await page.waitForTimeout(500);
+    const rk = fn.filter((b) => b.action === 'cred_rekey'), lg = db.writes.filter((w) => w.table === 'change_log').map((w) => JSON.stringify(w.body));
+    const after = await page.evaluate(() => ({ msg: document.getElementById('ccMsg').textContent, inp: !!document.querySelector('#ccList .cc-rk-in'), page: document.body.innerText.includes('NEW-FAKE-KEY') }));
+    v1 = true; await page.click('#ccList .cc-rekey'); await page.fill('#ccList .cc-rk-in', 'NEW-FAKE-KEY-67890'); await page.click('#ccList .cc-rk-go'); await page.waitForTimeout(400);
+    const m1 = await page.evaluate(() => document.getElementById('ccMsg').textContent);
+    await page.focus('#ccList .cc-rk-in'); await page.keyboard.press('Escape'); await page.waitForTimeout(100); const esc = await page.evaluate(() => !document.querySelector('#ccList .cc-rk-in'));
+    await ctx.close();
+    assert(/불러오는 중|등록된 계정이 없습니다|키 교체/.test(loading) && btns[0] === '키 교체+삭제' && btns[1] === '' && inp && inp.type === 'password' && inp.focus && inp.ac === 'new-password' && /새 API 키를 넣어/.test(m0)
+      && rk.length === 1 && rk[0].id === 1 && rk[0].apikey === 'NEW-FAKE-KEY-12345' && dlg.some((d) => /API 키를 새 키로 바꿉니다/.test(d))
+      && lg.length === 1 && /키 교체/.test(lg[0]) && !/NEW-FAKE-KEY/.test(lg[0]) && /바꿨습니다/.test(after.msg) && !after.inp && !after.page
+      && /v2 를 배포한 뒤/.test(m1) && esc && !c.errs.length, JSON.stringify({ loading, after, m1, esc, dlg, lgKey: lg.map((x) => /키 교체/.test(x) + '/' + /NEW-FAKE/.test(x)), errs: c.errs }));
+    return '키 교체 1번 · 이력에 키 없음 · v1 안내';
+  });
+}
+// ㊿+198 견적서 단가 = 포탈 가격표(price_books SaaS 최신 판) — 가짜 가격표(내장 값과 다른 숫자)로 덮어쓰는지 · 약정별 · 새 품목 · 구간 넘음 안내 · 못 읽으면 내장 값 · 저장된 단가 유지 · 이름 이스케이프
+if (S.blk()) {
+  const QPB = { label: '가상 판 2099', applied: '2099-01-01', data: {
+    cnac: { rows: [['1~100', 20000, 9000, 7000, 6000], ['101~3000', 10000, 5000, 4000, 3000]] },
+    ztna: { rows: [['1~100', 15000, 7000, 5000, 4500], ['101~3000', 8000, 4000, 3000, 2500]] },
+    services: [{ key: 'CIE', tiers: ['1~49', '50~'], cons: [99000, 88000] }, { key: 'MDRA', tiers: ['1~49', '50~'], cons: [44000, 33000] }, { key: 'MDR', tiers: ['1~49', '50~'], cons: [140000, 120000] },
+      { key: 'AV', tiers: ['1~49', '50~'], cons: [70000, 60000] }, { key: 'RW', tiers: ['1~49', '50~'], cons: ['x', 1] }, { key: 'ZZ', name: '가상 서비스', tiers: ['1~49', '50~'], cons: [11000, 10000] }],
+    addons: [['가상 부가 <b>저장</b>', 300000, 200000, 100000, '비고']] } };
+  const qpOpen = async (mode) => {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page); let hits = 0, q = '';
+    page.on('dialog', (d) => d.dismiss().catch(() => {}));
+    await mockBackend(page, { extra: async (route, u) => { if (!/\/rest\/v1\/price_books/.test(u)) return false; hits++; q = u;
+      if (mode === 'fail') { await route.fulfill({ status: 500, contentType: 'application/json', body: '{"message":"x"}' }); return true; }
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([QPB]) }); return true; } });
+    await page.goto(url + '/quote.html'); await page.waitForTimeout(900);
+    await page.evaluate(() => selectQuoteType('enterprise')); await page.waitForTimeout(400);
+    return { ctx, page, c, hits: () => hits, q: () => q };
+  };
+  const qpRow = async (page, i, prod, term, bill, qty) => page.evaluate(([i, prod, term, bill, qty]) => {
+    let tr = document.querySelectorAll('#itemTable tbody tr')[i]; if (!tr) tr = addRow();
+    const sel = tr.querySelector('.product-sel'); sel.value = prod; updateOptions(sel);
+    tr.querySelector('.term-sel').value = term; tr.querySelector('.billing-sel').value = bill; tr.querySelector('.qty').value = String(qty); resetConsumerManual(tr); calcAll();
+    return tr.querySelector('.consumer-price').value; }, [i, prod, term, bill, qty]);
+  await S.t('㊿+198 견적서 단가 = 가격표 최신 판: Cloud NAC 약정별(1년 · 3년) · ZTNA PA · CIE=GIES · 새 품목(MDR Add-on · MDR 통합 · 모르는 key · 부가 서비스) · 나쁜 표(RW)는 내장 값 · 3,000 초과 작성자 안내 · 출처 표시(인쇄 안 됨) · 저장된 단가 그대로 · 이름 이스케이프 / 못 읽으면 내장 값(2026-09-21 판) + 안내', async () => {
+    const A = await qpOpen('ok'); const p = A.page;
+    const nac1 = await qpRow(p, 0, 'Cloud NAC V6.0', '1년약정', '1', 50), nac3 = await qpRow(p, 0, 'Cloud NAC V6.0', '3년약정', '1', 50), nac0 = await qpRow(p, 0, 'Cloud NAC V5.0', '무약정', '1', 500);
+    const zt = await qpRow(p, 0, 'Cloud ZTNA (PA)', '2년약정', '1', 80), gies = await qpRow(p, 0, 'GIES (MDR Service)', '1년약정', '12', 60), rw = await qpRow(p, 0, 'GIER (Ransomware Service)', '1년약정', '12', 10);
+    const mdra = await qpRow(p, 0, 'MDR Add-on 24×7', '1년약정', '12', 10), msg = await p.evaluate(() => document.getElementById('quoteMessage').innerText);
+    const zz = await qpRow(p, 0, '가상 서비스', '1년약정', '12', 10), ad = await qpRow(p, 0, '가상 부가 <b>저장</b>', '1년약정', '12', 1);
+    const opt = await p.evaluate(() => { const s = document.querySelector('#itemTable tbody tr .product-sel'); return { names: Array.from(s.options).map((o) => o.value), bold: s.querySelectorAll('b').length }; });
+    await qpRow(p, 0, 'Cloud NAC V6.0', '무약정', '1', 3500); const over = await p.evaluate(() => ({ hint: document.getElementById('internalHint').innerText, disp: document.getElementById('internalHint').style.display, cp: document.querySelector('#itemTable tbody tr .consumer-price').value }));
+    const st = await p.evaluate(() => { const el = document.getElementById('qpState'); return { t: el.textContent, cls: el.className, prn: (() => { for (const sh of document.styleSheets) { try { for (const r of sh.cssRules) if (r.media && /print/.test(r.media.mediaText) && /\.qp-state/.test(r.cssText) && /display: none/.test(r.cssText)) return true; } catch (e) { /* noop */ } } return false; })() }; });
+    const kept = await p.evaluate(() => { const tr = addRow({ prod: 'Cloud NAC V6.0', term: '1년약정', billing: '1', qty: '50', consumerPrice: '16000', proposed: '7000' }); calcAll(); return tr.querySelector('.consumer-price').value; });
+    const errsA = A.c.errs.slice(), hits = A.hits(), qa = A.q(); await A.ctx.close();
+    const B = await qpOpen('fail'); const bn = await qpRow(B.page, 0, 'Cloud NAC V6.0', '1년약정', '1', 50), bz = await qpRow(B.page, 0, 'Cloud ZTNA (PA)', '무약정', '1', 50), bm = await qpRow(B.page, 0, 'Genian MDR 통합', '1년약정', '12', 10);
+    const bst = await B.page.evaluate(() => ({ t: document.getElementById('qpState').textContent, cls: document.getElementById('qpState').className })); const errsB = B.c.errs.slice(); await B.ctx.close();
+    const got = { nac1, nac3, nac0, zt, gies, rw, mdra, msg, zz, ad, opt, over, st, kept, hits, qa, bn, bz, bm, bst, errsA, errsB };
+    assert(nac1 === '9,000' && nac3 === '6,000' && nac0 === '10,000' && zt === '5,000' && gies === '88,000' && rw === '43,500' && mdra === '44,000' && /Genian MDR/.test(msg) && zz === '11,000' && ad === '300,000'
+      && ['MDR Add-on 24×7', 'Genian MDR 통합', '가상 서비스', '가상 부가 <b>저장</b>', '로그 장기 저장 1TB'].every((n) => opt.names.includes(n)) && opt.bold === 0
+      && over.disp === 'block' && /Cloud NAC V6\.0 3,500개/.test(over.hint) && /별도 협의/.test(over.hint) && over.cp === '10,000'
+      && /가상 판 2099 · 2099-01-01 적용/.test(st.t) && /Ransomware Service|GIER/.test(st.t) && /no-print/.test(st.cls) && st.prn && kept === '16,000'
+      && hits === 1 && /seg=eq\.saas/.test(qa) && /order=applied\.desc,id\.desc/.test(qa) && /limit=1/.test(qa)
+      && bn === '7,200' && bz === '13,300' && bm === '130,200' && /내장 값\(2026-09 MDR 3종 · 2026-09-21 판\)/.test(bst.t) && /warn/.test(bst.cls) && !errsA.length && !errsB.length, JSON.stringify(got));
+    return 'NAC 1년 9,000 · 3년 6,000 · ZTNA 2년 5,000 · GIES 88,000 · RW 내장 43,500 · 새 품목 4 · 3,500개 안내 · 저장 단가 16,000 유지 · 실패 → 내장 7,200';
   });
 }
 await browser.close(); srv.close();
