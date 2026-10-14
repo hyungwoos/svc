@@ -16,7 +16,7 @@ import { closeOvl, FORM_FN, logChange, msg, openOvl } from './edit.js';
 
 
 /* ================= Cloud 사이트 생성·수정 (my.genians.co.kr cloudsite / cloudsite-update · Edge Function cloudsite 경유) ================= */
-export var CS={wired:false, hist:undefined, creds:undefined, tab:'create'};
+export var CS={wired:false, hist:undefined, creds:undefined, credErr:'', tab:'create', histMsg:false, histOpen:{}};
 export async function csFn(payload){
   var r=await fetchT(SB_URL+'/functions/v1/cloudsite',{ method:'POST', headers:{'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+(ST.SB_TOKEN||'')}, body:JSON.stringify(payload) }, 90000, 'cloudsite 함수', !/^(create|update)$/.test(String(payload&&payload.action||'')));   /* ㊿+182 시간 제한 — 사이트 만들기 · 바꾸기는 다시 보내지 않음 */
   var j=null; try{ j=await r.json(); }catch(e){}
@@ -135,9 +135,10 @@ export function csSetTab(t){
 }
 export async function csLoadCreds(force){
   if(CS.creds!==undefined && !force) return CS.creds;
-  try{ var j=await csFn({action:'creds'}); CS.creds=j.ok? (j.creds||[]) : []; if(!j.ok) msg('csMsg',j.error||'','bad'); }catch(e){ CS.creds=[]; msg('csMsg',String(e.message||e),'bad'); }
+  CS.credErr='';   /* ㊿+195 못 불러온 것과 진짜 0개를 구분(예전엔 둘 다 «등록된 계정이 없습니다») */
+  try{ var j=await csFn({action:'creds'}); CS.creds=j.ok? (j.creds||[]) : []; if(!j.ok){ CS.credErr=String(j.error||'알 수 없는 오류'); msg('csMsg',CS.credErr,'bad'); } }catch(e){ CS.creds=[]; CS.credErr=String(/** @type {any} */(e).message||e); msg('csMsg',CS.credErr,'bad'); }
   var sel=$('#csCred'), cur=sel.value; sel.innerHTML='';
-  if(!CS.creds.length){ sel.innerHTML='<option value="">등록된 API 계정 없음 — 관리자가 «계정·API Key 관리»에서 추가</option>'; }
+  if(!CS.creds.length){ sel.innerHTML=CS.credErr? '<option value="">API 계정 목록을 불러오지 못했습니다 — 다시 시도</option>' : '<option value="">등록된 API 계정 없음 — 관리자가 «계정·API Key 관리»에서 추가</option>'; }
   CS.creds.forEach(function(c){ var o=document.createElement('option'); o.value=String(c.id); o.textContent=c.label+' — '+c.apiemail; sel.appendChild(o); });
   if(cur && CS.creds.some(function(c){ return String(c.id)===cur; })) sel.value=cur;
   csPreview(); return CS.creds;
@@ -145,7 +146,9 @@ export async function csLoadCreds(force){
 export function csRenderCreds(){
   var tb=$('#ccList tbody'), list=CS.creds||[];
   tb.innerHTML=list.length? list.map(function(c){ return tpl`<tr><td><b>${c.label}</b></td><td>${c.apiemail}</td><td class="mini">${String(c.created_at||'').slice(0,10)}${rawHtml(c.created_by? ' · '+esc(c.created_by):'')}</td><td>${rawHtml(c.id? tpl`<button class="chip cc-del" data-id="${rawHtml(c.id)}">삭제</button>` : '<span class="mini" style="color:var(--muted)">Secrets 에서 관리</span>')}</td></tr>`; }).join('')
-    : '<tr><td colspan="4" class="mini" style="color:var(--muted)">등록된 계정이 없습니다</td></tr>';
+    : (CS.credErr? tpl`<tr><td colspan="4" class="mini" style="color:var(--critical)">목록을 불러오지 못했습니다 — ${CS.credErr.slice(0,140)} <button type="button" class="chip" id="ccRetry">다시 시도</button><div style="color:var(--muted);margin-top:2px">계정은 서버에 그대로 있습니다(목록 조회만 실패). 계속되면 Supabase › Edge Functions › cloudsite › Logs 확인</div></td></tr>`
+      : '<tr><td colspan="4" class="mini" style="color:var(--muted)">등록된 계정이 없습니다</td></tr>');
+  var rt=document.getElementById('ccRetry'); if(rt) rt.onclick=async function(){ rt.disabled=true; await csLoadCreds(true); csRenderCreds(); };
   tb.querySelectorAll('.cc-del').forEach(function(b){ b.onclick=async function(){ var c=list.filter(function(x){ return String(x.id)===b.dataset.id; })[0];
     if(!confirm('«'+c.label+' — '+c.apiemail+'» API 계정을 삭제할까요? 이 계정으로는 더 이상 사이트를 만들 수 없습니다.')) return;
     try{ var j=await csFn({action:'cred_del', id:+b.dataset.id}); if(!j.ok) throw new Error(j.error); toast('API 계정 삭제', c.label); logChange('delete','api_credentials',+b.dataset.id,{label:c.label}); await csLoadCreds(true); csRenderCreds(); }catch(e){ msg('ccMsg',String(e.message||e),'bad'); } }; });
@@ -175,12 +178,27 @@ export function renderCsite(){
     $('#csDoneNew').onclick=function(){ ['csName','csDev','csMemo','csCust','csProdEtc','csEdEtc','cuName','cuNodes','cuSra','cuExp','cuCust','cuMemo','csDue'].forEach(function(i){ var e=$('#'+i); if(e) e.value=''; }); var pu1=$('#csPurpose'); if(pu1){ pu1.value='paid'; pu1.dispatchEvent(new Event('change')); } $('#cuMail').checked=false; $('#csProd').value='ztna'; $('#csEd').value='ent'; $('#csLang').value='ko'; $('#csBranch').value='candidate'; renderCsite(); };
     $('#csHistRefresh').onclick=function(){ CS.hist=undefined; csHist(); };
     $('#csHistQ').addEventListener('input',function(){ csHist(); });
+    try{ CS.histMsg=localStorage.getItem('svc_cs_histmsg')==='1'; }catch(e){}
+    var hm=document.getElementById('csHistMsg'); if(hm) hm.onchange=function(){ CS.histMsg=hm.checked; CS.histOpen={}; csMsgSave(); csHist(); };   /* ㊿+195 */
     $('#csCust').addEventListener('input',csPreview);
   }
   csSetTab(CS.tab||'create'); if(ST.IS_SUPER) csLoadCreds(); csHist();
   swLoad(false).then(function(){ var n=swAlerts().length, b=document.getElementById('csWatchN'); if(b){ b.textContent=n? n+'개 확인':''; b.style.display=n? '':'none'; } });
   setTimeout(function(){ var f=CS.tab==='update'? '#cuName' : '#csCust'; if(!$(f).value) $(f).focus(); },50);
 }
+/** ㊿+195 결과 칸의 짧은 이유 — 실패 줄에만 */
+export function csErrShort(m){
+  var s=String(m||'');
+  if(/do not have permission|not (have )?permi|permission denied|권한/i.test(s)) return '권한 없음';
+  if(/invalid api ?key|apikey|unauthori[sz]ed|인증/i.test(s)) return '키 오류';
+  if(/not (be )?found|no such site|존재하지/i.test(s)) return '사이트 없음';
+  if(/같|동일|변경.{0,6}없|no\s*change|nothing|unchanged|already|same/i.test(s)) return '변경 없음';
+  if(/시간|timeout|timed out/i.test(s)) return '응답 없음';
+  return s? '오류' : '';
+}
+/** ㊿+195 한국 시각 «MM-DD HH:mm» (예전엔 UTC 글자를 잘라 9시간 이르게 보였음) */
+export function csKst(v){ if(!v) return ''; try{ var d=new Date(v); if(isNaN(d.getTime())) return String(v).slice(5,16); var t=d.toLocaleString('sv-SE', {timeZone:'Asia/Seoul'}); return (t.slice(0,4)===String(new Date().getFullYear())? t.slice(5,16) : t.slice(2,16)); }catch(e){ return String(v).slice(5,16); } }
+export function csMsgSave(){ try{ localStorage.setItem('svc_cs_histmsg', CS.histMsg? '1':''); }catch(e){} }
 /** ㊿+194 my.genians 오류 → 할 일 한 줄 (영문 메시지 그대로 두고 아래에 덧붙임) */
 export function csErrHint(m){
   var s=String(m||'');
@@ -197,10 +215,29 @@ export async function csHist(){
   var h=CS.hist.filter(function(x){ return !q || String(x.sitename||'').toLowerCase().indexOf(q)>=0 || String(x.customer||'').toLowerCase().indexOf(q)>=0; });
   csFillSiteList();
   $('#csHistCap').textContent=CS.hist.length? (q? h.length+'건 (전체 '+CS.hist.length+')' : h.length+'건')+' · 성공 '+h.filter(function(x){return x.result;}).length : '';
-  tb.innerHTML=h.length? h.map(function(x){ var up=x.action==='update', ex=x.extra||{};
+  /* ㊿+195 이력 표 — 한 화면에 들어오게(가로 스크롤 없음): 사이트·고객사 한 칸 · 결과에 짧은 이유 · 메시지 원문 · 할 일 · API 계정 · 메모는 «메시지» 를 눌러 펼침(머리의 «메시지 모두 보기»로 전부) */
+  var allOpen=!!CS.histMsg, open=CS.histOpen||(CS.histOpen={});
+  var mb=document.getElementById('csHistMsg'); if(mb) mb.checked=allOpen;
+  tb.innerHTML=h.length? h.map(function(x){ var up=x.action==='update', ex=x.extra||{}, k=String(x.id);
       var what=up? ('노드 '+(x.devices||'')+(ex.sra!=null? ' · SRA '+ex.sra:'')+(ex.expiredate? ' · 만료 '+ex.expiredate:'')+(ex.send_mail? ' · 메일':'')) : ((x.product||'')+'/'+(x.edition||'')+(ex.branch? ' · '+(CS_BR[ex.branch]||ex.branch):'')+(x.language&&x.language!=='ko'? ' · '+x.language:'')+' · '+(x.devices||'')+'노드');
-      return tpl`<tr${rawHtml(x.result?'':' style="color:var(--muted)"')}><td style="white-space:nowrap">${String(x.created_at||'').replace('T',' ').slice(0,16)}</td><td>${rawHtml(up? '<span class="badge b-re">수정</span>':'<span class="badge b-new">생성</span>')}</td><td><b>${x.sitename}</b>${rawHtml(x.hidden? ' <span class="mini" style="color:var(--muted)" title="사이트 목록에서 숨김">(숨김)</span>':'')}</td><td>${x.customer||''}</td><td class="mini">${what}</td><td>${rawHtml(x.result? '<span class="badge b-new">성공</span>':'<span class="badge b-churn">실패</span>')}</td><td class="mini">${x.message||''}${rawHtml(!x.result && csErrHint(x.message)? tpl`<div class="cs-hint">${csErrHint(x.message)}</div>` : '')}</td><td class="mini" title="${x.requested_by||''}">${x.requested_by? ntfName(x.requested_by) : ''}</td><td class="mini">${x.cred_label||''}</td><td class="mini">${x.memo||''}</td></tr>`; }).join('')
-    : tpl`<tr><td colspan="10" class="mini" style="color:var(--muted)">${q? '검색 결과 없음' : '아직 이력이 없습니다 — 66_cloud_sites.sql 이 아직 실행되지 않았다면 표가 없어 비어 보입니다.'}</td></tr>`;
+      var why=x.result? '' : csErrShort(x.message), on=allOpen || !!open[k], hint=x.result? '' : csErrHint(x.message);
+      var has=!!(x.message || x.memo || x.cred_label);
+      return tpl`<tr class="${rawHtml(x.result? '' : 'cs-fail')}"><td class="cs-at" title="${String(x.created_at||'')}">${csKst(x.created_at)}</td>`+
+        tpl`<td>${rawHtml(up? '<span class="badge b-re">수정</span>':'<span class="badge b-new">생성</span>')}</td>`+
+        tpl`<td><b>${x.sitename}</b>${rawHtml(x.hidden? ' <span class="mini" style="color:var(--muted)" title="사이트 목록에서 숨김">(숨김)</span>':'')}<div class="mini cs-cust">${x.customer||''}</div></td>`+
+        tpl`<td class="mini">${what}</td>`+
+        tpl`<td>${rawHtml(x.result? '<span class="badge b-new">성공</span>' : '<span class="badge b-churn">실패</span>')}${rawHtml(why? tpl`<div class="mini cs-why">${why}</div>` : '')}</td>`+
+        tpl`<td class="mini" title="${x.requested_by||''}">${x.requested_by? ntfName(x.requested_by) : ''}</td>`+
+        tpl`<td class="cs-tg">${rawHtml(has? tpl`<button type="button" class="chip cs-msgbtn" data-cshist="${k}" aria-expanded="${on? 'true':'false'}">메시지 ${on? '▴':'▾'}</button>` : '')}</td></tr>`+
+        tpl`${rawHtml(has && on? tpl`<tr class="cs-det"><td colspan="7"><div class="cs-detbox">`+
+          tpl`${rawHtml(x.message? tpl`<div><span class="cs-k">메시지</span><span class="cs-v">${x.message}</span></div>` : '')}`+
+          tpl`${rawHtml(hint? tpl`<div class="cs-hint"><span class="cs-k">할 일</span><span class="cs-v">${hint}</span></div>` : '')}`+
+          tpl`${rawHtml(x.cred_label? tpl`<div><span class="cs-k">API 계정</span><span class="cs-v">${x.cred_label}</span></div>` : '')}`+
+          tpl`${rawHtml(x.memo? tpl`<div><span class="cs-k">메모</span><span class="cs-v">${x.memo}</span></div>` : '')}`+
+          tpl`${rawHtml(x.requested_by? tpl`<div><span class="cs-k">요청자</span><span class="cs-v">${x.requested_by}</span></div>` : '')}`+
+          tpl`</div></td></tr>` : '')}`; }).join('')
+    : tpl`<tr><td colspan="7" class="mini" style="color:var(--muted)">${q? '검색 결과 없음' : '아직 이력이 없습니다 — 66_cloud_sites.sql 이 아직 실행되지 않았다면 표가 없어 비어 보입니다.'}</td></tr>`;
+  tb.querySelectorAll('[data-cshist]').forEach(function(b){ b.onclick=function(){ var k=b.dataset.cshist; open[k]=!(allOpen || open[k]); if(allOpen && !open[k]){ CS.histMsg=false; h.forEach(function(x){ if(String(x.id)!==k) open[String(x.id)]=true; }); csMsgSave(); } csHist(); }; });
   try{ if(CS.tab!=='creds') csPreview(); }catch(e){}
 }
 export async function csAddCred(){

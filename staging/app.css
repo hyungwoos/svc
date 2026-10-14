@@ -3224,6 +3224,24 @@ details.eq-chk .eq-chk-act:empty{display:none}
 @media (max-width:1300px){ .eqb-charts{grid-template-columns:minmax(0,1fr)} }
 .eqb-charts .card{min-width:0}
 .eqb-charts .card svg[role="img"]{max-width:100%;height:auto}
-/* ㊿+194 Cloud 사이트 이력 — 실패 메시지 아래 할 일 한 줄 */
-#csHist .cs-hint{margin-top:3px;color:var(--warn-ink,#b45309);white-space:normal;max-width:420px}
+/* ㊿+195 Cloud 사이트 요청 이력 — 한 화면(가로 스크롤 없음) · 메시지는 펼쳐 봄 */
+.cs-histbox{overflow:visible}
+#csHist{width:100%;table-layout:fixed}
+#csHist col.c-at{width:11%} #csHist col.c-act{width:7%} #csHist col.c-site{width:22%} #csHist col.c-what{width:28%} #csHist col.c-res{width:11%} #csHist col.c-who{width:12%} #csHist col.c-tg{width:9%}
+#csHist td,#csHist th{white-space:normal;overflow-wrap:anywhere;vertical-align:middle}
+#csHist td.cs-at{white-space:nowrap;font-variant-numeric:tabular-nums}
+#csHist .cs-cust{color:var(--muted);margin-top:1px}
+#csHist .cs-why{color:var(--critical);margin-top:3px}
+#csHist tr.cs-fail td{color:var(--muted)} #csHist tr.cs-fail td b{color:var(--ink)}
+#csHist td.cs-tg{text-align:right} #csHist .cs-msgbtn{font-size:12px;padding:2px 8px;white-space:nowrap}
+#csHist tr.cs-det td{background:var(--surface-2);padding:8px 12px}
+#csHist .cs-detbox{display:grid;gap:4px;font-size:12px}
+#csHist .cs-detbox>div{display:flex;gap:10px;align-items:baseline}
+#csHist .cs-k{flex:0 0 64px;color:var(--muted)} #csHist .cs-v{flex:1;min-width:0;overflow-wrap:anywhere}
+#csHist .cs-hint .cs-v{color:var(--warn-ink,#b45309)}
+.cs-msgall{display:inline-flex;align-items:center;gap:5px;color:var(--muted);cursor:pointer}
+#csHist .badge{white-space:nowrap}
+@media (max-width:760px){ #csHist{table-layout:auto} #csHist col{width:auto!important}
+  #csHist tr:not(.cs-det)>td:nth-child(4),#csHist th:nth-child(4),#csHist tr:not(.cs-det)>td:nth-child(6),#csHist th:nth-child(6){display:none}
+  #csHist td,#csHist th{padding:8px 6px} #csHist td.cs-at{white-space:normal;width:52px} #csHist .cs-msgbtn{padding:2px 6px} }
 /* ==== ㊿+166 새 디자인 end ==== */

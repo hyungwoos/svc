@@ -36,6 +36,8 @@ export async function mockBackend(page, { role = 'super_admin', email = 'tester@
     if (u.includes('/rpc/load_all')) return route.fulfill({ status: 200, contentType: 'application/json', body: data });
     if (u.includes('/auth/v1/user')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id: 'u1', email, user_metadata: { pw_changed: true }, factors: [] }) });
     if (u.includes('/functions/v1/')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, text: 'mock', queries: [], mode: 'ping' }) });
+    /* ㊿+195 업데이트 안내 확인(rpc/upd_pending)은 읽기 — 첫 화면 1.5초 뒤에 오므로 병렬 부하에서 «읽기만» 시험의 쓰기로 잘못 세지던 것 */
+    if (u.includes('/rpc/upd_pending')) return route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
     if (/POST|PATCH|DELETE|PUT/.test(m)) { if (onWrite) onWrite({ m, url: u, body: route.request().postData() }); return route.fulfill({ status: m === 'POST' ? 201 : 204, contentType: 'application/json', headers: hdr, body: '[]' }); }
     return route.fulfill({ status: 200, contentType: 'application/json', headers: hdr, body: '[]' });
   });

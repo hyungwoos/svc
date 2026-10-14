@@ -1857,7 +1857,8 @@ if (S.blk()) {
     const extra = async (route, u) => { if (u.includes('/functions/v1/ask') && slow) { await new Promise((r) => setTimeout(r, slow)); await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, text: 'mock 늦은 답', queries: [] }) }).catch(() => {}); return true; } return false; };
     const { ctx, page, errs } = await fbootWith(null, { extra });
     const st = () => page.evaluate(() => ({ on: document.getElementById('answer').classList.contains('on'), say: document.getElementById('aiSay').textContent, asking: SVC.isAsking(), panel: !document.getElementById('aiPanel').hidden }));
-    await page.evaluate(() => SVC.ask('이번 달 MRR?')); await page.waitForFunction(() => /mock/.test(document.getElementById('aiSay').textContent), null, { timeout: 8000 });
+    await page.waitForFunction(() => SVC.AICFG && SVC.AICFG.enabled, null, { timeout: 15000 }).catch(() => null);   /* ㊿+195 AI 가 켜진 뒤 질문(병렬 부하) */
+    await page.evaluate(() => SVC.ask('이번 달 MRR?')); await page.waitForFunction(() => /mock/.test(document.getElementById('aiSay').textContent), null, { timeout: 15000 });
     const a = await st(); assert(a.on && a.panel, '답 ' + JSON.stringify(a));
     await page.evaluate(() => { SVC.navMenu('contracts'); SVC.navMenu('dash'); }); await page.waitForTimeout(150);
     const b = await st(); assert(b.on && /mock/.test(b.say), '다른 메뉴 갔다 오면 대화가 사라짐 ' + JSON.stringify(b));
@@ -2701,12 +2702,13 @@ if (S.blk()) {
   await S.t('㊿+174 SQL 105 전(표 없음 · 404): 기본 기준으로 알림함 동작 · 읽음은 이 브라우저에만(DB 쓰기 0) · 담당 지정 · Slack · 설정 저장 버튼 꺼짐 / 조회 전용 계정: 담당 지정 · 설정 · Slack 없음', async () => {
     const pre = await mkCtx({ sqlOk: false });
     const a = await pre.page.evaluate(() => { SVC.ntfOpen(); return { n: SVC.ntfItems().length, foot: document.querySelector('#ntfPanel .ntf-f').textContent, asg: !!document.querySelector('#ntfPanel [data-asg]'), slack: !!document.getElementById('ntfSlack'), tab: SVC.NTF.tab }; });
+    await pre.page.waitForFunction(() => SVC.UPD && SVC.UPD.checked, null, { timeout: 8000 }).catch(() => null); await pre.page.waitForTimeout(600);   /* ㊿+195 첫 화면 1.5초 뒤의 업데이트 안내(upd_notes 넣기)가 끝난 뒤에 «쓰기 0»을 셈 */
     const w0 = pre.st.writes.length; await pre.page.evaluate(() => SVC.ntfMark(SVC.ntfItems().map((x) => x.key), true)); await pre.page.waitForTimeout(300);
     const ls = await pre.page.evaluate(() => { try { return JSON.parse(localStorage.getItem('svc_ntf_read_tester@example.com') || '[]').length; } catch (e) { return -1; } });
     const w1 = pre.st.writes.filter((x) => /notify_/.test(x.url)).length, wM = pre.st.writes.length;
     await pre.page.evaluate(() => SVC.ntfGoSettings()); await pre.page.waitForTimeout(800);
     const dis = await pre.page.evaluate(() => document.getElementById('nsSave') && document.getElementById('nsSave').disabled);
-    assert(a.n > 0 && /SQL 105 전/.test(a.foot) && !a.asg && !a.slack && a.tab === 'team' && ls === a.n && w1 === 0 && wM === w0 && dis === true && !pre.c.errs.length, JSON.stringify({ a, ls, w1, dis, errs: pre.c.errs, extra: pre.st.writes.slice(w0).map((x) => (x.m || x.method || '') + ' ' + String(x.url || '').replace(/^.*\/rest\/v1\//, '').slice(0, 80)) }));
+    assert(a.n > 0 && /SQL 105 전/.test(a.foot) && !a.asg && !a.slack && a.tab === 'team' && ls === a.n && w1 === 0 && wM === w0 && dis === true && !pre.c.errs.length, JSON.stringify({ a, ls, w1, dis, errs: pre.c.errs, extra: pre.st.writes.slice(w0, wM).map((x) => (x.m || x.method || '') + ' ' + String(x.url || '').replace(/^.*\/rest\/v1\//, '').slice(0, 80)) }));
     await pre.ctx.close();
     const v = await mkCtx({ role: 'admin_viewer', set: SET });
     const b = await v.page.evaluate(() => { SVC.ntfOpen(); return { items: document.querySelectorAll('#ntfPanel .ntf-it').length, asg: !!document.querySelector('#ntfPanel [data-asg]'), set: !!document.getElementById('ntfSet'), slack: !!document.getElementById('ntfSlack'), can: SVC.ntfCanAssign() }; });
@@ -3908,6 +3910,7 @@ if (S.blk()) {
   await S.t('㊿+185 우선 업무 줄 담당: «담당 지정» 버튼(만기 · 재약정 · 비즈포탈 · 데이터 점검 줄) → 포탈 계정 목록(portal_accounts)에서 고름 → work_assign kind=area 저장 · 확인 창 전/후 · 변경 이력 · 줄에 이름 · 나로 지정하면 «내 업무»에 · 알림함 «나에게» · 다른 창(viewer)은 버튼 없음', async () => {
     const A = await mk185(), P = A.page;
     await P.evaluate(() => { SVC.HOME.scope = 'team'; SVC.HOME.allOpen = true; SVC.navMenu('dash'); }); await P.waitForTimeout(400);
+    await P.waitForFunction(() => document.querySelector('#ccInbox .hm-row .hm-asg'), null, { timeout: 10000 }).catch(() => null);   /* ㊿+195 계정 목록 · 담당 표를 읽은 뒤(병렬 부하에서 400ms 로는 모자랐음) */
     const a = await P.evaluate(() => [...document.querySelectorAll('#ccInbox .hm-row')].map((r) => r.dataset.key + ':' + (r.querySelector('.hm-asg') ? 'btn=' + r.querySelector('.hm-asg').textContent.replace(/✎/, '').trim() : (r.querySelector('.hm-own') || {}).textContent)));
     const keys = a.map((x) => x.split(':')[0]);
     assert(a.some((x) => /^(rnl|rnd|exp):btn=담당 지정$/.test(x)) && a.some((x) => /^biz:btn=정산 담당$/.test(x)) && !a.some((x) => /^(eq|ret|oi):btn=/.test(x)), JSON.stringify(a));
@@ -4667,18 +4670,33 @@ if (S.blk()) {
       && out.dlg.some((m) => /현황 \d+건을 맞출까요/.test(m)), JSON.stringify(out));
     return out.a + ' · ' + out.c + ' · ' + out.d;
   });
-  await S.t('㊿+194 Cloud 사이트 이력: «You do not have permission to update this site» 실패 줄 아래 할 일(권한 위임 · 만든 API 계정) · 요청자는 이름(김철수 대리) · 성공 줄엔 안내 없음 · csErrHint 분류', async () => {
+  await S.t('㊿+194 · ㊿+195 Cloud 사이트 요청 이력: 한 화면(1280 · 가로 넘침 0 · 칸 7개) · 실패 줄은 결과에 «권한 없음»만 · 메시지 · 할 일(권한 위임) · API 계정 · 메모는 «메시지 ▾»로 펼침 · «메시지 모두 보기»(브라우저에 기억) · 요청자 이름 · 일시는 한국 시각 · csErrHint/csErrShort 분류 / API 계정 목록을 못 불러오면 «불러오지 못했습니다 · 다시 시도»(예전엔 «계정이 없습니다»)', async () => {
     const cloud = [
-      { id: 1, action: 'update', sitename: 'vsite-perm', customer: '가상기관P', devices: 100, result: false, message: 'You do not have permission to update this site.', requested_by: 'other@example.com', cred_label: '가상 계정 A', created_at: '2026-10-12T01:00:00Z', extra: { expiredate: '2027-10-01' } },
+      { id: 1, action: 'update', sitename: 'vsite-perm', customer: '가상기관P', devices: 100, result: false, message: 'You do not have permission to update this site.', requested_by: 'other@example.com', cred_label: '가상 계정 A', memo: '가상 메모', created_at: '2026-10-12T15:22:00Z', extra: { expiredate: '2027-10-01' } },
       { id: 2, action: 'update', sitename: 'vsite-ok', customer: '가상기관Q', devices: 500, result: true, message: 'Site update successful.', requested_by: 'tester@example.com', cred_label: '가상 계정 B', created_at: '2026-10-12T02:00:00Z', extra: { expiredate: '2027-10-31' } }];
     const A = await mk194({ cloud });
+    await A.page.setViewportSize({ width: 1280, height: 900 });
+    await A.page.waitForFunction(() => SVC.ntfName('other@example.com') === '김철수 대리', null, { timeout: 10000 }).catch(() => null);   /* 계정 이름을 읽은 뒤 */
     await A.page.evaluate(() => { SVC.navMenu('csite'); SVC.csSetTab('update'); }); await A.page.waitForFunction(() => document.querySelectorAll('#csHist tbody tr').length >= 2, null, { timeout: 8000 }); await A.page.waitForTimeout(300);
-    const r = await A.page.evaluate(() => { const rows = [...document.querySelectorAll('#csHist tbody tr')].map((tr) => ({ t: tr.textContent.replace(/\s+/g, ' '), hint: (tr.querySelector('.cs-hint') || {}).textContent || '' }));
-      return { rows, k: [SVC.csErrHint('Invalid apikey'), SVC.csErrHint('site not found'), SVC.csErrHint('Site update successful.')].map((x) => x.slice(0, 12)).join('|') }; });
+    const rowsOf = () => A.page.evaluate(() => [...document.querySelectorAll('#csHist tbody tr')].map((tr) => ({ det: tr.classList.contains('cs-det'), t: tr.textContent.replace(/\s+/g, ' ').trim() })));
+    const r0 = await rowsOf();
+    const m0 = await A.page.evaluate(() => ({ doc: document.documentElement.scrollWidth, th: document.querySelectorAll('#csHist thead th').length, tbl: Math.round(document.getElementById('csHist').getBoundingClientRect().right), wrap: Math.round(document.getElementById('csHistWrap').getBoundingClientRect().right) }));
+    await A.page.click('#csHist [data-cshist="1"]'); await A.page.waitForTimeout(150);
+    const r1 = await rowsOf();
+    await A.page.check('#csHistMsg'); await A.page.waitForTimeout(150);
+    const r2 = await rowsOf(); const ls = await A.page.evaluate(() => localStorage.getItem('svc_cs_histmsg'));
+    const k = await A.page.evaluate(() => [SVC.csErrShort('You do not have permission to update this site.'), SVC.csErrShort('Invalid apikey'), SVC.csErrShort('변경 사항이 없습니다'), SVC.csErrShort(''), SVC.csErrHint('Site update successful.')].join('|'));
+    /* API 계정 목록 — cloudsite 함수가 creds 에서 실패하면 */
+    await A.page.route('**/functions/v1/cloudsite', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: false, error: '가상 실패(시험)' }) }));
+    await A.page.evaluate(async () => { SVC.CS.creds = undefined; SVC.csSetTab('creds'); await SVC.csLoadCreds(true); SVC.csRenderCreds(); }); await A.page.waitForTimeout(200);
+    const cr = await A.page.evaluate(() => ({ t: document.querySelector('#ccList tbody').textContent.replace(/\s+/g, ' '), retry: !!document.getElementById('ccRetry') }));
     await A.ctx.close();
-    const perm = r.rows.find((x) => /vsite-perm/.test(x.t)) || {}, okr = r.rows.find((x) => /vsite-ok/.test(x.t)) || {};
-    assert(/권한 위임/.test(perm.hint) && /김철수 대리/.test(perm.t) && !/other@example\.com/.test(perm.t) && !okr.hint && /홍길동 차장/.test(okr.t) && /^API 키가 맞지 않습|사이트명을 찾지 못|\|$/.test(r.k) && r.k.split('|')[2] === '', JSON.stringify(r));
-    return perm.hint.slice(0, 40);
+    const perm0 = r0.find((x) => /vsite-perm/.test(x.t)) || {}, det1 = r1.filter((x) => x.det), det2 = r2.filter((x) => x.det);
+    assert(m0.doc <= 1280 && m0.th === 7 && m0.tbl <= m0.wrap + 1 && r0.length === 2 && !r0.some((x) => x.det) && /실패\s?권한 없음/.test(perm0.t) && !/permission/.test(perm0.t) && /김철수 대리/.test(perm0.t) && /10-13 00:22/.test(perm0.t)
+      && det1.length === 1 && /You do not have permission/.test(det1[0].t) && /권한 위임/.test(det1[0].t) && /가상 계정 A/.test(det1[0].t) && /가상 메모/.test(det1[0].t) && /other@example\.com/.test(det1[0].t)
+      && det2.length === 2 && ls === '1' && k === '권한 없음|키 오류|변경 없음||'
+      && /불러오지 못했습니다/.test(cr.t) && /가상 실패\(시험\)/.test(cr.t) && /서버에 그대로/.test(cr.t) && cr.retry, JSON.stringify({ m0, r0, r1, r2, ls, k, cr }));
+    return '칸 ' + m0.th + ' · 문서 폭 ' + m0.doc + ' · 펼침 1 → 모두 2 · 목록 실패 표시';
   });
 }
 await browser.close(); srv.close();

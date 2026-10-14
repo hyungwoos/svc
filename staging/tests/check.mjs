@@ -284,6 +284,12 @@ say(/^export function tickMemo\(/m.test(jsAll) && /^export function cssvKey\(/m.
     && /^export function csErrHint\(m\)/m.test(sa) && /권한 위임/.test(sa) && /ntfName\(x\.requested_by\)/.test(sa)
     && /aicheck v1\.7/.test(ac) && !/ANTHROPIC_API_KEY/.test(ac.replace(/^\/\/.*$/gm, '')),
   '㊿+194 AI 비용 탭 뺌 · 답 · 점검에 공급자 · 출고일 = 수령희망›신청일 · 회수일 지어내지 않음 · 회수일 어긋남 · 사이트 권한 오류 안내 · aicheck v1.7'); }
+// ㊿+195 Cloud 사이트 요청 이력 한 화면 · 메시지 펼침 · 한국 시각 · API 계정 목록 실패 표시
+{ const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
+  const sa = rd('js/sales.js'), ix = rd('index.html'), css = rd('app.css');
+  say(/^export function csErrShort\(m\)/m.test(sa) && /^export function csKst\(v\)/m.test(sa) && /data-cshist=/.test(sa) && /class="cs-det"/.test(sa) && /CS\.credErr=/.test(sa) && /id="ccRetry"/.test(sa)
+    && /id="csHistMsg"/.test(ix) && /<col class="c-tg">/.test(ix) && !/<th>메시지<\/th><th>요청자<\/th><th>API 계정<\/th><th>메모<\/th>/.test(ix) && /#csHist\{width:100%;table-layout:fixed\}/.test(css),
+  '㊿+195 Cloud 사이트 요청 이력: 칸 7개 · 결과에 짧은 이유 · 메시지 펼침 · 모두 보기 · 한국 시각 · API 계정 목록 실패 표시'); }
 // ㊿+160 연장하면 상태 «재약정»(구분 그대로) · 계약 상세에 «계약 기간 · 연장 이력»
 say(/^export function renewStatus\(r\)/m.test(jsAll) && /var nst=renewStatus\(r\);/.test(jsAll) && /^export function ctPeriods\(c, mine\)/m.test(jsAll) && html.includes('id="dtRenew"'), '연장: 상태 «재약정»(renewStatus) · 계약 상세 연장 이력(ctPeriods · #dtRenew)');
 const idx = html + jsAll;
