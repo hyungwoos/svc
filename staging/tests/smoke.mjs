@@ -1117,11 +1117,11 @@ if (S.blk()) {
     assert(!(await page.$('#ovlUpd')), '안내 대상이 아닌데 팝업');
     return n + '개 시드 · ack ' + JSON.parse(ack.body).p_last_id;
   });
-  await S.t('㊿+149 관리자 화면 탭: 한 번에 한 구역만 · 탭 전환 · 뒤로가기 · 메뉴 다시(㊿+172)도 보던 탭 · «초기화»는 첫 탭', async () => {
+  await S.t('㊿+149 관리자 화면 탭(㊿+194 4개 · AI 비용 없음): 한 번에 한 구역만 · 탭 전환 · 뒤로가기 · 메뉴 다시(㊿+172)도 보던 탭 · «초기화»는 첫 탭', async () => {
     await page.evaluate(() => SVC.navMenu('adminx')); await page.waitForTimeout(700);
     const vis = () => page.evaluate(() => [...document.querySelectorAll('#viewAdmin .adm-pane')].filter((p) => p.getClientRects().length).map((p) => p.dataset.pane).join(','));
     const tabs = await page.$$eval('#admTabs button', (b) => b.map((x) => x.textContent.trim()));
-    assert(tabs.length === 5 && (await vis()) === 'acct', JSON.stringify({ tabs, vis: await vis() }));
+    assert(tabs.length === 4 && !tabs.some((t) => /AI 비용/.test(t)) && (await vis()) === 'acct' && !(await page.$('#axBillKpi')), JSON.stringify({ tabs, vis: await vis() }));   /* ㊿+194 «AI 비용» 탭 뺌 → 4개 */
     assert(await page.evaluate(() => { const d = document.getElementById('axNewBox'); return d && !d.open && !!document.getElementById('axTable') && document.getElementById('axTable').getClientRects().length > 0; }), '새 계정 접힘·계정 표 보임 아님');
     await page.click('#admTabs [data-t="cfg"]'); await page.waitForTimeout(200);
     assert((await vis()) === 'cfg' && (await page.$eval('#admTabs [data-t="cfg"]', (b) => b.getAttribute('aria-pressed'))) === 'true', 'cfg 전환 ' + (await vis()));
@@ -2706,7 +2706,7 @@ if (S.blk()) {
     const w1 = pre.st.writes.filter((x) => /notify_/.test(x.url)).length, wM = pre.st.writes.length;
     await pre.page.evaluate(() => SVC.ntfGoSettings()); await pre.page.waitForTimeout(800);
     const dis = await pre.page.evaluate(() => document.getElementById('nsSave') && document.getElementById('nsSave').disabled);
-    assert(a.n > 0 && /SQL 105 전/.test(a.foot) && !a.asg && !a.slack && a.tab === 'team' && ls === a.n && w1 === 0 && wM === w0 && dis === true && !pre.c.errs.length, JSON.stringify({ a, ls, w1, dis, errs: pre.c.errs }));
+    assert(a.n > 0 && /SQL 105 전/.test(a.foot) && !a.asg && !a.slack && a.tab === 'team' && ls === a.n && w1 === 0 && wM === w0 && dis === true && !pre.c.errs.length, JSON.stringify({ a, ls, w1, dis, errs: pre.c.errs, extra: pre.st.writes.slice(w0).map((x) => (x.m || x.method || '') + ' ' + String(x.url || '').replace(/^.*\/rest\/v1\//, '').slice(0, 80)) }));
     await pre.ctx.close();
     const v = await mkCtx({ role: 'admin_viewer', set: SET });
     const b = await v.page.evaluate(() => { SVC.ntfOpen(); return { items: document.querySelectorAll('#ntfPanel .ntf-it').length, asg: !!document.querySelector('#ntfPanel [data-asg]'), set: !!document.getElementById('ntfSet'), slack: !!document.getElementById('ntfSlack'), can: SVC.ntfCanAssign() }; });
@@ -4610,6 +4610,75 @@ if (S.blk()) {
     assert(w0 > 600 && css.doc <= 390 && css.svg <= 390 && after.doc <= 390 && after.w < 390 && after.right <= 390, JSON.stringify({ w0, css, after }));
     assert(!c.errs.length, '페이지 오류 ' + c.errs.join(' | ')); await ctx.close();
     return '1280 → 390 · svg ' + w0 + ' → ' + after.w + ' · 문서 폭 ' + after.doc;
+  });
+}
+// ㊿+194 AI 공급자 표시 · 장비 현황(출고일 = 수령희망›신청일 · 회수일 지어내지 않음 · 회수일 어긋남) · Cloud 사이트 권한 오류 안내 — 가짜 DB
+if (S.blk()) {
+  const mk194 = async (o) => { o = Object.assign({ role: 'super_admin', prov: 'OpenRouter' }, o || {});
+    const seed = seedData();
+    if (o.eq) { seed.equipment_orders = seed.equipment_orders.concat(o.eq.orders); seed.equipment_assets = seed.equipment_assets.concat(o.eq.assets); }
+    if (o.cloud) seed.cloud_sites = o.cloud;
+    const db = new FakeDB(seed);
+    db.rpc.portal_accounts = () => [{ email: 'tester@example.com', role: o.role, name: '홍길동', title: '차장' }, { email: 'other@example.com', role: 'admin', name: '김철수', title: '대리' }];
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page);
+    const dlg = []; page.on('dialog', (d) => { dlg.push(d.message().split('\n')[0]); d.accept(); });
+    await fakeBackend(page, db, { role: o.role, extra: async (route, u) => {
+      if (!/\/functions\/v1\/ask/.test(u)) return false;
+      const b = JSON.parse(route.request().postData() || '{}');
+      const body = b.mode === 'ping' ? { ok: true, version: o.prov ? 'v3.6' : 'v3.5', model: 'claude-sonnet-5.5', provider: o.prov ? o.prov : undefined }
+        : { ok: true, text: '가상 답 — LIVE 29곳', model: 'claude-sonnet-5.5', provider: o.prov || undefined, queries: [] };
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) }); return true; } });
+    await page.goto(url + '/index.html'); await page.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA && SVC.ST.DATA.rows.length, null, { timeout: 20000 }); await page.waitForTimeout(400);
+    if (o.ai) await page.waitForFunction(() => SVC.AICFG && SVC.AICFG.enabled, null, { timeout: 15000 });   /* ping 이 끝나 AI 가 켜진 뒤에 질문(부하 큰 병렬 실행에서 내장 규칙으로 빠지지 않게) */
+    return { db, ctx, page, c, dlg }; };
+  await S.t('㊿+194 AI 답 밑에 공급자(«sonnet-5.5 · OpenRouter») · 예전 함수(공급자 없음)면 표시 없음 · aiProvName(openrouter → OpenRouter)', async () => {
+    const A = await mk194({ ai: true });
+    await A.page.evaluate(() => SVC.ask('LIVE 고객사 몇 곳이야?')); await A.page.waitForFunction(() => /가상 답/.test((document.getElementById('aiSay') || {}).textContent || ''), null, { timeout: 15000 });
+    const a = await A.page.evaluate(() => ({ t: document.getElementById('aiSay').textContent.replace(/\s+/g, ' '), prov: (document.querySelector('#aiSay .ai-prov') || {}).textContent || '', n: SVC.aiProvName('openrouter') + '|' + SVC.aiProvName('OpenRouter') + '|' + SVC.aiProvName('') }));
+    await A.ctx.close();
+    const B = await mk194({ prov: '', ai: true });
+    await B.page.evaluate(() => SVC.ask('LIVE 고객사 몇 곳이야?')); await B.page.waitForFunction(() => /가상 답/.test((document.getElementById('aiSay') || {}).textContent || ''), null, { timeout: 8000 });
+    const b = await B.page.evaluate(() => ({ prov: !!document.querySelector('#aiSay .ai-prov'), t: document.getElementById('aiSay').textContent }));
+    await B.ctx.close();
+    assert(/sonnet-5\.5 · OpenRouter/.test(a.t) && a.prov === 'OpenRouter' && a.n === 'OpenRouter|OpenRouter|' && !b.prov && !/OpenRouter/.test(b.t) && !A.c.errs.length, JSON.stringify({ a, b, errs: A.c.errs }));
+    return a.prov;
+  });
+  await S.t('㊿+194 장비 현황 맞추기: 신청은 임대중인데 현황에 회수일이 남은 장비 = «회수일» 어긋남 → 맞추면 비움 · 회수완료 신청에 회수일이 없으면 «오늘»을 넣지 않음 · 출고일 = 수령희망일 › 신청일(한국 날짜) · 이미 있는 출고일은 그대로', async () => {
+    const eq = { orders: [
+      { id: 900, channel: '일반', order_type: '신규발주', customer: '가상고객_장비A', model: 'S100', qty: 2, serials: 'EQ94A, EQ94B', status: '설치완료', install_date: '2026-03-20', ship_date: '2026-03-12', created_at: '2026-03-01T16:30:00Z', returned_date: null, returned_serials: null },
+      { id: 901, channel: '일반', order_type: '신규발주', customer: '가상고객_장비B', model: 'S100', qty: 1, serials: 'EQ94C', status: '회수완료', install_date: '2026-02-20', ship_date: null, created_at: '2026-02-01T16:30:00Z', returned_date: null, returned_serials: null },
+      { id: 902, channel: '일반', order_type: '신규발주', customer: '가상고객_장비C', model: 'S100', qty: 1, serials: 'EQ94D', status: '설치완료', install_date: '2026-06-25', ship_date: '2026-05-07', created_at: '2026-05-01T00:00:00Z', returned_date: null, returned_serials: null }],
+      assets: [
+      { id: 9401, serial: 'EQ94A', model: 'S100', usage: '임대', status: '임대중', customer: '가상고객_장비A', channel: '일반', order_id: 900, deployed_date: '2026-03-20', returned_date: '2026-09-01', note: null },
+      { id: 9402, serial: 'EQ94B', model: 'S100', usage: '임대', status: '임대중', customer: '가상고객_장비A', channel: '일반', order_id: 900, deployed_date: '2026-03-20', returned_date: null, note: null },
+      { id: 9403, serial: 'EQ94C', model: 'S100', usage: '임대', status: '임대중', customer: '가상고객_장비B', channel: '일반', order_id: 901, deployed_date: null, returned_date: null, note: null }] };
+    const A = await mk194({ eq });
+    await A.page.evaluate(() => SVC.navMenu('orders')); await A.page.waitForTimeout(500);
+    const g = await A.page.evaluate(() => { const s = SVC.eqScan(); return s.gap.map((x) => x.o.id + ':' + x.why).join(' | '); });
+    await A.page.evaluate(() => { const d = document.getElementById('eqChk'); if (d) d.open = true; }); await A.page.waitForTimeout(100);
+    await A.page.click('#eqFixAll'); await A.page.waitForTimeout(1500);
+    const T = (sn) => A.db.table('equipment_assets').find((x) => x.serial === sn) || {};
+    const r = { a: T('EQ94A'), b: T('EQ94B'), c: T('EQ94C'), d: T('EQ94D') };
+    const pick = (x) => [x.status, x.deployed_date, x.returned_date].join('/');
+    const out = { g, a: pick(r.a), b: pick(r.b), c: pick(r.c), d: pick(r.d), dlg: A.dlg };
+    await A.ctx.close();
+    assert(/900:현황 값이 신청과 다름 — 회수일/.test(g) && /901:/.test(g) && /902:/.test(g)
+      && out.a === '임대중/2026-03-20/' && out.b === '임대중/2026-03-20/' && out.c === '회수완료/2026-02-02/' && out.d === '임대중/2026-05-07/'
+      && out.dlg.some((m) => /현황 \d+건을 맞출까요/.test(m)), JSON.stringify(out));
+    return out.a + ' · ' + out.c + ' · ' + out.d;
+  });
+  await S.t('㊿+194 Cloud 사이트 이력: «You do not have permission to update this site» 실패 줄 아래 할 일(권한 위임 · 만든 API 계정) · 요청자는 이름(김철수 대리) · 성공 줄엔 안내 없음 · csErrHint 분류', async () => {
+    const cloud = [
+      { id: 1, action: 'update', sitename: 'vsite-perm', customer: '가상기관P', devices: 100, result: false, message: 'You do not have permission to update this site.', requested_by: 'other@example.com', cred_label: '가상 계정 A', created_at: '2026-10-12T01:00:00Z', extra: { expiredate: '2027-10-01' } },
+      { id: 2, action: 'update', sitename: 'vsite-ok', customer: '가상기관Q', devices: 500, result: true, message: 'Site update successful.', requested_by: 'tester@example.com', cred_label: '가상 계정 B', created_at: '2026-10-12T02:00:00Z', extra: { expiredate: '2027-10-31' } }];
+    const A = await mk194({ cloud });
+    await A.page.evaluate(() => { SVC.navMenu('csite'); SVC.csSetTab('update'); }); await A.page.waitForFunction(() => document.querySelectorAll('#csHist tbody tr').length >= 2, null, { timeout: 8000 }); await A.page.waitForTimeout(300);
+    const r = await A.page.evaluate(() => { const rows = [...document.querySelectorAll('#csHist tbody tr')].map((tr) => ({ t: tr.textContent.replace(/\s+/g, ' '), hint: (tr.querySelector('.cs-hint') || {}).textContent || '' }));
+      return { rows, k: [SVC.csErrHint('Invalid apikey'), SVC.csErrHint('site not found'), SVC.csErrHint('Site update successful.')].map((x) => x.slice(0, 12)).join('|') }; });
+    await A.ctx.close();
+    const perm = r.rows.find((x) => /vsite-perm/.test(x.t)) || {}, okr = r.rows.find((x) => /vsite-ok/.test(x.t)) || {};
+    assert(/권한 위임/.test(perm.hint) && /김철수 대리/.test(perm.t) && !/other@example\.com/.test(perm.t) && !okr.hint && /홍길동 차장/.test(okr.t) && /^API 키가 맞지 않습|사이트명을 찾지 못|\|$/.test(r.k) && r.k.split('|')[2] === '', JSON.stringify(r));
+    return perm.hint.slice(0, 40);
   });
 }
 await browser.close(); srv.close();

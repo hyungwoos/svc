@@ -1,4 +1,5 @@
-// aicheck v1.6 — 포탈 AI 야간 자동 점검 (90점 프로젝트 ⑥ AI 2단계 · 2026-10-03)
+// aicheck v1.7 — 포탈 AI 야간 자동 점검 (90점 프로젝트 ⑥ AI 2단계 · 2026-10-03)
+//   · v1.7(2026-10-14 · ㊿+194 Anthropic 결제 해지 · ask v3.6 OpenRouter 전용): 실패 안내에서 ANTHROPIC_API_KEY 줄을 빼고 AI 키는 OPENROUTER_API_KEY 하나로 · «ask 최신» 표기 v3.6
 //   · v1.6(2026-10-10 · ㊿+178 «숫자 기준 하나로»): 채점을 숫자로 — 예전엔 «2026» 안에 «2»가 들어 있으면 «2건» 통과 · 금액은 아무 금액이나 통과 · 연도 · % 는 표기만 보면 통과
 //     · 건수: 단위(건 · 곳 · 개 · 대 · 명)가 붙은 숫자와 정확히 같아야 · 년/월/일/% 앞 숫자는 셈하지 않음
 //     · 금액: 답의 금액(억 · 천만 · 백만 · 만 · 천원 · 원)을 원으로 바꿔 기대값과 ±1% 안 · OI 는 진행 중 건수(oi_open) · 연도별은 SQL 110 rev_years(작년 합 ±2%)
@@ -113,11 +114,10 @@ export function failText(status: number, j: any): string {
 export function fixHint(why: string): string {
   if (/^기대값 못 읽음/.test(why)) return '→ 기대값 함수(SQL 94 ai_check_expect) 확인 — 배포·운영 › SQL 에서 select ai_check_expect()';
   if (/conflicting api keys/i.test(why)) return '→ aicheck 를 v1.5 이상으로 다시 배포 (ask 를 부를 때 apikey·Authorization 을 같은 서비스 키로 보냄 — Supabase 새 API 키에서 서로 다르면 거부)';
-  if (/OPENROUTER_API_KEY|크레딧|사용 한도/.test(why)) return '→ Supabase › Edge Functions › Secrets 의 AI 키(OPENROUTER_API_KEY) 확인 — Secret 을 바꿨으면 ask 를 한 번 더 배포해야 반영됩니다';
+  if (/OPENROUTER_API_KEY|AI 키가 없습니다|크레딧|사용 한도/.test(why)) return '→ Supabase › Edge Functions › Secrets 의 AI 키(OPENROUTER_API_KEY) 확인 — Secret 을 바꿨으면 ask 를 한 번 더 배포해야 반영됩니다';
   if (/401/.test(why) && /jwt/i.test(why)) return '→ 해결: 포탈 배포·운영 › Edge Function › 목록 불러오기 › ask › «Verify JWT» 체크 해제 › 설정만 저장 (ask 는 함수 안에서 토큰을 직접 확인합니다)';
-  if (/401|403/.test(why)) return '→ ask 가 서비스 키를 거부 — ask 를 최신(v3.4)으로 다시 배포했는지, Verify JWT 가 꺼져 있는지 확인';
+  if (/401|403/.test(why)) return '→ ask 가 서비스 키를 거부 — ask 를 최신(v3.6)으로 다시 배포했는지, Verify JWT 가 꺼져 있는지 확인';
   if (/404/.test(why)) return '→ ask 함수를 찾지 못함 — 함수 이름(ask)과 배포 상태 확인';
-  if (/ANTHROPIC_API_KEY/.test(why)) return '→ Supabase › Edge Functions › Secrets 에 ANTHROPIC_API_KEY 확인';
   if (/5\d\d|546|WORKER|BOOT/i.test(why)) return '→ ask 함수 실행 오류 — Supabase › Edge Functions › ask › Logs 에서 03:00 무렵 기록 확인';
   if (/abort|timed? ?out|시간/i.test(why)) return '→ ask 응답이 너무 느림 — 잠시 뒤 수동 점검(배포·운영 › 기록 › 15문 점검)으로 다시 확인';
   if (/기대값 없음|빈 답|답 미완성/.test(why)) return '→ AI 답이 기대값과 다름 — 포탈 › 배포·운영 › 기록 › 15문 점검으로 같은 질문 확인';

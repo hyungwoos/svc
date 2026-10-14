@@ -181,6 +181,14 @@ export function renderCsite(){
   swLoad(false).then(function(){ var n=swAlerts().length, b=document.getElementById('csWatchN'); if(b){ b.textContent=n? n+'개 확인':''; b.style.display=n? '':'none'; } });
   setTimeout(function(){ var f=CS.tab==='update'? '#cuName' : '#csCust'; if(!$(f).value) $(f).focus(); },50);
 }
+/** ㊿+194 my.genians 오류 → 할 일 한 줄 (영문 메시지 그대로 두고 아래에 덧붙임) */
+export function csErrHint(m){
+  var s=String(m||'');
+  if(/do not have permission|not (have )?permi|permission denied|권한/i.test(s)) return '고른 API 계정(이메일)이 이 사이트의 소유자 · 권한 위임 대상이 아닙니다. 고객이 직접 만든 사이트면 my.genians 사이트 상세의 «권한 위임»을 이 API 계정 이메일로 바꾼 뒤 다시 하거나, CSM 웹에서 수정하세요. 사이트를 만든 API 계정으로 보내면 됩니다(이력의 «API 계정» 칸).';
+  if(/invalid api ?key|apikey|unauthori[sz]ed|인증/i.test(s)) return 'API 키가 맞지 않습니다 — API 계정 관리에서 그 계정의 키를 다시 등록하세요(키는 my.genians 에서 재발급).';
+  if(/not (be )?found|no such site|존재하지/i.test(s)) return '사이트명을 찾지 못했습니다 — 사이트명(주소 앞부분)을 확인하세요.';
+  return '';
+}
 export async function csHist(){
   var tb=$('#csHist tbody');
   if(CS.hist===undefined){ tb.innerHTML='<tr><td colspan="10" class="mini" style="color:var(--muted)">불러오는 중…</td></tr>';
@@ -191,7 +199,7 @@ export async function csHist(){
   $('#csHistCap').textContent=CS.hist.length? (q? h.length+'건 (전체 '+CS.hist.length+')' : h.length+'건')+' · 성공 '+h.filter(function(x){return x.result;}).length : '';
   tb.innerHTML=h.length? h.map(function(x){ var up=x.action==='update', ex=x.extra||{};
       var what=up? ('노드 '+(x.devices||'')+(ex.sra!=null? ' · SRA '+ex.sra:'')+(ex.expiredate? ' · 만료 '+ex.expiredate:'')+(ex.send_mail? ' · 메일':'')) : ((x.product||'')+'/'+(x.edition||'')+(ex.branch? ' · '+(CS_BR[ex.branch]||ex.branch):'')+(x.language&&x.language!=='ko'? ' · '+x.language:'')+' · '+(x.devices||'')+'노드');
-      return tpl`<tr${rawHtml(x.result?'':' style="color:var(--muted)"')}><td style="white-space:nowrap">${String(x.created_at||'').replace('T',' ').slice(0,16)}</td><td>${rawHtml(up? '<span class="badge b-re">수정</span>':'<span class="badge b-new">생성</span>')}</td><td><b>${x.sitename}</b>${rawHtml(x.hidden? ' <span class="mini" style="color:var(--muted)" title="사이트 목록에서 숨김">(숨김)</span>':'')}</td><td>${x.customer||''}</td><td class="mini">${what}</td><td>${rawHtml(x.result? '<span class="badge b-new">성공</span>':'<span class="badge b-churn">실패</span>')}</td><td class="mini">${x.message||''}</td><td class="mini">${x.requested_by||''}</td><td class="mini">${x.cred_label||''}</td><td class="mini">${x.memo||''}</td></tr>`; }).join('')
+      return tpl`<tr${rawHtml(x.result?'':' style="color:var(--muted)"')}><td style="white-space:nowrap">${String(x.created_at||'').replace('T',' ').slice(0,16)}</td><td>${rawHtml(up? '<span class="badge b-re">수정</span>':'<span class="badge b-new">생성</span>')}</td><td><b>${x.sitename}</b>${rawHtml(x.hidden? ' <span class="mini" style="color:var(--muted)" title="사이트 목록에서 숨김">(숨김)</span>':'')}</td><td>${x.customer||''}</td><td class="mini">${what}</td><td>${rawHtml(x.result? '<span class="badge b-new">성공</span>':'<span class="badge b-churn">실패</span>')}</td><td class="mini">${x.message||''}${rawHtml(!x.result && csErrHint(x.message)? tpl`<div class="cs-hint">${csErrHint(x.message)}</div>` : '')}</td><td class="mini" title="${x.requested_by||''}">${x.requested_by? ntfName(x.requested_by) : ''}</td><td class="mini">${x.cred_label||''}</td><td class="mini">${x.memo||''}</td></tr>`; }).join('')
     : tpl`<tr><td colspan="10" class="mini" style="color:var(--muted)">${q? '검색 결과 없음' : '아직 이력이 없습니다 — 66_cloud_sites.sql 이 아직 실행되지 않았다면 표가 없어 비어 보입니다.'}</td></tr>`;
   try{ if(CS.tab!=='creds') csPreview(); }catch(e){}
 }
@@ -254,7 +262,7 @@ export async function csSubmit(){
       var er=String(j.error||'알 수 없는 오류');
       var noChg=up && /같|동일|변경\s*없|no\s*change|nothing|unchanged|already|same/i.test(er);
       $('#csDoneTitle').textContent=up? (noChg? '바뀐 내용이 없어 수정되지 않았습니다' : '수정하지 못했습니다') : '사이트를 만들지 못했습니다';
-      $('#csDoneSum').textContent=sum+' — '+er+' (이력에 실패로 기록됨'+(noChg? ' · 사이트 자체는 그대로 정상입니다':'')+')';
+      $('#csDoneSum').textContent=sum+' — '+er+' (이력에 실패로 기록됨'+(noChg? ' · 사이트 자체는 그대로 정상입니다':'')+')'+(csErrHint(er)? '\n→ '+csErrHint(er) : '');
     }
     csHist();
   }catch(e){ msg('csMsg',String(e.message||e),'bad'); }

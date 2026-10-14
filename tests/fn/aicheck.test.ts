@@ -109,6 +109,7 @@ ok(!calls.some((c) => c.body && /xoxb-test|cronkey-test/.test(c.body)), '슬랙 
 { gwConflict = 0; const r = await call({ dry: true }); ok(r.j.ok && r.j.pass === 12 && gwConflict === 0, 'v1.5: ask 호출 헤더가 같은 키 → 게이트웨이 거부 0', { gwConflict, pass: r.j.pass });
   const mod = await import('../../supabase/functions/aicheck/index.ts');
   ok(/v1\.5/.test(mod.fixHint('ask 호출 실패 — HTTP 401 · Conflicting API keys')), 'fixHint: Conflicting API keys → aicheck v1.5 안내', mod.fixHint('ask 호출 실패 — HTTP 401 · Conflicting API keys'));
+  ok(/OPENROUTER_API_KEY/.test(mod.fixHint('ask 호출 실패 — HTTP 500 · AI 키가 없습니다 — Supabase › Edge Functions › Secrets 에 OPENROUTER_API_KEY 를 넣어 주세요')) && !/ANTHROPIC/.test(mod.fixHint('ANTHROPIC_API_KEY 확인')), 'fixHint v1.7: AI 키 없음 → OPENROUTER_API_KEY · ANTHROPIC 안내 없음', mod.fixHint('ANTHROPIC_API_KEY 확인'));
   ok(/한 번 더 배포/.test(mod.fixHint('ask 호출 실패 — OpenRouter API 키가 거부되었습니다 — Supabase › Edge Functions › Secrets 의 OPENROUTER_API_KEY 값을 확인하세요')), 'fixHint: OpenRouter 키 거부 → Secret 확인 + ask 다시 배포'); }
 console.log('채점 규칙 v1.6 (㊿+178)');
 { const M = await import(new URL('../../supabase/functions/aicheck/index.ts', import.meta.url).href);

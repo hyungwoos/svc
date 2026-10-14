@@ -274,6 +274,16 @@ say(/^export function tickMemo\(/m.test(jsAll) && /^export function cssvKey\(/m.
     && /\{k:'_auto',l:'자동 회신',ro:true,html:1/.test(gr) && /r\._auto=IA\.map\?/.test(gr) && /\.ia-card \.ia-tag\{/.test(css)
     && /function redrawAll\(\)/.test(vz) && /redrawAll: redrawAll/.test(vz) && /host\.__vizW = W;/.test(vz) && /Viz\.redrawAll\(\)/.test(ini) && /\.eqb-charts\{grid-template-columns:minmax\(0,1fr\) minmax\(0,1\.7fr\)\}/.test(css) && /\.eqb-charts \.card svg\[role="img"\]\{max-width:100%;height:auto\}/.test(css),
   '㊿+193 인바운드 자동 회신(IA · inbound_auto · 카드 · 설정 창 · 지금 실행 · 목록 «자동 회신» 열 · 상세 줄) · 차트 창 폭 따라 다시 그리기(Viz.redrawAll · eqb-charts minmax 0)'); }
+// ㊿+194 AI 비용 탭 뺌 · 답에 공급자 · 장비 회수일/출고일 · 사이트 권한 오류 안내
+{ const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
+  const ix = rd('index.html'), ad = rd('js/admin.js'), ai = rd('js/ai.js'), eq = rd('js/equipment.js'), sa = rd('js/sales.js'), ac = rd('supabase/functions/aicheck/index.ts');
+  say(!/data-t="bill"/.test(ix) && !/data-pane="bill"/.test(ix) && !/abLoad|abSave|axBillKpi/.test(ad) && /var tabs=\['acct','sec','cfg','api'\];/.test(ad)
+    && /^export function aiProvName\(p\)/m.test(ai) && /r\.provider\? tpl` · <span class="ai-prov"/.test(ai) && /r\.provider\? ' · '\+aiProvName\(r\.provider\)/.test(ad)
+    && /^export function eqShipDate\(r, todayS\)/m.test(eq) && /var dep=gone\? eqShipDate\(r, todayS\) : null;/.test(eq) && !/\|\| todayS\) : null;/.test(eq) && !/slice\(0,10\):null\) \|\| todayS;/.test(eq)
+    && /if\(stA && stA!=='회수완료' && a\.returned_date\) d\.push\('회수일'\);/.test(eq) && /a\.deployed_date && a\.status!=='재고'\) o\.deployed_date=/.test(eq)
+    && /^export function csErrHint\(m\)/m.test(sa) && /권한 위임/.test(sa) && /ntfName\(x\.requested_by\)/.test(sa)
+    && /aicheck v1\.7/.test(ac) && !/ANTHROPIC_API_KEY/.test(ac.replace(/^\/\/.*$/gm, '')),
+  '㊿+194 AI 비용 탭 뺌 · 답 · 점검에 공급자 · 출고일 = 수령희망›신청일 · 회수일 지어내지 않음 · 회수일 어긋남 · 사이트 권한 오류 안내 · aicheck v1.7'); }
 // ㊿+160 연장하면 상태 «재약정»(구분 그대로) · 계약 상세에 «계약 기간 · 연장 이력»
 say(/^export function renewStatus\(r\)/m.test(jsAll) && /var nst=renewStatus\(r\);/.test(jsAll) && /^export function ctPeriods\(c, mine\)/m.test(jsAll) && html.includes('id="dtRenew"'), '연장: 상태 «재약정»(renewStatus) · 계약 상세 연장 이력(ctPeriods · #dtRenew)');
 const idx = html + jsAll;
