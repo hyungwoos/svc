@@ -515,7 +515,7 @@ export function dcMergeDlg(list, cn){
         var r=await sbWrite('POST','rpc/merge_customers',{p_keep:keep, p_drop:drops[i].id});
         done++; ['contracts','orders','assets','oi'].forEach(function(k){ tot[k]+=(r&&r[k])||0; });
       }
-      toast('고객사 병합 완료', keepC.name+' ← '+done+'곳 · 계약 '+tot.contracts+' · 장비 '+(tot.orders+tot.assets)+' · OI '+tot.oi);
+      toast('고객사 병합 완료', keepC.name+' ← '+done+'개사 · 계약 '+tot.contracts+' · 장비 '+(tot.orders+tot.assets)+' · OI '+tot.oi);
       ov.remove(); DC._rules=null;
       loadFromDb().then(function(d){ onData(d); if(ST.CUR_VIEW==='dcheck') renderDataCheck(); }).catch(function(){});
     }catch(e){ say('병합 실패: '+(e.message||e), true); this.disabled=false; }
@@ -594,7 +594,7 @@ export function renderLeadSrc(){
     return tpl`<div class="kpi ls-tile" data-src="${src}" style="padding:12px 14px;cursor:pointer${rawHtml(LS.pick===src?';outline:2px solid '+col:'')}" title="누르면 이 유입경로의 계약 목록">`+
       tpl`<div class="k" style="display:flex;align-items:center;gap:6px"><i style="width:9px;height:9px;border-radius:50%;background:${rawHtml(col)};display:inline-block"></i>${src}</div>`+
       tpl`<div style="font-size:22px;font-weight:800;margin-top:2px">${won(a.mrr)} <small style="font-size:12px;font-weight:500;color:var(--muted);white-space:nowrap">천원 · ${sh.toFixed(1)}%</small></div>`+
-      tpl`<div class="mini" style="margin-top:4px">계약 ${rawHtml(a.n)}건 · 고객사 ${Object.keys(a.custs).length}곳${rawHtml(a.newN? ' · 올해 신규 '+a.newN+'건':'')}</div>`+
+      tpl`<div class="mini" style="margin-top:4px">계약 ${rawHtml(a.n)}건 · 고객사 ${Object.keys(a.custs).length}개사${rawHtml(a.newN? ' · 올해 신규 '+a.newN+'건':'')}</div>`+
       tpl`<div class="mini">${rawHtml(y0)}년 누적 ${won(a.ytd)}천원</div></div>`; }).join(''))}`+ tpl`</div>`;
   if(zeroSrc.length) h+=tpl`<p class="mini ls-zero">${mk(b)} 매출 · ${rawHtml(y0)}년 누적 · 올해 신규가 모두 0 인 경로 ${rawHtml(zeroSrc.length)}개 — ${zeroSrc.join(' · ')} <button type="button" class="zr-btn" id="lsAllTiles">모두 보기</button></p>`;
   else if(isGN() && LS.allTiles) h+=tpl`<p class="mini ls-zero"><button type="button" class="zr-btn" id="lsAllTiles">0 인 경로 접기</button></p>`;
@@ -1339,14 +1339,14 @@ export function bzxRender(host){
   h+=tpl`<div class="kpis" style="margin-bottom:12px">`+
     tpl`<div class="kpi"><div class="k">비즈포탈 회계매출 (종료·계산서발행)</div><div class="v">${rawHtml(w(S.biz/1000))}<small>천원</small></div><div class="d">실패·중지 ${rawHtml(w(S.skip/1000))}천원 제외${rawHtml(S.ign? ' · 무시 규칙 '+w(S.ignBiz/1000)+'천원 제외':'')}</div></div>`+
     tpl`<div class="kpi"><div class="k">관리포탈 매출 (월 매출 + 설치비)</div><div class="v">${rawHtml(w(S.db/1000))}<small>천원</small></div><div class="d">이 포탈 DB 의 ${mk(T)} 인식 금액 · 정산일 ${mk(T)} 설치비 포함${rawHtml(S.ign? ' · 무시 규칙 '+w(S.ignDb/1000)+'천원 제외':'')}</div></div>`+
-    tpl`<div class="kpi ${S.diff>=0?'up':'down'}"><div class="k">차액 (비즈포탈 − 관리포탈)</div><div class="v">${S.diff>0?'+':''}${rawHtml(w(S.diff/1000))}<small>천원</small></div><div class="d">일치 ${rawHtml(S.n.eq||0)}곳 · 확인할 차이 ${diffs.length}곳${rawHtml(S.n.alias? ' (표기 차이 추정 '+S.n.alias+'쌍 포함)':'')}${rawHtml(ruled.length? ' · 반복 규칙 '+ruled.length+'곳'+(S.ign? ' (무시 '+S.ign+')':''):'')}</div></div></div>`;
+    tpl`<div class="kpi ${S.diff>=0?'up':'down'}"><div class="k">차액 (비즈포탈 − 관리포탈)</div><div class="v">${S.diff>0?'+':''}${rawHtml(w(S.diff/1000))}<small>천원</small></div><div class="d">일치 ${rawHtml(S.n.eq||0)}개사 · 확인할 차이 ${diffs.length}개사${rawHtml(S.n.alias? ' (표기 차이 추정 '+S.n.alias+'쌍 포함)':'')}${rawHtml(ruled.length? ' · 반복 규칙 '+ruled.length+'개사'+(S.ign? ' (무시 '+S.ign+')':''):'')}</div></div></div>`;
   (function(){
     var D=res.diag||{}, total=res.groups.length||1, bad=diffs.length/total;
     var lines=[];
     var nearTxt=Object.keys(D.nearCnt||{}).sort().map(function(i){ return mk(+i)+' '+D.nearCnt[i]+'건'; }).join(' · ');
     lines.push(tpl`관리포탈 월 매출(monthly_revenue) ${mk(T)}: 계약 <b>${rawHtml(D.dbCts||0)}건</b>${rawHtml(nearTxt? tpl` <span style="color:var(--muted)">(인접 달: ${rawHtml(nearTxt)})</span>`:'')}`+ tpl`${rawHtml((D.dbCts||0)===0? ' — <b style="color:var(--critical)">이 달 인식 금액이 하나도 없습니다. 월 매출 인식이 아직 안 돌았거나 대상 월이 다릅니다</b>':'')}`);
     if((D.dbCts||0)>0){
-      lines.push(tpl`비즈포탈 회계매출 있는 고객사 <b>${rawHtml(D.bizCusts||0)}곳</b> · 이름으로 관리포탈과 붙은 회사 <b>${rawHtml(D.matched||0)}곳</b>`+ tpl`${rawHtml((D.bizCusts||0)>0 && (D.matched||0)/(D.bizCusts||1)<0.5? ' — <b style="color:var(--critical)">절반도 안 붙었습니다. 두 쪽 고객사 표기 방식이 체계적으로 다른 것 같습니다 (아래 비슷한 이름 목록에서 패턴을 봐 주세요)</b>':'')}`);
+      lines.push(tpl`비즈포탈 회계매출 있는 고객사 <b>${rawHtml(D.bizCusts||0)}개사</b> · 이름으로 관리포탈과 붙은 회사 <b>${rawHtml(D.matched||0)}개사</b>`+ tpl`${rawHtml((D.bizCusts||0)>0 && (D.matched||0)/(D.bizCusts||1)<0.5? ' — <b style="color:var(--critical)">절반도 안 붙었습니다. 두 쪽 고객사 표기 방식이 체계적으로 다른 것 같습니다 (아래 비슷한 이름 목록에서 패턴을 봐 주세요)</b>':'')}`);
     } else lines.push('→ 관리포탈에 '+mk(T)+' 월 매출을 먼저 만들고(매출 인식·재계산) 엑셀을 다시 올리면 됩니다. 이 상태의 «비즈포탈에만 있음» 은 전부 그 때문이라 저장하지 마세요.');
     if(D.unit) lines.push(tpl`<b style="color:var(--critical)">⚠ ${rawHtml(D.unit)}</b>`);
     if((D.dbCts||0)>0 && D.nearMiss && D.nearMiss.length) lines.push(tpl`비즈포탈에만 있는 회사 중 관리포탈에 <i>비슷한 이름</i>이 있는 경우 (표기 패턴 확인용): `+
@@ -1382,9 +1382,9 @@ export function bzxRender(host){
        tpl`<div><b>관리포탈 계약 (이 DB)</b>${rawHtml((q.pair? q.pair.db : q.db).length? tpl`<table class="pr" style="margin-top:4px"><tbody>${rawHtml((q.pair? q.pair.db : q.db).map(function(d){ return tpl`<tr><td>${d.cust}</td><td>${lline(d.line)} · ${d.status||''}</td><td class="n">${rawHtml(w(d.amt))}${rawHtml(d.fee? ' + 설치비 '+w(d.fee):'')}</td><td class="mini">${(d.note||'').slice(0,40)}</td></tr>`; }).join(''))}</tbody></table>` : tpl`<div style="color:var(--muted)">이 달 매출 없음${q.cat==='bizonly'? ' — 계약 미등록·사명 불일치·인식 월 차이 중 하나':''}</div>`)}</div></div></td></tr>`;
   });
   h+='</tbody></table></div>';
-  h+=tpl`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px">`+ tpl`${rawHtml(ruled.length? tpl`<button class="chip" id="bzxRuled" aria-pressed="${rawHtml(BZX.showRuled)}" title="한 번 정한 규칙으로 매달 자동 처리되는 차이 — 사유 기록 반복은 저장 시 사유가 붙어 기록되고, 무시 반복은 총계·표에서 빠집니다">🔁 반복 규칙 ${ruled.length}곳 · 기록 ${ruled.length-S.ign} / 무시 ${rawHtml(S.ign)} ${BZX.showRuled?'접기':'보기'}</button>`:'')}`+
-     tpl`<button class="chip" id="bzxEq" aria-pressed="${rawHtml(BZX.showEq)}">일치 ${eqs.length}곳 ${BZX.showEq?'접기':'보기'}</button>`+
-     tpl`<button class="chip" id="bzxSkip" aria-pressed="${rawHtml(BZX.showSkip)}">실패·중지 참고 ${skips.length}곳 · ${rawHtml(w(S.skip/1000))}천원 ${BZX.showSkip?'접기':'보기'}</button>`+
+  h+=tpl`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px">`+ tpl`${rawHtml(ruled.length? tpl`<button class="chip" id="bzxRuled" aria-pressed="${rawHtml(BZX.showRuled)}" title="한 번 정한 규칙으로 매달 자동 처리되는 차이 — 사유 기록 반복은 저장 시 사유가 붙어 기록되고, 무시 반복은 총계·표에서 빠집니다">🔁 반복 규칙 ${ruled.length}개사 · 기록 ${ruled.length-S.ign} / 무시 ${rawHtml(S.ign)} ${BZX.showRuled?'접기':'보기'}</button>`:'')}`+
+     tpl`<button class="chip" id="bzxEq" aria-pressed="${rawHtml(BZX.showEq)}">일치 ${eqs.length}개사 ${BZX.showEq?'접기':'보기'}</button>`+
+     tpl`<button class="chip" id="bzxSkip" aria-pressed="${rawHtml(BZX.showSkip)}">실패·중지 참고 ${skips.length}개사 · ${rawHtml(w(S.skip/1000))}천원 ${BZX.showSkip?'접기':'보기'}</button>`+
      tpl`<span class="spacer" style="flex:1"></span>`+ tpl`${rawHtml(ST.IS_VIEWER? '' : tpl`<button class="pill pri" id="bzxSave">💾 비즈포탈 차액 표에 저장 (${rawHtml(T!=null? (+mk(T).slice(5,7))+'월':'')})</button>`)}`+
      tpl`<button class="pill ghost" id="bzxClose">닫기</button></div>`;
   if(BZX.showRuled && ruled.length) h+=tpl`<div class="mini" style="margin-top:8px"><b>🔁 반복 규칙으로 처리된 차이</b> — <b>사유 기록</b>은 저장 시 사유가 붙어 차액 표에 남고, <b>무시</b>는 우리 차액이 아닌 것으로 보아 총계·표에서 빠집니다. 차이 종류가 바뀌면 자동으로 다시 확인 표에 올라옵니다<table class="pr" style="margin-top:4px"><thead><tr><th>규칙</th><th>구분</th><th>고객사</th><th class="n">비즈포탈</th><th class="n">포탈</th><th class="n">차이</th><th>사유(규칙)</th><th></th></tr></thead><tbody>`+
@@ -1394,7 +1394,7 @@ export function bzxRender(host){
   h+=tpl`<div style="margin-top:10px">${rawHtml(helpBox('bzx','이 대조는 어떻게 계산하나요?',[
     ['비즈포탈 쪽','엑셀에서 쓰는 열은 «고객사»·«회계매출»·«진행상태» 셋뿐입니다. 진행상태가 «종료»·«계산서발행» 인 행의 «회계매출» 합 (실패·중지·취소류만 비교에서 빼고 참고로 보여줍니다). 행은 있는데 회계매출이 0 인 회사(상위 행만 있고 하위매출 미등록, 수금 변경 행)는 «비즈포탈 회계매출 0» 으로 따로 잡습니다. «예상시기» 는 대상 월 이름을 정할 때만 쓰고 행을 걸러내지 않습니다.'],
     ['관리포탈 쪽','이 통합 관리 포탈 DB 의 그 달 계약별 월 매출(monthly_revenue) 합 + 대금정산일이 그 달인 설치비. 비즈포탈은 설치비를 별도 행으로 잡기 때문에 같이 봐야 맞습니다. 표에서 «관리포탈» 은 항상 이 포탈, «비즈포탈» 은 올린 엑셀을 뜻합니다.'],
-    ['회사 묶기','띄어쓰기·㈜·(에스원)·괄호 안 사이트명·사명 변경 별칭을 무시하고 회사 단위로 묶습니다(두산에너빌리티 사우디/괌/이집트 → 1곳). 이름이 한 글자 오타 수준으로 닮은 짝(브랜드/브랜즈, 에프엔비/에프앤비)은 금액이 달라도 한 회사로 묶어 비교하고 «⇄ 표기 차이 추정» 으로 표시합니다. 그 위에 «비즈포탈에만 있음» = 엑셀에만 있음, «관리포탈에만 있음» = 이 포탈 DB 에만 있음입니다. 이름은 전혀 다른데 양쪽 금액이 같으면 «표기 차이(추정)»로 짝을 제안합니다. «별칭 저장»을 누르면 다음 달부터 자동으로 맞춰집니다.'],
+    ['회사 묶기','띄어쓰기·㈜·(에스원)·괄호 안 사이트명·사명 변경 별칭을 무시하고 회사 단위로 묶습니다(두산에너빌리티 사우디/괌/이집트 → 1개사). 이름이 한 글자 오타 수준으로 닮은 짝(브랜드/브랜즈, 에프엔비/에프앤비)은 금액이 달라도 한 회사로 묶어 비교하고 «⇄ 표기 차이 추정» 으로 표시합니다. 그 위에 «비즈포탈에만 있음» = 엑셀에만 있음, «관리포탈에만 있음» = 이 포탈 DB 에만 있음입니다. 이름은 전혀 다른데 양쪽 금액이 같으면 «표기 차이(추정)»로 짝을 제안합니다. «별칭 저장»을 누르면 다음 달부터 자동으로 맞춰집니다.'],
     ['사유','차이 행마다 담당자가 한 줄로 적습니다. 지난달에 같은 고객사로 적은 사유가 있으면 미리 채워 두니 확인만 하면 됩니다. 「저장」을 누르면 요약 3줄 + 고객사별 차이가 아래 «비즈포탈 차액» 표에 들어갑니다.'],
     ['🔁 매달 반복','<b>매달 같은 이유로 생기는 차이</b>는 사유를 적고 «매달 반복»에서 종류를 고르면 규칙으로 저장돼 다음 달부터 묻지 않습니다. <b>사유 기록 반복</b> = 차액은 그대로 인정하고 저장할 때 이 사유가 자동으로 붙어 기록됨(예: 설치비 인식 시점, 분기납 인식 차이). <b>무시 반복</b> = 우리 쪽 차액이 아닌 것(다른 부서 담당자가 등록하는 조달 건 등)으로 보고 총계·고객사별 표에서 아예 빼며 기록하지 않음. 둘 다 «반복 규칙» 묶음에서 확인·해제할 수 있고, 차이 종류가 바뀌면(예: 포탈에만 있음 → 금액 다름) 다시 확인을 받습니다.'],
     ['엑셀 파일','저장하지 않습니다. 화면을 닫으면 사라지고, 다음 달에는 새 파일을 다시 올리면 됩니다.']
@@ -1486,7 +1486,7 @@ export async function bzxSave(diffs){
     var ins=await bizSaveMonth(k, out, '엑셀 자동 대조');
     bizReplaceLocal(k, ins);
     logChange('update','biz_recon',0,{ym:k, rows:out.length, from:'엑셀 자동 대조', file:BZX.file, ignored_by_rule:nIgn});
-    toast('저장되었습니다', bizLabel(k)+' 비즈포탈 대조 결과 · 차이 '+(out.length-3)+'곳');
+    toast('저장되었습니다', bizLabel(k)+' 비즈포탈 대조 결과 · 차이 '+(out.length-3)+'개사');
     ST.DIRTY=true; BIZV.ym=k; BZX.res=null; BZX.rows=null; renderBizMonthly();
   }catch(e){ toast('저장 실패', String(e.message||e), 'info'); }
 }
@@ -1642,7 +1642,7 @@ export function chvBase(skipK){
 export function chvModeBar(){
   var bar=$('#chvMode'); if(!bar) return;
   var b=CHV.b!=null? CHV.b : STATE.base, n={cur:chvCurRows(CHV.all,b).length, next:chvNextRows(CHV.all,b).length, all:CHV.all.length};
-  var M=[['cur','현재 유효',n.cur,'곳'],['next','시작 예정',n.next,'건'],['all','전체 이력',n.all,'건']];
+  var M=[['cur','현재 유효',n.cur,'개사'],['next','시작 예정',n.next,'건'],['all','전체 이력',n.all,'건']];
   bar.innerHTML=M.map(function(m){ return tpl`<button type="button" data-m="${rawHtml(m[0])}" aria-pressed="${CHV.mode===m[0]?'true':'false'}">${m[1]} <b>${rawHtml(m[2])}</b>${rawHtml(m[3])}</button>`; }).join('');
   bar.querySelectorAll('button').forEach(function(bt){ bt.onclick=function(){ if(CHV.mode===bt.dataset.m) return; CHV.mode=bt.dataset.m; CHV.filters={}; CHV.sortK= CHV.mode==='cur'? 'sum' : (CHV.mode==='next'? 'start':'cust'); CHV.sortDir= CHV.mode==='cur'? -1 : 1; try{ localStorage.setItem('svc_chv_mode', CHV.mode); }catch(e){} renderChvTable(); }; });
 }
@@ -1660,12 +1660,12 @@ export function renderChvTable(){
   chvModeBar();
   var src=chvSource(), cap='';
   if(CHV.mode==='cur'){ var tot=src.reduce(function(a,r){ return a+(r._sum||0); },0);
-    cap=mk(b)+' 유효 고객사 '+src.length+'곳 · 고객 합계(당월 매출) 합 '+won(tot)+'천원 = 위 «당월 MRR» · 고객 합계 = 그 고객의 이 영역 계약들의 '+mk(b)+' 인식 금액 합 · 개별 계약 금액·이력은 고객사를 눌러서'; }
+    cap=mk(b)+' 유효 고객사 '+src.length+'개사 · 고객 합계(당월 매출) 합 '+won(tot)+'천원 = 위 «당월 MRR» · 고객 합계 = 그 고객의 이 영역 계약들의 '+mk(b)+' 인식 금액 합 · 개별 계약 금액·이력은 고객사를 눌러서'; }
   else if(CHV.mode==='next') cap=mk(b)+' 다음 달부터 시작하는 계약 '+src.length+'건 (재약정 등록분·신규 예정) · 금액은 계약 월 금액 — 아직 당월 매출에는 없음';
   else { var cnt={}; src.forEach(function(r){ var p=String(r._phase||'').replace(/^추가 계약 · /,''); cnt[p]=(cnt[p]||0)+1; }); var addN=src.filter(function(r){ return r.parent; }).length;
     cap='전체 이력 '+src.length+'건 · '+mk(b)+' 기준 유효 '+(cnt['유효']||0)+' · 시작 예정 '+(cnt['시작 예정']||0)+' · 종료 '+(cnt['종료']||0)+(addN? ' · 그중 추가 계약 '+addN:'')+' · 당월 인식 = 그 계약의 '+mk(b)+' 금액 · 계약 월 금액 = 계약서 MRR'; }
   $('#chvCtCap').textContent=cap;
-  $('#chvCnt').textContent=rows.length.toLocaleString('ko-KR')+(CHV.mode==='cur'?'곳':'건')+(rows.length!==src.length? ' / '+src.length+(CHV.mode==='cur'?'곳':'건'):'');
+  $('#chvCnt').textContent=rows.length.toLocaleString('ko-KR')+(CHV.mode==='cur'?'개사':'건')+(rows.length!==src.length? ' / '+src.length+(CHV.mode==='cur'?'개사':'건'):'');
   var nf=0; for(var k in CHV.filters){ if(CHV.filters[k]&&CHV.filters[k].length) nf++; }
   var fb=$('#chvFclr'); fb.style.display=nf? '':'none'; fb.textContent='✕ 필터 해제 ('+nf+')';
 
@@ -1818,7 +1818,7 @@ export function liveGroupNote(key){
   if(!g) return 'LIVE 고객사 탭 기준';
   var parts=LIVE_GROUPS[g].map(function(k){ return (CH_DEFS[k][0].replace(/^\S+ /,'').split(' · ')[1]||k)+' '+liveN(liveForArea(k)); });
   var tot=LIVE_GROUPS[g].reduce(function(a,k){ return a+liveN(liveForArea(k)); },0);
-  return 'LIVE 명단 '+g+' 전체 '+tot+'곳 = '+parts.join(' + ');
+  return 'LIVE 명단 '+g+' 전체 '+tot+'개사 = '+parts.join(' + ');
 }
 /* ─────────────────────────────────────────────────────────────────────────────
    LIVE 고객사 = 계약을 등록하면 자동으로 따라오는 결과 (64단계 · DB 함수 live_view() 와 같은 규칙)
@@ -1926,7 +1926,7 @@ export function liveForArea(key){
   if(!lv || !lv.ok) return null;
   return lv.rows.filter(function(x){ return liveAreaKey(x)===key; });
 }
-/* LIVE 명단의 «곳» = 회사 이름 기준 (한 회사가 사이트를 여러 줄로 갖고 있으면 1곳) */
+/* LIVE 명단의 «개사» = 회사 이름 기준 (한 회사가 사이트를 여러 줄로 갖고 있으면 1개사) */
 export function liveN(rows){ var u={}; (rows||[]).forEach(function(x){ u[x.cust]=1; }); return Object.keys(u).length; }
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -2009,7 +2009,7 @@ export function liveDeltaHtml(b){
   var plus=[n.신규? '신규 '+n.신규:'', n.복귀? '복귀 '+n.복귀:''].filter(Boolean).join(' · ');
   var minus=[n.만기? '만기 미처리 '+n.만기:'', n.해지? '해지 '+n.해지:'', n.종료? '종료 '+n.종료:'', n.예외? '예외 제외 '+n.예외:''].filter(Boolean).join(' · ');
   return tpl`<div class="lv-delta" title="LIVE 고객사 수의 전월 대비 변화를 사유별로 나눈 것 — 숫자는 회사 단위 · 만기 미처리 = 종료월이 지났는데 연장·해지·종료 처리가 없어 빠진 곳">`+
-    tpl`전월 ${rawHtml(dd.prevN)} → ${rawHtml(dd.curN)} <b class="${dn>0?'up':dn<0?'down':''}">(${dn>0?'+':''}${rawHtml(dn)})</b>`+ tpl`${rawHtml(dd.added.length? tpl` · <span class="up">+${dd.added.length}</span><span class="why">${plus}</span>`:'')}`+ tpl`${rawHtml(dd.removed.length? tpl` · <span class="down">−${dd.removed.length}</span><span class="why">${minus}</span>`:'')}`+ tpl`${rawHtml(dd.added.length||dd.removed.length? tpl` · <button type="button" class="lnk" data-diff="delta" title="늘어난 곳 · 빠진 곳을 고객사 이름으로 봅니다">변동 ${rawHtml(dd.added.length+dd.removed.length)}곳 보기</button>`:'')}`+ tpl`${rawHtml(dd.checking? tpl` · <button type="button" class="lnk" data-renew="checking" title="종료월이 최근 2개월 안에 지났는데 연장·해지 처리가 없는 계약 — LIVE 에 넣지 않고 표시만 합니다. 연장을 등록하면 되돌아옵니다">확인중 ${rawHtml(dd.checking)}건 →</button>`:'')}`+
+    tpl`전월 ${rawHtml(dd.prevN)} → ${rawHtml(dd.curN)} <b class="${dn>0?'up':dn<0?'down':''}">(${dn>0?'+':''}${rawHtml(dn)})</b>`+ tpl`${rawHtml(dd.added.length? tpl` · <span class="up">+${dd.added.length}</span><span class="why">${plus}</span>`:'')}`+ tpl`${rawHtml(dd.removed.length? tpl` · <span class="down">−${dd.removed.length}</span><span class="why">${minus}</span>`:'')}`+ tpl`${rawHtml(dd.added.length||dd.removed.length? tpl` · <button type="button" class="lnk" data-diff="delta" title="늘어난 곳 · 빠진 곳을 고객사 이름으로 봅니다">변동 ${rawHtml(dd.added.length+dd.removed.length)}개사 보기</button>`:'')}`+ tpl`${rawHtml(dd.checking? tpl` · <button type="button" class="lnk" data-renew="checking" title="종료월이 최근 2개월 안에 지났는데 연장·해지 처리가 없는 계약 — LIVE 에 넣지 않고 표시만 합니다. 연장을 등록하면 되돌아옵니다">확인중 ${rawHtml(dd.checking)}건 →</button>`:'')}`+
     tpl`</div>`;
 }
 /* ── ㊿+183 차이 근거 — 두 숫자가 다를 때 설명 글 대신 «실제로 다른 곳» 목록 (계산식은 그대로 · 보여 주기만)
@@ -2021,9 +2021,9 @@ export function diffOpen(o){
   if(!ov){ ov=document.createElement('div'); ov.className='ovl'; ov.id='ovlDiff'; document.body.appendChild(ov); }
   var gs=(o.groups||[]).filter(function(g){ return g.rows && g.rows.length; }), n=gs.reduce(function(a,g){ return a+g.rows.length; },0), MAX=300;
   var body=gs.length? gs.map(function(g, gi){
-    return tpl`<section class="df-g" aria-labelledby="dfG${String(gi)}"><h4 id="dfG${String(gi)}">${rawHtml(g.sign? tpl`<span class="df-s ${g.sign==='+'?'up':g.sign==='−'?'down':''}">${g.sign}</span>`:'')}${g.label} <b class="num">${String(g.rows.length)}곳</b></h4>`+
+    return tpl`<section class="df-g" aria-labelledby="dfG${String(gi)}"><h4 id="dfG${String(gi)}">${rawHtml(g.sign? tpl`<span class="df-s ${g.sign==='+'?'up':g.sign==='−'?'down':''}">${g.sign}</span>`:'')}${g.label} <b class="num">${String(g.rows.length)}개사</b></h4>`+
       tpl`${rawHtml(g.why? tpl`<p class="mini df-why">${g.why}</p>`:'')}<ul class="df-l">${rawHtml(g.rows.slice(0,MAX).map(function(r){ return tpl`<li><button type="button" class="df-c" data-c="${r.cust}" title="고객 한눈에">${r.cust}</button>${rawHtml(r.sub? tpl`<span class="df-sub">${r.sub}</span>`:'')}</li>`; }).join(''))}</ul>`+
-      tpl`${rawHtml(g.rows.length>MAX? tpl`<p class="mini">처음 ${String(MAX)}곳만 보입니다 — 전체는 «엑셀로 받기»</p>`:'')}</section>`; }).join('')
+      tpl`${rawHtml(g.rows.length>MAX? tpl`<p class="mini">처음 ${String(MAX)}개사만 보입니다 — 전체는 «엑셀로 받기»</p>`:'')}</section>`; }).join('')
     : tpl`<div class="ib-empty"><span class="ib-ic ok">${rawHtml(ico('check',16))}</span>다른 곳이 없습니다 — 두 숫자가 같습니다.</div>`;
   ov.innerHTML=tpl`<div class="modal df-m" role="dialog" aria-modal="true" aria-labelledby="dfT" style="width:min(720px,100%)">`+
     tpl`<h3 id="dfT">${o.title}</h3>${rawHtml(o.intro? tpl`<p class="cap">${o.intro}</p>`:'')}<div class="df-b">${rawHtml(body)}</div>`+
@@ -2034,14 +2034,14 @@ export function diffOpen(o){
   openOvl('ovlDiff');
   var f=ov.querySelector('.df-c, [data-close]'); if(f) try{ /** @type {any} */(f).focus(); }catch(e){}
 }
-/** LIVE 회사 수 vs 제품별 합 — 두 제품 이상 쓰는 곳(제품마다 1곳씩 세어 합이 커짐) · rows 를 주면 그 목록(대시보드 거르기 적용)으로 */
+/** LIVE 회사 수 vs 제품별 합 — 두 제품 이상 쓰는 곳(제품마다 1개사씩 세어 합이 커짐) · rows 를 주면 그 목록(대시보드 거르기 적용)으로 */
 export function liveMultiOpen(T, rows){
   var lv=rows? {rows:rows} : liveData(T); if(!lv || !lv.rows) return;
   var by={}; lv.rows.forEach(function(x){ var o=by[x.cust]=by[x.cust]||{}; o[x.line]=1; });
   var cs=Object.keys(by), ps=cs.reduce(function(a,c){ return a+Object.keys(by[c]).length; },0);
   var multi=cs.filter(function(c){ return Object.keys(by[c]).length>1; }).sort(function(a,b){ return Object.keys(by[b]).length-Object.keys(by[a]).length || a.localeCompare(b,'ko'); });
-  diffOpen({title:'LIVE 고객사 '+cs.length+'곳 vs 제품별 합 '+ps, xlsx:'LIVE_두제품이상',
-    intro:'회사는 1곳으로, 제품별 합은 제품마다 1곳씩 셉니다. 아래 '+multi.length+'곳이 제품을 두 개 이상 써서 차이 '+(ps-cs.length)+'이 납니다(세 제품이면 2만큼).',
+  diffOpen({title:'LIVE 고객사 '+cs.length+'개사 vs 제품별 합 '+ps, xlsx:'LIVE_두제품이상',
+    intro:'회사는 1개사로, 제품별 합은 제품마다 1개사씩 셉니다. 아래 '+multi.length+'개사가 제품을 두 개 이상 써서 차이 '+(ps-cs.length)+'이 납니다(세 제품이면 2만큼).',
     groups:[{label:'두 제품 이상 쓰는 곳', rows:multi.map(function(c){ var ls=Object.keys(by[c]); return {cust:c, sub:ls.length+'개 · '+ls.map(lline).join(' · ')}; })}]});
 }
 /** 계약 기준 LIVE vs 시트 명단 — 제품 단위로 다른 줄(LIVE 화면 «시트와 다른 곳»과 같은 계산) · keep 으로 대시보드 거르기 */
@@ -2049,7 +2049,7 @@ export function liveSheetDiffOpen(T, keep){
   var d=liveDiff(T), k=keep||function(){ return true; };
   var a=d.onlyDb.filter(k), b=d.onlySheet.filter(k);
   diffOpen({title:'계약 기준 LIVE vs 시트 명단', xlsx:'LIVE_시트차이',
-    intro:mk(T)+' 계약 기준 '+d.db.uniq+'곳 · 시트 명단 '+d.sheetN+'곳 — 이름은 띄어쓰기 · (주) · 괄호 · 별칭을 무시하고 맞췄습니다. 아래 줄이 없어지면 두 숫자가 같아집니다.',
+    intro:mk(T)+' 계약 기준 '+d.db.uniq+'개사 · 시트 명단 '+d.sheetN+'개사 — 이름은 띄어쓰기 · (주) · 괄호 · 별칭을 무시하고 맞췄습니다. 아래 줄이 없어지면 두 숫자가 같아집니다.',
     groups:[{label:'계약으로는 LIVE 인데 시트 명단에 없음', sign:'+', why:'시트 LIVE 탭에 추가하면 같아집니다', rows:a.map(function(x){ return {cust:x.cust, sub:lline(x.line)+(x.basis? ' · '+x.basis:'')}; })},
             {label:'시트 명단에는 있는데 계약으로는 LIVE 아님', sign:'−', why:'계약을 등록 · 연장하거나, 끝난 곳이면 시트에서 뺍니다', rows:b.map(function(x){ return {cust:x.cust, sub:lline(x.line)+' · '+x.why}; })}]});
 }
@@ -2060,7 +2060,7 @@ export function liveDeltaOpen(T){
   var subAdd=function(c){ var rs=(byCust[c]||[]).filter(function(r){ return liveActiveAt(r,T); }); return rs.map(function(r){ return lline(r.line)+' '+(r.startRaw!=null? mk(r.startRaw):'?')+'~'+(r.endRaw!=null? mk(r.endRaw):''); }).join(' · '); };
   var subRm=function(c){ var rs=(byCust[c]||[]).filter(function(r){ return liveActiveAt(r,T-1); }); return rs.map(function(r){ return lline(r.line)+' ~'+(r.endRaw!=null? mk(r.endRaw):'?')+(r.status? ' · 상태 '+r.status:''); }).join(' · '); };
   var g=function(arr, kind, sign, label, why){ return {label:label, sign:sign, why:why, rows:arr.filter(function(x){ return x.kind===kind; }).map(function(x){ return {cust:x.cust, sub:(sign==='+'? subAdd : subRm)(x.cust)}; })}; };
-  diffOpen({title:'LIVE 고객사 '+mk(T-1)+' '+dd.prevN+'곳 → '+mk(T)+' '+dd.curN+'곳', xlsx:'LIVE_전월대비',
+  diffOpen({title:'LIVE 고객사 '+mk(T-1)+' '+dd.prevN+'개사 → '+mk(T)+' '+dd.curN+'개사', xlsx:'LIVE_전월대비',
     intro:'회사 단위로 늘어난 곳 '+dd.added.length+' · 빠진 곳 '+dd.removed.length+' (차이 '+(dd.curN-dd.prevN>0?'+':'')+(dd.curN-dd.prevN)+'). 만기 미처리 = 종료월이 지났는데 연장 · 해지 · 종료 처리가 없어 빠진 곳.',
     groups:[g(dd.added,'신규','+','신규 — 첫 계약 시작'), g(dd.added,'복귀','+','복귀 — 다시 계약'),
             g(dd.removed,'만기','−','만기 미처리','연장이면 «만기 처리»에서 연장을 등록하면 되돌아옵니다'), g(dd.removed,'해지','−','해지'), g(dd.removed,'종료','−','서비스 종료'), g(dd.removed,'예외','−','LIVE 예외로 제외')]});
@@ -2433,7 +2433,7 @@ export function renderAreaSel(key){
   [].slice.call(document.querySelectorAll('#side button[data-v]')).forEach(function(b){ var k=b.dataset.v; if(!CH_DEFS[k] || b.classList.contains('mhide') || b.classList.contains('pdeny') || b.style.display==='none') return;
     var g=navSub(b)||'기타'; if(gi[g]==null){ gi[g]=groups.length; groups.push({t:g, items:[]}); } groups[gi[g]].items.push({k:k, t:navText(b)}); });
   sel.innerHTML=groups.map(function(g){ return tpl`<div class="area-g"><span class="area-gl">${g.t}</span>${rawHtml(g.items.map(function(it){ var s=areaStat(it.k), on=it.k===key;
-    return tpl`<button type="button" role="tab" data-area="${it.k}" aria-selected="${on?'true':'false'}" title="${CH_DEFS[it.k][2]}"><b>${it.t}</b><small>${won(s.mrr)}천원 · ${String(s.n)}곳</small></button>`; }).join(''))}</div>`; }).join('');
+    return tpl`<button type="button" role="tab" data-area="${it.k}" aria-selected="${on?'true':'false'}" title="${CH_DEFS[it.k][2]}"><b>${it.t}</b><small>${won(s.mrr)}천원 · ${String(s.n)}개사</small></button>`; }).join(''))}</div>`; }).join('');
   sel.querySelectorAll('[data-area]').forEach(function(b){ /** @type {any} */(b).onclick=function(){ var k=/** @type {any} */(b).dataset.area; if(k===key) return; switchView(k); try{ window.scrollTo(0, 0); }catch(e){} };
     /** @type {any} */(b).onkeydown=function(e){ if(e.key!=='ArrowRight' && e.key!=='ArrowLeft') return; e.preventDefault(); var all=[].slice.call(sel.querySelectorAll('[data-area]')), i=all.indexOf(b), j=(i+(e.key==='ArrowRight'?1:-1)+all.length)%all.length; var k2=/** @type {any} */(all[j]).dataset.area; all[j].click(); var nb=/** @type {any} */(sel.querySelector('[data-area="'+k2+'"]')); if(nb) nb.focus(); }; });
 }
@@ -2464,8 +2464,8 @@ export function renderChannelView(key){
     tpl`<span class="mini">${def[2]} · ${baseLabel()} 기준</span></div>`;
   h+=tpl`<div class="kpis" style="margin-bottom:16px">`+
     tpl`${rawHtml(tile('당월 MRR', won(mrr), '천원', '연환산 '+won(mrr*12)+'천원','cv_mrr'))}`+ tpl`${rawHtml(lvN!=null
-      ? tile('LIVE 고객사', liveN(lv).toLocaleString('ko-KR'), '곳', (lv.length!==liveN(lv)? '사이트 기준 '+lv.length+'건 · ':'')+liveGroupNote(key),'cv_live')
-      : tile('고객사', Object.keys(custs).length.toLocaleString('ko-KR'), '곳', '당월 매출 기준','cv_cust'))}`+ tpl`${rawHtml(hasEq? tile('임대중 장비', rentEq, '대', pendEq? '처리 대기 요청 '+pendEq+'건':'대기 요청 없음','cv_eq')
+      ? tile('LIVE 고객사', liveN(lv).toLocaleString('ko-KR'), '개사', (lv.length!==liveN(lv)? '사이트 기준 '+lv.length+'건 · ':'')+liveGroupNote(key),'cv_live')
+      : tile('고객사', Object.keys(custs).length.toLocaleString('ko-KR'), '개사', '당월 매출 기준','cv_cust'))}`+ tpl`${rawHtml(hasEq? tile('임대중 장비', rentEq, '대', pendEq? '처리 대기 요청 '+pendEq+'건':'대기 요청 없음','cv_eq')
           : tile('비중', (monthlyTotal(idxs(),b)? (mrr/monthlyTotal(idxs(),b)*100).toFixed(1):'0')+'%','','전체 당월 매출 대비','cv_mrr'))}`+
     tpl`</div>`;
   if(key==='cnpub'){
@@ -2481,7 +2481,7 @@ export function renderChannelView(key){
     });
     var oth=Object.keys(othGov).map(function(k3){ return lline(k3)+' '+othGov[k3]+'건'; }).join(' · ');
     var pubN=Object.keys(pubBad).length;
-    if(pubN||oth) h+=tpl`<section class="card c12" style="margin-bottom:16px"><h2>조달 표기 확인</h2>`+ tpl`${rawHtml(pubN? tpl`<p class="cap">⚠ 채널이 «공공»으로 입력된 고객사 ${rawHtml(pubN)}곳: ${Object.keys(pubBad).slice(0,12).join(', ')}${rawHtml(pubN>12?' 외 '+(pubN-12)+'곳':'')} — 산업군이 공공일 뿐 조달 판매가 아니면 «일반»으로, 실제 조달이면 «조달»로 수정하세요</p>`:'')}`+ tpl`${rawHtml(oth? tpl`<p class="cap">참고: Cloud NAC 외 제품의 조달 계약 ${rawHtml(oth)} — 이 화면에는 포함되지 않습니다</p>`:'')}`+
+    if(pubN||oth) h+=tpl`<section class="card c12" style="margin-bottom:16px"><h2>조달 표기 확인</h2>`+ tpl`${rawHtml(pubN? tpl`<p class="cap">⚠ 채널이 «공공»으로 입력된 고객사 ${rawHtml(pubN)}개사: ${Object.keys(pubBad).slice(0,12).join(', ')}${rawHtml(pubN>12?' 외 '+(pubN-12)+'개사':'')} — 산업군이 공공일 뿐 조달 판매가 아니면 «일반»으로, 실제 조달이면 «조달»로 수정하세요</p>`:'')}`+ tpl`${rawHtml(oth? tpl`<p class="cap">참고: Cloud NAC 외 제품의 조달 계약 ${rawHtml(oth)} — 이 화면에는 포함되지 않습니다</p>`:'')}`+
       tpl`</section>`;
   }
   h+='<div class="grid">';

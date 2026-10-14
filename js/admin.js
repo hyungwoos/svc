@@ -1830,16 +1830,127 @@ export function apiSnippets(key){
     ['Python', "import requests\nr = requests.get('"+b+"/revenue', headers={'X-API-Key': KEY}, params={'from': '2026-01', 'to': '2026-12'})\nrows = r.json()['data']"],
     ['엑셀용 CSV', 'curl -H "X-API-Key: '+k+'" "'+b+'/contracts?format=csv" -o contracts.csv']];
 }
+/* ── ㊿+200 외부 연동 «쉽게» — 사용자: «사용법이 너무 불친절 · 어떤 데이터를 어떻게 가져가는지 UI 로 쉽게»
+   · 맨 위 3단계(키 발급 → 전달 → 가져가기) · «무엇을 가져갈까요?» 자료 카드 7개 → 고르면: 들어 있는 칸(뜻 · 예시) · 주소 만들기(기간 · 조건 · 형식 → 주소가 바로 바뀜 · 복사)
+   · 가져가는 방법 탭: 엑셀(파워 쿼리) · 구글 시트(Apps Script · 매일 자동) · Power BI · 프로그램(Python · curl · 응답 모양) — 만든 주소가 그대로 들어감
+   · 자주 묻는 것(줄 수 · 다음 쪽 · 오류 뜻) · 예시 값은 전부 가짜 · 키는 여기 넣지 않음(«받은 키» 자리) */
+export var API_DS={
+  contracts:{t:'계약', use:'회계 ERP · BI 에서 계약 목록(고객사 · 서비스 · 기간 · 월 금액)을 맞출 때', row:'계약 1건 = 1줄', opt:['since','line','cstatus'],
+    f:[['id','계약 번호','1024'],['customer_id','고객사 번호','311'],['customer','고객사명 — 키가 «고객사명 포함»일 때만','가상고객01'],['line · line_label','서비스 코드 · 이름','Cloud · Cloud NAC'],['version','Cloud 버전','V6.0'],
+      ['contract_type','계약 유형','신규 · 재약정 · 추가'],['status','상태','재약정'],['start_month · end_month','시작월 · 종료월','2026-01 · 2026-12'],['term_months','약정 개월','12'],['mrr','월 금액(원)','480000'],['qty','수량(노드 등)','120'],
+      ['install_fee','설치비(원)','0'],['channel · partner','판매 채널 · 파트너','일반 · —'],['biller · billing','계산서 발행처 · 과금 방식','지니언스 · 월납입'],['renew_count · auto_renew','연장 횟수 · 자동 연장','1 · false'],
+      ['parent_contract_id','원계약 번호','—'],['churn_reason · churn_month','해지 사유 · 해지월','—'],['csm','CSM 사이트명','vcust01'],['s1_no','에스원 계약번호','—'],['updated_at','마지막 수정 시각','2026-10-14T09:12:00+09:00']]},
+  revenue:{t:'월 매출', use:'계약별로 달마다 얼마인지 — 회계 매출 대사 · 월 마감', row:'계약 × 월 = 1줄', opt:['from','to'],
+    f:[['contract_id','계약 번호(계약 자료의 id)','1024'],['month','월','2026-10'],['amount','금액(원)','480000']]},
+  customers:{t:'고객사', use:'고객사 번호 → 이름 · 산업군을 붙일 때', row:'고객사 하나 = 1줄', opt:[],
+    f:[['id','고객사 번호','311'],['name','고객사명 — 키가 «고객사명 포함»일 때만','가상고객01'],['industry · sector','산업군 · 구분','제조 · 민간']]},
+  mrr:{t:'월 매출 합계', use:'BI · 경영 보고 — 달마다 전체 · 서비스별 합계(포탈 «월 MRR»과 같은 숫자)', row:'월 1줄(CSV 는 월 × 서비스 1줄)', opt:['from','to'],
+    f:[['month','월','2026-10'],['total','그달 합계(원)','128450000'],['contracts','계약 수','214'],['by_line','서비스별 합계(원)','{"Cloud": 61200000, "MDR": 40100000, …}']]},
+  poc:{t:'MDR PoC·운영', use:'MDR 신청 ~ PoC ~ 구독 진행 현황', row:'신청 1건 = 1줄', opt:['since','pstatus'],
+    f:[['id · apply_date','번호 · 신청일','58 · 2026-09-02'],['svc_type','서비스 유형','CLOUD'],['customer','고객사명','가상고객07'],['status','상태','신청 · 대기 · 진행중 · 데모 · 구독 · 종료'],['license','라이선스','EDR+AV'],
+      ['plan_qty · agents_total','계약 수량 · 설치 수','300 · 274'],['mod_edr · mod_av …','모듈(EDR · 백신 · 랜섬웨어 · 매체제어)','true'],['start_date · end_date','시작 · 종료일','2026-09-15 · —'],['sales_name','영업 담당','홍길동']]},
+  orders:{t:'장비 신청', use:'임대 장비 출고 · 회수 진행', row:'신청 1건 = 1줄', opt:['since','ostatus'],
+    f:[['id · created_at','신청 번호 · 신청 시각','412 · 2026-10-02T10:20:00+09:00'],['order_type','유형','신규발주 · 추가 · 교체 · 철거·회수'],['customer','고객사명','가상고객03'],['model · qty','모델 · 수량','S10_R2 · 2'],
+      ['status','상태','접수 · 출하요청 · 배송중 · 설치완료 · 회수예정 · 회수완료 · 취소'],['install_date · ship_date','설치희망일 · 출고일','2026-10-10 · 2026-10-07'],['serials','시리얼','S7DE00000AA'],['returned_date · returned_serials','회수일 · 회수 시리얼','—']]},
+  assets:{t:'장비 현황', use:'시리얼별 재고 · 임대 · 회수(회계 재고 파악)', row:'장비 1대 = 1줄', opt:['since','astatus'],
+    f:[['serial · model','시리얼 · 모델','S7DE00000AA · S10_R2'],['usage','구분','임대 · 데모 · 대여 · 판매'],['status','상태','재고 · 임대중 · 회수완료'],['customer · channel · partner','고객사 · 채널 · 파트너','가상고객03 · 일반 · —'],
+      ['in_date · deployed_date · returned_date','입고 · 출고 · 회수일','2026-03-02 · 2026-10-07 · —'],['order_id','신청 번호','412'],['updated_at','마지막 수정 시각','2026-10-07T15:00:00+09:00']]}};
+export var API_HOW=[['excel','엑셀'],['sheet','구글 시트'],['pbi','Power BI'],['code','프로그램']];
+export var APIG={ds:'contracts', how:'excel', o:/** @type {Object<string,any>} */({})};
+export function apiYm(d){ return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2); }
+export function apiOpt(ds){ var o=APIG.o[ds]; if(!o){ var n=new Date(), a=new Date(n.getFullYear(), n.getMonth()-11, 1); o=APIG.o[ds]={fmt:'csv', from:apiYm(a), to:apiYm(n), since:'', line:'', st:'', limit:'5000'}; } return o; }
+/** 고른 조건 → 주소 */
+export function apiUrl(ds, fmt){
+  var o=apiOpt(ds), d=API_DS[ds], q=[], f=fmt||o.fmt;
+  if(d.opt.indexOf('from')>=0){ if(o.from) q.push('from='+o.from); if(o.to) q.push('to='+o.to); }
+  if(d.opt.indexOf('since')>=0 && o.since) q.push((ds==='contracts' || ds==='assets'? 'updated_since=' : 'since=')+o.since);
+  if(d.opt.indexOf('line')>=0 && o.line) q.push('line='+encodeURIComponent(o.line));
+  if(o.st && d.opt.some(function(k){ return /status$/.test(k); })) q.push('status='+o.st.split(',').map(encodeURIComponent).join(','));
+  if(ds!=='mrr' && o.limit && o.limit!=='1000') q.push('limit='+o.limit);
+  if(f==='csv') q.push('format=csv');
+  return apiBase()+'/'+ds+(q.length? '?'+q.join('&') : '');
+}
+export function apiFn(ds){ return {contracts:'계약', revenue:'월매출', customers:'고객사', mrr:'월매출합계', poc:'MDR', orders:'장비신청', assets:'장비현황'}[ds]||ds; }
+/** 가져가는 방법 — 도구별 따라 하기(주소 · 헤더 이름이 그대로 들어감) */
+export function apiHowHtml(ds){
+  var u=apiUrl(ds), d=API_DS[ds], csv=apiOpt(ds).fmt==='csv', how=APIG.how;
+  var copy=function(id, text){ return tpl`<div class="api-cp"><code id="${id}">${text}</code><button type="button" class="cbtn" data-apicp="${id}">복사</button></div>`; };
+  var keyRow=tpl`<div class="api-kv"><span>이름</span><code>X-API-Key</code><span>값</span><code>받은 키(svc_로 시작)</code></div>`;
+  if(how==='excel') return tpl`<ol class="api-steps"><li>엑셀 › <b>데이터</b> 탭 › <b>데이터 가져오기</b> › <b>기타 원본에서</b> › <b>웹</b></li>`+
+    tpl`<li><b>고급</b>을 고르고 «URL 부분» 칸에 이 주소를 붙여 넣기${rawHtml(copy('apiU1', u))}</li>`+
+    tpl`<li>아래 «HTTP 요청 헤더 매개 변수»에 넣고 <b>확인</b>${rawHtml(keyRow)}</li><li>인증을 물으면 <b>익명</b> › <b>연결</b> → 미리 보기에서 <b>로드</b></li>`+
+    tpl`<li>다음부터는 <b>데이터 › 모두 새로 고침</b> 한 번이면 최신 ${d.t}</li></ol>`+
+    tpl`<p class="api-note">${csv? '형식이 CSV 라 첫 줄이 칸 이름입니다.' : 'JSON 이면 파워 쿼리에서 data 목록을 «테이블로 변환»해야 합니다 — 엑셀은 CSV 가 쉽습니다.'} 키는 이 엑셀 파일(쿼리) 안에 남으니 파일을 회사 밖으로 보내지 마세요.</p>`;
+  if(how==='sheet'){ var fn='가져오기_'+apiFn(ds), sh=d.t;
+    var code="function "+fn+"() {\n  var url = '"+apiUrl(ds, 'csv')+"';\n"+
+      "  var key = PropertiesService.getScriptProperties().getProperty('SVC_API_KEY');\n  var res = UrlFetchApp.fetch(url, {headers: {'X-API-Key': key}, muteHttpExceptions: true});\n"+
+      "  if (res.getResponseCode() !== 200) throw new Error(res.getContentText());\n  var rows = Utilities.parseCsv(res.getContentText().replace(/^\\uFEFF/, ''));\n"+
+      "  var ss = SpreadsheetApp.getActive(), sh = ss.getSheetByName('"+sh+"') || ss.insertSheet('"+sh+"');\n  sh.clearContents();\n  if (rows.length) sh.getRange(1, 1, rows.length, rows[0].length).setValues(rows);\n}";
+    return tpl`<ol class="api-steps"><li>구글 시트 › <b>확장 프로그램</b> › <b>Apps Script</b></li>`+
+      tpl`<li>왼쪽 ⚙ <b>프로젝트 설정</b> › <b>스크립트 속성 추가</b> — 속성 <code>SVC_API_KEY</code> · 값 = 받은 키 (코드에 키를 직접 쓰지 않음)</li>`+
+      tpl`<li>편집기에 아래 코드를 붙여 넣고 저장 → <b>▶ 실행</b>(처음 한 번 권한 허용) → «${sh}» 시트가 채워짐${rawHtml(tpl`<div class="api-cp"><pre class="api-code" id="apiU2">${code}</pre><button type="button" class="cbtn" data-apicp="apiU2">복사</button></div>`)}</li>`+
+      tpl`<li>매일 자동으로: 왼쪽 ⏰ <b>트리거</b> › <b>트리거 추가</b> › 함수 <code>${fn}</code> · <b>시간 기반</b> · <b>일 단위</b></li></ol>`; }
+  if(how==='pbi') return tpl`<ol class="api-steps"><li>Power BI Desktop › <b>홈</b> › <b>데이터 가져오기</b> › <b>웹</b></li><li><b>고급</b> › «URL 부분»에 이 주소${rawHtml(copy('apiU3', u))}</li>`+
+    tpl`<li>«HTTP 요청 헤더 매개 변수»${rawHtml(keyRow)}</li><li>인증 <b>익명</b> → <b>로드</b> · 서비스에 게시한 뒤 «예약된 새로 고침»을 켜면 매일 최신</li></ol>`+
+    tpl`<p class="api-note">CSV 형식이 다루기 쉽습니다. JSON 이면 data 목록을 «테이블로 변환»하세요.</p>`;
+  var py="import requests\nKEY = '받은 키'   # 코드에 직접 두지 말고 환경 변수 · 비밀 저장소에서 읽기\nr = requests.get('"+apiUrl(ds, 'json')+"', headers={'X-API-Key': KEY}, timeout=60)\nr.raise_for_status()\nj = r.json()\nrows = j['data']          # 목록\nprint(j['count'], '줄 / 전체', j['total'])\n# 더 있으면: j['next_offset'] 을 offset= 으로 다시 부름";
+  var curl="curl -H \"X-API-Key: 받은키\" \""+u+"\""+(csv? ' -o svc_'+ds+'.csv' : '');
+  var resp='{\n  "ok": true, "resource": "'+ds+'", "count": 2, "total": 2,'+(ds==='mrr'? '' : ' "limit": 1000, "offset": 0, "next_offset": null,')+'\n  "units": {"amount": "원", "month": "YYYY-MM"},\n  "data": [ { … 위 칸들 … }, … ]\n}';
+  return tpl`<div class="mini" style="margin-top:2px"><b>Python</b></div><div class="api-cp"><pre class="api-code" id="apiU4">${py}</pre><button type="button" class="cbtn" data-apicp="apiU4">복사</button></div>`+
+    tpl`<div class="mini" style="margin-top:8px"><b>curl</b> (명령 창에서 한 줄)</div><div class="api-cp"><pre class="api-code" id="apiU5">${curl}</pre><button type="button" class="cbtn" data-apicp="apiU5">복사</button></div>`+
+    tpl`<div class="mini" style="margin-top:8px"><b>JSON 응답 모양</b></div><pre class="api-code">${resp}</pre>`;
+}
+/** «무엇을 가져갈까요?» — 자료 카드 · 칸 · 주소 만들기 · 방법 */
+export function apiGuideHtml(){
+  var ds=APIG.ds, d=API_DS[ds], o=apiOpt(ds), ks=(API.keys||[]).filter(function(k){ return k.active && (k.scopes||[]).indexOf(ds)>=0; });
+  var cards=Object.keys(API_DS).map(function(k){ var x=API_DS[k]; return tpl`<button type="button" class="api-ds${rawHtml(k===ds? ' on' : '')}" data-apids="${k}" aria-pressed="${k===ds? 'true' : 'false'}"><b>${x.t}</b><span>${x.use}</span></button>`; }).join('');
+  var sel=function(id, lab, cur, opts){ return tpl`<label class="api-o"><span>${lab}</span><select data-apio="${id}">${rawHtml(opts.map(function(p){ return tpl`<option value="${p[0]}"${rawHtml(p[0]===cur? ' selected' : '')}>${p[1]}</option>`; }).join(''))}</select></label>`; };
+  var ctl=[];
+  if(d.opt.indexOf('from')>=0){ ctl.push(tpl`<label class="api-o"><span>시작 월</span><input type="month" data-apio="from" value="${o.from}"></label>`); ctl.push(tpl`<label class="api-o"><span>끝 월</span><input type="month" data-apio="to" value="${o.to}"></label>`); }
+  if(d.opt.indexOf('since')>=0) ctl.push(tpl`<label class="api-o"><span>${ds==='contracts' || ds==='assets'? '이 날 뒤에 바뀐 것만' : '이 날 뒤에 신청한 것만'}</span><input type="date" data-apio="since" value="${o.since}"></label>`);
+  if(d.opt.indexOf('line')>=0) ctl.push(sel('line', '서비스', o.line, [['','전체']].concat([['Cloud','Cloud NAC'],['S1','S1 Cloud NAC'],['MDR','MDR'],['MDR_S1','S1 MDR'],['DRM','DRM'],['PNS','PNS'],['DLP','DLP']])));
+  if(d.opt.indexOf('cstatus')>=0) ctl.push(sel('st', '상태', o.st, [['','전체']].concat(['신규','재약정','추가','서비스종료','해지'].map(function(s){ return [s, s]; }))));
+  if(d.opt.indexOf('pstatus')>=0) ctl.push(sel('st', '상태', o.st, [['','전체'],['신청,대기,진행중,데모','PoC 단계(신청~데모)'],['구독','구독'],['종료','종료']]));
+  if(d.opt.indexOf('ostatus')>=0) ctl.push(sel('st', '상태', o.st, [['','전체']].concat(['접수','출하요청','배송중','설치완료','회수예정','회수완료','취소'].map(function(s){ return [s, s]; }))));
+  if(d.opt.indexOf('astatus')>=0) ctl.push(sel('st', '상태', o.st, [['','전체']].concat(['재고','임대중','회수완료'].map(function(s){ return [s, s]; }))));
+  ctl.push(sel('fmt', '형식', o.fmt, [['csv','CSV (엑셀 · 시트)'],['json','JSON (프로그램)']]));
+  if(ds!=='mrr') ctl.push(sel('limit', '한 번에', o.limit, [['1000','1,000줄'],['5000','5,000줄(최대)']]));
+  var fields=tpl`<div class="tbl-wrap api-f" tabindex="0"><table class="dgrid"><thead><tr><th>칸 이름</th><th>뜻</th><th>예시 (가짜 값)</th></tr></thead><tbody>${rawHtml(d.f.map(function(f){ return tpl`<tr><td><code>${f[0]}</code></td><td>${f[1]}</td><td class="mini">${f[2]}</td></tr>`; }).join(''))}</tbody></table></div>`;
+  return tpl`<div class="adm-h">무엇을 가져갈까요? <span class="mini">자료를 고르면 칸 · 주소 · 따라 하기가 바로 바뀝니다</span></div><div class="api-dsg" role="group" aria-label="가져갈 자료">${rawHtml(cards)}</div>`+
+    tpl`<div class="api-detail"><div class="api-dh"><b>${d.t}</b> <span class="mini">${d.row} · 금액은 원 · 월은 YYYY-MM</span>${rawHtml(ks.length? tpl`<span class="ctag ok">이 자료를 볼 수 있는 키: ${ks.map(function(k){ return k.name; }).join(' · ')}</span>` : tpl`<span class="ctag">이 자료를 고른 키가 아직 없습니다 — 아래 «새 키 발급»에서 «${d.t}»를 체크</span>`)}</div>`+
+    tpl`<div class="api-sec"><div class="api-st">① 들어 있는 칸</div>${rawHtml(fields)}</div>`+
+    tpl`<div class="api-sec"><div class="api-st">② 주소 만들기</div><div class="api-opts">${rawHtml(ctl.join(''))}</div><div class="api-cp api-url"><code id="apiUrl">${apiUrl(ds)}</code><button type="button" class="cbtn pri" data-apicp="apiUrl">주소 복사</button></div></div>`+
+    tpl`<div class="api-sec"><div class="api-st">③ 가져가는 방법</div><div class="api-how" role="tablist" aria-label="가져가는 방법">${rawHtml(API_HOW.map(function(h){ return tpl`<button type="button" role="tab" data-apihow="${h[0]}" aria-selected="${h[0]===APIG.how? 'true' : 'false'}">${h[1]}</button>`; }).join(''))}</div><div class="api-howb" role="tabpanel">${rawHtml(apiHowHtml(ds))}</div></div>`+
+    tpl`<details class="api-faq"><summary><b>자주 묻는 것</b></summary><ul class="mini">`+
+    tpl`<li><b>줄이 많을 때</b> — 한 번에 최대 5,000줄. 더 있으면 JSON 의 <code>next_offset</code> 값을 <code>offset=</code> 으로 붙여 다시(CSV 는 응답 머리 <code>X-Total-Count</code> 가 전체 줄 수)</li>`+
+    tpl`<li><b>얼마나 자주</b> — 키마다 분당 60번까지. 보통 하루 한 번 새로 고침이면 충분합니다</li>`+
+    tpl`<li><b>오류가 나면</b> — 401 키가 틀림 · 폐기 · 만료 / 403 이 키로 볼 수 없는 자료(발급할 때 체크 안 함) / 400 조건 형식(메시지에 이유) / 429 너무 자주 — 1분 뒤 다시. 모든 호출은 아래 «최근 호출»에 남습니다</li>`+
+    tpl`<li><b>키 다루기</b> — 키는 주소에 넣지 않고(<code>?key=</code> 는 거부) 헤더 <code>X-API-Key</code> 로만. 메신저 1:1 · 비밀번호 관리자로 전하고, 새면 «폐기» 후 새로 발급</li>`+
+    tpl`<li><b>개인정보</b> — 고객 담당자 · 연락처 · 주소 · 메모 같은 칸은 처음부터 내보내지 않습니다. 고객사명이 필요 없으면 키를 «고객사명 포함» 끄고 발급</li></ul></details></div>`;
+}
+export function apiGuidePaint(){ var g=document.getElementById('apiGuide'); if(!g) return; var f=document.activeElement, fk=f && f.getAttribute && (f.getAttribute('data-apio') || f.getAttribute('data-apids') || f.getAttribute('data-apihow')); g.innerHTML=apiGuideHtml(); apiGuideBind(g);
+  if(fk){ var b=/** @type {any} */(g.querySelector('[data-apio="'+fk+'"],[data-apids="'+fk+'"],[data-apihow="'+fk+'"]')); if(b) try{ b.focus(); }catch(e){} } }
+export function apiGuideBind(g){
+  g.querySelectorAll('[data-apids]').forEach(function(b){ /** @type {any} */(b).onclick=function(){ APIG.ds=/** @type {any} */(b).dataset.apids; apiGuidePaint(); }; });
+  g.querySelectorAll('[data-apihow]').forEach(function(b){ /** @type {any} */(b).onclick=function(){ APIG.how=/** @type {any} */(b).dataset.apihow; apiGuidePaint(); }; });
+  g.querySelectorAll('[data-apio]').forEach(function(el){ /** @type {any} */(el).onchange=function(){ var o=apiOpt(APIG.ds); o[/** @type {any} */(el).dataset.apio]=String(/** @type {any} */(el).value||''); apiGuidePaint(); }; });
+  g.querySelectorAll('[data-apicp]').forEach(function(b){ /** @type {any} */(b).onclick=function(){ var el=g.querySelector('#'+/** @type {any} */(b).dataset.apicp), t=el? el.textContent : ''; var ok=function(){ toast('복사했습니다', /^https?:/.test(t)? '주소 — 붙여 넣을 칸에 Ctrl+V' : '코드 — 붙여 넣을 곳에 Ctrl+V'); };
+    try{ navigator.clipboard.writeText(t).then(ok, function(){ prompt('아래를 복사하세요 (Ctrl+C)', t); }); }catch(e){ prompt('아래를 복사하세요 (Ctrl+C)', t); } }; });
+}
+
 export function apiPaint(){
   var box=document.getElementById('apiBox'); if(!box) return;
-  var h=tpl`<p class="cap" style="margin:0 0 10px">다른 시스템(ERP · BI · 시트 등)이 포탈 데이터를 <b>읽기 전용</b>으로 가져가는 주소입니다 — <code>${apiBase()}/&lt;자료&gt;</code> · 헤더 <code>X-API-Key</code> · 금액은 원 · 월은 YYYY-MM · 분당 60회 · 모든 호출이 아래 기록에 남습니다. 시스템마다 키를 따로 주면 하나만 바로 끊을 수 있습니다.</p>`;
+  /* ㊿+200 맨 위 3단계 */
+  var h=tpl`<ol class="api-flow" aria-label="외부 연동 순서"><li><b>① 키 발급</b><span>어느 시스템이 어떤 자료를 가져갈지 골라 키를 만듭니다 — 아래 «새 키 발급»</span></li><li><b>② 키 전달</b><span>그 시스템 담당자에게 메신저 1:1 · 비밀번호 관리자로(채팅방 · 메일 본문 · GitHub 금지)</span></li><li><b>③ 가져가기</b><span>«무엇을 가져갈까요?»에서 자료를 고르면 칸 설명 · 주소 · 엑셀 · 구글 시트 · Power BI 따라 하기가 나옵니다</span></li></ol>`+
+    tpl`<p class="cap" style="margin:0 0 10px">읽기 전용 — 포탈 데이터를 바꿀 수는 없습니다 · 키마다 분당 60번 · 모든 호출이 아래 «최근 호출»에 남고, 시스템마다 키를 따로 주면 하나만 바로 끊을 수 있습니다.</p>`;
   if(API.err) h+=tpl`<p class="cap" style="color:var(--critical);margin:0 0 10px">⚠ ${API.err}</p>`;
   if(API.made){
     var mk0=API.made;
     h+=tpl`<div class="api-made" role="status"><b>새 키 — «${mk0.name}»</b> <span class="mini">이 화면을 벗어나면 다시 볼 수 없습니다. 지금 복사해서 그 시스템 담당자에게 안전하게(메신저 1:1 · 비밀번호 관리자) 전하세요. 채팅방·메일 본문·GitHub 에는 붙이지 마세요.</span>`+
       tpl`<div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap"><code id="apiKeyText" class="api-key">${mk0.key}</code><button type="button" class="pill" id="apiCopy">복사</button><button type="button" class="pill ghost" id="apiMadeOk">전달했어요 · 숨기기</button></div>`+
-      tpl`<pre class="api-code">${apiSnippets(mk0.key)[0][1]}</pre></div>`;
+      tpl`<pre class="api-code">${apiSnippets(mk0.key)[0][1]}</pre><p class="mini" style="margin:6px 0 0">이 키로 가져갈 수 있는 자료: <b>${(API.keys||[]).filter(function(k){ return k.prefix===mk0.prefix; }).map(function(k){ return (k.scopes||[]).map(apiScopeLabel).join(' · '); })[0]||'—'}</b> — 위 «무엇을 가져갈까요?»에서 자료를 고르면 엑셀 · 구글 시트 따라 하기가 나옵니다.</p></div>`;
   }
+  h+=tpl`<div id="apiGuide">${rawHtml(apiGuideHtml())}</div>`;
   h+=tpl`<details class="api-new" id="apiNewBox"${rawHtml(API.keys && !API.keys.length? ' open':'')}><summary><b>＋ 새 키 발급</b></summary><div class="frm" style="grid-template-columns:1.4fr 1fr 1fr;margin-top:8px">`+
     tpl`<div><label for="apiName">어느 시스템인지</label><input id="apiName" maxlength="60" placeholder="예: 회계 ERP · 경영 BI · 영업팀 시트"></div>`+
     tpl`<div><label for="apiDays">유효 기간</label><select id="apiDays"><option value="90">90일</option><option value="180">180일</option><option value="365" selected>1년</option><option value="0">무기한</option></select></div>`+
@@ -1859,7 +1970,7 @@ export function apiPaint(){
   h+=lg.length? tpl`<div class="tbl-wrap" tabindex="0" style="max-height:40vh"><table class="dgrid" id="apiLog"><thead><tr><th>시각</th><th>키</th><th>자료</th><th>조건</th><th class="n">행</th><th>결과</th><th>IP</th><th class="n">ms</th></tr></thead><tbody>${rawHtml(lg.map(function(l){
       var ok=l.status>=200 && l.status<300;
       return tpl`<tr><td class="mini">${String(l.at||'').replace('T',' ').slice(0,19)}</td><td>${l.key_name||''}</td><td>${l.resource||''}</td><td class="mini">${String(l.query||'').slice(0,60)}</td><td class="n">${rawHtml(String(l.rows||0))}</td><td><span class="ctag ${rawHtml(ok? 'ok':'late')}">${String(l.status)}</span></td><td class="mini">${l.ip||''}</td><td class="n mini">${rawHtml(String(l.ms||0))}</td></tr>`; }).join(''))}</tbody></table></div>` : '<p class="cap">아직 호출이 없습니다.</p>';
-  h+=tpl`<details class="api-help"><summary><b>사용법 · 주소 · 예시</b></summary><ul class="mini" style="line-height:1.8;margin:6px 0">`+
+  h+=tpl`<details class="api-help"><summary><b>전체 규칙 · 예시 (개발자용)</b></summary><ul class="mini" style="line-height:1.8;margin:6px 0">`+
     tpl`<li><code>GET ${apiBase()}</code> — 이 키로 볼 수 있는 자료 · 단위</li>`+
     tpl`<li><code>/contracts</code> — 계약 · <code>updated_since=2026-10-01</code>(그 뒤 바뀐 것만) · <code>line=Cloud</code> · <code>status=재약정</code></li>`+
     tpl`<li><code>/revenue</code> — 월 매출 · <code>from=2026-01&amp;to=2026-12</code>(기본 최근 12개월) · <code>contract_id=</code></li>`+
@@ -1880,6 +1991,7 @@ export function apiBindBox(box){
     try{ navigator.clipboard.writeText(t).then(done, function(){ prompt('아래 키를 복사하세요 (Ctrl+C)', t); }); }catch(e){ prompt('아래 키를 복사하세요 (Ctrl+C)', t); } };
   var mo=g('apiMadeOk'); if(mo) mo.onclick=function(){ API.made=null; apiPaint(); };
   box.querySelectorAll('[data-revoke]').forEach(function(b){ b.onclick=function(){ apiRevoke(Number(b.getAttribute('data-revoke'))); }; });
+  var gd=g('apiGuide'); if(gd) apiGuideBind(gd);   /* ㊿+200 */
 }
 export async function apiCreate(){
   if(API.busy) return;

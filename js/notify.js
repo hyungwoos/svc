@@ -27,7 +27,7 @@ import { CS_PROD, csSetTab, QMGR_MAP, SW, SW_STATE, swAlerts, swLoad } from './s
 
 export var NTF_DEF={renew_days:[60,30], eq_days:3, month_end_days:5, renew_emails:[], eq_emails:[], biz_emails:[], dc_emails:[], slack_on:false, team_channel:'C08RA3PPDH8', auto_on:false, auto_days:[1], auto_time:'09:00', auto_dm:false};
 export var NTF={memo:null, ops:null, opsOk:null, set:null, sqlOk:null, reads:{}, readsOk:false, asg:{}, asgOk:false, area:/** @type {Object<string,any>} */({}), accounts:/** @type {?any[]} */(null), names:/** @type {?Object<string,{name:string,title:string}>} */(null), omap:null, users:null, open:false, tab:'me', loading:false, at:0, busy:false, snapOk:null, snapKey:'', snapAt:0, snap:null};
-export var NTF_KIND={ops:'운영 상태', renew:'재약정 만기', lapsed:'만기 미처리', eq:'장비 처리 지연', biz:'월말 마감', dc:'데이터 점검'};
+export var NTF_KIND={ops:'운영 상태', renew:'재약정 만기', lapsed:'만기 미처리', eq:'장비 처리 지연', biz:'월말 마감', dc:'데이터 점검', fb:'개선 요청'};
 export var OPS_TBL={customers:'고객사', contracts:'계약', monthly_revenue:'월 매출', equipment_orders:'장비 신청', equipment_assets:'장비 현황', oi_deals:'OI'};
 
 /** 설정(없으면 기본값) */
@@ -55,7 +55,7 @@ export function ntfItems(){
   if(!ST.DATA || !ST.DATA.rows || ST.IS_EQUIP) return [];
   var S=ntfSet(), rows=ST.DATA.rows, R=ST.RAWX||{};
   /* 같은 데이터 · 설정 · 담당 · 날짜면 지난 결과(데이터 점검 규칙까지 도는 계산이라 종 숫자를 다시 그릴 때마다 하지 않음) — 데이터를 새로 읽으면 ST.DATA · ST.RAWX 가 새 객체 */
-  var sig=(R.orders||[]).map(function(o){ return o.id+':'+o.status; }).join(','), deps=[ST.DATA, R, rows.length, sig, NTF.set, NTF.asg, NTF.area, NTF.ops, ST.AUTH_USER, ST.OWNER_NAMES, FB.newN, FB.ok, SW.rows, SW.ok, todayStr()];
+  var sig=(R.orders||[]).map(function(o){ return o.id+':'+o.status; }).join(','), deps=[ST.DATA, R, rows.length, sig, NTF.set, NTF.asg, NTF.area, NTF.ops, ST.AUTH_USER, ST.OWNER_NAMES, FB.rev, FB.ok, SW.rows, SW.ok, todayStr()];
   if(NTF.memo && NTF.memo.deps.length===deps.length && NTF.memo.deps.every(function(d, i){ return d===deps[i]; })) return NTF.memo.v;
   var v=tickMemo('ntfItems', deps, function(){
     var out=[], days=(S.renew_days||[60,30]).slice().sort(function(a,b){ return a-b; }), maxD=days[days.length-1];
@@ -95,8 +95,8 @@ export function ntfItems(){
         to:S.dc_emails.concat(ntfAreaTo('dc')), me:ntfIsMe(S.dc_emails) || ntfAreaMe('dc'), go:function(){ switchView('dcheck'); }}); }catch(e){}
     /* 6) ㊿+175 운영 상태(슈퍼 관리자 · SQL 106 ops_status) — 야간 백업 · 자동 작업 · AI 점검 · 브라우저 오류 · 옛 버전 · 백업 대비 행 수 */
     if(ST.IS_SUPER && NTF.ops) try{ opsItems(NTF.ops).forEach(function(x){ out.push(x); }); }catch(e){}
-    /* 7) ㊿+185 개선 요청(슈퍼 관리자) — 새 요청 건수 */
-    if(ST.IS_SUPER && FB.ok && FB.newN) out.push({kind:'fb', key:'fb:'+FB.newN+':'+(FB.rows[0]? FB.rows[0].id : 0), sev:'mid', order:0, title:'개선 요청 새 '+FB.newN+'건', detail:FB.rows.filter(function(x){ return x.status==='new'; }).slice(0,2).map(function(x){ return (x.menu||'포탈 전체')+' — '+String(x.content||'').slice(0,40); }).join(' · '), to:[], me:true, go:function(){ fbOpen({list:true}); }});   /* ㊿+185 */
+    /* 7) ㊿+185 개선 요청 → ㊿+200 처리자(새 요청 · 요청자 덧붙임 · 다시 요청) · 요청자(확인 시작 · 답변 · 완료) — fbItems */
+    if(FB.ok) try{ fbItems().forEach(function(x){ out.push(x); }); }catch(e){}
     /* 8) ㊿+192 계약 없이 쓰는 Cloud 사이트(SQL 115 site_watch) — 사이트마다 한 번 · 만든 사람에게(+ 사이트 메뉴 담당 없음) · 발주일 · PoC 종료일이 지나면 hi */
     if(SW.ok) swAlerts().forEach(function(s){
       var st=SW_STATE[s.state]||s.state, who=String(s.requested_by||'').toLowerCase(), hi=s.state==='overdue' || s.state==='poc_over' || (s.state==='waiting' && (s.days||0)>=60);
@@ -179,7 +179,7 @@ export async function ntfLoad(force){
     var g={}, ar={}; (as||[]).forEach(function(x){ if(x.kind==='area') ar[String(x.ref)]=x; else g[String(x.ref)]=x; }); var hadAsg=Object.keys(NTF.asg).length+Object.keys(NTF.area).length>0, wasOk=!!NTF.asgOk; NTF.asg=g; NTF.area=ar; NTF.asgOk=as!==null;
     if(hadAsg || Object.keys(g).length || Object.keys(ar).length || (NTF.asgOk && !wasOk)) try{ renderTodo(); }catch(e){}   /* ㊿+195 담당 표를 처음 읽었으면(비어 있어도) 홈을 다시 그려 «담당 지정» 버튼이 보이게 — 예전엔 먼저 그린 홈에 버튼이 안 나올 때가 있었음 */   /* 홈 «우선 업무»의 장비 담당 = 처리 담당 · 줄 담당 */
     await opsLoad();
-    if(ST.IS_SUPER) try{ await fbLoad(true); }catch(e){}   /* ㊿+185 개선 요청 새 건수(알림함) */
+    try{ await fbLoad(true); }catch(e){}   /* ㊿+185 개선 요청 새 건수(알림함) · ㊿+200 요청자도 내 요청의 진행(확인 중 · 답변 · 완료) */
     NTF.at=Date.now();
     ntfSnapSave(false);   /* ㊿+177 예약 발송 «보낼 글» — 켜져 있을 때만 · 슈퍼 관리자만 · 바뀌었거나 6시간 지났을 때만 씀 */
     if(NTF.readsOk && Math.random()<0.05) fetch(SB_URL+'/rest/v1/rpc/notify_reads_trim', {method:'POST', headers:sbHeaders(true), body:'{}'}).catch(function(){});
@@ -424,7 +424,7 @@ export async function ntfAreaOpen(key){
 /* ── ㊿+185 개선 요청 — 로그인한 사람 누구나 «포탈 전체» 또는 «특정 화면»을 골라 양식 없이 적어 보냄(portal_feedback · SQL 113)
    · 진입: 위 띠 💡 버튼 · 계정 메뉴 «개선 요청 보내기» · 슈퍼 관리자는 같은 창에서 받은 요청을 보고 «처리함» · 메모 · 알림함 «개선 요청 새 n건»
    · 보낸 사람은 자기 것만 봄 · 처리 표시 · 삭제는 슈퍼 관리자만(DB RLS) ── */
-export var FB={ok:null, newN:0, rows:/** @type {any[]} */([]), loaded:false, busy:false, filesOk:null, att:/** @type {any[]} */([])};
+export var FB={ok:null, newN:0, rows:/** @type {any[]} */([]), loaded:false, busy:false, filesOk:null, att:/** @type {any[]} */([]), v3:false, rev:0, msgs:/** @type {Object<string,any[]>} */({}), tab:'new', focus:/** @type {any} */(null), cmp:null};
 /* ㊿+189 개선 요청 첨부 — 캡처(Ctrl+V · 끌어다 놓기) · 파일(이미지 · PDF · 엑셀 · 문서) 5MB · 5개 → Storage 버킷 feedback/<uid>/… (SQL 114) · 행의 files 에 [{path,name,size,type}] */
 export var FB_MAX=5, FB_MAXB=5*1024*1024, FB_EXT=/\.(png|jpe?g|gif|webp|pdf|txt|csv|xlsx?|docx?|pptx?)$/i;
 export function fbUid(){ try{ return String(b64urlJson(String(ST.SB_TOKEN||'').split('.')[1]).sub||'me'); }catch(e){ return 'me'; } }
@@ -492,32 +492,86 @@ export function fbViews(){
     else if(s.btn && visBtn(s.btn)) out.push({v:s.btn.dataset.v, label:navText(s.btn)}); }); }catch(e){}
   return out;
 }
+/* ── ㊿+200 개선 요청 — 요청 ↔ 처리가 서로 보이게(SQL 120)
+   · 단계: 접수(new) → 확인 중(doing · 담당) → 완료(done · 처리 내용 필수) → 요청자 «확인했어요» / «다시 요청»
+   · 창 = 탭 «새 요청» · «내 요청» · (슈퍼 관리자) «받은 요청» — 카드마다 진행 줄(요청 · 담당 · 완료 · 요청자 확인) + 대화(이름 · 시각)
+   · 알림함: 처리자 — 새 요청 · 요청자가 덧붙이거나 다시 요청 / 요청자 — 확인 시작 · 답변 · 완료(처리자 이름) — Slack DM 은 예약 발송 설정대로(팀 채널엔 안 감)
+   · SQL 120 전(새 칸 없음)이면 예전처럼(처리함 · 메모) */
+export var FB_COLS1='id,view,menu,content,status,note,created_by,created_at,done_by,done_at', FB_COLS3=',assignee,assigned_at,confirmed_at,req_seen_at,last_by,last_at,reopen_n';
+export var FB_ST={'new':'접수', doing:'확인 중', done:'완료'};
+export var FB_MK={reply:'답변', assign:'담당 맡음', done:'완료 · 처리 내용', reopen:'다시 요청', confirm:'확인했어요'};
+export function fbLow(e){ return String(e||'').toLowerCase(); }
+export function fbMine(x){ return !!x && fbLow(x.created_by)===ntfMe(); }
+/** 요청자가 아직 못 본 변화(처리자가 맡기 · 답변 · 완료) */
+export function fbUnseen(x){ return !!(FB.v3 && x && x.last_at && fbLow(x.last_by)!==fbLow(x.created_by) && (!x.req_seen_at || String(x.req_seen_at)<String(x.last_at))); }
+/** 시각 — 올해면 «10/13 09:20» · 아니면 «2025-10-13» */
+export function fbT(ts){ if(!ts) return ''; var d=new Date(ts); if(isNaN(d.getTime())) return String(ts).slice(0,16); var p=function(n){ return (n<10? '0':'')+n; };
+  return d.getFullYear()===new Date().getFullYear()? (d.getMonth()+1)+'/'+d.getDate()+' '+p(d.getHours())+':'+p(d.getMinutes()) : d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()); }
 export async function fbLoad(force){
   if(!ST.SB_TOKEN) return;
   if(FB.loaded && !force) return;
   var mine=(ST.IS_SUPER? '' : '&created_by=eq.'+encodeURIComponent(ntfMe()));   /* 내 것만(DB RLS 도 같은 기준) */
-  var rows=await ntfGet('portal_feedback?select=id,view,menu,content,status,note,created_by,created_at,done_by,done_at,files&order=id.desc&limit=300'+mine);
-  if(rows===null){ rows=await ntfGet('portal_feedback?select=id,view,menu,content,status,note,created_by,created_at,done_by,done_at&order=id.desc&limit=300'+mine); FB.filesOk=rows===null? null : false; }   /* ㊿+189 SQL 114 전(files 열 없음)이면 첨부 없이 */
-  else FB.filesOk=true;
-  FB.ok=rows!==null; FB.rows=rows||[]; FB.loaded=true; FB.newN=FB.rows.filter(function(x){ return x.status==='new'; }).length;
+  var rows=null, used=null, tries=[[1,1],[1,0],[0,1],[0,0]];   /* [SQL 120 칸, SQL 114 첨부] — 없는 칸이면 400 → 다음 */
+  for(var i=0;i<tries.length && rows===null;i++){ rows=await ntfGet('portal_feedback?select='+FB_COLS1+(tries[i][1]? ',files' : '')+(tries[i][0]? FB_COLS3 : '')+'&order=id.desc&limit=300'+mine); if(rows!==null) used=tries[i]; }
+  FB.v3=!!(used && used[0]); FB.filesOk=used? !!used[1] : null;
+  FB.ok=rows!==null; FB.rows=rows||[]; FB.loaded=true; FB.rev++;
+  FB.newN=FB.rows.filter(function(x){ return x.status==='new'; }).length;
+}
+/** 대화 — 창을 열 때만(알림함 계산에는 안 씀) */
+export async function fbMsgsLoad(){
+  if(!FB.v3 || !FB.rows.length){ FB.msgs={}; return; }
+  var ids=FB.rows.slice(0,150).map(function(x){ return x.id; });
+  var rows=await ntfGet('portal_feedback_msgs?select=id,fb_id,kind,body,created_by,created_at&fb_id=in.('+ids.join(',')+')&order=id.asc&limit=3000');
+  var m=/** @type {any} */({}); (rows||[]).forEach(function(x){ (m[x.fb_id]=m[x.fb_id]||[]).push(x); }); FB.msgs=m;
+}
+/** 알림함 항목 */
+export function fbItems(){
+  var out=[], me=ntfMe(); if(!FB.ok) return out;
+  var go=function(tab, id){ return function(){ fbOpen({tab:tab, id:id}); }; };
+  if(ST.IS_SUPER && FB.newN) out.push({kind:'fb', key:'fb:'+FB.newN+':'+(FB.rows[0]? FB.rows[0].id : 0), sev:'mid', order:0, title:'개선 요청 새 '+FB.newN+'건', detail:FB.rows.filter(function(x){ return x.status==='new'; }).slice(0,2).map(function(x){ return ntfName(x.created_by)+' — '+(x.menu||'포탈 전체')+' · '+String(x.content||'').slice(0,30); }).join(' · '), to:[], me:true, dmOnly:true, go:go('inbox')});
+  if(!FB.v3) return out;
+  /* 처리자 — 확인 중인데 요청자가 덧붙이거나 다시 요청(마지막 글이 요청자) */
+  if(ST.IS_SUPER) FB.rows.forEach(function(x){
+    if(x.status!=='doing' || !x.last_at || fbLow(x.last_by)!==fbLow(x.created_by) || (x.assigned_at && String(x.last_at)<=String(x.assigned_at))) return;
+    var asg=fbLow(x.assignee);
+    out.push({kind:'fb', key:'fbq:'+x.id+':'+x.last_at, sev:'mid', order:1, title:'개선 요청 — '+ntfName(x.created_by)+(x.reopen_n? ' 다시 요청' : ' 덧붙임'), detail:(x.menu||'포탈 전체')+' · '+String(x.content||'').slice(0,40)+(asg? ' · 담당 '+ntfName(asg) : ''), to:asg? [asg] : [], me:!asg || asg===me, dmOnly:true, go:go('inbox', x.id)});
+  });
+  /* 요청자 — 확인 시작 · 답변 · 완료(처리자) — 본 뒤엔 사라짐 · 완료는 여러 건이면 한 줄 */
+  var by={}; FB.rows.forEach(function(x){ if(fbUnseen(x) && !(x.status==='done' && x.confirmed_at)) (by[fbLow(x.created_by)]=by[fbLow(x.created_by)]||[]).push(x); });
+  Object.keys(by).forEach(function(rq){
+    var a=by[rq], dn=a.filter(function(x){ return x.status==='done'; }), mid=a.filter(function(x){ return x.status!=='done'; });
+    if(dn.length){ var last=dn.map(function(x){ return String(x.last_at); }).sort().pop();
+      out.push({kind:'fb', key:'fbd:'+dn.map(function(x){ return x.id; }).join(',')+':'+last, sev:'mid', order:2, title:dn.length===1? '개선 요청 완료 — '+(dn[0].menu||'포탈 전체') : '개선 요청 '+dn.length+'건 완료',
+        detail:dn.slice(0,2).map(function(x){ return (dn.length>1? (x.menu||'포탈 전체')+' · ' : '')+'처리 '+ntfName(x.done_by||x.assignee)+' '+fbT(x.done_at); }).join(' · ')+' — 처리 내용을 보고 «확인했어요»',
+        to:[rq], me:rq===me, dmOnly:true, go:go('mine', dn[0].id)}); }
+    mid.forEach(function(x){
+      out.push({kind:'fb', key:'fbu:'+x.id+':'+x.last_at, sev:'mid', order:3, title:x.status==='doing' && fbLow(x.last_by)===fbLow(x.assignee)? '개선 요청 확인 중 — 담당 '+ntfName(x.assignee) : '개선 요청에 답변 — '+ntfName(x.last_by),
+        detail:(x.menu||'포탈 전체')+' · '+String(x.content||'').slice(0,40), to:[rq], me:rq===me, dmOnly:true, go:go('mine', x.id)}); });
+  });
+  return out;
 }
 export function fbOpen(opt){
   opt=opt||{};
   if(!ST.SB_TOKEN){ toast('로그인이 필요합니다','', 'info'); return; }
-  var m=ntfDlg('ovlFb', 620), views=fbViews(), cur=ST.CUR_VIEW && ST.CUR_VIEW!=='dash'? ST.CUR_VIEW : '';
+  var m=ntfDlg('ovlFb', 740), views=fbViews(), cur=ST.CUR_VIEW && ST.CUR_VIEW!=='dash'? ST.CUR_VIEW : '';
   var curOk=views.some(function(x){ return x.v===cur; });
-  m.innerHTML=tpl`<h3 id="ovlFbH">${rawHtml(ico('bulb',18))} 개선 요청</h3><p class="cap">불편한 점 · 틀린 숫자 · 있으면 좋을 기능을 양식 없이 적어 주세요. 특정 화면 이야기면 그 화면을 고르면 됩니다. 보낸 글은 관리자가 확인합니다.</p>`+
+  FB.tab=opt.tab || (opt.list? (ST.IS_SUPER? 'inbox' : 'mine') : 'new'); FB.focus=opt.id||null; FB.cmp=null;
+  if(FB.tab==='inbox' && !ST.IS_SUPER) FB.tab='mine';
+  m.innerHTML=tpl`<h3 id="ovlFbH">${rawHtml(ico('bulb',18))} 개선 요청</h3>`+
+    tpl`<div class="fb-tabs" role="tablist" aria-label="개선 요청"><button type="button" role="tab" id="fbTab-new" data-fbtab="new" aria-controls="fbPaneNew">새 요청</button><button type="button" role="tab" id="fbTab-mine" data-fbtab="mine" aria-controls="fbPaneList">내 요청 <span class="fb-cnt" id="fbCntMine"></span></button>${rawHtml(ST.IS_SUPER? '<button type="button" role="tab" id="fbTab-inbox" data-fbtab="inbox" aria-controls="fbPaneList">받은 요청 <span class="fb-cnt" id="fbCntInbox"></span></button>' : '')}</div>`+
+    tpl`<div id="fbPaneNew" role="tabpanel" aria-labelledby="fbTab-new"><p class="cap">불편한 점 · 틀린 숫자 · 있으면 좋을 기능을 양식 없이 적어 주세요. 특정 화면 이야기면 그 화면을 고르면 됩니다. 보내면 <b>접수 → 확인 중(담당자 이름) → 완료(처리 내용)</b> 순서로 «내 요청»과 알림함에서 바로 보입니다.</p>`+
     tpl`<div class="frm"><div class="full"><label for="fbMenu">어느 화면?</label><select id="fbMenu"><option value="">포탈 전체 — 특정 화면 아님</option>${rawHtml(views.map(function(x){ return tpl`<option value="${x.v}"${rawHtml(x.v===cur && curOk? ' selected':'')}>${x.label}</option>`; }).join(''))}</select></div>`+
     tpl`<div class="full"><label for="fbText">내용</label><textarea id="fbText" rows="5" maxlength="4000" placeholder="예) 계약 상세에서 종료월이 안 보여요 · OI 목록에 견적 금액도 같이 나오면 좋겠어요 · 홈 숫자가 시트와 달라요"></textarea></div>`+
     tpl`<div class="full fb-att"><div class="fb-att-bar"><label class="cbtn fb-att-btn" for="fbFile">${rawHtml(ico('doc',15))} 캡처 · 파일 붙이기</label><input id="fbFile" type="file" multiple accept="image/*,.pdf,.txt,.csv,.xls,.xlsx,.doc,.docx,.ppt,.pptx" class="fb-file"><span class="mini">이미지 · PDF · 엑셀 · 문서 — 5MB · 5개까지 · 캡처는 글 칸에 Ctrl+V 또는 끌어다 놓기</span></div><div id="fbPrev" class="fb-prev" hidden></div></div></div>`+
-    tpl`<div class="mact"><span class="mmsg" id="fbMsg" role="status"></span><button type="button" class="pill ghost" data-close="ovlFb">닫기</button><button type="button" class="pill pri" id="fbSend">보내기</button></div>`+
-    tpl`<div id="fbList" class="fb-list"></div>`;
+    tpl`<div class="mact"><span class="mmsg" id="fbMsg" role="status"></span><button type="button" class="pill ghost" data-close="ovlFb">닫기</button><button type="button" class="pill pri" id="fbSend">보내기</button></div></div>`+
+    tpl`<div id="fbPaneList" role="tabpanel" hidden><div id="fbList" class="fb-list"></div><div class="mact"><span class="mmsg" id="fbLMsg" role="status"></span><button type="button" class="pill ghost" data-close="ovlFb">닫기</button></div></div>`;
   var msg=m.querySelector('#fbMsg'), ta=/** @type {any} */(m.querySelector('#fbText')), sel=/** @type {any} */(m.querySelector('#fbMenu'));
   /* ㊿+189 첨부 — 파일 고르기 · 글 칸에 Ctrl+V(캡처) · 창에 끌어다 놓기 */
   fbAttClear(); var fi=/** @type {any} */(m.querySelector('#fbFile')); fi.onchange=function(){ fbAttAdd(fi.files, msg); fi.value=''; };
   ta.addEventListener('paste', function(e){ var cd=e.clipboardData; var fs=cd && cd.files? [].slice.call(cd.files) : []; if(fs.length){ e.preventDefault(); fbAttAdd(fs, msg); } });
-  m.addEventListener('dragover', function(e){ e.preventDefault(); m.classList.add('fb-drop'); }); m.addEventListener('dragleave', function(){ m.classList.remove('fb-drop'); });
-  m.addEventListener('drop', function(e){ e.preventDefault(); m.classList.remove('fb-drop'); var dt=e.dataTransfer; if(dt && dt.files && dt.files.length) fbAttAdd(dt.files, msg); });
+  m.addEventListener('dragover', function(e){ if(FB.tab!=='new') return; e.preventDefault(); m.classList.add('fb-drop'); }); m.addEventListener('dragleave', function(){ m.classList.remove('fb-drop'); });
+  m.addEventListener('drop', function(e){ if(FB.tab!=='new') return; e.preventDefault(); m.classList.remove('fb-drop'); var dt=e.dataTransfer; if(dt && dt.files && dt.files.length) fbAttAdd(dt.files, msg); });
+  m.querySelectorAll('[data-fbtab]').forEach(function(b){ /** @type {any} */(b).onclick=function(){ fbTab(/** @type {any} */(b).dataset.fbtab, true); }; });
   /** @type {any} */(m.querySelector('#fbSend')).onclick=async function(){
     var text=String(ta.value||'').trim(); if(!text){ msg.textContent='내용을 적어 주세요'; msg.className='mmsg bad'; ta.focus(); return; }
     if(FB.busy) return; FB.busy=true; msg.textContent=FB.att.length? '첨부 올리는 중…' : '보내는 중…'; msg.className='mmsg';
@@ -526,32 +580,115 @@ export function fbOpen(opt){
       var files=FB.att.length? await fbUpload() : null; if(files) msg.textContent='보내는 중…';
       var row={view:v||null, menu:lab||null, content:text, status:'new', created_by:ntfMe()||null, page:{ver:APP_VER, hash:String(location.hash||''), w:window.innerWidth}}; if(files) /** @type {any} */(row).files=files;
       await sbWrite('POST','portal_feedback',[row],'return=minimal'); fbAttClear();   /* created_by 는 DB 트리거가 로그인 계정으로 다시 씀 */
-      FB.loaded=false; closeOvl('ovlFb'); toast('개선 요청을 보냈습니다', (lab? lab+' · ' : '')+text.slice(0,40)+(text.length>40? '…':''), 'ok');
-      if(ST.IS_SUPER){ await fbLoad(true); ntfSync(); }
+      FB.loaded=false; closeOvl('ovlFb'); toast('개선 요청을 보냈습니다', (lab? lab+' · ' : '')+text.slice(0,40)+(text.length>40? '…':'')+' — 진행 상황은 «내 요청»과 알림함에서', 'ok');
+      await fbLoad(true); ntfSync();
     }catch(e){ var em=String(/** @type {any} */(e).message||e); msg.textContent=/SQL 114/.test(em)? em : /files/.test(em) && /column|schema cache/i.test(em)? 'SQL 114(첨부 열)를 먼저 실행해야 첨부를 보낼 수 있습니다 — 첨부를 빼면 보낼 수 있습니다' : /PGRST205|does not exist|404/.test(em)? 'SQL 113(portal_feedback)을 먼저 실행해야 보낼 수 있습니다' : '보내지 못했습니다 — '+em.slice(0,140); msg.className='mmsg bad'; }
     FB.busy=false;
   };
-  openOvl('ovlFb'); setTimeout(function(){ try{ (opt.list? m.querySelector('#fbList') : ta).focus(); }catch(e){} }, 30);
-  fbLoad(!!opt.reload).then(function(){ fbListPaint(); if(opt.list){ var l=m.querySelector('#fbList'); if(l) try{ l.scrollIntoView({block:'start'}); }catch(e){} } });
+  openOvl('ovlFb'); fbTab(FB.tab, false);
+  setTimeout(function(){ try{ if(FB.tab==='new') ta.focus(); }catch(e){} }, 30);
+  fbLoad(!!opt.reload || FB.tab!=='new').then(function(){ return fbMsgsLoad(); }).then(function(){ fbListPaint(); });
 }
-/** 받은 요청(슈퍼 관리자: 전부 · 그 밖: 내가 보낸 것) — «처리함» 토글 · 메모 */
+/** 탭 바꾸기 — 새 요청 / 내 요청 / 받은 요청 */
+export function fbTab(t, focus){
+  var m=document.getElementById('ovlFb'); if(!m) return; FB.tab=t;
+  m.querySelectorAll('[data-fbtab]').forEach(function(b){ var on=/** @type {any} */(b).dataset.fbtab===t; b.setAttribute('aria-selected', on? 'true' : 'false'); b.setAttribute('tabindex', on? '0' : '-1'); });
+  /** @type {any} */(m.querySelector('#fbPaneNew')).hidden=t!=='new'; /** @type {any} */(m.querySelector('#fbPaneList')).hidden=t==='new';
+  var pl=m.querySelector('#fbPaneList'); if(pl) pl.setAttribute('aria-labelledby', 'fbTab-'+(t==='new'? 'mine' : t));
+  if(t!=='new') fbListPaint();
+  if(focus){ var b=/** @type {any} */(m.querySelector('[data-fbtab="'+t+'"]')); if(b) b.focus(); }
+}
+/** 카드 하나 — 진행 줄 · 내용 · 첨부 · 대화 · 할 수 있는 동작 */
+export function fbCard(x){
+  var me=ntfMe(), own=fbMine(x), su=!!ST.IS_SUPER, v3=FB.v3, st=x.status||'new', conf=st==='done' && !!x.confirmed_at;
+  var who=ntfName(x.created_by)||fbLow(x.created_by).split('@')[0], asg=x.assignee || (st==='done'? x.done_by : '');
+  var badge=tpl`<span class="fb-st st-${st}${rawHtml(conf? ' conf' : '')}">${conf? '완료 · 확인함' : FB_ST[st]||st}</span>`;
+  var step=function(on, cur, k, t){ return tpl`<li class="${rawHtml((on? 'on' : '')+(cur? ' cur' : ''))}"><span class="k">${k}</span><span class="v">${t}</span></li>`; };
+  var steps=v3? tpl`<ol class="fb-steps" aria-label="진행">`+
+      step(true, st==='new', '요청', who+' · '+fbT(x.created_at))+
+      step(!!asg, st==='doing', '확인 중', asg? '담당 '+ntfName(asg)+(x.assigned_at? ' · '+fbT(x.assigned_at) : '') : '담당 전')+
+      step(st==='done', st==='done' && !conf, '완료', st==='done'? ntfName(x.done_by||asg)+' · '+fbT(x.done_at) : '—')+
+      step(conf, conf, '요청자 확인', conf? fbT(x.confirmed_at) : st==='done'? '확인 전' : '—')+`</ol>` : '';
+  var acts=[];
+  var A=function(act, lab, pri){ acts.push(tpl`<button type="button" class="cbtn${rawHtml(pri? ' pri' : '')}" data-fbact="${act}" data-id="${String(x.id)}">${lab}</button>`); };
+  if(v3){
+    if(su && st==='new') A('assign', '내가 맡기', true);
+    if(su && st==='doing') A('done', '완료 처리', true);
+    if(own && st==='done' && !conf) A('confirm', '확인했어요', true);
+    if(su && st==='done') A('reopen', '다시 열기');
+    else if(own && st==='done') A('reopen', '다시 요청');
+    A('reply', su? '답변' : '덧붙이기');
+  } else if(su){
+    acts.push(tpl`<button type="button" class="cbtn" data-fbdone="${String(x.id)}">${st==='done'? '다시 열기' : '처리함'}</button><button type="button" class="cbtn" data-fbnote="${String(x.id)}" title="관리자 메모">메모</button>`);
+  }
+  var ms=(FB.msgs||{})[x.id]||[];
+  var th=v3? (ms.length? tpl`<ul class="fb-th" aria-label="대화">${rawHtml(ms.map(function(g){ var mine2=fbLow(g.created_by)===fbLow(x.created_by);
+      return tpl`<li class="fb-m k-${g.kind}${rawHtml(mine2? ' req' : ' adm')}"><div class="fb-mh"><b>${ntfName(g.created_by)||'관리자'}</b><span class="fb-mk">${FB_MK[g.kind]||g.kind}</span><span class="mini">${fbT(g.created_at)}</span></div>${rawHtml(g.body? tpl`<div class="fb-mb">${g.body}</div>` : '')}</li>`; }).join(''))}</ul>` : '')
+    : (x.note? tpl`<div class="fb-n mini">메모: ${x.note}</div>` : '');
+  var files=Array.isArray(x.files) && x.files.length? tpl`<div class="fb-fs">${rawHtml(x.files.map(function(f, i){ return tpl`<button type="button" class="fb-f${rawHtml(fbIsImg(f.type, f.name)? ' img' : '')}" data-fbf="${String(x.id)}:${String(i)}" aria-expanded="false" title="${fbIsImg(f.type, f.name)? '미리 보기' : '내려받기'}">${rawHtml(ico(fbIsImg(f.type, f.name)? 'board' : 'doc', 14))}<span>${f.name||'파일'}</span><span class="mini">${fbSize(f.size)}</span></button>`; }).join(''))}</div>` : '';   /* ㊿+189 첨부 */
+  var legacyDone=!v3 && st==='done'? ' · 처리함'+(x.done_by? ' ('+esc(ntfName(x.done_by))+')' : '') : '';
+  return tpl`<li class="fb-it st-${st}${rawHtml(st==='done'? ' done' : '')}${rawHtml(FB.focus===x.id? ' focus' : '')}" data-id="${String(x.id)}"><div class="fb-h"><b>${x.menu||'포탈 전체'}</b>${rawHtml(v3? badge : '')}<span class="mini">${who} · ${String(x.created_at||'').slice(0,10)}${rawHtml(legacyDone)}</span>`+
+    tpl`${rawHtml(acts.length? tpl`<span class="fb-a">${rawHtml(acts.join(''))}</span>` : '')}</div>${rawHtml(steps)}<div class="fb-c">${x.content}</div>${rawHtml(files)}${rawHtml(th)}<div class="fb-cmp" hidden></div></li>`;
+}
+/** 목록 — 내 요청(내가 보낸 것) / 받은 요청(슈퍼 관리자 · 전부) */
 export function fbListPaint(){
   var host=document.getElementById('fbList'); if(!host) return;
+  var cm=document.getElementById('fbCntMine'), ci=document.getElementById('fbCntInbox');
+  var mineAll=FB.rows.filter(fbMine), openAll=FB.rows.filter(function(x){ return x.status!=='done'; });
+  if(cm) cm.textContent=mineAll.length? String(mineAll.length) : ''; if(ci) ci.textContent=openAll.length? '열림 '+openAll.length : '';
   if(FB.ok===false){ host.innerHTML=''; return; }
-  var rows=FB.rows, me=ntfMe();
-  if(!rows.length){ host.innerHTML=tpl`<p class="mini fb-empty">${ST.IS_SUPER? '아직 받은 요청이 없습니다' : '내가 보낸 요청이 아직 없습니다'}</p>`; return; }
-  var open=rows.filter(function(x){ return x.status!=='done'; }), done=rows.filter(function(x){ return x.status==='done'; });
-  function row(x){ var who=String(x.created_by||'').split('@')[0];
-    return tpl`<li class="fb-it${rawHtml(x.status==='done'? ' done':'')}" data-id="${String(x.id)}"><div class="fb-h"><b>${x.menu||'포탈 전체'}</b><span class="mini">${ntfName(x.created_by)||who} · ${String(x.created_at||'').slice(0,10)}${rawHtml(x.status==='done'? ' · 처리함'+(x.done_by? ' ('+esc(ntfName(x.done_by))+')' : '') : '')}</span>`+
-      tpl`${rawHtml(ST.IS_SUPER? tpl`<span class="fb-a"><button type="button" class="cbtn" data-fbdone="${String(x.id)}">${x.status==='done'? '다시 열기' : '처리함'}</button><button type="button" class="cbtn" data-fbnote="${String(x.id)}" title="관리자 메모">메모</button></span>` : '')}</div>`+
-      tpl`<div class="fb-c">${x.content}</div>${rawHtml(x.note? tpl`<div class="fb-n mini">메모: ${x.note}</div>` : '')}${rawHtml(Array.isArray(x.files) && x.files.length? tpl`<div class="fb-fs">${rawHtml(x.files.map(function(f, i){ return tpl`<button type="button" class="fb-f${rawHtml(fbIsImg(f.type, f.name)? ' img' : '')}" data-fbf="${String(x.id)}:${String(i)}" aria-expanded="false" title="${fbIsImg(f.type, f.name)? '미리 보기' : '내려받기'}">${rawHtml(ico(fbIsImg(f.type, f.name)? 'board' : 'doc', 14))}<span>${f.name||'파일'}</span><span class="mini">${fbSize(f.size)}</span></button>`; }).join(''))}</div>` : '')}</li>`; }   /* ㊿+189 첨부 */
-  host.innerHTML=tpl`<h4 class="fb-t">${ST.IS_SUPER? '받은 요청' : '내가 보낸 요청'} <span class="ctag">${String(open.length)}건 열림${rawHtml(done.length? ' · '+done.length+'건 처리' : '')}</span></h4><ul class="fb-ul">${rawHtml(open.concat(done).slice(0,100).map(row).join(''))}</ul>`;
-  host.querySelectorAll('[data-fbf]').forEach(function(b){ /** @type {any} */(b).onclick=function(){ var p=String(/** @type {any} */(b).dataset.fbf).split(':'), x=rows.filter(function(y){ return String(y.id)===p[0]; })[0], f=x && x.files && x.files[+p[1]]; if(f) fbFileOpen(f, b.closest('li'), b); }; });
-  host.querySelectorAll('[data-fbdone]').forEach(function(b){ /** @type {any} */(b).onclick=async function(){ var id=+/** @type {any} */(b).dataset.fbdone, x=rows.filter(function(y){ return y.id===id; })[0]; if(!x) return; var to=x.status==='done'? 'new' : 'done';
-    try{ await sbWrite('PATCH','portal_feedback?id=eq.'+id, to==='done'? {status:'done', done_by:me, done_at:new Date().toISOString()} : {status:'new', done_by:null, done_at:null}, 'return=minimal'); x.status=to; if(to==='done'){ x.done_by=me; } FB.newN=rows.filter(function(y){ return y.status==='new'; }).length; fbListPaint(); ntfSync(); }
+  var inbox=FB.tab==='inbox' && ST.IS_SUPER, rows=inbox? FB.rows : mineAll;
+  if(!rows.length){ host.innerHTML=tpl`<p class="mini fb-empty">${inbox? '아직 받은 요청이 없습니다' : '내가 보낸 요청이 아직 없습니다 — «새 요청»에서 보내면 여기서 진행 상황을 봅니다'}</p>`; return; }
+  var rank={'new':0, doing:1, done:2}, open=rows.filter(function(x){ return x.status!=='done'; }), done=rows.filter(function(x){ return x.status==='done'; });
+  var list=open.slice().sort(function(a,b){ return (rank[a.status]||0)-(rank[b.status]||0) || b.id-a.id; }).concat(done);
+  var cnt=function(s){ return rows.filter(function(x){ return x.status===s; }).length; };
+  var sum=FB.v3? tpl`접수 ${String(cnt('new'))} · 확인 중 ${String(cnt('doing'))} · 완료 ${String(done.length)}${rawHtml(done.length? tpl` (요청자 확인 ${String(done.filter(function(x){ return x.confirmed_at; }).length)})` : '')}` : tpl`${String(open.length)}건 열림${rawHtml(done.length? ' · '+done.length+'건 처리' : '')}`;
+  host.innerHTML=tpl`<h4 class="fb-t"><span class="fb-tt">${inbox? '받은 요청' : '내가 보낸 요청'}</span> <span class="ctag">${rawHtml(FB.v3? String(open.length)+'건 열림'+(done.length? ' · '+done.length+'건 처리' : '') : sum)}</span>${rawHtml(FB.v3? tpl` <span class="mini fb-sum">${rawHtml(sum)}</span>` : '')}</h4>`+
+    tpl`${rawHtml(FB.v3? '' : '<p class="mini fb-old">SQL 120 을 실행하면 «확인 중 · 담당 · 처리 내용 · 요청자 확인»이 보입니다</p>')}<ul class="fb-ul">${rawHtml(list.slice(0,100).map(fbCard).join(''))}</ul>`;
+  fbBindList(host, rows);
+  /* 요청자가 «내 요청»을 열면 본 것으로 — 알림함에서 사라짐 */
+  if(FB.v3 && !inbox){ var seen=mineAll.filter(fbUnseen); if(seen.length){ var now=new Date().toISOString(); seen.forEach(function(x){ x.req_seen_at=now; sbWrite('POST','rpc/feedback_act',{p_id:x.id, p_act:'seen'}).catch(function(){}); }); FB.rev++; ntfSync(); } }
+  if(FB.focus){ var f=host.querySelector('.fb-it[data-id="'+FB.focus+'"]'); if(f) try{ f.scrollIntoView({block:'nearest'}); }catch(e){} }
+}
+export function fbBindList(host, rows){
+  var me=ntfMe(), find=function(id){ return FB.rows.filter(function(y){ return String(y.id)===String(id); })[0]; };
+  host.querySelectorAll('[data-fbf]').forEach(function(b){ /** @type {any} */(b).onclick=function(){ var p=String(/** @type {any} */(b).dataset.fbf).split(':'), x=find(p[0]), f=x && x.files && x.files[+p[1]]; if(f) fbFileOpen(f, b.closest('li'), b); }; });
+  host.querySelectorAll('[data-fbact]').forEach(function(b){ /** @type {any} */(b).onclick=function(){ var act=/** @type {any} */(b).dataset.fbact, x=find(/** @type {any} */(b).dataset.id); if(!x) return;
+    if(act==='assign' || act==='confirm' || (act==='reopen' && ST.IS_SUPER && !fbMine(x))) fbDo(x, act, ''); else fbCompose(b.closest('li'), x, act); }; });
+  /* SQL 120 전 — 예전 «처리함» · «메모» */
+  host.querySelectorAll('[data-fbdone]').forEach(function(b){ /** @type {any} */(b).onclick=async function(){ var x=find(/** @type {any} */(b).dataset.fbdone); if(!x) return; var to=x.status==='done'? 'new' : 'done';
+    try{ await sbWrite('PATCH','portal_feedback?id=eq.'+x.id, to==='done'? {status:'done', done_by:me, done_at:new Date().toISOString()} : {status:'new', done_by:null, done_at:null}, 'return=minimal'); x.status=to; if(to==='done'){ x.done_by=me; } FB.newN=FB.rows.filter(function(y){ return y.status==='new'; }).length; FB.rev++; fbListPaint(); ntfSync(); }
     catch(e){ toast('저장 실패', String(/** @type {any} */(e).message||e).slice(0,120), 'bad'); } }; });
-  host.querySelectorAll('[data-fbnote]').forEach(function(b){ /** @type {any} */(b).onclick=async function(){ var id=+/** @type {any} */(b).dataset.fbnote, x=rows.filter(function(y){ return y.id===id; })[0]; if(!x) return; var n=prompt('관리자 메모 (요청한 사람에게도 보입니다)', x.note||''); if(n==null) return;
-    try{ await sbWrite('PATCH','portal_feedback?id=eq.'+id, {note:n.trim()||null}, 'return=minimal'); x.note=n.trim()||null; fbListPaint(); }catch(e){ toast('저장 실패', String(/** @type {any} */(e).message||e).slice(0,120), 'bad'); } }; });
+  host.querySelectorAll('[data-fbnote]').forEach(function(b){ /** @type {any} */(b).onclick=async function(){ var x=find(/** @type {any} */(b).dataset.fbnote); if(!x) return; var n=prompt('관리자 메모 (요청한 사람에게도 보입니다)', x.note||''); if(n==null) return;
+    try{ await sbWrite('PATCH','portal_feedback?id=eq.'+x.id, {note:n.trim()||null}, 'return=minimal'); x.note=n.trim()||null; fbListPaint(); }catch(e){ toast('저장 실패', String(/** @type {any} */(e).message||e).slice(0,120), 'bad'); } }; });
+}
+/** 카드 안 글 칸 — 답변 · 덧붙이기 · 완료 처리(처리 내용 필수) · 다시 요청(이유 필수) */
+export function fbCompose(li, x, act){
+  var box=/** @type {any} */(li && li.querySelector('.fb-cmp')); if(!box) return;
+  if(!box.hidden && box.dataset.act===act){ box.hidden=true; box.innerHTML=''; return; }
+  var own=fbMine(x), L={reply:[ST.IS_SUPER && !own? '답변' : '덧붙이기', ST.IS_SUPER && !own? '요청자에게 보이는 답변 — 예) 확인했습니다 · 이번 주 업데이트에 반영 예정' : '처리하는 사람에게 더 알릴 내용', '보내기'],
+    done:['완료 처리 — 처리 내용', '어떻게 처리했는지(요청자에게 그대로 보임) — 예) ㊿+194 에 반영 · 출고일 = 수령희망일 › 신청일', '완료로 바꾸기'],
+    reopen:['다시 요청 — 아직 안 된 점', '무엇이 아직 안 됐는지 · 어디서 확인했는지', '다시 요청 보내기']}[act];
+  if(!L) return;
+  box.dataset.act=act; box.hidden=false;
+  box.innerHTML=tpl`<label for="fbCmp-${String(x.id)}">${L[0]}</label><textarea id="fbCmp-${String(x.id)}" rows="3" maxlength="4000" placeholder="${L[1]}"></textarea><div class="fb-cmp-a"><span class="mmsg" role="status"></span><button type="button" class="cbtn" data-x="1">취소</button><button type="button" class="cbtn pri" data-go="1">${L[2]}</button></div>`;
+  var ta=/** @type {any} */(box.querySelector('textarea')), mm=/** @type {any} */(box.querySelector('.mmsg'));
+  box.querySelector('[data-x]').onclick=function(){ box.hidden=true; box.innerHTML=''; };
+  box.querySelector('[data-go]').onclick=function(){ var t=String(ta.value||'').trim(); if(!t){ mm.textContent='내용을 적어 주세요'; mm.className='mmsg bad'; ta.focus(); return; } fbDo(x, act, t, mm); };
+  ta.addEventListener('keydown', function(e){ if(e.key==='Escape'){ e.stopPropagation(); box.hidden=true; box.innerHTML=''; var b=/** @type {any} */(li.querySelector('[data-fbact="'+act+'"]')); if(b) b.focus(); } });
+  setTimeout(function(){ try{ ta.focus(); }catch(e){} }, 20);
+}
+/** 동작 보내기(SQL 120 feedback_act — 작성자 · 시각 · 상태는 DB 가) → 다시 읽기 */
+export async function fbDo(x, act, body, mm){
+  if(FB.busy) return; FB.busy=true;
+  var lm=/** @type {any} */(document.getElementById('fbLMsg')), say=function(t, bad){ var e=mm||lm; if(e){ e.textContent=t; e.className='mmsg'+(bad? ' bad' : ''); } };
+  say('저장 중…');
+  try{
+    await sbWrite('POST','rpc/feedback_act',{p_id:x.id, p_act:act, p_body:body||null});
+    FB.focus=x.id; await fbLoad(true); await fbMsgsLoad(); FB.busy=false; fbListPaint(); ntfSync();
+    var T={assign:['맡았습니다', '요청자에게 «확인 중 · 담당 '+ntfName(ntfMe())+'»으로 보입니다'], done:['완료로 바꿨습니다', '요청자 알림함에 처리 내용과 함께 갑니다'], reply:['보냈습니다', '상대 알림함에 갑니다'], reopen:['다시 요청했습니다', '담당자 알림함에 갑니다'], confirm:['확인했어요', '처리한 사람에게 «요청자 확인»으로 보입니다']}[act]||['저장했습니다',''];
+    toast('개선 요청 — '+T[0], T[1], 'ok'); say('');
+  }catch(e){ FB.busy=false; var em=String(/** @type {any} */(e).message||e), mj=/"message"\s*:\s*"([^"]+)"/.exec(em); say(/PGRST202|\(404\)/.test(em)? 'SQL 120 을 먼저 실행해야 합니다' : (mj? mj[1] : em).slice(0,140), true); }
 }
 
 /* ── 관리자 › 설정 › 알림 · Slack (슈퍼 관리자) ── */
@@ -703,7 +840,7 @@ export function ntfSlackText(items, head){
   var url=ntfPortalUrl(), by={};
   items.forEach(function(x){ (by[x.kind]=by[x.kind]||[]).push(x); });
   var lines=[ntfSl(head)];
-  ['lapsed','dc','biz','renew','eq'].forEach(function(k){ var a=by[k]; if(!a || !a.length) return;
+  ['lapsed','dc','biz','renew','eq','fb'].forEach(function(k){ var a=by[k]; if(!a || !a.length) return;   /* ㊿+200 fb = 개인 DM 에만(dmOnly) */
     lines.push('*'+(NTF_KIND[k]||k)+'* '+a.length+'건');
     a.slice(0,10).forEach(function(x){ lines.push('• '+ntfSl(x.title)+(x.detail? ' — '+ntfSl(x.detail) : '')); });
     if(a.length>10) lines.push('… 외 '+(a.length-10)+'건'); });
@@ -721,7 +858,8 @@ export function ntfSlackPlan(omap){
   all=all.filter(function(x){ return x.kind!=='ops'; });   /* 운영 상태는 관리자 화면 안에서만(Slack 에 안 보냄) */
   all.forEach(function(x){ ntfTargets(x, omap).forEach(function(e){ (per[e]=per[e]||[]).push(x); }); });
   var dms=Object.keys(per).sort().slice(0, 30).map(function(e){ return {email:e, n:per[e].length, text:ntfSlackText(per[e], '🔔 '+ntfName(e)+' 님 포탈 알림 '+day+' — '+per[e].length+'건')}; });
-  return {team:{channel:S.team_channel, n:all.length, text:ntfSlackText(all, '🔔 포탈 알림 '+day+' — '+all.length+'건')}, dms:dms, more:Math.max(0, Object.keys(per).length-30)};
+  var team=all.filter(function(x){ return !x.dmOnly; });   /* ㊿+200 개선 요청 진행은 본인 DM 에만(팀 채널엔 안 감) */
+  return {team:{channel:S.team_channel, n:team.length, text:ntfSlackText(team, '🔔 포탈 알림 '+day+' — '+team.length+'건')}, dms:dms, more:Math.max(0, Object.keys(per).length-30)};
 }
 export async function ntfCall(body){
   var r=await fetchT(SB_URL+'/functions/v1/notify', {method:'POST', headers:sbHeaders(true), body:JSON.stringify(body)}, 60000, 'notify 함수', !!(body && (body.dry || body.mode==='health' || body.mode==='preview')));   /* ㊿+182 시간 제한 — 보내기는 다시 보내지 않음 */

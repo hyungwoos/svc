@@ -392,7 +392,7 @@ export function openTerms(){
     ['당월 인식 매출 (홈의 «당월 MRR»)','기준월에 월 매출표에 잡힌 금액의 합 — 부속 계약 포함, 시작·종료·해지 월을 반영. 사업 영역의 «고객 합계 · 당월 매출»도 같은 값.'],
     ['연환산 ARR','당월 인식 매출 × 12. 목표 ARR 진행은 12월 계약분(12월 MRR × 12)도 함께 표시.'],
     ['비즈포탈 회계매출','회계 시스템에 잡힌 매출(세금계산서 기준). 포탈 매출과의 차이는 정산 › 비즈포탈 차액에서 고객사별로 대조.'],
-    ['곳 · 건 · 대','고객사 수는 «곳», 계약·신청·알림 대상은 «건», 실물 장비는 «대».']];
+    ['개사 · 건 · 대','고객사 수는 «개사», 계약·신청·알림 대상은 «건», 실물 장비는 «대».']];
   ov.innerHTML=tpl`<div class="modal" role="dialog" aria-modal="true" aria-labelledby="termsT" style="width:min(560px,100%)"><h3 id="termsT">단위 · 용어</h3><dl class="terms">${rawHtml(D.map(function(x){ return tpl`<dt>${x[0]}</dt><dd>${x[1]}</dd>`; }).join(''))}</dl>`+
     tpl`<div class="mact"><button type="button" class="pill" id="termsX">닫기</button></div></div>`;
   document.body.appendChild(ov);
@@ -485,8 +485,8 @@ export function gnSumRender(rows){
   function cell(k, cls, lab, v, u, sub, tip){ return tpl`<button type="button" class="gs-c ${rawHtml(cls)}" data-k="${k}" title="${tip}"><span class="gs-l">${lab}</span><span class="gs-v"><b class="num">${v}</b><small>${u}</small></span><span class="gs-s">${sub}</span></button>`; }
   host.innerHTML=tpl`<h2 class="sr">요약</h2>`+
     cell('mrr','', '당월 매출(MRR) · '+mk(b), won(m0), '천원', d==null? '전월 자료 없음' : '전월 대비 '+(d>=0?'+':'')+d.toFixed(1)+'%', '기준월 인식 매출(천원) — 눌러서 사업 현황으로')+
-    cell('live','', 'LIVE 고객', String(nC), '곳', '제품별 합 '+ps+(ps>nC? ' (두 제품 이상 '+(ps-nC)+'곳)':''), '회사 수 기준 — 눌러서 LIVE 고객사 목록')+
-    cell('exp', XS.rows.length? 'warn':'', EN+'개월 내 만료 위험', String(XS.rows.length), '건', '고객사 '+XS.custN+'곳 · 월 '+won(XS.amt)+'천원', '원계약 기준(부속 계약 제외) — 눌러서 같은 목록')+
+    cell('live','', 'LIVE 고객', String(nC), '개사', '제품별 합 '+ps+(ps>nC? ' (두 제품 이상 '+(ps-nC)+'개사)':''), '회사 수 기준 — 눌러서 LIVE 고객사 목록')+
+    cell('exp', XS.rows.length? 'warn':'', EN+'개월 내 만료 위험', String(XS.rows.length), '건', '고객사 '+XS.custN+'개사 · 월 '+won(XS.amt)+'천원', '원계약 기준(부속 계약 제외) — 눌러서 같은 목록')+
     cell('todo', l1.length? 'crit':'', '처리 필요', String(n1+n2), '건', '즉시 '+l1.length+'종 '+n1+'건 · 확인 '+l2.length+'종 '+n2+'건', '오늘 처리할 일의 즉시·확인 칸 대상 건수 — 눌러서 처리할 일로');
   host.querySelectorAll('.gs-c').forEach(function(c){ c.onclick=function(){ var k=c.dataset.k;
     if(k==='mrr'){ var h=document.getElementById('gnBizH')||document.getElementById('ccHeroHost'); if(h) h.scrollIntoView({behavior:'smooth', block:'start'}); }
@@ -524,7 +524,7 @@ export function renderInbox(){
   function areaOwn(key, dflt){ var e=ntfAreaOf(key); return e? ntfName(e) : (dflt||''); }
   function areaMe(key){ return ntfAreaMe(key)? {} : null; }
   var meL=meLoc(); function eqMe(o){ var a=NTF.asg[String(o.id)]; return !!meL && String(a? a.assignee : o.requester||'').toLowerCase().split('@')[0]===meL; }   /* ㊿+184 홈 «내 업무» — 나에게 맡겨진(없으면 내가 신청한) 장비 신청 */
-  function names(arr, f, n){ var u={}; arr.forEach(function(x){ var v=f(x); if(v) u[v]=1; }); var ks=Object.keys(u); return ks.slice(0,n||3).join(', ')+(ks.length>(n||3)? ' 외 '+(ks.length-(n||3))+'곳':''); }
+  function names(arr, f, n){ var u={}; arr.forEach(function(x){ var v=f(x); if(v) u[v]=1; }); var ks=Object.keys(u); return ks.slice(0,n||3).join(', ')+(ks.length>(n||3)? ' 외 '+(ks.length-(n||3))+'개사':''); }
   if(pendL.length){
     var oldest=pendL.map(function(o){ return String(o.created_at||'').slice(0,10); }).filter(Boolean).sort()[0];
     var age=oldest? Math.floor((new Date(todayS).getTime()-new Date(oldest).getTime())/864e5) : 0;
@@ -586,14 +586,14 @@ export function renderInbox(){
   if(GNI0 && !EQ){   /* ㊿+171 지니언스: 만료 예정 전체가 아니라 «재약정 대응 필요»(자동연장 · 재약정 등록 제외) — 홈 핵심 현황과 같은 숫자라 «지금 챙길 일» 3줄에서는 빠지고 «전체 할 일»에만 */
     var RN=renewNeedScan(list, b, EN), rnL=RN.rows.map(function(k){ return ST.DATA.rows[k]; });
     if(rnL.length){ var ends2=rnL.map(function(r){ return r.endIdx; }).sort(function(x,y){ return x-y; });
-      add('exp', {lv:3, ic:'clock', cls:'info', n:rnL.length, kpi:1, t:tpl`재약정 대응 필요 <span class="num">${rnL.length}건</span> · 고객사 ${rawHtml(RN.custN)}곳 — 월 <span class="num">${won(RN.amt)}</span>천원`,
+      add('exp', {lv:3, ic:'clock', cls:'info', n:rnL.length, kpi:1, t:tpl`재약정 대응 필요 <span class="num">${rnL.length}건</span> · 고객사 ${rawHtml(RN.custN)}개사 — 월 <span class="num">${won(RN.amt)}</span>천원`,
         nm:'재약정 대응(만료 전 연락)', cnt:'계약 '+rnL.length+'건', dueS:'종료 '+mk(ends2[0])+(ends2.length>1? '~'+mk(ends2[ends2.length-1]):''), dk:ends2[0]<=b? 2 : 3,
         who:names(rnL, function(r){ return r.cust; }), own:areaOwn('exp'), asg:'exp', me:areaMe('exp'), due:'종료 '+mk(ends2[0])+(ends2.length>1? '~'+mk(ends2[ends2.length-1]):''), imp:'월 '+won(RN.amt)+'천원 · '+EN+'개월 내 만료 '+XS.rows.length+'건 중 자동연장 '+RN.auto.length+' · 재약정 등록 '+RN.sure.length+' 제외',
         acts:[{l:'재약정 대응 '+rnL.length+'건 보기', pri:1, go:function(){ kpiOpen('expNeed'); }}]}); }
   }
   else if(expL.length && !(RS && EN===1 && RS.due.length)){
     var ends=expL.map(function(r){ return r.endIdx; }).sort(function(x,y){ return x-y; });
-    add('exp', {lv:3, ic:'clock', cls:'info', n:expL.length, t:tpl`${rawHtml(EN)}개월 내 만료 원계약 <span class="num">${expL.length}건</span> · 고객사 ${rawHtml(XS.custN)}곳 — 월 <span class="num">${won(expAmt)}</span>천원`,
+    add('exp', {lv:3, ic:'clock', cls:'info', n:expL.length, t:tpl`${rawHtml(EN)}개월 내 만료 원계약 <span class="num">${expL.length}건</span> · 고객사 ${rawHtml(XS.custN)}개사 — 월 <span class="num">${won(expAmt)}</span>천원`,
       s:names(expL, function(r){ return r.cust; })+' · 종료 '+mk(ends[0])+(ends.length>1? '~'+mk(ends[ends.length-1]):'')+' · 재약정 타깃',
       who:names(expL, function(r){ return r.cust; }), own:areaOwn('exp'), asg:'exp', me:areaMe('exp'), due:'종료 '+mk(ends[0])+(ends.length>1? '~'+mk(ends[ends.length-1]):''), imp:'월 '+won(expAmt)+'천원 · 재약정 대상',
       acts:[{l:'만료 원계약 '+expL.length+'건 보기', pri:1, go:function(){ kpiOpen('exp'); }}]});
@@ -842,10 +842,10 @@ export function renderEqDash(){
   }
   /* ㊿+169 범위를 이름에 — 장비(대) = 현황(시리얼) 기준 · 신청(건) = 신청 내역 기준 · 누르면 같은 조건의 목록(숫자 그대로) */
   K.innerHTML=
-    tile('good', 'var(--brand)', '임대중 · 현황', lent.length, '대', '고객사 '+Object.keys(lentCust).length+'곳 · 시리얼 기준', 'assets:임대중')+
+    tile('good', 'var(--brand)', '임대중 · 현황', lent.length, '대', '고객사 '+Object.keys(lentCust).length+'개사 · 시리얼 기준', 'assets:임대중')+
     tile(pend.length? (age>7? 'crit':'hot'):'', 'var(--info-ink)', '처리 대기 · 신청', pend.length, '건', pend.length? qty(pend)+'대 · '+['접수','출하요청','배송중'].filter(function(k){ return pendBy[k]; }).map(function(k){ return k+' '+pendBy[k]; }).join(' · ')+(age>=1? ' · 최장 '+age+'일':'') : '대기 중인 신청 없음', 'only:pend')+
     tile(retL.length? 'hot':'', '#D95926', '회수 진행 · 신청', retL.length, '건', retL.length? '회수 완료 '+retDone+'대 / 대상 '+retAll+'대':'진행 중인 회수 없음', 'only:ret')+
-    tile('', 'var(--ink-2)', '회수 완료 · 현황', retd.length, '대', retd.length? Object.keys(retdModel).sort(function(a,b){ return retdModel[b]-retdModel[a]; }).slice(0,3).map(function(m){ return esc(m)+' '+retdModel[m]; }).join(' · ')+' · 고객사 '+Object.keys(retdCust).length+'곳'+(retdLast? ' · 최근 '+retdLast:'') : '회수완료 장비 없음', 'assets:회수완료');
+    tile('', 'var(--ink-2)', '회수 완료 · 현황', retd.length, '대', retd.length? Object.keys(retdModel).sort(function(a,b){ return retdModel[b]-retdModel[a]; }).slice(0,3).map(function(m){ return esc(m)+' '+retdModel[m]; }).join(' · ')+' · 고객사 '+Object.keys(retdCust).length+'개사'+(retdLast? ' · 최근 '+retdLast:'') : '회수완료 장비 없음', 'assets:회수완료');
   var tc=document.getElementById('eqcTrendCap'); if(tc) tc.textContent='이달 설치 '+qty(instM)+'대 · 회수 '+qty(retM)+'대 · 지난달 설치 '+qty(instP)+'대 · 최근 12개월';
   K.querySelectorAll('[data-go]').forEach(function(t){
     t.onclick=function(){

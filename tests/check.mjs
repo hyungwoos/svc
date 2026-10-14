@@ -237,7 +237,7 @@ say(/^export function tickMemo\(/m.test(jsAll) && /^export function cssvKey\(/m.
 // ㊿+189 개선 요청 첨부(fbAttAdd · fbUpload · Storage feedback) · 표시 이름(portal_profiles · ntfProf · profEdit · 내 계정 · 관리자 계정)
 { const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
   const nt = rd('js/notify.js'), ad = rd('js/admin.js'), co = rd('js/core.js'), css = rd('app.css');
-  say(/^export function fbAttAdd\(files, msg\)/m.test(nt) && /^export async function fbUpload\(\)/m.test(nt) && /storage\/v1\/object\/feedback\//.test(nt) && /storage\/v1\/object\/authenticated\/feedback\//.test(nt) && /id="fbFile"/.test(nt) && /addEventListener\('paste'/.test(nt) && /done_at,files&order/.test(nt)
+  say(/^export function fbAttAdd\(files, msg\)/m.test(nt) && /^export async function fbUpload\(\)/m.test(nt) && /storage\/v1\/object\/feedback\//.test(nt) && /storage\/v1\/object\/authenticated\/feedback\//.test(nt) && /id="fbFile"/.test(nt) && /addEventListener\('paste'/.test(nt) && /(done_at,files&order|',files' : ''\))/.test(nt)
     && /^export function ntfProf\(e\)/m.test(nt) && /^export function profEdit\(email, opt\)/m.test(nt) && /portal_profiles\?on_conflict=email/.test(nt) && /return ntfDisp\(ntfProf\(e\)\) \|\| QMGR_MAP\[l\] \|\| l;/.test(nt) && /id="accProfEdit"/.test(ad) && /data-axpf=/.test(ad) && /\^portal_feedback\\b\|\^portal_profiles\\b/.test(co) && /\.fb-pv\{/.test(css),
   '㊿+189 개선 요청 첨부(fbAttAdd · fbUpload · 붙여넣기 · 버킷 feedback) · 표시 이름(ntfProf · profEdit · portal_profiles · 내 계정 · 관리자 계정 · 쓰기 관문 예외)'); }
 // ㊿+190 사람은 어디서나 «이름 직급»(ntfName) — 홈 장비 줄 · 상단 내 계정(gnMeSync) · 표 작성/누가 열 · 이력 · 제안 · 마감 · 공유 · 첨부 · 알림 · 이름 캐시
@@ -313,6 +313,12 @@ say(/^export function tickMemo\(/m.test(jsAll) && /^export function cssvKey\(/m.
   const sh = rd('js/shell.js'), css = rd('app.css');
   say(/^export function deEmojiEl\(el\)/m.test(sh) && /for\(var i=0;i<els\.length;i\+\+\) n\+=deEmojiEl\(els\[i\]\);/.test(sh) && /'🗑':'trash','👍':'thumbUp','👎':'thumbDown','❔':'help'/.test(sh) && /thumbUp:'<path/.test(sh) && /if\(!nm \|\| el\.querySelector\('svg'\)\) return 0;/.test(sh) && /button\.emo-ico\{display:inline-flex/.test(css),
   '㊿+199 그림 글자만 있는 단추는 떼지 않고 선 아이콘 + 이름(deEmojiEl · EMO_ICO) — 짝 없으면 그대로'); }
+// ㊿+200 개선 요청 흐름(SQL 120 feedback_act) · 외부 연동 안내 · 고객사 수 «개사»
+{ const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
+  const nt = rd('js/notify.js'), ad = rd('js/admin.js'), cr = rd('js/core.js'), sh = rd('js/shell.js'), ds = rd('js/dash.js');
+  say(/^export function fbItems\(\)/m.test(nt) && /sbWrite\('POST','rpc\/feedback_act',\{p_id:x\.id, p_act:act, p_body:body\|\|null\}\)/.test(nt) && /data-fbtab="inbox"/.test(nt) && /class="fb-steps"/.test(nt) && /dmOnly:true/.test(nt) && /var team=all\.filter\(function\(x\)\{ return !x\.dmOnly; \}\);/.test(nt) && /\^rpc\\\/feedback_act\\b/.test(cr)
+    && /^export var API_DS=/m.test(ad) && /^export function apiUrl\(ds, fmt\)/m.test(ad) && /<div id="apiGuide">/.test(ad) && /class="api-flow"/.test(ad) && !/'곳'/.test(ds + sh) && /\['개사 · 건 · 대'/.test(sh),
+  '㊿+200 개선 요청: 탭 · 진행 줄 · feedback_act · 요청자/처리자 알림(DM 만) / 외부 연동 안내(자료 · 주소 · 따라 하기) / 고객사 수 «개사»'); }
 // ㊿+160 연장하면 상태 «재약정»(구분 그대로) · 계약 상세에 «계약 기간 · 연장 이력»
 say(/^export function renewStatus\(r\)/m.test(jsAll) && /var nst=renewStatus\(r\);/.test(jsAll) && /^export function ctPeriods\(c, mine\)/m.test(jsAll) && html.includes('id="dtRenew"'), '연장: 상태 «재약정»(renewStatus) · 계약 상세 연장 이력(ctPeriods · #dtRenew)');
 const idx = html + jsAll;

@@ -29,3 +29,22 @@ export async function fakeBackend(page, db, { role = 'super_admin', email = 'tes
   await page.route(/open\.er-api\.com|api\.exchangerate|api\.frankfurter/, (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"rates":{"KRW":1400}}' }));
 }
 
+
+/** ㊿+200 SQL 120 feedback_act 흉내 — 부르는 사람(이메일 · 슈퍼 관리자 여부)을 정해 db.rpc.feedback_act 에 끼움 · 규칙은 SQL 과 같게 */
+export function fbActRpc(email, su) {
+  return (b, db) => {
+    const me = String(email).toLowerCase(), now = new Date().toISOString(), body = String(b.p_body || '').trim() || null;
+    const f = db.table('portal_feedback').find((x) => x.id === +b.p_id); if (!f) throw new Error('요청을 찾을 수 없습니다');
+    const own = String(f.created_by || '').toLowerCase() === me; if (!su && !own) throw new Error('이 요청을 볼 수 있는 사람이 아닙니다');
+    const msg = (kind) => db.table('portal_feedback_msgs').push({ id: db.nextId('portal_feedback_msgs'), fb_id: f.id, kind, body, created_by: me, created_at: now });
+    const act = b.p_act;
+    if (act === 'seen') { if (own) f.req_seen_at = now; return { ok: true }; }
+    if (act === 'assign') { if (!su) throw new Error('담당은 슈퍼 관리자만 맡을 수 있습니다'); if (f.status === 'done') throw new Error('완료된 요청입니다'); Object.assign(f, { status: 'doing', assignee: me, assigned_at: now, last_by: me, last_at: now }); msg('assign'); }
+    else if (act === 'reply') { if (!body) throw new Error('내용을 적어 주세요'); Object.assign(f, { last_by: me, last_at: now }); if (own) f.req_seen_at = now; msg('reply'); }
+    else if (act === 'done') { if (!su) throw new Error('완료 처리는 슈퍼 관리자만'); if (!body) throw new Error('어떻게 처리했는지 적어 주세요'); Object.assign(f, { status: 'done', done_by: me, done_at: now, assignee: f.assignee || me, assigned_at: f.assigned_at || now, confirmed_at: null, last_by: me, last_at: now }); msg('done'); }
+    else if (act === 'reopen') { if (f.status !== 'done') throw new Error('완료된 요청만 다시 열 수 있습니다'); if (!body && !su) throw new Error('무엇이 아직 안 됐는지 적어 주세요'); Object.assign(f, { status: f.assignee ? 'doing' : 'new', done_by: null, done_at: null, confirmed_at: null, reopen_n: (f.reopen_n || 0) + 1, last_by: me, last_at: now }); if (own) f.req_seen_at = now; msg('reopen'); }
+    else if (act === 'confirm') { if (!own) throw new Error('요청한 사람만 확인할 수 있습니다'); if (f.status !== 'done') throw new Error('아직 완료되지 않았습니다'); Object.assign(f, { confirmed_at: now, req_seen_at: now, last_by: me, last_at: now }); msg('confirm'); }
+    else throw new Error('모르는 동작입니다: ' + act);
+    return f;
+  };
+}
