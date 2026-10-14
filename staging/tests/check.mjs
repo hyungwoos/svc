@@ -296,6 +296,18 @@ say(/^export function tickMemo\(/m.test(jsAll) && /^export function cssvKey\(/m.
   say(/var keepCond=!!\(mem && NAV\.pop\);/.test(gr) && /\$\('#dvSearch'\)\.value=keepCond\? mem\.q : '';/.test(gr) && /^function useTot\(\)/m.test(s1) && /\/철거비\|회수비\/\.test\(proj\)\?'once'/.test(s1) && /headTotal:headTotal/.test(s1) && /S\.use\.etc=etc;/.test(s1) && /S\.use\.bizOnce=/.test(s1)
     && /total:T\.s1, biz_total:bizSum/.test(s1) && /etc:\(S\.use\.etc\|\|\[\]\)\.map\(useRowOut\), once:/.test(s1) && /기타 서비스\(EDR·MDR 등\)/.test(s1) && /일회성\(철거비\)/.test(s1) && /fee=Math\.round\(\(nacSum\+dkSum\)\*/.test(s1),
   '㊿+196 메뉴로 다시 들어오면 검색 · 필터 비움(뒤로는 그대로) · 에스원 정산: 청구 총액 = 리스트 «지급금액» · 기타 서비스(EDR·MDR) 합계 · 매칭 · 철거비 일회성 · 저장 · 불러오기 · 수수료 기준 그대로'); }
+// ㊿+197 API 계정 키 교체(cloudsite v2 cred_rekey)
+{ const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
+  const sa = rd('js/sales.js');
+  say(/class="chip cc-rekey"/.test(sa) && /action:'cred_rekey', id:\+c\.id, apikey:key/.test(sa) && /type="password" class="cc-rk-in" autocomplete="new-password"/.test(sa) && /logChange\('update','api_credentials',\+c\.id,\{label:c\.label, action:'키 교체'\}\)/.test(sa),
+  '㊿+197 API 계정 «키 교체»(비밀번호 칸 · cred_rekey · 이력에 키 없음)'); }
+// ㊿+198 견적서 단가 = 가격표(price_books SaaS 최신 판) · 내장 값은 못 읽을 때만
+{ const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
+  const q = rd('sat/quote.js'), qh = rd('quote.html'), qc = rd('sat/quote.css');
+  say(/^function qpLoad\(\)/m.test(q) && /price_books\?select=label,applied,data&seg=eq\.saas&order=applied\.desc,id\.desc&limit=1/.test(q) && /^const QP_SVC = \{ CIE: 'GIES \(MDR Service\)', MDRA: 'MDR Add-on 24×7', MDR: 'Genian MDR 통합', AV: 'GIEA \(AV Service\)', RW: 'GIER \(Ransomware Service\)', DC: 'GIED \(Device Control\)' \};/m.test(q)
+    && /'무약정': r\[1\], '1년약정': r\[2\], '2년약정': r\[3\], '3년약정': r\[4\]/.test(q) && /qpLoad\(\);   \/\/ ㊿\+198/.test(q) && /id="qpState" class="qp-state no-print"/.test(qh) && /@media print \{ \.qp-state \{ display: none !important; \} \}/.test(qc)
+    && /"Cloud ZTNA \(PA\)": \{\n {8}type: "monthly",\n {8}tiers: \[\n {12}\{ max: 100, prices: \{ "무약정": 13300, "1년약정": 6000, "2년약정": 4500, "3년약정": 4000 \} \}/.test(q),
+  '㊿+198 견적서 단가 = 가격표 SaaS 최신 판(서비스 key 매핑 · NAC/ZTNA 약정별 · 부가 서비스 · 작성자만 보는 출처 표시) · 내장 값 = 2026-09-21 판'); }
 // ㊿+160 연장하면 상태 «재약정»(구분 그대로) · 계약 상세에 «계약 기간 · 연장 이력»
 say(/^export function renewStatus\(r\)/m.test(jsAll) && /var nst=renewStatus\(r\);/.test(jsAll) && /^export function ctPeriods\(c, mine\)/m.test(jsAll) && html.includes('id="dtRenew"'), '연장: 상태 «재약정»(renewStatus) · 계약 상세 연장 이력(ctPeriods · #dtRenew)');
 const idx = html + jsAll;

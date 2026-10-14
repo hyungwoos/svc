@@ -141,16 +141,33 @@ export async function csLoadCreds(force){
   if(!CS.creds.length){ sel.innerHTML=CS.credErr? '<option value="">API 계정 목록을 불러오지 못했습니다 — 다시 시도</option>' : '<option value="">등록된 API 계정 없음 — 관리자가 «계정·API Key 관리»에서 추가</option>'; }
   CS.creds.forEach(function(c){ var o=document.createElement('option'); o.value=String(c.id); o.textContent=c.label+' — '+c.apiemail; sel.appendChild(o); });
   if(cur && CS.creds.some(function(c){ return String(c.id)===cur; })) sel.value=cur;
+  if(CS.tab==='creds') try{ csRenderCreds(); }catch(e){}   /* ㊿+197 계정 탭을 연 채로 들어오면 목록이 온 뒤 다시 그림 — 예전엔 «등록된 계정이 없습니다»가 남았음(«계정이 다 없어졌다»의 원인) */
   csPreview(); return CS.creds;
 }
 export function csRenderCreds(){
   var tb=$('#ccList tbody'), list=CS.creds||[];
-  tb.innerHTML=list.length? list.map(function(c){ return tpl`<tr><td><b>${c.label}</b></td><td>${c.apiemail}</td><td class="mini">${String(c.created_at||'').slice(0,10)}${rawHtml(c.created_by? ' · '+esc(c.created_by):'')}</td><td>${rawHtml(c.id? tpl`<button class="chip cc-del" data-id="${rawHtml(c.id)}">삭제</button>` : '<span class="mini" style="color:var(--muted)">Secrets 에서 관리</span>')}</td></tr>`; }).join('')
+  if(CS.creds===undefined){ tb.innerHTML='<tr><td colspan="4" class="mini" style="color:var(--muted)">불러오는 중…</td></tr>'; return; }   /* ㊿+197 */
+  tb.innerHTML=list.length? list.map(function(c){ return tpl`<tr><td><b>${c.label}</b></td><td>${c.apiemail}</td><td class="mini">${String(c.created_at||'').slice(0,10)}${rawHtml(c.created_by? ' · '+esc(c.created_by):'')}</td><td class="cc-act">${rawHtml(c.id? tpl`<button class="chip cc-rekey" data-id="${rawHtml(c.id)}" title="CSM(my.genians)에서 재발급한 새 키로 바꿉니다 — 라벨 · 이메일 · 이력은 그대로">키 교체</button> <button class="chip cc-del" data-id="${rawHtml(c.id)}">삭제</button>` : '<span class="mini" style="color:var(--muted)">Secrets 에서 관리</span>')}</td></tr>`; }).join('')
     : (CS.credErr? tpl`<tr><td colspan="4" class="mini" style="color:var(--critical)">목록을 불러오지 못했습니다 — ${CS.credErr.slice(0,140)} <button type="button" class="chip" id="ccRetry">다시 시도</button><div style="color:var(--muted);margin-top:2px">계정은 서버에 그대로 있습니다(목록 조회만 실패). 계속되면 Supabase › Edge Functions › cloudsite › Logs 확인</div></td></tr>`
       : '<tr><td colspan="4" class="mini" style="color:var(--muted)">등록된 계정이 없습니다</td></tr>');
   var rt=document.getElementById('ccRetry'); if(rt) rt.onclick=async function(){ rt.disabled=true; await csLoadCreds(true); csRenderCreds(); };
+  /* ㊿+197 키 교체 — 같은 계정으로 새 키만(cloudsite v2 «cred_rekey» · 키는 서버 Vault 에만 · 화면 · 기록에 안 남김) */
+  tb.querySelectorAll('.cc-rekey').forEach(function(b){ b.onclick=function(){ var c=list.filter(function(x){ return String(x.id)===b.dataset.id; })[0], td=b.parentElement;
+    td.innerHTML=tpl`<span class="cc-rk"><input type="password" class="cc-rk-in" autocomplete="new-password" spellcheck="false" placeholder="새 API 키 (my.genians 에서 재발급)" aria-label="${c.label} 새 API 키"><button type="button" class="chip cc-rk-go">저장</button><button type="button" class="chip cc-rk-x">취소</button></span>`;
+    var inp=/** @type {any} */(td.querySelector('.cc-rk-in')), go=/** @type {any} */(td.querySelector('.cc-rk-go'));
+    td.querySelector('.cc-rk-x').onclick=function(){ csRenderCreds(); };
+    go.onclick=async function(){ var key=String(inp.value||'').trim(); if(key.length<8){ msg('ccMsg','새 API 키를 넣어 주세요.','bad'); inp.focus(); return; }
+      if(!confirm('«'+c.label+' — '+c.apiemail+'» 의 API 키를 새 키로 바꿉니다.\n\n예전 키로는 더 이상 사이트를 만들거나 고치지 않습니다(이 포탈에서). 계속할까요?')) return;
+      go.disabled=true; msg('ccMsg','바꾸는 중…');
+      try{ var j=await csFn({action:'cred_rekey', id:+c.id, apikey:key}); inp.value='';
+        if(!j.ok) throw new Error(/알 수 없는 action/.test(String(j.error||''))? 'cloudsite 함수가 아직 예전 버전입니다 — cloudsite v2 를 배포한 뒤 다시 해 주세요' : j.error);
+        toast('API 키 교체', c.label); logChange('update','api_credentials',+c.id,{label:c.label, action:'키 교체'}); msg('ccMsg','바꿨습니다 ✅ (새 키는 서버의 암호화 보관함에만 있습니다)','ok'); csRenderCreds();
+      }catch(e){ go.disabled=false; msg('ccMsg',String(/** @type {any} */(e).message||e),'bad'); } };
+    inp.addEventListener('keydown', function(ev){ if(ev.key==='Enter'){ ev.preventDefault(); go.click(); } else if(ev.key==='Escape'){ csRenderCreds(); } });
+    setTimeout(function(){ try{ inp.focus(); }catch(e){} }, 30);
+  }; });
   tb.querySelectorAll('.cc-del').forEach(function(b){ b.onclick=async function(){ var c=list.filter(function(x){ return String(x.id)===b.dataset.id; })[0];
-    if(!confirm('«'+c.label+' — '+c.apiemail+'» API 계정을 삭제할까요? 이 계정으로는 더 이상 사이트를 만들 수 없습니다.')) return;
+    if(!confirm('«'+c.label+' — '+c.apiemail+'» API 계정을 삭제할까요? 이 계정으로는 더 이상 사이트를 만들 수 없고, 서버에 보관한 키도 지웁니다.')) return;
     try{ var j=await csFn({action:'cred_del', id:+b.dataset.id}); if(!j.ok) throw new Error(j.error); toast('API 계정 삭제', c.label); logChange('delete','api_credentials',+b.dataset.id,{label:c.label}); await csLoadCreds(true); csRenderCreds(); }catch(e){ msg('ccMsg',String(e.message||e),'bad'); } }; });
 }
 export function renderCsite(){
@@ -374,6 +391,8 @@ export var QCFG_DEF='https://aged-union-cdd3.choihw.workers.dev';
 /* 견적서 서비스명 → 포탈 OI 제품군 */
 export var QPROD_MAP={
   'GIES (MDR Service)':'MDR',
+  'MDR Add-on 24×7':'MDR',
+  'Genian MDR 통합':'MDR',
   'GIEA (AV Service)':'AV (안티바이러스)',
   'GIER (Ransomware Service)':'AR (안티랜섬웨어)',
   'DocuRay DRM':'DRM',
