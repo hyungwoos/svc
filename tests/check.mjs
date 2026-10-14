@@ -308,6 +308,11 @@ say(/^export function tickMemo\(/m.test(jsAll) && /^export function cssvKey\(/m.
     && /'무약정': r\[1\], '1년약정': r\[2\], '2년약정': r\[3\], '3년약정': r\[4\]/.test(q) && /qpLoad\(\);   \/\/ ㊿\+198/.test(q) && /id="qpState" class="qp-state no-print"/.test(qh) && /@media print \{ \.qp-state \{ display: none !important; \} \}/.test(qc)
     && /"Cloud ZTNA \(PA\)": \{\n {8}type: "monthly",\n {8}tiers: \[\n {12}\{ max: 100, prices: \{ "무약정": 13300, "1년약정": 6000, "2년약정": 4500, "3년약정": 4000 \} \}/.test(q),
   '㊿+198 견적서 단가 = 가격표 SaaS 최신 판(서비스 key 매핑 · NAC/ZTNA 약정별 · 부가 서비스 · 작성자만 보는 출처 표시) · 내장 값 = 2026-09-21 판'); }
+// ㊿+199 그림 글자만 있는 단추 → 아이콘(빈 단추 금지)
+{ const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
+  const sh = rd('js/shell.js'), css = rd('app.css');
+  say(/^export function deEmojiEl\(el\)/m.test(sh) && /for\(var i=0;i<els\.length;i\+\+\) n\+=deEmojiEl\(els\[i\]\);/.test(sh) && /'🗑':'trash','👍':'thumbUp','👎':'thumbDown','❔':'help'/.test(sh) && /thumbUp:'<path/.test(sh) && /if\(!nm \|\| el\.querySelector\('svg'\)\) return 0;/.test(sh) && /button\.emo-ico\{display:inline-flex/.test(css),
+  '㊿+199 그림 글자만 있는 단추는 떼지 않고 선 아이콘 + 이름(deEmojiEl · EMO_ICO) — 짝 없으면 그대로'); }
 // ㊿+160 연장하면 상태 «재약정»(구분 그대로) · 계약 상세에 «계약 기간 · 연장 이력»
 say(/^export function renewStatus\(r\)/m.test(jsAll) && /var nst=renewStatus\(r\);/.test(jsAll) && /^export function ctPeriods\(c, mine\)/m.test(jsAll) && html.includes('id="dtRenew"'), '연장: 상태 «재약정»(renewStatus) · 계약 상세 연장 이력(ctPeriods · #dtRenew)');
 const idx = html + jsAll;

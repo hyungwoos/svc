@@ -3248,4 +3248,10 @@ details.eq-chk .eq-chk-act:empty{display:none}
 #ccList td.cc-act{white-space:nowrap}
 #ccList .cc-rk{display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap}
 #ccList .cc-rk-in{height:30px;min-width:220px;padding:0 10px;border:1px solid var(--ring);border-radius:8px;background:var(--surface);color:inherit;font:inherit;font-size:13px}
+/* ㊿+199 그림 글자만 있던 단추(✎ · 🗑 · 👍/👎 · ❔) → 선 아이콘(deEmojiEl) */
+button.emo-ico{display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;line-height:1}
+button.emo-ico svg{display:block;flex:none}
+.ai-fb button.emo-ico{width:30px;padding:0}
+.ax-prof .cbtn.emo-ico{width:28px;height:26px;padding:0;margin-left:4px}
+.dgrid .act button.emo-ico{width:28px;min-width:28px;padding:0}
 /* ==== ㊿+166 새 디자인 end ==== */
