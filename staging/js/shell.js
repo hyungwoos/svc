@@ -65,7 +65,10 @@ export var ICO={
   sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="M5 5l1.5 1.5"/><path d="M17.5 17.5L19 19"/><path d="M5 19l1.5-1.5"/><path d="M17.5 6.5L19 5"/>',
   plus:'<path d="M12 5v14"/><path d="M5 12h14"/>',
   search:'<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
-  back:'<path d="M15 18l-6-6 6-6"/>'
+  back:'<path d="M15 18l-6-6 6-6"/>',
+  thumbUp:'<path d="M7 10v11"/><path d="M7 10l4-7a2 2 0 0 1 3 2l-1 5h6a2 2 0 0 1 2 2.3l-1.3 7A2 2 0 0 1 17.7 21H7"/><path d="M3 10h4v11H3z"/>',
+  thumbDown:'<path d="M17 14V3"/><path d="M17 14l-4 7a2 2 0 0 1-3-2l1-5H5a2 2 0 0 1-2-2.3l1.3-7A2 2 0 0 1 6.3 3H17"/><path d="M21 14h-4V3h4z"/>',
+  help:'<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 0 1 4.9.7c0 1.7-2.4 2.3-2.4 3.8"/><path d="M12 17.5h.01"/>'
 };
 /* ㊿+169 아이콘 한 가지 모양 — 위쪽·표 도구 버튼의 이모지/기호(✏️ ⊞ ↻ ⬇ 🧱 ☰ ❔ 📋)를 같은 선 아이콘 + 글자로 (id·이름표는 그대로) */
 export var UI_ICO={btnEdit:['edit','계약 입력·수정'], btnNew:['plus','등록'], btnWidgets:['board','홈 카드'], btnReload:['reload','새로고침'], btnFind:['spark','검색'],
@@ -315,14 +318,29 @@ export function vtDupSync(v){
 }
 export var EMO_RE=/^[\s ]*(?:[\u{1F000}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}][\u{FE0F}\u{200D}\u{1F3FB}-\u{1F3FF}]*)+[\s ]*/u;
 export var EMO_KEEP=/^[\s ]*[✓✔✕✖⚠☰✖]/;   /* ✓ ✔ ✕ ✖ ⚠ ☰ 는 뜻이 있는 기호 — 둠 */
+/* ㊿+199 그림 글자«만» 있는 단추(✎ 표시 이름 · 🗑 계정 삭제 · 👍/👎 AI 답 평가 · ❔ 사용법 …)는 떼면 빈 단추가 됨(㊿+186 부터 — 빈 동그라미로 보이던 것)
+   → 같은 뜻의 선 아이콘으로 바꾸고 이름(aria-label)을 붙임 · 짝이 없는 그림 글자는 떼지 않고 그대로 둠 */
+export var EMO_ICO={'✎':'edit','✏':'edit','🖊':'edit','📝':'edit','🗑':'trash','👍':'thumbUp','👎':'thumbDown','❔':'help','❓':'help','🔍':'search','🔎':'search','⚙':'gear','🔄':'reload','🔁':'reload','🔒':'lock','📎':'clip','👁':'eye','➕':'plus','⭐':'star','🔔':'bell','📅':'calendar','🗓':'calendar'};
+export var EMO_ICO_NAME={edit:'고치기', trash:'삭제', thumbUp:'도움이 됐어요', thumbDown:'틀렸거나 부족해요', help:'도움말', search:'찾기', gear:'설정', reload:'새로고침', lock:'잠김', clip:'첨부', eye:'보기', plus:'추가', star:'즐겨찾기', bell:'알림', calendar:'날짜'};
+export function deEmojiEl(el){
+  var tn=el.firstChild;
+  while(tn && tn.nodeType!==3 && tn.nodeType!==1) tn=tn.nextSibling;
+  if(!tn || tn.nodeType!==3) return 0;
+  var txt=tn.textContent; if(!EMO_RE.test(txt) || EMO_KEEP.test(txt)) return 0;
+  var rest=txt.replace(EMO_RE,'');
+  if(!rest.trim() && !String(el.textContent||'').replace(txt,'').trim()){   /* 그림 글자뿐 — 떼면 빈 단추 */
+    var nm=EMO_ICO[txt.replace(/[\s\u00a0\uFE0F\u200D\u{1F3FB}-\u{1F3FF}]/gu,'')];
+    if(!nm || el.querySelector('svg')) return 0;
+    if(!el.getAttribute('aria-label')) el.setAttribute('aria-label', el.getAttribute('title') || EMO_ICO_NAME[nm] || nm);
+    el.innerHTML=ico(nm, el.closest('.ai-fb')? 13 : 15); el.classList.add('emo-ico');
+    return 1;
+  }
+  tn.textContent=rest; return 1;
+}
 export function deEmoji(root){
   if(!isGN() || !root || !root.querySelectorAll) return;
   var els=root.querySelectorAll('h1,h2,h3,h4,button,summary,.chip,dt,label,.adm-tab,.pill'), n=0;
-  for(var i=0;i<els.length;i++){ var el=els[i], tn=el.firstChild;
-    while(tn && tn.nodeType!==3 && tn.nodeType!==1) tn=tn.nextSibling;
-    if(!tn || tn.nodeType!==3) continue;
-    var txt=tn.textContent; if(!EMO_RE.test(txt) || EMO_KEEP.test(txt)) continue;
-    tn.textContent=txt.replace(EMO_RE,''); n++; }
+  for(var i=0;i<els.length;i++) n+=deEmojiEl(els[i]);
   return n;
 }
 export var DEEMO={on:false, t:null, q:/** @type {any[]} */([])};
@@ -331,7 +349,7 @@ export function deEmojiStart(){
   var app=document.getElementById('app')||document.body;
   deEmoji(app);
   var mo=new MutationObserver(function(recs){ if(!isGN()) return; var seen=DEEMO.q; recs.forEach(function(r){ r.addedNodes && [].forEach.call(r.addedNodes, function(nd){ if(nd.nodeType===3) nd=nd.parentElement; if(nd && nd.nodeType===1 && seen.indexOf(nd)<0) seen.push(nd); }); });
-    if(!seen.length) return; clearTimeout(DEEMO.t); DEEMO.t=setTimeout(function(){ var list=DEEMO.q; DEEMO.q=[]; list.forEach(function(nd){ try{ if(nd.isConnected){ deEmoji(nd); if(nd.matches && nd.matches('h1,h2,h3,h4,button,summary,.chip,dt,label,.adm-tab,.pill')){ var tn=nd.firstChild; if(tn && tn.nodeType===3 && EMO_RE.test(tn.textContent) && !EMO_KEEP.test(tn.textContent)) tn.textContent=tn.textContent.replace(EMO_RE,''); } } }catch(e){} }); }, 30); });
+    if(!seen.length) return; clearTimeout(DEEMO.t); DEEMO.t=setTimeout(function(){ var list=DEEMO.q; DEEMO.q=[]; list.forEach(function(nd){ try{ if(nd.isConnected){ deEmoji(nd); if(nd.matches && nd.matches('h1,h2,h3,h4,button,summary,.chip,dt,label,.adm-tab,.pill')) deEmojiEl(nd); } }catch(e){} }); }, 30); });
   mo.observe(app, {childList:true, subtree:true});
   document.querySelectorAll('.ovl, #ntfPanel, #aiPanel').forEach(function(o){ try{ mo.observe(o, {childList:true, subtree:true}); }catch(e){} });
   var bodyMo=new MutationObserver(function(recs){ recs.forEach(function(r){ r.addedNodes && [].forEach.call(r.addedNodes, function(nd){ if(nd.nodeType===1 && nd.parentElement===document.body){ try{ mo.observe(nd, {childList:true, subtree:true}); deEmoji(nd); }catch(e){} } }); }); });

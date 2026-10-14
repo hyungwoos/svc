@@ -3501,6 +3501,29 @@ if (S.blk()) {
     await A.ctx.close();
     return '목록 · 초기화 · 생성';
   });
+  // ㊿+199 그림 글자만 있는 단추가 빈 동그라미로 보이던 것(㊿+186 deEmoji 가 떼고 빈 단추를 남김) → 선 아이콘 + 이름 · 짝이 없으면 그대로 · 글자 앞 그림만 떼기는 그대로
+  await S.t('㊿+199 그림 글자 단추: 관리자 계정 표 ✎(표시 이름) · 🗑(계정 삭제) → 아이콘 + 이름(빈 단추 0) / AI 👍·👎 · ❔ → 아이콘 / «📊 보고서» → «보고서» / 짝 없는 🦄 · ✓ 는 그대로 / 다시 그려도 같음', async () => {
+    const A = await mkA({ noSession: false, handle: async (route, u, m, st) => {
+      if (/\/rpc\/portal_accounts/.test(u)) { await J9(route, [{ email: 'boss@example.com', role: 'super_admin', name: '홍길동', title: '팀장' }, { email: 'tester@example.com', role: 'super_admin', name: '', title: '' }]); return true; }
+      return admH({})(route, u, m, st); } });
+    await A.page.evaluate(() => SVC.switchView('adminx')); await A.page.waitForFunction(() => document.querySelectorAll('#axTable tbody tr').length === 4, null, { timeout: 8000 }); await A.page.waitForTimeout(150);
+    const ax = await A.page.evaluate(() => { const rows = [...document.querySelectorAll('#axTable tbody tr')];
+      const boss = rows.find((r) => /boss@/.test(r.textContent)), pf = boss.querySelector('button.ax-pf'), dl = boss.querySelector('button.dl');
+      const empty = [...document.querySelectorAll('#axTable button')].filter((b) => !b.textContent.trim() && !b.querySelector('svg')).length;
+      return { pf: { svg: !!pf.querySelector('svg'), txt: pf.textContent.trim(), al: pf.getAttribute('aria-label'), w: Math.round(pf.getBoundingClientRect().width) }, dl: { svg: !!dl.querySelector('svg'), al: dl.getAttribute('aria-label') },
+        named: rows.filter((r) => r.querySelector('button.ax-pf') && /이름 적기/.test(r.querySelector('button.ax-pf').textContent)).length, empty }; });
+    await A.page.evaluate(() => { const d = document.createElement('div'); d.id = 'emoT';
+      d.innerHTML = '<span class="ai-fb"><button id="e1" aria-label="도움이 됐어요">👍</button><button id="e2" title="틀렸거나 부족해요">👎</button></span><button id="e3">❔</button><button id="e4">📊 보고서</button><button id="e5">🦄</button><button id="e6">✓ 완료</button><button id="e7">✏️</button>';
+      document.getElementById('app').appendChild(d); }); await A.page.waitForTimeout(200);
+    const g = await A.page.evaluate(() => { const q = (id) => { const b = document.getElementById(id); const sv = b.querySelector('svg'); return { svg: !!sv, sz: sv ? sv.getAttribute('width') : '', t: b.textContent, al: b.getAttribute('aria-label') }; }; return ['e1', 'e2', 'e3', 'e4', 'e5', 'e6', 'e7'].reduce((o, k) => (o[k] = q(k), o), {}); });
+    await A.page.evaluate(() => SVC.axPaint()); await A.page.waitForTimeout(150);
+    const again = await A.page.evaluate(() => [...document.querySelectorAll('#axTable button')].filter((b) => !b.textContent.trim() && !b.querySelector('svg')).length);
+    const errs = A.c.errs.slice(); await A.ctx.close();
+    assert(ax.pf.svg && ax.pf.txt === '' && /표시 이름/.test(ax.pf.al) && ax.pf.w >= 24 && ax.dl.svg && ax.dl.al === '계정 삭제' && ax.named === 3 && ax.empty === 0
+      && g.e1.svg && g.e1.sz === '13' && g.e1.al === '도움이 됐어요' && g.e2.svg && g.e2.al === '틀렸거나 부족해요' && g.e3.svg && g.e3.al === '도움말' && !g.e4.svg && g.e4.t === '보고서'
+      && !g.e5.svg && g.e5.t === '🦄' && !g.e6.svg && g.e6.t === '✓ 완료' && g.e7.svg && g.e7.al === '고치기' && again === 0 && !errs.length, JSON.stringify({ ax, g, again, errs }));
+    return '표 ✎ · 🗑 아이콘 · 빈 단추 0 · 👍👎❔ 아이콘 · 짝 없음 그대로';
+  });
   await S.t('㊿+180 보안 점검(관리자 › 보안): sec_audit → 🔴 RLS 꺼진 표(펼침) · 🟠 열린 쓰기 정책 · 공개 버킷 · 인증 앱 없는 관리자 · ✅ 없는 항목 · 이 브라우저(CSP) / SQL 112 전이면 안내 / 다른 사이트 iframe 안에서는 포탈 · 위성 화면을 비움', async () => {
     const aud = { no_rls: ['tmp_bak'], open_write: [{ t: 'client_errors', p: 'ins', cmd: 'INSERT', roles: 'authenticated' }], anon_definer: [], public_buckets: ['logo'], admins_no_mfa: ['staff@example.com'], api_no_expiry: [], stale: [{ email: 'old@example.com', last: null }], no_role: [], api_unused: [], users: 5, mfa_on: 2, auth_definer_n: 12 };
     const A = await mkA({ noSession: false, handle: admH(aud) });
