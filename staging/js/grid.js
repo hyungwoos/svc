@@ -277,8 +277,12 @@ export function switchView(v){
   if(v==='inbound' && !ST.RAWX.inbound){
     loadInbound(function(){ if(ST.CUR_VIEW==='inbound') renderGrid(); });
   }
-  var mem=(RESTORE && DVMEM[v])? DVMEM[v] : null;   /* ㊿+169 «뒤로» · ㊿+172 메뉴 재진입도 떠날 때 상태 그대로 · 조건을 들고 들어오는 이동(홈 할 일 · 검색 결과 · 고객 한눈에)은 처음부터 */
-  if(mem){ DV.page=mem.page; DV.sortK=mem.sortK; DV.sortDir=mem.sortDir; DV.chipVal=mem.chipVal; DV.filters=mem.filters; DV.lens=mem.lens; DV.lensAll=mem.lensAll; DV.pre=mem.pre; }
+  var mem=(RESTORE && DVMEM[v])? DVMEM[v] : null;   /* ㊿+169 «뒤로» · ㊿+172 메뉴 재진입도 떠날 때 상태 · 조건을 들고 들어오는 이동(홈 할 일 · 검색 결과 · 고객 한눈에)은 처음부터 */
+  /* ㊿+196 검색 · 필터는 «뒤로»(←)로 돌아올 때만 그대로 — 메뉴를 눌러 다시 들어오면 검색어 · 열 필터 · 빠른 보기 · 칩은 비우고(쪽 · 스크롤도 처음) 정렬 · 관점만 그대로(사용자: 계약에서 검색한 필터가 다른 메뉴에 갔다 와도 남음) */
+  var keepCond=!!(mem && NAV.pop);
+  if(mem){ DV.sortK=mem.sortK; DV.sortDir=mem.sortDir; DV.lens=mem.lens; DV.lensAll=mem.lensAll;
+    if(keepCond){ DV.page=mem.page; DV.chipVal=mem.chipVal; DV.filters=mem.filters; DV.pre=mem.pre; }
+    else { DV.page=0; DV.chipVal=''; DV.filters={}; DV.pre=null; } }
   else { DV.page=0; DV.sortK=null; DV.sortDir=1; DV.chipVal=''; DV.filters={}; DV.pre=null; DV.lens=''; }   /* ㊿+187 관점(계약 전용)도 비움 — 다른 화면 칩에 남지 않게 */
   closeColFilter();
   var g=GRIDS[v];
@@ -290,11 +294,12 @@ export function switchView(v){
   dvCapRender(v, g.cap + (hasWon && !isGN()? ' · 금액은 보기·입력 모두 천원 단위':'') + (ST.IS_VIEWER? ' · 조회 전용 계정입니다':''));   /* ㊿+186 지니언스: 단위는 상단 ₩ 배지 한 번 */
   $('#dvAdd').style.display=(g.add && !ST.IS_VIEWER)?'':'none';
   $('#dvPaste').style.display=(g.add && !ST.IS_VIEWER)?'':'none';
-  $('#dvSearch').value=mem? mem.q : '';
-  if(mem && mem.sy>0) DV.full=true;   /* ㊿+173 스크롤 위치로 돌아갈 때는 행을 한 번에(아래쪽 위치가 잘리지 않게) */
+  $('#dvSearch').value=keepCond? mem.q : '';
+  if(keepCond && mem.sy>0) DV.full=true;   /* ㊿+173 스크롤 위치로 돌아갈 때는 행을 한 번에(아래쪽 위치가 잘리지 않게) */
   renderGrid();
   applyDense();
-  if(mem) setTimeout(function(){ try{ window.scrollTo(0, mem.sy); var tw=$('#dvTable').parentElement; if(tw) tw.scrollLeft=mem.sx; }catch(e){} }, 0);
+  if(keepCond) setTimeout(function(){ try{ window.scrollTo(0, mem.sy); var tw=$('#dvTable').parentElement; if(tw) tw.scrollLeft=mem.sx; }catch(e){} }, 0);
+  else if(mem) try{ window.scrollTo(0, 0); }catch(e){}
 }
 
 export function fmtCell(c,v,r){

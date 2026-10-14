@@ -2081,7 +2081,7 @@ if (S.blk()) {
     assert(h2.includes('자동연장') && h2.includes('해지사유') && !h2.includes('계산서발행처') && !h3.includes('과금방식') && h3.includes('계산서발행처') && h4.length === 10 && !h5.includes('과금방식') && h6.length === 27 && saved === '전체', JSON.stringify({ h2, h3, h5: h5.length, h6: h6.length, saved }));
     return '운영 10열 · 전체 27열';
   });
-  await S.t('㊿+169 목록 상태 유지: 검색·정렬·스크롤 → 다른 화면 → «뒤로» 오면 그대로 · 메뉴로 다시 들어와도(㊿+172) 그대로 · «초기화»만 처음부터', async () => {
+  await S.t('㊿+169 목록 상태 유지: 검색·정렬·스크롤 → 다른 화면 → «뒤로» 오면 그대로 · ㊿+196 메뉴로 다시 들어오면 검색은 비우고 정렬은 그대로(위에서부터) · «초기화»만 전부 처음부터', async () => {
     await page.setViewportSize({ width: 1440, height: 600 });
     await page.evaluate(() => { SVC.wvSet('contracts', '운영'); SVC.navMenu('contracts'); }); await page.waitForTimeout(250);
     await page.fill('#dvSearch', '가상'); await page.waitForTimeout(150);
@@ -2096,8 +2096,8 @@ if (S.blk()) {
     await page.click('#btnMore'); await page.click('#btnViewReset'); await page.waitForTimeout(250);
     const fresh = await page.evaluate(() => ({ q: document.getElementById('dvSearch').value, k: SVC.DV.sortK, y: Math.round(window.scrollY) }));
     await page.setViewportSize({ width: 1440, height: 1000 });
-    assert(before.q === '가상' && before.k === 'mrr' && back.v === 'contracts' && back.q === '가상' && back.k === 'mrr' && Math.abs(back.y - before.y) < 30 && back.first === before.first && menu.q === '가상' && menu.k === 'mrr' && Math.abs(menu.y - before.y) < 30 && fresh.q === '' && fresh.k === null && fresh.y === 0, JSON.stringify({ before, back, menu, fresh }));
-    return '뒤로 · 메뉴 = 그대로 · 초기화 = 처음';
+    assert(before.q === '가상' && before.k === 'mrr' && back.v === 'contracts' && back.q === '가상' && back.k === 'mrr' && Math.abs(back.y - before.y) < 30 && back.first === before.first && menu.q === '' && menu.k === 'mrr' && menu.y === 0 && fresh.q === '' && fresh.k === null && fresh.y === 0, JSON.stringify({ before, back, menu, fresh }));
+    return '뒤로 = 그대로 · 메뉴 = 검색 비움 · 정렬 그대로 · 초기화 = 처음';
   });
   await S.t('㊿+169→172 홈: 핵심 현황 3칸(매출 · LIVE · 재약정 대응 — 같은 재약정 기준) · «업무 n가지»(대상 합계 없음 · 단위는 줄마다) · 줄 = 업무 · 대상 수 · 기한 · 담당 · 버튼 1개 · 펼치면 대상/담당/기한/영향 · «전체 n가지 펼치기»는 같은 자리 · 버튼 → 걸러진 목록(같은 건수)', async () => {
     await page.evaluate(() => { SVC.navMenu('dash'); SVC.HOME.allOpen = false; SVC.renderInbox(); }); await page.waitForTimeout(400);
@@ -2370,14 +2370,18 @@ if (S.blk()) {
     assert(/모두 지울까요/.test(dlg) && del.n === 0 && !del.on, '삭제 ' + JSON.stringify(del));
     await page.click('#aipClose'); return '닫기 · 새 대화 · 삭제';
   });
-  await S.t('㊿+172 OI 조건(빠른 보기 · 검색 · 열 필터 · 스크롤) → 다른 메뉴 → OI 메뉴 다시 = 그대로 · «초기화»만 처음으로 · 다른 화면 검색 창은 실제 조건 값 · 목록 행 수를 AI 에 보내고 같은 조건 결과와 대조', async () => {
+  await S.t('㊿+172→196 OI 조건(빠른 보기 · 검색 · 열 필터 · 스크롤) → 다른 메뉴 → «뒤로»(←) = 그대로 · ㊿+196 메뉴로 다시 들어오면 검색 · 필터는 비움(정렬은 그대로) · «초기화»만 처음으로 · 다른 화면 검색 창은 실제 조건 값 · 목록 행 수를 AI 에 보내고 같은 조건 결과와 대조', async () => {
     await page.setViewportSize({ width: 1440, height: 600 });
     await page.evaluate(() => SVC.navMenu('oi')); await page.waitForTimeout(300); await page.evaluate(() => { SVC.qvGo('oi', 'nonext'); SVC.DV.filters = { stage: ['협상'] }; SVC.renderGrid(); }); await page.fill('#dvSearch', '가상'); await page.waitForTimeout(250);
     await page.evaluate(() => scrollTo(0, 150)); await page.waitForTimeout(100);
     const st = () => page.evaluate(() => ({ q: document.getElementById('dvSearch').value, pre: SVC.DV.pre && SVC.DV.pre.qv, f: JSON.stringify(SVC.DV.filters), rows: document.querySelectorAll('#dvTable tbody tr:not(.dg-empty)').length, y: Math.round(scrollY) }));
-    const a = await st(); await page.evaluate(() => SVC.navMenu('contracts')); await page.waitForTimeout(250); await page.evaluate(() => SVC.navMenu('dash')); await page.waitForTimeout(250); await page.evaluate(() => SVC.navMenu('oi')); await page.waitForTimeout(400);
+    const a = await st(); await page.evaluate(() => SVC.navMenu('contracts')); await page.waitForTimeout(250); await page.evaluate(() => SVC.goBack()); await page.waitForTimeout(400);
     const b = await st();
-    assert(a.q === '가상' && b.q === a.q && b.pre === 'nonext' && b.f === a.f && b.rows === a.rows && Math.abs(b.y - a.y) < 30, JSON.stringify({ a, b }));
+    assert(a.q === '가상' && b.q === a.q && b.pre === 'nonext' && b.f === a.f && b.rows === a.rows && Math.abs(b.y - a.y) < 30, '뒤로 ' + JSON.stringify({ a, b }));
+    await page.evaluate(() => { SVC.DV.sortK = 'customer'; SVC.DV.sortDir = -1; }); await page.evaluate(() => SVC.navMenu('dash')); await page.waitForTimeout(250); await page.evaluate(() => SVC.navMenu('oi')); await page.waitForTimeout(400);
+    const c0 = await st(), srt = await page.evaluate(() => SVC.DV.sortK + '/' + SVC.DV.sortDir);
+    assert(c0.q === '' && !c0.pre && c0.f === '{}' && c0.y === 0 && srt === 'customer/-1', '메뉴 다시 ' + JSON.stringify({ c0, srt }));
+    await page.evaluate(() => { SVC.DV.sortK = null; SVC.DV.sortDir = 1; SVC.qvGo('oi', 'nonext'); SVC.DV.filters = { stage: ['협상'] }; SVC.renderGrid(); }); await page.fill('#dvSearch', '가상'); await page.waitForTimeout(250);   /* 아래 AI 단계는 같은 조건으로 */
     asks.length = 0; await page.keyboard.press('Control+k'); await page.waitForTimeout(250);
     const ctx1 = await page.evaluate(() => document.getElementById('fkCtx').textContent);
     await page.fill('#fkInput', '이 목록 진행 상황 어때?'); await page.click('#fkAsk'); await page.waitForTimeout(800);
@@ -2530,7 +2534,7 @@ if (S.blk()) {
     assert(a.dirty && a.kd && b.kpiTiles > 0 && !b.dirty && a.sum === b.sum && ov > 0, JSON.stringify({ a: Object.assign({}, a, { sum: 0 }), b: Object.assign({}, b, { sum: 0 }), ov }));
     return '접힘: 그리기 미룸 · 펼침: 타일 ' + b.kpiTiles;
   });
-  await S.t('㊿+173 목록: 처음 30행 먼저 → 곧 나머지(쪽당 100행 그대로 · 같은 순서) · 다른 메뉴 갔다 와서 스크롤 위치로 돌아갈 때는 한 번에 · 정렬 · 검색해도 같은 행', async () => {
+  await S.t('㊿+173 목록: 처음 30행 먼저 → 곧 나머지(쪽당 100행 그대로 · 같은 순서) · 다른 메뉴 갔다가 «뒤로»(㊿+196 — 메뉴로 다시 들어오면 위에서부터)로 스크롤 위치로 돌아갈 때는 한 번에 · 정렬 · 검색해도 같은 행', async () => {
     await page.evaluate(() => { SVC.viewResetHard('contracts'); }); await page.waitForTimeout(0);
     const first = await page.evaluate(() => { SVC.navMenu('dash'); SVC.navMenu('contracts'); return document.querySelectorAll('#dvTable tbody tr').length; });
     await page.waitForTimeout(500);
@@ -2538,7 +2542,8 @@ if (S.blk()) {
     const flush = await page.evaluate(() => { SVC.gridFlush(); return { n: document.querySelectorAll('#dvTable tbody tr').length, txt: [...document.querySelectorAll('#dvTable tbody tr')].map((t) => t.textContent).join('|') }; });   /* 한 번에 그린 것과 같은 행 · 같은 순서 */
     full.want = flush.n; const want = flush.txt === full.txt ? 100 : -1;
     await page.evaluate(() => window.scrollTo(0, 1500)); await page.waitForTimeout(100); const y0 = await page.evaluate(() => Math.round(scrollY));
-    const back = await page.evaluate(() => { SVC.navMenu('oi'); SVC.navMenu('contracts'); return document.querySelectorAll('#dvTable tbody tr').length; });
+    await page.evaluate(() => SVC.navMenu('oi')); await page.evaluate(() => SVC.goBack()); await page.waitForFunction(() => SVC.ST.CUR_VIEW === 'contracts', null, { timeout: 5000 });
+    const back = await page.evaluate(() => document.querySelectorAll('#dvTable tbody tr').length);
     await page.waitForTimeout(300); const y1 = await page.evaluate(() => Math.round(scrollY));
     assert(first === 30 && full.n === full.want && full.n === 100 && want === 100 && back === 100 && Math.abs(y1 - y0) < 5, JSON.stringify({ first, full: { n: full.n, want: full.want }, back, y0, y1 }));   /* ㊿+189 제목 숨김이 늦게 일어나 문서 높이가 바뀌던 것 고침 — 같은 자리여야 함(CI 글꼴에선 40px 차이로 실패했었음) */
     return '30 → ' + full.n + '행 · 돌아오면 ' + back + '행 한 번에';
@@ -4697,6 +4702,56 @@ if (S.blk()) {
       && det2.length === 2 && ls === '1' && k === '권한 없음|키 오류|변경 없음||'
       && /불러오지 못했습니다/.test(cr.t) && /가상 실패\(시험\)/.test(cr.t) && /서버에 그대로/.test(cr.t) && cr.retry, JSON.stringify({ m0, r0, r1, r2, ls, k, cr }));
     return '칸 ' + m0.th + ' · 문서 폭 ' + m0.doc + ' · 펼침 1 → 모두 2 · 목록 실패 표시';
+  });
+}
+// ㊿+196 에스원 사용료 정산 — 청구 총액 = 리스트 «지급금액» · 기타 서비스(EDR·MDR)도 합계 · 매칭 · 비즈포탈 회계매출은 설치비 · 철거비 빼고 → 둘이 같으면 차액 0 — 가짜 시트(셀 배열)
+if (S.blk()) {
+  await S.t('㊿+196 에스원 정산: 리스트 머리 «지급금액»(10,301) = 청구 총액(소수점 일할 1,300.8 은 에스원 기준) · 기타 서비스(가상의원MDR)는 합계에 들어가고 비즈포탈과 이름으로 매칭 · 비즈포탈 «철거비»는 일회성(설치비처럼 대조 · 합계에서 뺌) → 회계매출 10,301 · 차액 0 · 대조표(기타 · 일회성 구역 · 총계) · 엑셀 행 · 저장 → 다시 불러와도 같은 합계 / 머리 값과 금액 합이 다르면 경고하고 금액 합으로', async () => {
+    const db = new FakeDB(seedData()); db.rpc.is_super_admin = () => true;
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page);
+    await fakeBackend(page, db); await page.goto(url + '/s1.html'); await page.waitForFunction(() => window.CLS && CLS.ok === true, null, { timeout: 10000 });
+    const run = async (head) => page.evaluate((head) => {
+      const C = (a) => a.map((v) => (v === null ? null : { v }));
+      const H = ['사업팀', '개시사업장', '계약번호', '서비스제공처', '제공서비스', '수량', '단가', '외주비용', '계약일자', '기산일자', '사용일수', '해약일자', '현재상태'];
+      const s1 = [C(['□ 지급건 : ', 4, '건']), C(['□ 지급금액 : ', head, '원']), C(H),
+        C(['가상팀', '가상지사', 'N9000001', '가상기관A클라우드NAC', '클라우드NAC BASIC 50', 1, 7000, 7000, '2025.01.01', '2025.01.01', 30, null, '개시']),
+        C(['가상팀', '가상지사', 'N9000002', '가상기관B디바이스키퍼', '디바이스키퍼 50', 1, 2000, 2000, '2025.01.01', '2025.01.01', 30, null, '개시']),
+        C(['가상팀', '가상지사', 'N9000003', '가상의원MDR', '지니언스EDR_EDR+MDR', 1, 1000.4, 1000.4, '2026.09.30', null, 1, null, '개시']),
+        C(['가상팀', '가상지사', null, '가상의원MDR', '지니언스EDR_안티바이러스', 1, 300.4, 300.4, '2026.09.30', null, 1, null, '개시'])];
+      const BH = ['등록번호', '매출종류', '프로젝트명', '산업군', '고객사', '영업채널', '진행상태', '회계매출'];
+      const biz = [C(BH), C([1001, '제품판매', '[1/36] 가상기관A S1 Cloud NAC 신규 도입', '기업', '가상기관A (에스원)', '(주)에스원', '계산서발행', 7000]),
+        C([1002, '제품판매', '[에스원] 디바이스키퍼 대금 정산', '기업', '에스원', '(주)에스원', '계산서발행', 2000]),
+        C([1003, '제품판매', '[1/36] 가상의원 MDR 신규 도입', '기업', '가상의원 (에스원)', '(주)에스원', '계산서발행', 1301]),
+        C([1004, '제품판매', '가상기관C Cloud NAC 설치비', '기업', '가상기관C (에스원)', '(주)에스원', '계산서발행', 100000]),
+        C([1005, '제품판매', '가상기관D Cloud NAC 철거비', '기업', '가상기관D (에스원)', '(주)에스원', '계산서발행', 100000])];
+      document.getElementById('ym').value = '2026-09'; S.maps = [];
+      S.use = parseS1Use(s1); S.biz = parseBiz(biz); matchUse(); renderUse();
+      const T = useTot(), etc = S.use.etc[0];
+      return { T: { s1: T.s1, biz: T.biz, diff: T.diff, head: T.head, headOff: T.headOff, etc: Math.round(T.etc * 10) / 10, once: T.once.length, nInst: T.nInst },
+        kinds: S.biz.map((b) => b.no + ':' + b.kind).join(','), etc: etc && (etc.nm + '→' + (etc.biz && etc.biz.no) + '/' + etc.by), only: bizOnlyRows().map((b) => b.no).join(','),
+        tiles: [...document.querySelectorAll('#uTiles .tile')].map((t) => t.querySelector('.t').textContent + '=' + t.querySelector('.v').textContent.replace(/\s+/g, ' ').trim()),
+        extra: (document.getElementById('uExtra') || {}).textContent || '' };
+    }, head);
+    const a = await run(10301);
+    await page.evaluate(() => { window.open = function () { const f = document.createElement('iframe'); document.body.appendChild(f); const w = f.contentWindow; w.print = function () {}; window.__pw = w; return w; }; });
+    await page.evaluate(() => printUse()); await page.waitForTimeout(400);
+    const P = await page.evaluate(() => { const d = window.__pw.document; return { secs: [...d.querySelectorAll('tr.sec')].map((x) => x.textContent.replace(/\s+/g, ' ').trim()), foot: [...d.querySelectorAll('tfoot tr, tr.foot')].map((x) => x.textContent.replace(/\s+/g, ' ').trim()).join(' | '), note: d.querySelector('.note').textContent, sums: [...d.querySelectorAll('.sum')].map((x) => x.textContent.replace(/\s+/g, ' ').trim()) }; });
+    await page.evaluate(async () => { await saveSettle('use'); }); await page.waitForTimeout(500);
+    const saved = db.table('s1_settle').find((x) => x.kind === 'use') || {};
+    await page.evaluate(async (id) => { await restoreSettle(id); }, saved.id); await page.waitForTimeout(400);
+    const R = await page.evaluate(() => { const T = useTot(); return { s1: T.s1, biz: T.biz, diff: T.diff, once: T.once.length, etc: (S.use.etc || []).length, tiles: [...document.querySelectorAll('#uTiles .tile')].map((t) => t.querySelector('.t').textContent).join('|') }; });
+    const b = await run(9999);
+    await ctx.close();
+    const out = { a, P, saved: { total: saved.total, biz_total: saved.biz_total, etc: (saved.payload || {}).etc && saved.payload.etc.length, once: (saved.payload || {}).once && saved.payload.once.length, head: (saved.payload || {}).head_total }, R, b: { T: b.T, tiles: b.tiles.filter((x) => /청구/.test(x)) } };
+    assert(a.T.s1 === 10301 && a.T.biz === 10301 && a.T.diff === 0 && a.T.head === 10301 && !a.T.headOff && a.T.etc === 1300.8 && a.T.once === 1 && a.T.nInst === 1
+      && a.kinds === '1001:use,1002:settle,1003:use,1004:install,1005:once' && a.etc === '가상의원MDR→1003/name' && a.only === ''
+      && a.tiles.some((x) => /^기타 서비스\(EDR·MDR 등\)=1,301 1건$/.test(x)) && a.tiles.some((x) => /^에스원 청구 총액=10,301\s?= 리스트 «지급금액» ✓$/.test(x)) && a.tiles.some((x) => /^비즈포탈 회계매출=10,301 3건\s?설치비 1 · 철거비 1건 뺌$/.test(x)) && a.tiles.some((x) => /^차액=0$/.test(x))
+      && /일회성\(철거비\) 1건/.test(a.extra) && /가상의원MDR/.test(a.extra)
+      && P.secs.some((x) => /^기타 서비스\(EDR·MDR 등\) 1건/.test(x)) && P.secs.some((x) => /^일회성\(철거비\) 1건 · 100,000원/.test(x)) && /요약의 차액\(청구 − 비즈포탈\) 0/.test(P.note) && /리스트 머리 «지급금액»/.test(P.note) && P.sums.some((x) => /청구 총액\s?10,301원 \(= 리스트 지급금액\)/.test(x))
+      && out.saved.total === 10301 && out.saved.biz_total === 10301 && out.saved.etc === 1 && out.saved.once === 1 && out.saved.head === 10301
+      && R.s1 === 10301 && R.biz === 10301 && R.diff === 0 && R.once === 1 && R.etc === 1 && /기타 서비스/.test(R.tiles)
+      && b.T.headOff === true && b.T.s1 === 10301 && b.tiles.some((x) => /9,999 ≠ 금액 합/.test(x)) && !c.errs.length, JSON.stringify(out));
+    return '청구 10,301 = 회계매출 10,301 · 차액 0 · 저장 · 다시 불러오기 같음';
   });
 }
 await browser.close(); srv.close();
