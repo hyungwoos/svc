@@ -1033,9 +1033,17 @@ if (S.blk()) {
 // ㊿+148 데이터 점검 수정 창 · 업데이트 안내 팝업
 if (S.blk()) {
   const { FIX } = await import('./lib.mjs');
-  const writes = [], dialogs = []; let fixed = null, pending = { notify: false }, notesDb = [], notifyDb = [], ackDb = [], apiKeysDb = null, apiLogDb = [];
+  const writes = [], dialogs = []; let fixed = null, pending = { notify: false }, notesDb = [], notifyDb = [], ackDb = [], apiKeysDb = null, apiLogDb = [], exportCalls = [], exportMode = 'ok';
   const J = (route, o, st = 200) => route.fulfill({ status: st, contentType: 'application/json', body: JSON.stringify(o) });
   const { ctx, page, errs } = await open({ onWrite: (w) => writes.push(w), extra: async (route, u, m) => {
+    /* ㊿+203 export 함수(가짜) — 포탈 «API 문서» 시험 호출: 로그인(Bearer) · 발급 키(X-API-Key) · CSV · 연결 실패(CORS 흉내) */
+    if (/\/functions\/v1\/export/.test(u)) { const h = route.request().headers(); exportCalls.push({ u, auth: h.authorization || '', key: h['x-api-key'] || '', apikey: h.apikey || '', names: h['x-svc-names'] || '' });
+      if (exportMode === 'fail') { await route.abort('failed'); return true; }
+      const res = (/\/export\/(\w+)/.exec(u) || [])[1] || '';
+      if (h['x-api-key']) { if (h['x-api-key'] !== 'svc_' + 'a'.repeat(64)) { await J(route, { ok: false, error: '등록되지 않은 API 키입니다' }, 401); return true; }
+        if (res === 'contracts') { await J(route, { ok: false, error: '이 키로는 «contracts» 를 볼 수 없습니다 — 허용: revenue' }, 403); return true; } }
+      if (/format=csv/.test(u)) { await route.fulfill({ status: 200, contentType: 'text/csv; charset=utf-8', headers: { 'X-Total-Count': '3', 'Access-Control-Allow-Origin': '*', 'Access-Control-Expose-Headers': 'X-Total-Count, Retry-After' }, body: '\uFEFFcontract_id,month,amount\r\n1024,2026-01,480000\r\n1024,2026-02,480000\r\n1025,2026-01,90000\r\n' }); return true; }
+      await J(route, { ok: true, resource: res || 'contracts', count: 2, total: 5, limit: 5, offset: 0, next_offset: 2, units: { amount: '원', month: 'YYYY-MM' }, data: [{ id: 1024, customer_id: 311, customer: '가상고객01', line: 'Cloud', mrr: 480000 }, { id: 1025, customer_id: 312, customer: '가상고객02', line: 'MDR', mrr: 90000 }] }); return true; }
     /* ㊿+164 외부 연동 API 키 — apiKeysDb 가 null 이면 «SQL 102 전»(함수 없음 404) */
     if (/\/rpc\/(api_key_list|api_access_recent|api_key_create|api_key_revoke)/.test(u)) { const fn = /\/rpc\/(\w+)/.exec(u)[1], b = JSON.parse(route.request().postData() || '{}'); writes.push({ m, url: u, body: route.request().postData() });
       if (!apiKeysDb) { await J(route, { code: 'PGRST202', message: 'Could not find the function public.' + fn }, 404); return true; }
@@ -1164,7 +1172,7 @@ if (S.blk()) {
   // ㊿+200 외부 연동 «쉽게» — 3단계 · 자료 카드 · 칸 설명 · 주소 만들기 · 엑셀 · 구글 시트 · Power BI · 프로그램 따라 하기 · 키 안 들어감 · 폰 넘침 0
   await S.t('㊿+200 외부 연동 안내: 3단계 · 자료 카드 7개 → 칸(뜻 · 가짜 예시) · 이 자료를 볼 수 있는 키 · 주소 만들기(기간 · 상태 · 형식 → 주소 바로 바뀜 · 복사) · 따라 하기 탭(엑셀 헤더 X-API-Key · 구글 시트 Apps Script + 스크립트 속성 · Power BI · Python/curl) · 키 원문 없음 · 폰 넘침 0', async () => {
     apiKeysDb = [{ id: 7, name: '가상 회계 ERP', prefix: 'svc_7777777', scopes: ['contracts', 'revenue'], names: true, note: null, expires_at: null, active: true, revoked_at: null, last_used_at: null, calls_7d: 0, errors_7d: 0 }]; apiLogDb = [];
-    await page.evaluate(() => { SVC.navMenu('adminx'); }); await page.waitForTimeout(400); await page.click('#admTabs [data-t="api"]'); await page.evaluate(() => SVC.apiLoad()); await page.waitForSelector('#apiGuide .api-ds', { timeout: 5000 });
+    await page.evaluate(() => { SVC.navMenu('adminx'); }); await page.waitForTimeout(400); await page.click('#admTabs [data-t="api"]'); await page.evaluate(() => SVC.apiLoad()); await page.click('#apiBox [data-apitab="guide"]'); await page.waitForSelector('#apiGuide .api-ds', { timeout: 5000 });   /* ㊿+203 탭 «쉬운 안내» */
     await page.evaluate(() => { window.__cp = []; try { Object.defineProperty(navigator, 'clipboard', { value: { writeText: (t) => { window.__cp.push(t); return Promise.resolve(); } }, configurable: true }); } catch (e) { /* noop */ } });
     const g = () => page.evaluate(() => ({ flow: document.querySelectorAll('#apiBox .api-flow li').length, cards: [...document.querySelectorAll('#apiGuide .api-ds')].map((b) => b.querySelector('b').textContent + (b.classList.contains('on') ? '*' : '')), keys: (document.querySelector('#apiGuide .api-dh .ctag') || {}).textContent, url: document.getElementById('apiUrl').textContent,
       fields: [...document.querySelectorAll('#apiGuide .api-f tbody tr')].map((r) => r.cells[0].textContent), how: (document.querySelector('#apiGuide .api-howb') || {}).textContent, opts: [...document.querySelectorAll('#apiGuide [data-apio]')].map((e) => e.dataset.apio) }));
@@ -1187,6 +1195,55 @@ if (S.blk()) {
     assert(/\/export\/poc\?status=%EC%8B%A0%EC%B2%AD,%EB%8C%80%EA%B8%B0,%EC%A7%84%ED%96%89%EC%A4%91,%EB%8D%B0%EB%AA%A8&limit=5000&format=csv$/.test(pc.url) && /고른 키가 아직 없습니다/.test(pc.keys) && /Power BI/.test(pc.how) && /\/export\/customers\?limit=5000&format=csv$/.test(cu.url) && cu.opts.join() === 'fmt,limit'
       && ov <= 1 && !/svc_7777777\d/.test(txt) && !errs.length, 'PoC · 고객사 · 폰 ' + JSON.stringify({ ov, ovw, errs, key: /svc_7777777\d/.test(txt), pc: got.pc.url, cu: got.cu }));
     return '7 자료 · 주소 · 4 방법 · 복사 · 폰 넘침 0';
+  });
+  // ㊿+203 «API 문서 · 시험 호출»(Swagger 형식) — 엔드포인트 8개 · 조건 → 주소 · 예시 코드(키 자리만) · 내 로그인 시험(Bearer · 고객사명 옵션) · 발급 키 시험(X-API-Key · 403 이유) · CSV · 연결 실패 안내 · OpenAPI 받기 · 키가 화면 · HTML 에 안 남음 · 폰
+  await S.t('㊿+203 외부 연동 «API 문서»: GET 8개(/ + 자료 7) · 조건 입력 → 요청 주소 · curl/Python(키 자리 «받은 키») · ▶ 시험 호출 — 내 로그인(Authorization Bearer · 공개 키 · X-Svc-Names) → 200 표/JSON · 발급 키(X-API-Key · 형식 틀리면 안 보냄 · 403 이유+할 일) · CSV(X-Total-Count) · 연결 실패 → v1.2 배포 안내 · OpenAPI(JSON) 받기 · 키 원문이 HTML 에 없음 · 폰 넘침 0', async () => {
+    exportCalls.length = 0; exportMode = 'ok'; const KEY = 'svc_' + 'a'.repeat(64);
+    await page.evaluate(() => { SVC.navMenu('adminx'); }); await page.waitForTimeout(400); await page.click('#admTabs [data-t="api"]'); await page.evaluate(() => SVC.apiLoad());
+    await page.evaluate(() => { window.__cp = []; try { Object.defineProperty(navigator, 'clipboard', { value: { writeText: (t) => { window.__cp.push(t); return Promise.resolve(); } }, configurable: true }); } catch (e) { /* noop */ } });
+    await page.click('#apiBox [data-apitab="docs"]'); await page.waitForSelector('#apidOp-contracts .apid-opb', { timeout: 5000 });
+    const d0 = await page.evaluate(() => ({ tabs: [...document.querySelectorAll('#apiBox [data-apitab]')].map((b) => b.dataset.apitab + (b.getAttribute('aria-selected') === 'true' ? '*' : '')).join(','), docsHidden: document.getElementById('apiPane-docs').hidden, guideHidden: document.getElementById('apiPane-guide').hidden,
+      ops: [...document.querySelectorAll('#apiDocs .apid-oph')].map((b) => b.querySelector('.apid-m').textContent + ' ' + b.querySelector('code').textContent).join('|'), open: [...document.querySelectorAll('#apiDocs .apid-op.open')].map((e) => e.id).join(','),
+      params: [...document.querySelectorAll('#apidOp-contracts [data-apidv]')].map((e) => e.dataset.apidv.split('|')[1]).join(','), base: document.getElementById('apidBase').textContent, oa: document.getElementById('apidOa').textContent }));
+    await page.fill('#apidOp-contracts [data-apidv="contracts|updated_since"]', '2026-10-01'); await page.selectOption('#apidOp-contracts [data-apidv="contracts|line"]', 'Cloud');
+    const u1 = await page.$eval('#apidU-contracts', (e) => e.textContent), c1 = await page.$eval('#apidC-contracts', (e) => e.textContent);
+    await page.click('#apidOp-contracts [data-apidtry="contracts"]'); await page.waitForSelector('#apidR-contracts .apid-meta', { timeout: 5000 });
+    const r1 = await page.evaluate(() => ({ meta: document.querySelector('#apidR-contracts .apid-meta').textContent.replace(/\s+/g, ' '), th: [...document.querySelectorAll('#apidR-contracts .apid-tbl th')].map((t) => t.textContent).join(','), rows: document.querySelectorAll('#apidR-contracts .apid-tbl tbody tr').length }));
+    await page.click('#apidR-contracts [data-apidvw="contracts|json"]'); const j1 = await page.$eval('#apidR-contracts .apid-body', (e) => e.textContent);
+    await page.uncheck('#apidNames'); await page.click('#apidOp-contracts [data-apidtry="contracts"]'); await page.waitForTimeout(400);
+    const L = exportCalls.slice();
+    /* 발급 키 */
+    await page.check('#apiDocs input[name="apidAuth"][value="key"]'); await page.fill('#apidKey', 'svc_123'); const n0 = exportCalls.length;
+    await page.click('#apidOp-contracts [data-apidtry="contracts"]'); await page.waitForTimeout(200); const bad = await page.$eval('#apidR-contracts', (e) => e.textContent); const n1 = exportCalls.length;
+    await page.fill('#apidKey', KEY); const note = await page.$eval('#apidOp-contracts .apid-run .mini', (e) => e.textContent);
+    await page.click('#apidOp-contracts [data-apidtry="contracts"]'); await page.waitForSelector('#apidR-contracts .apid-err', { timeout: 5000 }); await page.waitForTimeout(200);
+    const r403 = await page.$eval('#apidR-contracts', (e) => e.textContent.replace(/\s+/g, ' ')); const k403 = exportCalls[exportCalls.length - 1];
+    /* 월 매출 CSV · 코드 탭 */
+    await page.click('#apiDocs [data-apidop="revenue"]'); await page.waitForSelector('#apidOp-revenue .apid-opb'); await page.selectOption('#apidOp-revenue [data-apidv="revenue|format"]', 'csv'); await page.fill('#apidOp-revenue [data-apidv="revenue|from"]', '2026-01');
+    await page.click('#apidOp-revenue [data-apidtry="revenue"]'); await page.waitForSelector('#apidR-revenue .apid-meta', { timeout: 5000 });
+    const csv = await page.evaluate(() => ({ meta: document.querySelector('#apidR-revenue .apid-meta').textContent.replace(/\s+/g, ' '), body: (document.querySelector('#apidR-revenue .apid-body') || {}).textContent || '' }));
+    await page.click('#apidOp-revenue [data-apidcode="py"]'); const py = await page.$eval('#apidC-revenue', (e) => e.textContent); const pyC = await page.$eval('#apidC-contracts', (e) => e.textContent);
+    await page.click('#apidOp-revenue [data-apicp="apidU-revenue"]'); await page.waitForTimeout(100); const cp = await page.evaluate(() => window.__cp.slice());
+    /* 연결 실패(함수가 예전 버전 · CORS) */
+    exportMode = 'fail'; await page.click('#apidOp-revenue [data-apidtry="revenue"]'); await page.waitForSelector('#apidR-revenue .apid-err', { timeout: 8000 }); const fl = await page.$eval('#apidR-revenue', (e) => e.textContent); exportMode = 'ok';
+    /* OpenAPI 받기 */
+    const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 5000 }), page.click('#apidSpecDl')]); const fs2 = await import('node:fs'); const spec = JSON.parse(fs2.readFileSync(await dl.path(), 'utf8'));
+    const html = await page.evaluate(() => document.documentElement.outerHTML), txt = await page.$eval('#apiBox', (e) => e.innerText);
+    /* 탭 키보드 · 폰 */
+    await page.focus('#apiBox [data-apitab="docs"]'); await page.keyboard.press('ArrowRight'); const kb = await page.evaluate(() => ({ sel: document.querySelector('#apiBox [aria-selected="true"][data-apitab]').dataset.apitab, foc: document.activeElement.dataset.apitab, keysShown: !document.getElementById('apiPane-keys').hidden }));
+    await page.click('#apiBox [data-apitab="docs"]'); const kept = await page.$eval('#apidKey', (e) => e.value === 'svc_' + 'a'.repeat(64));
+    await page.setViewportSize({ width: 390, height: 844 }); await page.waitForTimeout(300); const ov = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth); await page.setViewportSize({ width: 1280, height: 900 });
+    const got = { d0, u1, c1, r1, j1: j1.slice(0, 80), L, bad, n0, n1, note, r403, k403, csv, py: py.slice(0, 200), pyC: pyC.slice(0, 60), cp, fl, spec: { v: spec.openapi, n: Object.keys(spec.paths).length, sec: spec.components && spec.components.securitySchemes.ApiKey.name }, kb, kept, ov, errs };
+    assert(d0.tabs === 'guide,docs*,keys' && !d0.docsHidden && d0.guideHidden && d0.ops === 'GET /|GET /contracts|GET /revenue|GET /customers|GET /mrr|GET /poc|GET /orders|GET /assets' && d0.open === 'apidOp-contracts' && d0.params === 'updated_since,line,status,limit,offset,format'
+      && /\/functions\/v1\/export$/.test(d0.base) && /openapi\.json$/.test(d0.oa), '문서 처음 ' + JSON.stringify(got).slice(0, 900));
+    assert(/^GET https:\/\/[a-z0-9]+\.supabase\.co\/functions\/v1\/export\/contracts\?updated_since=2026-10-01&line=Cloud&limit=5$/.test(u1) && /^curl -H "X-API-Key: <받은 키>" "https:[^"]*contracts\?updated_since=2026-10-01&line=Cloud&limit=5"$/.test(c1)
+      && /^200/.test(r1.meta.trim()) && /이번 2줄 \/ 전체 5/.test(r1.meta) && /offset=2/.test(r1.meta) && r1.th === 'id,customer_id,customer,line,mrr' && r1.rows === 2 && /"resource": "contracts"/.test(j1)
+      && L.length === 2 && L[0].auth === 'Bearer tok' && /^sb_publishable_/.test(L[0].apikey) && !L[0].key && L[0].names === '' && L[1].names === '0' && /updated_since=2026-10-01&line=Cloud&limit=5$/.test(L[0].u), '로그인 시험 ' + JSON.stringify(got).slice(0, 1400));
+    assert(/키 형식이 아닙니다/.test(bad) && n1 === n0 && /발급 키 svc_aaaa…/.test(note) && /^403/.test(r403.trim()) && /볼 수 없습니다/.test(r403) && /키를 발급할 때/.test(r403) && k403.key === KEY && !k403.auth
+      && /X-Total-Count 3/.test(csv.meta) && /^contract_id,month,amount/.test(csv.body) && /os\.environ\['SVC_API_KEY'\]/.test(py) && /revenue\?from=2026-01&limit=5&format=csv/.test(py) && /^import os, requests/.test(pyC) && cp.length === 1 && /^https:.*\/export\/revenue\?from=2026-01&limit=5&format=csv$/.test(cp[0])
+      && /v1\.2/.test(fl) && /CORS/.test(fl), '키 · CSV · 코드 · 실패 ' + JSON.stringify({ bad: bad.slice(0, 60), n: [n0, n1], r403: r403.slice(0, 120), csvm: csv.meta.slice(0, 60), py: py.slice(0, 160), cp: cp.map((x) => x.slice(-50)), fl: fl.slice(0, 160) }));
+    assert(got.spec.v === '3.0.3' && got.spec.n === 8 && got.spec.sec === 'X-API-Key' && !html.includes(KEY) && !txt.includes(KEY) && !got.c1.includes('svc_a') && kb.sel === 'keys' && kb.foc === 'keys' && kb.keysShown && kept && ov <= 1 && !errs.length, 'OpenAPI · 키 비노출 · 키보드 · 폰 ' + JSON.stringify({ spec: got.spec, inHtml: html.includes(KEY), inTxt: txt.includes(KEY), kb, kept, ov, errs }));
+    return 'GET 8 · 로그인 200(표 · JSON) · 고객사명 끔 · 키 403 · CSV · 실패 안내 · OpenAPI 8경로 · 키 비노출 · 폰 ' + ov;
   });
   await S.t('㊿+148 관리자 › 업데이트 안내: 계정 «받기» upsert · 처음부터 다시 DELETE · 새 안내 POST · 내 계정 › 업데이트 내역', async () => {
     notifyDb = [{ email: 'sales@example.com', enabled: true }]; ackDb = [{ email: 'sales@example.com', last_id: notesDb.length - 1, acked_at: '2026-10-05T01:00:00Z' }];

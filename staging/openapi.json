@@ -1,0 +1,2289 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "SVC 포탈 데이터 API",
+    "version": "1.2",
+    "description": "지니언스 서비스사업부 포탈 데이터를 외부 시스템(회계 ERP · BI · 구글 시트 · 엑셀)이 읽기 전용으로 가져가는 API.\n\n· 인증: 헤더 X-API-Key 에 포탈 관리자가 발급한 키(svc_ + 64자). 주소에 ?key= 로 넣으면 거부\n· 금액 단위 원 · 월 YYYY-MM · 시각 ISO 8601\n· 한 번에 최대 5000줄 — 더 있으면 응답의 next_offset 을 offset 으로\n· 키마다 분당 60번 · 모든 호출 기록이 남음 · 고객 담당자 · 연락처 · 주소 · 메모 칸은 내보내지 않음"
+  },
+  "servers": [
+    {
+      "url": "https://amzbrdhkvzsyxjfjtugu.supabase.co/functions/v1/export",
+      "description": "운영"
+    }
+  ],
+  "security": [
+    {
+      "ApiKey": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "안내",
+      "description": "키 확인"
+    },
+    {
+      "name": "자료",
+      "description": "가져갈 수 있는 자료 7개"
+    }
+  ],
+  "paths": {
+    "/": {
+      "get": {
+        "operationId": "index",
+        "tags": [
+          "안내"
+        ],
+        "summary": "이 키로 볼 수 있는 자료",
+        "description": "키 이름 · 허용 자료 · 단위 · 한도를 돌려줍니다. 키가 맞는지 처음 확인할 때.",
+        "responses": {
+          "200": {
+            "description": "키 정보",
+            "content": {
+              "application/json": {
+                "example": {
+                  "ok": true,
+                  "version": "export v1.2",
+                  "key": {
+                    "name": "회계 ERP",
+                    "scopes": [
+                      "contracts",
+                      "revenue"
+                    ],
+                    "names": true,
+                    "expires_at": "2027-10-15T00:00:00+09:00"
+                  },
+                  "resources": [
+                    {
+                      "name": "contracts",
+                      "allowed": true,
+                      "url": "https://amzbrdhkvzsyxjfjtugu.supabase.co/functions/v1/export/contracts"
+                    },
+                    {
+                      "name": "revenue",
+                      "allowed": true,
+                      "url": "https://amzbrdhkvzsyxjfjtugu.supabase.co/functions/v1/export/revenue"
+                    },
+                    {
+                      "name": "customers",
+                      "allowed": false,
+                      "url": "https://amzbrdhkvzsyxjfjtugu.supabase.co/functions/v1/export/customers"
+                    },
+                    {
+                      "name": "mrr",
+                      "allowed": false,
+                      "url": "https://amzbrdhkvzsyxjfjtugu.supabase.co/functions/v1/export/mrr"
+                    },
+                    {
+                      "name": "poc",
+                      "allowed": false,
+                      "url": "https://amzbrdhkvzsyxjfjtugu.supabase.co/functions/v1/export/poc"
+                    },
+                    {
+                      "name": "orders",
+                      "allowed": false,
+                      "url": "https://amzbrdhkvzsyxjfjtugu.supabase.co/functions/v1/export/orders"
+                    },
+                    {
+                      "name": "assets",
+                      "allowed": false,
+                      "url": "https://amzbrdhkvzsyxjfjtugu.supabase.co/functions/v1/export/assets"
+                    }
+                  ],
+                  "units": {
+                    "amount": "원",
+                    "month": "YYYY-MM"
+                  },
+                  "rate": "분당 60회"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "502": {
+            "$ref": "#/components/responses/E502"
+          }
+        }
+      }
+    },
+    "/contracts": {
+      "get": {
+        "operationId": "contracts",
+        "tags": [
+          "자료"
+        ],
+        "summary": "계약 — 계약 목록",
+        "description": "회계 ERP · BI 에서 계약(고객사 · 서비스 · 기간 · 월 금액)을 맞출 때. 비고 · 연장 이력 같은 내부 칸은 나가지 않습니다. (계약 1건 = 1줄)",
+        "parameters": [
+          {
+            "name": "updated_since",
+            "in": "query",
+            "required": false,
+            "description": "이 날(시각) 뒤에 바뀐 계약만 — 날짜만 써도 됨",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "example": "2026-10-01"
+          },
+          {
+            "name": "line",
+            "in": "query",
+            "required": false,
+            "description": "서비스 코드",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Cloud",
+                "S1",
+                "MDR",
+                "MDR_S1",
+                "PNS",
+                "DRM",
+                "DLP"
+              ]
+            },
+            "example": "Cloud"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "description": "계약 상태 하나",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "신규",
+                "재약정",
+                "추가",
+                "서비스종료",
+                "해지"
+              ]
+            },
+            "example": "재약정"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "한 번에 받을 줄 수 — 기본 1000 · 최대 5000",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5000,
+              "default": 1000
+            },
+            "example": "5"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "description": "앞에서 건너뛸 줄 수 — 응답의 next_offset 값을 그대로 넣으면 다음 쪽",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            },
+            "example": "0"
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "description": "json(기본 · 프로그램) · csv(엑셀 · 구글 시트 — 첫 줄이 칸 이름)",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "json",
+                "csv"
+              ],
+              "default": "json"
+            },
+            "example": "json"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공 — JSON 이면 data 목록 · CSV 면 첫 줄이 칸 이름(엑셀용 BOM)",
+            "headers": {
+              "X-Total-Count": {
+                "description": "CSV 일 때 전체 줄 수",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContractsList"
+                },
+                "example": {
+                  "ok": true,
+                  "resource": "contracts",
+                  "count": 1,
+                  "total": 1,
+                  "limit": 1000,
+                  "offset": 0,
+                  "next_offset": null,
+                  "units": {
+                    "amount": "원",
+                    "month": "YYYY-MM"
+                  },
+                  "data": [
+                    {
+                      "id": 1024,
+                      "customer_id": 311,
+                      "customer": "가상고객01",
+                      "line": "Cloud",
+                      "version": "V6.0",
+                      "channel": "일반",
+                      "partner": null,
+                      "biller": "지니언스",
+                      "billing": "월납입",
+                      "contract_type": "신규",
+                      "status": "재약정",
+                      "start_month": "2026-01",
+                      "end_month": "2026-12",
+                      "term_months": 12,
+                      "mrr": 480000,
+                      "qty": 300,
+                      "install_fee": 0,
+                      "renew_count": 1,
+                      "auto_renew": true,
+                      "parent_contract_id": null,
+                      "churn_reason": null,
+                      "churn_month": null,
+                      "csm": "vcust01",
+                      "s1_no": null,
+                      "updated_at": "2026-10-14T09:10:00+09:00",
+                      "line_label": "Cloud NAC"
+                    }
+                  ]
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "502": {
+            "$ref": "#/components/responses/E502"
+          }
+        }
+      }
+    },
+    "/revenue": {
+      "get": {
+        "operationId": "revenue",
+        "tags": [
+          "자료"
+        ],
+        "summary": "월 매출 — 계약별 월 금액",
+        "description": "계약별로 달마다 얼마인지 — 회계 매출 대사 · 월 마감. 기간을 안 주면 최근 12개월 · 한 번에 최대 120개월. (계약 × 월 = 1줄)",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "description": "시작 월 YYYY-MM",
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "example": "2026-10"
+            },
+            "example": "2026-01"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "description": "끝 월 YYYY-MM — 없으면 이번 달",
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "example": "2026-10"
+            },
+            "example": "2026-12"
+          },
+          {
+            "name": "contract_id",
+            "in": "query",
+            "required": false,
+            "description": "계약 하나만",
+            "schema": {
+              "type": "integer"
+            },
+            "example": "1024"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "한 번에 받을 줄 수 — 기본 1000 · 최대 5000",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5000,
+              "default": 1000
+            },
+            "example": "5"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "description": "앞에서 건너뛸 줄 수 — 응답의 next_offset 값을 그대로 넣으면 다음 쪽",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            },
+            "example": "0"
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "description": "json(기본 · 프로그램) · csv(엑셀 · 구글 시트 — 첫 줄이 칸 이름)",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "json",
+                "csv"
+              ],
+              "default": "json"
+            },
+            "example": "json"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공 — JSON 이면 data 목록 · CSV 면 첫 줄이 칸 이름(엑셀용 BOM)",
+            "headers": {
+              "X-Total-Count": {
+                "description": "CSV 일 때 전체 줄 수",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevenueList"
+                },
+                "example": {
+                  "ok": true,
+                  "resource": "revenue",
+                  "count": 1,
+                  "total": 1,
+                  "limit": 1000,
+                  "offset": 0,
+                  "next_offset": null,
+                  "from": "2026-01",
+                  "to": "2026-12",
+                  "units": {
+                    "amount": "원",
+                    "month": "YYYY-MM"
+                  },
+                  "data": [
+                    {
+                      "contract_id": 1024,
+                      "month": "2026-10",
+                      "amount": 480000
+                    }
+                  ]
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "502": {
+            "$ref": "#/components/responses/E502"
+          }
+        }
+      }
+    },
+    "/customers": {
+      "get": {
+        "operationId": "customers",
+        "tags": [
+          "자료"
+        ],
+        "summary": "고객사 — 고객사 목록",
+        "description": "고객사 번호 → 이름 · 산업군을 붙일 때. (고객사 하나 = 1줄)",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "한 번에 받을 줄 수 — 기본 1000 · 최대 5000",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5000,
+              "default": 1000
+            },
+            "example": "5"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "description": "앞에서 건너뛸 줄 수 — 응답의 next_offset 값을 그대로 넣으면 다음 쪽",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            },
+            "example": "0"
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "description": "json(기본 · 프로그램) · csv(엑셀 · 구글 시트 — 첫 줄이 칸 이름)",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "json",
+                "csv"
+              ],
+              "default": "json"
+            },
+            "example": "json"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공 — JSON 이면 data 목록 · CSV 면 첫 줄이 칸 이름(엑셀용 BOM)",
+            "headers": {
+              "X-Total-Count": {
+                "description": "CSV 일 때 전체 줄 수",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomersList"
+                },
+                "example": {
+                  "ok": true,
+                  "resource": "customers",
+                  "count": 1,
+                  "total": 1,
+                  "limit": 1000,
+                  "offset": 0,
+                  "next_offset": null,
+                  "units": {
+                    "amount": "원",
+                    "month": "YYYY-MM"
+                  },
+                  "data": [
+                    {
+                      "id": 311,
+                      "name": "가상고객01",
+                      "industry": "제조",
+                      "sector": "민간"
+                    }
+                  ]
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "502": {
+            "$ref": "#/components/responses/E502"
+          }
+        }
+      }
+    },
+    "/mrr": {
+      "get": {
+        "operationId": "mrr",
+        "tags": [
+          "자료"
+        ],
+        "summary": "월 매출 합계 — 월별 · 서비스별 합계",
+        "description": "BI · 경영 보고 — 달마다 전체 · 서비스별 합계(포탈 «월 MRR»과 같은 숫자). month 하나 또는 from~to(최대 60개월). (월 1줄 (CSV 는 월 × 서비스 1줄 + 합계 줄))",
+        "parameters": [
+          {
+            "name": "month",
+            "in": "query",
+            "required": false,
+            "description": "한 달만 YYYY-MM (주면 from · to 는 무시)",
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "example": "2026-10"
+            },
+            "example": "2026-10"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "description": "시작 월 YYYY-MM",
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "example": "2026-10"
+            },
+            "example": "2026-01"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "description": "끝 월 YYYY-MM — 없으면 이번 달",
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "example": "2026-10"
+            },
+            "example": "2026-12"
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "description": "json(기본 · 프로그램) · csv(엑셀 · 구글 시트 — 첫 줄이 칸 이름)",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "json",
+                "csv"
+              ],
+              "default": "json"
+            },
+            "example": "json"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공 — JSON 이면 data 목록 · CSV 면 첫 줄이 칸 이름(엑셀용 BOM)",
+            "headers": {
+              "X-Total-Count": {
+                "description": "CSV 일 때 전체 줄 수",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MrrList"
+                },
+                "example": {
+                  "ok": true,
+                  "resource": "mrr",
+                  "count": 1,
+                  "total": 1,
+                  "from": "2026-10",
+                  "to": "2026-10",
+                  "units": {
+                    "amount": "원",
+                    "month": "YYYY-MM"
+                  },
+                  "data": [
+                    {
+                      "month": "2026-10",
+                      "total": 128450000,
+                      "contracts": 214,
+                      "by_line": {
+                        "Cloud": 61200000,
+                        "MDR": 40100000
+                      }
+                    }
+                  ]
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "502": {
+            "$ref": "#/components/responses/E502"
+          }
+        }
+      }
+    },
+    "/poc": {
+      "get": {
+        "operationId": "poc",
+        "tags": [
+          "자료"
+        ],
+        "summary": "MDR PoC·운영 — MDR 신청 ~ PoC ~ 구독",
+        "description": "MDR 신청부터 PoC · 구독 · 종료까지 진행 현황. 고객 담당자 · 연락처 · 진행 메모는 나가지 않습니다. (신청 1건 = 1줄)",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "description": "상태 — 쉼표로 여러 개 (PoC 단계 = 신청,대기,진행중,데모) — 값: 신청, 대기, 진행중, 데모, 구독, 종료",
+            "schema": {
+              "type": "string"
+            },
+            "example": "신청,대기,진행중,데모"
+          },
+          {
+            "name": "svc_type",
+            "in": "query",
+            "required": false,
+            "description": "서비스 유형",
+            "schema": {
+              "type": "string"
+            },
+            "example": "CLOUD"
+          },
+          {
+            "name": "channel",
+            "in": "query",
+            "required": false,
+            "description": "판매 채널",
+            "schema": {
+              "type": "string"
+            },
+            "example": "일반"
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "description": "이 날 뒤에 신청한 것만",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "example": "2026-10-01"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "한 번에 받을 줄 수 — 기본 1000 · 최대 5000",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5000,
+              "default": 1000
+            },
+            "example": "5"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "description": "앞에서 건너뛸 줄 수 — 응답의 next_offset 값을 그대로 넣으면 다음 쪽",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            },
+            "example": "0"
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "description": "json(기본 · 프로그램) · csv(엑셀 · 구글 시트 — 첫 줄이 칸 이름)",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "json",
+                "csv"
+              ],
+              "default": "json"
+            },
+            "example": "json"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공 — JSON 이면 data 목록 · CSV 면 첫 줄이 칸 이름(엑셀용 BOM)",
+            "headers": {
+              "X-Total-Count": {
+                "description": "CSV 일 때 전체 줄 수",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PocList"
+                },
+                "example": {
+                  "ok": true,
+                  "resource": "poc",
+                  "count": 1,
+                  "total": 1,
+                  "limit": 1000,
+                  "offset": 0,
+                  "next_offset": null,
+                  "units": {
+                    "amount": "원",
+                    "month": "YYYY-MM"
+                  },
+                  "data": [
+                    {
+                      "id": 58,
+                      "apply_date": "2026-09-02",
+                      "created_at": "2026-09-02T10:00:00+09:00",
+                      "svc_type": "CLOUD",
+                      "customer": "가상고객07",
+                      "status": "진행중",
+                      "channel": "일반",
+                      "license": "EDR+RANSOMWARE",
+                      "plan_qty": 300,
+                      "agents_total": 274,
+                      "agents_win": 250,
+                      "agents_mac": 20,
+                      "agents_linux": 4,
+                      "mod_edr": true,
+                      "mod_ransom": true,
+                      "mod_av": false,
+                      "mod_media": false,
+                      "start_date": "2026-09-15",
+                      "end_date": null,
+                      "on_rev_sheet": false,
+                      "sales_name": "홍길동",
+                      "updated_at": "2026-10-02T11:00:00+09:00",
+                      "modules": [
+                        "EDR",
+                        "랜섬웨어"
+                      ]
+                    }
+                  ]
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "502": {
+            "$ref": "#/components/responses/E502"
+          }
+        }
+      }
+    },
+    "/orders": {
+      "get": {
+        "operationId": "orders",
+        "tags": [
+          "자료"
+        ],
+        "summary": "장비 신청 — 임대 장비 출고 · 회수 신청",
+        "description": "임대 장비 출고 · 회수 진행. 수령인 · 연락처 · 주소 · 요청사항은 나가지 않습니다. (신청 1건 = 1줄)",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "description": "상태 — 쉼표로 여러 개 — 값: 접수, 출하요청, 배송중, 설치완료, 회수예정, 회수완료, 취소",
+            "schema": {
+              "type": "string"
+            },
+            "example": "배송중,설치완료"
+          },
+          {
+            "name": "channel",
+            "in": "query",
+            "required": false,
+            "description": "채널",
+            "schema": {
+              "type": "string"
+            },
+            "example": "일반"
+          },
+          {
+            "name": "order_type",
+            "in": "query",
+            "required": false,
+            "description": "유형",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "신규발주",
+                "추가",
+                "교체",
+                "철거·회수"
+              ]
+            },
+            "example": "신규발주"
+          },
+          {
+            "name": "model",
+            "in": "query",
+            "required": false,
+            "description": "모델",
+            "schema": {
+              "type": "string"
+            },
+            "example": "S10_R2"
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "description": "이 날 뒤에 신청한 것만",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "example": "2026-10-01"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "한 번에 받을 줄 수 — 기본 1000 · 최대 5000",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5000,
+              "default": 1000
+            },
+            "example": "5"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "description": "앞에서 건너뛸 줄 수 — 응답의 next_offset 값을 그대로 넣으면 다음 쪽",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            },
+            "example": "0"
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "description": "json(기본 · 프로그램) · csv(엑셀 · 구글 시트 — 첫 줄이 칸 이름)",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "json",
+                "csv"
+              ],
+              "default": "json"
+            },
+            "example": "json"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공 — JSON 이면 data 목록 · CSV 면 첫 줄이 칸 이름(엑셀용 BOM)",
+            "headers": {
+              "X-Total-Count": {
+                "description": "CSV 일 때 전체 줄 수",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrdersList"
+                },
+                "example": {
+                  "ok": true,
+                  "resource": "orders",
+                  "count": 1,
+                  "total": 1,
+                  "limit": 1000,
+                  "offset": 0,
+                  "next_offset": null,
+                  "units": {
+                    "amount": "원",
+                    "month": "YYYY-MM"
+                  },
+                  "data": [
+                    {
+                      "id": 412,
+                      "created_at": "2026-10-02T10:20:00+09:00",
+                      "channel": "일반",
+                      "order_type": "신규발주",
+                      "customer": "가상고객03",
+                      "contract_no": null,
+                      "install_date": "2026-10-10",
+                      "ship_date": "2026-10-07",
+                      "edition": null,
+                      "nodes": null,
+                      "model": "S10_R2",
+                      "qty": 1,
+                      "standalone_pod": false,
+                      "status": "배송중",
+                      "serials": "TST0000001",
+                      "returned_date": null,
+                      "returned_serials": null,
+                      "updated_at": "2026-10-07T15:00:00+09:00"
+                    }
+                  ]
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "502": {
+            "$ref": "#/components/responses/E502"
+          }
+        }
+      }
+    },
+    "/assets": {
+      "get": {
+        "operationId": "assets",
+        "tags": [
+          "자료"
+        ],
+        "summary": "장비 현황 — 시리얼별 재고 · 임대 · 회수",
+        "description": "시리얼별 재고 · 임대 · 회수(회계 재고 파악). 비고는 나가지 않습니다. (장비 1대 = 1줄)",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "description": "상태 — 쉼표로 여러 개 — 값: 재고, 임대중, 회수완료",
+            "schema": {
+              "type": "string"
+            },
+            "example": "임대중"
+          },
+          {
+            "name": "model",
+            "in": "query",
+            "required": false,
+            "description": "모델",
+            "schema": {
+              "type": "string"
+            },
+            "example": "S10_R2"
+          },
+          {
+            "name": "usage",
+            "in": "query",
+            "required": false,
+            "description": "구분",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "임대",
+                "데모",
+                "대여",
+                "판매"
+              ]
+            },
+            "example": "임대"
+          },
+          {
+            "name": "channel",
+            "in": "query",
+            "required": false,
+            "description": "채널",
+            "schema": {
+              "type": "string"
+            },
+            "example": "일반"
+          },
+          {
+            "name": "updated_since",
+            "in": "query",
+            "required": false,
+            "description": "이 날(시각) 뒤에 바뀐 장비만",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "example": "2026-10-01"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "한 번에 받을 줄 수 — 기본 1000 · 최대 5000",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5000,
+              "default": 1000
+            },
+            "example": "5"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "description": "앞에서 건너뛸 줄 수 — 응답의 next_offset 값을 그대로 넣으면 다음 쪽",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            },
+            "example": "0"
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "description": "json(기본 · 프로그램) · csv(엑셀 · 구글 시트 — 첫 줄이 칸 이름)",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "json",
+                "csv"
+              ],
+              "default": "json"
+            },
+            "example": "json"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공 — JSON 이면 data 목록 · CSV 면 첫 줄이 칸 이름(엑셀용 BOM)",
+            "headers": {
+              "X-Total-Count": {
+                "description": "CSV 일 때 전체 줄 수",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetsList"
+                },
+                "example": {
+                  "ok": true,
+                  "resource": "assets",
+                  "count": 1,
+                  "total": 1,
+                  "limit": 1000,
+                  "offset": 0,
+                  "next_offset": null,
+                  "units": {
+                    "amount": "원",
+                    "month": "YYYY-MM"
+                  },
+                  "data": [
+                    {
+                      "id": 7001,
+                      "serial": "TST0000001",
+                      "model": "S10_R2",
+                      "usage": "임대",
+                      "status": "임대중",
+                      "customer": "가상고객03",
+                      "channel": "일반",
+                      "partner": null,
+                      "in_date": "2026-03-02",
+                      "deployed_date": "2026-10-07",
+                      "returned_date": null,
+                      "order_id": 412,
+                      "updated_at": "2026-10-07T15:00:00+09:00"
+                    }
+                  ]
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "502": {
+            "$ref": "#/components/responses/E502"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "responses": {
+      "E400": {
+        "description": "조건 형식이 틀림 · 모르는 조건 — 응답 error 에 이유가 나옵니다 (예: from 은 YYYY-MM)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "ok": false,
+              "error": "조건 형식이 틀림 · 모르는 조건"
+            }
+          }
+        }
+      },
+      "E401": {
+        "description": "키가 없음 · 형식이 아님 · 등록 안 됨 · 폐기 · 만료 — 헤더 이름이 X-API-Key 인지, 키를 끝까지 붙였는지 확인 · 폐기 · 만료면 새 키",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "ok": false,
+              "error": "키가 없음 · 형식이 아님 · 등록 안 됨 · 폐기 · 만료"
+            }
+          }
+        }
+      },
+      "E403": {
+        "description": "이 키로 볼 수 없는 자료 — 키를 발급할 때 그 자료를 체크하지 않음 — 새 키를 발급",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "ok": false,
+              "error": "이 키로 볼 수 없는 자료"
+            }
+          }
+        }
+      },
+      "E404": {
+        "description": "모르는 자료 이름 — /contracts · /revenue · /customers · /mrr · /poc · /orders · /assets",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "ok": false,
+              "error": "모르는 자료 이름"
+            }
+          }
+        }
+      },
+      "E405": {
+        "description": "GET 이 아닌 방식 — 읽기 전용 — GET 만",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "ok": false,
+              "error": "GET 이 아닌 방식"
+            }
+          }
+        }
+      },
+      "E429": {
+        "description": "분당 60번 넘음 — 응답 머리 Retry-After(초)만큼 기다렸다 다시",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "ok": false,
+              "error": "분당 60번 넘음"
+            }
+          }
+        }
+      },
+      "E502": {
+        "description": "DB 읽기 실패 — 잠시 뒤 다시 — 계속되면 포탈 관리자에게",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "ok": false,
+              "error": "DB 읽기 실패"
+            }
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "ApiKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key",
+        "description": "포탈 › 관리자 › 외부 연동 › 키 관리에서 발급 (슈퍼 관리자)"
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "required": [
+          "ok",
+          "error"
+        ],
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "example": false
+          },
+          "error": {
+            "type": "string",
+            "description": "한국어 이유"
+          }
+        }
+      },
+      "Contracts": {
+        "type": "object",
+        "description": "계약 1건 = 1줄",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "계약 번호",
+            "example": 1024
+          },
+          "customer_id": {
+            "type": "integer",
+            "description": "고객사 번호(고객사 자료의 id)",
+            "example": 311
+          },
+          "customer": {
+            "type": "string",
+            "description": "고객사명 — 키가 «고객사명 포함»일 때만",
+            "example": "가상고객01"
+          },
+          "line": {
+            "type": "string",
+            "description": "서비스 코드",
+            "example": "Cloud"
+          },
+          "version": {
+            "type": "string",
+            "description": "버전 · 에디션",
+            "nullable": true,
+            "example": "V6.0"
+          },
+          "channel": {
+            "type": "string",
+            "description": "판매 채널",
+            "nullable": true,
+            "example": "일반"
+          },
+          "partner": {
+            "type": "string",
+            "description": "파트너",
+            "nullable": true
+          },
+          "biller": {
+            "type": "string",
+            "description": "계산서 발행처",
+            "nullable": true,
+            "example": "지니언스"
+          },
+          "billing": {
+            "type": "string",
+            "description": "과금 방식",
+            "nullable": true,
+            "example": "월납입"
+          },
+          "contract_type": {
+            "type": "string",
+            "description": "계약 유형",
+            "nullable": true,
+            "example": "신규"
+          },
+          "status": {
+            "type": "string",
+            "description": "상태",
+            "nullable": true,
+            "example": "재약정"
+          },
+          "start_month": {
+            "type": "string",
+            "description": "시작월 YYYY-MM",
+            "nullable": true,
+            "example": "2026-01"
+          },
+          "end_month": {
+            "type": "string",
+            "description": "종료월 YYYY-MM",
+            "nullable": true,
+            "example": "2026-12"
+          },
+          "term_months": {
+            "type": "integer",
+            "description": "약정 개월",
+            "nullable": true,
+            "example": 12
+          },
+          "mrr": {
+            "type": "number",
+            "description": "월 금액(원)",
+            "nullable": true,
+            "example": 480000
+          },
+          "qty": {
+            "type": "integer",
+            "description": "수량(노드 · 에이전트)",
+            "nullable": true,
+            "example": 300
+          },
+          "install_fee": {
+            "type": "number",
+            "description": "설치비(원)",
+            "nullable": true,
+            "example": 0
+          },
+          "renew_count": {
+            "type": "integer",
+            "description": "연장 횟수",
+            "nullable": true,
+            "example": 1
+          },
+          "auto_renew": {
+            "type": "boolean",
+            "description": "자동 연장",
+            "nullable": true,
+            "example": true
+          },
+          "parent_contract_id": {
+            "type": "integer",
+            "description": "원계약 번호",
+            "nullable": true
+          },
+          "churn_reason": {
+            "type": "string",
+            "description": "해지 사유",
+            "nullable": true
+          },
+          "churn_month": {
+            "type": "string",
+            "description": "해지월 YYYY-MM",
+            "nullable": true
+          },
+          "csm": {
+            "type": "string",
+            "description": "CSM 사이트명",
+            "nullable": true,
+            "example": "vcust01"
+          },
+          "s1_no": {
+            "type": "string",
+            "description": "에스원 계약번호",
+            "nullable": true
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "마지막 수정 시각",
+            "nullable": true,
+            "example": "2026-10-14T09:10:00+09:00"
+          },
+          "line_label": {
+            "type": "string",
+            "description": "서비스 이름",
+            "example": "Cloud NAC"
+          }
+        }
+      },
+      "ContractsList": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "resource": {
+            "type": "string",
+            "example": "contracts"
+          },
+          "count": {
+            "type": "integer",
+            "description": "이번에 받은 줄 수"
+          },
+          "total": {
+            "type": "integer",
+            "nullable": true,
+            "description": "조건에 맞는 전체 줄 수"
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "offset": {
+            "type": "integer"
+          },
+          "next_offset": {
+            "type": "integer",
+            "nullable": true,
+            "description": "더 있으면 다음 offset · 없으면 null"
+          },
+          "units": {
+            "type": "object",
+            "example": {
+              "amount": "원",
+              "month": "YYYY-MM"
+            }
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Contracts"
+            }
+          }
+        }
+      },
+      "Revenue": {
+        "type": "object",
+        "description": "계약 × 월 = 1줄",
+        "properties": {
+          "contract_id": {
+            "type": "integer",
+            "description": "계약 번호(계약 자료의 id)",
+            "example": 1024
+          },
+          "month": {
+            "type": "string",
+            "description": "월 YYYY-MM",
+            "example": "2026-10"
+          },
+          "amount": {
+            "type": "number",
+            "description": "금액(원)",
+            "example": 480000
+          }
+        }
+      },
+      "RevenueList": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "resource": {
+            "type": "string",
+            "example": "revenue"
+          },
+          "count": {
+            "type": "integer",
+            "description": "이번에 받은 줄 수"
+          },
+          "total": {
+            "type": "integer",
+            "nullable": true,
+            "description": "조건에 맞는 전체 줄 수"
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "offset": {
+            "type": "integer"
+          },
+          "next_offset": {
+            "type": "integer",
+            "nullable": true,
+            "description": "더 있으면 다음 offset · 없으면 null"
+          },
+          "units": {
+            "type": "object",
+            "example": {
+              "amount": "원",
+              "month": "YYYY-MM"
+            }
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Revenue"
+            }
+          }
+        }
+      },
+      "Customers": {
+        "type": "object",
+        "description": "고객사 하나 = 1줄",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "고객사 번호",
+            "example": 311
+          },
+          "name": {
+            "type": "string",
+            "description": "고객사명 — 키가 «고객사명 포함»일 때만",
+            "example": "가상고객01"
+          },
+          "industry": {
+            "type": "string",
+            "description": "산업군",
+            "nullable": true,
+            "example": "제조"
+          },
+          "sector": {
+            "type": "string",
+            "description": "구분",
+            "nullable": true,
+            "example": "민간"
+          }
+        }
+      },
+      "CustomersList": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "resource": {
+            "type": "string",
+            "example": "customers"
+          },
+          "count": {
+            "type": "integer",
+            "description": "이번에 받은 줄 수"
+          },
+          "total": {
+            "type": "integer",
+            "nullable": true,
+            "description": "조건에 맞는 전체 줄 수"
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "offset": {
+            "type": "integer"
+          },
+          "next_offset": {
+            "type": "integer",
+            "nullable": true,
+            "description": "더 있으면 다음 offset · 없으면 null"
+          },
+          "units": {
+            "type": "object",
+            "example": {
+              "amount": "원",
+              "month": "YYYY-MM"
+            }
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Customers"
+            }
+          }
+        }
+      },
+      "Mrr": {
+        "type": "object",
+        "description": "월 1줄 (CSV 는 월 × 서비스 1줄 + 합계 줄)",
+        "properties": {
+          "month": {
+            "type": "string",
+            "description": "월 YYYY-MM",
+            "example": "2026-10"
+          },
+          "total": {
+            "type": "number",
+            "description": "그달 합계(원)",
+            "example": 128450000
+          },
+          "contracts": {
+            "type": "integer",
+            "description": "계약 수",
+            "example": 214
+          },
+          "by_line": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "서비스별 합계(원) — 서비스 코드: 금액",
+            "example": {
+              "Cloud": 61200000,
+              "MDR": 40100000
+            }
+          }
+        }
+      },
+      "MrrList": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "resource": {
+            "type": "string",
+            "example": "mrr"
+          },
+          "count": {
+            "type": "integer",
+            "description": "이번에 받은 줄 수"
+          },
+          "total": {
+            "type": "integer",
+            "nullable": true,
+            "description": "조건에 맞는 전체 줄 수"
+          },
+          "units": {
+            "type": "object",
+            "example": {
+              "amount": "원",
+              "month": "YYYY-MM"
+            }
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Mrr"
+            }
+          }
+        }
+      },
+      "Poc": {
+        "type": "object",
+        "description": "신청 1건 = 1줄",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "번호",
+            "example": 58
+          },
+          "apply_date": {
+            "type": "string",
+            "format": "date",
+            "description": "신청일",
+            "nullable": true,
+            "example": "2026-09-02"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "등록 시각",
+            "nullable": true,
+            "example": "2026-09-02T10:00:00+09:00"
+          },
+          "svc_type": {
+            "type": "string",
+            "description": "서비스 유형",
+            "nullable": true,
+            "example": "CLOUD"
+          },
+          "customer": {
+            "type": "string",
+            "description": "고객사명 — 키가 «고객사명 포함»일 때만",
+            "example": "가상고객07"
+          },
+          "status": {
+            "type": "string",
+            "description": "상태",
+            "nullable": true,
+            "example": "진행중"
+          },
+          "channel": {
+            "type": "string",
+            "description": "판매 채널",
+            "nullable": true,
+            "example": "일반"
+          },
+          "license": {
+            "type": "string",
+            "description": "라이선스",
+            "nullable": true,
+            "example": "EDR+RANSOMWARE"
+          },
+          "plan_qty": {
+            "type": "integer",
+            "description": "계약 수량",
+            "nullable": true,
+            "example": 300
+          },
+          "agents_total": {
+            "type": "integer",
+            "description": "설치 수",
+            "nullable": true,
+            "example": 274
+          },
+          "agents_win": {
+            "type": "integer",
+            "description": "설치 수 — Windows",
+            "nullable": true,
+            "example": 250
+          },
+          "agents_mac": {
+            "type": "integer",
+            "description": "설치 수 — Mac",
+            "nullable": true,
+            "example": 20
+          },
+          "agents_linux": {
+            "type": "integer",
+            "description": "설치 수 — Linux",
+            "nullable": true,
+            "example": 4
+          },
+          "mod_edr": {
+            "type": "boolean",
+            "description": "모듈 EDR",
+            "nullable": true,
+            "example": true
+          },
+          "mod_ransom": {
+            "type": "boolean",
+            "description": "모듈 랜섬웨어",
+            "nullable": true,
+            "example": true
+          },
+          "mod_av": {
+            "type": "boolean",
+            "description": "모듈 백신",
+            "nullable": true,
+            "example": false
+          },
+          "mod_media": {
+            "type": "boolean",
+            "description": "모듈 매체제어",
+            "nullable": true,
+            "example": false
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date",
+            "description": "시작일",
+            "nullable": true,
+            "example": "2026-09-15"
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date",
+            "description": "종료일",
+            "nullable": true
+          },
+          "on_rev_sheet": {
+            "type": "boolean",
+            "description": "매출 시트에 올라감",
+            "nullable": true,
+            "example": false
+          },
+          "sales_name": {
+            "type": "string",
+            "description": "영업 담당",
+            "nullable": true,
+            "example": "홍길동"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "마지막 수정 시각",
+            "nullable": true,
+            "example": "2026-10-02T11:00:00+09:00"
+          },
+          "modules": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "켠 모듈 이름",
+            "example": [
+              "EDR",
+              "랜섬웨어"
+            ]
+          }
+        }
+      },
+      "PocList": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "resource": {
+            "type": "string",
+            "example": "poc"
+          },
+          "count": {
+            "type": "integer",
+            "description": "이번에 받은 줄 수"
+          },
+          "total": {
+            "type": "integer",
+            "nullable": true,
+            "description": "조건에 맞는 전체 줄 수"
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "offset": {
+            "type": "integer"
+          },
+          "next_offset": {
+            "type": "integer",
+            "nullable": true,
+            "description": "더 있으면 다음 offset · 없으면 null"
+          },
+          "units": {
+            "type": "object",
+            "example": {
+              "amount": "원",
+              "month": "YYYY-MM"
+            }
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Poc"
+            }
+          }
+        }
+      },
+      "Orders": {
+        "type": "object",
+        "description": "신청 1건 = 1줄",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "신청 번호",
+            "example": 412
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "신청 시각",
+            "nullable": true,
+            "example": "2026-10-02T10:20:00+09:00"
+          },
+          "channel": {
+            "type": "string",
+            "description": "채널",
+            "nullable": true,
+            "example": "일반"
+          },
+          "order_type": {
+            "type": "string",
+            "description": "유형",
+            "nullable": true,
+            "example": "신규발주"
+          },
+          "customer": {
+            "type": "string",
+            "description": "고객사명 — 키가 «고객사명 포함»일 때만",
+            "example": "가상고객03"
+          },
+          "contract_no": {
+            "type": "string",
+            "description": "에스원 계약번호",
+            "nullable": true
+          },
+          "install_date": {
+            "type": "string",
+            "format": "date",
+            "description": "설치 희망일",
+            "nullable": true,
+            "example": "2026-10-10"
+          },
+          "ship_date": {
+            "type": "string",
+            "format": "date",
+            "description": "출고일",
+            "nullable": true,
+            "example": "2026-10-07"
+          },
+          "edition": {
+            "type": "string",
+            "description": "에디션",
+            "nullable": true
+          },
+          "nodes": {
+            "type": "integer",
+            "description": "노드 수",
+            "nullable": true
+          },
+          "model": {
+            "type": "string",
+            "description": "모델",
+            "nullable": true,
+            "example": "S10_R2"
+          },
+          "qty": {
+            "type": "integer",
+            "description": "수량",
+            "nullable": true,
+            "example": 1
+          },
+          "standalone_pod": {
+            "type": "boolean",
+            "description": "단독 POD",
+            "nullable": true,
+            "example": false
+          },
+          "status": {
+            "type": "string",
+            "description": "상태",
+            "nullable": true,
+            "example": "배송중"
+          },
+          "serials": {
+            "type": "string",
+            "description": "시리얼(쉼표로)",
+            "nullable": true,
+            "example": "TST0000001"
+          },
+          "returned_date": {
+            "type": "string",
+            "format": "date",
+            "description": "회수일",
+            "nullable": true
+          },
+          "returned_serials": {
+            "type": "string",
+            "description": "회수 시리얼",
+            "nullable": true
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "마지막 수정 시각",
+            "nullable": true,
+            "example": "2026-10-07T15:00:00+09:00"
+          }
+        }
+      },
+      "OrdersList": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "resource": {
+            "type": "string",
+            "example": "orders"
+          },
+          "count": {
+            "type": "integer",
+            "description": "이번에 받은 줄 수"
+          },
+          "total": {
+            "type": "integer",
+            "nullable": true,
+            "description": "조건에 맞는 전체 줄 수"
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "offset": {
+            "type": "integer"
+          },
+          "next_offset": {
+            "type": "integer",
+            "nullable": true,
+            "description": "더 있으면 다음 offset · 없으면 null"
+          },
+          "units": {
+            "type": "object",
+            "example": {
+              "amount": "원",
+              "month": "YYYY-MM"
+            }
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Orders"
+            }
+          }
+        }
+      },
+      "Assets": {
+        "type": "object",
+        "description": "장비 1대 = 1줄",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "번호",
+            "example": 7001
+          },
+          "serial": {
+            "type": "string",
+            "description": "시리얼",
+            "example": "TST0000001"
+          },
+          "model": {
+            "type": "string",
+            "description": "모델",
+            "nullable": true,
+            "example": "S10_R2"
+          },
+          "usage": {
+            "type": "string",
+            "description": "구분",
+            "nullable": true,
+            "example": "임대"
+          },
+          "status": {
+            "type": "string",
+            "description": "상태",
+            "nullable": true,
+            "example": "임대중"
+          },
+          "customer": {
+            "type": "string",
+            "description": "고객사 — 키가 «고객사명 포함»일 때만",
+            "example": "가상고객03"
+          },
+          "channel": {
+            "type": "string",
+            "description": "채널",
+            "nullable": true,
+            "example": "일반"
+          },
+          "partner": {
+            "type": "string",
+            "description": "파트너",
+            "nullable": true
+          },
+          "in_date": {
+            "type": "string",
+            "format": "date",
+            "description": "입고일",
+            "nullable": true,
+            "example": "2026-03-02"
+          },
+          "deployed_date": {
+            "type": "string",
+            "format": "date",
+            "description": "출고일",
+            "nullable": true,
+            "example": "2026-10-07"
+          },
+          "returned_date": {
+            "type": "string",
+            "format": "date",
+            "description": "회수일",
+            "nullable": true
+          },
+          "order_id": {
+            "type": "integer",
+            "description": "장비 신청 번호",
+            "nullable": true,
+            "example": 412
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "마지막 수정 시각",
+            "nullable": true,
+            "example": "2026-10-07T15:00:00+09:00"
+          }
+        }
+      },
+      "AssetsList": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "resource": {
+            "type": "string",
+            "example": "assets"
+          },
+          "count": {
+            "type": "integer",
+            "description": "이번에 받은 줄 수"
+          },
+          "total": {
+            "type": "integer",
+            "nullable": true,
+            "description": "조건에 맞는 전체 줄 수"
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "offset": {
+            "type": "integer"
+          },
+          "next_offset": {
+            "type": "integer",
+            "nullable": true,
+            "description": "더 있으면 다음 offset · 없으면 null"
+          },
+          "units": {
+            "type": "object",
+            "example": {
+              "amount": "원",
+              "month": "YYYY-MM"
+            }
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Assets"
+            }
+          }
+        }
+      }
+    }
+  }
+}

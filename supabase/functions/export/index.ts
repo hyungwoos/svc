@@ -1,5 +1,5 @@
 // ============================================================================
-//  Supabase Edge Function: export  (v1.1 · 2026-10-08 · v1.1 = MDR PoC·운영 · 장비 신청 · 장비 현황 추가)
+//  Supabase Edge Function: export  (v1.2 · 2026-10-15 · v1.1 = MDR PoC·운영 · 장비 신청 · 장비 현황 추가 · v1.2 = 포탈 «API 문서» 시험 호출)
 //   외부 시스템이 포탈 데이터를 «읽기 전용»으로 가져가는 API — 시스템마다 API 키 (관리자 › 🔌 외부 연동에서 발급 · SQL 102)
 //   호출: GET https://<프로젝트>.supabase.co/functions/v1/export/<자료>?…   헤더 X-API-Key: svc_…  (또는 Authorization: Bearer svc_…)
 //     /export              이 키로 볼 수 있는 자료 · 단위 · 사용법
@@ -14,10 +14,14 @@
 //   금액 단위: 원 · 월: YYYY-MM
 //   보안: 키 원문은 DB 에 없음(SHA-256 만 · 발급할 때 한 번만 보여 줌) · 범위(scopes) 밖 403 · 만료·폐기 401 · 분당 60회 429(DB 에서 키 행을 잠그고 셈 — 동시 호출로 못 넘음)
 //         모든 호출은 api_access_log 에 남음 · 비고·연장 이력·LIVE 예외 메모 같은 내부 칸은 내보내지 않음 · 고객사명은 키 옵션(names)
-//         키는 주소(?key=)로 받지 않음 — 서버 로그·브라우저 기록에 남기 때문. CORS 헤더 없음(서버끼리 호출용)
+//         키는 주소(?key=)로 받지 않음 — 서버 로그·브라우저 기록에 남기 때문
+//   v1.2 포탈 «API 문서»에서 시험 호출 — CORS 는 포탈 출처(EXPORT_CORS_ORIGINS · 기본 https://svc.genians.co.kr)에만 · 다른 출처 · 서버끼리 호출은 예전과 같음
+//         ① 발급 키 붙여 넣기: 위와 똑같이(X-API-Key) ② 포탈 로그인: Authorization: Bearer <포탈 로그인 토큰> — 포탈 출처에서만 · 슈퍼 관리자 + 2단계 인증(DB 함수 is_super_admin · mfa_ok 를
+//            그 사람 토큰으로 불러 확인) · 모든 자료 · 고객사명은 X-Svc-Names: 0 이면 뺌 · 기록 api_access_log 에 «포탈 시험 · 이메일»(key_id 없음) · 분당 한도 없음(슈퍼 관리자)
+//         API 명세(OpenAPI 3) = 저장소 js/apispec.js → https://svc.genians.co.kr/openapi.json (조건 · 칸이 이 파일과 같은지 tests/check.mjs 가 비교)
 //   ★ 배포: 포탈 › 배포·운영 › Edge Function › ＋ 새 함수 «export» · Verify JWT 끔 (외부 시스템에는 Supabase 로그인 토큰이 없음 — 이 함수가 API 키를 직접 검사)
 // ============================================================================
-export const VERSION = 'export v1.1';
+export const VERSION = 'export v1.2';
 const SB_URL = Deno.env.get('SUPABASE_URL') || '';
 const SB_SVC = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 export const RATE_PER_MIN = 60;
@@ -37,7 +41,15 @@ export const ORD_COLS = ['id', 'created_at', 'channel', 'order_type', 'customer'
   'status', 'serials', 'returned_date', 'returned_serials', 'updated_at'];
 export const AST_COLS = ['id', 'serial', 'model', 'usage', 'status', 'customer', 'channel', 'partner', 'in_date', 'deployed_date', 'returned_date', 'order_id', 'updated_at'];
 const MODS: [string, string][] = [['mod_edr', 'EDR'], ['mod_ransom', '랜섬웨어'], ['mod_av', '백신'], ['mod_media', '매체제어']];
-type Key = { id: number; name: string; scopes: string[]; opts: { names?: boolean }; expires_at: string | null };
+type Key = { id: number; name: string; scopes: string[]; opts: { names?: boolean }; expires_at: string | null; portal?: boolean };
+/* v1.2 CORS — 포탈 화면(브라우저)에서 시험 호출할 때만. 목록 밖 출처는 CORS 헤더 없음(브라우저가 막음) · 서버끼리 호출은 Origin 이 없어 상관없음 */
+export const CORS_ORIGINS = (Deno.env.get('EXPORT_CORS_ORIGINS') || 'https://svc.genians.co.kr').split(',').map((s) => s.trim().replace(/\/+$/, '')).filter(Boolean);
+export function corsOf(req: Request): Record<string, string> {
+  const o = (req.headers.get('origin') || '').replace(/\/+$/, '');
+  if (!o || !CORS_ORIGINS.includes(o)) return {};
+  return { 'Access-Control-Allow-Origin': o, Vary: 'Origin', 'Access-Control-Expose-Headers': 'X-Total-Count, Retry-After, Content-Disposition' };
+}
+export const JWT_RE = /^eyJ[\w-]+\.[\w-]+\.[\w-]+$/;
 class HttpErr extends Error { constructor(public status: number, msg: string) { super(msg); } }
 
 const svcHdr = (): Record<string, string> => ({ apikey: SB_SVC, Authorization: 'Bearer ' + SB_SVC, 'Content-Type': 'application/json' });   // 새 sb_secret 키도 두 헤더가 같아야 함(aicheck v1.5)
@@ -57,6 +69,30 @@ async function rpc(name: string, body: unknown): Promise<any> {
   const r = await fetchT(SB_URL + '/rest/v1/rpc/' + name, { method: 'POST', headers: svcHdr(), body: JSON.stringify(body) });
   if (!r.ok) { console.error('export RPC', name, r.status, (await r.text()).slice(0, 300)); throw new HttpErr(r.status === 404 ? 503 : 502, r.status === 404 ? 'API 설정이 아직 없습니다 (포탈 관리자: SQL 102 실행)' : 'DB 오류 — 잠시 뒤 다시'); }
   const t = await r.text(); return t ? JSON.parse(t) : null;
+}
+/** v1.2 포탈 로그인 시험 — 그 사람 토큰으로 DB 함수를 불러(PostgREST 가 토큰 서명 · 만료를 검사) 슈퍼 관리자 · 2단계 인증 확인 → 이메일 */
+async function portalUser(req: Request, jwt: string): Promise<string> {
+  const anon = req.headers.get('apikey') || Deno.env.get('SUPABASE_ANON_KEY') || '';   // 포탈이 보내는 공개(publishable) 키 먼저 — 예전 anon 키가 꺼진 프로젝트도 됨
+  if (!anon) throw new HttpErr(503, '포탈 시험 호출 설정이 없습니다 (공개 키)');
+  const h = { apikey: anon, Authorization: 'Bearer ' + jwt, 'Content-Type': 'application/json' };
+  const one = async (fn: string) => {
+    const r = await fetchT(SB_URL + '/rest/v1/rpc/' + fn, { method: 'POST', headers: h, body: '{}' }, 8000);
+    if (r.status === 401 || r.status === 403) throw new HttpErr(401, '포탈 로그인이 만료되었습니다 — 포탈을 새로 고친 뒤 다시');
+    if (!r.ok) { console.error('export portal', fn, r.status, (await r.text()).slice(0, 200)); throw new HttpErr(502, '포탈 로그인 확인 실패 — 잠시 뒤 다시'); }
+    return (await r.json()) === true;
+  };
+  const [su, mfa] = await Promise.all([one('is_super_admin'), one('mfa_ok')]);
+  if (!su) throw new HttpErr(403, '포탈 로그인 시험 호출은 슈퍼 관리자만 됩니다 — 발급 키로 시험하세요');
+  if (!mfa) throw new HttpErr(403, '2단계 인증을 마친 뒤 시험 호출할 수 있습니다');
+  try { const p = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(jwt.split('.')[1].replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((jwt.split('.')[1].length + 3) % 4)), (c) => c.charCodeAt(0))));
+    return clean(String(p.email || p.sub || '?').toLowerCase(), 80); } catch { return '?'; }   // 서명은 위 DB 호출에서 이미 검사됨
+}
+/** 포탈 시험 기록 — key_id 없이 한 줄 */
+async function portalLog(e: Record<string, unknown>) {
+  try {
+    const r = await fetchT(SB_URL + '/rest/v1/api_access_log', { method: 'POST', headers: { ...svcHdr(), Prefer: 'return=minimal' }, body: JSON.stringify(e) }, 5000);
+    if (!r.ok) console.error('export portal log', r.status, (await r.text()).slice(0, 200));
+  } catch (x) { console.error('export portal log', String(x)); }
 }
 export async function sha256hex(s: string): Promise<string> {
   const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
@@ -204,6 +240,16 @@ async function finishLog(id: number, e: { rows: number; status: number; ms: numb
 }
 
 export async function handle(req: Request): Promise<Response> {
+  const cors = corsOf(req);
+  if (req.method === 'OPTIONS') {   // v1.2 브라우저 사전 확인 — 포탈 출처만
+    if (!cors['Access-Control-Allow-Origin']) return jres({ ok: false, error: '이 출처에서는 부를 수 없습니다 (서버에서 부르거나 포탈 «API 문서»에서)' }, 403);
+    return new Response(null, { status: 204, headers: { ...cors, 'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS', 'Access-Control-Allow-Headers': 'x-api-key, authorization, apikey, x-client-info, x-svc-names', 'Access-Control-Max-Age': '600' } });
+  }
+  const res = await serve(req);
+  for (const [k, v] of Object.entries(cors)) res.headers.set(k, v);
+  return res;
+}
+async function serve(req: Request): Promise<Response> {
   const t0 = Date.now(), url = new URL(req.url);
   const seg = url.pathname.split('/').filter(Boolean); const at = seg.lastIndexOf('export');
   const resource = (at >= 0 ? seg[at + 1] : seg[0] === 'export' ? '' : seg[0]) || '';
@@ -212,22 +258,39 @@ export async function handle(req: Request): Promise<Response> {
   if (url.searchParams.has('key') || url.searchParams.has('api_key')) return jres({ ok: false, error: 'API 키는 주소(?key=)가 아니라 헤더 X-API-Key 로 보내 주세요' }, 400);
   if (req.method !== 'GET' && req.method !== 'HEAD') return jres({ ok: false, error: 'GET 만 됩니다 (읽기 전용)' }, 405, { Allow: 'GET' });
   const raw = (req.headers.get('x-api-key') || (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '')).trim();
-  let key: Key | null = null, status = 200, nrows = 0, logId = 0;
+  let key: Key | null = null, status = 200, nrows = 0, logId = 0, plog = false;
   /* 기록: 통과한 호출은 api_key_auth 가 만든 줄에 결과를 채움 · 모르는/폐기/만료 키는 DB 함수가 1분에 한 줄만 남김 · 형식이 아닌 키는 남기지 않음(마구 보내도 표가 안 불어남) */
-  const done = async (res: Response) => { if (logId) await finishLog(logId, { rows: nrows, status, ms: Date.now() - t0 }); return res; };
+  const done = async (res: Response) => {
+    if (logId) await finishLog(logId, { rows: nrows, status, ms: Date.now() - t0 });
+    else if (plog && key) await portalLog({ key_id: null, key_name: key.name, resource: clean(resource || '(index)', 40), query: qs, rows: nrows, status, ip, ms: Date.now() - t0 });
+    return res; };
   try {
     if (!raw) { status = 401; return jres({ ok: false, error: 'API 키가 없습니다 — 헤더 X-API-Key: svc_… 로 보내 주세요' }, 401); }
-    if (!KEY_RE.test(raw)) { status = 401; return jres({ ok: false, error: 'API 키 형식이 아닙니다 (svc_ + 64자)' }, 401); }
-    const k = await rpc('api_key_auth', { p_hash: await sha256hex(raw), p_rate: RATE_PER_MIN, p_resource: clean(resource || '(index)', 40), p_query: qs, p_ip: ip });
-    if (!k) { status = 401; return await done(jres({ ok: false, error: '등록되지 않은 API 키입니다' }, 401)); }
-    if (k.bad) {
-      key = { id: k.id, name: k.name, scopes: [], opts: {}, expires_at: k.expires_at || null };
-      if (k.bad === 'rate') { status = 429; return await done(jres({ ok: false, error: '호출이 너무 많습니다 — 분당 ' + RATE_PER_MIN + '회까지 · 잠시 뒤 다시' }, 429, { 'Retry-After': '60' })); }
-      status = 401; return await done(jres({ ok: false, error: k.bad === 'expired' ? '만료된 API 키입니다 (' + String(k.expires_at || '').slice(0, 10) + ') — 관리자에게 새 키를 받으세요' : '폐기된 API 키입니다' }, 401));
+    /* v1.2 포탈 로그인 시험(포탈 출처 + 로그인 토큰) — 키 대신 */
+    if (!req.headers.get('x-api-key') && JWT_RE.test(raw)) {
+      if (!corsOf(req)['Access-Control-Allow-Origin']) { status = 401; return jres({ ok: false, error: '로그인 토큰은 포탈 «API 문서»의 시험 호출에서만 됩니다 — 외부 시스템은 X-API-Key' }, 401); }
+      const email = await portalUser(req, raw);
+      key = { id: 0, name: '포탈 시험 · ' + email, scopes: RESOURCES.slice(), opts: { names: req.headers.get('x-svc-names') !== '0' }, expires_at: null, portal: true }; plog = true;
     }
-    key = { id: k.id, name: k.name, scopes: Array.isArray(k.scopes) ? k.scopes : [], opts: k.opts || {}, expires_at: k.expires_at || null }; logId = Number(k.log_id) || 0;
+  } catch (e) {
+    status = e instanceof HttpErr ? e.status : 500;
+    return jres({ ok: false, error: e instanceof HttpErr ? e.message : '처리 중 오류 — 잠시 뒤 다시' }, status);
+  }
+  try {
+    if (!(key && key.portal)) {   // 발급 키(외부 시스템 · 포탈에서 키 붙여 넣기)
+      if (!KEY_RE.test(raw)) { status = 401; return jres({ ok: false, error: 'API 키 형식이 아닙니다 (svc_ + 64자)' }, 401); }
+      const k = await rpc('api_key_auth', { p_hash: await sha256hex(raw), p_rate: RATE_PER_MIN, p_resource: clean(resource || '(index)', 40), p_query: qs, p_ip: ip });
+      if (!k) { status = 401; return await done(jres({ ok: false, error: '등록되지 않은 API 키입니다' }, 401)); }
+      if (k.bad) {
+        key = { id: k.id, name: k.name, scopes: [], opts: {}, expires_at: k.expires_at || null };
+        if (k.bad === 'rate') { status = 429; return await done(jres({ ok: false, error: '호출이 너무 많습니다 — 분당 ' + RATE_PER_MIN + '회까지 · 잠시 뒤 다시' }, 429, { 'Retry-After': '60' })); }
+        status = 401; return await done(jres({ ok: false, error: k.bad === 'expired' ? '만료된 API 키입니다 (' + String(k.expires_at || '').slice(0, 10) + ') — 관리자에게 새 키를 받으세요' : '폐기된 API 키입니다' }, 401));
+      }
+      key = { id: k.id, name: k.name, scopes: Array.isArray(k.scopes) ? k.scopes : [], opts: k.opts || {}, expires_at: k.expires_at || null }; logId = Number(k.log_id) || 0;
+    }
+    if (!key) throw new HttpErr(401, 'API 키가 없습니다');
     if (!resource) {
-      return await done(jres({ ok: true, version: VERSION, key: { name: key.name, scopes: key.scopes, names: !!key.opts.names, expires_at: key.expires_at },
+      return await done(jres({ ok: true, version: VERSION, key: { name: key.name, scopes: key.scopes, names: !!key.opts.names, expires_at: key.expires_at, ...(key.portal ? { portal_test: true } : {}) },
         resources: RESOURCES.map((r) => ({ name: r, allowed: key!.scopes.includes(r), url: SB_URL + '/functions/v1/export/' + r })),
         units: { amount: '원', month: 'YYYY-MM' }, paging: { limit: DEF_LIMIT + ' (최대 ' + MAX_LIMIT + ')', offset: 0 }, format: 'json (기본) · csv (?format=csv)', rate: '분당 ' + RATE_PER_MIN + '회' }));
     }

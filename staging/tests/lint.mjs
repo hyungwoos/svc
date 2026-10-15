@@ -45,7 +45,8 @@ const LAZY = [...lazySrc.matchAll(/import\(\s*'\.\/([\w-]+\.js)'\s*\)/g)].map((m
 const eager = new Set(); (function walk(f) { if (eager.has(f) || !graph[f]) return; eager.add(f); graph[f].forEach(walk); })('js/main.js');
 const leak = LAZY.filter((f) => eager.has(f));
 say(LAZY.length >= 3 && !leak.length, '처음 열 때 불러오는 모듈 ' + LAZY.map((f) => path.basename(f)).join('·') + ' 을 처음부터 받는 모듈이 import 하지 않음' + (leak.length ? ' — 새는 것: ' + leak.join(', ') + ' (lazyView/lazyGet 으로)' : ''));
-say(LIST.filter((f) => !eager.has(f) && !LAZY.includes(f)).length === 0, 'app-js 의 모든 모듈이 main.js 에서 닿거나 지연 모듈' + (LIST.filter((f) => !eager.has(f) && !LAZY.includes(f)).length ? ' — 고아: ' + LIST.filter((f) => !eager.has(f) && !LAZY.includes(f)).join(', ') : ''));
+const lazyReach = new Set(); (function walk(fs) { fs.forEach((f) => { if (lazyReach.has(f) || !graph[f]) return; lazyReach.add(f); walk(graph[f]); }); })(LAZY);   // ㊿+203 지연 모듈이 import 하는 모듈(예: admin.js → apispec.js)도 지연
+say(LIST.filter((f) => !eager.has(f) && !lazyReach.has(f)).length === 0, 'app-js 의 모든 모듈이 main.js 에서 닿거나 지연 모듈(또는 지연 모듈이 부르는 것)' + (LIST.filter((f) => !eager.has(f) && !lazyReach.has(f)).length ? ' — 고아: ' + LIST.filter((f) => !eager.has(f) && !lazyReach.has(f)).join(', ') : ''));
 // ③ 파일을 읽을 때 다른 파일 이름을 쓰지 않음 (최상위 var 초기값 · 중첩 함수 안은 괜찮음)
 const evalRefs = [];
 function evalIds(node, out) {

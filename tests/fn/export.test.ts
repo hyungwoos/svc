@@ -37,7 +37,12 @@ function eqF(a: any[], q: URLSearchParams, skip: string[] = []) {
   return a;
 }
 const REV: any[] = []; for (const c of CT) for (let m = 1; m <= 12; m++) REV.push({ contract_id: c.id, month: '2026-' + String(m).padStart(2, '0') + '-01', amount: c.mrr });
-const authBodies: any[] = [], patches: any[] = [], restUrls: string[] = []; let authCalls = 0, logSeq = 0, failContracts = false;
+const authBodies: any[] = [], patches: any[] = [], restUrls: string[] = [], plogs: any[] = []; let authCalls = 0, logSeq = 0, failContracts = false;
+/* v1.2 포탈 로그인 시험 — 가짜 로그인 토큰(가상 이메일) · DB 함수 is_super_admin · mfa_ok 를 그 토큰으로 부름 */
+const b64u = (o: unknown) => btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(o)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const jwt = (email: string, tag: string) => 'eyJhbGciOiJIUzI1NiJ9.' + b64u({ email, tag }) + '.sig' + tag;
+const T_SU = jwt('tester@example.com', 'su'), T_ED = jwt('editor@example.com', 'ed'), T_NOMFA = jwt('tester@example.com', 'nomfa'), T_EXP = jwt('tester@example.com', 'exp');
+const PORTAL = 'https://svc.genians.co.kr', rpcAs: string[] = [];
 const CAP = 7;   // PostgREST max_rows 흉내 — 함수는 EXPORT_PAGE=7 로 나눠 읽어야 함
 function qOf(url: string) { return new URL(url).searchParams; }
 function rangeRes(all: any[], q: URLSearchParams, cols?: string[]) {
@@ -47,12 +52,20 @@ function rangeRes(all: any[], q: URLSearchParams, cols?: string[]) {
 }
 installFetch(async (url, method, body, init) => {
   const h = (init?.headers || {}) as Record<string, string>;
+  if (/\/rpc\/(is_super_admin|mfa_ok)$/.test(url)) {   // 그 사람 토큰으로 — 공개 키 + Bearer 로그인 토큰
+    if (h.apikey !== 'anon' && h.apikey !== 'sb_publishable_test') return J({ message: 'no apikey' }, 401);
+    const tok = String(h.Authorization || '').replace(/^Bearer /, ''); rpcAs.push(tok.slice(-8));
+    if (/sigexp$/.test(tok)) return J({ code: 'PGRST301', message: 'JWT expired' }, 401);
+    if (/is_super_admin$/.test(url)) return J(/sig(su|nomfa)$/.test(tok));
+    return J(!/signomfa$/.test(tok));
+  }
   if (h.apikey !== 'svc' || h.Authorization !== 'Bearer svc') return J({ message: 'Conflicting API keys' }, 401);
   if (url.includes('/rpc/api_key_auth')) { authCalls++; const b = JSON.parse(body || '{}'); authBodies.push(b); const k = KEYS[b.p_hash]; return J(k ? (k.bad ? k : { ...k, log_id: ++logSeq }) : null); }
   if (url.includes('/rpc/api_mrr')) { const b = JSON.parse(body || '{}'); const g = new Map<string, any>();
     for (const r of REV) { if (r.month < b.p_from || r.month > b.p_to) continue; const ln = CT.find((c) => c.id === r.contract_id)?.line || '기타', k = r.month.slice(0, 7) + '|' + ln; const x = g.get(k) || { month: r.month.slice(0, 7), line: ln, amount: 0, ids: new Set() }; x.amount += r.amount; x.ids.add(r.contract_id); g.set(k, x); }
     return J([...g.values()].map((x) => ({ month: x.month, line: x.line, amount: x.amount, contracts: x.ids.size }))); }
-  if (url.includes('/rest/v1/api_access_log') && method === 'PATCH') { patches.push({ id: Number(/id=eq\.(\d+)/.exec(url)?.[1]), ...JSON.parse(body || '{}') }); return new Response('', { status: 204 }); }
+  if (url.includes('/rest/v1/api_access_log') && method === 'PATCH') { patches.push({ id: Number(/id=eq\.(\d+)/.exec(url)?.[1]), ...JSON.parse(body || '{}') }); return new Response(null, { status: 204 }); }
+  if (url.includes('/rest/v1/api_access_log') && method === 'POST') { const b = JSON.parse(body || '{}'); if (b.key_id !== null) return J({ message: '키 호출 기록은 api_key_auth 가 만들고 함수는 PATCH 만' }, 400); plogs.push(b); return new Response('', { status: 201 }); }
   if (url.includes('/rest/v1/api_access_log')) return J({ message: '기록은 api_key_auth 가 만들고 함수는 PATCH 만' }, 400);
   restUrls.push(url);
   const q = qOf(url);
@@ -80,6 +93,7 @@ installFetch(async (url, method, body, init) => {
   return undefined;
 });
 Deno.env.set('SUPABASE_URL', 'https://mock.supabase.co'); Deno.env.set('SUPABASE_SERVICE_ROLE_KEY', 'svc'); Deno.env.set('EXPORT_PAGE', String(CAP));
+Deno.env.set('SUPABASE_ANON_KEY', 'anon'); Deno.env.set('EXPORT_CORS_ORIGINS', PORTAL + ',https://staging.example.test');
 await loadFn('export');
 async function get(path: string, key: string | null = K_ALL, opt: { auth?: boolean; method?: string; headers?: Record<string, string> } = {}) {
   const headers: Record<string, string> = { ...(opt.headers || {}) }; if (key) { if (opt.auth) headers.authorization = 'Bearer ' + key; else headers['x-api-key'] = key; }
@@ -163,4 +177,27 @@ console.log('export 함수');
   const ab = authBodies.concat(); ok(!JSON.stringify(ab).includes('a'.repeat(64)) && !JSON.stringify(patches).includes('a'.repeat(64)), '기록·DB 요청에 키 원문 없음 (해시만)');
   const bad = await get('/contracts', K_OFF); ok(bad.status === 401 && !patches.some((x) => x.id === 0), '폐기된 키: 함수는 기록 안 씀 (DB 함수가 1분에 한 줄)', bad.status);
 }
+/* ── v1.2 포탈 «API 문서» 시험 호출 · CORS ── */
+console.log('export v1.2 — 포탈 시험 호출 · CORS');
+{ const r = await realFetch('http://127.0.0.1:8000/export/contracts', { method: 'OPTIONS', headers: { origin: PORTAL, 'access-control-request-method': 'GET', 'access-control-request-headers': 'x-api-key' } }); await r.body?.cancel();
+  ok(r.status === 204 && r.headers.get('access-control-allow-origin') === PORTAL && /x-api-key/.test(r.headers.get('access-control-allow-headers') || '') && /authorization/.test(r.headers.get('access-control-allow-headers') || '') && /GET/.test(r.headers.get('access-control-allow-methods') || ''), 'OPTIONS(포탈 출처) → 204 · 허용 헤더 X-API-Key · Authorization', r.status); }
+{ const r = await realFetch('http://127.0.0.1:8000/export/contracts', { method: 'OPTIONS', headers: { origin: 'https://evil.example' } }); await r.body?.cancel(); ok(r.status === 403 && !r.headers.get('access-control-allow-origin'), 'OPTIONS(다른 출처) → 403 · CORS 헤더 없음', r.status); }
+{ const r = await get('/contracts?limit=1', K_ALL, { headers: { origin: PORTAL } }); ok(r.status === 200 && r.h.get('access-control-allow-origin') === PORTAL && /X-Total-Count/.test(r.h.get('access-control-expose-headers') || '') && /Origin/.test(r.h.get('vary') || ''), '키 + 포탈 출처 → 200 · CORS 허용(그 출처만)', r.h.get('access-control-allow-origin')); }
+{ const r = await get('/contracts?limit=1', K_ALL, { headers: { origin: 'https://evil.example' } }); ok(r.status === 200 && !r.h.get('access-control-allow-origin'), '키 + 다른 출처 → 응답은 같지만 CORS 없음(브라우저가 막음)', r.h.get('access-control-allow-origin')); }
+{ const r = await get('/contracts?limit=1'); ok(r.status === 200 && !r.h.get('access-control-allow-origin'), '서버끼리(Origin 없음) → 예전과 같음 · CORS 없음'); }
+{ const r = await get('/contracts', K_REV, { headers: { origin: PORTAL } }); ok(r.status === 403 && r.h.get('access-control-allow-origin') === PORTAL, '오류 응답에도 CORS(포탈이 이유를 보여 줄 수 있게)', r.j?.error); }
+{ const n = authCalls; plogs.length = 0; rpcAs.length = 0;
+  const r = await get('/contracts?limit=2', T_SU, { auth: true, headers: { origin: PORTAL } });
+  ok(r.status === 200 && r.j.count === 2 && r.j.total === 5 && r.j.data[0].customer === '가상고객01' && authCalls === n && rpcAs.length === 2, '포탈 로그인(슈퍼 관리자 · 2단계 인증) → 200 · 모든 자료 · 고객사명 · 키 확인 안 거침', { n: r.j?.count, e: r.j?.error });
+  const L = plogs[0]; ok(plogs.length === 1 && L.key_id === null && L.key_name === '포탈 시험 · tester@example.com' && L.resource === 'contracts' && L.status === 200 && L.rows === 2 && L.query === 'limit=2', '기록: «포탈 시험 · 이메일» · key_id 없음 · 결과', L);
+  ok(!JSON.stringify(plogs).includes(T_SU) && !JSON.stringify(plogs).includes('.sigsu'), '기록에 로그인 토큰 없음'); }
+{ const r = await get('/customers', T_SU, { auth: true, headers: { origin: PORTAL, 'x-svc-names': '0', apikey: 'sb_publishable_test' } }); ok(r.status === 200 && !('name' in r.j.data[0]), 'X-Svc-Names: 0 → 고객사명 빼고(이름 없는 키처럼) · 포탈이 보낸 공개 키로 확인', r.j?.data?.[0]); }
+{ const r = await get('/', T_SU, { auth: true, headers: { origin: PORTAL } }); ok(r.status === 200 && r.j.key.portal_test === true && r.j.resources.every((x: any) => x.allowed) && /포탈 시험/.test(r.j.key.name), '포탈 시험 /: 모든 자료 허용 · portal_test', r.j?.key); }
+{ const r = await get('/contracts', T_SU, { auth: true }); ok(r.status === 401 && /API 문서/.test(r.j.error), '로그인 토큰 + Origin 없음(서버) → 401 · 외부 시스템은 키', r.j?.error); }
+{ const r = await get('/contracts', T_SU, { auth: true, headers: { origin: 'https://evil.example' } }); ok(r.status === 401 && !r.h.get('access-control-allow-origin'), '로그인 토큰 + 다른 출처 → 401 · CORS 없음', r.j?.error); }
+{ plogs.length = 0; const r = await get('/contracts', T_ED, { auth: true, headers: { origin: PORTAL } }); ok(r.status === 403 && /슈퍼 관리자/.test(r.j.error) && !plogs.length, '슈퍼 관리자 아님 → 403', r.j?.error); }
+{ const r = await get('/contracts', T_NOMFA, { auth: true, headers: { origin: PORTAL } }); ok(r.status === 403 && /2단계/.test(r.j.error), '2단계 인증 안 함 → 403', r.j?.error); }
+{ const r = await get('/contracts', T_EXP, { auth: true, headers: { origin: PORTAL } }); ok(r.status === 401 && /만료/.test(r.j.error) && r.h.get('access-control-allow-origin') === PORTAL, '만료된 로그인 → 401 · 다시 로그인 안내', r.j?.error); }
+{ const r = await get('/contracts', null, { headers: { origin: PORTAL, 'x-api-key': K_REV, authorization: 'Bearer ' + T_SU } }); ok(r.status === 403, 'X-API-Key 가 있으면 키가 먼저(로그인 토큰 무시)', r.j?.error); }
+{ const r = await get('/contracts?format=csv&limit=1', T_SU, { auth: true, headers: { origin: PORTAL } }); ok(r.status === 200 && r.bom && r.h.get('access-control-allow-origin') === PORTAL && r.h.get('x-total-count') === '5', '포탈 시험 CSV · X-Total-Count', r.h.get('x-total-count')); }
 report('export');
