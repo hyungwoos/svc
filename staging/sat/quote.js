@@ -390,85 +390,85 @@ const pricingDB = {
     "GIES (MDR Service)": {
         type: "yearly",
         tiers: [
-            { max: 49, prices: { "무약정": 130200, "1년약정": 130200 } },
-            { max: 99, prices: { "무약정": 121700, "1년약정": 121700 } },
-            { max: 299, prices: { "무약정": 113400, "1년약정": 113400 } },
-            { max: 499, prices: { "무약정": 106900, "1년약정": 106900 } },
-            { max: 999, prices: { "무약정": 99900, "1년약정": 99900 } },
-            { max: 2999, prices: { "무약정": 92200, "1년약정": 92200 } },
-            { max: 4999, prices: { "무약정": 83200, "1년약정": 83200 } },
-            { max: 9999, prices: { "무약정": 76200, "1년약정": 76200 } },
-            { max: 9999999, prices: { "무약정": 67400, "1년약정": 67400 } }
+            { max: 49, prices: { "무약정": 130200, "1년약정": 130200 }, min: 97700 },
+            { max: 99, prices: { "무약정": 121700, "1년약정": 121700 }, min: 91300 },
+            { max: 299, prices: { "무약정": 113400, "1년약정": 113400 }, min: 85000 },
+            { max: 499, prices: { "무약정": 106900, "1년약정": 106900 }, min: 80100 },
+            { max: 999, prices: { "무약정": 99900, "1년약정": 99900 }, min: 74900 },
+            { max: 2999, prices: { "무약정": 92200, "1년약정": 92200 }, min: 69000 },
+            { max: 4999, prices: { "무약정": 83200, "1년약정": 83200 }, min: 62300 },
+            { max: 9999, prices: { "무약정": 76200, "1년약정": 76200 }, min: 57000 },
+            { max: 9999999, prices: { "무약정": 67400, "1년약정": 67400 }, min: 50400 }
         ]
     },
     "MDR Add-on 24×7": {
         type: "yearly",
         tiers: [
-            { max: 49, prices: { "무약정": 43300, "1년약정": 43300 } },
-            { max: 99, prices: { "무약정": 40300, "1년약정": 40300 } },
-            { max: 299, prices: { "무약정": 37500, "1년약정": 37500 } },
-            { max: 499, prices: { "무약정": 36500, "1년약정": 36500 } },
-            { max: 999, prices: { "무약정": 35000, "1년약정": 35000 } },
-            { max: 2999, prices: { "무약정": 32800, "1년약정": 32800 } },
-            { max: 4999, prices: { "무약정": 29300, "1년약정": 29300 } },
-            { max: 9999, prices: { "무약정": 27800, "1년약정": 27800 } },
-            { max: 9999999, prices: { "무약정": 24500, "1년약정": 24500 } }
+            { max: 49, prices: { "무약정": 43300, "1년약정": 43300 }, min: 32500 },
+            { max: 99, prices: { "무약정": 40300, "1년약정": 40300 }, min: 30200 },
+            { max: 299, prices: { "무약정": 37500, "1년약정": 37500 }, min: 28100 },
+            { max: 499, prices: { "무약정": 36500, "1년약정": 36500 }, min: 27400 },
+            { max: 999, prices: { "무약정": 35000, "1년약정": 35000 }, min: 26300 },
+            { max: 2999, prices: { "무약정": 32800, "1년약정": 32800 }, min: 24600 },
+            { max: 4999, prices: { "무약정": 29300, "1년약정": 29300 }, min: 22000 },
+            { max: 9999, prices: { "무약정": 27800, "1년약정": 27800 }, min: 20900 },
+            { max: 9999999, prices: { "무약정": 24500, "1년약정": 24500 }, min: 18400 }
         ]
     },
     "Cloud EDR": {
         type: "yearly",
         tiers: [
-            { max: 49, prices: { "무약정": 86900, "1년약정": 86900 } },
-            { max: 99, prices: { "무약정": 81400, "1년약정": 81400 } },
-            { max: 299, prices: { "무약정": 75900, "1년약정": 75900 } },
-            { max: 499, prices: { "무약정": 70400, "1년약정": 70400 } },
-            { max: 999, prices: { "무약정": 64900, "1년약정": 64900 } },
-            { max: 2999, prices: { "무약정": 59400, "1년약정": 59400 } },
-            { max: 4999, prices: { "무약정": 53900, "1년약정": 53900 } },
-            { max: 9999, prices: { "무약정": 48400, "1년약정": 48400 } },
-            { max: 9999999, prices: { "무약정": 42900, "1년약정": 42900 } }
+            { max: 49, prices: { "무약정": 86900, "1년약정": 86900 }, min: 65200 },
+            { max: 99, prices: { "무약정": 81400, "1년약정": 81400 }, min: 61100 },
+            { max: 299, prices: { "무약정": 75900, "1년약정": 75900 }, min: 56900 },
+            { max: 499, prices: { "무약정": 70400, "1년약정": 70400 }, min: 52700 },
+            { max: 999, prices: { "무약정": 64900, "1년약정": 64900 }, min: 48600 },
+            { max: 2999, prices: { "무약정": 59400, "1년약정": 59400 }, min: 44400 },
+            { max: 4999, prices: { "무약정": 53900, "1년약정": 53900 }, min: 40300 },
+            { max: 9999, prices: { "무약정": 48400, "1년약정": 48400 }, min: 36100 },
+            { max: 9999999, prices: { "무약정": 42900, "1년약정": 42900 }, min: 32000 }
         ]
     },
     "GIEA (AV Service)": {
         type: "yearly",
         tiers: [
-            { max: 49, prices: { "무약정": 74400, "1년약정": 74400 } },
-            { max: 99, prices: { "무약정": 67500, "1년약정": 67500 } },
-            { max: 299, prices: { "무약정": 61300, "1년약정": 61300 } },
-            { max: 499, prices: { "무약정": 57500, "1년약정": 57500 } },
-            { max: 999, prices: { "무약정": 54400, "1년약정": 54400 } },
-            { max: 2999, prices: { "무약정": 50600, "1년약정": 50600 } },
-            { max: 4999, prices: { "무약정": 48100, "1년약정": 48100 } },
-            { max: 9999, prices: { "무약정": 45000, "1년약정": 45000 } },
-            { max: 9999999, prices: { "무약정": 40600, "1년약정": 40600 } }
+            { max: 49, prices: { "무약정": 74400, "1년약정": 74400 }, min: 55800 },
+            { max: 99, prices: { "무약정": 67500, "1년약정": 67500 }, min: 50600 },
+            { max: 299, prices: { "무약정": 61300, "1년약정": 61300 }, min: 45900 },
+            { max: 499, prices: { "무약정": 57500, "1년약정": 57500 }, min: 43100 },
+            { max: 999, prices: { "무약정": 54400, "1년약정": 54400 }, min: 40800 },
+            { max: 2999, prices: { "무약정": 50600, "1년약정": 50600 }, min: 38000 },
+            { max: 4999, prices: { "무약정": 48100, "1년약정": 48100 }, min: 36000 },
+            { max: 9999, prices: { "무약정": 45000, "1년약정": 45000 }, min: 33700 },
+            { max: 9999999, prices: { "무약정": 40600, "1년약정": 40600 }, min: 30400 }
         ]
     },
     "GIER (Ransomware Service)": {
         type: "yearly",
         tiers: [
-            { max: 49, prices: { "무약정": 43500, "1년약정": 43500 } },
-            { max: 99, prices: { "무약정": 40700, "1년약정": 40700 } },
-            { max: 299, prices: { "무약정": 38000, "1년약정": 38000 } },
-            { max: 499, prices: { "무약정": 35200, "1년약정": 35200 } },
-            { max: 999, prices: { "무약정": 32400, "1년약정": 32400 } },
-            { max: 2999, prices: { "무약정": 29700, "1년약정": 29700 } },
-            { max: 4999, prices: { "무약정": 26900, "1년약정": 26900 } },
-            { max: 9999, prices: { "무약정": 24200, "1년약정": 24200 } },
-            { max: 9999999, prices: { "무약정": 21400, "1년약정": 21400 } }
+            { max: 49, prices: { "무약정": 43500, "1년약정": 43500 }, min: 32600 },
+            { max: 99, prices: { "무약정": 40700, "1년약정": 40700 }, min: 30500 },
+            { max: 299, prices: { "무약정": 38000, "1년약정": 38000 }, min: 28500 },
+            { max: 499, prices: { "무약정": 35200, "1년약정": 35200 }, min: 26400 },
+            { max: 999, prices: { "무약정": 32400, "1년약정": 32400 }, min: 24300 },
+            { max: 2999, prices: { "무약정": 29700, "1년약정": 29700 }, min: 22300 },
+            { max: 4999, prices: { "무약정": 26900, "1년약정": 26900 }, min: 20200 },
+            { max: 9999, prices: { "무약정": 24200, "1년약정": 24200 }, min: 18100 },
+            { max: 9999999, prices: { "무약정": 21400, "1년약정": 21400 }, min: 16100 }
         ]
     },
     "GIED (Device Control)": {
         type: "yearly",
         tiers: [
-            { max: 49, prices: { "무약정": 19800, "1년약정": 19800 } },
-            { max: 99, prices: { "무약정": 17800, "1년약정": 17800 } },
-            { max: 299, prices: { "무약정": 16100, "1년약정": 16100 } },
-            { max: 499, prices: { "무약정": 15100, "1년약정": 15100 } },
-            { max: 999, prices: { "무약정": 14100, "1년약정": 14100 } },
-            { max: 2999, prices: { "무약정": 13200, "1년약정": 13200 } },
-            { max: 4999, prices: { "무약정": 12500, "1년약정": 12500 } },
-            { max: 9999, prices: { "무약정": 11800, "1년약정": 11800 } },
-            { max: 9999999, prices: { "무약정": 10500, "1년약정": 10500 } }
+            { max: 49, prices: { "무약정": 19800, "1년약정": 19800 }, min: 9300 },
+            { max: 99, prices: { "무약정": 17800, "1년약정": 17800 }, min: 8700 },
+            { max: 299, prices: { "무약정": 16100, "1년약정": 16100 }, min: 8000 },
+            { max: 499, prices: { "무약정": 15100, "1년약정": 15100 }, min: 7300 },
+            { max: 999, prices: { "무약정": 14100, "1년약정": 14100 }, min: 6600 },
+            { max: 2999, prices: { "무약정": 13200, "1년약정": 13200 }, min: 5900 },
+            { max: 4999, prices: { "무약정": 12500, "1년약정": 12500 }, min: 5200 },
+            { max: 9999, prices: { "무약정": 11800, "1년약정": 11800 }, min: 4500 },
+            { max: 9999999, prices: { "무약정": 10500, "1년약정": 10500 }, min: 3900 }
         ]
     },
     "Cloud NAC V6.0": {
@@ -530,25 +530,25 @@ const pricingDB = {
     "로그 장기 저장 500GB": {
         type: "yearly",
         tiers: [
-            { max: 9999999, prices: { "무약정": 750000, "1년약정": 750000 } }
+            { max: 9999999, prices: { "무약정": 750000, "1년약정": 750000 }, min: 525000 }
         ]
     },
     "로그 장기 저장 1TB": {
         type: "yearly",
         tiers: [
-            { max: 9999999, prices: { "무약정": 1500000, "1년약정": 1500000 } }
+            { max: 9999999, prices: { "무약정": 1500000, "1년약정": 1500000 }, min: 1050000 }
         ]
     },
     "로그 장기 저장 10TB": {
         type: "yearly",
         tiers: [
-            { max: 9999999, prices: { "무약정": 13500000, "1년약정": 13500000 } }
+            { max: 9999999, prices: { "무약정": 13500000, "1년약정": 13500000 }, min: 9450000 }
         ]
     },
     "Slack 1일 보고 — 추가 관리자 계정": {
         type: "yearly",
         tiers: [
-            { max: 9999999, prices: { "무약정": 500000, "1년약정": 500000 } }
+            { max: 9999999, prices: { "무약정": 500000, "1년약정": 500000 }, min: 400000 }
         ]
     }
 };
@@ -576,15 +576,15 @@ const QP_LEGACY = {
     "Genian MDR 통합": {
         type: "yearly",
         tiers: [
-            { max: 49, prices: { "무약정": 130200, "1년약정": 130200 } },
-            { max: 99, prices: { "무약정": 121700, "1년약정": 121700 } },
-            { max: 299, prices: { "무약정": 113400, "1년약정": 113400 } },
-            { max: 499, prices: { "무약정": 106900, "1년약정": 106900 } },
-            { max: 999, prices: { "무약정": 99900, "1년약정": 99900 } },
-            { max: 2999, prices: { "무약정": 92200, "1년약정": 92200 } },
-            { max: 4999, prices: { "무약정": 83200, "1년약정": 83200 } },
-            { max: 9999, prices: { "무약정": 76200, "1년약정": 76200 } },
-            { max: 9999999, prices: { "무약정": 67400, "1년약정": 67400 } }
+            { max: 49, prices: { "무약정": 130200, "1년약정": 130200 }, min: 97700 },
+            { max: 99, prices: { "무약정": 121700, "1년약정": 121700 }, min: 91300 },
+            { max: 299, prices: { "무약정": 113400, "1년약정": 113400 }, min: 85000 },
+            { max: 499, prices: { "무약정": 106900, "1년약정": 106900 }, min: 80100 },
+            { max: 999, prices: { "무약정": 99900, "1년약정": 99900 }, min: 74900 },
+            { max: 2999, prices: { "무약정": 92200, "1년약정": 92200 }, min: 69000 },
+            { max: 4999, prices: { "무약정": 83200, "1년약정": 83200 }, min: 62300 },
+            { max: 9999, prices: { "무약정": 76200, "1년약정": 76200 }, min: 57000 },
+            { max: 9999999, prices: { "무약정": 67400, "1년약정": 67400 }, min: 50400 }
         ]
     }
 };
@@ -718,7 +718,11 @@ function qpBuild(D) {
         const name = QP_SVC[s.key] || String(s.name || '').trim(); if (!name || publicPricingDB[name]) return;
         const c = Array.isArray(s.cons) ? s.cons : [];
         const t = qpTiers(s.tiers, function (i) { return qpNum(c[i]); }, function (i) { return { '무약정': c[i], '1년약정': c[i] }; });
-        if (t) out[name] = { type: 'yearly', tiers: t }; else bad.push(name);
+        if (!t) { bad.push(name); return; }
+        /* ㊿+202 MDR 쪽 서비스: 제안 단가 자동 = 가격표 «최소제안가» 칸(minD · 구간마다 다 있을 때만 · 없으면 소비자가) — minP 는 «파트너 최소제안» */
+        const m = Array.isArray(s.minD) ? s.minD : [];
+        if (t.every(function (_, i) { return qpNum(m[i]) && m[i] > 0; })) t.forEach(function (x, i) { x.min = m[i]; });
+        out[name] = { type: 'yearly', tiers: t };
     });
     if (out['GIES (MDR Service)']) out['Genian MDR 통합'] = out['GIES (MDR Service)'];   /* ㊿+201 예전 견적의 «Genian MDR 통합» 줄도 같은 단가 */
     [['cnac', ['Cloud NAC V6.0', 'Cloud NAC V5.0']], ['ztna', ['Cloud ZTNA (PA)']]].forEach(function (p) {
@@ -732,7 +736,9 @@ function qpBuild(D) {
     (Array.isArray(D.addons) ? D.addons : []).forEach(function (a) {
         const name = Array.isArray(a) ? String(a[0] || '').trim() : ''; if (!name || publicPricingDB[name] || QP_SVC[name]) return;
         if (!qpNum(a[1])) { bad.push(name); return; }
-        out[name] = { type: 'yearly', tiers: [{ max: 9999999, prices: { '무약정': a[1], '1년약정': a[1] } }], addon: true };
+        const tr = { max: 9999999, prices: { '무약정': a[1], '1년약정': a[1] } };
+        if (qpNum(a[2]) && a[2] > 0) tr.min = a[2];   /* ㊿+202 부가 서비스도 제안 단가 = «최소제안가» 칸 */
+        out[name] = { type: 'yearly', tiers: [tr], addon: true };
     });
     return { out: out, bad: bad, max: max };
 }
@@ -1200,10 +1206,11 @@ function calcAll() {
             const db = allPricingDB[prodName];
             let tier = db.tiers.find(t => qty <= t.max);
             if (!tier) tier = db.tiers[db.tiers.length - 1];
-            /* ㊿+201 소비자 단가 = 가격표 소비자가(무약정) · 제안 단가 = 고른 약정 기간 단가 — 둘 다 자동, 같은 납부 주기 · 기간으로 · 고치면 그 값 유지 */
+            /* ㊿+201 소비자 단가 = 가격표 소비자가(무약정) · 제안 단가 = 고른 약정 기간 단가 — 둘 다 자동, 같은 납부 주기 · 기간으로 · 고치면 그 값 유지
+               ㊿+202 최소제안가가 있는 품목(MDR 쪽 서비스 · 부가 서비스)은 제안 단가 = 최소제안가 */
             const list = tier.prices['무약정'] != null ? tier.prices['무약정'] : (tier.prices[term] || 0);
             consumerPrice = qpPeriod(db, term, isLumpSum, billingMulti, list);
-            termAuto = qpPeriod(db, term, isLumpSum, billingMulti, tier.prices[term] != null ? tier.prices[term] : list);
+            termAuto = qpPeriod(db, term, isLumpSum, billingMulti, tier.min != null ? tier.min : tier.prices[term] != null ? tier.prices[term] : list);
         }
         const proposedEl = tr.querySelector('.proposed-price');
         if (prodName && prodName !== 'direct' && proposedEl.dataset.manual !== 'true') proposedEl.value = termAuto ? termAuto.toLocaleString() : '';

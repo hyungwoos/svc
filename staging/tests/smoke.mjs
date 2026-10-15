@@ -4805,6 +4805,49 @@ if (S.blk()) {
     return '청구 10,301 = 회계매출 10,301 · 차액 0 · 저장 · 다시 불러오기 같음';
   });
 }
+// ㊿+202 설치비 정산 — 설치 리스트의 «철거» 줄이 비즈포탈 «철거비» 건과 맞춰지는지(예전엔 설치비 건만 후보) · 같은 고객사 설치 줄은 설치비 건으로 · 합계 · 출력 · 저장/불러오기
+if (S.blk()) {
+  await S.t('㊿+202 설치비 정산: 철거 줄(작업구분 «철거» · 비고 «철거비용») ↔ 비즈포탈 «… Cloud NAC 철거비» 이름 자동 매칭 · 같은 고객사 신규 줄은 설치비 건으로 · 목록에 철거비 표시 · 비즈포탈 설치·철거비 합계 → 차액 0 · 미매칭 0 · 출력 제공서비스 «철거비» · 저장 → 불러오기에도 철거 / 프로젝트 리포트 계산서 발행일 · 품의일자 = 다음 달 10일', async () => {
+    const db = new FakeDB(seedData()); db.rpc.is_super_admin = () => true;
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page);
+    await fakeBackend(page, db); await page.goto(url + '/s1.html'); await page.waitForFunction(() => window.CLS && CLS.ok === true, null, { timeout: 10000 });
+    const a = await page.evaluate(() => {
+      const C = (x) => x.map((v) => (v === null ? null : { v }));
+      const IH = ['설치일', '계약번호', '계약처명', '작업구분', '종류', '수량', '센서', '비고', '개시상태'];
+      const inst = [C(IH), C(['20260901', 'N9100001', '가상기관C', '신규', 'Enterprise 100', 1, 0, null, null]),
+        C([null, 'N9100002', '가상기관D', '철거', 'Enterprise 200', 1, 2, '철거비용', null]),
+        C(['20260910', 'N9100003', '가상기관D', '신규', 'Enterprise 50', 1, 0, null, null])];
+      const BH = ['등록번호', '매출종류', '프로젝트명', '산업군', '고객사', '영업채널', '진행상태', '회계매출'];
+      const biz = [C(BH), C([1001, '제품판매', '[1/36] 가상기관A S1 Cloud NAC 신규 도입', '기업', '가상기관A (에스원)', '(주)에스원', '계산서발행', 7000]),
+        C([1004, '제품판매', '가상기관C Cloud NAC 설치비', '기업', '가상기관C (에스원)', '(주)에스원', '계산서발행', 100000]),
+        C([1005, '제품판매', '가상기관D Cloud NAC 철거비', '기업', '가상기관D (에스원)', '(주)에스원', '계산서발행', 260000]),
+        C([1006, '제품판매', '가상기관D Cloud NAC 설치비', '기업', '가상기관D (에스원)', '(주)에스원', '계산서발행', 100000])];
+      document.getElementById('ym').value = '2026-09'; S.maps = [];
+      S.biz = parseBiz(biz); S.inst = parseS1Inst(inst); matchInst(); renderInst();
+      const opts = [...document.querySelectorAll('#tInst tbody tr')[1].querySelectorAll('select.pick option')].map((o) => o.textContent);
+      return { m: S.inst.map((r) => r.nm + ':' + (r.biz && r.biz.no) + '/' + r.by).join(','), kinds: S.inst.map(instKind).join(','), opts,
+        tiles: [...document.querySelectorAll('#iTiles .tile')].map((t) => t.querySelector('.t').textContent + '=' + t.querySelector('.v').textContent.replace(/\s+/g, ' ').trim()),
+        need: document.querySelectorAll('#tInst tbody tr.st-need').length };
+    });
+    await page.evaluate(() => { window.open = function () { const f = document.createElement('iframe'); document.body.appendChild(f); const w = f.contentWindow; w.print = function () {}; window.__pw = w; return w; }; });
+    await page.evaluate(() => printInst()); await page.waitForTimeout(400);
+    const P = await page.evaluate(() => [...window.__pw.document.querySelectorAll('tbody tr')].map((x) => [...x.children].map((td) => td.textContent.trim()).join(' ')));
+    await page.evaluate(async () => { await saveSettle('inst'); }); await page.waitForTimeout(500);
+    const saved = db.table('s1_settle').find((x) => x.kind === 'install') || {};
+    await page.evaluate(async (id) => { await restoreSettle(id); }, saved.id); await page.waitForTimeout(400);
+    const R = await page.evaluate(() => ({ kinds: S.inst.map(instKind).join(','), work: S.inst.map((r) => r.work).join(','), biz: S.inst.map((r) => r.biz && r.biz.no).join(',') }));
+    /* 프로젝트 리포트 — 계산서 발행일 · 품의일자 = 다음 달 10일(9월분 → 10월 10일 · 12월분 → 다음 해 1월 10일) · 수금일 = 다음 달 말 */
+    await page.evaluate(async () => { await makeReport('inst'); document.getElementById('ym').value = '2026-12'; await makeReport('inst'); }); await page.waitForTimeout(300);
+    const rp = db.table('project_reports').map((x) => [x.report_month, x.payload.date, x.payload.taxdate, x.payload.paydate].join('|'));
+    await ctx.close();
+    const out = { a, P, saved: { total: saved.total, biz_total: saved.biz_total }, R, rp };
+    assert(a.m === '가상기관C:1004/name,가상기관D:1005/name,가상기관D:1006/name' && a.kinds === 'install,once,install' && /^1005 · 가상기관D \(에스원\) · 철거비 · 260,000$/.test(a.opts[1]) && a.need === 0
+      && a.tiles.some((x) => /^에스원 청구액=460,000$/.test(x)) && a.tiles.some((x) => /^비즈포탈 설치·철거비=460,000 3건$/.test(x)) && a.tiles.some((x) => /^차액=0$/.test(x)) && a.tiles.some((x) => /^미매칭=0건$/.test(x))
+      && P.some((x) => /1005 N9100002 가상기관D 철거비 1 2 260,000 철거 완료/.test(x)) && P.some((x) => /1004 N9100001 가상기관C 설치비/.test(x))
+      && saved.total === 460000 && saved.biz_total === 460000 && R.kinds === 'install,once,install' && R.work === '신규,철거,신규' && R.biz === '1004,1005,1006' && rp.join(',') === '2026-09-01|2026-10-10|2026-10-10|2026-10-31,2026-12-01|2027-01-10|2027-01-10|2027-01-31' && !c.errs.length, JSON.stringify({ P, saved: out.saved, R, rp, need: a.need, t: a.tiles.slice(3), errs: c.errs }));
+    return '철거 ↔ 1005 철거비(이름) · 신규 ↔ 1004/1006 설치비 · 합계 460,000 = 460,000 · 차액 0 · 출력 «철거비» · 저장/불러오기 철거 유지 · 리포트 9월분 계산서 · 품의 10-10 · 12월분 2027-01-10';
+  });
+}
 // ㊿+197 API 계정 «키 교체» — 같은 계정으로 새 키만(cloudsite v2 cred_rekey) · 입력은 비밀번호 칸 · 확인 창 · 화면 · 변경 이력에 키 없음 · 예전 함수면 안내 — 가짜 함수
 if (S.blk()) {
   await S.t('㊿+197 API 계정: 계정 탭을 연 채로 들어와도 목록이 온 뒤 보임(«계정이 다 없어졌다»의 원인) · 키 교체: «키 교체» → 비밀번호 칸 · 짧은 키는 막음 · 저장 → 확인 창 → cloudsite {action:cred_rekey, id, apikey} 1번 · 칸 비움 · 변경 이력(키 없음) · Esc 로 취소 / cloudsite 가 예전 버전(알 수 없는 action)이면 «v2 를 배포한 뒤» 안내', async () => {
@@ -4845,8 +4888,8 @@ if (S.blk()) {
   const QPB = { label: '가상 판 2099', applied: '2099-01-01', data: {
     cnac: { rows: [['1~100', 20000, 9000, 7000, 6000], ['101~3000', 10000, 5000, 4000, 3000]] },
     ztna: { rows: [['1~100', 15000, 7000, 5000, 4500], ['101~3000', 8000, 4000, 3000, 2500]] },
-    services: [{ key: 'CIE', tiers: ['1~49', '50~'], cons: [99000, 88000] }, { key: 'MDRA', tiers: ['1~49', '50~'], cons: [44000, 33000] }, { key: 'MDR', tiers: ['1~49', '50~'], cons: [140000, 120000] },
-      { key: 'AV', tiers: ['1~49', '50~'], cons: [70000, 60000] }, { key: 'RW', tiers: ['1~49', '50~'], cons: ['x', 1] }, { key: 'ZZ', name: '가상 서비스', tiers: ['1~49', '50~'], cons: [11000, 10000] }],
+    services: [{ key: 'CIE', tiers: ['1~49', '50~'], cons: [99000, 88000], minD: [90000, 80000] }, { key: 'MDRA', tiers: ['1~49', '50~'], cons: [44000, 33000], minP: [40000, 30000] }, { key: 'MDR', tiers: ['1~49', '50~'], cons: [140000, 120000], minD: [130000, 110000] },
+      { key: 'AV', tiers: ['1~49', '50~'], cons: [70000, 60000], minD: [65000, 'x'] }, { key: 'RW', tiers: ['1~49', '50~'], cons: ['x', 1] }, { key: 'ZZ', name: '가상 서비스', tiers: ['1~49', '50~'], cons: [11000, 10000] }],
     addons: [['가상 부가 <b>저장</b>', 300000, 200000, 100000, '비고']] } };
   const qpOpen = async (mode) => {
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page); let hits = 0, q = '';
@@ -4863,11 +4906,14 @@ if (S.blk()) {
     const sel = tr.querySelector('.product-sel'); sel.value = prod; updateOptions(sel);
     tr.querySelector('.term-sel').value = term; tr.querySelector('.billing-sel').value = bill; tr.querySelector('.qty').value = String(qty); resetConsumerManual(tr); calcAll();
     return tr.querySelector('.consumer-price').value + '|' + tr.querySelector('.proposed-price').value; }, [i, prod, term, bill, qty]);   /* ㊿+201 소비자 단가|제안 단가 */
-  await S.t('㊿+198 견적서 단가 = 가격표 최신 판(㊿+201: 소비자 단가 = 무약정 · 제안 단가 = 약정가 자동 · 고치면 유지 · GIES = MDR 통합 · CIE = Cloud EDR · V5.0 · MDR 통합은 예전 견적에만): Cloud NAC 약정별(1년 · 3년) · ZTNA PA · 새 품목(MDR Add-on · 모르는 key · 부가 서비스) · 나쁜 표(RW)는 내장 값 · 3,000 초과 작성자 안내 · 출처 표시(인쇄 안 됨) · 저장된 단가 그대로 · 이름 이스케이프 / 못 읽으면 내장 값(2026-09-21 판) + 안내', async () => {
+  await S.t('㊿+198 견적서 단가 = 가격표 최신 판(㊿+201: 소비자 단가 = 무약정 · 제안 단가 = 약정가 자동 · 고치면 유지 · GIES = MDR 통합 · CIE = Cloud EDR · V5.0 · MDR 통합은 예전 견적에만 / ㊿+202 MDR 쪽 서비스 · 부가 서비스 제안 단가 = «최소제안가» 칸(minD · 파트너 최소제안 minP 아님) · 없거나 나쁘면 소비자가 · 예전 MDR 통합 줄도): Cloud NAC 약정별(1년 · 3년) · ZTNA PA · 새 품목(MDR Add-on · 모르는 key · 부가 서비스) · 나쁜 표(RW)는 내장 값 · 3,000 초과 작성자 안내 · 출처 표시(인쇄 안 됨) · 저장된 단가 그대로 · 이름 이스케이프 / 못 읽으면 내장 값(2026-09-21 판) + 안내', async () => {
     const A = await qpOpen('ok'); const p = A.page;
     const nac1 = await qpRow(p, 0, 'Cloud NAC V6.0', '1년약정', '1', 50), tot1 = await p.evaluate(() => document.querySelector('#itemTable tbody tr .row-total').value), nac3 = await qpRow(p, 0, 'Cloud NAC V6.0', '3년약정', '1', 50), nac0 = await qpRow(p, 0, 'Cloud NAC V6.0', '무약정', '1', 500);
     const zt = await qpRow(p, 0, 'Cloud ZTNA (PA)', '2년약정', '1', 80), gies = await qpRow(p, 0, 'GIES (MDR Service)', '1년약정', '12', 60), rw = await qpRow(p, 0, 'GIER (Ransomware Service)', '1년약정', '12', 10);
     const mdra = await qpRow(p, 0, 'MDR Add-on 24×7', '1년약정', '12', 10), msg = await p.evaluate(() => document.getElementById('quoteMessage').innerText);
+    const av = await qpRow(p, 0, 'GIEA (AV Service)', '1년약정', '12', 10), gl = await qpRow(p, 0, 'GIES (MDR Service)', '1년약정', 'lump', 10);
+    const legM = await p.evaluate(() => { const tr = addRow({ prod: 'Genian MDR 통합', term: '1년약정', billing: '12', qty: '10', consumerPrice: '130200', proposed: '120000' }); calcAll(); const a = tr.querySelector('.proposed-price').value;
+      tr.querySelector('.qty').value = '60'; resetConsumerManual(tr); calcAll(); const b = tr.querySelector('.consumer-price').value + '|' + tr.querySelector('.proposed-price').value; tr.remove(); return a + ' → ' + b; });
     const zz = await qpRow(p, 0, '가상 서비스', '1년약정', '12', 10), ad = await qpRow(p, 0, '가상 부가 <b>저장</b>', '1년약정', '12', 1), edr = await qpRow(p, 0, 'Cloud EDR', '1년약정', '12', 10), edrMsg = await p.evaluate(() => document.getElementById('quoteMessage').innerText);
     /* ㊿+201 제안 단가를 고치면 그 값 유지 · 수량을 바꾸면 다시 자동 */
     await qpRow(p, 0, 'Cloud NAC V6.0', '1년약정', '1', 50); await p.fill('#itemTable tbody tr .proposed-price', '6500'); await p.evaluate(() => calcAll());
@@ -4883,15 +4929,16 @@ if (S.blk()) {
     const errsA = A.c.errs.slice(), hits = A.hits(), qa = A.q(); await A.ctx.close();
     const B = await qpOpen('fail'); const bn = await qpRow(B.page, 0, 'Cloud NAC V6.0', '1년약정', '1', 50), bz = await qpRow(B.page, 0, 'Cloud ZTNA (PA)', '무약정', '1', 50), bm = await qpRow(B.page, 0, 'GIES (MDR Service)', '1년약정', '12', 10);
     const bst = await B.page.evaluate(() => ({ t: document.getElementById('qpState').textContent, cls: document.getElementById('qpState').className })); const errsB = B.c.errs.slice(); await B.ctx.close();
-    const got = { nac1, tot1, nac3, nac0, zt, gies, rw, mdra, msg, zz, ad, edr, edrMsg, man, reauto, leg, opt, over, st, kept, hits, qa, bn, bz, bm, bst, errsA, errsB };
-    assert(nac1 === '20,000|9,000' && tot1 === '450,000' && nac3 === '20,000|6,000' && nac0 === '10,000|10,000' && zt === '15,000|5,000' && gies === '120,000|120,000' && rw === '43,500|43,500' && mdra === '44,000|44,000' && /Genian MDR/.test(msg) && zz === '11,000|11,000' && ad === '300,000|300,000'
-      && edr === '99,000|99,000' && /Cloud EDR/.test(edrMsg) && man === '6,500|325,000' && reauto === '9,000' && leg === 'Cloud NAC V5.0|16,000|7200 → Cloud NAC V5.0|20,000|9,000'
+    const got = { nac1, tot1, nac3, nac0, zt, gies, rw, mdra, msg, zz, ad, edr, edrMsg, av, gl, legM, man, reauto, leg, opt, over, st, kept, hits, qa, bn, bz, bm, bst, errsA, errsB };
+    assert(nac1 === '20,000|9,000' && tot1 === '450,000' && nac3 === '20,000|6,000' && nac0 === '10,000|10,000' && zt === '15,000|5,000' && gies === '120,000|110,000' && rw === '43,500|32,600' && mdra === '44,000|44,000' && /Genian MDR/.test(msg) && zz === '11,000|11,000' && ad === '300,000|200,000'
+      && av === '70,000|70,000' && gl === '140,000|130,000' && legM === '120000 → 120,000|110,000'
+      && edr === '99,000|90,000' && /Cloud EDR/.test(edrMsg) && man === '6,500|325,000' && reauto === '9,000' && leg === 'Cloud NAC V5.0|16,000|7200 → Cloud NAC V5.0|20,000|9,000'
       && ['MDR Add-on 24×7', 'Cloud EDR', '가상 서비스', '가상 부가 <b>저장</b>', '로그 장기 저장 1TB'].every((n) => opt.names.includes(n)) && !opt.names.includes('Cloud NAC V5.0') && !opt.names.includes('Genian MDR 통합') && opt.bold === 0
       && over.disp === 'block' && /Cloud NAC V6\.0 3,500개/.test(over.hint) && /별도 협의/.test(over.hint) && over.cp === '10,000'
       && /가상 판 2099 · 2099-01-01 적용/.test(st.t) && /Ransomware Service|GIER/.test(st.t) && /no-print/.test(st.cls) && st.prn && kept === '16,000'
       && hits === 1 && /seg=eq\.saas/.test(qa) && /order=applied\.desc,id\.desc/.test(qa) && /limit=1/.test(qa)
-      && bn === '16,000|7,200' && bz === '13,300|13,300' && bm === '130,200|130,200' && /내장 값\(2026-09 MDR 3종 · 2026-09-21 판\)/.test(bst.t) && /warn/.test(bst.cls) && !errsA.length && !errsB.length, JSON.stringify({ man, reauto, leg, edrMsg, kept, cp: over.cp, bn, bz, bm, errsA, errsB, nV5: opt.names.includes('Cloud NAC V5.0') }));
-    return 'NAC 소비자 20,000 · 1년 제안 9,000 · 3년 6,000 · ZTNA 2년 5,000 · GIES=MDR 통합 · Cloud EDR · 고친 제안 유지 · V5.0 예전 줄 · 실패 → 내장 16,000|7,200';
+      && bn === '16,000|7,200' && bz === '13,300|13,300' && bm === '130,200|97,700' && /내장 값\(2026-09 MDR 3종 · 2026-09-21 판\)/.test(bst.t) && /warn/.test(bst.cls) && !errsA.length && !errsB.length, JSON.stringify({ gies, rw, mdra, edr, av, ad, gl, legM, man, reauto, leg, edrMsg, kept, cp: over.cp, bn, bz, bm, errsA, errsB, nV5: opt.names.includes('Cloud NAC V5.0') }));
+    return 'NAC 소비자 20,000 · 1년 제안 9,000 · 3년 6,000 · ZTNA 2년 5,000 · GIES 120,000|최소 110,000 · Cloud EDR 99,000|90,000 · 부가 300,000|200,000 · 최소제안가 없음/나쁨 → 소비자가 · 고친 제안 유지 · V5.0 예전 줄 · 실패 → 내장 16,000|7,200 · GIES 130,200|97,700';
   });
 }
 // ㊿+200 개선 요청 — 요청 ↔ 처리가 서로 보이게(SQL 120 흉내 fbActRpc) · 가짜 DB 하나를 처리자 · 요청자 두 창이 같이 씀

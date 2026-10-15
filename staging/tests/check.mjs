@@ -325,6 +325,16 @@ say(/^export function tickMemo\(/m.test(jsAll) && /^export function cssvKey\(/m.
   say(/^function qpPeriod\(db, term, isLumpSum, billingMulti, p\)/m.test(q) && /const list = tier\.prices\['무약정'\] != null/.test(q) && /proposedEl\.dataset\.manual !== 'true'/.test(q) && /^function onProposedInput\(input\)/m.test(q) && /data-input="onProposedInput\(this\)"/.test(q)
     && /^const QP_LEGACY = \{/m.test(q) && /Object\.assign\(\{\}, QP_LEGACY, pricingDB, publicPricingDB\)/.test(q) && !/"Cloud NAC V5\.0"|"Genian MDR 통합"/.test(pdb) && /"Cloud EDR": \{\n {8}type: "yearly",\n {8}tiers: \[\n {12}\{ max: 49, prices: \{ "무약정": 86900/.test(pdb) && /"GIES \(MDR Service\)": \{\n {8}type: "yearly",\n {8}tiers: \[\n {12}\{ max: 49, prices: \{ "무약정": 130200/.test(pdb),
   '㊿+201 견적서: 소비자 단가 = 무약정 · 제안 단가 = 약정가 자동 · GIES = MDR 통합 · Cloud EDR · V5.0/MDR 통합 목록에서 뺌(예전 견적만)'); }
+// ㊿+202 견적서 MDR 쪽 서비스 · 부가 서비스: 제안 단가 자동 = 가격표 «최소제안가» 칸(minD · 부가는 3번째 값) · 내장 값에도 min
+{ const q = (() => { try { return fs.readFileSync(path.join(ROOT, 'sat/quote.js'), 'utf8'); } catch (e) { return ''; } })(), pdb = (q.match(/const pricingDB = \{[\s\S]*?\n\};/) || [''])[0];
+  const svcMin = ['GIES \\(MDR Service\\)', 'MDR Add-on 24×7', 'Cloud EDR', 'GIEA \\(AV Service\\)', 'GIER \\(Ransomware Service\\)', 'GIED \\(Device Control\\)'].every((n) => new RegExp('"' + n + '": \\{\\n {8}type: "yearly",\\n {8}tiers: \\[\\n {12}\\{ max: 49, prices: \\{ "무약정": \\d+, "1년약정": \\d+ \\}, min: \\d+ \\}').test(pdb));
+  say(svcMin && /"GIES \(MDR Service\)": \{\n {8}type: "yearly",\n {8}tiers: \[\n {12}\{ max: 49, prices: \{ "무약정": 130200, "1년약정": 130200 \}, min: 97700 \}/.test(pdb) && /const m = Array\.isArray\(s\.minD\) \? s\.minD : \[\];/.test(q) && /if \(qpNum\(a\[2\]\) && a\[2\] > 0\) tr\.min = a\[2\];/.test(q) && /"로그 장기 저장 1TB": \{\n {8}type: "yearly",\n {8}tiers: \[\n {12}\{ max: 9999999, prices: \{ "무약정": 1500000, "1년약정": 1500000 \}, min: 1050000 \}/.test(pdb) && /tier\.min != null \? tier\.min : tier\.prices\[term\] != null/.test(q) && !/min: /.test((pdb.match(/"Cloud NAC V6\.0": \{[\s\S]*?\n {4}\}/) || [''])[0]),
+  '㊿+202 견적서 MDR 쪽 서비스 6종 · 부가 서비스 제안 단가 = «최소제안가»(가격표 minD · 부가 3번째 값 · 내장 값 min) · NAC/ZTNA 는 약정가 그대로'); }
+// ㊿+202 에스원 설치비 정산: 철거 줄 ↔ 비즈포탈 철거비 · 리포트 계산서 발행일 · 품의일자 = 다음 달 발행일
+{ const s1 = (() => { try { return fs.readFileSync(path.join(ROOT, 'sat/s1.js'), 'utf8'); } catch (e) { return ''; } })();
+  say(/^function instKind\(r\)\{ return \/철거\|회수\//m.test(s1) && /return b\.kind==='install' \|\| b\.kind==='once';/.test(s1) && /same=biz\.filter\(function\(b\)\{ return b\.kind===want; \}\)/.test(s1) && /tile\('비즈포탈 설치·철거비'/.test(s1)
+    && /nx\.setMonth\(nx\.getMonth\(\)\+1\);/.test(s1) && (s1.match(/title:title, date:tax, contact:''/g) || []).length === 2 && !/date:today, contact/.test(s1) && /work:x\.work\|\|''/.test(s1),
+  '㊿+202 에스원 설치비 정산: 철거 줄 ↔ 비즈포탈 철거비(같은 종류끼리 자동 · 목록에 철거비) · 리포트 계산서 발행일 · 품의일자 = 다음 달 발행일'); }
 // ㊿+160 연장하면 상태 «재약정»(구분 그대로) · 계약 상세에 «계약 기간 · 연장 이력»
 say(/^export function renewStatus\(r\)/m.test(jsAll) && /var nst=renewStatus\(r\);/.test(jsAll) && /^export function ctPeriods\(c, mine\)/m.test(jsAll) && html.includes('id="dtRenew"'), '연장: 상태 «재약정»(renewStatus) · 계약 상세 연장 이력(ctPeriods · #dtRenew)');
 const idx = html + jsAll;
