@@ -4862,28 +4862,36 @@ if (S.blk()) {
     let tr = document.querySelectorAll('#itemTable tbody tr')[i]; if (!tr) tr = addRow();
     const sel = tr.querySelector('.product-sel'); sel.value = prod; updateOptions(sel);
     tr.querySelector('.term-sel').value = term; tr.querySelector('.billing-sel').value = bill; tr.querySelector('.qty').value = String(qty); resetConsumerManual(tr); calcAll();
-    return tr.querySelector('.consumer-price').value; }, [i, prod, term, bill, qty]);
-  await S.t('㊿+198 견적서 단가 = 가격표 최신 판: Cloud NAC 약정별(1년 · 3년) · ZTNA PA · CIE=GIES · 새 품목(MDR Add-on · MDR 통합 · 모르는 key · 부가 서비스) · 나쁜 표(RW)는 내장 값 · 3,000 초과 작성자 안내 · 출처 표시(인쇄 안 됨) · 저장된 단가 그대로 · 이름 이스케이프 / 못 읽으면 내장 값(2026-09-21 판) + 안내', async () => {
+    return tr.querySelector('.consumer-price').value + '|' + tr.querySelector('.proposed-price').value; }, [i, prod, term, bill, qty]);   /* ㊿+201 소비자 단가|제안 단가 */
+  await S.t('㊿+198 견적서 단가 = 가격표 최신 판(㊿+201: 소비자 단가 = 무약정 · 제안 단가 = 약정가 자동 · 고치면 유지 · GIES = MDR 통합 · CIE = Cloud EDR · V5.0 · MDR 통합은 예전 견적에만): Cloud NAC 약정별(1년 · 3년) · ZTNA PA · 새 품목(MDR Add-on · 모르는 key · 부가 서비스) · 나쁜 표(RW)는 내장 값 · 3,000 초과 작성자 안내 · 출처 표시(인쇄 안 됨) · 저장된 단가 그대로 · 이름 이스케이프 / 못 읽으면 내장 값(2026-09-21 판) + 안내', async () => {
     const A = await qpOpen('ok'); const p = A.page;
-    const nac1 = await qpRow(p, 0, 'Cloud NAC V6.0', '1년약정', '1', 50), nac3 = await qpRow(p, 0, 'Cloud NAC V6.0', '3년약정', '1', 50), nac0 = await qpRow(p, 0, 'Cloud NAC V5.0', '무약정', '1', 500);
+    const nac1 = await qpRow(p, 0, 'Cloud NAC V6.0', '1년약정', '1', 50), tot1 = await p.evaluate(() => document.querySelector('#itemTable tbody tr .row-total').value), nac3 = await qpRow(p, 0, 'Cloud NAC V6.0', '3년약정', '1', 50), nac0 = await qpRow(p, 0, 'Cloud NAC V6.0', '무약정', '1', 500);
     const zt = await qpRow(p, 0, 'Cloud ZTNA (PA)', '2년약정', '1', 80), gies = await qpRow(p, 0, 'GIES (MDR Service)', '1년약정', '12', 60), rw = await qpRow(p, 0, 'GIER (Ransomware Service)', '1년약정', '12', 10);
     const mdra = await qpRow(p, 0, 'MDR Add-on 24×7', '1년약정', '12', 10), msg = await p.evaluate(() => document.getElementById('quoteMessage').innerText);
-    const zz = await qpRow(p, 0, '가상 서비스', '1년약정', '12', 10), ad = await qpRow(p, 0, '가상 부가 <b>저장</b>', '1년약정', '12', 1);
+    const zz = await qpRow(p, 0, '가상 서비스', '1년약정', '12', 10), ad = await qpRow(p, 0, '가상 부가 <b>저장</b>', '1년약정', '12', 1), edr = await qpRow(p, 0, 'Cloud EDR', '1년약정', '12', 10), edrMsg = await p.evaluate(() => document.getElementById('quoteMessage').innerText);
+    /* ㊿+201 제안 단가를 고치면 그 값 유지 · 수량을 바꾸면 다시 자동 */
+    await qpRow(p, 0, 'Cloud NAC V6.0', '1년약정', '1', 50); await p.fill('#itemTable tbody tr .proposed-price', '6500'); await p.evaluate(() => calcAll());
+    const man = await p.evaluate(() => { const tr = document.querySelector('#itemTable tbody tr'); return tr.querySelector('.proposed-price').value + '|' + tr.querySelector('.row-total').value; });
+    const reauto = await p.evaluate(() => { const tr = document.querySelector('#itemTable tbody tr'); tr.querySelector('.qty').value = '60'; resetConsumerManual(tr); calcAll(); return tr.querySelector('.proposed-price').value; });
+    /* ㊿+201 예전 견적의 뺀 품목(Cloud NAC V5.0) — 그 줄에만 남고 계산도 됨 */
+    const leg = await p.evaluate(() => { const tr = addRow({ prod: 'Cloud NAC V5.0', term: '1년약정', billing: '1', qty: '50', consumerPrice: '16000', proposed: '7200' }); calcAll(); const a = tr.querySelector('.product-sel').value + '|' + tr.querySelector('.consumer-price').value + '|' + tr.querySelector('.proposed-price').value;
+      tr.querySelector('.qty').value = '60'; resetConsumerManual(tr); calcAll(); const b = tr.querySelector('.product-sel').value + '|' + tr.querySelector('.consumer-price').value + '|' + tr.querySelector('.proposed-price').value; tr.remove(); return a + ' → ' + b; });
     const opt = await p.evaluate(() => { const s = document.querySelector('#itemTable tbody tr .product-sel'); return { names: Array.from(s.options).map((o) => o.value), bold: s.querySelectorAll('b').length }; });
     await qpRow(p, 0, 'Cloud NAC V6.0', '무약정', '1', 3500); const over = await p.evaluate(() => ({ hint: document.getElementById('internalHint').innerText, disp: document.getElementById('internalHint').style.display, cp: document.querySelector('#itemTable tbody tr .consumer-price').value }));
     const st = await p.evaluate(() => { const el = document.getElementById('qpState'); return { t: el.textContent, cls: el.className, prn: (() => { for (const sh of document.styleSheets) { try { for (const r of sh.cssRules) if (r.media && /print/.test(r.media.mediaText) && /\.qp-state/.test(r.cssText) && /display: none/.test(r.cssText)) return true; } catch (e) { /* noop */ } } return false; })() }; });
     const kept = await p.evaluate(() => { const tr = addRow({ prod: 'Cloud NAC V6.0', term: '1년약정', billing: '1', qty: '50', consumerPrice: '16000', proposed: '7000' }); calcAll(); return tr.querySelector('.consumer-price').value; });
     const errsA = A.c.errs.slice(), hits = A.hits(), qa = A.q(); await A.ctx.close();
-    const B = await qpOpen('fail'); const bn = await qpRow(B.page, 0, 'Cloud NAC V6.0', '1년약정', '1', 50), bz = await qpRow(B.page, 0, 'Cloud ZTNA (PA)', '무약정', '1', 50), bm = await qpRow(B.page, 0, 'Genian MDR 통합', '1년약정', '12', 10);
+    const B = await qpOpen('fail'); const bn = await qpRow(B.page, 0, 'Cloud NAC V6.0', '1년약정', '1', 50), bz = await qpRow(B.page, 0, 'Cloud ZTNA (PA)', '무약정', '1', 50), bm = await qpRow(B.page, 0, 'GIES (MDR Service)', '1년약정', '12', 10);
     const bst = await B.page.evaluate(() => ({ t: document.getElementById('qpState').textContent, cls: document.getElementById('qpState').className })); const errsB = B.c.errs.slice(); await B.ctx.close();
-    const got = { nac1, nac3, nac0, zt, gies, rw, mdra, msg, zz, ad, opt, over, st, kept, hits, qa, bn, bz, bm, bst, errsA, errsB };
-    assert(nac1 === '9,000' && nac3 === '6,000' && nac0 === '10,000' && zt === '5,000' && gies === '88,000' && rw === '43,500' && mdra === '44,000' && /Genian MDR/.test(msg) && zz === '11,000' && ad === '300,000'
-      && ['MDR Add-on 24×7', 'Genian MDR 통합', '가상 서비스', '가상 부가 <b>저장</b>', '로그 장기 저장 1TB'].every((n) => opt.names.includes(n)) && opt.bold === 0
+    const got = { nac1, tot1, nac3, nac0, zt, gies, rw, mdra, msg, zz, ad, edr, edrMsg, man, reauto, leg, opt, over, st, kept, hits, qa, bn, bz, bm, bst, errsA, errsB };
+    assert(nac1 === '20,000|9,000' && tot1 === '450,000' && nac3 === '20,000|6,000' && nac0 === '10,000|10,000' && zt === '15,000|5,000' && gies === '120,000|120,000' && rw === '43,500|43,500' && mdra === '44,000|44,000' && /Genian MDR/.test(msg) && zz === '11,000|11,000' && ad === '300,000|300,000'
+      && edr === '99,000|99,000' && /Cloud EDR/.test(edrMsg) && man === '6,500|325,000' && reauto === '9,000' && leg === 'Cloud NAC V5.0|16,000|7200 → Cloud NAC V5.0|20,000|9,000'
+      && ['MDR Add-on 24×7', 'Cloud EDR', '가상 서비스', '가상 부가 <b>저장</b>', '로그 장기 저장 1TB'].every((n) => opt.names.includes(n)) && !opt.names.includes('Cloud NAC V5.0') && !opt.names.includes('Genian MDR 통합') && opt.bold === 0
       && over.disp === 'block' && /Cloud NAC V6\.0 3,500개/.test(over.hint) && /별도 협의/.test(over.hint) && over.cp === '10,000'
       && /가상 판 2099 · 2099-01-01 적용/.test(st.t) && /Ransomware Service|GIER/.test(st.t) && /no-print/.test(st.cls) && st.prn && kept === '16,000'
       && hits === 1 && /seg=eq\.saas/.test(qa) && /order=applied\.desc,id\.desc/.test(qa) && /limit=1/.test(qa)
-      && bn === '7,200' && bz === '13,300' && bm === '130,200' && /내장 값\(2026-09 MDR 3종 · 2026-09-21 판\)/.test(bst.t) && /warn/.test(bst.cls) && !errsA.length && !errsB.length, JSON.stringify(got));
-    return 'NAC 1년 9,000 · 3년 6,000 · ZTNA 2년 5,000 · GIES 88,000 · RW 내장 43,500 · 새 품목 4 · 3,500개 안내 · 저장 단가 16,000 유지 · 실패 → 내장 7,200';
+      && bn === '16,000|7,200' && bz === '13,300|13,300' && bm === '130,200|130,200' && /내장 값\(2026-09 MDR 3종 · 2026-09-21 판\)/.test(bst.t) && /warn/.test(bst.cls) && !errsA.length && !errsB.length, JSON.stringify({ man, reauto, leg, edrMsg, kept, cp: over.cp, bn, bz, bm, errsA, errsB, nV5: opt.names.includes('Cloud NAC V5.0') }));
+    return 'NAC 소비자 20,000 · 1년 제안 9,000 · 3년 6,000 · ZTNA 2년 5,000 · GIES=MDR 통합 · Cloud EDR · 고친 제안 유지 · V5.0 예전 줄 · 실패 → 내장 16,000|7,200';
   });
 }
 // ㊿+200 개선 요청 — 요청 ↔ 처리가 서로 보이게(SQL 120 흉내 fbActRpc) · 가짜 DB 하나를 처리자 · 요청자 두 창이 같이 씀
