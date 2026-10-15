@@ -257,6 +257,7 @@ function updateQuoteMessage() {
         "GIES (MDR Service)": "Genian MDR(서비스형) 제안에 대하여 아래와 같이 견적 합니다.",
         "MDR Add-on 24×7": "Genian MDR(서비스형) 제안에 대하여 아래와 같이 견적 합니다.",
         "Genian MDR 통합": "Genian MDR(서비스형) 제안에 대하여 아래와 같이 견적 합니다.",
+        "Cloud EDR": "Genian Cloud EDR(서비스형) 제안에 대하여 아래와 같이 견적 합니다.",
         "GIEA (AV Service)": "Genian MDR(서비스형) 제안에 대하여 아래와 같이 견적 합니다.",
         "GIER (Ransomware Service)": "Genian MDR(서비스형) 제안에 대하여 아래와 같이 견적 합니다.",
         "GIED (Device Control)": "Genian MDR(서비스형) 제안에 대하여 아래와 같이 견적 합니다.",
@@ -280,6 +281,7 @@ function updateRemarksText() {
     let hasNAC = false, nacCycle = "";
     let hasPA = false, paCycle = "";
     let hasDocuRay = false;
+    let hasEDR = false, edrCycle = "";
     let hasPublicZTNA = false, publicZtnaCycle = "";
     let hasPublicGPI = false, publicGpiCycle = "";
     let hasBlockModule = false, hasGatewayModule = false;
@@ -310,6 +312,7 @@ function updateRemarksText() {
             return;
         }
         if (QP.addon[prod]) return;   // ㊿+198 가격표 부가 서비스(로그 저장 등)는 비고 문구 없음
+        if (prod === "Cloud EDR") { hasEDR = true; edrCycle = cycleStr; return; }   // ㊿+201
         if (prod.includes("MDR") || prod.includes("AV") || prod.includes("Ransomware") || prod.includes("Device")) {
             hasMDR = true; mdrCycle = cycleStr;
         } else if (prod.includes("NAC")) {
@@ -334,6 +337,9 @@ function updateRemarksText() {
         if (hasBlockModule) moduleDesc.push('차단서버모듈(NAC 기능, 100만원)');
         if (hasGatewayModule) moduleDesc.push('게이트웨이모듈(ZTNA 기능, 300만원)');
         parts.push(`[초기 구축비용]\n- 포함 모듈: ${moduleDesc.join(' + ')}\n- 총 초기 구축비용(1회성, 월 이용료 별도): ${setupTotal.toLocaleString()}원`);
+    }
+    if (hasEDR) {
+        parts.push(`[Cloud EDR]\n${getMethodStr(edrCycle)}\n- 24시간 관제가 필요하면 MDR Add-on 24×7 을 함께 구성`);
     }
     if (hasMDR) {
         parts.push(`[Genian MDR]\n${getMethodStr(mdrCycle)}\n- 관제/대응/분석/조치 모두 포함\n- 별도 추가 과금 없음`);
@@ -384,107 +390,88 @@ const pricingDB = {
     "GIES (MDR Service)": {
         type: "yearly",
         tiers: [
-            { max: 49, prices: { "무약정": 86900, "1년약정": 86900 } },
-            { max: 99, prices: { "무약정": 81400, "1년약정": 81400 } },
-            { max: 299, prices: { "무약정": 75900, "1년약정": 75900 } },
-            { max: 499, prices: { "무약정": 70400, "1년약정": 70400 } },
-            { max: 999, prices: { "무약정": 64900, "1년약정": 64900 } },
-            { max: 2999, prices: { "무약정": 59400, "1년약정": 59400 } },
-            { max: 4999, prices: { "무약정": 53900, "1년약정": 53900 } },
-            { max: 9999, prices: { "무약정": 48400, "1년약정": 48400 } },
-            { max: 9999999, prices: { "무약정": 42900, "1년약정": 42900 } }
+            { max: 49, prices: { "무약정": 130200, "1년약정": 130200 }, min: 97700 },
+            { max: 99, prices: { "무약정": 121700, "1년약정": 121700 }, min: 91300 },
+            { max: 299, prices: { "무약정": 113400, "1년약정": 113400 }, min: 85000 },
+            { max: 499, prices: { "무약정": 106900, "1년약정": 106900 }, min: 80100 },
+            { max: 999, prices: { "무약정": 99900, "1년약정": 99900 }, min: 74900 },
+            { max: 2999, prices: { "무약정": 92200, "1년약정": 92200 }, min: 69000 },
+            { max: 4999, prices: { "무약정": 83200, "1년약정": 83200 }, min: 62300 },
+            { max: 9999, prices: { "무약정": 76200, "1년약정": 76200 }, min: 57000 },
+            { max: 9999999, prices: { "무약정": 67400, "1년약정": 67400 }, min: 50400 }
         ]
     },
     "MDR Add-on 24×7": {
         type: "yearly",
         tiers: [
-            { max: 49, prices: { "무약정": 43300, "1년약정": 43300 } },
-            { max: 99, prices: { "무약정": 40300, "1년약정": 40300 } },
-            { max: 299, prices: { "무약정": 37500, "1년약정": 37500 } },
-            { max: 499, prices: { "무약정": 36500, "1년약정": 36500 } },
-            { max: 999, prices: { "무약정": 35000, "1년약정": 35000 } },
-            { max: 2999, prices: { "무약정": 32800, "1년약정": 32800 } },
-            { max: 4999, prices: { "무약정": 29300, "1년약정": 29300 } },
-            { max: 9999, prices: { "무약정": 27800, "1년약정": 27800 } },
-            { max: 9999999, prices: { "무약정": 24500, "1년약정": 24500 } }
+            { max: 49, prices: { "무약정": 43300, "1년약정": 43300 }, min: 32500 },
+            { max: 99, prices: { "무약정": 40300, "1년약정": 40300 }, min: 30200 },
+            { max: 299, prices: { "무약정": 37500, "1년약정": 37500 }, min: 28100 },
+            { max: 499, prices: { "무약정": 36500, "1년약정": 36500 }, min: 27400 },
+            { max: 999, prices: { "무약정": 35000, "1년약정": 35000 }, min: 26300 },
+            { max: 2999, prices: { "무약정": 32800, "1년약정": 32800 }, min: 24600 },
+            { max: 4999, prices: { "무약정": 29300, "1년약정": 29300 }, min: 22000 },
+            { max: 9999, prices: { "무약정": 27800, "1년약정": 27800 }, min: 20900 },
+            { max: 9999999, prices: { "무약정": 24500, "1년약정": 24500 }, min: 18400 }
         ]
     },
-    "Genian MDR 통합": {
+    "Cloud EDR": {
         type: "yearly",
         tiers: [
-            { max: 49, prices: { "무약정": 130200, "1년약정": 130200 } },
-            { max: 99, prices: { "무약정": 121700, "1년약정": 121700 } },
-            { max: 299, prices: { "무약정": 113400, "1년약정": 113400 } },
-            { max: 499, prices: { "무약정": 106900, "1년약정": 106900 } },
-            { max: 999, prices: { "무약정": 99900, "1년약정": 99900 } },
-            { max: 2999, prices: { "무약정": 92200, "1년약정": 92200 } },
-            { max: 4999, prices: { "무약정": 83200, "1년약정": 83200 } },
-            { max: 9999, prices: { "무약정": 76200, "1년약정": 76200 } },
-            { max: 9999999, prices: { "무약정": 67400, "1년약정": 67400 } }
+            { max: 49, prices: { "무약정": 86900, "1년약정": 86900 }, min: 65200 },
+            { max: 99, prices: { "무약정": 81400, "1년약정": 81400 }, min: 61100 },
+            { max: 299, prices: { "무약정": 75900, "1년약정": 75900 }, min: 56900 },
+            { max: 499, prices: { "무약정": 70400, "1년약정": 70400 }, min: 52700 },
+            { max: 999, prices: { "무약정": 64900, "1년약정": 64900 }, min: 48600 },
+            { max: 2999, prices: { "무약정": 59400, "1년약정": 59400 }, min: 44400 },
+            { max: 4999, prices: { "무약정": 53900, "1년약정": 53900 }, min: 40300 },
+            { max: 9999, prices: { "무약정": 48400, "1년약정": 48400 }, min: 36100 },
+            { max: 9999999, prices: { "무약정": 42900, "1년약정": 42900 }, min: 32000 }
         ]
     },
     "GIEA (AV Service)": {
         type: "yearly",
         tiers: [
-            { max: 49, prices: { "무약정": 74400, "1년약정": 74400 } },
-            { max: 99, prices: { "무약정": 67500, "1년약정": 67500 } },
-            { max: 299, prices: { "무약정": 61300, "1년약정": 61300 } },
-            { max: 499, prices: { "무약정": 57500, "1년약정": 57500 } },
-            { max: 999, prices: { "무약정": 54400, "1년약정": 54400 } },
-            { max: 2999, prices: { "무약정": 50600, "1년약정": 50600 } },
-            { max: 4999, prices: { "무약정": 48100, "1년약정": 48100 } },
-            { max: 9999, prices: { "무약정": 45000, "1년약정": 45000 } },
-            { max: 9999999, prices: { "무약정": 40600, "1년약정": 40600 } }
+            { max: 49, prices: { "무약정": 74400, "1년약정": 74400 }, min: 55800 },
+            { max: 99, prices: { "무약정": 67500, "1년약정": 67500 }, min: 50600 },
+            { max: 299, prices: { "무약정": 61300, "1년약정": 61300 }, min: 45900 },
+            { max: 499, prices: { "무약정": 57500, "1년약정": 57500 }, min: 43100 },
+            { max: 999, prices: { "무약정": 54400, "1년약정": 54400 }, min: 40800 },
+            { max: 2999, prices: { "무약정": 50600, "1년약정": 50600 }, min: 38000 },
+            { max: 4999, prices: { "무약정": 48100, "1년약정": 48100 }, min: 36000 },
+            { max: 9999, prices: { "무약정": 45000, "1년약정": 45000 }, min: 33700 },
+            { max: 9999999, prices: { "무약정": 40600, "1년약정": 40600 }, min: 30400 }
         ]
     },
     "GIER (Ransomware Service)": {
         type: "yearly",
         tiers: [
-            { max: 49, prices: { "무약정": 43500, "1년약정": 43500 } },
-            { max: 99, prices: { "무약정": 40700, "1년약정": 40700 } },
-            { max: 299, prices: { "무약정": 38000, "1년약정": 38000 } },
-            { max: 499, prices: { "무약정": 35200, "1년약정": 35200 } },
-            { max: 999, prices: { "무약정": 32400, "1년약정": 32400 } },
-            { max: 2999, prices: { "무약정": 29700, "1년약정": 29700 } },
-            { max: 4999, prices: { "무약정": 26900, "1년약정": 26900 } },
-            { max: 9999, prices: { "무약정": 24200, "1년약정": 24200 } },
-            { max: 9999999, prices: { "무약정": 21400, "1년약정": 21400 } }
+            { max: 49, prices: { "무약정": 43500, "1년약정": 43500 }, min: 32600 },
+            { max: 99, prices: { "무약정": 40700, "1년약정": 40700 }, min: 30500 },
+            { max: 299, prices: { "무약정": 38000, "1년약정": 38000 }, min: 28500 },
+            { max: 499, prices: { "무약정": 35200, "1년약정": 35200 }, min: 26400 },
+            { max: 999, prices: { "무약정": 32400, "1년약정": 32400 }, min: 24300 },
+            { max: 2999, prices: { "무약정": 29700, "1년약정": 29700 }, min: 22300 },
+            { max: 4999, prices: { "무약정": 26900, "1년약정": 26900 }, min: 20200 },
+            { max: 9999, prices: { "무약정": 24200, "1년약정": 24200 }, min: 18100 },
+            { max: 9999999, prices: { "무약정": 21400, "1년약정": 21400 }, min: 16100 }
         ]
     },
     "GIED (Device Control)": {
         type: "yearly",
         tiers: [
-            { max: 49, prices: { "무약정": 19800, "1년약정": 19800 } },
-            { max: 99, prices: { "무약정": 17800, "1년약정": 17800 } },
-            { max: 299, prices: { "무약정": 16100, "1년약정": 16100 } },
-            { max: 499, prices: { "무약정": 15100, "1년약정": 15100 } },
-            { max: 999, prices: { "무약정": 14100, "1년약정": 14100 } },
-            { max: 2999, prices: { "무약정": 13200, "1년약정": 13200 } },
-            { max: 4999, prices: { "무약정": 12500, "1년약정": 12500 } },
-            { max: 9999, prices: { "무약정": 11800, "1년약정": 11800 } },
-            { max: 9999999, prices: { "무약정": 10500, "1년약정": 10500 } }
+            { max: 49, prices: { "무약정": 19800, "1년약정": 19800 }, min: 9300 },
+            { max: 99, prices: { "무약정": 17800, "1년약정": 17800 }, min: 8700 },
+            { max: 299, prices: { "무약정": 16100, "1년약정": 16100 }, min: 8000 },
+            { max: 499, prices: { "무약정": 15100, "1년약정": 15100 }, min: 7300 },
+            { max: 999, prices: { "무약정": 14100, "1년약정": 14100 }, min: 6600 },
+            { max: 2999, prices: { "무약정": 13200, "1년약정": 13200 }, min: 5900 },
+            { max: 4999, prices: { "무약정": 12500, "1년약정": 12500 }, min: 5200 },
+            { max: 9999, prices: { "무약정": 11800, "1년약정": 11800 }, min: 4500 },
+            { max: 9999999, prices: { "무약정": 10500, "1년약정": 10500 }, min: 3900 }
         ]
     },
     "Cloud NAC V6.0": {
-        type: "monthly",
-        tiers: [
-            { max: 100, prices: { "무약정": 16000, "1년약정": 7200, "2년약정": 5500, "3년약정": 4800 } },
-            { max: 200, prices: { "무약정": 10700, "1년약정": 4800, "2년약정": 3700, "3년약정": 3200 } },
-            { max: 300, prices: { "무약정": 8700, "1년약정": 3900, "2년약정": 3000, "3년약정": 2600 } },
-            { max: 400, prices: { "무약정": 7400, "1년약정": 3300, "2년약정": 2500, "3년약정": 2200 } },
-            { max: 500, prices: { "무약정": 6700, "1년약정": 3000, "2년약정": 2300, "3년약정": 2000 } },
-            { max: 600, prices: { "무약정": 6100, "1년약정": 2800, "2년약정": 2100, "3년약정": 1800 } },
-            { max: 700, prices: { "무약정": 5600, "1년약정": 2500, "2년약정": 1900, "3년약정": 1700 } },
-            { max: 800, prices: { "무약정": 5400, "1년약정": 2400, "2년약정": 1800, "3년약정": 1600 } },
-            { max: 900, prices: { "무약정": 5100, "1년약정": 2300, "2년약정": 1700, "3년약정": 1500 } },
-            { max: 1000, prices: { "무약정": 4900, "1년약정": 2200, "2년약정": 1600, "3년약정": 1400 } },
-            { max: 1500, prices: { "무약정": 3900, "1년약정": 1700, "2년약정": 1300, "3년약정": 1200 } },
-            { max: 2000, prices: { "무약정": 3300, "1년약정": 1500, "2년약정": 1100, "3년약정": 1000 } },
-            { max: 2500, prices: { "무약정": 2900, "1년약정": 1300, "2년약정": 1000, "3년약정": 900 } },
-            { max: 9999999, prices: { "무약정": 2700, "1년약정": 1200, "2년약정": 900, "3년약정": 800 } }
-        ]
-    },
-    "Cloud NAC V5.0": {
         type: "monthly",
         tiers: [
             { max: 100, prices: { "무약정": 16000, "1년약정": 7200, "2년약정": 5500, "3년약정": 4800 } },
@@ -543,25 +530,61 @@ const pricingDB = {
     "로그 장기 저장 500GB": {
         type: "yearly",
         tiers: [
-            { max: 9999999, prices: { "무약정": 750000, "1년약정": 750000 } }
+            { max: 9999999, prices: { "무약정": 750000, "1년약정": 750000 }, min: 525000 }
         ]
     },
     "로그 장기 저장 1TB": {
         type: "yearly",
         tiers: [
-            { max: 9999999, prices: { "무약정": 1500000, "1년약정": 1500000 } }
+            { max: 9999999, prices: { "무약정": 1500000, "1년약정": 1500000 }, min: 1050000 }
         ]
     },
     "로그 장기 저장 10TB": {
         type: "yearly",
         tiers: [
-            { max: 9999999, prices: { "무약정": 13500000, "1년약정": 13500000 } }
+            { max: 9999999, prices: { "무약정": 13500000, "1년약정": 13500000 }, min: 9450000 }
         ]
     },
     "Slack 1일 보고 — 추가 관리자 계정": {
         type: "yearly",
         tiers: [
-            { max: 9999999, prices: { "무약정": 500000, "1년약정": 500000 } }
+            { max: 9999999, prices: { "무약정": 500000, "1년약정": 500000 }, min: 400000 }
+        ]
+    }
+};
+// ㊿+201 목록에서 뺀 품목(예전 견적을 열 때만 — 새 줄에는 안 나옴): Cloud NAC V5.0 = V6.0 단가 · «Genian MDR 통합»은 GIES 로 합침
+const QP_LEGACY = {
+    "Cloud NAC V5.0": {
+        type: "monthly",
+        tiers: [
+            { max: 100, prices: { "무약정": 16000, "1년약정": 7200, "2년약정": 5500, "3년약정": 4800 } },
+            { max: 200, prices: { "무약정": 10700, "1년약정": 4800, "2년약정": 3700, "3년약정": 3200 } },
+            { max: 300, prices: { "무약정": 8700, "1년약정": 3900, "2년약정": 3000, "3년약정": 2600 } },
+            { max: 400, prices: { "무약정": 7400, "1년약정": 3300, "2년약정": 2500, "3년약정": 2200 } },
+            { max: 500, prices: { "무약정": 6700, "1년약정": 3000, "2년약정": 2300, "3년약정": 2000 } },
+            { max: 600, prices: { "무약정": 6100, "1년약정": 2800, "2년약정": 2100, "3년약정": 1800 } },
+            { max: 700, prices: { "무약정": 5600, "1년약정": 2500, "2년약정": 1900, "3년약정": 1700 } },
+            { max: 800, prices: { "무약정": 5400, "1년약정": 2400, "2년약정": 1800, "3년약정": 1600 } },
+            { max: 900, prices: { "무약정": 5100, "1년약정": 2300, "2년약정": 1700, "3년약정": 1500 } },
+            { max: 1000, prices: { "무약정": 4900, "1년약정": 2200, "2년약정": 1600, "3년약정": 1400 } },
+            { max: 1500, prices: { "무약정": 3900, "1년약정": 1700, "2년약정": 1300, "3년약정": 1200 } },
+            { max: 2000, prices: { "무약정": 3300, "1년약정": 1500, "2년약정": 1100, "3년약정": 1000 } },
+            { max: 2500, prices: { "무약정": 2900, "1년약정": 1300, "2년약정": 1000, "3년약정": 900 } },
+            { max: 9999999, prices: { "무약정": 2700, "1년약정": 1200, "2년약정": 900, "3년약정": 800 } }
+        ]
+    },
+    "Genian MDR 통합": {
+        type: "yearly",
+        tiers: [
+            { max: 49, prices: { "무약정": 130200, "1년약정": 130200 }, min: 97700 },
+            { max: 99, prices: { "무약정": 121700, "1년약정": 121700 }, min: 91300 },
+            { max: 299, prices: { "무약정": 113400, "1년약정": 113400 }, min: 85000 },
+            { max: 499, prices: { "무약정": 106900, "1년약정": 106900 }, min: 80100 },
+            { max: 999, prices: { "무약정": 99900, "1년약정": 99900 }, min: 74900 },
+            { max: 2999, prices: { "무약정": 92200, "1년약정": 92200 }, min: 69000 },
+            { max: 4999, prices: { "무약정": 83200, "1년약정": 83200 }, min: 62300 },
+            { max: 9999, prices: { "무약정": 76200, "1년약정": 76200 }, min: 57000 },
+            { max: 9999999, prices: { "무약정": 67400, "1년약정": 67400 }, min: 50400 }
         ]
     }
 };
@@ -660,7 +683,7 @@ const publicPricingDB = {
     }
 };
 // 계산/조회 시에는 두 DB를 합쳐서 찾습니다 (기존에 저장된 견적을 나중에 열어도 정상 계산되도록).
-const allPricingDB = Object.assign({}, pricingDB, publicPricingDB);
+const allPricingDB = Object.assign({}, QP_LEGACY, pricingDB, publicPricingDB);
 // 화면에 보여줄 "서비스 선택" 목록은 선택한 견적 종류에 따라 달라집니다.
 let activePricingDB = pricingDB;
 // ─────────────────────────────────────────────
@@ -670,7 +693,7 @@ let activePricingDB = pricingDB;
 //   cnac → Cloud NAC V6.0 · V5.0 / ztna → Cloud ZTNA (PA) — 행 = [구간, 무약정, 1년, 2년, 3년] / 서비스 = 소비자가 9구간 / 부가 서비스 = 소비자가(원/년)
 //   저장된 견적은 저장 당시 소비자 단가를 그대로 씀(불러올 때 다시 계산하지 않음)
 // ─────────────────────────────────────────────
-const QP_SVC = { CIE: 'GIES (MDR Service)', MDRA: 'MDR Add-on 24×7', MDR: 'Genian MDR 통합', AV: 'GIEA (AV Service)', RW: 'GIER (Ransomware Service)', DC: 'GIED (Device Control)' };
+const QP_SVC = { MDR: 'GIES (MDR Service)', MDRA: 'MDR Add-on 24×7', CIE: 'Cloud EDR', AV: 'GIEA (AV Service)', RW: 'GIER (Ransomware Service)', DC: 'GIED (Device Control)' };   /* ㊿+201 GIES = MDR 통합 · CIE = Cloud EDR */
 const QP = { st: 'builtin', label: '2026-09 MDR 3종', applied: '2026-09-21', err: '', max: { 'Cloud NAC V6.0': 3000, 'Cloud NAC V5.0': 3000, 'Cloud ZTNA (PA)': 3000 },
     addon: { '로그 장기 저장 500GB': 1, '로그 장기 저장 1TB': 1, '로그 장기 저장 10TB': 1, 'Slack 1일 보고 — 추가 관리자 계정': 1 }, busy: null };
 function qpNum(v) { return typeof v === 'number' && isFinite(v) && v >= 0; }
@@ -695,8 +718,13 @@ function qpBuild(D) {
         const name = QP_SVC[s.key] || String(s.name || '').trim(); if (!name || publicPricingDB[name]) return;
         const c = Array.isArray(s.cons) ? s.cons : [];
         const t = qpTiers(s.tiers, function (i) { return qpNum(c[i]); }, function (i) { return { '무약정': c[i], '1년약정': c[i] }; });
-        if (t) out[name] = { type: 'yearly', tiers: t }; else bad.push(name);
+        if (!t) { bad.push(name); return; }
+        /* ㊿+202 MDR 쪽 서비스: 제안 단가 자동 = 가격표 «최소제안가» 칸(minD · 구간마다 다 있을 때만 · 없으면 소비자가) — minP 는 «파트너 최소제안» */
+        const m = Array.isArray(s.minD) ? s.minD : [];
+        if (t.every(function (_, i) { return qpNum(m[i]) && m[i] > 0; })) t.forEach(function (x, i) { x.min = m[i]; });
+        out[name] = { type: 'yearly', tiers: t };
     });
+    if (out['GIES (MDR Service)']) out['Genian MDR 통합'] = out['GIES (MDR Service)'];   /* ㊿+201 예전 견적의 «Genian MDR 통합» 줄도 같은 단가 */
     [['cnac', ['Cloud NAC V6.0', 'Cloud NAC V5.0']], ['ztna', ['Cloud ZTNA (PA)']]].forEach(function (p) {
         const rows = D[p[0]] && Array.isArray(D[p[0]].rows) ? D[p[0]].rows : null; if (!rows) return;
         const t = qpTiers(rows.map(function (r) { return r && r[0]; }), function (i) { const r = rows[i]; return Array.isArray(r) && [1, 2, 3, 4].every(function (k) { return qpNum(r[k]); }); },
@@ -708,7 +736,9 @@ function qpBuild(D) {
     (Array.isArray(D.addons) ? D.addons : []).forEach(function (a) {
         const name = Array.isArray(a) ? String(a[0] || '').trim() : ''; if (!name || publicPricingDB[name] || QP_SVC[name]) return;
         if (!qpNum(a[1])) { bad.push(name); return; }
-        out[name] = { type: 'yearly', tiers: [{ max: 9999999, prices: { '무약정': a[1], '1년약정': a[1] } }], addon: true };
+        const tr = { max: 9999999, prices: { '무약정': a[1], '1년약정': a[1] } };
+        if (qpNum(a[2]) && a[2] > 0) tr.min = a[2];   /* ㊿+202 부가 서비스도 제안 단가 = «최소제안가» 칸 */
+        out[name] = { type: 'yearly', tiers: [tr], addon: true };
     });
     return { out: out, bad: bad, max: max };
 }
@@ -717,7 +747,7 @@ function qpApply(row) {
     if (!D) throw new Error('가격표 내용이 비어 있습니다');
     const b = qpBuild(D), names = Object.keys(b.out);
     if (!names.length) throw new Error('가격표에서 견적 품목을 하나도 못 읽었습니다');
-    names.forEach(function (n) { const e = { type: b.out[n].type, tiers: b.out[n].tiers }; pricingDB[n] = e; allPricingDB[n] = e; if (b.out[n].addon) QP.addon[n] = 1; });
+    names.forEach(function (n) { const e = { type: b.out[n].type, tiers: b.out[n].tiers }; if (QP_LEGACY[n]) QP_LEGACY[n] = e; else pricingDB[n] = e; allPricingDB[n] = e; if (b.out[n].addon) QP.addon[n] = 1; });   /* ㊿+201 목록에서 뺀 품목(V5.0 · MDR 통합)은 예전 견적 계산용으로만 */
     Object.assign(QP.max, b.max);
     QP.st = b.bad.length ? 'part' : 'db'; QP.label = String(row.label || ''); QP.applied = String(row.applied || '').slice(0, 10); QP.err = b.bad.length ? '못 읽은 표: ' + b.bad.join(', ') : '';
 }
@@ -737,8 +767,8 @@ function qpRefreshRows() {
     document.querySelectorAll('#itemTable tbody tr .product-sel').forEach(function (sel) {
         const have = Array.from(sel.options).map(function (o) { return o.value; }).filter(function (v) { return v && v !== 'direct'; });
         if (have.join('\n') === names.join('\n')) return;
-        const cur = sel.value;
-        sel.innerHTML = tpl`<option value="">-- 서비스 선택 --</option>${rawHtml(names.map(function (n) { return tpl`<option value="${n}">${n}</option>`; }).join(''))}<option value="direct">직접 입력</option>`;
+        const cur = sel.value, keep = cur && cur !== 'direct' && names.indexOf(cur) < 0 && allPricingDB[cur] ? [cur] : [];   /* ㊿+201 예전 견적의 뺀 품목은 그 줄에만 남김 */
+        sel.innerHTML = tpl`<option value="">-- 서비스 선택 --</option>${rawHtml(names.concat(keep).map(function (n) { return tpl`<option value="${n}">${n}</option>`; }).join(''))}<option value="direct">직접 입력</option>`;
         sel.value = cur;
     });
     if (typeof calcAll === 'function') calcAll();
@@ -970,7 +1000,7 @@ function addRow(data) {
         </td>
         <td><input type="text" class="consumer-price input-num text-right" data-manual="false" placeholder="자동계산" data-input="onConsumerPriceInput(this)"></td>
         <td><input type="text" inputmode="numeric" class="qty input-num" value="1" maxlength="9" data-input="sanitizeQtyInput(this); resetConsumerManual(this.closest('tr')); calcAll();" style="display: none; width: 100%; box-sizing: border-box; padding: 2px 4px;"></td>
-        <td><input type="text" class="proposed-price input-num text-right" data-input="formatCurrency(this)" placeholder="직접입력"></td>
+        <td><input type="text" class="proposed-price input-num text-right" data-manual="false" data-input="onProposedInput(this)" placeholder="자동계산"></td>
         <td><input type="text" class="row-total input-num text-right" readonly></td>
         <td><input type="text" class="row-vat input-num text-right" readonly></td>
         <td style="position:relative;">
@@ -984,6 +1014,9 @@ function addRow(data) {
     tbody.appendChild(tr);
     if (data) {
         const prodSel = tr.querySelector('.product-sel');
+        if (data.prod && data.prod !== 'direct' && allPricingDB[data.prod] && !Array.from(prodSel.options).some(o => o.value === data.prod)) {   /* ㊿+201 목록에서 뺀 품목(예전 견적) — 그 줄에만 */
+            const o = document.createElement('option'); o.value = data.prod; o.textContent = data.prod; prodSel.insertBefore(o, prodSel.lastElementChild);
+        }
         prodSel.value = data.prod || "";
         if (data.prod === 'direct') {
             prodSel.style.display = 'none';
@@ -1014,6 +1047,7 @@ function addRow(data) {
         }
         tr.querySelector('.billing-sel').value = data.billing || "";
         tr.querySelector('.proposed-price').value = data.proposed || "";
+        tr.querySelector('.proposed-price').dataset.manual = "true";   /* ㊿+201 저장 · 복제한 제안 단가는 그대로(수량 · 기간 · 납부 주기를 바꾸면 다시 자동) */
         tr.querySelector('td:last-child input[type="text"]').value = data.note || "";
     }
     calcAll();
@@ -1061,6 +1095,7 @@ function updateOptions(selectElem) {
     const termCustom = tr.querySelector('.term-custom');
     const consumerPrice = tr.querySelector('.consumer-price');
     consumerPrice.dataset.manual = "false";
+    tr.querySelector('.proposed-price').dataset.manual = "false";   /* ㊿+201 */
     termSel.innerHTML = '<option value="">-- 계약 기간 --</option>';
     applyBillingRestriction(tr, prodName);
     if (prodName === 'direct') {
@@ -1125,6 +1160,30 @@ function onConsumerPriceInput(input) {
 function resetConsumerManual(tr) {
     const consumerPrice = tr.querySelector('.consumer-price');
     if (consumerPrice) consumerPrice.dataset.manual = "false";
+    const proposed = tr.querySelector('.proposed-price');   /* ㊿+201 제안 단가도 다시 자동 */
+    if (proposed) proposed.dataset.manual = "false";
+}
+// ㊿+201 제안 단가: 자동으로 채우되 사람이 고치면 그 값 유지(서비스 · 기간 · 납부 주기 · 수량을 바꾸면 다시 자동)
+function onProposedInput(input) {
+    input.dataset.manual = "true";
+    formatCurrency(input);
+}
+/** ㊿+201 납부 주기 · 계약 기간에 맞춘 단가(예전 계산식 그대로 — 소비자 단가 · 제안 단가에 같이 씀) */
+function qpPeriod(db, term, isLumpSum, billingMulti, p) {
+    let v = +p || 0;
+    if (isLumpSum) {
+        let years = 1;
+        if (term.includes('2년')) years = 2;
+        else if (term.includes('3년')) years = 3;
+        else if (term.includes('4년')) years = 4;
+        else if (term.includes('5년')) years = 5;
+        if (db.type === 'monthly') { if (term !== '무약정') v *= years * 12; }
+        else if (db.type === 'yearly') v *= years;
+    } else {
+        if (db.type === 'monthly' && billingMulti === 12) v *= 12;
+        if (db.type === 'yearly' && billingMulti === 1) v = Math.floor(v / 12);
+    }
+    return v;
 }
 function calcAll() {
     if (isPo()) { calcPo(); return; }
@@ -1139,35 +1198,23 @@ function calcAll() {
         const isLumpSum = (billingVal === 'lump');
         const billingMulti = parseInt(billingVal) || 1;
         const qty = parseInt(tr.querySelector('.qty').value) || 0;
-        const proposedInput = tr.querySelector('.proposed-price').value.replace(/,/g, '');
-        const proposedPrice = parseInt(proposedInput) || 0;
-        let consumerPrice = 0;
+        let consumerPrice = 0, termAuto = 0;
         if (prodName === 'direct') {
             const cPriceInput = tr.querySelector('.consumer-price').value.replace(/,/g, '');
             consumerPrice = parseInt(cPriceInput) || 0;
-        } else if (prodName && term && billingVal !== "" && qty > 0) {
+        } else if (prodName && term && billingVal !== "" && qty > 0 && allPricingDB[prodName]) {
             const db = allPricingDB[prodName];
             let tier = db.tiers.find(t => qty <= t.max);
             if (!tier) tier = db.tiers[db.tiers.length - 1];
-            let basePrice = tier.prices[term] || 0;
-            if (isLumpSum) {
-                let years = 1;
-                if (term.includes('2년')) years = 2;
-                else if (term.includes('3년')) years = 3;
-                else if (term.includes('4년')) years = 4;
-                else if (term.includes('5년')) years = 5;
-                if (db.type === "monthly") {
-                    if (term === '무약정') { basePrice *= 1; }
-                    else { basePrice *= (years * 12); }
-                } else if (db.type === "yearly") {
-                    basePrice *= years;
-                }
-            } else {
-                if (db.type === "monthly" && billingMulti === 12) basePrice *= 12;
-                if (db.type === "yearly" && billingMulti === 1) basePrice = Math.floor(basePrice / 12);
-            }
-            consumerPrice = basePrice;
+            /* ㊿+201 소비자 단가 = 가격표 소비자가(무약정) · 제안 단가 = 고른 약정 기간 단가 — 둘 다 자동, 같은 납부 주기 · 기간으로 · 고치면 그 값 유지
+               ㊿+202 최소제안가가 있는 품목(MDR 쪽 서비스 · 부가 서비스)은 제안 단가 = 최소제안가 */
+            const list = tier.prices['무약정'] != null ? tier.prices['무약정'] : (tier.prices[term] || 0);
+            consumerPrice = qpPeriod(db, term, isLumpSum, billingMulti, list);
+            termAuto = qpPeriod(db, term, isLumpSum, billingMulti, tier.min != null ? tier.min : tier.prices[term] != null ? tier.prices[term] : list);
         }
+        const proposedEl = tr.querySelector('.proposed-price');
+        if (prodName && prodName !== 'direct' && proposedEl.dataset.manual !== 'true') proposedEl.value = termAuto ? termAuto.toLocaleString() : '';
+        const proposedPrice = parseInt(proposedEl.value.replace(/,/g, '')) || 0;
         const isIncomplete = !!prodName && prodName !== 'direct' && (!term || billingVal === "");
         tr.classList.toggle('row-incomplete', isIncomplete);
         if (isIncomplete) incompleteCount++;
@@ -1527,6 +1574,7 @@ SAT.act({
   listGithubQuotes: listGithubQuotes,
   loadQuoteData: loadQuoteData,
   onConsumerPriceInput: onConsumerPriceInput,
+  onProposedInput: onProposedInput,
   prepareAndPrint: prepareAndPrint,
   remarksGrow: remarksGrow,
   requestGithubSettings: requestGithubSettings,

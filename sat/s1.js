@@ -235,8 +235,10 @@ function countUse(){
   $('#cWhy').innerHTML='신규 = 기산일자가 '+(ym||'정산월')+'(또는 노란색) · 해약 = 해약일자·현재상태(붉은색) · 연장 = 계약일자만 '+(ym||'정산월')+'인 건'+
     (extHint?tpl` <span class="lnk" title="비즈포탈 프로젝트명에 연장·재약정이 들어간 건">(비즈포탈에 «연장» 표기 ${rawHtml(extHint)}건 있음)</span>`:'')+' — 모두 직접 고칠 수 있습니다';
 }
+/* ㊿+202 설치 리스트 한 줄이 철거인지(작업구분 · 비고에 철거 · 회수) — 철거 줄은 비즈포탈 «철거비 · 회수비» 건과 맞춤 */
+function instKind(r){ return /철거|회수/.test(String(r.work||'')+' '+String(r.note||''))? 'once' : 'install'; }
 function matchInst(){
-  var biz=(S.biz||[]).filter(function(b){ return b.kind==='install'; });
+  var biz=(S.biz||[]).filter(function(b){ return b.kind==='install' || b.kind==='once'; });   /* ㊿+202 설치비 + 철거비(예전엔 설치비만 → 철거 줄은 후보에도 안 나왔음) */
   var mapByCno={}; S.maps.forEach(function(m){ if(m.contract_no) mapByCno[m.contract_no]=m; });
   var used={};
   S.inst.forEach(function(r){
@@ -244,13 +246,14 @@ function matchInst(){
     r.amt=r.base*n(S.cfg.install&&S.cfg.install.base||100000)+r.extra*n(S.cfg.install&&S.cfg.install.extra||80000);
     r.biz=null; r.by=null;
     var m=r.cno&&mapByCno['I:'+r.cno];   // 설치비는 매월 새 등록번호 → 'I:' 접두 매핑은 참고용
-    var c=biz.filter(function(b){ return !used[b.no] && (nameHit(b.cust,r.nm)||nameHit(b.name,r.nm)); });
+    var want=instKind(r), same=biz.filter(function(b){ return b.kind===want; });   /* 자동 매칭은 같은 종류끼리(설치 ↔ 설치비 · 철거 ↔ 철거비) */
+    var c=same.filter(function(b){ return !used[b.no] && (nameHit(b.cust,r.nm)||nameHit(b.name,r.nm)); });
     if(c.length===1){ r.biz=c[0]; r.by='name'; used[c[0].no]=1; }
     if(!r.biz){
-      var c2=biz.filter(function(b){ return !used[b.no] && Math.abs(b.acc-r.amt)<1 && Math.max(simBest(b.cust,r.nm),simBest(b.name,r.nm))>=.45; });
+      var c2=same.filter(function(b){ return !used[b.no] && Math.abs(b.acc-r.amt)<1 && Math.max(simBest(b.cust,r.nm),simBest(b.name,r.nm))>=.45; });
       if(c2.length===1){ r.biz=c2[0]; r.by='amt'; used[c2[0].no]=1; }
     }
-    r.cand=biz.map(function(b){ return { b:b, s:Math.max(simBest(b.cust,r.nm),simBest(b.name,r.nm))+(Math.abs(b.acc-r.amt)<1?.5:0)-(used[b.no]?.2:0) }; })
+    r.cand=biz.map(function(b){ return { b:b, s:Math.max(simBest(b.cust,r.nm),simBest(b.name,r.nm))+(Math.abs(b.acc-r.amt)<1?.5:0)-(used[b.no]?.2:0)+(b.kind===want?.3:0) }; })
               .sort(function(x,y){ return y.s-x.s; }).slice(0,8);
     r.diff=r.biz?(r.biz.acc-r.amt):0;
   });
@@ -341,7 +344,7 @@ function renderInst(){
   $('#iTiles').innerHTML=
     tile('설치 건수', tpl`${S.inst.length}건 <span class="mini">기본 ${rawHtml(S.inst.reduce(function(a,r){return a+r.base;},0))} · 추가 ${rawHtml(S.inst.reduce(function(a,r){return a+r.extra;},0))}</span>`)+
     tile('에스원 청구액', fmt(sum))+
-    tile('비즈포탈 설치비', tpl`${rawHtml(fmt(bizSum))} <span class="mini">${(S.instBiz||[]).length}건</span>`)+
+    tile('비즈포탈 설치·철거비', tpl`${rawHtml(fmt(bizSum))} <span class="mini">${(S.instBiz||[]).length}건</span>`)+
     tile('차액', fmt(sum-bizSum), Math.abs(sum-bizSum)<1?'ok':'bad')+
     tile('미매칭', need+'건', need?'bad':'ok')+
     tile('매입(업체 지급)', fmt(buy))+
@@ -351,7 +354,7 @@ function renderInst(){
     var st=!r.biz?'need':(Math.abs(r.diff)>=1?'diff':'auto');
     var by={name:'<span class="tag">이름 일치</span>',amt:'<span class="tag amt">금액 일치</span>',pick:'<span class="tag map">선택</span>'}[r.by]||'<span class="tag need">확인 필요</span>';
     var pick=tpl`<select class="pick" data-i="${rawHtml(i)}" data-change="pickInst(this)"><option value="">— 선택 —</option>`+
-      tpl`${rawHtml(r.cand.map(function(c){ return tpl`<option value="${rawHtml(c.b.no)}"${r.biz&&r.biz.no===c.b.no?' selected':''}>${c.b.no+' · '+(c.b.cust||c.b.name)+' · '+fmt(c.b.acc)}</option>`; }).join(''))}</select>`;
+      tpl`${rawHtml(r.cand.map(function(c){ return tpl`<option value="${rawHtml(c.b.no)}"${r.biz&&r.biz.no===c.b.no?' selected':''}>${c.b.no+' · '+(c.b.cust||c.b.name)+(c.b.kind==='once'?' · 철거비':'')+' · '+fmt(c.b.acc)}</option>`; }).join(''))}</select>`;
     var tr=document.createElement('tr'); tr.className='st-'+st;
     tr.innerHTML=tpl`<td>${rawHtml(by)}</td><td>${String(r.idate||'')}</td><td>${r.cno}</td><td>${r.nm}</td>`+
       tpl`<td class="mini">${r.work+' '+r.spec}</td>`+
@@ -453,7 +456,7 @@ async function dlInstXlsx(){
   var aoa=[['클라우드 NAC 센서 설치/철거 — '+ym],[],
     ['Bizportal 등록번호','계약번호','고객사','제공서비스','기본 단가','기본 수량','추가 단가','추가 수량','총 설치/철거비','현재상태']];
   S.inst.forEach(function(r){
-    aoa.push([ r.biz?r.biz.no:'', r.cno, r.nm, '설치비', base, r.base, extra, r.extra, r.amt, r.stat||'설치 완료' ]);
+    aoa.push([ r.biz?r.biz.no:'', r.cno, r.nm, instKind(r)==='once'?'철거비':'설치비', base, r.base, extra, r.extra, r.amt, r.stat||(instKind(r)==='once'?'철거 완료':'설치 완료') ]);
   });
   aoa.push([]); aoa.push(['','','','','','','','합계',S.inst.reduce(function(a,r){ return a+r.amt; },0)]);
   aoa.push(['매입('+($('#vendor').value||'설치업체')+')','','','','','','',n($('#buyTotal').value)]);
@@ -486,7 +489,7 @@ async function saveSettle(kind){
             biz_total:(S.instBiz||[]).reduce(function(a,b){ return a+b.acc; },0),
             cnt_new:S.inst.reduce(function(a,r){ return a+r.base; },0), cnt_ext:S.inst.reduce(function(a,r){ return a+r.extra; },0),
             buy_amount:n($('#buyTotal').value),
-            payload:{ vendor:$('#vendor').value, rows:S.inst.map(function(r){ return { cno:r.cno, nm:r.nm, idate:String(r.idate||''), base:r.base, extra:r.extra, amt:r.amt, biz:r.biz?r.biz.no:null, bacc:r.biz?r.biz.acc:null, note:r.note }; }) },   /* ㊿+176 bacc = 비즈포탈 금액(불러올 때 차이가 0으로 보이던 것) */
+            payload:{ vendor:$('#vendor').value, rows:S.inst.map(function(r){ return { cno:r.cno, nm:r.nm, idate:String(r.idate||''), base:r.base, extra:r.extra, amt:r.amt, biz:r.biz?r.biz.no:null, bacc:r.biz?r.biz.acc:null, note:r.note, work:r.work||'' }; }) },   /* ㊿+176 bacc = 비즈포탈 금액(불러올 때 차이가 0으로 보이던 것) */
             created_by:s.u||null };
     }
     var have=await sbGet('s1_settle?select=id&month=eq.'+row.month+'&kind=eq.'+row.kind);
@@ -571,8 +574,8 @@ function printInst(){
     cols:[{k:'no',l:'Bizportal 등록번호',w:'14%'},{k:'cno',l:'계약번호',w:'12%'},{k:'cust',l:'고객사',w:'22%',wrap:true},
           {k:'svc',l:'제공서비스',w:'10%'},{k:'b',l:'기본 수량',n:true,w:'9%'},{k:'e',l:'추가 수량',n:true,w:'9%'},
           {k:'amt',l:'총 설치/철거비',n:true,w:'13%'},{k:'stat',l:'현재상태',w:'11%'}],
-    rows:S.inst.map(function(r){ return { no:r.biz? r.biz.no:'', cno:r.cno, cust:r.nm, svc:'설치비',
-      b:r.base, e:r.extra, amt:fmt(r.amt), stat:r.stat||'설치 완료', __hl:!r.biz }; }),
+    rows:S.inst.map(function(r){ return { no:r.biz? r.biz.no:'', cno:r.cno, cust:r.nm, svc:instKind(r)==='once'?'철거비':'설치비',
+      b:r.base, e:r.extra, amt:fmt(r.amt), stat:r.stat||(instKind(r)==='once'?'철거 완료':'설치 완료'), __hl:!r.biz }; }),
     foot:[{ cust:'합계', amt:fmt(sum) }],
     note:'· 연한 노란 줄은 비즈포탈 등록번호가 연결되지 않은 건입니다.\n· 설치업체 지급액은 업체 견적서 기준으로 입력합니다.'
   });
@@ -688,7 +691,8 @@ async function restoreSettle(id){
       msg('mU2','저장된 정산을 불러왔습니다 ('+ym+' · '+fmt(r.total)+'원)','ok');
     }else{
       S.inst=(p.rows||[]).map(function(x){
-        return { row:0, cno:x.cno, nm:x.nm, work:'', idate:x.idate||'', price:0, spec:'', qty:x.base||0, sensor:x.extra||0,
+        return { row:0, cno:x.cno, nm:x.nm, work:x.work||'', idate:x.idate||'',   /* ㊿+202 작업구분(철거) 도 저장 · 불러오기 */
+                 price:0, spec:'', qty:x.base||0, sensor:x.extra||0,
                  note:x.note||'', stat:'', base:Number(x.base||0), extra:Number(x.extra||0), amt:Number(x.amt||0),
                  biz: x.biz? { no:x.biz, cust:'', acc:Number(x.bacc!=null? x.bacc : x.amt||0) } : null, by:'map', cand:[], diff:(x.biz && x.bacc!=null)? Number(x.amt||0)-Number(x.bacc) : 0 };
       });
@@ -743,7 +747,9 @@ async function makeReport(kind){
   var ym=$('#ym').value; if(!ym){ alert('정산월을 고르세요'); return; }
   var mid=kind==='use'?'mU2':'mI2';
   var M=+ym.slice(5,7), day=String(n(S.cfg.invoice&&S.cfg.invoice.day||10)).padStart(2,'0');
-  var today=todayISO(), tax=ym+'-'+day;
+  /* ㊿+202 계산서 발행일 · 품의일자 = 정산월 다음 달 «발행일»(설정 · 기본 10일) — 9월분이면 10월 10일 (예전: 계산서는 정산월 10일 · 품의일자는 오늘) */
+  var nx=new Date(ym+'-01T00:00:00'); nx.setMonth(nx.getMonth()+1);
+  var today=todayISO(), tax=nx.getFullYear()+'-'+String(nx.getMonth()+1).padStart(2,'0')+'-'+day;
   var d=new Date(ym+'-01T00:00:00'); d.setMonth(d.getMonth()+2); d.setDate(0);
   var pay=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
   try{
@@ -755,7 +761,7 @@ async function makeReport(kind){
       title='클라우드 NAC '+M+'월 대금';
       var rate=n(S.cfg.fee&&S.cfg.fee.rate||5);
       p={ no:nos, team1:'서비스사업팀', team2:'영업관리팀', team3:'경영지원본부', dept:'서비스사업팀',
-          customer:'에스원', writer:'최형우', title:title, date:today, contact:'',
+          customer:'에스원', writer:'최형우', title:title, date:tax, contact:'',
           cdate:today, amount:String(amount), paydate:pay, payterm:'익월 말 결제', taxdate:tax,
           warranty:'1개월', saletype:'직접판매', hwcost:'', flow:'에스원 - 지니언스',
           remarks:' - 신규 '+$('#cNew').value+'건, 해약 '+$('#cEnd').value+'건, 연장 '+$('#cExt').value+'건\n  ※ 상세 내역 별첨',
@@ -769,7 +775,7 @@ async function makeReport(kind){
       var base=n(S.cfg.install&&S.cfg.install.base||100000), extra=n(S.cfg.install&&S.cfg.install.extra||80000);
       var nb=S.inst.reduce(function(a,r){ return a+r.base; },0), ne=S.inst.reduce(function(a,r){ return a+r.extra; },0);
       p={ no:nos, team1:'서비스사업팀', team2:'영업관리팀', team3:'경영지원본부', dept:'서비스사업팀',
-          customer:'에스원', writer:'최형우', title:title, date:today, contact:'',
+          customer:'에스원', writer:'최형우', title:title, date:tax, contact:'',
           cdate:today, amount:String(amount), paydate:pay, payterm:'익월 말 결제', taxdate:tax,
           warranty:'1개월', saletype:'직접판매', hwcost:'', flow:'에스원 - 지니언스 - '+($('#vendor').value||'설치업체'),
           remarks:' - 설치(검수)확인서 별첨',

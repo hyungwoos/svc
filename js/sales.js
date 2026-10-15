@@ -391,8 +391,9 @@ export var QCFG_DEF='https://aged-union-cdd3.choihw.workers.dev';
 /* 견적서 서비스명 → 포탈 OI 제품군 */
 export var QPROD_MAP={
   'GIES (MDR Service)':'MDR',
-  'MDR Add-on 24×7':'MDR',
-  'Genian MDR 통합':'MDR',
+  'MDR Add-on 24×7':'MDR Add-on',
+  'Genian MDR 통합':'MDR',   /* ㊿+201 예전 견적 — 지금은 GIES 로 합침 */
+  'Cloud EDR':'Cloud EDR',
   'GIEA (AV Service)':'AV (안티바이러스)',
   'GIER (Ransomware Service)':'AR (안티랜섬웨어)',
   'DocuRay DRM':'DRM',

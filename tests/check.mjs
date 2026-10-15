@@ -304,7 +304,7 @@ say(/^export function tickMemo\(/m.test(jsAll) && /^export function cssvKey\(/m.
 // ㊿+198 견적서 단가 = 가격표(price_books SaaS 최신 판) · 내장 값은 못 읽을 때만
 { const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
   const q = rd('sat/quote.js'), qh = rd('quote.html'), qc = rd('sat/quote.css');
-  say(/^function qpLoad\(\)/m.test(q) && /price_books\?select=label,applied,data&seg=eq\.saas&order=applied\.desc,id\.desc&limit=1/.test(q) && /^const QP_SVC = \{ CIE: 'GIES \(MDR Service\)', MDRA: 'MDR Add-on 24×7', MDR: 'Genian MDR 통합', AV: 'GIEA \(AV Service\)', RW: 'GIER \(Ransomware Service\)', DC: 'GIED \(Device Control\)' \};/m.test(q)
+  say(/^function qpLoad\(\)/m.test(q) && /price_books\?select=label,applied,data&seg=eq\.saas&order=applied\.desc,id\.desc&limit=1/.test(q) && /^const QP_SVC = \{ MDR: 'GIES \(MDR Service\)', MDRA: 'MDR Add-on 24×7', CIE: 'Cloud EDR', AV: 'GIEA \(AV Service\)', RW: 'GIER \(Ransomware Service\)', DC: 'GIED \(Device Control\)' \};/m.test(q)
     && /'무약정': r\[1\], '1년약정': r\[2\], '2년약정': r\[3\], '3년약정': r\[4\]/.test(q) && /qpLoad\(\);   \/\/ ㊿\+198/.test(q) && /id="qpState" class="qp-state no-print"/.test(qh) && /@media print \{ \.qp-state \{ display: none !important; \} \}/.test(qc)
     && /"Cloud ZTNA \(PA\)": \{\n {8}type: "monthly",\n {8}tiers: \[\n {12}\{ max: 100, prices: \{ "무약정": 13300, "1년약정": 6000, "2년약정": 4500, "3년약정": 4000 \} \}/.test(q),
   '㊿+198 견적서 단가 = 가격표 SaaS 최신 판(서비스 key 매핑 · NAC/ZTNA 약정별 · 부가 서비스 · 작성자만 보는 출처 표시) · 내장 값 = 2026-09-21 판'); }
@@ -319,6 +319,22 @@ say(/^export function tickMemo\(/m.test(jsAll) && /^export function cssvKey\(/m.
   say(/^export function fbItems\(\)/m.test(nt) && /sbWrite\('POST','rpc\/feedback_act',\{p_id:x\.id, p_act:act, p_body:body\|\|null\}\)/.test(nt) && /data-fbtab="inbox"/.test(nt) && /class="fb-steps"/.test(nt) && /dmOnly:true/.test(nt) && /var team=all\.filter\(function\(x\)\{ return !x\.dmOnly; \}\);/.test(nt) && /\^rpc\\\/feedback_act\\b/.test(cr)
     && /^export var API_DS=/m.test(ad) && /^export function apiUrl\(ds, fmt\)/m.test(ad) && /<div id="apiGuide">/.test(ad) && /class="api-flow"/.test(ad) && !/'곳'/.test(ds + sh) && /\['개사 · 건 · 대'/.test(sh),
   '㊿+200 개선 요청: 탭 · 진행 줄 · feedback_act · 요청자/처리자 알림(DM 만) / 외부 연동 안내(자료 · 주소 · 따라 하기) / 고객사 수 «개사»'); }
+// ㊿+201 견적서: 소비자 단가 = 무약정 · 제안 단가 = 약정가 자동(고치면 유지) · V5.0 · MDR 통합은 예전 견적에만
+{ const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
+  const q = rd('sat/quote.js'), pdb = (q.match(/const pricingDB = \{[\s\S]*?\n\};/) || [''])[0];
+  say(/^function qpPeriod\(db, term, isLumpSum, billingMulti, p\)/m.test(q) && /const list = tier\.prices\['무약정'\] != null/.test(q) && /proposedEl\.dataset\.manual !== 'true'/.test(q) && /^function onProposedInput\(input\)/m.test(q) && /data-input="onProposedInput\(this\)"/.test(q)
+    && /^const QP_LEGACY = \{/m.test(q) && /Object\.assign\(\{\}, QP_LEGACY, pricingDB, publicPricingDB\)/.test(q) && !/"Cloud NAC V5\.0"|"Genian MDR 통합"/.test(pdb) && /"Cloud EDR": \{\n {8}type: "yearly",\n {8}tiers: \[\n {12}\{ max: 49, prices: \{ "무약정": 86900/.test(pdb) && /"GIES \(MDR Service\)": \{\n {8}type: "yearly",\n {8}tiers: \[\n {12}\{ max: 49, prices: \{ "무약정": 130200/.test(pdb),
+  '㊿+201 견적서: 소비자 단가 = 무약정 · 제안 단가 = 약정가 자동 · GIES = MDR 통합 · Cloud EDR · V5.0/MDR 통합 목록에서 뺌(예전 견적만)'); }
+// ㊿+202 견적서 MDR 쪽 서비스 · 부가 서비스: 제안 단가 자동 = 가격표 «최소제안가» 칸(minD · 부가는 3번째 값) · 내장 값에도 min
+{ const q = (() => { try { return fs.readFileSync(path.join(ROOT, 'sat/quote.js'), 'utf8'); } catch (e) { return ''; } })(), pdb = (q.match(/const pricingDB = \{[\s\S]*?\n\};/) || [''])[0];
+  const svcMin = ['GIES \\(MDR Service\\)', 'MDR Add-on 24×7', 'Cloud EDR', 'GIEA \\(AV Service\\)', 'GIER \\(Ransomware Service\\)', 'GIED \\(Device Control\\)'].every((n) => new RegExp('"' + n + '": \\{\\n {8}type: "yearly",\\n {8}tiers: \\[\\n {12}\\{ max: 49, prices: \\{ "무약정": \\d+, "1년약정": \\d+ \\}, min: \\d+ \\}').test(pdb));
+  say(svcMin && /"GIES \(MDR Service\)": \{\n {8}type: "yearly",\n {8}tiers: \[\n {12}\{ max: 49, prices: \{ "무약정": 130200, "1년약정": 130200 \}, min: 97700 \}/.test(pdb) && /const m = Array\.isArray\(s\.minD\) \? s\.minD : \[\];/.test(q) && /if \(qpNum\(a\[2\]\) && a\[2\] > 0\) tr\.min = a\[2\];/.test(q) && /"로그 장기 저장 1TB": \{\n {8}type: "yearly",\n {8}tiers: \[\n {12}\{ max: 9999999, prices: \{ "무약정": 1500000, "1년약정": 1500000 \}, min: 1050000 \}/.test(pdb) && /tier\.min != null \? tier\.min : tier\.prices\[term\] != null/.test(q) && !/min: /.test((pdb.match(/"Cloud NAC V6\.0": \{[\s\S]*?\n {4}\}/) || [''])[0]),
+  '㊿+202 견적서 MDR 쪽 서비스 6종 · 부가 서비스 제안 단가 = «최소제안가»(가격표 minD · 부가 3번째 값 · 내장 값 min) · NAC/ZTNA 는 약정가 그대로'); }
+// ㊿+202 에스원 설치비 정산: 철거 줄 ↔ 비즈포탈 철거비 · 리포트 계산서 발행일 · 품의일자 = 다음 달 발행일
+{ const s1 = (() => { try { return fs.readFileSync(path.join(ROOT, 'sat/s1.js'), 'utf8'); } catch (e) { return ''; } })();
+  say(/^function instKind\(r\)\{ return \/철거\|회수\//m.test(s1) && /return b\.kind==='install' \|\| b\.kind==='once';/.test(s1) && /same=biz\.filter\(function\(b\)\{ return b\.kind===want; \}\)/.test(s1) && /tile\('비즈포탈 설치·철거비'/.test(s1)
+    && /nx\.setMonth\(nx\.getMonth\(\)\+1\);/.test(s1) && (s1.match(/title:title, date:tax, contact:''/g) || []).length === 2 && !/date:today, contact/.test(s1) && /work:x\.work\|\|''/.test(s1),
+  '㊿+202 에스원 설치비 정산: 철거 줄 ↔ 비즈포탈 철거비(같은 종류끼리 자동 · 목록에 철거비) · 리포트 계산서 발행일 · 품의일자 = 다음 달 발행일'); }
 // ㊿+160 연장하면 상태 «재약정»(구분 그대로) · 계약 상세에 «계약 기간 · 연장 이력»
 say(/^export function renewStatus\(r\)/m.test(jsAll) && /var nst=renewStatus\(r\);/.test(jsAll) && /^export function ctPeriods\(c, mine\)/m.test(jsAll) && html.includes('id="dtRenew"'), '연장: 상태 «재약정»(renewStatus) · 계약 상세 연장 이력(ctPeriods · #dtRenew)');
 const idx = html + jsAll;
