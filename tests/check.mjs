@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const tmp = fs.mkdtempSync(path.join(process.env.TMPDIR || '/tmp', 'svc-check-'));
 const ghErr = (title, m) => { if (process.env.GITHUB_ACTIONS) console.log('::error title=' + title + '::' + String(m).replace(/%/g, '%25').replace(/\r?\n/g, '%0A').slice(0, 900)); };   /* ㊿+158 실패를 Actions 요약 화면(로그인 없이 보임)에 주석으로 */
@@ -335,6 +335,32 @@ say(/^export function tickMemo\(/m.test(jsAll) && /^export function cssvKey\(/m.
   say(/^function instKind\(r\)\{ return \/철거\|회수\//m.test(s1) && /return b\.kind==='install' \|\| b\.kind==='once';/.test(s1) && /same=biz\.filter\(function\(b\)\{ return b\.kind===want; \}\)/.test(s1) && /tile\('비즈포탈 설치·철거비'/.test(s1)
     && /nx\.setMonth\(nx\.getMonth\(\)\+1\);/.test(s1) && (s1.match(/title:title, date:tax, contact:''/g) || []).length === 2 && !/date:today, contact/.test(s1) && /work:x\.work\|\|''/.test(s1),
   '㊿+202 에스원 설치비 정산: 철거 줄 ↔ 비즈포탈 철거비(같은 종류끼리 자동 · 목록에 철거비) · 리포트 계산서 발행일 · 품의일자 = 다음 달 발행일'); }
+// ㊿+203 외부 연동 «API 문서»(Swagger 형식) · 시험 호출 · openapi.json · export v1.2 — 명세(js/apispec.js)와 함수가 같은 조건 · 칸
+try {
+  const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
+  const { openapiText } = await import('./openapi.mjs'); const want = await openapiText(ROOT);
+  say(want === rd('openapi.json'), 'openapi.json = js/apispec.js 로 만든 것 (다르면 node tests/openapi.mjs)');
+  const spec = await import(pathToFileURL(path.join(ROOT, 'js/apispec.js')).href), fn = rd('supabase/functions/export/index.ts');
+  const arr = (name) => { const m = new RegExp('export const ' + name + ' = \\[([^\\]]*)\\]').exec(fn); return m ? [...m[1].matchAll(/'([\w]+)'/g)].map((x) => x[1]) : null; };
+  const allow = (tbl) => { const m = new RegExp("getList\\('" + tbl + "', \\w+, '[^']+', p, key, \\[([^\\]]*)\\], \\['(\\w+)'").exec(fn); return m ? [...m[1].matchAll(/'(\w+)'/g)].map((x) => x[1]).concat([m[2]]) : null; };
+  const qn = (id) => spec.apiRes(id).q.map((q) => q.n).filter((n) => !['limit', 'offset', 'format'].includes(n)).sort().join(',');
+  const fnm = (id) => spec.apiRes(id).f.map((f) => f[0]);
+  const same = (a, b) => a && b && a.slice().sort().join(',') === b.slice().sort().join(',');
+  const bad = [];
+  if (!same(fnm('contracts'), (arr('CT_COLS') || []).concat(['customer', 'line_label']))) bad.push('contracts 칸');
+  if (!same(fnm('poc'), (arr('POC_COLS') || []).concat(['modules']))) bad.push('poc 칸');
+  if (!same(fnm('orders'), arr('ORD_COLS'))) bad.push('orders 칸');
+  if (!same(fnm('assets'), arr('AST_COLS'))) bad.push('assets 칸');
+  [['poc', 'mdr_ops'], ['orders', 'equipment_orders'], ['assets', 'equipment_assets']].forEach(([id, tbl]) => { const a = allow(tbl); if (!a || a.slice().sort().join(',') !== qn(id)) bad.push(id + ' 조건 ' + (a || []).join('·') + ' ≠ ' + qn(id)); });
+  [['contracts', ['updated_since', 'line', 'status']], ['revenue', ['from', 'to', 'contract_id']], ['mrr', ['month', 'from', 'to']], ['customers', []]].forEach(([id, ns]) => { if (qn(id) !== ns.slice().sort().join(',') || !ns.every((n) => fn.includes("'" + n + "'"))) bad.push(id + ' 조건'); });
+  if (!same(spec.API_RES.map((r) => r.id), arr('RESOURCES'))) bad.push('자료 목록');
+  say(!bad.length, '명세(js/apispec.js) ↔ export 함수: 자료 7개 · 조건 · 내보내는 칸이 같음' + (bad.length ? ' — 다름: ' + bad.join(' / ') : ''));
+  const ad = rd('js/admin.js');
+  say(/export const VERSION = 'export v1\.2';/.test(fn) && /^export function corsOf\(req: Request\)/m.test(fn) && /one\('is_super_admin'\), one\('mfa_ok'\)/.test(fn) && /if \(!corsOf\(req\)\['Access-Control-Allow-Origin'\]\) \{ status = 401;/.test(fn) && /'Access-Control-Allow-Headers': 'x-api-key, authorization, apikey, x-client-info, x-svc-names'/.test(fn)
+    && /^export async function apidTry\(id\)/m.test(ad) && /h\['X-API-Key'\]=k;/.test(ad) && /h\.Authorization='Bearer '\+ST\.SB_TOKEN;/.test(ad) && /'curl -H "X-API-Key: <받은 키>" "'\+u/.test(ad) && !/apidUrl[^\n]*APID\.key/.test(ad) && /key\.value=APID\.key\|\|'';/.test(ad)
+    && /data-apitab=/.test(ad) && /js\/apispec\.js/.test(rd('index.html')) && /'\.\/js\/apispec\.js'/.test(rd('sw.js')),
+  '㊿+203 API 문서: 시험 호출(내 로그인 Bearer · 발급 키 X-API-Key) · 키는 주소 · 예시 코드에 안 넣음 · export v1.2(포탈 출처만 CORS · 로그인은 슈퍼 관리자 + 2단계 인증)');
+} catch (e) { say(false, '㊿+203 API 명세 검사를 못 함 — ' + String(e.message || e).slice(0, 160)); }
 // ㊿+160 연장하면 상태 «재약정»(구분 그대로) · 계약 상세에 «계약 기간 · 연장 이력»
 say(/^export function renewStatus\(r\)/m.test(jsAll) && /var nst=renewStatus\(r\);/.test(jsAll) && /^export function ctPeriods\(c, mine\)/m.test(jsAll) && html.includes('id="dtRenew"'), '연장: 상태 «재약정»(renewStatus) · 계약 상세 연장 이력(ctPeriods · #dtRenew)');
 const idx = html + jsAll;

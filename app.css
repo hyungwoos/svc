@@ -3343,4 +3343,60 @@ button.emo-ico svg{display:block;flex:none}
 .api-faq ul{margin:6px 0 0;padding-left:18px;line-height:1.75}
 @media (max-width:760px){ .api-flow{grid-template-columns:1fr} .api-kv{grid-template-columns:auto 1fr} .api-cp{flex-direction:column} .api-cp .cbtn{align-self:flex-end} }
 .api-dh .ctag{white-space:normal;height:auto;min-height:22px;line-height:1.45;padding:2px 8px;max-width:100%}
+/* ㊿+203 외부 연동 탭 · «API 문서 · 시험 호출»(Swagger 형식) */
+.api-tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:4px 0 12px;overflow-x:auto}
+.api-tabs [role="tab"]{appearance:none;border:0;background:none;font:inherit;font-size:14px;font-weight:600;color:var(--ink-2);padding:8px 14px;min-height:40px;border-bottom:2px solid transparent;margin-bottom:-1px;cursor:pointer;white-space:nowrap}
+.api-tabs [role="tab"][aria-selected="true"]{color:var(--ink);border-bottom-color:var(--brand-solid)}
+.api-tabs [role="tab"]:focus-visible{outline:2px solid var(--s1);outline-offset:-2px}
+.api-pane[hidden]{display:none}
+.apid-head{border:1px solid var(--ring);border-radius:12px;padding:12px 14px;background:var(--surface);margin:0 0 10px}
+.apid-title{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.apid-title>b{font-size:18px}
+.apid-kv{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px 12px;align-items:start;font-size:13px}
+.apid-kv>span{color:var(--ink-2);padding-top:8px;font-size:12px;font-weight:600}
+.apid-kv .api-cp{margin-top:0}
+.apid-kv code{font-size:12px}
+.apid-oa{display:flex;flex-direction:column;gap:6px}
+.apid-oa>.cbtn{align-self:flex-start}
+.apid-auth{border:1px solid var(--ring);border-radius:12px;padding:10px 14px 8px;margin:0 0 12px;background:var(--surface);display:flex;flex-direction:column;gap:6px;min-width:0}
+.apid-auth legend{font-size:13px;font-weight:700;padding:0 4px}
+.apid-a{font-size:13px;display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;cursor:pointer}
+.apid-sub{margin-left:24px;font-size:13px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.apid-keyrow input{flex:1;min-width:0;max-width:520px;height:34px;padding:0 10px;border:1px solid var(--ring);border-radius:8px;background:var(--surface-2);color:var(--ink);font-family:ui-monospace,monospace;font-size:13px}
+.apid-keyrow input:disabled{opacity:.55}
+.apid-keynote{margin:2px 0 0;color:var(--ink-2)}
+.apid-ops{display:flex;flex-direction:column;gap:8px;margin:0 0 12px}
+.apid-op{border:1px solid var(--ring);border-left:4px solid var(--brand-solid);border-radius:10px;background:var(--surface);overflow:hidden}
+.apid-op.open{box-shadow:0 1px 0 var(--ring)}
+.apid-oph{appearance:none;width:100%;display:flex;align-items:center;gap:10px;padding:8px 12px;border:0;background:var(--brand-t);color:var(--ink);font:inherit;text-align:left;cursor:pointer;min-height:44px}
+.apid-oph:focus-visible{outline:2px solid var(--s1);outline-offset:-2px}
+.apid-m{display:inline-block;min-width:44px;text-align:center;font-size:12px;font-weight:700;color:#fff;background:var(--brand-solid);border-radius:6px;padding:3px 6px;letter-spacing:.02em}
+.apid-oph code{font-size:14px;font-weight:700;font-family:ui-monospace,monospace}
+.apid-sum{font-size:13px;color:var(--ink-2);flex:1;min-width:0}
+.apid-chev{font-size:13px;color:var(--ink-2)}
+.apid-opb{padding:10px 14px 12px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.apid-opb .api-st{margin:8px 0 0}
+.apid-d{margin:0;font-size:13px;line-height:1.55}
+.apid-pt td{vertical-align:middle}
+.apid-pt input,.apid-pt select{width:100%;min-width:120px;height:32px;padding:0 8px;border:1px solid var(--ring);border-radius:8px;background:var(--surface-2);color:var(--ink);font:inherit;font-size:13px}
+.apid-run{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px}
+.apid-run .cbtn.pri{background:var(--brand-solid);border-color:var(--brand-solid);color:#fff;font-weight:700;min-height:36px;padding:0 14px}
+.apid-run .mini{color:var(--ink-2)}
+.apid-codes{display:flex;gap:4px;border-bottom:1px solid var(--line)}
+.apid-codes [role="tab"]{appearance:none;border:0;background:none;font:inherit;font-size:13px;font-weight:600;color:var(--ink-2);padding:4px 10px;min-height:32px;border-bottom:2px solid transparent;margin-bottom:-1px;cursor:pointer}
+.apid-codes [role="tab"][aria-selected="true"]{color:var(--ink);border-bottom-color:var(--brand-solid)}
+.apid-res{border:1px dashed var(--ring);border-radius:10px;padding:8px 10px;background:var(--surface-2);min-width:0}
+.apid-res>p{margin:0}
+.apid-meta{display:flex;align-items:center;gap:6px 10px;flex-wrap:wrap;font-size:13px;margin-bottom:6px}
+.apid-err{color:var(--critical);font-size:13px;line-height:1.5}
+.apid-err .mini{color:var(--ink-2)}
+.apid-vw{display:flex;gap:4px;margin-bottom:6px}
+.apid-vw .cbtn.on{background:var(--brand-t);border-color:var(--brand-solid);color:var(--brand-ink);font-weight:700}
+.apid-tbl{max-height:320px}
+.apid-tbl td{white-space:nowrap;font-size:12px}
+.apid-body{max-height:360px;overflow:auto;margin:0}
+.apid-ex summary,.apid-errs summary{cursor:pointer;font-size:13px}
+.apid-ex pre{margin:6px 0}
+.apid-errs{margin:0 0 12px}
+@media (max-width:760px){ .apid-kv{grid-template-columns:1fr} .apid-kv>span{padding-top:0} .apid-oph{flex-wrap:wrap;gap:6px} .apid-sum{flex-basis:100%} .apid-sub{margin-left:0} .apid-pt input,.apid-pt select{min-width:96px} }
 /* ==== ㊿+166 새 디자인 end ==== */

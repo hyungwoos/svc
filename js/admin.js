@@ -1,7 +1,7 @@
 /* ===== admin.js — 관리자(계정·권한·MFA 정책) · 배포·운영 · AI 점검 · 내 계정 · 수령처 =====
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { APP_VER, IS_STAGING, ST } from './state.js';
-import { $, applyPerms, axTime, closeBtn, curLook, doLogout, esc, fetchT, IDLE_KEY, IDLE_OPTS, idleLabel, idleMin, idleTouch, keepLogin, loadPerms, logoutAll, LOOKS, mfaCardRender, navText, PERF, PERM_EXEMPT, PERM_OPTIN, pwaHintHtml, pwaInstall, pwaStandalone, pwGen, pwRule, rawHtml, SB_KEY, SB_URL, SESS_MAX_DAYS, sessRead, setLook, STATE, tpl } from './core.js';
+import { $, applyPerms, axTime, closeBtn, curLook, doLogout, esc, fetchT, IDLE_KEY, IDLE_OPTS, idleLabel, idleMin, idleTouch, keepLogin, loadPerms, logoutAll, LOOKS, mfaCardRender, navText, PERF, PERM_EXEMPT, PERM_OPTIN, pwaHintHtml, pwaInstall, pwaStandalone, pwGen, pwRule, rawHtml, refreshToken, SB_KEY, SB_URL, SESS_MAX_DAYS, sessRead, setLook, STATE, tpl } from './core.js';
 import { cacheDrop, idxDate, ROLE_VIEWS, sbHeaders, sbTry, sbWrite, toast, todayStr } from './shell.js';
 import { aiFetch, aiProvName, buildDigest } from './ai.js';
 import { applyCodes, CODE_KIND, CODE_KIND_LABEL, CODE_KIND_NOTE } from './grids.js';
@@ -12,6 +12,7 @@ import { closeOvl, logChange, openOvl, setAuthTab } from './edit.js';
 import { csFn, qFetch } from './sales.js';
 import { clFetchFx } from './cloud.js';
 import { NTF, ntfAccounts, ntfAdminRender, ntfCall, ntfDisp, ntfName, ntfProf, opsItems, opsLoad, profEdit } from './notify.js';
+import { API_ERRS, API_RES, API_VER, apiRes, apiRespEx, buildOpenApi } from './apispec.js';
 
 
 /* ===== 관리자 (super_admin 전용) — 계정·권한 관리 ===== */
@@ -1938,10 +1939,172 @@ export function apiGuideBind(g){
     try{ navigator.clipboard.writeText(t).then(ok, function(){ prompt('아래를 복사하세요 (Ctrl+C)', t); }); }catch(e){ prompt('아래를 복사하세요 (Ctrl+C)', t); } }; });
 }
 
+/* ── ㊿+203 «API 문서 · 시험 호출» — Swagger 처럼: GET 엔드포인트(접기) · 조건 · 시험 호출 · 요청 주소 · 예시 코드 · 응답 · 응답 예시 · 칸 설명 · 오류 · OpenAPI(JSON)
+   사용자: «스웨거 같은 REST API 방식 · 쉬운 예시 · 포탈에서 테스트로 호출도» — 명세는 js/apispec.js 한곳(https://…/openapi.json 도 같은 것)
+   · 시험 인증 둘: 내 포탈 로그인(키 없이 · 슈퍼 관리자 + 2단계 인증 — export v1.2 가 확인) / 발급 키 붙여 넣기(외부 시스템과 같은 범위)
+   · 키는 이 화면 변수(APID.key)에만 — 저장 · 기록 · 주소 · 예시 코드 · 화면 글에 넣지 않음(입력 칸 값으로만 · 새로 고치면 지워짐) */
+export var APID=/** @type {any} */({tab:null, open:{index:false, contracts:true}, v:{}, auth:'login', key:'', names:true, res:{}, busy:{}, code:'curl', view:{}});
+export var APID_TABS=[['guide','쉬운 안내'],['docs','API 문서 · 시험 호출'],['keys','키 관리 · 호출 기록']];
+export var APID_IDX={id:'index', t:'키 확인', sum:'이 키로 볼 수 있는 자료', d:'키 이름 · 가져갈 수 있는 자료 · 단위 · 한도를 돌려줍니다. 받은 키가 맞는지 처음 확인할 때 부르세요.', row:'—', q:[], f:[]};
+/** 지금 탭 — 처음엔 키가 하나도 없으면 «키 관리», 아니면 «쉬운 안내» (한 번 정하면 유지) */
+export function apidTab(){ if(!APID.tab && API.keys) APID.tab=API.keys.length? 'guide' : 'keys'; return APID.tab||'guide'; }
+export function apidOps(){ return [APID_IDX].concat(API_RES); }
+export function apidOp(id){ return id==='index'? APID_IDX : apiRes(id); }
+export function apidVals(id){ var o=APID.v[id]; if(!o){ o=APID.v[id]={}; var r=apidOp(id); if(r && r.q.some(function(q){ return q.n==='limit'; })) o.limit='5'; } return o; }
+/** 조건 → 주소 (빈 칸은 뺌 · 쉼표는 그대로 보이게) */
+export function apidUrl(id){
+  var r=apidOp(id), o=apidVals(id), q=[];
+  (r? r.q : []).forEach(function(p){ var v=String(o[p.n]==null? '' : o[p.n]).trim(); if(v) q.push(p.n+'='+encodeURIComponent(v).replace(/%2C/gi, ',')); });
+  return apiBase()+(id==='index'? '' : '/'+id)+(q.length? '?'+q.join('&') : '');
+}
+export function apidOpenapiUrl(){ try{ return new URL('openapi.json', location.href).href; }catch(e){ return 'openapi.json'; } }
+/** 예시 코드 — 키 자리는 늘 «받은 키»(실제 키를 넣지 않음) */
+export function apidCode(id, lang){
+  var u=apidUrl(id), r=apidOp(id), csv=/[?&]format=csv/.test(u);
+  if(lang==='py') return "import os, requests\n\nKEY = os.environ['SVC_API_KEY']   # 받은 키 — 코드에 직접 쓰지 않기\nr = requests.get('"+u+"', headers={'X-API-Key': KEY}, timeout=60)\nr.raise_for_status()\n"+
+    (csv? "open('svc_"+id+".csv', 'wb').write(r.content)   # 엑셀에서 바로 열림" : id==='index'? "print(r.json()['resources'])" : "j = r.json()\nrows = j['data']                 # "+(r? r.row : '')+"\nprint(j['count'], '줄 / 전체', j['total'])"+(id!=='mrr'? "\n# 더 있으면 j['next_offset'] 을 offset= 으로 다시" : ''));
+  if(lang==='js') return "// Node 18+ · 브라우저가 아닌 서버에서 (키를 웹 페이지에 넣지 않기)\nconst r = await fetch('"+u+"', { headers: { 'X-API-Key': process.env.SVC_API_KEY } });\nif (!r.ok) throw new Error((await r.json()).error);\n"+
+    (csv? "const csv = await r.text();" : "const j = await r.json();\nconsole.log(j.count, j.total, j.data"+(id==='index'? '' : '[0]')+");");
+  return 'curl -H "X-API-Key: <받은 키>" "'+u+'"'+(csv? ' -o svc_'+id+'.csv' : '');
+}
+export function apidInput(id, p){
+  var v=String(apidVals(id)[p.n]==null? '' : apidVals(id)[p.n]), key=id+'|'+p.n, lab=p.n+' 값';
+  if(p.en && !p.multi) return tpl`<select data-apidv="${key}" aria-label="${lab}"><option value="">(비움)</option>${rawHtml(p.en.map(function(x){ return tpl`<option value="${x}"${rawHtml(x===v? ' selected' : '')}>${x}</option>`; }).join(''))}</select>`;
+  var ty=p.fmt==='ym'? 'month' : (p.fmt==='date' || p.fmt==='date-time')? 'date' : p.type==='integer'? 'number' : 'text';
+  return tpl`<input type="${ty}" data-apidv="${key}" aria-label="${lab}" value="${v}" placeholder="${p.ex||''}"${rawHtml(p.min!=null? ' min="'+p.min+'"' : '')}${rawHtml(p.max!=null? ' max="'+p.max+'"' : '')} autocomplete="off">`;
+}
+export function apidAuthNote(){ return APID.auth==='key'? (APID.key? '발급 키 '+String(APID.key).slice(0, 8)+'…' : '발급 키 (위에 붙여 넣기)') : '내 포탈 로그인'+(APID.names? '' : ' · 고객사명 빼고'); }
+/** 응답 칸 */
+export function apidResHtml(id){
+  var x=APID.res[id]; if(!x) return tpl`<p class="mini apid-none">«▶ 시험 호출»을 누르면 지금 인증(${apidAuthNote()})으로 위 주소를 불러 실제 응답을 보여 줍니다 — 읽기만 합니다.</p>`;
+  if(x.wait) return '<p class="mini">호출 중…</p>';
+  if(x.err) return tpl`<div class="apid-err" role="alert"><b>호출하지 못했습니다</b><div class="mini">${x.err}</div></div>`;
+  var j=null; try{ if(/json/.test(x.ct)) j=JSON.parse(x.body); }catch(e){ j=null; }
+  var ok=x.status>=200 && x.status<300, er=API_ERRS.filter(function(e){ return e[0]===x.status; })[0];
+  var meta=tpl`<div class="apid-meta"><span class="ctag ${rawHtml(ok? 'ok' : 'late')}">${String(x.status)}</span><span>${String(x.ms)}ms</span>`+
+    (j && j.count!=null? tpl`<span>이번 ${String(j.count)}줄${rawHtml(j.total!=null? ' / 전체 '+esc(String(j.total)) : '')}</span>` : '')+(j && j.next_offset!=null? tpl`<span>다음 쪽 offset=${String(j.next_offset)}</span>` : '')+
+    (x.total? tpl`<span>X-Total-Count ${x.total}</span>` : '')+tpl`<span class="mini">${x.ct.split(';')[0]||'—'} · ${x.who}</span></div>`;
+  if(!ok) return meta+tpl`<div class="apid-err"><b>${j && j.error? j.error : '오류'}</b>${rawHtml(er? tpl`<div class="mini">${er[1]} — ${er[2]}</div>` : '')}</div>`;
+  if(!j){ var ls=String(x.body||'').replace(/^﻿/, '').split(/\r?\n/), more=ls.length>31? ls.length-31 : 0; return meta+tpl`<pre class="api-code apid-body">${ls.slice(0, 31).join('\n')}${more? '\n… '+more+'줄 더' : ''}</pre>`; }
+  var rows=Array.isArray(j.data)? j.data : null, view=APID.view[id]||(rows && rows.length? 'tbl' : 'json');
+  var sw=tpl`<div class="apid-vw" role="group" aria-label="응답 보기">${rawHtml([['tbl','표'],['json','JSON 원문']].map(function(v){ return tpl`<button type="button" class="cbtn${rawHtml(v[0]===view? ' on' : '')}" data-apidvw="${id}|${v[0]}" aria-pressed="${v[0]===view? 'true' : 'false'}"${rawHtml(v[0]==='tbl' && !(rows && rows.length)? ' disabled' : '')}>${v[1]}</button>`; }).join(''))}</div>`;
+  if(view==='tbl' && rows && rows.length){
+    var cols=Object.keys(rows[0]), show=rows.slice(0, 20), cell=function(v){ return v==null? '' : typeof v==='object'? JSON.stringify(v) : String(v); };
+    return meta+sw+tpl`<div class="tbl-wrap apid-tbl" tabindex="0"><table class="dgrid"><thead><tr>${rawHtml(cols.map(function(c){ return tpl`<th>${c}</th>`; }).join(''))}</tr></thead><tbody>${rawHtml(show.map(function(rw){ return tpl`<tr>${rawHtml(cols.map(function(c){ return tpl`<td>${cell(rw[c])}</td>`; }).join(''))}</tr>`; }).join(''))}</tbody></table></div>`+
+      (rows.length>20? tpl`<p class="mini">앞 20줄만 표로 — 나머지 ${String(rows.length-20)}줄은 «JSON 원문»</p>` : '');
+  }
+  var txt=JSON.stringify(j, null, 2); if(txt.length>20000) txt=txt.slice(0, 20000)+'\n… (화면에는 앞부분만 — 전체는 위 주소로)';
+  return meta+sw+tpl`<pre class="api-code apid-body">${txt}</pre>`;
+}
+/** 엔드포인트 하나 */
+export function apidOpHtml(r){
+  var id=r.id, open=!!APID.open[id], path=id==='index'? '/' : '/'+id;
+  var head=tpl`<button type="button" class="apid-oph" data-apidop="${id}" aria-expanded="${open? 'true' : 'false'}" aria-controls="apidB-${id}"><span class="apid-m">GET</span><code>${path}</code><span class="apid-sum">${r.t} — ${r.sum}</span><span class="apid-chev" aria-hidden="true">${open? '▾' : '▸'}</span></button>`;
+  if(!open) return tpl`<div class="apid-op" id="apidOp-${id}">${rawHtml(head)}</div>`;
+  var pt=r.q.length? tpl`<div class="tbl-wrap apid-pt" tabindex="0"><table class="dgrid"><thead><tr><th>조건</th><th>형</th><th>뜻</th><th>값</th></tr></thead><tbody>${rawHtml(r.q.map(function(p){
+      return tpl`<tr><td><code>${p.n}</code></td><td class="mini">${p.fmt==='ym'? 'YYYY-MM' : p.fmt||p.type}</td><td class="mini">${p.d}${rawHtml(p.en && p.multi? tpl`<div>값: ${p.en.join(', ')}</div>` : '')}</td><td>${rawHtml(apidInput(id, p))}</td></tr>`; }).join(''))}</tbody></table></div>`
+    : '<p class="mini">조건 없음</p>';
+  var code=tpl`<div class="apid-codes" role="tablist" aria-label="예시 코드">${rawHtml([['curl','curl'],['py','Python'],['js','JavaScript']].map(function(c){ return tpl`<button type="button" role="tab" data-apidcode="${c[0]}" aria-selected="${c[0]===APID.code? 'true' : 'false'}">${c[1]}</button>`; }).join(''))}</div>`+
+    tpl`<div class="api-cp"><pre class="api-code" id="apidC-${id}">${apidCode(id, APID.code)}</pre><button type="button" class="cbtn" data-apicp="apidC-${id}">복사</button></div>`;
+  var ex=JSON.stringify(id==='index'? (buildOpenApi(apiBase()).paths['/'].get.responses[200].content['application/json'].example) : apiRespEx(r, true), null, 2);
+  var ft=r.f.length? tpl`<div class="tbl-wrap api-f" tabindex="0"><table class="dgrid"><thead><tr><th>칸</th><th>형</th><th>뜻</th><th>예시 (가짜)</th></tr></thead><tbody>${rawHtml(r.f.map(function(f){
+      return tpl`<tr><td><code>${f[0]}</code></td><td class="mini">${f[1]}${rawHtml(f[4] && f[4]!=='names'? ' · 빈 값 가능' : '')}</td><td class="mini">${f[2]}${rawHtml(f[4]==='names'? ' <span class="ctag">고객사명 포함 키만</span>' : '')}</td><td class="mini">${f[3]==null? 'null' : typeof f[3]==='object'? JSON.stringify(f[3]) : String(f[3])}</td></tr>`; }).join(''))}</tbody></table></div>` : '';
+  return tpl`<div class="apid-op open" id="apidOp-${id}">${rawHtml(head)}<div class="apid-opb" id="apidB-${id}">`+
+    tpl`<p class="apid-d">${r.d}${rawHtml(r.row!=='—'? tpl` <span class="mini">(${r.row})</span>` : '')}</p>`+
+    tpl`<div class="api-st">조건 <span class="mini">주소 뒤 ?이름=값 · 비우면 기본값</span></div>${rawHtml(pt)}`+
+    tpl`<div class="apid-run"><button type="button" class="cbtn pri" data-apidtry="${id}"${rawHtml(APID.busy[id]? ' disabled' : '')}>▶ 시험 호출</button><button type="button" class="cbtn" data-apidclr="${id}">조건 처음으로</button><span class="mini">인증: ${apidAuthNote()}</span></div>`+
+    tpl`<div class="api-st">요청 주소</div><div class="api-cp api-url"><code id="apidU-${id}">${'GET '+apidUrl(id)}</code><button type="button" class="cbtn" data-apicp="apidU-${id}">복사</button></div>`+
+    tpl`<div class="api-st">예시 코드 <span class="mini">키 자리는 «받은 키» — 실제 키는 넣지 않습니다</span></div>${rawHtml(code)}`+
+    tpl`<div class="api-st">응답</div><div class="apid-res" id="apidR-${id}" aria-live="polite">${rawHtml(apidResHtml(id))}</div>`+
+    tpl`<details class="apid-ex"><summary><b>응답 예시 · 칸 설명</b> <span class="mini">200 · application/json (가짜 값)</span></summary><pre class="api-code">${ex}</pre>${rawHtml(ft)}</details></div></div>`;
+}
+export function apidDocsHtml(){
+  var oa=apidOpenapiUrl();
+  var head=tpl`<div class="apid-head"><div class="apid-title"><b>SVC 포탈 데이터 API</b><span class="ctag">v${API_VER}</span><span class="ctag">OpenAPI 3.0</span><span class="ctag">읽기 전용 · GET</span></div>`+
+    tpl`<p class="mini" style="margin:4px 0 8px">REST API — 주소 = Base URL + /자료 + ?조건 · 응답 JSON(기본) 또는 CSV(format=csv) · 금액 원 · 월 YYYY-MM · 한 번에 최대 5,000줄 · 키마다 분당 60번</p>`+
+    tpl`<div class="apid-kv"><span>Base URL</span><div class="api-cp"><code id="apidBase">${apiBase()}</code><button type="button" class="cbtn" data-apicp="apidBase">복사</button></div>`+
+    tpl`<span>인증</span><div><code>X-API-Key: svc_…</code> <span class="mini">헤더로만 · 주소(?key=)는 거부</span></div>`+
+    tpl`<span>OpenAPI</span><div class="apid-oa"><button type="button" class="cbtn pri" id="apidSpecDl">OpenAPI(JSON) 받기</button><div class="api-cp"><code id="apidOa">${oa}</code><button type="button" class="cbtn" data-apicp="apidOa">주소 복사</button></div><span class="mini">Swagger Editor · Postman › Import › Link 에 이 주소를 넣으면 같은 문서 · 시험 화면이 열립니다</span></div></div></div>`;
+  var auth=tpl`<fieldset class="apid-auth"><legend>시험 호출 인증 <span class="mini">(Swagger 의 Authorize)</span></legend>`+
+    tpl`<label class="apid-a"><input type="radio" name="apidAuth" value="login"${rawHtml(APID.auth==='login'? ' checked' : '')}> <b>내 포탈 로그인</b> <span class="mini">키 없이 바로 · 슈퍼 관리자 + 2단계 인증 · 모든 자료</span></label>`+
+    tpl`<label class="apid-sub"><input type="checkbox" id="apidNames"${rawHtml(APID.names? ' checked' : '')}${rawHtml(APID.auth==='login'? '' : ' disabled')}> 고객사명 포함 <span class="mini">(끄면 «고객사명 빼고» 키처럼)</span></label>`+
+    tpl`<label class="apid-a"><input type="radio" name="apidAuth" value="key"${rawHtml(APID.auth==='key'? ' checked' : '')}> <b>발급 키</b> <span class="mini">외부 시스템과 똑같은 범위 · 고객사명 옵션으로 확인</span></label>`+
+    tpl`<div class="apid-sub apid-keyrow"><input type="password" id="apidKey" placeholder="svc_ 로 시작하는 키를 붙여 넣기" autocomplete="off" spellcheck="false" aria-label="시험할 API 키"${rawHtml(APID.auth==='key'? '' : ' disabled')}><button type="button" class="cbtn" id="apidKeyClr">지우기</button></div>`+
+    tpl`<p class="mini apid-keynote">키는 이 화면에만 잠깐 둡니다 — 저장 · 호출 기록 · 주소 · 예시 코드에 들어가지 않고, 새로 고치면 지워집니다. 시험 호출도 «최근 호출»에 남습니다(로그인 시험은 «포탈 시험 · 이메일»).</p></fieldset>`;
+  var ops=tpl`<div class="apid-ops">${rawHtml(apidOps().map(apidOpHtml).join(''))}</div>`;
+  var errs=tpl`<details class="apid-errs"><summary><b>오류 코드</b> <span class="mini">응답 {"ok": false, "error": "이유"}</span></summary><div class="tbl-wrap" tabindex="0"><table class="dgrid"><thead><tr><th class="n">상태</th><th>뜻</th><th>어떻게</th></tr></thead><tbody>${rawHtml(API_ERRS.map(function(e){ return tpl`<tr><td class="n"><b>${String(e[0])}</b></td><td>${e[1]}</td><td class="mini">${e[2]}</td></tr>`; }).join(''))}</tbody></table></div></details>`;
+  return head+auth+ops+errs;
+}
+/** 엔드포인트 하나만 다시 그림(입력 칸 포커스 유지) */
+export function apidPaintOp(id){
+  var el=document.getElementById('apidOp-'+id), r=apidOp(id); if(!el || !r) return;
+  var f=/** @type {any} */(document.activeElement), fk=f && f.getAttribute && (f.getAttribute('data-apidv') || f.getAttribute('data-apidtry') || f.getAttribute('data-apidop') || f.getAttribute('data-apidvw'));
+  var w=document.createElement('div'); w.innerHTML=apidOpHtml(r); var n=/** @type {any} */(w.firstElementChild); el.replaceWith(n); apidBind(n);
+  if(fk){ var b=/** @type {any} */(n.querySelector('[data-apidv="'+fk+'"],[data-apidtry="'+fk+'"],[data-apidop="'+fk+'"],[data-apidvw="'+fk+'"]')); if(b) try{ b.focus(); }catch(e){} }
+}
+export function apidCopy(t){ var ok=function(){ toast('복사했습니다', /^(GET )?https?:/.test(t)? '주소 — 붙여 넣을 곳에 Ctrl+V' : '코드 — 붙여 넣을 곳에 Ctrl+V'); };
+  try{ navigator.clipboard.writeText(t).then(ok, function(){ prompt('아래를 복사하세요 (Ctrl+C)', t); }); }catch(e){ prompt('아래를 복사하세요 (Ctrl+C)', t); } }
+export function apidBind(root){
+  var q=function(s){ return /** @type {any[]} */([].slice.call(root.querySelectorAll(s))); };
+  q('[data-apidop]').forEach(function(b){ b.onclick=function(){ var id=b.dataset.apidop; APID.open[id]=!APID.open[id]; apidPaintOp(id); }; });
+  q('[data-apidv]').forEach(function(el){ var h=function(){ var k=el.dataset.apidv.split('|'); apidVals(k[0])[k[1]]=String(el.value||''); var u=document.getElementById('apidU-'+k[0]), c=document.getElementById('apidC-'+k[0]); if(u) u.textContent='GET '+apidUrl(k[0]); if(c) c.textContent=apidCode(k[0], APID.code); };
+    el.oninput=h; el.onchange=h; el.onkeydown=function(/** @type {any} */ e){ if(e.key==='Enter'){ e.preventDefault(); h(); apidTry(el.dataset.apidv.split('|')[0]); } }; });
+  q('[data-apidtry]').forEach(function(b){ b.onclick=function(){ apidTry(b.dataset.apidtry); }; });
+  q('[data-apidclr]').forEach(function(b){ b.onclick=function(){ var id=b.dataset.apidclr; delete APID.v[id]; delete APID.res[id]; apidPaintOp(id); }; });
+  q('[data-apidvw]').forEach(function(b){ b.onclick=function(){ var k=b.dataset.apidvw.split('|'); APID.view[k[0]]=k[1]; var r=document.getElementById('apidR-'+k[0]); if(r){ r.innerHTML=apidResHtml(k[0]); apidBind(r); var nb=/** @type {any} */(r.querySelector('[data-apidvw="'+b.dataset.apidvw+'"]')); if(nb) try{ nb.focus(); }catch(e){} } }; });
+  q('[data-apidcode]').forEach(function(b){ b.onclick=function(){ APID.code=b.dataset.apidcode; document.querySelectorAll('#apiDocs [data-apidcode]').forEach(function(x){ x.setAttribute('aria-selected', /** @type {any} */(x).dataset.apidcode===APID.code? 'true' : 'false'); });
+    apidOps().forEach(function(r){ var c=document.getElementById('apidC-'+r.id); if(c) c.textContent=apidCode(r.id, APID.code); }); }; });
+  q('[data-apicp]').forEach(function(b){ b.onclick=function(){ var el=document.getElementById(b.dataset.apicp); apidCopy(el? String(el.textContent||'').replace(/^GET /, '') : ''); }; });
+}
+/** 문서 칸 전체 연결 — 인증 칸은 다시 그리지 않음(키 입력 값 유지) */
+export function apidBindDocs(box){
+  var d=box.querySelector('#apiDocs'); if(!d) return;
+  apidBind(d);
+  var key=/** @type {any} */(d.querySelector('#apidKey')), nm=/** @type {any} */(d.querySelector('#apidNames'));
+  if(key){ key.value=APID.key||''; key.oninput=function(){ APID.key=String(key.value||'').trim(); apidAuthSync(); }; }
+  d.querySelectorAll('input[name="apidAuth"]').forEach(function(/** @type {any} */ r){ r.onchange=function(){ if(r.checked){ APID.auth=r.value; if(key) key.disabled=APID.auth!=='key'; if(nm) nm.disabled=APID.auth!=='login'; if(APID.auth==='key' && key) try{ key.focus(); }catch(e){} apidAuthSync(); } }; });
+  if(nm) nm.onchange=function(){ APID.names=!!nm.checked; apidAuthSync(); };
+  var kc=d.querySelector('#apidKeyClr'); if(kc) /** @type {any} */(kc).onclick=function(){ APID.key=''; if(key) key.value=''; apidAuthSync(); };
+  var dl=d.querySelector('#apidSpecDl'); if(dl) /** @type {any} */(dl).onclick=apidSpecDl;
+}
+/** 인증이 바뀌면 «인증: …» 글만 고침 */
+export function apidAuthSync(){ document.querySelectorAll('#apiDocs .apid-run .mini').forEach(function(s){ s.textContent='인증: '+apidAuthNote(); }); document.querySelectorAll('#apiDocs .apid-none').forEach(function(s){ s.textContent='«▶ 시험 호출»을 누르면 지금 인증('+apidAuthNote()+')으로 위 주소를 불러 실제 응답을 보여 줍니다 — 읽기만 합니다.'; }); }
+export function apidSpecDl(){
+  var t=JSON.stringify(buildOpenApi(apiBase()), null, 2), b=new Blob([t], {type:'application/json'}), a=document.createElement('a');
+  a.href=URL.createObjectURL(b); a.download='svc-portal-api-openapi.json'; document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  toast('OpenAPI(JSON) 받기', 'Swagger Editor · Postman 에서 «파일 가져오기»');
+}
+/** 시험 호출 — 결과는 화면에만 */
+export async function apidTry(id){
+  if(APID.busy[id]) return;
+  var url=apidUrl(id), h=/** @type {Object<string,string>} */({}), who='';
+  if(APID.auth==='key'){
+    var k=String(APID.key||'').trim();
+    if(!/^svc_[0-9a-f]{64}$/.test(k)){ APID.res[id]={err:k? '키 형식이 아닙니다 — svc_ 로 시작하는 68자를 그대로 붙여 넣으세요' : '위 «시험 호출 인증»에 발급 키를 붙여 넣으세요 (또는 «내 포탈 로그인»)'}; apidPaintOp(id); return; }
+    h['X-API-Key']=k; who='키 '+k.slice(0, 8)+'…';
+  }else{
+    if(!ST.SB_TOKEN){ APID.res[id]={err:'로그인이 필요합니다'}; apidPaintOp(id); return; }
+    h.apikey=SB_KEY; h.Authorization='Bearer '+ST.SB_TOKEN; if(!APID.names) h['X-Svc-Names']='0'; who='내 로그인';
+  }
+  APID.busy[id]=true; APID.res[id]={wait:true}; apidPaintOp(id);
+  var t0=Date.now();
+  try{
+    var go=function(){ return fetchT(url, {headers:h}, 45000, '외부 연동 API'); };
+    var r=await go();
+    if(r.status===401 && APID.auth==='login' && await refreshToken()){ h.Authorization='Bearer '+ST.SB_TOKEN; t0=Date.now(); r=await go(); }
+    var body=await r.text();
+    APID.res[id]={status:r.status, ms:Date.now()-t0, ct:r.headers.get('content-type')||'', total:r.headers.get('x-total-count')||'', body:body.length>400000? body.slice(0, 400000) : body, who:who};
+  }catch(e){
+    var m=String((e && /** @type {any} */(e).message)||e);
+    APID.res[id]={err:m+(/연결하지 못했|Failed to fetch|NetworkError|Load failed/i.test(m)? ' — export 함수가 v1.2 보다 예전이면 브라우저가 막습니다(CORS). 포탈 › 배포·운영 › Edge Function 에서 export 를 다시 배포하세요.' : '')};
+  }
+  APID.busy[id]=false; apidPaintOp(id);
+}
+
 export function apiPaint(){
   var box=document.getElementById('apiBox'); if(!box) return;
   /* ㊿+200 맨 위 3단계 */
-  var h=tpl`<ol class="api-flow" aria-label="외부 연동 순서"><li><b>① 키 발급</b><span>어느 시스템이 어떤 자료를 가져갈지 골라 키를 만듭니다 — 아래 «새 키 발급»</span></li><li><b>② 키 전달</b><span>그 시스템 담당자에게 메신저 1:1 · 비밀번호 관리자로(채팅방 · 메일 본문 · GitHub 금지)</span></li><li><b>③ 가져가기</b><span>«무엇을 가져갈까요?»에서 자료를 고르면 칸 설명 · 주소 · 엑셀 · 구글 시트 · Power BI 따라 하기가 나옵니다</span></li></ol>`+
+  var h=tpl`<ol class="api-flow" aria-label="외부 연동 순서"><li><b>① 키 발급</b><span>어느 시스템이 어떤 자료를 가져갈지 골라 키를 만듭니다 — «키 관리» 탭</span></li><li><b>② 키 전달</b><span>그 시스템 담당자에게 메신저 1:1 · 비밀번호 관리자로(채팅방 · 메일 본문 · GitHub 금지)</span></li><li><b>③ 가져가기</b><span>엑셀 · 구글 시트 · Power BI 는 «쉬운 안내», 개발자는 «API 문서»(Swagger 형식 · 시험 호출)</span></li></ol>`+
     tpl`<p class="cap" style="margin:0 0 10px">읽기 전용 — 포탈 데이터를 바꿀 수는 없습니다 · 키마다 분당 60번 · 모든 호출이 아래 «최근 호출»에 남고, 시스템마다 키를 따로 주면 하나만 바로 끊을 수 있습니다.</p>`;
   if(API.err) h+=tpl`<p class="cap" style="color:var(--critical);margin:0 0 10px">⚠ ${API.err}</p>`;
   if(API.made){
@@ -1950,7 +2113,12 @@ export function apiPaint(){
       tpl`<div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap"><code id="apiKeyText" class="api-key">${mk0.key}</code><button type="button" class="pill" id="apiCopy">복사</button><button type="button" class="pill ghost" id="apiMadeOk">전달했어요 · 숨기기</button></div>`+
       tpl`<pre class="api-code">${apiSnippets(mk0.key)[0][1]}</pre><p class="mini" style="margin:6px 0 0">이 키로 가져갈 수 있는 자료: <b>${(API.keys||[]).filter(function(k){ return k.prefix===mk0.prefix; }).map(function(k){ return (k.scopes||[]).map(apiScopeLabel).join(' · '); })[0]||'—'}</b> — 위 «무엇을 가져갈까요?»에서 자료를 고르면 엑셀 · 구글 시트 따라 하기가 나옵니다.</p></div>`;
   }
-  h+=tpl`<div id="apiGuide">${rawHtml(apiGuideHtml())}</div>`;
+  /* ㊿+203 탭: 쉬운 안내 · API 문서 · 키 관리 (모두 그려 두고 고른 것만 보임) */
+  var tab=apidTab(), pane=function(k){ return rawHtml(k===tab? '' : ' hidden'); };
+  h+=tpl`<div class="api-tabs" role="tablist" aria-label="외부 연동">${rawHtml(APID_TABS.map(function(t){ return tpl`<button type="button" role="tab" id="apiTab-${t[0]}" data-apitab="${t[0]}" aria-controls="apiPane-${t[0]}" aria-selected="${t[0]===tab? 'true' : 'false'}">${t[1]}${rawHtml(t[0]==='keys' && API.keys? tpl` <span class="mini">${String(API.keys.filter(function(k){ return k.active; }).length)}</span>` : '')}</button>`; }).join(''))}</div>`;
+  h+=tpl`<div class="api-pane" role="tabpanel" id="apiPane-guide" aria-labelledby="apiTab-guide"${pane('guide')}><div id="apiGuide">${rawHtml(apiGuideHtml())}</div></div>`;
+  h+=tpl`<div class="api-pane" role="tabpanel" id="apiPane-docs" aria-labelledby="apiTab-docs"${pane('docs')}><div id="apiDocs">${rawHtml(apidDocsHtml())}</div></div>`;
+  h+=tpl`<div class="api-pane" role="tabpanel" id="apiPane-keys" aria-labelledby="apiTab-keys"${pane('keys')}>`;
   h+=tpl`<details class="api-new" id="apiNewBox"${rawHtml(API.keys && !API.keys.length? ' open':'')}><summary><b>＋ 새 키 발급</b></summary><div class="frm" style="grid-template-columns:1.4fr 1fr 1fr;margin-top:8px">`+
     tpl`<div><label for="apiName">어느 시스템인지</label><input id="apiName" maxlength="60" placeholder="예: 회계 ERP · 경영 BI · 영업팀 시트"></div>`+
     tpl`<div><label for="apiDays">유효 기간</label><select id="apiDays"><option value="90">90일</option><option value="180">180일</option><option value="365" selected>1년</option><option value="0">무기한</option></select></div>`+
@@ -1970,16 +2138,7 @@ export function apiPaint(){
   h+=lg.length? tpl`<div class="tbl-wrap" tabindex="0" style="max-height:40vh"><table class="dgrid" id="apiLog"><thead><tr><th>시각</th><th>키</th><th>자료</th><th>조건</th><th class="n">행</th><th>결과</th><th>IP</th><th class="n">ms</th></tr></thead><tbody>${rawHtml(lg.map(function(l){
       var ok=l.status>=200 && l.status<300;
       return tpl`<tr><td class="mini">${String(l.at||'').replace('T',' ').slice(0,19)}</td><td>${l.key_name||''}</td><td>${l.resource||''}</td><td class="mini">${String(l.query||'').slice(0,60)}</td><td class="n">${rawHtml(String(l.rows||0))}</td><td><span class="ctag ${rawHtml(ok? 'ok':'late')}">${String(l.status)}</span></td><td class="mini">${l.ip||''}</td><td class="n mini">${rawHtml(String(l.ms||0))}</td></tr>`; }).join(''))}</tbody></table></div>` : '<p class="cap">아직 호출이 없습니다.</p>';
-  h+=tpl`<details class="api-help"><summary><b>전체 규칙 · 예시 (개발자용)</b></summary><ul class="mini" style="line-height:1.8;margin:6px 0">`+
-    tpl`<li><code>GET ${apiBase()}</code> — 이 키로 볼 수 있는 자료 · 단위</li>`+
-    tpl`<li><code>/contracts</code> — 계약 · <code>updated_since=2026-10-01</code>(그 뒤 바뀐 것만) · <code>line=Cloud</code> · <code>status=재약정</code></li>`+
-    tpl`<li><code>/revenue</code> — 월 매출 · <code>from=2026-01&amp;to=2026-12</code>(기본 최근 12개월) · <code>contract_id=</code></li>`+
-    tpl`<li><code>/customers</code> — 고객사 · <code>/mrr</code> — 월 매출 합계 · <code>month=2026-10</code> 또는 <code>from~to</code></li>`+
-    tpl`<li><code>/poc</code> — MDR PoC·운영 · <code>status=신청,대기,진행중,데모</code>(PoC 단계) · <code>svc_type</code> · <code>since=2026-10-01</code>(신청일)</li>`+
-    tpl`<li><code>/orders</code> — 장비 신청 · <code>status</code> · <code>order_type</code> · <code>since</code> · <code>/assets</code> — 장비 현황(시리얼) · <code>status=임대중</code> · <code>model</code> · <code>updated_since</code></li>`+
-    tpl`<li>공통: <code>limit</code>(기본 1000 · 최대 5000) · <code>offset</code> · 응답의 <code>next_offset</code> 으로 다음 쪽 · <code>format=csv</code></li>`+
-    tpl`<li>오류: 401 키 없음·모름·폐기·만료 · 403 범위 밖 · 429 분당 60회 넘음 · 키는 주소(<code>?key=</code>)로 보내면 거부</li></ul>`+
-    tpl`${rawHtml(apiSnippets(null).map(function(s){ return tpl`<div class="mini" style="margin-top:6px"><b>${s[0]}</b></div><pre class="api-code">${s[1]}</pre>`; }).join(''))}</details>`;
+  h+='</div>';   /* ㊿+203 «전체 규칙 · 예시 (개발자용)»은 «API 문서» 탭으로 */
   box.innerHTML=h;
   apiBindBox(box);
 }
@@ -1992,7 +2151,15 @@ export function apiBindBox(box){
   var mo=g('apiMadeOk'); if(mo) mo.onclick=function(){ API.made=null; apiPaint(); };
   box.querySelectorAll('[data-revoke]').forEach(function(b){ b.onclick=function(){ apiRevoke(Number(b.getAttribute('data-revoke'))); }; });
   var gd=g('apiGuide'); if(gd) apiGuideBind(gd);   /* ㊿+200 */
+  apidBindDocs(box);   /* ㊿+203 */
+  box.querySelectorAll('[data-apitab]').forEach(function(b){ b.onclick=function(){ apidTabGo(b.getAttribute('data-apitab')); }; b.onkeydown=function(/** @type {any} */ e){
+    if(e.key!=='ArrowRight' && e.key!=='ArrowLeft') return; e.preventDefault(); var ks=APID_TABS.map(function(x){ return x[0]; }), i=ks.indexOf(b.getAttribute('data-apitab')), n=ks[(i+(e.key==='ArrowRight'? 1 : ks.length-1))%ks.length];
+    apidTabGo(n); var nb=/** @type {any} */(box.querySelector('[data-apitab="'+n+'"]')); if(nb) nb.focus(); }; });
 }
+/** ㊿+203 탭 바꾸기 — 다시 그리지 않고 보이기만(입력 값 · 응답 유지) */
+export function apidTabGo(k){ APID.tab=k; var box=document.getElementById('apiBox'); if(!box) return;
+  box.querySelectorAll('[data-apitab]').forEach(function(b){ b.setAttribute('aria-selected', b.getAttribute('data-apitab')===k? 'true' : 'false'); });
+  box.querySelectorAll('.api-pane').forEach(function(p){ /** @type {any} */(p).hidden=p.id!=='apiPane-'+k; }); }
 export async function apiCreate(){
   if(API.busy) return;
   var box=document.getElementById('apiBox'), msg=box&&box.querySelector('#apiMsg');
