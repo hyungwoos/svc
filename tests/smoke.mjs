@@ -1894,7 +1894,7 @@ if (S.blk()) {
       const B = await M();
       assert(B.v === NOS && !B.hClip && !B.vClip && B.h >= 48 && B.long, 'NO. 긴 번호 ' + JSON.stringify(B));
       await page.emulateMedia({ media: 'print' }); await page.waitForTimeout(200); const BP = await M(); await page.emulateMedia({ media: 'screen' });
-      assert(!BP.vClip && !BP.hClip && BP.gap >= 0, '인쇄(긴 번호 · 한 장) ' + JSON.stringify(BP));
+      assert(!BP.vClip && !BP.hClip && BP.gap >= 0 && Math.abs(BP.gap - AP.gap) <= 1, '인쇄(긴 번호 · 한 장 · NO. 줄 수가 아래 내용을 밀지 않음) ' + JSON.stringify({ AP: AP.gap, BP }));
       await page.fill('[data-k="no"]', 'R-1'); await page.waitForTimeout(150); const C = await M();
       assert(C.h <= 22 && !C.long && C.saved === 'R-1', '짧게 고침 ' + JSON.stringify(C));
       assert(!c.errs.length && !c.csp.length, c.errs.concat(c.csp).join('|'));
