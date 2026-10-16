@@ -115,7 +115,7 @@ export function openCust360(name){
   try{ c360Enhance(nm, cts, lives, ois, inbs, asts, ords); }catch(e){ console.warn('c360', e); }
   /* ㊿+172 이 고객으로 목록 보기 — 계약 · LIVE · OI · 인바운드 · 장비로 옮겨 다녀도 같은 고객(«고객 고정» · 목록 위 «해제») */
   (function(){ var cap=$('#c360Cap'); if(!cap) return; var old=document.getElementById('c360Go'); if(old) old.remove();
-    var V=[['contracts','계약',cts.length],['live','LIVE',lives.length],['oi','OI',ois.length],['inbound','인바운드',inbs.length],['orders','장비 신청',ords.length],['assets','장비 현황',asts.length]].filter(function(x){ var b=document.querySelector('#side button[data-v="'+x[0]+'"]'); return !!b && visBtn(/** @type {any} */(b)); });
+    var V=[['contracts','계약',cts.length],['live','LIVE',lives.length],['oi','OI',ois.length],['inbound','인바운드',inbs.length],['orders','Cloud NAC 발주',ords.length],['assets','장비 현황',asts.length]].filter(function(x){ var b=document.querySelector('#side button[data-v="'+x[0]+'"]'); return !!b && visBtn(/** @type {any} */(b)); });
     var d=document.createElement('div'); d.id='c360Go'; d.className='c360-go'; d.setAttribute('role','group'); d.setAttribute('aria-label','이 고객으로 목록 보기');
     d.innerHTML=tpl`<span class="mini">이 고객으로 목록 보기</span>${rawHtml(V.map(function(x){ return tpl`<button type="button" class="cbtn" data-cv="${x[0]}" title="${x[1]} ${String(x[2])}건 — 목록 화면으로">${x[1]}${rawHtml(isGN()? '' : tpl` <b class="num">${String(x[2])}</b>`)}</button>`; }).join(''))}`;
     cap.parentElement.insertBefore(d, cap.nextSibling);
@@ -312,6 +312,15 @@ export function applyMenuConf(){
 export var MENU_OLD_CHGRP={'g:사업 영역 · Cloud NAC':['cngen','cnpub','cns1','cnlgu'], 'g:사업 영역 · MDR':['mdrgen','mdrs1','mdrlgu'], 'g:사업 영역 · 기타 (유통)':['chdist','cnpns']};
 export function menuConfMigrate(conf){
   if(!conf) return conf; var NEW='g:사업 영역', olds=Object.keys(MENU_OLD_CHGRP), touched=false;
+  /* ㊿+208 «PoC·데모» 묶음 → «발주»(Cloud NAC 발주 신청 · 내역이 «장비»에서 옮겨 옴) — 저장한 순서에서는 «장비» 바로 앞에 · 숨김은 메뉴 단위로 옮김 */
+  var old208=(conf.order && conf.order.length && conf.order.indexOf('g:발주')<0) || (conf.hidden && conf.hidden['g:PoC·데모']);
+  if(old208 && !conf.m208){   /* 208 전에 저장한 설정만 · 한 번만 — 그 뒤 메뉴 편집으로 «장비»를 숨겨도 발주 메뉴는 건드리지 않음 */
+    if(conf.order && conf.order.indexOf('g:발주')<0 && (conf.order.indexOf('g:PoC·데모')>=0 || conf.order.indexOf('g:장비')>=0)){
+      var od=conf.order.filter(function(k){ return k!=='g:PoC·데모'; }), at=od.indexOf('g:장비'); od.splice(at>=0? at : od.length, 0, 'g:발주'); conf.order=od; }
+    var hd=conf.hidden;
+    if(hd && hd['g:PoC·데모']){ hd['b:mdrnew']=1; hd['b:mdrops']=1; delete hd['g:PoC·데모']; }
+    if(hd && hd['g:장비']){ hd['b:ordernew']=1; hd['b:orders']=1; }
+    conf.m208=1; touched=true; }
   if(conf.order && conf.order.some(function(k){ return MENU_OLD_CHGRP[k]; })){
     var seen={}; conf.order=conf.order.map(function(k){ return MENU_OLD_CHGRP[k]? NEW : k; }).filter(function(k){ if(seen[k]) return false; seen[k]=1; return true; }); touched=true; }
   var hid=conf.hidden||{};

@@ -7,7 +7,7 @@ import { buildControls, expN, expScan, hbars, idxs, kpiOpen, monthlyTotal, rende
 import { ask } from './ai.js';
 import { applyCodes, GRIDS, loadCodes } from './grids.js';
 import { eqCanRet, eqOrderById, eqRetOpen, eqRetSet, eqScan, eqSerialsHtml, eqWant, syncOrderAssets } from './equipment.js';
-import { applyChannelMenu, CH_DEFS, chOf, ctRawOf, ctSuccessor, dcRules, ensureLeadSrc, liveData, openRenewList, renewKindOf, renewOpenFor, renewScan } from './analysis.js';
+import { applyChannelMenu, CH_DEFS, chOf, ctRawOf, ctSuccessor, dcRulesQuick, ensureLeadSrc, liveData, openRenewList, renewKindOf, renewOpenFor, renewScan } from './analysis.js';
 import { applyMenuConf, fkNorm, freqTop, menuSegments, navSub, openMenuEdit, renderTodo, subgrpSync, viewLabel } from './tools.js';
 import { loadInbound, loadMxMemos } from './inbound.js';
 import { UPD, updCheck } from './upd.js';
@@ -72,7 +72,7 @@ export var ICO={
 };
 /* ㊿+169 아이콘 한 가지 모양 — 위쪽·표 도구 버튼의 이모지/기호(✏️ ⊞ ↻ ⬇ 🧱 ☰ ❔ 📋)를 같은 선 아이콘 + 글자로 (id·이름표는 그대로) */
 export var UI_ICO={btnEdit:['edit','계약 입력·수정'], btnNew:['plus','등록'], btnWidgets:['board','홈 카드'], btnReload:['reload','새로고침'], btnFind:['spark','검색'],
-  dvAdd:['plus','행 추가'], dvPaste:['doc','붙여넣기 입력'], dvReload:['reload','다시 읽기'], dvCsv:['down','엑셀'], dvDense:['menu','밀도'], dvHelp:['spark','AI 도움말']};
+  dvAdd:['plus','행 추가'], dvPaste:['doc','붙여넣기 입력'], dvReload:['reload','다시 읽기'], dvCsv:['down','엑셀'], dvDense:['menu','밀도'], dvHelp:['help','도움말'], btnHelp:['help','사용 설명서']};
 export function icoLbl(name, label){ return ico(name,15)+(label? tpl`<span>${label}</span>` : ''); }
 export function uiIconize(){
   Object.keys(UI_ICO).forEach(function(id){ var b=document.getElementById(id); if(b && !b.querySelector('svg')){ b.innerHTML=icoLbl(UI_ICO[id][0], UI_ICO[id][1]); b.classList.add('icb'); } });
@@ -147,15 +147,15 @@ export function railFlyToggle(btn, key){
 
 
 /* ---- ㊿+167 «지니언스» 상단 메뉴 (㊿+166 의 왼쪽 사이드바를 대신) — #rail 을 상단바(.topbar) 첫 줄로 옮겨 차콜 메뉴 막대로
-   · 구조는 menuSegments() 그대로(메뉴 편집·채널 숨김·권한 반영) · 그룹이 많아 묶음: PoC·데모+영업+인바운드 = «영업», 정산·목표+도구 = «정산·도구», 관리자 = 오른쪽 «관리»
+   · 구조는 menuSegments() 그대로(메뉴 편집·채널 숨김·권한 반영) · 그룹이 많아 묶음: 영업+인바운드 = «영업»(㊿+208 PoC·데모는 Cloud NAC 발주와 함께 «발주» 묶음), 정산·목표+도구 = «정산·도구», 관리자 = 오른쪽 «관리»
    · 묶음 버튼을 누르면 큰 펼침 메뉴(#gnMenu · 그룹/소제목마다 한 칸) · 다른 묶음에 마우스를 올리면 바로 옮겨 감 · Esc·바깥 클릭·이동하면 닫힘 · ↓ 로 첫 항목
-   · 배지: 홈 = 인박스 건수 · 데이터 점검 = 바로 고칠 항목 · 임대 장비 대시보드 = 처리 대기 · 인바운드 목록 = 미대응 → 묶음 버튼엔 합계 ---- */
+   · 배지: 홈 = 인박스 건수 · 데이터 점검 = 바로 고칠 항목 · Cloud NAC 발주 내역 = 처리 대기(㊿+208) · 인바운드 목록 = 미대응 → 묶음 버튼엔 합계 ---- */
 export var GN_ICO={dash:'home', weekly:'calendar', contracts:'doc', live:'target', churn:'chart', churnrate:'chart', custflow:'users', leadsrc:'arrow', dcheck:'check',
   cngen:'cloud', cnpub:'cloud', cns1:'cloud', cnlgu:'cloud', mdrgen:'shield', mdrs1:'shield', mdrlgu:'shield', chdist:'layers', cnpns:'layers',
   eqboard:'board', ordernew:'doc', orders:'box', assets:'box', mdrnew:'flask', mdrops:'flask', oinew:'target', oi:'target', inbstat:'chart', inbound:'inbox',
   biz:'scale', targets:'target', quote:'doc', quotes:'doc', preport:'doc', s1:'scale', kk:'scale', price:'doc', cloud:'cloud', csite:'cloud', report:'doc', aiknow:'spark',
   log:'clock', adminx:'gear', ops:'tool', account:'user'};
-export var GN_MERGE={'g:PoC·데모':'영업', 'g:영업':'영업', 'g:인바운드':'영업', 'g:정산·목표':'정산·도구', 'g:도구':'정산·도구', 'g:관리자':'관리'};
+export var GN_MERGE={'g:영업':'영업', 'g:인바운드':'영업', 'g:정산·목표':'정산·도구', 'g:도구':'정산·도구', 'g:관리자':'관리'};
 export var GN_BADGE={inb:null, dc:null, inbound:null};
 export var GN_NAV={menus:{}, open:null};
 export function buildGnNav(rail){
@@ -191,7 +191,7 @@ export function buildGnNav(rail){
   function topBtn(o){
     if(o.v) return tpl`<button type="button" class="gn-tb" data-v="${o.v}" title="${o.t}" aria-current="false">${o.t}<span class="gn-bd" hidden></span></button>`;
     var m=menus[o.seg];
-    return tpl`<button type="button" class="gn-tb" data-seg="${o.seg}"${rawHtml(/장비/.test(o.seg)? ' data-eq="1"':'')} aria-haspopup="true" aria-expanded="false" aria-controls="gnMenu" aria-current="false" title="${m.label} — 눌러서 화면 목록">${m.label}<span class="gn-bd" hidden></span>${rawHtml(chev)}</button>`;
+    return tpl`<button type="button" class="gn-tb" data-seg="${o.seg}"${rawHtml(/발주/.test(o.seg)? ' data-eq="1"':'')} aria-haspopup="true" aria-expanded="false" aria-controls="gnMenu" aria-current="false" title="${m.label} — 눌러서 화면 목록">${m.label}<span class="gn-bd" hidden></span>${rawHtml(chev)}</button>`;
   }
   var adm=tops.filter(function(o){ return o.seg==='m:관리'; })[0];
   var h=tpl`<div class="gn-bar"><a class="gn-logo" data-v="dash" href="#" aria-label="Genians — 홈"><svg class="gn-lw" viewBox="0 0 587.2 133.4" aria-hidden="true"><use href="#gnLogo"/></svg><svg class="gn-lm" viewBox="0 0 171.1 133.4" aria-hidden="true"><use href="#gnMark"/></svg></a>`;
@@ -253,7 +253,7 @@ export function gnMenuOpen(btn){
 /* 화면별 배지 숫자 (펼침 메뉴 · 묶음 버튼 합계) */
 export function gnBadges(){
   var pend=(ST.RAWX.orders||[]).filter(function(o){ return ['접수','출하요청','배송중'].indexOf(o.status)>=0; }).length;
-  return {dcheck:GN_BADGE.dc||0, inbound:GN_BADGE.inbound||0, eqboard:pend};
+  return {dcheck:GN_BADGE.dc||0, inbound:GN_BADGE.inbound||0, orders:pend};   /* ㊿+208 처리 대기 = «발주» › Cloud NAC 발주 내역(예전엔 장비 대시보드) */
 }
 /** ㊿+190 상단 «내 계정» 버튼을 이름으로 — 계정 목록(이름)이 뒤늦게 오거나 «표시 이름»을 고친 뒤 */
 export function gnMeSync(){
@@ -359,10 +359,10 @@ export function deEmojiStart(){
 export function moreMenuSetup(){
   if(!isGN()) return;
   var tb=document.querySelector('#app .topbar'); if(!tb || document.getElementById('btnMore')) return;
-  var b=document.createElement('button'); b.type='button'; b.id='btnMore'; b.className='pill ghost icb'; b.setAttribute('aria-haspopup','menu'); b.setAttribute('aria-expanded','false'); b.setAttribute('aria-label','더보기 — 초기화 · 새로고침 · 글자 크기 · 다크 모드'); b.title='더보기 — 초기화 · 새로고침 · 글자 크기 · 다크 모드';
+  var b=document.createElement('button'); b.type='button'; b.id='btnMore'; b.className='pill ghost icb'; b.setAttribute('aria-haspopup','menu'); b.setAttribute('aria-expanded','false'); b.setAttribute('aria-label','더보기 — 사용 설명서 · 초기화 · 새로고침 · 글자 크기 · 다크 모드'); b.title='더보기 — 사용 설명서 · 초기화 · 새로고침 · 글자 크기 · 다크 모드';
   b.innerHTML=icoLbl('more','');
   var m=document.createElement('div'); m.id='moreMenu'; m.className='more-menu'; m.setAttribute('role','menu'); m.hidden=true;
-  ['btnViewReset','btnReload','btnFont','btnTheme'].forEach(function(id){ var x=document.getElementById(id); if(!x) return; x.classList.add('mm-it'); x.setAttribute('role','menuitem'); m.appendChild(x); });
+  ['btnHelp','btnViewReset','btnReload','btnFont','btnTheme'].forEach(function(id){ var x=document.getElementById(id); if(!x) return; x.classList.add('mm-it'); x.setAttribute('role','menuitem'); m.appendChild(x); });
   tb.appendChild(b); tb.appendChild(m);
   function close(back){ m.hidden=true; b.setAttribute('aria-expanded','false'); if(back) try{ b.focus(); }catch(e){} }
   function open(){ m.hidden=false; b.setAttribute('aria-expanded','true'); var r=b.getBoundingClientRect(); m.style.top=(r.bottom+6)+'px'; m.style.right=Math.max(8, window.innerWidth-r.right)+'px'; var f=m.querySelector('button:not([hidden])'); if(f) try{ f.focus(); }catch(e){} }
@@ -578,7 +578,7 @@ export function renderInbox(){
   }
   /* 데이터 점검 (㊿+133): 바로 고쳐야 할 항목이 있으면 한 줄 */
   /* ㊿+171 데이터 점검 «바로 고칠 것» — «만기 지났는데 미처리»(c_lapsed)는 위 만기 처리 줄과 같은 계약이라 빼고 셈(같은 문제를 두 번 · 두 메뉴에 강조하지 않음) */
-  if(!EQ){ var DS=null; try{ DS={crit:0, warn:0, items:{}}; dcRules().forEach(function(r){ if(!r.items.length || r.id==='c_lapsed') return; if(r.sev==='crit' || r.sev==='warn') DS[r.sev]+=r.items.length; if(r.sev==='crit') DS.items[r.title]=r.items.length; }); }catch(e){ DS=null; }
+  if(!EQ){ var DS=null; try{ DS={crit:0, warn:0, items:{}}; dcRulesQuick().forEach(function(r){ if(!r.items.length || r.id==='c_lapsed') return; if(r.sev==='crit' || r.sev==='warn') DS[r.sev]+=r.items.length; if(r.sev==='crit') DS.items[r.title]=r.items.length; }); }catch(e){ DS=null; }
     if(DS && DS.crit){ var dcs=Object.keys(DS.items).filter(function(k){ return DS.items[k]; }).slice(0,3).map(function(k){ return k+' '+DS.items[k]; }).join(' · ');
       add('dc', {lv:1, ic:'scale', cls:'crit', n:DS.crit, t:tpl`데이터 점검 — 바로 고칠 항목 <span class="num">${rawHtml(DS.crit)}건</span>${rawHtml(DS.warn? ' · 확인 필요 '+DS.warn+'건':'')}`,
       s:dcs, who:dcs, own:areaOwn('dc', '관리자'), asg:'dc', me:areaMe('dc'), due:'오늘', imp:'매출·LIVE·만기 숫자가 틀리게 나올 수 있음', nm:'데이터 바로 고칠 것', cnt:'항목 '+DS.crit+'건', dueS:'오늘', dk:1,
@@ -768,7 +768,7 @@ export function ccTileEquip(){
   c.innerHTML=tpl`<div class="k">임대 장비 운영 ${rawHtml(tag)}</div>`+
     tpl`<div class="tri"><div><b class="num">${rawHtml(lent)}</b><span>임대중</span></div><div><b class="num">${rawHtml(stock)}</b><span>재고</span></div><div><b class="num" style="color:${prog.length?'var(--warn-ink)':'inherit'}">${prog.length}</b><span>회수 진행</span></div></div>${rawHtml(ph)}`+
     tpl`<div class="d" style="margin-top:auto;padding-top:6px;color:var(--s1-ink);font-weight:500">장비 대시보드 →</div>`;
-  c.style.cursor='pointer'; c.title='임대 장비 대시보드 (클릭)'; c.setAttribute('role','button'); c.tabIndex=0;
+  c.style.cursor='pointer'; c.title='장비 대시보드 (클릭)'; c.setAttribute('role','button'); c.tabIndex=0;
   c.onclick=function(){ switchView('eqboard'); };
   return c;
 }
@@ -1193,6 +1193,8 @@ export async function sbAll(q){
   var pages=await Promise.all(jobs);
   return [].concat.apply([],pages);
 }
+/** ㊿+205 업무 데이터를 쓴 횟수 — 홈 · 알림함의 요약(dcRulesQuick)이 «같은 데이터인지» 볼 때 씀 */
+export var SBW={n:0};
 export async function sbWrite(method, path, body, prefer, asView){   /* asView(㊿+148): 다른 화면에서 저장할 때 그 표의 화면 권한으로 검사 — 예: 데이터 점검 수정 창 → 'contracts' */
   if(!ST.SB_TOKEN) throw new Error('로그인이 필요합니다.');
   permWriteGuard(method, path, asView);
@@ -1211,7 +1213,7 @@ export async function sbWrite(method, path, body, prefer, asView){   /* asView(�
   if(!r.ok) throw new Error('저장 실패 ('+r.status+'): '+(await r.text()).slice(0,220));
   // 저장 성공 → 이전 캐시는 옛 데이터이므로 즉시 무효화 (새로고침 시 옛 화면 방지)
   // 단, rpc/load_… 는 읽기 전용 호출이라 캐시를 지우지 않음
-  if(!/^rpc\/load_|^notify_snapshot\b/.test(path)) cacheDrop();   /* ㊿+177 예약 발송 «보낼 글»은 업무 데이터가 아님 */
+  if(!/^rpc\/load_|^notify_snapshot\b/.test(path)){ cacheDrop(); SBW.n++; }   /* ㊿+177 예약 발송 «보낼 글»은 업무 데이터가 아님 · ㊿+205 쓴 횟수(요약 계산 다시 하기 신호) */
   /* ㊿+141: 저장이 됐으니 열린 창의 «입력 중» 표시를 지움 (바깥 클릭·Esc 로 닫을 때 확인을 묻지 않게) — 기록용 표는 제외 */
   if(!/^rpc\/load_/.test(path) && !OVL_SKIP_CLEAN.test(path)) try{ ovlMarkClean(); }catch(e){}
   var t=await r.text();

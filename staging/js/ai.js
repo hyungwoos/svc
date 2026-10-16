@@ -10,6 +10,7 @@ import { CL, clBuild, clEnsure, clFxRate, clSum } from './cloud.js';
 import { openOvl } from './edit.js';
 import { aiHistory, aipOpen, aipSync, ansBlank, homePh, ansClear, ansStateSet, homeAfter, homeB, homeBeforeAsk, homeLocal, homeMetaAI, localIntent } from './home.js';
 import { oiOpen } from './grid.js';
+import { lazyLoad } from './lazy.js';
 
 
 /* ==================================================================
@@ -190,8 +191,8 @@ export function ask(q, opt){
       localAnswer(q,'⚠ AI가 응답하지 않아 내장 규칙으로 답했습니다 — 잠시 후 다시 물어봐 주세요.', opt); aiRetryBtn(q, opt);
     }
   }, AI_TIMEOUT_MS+5000);
-  Promise.all([loadHist(), clEnsure()]).then(function(){
-    return aiFetch({mode:'chat', question:opt.ctx? q+'\n\n'+opt.ctx.text : q, digest:buildDigest(), history:aiHistory()});
+  Promise.all([loadHist(), clEnsure(), lazyLoad('help').catch(function(){ return null; })]).then(function(rs){
+    return aiFetch({mode:'chat', question:aiHelpAdd(opt.ctx? q+'\n\n'+opt.ctx.text : q, q, rs[2]), digest:buildDigest(), history:aiHistory()});
   })
     .then(function(r){
       clearTimeout(guard); if(gone()) return; setAsking(false);
@@ -344,6 +345,15 @@ export function showClarify(q, plan){
 }
 
 /* ---- 자유 질문용 데이터 요약 (전부 포탈이 직접 계산) ---- */
+/** ㊿+206 «어떻게 · 어디서 · 안 돼요» 같은 사용법 질문이면 사용 설명서(js/help.js)에서 맞는 항목을 질문 뒤에 붙임
+ *  · 요약(digest)은 질문마다 같아야 함수 쪽 캐시가 맞으므로 요약이 아니라 질문에 · 함수가 질문을 2,000자에서 자르므로 남는 만큼만(300자 안 남으면 안 붙임)
+ *  · 대화 기록(aiHistory)에는 원래 질문만 남음 */
+export function aiHelpAdd(qq, q, hm){
+  try{ var t=hm && hm.helpForQ? hm.helpForQ(q) : null; if(!t) return qq;
+    var head='\n\n[포탈 사용 설명서 — 이 질문과 맞는 항목 · 화면 사용법을 물으면 이 순서 · 버튼 이름대로 안내]\n', room=1990-qq.length-head.length;
+    return room<300? qq : qq+head+String(t).slice(0, room);
+  }catch(e){ return qq; }
+}
 export function buildDigest(){
   /* ㊿+178 기준월 = 이번 달(홈 · 추천 질문과 같은 homeB) — 예전엔 대시보드에서 고른 «분석 기준월»(STATE.base)이라, 그걸 바꿔 두면 «이번 달 MRR» 답이 달라졌음 */
   var b=homeB(), all=ST.DATA.rows.map(function(r,i){return i;});

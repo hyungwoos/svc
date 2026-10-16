@@ -231,12 +231,14 @@ if (S.blk()) {
     const d = await page.evaluate(() => { SVC.switchView('biz'); return document.querySelector('#dvCap .cap-more'); }); assert(!d, '짧은 cap 에 버튼이 생김');   /* ㊿+186 지니언스는 60자부터 접음 — 비즈포탈(28자)로 */
     return a.len + '→' + b.len;
   });
-  await S.t('❔ 이 화면 사용법 → 그 자리 검색·질문 창(보던 화면 문맥) · ? 단축키 안내 · Esc 닫기', async () => {
+  await S.t('❔ 이 화면 사용법 → ㊿+206 그 화면 사용 설명서 → «AI 에게 더 묻기» = 그 자리 검색·질문 창(보던 화면 문맥) · ? 단축키 안내 · Esc 닫기', async () => {
     await page.evaluate(() => SVC.switchView('orders')); await page.waitForTimeout(200);
-    await page.click('#dvHelp'); await page.waitForTimeout(900);
+    await page.click('#dvHelp'); await page.waitForSelector('#ovlHelp.on #hpT', { timeout: 8000 });
+    const hp = await page.evaluate(() => document.getElementById('hpT').textContent); assert(hp === 'Cloud NAC 발주 내역', '설명서 항목 ' + hp);
+    await page.click('#ovlHelp [data-hpai]'); await page.waitForTimeout(900);
     /* ㊿+172 그 화면 그대로(목록 안 바뀜) · 오른쪽 AI 패널에 답 · 문맥(보던 화면)이 질문 옆에 */
     const st = await page.evaluate(() => ({ v: SVC.ST.CUR_VIEW, panel: !document.getElementById('aiPanel').hidden, on: document.getElementById('answer').classList.contains('on'), title: document.getElementById('ansQ').textContent, say: document.getElementById('aiSay').textContent }));
-    assert(st.v === 'orders' && st.panel && st.on && /화면/.test(st.title) && /보던 화면: 임대 장비 신청 내역/.test(st.title) && /mock/.test(st.say), JSON.stringify(st).slice(0, 200));
+    assert(st.v === 'orders' && st.panel && st.on && /화면/.test(st.title) && /보던 화면: Cloud NAC 발주 내역/.test(st.title) && /mock/.test(st.say), JSON.stringify(st).slice(0, 200));
     await page.keyboard.press('Escape'); await page.waitForTimeout(150);
     assert(await page.evaluate(() => document.getElementById('aiPanel').hidden && document.getElementById('answer').classList.contains('on')), 'Esc → 패널 닫힘 · 대화 유지 아님');
     await page.evaluate(() => { SVC.closeAnswer('', true); }); await page.evaluate(() => SVC.switchView('dash')); await page.waitForTimeout(200);
@@ -757,6 +759,256 @@ if (S.blk()) {
     return '멈춤 → 15초 뒤 이유 + 새로고침 · 로그인 유지 · 거부면 로그인 화면';
   });
 }
+// ㊿+206 사용 설명서 · 운영자 매뉴얼 — 더보기 › «사용 설명서» · 표 위 ❔ = 그 화면 항목 · 찾기 · 이 화면 열기 · 권한별(운영자 매뉴얼은 슈퍼 관리자만) · AI 사용법 질문에 설명서 항목 · 폰
+if (S.blk()) {
+  const mk206 = async (o) => {
+    o = Object.assign({ role: 'super_admin', w: 1440, h: 900 }, o || {});
+    const ctx = await browser.newContext({ viewport: { width: o.w, height: o.h }, serviceWorkers: 'block', isMobile: !!o.mobile, hasTouch: !!o.mobile }); const page = await ctx.newPage(); const c = collect(page);
+    const st = { asks: [] };
+    await mockBackend(page, { role: o.role, extra: async (route, u) => {
+      if (!u.includes('/functions/v1/ask')) return false; const b = JSON.parse(route.request().postData() || '{}'); if (b.mode === 'ping') return false; st.asks.push(b);
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, text: '설명서대로 안내합니다.', model: 'claude-sonnet-5', queries: [] }) }); return true; } });
+    await page.goto(url + '/index.html'); await page.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA, null, { timeout: 15000 }); await page.waitForTimeout(400);
+    return { ctx, page, c, st };
+  };
+  const navOf = (page) => page.evaluate(() => ({ groups: [...document.querySelectorAll('#hpNav .hp-g')].map((g) => g.textContent), items: [...document.querySelectorAll('#hpNav [data-hpid]')].map((b) => b.textContent), cur: (document.querySelector('#hpNav [aria-current="true"]') || {}).textContent || '', title: (document.getElementById('hpT') || {}).textContent || '' }));
+  await S.t('㊿+206 사용 설명서(슈퍼 관리자 · PC): 더보기 › «사용 설명서» = 지금 화면 항목 · 묶음 8(운영자 매뉴얼 포함) · 찾기(조사 붙은 낱말도) · Enter = 첫 결과 · 할 일 순서 · 자주 묻는 것 · «이 화면 열기» · 표 위 ❔ = 그 화면 · Esc 닫고 초점 되돌림 · AI 사용법 질문에만 설명서 항목(질문 2,000자 안 · 화면 질문 글은 그대로)', async () => {
+    const A = await mk206(), P = A.page;
+    await P.click('#btnMore'); await P.waitForTimeout(120);
+    const mi = await P.evaluate(() => { const b = document.getElementById('btnHelp'); return { first: document.querySelector('#moreMenu .mm-it').id, txt: b.textContent.trim(), vis: b.getBoundingClientRect().height > 0 }; });
+    await P.click('#btnHelp'); await P.waitForSelector('#ovlHelp.on #hpT', { timeout: 8000 }); await P.waitForTimeout(150);
+    const n0 = await navOf(P); const focusQ = await P.evaluate(() => document.activeElement && document.activeElement.id);
+    await P.fill('#hpQ', '시리얼'); await P.waitForTimeout(120); const n1 = await navOf(P);
+    await P.fill('#hpQ', '만기 계약은 어떻게 처리해'); await P.waitForTimeout(120); const n2 = await navOf(P);
+    await P.fill('#hpQ', '롤백'); await P.waitForTimeout(120); const n3 = await navOf(P);
+    await P.press('#hpQ', 'Enter'); await P.waitForTimeout(150); const n3b = await navOf(P);
+    await P.fill('#hpQ', 'ㅁㅁ없는말ㅁㅁ'); await P.waitForTimeout(120); const none = await P.evaluate(() => document.getElementById('hpNav').textContent);
+    await P.fill('#hpQ', ''); await P.waitForTimeout(100);
+    await P.click('#hpNav [data-hpid="contracts"]'); await P.waitForTimeout(150);
+    const body = await P.evaluate(() => { const b = document.getElementById('hpBody'); return { t: document.getElementById('hpT').textContent, steps: b.querySelectorAll('.hp-task li').length, tasks: b.querySelectorAll('.hp-task h4').length, faq: b.querySelectorAll('.hp-faq details').length, see: b.querySelectorAll('.hp-see [data-hpid]').length, go: !!b.querySelector('[data-hpgo="contracts"]'), ai: !!b.querySelector('[data-hpai]'), txt: b.textContent, focus: document.activeElement && document.activeElement.id }; });
+    await P.click('#hpBody .hp-see [data-hpid]'); await P.waitForTimeout(120); const seeT = await P.evaluate(() => document.getElementById('hpT').textContent);
+    await P.click('#hpNav [data-hpid="contracts"]'); await P.waitForTimeout(100);
+    await P.click('#hpBody [data-hpgo="contracts"]'); await P.waitForTimeout(500);
+    const go = await P.evaluate(() => ({ v: SVC.ST.CUR_VIEW, on: document.getElementById('ovlHelp').classList.contains('on') }));
+    await P.click('#dvHelp'); await P.waitForSelector('#ovlHelp.on', { timeout: 5000 }); await P.waitForTimeout(150);
+    const dv = await navOf(P);
+    await P.keyboard.press('Escape'); await P.waitForTimeout(200);
+    const esc = await P.evaluate(() => ({ on: document.getElementById('ovlHelp').classList.contains('on'), act: document.activeElement && document.activeElement.id }));
+    await P.evaluate(() => SVC.navMenu('cngen')); await P.waitForTimeout(300); await P.evaluate(() => SVC.helpGo('cngen')); await P.waitForSelector('#ovlHelp.on', { timeout: 5000 });
+    const area = await navOf(P); await P.keyboard.press('Escape'); await P.waitForTimeout(150);
+    await P.evaluate(() => SVC.navMenu('dash')); await P.waitForTimeout(300); await P.waitForFunction(() => SVC.AICFG && SVC.AICFG.enabled, null, { timeout: 8000 });
+    await P.evaluate(() => SVC.ask('새 계약을 등록하려면 어떻게 해?')); await P.waitForFunction(() => /설명서대로/.test(document.getElementById('aiSay').textContent), null, { timeout: 8000 });
+    const ansQ = await P.evaluate(() => document.getElementById('ansQ').textContent);
+    await P.evaluate(() => SVC.ask('이번 달 MRR 얼마야?')); for (let i = 0; i < 40 && A.st.asks.filter((x) => x.mode === 'chat').length < 2; i++) await P.waitForTimeout(200);
+    const chats = A.st.asks.filter((b) => b.mode === 'chat');
+    const q1 = (chats[0] || {}).question || '', q2 = (chats[1] || {}).question || '';
+    const errs = A.c.errs.slice(); await A.ctx.close();
+    assert(mi.first === 'btnHelp' && /사용 설명서/.test(mi.txt) && mi.vis, '더보기 ' + JSON.stringify(mi));
+    assert(n0.title === '홈' && n0.cur === '홈' && n0.groups.length === 9 && n0.groups.includes('운영자 매뉴얼') && n0.groups.includes('발주') && n0.items.length >= 44 && n0.items.includes('장애 대응(증상별)') && focusQ === 'hpQ', '처음 ' + JSON.stringify(n0) + ' ' + focusQ);
+    assert(n1.items[0] === '임대 장비 현황' || n1.items.slice(0, 3).includes('임대 장비 현황'), '시리얼 ' + JSON.stringify(n1.items));
+    assert(n2.items.slice(0, 3).includes('홈') || n2.items.slice(0, 3).includes('계약'), '만기 ' + JSON.stringify(n2.items));
+    assert(n3.items[0] === '운영 되돌리기' && n3b.title === '운영 되돌리기', '롤백 ' + JSON.stringify([n3.items, n3b.title]));
+    assert(/맞는 항목이 없습니다/.test(none), '없음 ' + none);
+    assert(body.t === '계약' && body.tasks >= 3 && body.steps >= 8 && body.faq >= 2 && body.see >= 2 && body.go && body.ai && /«등록»/.test(body.txt) && /«계약 입력·수정»/.test(body.txt) && body.focus === 'hpT', '본문 ' + JSON.stringify(Object.assign({}, body, { txt: body.txt.slice(0, 60) })));
+    assert(seeT === 'LIVE 고객사' && go.v === 'contracts' && !go.on, '함께 보기 · 이 화면 열기 ' + JSON.stringify([seeT, go]));
+    assert(dv.title === '계약' && !esc.on && esc.act === 'dvHelp' && area.title === '사업 영역', '❔ · Esc · 영역 ' + JSON.stringify([dv.title, esc, area.title]));
+    assert(/\[포탈 사용 설명서/.test(q1) && /\[계약\]/.test(q1) && q1.length <= 2000 && /^새 계약을 등록하려면 어떻게 해\?/.test(q1) && !/\[포탈 사용 설명서/.test(q2) && /^이번 달 MRR 얼마야\?$/.test(q2) && /새 계약을 등록하려면/.test(ansQ) && !/설명서/.test(ansQ), 'AI ' + JSON.stringify([q1.slice(0, 120), q1.length, q2, ansQ]));
+    assert(!errs.length, 'pageerror ' + errs.slice(0, 2).join(' | '));
+    return '항목 ' + n0.items.length + ' · AI 질문 ' + q1.length + '자';
+  });
+  await S.t('㊿+206 권한별: 관리자 = 운영자 매뉴얼 · 관리자 화면 · 변경 이력 안 보임(«승격» 찾아도 없음 · AI 질문에도 안 붙음) · AI 지식은 보임 / 장비 계정 = 시작 · 장비 화면만 / 폰(390) = 창 안에 다 들어감 · 가로 넘침 0', async () => {
+    const A = await mk206({ role: 'admin' }), P = A.page;
+    await P.evaluate(() => SVC.helpGo()); await P.waitForSelector('#ovlHelp.on #hpT', { timeout: 8000 });
+    const n = await navOf(P); await P.fill('#hpQ', '승격'); await P.waitForTimeout(120); const s1 = await navOf(P);
+    const ql = await P.evaluate(() => SVC.lazyLoad('help').then((m) => m.helpForQ('운영 승격은 어떻게 해?')));
+    await A.ctx.close();
+    const E = await mk206({ role: 'equipment' }), Q = E.page;
+    await Q.evaluate(() => SVC.helpGo()); await Q.waitForSelector('#ovlHelp.on #hpT', { timeout: 8000 });
+    const ne = await navOf(Q); const eErr = E.c.errs.slice(); await E.ctx.close();
+    const M = await mk206({ w: 390, h: 844, mobile: true }), R = M.page;
+    await R.click('#btnMore'); await R.waitForTimeout(120); await R.click('#btnHelp'); await R.waitForSelector('#ovlHelp.on #hpT', { timeout: 8000 }); await R.waitForTimeout(200);
+    await R.click('#hpNav [data-hpid="op-incident"]'); await R.waitForTimeout(150);
+    const m = await R.evaluate(() => { const md = document.querySelector('#ovlHelp .hp-modal').getBoundingClientRect(), nav = document.getElementById('hpNav').getBoundingClientRect(), bd = document.getElementById('hpBody'); const r = bd.getBoundingClientRect();
+      return { fit: md.left >= 0 && md.right <= innerWidth + 1, nav: nav.height > 80, body: r.height > 150 && r.top >= nav.bottom - 1, ov: [...document.querySelectorAll('#ovlHelp *')].filter((e) => e.scrollWidth > e.clientWidth + 2 && getComputedStyle(e).overflowX === 'visible' && e.clientWidth > 0).length, doc: document.documentElement.scrollWidth <= document.documentElement.clientWidth, q: document.getElementById('hpQ').getBoundingClientRect().width > 200, t: document.getElementById('hpT').textContent }; });
+    await M.ctx.close();
+    assert(!n.groups.includes('운영자 매뉴얼') && !n.items.includes('관리자') && !n.items.includes('변경 이력') && n.items.includes('AI 지식') && n.groups.length === 8 && !s1.items.some((t) => /승격|배포/.test(t)) && !/배포 · 승격/.test(ql || ''), '관리자 ' + JSON.stringify([n.groups, s1.items, (ql || '').slice(0, 60)]));
+    assert(ne.items.length >= 5 && ne.items.length <= 9 && ne.items.includes('Cloud NAC 발주 내역') && !ne.items.includes('계약') && !ne.items.includes('관리자') && !eErr.length, '장비 ' + JSON.stringify(ne.items) + eErr.join('|'));
+    assert(m.fit && m.nav && m.body && m.ov === 0 && m.doc && m.q && m.t === '장애 대응(증상별)', '폰 ' + JSON.stringify(m));
+    return '관리자 ' + n.items.length + ' · 장비 ' + ne.items.length;
+  });
+}
+// ㊿+207 MDR 정식 발주(EDR 발주요청서) — 같은 화면 «신청 구분» · PoC 는 예전 칸 그대로 · 정식 발주 = 계약번호(ICT지원사업은 꼭) · 사업 구분 · 초동조치 · 상태 «발주요청» · SQL 122 전이면 안내 · 현황 열 · 새 칸은 DB 에 있을 때만 저장
+if (S.blk()) {
+  const mk207 = async (o) => {
+    o = Object.assign({ noCols: false }, o || {});
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page);
+    const st = { posts: [], n: 0 };
+    await mockBackend(page, { extra: async (route, u, m) => {
+      if (!/\/rest\/v1\/mdr_ops/.test(u) || m !== 'POST') return false;
+      const rows = JSON.parse(route.request().postData() || '[]'); st.posts.push(rows[0]);
+      if (o.noCols && rows.some((r) => 'contract_no' in r || 'req_kind' in r)) { await route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ code: 'PGRST204', message: "Could not find the 'biz_kind' column of 'mdr_ops' in the schema cache" }) }); return true; }
+      await route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify(rows.map((r) => Object.assign({ id: 900 + (++st.n), created_at: '2026-10-16T01:00:00Z' }, r))) }); return true; } });
+    await page.goto(url + '/index.html'); await page.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA, null, { timeout: 15000 }); await page.waitForTimeout(300);
+    await page.evaluate(() => SVC.navMenu('mdrnew')); await page.waitForSelector('#mpFormWrap .wz-steps', { timeout: 5000 }); await page.waitForTimeout(150);
+    return { ctx, page, c, st };
+  };
+  const vis = (page, sel) => page.evaluate((s) => { const e = document.querySelector(s); if (!e) return null; const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; }, sel);
+  const next = async (page) => { await page.click('#mpFormWrap .wz-next'); await page.waitForTimeout(80); };
+  const stepOf = (page) => page.evaluate(() => document.querySelector('#mpFormWrap [aria-current="step"]').dataset.s);
+  await S.t('㊿+207 MDR 신청: 구분 PoC = 예전 그대로(칸 · 상태 «신청» · 새 칸 안 보냄) / 정식 발주 = 제목 · 버튼 · 안내 바뀜 · 계약번호(ICT지원사업만 꼭) · 사업 구분 · 초동조치 · 확인 요약 · 상태 «발주요청» · 완료 화면 / 현황 «구분» · «계약번호» 열 · «발주요청» 칩 · 메뉴 이름', async () => {
+    const A = await mk207(), P = A.page;
+    const p0 = await P.evaluate(() => ({ kind: document.getElementById('mpKind').value, title: document.getElementById('mpTitle').textContent, go: document.getElementById('mpGo').textContent, menu: document.querySelector('#side button[data-v="mdrnew"]').textContent }));
+    const hid0 = { ct: await vis(P, '#mpContract'), biz: await vis(P, '#mpBiz'), first: await P.evaluate(() => document.getElementById('mpFirst').closest('label').style.display !== 'none') };
+    await P.fill('#mpCompany', '가상고객01'); await P.fill('#mpMgr', '홍길동'); await next(P); await next(P); await next(P);
+    const sum0 = await P.evaluate(() => document.getElementById('mpWzSum').textContent);
+    await P.click('#mpGo'); await P.waitForSelector('#mpDone', { state: 'visible', timeout: 5000 });
+    const d0 = await P.evaluate(() => ({ t: document.getElementById('mpDoneT').textContent, note: document.getElementById('mpDoneNote').textContent }));
+    const b0 = A.st.posts[0] || {};
+    await P.click('#mpDoneNew'); await P.waitForTimeout(150);
+    await P.selectOption('#mpKind', 'order'); await P.waitForTimeout(80);
+    const p1 = await P.evaluate(() => ({ title: document.getElementById('mpTitle').textContent, go: document.getElementById('mpGo').textContent, note: document.querySelector('#mpFormWrap .wz-note').textContent, req: document.getElementById('mpContract').getAttribute('aria-required') }));
+    const vis1 = { ct: await vis(P, '#mpContract'), biz: await vis(P, '#mpBiz'), first: await P.evaluate(() => document.getElementById('mpFirst').closest('label').style.display !== 'none') };   /* 초동조치는 2단계(조건) 상자 — 숨김 표시만 봄 */
+    await P.fill('#mpCompany', '가상기관02'); await P.fill('#mpMgr', '김철수'); await next(P);
+    const e1 = await P.evaluate(() => ({ err: (document.getElementById('mpContractErr') || {}).textContent || '', step: document.querySelector('#mpFormWrap [aria-current="step"]').dataset.s, foc: document.activeElement && document.activeElement.id }));
+    await P.selectOption('#mpBiz', '일반'); await next(P); const s1 = await stepOf(P);
+    await P.click('#mpFormWrap .wz-prev'); await P.waitForTimeout(80); await P.selectOption('#mpBiz', 'ICT지원사업'); await P.fill('#mpContract', 'N1234567');
+    await next(P); await P.check('#mpFirst'); await P.check('#mpAv'); await P.fill('#mpWin', '10'); await P.fill('#mpMac', '50'); await next(P); await next(P);
+    const sum1 = await P.evaluate(() => document.getElementById('mpWzSum').textContent);
+    await P.click('#mpGo'); await P.waitForSelector('#mpDone', { state: 'visible', timeout: 5000 });
+    const d1 = await P.evaluate(() => ({ t: document.getElementById('mpDoneT').textContent, sum: document.getElementById('mpDoneSum').textContent, note: document.getElementById('mpDoneNote').textContent }));
+    const b1 = A.st.posts[1] || {};
+    await P.evaluate(() => SVC.navMenu('mdrops')); await P.waitForTimeout(500);
+    const g = await P.evaluate(() => ({ head: [...document.querySelectorAll('#dvTable thead th')].map((t) => t.textContent.trim()).join('|'), body: document.querySelector('#dvTable tbody').textContent, chips: document.getElementById('viewData').textContent }));
+    const errs = A.c.errs.slice(); await A.ctx.close();
+    assert(p0.kind === 'poc' && /POC 신청/.test(p0.title) && p0.go === 'POC 신청' && /PoC · 발주 신청/.test(p0.menu) && hid0.ct === false && hid0.biz === false && hid0.first === false, 'PoC 처음 ' + JSON.stringify([p0, hid0]));
+    assert(/PoC · 데모/.test(sum0) && !/계약번호/.test(sum0) && b0.status === '신청' && !('req_kind' in b0) && !('contract_no' in b0) && !('biz_kind' in b0) && !('mod_first' in b0) && b0.customer === '가상고객01' && d0.t === 'POC 신청이 접수되었습니다', 'PoC 저장 ' + JSON.stringify([sum0.slice(0, 80), b0, d0]));
+    assert(/발주요청서/.test(p1.title) && p1.go === '발주 요청' && /발주요청/.test(p1.note) && p1.req === 'true' && vis1.ct && vis1.biz && vis1.first, '정식 발주 화면 ' + JSON.stringify([p1, vis1]));
+    assert(/계약번호/.test(e1.err) && e1.step === '0' && e1.foc === 'mpContract' && s1 === '1', '계약번호 필수(ICT 만) ' + JSON.stringify([e1, s1]));
+    assert(/정식 발주/.test(sum1) && /ICT지원사업/.test(sum1) && /N1234567/.test(sum1) && /초동조치/.test(sum1), '요약 ' + sum1.slice(0, 200));
+    assert(b1.status === '발주요청' && b1.req_kind === 'order' && b1.contract_no === 'N1234567' && b1.biz_kind === 'ICT지원사업' && b1.mod_first === true && b1.mod_av === true && b1.os_win === 10 && b1.os_mac === 50 && b1.customer === '가상기관02', '정식 발주 저장 ' + JSON.stringify(b1));
+    assert(d1.t === '발주요청이 접수되었습니다' && /정식 발주\(ICT지원사업\)/.test(d1.sum) && /계약번호 N1234567/.test(d1.sum) && /발주요청/.test(d1.note), '완료 ' + JSON.stringify(d1));
+    assert(/구분/.test(g.head) && /계약번호/.test(g.head) && /사업 구분/.test(g.head) && /정식 발주/.test(g.body) && /N1234567/.test(g.body) && /발주요청/.test(g.chips) && !errs.length, '현황 ' + JSON.stringify({ head: g.head.slice(0, 200), errs }));
+    return 'PoC · 정식 발주 각 1건';
+  });
+  await S.t('㊿+207 SQL 122 전 DB: 정식 발주 = «SQL 122 먼저» 안내(값 그대로 · 완료 안 됨) · PoC 는 그대로 저장 / 현황 표 고치기: 새 칸(계약번호 · 사업 구분)은 읽어 온 행에 그 칸이 있을 때만 보냄', async () => {
+    const A = await mk207({ noCols: true }), P = A.page;
+    await P.selectOption('#mpKind', 'order'); await P.fill('#mpCompany', '가상기관03'); await P.fill('#mpMgr', '홍길동'); await P.fill('#mpContract', 'N7654321');
+    await next(P); await next(P); await next(P); await P.click('#mpGo'); await P.waitForTimeout(700);
+    const f = await P.evaluate(() => ({ msg: document.getElementById('mpMsg').textContent, done: getComputedStyle(document.getElementById('mpDone')).display, c: document.getElementById('mpCompany').value, dis: document.getElementById('mpGo').disabled }));
+    await P.click('#mpFormWrap [data-s="0"]'); await P.waitForTimeout(80); await P.selectOption('#mpKind', 'poc'); await next(P); await next(P); await next(P); await P.click('#mpGo'); await P.waitForSelector('#mpDone', { state: 'visible', timeout: 5000 });
+    const last = A.st.posts[A.st.posts.length - 1] || {};
+    const rr = await P.evaluate(() => { const g = SVC.GRIDS.mdrops; const tr = document.createElement('tr');
+      [['customer', '가상고객09'], ['contract_no', 'N1'], ['status', '구독']].forEach(([k, v]) => { const i = document.createElement('input'); i.dataset.k = k; i.value = v; tr.appendChild(i); });
+      const keep = SVC.ST.RAWX.mdrops; SVC.ST.RAWX.mdrops = [{ id: 1, customer: 'a', status: '신청' }]; const without = SVC.readRowInputs(tr, g);
+      SVC.ST.RAWX.mdrops = [{ id: 1, customer: 'a', status: '신청', contract_no: null, biz_kind: null }]; const withC = SVC.readRowInputs(tr, g); SVC.ST.RAWX.mdrops = keep;
+      return { without, withC }; });
+    const errs = A.c.errs.slice(); await A.ctx.close();
+    assert(/SQL 122/.test(f.msg) && /PoC 신청은 지금도/.test(f.msg) && f.done === 'none' && f.c === '가상기관03' && !f.dis, '안내 ' + JSON.stringify(f));
+    assert(last.status === '신청' && !('req_kind' in last) && !('contract_no' in last) && last.customer === '가상기관03', 'PoC 그대로 ' + JSON.stringify(last));
+    assert(!('contract_no' in rr.without) && rr.without.customer === '가상고객09' && rr.withC.contract_no === 'N1' && !errs.length, '새 칸 저장 ' + JSON.stringify(rr));
+    return 'SQL 122 안내 · PoC 저장';
+  });
+}
+// ㊿+208 «임대 장비 신청» → «Cloud NAC 발주» · 위 메뉴 «발주» 묶음(Cloud NAC 발주 신청 · 내역 · MDR PoC · 발주 신청 · MDR 운영·신청 현황) · «장비» = 대시보드 · 임대 장비 현황 · 저장한 메뉴 설정 옮기기
+if (S.blk()) {
+  await S.t('㊿+208 발주 묶음: 위 메뉴 순서(사업 영역 → 발주 → 장비) · 발주 4개 · 장비 2개 · 화면 제목 · «＋ 등록» · 예전 메뉴 설정(PoC·데모 · 장비 숨김) → 발주로 옮김(한 번만 · 새로 저장한 설정은 그대로) · 장비 전용 계정', async () => {
+    const A = await open(), P = A.page;
+    const seg = (k) => '#rail .gn-tb[data-seg="' + k + '"]';
+    const tabs = await P.evaluate(() => [...document.querySelectorAll('#rail .gn-tabs .gn-tb')].map((b) => b.dataset.seg || b.dataset.v).join('|'));
+    await P.click(seg('g:발주')); await P.waitForTimeout(150);
+    const ord = await P.evaluate(() => [...document.querySelectorAll('#gnMenu .gn-mi')].map((x) => x.dataset.v + ':' + x.querySelector('.gn-l').textContent.trim()).join('|'));
+    const bdg = await P.evaluate(() => ({ seg: +(document.querySelector('#rail .gn-tb[data-seg="g:발주"] .gn-bd:not([hidden])') || { textContent: 0 }).textContent, eqSeg: !!document.querySelector('#rail .gn-tb[data-seg="g:장비"] .gn-bd:not([hidden])'), dataEq: (document.querySelector('#rail .gn-tb[data-eq]') || {}).dataset.seg, pend: (SVC.ST.RAWX.orders || []).filter((o) => ['접수', '출하요청', '배송중'].indexOf(o.status) >= 0).length }));
+    await P.keyboard.press('Escape'); await P.click(seg('g:장비')); await P.waitForTimeout(150);
+    const eq = await P.evaluate(() => [...document.querySelectorAll('#gnMenu .gn-mi')].map((x) => x.dataset.v + ':' + x.querySelector('.gn-l').textContent.trim()).join('|'));
+    await P.keyboard.press('Escape');
+    await P.evaluate(() => SVC.navMenu('ordernew')); await P.waitForTimeout(300);
+    const t1 = await P.evaluate(() => ({ h: document.querySelector('#viewOrderNew h3').textContent, cap: document.querySelector('#viewOrderNew .cap').textContent, ttl: document.getElementById('gnTitle').textContent }));
+    await P.evaluate(() => SVC.navMenu('orders')); await P.waitForTimeout(400); const t2 = await P.evaluate(() => document.getElementById('gnTitle').textContent);
+    await P.evaluate(() => SVC.navMenu('dash')); await P.waitForTimeout(200); await P.click('#btnNew'); await P.waitForTimeout(120);
+    const nw = await P.evaluate(() => [...document.querySelectorAll('#rowMenu [role="menuitem"]')].map((b) => b.textContent.trim()).join('|')); await P.keyboard.press('Escape');
+    const mg = await P.evaluate(() => {
+      const old = SVC.menuConfMigrate({ order: ['g:전체 데이터', 'g:사업 영역', 'g:장비', 'g:PoC·데모', 'g:영업', 'g:인바운드'], hidden: { 'g:PoC·데모': 1, 'g:장비': 1 } });
+      const again = SVC.menuConfMigrate(JSON.parse(JSON.stringify(old)));
+      const fresh = SVC.menuConfMigrate({ order: ['g:전체 데이터', 'g:사업 영역', 'g:발주', 'g:장비', 'g:영업'], hidden: { 'g:장비': 1 } });
+      return { old, again, fresh }; });
+    await P.evaluate(() => { localStorage.setItem(SVC.menuConfKey(), JSON.stringify({ order: ['g:전체 데이터', 'g:장비', 'g:PoC·데모', 'g:사업 영역', 'g:영업'], hidden: { 'g:PoC·데모': 1 } })); SVC.applyMenuConf(); SVC.buildRail(); });
+    const ap = await P.evaluate(() => ({ segs: SVC.menuSegments().filter((s) => s.grp).map((s) => s.label).slice(0, 4).join('|'), mdr: ['mdrnew', 'mdrops'].every((v) => document.querySelector('#side button[data-v="' + v + '"]').classList.contains('mhide')), nac: !document.querySelector('#side button[data-v="ordernew"]').classList.contains('mhide') }));
+    const errs = A.errs.slice(); await A.ctx.close();
+    const E = await open({ role: 'equipment' });
+    const en = await E.page.evaluate(() => ({ tabs: [...document.querySelectorAll('#rail .gn-tb')].map((b) => b.dataset.seg || b.dataset.v).join('|'), on: [...document.querySelectorAll('#side button[data-v]')].filter((b) => b.style.display !== 'none').map((b) => b.dataset.v).join(',') }));
+    await E.ctx.close();
+    assert(/\|area\|g:발주\|g:장비\|/.test(tabs), '위 메뉴 ' + tabs);
+    assert(ord === 'ordernew:Cloud NAC 발주 신청|orders:Cloud NAC 발주 내역|mdrnew:MDR PoC · 발주 신청|mdrops:MDR 운영·신청 현황' && /^eqboard:장비 대시보드\|assets:임대 장비 현황$/.test(eq) && bdg.pend > 0 && bdg.seg === bdg.pend && !bdg.eqSeg && bdg.dataEq === 'g:발주', '묶음 ' + JSON.stringify({ ord, eq, bdg }));
+    assert(/Cloud NAC 발주 신청/.test(t1.h) && /에스원 · 조달 · LG U\+/.test(t1.cap) && /Cloud NAC 발주 내역/.test(t1.cap) && t1.ttl === 'Cloud NAC 발주 신청' && t2 === 'Cloud NAC 발주 내역', '제목 ' + JSON.stringify([t1, t2]));
+    assert(/Cloud NAC 발주 신청/.test(nw) && /MDR PoC · 발주 신청/.test(nw) && !/장비 신청/.test(nw), '＋ 등록 ' + nw);
+    assert(mg.old.order.join('|') === 'g:전체 데이터|g:사업 영역|g:발주|g:장비|g:영업|g:인바운드' && mg.old.hidden['b:mdrnew'] && mg.old.hidden['b:mdrops'] && !mg.old.hidden['g:PoC·데모'] && mg.old.hidden['b:ordernew'] && mg.old.hidden['b:orders'] && mg.old.m208 === 1
+      && JSON.stringify(mg.again) === JSON.stringify(mg.old) && !mg.fresh.hidden['b:ordernew'] && !mg.fresh.m208, '설정 옮기기 ' + JSON.stringify(mg));
+    assert(ap.segs === '전체 데이터|발주|장비|사업 영역' && ap.mdr && ap.nac && !errs.length, '적용 ' + JSON.stringify(ap) + errs.join('|'));
+    assert(/g:발주\|g:장비/.test(en.tabs) && /ordernew/.test(en.on) && /orders/.test(en.on) && /assets/.test(en.on) && /eqboard/.test(en.on) && !/mdrnew/.test(en.on), '장비 계정 ' + JSON.stringify(en));
+    return tabs;
+  });
+}
+// ㊿+209 운영 감시(선택 · 기본 꺼짐) — 배포·운영 › 기록 «운영 감시» · 지금 점검(watch 함수 · Slack 안 보냄) · 설정 저장(확인 창 · 검사) · SQL 123 전 안내 · 알림함 · 배포 뒤 자동 확인
+if (S.blk()) {
+  const mk209 = async (o) => {
+    o = Object.assign({ sql: true, fn: true, set: { id: 1, auto_on: false, slack_on: false, inbox_on: true, channel: null, err_24h: 30, boot_p90_ms: 8000, backup_h: 30, repeat_h: 6 }, logs: [] }, o || {});
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page);
+    const st = { calls: [], patches: [], dialogs: [] };
+    page.on('dialog', (d) => { st.dialogs.push(d.message()); d.accept(); });
+    const ITEMS = [{ k: 'site', name: '포탈 사이트', sev: 'ok', info: '2026-09-16 ㊿+209 · 0.4초' }, { k: 'fn:export', name: '함수 export', sev: 'bad', info: '없음(404) — 배포되지 않음' }, { k: 'backup', name: '야간 백업', sev: 'warn', info: '마지막 2026-10-14 (38시간 전)' }];
+    await mockBackend(page, { extra: async (route, u, m) => {
+      const J = (b, s2) => route.fulfill({ status: s2 || 200, contentType: 'application/json', body: JSON.stringify(b) });
+      if (/\/rest\/v1\/watch_settings/.test(u)) { if (!o.sql) { await J({ code: '42P01', message: 'relation does not exist' }, 404); return true; }
+        if (m === 'PATCH') { const b = JSON.parse(route.request().postData() || '{}'); st.patches.push(b); Object.assign(o.set, b); await J([o.set]); return true; } await J([o.set]); return true; }
+      if (/\/rest\/v1\/watch_log/.test(u)) { if (!o.sql) { await J({}, 404); return true; } await J(o.logs); return true; }
+      if (/\/functions\/v1\/watch/.test(u)) { const b = JSON.parse(route.request().postData() || '{}'); st.calls.push(b);
+        if (!o.fn) { await route.fulfill({ status: 404, contentType: 'text/plain', body: 'not found' }); return true; }
+        if (b.mode === 'deploy') { await J({ ok: true, kind: 'deploy', worst: o.deployBad ? 'bad' : 'ok', items: o.deployBad ? ITEMS : ITEMS.slice(0, 1), slack: 'off', ms: 900 }); return true; }
+        const row = { id: 50 + st.calls.length, at: new Date().toISOString(), kind: 'manual', by_email: 'tester@example.com', worst: 'bad', n_warn: 1, n_bad: 1, items: ITEMS, slack: null, ms: 1200 };
+        o.logs = [row].concat(o.logs); await J(Object.assign({ ok: true }, row)); return true; }
+      return false; } });
+    await page.goto(url + '/index.html'); await page.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA, null, { timeout: 15000 }); await page.waitForTimeout(300);
+    return { ctx, page, c, st, o };
+  };
+  const openLog = async (P) => { await P.evaluate(() => SVC.navMenu('ops')); await P.waitForSelector('#opsTabs', { timeout: 8000 }); await P.click('#opsTabs [data-t="log"]'); await P.waitForFunction(() => /운영 감시/.test(document.getElementById('opsBody').textContent) && !/불러오는 중/.test((document.querySelector('.wt-h') || {}).nextElementSibling ? document.querySelector('.wt-h').nextElementSibling.textContent : ''), null, { timeout: 8000 }); await P.waitForTimeout(200); };
+  await S.t('㊿+209 운영 감시: 기본 꺼짐 설정 · «지금 점검» = watch {mode:run} 한 번 · 결과 표(문제 · 주의) · 기록 · Slack 시험은 Slack 켰을 때만 · 설정 저장 = 확인 창(바뀐 것) → PATCH · 틀린 채널은 막음 · 알림함 한 줄(설정 따라)', async () => {
+    const A = await mk209(), P = A.page; await openLog(P);
+    const s0 = await P.evaluate(() => ({ auto: document.getElementById('wtAuto').checked, slack: document.getElementById('wtSlackOn').checked, inbox: document.getElementById('wtInbox').checked, test: !!document.getElementById('wtSlackTest'), last: document.getElementById('wtLast').textContent, badge: document.querySelector('.wt-h .ubadge').textContent }));
+    await P.click('#wtRun'); await P.waitForFunction(() => document.querySelector('.wt-tbl'), null, { timeout: 8000 }); await P.waitForTimeout(200);
+    const r1 = await P.evaluate(() => ({ rows: [...document.querySelectorAll('.wt-tbl tbody tr')].map((tr) => tr.textContent).join('|'), msg: (document.querySelector('.wt-msg') || {}).textContent || '', last: document.getElementById('wtLast').textContent, hist: (document.querySelector('.wt-hist summary') || {}).textContent || '' }));
+    await P.fill('#wtCh', 'not-a-channel'); await P.click('#wtSave'); await P.waitForTimeout(200);
+    const bad = await P.evaluate(() => (document.querySelector('.wt-msg') || {}).textContent || '');
+    await P.fill('#wtCh', 'C0WATCH123'); await P.check('#wtAuto'); await P.check('#wtSlackOn'); await P.fill('#wtRepeat', '12'); await P.click('#wtSave'); await P.waitForTimeout(500);
+    const after = await P.evaluate(() => ({ msg: (document.querySelector('.wt-msg') || {}).textContent || '', test: !!document.getElementById('wtSlackTest') }));
+    const inbox = await P.evaluate(async () => { await SVC.watchLoad(); const a = SVC.watchItems(); SVC.NTF.watch.set.inbox_on = false; const b = SVC.watchItems(); SVC.NTF.watch.set.inbox_on = true; SVC.NTF.watch.log.worst = 'ok'; const c2 = SVC.watchItems(); return { a: a.map((x) => x.title + ' / ' + x.detail), b: b.length, c: c2.length, sev: a[0] && a[0].sev }; });
+    const errs = A.c.errs.slice(); const st = A.st; await A.ctx.close();
+    assert(!s0.auto && !s0.slack && s0.inbox && !s0.test && /아직 점검 기록 없음/.test(s0.last) && /기본 꺼짐/.test(s0.badge), '처음 ' + JSON.stringify(s0));
+    assert(st.calls.length === 1 && st.calls[0].mode === 'run' && /함수 export/.test(r1.rows) && /문제/.test(r1.rows) && /야간 백업/.test(r1.rows) && /주의/.test(r1.rows) && /문제 1 · 주의 1/.test(r1.msg) && /지금 점검 · 문제 1 · 주의 1/.test(r1.last) && /점검 기록 1개/.test(r1.hist), '지금 점검 ' + JSON.stringify(r1));
+    assert(/채널 ID/.test(bad) && st.patches.length === 1 && st.dialogs.length === 1 && /자동 감시: 꺼짐 → 켬/.test(st.dialogs[0]) && /Slack 알림: 꺼짐 → 켬/.test(st.dialogs[0]) && /채널: \(없음\) → C0WATCH123/.test(st.dialogs[0]) && /15분마다/.test(st.dialogs[0])
+      && st.patches[0].auto_on === true && st.patches[0].slack_on === true && st.patches[0].channel === 'C0WATCH123' && st.patches[0].repeat_h === 12 && st.patches[0].boot_p90_ms === 8000 && /저장했습니다/.test(after.msg) && after.test, '설정 저장 ' + JSON.stringify({ bad, d: st.dialogs, p: st.patches, after }));
+    assert(inbox.a.length === 1 && /운영 감시 — 문제 1 · 주의 1/.test(inbox.a[0]) && /함수 export/.test(inbox.a[0]) && inbox.sev === 'hi' && inbox.b === 0 && inbox.c === 0 && !errs.length, '알림함 ' + JSON.stringify(inbox) + errs.join('|'));
+    return '지금 점검 · 저장 · 알림함';
+  });
+  await S.t('㊿+209 SQL 123 전 = 안내만(시스템 점검은 그대로) / 배포 뒤 확인: 운영 버전 = 기대 → watch {mode:deploy} → 정상 · 문제(되돌리기 안내) · 함수 없음(버전만) · 시간 넘음(Actions 안내)', async () => {
+    const A = await mk209({ sql: false }), P = A.page; await openLog(P);
+    const g = await P.evaluate(() => ({ t: document.querySelector('.wt-h').nextElementSibling.textContent, health: !!document.getElementById('opsHealth'), run: !!document.getElementById('wtRun') }));
+    await A.ctx.close();
+    const B = await mk209(), Q = B.page;
+    await Q.evaluate(async () => { await SVC.lazyLoad('admin'); SVC.navMenu('ops'); }); await Q.waitForSelector('#opsTabs', { timeout: 8000 });
+    const run = async (expect, prev, until) => Q.evaluate(async ([e, p, u]) => { const D = SVC.DW; D.first = 20; D.every = 60; D.max = 900; SVC.dwStart(e, p); for (let i = 0; i < 80 && !new RegExp(u).test(D.state); i++) await new Promise((r) => setTimeout(r, 50)); return { state: D.state, cur: D.cur, html: SVC.dwHtml() }; }, [expect, prev, until]);
+    const ver = await Q.evaluate(() => SVC.APP_VER);
+    const ok1 = await run(ver, '', '^(ok|bad|nofn|err|timeout)$');
+    B.o.deployBad = true; const bad1 = await run(ver, '', '^(ok|bad|nofn|err|timeout)$');
+    B.o.fn = false; const nof = await run(ver, '', '^(ok|bad|nofn|err|timeout)$');
+    const to = await run('2099-01-01 ㊿+999', '', '^(ok|bad|nofn|err|timeout)$');
+    const dep = B.st.calls.filter((x) => x.mode === 'deploy');
+    const errs = B.c.errs.slice(); await B.ctx.close();
+    assert(/SQL 123 을 실행하면/.test(g.t) && g.health && !g.run, 'SQL 전 ' + JSON.stringify(g));
+    assert(ok1.state === 'ok' && ok1.cur === ver && /점검 정상/.test(ok1.html) && bad1.state === 'bad' && /문제 1/.test(bad1.html) && /운영 되돌리기/.test(bad1.html) && nof.state === 'nofn' && /watch 함수가 없어/.test(nof.html)
+      && to.state === 'timeout' && /Actions/.test(to.html) && dep.length === 3 && dep.every((x) => x.expect === ver) && !errs.length, '배포 뒤 확인 ' + JSON.stringify({ ok1: ok1.state, bad1: bad1.state, nof: nof.state, to: to.state, dep: dep.length, errs }));
+    return '정상 · 문제 · 함수 없음 · 시간 넘음';
+  });
+}
 // ㊿+142 디자인 정리: 글자 크기 7단계 · 버튼 4종 · 표 열 너비 조절 · 메뉴 «사업 영역» 한 그룹
 if (S.blk()) {
   const { ctx, page, errs } = await open();
@@ -809,8 +1061,8 @@ if (S.blk()) {
   await S.t('메뉴 편집 예전 설정(옛 «사업 영역 · MDR» 숨김·순서) → 새 그룹으로 옮김', async () => {
     await page.evaluate(() => { localStorage.setItem(SVC.menuConfKey(), JSON.stringify({ order: ['g:장비', 'g:사업 영역 · MDR', 'g:전체 데이터', 'g:사업 영역 · Cloud NAC'], hidden: { 'g:사업 영역 · MDR': 1 } })); SVC.applyMenuConf(); SVC.buildRail(); });
     const r = await page.evaluate(() => ({ conf: JSON.parse(localStorage.getItem(SVC.menuConfKey())), segs: SVC.menuSegments().filter((s) => s.grp).map((s) => s.label).slice(0, 3), mdrHidden: ['mdrgen', 'mdrs1', 'mdrlgu'].every((v) => document.querySelector('#side button[data-v="' + v + '"]').classList.contains('mhide')), subMdr: document.querySelector('#side .subgrp[data-sub="MDR"]').classList.contains('sub-empty'), cn: !document.querySelector('#side button[data-v="cngen"]').classList.contains('mhide') }));
-    assert(r.conf.order.join('|') === 'g:장비|g:사업 영역|g:전체 데이터' && r.conf.hidden['b:mdrgen'] && !r.conf.hidden['g:사업 영역 · MDR'], JSON.stringify(r.conf));
-    assert(r.segs.join('|') === '장비|사업 영역|전체 데이터' && r.mdrHidden && r.subMdr && r.cn, JSON.stringify(r));
+    assert(r.conf.order.join('|') === 'g:발주|g:장비|g:사업 영역|g:전체 데이터' && r.conf.hidden['b:mdrgen'] && !r.conf.hidden['g:사업 영역 · MDR'] && r.conf.m208 === 1, JSON.stringify(r.conf));   /* ㊿+208 «발주»는 «장비» 바로 앞에 */
+    assert(r.segs.join('|') === '발주|장비|사업 영역' && r.mdrHidden && r.subMdr && r.cn, JSON.stringify(r));
     assert(!errs.length, errs.join(' | ')); return r.segs.join('·');
   });
   await ctx.close();
@@ -1992,17 +2244,17 @@ if (S.blk()) {
         left: Math.round(rail.getBoundingClientRect().left), w: Math.round(rail.getBoundingClientRect().width), W: document.documentElement.clientWidth, pad: getComputedStyle(document.body).paddingLeft,
         home: (rail.querySelector('.gn-tb[aria-current="true"]') || {}).dataset.v, ttl: document.getElementById('gnTitle').textContent }; });
     assert(r.skin === 'gn' && r.look === 'cc' && r.cc && r.gn && r.cur === 'gn' && /^gn,cc,simple,classic$/.test(r.keys), JSON.stringify(r));
-    assert(r.inTop && r.logo && /^dash\|weekly\|g:전체 데이터\|area\|g:장비\|m:영업\|m:정산·도구$/.test(r.tabs)   /* ㊿+187 사업 영역은 펼침 없는 버튼 하나(area) */ && r.right === 'm:관리' && r.left === 0 && r.w === r.W && r.pad === '0px' && r.home === 'dash' && r.ttl === '홈', JSON.stringify(r));
+    assert(r.inTop && r.logo && /^dash\|weekly\|g:전체 데이터\|area\|g:발주\|g:장비\|m:영업\|m:정산·도구$/.test(r.tabs)   /* ㊿+208 «발주» 묶음 */   /* ㊿+187 사업 영역은 펼침 없는 버튼 하나(area) */ && r.right === 'm:관리' && r.left === 0 && r.w === r.W && r.pad === '0px' && r.home === 'dash' && r.ttl === '홈', JSON.stringify(r));
     return r.tabs.split('|').length + '개 묶음 + 관리';
   });
   await S.t('㊿+167 상단 메뉴: 묶음 누르면 펼침(소제목·그룹마다 칸) · 항목 누르면 이동·닫힘 · 지금 화면 묶음 표시 · 다른 묶음에 마우스 → 옮겨 감 · Esc·바깥 클릭 닫힘 · ↓ 첫 항목 · 배지 합계', async () => {
     const seg = (k) => '#rail .gn-tb[data-seg="' + k + '"]';
     await page.click(seg('g:장비')); await page.waitForTimeout(150);   /* ㊿+187 사업 영역 묶음은 펼침이 없어져 장비 묶음으로 */
     const a = await page.evaluate(() => { const m = document.getElementById('gnMenu'); return { open: !m.hidden, exp: document.querySelector('#rail .gn-tb[data-seg="g:장비"]').getAttribute('aria-expanded'), cols: [...m.querySelectorAll('.gn-st')].map((x) => x.textContent).join('|'), n: m.querySelectorAll('.gn-mi').length, inView: m.getBoundingClientRect().right <= document.documentElement.clientWidth }; });
-    assert(a.open && a.exp === 'true' && /장비/.test(a.cols) && a.n >= 3 && a.inView, '장비 묶음 ' + JSON.stringify(a));
+    assert(a.open && a.exp === 'true' && /장비/.test(a.cols) && a.n >= 2 && a.inView, '장비 묶음 ' + JSON.stringify(a));   /* ㊿+208 장비 = 대시보드 · 현황(발주는 «발주» 묶음) */
     await page.hover(seg('m:영업')); await page.waitForTimeout(120);
     const b = await page.evaluate(() => ({ cols: [...document.querySelectorAll('#gnMenu .gn-st')].map((x) => x.textContent).join('|'), e1: document.querySelector('#rail .gn-tb[data-seg="g:장비"]').getAttribute('aria-expanded') }));
-    assert(/PoC·데모/.test(b.cols) && /영업/.test(b.cols) && /인바운드/.test(b.cols) && b.e1 === 'false', '영업 묶음 ' + JSON.stringify(b));
+    assert(!/PoC·데모/.test(b.cols) && /영업/.test(b.cols) && /인바운드/.test(b.cols) && b.e1 === 'false', '영업 묶음 ' + JSON.stringify(b));   /* ㊿+208 PoC·데모 → «발주» */
     await page.click('#gnMenu .gn-mi[data-v="oi"]'); await page.waitForTimeout(300);
     const c = await page.evaluate(() => ({ v: SVC.ST.CUR_VIEW, open: !document.getElementById('gnMenu').hidden, cur: (document.querySelector('#rail .gn-tb[aria-current="true"]') || {}).dataset.seg, ttl: document.getElementById('gnTitle').textContent }));
     assert(c.v === 'oi' && !c.open && c.cur === 'm:영업' && c.ttl === 'OI 현황', '이동 ' + JSON.stringify(c));
@@ -2334,7 +2586,7 @@ if (S.blk()) {
     await page.evaluate(() => SVC.closeOvl('ovlEdit'));
     await page.evaluate(() => SVC.navMenu('oinew')); await page.waitForTimeout(200); await page.fill('#oiCust', '검증_새고객'); await page.fill('#oiCEmail', 'not-an-email'); await page.click('#oiFormWrap .wz-next'); await page.waitForTimeout(80);
     const em = await page.evaluate(() => ({ err: (document.getElementById('oiCEmailErr') || {}).textContent || '', step: document.querySelector('#oiFormWrap [aria-current="step"]').dataset.s }));
-    assert(/계약 등록\|계약 변경.*\|영업기회\(OI\) 등록\|장비 신청\|PoC 신청/.test(items) && ed.on && ed.tab === 'new' && /이메일 형식/.test(em.err) && em.step === '0', JSON.stringify({ items, ed, em }));
+    assert(/계약 등록\|계약 변경.*\|영업기회\(OI\) 등록\|Cloud NAC 발주 신청\|MDR PoC · 발주 신청/.test(items) && ed.on && ed.tab === 'new' && /이메일 형식/.test(em.err) && em.step === '0', JSON.stringify({ items, ed, em }));
     return items.split('|').length + '개 메뉴';
   });
   await S.t('㊿+170 영업·인바운드 빠른 보기: 건수 = 거른 목록 · «기준»에서 일수 저장 · ㊿+184 «내 OI» = 내가 작성한 견적서가 붙은 OI(이름 고르기 없음) · «견적 전» · 견적 담당 칸 · 인바운드엔 «내 담당» 없음 · 홈에 인바운드 할 일 없음 · OI 담당 = 견적 작성자 · «다시 조회»는 시트를 안 건드림 · OI → 계약 전환 때 같은 고객사 유효 계약 알림', async () => {
@@ -2692,7 +2944,7 @@ if (S.blk()) {
     await page.evaluate(() => SVC.navMenu('ops')); await page.waitForTimeout(500); await page.click('#opsTabs [data-t="log"]'); await page.waitForTimeout(300);
     await page.click('#opsPerf'); await page.waitForTimeout(500);
     const t = await page.evaluate(() => { const h = [...document.querySelectorAll('.ops-h')].find((x) => /포탈 속도/.test(x.textContent)); const tb = h && h.nextElementSibling && h.nextElementSibling.nextElementSibling; return { head: h && h.textContent, rows: tb ? [...tb.querySelectorAll('tbody tr')].map((r) => r.textContent).join(' / ') : '' }; });
-    assert(/30건/.test(t.head) && /90일 지난 3건 정리/.test(t.head) && /처음 열기.*20.*2\.00초/.test(t.rows) && /메뉴 › 임대 장비 신청 내역102\.20초3\.40초/.test(t.rows), JSON.stringify(t));
+    assert(/30건/.test(t.head) && /90일 지난 3건 정리/.test(t.head) && /처음 열기.*20.*2\.00초/.test(t.rows) && /메뉴 › Cloud NAC 발주 내역102\.20초3\.40초/.test(t.rows), JSON.stringify(t));
     await page.evaluate(() => SVC.navMenu('dash'));
     assert(!c.errs.length, c.errs.join(' | '));
     return kinds.split(',').slice(0, 4).join(' · ');
@@ -4159,8 +4411,8 @@ if (S.blk()) {
     const V = await mk186({ role: 'viewer', email: 'v@example.com' }); await V.page.evaluate(async () => { await SVC.lazyLoad('price'); SVC.navMenu('price'); }); await V.page.waitForTimeout(600);
     const pv = await V.page.evaluate(() => document.getElementById('viewPrice').textContent); await V.ctx.close();
     const emoAll = Object.values(emo).flat();
-    assert(emoAll.length === 0 && dyn === '동적 버튼' && mm.hid && mm.items === 'btnViewReset,btnReload,btnFont,btnTheme' && mm.inTop && !mm.themeVis && !mo.hid && mo.exp === 'true' && mo.themeVis && mo.focusIn && th.theme === 'dark' && th.hid && esc.afterClick === 'btnMore' && esc.hid && esc.theme === 'light' && esc.act === 'btnMore'
-      && row.op0 === '0' && row2.op1 === '1' && row2.other === '0' && cap.more && cap.head.length < 70 && cap.help === 'AI 도움말' && cap.unitChipVis === false && cap.badge && cta === '견적 만들기' && v2 === 'quote' && mob.rows === 1 && mob.n <= 8 && mob.ab === '1' && !/sql/i.test(pv) && /관리자가 가격표를 등록하면/.test(pv),
+    assert(emoAll.length === 0 && dyn === '동적 버튼' && mm.hid && mm.items === 'btnHelp,btnViewReset,btnReload,btnFont,btnTheme' && mm.inTop && !mm.themeVis && !mo.hid && mo.exp === 'true' && mo.themeVis && mo.focusIn && th.theme === 'dark' && th.hid && esc.afterClick === 'btnMore' && esc.hid && esc.theme === 'light' && esc.act === 'btnMore'
+      && row.op0 === '0' && row2.op1 === '1' && row2.other === '0' && cap.more && cap.head.length < 70 && cap.help === '도움말' && cap.unitChipVis === false && cap.badge && cta === '견적 만들기' && v2 === 'quote' && mob.rows === 1 && mob.n <= 8 && mob.ab === '1' && !/sql/i.test(pv) && /관리자가 가격표를 등록하면/.test(pv),
       JSON.stringify({ emo, dyn, mm, mo, th, esc, row, row2, cap, cta, v2, mob, pv: pv.slice(0, 80) }));
     return '이모지 0 · 더보기 4 · 폰 상단 ' + mob.n + '개 한 줄 · 빈 화면 → ' + v2;
   });
@@ -4340,7 +4592,7 @@ if (S.blk()) {
     assert(g.uniq && h.det && h.open && /✓ 신청 ↔ 현황 일치/.test(h.sum) && /신청 2건/.test(h.sum) && h.ok && h.fixVis === 'none' && h.diagIn && h.body && !h2.open && h2.mem === false && !h3.open && h4.open && h4.diag, '장비 ' + JSON.stringify({ g, h, h2, h3, h4 }));
     assert(i.small && i.q === 'none' && i.csv === 'none' && i.add !== 'none' && j.t1 === 'MRR(천원): 480 · 상태: 해지 (계약 표 ✎)' && j.t2 === 'kind: eq · assignee: (비움) → a@example.com' && j.t3 === '그냥 글' && j.t4 === '맞춤: 3개 · ok: 예', '작은 표 · 이력 ' + JSON.stringify({ i, j }));
     assert(k && /월 인식 금액\(천원\) · \d{4}-\d\d ~ \d{4}-\d\d · \d+개월 · 합계 [\d,]+천원/.test(l.cap) && /매달 [\d,]+천원 — 기간 내 변동 없음/.test(l.flat) && !l.h200 && l.nolog && !l.thead && /기록이 없습니다/.test(l.log) && l.mact === 'sticky' && m0 && m.svg && m.h200 && m.cap && n.mact === 'sticky' && n.bt === '1px', '상세 · 입력 창 ' + JSON.stringify({ k, l, m0, m, n }));
-    assert(o.cap === '인바운드는 메뉴를 한 번 연 뒤 집계됩니다' && o.go === '계약|LIVE|OI|인바운드|장비 신청|장비 현황' && !o.goNum && /^요약\|계약\s?\d+\|LIVE\s?\d+$/.test(o.tabs) && o.eq4 === 'none' && /이력 없음/.test(o.eqLine) && o.eqH4 === 1, '고객 360 ' + JSON.stringify(o));
+    assert(o.cap === '인바운드는 메뉴를 한 번 연 뒤 집계됩니다' && o.go === '계약|LIVE|OI|인바운드|Cloud NAC 발주|장비 현황' && !o.goNum && /^요약\|계약\s?\d+\|LIVE\s?\d+$/.test(o.tabs) && o.eq4 === 'none' && /이력 없음/.test(o.eqLine) && o.eqH4 === 1, '고객 360 ' + JSON.stringify(o));
     assert(p.src && p.emb === 'gn' && p.gg === '#3F7A0C' && p.tab === 'rgb(28, 30, 32)' && p.ttl === 'none' && p.badge !== 'none' && !/embed/.test(p.newWin) && q === 0, '위성 · 단위 ' + JSON.stringify({ p, q }));
     assert(cl.zr === 0 && !cl.flt && !cl.eq.det && cl.eq.old && /계약 \d+건 · LIVE/.test(cl.cap) && !A.c.errs.filter((e) => !/serviceWorker/.test(e)).length, '클래식 ' + JSON.stringify({ cl, errs: A.c.errs }));
     return '0행 ' + a.n + ' · 경로 5 · 눈금 ' + g.ticks + ' · 대조 한 줄 · 이력 글';

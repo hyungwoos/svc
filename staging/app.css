@@ -3404,4 +3404,77 @@ button.emo-ico svg{display:block;flex:none}
 .loading .ld-slow{visibility:hidden;max-width:460px;padding:0 16px;text-align:center;font-size:13px;line-height:1.6;color:var(--ink-2);animation:ldSlow 0s linear 20s forwards}
 .loading .ld-slow a{color:var(--brand-ink);font-weight:700}
 @keyframes ldSlow{to{visibility:visible}}
+/* ㊿+206 사용 설명서 · 운영자 매뉴얼 (#ovlHelp · js/help.js) */
+.modal.hp-modal{width:min(980px,100%);height:min(86vh,820px);max-height:86vh;padding:0;display:flex;flex-direction:column;overflow:hidden}
+.hp-head{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--line);flex:0 0 auto}
+.hp-head h2{margin:0;font-size:18px;white-space:nowrap}
+.hp-head input[type="search"]{flex:1;min-width:0;height:38px;padding:0 12px;border:1px solid var(--ring);border-radius:10px;background:var(--surface-2,var(--surface));color:var(--ink);font:inherit;font-size:14px}
+.hp-head input[type="search"]:focus-visible{outline:2px solid var(--s1);outline-offset:1px}
+.hp-wrap{display:grid;grid-template-columns:240px minmax(0,1fr);flex:1 1 auto;min-height:0}
+.hp-nav{border-right:1px solid var(--line);overflow:auto;padding:8px 8px 16px;min-height:0}
+.hp-g{font-size:12px;font-weight:700;color:var(--ink-2);padding:12px 8px 4px;letter-spacing:.02em}
+.hp-ul{list-style:none;margin:0;padding:0}
+.hp-ul button{appearance:none;display:block;width:100%;text-align:left;border:0;background:none;font:inherit;font-size:14px;color:var(--ink);padding:7px 10px;min-height:34px;border-radius:8px;cursor:pointer}
+.hp-ul button:hover{background:var(--surface-2,var(--plane))}
+.hp-ul button[aria-current="true"]{background:var(--surface-2,var(--plane));font-weight:700;box-shadow:inset 3px 0 0 var(--brand-solid)}
+.hp-ul button:focus-visible{outline:2px solid var(--s1);outline-offset:-2px}
+.hp-cnt{padding:8px 8px 4px;margin:0}
+.hp-body{overflow:auto;padding:16px 22px 24px;min-height:0}
+.hp-body:focus{outline:none}
+.hp-doc h3{font-size:18px;margin:0 0 6px}
+.hp-doc h3:focus{outline:none}
+.hp-what{font-size:14px;line-height:1.6;color:var(--ink);margin:0 0 12px}
+
+.hp-task{margin:14px 0 0}
+.hp-task h4,.hp-faq h4{font-size:15px;margin:0 0 6px}
+.hp-task ol{margin:0;padding-left:22px}
+.hp-task li{font-size:14px;line-height:1.6;margin:2px 0}
+.hp-faq{margin:18px 0 0}
+.hp-faq details{border:1px solid var(--ring);border-radius:10px;padding:0 12px;margin:0 0 6px;background:var(--surface)}
+.hp-faq summary{font-size:14px;font-weight:600;padding:9px 0;cursor:pointer;min-height:24px}
+.hp-faq summary:focus-visible{outline:2px solid var(--s1);outline-offset:2px;border-radius:4px}
+.hp-faq details p{font-size:14px;line-height:1.6;margin:0 0 10px;color:var(--ink)}
+.hp-see{font-size:13px;color:var(--ink-2);margin:18px 0 0}
+.hp-see .lnk{font:inherit;font-size:13px;background:none;border:0;padding:4px 2px;color:var(--s1-ink,var(--ink));cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+@media (max-width:720px){
+  .modal.hp-modal{height:92vh;max-height:92vh}
+  .hp-head{flex-wrap:wrap;padding:12px 14px}
+  .hp-head input[type="search"]{order:3;flex-basis:100%}
+  .hp-head [data-close]{margin-left:auto}
+  .hp-wrap{grid-template-columns:1fr;grid-template-rows:minmax(0,38%) minmax(0,1fr)}
+  .hp-nav{border-right:0;border-bottom:1px solid var(--line)}
+  .hp-body{padding:14px 14px 20px}
+}
+@media print{ #ovlHelp{display:none !important} }
+.hp-acts{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px}
+.hp-acts .pill{margin:0}
+/* ㊿+209 운영 감시 · 배포 뒤 확인 (배포·운영 › 기록 · GitHub) */
+.ops-h.wt-h{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ops-h.wt-h .mini{font-weight:400}
+.wt-msg{margin:0 0 8px}
+.wt-msg.ok{color:var(--good)}
+.wt-msg.bad{color:var(--critical)}
+.wt-msg.warn{color:var(--warn,var(--s4-ink))}
+.wt-set{border:1px solid var(--ring);border-radius:12px;padding:10px 14px 12px;margin:0 0 12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:8px 16px;min-width:0}
+.wt-set legend{font-size:13px;font-weight:700;padding:0 4px}
+.wt-set label{font-size:13px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0}
+.wt-set .wt-in input{width:96px;height:32px;padding:0 8px;border:1px solid var(--ring);border-radius:8px;background:var(--surface-2,var(--surface));color:var(--ink);font:inherit;font-size:13px}
+.wt-set .wt-in input#wtCh{width:min(260px,100%)}
+.wt-act{grid-column:1/-1;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.wt-tbl{margin:0 0 12px}
+.wt-tbl caption{text-align:left;padding:0 0 4px}
+.wt-tbl .wt-n{width:220px}
+.wt-sev{display:inline-block;font-size:12px;font-weight:700;padding:1px 8px;border-radius:999px;border:1px solid var(--ring);white-space:nowrap}
+.wt-sev.wt-ok{color:var(--good);border-color:currentColor}
+.wt-sev.wt-warn{color:var(--s4-ink);border-color:currentColor}
+.wt-sev.wt-bad{color:var(--critical);border-color:currentColor}
+.wt-sev.wt-skip{color:var(--ink-2)}
+.wt-hist{margin:0 0 14px}
+.wt-hist summary{font-size:13px;cursor:pointer;padding:4px 0}
+.wt-dw{display:flex;align-items:flex-start;gap:8px;margin:10px 0 0;padding:10px 12px;border:1px solid var(--ring);border-radius:10px;font-size:13px;line-height:1.5;background:var(--surface)}
+.wt-dw>span{flex:1;min-width:0}
+.wt-dw-ok,.wt-dw-nofn{border-color:var(--good)}
+.wt-dw-bad,.wt-dw-err{border-color:var(--critical)}
+.wt-dw-timeout{border-color:var(--s4-ink)}
+@media (max-width:640px){ .wt-tbl .wt-n{width:auto} .wt-set{grid-template-columns:1fr} }
 /* ==== ㊿+166 새 디자인 end ==== */

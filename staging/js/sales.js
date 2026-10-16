@@ -1002,6 +1002,7 @@ export function setupSide(){
   function odS1Sync(){ var s1=$('#odChannel').value==='에스원'; document.querySelectorAll('#odFormWrap .od-s1').forEach(function(d){ d.style.display=s1? '':'none'; }); }
   $('#odChannel').onchange=odS1Sync; odS1Sync();
   $('#mpGo').onclick=submitMdrPoc;
+  var mk=$('#mpKind'); if(mk){ mk.onchange=function(){ wzErr('mpContract',''); mpKindSync(); }; var mb=$('#mpBiz'); if(mb) mb.onchange=function(){ wzErr('mpContract',''); mpKindSync(); }; mpKindSync(); }   /* ㊿+207 PoC · 데모 / 정식 발주 */
   $('#oiGo').onclick=submitOi;
   amtHint($('#oiAmt'), null, false); amtHint($('#oiRival'), null, false);   /* ㊿+157 «= 1,200만원» */
   $('#oiQuoteBtn').onclick=openQuotePick;
@@ -1125,7 +1126,12 @@ export function crIsSup(r){ return /지원/.test(String(r.saleType||'')); }
 export function crPool(match){
   var rows=ST.DATA.rows;
   return tickMemo('crPool', [rows, rows.length, match, CR.base, CR.sup, CR.cnd, JSON.stringify(CR.f||{}), CR_G], function(){
-    var out=[]; rows.forEach(function(r, i){ if(crEligible(r) && match(r)) out.push(i); }); return out; });
+    return crBase().filter(function(i){ return match(rows[i]); }); });   /* ㊿+205 규칙(crEligible)은 한 번 · 필터(match)만 매번 — 결과 · 순서 같음 */
+}
+/** ㊿+205 집계 대상 규칙(crEligible)을 통과한 행 번호 — 규칙은 기준 · 지원사업 · CND 설정에만 달려 있어 같은 묶음 안에서 한 번 */
+export function crBase(){
+  var rows=ST.DATA.rows;
+  return tickMemo('crBase', [rows, rows.length, CR.base, CR.sup, CR.cnd], function(){ var out=[]; rows.forEach(function(r, i){ if(crEligible(r)) out.push(i); }); return out; });
 }
 export function crActive(t, match){
   var out=[], rows=ST.DATA.rows;
@@ -1868,9 +1874,28 @@ export async function submitOrder(){
   btn.disabled=false;
 }
 
+/* ㊿+207 정식 발주(EDR 발주요청서) — 같은 화면 «신청 구분»: PoC · 데모(예전 그대로) / 정식 발주(계약번호 · 사업 구분 · 초동조치 · 상태 «발주요청»)
+   · 사용자: «MDR PoC나 데모신청 말고 정식 발주신청 기능도» · 접수 뒤 = Slack 통보(선택 — Apps Script 에 발주 알림 구역을 붙였을 때만)
+   · 정식 발주 칸(req_kind · contract_no · biz_kind · mod_first)은 SQL 122 — 실행 전에는 PoC 는 예전처럼 되고 정식 발주만 «SQL 122 먼저» 안내 */
+export function mpIsOrder(){ var k=/** @type {any} */(document.getElementById('mpKind')); return !!k && k.value==='order'; }
+export var MP_TXT={
+  poc:{title:'🛡️ EDR+MDR POC 신청', cap:'저장하면 DB에 기록되고 슬랙으로 자동 통보됩니다. 접수된 신청은 「운영·신청 현황」에서 데모·구독까지 이어서 관리합니다.', go:'POC 신청', done:'POC 신청이 접수되었습니다', note:'슬랙 채널로 자동 통보되었습니다'},
+  order:{title:'🛡️ EDR 발주요청서 — 정식 발주', cap:'계약이 확정된 정식 발주를 요청합니다. 저장하면 DB에 기록되고 「운영·신청 현황」에 «발주요청»으로 등록됩니다. Slack 알림은 Apps Script 에 발주 알림 구역을 붙인 경우에만 갑니다.', go:'발주 요청', done:'발주요청이 접수되었습니다', note:'운영·신청 현황에 «발주요청»으로 등록되었습니다 (Slack 알림은 Apps Script 발주 알림 구역을 붙인 경우에만)',
+    notice:'«발주 요청»을 누르면 DB 에 저장되고 운영·신청 현황에 «발주요청»으로 등록됩니다 · Slack 알림은 Apps Script 에 발주 알림 구역을 붙였을 때만 갑니다'}
+};
+export function mpKindSync(){
+  var ord=mpIsOrder(), T=MP_TXT[ord? 'order' : 'poc'];
+  document.querySelectorAll('#viewMdrNew .mp-ord').forEach(function(el){ /** @type {any} */(el).style.display=ord? '' : 'none'; });
+  var set=function(id, t){ var e=document.getElementById(id); if(e) e.textContent=t; };
+  set('mpTitle', T.title); set('mpCap', T.cap); set('mpGo', T.go);
+  var nt=document.querySelector('#mpFormWrap .wz-note'); if(nt) nt.textContent=ord? MP_TXT.order.notice : WZ_DEF.mp.notice;
+  var ct=document.getElementById('mpContract'); if(ct){ if(ord && /** @type {any} */(document.getElementById('mpBiz')).value==='ICT지원사업') ct.setAttribute('aria-required','true'); else ct.removeAttribute('aria-required'); }
+}
 export async function submitMdrPoc(){
-  var comp=$('#mpCompany').value.trim(), mgr=$('#mpMgr').value.trim();
+  var comp=$('#mpCompany').value.trim(), mgr=$('#mpMgr').value.trim(), ord=mpIsOrder();
   if(!comp||!mgr){ msg('mpMsg','회사명과 고객 담당자 이름은 필수입니다','bad'); return; }
+  var biz=ord? $('#mpBiz').value : null, cno=ord? $('#mpContract').value.trim() : '';
+  if(ord && biz==='ICT지원사업' && !cno){ msg('mpMsg','ICT지원사업 정식 발주는 계약번호가 필요합니다','bad'); return; }
   var btn=$('#mpGo'); btn.disabled=true; msg('mpMsg','접수 중…');
   try{
     var osSum=(+$('#mpWin').value||0)+(+$('#mpLinux').value||0)+(+$('#mpMac').value||0);
@@ -1897,19 +1922,25 @@ export async function submitMdrPoc(){
       sales_phone: $('#mpSalesPh').value.trim()||null,
       apply_date: $('#mpDate').value||null,
       note: $('#mpNote').value.trim()||null,
-      status:'신청'
+      status: ord? '발주요청' : '신청'
     };
-    var out=await sbWrite('POST','mdr_ops?select=*',[row],'return=representation');
+    /* PoC 는 예전 칸 그대로(SQL 122 전에도 됨) · 정식 발주만 새 칸 */
+    if(ord) Object.assign(row, {req_kind:'order', contract_no:cno||null, biz_kind:biz, mod_first:$('#mpFirst').checked});
+    var out;
+    try{ out=await sbWrite('POST','mdr_ops?select=*',[row],'return=representation'); }
+    catch(e1){ if(ord && /req_kind|contract_no|biz_kind|mod_first|PGRST204|schema cache/.test(String(/** @type {any} */(e1).message||e1))) throw new Error('정식 발주 칸이 아직 DB 에 없습니다 — 관리자가 SQL 122 를 먼저 실행해야 합니다(PoC 신청은 지금도 됩니다)'); throw e1; }
     ST.RAWX.mdrops=ST.RAWX.mdrops||[]; ST.RAWX.mdrops.unshift(out[0]);
-    logChange('insert','mdr_ops',out[0].id,{company:comp,mgr:mgr});
+    logChange('insert','mdr_ops',out[0].id, ord? {company:comp, mgr:mgr, kind:'정식 발주', contract_no:cno||null, biz:biz} : {company:comp,mgr:mgr});
     msg('mpMsg','');
-    var mods=[row.mod_edr?'EDR+MDR':'',row.mod_av?'백신':'',row.mod_ransom?'랜섬웨어':'',row.mod_media?'매체제어':''].filter(Boolean).join('·');
-    $('#mpDoneSum').textContent=[comp, mgr, row.device_count||'', mods].filter(Boolean).join(' · ');
+    var mods=[row.mod_edr?'EDR+MDR':'',row.mod_av?'백신':'',row.mod_ransom?'랜섬웨어':'',row.mod_media?'매체제어':'', ord && row.mod_first?'초동조치':''].filter(Boolean).join('·');
+    var T=MP_TXT[ord? 'order' : 'poc'];
+    $('#mpDoneSum').textContent=[ord? '정식 발주'+(biz? '('+biz+')' : '') : '', ord && cno? '계약번호 '+cno : '', comp, mgr, row.device_count||'', mods].filter(Boolean).join(' · ');
+    $('#mpDoneT').textContent=T.done; $('#mpDoneNote').textContent=T.note;
     $('#mpFormWrap').style.display='none';
     $('#mpDone').style.display='';
-    toast('POC 신청 접수 완료', comp+' · '+(mods||'모듈 미선택'));
-    ['mpCompany','mpMgr','mpPhone','mpEmail','mpDev','mpWin','mpLinux','mpMac','mpWebui','mpSales','mpSalesPh','mpNote'].forEach(function(i){ $('#'+i).value=''; });
-    $('#mpEdr').checked=true; ['mpAv','mpRansom','mpMedia'].forEach(function(i){ $('#'+i).checked=false; });
+    toast(ord? '발주요청 접수 완료' : 'POC 신청 접수 완료', comp+' · '+(mods||'모듈 미선택'));
+    ['mpCompany','mpMgr','mpPhone','mpEmail','mpDev','mpWin','mpLinux','mpMac','mpWebui','mpSales','mpSalesPh','mpNote','mpContract'].forEach(function(i){ var x=$('#'+i); if(x) x.value=''; });
+    $('#mpEdr').checked=true; ['mpAv','mpRansom','mpMedia','mpFirst'].forEach(function(i){ var x=$('#'+i); if(x) x.checked=false; });
   }catch(e){ msg('mpMsg',String(e.message||e),'bad'); }
   btn.disabled=false;
 }
@@ -1934,9 +1965,10 @@ export var WZ_DEF={
     req:{oiCust:'고객사'}},
   mp:{wrap:'mpFormWrap', go:'mpGo', msg:'mpMsg', first:'mpCompany', cust:'mpCompany',
     notice:'«POC 신청»을 누르면 DB 에 저장되고 슬랙 채널로 알림이 갑니다 · 운영·신청 현황에 «신청»으로 등록됩니다',
-    steps:[['기본',['mpCompany','mpMgr','mpPhone','mpEmail','mpDev']], ['조건',['mpEdr','mpWin','mpLinux','mpMac','mpNac','mpWebui']],
+    steps:[['기본',['mpKind','mpBiz','mpContract','mpCompany','mpMgr','mpPhone','mpEmail','mpDev']], ['조건',['mpEdr','mpWin','mpLinux','mpMac','mpNac','mpWebui']],
       ['신청 정보',['mpSales','mpSalesPh','mpDate','mpNote']], ['확인',[]]],
-    req:{mpCompany:'회사명', mpMgr:'고객 담당자 이름'}}
+    req:{mpCompany:'회사명', mpMgr:'고객 담당자 이름'},
+    reqIf:{mpContract:['계약번호', function(){ return mpIsOrder() && /** @type {any} */(document.getElementById('mpBiz')).value==='ICT지원사업'; }]}}   /* ㊿+207 ICT지원사업 정식 발주만 */
 };
 export var WZ={};
 /** 칸 하나를 담고 있는 상자(라벨 + 입력) */
@@ -1955,7 +1987,7 @@ export function wzLabel(id){
 export function wzVal(id){
   var e=/** @type {any} */(document.getElementById(id)); if(!e) return '';
   if(id==='oiProducts') return [].slice.call(e.querySelectorAll('.oi-prow')).filter(function(r){ var c=r.querySelector('input[data-oip]'); return c && c.checked; }).map(function(r){ var c=r.querySelector('input[data-oip]'), q=r.querySelector('.oi-qty'), et=r.querySelector('.oi-etc'); return (c.dataset.oip==='__etc'? (et&&et.value)||'기타' : c.dataset.oip)+(q&&q.value? ' '+q.value : ''); }).join(', ');
-  if(id==='mpEdr') return [['mpEdr','EDR+MDR'],['mpAv','안티바이러스'],['mpRansom','안티랜섬웨어'],['mpMedia','매체제어']].filter(function(x){ var c=/** @type {any} */(document.getElementById(x[0])); return c && c.checked; }).map(function(x){ return x[1]; }).join(' · ');
+  if(id==='mpEdr') return [['mpEdr','EDR+MDR'],['mpAv','안티바이러스'],['mpRansom','안티랜섬웨어'],['mpMedia','매체제어']].concat(mpIsOrder()? [['mpFirst','초동조치']] : []).filter(function(x){ var c=/** @type {any} */(document.getElementById(x[0])); return c && c.checked; }).map(function(x){ return x[1]; }).join(' · ');
   if(id==='oiQuoteBtn'){ var tg=document.getElementById('oiQuoteTag'); return OI_QUOTE && tg? tg.textContent : ''; }
   if(e.type==='checkbox') return e.checked? '예' : '';
   if(e.tagName==='SELECT'){ var o=e.options[e.selectedIndex]; return o && e.value!==''? o.textContent : ''; }
@@ -1974,6 +2006,7 @@ export function wzInit(key){
   });
   var last=steps[steps.length-1]; last.querySelector('.frm').remove();
   last.insertAdjacentHTML('beforeend', tpl`<div class="wz-sum" id="${key}WzSum"></div><p class="wz-note" role="note">${D.notice}</p>`);
+  if(key==='mp') setTimeout(function(){ try{ mpKindSync(); }catch(e){} }, 0);   /* ㊿+207 구분에 맞는 안내 */
   var nav=document.createElement('div'); nav.className='wz-nav mact';
   nav.innerHTML='<button type="button" class="pill ghost wz-prev">이전</button><button type="button" class="pill pri wz-next">다음</button>';
   if(ms) nav.insertBefore(ms, nav.firstChild); if(go) nav.appendChild(go);
@@ -2007,7 +2040,9 @@ export function wzCheck(key, to){
   var D=WZ_DEF[key], W=WZ[key], bad=/** @type {any} */(null);
   for(var s=0; s<Math.min(to, D.steps.length-1); s++){
     D.steps[s][1].forEach(function(id){ var e=/** @type {any} */(document.getElementById(id)); if(!e) return;
-      var t=''; if(D.req[id] && !String(e.value||'').trim()) t=D.req[id]+'은(는) 꼭 넣어야 합니다';
+      var bx=wzBox(id); if(bx && /** @type {any} */(bx).style.display==='none') return;   /* ㊿+207 숨긴 칸(PoC 의 계약번호 등)은 보지 않음 */
+      var rq=D.req[id] || (D.reqIf && D.reqIf[id] && D.reqIf[id][1]()? D.reqIf[id][0] : '');
+      var t=''; if(rq && !String(e.value||'').trim()) t=rq+'은(는) 꼭 넣어야 합니다';
       else if(e.type==='email' && e.value && !e.checkValidity()) t='이메일 형식이 아닙니다 (예: name@company.com)';
       else if(e.type==='number' && e.value!=='' && !e.checkValidity()) t='숫자 범위를 확인하세요';
       wzErr(id, t); if(t && !bad) bad={s:s, id:id}; });
@@ -2050,7 +2085,7 @@ export function openNewMenu(btn){
   var it=[];
   if(!ST.IS_VIEWER && canWrite('contracts')) it.push({l:'계약 등록', ic:'doc', go:function(){ $('#btnEdit').click(); var t=/** @type {any} */(document.querySelector('#eTabs button[data-t="new"]')); if(t) t.click(); }},
     {l:'계약 변경 — 갱신·추가·해지·금액', ic:'edit', go:function(){ $('#btnEdit').click(); var t=/** @type {any} */(document.querySelector('#eTabs button[data-t="renew"]')); if(t) t.click(); }});
-  [['oinew','영업기회(OI) 등록','target'],['ordernew','장비 신청','box'],['mdrnew','PoC 신청','shield']].forEach(function(x){ if(canView(x[0])) it.push({l:x[1], ic:x[2], go:function(){ navMenu(x[0]); }}); });
+  [['oinew','영업기회(OI) 등록','target'],['ordernew','Cloud NAC 발주 신청','box'],['mdrnew','MDR PoC · 발주 신청','shield']].forEach(function(x){ if(canView(x[0])) it.push({l:x[1], ic:x[2], go:function(){ navMenu(x[0]); }}); });
   if(it.length) rowMenu(btn, it);
 }
 

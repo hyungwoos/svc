@@ -11,7 +11,7 @@ import { EQOPEN, eqSnDetail } from './equipment.js';
 import { applyFs, openFind } from './tools.js';
 import { wkFsSync, wkNext, wkPrev, wkToggleFs } from './inbound.js';
 import { qoiOnSaved } from './sales.js';
-import { askScreenHelp, btnBackSync, comboPlace, goBack, gridActPad, LENS_DEFS, LENS_DESC, NAV, navValid, switchView, viewSnapAdd, viewSnapInit } from './grid.js';
+import { btnBackSync, comboPlace, goBack, gridActPad, helpGo, LENS_DEFS, LENS_DESC, NAV, navValid, switchView, viewSnapAdd, viewSnapInit } from './grid.js';
 import { closeOvl, fillSectorSel, ovlDismiss, ovlInit, ovlTop, renameShowPreview, syncCustMeta } from './edit.js';
 import { lazyHook } from './lazy.js';
 import { verStart } from './guard.js';
@@ -241,7 +241,7 @@ export function start(){
   document.addEventListener('submit', function(e){ if(e.target && e.target.id==='lsLogin') e.preventDefault(); });
   /* ⑤ UX 2단계 (㊿+139): 표 동작 열 여백은 창 크기에 따라 다시 계산 · ❔ 화면 도움말 · ? 단축키 안내 */
   onResize(function(){ if(ST.CUR_VIEW && GRIDS[ST.CUR_VIEW]) gridActPad(); });
-  (function(){ var b=document.getElementById('dvHelp'); if(b) b.addEventListener('click', askScreenHelp); })();
+  (function(){ var b=document.getElementById('dvHelp'); if(b) b.addEventListener('click', function(){ helpGo(ST.CUR_VIEW); }); var h=document.getElementById('btnHelp'); if(h) h.addEventListener('click', function(){ helpGo(ST.CUR_VIEW); }); })();   /* ㊿+206 ❔ = 이 화면 사용 설명서(안에서 «AI 에게 더 묻기») */
   document.addEventListener('keydown', function(e){
     if(e.key!=='?' || e.ctrlKey || e.metaKey || e.altKey) return;
     var a=document.activeElement, tag=a? a.tagName : ''; if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||(a&&a.isContentEditable)) return;

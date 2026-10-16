@@ -3,7 +3,7 @@
 import { APP_VER, IS_QA, IS_STAGING, ST } from './state.js';
 import { Viz } from './viz.js';
 import { $, amtGuard, amtHint, baseLabel, bizKey, bizLabel, bizY, canWrite, cssv, navText, esc, fetchT, isGN, kwToWon, lline, llineVer, mk, rawHtml, SB_KEY, SB_URL, STATE, tickMemo, tpl, won, wonFull, wonKo, wonToKw, yOf } from './core.js';
-import { dIdx, ico, idxDate, loadFromDb, onData, SB_RAW, sbHeaders, sbTry, sbWrite, toast, todayStr } from './shell.js';
+import { dIdx, ico, idxDate, loadFromDb, onData, SB_RAW, SBW, sbHeaders, sbTry, sbWrite, toast, todayStr } from './shell.js';
 import { hbars, idxs, monthlyTotal } from './dash.js';
 import { CHURN_OPTS, codeActive, GRIDS, LEAD_OPTS, LINE_OPTS } from './grids.js';
 import { bizHostEl, bizNz, BIZV, eqIsPh, eqScan, eqSerials, syncOrderAssets } from './equipment.js';
@@ -58,7 +58,7 @@ export async function dcDailySave(force){
   try{
     if(DCA.ok===null) await dcAckLoad();
     var o={day:todayStr(), crit:0, warn:0, info:0, acked:0, items:{}, ver:APP_VER};
-    dcRules().forEach(function(r){ o[r.sev]+=r.items.length; o.acked+=(r.acked||[]).length; if(r.items.length) o.items[r.id]=r.items.length; });
+    dcRulesQuick().forEach(function(r){ o[r.sev]+=r.items.length; o.acked+=(r.acked||[]).length; if(r.items.length) o.items[r.id]=r.items.length; });
     var res=await fetch(SB_URL+'/rest/v1/dc_daily?on_conflict=day', {method:'POST', headers:Object.assign(sbHeaders(true), {Prefer:'resolution=merge-duplicates,return=minimal'}), body:JSON.stringify(o)});
     if(res.status===404) DCD.ok=false; else if(res.ok){ DCD.ok=true; DCD.lat=0; }
     return res.ok;
@@ -96,12 +96,32 @@ export function dcSimilar(CU){
   var add=function(a, b, why){ if(a.c.id===b.c.id || a.k===b.k) return; var id=Math.min(a.c.id, b.c.id)+'-'+Math.max(a.c.id, b.c.id); if(seen[id]) return; seen[id]=1; res.push({a:a.c, b:b.c, why:why, id:id}); };
   L.forEach(function(x){ x.al.forEach(function(k){ (byK[k]||[]).forEach(function(y){ add(x, y, '«'+x.c.name+'»의 별칭이 «'+y.c.name+'»와 같음'); }); }); });
   var S=L.slice().sort(function(p, q){ return p.k.length-q.k.length; });
-  for(var i=0;i<S.length && res.length<300;i++){ var a=S[i]; if(a.k.length<4) continue;
-    for(var j=i+1;j<S.length;j++){ var b=S[j], d=b.k.length-a.k.length; if(d>4) break;
-      if(d<=1 && dcLev1(a.k, b.k)){ var p0=0; while(p0<a.k.length && a.k[p0]===b.k[p0]) p0++;
-        if(a.k.length>=5 && p0>=2 && !/\d/.test((a.k[p0]||'')+(b.k[p0]||''))) add(a, b, '이름 한 글자 차이'); }   /* 앞 두 글자(지역 · 기관 이름 «강남구청/강북구청»)나 숫자(1공장/2공장)가 다른 것은 뺌 */
-      else if(d>=1 && b.k.indexOf(a.k)===0 && !/^\d+$/.test(b.k.slice(a.k.length))) add(a, b, '앞부분이 같음(+'+d+'글자)'); } }
+  /* ㊿+205 같은 결과 · 빠르게 — 예전엔 길이가 비슷한 모든 쌍을 비교(고객사 수의 제곱 · 데이터 10배에서 2초 넘음 · 홈을 여는 동안 멈춤)
+     → 판정이 참일 수 있는 쌍만 뽑음(dcSimPairs) · 판정 · 순서(i, j) · 300건에서 멈추는 규칙은 그대로 (tests/unit.mjs 가 예전 방식과 결과 대조) */
+  var P=dcSimPairs(S.map(function(x){ return x.k; })), lastI=-1;
+  for(var t=0;t<P.length;t++){ var i=P[t][0], j=P[t][1];
+    if(i!==lastI){ if(res.length>=300) break; lastI=i; }
+    var a=S[i], b=S[j], d=b.k.length-a.k.length;
+    if(d<=1 && dcLev1(a.k, b.k)){ var p0=0; while(p0<a.k.length && a.k[p0]===b.k[p0]) p0++;
+      if(a.k.length>=5 && p0>=2 && !/\d/.test((a.k[p0]||'')+(b.k[p0]||''))) add(a, b, '이름 한 글자 차이'); }   /* 앞 두 글자(지역 · 기관 이름 «강남구청/강북구청»)나 숫자(1공장/2공장)가 다른 것은 뺌 */
+    else if(d>=1 && b.k.indexOf(a.k)===0 && !/^\d+$/.test(b.k.slice(a.k.length))) add(a, b, '앞부분이 같음(+'+d+'글자)'); }
   DC._sim={src:CU, n:CU.length, al:SB_RAW.customers, res:res}; return res;
+}
+/** ㊿+205 비슷한 이름 후보 쌍 [i, j](i < j · K 는 길이 오름차순) — 예전 이중 반복에서 판정이 참일 수 있는 쌍만:
+    ① 한 글자 차이(길이 차 0~1): 한 글자를 지운 꼴(또는 그대로)이 같은 쌍 ② 앞부분이 같음(길이 차 1~4): 긴 쪽의 앞부분이 짧은 쪽과 같은 쌍
+    짧은 쪽이 4글자 미만 · 길이 차 4 초과는 예전처럼 뺌 · (i, j) 순서로 정렬 */
+export function dcSimPairs(K){
+  var n=K.length, seen=new Set(), out=[];
+  var push=function(i, j){ if(i===j) return; if(i>j){ var t=i; i=j; j=t; } if(K[i].length<4) return; var d=K[j].length-K[i].length; if(d<0 || d>4) return;
+    var id=i*n+j; if(seen.has(id)) return; seen.add(id); out.push([i, j]); };
+  var vm=new Map();
+  for(var i=0;i<n;i++){ var k=K[i], vs=new Set([k]); for(var p=0;p<k.length;p++) vs.add(k.slice(0, p)+k.slice(p+1));
+    vs.forEach(function(v){ var arr=vm.get(v); if(arr) arr.push(i); else vm.set(v, [i]); }); }
+  vm.forEach(function(arr){ if(arr.length<2) return; for(var x=0;x<arr.length;x++) for(var y=x+1;y<arr.length;y++) push(arr[x], arr[y]); });
+  var byKey=new Map(); K.forEach(function(k, i){ var arr=byKey.get(k); if(arr) arr.push(i); else byKey.set(k, [i]); });
+  for(var j=0;j<n;j++){ var kj=K[j]; for(var dd=1;dd<=4;dd++){ var pre=kj.slice(0, kj.length-dd); if(pre.length<4) break; var hit=byKey.get(pre); if(hit) hit.forEach(function(ii){ push(ii, j); }); } }
+  out.sort(function(x, y){ return x[0]-y[0] || x[1]-y[1]; });
+  return out;
 }
 /** ㊿+170 일괄 수정 미리 보기 — 무엇이 바뀌는지 표로 보여 주고, 사람이 «n건 반영»을 눌러야만 실행(자동 실행 없음) */
 export function previewDlg(o){
@@ -112,6 +132,13 @@ export function previewDlg(o){
   var ok=/** @type {any} */(document.getElementById('pvOk')); ok.textContent=o.ok; ok.disabled=false; /** @type {any} */(document.getElementById('pvM')).textContent=o.rows.length>300? '처음 300건만 보입니다 (전체 '+o.rows.length+'건 반영)' : '';
   ok.onclick=function(){ ok.disabled=true; closeOvl('ovlPrev'); o.run(); };
   openOvl('ovlPrev');
+}
+/** ㊿+205 홈 할 일 · 알림함의 «데이터 바로 고칠 것» 숫자용 — 같은 데이터(읽은 데이터 · 표 원본 · 쓴 횟수 · 확인 표시 수 · 코드 목록이 같음)면
+    5초 안의 다시 부름은 앞 결과를 씀(처음 열 때 둘이 같은 계산을 두 번 하던 것 · 데이터 10배에서 1초 넘게) · 데이터 점검 화면 · 고치기는 늘 dcRules() 로 새로 */
+export function dcRulesQuick(){
+  var c=DC._q, now=Date.now(), ak=DCA.map? Object.keys(DCA.map).length : -1;
+  if(c && c.d===ST.DATA && c.r===ST.RAWX && c.w===SBW.n && c.a===ak && c.c===ST.CODES && now-c.at<5000) return c.v;
+  var v=dcRules(); DC._q={d:ST.DATA, r:ST.RAWX, w:SBW.n, a:ak, c:ST.CODES, at:now, v:v}; return v;
 }
 export function dcRules(){
   var rows=(ST.DATA&&ST.DATA.rows)||[], T=(ST.DATA&&ST.DATA.nowIdx)||0, R=ST.RAWX||{}, out=[];
@@ -153,7 +180,8 @@ export function dcRules(){
   rule('c_renew_overlap','warn','연장한 계약과 겹치는 재약정 행','연장(«연장 n회»)으로 기간을 늘린 계약이 있는데 같은 고객·서비스에 같은 기간의 «재약정» 행이 또 있음 — 겹치는 달 월 매출이 두 번 잡힙니다. 재약정 행을 지우거나, 그 행을 남길 거면 원계약의 연장을 «↩ 마지막 연장 되돌리기»로 취소하세요.', ovl, '계약 관리');
   /* 포탈(renewScan) ↔ DB(renew_watch · SQL 84) 만기 판정 대조 — 슬랙 알림(remind)은 DB 쪽을 쓰므로 두 쪽이 어긋나면 알림과 화면 숫자가 달라짐. 결과는 dcRenewSync() 가 비동기로 채움(DC.rw) */
   var rw=DC.rw, rwItems=[];
-  if(rw && rw.T===T && rw.diff) rw.diff.forEach(function(d){ var r=rows.filter(function(x){ return x._id===d.id; })[0]; var it=r? fxC(['status','end_month','auto_renew','live_override'])(r) : {label:'#'+d.id+' '+(d.cust||''), sub:'', go:null, key:d.id}; it.sub=(d.side==='portal'? '포탈만 ':'DB(renew_watch)만 ')+'«'+d.kind+'»'+(d.other? ' · 상대쪽 «'+d.other+'»':'')+(it.sub? ' · '+it.sub:''); rwItems.push(it); });
+  var rwById=null;   /* ㊿+205 계약 번호 → 행(첫 번째) 한 번만 만듦 — 예전엔 불일치 건마다 전체 계약을 훑음(데이터 10배에서 1초) */
+  if(rw && rw.T===T && rw.diff) rw.diff.forEach(function(d){ if(!rwById){ rwById={}; rows.forEach(function(x){ if(!(x._id in rwById)) rwById[x._id]=x; }); } var r=rwById[d.id]; var it=r? fxC(['status','end_month','auto_renew','live_override'])(r) : {label:'#'+d.id+' '+(d.cust||''), sub:'', go:null, key:d.id}; it.sub=(d.side==='portal'? '포탈만 ':'DB(renew_watch)만 ')+'«'+d.kind+'»'+(d.other? ' · 상대쪽 «'+d.other+'»':'')+(it.sub? ' · '+it.sub:''); rwItems.push(it); });
   rule('c_renew_sync', (!rw || rw.error || rw.pending)? 'info':'warn', '만기 판정 포탈 ↔ DB 불일치', rw? (rw.error? 'DB 쪽(renew_watch) 조회 실패 — '+rw.error+' (SQL 84 미실행이면 정상)' : '홈 «만기 처리»(포탈 계산)와 슬랙 알림(DB 함수 renew_watch)이 보는 미처리·이달·다음 달 목록이 다름 — 보통 auto_renew·live_override·상태값이 한쪽 규칙에만 걸린 경우. 포탈 '+rw.portalN+'건 vs DB '+rw.dbN+'건.') : '확인 중… (DB 함수 renew_watch 와 대조)', rwItems, '홈 › 만기 처리');
   var bad=[]; rows.forEach(function(r){ var w=[], f=[];
     if(!codeActive('contract_status', r.status)){ w.push('상태 «'+r.status+'»'); f.push('status'); }
@@ -204,13 +232,13 @@ export function dcRules(){
   rule('eq_serial_dup','crit','장비 현황에 같은 시리얼이 여러 행','equipment_assets 에 시리얼이 중복 — 임대중 수·회수 처리가 두 번 셉니다. SQL 90 이 최근 행만 남기고 UNIQUE 인덱스를 만듭니다.', sdup, '임대 장비 현황');
   var es=null; try{ es=eqScan(); }catch(e){}
   rule('eq_gap','warn','신청 ↔ 현황 불일치','신청 내역과 장비 현황이 어긋남(수량·시리얼·상태) — 신청 내역 › 「신청 ↔ 현황 대조」에서 맞추기.',
-    (es? es.gap:[]).map(function(g){ return {label:(g.o.customer||'?')+' — '+(g.o.model||'')+' × '+(g.o.qty||1), sub:g.why, go:goGrid('orders', g.o.customer), key:g.o.id}; }), '임대 장비 신청 내역');
+    (es? es.gap:[]).map(function(g){ return {label:(g.o.customer||'?')+' — '+(g.o.model||'')+' × '+(g.o.qty||1), sub:g.why, go:goGrid('orders', g.o.customer), key:g.o.id}; }), 'Cloud NAC 발주 내역');
   rule('eq_orphan','warn','신청 없이 임대중인 장비','현황에 임대중인데 어떤 신청에도 연결되지 않음(수기 입력) — 신청을 만들어 연결하거나 상태를 고치세요.',
     (es? es.orphan:[]).map(function(a){ return fxO({label:(a.serial||'?')+' · '+(a.model||''), sub:(a.customer||'?')+' · '+(a.channel||''), go:goGrid('assets', a.serial), key:a.id}, 'equipment_assets', 'assets', a.id, ['status','customer','note']); }), '임대 장비 현황');
   rule('eq_noserial','info','설치완료인데 시리얼 없음','상태가 설치완료/회수예정인데 시리얼이 비어 있음(임시 «미등록-» 시리얼로만 현황에 있음) — 실제 시리얼을 넣으세요.',
-    (R.orders||[]).filter(function(o){ return /설치완료|회수예정/.test(String(o.status||'')) && !eqSerials(o).length; }).map(function(o){ return fxO({label:(o.customer||'?')+' — '+(o.model||'')+' × '+(o.qty||1), sub:(o.status||'')+' · 설치 '+(o.install_date||'—'), go:goGrid('orders', o.customer), key:o.id}, 'equipment_orders', 'orders', o.id, ['serials']); }), '임대 장비 신청 내역');
+    (R.orders||[]).filter(function(o){ return /설치완료|회수예정/.test(String(o.status||'')) && !eqSerials(o).length; }).map(function(o){ return fxO({label:(o.customer||'?')+' — '+(o.model||'')+' × '+(o.qty||1), sub:(o.status||'')+' · 설치 '+(o.install_date||'—'), go:goGrid('orders', o.customer), key:o.id}, 'equipment_orders', 'orders', o.id, ['serials']); }), 'Cloud NAC 발주 내역');
   rule('eq_vocab','warn','장비 신청의 상태·채널 값이 목록에 없음','상태 보드·대시보드가 이 값을 못 받아 카드가 사라집니다. (목록: 관리자 › 코드 관리 › 장비 신청 상태·채널)',
-    (R.orders||[]).filter(function(o){ return !codeActive('order_status', o.status) || !codeActive('order_channel', o.channel); }).map(function(o){ var it=fxO({label:(o.customer||'?')+' — '+(o.model||''), sub:'상태 «'+(o.status||'')+'» · 채널 «'+(o.channel||'')+'»', go:goGrid('orders', o.customer), key:o.id}, 'equipment_orders', 'orders', o.id, ['status','channel']); it.fix.bad=[!codeActive('order_status', o.status)? 'status':'', !codeActive('order_channel', o.channel)? 'channel':''].filter(Boolean); return it; }), '임대 장비 신청 내역');
+    (R.orders||[]).filter(function(o){ return !codeActive('order_status', o.status) || !codeActive('order_channel', o.channel); }).map(function(o){ var it=fxO({label:(o.customer||'?')+' — '+(o.model||''), sub:'상태 «'+(o.status||'')+'» · 채널 «'+(o.channel||'')+'»', go:goGrid('orders', o.customer), key:o.id}, 'equipment_orders', 'orders', o.id, ['status','channel']); it.fix.bad=[!codeActive('order_status', o.status)? 'status':'', !codeActive('order_channel', o.channel)? 'channel':''].filter(Boolean); return it; }), 'Cloud NAC 발주 내역');
   /* ── OI ── */
   var nowYm=mk(T);
   rule('oi_overdue','info','예정 월이 지난 진행 중 OI','등록·진행 단계인데 예상 시기가 이미 지남 — 단계를 바꾸거나 예상 시기를 미루세요.',

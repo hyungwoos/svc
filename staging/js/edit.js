@@ -571,7 +571,7 @@ export async function saveEdit(){
       var q='«'+xo+'» → «'+xn+'»\n\n'+pv.lines.join('\n')+(pv.merge? '\n\n⚠ «'+xn+'» 고객사가 이미 있어 그쪽으로 합쳐집니다 (계약 이동 · 빈 고객사 삭제).':'')+'\n\n실행할까요?';
       if(!confirm(q)) throw new Error('취소했습니다.');
       var rr=await sbWrite('POST','rpc/rename_customer',{p_old:xo, p_new:xn, p_keep_alias:!!$('#xAlias').checked});
-      var LBL={contracts:'계약',live:'LIVE 명단',lg:'LG U+',orders:'장비 신청',assets:'장비 현황',oi:'OI',mdrops:'MDR 운영',mdrpoc:'PoC',weekly:'주간보고',biz:'비즈포탈 대조',inbound:'인바운드'};
+      var LBL={contracts:'계약',live:'LIVE 명단',lg:'LG U+',orders:'Cloud NAC 발주',assets:'장비 현황',oi:'OI',mdrops:'MDR 운영',mdrpoc:'PoC',weekly:'주간보고',biz:'비즈포탈 대조',inbound:'인바운드'};
       var parts=Object.keys(LBL).filter(function(k){ return rr && rr[k]; }).map(function(k){ return LBL[k]+' '+rr[k]; });
       msg('eMsg','사명 변경 완료 ✅ — '+xo+' → '+xn+(rr&&rr.merged?' (기존 고객사에 합침)':'')+' · '+(parts.join(' · ')||'변경 0건'),'ok');
       $('#xOld').value=''; $('#xNew').value=''; $('#xPrev').style.display='none';
@@ -602,7 +602,7 @@ export function renamePreview(xo,xn){
     '계약': cus? (X.contracts||[]).filter(function(c){ return c.customer_id===cus.id; }).length : 0,
     'LIVE 명단': (X.live||[]).filter(function(x){ return eq(x.name); }).length,
     'LG U+': (X.lg||[]).filter(function(x){ return eq(x.customer); }).length,
-    '장비 신청': (X.orders||[]).filter(function(x){ return eq(x.customer); }).length,
+    'Cloud NAC 발주': (X.orders||[]).filter(function(x){ return eq(x.customer); }).length,
     '장비 현황': (X.assets||[]).filter(function(x){ return eq(x.customer); }).length,
     'OI': (X.oi||[]).filter(function(x){ return eq(x.customer); }).length,
     'MDR 운영': (X.mdrops||[]).filter(function(x){ return eq(x.customer); }).length,

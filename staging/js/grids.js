@@ -84,7 +84,7 @@ export function s1NoInfo(no){
   var m=(R.s1map||[]).filter(function(x){ return String(x.contract_no).trim()===no; })[0];
   if(m) return {src:'에스원 정산', cust:m.customer||m.s1_name||'', biz:m.biz_no||null};
   var o=(R.orders||[]).filter(function(x){ return String(x.contract_no||'').trim()===no; })[0];
-  if(o) return {src:'장비 신청', cust:o.customer||'', biz:null};
+  if(o) return {src:'Cloud NAC 발주', cust:o.customer||'', biz:null};
   var c=(R.contracts||[]).filter(function(x){ return String(x.s1_no||'').trim()===no; })[0];
   if(c){ var cu=(R.customers||[]).filter(function(x){ return x.id===c.customer_id; })[0]; return {src:'기존 계약', cust:(cu&&cu.name)||'', biz:null}; }
   return null;
@@ -155,6 +155,7 @@ export var OI_PARTNERS=['다원티에스','글로웰시스템','에티버스','�
  * @property {function(any, any=): any} [fmt] 셀 표시 @property {boolean|number} [won] 원 단위 @property {boolean|number} [req] 필수 @property {boolean|number} [num] 숫자
  * @property {any} [href] 링크 @property {boolean|number} [html] fmt 결과가 HTML @property {boolean|number} [raw] 원본 그대로
  * @property {boolean|number} [badge] 상태 배지로 표시 @property {function(any): boolean} [na] 비어 있을 때 해당 없음(빈칸)인지 — 아니면 미입력(—)
+ * @property {boolean} [ifCol] 새 칸(207) — 읽어 온 행에 그 칸이 있을 때만 저장(SQL 전 DB 에서 다른 칸 저장을 막지 않게)
  */
 /** @type {?Object<string, GridDef>} */
 export var GRIDS=null;
@@ -352,9 +353,9 @@ export function buildGrids(){
       ]
     },
     mdrops:{
-      emptyCta:{l:'PoC 신청', v:'mdrnew', s:'PoC 를 신청하면 여기에 쌓입니다'}, title:'MDR 운영·신청 현황', table:'mdr_ops', mob:['customer','status','svc_type','_fill','sales_name'],
-      chipsField:'status', chipsOpts:['신청','대기','진행중','데모','구독','종료'],
-      cap:'행 클릭 = 고객 한눈에 · PoC 신청부터 운영까지 — 신청 → 진행중 → 데모 → 구독 · 설치율 = 설치 ÷ 계약 수량', add:true, del:true,
+      emptyCta:{l:'MDR PoC · 발주 신청', v:'mdrnew', s:'PoC 나 정식 발주를 신청하면 여기에 쌓입니다'}, title:'MDR 운영·신청 현황', table:'mdr_ops', mob:['customer','status','svc_type','_fill','sales_name'],
+      chipsField:'status', chipsOpts:['발주요청','신청','대기','진행중','데모','구독','종료'],
+      cap:'행 클릭 = 고객 한눈에 · PoC 신청 · 정식 발주부터 운영까지 — PoC: 신청 → 진행중 → 데모 → 구독 · 정식 발주: 발주요청 → 구독 · 설치율 = 설치 ÷ 계약 수량', add:true, del:true,
       rowClick:function(r){ if(!ST.IS_EQUIP) openCust360(r.customer); },
       rows:function(){ return (ST.RAWX.mdrops||[]).slice().sort(function(a,b){
         var n=String(b.start_date||'').localeCompare(String(a.start_date||''));
@@ -362,7 +363,10 @@ export function buildGrids(){
       cols:[
         {k:'svc_type',l:'서비스유형',t:'select',opts:['IDC 상면','CLOUD','구축(Onprem)']},
         {k:'customer',l:'고객명',req:true},
-        {k:'status',l:'상태',t:'select',opts:['신청','대기','진행중','데모','구독','종료']},
+        {k:'status',l:'상태',t:'select',opts:['발주요청','신청','대기','진행중','데모','구독','종료']},
+        {k:'req_kind',l:'구분',ro:true,fmt:function(v){ return v==='order'? '정식 발주' : 'PoC'; }},   /* ㊿+207 SQL 122 · 신청 화면에서만 정함 */
+        {k:'contract_no',l:'계약번호',ifCol:true},
+        {k:'biz_kind',l:'사업 구분',t:'list',opts:['ICT지원사업','일반'],ifCol:true},
         {k:'on_rev_sheet',l:'수주기입',t:'bool',fmt:function(v){return v?'✅':'·';}},
         {k:'plan_qty',l:'계약수량',t:'number'},
         {k:'agents_total',l:'설치 전체',t:'number'},
@@ -383,7 +387,7 @@ export function buildGrids(){
         {k:'mgr_phone',l:'연락처'},
         {k:'_mods',l:'신청 모듈',ro:true,fmt:function(v,r0){
           if(!r0) return '·';
-          var m=[r0.mod_edr?'EDR':'',r0.mod_ransom?'랜섬웨어':'',r0.mod_av?'백신':'',r0.mod_media?'매체제어':''].filter(Boolean);
+          var m=[r0.mod_edr?'EDR':'',r0.mod_ransom?'랜섬웨어':'',r0.mod_av?'백신':'',r0.mod_media?'매체제어':'',r0.mod_first?'초동조치':''].filter(Boolean);
           return m.length? m.join('+') : '·'; }},
         {k:'sales_name',l:'영업담당'},
         {k:'progress',l:'진행 내역'},
@@ -391,9 +395,9 @@ export function buildGrids(){
       ]
     },
     orders:{
-      emptyCta:{l:'장비 신청', v:'ordernew', s:'임대 장비를 신청하면 여기에 쌓입니다'}, title:'임대 장비 신청 내역', table:'equipment_orders',
+      emptyCta:{l:'Cloud NAC 발주 신청', v:'ordernew', s:'Cloud NAC 발주(임대 장비 출고 · 교체 · 회수)를 신청하면 여기에 쌓입니다'}, title:'Cloud NAC 발주 내역', table:'equipment_orders',
       chipsField:'channel', chipsOpts:ORD_CH_OPTS, pin:['customer','status'], mob:['install_date','model','qty'],   /* 폰: 설치희망 · 모델 · 수량 */
-      cap:'저장할 때마다 장비 현황에 자동 반영됩니다 — 접수·출하요청·배송중은 재고, 설치완료·회수예정은 임대중, 회수완료는 회수완료 (취소는 현황에서 내림) · 시리얼 칩 = 시리얼 상세 · 회수는 행의 «회수 처리»(일부·전부·취소 미리 보기 → 저장 → 되돌리기) · 시리얼을 비워두면 «미등록 시리얼»로 수량만큼 임시 등록 · 신규 신청은 장비 › 임대 장비 신청 · 삭제는 «더보기»', add:true, del:true,
+      cap:'저장할 때마다 장비 현황에 자동 반영됩니다 — 접수·출하요청·배송중은 재고, 설치완료·회수예정은 임대중, 회수완료는 회수완료 (취소는 현황에서 내림) · 시리얼 칩 = 시리얼 상세 · 회수는 행의 «회수 처리»(일부·전부·취소 미리 보기 → 저장 → 되돌리기) · 시리얼을 비워두면 «미등록 시리얼»로 수량만큼 임시 등록 · 신규 신청은 발주 › Cloud NAC 발주 신청 · 삭제는 «더보기»', add:true, del:true,
       rows:function(){ return ST.RAWX.orders||[]; },
       cols:[
         {k:'created_at',l:'신청일',ro:true,fmt:function(v){return String(v||'').slice(0,10);}},
@@ -428,7 +432,7 @@ export function buildGrids(){
     assets:{
       title:'임대 장비 현황 (시리얼 단위)', table:'equipment_assets',
       chipsField:'channel', chipsOpts:ORD_CH_OPTS, pin:['serial','status'], mob:['customer','model','deployed_date'],
-      cap:'신청 내역에서 자동으로 만들어지는 시리얼 단위 저장소입니다 — 신청에 붙은 장비(자물쇠)는 «임대 장비 신청 내역»에서 수정·회수 처리하면 따라옵니다 · 여기서는 신청과 무관한 재고·데모·판매 장비만 직접 등록·수정', add:true, del:true,
+      cap:'신청 내역에서 자동으로 만들어지는 시리얼 단위 저장소입니다 — 신청에 붙은 장비(자물쇠)는 «Cloud NAC 발주 내역»에서 수정·회수 처리하면 따라옵니다 · 여기서는 신청과 무관한 재고·데모·판매 장비만 직접 등록·수정', add:true, del:true,
       rows:function(){
         var om={}; (ST.RAWX.orders||[]).forEach(function(o){ om[String(o.id)]=o; });
         var out=(ST.RAWX.assets||[]).slice();

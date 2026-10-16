@@ -529,7 +529,7 @@ export function qbSources(){
     live:{ label:'LIVE 고객사 (계약 기준)', icon:'🟢', key:null, rows:function(){ try{ return liveCalc().rows||[]; }catch(e){ return []; } },
       cols:[{k:'cust',l:'고객사',t:'text'},{k:'ind',l:'산업군',t:'text'},{k:'line',l:'서비스',t:'text',fmt:function(v){ return lline(v); }},{k:'channel',l:'판매 채널',t:'text'},{k:'partner',l:'파트너',t:'text'},
             {k:'nodes',l:'노드',t:'num'},{k:'start',l:'최초 개시월',t:'month'},{k:'curStart',l:'현행 시작월',t:'month'},{k:'end',l:'현행 종료월',t:'month'},{k:'csm',l:'CSM(사이트명)',t:'text'},{k:'status',l:'상태',t:'text'},{k:'ctId',l:'현행 계약 번호',t:'num'},{k:'n',l:'유효 계약 수',t:'num'}] },
-    orders:{ label:'임대 장비 신청', icon:'📦', key:'id', rows:function(){ return ST.RAWX.orders||[]; },
+    orders:{ label:'Cloud NAC 발주', icon:'📦', key:'id', rows:function(){ return ST.RAWX.orders||[]; },
       cols:[{k:'id',l:'신청 번호',t:'num'}].concat(qbColsFromGrid('orders',['returned_serials']), [{k:'serials',l:'시리얼',t:'text'},{k:'_nret',l:'회수 시리얼 수',t:'num',get:function(r){ try{ return eqRetSet(r).length; }catch(e){ return 0; } }}]) },
     assets:{ label:'장비 현황 (시리얼)', icon:'🔩', key:'serial', rows:function(){ return ST.RAWX.assets||[]; },
       cols:[{k:'id',l:'현황 번호',t:'num'}].concat(qbColsFromGrid('assets',['_ostat','order_id']), [{k:'order_id',l:'신청 번호',t:'num'}]) },

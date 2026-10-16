@@ -14,7 +14,7 @@ import { inbLast, loadInbound, renderInbPanel, renderInbStat, renderWeekly } fro
 import { CHURN, CR, CS, csSetTab, ensureGroupOpen, helpBox, helpWire, initOiForm, loadRecvPresets, oiLinkQuote, oiToContract, QMGR_MAP, qoiCand, qoiOpen, quoteOpen, QUOTES, quotesLoad, renderChurn,
   renderChurnRate, renderCsite, renderCustFlow, renderOiTiles, wzReset } from './sales.js';
 import { closeOvl, logChange, monthRows, msg, openOvl } from './edit.js';
-import { lazyGet, lazyView } from './lazy.js';
+import { lazyGet, lazyLoad, lazyView } from './lazy.js';
 import { isNetErr, netToast, rowGuard, savedRows, saveFailMsg } from './guard.js';
 import { ntfName } from './notify.js';
 
@@ -467,11 +467,14 @@ export function wireRowInputs(tr,g){
     });
   }
 }
+/** ㊿+207 읽어 온 행에 그 칸이 있는지(PostgREST select=* 는 있는 칸을 전부 돌려줌 · 행이 없으면 모름 → 보내지 않음) */
+export function gridHasCol(g, k){ try{ var rs=g.rows? g.rows() : []; return !!(rs && rs.length && rs[0] && (k in rs[0])); }catch(e){ return false; } }
 export function readRowInputs(tr,g){
   var body={};
   tr.querySelectorAll('[data-k]').forEach(function(inp){
     var c=g.cols.filter(function(x){return x.k===inp.dataset.k;})[0];
     if(!c || c.ro || c.k[0]==='_') return;          // 계산 열은 저장하지 않음
+    if(c.ifCol && !gridHasCol(g, c.k)) return;      // ㊿+207 새 칸(SQL 을 아직 안 돌린 DB 에는 없음)은 DB 에 있을 때만 보냄 — 없으면 다른 칸 저장까지 막힘
     var v;
     if(c.t==='bool') v=inp.checked;
     else if(c.t==='select' && c.num) v=Number(inp.value);
@@ -1291,6 +1294,10 @@ export function gridLayoutLater(){
   GLAY.ro.disconnect(); GLAY.ro.observe(t);
 }
 /* ❔ 이 화면 사용법 — 포탈 AI(팀 지식 SQL 91 포함)에게 현재 화면 사용법을 묻고 홈 답변 칸으로 이동 */
+/** ㊿+206 사용 설명서 열기(처음 열 때 js/help.js 를 받음) — v: 화면 키(이 화면 항목) · 없으면 지금 화면 */
+export function helpGo(v){
+  lazyLoad('help').then(function(m){ m.helpOpen(v||ST.CUR_VIEW); }, function(e){ toast('사용 설명서를 열지 못했습니다', '새로고침한 뒤 다시 열어 주세요 — '+String((e&&e.message)||e).slice(0,100), 'warn'); });
+}
 export function askScreenHelp(){
   var g=GRIDS[ST.CUR_VIEW], title=g? g.title : (function(){ var b=document.querySelector('#side button[data-v="'+ST.CUR_VIEW+'"]'); return b? navText(b) : ST.CUR_VIEW; })();
   var q='포탈의 «'+String(title||'').replace(/^[^\w가-힣]+/,'').trim()+'» 화면은 어떻게 쓰나요? 주요 기능과 주의할 점을 짧게 알려줘';
@@ -1699,8 +1706,8 @@ export function gridRow(r,g,editing){
       }
       if(g.table==='equipment_assets' && r.order_id!=null){
         /* 현황은 신청 내역에서 만들어지는 저장소 — 신청에 붙은 장비는 여기서 고치지 않고 신청 내역(↩ 회수 처리 · ✎)에서 고칩니다 */
-        var lk=ab('locked','lock','신청 #'+r.order_id+' 에서 만들어진 장비 — 수정·회수는 «임대 장비 신청 내역»에서(회수 처리)', function(){}, 'lk');
-        lk.onclick=function(){ toast('신청 내역에서 수정', '이 장비는 신청 #'+r.order_id+' 에 붙어 있습니다. 임대 장비 신청 내역에서 «수정» 또는 «회수 처리»로 고치면 현황이 따라옵니다', 'info'); };
+        var lk=ab('locked','lock','신청 #'+r.order_id+' 에서 만들어진 장비 — 수정·회수는 «Cloud NAC 발주 내역»에서(회수 처리)', function(){}, 'lk');
+        lk.onclick=function(){ toast('신청 내역에서 수정', '이 장비는 신청 #'+r.order_id+' 에 붙어 있습니다. Cloud NAC 발주 내역에서 «수정» 또는 «회수 처리»로 고치면 현황이 따라옵니다', 'info'); };
         act.appendChild(lk);
         return;
       }
