@@ -1009,7 +1009,8 @@ export function setupSide(){
   $('#oiDoneList').onclick=function(){ switchView('oi'); };
   $('#oiDoneNew').onclick=function(){ $('#oiDone').style.display='none'; $('#oiFormWrap').style.display=''; wzReset('oi'); $('#oiCust').focus(); };
   $('#mpDoneList').onclick=function(){ switchView('mdrops'); };
-  $('#mpDoneNew').onclick=function(){ $('#mpDone').style.display='none'; $('#mpFormWrap').style.display=''; wzReset('mp'); $('#mpCompany').focus(); };
+  $('#mpDoneNew').onclick=function(){ $('#mpDone').style.display='none'; $('#mpFormWrap').style.display=''; mpConvClear(); wzReset('mp'); $('#mpCompany').focus(); };
+  var cx=$('#mpConvX'); if(cx) cx.onclick=function(){ mpConvClear(); toast('전환 취소','채운 내용은 그대로 — 새 신청으로 쓰거나 지우고 다시 쓰세요','info'); };   /* ㊿+210 */
   $('#odDoneList').onclick=function(){ switchView('orders'); };
   $('#odDoneNew').onclick=function(){ $('#odDone').style.display='none'; $('#odFormWrap').style.display=''; wzReset('od'); $('#odCustomer').focus(); };
   ['od','oi','mp'].forEach(function(k){ try{ wzInit(k); }catch(e){ console.warn('입력 단계', k, e); } });   /* ㊿+170 입력 단계 */
@@ -1875,13 +1876,13 @@ export async function submitOrder(){
 }
 
 /* ㊿+207 정식 발주(EDR 발주요청서) — 같은 화면 «신청 구분»: PoC · 데모(예전 그대로) / 정식 발주(계약번호 · 사업 구분 · 초동조치 · 상태 «발주요청»)
-   · 사용자: «MDR PoC나 데모신청 말고 정식 발주신청 기능도» · 접수 뒤 = Slack 통보(선택 — Apps Script 에 발주 알림 구역을 붙였을 때만)
+   · 사용자: «MDR PoC나 데모신청 말고 정식 발주신청 기능도» · 접수 뒤 = Slack 통보(Apps Script mdrOrderNotify_ → 채널 2곳 · 사용자 지정)
    · 정식 발주 칸(req_kind · contract_no · biz_kind · mod_first)은 SQL 122 — 실행 전에는 PoC 는 예전처럼 되고 정식 발주만 «SQL 122 먼저» 안내 */
 export function mpIsOrder(){ var k=/** @type {any} */(document.getElementById('mpKind')); return !!k && k.value==='order'; }
 export var MP_TXT={
   poc:{title:'🛡️ EDR+MDR POC 신청', cap:'저장하면 DB에 기록되고 슬랙으로 자동 통보됩니다. 접수된 신청은 「운영·신청 현황」에서 데모·구독까지 이어서 관리합니다.', go:'POC 신청', done:'POC 신청이 접수되었습니다', note:'슬랙 채널로 자동 통보되었습니다'},
-  order:{title:'🛡️ EDR 발주요청서 — 정식 발주', cap:'계약이 확정된 정식 발주를 요청합니다. 저장하면 DB에 기록되고 「운영·신청 현황」에 «발주요청»으로 등록됩니다. Slack 알림은 Apps Script 에 발주 알림 구역을 붙인 경우에만 갑니다.', go:'발주 요청', done:'발주요청이 접수되었습니다', note:'운영·신청 현황에 «발주요청»으로 등록되었습니다 (Slack 알림은 Apps Script 발주 알림 구역을 붙인 경우에만)',
-    notice:'«발주 요청»을 누르면 DB 에 저장되고 운영·신청 현황에 «발주요청»으로 등록됩니다 · Slack 알림은 Apps Script 에 발주 알림 구역을 붙였을 때만 갑니다'}
+  order:{title:'🛡️ EDR 발주요청서 — 정식 발주', cap:'계약이 확정된 정식 발주를 요청합니다. 저장하면 DB에 기록되고 슬랙 발주 채널(Cloud NAC 발주와 같은 2곳)로 자동 통보됩니다. 접수된 발주는 「운영·신청 현황」에 «발주요청»으로 등록됩니다.', go:'발주 요청', done:'발주요청이 접수되었습니다', note:'슬랙 발주 채널(2곳)로 자동 통보되었습니다 · 운영·신청 현황에 «발주요청»으로 등록',
+    notice:'«발주 요청»을 누르면 DB 에 저장되고 슬랙 발주 채널(2곳)로 알림이 갑니다 · 운영·신청 현황에 «발주요청»으로 등록됩니다'}
 };
 export function mpKindSync(){
   var ord=mpIsOrder(), T=MP_TXT[ord? 'order' : 'poc'];
@@ -1891,11 +1892,43 @@ export function mpKindSync(){
   var nt=document.querySelector('#mpFormWrap .wz-note'); if(nt) nt.textContent=ord? MP_TXT.order.notice : WZ_DEF.mp.notice;
   var ct=document.getElementById('mpContract'); if(ct){ if(ord && /** @type {any} */(document.getElementById('mpBiz')).value==='ICT지원사업') ct.setAttribute('aria-required','true'); else ct.removeAttribute('aria-required'); }
 }
+/* ㊿+210 PoC · 데모 → 정식 발주 전환 — 사용자: «기존 PoC나 데모로 진행했던 건이 발주로 전환되면 전환 버튼을 클릭해서 동일하게 슬랙 채널로»
+   · 운영·신청 현황의 PoC 행 «발주 전환» → 신청 화면이 그 PoC 내용으로 채워지고 «정식 발주»로 고정 → 계약번호 · 사업 구분 · 수량 확인 → «발주 요청»
+   · 저장 = 정식 발주 새 행(src_id = PoC 번호 · SQL 124) → Slack 은 정식 발주와 똑같이(Apps Script · 발주 채널 2곳) · PoC 행은 상태 «발주전환»(PoC 내용 · 이력은 그대로)
+   · SQL 124 전이면 연결 번호 없이 저장(발주 · Slack · PoC 상태 바꾸기는 그대로 됨) */
+export var MP_CONV={src:/** @type {any} */(null)};
+/** 이 PoC 를 전환해 만든 정식 발주 행(없으면 null) */
+export function mpConvOf(r){ if(!r || r.id==null) return null; return (ST.RAWX.mdrops||[]).filter(function(x){ return x.src_id!=null && String(x.src_id)===String(r.id); })[0]||null; }
+/** 발주 전환 버튼을 보일 PoC 행 — SQL 122 뒤(구분 칸이 있는 행) · PoC · 아직 전환 안 됨 */
+export function mpCanConv(r){ return !!r && ('req_kind' in r) && r.req_kind!=='order' && r.status!=='발주전환' && !mpConvOf(r); }
+export function mpConvSync(){
+  var s=MP_CONV.src, bx=document.getElementById('mpConv'), k=/** @type {any} */(document.getElementById('mpKind'));
+  if(k) k.disabled=!!s;
+  if(!bx) return; bx.hidden=!s; if(!s) return;
+  var t=document.getElementById('mpConvT'); if(t) t.textContent='PoC #'+s.id+' «'+(s.customer||'')+'»('+[s.status||'', String(s.apply_date||s.created_at||'').slice(0,10)].filter(Boolean).join(' · ')+')를 정식 발주로 전환합니다 — PoC 내용을 채워 두었으니 계약번호 · 사업 구분 · 수량을 확인하고 «발주 요청»을 누르세요. 접수되면 슬랙 발주 채널(2곳)로 알림이 가고 PoC 는 «발주전환»으로 바뀝니다.';
+}
+export function mpConvClear(){ MP_CONV.src=null; mpConvSync(); }
+export function mpConvert(r){
+  if(!ST.SB_TOKEN){ openOvl('ovlAuth'); return; }
+  if(!mpCanConv(r)){ var o=mpConvOf(r); toast('이미 전환된 PoC', o? '정식 발주 #'+o.id+' 로 전환되어 있습니다' : '정식 발주 행은 전환하지 않습니다', 'info'); return; }
+  navMenu('mdrnew'); if(ST.CUR_VIEW!=='mdrnew') return;   /* 권한 · 로그인으로 못 열면 아무것도 안 채움 */
+  MP_CONV.src=r;
+  var sv=function(id, v){ var e=/** @type {any} */(document.getElementById(id)); if(e) e.value=(v==null? '' : String(v)); };
+  var sc=function(id, v){ var e=/** @type {any} */(document.getElementById(id)); if(e) e.checked=!!v; };
+  var lic=String(r.license||'');
+  sv('mpKind','order'); sv('mpContract',''); sv('mpCompany', r.customer); sv('mpMgr', r.mgr_name); sv('mpPhone', r.mgr_phone); sv('mpEmail', r.mgr_email); sv('mpDev', r.device_count);
+  sc('mpEdr', r.mod_edr==null? true : r.mod_edr); sc('mpAv', r.mod_av==null? /AV/.test(lic) : r.mod_av); sc('mpRansom', r.mod_ransom==null? /RANSOM/.test(lic) : r.mod_ransom); sc('mpMedia', r.mod_media); sc('mpFirst', r.mod_first);
+  sv('mpWin', r.os_win); sv('mpLinux', r.os_linux); sv('mpMac', r.os_mac); if(['사용X','사용'].indexOf(r.nac_use)>=0) sv('mpNac', r.nac_use);
+  sv('mpWebui', r.webui_email); sv('mpSales', r.sales_name); sv('mpSalesPh', r.sales_phone); sv('mpDate', todayStr()); sv('mpNote','');
+  mpKindSync(); mpConvSync();
+  setTimeout(function(){ var c=/** @type {any} */(document.getElementById('mpContract')); if(c) c.focus(); }, 60);
+}
 export async function submitMdrPoc(){
   var comp=$('#mpCompany').value.trim(), mgr=$('#mpMgr').value.trim(), ord=mpIsOrder();
   if(!comp||!mgr){ msg('mpMsg','회사명과 고객 담당자 이름은 필수입니다','bad'); return; }
   var biz=ord? $('#mpBiz').value : null, cno=ord? $('#mpContract').value.trim() : '';
   if(ord && biz==='ICT지원사업' && !cno){ msg('mpMsg','ICT지원사업 정식 발주는 계약번호가 필요합니다','bad'); return; }
+  var conv=ord? MP_CONV.src : null, noLink=false, convWarn='';   /* ㊿+210 PoC → 발주 전환 */
   var btn=$('#mpGo'); btn.disabled=true; msg('mpMsg','접수 중…');
   try{
     var osSum=(+$('#mpWin').value||0)+(+$('#mpLinux').value||0)+(+$('#mpMac').value||0);
@@ -1926,19 +1959,32 @@ export async function submitMdrPoc(){
     };
     /* PoC 는 예전 칸 그대로(SQL 122 전에도 됨) · 정식 발주만 새 칸 */
     if(ord) Object.assign(row, {req_kind:'order', contract_no:cno||null, biz_kind:biz, mod_first:$('#mpFirst').checked});
-    var out;
-    try{ out=await sbWrite('POST','mdr_ops?select=*',[row],'return=representation'); }
-    catch(e1){ if(ord && /req_kind|contract_no|biz_kind|mod_first|PGRST204|schema cache/.test(String(/** @type {any} */(e1).message||e1))) throw new Error('정식 발주 칸이 아직 DB 에 없습니다 — 관리자가 SQL 122 를 먼저 실행해야 합니다(PoC 신청은 지금도 됩니다)'); throw e1; }
+    if(conv) /** @type {any} */(row).src_id=conv.id;
+    var out, ins=async function(){
+      try{ return await sbWrite('POST','mdr_ops?select=*',[row],'return=representation'); }
+      catch(e1){ var m1=String(/** @type {any} */(e1).message||e1);
+        if(conv && /23505|duplicate key|mdr_ops_src_uniq/.test(m1)) throw new Error('이 PoC 는 이미 정식 발주로 전환되었습니다 — 운영·신청 현황을 새로 고쳐 확인하세요');
+        if(conv && /src_id/.test(m1)){ delete /** @type {any} */(row).src_id; noLink=true; return ins(); }   /* SQL 124 전 — 연결 번호 없이 */
+        if(ord && /req_kind|contract_no|biz_kind|mod_first|PGRST204|schema cache/.test(m1)) throw new Error('정식 발주 칸이 아직 DB 에 없습니다 — 관리자가 SQL 122 를 먼저 실행해야 합니다(PoC 신청은 지금도 됩니다)'); throw e1; }
+    };
+    out=await ins();
     ST.RAWX.mdrops=ST.RAWX.mdrops||[]; ST.RAWX.mdrops.unshift(out[0]);
-    logChange('insert','mdr_ops',out[0].id, ord? {company:comp, mgr:mgr, kind:'정식 발주', contract_no:cno||null, biz:biz} : {company:comp,mgr:mgr});
+    logChange('insert','mdr_ops',out[0].id, ord? Object.assign({company:comp, mgr:mgr, kind:'정식 발주', contract_no:cno||null, biz:biz}, conv? {from_poc:conv.id} : {}) : {company:comp,mgr:mgr});
+    if(conv){   /* PoC 행 = «발주전환»(내용은 그대로) — 못 바꿔도 발주 · Slack 은 이미 됨 */
+      try{ await sbWrite('PATCH','mdr_ops?id=eq.'+conv.id,{status:'발주전환'}); var was=conv.status; conv.status='발주전환'; logChange('update','mdr_ops',conv.id,{status:'발주전환', before:was||null, order:out[0].id}); }
+      catch(e2){ convWarn='PoC #'+conv.id+' 상태는 바꾸지 못했습니다 — 운영·신청 현황에서 «발주전환»으로 바꿔 주세요'; }
+      mpConvClear(); ST.DIRTY=true;
+    }
     msg('mpMsg','');
     var mods=[row.mod_edr?'EDR+MDR':'',row.mod_av?'백신':'',row.mod_ransom?'랜섬웨어':'',row.mod_media?'매체제어':'', ord && row.mod_first?'초동조치':''].filter(Boolean).join('·');
     var T=MP_TXT[ord? 'order' : 'poc'];
     $('#mpDoneSum').textContent=[ord? '정식 발주'+(biz? '('+biz+')' : '') : '', ord && cno? '계약번호 '+cno : '', comp, mgr, row.device_count||'', mods].filter(Boolean).join(' · ');
-    $('#mpDoneT').textContent=T.done; $('#mpDoneNote').textContent=T.note;
+    if(conv) $('#mpDoneSum').textContent='PoC #'+conv.id+' 에서 전환 · '+$('#mpDoneSum').textContent;
+    $('#mpDoneT').textContent=conv? '발주 전환이 접수되었습니다' : T.done;
+    $('#mpDoneNote').textContent=T.note+(conv? ' · PoC #'+conv.id+(convWarn? '' : ' 는 «발주전환»') : '')+(noLink? ' (PoC 연결 번호는 관리자가 SQL 124 를 실행한 뒤부터 저장)' : '')+(convWarn? ' · ⚠ '+convWarn : '');
     $('#mpFormWrap').style.display='none';
     $('#mpDone').style.display='';
-    toast(ord? '발주요청 접수 완료' : 'POC 신청 접수 완료', comp+' · '+(mods||'모듈 미선택'));
+    toast(conv? '발주 전환 접수 완료' : ord? '발주요청 접수 완료' : 'POC 신청 접수 완료', comp+' · '+(mods||'모듈 미선택'));
     ['mpCompany','mpMgr','mpPhone','mpEmail','mpDev','mpWin','mpLinux','mpMac','mpWebui','mpSales','mpSalesPh','mpNote','mpContract'].forEach(function(i){ var x=$('#'+i); if(x) x.value=''; });
     $('#mpEdr').checked=true; ['mpAv','mpRansom','mpMedia','mpFirst'].forEach(function(i){ var x=$('#'+i); if(x) x.checked=false; });
   }catch(e){ msg('mpMsg',String(e.message||e),'bad'); }
@@ -1952,7 +1998,7 @@ export async function submitMdrPoc(){
    · 저장 중엔 버튼 잠금(두 번 저장 방지 · 예전과 같음) · 실패하면 값 그대로(예전과 같음) */
 export var WZ_DEF={
   od:{wrap:'odFormWrap', go:'odGo', msg:'odMsg', first:'odCustomer', cust:'odCustomer',
-    notice:'«발주 신청»을 누르면 DB 에 저장되고 슬랙 #service-managed 채널로 알림이 갑니다 · 장비 현황에도 바로 «재고»로 행이 생깁니다(시리얼이 없으면 «미등록 시리얼»)',
+    notice:'«발주 신청»을 누르면 DB 에 저장되고 슬랙 발주 채널(2곳)로 알림이 갑니다 · 장비 현황에도 바로 «재고»로 행이 생깁니다(시리얼이 없으면 «미등록 시리얼»)',
     steps:[['기본',['odChannel','odType','odCustomer','odContract','odMgr','odPhone','odAddr']],
       ['조건',['odModel','odQty','odNodes','odPod','odEdition','odFeat','odAdmin','odInstall','odSerials']],
       ['배송',['odRecvPick','odRecvAddr','odRecvName','odRecvPhone','odShip','odNote']], ['확인',[]]],
@@ -2074,7 +2120,7 @@ export function wzDup(key){
   var same=function(n){ return String(n||'').replace(/\s/g,'').toLowerCase()===v; }, hits=[], lab='';
   if(key==='od'){ hits=(ST.RAWX.orders||[]).filter(function(o){ return same(o.customer) && ['접수','출하요청','배송중'].indexOf(o.status)>=0; }).map(function(o){ return '#'+o.id+' '+o.status+' · '+(o.model||'')+' ×'+(o.qty||1)+' · '+String(o.created_at||'').slice(0,10); }); lab='처리 대기 장비 신청'; }
   if(key==='oi'){ hits=(ST.RAWX.oi||[]).filter(function(o){ return same(o.customer) && !/수주|계산서|종료|중지|실패/.test(String(o.stage||'')); }).map(function(o){ return '#'+o.id+' '+(o.deal_name||'')+' · '+(o.stage||''); }); lab='진행 중 OI'; }
-  if(key==='mp'){ hits=(ST.RAWX.mdrops||[]).filter(function(o){ return same(o.customer) && !/종료|취소|해지/.test(String(o.status||'')); }).map(function(o){ return '#'+o.id+' '+(o.status||'')+' · '+String(o.apply_date||o.created_at||'').slice(0,10); }); lab='진행 중 PoC·운영'; }
+  if(key==='mp'){ hits=(ST.RAWX.mdrops||[]).filter(function(o){ return same(o.customer) && !/종료|취소|해지|발주전환/.test(String(o.status||'')) && !(MP_CONV.src && o===MP_CONV.src); }).map(function(o){ return '#'+o.id+' '+(o.status||'')+' · '+String(o.apply_date||o.created_at||'').slice(0,10); }); lab='진행 중 PoC·운영'; }
   if(!hits.length) return;
   var b=wzBox(D.cust); if(!b) return; var x=document.createElement('div'); x.id=key+'WzDup'; x.className='wz-dup'; x.setAttribute('role','status');
   x.textContent='같은 고객사의 '+lab+' '+hits.length+'건이 있습니다 — '+hits.slice(0,3).join(' / ')+(hits.length>3? ' 외 '+(hits.length-3)+'건':'')+' · 중복이 아니면 그대로 진행하세요';

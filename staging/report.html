@@ -14,10 +14,10 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="SVC 포탈">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<script src="sat/common.js?v=2026-09-16%20%E3%8A%BF%2B209"></script>
-<script src="sat/db.js?v=2026-09-16%20%E3%8A%BF%2B209"></script>
-<script src="sat/close.js?v=2026-09-16%20%E3%8A%BF%2B209"></script>
-<link rel="stylesheet" href="sat/report.css?v=2026-09-16%20%E3%8A%BF%2B209">
+<script src="sat/common.js?v=2026-09-16%20%E3%8A%BF%2B210"></script>
+<script src="sat/db.js?v=2026-09-16%20%E3%8A%BF%2B210"></script>
+<script src="sat/close.js?v=2026-09-16%20%E3%8A%BF%2B210"></script>
+<link rel="stylesheet" href="sat/report.css?v=2026-09-16%20%E3%8A%BF%2B210">
 </head>
 <body>
 <div id="loginOverlay">
@@ -58,7 +58,7 @@
     <div class="hd">
         <div class="title-box"><span>PROJECT&nbsp; REPORT</span></div>
         <div class="apwrap">
-            <div class="no">NO. <input data-k="no" placeholder="비즈포탈 영업현황 등록번호 (수기)"></div>
+            <div class="no"><span>NO.</span><textarea data-k="no" rows="1" placeholder="비즈포탈 영업현황 등록번호 (수기)"></textarea></div>
             <table class="ap">
                 <colgroup><col class="w1"><col class="w2"><col class="w3"><col class="w4"><col class="w5"></colgroup>
                 <tr class="team"><th colspan="5"><input data-k="team1" value="서비스사업팀"></th></tr>
@@ -82,10 +82,10 @@
     <div class="sec"><span>2. 프로젝트 수행내역</span><span class="unit">[단위 : 원, VAT별도]</span></div>
     <div class="two">
         <table class="f">
-            <colgroup><col style="width:29.4%"><col style="width:26.4%"><col style="width:32.2%"><col style="width:12%"></colgroup>
+            <colgroup><col style="width:29.4%"><col style="width:32.6%"><col style="width:27%"><col style="width:11%"></colgroup>
             <tr><th style="height:29px">구분</th><th>일자</th><th>금액</th><th>DC율</th></tr>
-            <tr><td class="bold">계약일자</td><td class="bold"><input class="ctr" type="date" data-k="cdate"></td><td class="r"><input class="num money" data-k="amount" placeholder="0"></td><td><input class="ctr" data-k="dc"></td></tr>
-            <tr><td class="bold">수금일자</td><td class="bold"><input class="ctr" type="date" data-k="paydate"></td><td></td><td></td></tr>
+            <tr><td class="bold">계약일자</td><td class="bold dt"><input class="ctr" type="date" data-k="cdate"></td><td class="r"><input class="num money" data-k="amount" placeholder="0"></td><td><input class="ctr" data-k="dc"></td></tr>
+            <tr><td class="bold">수금일자</td><td class="bold dt"><input class="ctr" type="date" data-k="paydate"></td><td></td><td></td></tr>
             <tr><td class="lbl">Total</td><td class="b1"></td><td class="b1"></td><td class="b1"></td></tr>
             <tr><td class="bold">수금조건</td><td colspan="3"><input class="ctr" data-k="payterm" value="익월 말 결제"></td></tr>
             <tr><td class="bold">계산서발행일</td><td colspan="3"><input class="ctr" type="date" data-k="taxdate"></td></tr>
@@ -155,6 +155,6 @@
     <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px"><button class="btn green" data-click="costSaveNew()">새 항목 저장</button></div>
 </div></div>
 
-<script src="sat/report.js?v=2026-09-16%20%E3%8A%BF%2B209"></script>
+<script src="sat/report.js?v=2026-09-16%20%E3%8A%BF%2B210"></script>
 </body>
 </html>

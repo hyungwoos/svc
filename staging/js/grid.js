@@ -11,7 +11,7 @@ import { AK, areaPick, BZX, CH_DEFS, ctOrig, ctRawOf, ctSuccessor, DC, ensureLea
 import { applyDense, openCust360, PR, pushRecent, renderTodo } from './tools.js';
 import { CL, renderCloud } from './cloud.js';
 import { inbLast, loadInbound, renderInbPanel, renderInbStat, renderWeekly } from './inbound.js';
-import { CHURN, CR, CS, csSetTab, ensureGroupOpen, helpBox, helpWire, initOiForm, loadRecvPresets, oiLinkQuote, oiToContract, QMGR_MAP, qoiCand, qoiOpen, quoteOpen, QUOTES, quotesLoad, renderChurn,
+import { CHURN, CR, CS, csSetTab, ensureGroupOpen, helpBox, helpWire, initOiForm, loadRecvPresets, mpCanConv, mpConvClear, mpConvert, oiLinkQuote, oiToContract, QMGR_MAP, qoiCand, qoiOpen, quoteOpen, QUOTES, quotesLoad, renderChurn,
   renderChurnRate, renderCsite, renderCustFlow, renderOiTiles, wzReset } from './sales.js';
 import { closeOvl, logChange, monthRows, msg, openOvl } from './edit.js';
 import { lazyGet, lazyLoad, lazyView } from './lazy.js';
@@ -225,7 +225,7 @@ export function switchView(v){
     return;
   }
   if(mnew){
-    try{ wzReset('mp'); }catch(e){}
+    try{ mpConvClear(); wzReset('mp'); }catch(e){}   /* ㊿+210 발주 전환은 mpConvert 가 이 뒤에 다시 채움 */
     msg('mpMsg','');
     $('#mpFormWrap').style.display='';
     $('#mpDone').style.display='none';
@@ -1700,6 +1700,12 @@ export function gridRow(r,g,editing){
         }
         act.appendChild(ab('quote','clip', r.quote_file? '연결된 견적서 바꾸기·해제' : '견적서 연결', function(){ oiLinkQuote(r); }));
         if(QUOTES.ok!==false && canView('quote')) act.appendChild(ab('quoteNew','plus','이 OI 로 견적 만들기 — 저장하면 이 OI 에 연결', function(){ quoteOpen('oi='+r.id); }));   /* ㊿+177 */
+      }
+      if(ST.CUR_VIEW==='mdrops' && mpCanConv(r) && canView('mdrnew')){   /* ㊿+210 PoC · 데모 → 정식 발주 전환(슬랙 발주 채널 2곳 · 정식 발주와 같게) */
+        var bo=document.createElement('button'); bo.type='button'; bo.textContent='발주 전환'; bo.dataset.act='toOrder';
+        bo.title='이 PoC · 데모 건을 정식 발주로 전환 — 신청 화면이 이 내용으로 채워집니다(접수되면 슬랙 발주 채널 2곳 · PoC 는 «발주전환»)'; bo.setAttribute('aria-label','이 PoC · 데모 건을 정식 발주로 전환');
+        bo.style.color='var(--good,#0ca30c)'; bo.onclick=function(){ mpConvert(r); };
+        act.appendChild(bo);
       }
       if(g.table==='equipment_orders' && eqWant(r).length && ['설치완료','회수예정','회수완료'].indexOf(r.status)>=0){
         act.appendChild(ab('return','undo','회수 처리 — 시리얼을 골라 일부·전부 회수 또는 회수 취소', function(){ eqRetOpen(r); }, 'ret'));

@@ -781,6 +781,8 @@ export function wrapNavIcons(){
   });
 }
 export function navText(b){   // 메뉴 글자만 (심플 디자인에서는 이모지 제외)
+  /* ㊿+209 메뉴 버튼 안 숫자 배지(리포트 «슬라이드에 담은 항목» .rpb-cnt · 묶음 .rb · .gn-bd)는 이름이 아님 — 위 메뉴에 «리포트1»처럼 붙던 것 */
+  if(b.querySelector && b.querySelector('.rpb-cnt,.rb,.gn-bd')){ var c=/** @type {any} */(b.cloneNode(true)); c.querySelectorAll('.rpb-cnt,.rb,.gn-bd').forEach(function(/** @type {any} */ x){ x.remove(); }); b=c; }
   var t=(b.textContent||'').trim(), ic=b.querySelector('.ic');
   if(ic && document.documentElement.getAttribute('data-look')!=='classic') t=t.replace(ic.textContent,'').trim();
   return t;

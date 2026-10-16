@@ -33,7 +33,7 @@ export function rpMonthData(j){
   for(var jj=Math.max(0,j-mon+1); jj<=j; jj++){ if(mk(jj).slice(0,4)===String(year)) for(var i2=0;i2<ST.MAT.length;i2++) ytd+=ST.MAT[i2][jj]; }
   var mtg=0; (ST.RAWX.mtargets||[]).forEach(function(t){ if(+t.year===year&&+t.month===mon) mtg=Number(t.amount)||0; });
   var ytg=0; (ST.RAWX.targets||[]).forEach(function(t){ if(+t.year===year) ytg=Number(t.amount)||0; });
-  var poc=(ST.RAWX.mdrops||[]).filter(function(x){ return String(x.apply_date||'').slice(0,7)===ym; });
+  var poc=(ST.RAWX.mdrops||[]).filter(function(x){ return String(x.apply_date||'').slice(0,7)===ym && x.req_kind!=='order'; });   /* ㊿+210 «신규 PoC 신청»에 정식 발주는 빼고(㊿+207 부터 같은 표) */
   var inb=(ST.RAWX.inbound||[]).filter(function(x){ return String(x.on_date||'').slice(0,7)===ym; });
   var inbWon=inb.filter(function(x){ return /수주/.test(x.result||''); });
   var oiOp=(ST.RAWX.oi||[]).filter(oiOpen);   /* ㊿+178 진행 중 OI = 포탈 공통 기준(grid.js oiOpen) */
@@ -106,7 +106,7 @@ export function rpMdrData(j){
     return out;
   }
   var cur=yearNew(year), prv=yearNew(year-1);
-  var poc=(ST.RAWX.mdrops||[]).filter(function(x){ return ['신청','대기','진행중','데모'].indexOf(x.status||'')>=0; });
+  var poc=(ST.RAWX.mdrops||[]).filter(function(x){ return ['신청','대기','진행중','데모'].indexOf(x.status||'')>=0 && x.req_kind!=='order'; });
   var pocEp=0; poc.forEach(function(x){ pocEp+=Number(x.plan_qty)||0; });
   var actN=Object.keys(act).length, addN=Object.keys(actAdd).length;
   var lines=['총 '+actN+'개 고객사 확보 (MDR '+(actN-addN)+'개사, Add-on '+addN+'개사)'+(ep?' · '+ep.toLocaleString('ko-KR')+'개 엔드포인트 관리 중':'')];

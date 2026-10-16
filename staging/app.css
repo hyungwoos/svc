@@ -3477,4 +3477,9 @@ button.emo-ico svg{display:block;flex:none}
 .wt-dw-bad,.wt-dw-err{border-color:var(--critical)}
 .wt-dw-timeout{border-color:var(--s4-ink)}
 @media (max-width:640px){ .wt-tbl .wt-n{width:auto} .wt-set{grid-template-columns:1fr} }
+/* ㊿+210 MDR PoC · 데모 → 정식 발주 전환 안내(신청 화면 맨 위) */
+.mp-conv{display:flex;gap:10px;align-items:flex-start;margin:0 0 12px;padding:10px 12px;border-radius:10px;background:rgba(12,163,12,.09);color:var(--brand-ink);border-left:3px solid var(--good);font-size:13px;font-weight:600;line-height:1.5}
+.mp-conv[hidden]{display:none}
+.mp-conv span{flex:1}
+.mp-conv .cap-more{flex:none;white-space:nowrap}
 /* ==== ㊿+166 새 디자인 end ==== */

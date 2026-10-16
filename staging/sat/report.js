@@ -84,7 +84,12 @@ function calc() {
     $('#dQty').value = qty ? fmt(qty) : '-'; $('#dSum').value = mgmt ? fmt(mgmt) : '-'; $('#bSum').value = buy ? fmt(buy) : '-';
     $('#cSales').value = '₩' + (fmt(sales) || '0'); $('#cCost').value = '₩' + (fmt(cost) || '0'); $('#cMgmt').value = '₩ ' + (fmt(mgmt) || '-'); $('#cBuy').value = '₩ ' + (fmt(buy) || '-');
     $('#cGm').value = '₩ ' + (fmt(gm) || '-'); $('#cRate').value = sales ? Math.round(gm / sales * 100) + '%' : '-';
-    document.querySelectorAll('textarea').forEach(function (t) { t.style.height = 'auto'; t.style.height = Math.max(20, t.scrollHeight) + 'px'; });
+    fitTa();
+}
+/* 글 칸(비고 · NO.) 높이를 글자에 맞춤 — ㊿+210 NO.(영업현황 등록번호)도 여러 줄로(아래 테두리 두께까지) */
+function fitTa() {
+    document.querySelectorAll('textarea').forEach(function (t) { t.style.height = 'auto'; t.style.height = Math.max(20, t.scrollHeight + (t.offsetHeight - t.clientHeight)) + 'px'; });
+    var no = document.querySelector('.no textarea'); if (no && no.offsetHeight) no.parentNode.classList.toggle('long', no.scrollHeight > 3 * 16);   // 3줄 이상 = 인쇄 때 글자를 조금 작게(한 장에 들어가게)
 }
 document.addEventListener('input', function (e) {
     var el = e.target; if (!el.matches || !el.matches('input,textarea,select')) return;
@@ -185,6 +190,7 @@ function clearDoc(keepHeader) {
     document.querySelectorAll('.page [data-k]').forEach(function (el) { if (['team1', 'team2', 'team3', 'dept', 'writer', 'payterm'].indexOf(el.dataset.k) >= 0 && keepHeader) return; el.value = ''; });
     $('#tDeliv tbody').innerHTML = ''; $('#tBuy tbody').innerHTML = ''; padRows();
     setV('payterm', '익월 말 결제'); if ($('#qAppr').value !== 'custom') setAppr($('#qAppr').value);
+    fitTa();
 }
 async function prefill(c, keepUser) {
     if (!c) return;

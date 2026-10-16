@@ -38,8 +38,10 @@ select.sel-plain:hover { background: #fffbe6; }
 .title-box { background: var(--tb); color: #fff; font-weight: 700; font-size: 24px; white-space: nowrap; width: 36.6%; height: 116px; display: flex; align-items: center; justify-content: center; margin-top: 20px; }
 .title-box span { border-bottom: 2px solid #fff; padding-bottom: 2px; letter-spacing: .3px; }
 .apwrap { width: 45.8%; }
-.no { text-align: right; font-size: 11px; height: 20px; line-height: 20px; margin-bottom: 4px; }
-.no input { width: 78%; font-weight: bold; text-align: left; border-bottom: 1px dashed #bbb; display: inline-block; }
+/* ㊿+210 NO.(영업현황 등록번호) — 길면 다음 줄로(잘리지 않게) · 저장된 줄바꿈(«…해지 n건 / 기존 n건») 그대로 */
+.no { display: flex; justify-content: flex-end; align-items: flex-start; gap: 4px; font-size: 11px; min-height: 20px; line-height: 20px; margin-bottom: 4px; }
+.no > span { white-space: nowrap; }
+.no textarea { width: 78%; font-weight: bold; text-align: left; border-bottom: 1px dashed #bbb; display: block; line-height: 16px; padding: 2px 3px 1px; min-height: 20px; height: 20px; white-space: pre-wrap; overflow-wrap: break-word; }
 table.ap { border-collapse: collapse; width: 100%; table-layout: fixed; }
 table.ap col.w1 { width: 17.6%; } table.ap col.w2 { width: 18%; } table.ap col.w3 { width: 23.7%; } table.ap col.w4 { width: 16.7%; } table.ap col.w5 { width: 24%; }
 table.ap th, table.ap td { border: 1px solid var(--bd); text-align: center; font-size: 11px; padding: 0; height: 21px; font-weight: normal; }
@@ -62,6 +64,9 @@ table.f td.r input { text-align: right; }
 table.f .lbl { background: var(--b1); font-weight: bold; }
 table.f .bold { font-weight: bold; }
 table.f .bold input { font-weight: bold; }
+/* ㊿+210 계약일자 · 수금일자 — 날짜가 끝까지 보이게(칸 넓힘 · 달력 단추 작게) */
+table.f td.dt { padding: 1px 2px; }
+table.f input[type=date]::-webkit-calendar-picker-indicator { margin-inline-start: 1px; padding: 0; width: 11px; height: 11px; cursor: pointer; }
 table.ci th, table.ci td { height: 43px; }
 table.dv thead th { height: 25px; } table.dv tbody td { height: 40px; } table.dv tfoot td { height: 20px; }
 table.by thead th { height: 23px; } table.by tbody td { height: 23px; } table.by tbody tr:first-child td { height: 43px; } table.by tfoot td { height: 23px; }
@@ -133,6 +138,9 @@ tr:hover .rowact { display: flex; }
     select.sel-plain { background: transparent !important; }
     textarea[data-k=remarks] { min-height: 40px; }
 }
+/* ㊿+210 인쇄할 때 NO. 칸 높이를 글자에 맞춤(화면과 종이 폭이 달라 줄 수가 바뀌어도 잘리지 않게 · 지원하는 브라우저만 — 나머지는 화면에서 맞춘 높이) */
+@media print { .page .no.long textarea { font-size: 9px; line-height: 12px; width: auto; flex: 1; } .page .hd:has(.no.long) { margin-bottom: 4px; } }
+@supports (field-sizing: content) { @media print { .page .no textarea { field-sizing: content; height: auto !important; } } }
 /* ㊿+176 월 마감 · 발행 잠금 · 이력 */
 .rp-state{display:inline-flex;gap:6px;align-items:center}
 .rp-state .tag.issued{font-size:12px}

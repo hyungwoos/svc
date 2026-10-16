@@ -401,7 +401,7 @@ try {
   const sub = (sa.match(/export async function submitMdrPoc\(\)\{[\s\S]*?\n\}/) || [''])[0];
   say(/<select id="mpKind"><option value="poc">PoC · 데모<\/option><option value="order">정식 발주<\/option><\/select>/.test(html) && /id="mpContract"/.test(html) && /id="mpBiz"/.test(html) && /id="mpFirst"/.test(html) && /data-v="mdrnew">[^<]*PoC · 발주 신청</.test(html)
     && /status: ord\? '발주요청' : '신청'/.test(sub) && /if\(ord\) Object\.assign\(row, \{req_kind:'order', contract_no:cno\|\|null, biz_kind:biz, mod_first:/.test(sub) && /SQL 122 를 먼저/.test(sub) && /ICT지원사업 정식 발주는 계약번호가 필요합니다/.test(sub)
-    && /reqIf:\{mpContract:\['계약번호'/.test(sa) && /D\.reqIf\[id\]\[1\]\(\)/.test(sa) && /\{k:'contract_no',l:'계약번호',ifCol:true\}/.test(gs) && /opts:\['발주요청','신청','대기','진행중','데모','구독','종료'\]/.test(gs) && /if\(c\.ifCol && !gridHasCol\(g, c\.k\)\) return;/.test(gr),
+    && /reqIf:\{mpContract:\['계약번호'/.test(sa) && /D\.reqIf\[id\]\[1\]\(\)/.test(sa) && /\{k:'contract_no',l:'계약번호',ifCol:true\}/.test(gs) && /opts:\['발주요청','신청','대기','진행중','데모',(?:'발주전환',)?'구독','종료'\]/.test(gs) && /if\(c\.ifCol && !gridHasCol\(g, c\.k\)\) return;/.test(gr),
   '㊿+207 MDR 정식 발주: 신청 구분(PoC · 데모 / 정식 발주) · 계약번호(ICT지원사업만 꼭) · 사업 구분 · 초동조치 · 상태 «발주요청» · PoC 는 새 칸 안 보냄 · SQL 122 전 안내 · 현황 새 칸은 DB 에 있을 때만 저장'); }
 // ㊿+208 «임대 장비 신청» → «Cloud NAC 발주» · 위 메뉴 «발주» 묶음 · 장비 = 대시보드 · 현황 · 예전 메뉴 설정 옮기기
 { const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
@@ -419,6 +419,22 @@ try {
     && /^export function opsWatchHtml\(\)/m.test(ad) && /var h=opsWatchHtml\(\)\+tpl`/.test(ad) && /watchCall\(\{mode:'run'\}\)/.test(ad) && /if\(promote\) dwStart\(expV, prevV\);/.test(ad) && /watchCall\(\{mode:'deploy', expect:ver\}/.test(ad)
     && /^export function watchItems\(\)/m.test(nt) && /w\.set\.inbox_on===false/.test(nt) && /await watchLoad\(\);/.test(nt),
   '㊿+209 운영 감시: watch 함수(자동은 일회용 번호 · 포탈은 슈퍼 관리자 · 서비스 키 거절 · 지금 점검 Slack 없음 · Slack 은 감시 · «Slack 사용» 둘 다 켜야 · 함수는 OPTIONS 만) · 함수 시험 · 기록 탭 «운영 감시» · 알림함(설정 따라) · 승격 뒤 자동 확인'); }
+// ㊿+210 프로젝트 리포트 NO.(영업현황 등록번호) = 여러 줄 글 칸(줄바꿈 그대로 · 길면 다음 줄 · 인쇄 한 장) · 계약일자 · 수금일자 칸 넓힘 · 메뉴 이름에 숫자 배지 안 붙음
+{ const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
+  const rh = rd('report.html'), rc = rd('sat/report.css'), rj = rd('sat/report.js'), co = rd('js/core.js');
+  say(/<div class="no"><span>NO\.<\/span><textarea data-k="no" rows="1"/.test(rh) && !/<input data-k="no"/.test(rh) && /<col style="width:29\.4%"><col style="width:32\.6%"><col style="width:27%"><col style="width:11%">/.test(rh) && (rh.match(/<td class="bold dt"><input class="ctr" type="date" data-k="(?:cdate|paydate)">/g) || []).length === 2
+    && /\.no textarea \{[^}]*white-space: pre-wrap/.test(rc) && /\.page \.no\.long textarea \{ font-size: 9px/.test(rc) && /field-sizing: content/.test(rc) && /^function fitTa\(\)/m.test(rj) && /classList\.toggle\('long'/.test(rj)
+    && /b\.querySelector\('\.rpb-cnt,\.rb,\.gn-bd'\)/.test(co),
+  '㊿+210 프로젝트 리포트: NO. 여러 줄(줄바꿈 그대로 · 길면 다음 줄 · 3줄 넘으면 인쇄 글자 작게 · 한 장) · 계약일자 · 수금일자 칸 넓힘(달력 단추 작게) · 메뉴 이름에 숫자 배지(리포트1) 안 붙음'); }
+// ㊿+210 MDR PoC · 데모 → 정식 발주 전환(행 «발주 전환» → 신청 화면 채움 → 정식 발주 새 행(src_id · SQL 124) → Slack 은 정식 발주와 같게(INSERT 웹훅) · PoC = «발주전환»)
+{ const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
+  const sa = rd('js/sales.js'), gr = rd('js/grid.js'), gs = rd('js/grids.js'), rp = rd('js/report.js');
+  say(/^export function mpConvert\(r\)/m.test(sa) && /^export function mpCanConv\(r\)\{ return !!r && \('req_kind' in r\) && r\.req_kind!=='order' && r\.status!=='발주전환' && !mpConvOf\(r\); \}/m.test(sa)
+    && /if\(conv\) \/\*\* @type \{any\} \*\/\(row\)\.src_id=conv\.id;/.test(sa) && /sbWrite\('PATCH','mdr_ops\?id=eq\.'\+conv\.id,\{status:'발주전환'\}\)/.test(sa) && /mdr_ops_src_uniq/.test(sa) && /noLink=true; return ins\(\);/.test(sa)
+    && /mpCanConv\(r\) && canView\('mdrnew'\)/.test(gr) && /bo\.dataset\.act='toOrder'/.test(gr) && /mpConvClear\(\); wzReset\('mp'\);/.test(gr)
+    && /chipsOpts:\['발주요청','신청','대기','진행중','데모','발주전환','구독','종료'\]/.test(gs) && /'PoC → 발주 #'\+o\.id/.test(gs)
+    && (rp.match(/x\.req_kind!=='order'/g) || []).length === 2 && /<div id="mpConv" class="mp-conv" role="status" hidden>/.test(html),
+  '㊿+210 MDR 발주 전환: PoC 행 «발주 전환»(구분 칸 있을 때 · 전환 안 된 PoC · 보기 권한) → 신청 화면 채움 · 정식 발주 고정 → 새 행 src_id(두 번 안 됨 · SQL 124 전엔 연결 없이) → PoC «발주전환» · 리포트 PoC 표에 정식 발주 안 셈'); }
 // ㊿+160 연장하면 상태 «재약정»(구분 그대로) · 계약 상세에 «계약 기간 · 연장 이력»
 say(/^export function renewStatus\(r\)/m.test(jsAll) && /var nst=renewStatus\(r\);/.test(jsAll) && /^export function ctPeriods\(c, mine\)/m.test(jsAll) && html.includes('id="dtRenew"'), '연장: 상태 «재약정»(renewStatus) · 계약 상세 연장 이력(ctPeriods · #dtRenew)');
 const idx = html + jsAll;

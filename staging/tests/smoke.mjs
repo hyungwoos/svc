@@ -909,6 +909,82 @@ if (S.blk()) {
     return 'SQL 122 안내 · PoC 저장';
   });
 }
+// ㊿+210 MDR PoC · 데모 → 정식 발주 전환 — 현황 행 «발주 전환» → 신청 화면이 PoC 내용으로 채워짐(정식 발주 고정) → 새 행 src_id · Slack 은 정식 발주와 같은 INSERT · PoC 행 = «발주전환» · SQL 124 전 · 두 번 전환
+if (S.blk()) {
+  const mk210 = async (o) => {
+    o = Object.assign({ noSrc: false, dup: false }, o || {});
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page);
+    const st = { posts: [], patches: [], n: 0 };
+    await mockBackend(page, { extra: async (route, u, m) => {
+      if (!/\/rest\/v1\/mdr_ops/.test(u) || (m !== 'POST' && m !== 'PATCH')) return false;
+      const body = JSON.parse(route.request().postData() || 'null');
+      if (m === 'PATCH') { st.patches.push({ u: decodeURIComponent(u.split('/rest/v1/')[1]), body }); await route.fulfill({ status: 204, body: '' }); return true; }
+      const rows = body; st.posts.push(rows[0]);
+      if (o.noSrc && rows.some((r) => 'src_id' in r)) { await route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ code: 'PGRST204', message: "Could not find the 'src_id' column of 'mdr_ops' in the schema cache" }) }); return true; }
+      if (o.dup) { await route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ code: '23505', message: 'duplicate key value violates unique constraint "mdr_ops_src_uniq"' }) }); return true; }
+      await route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify(rows.map((r) => Object.assign({ id: 900 + (++st.n), created_at: '2026-10-16T01:00:00Z' }, r))) }); return true; } });
+    await page.goto(url + '/index.html'); await page.waitForFunction(() => window.SVC && SVC.ST && SVC.ST.DATA, null, { timeout: 15000 }); await page.waitForTimeout(300);
+    await page.evaluate(() => { SVC.ST.RAWX.mdrops = [
+      { id: 11, customer: '가상고객01', status: '데모', req_kind: 'poc', svc_type: 'CLOUD', mgr_name: '홍길동', mgr_phone: '010-0000-0000', mgr_email: 'tester@example.com', device_count: 'PC 30대', mod_edr: true, mod_av: true, mod_ransom: false, mod_media: true, os_win: 30, os_mac: 2, nac_use: '사용', webui_email: 'tester@example.com', sales_name: '김철수', apply_date: '2026-09-01', note: 'PoC 메모' },
+      { id: 12, customer: '가상고객02', status: '진행중', req_kind: 'poc', license: 'EDR+RANSOMWARE+AV' },
+      { id: 13, customer: '가상기관03', status: '발주요청', req_kind: 'order' },
+      { id: 14, customer: '가상고객04', status: '데모' }]; });
+    await page.evaluate(() => SVC.navMenu('mdrops')); await page.waitForTimeout(500);
+    return { ctx, page, c, st };
+  };
+  const btns = (P) => P.evaluate(() => [...document.querySelectorAll('#dvTable tbody tr')].filter((tr) => tr.querySelector('[data-act="toOrder"]')).map((tr) => (tr.textContent.match(/가상[가-힣]+\d+/) || [''])[0]).sort().join(','));
+  const conv = (P, nm) => P.evaluate((n) => { const tr = [...document.querySelectorAll('#dvTable tbody tr')].find((t) => t.textContent.includes(n)); tr.querySelector('[data-act="toOrder"]').click(); }, nm);
+  const next3 = async (P) => { for (let i = 0; i < 3; i++) { await P.click('#mpFormWrap .wz-next'); await P.waitForTimeout(80); } };
+  await S.t('㊿+210 MDR 발주 전환: PoC 행만 «발주 전환» → 신청 화면 PoC 내용 · 정식 발주 고정 · 안내 → 발주 요청 = 새 행(src_id · 발주요청) + PoC «발주전환» · 완료 · 현황 연결 표시 · 버튼 사라짐 · 전환 취소 · 다시 들어오면 보통 신청', async () => {
+    const A = await mk210(), P = A.page;
+    const b0 = await btns(P);
+    await conv(P, '가상고객01'); await P.waitForSelector('#viewMdrNew:not(.hidden) #mpConv:not([hidden])', { timeout: 5000 }); await P.waitForTimeout(120);
+    const f = await P.evaluate(() => { const v = (i) => document.getElementById(i).value, ck = (i) => document.getElementById(i).checked;
+      return { kind: v('mpKind'), dis: document.getElementById('mpKind').disabled, ban: document.getElementById('mpConvT').textContent, title: document.getElementById('mpTitle').textContent, go: document.getElementById('mpGo').textContent,
+        comp: v('mpCompany'), mgr: v('mpMgr'), ph: v('mpPhone'), em: v('mpEmail'), dev: v('mpDev'), edr: ck('mpEdr'), av: ck('mpAv'), rs: ck('mpRansom'), md: ck('mpMedia'), win: v('mpWin'), mac: v('mpMac'), nac: v('mpNac'), sales: v('mpSales'), note: v('mpNote'), date: v('mpDate'), ct: v('mpContract') }; });
+    await P.fill('#mpContract', 'N0000001'); await next3(P);
+    const sum = await P.evaluate(() => document.getElementById('mpWzSum').textContent);
+    await P.click('#mpGo'); await P.waitForSelector('#mpDone', { state: 'visible', timeout: 5000 });
+    const d = await P.evaluate(() => ({ t: document.getElementById('mpDoneT').textContent, sum: document.getElementById('mpDoneSum').textContent, note: document.getElementById('mpDoneNote').textContent, st: SVC.ST.RAWX.mdrops.find((x) => x.id === 11).status, src: SVC.MP_CONV.src, dis: document.getElementById('mpKind').disabled, ban: document.getElementById('mpConv').hidden }));
+    const post = A.st.posts[0] || {}, pat = A.st.patches[0] || {};
+    await P.evaluate(() => SVC.navMenu('mdrops')); await P.waitForTimeout(400);
+    const g = await P.evaluate(() => document.querySelector('#dvTable tbody').textContent); const b1 = await btns(P);
+    await conv(P, '가상고객02'); await P.waitForSelector('#mpConv:not([hidden])', { timeout: 5000 });
+    const f2 = await P.evaluate(() => ({ av: document.getElementById('mpAv').checked, rs: document.getElementById('mpRansom').checked, ban: document.getElementById('mpConvT').textContent }));
+    await P.click('#mpConvX'); await P.waitForTimeout(100);
+    const x = await P.evaluate(() => ({ ban: document.getElementById('mpConv').hidden, dis: document.getElementById('mpKind').disabled, src: SVC.MP_CONV.src }));
+    await conv(P, '가상고객02').catch(() => {}); await P.evaluate(() => SVC.navMenu('mdrops')); await P.waitForTimeout(200); await conv(P, '가상고객02'); await P.waitForTimeout(150);
+    await P.evaluate(() => SVC.navMenu('mdrnew')); await P.waitForTimeout(200);
+    const y = await P.evaluate(() => ({ ban: document.getElementById('mpConv').hidden, dis: document.getElementById('mpKind').disabled, src: SVC.MP_CONV.src }));
+    const errs = A.c.errs.slice(); await A.ctx.close();
+    assert(b0 === '가상고객01,가상고객02', '버튼 = 전환 안 된 PoC 만(정식 발주 · 구분 칸 없는 행 없음) ' + b0);
+    assert(f.kind === 'order' && f.dis && /PoC #11 «가상고객01»\(데모 · 2026-09-01\)/.test(f.ban) && /발주요청서/.test(f.title) && f.go === '발주 요청' && f.comp === '가상고객01' && f.mgr === '홍길동' && f.ph === '010-0000-0000' && f.em === 'tester@example.com' && f.dev === 'PC 30대'
+      && f.edr && f.av && !f.rs && f.md && f.win === '30' && f.mac === '2' && f.nac === '사용' && f.sales === '김철수' && f.note === '' && f.ct === '' && /^\d{4}-\d{2}-\d{2}$/.test(f.date), '채운 화면 ' + JSON.stringify(f));
+    assert(/정식 발주/.test(sum) && /N0000001/.test(sum) && /가상고객01/.test(sum), '요약 ' + sum.slice(0, 160));
+    assert(post.req_kind === 'order' && post.status === '발주요청' && post.src_id === 11 && post.contract_no === 'N0000001' && post.biz_kind === 'ICT지원사업' && post.customer === '가상고객01' && post.os_win === 30 && post.mod_av === true && post.mod_media === true, '새 행 ' + JSON.stringify(post));
+    assert(A.st.patches.length === 1 && /^mdr_ops\?id=eq\.11$/.test(pat.u) && JSON.stringify(pat.body) === '{"status":"발주전환"}', 'PoC 상태 ' + JSON.stringify(A.st.patches));
+    assert(d.t === '발주 전환이 접수되었습니다' && /^PoC #11 에서 전환 · 정식 발주\(ICT지원사업\)/.test(d.sum) && /발주 채널\(2곳\)/.test(d.note) && /PoC #11 는 «발주전환»/.test(d.note) && !/SQL 124/.test(d.note) && d.st === '발주전환' && d.src === null && !d.dis && d.ban, '완료 ' + JSON.stringify(d));
+    assert(/정식 발주\(PoC #11 전환\)/.test(g) && /PoC → 발주 #901/.test(g) && /발주전환/.test(g) && b1 === '가상고객02', '현황 ' + JSON.stringify({ b1, g: g.slice(0, 300) }));
+    assert(f2.av && f2.rs && /PoC #12/.test(f2.ban) && x.ban && !x.dis && x.src === null && y.ban && !y.dis && y.src === null && !errs.length, '라이선스 칩 · 전환 취소 · 보통 신청 ' + JSON.stringify({ f2, x, y, errs }));
+    return '전환 1건 · 버튼 ' + b0 + ' → ' + b1;
+  });
+  await S.t('㊿+210 MDR 발주 전환 — SQL 124 전 DB: 연결 번호 없이 다시 저장(발주 · PoC «발주전환» · 안내) / 이미 전환된 PoC(동시에 두 번): «이미 전환» 안내 · PoC 상태 안 바꿈 · 값 그대로', async () => {
+    const A = await mk210({ noSrc: true }), P = A.page;
+    await conv(P, '가상고객02'); await P.waitForSelector('#mpConv:not([hidden])', { timeout: 5000 }); await P.fill('#mpMgr', '홍길동'); await P.selectOption('#mpBiz', '일반'); await next3(P);
+    await P.click('#mpGo'); await P.waitForSelector('#mpDone', { state: 'visible', timeout: 5000 });
+    const a = await P.evaluate(() => ({ note: document.getElementById('mpDoneNote').textContent, st: SVC.ST.RAWX.mdrops.find((x) => x.id === 12).status }));
+    const ps = A.st.posts.map((r) => ('src_id' in r) + ':' + r.req_kind).join(','), pt = A.st.patches.map((x) => x.u).join(',');
+    const errs1 = A.c.errs.slice(); await A.ctx.close();
+    const B = await mk210({ dup: true }), Q = B.page;
+    await conv(Q, '가상고객01'); await Q.waitForSelector('#mpConv:not([hidden])', { timeout: 5000 }); await Q.fill('#mpContract', 'N0000002'); await next3(Q);
+    await Q.click('#mpGo'); await Q.waitForTimeout(700);
+    const b = await Q.evaluate(() => ({ msg: document.getElementById('mpMsg').textContent, done: getComputedStyle(document.getElementById('mpDone')).display, st: SVC.ST.RAWX.mdrops.find((x) => x.id === 11).status, src: SVC.MP_CONV.src && SVC.MP_CONV.src.id, ct: document.getElementById('mpContract').value, go: document.getElementById('mpGo').disabled }));
+    const pt2 = B.st.patches.length, errs2 = B.c.errs.slice(); await B.ctx.close();
+    assert(ps === 'true:order,false:order' && pt === 'mdr_ops?id=eq.12' && /SQL 124/.test(a.note) && a.st === '발주전환' && !errs1.length, 'SQL 124 전 ' + JSON.stringify({ ps, pt, a, errs1 }));
+    assert(/이미 정식 발주로 전환/.test(b.msg) && b.done === 'none' && b.st === '데모' && b.src === 11 && b.ct === 'N0000002' && !b.go && pt2 === 0 && !errs2.length, '두 번 전환 ' + JSON.stringify({ b, pt2, errs2 }));
+    return 'SQL 124 전 다시 저장 · 두 번 전환 막음';
+  });
+}
 // ㊿+208 «임대 장비 신청» → «Cloud NAC 발주» · 위 메뉴 «발주» 묶음(Cloud NAC 발주 신청 · 내역 · MDR PoC · 발주 신청 · MDR 운영·신청 현황) · «장비» = 대시보드 · 임대 장비 현황 · 저장한 메뉴 설정 옮기기
 if (S.blk()) {
   await S.t('㊿+208 발주 묶음: 위 메뉴 순서(사업 영역 → 발주 → 장비) · 발주 4개 · 장비 2개 · 화면 제목 · «＋ 등록» · 예전 메뉴 설정(PoC·데모 · 장비 숨김) → 발주로 옮김(한 번만 · 새로 저장한 설정은 그대로) · 장비 전용 계정', async () => {
@@ -946,6 +1022,16 @@ if (S.blk()) {
     assert(ap.segs === '전체 데이터|발주|장비|사업 영역' && ap.mdr && ap.nac && !errs.length, '적용 ' + JSON.stringify(ap) + errs.join('|'));
     assert(/g:발주\|g:장비/.test(en.tabs) && /ordernew/.test(en.on) && /orders/.test(en.on) && /assets/.test(en.on) && /eqboard/.test(en.on) && !/mdrnew/.test(en.on), '장비 계정 ' + JSON.stringify(en));
     return tabs;
+  });
+  await S.t('㊿+209 메뉴 이름에 숫자 배지가 붙지 않음: 리포트 «슬라이드에 담은 항목» 1개 → 위 메뉴 · 화면 제목 «리포트»(«리포트1» 아님)', async () => {
+    const A = await open(), P = A.page;
+    await P.evaluate(() => { localStorage.setItem(SVC.rpbKey(), JSON.stringify([{ id: 'x1', t: '가상 슬라이드' }])); SVC.RPB.items = null; SVC.rpbBadge(); SVC.buildRail(); });
+    await P.click('#rail .gn-tb[data-seg="m:정산·도구"]'); await P.waitForTimeout(150);
+    const r = await P.evaluate(() => ({ mi: (document.querySelector('#gnMenu .gn-mi[data-v="report"] .gn-l') || {}).textContent, side: !!document.querySelector('#side button[data-v="report"] .rpb-cnt'), nt: SVC.navText(document.querySelector('#side button[data-v="report"]')) }));
+    await P.keyboard.press('Escape');
+    const errs = A.errs.slice(); await A.ctx.close();
+    assert(r.mi === '리포트' && r.side && !/\d/.test(r.nt) && !errs.length, JSON.stringify(r));
+    return r.mi;
   });
 }
 // ㊿+209 운영 감시(선택 · 기본 꺼짐) — 배포·운영 › 기록 «운영 감시» · 지금 점검(watch 함수 · Slack 안 보냄) · 설정 저장(확인 창 · 검사) · SQL 123 전 안내 · 알림함 · 배포 뒤 자동 확인
@@ -1759,6 +1845,36 @@ if (S.blk()) {
       assert((await page.evaluate(() => COST_NEW.length)) === 0, '새 항목 삭제');
       await page.click('#ovlCost [data-click="closeOvl(\'ovlCost\')"]'); await page.waitForTimeout(150); assert(!(await page.evaluate(() => document.getElementById('ovlCost').classList.contains('show'))), '닫기');
       assert(!c.errs.length, c.errs.join(' | ')); return 'data-* ' + n + '개';
+    });
+    await ctx.close(); }
+  // ㊿+210 프로젝트 리포트 — NO.(영업현황 등록번호)가 잘리던 것 · 계약일자 · 수금일자 날짜가 잘리던 것
+  { const ctx = await browser.newContext({ viewport: { width: 1280, height: 1100 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page);
+    page.on('dialog', (d) => d.dismiss().catch(() => {}));
+    const PL = { no: 'R-0001 외 신규 3건, 해지 1건 \n기존 412건', customer: '가상고객01', title: '시험 리포트', date: '2026-10-10', cdate: '2026-10-16', paydate: '2026-11-30', amount: '1234567890', deliv: [], buy: [] };
+    const NOS = Array.from({ length: 12 }, (_, i) => 'R-2026-09' + String(i + 1).padStart(2, '0')).join(', ');
+    await mockBackend(page, { extra: async (route, u) => { if (/project_reports\?select=payload/.test(u)) { await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([{ payload: /id=eq\.2/.test(u) ? Object.assign({}, PL, { no: NOS }) : PL }]) }); return true; } return false; } });
+    await S.t('㊿+210 위성 report.html: NO.(영업현황 등록번호) 여러 줄(저장된 줄바꿈 · 길면 다음 줄 · 잘림 없음) · 계약일자 · 수금일자 날짜 끝까지 · 인쇄 한 장', async () => {
+      const M = () => page.evaluate(() => { const q = (s) => document.querySelector(s), t = q('[data-k="no"]'), cx = document.createElement('canvas').getContext('2d');
+        const fit = (el, txt, extra) => { const cs = getComputedStyle(el); cx.font = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily; return Math.ceil(cx.measureText(txt).width + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + extra) <= el.clientWidth; };
+        const foot = q('.page .foot').getBoundingClientRect().top, last = [...q('#page').children].filter((x) => !x.classList.contains('foot')).pop().getBoundingClientRect().bottom;
+        return { tag: t.tagName, v: t.value, hClip: t.scrollWidth > t.clientWidth, vClip: t.scrollHeight > t.clientHeight + 1, h: t.clientHeight, long: t.parentNode.classList.contains('long'),
+          cd: q('[data-k="cdate"]').value, pd: q('[data-k="paydate"]').value, dFit: ['cdate', 'paydate'].map((k) => fit(q('[data-k="' + k + '"]'), '2026. 10. 16.', matchMedia('print').matches ? 0 : 16)),
+          aFit: fit(q('[data-k="amount"]'), '1,234,567,890', 0), gap: Math.round(foot - last), saved: collect().no }; });
+      await page.goto(url + '/report.html?id=1'); await page.waitForFunction(() => document.querySelector('[data-k="cdate"]').value === '2026-10-16', null, { timeout: 10000 }); await page.waitForTimeout(300);
+      const A = await M();
+      assert(A.tag === 'TEXTAREA' && A.v === PL.no && A.saved === PL.no && !A.hClip && !A.vClip && A.h >= 32 && !A.long, 'NO. 두 줄 ' + JSON.stringify(A));
+      assert(A.cd === '2026-10-16' && A.pd === '2026-11-30' && A.dFit.every(Boolean) && A.aFit, '날짜 · 금액 칸 ' + JSON.stringify(A));
+      await page.emulateMedia({ media: 'print' }); await page.waitForTimeout(200); const AP = await M(); await page.emulateMedia({ media: 'screen' });
+      assert(!AP.vClip && AP.dFit.every(Boolean) && AP.gap >= 0, '인쇄(두 줄) ' + JSON.stringify(AP));
+      await page.goto(url + '/report.html?id=2'); await page.waitForFunction(() => document.querySelector('[data-k="cdate"]').value === '2026-10-16', null, { timeout: 10000 }); await page.waitForTimeout(300);
+      const B = await M();
+      assert(B.v === NOS && !B.hClip && !B.vClip && B.h >= 48 && B.long, 'NO. 긴 번호 ' + JSON.stringify(B));
+      await page.emulateMedia({ media: 'print' }); await page.waitForTimeout(200); const BP = await M(); await page.emulateMedia({ media: 'screen' });
+      assert(!BP.vClip && !BP.hClip && BP.gap >= 0, '인쇄(긴 번호 · 한 장) ' + JSON.stringify(BP));
+      await page.fill('[data-k="no"]', 'R-1'); await page.waitForTimeout(150); const C = await M();
+      assert(C.h <= 22 && !C.long && C.saved === 'R-1', '짧게 고침 ' + JSON.stringify(C));
+      assert(!c.errs.length && !c.csp.length, c.errs.concat(c.csp).join('|'));
+      return 'NO. ' + A.h + '·' + B.h + 'px(인쇄 여유 ' + AP.gap + '·' + BP.gap + 'px) · 날짜 칸 끝까지';
     });
     await ctx.close(); }
   for (const f of ['s1.html', 'kk.html']) {

@@ -354,8 +354,8 @@ export function buildGrids(){
     },
     mdrops:{
       emptyCta:{l:'MDR PoC · 발주 신청', v:'mdrnew', s:'PoC 나 정식 발주를 신청하면 여기에 쌓입니다'}, title:'MDR 운영·신청 현황', table:'mdr_ops', mob:['customer','status','svc_type','_fill','sales_name'],
-      chipsField:'status', chipsOpts:['발주요청','신청','대기','진행중','데모','구독','종료'],
-      cap:'행 클릭 = 고객 한눈에 · PoC 신청 · 정식 발주부터 운영까지 — PoC: 신청 → 진행중 → 데모 → 구독 · 정식 발주: 발주요청 → 구독 · 설치율 = 설치 ÷ 계약 수량', add:true, del:true,
+      chipsField:'status', chipsOpts:['발주요청','신청','대기','진행중','데모','발주전환','구독','종료'],
+      cap:'행 클릭 = 고객 한눈에 · PoC 신청 · 정식 발주부터 운영까지 — PoC: 신청 → 진행중 → 데모 → 구독 · 정식 발주: 발주요청 → 구독 · PoC 가 발주로 바뀌면 행의 «발주 전환»(슬랙 발주 채널로 · PoC 는 «발주전환») · 설치율 = 설치 ÷ 계약 수량', add:true, del:true,
       rowClick:function(r){ if(!ST.IS_EQUIP) openCust360(r.customer); },
       rows:function(){ return (ST.RAWX.mdrops||[]).slice().sort(function(a,b){
         var n=String(b.start_date||'').localeCompare(String(a.start_date||''));
@@ -363,8 +363,11 @@ export function buildGrids(){
       cols:[
         {k:'svc_type',l:'서비스유형',t:'select',opts:['IDC 상면','CLOUD','구축(Onprem)']},
         {k:'customer',l:'고객명',req:true},
-        {k:'status',l:'상태',t:'select',opts:['발주요청','신청','대기','진행중','데모','구독','종료']},
-        {k:'req_kind',l:'구분',ro:true,fmt:function(v){ return v==='order'? '정식 발주' : 'PoC'; }},   /* ㊿+207 SQL 122 · 신청 화면에서만 정함 */
+        {k:'status',l:'상태',t:'select',opts:['발주요청','신청','대기','진행중','데모','발주전환','구독','종료']},
+        {k:'req_kind',l:'구분',ro:true,fmt:function(v,r0){   /* ㊿+207 SQL 122 · 신청 화면에서만 정함 · ㊿+210 PoC → 발주 전환 연결(src_id · SQL 124) */
+          if(v==='order') return r0 && r0.src_id!=null? '정식 발주(PoC #'+r0.src_id+' 전환)' : '정식 발주';
+          var o=r0 && r0.id!=null? (ST.RAWX.mdrops||[]).filter(function(x){ return x.src_id!=null && String(x.src_id)===String(r0.id); })[0] : null;
+          return o? 'PoC → 발주 #'+o.id : 'PoC'; }},
         {k:'contract_no',l:'계약번호',ifCol:true},
         {k:'biz_kind',l:'사업 구분',t:'list',opts:['ICT지원사업','일반'],ifCol:true},
         {k:'on_rev_sheet',l:'수주기입',t:'bool',fmt:function(v){return v?'✅':'·';}},

@@ -409,11 +409,11 @@ export function railSync(v){
     var cur = b.dataset.v? (b.dataset.v===v) : !!inSeg[b.dataset.seg];
     b.setAttribute('aria-current', cur? 'true':'false');
   });
-  /* 장비 그룹에 처리 대기 건수 배지 */
+  /* 처리 대기 건수 배지 — ㊿+208 부터 «발주» 묶음(Cloud NAC 발주 내역이 있는 곳) */
   var pend=(ST.RAWX.orders||[]).filter(function(o){ return ['접수','출하요청','배송중'].indexOf(o.status)>=0; }).length;
   rail.querySelectorAll('[data-seg]').forEach(function(b){
     var old=b.querySelector('.rb'); if(old) old.remove();
-    if(/장비/.test(b.dataset.seg) && pend){ var s=document.createElement('span'); s.className='rb'; s.textContent=pend>99?'99+':pend; b.appendChild(s); }
+    if(/발주/.test(b.dataset.seg) && pend){ var s=document.createElement('span'); s.className='rb'; s.textContent=pend>99?'99+':pend; b.appendChild(s); }
   });
   mtabsSync(v);
 }
