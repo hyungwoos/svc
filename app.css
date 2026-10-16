@@ -3399,4 +3399,9 @@ button.emo-ico svg{display:block;flex:none}
 .apid-ex pre{margin:6px 0}
 .apid-errs{margin:0 0 12px}
 @media (max-width:760px){ .apid-kv{grid-template-columns:1fr} .apid-kv>span{padding-top:0} .apid-oph{flex-wrap:wrap;gap:6px} .apid-sum{flex-basis:100%} .apid-sub{margin-left:0} .apid-pt input,.apid-pt select{min-width:96px} }
+/* ㊿+204 시작이 오래 걸릴 때 — 20초 뒤 새로고침 안내(코드가 멈춰도 CSS 로) · 걸린 초 */
+.loading .ld-sec{font-variant-numeric:tabular-nums;color:var(--ink-2)}
+.loading .ld-slow{visibility:hidden;max-width:460px;padding:0 16px;text-align:center;font-size:13px;line-height:1.6;color:var(--ink-2);animation:ldSlow 0s linear 20s forwards}
+.loading .ld-slow a{color:var(--brand-ink);font-weight:700}
+@keyframes ldSlow{to{visibility:visible}}
 /* ==== ㊿+166 새 디자인 end ==== */

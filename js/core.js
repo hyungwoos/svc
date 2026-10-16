@@ -366,14 +366,16 @@ export async function restoreSess(){
   if(Math.floor(Date.now()/1000) < (s.e||0)-120){ ST.SB_TOKEN=s.a; ST.AUTH_USER=s.u; }
   else {
     if(!s.r){ clearSess(); return false; }
-    try{
-      var r=await fetch(SB_URL+'/auth/v1/token?grant_type=refresh_token',{
+    /* ㊿+204 시간 제한 15초 — 예전엔 제한이 없어 노트북을 깨운 직후 · 네트워크를 바꾼 직후 이 요청이 멈추면 «데이터를 불러오는 중…»에 끝없이 머묾
+       네트워크 · 시간 초과는 로그인을 지우지 않고 이유 + 새로고침(boot 의 onErr) · 서버가 «로그인 무효»라고 답하면 예전처럼 로그인 화면 */
+    var r=null;
+    try{ r=await fetchT(SB_URL+'/auth/v1/token?grant_type=refresh_token',{
         method:'POST', headers:{apikey:SB_KEY,'Content-Type':'application/json'},
-        body:JSON.stringify({refresh_token:s.r})});
-      var j=await r.json();
-      if(!r.ok||!j.access_token){ clearSess(); return false; }
-      ST.SB_TOKEN=j.access_token; ST.AUTH_USER=s.u; saveSess(j,s.u,sessPKeep(j, s));
-    }catch(e){ clearSess(); return false; }
+        body:JSON.stringify({refresh_token:s.r})}, 15000, '로그인 서버', true); }
+    catch(e){ var x=/** @type {any} */(new Error('로그인 확인이 늦어 시작하지 못했습니다 — '+String(/** @type {any} */(e) && /** @type {any} */(e).message || e))); x.boot='auth'; throw x; }
+    var j=null; try{ j=await r.json(); }catch(e){ j=null; }
+    if(!r.ok||!j||!j.access_token){ clearSess(); return false; }
+    ST.SB_TOKEN=j.access_token; ST.AUTH_USER=s.u; saveSess(j,s.u,sessPKeep(j, s));
   }
   // 인증 앱이 등록된 계정인데 저장된 세션이 aal1(코드 미확인)이면 코드부터 — 취소하면 로그인 화면으로
   // ㊿+145: 지난번 확인에서 «인증 앱 없음»(s.m='none')이면 기다리지 않고 데이터부터 — 확인은 뒤에서(mfaBgCheck)
@@ -385,9 +387,9 @@ export async function refreshToken(){
   var s=sessRead();
   if(!s || !s.r) return false;
   try{
-    var r=await fetch(SB_URL+'/auth/v1/token?grant_type=refresh_token',{
+    var r=await fetchT(SB_URL+'/auth/v1/token?grant_type=refresh_token',{
       method:'POST', headers:{apikey:SB_KEY,'Content-Type':'application/json'},
-      body:JSON.stringify({refresh_token:s.r})});
+      body:JSON.stringify({refresh_token:s.r})}, 15000, '로그인 서버', true);   /* ㊿+204 시간 제한 */
     var j=await r.json();
     if(!r.ok || !j.access_token) return false;
     ST.SB_TOKEN=j.access_token; saveSess(j, s.u, sessPKeep(j, s));
@@ -489,7 +491,7 @@ export function b64urlJson(p){ p=String(p||'').replace(/-/g,'+').replace(/_/g,'/
 export function sessAal(tok){ try{ return b64urlJson(String(tok||ST.SB_TOKEN||'').split('.')[1]).aal||'aal1'; }catch(e){ return 'aal1'; } }
 export function authHdr(tok){ return {apikey:SB_KEY, 'Content-Type':'application/json', Authorization:'Bearer '+(tok||ST.SB_TOKEN)}; }
 export async function authApi(method, path, body, tok){
-  var r=await fetch(SB_URL+'/auth/v1/'+path, {method:method, headers:authHdr(tok), body:body? JSON.stringify(body) : undefined});
+  var r=await fetchT(SB_URL+'/auth/v1/'+path, {method:method, headers:authHdr(tok), body:body? JSON.stringify(body) : undefined}, 15000, '인증 서버', method==='GET');   /* ㊿+204 시간 제한(시작할 때 2단계 인증 확인이 멈추지 않게) */
   var j=null; try{ j=await r.json(); }catch(e){ j={}; }
   if(!r.ok){ var e2=new Error((j&&(j.msg||j.error_description||j.message||j.error))||('인증 서버 오류 '+r.status)); e2.status=r.status; throw e2; }
   return j||{};
@@ -499,7 +501,7 @@ export function mfaVerifiedOf(fs){ return (fs||[]).filter(function(f){ return f.
 /* 로그인(또는 저장된 세션) 뒤 관문: 인증 앱이 등록돼 있고 토큰이 aal1 이면 코드를 받아 aal2 세션으로 교체. true=계속 · false=중단 */
 export var MFA_ST=null;   // 본인 정책(rpc mfa_status · SQL 89) — {required, deadline, today, enrolled, aal}
 export async function mfaPolicy(tok){
-  try{ var r=await fetch(SB_URL+'/rest/v1/rpc/mfa_status',{method:'POST', headers:authHdr(tok), body:'{}'}); if(!r.ok) return null; return await r.json(); }catch(e){ return null; }
+  try{ var r=await fetchT(SB_URL+'/rest/v1/rpc/mfa_status',{method:'POST', headers:authHdr(tok), body:'{}'}, 10000, 'DB', true); if(!r.ok) return null; return await r.json(); }catch(e){ return null; }   /* ㊿+204 시간 제한 — 늦으면 정책 없음으로 계속(DB 의 2단계 인증 정책이 2차 방어) */
 }
 export function mfaDue(st){ return !!(st && st.required && !st.enrolled && (!st.deadline || (st.today||todayStr())>=st.deadline)); }
 export function mfaDaysLeft(st){ if(!st||!st.deadline) return 0; var a=new Date(st.deadline+'T00:00:00'), b=new Date((st.today||todayStr())+'T00:00:00'); return Math.round((a.getTime()-b.getTime())/86400000); }

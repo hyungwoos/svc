@@ -2,7 +2,7 @@
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { IS_QA, ST } from './state.js';
 import { Viz } from './viz.js';
-import { $, applyPerms, bizHas, bizKey, canView, canWrite, clearSess, cssv, el, esc, fetchT, isCC, isGN, keepLogin, lfFail, lfMsg, lfOk, lfWait, LIVE2CODE, lline, loadPerms, loginRecord, mfaGate, mfaVerifiedOf, mfaWarnIfNeeded, mk, monOf, navText, PERF, perfDev, perfNet, perfRec, permWriteGuard, pwRule, rawHtml, refreshToken, restoreSess, saveSess, SB_KEY, SB_URL, seriesColor, sessIdleOver, sessRead, sessTooOld, sessWrite, STATE, tpl, won } from './core.js';
+import { $, applyPerms, bizHas, bizKey, canView, canWrite, clearSess, cssv, el, esc, fetchT, isCC, isGN, keepLogin, lfFail, lfMsg, lfOk, lfWait, LIVE2CODE, lline, loadPerms, logClientError, loginRecord, mfaGate, mfaVerifiedOf, mfaWarnIfNeeded, mk, monOf, navText, PERF, perfDev, perfNet, perfRec, permWriteGuard, pwRule, rawHtml, refreshToken, restoreSess, saveSess, SB_KEY, SB_URL, seriesColor, sessIdleOver, sessRead, sessTooOld, sessWrite, STATE, tpl, won } from './core.js';
 import { buildControls, expN, expScan, hbars, idxs, kpiOpen, monthlyTotal, renderAll, renderInstall, renderKpis, renderMatrix, renewNeedScan } from './dash.js';
 import { ask } from './ai.js';
 import { applyCodes, GRIDS, loadCodes } from './grids.js';
@@ -1149,7 +1149,22 @@ export function toast(title, sub, type, act){
 export function showLoading(t){
   $('#app').classList.add('hidden');
   var l=$('#loading'); l.classList.remove('hidden');
-  l.innerHTML=tpl`<div class="spin"></div><div>${rawHtml(t)}</div>`;
+  l.innerHTML=tpl`<div class="spin"></div><div>${rawHtml(t)} <span class="ld-sec" aria-hidden="true"></span></div>`+LD_SLOW;
+}
+/* ㊿+204 시작이 오래 걸릴 때 — 20초 뒤 «새로고침» 안내가 CSS 로 나타남(코드가 멈춰도 · index.html 의 첫 화면에도 같은 줄) · 걸린 초 · 늦은 단계는 기록(client_errors · 한 번) */
+export var LD_SLOW='<div class="ld-slow" role="status">평소보다 오래 걸리고 있습니다 — <a href="">새로고침</a> 해 보세요 · 계속되면 Ctrl+Shift+R (네트워크 · VPN 을 바꾼 직후면 잠시 뒤)</div>';
+export var BOOTW=/** @type {any} */({t0:0, tm:0, stage:'', logged:false});
+export function bootStage(s){
+  BOOTW.stage=s; var l=$('#loading');
+  if(l && !l.classList.contains('hidden') && !l.querySelector('.err')) showLoading(s==='auth'? '로그인 확인 중…' : '데이터를 불러오는 중…');
+}
+export function bootWatch(){
+  BOOTW.t0=Date.now(); BOOTW.logged=false; if(BOOTW.tm) clearInterval(BOOTW.tm);
+  BOOTW.tm=setInterval(function(){
+    var l=$('#loading'); if(!l || l.classList.contains('hidden') || l.querySelector('.err')){ clearInterval(BOOTW.tm); BOOTW.tm=0; return; }
+    var s=Math.round((Date.now()-BOOTW.t0)/1000), sp=l.querySelector('.ld-sec'); if(sp) sp.textContent=s>=8? '('+s+'초)' : '';
+    if(s>=20 && !BOOTW.logged){ BOOTW.logged=true; try{ logClientError('[느린 시작] '+(BOOTW.stage==='auth'? '로그인 확인' : '데이터 읽기')+' 20초 넘음 · '+(navigator.onLine? '온라인' : '오프라인'), 'boot', 0, 0, ''); }catch(e){} }
+  }, 1000);
 }
 
 export function sbHeaders(json){
@@ -1523,6 +1538,7 @@ export function enterEquipMode(d){
 export function boot(skipCache){
   if(!skipCache) prefetchData();   /* ㊿+173 로그인 확인과 동시에 데이터 요청 */
   if(!SHELL_ONCE.edit){ SHELL_ONCE.edit=1; setupEdit(); setupSide(); }
+  bootStage('auth'); bootWatch();   /* ㊿+204 어느 단계에서 늦는지 보이게 */
   restoreSess().then(function(ok){
     /* ㊿+145: 로그인 안 된 상태 → 서버에 묻지 않고 바로 로그인 화면 (예전엔 익명으로 load_all 을 한 번 불러 «빈 결과»를 확인한 뒤에야 보여 줌 — 로그아웃이 느렸던 이유) */
     if(!ok){ showLoginScreen(); return null; }
@@ -1543,7 +1559,7 @@ export function boot(skipCache){
           try{ toast('최신 데이터를 불러오지 못했습니다','지금 화면은 이전 방문 때 저장한 사본입니다 — 잠시 뒤 ↻ 새로고침 ('+String(e&&e.message||e).slice(0,80)+')','warn'); }catch(x){} });
         return null;   // 아래 then 건너뜀
       }
-      showLoading('데이터를 불러오는 중…');
+      bootStage('data');
     }
     return loadFromDb();
   }).then(function(d){
@@ -1585,7 +1601,7 @@ export function enterAfterLogin(){
   $('#viewLogin').classList.add('hidden');
   $('#loading').classList.remove('hidden');
   document.body.style.paddingLeft='';
-  showLoading('로그인 완료 — 데이터를 불러오는 중…');
+  showLoading('로그인 완료 — 데이터를 불러오는 중…'); BOOTW.stage='data'; bootWatch();   /* ㊿+204 */
   loadFromDb().then(afterLoad).catch(onErr);
 }
 export async function screenLogin(){
@@ -1594,9 +1610,9 @@ export async function screenLogin(){
   var wt=lfWait(em); if(wt){ m.style.color='var(--critical,#d03b3b)'; m.textContent=lfMsg(wt); return; }   /* ㊿+180 연속 실패 대기 */
   m.style.color='var(--muted)'; m.textContent='확인 중…';
   try{
-    var r=await fetch(SB_URL+'/auth/v1/token?grant_type=password',{
+    var r=await fetchT(SB_URL+'/auth/v1/token?grant_type=password',{
       method:'POST', headers:{apikey:SB_KEY,'Content-Type':'application/json'},
-      body:JSON.stringify({email:em, password:pw})});
+      body:JSON.stringify({email:em, password:pw})}, 20000, '로그인 서버', true);   /* ㊿+204 시간 제한 — «확인 중…»에 멈추지 않게 */
     var j=await r.json();
     if(!r.ok||!j.access_token){ if(r.status===400 || r.status===401){ var lf=lfFail(em); if(lf.until>Date.now()) throw new Error(lfMsg(lfWait(em))); } throw new Error(j.error_description||j.msg||'이메일 또는 비밀번호가 올바르지 않습니다'); }
     lfOk(em);
@@ -1624,9 +1640,9 @@ export async function screenPw(){
   if(p1!==p2){ m.style.color='var(--critical,#d03b3b)'; m.textContent='비밀번호 확인이 일치하지 않습니다'; return; }
   m.style.color='var(--muted)'; m.textContent='변경 중…';
   try{
-    var r=await fetch(SB_URL+'/auth/v1/user',{
+    var r=await fetchT(SB_URL+'/auth/v1/user',{
       method:'PUT', headers:{apikey:SB_KEY,'Content-Type':'application/json',Authorization:'Bearer '+ST.SB_TOKEN},
-      body:JSON.stringify({password:p1, data:{pw_changed:true}})});
+      body:JSON.stringify({password:p1, data:{pw_changed:true}})}, 20000, '로그인 서버');   /* ㊿+204 시간 제한 */
     var j=await r.json();
     if(!r.ok) throw new Error(j.error_description||j.msg||'변경 실패');
     try{ var s0=sessRead(); if(s0){ s0.p=true; sessWrite(s0); } }catch(e){}
@@ -1635,9 +1651,11 @@ export async function screenPw(){
 }
 
 export function onErr(e){
+  var au=!!(e && /** @type {any} */(e).boot==='auth');   /* ㊿+204 로그인 확인 단계 — 로그인은 남겨 둠(새로고침하면 다시 시도) */
   $('#loading').innerHTML = tpl`<div class="card err" style="max-width:620px">`+
-    tpl`<h2>데이터를 불러오지 못했습니다</h2><p class="cap">${rawHtml(String(e&&e.message||e))}</p>`+
-    tpl`<p class="cap">네트워크 상태와 Supabase 프로젝트 상태(일시정지 여부)를 확인해 주세요.</p></div>`;
+    tpl`<h2>${au? '로그인을 확인하지 못했습니다' : '데이터를 불러오지 못했습니다'}</h2><p class="cap">${String(e&&e.message||e)}</p>`+
+    tpl`<p class="cap">네트워크 상태와 Supabase 프로젝트 상태(일시정지 여부)를 확인해 주세요.${au? ' 로그인은 그대로 남아 있습니다.' : ''}</p>`+
+    tpl`<p style="margin:12px 0 0"><a class="pill" href="">새로고침</a></p></div>`;
 }
 
 export function onData(d){

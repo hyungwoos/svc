@@ -361,6 +361,15 @@ try {
     && /data-apitab=/.test(ad) && /js\/apispec\.js/.test(rd('index.html')) && /'\.\/js\/apispec\.js'/.test(rd('sw.js')),
   '㊿+203 API 문서: 시험 호출(내 로그인 Bearer · 발급 키 X-API-Key) · 키는 주소 · 예시 코드에 안 넣음 · export v1.2(포탈 출처만 CORS · 로그인은 슈퍼 관리자 + 2단계 인증)');
 } catch (e) { say(false, '㊿+203 API 명세 검사를 못 함 — ' + String(e.message || e).slice(0, 160)); }
+// ㊿+204 시작이 멈추지 않음 — 로그인 연장 · 2단계 인증 확인 · 로그인 요청에 시간 제한 · 단계 표시 · 20초 새로고침 안내(첫 화면 HTML · CSS)
+{ const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
+  const co = rd('js/core.js'), sh = rd('js/shell.js'), css = rd('app.css');
+  const rs = (co.match(/export async function restoreSess\(\)\{[\s\S]*?\n\}/) || [''])[0];
+  say(/fetchT\(SB_URL\+'\/auth\/v1\/token\?grant_type=refresh_token'[\s\S]*?15000, '로그인 서버', true\)/.test(rs) && /x\.boot='auth'; throw x;/.test(rs) && !/await fetch\(/.test(rs)
+    && /var r=await fetchT\(SB_URL\+'\/auth\/v1\/'\+path,/.test(co) && /fetchT\(SB_URL\+'\/rest\/v1\/rpc\/mfa_status'/.test(co) && !/await fetch\(SB_URL\+'\/auth\/v1\/token\?grant_type=(refresh_token|password)'/.test(co + sh)
+    && /bootStage\('auth'\); bootWatch\(\);/.test(sh) && /^export function onErr\(e\)/m.test(sh) && /<a class="pill" href="">새로고침<\/a>/.test(sh) && /logClientError\('\[느린 시작\] '/.test(sh)
+    && /<div id="loading" class="loading">[\s\S]*?class="ld-slow"[\s\S]*?<a href="">새로고침<\/a>/.test(html) && /\.loading \.ld-slow\{visibility:hidden;[^}]*animation:ldSlow 0s linear 20s forwards\}/.test(css) && /@keyframes ldSlow\{to\{visibility:visible\}\}/.test(css),
+  '㊿+204 시작 멈춤 방지: 로그인 연장(15초 · 실패해도 로그인 유지 · 이유 + 새로고침) · 인증 서버 · 2단계 정책 · 로그인 요청 시간 제한 · 단계 · 초 표시 · 20초 새로고침 안내(HTML · CSS) · 느린 시작 기록'); }
 // ㊿+160 연장하면 상태 «재약정»(구분 그대로) · 계약 상세에 «계약 기간 · 연장 이력»
 say(/^export function renewStatus\(r\)/m.test(jsAll) && /var nst=renewStatus\(r\);/.test(jsAll) && /^export function ctPeriods\(c, mine\)/m.test(jsAll) && html.includes('id="dtRenew"'), '연장: 상태 «재약정»(renewStatus) · 계약 상세 연장 이력(ctPeriods · #dtRenew)');
 const idx = html + jsAll;
