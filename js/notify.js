@@ -17,7 +17,7 @@ import { APP_VER, IS_STAGING, ST } from './state.js';
 import { b64urlJson, bizHas, canWrite, esc, fetchT, lline, mk, monOf, navText, rawHtml, SB_KEY, SB_URL, tickMemo, tpl, won } from './core.js';
 import { expAmtOf, expEligible } from './dash.js';
 import { gnMeSync, ico, sbHeaders, sbTry, sbWrite, toast, todayStr, visBtn } from './shell.js';
-import { ctSuccessor, dcAckLoad, dcDailySave, dcRules, openRenewList, renewScan } from './analysis.js';
+import { ctSuccessor, dcAckLoad, dcDailySave, dcRulesQuick, openRenewList, renewScan } from './analysis.js';
 import { gridGoPre, meMatch, switchView } from './grid.js';
 import { closeOvl, logChange, openOvl } from './edit.js';
 import { menuSegments, openCust360, renderTodo } from './tools.js';
@@ -26,9 +26,9 @@ import { verNum } from './guard.js';
 import { CS_PROD, csSetTab, QMGR_MAP, SW, SW_STATE, swAlerts, swLoad } from './sales.js';
 
 export var NTF_DEF={renew_days:[60,30], eq_days:3, month_end_days:5, renew_emails:[], eq_emails:[], biz_emails:[], dc_emails:[], slack_on:false, team_channel:'C08RA3PPDH8', auto_on:false, auto_days:[1], auto_time:'09:00', auto_dm:false};
-export var NTF={memo:null, ops:null, opsOk:null, set:null, sqlOk:null, reads:{}, readsOk:false, asg:{}, asgOk:false, area:/** @type {Object<string,any>} */({}), accounts:/** @type {?any[]} */(null), names:/** @type {?Object<string,{name:string,title:string}>} */(null), omap:null, users:null, open:false, tab:'me', loading:false, at:0, busy:false, snapOk:null, snapKey:'', snapAt:0, snap:null};
+export var NTF={memo:null, ops:null, opsOk:null, watch:/** @type {any} */(null), set:null, sqlOk:null, reads:{}, readsOk:false, asg:{}, asgOk:false, area:/** @type {Object<string,any>} */({}), accounts:/** @type {?any[]} */(null), names:/** @type {?Object<string,{name:string,title:string}>} */(null), omap:null, users:null, open:false, tab:'me', loading:false, at:0, busy:false, snapOk:null, snapKey:'', snapAt:0, snap:null};
 export var NTF_KIND={ops:'운영 상태', renew:'재약정 만기', lapsed:'만기 미처리', eq:'장비 처리 지연', biz:'월말 마감', dc:'데이터 점검', fb:'개선 요청'};
-export var OPS_TBL={customers:'고객사', contracts:'계약', monthly_revenue:'월 매출', equipment_orders:'장비 신청', equipment_assets:'장비 현황', oi_deals:'OI'};
+export var OPS_TBL={customers:'고객사', contracts:'계약', monthly_revenue:'월 매출', equipment_orders:'Cloud NAC 발주', equipment_assets:'장비 현황', oi_deals:'OI'};
 
 /** 설정(없으면 기본값) */
 export function ntfSet(){ return Object.assign({}, NTF_DEF, NTF.set||{}); }
@@ -90,11 +90,12 @@ export function ntfItems(){
       if(!done && left2!=null && left2>=0 && left2<=S.month_end_days) out.push({kind:'biz', key:'biz:'+mk(T2), sev:left2<=2? 'hi' : 'mid', order:left2, title:curYm+' 비즈포탈 차액 입력 — 마감 D-'+left2,
         detail:'정산 · 목표 달성률이 «미입력»으로 남음', to:S.biz_emails.concat(ntfAreaTo('biz')), me:ntfIsMe(S.biz_emails) || ntfAreaMe('biz'), go:function(){ switchView('biz'); }}); } }catch(e){}
     /* 5) 데이터 점검 «바로 고쳐야 함» (만기 지남 규칙은 2)와 겹쳐 뺌 — 홈과 같은 기준) */
-    try{ var crit=dcRules().filter(function(x){ return x.sev==='crit' && x.id!=='c_lapsed' && x.items.length; }), n=crit.reduce(function(a,x){ return a+x.items.length; }, 0);
+    try{ var crit=dcRulesQuick().filter(function(x){ return x.sev==='crit' && x.id!=='c_lapsed' && x.items.length; }), n=crit.reduce(function(a,x){ return a+x.items.length; }, 0);
       if(n) out.push({kind:'dc', key:'dc:'+mk(ST.DATA.nowIdx)+':'+n, sev:'hi', order:0, title:'데이터 바로 고칠 것 '+n+'건', detail:crit.map(function(x){ return x.title+' '+x.items.length; }).slice(0,3).join(' · '),
         to:S.dc_emails.concat(ntfAreaTo('dc')), me:ntfIsMe(S.dc_emails) || ntfAreaMe('dc'), go:function(){ switchView('dcheck'); }}); }catch(e){}
     /* 6) ㊿+175 운영 상태(슈퍼 관리자 · SQL 106 ops_status) — 야간 백업 · 자동 작업 · AI 점검 · 브라우저 오류 · 옛 버전 · 백업 대비 행 수 */
     if(ST.IS_SUPER && NTF.ops) try{ opsItems(NTF.ops).forEach(function(x){ out.push(x); }); }catch(e){}
+    if(ST.IS_SUPER && NTF.watch) try{ watchItems().forEach(function(x){ out.push(x); }); }catch(e){}   /* ㊿+209 운영 감시 */
     /* 7) ㊿+185 개선 요청 → ㊿+200 처리자(새 요청 · 요청자 덧붙임 · 다시 요청) · 요청자(확인 시작 · 답변 · 완료) — fbItems */
     if(FB.ok) try{ fbItems().forEach(function(x){ out.push(x); }); }catch(e){}
     /* 8) ㊿+192 계약 없이 쓰는 Cloud 사이트(SQL 115 site_watch) — 사이트마다 한 번 · 만든 사람에게(+ 사이트 메뉴 담당 없음) · 발주일 · PoC 종료일이 지나면 hi */
@@ -147,6 +148,21 @@ export function ntfGoOps(){
   setTimeout(go, 0);
 }
 /** ㊿+175 운영 상태 읽기(슈퍼 관리자 · SQL 106 전이면 null) */
+/* ㊿+209 운영 감시(SQL 123 watch_log · 슈퍼 관리자) — 마지막 결과가 문제 · 주의면 한 줄 · 설정 «알림함 표시» · 3시간 안 결과만 */
+export function watchItems(){
+  var w=NTF.watch; if(!w || !w.log || !w.set || w.set.inbox_on===false) return [];
+  var L=w.log; if(L.worst==='ok') return [];
+  var age=(Date.now()-new Date(L.at).getTime())/36e5; if(!(age<=3)) return [];
+  var names=(Array.isArray(L.items)? L.items : []).filter(function(i){ return i && (i.sev==='bad' || i.sev==='warn'); }).map(function(i){ return String(i.name||i.k||''); });
+  return [{kind:'ops', key:'watch:'+L.id, sev:L.worst==='bad'? 'hi' : 'mid', order:0, title:'운영 감시 — 문제 '+(+L.n_bad||0)+' · 주의 '+(+L.n_warn||0),
+    detail:names.slice(0,4).join(' · ')+(names.length>4? ' 외 '+(names.length-4)+'개' : '')+' — 배포·운영 › 기록 › 운영 감시', to:[], me:true, ops:true, go:function(){ ntfGoOps(); }}];
+}
+export async function watchLoad(){
+  if(!ST.IS_SUPER || !ST.SB_TOKEN) return (NTF.watch=null);
+  var s=await ntfGet('watch_settings?select=*&id=eq.1'); if(s===null) return (NTF.watch=null);
+  var l=await ntfGet('watch_log?select=id,at,kind,worst,n_warn,n_bad,items,slack,app_ver,ms&order=at.desc&limit=1');
+  NTF.watch={set:s[0]||null, log:(l && l[0])||null}; return NTF.watch;
+}
 export async function opsLoad(){
   if(!ST.IS_SUPER || !ST.SB_TOKEN) return null;
   try{ var r=await fetch(SB_URL+'/rest/v1/rpc/ops_status', {method:'POST', headers:sbHeaders(true), body:'{}'}); NTF.opsOk=r.ok; if(!r.ok) return (NTF.ops=null); var j=await r.json(); NTF.ops=(j && typeof j==='object')? j : null; }
@@ -179,6 +195,7 @@ export async function ntfLoad(force){
     var g={}, ar={}; (as||[]).forEach(function(x){ if(x.kind==='area') ar[String(x.ref)]=x; else g[String(x.ref)]=x; }); var hadAsg=Object.keys(NTF.asg).length+Object.keys(NTF.area).length>0, wasOk=!!NTF.asgOk; NTF.asg=g; NTF.area=ar; NTF.asgOk=as!==null;
     if(hadAsg || Object.keys(g).length || Object.keys(ar).length || (NTF.asgOk && !wasOk)) try{ renderTodo(); }catch(e){}   /* ㊿+195 담당 표를 처음 읽었으면(비어 있어도) 홈을 다시 그려 «담당 지정» 버튼이 보이게 — 예전엔 먼저 그린 홈에 버튼이 안 나올 때가 있었음 */   /* 홈 «우선 업무»의 장비 담당 = 처리 담당 · 줄 담당 */
     await opsLoad();
+    try{ await watchLoad(); }catch(e){}   /* ㊿+209 운영 감시(SQL 123 전이면 조용히 없음) */
     try{ await fbLoad(true); }catch(e){}   /* ㊿+185 개선 요청 새 건수(알림함) · ㊿+200 요청자도 내 요청의 진행(확인 중 · 답변 · 완료) */
     NTF.at=Date.now();
     ntfSnapSave(false);   /* ㊿+177 예약 발송 «보낼 글» — 켜져 있을 때만 · 슈퍼 관리자만 · 바뀌었거나 6시간 지났을 때만 씀 */
@@ -306,7 +323,7 @@ export function ntfDlg(id, w){
 }
 export function ntfAssignOpen(x){
   var o=(ST.RAWX.orders||[]).filter(function(r){ return String(r.id)===String(x.id); })[0]; if(!o) return;
-  if(!ntfCanAssign()){ toast('지정할 수 없습니다', NTF.asgOk? '임대 장비 신청 «쓰기» 권한이 필요합니다' : 'SQL 105(work_assign 표)를 먼저 실행해 주세요', 'info'); return; }
+  if(!ntfCanAssign()){ toast('지정할 수 없습니다', NTF.asgOk? 'Cloud NAC 발주 «쓰기» 권한이 필요합니다' : 'SQL 105(work_assign 표)를 먼저 실행해 주세요', 'info'); return; }
   var cur=x.asg||'', cands=ntfCands(), me=ntfMe();
   ntfAccounts().then(function(a){ var dl=document.getElementById('naList'); if(!dl || !a.length) return; var u={}; cands.concat(a.map(function(z){ return z.email; })).forEach(function(e){ u[e]=1; }); dl.innerHTML=Object.keys(u).sort().map(function(e){ return tpl`<option value="${e}">${e===me? '나' : ntfName(e)}</option>`; }).join(''); });   /* ㊿+185 포탈 계정 전체 */
   var m=ntfDlg('ovlNtfAsg', 480);

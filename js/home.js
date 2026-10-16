@@ -60,7 +60,8 @@ export function placeSearchBtn(){
   function toTop(){ var ub=document.getElementById('unitBadge'); if(cmd.parentElement!==tb) tb.insertBefore(cmd, ub||null); if(op && op.parentElement!==tb) tb.insertBefore(op, cmd.nextSibling); bell(); }
   if(wide){ if(cmd.parentElement!==right) right.insertBefore(cmd, right.firstChild); if(op && op.parentElement!==right) right.insertBefore(op, cmd.nextSibling); bell();
     /* 위 메뉴 묶음이 잘리면(좁은 노트북 폭) 검색 · AI 대화는 아래 띠로 — 메뉴가 먼저 */
-    var tabs=document.querySelector('#rail .gn-tabs'); if(tabs && tabs.scrollWidth>tabs.clientWidth+1) toTop(); }
+    var tabs=document.querySelector('#rail .gn-tabs');   /* ㊿+205 폭 재기는 그리기 직전에(처음 열 때 화면 전체 배치를 한 번 더 하던 것 — 데이터 10배에서 0.4초) */
+    if(tabs) requestAnimationFrame(function(){ if(tabs.scrollWidth>tabs.clientWidth+1 && cmd.parentElement===right) toTop(); }); }
   else toTop();
   if(!HOME.rz){ HOME.rz=1; onResize(placeSearchBtn); }
 }

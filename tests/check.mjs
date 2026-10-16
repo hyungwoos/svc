@@ -216,7 +216,7 @@ say(/^export function tickMemo\(/m.test(jsAll) && /^export function cssvKey\(/m.
 // ㊿+186 전역 정리 — 제목 한 번(vtDupSync) · 이모지 제거(deEmoji) · 더보기 메뉴(moreMenuSetup) · 빈 화면 버튼(emptyCta) · 푸터
 { const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
   const sh = rd('js/shell.js'), gr = rd('js/grid.js'), da = rd('js/dash.js'), css = rd('app.css');
-  say(/^export function vtDupSync\(v\)/m.test(sh) && /^export function deEmoji\(root\)/m.test(sh) && /^export function moreMenuSetup\(\)/m.test(sh) && /\['btnViewReset','btnReload','btnFont','btnTheme'\]/.test(sh) && /try\{ vtDupSync\(v\);/.test(sh)
+  say(/^export function vtDupSync\(v\)/m.test(sh) && /^export function deEmoji\(root\)/m.test(sh) && /^export function moreMenuSetup\(\)/m.test(sh) && /\['btnHelp','btnViewReset','btnReload','btnFont','btnTheme'\]/.test(sh) && /try\{ vtDupSync\(v\);/.test(sh)
     && /data-dge="cta"/.test(gr) && /emptyCta:\{l:'견적 만들기', v:'quote'/.test(rd('js/grids.js')) && !/원본: Supabase DB/.test(da) && /\.vt-dup \.vt-txt\{position:absolute/.test(css) && /td\.act \.ab\{opacity:0/.test(css) && !/43_inbound\.sql 실행과 Apps Script 코드 교체·배포가 필요합니다\.<\/p>/.test(rd('js/inbound.js')),
   '㊿+186 전역 정리(제목 한 번 · 이모지 제거 · «더보기» 메뉴 · 행 버튼 올렸을 때 · 빈 화면 버튼 · 푸터 · 설정 안내는 관리자만)'); }
 // ㊿+187 표 위 필터 한 줄(fbarSync · #dvFilterPop · #dvChips · 저장된 보기 fv*) · 사업 영역 한 화면(renderAreaSel · areaPick · 상단 «사업 영역» 버튼)
@@ -370,6 +370,75 @@ try {
     && /bootStage\('auth'\); bootWatch\(\);/.test(sh) && /^export function onErr\(e\)/m.test(sh) && /<a class="pill" href="">새로고침<\/a>/.test(sh) && /logClientError\('\[느린 시작\] '/.test(sh)
     && /<div id="loading" class="loading">[\s\S]*?class="ld-slow"[\s\S]*?<a href="">새로고침<\/a>/.test(html) && /\.loading \.ld-slow\{visibility:hidden;[^}]*animation:ldSlow 0s linear 20s forwards\}/.test(css) && /@keyframes ldSlow\{to\{visibility:visible\}\}/.test(css),
   '㊿+204 시작 멈춤 방지: 로그인 연장(15초 · 실패해도 로그인 유지 · 이유 + 새로고침) · 인증 서버 · 2단계 정책 · 로그인 요청 시간 제한 · 단계 · 초 표시 · 20초 새로고침 안내(HTML · CSS) · 느린 시작 기록'); }
+// ㊿+205 성능: 비슷한 이름 후보 쌍(dcSimPairs) · 홈/알림함 요약 한 번(dcRulesQuick) · 포탈↔DB 대조 id 표 · 해지율 대상 규칙 한 번(crBase) · 폭 재기 rAF
+{ const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
+  const an = rd('js/analysis.js'), sh = rd('js/shell.js'), nt = rd('js/notify.js'), sa = rd('js/sales.js'), hm = rd('js/home.js');
+  const sim = (an.match(/export function dcSimilar\(CU\)\{[\s\S]*?\n\}/) || [''])[0];
+  say(/^export function dcSimPairs\(K\)/m.test(an) && /var P=dcSimPairs\(S\.map/.test(sim) && !/for\(var j=i\+1;j<S\.length;j\+\+\)/.test(sim) && /^export function dcRulesQuick\(\)/m.test(an) && /dcRulesQuick\(\)\.forEach/.test(sh) && /dcRulesQuick\(\)\.filter/.test(nt)
+    && /var rwById=null;/.test(an) && /^export function crBase\(\)/m.test(sa) && /return crBase\(\)\.filter/.test(sa) && /SBW\.n\+\+;/.test(sh) && /requestAnimationFrame\(function\(\)\{ if\(tabs\.scrollWidth>tabs\.clientWidth\+1/.test(hm),
+  '㊿+205 성능: 비슷한 이름 후보 쌍만 · 홈/알림함 데이터 점검 요약 한 번 · 만기 대조 id 표 · 해지율 대상 규칙 한 번 · 위 메뉴 폭 재기는 그리기 직전'); }
+// ㊿+206 사용 설명서 · 운영자 매뉴얼 — js/help.js(화면 · 처음 열 때) · js/helpdata.js(내용 · 찾기) · 더보기 «사용 설명서» · ❔ = 그 화면 · AI 사용법 질문에 설명서 항목
+{ const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
+  const HD = await import(pathToFileURL(path.join(ROOT, 'js/helpdata.js')).href), hs = rd('js/help.js'), hsrc = rd('js/helpdata.js');
+  const ids = HD.HELP.map((h) => h.id), views = new Set([...html.matchAll(/data-v="([a-z0-9]+)"/g)].map((m) => m[1]).concat(['area']));
+  const bad = [];
+  ids.forEach((x, i) => { if (ids.indexOf(x) !== i) bad.push('겹친 id ' + x); });
+  HD.HELP.forEach((h) => { if (h.v && !views.has(h.v)) bad.push(h.id + ' 메뉴 키 ' + h.v); (h.see || []).forEach((x) => { if (!ids.includes(x)) bad.push(h.id + ' → ' + x); }); if (h.g === 'ops' && h.role !== 'super') bad.push(h.id + ' 운영자 매뉴얼인데 super 아님'); });
+  Object.entries(HD.HELP_VIEW_MAP).forEach(([k, v]) => { if (!views.has(k) || !ids.includes(v)) bad.push('HELP_VIEW_MAP ' + k); });
+  /* «…» 안 이름(버튼 · 메뉴 · 탭 글자)이 지금 코드 · 화면에 있는지 — 화면을 고치고 설명서를 안 고치면 여기서 걸림 */
+  const corpus = [html, ...fs.readdirSync(path.join(ROOT, 'js')).filter((f) => f.endsWith('.js') && !/^(helpdata|upd)\.js$/.test(f)).map((f) => rd('js/' + f)),
+    ...fs.readdirSync(path.join(ROOT, 'sat')).filter((f) => f.endsWith('.js')).map((f) => rd('sat/' + f)), ...fs.readdirSync(ROOT).filter((f) => f.endsWith('.html') && f !== 'index.html').map((f) => rd(f))].join('\n');
+  [...new Set([...hsrc.matchAll(/«([^»]{2,40})»/g)].map((m) => m[1]))].forEach((q) => { if (!corpus.includes(q)) bad.push('화면에 없는 이름 «' + q + '»'); });
+  if (/(sb_secret_|sbp_[0-9a-f]{8}|xox[bpa]-\d|ghp_[A-Za-z0-9]{10}|sk-or-v1|eyJhbGciOi)/.test(hsrc)) bad.push('비밀값 모양');
+  if (/^import /m.test(hsrc)) bad.push('helpdata.js 가 다른 파일을 부름');
+  say(!bad.length && /help:function\(\)\{ return import\('\.\/help\.js'\); \}/.test(rd('js/lazy.js')) && /js\/helpdata\.js,js\/help\.js/.test(html) && /'\.\/js\/helpdata\.js', '\.\/js\/help\.js'/.test(rd('sw.js'))
+    && /id="btnHelp"/.test(html) && /\['btnHelp','btnViewReset','btnReload','btnFont','btnTheme'\]/.test(jsAll) && /export function helpGo\(v\)\{\n  lazyLoad\('help'\)/.test(rd('js/grid.js'))
+    && /getElementById\('dvHelp'\); if\(b\) b\.addEventListener\('click', function\(\)\{ helpGo\(ST\.CUR_VIEW\); \}\)/.test(rd('js/init.js')) && /question:aiHelpAdd\(/.test(rd('js/ai.js')) && /^export function helpOpen\(idOrView\)/m.test(hs) && /^export function helpCan\(h\)/m.test(hs),
+  '㊿+206 사용 설명서: 항목 ' + ids.length + '개 · 메뉴 키 · 함께 보기 · 운영자 매뉴얼 = 슈퍼 관리자 · «…» 이름이 화면에 있음 · 비밀값 없음 · 처음 열 때 받음(lazy · app-js · sw) · 더보기 첫 줄 · ❔ = 그 화면 · AI 사용법 질문에 붙임' + (bad.length ? ' — ' + bad.slice(0, 8).join(' / ') : '')); }
+// ㊿+207 MDR 정식 발주(EDR 발주요청서) — 같은 화면 «신청 구분» · 정식 발주만 새 칸(SQL 122) · 상태 «발주요청» · 현황 열은 DB 에 그 칸이 있을 때만 저장
+{ const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
+  const sa = rd('js/sales.js'), gs = rd('js/grids.js'), gr = rd('js/grid.js');
+  const sub = (sa.match(/export async function submitMdrPoc\(\)\{[\s\S]*?\n\}/) || [''])[0];
+  say(/<select id="mpKind"><option value="poc">PoC · 데모<\/option><option value="order">정식 발주<\/option><\/select>/.test(html) && /id="mpContract"/.test(html) && /id="mpBiz"/.test(html) && /id="mpFirst"/.test(html) && /data-v="mdrnew">[^<]*PoC · 발주 신청</.test(html)
+    && /status: ord\? '발주요청' : '신청'/.test(sub) && /if\(ord\) Object\.assign\(row, \{req_kind:'order', contract_no:cno\|\|null, biz_kind:biz, mod_first:/.test(sub) && /SQL 122 를 먼저/.test(sub) && /ICT지원사업 정식 발주는 계약번호가 필요합니다/.test(sub)
+    && /reqIf:\{mpContract:\['계약번호'/.test(sa) && /D\.reqIf\[id\]\[1\]\(\)/.test(sa) && /\{k:'contract_no',l:'계약번호',ifCol:true\}/.test(gs) && /opts:\['발주요청','신청','대기','진행중','데모',(?:'발주전환',)?'구독','종료'\]/.test(gs) && /if\(c\.ifCol && !gridHasCol\(g, c\.k\)\) return;/.test(gr),
+  '㊿+207 MDR 정식 발주: 신청 구분(PoC · 데모 / 정식 발주) · 계약번호(ICT지원사업만 꼭) · 사업 구분 · 초동조치 · 상태 «발주요청» · PoC 는 새 칸 안 보냄 · SQL 122 전 안내 · 현황 새 칸은 DB 에 있을 때만 저장'); }
+// ㊿+208 «임대 장비 신청» → «Cloud NAC 발주» · 위 메뉴 «발주» 묶음 · 장비 = 대시보드 · 현황 · 예전 메뉴 설정 옮기기
+{ const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
+  const nav = (html.match(/<div class="grp">발주<\/div>[\s\S]*?<div class="grp">영업<\/div>/) || [''])[0], tl = rd('js/tools.js'), sh = rd('js/shell.js');
+  const ui = [html, ...fs.readdirSync(path.join(ROOT, 'js')).filter((f) => f.endsWith('.js') && !/^(upd|helpdata)\.js$/.test(f)).map((f) => rd('js/' + f))].join('\n').replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '').replace(/^\s*\/\/.*$/gm, '');
+  say(/data-v="ordernew">[^<]*Cloud NAC 발주 신청<\/button>\s*<button data-v="orders">[^<]*Cloud NAC 발주 내역<\/button>\s*<button data-v="mdrnew">[^<]*MDR PoC · 발주 신청<\/button>\s*<button data-v="mdrops">[^<]*MDR 운영·신청 현황<\/button>\s*<div class="grp">장비<\/div>\s*<button data-v="eqboard">[^<]*장비 대시보드<\/button>\s*<button data-v="assets">[^<]*임대 장비 현황<\/button>/.test(nav)
+    && !/<div class="grp">PoC·데모<\/div>/.test(html) && !/'g:PoC·데모':/.test(sh) && /var old208=/.test(tl) && /conf\.m208=1/.test(tl) && !/임대 장비 신청|'장비 신청'/.test(ui),
+  '㊿+208 발주 묶음: Cloud NAC 발주 신청 · 내역 · MDR PoC · 발주 신청 · MDR 운영·신청 현황 → 장비(대시보드 · 임대 장비 현황) · PoC·데모 묶음 없음 · 예전 설정 옮김(한 번만) · 화면 글자에 «임대 장비 신청» · «장비 신청» 없음'); }
+// ㊿+209 운영 감시(선택 · 기본 꺼짐) — watch 함수(자동 = 일회용 번호 · 포탈 = 슈퍼 관리자 · 서비스 키 거절 · 지금 점검은 Slack 안 보냄) · 포탈 «운영 감시» · 알림함 · 배포 뒤 확인
+{ const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
+  const wf = rd('supabase/functions/watch/index.ts'), ad = rd('js/admin.js'), nt = rd('js/notify.js');
+  say(!!wf && /if \(typeof body\.cron === 'string'\)/.test(wf) && /used_at=is\.null&created_at=gt\./.test(wf) && /서비스 키로 부르는 점검은 받지 않습니다/.test(wf) && /rpc\/is_super_admin/.test(wf)
+    && /const slack = kind === 'manual' \? null : await slackDecide/.test(wf) && /if \(set\.slack_on !== true\) return 'off';/.test(wf) && /ns\.slack_on !== true/.test(wf) && /method: 'OPTIONS'/.test(wf) && !/SUPABASE_SERVICE_ROLE_KEY'\) \|\| '[^']/.test(wf)
+    && /deno run -A tests\/fn\/watch\.test\.ts/.test(rd('package.json')) && fs.existsSync(path.join(ROOT, 'tests/fn/watch.test.ts'))
+    && /^export function opsWatchHtml\(\)/m.test(ad) && /var h=opsWatchHtml\(\)\+tpl`/.test(ad) && /watchCall\(\{mode:'run'\}\)/.test(ad) && /if\(promote\) dwStart\(expV, prevV\);/.test(ad) && /watchCall\(\{mode:'deploy', expect:ver\}/.test(ad)
+    && /^export function watchItems\(\)/m.test(nt) && /w\.set\.inbox_on===false/.test(nt) && /await watchLoad\(\);/.test(nt),
+  '㊿+209 운영 감시: watch 함수(자동은 일회용 번호 · 포탈은 슈퍼 관리자 · 서비스 키 거절 · 지금 점검 Slack 없음 · Slack 은 감시 · «Slack 사용» 둘 다 켜야 · 함수는 OPTIONS 만) · 함수 시험 · 기록 탭 «운영 감시» · 알림함(설정 따라) · 승격 뒤 자동 확인'); }
+// ㊿+210 프로젝트 리포트 NO.(영업현황 등록번호) = 여러 줄 글 칸(줄바꿈 그대로 · 길면 다음 줄 · 인쇄 한 장) · 계약일자 · 수금일자 칸 넓힘 · 메뉴 이름에 숫자 배지 안 붙음
+{ const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
+  const rh = rd('report.html'), rc = rd('sat/report.css'), rj = rd('sat/report.js'), co = rd('js/core.js');
+  say(/<div class="no"><span>NO\.<\/span><textarea data-k="no" rows="1"/.test(rh) && !/<input data-k="no"/.test(rh) && /<col style="width:29\.4%"><col style="width:32\.6%"><col style="width:27%"><col style="width:11%">/.test(rh) && (rh.match(/<td class="bold dt"><input class="ctr" type="date" data-k="(?:cdate|paydate)">/g) || []).length === 2
+    && /\.no textarea \{[^}]*white-space: pre-wrap/.test(rc) && /\.page \.no\.long textarea \{ font-size: 9px/.test(rc) && /field-sizing: content/.test(rc) && /^function fitTa\(\)/m.test(rj) && /classList\.toggle\('long'/.test(rj)
+    && /b\.querySelector\('\.rpb-cnt,\.rb,\.gn-bd'\)/.test(co),
+  '㊿+210 프로젝트 리포트: NO. 여러 줄(줄바꿈 그대로 · 길면 다음 줄 · 3줄 넘으면 인쇄 글자 작게 · 한 장) · 계약일자 · 수금일자 칸 넓힘(달력 단추 작게) · 메뉴 이름에 숫자 배지(리포트1) 안 붙음'); }
+// ㊿+210 MDR PoC · 데모 → 정식 발주 전환(행 «발주 전환» → 신청 화면 채움 → 정식 발주 새 행(src_id · SQL 124) → Slack 은 정식 발주와 같게(INSERT 웹훅) · PoC = «발주전환»)
+{ const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
+  const sa = rd('js/sales.js'), gr = rd('js/grid.js'), gs = rd('js/grids.js'), rp = rd('js/report.js');
+  say(/^export function mpConvert\(r\)/m.test(sa) && /^export function mpCanConv\(r\)\{ return !!r && \('req_kind' in r\) && r\.req_kind!=='order' && r\.status!=='발주전환' && !mpConvOf\(r\); \}/m.test(sa)
+    && /if\(conv\) \/\*\* @type \{any\} \*\/\(row\)\.src_id=conv\.id;/.test(sa) && /sbWrite\('PATCH','mdr_ops\?id=eq\.'\+conv\.id,\{status:'발주전환'\}\)/.test(sa) && /mdr_ops_src_uniq/.test(sa) && /noLink=true; return ins\(\);/.test(sa)
+    && /mpCanConv\(r\) && canView\('mdrnew'\)/.test(gr) && /bo\.dataset\.act='toOrder'/.test(gr) && /mpConvClear\(\); wzReset\('mp'\);/.test(gr)
+    && /chipsOpts:\['발주요청','신청','대기','진행중','데모','발주전환','구독','종료'\]/.test(gs) && /'PoC → 발주 #'\+o\.id/.test(gs)
+    && (rp.match(/x\.req_kind!=='order'/g) || []).length === 2 && /<div id="mpConv" class="mp-conv" role="status" hidden>/.test(html),
+  '㊿+210 MDR 발주 전환: PoC 행 «발주 전환»(구분 칸 있을 때 · 전환 안 된 PoC · 보기 권한) → 신청 화면 채움 · 정식 발주 고정 → 새 행 src_id(두 번 안 됨 · SQL 124 전엔 연결 없이) → PoC «발주전환» · 리포트 PoC 표에 정식 발주 안 셈'); }
+// ㊿+211 MDR 정식 발주 양식 — ICT지원사업(초동조치 · EDR 발주요청서(ICT지원사업)) / 일반(EDR+MDR 발주요청서 · PoC 와 같은 모듈)
+{ const sa = fs.readFileSync(path.join(ROOT, 'js/sales.js'), 'utf8');
+  say(/<label class="mpchk mp-ord mp-ict"><input id="mpFirst"/.test(html) && /^export function mpIsIct\(\)/m.test(sa) && /mod_first:biz==='ICT지원사업' && \$\('#mpFirst'\)\.checked/.test(sa) && /mpIsIct\(\)\? \[\['mpAv','EDR\(백신\)'\],\['mpRansom','EDR\(안티랜섬웨어\)'\],\['mpMedia','매체제어'\],\['mpFirst','초동조치'\]\]/.test(sa) && /<label class="mpchk mp-noict"><input id="mpEdr"/.test(html) && /data-ict="EDR\(백신\)"/.test(html) && /if\(ord && biz==='ICT지원사업'\) row\.mod_edr=false;/.test(sa) && /\['mpEdr','mpWin','mpLinux','mpMac','mpWebui','mpNac'\]/.test(sa) && /EDR\+MDR 발주요청서 — 정식 발주/.test(sa),
+  '㊿+211~212 MDR 정식 발주 양식: ICT = EDR(백신) · EDR(안티랜섬웨어) · 매체제어 · 초동조치(EDR+MDR 없음) · 일반 · PoC = EDR+MDR · 안티바이러스 · 안티랜섬웨어 · 매체제어 · Web UI 이메일 → NAC 순서 · 초동조치 = ICT지원사업만(화면 · 요약 · 저장) · 제목 ICT «EDR 발주요청서(ICT지원사업)» / 일반 «EDR+MDR 발주요청서»'); }
 // ㊿+160 연장하면 상태 «재약정»(구분 그대로) · 계약 상세에 «계약 기간 · 연장 이력»
 say(/^export function renewStatus\(r\)/m.test(jsAll) && /var nst=renewStatus\(r\);/.test(jsAll) && /^export function ctPeriods\(c, mine\)/m.test(jsAll) && html.includes('id="dtRenew"'), '연장: 상태 «재약정»(renewStatus) · 계약 상세 연장 이력(ctPeriods · #dtRenew)');
 const idx = html + jsAll;

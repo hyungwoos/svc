@@ -11,7 +11,7 @@ import { switchView, viewLabelOf, xlsxAoa } from './grid.js';
 import { closeOvl, logChange, openOvl, setAuthTab } from './edit.js';
 import { csFn, qFetch } from './sales.js';
 import { clFetchFx } from './cloud.js';
-import { NTF, ntfAccounts, ntfAdminRender, ntfCall, ntfDisp, ntfName, ntfProf, opsItems, opsLoad, profEdit } from './notify.js';
+import { NTF, ntfAccounts, ntfAdminRender, ntfCall, ntfDisp, ntfGet, ntfName, ntfProf, ntfSync, opsItems, opsLoad, profEdit, watchLoad } from './notify.js';
 import { API_ERRS, API_RES, API_VER, apiRes, apiRespEx, buildOpenApi } from './apispec.js';
 
 
@@ -171,6 +171,7 @@ export function opsGhHtml(){
     h+=tpl`<p class="mini" style="margin:6px 0 0">커밋 하나로 묶여 올라가고, 테스트가 통과하면 GitHub Pages 에 반영(보통 2~3분). ${stg? '스테이징에서 확인한 뒤 «스테이징 → 운영 승격»으로 같은 파일을 운영에 올립니다.':'index.html 은 올린 뒤 이 화면을 새로고침하면 새 버전으로 바뀝니다.'} 저장소 파일(.github · supabase · cloudflare · tests/fn · README · package.json · .gitignore)은 대상과 상관없이 루트로 갑니다.</p>`;
   }
   h+=tpl`<div class="ops-h" style="margin-top:14px">스테이징 ↔ 운영</div><div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="cbtn" id="opsSync" title="운영에 있는 포탈 파일 전부를 staging/ 로 복사(재업로드 없이 같은 내용) — 스테이징을 운영과 똑같이 맞출 때">운영 → 스테이징 동기화</button><button type="button" class="cbtn" id="opsQa" title="스테이징 포탈을 창 안에서 열어 메뉴 전부를 자동으로 눌러 봅니다 — JS 오류·빈 화면·깨진 값·넘침·핵심 숫자 비교 (약 30초)">🧪 스테이징 QA</button>${rawHtml(qaBadgeHtml())}<button type="button" class="cbtn pri" id="opsPromote" title="staging/ 에 있는 파일을 운영(루트)으로 복사 — 스테이징에서 확인이 끝났을 때">스테이징 → 운영 승격</button><a class="cbtn" href="${stagingUrl()}" target="_blank" rel="noopener">스테이징 열기 ↗</a></div>`;
+  h+=tpl`<div id="opsDwHost">${rawHtml(dwHtml())}</div>`;   /* ㊿+209 배포 뒤 자동 확인 */
   h+=opsRbHtml();   /* ㊿+175 운영 되돌리기 */
   h+='</div>';
   h+=tpl`<div><div class="ops-h">② 저장소 · 이전 버전</div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px"><button type="button" class="pill ghost" id="opsGhList">저장소 파일 보기</button><button type="button" class="pill ghost" id="opsGhHist" data-p="index.html">index.html 이력</button><a class="pill ghost" href="https://github.com/${(OPS.st&&OPS.st.github&&OPS.st.github.repo)||'hyungwoos/svc'}/actions" target="_blank" rel="noopener" title="테스트·배포 진행 상황">Actions ↗</a></div>`;
@@ -285,6 +286,7 @@ export function opsAutoMsg(){
   return (vers.length? '포탈 '+vers[0].replace(/^.*\s/,'')+' · ' : '')+names.join(', ')+' (포탈에서 배포)';
 }
 export function opsGhBind(host){
+  var dwc=host.querySelector('[data-dw-close]'); if(dwc) /** @type {any} */(dwc).onclick=function(){ DW.state=''; dwPaint(); };   /* ㊿+209 */
   host.querySelectorAll('#opsTarget button').forEach(function(b){ b.onclick=function(){ OPS.target=b.dataset.tg; OPS.commitMsg=''; renderOps(true); }; });
   var drop=host.querySelector('#opsDrop'), inp=host.querySelector('#opsFile'), finp=host.querySelector('#opsFolder');
   if(drop){
@@ -422,7 +424,9 @@ export async function opsCopy(src, dst){
   var qaLine=promote? (QA.res? (QA.res.fail? '\n\n⚠ 스테이징 QA 에서 '+QA.res.fail+'건 실패('+QA.res.verS+') — 그래도 승격할까요?' : '\n\n✅ 스테이징 QA 통과 '+QA.res.pass+'/'+QA.res.total+' ('+QA.res.verS+')') : '\n\n⚠ 스테이징 QA 를 아직 실행하지 않았습니다 — «🧪 스테이징 QA» 로 먼저 점검하는 것을 권합니다') : '';
   if(!confirm(promote? '스테이징(staging/)의 포탈 파일을 운영(루트)으로 복사합니다. 운영 포탈이 스테이징과 같아집니다 — 스테이징에서 충분히 확인했나요?'+qaLine : '운영(루트)의 포탈 파일을 staging/ 로 복사합니다. 스테이징이 운영과 같아집니다. 계속할까요?')) return;
   OPS.busy=true; opsSetMsg(promote? '승격 중…':'동기화 중…');
-  try{ var r=await opsCall('gh_copy',{src:src, dst:dst}); opsSetMsg((promote? '승격 커밋 완료 — ':'동기화 커밋 완료 — ')+r.commit.slice(0,7)+' · '+r.files.length+'개 파일 · '+(r.note||''),'ok'); toast(promote? '스테이징 → 운영 승격':'운영 → 스테이징 동기화', r.files.length+'개 파일 · '+r.commit.slice(0,7)); OPS.hist=null; renderOps(true); }
+  /* ㊿+209 배포 뒤 확인용 — 승격 전 스테이징 · 운영 버전(못 읽으면 «운영 버전이 바뀌는지»만 봄) */
+  var expV='', prevV=''; if(promote){ try{ var rs=await fetchT(stagingUrl()+'?nocache='+Date.now(), {cache:'no-store'}, 12000, '스테이징', true); if(rs.ok) expV=opsVerOf(await rs.text())||''; }catch(e){} try{ var rp=await fetchT(prodUrl()+'?nocache='+Date.now(), {cache:'no-store'}, 12000, '운영 포탈', true); if(rp.ok) prevV=opsVerOf(await rp.text())||''; }catch(e){} }
+  try{ var r=await opsCall('gh_copy',{src:src, dst:dst}); opsSetMsg((promote? '승격 커밋 완료 — ':'동기화 커밋 완료 — ')+r.commit.slice(0,7)+' · '+r.files.length+'개 파일 · '+(r.note||''),'ok'); toast(promote? '스테이징 → 운영 승격':'운영 → 스테이징 동기화', r.files.length+'개 파일 · '+r.commit.slice(0,7)); OPS.hist=null; if(promote) dwStart(expV, prevV); renderOps(true); }   /* ㊿+209 배포 뒤 자동 확인 */
   catch(e){ opsSetMsg(String(e.message||e),'bad'); }
   OPS.busy=false;
 }
@@ -845,9 +849,138 @@ export function integHtml(){
   if(X.running && !X.rows.length) return h+tpl`<p class="mini" style="margin:0 0 14px">확인하는 중…</p>`;
   return h+tpl`<table class="rn-tbl integ-tbl" style="margin-bottom:14px"><tbody>${rawHtml(X.rows.map(function(r){ return tpl`<tr class="integ-${r.sev}" data-integ="${r.k}"><td class="integ-n">${r.name}</td><td>${rawHtml(ic[r.sev]||'')} ${r.info}${rawHtml(r.fix? tpl`<div class="mini">고칠 곳: ${r.fix}</div>` : '')}</td></tr>`; }).join(''))}</tbody></table>`;
 }
+/* ── ㊿+209 운영 감시(선택 · 기본 꺼짐 · SQL 123 · watch 함수) — 배포·운영 › 기록 맨 위
+   · 지금 점검(슈퍼 관리자 · Slack 안 보냄) · 설정(자동 15분 · Slack · 알림함 · 채널 · 기준값) · 마지막 결과 · 기록 20개
+   · SQL 123 전이면 안내만(아래 «시스템 점검»은 그대로) · 함수가 없으면 배포 안내 ── */
+export var WATCH={set:/** @type {any} */(null), logs:/** @type {?any[]} */(null), sqlOk:/** @type {?boolean} */(null), running:false, res:/** @type {any} */(null), msg:'', cls:'', loading:false};
+export function watchUrl(){ return SB_URL+'/functions/v1/watch'; }
+export async function watchCall(body, ms){
+  var r;
+  try{ r=await fetchT(watchUrl(), {method:'POST', headers:{'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+ST.SB_TOKEN}, body:JSON.stringify(body)}, ms||90000, 'watch 함수', true); }
+  catch(e){ if(/** @type {any} */(e).timeout) throw e; var x=/** @type {any} */(new Error('watch 함수에 연결하지 못했습니다 — Edge Functions 에 «watch» 를 배포하고 Verify JWT 를 끄세요')); x.nofn=true; throw x; }
+  if(r.status===404){ var y=/** @type {any} */(new Error('watch 함수가 없습니다 — Edge Functions 에 «watch» 를 배포하세요(Verify JWT 끔)')); y.nofn=true; throw y; }
+  var j=null; try{ j=await r.json(); }catch(e){}
+  if(!j) throw new Error('watch 함수 응답을 읽지 못했습니다 ('+r.status+')');
+  if(j.ok===false && j.error) throw new Error(j.error);
+  return j;
+}
+export async function watchLoadAll(){
+  if(WATCH.loading) return; WATCH.loading=true;
+  try{
+    var s=await ntfGet('watch_settings?select=*&id=eq.1');
+    if(s===null){ WATCH.sqlOk=false; WATCH.set=null; WATCH.logs=null; }
+    else { WATCH.sqlOk=true; WATCH.set=s[0]||null; WATCH.logs=(await ntfGet('watch_log?select=id,at,kind,by_email,worst,n_warn,n_bad,items,slack,app_ver,ms&order=at.desc&limit=20'))||[]; }
+  }finally{ WATCH.loading=false; }
+  if(ST.CUR_VIEW==='ops' && OPS.tab==='log') renderOps(true);
+}
+export var WATCH_SEV={ok:['정상','up'], warn:['주의','warn'], bad:['문제','bad'], skip:['건너뜀','mini']};
+export function watchSevHtml(s){ var x=WATCH_SEV[s]||[String(s||''),'mini']; return tpl`<span class="wt-sev wt-${rawHtml(s||'skip')}">${x[0]}</span>`; }
+export function watchKind(k){ return k==='cron'? '자동' : k==='deploy'? '배포 뒤 확인' : '지금 점검'; }
+export function watchWhen(at){ var d=new Date(at); if(isNaN(d.getTime())) return ''; var p=function(n){ return String(n).padStart(2,'0'); }; return (d.getMonth()+1)+'/'+d.getDate()+' '+p(d.getHours())+':'+p(d.getMinutes()); }
+export function watchSlackTxt(s){ if(!s) return '—'; if(s==='sent') return '보냄'; if(s==='same') return '같은 문제 — 안 보냄'; if(/^off/.test(s)) return '꺼짐'; return String(s).replace(/^fail: /,'실패: '); }
+export function opsWatchHtml(){
+  var W=WATCH, h=tpl`<div class="ops-h wt-h">운영 감시 <span class="ubadge sm">선택 · 기본 꺼짐</span>`;
+  if(W.sqlOk===null) return h+tpl`</div><p class="mini" style="margin:0 0 14px">불러오는 중…</p>`;
+  if(W.sqlOk===false) return h+tpl`</div><p class="mini" style="margin:0 0 14px">SQL 123 을 실행하면 켤 수 있습니다 — 15분마다 포탈 사이트 · 함수 · DB(야간 백업 · 오류 · 속도 · 자동 작업)를 점검하고, 원하면 문제가 생기거나 풀릴 때 Slack 으로 알립니다. 그 전에도 아래 «시스템 점검»은 됩니다.</p>`;
+  var S=W.set||{}, last=W.res || (W.logs||[])[0] || null;
+  h+=tpl`<button type="button" class="cbtn" id="wtRun"${rawHtml(W.running? ' disabled' : '')}>${W.running? '점검 중…' : '지금 점검'}</button>`;
+  if(S.slack_on) h+=tpl`<button type="button" class="cbtn" id="wtSlackTest" title="설정한 채널로 시험 한 줄">Slack 시험</button>`;
+  h+=tpl`<span class="mini" id="wtLast">${last? '마지막 '+watchWhen(last.at)+' '+watchKind(last.kind)+' · '+(last.worst==='ok'? '정상' : '문제 '+(+last.n_bad||0)+' · 주의 '+(+last.n_warn||0)) : '아직 점검 기록 없음'}</span></div>`;
+  if(W.msg) h+=tpl`<p class="mini wt-msg ${rawHtml(W.cls||'')}" role="status">${W.msg}</p>`;
+  h+=tpl`<fieldset class="wt-set"><legend>설정</legend>`+
+    tpl`<label><input type="checkbox" id="wtAuto"${rawHtml(S.auto_on? ' checked' : '')}> 자동 감시(15분마다)</label>`+
+    tpl`<label><input type="checkbox" id="wtSlackOn"${rawHtml(S.slack_on? ' checked' : '')}> Slack 알림(문제가 생기거나 풀릴 때)</label>`+
+    tpl`<label><input type="checkbox" id="wtInbox"${rawHtml(S.inbox_on!==false? ' checked' : '')}> 알림함에 표시</label>`+
+    tpl`<label class="wt-in">채널 ID <input id="wtCh" value="${S.channel||''}" placeholder="비우면 OPS_SLACK_CHANNEL → 알림 팀 채널" maxlength="24" autocomplete="off"></label>`+
+    tpl`<label class="wt-in">브라우저 오류 <input id="wtErr" type="number" min="1" max="100000" value="${String(S.err_24h||30)}">건/24시간 넘으면 주의</label>`+
+    tpl`<label class="wt-in">처음 열기 <input id="wtBoot" type="number" min="1" max="120" step="0.5" value="${String((S.boot_p90_ms||8000)/1000)}">초(느린 쪽 90%) 넘으면 주의</label>`+
+    tpl`<label class="wt-in">야간 백업 <input id="wtBackup" type="number" min="6" max="240" value="${String(S.backup_h||30)}">시간 넘으면 주의</label>`+
+    tpl`<label class="wt-in">같은 문제 Slack <input id="wtRepeat" type="number" min="1" max="168" value="${String(S.repeat_h||6)}">시간마다 한 번</label>`+
+    tpl`<div class="wt-act"><button type="button" class="cbtn pri" id="wtSave">설정 저장</button><span class="mini">Slack 은 관리자 › 설정 › «알림 · Slack»의 «Slack 사용»도 켜져 있어야 갑니다 · 자동 감시는 Edge Function «watch» 배포가 필요합니다</span></div></fieldset>`;
+  if(last && Array.isArray(last.items)) h+=tpl`<table class="rn-tbl wt-tbl"><caption class="mini">${watchKind(last.kind)} ${watchWhen(last.at)} 결과${last.slack? ' · Slack '+watchSlackTxt(last.slack) : ''}</caption><tbody>${rawHtml(last.items.map(function(i){ return tpl`<tr class="wt-r-${rawHtml(i.sev||'skip')}"><td class="wt-n">${String(i.name||i.k||'')}</td><td>${rawHtml(watchSevHtml(i.sev))}</td><td>${String(i.info||'')}</td></tr>`; }).join(''))}</tbody></table>`;
+  var L=W.logs||[];
+  if(L.length) h+=tpl`<details class="wt-hist"><summary>점검 기록 ${String(L.length)}개(30일 보관)</summary><table class="rn-tbl"><thead><tr><th>시각</th><th>종류</th><th>결과</th><th>Slack</th><th class="n">걸린 시간</th></tr></thead><tbody>${rawHtml(L.map(function(x){ return tpl`<tr><td>${watchWhen(x.at)}</td><td>${watchKind(x.kind)}${x.kind!=='cron' && x.by_email? ' · '+String(x.by_email).split('@')[0] : ''}</td><td>${rawHtml(watchSevHtml(x.worst))} ${x.worst==='ok'? '' : '문제 '+(+x.n_bad||0)+' · 주의 '+(+x.n_warn||0)}</td><td>${watchSlackTxt(x.slack)}</td><td class="n">${x.ms!=null? (x.ms/1000).toFixed(1)+'초' : ''}</td></tr>`; }).join(''))}</tbody></table></details>`;
+  return h;
+}
+export async function watchRun(){
+  if(WATCH.running) return; WATCH.running=true; WATCH.msg=''; renderOps(true);
+  try{ var j=await watchCall({mode:'run'}); WATCH.res=j; WATCH.msg=j.worst==='ok'? '정상입니다' : '문제 '+j.items.filter(function(i){ return i.sev==='bad'; }).length+' · 주의 '+j.items.filter(function(i){ return i.sev==='warn'; }).length+' — 아래 표 확인'; WATCH.cls=j.worst==='ok'? 'ok' : j.worst; }
+  catch(e){ WATCH.msg=String(/** @type {any} */(e).message||e); WATCH.cls='bad'; }
+  WATCH.running=false; WATCH.logs=null;
+  try{ await watchLoadAll(); }catch(e){} try{ await watchLoad(); ntfSync(); }catch(e){}
+  renderOps(true);
+}
+export async function watchSlackTest(){
+  try{ var j=await watchCall({mode:'slack_test'}, 30000); WATCH.msg=j.ok? 'Slack 시험을 보냈습니다('+j.channel+')' : 'Slack 시험 실패 — '+String(j.slack||''); WATCH.cls=j.ok? 'ok' : 'bad'; }
+  catch(e){ WATCH.msg=String(/** @type {any} */(e).message||e); WATCH.cls='bad'; }
+  renderOps(true);
+}
+export async function watchSave(){
+  var g=function(id){ return /** @type {any} */(document.getElementById(id)); }, S=WATCH.set||{};
+  var body={auto_on:!!g('wtAuto').checked, slack_on:!!g('wtSlackOn').checked, inbox_on:!!g('wtInbox').checked, channel:String(g('wtCh').value||'').trim()||null,
+    err_24h:Math.round(+g('wtErr').value), boot_p90_ms:Math.round(+g('wtBoot').value*1000), backup_h:Math.round(+g('wtBackup').value), repeat_h:Math.round(+g('wtRepeat').value)};
+  var bad=body.channel && !/^[CG][A-Z0-9]{6,20}$/.test(body.channel)? '채널 ID 는 C 또는 G 로 시작하는 Slack 채널 ID 입니다(예: C0123ABCD)'
+    : !(body.err_24h>=1 && body.err_24h<=100000)? '브라우저 오류 기준은 1~100000' : !(body.boot_p90_ms>=1000 && body.boot_p90_ms<=120000)? '처음 열기 기준은 1~120초'
+    : !(body.backup_h>=6 && body.backup_h<=240)? '야간 백업 기준은 6~240시간' : !(body.repeat_h>=1 && body.repeat_h<=168)? '같은 문제 Slack 은 1~168시간' : '';
+  if(bad){ WATCH.msg=bad; WATCH.cls='bad'; renderOps(true); return; }
+  var L={auto_on:'자동 감시', slack_on:'Slack 알림', inbox_on:'알림함 표시', channel:'채널', err_24h:'브라우저 오류 기준', boot_p90_ms:'처음 열기 기준(ms)', backup_h:'야간 백업 기준(시간)', repeat_h:'같은 문제 Slack(시간)'};
+  var ch=Object.keys(body).filter(function(k){ return String(body[k]==null? '' : body[k])!==String(S[k]==null? '' : S[k]); }).map(function(k){ var f=function(v){ return v===true? '켬' : v===false? '꺼짐' : v==null? '(없음)' : String(v); }; return '· '+L[k]+': '+f(S[k])+' → '+f(body[k]); });
+  if(!ch.length){ WATCH.msg='바뀐 것이 없습니다'; WATCH.cls=''; renderOps(true); return; }
+  if(!confirm('운영 감시 설정을 바꿉니다\n\n'+ch.join('\n')+(body.auto_on && !S.auto_on? '\n\n자동 감시를 켜면 15분마다 Edge Function «watch» 가 점검합니다(배포 · Verify JWT 끔 필요).' : '')+'\n\n저장할까요? (변경 이력에 남습니다)')) return;
+  try{ var out=await sbWrite('PATCH','watch_settings?id=eq.1', body, 'return=representation'); WATCH.set=(out && out[0]) || Object.assign({}, S, body); logChange('update','watch_settings',1,body); WATCH.msg='저장했습니다'; WATCH.cls='ok'; try{ await watchLoad(); ntfSync(); }catch(e){} }
+  catch(e){ WATCH.msg=String(/** @type {any} */(e).message||e); WATCH.cls='bad'; }
+  renderOps(true);
+}
+export function watchBind(host){
+  if(WATCH.sqlOk===null && !WATCH.loading) watchLoadAll();
+  var b=host.querySelector('#wtRun'); if(b) b.onclick=watchRun;
+  var t=host.querySelector('#wtSlackTest'); if(t) t.onclick=watchSlackTest;
+  var s=host.querySelector('#wtSave'); if(s) s.onclick=watchSave;
+}
+/* ── ㊿+209 배포 뒤 자동 확인 — 승격 커밋 뒤 운영 index 버전이 스테이징 버전이 될 때까지(20초마다 · 8분) 본 다음 watch {mode:'deploy'}
+   · watch 함수가 없으면 버전 확인만 · 8분 안에 안 바뀌면 Actions(시험) 실패 가능 안내 · 문제면 «운영 되돌리기» 안내(자동으로 되돌리지 않음) ── */
+export var DW={state:'', expect:'', prev:'', cur:'', t0:0, res:/** @type {any} */(null), msg:'', tm:0, first:15000, every:20000, max:8*60000};   /* first · every · max = 첫 확인 · 간격 · 최대(시험에서 줄임) */
+export function dwStart(expect, prev){
+  clearTimeout(DW.tm); DW.state='wait'; DW.expect=expect||''; DW.prev=prev||''; DW.cur=''; DW.t0=Date.now(); DW.res=null; DW.msg='';
+  dwPaint(); DW.tm=setTimeout(dwTick, DW.first);
+}
+export async function dwTick(){
+  if(DW.state!=='wait') return;
+  var ver=null; try{ var r=await fetchT(prodUrl()+'?nocache='+Date.now(), {cache:'no-store'}, 15000, '운영 포탈', true); if(r.ok) ver=opsVerOf(await r.text()); }catch(e){}
+  DW.cur=ver||'';
+  var hit=!!ver && (DW.expect? ver===DW.expect : (!!DW.prev && ver!==DW.prev));
+  if(hit){
+    DW.state='check'; dwPaint();
+    try{ var j=await watchCall({mode:'deploy', expect:ver}, 120000); DW.res=j; DW.state=j.worst==='bad'? 'bad' : 'ok'; }
+    catch(e){ DW.state=/** @type {any} */(e).nofn? 'nofn' : 'err'; DW.msg=String(/** @type {any} */(e).message||e); }
+    dwPaint();
+    toast(DW.state==='bad'? '배포 뒤 확인 — 문제 있음' : DW.state==='err'? '배포 뒤 확인 — 점검 실패' : '배포 뒤 확인 — 운영 반영됨', DW.state==='bad'? '배포·운영 › GitHub 에서 결과 · «운영 되돌리기»를 확인하세요' : '운영 '+ver, DW.state==='bad'? 'warn' : 'info');
+    return;
+  }
+  if(Date.now()-DW.t0>DW.max){ DW.state='timeout'; dwPaint(); toast('배포 뒤 확인 — 운영 버전이 안 바뀜', '8분 안에 운영 포탈이 '+(DW.expect||'새 버전')+'이 되지 않았습니다 — GitHub Actions 를 확인하세요', 'warn'); return; }
+  dwPaint(); DW.tm=setTimeout(dwTick, DW.every);
+}
+export function dwHtml(){
+  if(!DW.state) return '';
+  var sec=Math.round((Date.now()-DW.t0)/1000), R=DW.res, bad=R? (R.items||[]).filter(function(i){ return i.sev==='bad'; }) : [], warn=R? (R.items||[]).filter(function(i){ return i.sev==='warn'; }) : [];
+  var t= DW.state==='wait'? '⏳ 운영 반영 확인 중 — 기대 '+(DW.expect||'새 버전')+' · 지금 운영 '+(DW.cur||'?')+' · '+sec+'초(20초마다 · 8분까지)'
+    : DW.state==='check'? '🔎 운영 버전 확인됨 — 사이트 · 함수 · DB 점검 중…'
+    : DW.state==='ok'? '✅ 배포 뒤 확인 — 운영 '+(DW.cur||'')+' · 점검 정상'+(warn.length? '(주의 '+warn.length+': '+warn.map(function(i){ return i.name; }).slice(0,3).join(' · ')+')' : '')
+    : DW.state==='bad'? '❌ 배포 뒤 확인 — 문제 '+bad.length+(warn.length? ' · 주의 '+warn.length : '')+': '+bad.map(function(i){ return i.name+' '+i.info; }).slice(0,3).join(' / ')+' — 운영에서 문제가 보이면 아래 «운영 되돌리기»'
+    : DW.state==='nofn'? '✅ 운영 '+(DW.cur||'')+' 반영 확인 — watch 함수가 없어 함수 · DB 점검은 건너뜀(SQL 123 · watch 배포 뒤부터 자동)'
+    : DW.state==='timeout'? '⚠ 8분 안에 운영 버전이 '+(DW.expect||'새 버전')+'이 되지 않았습니다(지금 '+(DW.cur||'?')+') — GitHub › Actions(시험) 실패일 수 있음 · 확인 뒤 다시 승격하거나 «운영 되돌리기»'
+    : '⚠ 배포 뒤 점검 실패 — '+DW.msg;
+  return tpl`<div class="wt-dw wt-dw-${rawHtml(DW.state)}" id="opsDw" role="status"><span>${t}</span>${rawHtml(/^(ok|bad|nofn|timeout|err)$/.test(DW.state)? closeBtn({'data-dw-close':'1'},'이 안내 닫기','✕') : '')}</div>`;
+}
+export function dwPaint(){
+  var el=document.getElementById('opsDw'), html=dwHtml();
+  if(el){ if(html) el.outerHTML=html; else el.remove(); }
+  else if(html && ST.CUR_VIEW==='ops' && OPS.tab==='gh'){ var host=document.getElementById('opsDwHost'); if(host) host.innerHTML=html; }
+  var c=document.querySelector('[data-dw-close]'); if(c) /** @type {any} */(c).onclick=function(){ DW.state=''; dwPaint(); };
+}
 export function opsLogHtml(){
   var st=OPS.st, L=(st&&st.ok&&st.recent)||[], H=OPS.health, E=OPS.errs;
-  var h=tpl`<div class="ops-h" style="display:flex;align-items:center;gap:10px">시스템 점검 <button type="button" class="cbtn" id="opsHealth"${H&&H.running? ' disabled':''}>${H&&H.running? '점검 중…':'지금 점검'}</button>${rawHtml(H&&H.at? tpl`<span class="mini">${H.at.toLocaleTimeString('ko-KR')}</span>`:'')}${H&&!H.running&&H.rows.length? closeBtn({'data-ops-close':'health'},'점검 결과 닫기'):''}</div>`;
+  var h=opsWatchHtml()+tpl`<div class="ops-h" style="display:flex;align-items:center;gap:10px">시스템 점검 <button type="button" class="cbtn" id="opsHealth"${H&&H.running? ' disabled':''}>${H&&H.running? '점검 중…':'지금 점검'}</button>${rawHtml(H&&H.at? tpl`<span class="mini">${H.at.toLocaleTimeString('ko-KR')}</span>`:'')}${H&&!H.running&&H.rows.length? closeBtn({'data-ops-close':'health'},'점검 결과 닫기'):''}</div>`;
   if(H && H.rows.length) h+=tpl`<table class="rn-tbl" style="margin-bottom:14px"><tbody>${rawHtml(H.rows.map(function(r){ return tpl`<tr><td style="width:240px">${r.name}</td><td>${rawHtml(r.ok? '<span class="up">✓</span>':'<span style="color:var(--critical)">✗</span>')} ${r.info}</td><td class="n mini">${rawHtml(r.ms)}ms</td></tr>`; }).join(''))}</tbody></table>`;
   else h+='<p class="mini" style="margin:0 0 14px">Pages 최신 버전 · Supabase REST · AI · remind · ops · (PIN 있으면) 운영 DB · 서비스 워커를 순서대로 확인합니다.</p>';
   h+=integHtml();
@@ -876,6 +1009,7 @@ export function opsTgtHtml(t){
 }
 export function opsLogBind(host){
   aiCheckBind(host);
+  watchBind(host);   /* ㊿+209 운영 감시 */
   var hb=host.querySelector('#opsHealth'); if(hb) hb.onclick=opsHealth;
   var ib=host.querySelector('#opsInteg'); if(ib) ib.onclick=opsIntegrations;
   var eb=host.querySelector('#opsErrs'); if(eb) eb.onclick=opsLoadErrors;
@@ -1323,7 +1457,7 @@ export var ROLE_INFO={
   admin:        ['관리자','모든 화면을 조회하고 수정할 수 있습니다 (계약·장비·OI·주간회의 메모 등). 계정 관리와 변경 이력은 슈퍼 관리자 전용입니다.'],
   admin_viewer: ['관리자 — 조회 전용','모든 화면을 볼 수 있지만 어떤 데이터도 수정할 수 없습니다.'],
   poc:          ['PoC 전용','PoC 신청·운영 현황과 주간회의만 사용할 수 있고, 매출 데이터에는 접근할 수 없습니다.'],
-  equipment_poc:['장비·PoC 전용','임대 장비(신청·내역·현황), PoC, 주간회의만 사용할 수 있고 매출 데이터에는 접근할 수 없습니다.'],
+  equipment_poc:['장비·PoC 전용','Cloud NAC 발주(신청·내역) · 임대 장비 현황, MDR PoC · 발주, 주간회의만 사용할 수 있고 매출 데이터에는 접근할 수 없습니다.'],
   /* (구) 역할 — 46단계 실행 전 임시 표시용 */
   editor:    ['(구) 편집자','admin 으로 통합 예정입니다.'],
   viewer:    ['(구) 조회 전용','admin_viewer 로 통합 예정입니다.'],
@@ -1815,7 +1949,7 @@ export function qaCopy(){
 export var API={keys:null, log:null, made:null, err:'', busy:false};
 export var API_SCOPES=[['contracts','계약','고객사 · 서비스 · 구분 · 상태 · 기간 · MRR · 노드 (비고·연장 이력 제외)'],['revenue','월 매출','계약별 월 금액(원)'],['customers','고객사','id · 이름(옵션) · 산업군'],['mrr','월 매출 합계','월별 · 서비스별 합계(포탈 «월 MRR»과 같은 원천)'],
   ['poc','MDR PoC·운영','고객사 · 서비스유형 · 상태(신청~데모 = PoC · 구독 · 종료) · 계약수량 · 설치 수 · 라이선스 · 모듈 · 시작일 (고객 담당자·연락처·진행 메모 제외)'],
-  ['orders','장비 신청','신청일 · 유형 · 고객사 · 모델 · 수량 · 상태 · 시리얼 · 회수 (수령인·연락처·주소·요청사항 제외)'],
+  ['orders','Cloud NAC 발주','신청일 · 유형 · 고객사 · 모델 · 수량 · 상태 · 시리얼 · 회수 (수령인·연락처·주소·요청사항 제외)'],
   ['assets','장비 현황','시리얼 · 모델 · 구분 · 상태 · 고객사 · 출고·회수일 (비고 제외)']];
 export function apiBase(){ return SB_URL+'/functions/v1/export'; }
 export function apiScopeLabel(s){ var x=API_SCOPES.filter(function(a){ return a[0]===s; })[0]; return x? x[1] : s; }
@@ -1850,7 +1984,7 @@ export var API_DS={
   poc:{t:'MDR PoC·운영', use:'MDR 신청 ~ PoC ~ 구독 진행 현황', row:'신청 1건 = 1줄', opt:['since','pstatus'],
     f:[['id · apply_date','번호 · 신청일','58 · 2026-09-02'],['svc_type','서비스 유형','CLOUD'],['customer','고객사명','가상고객07'],['status','상태','신청 · 대기 · 진행중 · 데모 · 구독 · 종료'],['license','라이선스','EDR+AV'],
       ['plan_qty · agents_total','계약 수량 · 설치 수','300 · 274'],['mod_edr · mod_av …','모듈(EDR · 백신 · 랜섬웨어 · 매체제어)','true'],['start_date · end_date','시작 · 종료일','2026-09-15 · —'],['sales_name','영업 담당','홍길동']]},
-  orders:{t:'장비 신청', use:'임대 장비 출고 · 회수 진행', row:'신청 1건 = 1줄', opt:['since','ostatus'],
+  orders:{t:'Cloud NAC 발주', use:'Cloud NAC 발주 — 임대 장비 출고 · 회수 진행', row:'신청 1건 = 1줄', opt:['since','ostatus'],
     f:[['id · created_at','신청 번호 · 신청 시각','412 · 2026-10-02T10:20:00+09:00'],['order_type','유형','신규발주 · 추가 · 교체 · 철거·회수'],['customer','고객사명','가상고객03'],['model · qty','모델 · 수량','S10_R2 · 2'],
       ['status','상태','접수 · 출하요청 · 배송중 · 설치완료 · 회수예정 · 회수완료 · 취소'],['install_date · ship_date','설치희망일 · 출고일','2026-10-10 · 2026-10-07'],['serials','시리얼','S7DE00000AA'],['returned_date · returned_serials','회수일 · 회수 시리얼','—']]},
   assets:{t:'장비 현황', use:'시리얼별 재고 · 임대 · 회수(회계 재고 파악)', row:'장비 1대 = 1줄', opt:['since','astatus'],

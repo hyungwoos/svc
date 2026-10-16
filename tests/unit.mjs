@@ -195,3 +195,56 @@ test('계약 상태 묶기 · 색 바탕 글자색', () => {
   assert.equal(dash.statusOf({ status: '신규' }), '신규'); assert.equal(dash.statusOf({}), '기타'); assert.equal(dash.statusOf({ status: '보류' }), '보류');
   assert.equal(dash.inkOn('#ffff00'), '#111'); assert.equal(dash.inkOn('#1e3a8a'), '#fff'); assert.equal(dash.inkOn('rgb(255, 255, 255)'), '#111'); assert.equal(dash.inkOn('var(--x)'), '#fff');
 });
+
+test('데이터 점검 «비슷한 이름»(㊿+205): 후보 쌍만 보는 새 방식 = 예전 이중 반복과 같은 판정 · 순서 · 300건 규칙 (가짜 이름 무작위 2,000개 × 6벌)', () => {
+  /* 예전 방식 그대로(㊿+179) — 같은 판정을 쌍 목록으로 */
+  const old = (S) => { const res = [], seen = {}; const add = (a, b, why) => { if (a.k === b.k) return; const id = a.i + '-' + b.i; if (seen[id]) return; seen[id] = 1; res.push(id + ':' + why); };
+    for (let i = 0; i < S.length && res.length < 300; i++) { const a = S[i]; if (a.k.length < 4) continue;
+      for (let j = i + 1; j < S.length; j++) { const b = S[j], d = b.k.length - a.k.length; if (d > 4) break;
+        if (d <= 1 && ana.dcLev1(a.k, b.k)) { let p0 = 0; while (p0 < a.k.length && a.k[p0] === b.k[p0]) p0++; if (a.k.length >= 5 && p0 >= 2 && !/\d/.test((a.k[p0] || '') + (b.k[p0] || ''))) add(a, b, '한'); }
+        else if (d >= 1 && b.k.indexOf(a.k) === 0 && !/^\d+$/.test(b.k.slice(a.k.length))) add(a, b, '앞' + d); } }
+    return res; };
+  const neu = (S) => { const res = [], seen = {}; const add = (a, b, why) => { if (a.k === b.k) return; const id = a.i + '-' + b.i; if (seen[id]) return; seen[id] = 1; res.push(id + ':' + why); };
+    const P = ana.dcSimPairs(S.map((x) => x.k)); let last = -1;
+    for (const [i, j] of P) { if (i !== last) { if (res.length >= 300) break; last = i; } const a = S[i], b = S[j], d = b.k.length - a.k.length;
+      if (d <= 1 && ana.dcLev1(a.k, b.k)) { let p0 = 0; while (p0 < a.k.length && a.k[p0] === b.k[p0]) p0++; if (a.k.length >= 5 && p0 >= 2 && !/\d/.test((a.k[p0] || '') + (b.k[p0] || ''))) add(a, b, '한'); }
+      else if (d >= 1 && b.k.indexOf(a.k) === 0 && !/^\d+$/.test(b.k.slice(a.k.length))) add(a, b, '앞' + d); }
+    return res; };
+  let seed = 7; const rnd = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
+  const AB = ['가', '상', '고', '객', '정', '보', '1', '2', '산', '업'];
+  for (let run = 0; run < 6; run++) {
+    const keys = []; for (let n = 0; n < 2000; n++) { if (keys.length && rnd() < 0.35) { const b = keys[Math.floor(rnd() * keys.length)], m = rnd(), p = Math.floor(rnd() * (b.length + 1)), c = AB[Math.floor(rnd() * AB.length)];
+        keys.push(m < 0.33 ? b.slice(0, p) + c + b.slice(p) : m < 0.66 ? b.slice(0, p) + b.slice(p + 1) : b + AB.slice(0, 1 + Math.floor(rnd() * 4)).join('')); }
+      else { let s = ''; const L = 2 + Math.floor(rnd() * 8); for (let q = 0; q < L; q++) s += AB[Math.floor(rnd() * (run % 2 ? 4 : AB.length))]; keys.push(s); } }
+    const S = keys.filter((k) => k.length >= 2).map((k, i) => ({ k, i })).sort((p, q) => p.k.length - q.k.length);
+    const A = old(S), B = neu(S);
+    assert.deepEqual(B, A, 'run ' + run + ' 예전 ' + A.length + '건 · 새 ' + B.length + '건');
+    assert.ok(A.length > 20, 'run ' + run + ' 쌍이 너무 적음 ' + A.length);
+  }
+});
+
+test('데이터 점검 «비슷한 이름» 속도(㊿+205): 가짜 이름 6,000개도 1.5초 안 (예전 방식은 고객사 수의 제곱)', () => {
+  let seed = 11; const rnd = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
+  const AB = '가나다라마바사아자차카타파하고객정보산업'.split('');
+  const K = []; for (let n = 0; n < 6000; n++) { let s = ''; const L = 4 + Math.floor(rnd() * 8); for (let q = 0; q < L; q++) s += AB[Math.floor(rnd() * AB.length)]; K.push(s); }
+  K.sort((a, b) => a.length - b.length);
+  const t0 = Date.now(); const P = ana.dcSimPairs(K); const ms = Date.now() - t0;
+  assert.ok(ms < 1500, ms + 'ms'); assert.ok(Array.isArray(P));
+});
+
+
+test('사용 설명서 내용 · 찾기(㊿+206 · ㊿+208 묶음 9): id 겹침 없음 · 묶음 9 · 운영자 매뉴얼 = 슈퍼 관리자만 · 조사 붙은 낱말도 찾음 · AI 용 글은 사용법 질문에만 · 1,800자 안 · 비밀값 모양 없음', async () => {
+  const H = await import('../js/helpdata.js');
+  const ids = H.HELP.map((h) => h.id); assert.equal(new Set(ids).size, ids.length, '겹친 id');
+  assert.equal(H.HELP_GROUPS.length, 9);   /* ㊿+208 «발주» 묶음 */ H.HELP_GROUPS.forEach((g) => assert.ok(H.HELP.some((h) => h.g === g[0]), '빈 묶음 ' + g[0]));
+  H.HELP.forEach((h) => { assert.ok(h.t && h.what && H.HELP_GROUPS.some((g) => g[0] === h.g), 'item ' + h.id); (h.tasks || []).forEach((x) => assert.ok(x.t && x.s.length && x.s.every((s) => typeof s === 'string' && s.length > 3), 'steps ' + h.id));
+    (h.see || []).forEach((x) => assert.ok(ids.includes(x), h.id + ' → ' + x)); if (h.g === 'ops') assert.equal(h.role, 'super', 'ops ' + h.id); });
+  assert.deepEqual(H.helpStems('계약은'), ['계약은', '계약']); assert.deepEqual(H.helpWords('만기 계약은 어떻게 처리해?'), ['만기', '계약은', '처리해']);
+  const top = (q) => H.helpSearchIn(H.HELP, q).slice(0, 3).map((h) => h.id);
+  assert.equal(top('롤백')[0], 'op-rollback'); assert.ok(top('시리얼').includes('assets')); assert.ok(top('2단계 인증은 어디서 켜요').includes('account'));
+  assert.ok(top('철거비 정산').includes('s1')); assert.ok(top('최소제안가').includes('quote')); assert.deepEqual(top('어떻게 해?'), []);
+  const a = H.helpForQIn(H.HELP, '2단계 인증 어떻게 켜?'); assert.ok(a && /\[내 계정\]/.test(a) && a.length <= 1800, a);
+  assert.equal(H.helpForQIn(H.HELP, '이번 달 MRR 얼마야?'), null); assert.equal(H.helpForQIn(H.HELP, '가상고객 계약 몇 건이야?'), null);
+  assert.ok(/\[운영 되돌리기\]/.test(H.helpForQIn(H.HELP, '승격 뒤에 문제 생기면 롤백 어떻게 해?') || ''));
+  const all = H.HELP.map(H.helpText).join('\n'); assert.ok(!/(sb_secret_|sbp_[0-9a-f]{8}|xox[bpa]-\d|ghp_[A-Za-z0-9]{10}|sk-or-v1|eyJhbGciOi)/.test(all), '비밀값 모양'); assert.ok(all.length < 40000, '길이 ' + all.length);
+});

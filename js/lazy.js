@@ -9,7 +9,8 @@ import { logClientError } from './core.js';
 var LOAD={
   report:function(){ return import('./report.js'); },
   admin:function(){ return import('./admin.js'); },
-  price:function(){ return import('./price.js'); }
+  price:function(){ return import('./price.js'); },
+  help:function(){ return import('./help.js'); }   /* ㊿+206 사용 설명서 · 운영자 매뉴얼 */
 };
 var MOD={}, WAIT={}, HOOKS=[], TRY={};
 /* 다시 시도 — 브라우저는 한 번 실패한 모듈 주소를 기억해 같은 주소로는 다시 받지 않음 → 주소 끝에 &retry=N (importmap 이 붙인 ?v= 는 그대로) */

@@ -461,11 +461,15 @@ export function pwRule(p, email, old){
   return '';
 }
 export function pwGen(n){
-  var A='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz', D='23456789', all=A+D, out='', u=new Uint32Array(n||14);
-  try{ crypto.getRandomValues(u); }catch(e){ for(var k=0;k<u.length;k++) u[k]=Math.floor(Math.random()*4294967295); }
-  for(var i=0;i<u.length;i++) out+=all[u[i]%all.length];
-  if(!/\d/.test(out)) out=out.slice(0,-1)+D[u[0]%D.length];
-  if(!/[A-Za-z]/.test(out)) out=A[u[1]%A.length]+out.slice(1);
+  var A='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz', D='23456789', all=A+D, out='';
+  /* ㊿+209 드물게(약 1/1000) «흔한 비밀번호»(qwer · asdf …)로 시작하는 값이 나와 pwRule 이 거절하던 것 — 그러면 다시 만듦 */
+  for(var t=0; t<20 && (!out || /^(password|qwer|asdf|genians|1q2w3e)/i.test(out)); t++){
+    var u=new Uint32Array(n||14); out='';
+    try{ crypto.getRandomValues(u); }catch(e){ for(var k=0;k<u.length;k++) u[k]=Math.floor(Math.random()*4294967295); }
+    for(var i=0;i<u.length;i++) out+=all[u[i]%all.length];
+    if(!/\d/.test(out)) out=out.slice(0,-1)+D[u[0]%D.length];
+    if(!/[A-Za-z]/.test(out)) out=A[u[1]%A.length]+out.slice(1);
+  }
   return out;
 }
 export var LF_KEY='svc_lf', LF_MAX=5;
@@ -777,6 +781,8 @@ export function wrapNavIcons(){
   });
 }
 export function navText(b){   // 메뉴 글자만 (심플 디자인에서는 이모지 제외)
+  /* ㊿+209 메뉴 버튼 안 숫자 배지(리포트 «슬라이드에 담은 항목» .rpb-cnt · 묶음 .rb · .gn-bd)는 이름이 아님 — 위 메뉴에 «리포트1»처럼 붙던 것 */
+  if(b.querySelector && b.querySelector('.rpb-cnt,.rb,.gn-bd')){ var c=/** @type {any} */(b.cloneNode(true)); c.querySelectorAll('.rpb-cnt,.rb,.gn-bd').forEach(function(/** @type {any} */ x){ x.remove(); }); b=c; }
   var t=(b.textContent||'').trim(), ic=b.querySelector('.ic');
   if(ic && document.documentElement.getAttribute('data-look')!=='classic') t=t.replace(ic.textContent,'').trim();
   return t;

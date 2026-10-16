@@ -903,8 +903,8 @@
         "tags": [
           "자료"
         ],
-        "summary": "장비 신청 — 임대 장비 출고 · 회수 신청",
-        "description": "임대 장비 출고 · 회수 진행. 수령인 · 연락처 · 주소 · 요청사항은 나가지 않습니다. (신청 1건 = 1줄)",
+        "summary": "Cloud NAC 발주 — Cloud NAC 발주 — 임대 장비 출고 · 회수",
+        "description": "Cloud NAC 발주(에스원 · 조달 · LG U+) — 임대 장비 출고 · 회수 진행. 수령인 · 연락처 · 주소 · 요청사항은 나가지 않습니다. (신청 1건 = 1줄)",
         "parameters": [
           {
             "name": "status",

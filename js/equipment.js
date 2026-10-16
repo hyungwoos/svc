@@ -459,14 +459,14 @@ export function renderEqPanel(){
   var h;
   if(gn){
     h=tpl`<details class="card eq-chk${bad?' bad':' ok'}" id="eqChk"${rawHtml(needOpen? ' open':'')}><summary><b>${bad? '⚠ 신청 ↔ 현황 맞지 않음 '+s.gap.length+'건' : '✓ 신청 ↔ 현황 일치'}</b> ${rawHtml(stat)}<span class="mini eq-chk-more">자세히</span></summary><div class="eq-chk-body"><div class="eq-chk-act">${rawHtml(btns)}<span class="mini" id="eqMsg" style="color:var(--muted)"></span></div>`+   /* 버튼은 요약 줄이 아니라 본문 첫 줄(요약 안 버튼은 접근성 위반) */
-      tpl`<div class="mini" style="margin-top:4px;color:var(--muted)">기준은 «임대 장비 신청 내역» 입니다 — 취소를 뺀 모든 신청이 현황에 «수량»대씩 있어야 하고, 상태·고객사·모델·채널은 신청 내역 값으로 맞춥니다 (출고 전이면 재고)`+ tpl`${u? ' · 마지막 일괄 작업은 «↩ 원복» 으로 되돌릴 수 있습니다':''}</div>`;
+      tpl`<div class="mini" style="margin-top:4px;color:var(--muted)">기준은 «Cloud NAC 발주 내역» 입니다 — 취소를 뺀 모든 신청이 현황에 «수량»대씩 있어야 하고, 상태·고객사·모델·채널은 신청 내역 값으로 맞춥니다 (출고 전이면 재고)`+ tpl`${u? ' · 마지막 일괄 작업은 «↩ 원복» 으로 되돌릴 수 있습니다':''}</div>`;
   } else {
     h=tpl`<div class="card" style="padding:11px 14px;margin-bottom:10px;border-left:4px solid `+ tpl`${bad?'var(--warning,#fab219)':'var(--good,#0ca30c)'}">`+
     tpl`<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">`+
       tpl`<b style="font-size:14px">신청 ↔ 현황 대조</b>`+stat+btns+
       tpl`<span class="mini" id="eqMsg" style="color:var(--muted)"></span>`+
     tpl`</div>`+
-    tpl`<div class="mini" style="margin-top:4px;color:var(--muted)">기준은 «임대 장비 신청 내역» 입니다 — 취소를 뺀 모든 신청이 현황에 «수량»대씩 있어야 하고, 상태·고객사·모델·채널은 신청 내역 값으로 맞춥니다 (출고 전이면 재고)`+ tpl`${u? ' · 마지막 일괄 작업은 «↩ 원복» 으로 되돌릴 수 있습니다':''}</div>`;
+    tpl`<div class="mini" style="margin-top:4px;color:var(--muted)">기준은 «Cloud NAC 발주 내역» 입니다 — 취소를 뺀 모든 신청이 현황에 «수량»대씩 있어야 하고, 상태·고객사·모델·채널은 신청 내역 값으로 맞춥니다 (출고 전이면 재고)`+ tpl`${u? ' · 마지막 일괄 작업은 «↩ 원복» 으로 되돌릴 수 있습니다':''}</div>`;
   }
   if(bad){
     h+=tpl`<div class="mini" style="margin-top:8px;color:var(--ink-2);line-height:1.7">`+

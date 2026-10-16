@@ -33,7 +33,7 @@ export function rpMonthData(j){
   for(var jj=Math.max(0,j-mon+1); jj<=j; jj++){ if(mk(jj).slice(0,4)===String(year)) for(var i2=0;i2<ST.MAT.length;i2++) ytd+=ST.MAT[i2][jj]; }
   var mtg=0; (ST.RAWX.mtargets||[]).forEach(function(t){ if(+t.year===year&&+t.month===mon) mtg=Number(t.amount)||0; });
   var ytg=0; (ST.RAWX.targets||[]).forEach(function(t){ if(+t.year===year) ytg=Number(t.amount)||0; });
-  var poc=(ST.RAWX.mdrops||[]).filter(function(x){ return String(x.apply_date||'').slice(0,7)===ym; });
+  var poc=(ST.RAWX.mdrops||[]).filter(function(x){ return String(x.apply_date||'').slice(0,7)===ym && x.req_kind!=='order'; });   /* ㊿+210 «신규 PoC 신청»에 정식 발주는 빼고(㊿+207 부터 같은 표) */
   var inb=(ST.RAWX.inbound||[]).filter(function(x){ return String(x.on_date||'').slice(0,7)===ym; });
   var inbWon=inb.filter(function(x){ return /수주/.test(x.result||''); });
   var oiOp=(ST.RAWX.oi||[]).filter(oiOpen);   /* ㊿+178 진행 중 OI = 포탈 공통 기준(grid.js oiOpen) */
@@ -106,7 +106,7 @@ export function rpMdrData(j){
     return out;
   }
   var cur=yearNew(year), prv=yearNew(year-1);
-  var poc=(ST.RAWX.mdrops||[]).filter(function(x){ return ['신청','대기','진행중','데모'].indexOf(x.status||'')>=0; });
+  var poc=(ST.RAWX.mdrops||[]).filter(function(x){ return ['신청','대기','진행중','데모'].indexOf(x.status||'')>=0 && x.req_kind!=='order'; });
   var pocEp=0; poc.forEach(function(x){ pocEp+=Number(x.plan_qty)||0; });
   var actN=Object.keys(act).length, addN=Object.keys(actAdd).length;
   var lines=['총 '+actN+'개 고객사 확보 (MDR '+(actN-addN)+'개사, Add-on '+addN+'개사)'+(ep?' · '+ep.toLocaleString('ko-KR')+'개 엔드포인트 관리 중':'')];
@@ -529,7 +529,7 @@ export function qbSources(){
     live:{ label:'LIVE 고객사 (계약 기준)', icon:'🟢', key:null, rows:function(){ try{ return liveCalc().rows||[]; }catch(e){ return []; } },
       cols:[{k:'cust',l:'고객사',t:'text'},{k:'ind',l:'산업군',t:'text'},{k:'line',l:'서비스',t:'text',fmt:function(v){ return lline(v); }},{k:'channel',l:'판매 채널',t:'text'},{k:'partner',l:'파트너',t:'text'},
             {k:'nodes',l:'노드',t:'num'},{k:'start',l:'최초 개시월',t:'month'},{k:'curStart',l:'현행 시작월',t:'month'},{k:'end',l:'현행 종료월',t:'month'},{k:'csm',l:'CSM(사이트명)',t:'text'},{k:'status',l:'상태',t:'text'},{k:'ctId',l:'현행 계약 번호',t:'num'},{k:'n',l:'유효 계약 수',t:'num'}] },
-    orders:{ label:'임대 장비 신청', icon:'📦', key:'id', rows:function(){ return ST.RAWX.orders||[]; },
+    orders:{ label:'Cloud NAC 발주', icon:'📦', key:'id', rows:function(){ return ST.RAWX.orders||[]; },
       cols:[{k:'id',l:'신청 번호',t:'num'}].concat(qbColsFromGrid('orders',['returned_serials']), [{k:'serials',l:'시리얼',t:'text'},{k:'_nret',l:'회수 시리얼 수',t:'num',get:function(r){ try{ return eqRetSet(r).length; }catch(e){ return 0; } }}]) },
     assets:{ label:'장비 현황 (시리얼)', icon:'🔩', key:'serial', rows:function(){ return ST.RAWX.assets||[]; },
       cols:[{k:'id',l:'현황 번호',t:'num'}].concat(qbColsFromGrid('assets',['_ostat','order_id']), [{k:'order_id',l:'신청 번호',t:'num'}]) },
