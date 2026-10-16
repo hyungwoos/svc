@@ -735,6 +735,28 @@ if (S.blk()) {
   });
   await ctx.close();
 }
+// ㊿+204 시작이 멈추지 않음 — 로그인 연장 요청이 응답 없이 멈추면 15초 뒤 이유 + 새로고침(로그인은 남김) · 단계 글 · 걸린 초 · 20초 안내 줄(CSS) / 연장 거부면 예전처럼 로그인 화면
+if (S.blk()) {
+  await S.t('㊿+204 시작 멈춤: 저장된 로그인이 만료돼 연장 요청이 응답 없음 → «로그인 확인 중… (n초)» → 15초 뒤 «로그인을 확인하지 못했습니다» + 새로고침 링크 · 로그인은 그대로 · 20초 안내 줄(CSS · 첫 화면 HTML 에도) / 연장 거부(400)면 로그인 화면', async () => {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page);
+    let mode = 'hang', hits = 0;
+    await mockBackend(page, { extra: async (route, u) => { if (!/\/auth\/v1\/token\?grant_type=refresh_token/.test(u)) return false; hits++;
+      if (mode === 'hang') return true;   /* 응답하지 않음 — 멈춘 연결 흉내 */
+      await route.fulfill({ status: 400, contentType: 'application/json', body: '{"error":"invalid_grant"}' }); return true; } });
+    await page.addInitScript(() => { try { sessionStorage.setItem('svc_sess', JSON.stringify({ a: 'oldtok', r: 'rtok', e: Math.floor(Date.now() / 1000) - 60, u: 'tester@example.com', p: true, l: Date.now() })); } catch (e) { /* noop */ } });
+    await page.goto(url + '/index.html'); await page.waitForTimeout(9500);
+    const w = await page.evaluate(() => { const s = document.querySelector('#loading .ld-slow'), cs = s && getComputedStyle(s); return { txt: document.getElementById('loading').innerText, slow: cs ? { anim: cs.animationName, delay: cs.animationDelay, vis: cs.visibility } : null }; });
+    await page.waitForSelector('#loading .err', { timeout: 12000 });
+    const e = await page.evaluate(() => { const r = document.querySelector('#loading .err'), a = r.querySelector('a'); return { h: r.querySelector('h2').textContent, t: r.textContent, a: a ? a.getAttribute('href') : null, sess: !!sessionStorage.getItem('svc_sess'), login: !document.getElementById('viewLogin').classList.contains('hidden') }; });
+    mode = 'deny'; await page.goto(url + '/index.html'); await page.waitForTimeout(2500);
+    const d = await page.evaluate(() => ({ login: !document.getElementById('viewLogin').classList.contains('hidden'), sess: !!sessionStorage.getItem('svc_sess') }));
+    const st = /<div id="loading" class="loading">[\s\S]*?class="ld-slow"[\s\S]*?<a href="">새로고침<\/a>/.test(fs.readFileSync(path.join(DIR, 'index.html'), 'utf8'));
+    await ctx.close();
+    assert(/로그인 확인 중…/.test(w.txt) && /\(\d+초\)/.test(w.txt) && w.slow && w.slow.anim === 'ldSlow' && w.slow.delay === '20s' && w.slow.vis === 'hidden'
+      && e.h === '로그인을 확인하지 못했습니다' && /15초/.test(e.t) && /로그인은 그대로 남아/.test(e.t) && e.a === '' && e.sess && !e.login && d.login && !d.sess && hits >= 2 && st && !c.errs.length, JSON.stringify({ w, e: { h: e.h, t: e.t.slice(0, 160), a: e.a, sess: e.sess, login: e.login }, d, hits, st, errs: c.errs }));
+    return '멈춤 → 15초 뒤 이유 + 새로고침 · 로그인 유지 · 거부면 로그인 화면';
+  });
+}
 // ㊿+142 디자인 정리: 글자 크기 7단계 · 버튼 4종 · 표 열 너비 조절 · 메뉴 «사업 영역» 한 그룹
 if (S.blk()) {
   const { ctx, page, errs } = await open();
