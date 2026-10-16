@@ -910,7 +910,9 @@ if (S.blk()) {
   });
   await S.t('㊿+211 MDR 정식 발주 양식: ICT지원사업 = «EDR 발주요청서(ICT지원사업)» · 초동조치 보임 / 일반 = «EDR+MDR 발주요청서» · 초동조치 숨김 · 요약에 없음 · 켜 두었어도 false 로 저장', async () => {
     const A = await mk207(), P = A.page;
-    const st = () => P.evaluate(() => ({ t: document.getElementById('mpTitle').textContent, f: document.getElementById('mpFirst').closest('label').style.display !== 'none' }));
+    const st = () => P.evaluate(() => ({ t: document.getElementById('mpTitle').textContent, f: document.getElementById('mpFirst').closest('label').style.display !== 'none',
+      mods: [...document.querySelectorAll('#viewMdrNew .mpchk')].filter((l) => l.style.display !== 'none').map((l) => l.textContent.trim()).join('|') }));
+    const poc = await st();
     await P.selectOption('#mpKind', 'order'); await P.waitForTimeout(80); const ict = await st();
     await P.evaluate(() => { document.getElementById('mpFirst').checked = true; });
     await P.selectOption('#mpBiz', '일반'); await P.waitForTimeout(80); const gen = await st();
@@ -918,9 +920,17 @@ if (S.blk()) {
     const sum = await P.evaluate(() => document.getElementById('mpWzSum').textContent);
     await P.click('#mpGo'); await P.waitForSelector('#mpDone', { state: 'visible', timeout: 5000 });
     const b = A.st.posts[0] || {}; const errs = A.c.errs.slice(); await A.ctx.close();
-    assert(/EDR 발주요청서\(ICT지원사업\)/.test(ict.t) && ict.f && /EDR\+MDR 발주요청서/.test(gen.t) && !gen.f, '양식 ' + JSON.stringify({ ict, gen }));
+    assert(poc.mods === 'EDR+MDR|안티바이러스|안티랜섬웨어|매체제어' && /EDR 발주요청서\(ICT지원사업\)/.test(ict.t) && ict.f && ict.mods === 'EDR(백신)|EDR(안티랜섬웨어)|매체제어|초동조치' && /EDR\+MDR 발주요청서/.test(gen.t) && !gen.f && gen.mods === 'EDR+MDR|안티바이러스|안티랜섬웨어|매체제어', '양식 ' + JSON.stringify({ poc, ict, gen }));
     assert(!/초동조치/.test(sum) && b.biz_kind === '일반' && b.mod_first === false && b.req_kind === 'order' && !errs.length, '일반 저장 ' + JSON.stringify({ sum: sum.slice(0, 120), b, errs }));
-    return 'ICT · 일반 양식';
+    const B = await mk207(), Q = B.page;
+    await Q.selectOption('#mpKind', 'order'); await Q.fill('#mpContract', 'N0000003'); await Q.fill('#mpCompany', '가상기관02'); await Q.fill('#mpMgr', '김철수'); await Q.click('#mpFormWrap .wz-next'); await Q.waitForTimeout(80);
+    const ord2 = await Q.evaluate(() => [...document.querySelectorAll('#mpFormWrap .wz-step:not([hidden]) input, #mpFormWrap .wz-step:not([hidden]) select')].map((e) => e.id).filter((i) => /^mp(Webui|Nac)$/.test(i)).join(','));
+    await Q.check('#mpAv'); await Q.check('#mpFirst'); await Q.click('#mpFormWrap .wz-next'); await Q.waitForTimeout(80); await Q.click('#mpFormWrap .wz-next'); await Q.waitForTimeout(80);
+    const sumI = await Q.evaluate(() => document.getElementById('mpWzSum').textContent);
+    await Q.click('#mpGo'); await Q.waitForSelector('#mpDone', { state: 'visible', timeout: 5000 });
+    const bi = B.st.posts[0] || {}, di = await Q.evaluate(() => document.getElementById('mpDoneSum').textContent); const errsI = B.c.errs.slice(); await B.ctx.close();
+    assert(ord2 === 'mpWebui,mpNac' && /EDR\(백신\)/.test(sumI) && /초동조치/.test(sumI) && !/EDR\+MDR|안티바이러스/.test(sumI) && bi.biz_kind === 'ICT지원사업' && bi.mod_edr === false && bi.mod_av === true && bi.mod_first === true && /EDR\(백신\)·초동조치/.test(di) && !errsI.length, 'ICT 저장 ' + JSON.stringify({ ord2, sumI: sumI.slice(0, 160), bi, di, errsI }));
+    return 'PoC · 일반 · ICT 양식';
   });
 }
 // ㊿+210 MDR PoC · 데모 → 정식 발주 전환 — 현황 행 «발주 전환» → 신청 화면이 PoC 내용으로 채워짐(정식 발주 고정) → 새 행 src_id · Slack 은 정식 발주와 같은 INSERT · PoC 행 = «발주전환» · SQL 124 전 · 두 번 전환

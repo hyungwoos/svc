@@ -398,6 +398,9 @@ export var UPD_SEED=[
     '- MDR 정식 발주: ICT지원사업은 «EDR 발주요청서(ICT지원사업)» 양식(모듈 «초동조치» 포함), 일반은 «EDR+MDR 발주요청서» 양식(모듈 · 칸이 PoC 와 같음)으로 나눴습니다. 일반 발주에는 «초동조치»가 나오지 않습니다.',
     '- (관리자) Slack 알림도 같은 기준으로 두 양식 — Apps Script(Code.gs) 새 전체본 · MDR 정식 발주 알림은 SQL 125 를 실행해야 갑니다.',
   ].join('\n')}
+  ,{ver:'㊿+212', date:'2026-10-16', title:'ICT지원사업 정식 발주 = ICT 양식 그대로', body:[
+    '- MDR 정식 발주에서 사업 구분 «ICT지원사업»을 고르면 모듈이 «EDR 발주요청서(ICT지원사업)» 양식대로 EDR(백신) · EDR(안티랜섬웨어) · 매체제어 · 초동조치 네 가지만 나옵니다(EDR+MDR 없음). 일반 발주는 그대로입니다.',
+  ].join('\n')}
 ];
 export async function updFetch(path, opt){   /* 캐시를 건드리지 않는 직접 호출 — 401 이면 토큰 갱신 뒤 1회 재시도 */
   if(!ST.SB_TOKEN) throw new Error('로그인이 필요합니다');

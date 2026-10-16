@@ -1890,6 +1890,9 @@ export function mpKindSync(){
   var ord=mpIsOrder(), T=MP_TXT[ord? 'order' : 'poc'];
   document.querySelectorAll('#viewMdrNew .mp-ord').forEach(function(el){ /** @type {any} */(el).style.display=ord? '' : 'none'; });
   var ict=mpIsIct(); document.querySelectorAll('#viewMdrNew .mp-ict').forEach(function(el){ /** @type {any} */(el).style.display=ict? '' : 'none'; });   /* ㊿+211 초동조치 = ICT지원사업만 */
+  /* ㊿+212 ICT지원사업 = «EDR 발주요청서(ICT지원사업)» 양식 그대로 — 모듈 EDR(백신) · EDR(안티랜섬웨어) · 매체제어 · 초동조치(EDR+MDR 없음) */
+  document.querySelectorAll('#viewMdrNew .mp-noict').forEach(function(el){ /** @type {any} */(el).style.display=ict? 'none' : ''; });
+  document.querySelectorAll('#viewMdrNew span[data-ict]').forEach(function(el){ var e=/** @type {any} */(el); if(!e.dataset.def) e.dataset.def=e.textContent; e.textContent=ict? e.dataset.ict : e.dataset.def; });
   var set=function(id, t){ var e=document.getElementById(id); if(e) e.textContent=t; };
   set('mpTitle', ord? (ict? '🛡️ EDR 발주요청서(ICT지원사업) — 정식 발주' : '🛡️ EDR+MDR 발주요청서 — 정식 발주') : T.title); set('mpCap', T.cap); set('mpGo', T.go);
   var nt=document.querySelector('#mpFormWrap .wz-note'); if(nt) nt.textContent=ord? MP_TXT.order.notice : WZ_DEF.mp.notice;
@@ -1962,6 +1965,7 @@ export async function submitMdrPoc(){
     };
     /* PoC 는 예전 칸 그대로(SQL 122 전에도 됨) · 정식 발주만 새 칸 */
     if(ord) Object.assign(row, {req_kind:'order', contract_no:cno||null, biz_kind:biz, mod_first:biz==='ICT지원사업' && $('#mpFirst').checked});   /* ㊿+211 초동조치는 ICT지원사업만 */
+    if(ord && biz==='ICT지원사업') row.mod_edr=false;   /* ㊿+212 ICT 양식에는 EDR+MDR 항목이 없음 */
     if(conv) /** @type {any} */(row).src_id=conv.id;
     var out, ins=async function(){
       try{ return await sbWrite('POST','mdr_ops?select=*',[row],'return=representation'); }
@@ -1979,7 +1983,8 @@ export async function submitMdrPoc(){
       mpConvClear(); ST.DIRTY=true;
     }
     msg('mpMsg','');
-    var mods=[row.mod_edr?'EDR+MDR':'',row.mod_av?'백신':'',row.mod_ransom?'랜섬웨어':'',row.mod_media?'매체제어':'', ord && row.mod_first?'초동조치':''].filter(Boolean).join('·');
+    var ictM=ord && biz==='ICT지원사업';   /* ㊿+212 ICT 양식 이름 */
+    var mods=(ictM? [row.mod_av?'EDR(백신)':'', row.mod_ransom?'EDR(안티랜섬웨어)':'', row.mod_media?'매체제어':'', row.mod_first?'초동조치':''] : [row.mod_edr?'EDR+MDR':'',row.mod_av?'백신':'',row.mod_ransom?'랜섬웨어':'',row.mod_media?'매체제어':'']).filter(Boolean).join('·');
     var T=MP_TXT[ord? 'order' : 'poc'];
     $('#mpDoneSum').textContent=[ord? '정식 발주'+(biz? '('+biz+')' : '') : '', ord && cno? '계약번호 '+cno : '', comp, mgr, row.device_count||'', mods].filter(Boolean).join(' · ');
     if(conv) $('#mpDoneSum').textContent='PoC #'+conv.id+' 에서 전환 · '+$('#mpDoneSum').textContent;
@@ -2014,7 +2019,7 @@ export var WZ_DEF={
     req:{oiCust:'고객사'}},
   mp:{wrap:'mpFormWrap', go:'mpGo', msg:'mpMsg', first:'mpCompany', cust:'mpCompany',
     notice:'«POC 신청»을 누르면 DB 에 저장되고 슬랙 채널로 알림이 갑니다 · 운영·신청 현황에 «신청»으로 등록됩니다',
-    steps:[['기본',['mpKind','mpBiz','mpContract','mpCompany','mpMgr','mpPhone','mpEmail','mpDev']], ['조건',['mpEdr','mpWin','mpLinux','mpMac','mpNac','mpWebui']],
+    steps:[['기본',['mpKind','mpBiz','mpContract','mpCompany','mpMgr','mpPhone','mpEmail','mpDev']], ['조건',['mpEdr','mpWin','mpLinux','mpMac','mpWebui','mpNac']],
       ['신청 정보',['mpSales','mpSalesPh','mpDate','mpNote']], ['확인',[]]],
     req:{mpCompany:'회사명', mpMgr:'고객 담당자 이름'},
     reqIf:{mpContract:['계약번호', function(){ return mpIsOrder() && /** @type {any} */(document.getElementById('mpBiz')).value==='ICT지원사업'; }]}}   /* ㊿+207 ICT지원사업 정식 발주만 */
@@ -2029,6 +2034,7 @@ export function wzBox(id){
   return e.closest('.frm > div') || e.parentElement;
 }
 export function wzLabel(id){
+  if(id==='mpEdr') return '적용 예정 모듈';   /* ㊿+212 모듈 상자 이름(첫 칸 «EDR+MDR»이 이름처럼 보이던 것) */
   var l=/** @type {any} */(document.querySelector('label[for="'+id+'"]')); var t=l? l.textContent : '';
   if(!t){ var b=wzBox(id), x=b && b.querySelector('label'); t=x? x.textContent : id; }
   return String(t).replace(/\s*\*\s*$/,'').replace(/\s*\(.*$/,'').trim();
@@ -2036,7 +2042,7 @@ export function wzLabel(id){
 export function wzVal(id){
   var e=/** @type {any} */(document.getElementById(id)); if(!e) return '';
   if(id==='oiProducts') return [].slice.call(e.querySelectorAll('.oi-prow')).filter(function(r){ var c=r.querySelector('input[data-oip]'); return c && c.checked; }).map(function(r){ var c=r.querySelector('input[data-oip]'), q=r.querySelector('.oi-qty'), et=r.querySelector('.oi-etc'); return (c.dataset.oip==='__etc'? (et&&et.value)||'기타' : c.dataset.oip)+(q&&q.value? ' '+q.value : ''); }).join(', ');
-  if(id==='mpEdr') return [['mpEdr','EDR+MDR'],['mpAv','안티바이러스'],['mpRansom','안티랜섬웨어'],['mpMedia','매체제어']].concat(mpIsIct()? [['mpFirst','초동조치']] : []).filter(function(x){ var c=/** @type {any} */(document.getElementById(x[0])); return c && c.checked; }).map(function(x){ return x[1]; }).join(' · ');
+  if(id==='mpEdr') return (mpIsIct()? [['mpAv','EDR(백신)'],['mpRansom','EDR(안티랜섬웨어)'],['mpMedia','매체제어'],['mpFirst','초동조치']] : [['mpEdr','EDR+MDR'],['mpAv','안티바이러스'],['mpRansom','안티랜섬웨어'],['mpMedia','매체제어']]).filter(function(x){ var c=/** @type {any} */(document.getElementById(x[0])); return c && c.checked; }).map(function(x){ return x[1]; }).join(' · ');
   if(id==='oiQuoteBtn'){ var tg=document.getElementById('oiQuoteTag'); return OI_QUOTE && tg? tg.textContent : ''; }
   if(e.type==='checkbox') return e.checked? '예' : '';
   if(e.tagName==='SELECT'){ var o=e.options[e.selectedIndex]; return o && e.value!==''? o.textContent : ''; }
