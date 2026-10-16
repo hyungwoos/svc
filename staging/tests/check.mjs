@@ -435,6 +435,10 @@ try {
     && /chipsOpts:\['발주요청','신청','대기','진행중','데모','발주전환','구독','종료'\]/.test(gs) && /'PoC → 발주 #'\+o\.id/.test(gs)
     && (rp.match(/x\.req_kind!=='order'/g) || []).length === 2 && /<div id="mpConv" class="mp-conv" role="status" hidden>/.test(html),
   '㊿+210 MDR 발주 전환: PoC 행 «발주 전환»(구분 칸 있을 때 · 전환 안 된 PoC · 보기 권한) → 신청 화면 채움 · 정식 발주 고정 → 새 행 src_id(두 번 안 됨 · SQL 124 전엔 연결 없이) → PoC «발주전환» · 리포트 PoC 표에 정식 발주 안 셈'); }
+// ㊿+211 MDR 정식 발주 양식 — ICT지원사업(초동조치 · EDR 발주요청서(ICT지원사업)) / 일반(EDR+MDR 발주요청서 · PoC 와 같은 모듈)
+{ const sa = fs.readFileSync(path.join(ROOT, 'js/sales.js'), 'utf8');
+  say(/<label class="mpchk mp-ord mp-ict"><input id="mpFirst"/.test(html) && /^export function mpIsIct\(\)/m.test(sa) && /mod_first:biz==='ICT지원사업' && \$\('#mpFirst'\)\.checked/.test(sa) && /concat\(mpIsIct\(\)\? \[\['mpFirst','초동조치'\]\]/.test(sa) && /EDR\+MDR 발주요청서 — 정식 발주/.test(sa),
+  '㊿+211 MDR 정식 발주 양식: 초동조치 = ICT지원사업만(화면 · 요약 · 저장) · 제목 ICT «EDR 발주요청서(ICT지원사업)» / 일반 «EDR+MDR 발주요청서»'); }
 // ㊿+160 연장하면 상태 «재약정»(구분 그대로) · 계약 상세에 «계약 기간 · 연장 이력»
 say(/^export function renewStatus\(r\)/m.test(jsAll) && /var nst=renewStatus\(r\);/.test(jsAll) && /^export function ctPeriods\(c, mine\)/m.test(jsAll) && html.includes('id="dtRenew"'), '연장: 상태 «재약정»(renewStatus) · 계약 상세 연장 이력(ctPeriods · #dtRenew)');
 const idx = html + jsAll;

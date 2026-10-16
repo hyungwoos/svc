@@ -1879,6 +1879,8 @@ export async function submitOrder(){
    · 사용자: «MDR PoC나 데모신청 말고 정식 발주신청 기능도» · 접수 뒤 = Slack 통보(Apps Script mdrOrderNotify_ → 채널 2곳 · 사용자 지정)
    · 정식 발주 칸(req_kind · contract_no · biz_kind · mod_first)은 SQL 122 — 실행 전에는 PoC 는 예전처럼 되고 정식 발주만 «SQL 122 먼저» 안내 */
 export function mpIsOrder(){ var k=/** @type {any} */(document.getElementById('mpKind')); return !!k && k.value==='order'; }
+/** ㊿+211 ICT지원사업 정식 발주(초동조치 · «EDR 발주요청서(ICT지원사업)» 양식) — 일반 발주는 «EDR+MDR 발주요청서»(PoC 와 같은 모듈) */
+export function mpIsIct(){ var b=/** @type {any} */(document.getElementById('mpBiz')); return mpIsOrder() && !!b && b.value==='ICT지원사업'; }
 export var MP_TXT={
   poc:{title:'🛡️ EDR+MDR POC 신청', cap:'저장하면 DB에 기록되고 슬랙으로 자동 통보됩니다. 접수된 신청은 「운영·신청 현황」에서 데모·구독까지 이어서 관리합니다.', go:'POC 신청', done:'POC 신청이 접수되었습니다', note:'슬랙 채널로 자동 통보되었습니다'},
   order:{title:'🛡️ EDR 발주요청서 — 정식 발주', cap:'계약이 확정된 정식 발주를 요청합니다. 저장하면 DB에 기록되고 슬랙 발주 채널(Cloud NAC 발주와 같은 2곳)로 자동 통보됩니다. 접수된 발주는 「운영·신청 현황」에 «발주요청»으로 등록됩니다.', go:'발주 요청', done:'발주요청이 접수되었습니다', note:'슬랙 발주 채널(2곳)로 자동 통보되었습니다 · 운영·신청 현황에 «발주요청»으로 등록',
@@ -1887,8 +1889,9 @@ export var MP_TXT={
 export function mpKindSync(){
   var ord=mpIsOrder(), T=MP_TXT[ord? 'order' : 'poc'];
   document.querySelectorAll('#viewMdrNew .mp-ord').forEach(function(el){ /** @type {any} */(el).style.display=ord? '' : 'none'; });
+  var ict=mpIsIct(); document.querySelectorAll('#viewMdrNew .mp-ict').forEach(function(el){ /** @type {any} */(el).style.display=ict? '' : 'none'; });   /* ㊿+211 초동조치 = ICT지원사업만 */
   var set=function(id, t){ var e=document.getElementById(id); if(e) e.textContent=t; };
-  set('mpTitle', T.title); set('mpCap', T.cap); set('mpGo', T.go);
+  set('mpTitle', ord? (ict? '🛡️ EDR 발주요청서(ICT지원사업) — 정식 발주' : '🛡️ EDR+MDR 발주요청서 — 정식 발주') : T.title); set('mpCap', T.cap); set('mpGo', T.go);
   var nt=document.querySelector('#mpFormWrap .wz-note'); if(nt) nt.textContent=ord? MP_TXT.order.notice : WZ_DEF.mp.notice;
   var ct=document.getElementById('mpContract'); if(ct){ if(ord && /** @type {any} */(document.getElementById('mpBiz')).value==='ICT지원사업') ct.setAttribute('aria-required','true'); else ct.removeAttribute('aria-required'); }
 }
@@ -1958,7 +1961,7 @@ export async function submitMdrPoc(){
       status: ord? '발주요청' : '신청'
     };
     /* PoC 는 예전 칸 그대로(SQL 122 전에도 됨) · 정식 발주만 새 칸 */
-    if(ord) Object.assign(row, {req_kind:'order', contract_no:cno||null, biz_kind:biz, mod_first:$('#mpFirst').checked});
+    if(ord) Object.assign(row, {req_kind:'order', contract_no:cno||null, biz_kind:biz, mod_first:biz==='ICT지원사업' && $('#mpFirst').checked});   /* ㊿+211 초동조치는 ICT지원사업만 */
     if(conv) /** @type {any} */(row).src_id=conv.id;
     var out, ins=async function(){
       try{ return await sbWrite('POST','mdr_ops?select=*',[row],'return=representation'); }
@@ -2033,7 +2036,7 @@ export function wzLabel(id){
 export function wzVal(id){
   var e=/** @type {any} */(document.getElementById(id)); if(!e) return '';
   if(id==='oiProducts') return [].slice.call(e.querySelectorAll('.oi-prow')).filter(function(r){ var c=r.querySelector('input[data-oip]'); return c && c.checked; }).map(function(r){ var c=r.querySelector('input[data-oip]'), q=r.querySelector('.oi-qty'), et=r.querySelector('.oi-etc'); return (c.dataset.oip==='__etc'? (et&&et.value)||'기타' : c.dataset.oip)+(q&&q.value? ' '+q.value : ''); }).join(', ');
-  if(id==='mpEdr') return [['mpEdr','EDR+MDR'],['mpAv','안티바이러스'],['mpRansom','안티랜섬웨어'],['mpMedia','매체제어']].concat(mpIsOrder()? [['mpFirst','초동조치']] : []).filter(function(x){ var c=/** @type {any} */(document.getElementById(x[0])); return c && c.checked; }).map(function(x){ return x[1]; }).join(' · ');
+  if(id==='mpEdr') return [['mpEdr','EDR+MDR'],['mpAv','안티바이러스'],['mpRansom','안티랜섬웨어'],['mpMedia','매체제어']].concat(mpIsIct()? [['mpFirst','초동조치']] : []).filter(function(x){ var c=/** @type {any} */(document.getElementById(x[0])); return c && c.checked; }).map(function(x){ return x[1]; }).join(' · ');
   if(id==='oiQuoteBtn'){ var tg=document.getElementById('oiQuoteTag'); return OI_QUOTE && tg? tg.textContent : ''; }
   if(e.type==='checkbox') return e.checked? '예' : '';
   if(e.tagName==='SELECT'){ var o=e.options[e.selectedIndex]; return o && e.value!==''? o.textContent : ''; }

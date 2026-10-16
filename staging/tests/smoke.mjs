@@ -908,6 +908,20 @@ if (S.blk()) {
     assert(!('contract_no' in rr.without) && rr.without.customer === '가상고객09' && rr.withC.contract_no === 'N1' && !errs.length, '새 칸 저장 ' + JSON.stringify(rr));
     return 'SQL 122 안내 · PoC 저장';
   });
+  await S.t('㊿+211 MDR 정식 발주 양식: ICT지원사업 = «EDR 발주요청서(ICT지원사업)» · 초동조치 보임 / 일반 = «EDR+MDR 발주요청서» · 초동조치 숨김 · 요약에 없음 · 켜 두었어도 false 로 저장', async () => {
+    const A = await mk207(), P = A.page;
+    const st = () => P.evaluate(() => ({ t: document.getElementById('mpTitle').textContent, f: document.getElementById('mpFirst').closest('label').style.display !== 'none' }));
+    await P.selectOption('#mpKind', 'order'); await P.waitForTimeout(80); const ict = await st();
+    await P.evaluate(() => { document.getElementById('mpFirst').checked = true; });
+    await P.selectOption('#mpBiz', '일반'); await P.waitForTimeout(80); const gen = await st();
+    await P.fill('#mpCompany', '가상고객01'); await P.fill('#mpMgr', '홍길동'); await next(P); await next(P); await next(P);
+    const sum = await P.evaluate(() => document.getElementById('mpWzSum').textContent);
+    await P.click('#mpGo'); await P.waitForSelector('#mpDone', { state: 'visible', timeout: 5000 });
+    const b = A.st.posts[0] || {}; const errs = A.c.errs.slice(); await A.ctx.close();
+    assert(/EDR 발주요청서\(ICT지원사업\)/.test(ict.t) && ict.f && /EDR\+MDR 발주요청서/.test(gen.t) && !gen.f, '양식 ' + JSON.stringify({ ict, gen }));
+    assert(!/초동조치/.test(sum) && b.biz_kind === '일반' && b.mod_first === false && b.req_kind === 'order' && !errs.length, '일반 저장 ' + JSON.stringify({ sum: sum.slice(0, 120), b, errs }));
+    return 'ICT · 일반 양식';
+  });
 }
 // ㊿+210 MDR PoC · 데모 → 정식 발주 전환 — 현황 행 «발주 전환» → 신청 화면이 PoC 내용으로 채워짐(정식 발주 고정) → 새 행 src_id · Slack 은 정식 발주와 같은 INSERT · PoC 행 = «발주전환» · SQL 124 전 · 두 번 전환
 if (S.blk()) {
