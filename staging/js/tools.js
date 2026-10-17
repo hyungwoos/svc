@@ -3,7 +3,7 @@
 import { ST } from './state.js';
 import { $, amtWhy, isCC, isGN, lline, mk, navText, rawHtml, tpl, won, wonKo } from './core.js';
 import { buildRail, c360Enhance, dIdx, ico, loadFromDb, onData, renderInbox, sbWrite, toast, todayStr, visBtn } from './shell.js';
-import { GRIDS } from './grids.js';
+import { GRIDS, pocTabSet } from './grids.js';
 import { applyChannelMenu, ctRawOf, liveData } from './analysis.js';
 import { goInbList } from './inbound.js';
 import { applyMenuFold } from './sales.js';
@@ -33,7 +33,7 @@ export function fkSources(){
     out.push({t:'인바운드', nm:r.org, sb:(r.on_date||'')+' · '+(r.product||'')+' · '+(r.result||'')+' · '+(r.owner||'')+' '+ntfName(r.requester), go:function(){ goInbList(); $('#dvSearch').value=r.org; renderGrid(); }, cust:r.org});
   });
   (ST.RAWX.mdrops||[]).forEach(function(r){
-    out.push({t:'MDR', nm:r.customer, sb:(r.svc_type||'')+' · '+(r.status||'')+' · '+(r.sales_name||'')+' '+ntfName(r.requester)+' '+(r.mgr_name||''), go:function(){ switchView('mdrops'); $('#dvSearch').value=r.customer; renderGrid(); }, cust:r.customer});
+    out.push({t:'MDR', nm:r.customer, sb:(r.svc_type||'')+' · '+(r.status||'')+' · '+(r.sales_name||'')+' '+ntfName(r.requester)+' '+(r.mgr_name||''), go:function(){ var po=r.req_kind!==undefined && r.req_kind!=='order'; if(po) pocTabSet('mdr'); switchView(po? 'pocs' : 'mdrops'); $('#dvSearch').value=r.customer; renderGrid(); }, cust:r.customer});   /* ㊿+215 PoC 행 = «PoC · 데모 현황» › MDR */
   });
   (ST.RAWX.assets||[]).forEach(function(r){
     out.push({t:'장비', nm:r.serial, sb:(r.model||'')+' · '+(r.status||'')+' · '+(r.customer||''), go:function(){ switchView('assets'); $('#dvSearch').value=r.serial; renderGrid(); }});

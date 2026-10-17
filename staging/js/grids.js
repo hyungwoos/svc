@@ -353,13 +353,11 @@ export function buildGrids(){
       ]
     },
     mdrops:{
-      emptyCta:{l:'PoC · 데모 신청', v:'mdrnew', s:'MDR PoC · 데모를 신청하거나 «발주 신청»에서 MDR 정식 발주를 하면 여기에 쌓입니다'}, title:'MDR 운영·신청 현황', table:'mdr_ops', mob:['customer','status','svc_type','_fill','sales_name'],
-      chipsField:'status', chipsOpts:['발주요청','신청','대기','진행중','데모','발주전환','구독','종료'],
-      cap:'행 클릭 = 고객 한눈에 · PoC 신청 · 정식 발주부터 운영까지 — PoC: 신청 → 진행중 → 데모 → 구독 · 정식 발주: 발주요청 → 구독 · PoC 가 발주로 바뀌면 행의 «발주 전환»(슬랙 발주 채널로 · PoC 는 «발주전환») · 설치율 = 설치 ÷ 계약 수량', add:true, del:true,
+      emptyCta:{l:'발주 신청', v:'ordernew', s:'«발주 신청»에서 MDR 정식 발주를 하면 여기에 쌓입니다 · PoC · 데모는 «PoC · 데모 현황» › MDR'}, title:'MDR 운영·신청 현황', table:'mdr_ops', mob:['customer','status','svc_type','_fill','sales_name'],
+      chipsField:'status', chipsOpts:['발주요청','대기','진행중','데모','구독','종료'],
+      cap:'행 클릭 = 고객 한눈에 · MDR 정식 발주 · 운영 — 발주요청 → 구독 · PoC · 데모는 «PoC · 데모 현황» › MDR(발주로 바뀌면 거기서 «발주 전환») · 설치율 = 설치 ÷ 계약 수량', add:true, del:true,
       rowClick:function(r){ if(!ST.IS_EQUIP) openCust360(r.customer); },
-      rows:function(){ return (ST.RAWX.mdrops||[]).slice().sort(function(a,b){
-        var n=String(b.start_date||'').localeCompare(String(a.start_date||''));
-        return n || ((b.id||0)-(a.id||0)); }); },
+      rows:function(){ return mdrRows(true); },   /* ㊿+215 정식 발주만 — PoC · 데모는 «PoC · 데모 현황» › MDR */
       cols:[
         {k:'svc_type',l:'서비스유형',t:'select',opts:['IDC 상면','CLOUD','구축(Onprem)']},
         {k:'customer',l:'고객명',req:true},
@@ -397,11 +395,11 @@ export function buildGrids(){
         {k:'note',l:'비고'}
       ]
     },
-    /* ㊿+214 PoC · 데모 현황 — MDR 이 아닌 제품(가격표 SaaS)의 PoC · 데모 신청(poc_requests · SQL 126) · MDR PoC 는 mdrops */
+    /* ㊿+214 PoC · 데모 현황 — MDR 이 아닌 제품(가격표 SaaS)의 PoC · 데모 신청(poc_requests · SQL 126) · ㊿+215 MDR PoC 는 같은 화면 «MDR» 탭(pocTabSet) */
     pocs:{
       emptyCta:{l:'PoC · 데모 신청', v:'mdrnew', s:'Cloud NAC · ZTNA 등 MDR 이 아닌 제품의 PoC · 데모를 신청하면 여기에 쌓입니다'}, title:'PoC · 데모 현황', table:'poc_requests', mob:['customer','product','status','sales_name'],
       chipsField:'status', chipsOpts:['신청','진행중','데모','발주전환','종료'],
-      cap:'MDR 이 아닌 제품(가격표 SaaS)의 PoC · 데모 — 신청 → 진행중 → 데모 → 발주전환 · 종료 · 행 클릭 = 고객 한눈에 · MDR PoC 는 «MDR 운영·신청 현황»', add:true, del:true,
+      cap:'Cloud NAC · ZTNA · Cloud Insights E · AV 의 PoC · 데모 — 신청 → 진행중 → 데모 → 발주전환 · 종료 · 행 클릭 = 고객 한눈에 · Genian MDR 서비스는 위 «MDR»', add:true, del:true,
       rowClick:function(r){ if(!ST.IS_EQUIP) openCust360(r.customer); },
       rows:function(){ return ST.RAWX.pocs||[]; },
       cols:[
@@ -582,4 +580,27 @@ export function buildGrids(){
       ]
     }
   };
+  /* ㊿+215 PoC · 데모 현황 = 탭 2개(같은 화면 pocs) — MDR(mdr_ops 의 PoC 행 · 데이터는 그대로 mdr_ops) / 그 밖의 제품(poc_requests)
+     · 탭을 바꾸면 GRIDS.pocs 의 표 · 열 · 칩 · 안내를 그 탭 것으로 바꿔 끼움(저장 · 삭제는 그 탭의 표로) */
+  var md=GRIDS.mdrops, KEYS=['title','table','mob','chipsField','chipsOpts','cap','emptyCta','rows','cols','add','del','rowClick'];
+  POC_TABS.etc={}; KEYS.forEach(function(k){ POC_TABS.etc[k]=GRIDS.pocs[k]; });
+  POC_TABS.mdr={title:'PoC · 데모 현황', table:'mdr_ops', mob:md.mob, chipsField:'status', chipsOpts:['신청','대기','진행중','데모','발주전환','구독','종료'],
+    cap:'Genian MDR 서비스 PoC · 데모 — 신청 → 진행중 → 데모 → 발주전환 · 종료 · 정식 발주로 바뀌면 행의 «발주 전환»(정식 발주는 «MDR 운영·신청 현황») · 행 클릭 = 고객 한눈에',
+    emptyCta:{l:'PoC · 데모 신청', v:'mdrnew', s:'«PoC · 데모 신청» › Genian MDR 서비스로 신청하면 여기에 쌓입니다'},
+    rows:function(){ return mdrRows(false); }, cols:md.cols.filter(function(c){ return ['contract_no','biz_kind','on_rev_sheet'].indexOf(c.k)<0; }),
+    add:md.add, del:md.del, rowClick:md.rowClick};
+  pocTabSet(POC_TAB.cur);
+}
+/** ㊿+215 MDR 행 나누기 — ord=true 정식 발주(req_kind 'order') / false PoC · 데모 · req_kind 칸이 없는 DB(SQL 122 전)면 전부 정식 쪽(예전처럼 한 표) */
+export function mdrRows(ord){
+  var all=ST.RAWX.mdrops||[], has=all.some(function(x){ return x && x.req_kind!==undefined; });
+  return all.filter(function(x){ return !has || ((x.req_kind==='order')===ord); }).sort(function(a,b){
+    var n=String(b.start_date||'').localeCompare(String(a.start_date||''));
+    return n || ((b.id||0)-(a.id||0)); });
+}
+export var POC_TABS=/** @type {any} */({}), POC_TAB={cur:'mdr'};
+export function pocTabSet(t){
+  POC_TAB.cur=(t==='etc')? 'etc' : 'mdr';
+  var d=POC_TABS[POC_TAB.cur], g=GRIDS && GRIDS.pocs; if(!d || !g) return;
+  Object.keys(d).forEach(function(k){ /** @type {any} */(g)[k]=d[k]; });
 }

@@ -432,7 +432,7 @@ try {
   say(/^export function mpConvert\(r\)/m.test(sa) && /^export function mpCanConv\(r\)\{ return !!r && \('req_kind' in r\) && r\.req_kind!=='order' && r\.status!=='발주전환' && !mpConvOf\(r\); \}/m.test(sa)
     && /if\(conv\) \/\*\* @type \{any\} \*\/\(row\)\.src_id=conv\.id;/.test(sa) && /sbWrite\('PATCH','mdr_ops\?id=eq\.'\+conv\.id,\{status:'발주전환'\}\)/.test(sa) && /mdr_ops_src_uniq/.test(sa) && /noLink=true; return ins\(\);/.test(sa)
     && /mpCanConv\(r\) && canView\('mdrnew'\)/.test(gr) && /bo\.dataset\.act='toOrder'/.test(gr) && /reqOpen\(\);/.test(gr) && /navMenu\('ordernew'\); if\(ST\.CUR_VIEW!=='ordernew'\) return;/.test(sa)
-    && /chipsOpts:\['발주요청','신청','대기','진행중','데모','발주전환','구독','종료'\]/.test(gs) && /'PoC → 발주 #'\+o\.id/.test(gs)
+    && /chipsOpts:\['신청','대기','진행중','데모','발주전환','구독','종료'\]/.test(gs) && /'PoC → 발주 #'\+o\.id/.test(gs)
     && (rp.match(/x\.req_kind!=='order'/g) || []).length === 2 && /<div id="mpConv" class="mp-conv" role="status" hidden>/.test(html),
   '㊿+210 MDR 발주 전환: PoC 행 «발주 전환»(구분 칸 있을 때 · 전환 안 된 PoC · 보기 권한) → 신청 화면 채움 · 정식 발주 고정 → 새 행 src_id(두 번 안 됨 · SQL 124 전엔 연결 없이) → PoC «발주전환» · 리포트 PoC 표에 정식 발주 안 셈'); }
 // ㊿+211 MDR 정식 발주 양식 — ICT지원사업(초동조치 · EDR 발주요청서(ICT지원사업)) / 일반(EDR+MDR 발주요청서 · PoC 와 같은 모듈)
@@ -448,6 +448,15 @@ try {
     && /if\(go && t && t\.closest && t\.closest\('#'\+D\.go\) && !wzCheck\(key, D\.steps\.length-1\)\)/.test(sa) && /reqOpen\(\);/.test(gr) && /pocOpen\(\);/.test(gr)
     && /pocs:\{[\s\S]{0,400}table:'poc_requests'/.test(gs) && /poc:\s+\{ordernew:1, mdrnew:1, mdrops:1, pocs:1,/.test(sh) && /SMOKE_FONT_STRESS/.test(lb),
   '㊿+214 발주 신청 · PoC · 데모 신청: 한 화면(구역 · 오른쪽 요약 · 저장 전 꼭 넣을 칸 확인) · 종류 카드(권한) · 제품 = 가격표 SaaS · 단추 · − + · 날짜 · 최근 고객 · 지난 신청 · PoC · 데모 현황(poc_requests) · PoC 전용 계정 = 발주 신청(MDR) · 글꼴 흔들기 시험'); }
+// ㊿+215 MDR 운영 = 정식 발주만 · PoC · 데모 현황 = MDR 탭(mdr_ops PoC 행) + 그 밖의 제품 탭 · PoC 제품 조합(추가로만 = MDRA · RW · DC) · 모듈 체크 상자 크기
+{ const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
+  const sa = rd('js/sales.js'), gs = rd('js/grids.js'), gr = rd('js/grid.js'), css = rd('app.css');
+  say(/rows:function\(\)\{ return mdrRows\(true\); \}/.test(gs) && /rows:function\(\)\{ return mdrRows\(false\); \}/.test(gs) && /^export function pocTabSet\(t\)/m.test(gs) && /\['contract_no','biz_kind','on_rev_sheet'\]\.indexOf\(c\.k\)<0/.test(gs)
+    && /if\(g\.table==='mdr_ops' && mpCanConv\(r\) && canView\('mdrnew'\)\)/.test(gr) && /data-pt="\$\{x\[0\]\}"/.test(gr)
+    && /var POC_ADDON=\{MDRA:1, RW:1, DC:1\}/.test(sa) && /t:'Cloud NAC \+ Cloud ZTNA'/.test(sa) && /t:'Genian MDR 서비스'/.test(sa) && /\['AV','RW','DC','MDRA'\]\.filter/.test(sa) && /\['AV','RW','DC'\]\.filter/.test(sa)
+    && /id="pcAddBox" hidden/.test(html) && /id="pcQty2Box" hidden/.test(html) && /\.frm \.mpchk input\[type="checkbox"\]\{width:16px;height:16px/.test(css),
+  '㊿+215 MDR 운영 = 정식 발주만 · PoC · 데모 현황 MDR 탭(발주 전환 거기서) · PoC 제품 = 팔 수 있는 조합(NAC · ZTNA · NAC+ZTNA · Insights E(+4) · Genian MDR 서비스(+3) · AV) · 모듈 체크 상자 16px');
+}
 // ㊿+160 연장하면 상태 «재약정»(구분 그대로) · 계약 상세에 «계약 기간 · 연장 이력»
 say(/^export function renewStatus\(r\)/m.test(jsAll) && /var nst=renewStatus\(r\);/.test(jsAll) && /^export function ctPeriods\(c, mine\)/m.test(jsAll) && html.includes('id="dtRenew"'), '연장: 상태 «재약정»(renewStatus) · 계약 상세 연장 이력(ctPeriods · #dtRenew)');
 const idx = html + jsAll;

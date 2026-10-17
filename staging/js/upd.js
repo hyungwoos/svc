@@ -410,6 +410,12 @@ export var UPD_SEED=[
     '- 고객사를 고르면 같은 고객사의 «지난 신청 불러오기»로 담당자 · 연락처 · 주소를 채울 수 있습니다. «최근 고객» 단추도 있습니다. 영업담당자는 내 이름이 먼저 들어갑니다.',
     '- (관리자) PoC · 데모 표는 SQL 126, 알림 확인값은 SQL 127 — Apps Script(Code.gs) 새 전체본을 먼저 배포한 뒤 실행하고, 확인값을 스크립트 속성 WEBHOOK_SECRET 에 넣습니다. Code.gs 의 testOrderMessages 로 알림 글을 미리 볼 수 있습니다.',
   ].join('\n')}
+  ,{ver:'㊿+215', date:'2026-10-17', title:'PoC · 데모 현황에 MDR 탭 · PoC · 데모 신청 제품 조합 · 모듈 체크 상자', body:[
+    '- «MDR 운영·신청 현황»은 정식 발주만 보입니다. MDR PoC · 데모는 «PoC · 데모 현황» 위 «제품» 단추의 «MDR»에서 봅니다(표 · 내용 · 변경 이력은 그대로) — «발주 전환»도 거기서.',
+    '- «PoC · 데모 신청» 제품 카드 = 팔 수 있는 조합: Cloud NAC · Cloud ZTNA · Cloud NAC + Cloud ZTNA · Cloud Insights E · Genian MDR 서비스(예전 «Genian MDR 통합») · AV. Anti-Ransom · 매체제어 · MDR Add-on 24×7 은 단독 카드 없이 추가로만.',
+    '- Cloud Insights E 는 «추가 모듈»에서 AV · Anti-Ransom · 매체제어 · MDR Add-on 24×7 을 여러 개 고를 수 있습니다. Genian MDR 서비스는 MDR PoC 양식의 모듈 칸(안티바이러스 · 안티랜섬웨어 · 매체제어). Cloud NAC + Cloud ZTNA 는 규모를 노드 · ZTNA Agent 두 칸으로.',
+    '- MDR 신청서의 모듈 체크 상자가 크게 보이던 것 → 작은 체크 + 이름 한 줄로.'
+  ].join('\n')}
 ];
 export async function updFetch(path, opt){   /* 캐시를 건드리지 않는 직접 호출 — 401 이면 토큰 갱신 뒤 1회 재시도 */
   if(!ST.SB_TOKEN) throw new Error('로그인이 필요합니다');

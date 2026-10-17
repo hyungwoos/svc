@@ -5,7 +5,7 @@ import { Viz } from './viz.js';
 import { $, amtGuard, amtHint, canView, canWrite, cssv, esc, isGN, kwToWon, lline, mk, navText, perfNav, permEnter, rawHtml, STATE, tpl, won, wonFull, wonKo, wonToKw } from './core.js';
 import { cmdAskHit, dIdx, EQB, EQUIP_VIEWS, gridGo, ico, idxDate, loadFromDb, onData, railSync, renderEqBoard, sbTry, sbWrite, toast, todayStr, vtDupSync } from './shell.js';
 import { buildControls, DASH_DIRTY, dashDetailShown, renderAll } from './dash.js';
-import { GRIDS } from './grids.js';
+import { GRIDS, mdrRows, POC_TAB, pocTabSet } from './grids.js';
 import { eqRetOpen, eqWant, renderEqPanel, syncOrderAssets } from './equipment.js';
 import { AK, areaPick, BZX, CH_DEFS, ctOrig, ctRawOf, ctSuccessor, DC, ensureLeadSrc, liveCalc, liveDelta, liveDeltaOpen, liveDiff, liveMultiOpen, loadLib, LS, LV, renderChannelView, renewKindOf, renewOpenFor, setLiveSrc } from './analysis.js';
 import { applyDense, openCust360, PR, pushRecent, renderTodo } from './tools.js';
@@ -1418,6 +1418,11 @@ export function renderGrid(){
   if(WD){ wb.hidden=false;
     wb.innerHTML=tpl`<span class="wv-l" id="wvLbl">보기</span><div class="seg" role="group" aria-labelledby="wvLbl">${rawHtml(WD.views.map(function(x){ return tpl`<button type="button" data-wv="${x[0]}" aria-pressed="${x===WC?'true':'false'}" title="${x[1]}">${x[0]}</button>`; }).join(''))}</div><span class="mini wv-d">${WC[1]} · 보기마다 열 구성이 내 브라우저에 저장됩니다</span>`;
     wb.querySelectorAll('[data-wv]').forEach(function(b){ b.onclick=function(){ wvSet(ST.CUR_VIEW, b.dataset.wv); DV.page=0; renderGrid(); }; });
+  } else if(ST.CUR_VIEW==='pocs' && !isCustom){   /* ㊿+215 PoC · 데모 현황 탭 — MDR(mdr_ops) / NAC · ZTNA · Insights E · AV(poc_requests) */
+    wb.hidden=false;
+    var PT=[['mdr','MDR',mdrRows(false).length,'Genian MDR 서비스 PoC · 데모(MDR 운영 표의 PoC 행)'],['etc','NAC · ZTNA · Insights E · AV',ST.RAWX.pocs? ST.RAWX.pocs.length : '…','Cloud NAC · Cloud ZTNA · Cloud Insights E · AV PoC · 데모']];
+    wb.innerHTML=tpl`<span class="wv-l" id="ptLbl">제품</span><div class="seg" role="group" aria-labelledby="ptLbl">${rawHtml(PT.map(function(x){ return tpl`<button type="button" data-pt="${x[0]}" aria-pressed="${POC_TAB.cur===x[0]?'true':'false'}" title="${x[3]}">${x[1]} <span class="num">${String(x[2])}</span></button>`; }).join(''))}</div>`;
+    wb.querySelectorAll('[data-pt]').forEach(function(b){ b.onclick=function(){ if(POC_TAB.cur===b.dataset.pt) return; pocTabSet(b.dataset.pt); delete DVMEM.pocs; switchView('pocs'); }; });
   } else { wb.hidden=true; wb.innerHTML=''; }
   /* ㊿+169 홈 알림에서 넘어온 조건 — 이름표 + ✕ */
   var pb=document.getElementById('dvPreBar');
@@ -1694,7 +1699,7 @@ export function gridRow(r,g,editing){
         act.appendChild(ab('quote','clip', r.quote_file? '연결된 견적서 바꾸기·해제' : '견적서 연결', function(){ oiLinkQuote(r); }));
         if(QUOTES.ok!==false && canView('quote')) act.appendChild(ab('quoteNew','plus','이 OI 로 견적 만들기 — 저장하면 이 OI 에 연결', function(){ quoteOpen('oi='+r.id); }));   /* ㊿+177 */
       }
-      if(ST.CUR_VIEW==='mdrops' && mpCanConv(r) && canView('mdrnew')){   /* ㊿+210 PoC · 데모 → 정식 발주 전환(슬랙 발주 채널 2곳 · 정식 발주와 같게) */
+      if(g.table==='mdr_ops' && mpCanConv(r) && canView('mdrnew')){   /* ㊿+215 PoC 행은 «PoC · 데모 현황» › MDR 탭 */   /* ㊿+210 PoC · 데모 → 정식 발주 전환(슬랙 발주 채널 2곳 · 정식 발주와 같게) */
         var bo=document.createElement('button'); bo.type='button'; bo.textContent='발주 전환'; bo.dataset.act='toOrder';
         bo.title='이 PoC · 데모 건을 정식 발주로 전환 — 신청 화면이 이 내용으로 채워집니다(접수되면 슬랙 발주 채널 2곳 · PoC 는 «발주전환»)'; bo.setAttribute('aria-label','이 PoC · 데모 건을 정식 발주로 전환');
         bo.style.color='var(--good,#0ca30c)'; bo.onclick=function(){ mpConvert(r); };

@@ -3525,4 +3525,9 @@ button.emo-ico svg{display:block;flex:none}
 .pk-lb{font-size:12px;color:var(--muted);margin-right:2px}
 .pk-sumbtn{margin-top:6px;min-height:28px;padding:3px 10px;font-size:12px}
 @media (max-width:900px){.wz-one{grid-template-columns:1fr}.wz-side{position:static}}
+/* ㊿+215 모듈 체크 상자 — 한 화면(.frm 안)에서도 작은 체크 + 글자 한 줄(입력 칸 크기 규칙이 체크 상자까지 키우던 것) */
+.frm .mpchk{display:inline-flex;align-items:center;gap:7px;margin:0;font-size:14px;color:var(--ink)}
+.frm .mpchk input[type="checkbox"]{width:16px;height:16px;min-height:0;padding:0;margin:0;border-radius:4px;flex:0 0 auto}
+/* ㊿+215 추가 모듈(여러 개 고르기) 단추 — 고른 것 = 단추 묶음과 같은 색 */
+.pk-chip[aria-pressed="true"]{background:var(--brand-solid);border-color:var(--brand-solid);color:#fff;font-weight:650}
 /* ==== ㊿+166 새 디자인 end ==== */

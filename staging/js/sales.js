@@ -4,7 +4,7 @@ import { APP_VER, ST } from './state.js';
 import { $, amtHint, canView, canWrite, doLogout, esc, fetchT, isGN, kwToWon, lline, mk, rawHtml, refreshToken, SB_KEY, SB_URL, tickMemo, tpl, won, wonToKw } from './core.js';
 import { dIdx, EQB, EQUIP_VIEWS, loadFromDb, onData, railSync, renderEqBoard, SB_RAW, sbHeaders, sbTry, sbWrite, toast, todayStr } from './shell.js';
 import { kpiTable, toggleWidgetPanel } from './dash.js';
-import { OI_IND, OI_OWNERS, OI_PARTNERS, OI_PROB, OI_PRODUCTS, OI_TYPE } from './grids.js';
+import { OI_IND, OI_OWNERS, OI_PARTNERS, OI_PROB, OI_PRODUCTS, OI_TYPE, pocTabSet } from './grids.js';
 import { CH_DEFS, chOf, diffOpen, nmKeys } from './analysis.js';
 import { applyDense, denseKey, foldZeroRows, openFind, openPaste, renderTodo } from './tools.js';
 import { ntfDlg, ntfName, ntfSync } from './notify.js';
@@ -1008,10 +1008,10 @@ export function setupSide(){
   $('#oiQuoteBtn').onclick=openQuotePick;
   $('#oiDoneList').onclick=function(){ switchView('oi'); };
   $('#oiDoneNew').onclick=function(){ $('#oiDone').style.display='none'; $('#oiFormWrap').style.display=''; wzReset('oi'); $('#oiCust').focus(); };
-  $('#mpDoneList').onclick=function(){ switchView('mdrops'); };
+  $('#mpDoneList').onclick=function(){ var o=/** @type {any} */(document.getElementById('mpKind')).value==='order'; if(!o) pocTabSet('mdr'); switchView(o? 'mdrops' : 'pocs'); };   /* ㊿+215 PoC = «PoC · 데모 현황» › MDR */
   $('#mpDoneNew').onclick=function(){ $('#mpDone').style.display='none'; $('#mpFormWrap').style.display=''; mpConvClear(); wzReset('mp'); $('#mpCompany').focus(); };
   $('#pcGo').onclick=submitPoc;   /* ㊿+214 PoC · 데모(MDR 이 아닌 제품) */
-  $('#pcDoneList').onclick=function(){ switchView('pocs'); };
+  $('#pcDoneList').onclick=function(){ pocTabSet('etc'); switchView('pocs'); };
   $('#pcDoneNew').onclick=function(){ $('#pcDone').style.display='none'; $('#pcFormWrap').style.display=''; wzReset('pc'); $('#pcCompany').focus(); };
   var cx=$('#mpConvX'); if(cx) cx.onclick=function(){ mpConvClear(); toast('전환 취소','채운 내용은 그대로 — 새 신청으로 쓰거나 지우고 다시 쓰세요','info'); };   /* ㊿+210 */
   $('#odDoneList').onclick=function(){ switchView('orders'); };
@@ -2033,9 +2033,9 @@ export var WZ_DEF={
     reqIf:{mpContract:['계약번호', function(){ return mpIsOrder() && /** @type {any} */(document.getElementById('mpBiz')).value==='ICT지원사업'; }]}},   /* ㊿+207 ICT지원사업 정식 발주만 */
   /* ㊿+214 MDR 이 아닌 제품의 PoC · 데모(가격표 SaaS 제품) — poc_requests(SQL 126) · Slack 발주 채널 2곳 */
   pc:{one:true, wrap:'pcFormWrap', go:'pcGo', msg:'pcMsg', first:'pcCompany', cust:'pcCompany',
-    head:function(){ return (REQ.prod? REQ.prod.t : '제품')+' · '+wzVal('pcKind'); },
+    head:function(){ return (REQ.prod? pocPicked(REQ.prod).t : '제품')+' · '+wzVal('pcKind'); },
     notice:'«PoC · 데모 신청»을 누르면 DB 에 저장되고 슬랙 발주 채널(2곳)로 알림이 갑니다 · «PoC · 데모 현황»에 «신청»으로 등록됩니다',
-    steps:[['고객 정보',['pcKind','pcCompany','pcMgr','pcPhone','pcEmail']], ['규모 · 일정',['pcQty','pcStart','pcPeriod']],
+    steps:[['고객 정보',['pcKind','pcAdd','pcCompany','pcMgr','pcPhone','pcEmail']], ['규모 · 일정',['pcQty','pcQty2','pcStart','pcPeriod']],
       ['신청 정보',['pcSales','pcSalesPh','pcNote']], ['확인',[]]],
     req:{pcCompany:'회사명', pcMgr:'고객 담당자 이름'}}
 };
@@ -2059,6 +2059,7 @@ export function wzVal(id){
   if(id==='oiProducts') return [].slice.call(e.querySelectorAll('.oi-prow')).filter(function(r){ var c=r.querySelector('input[data-oip]'); return c && c.checked; }).map(function(r){ var c=r.querySelector('input[data-oip]'), q=r.querySelector('.oi-qty'), et=r.querySelector('.oi-etc'); return (c.dataset.oip==='__etc'? (et&&et.value)||'기타' : c.dataset.oip)+(q&&q.value? ' '+q.value : ''); }).join(', ');
   if(id==='mpEdr') return (mpIsIct()? [['mpAv','EDR(백신)'],['mpRansom','EDR(안티랜섬웨어)'],['mpMedia','매체제어'],['mpFirst','초동조치']] : [['mpEdr','EDR+MDR'],['mpAv','안티바이러스'],['mpRansom','안티랜섬웨어'],['mpMedia','매체제어']]).filter(function(x){ var c=/** @type {any} */(document.getElementById(x[0])); return c && c.checked; }).map(function(x){ return x[1]; }).join(' · ');
   if(id==='oiQuoteBtn'){ var tg=document.getElementById('oiQuoteTag'); return OI_QUOTE && tg? tg.textContent : ''; }
+  if(id==='pcAdd') return [].slice.call(e.querySelectorAll('[data-add][aria-pressed="true"]')).map(function(b){ return b.textContent; }).join(' · ');   /* ㊿+215 */
   if(e.type==='checkbox') return e.checked? '예' : '';
   if(e.tagName==='SELECT'){ var o=e.options[e.selectedIndex]; return o && e.value!==''? o.textContent : ''; }
   return String(e.value||'').trim();
@@ -2186,7 +2187,7 @@ export function wzHid(el, stop){ for(var x=/** @type {any} */(el); x && x!==stop
 export var PK_CFG={
   od:{chips:['odChannel','odType','odEdition','odModel'], steps:{odQty:[1,2,5,10], odNodes:[50,100,300,500,1000]}, dates:['odInstall','odShip'], cust:'odCustomer'},
   mp:{chips:['mpNac'], steps:{mpWin:[10,50,100], mpLinux:[1,5,10], mpMac:[10,50,100]}, dates:['mpDate'], cust:'mpCompany', me:['mpSales','mpSalesPh']},
-  pc:{chips:['pcKind','pcPeriod'], steps:{pcQty:[10,50,100,300]}, dates:['pcStart'], cust:'pcCompany', me:['pcSales','pcSalesPh']}
+  pc:{chips:['pcKind','pcPeriod'], steps:{pcQty:[10,50,100,300], pcQty2:[10,50,100,300]}, dates:['pcStart'], cust:'pcCompany', me:['pcSales','pcSalesPh']}
 };
 export function pkEnhance(key){
   var C=PK_CFG[key]; if(!C) return;
@@ -2304,7 +2305,7 @@ export function pkDevHint(key){
 
 /* ===== ㊿+214 «발주 신청» — Cloud NAC · MDR 정식(ICT지원사업) · MDR 정식(일반)을 위 카드로 고름 =====
    · MDR 은 «PoC · 데모 신청»과 같은 입력(mpBox)을 이 화면으로 옮겨 씀(정식 발주 · 사업 구분 고정) */
-export var REQ={kind:'nac', prod:/** @type {any} */(null), prods:/** @type {any} */(null), ld:false};
+export var REQ={kind:'nac', prod:/** @type {any} */(null), prods:/** @type {any} */(null), ld:false, adds:/** @type {any} */({})};
 export var REQ_KINDS=[
   {k:'nac', ic:'☁️', t:'Cloud NAC 발주', s:'에스원 · 조달 · LG U+ 판매 — 임대 장비 출고 · 교체 · 회수'},
   {k:'ict', ic:'🛡️', t:'MDR 정식 발주 · ICT지원사업', s:'EDR 발주요청서(ICT지원사업) 양식 — 초동조치 포함'},
@@ -2350,14 +2351,43 @@ export function reqOpen(){
 }
 
 /* ===== ㊿+214 «PoC · 데모 신청» — 제품 = 가격표(SaaS 최신 판) 메뉴판 · MDR 은 MDR 운영·신청 현황(예전 그대로) · 그 밖은 poc_requests ===== */
+/* ㊿+215 PoC · 데모 제품 = 팔 수 있는 경우의 수(가격표 SaaS 서비스 키 CIE · MDRA · MDR · AV · RW · DC)
+   카드(단독) = Cloud NAC · Cloud ZTNA · Cloud NAC + Cloud ZTNA · Cloud Insights E · Genian MDR 서비스 · AV
+   추가로만(카드 없음) = MDR Add-on 24×7 · Anti-Ransom · 매체제어
+     · Cloud Insights E ← AV · Anti-Ransom · 매체제어 · MDR Add-on 24×7(아래 «추가 모듈» 단추)
+     · Genian MDR 서비스 ← AV · Anti-Ransom · 매체제어(MDR PoC 양식의 모듈 칸 — 안티바이러스 · 안티랜섬웨어 · 매체제어)
+   가격표에 새로 생긴 다른 키 = 단독 카드(이름 · 설명 그대로) */
+var POC_ADDON={MDRA:1, RW:1, DC:1}, POC_ADD_LBL={AV:'AV', RW:'Anti-Ransom', DC:'매체제어', MDRA:'MDR Add-on 24×7'};
 export function pocProducts(){
   var b=(ST.RAWX.price||[]).filter(function(x){ return x.seg==='saas'; })[0] || REQ.prods, D=b && b.data || null, out=/** @type {any[]} */([]);
-  if(!D || D.cnac) out.push({k:'CNAC', ic:'☁️', t:'Cloud NAC', s:'노드 기준', unit:'노드', mdr:false});
-  if(!D || D.ztna) out.push({k:'ZTNA', ic:'🌐', t:'Cloud ZTNA', s:'PA Agent 기준', unit:'Agent', mdr:false});
-  var sv=D && D.services && D.services.length? D.services : [{key:'MDR', icon:'🛡️', name:'EDR+MDR', sub:'EDR · MDR'}];
-  sv.forEach(function(s){ out.push({k:String(s.key||s.name||''), ic:s.icon||'🛡️', t:String(s.name||s.key||''), s:String(s.sub||''), unit:'Agent', mdr:s.key==='MDR'}); });
+  var sv=D && D.services && D.services.length? D.services : ['CIE','MDRA','MDR','AV','RW','DC'].map(function(k){ return {key:k}; });   // 가격표를 못 읽으면 기본 조합
+  var has={}; sv.forEach(function(x){ has[String(x.key||'')]=1; });
+  var lbl=function(ks){ return ks.map(function(k){ return POC_ADD_LBL[k]; }).join(' · '); };
+  var nac=!D || !!D.cnac, zt=!D || !!D.ztna;
+  if(nac) out.push({k:'CNAC', t:'Cloud NAC', s:'단독 · 노드 기준', unit:'노드'});
+  if(zt) out.push({k:'ZTNA', t:'Cloud ZTNA', s:'단독 · PA Agent 기준', unit:'Agent'});
+  if(nac && zt) out.push({k:'CNAC+ZTNA', t:'Cloud NAC + Cloud ZTNA', s:'두 제품 함께 · 노드 + Agent', unit:'노드', unit2:'ZTNA Agent'});
+  sv.forEach(function(x){
+    var k=String(x.key||x.name||''); if(!k || POC_ADDON[k]) return;
+    if(k==='CIE'){ var ad=['AV','RW','DC','MDRA'].filter(function(y){ return has[y]; }); out.push({k:k, t:String(x.name||'Cloud Insights E'), s:'단독'+(ad.length? ' · + '+lbl(ad)+' 추가 가능' : ''), unit:'Agent', adds:ad}); return; }
+    if(k==='MDR'){ var am=['AV','RW','DC'].filter(function(y){ return has[y]; }); out.push({k:k, t:'Genian MDR 서비스', s:'Cloud Insights E + 24×7 관제'+(am.length? ' · + '+lbl(am)+' 추가 가능' : ''), unit:'Agent', mdr:true}); return; }
+    if(k==='AV'){ out.push({k:k, t:String(x.name||'AV Service'), s:'단독', unit:'Agent'}); return; }
+    out.push({k:k, t:String(x.name||k), s:String(x.sub||''), unit:'Agent'});
+  });
   return out;
 }
+/** 고른 제품 + 추가 모듈 이름(«Cloud Insights E + AV + MDR Add-on 24×7») · 키(«CIE+AV+MDRA») */
+export function pocPicked(p){
+  var ad=(p && p.adds || []).filter(function(k){ return REQ.adds && REQ.adds[k]; });
+  return {t:(p? p.t : '')+ad.map(function(k){ return ' + '+POC_ADD_LBL[k]; }).join(''), k:(p? p.k : '')+ad.map(function(k){ return '+'+k; }).join('')};
+}
+function pocAddPaint(p){
+  var box=document.getElementById('pcAddBox'), host=document.getElementById('pcAdd'); if(!box || !host) return;
+  var ad=p && p.adds || []; box.hidden=!ad.length; if(!ad.length){ host.innerHTML=''; return; }
+  host.innerHTML=ad.map(function(k){ return tpl`<button type="button" class="pk-chip" data-add="${k}" aria-pressed="${REQ.adds && REQ.adds[k]? 'true':'false'}">${POC_ADD_LBL[k]}</button>`; }).join('');
+  host.onclick=function(e){ var b=/** @type {any} */(e.target).closest('[data-add]'); if(!b) return; REQ.adds=REQ.adds||{}; REQ.adds[b.dataset.add]=!REQ.adds[b.dataset.add]; pocAddPaint(p); pocTitlePaint(p); wzSummary('pc'); };
+}
+function pocTitlePaint(p){ var t=document.getElementById('pcTitle'); if(t) t.textContent=pocPicked(p).t+' PoC · 데모 신청'; }
 export function pocLoad(){
   if(REQ.ld || (ST.RAWX.price||[]).some(function(x){ return x.seg==='saas'; })) return;
   REQ.ld=true;
@@ -2378,10 +2408,14 @@ export function pocPaint(){
     var k=/** @type {any} */(document.getElementById('mpKind')); if(k.value!=='poc'){ k.value='poc'; mpKindSync(); }
     wzSummary('mp');
   }else if(mb && mb.parentNode===mh) mb.hidden=true;
-  if(pb){ pb.hidden=!(p && !p.mdr); if(p && !p.mdr){ var t=document.getElementById('pcTitle'); if(t) t.textContent=p.t+' PoC · 데모 신청'; var ql=document.getElementById('pcQtyL'); if(ql) ql.textContent='규모('+(p.unit||'수량')+')'; wzSummary('pc'); } }
+  if(pb){ pb.hidden=!(p && !p.mdr); if(p && !p.mdr){ pocTitlePaint(p); pocAddPaint(p);
+    var ql=document.getElementById('pcQtyL'); if(ql) ql.textContent='규모('+(p.unit2? 'NAC ' : '')+(p.unit||'수량')+')';
+    var q2=document.getElementById('pcQty2Box'); if(q2) q2.hidden=!p.unit2;   /* ㊿+215 Cloud NAC + ZTNA = 노드 · Agent 두 칸 */
+    wzSummary('pc'); } }
 }
 export function pocSelect(k){
   var p=pocProducts().filter(function(x){ return x.k===k; })[0]; if(!p) return;
+  if(!REQ.prod || REQ.prod.k!==p.k) REQ.adds={};   /* ㊿+215 제품을 바꾸면 추가 모듈은 비움 */
   REQ.prod=p; try{ localStorage.setItem(POC_LAST, k); }catch(e){}
   pocPaint();
   var f=/** @type {any} */(document.getElementById(p.mdr? 'mpCompany' : 'pcCompany')); if(f && f.offsetParent && !(document.activeElement && document.activeElement.closest && document.activeElement.closest('.req-kinds'))) f.focus();
@@ -2390,6 +2424,7 @@ export function pocSelect(k){
 export function pocOpen(){
   try{ mpConvClear(); }catch(e){}
   ['mp','pc'].forEach(function(k){ try{ wzReset(k); }catch(e){} });
+  REQ.adds={};   /* ㊿+215 추가 모듈은 새로 */
   msg('mpMsg',''); msg('pcMsg','');
   ['mpFormWrap','pcFormWrap'].forEach(function(id){ var x=document.getElementById(id); if(x) x.style.display=''; });
   ['mpDone','pcDone'].forEach(function(id){ var x=document.getElementById(id); if(x) x.style.display='none'; });
@@ -2404,9 +2439,10 @@ export async function submitPoc(){
   if(!comp||!mgr){ msg('pcMsg','회사명과 고객 담당자 이름은 필수입니다','bad'); return; }
   var btn=$('#pcGo'); btn.disabled=true; msg('pcMsg','접수 중…');
   try{
-    var row={ requester:ST.AUTH_USER||null, product:p.t, product_key:p.k, kind:$('#pcKind').value, customer:comp, mgr_name:mgr,
+    var pk=pocPicked(p), q2=p.unit2 && $('#pcQty2').value!==''? (+$('#pcQty2').value||0) : null;
+    var row={ requester:ST.AUTH_USER||null, product:pk.t, product_key:pk.k, kind:$('#pcKind').value, customer:comp, mgr_name:mgr,
       mgr_phone:$('#pcPhone').value.trim()||null, mgr_email:$('#pcEmail').value.trim()||null,
-      qty:$('#pcQty').value===''? null : (+$('#pcQty').value||0), qty_unit:p.unit||null,
+      qty:$('#pcQty').value===''? null : (+$('#pcQty').value||0), qty_unit:(p.unit||'')+(q2!=null? ' · '+p.unit2+' '+q2 : '') || null,   /* ㊿+215 NAC + ZTNA = «노드 · ZTNA Agent 30» */
       start_date:$('#pcStart').value||null, period:$('#pcPeriod').value||null,
       sales_name:$('#pcSales').value.trim()||null, sales_phone:$('#pcSalesPh').value.trim()||null,
       note:$('#pcNote').value.trim()||null, status:'신청' };
@@ -2414,9 +2450,9 @@ export async function submitPoc(){
     try{ out=await sbWrite('POST','poc_requests?select=*',[row],'return=representation'); }
     catch(e1){ if(/poc_requests|PGRST205|PGRST204|42P01|schema cache|404/.test(String(/** @type {any} */(e1).message||e1))) throw new Error('PoC · 데모 표가 아직 DB 에 없습니다 — 관리자가 SQL 126 을 먼저 실행해야 합니다(MDR PoC 는 지금도 됩니다)'); throw e1; }
     ST.RAWX.pocs=ST.RAWX.pocs||[]; ST.RAWX.pocs.unshift(out[0]);
-    logChange('insert','poc_requests',out[0].id,{product:p.t, kind:row.kind, company:comp, mgr:mgr});
+    logChange('insert','poc_requests',out[0].id,{product:pk.t, kind:row.kind, company:comp, mgr:mgr});
     pkMeSave('pc'); msg('pcMsg','');
-    $('#pcDoneSum').textContent=[p.t+' '+row.kind, comp, mgr, row.qty!=null? row.qty+(p.unit? ' '+p.unit : '') : '', row.period||''].filter(Boolean).join(' · ');
+    $('#pcDoneSum').textContent=[pk.t+' '+row.kind, comp, mgr, row.qty!=null? row.qty+(row.qty_unit? ' '+row.qty_unit : '') : '', row.period||''].filter(Boolean).join(' · ');
     $('#pcFormWrap').style.display='none'; $('#pcDone').style.display='';
     toast(p.t+' '+row.kind+' 신청 접수 완료', comp+' · '+mgr);
     ['pcCompany','pcMgr','pcPhone','pcEmail','pcQty','pcStart','pcNote'].forEach(function(i){ var x=$('#'+i); if(x) x.value=''; });

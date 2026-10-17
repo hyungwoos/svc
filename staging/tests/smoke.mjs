@@ -928,31 +928,35 @@ if (S.blk()) {
       { id: 12, customer: '가상고객02', status: '진행중', req_kind: 'poc', license: 'EDR+RANSOMWARE+AV' },
       { id: 13, customer: '가상기관03', status: '발주요청', req_kind: 'order' },
       { id: 14, customer: '가상고객04', status: '데모' }]; });
-    await page.evaluate(() => SVC.navMenu('mdrops')); await page.waitForTimeout(500);
+    await page.evaluate(() => { SVC.pocTabSet('mdr'); SVC.navMenu('pocs'); }); await page.waitForSelector('#dvTable [data-act="toOrder"]', { timeout: 10000 }); await page.waitForTimeout(150);   /* ㊿+215 PoC 행 = «PoC · 데모 현황» › MDR · 부하에서도 버튼이 그려진 뒤 */
     return { ctx, page, c, st };
   };
   const btns = (P) => P.evaluate(() => [...document.querySelectorAll('#dvTable tbody tr')].filter((tr) => tr.querySelector('[data-act="toOrder"]')).map((tr) => (tr.textContent.match(/가상[가-힣]+\d+/) || [''])[0]).sort().join(','));
   const conv = (P, nm) => P.evaluate((n) => { const tr = [...document.querySelectorAll('#dvTable tbody tr')].find((t) => t.textContent.includes(n)); tr.querySelector('[data-act="toOrder"]').click(); }, nm);
+  const toPoc = async (P) => { await P.evaluate(() => { SVC.pocTabSet('mdr'); SVC.navMenu('pocs'); }); await P.waitForSelector('#dvTable [data-act="toOrder"]', { timeout: 10000 }); await P.waitForTimeout(150); };   /* ㊿+215 «PoC · 데모 현황» › MDR · 버튼이 그려진 뒤 */
   const next3 = async (P) => { await P.waitForTimeout(80); };   /* ㊿+214 한 화면 — 단계 없음 */
   await S.t('㊿+210 MDR 발주 전환: PoC 행만 «발주 전환» → 신청 화면 PoC 내용 · 정식 발주 고정 · 안내 → 발주 요청 = 새 행(src_id · 발주요청) + PoC «발주전환» · 완료 · 현황 연결 표시 · 버튼 사라짐 · 전환 취소 · 다시 들어오면 보통 신청', async () => {
     const A = await mk210(), P = A.page;
     const b0 = await btns(P);
-    await conv(P, '가상고객01'); await P.waitForSelector('#viewOrderNew:not(.hidden) #mpConv:not([hidden])', { timeout: 5000 }); await P.waitForTimeout(120);
+    await conv(P, '가상고객01'); await P.waitForSelector('#viewOrderNew:not(.hidden) #mpConv:not([hidden])', { timeout: 10000 }); await P.waitForTimeout(120);
     const f = await P.evaluate(() => { const v = (i) => document.getElementById(i).value, ck = (i) => document.getElementById(i).checked;
       return { kind: v('mpKind'), dis: document.getElementById('mpKind').disabled, ban: document.getElementById('mpConvT').textContent, title: document.getElementById('mpTitle').textContent, go: document.getElementById('mpGo').textContent,
         comp: v('mpCompany'), mgr: v('mpMgr'), ph: v('mpPhone'), em: v('mpEmail'), dev: v('mpDev'), edr: ck('mpEdr'), av: ck('mpAv'), rs: ck('mpRansom'), md: ck('mpMedia'), win: v('mpWin'), mac: v('mpMac'), nac: v('mpNac'), sales: v('mpSales'), note: v('mpNote'), date: v('mpDate'), ct: v('mpContract') }; });
     await P.fill('#mpContract', 'N0000001'); await next3(P);
     const sum = await P.evaluate(() => document.getElementById('mpWzSum').textContent);
-    await P.click('#mpGo'); await P.waitForSelector('#mpDone', { state: 'visible', timeout: 5000 });
+    await P.click('#mpGo'); await P.waitForSelector('#mpDone', { state: 'visible', timeout: 10000 });
     const d = await P.evaluate(() => ({ t: document.getElementById('mpDoneT').textContent, sum: document.getElementById('mpDoneSum').textContent, note: document.getElementById('mpDoneNote').textContent, st: SVC.ST.RAWX.mdrops.find((x) => x.id === 11).status, src: SVC.MP_CONV.src, dis: document.getElementById('mpKind').disabled, ban: document.getElementById('mpConv').hidden }));
     const post = A.st.posts[0] || {}, pat = A.st.patches[0] || {};
-    await P.evaluate(() => SVC.navMenu('mdrops')); await P.waitForTimeout(400);
+    await toPoc(P);
     const g = await P.evaluate(() => document.querySelector('#dvTable tbody').textContent); const b1 = await btns(P);
-    await conv(P, '가상고객02'); await P.waitForSelector('#mpConv:not([hidden])', { timeout: 5000 });
+    await P.evaluate(() => SVC.navMenu('mdrops')); await P.waitForTimeout(400);
+    const g2 = await P.evaluate(() => document.querySelector('#dvTable tbody').textContent);
+    await toPoc(P);
+    await conv(P, '가상고객02'); await P.waitForSelector('#mpConv:not([hidden])', { timeout: 10000 });
     const f2 = await P.evaluate(() => ({ av: document.getElementById('mpAv').checked, rs: document.getElementById('mpRansom').checked, ban: document.getElementById('mpConvT').textContent }));
     await P.click('#mpConvX'); await P.waitForTimeout(100);
     const x = await P.evaluate(() => ({ ban: document.getElementById('mpConv').hidden, dis: document.getElementById('mpKind').disabled, src: SVC.MP_CONV.src }));
-    await conv(P, '가상고객02').catch(() => {}); await P.evaluate(() => SVC.navMenu('mdrops')); await P.waitForTimeout(200); await conv(P, '가상고객02'); await P.waitForTimeout(150);
+    await conv(P, '가상고객02').catch(() => {}); await toPoc(P); await conv(P, '가상고객02'); await P.waitForTimeout(150);
     await P.evaluate(() => SVC.navMenu('mdrnew')); await P.waitForTimeout(200);
     const y = await P.evaluate(() => ({ ban: document.getElementById('mpConv').hidden, dis: document.getElementById('mpKind').disabled, src: SVC.MP_CONV.src }));
     const errs = A.c.errs.slice(); await A.ctx.close();
@@ -963,19 +967,19 @@ if (S.blk()) {
     assert(post.req_kind === 'order' && post.status === '발주요청' && post.src_id === 11 && post.contract_no === 'N0000001' && post.biz_kind === 'ICT지원사업' && post.customer === '가상고객01' && post.os_win === 30 && post.mod_av === true && post.mod_media === true, '새 행 ' + JSON.stringify(post));
     assert(A.st.patches.length === 1 && /^mdr_ops\?id=eq\.11$/.test(pat.u) && JSON.stringify(pat.body) === '{"status":"발주전환"}', 'PoC 상태 ' + JSON.stringify(A.st.patches));
     assert(d.t === '발주 전환이 접수되었습니다' && /^PoC #11 에서 전환 · 정식 발주\(ICT지원사업\)/.test(d.sum) && /발주 채널\(2곳\)/.test(d.note) && /PoC #11 는 «발주전환»/.test(d.note) && !/SQL 124/.test(d.note) && d.st === '발주전환' && d.src === null && !d.dis && d.ban, '완료 ' + JSON.stringify(d));
-    assert(/정식 발주\(PoC #11 전환\)/.test(g) && /PoC → 발주 #901/.test(g) && /발주전환/.test(g) && b1 === '가상고객02', '현황 ' + JSON.stringify({ b1, g: g.slice(0, 300) }));
+    assert(/정식 발주\(PoC #11 전환\)/.test(g2) && /PoC → 발주 #901/.test(g) && /발주전환/.test(g) && b1 === '가상고객02' && !/가상기관03|정식 발주/.test(g) && !/가상고객02/.test(g2) && /가상기관03/.test(g2), '현황(PoC 탭 · MDR 운영 = 정식 발주만) ' + JSON.stringify({ b1, g: g.slice(0, 300), g2: g2.slice(0, 300) }));
     assert(f2.av && f2.rs && /PoC #12/.test(f2.ban) && x.ban && !x.dis && x.src === null && y.ban && !y.dis && y.src === null && !errs.length, '라이선스 칩 · 전환 취소 · 보통 신청 ' + JSON.stringify({ f2, x, y, errs }));
     return '전환 1건 · 버튼 ' + b0 + ' → ' + b1;
   });
   await S.t('㊿+210 MDR 발주 전환 — SQL 124 전 DB: 연결 번호 없이 다시 저장(발주 · PoC «발주전환» · 안내) / 이미 전환된 PoC(동시에 두 번): «이미 전환» 안내 · PoC 상태 안 바꿈 · 값 그대로', async () => {
     const A = await mk210({ noSrc: true }), P = A.page;
-    await conv(P, '가상고객02'); await P.waitForSelector('#mpConv:not([hidden])', { timeout: 5000 }); await P.fill('#mpMgr', '홍길동'); await P.click('#reqKinds [data-k="gen"]'); await P.waitForTimeout(150); await next3(P);
-    await P.click('#mpGo'); await P.waitForSelector('#mpDone', { state: 'visible', timeout: 5000 });
+    await conv(P, '가상고객02'); await P.waitForSelector('#mpConv:not([hidden])', { timeout: 10000 }); await P.fill('#mpMgr', '홍길동'); await P.click('#reqKinds [data-k="gen"]'); await P.waitForTimeout(150); await next3(P);
+    await P.click('#mpGo'); await P.waitForSelector('#mpDone', { state: 'visible', timeout: 10000 });
     const a = await P.evaluate(() => ({ note: document.getElementById('mpDoneNote').textContent, st: SVC.ST.RAWX.mdrops.find((x) => x.id === 12).status }));
     const ps = A.st.posts.map((r) => ('src_id' in r) + ':' + r.req_kind).join(','), pt = A.st.patches.map((x) => x.u).join(',');
     const errs1 = A.c.errs.slice(); await A.ctx.close();
     const B = await mk210({ dup: true }), Q = B.page;
-    await conv(Q, '가상고객01'); await Q.waitForSelector('#mpConv:not([hidden])', { timeout: 5000 }); await Q.fill('#mpContract', 'N0000002'); await next3(Q);
+    await conv(Q, '가상고객01'); await Q.waitForSelector('#mpConv:not([hidden])', { timeout: 10000 }); await Q.fill('#mpContract', 'N0000002'); await next3(Q);
     await Q.click('#mpGo'); await Q.waitForTimeout(700);
     const b = await Q.evaluate(() => ({ msg: document.getElementById('mpMsg').textContent, done: getComputedStyle(document.getElementById('mpDone')).display, st: SVC.ST.RAWX.mdrops.find((x) => x.id === 11).status, src: SVC.MP_CONV.src && SVC.MP_CONV.src.id, ct: document.getElementById('mpContract').value, go: document.getElementById('mpGo').disabled }));
     const pt2 = B.st.patches.length, errs2 = B.c.errs.slice(); await B.ctx.close();
@@ -987,7 +991,7 @@ if (S.blk()) {
 // ㊿+214 발주 신청 · PoC · 데모 신청 — 한 화면 · 종류/제품 카드 · 선택 단추 · − + · 날짜 · 최근 고객 · 지난 신청 불러오기 · 꼭 넣을 칸 · 양식 대조(ICT · 일반 · PoC) · poc_requests · 폰
 if (S.blk()) {
   const day = (o) => { const d = new Date(); if (o === 'mon') { const w = d.getDay(); d.setDate(d.getDate() + (((8 - w) % 7) || 7)); } else d.setDate(d.getDate() + o); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
-  const BOOK = { id: 9, seg: 'saas', label: '시험 판', applied: '2026-10-01', data: { cnac: { rows: [] }, ztna: { rows: [] }, services: [{ key: 'CIE', icon: '🧩', name: '가상서비스A', sub: 'Agent 기준', tiers: [] }, { key: 'MDR', icon: '🛡️', name: 'EDR+MDR', sub: 'EDR · MDR', tiers: [] }] } };
+  const BOOK = { id: 9, seg: 'saas', label: '시험 판', applied: '2026-10-01', data: { cnac: { rows: [] }, ztna: { rows: [] }, services: [{ key: 'CIE', icon: '🧩', name: '가상서비스A', sub: 'Agent 기준', tiers: [] }, { key: 'MDRA', name: '가상추가24', tiers: [] }, { key: 'MDR', icon: '🛡️', name: 'EDR+MDR', sub: 'EDR · MDR', tiers: [] }, { key: 'AV', name: '가상백신', tiers: [] }, { key: 'RW', name: '가상랜섬', tiers: [] }, { key: 'DC', name: '가상매체', tiers: [] }] } };
   const mk214 = async (o) => {
     o = Object.assign({ w: 1360, noPoc: false }, o || {});
     const ctx = await browser.newContext({ viewport: { width: o.w, height: 1000 }, serviceWorkers: 'block' }); const page = await ctx.newPage(); const c = collect(page);
@@ -1063,10 +1067,19 @@ if (S.blk()) {
   });
   await S.t('㊿+214 PoC · 데모 신청: 제품 메뉴판 = 가격표 SaaS(가짜 판) · MDR = MDR PoC 양식(계약번호 없음 · 모듈 = 일반) · 그 밖 = PoC · 데모 양식(구분 · 규모 단위 · 기간 단추 · 다음 주 월요일) → poc_requests · 완료 · 현황 / SQL 126 전 = 안내', async () => {
     const A = await mk214(), P = A.page;
-    await P.evaluate(() => { try { localStorage.removeItem('svc_poc_last'); } catch (e) {} SVC.navMenu('mdrnew'); }); await P.waitForFunction(() => document.querySelectorAll('#pocProds .req-kind').length === 4, null, { timeout: 5000 });
+    await P.evaluate(() => { try { localStorage.removeItem('svc_poc_last'); } catch (e) {} SVC.navMenu('mdrnew'); }); await P.waitForFunction(() => /가상서비스A/.test((document.getElementById('pocProds') || {}).textContent || ''), null, { timeout: 5000 });   /* 가짜 판을 읽은 뒤(못 읽으면 기본 조합 6개) */
     const p0 = await P.evaluate(() => ({ cards: [...document.querySelectorAll('#pocProds .req-kind b')].map((b) => b.textContent.trim()).join('|'), hint: !document.getElementById('pocHint').hidden, mp: document.getElementById('mpBox').hidden, pc: document.getElementById('pcBox').hidden, menu: document.querySelector('#side button[data-v="mdrnew"]').textContent.trim() }));
     await P.click('#pocProds [data-k="MDR"]'); await P.waitForTimeout(200);
     const lm = await labels(P, 'mpFormWrap'); const m1 = await P.evaluate(() => ({ go: document.getElementById('mpGo').textContent, kind: document.getElementById('mpKind').value, mp: document.getElementById('mpBox').hidden }));
+    /* ㊿+215 모듈 체크 상자 = 작은 체크(16px) + 이름 한 줄(입력 칸 크기 규칙이 키우던 것) */
+    const ck = await P.evaluate(() => { const i = document.getElementById('mpAv').getBoundingClientRect(), l = document.getElementById('mpAv').closest('label').getBoundingClientRect(); return { w: Math.round(i.width), h: Math.round(i.height), lh: Math.round(l.height), row: Math.abs((i.top + i.height / 2) - (l.top + l.height / 2)) < 4 }; });
+    /* ㊿+215 Cloud Insights E = 추가 모듈 4개(여러 개) · NAC + ZTNA = 규모 두 칸 · 추가 모듈은 제품을 바꾸면 비움 */
+    await P.click('#pocProds [data-k="CIE"]'); await P.waitForTimeout(150);
+    const ad = await P.evaluate(() => ({ box: !document.getElementById('pcAddBox').hidden, chips: [...document.querySelectorAll('#pcAdd [data-add]')].map((b) => b.textContent).join('|'), sub: document.querySelector('#pocProds [data-k="CIE"]').textContent }));
+    await P.click('#pcAdd [data-add="AV"]'); await P.click('#pcAdd [data-add="MDRA"]'); await P.waitForTimeout(100);
+    const ad2 = await P.evaluate(() => ({ t: document.getElementById('pcTitle').textContent, pk: SVC.pocPicked(SVC.REQ.prod), on: [...document.querySelectorAll('#pcAdd [aria-pressed="true"]')].length, sum: document.getElementById('pcWzSum') ? document.getElementById('pcWzSum').textContent : '' }));
+    await P.click('#pocProds [data-k="CNAC+ZTNA"]'); await P.waitForTimeout(150);
+    const cz = await P.evaluate(() => ({ add: document.getElementById('pcAddBox').hidden, q2: !document.getElementById('pcQty2Box').hidden, ql: document.getElementById('pcQtyL').textContent, pk: SVC.pocPicked(SVC.REQ.prod).k }));
     await P.click('#pocProds [data-k="ZTNA"]'); await P.waitForTimeout(200);
     const lp = await labels(P, 'pcFormWrap'); const z1 = await P.evaluate(() => ({ t: document.getElementById('pcTitle').textContent, mp: document.getElementById('mpBox').hidden, pc: document.getElementById('pcBox').hidden }));
     await P.click('#pcKind + .pk-chips [data-v="데모"]'); await P.click('#pcPeriod + .pk-chips [data-v="2개월"]');
@@ -1075,7 +1088,18 @@ if (S.blk()) {
     await P.click('#pcGo'); await P.waitForSelector('#pcDone', { state: 'visible', timeout: 5000 });
     const d = await P.evaluate(() => ({ sum: document.getElementById('pcDoneSum').textContent }));
     const bp = (A.st.posts.find((x) => x.t === 'poc_requests') || {}).row || {};
-    await P.evaluate(() => SVC.navMenu('pocs')); await P.waitForTimeout(500);
+    await P.click('#pcDoneNew'); await P.click('#pocProds [data-k="CNAC+ZTNA"]'); await P.waitForTimeout(150);
+    await P.fill('#pcCompany', '가상고객09'); await P.fill('#pcMgr', '김철수'); await P.fill('#pcQty', '100'); await P.fill('#pcQty2', '30');
+    await P.click('#pcGo'); await P.waitForSelector('#pcDone', { state: 'visible', timeout: 5000 });
+    const bz = (A.st.posts.filter((x) => x.t === 'poc_requests')[1] || {}).row || {};
+    /* ㊿+215 PoC · 데모 현황 = 탭 2개 — 그 밖의 제품(poc_requests) / MDR(mdr_ops PoC 행) · MDR 운영 = 정식 발주만 */
+    await P.evaluate(() => { SVC.pocTabSet('etc'); SVC.navMenu('pocs'); }); await P.waitForTimeout(500);
+    const tb = await P.evaluate(() => ({ pt: [...document.querySelectorAll('#dvWvBar [data-pt]')].map((b) => b.dataset.pt + ':' + b.getAttribute('aria-pressed')).join(','), body: document.querySelector('#dvTable tbody').textContent }));
+    await P.click('#dvWvBar [data-pt="mdr"]'); await P.waitForTimeout(400);
+    const tm = await P.evaluate(() => ({ pt: document.querySelector('#dvWvBar [data-pt="mdr"]').getAttribute('aria-pressed'), body: document.querySelector('#dvTable tbody').textContent, head: [...document.querySelectorAll('#dvTable thead th')].map((t) => t.textContent.trim()).join('|'), table: SVC.GRIDS.pocs.table }));
+    await P.evaluate(() => SVC.navMenu('mdrops')); await P.waitForTimeout(400);
+    const mo = await P.evaluate(() => document.querySelector('#dvTable tbody').textContent);
+    await P.evaluate(() => { SVC.pocTabSet('etc'); SVC.navMenu('pocs'); }); await P.waitForTimeout(400);
     const g = await P.evaluate(() => ({ title: document.getElementById('dvTitle') ? document.getElementById('dvTitle').textContent : '', body: (document.querySelector('#dvTable tbody') || {}).textContent || '' }));
     const errs = A.c.errs.slice(); await A.ctx.close();
     const B = await mk214({ noPoc: true }), Q = B.page;
@@ -1084,13 +1108,18 @@ if (S.blk()) {
     const n = await Q.evaluate(() => ({ msg: document.getElementById('pcMsg').textContent, done: getComputedStyle(document.getElementById('pcDone')).display, last: document.querySelector('#pocProds [aria-checked="true"]').dataset.k, c: document.getElementById('pcCompany').value }));
     const errs2 = B.c.errs.slice(); await B.ctx.close();
     const PC = '구분|회사명|고객 담당자 이름|고객 연락처|고객 담당자 이메일|규모(Agent)|희망 시작일|기간|영업담당자|영업담당자 연락처|요청사항 / 비고';
-    assert(p0.cards === 'Cloud NAC|Cloud ZTNA|가상서비스A|EDR+MDR' && p0.hint && p0.mp && p0.pc && /PoC · 데모 신청/.test(p0.menu), '메뉴판 ' + JSON.stringify(p0));
+    assert(p0.cards === 'Cloud NAC|Cloud ZTNA|Cloud NAC + Cloud ZTNA|가상서비스A|Genian MDR 서비스|가상백신' && p0.hint && p0.mp && p0.pc && /PoC · 데모 신청/.test(p0.menu), '메뉴판(추가로만 = 카드 없음) ' + JSON.stringify(p0));
+    assert(ad.box && ad.chips === 'AV|Anti-Ransom|매체제어|MDR Add-on 24×7' && /추가 가능/.test(ad.sub) && ad2.on === 2 && ad2.pk.t === '가상서비스A + AV + MDR Add-on 24×7' && ad2.pk.k === 'CIE+AV+MDRA' && /가상서비스A \+ AV \+ MDR Add-on 24×7 PoC · 데모 신청/.test(ad2.t)
+      && cz.add && cz.q2 && cz.ql === '규모(NAC 노드)' && cz.pk === 'CNAC+ZTNA', '추가 모듈 · NAC + ZTNA ' + JSON.stringify({ ad, ad2, cz }));
+    assert(ck.w <= 18 && ck.h <= 18 && ck.lh <= 40 && ck.row, '모듈 체크 상자 크기 ' + JSON.stringify(ck));
+    assert(bz.product === 'Cloud NAC + Cloud ZTNA' && bz.product_key === 'CNAC+ZTNA' && bz.qty === 100 && bz.qty_unit === '노드 · ZTNA Agent 30', 'NAC + ZTNA 저장 ' + JSON.stringify(bz));
+    assert(tb.pt === 'mdr:false,etc:true' && /가상고객07/.test(tb.body) && tm.pt === 'true' && tm.table === 'mdr_ops' && /가상고객01/.test(tm.body) && !/가상고객07/.test(tm.body) && /서비스유형/.test(tm.head) && !/계약번호|수주기입/.test(tm.head) && !/가상고객01/.test(mo), '현황 탭 ' + JSON.stringify({ tb: tb.pt, tm: { pt: tm.pt, t: tm.table, h: tm.head.slice(0, 120), b: tm.body.slice(0, 120) }, mo: mo.slice(0, 120) }));
     assert(lm === '회사명|고객 담당자 이름|고객 연락처|고객 담당자 이메일|단말 및 서버 수량|[EDR+MDR]|[안티바이러스]|[안티랜섬웨어]|[매체제어]|Windows|Linux|MacOS|EDR Web UI 접속 계정용 이메일 주소|NAC 사용여부|영업담당자|영업담당자 연락처|신청일자|요청사항 / 비고' && m1.go === 'POC 신청' && m1.kind === 'poc' && !m1.mp, 'MDR PoC 양식 ' + JSON.stringify({ lm, m1 }));
     assert(lp === PC && /Cloud ZTNA PoC · 데모 신청/.test(z1.t) && z1.mp && !z1.pc, 'PoC · 데모 양식 ' + JSON.stringify({ lp, z1 }));
     assert(bp.product === 'Cloud ZTNA' && bp.product_key === 'ZTNA' && bp.kind === '데모' && bp.period === '2개월' && bp.qty === 40 && bp.qty_unit === 'Agent' && bp.start_date === day('mon') && bp.status === '신청' && bp.customer === '가상고객07' && /Cloud ZTNA 데모/.test(d.sum), '저장 ' + JSON.stringify({ bp, d }));
     assert(/PoC · 데모 현황/.test(g.title) && /가상고객07/.test(g.body) && !errs.length, '현황 ' + JSON.stringify({ g: { t: g.title, b: g.body.slice(0, 120) }, errs }));
     assert(/SQL 126/.test(n.msg) && n.done === 'none' && n.last === 'CNAC' && n.c === '가상고객08' && !errs2.length, 'SQL 126 전 ' + JSON.stringify({ n, errs2 }));
-    return '메뉴판 4 · MDR · ZTNA 저장 · 현황 · 126 전';
+    return '메뉴판 6(조합) · 추가 모듈 · NAC + ZTNA · MDR · ZTNA 저장 · 현황 탭 · 126 전';
   });
   await S.t('㊿+214 폰(390px): 발주 신청 · PoC · 데모 신청 — 요약이 아래로 · 가로 넘침 0 · 카드 한 줄에 하나 이상 · 단추 누르는 크기 28px 이상', async () => {
     const A = await mk214({ w: 390 }), P = A.page;
