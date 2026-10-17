@@ -29,6 +29,8 @@ export function serve(dir = ROOT, base = '/svc') {
 /** token: 주입할 access token(기본 'tok' · JWT 모양이면 aal 검사에 쓰임) · noSession: 세션 없이 시작(로그인 화면 테스트) */
 export async function mockBackend(page, { role = 'super_admin', email = 'tester@example.com', onWrite = null, extra = null, token = 'tok', noSession = false, keepStore = false } = {}) {
   const data = JSON.stringify(Object.assign({}, FIX, { roles: [{ role }] }));
+  /* ㊿+214 글꼴 흔들기(SMOKE_FONT_STRESS=1): 글꼴 · 글자 간격을 바꿔 «화면 위치 · 크기를 재는 시험»이 글꼴에 기대는지 찾음 — CI 서버 글꼴이 달라 깨지던 시험 대비 */
+  if (process.env.SMOKE_FONT_STRESS) await page.addInitScript(() => { const add = () => { if (document.getElementById('__fontStress') || !document.documentElement) return; const s = document.createElement('style'); s.id = '__fontStress'; s.textContent = '*{letter-spacing:.05em!important;font-family:"DejaVu Sans","Noto Sans",sans-serif!important}'; (document.head || document.documentElement).appendChild(s); }; add(); document.addEventListener('DOMContentLoaded', add); });
   await page.route('**/*supabase.co/**', async (route) => {
     const u = route.request().url(), m = route.request().method();
     if (extra) { const r = await extra(route, u, m); if (r) return; }
@@ -55,7 +57,7 @@ export async function mockBackend(page, { role = 'super_admin', email = 'tester@
 export function collect(page) {
   const errs = [], csp = [];
   page.on('pageerror', (e) => errs.push(String(e).slice(0, 300)));
-  page.on('console', (msg) => { if (msg.type() === 'error') { const t = msg.text(); if (/Content Security Policy|Refused to/.test(t)) csp.push(t.slice(0, 200)); } });
+  page.on('console', (msg) => { if (msg.type() === 'error') { const t = msg.text(); if (process.env.SMOKE_FONT_STRESS && /inline style/.test(t)) return; /* 글꼴 흔들기가 넣은 style 이 CSP 에 막힌 것 — 앱 문제 아님 */ if (/Content Security Policy|Refused to/.test(t)) csp.push(t.slice(0, 200)); } });
   return { errs, csp };
 }
 
@@ -64,7 +66,7 @@ export class Suite {
   /** ㊿+182 맨 위 블록 하나 — 병렬(SMOKE_CLAIM) 이면 먼저 잡은 프로세스만 실행(mkdir 은 한 곳만 성공) · 아니면 늘 실행 */
   blk() { this.bi++; const d = process.env.SMOKE_CLAIM; if (!d) return true; try { fs.mkdirSync(path.join(d, 'b' + this.bi)); return true; } catch (e) { return false; } }
   async t(label, fn) {
-    if (process.env.SMOKE_ONLY && !label.includes(process.env.SMOKE_ONLY)) return;   // 개발용: 이름에 이 글자가 든 시험만 (CI 는 안 씀)
+    if (process.env.SMOKE_ONLY && !process.env.SMOKE_ONLY.split('||').some((x) => label.includes(x))) return;   // 개발용: 이름에 이 글자가 든 시험만(«||»로 여럿) · CI 는 안 씀
     const t0 = Date.now();
     try { const info = await fn(); this.results.push({ label, ok: true, ms: Date.now() - t0, info }); console.log(`  ✓ ${label}${info ? ' — ' + (typeof info === 'string' ? info : JSON.stringify(info)).slice(0, 120) : ''}`); }
     catch (e) { this.results.push({ label, ok: false, ms: Date.now() - t0, error: String(e && e.message || e).slice(0, 400) }); console.log(`  ✗ ${label} — ${String(e && e.message || e).slice(0, 300)}`); }

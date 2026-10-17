@@ -2,7 +2,7 @@
    ES 모듈(㊿+153) — 다른 파일의 이름은 아래 import 로만 씀 · 이 파일의 최상위 var/function 은 전부 export · 즉시 실행 문장은 js/init.js 의 start() 에 */
 import { APP_VER, ST } from './state.js';
 import { $, amtHint, canView, canWrite, doLogout, esc, fetchT, isGN, kwToWon, lline, mk, rawHtml, refreshToken, SB_KEY, SB_URL, tickMemo, tpl, won, wonToKw } from './core.js';
-import { dIdx, EQB, loadFromDb, onData, railSync, renderEqBoard, SB_RAW, sbHeaders, sbTry, sbWrite, toast, todayStr } from './shell.js';
+import { dIdx, EQB, EQUIP_VIEWS, loadFromDb, onData, railSync, renderEqBoard, SB_RAW, sbHeaders, sbTry, sbWrite, toast, todayStr } from './shell.js';
 import { kpiTable, toggleWidgetPanel } from './dash.js';
 import { OI_IND, OI_OWNERS, OI_PARTNERS, OI_PROB, OI_PRODUCTS, OI_TYPE } from './grids.js';
 import { CH_DEFS, chOf, diffOpen, nmKeys } from './analysis.js';
@@ -1010,10 +1010,13 @@ export function setupSide(){
   $('#oiDoneNew').onclick=function(){ $('#oiDone').style.display='none'; $('#oiFormWrap').style.display=''; wzReset('oi'); $('#oiCust').focus(); };
   $('#mpDoneList').onclick=function(){ switchView('mdrops'); };
   $('#mpDoneNew').onclick=function(){ $('#mpDone').style.display='none'; $('#mpFormWrap').style.display=''; mpConvClear(); wzReset('mp'); $('#mpCompany').focus(); };
+  $('#pcGo').onclick=submitPoc;   /* ㊿+214 PoC · 데모(MDR 이 아닌 제품) */
+  $('#pcDoneList').onclick=function(){ switchView('pocs'); };
+  $('#pcDoneNew').onclick=function(){ $('#pcDone').style.display='none'; $('#pcFormWrap').style.display=''; wzReset('pc'); $('#pcCompany').focus(); };
   var cx=$('#mpConvX'); if(cx) cx.onclick=function(){ mpConvClear(); toast('전환 취소','채운 내용은 그대로 — 새 신청으로 쓰거나 지우고 다시 쓰세요','info'); };   /* ㊿+210 */
   $('#odDoneList').onclick=function(){ switchView('orders'); };
   $('#odDoneNew').onclick=function(){ $('#odDone').style.display='none'; $('#odFormWrap').style.display=''; wzReset('od'); $('#odCustomer').focus(); };
-  ['od','oi','mp'].forEach(function(k){ try{ wzInit(k); }catch(e){ console.warn('입력 단계', k, e); } });   /* ㊿+170 입력 단계 */
+  ['od','oi','mp','pc'].forEach(function(k){ try{ wzInit(k); }catch(e){ console.warn('입력 단계', k, e); } });   /* ㊿+170 입력 단계 · ㊿+214 od · mp · pc 는 한 화면 */
   var bn=document.getElementById('btnNew'); if(bn) bn.onclick=function(e){ e.stopPropagation(); openNewMenu(bn); };
   $('#btnLogout').onclick=doLogout;
   $('#btnWidgets').onclick=toggleWidgetPanel;
@@ -1882,19 +1885,20 @@ export function mpIsOrder(){ var k=/** @type {any} */(document.getElementById('m
 /** ㊿+211 ICT지원사업 정식 발주(초동조치 · «EDR 발주요청서(ICT지원사업)» 양식) — 일반 발주는 «EDR+MDR 발주요청서»(PoC 와 같은 모듈) */
 export function mpIsIct(){ var b=/** @type {any} */(document.getElementById('mpBiz')); return mpIsOrder() && !!b && b.value==='ICT지원사업'; }
 export var MP_TXT={
-  poc:{title:'🛡️ EDR+MDR POC 신청', cap:'저장하면 DB에 기록되고 슬랙으로 자동 통보됩니다. 접수된 신청은 「운영·신청 현황」에서 데모·구독까지 이어서 관리합니다.', go:'POC 신청', done:'POC 신청이 접수되었습니다', note:'슬랙 채널로 자동 통보되었습니다'},
-  order:{title:'🛡️ EDR 발주요청서 — 정식 발주', cap:'계약이 확정된 정식 발주를 요청합니다. 저장하면 DB에 기록되고 슬랙 발주 채널(Cloud NAC 발주와 같은 2곳)로 자동 통보됩니다. 접수된 발주는 「운영·신청 현황」에 «발주요청»으로 등록됩니다.', go:'발주 요청', done:'발주요청이 접수되었습니다', note:'슬랙 발주 채널(2곳)로 자동 통보되었습니다 · 운영·신청 현황에 «발주요청»으로 등록',
+  poc:{title:'EDR+MDR POC 신청', cap:'저장하면 DB에 기록되고 슬랙으로 자동 통보됩니다. 접수된 신청은 「운영·신청 현황」에서 데모·구독까지 이어서 관리합니다.', go:'POC 신청', done:'POC 신청이 접수되었습니다', note:'슬랙 채널로 자동 통보되었습니다'},
+  order:{title:'EDR 발주요청서 — 정식 발주', cap:'계약이 확정된 정식 발주를 요청합니다. 저장하면 DB에 기록되고 슬랙 발주 채널(Cloud NAC 발주와 같은 2곳)로 자동 통보됩니다. 접수된 발주는 「운영·신청 현황」에 «발주요청»으로 등록됩니다.', go:'발주 요청', done:'발주요청이 접수되었습니다', note:'슬랙 발주 채널(2곳)로 자동 통보되었습니다 · 운영·신청 현황에 «발주요청»으로 등록',
     notice:'«발주 요청»을 누르면 DB 에 저장되고 슬랙 발주 채널(2곳)로 알림이 갑니다 · 운영·신청 현황에 «발주요청»으로 등록됩니다'}
 };
 export function mpKindSync(){
   var ord=mpIsOrder(), T=MP_TXT[ord? 'order' : 'poc'];
-  document.querySelectorAll('#viewMdrNew .mp-ord').forEach(function(el){ /** @type {any} */(el).style.display=ord? '' : 'none'; });
-  var ict=mpIsIct(); document.querySelectorAll('#viewMdrNew .mp-ict').forEach(function(el){ /** @type {any} */(el).style.display=ict? '' : 'none'; });   /* ㊿+211 초동조치 = ICT지원사업만 */
+  document.querySelectorAll('#mpBox .mp-ord').forEach(function(el){ /** @type {any} */(el).style.display=ord? '' : 'none'; });
+  var ict=mpIsIct(); document.querySelectorAll('#mpBox .mp-ict').forEach(function(el){ /** @type {any} */(el).style.display=ict? '' : 'none'; });   /* ㊿+211 초동조치 = ICT지원사업만 */
   /* ㊿+212 ICT지원사업 = «EDR 발주요청서(ICT지원사업)» 양식 그대로 — 모듈 EDR(백신) · EDR(안티랜섬웨어) · 매체제어 · 초동조치(EDR+MDR 없음) */
-  document.querySelectorAll('#viewMdrNew .mp-noict').forEach(function(el){ /** @type {any} */(el).style.display=ict? 'none' : ''; });
-  document.querySelectorAll('#viewMdrNew span[data-ict]').forEach(function(el){ var e=/** @type {any} */(el); if(!e.dataset.def) e.dataset.def=e.textContent; e.textContent=ict? e.dataset.ict : e.dataset.def; });
+  var cl=document.querySelector('label[for="mpContract"]'); if(cl) cl.textContent=ict? '계약번호 *' : '계약번호';   /* ㊿+214 ICT지원사업은 꼭 */
+  document.querySelectorAll('#mpBox .mp-noict').forEach(function(el){ /** @type {any} */(el).style.display=ict? 'none' : ''; });
+  document.querySelectorAll('#mpBox span[data-ict]').forEach(function(el){ var e=/** @type {any} */(el); if(!e.dataset.def) e.dataset.def=e.textContent; e.textContent=ict? e.dataset.ict : e.dataset.def; });
   var set=function(id, t){ var e=document.getElementById(id); if(e) e.textContent=t; };
-  set('mpTitle', ord? (ict? '🛡️ EDR 발주요청서(ICT지원사업) — 정식 발주' : '🛡️ EDR+MDR 발주요청서 — 정식 발주') : T.title); set('mpCap', T.cap); set('mpGo', T.go);
+  set('mpTitle', ord? (ict? 'EDR 발주요청서(ICT지원사업) — 정식 발주' : 'EDR+MDR 발주요청서 — 정식 발주') : T.title); set('mpCap', T.cap); set('mpGo', T.go);
   var nt=document.querySelector('#mpFormWrap .wz-note'); if(nt) nt.textContent=ord? MP_TXT.order.notice : WZ_DEF.mp.notice;
   var ct=document.getElementById('mpContract'); if(ct){ if(ord && /** @type {any} */(document.getElementById('mpBiz')).value==='ICT지원사업') ct.setAttribute('aria-required','true'); else ct.removeAttribute('aria-required'); }
 }
@@ -1917,7 +1921,9 @@ export function mpConvClear(){ MP_CONV.src=null; mpConvSync(); }
 export function mpConvert(r){
   if(!ST.SB_TOKEN){ openOvl('ovlAuth'); return; }
   if(!mpCanConv(r)){ var o=mpConvOf(r); toast('이미 전환된 PoC', o? '정식 발주 #'+o.id+' 로 전환되어 있습니다' : '정식 발주 행은 전환하지 않습니다', 'info'); return; }
-  navMenu('mdrnew'); if(ST.CUR_VIEW!=='mdrnew') return;   /* 권한 · 로그인으로 못 열면 아무것도 안 채움 */
+  navMenu('ordernew'); if(ST.CUR_VIEW!=='ordernew') return;   /* 권한 · 로그인으로 못 열면 아무것도 안 채움 · ㊿+214 정식 발주는 «발주 신청» 화면 */
+  if(!reqCan('ict')) return;
+  reqSelect('ict');
   MP_CONV.src=r;
   var sv=function(id, v){ var e=/** @type {any} */(document.getElementById(id)); if(e) e.value=(v==null? '' : String(v)); };
   var sc=function(id, v){ var e=/** @type {any} */(document.getElementById(id)); if(e) e.checked=!!v; };
@@ -2005,10 +2011,11 @@ export async function submitMdrPoc(){
    · 마지막 «확인» 단계: 넣은 값 요약 + 저장하면 생기는 일(슬랙 알림 등) → 그때만 저장 버튼
    · 저장 중엔 버튼 잠금(두 번 저장 방지 · 예전과 같음) · 실패하면 값 그대로(예전과 같음) */
 export var WZ_DEF={
-  od:{wrap:'odFormWrap', go:'odGo', msg:'odMsg', first:'odCustomer', cust:'odCustomer',
+  od:{one:true, wrap:'odFormWrap', go:'odGo', msg:'odMsg', first:'odCustomer', cust:'odCustomer',   /* ㊿+214 한 화면 */
+    head:function(){ return 'Cloud NAC 발주 · '+wzVal('odChannel')+' · '+wzVal('odType'); },
     notice:'«발주 신청»을 누르면 DB 에 저장되고 슬랙 발주 채널(2곳)로 알림이 갑니다 · 장비 현황에도 바로 «재고»로 행이 생깁니다(시리얼이 없으면 «미등록 시리얼»)',
-    steps:[['기본',['odChannel','odType','odCustomer','odContract','odMgr','odPhone','odAddr']],
-      ['조건',['odModel','odQty','odNodes','odPod','odEdition','odFeat','odAdmin','odInstall','odSerials']],
+    steps:[['채널 · 고객',['odChannel','odType','odCustomer','odContract','odMgr','odPhone','odAddr']],
+      ['장비 · 조건',['odModel','odQty','odNodes','odPod','odEdition','odFeat','odAdmin','odInstall','odSerials']],
       ['배송',['odRecvPick','odRecvAddr','odRecvName','odRecvPhone','odShip','odNote']], ['확인',[]]],
     req:{odCustomer:'고객사명', odMgr:'고객 담당자'}},
   oi:{wrap:'oiFormWrap', go:'oiGo', msg:'oiMsg', first:'oiCust', cust:'oiCust',
@@ -2017,12 +2024,20 @@ export var WZ_DEF={
       ['조건',['oiType','oiName','oiRoute','oiFree','oiProducts','oiStrategy']],
       ['금액·일정',['oiMonth','oiAmt','oiRival','oiProb','oiNext','oiNextDate','oiNote']], ['확인',[]]],
     req:{oiCust:'고객사'}},
-  mp:{wrap:'mpFormWrap', go:'mpGo', msg:'mpMsg', first:'mpCompany', cust:'mpCompany',
+  mp:{one:true, wrap:'mpFormWrap', go:'mpGo', msg:'mpMsg', first:'mpCompany', cust:'mpCompany',   /* ㊿+214 한 화면 */
+    head:function(){ return mpIsOrder()? 'MDR 정식 발주 · '+wzVal('mpBiz') : 'MDR(EDR+MDR) PoC · 데모'; },
     notice:'«POC 신청»을 누르면 DB 에 저장되고 슬랙 채널로 알림이 갑니다 · 운영·신청 현황에 «신청»으로 등록됩니다',
-    steps:[['기본',['mpKind','mpBiz','mpContract','mpCompany','mpMgr','mpPhone','mpEmail','mpDev']], ['조건',['mpEdr','mpWin','mpLinux','mpMac','mpWebui','mpNac']],
+    steps:[['고객 정보',['mpKind','mpBiz','mpContract','mpCompany','mpMgr','mpPhone','mpEmail','mpDev']], ['모듈 · 설치 수량',['mpEdr','mpWin','mpLinux','mpMac','mpWebui','mpNac']],
       ['신청 정보',['mpSales','mpSalesPh','mpDate','mpNote']], ['확인',[]]],
     req:{mpCompany:'회사명', mpMgr:'고객 담당자 이름'},
-    reqIf:{mpContract:['계약번호', function(){ return mpIsOrder() && /** @type {any} */(document.getElementById('mpBiz')).value==='ICT지원사업'; }]}}   /* ㊿+207 ICT지원사업 정식 발주만 */
+    reqIf:{mpContract:['계약번호', function(){ return mpIsOrder() && /** @type {any} */(document.getElementById('mpBiz')).value==='ICT지원사업'; }]}},   /* ㊿+207 ICT지원사업 정식 발주만 */
+  /* ㊿+214 MDR 이 아닌 제품의 PoC · 데모(가격표 SaaS 제품) — poc_requests(SQL 126) · Slack 발주 채널 2곳 */
+  pc:{one:true, wrap:'pcFormWrap', go:'pcGo', msg:'pcMsg', first:'pcCompany', cust:'pcCompany',
+    head:function(){ return (REQ.prod? REQ.prod.t : '제품')+' · '+wzVal('pcKind'); },
+    notice:'«PoC · 데모 신청»을 누르면 DB 에 저장되고 슬랙 발주 채널(2곳)로 알림이 갑니다 · «PoC · 데모 현황»에 «신청»으로 등록됩니다',
+    steps:[['고객 정보',['pcKind','pcCompany','pcMgr','pcPhone','pcEmail']], ['규모 · 일정',['pcQty','pcStart','pcPeriod']],
+      ['신청 정보',['pcSales','pcSalesPh','pcNote']], ['확인',[]]],
+    req:{pcCompany:'회사명', pcMgr:'고객 담당자 이름'}}
 };
 export var WZ={};
 /** 칸 하나를 담고 있는 상자(라벨 + 입력) */
@@ -2050,6 +2065,7 @@ export function wzVal(id){
 }
 export function wzInit(key){
   var D=WZ_DEF[key], wrap=document.getElementById(D.wrap); if(!wrap || WZ[key]) return;
+  if(D.one){ wzInitOne(key); return; }
   var go=document.getElementById(D.go), ms=document.getElementById(D.msg);
   var head=document.createElement('ol'); head.className='wz-steps';
   var steps=D.steps.map(function(s, i){
@@ -2103,11 +2119,12 @@ export function wzCheck(key, to){
       wzErr(id, t); if(t && !bad) bad={s:s, id:id}; });
     if(bad) break;
   }
-  if(bad){ if(bad.s!==W.i) wzGo(key, bad.s); var f=/** @type {any} */(document.getElementById(bad.id)); if(f) f.focus(); return false; }
+  if(bad){ if(bad.s!==W.i && !W.one) wzGo(key, bad.s); var f=/** @type {any} */(document.getElementById(bad.id)); if(f){ f.focus(); try{ f.scrollIntoView({block:'center'}); }catch(e){} } if(W.one) wzSummary(key); return false; }
   return true;
 }
 export function wzGo(key, i){
   var D=WZ_DEF[key], W=WZ[key]; if(!W) return; i=Math.max(0, Math.min(D.steps.length-1, i)); W.i=i;
+  if(W.one){ var sec=W.steps[i]; if(sec && i>0){ try{ sec.scrollIntoView({block:'start'}); }catch(e){} var f=/** @type {any} */(sec.querySelector('input,select,textarea')); if(f && f.offsetParent) f.focus({preventScroll:true}); } wzSummary(key); return; }
   W.steps.forEach(function(s, k){ s.hidden=(k!==i); });
   W.head.querySelectorAll('button').forEach(function(b){ var k=+b.dataset.s; b.setAttribute('aria-current', k===i? 'step':'false'); b.classList.toggle('done', k<i); });
   /** @type {any} */(W.nav.querySelector('.wz-prev')).hidden=(i===0);
@@ -2116,12 +2133,296 @@ export function wzGo(key, i){
 }
 export function wzSummary(key){
   var D=WZ_DEF[key], box=document.getElementById(key+'WzSum'); if(!box) return;
-  box.innerHTML=D.steps.slice(0,-1).map(function(s, k){
-    var rows=s[1].map(function(id){ var b=wzBox(id); if(!b || b.style.display==='none') return ''; var v=wzVal(id); return v? tpl`<div><dt>${wzLabel(id)}</dt><dd>${v}</dd></div>` : ''; }).join('');
+  var hd=''; try{ hd=D.head? D.head() : ''; }catch(e){}
+  box.innerHTML=(hd? tpl`<p class="wz-hd">${hd}</p>` : '')+D.steps.slice(0,-1).map(function(s, k){
+    var rows=s[1].map(function(id){ var b=wzBox(id); if(!b || b.style.display==='none' || (b.classList && b.classList.contains('req-state'))) return ''; var v=wzVal(id); return v? tpl`<div><dt>${wzLabel(id)}</dt><dd>${v}</dd></div>` : ''; }).join('');
     return tpl`<section><h4>${String(k+1)}. ${s[0]} <button type="button" class="cap-more" data-s="${String(k)}">고치기</button></h4><dl>${rawHtml(rows || '<div><dd class="mini">넣은 값 없음</dd></div>')}</dl></section>`; }).join('');
   box.querySelectorAll('[data-s]').forEach(function(b){ /** @type {any} */(b).onclick=function(){ wzGo(key, +(/** @type {any} */(b).dataset.s)); }; });
+  var W=WZ[key]; if(W && W.one){   /* ㊿+214 한 화면: 꼭 넣을 칸 · 선택 단추 상태 */
+    var miss=[]; D.steps.slice(0,-1).forEach(function(s){ s[1].forEach(function(id){ var e=/** @type {any} */(document.getElementById(id)); if(!e) return; var bx=wzBox(id); if(bx && wzHid(bx, W.wrap)) return;
+      var rq=D.req[id] || (D.reqIf && D.reqIf[id] && D.reqIf[id][1]()? D.reqIf[id][0] : ''); if(rq && !String(e.value||'').trim()) miss.push(rq); }); });
+    var mb=document.getElementById(key+'WzMiss'); if(mb){ mb.textContent=miss.length? '꼭 넣을 칸: '+miss.join(' · ') : '✓ 꼭 넣을 칸을 모두 넣었습니다'; mb.classList.toggle('ok', !miss.length); }
+    pkSync(W.wrap); pkDevHint(key);
+  }
 }
-export function wzReset(key){ var D=WZ_DEF[key]; if(!WZ[key]) wzInit(key); Object.keys(D.req).forEach(function(id){ wzErr(id,''); }); var dp=document.getElementById(key+'WzDup'); if(dp) dp.remove(); wzGo(key, 0); }
+export function wzReset(key){ var D=WZ_DEF[key]; if(!WZ[key]) wzInit(key); Object.keys(D.req).forEach(function(id){ wzErr(id,''); }); Object.keys(D.reqIf||{}).forEach(function(id){ wzErr(id,''); }); var dp=document.getElementById(key+'WzDup'); if(dp) dp.remove(); if(WZ[key] && WZ[key].one){ pkMe(key); pkCustPaint(key); } wzGo(key, 0); }
+/* ===== ㊿+214 한 화면 입력(발주 신청 · PoC · 데모 신청) — 사용자: «발주신청이 번거로운 구조 · 최대한 선택형 · 쉽고 깔끔하게»
+   · 단계(다음 · 이전) 대신 구역 제목 + 오른쪽 요약(꼭 넣을 칸 · 저장 단추) · 칸 id · 저장 코드는 그대로
+   · 고르는 칸 = 단추(pkChips — 원래 select 는 값만 들고 숨김) · 수량 = − + 와 자주 쓰는 수(pkStep) · 날짜 = 오늘 · 내일 · 다음 주 월요일(pkDate)
+   · 고객사 = 최근 고객 단추 · 같은 고객사의 지난 신청에서 담당자 · 연락처 · 주소 불러오기(pkCust) · 영업담당 = 나(pkMe) */
+export function wzInitOne(key){
+  var D=WZ_DEF[key], wrap=document.getElementById(D.wrap); if(!wrap) return;
+  var go=document.getElementById(D.go), ms=document.getElementById(D.msg);
+  var main=document.createElement('div'); main.className='wz-main';
+  var secs=D.steps.slice(0,-1).map(function(s, i){
+    var sec=document.createElement('section'); sec.className='wz-step wz-sec'; sec.dataset.s=String(i); sec.setAttribute('aria-label', s[0]);
+    sec.innerHTML=tpl`<h4 class="wz-h">${s[0]}</h4>`;
+    var grid=document.createElement('div'); grid.className='frm'; sec.appendChild(grid);
+    s[1].forEach(function(id){ var b=wzBox(id); if(!b) return; if(/^(oiQuoteBtn|oiProducts|mpEdr)$/.test(id)) b.classList.add('full'); grid.appendChild(b); });
+    main.appendChild(sec); return sec;
+  });
+  var side=document.createElement('aside'); side.className='wz-side'; side.setAttribute('aria-label','요약');
+  side.innerHTML=tpl`<h4 class="wz-h">요약</h4><div class="wz-sum" id="${key}WzSum"></div><p class="wz-miss" id="${key}WzMiss" role="status"></p><p class="wz-note" role="note">${D.notice}</p>`;
+  if(ms) side.appendChild(ms); if(go) side.appendChild(go);
+  var conv=wrap.querySelector('.mp-conv');
+  [].slice.call(wrap.children).forEach(function(ch){ if(ch===conv) return; if(ch.querySelector && !ch.querySelector('input,select,textarea,button')) ch.remove(); else if(ch.classList && (ch.classList.contains('frm') || ch.classList.contains('mact')) && !ch.querySelector('input,select,textarea')) ch.remove(); });
+  if(conv) main.insertBefore(conv, main.firstChild);
+  wrap.classList.add('wz-one'); wrap.appendChild(main); wrap.appendChild(side);
+  var W=WZ[key]={i:0, steps:secs, one:true, go:go, wrap:wrap, side:side, head:null, nav:null};
+  /* 저장 단추: 꼭 넣을 칸 · 형식을 먼저 확인(빠진 칸으로 옮겨 감) — 원래 저장 함수(onclick)보다 먼저 */
+  wrap.addEventListener('click', function(e){ var t=/** @type {any} */(e.target); if(go && t && t.closest && t.closest('#'+D.go) && !wzCheck(key, D.steps.length-1)){ e.preventDefault(); e.stopImmediatePropagation(); } }, true);
+  var tm=0, upd=function(){ clearTimeout(tm); tm=setTimeout(function(){ wzSummary(key); }, 60); };
+  wrap.addEventListener('input', upd); wrap.addEventListener('change', upd);
+  Object.keys(D.req).forEach(function(id){ var e=document.getElementById(id); if(e){ e.setAttribute('aria-required','true'); e.addEventListener('input', function(){ wzErr(id, ''); }); } });
+  Object.keys(D.reqIf||{}).forEach(function(id){ var e=document.getElementById(id); if(e) e.addEventListener('input', function(){ wzErr(id, ''); }); });
+  var ce=/** @type {any} */(document.getElementById(D.cust));
+  if(ce){ ce.setAttribute('list','dlCustAll'); ce.setAttribute('autocomplete','off'); var t2=0; ce.addEventListener('input', function(){ clearTimeout(t2); t2=setTimeout(function(){ wzDup(key); }, 250); }); ce.addEventListener('focus', wzCustList); }
+  pkEnhance(key);
+  wzSummary(key);
+}
+/** 상자가 (입력 영역 안에서) 숨겨졌는지 — 화면 전체가 아직 안 보일 때도 맞게(계산된 display) */
+export function wzHid(el, stop){ for(var x=/** @type {any} */(el); x && x!==stop && x.nodeType===1; x=x.parentElement){ if(x.hidden || x.style.display==='none' || getComputedStyle(x).display==='none') return true; } return false; }
+/** 칸마다 고르는 방식 */
+export var PK_CFG={
+  od:{chips:['odChannel','odType','odEdition','odModel'], steps:{odQty:[1,2,5,10], odNodes:[50,100,300,500,1000]}, dates:['odInstall','odShip'], cust:'odCustomer'},
+  mp:{chips:['mpNac'], steps:{mpWin:[10,50,100], mpLinux:[1,5,10], mpMac:[10,50,100]}, dates:['mpDate'], cust:'mpCompany', me:['mpSales','mpSalesPh']},
+  pc:{chips:['pcKind','pcPeriod'], steps:{pcQty:[10,50,100,300]}, dates:['pcStart'], cust:'pcCompany', me:['pcSales','pcSalesPh']}
+};
+export function pkEnhance(key){
+  var C=PK_CFG[key]; if(!C) return;
+  C.chips.forEach(function(id){ pkChips(/** @type {any} */(document.getElementById(id))); });
+  Object.keys(C.steps).forEach(function(id){ pkStep(/** @type {any} */(document.getElementById(id)), C.steps[id]); });
+  C.dates.forEach(function(id){ pkDate(/** @type {any} */(document.getElementById(id))); });
+  pkCust(key); pkMe(key);
+}
+/** select → 단추 묶음(role=radiogroup · ← → 로 옮김) — select 는 값만 들고 화면에서는 숨김(다른 코드 · 시험이 그대로 씀) */
+export function pkChips(sel){
+  if(!sel || sel.dataset.pk) return; sel.dataset.pk='1';
+  var box=document.createElement('div'); box.className='pk-chips'; box.setAttribute('role','radiogroup');
+  var lab=/** @type {any} */(document.querySelector('label[for="'+sel.id+'"]')); if(lab){ if(!lab.id) lab.id=sel.id+'Lb'; box.setAttribute('aria-labelledby', lab.id); }
+  sel.classList.add('pk-hid'); sel.tabIndex=-1; sel.setAttribute('aria-hidden','true');
+  sel.parentNode.insertBefore(box, sel.nextSibling);
+  box.innerHTML=[].slice.call(sel.options).filter(function(o){ return o.value!=='' && !o.disabled; }).map(function(o){ return tpl`<button type="button" class="pk-chip" role="radio" data-v="${o.value}" aria-checked="false">${o.textContent}</button>`; }).join('');
+  var pick=function(b){ if(!b) return; sel.value=b.dataset.v; sel.dispatchEvent(new Event('change',{bubbles:true})); pkSync(box.parentNode); };
+  box.addEventListener('click', function(e){ var b=/** @type {any} */(e.target).closest('.pk-chip'); if(b) pick(b); });
+  box.addEventListener('keydown', function(e){ var k=e.key; if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End'].indexOf(k)<0) return; e.preventDefault();
+    var L=[].slice.call(box.querySelectorAll('.pk-chip')), i=L.indexOf(document.activeElement); if(i<0) i=0;
+    var n=k==='Home'? 0 : k==='End'? L.length-1 : (i+((k==='ArrowLeft'||k==='ArrowUp')? -1 : 1)+L.length)%L.length; pick(L[n]); L[n].focus(); });
+  sel.addEventListener('change', function(){ pkSync(box.parentNode); });
+  pkSync(box.parentNode);
+}
+/** 단추 묶음을 select 값에 맞춤(값을 코드로 바꾼 뒤에도) */
+export function pkSync(root){
+  (root||document).querySelectorAll('select[data-pk]').forEach(function(s){ var sel=/** @type {any} */(s), box=sel.nextElementSibling; if(!box || !box.classList.contains('pk-chips')) return;
+    var any=false; box.querySelectorAll('.pk-chip').forEach(function(b){ var on=b.dataset.v===sel.value; if(on) any=true; b.setAttribute('aria-checked', on? 'true':'false'); b.tabIndex=on? 0 : -1; });
+    if(!any){ var f=/** @type {any} */(box.querySelector('.pk-chip')); if(f) f.tabIndex=0; } });
+}
+/** 수량 − + 와 자주 쓰는 수 */
+export function pkStep(inp, pre){
+  if(!inp || inp.dataset.pk) return; inp.dataset.pk='1';
+  var nm=wzLabel(inp.id), box=document.createElement('div'); box.className='pk-step';
+  inp.parentNode.insertBefore(box, inp);
+  var mk=function(t, lab){ var b=document.createElement('button'); b.type='button'; b.className='pk-sb'; b.textContent=t; b.setAttribute('aria-label', nm+' '+lab); return b; };
+  var mn=mk('−','줄이기'), pl=mk('+','늘리기'); box.appendChild(mn); box.appendChild(inp); box.appendChild(pl);
+  var set=function(v){ var min=inp.min!==''? +inp.min : 0; v=Math.max(min, Math.round(v)); inp.value=String(v); inp.dispatchEvent(new Event('input',{bubbles:true})); inp.dispatchEvent(new Event('change',{bubbles:true})); };
+  mn.onclick=function(){ set((+inp.value||0)-1); }; pl.onclick=function(){ set((+inp.value||0)+1); };
+  if(pre && pre.length){ var pr=document.createElement('div'); pr.className='pk-pre'; pr.setAttribute('aria-label', nm+' 빠른 선택');
+    pr.innerHTML=pre.map(function(n){ return tpl`<button type="button" class="pk-chip" data-n="${String(n)}">${String(n)}</button>`; }).join('');
+    box.parentNode.insertBefore(pr, box.nextSibling); pr.querySelectorAll('button').forEach(function(b){ /** @type {any} */(b).onclick=function(){ set(+(/** @type {any} */(b).dataset.n)); }; }); }
+}
+export function pkDay(off){ var d=new Date(); if(off==='mon'){ var w=d.getDay(); d.setDate(d.getDate()+(((8-w)%7)||7)); } else d.setDate(d.getDate()+(+off||0)); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+/** 날짜 빠른 선택 */
+export function pkDate(inp){
+  if(!inp || inp.dataset.pk) return; inp.dataset.pk='1';
+  var pr=document.createElement('div'); pr.className='pk-pre'; pr.setAttribute('aria-label', wzLabel(inp.id)+' 빠른 선택');
+  pr.innerHTML=[['오늘','0'],['내일','1'],['다음 주 월요일','mon']].map(function(q){ return tpl`<button type="button" class="pk-chip" data-d="${q[1]}">${q[0]}</button>`; }).join('');
+  inp.parentNode.insertBefore(pr, inp.nextSibling);
+  pr.querySelectorAll('button').forEach(function(b){ /** @type {any} */(b).onclick=function(){ inp.value=pkDay(/** @type {any} */(b).dataset.d); inp.dispatchEvent(new Event('input',{bubbles:true})); inp.dispatchEvent(new Event('change',{bubbles:true})); }; });
+}
+/* 고객사 — 최근 고객 · 지난 신청 불러오기 */
+var PK_SRC={od:function(){ return ST.RAWX.orders||[]; }, mp:function(){ return ST.RAWX.mdrops||[]; }, pc:function(){ return ST.RAWX.pocs||[]; }};
+export var PK_MAP={
+  od:{odMgr:'mgr_name', odPhone:'mgr_phone', odAddr:'customer_addr', odAdmin:'admin_account', odEdition:'edition', odFeat:'features', odRecvAddr:'recv_addr', odRecvName:'recv_name', odRecvPhone:'recv_phone'},
+  mp:{mpMgr:'mgr_name', mpPhone:'mgr_phone', mpEmail:'mgr_email', mpDev:'device_count', mpWebui:'webui_email', mpNac:'nac_use', mpSales:'sales_name', mpSalesPh:'sales_phone'},
+  pc:{pcMgr:'mgr_name', pcPhone:'mgr_phone', pcEmail:'mgr_email', pcSales:'sales_name', pcSalesPh:'sales_phone'}
+};
+export function pkNorm(n){ return String(n||'').replace(/\s|\(주\)|주식회사|㈜/g,'').toLowerCase(); }
+export function pkCust(key){
+  var C=PK_CFG[key], inp=/** @type {any} */(C && document.getElementById(C.cust)); if(!inp || inp.dataset.pkc) return; inp.dataset.pkc='1';
+  var box=document.createElement('div'); box.className='pk-cust'; box.id=key+'PkCust'; inp.parentNode.insertBefore(box, inp.nextSibling);
+  var t=0, paint=function(){ clearTimeout(t); t=setTimeout(function(){ pkCustPaint(key); }, 120); };
+  inp.addEventListener('input', paint); inp.addEventListener('change', paint);
+  box.addEventListener('click', function(e){ var b=/** @type {any} */(e.target).closest('button'); if(!b) return;
+    if(b.dataset.cust!=null){ inp.value=b.dataset.cust; inp.dispatchEvent(new Event('input',{bubbles:true})); inp.dispatchEvent(new Event('change',{bubbles:true})); pkCustPaint(key); return; }
+    if(b.dataset.prev!=null) pkPrevFill(key, b.dataset.prev); });
+  pkCustPaint(key);
+}
+function pkNewest(a, b){ return String(b.created_at||b.apply_date||'').localeCompare(String(a.created_at||a.apply_date||'')) || ((+b.id||0)-(+a.id||0)); }
+export function pkCustPaint(key){
+  var C=PK_CFG[key], inp=/** @type {any} */(C && document.getElementById(C.cust)), box=document.getElementById(key+'PkCust'); if(!inp || !box) return;
+  var me=String(ST.AUTH_USER||'').toLowerCase(), rows=(PK_SRC[key]()||[]).slice().sort(pkNewest), v=pkNorm(inp.value), h='';
+  if(v){
+    var hits=rows.filter(function(r){ return pkNorm(r.customer)===v; }).slice(0,3);
+    if(hits.length) h=tpl`<span class="pk-lb">지난 신청 불러오기</span>${rawHtml(hits.map(function(r){ return tpl`<button type="button" class="pk-chip" data-prev="${String(r.id)}" title="담당자 · 연락처 · 주소를 채웁니다">#${String(r.id)} ${String(r.created_at||r.apply_date||'').slice(0,10)}${r.mgr_name? ' · '+r.mgr_name : ''}</button>`; }).join(''))}`;
+  }else{
+    var seen={}, list=[], pickFrom=function(src){ src.forEach(function(r){ var c=String(r.customer||'').trim(), k=pkNorm(c); if(c && !seen[k] && list.length<6){ seen[k]=1; list.push(c); } }); };
+    pickFrom(rows.filter(function(r){ return String(r.requester||'').toLowerCase()===me; })); if(list.length<3) pickFrom(rows);
+    if(list.length) h=tpl`<span class="pk-lb">최근 고객</span>${rawHtml(list.map(function(c){ return tpl`<button type="button" class="pk-chip" data-cust="${c}">${c}</button>`; }).join(''))}`;
+  }
+  box.innerHTML=h; box.hidden=!h;
+}
+export function pkPrevFill(key, id){
+  var r=(PK_SRC[key]()||[]).filter(function(x){ return String(x.id)===String(id); })[0]; if(!r) return;
+  var M=PK_MAP[key], n=0;
+  Object.keys(M).forEach(function(fid){ var el=/** @type {any} */(document.getElementById(fid)), v=r[M[fid]]; if(!el || v==null || v==='') return;
+    if(el.tagName==='SELECT'){ if(![].slice.call(el.options).some(function(o){ return o.value===String(v); })) return; }
+    el.value=String(v); el.dispatchEvent(new Event('input',{bubbles:true})); el.dispatchEvent(new Event('change',{bubbles:true})); n++; });
+  pkSync(document.getElementById(WZ_DEF[key].wrap)); wzSummary(key);
+  toast('지난 신청 #'+r.id+' 에서 '+n+'칸을 채웠습니다', '담당자 · 연락처 · 주소가 지금도 맞는지 확인하세요', 'info');
+}
+/* 영업담당 = 나(처음 한 번 · 연락처는 이 브라우저가 지난번 값을 기억) */
+var PK_ME_KEY='svc_req_me';
+export function pkMe(key){
+  var C=PK_CFG[key]; if(!C || !C.me) return; var n=/** @type {any} */(document.getElementById(C.me[0])), ph=/** @type {any} */(document.getElementById(C.me[1])); if(!n) return;
+  var mem={}; try{ mem=JSON.parse(localStorage.getItem(PK_ME_KEY)||'{}')||{}; }catch(e){}
+  if(!n.value){ var nm=''; try{ nm=ST.AUTH_USER? ntfName(ST.AUTH_USER) : ''; }catch(e){} n.value=mem.name || nm || ''; }
+  if(ph && !ph.value && mem.phone) ph.value=mem.phone;
+}
+export function pkMeSave(key){
+  var C=PK_CFG[key]; if(!C || !C.me) return; var n=/** @type {any} */(document.getElementById(C.me[0])), ph=/** @type {any} */(document.getElementById(C.me[1]));
+  try{ if(n && n.value.trim()) localStorage.setItem(PK_ME_KEY, JSON.stringify({name:n.value.trim(), phone:ph? ph.value.trim() : ''})); }catch(e){}
+}
+/* MDR — 단말 및 서버 수량이 비었으면 OS 수량 합계로 채우는 단추 */
+export function pkDevHint(key){
+  if(key!=='mp') return; var dev=/** @type {any} */(document.getElementById('mpDev')); if(!dev) return;
+  var w=+(/** @type {any} */(document.getElementById('mpWin')).value)||0, l=+(/** @type {any} */(document.getElementById('mpLinux')).value)||0, m=+(/** @type {any} */(document.getElementById('mpMac')).value)||0, sum=w+l+m;
+  var b=/** @type {any} */(document.getElementById('mpDevSum'));
+  if(!b){ b=document.createElement('button'); b.type='button'; b.id='mpDevSum'; b.className='pk-chip pk-sumbtn'; dev.parentNode.insertBefore(b, dev.nextSibling);
+    b.onclick=function(){ dev.value=b.dataset.v; dev.dispatchEvent(new Event('input',{bubbles:true})); }; }
+  var v=sum? sum+'대' : ''; b.dataset.v=v; b.textContent='운영체제별 수량 합계 '+v+' 로 채우기'; b.hidden=!sum || dev.value.trim()===v;
+}
+
+/* ===== ㊿+214 «발주 신청» — Cloud NAC · MDR 정식(ICT지원사업) · MDR 정식(일반)을 위 카드로 고름 =====
+   · MDR 은 «PoC · 데모 신청»과 같은 입력(mpBox)을 이 화면으로 옮겨 씀(정식 발주 · 사업 구분 고정) */
+export var REQ={kind:'nac', prod:/** @type {any} */(null), prods:/** @type {any} */(null), ld:false};
+export var REQ_KINDS=[
+  {k:'nac', ic:'☁️', t:'Cloud NAC 발주', s:'에스원 · 조달 · LG U+ 판매 — 임대 장비 출고 · 교체 · 회수'},
+  {k:'ict', ic:'🛡️', t:'MDR 정식 발주 · ICT지원사업', s:'EDR 발주요청서(ICT지원사업) 양식 — 초동조치 포함'},
+  {k:'gen', ic:'🛡️', t:'MDR 정식 발주 · 일반', s:'EDR+MDR 발주요청서 양식 — PoC 와 같은 모듈'}
+];
+/** 이 계정이 고를 수 있는 발주 종류 — Cloud NAC = 발주 내역 권한 · MDR = MDR 운영·신청 현황 권한 */
+export function reqCan(k){ var ev=ST.IS_EQUIP? EQUIP_VIEWS : null; var v=k==='nac'? 'orders' : 'mdrops'; return ev? !!ev[v] : canView(v); }
+export function reqPaint(){
+  var host=document.getElementById('reqKinds'); if(!host) return;
+  var list=REQ_KINDS.filter(function(x){ return reqCan(x.k); }); if(!list.length) list=[REQ_KINDS[0]];
+  if(!list.some(function(x){ return x.k===REQ.kind; })) REQ.kind=list[0].k;
+  host.innerHTML=list.map(function(x){ return tpl`<button type="button" class="req-kind" role="radio" data-k="${x.k}" aria-checked="${x.k===REQ.kind? 'true':'false'}" tabindex="${x.k===REQ.kind? '0':'-1'}"><b>${x.t}</b><small>${x.s}</small></button>`; }).join('');   /* 단추 글자에 이모지 없음(㊿+186) */
+  host.hidden=list.length<2;
+  host.onclick=function(e){ var b=/** @type {any} */(e.target).closest('.req-kind'); if(b) reqSelect(b.dataset.k); };
+  host.onkeydown=function(e){ reqKeyNav(e, host, '.req-kind', function(b){ reqSelect(b.dataset.k); }); };
+  var nac=REQ.kind==='nac', nb=document.getElementById('reqNac'), mh=document.getElementById('reqMdrHost'), box=document.getElementById('mpBox');
+  if(nb) nb.hidden=!nac;
+  if(mh) mh.hidden=nac;
+  if(!nac && mh && box){
+    if(box.parentNode!==mh) mh.appendChild(box); box.hidden=false;
+    var k=/** @type {any} */(document.getElementById('mpKind')), b2=/** @type {any} */(document.getElementById('mpBiz'));
+    k.value='order'; b2.value=REQ.kind==='ict'? 'ICT지원사업' : '일반'; wzErr('mpContract',''); mpKindSync(); wzSummary('mp');
+  }
+}
+export function reqKeyNav(e, host, sel, pick){
+  var k=e.key; if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].indexOf(k)<0) return; e.preventDefault();
+  var L=[].slice.call(host.querySelectorAll(sel)), i=L.indexOf(document.activeElement); if(i<0) i=0;
+  var n=(i+((k==='ArrowLeft'||k==='ArrowUp')? -1 : 1)+L.length)%L.length; pick(L[n]); var f=/** @type {any} */(host.querySelectorAll(sel)[n]); if(f) f.focus();
+}
+export function reqSelect(k){
+  REQ.kind=k; reqPaint();
+  var f=/** @type {any} */(document.getElementById(k==='nac'? 'odCustomer' : (k==='ict'? 'mpContract' : 'mpCompany'))); if(f && f.offsetParent && document.activeElement && !document.activeElement.closest('.req-kinds')) f.focus();
+}
+/** 발주 신청 화면을 열 때 */
+export function reqOpen(){
+  try{ mpConvClear(); }catch(e){}
+  ['od','mp'].forEach(function(k){ try{ wzReset(k); }catch(e){} });
+  msg('odMsg',''); msg('mpMsg','');
+  ['odFormWrap','mpFormWrap'].forEach(function(id){ var x=document.getElementById(id); if(x) x.style.display=''; });
+  ['odDone','mpDone'].forEach(function(id){ var x=document.getElementById(id); if(x) x.style.display='none'; });
+  var dt=/** @type {any} */(document.getElementById('mpDate')); if(dt && !dt.value) dt.value=todayStr();
+  loadRecvPresets(); reqPaint();
+}
+
+/* ===== ㊿+214 «PoC · 데모 신청» — 제품 = 가격표(SaaS 최신 판) 메뉴판 · MDR 은 MDR 운영·신청 현황(예전 그대로) · 그 밖은 poc_requests ===== */
+export function pocProducts(){
+  var b=(ST.RAWX.price||[]).filter(function(x){ return x.seg==='saas'; })[0] || REQ.prods, D=b && b.data || null, out=/** @type {any[]} */([]);
+  if(!D || D.cnac) out.push({k:'CNAC', ic:'☁️', t:'Cloud NAC', s:'노드 기준', unit:'노드', mdr:false});
+  if(!D || D.ztna) out.push({k:'ZTNA', ic:'🌐', t:'Cloud ZTNA', s:'PA Agent 기준', unit:'Agent', mdr:false});
+  var sv=D && D.services && D.services.length? D.services : [{key:'MDR', icon:'🛡️', name:'EDR+MDR', sub:'EDR · MDR'}];
+  sv.forEach(function(s){ out.push({k:String(s.key||s.name||''), ic:s.icon||'🛡️', t:String(s.name||s.key||''), s:String(s.sub||''), unit:'Agent', mdr:s.key==='MDR'}); });
+  return out;
+}
+export function pocLoad(){
+  if(REQ.ld || (ST.RAWX.price||[]).some(function(x){ return x.seg==='saas'; })) return;
+  REQ.ld=true;
+  sbTry('price_books?select=seg,label,applied,data&seg=eq.saas&order=applied.desc,id.desc').then(function(rows){ if(rows && rows[0]){ REQ.prods=rows[0]; if(ST.CUR_VIEW==='mdrnew') pocPaint(); } });
+}
+var POC_LAST='svc_poc_last';
+export function pocPaint(){
+  var host=document.getElementById('pocProds'); if(!host) return;
+  var P=pocProducts();
+  if(REQ.prod && !P.some(function(x){ return x.k===REQ.prod.k; })) REQ.prod=null;
+  host.innerHTML=P.map(function(x){ var on=!!REQ.prod && REQ.prod.k===x.k; return tpl`<button type="button" class="req-kind" role="radio" data-k="${x.k}" aria-checked="${on? 'true':'false'}" tabindex="${on || (!REQ.prod && x===P[0])? '0':'-1'}"><b>${x.t}</b><small>${x.s||' '}</small></button>`; }).join('');
+  host.onclick=function(e){ var b=/** @type {any} */(e.target).closest('.req-kind'); if(b) pocSelect(b.dataset.k); };
+  host.onkeydown=function(e){ reqKeyNav(e, host, '.req-kind', function(b){ pocSelect(b.dataset.k); }); };
+  var p=REQ.prod, mb=document.getElementById('mpBox'), mh=document.getElementById('pocMdrHost'), pb=document.getElementById('pcBox'), hint=document.getElementById('pocHint');
+  if(hint) hint.hidden=!!p;
+  if(p && p.mdr){
+    if(mb && mh){ if(mb.parentNode!==mh) mh.appendChild(mb); mb.hidden=false; }
+    var k=/** @type {any} */(document.getElementById('mpKind')); if(k.value!=='poc'){ k.value='poc'; mpKindSync(); }
+    wzSummary('mp');
+  }else if(mb && mb.parentNode===mh) mb.hidden=true;
+  if(pb){ pb.hidden=!(p && !p.mdr); if(p && !p.mdr){ var t=document.getElementById('pcTitle'); if(t) t.textContent=p.t+' PoC · 데모 신청'; var ql=document.getElementById('pcQtyL'); if(ql) ql.textContent='규모('+(p.unit||'수량')+')'; wzSummary('pc'); } }
+}
+export function pocSelect(k){
+  var p=pocProducts().filter(function(x){ return x.k===k; })[0]; if(!p) return;
+  REQ.prod=p; try{ localStorage.setItem(POC_LAST, k); }catch(e){}
+  pocPaint();
+  var f=/** @type {any} */(document.getElementById(p.mdr? 'mpCompany' : 'pcCompany')); if(f && f.offsetParent && !(document.activeElement && document.activeElement.closest && document.activeElement.closest('.req-kinds'))) f.focus();
+}
+/** PoC · 데모 신청 화면을 열 때 */
+export function pocOpen(){
+  try{ mpConvClear(); }catch(e){}
+  ['mp','pc'].forEach(function(k){ try{ wzReset(k); }catch(e){} });
+  msg('mpMsg',''); msg('pcMsg','');
+  ['mpFormWrap','pcFormWrap'].forEach(function(id){ var x=document.getElementById(id); if(x) x.style.display=''; });
+  ['mpDone','pcDone'].forEach(function(id){ var x=document.getElementById(id); if(x) x.style.display='none'; });
+  var dt=/** @type {any} */(document.getElementById('mpDate')); if(dt && !dt.value) dt.value=todayStr();
+  if(!REQ.prod){ var last=''; try{ last=localStorage.getItem(POC_LAST)||''; }catch(e){} var p=pocProducts().filter(function(x){ return x.k===last; })[0]; if(p) REQ.prod=p; }
+  pocLoad(); pocPaint();
+}
+/** PoC · 데모 신청(MDR 이 아닌 제품) 저장 — poc_requests · 트리거가 Apps Script 로(발주 채널 2곳) */
+export async function submitPoc(){
+  var p=REQ.prod; if(!p || p.mdr){ msg('pcMsg','제품을 먼저 고르세요','bad'); return; }
+  var comp=$('#pcCompany').value.trim(), mgr=$('#pcMgr').value.trim();
+  if(!comp||!mgr){ msg('pcMsg','회사명과 고객 담당자 이름은 필수입니다','bad'); return; }
+  var btn=$('#pcGo'); btn.disabled=true; msg('pcMsg','접수 중…');
+  try{
+    var row={ requester:ST.AUTH_USER||null, product:p.t, product_key:p.k, kind:$('#pcKind').value, customer:comp, mgr_name:mgr,
+      mgr_phone:$('#pcPhone').value.trim()||null, mgr_email:$('#pcEmail').value.trim()||null,
+      qty:$('#pcQty').value===''? null : (+$('#pcQty').value||0), qty_unit:p.unit||null,
+      start_date:$('#pcStart').value||null, period:$('#pcPeriod').value||null,
+      sales_name:$('#pcSales').value.trim()||null, sales_phone:$('#pcSalesPh').value.trim()||null,
+      note:$('#pcNote').value.trim()||null, status:'신청' };
+    var out;
+    try{ out=await sbWrite('POST','poc_requests?select=*',[row],'return=representation'); }
+    catch(e1){ if(/poc_requests|PGRST205|PGRST204|42P01|schema cache|404/.test(String(/** @type {any} */(e1).message||e1))) throw new Error('PoC · 데모 표가 아직 DB 에 없습니다 — 관리자가 SQL 126 을 먼저 실행해야 합니다(MDR PoC 는 지금도 됩니다)'); throw e1; }
+    ST.RAWX.pocs=ST.RAWX.pocs||[]; ST.RAWX.pocs.unshift(out[0]);
+    logChange('insert','poc_requests',out[0].id,{product:p.t, kind:row.kind, company:comp, mgr:mgr});
+    pkMeSave('pc'); msg('pcMsg','');
+    $('#pcDoneSum').textContent=[p.t+' '+row.kind, comp, mgr, row.qty!=null? row.qty+(p.unit? ' '+p.unit : '') : '', row.period||''].filter(Boolean).join(' · ');
+    $('#pcFormWrap').style.display='none'; $('#pcDone').style.display='';
+    toast(p.t+' '+row.kind+' 신청 접수 완료', comp+' · '+mgr);
+    ['pcCompany','pcMgr','pcPhone','pcEmail','pcQty','pcStart','pcNote'].forEach(function(i){ var x=$('#'+i); if(x) x.value=''; });
+  }catch(e){ msg('pcMsg',String(/** @type {any} */(e).message||e),'bad'); }
+  btn.disabled=false;
+}
 /** 같은 고객사의 진행 중 건 — 중복 신청·등록 의심(막지 않음) */
 export function wzDup(key){
   var D=WZ_DEF[key], ce=/** @type {any} */(document.getElementById(D.cust)); if(!ce) return; var v=String(ce.value||'').replace(/\s/g,'').toLowerCase();
@@ -2140,7 +2441,7 @@ export function openNewMenu(btn){
   var it=[];
   if(!ST.IS_VIEWER && canWrite('contracts')) it.push({l:'계약 등록', ic:'doc', go:function(){ $('#btnEdit').click(); var t=/** @type {any} */(document.querySelector('#eTabs button[data-t="new"]')); if(t) t.click(); }},
     {l:'계약 변경 — 갱신·추가·해지·금액', ic:'edit', go:function(){ $('#btnEdit').click(); var t=/** @type {any} */(document.querySelector('#eTabs button[data-t="renew"]')); if(t) t.click(); }});
-  [['oinew','영업기회(OI) 등록','target'],['ordernew','Cloud NAC 발주 신청','box'],['mdrnew','MDR PoC · 발주 신청','shield']].forEach(function(x){ if(canView(x[0])) it.push({l:x[1], ic:x[2], go:function(){ navMenu(x[0]); }}); });
+  [['oinew','영업기회(OI) 등록','target'],['ordernew','발주 신청','box'],['mdrnew','PoC · 데모 신청','shield']].forEach(function(x){ if(canView(x[0])) it.push({l:x[1], ic:x[2], go:function(){ navMenu(x[0]); }}); });
   if(it.length) rowMenu(btn, it);
 }
 

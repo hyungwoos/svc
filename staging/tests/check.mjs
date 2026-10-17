@@ -399,7 +399,7 @@ try {
 { const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
   const sa = rd('js/sales.js'), gs = rd('js/grids.js'), gr = rd('js/grid.js');
   const sub = (sa.match(/export async function submitMdrPoc\(\)\{[\s\S]*?\n\}/) || [''])[0];
-  say(/<select id="mpKind"><option value="poc">PoC · 데모<\/option><option value="order">정식 발주<\/option><\/select>/.test(html) && /id="mpContract"/.test(html) && /id="mpBiz"/.test(html) && /id="mpFirst"/.test(html) && /data-v="mdrnew">[^<]*PoC · 발주 신청</.test(html)
+  say(/<select id="mpKind"><option value="poc">PoC · 데모<\/option><option value="order">정식 발주<\/option><\/select>/.test(html) && /id="mpContract"/.test(html) && /id="mpBiz"/.test(html) && /id="mpFirst"/.test(html) && /data-v="mdrnew">[^<]*PoC · 데모 신청</.test(html)
     && /status: ord\? '발주요청' : '신청'/.test(sub) && /if\(ord\) Object\.assign\(row, \{req_kind:'order', contract_no:cno\|\|null, biz_kind:biz, mod_first:/.test(sub) && /SQL 122 를 먼저/.test(sub) && /ICT지원사업 정식 발주는 계약번호가 필요합니다/.test(sub)
     && /reqIf:\{mpContract:\['계약번호'/.test(sa) && /D\.reqIf\[id\]\[1\]\(\)/.test(sa) && /\{k:'contract_no',l:'계약번호',ifCol:true\}/.test(gs) && /opts:\['발주요청','신청','대기','진행중','데모',(?:'발주전환',)?'구독','종료'\]/.test(gs) && /if\(c\.ifCol && !gridHasCol\(g, c\.k\)\) return;/.test(gr),
   '㊿+207 MDR 정식 발주: 신청 구분(PoC · 데모 / 정식 발주) · 계약번호(ICT지원사업만 꼭) · 사업 구분 · 초동조치 · 상태 «발주요청» · PoC 는 새 칸 안 보냄 · SQL 122 전 안내 · 현황 새 칸은 DB 에 있을 때만 저장'); }
@@ -407,9 +407,9 @@ try {
 { const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
   const nav = (html.match(/<div class="grp">발주<\/div>[\s\S]*?<div class="grp">영업<\/div>/) || [''])[0], tl = rd('js/tools.js'), sh = rd('js/shell.js');
   const ui = [html, ...fs.readdirSync(path.join(ROOT, 'js')).filter((f) => f.endsWith('.js') && !/^(upd|helpdata)\.js$/.test(f)).map((f) => rd('js/' + f))].join('\n').replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '').replace(/^\s*\/\/.*$/gm, '');
-  say(/data-v="ordernew">[^<]*Cloud NAC 발주 신청<\/button>\s*<button data-v="orders">[^<]*Cloud NAC 발주 내역<\/button>\s*<button data-v="mdrnew">[^<]*MDR PoC · 발주 신청<\/button>\s*<button data-v="mdrops">[^<]*MDR 운영·신청 현황<\/button>\s*<div class="grp">장비<\/div>\s*<button data-v="eqboard">[^<]*장비 대시보드<\/button>\s*<button data-v="assets">[^<]*임대 장비 현황<\/button>/.test(nav)
+  say(/data-v="ordernew">[^<]*발주 신청<\/button>\s*<button data-v="mdrnew">[^<]*PoC · 데모 신청<\/button>\s*<button data-v="orders">[^<]*Cloud NAC 발주 내역<\/button>\s*<button data-v="mdrops">[^<]*MDR 운영·신청 현황<\/button>\s*<button data-v="pocs">[^<]*PoC · 데모 현황<\/button>\s*<div class="grp">장비<\/div>\s*<button data-v="eqboard">[^<]*장비 대시보드<\/button>\s*<button data-v="assets">[^<]*임대 장비 현황<\/button>/.test(nav)
     && !/<div class="grp">PoC·데모<\/div>/.test(html) && !/'g:PoC·데모':/.test(sh) && /var old208=/.test(tl) && /conf\.m208=1/.test(tl) && !/임대 장비 신청|'장비 신청'/.test(ui),
-  '㊿+208 발주 묶음: Cloud NAC 발주 신청 · 내역 · MDR PoC · 발주 신청 · MDR 운영·신청 현황 → 장비(대시보드 · 임대 장비 현황) · PoC·데모 묶음 없음 · 예전 설정 옮김(한 번만) · 화면 글자에 «임대 장비 신청» · «장비 신청» 없음'); }
+  '㊿+208~214 발주 묶음: 발주 신청 · PoC · 데모 신청 · Cloud NAC 발주 내역 · MDR 운영·신청 현황 · PoC · 데모 현황 → 장비(대시보드 · 임대 장비 현황) · PoC·데모 묶음 없음 · 예전 설정 옮김(한 번만) · 화면 글자에 «임대 장비 신청» · «장비 신청» 없음'); }
 // ㊿+209 운영 감시(선택 · 기본 꺼짐) — watch 함수(자동 = 일회용 번호 · 포탈 = 슈퍼 관리자 · 서비스 키 거절 · 지금 점검은 Slack 안 보냄) · 포탈 «운영 감시» · 알림함 · 배포 뒤 확인
 { const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
   const wf = rd('supabase/functions/watch/index.ts'), ad = rd('js/admin.js'), nt = rd('js/notify.js');
@@ -431,7 +431,7 @@ try {
   const sa = rd('js/sales.js'), gr = rd('js/grid.js'), gs = rd('js/grids.js'), rp = rd('js/report.js');
   say(/^export function mpConvert\(r\)/m.test(sa) && /^export function mpCanConv\(r\)\{ return !!r && \('req_kind' in r\) && r\.req_kind!=='order' && r\.status!=='발주전환' && !mpConvOf\(r\); \}/m.test(sa)
     && /if\(conv\) \/\*\* @type \{any\} \*\/\(row\)\.src_id=conv\.id;/.test(sa) && /sbWrite\('PATCH','mdr_ops\?id=eq\.'\+conv\.id,\{status:'발주전환'\}\)/.test(sa) && /mdr_ops_src_uniq/.test(sa) && /noLink=true; return ins\(\);/.test(sa)
-    && /mpCanConv\(r\) && canView\('mdrnew'\)/.test(gr) && /bo\.dataset\.act='toOrder'/.test(gr) && /mpConvClear\(\); wzReset\('mp'\);/.test(gr)
+    && /mpCanConv\(r\) && canView\('mdrnew'\)/.test(gr) && /bo\.dataset\.act='toOrder'/.test(gr) && /reqOpen\(\);/.test(gr) && /navMenu\('ordernew'\); if\(ST\.CUR_VIEW!=='ordernew'\) return;/.test(sa)
     && /chipsOpts:\['발주요청','신청','대기','진행중','데모','발주전환','구독','종료'\]/.test(gs) && /'PoC → 발주 #'\+o\.id/.test(gs)
     && (rp.match(/x\.req_kind!=='order'/g) || []).length === 2 && /<div id="mpConv" class="mp-conv" role="status" hidden>/.test(html),
   '㊿+210 MDR 발주 전환: PoC 행 «발주 전환»(구분 칸 있을 때 · 전환 안 된 PoC · 보기 권한) → 신청 화면 채움 · 정식 발주 고정 → 새 행 src_id(두 번 안 됨 · SQL 124 전엔 연결 없이) → PoC «발주전환» · 리포트 PoC 표에 정식 발주 안 셈'); }
@@ -439,6 +439,15 @@ try {
 { const sa = fs.readFileSync(path.join(ROOT, 'js/sales.js'), 'utf8');
   say(/<label class="mpchk mp-ord mp-ict"><input id="mpFirst"/.test(html) && /^export function mpIsIct\(\)/m.test(sa) && /mod_first:biz==='ICT지원사업' && \$\('#mpFirst'\)\.checked/.test(sa) && /mpIsIct\(\)\? \[\['mpAv','EDR\(백신\)'\],\['mpRansom','EDR\(안티랜섬웨어\)'\],\['mpMedia','매체제어'\],\['mpFirst','초동조치'\]\]/.test(sa) && /<label class="mpchk mp-noict"><input id="mpEdr"/.test(html) && /data-ict="EDR\(백신\)"/.test(html) && /if\(ord && biz==='ICT지원사업'\) row\.mod_edr=false;/.test(sa) && /\['mpEdr','mpWin','mpLinux','mpMac','mpWebui','mpNac'\]/.test(sa) && /EDR\+MDR 발주요청서 — 정식 발주/.test(sa),
   '㊿+211~212 MDR 정식 발주 양식: ICT = EDR(백신) · EDR(안티랜섬웨어) · 매체제어 · 초동조치(EDR+MDR 없음) · 일반 · PoC = EDR+MDR · 안티바이러스 · 안티랜섬웨어 · 매체제어 · Web UI 이메일 → NAC 순서 · 초동조치 = ICT지원사업만(화면 · 요약 · 저장) · 제목 ICT «EDR 발주요청서(ICT지원사업)» / 일반 «EDR+MDR 발주요청서»'); }
+// ㊿+214 발주 신청 · PoC · 데모 신청 — 한 화면(od · mp · pc) · 종류/제품 카드 · 선택 단추 · PoC · 데모 현황(poc_requests) · 글꼴 흔들기 시험
+{ const rd = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { return ''; } };
+  const sa = rd('js/sales.js'), gs = rd('js/grids.js'), sh = rd('js/shell.js'), lb = rd('tests/lib.mjs'), gr = rd('js/grid.js');
+  say(/id="reqKinds" class="req-kinds" role="radiogroup"/.test(html) && /id="pocProds" class="req-kinds" role="radiogroup"/.test(html) && /<button data-v="pocs">/.test(html) && /id="pcFormWrap"/.test(html)
+    && /^export function wzInitOne\(key\)/m.test(sa) && /^export function pkChips\(sel\)/m.test(sa) && /^export function pkStep\(inp, pre\)/m.test(sa) && /^export function pkDate\(inp\)/m.test(sa) && /^export function pkCustPaint\(key\)/m.test(sa)
+    && /^export function reqCan\(k\)/m.test(sa) && /^export async function submitPoc\(\)/m.test(sa) && /sbWrite\('POST','poc_requests\?select=\*'/.test(sa) && (sa.match(/\{one:true, wrap:'(od|mp|pc)FormWrap'/g) || []).length === 3
+    && /if\(go && t && t\.closest && t\.closest\('#'\+D\.go\) && !wzCheck\(key, D\.steps\.length-1\)\)/.test(sa) && /reqOpen\(\);/.test(gr) && /pocOpen\(\);/.test(gr)
+    && /pocs:\{[\s\S]{0,400}table:'poc_requests'/.test(gs) && /poc:\s+\{ordernew:1, mdrnew:1, mdrops:1, pocs:1,/.test(sh) && /SMOKE_FONT_STRESS/.test(lb),
+  '㊿+214 발주 신청 · PoC · 데모 신청: 한 화면(구역 · 오른쪽 요약 · 저장 전 꼭 넣을 칸 확인) · 종류 카드(권한) · 제품 = 가격표 SaaS · 단추 · − + · 날짜 · 최근 고객 · 지난 신청 · PoC · 데모 현황(poc_requests) · PoC 전용 계정 = 발주 신청(MDR) · 글꼴 흔들기 시험'); }
 // ㊿+160 연장하면 상태 «재약정»(구분 그대로) · 계약 상세에 «계약 기간 · 연장 이력»
 say(/^export function renewStatus\(r\)/m.test(jsAll) && /var nst=renewStatus\(r\);/.test(jsAll) && /^export function ctPeriods\(c, mine\)/m.test(jsAll) && html.includes('id="dtRenew"'), '연장: 상태 «재약정»(renewStatus) · 계약 상세 연장 이력(ctPeriods · #dtRenew)');
 const idx = html + jsAll;

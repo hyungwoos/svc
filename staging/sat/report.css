@@ -66,6 +66,8 @@ table.f .bold { font-weight: bold; }
 table.f .bold input { font-weight: bold; }
 /* ㊿+210 계약일자 · 수금일자 — 날짜가 끝까지 보이게(칸 넓힘 · 달력 단추 작게) */
 table.f td.dt { padding: 1px 2px; }
+/* ㊿+214 칸보다 길면 글자만 조금 작게(report.js fitCells · --fit = 줄일 비율) */
+table.f [data-k="cdate"], table.f [data-k="paydate"], table.f [data-k="taxdate"], table.f [data-k="amount"] { font-size: calc(1em * var(--fit, 1)); }
 table.f input[type=date]::-webkit-calendar-picker-indicator { margin-inline-start: 1px; padding: 0; width: 11px; height: 11px; cursor: pointer; }
 table.ci th, table.ci td { height: 43px; }
 table.dv thead th { height: 25px; } table.dv tbody td { height: 40px; } table.dv tfoot td { height: 20px; }

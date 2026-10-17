@@ -11,7 +11,7 @@ import { AK, areaPick, BZX, CH_DEFS, ctOrig, ctRawOf, ctSuccessor, DC, ensureLea
 import { applyDense, openCust360, PR, pushRecent, renderTodo } from './tools.js';
 import { CL, renderCloud } from './cloud.js';
 import { inbLast, loadInbound, renderInbPanel, renderInbStat, renderWeekly } from './inbound.js';
-import { CHURN, CR, CS, csSetTab, ensureGroupOpen, helpBox, helpWire, initOiForm, loadRecvPresets, mpCanConv, mpConvClear, mpConvert, oiLinkQuote, oiToContract, QMGR_MAP, qoiCand, qoiOpen, quoteOpen, QUOTES, quotesLoad, renderChurn,
+import { CHURN, CR, CS, csSetTab, ensureGroupOpen, helpBox, helpWire, initOiForm, mpCanConv, mpConvert, oiLinkQuote, pocOpen, REQ, reqOpen, oiToContract, QMGR_MAP, qoiCand, qoiOpen, quoteOpen, QUOTES, quotesLoad, renderChurn,
   renderChurnRate, renderCsite, renderCustFlow, renderOiTiles, wzReset } from './sales.js';
 import { closeOvl, logChange, monthRows, msg, openOvl } from './edit.js';
 import { lazyGet, lazyLoad, lazyView } from './lazy.js';
@@ -206,13 +206,9 @@ export function switchView(v){
   if(adminx){ lazyView('admin','viewAdmin','renderAdmin'); return; }
   if(chv){ renderChannelView(v); return; }
   if(acct){ lazyView('admin','viewAccount','renderAccount'); return; }
-  if(onew){
-    try{ wzReset('od'); }catch(e){}
-    msg('odMsg','');
-    $('#odFormWrap').style.display='';
-    $('#odDone').style.display='none';
-    loadRecvPresets();
-    setTimeout(function(){ $('#odCustomer').focus(); },50);
+  if(onew){   /* ㊿+214 «발주 신청» — Cloud NAC · MDR 정식(ICT지원사업 · 일반) */
+    reqOpen();
+    setTimeout(function(){ var f=/** @type {any} */(document.getElementById(REQ.kind==='nac'? 'odCustomer' : 'mpCompany')); if(f && f.offsetParent) f.focus(); },50);
     return;
   }
   if(oinew){
@@ -224,14 +220,8 @@ export function switchView(v){
     setTimeout(function(){ $('#oiCust').focus(); },50);
     return;
   }
-  if(mnew){
-    try{ mpConvClear(); wzReset('mp'); }catch(e){}   /* ㊿+210 발주 전환은 mpConvert 가 이 뒤에 다시 채움 */
-    msg('mpMsg','');
-    $('#mpFormWrap').style.display='';
-    $('#mpDone').style.display='none';
-    if(!$('#mpDate').value) $('#mpDate').value=todayStr();
-    if(!$('#mpSales').value && ST.AUTH_USER) $('#mpSales').value='';
-    setTimeout(function(){ $('#mpCompany').focus(); },50);
+  if(mnew){   /* ㊿+214 «PoC · 데모 신청» — 제품 메뉴판(가격표 SaaS) */
+    pocOpen();
     return;
   }
   if(kkv){
@@ -273,6 +263,9 @@ export function switchView(v){
     sbTry('change_log?select=*&order=id.desc&limit=300').then(function(rows){
       ST.RAWX.log=rows||[]; renderGrid();
     });
+  }
+  if(v==='pocs' && !ST.RAWX.pocs){   /* ㊿+214 PoC · 데모 현황 — 열 때 읽음(SQL 126 전이면 빈 표) */
+    sbTry('poc_requests?select=*&order=id.desc').then(function(rows){ ST.RAWX.pocs=rows||[]; if(ST.CUR_VIEW==='pocs') renderGrid(); });
   }
   if(v==='inbound' && !ST.RAWX.inbound){
     loadInbound(function(){ if(ST.CUR_VIEW==='inbound') renderGrid(); });

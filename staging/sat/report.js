@@ -86,10 +86,24 @@ function calc() {
     $('#cGm').value = '₩ ' + (fmt(gm) || '-'); $('#cRate').value = sales ? Math.round(gm / sales * 100) + '%' : '-';
     fitTa();
 }
+/* ㊿+214 계약일자 · 수금일자 · 계산서발행일 · 금액이 칸보다 길면 글자를 조금 줄여 끝까지 보이게(글꼴 · 컴퓨터마다 글자 폭이 달라도 · 인쇄도 같은 비율) */
+var FIT_SEL = '[data-k="cdate"],[data-k="paydate"],[data-k="taxdate"],[data-k="amount"]';
+function fitCells() {
+    var cx = fitCells.cx || (fitCells.cx = document.createElement('canvas').getContext('2d'));
+    document.querySelectorAll(FIT_SEL).forEach(function (el) {
+        el.style.removeProperty('--fit'); var v = el.value; if (!v || !el.clientWidth) return;
+        var cs = getComputedStyle(el), t = v;
+        if (el.type === 'date') { var d = new Date(v + 'T00:00:00'); if (!isNaN(d)) try { t = new Intl.DateTimeFormat(navigator.language || 'ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(d); } catch (e) {} }
+        cx.font = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily; try { cx.letterSpacing = cs.letterSpacing; } catch (e) {}
+        var need = cx.measureText(t).width + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + (el.type === 'date' ? 18 : 2);
+        if (need > el.clientWidth) el.style.setProperty('--fit', String(Math.max(0.7, Math.floor(el.clientWidth / need * 100) / 100)));
+    });
+}
 /* 글 칸(비고 · NO.) 높이를 글자에 맞춤 — ㊿+210 NO.(영업현황 등록번호)도 여러 줄로(아래 테두리 두께까지) */
 function fitTa() {
     document.querySelectorAll('textarea').forEach(function (t) { t.style.height = 'auto'; t.style.height = Math.max(20, t.scrollHeight + (t.offsetHeight - t.clientHeight)) + 'px'; });
     var no = document.querySelector('.no textarea'); if (no && no.offsetHeight) no.parentNode.classList.toggle('long', no.scrollHeight > 3 * 16);   // 3줄 이상 = 인쇄 때 글자를 조금 작게(한 장에 들어가게)
+    try { fitCells(); } catch (e) {}
 }
 document.addEventListener('input', function (e) {
     var el = e.target; if (!el.matches || !el.matches('input,textarea,select')) return;

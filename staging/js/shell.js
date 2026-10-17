@@ -152,7 +152,7 @@ export function railFlyToggle(btn, key){
    · 배지: 홈 = 인박스 건수 · 데이터 점검 = 바로 고칠 항목 · Cloud NAC 발주 내역 = 처리 대기(㊿+208) · 인바운드 목록 = 미대응 → 묶음 버튼엔 합계 ---- */
 export var GN_ICO={dash:'home', weekly:'calendar', contracts:'doc', live:'target', churn:'chart', churnrate:'chart', custflow:'users', leadsrc:'arrow', dcheck:'check',
   cngen:'cloud', cnpub:'cloud', cns1:'cloud', cnlgu:'cloud', mdrgen:'shield', mdrs1:'shield', mdrlgu:'shield', chdist:'layers', cnpns:'layers',
-  eqboard:'board', ordernew:'doc', orders:'box', assets:'box', mdrnew:'flask', mdrops:'flask', oinew:'target', oi:'target', inbstat:'chart', inbound:'inbox',
+  eqboard:'board', ordernew:'doc', orders:'box', assets:'box', mdrnew:'flask', mdrops:'flask', pocs:'flask', oinew:'target', oi:'target', inbstat:'chart', inbound:'inbox',
   biz:'scale', targets:'target', quote:'doc', quotes:'doc', preport:'doc', s1:'scale', kk:'scale', price:'doc', cloud:'cloud', csite:'cloud', report:'doc', aiknow:'spark',
   log:'clock', adminx:'gear', ops:'tool', account:'user'};
 export var GN_MERGE={'g:영업':'영업', 'g:인바운드':'영업', 'g:정산·목표':'정산·도구', 'g:도구':'정산·도구', 'g:관리자':'관리'};
@@ -373,7 +373,7 @@ export function moreMenuSetup(){
 }
 
 /* ㊿+168 금액 단위 안내 — 화면마다 실제 단위(가격표 = 원 · 금액 없는 화면은 숨김 · 주간보고 예상매출 = 백만원) · 누르면 용어 설명 */
-export var UNIT_NONE={quotes:1, ordernew:1, orders:1, assets:1, eqboard:1, inbound:1, inbstat:1, mdrnew:1, mdrops:1, log:1, account:1, adminx:1, ops:1, aiknow:1, csite:1, kk:1, s1:1, quote:1, preport:1};
+export var UNIT_NONE={quotes:1, ordernew:1, orders:1, assets:1, eqboard:1, inbound:1, inbstat:1, mdrnew:1, mdrops:1, pocs:1, log:1, account:1, adminx:1, ops:1, aiknow:1, csite:1, kk:1, s1:1, quote:1, preport:1};
 export function unitSync(v){
   var u=document.getElementById('unitBadge'); if(!u) return;
   if(!u.__terms){ u.__terms=1; u.setAttribute('role','button'); u.tabIndex=0; u.style.cursor='pointer';
@@ -1496,8 +1496,8 @@ export function afterLoad(dd){
 /* ---- 제한 역할(장비/POC 전용) : 포탈 안에서 해당 메뉴만 사용 ---- */
 export var ROLE_VIEWS={
   equipment:     {orders:1, assets:1, ordernew:1, eqboard:1, weekly:1, account:1},   // (구) — equipment_poc 로 통합됨
-  poc:           {mdrnew:1, mdrops:1, weekly:1, account:1},
-  equipment_poc: {orders:1, assets:1, ordernew:1, eqboard:1, mdrnew:1, mdrops:1, weekly:1, account:1}
+  poc:           {ordernew:1, mdrnew:1, mdrops:1, pocs:1, weekly:1, account:1},   /* ㊿+214 정식 발주는 «발주 신청»(MDR 카드만) · PoC · 데모 현황 */
+  equipment_poc: {orders:1, assets:1, ordernew:1, eqboard:1, mdrnew:1, mdrops:1, pocs:1, weekly:1, account:1}
 };
 export var ROLE_LABEL={equipment:'장비 관리 전용', poc:'PoC 전용', equipment_poc:'장비·PoC 전용'};
 export var EQUIP_VIEWS=ROLE_VIEWS.equipment;   // 현재 계정에 허용된 화면 (아래에서 교체)

@@ -3482,4 +3482,47 @@ button.emo-ico svg{display:block;flex:none}
 .mp-conv[hidden]{display:none}
 .mp-conv span{flex:1}
 .mp-conv .cap-more{flex:none;white-space:nowrap}
+/* ㊿+214 발주 신청 · PoC · 데모 신청 — 한 화면 · 종류 카드 · 선택 단추 · 오른쪽 요약 */
+.req-card{max-width:1120px;margin:0 auto}
+.req-kinds{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin:0 0 16px}
+.req-kinds[hidden]{display:none}
+.req-kind{display:flex;flex-direction:column;gap:3px;text-align:left;font:inherit;color:inherit;cursor:pointer;padding:12px 14px;border:1.5px solid var(--ring);border-radius:12px;background:var(--surface);min-height:64px}
+.req-kind b{font-size:14px;font-weight:700}
+.req-kind small{font-size:12px;color:var(--muted);line-height:1.4}
+.req-kind:hover{border-color:var(--brand)}
+.req-kind[aria-checked="true"]{border-color:var(--brand);background:var(--brand-t);box-shadow:inset 0 0 0 1px var(--brand)}
+.req-sub{margin:4px 0 10px;font-size:14px;font-weight:700}
+.req-state{display:none!important}
+.wz-one{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:22px;align-items:start}
+.wz-one .wz-main{min-width:0}
+.wz-one .wz-sec{margin:0 0 18px}
+.wz-one .wz-h{margin:0 0 10px;padding-bottom:6px;border-bottom:1px solid var(--ring);font-size:14px;font-weight:700}
+.wz-side{position:sticky;top:84px;padding:14px;border:1px solid var(--ring);border-radius:12px;background:var(--surface-2)}
+.wz-side .wz-sum{max-height:46vh;overflow:auto;font-size:13px}
+.wz-side .wz-sum section{margin:0 0 8px}
+.wz-side .wz-sum h4{display:flex;align-items:center;margin:0 0 4px;font-size:13px}
+.wz-side .wz-hd{margin:0 0 8px;font-weight:700;font-size:14px}
+.wz-side .wz-note{margin:10px 0 0;font-size:12px}
+.wz-side .btn{width:100%;height:42px;margin-top:10px}
+.wz-side .mmsg{display:block;margin-top:8px}
+.wz-miss{margin:8px 0 0;font-size:13px;font-weight:600;color:var(--warn-ink)}
+.wz-miss.ok{color:var(--brand-ink)}
+.pk-chips{display:flex;flex-wrap:wrap;gap:6px}
+.pk-chip{min-height:32px;padding:5px 12px;border:1px solid var(--ring);border-radius:999px;background:var(--surface);color:inherit;font:inherit;font-size:13px;cursor:pointer}
+.pk-chip:hover{border-color:var(--brand)}
+.pk-chip[aria-checked="true"]{background:var(--brand-solid);border-color:var(--brand-solid);color:#fff;font-weight:650}
+.pk-hid{position:absolute!important;width:1px!important;height:1px!important;margin:0!important;padding:0!important;border:0!important;opacity:0!important;pointer-events:none;overflow:hidden}
+.frm > div{position:relative}
+.pk-step{display:flex;gap:6px;align-items:stretch}
+.pk-step input{flex:1;min-width:0;text-align:center}
+.pk-sb{flex:none;width:38px;border:1px solid var(--ring);border-radius:8px;background:var(--surface);color:inherit;font:inherit;font-size:18px;line-height:1;cursor:pointer}
+.pk-sb:hover{border-color:var(--brand)}
+.pk-pre{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.pk-pre .pk-chip{min-height:28px;padding:3px 10px;font-size:12px}
+.pk-cust{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:6px}
+.pk-cust[hidden]{display:none}
+.pk-cust .pk-chip{min-height:28px;padding:3px 10px;font-size:12px}
+.pk-lb{font-size:12px;color:var(--muted);margin-right:2px}
+.pk-sumbtn{margin-top:6px;min-height:28px;padding:3px 10px;font-size:12px}
+@media (max-width:900px){.wz-one{grid-template-columns:1fr}.wz-side{position:static}}
 /* ==== ㊿+166 새 디자인 end ==== */

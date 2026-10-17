@@ -353,7 +353,7 @@ export function buildGrids(){
       ]
     },
     mdrops:{
-      emptyCta:{l:'MDR PoC · 발주 신청', v:'mdrnew', s:'PoC 나 정식 발주를 신청하면 여기에 쌓입니다'}, title:'MDR 운영·신청 현황', table:'mdr_ops', mob:['customer','status','svc_type','_fill','sales_name'],
+      emptyCta:{l:'PoC · 데모 신청', v:'mdrnew', s:'MDR PoC · 데모를 신청하거나 «발주 신청»에서 MDR 정식 발주를 하면 여기에 쌓입니다'}, title:'MDR 운영·신청 현황', table:'mdr_ops', mob:['customer','status','svc_type','_fill','sales_name'],
       chipsField:'status', chipsOpts:['발주요청','신청','대기','진행중','데모','발주전환','구독','종료'],
       cap:'행 클릭 = 고객 한눈에 · PoC 신청 · 정식 발주부터 운영까지 — PoC: 신청 → 진행중 → 데모 → 구독 · 정식 발주: 발주요청 → 구독 · PoC 가 발주로 바뀌면 행의 «발주 전환»(슬랙 발주 채널로 · PoC 는 «발주전환») · 설치율 = 설치 ÷ 계약 수량', add:true, del:true,
       rowClick:function(r){ if(!ST.IS_EQUIP) openCust360(r.customer); },
@@ -397,10 +397,35 @@ export function buildGrids(){
         {k:'note',l:'비고'}
       ]
     },
+    /* ㊿+214 PoC · 데모 현황 — MDR 이 아닌 제품(가격표 SaaS)의 PoC · 데모 신청(poc_requests · SQL 126) · MDR PoC 는 mdrops */
+    pocs:{
+      emptyCta:{l:'PoC · 데모 신청', v:'mdrnew', s:'Cloud NAC · ZTNA 등 MDR 이 아닌 제품의 PoC · 데모를 신청하면 여기에 쌓입니다'}, title:'PoC · 데모 현황', table:'poc_requests', mob:['customer','product','status','sales_name'],
+      chipsField:'status', chipsOpts:['신청','진행중','데모','발주전환','종료'],
+      cap:'MDR 이 아닌 제품(가격표 SaaS)의 PoC · 데모 — 신청 → 진행중 → 데모 → 발주전환 · 종료 · 행 클릭 = 고객 한눈에 · MDR PoC 는 «MDR 운영·신청 현황»', add:true, del:true,
+      rowClick:function(r){ if(!ST.IS_EQUIP) openCust360(r.customer); },
+      rows:function(){ return ST.RAWX.pocs||[]; },
+      cols:[
+        {k:'created_at',l:'신청일',ro:true,fmt:function(v){ return String(v||'').slice(0,10); }},
+        {k:'product',l:'제품',req:true},
+        {k:'kind',l:'구분',t:'select',opts:['PoC','데모']},
+        {k:'customer',l:'고객사',req:true},
+        {k:'status',l:'상태',t:'select',opts:['신청','진행중','데모','발주전환','종료'],badge:1},
+        {k:'qty',l:'규모',t:'number'},
+        {k:'qty_unit',l:'단위'},
+        {k:'start_date',l:'시작일',t:'date'},
+        {k:'period',l:'기간',t:'list',opts:['2주','1개월','2개월','3개월']},
+        {k:'mgr_name',l:'고객 담당자'},
+        {k:'mgr_phone',l:'연락처'},
+        {k:'mgr_email',l:'이메일'},
+        {k:'sales_name',l:'영업담당'},
+        {k:'progress',l:'진행 내역'},
+        {k:'note',l:'비고'}
+      ]
+    },
     orders:{
-      emptyCta:{l:'Cloud NAC 발주 신청', v:'ordernew', s:'Cloud NAC 발주(임대 장비 출고 · 교체 · 회수)를 신청하면 여기에 쌓입니다'}, title:'Cloud NAC 발주 내역', table:'equipment_orders',
+      emptyCta:{l:'발주 신청', v:'ordernew', s:'Cloud NAC 발주(임대 장비 출고 · 교체 · 회수)를 신청하면 여기에 쌓입니다'}, title:'Cloud NAC 발주 내역', table:'equipment_orders',
       chipsField:'channel', chipsOpts:ORD_CH_OPTS, pin:['customer','status'], mob:['install_date','model','qty'],   /* 폰: 설치희망 · 모델 · 수량 */
-      cap:'저장할 때마다 장비 현황에 자동 반영됩니다 — 접수·출하요청·배송중은 재고, 설치완료·회수예정은 임대중, 회수완료는 회수완료 (취소는 현황에서 내림) · 시리얼 칩 = 시리얼 상세 · 회수는 행의 «회수 처리»(일부·전부·취소 미리 보기 → 저장 → 되돌리기) · 시리얼을 비워두면 «미등록 시리얼»로 수량만큼 임시 등록 · 신규 신청은 발주 › Cloud NAC 발주 신청 · 삭제는 «더보기»', add:true, del:true,
+      cap:'저장할 때마다 장비 현황에 자동 반영됩니다 — 접수·출하요청·배송중은 재고, 설치완료·회수예정은 임대중, 회수완료는 회수완료 (취소는 현황에서 내림) · 시리얼 칩 = 시리얼 상세 · 회수는 행의 «회수 처리»(일부·전부·취소 미리 보기 → 저장 → 되돌리기) · 시리얼을 비워두면 «미등록 시리얼»로 수량만큼 임시 등록 · 신규 신청은 발주 › 발주 신청(Cloud NAC) · 삭제는 «더보기»', add:true, del:true,
       rows:function(){ return ST.RAWX.orders||[]; },
       cols:[
         {k:'created_at',l:'신청일',ro:true,fmt:function(v){return String(v||'').slice(0,10);}},
